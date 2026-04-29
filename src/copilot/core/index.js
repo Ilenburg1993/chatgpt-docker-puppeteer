@@ -40,6 +40,7 @@ export * from './schemas.js';
 export { SHUTDOWN_PRIORITY } from './shutdown-priorities.js';
 export {
     getLastShutdownReport,
+    getShutdownLifecycleMetrics,
     isShuttingDown,
     listShutdownHandlers,
     registerShutdownHandler,
@@ -52,6 +53,7 @@ export {
     activeCount as activeTimerCount,
     cancelAll as cancelAllTimers,
     cancel as cancelTimer,
+    listActiveTimers,
     registerTimer,
 } from './timer-registry.js';
 

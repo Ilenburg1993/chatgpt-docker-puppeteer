@@ -23,14 +23,11 @@ import {
 } from '#copilot/events';
 import { container } from '../../core/di-container.js';
 import { logSwallowed } from '../../core/error-handlers.js';
-import {
-    buildTelemetryConfig,
-    defaultErrorTracker,
-    defaultMetrics,
-    initEventCollector,
-    log,
-    startSpan,
-} from '../ports/observability-port.js';
+import { defaultErrorTracker } from '../ports/error-tracking-port.js';
+import { initEventCollector } from '../ports/event-observer-port.js';
+import { log } from '../ports/logging-port.js';
+import { defaultMetrics } from '../ports/metrics-port.js';
+import { buildTelemetryConfig, startSpan } from '../ports/tracing-port.js';
 
 import { getHubSessionId, setSharedSdkSessionId } from '#copilot/core';
 import { SHUTDOWN_TIMEOUT_MS, STOP_BOOT_WAIT_MS } from '../../config/agent.js';

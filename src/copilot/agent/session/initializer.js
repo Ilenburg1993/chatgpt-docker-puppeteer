@@ -35,7 +35,8 @@ import {
     persistStateWithPolicy as _persistStateWithPolicy,
     readStateAsync as _readStateAsync,
 } from '../lifecycle/state-io.js';
-import { defaultMetrics, log } from '../ports/observability-port.js';
+import { log } from '../ports/logging-port.js';
+import { defaultMetrics } from '../ports/metrics-port.js';
 import { buildHookSystemContextSafe } from './hook-context.js';
 
 // Re-exports para backward compatibility

@@ -57,6 +57,20 @@ let _emitShutdownEvent = null;
  * @property {number} failedCount
  * @property {number} timeoutCount
  * @property {ShutdownHandlerReport[]} handlers
+ *
+ * @typedef {object} ShutdownHandlerMetric
+ * @property {string} name
+ * @property {number} priority
+ * @property {number} attempts
+ * @property {number} okCount
+ * @property {number} failedCount
+ * @property {number} timeoutCount
+ * @property {number} totalDurationMs
+ * @property {number} avgDurationMs
+ * @property {ShutdownHandlerStatus} lastStatus
+ * @property {number} lastDurationMs
+ * @property {number} lastCompletedAt
+ * @property {string | null} lastError
  */
 
 /** @type {ShutdownHandler[]} */
@@ -70,6 +84,8 @@ let shutdownInFlight = null;
 
 /** @type {ShutdownReport | null} */
 let lastShutdownReport = null;
+/** @type {Map<string, Omit<ShutdownHandlerMetric, 'avgDurationMs'>>} */
+const shutdownHandlerMetrics = new Map();
 
 class ShutdownHandlerTimeoutError extends Error {
     constructor(/** @type {string} */ handlerName) {
@@ -152,31 +168,35 @@ export function runShutdown(reason = 'unknown') {
             try {
                 await runHandlerWithTimeout(handler);
                 const completedAt = Date.now();
-                handlerReports.push({
+                const report = {
                     name: handler.name,
                     priority: handler.priority,
                     timeoutMs: handler.timeoutMs,
-                    status: 'ok',
+                    status: /** @type {const} */ ('ok'),
                     startedAt: handlerStartedAt,
                     completedAt,
                     durationMs: completedAt - handlerStartedAt,
                     error: null,
-                });
+                };
+                handlerReports.push(report);
+                recordShutdownHandlerMetric(report);
                 _log('INFO', `  ✓ ${handler.name}`);
             } catch (err) {
                 const error = toError(err);
                 const completedAt = Date.now();
                 const status = err instanceof ShutdownHandlerTimeoutError ? 'timeout' : 'failed';
-                handlerReports.push({
+                const report = {
                     name: handler.name,
                     priority: handler.priority,
                     timeoutMs: handler.timeoutMs,
-                    status,
+                    status: /** @type {ShutdownHandlerStatus} */ (status),
                     startedAt: handlerStartedAt,
                     completedAt,
                     durationMs: completedAt - handlerStartedAt,
                     error: error.message,
-                });
+                };
+                handlerReports.push(report);
+                recordShutdownHandlerMetric(report);
                 _log('WARN', `  ✗ ${handler.name}: ${error.message}`);
                 emitShutdownLifecycleEvent('runtime.shutdown.handler_failed', {
                     reason,
@@ -246,6 +266,20 @@ export function getLastShutdownReport() {
 }
 
 /**
+ * Retorna métricas agregadas por handler desde o último reset do processo.
+ *
+ * @returns {ShutdownHandlerMetric[]}
+ */
+export function getShutdownLifecycleMetrics() {
+    return Array.from(shutdownHandlerMetrics.values())
+        .map((metric) => ({
+            ...metric,
+            avgDurationMs: metric.attempts > 0 ? Math.round(metric.totalDurationMs / metric.attempts) : 0,
+        }))
+        .sort((a, b) => b.totalDurationMs - a.totalDurationMs || a.name.localeCompare(b.name));
+}
+
+/**
  * Snapshot dos handlers registrados, em ordem de execução.
  *
  * @returns {{ name: string; priority: number; timeoutMs: number }[]}
@@ -274,6 +308,37 @@ async function runHandlerWithTimeout(handler) {
 }
 
 /**
+ * @param {ShutdownHandlerReport} report
+ * @returns {void}
+ */
+function recordShutdownHandlerMetric(report) {
+    const existing = shutdownHandlerMetrics.get(report.name) ?? {
+        name: report.name,
+        priority: report.priority,
+        attempts: 0,
+        okCount: 0,
+        failedCount: 0,
+        timeoutCount: 0,
+        totalDurationMs: 0,
+        lastStatus: report.status,
+        lastDurationMs: 0,
+        lastCompletedAt: 0,
+        lastError: null,
+    };
+    existing.priority = report.priority;
+    existing.attempts += 1;
+    existing.totalDurationMs += report.durationMs;
+    existing.lastStatus = report.status;
+    existing.lastDurationMs = report.durationMs;
+    existing.lastCompletedAt = report.completedAt;
+    existing.lastError = report.error;
+    if (report.status === 'ok') existing.okCount += 1;
+    else if (report.status === 'timeout') existing.timeoutCount += 1;
+    else existing.failedCount += 1;
+    shutdownHandlerMetrics.set(report.name, existing);
+}
+
+/**
  * Emite eventos de shutdown em modo best-effort; falha em observabilidade nunca pode interromper shutdown.
  *
  * @param {string} type
@@ -297,5 +362,6 @@ export function _resetForTesting() {
     shuttingDown = false;
     shutdownInFlight = null;
     lastShutdownReport = null;
+    shutdownHandlerMetrics.clear();
     _emitShutdownEvent = null;
 }

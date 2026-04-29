@@ -20,7 +20,8 @@ import { access, open, readdir, readFile, stat } from 'node:fs/promises';
 import { z } from 'zod';
 import { HOOK_CONTEXT_MAX_BYTES as _HOOK_CONTEXT_MAX_BYTES } from '../../config/agent.js';
 import { safeJsonParse } from '../../core/safe-json.js';
-import { log, METRICS_STORE } from '../ports/observability-port.js';
+import { log } from '../ports/logging-port.js';
+import { METRICS_STORE } from '../ports/metrics-port.js';
 import { readAgentTodoStore } from '../ports/tool-port.js';
 
 // ─── Paths ───────────────────────────────────────────────────────────────────

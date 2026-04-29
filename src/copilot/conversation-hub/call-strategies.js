@@ -42,9 +42,7 @@ export async function callViaDialogLoop(agent, message, messageContent, ctx) {
     if (!agent.sendDialogTurn) {
         throw new SessionError('[HubOrchestrator] agentInst não suporta sendDialogTurn', 'ORCH_NO_DIALOG_TURN');
     }
-    const dialogAgent = /** @type {import('#copilot/agent/facades/agent-dialog-runtime.js').AgentDialogTurnTarget} */ (
-        agent
-    );
+    const dialogAgent = /** @type {Parameters<typeof sendAgentDialogTurn>[0]} */ (agent);
     const content = typeof message === 'string' ? message : messageContent;
     log('DEBUG', `[HubOrchestrator] Usando sendDialogTurn (modo eficiente) para turno #${ctx.turnNumber + 1}.`);
     // BUG-HIGH-03 (fix): capturar task.delta durante sendDialogTurn para emitir turn:delta em tempo real

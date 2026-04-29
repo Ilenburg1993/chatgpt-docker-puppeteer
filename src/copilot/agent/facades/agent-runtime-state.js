@@ -137,6 +137,30 @@ export async function persistAgentRuntimePendingTurnState(input) {
 }
 
 /**
+ * Persiste a pergunta pendente canônica produzida por `ask_user`.
+ *
+ * @param {{
+ *     question: string;
+ *     meta: import('../types.js').PendingQuestionMeta;
+ *     askedAt: number;
+ * }} input
+ * @param {{ label?: string }} [options]
+ * @returns {Promise<
+ *     import('../error-policy.js').AgentPolicyResult<import('../lifecycle/state-io.js').AliveAgentState>
+ * >}
+ */
+export async function persistAgentRuntimePendingQuestionState(input, options = {}) {
+    return persistStateWithPolicy(
+        {
+            pendingQuestion: input.question,
+            pendingQuestionMeta: input.meta,
+            lastAskUserAt: input.askedAt,
+        },
+        { label: options.label ?? 'question.persist.pending' },
+    );
+}
+
+/**
  * Limpa a shadow persistida de `ask_user` restaurada no runtime e agenda a persistência canônica.
  *
  * @param {AgentRuntimeStateContext} ctx

@@ -12,7 +12,7 @@
 
 import { withAgentErrorPolicy } from '../error-policy.js';
 import { canReadAgentSdkSessionMessages, readAgentSdkSessionMessages } from '../facades/agent-sdk-runtime.js';
-import { log } from '../ports/observability-port.js';
+import { log } from '../ports/logging-port.js';
 
 const DEFAULT_MESSAGES_CACHE_MAX_ITEMS = 1_000;
 

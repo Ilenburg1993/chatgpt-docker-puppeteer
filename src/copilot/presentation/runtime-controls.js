@@ -9,27 +9,25 @@
  */
 
 import {
+    abortRuntimeCurrentMessage,
+    answerRuntimePendingQuestion,
+    clearRuntimePendingQuestionShadow,
     createRuntimeSnapshot,
     getRuntimeHandoffHistory,
     getRuntimeHandoffManager,
     listRuntimeSnapshots,
     loadRuntimeSnapshot,
-    saveRuntimeSnapshot,
-    setRuntimeBackgroundCompactionThreshold,
-    stopAgentDialogLoopAuthorized,
-} from '#copilot/agent';
-import {
-    abortRuntimeCurrentMessage,
-    answerRuntimePendingQuestion,
-    clearRuntimePendingQuestionShadow,
     offRuntimeEvent,
     onRuntimeEvent,
     onceRuntimeEvent,
     pauseRuntimeDialogLoop,
     readRuntimeControlState,
     resumeRuntimeDialogLoop,
+    saveRuntimeSnapshot,
+    setRuntimeBackgroundCompactionThreshold,
     startRuntime,
-} from '../agent/facades/agent-runtime-controls.js';
+    stopAgentDialogLoopAuthorized,
+} from '#copilot/agent';
 import {
     getAgentRuntime,
     getDefaultAgentRuntime,

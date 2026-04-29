@@ -29,7 +29,8 @@ import {
     sendAgentSdkSessionAndWait,
 } from '../facades/agent-sdk-runtime.js';
 import { persistStateWithPolicy } from '../lifecycle/state-io.js';
-import { log, startSpan, startSpanImmediate } from '../ports/observability-port.js';
+import { log } from '../ports/logging-port.js';
+import { startSpan, startSpanImmediate } from '../ports/tracing-port.js';
 
 /**
  * @typedef {import('../agent-context.js').AgentContext} AgentContext

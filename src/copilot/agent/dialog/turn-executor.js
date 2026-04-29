@@ -26,7 +26,9 @@ import {
 import { LLM_B_TURN_TIMEOUT_MS } from '../../config/env.js';
 import { DialogProtocol } from '../../dialog/protocol.js';
 import { persistAgentRuntimePendingTurnState } from '../facades/agent-runtime-state.js';
-import { log, METRICS_STORE, startSpan } from '../ports/observability-port.js';
+import { log } from '../ports/logging-port.js';
+import { METRICS_STORE } from '../ports/metrics-port.js';
+import { startSpan } from '../ports/tracing-port.js';
 
 const MAX_DELTA_FALLBACK_CHARS = 50_000;
 

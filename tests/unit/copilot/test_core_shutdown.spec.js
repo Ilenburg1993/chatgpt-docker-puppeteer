@@ -11,6 +11,7 @@ import { afterAll, beforeEach, describe, it } from 'vitest';
 import {
     _resetForTesting,
     getLastShutdownReport,
+    getShutdownLifecycleMetrics,
     isShuttingDown,
     listShutdownHandlers,
     registerShutdownHandler,
@@ -231,5 +232,47 @@ describe('core/shutdown.js', () => {
             'runtime.shutdown.completed',
         ]);
         assert.equal(getLastShutdownReport()?.failedCount, 1);
+    });
+
+    it('agrega métricas por handler de shutdown', async () => {
+        registerShutdownHandler('ok', async () => {}, 10);
+        registerShutdownHandler(
+            'fail',
+            async () => {
+                throw new Error('boom');
+            },
+            20,
+        );
+
+        await runShutdown('metrics');
+
+        const compact = getShutdownLifecycleMetrics().map((metric) => ({
+            name: metric.name,
+            attempts: metric.attempts,
+            okCount: metric.okCount,
+            failedCount: metric.failedCount,
+            lastStatus: metric.lastStatus,
+        }));
+        assert.equal(compact.length, 2);
+        assert.ok(
+            compact.some(
+                (metric) =>
+                    metric.name === 'fail' &&
+                    metric.attempts === 1 &&
+                    metric.okCount === 0 &&
+                    metric.failedCount === 1 &&
+                    metric.lastStatus === 'failed',
+            ),
+        );
+        assert.ok(
+            compact.some(
+                (metric) =>
+                    metric.name === 'ok' &&
+                    metric.attempts === 1 &&
+                    metric.okCount === 1 &&
+                    metric.failedCount === 0 &&
+                    metric.lastStatus === 'ok',
+            ),
+        );
     });
 });

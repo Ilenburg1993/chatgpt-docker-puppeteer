@@ -78,7 +78,9 @@ describe('FG-3 — core barrel contract', () => {
             'runShutdown',
             'isShuttingDown',
             'getLastShutdownReport',
+            'getShutdownLifecycleMetrics',
             'listShutdownHandlers',
+            'listActiveTimers',
             'SHUTDOWN_PRIORITY',
             'setShutdownEventEmitter',
         ];

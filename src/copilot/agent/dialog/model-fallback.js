@@ -14,7 +14,7 @@
  * @see EventBus
  */
 
-import { log } from '../ports/observability-port.js';
+import { log } from '../ports/logging-port.js';
 
 /** @typedef {Pick<import('../types.js').DialogLoopHost, 'getModel' | 'setModel'>} AgentHostForFallback */
 

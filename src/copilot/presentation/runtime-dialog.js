@@ -8,13 +8,14 @@
  */
 
 import {
+    readRuntimeControlState,
+    readRuntimeInteractionState,
     recoverAgentDialogInputChannel,
     sendAgentDialogTurn,
     startAgentDialogLoop,
     stopAgentDialogLoopAuthorized,
 } from '#copilot/agent';
 import { log } from '#copilot/observability';
-import { readRuntimeControlState, readRuntimeInteractionState } from '../agent/facades/agent-runtime-controls.js';
 import { getAgentRuntimeControlsTarget, getDefaultAgentRuntimeControlsTarget } from './runtime-controls.js';
 import { attachmentToEmbed, embedMultiple, MAX_EMBED_BYTES, readFileContext } from './runtime-file-context.js';
 

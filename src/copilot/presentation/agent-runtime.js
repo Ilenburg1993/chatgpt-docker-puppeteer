@@ -14,8 +14,8 @@ import {
     getRegisteredAgentRuntime,
     listAgentRuntimes,
     getDefaultAgentRuntimeId as readDefaultAgentRuntimeId,
+    readRuntimeControlState,
 } from '#copilot/agent';
-import { readRuntimeControlState } from '../agent/facades/agent-runtime-controls.js';
 import { normalizeRuntimeId } from './runtime-targeting.js';
 
 /**

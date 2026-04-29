@@ -9,9 +9,7 @@
 
 import { readAgentRuntimeTools } from '#copilot/agent';
 
-/**
- * @typedef {import('#copilot/agent/facades/agent-runtime-tools.js').AgentRuntimeToolsSnapshot} AgentRuntimeToolsSnapshot
- */
+/** @typedef {ReturnType<typeof readAgentRuntimeTools>} AgentRuntimeToolsSnapshot */
 
 /**
  * @param {unknown} value

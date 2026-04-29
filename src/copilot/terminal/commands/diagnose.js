@@ -143,6 +143,19 @@ export async function cmdDiagnose({ hubSessionId, println }, arg = '') {
         : shutdownReport
           ? `${shutdownReport.failedCount || shutdownReport.timeoutCount ? C.yellow : C.green}${shutdownReport.reason}${C.reset} ${C.grey}${shutdownReport.okCount}/${shutdownReport.handlerCount} handlers · ${shutdownReport.durationMs}ms${C.reset}`
           : `${C.grey}n/d${C.reset}`;
+    const activeTimers = lifecycle.activeTimers ?? [];
+    const timerLine =
+        activeTimers.length === 0
+            ? `${C.green}0 ativos${C.reset}`
+            : `${C.yellow}${activeTimers.length} ativos${C.reset}${activeTimers[0] ? ` ${C.grey}· oldest=${activeTimers[0].id} ${Math.round(activeTimers[0].ageMs / 1000)}s${C.reset}` : ''}`;
+    const bootMetrics = lifecycle.bootMetrics ?? [];
+    const slowestBootPhase = bootMetrics[0] ?? null;
+    const shutdownMetrics = lifecycle.shutdownMetrics ?? [];
+    const slowestShutdownHandler = shutdownMetrics[0] ?? null;
+    const lifecycleMetricsLine =
+        slowestBootPhase || slowestShutdownHandler
+            ? `${slowestBootPhase ? `boot=${slowestBootPhase.id}/${slowestBootPhase.avgDurationMs}ms avg` : 'boot=n/d'} ${C.grey}·${C.reset} ${slowestShutdownHandler ? `shutdown=${slowestShutdownHandler.name}/${slowestShutdownHandler.avgDurationMs}ms avg` : 'shutdown=n/d'}`
+            : `${C.grey}n/d${C.reset}`;
 
     println(`
 ${C.bold}${C.cyan}╔══════════════════════════════════════════════════════════════╗${C.reset}
@@ -178,6 +191,8 @@ ${C.cyan}  INFRAESTRUTURA${C.reset}
     Hub storage   ${hubLine}
     Boot report   ${bootLine}
     Shutdown      ${shutdownLine}
+    Timers        ${timerLine}
+    Lifecycle mx  ${lifecycleMetricsLine}
     Uptime        ${C.grey}${Math.floor(uptimeSec / 60)}m ${uptimeSec % 60}s${C.reset}
     Memória RSS   ${memMB > 400 ? C.yellow : C.grey}${memMB}MB${C.reset}
 

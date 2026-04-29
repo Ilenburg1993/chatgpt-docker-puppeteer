@@ -9,6 +9,7 @@ import { CircuitBreaker } from '../../core/circuit-breaker.js';
 import { logSwallowed, toError } from '../../core/error-handlers.js';
 import { getSdkRecoveryPolicy, toSdkOperationError } from '../errors.js';
 import { log } from '../logger.js';
+import { setModelListClientProvider } from '../models/client-provider.js';
 import { emitSdkOperationMetric } from '../telemetry/operation-metrics.js';
 import { buildCopilotClientOptionsFromEnv } from './client-options.js';
 import { createSession as createLifecycleSession, resumeSession as resumeLifecycleSession } from './lifecycle.js';
@@ -504,6 +505,8 @@ export function getSdkConnectionCircuitBreaker() {
 export async function getClient(overrides = {}) {
     return defaultClientManager.getClient(overrides);
 }
+
+setModelListClientProvider(getClient);
 
 export async function stopClient() {
     return defaultClientManager.stopClient();

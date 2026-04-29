@@ -7,10 +7,10 @@
  *   próprio mapeamento `Error -> status/body`.
  */
 
+import { classifyAgentError } from '#copilot/agent';
 import { toError } from '#copilot/core';
-import { classifyAgentError } from '../agent/error-policy.js';
 
-/** @typedef {import('../agent/error-policy.js').AgentErrorDisposition} AgentErrorDisposition */
+/** @typedef {'retry' | 'fatal' | 'ignore'} AgentErrorDisposition */
 
 /**
  * @typedef {Object} AgentHttpErrorProjection

@@ -3,6 +3,7 @@
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
+    bootRollbacks: /** @type {{ phaseId: string; id: string; rollback: () => void | Promise<void> }[]} */ ([]),
     bootstrapObservability: vi.fn(),
     bootstrapLateDeps: vi.fn(),
     validateRequired: vi.fn(),
@@ -27,10 +28,16 @@ const mocks = vi.hoisted(() => ({
     runCopilotBootPlan: vi.fn(async (plan, options) => {
         for (const phase of plan.phases) {
             const handler = options?.phaseHandlers?.[phase.id];
+            const context = {
+                phaseId: phase.id,
+                registerRollback: vi.fn((id, rollback) => {
+                    mocks.bootRollbacks.push({ phaseId: phase.id, id, rollback });
+                }),
+            };
             if (typeof handler === 'function') {
-                await handler();
+                await handler(context);
             } else if (handler?.run) {
-                await handler.run();
+                await handler.run(context);
             }
         }
         return { status: 'ok', phases: [] };
@@ -50,6 +57,9 @@ const mocks = vi.hoisted(() => ({
     runTerminalHttpServerPhase: vi.fn(),
     runTerminalRuntimeListenersPhase: vi.fn(),
     runTerminalReplPhase: vi.fn(),
+    rollbackTerminalPinnedContextPhase: vi.fn(),
+    rollbackTerminalHttpServerPhase: vi.fn(),
+    rollbackTerminalRuntimeListenersPhase: vi.fn(),
     wireCopilotRuntimeDI: vi.fn(),
     startTodoCleanupJob: vi.fn(),
     buildTool: vi.fn(),
@@ -109,6 +119,9 @@ vi.mock('../../../src/copilot/terminal/index.js', () => ({
     runTerminalHttpServerPhase: mocks.runTerminalHttpServerPhase,
     runTerminalRuntimeListenersPhase: mocks.runTerminalRuntimeListenersPhase,
     runTerminalReplPhase: mocks.runTerminalReplPhase,
+    rollbackTerminalPinnedContextPhase: mocks.rollbackTerminalPinnedContextPhase,
+    rollbackTerminalHttpServerPhase: mocks.rollbackTerminalHttpServerPhase,
+    rollbackTerminalRuntimeListenersPhase: mocks.rollbackTerminalRuntimeListenersPhase,
 }));
 
 vi.mock('../../../src/copilot/runtime-wiring.js', () => ({
@@ -219,9 +232,13 @@ describe('copilot/bootstrap', () => {
         mocks.runTerminalHttpServerPhase.mockReset();
         mocks.runTerminalRuntimeListenersPhase.mockReset();
         mocks.runTerminalReplPhase.mockReset();
+        mocks.rollbackTerminalPinnedContextPhase.mockReset();
+        mocks.rollbackTerminalHttpServerPhase.mockReset();
+        mocks.rollbackTerminalRuntimeListenersPhase.mockReset();
         mocks.wireCopilotRuntimeDI.mockReset();
         mocks.assertCopilotBootSurfaces.mockClear();
         mocks.registerGlobalHandlers.mockReset();
+        mocks.bootRollbacks.length = 0;
     });
 
     it('reseta a trava de boot quando o boot falha e permite nova tentativa', async () => {
@@ -236,5 +253,22 @@ describe('copilot/bootstrap', () => {
         expect(mocks.bootstrapObservability).toHaveBeenCalledTimes(2);
         expect(mocks.registerGlobalHandlers).toHaveBeenCalledTimes(2);
         expect(mocks.assertCopilotBootSurfaces).toHaveBeenCalledTimes(2);
+    });
+
+    it('registra rollbacks transacionais para recursos terminal alocados por fase', async () => {
+        await bootstrapMod.bootCopilot();
+
+        expect(mocks.bootRollbacks.map((entry) => `${entry.phaseId}:${entry.id}`)).toEqual(
+            expect.arrayContaining([
+                'terminal-pinned-context:pinned-context',
+                'copilot-http-server:http-server',
+                'terminal-runtime-listeners:runtime-listeners',
+            ]),
+        );
+
+        await Promise.all(mocks.bootRollbacks.map((entry) => entry.rollback()));
+        expect(mocks.rollbackTerminalPinnedContextPhase).toHaveBeenCalled();
+        expect(mocks.rollbackTerminalHttpServerPhase).toHaveBeenCalled();
+        expect(mocks.rollbackTerminalRuntimeListenersPhase).toHaveBeenCalled();
     });
 });

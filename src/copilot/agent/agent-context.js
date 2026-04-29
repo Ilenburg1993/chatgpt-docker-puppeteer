@@ -26,7 +26,7 @@ import {
     isPendingQuestionShadowExpired,
 } from './dialog/pending-question-shadow.js';
 import { performKeepaliveSdkTick } from './facades/agent-session-ops.js';
-import { log } from './ports/observability-port.js';
+import { log } from './ports/logging-port.js';
 
 /**
  * @typedef {import('#copilot/sdk/types').CopilotClient} CopilotClient

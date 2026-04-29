@@ -66,6 +66,67 @@ const altRuntime = /** @type {any} */ ({
     }),
 });
 
+/**
+ * @param {typeof defaultRuntime} runtime
+ * @returns {{
+ *     status: string;
+ *     model: string;
+ *     reasoningEffort: string;
+ *     sessionId: string | null;
+ *     dialogLoopActive: boolean;
+ *     dialogPaused: boolean;
+ *     queueSize: number;
+ * }}
+ */
+function readMockRuntimeControlState(runtime) {
+    const snap = runtime.getStatusSnapshot?.() ?? {};
+    return {
+        status: snap.status ?? runtime.status ?? 'unknown',
+        model: snap.model ?? runtime.model ?? 'unknown',
+        reasoningEffort: snap.reasoningEffort ?? runtime.reasoningEffort ?? 'off',
+        sessionId: runtime.sessionId ?? snap.sessionId ?? null,
+        dialogLoopActive: Boolean(runtime.dialogLoopActive),
+        dialogPaused: Boolean(snap.dialogPaused ?? runtime.dialogPaused),
+        queueSize: Number(runtime.queueSize ?? snap.queueSize ?? 0),
+    };
+}
+
+/**
+ * @param {typeof defaultRuntime} runtime
+ * @returns {Record<string, any>}
+ */
+function readMockRuntimeInteractionState(runtime) {
+    const health = runtime.getHealthSnapshot?.() ?? {};
+    return {
+        pendingQuestion: runtime.pendingQuestion ?? null,
+        pendingQuestionKind: health.pendingQuestionKind ?? runtime.pendingQuestionKind ?? null,
+        pendingQuestionShadow: runtime.pendingQuestionShadow ?? (health.pendingQuestionShadow ? {} : null),
+        pendingQuestionShadowKind: health.pendingQuestionShadowKind ?? runtime.pendingQuestionShadowKind ?? null,
+        pendingQuestionShadowState: health.pendingQuestionShadowState ?? runtime.pendingQuestionShadowState ?? null,
+        pendingQuestionShadowExpired: Boolean(
+            health.pendingQuestionShadowExpired ?? runtime.pendingQuestionShadowExpired,
+        ),
+        pendingQuestionShadowAgeMs: health.pendingQuestionShadowAgeMs ?? runtime.pendingQuestionShadowAgeMs ?? null,
+        pendingQuestionShadowExpiresAt: runtime.pendingQuestionShadowExpiresAt ?? null,
+        pendingQuestionShadowRemainingMs:
+            health.pendingQuestionShadowRemainingMs ?? runtime.pendingQuestionShadowRemainingMs ?? null,
+    };
+}
+
+/**
+ * @param {typeof defaultRuntime} runtime
+ * @returns {Record<string, any>}
+ */
+function readMockRuntimePrBudgetSnapshot(runtime) {
+    return {
+        sendCount: Number(runtime.getStatusSnapshot?.().sendCount ?? 0),
+        dialogLoopActive: Boolean(runtime.dialogLoopActive),
+        sessionId: runtime.sessionId ?? null,
+        prMetrics: runtime.dialogPrMetrics ?? null,
+        lastPrInfo: runtime.lastPrInfo ?? null,
+    };
+}
+
 vi.mock('#copilot/agent', () => ({
     getAgent: () => defaultRuntime,
     getDefaultAgentRuntimeId: () => 'default',
@@ -78,6 +139,9 @@ vi.mock('#copilot/agent', () => ({
     ],
     readAgentRuntimeStatusSnapshot: (/** @type {typeof defaultRuntime} */ agent) => agent.getStatusSnapshot(),
     readAgentRuntimeHealthSnapshot: (/** @type {typeof defaultRuntime} */ agent) => agent.getHealthSnapshot(),
+    readRuntimeControlState: readMockRuntimeControlState,
+    readRuntimeInteractionState: readMockRuntimeInteractionState,
+    readRuntimePrBudgetSnapshot: readMockRuntimePrBudgetSnapshot,
     readAgentRuntimeTodoSummaries: vi.fn(async () => []),
     readSdkModelMetadata: () => null,
 }));
@@ -164,6 +228,8 @@ describe('commands/diagnose', () => {
         expect(ctx.output()).toContain('*default:gpt-5/processing');
         expect(ctx.output()).toContain('Boot report');
         expect(ctx.output()).toContain('Shutdown');
+        expect(ctx.output()).toContain('Timers');
+        expect(ctx.output()).toContain('Lifecycle mx');
     });
 
     it('aceita runtimeId explícito no comando', async () => {

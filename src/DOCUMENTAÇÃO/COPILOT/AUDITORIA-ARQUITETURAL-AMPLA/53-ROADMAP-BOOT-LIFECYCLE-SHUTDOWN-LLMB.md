@@ -112,7 +112,10 @@ Criar um módulo canônico com fases:
 - [x] fases que alocam recurso podem registrar rollback;
 - [x] falha em fase N executa rollbacks N..0;
 - [x] recursos do terminal permanecem registrados no shutdown central após as subfases;
-- [ ] adicionar rollback direto de subfase para falhas antes do shutdown central.
+- [x] adicionar rollback direto de subfase para falhas antes do shutdown central.
+  - Checkpoint: `BootPhaseRunContext.registerRollback()` cobre recursos parciais dentro da fase
+    corrente; `bootstrap.js` registra rollbacks diretos para pinned context, HTTP server e runtime
+    listeners.
 
 ### D3 — Exposição
 
@@ -130,8 +133,10 @@ Criar um módulo canônico com fases:
       antes do servidor se algum caminho/export crítico estiver ausente;
 - [x] a validação também detecta fases novas no plano sem handler executável, exceto fases
       documentais/compat explicitamente permitidas;
-- [ ] ampliar a superfície mínima conforme novos recursos do SDK/agent se tornarem obrigatórios para
+- [x] ampliar a superfície mínima conforme novos recursos do SDK/agent se tornarem obrigatórios para
       o boot transacional.
+  - Checkpoint: validação inclui `#copilot/core`, timers ativos, métricas de shutdown, facades
+    públicas de runtime-state/control e rollbacks transacionais do terminal.
 
 ---
 
@@ -176,7 +181,9 @@ Criar um módulo canônico com fases:
 - [x] emitir `runtime.shutdown.started/completed/handler_failed`;
 - [x] emitir `runtime.boot.started/completed/failed`;
 - [x] emitir `runtime.boot.phase_started/phase_completed/phase_failed`;
-- [ ] conectar métricas agregadas por fase/handler em dashboard.
+- [x] conectar métricas agregadas por fase/handler em dashboard.
+  - Checkpoint: `getBootLifecycleMetrics()` e `getShutdownLifecycleMetrics()` alimentam
+    `runtime-lifecycle` e `/diagnose`.
 
 ### F3 — Diagnóstico UX
 

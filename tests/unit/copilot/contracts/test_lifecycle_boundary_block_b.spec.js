@@ -1,6 +1,6 @@
 // @ts-check
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, it } from 'vitest';
 
@@ -135,5 +135,89 @@ describe('Block B — lifecycle ownership contracts', () => {
         assert.match(src, /canReadAgentSdkSessionMessages/);
         assert.doesNotMatch(src, /\bclient\.(?:createSession|resumeSession)\(/);
         assert.doesNotMatch(src, /\bsession\.getMessages\b/);
+    });
+
+    it('agent usa portas finas de observabilidade em vez do aggregate observability-port', () => {
+        const agentDir = srcPath('agent');
+        /** @type {string[]} */
+        const violations = [];
+        /**
+         * @param {string} dir
+         * @returns {void}
+         */
+        function walk(dir) {
+            for (const entry of readdirSync(dir, { withFileTypes: true })) {
+                const abs = join(dir, entry.name);
+                if (entry.isDirectory()) {
+                    walk(abs);
+                    continue;
+                }
+                if (!entry.isFile() || !entry.name.endsWith('.js') || abs.endsWith('/ports/observability-port.js')) {
+                    continue;
+                }
+                const rel = abs.replace(ROOT, '').replace(/\\/g, '/');
+                const src = readFileSync(abs, 'utf8');
+                if (/from ['"].*ports\/observability-port\.js['"]/.test(src)) {
+                    violations.push(rel);
+                }
+            }
+        }
+
+        walk(agentDir);
+
+        assert.deepEqual(
+            violations,
+            [],
+            `Imports do aggregate observability-port encontrados:\n${violations.join('\n')}`,
+        );
+        assert.match(readFileSync(srcPath('agent', 'ports', 'observability-port.js'), 'utf8'), /logging-port/);
+        assert.match(readFileSync(srcPath('agent', 'ports', 'observability-port.js'), 'utf8'), /metrics-port/);
+        assert.match(readFileSync(srcPath('agent', 'ports', 'observability-port.js'), 'utf8'), /tracing-port/);
+    });
+
+    it('always-alive delega subsistemas pela superfície runtime interna', () => {
+        const alwaysAlive = readFileSync(srcPath('agent', 'always-alive.js'), 'utf8');
+        const surface = readFileSync(srcPath('agent', 'agent-runtime-surface.js'), 'utf8');
+
+        assert.match(alwaysAlive, /from '\.\/agent-runtime-surface\.js'/);
+        assert.doesNotMatch(alwaysAlive, /from ['"]\.\/(?:dialog|facades|lifecycle|messaging|ports|state)\//);
+        assert.doesNotMatch(alwaysAlive, /from ['"]\.\/(?:event-bridge-wiring|health-check|runtime-registry)\.js['"]/);
+        assert.match(surface, /from '\.\/lifecycle\/agent-lifecycle\.js'/);
+        assert.match(surface, /from '\.\/messaging\/agent-messaging\.js'/);
+        assert.match(surface, /from '\.\/facades\/agent-sdk-access\.js'/);
+        assert.match(surface, /from '\.\/runtime-registry\.js'/);
+    });
+
+    it('agent/dialog não importa state-io diretamente; usa runtime-state semanticamente', () => {
+        const dialogDir = srcPath('agent', 'dialog');
+        /** @type {string[]} */
+        const violations = [];
+
+        /**
+         * @param {string} dir
+         * @returns {void}
+         */
+        function walk(dir) {
+            for (const entry of readdirSync(dir, { withFileTypes: true })) {
+                const abs = join(dir, entry.name);
+                if (entry.isDirectory()) {
+                    walk(abs);
+                    continue;
+                }
+                if (!entry.isFile() || !entry.name.endsWith('.js')) continue;
+                const src = readFileSync(abs, 'utf8');
+                if (/from ['"].*lifecycle\/state-io\.js['"]/.test(src)) {
+                    violations.push(abs.replace(ROOT, '').replace(/\\/g, '/'));
+                }
+            }
+        }
+
+        walk(dialogDir);
+
+        assert.deepEqual(violations, [], `Imports diretos de state-io em dialog:\n${violations.join('\n')}`);
+        assert.match(
+            readFileSync(srcPath('agent', 'dialog', 'user-input-handler.js'), 'utf8'),
+            /persistAgentRuntimePendingQuestionState/,
+        );
     });
 });

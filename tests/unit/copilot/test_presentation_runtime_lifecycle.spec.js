@@ -24,7 +24,9 @@ describe('presentation/runtime-lifecycle', () => {
                     { id: 'repl', status: 'ok' },
                 ],
             }),
+            bootMetrics: [{ id: 'repl', attempts: 1, avgDurationMs: 12 }],
             shutdownHandlers: [{ name: 'terminal', priority: 10 }],
+            activeTimers: [{ id: 'metrics', type: 'interval', registeredAt: 1, ageMs: 1234 }],
             lastShutdownReport: /** @type {any} */ ({
                 reason: 'test',
                 handlerCount: 2,
@@ -37,6 +39,7 @@ describe('presentation/runtime-lifecycle', () => {
                     { name: 'slow', status: 'timeout' },
                 ],
             }),
+            shutdownMetrics: [{ name: 'slow', attempts: 1, avgDurationMs: 99 }],
         });
 
         expect(summary).toEqual({
@@ -66,6 +69,8 @@ describe('presentation/runtime-lifecycle', () => {
                 durationMs: 99,
             },
             registeredShutdownHandlers: 1,
+            activeTimerCount: 1,
+            oldestActiveTimer: { id: 'metrics', type: 'interval', ageMs: 1234 },
         });
     });
 });

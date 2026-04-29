@@ -66,6 +66,7 @@ export {
     clearAgentRuntimePendingQuestionShadow,
     markAgentRuntimeDialogPausedForRecovery,
     persistAgentRuntimeGracefulShutdownState,
+    persistAgentRuntimePendingQuestionState,
     persistAgentRuntimePrConsumptionSnapshot,
     readAgentRuntimeSessionId,
     resetAgentRuntimeGracefulShutdownFlag,

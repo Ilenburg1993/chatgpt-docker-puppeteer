@@ -14,51 +14,74 @@
 import { container, logSwallowed } from '#copilot/core';
 import { EMITTER_PROCESS_QUEUE } from '#copilot/events';
 import { EventEmitter } from 'node:events';
-import { METRICS_STORE } from './ports/observability-port.js';
 
 // DialogProtocol agora é usado apenas pelo DialogLoopManager — removido daqui (E.1)
 
 import { MAX_LISTENERS } from '../config/agent.js';
+// F35: AgentContext — contexto compartilhado entre módulos internos
+import { AgentContext } from './agent-context.js';
 import {
-    ensureDialogLoopAttached as dialogEnsureAttached,
+    abortCurrentMessage,
+    agentStart,
+    agentStop,
+    agentTryReconnect,
+    clearAgentRuntimePendingQuestionShadow,
+    compactSdkSession,
+    confirmSdkSessionUi,
+    createSdkWorkspaceFile,
+    deleteSdkPlan,
+    deselectSdkAgent,
+    dialogEnsureAttached,
     dialogRecoverInputChannel,
     dialogResume,
     dialogStart,
     dialogStop,
-} from './dialog/agent-dialog-controller.js';
-// F35: AgentContext — contexto compartilhado entre módulos internos
-import { AgentContext } from './agent-context.js';
-import { getAgentHealthSnapshot as healthSnapshot } from './health-check.js';
-// F36: Lifecycle — start, stop, initSession, tryReconnect
-import { agentStart, agentStop, agentTryReconnect } from './lifecycle/agent-lifecycle.js';
-// F38: Messaging — sendMessage, steerMessage, answerPendingQuestion
-import {
-    answerPendingQuestion as msgAnswer,
-    processQueue as msgProcessQueue,
-    sendMessage as msgSend,
-    sendMessageDialogBoot as msgSendBoot,
-    steerMessage as msgSteer,
-} from './messaging/agent-messaging.js';
-// F39: State — getStatusSnapshot, listenerDiagnostics
-import { listenerDiagnostics as stateDiagnostics, getStatusSnapshot as stateSnapshot } from './state/agent-state.js';
-// O3: Facades extraídas para reduzir LoC desta classe
-import { ensureAgentEventBusBridge, resetAgentEventBusBridgeWiring } from './event-bridge-wiring.js';
-import {
     dispatchAgentDialogTurn,
+    ensureAgentEventBusBridge,
+    execSdkShell,
+    getCurrentSdkAgent,
+    getForegroundSdkSessionId,
+    getLastSdkSessionId,
+    getModel,
+    getPendingSdkElicitation,
+    getReasoningEffort,
+    getRuntimeHandoffManager,
+    getSdkAuthStatus,
+    getSdkHandles,
+    getSdkQuota,
+    getSdkResourceSnapshot,
+    getSdkSessionCapabilities,
+    getSdkSessionMode,
+    getSdkStatus,
+    getSessionMessages,
+    handleSdkPendingCommand,
+    handleSdkPendingPermission,
+    handleSdkPendingToolCall,
+    healthSnapshot,
+    inputSdkSessionUi,
     isAgentDialogLoopPaused,
+    isSdkSessionUiElicitationAvailable,
+    killSdkShell,
+    listAvailableModels,
+    listPendingSdkElicitations,
+    listSdkAgents,
+    listSdkBuiltInTools,
+    listSdkModels,
+    listSdkSessions,
+    listSdkWorkspaceFiles,
+    listWebhooks,
+    METRICS_STORE,
+    msgAnswer,
+    msgProcessQueue,
+    msgSend,
+    msgSendBoot,
+    msgSteer,
     pauseAgentDialogLoop,
+    pingDialogWatchdog,
+    pingSdk,
     readAgentDialogLastPrInfo,
     readAgentDialogPrMetrics,
-} from './facades/agent-dialog-runtime.js';
-import {
-    getModel,
-    getReasoningEffort,
-    listAvailableModels,
-    setModel,
-    setReasoningEffort,
-} from './facades/agent-model-config.js';
-import {
-    getRuntimeHandoffManager,
+    readAgentRuntimeSessionId,
     readRuntimeContextFactoryCapabilities,
     readRuntimeControlState,
     readRuntimeInteractionState,
@@ -66,61 +89,28 @@ import {
     readRuntimePermissionMode,
     readRuntimeToolRegistry,
     readRuntimeToolRegistryEntries,
-    setRuntimePermissionMode,
-} from './facades/agent-runtime-controls.js';
-import { clearAgentRuntimePendingQuestionShadow, readAgentRuntimeSessionId } from './facades/agent-runtime-state.js';
-import {
-    compactSdkSession,
-    confirmSdkSessionUi,
-    createSdkWorkspaceFile,
-    deselectSdkAgent,
-    execSdkShell,
-    getCurrentSdkAgent,
-    getForegroundSdkSessionId,
-    getLastSdkSessionId,
-    getPendingSdkElicitation,
-    getSdkAuthStatus,
-    getSdkHandles,
-    getSdkQuota,
-    getSdkResourceSnapshot,
-    getSdkSessionCapabilities,
-    getSdkStatus,
-    handleSdkPendingCommand,
-    handleSdkPendingPermission,
-    handleSdkPendingToolCall,
-    inputSdkSessionUi,
-    isSdkSessionUiElicitationAvailable,
-    killSdkShell,
-    listPendingSdkElicitations,
-    listSdkAgents,
-    listSdkBuiltInTools,
-    listSdkModels,
-    listSdkSessions,
-    listSdkWorkspaceFiles,
-    pingSdk,
+    readSdkPlan,
     readSdkWorkspaceFile,
+    registerAgentRuntime,
+    registerWebhook,
     reloadSdkAgents,
     requestSdkElicitation,
+    resetAgentEventBusBridgeWiring,
     resolvePendingSdkElicitation,
     selectSdkAgent,
     selectSdkSessionUi,
-    setForegroundSdkSessionId,
-} from './facades/agent-sdk-access.js';
-import {
-    deleteSdkPlan,
-    getSdkSessionMode,
-    readSdkPlan,
-    setSdkSessionMode,
-    updateSdkPlan,
-} from './facades/agent-sdk-session.js';
-import {
-    abortCurrentMessage,
-    getSessionMessages,
-    pingDialogWatchdog,
     sessionLog,
-} from './facades/agent-session-ops.js';
-import { listWebhooks, registerWebhook, unregisterWebhook } from './facades/agent-webhook-ops.js';
-import { registerAgentRuntime, unregisterAgentRuntime } from './runtime-registry.js';
+    setForegroundSdkSessionId,
+    setModel,
+    setReasoningEffort,
+    setRuntimePermissionMode,
+    setSdkSessionMode,
+    stateDiagnostics,
+    stateSnapshot,
+    unregisterAgentRuntime,
+    unregisterWebhook,
+    updateSdkPlan,
+} from './agent-runtime-surface.js';
 
 /**
  * @typedef {import('./types.js').CopilotSession} CopilotSession

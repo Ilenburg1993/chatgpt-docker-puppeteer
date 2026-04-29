@@ -41,7 +41,8 @@ import {
     readAgentRuntimeDialogPersistedState,
 } from '../facades/agent-runtime-state.js';
 import { waitForAgentSdkEvent } from '../facades/agent-sdk-runtime.js';
-import { log, startSpanImmediate } from '../ports/observability-port.js';
+import { log } from '../ports/logging-port.js';
+import { startSpanImmediate } from '../ports/tracing-port.js';
 import { TurnQueue } from './backpressure.js';
 import { DialogCompactionPolicy } from './compaction-policy.js';
 import { DialogCostLedger } from './cost-ledger.js';

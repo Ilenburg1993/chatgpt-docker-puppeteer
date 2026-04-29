@@ -22,7 +22,7 @@ import { DRAIN_WRITES_TIMEOUT_MS, STATE_FILE as _STATE_FILE_ENV } from '../../co
 import { safeJsonParse } from '../../core/safe-json.js';
 import { AliveAgentStateSchema } from '../../core/schemas.js';
 import { withAgentErrorPolicy } from '../error-policy.js';
-import { log } from '../ports/observability-port.js';
+import { log } from '../ports/logging-port.js';
 
 const STATE_DIR = resolveHooksStateDir();
 // G2-DX-14: STATE_FILE path configurável via AGENT_STATE_FILE env var.

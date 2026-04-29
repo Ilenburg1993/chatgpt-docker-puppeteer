@@ -10,7 +10,7 @@
  */
 
 import { logSwallowed, toError } from '#copilot/core';
-import { log } from '../ports/observability-port.js';
+import { log } from '../ports/logging-port.js';
 import { pingAgentSdkClient } from './agent-sdk-access.js';
 import { sendAgentSdkSession } from './agent-sdk-runtime.js';
 

@@ -91,7 +91,8 @@ export async function bootCopilot() {
         /**
          * @type {Record<
          *     string,
-         *     import('./boot/lifecycle-runner.js').BootPhaseHandler | (() => void | Promise<void>)
+         *     | import('./boot/lifecycle-runner.js').BootPhaseHandler
+         *     | ((context: import('./boot/lifecycle-runner.js').BootPhaseRunContext) => void | Promise<void>)
          * >}
          */
         const phaseHandlers = {
@@ -155,11 +156,13 @@ export async function bootCopilot() {
                 if (!bootState.terminal) {
                     throw new Error('[bootstrap] runtime-wiring não carregou a superfície terminal.');
                 }
-                const [sdkSurface, agentSurface] = await Promise.all([
+                const [coreSurface, sdkSurface, agentSurface] = await Promise.all([
+                    import('#copilot/core'),
                     import('#copilot/sdk'),
                     import('#copilot/agent'),
                 ]);
                 const report = assertCopilotBootSurfaces({
+                    core: coreSurface,
                     sdk: sdkSurface,
                     agent: agentSurface,
                     terminal: bootState.terminal,
@@ -188,21 +191,32 @@ export async function bootCopilot() {
                 const { terminal, ctx } = requireTerminalBootState(bootState);
                 await terminal.runTerminalRuntimeConfigPhase(ctx);
             },
-            'terminal-pinned-context': async () => {
+            'terminal-pinned-context': async (
+                /** @type {import('./boot/lifecycle-runner.js').BootPhaseRunContext | undefined} */ bootPhase,
+            ) => {
                 const { terminal, ctx } = requireTerminalBootState(bootState);
                 await terminal.runTerminalPinnedContextPhase(ctx);
+                bootPhase?.registerRollback('pinned-context', () => terminal.rollbackTerminalPinnedContextPhase(ctx));
             },
             'terminal-conversation-hub': async () => {
                 const { terminal, ctx } = requireTerminalBootState(bootState);
                 await terminal.runTerminalConversationHubPhase(ctx);
             },
-            'copilot-http-server': async () => {
+            'copilot-http-server': async (
+                /** @type {import('./boot/lifecycle-runner.js').BootPhaseRunContext | undefined} */ bootPhase,
+            ) => {
                 const { terminal, ctx } = requireTerminalBootState(bootState);
                 await terminal.runTerminalHttpServerPhase(ctx);
+                bootPhase?.registerRollback('http-server', () => terminal.rollbackTerminalHttpServerPhase(ctx));
             },
-            'terminal-runtime-listeners': async () => {
+            'terminal-runtime-listeners': async (
+                /** @type {import('./boot/lifecycle-runner.js').BootPhaseRunContext | undefined} */ bootPhase,
+            ) => {
                 const { terminal, ctx } = requireTerminalBootState(bootState);
                 await terminal.runTerminalRuntimeListenersPhase(ctx);
+                bootPhase?.registerRollback('runtime-listeners', () =>
+                    terminal.rollbackTerminalRuntimeListenersPhase(ctx),
+                );
             },
             repl: async () => {
                 const { terminal, ctx } = requireTerminalBootState(bootState);

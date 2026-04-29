@@ -124,6 +124,11 @@ describe('W4-9 — barrel exports: símbolos mínimos', () => {
         const mod = await import('#copilot/audit');
         assert.ok(mod.defaultAuditLog, 'defaultAuditLog deve existir no barrel audit');
     });
+
+    it('agent barrel exporta política pública de erros para bordas', async () => {
+        const mod = await import('#copilot/agent');
+        assert.equal(typeof mod.classifyAgentError, 'function', 'classifyAgentError deve sair pelo barrel agent');
+    });
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -224,6 +229,52 @@ describe('W4-9 — fronteira agent→sdk: barrel-only fora de facades/ports', ()
         }
 
         assert.deepEqual(violations, [], `Deep-imports #copilot/sdk/* fora da fronteira:\n${violations.join('\n')}`);
+    });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// 3C. Fronteira externa→agent: consumidores usam o barrel público do agent
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('W4-9 — fronteira externa→agent: sem deep-import de facades internas', () => {
+    it('src/copilot fora de agent não importa agent/facades/* nem agent/error-policy.js', () => {
+        const files = listJsFilesRecursive(COPILOT_ROOT);
+        /** @type {string[]} */
+        const violations = [];
+
+        for (const abs of files) {
+            const rel = abs.replace(COPILOT_ROOT, '').replace(/\\/g, '/');
+            if (rel.startsWith('agent/')) continue;
+            const src = readFileSync(abs, 'utf-8');
+            if (
+                /(?:from\s+['"][^'"]*agent\/facades\/|import\(['"][^'"]*agent\/facades\/)/.test(src) ||
+                /(?:from\s+['"][^'"]*agent\/error-policy\.js['"]|import\(['"][^'"]*agent\/error-policy\.js['"])/.test(
+                    src,
+                )
+            ) {
+                violations.push(rel);
+            }
+        }
+
+        assert.deepEqual(
+            violations,
+            [],
+            `Consumidores externos devem usar #copilot/agent, não facades internas:\n${violations.join('\n')}`,
+        );
+    });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// 3D. SDK model/session: sem ciclo estático entre model helpers e client lifecycle
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('W4-9 — SDK model/session: helpers de modelo não importam client estaticamente', () => {
+    it('sdk/models/helpers.js carrega session/client.js apenas de forma lazy', () => {
+        const src = readSrc('sdk/models/helpers.js');
+
+        assert.doesNotMatch(src, /import\s+\{[^}]*getClient[^}]*\}\s+from\s+['"]\.\.\/session\/client\.js['"]/);
+        assert.doesNotMatch(src, /import\(['"]\.\.\/session\/client\.js['"]\)/);
+        assert.match(src, /from ['"]\.\/client-provider\.js['"]/);
     });
 });
 

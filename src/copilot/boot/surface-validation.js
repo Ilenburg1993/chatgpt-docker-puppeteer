@@ -5,7 +5,7 @@
  */
 
 /**
- * @typedef {'sdk' | 'agent' | 'terminal' | 'phaseHandlers'} CopilotBootSurfaceGroupName
+ * @typedef {'core' | 'sdk' | 'agent' | 'terminal' | 'phaseHandlers'} CopilotBootSurfaceGroupName
  *
  * @typedef {{
  *     name: CopilotBootSurfaceGroupName;
@@ -25,6 +25,16 @@
  */
 
 export const COPILOT_BOOT_REQUIRED_SURFACES = Object.freeze({
+    core: Object.freeze([
+        'runShutdown',
+        'isShuttingDown',
+        'getLastShutdownReport',
+        'getShutdownLifecycleMetrics',
+        'listShutdownHandlers',
+        'registerTimer',
+        'listActiveTimers',
+        'activeTimerCount',
+    ]),
     sdk: Object.freeze([
         'createCopilotClient',
         'checkAuthStatus',
@@ -47,6 +57,11 @@ export const COPILOT_BOOT_REQUIRED_SURFACES = Object.freeze({
         'readAgentRuntimeHealthSnapshot',
         'readAgentRuntimeSdkResourceSnapshot',
         'readAgentRuntimeCapabilities',
+        'readRuntimeControlState',
+        'readRuntimeInteractionState',
+        'readRuntimePrBudgetSnapshot',
+        'persistAgentRuntimePendingQuestionState',
+        'classifyAgentError',
         'startRuntime',
         'startAgentDialogLoop',
         'sendAgentDialogTurn',
@@ -62,6 +77,9 @@ export const COPILOT_BOOT_REQUIRED_SURFACES = Object.freeze({
         'runTerminalHttpServerPhase',
         'runTerminalRuntimeListenersPhase',
         'runTerminalReplPhase',
+        'rollbackTerminalPinnedContextPhase',
+        'rollbackTerminalHttpServerPhase',
+        'rollbackTerminalRuntimeListenersPhase',
         'startTerminalServer',
     ]),
 });
@@ -72,6 +90,7 @@ const DOCUMENTAL_PHASES_WITHOUT_HANDLER = new Set(['compat-runtime-host']);
  * Valida superfícies carregadas do SDK/agent/terminal e a cobertura dos phase handlers do boot plan.
  *
  * @param {{
+ *     core: Record<string, unknown>;
  *     sdk: Record<string, unknown>;
  *     agent: Record<string, unknown>;
  *     terminal: Record<string, unknown>;
@@ -82,6 +101,7 @@ const DOCUMENTAL_PHASES_WITHOUT_HANDLER = new Set(['compat-runtime-host']);
  */
 export function validateCopilotBootSurfaces(input) {
     const groups = [
+        buildSurfaceGroupReport('core', input.core, COPILOT_BOOT_REQUIRED_SURFACES.core),
         buildSurfaceGroupReport('sdk', input.sdk, COPILOT_BOOT_REQUIRED_SURFACES.sdk),
         buildSurfaceGroupReport('agent', input.agent, COPILOT_BOOT_REQUIRED_SURFACES.agent),
         buildSurfaceGroupReport('terminal', input.terminal, COPILOT_BOOT_REQUIRED_SURFACES.terminal),

@@ -5,7 +5,7 @@
  */
 
 import { withAgentErrorPolicy } from '../error-policy.js';
-import { log } from '../ports/observability-port.js';
+import { log } from '../ports/logging-port.js';
 
 /**
  * @param {string} label

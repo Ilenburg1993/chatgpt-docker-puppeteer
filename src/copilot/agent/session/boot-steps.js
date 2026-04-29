@@ -29,14 +29,11 @@ import {
     shouldScheduleAgentRuntimeDialogBootRecovery,
 } from '../facades/agent-runtime-state.js';
 import { getAgentSdkModelStatsTracker, isAgentSdkExperimentalEnabled } from '../facades/agent-sdk-access.js';
+import { defaultErrorTracker } from '../ports/error-tracking-port.js';
+import { createAgentEventObserver, defaultEventCollector } from '../ports/event-observer-port.js';
+import { log } from '../ports/logging-port.js';
 import { startDefaultMcpAutoReconnect } from '../ports/mcp-port.js';
-import {
-    createAgentEventObserver,
-    defaultErrorTracker,
-    defaultEventCollector,
-    defaultMetrics,
-    log,
-} from '../ports/observability-port.js';
+import { defaultMetrics } from '../ports/metrics-port.js';
 import { resolveAgentUserInput } from '../ports/tool-port.js';
 import { cleanupStaleSessionsWithPolicy } from './cleanup.js';
 import { wireSessionEvents } from './event-wirer.js';

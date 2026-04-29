@@ -3,6 +3,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+    buildRuntimeRouteMetaFromSelection,
     buildRuntimeRouteMetaPayload,
     normalizeRuntimeRouteMeta,
 } from '../../../src/copilot/presentation/runtime-meta.js';
@@ -44,5 +45,21 @@ describe('presentation/runtime-meta', () => {
         });
 
         expect(buildRuntimeRouteMetaPayload(undefined)).toEqual({});
+    });
+
+    it('projeta metadata canônica a partir de seleção de runtime', () => {
+        expect(
+            buildRuntimeRouteMetaFromSelection({
+                runtimeId: 'default',
+                requestedRuntimeId: 'missing',
+                runtimeFound: false,
+                usedDefaultRuntimeFallback: true,
+            }),
+        ).toEqual({
+            runtimeId: 'default',
+            requestedRuntimeId: 'missing',
+            runtimeFound: false,
+            usedDefaultRuntimeFallback: true,
+        });
     });
 });

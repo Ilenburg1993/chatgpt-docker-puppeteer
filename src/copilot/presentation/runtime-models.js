@@ -8,12 +8,14 @@
  * @typedef {import('./types.js').RuntimeModelInfo} RuntimeModelInfo
  */
 
-import { listSdkCatalogModels, readSdkModelMetadata, readSdkModelStats } from '#copilot/agent';
 import {
+    listSdkCatalogModels,
     readRuntimeModelSelection,
+    readSdkModelMetadata,
+    readSdkModelStats,
     setRuntimeModel,
     setRuntimeReasoningEffort,
-} from '../agent/facades/agent-model-config.js';
+} from '#copilot/agent';
 import { resolveAgentRuntimeSelection } from './agent-runtime.js';
 
 /**

@@ -55,9 +55,11 @@ vi.mock('../../../src/copilot/agent/lifecycle/state-io.js', () => ({
     persistStateWithPolicy: mocks.persistState,
     readStateAsync: mocks.readState,
 }));
-vi.mock('../../../src/copilot/agent/ports/observability-port.js', () => ({
+vi.mock('../../../src/copilot/agent/ports/logging-port.js', () => ({ log: vi.fn() }));
+vi.mock('../../../src/copilot/agent/ports/metrics-port.js', () => ({
     defaultMetrics: { recordSessionRotation: vi.fn() },
-    log: vi.fn(),
+}));
+vi.mock('../../../src/copilot/agent/ports/tracing-port.js', () => ({
     startSpanImmediate: vi.fn(() => ({ end: vi.fn(), setAttribute: vi.fn() })),
 }));
 vi.mock('../../../src/copilot/agent/session/hook-context.js', () => ({

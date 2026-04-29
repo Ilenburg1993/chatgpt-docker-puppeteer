@@ -62,7 +62,7 @@ import {
     workspaceListFiles,
     workspaceReadFile,
 } from '#copilot/sdk';
-import { log } from '../ports/observability-port.js';
+import { log } from '../ports/logging-port.js';
 export { canReadAgentSdkSessionMessages, readAgentSdkSessionMessages } from './agent-sdk-runtime.js';
 
 /**

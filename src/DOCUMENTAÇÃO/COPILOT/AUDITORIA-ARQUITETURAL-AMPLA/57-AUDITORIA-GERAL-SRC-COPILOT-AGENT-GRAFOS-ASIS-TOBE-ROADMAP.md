@@ -247,11 +247,43 @@ Princípios TO-BE:
 - **R1.2**: reduzir duplicações de metadata runtime em payloads HTTP/SSE;
 - **R1.3**: travar contracts de projection com testes estruturais adicionais.
 
+Checkpoint aplicado nesta rodada:
+
+- `runtime-meta.js` passa a ser a fonte única para metadata de runtime/fallback vinda de seleção
+  (`runtimeId`, `requestedRuntimeId`, `runtimeFound`, `usedDefaultRuntimeFallback`);
+- `runtime-route-deps.js`, `runtime-health.js` e `runtime-webhooks.js` deixam de remontar esses
+  campos manualmente;
+- o barrel `presentation/index.js` exporta a superfície de metadata para bordas futuras;
+- teste live de `terminal:llm-b` em `model=auto` confirmou conversa real apesar de quota weekly
+  baixa/zerada no modelo concreto anterior: o SDK roteou para `claude-haiku-4.5` e respondeu o turno
+  `OK_AUTO`.
+
 ### Faixa R2 (médio prazo, transformação de ownership)
 
 - **R2.1**: fatiar `observability-port` por domínios (`lifecycle`, `dialog`, `quota`, `errors`);
 - **R2.2**: reduzir fan-out de `always-alive` com extração de orquestradores de fase;
 - **R2.3**: consolidar pipeline boot/start em steps declarativos com relatórios estáveis.
+
+Checkpoint R2.1 aplicado nesta rodada:
+
+- `ports/observability-port.js` virou aggregate compatível, não mais dependência direta do miolo do
+  agent;
+- novas portas finas: `logging-port`, `metrics-port`, `tracing-port`, `error-tracking-port`,
+  `event-observer-port` e `snapshot-port`;
+- imports de lifecycle/session/dialog/state/facades foram migrados para a porta específica do sinal;
+- contrato estrutural impede novos imports do aggregate fora do próprio
+  `ports/observability-port.js`.
+
+Checkpoint R2.2 aplicado nesta rodada:
+
+- `always-alive.js` deixou de importar diretamente subsistemas internos como `dialog/`,
+  `lifecycle/`, `messaging/`, `state/`, `facades/`, `ports/`, `runtime-registry`, `health-check` e
+  `event-bridge-wiring`;
+- a nova superfície `agent-runtime-surface.js` concentra as dependências semânticas necessárias para
+  o root compatível do agent delegar boot/lifecycle/dialog/messaging/SDK/status/registry;
+- `always-alive.js` mantém a API pública compatível e a posse do singleton, mas passa a atuar como
+  orquestrador fino sobre uma superfície interna explícita;
+- contrato estrutural adicional impede regressão para imports diretos desses subsistemas pelo root.
 
 ### Faixa R3 (profundidade arquitetural)
 

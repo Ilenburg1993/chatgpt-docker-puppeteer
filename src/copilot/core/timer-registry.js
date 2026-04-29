@@ -21,6 +21,13 @@ import { registerShutdownHandler } from './shutdown.js';
  * @property {string} id - Identificador do timer
  * @property {TimerType} type - Tipo: timeout ou interval
  * @property {ReturnType<typeof setTimeout>} handle - Handle nativo do timer
+ * @property {number} registeredAt - Timestamp de registro
+ *
+ * @typedef {object} TimerSnapshot
+ * @property {string} id
+ * @property {TimerType} type
+ * @property {number} registeredAt
+ * @property {number} ageMs
  */
 
 /** @type {Map<string, TimerEntry>} */
@@ -41,7 +48,7 @@ let shutdownRegistered = false;
 export function registerTimer(id, type, handle) {
     ensureShutdownRegistered();
     cancel(id);
-    timers.set(id, { id, type, handle });
+    timers.set(id, { id, type, handle, registeredAt: Date.now() });
     return handle;
 }
 
@@ -88,6 +95,23 @@ export function cancelAll() {
  */
 export function activeCount() {
     return timers.size;
+}
+
+/**
+ * Retorna um snapshot estável dos timers ativos para health/diagnose. O handle nativo nunca é exposto.
+ *
+ * @param {number} [now=Date.now()] Default is `Date.now()`
+ * @returns {TimerSnapshot[]}
+ */
+export function listActiveTimers(now = Date.now()) {
+    return Array.from(timers.values())
+        .map((entry) => ({
+            id: entry.id,
+            type: entry.type,
+            registeredAt: entry.registeredAt,
+            ageMs: Math.max(0, now - entry.registeredAt),
+        }))
+        .sort((a, b) => b.ageMs - a.ageMs || a.id.localeCompare(b.id));
 }
 
 /**

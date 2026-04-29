@@ -34,6 +34,7 @@ export {
     PR_CONSUMING_EVENTS,
 } from '../events/agent-events.js';
 export { AlwaysAliveAgent, alwaysAliveAgent, getAgent, resetAgent } from './always-alive.js';
+export { classifyAgentError } from './error-policy.js';
 export {
     DEFAULT_AGENT_RUNTIME_ID,
     clearAgentRuntimeRegistry,
@@ -73,6 +74,7 @@ export {
     onRuntimeEvent,
     onceRuntimeEvent,
     pauseRuntimeDialogLoop,
+    persistAgentRuntimePendingQuestionState,
     readAgentRuntimeCapabilities,
     readAgentRuntimeHealthSnapshot,
     readAgentRuntimeSdkResourceSnapshot,

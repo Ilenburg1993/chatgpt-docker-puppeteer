@@ -72,6 +72,31 @@ const altRuntime = /** @type {any} */ ({
     }),
 });
 
+/**
+ * @param {typeof defaultRuntime} runtime
+ * @returns {{
+ *     status: string;
+ *     model: string;
+ *     reasoningEffort: string;
+ *     sessionId: string | null;
+ *     dialogLoopActive: boolean;
+ *     dialogPaused: boolean;
+ *     queueSize: number;
+ * }}
+ */
+function readMockRuntimeControlState(runtime) {
+    const snap = runtime.getStatusSnapshot?.() ?? {};
+    return {
+        status: snap.status ?? runtime.status ?? 'unknown',
+        model: snap.model ?? runtime.model ?? 'unknown',
+        reasoningEffort: snap.reasoningEffort ?? runtime.reasoningEffort ?? 'off',
+        sessionId: runtime.sessionId ?? snap.sessionId ?? null,
+        dialogLoopActive: Boolean(runtime.dialogLoopActive),
+        dialogPaused: Boolean(snap.dialogPaused ?? runtime.dialogPaused),
+        queueSize: Number(runtime.queueSize ?? snap.queueSize ?? 0),
+    };
+}
+
 vi.mock('#copilot/agent', () => ({
     alwaysAliveAgent: defaultRuntime,
     getAgent: () => defaultRuntime,
@@ -87,6 +112,14 @@ vi.mock('#copilot/agent', () => ({
     ],
     readAgentRuntimeStatusSnapshot: (/** @type {any} */ runtime) => runtime.getStatusSnapshot(),
     readAgentRuntimeHealthSnapshot: (/** @type {any} */ runtime) => runtime.getHealthSnapshot(),
+    classifyAgentError: (/** @type {any} */ error) => {
+        if (error instanceof DOMException && error.name === 'AbortError') return 'ignore';
+        if (error?.code === 'AGENT_STOPPED') return 'fatal';
+        return 'retry';
+    },
+    readRuntimeControlState: readMockRuntimeControlState,
+    pauseRuntimeDialogLoop: vi.fn(async (/** @type {any} */ runtime) => runtime.pauseDialogLoop?.()),
+    resumeRuntimeDialogLoop: vi.fn(async (/** @type {any} */ runtime) => runtime.resumeDialogLoop?.()),
     getRuntimeHandoffManager: (/** @type {any} */ runtime) => runtime.getHandoffManager(),
     getRuntimeHandoffHistory: (/** @type {any} */ runtime) => runtime.getHandoffManager().getHistory(),
     readAgentRuntimeTodoSummaries: vi.fn(async () => []),

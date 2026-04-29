@@ -22,7 +22,8 @@
 import { readCopilotBootConfig } from '#copilot/boot';
 import { DEFAULT_EXCLUDED_TOOLS, SessionConfigBuilder } from '#copilot/config';
 import { container } from '#copilot/core';
-import { log, METRICS_STORE } from '../ports/observability-port.js';
+import { log } from '../ports/logging-port.js';
+import { METRICS_STORE } from '../ports/metrics-port.js';
 
 import { DialogProtocol } from '../../dialog/protocol.js';
 import { handleUserInputRequest } from '../dialog/user-input-handler.js';

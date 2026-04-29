@@ -76,6 +76,64 @@ const altRuntime = /** @type {any} */ ({
     pendingQuestionShadowRemainingMs: null,
 });
 
+/**
+ * @param {typeof defaultRuntime} runtime
+ * @returns {{
+ *     status: string;
+ *     model: string;
+ *     reasoningEffort: string;
+ *     sessionId: string | null;
+ *     dialogLoopActive: boolean;
+ *     dialogPaused: boolean;
+ *     queueSize: number;
+ * }}
+ */
+function readMockRuntimeControlState(runtime) {
+    const snap = runtime.getStatusSnapshot?.() ?? {};
+    return {
+        status: snap.status ?? runtime.status ?? 'unknown',
+        model: snap.model ?? runtime.model ?? 'unknown',
+        reasoningEffort: snap.reasoningEffort ?? runtime.reasoningEffort ?? 'off',
+        sessionId: runtime.sessionId ?? snap.sessionId ?? null,
+        dialogLoopActive: Boolean(runtime.dialogLoopActive),
+        dialogPaused: Boolean(snap.dialogPaused ?? runtime.dialogPaused),
+        queueSize: Number(runtime.queueSize ?? snap.queueSize ?? 0),
+    };
+}
+
+/**
+ * @param {typeof defaultRuntime} runtime
+ * @returns {Record<string, any>}
+ */
+function readMockRuntimeInteractionState(runtime) {
+    return {
+        pendingQuestion: runtime.pendingQuestion ?? null,
+        pendingQuestionKind: runtime.pendingQuestionKind ?? runtime.pendingQuestion?.kind ?? null,
+        pendingQuestionShadow: runtime.pendingQuestionShadow ?? null,
+        pendingQuestionShadowKind:
+            runtime.pendingQuestionShadowKind ?? runtime.pendingQuestionShadow?.meta?.kind ?? null,
+        pendingQuestionShadowState: runtime.pendingQuestionShadowState ?? null,
+        pendingQuestionShadowExpired: Boolean(runtime.pendingQuestionShadowExpired),
+        pendingQuestionShadowAgeMs: runtime.pendingQuestionShadowAgeMs ?? null,
+        pendingQuestionShadowExpiresAt: runtime.pendingQuestionShadowExpiresAt ?? null,
+        pendingQuestionShadowRemainingMs: runtime.pendingQuestionShadowRemainingMs ?? null,
+    };
+}
+
+/**
+ * @param {typeof defaultRuntime} runtime
+ * @returns {Record<string, any>}
+ */
+function readMockRuntimePrBudgetSnapshot(runtime) {
+    return {
+        sendCount: Number(runtime.getStatusSnapshot?.().sendCount ?? 0),
+        dialogLoopActive: Boolean(runtime.dialogLoopActive),
+        sessionId: runtime.sessionId ?? null,
+        prMetrics: runtime.dialogPrMetrics ?? null,
+        lastPrInfo: runtime.lastPrInfo ?? null,
+    };
+}
+
 vi.mock('#copilot/agent', () => ({
     alwaysAliveAgent: defaultRuntime,
     getAgent: () => defaultRuntime,
@@ -89,6 +147,13 @@ vi.mock('#copilot/agent', () => ({
     ],
     readAgentRuntimeStatusSnapshot: (/** @type {typeof defaultRuntime} */ agent) => agent.getStatusSnapshot(),
     readAgentRuntimeHealthSnapshot: (/** @type {typeof defaultRuntime} */ agent) => agent.getHealthSnapshot(),
+    readRuntimeControlState: readMockRuntimeControlState,
+    readRuntimeInteractionState: readMockRuntimeInteractionState,
+    readRuntimePrBudgetSnapshot: readMockRuntimePrBudgetSnapshot,
+    answerRuntimePendingQuestion: (/** @type {typeof defaultRuntime} */ runtime, /** @type {string} */ answer) =>
+        runtime.answerPendingQuestion?.(answer) ?? false,
+    clearRuntimePendingQuestionShadow: (/** @type {typeof defaultRuntime} */ runtime) =>
+        runtime.clearPendingQuestionShadow?.() ?? false,
     readSdkModelMetadata: () => null,
     readAgentRuntimeTodoSummaries: vi.fn(async () => []),
     createRuntimeSnapshot: vi.fn((/** @type {Record<string, unknown>} */ data) => ({

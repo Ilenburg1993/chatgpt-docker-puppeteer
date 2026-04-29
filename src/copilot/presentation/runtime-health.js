@@ -7,11 +7,14 @@
  *   semântica compartilhada próxima de `runtime-overview.js` e `runtime-status.js`.
  */
 
-import { readAgentRuntimeHealthSnapshot } from '#copilot/agent';
-import { readRuntimeControlState } from '../agent/facades/agent-runtime-controls.js';
-import { readAgentRuntimeSdkResourceSnapshot } from '../agent/facades/agent-runtime-status.js';
+import {
+    readAgentRuntimeHealthSnapshot,
+    readAgentRuntimeSdkResourceSnapshot,
+    readRuntimeControlState,
+} from '#copilot/agent';
 import { resolveAgentRuntimeSelection } from './agent-runtime.js';
 import { readRuntimeLifecycleSnapshot } from './runtime-lifecycle.js';
+import { buildRuntimeRouteMetaFromSelection } from './runtime-meta.js';
 import { readAgentStatusSnapshot } from './runtime-status.js';
 
 /**
@@ -56,10 +59,7 @@ function resolveRuntimeHealthTarget(runtimeId) {
     const selection = resolveAgentRuntimeSelection(runtimeId);
     return {
         agent: selection.runtime,
-        runtimeId: selection.runtimeId,
-        requestedRuntimeId: selection.requestedRuntimeId,
-        runtimeFound: selection.runtimeFound,
-        usedDefaultRuntimeFallback: selection.usedDefaultRuntimeFallback,
+        ...buildRuntimeRouteMetaFromSelection(selection),
     };
 }
 

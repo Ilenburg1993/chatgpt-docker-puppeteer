@@ -13,6 +13,7 @@ import {
     activeCount,
     cancel,
     cancelAll,
+    listActiveTimers,
     registerTimer,
 } from '../../../src/copilot/core/timer-registry.js';
 
@@ -100,5 +101,28 @@ describe('core/timer-registry.js › cancelAll', () => {
 
     it('retorna 0 para registry vazio', () => {
         assert.equal(cancelAll(), 0);
+    });
+});
+
+describe('core/timer-registry.js › listActiveTimers', () => {
+    it('expõe snapshot estável sem handle nativo e ordenado por idade', () => {
+        registerTimer(
+            'newer',
+            'timeout',
+            setTimeout(() => {}, 100_000),
+        );
+        registerTimer(
+            'older',
+            'interval',
+            setInterval(() => {}, 100_000),
+        );
+
+        const registeredAt = listActiveTimers().find((timer) => timer.id === 'older')?.registeredAt ?? Date.now();
+        const snapshot = listActiveTimers(registeredAt + 5_000);
+
+        assert.equal(snapshot.length, 2);
+        assert.equal(snapshot[0]?.id, 'newer');
+        assert.equal(Object.hasOwn(snapshot[0] ?? {}, 'handle'), false);
+        assert.equal(typeof snapshot[0]?.ageMs, 'number');
     });
 });

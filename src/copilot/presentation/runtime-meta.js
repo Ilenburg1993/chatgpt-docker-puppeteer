@@ -11,6 +11,14 @@
  *     runtimeFound?: boolean;
  *     usedDefaultRuntimeFallback?: boolean;
  * }} RuntimeRouteMeta
+ *
+ *
+ * @typedef {{
+ *     runtimeId: string;
+ *     requestedRuntimeId: string | null;
+ *     runtimeFound: boolean;
+ *     usedDefaultRuntimeFallback: boolean;
+ * }} RuntimeRouteSelectionMeta
  */
 
 /**
@@ -47,5 +55,23 @@ export function buildRuntimeRouteMetaPayload(meta) {
         ...(runtimeMeta.usedDefaultRuntimeFallback !== undefined
             ? { usedDefaultRuntimeFallback: runtimeMeta.usedDefaultRuntimeFallback }
             : {}),
+    };
+}
+
+/**
+ * Converte seleções de runtime vindas de `resolveAgentRuntimeSelection()` em metadata de borda.
+ *
+ * Mantém `presentation/*` com um único shape de runtime targeting/fallback e evita que cada projection copie os mesmos
+ * quatro campos manualmente.
+ *
+ * @param {RuntimeRouteSelectionMeta} selection
+ * @returns {RuntimeRouteSelectionMeta}
+ */
+export function buildRuntimeRouteMetaFromSelection(selection) {
+    return {
+        runtimeId: selection.runtimeId,
+        requestedRuntimeId: selection.requestedRuntimeId,
+        runtimeFound: selection.runtimeFound,
+        usedDefaultRuntimeFallback: selection.usedDefaultRuntimeFallback,
     };
 }

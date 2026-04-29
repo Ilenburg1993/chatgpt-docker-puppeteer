@@ -26,7 +26,7 @@ import { createAgentSdkToolsRegistry } from './facades/agent-sdk-access.js';
 import { HandoffManager } from './infra/handoff-manager.js';
 import { MessageQueue } from './infra/message-queue.js';
 import { createQueuedElicitationHandler } from './ports/hook-port.js';
-import { defaultMetrics } from './ports/observability-port.js';
+import { defaultMetrics } from './ports/metrics-port.js';
 import { createAgentPermissionController } from './ports/permission-port.js';
 import { SessionMessagesCache } from './session/history-sync.js';
 import { SessionKeepalive } from './session/keepalive.js';

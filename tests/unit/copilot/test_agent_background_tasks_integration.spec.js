@@ -64,7 +64,7 @@ describe('agent › K4 background task tracker integration', () => {
 
     it('user-input-handler aceita trackBackgroundTask para persistência assíncrona', () => {
         assert.ok(userInputSrc.includes('trackBackgroundTask'));
-        assert.ok(userInputSrc.includes('persistStateWithPolicy'));
+        assert.ok(userInputSrc.includes('persistAgentRuntimePendingQuestionState'));
         assert.ok(userInputSrc.includes('question.persist.pending'));
     });
 

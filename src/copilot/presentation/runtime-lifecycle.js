@@ -4,15 +4,24 @@
  * @file Projection compartilhada do lifecycle de processo: boot/shutdown e handlers registrados.
  */
 
-import { getLastBootLifecycleReport } from '#copilot/boot';
-import { getLastShutdownReport, isShuttingDown, listShutdownHandlers } from '#copilot/core';
+import { getBootLifecycleMetrics, getLastBootLifecycleReport } from '#copilot/boot';
+import {
+    getLastShutdownReport,
+    getShutdownLifecycleMetrics,
+    isShuttingDown,
+    listActiveTimers,
+    listShutdownHandlers,
+} from '#copilot/core';
 
 /**
  * @typedef {{
  *     shuttingDown: boolean;
  *     lastBootReport: ReturnType<typeof getLastBootLifecycleReport>;
+ *     bootMetrics: ReturnType<typeof getBootLifecycleMetrics>;
  *     shutdownHandlers: ReturnType<typeof listShutdownHandlers>;
  *     lastShutdownReport: ReturnType<typeof getLastShutdownReport>;
+ *     shutdownMetrics: ReturnType<typeof getShutdownLifecycleMetrics>;
+ *     activeTimers: ReturnType<typeof listActiveTimers>;
  * }} RuntimeLifecycleSnapshot
  *
  *
@@ -43,6 +52,8 @@ import { getLastShutdownReport, isShuttingDown, listShutdownHandlers } from '#co
  *         durationMs: number;
  *     } | null;
  *     registeredShutdownHandlers: number;
+ *     activeTimerCount: number;
+ *     oldestActiveTimer: { id: string; type: 'timeout' | 'interval'; ageMs: number } | null;
  * }} RuntimeLifecycleSummary
  */
 
@@ -55,8 +66,11 @@ export function readRuntimeLifecycleSnapshot() {
     return {
         shuttingDown: isShuttingDown(),
         lastBootReport: getLastBootLifecycleReport(),
+        bootMetrics: getBootLifecycleMetrics(),
         shutdownHandlers: listShutdownHandlers(),
         lastShutdownReport: getLastShutdownReport(),
+        shutdownMetrics: getShutdownLifecycleMetrics(),
+        activeTimers: listActiveTimers(),
     };
 }
 
@@ -75,6 +89,7 @@ export function buildRuntimeLifecycleSummary(lifecycle = readRuntimeLifecycleSna
     const bootFailedCount = boot?.failedCount ?? (boot?.status === 'failed' ? 1 : 0);
     const bootTimeoutCount = boot?.timeoutCount ?? 0;
     const bootCompletedCount = boot ? boot.okCount + bootSkippedCount : 0;
+    const oldestActiveTimer = lifecycle.activeTimers[0] ?? null;
     return {
         shuttingDown: lifecycle.shuttingDown,
         boot: boot
@@ -106,5 +121,9 @@ export function buildRuntimeLifecycleSummary(lifecycle = readRuntimeLifecycleSna
               }
             : null,
         registeredShutdownHandlers: lifecycle.shutdownHandlers.length,
+        activeTimerCount: lifecycle.activeTimers.length,
+        oldestActiveTimer: oldestActiveTimer
+            ? { id: oldestActiveTimer.id, type: oldestActiveTimer.type, ageMs: oldestActiveTimer.ageMs }
+            : null,
     };
 }

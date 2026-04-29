@@ -8,7 +8,7 @@
 
 import { ConfigError } from '#copilot/core';
 import { log } from '../logger.js';
-import { getClient } from '../session/client.js';
+import { getModelListClient } from './client-provider.js';
 import { modelSelector } from './registry.js';
 
 import { toError } from '../../core/error-handlers.js';
@@ -58,7 +58,7 @@ export async function listModels(clientOverrides = {}, forceRefresh = false) {
     if (!forceRefresh && _modelsCache && _modelsCache.expiresAt > now) {
         return _modelsCache.models;
     }
-    const client = await getClient(clientOverrides);
+    const client = await getModelListClient(clientOverrides);
     let models;
     try {
         models = await client.listModels();

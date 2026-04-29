@@ -44,8 +44,13 @@ describe('event-bridge-map › contratos declarativos', () => {
             '/workspaces/chatgpt-docker-puppeteer/src/copilot/agent/event-bridge-wiring.js',
             'utf8',
         );
+        const surfaceSrc = readFileSync(
+            '/workspaces/chatgpt-docker-puppeteer/src/copilot/agent/agent-runtime-surface.js',
+            'utf8',
+        );
 
-        assert.match(alwaysAliveSrc, /event-bridge-wiring\.js/);
+        assert.match(alwaysAliveSrc, /agent-runtime-surface\.js/);
+        assert.match(surfaceSrc, /event-bridge-wiring\.js/);
         assert.match(alwaysAliveSrc, /ensureAgentEventBusBridge\(/);
         assert.match(wiringSrc, /wireAgentRuntimeEventBusBridge\(agent, bus\)/);
         assert.doesNotMatch(wiringSrc, /agent\.ctx\.getDialogLoopManagerSnapshot\(/);

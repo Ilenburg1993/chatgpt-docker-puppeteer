@@ -25,6 +25,7 @@ import {
     clearAgentRuntimePendingQuestionShadow,
     markAgentRuntimeDialogPausedForRecovery,
     persistAgentRuntimeGracefulShutdownState,
+    persistAgentRuntimePendingQuestionState,
     persistAgentRuntimePrConsumptionSnapshot,
     readAgentRuntimeSessionId,
     resetAgentRuntimeGracefulShutdownFlag,
@@ -177,6 +178,28 @@ describe('agent-runtime-state facade', () => {
                 lastQuotaSnapshots: { main: { remainingPercentage: 80 } },
             },
             { label: 'state.pr_consumed.persist' },
+        );
+    });
+
+    it('persiste pendingQuestion via helper semântico do runtime-state', async () => {
+        await persistAgentRuntimePendingQuestionState({
+            question: 'READY?',
+            askedAt: 456,
+            meta: {
+                kind: 'ready',
+                askedAt: 456,
+                allowFreeform: true,
+                protocolControlled: true,
+            },
+        });
+
+        expect(mocks.persistStateWithPolicy).toHaveBeenCalledWith(
+            {
+                pendingQuestion: 'READY?',
+                pendingQuestionMeta: expect.objectContaining({ kind: 'ready', protocolControlled: true }),
+                lastAskUserAt: 456,
+            },
+            { label: 'question.persist.pending' },
         );
     });
 

@@ -16,7 +16,8 @@ import { container, SessionError } from '#copilot/core';
 import { EMITTER_DIALOG_LOOP_CHANGED, EMITTER_DIALOG_RECOVERY, EMITTER_SESSION_KEEPALIVE } from '#copilot/events';
 import { CONTEXT_UTIL_BLOCK_THRESHOLD, CONTEXT_UTIL_WARN_THRESHOLD } from '../../config/agent.js';
 import { withAgentErrorPolicy } from '../error-policy.js';
-import { log, METRICS_STORE } from '../ports/observability-port.js';
+import { log } from '../ports/logging-port.js';
+import { METRICS_STORE } from '../ports/metrics-port.js';
 import {
     assertEmitterHost,
     normalizeCompactionComplete,

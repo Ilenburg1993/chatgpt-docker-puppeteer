@@ -31,6 +31,7 @@ import { toError } from '../core/error-handlers.js';
  *
  * @typedef {{
  *     id: string;
+ *     phaseId: string | null;
  *     status: 'ok' | 'failed';
  *     startedAt: number;
  *     completedAt: number;
@@ -59,9 +60,32 @@ import { toError } from '../core/error-handlers.js';
  *
  *
  * @typedef {{
- *     run: () => void | Promise<void>;
+ *     id: string;
+ *     attempts: number;
+ *     okCount: number;
+ *     skippedCount: number;
+ *     failedCount: number;
+ *     timeoutCount: number;
+ *     totalDurationMs: number;
+ *     avgDurationMs: number;
+ *     lastStatus: BootPhaseStatus;
+ *     lastDurationMs: number;
+ *     lastCompletedAt: number;
+ *     lastError: string | null;
+ * }} BootPhaseMetric
+ *
+ *
+ * @typedef {{
+ *     phaseId: string;
+ *     registerRollback: (id: string, rollback: () => void | Promise<void>) => void;
+ * }} BootPhaseRunContext
+ *
+ *
+ * @typedef {{
+ *     run: (context: BootPhaseRunContext) => void | Promise<void>;
  *     rollback?: () => void | Promise<void>;
  * }} BootPhaseHandler
+ *
  *
  * @typedef {(event: { type: string; timestamp: number; [key: string]: unknown }) => void} BootLifecycleEventEmitter
  *
@@ -72,6 +96,8 @@ const DEFAULT_BOOT_PHASE_TIMEOUT_MS = 30_000;
 
 /** @type {BootLifecycleReport | null} */
 let lastBootLifecycleReport = null;
+/** @type {Map<string, Omit<BootPhaseMetric, 'avgDurationMs'>>} */
+const bootPhaseMetrics = new Map();
 
 export class BootPhaseTimeoutError extends Error {
     /**
@@ -97,7 +123,7 @@ export class BootPhaseTimeoutError extends Error {
  *     phases: BootPlanPhaseLike[];
  * }} plan
  * @param {{
- *     phaseHandlers?: Record<string, BootPhaseHandler | (() => void | Promise<void>)>;
+ *     phaseHandlers?: Record<string, BootPhaseHandler | ((context: BootPhaseRunContext) => void | Promise<void>)>;
  *     emit?: BootLifecycleEventEmitter | null;
  *     log?: BootLifecycleLogFn | null;
  * }} [options]
@@ -109,7 +135,7 @@ export async function runCopilotBootPlan(plan, options = {}) {
     const phases = [];
     /** @type {BootRollbackReport[]} */
     const rollbacks = [];
-    /** @type {{ id: string; rollback: () => void | Promise<void> }[]} */
+    /** @type {{ id: string; phaseId: string | null; rollback: () => void | Promise<void> }[]} */
     const rollbackStack = [];
     const emit = typeof options.emit === 'function' ? options.emit : null;
     const log = typeof options.log === 'function' ? options.log : null;
@@ -130,19 +156,22 @@ export async function runCopilotBootPlan(plan, options = {}) {
 
             if (!handler) {
                 const completedAt = Date.now();
-                phases.push({
+                const report = {
                     id: phase.id,
                     owner: phase.owner,
-                    status: 'skipped',
+                    status: /** @type {const} */ ('skipped'),
                     timeoutMs,
                     startedAt: phaseStartedAt,
                     completedAt,
                     durationMs: completedAt - phaseStartedAt,
                     error: null,
-                });
+                };
+                phases.push(report);
+                recordBootPhaseMetric(report);
                 continue;
             }
 
+            const phaseContext = createBootPhaseRunContext(phase.id, rollbackStack);
             emitBootEvent(emit, 'runtime.boot.phase_started', {
                 phase: phase.id,
                 owner: phase.owner,
@@ -150,19 +179,23 @@ export async function runCopilotBootPlan(plan, options = {}) {
             });
 
             try {
-                await runPhaseWithTimeout(phase.id, timeoutMs, handler.run);
+                await runPhaseWithTimeout(phase.id, timeoutMs, handler.run, phaseContext);
                 const completedAt = Date.now();
-                phases.push({
+                const report = {
                     id: phase.id,
                     owner: phase.owner,
-                    status: 'ok',
+                    status: /** @type {const} */ ('ok'),
                     timeoutMs,
                     startedAt: phaseStartedAt,
                     completedAt,
                     durationMs: completedAt - phaseStartedAt,
                     error: null,
-                });
-                if (handler.rollback) rollbackStack.push({ id: phase.id, rollback: handler.rollback });
+                };
+                phases.push(report);
+                recordBootPhaseMetric(report);
+                if (handler.rollback) {
+                    rollbackStack.push({ id: phase.id, phaseId: phase.id, rollback: handler.rollback });
+                }
                 emitBootEvent(emit, 'runtime.boot.phase_completed', {
                     phase: phase.id,
                     owner: phase.owner,
@@ -172,16 +205,18 @@ export async function runCopilotBootPlan(plan, options = {}) {
                 const bootError = toError(error);
                 const completedAt = Date.now();
                 const status = error instanceof BootPhaseTimeoutError ? 'timeout' : 'failed';
-                phases.push({
+                const phaseReport = {
                     id: phase.id,
                     owner: phase.owner,
-                    status,
+                    status: /** @type {BootPhaseStatus} */ (status),
                     timeoutMs,
                     startedAt: phaseStartedAt,
                     completedAt,
                     durationMs: completedAt - phaseStartedAt,
                     error: bootError.message,
-                });
+                };
+                phases.push(phaseReport);
+                recordBootPhaseMetric(phaseReport);
                 emitBootEvent(emit, 'runtime.boot.phase_failed', {
                     phase: phase.id,
                     owner: phase.owner,
@@ -190,9 +225,16 @@ export async function runCopilotBootPlan(plan, options = {}) {
                     error: bootError.message,
                 });
                 await runBootRollbacks(rollbackStack, rollbacks, log);
-                const report = buildBootLifecycleReport(plan, phases, rollbacks, startedAt, phase.id, 'failed');
-                lastBootLifecycleReport = report;
-                emitBootEvent(emit, 'runtime.boot.failed', summarizeBootReport(report));
+                const lifecycleReport = buildBootLifecycleReport(
+                    plan,
+                    phases,
+                    rollbacks,
+                    startedAt,
+                    phase.id,
+                    'failed',
+                );
+                lastBootLifecycleReport = lifecycleReport;
+                emitBootEvent(emit, 'runtime.boot.failed', summarizeBootReport(lifecycleReport));
                 throw error;
             }
         }
@@ -230,16 +272,31 @@ export function getLastBootLifecycleReport() {
 }
 
 /**
+ * Retorna métricas agregadas por fase desde o último reset do processo.
+ *
+ * @returns {BootPhaseMetric[]}
+ */
+export function getBootLifecycleMetrics() {
+    return Array.from(bootPhaseMetrics.values())
+        .map((metric) => ({
+            ...metric,
+            avgDurationMs: metric.attempts > 0 ? Math.round(metric.totalDurationMs / metric.attempts) : 0,
+        }))
+        .sort((a, b) => b.totalDurationMs - a.totalDurationMs || a.id.localeCompare(b.id));
+}
+
+/**
  * Uso exclusivo em testes.
  *
  * @returns {void}
  */
 export function resetBootLifecycleReportForTests() {
     lastBootLifecycleReport = null;
+    bootPhaseMetrics.clear();
 }
 
 /**
- * @param {BootPhaseHandler | (() => void | Promise<void>) | undefined} handler
+ * @param {BootPhaseHandler | ((context: BootPhaseRunContext) => void | Promise<void>) | undefined} handler
  * @returns {BootPhaseHandler | null}
  */
 function normalizePhaseHandler(handler) {
@@ -259,17 +316,72 @@ function normalizeTimeoutMs(timeoutMs) {
 }
 
 /**
+ * @param {BootPhaseReport} phase
+ * @returns {void}
+ */
+function recordBootPhaseMetric(phase) {
+    const existing = bootPhaseMetrics.get(phase.id) ?? {
+        id: phase.id,
+        attempts: 0,
+        okCount: 0,
+        skippedCount: 0,
+        failedCount: 0,
+        timeoutCount: 0,
+        totalDurationMs: 0,
+        lastStatus: phase.status,
+        lastDurationMs: 0,
+        lastCompletedAt: 0,
+        lastError: null,
+    };
+    existing.attempts += 1;
+    existing.totalDurationMs += phase.durationMs;
+    existing.lastStatus = phase.status;
+    existing.lastDurationMs = phase.durationMs;
+    existing.lastCompletedAt = phase.completedAt;
+    existing.lastError = phase.error;
+    if (phase.status === 'ok') existing.okCount += 1;
+    else if (phase.status === 'skipped') existing.skippedCount += 1;
+    else if (phase.status === 'timeout') existing.timeoutCount += 1;
+    else existing.failedCount += 1;
+    bootPhaseMetrics.set(phase.id, existing);
+}
+
+/**
+ * Cria o contexto mutável de uma fase para que handlers transacionais registrem rollbacks parciais assim que alocam
+ * recursos. Isso cobre falhas dentro da própria fase, antes que o rollback de fase completa possa ser registrado.
+ *
+ * @param {string} phaseId
+ * @param {{ id: string; phaseId: string | null; rollback: () => void | Promise<void> }[]} rollbackStack
+ * @returns {BootPhaseRunContext}
+ */
+function createBootPhaseRunContext(phaseId, rollbackStack) {
+    return {
+        phaseId,
+        registerRollback(id, rollback) {
+            if (typeof id !== 'string' || id.trim() === '') {
+                throw new TypeError(`Boot phase "${phaseId}" tried to register a rollback without id`);
+            }
+            if (typeof rollback !== 'function') {
+                throw new TypeError(`Boot phase "${phaseId}" rollback "${id}" is not executable`);
+            }
+            rollbackStack.push({ id: `${phaseId}:${id.trim()}`, phaseId, rollback });
+        },
+    };
+}
+
+/**
  * @param {string} phaseId
  * @param {number} timeoutMs
- * @param {() => void | Promise<void>} run
+ * @param {(context: BootPhaseRunContext) => void | Promise<void>} run
+ * @param {BootPhaseRunContext} context
  * @returns {Promise<void>}
  */
-async function runPhaseWithTimeout(phaseId, timeoutMs, run) {
+async function runPhaseWithTimeout(phaseId, timeoutMs, run, context) {
     /** @type {ReturnType<typeof setTimeout> | null} */
     let timeout = null;
     try {
         await Promise.race([
-            Promise.resolve().then(run),
+            Promise.resolve().then(() => run(context)),
             new Promise((_, reject) => {
                 timeout = setTimeout(() => reject(new BootPhaseTimeoutError(phaseId, timeoutMs)), timeoutMs);
             }),
@@ -280,7 +392,7 @@ async function runPhaseWithTimeout(phaseId, timeoutMs, run) {
 }
 
 /**
- * @param {{ id: string; rollback: () => void | Promise<void> }[]} rollbackStack
+ * @param {{ id: string; phaseId: string | null; rollback: () => void | Promise<void> }[]} rollbackStack
  * @param {BootRollbackReport[]} rollbacks
  * @param {BootLifecycleLogFn | null} log
  * @returns {Promise<void>}
@@ -293,6 +405,7 @@ async function runBootRollbacks(rollbackStack, rollbacks, log) {
             const completedAt = Date.now();
             rollbacks.push({
                 id: item.id,
+                phaseId: item.phaseId,
                 status: 'ok',
                 startedAt,
                 completedAt,
@@ -304,6 +417,7 @@ async function runBootRollbacks(rollbackStack, rollbacks, log) {
             const message = toError(error).message;
             rollbacks.push({
                 id: item.id,
+                phaseId: item.phaseId,
                 status: 'failed',
                 startedAt,
                 completedAt,

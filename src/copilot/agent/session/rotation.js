@@ -17,7 +17,8 @@ import {
     ROTATION_MAX_TURNS,
     ROTATION_MAX_UTIL,
 } from '../../config/agent.js';
-import { log, startSpanImmediate } from '../ports/observability-port.js';
+import { log } from '../ports/logging-port.js';
+import { startSpanImmediate } from '../ports/tracing-port.js';
 
 /**
  * @typedef {Object} RotationDecision

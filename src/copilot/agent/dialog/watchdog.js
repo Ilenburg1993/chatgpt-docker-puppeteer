@@ -10,7 +10,7 @@
  */
 
 import { WATCHDOG_THRESHOLDS } from '../../config/agent.js';
-import { log } from '../ports/observability-port.js';
+import { log } from '../ports/logging-port.js';
 
 /**
  * @typedef {Object} DialogWatchdogOptions

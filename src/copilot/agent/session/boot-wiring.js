@@ -25,7 +25,8 @@ import { toError } from '#copilot/core';
 import { EMITTER_QUOTA_WARNING, EMITTER_SDK_LIFECYCLE } from '#copilot/events';
 import { withAgentErrorPolicy } from '../error-policy.js';
 import { attachAgentSdkBootLifecycleBridge, startAgentSdkBootQuotaBridge } from '../facades/agent-sdk-access.js';
-import { defaultMetrics, log } from '../ports/observability-port.js';
+import { log } from '../ports/logging-port.js';
+import { defaultMetrics } from '../ports/metrics-port.js';
 import {
     createBootWiringState,
     stepAttachAgentObserver,

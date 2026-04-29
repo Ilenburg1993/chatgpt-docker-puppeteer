@@ -3,6 +3,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 
 import {
+    getBootLifecycleMetrics,
     getLastBootLifecycleReport,
     resetBootLifecycleReportForTests,
     runCopilotBootPlan,
@@ -77,5 +78,50 @@ describe('boot/lifecycle-runner', () => {
         expect(report?.failedPhase).toBe('two');
         expect(report?.failedCount).toBe(1);
         expect(report?.rollbacks).toEqual([expect.objectContaining({ id: 'one', status: 'ok' })]);
+    });
+
+    it('permite rollback parcial registrado dentro da fase que falha', async () => {
+        /** @type {string[]} */
+        const rollbacks = [];
+
+        await expect(
+            runCopilotBootPlan(plan, {
+                phaseHandlers: {
+                    one: {
+                        run: (ctx) => {
+                            ctx.registerRollback('socket', () => rollbacks.push('socket'));
+                            ctx.registerRollback('listener', () => rollbacks.push('listener'));
+                            throw new Error('partial boom');
+                        },
+                    },
+                },
+            }),
+        ).rejects.toThrow('partial boom');
+
+        expect(rollbacks).toEqual(['listener', 'socket']);
+        const report = getLastBootLifecycleReport();
+        expect(report?.failedPhase).toBe('one');
+        expect(report?.rollbacks).toEqual([
+            expect.objectContaining({ id: 'one:listener', phaseId: 'one', status: 'ok' }),
+            expect.objectContaining({ id: 'one:socket', phaseId: 'one', status: 'ok' }),
+        ]);
+    });
+
+    it('agrega métricas por fase do boot lifecycle', async () => {
+        await runCopilotBootPlan(plan, {
+            phaseHandlers: {
+                one: () => undefined,
+                two: () => undefined,
+            },
+        });
+
+        const metrics = getBootLifecycleMetrics();
+        expect(metrics).toEqual(
+            expect.arrayContaining([
+                expect.objectContaining({ id: 'one', attempts: 1, okCount: 1, lastStatus: 'ok' }),
+                expect.objectContaining({ id: 'two', attempts: 1, okCount: 1, lastStatus: 'ok' }),
+                expect.objectContaining({ id: 'delegated', attempts: 1, skippedCount: 1, lastStatus: 'skipped' }),
+            ]),
+        );
     });
 });

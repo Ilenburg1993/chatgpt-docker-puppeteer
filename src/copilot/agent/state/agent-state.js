@@ -14,7 +14,7 @@
 import { AGENT_EVENTS } from '#copilot/events';
 import { STATUS_SNAPSHOT_TTL_MS } from '../../config/agent.js';
 import { readState } from '../lifecycle/state-io.js';
-import { buildStatusSnapshot } from '../ports/observability-port.js';
+import { buildStatusSnapshot } from '../ports/snapshot-port.js';
 
 /**
  * @typedef {import('../agent-context.js').AgentContext} AgentContext

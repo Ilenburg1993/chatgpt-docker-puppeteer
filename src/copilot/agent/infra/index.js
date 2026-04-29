@@ -10,8 +10,8 @@ export { buildAuditingPermissionHandler, isHighRiskTool, logToolAudit } from '#c
 export { checkResolvedIp, isPrivateIp, validateWebhookUrl } from '#copilot/core';
 export { WebhookManager } from '../../infra/webhooks.js';
 export { executeTask } from '../messaging/agent-messaging.js';
-export { buildStatusSnapshot } from '../ports/observability-port.js';
 export { PermissionController } from '../ports/permission-port.js';
+export { buildStatusSnapshot } from '../ports/snapshot-port.js';
 export {
     bootstrapAgentTools as bootstrapTools,
     configureHookTools,

@@ -41,8 +41,9 @@ import {
 } from '../../events/index.js';
 import { getAgent } from '../always-alive.js';
 import { checkAgentSdkAuthStatus, createAgentSdkClient } from '../facades/agent-sdk-access.js';
+import { ERROR_TRACKER } from '../ports/error-tracking-port.js';
 import { getDefaultHookBus } from '../ports/hook-port.js';
-import { ERROR_TRACKER, log } from '../ports/observability-port.js';
+import { log } from '../ports/logging-port.js';
 import {
     discoverRuntimePlugins,
     registerRuntimeAgentEventHost,

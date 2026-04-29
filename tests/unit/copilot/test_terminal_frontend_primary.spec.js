@@ -186,12 +186,12 @@ vi.mock('#copilot/agent', () => ({
     readAgentRuntimeStatusSnapshot: (/** @type {any} */ runtime) => runtime.getStatusSnapshot(),
     readAgentRuntimeHealthSnapshot: (/** @type {any} */ runtime) => runtime.getHealthSnapshot(),
     readRuntimeControlState: (/** @type {any} */ runtime) => ({
-        status: runtime.status,
-        model: runtime.model,
-        reasoningEffort: runtime.reasoningEffort ?? 'off',
-        sessionId: runtime.sessionId ?? null,
+        status: runtime.getStatusSnapshot?.().status ?? runtime.status,
+        model: runtime.getStatusSnapshot?.().model ?? runtime.model,
+        reasoningEffort: runtime.getStatusSnapshot?.().reasoningEffort ?? runtime.reasoningEffort ?? 'off',
+        sessionId: runtime.sessionId ?? runtime.getStatusSnapshot?.().sessionId ?? null,
         dialogLoopActive: Boolean(runtime.dialogLoopActive),
-        dialogPaused: Boolean(runtime.dialogPaused),
+        dialogPaused: Boolean(runtime.getStatusSnapshot?.().dialogPaused ?? runtime.dialogPaused),
         queueSize: Number(runtime.queueSize ?? 0),
     }),
     readRuntimeInteractionState: (/** @type {any} */ runtime) => ({

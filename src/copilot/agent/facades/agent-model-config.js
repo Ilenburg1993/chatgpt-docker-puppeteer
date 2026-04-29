@@ -10,7 +10,7 @@
  */
 
 import { toError } from '../../core/error-handlers.js';
-import { log } from '../ports/observability-port.js';
+import { log } from '../ports/logging-port.js';
 import { trySetLiveSessionModel } from '../runtime-contracts.js';
 import { readAgentRuntimeStatusSnapshot } from './agent-runtime-status.js';
 import {

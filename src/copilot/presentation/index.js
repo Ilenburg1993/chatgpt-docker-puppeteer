@@ -23,6 +23,7 @@ export {
     getAgentHealthSnapshotCompat,
 } from './runtime-health.js';
 export * from './runtime-lifecycle.js';
+export * from './runtime-meta.js';
 export * from './runtime-models.js';
 export * from './runtime-overview.js';
 export * from './runtime-ownership.js';

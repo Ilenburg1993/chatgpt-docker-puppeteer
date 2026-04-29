@@ -32,7 +32,7 @@ import { log } from '#copilot/observability';
 import { getMcpStatus } from '../bridges/mcp-tool-bridge.js';
 import { PinnedFilesLoader } from '../config/pinned-files.js';
 import { container } from '../core/di-container.js';
-import { registerTimer } from '../core/timer-registry.js';
+import { cancel as cancelTimer, registerTimer } from '../core/timer-registry.js';
 import { getHubSessionId, setHubSessionId } from '../presentation/runtime-ui-state-store.js';
 import { recordTerminalActivity, terminalActivityEmitter } from './activity-state.js';
 import { loadAliasesAsync } from './alias-store.js';
@@ -98,6 +98,8 @@ let _reflectionTimer = null;
 
 /** @type {boolean} */
 let _sighupHandlerRegistered = false;
+/** @type {(() => void) | null} */
+let _sighupHandler = null;
 
 /**
  * @typedef {import('../server/index.js').CopilotServerOptions} TerminalCopilotServerOptions
@@ -134,6 +136,7 @@ let _sighupHandlerRegistered = false;
  *       ) => void)
  *     | null} terminalActivityChangedHandler
  * @property {TerminalCopilotServer | null} copilotServer
+ * @property {NodeJS.Timeout | null} todoCleanupTimer
  */
 
 /**
@@ -198,6 +201,7 @@ export function createTerminalBootContext(options = {}) {
         activityChangedHandler: null,
         terminalActivityChangedHandler: null,
         copilotServer: null,
+        todoCleanupTimer: null,
     };
 }
 
@@ -354,6 +358,7 @@ export async function runTerminalRuntimeListenersPhase(ctx) {
 
     const todoCleanupTimer = ctx.startTodoCleanupJob();
     if (typeof todoCleanupTimer.unref === 'function') todoCleanupTimer.unref();
+    ctx.todoCleanupTimer = todoCleanupTimer;
     registerTimer('terminal.todoCleanup', 'interval', todoCleanupTimer);
 
     registerTerminalShutdownHandlers(ctx);
@@ -363,9 +368,10 @@ export async function runTerminalRuntimeListenersPhase(ctx) {
     }
 
     if (!_sighupHandlerRegistered) {
-        process.on('SIGHUP', () => {
+        _sighupHandler = () => {
             log('INFO', '[TerminalServer] SIGHUP recebido — mantendo inject server ativo (painel reaberto).');
-        });
+        };
+        process.on('SIGHUP', _sighupHandler);
         _sighupHandlerRegistered = true;
     }
 
@@ -382,6 +388,73 @@ export async function runTerminalRuntimeListenersPhase(ctx) {
         bootPreflight: ctx.bootPreflight,
     });
     log('INFO', '[TerminalServer] terminal.started emitido.');
+}
+
+/**
+ * Rollback/cleanup direto dos recursos de pinned context. Usado tanto pelo shutdown central quanto por falha de boot
+ * antes do shutdown global assumir.
+ *
+ * @param {TerminalBootContext} ctx
+ * @returns {Promise<void>}
+ */
+export async function rollbackTerminalPinnedContextPhase(ctx) {
+    const pinnedLoader = ctx.pinnedLoader;
+    ctx.disposePinnedBridge?.();
+    ctx.disposePinnedBridge = null;
+    if (ctx.activityChangedHandler) {
+        terminalActivityEmitter.off('activity:changed', ctx.activityChangedHandler);
+        ctx.activityChangedHandler = null;
+    }
+    if (pinnedLoader && ctx.pinnedFilesChangedHandler) {
+        if (typeof pinnedLoader.off === 'function') {
+            pinnedLoader.off('changed', ctx.pinnedFilesChangedHandler);
+        } else {
+            pinnedLoader.removeListener('changed', ctx.pinnedFilesChangedHandler);
+        }
+        ctx.pinnedFilesChangedHandler = null;
+    }
+    if (pinnedLoader && typeof pinnedLoader.stop === 'function') {
+        await Promise.resolve(pinnedLoader.stop());
+    }
+    ctx.pinnedLoader = null;
+}
+
+/**
+ * @param {TerminalBootContext} ctx
+ * @returns {Promise<void>}
+ */
+export async function rollbackTerminalHttpServerPhase(ctx) {
+    const server = ctx.copilotServer;
+    ctx.copilotServer = null;
+    if (server && typeof server.close === 'function') {
+        await server.close();
+    }
+}
+
+/**
+ * @param {TerminalBootContext} ctx
+ * @returns {Promise<void>}
+ */
+export async function rollbackTerminalRuntimeListenersPhase(ctx) {
+    if (_reflectionTimer !== null) {
+        clearInterval(_reflectionTimer);
+        cancelTimer('terminal.reflection');
+        _reflectionTimer = null;
+    }
+    if (ctx.todoCleanupTimer !== null) {
+        clearInterval(ctx.todoCleanupTimer);
+        cancelTimer('terminal.todoCleanup');
+        ctx.todoCleanupTimer = null;
+    }
+    if (ctx.terminalActivityChangedHandler) {
+        terminalActivityEmitter.off('activity:changed', ctx.terminalActivityChangedHandler);
+        ctx.terminalActivityChangedHandler = null;
+    }
+    if (_sighupHandlerRegistered && _sighupHandler) {
+        process.off('SIGHUP', _sighupHandler);
+        _sighupHandler = null;
+        _sighupHandlerRegistered = false;
+    }
 }
 
 /**
@@ -412,10 +485,7 @@ function registerTerminalShutdownHandlers(ctx) {
     registerShutdownHandler(
         'terminal.reflectionTimer',
         async () => {
-            if (_reflectionTimer !== null) {
-                clearInterval(_reflectionTimer);
-                _reflectionTimer = null;
-            }
+            await rollbackTerminalRuntimeListenersPhase(ctx);
             log('INFO', '[TerminalServer] Reflection timer cancelado via shutdown handler.');
         },
         SHUTDOWN_PRIORITY.RUNTIME_CRITICAL,
@@ -424,21 +494,7 @@ function registerTerminalShutdownHandlers(ctx) {
     registerShutdownHandler(
         'terminal.pinnedFilesLoader',
         async () => {
-            const pinnedLoader = ctx.pinnedLoader;
-            ctx.disposePinnedBridge?.();
-            if (ctx.activityChangedHandler) {
-                terminalActivityEmitter.off('activity:changed', ctx.activityChangedHandler);
-            }
-            if (pinnedLoader && ctx.pinnedFilesChangedHandler) {
-                if (typeof pinnedLoader.off === 'function') {
-                    pinnedLoader.off('changed', ctx.pinnedFilesChangedHandler);
-                } else {
-                    pinnedLoader.removeListener('changed', ctx.pinnedFilesChangedHandler);
-                }
-            }
-            if (pinnedLoader && typeof pinnedLoader.stop === 'function') {
-                await Promise.resolve(pinnedLoader.stop());
-            }
+            await rollbackTerminalPinnedContextPhase(ctx);
             log('INFO', '[TerminalServer] PinnedFilesLoader desligado via shutdown handler.');
         },
         SHUTDOWN_PRIORITY.TERMINAL_RESOURCE,
@@ -447,9 +503,7 @@ function registerTerminalShutdownHandlers(ctx) {
     registerShutdownHandler(
         'terminal.activityEmitter',
         async () => {
-            if (ctx.terminalActivityChangedHandler) {
-                terminalActivityEmitter.off('activity:changed', ctx.terminalActivityChangedHandler);
-            }
+            await rollbackTerminalRuntimeListenersPhase(ctx);
             log('INFO', '[TerminalServer] Activity emitter desacoplado via shutdown handler.');
         },
         SHUTDOWN_PRIORITY.TERMINAL_ACTIVITY,

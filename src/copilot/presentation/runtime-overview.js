@@ -7,12 +7,13 @@
  *   duplicação entre `presentation/system-*`, `terminal/frontend/*` e futuras bordas multi-agent.
  */
 
-import { readAgentRuntimeHealthSnapshot, readAgentRuntimeStatusSnapshot } from '#copilot/agent';
 import {
+    readAgentRuntimeHealthSnapshot,
+    readAgentRuntimeStatusSnapshot,
     readRuntimeControlState,
     readRuntimeInteractionState,
     readRuntimePrBudgetSnapshot,
-} from '../agent/facades/agent-runtime-controls.js';
+} from '#copilot/agent';
 import { listKnownAgentRuntimes, resolveAgentRuntimeSelection } from './agent-runtime.js';
 
 /**

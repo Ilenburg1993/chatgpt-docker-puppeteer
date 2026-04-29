@@ -12,8 +12,8 @@
 
 import { EMITTER_QUESTION_PENDING } from '#copilot/events';
 import { DialogProtocol } from '../../dialog/protocol.js';
-import { persistStateWithPolicy } from '../lifecycle/state-io.js';
-import { log } from '../ports/observability-port.js';
+import { persistAgentRuntimePendingQuestionState } from '../facades/agent-runtime-state.js';
+import { log } from '../ports/logging-port.js';
 
 const REPLY_PROTOCOL_CONTINUE =
     'CONTINUE_DIALOG_LOOP: resposta entregue ao usuario; chame ask_user("READY: aguardando próxima mensagem") agora.';
@@ -63,13 +63,19 @@ function trackBackgroundTask(ctx, task, meta) {
  * Persiste snapshot parcial do user-input usando a policy canônica do `agent`.
  *
  * @param {UserInputContext} ctx
- * @param {Record<string, unknown>} data
+ * @param {{
+ *     question: string;
+ *     meta: import('../types.js').PendingQuestionMeta;
+ *     askedAt: number;
+ * }} data
  * @param {{ label?: string; description?: string }} meta
  * @returns {void}
  */
 function trackPersistedUserInputState(ctx, data, meta) {
-    const policyOpts = meta.label !== undefined ? { label: meta.label } : {};
-    const task = persistStateWithPolicy(data, policyOpts).then((result) => {
+    const task = persistAgentRuntimePendingQuestionState(
+        data,
+        meta.label !== undefined ? { label: meta.label } : {},
+    ).then((result) => {
         if (!result.ok) {
             throw result.error;
         }
@@ -195,14 +201,14 @@ function handleInteractiveQuestion({ question, choices, allowFreeform, kind = 'q
             trackPersistedUserInputState(
                 ctx,
                 {
-                    pendingQuestion: question,
-                    pendingQuestionMeta: buildPendingQuestionMeta({
+                    question,
+                    askedAt,
+                    meta: buildPendingQuestionMeta({
                         kind: questionKind,
                         askedAt,
                         allowFreeform,
                         ...(choices !== undefined ? { choices } : {}),
                     }),
-                    lastAskUserAt: askedAt,
                 },
                 {
                     label: 'question.persist.pending',

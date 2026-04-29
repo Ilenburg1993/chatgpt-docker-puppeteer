@@ -1,16 +1,19 @@
 // @ts-check
 /**
- * Porta de observabilidade do agent.
+ * Porta agregada de observabilidade do agent.
  *
- * Centraliza o acesso do runtime a logging, spans, métricas e snapshots para que o miolo do `agent/` não dependa
- * diretamente da topologia concreta de `observability/`.
+ * Compatibilidade: novos imports devem preferir portas finas (`logging-port`, `metrics-port`, `tracing-port`,
+ * `error-tracking-port`, `event-observer-port`, `snapshot-port`).
  *
- * Esta porta é deliberadamente um re-export fino. Ela não deve reinterpretar métricas nem decidir health; serve apenas
- * como ponto de import permitido para módulos do agent que precisam registrar sinais operacionais.
+ * Esta porta permanece como aggregate para consumidores legados/testes e para evitar quebra em ondas intermediárias.
  *
  * Ao adicionar nova observabilidade no runtime:
  *
- * - se for emissão/coleta transversal, exporte por aqui;
+ * - se for logging, use `logging-port`;
+ * - se for métrica, use `metrics-port`;
+ * - se for span/telemetry, use `tracing-port`;
+ * - se for erro, use `error-tracking-port`;
+ * - se for evento/coletor, use `event-observer-port`;
  * - se for projection para HTTP/terminal, prefira `presentation/`;
  * - se for decisão de domínio, mantenha no módulo do agent que possui o estado.
  *
@@ -18,18 +21,9 @@
  * @internal
  */
 
-export {
-    ERROR_TRACKER,
-    METRICS_STORE,
-    buildTelemetryConfig,
-    createAgentEventObserver,
-    defaultErrorTracker,
-    defaultEventCollector,
-    defaultMetrics,
-    initEventCollector,
-    log,
-    startSpan,
-    startSpanImmediate,
-} from '#copilot/observability';
-
-export { buildStatusSnapshot } from '../../observability/snapshots.js';
+export { ERROR_TRACKER, defaultErrorTracker } from './error-tracking-port.js';
+export { createAgentEventObserver, defaultEventCollector, initEventCollector } from './event-observer-port.js';
+export { log } from './logging-port.js';
+export { METRICS_STORE, defaultMetrics } from './metrics-port.js';
+export { buildStatusSnapshot } from './snapshot-port.js';
+export { buildTelemetryConfig, startSpan, startSpanImmediate } from './tracing-port.js';

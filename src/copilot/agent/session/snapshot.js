@@ -19,7 +19,8 @@ import { SNAPSHOT_DIR as _SNAPSHOT_DIR_ENV, MAX_SNAPSHOTS } from '../../config/a
 import { safeJsonParse } from '../../core/safe-json.js';
 import { SessionSnapshotDataSchema, SnapshotListItemSchema } from '../../core/schemas.js';
 import { readState } from '../lifecycle/state-io.js';
-import { log, startSpan } from '../ports/observability-port.js';
+import { log } from '../ports/logging-port.js';
+import { startSpan } from '../ports/tracing-port.js';
 
 const SNAPSHOT_DIR = _SNAPSHOT_DIR_ENV ? resolve(_SNAPSHOT_DIR_ENV) : resolve(resolveHooksStateDir(), 'snapshots');
 

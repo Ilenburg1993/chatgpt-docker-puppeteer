@@ -8,6 +8,7 @@
  */
 
 import { resolveAgentRuntimeSelection } from './agent-runtime.js';
+import { buildRuntimeRouteMetaFromSelection } from './runtime-meta.js';
 
 /**
  * @typedef {{
@@ -25,9 +26,6 @@ export function buildDefaultCopilotApiRouteDeps(runtimeId) {
     const selection = resolveAgentRuntimeSelection(runtimeId);
     return {
         agent: selection.runtime,
-        runtimeId: selection.runtimeId,
-        requestedRuntimeId: selection.requestedRuntimeId,
-        runtimeFound: selection.runtimeFound,
-        usedDefaultRuntimeFallback: selection.usedDefaultRuntimeFallback,
+        ...buildRuntimeRouteMetaFromSelection(selection),
     };
 }
