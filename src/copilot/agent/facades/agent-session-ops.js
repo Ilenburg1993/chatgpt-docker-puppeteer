@@ -76,8 +76,8 @@ export async function getSessionMessages(ctx) {
  * Executa um tick semântico de keepalive da sessão viva do agent.
  *
  * Regra arquitetural: o scheduler de keepalive decide apenas _quando_ manter a sessão viva. A decisão de _como_ tocar o
- * SDK (`client.ping()` vs `session.send()`) passa por esta façade, evitando que `agent/session/keepalive.js` manipule
- * handles crus do SDK diretamente.
+ * SDK (`client.ping()` vs `session.send()`) passa por esta façade, evitando que `agent/session/lifecycle/keepalive.js`
+ * manipule handles crus do SDK diretamente.
  *
  * @param {import('../agent-context.js').AgentContext} ctx
  * @returns {Promise<'client.ping' | 'session.send' | null>}

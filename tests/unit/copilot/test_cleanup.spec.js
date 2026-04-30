@@ -20,7 +20,7 @@ vi.mock('../../../src/copilot/agent/config.js', () => ({
 
 /* ── SUT ── */
 import { deleteSession, listSessions } from '#copilot/sdk/session';
-import { cleanupStaleSessions } from '../../../src/copilot/agent/session/cleanup.js';
+import { cleanupStaleSessions } from '../../../src/copilot/agent/session/lifecycle/cleanup.js';
 
 describe('cleanupStaleSessions', () => {
     beforeEach(() => {

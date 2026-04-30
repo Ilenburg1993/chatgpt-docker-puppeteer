@@ -1,6 +1,6 @@
 // @ts-check
 /**
- * src/copilot/agent/session/history-sync.js
+ * src/copilot/agent/session/history/history-sync.js
  *
  * Sincronização de histórico SDK → ConversationStore e cache de mensagens.
  *
@@ -10,9 +10,9 @@
  * @see EventBus
  */
 
-import { withAgentErrorPolicy } from '../error-policy.js';
-import { canReadAgentSdkSessionMessages, readAgentSdkSessionMessages } from '../facades/agent-sdk-runtime.js';
-import { log } from '../ports/logging-port.js';
+import { withAgentErrorPolicy } from '../../error-policy.js';
+import { canReadAgentSdkSessionMessages, readAgentSdkSessionMessages } from '../../facades/agent-sdk-runtime.js';
+import { log } from '../../ports/logging-port.js';
 
 const DEFAULT_MESSAGES_CACHE_MAX_ITEMS = 1_000;
 
@@ -105,7 +105,7 @@ async function runSdkHistorySync(session, deps) {
  *     phase?: string;
  *     taskId?: string;
  * }} [policy]
- * @returns {Promise<import('../error-policy.js').AgentPolicyResult<SessionHistorySyncResult>>}
+ * @returns {Promise<import('../../error-policy.js').AgentPolicyResult<SessionHistorySyncResult>>}
  */
 export async function syncSdkHistory(session, emit, deps, policy = {}) {
     const label = policy.label ?? 'session.history.sync';

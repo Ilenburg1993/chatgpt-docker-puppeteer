@@ -16,7 +16,7 @@ vi.mock('../../../src/copilot/agent/lifecycle/state-io.js', () => ({
     readStateAsync: mocks.readStateAsync,
 }));
 
-vi.mock('../../../src/copilot/agent/session/snapshot.js', () => ({
+vi.mock('../../../src/copilot/agent/session/state/snapshot.js', () => ({
     createSnapshot: mocks.createSnapshot,
     saveSnapshotAsync: mocks.saveSnapshotAsync,
 }));

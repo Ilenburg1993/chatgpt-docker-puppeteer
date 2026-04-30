@@ -324,18 +324,18 @@ describe('Fase A3 — boot-wiring lifecycle + SessionConfig fields', () => {
         it('boot-wiring.js usa helpers de lifecycle via agent-sdk-access', async () => {
             const fs = await import('node:fs');
             const src = fs.readFileSync(
-                new URL('../../../src/copilot/agent/session/boot-wiring.js', import.meta.url),
+                new URL('../../../src/copilot/agent/session/boot/boot-wiring.js', import.meta.url),
                 'utf-8',
             );
             expect(src).toContain('attachAgentSdkBootLifecycleBridge');
-            expect(src).toContain("from '../facades/agent-sdk-access.js'");
+            expect(src).toContain("from '../../facades/agent-sdk-access.js'");
             expect(src).not.toContain("from '#copilot/sdk'");
         });
 
         it('boot-wiring.js NÃO usa SESSION_LIFECYCLE_EVENTS diretamente em client.on()', async () => {
             const fs = await import('node:fs');
             const src = fs.readFileSync(
-                new URL('../../../src/copilot/agent/session/boot-wiring.js', import.meta.url),
+                new URL('../../../src/copilot/agent/session/boot/boot-wiring.js', import.meta.url),
                 'utf-8',
             );
             const section3Match = src.match(/\/\/ ── 3\. Client lifecycle[\s\S]*?\/\/ ── 4\./);

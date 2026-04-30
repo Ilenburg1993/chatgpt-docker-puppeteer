@@ -45,10 +45,13 @@ describe('agent › K4 background task tracker integration', () => {
             readFile(new URL('../../../src/copilot/agent/agent-context.js', import.meta.url), 'utf-8'),
             readFile(new URL('../../../src/copilot/agent/context-factories.js', import.meta.url), 'utf-8'),
             readFile(new URL('../../../src/copilot/agent/lifecycle/agent-lifecycle.js', import.meta.url), 'utf-8'),
-            readFile(new URL('../../../src/copilot/agent/session/boot-steps.js', import.meta.url), 'utf-8'),
-            readFile(new URL('../../../src/copilot/agent/session/boot-session-prep.js', import.meta.url), 'utf-8'),
-            readFile(new URL('../../../src/copilot/agent/session/boot-dialog-recovery.js', import.meta.url), 'utf-8'),
-            readFile(new URL('../../../src/copilot/agent/session/boot-runtime-bind.js', import.meta.url), 'utf-8'),
+            readFile(new URL('../../../src/copilot/agent/session/boot/boot-steps.js', import.meta.url), 'utf-8'),
+            readFile(new URL('../../../src/copilot/agent/session/boot/boot-session-prep.js', import.meta.url), 'utf-8'),
+            readFile(
+                new URL('../../../src/copilot/agent/session/boot/boot-dialog-recovery.js', import.meta.url),
+                'utf-8',
+            ),
+            readFile(new URL('../../../src/copilot/agent/session/boot/boot-runtime-bind.js', import.meta.url), 'utf-8'),
             readFile(
                 new URL('../../../src/copilot/agent/dialog/wiring/user-input-handler.js', import.meta.url),
                 'utf-8',

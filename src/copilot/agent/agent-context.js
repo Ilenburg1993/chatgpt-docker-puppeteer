@@ -151,13 +151,13 @@ export class AgentContext {
     /** @type {import('#copilot/sdk/tools-registry').ToolRegistry} */
     toolsRegistry;
 
-    /** @type {import('./session/keepalive.js').SessionKeepalive} */
+    /** @type {import('./session/lifecycle/keepalive.js').SessionKeepalive} */
     keepalive;
 
     /** @type {import('./infra/handoff-manager.js').HandoffManager} */
     handoff;
 
-    /** @type {import('./session/history-sync.js').SessionMessagesCache} */
+    /** @type {import('./session/history/history-sync.js').SessionMessagesCache} */
     messagesCache;
 
     /** @type {import('./background-tasks.js').BackgroundTasks} */
@@ -1688,7 +1688,7 @@ export class AgentContext {
     /**
      * Retorna o keepalive vivo para integrações legadas que ainda exigem o manager.
      *
-     * @returns {import('./session/keepalive.js').SessionKeepalive}
+     * @returns {import('./session/lifecycle/keepalive.js').SessionKeepalive}
      */
     getKeepaliveManagerSnapshot() {
         return this.keepalive;

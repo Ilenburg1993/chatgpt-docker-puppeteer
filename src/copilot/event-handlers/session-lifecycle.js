@@ -34,8 +34,8 @@ function normalizeSdkMessage(raw) {
 }
 
 /**
- * @param {import('#copilot/agent/session/event-wirer').CopilotSessionLike} session
- * @param {Pick<import('#copilot/agent/session/event-wirer').SessionWirerCallbacks, 'emit'>} cb
+ * @param {import('#copilot/agent/session/wiring/event-wirer').CopilotSessionLike} session
+ * @param {Pick<import('#copilot/agent/session/wiring/event-wirer').SessionWirerCallbacks, 'emit'>} cb
  * @returns {(() => void)[]}
  */
 export function wireSessionLifecycleEvents(session, { emit }) {

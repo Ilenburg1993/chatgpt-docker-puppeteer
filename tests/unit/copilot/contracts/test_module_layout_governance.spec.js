@@ -160,8 +160,8 @@ describe('W113 — module layout governance: agent/session', () => {
     });
 
     it('mantem arquivos primarios navegaveis', () => {
-        assert.equal(getSessionModuleRole('initializer.js'), 'initializer');
-        assert.equal(getSessionModuleRole('boot-wiring.js'), 'boot');
+        assert.equal(getSessionModuleRole('initializers/initializer.js'), 'initializer');
+        assert.equal(getSessionModuleRole('boot/boot-wiring.js'), 'boot');
         assert.equal(getSessionModuleRole('index.js'), 'entrypoint');
     });
 
@@ -170,12 +170,37 @@ describe('W113 — module layout governance: agent/session', () => {
             .map((entry) => entry.path)
             .sort();
         assert.deepEqual(boot, [
+            'boot/boot-dialog-recovery.js',
+            'boot/boot-runtime-bind.js',
+            'boot/boot-session-prep.js',
+            'boot/boot-steps.js',
+            'boot/boot-wiring.js',
+        ]);
+    });
+
+    it('nao preserva shims na raiz de session apos migracao para subpastas semanticas', () => {
+        const oldRootFiles = [
+            'initializer.js',
+            'boot-wiring.js',
+            'boot-steps.js',
+            'boot-session-prep.js',
             'boot-dialog-recovery.js',
             'boot-runtime-bind.js',
-            'boot-session-prep.js',
-            'boot-steps.js',
-            'boot-wiring.js',
-        ]);
+            'keepalive.js',
+            'cleanup.js',
+            'rotation.js',
+            'event-wirer.js',
+            'history-sync.js',
+            'hook-context.js',
+            'ownership.js',
+            'snapshot.js',
+            'snapshot-store.js',
+        ];
+
+        assert.deepEqual(
+            oldRootFiles.filter((file) => getSessionModuleRole(file) !== undefined),
+            [],
+        );
     });
 
     it('README local documenta os papeis arquiteturais declarados', () => {

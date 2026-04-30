@@ -6,23 +6,23 @@
  * @see EventBus
  */
 
-export { performBootWiring } from './boot-wiring.js';
-export { cleanupStaleSessions } from './cleanup.js';
-export { wireSessionEvents } from './event-wirer.js';
-export { SessionMessagesCache, syncSdkHistory } from './history-sync.js';
+export { performBootWiring } from './boot/boot-wiring.js';
+export { SessionMessagesCache, syncSdkHistory } from './history/history-sync.js';
 export {
     buildHookSystemContext,
     buildHookSystemContextSafe,
     initOrResumeSession,
     setBackgroundCompactionThreshold,
-} from './initializer.js';
-export { SessionKeepalive } from './keepalive.js';
+} from './initializers/initializer.js';
+export { cleanupStaleSessions } from './lifecycle/cleanup.js';
+export { SessionKeepalive } from './lifecycle/keepalive.js';
+export { shouldRotateSession } from './lifecycle/rotation.js';
 export {
     SESSION_MODULE_LAYOUT,
     getSessionModuleDescriptor,
     getSessionModuleRole,
     listSessionModulesByRole,
 } from './module-map.js';
-export { clearActiveSdkSessionOwnership, syncActiveSessionOwnership } from './ownership.js';
-export { shouldRotateSession } from './rotation.js';
-export { createSnapshot, listSnapshotsAsync, loadSnapshotAsync, saveSnapshotAsync } from './snapshot.js';
+export { clearActiveSdkSessionOwnership, syncActiveSessionOwnership } from './state/ownership.js';
+export { createSnapshot, listSnapshotsAsync, loadSnapshotAsync, saveSnapshotAsync } from './state/snapshot.js';
+export { wireSessionEvents } from './wiring/event-wirer.js';

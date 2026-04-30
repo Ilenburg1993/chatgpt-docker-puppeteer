@@ -624,7 +624,7 @@ describe('W4-9 — SDK model/session: helpers de modelo não importam client est
 
 describe('W86.4 — boot steps aggregate permanece fino por re-export', () => {
     it('boot-steps.js não define funções operacionais próprias de wiring', () => {
-        const src = readSrc('agent/session/boot-steps.js');
+        const src = readSrc('agent/session/boot/boot-steps.js');
 
         assert.match(src, /from ['"]\.\/boot-session-prep\.js['"]/);
         assert.match(src, /from ['"]\.\/boot-dialog-recovery\.js['"]/);
@@ -638,7 +638,7 @@ describe('W86.4 — boot steps aggregate permanece fino por re-export', () => {
     });
 
     it('boot-wiring.js continua consumindo surface estável via boot-steps aggregate', () => {
-        const src = readSrc('agent/session/boot-wiring.js');
+        const src = readSrc('agent/session/boot/boot-wiring.js');
 
         assert.match(src, /from ['"]\.\/boot-steps\.js['"]/);
         assert.doesNotMatch(src, /from ['"]\.\/boot-session-prep\.js['"]/);
@@ -659,7 +659,7 @@ describe('W86.5 — state-io consumido via façade fora da allowlist infra', () 
             'agent/runtime/pending-question-state.js',
             'agent/runtime/session-bootstrap-state.js',
             'agent/runtime/shutdown-snapshot-state.js',
-            'agent/session/snapshot.js',
+            'agent/session/state/snapshot.js',
         ]);
         /** @type {string[]} */
         const violations = [];
@@ -839,8 +839,8 @@ describe('W87.1 — agent lifecycle consome core via porta local', () => {
 
 describe('W87.2 — session snapshot delega IO/schema para snapshot-store', () => {
     it('snapshot.js permanece façade fina sem fs/schema parsing inline', () => {
-        const facade = readSrc('agent/session/snapshot.js');
-        const store = readSrc('agent/session/snapshot-store.js');
+        const facade = readSrc('agent/session/state/snapshot.js');
+        const store = readSrc('agent/session/state/snapshot-store.js');
 
         assert.match(facade, /from ['"]\.\/snapshot-store\.js['"]/);
         assert.match(facade, /saveSnapshotFileAsync/);

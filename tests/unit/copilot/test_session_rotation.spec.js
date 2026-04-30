@@ -9,11 +9,11 @@ import assert from 'node:assert/strict';
 import { beforeAll, describe, it } from 'vitest';
 
 describe('shouldRotateSession', async () => {
-    /** @type {typeof import('../../../src/copilot/agent/session/rotation.js').shouldRotateSession} */
+    /** @type {typeof import('../../../src/copilot/agent/session/lifecycle/rotation.js').shouldRotateSession} */
     let shouldRotateSession;
 
     beforeAll(async () => {
-        ({ shouldRotateSession } = await import('../../../src/copilot/agent/session/rotation.js'));
+        ({ shouldRotateSession } = await import('../../../src/copilot/agent/session/lifecycle/rotation.js'));
     });
 
     it('deve retornar false para contexto vazio (dentro dos limites)', () => {

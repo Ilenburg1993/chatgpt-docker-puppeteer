@@ -1,6 +1,6 @@
 // @ts-check
 /**
- * src/copilot/agent/session/event-wirer.js
+ * src/copilot/agent/session/wiring/event-wirer.js
  *
  * Orquestrador de event handlers SDK — delega para módulos em `event-handlers/`.
  *
@@ -26,7 +26,7 @@ import {
 } from '#copilot/event-handlers';
 
 // Re-exportar KNOWN_SDK_EVENTS para consumidores existentes
-export { KNOWN_SDK_EVENTS } from '../../event-handlers/catch-all.js';
+export { KNOWN_SDK_EVENTS } from '../../../event-handlers/catch-all.js';
 
 /**
  * Tipo mínimo de sessão SDK usado pelos handlers — compatível com CopilotSession.
@@ -43,7 +43,7 @@ export { KNOWN_SDK_EVENTS } from '../../event-handlers/catch-all.js';
  *
  * @typedef {Object} SessionWirerCallbacks
  * @property {(event: string, payload?: unknown) => void} emit
- * @property {() => import('../types.js').AgentStatusSnapshot} getStatusSnapshot
+ * @property {() => import('../../types.js').AgentStatusSnapshot} getStatusSnapshot
  * @property {(path: string) => void} onCheckpointPath
  * @property {(contextState: { tokens: number; tokenLimit: number; utilization: number } | null) => void} onContextState
  * @property {(prInfo: {

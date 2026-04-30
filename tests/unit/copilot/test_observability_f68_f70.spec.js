@@ -119,8 +119,8 @@ vi.mock('#copilot/observability', () => ({
 
 import { defaultMetrics, startSpan, startSpanImmediate } from '#copilot/observability';
 import { deleteSession, listSessions } from '#copilot/sdk/session';
-import { cleanupStaleSessions } from '../../../src/copilot/agent/session/cleanup.js';
-import { shouldRotateSession } from '../../../src/copilot/agent/session/rotation.js';
+import { cleanupStaleSessions } from '../../../src/copilot/agent/session/lifecycle/cleanup.js';
+import { shouldRotateSession } from '../../../src/copilot/agent/session/lifecycle/rotation.js';
 
 /** @returns {import('#copilot/sdk/types').CopilotClient} */
 function makeClient() {
@@ -319,7 +319,7 @@ describe('F70: Métricas e Cleanup paralelo', () => {
 
 describe('F69: Async snapshot exports', () => {
     it('exporta funções async de snapshot.js', async () => {
-        const mod = await import('../../../src/copilot/agent/session/snapshot.js');
+        const mod = await import('../../../src/copilot/agent/session/state/snapshot.js');
 
         expect(typeof mod.saveSnapshotAsync).toBe('function');
         expect(typeof mod.listSnapshotsAsync).toBe('function');
@@ -329,7 +329,7 @@ describe('F69: Async snapshot exports', () => {
     });
 
     it('createSnapshot continua síncrono', async () => {
-        const { createSnapshot } = await import('../../../src/copilot/agent/session/snapshot.js');
+        const { createSnapshot } = await import('../../../src/copilot/agent/session/state/snapshot.js');
 
         const snap = createSnapshot({
             sessionId: 'test-sess',

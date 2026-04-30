@@ -14,7 +14,7 @@
  *
  *   | Interface | Implementação canônica | Camada | | ----------------- | ---------------------------------------- |
  *   -------------- | | IAgent | `agent/always-alive.js` | agent/ | | IEventBus | `core/event-bus.js::EventBus` | core/
- *   | | IStateStore | `agent/session/snapshot.js` | agent/session/ | | IToolRegistry |
+ *   | | IStateStore | `agent/session/state/snapshot.js` | agent/session/ | | IToolRegistry |
  *   `sdk/tools/registry.js::ToolRegistry` | sdk/ | | IHooksPipeline | `hooks/types.js::SessionHooks` | hooks/ | |
  *   IConfigProvider | `config/env.js` (flat constants) | config/ | | IMetricsCollector |
  *   `observability/metrics.js::MetricsStore` | observability/ |
@@ -134,7 +134,7 @@
  * Interface de persistência de estado do agente.
  *
  * Permite abstrair a camada de armazenamento (file system, SQLite, Redis, in-memory para testes). Implementação
- * canônica: funções em `agent/session/snapshot.js`.
+ * canônica: funções em `agent/session/state/snapshot.js`.
  *
  * @typedef {object} IStateStore
  * @property {(opts: {

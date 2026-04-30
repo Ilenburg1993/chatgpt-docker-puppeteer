@@ -253,12 +253,15 @@ estejam registrados no roadmap e cobertos por contrato de remoção.
   `boot/*`, `policies/*`, `state/*`, `wiring/*` e `watchdogs/*`; shims de raiz removidos)
 - W112: migrar imports internos do dialog para as novas subpastas e reduzir deep imports de testes
   (**iniciada** com contrato anti-import de shims em código de produção)
-- W113: aplicar a mesma taxonomia em `agent/session` e `agent/lifecycle` (**iniciada** nos dois
-  diretórios com `README.md`, `module-map.js` e contrato anti-órfão)
+- W113: aplicar a mesma taxonomia em `agent/session` e `agent/lifecycle` (\*\*concluída para
+  `agent/session` com migração física para `boot/`, `initializers/`, `lifecycle/`, `state/`,
+  `wiring/`, `history/` e `context/` sem shims; iniciada em `agent/lifecycle` com `README.md`,
+  `module-map.js` e contrato anti-órfão)
 - W114: aplicar a taxonomia nas bordas `server`/`terminal`, preservando adapters finos
 - W115: criar scorecard de organização física por diretório quente
 - W116: remover shims legados e congelar baseline 2.1 de navegação estrutural (\*\*concluída para
-  `agent/dialog`; próxima aplicação prevista em `agent/session` após migração física)
+  `agent/dialog` e `agent/session`; próxima aplicação prevista em `agent/lifecycle` e nas bordas
+  `server`/`terminal`)
 
 ---
 

@@ -66,7 +66,7 @@ vi.mock('../../../src/copilot/agent/ports/metrics-port.js', () => ({
 vi.mock('../../../src/copilot/agent/ports/tracing-port.js', () => ({
     startSpanImmediate: vi.fn(() => ({ end: vi.fn(), setAttribute: vi.fn() })),
 }));
-vi.mock('../../../src/copilot/agent/session/hook-context.js', () => ({
+vi.mock('../../../src/copilot/agent/session/context/hook-context.js', () => ({
     buildHookSystemContextSafe: mocks.buildHookSystemContextSafe,
 }));
 
@@ -76,7 +76,7 @@ describe('agent/session/initializer — sessionFs wiring', () => {
     });
 
     it('injeta createSessionFsHandler configurado no fluxo initOrResumeSession', async () => {
-        const { initOrResumeSession } = await import('../../../src/copilot/agent/session/initializer.js');
+        const { initOrResumeSession } = await import('../../../src/copilot/agent/session/initializers/initializer.js');
         const customHandler = vi.fn();
         mocks.getAgentConfiguredSessionFsHandler.mockReturnValue(customHandler);
 
@@ -93,7 +93,7 @@ describe('agent/session/initializer — sessionFs wiring', () => {
     });
 
     it('persiste o modelo efetivo resolvido em vez do placeholder auto', async () => {
-        const { initOrResumeSession } = await import('../../../src/copilot/agent/session/initializer.js');
+        const { initOrResumeSession } = await import('../../../src/copilot/agent/session/initializers/initializer.js');
         mocks.resumeOrCreateAgentSdkSession.mockResolvedValueOnce({
             session: { sessionId: 'resolved-sess' },
             isResumed: false,
@@ -122,7 +122,7 @@ describe('agent/session/initializer — sessionFs wiring', () => {
     });
 
     it('preserva model auto nativo ao retomar sessão com modelo concreto persistido', async () => {
-        const { initOrResumeSession } = await import('../../../src/copilot/agent/session/initializer.js');
+        const { initOrResumeSession } = await import('../../../src/copilot/agent/session/initializers/initializer.js');
         mocks.readState.mockResolvedValueOnce({
             sessionId: 'saved-sess',
             model: 'gpt-5-mini',

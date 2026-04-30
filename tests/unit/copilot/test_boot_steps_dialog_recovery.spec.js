@@ -31,13 +31,13 @@ import {
     runDialogBootRecovery,
     scheduleDialogBootRecovery,
     stepScheduleDialogRecovery,
-} from '../../../src/copilot/agent/session/boot-steps.js';
+} from '../../../src/copilot/agent/session/boot/boot-steps.js';
 
 /**
- * @param {Partial<import('../../../src/copilot/agent/session/boot-steps.js').BootWiringContext>} [overrides]
+ * @param {Partial<import('../../../src/copilot/agent/session/boot/boot-steps.js').BootWiringContext>} [overrides]
  */
 function createCtx(overrides = {}) {
-    return /** @type {import('../../../src/copilot/agent/session/boot-steps.js').BootWiringContext} */ ({
+    return /** @type {import('../../../src/copilot/agent/session/boot/boot-steps.js').BootWiringContext} */ ({
         emit: vi.fn(() => true),
         getStatusSnapshot: vi.fn(() => /** @type {any} */ ({ status: 'idle' })),
         onCheckpointPath: vi.fn(),

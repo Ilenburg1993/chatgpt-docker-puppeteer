@@ -7,7 +7,7 @@
 
 import assert from 'node:assert/strict';
 import { describe, it } from 'vitest';
-import { cleanupStaleSessions } from '../../../src/copilot/agent/session/cleanup.js';
+import { cleanupStaleSessions } from '../../../src/copilot/agent/session/lifecycle/cleanup.js';
 
 describe('cleanupStaleSessions', () => {
     /**

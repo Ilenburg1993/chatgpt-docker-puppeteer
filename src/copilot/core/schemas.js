@@ -28,7 +28,7 @@ export const PendingQuestionShadowSchema = z.object({
     expiresAt: z.number(),
 });
 
-// ─── Snapshot (session/snapshot.js) ──────────────────────────────────────────
+// ─── Snapshot (session/state/snapshot.js) ──────────────────────────────────────────
 
 /**
  * Schema para itens listados via listSnapshots/listSnapshotsAsync.

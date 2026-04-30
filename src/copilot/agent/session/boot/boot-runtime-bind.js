@@ -10,15 +10,15 @@ import {
     EMITTER_QUESTION_ANSWERED,
     EMITTER_SESSION_KEEPALIVE,
 } from '#copilot/events';
-import { MCP_RECONNECT_MS, METRICS_INTERVAL_MS } from '../../config/agent.js';
-import { registerTimer } from '../../core/timer-registry.js';
-import { getAgentSdkModelStatsTracker, isAgentSdkExperimentalEnabled } from '../facades/agent-sdk-access.js';
-import { defaultErrorTracker } from '../ports/error-tracking-port.js';
-import { createAgentEventObserver } from '../ports/event-observer-port.js';
-import { log } from '../ports/logging-port.js';
-import { startDefaultMcpAutoReconnect } from '../ports/mcp-port.js';
-import { defaultMetrics } from '../ports/metrics-port.js';
-import { resolveAgentUserInput } from '../ports/tool-port.js';
+import { MCP_RECONNECT_MS, METRICS_INTERVAL_MS } from '../../../config/agent.js';
+import { registerTimer } from '../../../core/timer-registry.js';
+import { getAgentSdkModelStatsTracker, isAgentSdkExperimentalEnabled } from '../../facades/agent-sdk-access.js';
+import { defaultErrorTracker } from '../../ports/error-tracking-port.js';
+import { createAgentEventObserver } from '../../ports/event-observer-port.js';
+import { log } from '../../ports/logging-port.js';
+import { startDefaultMcpAutoReconnect } from '../../ports/mcp-port.js';
+import { defaultMetrics } from '../../ports/metrics-port.js';
+import { resolveAgentUserInput } from '../../ports/tool-port.js';
 import { reapExpiredPendingQuestionShadow } from './boot-dialog-recovery.js';
 
 /**
@@ -30,7 +30,7 @@ import { reapExpiredPendingQuestionShadow } from './boot-dialog-recovery.js';
 /**
  * @param {import('node:events').EventEmitter} agentEmitter
  * @param {BootWiringPipelineState} state
- * @param {{ eventBus?: import('../../core/event-bus.js').EventBus }} [options]
+ * @param {{ eventBus?: import('../../../core/event-bus.js').EventBus }} [options]
  * @returns {void}
  */
 export function stepAttachAgentObserver(agentEmitter, state, options) {

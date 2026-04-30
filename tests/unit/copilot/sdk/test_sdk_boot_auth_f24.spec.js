@@ -170,20 +170,21 @@ describe('F114 — mensagem clara quando não autenticado', () => {
 
 describe('F115 — keepalive usa client.ping() como recurso primário', () => {
     it('SessionKeepalive exporta classe', async () => {
-        const module = await import('/workspaces/chatgpt-docker-puppeteer/src/copilot/agent/session/keepalive.js');
+        const module =
+            await import('/workspaces/chatgpt-docker-puppeteer/src/copilot/agent/session/lifecycle/keepalive.js');
         expect(module.SessionKeepalive).toBeDefined();
     });
 
     it('SessionKeepalive pode ser instanciada com config padrão', async () => {
         const { SessionKeepalive } =
-            await import('/workspaces/chatgpt-docker-puppeteer/src/copilot/agent/session/keepalive.js');
+            await import('/workspaces/chatgpt-docker-puppeteer/src/copilot/agent/session/lifecycle/keepalive.js');
         const ka = new SessionKeepalive({ intervalMs: 60_000, idleThresholdMs: 30_000 });
         expect(ka).toBeInstanceOf(SessionKeepalive);
     });
 
     it('performKeepalive callback é suportado na interface de callbacks', async () => {
         const { SessionKeepalive } =
-            await import('/workspaces/chatgpt-docker-puppeteer/src/copilot/agent/session/keepalive.js');
+            await import('/workspaces/chatgpt-docker-puppeteer/src/copilot/agent/session/lifecycle/keepalive.js');
         const ka = new SessionKeepalive({ intervalMs: 9_999_999, idleThresholdMs: 0 });
         // Não deve lançar ao registrar callbacks com a interface semântica atual.
         expect(() => {
@@ -198,7 +199,7 @@ describe('F115 — keepalive usa client.ping() como recurso primário', () => {
 
     it('client.ping é chamado durante tick quando idle e dialog loop inativo', async () => {
         const { SessionKeepalive } =
-            await import('/workspaces/chatgpt-docker-puppeteer/src/copilot/agent/session/keepalive.js');
+            await import('/workspaces/chatgpt-docker-puppeteer/src/copilot/agent/session/lifecycle/keepalive.js');
         // Usa idleThresholdMs=0 para garantir que tick age imediatamente
         const ka = new SessionKeepalive({ intervalMs: 9_999_999, idleThresholdMs: 0 });
         const mockClient = makeMockClient();

@@ -1,6 +1,6 @@
 // @ts-check
 /**
- * src/copilot/agent/session/boot-steps.js
+ * src/copilot/agent/session/boot/boot-steps.js
  *
  * K5b: etapas reais do pipeline de boot extraídas de `boot-wiring.js`.
  *

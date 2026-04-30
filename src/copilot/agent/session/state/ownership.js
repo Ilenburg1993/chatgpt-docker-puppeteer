@@ -4,8 +4,8 @@
  * @file SSOT operacional do vínculo entre sessão SDK ativa e hub session conversacional.
  */
 
-import { withAgentErrorPolicy } from '../error-policy.js';
-import { log } from '../ports/logging-port.js';
+import { withAgentErrorPolicy } from '../../error-policy.js';
+import { log } from '../../ports/logging-port.js';
 
 /**
  * @param {string} label
@@ -52,7 +52,9 @@ export function syncActiveSessionOwnership(sdkSessionId, deps) {
  *     conversationStore?: { updateSdkSession?: (hubSessionId: string, sdkSessionId: string) => void } | null;
  * }} deps
  * @param {{ label?: string }} [opts]
- * @returns {Promise<import('../error-policy.js').AgentPolicyResult<ReturnType<typeof syncActiveSessionOwnership>>>}
+ * @returns {Promise<
+ *     import('../../error-policy.js').AgentPolicyResult<ReturnType<typeof syncActiveSessionOwnership>>
+ * >}
  */
 export async function syncActiveSessionOwnershipWithPolicy(sdkSessionId, deps, opts = {}) {
     const label = opts.label ?? 'session.ownership.sync';
@@ -85,7 +87,7 @@ export function clearActiveSdkSessionOwnership(deps) {
  * @param {{ setSharedSdkSessionId: (id: string | null) => void; getHubSessionId: () => string | null }} deps
  * @param {{ label?: string }} [opts]
  * @returns {Promise<
- *     import('../error-policy.js').AgentPolicyResult<ReturnType<typeof clearActiveSdkSessionOwnership>>
+ *     import('../../error-policy.js').AgentPolicyResult<ReturnType<typeof clearActiveSdkSessionOwnership>>
  * >}
  */
 export async function clearActiveSdkSessionOwnershipWithPolicy(deps, opts = {}) {

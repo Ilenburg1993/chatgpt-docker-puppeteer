@@ -13,11 +13,11 @@ const TEST_SNAPSHOT_DIR = join(import.meta.dirname, '.tmp-test-snapshots');
 process.env['AGENT_SNAPSHOT_DIR'] = TEST_SNAPSHOT_DIR;
 
 describe('session-snapshot', async () => {
-    /** @type {typeof import('../../../src/copilot/agent/session/snapshot.js')} */
+    /** @type {typeof import('../../../src/copilot/agent/session/state/snapshot.js')} */
     let mod;
 
     beforeAll(async () => {
-        mod = await import('../../../src/copilot/agent/session/snapshot.js');
+        mod = await import('../../../src/copilot/agent/session/state/snapshot.js');
     });
 
     beforeEach(() => {

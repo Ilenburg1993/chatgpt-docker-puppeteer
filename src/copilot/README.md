@@ -124,7 +124,7 @@ Em resumo:
 ```text
 sdk/generated/session-events.d.ts
   -> src/copilot/event-handlers/
-    -> src/copilot/agent/session/event-wirer.js
+    -> src/copilot/agent/session/wiring/event-wirer.js
       -> AlwaysAliveAgent EventEmitter
         -> terminal/sdk-session-events.js ou terminal/repl-listeners.js
 ```

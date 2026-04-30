@@ -11,11 +11,11 @@ import assert from 'node:assert/strict';
 import { afterEach, beforeAll, describe, it } from 'vitest';
 
 describe.skip('SessionKeepalive', async () => {
-    /** @type {typeof import('../../../src/copilot/agent/session/keepalive.js').SessionKeepalive} */
+    /** @type {typeof import('../../../src/copilot/agent/session/lifecycle/keepalive.js').SessionKeepalive} */
     let SessionKeepalive;
 
     beforeAll(async () => {
-        ({ SessionKeepalive } = await import('../../../src/copilot/agent/session/keepalive.js'));
+        ({ SessionKeepalive } = await import('../../../src/copilot/agent/session/lifecycle/keepalive.js'));
     });
 
     describe('construtor', () => {

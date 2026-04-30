@@ -7,12 +7,14 @@ import * as assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { describe, it } from 'vitest';
 
-const BOOT_WIRING_PATH = '/workspaces/chatgpt-docker-puppeteer/src/copilot/agent/session/boot-wiring.js';
-const BOOT_STEPS_PATH = '/workspaces/chatgpt-docker-puppeteer/src/copilot/agent/session/boot-steps.js';
-const BOOT_SESSION_PREP_PATH = '/workspaces/chatgpt-docker-puppeteer/src/copilot/agent/session/boot-session-prep.js';
+const BOOT_WIRING_PATH = '/workspaces/chatgpt-docker-puppeteer/src/copilot/agent/session/boot/boot-wiring.js';
+const BOOT_STEPS_PATH = '/workspaces/chatgpt-docker-puppeteer/src/copilot/agent/session/boot/boot-steps.js';
+const BOOT_SESSION_PREP_PATH =
+    '/workspaces/chatgpt-docker-puppeteer/src/copilot/agent/session/boot/boot-session-prep.js';
 const BOOT_DIALOG_RECOVERY_PATH =
-    '/workspaces/chatgpt-docker-puppeteer/src/copilot/agent/session/boot-dialog-recovery.js';
-const BOOT_RUNTIME_BIND_PATH = '/workspaces/chatgpt-docker-puppeteer/src/copilot/agent/session/boot-runtime-bind.js';
+    '/workspaces/chatgpt-docker-puppeteer/src/copilot/agent/session/boot/boot-dialog-recovery.js';
+const BOOT_RUNTIME_BIND_PATH =
+    '/workspaces/chatgpt-docker-puppeteer/src/copilot/agent/session/boot/boot-runtime-bind.js';
 const SRC = readFileSync(BOOT_WIRING_PATH, 'utf8');
 const STEPS_SRC = readFileSync(BOOT_STEPS_PATH, 'utf8');
 const BOOT_SESSION_PREP_SRC = readFileSync(BOOT_SESSION_PREP_PATH, 'utf8');

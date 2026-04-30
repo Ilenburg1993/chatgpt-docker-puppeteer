@@ -1,6 +1,6 @@
 // @ts-check
 /**
- * src/copilot/agent/session/boot-wiring.js
+ * src/copilot/agent/session/boot/boot-wiring.js
  *
  * Encapsula os wirings pós-init executados durante o `start()` do AlwaysAliveAgent:
  *
@@ -23,10 +23,10 @@
 
 import { toError } from '#copilot/core';
 import { EMITTER_QUOTA_WARNING, EMITTER_SDK_LIFECYCLE } from '#copilot/events';
-import { withAgentErrorPolicy } from '../error-policy.js';
-import { attachAgentSdkBootLifecycleBridge, startAgentSdkBootQuotaBridge } from '../facades/agent-sdk-access.js';
-import { log } from '../ports/logging-port.js';
-import { defaultMetrics } from '../ports/metrics-port.js';
+import { withAgentErrorPolicy } from '../../error-policy.js';
+import { attachAgentSdkBootLifecycleBridge, startAgentSdkBootQuotaBridge } from '../../facades/agent-sdk-access.js';
+import { log } from '../../ports/logging-port.js';
+import { defaultMetrics } from '../../ports/metrics-port.js';
 import {
     createBootWiringState,
     stepAttachAgentObserver,
@@ -46,9 +46,9 @@ import {
  *
  * @typedef {import('#copilot/sdk/types').CopilotSession} CopilotSession
  *
- * @typedef {import('../session/keepalive.js').SessionKeepalive} SessionKeepalive
+ * @typedef {import('../lifecycle/keepalive.js').SessionKeepalive} SessionKeepalive
  *
- * @typedef {import('../dialog/orchestrators/loop-manager.js').DialogLoopManager} DialogLoopManager
+ * @typedef {import('../../dialog/orchestrators/loop-manager.js').DialogLoopManager} DialogLoopManager
  */
 
 /**
@@ -56,7 +56,7 @@ import {
  *
  * @typedef {Object} BootWiringContext
  * @property {(event: string, payload?: unknown) => boolean} emit — Emitir evento no agente
- * @property {() => import('../types.js').AgentStatusSnapshot} getStatusSnapshot
+ * @property {() => import('../../types.js').AgentStatusSnapshot} getStatusSnapshot
  * @property {(path: string) => void} onCheckpointPath — Atualizar checkpoint path
  * @property {(state: { tokens: number; tokenLimit: number; utilization: number } | null) => void} onContextState
  * @property {(info: { model?: string; cost?: number; quotaSnapshots?: Record<string, unknown>; ts: number }) => void} onPrInfo
@@ -110,13 +110,13 @@ import {
  * @property {(() => void)[]} unsubs — Funções de unsubscribe de eventos
  * @property {{
  *     attach: (agent: import('node:events').EventEmitter) => void;
- *     attachToBus?: (bus: import('../../core/event-bus.js').EventBus) => void;
+ *     attachToBus?: (bus: import('../../../core/event-bus.js').EventBus) => void;
  *     detach: () => void;
  * } | null} agentObserver
  * @property {ReturnType<typeof setInterval> | null} metricsTimer
  * @property {(() => void) | null} mcpReconnectCancel
  * @property {import('#copilot/sdk/quota-monitor').QuotaMonitor | null} quotaMonitor — Monitor de quota (F118, Faixa 25)
- * @property {import('../types.js').AgentBootReport} bootReport - Relatório consolidado do pipeline de boot
+ * @property {import('../../types.js').AgentBootReport} bootReport - Relatório consolidado do pipeline de boot
  * @property {Error | null} [error] - Erro capturado durante a execução de alguma etapa
  */
 
@@ -127,13 +127,13 @@ import {
  * @property {(() => void)[]} unsubs
  * @property {{
  *     attach: (agent: import('node:events').EventEmitter) => void;
- *     attachToBus?: (bus: import('../../core/event-bus.js').EventBus) => void;
+ *     attachToBus?: (bus: import('../../../core/event-bus.js').EventBus) => void;
  *     detach: () => void;
  * } | null} agentObserver
  * @property {ReturnType<typeof setInterval> | null} metricsTimer
  * @property {(() => void) | null} mcpReconnectCancel
  * @property {import('#copilot/sdk/quota-monitor').QuotaMonitor | null} quotaMonitor
- * @property {import('../types.js').AgentBootStepResult[]} stepReports
+ * @property {import('../../types.js').AgentBootStepResult[]} stepReports
  * @property {number} bootStartedAt
  */
 
@@ -223,7 +223,7 @@ function stepStartQuotaMonitor(client, ctx, state) {
  * @param {import('node:events').EventEmitter} agentEmitter
  * @param {BootWiringContext} ctx
  * @param {BootWiringPipelineState} state
- * @param {{ eventBus?: import('../../core/event-bus.js').EventBus }} [options]
+ * @param {{ eventBus?: import('../../../core/event-bus.js').EventBus }} [options]
  * @returns {BootWiringStep[]}
  */
 export function createBootWiringSteps(client, session, isResumed, agentEmitter, ctx, state, options) {
@@ -369,7 +369,7 @@ export async function runBootPipeline(steps, state) {
  * @param {boolean} isResumed — Se a sessão foi retomada
  * @param {import('node:events').EventEmitter} agentEmitter — O agente como EventEmitter (para observer.attach)
  * @param {BootWiringContext} ctx — Callbacks e referências
- * @param {{ eventBus?: import('../../core/event-bus.js').EventBus }} [options] - Opções adicionais (FAIXA-L14)
+ * @param {{ eventBus?: import('../../../core/event-bus.js').EventBus }} [options] - Opções adicionais (FAIXA-L14)
  * @returns {Promise<BootWiringResult>}
  */
 export async function performBootWiring(client, session, isResumed, agentEmitter, ctx, options) {

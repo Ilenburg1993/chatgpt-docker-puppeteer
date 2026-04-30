@@ -10,9 +10,9 @@ import { log } from '#copilot/observability';
 import { onSessionEvent } from '../sdk/session/events.js';
 
 /**
- * @param {import('#copilot/agent/session/event-wirer').CopilotSessionLike} session
+ * @param {import('#copilot/agent/session/wiring/event-wirer').CopilotSessionLike} session
  * @param {Pick<
- *     import('#copilot/agent/session/event-wirer').SessionWirerCallbacks,
+ *     import('#copilot/agent/session/wiring/event-wirer').SessionWirerCallbacks,
  *     'emit' | 'getStatusSnapshot' | 'onCheckpointPath'
  * >} cb
  * @returns {(() => void)[]}

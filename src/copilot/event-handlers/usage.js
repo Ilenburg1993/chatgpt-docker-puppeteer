@@ -10,8 +10,8 @@ import { log } from '#copilot/observability';
 import { onSessionEvent } from '../sdk/session/events.js';
 
 /**
- * @param {import('#copilot/agent/session/event-wirer').CopilotSessionLike} session
- * @param {Pick<import('#copilot/agent/session/event-wirer').SessionWirerCallbacks, 'emit' | 'onPrInfo'>} cb
+ * @param {import('#copilot/agent/session/wiring/event-wirer').CopilotSessionLike} session
+ * @param {Pick<import('#copilot/agent/session/wiring/event-wirer').SessionWirerCallbacks, 'emit' | 'onPrInfo'>} cb
  * @returns {() => void}
  */
 export function wireUsageEvent(session, { emit, onPrInfo }) {

@@ -3,8 +3,8 @@
  * @module copilot/presentation/runtime-ownership
  * @file Façade compartilhada do vínculo canônico entre sessão SDK ativa e hub session.
  *
- *   Esta camada concentra o bridge de ownership exposto por `agent/session/ownership.js` para que `presentation/` e as
- *   bordas não importem helpers de ownership diretamente de `#copilot/agent` em vários pontos.
+ *   Esta camada concentra o bridge de ownership exposto por `agent/session/state/ownership.js` para que `presentation/` e
+ *   as bordas não importem helpers de ownership diretamente de `#copilot/agent` em vários pontos.
  */
 
 import { clearRuntimeSdkSessionOwnership, syncRuntimeSdkSessionOwnership } from '#copilot/agent';

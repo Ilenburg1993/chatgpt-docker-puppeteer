@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { setBackgroundCompactionThreshold } from '../../../src/copilot/agent/session/initializer.js';
+import { setBackgroundCompactionThreshold } from '../../../src/copilot/agent/session/initializers/initializer.js';
 
 describe('initializer.js', () => {
     describe('setBackgroundCompactionThreshold()', () => {

@@ -9,9 +9,9 @@ import { SESSION_EVENTS } from '#copilot/events';
 import { onSessionEvent } from '../sdk/session/events.js';
 
 /**
- * @param {import('#copilot/agent/session/event-wirer').CopilotSessionLike} session
+ * @param {import('#copilot/agent/session/wiring/event-wirer').CopilotSessionLike} session
  * @param {Pick<
- *     import('#copilot/agent/session/event-wirer').SessionWirerCallbacks,
+ *     import('#copilot/agent/session/wiring/event-wirer').SessionWirerCallbacks,
  *     'emit' | 'isProcessing' | 'dialogLoopActive'
  * >} cb
  * @returns {(() => void)[]}

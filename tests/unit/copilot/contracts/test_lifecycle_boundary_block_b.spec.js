@@ -39,7 +39,7 @@ describe('Block B — lifecycle ownership contracts', () => {
         );
         assert.deepEqual(findings, []);
 
-        const src = readFileSync(srcPath('agent', 'session', 'keepalive.js'), 'utf8');
+        const src = readFileSync(srcPath('agent', 'session', 'lifecycle', 'keepalive.js'), 'utf8');
         assert.match(src, /performKeepalive/);
         assert.doesNotMatch(src, /\bclient\.(?:ping|start|stop)\(/);
         assert.doesNotMatch(src, /\bsession\.send\(/);
@@ -62,10 +62,10 @@ describe('Block B — lifecycle ownership contracts', () => {
         );
         assert.deepEqual(findings, []);
 
-        const src = readFileSync(srcPath('agent', 'session', 'boot-wiring.js'), 'utf8');
+        const src = readFileSync(srcPath('agent', 'session', 'boot', 'boot-wiring.js'), 'utf8');
         const alwaysAlive = readFileSync(srcPath('agent', 'always-alive.js'), 'utf8');
-        const bootSteps = readFileSync(srcPath('agent', 'session', 'boot-steps.js'), 'utf8');
-        const bootDialogRecovery = readFileSync(srcPath('agent', 'session', 'boot-dialog-recovery.js'), 'utf8');
+        const bootSteps = readFileSync(srcPath('agent', 'session', 'boot', 'boot-steps.js'), 'utf8');
+        const bootDialogRecovery = readFileSync(srcPath('agent', 'session', 'boot', 'boot-dialog-recovery.js'), 'utf8');
         const lifecycle = readFileSync(srcPath('agent', 'lifecycle', 'agent-lifecycle.js'), 'utf8');
 
         assert.match(src, /attachAgentSdkBootLifecycleBridge/);
@@ -137,7 +137,7 @@ describe('Block B — lifecycle ownership contracts', () => {
     });
 
     it('initializer continua dependendo da façade do agent para o lifecycle vanilla do SDK', () => {
-        const src = readFileSync(srcPath('agent', 'session', 'initializer.js'), 'utf8');
+        const src = readFileSync(srcPath('agent', 'session', 'initializers', 'initializer.js'), 'utf8');
         assert.match(src, /resumeOrCreateAgentSdkSession/);
         assert.match(src, /createAgentSdkSessionByClient/);
         assert.match(src, /canReadAgentSdkSessionMessages/);

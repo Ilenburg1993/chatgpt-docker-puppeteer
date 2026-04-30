@@ -114,8 +114,8 @@ describe('F166 — Auditoria de zero-bypass SDK em src/copilot/', () => {
     });
 
     it('boot-wiring.js usa fachada agent-sdk-access para quota monitor (sem bypass)', () => {
-        const src = read('src/copilot/agent/session/boot-wiring.js');
-        expect(src).toContain("from '../facades/agent-sdk-access.js'");
+        const src = read('src/copilot/agent/session/boot/boot-wiring.js');
+        expect(src).toContain("from '../../facades/agent-sdk-access.js'");
         expect(src).toContain('startAgentSdkBootQuotaBridge');
         expect(src).not.toContain("from '#copilot/sdk'");
     });
@@ -175,8 +175,8 @@ describe('F169 — agent/ sem bypass direto de SDK', () => {
         'src/copilot/tools/bootstrap.js',
         'src/copilot/agent/dialog/orchestrators/loop-manager.js',
         'src/copilot/agent/lifecycle/agent-lifecycle.js',
-        'src/copilot/agent/session/initializer.js',
-        'src/copilot/agent/session/cleanup.js',
+        'src/copilot/agent/session/initializers/initializer.js',
+        'src/copilot/agent/session/lifecycle/cleanup.js',
         'src/copilot/agent/agent-context.js',
         'src/copilot/agent/lifecycle/session-setup.js',
     ];

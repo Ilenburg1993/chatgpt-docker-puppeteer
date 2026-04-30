@@ -1,6 +1,6 @@
 // @ts-check
 /**
- * src/copilot/agent/session/snapshot.js
+ * src/copilot/agent/session/state/snapshot.js
  *
  * F41 — Session Snapshot & Restore.
  *
@@ -11,7 +11,7 @@
  * @see EventBus
  */
 
-import { readState } from '../lifecycle/state-io.js';
+import { readState } from '../../lifecycle/state-io.js';
 import {
     listSnapshotFilesAsync,
     loadLatestSnapshotFileAsync,
@@ -32,9 +32,9 @@ import {
  * @property {boolean} dialogLoopActive - Se o dialog loop estava ativo
  * @property {boolean} dialogPaused - Se o dialog loop estava pausado
  * @property {string | null} pendingQuestion - Pergunta pendente (se houver)
- * @property {import('../types.js').PendingQuestionMeta | null} [pendingQuestionMeta] - Metadados semânticos da pergunta
- *   pendente
- * @property {import('../types.js').PendingQuestionShadow | null} [pendingQuestionShadow] - Shadow persistida do
+ * @property {import('../../types.js').PendingQuestionMeta | null} [pendingQuestionMeta] - Metadados semânticos da
+ *   pergunta pendente
+ * @property {import('../../types.js').PendingQuestionShadow | null} [pendingQuestionShadow] - Shadow persistida do
  *   `ask_user`, quando houver
  * @property {Record<string, unknown> | null} stateSnapshot - Estado completo do state-io
  * @property {{ boots: number; resumesWithPR: number; resumesZeroPR: number; totalPR: number } | null} prMetrics
@@ -52,8 +52,8 @@ import {
  *     dialogLoopActive: boolean;
  *     dialogPaused: boolean;
  *     pendingQuestion: string | null;
- *     pendingQuestionMeta?: import('../types.js').PendingQuestionMeta | null;
- *     pendingQuestionShadow?: import('../types.js').PendingQuestionShadow | null;
+ *     pendingQuestionMeta?: import('../../types.js').PendingQuestionMeta | null;
+ *     pendingQuestionShadow?: import('../../types.js').PendingQuestionShadow | null;
  *     prMetrics?: { boots: number; resumesWithPR: number; resumesZeroPR: number; totalPR: number } | null;
  *     reason?: string;
  * }} opts
@@ -168,7 +168,7 @@ function fromSnapshotRecord(snapshot) {
 /**
  * Adapter sobre as funções de snapshot que implementa a interface `IStateStore`.
  *
- * @type {import('../../core/interfaces.js').IStateStore}
+ * @type {import('../../../core/interfaces.js').IStateStore}
  */
 export const snapshotStore = {
     createSnapshot: (opts) => toSnapshotRecord(createSnapshot(opts)),

@@ -107,28 +107,28 @@ describe('F148 — agent/lifecycle/ usa barrel para event-helpers', () => {
 
 describe('F149 — agent/session/ converge para façades do agent', () => {
     it('cleanup.js não importa de #copilot/sdk/session', () => {
-        expect(src('agent/session/cleanup.js')).not.toContain("from '#copilot/sdk/session'");
+        expect(src('agent/session/lifecycle/cleanup.js')).not.toContain("from '#copilot/sdk/session'");
     });
 
     it('cleanup.js usa façade agent-sdk-access', () => {
-        const content = src('agent/session/cleanup.js');
-        expect(content).toContain("from '../facades/agent-sdk-access.js'");
+        const content = src('agent/session/lifecycle/cleanup.js');
+        expect(content).toContain("from '../../facades/agent-sdk-access.js'");
         expect(content).toContain('listAgentSdkSessionsByClient');
         expect(content).toContain('deleteAgentSdkSessionByClient');
         expect(content).not.toContain("from '#copilot/sdk'");
     });
 
     it('initializer.js não importa de #copilot/sdk/tools-state', () => {
-        expect(src('agent/session/initializer.js')).not.toContain("from '#copilot/sdk/tools-state'");
+        expect(src('agent/session/initializers/initializer.js')).not.toContain("from '#copilot/sdk/tools-state'");
     });
 
     it('initializer.js não importa de #copilot/sdk/utils', () => {
-        expect(src('agent/session/initializer.js')).not.toContain("from '#copilot/sdk/utils'");
+        expect(src('agent/session/initializers/initializer.js')).not.toContain("from '#copilot/sdk/utils'");
     });
 
     it('initializer.js usa façade agent-sdk-access', () => {
-        const content = src('agent/session/initializer.js');
-        expect(content).toContain("from '../facades/agent-sdk-access.js'");
+        const content = src('agent/session/initializers/initializer.js');
+        expect(content).toContain("from '../../facades/agent-sdk-access.js'");
         expect(content).toContain('resumeOrCreateAgentSdkSession');
         expect(content).toContain('createAgentSdkSessionByClient');
         expect(content).not.toContain("from '#copilot/sdk'");

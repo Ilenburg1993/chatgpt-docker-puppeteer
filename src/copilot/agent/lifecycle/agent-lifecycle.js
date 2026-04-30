@@ -53,13 +53,13 @@ import {
     finalizeSessionInit,
 } from '../lifecycle/session-setup.js';
 import { resolveConversationStore } from '../ports/conversation-port.js';
-import { performBootWiring } from '../session/boot-wiring.js';
-import { syncSdkHistory } from '../session/history-sync.js';
-import { initOrResumeSession } from '../session/initializer.js';
+import { performBootWiring } from '../session/boot/boot-wiring.js';
+import { syncSdkHistory } from '../session/history/history-sync.js';
+import { initOrResumeSession } from '../session/initializers/initializer.js';
 import {
     clearActiveSdkSessionOwnershipWithPolicy,
     syncActiveSessionOwnershipWithPolicy,
-} from '../session/ownership.js';
+} from '../session/state/ownership.js';
 import { detachRuntimeObservers, disconnectRuntimeSdkHandles, teardownRuntimeSidecars } from './runtime-teardown.js';
 
 /**

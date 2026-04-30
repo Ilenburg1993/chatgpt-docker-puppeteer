@@ -282,18 +282,18 @@ describe('F118 — boot-wiring importa e usa quota monitor via façade', () => {
     it('boot-wiring.js importa startAgentSdkBootQuotaBridge via agent-sdk-access', async () => {
         const { readFileSync } = await import('node:fs');
         const content = readFileSync(
-            '/workspaces/chatgpt-docker-puppeteer/src/copilot/agent/session/boot-wiring.js',
+            '/workspaces/chatgpt-docker-puppeteer/src/copilot/agent/session/boot/boot-wiring.js',
             'utf8',
         );
         expect(content).toContain('startAgentSdkBootQuotaBridge');
-        expect(content).toContain("from '../facades/agent-sdk-access.js'");
+        expect(content).toContain("from '../../facades/agent-sdk-access.js'");
         expect(content).not.toContain("from '#copilot/sdk'");
     });
 
     it('boot-wiring.js chama startAgentSdkBootQuotaBridge no performBootWiring', async () => {
         const { readFileSync } = await import('node:fs');
         const content = readFileSync(
-            '/workspaces/chatgpt-docker-puppeteer/src/copilot/agent/session/boot-wiring.js',
+            '/workspaces/chatgpt-docker-puppeteer/src/copilot/agent/session/boot/boot-wiring.js',
             'utf8',
         );
         expect(content).toContain('startAgentSdkBootQuotaBridge(');
@@ -303,7 +303,7 @@ describe('F118 — boot-wiring importa e usa quota monitor via façade', () => {
     it('BootWiringResult inclui campo quotaMonitor', async () => {
         const { readFileSync } = await import('node:fs');
         const content = readFileSync(
-            '/workspaces/chatgpt-docker-puppeteer/src/copilot/agent/session/boot-wiring.js',
+            '/workspaces/chatgpt-docker-puppeteer/src/copilot/agent/session/boot/boot-wiring.js',
             'utf8',
         );
         expect(content).toContain('quotaMonitor');

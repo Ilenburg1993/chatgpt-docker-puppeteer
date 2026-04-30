@@ -28,7 +28,7 @@ const SMALL_LIMIT = 512;
 process.env.AGENT_HOOK_CONTEXT_MAX_BYTES = String(SMALL_LIMIT);
 
 const { buildHookSystemContext, buildHookSystemContextSafe } =
-    await import('../../../src/copilot/agent/session/initializer.js');
+    await import('../../../src/copilot/agent/session/initializers/initializer.js');
 
 describe('session-initializer', () => {
     /** @type {string | null} */

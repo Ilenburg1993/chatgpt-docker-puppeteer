@@ -5,25 +5,25 @@
  */
 
 import { EMITTER_SESSION_CLEANUP } from '#copilot/events';
-import { defaultEventCollector } from '../ports/event-observer-port.js';
-import { defaultMetrics } from '../ports/metrics-port.js';
-import { cleanupStaleSessionsWithPolicy } from './cleanup.js';
-import { wireSessionEvents } from './event-wirer.js';
+import { defaultEventCollector } from '../../ports/event-observer-port.js';
+import { defaultMetrics } from '../../ports/metrics-port.js';
+import { cleanupStaleSessionsWithPolicy } from '../lifecycle/cleanup.js';
+import { wireSessionEvents } from '../wiring/event-wirer.js';
 
 /**
  * @typedef {import('#copilot/sdk/types').CopilotClient} CopilotClient
  *
  * @typedef {import('#copilot/sdk/types').CopilotSession} CopilotSession
  *
- * @typedef {import('../dialog/orchestrators/loop-manager.js').DialogLoopManager} DialogLoopManager
+ * @typedef {import('../../dialog/orchestrators/loop-manager.js').DialogLoopManager} DialogLoopManager
  *
- * @typedef {import('../session/keepalive.js').SessionKeepalive} SessionKeepalive
+ * @typedef {import('../lifecycle/keepalive.js').SessionKeepalive} SessionKeepalive
  */
 
 /**
  * @typedef {Object} BootWiringContext
  * @property {(event: string, payload?: unknown) => boolean} emit
- * @property {() => import('../types.js').AgentStatusSnapshot} getStatusSnapshot
+ * @property {() => import('../../types.js').AgentStatusSnapshot} getStatusSnapshot
  * @property {(path: string) => void} onCheckpointPath
  * @property {(state: { tokens: number; tokenLimit: number; utilization: number } | null) => void} onContextState
  * @property {(info: { model?: string; cost?: number; quotaSnapshots?: Record<string, unknown>; ts: number }) => void} onPrInfo
@@ -72,13 +72,13 @@ import { wireSessionEvents } from './event-wirer.js';
  * @property {(() => void)[]} unsubs
  * @property {{
  *     attach: (agent: import('node:events').EventEmitter) => void;
- *     attachToBus?: (bus: import('../../core/event-bus.js').EventBus) => void;
+ *     attachToBus?: (bus: import('../../../core/event-bus.js').EventBus) => void;
  *     detach: () => void;
  * } | null} agentObserver
  * @property {ReturnType<typeof setInterval> | null} metricsTimer
  * @property {(() => void) | null} mcpReconnectCancel
  * @property {import('#copilot/sdk/quota-monitor').QuotaMonitor | null} quotaMonitor
- * @property {import('../types.js').AgentBootStepResult[]} stepReports
+ * @property {import('../../types.js').AgentBootStepResult[]} stepReports
  * @property {number} bootStartedAt
  */
 

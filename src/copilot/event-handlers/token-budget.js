@@ -34,9 +34,12 @@ function checkAndEmitTokenBudgetWarning({ currentTokens, tokenLimit }, isResumed
 }
 
 /**
- * @param {import('#copilot/agent/session/event-wirer').CopilotSessionLike} session
+ * @param {import('#copilot/agent/session/wiring/event-wirer').CopilotSessionLike} session
  * @param {boolean} isResumed
- * @param {Pick<import('#copilot/agent/session/event-wirer').SessionWirerCallbacks, 'emit' | 'onContextState'>} cb
+ * @param {Pick<
+ *     import('#copilot/agent/session/wiring/event-wirer').SessionWirerCallbacks,
+ *     'emit' | 'onContextState'
+ * >} cb
  * @returns {(() => void)[]}
  */
 export function wireTokenBudgetEvents(session, isResumed, { emit, onContextState }) {

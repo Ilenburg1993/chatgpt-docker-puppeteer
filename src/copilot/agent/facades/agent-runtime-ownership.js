@@ -4,10 +4,10 @@
  * @file Facade canônica do vínculo entre sessão SDK ativa e hub session.
  *
  *   Esta camada concentra as operações de ownership do runtime para que bordas compartilhadas não importem helpers
- *   diretamente do subsistema `session/ownership.js` através do barrel bruto do agent.
+ *   diretamente do subsistema `session/state/ownership.js` através do barrel bruto do agent.
  */
 
-import { clearActiveSdkSessionOwnership, syncActiveSessionOwnership } from '../session/ownership.js';
+import { clearActiveSdkSessionOwnership, syncActiveSessionOwnership } from '../session/state/ownership.js';
 
 /**
  * @param {string | null} sdkSessionId

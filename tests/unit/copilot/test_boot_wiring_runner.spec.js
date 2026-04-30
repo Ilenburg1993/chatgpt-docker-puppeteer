@@ -3,8 +3,8 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'vitest';
 
-import { createBootWiringState } from '../../../src/copilot/agent/session/boot-steps.js';
-import { runBootPipeline } from '../../../src/copilot/agent/session/boot-wiring.js';
+import { createBootWiringState } from '../../../src/copilot/agent/session/boot/boot-steps.js';
+import { runBootPipeline } from '../../../src/copilot/agent/session/boot/boot-wiring.js';
 
 describe('boot-wiring runner', () => {
     it('continua após falha retryable em step opcional, marcando degraded', async () => {

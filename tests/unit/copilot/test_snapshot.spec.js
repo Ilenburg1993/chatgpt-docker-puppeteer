@@ -64,7 +64,7 @@ import {
     loadSnapshotAsync,
     pruneSnapshotsAsync,
     saveSnapshotAsync,
-} from '../../../src/copilot/agent/session/snapshot.js';
+} from '../../../src/copilot/agent/session/state/snapshot.js';
 
 describe('snapshot', () => {
     beforeEach(() => {

@@ -5,7 +5,7 @@
  */
 
 import { persistStateWithPolicy } from '../lifecycle/state-io.js';
-import { createSnapshot, saveSnapshotAsync } from '../session/snapshot.js';
+import { createSnapshot, saveSnapshotAsync } from '../session/state/snapshot.js';
 
 /**
  * @typedef {import('../facades/agent-runtime-state.js').AgentRuntimeStateContext} AgentRuntimeStateContext

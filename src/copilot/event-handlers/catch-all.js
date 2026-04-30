@@ -90,7 +90,7 @@ export const KNOWN_SDK_EVENTS = new Set([
 ]);
 
 /**
- * @param {import('#copilot/agent/session/event-wirer').CopilotSessionLike} session
+ * @param {import('#copilot/agent/session/wiring/event-wirer').CopilotSessionLike} session
  * @returns {() => void}
  */
 export function wireCatchAll(session) {

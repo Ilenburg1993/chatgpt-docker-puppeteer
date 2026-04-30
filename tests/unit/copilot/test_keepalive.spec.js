@@ -14,7 +14,7 @@ vi.mock('../../../src/copilot/agent/config.js', () => ({
 }));
 
 /* ── SUT ── */
-import { SessionKeepalive } from '../../../src/copilot/agent/session/keepalive.js';
+import { SessionKeepalive } from '../../../src/copilot/agent/session/lifecycle/keepalive.js';
 
 describe('SessionKeepalive', () => {
     beforeEach(() => {

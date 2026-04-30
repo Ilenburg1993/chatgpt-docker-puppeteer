@@ -16,7 +16,7 @@ vi.mock('../../../src/copilot/agent/lifecycle/state-io.js', () => ({
     readStateAsync: vi.fn(async () => null),
 }));
 
-import { reapExpiredPendingQuestionShadow } from '../../../src/copilot/agent/session/boot-steps.js';
+import { reapExpiredPendingQuestionShadow } from '../../../src/copilot/agent/session/boot/boot-steps.js';
 
 describe('boot-steps › pendingQuestionShadow reaper', () => {
     beforeEach(() => {

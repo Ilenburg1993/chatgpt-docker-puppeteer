@@ -6,7 +6,7 @@ import {
     clearActiveSdkSessionOwnershipWithPolicy,
     syncActiveSessionOwnership,
     syncActiveSessionOwnershipWithPolicy,
-} from '../../../src/copilot/agent/session/ownership.js';
+} from '../../../src/copilot/agent/session/state/ownership.js';
 import {
     clearSharedSessionBinding,
     getHubSessionId,

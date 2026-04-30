@@ -28,8 +28,8 @@ import { MessageQueue } from './infra/message-queue.js';
 import { createQueuedElicitationHandler } from './ports/hook-port.js';
 import { defaultMetrics } from './ports/metrics-port.js';
 import { createAgentPermissionController } from './ports/permission-port.js';
-import { SessionMessagesCache } from './session/history-sync.js';
-import { SessionKeepalive } from './session/keepalive.js';
+import { SessionMessagesCache } from './session/history/history-sync.js';
+import { SessionKeepalive } from './session/lifecycle/keepalive.js';
 
 /**
  * @typedef {{

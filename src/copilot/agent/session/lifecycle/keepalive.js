@@ -1,6 +1,6 @@
 // @ts-check
 /**
- * src/copilot/agent/session/keepalive.js
+ * src/copilot/agent/session/lifecycle/keepalive.js
  *
  * F42.2 (BUG-SD-001 fix): Previne expiração de sessão SDK por idle timeout (30 min).
  *
@@ -11,9 +11,9 @@
  * @see EventBus
  */
 
-import { KEEPALIVE_IDLE_THRESHOLD_MS, KEEPALIVE_INTERVAL_MS } from '../../config/agent.js';
-import { withAgentErrorPolicy } from '../error-policy.js';
-import { log } from '../ports/logging-port.js';
+import { KEEPALIVE_IDLE_THRESHOLD_MS, KEEPALIVE_INTERVAL_MS } from '../../../config/agent.js';
+import { withAgentErrorPolicy } from '../../error-policy.js';
+import { log } from '../../ports/logging-port.js';
 
 /**
  * @typedef {Object} SessionKeepaliveOptions

@@ -1,6 +1,6 @@
 // @ts-check
 /**
- * src/copilot/agent/session/rotation.js
+ * src/copilot/agent/session/lifecycle/rotation.js
  *
  * F43.2 (GAP-SD-03): Política de rotação de sessão.
  *
@@ -16,9 +16,9 @@ import {
     ROTATION_MAX_COMPACTIONS,
     ROTATION_MAX_TURNS,
     ROTATION_MAX_UTIL,
-} from '../../config/agent.js';
-import { log } from '../ports/logging-port.js';
-import { startSpanImmediate } from '../ports/tracing-port.js';
+} from '../../../config/agent.js';
+import { log } from '../../ports/logging-port.js';
+import { startSpanImmediate } from '../../ports/tracing-port.js';
 
 /**
  * @typedef {Object} RotationDecision

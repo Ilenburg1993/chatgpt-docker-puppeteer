@@ -1,6 +1,6 @@
 // @ts-check
 /**
- * src/copilot/agent/session/initializer.js
+ * src/copilot/agent/session/initializers/initializer.js
  *
  * Inicializador de sessão persistente para o Always-Alive Agent. Preserva o sessionId em disco e retoma sessões após
  * reinicializações (PM2/reboot).
@@ -19,12 +19,12 @@ import { buildAuditingPermissionHandler } from '#copilot/audit';
 import { WORKSPACE_ROOT, readBootSkillConfig } from '#copilot/boot';
 import { buildCustomAgentsConfig } from '#copilot/config';
 import { toError } from '#copilot/core';
-import { SESSION_MAX_AGE_MS } from '../../config/agent.js';
-import { buildSystemMessage } from '../../config/system-prompt/index.js';
+import { SESSION_MAX_AGE_MS } from '../../../config/agent.js';
+import { buildSystemMessage } from '../../../config/system-prompt/index.js';
 import {
     persistAgentRuntimeStatePartial,
     readAgentRuntimePersistedStateAsync,
-} from '../facades/agent-runtime-state.js';
+} from '../../facades/agent-runtime-state.js';
 import {
     AGENT_SDK_DEFAULT_MODEL,
     canReadAgentSdkSessionMessages,
@@ -34,13 +34,13 @@ import {
     pickDefinedAgentSdkOptions,
     readAgentSdkSessionMessages,
     resumeOrCreateAgentSdkSession,
-} from '../facades/agent-sdk-access.js';
-import { log } from '../ports/logging-port.js';
-import { defaultMetrics } from '../ports/metrics-port.js';
-import { buildHookSystemContextSafe } from './hook-context.js';
+} from '../../facades/agent-sdk-access.js';
+import { log } from '../../ports/logging-port.js';
+import { defaultMetrics } from '../../ports/metrics-port.js';
+import { buildHookSystemContextSafe } from '../context/hook-context.js';
 
 // Re-exports para backward compatibility
-export { SessionJsonSchema, buildHookSystemContext, buildHookSystemContextSafe } from './hook-context.js';
+export { SessionJsonSchema, buildHookSystemContext, buildHookSystemContextSafe } from '../context/hook-context.js';
 
 /**
  * @typedef {import('#copilot/sdk/types').CopilotClient} CopilotClient
@@ -210,8 +210,8 @@ export async function initOrResumeSession(client, sessionOptions) {
     // F43.2 (GAP-SD-03): verificar se a sessão deve ser rotacionada antes de tentar retomada
     let savedSessionId = _validateSessionForResume(state?.sessionId, state?.resumedAt ?? state?.startedAt);
     if (savedSessionId) {
-        const { shouldRotateSession } = await import('./rotation.js');
-        /** @type {import('./rotation.js').RotationContext} */
+        const { shouldRotateSession } = await import('../lifecycle/rotation.js');
+        /** @type {import('../lifecycle/rotation.js').RotationContext} */
         const rotationCtx = {};
         if (state?.startedAt) {
             rotationCtx.sessionAgeMs = Date.now() - state.startedAt;

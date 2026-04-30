@@ -10,34 +10,28 @@ arquivos são primários, quais são steps de boot, e quais são suporte secund�
 
 1. Comece por `index.js` para a superfície pública.
 2. Use `module-map.js` para o inventário executável de papéis, tiers e arquivos.
-3. Leia primeiro os módulos `primary`: `initializer.js` e `boot-wiring.js`.
+3. Leia primeiro os módulos `primary`: `initializers/initializer.js` e `boot/boot-wiring.js`.
 4. Depois desça por papel: `boot`, `lifecycle`, `wiring`, `history`, `context` e `state`.
 5. Trate `snapshot-store.js` e os substeps de boot como detalhes internos, mesmo quando usados por
    módulos públicos do subsistema.
 
 ## Mapa atual de papéis
 
-| Papel         | Arquivos                                                                                                     |
-| ------------- | ------------------------------------------------------------------------------------------------------------ |
-| `entrypoint`  | `index.js`, `module-map.js`                                                                                  |
-| `initializer` | `initializer.js`                                                                                             |
-| `boot`        | `boot-wiring.js`, `boot-steps.js`, `boot-session-prep.js`, `boot-dialog-recovery.js`, `boot-runtime-bind.js` |
-| `lifecycle`   | `keepalive.js`, `cleanup.js`, `rotation.js`                                                                  |
-| `wiring`      | `event-wirer.js`                                                                                             |
-| `history`     | `history-sync.js`                                                                                            |
-| `context`     | `hook-context.js`                                                                                            |
-| `state`       | `ownership.js`, `snapshot.js`, `snapshot-store.js`                                                           |
+| Papel         | Arquivos                                                                                                                              |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| `entrypoint`  | `index.js`, `module-map.js`                                                                                                           |
+| `initializer` | `initializers/initializer.js`                                                                                                         |
+| `boot`        | `boot/boot-wiring.js`, `boot/boot-steps.js`, `boot/boot-session-prep.js`, `boot/boot-dialog-recovery.js`, `boot/boot-runtime-bind.js` |
+| `lifecycle`   | `lifecycle/keepalive.js`, `lifecycle/cleanup.js`, `lifecycle/rotation.js`                                                             |
+| `wiring`      | `wiring/event-wirer.js`                                                                                                               |
+| `history`     | `history/history-sync.js`                                                                                                             |
+| `context`     | `context/hook-context.js`                                                                                                             |
+| `state`       | `state/ownership.js`, `state/snapshot.js`, `state/snapshot-store.js`                                                                  |
 
 ## Situação física atual
 
-O diretório ainda está plano. Isso é aceitável como checkpoint porque o `module-map.js` agora torna
-explícita a responsabilidade de cada arquivo e impede novas adições órfãs. A próxima onda pode mover
-as famílias para subpastas semânticas com shims temporários, seguindo a estratégia já validada em
-`agent/dialog`.
-
-## Situação física alvo
-
-A migração final deve convergir para:
+A W113 migrou os owners reais para subpastas semânticas e não deixou shims de raiz. A raiz do
+diretório fica reservada a navegação e superfície pública:
 
 ```text
 agent/session/
@@ -45,15 +39,16 @@ agent/session/
   index.js
   module-map.js
   boot/
-  lifecycle/
-  wiring/
-  history/
   context/
+  history/
+  initializers/
+  lifecycle/
   state/
+  wiring/
 ```
 
-Durante a migração física, arquivos de raiz podem permanecer como shims temporários, mas cada shim
-deve estar registrado no roadmap, no mapa local e em contrato de remoção.
+Qualquer novo arquivo funcional criado diretamente na raiz precisa ser tratado como regressão
+arquitetural ou ter justificativa explícita no `module-map.js` e no roadmap.
 
 ## Regra para novos arquivos
 

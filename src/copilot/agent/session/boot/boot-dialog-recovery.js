@@ -5,16 +5,16 @@
  */
 
 import { EMITTER_DIALOG_BOOT_RECOVERY } from '#copilot/events';
-import { BOOT_RECOVERY_DELAY_MS } from '../../config/agent.js';
-import { logSwallowed, toError } from '../../core/error-handlers.js';
-import { registerTimer } from '../../core/timer-registry.js';
+import { BOOT_RECOVERY_DELAY_MS } from '../../../config/agent.js';
+import { logSwallowed, toError } from '../../../core/error-handlers.js';
+import { registerTimer } from '../../../core/timer-registry.js';
 import {
     clearAgentRuntimePendingQuestionShadow,
     markAgentRuntimeDialogPausedForRecovery,
     shouldReapAgentRuntimePendingQuestionShadow,
     shouldScheduleAgentRuntimeDialogBootRecovery,
-} from '../facades/agent-runtime-state.js';
-import { log } from '../ports/logging-port.js';
+} from '../../facades/agent-runtime-state.js';
+import { log } from '../../ports/logging-port.js';
 
 /**
  * @typedef {import('./boot-session-prep.js').BootWiringContext} BootWiringContext
