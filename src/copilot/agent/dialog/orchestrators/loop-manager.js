@@ -4,7 +4,7 @@
  * @file Gerenciador do loop de diálogo: controla turnos, compaction, stall detection e watchdog. Coordena a execução de
  *   cada turno via TurnExecutor.
  *
- *   src/copilot/agent/dialog/loop-manager.js
+ *   src/copilot/agent/dialog/orchestrators/loop-manager.js
  * @see EventBus
  * @see module:copilot/always-alive
  * @see module:copilot/dialog/protocol
@@ -22,26 +22,21 @@ import {
     EMITTER_LOOP_REPLY,
     EMITTER_LOOP_RESUMED,
     EMITTER_LOOP_STALLED,
-    EMITTER_LOOP_TURN_TIMEOUT,
 } from '#copilot/events';
 import { EventEmitter } from 'node:events';
-import { BOOT_LATE_PROTOCOL_GRACE_MS, LONG_TASK_TIMEOUT_MS } from '../../config/agent.js';
-import { logSwallowed } from '../../core/error-handlers.js';
-import { DialogProtocol } from '../../dialog/protocol.js';
+import { logSwallowed } from '../../../core/error-handlers.js';
+import { DialogProtocol } from '../../../dialog/protocol.js';
 import {
     persistAgentRuntimeDialogState,
     readAgentRuntimeDialogPersistedState,
-} from '../facades/agent-runtime-state.js';
-import { waitForAgentSdkEvent } from '../facades/agent-sdk-runtime.js';
-import { log } from '../ports/logging-port.js';
-import { startSpanImmediate } from '../ports/tracing-port.js';
-import { createDialogLoopRuntimeKit } from './loop-runtime-kit.js';
-import { selectDialogResumeStrategy } from './resume-policy.js';
-import { executeTurnImpl } from './turn-executor.js';
-
-const BOOT_FAILURE_CIRCUIT_WINDOW_MS = 120_000;
-const BOOT_FAILURE_CIRCUIT_COOLDOWN_MS = 60_000;
-const BOOT_FAILURE_CIRCUIT_MAX_FAILURES = 3;
+} from '../../facades/agent-runtime-state.js';
+import { log } from '../../ports/logging-port.js';
+import { startSpanImmediate } from '../../ports/tracing-port.js';
+import { DialogBootCircuit } from '../boot/loop-boot-circuit.js';
+import { runDialogLoopBoot } from '../boot/loop-boot-runner.js';
+import { createDialogLoopRuntimeKit } from '../boot/loop-runtime-kit.js';
+import { executeTurnImpl } from '../executors/turn-executor.js';
+import { selectDialogResumeStrategy } from '../policies/resume-policy.js';
 
 /**
  * @typedef {Object} DialogLoopManagerOptions
@@ -52,30 +47,20 @@ const BOOT_FAILURE_CIRCUIT_MAX_FAILURES = 3;
  * @property {string | null} [fallbackModel] - Modelo de fallback a usar na próxima inicialização (agendado por
  *   `scheduleFallback()`) Interface esperada do agente host (AlwaysAliveAgent) para interação bidirecional.
  *
- * @typedef {import('../types.js').DialogLoopHost} DialogLoopHost
+ * @typedef {import('../../types.js').DialogLoopHost} DialogLoopHost
  *
- * @typedef {import('./backpressure.js').TurnQueue} TurnQueue
+ * @typedef {import('../state/backpressure.js').TurnQueue} TurnQueue
  *
- * @typedef {import('./compaction-policy.js').DialogCompactionPolicy} DialogCompactionPolicy
+ * @typedef {import('../policies/compaction-policy.js').DialogCompactionPolicy} DialogCompactionPolicy
  *
- * @typedef {import('./cost-ledger.js').DialogCostLedger} DialogCostLedger
+ * @typedef {import('../state/cost-ledger.js').DialogCostLedger} DialogCostLedger
  *
- * @typedef {import('./model-fallback.js').ModelFallbackState} ModelFallbackState
+ * @typedef {import('../policies/model-fallback.js').ModelFallbackState} ModelFallbackState
  *
- * @typedef {import('./state-machine.js').DialogLoopStateMachine} DialogLoopStateMachine
+ * @typedef {import('../state/state-machine.js').DialogLoopStateMachine} DialogLoopStateMachine
  *
- * @typedef {import('./watchdog-supervisor.js').DialogWatchdogSupervisor} DialogWatchdogSupervisor
+ * @typedef {import('../watchdogs/watchdog-supervisor.js').DialogWatchdogSupervisor} DialogWatchdogSupervisor
  */
-
-/**
- * @param {unknown} error
- * @returns {boolean}
- */
-function isBootTimeoutError(error) {
-    const candidate = /** @type {{ code?: unknown; message?: unknown }} */ (error);
-    const message = typeof candidate?.message === 'string' ? candidate.message : String(error);
-    return candidate?.code === 'DIALOG_TIMEOUT' || message.includes('Boot timeout');
-}
 
 /**
  * Gerenciador do dialog loop — encapsula mutex, watchdog, backpressure, pause/resume e protocolo READY/REPLY.
@@ -113,11 +98,8 @@ export class DialogLoopManager extends EventEmitter {
     /** @type {DialogCostLedger} F5: ledger de PR consumido por boot/resume */
     #costLedger;
 
-    /** @type {number[]} */
-    #bootFailureTimestamps = [];
-
-    /** @type {number} */
-    #bootCircuitOpenUntil = 0;
+    /** @type {DialogBootCircuit} W86.8: circuit breaker do boot extraído do manager */
+    #bootCircuit = new DialogBootCircuit();
 
     /**
      * @param {DialogLoopManagerOptions} [options]
@@ -241,7 +223,7 @@ export class DialogLoopManager extends EventEmitter {
                 'NOT_ATTACHED',
             );
         }
-        this.#assertBootCircuitClosed();
+        this.#bootCircuit.assertClosed();
 
         // F42.6: permitir start() durante resume (Estratégia B) mas bloquear duplicatas externas
         if (this.#state.active) {
@@ -267,80 +249,21 @@ export class DialogLoopManager extends EventEmitter {
             model: this.#host?.getModel() ?? '',
         });
 
-        // F60: delegar aplicação de fallback ao ModelFallbackState
-        this.#modelFallback.applyIfPending(
-            this.#host,
-            /** @param {string} event @param {unknown} payload */ (event, payload) => this.emit(event, payload),
-        );
-
-        const metaPrompt = bootPrompt ?? DialogProtocol.buildBootPrompt();
-
-        const bootPromise = waitForAgentSdkEvent(this, 'ready', {
-            timeoutMs: this.#bootTimeoutMs,
-            timeoutError: `[DialogLoopManager] Boot timeout após ${this.#bootTimeoutMs}ms`,
+        await runDialogLoopBoot({
+            emitter: this,
+            host: this.#host,
+            state: this.#state,
+            bootTimeoutMs: this.#bootTimeoutMs,
+            watchdogSupervisor: this.#watchdogSupervisor,
+            modelFallback: this.#modelFallback,
+            costLedger: this.#costLedger,
+            bootCircuit: this.#bootCircuit,
+            ...(bootPrompt !== undefined && { bootPrompt }),
+            emit: (event, payload) => this.emit(event, payload),
+            trackPersistedState: (data, meta) => this.#trackPersistedState(data, meta),
+            persistPrMetrics: (label, description) => this.#persistPrMetrics(label, description),
+            endLoopSpan: (success) => this.#endLoopSpan(success),
         });
-
-        this.#watchdogSupervisor.start();
-
-        // G2-ARCH-02: usar sendMessageDialogBoot() para evitar a heurística frágil timeoutMs===24h.
-        // O boot prompt tem timeout muito longo pois o dialog loop não emite session.idle organicamente.
-        const host = this.#host;
-        const bootSendFn =
-            typeof (/** @type {{ sendMessageDialogBoot?: Function }} */ (host).sendMessageDialogBoot) === 'function'
-                ? /** @type {{ sendMessageDialogBoot: Function }} */ (host).sendMessageDialogBoot.bind(host)
-                : (/** @type {string} */ msg, /** @type {{ timeoutMs?: number }} */ opts = {}) =>
-                      host.sendMessage(msg, { ...opts, timeoutMs: LONG_TASK_TIMEOUT_MS });
-
-        let bootFailureHandled = false;
-        /** @type {Error | null} */
-        let bootSendError = null;
-        const bootSendFailure = Promise.resolve(bootSendFn(metaPrompt, { timeoutMs: LONG_TASK_TIMEOUT_MS })).then(
-            () => new Promise(() => {}),
-            (/** @type {Error} */ e) => {
-                if (this.#state.active) {
-                    bootFailureHandled = true;
-                    bootSendError = e;
-                    this.#markBootFailed(e);
-                }
-                throw e;
-            },
-        );
-
-        // G2-ARCH-20: emitir dialog.turn_timeout via SSE quando o boot timeout expira, em vez de apenas rejeitar.
-        bootPromise.catch((e) => {
-            if (!this.#state.active) {
-                return;
-            }
-            if (isBootTimeoutError(e)) {
-                this.emit(EMITTER_LOOP_TURN_TIMEOUT, { phase: 'boot', timeoutMs: this.#bootTimeoutMs, ts: Date.now() });
-                log(
-                    'WARN',
-                    `[DialogLoopManager] Boot timeout (${this.#bootTimeoutMs}ms) — evento turn_timeout emitido.`,
-                );
-            }
-        });
-
-        try {
-            await Promise.race([bootPromise, bootSendFailure]);
-        } catch (bootErr) {
-            if (bootFailureHandled) {
-                throw bootSendError ?? bootErr;
-            }
-            if (isBootTimeoutError(bootErr) && (await this.#waitForLateBootReady())) {
-                log(
-                    'WARN',
-                    `[DialogLoopManager] Boot READY recuperado dentro da janela zero-PR (${BOOT_LATE_PROTOCOL_GRACE_MS}ms).`,
-                );
-            } else {
-                this.#failBoot(bootErr);
-            }
-        }
-        // F41B.8: contabilizar boot como 1 PR consumido
-        this.#recordBootSuccess();
-        this.#costLedger.recordBoot();
-        // F42.4: persistir prMetrics após boot bem-sucedido
-        void this.#persistPrMetrics('dialog.prMetrics.boot', 'Persist dialog loop PR metrics after boot');
-        log('INFO', '[DialogLoopManager] Dialog loop iniciado.');
     }
 
     /**
@@ -583,105 +506,6 @@ export class DialogLoopManager extends EventEmitter {
     }
 
     /**
-     * Aguarda um READY tardio sem consumir novo PR. Alguns boots do SDK chegam poucos segundos após o timeout nominal;
-     * em vez de derrubar o loop e disparar um segundo boot, tratamos esse timeout como aviso e damos uma janela curta
-     * de estabilização.
-     *
-     * @returns {Promise<boolean>}
-     */
-    async #waitForLateBootReady() {
-        log(
-            'WARN',
-            `[DialogLoopManager] Boot timeout atingido; aguardando READY tardio por ${BOOT_LATE_PROTOCOL_GRACE_MS}ms antes de falhar.`,
-        );
-        try {
-            await waitForAgentSdkEvent(this, EMITTER_LOOP_READY, {
-                timeoutMs: BOOT_LATE_PROTOCOL_GRACE_MS,
-                timeoutError: `[DialogLoopManager] READY tardio não chegou após ${BOOT_LATE_PROTOCOL_GRACE_MS}ms`,
-            });
-            return true;
-        } catch (lateErr) {
-            log(
-                'WARN',
-                `[DialogLoopManager] READY tardio ausente: ${lateErr instanceof Error ? lateErr.message : lateErr}`,
-            );
-            return false;
-        }
-    }
-
-    /**
-     * @param {unknown} bootErr
-     * @returns {void}
-     */
-    #markBootFailed(bootErr) {
-        this.#recordBootFailure();
-        const reason = bootErr instanceof Error ? bootErr.message : String(bootErr);
-        this.#state.deactivate();
-        this.#watchdogSupervisor.clear();
-        this.#endLoopSpan(false);
-        this.emit(EMITTER_LOOP_CHANGED, { active: false, ts: Date.now() });
-        this.emit('stopped', { reason });
-        void this.#trackPersistedState(
-            { dialogLoopActive: false },
-            {
-                label: 'dialog.state.boot_failed',
-                description: 'Persist dialogLoopActive=false after boot failure',
-            },
-        );
-    }
-
-    /**
-     * @returns {void}
-     */
-    #assertBootCircuitClosed() {
-        const now = Date.now();
-        if (this.#bootCircuitOpenUntil > now) {
-            const waitMs = this.#bootCircuitOpenUntil - now;
-            throw new SessionError(
-                `[DialogLoopManager] Circuit breaker de boot aberto por ${waitMs}ms após ${BOOT_FAILURE_CIRCUIT_MAX_FAILURES} falhas recentes.`,
-                'DIALOG_BOOT_CIRCUIT_OPEN',
-            );
-        }
-        if (this.#bootCircuitOpenUntil > 0) {
-            this.#bootCircuitOpenUntil = 0;
-            this.#bootFailureTimestamps = [];
-        }
-    }
-
-    /**
-     * @returns {void}
-     */
-    #recordBootFailure() {
-        const now = Date.now();
-        const windowStart = now - BOOT_FAILURE_CIRCUIT_WINDOW_MS;
-        this.#bootFailureTimestamps = [...this.#bootFailureTimestamps.filter((ts) => ts >= windowStart), now];
-        if (this.#bootFailureTimestamps.length >= BOOT_FAILURE_CIRCUIT_MAX_FAILURES) {
-            this.#bootCircuitOpenUntil = now + BOOT_FAILURE_CIRCUIT_COOLDOWN_MS;
-            log(
-                'WARN',
-                `[DialogLoopManager] Circuit breaker de boot aberto por ${BOOT_FAILURE_CIRCUIT_COOLDOWN_MS}ms após ${this.#bootFailureTimestamps.length} falhas.`,
-            );
-        }
-    }
-
-    /**
-     * @returns {void}
-     */
-    #recordBootSuccess() {
-        this.#bootFailureTimestamps = [];
-        this.#bootCircuitOpenUntil = 0;
-    }
-
-    /**
-     * @param {unknown} bootErr
-     * @throws {unknown}
-     */
-    #failBoot(bootErr) {
-        this.#markBootFailed(bootErr);
-        throw bootErr;
-    }
-
-    /**
      * F68.2: Encerra o span OTEL do dialog loop.
      *
      * @param {boolean} success - Se o loop encerrou com sucesso (stop) ou forçadamente.
@@ -788,7 +612,7 @@ export class DialogLoopManager extends EventEmitter {
         return this.#trackBackgroundTask(
             persistAgentRuntimeDialogState(data, label).then((result) => {
                 if (!result.ok) {
-                    const failure = /** @type {import('../error-policy.js').AgentPolicyFailure} */ (result);
+                    const failure = /** @type {import('../../error-policy.js').AgentPolicyFailure} */ (result);
                     throw failure.error;
                 }
                 return undefined;
@@ -826,4 +650,4 @@ export class DialogLoopManager extends EventEmitter {
 }
 
 // F61: wireDialogLoopEvents extraído para event-wiring.js — re-exportado para compatibilidade
-export { wireDialogLoopEvents } from './event-wiring.js';
+export { wireDialogLoopEvents } from '../wiring/event-wiring.js';

@@ -121,7 +121,7 @@ vi.mock('../../../src/copilot/agent/lifecycle/state-io.js', () => ({
     writeStateAsync: vi.fn().mockResolvedValue(undefined),
 }));
 
-vi.mock('../../../src/copilot/agent/dialog/watchdog.js', () => ({
+vi.mock('../../../src/copilot/agent/dialog/watchdogs/watchdog.js', () => ({
     DialogWatchdog: class MockWatchdog {
         start = vi.fn();
         stop = vi.fn();
@@ -130,13 +130,13 @@ vi.mock('../../../src/copilot/agent/dialog/watchdog.js', () => ({
 }));
 
 /* turn-executor — mock que simula host interaction via emitter */
-vi.mock('../../../src/copilot/agent/dialog/turn-executor.js', () => ({
+vi.mock('../../../src/copilot/agent/dialog/executors/turn-executor.js', () => ({
     executeTurnImpl: vi.fn(),
 }));
 
 /* ── SUT (real) ── */
-import { DialogLoopManager } from '../../../src/copilot/agent/dialog/loop-manager.js';
-import { executeTurnImpl } from '../../../src/copilot/agent/dialog/turn-executor.js';
+import { executeTurnImpl } from '../../../src/copilot/agent/dialog/executors/turn-executor.js';
+import { DialogLoopManager } from '../../../src/copilot/agent/dialog/orchestrators/loop-manager.js';
 
 /* ── helpers ── */
 const tick = () => new Promise((r) => setTimeout(r, 0));

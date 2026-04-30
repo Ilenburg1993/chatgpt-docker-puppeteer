@@ -77,22 +77,29 @@ describe('F148 — agent/lifecycle/ usa barrel para event-helpers', () => {
     });
 
     it('loop-manager.js não importa de #copilot/sdk/event-helpers', () => {
-        expect(src('agent/dialog/loop-manager.js')).not.toContain("from '#copilot/sdk/event-helpers'");
+        expect(src('agent/dialog/orchestrators/loop-manager.js')).not.toContain("from '#copilot/sdk/event-helpers'");
     });
 
     it('loop-manager.js não importa waitForEvent diretamente de #copilot/sdk', () => {
-        expect(src('agent/dialog/loop-manager.js')).not.toContain("from '#copilot/sdk'");
+        expect(src('agent/dialog/orchestrators/loop-manager.js')).not.toContain("from '#copilot/sdk'");
     });
 
-    it('loop-manager.js usa a façade agent-sdk-runtime para waitForAgentSdkEvent', () => {
-        expect(src('agent/dialog/loop-manager.js')).toContain("from '../facades/agent-sdk-runtime.js'");
-        expect(src('agent/dialog/loop-manager.js')).toContain('waitForAgentSdkEvent');
+    it('loop-manager.js mantém o SDK fora do orquestrador principal', () => {
+        expect(src('agent/dialog/orchestrators/loop-manager.js')).not.toContain(
+            "from '../facades/agent-sdk-runtime.js'",
+        );
+        expect(src('agent/dialog/orchestrators/loop-manager.js')).not.toContain('waitForAgentSdkEvent');
+    });
+
+    it('loop-boot-runner.js usa a façade agent-sdk-runtime para waitForAgentSdkEvent', () => {
+        expect(src('agent/dialog/boot/loop-boot-runner.js')).toContain("from '../../facades/agent-sdk-runtime.js'");
+        expect(src('agent/dialog/boot/loop-boot-runner.js')).toContain('waitForAgentSdkEvent');
     });
 
     it('resume-policy.js usa a façade agent-sdk-runtime para waitForAgentSdkEvent', () => {
-        expect(src('agent/dialog/resume-policy.js')).toContain("from '../facades/agent-sdk-runtime.js'");
-        expect(src('agent/dialog/resume-policy.js')).toContain('waitForAgentSdkEvent');
-        expect(src('agent/dialog/resume-policy.js')).not.toContain("from '#copilot/sdk'");
+        expect(src('agent/dialog/policies/resume-policy.js')).toContain("from '../../facades/agent-sdk-runtime.js'");
+        expect(src('agent/dialog/policies/resume-policy.js')).toContain('waitForAgentSdkEvent');
+        expect(src('agent/dialog/policies/resume-policy.js')).not.toContain("from '#copilot/sdk'");
     });
 });
 

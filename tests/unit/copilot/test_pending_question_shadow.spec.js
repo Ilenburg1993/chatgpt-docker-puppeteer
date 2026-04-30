@@ -12,7 +12,7 @@ import {
     getPendingQuestionShadowState,
     getPendingQuestionShadowTtlMs,
     isPendingQuestionShadowExpired,
-} from '../../../src/copilot/agent/dialog/pending-question-shadow.js';
+} from '../../../src/copilot/agent/dialog/state/pending-question-shadow.js';
 
 describe('pending-question-shadow helpers', () => {
     it('cria shadow com restoredAt/expiresAt derivados', () => {

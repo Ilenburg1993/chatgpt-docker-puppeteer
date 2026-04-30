@@ -4,7 +4,7 @@
  * @file Executor de turno individual: envia mensagem ao SDK, processa resposta, emite eventos de início/fim e trata
  *   erros de sessão por turno.
  *
- *   src/copilot/agent/dialog/turn-executor.js
+ *   src/copilot/agent/dialog/executors/turn-executor.js
  */
 
 import { container, SessionError } from '#copilot/core';
@@ -15,17 +15,17 @@ import {
     EMITTER_QUESTION_PENDING,
     EMITTER_TURN_START,
 } from '#copilot/events';
-import { persistAgentRuntimePendingTurnState } from '../facades/agent-runtime-state.js';
-import { log } from '../ports/logging-port.js';
-import { METRICS_STORE } from '../ports/metrics-port.js';
-import { startSpan } from '../ports/tracing-port.js';
+import { persistAgentRuntimePendingTurnState } from '../../facades/agent-runtime-state.js';
+import { log } from '../../ports/logging-port.js';
+import { METRICS_STORE } from '../../ports/metrics-port.js';
+import { startSpan } from '../../ports/tracing-port.js';
 import {
     castListener as castListenerImpl,
     createAssistantReplyFallback as createAssistantReplyFallbackImpl,
     createInactivityTimeout as createInactivityTimeoutImpl,
     detachAbortListener as detachAbortListenerImpl,
     traceLabel as traceLabelImpl,
-} from './seams/turn-execution-context.js';
+} from '../seams/turn-execution-context.js';
 import {
     createAbortError as createAbortErrorImpl,
     finalizeTurnReply as finalizeTurnReplyImpl,
@@ -34,8 +34,8 @@ import {
     normalizeReplyEvent as normalizeReplyEventImpl,
     normalizeStopEvent as normalizeStopEventImpl,
     readPendingProtocolSnapshot as readPendingProtocolSnapshotImpl,
-} from './seams/turn-input-validation.js';
-import { buildTurnResolutionListenersImpl, dispatchTurnToHostImpl } from './seams/turn-result-persistence.js';
+} from '../seams/turn-input-validation.js';
+import { buildTurnResolutionListenersImpl, dispatchTurnToHostImpl } from '../seams/turn-result-persistence.js';
 
 /**
  * Subconjunto do EventEmitter necessário para os executores de turno.
@@ -54,7 +54,7 @@ import { buildTurnResolutionListenersImpl, dispatchTurnToHostImpl } from './seam
  * }} ProgressEventSource
  */
 
-/** @typedef {import('../types.js').DialogTurnHost} TurnHost */
+/** @typedef {import('../../types.js').DialogTurnHost} TurnHost */
 
 /**
  * Cria um listener que aceita `unknown` e faz cast para o tipo esperado.
@@ -207,7 +207,7 @@ export function emitTurnStart(emitter, message, counter, host) {
     emitter.emit(EMITTER_TURN_START, { message: message.slice(0, 120), ts: turnStart });
     const persistPendingTurnTask = persistAgentRuntimePendingTurnState({ message, ts: turnStart }).then((result) => {
         if (!result.ok) {
-            const failure = /** @type {import('../error-policy.js').AgentPolicyFailure} */ (result);
+            const failure = /** @type {import('../../error-policy.js').AgentPolicyFailure} */ (result);
             throw failure.error;
         }
         return undefined;

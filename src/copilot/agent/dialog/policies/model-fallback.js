@@ -1,6 +1,6 @@
 // @ts-check
 /**
- * src/copilot/agent/dialog/model-fallback.js
+ * src/copilot/agent/dialog/policies/model-fallback.js
  *
  * F60: Encapsula o estado de fallback de modelo do dialog loop.
  *
@@ -14,9 +14,9 @@
  * @see EventBus
  */
 
-import { log } from '../ports/logging-port.js';
+import { log } from '../../ports/logging-port.js';
 
-/** @typedef {Pick<import('../types.js').DialogLoopHost, 'getModel' | 'setModel'>} AgentHostForFallback */
+/** @typedef {{ getModel: () => string; setModel?: (model: string) => void }} AgentHostForFallback */
 
 /**
  * Gerencia o estado de fallback de modelo para o dialog loop.

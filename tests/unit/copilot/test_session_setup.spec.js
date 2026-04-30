@@ -50,13 +50,13 @@ vi.mock('../../../src/copilot/tools/bootstrap.js', () => ({
     bootstrapTools: vi.fn((_registry, mcpTools) => ['tool1', 'tool2', ...mcpTools]),
     setSessionRpc: vi.fn(),
 }));
-vi.mock('../../../src/copilot/agent/dialog/user-input-handler.js', () => ({
+vi.mock('../../../src/copilot/agent/dialog/wiring/user-input-handler.js', () => ({
     handleUserInputRequest: vi.fn(),
 }));
 
 import { createSessionRpcFacade } from '#copilot/sdk';
 import { isToolDisabled } from '#copilot/tools';
-import { handleUserInputRequest } from '../../../src/copilot/agent/dialog/user-input-handler.js';
+import { handleUserInputRequest } from '../../../src/copilot/agent/dialog/wiring/user-input-handler.js';
 import { getAgentSdkToolsConfig } from '../../../src/copilot/agent/facades/agent-sdk-access.js';
 import {
     buildSessionHooks,

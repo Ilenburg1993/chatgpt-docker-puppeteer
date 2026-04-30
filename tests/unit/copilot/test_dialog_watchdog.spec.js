@@ -10,7 +10,7 @@
 
 import assert from 'node:assert/strict';
 import { afterEach, beforeAll, describe, it, vi } from 'vitest';
-import { DialogWatchdog, WATCHDOG_THRESHOLDS } from '../../../src/copilot/agent/dialog/watchdog.js';
+import { DialogWatchdog, WATCHDOG_THRESHOLDS } from '../../../src/copilot/agent/dialog/watchdogs/watchdog.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Suite: análise estrutural — stop() com shutdownTimeoutMs
@@ -25,7 +25,7 @@ describe('DialogLoopManager › G2-ARCH-11: stop() com shutdownTimeoutMs', async
         const { resolve, dirname } = await import('node:path');
         const { fileURLToPath } = await import('node:url');
         const dir = dirname(fileURLToPath(import.meta.url));
-        src = await readFile(resolve(dir, '../../../src/copilot/agent/dialog/loop-manager.js'), 'utf8');
+        src = await readFile(resolve(dir, '../../../src/copilot/agent/dialog/orchestrators/loop-manager.js'), 'utf8');
         assert.ok(src.includes('shutdownTimeoutMs'), 'stop() deve ter parâmetro shutdownTimeoutMs');
     });
 
@@ -67,10 +67,10 @@ describe('DialogLoopManager › G2-ARCH-20: boot timeout emite turn_timeout', as
         const { resolve, dirname } = await import('node:path');
         const { fileURLToPath } = await import('node:url');
         const dir = dirname(fileURLToPath(import.meta.url));
-        src = await readFile(resolve(dir, '../../../src/copilot/agent/dialog/loop-manager.js'), 'utf8');
+        src = await readFile(resolve(dir, '../../../src/copilot/agent/dialog/boot/loop-boot-runner.js'), 'utf8');
         assert.ok(
             src.includes('emit(EMITTER_LOOP_TURN_TIMEOUT') || src.includes("emit('turn_timeout'"),
-            'dialog-loop-manager deve emitir turn_timeout no handler de erro de boot',
+            'dialog boot runner deve emitir turn_timeout no handler de erro de boot',
         );
     });
 
@@ -87,8 +87,11 @@ describe('DialogLoopManager › G2-ARCH-20: boot timeout emite turn_timeout', as
         const { fileURLToPath } = await import('node:url');
         const dir = dirname(fileURLToPath(import.meta.url));
         const aaSrc = await readFile(resolve(dir, '../../../src/copilot/agent/always-alive.js'), 'utf8');
-        // dialog-loop-wirer.js é responsável pelo forwarding (Fase 5 refactor)
-        const wirerSrc = await readFile(resolve(dir, '../../../src/copilot/agent/dialog/loop-manager.js'), 'utf8');
+        // event-wiring.js é responsável pelo forwarding (Fase 5 refactor)
+        const wirerSrc = await readFile(
+            resolve(dir, '../../../src/copilot/agent/dialog/wiring/event-wiring.js'),
+            'utf8',
+        );
         assert.ok(
             aaSrc.includes('dialog.turn_timeout') || wirerSrc.includes('dialog.turn_timeout'),
             "always-alive (ou dialog-loop-wirer) deve reemitir 'dialog.turn_timeout'",
@@ -236,7 +239,10 @@ describe('DialogWatchdog › F31: DLM pause/resume integração source analysis'
         const { resolve, dirname } = await import('node:path');
         const { fileURLToPath } = await import('node:url');
         const dir = dirname(fileURLToPath(import.meta.url));
-        dlmSrc = await readFile(resolve(dir, '../../../src/copilot/agent/dialog/loop-manager.js'), 'utf8');
+        dlmSrc = await readFile(
+            resolve(dir, '../../../src/copilot/agent/dialog/orchestrators/loop-manager.js'),
+            'utf8',
+        );
     });
 
     it('pause() chama watchdog supervisor stop() para evitar falsos-positivos', () => {

@@ -1,6 +1,6 @@
 // @ts-check
 /**
- * src/copilot/agent/dialog/user-input-handler.js
+ * src/copilot/agent/dialog/wiring/user-input-handler.js
  *
  * Handlers de input do usuário extraídos do AlwaysAliveAgent.
  *
@@ -11,17 +11,17 @@
  */
 
 import { EMITTER_QUESTION_PENDING } from '#copilot/events';
-import { DialogProtocol } from '../../dialog/protocol.js';
-import { persistAgentRuntimePendingQuestionState } from '../facades/agent-runtime-state.js';
-import { log } from '../ports/logging-port.js';
+import { DialogProtocol } from '../../../dialog/protocol.js';
+import { persistAgentRuntimePendingQuestionState } from '../../facades/agent-runtime-state.js';
+import { log } from '../../ports/logging-port.js';
 
 const REPLY_PROTOCOL_CONTINUE =
     'CONTINUE_DIALOG_LOOP: resposta entregue ao usuario; chame ask_user("READY: aguardando próxima mensagem") agora.';
 
 /**
- * @typedef {import('../types.js').PendingQuestion} PendingQuestion
+ * @typedef {import('../../types.js').PendingQuestion} PendingQuestion
  *
- * @typedef {import('../types.js').PendingQuestionKind} PendingQuestionKind
+ * @typedef {import('../../types.js').PendingQuestionKind} PendingQuestionKind
  */
 
 /**
@@ -32,7 +32,7 @@ const REPLY_PROTOCOL_CONTINUE =
  * @property {(question: string) => boolean} [shouldHandleProtocolInput] - permite tratar READY/REPLY/STOPPED como
  *   protocolo mesmo durante recovery, quando o loop ainda esta anexado mas o flag `active` ficou defasado
  * @property {(input: { question: string }) => void} handleProtocolInput - DLM.handleProtocolInput
- * @property {(status: import('../types.js').AgentStatus) => void} setStatus - #setStatus
+ * @property {(status: import('../../types.js').AgentStatus) => void} setStatus - #setStatus
  * @property {(pq: PendingQuestion | null) => void} setPendingQuestion - #pendingQuestion setter
  * @property {(task: Promise<unknown>, meta?: { label?: string; description?: string }) => Promise<void>} [trackBackgroundTask]
  *   - Tracker opcional para writes fire-and-forget
@@ -65,7 +65,7 @@ function trackBackgroundTask(ctx, task, meta) {
  * @param {UserInputContext} ctx
  * @param {{
  *     question: string;
- *     meta: import('../types.js').PendingQuestionMeta;
+ *     meta: import('../../types.js').PendingQuestionMeta;
  *     askedAt: number;
  * }} data
  * @param {{ label?: string; description?: string }} meta
@@ -99,7 +99,7 @@ function shouldPersistPendingQuestion(kind) {
  *     allowFreeform: boolean;
  *     choices?: string[];
  * }} input
- * @returns {import('../types.js').PendingQuestionMeta}
+ * @returns {import('../../types.js').PendingQuestionMeta}
  */
 function buildPendingQuestionMeta({ kind, askedAt, allowFreeform, choices }) {
     return {

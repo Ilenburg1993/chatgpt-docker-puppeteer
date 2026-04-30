@@ -6,7 +6,7 @@
  */
 import EventEmitter from 'node:events';
 import { describe, expect, it, vi } from 'vitest';
-import { DLM_EVENTS, EVENT_MAP, wireDialogLoopEvents } from '../../../src/copilot/agent/dialog/event-wiring.js';
+import { DLM_EVENTS, EVENT_MAP, wireDialogLoopEvents } from '../../../src/copilot/agent/dialog/wiring/event-wiring.js';
 
 describe('wireDialogLoopEvents', () => {
     it('deve registrar listeners para todos os 14 eventos DLM', () => {

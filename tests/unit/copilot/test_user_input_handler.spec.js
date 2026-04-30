@@ -10,7 +10,7 @@ vi.mock('../../../src/copilot/agent/facades/agent-runtime-state.js', () => ({
     persistAgentRuntimePendingQuestionState: mocks.persistAgentRuntimePendingQuestionState,
 }));
 
-import { handleUserInputRequest } from '../../../src/copilot/agent/dialog/user-input-handler.js';
+import { handleUserInputRequest } from '../../../src/copilot/agent/dialog/wiring/user-input-handler.js';
 
 function createCtx(/** @type {boolean} */ dialogLoopActive) {
     return {

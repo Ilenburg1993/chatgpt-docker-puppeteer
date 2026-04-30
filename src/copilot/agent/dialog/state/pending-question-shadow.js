@@ -12,14 +12,14 @@ import {
     PENDING_QUESTION_SHADOW_TTL_MS,
     PENDING_QUESTION_SHADOW_TTL_QUESTION_MS,
     PENDING_QUESTION_SHADOW_TTL_READY_MS,
-} from '../../config/agent.js';
+} from '../../../config/agent.js';
 
 /**
  * @typedef {'fresh' | 'active' | 'expiring_soon' | 'expired'} PendingQuestionShadowState
  */
 
 /**
- * @param {import('../types.js').PendingQuestionKind} [kind]
+ * @param {import('../../types.js').PendingQuestionKind} [kind]
  * @returns {number}
  */
 export function getPendingQuestionShadowTtlMs(kind = 'question') {
@@ -34,7 +34,7 @@ export function getPendingQuestionShadowTtlMs(kind = 'question') {
 }
 
 /**
- * @param {import('../types.js').PendingQuestionShadow} shadow
+ * @param {import('../../types.js').PendingQuestionShadow} shadow
  * @param {number} [ttlMs]
  * @returns {number}
  */
@@ -49,7 +49,7 @@ export function getPendingQuestionShadowExpiresAt(shadow, ttlMs = PENDING_QUESTI
 }
 
 /**
- * @param {import('../types.js').PendingQuestionShadow} shadow
+ * @param {import('../../types.js').PendingQuestionShadow} shadow
  * @param {number} [now]
  * @returns {number}
  */
@@ -58,7 +58,7 @@ export function getPendingQuestionShadowAgeMs(shadow, now = Date.now()) {
 }
 
 /**
- * @param {import('../types.js').PendingQuestionShadow} shadow
+ * @param {import('../../types.js').PendingQuestionShadow} shadow
  * @param {number} [now]
  * @returns {number}
  */
@@ -67,7 +67,7 @@ export function getPendingQuestionShadowRemainingMs(shadow, now = Date.now()) {
 }
 
 /**
- * @param {import('../types.js').PendingQuestionKind} [kind]
+ * @param {import('../../types.js').PendingQuestionKind} [kind]
  * @returns {number}
  */
 export function getPendingQuestionShadowExpiringSoonThresholdMs(kind = 'question') {
@@ -78,7 +78,7 @@ export function getPendingQuestionShadowExpiringSoonThresholdMs(kind = 'question
 }
 
 /**
- * @param {import('../types.js').PendingQuestionShadow} shadow
+ * @param {import('../../types.js').PendingQuestionShadow} shadow
  * @param {{ now?: number; ttlMs?: number }} [opts]
  * @returns {boolean}
  */
@@ -89,7 +89,7 @@ export function isPendingQuestionShadowExpired(shadow, opts = {}) {
 }
 
 /**
- * @param {import('../types.js').PendingQuestionShadow} shadow
+ * @param {import('../../types.js').PendingQuestionShadow} shadow
  * @param {{ now?: number }} [opts]
  * @returns {PendingQuestionShadowState}
  */
@@ -112,9 +112,9 @@ export function getPendingQuestionShadowState(shadow, opts = {}) {
 
 /**
  * @param {string} question
- * @param {import('../types.js').PendingQuestionMeta} meta
+ * @param {import('../../types.js').PendingQuestionMeta} meta
  * @param {{ now?: number; ttlMs?: number }} [opts]
- * @returns {import('../types.js').PendingQuestionShadow}
+ * @returns {import('../../types.js').PendingQuestionShadow}
  */
 export function createPendingQuestionShadow(question, meta, opts = {}) {
     const now = opts.now ?? Date.now();

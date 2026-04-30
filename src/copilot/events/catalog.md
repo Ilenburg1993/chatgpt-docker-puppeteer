@@ -173,14 +173,14 @@ Eventos de infraestrutura: shutdown, config, health, bridges.
 
 ## Bridge Coverage (FAIXA-2C)
 
-| Emitter           | Arquivo                            | Bridgeado?    | Via                                              |
-| ----------------- | ---------------------------------- | ------------- | ------------------------------------------------ |
-| AlwaysAliveAgent  | `agent/always-alive.js`            | ✅            | `always-alive.js`                                |
-| DialogLoopManager | `agent/dialog/loop-manager.js`     | ✅            | `always-alive.js`                                |
-| HandoffManager    | `agent/infra/handoff-manager.js`   | ✅            | `always-alive.js`                                |
-| HookBus           | `hooks/bus.js`                     | ✅            | `agent/lifecycle/entry.js`                       |
-| HubOrchestrator   | `conversation-hub/orchestrator.js` | ✅            | `conversation-hub/hub.js`                        |
-| PinnedFilesLoader | `config/pinned-files.js`           | ✅ (FAIXA-2C) | `conversation-hub/hub.js` ou `terminal/index.js` |
+| Emitter           | Arquivo                                      | Bridgeado?    | Via                                              |
+| ----------------- | -------------------------------------------- | ------------- | ------------------------------------------------ |
+| AlwaysAliveAgent  | `agent/always-alive.js`                      | ✅            | `always-alive.js`                                |
+| DialogLoopManager | `agent/dialog/orchestrators/loop-manager.js` | ✅            | `always-alive.js`                                |
+| HandoffManager    | `agent/infra/handoff-manager.js`             | ✅            | `always-alive.js`                                |
+| HookBus           | `hooks/bus.js`                               | ✅            | `agent/lifecycle/entry.js`                       |
+| HubOrchestrator   | `conversation-hub/orchestrator.js`           | ✅            | `conversation-hub/hub.js`                        |
+| PinnedFilesLoader | `config/pinned-files.js`                     | ✅ (FAIXA-2C) | `conversation-hub/hub.js` ou `terminal/index.js` |
 
 ---
 

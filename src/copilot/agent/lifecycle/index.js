@@ -6,6 +6,12 @@
  * @see EventBus
  */
 
+export {
+    LIFECYCLE_MODULE_LAYOUT,
+    getLifecycleModuleDescriptor,
+    getLifecycleModuleRole,
+    listLifecycleModulesByRole,
+} from './module-map.js';
 export { tryReconnect } from './reconnect-policy.js';
 export {
     discoverRuntimePlugins,

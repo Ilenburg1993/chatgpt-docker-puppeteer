@@ -1022,7 +1022,7 @@ export class AlwaysAliveAgent extends EventEmitter {
      * Recupera o canal de input do dialog loop por operação semântica do Agent.
      *
      * @param {{ reason?: string; traceId?: string }} [opts]
-     * @returns {Promise<import('./dialog/agent-dialog-controller.js').DialogInputRecoveryResult>}
+     * @returns {Promise<import('./dialog/controllers/agent-dialog-controller.js').DialogInputRecoveryResult>}
      */
     async recoverDialogInputChannel(opts) {
         return dialogRecoverInputChannel(this.ctx, this, opts);

@@ -3,7 +3,8 @@
  * src/copilot/core/mutex.js
  *
  * Mutex baseado em promise-chain para serialização de operações assíncronas. Substitui os padrões de mutex inline
- * espalhados pelo código (tools/todo/store.js, terminal/dialog/engine.js, agent/dialog/loop-manager.js, etc.).
+ * espalhados pelo código (tools/todo/store.js, terminal/dialog/engine.js, agent/dialog/orchestrators/loop-manager.js,
+ * etc.).
  *
  * Uso:
  *

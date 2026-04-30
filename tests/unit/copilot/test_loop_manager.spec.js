@@ -79,11 +79,11 @@ vi.mock('../../../src/copilot/agent/lifecycle/state-io.js', () => ({
     SYSTEM_PROMPT_SECTIONS: {},
 }));
 
-vi.mock('../../../src/copilot/agent/dialog/turn-executor.js', () => ({
+vi.mock('../../../src/copilot/agent/dialog/executors/turn-executor.js', () => ({
     executeTurnImpl: vi.fn(async () => 'REPLY: ok'),
 }));
 
-vi.mock('../../../src/copilot/agent/dialog/watchdog.js', () => ({
+vi.mock('../../../src/copilot/agent/dialog/watchdogs/watchdog.js', () => ({
     DialogWatchdog: class MockWatchdog {
         start = vi.fn();
         stop = vi.fn();
@@ -91,12 +91,12 @@ vi.mock('../../../src/copilot/agent/dialog/watchdog.js', () => ({
     },
 }));
 
-import { DialogCompactionPolicy } from '../../../src/copilot/agent/dialog/compaction-policy.js';
-import { DialogCostLedger } from '../../../src/copilot/agent/dialog/cost-ledger.js';
-import { DialogLoopManager } from '../../../src/copilot/agent/dialog/loop-manager.js';
-import { selectDialogResumeStrategy } from '../../../src/copilot/agent/dialog/resume-policy.js';
-import { DialogLoopStateMachine } from '../../../src/copilot/agent/dialog/state-machine.js';
-import { executeTurnImpl } from '../../../src/copilot/agent/dialog/turn-executor.js';
+import { executeTurnImpl } from '../../../src/copilot/agent/dialog/executors/turn-executor.js';
+import { DialogLoopManager } from '../../../src/copilot/agent/dialog/orchestrators/loop-manager.js';
+import { DialogCompactionPolicy } from '../../../src/copilot/agent/dialog/policies/compaction-policy.js';
+import { selectDialogResumeStrategy } from '../../../src/copilot/agent/dialog/policies/resume-policy.js';
+import { DialogCostLedger } from '../../../src/copilot/agent/dialog/state/cost-ledger.js';
+import { DialogLoopStateMachine } from '../../../src/copilot/agent/dialog/state/state-machine.js';
 import { persistStateWithPolicy, readState } from '../../../src/copilot/agent/lifecycle/state-io.js';
 
 // ── Helpers ──────────────────────────────────────────────────────────────

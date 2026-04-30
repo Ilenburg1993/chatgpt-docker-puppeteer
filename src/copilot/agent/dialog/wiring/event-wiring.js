@@ -1,6 +1,6 @@
 // @ts-check
 /**
- * src/copilot/agent/dialog/event-wiring.js
+ * src/copilot/agent/dialog/wiring/event-wiring.js
  *
  * F61: Registra listeners de forwarding de eventos do DialogLoopManager para o agente host.
  *
@@ -61,7 +61,7 @@ const EVENT_MAP = [
  * 1. Chama `removeAllListeners()` para os eventos conhecidos do DLM.
  * 2. Registra um listener para cada evento relevante, encaminhando-o ao agente via `emitFn`.
  *
- * @param {import('./loop-manager.js').DialogLoopManager} dialogLoop
+ * @param {import('../orchestrators/loop-manager.js').DialogLoopManager} dialogLoop
  * @param {(event: string, payload: Record<string, unknown>) => void} emitFn - Função de emissão do agente host.
  * @returns {void}
  */

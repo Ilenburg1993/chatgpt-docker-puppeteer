@@ -17,6 +17,7 @@
  */
 
 export * from './conversation-port.js';
+export * from './core-runtime-port.js';
 export * from './error-tracking-port.js';
 export * from './event-observer-port.js';
 export * from './hook-port.js';

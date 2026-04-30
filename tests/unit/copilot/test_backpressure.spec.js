@@ -5,7 +5,7 @@
  * F59.4: Testes unitários para TurnQueue (backpressure.js)
  */
 import { describe, expect, it } from 'vitest';
-import { TurnQueue } from '../../../src/copilot/agent/dialog/backpressure.js';
+import { TurnQueue } from '../../../src/copilot/agent/dialog/state/backpressure.js';
 
 describe('TurnQueue', () => {
     it('deve inicializar com depth 0 e full=false', () => {

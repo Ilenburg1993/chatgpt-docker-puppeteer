@@ -7,18 +7,24 @@
  */
 
 export { DialogProtocol } from '../../dialog/protocol.js';
-export { DialogCompactionPolicy } from './compaction-policy.js';
-export { DialogCostLedger } from './cost-ledger.js';
-export { DialogLoopManager, wireDialogLoopEvents } from './loop-manager.js';
-export { selectDialogResumeStrategy } from './resume-policy.js';
-export { DialogLoopStateMachine } from './state-machine.js';
 export {
     buildTurnResolutionListeners,
     dispatchTurnToHost,
     emitTurnStart,
     executeTurnImpl,
     waitForRestartAndReply,
-} from './turn-executor.js';
-export { handleUserInputRequest } from './user-input-handler.js';
-export { DialogWatchdogSupervisor } from './watchdog-supervisor.js';
-export { DialogWatchdog, WATCHDOG_THRESHOLDS } from './watchdog.js';
+} from './executors/turn-executor.js';
+export {
+    DIALOG_MODULE_LAYOUT,
+    getDialogModuleDescriptor,
+    getDialogModuleRole,
+    listDialogModulesByRole,
+} from './module-map.js';
+export { DialogLoopManager, wireDialogLoopEvents } from './orchestrators/loop-manager.js';
+export { DialogCompactionPolicy } from './policies/compaction-policy.js';
+export { selectDialogResumeStrategy } from './policies/resume-policy.js';
+export { DialogCostLedger } from './state/cost-ledger.js';
+export { DialogLoopStateMachine } from './state/state-machine.js';
+export { DialogWatchdogSupervisor } from './watchdogs/watchdog-supervisor.js';
+export { DialogWatchdog, WATCHDOG_THRESHOLDS } from './watchdogs/watchdog.js';
+export { handleUserInputRequest } from './wiring/user-input-handler.js';

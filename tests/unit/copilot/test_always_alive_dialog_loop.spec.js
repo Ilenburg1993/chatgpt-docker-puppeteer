@@ -43,11 +43,11 @@ describe('always-alive › dialog loop: análise estrutural', async () => {
         const { readFile } = await import('node:fs/promises');
         sourceCode = await readFile(new URL('../../../src/copilot/agent/always-alive.js', import.meta.url), 'utf-8');
         dlmSourceCode = await readFile(
-            new URL('../../../src/copilot/agent/dialog/loop-manager.js', import.meta.url),
+            new URL('../../../src/copilot/agent/dialog/orchestrators/loop-manager.js', import.meta.url),
             'utf-8',
         );
         wirerSourceCode = await readFile(
-            new URL('../../../src/copilot/agent/dialog/event-wiring.js', import.meta.url),
+            new URL('../../../src/copilot/agent/dialog/wiring/event-wiring.js', import.meta.url),
             'utf-8',
         );
     });
@@ -195,20 +195,25 @@ describe('always-alive › dialog loop: comportamento via eventos', () => {
 describe('always-alive › dialog loop: protocolo 0-PR', async () => {
     /** @type {string} */
     let dlmSourceCode = '';
+    /** @type {string} */
+    let bootRunnerSourceCode = '';
 
     beforeAll(async () => {
         const { readFile } = await import('node:fs/promises');
         dlmSourceCode = await readFile(
-            new URL('../../../src/copilot/agent/dialog/loop-manager.js', import.meta.url),
+            new URL('../../../src/copilot/agent/dialog/orchestrators/loop-manager.js', import.meta.url),
+            'utf-8',
+        );
+        bootRunnerSourceCode = await readFile(
+            new URL('../../../src/copilot/agent/dialog/boot/loop-boot-runner.js', import.meta.url),
             'utf-8',
         );
     });
 
-    it('DialogLoopManager usa sendMessage() do host para boot (não sendAndWait direto)', () => {
-        // E.1: DLM usa host.sendMessage() que coloca na fila
+    it('DialogLoop boot runner usa sendMessage() do host para boot fallback (não sendAndWait direto)', () => {
         assert.ok(
-            dlmSourceCode.includes('host.sendMessage(') || dlmSourceCode.includes('this.#host.sendMessage('),
-            'DialogLoopManager deve usar host.sendMessage() para o boot prompt',
+            bootRunnerSourceCode.includes('host.sendMessage('),
+            'DialogLoop boot runner deve usar host.sendMessage() como fallback do boot prompt',
         );
     });
 
@@ -220,10 +225,10 @@ describe('always-alive › dialog loop: protocolo 0-PR', async () => {
         );
     });
 
-    it('DialogLoopManager aguarda evento ready antes de resolver start()', () => {
+    it('DialogLoop boot runner aguarda evento ready antes de resolver start()', () => {
         assert.ok(
-            dlmSourceCode.includes("'ready'") && dlmSourceCode.includes('bootPromise'),
-            'DialogLoopManager.start() deve aguardar ready via promise antes de resolver',
+            bootRunnerSourceCode.includes('EMITTER_LOOP_READY') && bootRunnerSourceCode.includes('bootPromise'),
+            'DialogLoop boot runner deve aguardar ready via promise antes de resolver',
         );
     });
 
@@ -274,12 +279,12 @@ describe('always-alive › dialog loop: DL-PERM hardening', async () => {
     beforeAll(async () => {
         const { readFile } = await import('node:fs/promises');
         dlmSourceCode = await readFile(
-            new URL('../../../src/copilot/agent/dialog/loop-manager.js', import.meta.url),
+            new URL('../../../src/copilot/agent/dialog/orchestrators/loop-manager.js', import.meta.url),
             'utf-8',
         );
         // #executeTurn foi extraído para dialog-turn-executor.js na Fase 5
         turnExecutorCode = await readFile(
-            new URL('../../../src/copilot/agent/dialog/turn-executor.js', import.meta.url),
+            new URL('../../../src/copilot/agent/dialog/executors/turn-executor.js', import.meta.url),
             'utf-8',
         );
         turnExecutorCode += await readFile(

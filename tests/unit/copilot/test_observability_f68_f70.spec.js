@@ -193,7 +193,8 @@ describe('F68: OTEL Spans', () => {
 
     describe('loop-manager span lifecycle', () => {
         it('startSpanImmediate é chamado no start() com copilot.dialog.loop', async () => {
-            const { DialogLoopManager } = await import('../../../src/copilot/agent/dialog/loop-manager.js');
+            const { DialogLoopManager } =
+                await import('../../../src/copilot/agent/dialog/orchestrators/loop-manager.js');
             const dlm = new DialogLoopManager({ bootTimeoutMs: 50 });
 
             const host = makeDialogHost();

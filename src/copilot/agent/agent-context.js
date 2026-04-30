@@ -24,7 +24,7 @@ import {
     getPendingQuestionShadowRemainingMs,
     getPendingQuestionShadowState,
     isPendingQuestionShadowExpired,
-} from './dialog/pending-question-shadow.js';
+} from './dialog/state/pending-question-shadow.js';
 import { performKeepaliveSdkTick } from './facades/agent-session-ops.js';
 import { log } from './ports/logging-port.js';
 
@@ -136,7 +136,7 @@ export class AgentContext {
 
     // ─── Managers (instâncias com lifecycle) ───────────────────────────────
 
-    /** @type {import('./dialog/loop-manager.js').DialogLoopManager} */
+    /** @type {import('./dialog/orchestrators/loop-manager.js').DialogLoopManager} */
     dialogLoop;
 
     /** @type {import('./infra/message-queue.js').MessageQueue} */
@@ -1360,7 +1360,7 @@ export class AgentContext {
      * Retorna o estado semântico da shadow persistida.
      *
      * @param {number} [now]
-     * @returns {import('./dialog/pending-question-shadow.js').PendingQuestionShadowState | null}
+     * @returns {import('./dialog/state/pending-question-shadow.js').PendingQuestionShadowState | null}
      */
     getPendingQuestionShadowState(now = Date.now()) {
         return this.dialogState.pendingQuestionShadow
@@ -1679,7 +1679,7 @@ export class AgentContext {
     /**
      * Retorna o manager vivo do dialog loop para integrações que ainda exigem EventEmitter/manager.
      *
-     * @returns {import('./dialog/loop-manager.js').DialogLoopManager}
+     * @returns {import('./dialog/orchestrators/loop-manager.js').DialogLoopManager}
      */
     getDialogLoopManagerSnapshot() {
         return this.dialogLoop;

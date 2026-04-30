@@ -67,7 +67,7 @@ import {
     emitTurnStart,
     executeTurnImpl,
     waitForRestartAndReply,
-} from '../../../src/copilot/agent/dialog/turn-executor.js';
+} from '../../../src/copilot/agent/dialog/executors/turn-executor.js';
 import { persistAgentRuntimePendingTurnState } from '../../../src/copilot/agent/facades/agent-runtime-state.js';
 
 /* ── helpers ── */
@@ -84,7 +84,7 @@ function makeEmitter() {
 /**
  * Cria um host mínimo compatível com TurnHost.
  *
- * @param {Partial<import('../../../src/copilot/agent/dialog/turn-executor.js').TurnHost>} [overrides]
+ * @param {Partial<import('../../../src/copilot/agent/dialog/executors/turn-executor.js').TurnHost>} [overrides]
  */
 function makeTurnHost(overrides = {}) {
     return {

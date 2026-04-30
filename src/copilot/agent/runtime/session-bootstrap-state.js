@@ -8,7 +8,10 @@
  */
 
 import { logSwallowed } from '#copilot/core';
-import { createPendingQuestionShadow, isPendingQuestionShadowExpired } from '../dialog/pending-question-shadow.js';
+import {
+    createPendingQuestionShadow,
+    isPendingQuestionShadowExpired,
+} from '../dialog/state/pending-question-shadow.js';
 import { persistStateWithPolicy, readState, readStateAsync } from '../lifecycle/state-io.js';
 
 /**

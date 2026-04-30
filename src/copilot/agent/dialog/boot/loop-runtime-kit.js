@@ -1,6 +1,6 @@
 // @ts-check
 /**
- * @module copilot/agent/dialog/loop-runtime-kit
+ * @module copilot/agent/dialog/boot/loop-runtime-kit
  * @file Kit de inicialização estrutural do DialogLoopManager.
  *
  *   Consolida a criação de componentes internos (state machine, queue, watchdog, fallback e ledger) para reduzir
@@ -8,14 +8,14 @@
  */
 
 import { getCopilotFallbackModel } from '#copilot/config';
-import { BOOT_TIMEOUT_MS, DIALOG_QUEUE_MAX, WATCHDOG_INTERVAL_MS, WATCHDOG_STALL_MS } from '../../config/agent.js';
-import { readAgentRuntimeDialogBootstrapState } from '../facades/agent-runtime-state.js';
-import { TurnQueue } from './backpressure.js';
-import { DialogCompactionPolicy } from './compaction-policy.js';
-import { DialogCostLedger } from './cost-ledger.js';
-import { ModelFallbackState } from './model-fallback.js';
-import { DialogLoopStateMachine } from './state-machine.js';
-import { DialogWatchdogSupervisor } from './watchdog-supervisor.js';
+import { BOOT_TIMEOUT_MS, DIALOG_QUEUE_MAX, WATCHDOG_INTERVAL_MS, WATCHDOG_STALL_MS } from '../../../config/agent.js';
+import { readAgentRuntimeDialogBootstrapState } from '../../facades/agent-runtime-state.js';
+import { DialogCompactionPolicy } from '../policies/compaction-policy.js';
+import { ModelFallbackState } from '../policies/model-fallback.js';
+import { TurnQueue } from '../state/backpressure.js';
+import { DialogCostLedger } from '../state/cost-ledger.js';
+import { DialogLoopStateMachine } from '../state/state-machine.js';
+import { DialogWatchdogSupervisor } from '../watchdogs/watchdog-supervisor.js';
 
 /**
  * @typedef {{

@@ -15,7 +15,7 @@ import { wireSessionEvents } from './event-wirer.js';
  *
  * @typedef {import('#copilot/sdk/types').CopilotSession} CopilotSession
  *
- * @typedef {import('../dialog/loop-manager.js').DialogLoopManager} DialogLoopManager
+ * @typedef {import('../dialog/orchestrators/loop-manager.js').DialogLoopManager} DialogLoopManager
  *
  * @typedef {import('../session/keepalive.js').SessionKeepalive} SessionKeepalive
  */

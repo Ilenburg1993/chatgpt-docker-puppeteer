@@ -49,10 +49,16 @@ describe('agent › K4 background task tracker integration', () => {
             readFile(new URL('../../../src/copilot/agent/session/boot-session-prep.js', import.meta.url), 'utf-8'),
             readFile(new URL('../../../src/copilot/agent/session/boot-dialog-recovery.js', import.meta.url), 'utf-8'),
             readFile(new URL('../../../src/copilot/agent/session/boot-runtime-bind.js', import.meta.url), 'utf-8'),
-            readFile(new URL('../../../src/copilot/agent/dialog/user-input-handler.js', import.meta.url), 'utf-8'),
-            readFile(new URL('../../../src/copilot/agent/dialog/loop-manager.js', import.meta.url), 'utf-8'),
-            readFile(new URL('../../../src/copilot/agent/dialog/resume-policy.js', import.meta.url), 'utf-8'),
-            readFile(new URL('../../../src/copilot/agent/dialog/turn-executor.js', import.meta.url), 'utf-8'),
+            readFile(
+                new URL('../../../src/copilot/agent/dialog/wiring/user-input-handler.js', import.meta.url),
+                'utf-8',
+            ),
+            readFile(
+                new URL('../../../src/copilot/agent/dialog/orchestrators/loop-manager.js', import.meta.url),
+                'utf-8',
+            ),
+            readFile(new URL('../../../src/copilot/agent/dialog/policies/resume-policy.js', import.meta.url), 'utf-8'),
+            readFile(new URL('../../../src/copilot/agent/dialog/executors/turn-executor.js', import.meta.url), 'utf-8'),
         ]);
     });
 

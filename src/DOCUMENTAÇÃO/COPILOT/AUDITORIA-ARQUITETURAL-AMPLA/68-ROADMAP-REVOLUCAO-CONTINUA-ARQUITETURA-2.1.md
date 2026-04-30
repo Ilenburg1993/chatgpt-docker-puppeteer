@@ -136,23 +136,84 @@ estabilidade multi-runtime.
 
 ---
 
+## F9 — Arquitetura informacional da árvore (`README` + `module-map` + migração física)
+
+### Situação atual validada
+
+Mesmo após a redução de acoplamentos e extração de seams, vários diretórios ainda são difíceis de
+ler ao abrir a pasta: arquivos primários, secundários, policies, stores, adapters e seams convivem
+lado a lado. Isso aumenta custo cognitivo, torna code review dependente de memória histórica e
+facilita a criação de novos "mini-orquestradores" sem ownership claro.
+
+O caso `src/copilot/agent/dialog/` é exemplar: há controller, loop manager, turn executor, boot
+runner, policies, state helpers, watchdogs e seams internos na mesma raiz física. A arquitetura
+funciona, mas a topologia visual ainda não comunica hierarquia.
+
+### Situação ideal
+
+Cada diretório de domínio em `src/copilot/` deve ter três artefatos canônicos:
+
+1. `README.md` — navegação humana, papéis e ordem recomendada de leitura;
+2. `index.js` — superfície pública/sub-barrel, sem virar inventário informal;
+3. `module-map.js` — inventário executável de arquivos, papéis, tiers e public/private.
+
+A migração física deve convergir para subpastas semânticas padronizadas, usadas conforme o domínio:
+
+- `controllers/`: adapters internos de entrada;
+- `orchestrators/`: coordenação de fluxos vivos;
+- `executors/`: execução de ações/turnos;
+- `boot/`: bootstrap, handshake, circuit breakers e kits de runtime;
+- `policies/`: decisão pura, fallback e regras;
+- `state/`: máquinas, ledgers, registries e estado auxiliar;
+- `wiring/`: ligação de eventos/listeners;
+- `ports/`: fronteiras abstratas para capacidades externas;
+- `adapters/`: implementações concretas de portas;
+- `stores/`: IO/persistência e schema local;
+- `projections/`: payloads/read models quando o owner não for `presentation/`;
+- `seams/`: módulos internos extraídos de caminhos quentes.
+
+Regra alvo: a raiz de um diretório de domínio deve tender a `README.md`, `index.js` e
+`module-map.js`. Arquivos legados na raiz podem sobreviver temporariamente como shims, desde que
+estejam registrados no roadmap e cobertos por contrato de remoção.
+
+### Subfaixas
+
+- F9.1 Introduzir `module-map.js` e `README.md` nos diretórios quentes (`agent/dialog` primeiro)
+- F9.2 Criar contratos que impedem arquivos órfãos sem papel arquitetural
+- F9.3 Migrar fisicamente arquivos para subpastas semânticas com shims compatíveis
+- F9.4 Atualizar imports internos para barrels/subpastas canônicas
+- F9.5 Remover shims legados quando testes e consumers estiverem migrados
+- F9.6 Replicar a taxonomia para `agent/session`, `agent/lifecycle`, `server`, `terminal`,
+  `presentation` e `sdk`
+
+### Pronto quando
+
+- ao abrir qualquer diretório quente de `src/copilot`, os orquestradores primários, módulos
+  secundários e detalhes internos estão explícitos em documentação local e contrato executável.
+
+---
+
 ## 3) Ordem recomendada de ataque (2.1)
 
 1. **F1 + F2** (máximo impacto em clareza/custo cognitivo)
 2. **F3 + F4** (robustez de borda e multi-runtime real)
 3. **F5 + F6** (boundary vendor + observabilidade sem drift)
 4. **F7 + F8** (institucionalização e fechamento de legado)
+5. **F9 transversal** (arquitetura informacional aplicada junto de cada refactor físico)
 
 ---
 
-## 4) Plano em ondas (W85–W108)
+## 4) Plano em ondas (W85–W116)
 
 ### Bloco K — Simplificação e projection final (W85–W92)
 
 - W85: hotspot map `agent/*` por aresta e semântica
 - W86: extração de seams internos faltantes (**em andamento avançado**; `state-io`, runtime-state,
-  boot seams, lifecycle teardown e `turn-executor` já fatiados até W86.7.3)
-- W87: limpeza de dependências `agent -> core/config`
+  boot seams, lifecycle teardown, `turn-executor` e boot lifecycle do `loop-manager` já fatiados até
+  W86.8)
+- W87: limpeza de dependências `agent -> core/config` (**iniciada**; `agent-lifecycle` já consome
+  core/container/error-handlers via `agent/ports/core-runtime-port.js` e `session/snapshot.js`
+  delega IO/schema para `session/snapshot-store.js`)
 - W88: catálogo 2.1 de projections em `presentation`
 - W89: unificação de payloads runtime/health/session/capabilities
 - W90: testes anti-ad-hoc por família de projection
@@ -181,6 +242,24 @@ estabilidade multi-runtime.
 - W107: auditoria ampla final 2.1
 - W108: baseline congelada pós-2.1
 
+### Bloco N — Organização física e navegação executável (W109–W116)
+
+- W109: introduzir taxonomia executável em `agent/dialog` (`README.md`, `module-map.js`, contrato de
+  cobertura e critérios de leitura)
+- W110: classificar diretórios quentes por papel e risco (`agent/session`, `agent/lifecycle`,
+  `server/routes`, `terminal/handlers`, `presentation`)
+- W111: migrar fisicamente `agent/dialog` para subpastas semânticas com shims temporários e
+  contratos anti-órfão (**concluída** com `controllers/*`, `orchestrators/*`, `executors/*`,
+  `boot/*`, `policies/*`, `state/*`, `wiring/*` e `watchdogs/*`; shims de raiz removidos)
+- W112: migrar imports internos do dialog para as novas subpastas e reduzir deep imports de testes
+  (**iniciada** com contrato anti-import de shims em código de produção)
+- W113: aplicar a mesma taxonomia em `agent/session` e `agent/lifecycle` (**iniciada** nos dois
+  diretórios com `README.md`, `module-map.js` e contrato anti-órfão)
+- W114: aplicar a taxonomia nas bordas `server`/`terminal`, preservando adapters finos
+- W115: criar scorecard de organização física por diretório quente
+- W116: remover shims legados e congelar baseline 2.1 de navegação estrutural (\*\*concluída para
+  `agent/dialog`; próxima aplicação prevista em `agent/session` após migração física)
+
 ---
 
 ## 5) Critério de sucesso desta nova fase
@@ -191,16 +270,20 @@ A fase 2.1 só é considerada bem-sucedida quando:
 2. projection monopoly fica completo e defendido por contrato;
 3. multi-runtime permanece estável sob concorrência real;
 4. fronteira SDK evolui sem drift;
-5. governança executável impede regressão por crescimento orgânico.
+5. governança executável impede regressão por crescimento orgânico;
+6. diretórios críticos deixam claro, localmente e por contrato, quais arquivos são orquestradores,
+   quais são módulos secundários e quais são detalhes internos.
 
 ---
 
 ## 6) Próximo passo operacional
 
-Com os documentos 65–68 concluídos e a W86.7.3 consolidada, o próximo alvo operacional de maior
+Com os documentos 65–68 concluídos e a W86.8 consolidada, o próximo alvo operacional de maior
 custo-benefício é:
 
-1. fechar W86.8 com decomposição de `loop-manager.js`;
-2. abrir W87 para reduzir dependências diretas e imports cruzados remanescentes no eixo
+1. abrir W87 para reduzir dependências diretas e imports cruzados remanescentes no eixo
    `agent -> core/config/sdk`;
-3. preparar W93 com testes multi-runtime reais sobre os registries já extraídos.
+2. iniciar W109 em `agent/dialog` para formalizar taxonomia, papéis e próximos movimentos físicos;
+3. preparar W93 com testes multi-runtime reais sobre os registries já extraídos;
+4. iniciar W88/W89 em paralelo quando a família de projection runtime estiver suficientemente
+   inventariada.

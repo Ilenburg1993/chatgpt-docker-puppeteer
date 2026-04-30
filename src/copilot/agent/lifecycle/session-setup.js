@@ -26,7 +26,7 @@ import { log } from '../ports/logging-port.js';
 import { METRICS_STORE } from '../ports/metrics-port.js';
 
 import { DialogProtocol } from '../../dialog/protocol.js';
-import { handleUserInputRequest } from '../dialog/user-input-handler.js';
+import { handleUserInputRequest } from '../dialog/wiring/user-input-handler.js';
 import {
     createAgentSdkToolsRegistry,
     getAgentSdkToolsConfig,

@@ -1,6 +1,6 @@
 // @ts-check
 /**
- * src/copilot/agent/dialog/agent-dialog-controller.js
+ * src/copilot/agent/dialog/controllers/agent-dialog-controller.js
  *
  * F37: Controle do dialog loop — funções extraídas de always-alive.js.
  *
@@ -14,23 +14,23 @@
 
 import { container, SessionError } from '#copilot/core';
 import { EMITTER_DIALOG_LOOP_CHANGED, EMITTER_DIALOG_RECOVERY, EMITTER_SESSION_KEEPALIVE } from '#copilot/events';
-import { CONTEXT_UTIL_BLOCK_THRESHOLD, CONTEXT_UTIL_WARN_THRESHOLD } from '../../config/agent.js';
-import { withAgentErrorPolicy } from '../error-policy.js';
-import { log } from '../ports/logging-port.js';
-import { METRICS_STORE } from '../ports/metrics-port.js';
+import { CONTEXT_UTIL_BLOCK_THRESHOLD, CONTEXT_UTIL_WARN_THRESHOLD } from '../../../config/agent.js';
+import { withAgentErrorPolicy } from '../../error-policy.js';
+import { log } from '../../ports/logging-port.js';
+import { METRICS_STORE } from '../../ports/metrics-port.js';
 import {
     assertEmitterHost,
     normalizeCompactionComplete,
     normalizeTokenBudgetWarning,
     trySetLiveSessionModel,
-} from '../runtime-contracts.js';
-import { wireDialogLoopEvents } from './loop-manager.js';
+} from '../../runtime-contracts.js';
+import { wireDialogLoopEvents } from '../orchestrators/loop-manager.js';
 
 /**
- * @typedef {import('../agent-context.js').AgentContext} AgentContext
+ * @typedef {import('../../agent-context.js').AgentContext} AgentContext
  */
 
-/** @typedef {import('../types.js').DialogHost} DialogHost */
+/** @typedef {import('../../types.js').DialogHost} DialogHost */
 
 /**
  * @typedef {object} DialogInputRecoveryResult
@@ -260,7 +260,7 @@ export async function dialogResume(ctx) {
 export function ensureDialogLoopAttached(ctx, host) {
     const emitterHost = assertEmitterHost(host, 'DialogHost');
 
-    /** @type {import('../types.js').DialogLoopHost} */
+    /** @type {import('../../types.js').DialogLoopHost} */
     const agentHost = {
         sendMessage: (msg, opts) => host.sendMessage(msg, opts),
         sendMessageDialogBoot: (msg, opts) => host.sendMessageDialogBoot(msg, opts),

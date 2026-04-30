@@ -15,7 +15,7 @@ import {
     dialogStart,
     dialogStop,
     ensureDialogLoopAttached,
-} from '../../../src/copilot/agent/dialog/agent-dialog-controller.js';
+} from '../../../src/copilot/agent/dialog/controllers/agent-dialog-controller.js';
 
 describe('agent-dialog-controller › dialogStart', () => {
     /** @returns {{ ctx: AgentContext; host: EventEmitter & Record<string, any> }} */
@@ -159,10 +159,12 @@ describe('agent-dialog-controller › dialogStop', () => {
         ctx.status = 'idle';
         ctx.setSession(/** @type {any} */ ({ sessionId: 'sess-1' }));
 
-        /** @type {{
-    isIdle?: () => boolean;
-    onKeepalive?: (info: { ts: number; strategy: 'client.ping' | 'session.send' }) => void;
-} | null} */
+        /**
+         * @type {{
+         *     isIdle?: () => boolean;
+         *     onKeepalive?: (info: { ts: number; strategy: 'client.ping' | 'session.send' }) => void;
+         * } | null}
+         */
         let keepaliveOptions = null;
         ctx.startKeepalive = (options = {}) => {
             keepaliveOptions = options;
@@ -176,10 +178,12 @@ describe('agent-dialog-controller › dialogStop', () => {
         if (!keepaliveOptions) {
             throw new Error('dialogStop não forneceu opções de keepalive');
         }
-        const restartOptions = /** @type {{
-    isIdle?: () => boolean;
-    onKeepalive?: (info: { ts: number; strategy: 'client.ping' | 'session.send' }) => void;
-}} */ (keepaliveOptions);
+        const restartOptions = /**
+         * @type {{
+         *     isIdle?: () => boolean;
+         *     onKeepalive?: (info: { ts: number; strategy: 'client.ping' | 'session.send' }) => void;
+         * }}
+         */ (keepaliveOptions);
         assert.equal(typeof restartOptions.onKeepalive, 'function');
     });
 });

@@ -55,7 +55,7 @@ describe('always-alive.js › delegação para módulos extraídos', () => {
 
     it('importa dialogStart, dialogStop, dialogResume, ensureDialogLoopAttached', () => {
         assert.ok(src.includes("from './agent-runtime-surface.js'"));
-        assert.ok(surfaceSrc.includes("from './dialog/agent-dialog-controller.js'"));
+        assert.ok(surfaceSrc.includes("from './dialog/controllers/agent-dialog-controller.js'"));
         assert.ok(src.includes('dialogStart'));
         assert.ok(src.includes('dialogStop'));
         assert.ok(src.includes('dialogResume'));

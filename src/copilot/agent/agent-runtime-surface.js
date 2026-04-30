@@ -14,7 +14,7 @@ export {
     dialogResume,
     dialogStart,
     dialogStop,
-} from './dialog/agent-dialog-controller.js';
+} from './dialog/controllers/agent-dialog-controller.js';
 export { ensureAgentEventBusBridge, resetAgentEventBusBridgeWiring } from './event-bridge-wiring.js';
 export { getAgentHealthSnapshot as healthSnapshot } from './health-check.js';
 export { agentStart, agentStop, agentTryReconnect } from './lifecycle/agent-lifecycle.js';

@@ -5,7 +5,7 @@
  * F60.4: Testes unitários para ModelFallbackState
  */
 import { describe, expect, it, vi } from 'vitest';
-import { ModelFallbackState } from '../../../src/copilot/agent/dialog/model-fallback.js';
+import { ModelFallbackState } from '../../../src/copilot/agent/dialog/policies/model-fallback.js';
 
 describe('ModelFallbackState', () => {
     it('deve iniciar sem fallback pendente', () => {

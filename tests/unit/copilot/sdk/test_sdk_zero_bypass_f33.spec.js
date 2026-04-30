@@ -173,7 +173,7 @@ describe('F168 — server/routes/sdk/ sem bypass direto de SDK', () => {
 describe('F169 — agent/ sem bypass direto de SDK', () => {
     const AGENT_FILES = [
         'src/copilot/tools/bootstrap.js',
-        'src/copilot/agent/dialog/loop-manager.js',
+        'src/copilot/agent/dialog/orchestrators/loop-manager.js',
         'src/copilot/agent/lifecycle/agent-lifecycle.js',
         'src/copilot/agent/session/initializer.js',
         'src/copilot/agent/session/cleanup.js',

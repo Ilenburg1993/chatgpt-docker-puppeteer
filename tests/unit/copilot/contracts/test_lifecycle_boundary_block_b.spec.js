@@ -224,7 +224,7 @@ describe('Block B — lifecycle ownership contracts', () => {
 
         assert.deepEqual(violations, [], `Imports diretos de state-io em dialog:\n${violations.join('\n')}`);
         assert.match(
-            readFileSync(srcPath('agent', 'dialog', 'user-input-handler.js'), 'utf8'),
+            readFileSync(srcPath('agent', 'dialog', 'wiring', 'user-input-handler.js'), 'utf8'),
             /persistAgentRuntimePendingQuestionState/,
         );
     });

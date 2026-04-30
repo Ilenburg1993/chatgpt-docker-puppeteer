@@ -1,0 +1,187 @@
+// @ts-check
+/**
+ * @module copilot/agent/session/snapshot-store
+ * @file Persistência física e validação de snapshots de sessão.
+ */
+
+import { resolveHooksStateDir } from '#copilot/boot';
+import { access, mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { join, resolve } from 'node:path';
+import { SNAPSHOT_DIR as _SNAPSHOT_DIR_ENV, MAX_SNAPSHOTS } from '../../config/agent.js';
+import { safeJsonParse } from '../../core/safe-json.js';
+import { SessionSnapshotDataSchema, SnapshotListItemSchema } from '../../core/schemas.js';
+import { logSwallowed } from '../ports/core-runtime-port.js';
+import { log } from '../ports/logging-port.js';
+import { startSpan } from '../ports/tracing-port.js';
+
+const SNAPSHOT_DIR = _SNAPSHOT_DIR_ENV ? resolve(_SNAPSHOT_DIR_ENV) : resolve(resolveHooksStateDir(), 'snapshots');
+
+/**
+ * @typedef {import('./snapshot.js').SessionSnapshotData} SessionSnapshotData
+ *
+ * @typedef {Object} SnapshotListItem
+ * @property {string} snapshotId
+ * @property {number} createdAt
+ * @property {string | null} sessionId
+ * @property {string} model
+ * @property {string} [reason]
+ * @property {string} filepath
+ */
+
+/**
+ * @param {Record<string, unknown>} snapshot
+ * @returns {SessionSnapshotData}
+ * @throws {TypeError}
+ */
+export function normalizeSnapshotRecord(snapshot) {
+    const parsed = SessionSnapshotDataSchema.safeParse(snapshot);
+    if (!parsed.success) {
+        throw new TypeError('Snapshot payload inválido para IStateStore.saveSnapshot');
+    }
+    return /** @type {SessionSnapshotData} */ (parsed.data);
+}
+
+/**
+ * @param {SessionSnapshotData} snapshot
+ * @returns {Promise<string>}
+ */
+export async function saveSnapshotFileAsync(snapshot) {
+    return startSpan(
+        'copilot.snapshot.save',
+        { extra: { snapshotId: snapshot.snapshotId, reason: snapshot.reason ?? 'manual' } },
+        async () => {
+            await mkdir(SNAPSHOT_DIR, { recursive: true });
+
+            const filename = `${snapshot.snapshotId}.json`;
+            const filepath = join(SNAPSHOT_DIR, filename);
+
+            await writeFile(filepath, JSON.stringify(snapshot, null, 4), 'utf8');
+            log('INFO', `[SessionSnapshot] Snapshot salvo (async): ${filepath}`);
+
+            await pruneSnapshotFilesAsync();
+
+            return filepath;
+        },
+    );
+}
+
+/**
+ * @returns {Promise<SnapshotListItem[]>}
+ */
+export async function listSnapshotFilesAsync() {
+    try {
+        await access(SNAPSHOT_DIR);
+    } catch {
+        return [];
+    }
+
+    /** @type {SnapshotListItem[]} */
+    const result = [];
+    for (const f of await readdir(SNAPSHOT_DIR)) {
+        if (!f.endsWith('.json')) continue;
+        const filepath = join(SNAPSHOT_DIR, f);
+        try {
+            const text = await readFile(filepath, 'utf8');
+            const jsonResult = safeJsonParse(text, `[SessionSnapshot/listAsync/${f}]`);
+            if (!jsonResult.ok) continue;
+            const parsed = SnapshotListItemSchema.safeParse(jsonResult.data);
+            if (!parsed.success) {
+                log('WARN', `[SessionSnapshot] Snapshot inválido (${f}): schema validation failed`);
+                continue;
+            }
+            const data = parsed.data;
+            result.push({
+                snapshotId: String(data.snapshotId ?? f.replace('.json', '')),
+                createdAt: Number(data.createdAt ?? 0),
+                sessionId: data.sessionId ?? null,
+                model: String(data.model ?? 'unknown'),
+                filepath,
+                ...(data.reason ? { reason: data.reason } : {}),
+            });
+        } catch (e) {
+            logSwallowed(e, 'snapshot.listAsync.parseFile');
+        }
+    }
+    result.sort((a, b) => b.createdAt - a.createdAt);
+    return result;
+}
+
+/**
+ * @param {string} snapshotId
+ * @returns {Promise<SessionSnapshotData | null>}
+ */
+export async function loadSnapshotFileAsync(snapshotId) {
+    return startSpan('copilot.snapshot.load', { extra: { snapshotId } }, async () => {
+        try {
+            await access(SNAPSHOT_DIR);
+        } catch {
+            return null;
+        }
+
+        const filepath = join(SNAPSHOT_DIR, `${snapshotId}.json`);
+        let fileExists = true;
+        try {
+            await access(filepath);
+        } catch {
+            fileExists = false;
+        }
+        if (!fileExists) {
+            const files = (await readdir(SNAPSHOT_DIR)).filter((f) => f.startsWith(snapshotId) && f.endsWith('.json'));
+            if (files.length === 0) return null;
+            const first = files[0];
+            if (!first) return null;
+            try {
+                const text = await readFile(join(SNAPSHOT_DIR, first), 'utf8');
+                const jsonResult = safeJsonParse(text, `[SessionSnapshot/loadAsync/${first}]`);
+                if (!jsonResult.ok) return null;
+                const parsed = SessionSnapshotDataSchema.safeParse(jsonResult.data);
+                return parsed.success ? /** @type {SessionSnapshotData} */ (parsed.data) : null;
+            } catch {
+                return null;
+            }
+        }
+
+        try {
+            const text = await readFile(filepath, 'utf8');
+            const jsonResult = safeJsonParse(text, `[SessionSnapshot/loadAsync/${filepath}]`);
+            if (!jsonResult.ok) return null;
+            const parsed = SessionSnapshotDataSchema.safeParse(jsonResult.data);
+            return parsed.success ? /** @type {SessionSnapshotData} */ (parsed.data) : null;
+        } catch {
+            return null;
+        }
+    });
+}
+
+/**
+ * @returns {Promise<SessionSnapshotData | null>}
+ */
+export async function loadLatestSnapshotFileAsync() {
+    const snapshots = await listSnapshotFilesAsync();
+    if (snapshots.length === 0) return null;
+    const latest = snapshots[0];
+    return latest ? loadSnapshotFileAsync(latest.snapshotId) : null;
+}
+
+/**
+ * @param {number} [keep]
+ * @returns {Promise<number>}
+ */
+export async function pruneSnapshotFilesAsync(keep = MAX_SNAPSHOTS) {
+    const snapshots = await listSnapshotFilesAsync();
+    if (snapshots.length <= keep) return 0;
+
+    const toRemove = snapshots.slice(keep);
+    let removed = 0;
+    for (const snap of toRemove) {
+        try {
+            if (snap?.filepath) {
+                await rm(snap.filepath, { force: true });
+                removed++;
+            }
+        } catch (e) {
+            logSwallowed(e, 'snapshot.pruneAsync.rmFile');
+        }
+    }
+    return removed;
+}

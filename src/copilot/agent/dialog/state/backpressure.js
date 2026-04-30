@@ -1,6 +1,6 @@
 // @ts-check
 /**
- * src/copilot/agent/dialog/backpressure.js
+ * src/copilot/agent/dialog/state/backpressure.js
  *
  * F59: Encapsula a lógica de backpressure e serialização de turnos do dialog loop.
  *
@@ -16,7 +16,7 @@
  */
 
 import { SessionError } from '#copilot/core';
-import { logSwallowed } from '../../core/error-handlers.js';
+import { logSwallowed } from '../../../core/error-handlers.js';
 
 /**
  * Serializa execução de turnos com backpressure baseada em profundidade da fila.
