@@ -47,7 +47,7 @@ No `src/copilot/` a palavra "host" passou a ter significado estrito por contexto
 - `boot host`: a borda operacional que sobe o runtime local a partir de `terminal/bootstrap.js` e
   `bootstrap.js`;
 - `process host`: a borda Node/IPC/sinais do runtime compatível em
-  `agent/lifecycle/runtime-host.js`;
+  `agent/lifecycle/process-host/runtime-host.js`;
 - `DialogHost`: o host externo do subsistema de dialog, isto é, o runtime do agent exposto ao
   controller;
 - `DialogLoopHost`: o adapter estreito que o controller monta para o `DialogLoopManager`;

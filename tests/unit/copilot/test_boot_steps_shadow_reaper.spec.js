@@ -12,7 +12,7 @@ vi.mock('../../../src/copilot/agent/facades/agent-runtime-state.js', () => ({
     shouldReapAgentRuntimePendingQuestionShadow: mocks.shouldReapAgentRuntimePendingQuestionShadow,
 }));
 
-vi.mock('../../../src/copilot/agent/lifecycle/state-io.js', () => ({
+vi.mock('../../../src/copilot/agent/lifecycle/state/state-io.js', () => ({
     readStateAsync: vi.fn(async () => null),
 }));
 

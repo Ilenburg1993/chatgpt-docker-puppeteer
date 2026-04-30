@@ -67,7 +67,7 @@ const RULES = [
         regex: /\bawait\s+(?:client|activeClient)\.(?:start|stop|ping|createSession|resumeSession)\(/,
     },
     {
-        file: 'src/copilot/agent/lifecycle/agent-lifecycle.js',
+        file: 'src/copilot/agent/lifecycle/orchestrators/agent-lifecycle.js',
         rule: 'agent-lifecycle-must-delegate-runtime-state-io',
         patterns: [
             /\breadStateAsync\(/,
@@ -78,7 +78,7 @@ const RULES = [
         message: 'agent-lifecycle deve delegar I/O e restauração de runtime state à façade agent-runtime-state.',
     },
     {
-        file: 'src/copilot/agent/lifecycle/agent-lifecycle.js',
+        file: 'src/copilot/agent/lifecycle/orchestrators/agent-lifecycle.js',
         rule: 'agent-lifecycle-must-delegate-shutdown-snapshot',
         patterns: [/\bcreateSnapshot\(/, /\bsaveSnapshotAsync\(/],
         message: 'agent-lifecycle deve delegar snapshots de shutdown à façade agent-runtime-state.',

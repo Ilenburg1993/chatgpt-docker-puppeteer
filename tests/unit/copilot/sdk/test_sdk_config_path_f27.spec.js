@@ -93,18 +93,18 @@ describe('F129 — DEFAULT_EXCLUDED_TOOLS acessível via config barrel', () => {
 
 describe('F130 — session-setup.js usa config canônica para DEFAULT_EXCLUDED_TOOLS', () => {
     it('session-setup.js não importa DEFAULT_EXCLUDED_TOOLS de #copilot/config/session-config', () => {
-        const content = readFileSync(join(SRC, 'agent/lifecycle/session-setup.js'), 'utf8');
+        const content = readFileSync(join(SRC, 'agent/lifecycle/setup/session-setup.js'), 'utf8');
         // Não deve ter o import antigo
         expect(content).not.toContain("import { DEFAULT_EXCLUDED_TOOLS } from '#copilot/config/session-config'");
     });
 
     it('session-setup.js importa DEFAULT_EXCLUDED_TOOLS do config barrel', () => {
-        const content = readFileSync(join(SRC, 'agent/lifecycle/session-setup.js'), 'utf8');
+        const content = readFileSync(join(SRC, 'agent/lifecycle/setup/session-setup.js'), 'utf8');
         expect(content).toContain("from '#copilot/config'");
     });
 
     it('session-setup.js ainda usa DEFAULT_EXCLUDED_TOOLS', () => {
-        const content = readFileSync(join(SRC, 'agent/lifecycle/session-setup.js'), 'utf8');
+        const content = readFileSync(join(SRC, 'agent/lifecycle/setup/session-setup.js'), 'utf8');
         expect(content).toContain('DEFAULT_EXCLUDED_TOOLS');
     });
 });

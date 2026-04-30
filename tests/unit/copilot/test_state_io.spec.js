@@ -25,7 +25,7 @@ process.env.AGENT_STATE_FILE = TEST_STATE_FILE;
 
 // Importar após definir env
 const { readState, readStateAsync, writeState, writeStateAsync, clearState, clearStateAsync, persistStateWithPolicy } =
-    await import('#copilot/agent/lifecycle/state-io');
+    await import('#copilot/agent/lifecycle/state/state-io');
 
 describe('state-io', () => {
     beforeAll(() => {

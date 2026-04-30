@@ -12,7 +12,7 @@ import {
     createPendingQuestionShadow,
     isPendingQuestionShadowExpired,
 } from '../dialog/state/pending-question-shadow.js';
-import { persistStateWithPolicy, readState, readStateAsync } from '../lifecycle/state-io.js';
+import { persistStateWithPolicy, readState, readStateAsync } from '../lifecycle/state/state-io.js';
 
 /**
  * @typedef {{

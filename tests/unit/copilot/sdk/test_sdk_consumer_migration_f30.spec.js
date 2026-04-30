@@ -66,12 +66,14 @@ describe('F147 — bridges/ usa barrel para onSessionEvent e createTool', () => 
 
 describe('F148 — agent/lifecycle/ usa barrel para event-helpers', () => {
     it('agent-lifecycle.js não importa de #copilot/sdk/event-helpers', () => {
-        expect(src('agent/lifecycle/agent-lifecycle.js')).not.toContain("from '#copilot/sdk/event-helpers'");
+        expect(src('agent/lifecycle/orchestrators/agent-lifecycle.js')).not.toContain(
+            "from '#copilot/sdk/event-helpers'",
+        );
     });
 
     it('agent-lifecycle.js usa façade agent-sdk-access para raceAgentSdkEvents', () => {
-        const content = src('agent/lifecycle/agent-lifecycle.js');
-        expect(content).toContain("from '../facades/agent-sdk-access.js'");
+        const content = src('agent/lifecycle/orchestrators/agent-lifecycle.js');
+        expect(content).toContain("from '../../facades/agent-sdk-access.js'");
         expect(content).toContain('raceAgentSdkEvents');
         expect(content).not.toContain("from '#copilot/sdk'");
     });

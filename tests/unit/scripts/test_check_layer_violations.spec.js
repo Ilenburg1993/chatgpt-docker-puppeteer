@@ -15,7 +15,7 @@ import {
 describe('check-layer-violations — extractModule', () => {
     it('retorna o módulo de primeiro nível', () => {
         assert.equal(extractModule('core/error-handlers.js'), 'core');
-        assert.equal(extractModule('agent/lifecycle/session-setup.js'), 'agent');
+        assert.equal(extractModule('agent/lifecycle/setup/session-setup.js'), 'agent');
         assert.equal(extractModule('conversation-hub/index.js'), 'conversation-hub');
     });
 

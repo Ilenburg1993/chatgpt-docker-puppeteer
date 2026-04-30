@@ -237,16 +237,34 @@ describe('W113 — module layout governance: agent/lifecycle', () => {
     });
 
     it('mantem lifecycle primario e entrypoint compat explicitos', () => {
-        assert.equal(getLifecycleModuleRole('agent-lifecycle.js'), 'orchestrator');
-        assert.equal(getLifecycleModuleRole('entry.js'), 'compat-entry');
-        assert.equal(getLifecycleModuleRole('runtime-host.js'), 'process-host');
+        assert.equal(getLifecycleModuleRole('orchestrators/agent-lifecycle.js'), 'orchestrator');
+        assert.equal(getLifecycleModuleRole('entrypoints/entry.js'), 'compat-entry');
+        assert.equal(getLifecycleModuleRole('process-host/runtime-host.js'), 'process-host');
     });
 
     it('mantem estado separado entre API semantica e I/O cru', () => {
         const state = listLifecycleModulesByRole('state')
             .map((entry) => entry.path)
             .sort();
-        assert.deepEqual(state, ['state-file-io.js', 'state-io.js']);
+        assert.deepEqual(state, ['state/state-file-io.js', 'state/state-io.js']);
+    });
+
+    it('nao preserva shims na raiz de lifecycle apos migracao para subpastas semanticas', () => {
+        const oldRootFiles = [
+            'agent-lifecycle.js',
+            'entry.js',
+            'runtime-host.js',
+            'session-setup.js',
+            'reconnect-policy.js',
+            'runtime-teardown.js',
+            'state-io.js',
+            'state-file-io.js',
+        ];
+
+        assert.deepEqual(
+            oldRootFiles.filter((file) => getLifecycleModuleRole(file) !== undefined),
+            [],
+        );
     });
 
     it('README local documenta os papeis arquiteturais declarados', () => {

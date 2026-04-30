@@ -1,7 +1,7 @@
 # 93 — Bloco N / W113: taxonomia de organização física em `agent/lifecycle`
 
-**Data:** 2026-04-30 **Escopo:** `src/copilot/agent/lifecycle/` **Status:** checkpoint inicial
-executável da W113
+**Data:** 2026-04-30 **Escopo:** `src/copilot/agent/lifecycle/` **Status:** migração física W113
+consolidada sem shims
 
 ---
 
@@ -29,8 +29,11 @@ Foi aplicada a mesma regra de `dialog` e `session`:
 1. `README.md` local para navegação humana;
 2. `module-map.js` local para inventário executável;
 3. contrato unitário que garante cobertura completa e documentação dos papéis.
+4. migração física dos owners reais para subpastas semânticas;
+5. remoção imediata de shims temporários, com contrato anti-raiz antiga.
 
-Nenhum arquivo foi movido nesta onda; a etapa atual prepara a reorganização física futura.
+Ao final da onda, a raiz de `agent/lifecycle` não preserva arquivos funcionais soltos: ela fica
+restrita a `README.md`, `index.js` e `module-map.js`.
 
 ---
 
@@ -49,11 +52,35 @@ Nenhum arquivo foi movido nesta onda; a etapa atual prepara a reorganização f�
 
 ---
 
-## 4) Arquivos adicionados
+## 4) Estrutura consolidada
 
-- `src/copilot/agent/lifecycle/README.md`;
-- `src/copilot/agent/lifecycle/module-map.js`;
-- ampliação de `tests/unit/copilot/contracts/test_module_layout_governance.spec.js`.
+```text
+src/copilot/agent/lifecycle/
+  README.md
+  index.js
+  module-map.js
+  entrypoints/
+    entry.js
+  orchestrators/
+    agent-lifecycle.js
+  policies/
+    reconnect-policy.js
+  process-host/
+    runtime-host.js
+  setup/
+    session-setup.js
+  state/
+    state-file-io.js
+    state-io.js
+  teardown/
+    runtime-teardown.js
+```
+
+O sub-barrel `index.js` continua expondo apenas a superfície pública (`tryReconnect`, `runtime-host`
+e `state-io`) e os inventários canônicos. O orquestrador principal permanece consumido pela
+superfície interna do agent (`agent-runtime-surface.js`), não pelo barrel público.
+
+## 5) Arquivos e contratos adicionados
 
 Exports adicionados ao sub-barrel:
 
@@ -62,23 +89,36 @@ Exports adicionados ao sub-barrel:
 - `getLifecycleModuleRole()`;
 - `listLifecycleModulesByRole()`.
 
+Contrato ampliado:
+
+- `tests/unit/copilot/contracts/test_module_layout_governance.spec.js` cobre presença/ausência dos
+  arquivos declarados, papéis documentados no README, estado separado entre API semântica e I/O cru,
+  e ausência de shims de raiz.
+
 ---
 
-## 5) Roadmap local
+## 6) Roadmap local
 
 1. W113.8 — mapa executável e README local: concluído neste checkpoint.
 2. W113.9 — contrato anti-órfão para `agent/lifecycle`: concluído neste checkpoint.
-3. W113.10 — mover `agent-lifecycle.js` para `orchestrators/` com shim temporário.
-4. W113.11 — mover `runtime-host.js` para `process-host/` e `session-setup.js` para `setup/`.
-5. W113.12 — mover `reconnect-policy.js`, `runtime-teardown.js`, `state-*` para subpastas finais.
-6. W113.13 — migrar imports internos e adicionar contrato anti-import de shims.
+3. W113.10 — mover `agent-lifecycle.js` para `orchestrators/`: concluído sem shim persistente.
+4. W113.11 — mover `runtime-host.js` para `process-host/` e `session-setup.js` para `setup/`:
+   concluído.
+5. W113.12 — mover `reconnect-policy.js`, `runtime-teardown.js`, `state-*` para subpastas finais:
+   concluído.
+6. W113.13 — migrar imports internos e adicionar contrato anti-import de shims: concluído para raiz
+   antiga de `lifecycle`.
+7. W113.14 — próxima revisão: aplicar a mesma disciplina às bordas `server` e `terminal`, onde há
+   maior risco de handlers funcionais e adapters se misturarem.
 
 ---
 
-## 6) Critérios objetivos de conclusão
+## 7) Critérios objetivos de conclusão
 
 - nenhum arquivo JS em `agent/lifecycle` existe sem entrada em `module-map.js`;
 - `README.md` documenta todos os papéis declarados;
 - `index.js` exporta apenas superfície pública e inventários canônicos;
-- `state-file-io.js` continua subordinado à API semântica `state-io.js`;
-- `entry.js` permanece identificado como compat, não como boot canônico.
+- `state/state-file-io.js` continua subordinado à API semântica `state/state-io.js`;
+- `entrypoints/entry.js` permanece identificado como compat, não como boot canônico;
+- a raiz antiga (`agent-lifecycle.js`, `runtime-host.js`, `state-io.js`, etc.) permanece sem shims;
+- futuros shims temporários têm remoção registrada e testável no mesmo turno em que forem criados.

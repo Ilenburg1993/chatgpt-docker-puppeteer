@@ -485,7 +485,7 @@ const requiredBootEnvKeys = [
 ];
 const missingBootEnvKeys = requiredBootEnvKeys.filter((key) => !BOOT_CONFIG_ENV_KEYS.includes(key));
 const terminalIndexSrc = readFileSync(resolve('src/copilot/terminal/index.js'), 'utf-8');
-const sessionSetupSrc = readFileSync(resolve('src/copilot/agent/lifecycle/session-setup.js'), 'utf-8');
+const sessionSetupSrc = readFileSync(resolve('src/copilot/agent/lifecycle/setup/session-setup.js'), 'utf-8');
 const terminalStillHardcodesPinnedContext =
     terminalIndexSrc.includes("'.github', 'skills'") || terminalIndexSrc.includes("'.github', 'instructions'");
 const sessionSetupStillUsesProcessCwd = sessionSetupSrc.includes('.workingDirectory(process.cwd())');

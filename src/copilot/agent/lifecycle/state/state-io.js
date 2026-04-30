@@ -1,6 +1,6 @@
 // @ts-check
 /**
- * src/copilot/agent/lifecycle/state-io.js
+ * src/copilot/agent/lifecycle/state/state-io.js
  *
  * I/O de estado persistido do Always-Alive Agent. Centraliza leitura, escrita e remoção do snapshot
  * `sdk-always-alive.json` em `.github/hooks/state/`.
@@ -8,18 +8,18 @@
  * Separado de `session-manager.js` para isolar responsabilidades: este módulo não conhece a lógica de sessão SDK —
  * apenas serializa e desserializa o estado.
  *
- * @module copilot/agent/lifecycle/state-io
+ * @module copilot/agent/lifecycle/state/state-io
  * @see EventBus
  * @see module:copilot/always-alive
  * @see module:copilot/agent/session/initializer
  */
 
 import { logSwallowed, toError } from '#copilot/core';
-import { DRAIN_WRITES_TIMEOUT_MS } from '../../config/agent.js';
-import { safeJsonParse } from '../../core/safe-json.js';
-import { AliveAgentStateSchema } from '../../core/schemas.js';
-import { withAgentErrorPolicy } from '../error-policy.js';
-import { log } from '../ports/logging-port.js';
+import { DRAIN_WRITES_TIMEOUT_MS } from '../../../config/agent.js';
+import { safeJsonParse } from '../../../core/safe-json.js';
+import { AliveAgentStateSchema } from '../../../core/schemas.js';
+import { withAgentErrorPolicy } from '../../error-policy.js';
+import { log } from '../../ports/logging-port.js';
 import {
     readStateFileIfExists,
     removeStateFileIfExists,
@@ -42,7 +42,7 @@ import {
  * @property {'low' | 'medium' | 'high' | 'xhigh'} [reasoningEffort] - Nível de reasoning efetivo conhecido
  * @property {string | null} pendingQuestion - Texto da pergunta pendente do modelo, ou null
  * @property {{
- *     kind: import('../types.js').PendingQuestionKind;
+ *     kind: import('../../types.js').PendingQuestionKind;
  *     askedAt: number;
  *     allowFreeform: boolean;
  *     protocolControlled: boolean;
@@ -298,7 +298,7 @@ export async function drainStateWrites(timeoutMs = DRAIN_WRITES_TIMEOUT_MS) {
  *
  * @param {Partial<AliveAgentState>} data - Dados parciais a persistir
  * @param {{ label?: string }} [opts]
- * @returns {Promise<import('../error-policy.js').AgentPolicyResult<AliveAgentState>>}
+ * @returns {Promise<import('../../error-policy.js').AgentPolicyResult<AliveAgentState>>}
  */
 export async function persistStateWithPolicy(data, opts = {}) {
     const label = opts.label ?? 'state.persist';

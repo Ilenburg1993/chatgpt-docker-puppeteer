@@ -1,13 +1,13 @@
 // @ts-check
 /**
- * src/copilot/agent/lifecycle/agent-lifecycle.js
+ * src/copilot/agent/lifecycle/orchestrators/agent-lifecycle.js
  *
  * F36: Lógica de lifecycle do agente — start(), stop(), initSession().
  *
  * Funções extraídas de always-alive.js que operam sobre o AgentContext e o EventEmitter do agente. Reduz o tamanho do
  * always-alive.js em ~300L.
  *
- * @module copilot/agent/lifecycle/agent-lifecycle
+ * @module copilot/agent/lifecycle/orchestrators/agent-lifecycle
  * @internal
  * @see EventBus
  */
@@ -29,51 +29,59 @@ import {
     SessionError,
     setSharedSdkSessionId,
     toError,
-} from '../ports/core-runtime-port.js';
-import { defaultErrorTracker } from '../ports/error-tracking-port.js';
-import { initEventCollector } from '../ports/event-observer-port.js';
-import { log } from '../ports/logging-port.js';
-import { defaultMetrics } from '../ports/metrics-port.js';
-import { buildTelemetryConfig, startSpan } from '../ports/tracing-port.js';
+} from '../../ports/core-runtime-port.js';
+import { defaultErrorTracker } from '../../ports/error-tracking-port.js';
+import { initEventCollector } from '../../ports/event-observer-port.js';
+import { log } from '../../ports/logging-port.js';
+import { defaultMetrics } from '../../ports/metrics-port.js';
+import { buildTelemetryConfig, startSpan } from '../../ports/tracing-port.js';
 
-import { SHUTDOWN_TIMEOUT_MS, STOP_BOOT_WAIT_MS } from '../../config/agent.js';
+import { SHUTDOWN_TIMEOUT_MS, STOP_BOOT_WAIT_MS } from '../../../config/agent.js';
 import {
     persistAgentRuntimeGracefulShutdownState,
     persistAgentRuntimePrConsumptionSnapshot,
     resetAgentRuntimeGracefulShutdownFlag,
     restoreAgentRuntimePersistentBootState,
     saveAgentRuntimeShutdownSnapshot,
-} from '../facades/agent-runtime-state.js';
-import { createAgentSdkClient, ensureAgentSdkClientStarted, raceAgentSdkEvents } from '../facades/agent-sdk-access.js';
-import { tryReconnect } from '../lifecycle/reconnect-policy.js';
+} from '../../facades/agent-runtime-state.js';
+import {
+    createAgentSdkClient,
+    ensureAgentSdkClientStarted,
+    raceAgentSdkEvents,
+} from '../../facades/agent-sdk-access.js';
+import { resolveConversationStore } from '../../ports/conversation-port.js';
+import { performBootWiring } from '../../session/boot/boot-wiring.js';
+import { syncSdkHistory } from '../../session/history/history-sync.js';
+import { initOrResumeSession } from '../../session/initializers/initializer.js';
+import {
+    clearActiveSdkSessionOwnershipWithPolicy,
+    syncActiveSessionOwnershipWithPolicy,
+} from '../../session/state/ownership.js';
+import { tryReconnect } from '../policies/reconnect-policy.js';
 import {
     buildSessionHooks,
     buildSessionOptions,
     buildSessionTools,
     finalizeSessionInit,
-} from '../lifecycle/session-setup.js';
-import { resolveConversationStore } from '../ports/conversation-port.js';
-import { performBootWiring } from '../session/boot/boot-wiring.js';
-import { syncSdkHistory } from '../session/history/history-sync.js';
-import { initOrResumeSession } from '../session/initializers/initializer.js';
+} from '../setup/session-setup.js';
 import {
-    clearActiveSdkSessionOwnershipWithPolicy,
-    syncActiveSessionOwnershipWithPolicy,
-} from '../session/state/ownership.js';
-import { detachRuntimeObservers, disconnectRuntimeSdkHandles, teardownRuntimeSidecars } from './runtime-teardown.js';
+    detachRuntimeObservers,
+    disconnectRuntimeSdkHandles,
+    teardownRuntimeSidecars,
+} from '../teardown/runtime-teardown.js';
 
 /**
- * @typedef {import('../agent-context.js').AgentContext} AgentContext
+ * @typedef {import('../../agent-context.js').AgentContext} AgentContext
  *
  * @typedef {import('#copilot/sdk/types').CopilotSession} CopilotSession
  *
- * @typedef {import('../types.js').AgentStatus} AgentStatus
+ * @typedef {import('../../types.js').AgentStatus} AgentStatus
  */
 
-/** @typedef {import('../types.js').LifecycleHost} LifecycleHost */
+/** @typedef {import('../../types.js').LifecycleHost} LifecycleHost */
 
 /**
- * @typedef {import('../types.js').AgentStartPhaseResult} AgentStartPhaseResult
+ * @typedef {import('../../types.js').AgentStartPhaseResult} AgentStartPhaseResult
  *
  * @typedef {AgentStartPhaseResult['phase']} AgentStartPhase
  */
@@ -440,7 +448,7 @@ async function runAgentStartPhase(phases, name, phase, fn) {
  * @param {boolean} ok
  * @param {string | null} failedPhase
  * @param {string | null} error
- * @returns {import('../types.js').AgentStartReport}
+ * @returns {import('../../types.js').AgentStartReport}
  */
 function buildAgentStartReport(startedAt, phases, ok, failedPhase, error) {
     const completedAt = Date.now();

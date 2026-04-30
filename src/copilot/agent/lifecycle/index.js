@@ -12,7 +12,7 @@ export {
     getLifecycleModuleRole,
     listLifecycleModulesByRole,
 } from './module-map.js';
-export { tryReconnect } from './reconnect-policy.js';
+export { tryReconnect } from './policies/reconnect-policy.js';
 export {
     discoverRuntimePlugins,
     registerRuntimeAgentEventHost,
@@ -20,7 +20,7 @@ export {
     registerRuntimeProcessSignals,
     registerRuntimeShutdownHost,
     runCopilotSdkBootPreflight,
-} from './runtime-host.js';
+} from './process-host/runtime-host.js';
 export {
     clearState,
     clearStateAsync,
@@ -30,4 +30,4 @@ export {
     readStateAsync,
     writeState,
     writeStateAsync,
-} from './state-io.js';
+} from './state/state-io.js';

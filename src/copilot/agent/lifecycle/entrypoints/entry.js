@@ -1,6 +1,6 @@
 // @ts-check
 /**
- * src/copilot/agent/lifecycle/entry.js
+ * src/copilot/agent/lifecycle/entrypoints/entry.js
  *
  * Agent lifecycle mantido para compat interna.
  *
@@ -13,7 +13,7 @@
  * O "host" citado pelos helpers deste arquivo é o host de processo compatível. Ele não se confunde com os
  * `DialogHost`/`DialogLoopHost` de `agent/types.js`.
  *
- * @module copilot/agent/lifecycle/entry
+ * @module copilot/agent/lifecycle/entrypoints/entry
  * @see EventBus
  */
 
@@ -26,8 +26,8 @@ import {
     DRAIN_WRITES_TIMEOUT_MS,
     PING_TIMEOUT_MS,
     RESTART_DELAY_MS,
-} from '../../config/agent.js';
-import { logSwallowed } from '../../core/error-handlers.js';
+} from '../../../config/agent.js';
+import { logSwallowed } from '../../../core/error-handlers.js';
 import {
     EMITTER_ERROR,
     EMITTER_SESSION_FATAL,
@@ -38,12 +38,12 @@ import {
     HOOK_PROMPT_SUBMITTED,
     HOOK_SESSION_END,
     HOOK_SESSION_START,
-} from '../../events/index.js';
-import { getAgent } from '../always-alive.js';
-import { checkAgentSdkAuthStatus, createAgentSdkClient } from '../facades/agent-sdk-access.js';
-import { ERROR_TRACKER } from '../ports/error-tracking-port.js';
-import { getDefaultHookBus } from '../ports/hook-port.js';
-import { log } from '../ports/logging-port.js';
+} from '../../../events/index.js';
+import { getAgent } from '../../always-alive.js';
+import { checkAgentSdkAuthStatus, createAgentSdkClient } from '../../facades/agent-sdk-access.js';
+import { ERROR_TRACKER } from '../../ports/error-tracking-port.js';
+import { getDefaultHookBus } from '../../ports/hook-port.js';
+import { log } from '../../ports/logging-port.js';
 import {
     discoverRuntimePlugins,
     registerRuntimeAgentEventHost,
@@ -51,8 +51,8 @@ import {
     registerRuntimeProcessSignals,
     registerRuntimeShutdownHost,
     runCopilotSdkBootPreflight,
-} from './runtime-host.js';
-import { drainStateWrites } from './state-io.js';
+} from '../process-host/runtime-host.js';
+import { drainStateWrites } from '../state/state-io.js';
 
 /**
  * Inicializa o agent lifecycle: plugin discovery, event wiring, retries, shutdown, IPC.

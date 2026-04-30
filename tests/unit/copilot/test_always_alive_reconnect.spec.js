@@ -28,7 +28,10 @@ describe('always-alive › Sprint 6: backoff exponencial de reconexão', async (
         const { readFile } = await import('node:fs/promises');
         const [mainCode, rpCode, messagingCode] = await Promise.all([
             readFile(new URL('../../../src/copilot/agent/always-alive.js', import.meta.url), 'utf-8'),
-            readFile(new URL('../../../src/copilot/agent/lifecycle/reconnect-policy.js', import.meta.url), 'utf-8'),
+            readFile(
+                new URL('../../../src/copilot/agent/lifecycle/policies/reconnect-policy.js', import.meta.url),
+                'utf-8',
+            ),
             readFile(new URL('../../../src/copilot/agent/messaging/agent-messaging.js', import.meta.url), 'utf-8'),
         ]);
         sourceCode = mainCode + '\n' + messagingCode;

@@ -60,7 +60,7 @@ import { registerAgentEventListeners } from './terminal-agent-wiring.js';
 /**
  * @param {{
  *     serverUrl: string;
- *     bootPreflight?: import('../agent/lifecycle/runtime-host.js').CopilotSdkBootPreflightReport | null;
+ *     bootPreflight?: import('../agent/lifecycle/process-host/runtime-host.js').CopilotSdkBootPreflightReport | null;
  * }} opts
  * @returns {void}
  */
@@ -114,14 +114,14 @@ let _sighupHandler = null;
  * @property {() => void} [wireRuntime]
  * @property {() => NodeJS.Timeout} [startTodoCleanupJob]
  * @property {ReturnType<import('#copilot/boot').readCopilotBootConfig>} [bootConfig]
- * @property {import('../agent/lifecycle/runtime-host.js').CopilotSdkBootPreflightReport} [bootPreflight]
+ * @property {import('../agent/lifecycle/process-host/runtime-host.js').CopilotSdkBootPreflightReport} [bootPreflight]
  *
  * @typedef {object} TerminalBootContext
  * @property {TerminalServerStartDeps['startCopilotServer']} startCopilotServer
  * @property {() => void} wireRuntime
  * @property {() => NodeJS.Timeout} startTodoCleanupJob
  * @property {ReturnType<import('#copilot/boot').readCopilotBootConfig>} bootConfig
- * @property {import('../agent/lifecycle/runtime-host.js').CopilotSdkBootPreflightReport | null} bootPreflight
+ * @property {import('../agent/lifecycle/process-host/runtime-host.js').CopilotSdkBootPreflightReport | null} bootPreflight
  * @property {PinnedFilesLoader | null} pinnedLoader
  * @property {(() => void) | null} disposePinnedBridge
  * @property {((evt: { file: string; type: string }) => void) | null} pinnedFilesChangedHandler

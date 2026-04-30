@@ -4,7 +4,7 @@
  * @file Façade semântica para fallback de estado persistido do runtime vivo.
  */
 
-import { persistStateWithPolicy, readState, readStateAsync } from '../lifecycle/state-io.js';
+import { persistStateWithPolicy, readState, readStateAsync } from '../lifecycle/state/state-io.js';
 import {
     markAgentRuntimeDialogPausedForRecovery as markAgentRuntimeDialogPausedForRecoveryImpl,
     persistAgentRuntimeDialogState as persistAgentRuntimeDialogStateImpl,
@@ -35,7 +35,7 @@ import {
  * Uso recomendado: pontos de domínio que precisam apenas de leitura e não devem importar `lifecycle/state-io.js`
  * diretamente.
  *
- * @returns {import('../lifecycle/state-io.js').AliveAgentState | null}
+ * @returns {import('../lifecycle/state/state-io.js').AliveAgentState | null}
  */
 export function readAgentRuntimePersistedStateSync() {
     return readState();
@@ -44,7 +44,7 @@ export function readAgentRuntimePersistedStateSync() {
 /**
  * Lê o snapshot persistido bruto do runtime de forma assíncrona.
  *
- * @returns {Promise<import('../lifecycle/state-io.js').AliveAgentState | null>}
+ * @returns {Promise<import('../lifecycle/state/state-io.js').AliveAgentState | null>}
  */
 export function readAgentRuntimePersistedStateAsync() {
     return readStateAsync();
@@ -55,10 +55,10 @@ export function readAgentRuntimePersistedStateAsync() {
  *
  * Wrapper intencional para evitar imports diretos de `persistStateWithPolicy` em camadas de domínio.
  *
- * @param {Partial<import('../lifecycle/state-io.js').AliveAgentState>} data
+ * @param {Partial<import('../lifecycle/state/state-io.js').AliveAgentState>} data
  * @param {{ label?: string }} [options]
  * @returns {Promise<
- *     import('../error-policy.js').AgentPolicyResult<import('../lifecycle/state-io.js').AliveAgentState>
+ *     import('../error-policy.js').AgentPolicyResult<import('../lifecycle/state/state-io.js').AliveAgentState>
  * >}
  */
 export function persistAgentRuntimeStatePartial(data, options = {}) {
@@ -150,7 +150,7 @@ export async function readAgentRuntimeDialogPersistedState() {
  * @param {Record<string, unknown>} partial
  * @param {string} label
  * @returns {Promise<
- *     import('../error-policy.js').AgentPolicyResult<import('../lifecycle/state-io.js').AliveAgentState>
+ *     import('../error-policy.js').AgentPolicyResult<import('../lifecycle/state/state-io.js').AliveAgentState>
  * >}
  */
 export async function persistAgentRuntimeDialogState(partial, label) {
@@ -162,7 +162,7 @@ export async function persistAgentRuntimeDialogState(partial, label) {
  *
  * @param {{ message: string; ts: number }} input
  * @returns {Promise<
- *     import('../error-policy.js').AgentPolicyResult<import('../lifecycle/state-io.js').AliveAgentState>
+ *     import('../error-policy.js').AgentPolicyResult<import('../lifecycle/state/state-io.js').AliveAgentState>
  * >}
  */
 export async function persistAgentRuntimePendingTurnState(input) {
@@ -179,7 +179,7 @@ export async function persistAgentRuntimePendingTurnState(input) {
  * }} input
  * @param {{ label?: string }} [options]
  * @returns {Promise<
- *     import('../error-policy.js').AgentPolicyResult<import('../lifecycle/state-io.js').AliveAgentState>
+ *     import('../error-policy.js').AgentPolicyResult<import('../lifecycle/state/state-io.js').AliveAgentState>
  * >}
  */
 export async function persistAgentRuntimePendingQuestionState(input, options = {}) {
@@ -212,7 +212,7 @@ export async function shouldScheduleAgentRuntimeDialogBootRecovery() {
  * Persiste a intenção canônica de `dialogPaused=true` antes do boot recovery do dialog loop.
  *
  * @returns {Promise<
- *     import('../error-policy.js').AgentPolicyResult<import('../lifecycle/state-io.js').AliveAgentState>
+ *     import('../error-policy.js').AgentPolicyResult<import('../lifecycle/state/state-io.js').AliveAgentState>
  * >}
  */
 export async function markAgentRuntimeDialogPausedForRecovery() {
@@ -223,7 +223,7 @@ export async function markAgentRuntimeDialogPausedForRecovery() {
  * Reseta a flag persistida de shutdown gracioso no começo do boot do runtime.
  *
  * @returns {Promise<
- *     import('../error-policy.js').AgentPolicyResult<import('../lifecycle/state-io.js').AliveAgentState>
+ *     import('../error-policy.js').AgentPolicyResult<import('../lifecycle/state/state-io.js').AliveAgentState>
  * >}
  */
 export async function resetAgentRuntimeGracefulShutdownFlag() {
@@ -235,7 +235,7 @@ export async function resetAgentRuntimeGracefulShutdownFlag() {
  *
  * @param {{ model?: string; cost?: number; quotaSnapshots?: Record<string, unknown>; ts: number }} info
  * @returns {Promise<
- *     import('../error-policy.js').AgentPolicyResult<import('../lifecycle/state-io.js').AliveAgentState>
+ *     import('../error-policy.js').AgentPolicyResult<import('../lifecycle/state/state-io.js').AliveAgentState>
  * >}
  */
 export async function persistAgentRuntimePrConsumptionSnapshot(info) {
@@ -276,7 +276,7 @@ export async function saveAgentRuntimeShutdownSnapshot(ctx, options) {
  * @param {AgentRuntimeStateContext} ctx
  * @param {{ dialogLoopActive: boolean }} options
  * @returns {Promise<
- *     import('../error-policy.js').AgentPolicyResult<import('../lifecycle/state-io.js').AliveAgentState>
+ *     import('../error-policy.js').AgentPolicyResult<import('../lifecycle/state/state-io.js').AliveAgentState>
  * >}
  */
 export async function persistAgentRuntimeGracefulShutdownState(ctx, options) {

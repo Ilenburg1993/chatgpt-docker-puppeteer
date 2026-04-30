@@ -23,7 +23,7 @@ vi.mock('../../../src/copilot/agent/config.js', () => ({
     MAX_SNAPSHOTS: 3,
 }));
 
-vi.mock('../../../src/copilot/agent/lifecycle/state-io.js', () => ({
+vi.mock('../../../src/copilot/agent/lifecycle/state/state-io.js', () => ({
     readState: vi.fn(() => ({ key: 'value' })),
     persistStateWithPolicy: vi.fn(async () => ({ ok: true, value: undefined })),
 }));

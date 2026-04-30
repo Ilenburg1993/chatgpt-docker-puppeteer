@@ -37,7 +37,7 @@ describe('always-alive.js › delegação para módulos extraídos', () => {
 
     it('importa agentStart, agentStop, agentTryReconnect pela superfície runtime', () => {
         assert.ok(src.includes("from './agent-runtime-surface.js'"));
-        assert.ok(surfaceSrc.includes("from './lifecycle/agent-lifecycle.js'"));
+        assert.ok(surfaceSrc.includes("from './lifecycle/orchestrators/agent-lifecycle.js'"));
         assert.ok(src.includes('agentStart'));
         assert.ok(src.includes('agentStop'));
         assert.ok(src.includes('agentTryReconnect'));

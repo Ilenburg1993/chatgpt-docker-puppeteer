@@ -28,7 +28,7 @@ import { HOOKS_LOGGER } from '#copilot/hooks';
 import { ERROR_TRACKER } from '#copilot/observability';
 import { SDK_LOGGER, TOOLS_BUILDER, checkAuthStatus, createCopilotClient } from '#copilot/sdk';
 import { TOOLS_LOGGER, TOOLS_METRICS } from '#copilot/tools';
-import { runCopilotSdkBootPreflight } from './agent/lifecycle/runtime-host.js';
+import { runCopilotSdkBootPreflight } from './agent/lifecycle/process-host/runtime-host.js';
 import { COPILOT_MODEL, PING_TIMEOUT_MS } from './config/agent.js';
 import { container } from './core/di-container.js';
 import { bootstrapLateDeps, bootstrapObservability } from './observability/bootstrap.js';
@@ -68,7 +68,9 @@ export async function bootCopilot() {
         const bootPlan = createCopilotBootPlan(bootConfig);
         /**
          * @type {{
-         *     bootPreflight: import('./agent/lifecycle/runtime-host.js').CopilotSdkBootPreflightReport | null;
+         *     bootPreflight:
+         *         | import('./agent/lifecycle/process-host/runtime-host.js').CopilotSdkBootPreflightReport
+         *         | null;
          *     startTodoCleanupJob: null | typeof import('./tools/todo/store.js').startTodoCleanupJob;
          *     wireRuntime: null | (() => void);
          *     terminal: null | typeof import('./terminal/index.js');

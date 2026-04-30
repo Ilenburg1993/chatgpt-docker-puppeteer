@@ -19,7 +19,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'vitest';
 
-import { tryReconnect as importedTryReconnect } from '../../../src/copilot/agent/lifecycle/reconnect-policy.js';
+import { tryReconnect as importedTryReconnect } from '../../../src/copilot/agent/lifecycle/policies/reconnect-policy.js';
 
 const tryReconnect = /** @type {any} */ (importedTryReconnect);
 

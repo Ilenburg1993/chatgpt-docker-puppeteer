@@ -1,6 +1,6 @@
 // @ts-check
 /**
- * src/copilot/agent/lifecycle/runtime-host.js
+ * src/copilot/agent/lifecycle/process-host/runtime-host.js
  *
  * Helpers do host de processo do runtime do agente.
  *
@@ -9,15 +9,15 @@
  * capacidades.
  *
  * Este módulo não é boot canônico. Ele encapsula preocupações de processo usadas pelo entrypoint compatível
- * (`agent/lifecycle/entry.js`) e por diagnósticos do boot canônico.
+ * (`agent/lifecycle/entrypoints/entry.js`) e por diagnósticos do boot canônico.
  *
- * @module copilot/agent/lifecycle/runtime-host
+ * @module copilot/agent/lifecycle/process-host/runtime-host
  */
 
 import { SHUTDOWN_PRIORITY, TimeoutError, registerShutdownHandler, runShutdown, toError } from '#copilot/core';
-import { readRuntimeControlState } from '../agent-runtime-surface.js';
-import { listSdkCatalogModels } from '../facades/agent-model-config.js';
-import { ensureAgentSdkClientStarted, pingAgentSdkClient, stopAgentSdkClient } from '../facades/agent-sdk-access.js';
+import { readRuntimeControlState } from '../../agent-runtime-surface.js';
+import { listSdkCatalogModels } from '../../facades/agent-model-config.js';
+import { ensureAgentSdkClientStarted, pingAgentSdkClient, stopAgentSdkClient } from '../../facades/agent-sdk-access.js';
 
 /** @type {boolean} */
 let _processSignalHandlersRegistered = false;

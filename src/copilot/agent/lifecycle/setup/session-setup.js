@@ -1,6 +1,6 @@
 // @ts-check
 /**
- * src/copilot/agent/lifecycle/session-setup.js
+ * src/copilot/agent/lifecycle/setup/session-setup.js
  *
  * F63: Funções de configuração de sessão extraídas de agent-lifecycle.js.
  *
@@ -14,7 +14,7 @@
  * - esses acoplamentos entram por `agent/ports/*`, mantendo lifecycle/session legíveis durante a migração para runtime
  *   façade/capabilities.
  *
- * @module copilot/agent/lifecycle/session-setup
+ * @module copilot/agent/lifecycle/setup/session-setup
  * @internal
  * @see EventBus
  */
@@ -22,19 +22,19 @@
 import { readCopilotBootConfig } from '#copilot/boot';
 import { DEFAULT_EXCLUDED_TOOLS, SessionConfigBuilder } from '#copilot/config';
 import { container } from '#copilot/core';
-import { log } from '../ports/logging-port.js';
-import { METRICS_STORE } from '../ports/metrics-port.js';
+import { log } from '../../ports/logging-port.js';
+import { METRICS_STORE } from '../../ports/metrics-port.js';
 
-import { DialogProtocol } from '../../dialog/protocol.js';
-import { handleUserInputRequest } from '../dialog/wiring/user-input-handler.js';
+import { DialogProtocol } from '../../../dialog/protocol.js';
+import { handleUserInputRequest } from '../../dialog/wiring/user-input-handler.js';
 import {
     createAgentSdkToolsRegistry,
     getAgentSdkToolsConfig,
     readAgentSdkModelRegistryEntry,
-} from '../facades/agent-sdk-access.js';
-import { buildAgentBusHooks, withAgentRuntimeToolPolicy } from '../ports/hook-port.js';
-import { buildDefaultMcpConfig, buildDefaultMcpTools } from '../ports/mcp-port.js';
-import { bindAgentSessionTools, bootstrapAgentTools, isAgentToolDisabled } from '../ports/tool-port.js';
+} from '../../facades/agent-sdk-access.js';
+import { buildAgentBusHooks, withAgentRuntimeToolPolicy } from '../../ports/hook-port.js';
+import { buildDefaultMcpConfig, buildDefaultMcpTools } from '../../ports/mcp-port.js';
+import { bindAgentSessionTools, bootstrapAgentTools, isAgentToolDisabled } from '../../ports/tool-port.js';
 
 /**
  * Contrato mínimo do `AgentContext` exigido pelo setup de sessão.
@@ -68,10 +68,10 @@ import { bindAgentSessionTools, bootstrapAgentTools, isAgentToolDisabled } from 
  * @property {() => boolean} isDialogLoopActive - Distingue `ask_user` controlado pelo protocolo de input manual.
  * @property {() => boolean} [getDialogLoopAttachedSnapshot] - Indica se o wiring do DLM ainda está anexado ao host,
  *   mesmo quando `dialogLoopActive` ficou temporariamente defasado após timeout/recovery.
- * @property {(status: import('../types.js').AgentStatus, host: LifecycleHost) => void} setStatus - Atualiza status via
- *   host para preservar eventos/observabilidade do runtime.
- * @property {(question: import('../types.js').PendingQuestion | null) => void} setPendingQuestion - Registra ou limpa a
- *   pergunta pendente viva.
+ * @property {(status: import('../../types.js').AgentStatus, host: LifecycleHost) => void} setStatus - Atualiza status
+ *   via host para preservar eventos/observabilidade do runtime.
+ * @property {(question: import('../../types.js').PendingQuestion | null) => void} setPendingQuestion - Registra ou
+ *   limpa a pergunta pendente viva.
  * @property {(task: Promise<unknown>, meta?: { label?: string; description?: string }) => Promise<void>} trackBackgroundTask
  *   - Registra tarefas fire-and-forget originadas por respostas de input.
  *
@@ -79,7 +79,7 @@ import { bindAgentSessionTools, bootstrapAgentTools, isAgentToolDisabled } from 
  *   no contexto.
  * @property {(isResumed: boolean) => void} setIsResumed - Marca se a sessão veio de resume ou criação nova.
  *
- * @typedef {import('../types.js').LifecycleHost} LifecycleHost
+ * @typedef {import('../../types.js').LifecycleHost} LifecycleHost
  *
  * @typedef {import('#copilot/sdk/types').MCPServerConfig} MCPServerConfig
  *

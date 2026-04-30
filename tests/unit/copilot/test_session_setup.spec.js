@@ -63,7 +63,7 @@ import {
     buildSessionOptions,
     buildSessionTools,
     finalizeSessionInit,
-} from '../../../src/copilot/agent/lifecycle/session-setup.js';
+} from '../../../src/copilot/agent/lifecycle/setup/session-setup.js';
 import { buildMcpTools } from '../../../src/copilot/bridges/mcp-tool-bridge.js';
 import { setSessionRpc } from '../../../src/copilot/tools/bootstrap.js';
 

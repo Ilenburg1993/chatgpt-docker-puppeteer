@@ -66,7 +66,7 @@ describe('Block B — lifecycle ownership contracts', () => {
         const alwaysAlive = readFileSync(srcPath('agent', 'always-alive.js'), 'utf8');
         const bootSteps = readFileSync(srcPath('agent', 'session', 'boot', 'boot-steps.js'), 'utf8');
         const bootDialogRecovery = readFileSync(srcPath('agent', 'session', 'boot', 'boot-dialog-recovery.js'), 'utf8');
-        const lifecycle = readFileSync(srcPath('agent', 'lifecycle', 'agent-lifecycle.js'), 'utf8');
+        const lifecycle = readFileSync(srcPath('agent', 'lifecycle', 'orchestrators', 'agent-lifecycle.js'), 'utf8');
 
         assert.match(src, /attachAgentSdkBootLifecycleBridge/);
         assert.match(src, /startAgentSdkBootQuotaBridge/);
@@ -190,7 +190,7 @@ describe('Block B — lifecycle ownership contracts', () => {
         assert.match(alwaysAlive, /from '\.\/agent-runtime-surface\.js'/);
         assert.doesNotMatch(alwaysAlive, /from ['"]\.\/(?:dialog|facades|lifecycle|messaging|ports|state)\//);
         assert.doesNotMatch(alwaysAlive, /from ['"]\.\/(?:event-bridge-wiring|health-check|runtime-registry)\.js['"]/);
-        assert.match(surface, /from '\.\/lifecycle\/agent-lifecycle\.js'/);
+        assert.match(surface, /from '\.\/lifecycle\/orchestrators\/agent-lifecycle\.js'/);
         assert.match(surface, /from '\.\/messaging\/agent-messaging\.js'/);
         assert.match(surface, /from '\.\/facades\/agent-sdk-access\.js'/);
         assert.match(surface, /from '\.\/runtime-registry\.js'/);

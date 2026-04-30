@@ -16,7 +16,7 @@ import { AgentContext } from '../../../src/copilot/agent/agent-context.js';
 
 describe('agent-lifecycle › exports', () => {
     it('exporta agentStart, agentStop, initSession e agentTryReconnect', async () => {
-        const mod = await import('../../../src/copilot/agent/lifecycle/agent-lifecycle.js');
+        const mod = await import('../../../src/copilot/agent/lifecycle/orchestrators/agent-lifecycle.js');
         assert.equal(typeof mod.agentStart, 'function');
         assert.equal(typeof mod.agentStop, 'function');
         assert.equal(typeof mod.initSession, 'function');
@@ -26,7 +26,7 @@ describe('agent-lifecycle › exports', () => {
 
 describe('agent-lifecycle › agentStart guard', () => {
     it('retorna silenciosamente se status não é stopped', async () => {
-        const { agentStart } = await import('../../../src/copilot/agent/lifecycle/agent-lifecycle.js');
+        const { agentStart } = await import('../../../src/copilot/agent/lifecycle/orchestrators/agent-lifecycle.js');
         const emitter = new EventEmitter();
         const ctx = new AgentContext(emitter);
         ctx.status = 'idle'; // não é stopped
@@ -59,8 +59,14 @@ describe('agent-lifecycle › source contracts', () => {
 
     beforeAll(async () => {
         [src, runtimeTeardownSrc] = await Promise.all([
-            readFile(new URL('../../../src/copilot/agent/lifecycle/agent-lifecycle.js', import.meta.url), 'utf-8'),
-            readFile(new URL('../../../src/copilot/agent/lifecycle/runtime-teardown.js', import.meta.url), 'utf-8'),
+            readFile(
+                new URL('../../../src/copilot/agent/lifecycle/orchestrators/agent-lifecycle.js', import.meta.url),
+                'utf-8',
+            ),
+            readFile(
+                new URL('../../../src/copilot/agent/lifecycle/teardown/runtime-teardown.js', import.meta.url),
+                'utf-8',
+            ),
         ]);
     });
 

@@ -44,7 +44,10 @@ describe('agent › K4 background task tracker integration', () => {
         ] = await Promise.all([
             readFile(new URL('../../../src/copilot/agent/agent-context.js', import.meta.url), 'utf-8'),
             readFile(new URL('../../../src/copilot/agent/context-factories.js', import.meta.url), 'utf-8'),
-            readFile(new URL('../../../src/copilot/agent/lifecycle/agent-lifecycle.js', import.meta.url), 'utf-8'),
+            readFile(
+                new URL('../../../src/copilot/agent/lifecycle/orchestrators/agent-lifecycle.js', import.meta.url),
+                'utf-8',
+            ),
             readFile(new URL('../../../src/copilot/agent/session/boot/boot-steps.js', import.meta.url), 'utf-8'),
             readFile(new URL('../../../src/copilot/agent/session/boot/boot-session-prep.js', import.meta.url), 'utf-8'),
             readFile(

@@ -71,7 +71,7 @@ vi.mock('../../../src/copilot/agent/facades/agent-sdk-runtime.js', () => ({
     ) => mockWaitForAgentSdkEvent(emitter, event, opts),
 }));
 
-vi.mock('../../../src/copilot/agent/lifecycle/state-io.js', () => ({
+vi.mock('../../../src/copilot/agent/lifecycle/state/state-io.js', () => ({
     persistState: vi.fn(),
     persistStateWithPolicy: vi.fn(async () => ({ ok: true, value: /** @type {any} */ ({}) })),
     readState: vi.fn(() => null),
@@ -97,7 +97,7 @@ import { DialogCompactionPolicy } from '../../../src/copilot/agent/dialog/polici
 import { selectDialogResumeStrategy } from '../../../src/copilot/agent/dialog/policies/resume-policy.js';
 import { DialogCostLedger } from '../../../src/copilot/agent/dialog/state/cost-ledger.js';
 import { DialogLoopStateMachine } from '../../../src/copilot/agent/dialog/state/state-machine.js';
-import { persistStateWithPolicy, readState } from '../../../src/copilot/agent/lifecycle/state-io.js';
+import { persistStateWithPolicy, readState } from '../../../src/copilot/agent/lifecycle/state/state-io.js';
 
 // ── Helpers ──────────────────────────────────────────────────────────────
 

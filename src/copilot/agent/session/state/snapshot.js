@@ -11,7 +11,7 @@
  * @see EventBus
  */
 
-import { readState } from '../../lifecycle/state-io.js';
+import { readState } from '../../lifecycle/state/state-io.js';
 import {
     listSnapshotFilesAsync,
     loadLatestSnapshotFileAsync,

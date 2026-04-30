@@ -56,8 +56,8 @@ const F19_MIGRATED = [
     'server/routes/sdk/session-crud.js',
     'hooks/permission-controller.js',
     'hooks/permission-handler.js',
-    'agent/lifecycle/agent-lifecycle.js',
-    'agent/lifecycle/entry.js',
+    'agent/lifecycle/orchestrators/agent-lifecycle.js',
+    'agent/lifecycle/entrypoints/entry.js',
     'audit/pipeline.js',
 ];
 
@@ -132,7 +132,10 @@ describe('F19 — Consumidores migrados importam de #copilot/sdk', () => {
     });
 
     describe('Arquivos com client SDK via façade', () => {
-        const clientFiles = ['agent/lifecycle/agent-lifecycle.js', 'agent/lifecycle/entry.js'];
+        const clientFiles = [
+            'agent/lifecycle/orchestrators/agent-lifecycle.js',
+            'agent/lifecycle/entrypoints/entry.js',
+        ];
 
         for (const file of clientFiles) {
             it(`${file}: cria client via agent-sdk-access`, () => {

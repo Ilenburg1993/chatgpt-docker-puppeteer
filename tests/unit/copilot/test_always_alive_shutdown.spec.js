@@ -29,7 +29,10 @@ describe('always-alive › Sprint 7: graceful shutdown', async () => {
         const { readFile } = await import('node:fs/promises');
         const [main, lifecycle, agentConfig] = await Promise.all([
             readFile(new URL('../../../src/copilot/agent/always-alive.js', import.meta.url), 'utf-8'),
-            readFile(new URL('../../../src/copilot/agent/lifecycle/agent-lifecycle.js', import.meta.url), 'utf-8'),
+            readFile(
+                new URL('../../../src/copilot/agent/lifecycle/orchestrators/agent-lifecycle.js', import.meta.url),
+                'utf-8',
+            ),
             readFile(new URL('../../../src/copilot/config/agent.js', import.meta.url), 'utf-8'),
         ]);
         sourceCode = main + '\n' + lifecycle + '\n' + agentConfig;
@@ -118,7 +121,10 @@ describe('always-alive › stop() retrocompatibilidade', async () => {
         const { readFile } = await import('node:fs/promises');
         const [main, lifecycle] = await Promise.all([
             readFile(new URL('../../../src/copilot/agent/always-alive.js', import.meta.url), 'utf-8'),
-            readFile(new URL('../../../src/copilot/agent/lifecycle/agent-lifecycle.js', import.meta.url), 'utf-8'),
+            readFile(
+                new URL('../../../src/copilot/agent/lifecycle/orchestrators/agent-lifecycle.js', import.meta.url),
+                'utf-8',
+            ),
         ]);
         sourceCode = main + '\n' + lifecycle;
     });
@@ -211,7 +217,10 @@ describe('always-alive › stop() idempotência', async () => {
         const { readFile } = await import('node:fs/promises');
         const [main, lifecycle] = await Promise.all([
             readFile(new URL('../../../src/copilot/agent/always-alive.js', import.meta.url), 'utf-8'),
-            readFile(new URL('../../../src/copilot/agent/lifecycle/agent-lifecycle.js', import.meta.url), 'utf-8'),
+            readFile(
+                new URL('../../../src/copilot/agent/lifecycle/orchestrators/agent-lifecycle.js', import.meta.url),
+                'utf-8',
+            ),
         ]);
         sourceCode = main + '\n' + lifecycle;
     });

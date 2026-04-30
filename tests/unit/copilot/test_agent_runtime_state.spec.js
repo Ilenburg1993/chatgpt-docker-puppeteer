@@ -10,7 +10,7 @@ const mocks = vi.hoisted(() => ({
     saveSnapshotAsync: vi.fn(async () => '/tmp/snap-test.json'),
 }));
 
-vi.mock('../../../src/copilot/agent/lifecycle/state-io.js', () => ({
+vi.mock('../../../src/copilot/agent/lifecycle/state/state-io.js', () => ({
     persistStateWithPolicy: mocks.persistStateWithPolicy,
     readState: mocks.readState,
     readStateAsync: mocks.readStateAsync,

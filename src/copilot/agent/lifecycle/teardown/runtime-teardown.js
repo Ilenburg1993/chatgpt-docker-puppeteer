@@ -1,6 +1,6 @@
 // @ts-check
 /**
- * @module copilot/agent/lifecycle/runtime-teardown
+ * @module copilot/agent/lifecycle/teardown/runtime-teardown
  * @file Helpers internos de teardown do runtime do agent.
  *
  *   Centraliza blocos repetidos de cleanup usados por `agentStart` rollback e `agentStop`, mantendo a API pública no
@@ -8,13 +8,13 @@
  */
 
 import { toError } from '#copilot/core';
-import { disconnectAgentSdkSession, stopAgentSdkClient } from '../facades/agent-sdk-access.js';
-import { log } from '../ports/logging-port.js';
-import { defaultMetrics } from '../ports/metrics-port.js';
-import { unbindAgentSessionTools } from '../ports/tool-port.js';
+import { disconnectAgentSdkSession, stopAgentSdkClient } from '../../facades/agent-sdk-access.js';
+import { log } from '../../ports/logging-port.js';
+import { defaultMetrics } from '../../ports/metrics-port.js';
+import { unbindAgentSessionTools } from '../../ports/tool-port.js';
 
 /**
- * @typedef {import('../agent-context.js').AgentContext} AgentContext
+ * @typedef {import('../../agent-context.js').AgentContext} AgentContext
  */
 
 /**

@@ -17,7 +17,7 @@ export {
 } from './dialog/controllers/agent-dialog-controller.js';
 export { ensureAgentEventBusBridge, resetAgentEventBusBridgeWiring } from './event-bridge-wiring.js';
 export { getAgentHealthSnapshot as healthSnapshot } from './health-check.js';
-export { agentStart, agentStop, agentTryReconnect } from './lifecycle/agent-lifecycle.js';
+export { agentStart, agentStop, agentTryReconnect } from './lifecycle/orchestrators/agent-lifecycle.js';
 export {
     answerPendingQuestion as msgAnswer,
     processQueue as msgProcessQueue,

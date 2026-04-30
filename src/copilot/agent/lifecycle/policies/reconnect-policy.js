@@ -1,21 +1,21 @@
 // @ts-check
 /**
- * src/copilot/agent/lifecycle/reconnect-policy.js
+ * src/copilot/agent/lifecycle/policies/reconnect-policy.js
  *
  * Política de reconexão com backoff exponencial + jitter para o AlwaysAliveAgent.
  *
  * Função pura sem estado próprio — recebe callbacks do host (AlwaysAliveAgent) para as operações de side-effect (emit,
  * initSession, dialogLoop). Testável de forma independente.
  *
- * @module copilot/agent/lifecycle/reconnect-policy
+ * @module copilot/agent/lifecycle/policies/reconnect-policy
  * @see EventBus
  */
 
 import { toError } from '#copilot/core';
-import { withAgentErrorPolicy } from '../error-policy.js';
-import { getAgentSdkRecoveryPolicy, pingAgentSdkClient, stopAgentSdkClient } from '../facades/agent-sdk-access.js';
-import { log } from '../ports/logging-port.js';
-import { startSpan } from '../ports/tracing-port.js';
+import { withAgentErrorPolicy } from '../../error-policy.js';
+import { getAgentSdkRecoveryPolicy, pingAgentSdkClient, stopAgentSdkClient } from '../../facades/agent-sdk-access.js';
+import { log } from '../../ports/logging-port.js';
+import { startSpan } from '../../ports/tracing-port.js';
 
 /**
  * @typedef {Object} ReconnectCallbacks

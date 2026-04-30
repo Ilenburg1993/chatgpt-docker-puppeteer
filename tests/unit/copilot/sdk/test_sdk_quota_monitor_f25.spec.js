@@ -316,7 +316,7 @@ describe('F119 — lifecycle para quotaMonitor no shutdown', () => {
     it('agent-lifecycle.js armazena ctx.quotaMonitor', async () => {
         const { readFileSync } = await import('node:fs');
         const content = readFileSync(
-            '/workspaces/chatgpt-docker-puppeteer/src/copilot/agent/lifecycle/agent-lifecycle.js',
+            '/workspaces/chatgpt-docker-puppeteer/src/copilot/agent/lifecycle/orchestrators/agent-lifecycle.js',
             'utf8',
         );
         expect(content).toContain('ctx.setQuotaMonitor(bootResult.quotaMonitor)');
@@ -325,7 +325,7 @@ describe('F119 — lifecycle para quotaMonitor no shutdown', () => {
     it('agent-lifecycle.js para quotaMonitor via AgentContext no shutdown', async () => {
         const { readFileSync } = await import('node:fs');
         const content = readFileSync(
-            '/workspaces/chatgpt-docker-puppeteer/src/copilot/agent/lifecycle/agent-lifecycle.js',
+            '/workspaces/chatgpt-docker-puppeteer/src/copilot/agent/lifecycle/orchestrators/agent-lifecycle.js',
             'utf8',
         );
         expect(content).toContain('ctx.stopQuotaMonitor()');

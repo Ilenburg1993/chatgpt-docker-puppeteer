@@ -5,7 +5,7 @@
  */
 
 import { logSwallowed } from '#copilot/core';
-import { persistStateWithPolicy } from '../lifecycle/state-io.js';
+import { persistStateWithPolicy } from '../lifecycle/state/state-io.js';
 
 /**
  * @typedef {import('../facades/agent-runtime-state.js').AgentRuntimeStateContext} AgentRuntimeStateContext
@@ -36,7 +36,7 @@ export function shouldReapAgentRuntimePendingQuestionShadow(ctx) {
  * }} input
  * @param {{ label?: string }} [options]
  * @returns {Promise<
- *     import('../error-policy.js').AgentPolicyResult<import('../lifecycle/state-io.js').AliveAgentState>
+ *     import('../error-policy.js').AgentPolicyResult<import('../lifecycle/state/state-io.js').AliveAgentState>
  * >}
  */
 export async function persistAgentRuntimePendingQuestionState(input, options = {}) {

@@ -651,8 +651,8 @@ describe('W86.5 — state-io consumido via façade fora da allowlist infra', () 
     it('imports diretos de lifecycle/state-io.js ficam restritos a pontos infra explícitos', () => {
         const files = listJsFilesRecursive(copilotPath('agent'));
         const allowlist = new Set([
-            'agent/lifecycle/state-io.js',
-            'agent/lifecycle/entry.js',
+            'agent/lifecycle/state/state-io.js',
+            'agent/lifecycle/entrypoints/entry.js',
             'agent/lifecycle/index.js',
             'agent/facades/agent-runtime-state.js',
             'agent/runtime/dialog-runtime-state.js',
@@ -697,7 +697,7 @@ describe('W86.5.3 — state-file-io permanece seam infra isolado', () => {
             }
         }
 
-        assert.deepEqual(importers, ['agent/lifecycle/state-io.js']);
+        assert.deepEqual(importers, ['agent/lifecycle/state/state-io.js']);
     });
 });
 
@@ -823,10 +823,10 @@ describe('W86.8 — dialog loop boot lifecycle seam extraído', () => {
 
 describe('W87.1 — agent lifecycle consome core via porta local', () => {
     it('agent-lifecycle não importa core/container/error-handlers diretamente', () => {
-        const lifecycle = readSrc('agent/lifecycle/agent-lifecycle.js');
+        const lifecycle = readSrc('agent/lifecycle/orchestrators/agent-lifecycle.js');
         const port = readSrc('agent/ports/core-runtime-port.js');
 
-        assert.match(lifecycle, /from ['"]\.\.\/ports\/core-runtime-port\.js['"]/);
+        assert.match(lifecycle, /from ['"]\.\.\/\.\.\/ports\/core-runtime-port\.js['"]/);
         assert.match(port, /from ['"]#copilot\/core['"]/);
         assert.match(port, /from ['"]\.\.\/\.\.\/core\/di-container\.js['"]/);
         assert.match(port, /from ['"]\.\.\/\.\.\/core\/error-handlers\.js['"]/);

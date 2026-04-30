@@ -114,7 +114,7 @@ vi.mock('#copilot/sdk/event-helpers', () => ({
     SYSTEM_PROMPT_SECTIONS: {},
 }));
 
-vi.mock('../../../src/copilot/agent/lifecycle/state-io.js', () => ({
+vi.mock('../../../src/copilot/agent/lifecycle/state/state-io.js', () => ({
     persistState: vi.fn(),
     persistStateWithPolicy: vi.fn(async () => ({ ok: true, value: undefined })),
     readState: vi.fn(() => null),

@@ -167,7 +167,7 @@ describe('F68: OTEL Spans', () => {
 
     describe('reconnect-policy', () => {
         it('envolve tryReconnect em startSpan copilot.reconnect', async () => {
-            const { tryReconnect } = await import('../../../src/copilot/agent/lifecycle/reconnect-policy.js');
+            const { tryReconnect } = await import('../../../src/copilot/agent/lifecycle/policies/reconnect-policy.js');
 
             const callbacks = /** @type {any} */ ({
                 emit: vi.fn(),

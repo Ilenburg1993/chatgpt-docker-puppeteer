@@ -174,11 +174,11 @@ describe('F169 — agent/ sem bypass direto de SDK', () => {
     const AGENT_FILES = [
         'src/copilot/tools/bootstrap.js',
         'src/copilot/agent/dialog/orchestrators/loop-manager.js',
-        'src/copilot/agent/lifecycle/agent-lifecycle.js',
+        'src/copilot/agent/lifecycle/orchestrators/agent-lifecycle.js',
         'src/copilot/agent/session/initializers/initializer.js',
         'src/copilot/agent/session/lifecycle/cleanup.js',
         'src/copilot/agent/agent-context.js',
-        'src/copilot/agent/lifecycle/session-setup.js',
+        'src/copilot/agent/lifecycle/setup/session-setup.js',
     ];
 
     for (const file of AGENT_FILES) {

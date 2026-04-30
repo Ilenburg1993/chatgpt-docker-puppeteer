@@ -1,6 +1,6 @@
 // @ts-check
 /**
- * @module copilot/agent/lifecycle/state-file-io
+ * @module copilot/agent/lifecycle/state/state-file-io
  * @file Operações de filesystem cruas para o estado persistido do agent runtime.
  *
  *   Separa concerns de I/O (`mkdir/read/write/rm`) da policy semântica de estado em `state-io.js`.
@@ -9,7 +9,7 @@
 import { resolveHooksStateDir, resolveHooksStateFile } from '#copilot/boot';
 import { mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
-import { STATE_FILE as _STATE_FILE_ENV } from '../../config/agent.js';
+import { STATE_FILE as _STATE_FILE_ENV } from '../../../config/agent.js';
 
 /** @type {string} */
 export const STATE_DIR = resolveHooksStateDir();
