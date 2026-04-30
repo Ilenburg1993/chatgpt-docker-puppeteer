@@ -276,6 +276,31 @@ describe('turn-executor', () => {
             expect(reject.mock.calls[0]?.[0]?.code).toBe('DIALOG_TIMEOUT');
         });
 
+        it('limpa listeners de progresso registrados no host após resolução', async () => {
+            const resolve = vi.fn();
+            const reject = vi.fn();
+            const host = Object.assign(new EventEmitter(), makeTurnHost());
+
+            const { onReplyOuter } = buildTurnResolutionListeners(emitter, {
+                host,
+                turnStart: Date.now(),
+                timeout: 3000,
+                message: 'hi',
+                pendingListenerRef: { current: null },
+                resolve,
+                reject,
+                waitForRestartAndReplyFn: vi.fn(),
+            });
+
+            expect(host.listenerCount('tool.execution_progress')).toBe(1);
+
+            onReplyOuter({ reply: 'world' });
+
+            expect(host.listenerCount('tool.execution_progress')).toBe(0);
+            await vi.advanceTimersByTimeAsync(3100);
+            expect(reject).not.toHaveBeenCalled();
+        });
+
         it('onReadyOuter usa fallback semântico antes do timeout quando houver reply candidato', () => {
             const resolve = vi.fn();
             const reject = vi.fn();

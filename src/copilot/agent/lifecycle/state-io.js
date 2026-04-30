@@ -14,19 +14,18 @@
  * @see module:copilot/agent/session/initializer
  */
 
-import { resolveHooksStateDir, resolveHooksStateFile } from '#copilot/boot';
 import { logSwallowed, toError } from '#copilot/core';
-import { mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
-import { resolve } from 'node:path';
-import { DRAIN_WRITES_TIMEOUT_MS, STATE_FILE as _STATE_FILE_ENV } from '../../config/agent.js';
+import { DRAIN_WRITES_TIMEOUT_MS } from '../../config/agent.js';
 import { safeJsonParse } from '../../core/safe-json.js';
 import { AliveAgentStateSchema } from '../../core/schemas.js';
 import { withAgentErrorPolicy } from '../error-policy.js';
 import { log } from '../ports/logging-port.js';
-
-const STATE_DIR = resolveHooksStateDir();
-// G2-DX-14: STATE_FILE path configurável via AGENT_STATE_FILE env var.
-const STATE_FILE = _STATE_FILE_ENV ? resolve(_STATE_FILE_ENV) : resolveHooksStateFile('sdk-always-alive.json');
+import {
+    readStateFileIfExists,
+    removeStateFileIfExists,
+    resetStateFileIoCache,
+    writeStateFileJson,
+} from './state-file-io.js';
 
 // ─── Typedefs ────────────────────────────────────────────────────────────────
 
@@ -84,13 +83,6 @@ let _stateCache = null;
  * @type {Promise<AliveAgentState | null> | null}
  */
 let _readStatePromise = null;
-
-/**
- * Flag para evitar chamadas redundantes a `mkdirSync`/`mkdir` após a primeira criação do diretório.
- *
- * @type {boolean}
- */
-let _stateDirReady = false;
 
 /**
  * Mutex serial para `writeStateAsync` — evita race conditions quando múltiplas escritas concorrentes lêem o estado
@@ -179,13 +171,9 @@ export async function writeStateAsync(updates) {
  * @returns {Promise<AliveAgentState>}
  */
 async function _doWriteState(updates) {
-    if (!_stateDirReady) {
-        await mkdir(STATE_DIR, { recursive: true });
-        _stateDirReady = true;
-    }
     const current = (await readStateAsync()) ?? _defaultState();
     const next = /** @type {AliveAgentState} */ ({ ...current, ...updates });
-    await writeFile(STATE_FILE, JSON.stringify(next, null, 4), 'utf8');
+    await writeStateFileJson(next);
     _stateCache = next;
     return next;
 }
@@ -201,7 +189,7 @@ async function _doWriteState(updates) {
 export function clearState() {
     _stateCache = null;
     _readStatePromise = null;
-    _stateDirReady = false;
+    resetStateFileIoCache();
     _writeQueue = Promise.resolve();
     clearStateAsync().catch((e) => logSwallowed(e, 'stateIo.clearState.asyncFallback'));
 }
@@ -218,18 +206,16 @@ export async function readStateAsync() {
     if (_readStatePromise) return _readStatePromise;
 
     _readStatePromise = (async () => {
-        try {
-            await stat(STATE_FILE);
-        } catch {
+        const raw = await readStateFileIfExists();
+        if (raw === null) {
             return null;
         }
         try {
-            const raw = await readFile(STATE_FILE, 'utf8');
             const parseResult = safeJsonParse(raw, '[PersistentSession/readStateAsync]');
             if (!parseResult.ok) {
                 log('WARN', '[PersistentSession] Estado corrompido (JSON inválido) — removendo arquivo e reiniciando.');
                 try {
-                    await rm(STATE_FILE, { force: true });
+                    await removeStateFileIfExists();
                 } catch (e) {
                     logSwallowed(e, 'stateIo.readStateAsync.rmCorrupt');
                 }
@@ -248,7 +234,7 @@ export async function readStateAsync() {
                 `[PersistentSession] Estado corrompido (${toError(e).message}) — removendo arquivo e reiniciando.`,
             );
             try {
-                await rm(STATE_FILE, { force: true });
+                await removeStateFileIfExists();
             } catch (e) {
                 logSwallowed(e, 'stateIo.readStateAsync.rmCorruptOuter');
             }
@@ -272,14 +258,14 @@ export async function readStateAsync() {
  */
 export async function clearStateAsync() {
     try {
-        await rm(STATE_FILE, { force: true });
+        await removeStateFileIfExists();
         log('INFO', '[PersistentSession] Estado removido (async) — próxima inicialização criará nova sessão.');
     } catch (e) {
         logSwallowed(e, 'stateIo.clearStateAsync.rm');
     }
     _stateCache = null;
     _readStatePromise = null;
-    _stateDirReady = false;
+    resetStateFileIoCache();
     _writeQueue = Promise.resolve();
 }
 

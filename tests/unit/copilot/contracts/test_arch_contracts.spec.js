@@ -476,8 +476,12 @@ describe('W4-9 — copilot-api routes propagam runtime metadata canônica', () =
     it('dialog/turn usa gate de concorrência por runtimeId, não mutex global do processo', () => {
         const dialogSrc = readSrc('server/routes/copilot-api/dialog.js');
 
-        assert.match(dialogSrc, /turnInFlightByRuntime/);
+        assert.match(dialogSrc, /runtime-state\/copilot-api-dialog\.js/);
+        assert.match(dialogSrc, /hasDialogTurnInFlight\(/);
+        assert.match(dialogSrc, /markDialogTurnInFlight\(/);
+        assert.match(dialogSrc, /clearDialogTurnInFlight\(/);
         assert.match(dialogSrc, /deps\.runtimeId\s*\?\?\s*['"]default['"]/);
+        assert.doesNotMatch(dialogSrc, /^\s*(?:const|let)\s+\w+\s*=\s*new Map\(/m);
         assert.doesNotMatch(dialogSrc, /\b_turnInFlight\b/);
         assert.doesNotMatch(dialogSrc, /let\s+\w*turnInFlight\w*\s*=\s*false/);
     });
@@ -511,6 +515,19 @@ describe('W4-9 — SDK routes propagam runtime metadata canônica', () => {
         assert.doesNotMatch(observabilitySrc, /res\.json\(\{\s*ok:\s*true,\s*(?:entries|catalog|enabled)\b/);
         assert.doesNotMatch(observabilitySrc, /status\(400\)\.json\(\{\s*ok:\s*false,\s*error:/);
     });
+
+    it('sessions infra routes propagam runtime metadata também em 401/400/429/500', () => {
+        const sessionsSrc = readSrc('server/routes/sdk/sessions.js');
+        const middlewareSrc = readSrc('server/routes/sdk/session-middleware.js');
+
+        assert.match(sessionsSrc, /buildRuntimeRouteMetaPayload\(routeDeps\)/);
+        assert.match(middlewareSrc, /buildSessionRouteRuntimeMeta\(req\)/);
+        assert.match(middlewareSrc, /status\(429\)\.json\(\{[\s\S]*buildSessionRouteRuntimeMeta\(req\)/);
+        assert.match(middlewareSrc, /status\(400\)\.json\(\{[\s\S]*buildSessionRouteRuntimeMeta\(req\)/);
+        assert.match(middlewareSrc, /status\(500\)\.json\(\{[\s\S]*buildSessionRouteRuntimeMeta\(req\)/);
+        assert.doesNotMatch(middlewareSrc, /status\(429\)\.json\(\{\s*ok:\s*false,\s*error:/);
+        assert.doesNotMatch(sessionsSrc, /status\(401\)\.json\(\{\s*ok:\s*false,\s*error:/);
+    });
 });
 
 describe('W4-9 — streams SSE propagam runtimeId em connected e broadcasts', () => {
@@ -529,9 +546,15 @@ describe('W4-9 — streams SSE propagam runtimeId em connected e broadcasts', ()
         const sessionSrc = readSrc('server/routes/sdk/session-messaging.js');
 
         assert.match(agentSrc, /runtimeId:\s*key/);
+        assert.match(agentSrc, /runtime-state\/sdk-agent-stream\.js/);
         assert.match(hooksSrc, /runtimeId:\s*runtimeKey/);
-        assert.match(sessionSrc, /const key = `\$\{runtimeId\}:\$\{id\}`/);
+        assert.match(hooksSrc, /runtime-state\/sdk-hooks-stream\.js/);
+        assert.match(sessionSrc, /runtime-state\/sdk-session-stream\.js/);
+        assert.match(sessionSrc, /const key = buildSdkSessionStreamKey\(runtimeId, id\)/);
         assert.match(sessionSrc, /standardizeSsePayload\(\{\s*\.\.\.event,\s*runtimeId\s*\}/);
+        assert.doesNotMatch(agentSrc, /^\s*(?:const|let)\s+\w+\s*=\s*new Map\(/m);
+        assert.doesNotMatch(hooksSrc, /^\s*(?:const|let)\s+\w+\s*=\s*new Map\(/m);
+        assert.doesNotMatch(sessionSrc, /^\s*(?:const|let)\s+\w+\s*=\s*new Map\(/m);
         assert.doesNotMatch(sessionSrc, /_sessionStreamStates\.get\(id\)/);
         assert.doesNotMatch(sessionSrc, /_sessionStreamStates\.set\(id,/);
     });
@@ -592,6 +615,178 @@ describe('W4-9 — SDK model/session: helpers de modelo não importam client est
         assert.match(src, /listModelsFn/);
         assert.match(src, /resolveModelIdAutoFn/);
         assert.match(src, /from ['"]\.\/helpers\.js['"]/);
+    });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// W86.4. Boot steps aggregate: sem reconcentração de lógica operacional
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('W86.4 — boot steps aggregate permanece fino por re-export', () => {
+    it('boot-steps.js não define funções operacionais próprias de wiring', () => {
+        const src = readSrc('agent/session/boot-steps.js');
+
+        assert.match(src, /from ['"]\.\/boot-session-prep\.js['"]/);
+        assert.match(src, /from ['"]\.\/boot-dialog-recovery\.js['"]/);
+        assert.match(src, /from ['"]\.\/boot-runtime-bind\.js['"]/);
+
+        assert.doesNotMatch(src, /export\s+function\s+step[A-Z]/);
+        assert.doesNotMatch(src, /export\s+function\s+createBootWiringState/);
+        assert.doesNotMatch(src, /cleanupStaleSessionsWithPolicy/);
+        assert.doesNotMatch(src, /wireSessionEvents/);
+        assert.doesNotMatch(src, /startDefaultMcpAutoReconnect/);
+    });
+
+    it('boot-wiring.js continua consumindo surface estável via boot-steps aggregate', () => {
+        const src = readSrc('agent/session/boot-wiring.js');
+
+        assert.match(src, /from ['"]\.\/boot-steps\.js['"]/);
+        assert.doesNotMatch(src, /from ['"]\.\/boot-session-prep\.js['"]/);
+        assert.doesNotMatch(src, /from ['"]\.\/boot-dialog-recovery\.js['"]/);
+        assert.doesNotMatch(src, /from ['"]\.\/boot-runtime-bind\.js['"]/);
+    });
+});
+
+describe('W86.5 — state-io consumido via façade fora da allowlist infra', () => {
+    it('imports diretos de lifecycle/state-io.js ficam restritos a pontos infra explícitos', () => {
+        const files = listJsFilesRecursive(copilotPath('agent'));
+        const allowlist = new Set([
+            'agent/lifecycle/state-io.js',
+            'agent/lifecycle/entry.js',
+            'agent/lifecycle/index.js',
+            'agent/facades/agent-runtime-state.js',
+            'agent/runtime/dialog-runtime-state.js',
+            'agent/runtime/pending-question-state.js',
+            'agent/runtime/session-bootstrap-state.js',
+            'agent/runtime/shutdown-snapshot-state.js',
+            'agent/session/snapshot.js',
+        ]);
+        /** @type {string[]} */
+        const violations = [];
+
+        for (const abs of files) {
+            const rel = abs.replace(COPILOT_ROOT, '').replace(/\\/g, '/');
+            if (allowlist.has(rel)) {
+                continue;
+            }
+            const src = readFileSync(abs, 'utf-8');
+            if (/from ['"][^'"]*lifecycle\/state-io\.js['"]/.test(src)) {
+                violations.push(rel);
+            }
+        }
+
+        assert.deepEqual(
+            violations,
+            [],
+            `Bypass direto de state-io fora da allowlist infra:\n${violations.join('\n')}`,
+        );
+    });
+});
+
+describe('W86.5.3 — state-file-io permanece seam infra isolado', () => {
+    it('state-file-io.js é importado apenas por state-io.js', () => {
+        const files = listJsFilesRecursive(copilotPath('agent'));
+        /** @type {string[]} */
+        const importers = [];
+
+        for (const abs of files) {
+            const rel = abs.replace(COPILOT_ROOT, '').replace(/\\/g, '/');
+            const src = readFileSync(abs, 'utf-8');
+            if (/from ['"][^'"]*(?:lifecycle\/state-file-io|\.\/state-file-io)\.js['"]/.test(src)) {
+                importers.push(rel);
+            }
+        }
+
+        assert.deepEqual(importers, ['agent/lifecycle/state-io.js']);
+    });
+});
+
+describe('W86.6 — runtime pending-question seam extraído', () => {
+    it('agent-runtime-state consome runtime/pending-question-state para operações de pending question', () => {
+        const src = readSrc('agent/facades/agent-runtime-state.js');
+
+        assert.match(src, /from ['"]\.\.\/runtime\/pending-question-state\.js['"]/);
+        assert.match(src, /shouldReapAgentRuntimePendingQuestionShadowImpl/);
+        assert.match(src, /persistAgentRuntimePendingQuestionStateImpl/);
+        assert.match(src, /clearAgentRuntimePendingQuestionShadowImpl/);
+    });
+});
+
+describe('W86.6.1 — runtime dialog-state seam extraído', () => {
+    it('agent-runtime-state delega operações de dialog bootstrap/recovery para runtime/dialog-runtime-state', () => {
+        const src = readSrc('agent/facades/agent-runtime-state.js');
+
+        assert.match(src, /from ['"]\.\.\/runtime\/dialog-runtime-state\.js['"]/);
+        assert.match(src, /readAgentRuntimeDialogBootstrapStateImpl/);
+        assert.match(src, /readAgentRuntimeDialogPersistedStateImpl/);
+        assert.match(src, /persistAgentRuntimeDialogStateImpl/);
+        assert.match(src, /persistAgentRuntimePendingTurnStateImpl/);
+        assert.match(src, /shouldScheduleAgentRuntimeDialogBootRecoveryImpl/);
+        assert.match(src, /markAgentRuntimeDialogPausedForRecoveryImpl/);
+    });
+});
+
+describe('W86.6.2 — runtime shutdown/snapshot seam extraído', () => {
+    it('agent-runtime-state delega operações de snapshot/shutdown para runtime/shutdown-snapshot-state', () => {
+        const src = readSrc('agent/facades/agent-runtime-state.js');
+
+        assert.match(src, /from ['"]\.\.\/runtime\/shutdown-snapshot-state\.js['"]/);
+        assert.match(src, /resetAgentRuntimeGracefulShutdownFlagImpl/);
+        assert.match(src, /persistAgentRuntimePrConsumptionSnapshotImpl/);
+        assert.match(src, /saveAgentRuntimeShutdownSnapshotImpl/);
+        assert.match(src, /persistAgentRuntimeGracefulShutdownStateImpl/);
+    });
+});
+
+describe('W86.6.3 — runtime session-bootstrap seam extraído', () => {
+    it('agent-runtime-state delega operações de session-id fallback e boot-state restore para runtime/session-bootstrap-state', () => {
+        const src = readSrc('agent/facades/agent-runtime-state.js');
+
+        assert.match(src, /from ['"]\.\.\/runtime\/session-bootstrap-state\.js['"]/);
+        assert.match(src, /readAgentRuntimeSessionIdImpl/);
+        assert.match(src, /restoreAgentRuntimePersistentBootStateImpl/);
+    });
+});
+
+describe('W86.7.1 — dialog turn-input-validation seam extraído', () => {
+    it('turn-executor delega validações e normalizações para dialog/seams/turn-input-validation', () => {
+        const src = readSrc('agent/dialog/turn-executor.js');
+
+        assert.match(src, /from ['"]\.\/seams\/turn-input-validation\.js['"]/);
+        assert.match(src, /createAbortErrorImpl/);
+        assert.match(src, /normalizeReplyEventImpl/);
+        assert.match(src, /normalizeStopEventImpl/);
+        assert.match(src, /normalizeAssistantMessageEventImpl/);
+        assert.match(src, /normalizeAssistantReplyCandidateImpl/);
+        assert.match(src, /readPendingProtocolSnapshotImpl/);
+        assert.match(src, /finalizeTurnReplyImpl/);
+    });
+});
+
+describe('W86.7.2 — dialog turn-execution-context seam extraído', () => {
+    it('turn-executor delega contexto e lifecycle management para dialog/seams/turn-execution-context', () => {
+        const src = readSrc('agent/dialog/turn-executor.js');
+
+        assert.match(src, /from ['"]\.\/seams\/turn-execution-context\.js['"]/);
+        assert.match(src, /castListenerImpl/);
+        assert.match(src, /createAssistantReplyFallbackImpl/);
+        assert.match(src, /createInactivityTimeoutImpl/);
+        assert.match(src, /detachAbortListenerImpl/);
+        assert.match(src, /traceLabelImpl/);
+    });
+});
+
+describe('W86.7.3 — dialog turn-result-persistence seam extraído', () => {
+    it('turn-executor delega listeners e despacho para dialog/seams/turn-result-persistence', () => {
+        const src = readSrc('agent/dialog/turn-executor.js');
+        const seam = readSrc('agent/dialog/seams/turn-result-persistence.js');
+
+        assert.match(src, /from ['"]\.\/seams\/turn-result-persistence\.js['"]/);
+        assert.match(src, /buildTurnResolutionListenersImpl/);
+        assert.match(src, /dispatchTurnToHostImpl/);
+        assert.match(seam, /export function buildTurnResolutionListenersImpl/);
+        assert.match(seam, /export function dispatchTurnToHostImpl/);
+        assert.doesNotMatch(src, /new SessionError\(\s*\[`'"]\[DialogLoopManager\] sendTurn sem progresso/);
     });
 });
 

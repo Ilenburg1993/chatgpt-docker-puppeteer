@@ -10,9 +10,8 @@
  */
 
 import { logSwallowed, toError } from '#copilot/core';
+import { sendSession } from '#copilot/sdk';
 import { log } from '../ports/logging-port.js';
-import { pingAgentSdkClient } from './agent-sdk-access.js';
-import { sendAgentSdkSession } from './agent-sdk-runtime.js';
 
 /**
  * Aborta a mensagem SDK em processamento na sessão atual.
@@ -87,7 +86,7 @@ export async function performKeepaliveSdkTick(ctx) {
     const client = ctx.getClientSnapshot();
     if (client && typeof client.ping === 'function') {
         try {
-            await pingAgentSdkClient(client);
+            await client.ping();
             return 'client.ping';
         } catch (error) {
             log(
@@ -102,6 +101,6 @@ export async function performKeepaliveSdkTick(ctx) {
         return null;
     }
 
-    await sendAgentSdkSession(session, { prompt: '[keepalive]' });
+    await sendSession(session, { prompt: '[keepalive]' });
     return 'session.send';
 }

@@ -19,22 +19,24 @@ describe('contracts/runtime-state-governance — estado vivo multi-runtime é ex
     it('copilot-api dialog serializa turnos por runtimeId, não por processo', () => {
         const src = readSrc('server/routes/copilot-api/dialog.js');
 
-        assert.match(src, /const turnInFlightByRuntime = new Map\(\)/);
+        assert.match(src, /runtime-state\/copilot-api-dialog\.js/);
         assert.match(src, /const runtimeKey = deps\.runtimeId \?\? ['"]default['"]/);
-        assert.match(src, /turnInFlightByRuntime\.has\(runtimeKey\)/);
-        assert.match(src, /turnInFlightByRuntime\.set\(runtimeKey, true\)/);
-        assert.match(src, /turnInFlightByRuntime\.delete\(runtimeKey\)/);
+        assert.match(src, /hasDialogTurnInFlight\(runtimeKey\)/);
+        assert.match(src, /markDialogTurnInFlight\(runtimeKey\)/);
+        assert.match(src, /clearDialogTurnInFlight\(runtimeKey\)/);
+        assert.doesNotMatch(src, /^\s*(?:const|let)\s+\w+\s*=\s*new Map\(/m);
         assert.doesNotMatch(src, /\b_turnInFlight\b/);
     });
 
     it('copilot-api stream mantém pools por runtimeId resolvido', () => {
         const src = readSrc('server/routes/copilot-api/stream.js');
 
-        assert.match(src, /const runtimeStates = new Map\(\)/);
+        assert.match(src, /runtime-state\/copilot-api-stream\.js/);
         assert.match(src, /const runtimeKey = deps\.runtimeId/);
-        assert.match(src, /runtimeStates\.get\(runtimeKey\)/);
-        assert.match(src, /runtimeStates\.set\(runtimeKey, state\)/);
-        assert.match(src, /runtimeStates\.delete\(state\.runtimeId\)/);
+        assert.match(src, /getCopilotApiStreamState\(runtimeKey\)/);
+        assert.match(src, /setCopilotApiStreamState\(runtimeKey, state\)/);
+        assert.match(src, /deleteCopilotApiStreamState\(state\.runtimeId\)/);
+        assert.doesNotMatch(src, /^\s*(?:const|let)\s+\w+\s*=\s*new Map\(/m);
     });
 
     it('sdk agent/hooks/session streams não colidem entre runtimes', () => {
@@ -43,16 +45,22 @@ describe('contracts/runtime-state-governance — estado vivo multi-runtime é ex
         const sessionSrc = readSrc('server/routes/sdk/session-messaging.js');
 
         assert.match(agentSrc, /const key = routeDeps\.runtimeId \?\? ['"]default['"]/);
-        assert.match(agentSrc, /streamStates\.get\(key\)/);
-        assert.match(agentSrc, /streamStates\.set\(key, state\)/);
+        assert.match(agentSrc, /runtime-state\/sdk-agent-stream\.js/);
+        assert.match(agentSrc, /getSdkAgentStreamState\(key\)/);
+        assert.match(agentSrc, /setSdkAgentStreamState\(key, state\)/);
+        assert.doesNotMatch(agentSrc, /^\s*(?:const|let)\s+\w+\s*=\s*new Map\(/m);
 
         assert.match(hooksSrc, /const runtimeKey = routeDeps\.runtimeId \|\| ['"]default['"]/);
-        assert.match(hooksSrc, /_hookRuntimeStates\.get\(runtimeKey\)/);
-        assert.match(hooksSrc, /_hookRuntimeStates\.set\(runtimeKey, state\)/);
+        assert.match(hooksSrc, /runtime-state\/sdk-hooks-stream\.js/);
+        assert.match(hooksSrc, /getSdkHooksRuntimeState\(runtimeKey\)/);
+        assert.match(hooksSrc, /setSdkHooksRuntimeState\(runtimeKey, state\)/);
+        assert.doesNotMatch(hooksSrc, /^\s*(?:const|let)\s+\w+\s*=\s*new Map\(/m);
 
         assert.match(sessionSrc, /const runtimeId = routeDeps\.runtimeId \|\| ['"]default['"]/);
-        assert.match(sessionSrc, /const key = `\$\{runtimeId\}:\$\{id\}`/);
-        assert.match(sessionSrc, /_sessionStreamStates\.get\(key\)/);
-        assert.match(sessionSrc, /_sessionStreamStates\.set\(key, state\)/);
+        assert.match(sessionSrc, /runtime-state\/sdk-session-stream\.js/);
+        assert.match(sessionSrc, /const key = buildSdkSessionStreamKey\(runtimeId, id\)/);
+        assert.match(sessionSrc, /getSdkSessionStreamState\(key\)/);
+        assert.match(sessionSrc, /setSdkSessionStreamState\(key, state\)/);
+        assert.doesNotMatch(sessionSrc, /^\s*(?:const|let)\s+\w+\s*=\s*new Map\(/m);
     });
 });

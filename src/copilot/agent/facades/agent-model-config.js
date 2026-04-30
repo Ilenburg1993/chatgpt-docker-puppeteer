@@ -9,15 +9,11 @@
  * @see EventBus
  */
 
+import { listModels, modelRegistry, modelStatsTracker } from '#copilot/sdk';
 import { toError } from '../../core/error-handlers.js';
 import { log } from '../ports/logging-port.js';
 import { trySetLiveSessionModel } from '../runtime-contracts.js';
-import { readAgentRuntimeStatusSnapshot } from './agent-runtime-status.js';
-import {
-    listAgentSdkCatalogModels,
-    readAgentSdkModelRegistryEntry,
-    readAgentSdkModelStats,
-} from './agent-sdk-access.js';
+import { readAgentRuntimeStatusSnapshot } from '../runtime/status-readers.js';
 
 /**
  * Retorna o ID do modelo atual configurado no contexto.
@@ -50,7 +46,7 @@ export function setModel(ctx, modelId) {
 export async function listAvailableModels(ctx) {
     if (!ctx.getClientSnapshot()) return [];
     try {
-        return await listAgentSdkCatalogModels();
+        return await listModels();
     } catch (e) {
         log('WARN', `[AlwaysAlive] listModels() falhou: ${toError(e).message}`);
         return [];
@@ -63,7 +59,7 @@ export async function listAvailableModels(ctx) {
  * @returns {Promise<import('#copilot/sdk/types').ModelInfo[]>}
  */
 export async function listSdkCatalogModels() {
-    return listAgentSdkCatalogModels();
+    return listModels();
 }
 
 /**
@@ -79,14 +75,23 @@ export async function listSdkCatalogModels() {
  * } | null}
  */
 export function readSdkModelMetadata(modelId) {
-    return readAgentSdkModelRegistryEntry(modelId);
+    const rawMeta = modelRegistry.get(modelId);
+    return rawMeta
+        ? {
+              costTier: rawMeta.costTier,
+              speedTier: rawMeta.speedTier,
+              contextWindow: rawMeta.contextWindow,
+              supportsReasoning: rawMeta.supportsReasoning,
+              supportsVision: rawMeta.supportsVision,
+          }
+        : null;
 }
 
 /**
- * @returns {ReturnType<typeof readAgentSdkModelStats>}
+ * @returns {ReturnType<typeof modelStatsTracker.allStats>}
  */
 export function readSdkModelStats() {
-    return readAgentSdkModelStats();
+    return modelStatsTracker.allStats();
 }
 
 /**

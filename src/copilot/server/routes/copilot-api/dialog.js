@@ -23,6 +23,11 @@ import {
 } from '../../../presentation/runtime-dialog.js';
 import { buildRuntimeRouteMetaPayload } from '../../../presentation/runtime-meta.js';
 import { resolveCopilotApiRouteBinding } from '../../../presentation/runtime-request.js';
+import {
+    clearDialogTurnInFlight,
+    hasDialogTurnInFlight,
+    markDialogTurnInFlight,
+} from '../../runtime-state/copilot-api-dialog.js';
 
 /**
  * @typedef {import('express').Request} Req
@@ -44,11 +49,6 @@ import { resolveCopilotApiRouteBinding } from '../../../presentation/runtime-req
  * @returns {void}
  */
 export function registerDialogRoutes(bridge, binding) {
-    // G2-API-09/G-2.0: rate limiting por runtime — impede turnos concorrentes no mesmo runtime
-    // sem serializar runtimes independentes no mesmo processo HTTP.
-    /** @type {Map<string, true>} */
-    const turnInFlightByRuntime = new Map();
-
     // ─── POST /dialog/start ───────────────────────────────────────────────────
 
     /**
@@ -106,7 +106,7 @@ export function registerDialogRoutes(bridge, binding) {
         const runtimeMeta = buildRuntimeRouteMetaPayload(deps);
         const runtimeKey = deps.runtimeId ?? 'default';
         // G2-API-09: rate limiting — rejeitar imediatamente se já há turno HTTP em andamento
-        if (turnInFlightByRuntime.has(runtimeKey)) {
+        if (hasDialogTurnInFlight(runtimeKey)) {
             return res.status(429).json({
                 ok: false,
                 ...runtimeMeta,
@@ -144,7 +144,7 @@ export function registerDialogRoutes(bridge, binding) {
             allowDisabled: true,
         });
 
-        turnInFlightByRuntime.set(runtimeKey, true);
+        markDialogTurnInFlight(runtimeKey);
         try {
             const reply = await sendRuntimeDialogTurnOnActiveLoop(
                 message,
@@ -175,7 +175,7 @@ export function registerDialogRoutes(bridge, binding) {
                 dialogLoopActive: readAgentRuntimeControlStateFromRoute(deps).dialogLoopActive,
             });
         } finally {
-            turnInFlightByRuntime.delete(runtimeKey);
+            clearDialogTurnInFlight(runtimeKey);
         }
     });
 

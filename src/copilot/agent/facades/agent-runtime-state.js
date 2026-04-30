@@ -4,10 +4,66 @@
  * @file Façade semântica para fallback de estado persistido do runtime vivo.
  */
 
-import { logSwallowed } from '#copilot/core';
-import { createPendingQuestionShadow, isPendingQuestionShadowExpired } from '../dialog/pending-question-shadow.js';
 import { persistStateWithPolicy, readState, readStateAsync } from '../lifecycle/state-io.js';
-import { createSnapshot, saveSnapshotAsync } from '../session/snapshot.js';
+import {
+    markAgentRuntimeDialogPausedForRecovery as markAgentRuntimeDialogPausedForRecoveryImpl,
+    persistAgentRuntimeDialogState as persistAgentRuntimeDialogStateImpl,
+    persistAgentRuntimePendingTurnState as persistAgentRuntimePendingTurnStateImpl,
+    readAgentRuntimeDialogBootstrapState as readAgentRuntimeDialogBootstrapStateImpl,
+    readAgentRuntimeDialogPersistedState as readAgentRuntimeDialogPersistedStateImpl,
+    shouldScheduleAgentRuntimeDialogBootRecovery as shouldScheduleAgentRuntimeDialogBootRecoveryImpl,
+} from '../runtime/dialog-runtime-state.js';
+import {
+    clearAgentRuntimePendingQuestionShadow as clearAgentRuntimePendingQuestionShadowImpl,
+    persistAgentRuntimePendingQuestionState as persistAgentRuntimePendingQuestionStateImpl,
+    shouldReapAgentRuntimePendingQuestionShadow as shouldReapAgentRuntimePendingQuestionShadowImpl,
+} from '../runtime/pending-question-state.js';
+import {
+    readAgentRuntimeSessionId as readAgentRuntimeSessionIdImpl,
+    restoreAgentRuntimePersistentBootState as restoreAgentRuntimePersistentBootStateImpl,
+} from '../runtime/session-bootstrap-state.js';
+import {
+    persistAgentRuntimeGracefulShutdownState as persistAgentRuntimeGracefulShutdownStateImpl,
+    persistAgentRuntimePrConsumptionSnapshot as persistAgentRuntimePrConsumptionSnapshotImpl,
+    resetAgentRuntimeGracefulShutdownFlag as resetAgentRuntimeGracefulShutdownFlagImpl,
+    saveAgentRuntimeShutdownSnapshot as saveAgentRuntimeShutdownSnapshotImpl,
+} from '../runtime/shutdown-snapshot-state.js';
+
+/**
+ * Lê o snapshot persistido bruto do runtime de forma síncrona (cache-first).
+ *
+ * Uso recomendado: pontos de domínio que precisam apenas de leitura e não devem importar `lifecycle/state-io.js`
+ * diretamente.
+ *
+ * @returns {import('../lifecycle/state-io.js').AliveAgentState | null}
+ */
+export function readAgentRuntimePersistedStateSync() {
+    return readState();
+}
+
+/**
+ * Lê o snapshot persistido bruto do runtime de forma assíncrona.
+ *
+ * @returns {Promise<import('../lifecycle/state-io.js').AliveAgentState | null>}
+ */
+export function readAgentRuntimePersistedStateAsync() {
+    return readStateAsync();
+}
+
+/**
+ * Persiste dados parciais do runtime usando a policy canônica do agent.
+ *
+ * Wrapper intencional para evitar imports diretos de `persistStateWithPolicy` em camadas de domínio.
+ *
+ * @param {Partial<import('../lifecycle/state-io.js').AliveAgentState>} data
+ * @param {{ label?: string }} [options]
+ * @returns {Promise<
+ *     import('../error-policy.js').AgentPolicyResult<import('../lifecycle/state-io.js').AliveAgentState>
+ * >}
+ */
+export function persistAgentRuntimeStatePartial(data, options = {}) {
+    return persistStateWithPolicy(data, { label: options.label ?? 'state.persist.partial' });
+}
 
 /**
  * @typedef {{
@@ -55,26 +111,19 @@ import { createSnapshot, saveSnapshotAsync } from '../session/snapshot.js';
  * @returns {boolean}
  */
 export function shouldReapAgentRuntimePendingQuestionShadow(ctx) {
-    const hasLivePending = ctx.hasPendingQuestion?.() ?? false;
-    const hasShadow = ctx.hasPendingQuestionShadow();
-    const shadowExpired = ctx.isPendingQuestionShadowExpired?.() ?? false;
-    return !hasLivePending && hasShadow && shadowExpired;
+    return shouldReapAgentRuntimePendingQuestionShadowImpl(ctx);
 }
 
 /**
  * Lê o sessionId atual do runtime usando a sessão viva e, como fallback controlado, o snapshot persistido.
  *
+ * Delegado para: `runtime/session-bootstrap-state.js`
+ *
  * @param {AgentRuntimeStateContext} ctx
  * @returns {string | null}
  */
 export function readAgentRuntimeSessionId(ctx) {
-    const activeSessionId = ctx.getSessionSnapshot?.()?.sessionId ?? null;
-    if (typeof activeSessionId === 'string' && activeSessionId.length > 0) {
-        return activeSessionId;
-    }
-
-    const persistedSessionId = readState()?.sessionId ?? null;
-    return typeof persistedSessionId === 'string' && persistedSessionId.length > 0 ? persistedSessionId : null;
+    return readAgentRuntimeSessionIdImpl(ctx);
 }
 
 /**
@@ -83,12 +132,7 @@ export function readAgentRuntimeSessionId(ctx) {
  * @returns {{ dialogPaused: boolean; prMetrics: Record<string, unknown> | null }}
  */
 export function readAgentRuntimeDialogBootstrapState() {
-    const persistedState = readState();
-    const rawPrMetrics = persistedState?.prMetrics;
-    return {
-        dialogPaused: Boolean(persistedState?.dialogPaused),
-        prMetrics: rawPrMetrics && typeof rawPrMetrics === 'object' ? rawPrMetrics : null,
-    };
+    return readAgentRuntimeDialogBootstrapStateImpl();
 }
 
 /**
@@ -97,11 +141,7 @@ export function readAgentRuntimeDialogBootstrapState() {
  * @returns {Promise<{ dialogPaused: boolean; dialogLoopActive: boolean }>}
  */
 export async function readAgentRuntimeDialogPersistedState() {
-    const state = await readStateAsync();
-    return {
-        dialogPaused: Boolean(state?.dialogPaused),
-        dialogLoopActive: Boolean(state?.dialogLoopActive),
-    };
+    return readAgentRuntimeDialogPersistedStateImpl();
 }
 
 /**
@@ -114,7 +154,7 @@ export async function readAgentRuntimeDialogPersistedState() {
  * >}
  */
 export async function persistAgentRuntimeDialogState(partial, label) {
-    return persistStateWithPolicy(partial, { label });
+    return persistAgentRuntimeDialogStateImpl(partial, label);
 }
 
 /**
@@ -126,14 +166,7 @@ export async function persistAgentRuntimeDialogState(partial, label) {
  * >}
  */
 export async function persistAgentRuntimePendingTurnState(input) {
-    return persistStateWithPolicy(
-        {
-            pendingTurnMessage: input.message,
-            pendingTurnTs: input.ts,
-            pendingTurnConsumedPR: false,
-        },
-        { label: 'dialog.turn.pending' },
-    );
+    return persistAgentRuntimePendingTurnStateImpl(input);
 }
 
 /**
@@ -150,14 +183,7 @@ export async function persistAgentRuntimePendingTurnState(input) {
  * >}
  */
 export async function persistAgentRuntimePendingQuestionState(input, options = {}) {
-    return persistStateWithPolicy(
-        {
-            pendingQuestion: input.question,
-            pendingQuestionMeta: input.meta,
-            lastAskUserAt: input.askedAt,
-        },
-        { label: options.label ?? 'question.persist.pending' },
-    );
+    return persistAgentRuntimePendingQuestionStateImpl(input, options);
 }
 
 /**
@@ -168,31 +194,7 @@ export async function persistAgentRuntimePendingQuestionState(input, options = {
  * @returns {boolean}
  */
 export function clearAgentRuntimePendingQuestionShadow(ctx, options = {}) {
-    if (!ctx.hasPendingQuestionShadow()) {
-        return false;
-    }
-
-    const label = options.label ?? 'state.pendingQuestionShadow.clear';
-    const description = options.description ?? 'Clear ask_user shadow from persisted state';
-
-    ctx.clearPendingQuestionShadow();
-
-    const persistTask = persistStateWithPolicy({ pendingQuestion: null, pendingQuestionMeta: null }, { label }).then(
-        (result) => {
-            if (!result.ok) {
-                throw result.error;
-            }
-            return undefined;
-        },
-    );
-
-    if (typeof ctx.trackBackgroundTask === 'function') {
-        void ctx.trackBackgroundTask(persistTask, { label, description });
-    } else {
-        void persistTask.catch((error) => logSwallowed(error, `agent.runtimeState.${label}`));
-    }
-
-    return true;
+    return clearAgentRuntimePendingQuestionShadowImpl(ctx, options);
 }
 
 /**
@@ -203,8 +205,7 @@ export function clearAgentRuntimePendingQuestionShadow(ctx, options = {}) {
  * @returns {Promise<boolean>}
  */
 export async function shouldScheduleAgentRuntimeDialogBootRecovery() {
-    const savedState = await readStateAsync();
-    return Boolean(savedState?.dialogLoopActive && !savedState?.dialogPaused);
+    return shouldScheduleAgentRuntimeDialogBootRecoveryImpl();
 }
 
 /**
@@ -215,7 +216,7 @@ export async function shouldScheduleAgentRuntimeDialogBootRecovery() {
  * >}
  */
 export async function markAgentRuntimeDialogPausedForRecovery() {
-    return persistStateWithPolicy({ dialogPaused: true }, { label: 'dialog.boot_recovery.pause' });
+    return markAgentRuntimeDialogPausedForRecoveryImpl();
 }
 
 /**
@@ -226,7 +227,7 @@ export async function markAgentRuntimeDialogPausedForRecovery() {
  * >}
  */
 export async function resetAgentRuntimeGracefulShutdownFlag() {
-    return persistStateWithPolicy({ gracefulShutdown: false }, { label: 'state.gracefulShutdown.reset' });
+    return resetAgentRuntimeGracefulShutdownFlagImpl();
 }
 
 /**
@@ -238,65 +239,19 @@ export async function resetAgentRuntimeGracefulShutdownFlag() {
  * >}
  */
 export async function persistAgentRuntimePrConsumptionSnapshot(info) {
-    return persistStateWithPolicy(
-        {
-            pendingTurnConsumedPR: true,
-            lastPrConsumedAt: info.ts,
-            lastPrModel: info.model ?? '',
-            lastPrCost: info.cost ?? 0,
-            lastQuotaSnapshots: info.quotaSnapshots ?? null,
-        },
-        { label: 'state.pr_consumed.persist' },
-    );
+    return persistAgentRuntimePrConsumptionSnapshotImpl(info);
 }
 
 /**
  * Restaura do state persistido o contador de envios e a shadow de pergunta pendente.
  *
+ * Delegado para: `runtime/session-bootstrap-state.js`
+ *
  * @param {AgentRuntimeStateContext} ctx
  * @returns {Promise<AgentRuntimePersistentBootStateResult>}
  */
 export async function restoreAgentRuntimePersistentBootState(ctx) {
-    const persistedState = await readStateAsync();
-    const sendCount = persistedState?.sendCount ?? 0;
-    ctx.setSendCount?.(sendCount);
-
-    if (!persistedState?.pendingQuestion || !persistedState.pendingQuestionMeta) {
-        ctx.clearPendingQuestionShadow();
-        return {
-            sendCount,
-            pendingQuestionShadowRestored: false,
-            pendingQuestionShadowExpired: false,
-        };
-    }
-
-    const pendingQuestionShadow = createPendingQuestionShadow(
-        persistedState.pendingQuestion,
-        persistedState.pendingQuestionMeta,
-    );
-    ctx.setPendingQuestionShadow?.(pendingQuestionShadow);
-
-    const expired = isPendingQuestionShadowExpired(pendingQuestionShadow);
-    if (expired) {
-        const persistTask = persistStateWithPolicy(
-            { pendingQuestion: null, pendingQuestionMeta: null },
-            { label: 'state.pendingQuestionShadow.expire' },
-        ).then(() => undefined);
-        if (typeof ctx.trackBackgroundTask === 'function') {
-            void ctx.trackBackgroundTask(persistTask, {
-                label: 'state.pendingQuestionShadow.expire',
-                description: 'Clear expired ask_user shadow from persisted state',
-            });
-        } else {
-            void persistTask.catch((error) => logSwallowed(error, 'agent.runtimeState.pendingQuestionShadow.expire'));
-        }
-    }
-
-    return {
-        sendCount,
-        pendingQuestionShadowRestored: true,
-        pendingQuestionShadowExpired: expired,
-    };
+    return restoreAgentRuntimePersistentBootStateImpl(ctx);
 }
 
 /**
@@ -312,29 +267,7 @@ export async function restoreAgentRuntimePersistentBootState(ctx) {
  * @returns {Promise<string>}
  */
 export async function saveAgentRuntimeShutdownSnapshot(ctx, options) {
-    const pendingQuestion = ctx.getPendingQuestionSnapshot?.() ?? null;
-    const snap = createSnapshot({
-        sessionId: options.sessionId ?? null,
-        model: ctx.getModelSnapshot?.() ?? 'unknown',
-        status: ctx.getRuntimeStatus?.() ?? 'unknown',
-        sendCount: ctx.getSendCountSnapshot?.() ?? 0,
-        dialogLoopActive: options.dialogLoopActive,
-        dialogPaused: ctx.isDialogLoopPaused?.() ?? false,
-        pendingQuestion: pendingQuestion?.question ?? null,
-        pendingQuestionMeta:
-            pendingQuestion !== null
-                ? {
-                      kind: pendingQuestion.kind,
-                      askedAt: pendingQuestion.askedAt,
-                      allowFreeform: pendingQuestion.allowFreeform,
-                      protocolControlled: pendingQuestion.protocolControlled,
-                      ...(pendingQuestion.choices !== undefined ? { choices: pendingQuestion.choices } : {}),
-                  }
-                : null,
-        prMetrics: options.dialogPrMetrics ?? null,
-        reason: options.reason ?? 'auto-shutdown',
-    });
-    return saveSnapshotAsync(snap);
+    return saveAgentRuntimeShutdownSnapshotImpl(ctx, options);
 }
 
 /**
@@ -347,13 +280,5 @@ export async function saveAgentRuntimeShutdownSnapshot(ctx, options) {
  * >}
  */
 export async function persistAgentRuntimeGracefulShutdownState(ctx, options) {
-    return persistStateWithPolicy(
-        {
-            sendCount: ctx.getSendCountSnapshot?.() ?? 0,
-            gracefulShutdown: true,
-            dialogLoopActive: options.dialogLoopActive,
-            dialogPaused: ctx.isDialogLoopPaused?.() ?? false,
-        },
-        { label: 'state.gracefulShutdown.persist' },
-    );
+    return persistAgentRuntimeGracefulShutdownStateImpl(ctx, options);
 }

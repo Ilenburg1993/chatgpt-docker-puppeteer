@@ -13,7 +13,7 @@
 
 import { AGENT_EVENTS } from '#copilot/events';
 import { STATUS_SNAPSHOT_TTL_MS } from '../../config/agent.js';
-import { readState } from '../lifecycle/state-io.js';
+import { readAgentRuntimePersistedStateSync } from '../facades/agent-runtime-state.js';
 import { buildStatusSnapshot } from '../ports/snapshot-port.js';
 
 /**
@@ -34,7 +34,7 @@ export function getStatusSnapshot(ctx, host) {
     if (cachedSnapshot) {
         return cachedSnapshot;
     }
-    const state = readState();
+    const state = readAgentRuntimePersistedStateSync();
     const queue = ctx.getQueueSnapshot();
     const snapshot = buildStatusSnapshot({
         status: ctx.getRuntimeStatus(),

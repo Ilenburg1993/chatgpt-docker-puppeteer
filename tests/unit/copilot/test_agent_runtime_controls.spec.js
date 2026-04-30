@@ -7,7 +7,7 @@ const mocks = vi.hoisted(() => ({
     readAgentRuntimeStatusSnapshot: vi.fn(() => ({})),
 }));
 
-vi.mock('../../../src/copilot/agent/facades/agent-runtime-status.js', () => ({
+vi.mock('../../../src/copilot/agent/runtime/status-readers.js', () => ({
     readAgentRuntimeHealthSnapshot: mocks.readAgentRuntimeHealthSnapshot,
     readAgentRuntimeStatusSnapshot: mocks.readAgentRuntimeStatusSnapshot,
 }));

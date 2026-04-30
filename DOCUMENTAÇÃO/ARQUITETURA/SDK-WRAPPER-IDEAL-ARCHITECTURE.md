@@ -1405,6 +1405,119 @@ incluindo:
 - grafo TO-BE por camadas (orchestration, seams, ports, infra);
 - roadmap consolidado do que falta, alinhado aos checkpoints 42–56.
 
+### 10.30 Checkpoint complementar — registries explícitos de estado vivo em rotas multi-runtime (2026-04-30)
+
+Estado complementar validado na continuação do Gate 2.0-D:
+
+- rotas críticas deixaram de declarar `Map` local para concorrência/stream multi-runtime e passaram
+  a consumir registries explícitos em `src/copilot/server/runtime-state/`;
+- a política de cada rota continua local, mas o estado vivo process-wide agora tem owner nomeado;
+- foi produzido inventário factual dos `Map`/`Set` module-level remanescentes em
+  `60-MAPEAMENTO-ESTADO-GLOBAL-VIVO-E-REGISTRIES-MULTIRUNTIME.md`, classificando catálogos,
+  registries legítimos, caches/UX local e pontos que exigem monitoramento.
+
+Guardrails e contratos deste checkpoint:
+
+- `tests/unit/copilot/contracts/test_runtime_state_governance.spec.js` atualizado para exigir uso da
+  camada `server/runtime-state`;
+- `tests/unit/copilot/contracts/test_runtime_state_registry_inventory.spec.js` criado para congelar
+  o inventário dos registries e proibir `Map` local nas rotas críticas;
+- `tests/unit/copilot/contracts/test_server_route_inventory.spec.js` ampliado para confirmar que as
+  rotas `presentationBridge` seguem finas, sem reabrir runtime state ou domínio local.
+
+Leitura arquitetural:
+
+- o objetivo da Arquitetura 2.0 não é eliminar todo estado module-level, mas tornar cada estado
+  process-wide classificável, documentado e testável;
+- o caminho correto para SSE/concorrência multi-runtime é registry explícito, não `Map` anônimo
+  escondido dentro da rota.
+
+### 10.31 Checkpoint complementar — desacoplamento profundo entre facades (2026-04-30)
+
+Faixa E avançada com transformação estrutural real, além da matriz contratual:
+
+- extração de seams internos neutros para leitura compartilhada de runtime em `agent/runtime/*`
+  (`status-readers.js` e `governance-readers.js`);
+- redução de imports cruzados entre facades críticas (`runtime-*`, `model-config`, `session-ops`,
+  `sdk-access`), mantendo a API pública das facades enquanto o compartilhamento interno migra para
+  módulos de camada;
+- atualização da matriz de bypass para refletir a queda efetiva de `allowedFacadeImports` nos pontos
+  limpos.
+
+Validação executada no checkpoint:
+
+- `test_facade_bypass_matrix`, `test_arch_contracts` e contratos de runtime-state verdes no lote
+  focado;
+- `typecheck:strict:src.copilot` verde;
+- `eslint` focado nos módulos alterados verde.
+
+Leitura arquitetural:
+
+- facades públicas continuam a fronteira estável para bordas;
+- a lógica compartilhada entre facades deixa de formar malha ad hoc e passa a usar seams internos
+  com ownership explícito por camada.
+
+### 10.32 Checkpoint complementar — rate limiting de sessão em runtime-state explícito (2026-04-30)
+
+Fechamento de ponto residual do Gate 2.0-D no eixo de rotas SDK:
+
+- `server/routes/sdk/session-middleware.js` deixou de manter `Map` local (`_rlWindowMap`) para
+  janela de rate limiting;
+- estado movido para `server/runtime-state/sdk-session-rate-limit.js` com API explícita de
+  iteração/leitura/escrita/remoção;
+- política de rate limiting permanece no middleware, mas o estado vivo process-wide passa a ter
+  owner nomeado em camada de registry.
+
+Validação executada:
+
+- contratos `test_runtime_state_registry_inventory`, `test_runtime_state_governance` e
+  `test_arch_contracts` verdes no lote focado;
+- `test_sdk_runtime_projection_routes` verde;
+- `typecheck:strict:src.copilot` e `eslint` focado verdes.
+
+Leitura arquitetural:
+
+- convergência de runtime-state deixa de cobrir apenas concorrência/streams e passa a incluir também
+  infra de rate limiting por sessão, reduzindo estado mutável anônimo em módulos de rota.
+
+### 10.33 Checkpoint complementar — metadata runtime em fluxos infra de sessões SDK (2026-04-30)
+
+Varredura geral de pendências identificou um gap residual no adapter de sessões SDK: caminhos de
+infra ainda devolviam erro sem metadata runtime canônica.
+
+Transformações aplicadas:
+
+- `server/routes/sdk/sessions.js` passou a anexar metadata runtime no `401 Unauthorized`;
+- `server/routes/sdk/session-middleware.js` passou a anexar metadata runtime em `400` (body
+  inválido), `429` (rate limit) e `500` (error handler fallback) via helper dedicado.
+
+Guardrails atualizados:
+
+- `test_arch_contracts` agora exige metadata runtime nesses fluxos infra e bloqueia regressão para
+  payloads triviais sem `runtimeId/requestedRuntimeId/runtimeFound/usedDefaultRuntimeFallback`.
+
+Validação:
+
+- contratos focados (`runtime_state_registry_inventory`, `runtime_state_governance`,
+  `arch_contracts`, `sdk_runtime_projection_routes`) verdes;
+- `typecheck:strict:src.copilot` e `eslint` focado verdes.
+
+### 10.34 Checkpoint complementar — rodada operacional ampla do Gate 2.0-F (2026-04-30)
+
+Validação operacional ampla executada após os fechamentos estruturais de Faixa E/F/G:
+
+- `typecheck:strict:src.copilot` ✅;
+- `typecheck:strict:tests.unit` ✅;
+- `eslint src/copilot --max-warnings=0` ✅;
+- `madge src/copilot --extensions js --circular` ✅ (0 ciclos);
+- `vitest` amplo em `tests/unit/copilot` ✅ (`4369 passed`, `28 skipped`).
+
+Leitura arquitetural:
+
+- os critérios técnicos do Gate 2.0-F ficam comprovados em execução ampla;
+- o foco de continuidade passa a ser governança anti-regressão por contratos e checkpoints
+  incrementais, não mais transformação estrutural de base.
+
 ### 10.26 Checkpoint complementar — `session/lifecycle` desacoplado do barrel de models por porta explícita (2026-04-29)
 
 Estado complementar validado na continuação da Faixa B (SDK model/session):

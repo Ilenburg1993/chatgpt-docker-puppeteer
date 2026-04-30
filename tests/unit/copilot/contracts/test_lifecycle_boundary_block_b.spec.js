@@ -65,6 +65,7 @@ describe('Block B — lifecycle ownership contracts', () => {
         const src = readFileSync(srcPath('agent', 'session', 'boot-wiring.js'), 'utf8');
         const alwaysAlive = readFileSync(srcPath('agent', 'always-alive.js'), 'utf8');
         const bootSteps = readFileSync(srcPath('agent', 'session', 'boot-steps.js'), 'utf8');
+        const bootDialogRecovery = readFileSync(srcPath('agent', 'session', 'boot-dialog-recovery.js'), 'utf8');
         const lifecycle = readFileSync(srcPath('agent', 'lifecycle', 'agent-lifecycle.js'), 'utf8');
 
         assert.match(src, /attachAgentSdkBootLifecycleBridge/);
@@ -101,15 +102,22 @@ describe('Block B — lifecycle ownership contracts', () => {
             alwaysAlive,
             /this\.ctx\.(?:getPermissionModeSnapshot|setPermissionMode|getPermissionCapabilitySnapshot|getContextFactoryCapabilitiesSnapshot|getToolRegistrySnapshot|getToolRegistryEntriesSnapshot)\b/,
         );
-        assert.match(bootSteps, /clearAgentRuntimePendingQuestionShadow\(/);
-        assert.match(bootSteps, /shouldReapAgentRuntimePendingQuestionShadow\(/);
-        assert.match(bootSteps, /markAgentRuntimeDialogPausedForRecovery\(/);
-        assert.match(bootSteps, /shouldScheduleAgentRuntimeDialogBootRecovery\(/);
-        assert.doesNotMatch(bootSteps, /persistStateWithPolicy\(\s*\{\s*pendingQuestion:\s*null/);
-        assert.doesNotMatch(bootSteps, /persistStateWithPolicy\(\s*\{\s*dialogPaused:\s*true/);
-        assert.doesNotMatch(bootSteps, /\breadStateAsync\(/);
+        assert.match(bootSteps, /from ['"]\.\/boot-dialog-recovery\.js['"]/);
+        assert.match(bootDialogRecovery, /clearAgentRuntimePendingQuestionShadow\(/);
+        assert.match(bootDialogRecovery, /shouldReapAgentRuntimePendingQuestionShadow\(/);
+        assert.match(bootDialogRecovery, /markAgentRuntimeDialogPausedForRecovery\(/);
+        assert.match(bootDialogRecovery, /shouldScheduleAgentRuntimeDialogBootRecovery\(/);
         assert.doesNotMatch(
-            bootSteps,
+            `${bootSteps}\n${bootDialogRecovery}`,
+            /persistStateWithPolicy\(\s*\{\s*pendingQuestion:\s*null/,
+        );
+        assert.doesNotMatch(
+            `${bootSteps}\n${bootDialogRecovery}`,
+            /persistStateWithPolicy\(\s*\{\s*dialogPaused:\s*true/,
+        );
+        assert.doesNotMatch(`${bootSteps}\n${bootDialogRecovery}`, /\breadStateAsync\(/);
+        assert.doesNotMatch(
+            bootDialogRecovery,
             /\bctx\.(?:hasPendingQuestion|hasPendingQuestionShadow|isPendingQuestionShadowExpired)\(/,
         );
         assert.doesNotMatch(

@@ -55,9 +55,9 @@ vi.mock('../../../src/copilot/agent/facades/agent-sdk-access.js', () => ({
     readAgentSdkSessionMessages: mocks.readAgentSdkSessionMessages,
     resumeOrCreateAgentSdkSession: mocks.resumeOrCreateAgentSdkSession,
 }));
-vi.mock('../../../src/copilot/agent/lifecycle/state-io.js', () => ({
-    persistStateWithPolicy: mocks.persistState,
-    readStateAsync: mocks.readState,
+vi.mock('../../../src/copilot/agent/facades/agent-runtime-state.js', () => ({
+    persistAgentRuntimeStatePartial: mocks.persistState,
+    readAgentRuntimePersistedStateAsync: mocks.readState,
 }));
 vi.mock('../../../src/copilot/agent/ports/logging-port.js', () => ({ log: vi.fn() }));
 vi.mock('../../../src/copilot/agent/ports/metrics-port.js', () => ({

@@ -5,8 +5,8 @@
  * Inicializador de sessão persistente para o Always-Alive Agent. Preserva o sessionId em disco e retoma sessões após
  * reinicializações (PM2/reboot).
  *
- * I/O de estado persistido delegado a `lifecycle/state-io.js`. Logging de auditoria delegado a
- * `infra/tool-audit-logger.js`.
+ * I/O de estado persistido consumido via façade `agent-runtime-state` (que delega ao `state-io`). Logging de auditoria
+ * delegado a `infra/tool-audit-logger.js`.
  *
  * @module copilot/agent/session/initializer
  * @see EventBus
@@ -22,6 +22,10 @@ import { toError } from '#copilot/core';
 import { SESSION_MAX_AGE_MS } from '../../config/agent.js';
 import { buildSystemMessage } from '../../config/system-prompt/index.js';
 import {
+    persistAgentRuntimeStatePartial,
+    readAgentRuntimePersistedStateAsync,
+} from '../facades/agent-runtime-state.js';
+import {
     AGENT_SDK_DEFAULT_MODEL,
     canReadAgentSdkSessionMessages,
     createAgentSdkSessionByClient,
@@ -31,10 +35,6 @@ import {
     readAgentSdkSessionMessages,
     resumeOrCreateAgentSdkSession,
 } from '../facades/agent-sdk-access.js';
-import {
-    persistStateWithPolicy as _persistStateWithPolicy,
-    readStateAsync as _readStateAsync,
-} from '../lifecycle/state-io.js';
 import { log } from '../ports/logging-port.js';
 import { defaultMetrics } from '../ports/metrics-port.js';
 import { buildHookSystemContextSafe } from './hook-context.js';
@@ -171,7 +171,7 @@ function _validateSessionForResume(sessionId, lastActivityMs) {
  * @throws {Error} Se a criação/retomada da sessão SDK falhar ou a escrita de estado falhar
  */
 export async function initOrResumeSession(client, sessionOptions) {
-    const state = await _readStateAsync();
+    const state = await readAgentRuntimePersistedStateAsync();
     const model = sessionOptions.model ?? AGENT_SDK_DEFAULT_MODEL;
     const injectContext = sessionOptions.injectHookContext !== false;
     const bootSkills = readBootSkillConfig();
@@ -259,7 +259,7 @@ export async function initOrResumeSession(client, sessionOptions) {
 
     // SYNC-SM-01 (fix): usar writeStateAsync nas chamadas dentro de funções async para não bloquear o event loop
     if (result.isResumed) {
-        const persistedResume = await _persistStateWithPolicy(
+        const persistedResume = await persistAgentRuntimeStatePartial(
             {
                 resumedAt: Date.now(),
                 resumeCount: (state?.resumeCount ?? 0) + 1,
@@ -273,7 +273,7 @@ export async function initOrResumeSession(client, sessionOptions) {
         }
         log('INFO', `[PersistentSession] Sessão retomada com sucesso (retomada #${(state?.resumeCount ?? 0) + 1}).`);
     } else {
-        const persistedNewSession = await _persistStateWithPolicy(
+        const persistedNewSession = await persistAgentRuntimeStatePartial(
             {
                 sessionId: result.session.sessionId,
                 startedAt: Date.now(),

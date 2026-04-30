@@ -9,8 +9,15 @@ import { describe, it } from 'vitest';
 
 const BOOT_WIRING_PATH = '/workspaces/chatgpt-docker-puppeteer/src/copilot/agent/session/boot-wiring.js';
 const BOOT_STEPS_PATH = '/workspaces/chatgpt-docker-puppeteer/src/copilot/agent/session/boot-steps.js';
+const BOOT_SESSION_PREP_PATH = '/workspaces/chatgpt-docker-puppeteer/src/copilot/agent/session/boot-session-prep.js';
+const BOOT_DIALOG_RECOVERY_PATH =
+    '/workspaces/chatgpt-docker-puppeteer/src/copilot/agent/session/boot-dialog-recovery.js';
+const BOOT_RUNTIME_BIND_PATH = '/workspaces/chatgpt-docker-puppeteer/src/copilot/agent/session/boot-runtime-bind.js';
 const SRC = readFileSync(BOOT_WIRING_PATH, 'utf8');
 const STEPS_SRC = readFileSync(BOOT_STEPS_PATH, 'utf8');
+const BOOT_SESSION_PREP_SRC = readFileSync(BOOT_SESSION_PREP_PATH, 'utf8');
+const BOOT_DIALOG_RECOVERY_SRC = readFileSync(BOOT_DIALOG_RECOVERY_PATH, 'utf8');
+const BOOT_RUNTIME_BIND_SRC = readFileSync(BOOT_RUNTIME_BIND_PATH, 'utf8');
 
 describe('boot-wiring › pipeline nomeado', () => {
     it('expõe createBootWiringSteps() e runBootPipeline()', () => {
@@ -69,15 +76,21 @@ describe('boot-wiring › pipeline nomeado', () => {
 
     it('delega a implementação das steps para módulo dedicado', () => {
         assert.match(SRC, /from '\.\/boot-steps\.js'/);
-        assert.match(STEPS_SRC, /export function createBootWiringState\(/);
-        assert.match(STEPS_SRC, /export function stepWireSessionEvents\(/);
-        assert.match(STEPS_SRC, /export function stepStartKeepalive\(/);
-        assert.match(STEPS_SRC, /export async function runDialogBootRecovery\(/);
-        assert.match(STEPS_SRC, /export function stepWireQuestionAnsweredRelay\(/);
+        assert.match(STEPS_SRC, /from '\.\/boot-session-prep\.js'/);
+        assert.match(STEPS_SRC, /from '\.\/boot-dialog-recovery\.js'/);
+        assert.match(STEPS_SRC, /from '\.\/boot-runtime-bind\.js'/);
+        assert.match(BOOT_SESSION_PREP_SRC, /export function createBootWiringState\(/);
+        assert.match(BOOT_SESSION_PREP_SRC, /export function stepWireSessionEvents\(/);
+        assert.match(BOOT_RUNTIME_BIND_SRC, /export function stepStartKeepalive\(/);
+        assert.match(BOOT_DIALOG_RECOVERY_SRC, /export async function runDialogBootRecovery\(/);
+        assert.match(BOOT_RUNTIME_BIND_SRC, /export function stepWireQuestionAnsweredRelay\(/);
     });
 
     it('passa o contexto para steps que usam o tracker de background', () => {
         assert.match(SRC, /stepWireQuestionAnsweredRelay\(agentEmitter, ctx, state\)/);
-        assert.match(STEPS_SRC, /trackBackgroundTask\(/);
+        assert.match(
+            `${BOOT_SESSION_PREP_SRC}\n${BOOT_DIALOG_RECOVERY_SRC}\n${BOOT_RUNTIME_BIND_SRC}`,
+            /trackBackgroundTask\(/,
+        );
     });
 });

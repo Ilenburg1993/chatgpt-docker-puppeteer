@@ -38,13 +38,7 @@ import {
     restoreAgentRuntimePersistentBootState,
     saveAgentRuntimeShutdownSnapshot,
 } from '../facades/agent-runtime-state.js';
-import {
-    createAgentSdkClient,
-    disconnectAgentSdkSession,
-    ensureAgentSdkClientStarted,
-    raceAgentSdkEvents,
-    stopAgentSdkClient,
-} from '../facades/agent-sdk-access.js';
+import { createAgentSdkClient, ensureAgentSdkClientStarted, raceAgentSdkEvents } from '../facades/agent-sdk-access.js';
 import { tryReconnect } from '../lifecycle/reconnect-policy.js';
 import {
     buildSessionHooks,
@@ -53,7 +47,6 @@ import {
     finalizeSessionInit,
 } from '../lifecycle/session-setup.js';
 import { resolveConversationStore } from '../ports/conversation-port.js';
-import { unbindAgentSessionTools } from '../ports/tool-port.js';
 import { performBootWiring } from '../session/boot-wiring.js';
 import { syncSdkHistory } from '../session/history-sync.js';
 import { initOrResumeSession } from '../session/initializer.js';
@@ -61,6 +54,7 @@ import {
     clearActiveSdkSessionOwnershipWithPolicy,
     syncActiveSessionOwnershipWithPolicy,
 } from '../session/ownership.js';
+import { detachRuntimeObservers, disconnectRuntimeSdkHandles, teardownRuntimeSidecars } from './runtime-teardown.js';
 
 /**
  * @typedef {import('../agent-context.js').AgentContext} AgentContext
@@ -271,19 +265,7 @@ async function rollbackFailedAgentStart(ctx, host, cause) {
         host.emit(EMITTER_DIALOG_LOOP_CHANGED, { active: false, ts: Date.now(), reason: 'agent_start_failed' });
     }
 
-    const metricsTimer = ctx.getMetricsTimerSnapshot();
-    if (metricsTimer) {
-        clearInterval(metricsTimer);
-        ctx.clearMetricsTimer();
-    }
-    const mcpReconnectCancel = ctx.getMcpReconnectCancelSnapshot();
-    if (mcpReconnectCancel) {
-        mcpReconnectCancel();
-        ctx.clearMcpReconnectCancel();
-    }
-    ctx.stopQuotaMonitor();
-    ctx.stopKeepalive('agent_start_failed');
-    defaultMetrics.stopPeriodicSnapshot();
+    teardownRuntimeSidecars(ctx, 'agent_start_failed');
 
     const drainedBackgroundTasks = await ctx.drainBackgroundTasks(1000);
     if (!drainedBackgroundTasks) {
@@ -297,45 +279,12 @@ async function rollbackFailedAgentStart(ctx, host, cause) {
         log('WARN', `[AlwaysAlive] Rejeitando ${remainingTasks.length} tarefa(s) pendente(s) no rollback de start.`);
     }
 
-    const agentObserver = ctx.getAgentObserverSnapshot();
-    if (agentObserver) {
-        agentObserver.detach();
-        ctx.clearAgentObserver();
-    }
+    detachRuntimeObservers(ctx);
 
-    const sessionEventUnsubscribers = ctx.getSessionEventUnsubscribersSnapshot();
-    for (const unsub of sessionEventUnsubscribers) unsub();
-    ctx.clearSessionEventUnsubscribers();
-
-    const session = ctx.getSessionSnapshot();
-    if (session) {
-        try {
-            await disconnectAgentSdkSession(session);
-        } catch (e) {
-            log('WARN', `[AlwaysAlive] Erro ao desconectar sessão no rollback de start: ${toError(e).message}`);
-        }
-        ctx.clearSession();
-        ctx.invalidateMessagesCache();
-        unbindAgentSessionTools();
-    }
-
-    const client = ctx.getClientSnapshot();
-    if (client) {
-        try {
-            const stopErrors = await stopAgentSdkClient(client);
-            if (stopErrors.length > 0) {
-                log(
-                    'WARN',
-                    `[AlwaysAlive] SDK client.stop() no rollback retornou erros: ${stopErrors
-                        .map((e) => toError(e).message)
-                        .join('; ')}`,
-                );
-            }
-        } catch (e) {
-            log('WARN', `[AlwaysAlive] Erro ao parar client SDK no rollback de start: ${toError(e).message}`);
-        }
-        ctx.clearClient();
-    }
+    await disconnectRuntimeSdkHandles(ctx, {
+        sessionLabel: '[AlwaysAlive] Erro ao desconectar sessão no rollback de start',
+        clientLabel: '[AlwaysAlive] SDK client.stop() no rollback retornou erros',
+    });
 
     const clearedOwnership = await clearActiveSdkSessionOwnershipWithPolicy(
         {
@@ -587,19 +536,7 @@ export async function agentStop(
             log('WARN', `[AlwaysAlive] writeState sendCount falhou: ${persistedShutdown.error.message}`);
         }
 
-        const metricsTimer = ctx.getMetricsTimerSnapshot();
-        if (metricsTimer) {
-            clearInterval(metricsTimer);
-            ctx.clearMetricsTimer();
-        }
-        const mcpReconnectCancel = ctx.getMcpReconnectCancelSnapshot();
-        if (mcpReconnectCancel) {
-            mcpReconnectCancel();
-            ctx.clearMcpReconnectCancel();
-        }
-        ctx.stopQuotaMonitor();
-        ctx.stopKeepalive('agent_shutdown');
-        defaultMetrics.stopPeriodicSnapshot();
+        teardownRuntimeSidecars(ctx, 'agent_shutdown');
 
         const drainedBackgroundTasks = await ctx.drainBackgroundTasks(5000);
         if (!drainedBackgroundTasks) {
@@ -616,43 +553,12 @@ export async function agentStop(
             log('WARN', `[AlwaysAlive] Rejeitando ${remainingTasks.length} tarefa(s) pendente(s) no shutdown.`);
         }
 
-        const agentObserver = ctx.getAgentObserverSnapshot();
-        if (agentObserver) {
-            agentObserver.detach();
-            ctx.clearAgentObserver();
-        }
+        detachRuntimeObservers(ctx);
 
-        const sessionEventUnsubscribers = ctx.getSessionEventUnsubscribersSnapshot();
-        for (const unsub of sessionEventUnsubscribers) unsub();
-        ctx.clearSessionEventUnsubscribers();
-
-        const session = ctx.getSessionSnapshot();
-        if (session) {
-            try {
-                await disconnectAgentSdkSession(session);
-            } catch (e) {
-                log('WARN', `[AlwaysAlive] Erro ao desconectar sessão: ${toError(e).message}`);
-            }
-            ctx.clearSession();
-            ctx.invalidateMessagesCache();
-            unbindAgentSessionTools();
-        }
-
-        const client = ctx.getClientSnapshot();
-        if (client) {
-            try {
-                const stopErrors = await stopAgentSdkClient(client);
-                if (stopErrors.length > 0) {
-                    log(
-                        'WARN',
-                        `[AlwaysAlive] SDK client.stop() erros: ${stopErrors.map((e) => toError(e).message).join('; ')}`,
-                    );
-                }
-            } catch (e) {
-                log('WARN', `[AlwaysAlive] Erro ao parar client SDK: ${toError(e).message}`);
-            }
-            ctx.clearClient();
-        }
+        await disconnectRuntimeSdkHandles(ctx, {
+            sessionLabel: '[AlwaysAlive] Erro ao desconectar sessão',
+            clientLabel: '[AlwaysAlive] SDK client.stop() erros',
+        });
 
         const clearedOwnership = await clearActiveSdkSessionOwnershipWithPolicy(
             {

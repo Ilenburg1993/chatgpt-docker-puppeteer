@@ -29,6 +29,7 @@ import {
     getCurrentAgent,
     getSdkRecoveryPolicy,
     getSessionCapabilities,
+    getSessionMessages,
     getToolsConfig,
     isExperimentalEnabled,
     isSdkQuotaOrRateLimitError,
@@ -63,7 +64,25 @@ import {
     workspaceReadFile,
 } from '#copilot/sdk';
 import { log } from '../ports/logging-port.js';
-export { canReadAgentSdkSessionMessages, readAgentSdkSessionMessages } from './agent-sdk-runtime.js';
+
+/**
+ * Exposição canônica se a sessão SDK ativa suporta leitura de histórico (`getMessages`).
+ *
+ * @param {import('#copilot/sdk/types').CopilotSession} session
+ * @returns {boolean}
+ */
+export function canReadAgentSdkSessionMessages(session) {
+    const candidate = /** @type {{ getMessages?: unknown } | null} */ (/** @type {unknown} */ (session));
+    return typeof candidate?.getMessages === 'function';
+}
+
+/**
+ * @param {import('#copilot/sdk/types').CopilotSession} session
+ * @returns {Promise<unknown[]>}
+ */
+export async function readAgentSdkSessionMessages(session) {
+    return getSessionMessages(session);
+}
 
 /**
  * @typedef {import('../agent-context.js').AgentContext} AgentContext

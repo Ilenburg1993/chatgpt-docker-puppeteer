@@ -12,8 +12,8 @@ import {
     readRuntimePermissionCapability,
     readRuntimePermissionMode,
     readRuntimeToolRegistryEntries,
-} from './agent-runtime-controls.js';
-import { readAgentRuntimeHealthSnapshot, readAgentRuntimeStatusSnapshot } from './agent-runtime-status.js';
+} from '../runtime/governance-readers.js';
+import { readAgentRuntimeHealthSnapshot, readAgentRuntimeStatusSnapshot } from '../runtime/status-readers.js';
 
 /**
  * @typedef {import('../types.js').IAlwaysAliveAgent & {

@@ -9,18 +9,20 @@ const ROOT = new URL('../../../../src/copilot/', import.meta.url).pathname;
 
 const ALLOWED_FACADE_ROLES = new Set(['query', 'mutation', 'lifecycle', 'infra', 'projection']);
 
+/**
+ * @typedef {{
+ *     role: 'query' | 'mutation' | 'lifecycle' | 'infra' | 'projection';
+ *     allowedFacadeImports: string[];
+ * }} FacadeMatrixEntry
+ */
+
+/** @type {Record<string, FacadeMatrixEntry>} */
 const FACADE_OPERATION_MATRIX = {
     'agent-dialog-runtime.js': { role: 'lifecycle', allowedFacadeImports: [] },
     'agent-health-access.js': { role: 'query', allowedFacadeImports: [] },
-    'agent-model-config.js': {
-        role: 'mutation',
-        allowedFacadeImports: ['agent-runtime-status.js', 'agent-sdk-access.js'],
-    },
-    'agent-runtime-capabilities.js': {
-        role: 'projection',
-        allowedFacadeImports: ['agent-runtime-controls.js', 'agent-runtime-status.js'],
-    },
-    'agent-runtime-controls.js': { role: 'mutation', allowedFacadeImports: ['agent-runtime-status.js'] },
+    'agent-model-config.js': { role: 'mutation', allowedFacadeImports: [] },
+    'agent-runtime-capabilities.js': { role: 'projection', allowedFacadeImports: [] },
+    'agent-runtime-controls.js': { role: 'mutation', allowedFacadeImports: [] },
     'agent-runtime-event-bridge.js': { role: 'infra', allowedFacadeImports: [] },
     'agent-runtime-ownership.js': { role: 'mutation', allowedFacadeImports: [] },
     'agent-runtime-state.js': { role: 'mutation', allowedFacadeImports: [] },
@@ -28,13 +30,10 @@ const FACADE_OPERATION_MATRIX = {
     'agent-runtime-todos.js': { role: 'query', allowedFacadeImports: [] },
     'agent-runtime-tools.js': { role: 'query', allowedFacadeImports: [] },
     'agent-runtime-webhooks.js': { role: 'mutation', allowedFacadeImports: [] },
-    'agent-sdk-access.js': { role: 'infra', allowedFacadeImports: ['agent-sdk-runtime.js'] },
+    'agent-sdk-access.js': { role: 'infra', allowedFacadeImports: [] },
     'agent-sdk-runtime.js': { role: 'infra', allowedFacadeImports: [] },
     'agent-sdk-session.js': { role: 'mutation', allowedFacadeImports: [] },
-    'agent-session-ops.js': {
-        role: 'lifecycle',
-        allowedFacadeImports: ['agent-sdk-access.js', 'agent-sdk-runtime.js'],
-    },
+    'agent-session-ops.js': { role: 'lifecycle', allowedFacadeImports: [] },
     'agent-webhook-ops.js': { role: 'mutation', allowedFacadeImports: [] },
 };
 
@@ -155,6 +154,8 @@ describe('contracts/facade-bypass-matrix — consumers permitidos por facade cr�
             'agent/dialog/',
             'agent/session/',
             'agent/lifecycle/',
+            'agent/messaging/',
+            'agent/state/',
             'agent/agent-runtime-surface.js',
         ]);
         assert.deepEqual(violations, [], `Imports não autorizados de agent-runtime-state:\n${violations.join('\n')}`);

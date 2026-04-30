@@ -19,6 +19,11 @@ import { defaultMetrics } from '#copilot/observability';
 import { Router } from 'express';
 import { SseClientPool } from '../../../infra/sse/stream-hub.js';
 import { createSseWriter, SseConnectionTracker, standardizeSsePayload } from '../../../infra/sse/utils.js';
+import {
+    deleteSdkHooksRuntimeState,
+    getSdkHooksRuntimeState,
+    setSdkHooksRuntimeState,
+} from '../../runtime-state/sdk-hooks-stream.js';
 import { resolveSdkRouteSharedDeps } from './deps.js';
 import { withErrorHandler as _withErrorHandler } from './middleware.js';
 
@@ -34,22 +39,19 @@ const _hooksTracker = new SseConnectionTracker('hooks/events');
  * }} HookRuntimeState
  */
 
-/** @type {Map<string, HookRuntimeState>} */
-const _hookRuntimeStates = new Map();
-
 /**
  * @param {ReturnType<typeof resolveSdkRouteSharedDeps>} routeDeps
  * @returns {HookRuntimeState}
  */
 function ensureHookRuntimeState(routeDeps) {
     const runtimeKey = routeDeps.runtimeId || 'default';
-    const existing = _hookRuntimeStates.get(runtimeKey);
+    const existing = /** @type {HookRuntimeState | undefined} */ (getSdkHooksRuntimeState(runtimeKey));
     if (existing && existing.bus === routeDeps.sdkHooks.bus) return existing;
 
     if (existing) {
         existing.pool.closeAll();
         existing.bus.off('*', existing.listener);
-        _hookRuntimeStates.delete(runtimeKey);
+        deleteSdkHooksRuntimeState(runtimeKey);
     }
 
     const pool = new SseClientPool(undefined, {
@@ -68,7 +70,7 @@ function ensureHookRuntimeState(routeDeps) {
     routeDeps.sdkHooks.bus.on('*', listener);
 
     const state = { runtimeId: runtimeKey, bus: routeDeps.sdkHooks.bus, pool, listener };
-    _hookRuntimeStates.set(runtimeKey, state);
+    setSdkHooksRuntimeState(runtimeKey, state);
     return state;
 }
 
@@ -80,7 +82,7 @@ function ensureHookRuntimeState(routeDeps) {
 function maybeDisposeHookRuntimeState(/** @type {ReturnType<typeof resolveSdkRouteSharedDeps>} */ routeDeps, state) {
     if (state.pool.size > 0) return;
     state.bus.off('*', state.listener);
-    _hookRuntimeStates.delete(state.runtimeId);
+    deleteSdkHooksRuntimeState(state.runtimeId);
     routeDeps.sdkHooks.log('INFO', `[sdk-api] SSE hooks/events encerrado: runtime ${state.runtimeId}`);
 }
 

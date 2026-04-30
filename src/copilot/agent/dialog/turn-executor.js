@@ -5,32 +5,37 @@
  *   erros de sessão por turno.
  *
  *   src/copilot/agent/dialog/turn-executor.js
- * @see EventBus
  */
 
 import { container, SessionError } from '#copilot/core';
 import {
-    EMITTER_ASSISTANT_MESSAGE,
-    EMITTER_ASSISTANT_STREAMING_DELTA,
-    EMITTER_ASSISTANT_TURN_END,
     EMITTER_LOOP_READY,
     EMITTER_LOOP_REPLY,
     EMITTER_LOOP_STOPPED,
     EMITTER_QUESTION_PENDING,
-    EMITTER_TASK_DELTA,
-    EMITTER_TASK_REASONING,
-    EMITTER_TOOL_EXECUTION_PROGRESS,
-    EMITTER_TURN_END,
     EMITTER_TURN_START,
 } from '#copilot/events';
-import { LLM_B_TURN_TIMEOUT_MS } from '../../config/env.js';
-import { DialogProtocol } from '../../dialog/protocol.js';
 import { persistAgentRuntimePendingTurnState } from '../facades/agent-runtime-state.js';
 import { log } from '../ports/logging-port.js';
 import { METRICS_STORE } from '../ports/metrics-port.js';
 import { startSpan } from '../ports/tracing-port.js';
-
-const MAX_DELTA_FALLBACK_CHARS = 50_000;
+import {
+    castListener as castListenerImpl,
+    createAssistantReplyFallback as createAssistantReplyFallbackImpl,
+    createInactivityTimeout as createInactivityTimeoutImpl,
+    detachAbortListener as detachAbortListenerImpl,
+    traceLabel as traceLabelImpl,
+} from './seams/turn-execution-context.js';
+import {
+    createAbortError as createAbortErrorImpl,
+    finalizeTurnReply as finalizeTurnReplyImpl,
+    normalizeAssistantMessageEvent as normalizeAssistantMessageEventImpl,
+    normalizeAssistantReplyCandidate as normalizeAssistantReplyCandidateImpl,
+    normalizeReplyEvent as normalizeReplyEventImpl,
+    normalizeStopEvent as normalizeStopEventImpl,
+    readPendingProtocolSnapshot as readPendingProtocolSnapshotImpl,
+} from './seams/turn-input-validation.js';
+import { buildTurnResolutionListenersImpl, dispatchTurnToHostImpl } from './seams/turn-result-persistence.js';
 
 /**
  * Subconjunto do EventEmitter necessário para os executores de turno.
@@ -59,7 +64,7 @@ const MAX_DELTA_FALLBACK_CHARS = 50_000;
  * @returns {(evt: unknown) => void}
  */
 function castListener(fn) {
-    return (evt) => fn(/** @type {T} */ (evt));
+    return castListenerImpl(fn);
 }
 
 /**
@@ -67,11 +72,7 @@ function castListener(fn) {
  * @returns {{ reply: string }}
  */
 function normalizeReplyEvent(evt) {
-    if (!evt || typeof evt !== 'object') {
-        return { reply: '' };
-    }
-    const reply = Reflect.get(evt, 'reply');
-    return { reply: typeof reply === 'string' ? reply : '' };
+    return normalizeReplyEventImpl(evt);
 }
 
 /**
@@ -79,15 +80,7 @@ function normalizeReplyEvent(evt) {
  * @returns {{ authorized?: boolean; reason?: string }}
  */
 function normalizeStopEvent(evt) {
-    if (!evt || typeof evt !== 'object') {
-        return {};
-    }
-    const authorized = Reflect.get(evt, 'authorized');
-    const reason = Reflect.get(evt, 'reason');
-    return {
-        ...(typeof authorized === 'boolean' ? { authorized } : {}),
-        ...(typeof reason === 'string' ? { reason } : {}),
-    };
+    return normalizeStopEventImpl(evt);
 }
 
 /**
@@ -96,7 +89,7 @@ function normalizeStopEvent(evt) {
  * @returns {void}
  */
 function detachAbortListener(signal, listener) {
-    signal?.removeEventListener?.('abort', listener);
+    return detachAbortListenerImpl(signal, listener);
 }
 
 /**
@@ -104,12 +97,7 @@ function detachAbortListener(signal, listener) {
  * @returns {Error}
  */
 function createAbortError(message) {
-    if (typeof DOMException === 'function') {
-        return new DOMException(message, 'AbortError');
-    }
-    const error = new Error(message);
-    error.name = 'AbortError';
-    return error;
+    return createAbortErrorImpl(message);
 }
 
 /**
@@ -117,15 +105,7 @@ function createAbortError(message) {
  * @returns {{ content: string; ts: number | null }}
  */
 function normalizeAssistantMessageEvent(evt) {
-    if (!evt || typeof evt !== 'object') {
-        return { content: '', ts: null };
-    }
-    const content = Reflect.get(evt, 'content');
-    const ts = Reflect.get(evt, 'ts');
-    return {
-        content: typeof content === 'string' ? content : '',
-        ts: typeof ts === 'number' ? ts : null,
-    };
+    return normalizeAssistantMessageEventImpl(evt);
 }
 
 /**
@@ -133,16 +113,7 @@ function normalizeAssistantMessageEvent(evt) {
  * @returns {string | null}
  */
 function normalizeAssistantReplyCandidate(content) {
-    const trimmed = content.trim();
-    if (!trimmed) return null;
-    const kind = DialogProtocol.classify(trimmed);
-    if (kind === 'reply') {
-        return DialogProtocol.extractReply(trimmed) || null;
-    }
-    if (kind === 'ready' || kind === 'stopped') {
-        return null;
-    }
-    return trimmed;
+    return normalizeAssistantReplyCandidateImpl(content);
 }
 
 /**
@@ -150,23 +121,7 @@ function normalizeAssistantReplyCandidate(content) {
  * @returns {{ kind: 'reply' | 'ready' | 'stopped'; question: string; reply?: string } | null}
  */
 function readPendingProtocolSnapshot(host) {
-    if (typeof host.getPendingQuestionSnapshot !== 'function') {
-        return null;
-    }
-    const pending = host.getPendingQuestionSnapshot();
-    if (!pending?.protocolControlled || typeof pending.question !== 'string') {
-        return null;
-    }
-    if (pending.kind === 'reply') {
-        const reply = DialogProtocol.extractReply(pending.question);
-        if (reply) {
-            return { kind: 'reply', question: pending.question, reply };
-        }
-    }
-    if (pending.kind === 'ready' || pending.kind === 'stopped') {
-        return { kind: pending.kind, question: pending.question };
-    }
-    return null;
+    return readPendingProtocolSnapshotImpl(host);
 }
 
 /**
@@ -179,9 +134,7 @@ function readPendingProtocolSnapshot(host) {
  * @returns {void}
  */
 function finalizeTurnReply(turnStart, reply, input) {
-    const durationMs = Date.now() - turnStart;
-    input.emit(EMITTER_TURN_END, { reply: reply.slice(0, 120), durationMs });
-    input.metrics.recordDialogTurn(durationMs, true);
+    return finalizeTurnReplyImpl(turnStart, reply, input);
 }
 
 /**
@@ -189,7 +142,7 @@ function finalizeTurnReply(turnStart, reply, input) {
  * @returns {string}
  */
 function traceLabel(traceId) {
-    return traceId ? `trace=${traceId}` : 'trace=none';
+    return traceLabelImpl(traceId);
 }
 
 /**
@@ -210,72 +163,7 @@ function traceLabel(traceId) {
  * @returns {{ timeoutHandle: ReturnType<typeof setTimeout> | null; clear: () => void }}
  */
 function createInactivityTimeout(emitter, opts) {
-    /** @type {ReturnType<typeof setTimeout> | null} */
-    let handle = null;
-    let disposed = false;
-    /** @type {[string, (...args: any[]) => void][]} */
-    const listeners = [];
-
-    const detachProgressListeners = () => {
-        for (const [event, listener] of listeners) {
-            emitter.off(event, listener);
-        }
-        listeners.length = 0;
-    };
-
-    const arm = () => {
-        if (opts.timeout === null) return;
-        if (disposed) return;
-        if (handle) clearTimeout(handle);
-        handle = setTimeout(() => {
-            if (disposed) return;
-            disposed = true;
-            handle = null;
-            detachProgressListeners();
-            opts.onTimeout();
-        }, opts.timeout);
-    };
-
-    const onProgress = () => {
-        if (disposed) return;
-        arm();
-    };
-
-    const sources = [emitter, ...(opts.progressSources ?? [])];
-
-    for (const event of [
-        EMITTER_ASSISTANT_MESSAGE,
-        EMITTER_ASSISTANT_STREAMING_DELTA,
-        EMITTER_ASSISTANT_TURN_END,
-        EMITTER_TASK_DELTA,
-        EMITTER_TASK_REASONING,
-        EMITTER_TOOL_EXECUTION_PROGRESS,
-    ]) {
-        for (const source of sources) {
-            if (typeof source?.on !== 'function' || typeof source?.off !== 'function') {
-                continue;
-            }
-            listeners.push([event, onProgress]);
-            source.on(event, onProgress);
-        }
-    }
-
-    arm();
-    const initialHandle = handle;
-    if (initialHandle === null && opts.timeout !== null) {
-        throw new SessionError('[DialogLoopManager] Falha ao armar timeout de inatividade.', 'DIALOG_TIMEOUT_SETUP');
-    }
-
-    return {
-        timeoutHandle: initialHandle,
-        clear: () => {
-            if (disposed) return;
-            disposed = true;
-            if (handle) clearTimeout(handle);
-            handle = null;
-            detachProgressListeners();
-        },
-    };
+    return createInactivityTimeoutImpl(emitter, opts);
 }
 
 /**
@@ -297,75 +185,11 @@ function createInactivityTimeout(emitter, opts) {
  * }}
  */
 function createAssistantReplyFallback(host) {
-    if (typeof host.on !== 'function' || typeof host.off !== 'function') {
-        return {
-            markDispatched: () => {},
-            tryResolve: () => false,
-            cleanup: () => {},
-        };
-    }
-
-    let dispatched = false;
-    /** @type {string | null} */
-    let candidate = null;
-    /** @type {string} */
-    let deltaCandidate = '';
-
-    const onAssistantMessage = (/** @type {unknown} */ evt) => {
-        if (!dispatched) return;
-        const { content } = normalizeAssistantMessageEvent(evt);
-        const normalized = normalizeAssistantReplyCandidate(content);
-        if (normalized) {
-            candidate = normalized;
-        }
-    };
-
-    const onTaskDelta = (/** @type {unknown} */ rawEvt) => {
-        if (!dispatched || !rawEvt || typeof rawEvt !== 'object') return;
-        const chunk = Reflect.get(rawEvt, 'chunk');
-        if (typeof chunk === 'string' && chunk.length > 0) {
-            const remaining = MAX_DELTA_FALLBACK_CHARS - deltaCandidate.length;
-            if (remaining > 0) {
-                deltaCandidate += chunk.slice(0, remaining);
-            }
-        }
-    };
-
-    // Mantemos esse listener para amarrar a elegibilidade do fallback ao fechamento de um turno real do SDK.
-    const onAssistantTurnEnd = () => {
-        if (!dispatched) return;
-    };
-
-    host.on(EMITTER_ASSISTANT_MESSAGE, onAssistantMessage);
-    host.on(EMITTER_ASSISTANT_TURN_END, onAssistantTurnEnd);
-    host.on(EMITTER_TASK_DELTA, onTaskDelta);
-
-    return {
-        markDispatched: () => {
-            dispatched = true;
-            candidate = null;
-            deltaCandidate = '';
-        },
-        tryResolve: (turnStart, resolve, finalizeReply) => {
-            const reply =
-                candidate ??
-                normalizeAssistantReplyCandidate(deltaCandidate) ??
-                readPendingProtocolSnapshot(host)?.reply ??
-                null;
-            if (!reply) return false;
-            candidate = null;
-            deltaCandidate = '';
-            log('WARN', '[DialogLoopManager] fallback semântico usado para resolver reply do dialog loop.');
-            finalizeReply(turnStart, reply);
-            resolve(reply);
-            return true;
-        },
-        cleanup: () => {
-            host.off?.(EMITTER_ASSISTANT_MESSAGE, onAssistantMessage);
-            host.off?.(EMITTER_ASSISTANT_TURN_END, onAssistantTurnEnd);
-            host.off?.(EMITTER_TASK_DELTA, onTaskDelta);
-        },
-    };
+    return createAssistantReplyFallbackImpl(host, {
+        normalizeAssistantMessageEvent,
+        normalizeAssistantReplyCandidate,
+        readPendingProtocolSnapshot,
+    });
 }
 
 /**
@@ -405,326 +229,40 @@ export function emitTurnStart(emitter, message, counter, host) {
 }
 
 /**
- * Constrói os event handlers principais de resolução/rejeição de um turno.
+ * Construtor de listeners de resolução de turno (reply/ready/stop).
  *
  * @param {TurnEmitter} emitter
- * @param {{
- *     host: TurnHost;
- *     turnStart: number;
- *     timeout: number | null;
- *     message: string;
- *     pendingListenerRef: { current: ((arg: unknown) => void) | null };
- *     resolve: (v: string) => void;
- *     reject: (e: Error) => void;
- *     waitForRestartAndReplyFn: (message: string, timeout: number, stopReason?: string) => Promise<string>;
- *     tryUseReplyFallback?: () => boolean;
- *     traceId?: string;
- * }} opts
- * @returns {{
- *     timeoutHandle: ReturnType<typeof setTimeout> | null;
- *     clearTurnTimeout: () => void;
- *     onReplyOuter: (evt: unknown) => void;
- *     onReadyOuter: (evt: unknown) => void;
- *     onStopOuter: (evt: unknown) => void;
- * }}
+ * @param {any} opts
+ * @returns {any}
  */
 export function buildTurnResolutionListeners(emitter, opts) {
-    const {
-        turnStart,
-        timeout,
-        pendingListenerRef,
-        resolve,
-        reject,
-        waitForRestartAndReplyFn,
-        tryUseReplyFallback,
-        traceId,
-    } = opts;
-
-    /**
-     * @type {{
-     *     reply: (evt: unknown) => void;
-     *     ready: (evt: unknown) => void;
-     *     stop: (evt: unknown) => void;
-     * }}
-     */
-    const handlers = {
-        reply: (_) => {},
-        ready: (_) => {},
-        stop: (_) => {},
-    };
-
-    const turnTimeout = createInactivityTimeout(emitter, {
-        timeout,
-        progressSources: [opts.host],
-        ...(traceId ? { traceId } : {}),
-        phase: 'outer',
-        onTimeout: () => {
-            if (pendingListenerRef.current) {
-                emitter.off(EMITTER_QUESTION_PENDING, pendingListenerRef.current);
-                pendingListenerRef.current = null;
-            }
-            emitter.off(EMITTER_LOOP_REPLY, handlers.reply);
-            emitter.off(EMITTER_LOOP_READY, handlers.ready);
-            emitter.off(EMITTER_LOOP_STOPPED, handlers.stop);
-            if (tryUseReplyFallback?.()) {
-                return;
-            }
-            log(
-                'WARN',
-                `[DialogLoopManager] sendTurn inactivity timeout (${traceLabel(traceId)}, timeout=${timeout}ms)`,
-            );
-            reject(new SessionError(`[DialogLoopManager] sendTurn sem progresso por ${timeout}ms`, 'DIALOG_TIMEOUT'));
-        },
+    return buildTurnResolutionListenersImpl(emitter, {
+        ...opts,
+        castListener,
+        createInactivityTimeout,
+        finalizeTurnReply,
+        traceLabel,
     });
-
-    handlers.reply = castListener(
-        /** @param {{ reply: string }} evt */
-        (evt) => {
-            turnTimeout.clear();
-            emitter.off(EMITTER_LOOP_READY, handlers.ready);
-            emitter.off(EMITTER_LOOP_STOPPED, handlers.stop);
-            log('INFO', `[DialogLoopManager] reply resolved (${traceLabel(traceId)}, source=loop.reply)`);
-            finalizeTurnReply(turnStart, evt.reply, {
-                emit: (event, payload) => emitter.emit(event, payload),
-                metrics: container.resolve(METRICS_STORE),
-            });
-            resolve(evt.reply);
-        },
-    );
-
-    handlers.ready = castListener(() => {
-        if (!tryUseReplyFallback?.()) {
-            return;
-        }
-        turnTimeout.clear();
-        emitter.off(EMITTER_LOOP_REPLY, handlers.reply);
-        emitter.off(EMITTER_LOOP_STOPPED, handlers.stop);
-        log('INFO', `[DialogLoopManager] reply resolved (${traceLabel(traceId)}, source=loop.ready_fallback)`);
-    });
-
-    handlers.stop = castListener(
-        /** @param {{ authorized?: boolean; reason?: string }} stopEvt */
-        (stopEvt) => {
-            turnTimeout.clear();
-            emitter.off(EMITTER_LOOP_REPLY, handlers.reply);
-            emitter.off(EMITTER_LOOP_READY, handlers.ready);
-            if (stopEvt?.authorized) {
-                reject(new SessionError('[DialogLoopManager] Diálogo encerrado.', 'DIALOG_ENDED'));
-            } else {
-                log(
-                    'INFO',
-                    `[DialogLoopManager] loop stopped, waiting restart (${traceLabel(traceId)}, reason=${stopEvt?.reason ?? 'unknown'})`,
-                );
-                log(
-                    'INFO',
-                    `[DialogLoopManager] Dialog loop parado sem autorização (${stopEvt?.reason ?? 'unknown'}) — aguardando restart automático.`,
-                );
-                waitForRestartAndReplyFn(opts.message, timeout ?? LLM_B_TURN_TIMEOUT_MS, stopEvt?.reason)
-                    .then(resolve)
-                    .catch(reject);
-            }
-        },
-    );
-
-    return {
-        timeoutHandle: turnTimeout.timeoutHandle,
-        clearTurnTimeout: turnTimeout.clear,
-        onReplyOuter: handlers.reply,
-        onReadyOuter: handlers.ready,
-        onStopOuter: handlers.stop,
-    };
 }
 
 /**
- * Despacha a mensagem ao host — responde pergunta pendente ou aguarda `question.pending`.
+ * Despacha mensagem ao host — gerencia pergunta pendente e listeners internos.
  *
  * @param {TurnEmitter} emitter
- * @param {{
- *     host: TurnHost;
- *     message: string;
- *     timeout: number | null;
- *     signal?: AbortSignal;
- *     timeoutHandle: ReturnType<typeof setTimeout> | null;
- *     clearTurnTimeout?: () => void;
- *     pendingListenerRef: { current: ((arg: unknown) => void) | null };
- *     onReplyOuter: (evt: unknown) => void;
- *     onReadyOuter: (evt: unknown) => void;
- *     onStopOuter: (evt: unknown) => void;
- *     resolve: (v: string) => void;
- *     reject: (e: Error) => void;
- *     waitForRestartAndReplyFn: (message: string, timeout: number, stopReason?: string) => Promise<string>;
- *     onDispatch?: () => void;
- *     tryUseReplyFallback?: () => boolean;
- *     traceId?: string;
- * }} opts
+ * @param {any} opts
+ * @returns {void}
  */
 export function dispatchTurnToHost(emitter, opts) {
-    const {
-        host,
-        message,
-        timeout,
-        timeoutHandle,
-        clearTurnTimeout,
-        pendingListenerRef,
-        onReplyOuter,
-        onReadyOuter = () => {},
-        onStopOuter,
-        resolve,
-        reject,
-        waitForRestartAndReplyFn,
-        onDispatch,
-        tryUseReplyFallback,
-        traceId,
-    } = opts;
-
-    if (host.hasPendingQuestion()) {
-        const pendingProtocol = readPendingProtocolSnapshot(host);
-        if (pendingProtocol?.kind === 'reply' && pendingProtocol.reply) {
-            log(
-                'INFO',
-                `[DialogLoopManager] pending protocol shortcut (${traceLabel(traceId)}, kind=reply, source=pending-question)`,
-            );
-            onReplyOuter({ reply: pendingProtocol.reply });
-            return;
-        }
-        if (pendingProtocol?.kind === 'stopped') {
-            log(
-                'WARN',
-                `[DialogLoopManager] pending protocol shortcut (${traceLabel(traceId)}, kind=stopped, source=pending-question)`,
-            );
-            onStopOuter({ authorized: false, reason: 'pending_protocol_stopped' });
-            return;
-        }
-        log('INFO', `[DialogLoopManager] dispatching turn to pending question (${traceLabel(traceId)})`);
-        onDispatch?.();
-        host.answerPendingQuestion(message);
-    } else {
-        const onPending = () => {
-            pendingListenerRef.current = null;
-            const pendingProtocol = readPendingProtocolSnapshot(host);
-            if (pendingProtocol?.kind === 'reply' && pendingProtocol.reply) {
-                log(
-                    'INFO',
-                    `[DialogLoopManager] pending protocol shortcut after question.pending (${traceLabel(traceId)}, kind=reply)`,
-                );
-                onReplyOuter({ reply: pendingProtocol.reply });
-                return;
-            }
-            if (pendingProtocol?.kind === 'stopped') {
-                log(
-                    'WARN',
-                    `[DialogLoopManager] pending protocol shortcut after question.pending (${traceLabel(traceId)}, kind=stopped)`,
-                );
-                onStopOuter({ authorized: false, reason: 'pending_protocol_stopped' });
-                return;
-            }
-            if (clearTurnTimeout) {
-                clearTurnTimeout();
-            } else {
-                clearTimeout(timeoutHandle ?? undefined);
-            }
-            // F41B.3: remover os outer listeners registrados por buildTurnResolutionListeners
-            // para evitar listener leak / double-fire quando novos listeners são registrados abaixo
-            emitter.off(EMITTER_LOOP_REPLY, onReplyOuter);
-            if (onReadyOuter) {
-                emitter.off(EMITTER_LOOP_READY, onReadyOuter);
-            }
-            emitter.off(EMITTER_LOOP_STOPPED, onStopOuter);
-            const innerTimeout = createInactivityTimeout(emitter, {
-                timeout,
-                progressSources: [host],
-                ...(traceId ? { traceId } : {}),
-                phase: 'pending',
-                onTimeout: () => {
-                    emitter.off(EMITTER_LOOP_REPLY, onReply);
-                    emitter.off(EMITTER_LOOP_READY, onReady);
-                    emitter.off(EMITTER_LOOP_STOPPED, onStop);
-                    if (tryUseReplyFallback?.()) {
-                        return;
-                    }
-                    log(
-                        'WARN',
-                        `[DialogLoopManager] sendTurn inactivity timeout after question.pending (${traceLabel(traceId)}, timeout=${timeout}ms)`,
-                    );
-                    reject(
-                        new SessionError(
-                            `[DialogLoopManager] sendTurn sem progresso por ${timeout}ms`,
-                            'DIALOG_TIMEOUT',
-                        ),
-                    );
-                },
-            });
-            /** @type {(() => void) | null} */
-            let onAbortInner = null;
-            const onReply = castListener(
-                /** @param {{ reply: string }} evt */
-                (evt) => {
-                    innerTimeout.clear();
-                    emitter.off(EMITTER_LOOP_READY, onReady);
-                    emitter.off(EMITTER_LOOP_STOPPED, onStop);
-                    if (onAbortInner) {
-                        detachAbortListener(opts.signal, onAbortInner);
-                        onAbortInner = null;
-                    }
-                    resolve(evt.reply);
-                },
-            );
-            const onReady = castListener(() => {
-                if (!tryUseReplyFallback?.()) {
-                    return;
-                }
-                innerTimeout.clear();
-                emitter.off(EMITTER_LOOP_REPLY, onReply);
-                emitter.off(EMITTER_LOOP_STOPPED, onStop);
-                if (onAbortInner) {
-                    detachAbortListener(opts.signal, onAbortInner);
-                    onAbortInner = null;
-                }
-            });
-            const onStop = castListener(
-                /** @param {{ authorized?: boolean; reason?: string }} stopEvt2 */
-                (stopEvt2) => {
-                    innerTimeout.clear();
-                    emitter.off(EMITTER_LOOP_REPLY, onReply);
-                    emitter.off(EMITTER_LOOP_READY, onReady);
-                    if (onAbortInner) {
-                        detachAbortListener(opts.signal, onAbortInner);
-                        onAbortInner = null;
-                    }
-                    if (stopEvt2?.authorized) {
-                        reject(new SessionError('[DialogLoopManager] Diálogo encerrado.', 'DIALOG_ENDED'));
-                    } else {
-                        waitForRestartAndReplyFn(message, timeout ?? LLM_B_TURN_TIMEOUT_MS, stopEvt2?.reason)
-                            .then(resolve)
-                            .catch(reject);
-                    }
-                },
-            );
-            if (opts.signal) {
-                onAbortInner = () => {
-                    innerTimeout.clear();
-                    emitter.off(EMITTER_LOOP_REPLY, onReply);
-                    emitter.off(EMITTER_LOOP_READY, onReady);
-                    emitter.off(EMITTER_LOOP_STOPPED, onStop);
-                    reject(createAbortError('[DialogLoopManager] sendTurn abortado.'));
-                };
-                opts.signal.addEventListener('abort', onAbortInner, { once: true });
-            }
-            emitter.once(EMITTER_LOOP_REPLY, onReply);
-            emitter.once(EMITTER_LOOP_READY, onReady);
-            emitter.once(EMITTER_LOOP_STOPPED, onStop);
-            log('INFO', `[DialogLoopManager] dispatching turn after question.pending (${traceLabel(traceId)})`);
-            onDispatch?.();
-            host.answerPendingQuestion(message);
-        };
-        pendingListenerRef.current = onPending;
-        emitter.once(EMITTER_QUESTION_PENDING, onPending);
-        if (host.hasPendingQuestion()) {
-            emitter.off(EMITTER_QUESTION_PENDING, onPending);
-            pendingListenerRef.current = null;
-            onPending();
-        }
-    }
+    return dispatchTurnToHostImpl(emitter, {
+        ...opts,
+        castListener,
+        createInactivityTimeout,
+        readPendingProtocolSnapshot,
+        traceLabel,
+        createAbortError,
+        detachAbortListener,
+        finalizeTurnReply,
+    });
 }
 
 /**
@@ -921,6 +459,7 @@ export function executeTurnImpl(emitter, message, { timeout, signal, traceId }, 
                 dispatchTurnToHost(emitter, {
                     host,
                     message,
+                    turnStart,
                     timeout,
                     ...(signal !== undefined && { signal }),
                     timeoutHandle,

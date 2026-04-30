@@ -28,6 +28,11 @@ import {
     SseConnectionTracker,
     standardizeSsePayload,
 } from '../../../infra/sse/utils.js';
+import {
+    deleteSdkAgentStreamState,
+    getSdkAgentStreamState,
+    setSdkAgentStreamState,
+} from '../../runtime-state/sdk-agent-stream.js';
 import { withErrorHandler as _withErrorHandler } from './middleware.js';
 
 /** GAP-EVARCH-01 (fix): tracker centralizado para /agent/stream. */
@@ -97,9 +102,6 @@ export default function createAgentRouter(deps) {
      * }} AgentStreamState
      */
 
-    /** @type {Map<string, AgentStreamState>} */
-    const streamStates = new Map();
-
     /**
      * @param {AgentRouterDeps} routeDeps
      * @returns {Promise<AgentStreamState>}
@@ -107,13 +109,13 @@ export default function createAgentRouter(deps) {
     async function ensureAgentStreamState(routeDeps) {
         const key = routeDeps.runtimeId ?? 'default';
         const client = await routeDeps.getClient();
-        const existing = streamStates.get(key);
+        const existing = getSdkAgentStreamState(key);
         if (existing && existing.client === client) return existing;
 
         if (existing) {
             existing.pool.closeAll();
             existing.unsubscribe();
-            streamStates.delete(key);
+            deleteSdkAgentStreamState(key);
         }
 
         const pool = new SseClientPool(new SseReplayBuffer(), {
@@ -131,7 +133,7 @@ export default function createAgentRouter(deps) {
         });
 
         const state = { key, runtimeId: routeDeps.runtimeId, client, pool, unsubscribe };
-        streamStates.set(key, state);
+        setSdkAgentStreamState(key, state);
         return state;
     }
 
@@ -142,7 +144,7 @@ export default function createAgentRouter(deps) {
     function maybeDisposeAgentStreamState(state) {
         if (state.pool.size > 0) return;
         state.unsubscribe();
-        streamStates.delete(state.key);
+        deleteSdkAgentStreamState(state.key);
     }
 
     /**

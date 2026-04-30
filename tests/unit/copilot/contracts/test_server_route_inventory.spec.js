@@ -117,4 +117,29 @@ describe('contracts/server-route-inventory — rotas agent-runtime vs hub/server
         assert.doesNotMatch(src, /getSharedSdkSessionId/);
         assert.doesNotMatch(src, /sanitizeHttpErrorMessage/);
     });
+
+    it('presentationBridge routes delegam domínio para presentation e não reabrem estado/runtime local', () => {
+        const forbidden = [
+            /#copilot\/agent/,
+            /#copilot\/observability/,
+            /container(?:\.resolve)?/,
+            /CONVERSATION_STORE/,
+            /getSharedSdkSessionId/,
+        ];
+
+        const violations = SERVER_ROUTE_INVENTORY.presentationBridge.flatMap((rel) => {
+            const src = readRoute(rel);
+            const hasPresentation = /\.\.\/\.\.\/presentation\//.test(src);
+            if (!hasPresentation) {
+                return [`${rel} -> sem import de presentation/*`];
+            }
+            return forbidden.filter((pattern) => pattern.test(src)).map((pattern) => `${rel} -> ${pattern}`);
+        });
+
+        assert.deepEqual(
+            violations,
+            [],
+            `Rotas presentationBridge devem permanecer adapters finos:\n${violations.join('\n')}`,
+        );
+    });
 });

@@ -22,13 +22,13 @@ import {
 } from '#copilot/events';
 import { TASK_TIMEOUT_MS as DEFAULT_TASK_TIMEOUT_MS, MAX_TASK_RETRIES } from '../../config/agent.js';
 import { withAgentErrorPolicy } from '../error-policy.js';
+import { persistAgentRuntimeStatePartial } from '../facades/agent-runtime-state.js';
 import {
     onAgentSdkSessionEvent,
     onAllAgentSdkSessionEvents,
     sendAgentSdkSession,
     sendAgentSdkSessionAndWait,
 } from '../facades/agent-sdk-runtime.js';
-import { persistStateWithPolicy } from '../lifecycle/state-io.js';
 import { log } from '../ports/logging-port.js';
 import { startSpan, startSpanImmediate } from '../ports/tracing-port.js';
 
@@ -519,7 +519,7 @@ export function answerPendingQuestion(ctx, host, answer) {
     log('INFO', `[AlwaysAlive] Respondendo pergunta pendente: "${answer.slice(0, 80)}..."`);
     ctx.resolvePendingQuestion(answer);
     void ctx.trackBackgroundTask(
-        persistStateWithPolicy(
+        persistAgentRuntimeStatePartial(
             { pendingQuestion: null, pendingQuestionMeta: null },
             { label: 'question.clear.pending' },
         ).then((result) => {

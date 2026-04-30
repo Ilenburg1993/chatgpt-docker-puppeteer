@@ -11,7 +11,7 @@
  * @see module:copilot/agent/dialog/watchdog
  */
 
-import { getCopilotFallbackModel, LLM_B_TURN_TIMEOUT_MS } from '#copilot/config';
+import { LLM_B_TURN_TIMEOUT_MS } from '#copilot/config';
 import { SessionError } from '#copilot/core';
 import {
     EMITTER_LOOP_CHANGED,
@@ -25,32 +25,19 @@ import {
     EMITTER_LOOP_TURN_TIMEOUT,
 } from '#copilot/events';
 import { EventEmitter } from 'node:events';
-import {
-    BOOT_LATE_PROTOCOL_GRACE_MS,
-    BOOT_TIMEOUT_MS,
-    DIALOG_QUEUE_MAX,
-    LONG_TASK_TIMEOUT_MS,
-    WATCHDOG_INTERVAL_MS,
-    WATCHDOG_STALL_MS,
-} from '../../config/agent.js';
+import { BOOT_LATE_PROTOCOL_GRACE_MS, LONG_TASK_TIMEOUT_MS } from '../../config/agent.js';
 import { logSwallowed } from '../../core/error-handlers.js';
 import { DialogProtocol } from '../../dialog/protocol.js';
 import {
     persistAgentRuntimeDialogState,
-    readAgentRuntimeDialogBootstrapState,
     readAgentRuntimeDialogPersistedState,
 } from '../facades/agent-runtime-state.js';
 import { waitForAgentSdkEvent } from '../facades/agent-sdk-runtime.js';
 import { log } from '../ports/logging-port.js';
 import { startSpanImmediate } from '../ports/tracing-port.js';
-import { TurnQueue } from './backpressure.js';
-import { DialogCompactionPolicy } from './compaction-policy.js';
-import { DialogCostLedger } from './cost-ledger.js';
-import { ModelFallbackState } from './model-fallback.js';
+import { createDialogLoopRuntimeKit } from './loop-runtime-kit.js';
 import { selectDialogResumeStrategy } from './resume-policy.js';
-import { DialogLoopStateMachine } from './state-machine.js';
 import { executeTurnImpl } from './turn-executor.js';
-import { DialogWatchdogSupervisor } from './watchdog-supervisor.js';
 
 const BOOT_FAILURE_CIRCUIT_WINDOW_MS = 120_000;
 const BOOT_FAILURE_CIRCUIT_COOLDOWN_MS = 60_000;
@@ -66,6 +53,18 @@ const BOOT_FAILURE_CIRCUIT_MAX_FAILURES = 3;
  *   `scheduleFallback()`) Interface esperada do agente host (AlwaysAliveAgent) para interação bidirecional.
  *
  * @typedef {import('../types.js').DialogLoopHost} DialogLoopHost
+ *
+ * @typedef {import('./backpressure.js').TurnQueue} TurnQueue
+ *
+ * @typedef {import('./compaction-policy.js').DialogCompactionPolicy} DialogCompactionPolicy
+ *
+ * @typedef {import('./cost-ledger.js').DialogCostLedger} DialogCostLedger
+ *
+ * @typedef {import('./model-fallback.js').ModelFallbackState} ModelFallbackState
+ *
+ * @typedef {import('./state-machine.js').DialogLoopStateMachine} DialogLoopStateMachine
+ *
+ * @typedef {import('./watchdog-supervisor.js').DialogWatchdogSupervisor} DialogWatchdogSupervisor
  */
 
 /**
@@ -125,24 +124,18 @@ export class DialogLoopManager extends EventEmitter {
      */
     constructor(options = {}) {
         super();
-        this.#turnQueue = new TurnQueue({ maxSize: options.maxQueueSize ?? DIALOG_QUEUE_MAX });
-        this.#bootTimeoutMs = options.bootTimeoutMs ?? BOOT_TIMEOUT_MS;
-        this.#watchdogSupervisor = new DialogWatchdogSupervisor({
-            intervalMs: options.watchdogIntervalMs ?? WATCHDOG_INTERVAL_MS,
-            stallThresholdMs: options.watchdogStallMs ?? WATCHDOG_STALL_MS,
+        const runtimeKit = createDialogLoopRuntimeKit(options, {
             onStall: (stalledMs) => this.emit(EMITTER_LOOP_STALLED, { stalledMs }),
             onPreStallWarning: (stalledMs) => this.emit(EMITTER_LOOP_PRE_STALL_WARNING, { stalledMs }),
         });
-        this.#modelFallback = new ModelFallbackState({
-            defaultModel: options.fallbackModel ?? getCopilotFallbackModel(),
-        });
-        this.#compactionPolicy = new DialogCompactionPolicy();
 
-        // F42.4 (BUG-SD-003 fix): restaurar prMetrics do estado persistido para sobreviver a restarts
-        const persistedBootstrap = readAgentRuntimeDialogBootstrapState();
-        this.#state = new DialogLoopStateMachine({ paused: persistedBootstrap.dialogPaused });
-        const saved = persistedBootstrap.prMetrics;
-        this.#costLedger = new DialogCostLedger(saved && typeof saved === 'object' ? saved : null);
+        this.#turnQueue = runtimeKit.turnQueue;
+        this.#bootTimeoutMs = runtimeKit.bootTimeoutMs;
+        this.#watchdogSupervisor = runtimeKit.watchdogSupervisor;
+        this.#modelFallback = runtimeKit.modelFallback;
+        this.#compactionPolicy = runtimeKit.compactionPolicy;
+        this.#state = runtimeKit.state;
+        this.#costLedger = runtimeKit.costLedger;
     }
 
     /**
@@ -275,7 +268,10 @@ export class DialogLoopManager extends EventEmitter {
         });
 
         // F60: delegar aplicação de fallback ao ModelFallbackState
-        this.#modelFallback.applyIfPending(this.#host, (event, payload) => this.emit(event, payload));
+        this.#modelFallback.applyIfPending(
+            this.#host,
+            /** @param {string} event @param {unknown} payload */ (event, payload) => this.emit(event, payload),
+        );
 
         const metaPrompt = bootPrompt ?? DialogProtocol.buildBootPrompt();
 

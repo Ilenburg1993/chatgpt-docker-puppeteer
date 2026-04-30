@@ -24,6 +24,12 @@ import {
     sendSessionAndWait,
     setSessionModel,
 } from '../../../sdk/session/wrapper.js';
+import {
+    buildSdkSessionStreamKey,
+    deleteSdkSessionStreamState,
+    getSdkSessionStreamState,
+    setSdkSessionStreamState,
+} from '../../runtime-state/sdk-session-stream.js';
 import { resolveSdkRouteSharedDeps } from './deps.js';
 import {
     ElicitationBodySchema,
@@ -74,9 +80,6 @@ const _sessionsTracker = new SseConnectionTracker('sessions/stream');
  *     unsubscribe: () => void;
  * }} SessionStreamState
  */
-
-/** @type {Map<string, SessionStreamState>} */
-const _sessionStreamStates = new Map();
 
 // C14-04: limite máximo de bytes aceitos em prompt para evitar uso excessivo de tokens
 const MAX_PROMPT_BYTES = 512_000;
@@ -168,14 +171,14 @@ function ensureSessionStreamState(routeDeps, id, entry) {
         throw new Error(`Sessão "${id}" não está ativa para stream SSE.`);
     }
     const runtimeId = routeDeps.runtimeId || 'default';
-    const key = `${runtimeId}:${id}`;
-    const existing = _sessionStreamStates.get(key);
+    const key = buildSdkSessionStreamKey(runtimeId, id);
+    const existing = /** @type {SessionStreamState | undefined} */ (getSdkSessionStreamState(key));
     if (existing && existing.sessionRef === entry.session) return existing;
 
     if (existing) {
         existing.pool.closeAll();
         existing.unsubscribe();
-        _sessionStreamStates.delete(key);
+        deleteSdkSessionStreamState(key);
     }
 
     const pool = new SseClientPool(new SseReplayBuffer(), {
@@ -193,7 +196,7 @@ function ensureSessionStreamState(routeDeps, id, entry) {
     );
 
     const state = { key, runtimeId, sessionId: id, sessionRef: entry.session, pool, unsubscribe };
-    _sessionStreamStates.set(key, state);
+    setSdkSessionStreamState(key, state);
     return state;
 }
 
@@ -205,7 +208,7 @@ function ensureSessionStreamState(routeDeps, id, entry) {
 function maybeDisposeSessionStreamState(routeDeps, state) {
     if (state.pool.size > 0) return;
     state.unsubscribe();
-    _sessionStreamStates.delete(state.key);
+    deleteSdkSessionStreamState(state.key);
     routeDeps.sdkObservability.log(
         'INFO',
         `[sdk-api] SSE stream encerrado: runtime ${state.runtimeId} sessão ${state.sessionId}`,

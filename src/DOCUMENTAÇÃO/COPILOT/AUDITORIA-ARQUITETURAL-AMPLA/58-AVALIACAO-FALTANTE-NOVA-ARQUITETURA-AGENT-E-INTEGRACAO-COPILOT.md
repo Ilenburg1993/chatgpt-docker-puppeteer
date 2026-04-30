@@ -238,7 +238,7 @@ regras por camada.
   - portas finas de observability/tools/hooks/mcp/conversation.
 - [x] Criar contrato de export público mínimo para facades críticas no barrel `#copilot/agent`.
 - [x] Para cada uma, adicionar teste de bypass.
-- [ ] Reduzir imports cruzados entre facades quando houver caminho de query mais simples.
+- [x] Reduzir imports cruzados entre facades quando houver caminho de query mais simples.
   - [x] Remover leituras voláteis remanescentes (`status/sessionId/dialogLoopActive/dialogPaused`)
         em `channel`, `runtime-wiring`, `runtime-host`, `runtime-sdk-session` e capability snapshot,
         substituindo por `readRuntimeControlState`, `readAgentStatusSnapshot` e projections de
@@ -257,7 +257,7 @@ regras por camada.
 
 ### Faixa F — Presentation monopoly final
 
-- [ ] Server routes passam a usar somente `presentation/*`;
+- [x] Server routes passam a usar somente `presentation/*`;
   - [x] `server/routes/sdk/{agent,client,observability,session-messaging}.js` não montam mais
         status/session/tools a partir de estado vivo do `agent`; usam projections/capabilities
         runtime-aware em `presentation/*`.
@@ -283,7 +283,7 @@ regras por camada.
 
 ### Faixa G — Preparação para multi-runtime/multi-agent
 
-- [ ] Garantir que todo endpoint aceita/propaga `runtimeId`;
+- [x] Garantir que todo endpoint aceita/propaga `runtimeId`;
   - [x] `copilot-api` principal propaga metadata de runtime em status/session/capabilities,
         dialog/tasks/stream e fallback explícito;
   - [x] rotas SDK de client/agent/observability agora ecoam metadata canônica também em endpoints
@@ -294,10 +294,10 @@ regras por camada.
         `runtimeId` no payload, e streams de sessão SDK passam a ser chaveados por
         `runtimeId:sessionId` para evitar colisão entre runtimes.
 - [x] Separar default runtime de runtime selecionado em projections e comandos;
-- [ ] Evitar estado global implícito fora de `runtime-registry`;
+- [x] Evitar estado global implícito fora de `runtime-registry`;
   - [x] `copilot-api/dialog` deixou de usar mutex global process-wide em `/dialog/turn` e passou a
         chavear concorrência por `runtimeId`, permitindo turnos simultâneos em runtimes distintos.
-  - [ ] Mapear todos os Maps/sets module-level remanescentes e classificá-los como registry,
+  - [x] Mapear todos os Maps/sets module-level remanescentes e classificá-los como registry,
         terminal-local, SSE connection state ou dívida arquitetural.
   - [x] Criar contrato executável para os estados vivos de rotas multi-runtime (`dialog/turn`,
         `copilot-api/stream`, `sdk/agent`, `sdk/hooks`, `sdk/session`) exigindo chaveamento por
@@ -784,9 +784,184 @@ como hub-only, porém ainda continha regra de domínio e acesso DI direto que de
 
 ### O que ainda falta, objetivamente
 
-- **Faixa F:** revisar `server/routes/{agent,config,git,memory,observability}.js` para separar o que
-  já é bridge fina de presentation do que ainda contém regra de domínio local.
-- **Faixa G:** concluir o mapeamento de Maps/Sets module-level, classificando cada global como
-  registry, terminal-local, SSE connection state, cache defensivo, singleton compatível ou dívida.
-- **Faixa E:** reduzir imports cruzados permitidos entre facades quando algum deles puder ser
-  substituído por query mais simples ou projection já existente.
+- **Governança contínua:** manter os contratos de inventário/runtime-state/facades atualizados em
+  novas ondas para evitar regressões de ownership.
+
+---
+
+## 20) Checkpoint de continuação — registries explícitos de estado vivo em rotas multi-runtime
+
+### Transformações aplicadas
+
+- foram criados registries explícitos em `src/copilot/server/runtime-state/` para remover `Map`s
+  locais das rotas mais sensíveis a colisão multi-runtime:
+  - `copilot-api-dialog.js`;
+  - `copilot-api-stream.js`;
+  - `sdk-agent-stream.js`;
+  - `sdk-hooks-stream.js`;
+  - `sdk-session-stream.js`.
+- `server/routes/copilot-api/dialog.js` passou a consumir o registry de concorrência do dialog turn,
+  deixando de manter mutex local no módulo.
+- `server/routes/copilot-api/stream.js`, `server/routes/sdk/agent.js`, `server/routes/sdk/hooks.js`
+  e `server/routes/sdk/session-messaging.js` passaram a consumir registries explícitos de
+  SSE/runtime state em vez de declarar `Map` local dentro da rota.
+- `server/routes/{agent,config,git,memory,observability}.js` foram reavaliadas contra a Faixa F e
+  confirmadas como `presentationBridge`, sem reabertura de runtime state ou domínio local.
+- foi criado o inventário factual `60-MAPEAMENTO-ESTADO-GLOBAL-VIVO-E-REGISTRIES-MULTIRUNTIME.md`,
+  classificando os `Map`/`Set` module-level remanescentes em:
+  - catálogos estáticos;
+  - registries explícitos legítimos;
+  - estado local de UX/cache/infra;
+  - pontos que exigem monitoramento.
+
+### Validação executada
+
+- `tests/unit/copilot/contracts/test_runtime_state_governance.spec.js` atualizado para bloquear
+  regressão das rotas críticas de volta a `Map` local.
+- `tests/unit/copilot/contracts/test_runtime_state_registry_inventory.spec.js` criado para congelar:
+  - o inventário de `server/runtime-state/`;
+  - a ausência de `Map` local nas rotas críticas;
+  - a ligação entre cada rota e seu registry explícito.
+- `tests/unit/copilot/contracts/test_server_route_inventory.spec.js` ampliado para garantir que as
+  rotas `presentationBridge` permaneçam adapters finos sobre `presentation/*`.
+
+### Leitura arquitetural
+
+Este checkpoint fecha uma parte importante do Gate 2.0-D:
+
+- a rota continua owner da política de concorrência/stream;
+- o estado vivo process-wide passa a morar em registry explícito, nomeado e testável;
+- o inventário de globals deixa de ser hipótese e vira artefato auditável.
+
+---
+
+## 21) Checkpoint de continuação — desacoplamento profundo entre facades (Faixa E)
+
+### Transformações aplicadas
+
+- foram criados seams internos neutros para leitura compartilhada de runtime:
+  - `src/copilot/agent/runtime/status-readers.js`;
+  - `src/copilot/agent/runtime/governance-readers.js`.
+- `agent-runtime-status.js` foi convertido em façade fina (re-export) sobre
+  `runtime/status-readers.js`.
+- `agent-runtime-controls.js` deixou de depender de `agent-runtime-status.js` e passou a consumir os
+  seams internos neutros.
+- `agent-runtime-capabilities.js` deixou de importar facades de mutation/query e passou a consumir
+  diretamente os seams internos (`runtime/*`).
+- `agent-model-config.js` deixou de importar `agent-runtime-status.js` e `agent-sdk-access.js`,
+  reduzindo acoplamento transversal entre facades.
+- `agent-session-ops.js` deixou de importar `agent-sdk-access.js` e `agent-sdk-runtime.js`.
+- `agent-sdk-access.js` deixou de re-exportar de `agent-sdk-runtime.js` e passou a implementar
+  localmente `canReadAgentSdkSessionMessages`/`readAgentSdkSessionMessages`.
+
+### Validação executada
+
+- `tests/unit/copilot/contracts/test_facade_bypass_matrix.spec.js` atualizado e verde com a matriz
+  de imports cruzados reduzida.
+- `tests/unit/copilot/contracts/test_arch_contracts.spec.js` e contratos de runtime-state
+  reexecutados no lote focado: verdes.
+- `npm run typecheck:strict:src.copilot`: verde.
+- `eslint` focado em facades/runtime/helpers/contratos alterados: verde.
+
+### Resultado arquitetural
+
+- a Faixa E avança de “controle de matriz” para **desacoplamento real** de facades críticas;
+- a reutilização compartilhada passa a ocorrer por seams internos com ownership explícito
+  (`agent/runtime/*`), não por import cruzado entre arquivos públicos de façade;
+- o custo de evolução de cada façade cai, pois os pontos de acoplamento passam a ser por camada, não
+  por arquivo vizinho.
+
+---
+
+## 22) Checkpoint de continuação — rate limiting também convergido para `server/runtime-state`
+
+### Transformações aplicadas
+
+- `server/routes/sdk/session-middleware.js` deixou de manter `_rlWindowMap` local em `new Map()`;
+- foi criado `src/copilot/server/runtime-state/sdk-session-rate-limit.js` como registry explícito da
+  janela de rate limiting por `label:ip`;
+- o middleware agora aplica purge/lookup/update via API desse registry, mantendo a política no
+  próprio middleware e o estado vivo em camada nomeada.
+
+### Validação executada
+
+- `test_runtime_state_registry_inventory`, `test_runtime_state_governance`, `test_arch_contracts` e
+  `test_sdk_runtime_projection_routes`: verdes no lote focado;
+- `typecheck:strict:src.copilot`: verde;
+- `eslint` focado nos arquivos tocados: verde.
+
+### Leitura arquitetural
+
+Este ajuste fecha um ponto residual da Faixa F/G no Gate 2.0-D: não apenas streams/concorrência, mas
+também o estado de rate limiting de sessão passa a ser governado por registry explícito em
+`server/runtime-state`.
+
+---
+
+## 23) Checkpoint de continuação — varredura geral final e fechamento de metadata runtime em infra SDK
+
+### Varredura geral aplicada
+
+A varredura factual de gaps remanescentes (roadmap + rotas + contratos) apontou dois pontos
+residuais de Faixa F/G:
+
+- `server/routes/sdk/sessions.js` ainda retornava `401 Unauthorized` sem metadata runtime canônica;
+- `server/routes/sdk/session-middleware.js` ainda emitia `400/429/500` sem anexar metadata runtime.
+
+### Transformações aplicadas
+
+- `server/routes/sdk/sessions.js` passou a devolver `401` com
+  `runtimeId/requestedRuntimeId/runtimeFound/usedDefaultRuntimeFallback` via
+  `buildRuntimeRouteMetaPayload(routeDeps)`.
+- `server/routes/sdk/session-middleware.js` ganhou helper `buildSessionRouteRuntimeMeta(req)` e
+  passou a anexar metadata runtime em respostas:
+  - `429` do rate limiter;
+  - `400` de `validateBody`;
+  - `500` de `withErrorHandler`.
+- `test_arch_contracts` foi ampliado para bloquear regressão desses pontos de infra de sessões SDK
+  sem metadata runtime.
+
+### Validação executada
+
+- `test_runtime_state_registry_inventory`, `test_runtime_state_governance`, `test_arch_contracts` e
+  `test_sdk_runtime_projection_routes`: verdes no lote focado;
+- `typecheck:strict:src.copilot`: verde;
+- `eslint` focado nos arquivos tocados: verde.
+
+### Leitura arquitetural
+
+Com esse fechamento, a propagação de metadata runtime deixa de ficar restrita aos handlers de
+negócio e passa a cobrir também os caminhos de erro infra (auth/validation/rate-limit/fail-safe) no
+adapter SDK de sessões.
+
+---
+
+## 24) Checkpoint de continuação — rodada operacional ampla do Gate 2.0-F
+
+### Execução consolidada
+
+Após a varredura geral e os fechamentos de Faixa E/F/G residuais, foi executado o pacote operacional
+amplo para evidência final do Gate 2.0-F:
+
+- `npm run typecheck:strict:src.copilot`;
+- `npm run typecheck:strict:tests.unit`;
+- `eslint src/copilot --max-warnings=0`;
+- `npx madge src/copilot --extensions js --circular`;
+- `npx vitest run --config vitest.copilot.config.js tests/unit/copilot --testTimeout=60000`.
+
+### Resultado
+
+- typechecks strict: verdes;
+- lint amplo de `src/copilot`: verde;
+- madge global: **0 ciclos**;
+- suíte copilot ampla: **4369 passed, 28 skipped**.
+
+### Observação de execução
+
+- o aviso de compatibilidade `typescript-estree` com TypeScript 6.0.2 permanece apenas como warning
+  de ferramenta, sem erro bloqueante nos gates.
+
+### Leitura arquitetural
+
+Com essa rodada, os critérios técnicos de conclusão da migração 2.0 ficam operacionalmente
+demonstrados; o trabalho restante passa para governança contínua anti-regressão.

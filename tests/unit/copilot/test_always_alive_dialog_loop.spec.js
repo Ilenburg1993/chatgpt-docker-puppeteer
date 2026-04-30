@@ -282,6 +282,10 @@ describe('always-alive › dialog loop: DL-PERM hardening', async () => {
             new URL('../../../src/copilot/agent/dialog/turn-executor.js', import.meta.url),
             'utf-8',
         );
+        turnExecutorCode += await readFile(
+            new URL('../../../src/copilot/agent/dialog/seams/turn-result-persistence.js', import.meta.url),
+            'utf-8',
+        );
     });
 
     it('DL-PERM-04: sendTurn() pinga watchdog antes de serializar o turno', () => {

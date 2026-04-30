@@ -14,6 +14,12 @@ describe('agent › K4 background task tracker integration', () => {
     /** @type {string} */
     let bootStepsSrc = '';
     /** @type {string} */
+    let bootSessionPrepSrc = '';
+    /** @type {string} */
+    let bootDialogRecoverySrc = '';
+    /** @type {string} */
+    let bootRuntimeBindSrc = '';
+    /** @type {string} */
     let userInputSrc = '';
     /** @type {string} */
     let loopManagerSrc = '';
@@ -28,6 +34,9 @@ describe('agent › K4 background task tracker integration', () => {
             contextFactoriesSrc,
             lifecycleSrc,
             bootStepsSrc,
+            bootSessionPrepSrc,
+            bootDialogRecoverySrc,
+            bootRuntimeBindSrc,
             userInputSrc,
             loopManagerSrc,
             resumePolicySrc,
@@ -37,6 +46,9 @@ describe('agent › K4 background task tracker integration', () => {
             readFile(new URL('../../../src/copilot/agent/context-factories.js', import.meta.url), 'utf-8'),
             readFile(new URL('../../../src/copilot/agent/lifecycle/agent-lifecycle.js', import.meta.url), 'utf-8'),
             readFile(new URL('../../../src/copilot/agent/session/boot-steps.js', import.meta.url), 'utf-8'),
+            readFile(new URL('../../../src/copilot/agent/session/boot-session-prep.js', import.meta.url), 'utf-8'),
+            readFile(new URL('../../../src/copilot/agent/session/boot-dialog-recovery.js', import.meta.url), 'utf-8'),
+            readFile(new URL('../../../src/copilot/agent/session/boot-runtime-bind.js', import.meta.url), 'utf-8'),
             readFile(new URL('../../../src/copilot/agent/dialog/user-input-handler.js', import.meta.url), 'utf-8'),
             readFile(new URL('../../../src/copilot/agent/dialog/loop-manager.js', import.meta.url), 'utf-8'),
             readFile(new URL('../../../src/copilot/agent/dialog/resume-policy.js', import.meta.url), 'utf-8'),
@@ -57,9 +69,10 @@ describe('agent › K4 background task tracker integration', () => {
     });
 
     it('boot-steps usa trackBackgroundTask nas tarefas fire-and-forget', () => {
-        assert.ok(bootStepsSrc.includes('trackBackgroundTask('));
-        assert.ok(bootStepsSrc.includes('dialog.boot_recovery.run'));
-        assert.ok(bootStepsSrc.includes('hooks.question_answered.relay'));
+        const bootImplementationSrc = `${bootStepsSrc}\n${bootSessionPrepSrc}\n${bootDialogRecoverySrc}\n${bootRuntimeBindSrc}`;
+        assert.ok(bootImplementationSrc.includes('trackBackgroundTask('));
+        assert.ok(bootImplementationSrc.includes('dialog.boot_recovery.run'));
+        assert.ok(bootImplementationSrc.includes('hooks.question_answered.relay'));
     });
 
     it('user-input-handler aceita trackBackgroundTask para persistência assíncrona', () => {

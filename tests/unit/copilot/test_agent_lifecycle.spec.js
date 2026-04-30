@@ -54,12 +54,14 @@ describe('agent-lifecycle › agentStart guard', () => {
 describe('agent-lifecycle › source contracts', () => {
     /** @type {string} */
     let src;
+    /** @type {string} */
+    let runtimeTeardownSrc;
 
     beforeAll(async () => {
-        src = await readFile(
-            new URL('../../../src/copilot/agent/lifecycle/agent-lifecycle.js', import.meta.url),
-            'utf-8',
-        );
+        [src, runtimeTeardownSrc] = await Promise.all([
+            readFile(new URL('../../../src/copilot/agent/lifecycle/agent-lifecycle.js', import.meta.url), 'utf-8'),
+            readFile(new URL('../../../src/copilot/agent/lifecycle/runtime-teardown.js', import.meta.url), 'utf-8'),
+        ]);
     });
 
     it('agentStop aceita shutdownTimeoutMs como parâmetro', () => {
@@ -111,12 +113,16 @@ describe('agent-lifecycle › source contracts', () => {
             'rollback deve limpar ownership de sessão SDK compartilhada',
         );
         assert.ok(
-            src.includes("ctx.stopKeepalive('agent_start_failed')"),
+            src.includes("teardownRuntimeSidecars(ctx, 'agent_start_failed')") &&
+                runtimeTeardownSrc.includes('ctx.stopKeepalive(keepaliveStopReason)'),
             'rollback deve parar keepalive iniciado antes da falha',
         );
-        assert.ok(src.includes('stopAgentSdkClient(client)'), 'rollback deve parar client SDK pela façade canônica');
         assert.ok(
-            src.includes('disconnectAgentSdkSession(session)'),
+            runtimeTeardownSrc.includes('stopAgentSdkClient(client)'),
+            'rollback deve parar client SDK pela façade canônica',
+        );
+        assert.ok(
+            runtimeTeardownSrc.includes('disconnectAgentSdkSession(session)'),
             'rollback deve desconectar sessão SDK pela façade canônica',
         );
     });
@@ -158,8 +164,15 @@ describe('agent-lifecycle › source contracts', () => {
     });
 
     it('agentStop para o client SDK pela façade, sem chamar client.stop() cru', () => {
-        assert.ok(src.includes('stopAgentSdkClient(client)'), 'agentStop deve usar a façade para parar o client SDK');
-        assert.ok(!src.includes('await client.stop()'), 'agentStop não deve chamar client.stop() cru');
+        assert.ok(
+            src.includes('disconnectRuntimeSdkHandles(ctx') &&
+                runtimeTeardownSrc.includes('stopAgentSdkClient(client)'),
+            'agentStop deve usar a façade para parar o client SDK',
+        );
+        assert.ok(
+            !src.includes('await client.stop()') && !runtimeTeardownSrc.includes('await client.stop()'),
+            'agentStop não deve chamar client.stop() cru',
+        );
     });
 
     it('lifecycle delega I/O de runtime state e snapshot de shutdown para façades', () => {

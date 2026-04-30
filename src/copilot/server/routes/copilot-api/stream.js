@@ -24,6 +24,11 @@ import {
 import { buildRuntimeRouteMetaPayload } from '../../../presentation/runtime-meta.js';
 import { resolveCopilotApiRouteBinding } from '../../../presentation/runtime-request.js';
 import { buildAgentConnectedSsePayloadFromRoute } from '../../../presentation/runtime-status.js';
+import {
+    deleteCopilotApiStreamState,
+    getCopilotApiStreamState,
+    setCopilotApiStreamState,
+} from '../../runtime-state/copilot-api-stream.js';
 
 /**
  * @typedef {import('express').Request} Req
@@ -68,16 +73,13 @@ export function registerStreamRoutes(bridge, binding) {
      * }} RuntimeSseState
      */
 
-    /** @type {Map<string, RuntimeSseState>} */
-    const runtimeStates = new Map();
-
     /**
      * @param {RuntimeRouteDeps} deps
      * @returns {RuntimeSseState}
      */
     function ensureRuntimeState(deps) {
         const runtimeKey = deps.runtimeId;
-        const existing = runtimeStates.get(runtimeKey);
+        const existing = getCopilotApiStreamState(runtimeKey);
         if (existing && existing.agent === deps.agent) return existing;
         if (existing) {
             detachRuntimeState(existing);
@@ -99,7 +101,7 @@ export function registerStreamRoutes(bridge, binding) {
         };
 
         wireRuntimeState(state);
-        runtimeStates.set(runtimeKey, state);
+        setCopilotApiStreamState(runtimeKey, state);
         return state;
     }
 
@@ -168,7 +170,7 @@ export function registerStreamRoutes(bridge, binding) {
     function maybeDisposeRuntimeState(state) {
         if (state.streamPool.size > 0 || state.taskPool.size > 0) return;
         detachRuntimeState(state);
-        runtimeStates.delete(state.runtimeId);
+        deleteCopilotApiStreamState(state.runtimeId);
     }
 
     // BUG-EVDUP-03 (fix): tracker centralizado para limitar conexões SSE no bridge-stream
