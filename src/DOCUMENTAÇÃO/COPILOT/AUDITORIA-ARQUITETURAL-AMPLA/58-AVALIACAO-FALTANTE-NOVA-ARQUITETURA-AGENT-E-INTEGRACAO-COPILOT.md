@@ -219,6 +219,15 @@ regras por camada.
         em `channel`, `runtime-wiring`, `runtime-host`, `runtime-sdk-session` e capability snapshot,
         substituindo por `readRuntimeControlState`, `readAgentStatusSnapshot` e projections de
         `presentation`.
+  - [x] Exportar e consumir `readRuntimePermissionMode` pelo barrel público do agent para evitar que
+        bordas/projections precisem chamar métodos legados de permission mode diretamente.
+  - [x] `agent-runtime-capabilities` passou a reutilizar helpers de governance
+        (`readRuntimePermissionMode`, `readRuntimePermissionCapability`,
+        `readRuntimeContextFactoryCapabilities`, `readRuntimeToolRegistryEntries`) em vez de
+        remontar snapshots do contexto diretamente.
+  - [x] Ampliar a matriz de bypass para facades secundárias (`agent-runtime-tools`,
+        `agent-runtime-webhooks`, `agent-runtime-todos`) com contrato de consumidor e de ownership
+        query/admin.
 
 ### Faixa F — Presentation monopoly final
 
@@ -233,7 +242,12 @@ regras por camada.
   - [x] `/tools` deixou de consultar `observability` diretamente e passou a consumir
         `readTerminalToolStatsProjection()`, que usa projection compartilhada em
         `presentation/system-metrics`.
-- [ ] `presentation/runtime-overview` vira a leitura padrão para status/health/context/pr;
+- [x] `presentation/runtime-overview` vira a leitura padrão para status/health/context/pr;
+  - [x] `runtime-health.resolveAgentHealthSelection()` passou a usar `readAgentRuntimeOverview()`
+        como base da seleção de runtime/health.
+  - [x] `/copilot-api/health` deixou de montar health, permission mode, versão de canal/SDK,
+        listener diagnostics e health do hub dentro da rota; a montagem passou para
+        `buildCopilotApiHealthHttpResponseFromRoute()`.
 - [x] Criar contratos impedindo payload ad hoc de status/health fora de `presentation`.
 
 ### Faixa G — Preparação para multi-runtime/multi-agent
@@ -579,3 +593,43 @@ agent e SDK já está mais limpa; agora vale atacar a confiabilidade operacional
   - `test_presentation_runtime_route_deps`;
   - `test_copilot_api_multi_runtime`. Resultado: **verdes**.
 - `npx madge src/copilot --extensions js --circular`: **0 ciclos globais**.
+
+---
+
+## 16) Checkpoint de continuação — main-only, runtime-overview como leitura padrão e facades secundárias
+
+### Transformações aplicadas
+
+- O checkpoint anterior foi aplicado por fast-forward diretamente na `main`, enviado para
+  `origin/main`, e a branch temporária do PR foi removida. O trabalho passa a seguir sempre na
+  `main`, sem PR intermediário.
+- `presentation/runtime-health.js` passou a usar `readAgentRuntimeOverview()` para resolver seleção
+  de runtime e snapshot de health, alinhando health com a mesma leitura base usada por status,
+  terminal e system config.
+- A montagem completa do `/copilot-api/health` saiu de `server/routes/copilot-api/control.js` e
+  passou para `buildCopilotApiHealthHttpResponseFromRoute()` em `presentation/runtime-health.js`. A
+  rota agora apenas resolve deps runtime-aware e serializa a projection.
+- `#copilot/agent` passou a exportar `readRuntimePermissionMode`, permitindo que projections leiam
+  permission mode pelo seam público em vez de depender de métodos legados do singleton.
+- `agent-runtime-capabilities` passou a depender dos helpers de governance já existentes em
+  `agent-runtime-controls`, reduzindo remontagem local de permission/context/tool registry snapshot.
+- `test_facade_bypass_matrix` foi ampliado para `agent-runtime-tools`, `agent-runtime-webhooks` e
+  `agent-runtime-todos`, cobrindo consumidores internos e proibindo abertura de SDK/state cru nessas
+  facades secundárias.
+- `test_arch_contracts` agora impede regressão de `control.js` reabrindo `CONVERSATION_STORE`,
+  `CHANNEL_VERSION`, `getAgentHealthSnapshotCompat`, `getAgentHealthHttpStatus` ou
+  `listenerDiagnostics` diretamente na rota.
+
+### Validação executada
+
+- `npm run typecheck:strict:src.copilot`: **verde**.
+- `npm run typecheck:strict:tests.unit`: **verde**.
+- Testes focados:
+  - `test_presentation_runtime_health`;
+  - `test_agent_health_routes`;
+  - `test_arch_contracts`;
+  - `test_facade_bypass_matrix`;
+  - `test_presentation_barrel`.
+
+Resultado parcial desta faixa: **presentation monopoly** avançou de metadata/status para health
+operacional completo, e a Faixa E ganhou cobertura executável para facades secundárias.

@@ -78,6 +78,9 @@ Cobertura atual relevante:
   - `agent-runtime-controls`;
   - `agent-health-access`;
   - `agent-sdk-access` e `agent-sdk-runtime`.
+  - `agent-runtime-tools`;
+  - `agent-runtime-webhooks`;
+  - `agent-runtime-todos`.
 
 ---
 
@@ -86,20 +89,23 @@ Cobertura atual relevante:
 Itens ainda abertos para “congelamento total”:
 
 1. **redução de imports cruzados entre facades**
-   - especialmente quando houver fluxo query-only que pode ser resolvido por helper mais fino;
+   - primeiro corte concluído em `agent-runtime-capabilities`, que agora reutiliza helpers de
+     governance de `agent-runtime-controls`;
+   - ainda vale reduzir dependências restantes por tipo de leitura quando surgirem helpers mais
+     finos;
 2. **matriz de contrato por tipo de operação**
    - separar tests de query-only vs mutation-only vs lifecycle bridge;
 3. **cobertura complementar de facades secundárias**
-   - expandir o mesmo padrão para `agent-runtime-tools`, `agent-runtime-webhooks` e
-     `agent-runtime-todos`.
+   - concluída para `agent-runtime-tools`, `agent-runtime-webhooks` e `agent-runtime-todos`;
+   - próximo refinamento: mover essa matriz para uma tabela declarativa por tipo de operação.
 
 ---
 
 ## 6) Próxima onda recomendada
 
-1. Expandir `test_facade_bypass_matrix.spec.js` para facades secundárias (tools/webhooks/todos);
-2. Aplicar 1 refactor de baixo risco para reduzir import cruzado entre facades em
-   `agent-runtime-capabilities`;
-3. Introduzir contratos por tipo de operação (query/mutation/lifecycle) para fortalecer ownership.
+1. Introduzir contratos por tipo de operação (query/mutation/lifecycle) para fortalecer ownership.
+2. Levar a governança de secondary facades para uma tabela única de ownership executável.
+3. Avaliar se `agent-runtime-controls` deve expor helpers query-only ainda menores para reduzir
+   imports cruzados sem duplicar leitura de contexto.
 
 Com isso, o bloco E deixa de ser “parcialmente coberto” e vira governança executável completa.

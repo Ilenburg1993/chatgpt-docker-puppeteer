@@ -7,6 +7,12 @@
  *   projection em `presentation/`, mas a leitura semântica do que o agent sabe fazer nasce aqui.
  */
 
+import {
+    readRuntimeContextFactoryCapabilities,
+    readRuntimePermissionCapability,
+    readRuntimePermissionMode,
+    readRuntimeToolRegistryEntries,
+} from './agent-runtime-controls.js';
 import { readAgentRuntimeHealthSnapshot, readAgentRuntimeStatusSnapshot } from './agent-runtime-status.js';
 
 /**
@@ -155,6 +161,9 @@ function stateFromCheck(ok, available) {
  * @returns {AgentRuntimeCapabilitiesSnapshot}
  */
 export function readAgentRuntimeCapabilities(agent, options = {}) {
+    const governanceTarget = /** @type {Parameters<typeof readRuntimePermissionMode>[0]} */ (
+        /** @type {unknown} */ (agent)
+    );
     const snap = readAgentRuntimeStatusSnapshot(agent);
     const health = asRecord(options.healthSnapshot ?? readAgentRuntimeHealthSnapshot(agent));
     const checks = asRecord(health?.['checks']);
@@ -164,19 +173,10 @@ export function readAgentRuntimeCapabilities(agent, options = {}) {
     const missingResources = Array.isArray(sdkResources?.['missingResources'])
         ? /** @type {unknown[]} */ (sdkResources['missingResources']).filter((item) => typeof item === 'string')
         : [];
-    const permissionMode =
-        typeof agent.getPermissionMode === 'function'
-            ? agent.getPermissionMode()
-            : typeof snap['permissionMode'] === 'string'
-              ? snap['permissionMode']
-              : 'approve_all';
-    const permissionCapability =
-        typeof agent.getPermissionCapabilitySnapshot === 'function' ? agent.getPermissionCapabilitySnapshot() : null;
+    const permissionMode = readRuntimePermissionMode(governanceTarget);
+    const permissionCapability = readRuntimePermissionCapability(governanceTarget);
     const permissionCapabilityRecord = asRecord(permissionCapability);
-    const factoryCapabilities =
-        typeof agent.getContextFactoryCapabilitiesSnapshot === 'function'
-            ? asRecord(agent.getContextFactoryCapabilitiesSnapshot())
-            : null;
+    const factoryCapabilities = asRecord(readRuntimeContextFactoryCapabilities(governanceTarget));
     const queueFactory = asRecord(factoryCapabilities?.['runtime.queue']);
     const dialogFactory = asRecord(factoryCapabilities?.['dialog.loop']);
     const permissionsFactory = asRecord(factoryCapabilities?.['governance.permissions']);
@@ -185,13 +185,15 @@ export function readAgentRuntimeCapabilities(agent, options = {}) {
     const handoffFactory = asRecord(factoryCapabilities?.['integration.handoff']);
     const permissionHandlerAvailable = readBoolean(permissionCapabilityRecord?.['handlerAvailable']);
     const permissionCapabilityAvailable =
-        permissionCapabilityRecord !== null || typeof agent.getPermissionMode === 'function';
+        typeof agent.getPermissionCapabilitySnapshot === 'function' || typeof agent.getPermissionMode === 'function';
     const permissionCapabilityState =
         permissionHandlerAvailable === false ? 'degraded' : permissionCapabilityAvailable ? 'ready' : 'unknown';
     const webhookCount = typeof agent.listWebhooks === 'function' ? agent.listWebhooks().length : null;
     const hasHandoffManager = typeof agent.getHandoffManager === 'function';
     const toolRegistryEntries =
-        typeof agent.getToolRegistryEntriesSnapshot === 'function' ? agent.getToolRegistryEntriesSnapshot() : null;
+        typeof agent.getToolRegistryEntriesSnapshot === 'function'
+            ? readRuntimeToolRegistryEntries(governanceTarget)
+            : null;
     const toolRegistryAvailableFlag = readBoolean(sdkResourceFlags?.['toolRegistryAvailable']);
     const toolRegistryAvailable = toolRegistryEntries !== null || toolRegistryAvailableFlag === true;
     const toolRegistryState =

@@ -117,4 +117,60 @@ describe('contracts/facade-bypass-matrix — consumers permitidos por facade cr�
             `Imports não autorizados de agent-sdk-runtime:\n${sdkRuntimeViolations.join('\n')}`,
         );
     });
+
+    it('facades secundárias tools/webhooks/todos não têm consumidores internos fora do barrel de facades', () => {
+        const secondaryFacades = [
+            'facades/agent-runtime-tools.js',
+            'facades/agent-runtime-webhooks.js',
+            'facades/agent-runtime-todos.js',
+        ];
+        /** @type {string[]} */
+        const violations = [];
+
+        for (const facade of secondaryFacades) {
+            const facadeViolations = findFacadeImportViolations(facade, []);
+            violations.push(...facadeViolations.map((rel) => `${facade} -> ${rel}`));
+        }
+
+        assert.deepEqual(
+            violations,
+            [],
+            `Facades secundárias devem sair pelo barrel #copilot/agent/facades, sem bypass granular:\n${violations.join('\n')}`,
+        );
+    });
+
+    it('facades secundárias mantêm ownership query/admin sem abrir SDK ou estado persistido cru', () => {
+        const forbiddenPatterns = [
+            /from ['"][^'"]*(?:sdk\/|lifecycle\/state-io\.js)/,
+            /persistStateWithPolicy\s*\(/,
+            /readStateAsync\s*\(/,
+            /writeStateAsync\s*\(/,
+        ];
+        const facades = [
+            'agent/facades/agent-runtime-tools.js',
+            'agent/facades/agent-runtime-webhooks.js',
+            'agent/facades/agent-runtime-todos.js',
+        ];
+        const violations = facades.flatMap((rel) => {
+            const src = readFileSync(srcPath(rel), 'utf8');
+            return forbiddenPatterns.some((pattern) => pattern.test(src)) ? [rel] : [];
+        });
+
+        assert.deepEqual(
+            violations,
+            [],
+            `Facades secundárias não devem abrir SDK/state cru:\n${violations.join('\n')}`,
+        );
+    });
+
+    it('agent-runtime-capabilities reutiliza helpers de governance em vez de remontar snapshots de contexto', () => {
+        const src = readFileSync(srcPath('agent/facades/agent-runtime-capabilities.js'), 'utf8');
+
+        assert.match(src, /readRuntimePermissionMode/);
+        assert.match(src, /readRuntimePermissionCapability/);
+        assert.match(src, /readRuntimeContextFactoryCapabilities/);
+        assert.match(src, /readRuntimeToolRegistryEntries/);
+        assert.doesNotMatch(src, /agent\.getContextFactoryCapabilitiesSnapshot\?\.\(/);
+        assert.doesNotMatch(src, /agent\.getPermissionCapabilitySnapshot\?\.\(\)/);
+    });
 });

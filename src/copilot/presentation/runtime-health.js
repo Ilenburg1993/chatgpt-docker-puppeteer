@@ -11,15 +11,31 @@ import {
     readAgentRuntimeHealthSnapshot,
     readAgentRuntimeSdkResourceSnapshot,
     readRuntimeControlState,
+    readRuntimePermissionMode,
 } from '#copilot/agent';
+import { CHANNEL_VERSION } from '#copilot/channel';
+import { BRIDGE_EXPOSE_DIAGNOSTICS } from '#copilot/config';
+import { CONVERSATION_STORE } from '#copilot/conversation-hub';
+import { container } from '#copilot/core';
+import { createRequire } from 'node:module';
 import { resolveAgentRuntimeSelection } from './agent-runtime.js';
 import { readRuntimeLifecycleSnapshot } from './runtime-lifecycle.js';
 import { buildRuntimeRouteMetaFromSelection, buildRuntimeRouteMetaPayload } from './runtime-meta.js';
+import { readAgentRuntimeOverview } from './runtime-overview.js';
 import { readAgentStatusSnapshot } from './runtime-status.js';
 
 /**
  * @typedef {import('../agent/types.js').IAlwaysAliveAgent} AlwaysAliveAgentLike
  */
+
+const _sdkVersion = (() => {
+    try {
+        const req = createRequire(import.meta.url);
+        return /** @type {{ version: string }} */ (req('@github/copilot-sdk/package.json')).version;
+    } catch {
+        return 'unknown';
+    }
+})();
 
 /**
  * @typedef {{
@@ -92,9 +108,11 @@ export function getDefaultAgentHealthSnapshotCompat(runtimeId) {
  * }}
  */
 export function resolveAgentHealthSelection(runtimeId) {
-    const target = resolveRuntimeHealthTarget(runtimeId);
+    const target = readAgentRuntimeOverview(runtimeId);
     return {
-        health: getAgentHealthSnapshotCompat(target.agent),
+        health: /** @type {import('../agent/types.js').AgentHealthSnapshot} */ (
+            target.health ?? getAgentHealthSnapshotCompat(target.agent)
+        ),
         runtimeId: target.runtimeId,
         requestedRuntimeId: target.requestedRuntimeId,
         runtimeFound: target.runtimeFound,
@@ -123,6 +141,65 @@ export function buildAgentHealthHttpResponse(runtimeId) {
         body: {
             ...buildRuntimeRouteMetaPayload(selection),
             ...selection.health,
+        },
+    };
+}
+
+/**
+ * @returns {{ ok: boolean; error?: string }}
+ */
+function readConversationStorePing() {
+    try {
+        const store = container.resolve(CONVERSATION_STORE);
+        if (!store.db) return { ok: false, error: 'db não inicializado' };
+        store.db.prepare('SELECT 1').get();
+        return { ok: true };
+    } catch (error) {
+        return { ok: false, error: error instanceof Error ? error.message : String(error) };
+    }
+}
+
+/**
+ * Projection HTTP-safe do `/health` operacional do `copilot-api`.
+ *
+ * Mantém fora da rota a montagem de status, runtime metadata, permission mode, versão de canal/SDK e diagnóstico do
+ * hub. A rota só resolve as deps do runtime e serializa o resultado.
+ *
+ * @param {import('./runtime-route-deps.js').CopilotApiRouteDeps} deps
+ * @returns {{
+ *     statusCode: number;
+ *     body: import('../agent/types.js').AgentHealthSnapshot & {
+ *         permissionMode: string;
+ *         channelVersion: string;
+ *         sdkVersion: string;
+ *         nodeVersion: string;
+ *         listenerDiagnostics?: Record<string, number>;
+ *         hubStore: { ok: boolean; error?: string };
+ *     } & ReturnType<typeof buildRuntimeRouteMetaPayload>;
+ * }}
+ */
+export function buildCopilotApiHealthHttpResponseFromRoute(deps) {
+    const health = getAgentHealthSnapshotCompat(deps.agent);
+    const permissionMode =
+        typeof deps.agent.getPermissionMode === 'function'
+            ? deps.agent.getPermissionMode()
+            : readRuntimePermissionMode(/** @type {any} */ (deps.agent));
+    const listenerDiagnostics =
+        process.env['NODE_ENV'] === 'development' && BRIDGE_EXPOSE_DIAGNOSTICS
+            ? deps.agent.listenerDiagnostics?.()
+            : undefined;
+
+    return {
+        statusCode: getAgentHealthHttpStatus(health),
+        body: {
+            ...buildRuntimeRouteMetaPayload(deps),
+            ...health,
+            permissionMode,
+            channelVersion: CHANNEL_VERSION,
+            sdkVersion: _sdkVersion,
+            nodeVersion: process.version,
+            ...(listenerDiagnostics ? { listenerDiagnostics } : {}),
+            hubStore: readConversationStorePing(),
         },
     };
 }

@@ -9,18 +9,14 @@
  * @module copilot/server/routes/copilot-api/control
  */
 
-import { CHANNEL_VERSION } from '#copilot/channel';
-import { BRIDGE_ADMIN_TOKEN, BRIDGE_EXPOSE_DIAGNOSTICS } from '#copilot/config';
-import { CONVERSATION_STORE } from '#copilot/conversation-hub';
-import { container } from '#copilot/core';
+import { BRIDGE_ADMIN_TOKEN } from '#copilot/config';
 import { globalAuditTrail } from '#copilot/hooks';
 import { log } from '#copilot/observability';
-import { createRequire } from 'node:module';
 import { toError } from '../../../core/error-handlers.js';
 import { projectAgentHttpError } from '../../../presentation/agent-http-errors.js';
 import { buildAgentRuntimeCapabilitiesFromRoute } from '../../../presentation/runtime-capabilities.js';
 import { readAgentRuntimeControlStateFromRoute } from '../../../presentation/runtime-controls.js';
-import { getAgentHealthHttpStatus, getAgentHealthSnapshotCompat } from '../../../presentation/runtime-health.js';
+import { buildCopilotApiHealthHttpResponseFromRoute } from '../../../presentation/runtime-health.js';
 import { buildRuntimeRouteMetaPayload } from '../../../presentation/runtime-meta.js';
 import { resolveCopilotApiRouteBinding } from '../../../presentation/runtime-request.js';
 import {
@@ -28,16 +24,6 @@ import {
     buildAgentStatusHttpPayloadFromRoute,
 } from '../../../presentation/runtime-status.js';
 import { sanitizeHttpErrorMessage } from '../../middleware/error-handler.js';
-
-// UPG-PROP-07 (fix): ler versão do SDK uma vez no carregamento do módulo para incluir no /health
-const _sdkVersion = (() => {
-    try {
-        const req = createRequire(import.meta.url);
-        return /** @type {{ version: string }} */ (req('@github/copilot-sdk/package.json')).version;
-    } catch {
-        return 'unknown';
-    }
-})();
 
 /**
  * @typedef {import('express').Request} Req
@@ -165,39 +151,8 @@ function _makeAdminAuthMiddleware() {
  * @param {RuntimeRouteDeps} deps
  */
 function _handleHealth(res, deps) {
-    const { agent } = deps;
-    const health = getAgentHealthSnapshotCompat(agent);
-
-    // ARCH-04: verificar conectividade do ConversationStore (SQLite)
-    // API-P4-01: verificar se db existe antes de usar ? para não gerar false positive
-    /** @type {{ ok: boolean; error?: string }} */
-    const hubStore = (() => {
-        const store = container.resolve(CONVERSATION_STORE);
-        if (!store.db) return { ok: false, error: 'db não inicializado' };
-        try {
-            store.db.prepare('SELECT 1').get();
-            return { ok: true };
-        } catch (e) {
-            return { ok: false, error: String(toError(e).message ?? 'unknown') };
-        }
-    })();
-
-    res.status(getAgentHealthHttpStatus(health)).json({
-        ...buildRuntimeRouteMetaPayload(deps),
-        ...health,
-        // G2-API-14: permissionMode para rastreabilidade de configuração de auditoria
-        permissionMode: typeof agent.getPermissionMode === 'function' ? agent.getPermissionMode() : 'approve_all',
-        channelVersion: CHANNEL_VERSION,
-        // UPG-PROP-07: versão do SDK e do Node.js para rastreabilidade em deploys
-        sdkVersion: _sdkVersion,
-        nodeVersion: process.version,
-        // UPG-PROP-10: diagnóstico de listeners disponível apenas em desenvolvimento
-        listenerDiagnostics:
-            process.env['NODE_ENV'] === 'development' && BRIDGE_EXPOSE_DIAGNOSTICS
-                ? agent.listenerDiagnostics?.()
-                : undefined,
-        hubStore,
-    });
+    const response = buildCopilotApiHealthHttpResponseFromRoute(deps);
+    res.status(response.statusCode).json(response.body);
 }
 
 /**

@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest';
 import {
     buildAgentHealthHttpResponse,
     buildAgentModuleHealth,
+    buildCopilotApiHealthHttpResponseFromRoute,
     buildLegacyAgentHealth,
     getAgentHealthHttpStatus,
     getAgentHealthSnapshotCompat,
@@ -77,6 +78,39 @@ describe('presentation/runtime-health', () => {
                 runtimeFound: false,
                 usedDefaultRuntimeFallback: true,
                 status: expect.any(String),
+            }),
+        );
+    });
+
+    it('projeta o health operacional do copilot-api sem montagem ad hoc na rota', () => {
+        const agent = /** @type {any} */ ({
+            getStatusSnapshot: () => ({ status: 'idle', sessionId: 'sess-1', model: 'gpt-5-mini' }),
+            getHealthSnapshot: () => ({ ok: true, status: 'healthy', sessionId: 'sess-1', checks: {} }),
+            getPermissionMode: () => 'selective',
+        });
+
+        const response = buildCopilotApiHealthHttpResponseFromRoute({
+            agent,
+            runtimeId: 'default',
+            requestedRuntimeId: 'missing',
+            runtimeFound: false,
+            usedDefaultRuntimeFallback: true,
+        });
+
+        expect(response.statusCode).toBe(200);
+        expect(response.body).toEqual(
+            expect.objectContaining({
+                ok: true,
+                status: 'healthy',
+                runtimeId: 'default',
+                requestedRuntimeId: 'missing',
+                runtimeFound: false,
+                usedDefaultRuntimeFallback: true,
+                permissionMode: 'selective',
+                channelVersion: expect.any(String),
+                sdkVersion: expect.any(String),
+                nodeVersion: expect.stringMatching(/^v/),
+                hubStore: expect.objectContaining({ ok: expect.any(Boolean) }),
             }),
         );
     });

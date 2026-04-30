@@ -19,6 +19,7 @@ export * from './runtime-file-context.js';
 export {
     buildAgentHealthHttpResponse,
     buildAgentModuleHealth,
+    buildCopilotApiHealthHttpResponseFromRoute,
     buildLegacyAgentHealth,
     getAgentHealthHttpStatus,
     getAgentHealthSnapshotCompat,

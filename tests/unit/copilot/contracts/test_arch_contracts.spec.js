@@ -140,6 +140,8 @@ describe('W4-9 — barrel exports: símbolos mínimos', () => {
             'readAgentRuntimeStatusSnapshot',
             'readAgentRuntimeHealthSnapshot',
             'readAgentHealthInputSnapshot',
+            'readRuntimeGovernanceState',
+            'readRuntimePermissionMode',
             'createAgentSdkClient',
             'ensureAgentSdkClientStarted',
             'sendAgentSdkSession',
@@ -388,9 +390,15 @@ describe('W4-9 — copilot-api: payloads operacionais via projection de rota', (
         assert.match(src, /buildAgentStatusHttpPayloadFromRoute/);
         assert.match(src, /buildAgentSessionHttpPayloadFromRoute/);
         assert.match(src, /buildAgentRuntimeCapabilitiesFromRoute/);
+        assert.match(src, /buildCopilotApiHealthHttpResponseFromRoute/);
         assert.doesNotMatch(src, /buildAgentStatusHttpPayload\s*\(\s*deps\.agent\b/);
         assert.doesNotMatch(src, /buildAgentSessionHttpPayload\s*\(\s*deps\.agent\b/);
         assert.doesNotMatch(src, /buildAgentRuntimeCapabilities\s*\(\s*deps\.agent\b/);
+        assert.doesNotMatch(src, /getAgentHealthSnapshotCompat/);
+        assert.doesNotMatch(src, /getAgentHealthHttpStatus/);
+        assert.doesNotMatch(src, /CONVERSATION_STORE/);
+        assert.doesNotMatch(src, /CHANNEL_VERSION/);
+        assert.doesNotMatch(src, /listenerDiagnostics\?\.\(\)/);
     });
 
     it('stream.js usa projection connected por deps de rota', () => {

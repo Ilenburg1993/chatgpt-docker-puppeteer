@@ -97,6 +97,7 @@ import { readAgentRuntimeHealthSnapshot, readAgentRuntimeStatusSnapshot } from '
  *
  * @typedef {{
  *     getPermissionModeSnapshot?: (() => 'approve_all' | 'audit_only' | 'selective') | undefined;
+ *     getPermissionMode?: (() => 'approve_all' | 'audit_only' | 'selective') | undefined;
  *     setPermissionMode?:
  *         | ((
  *               mode: 'approve_all' | 'audit_only' | 'selective',
@@ -242,7 +243,7 @@ export function readRuntimeGovernanceState(runtime) {
  * @returns {'approve_all' | 'audit_only' | 'selective'}
  */
 export function readRuntimePermissionMode(runtime) {
-    return runtime.getPermissionModeSnapshot?.() ?? 'approve_all';
+    return runtime.getPermissionModeSnapshot?.() ?? runtime.getPermissionMode?.() ?? 'approve_all';
 }
 
 /**
