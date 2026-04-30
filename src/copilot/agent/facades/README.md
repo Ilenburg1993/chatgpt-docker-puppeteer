@@ -9,14 +9,30 @@ Fachadas finas do `AlwaysAliveAgent`.
 
 ## Arquivos
 
-| Arquivo                         | Função                                                                                                                                                          |
-| ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `agent-sdk-access.js`           | handles crus do SDK + operações vanilla de alto valor (status, quota, models/tools, mode, plan, workspace, elicitation, pending calls, shell, sessions, agents) |
-| `agent-session-ops.js`          | operações diretas de sessão (abort, log, watchdog, histórico)                                                                                                   |
-| `agent-model-config.js`         | modelo, reasoning e listagem de modelos                                                                                                                         |
-| `agent-webhook-ops.js`          | operações de webhook/integração expostas pela fachada do agente                                                                                                 |
-| `agent-runtime-capabilities.js` | mapa canônico das capabilities públicas atuais do runtime                                                                                                       |
-| `index.js`                      | barrel canônico das façades modernas reexportadas por `agent/index.js`                                                                                          |
+| Arquivo                         | Owner semântico | Função                                                                                                                                                          |
+| ------------------------------- | --------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `agent-dialog-runtime.js`       | lifecycle       | operações de diálogo runtime (`start/send/stop/recover`)                                                                                                        |
+| `agent-health-access.js`        | query           | leitura canônica dos sinais de health                                                                                                                           |
+| `agent-model-config.js`         | mutation        | modelo, reasoning e listagem de modelos                                                                                                                         |
+| `agent-runtime-capabilities.js` | projection      | mapa canônico das capabilities públicas atuais do runtime                                                                                                       |
+| `agent-runtime-controls.js`     | mutation        | controles e mutações auxiliares do runtime                                                                                                                      |
+| `agent-runtime-event-bridge.js` | infra           | wiring dos emitters internos para o EventBus                                                                                                                    |
+| `agent-runtime-ownership.js`    | mutation        | vínculo entre sessão SDK ativa e hub session                                                                                                                    |
+| `agent-runtime-state.js`        | mutation        | persistência semântica do estado vivo do runtime                                                                                                                |
+| `agent-runtime-status.js`       | query           | snapshots/status/health compatíveis do runtime                                                                                                                  |
+| `agent-runtime-todos.js`        | query           | projections da capacidade TODO                                                                                                                                  |
+| `agent-runtime-tools.js`        | query           | tools disponíveis no runtime do agent                                                                                                                           |
+| `agent-runtime-webhooks.js`     | mutation        | operações de webhook do runtime                                                                                                                                 |
+| `agent-sdk-access.js`           | infra           | handles crus do SDK + operações vanilla de alto valor (status, quota, models/tools, mode, plan, workspace, elicitation, pending calls, shell, sessions, agents) |
+| `agent-sdk-runtime.js`          | infra           | operações de sessão SDK ativa dentro do runtime                                                                                                                 |
+| `agent-sdk-session.js`          | mutation        | operações vanilla de sessão SDK (`mode` e `plan`)                                                                                                               |
+| `agent-session-ops.js`          | lifecycle       | operações diretas de sessão (abort, log, watchdog, histórico)                                                                                                   |
+| `agent-webhook-ops.js`          | mutation        | operações de webhook/integração expostas pela fachada do agente                                                                                                 |
+| `index.js`                      | barrel          | barrel canônico das façades modernas reexportadas por `agent/index.js`                                                                                          |
+
+Os owners acima são protegidos por `tests/unit/copilot/contracts/test_facade_bypass_matrix.spec.js`.
+Qualquer import cruzado entre facades precisa estar declarado na matriz executável antes de ser
+aceito.
 
 ## Regra de uso
 

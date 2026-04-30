@@ -252,7 +252,7 @@ regras por camada.
   - [x] Ampliar a matriz de bypass para facades secundárias (`agent-runtime-tools`,
         `agent-runtime-webhooks`, `agent-runtime-todos`) com contrato de consumidor e de ownership
         query/admin.
-  - [ ] Criar matriz executável de tipo de operação por façade (`query`, `mutation`, `lifecycle`,
+  - [x] Criar matriz executável de tipo de operação por façade (`query`, `mutation`, `lifecycle`,
         `infra`, `projection`) para bloquear import cruzado que reabra ownership sem necessidade.
 
 ### Faixa F — Presentation monopoly final
@@ -275,7 +275,7 @@ regras por camada.
         listener diagnostics e health do hub dentro da rota; a montagem passou para
         `buildCopilotApiHealthHttpResponseFromRoute()`.
 - [x] Criar contratos impedindo payload ad hoc de status/health fora de `presentation`.
-- [ ] Inventariar rotas não-agent (`server/routes/sessions.js`, `server/routes/health.js` em
+- [x] Inventariar rotas não-agent (`server/routes/sessions.js`, `server/routes/health.js` em
       `/ws/info` e equivalentes) para separar dívida real de payload operacional de runtime de
       payload meramente HTTP/hub.
 
@@ -297,6 +297,9 @@ regras por camada.
         chavear concorrência por `runtimeId`, permitindo turnos simultâneos em runtimes distintos.
   - [ ] Mapear todos os Maps/sets module-level remanescentes e classificá-los como registry,
         terminal-local, SSE connection state ou dívida arquitetural.
+  - [x] Criar contrato executável para os estados vivos de rotas multi-runtime (`dialog/turn`,
+        `copilot-api/stream`, `sdk/agent`, `sdk/hooks`, `sdk/session`) exigindo chaveamento por
+        `runtimeId`.
 - [x] Criar teste de dois runtimes registrados com fallback explícito.
 
 ---
@@ -709,3 +712,35 @@ operacional completo, e a Faixa E ganhou cobertura executável para facades secu
   observability, garantindo que todos ecoem fallback explícito de runtime.
 - `test_arch_contracts` passou a bloquear retorno de `_turnInFlight`/mutex global em
   `copilot-api/dialog` e respostas triviais de observability sem `buildObservabilityRuntimeMeta()`.
+
+---
+
+## 18) Checkpoint de continuação — matriz de facades e estado vivo governado
+
+### Transformações aplicadas
+
+- `src/copilot/agent/facades/README.md` passou a declarar owner semântico para cada facade: `query`,
+  `mutation`, `lifecycle`, `infra` ou `projection`.
+- `test_facade_bypass_matrix` ganhou uma matriz executável cobrindo todas as facades públicas,
+  validando:
+  - cobertura exata dos arquivos em `agent/facades/*.js`;
+  - roles permitidas;
+  - imports cruzados entre facades explicitamente declarados.
+- Foi criado `test_runtime_state_governance`, contrato dedicado ao Gate 2.0-D, exigindo que o estado
+  vivo de rotas multi-runtime seja chaveado por `runtimeId`:
+  - `/copilot-api/dialog/turn`;
+  - `/copilot-api/stream`;
+  - `/api/sdk/agent/stream`;
+  - `/api/sdk/hooks/events`;
+  - `/api/sdk/sessions/:id/stream`.
+- Foi criado `test_server_route_inventory`, separando rotas runtime-aware, hub-only, server-only,
+  bridges de presentation e infra de router. O contrato impede que `sessions.js`, `sse.js` e rotas
+  server-only sejam confundidas com dívida de metadata runtime.
+
+### Resultado arquitetural
+
+- A Faixa E saiu de “matriz descrita no roadmap” para contrato executável.
+- A Faixa G ganhou proteção específica contra regressão de estado vivo compartilhado entre runtimes
+  nas rotas mais sensíveis a colisão.
+- A Faixa F ganhou inventário executável de rotas, reduzindo ambiguidade entre payload operacional
+  de agent e payload meramente HTTP/hub.
