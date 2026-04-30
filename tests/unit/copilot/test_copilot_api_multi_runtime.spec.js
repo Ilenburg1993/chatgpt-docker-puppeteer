@@ -117,7 +117,24 @@ function createRuntime(sessionId, model) {
         getToolRegistryEntriesSnapshot: () => [],
         listWebhooks: () => [],
         getHandoffManager: () => ({}),
+        sendDialogTurn: async (/** @type {string} */ message) => `${sessionId}:${message}`,
     };
+}
+
+/**
+ * @template T
+ * @returns {{ promise: Promise<T>; resolve: (value: T) => void; reject: (reason?: unknown) => void }}
+ */
+function deferred() {
+    /** @type {(value: T) => void} */
+    let resolve = () => {};
+    /** @type {(reason?: unknown) => void} */
+    let reject = () => {};
+    const promise = new Promise((res, rej) => {
+        resolve = res;
+        reject = rej;
+    });
+    return { promise, resolve, reject };
 }
 
 describe('copilot-api multi-runtime propagation', () => {
@@ -158,5 +175,48 @@ describe('copilot-api multi-runtime propagation', () => {
         assert.equal(fallback.body.runtimeFound, false);
         assert.equal(fallback.body.usedDefaultRuntimeFallback, true);
         assert.equal(fallback.body.sessionId, 'default-session');
+    });
+
+    it('dialog/turn bloqueia concorrência por runtime sem serializar runtimes independentes', async () => {
+        const defaultRuntime = createRuntime('default-session', 'gpt-5-mini');
+        const auditRuntime = createRuntime('audit-session', 'gpt-5');
+        const defaultReply = deferred();
+        const defaultStarted = deferred();
+
+        defaultRuntime.sendDialogTurn = async () => {
+            defaultStarted.resolve(undefined);
+            return defaultReply.promise;
+        };
+        auditRuntime.sendDialogTurn = async (/** @type {string} */ message) => `audit:${message}`;
+
+        registerAgentRuntime(defaultRuntime, 'default');
+        registerAgentRuntime(auditRuntime, 'audit');
+
+        const app = express();
+        app.use(express.json());
+        app.use(createCopilotApiRouter());
+
+        const firstDefaultTurn = (async () =>
+            supertest(app).post('/dialog/turn?runtimeId=default').send({ message: 'um' }))();
+        await defaultStarted.promise;
+
+        const busyDefault = await supertest(app)
+            .post('/dialog/turn?runtimeId=default')
+            .send({ message: 'dois' })
+            .expect(429);
+        assert.equal(busyDefault.body.runtimeId, 'default');
+
+        const auditTurn = await supertest(app)
+            .post('/dialog/turn?runtimeId=audit')
+            .send({ message: 'livre' })
+            .expect(200);
+        assert.equal(auditTurn.body.runtimeId, 'audit');
+        assert.equal(auditTurn.body.reply, 'audit:livre');
+
+        defaultReply.resolve('default:um');
+        const firstDefault = await firstDefaultTurn;
+        assert.equal(firstDefault.status, 200);
+        assert.equal(firstDefault.body.runtimeId, 'default');
+        assert.equal(firstDefault.body.reply, 'default:um');
     });
 });

@@ -13,6 +13,7 @@ import {
 import { clearSdkRuntimeBinding, resolveSdkRuntimeProjection } from '../../../src/copilot/presentation/sdk-sessions.js';
 import createAgentRouter from '../../../src/copilot/server/routes/sdk/agent.js';
 import createClientRouter from '../../../src/copilot/server/routes/sdk/client.js';
+import createObservabilityRouter from '../../../src/copilot/server/routes/sdk/observability.js';
 
 /** @returns {any} */
 function createMockClient() {
@@ -59,6 +60,23 @@ function createMockAgent() {
                 skipPermission: false,
             },
         ],
+    };
+}
+
+/** @returns {any} */
+function createMockObservability() {
+    return {
+        defaultAuditLog: {
+            flush: async () => {},
+            getLast: () => [],
+        },
+        getAuditTail: () => [],
+        isOtelEnabled: () => true,
+        otelExporterOtlpEndpoint: 'http://otel.local',
+        defaultOtelFile: '/tmp/otel.jsonl',
+        getCatalog: () => ({ 'session.boot': { version: 1 } }),
+        getDeadLetters: () => [],
+        log: () => {},
     };
 }
 
@@ -359,5 +377,38 @@ describe('sdk runtime projection routes', () => {
             skipPermission: true,
             hasParameters: false,
         });
+    });
+
+    it('rotas observability remanescentes propagam metadata runtime canônica', async () => {
+        const app = express();
+        app.use(express.json());
+        app.use(
+            createObservabilityRouter(
+                routeDeps({
+                    sdkObservability: createMockObservability(),
+                    runtimeId: 'default',
+                    requestedRuntimeId: 'audit',
+                    runtimeFound: false,
+                    usedDefaultRuntimeFallback: true,
+                }),
+            ),
+        );
+
+        const requests = [
+            request(app).post('/observability/log-level').send({ level: 'TRACE' }).expect(400),
+            request(app).post('/observability/audit/flush').send({}).expect(200),
+            request(app).get('/observability/audit-tail').expect(200),
+            request(app).get('/observability/otel-status').expect(200),
+            request(app).get('/observability/events/catalog').expect(200),
+            request(app).get('/observability/events/dead-letter').expect(200),
+        ];
+
+        const responses = await Promise.all(requests);
+        for (const res of responses) {
+            assert.equal(res.body.runtimeId, 'default');
+            assert.equal(res.body.requestedRuntimeId, 'audit');
+            assert.equal(res.body.runtimeFound, false);
+            assert.equal(res.body.usedDefaultRuntimeFallback, true);
+        }
     });
 });

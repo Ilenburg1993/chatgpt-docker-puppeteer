@@ -473,6 +473,15 @@ describe('W4-9 — copilot-api routes propagam runtime metadata canônica', () =
         assert.match(tasksSrc, /buildRuntimeRouteMetaPayload/);
     });
 
+    it('dialog/turn usa gate de concorrência por runtimeId, não mutex global do processo', () => {
+        const dialogSrc = readSrc('server/routes/copilot-api/dialog.js');
+
+        assert.match(dialogSrc, /turnInFlightByRuntime/);
+        assert.match(dialogSrc, /deps\.runtimeId\s*\?\?\s*['"]default['"]/);
+        assert.doesNotMatch(dialogSrc, /\b_turnInFlight\b/);
+        assert.doesNotMatch(dialogSrc, /let\s+\w*turnInFlight\w*\s*=\s*false/);
+    });
+
     it('stream/tasks inclui metadata runtime no evento connected', () => {
         const streamSrc = readSrc('server/routes/copilot-api/stream.js');
         assert.match(streamSrc, /buildRuntimeRouteMetaPayload/);
@@ -498,6 +507,9 @@ describe('W4-9 — SDK routes propagam runtime metadata canônica', () => {
         assert.match(agentSrc, /buildAgentRuntimeMeta/);
         assert.match(observabilitySrc, /buildObservabilityRuntimeMeta/);
         assert.match(hooksSrc, /buildRuntimeRouteMetaPayload/);
+        assert.doesNotMatch(observabilitySrc, /res\.json\(\{\s*ok:\s*true\s*\}\)/);
+        assert.doesNotMatch(observabilitySrc, /res\.json\(\{\s*ok:\s*true,\s*(?:entries|catalog|enabled)\b/);
+        assert.doesNotMatch(observabilitySrc, /status\(400\)\.json\(\{\s*ok:\s*false,\s*error:/);
     });
 });
 

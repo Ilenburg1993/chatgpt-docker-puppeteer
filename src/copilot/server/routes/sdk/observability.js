@@ -288,15 +288,19 @@ export default function createObservabilityRouter(deps) {
 
     router.post('/observability/log-level', (req, res) =>
         withErrorHandler(req, res, async () => {
+            const routeDeps = resolveObservabilityRouterDeps(deps, req);
             const { level } = /** @type {{ level?: string }} */ (req.body ?? {});
             const valid = ['DEBUG', 'INFO', 'WARN', 'ERROR', 'FATAL'];
             if (!level || !valid.includes(level.toUpperCase())) {
-                res.status(400).json({ ok: false, error: `Invalid level. Valid: ${valid.join(', ')}` });
+                res.status(400).json({
+                    ok: false,
+                    ...buildObservabilityRuntimeMeta(routeDeps),
+                    error: `Invalid level. Valid: ${valid.join(', ')}`,
+                });
                 return;
             }
             const { log: obsLog } = await import('#copilot/observability/logger');
             obsLog.setLevel(/** @type {import('#copilot/observability/logger').LogLevel} */ (level.toUpperCase()));
-            const routeDeps = resolveObservabilityRouterDeps(deps, req);
             const { sdkObservability } = routeDeps;
             sdkObservability.log('INFO', `[observability] Log level changed to ${level.toUpperCase()} via API`);
             res.json({ ok: true, ...buildObservabilityRuntimeMeta(routeDeps), level: level.toUpperCase() });
@@ -323,10 +327,11 @@ export default function createObservabilityRouter(deps) {
 
     router.post('/observability/audit/flush', (req, res) =>
         withErrorHandler(req, res, async () => {
-            const { sdkObservability } = resolveObservabilityRouterDeps(deps, req);
+            const routeDeps = resolveObservabilityRouterDeps(deps, req);
+            const { sdkObservability } = routeDeps;
             await sdkObservability.defaultAuditLog.flush();
             sdkObservability.log('INFO', '[observability] Audit log flushed via API');
-            res.json({ ok: true });
+            res.json({ ok: true, ...buildObservabilityRuntimeMeta(routeDeps) });
         }),
     );
 
@@ -334,7 +339,8 @@ export default function createObservabilityRouter(deps) {
 
     router.get('/observability/audit-tail', (req, res) =>
         withErrorHandler(req, res, async () => {
-            const { sdkObservability } = resolveObservabilityRouterDeps(deps, req);
+            const routeDeps = resolveObservabilityRouterDeps(deps, req);
+            const { sdkObservability } = routeDeps;
             const n = Math.min(Math.max(Number(req.query['n']) || 50, 1), 500);
             const sessionId = typeof req.query['sessionId'] === 'string' ? req.query['sessionId'] : undefined;
             const tool = typeof req.query['tool'] === 'string' ? req.query['tool'] : undefined;
@@ -350,16 +356,18 @@ export default function createObservabilityRouter(deps) {
                     return record?.data?.toolName === tool;
                 });
             }
-            res.json({ ok: true, entries, count: entries.length });
+            res.json({ ok: true, ...buildObservabilityRuntimeMeta(routeDeps), entries, count: entries.length });
         }),
     );
 
     // ─── GET /observability/otel-status ──────────────────────────────────────────
 
     router.get('/observability/otel-status', (_req, res) => {
-        const { sdkObservability } = resolveObservabilityRouterDeps(deps, /** @type {Req} */ (_req));
+        const routeDeps = resolveObservabilityRouterDeps(deps, /** @type {Req} */ (_req));
+        const { sdkObservability } = routeDeps;
         res.json({
             ok: true,
+            ...buildObservabilityRuntimeMeta(routeDeps),
             enabled: sdkObservability.isOtelEnabled(),
             endpoint: sdkObservability.otelExporterOtlpEndpoint ?? null,
             traceFile: sdkObservability.defaultOtelFile,
@@ -370,17 +378,19 @@ export default function createObservabilityRouter(deps) {
     // ─── GET /observability/events/catalog ───────────────────────────────────────
 
     router.get('/observability/events/catalog', (_req, res) => {
-        const { sdkObservability } = resolveObservabilityRouterDeps(deps, /** @type {Req} */ (_req));
-        res.json({ ok: true, catalog: sdkObservability.getCatalog() });
+        const routeDeps = resolveObservabilityRouterDeps(deps, /** @type {Req} */ (_req));
+        const { sdkObservability } = routeDeps;
+        res.json({ ok: true, ...buildObservabilityRuntimeMeta(routeDeps), catalog: sdkObservability.getCatalog() });
     });
 
     // ─── GET /observability/events/dead-letter ────────────────────────────────────
 
     router.get('/observability/events/dead-letter', (req, res) => {
-        const { sdkObservability } = resolveObservabilityRouterDeps(deps, req);
+        const routeDeps = resolveObservabilityRouterDeps(deps, req);
+        const { sdkObservability } = routeDeps;
         const limit = Math.min(Number(req.query['limit']) || 50, 200);
         const entries = sdkObservability.getDeadLetters(limit);
-        res.json({ ok: true, entries, count: entries.length });
+        res.json({ ok: true, ...buildObservabilityRuntimeMeta(routeDeps), entries, count: entries.length });
     });
 
     return router;

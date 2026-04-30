@@ -44,8 +44,10 @@ import { resolveCopilotApiRouteBinding } from '../../../presentation/runtime-req
  * @returns {void}
  */
 export function registerDialogRoutes(bridge, binding) {
-    // G2-API-09: flag de rate limiting — impede turnos concorrentes na camada HTTP
-    let _turnInFlight = false;
+    // G2-API-09/G-2.0: rate limiting por runtime — impede turnos concorrentes no mesmo runtime
+    // sem serializar runtimes independentes no mesmo processo HTTP.
+    /** @type {Map<string, true>} */
+    const turnInFlightByRuntime = new Map();
 
     // ─── POST /dialog/start ───────────────────────────────────────────────────
 
@@ -102,8 +104,9 @@ export function registerDialogRoutes(bridge, binding) {
         const deps = resolveCopilotApiRouteBinding(binding, req);
         const { agent } = deps;
         const runtimeMeta = buildRuntimeRouteMetaPayload(deps);
+        const runtimeKey = deps.runtimeId ?? 'default';
         // G2-API-09: rate limiting — rejeitar imediatamente se já há turno HTTP em andamento
-        if (_turnInFlight) {
+        if (turnInFlightByRuntime.has(runtimeKey)) {
             return res.status(429).json({
                 ok: false,
                 ...runtimeMeta,
@@ -141,7 +144,7 @@ export function registerDialogRoutes(bridge, binding) {
             allowDisabled: true,
         });
 
-        _turnInFlight = true;
+        turnInFlightByRuntime.set(runtimeKey, true);
         try {
             const reply = await sendRuntimeDialogTurnOnActiveLoop(
                 message,
@@ -172,7 +175,7 @@ export function registerDialogRoutes(bridge, binding) {
                 dialogLoopActive: readAgentRuntimeControlStateFromRoute(deps).dialogLoopActive,
             });
         } finally {
-            _turnInFlight = false;
+            turnInFlightByRuntime.delete(runtimeKey);
         }
     });
 

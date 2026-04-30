@@ -73,6 +73,30 @@ digraph AgentCopilotToBe {
 6. Boot e shutdown produzem relatórios estáveis e rollback previsível.
 7. O SDK remove ciclos internos de model/session antes de virar fundação final para multi-runtime.
 
+### 2.3 Critérios objetivos para declarar Arquitetura 2.0
+
+A migração 2.0 só deve ser considerada concluída quando todos os gates abaixo estiverem verdes por
+contrato automatizado e por teste operacional:
+
+- **Gate 2.0-A — fronteira pública do agent:** nenhum consumidor fora de `src/copilot/agent` abre
+  `agent/facades/*`, `agent/error-policy.js` ou propriedades voláteis (`status`, `sessionId`,
+  `dialogLoopActive`, `dialogPaused`) quando já houver façade/projection canônica.
+- **Gate 2.0-B — presentation monopoly:** rotas HTTP/SSE, terminal commands e channel clients não
+  montam payload operacional de agent diretamente; status, health, capabilities, runtime metadata e
+  erros passam por `presentation/*`.
+- **Gate 2.0-C — multi-runtime explícito:** todo endpoint associado a agent/SDK aceita ou preserva
+  `runtimeId`, responde com `runtimeId/requestedRuntimeId/runtimeFound/usedDefaultRuntimeFallback`
+  quando aplicável e nunca usa mutex/estado process-wide para serializar runtimes independentes.
+- **Gate 2.0-D — estado global governado:** estado mutável de runtime fica em
+  `agent/runtime-registry`, registries explícitos, stores terminal-local documentados ou mapas SSE
+  chaveados por runtime. Qualquer outro global deve ter justificativa e contrato.
+- **Gate 2.0-E — facades congeladas por contrato:** cada façade crítica possui dono declarado
+  (`query`, `mutation`, `lifecycle`, `infra`, `projection`), export público mínimo e teste
+  anti-bypass.
+- **Gate 2.0-F — operação comprovada:** `typecheck:strict:src.copilot`,
+  `typecheck:strict:tests.unit`, `lint`, suíte copilot, `format`, `madge src/copilot --circular` e
+  teste live `terminal:llm-b` ficam verdes depois das transformações finais.
+
 ---
 
 ## 3) Dívidas restantes por domínio
@@ -228,6 +252,8 @@ regras por camada.
   - [x] Ampliar a matriz de bypass para facades secundárias (`agent-runtime-tools`,
         `agent-runtime-webhooks`, `agent-runtime-todos`) com contrato de consumidor e de ownership
         query/admin.
+  - [ ] Criar matriz executável de tipo de operação por façade (`query`, `mutation`, `lifecycle`,
+        `infra`, `projection`) para bloquear import cruzado que reabra ownership sem necessidade.
 
 ### Faixa F — Presentation monopoly final
 
@@ -249,6 +275,9 @@ regras por camada.
         listener diagnostics e health do hub dentro da rota; a montagem passou para
         `buildCopilotApiHealthHttpResponseFromRoute()`.
 - [x] Criar contratos impedindo payload ad hoc de status/health fora de `presentation`.
+- [ ] Inventariar rotas não-agent (`server/routes/sessions.js`, `server/routes/health.js` em
+      `/ws/info` e equivalentes) para separar dívida real de payload operacional de runtime de
+      payload meramente HTTP/hub.
 
 ### Faixa G — Preparação para multi-runtime/multi-agent
 
@@ -264,17 +293,30 @@ regras por camada.
         `runtimeId:sessionId` para evitar colisão entre runtimes.
 - [x] Separar default runtime de runtime selecionado em projections e comandos;
 - [ ] Evitar estado global implícito fora de `runtime-registry`;
+  - [x] `copilot-api/dialog` deixou de usar mutex global process-wide em `/dialog/turn` e passou a
+        chavear concorrência por `runtimeId`, permitindo turnos simultâneos em runtimes distintos.
+  - [ ] Mapear todos os Maps/sets module-level remanescentes e classificá-los como registry,
+        terminal-local, SSE connection state ou dívida arquitetural.
 - [x] Criar teste de dois runtimes registrados com fallback explícito.
 
 ---
 
 ## 5) Próxima ordem de ataque recomendada
 
-1. **A** — fechar fronteira externa do agent (baixo risco, alto impacto).
-2. **C** — remover persistência direta remanescente em `dialog/user-input-handler`.
-3. **B** — quebrar ciclos globais do SDK model/session.
-4. **D** — completar boot/shutdown transacional.
-5. **F/G** — consolidar presentation e preparar multi-runtime real.
+As Faixas A, B, C e D já estão operacionalmente completas. A próxima onda deve concentrar a migração
+2.0 nos pontos que ainda podem gerar comportamento incorreto quando o sistema deixa de ser
+single-runtime:
+
+1. **G1 — concorrência por runtime:** remover qualquer mutex/global process-wide de rotas de
+   agent/SDK. Primeiro alvo: `/copilot-api/dialog/turn`.
+2. **G2 — metadata runtime completa:** fechar endpoints SDK/observability restantes que ainda
+   respondem sem metadata canônica em casos de validação, tail, catalog, dead-letter e OTEL.
+3. **E2 — contrato semântico de facades:** transformar a matriz de facades em teste executável de
+   ownership por operação.
+4. **F2 — inventário de rotas não-agent:** marcar explicitamente quais rotas são hub/server-only
+   para não contaminarem a métrica de presentation monopoly.
+5. **D2 — gates operacionais finais:** após a próxima leva de refactors, rodar typecheck strict,
+   lint, suíte copilot, format, madge e novo teste live `terminal:llm-b`.
 
 Critério de conclusão da migração:
 
@@ -633,3 +675,37 @@ agent e SDK já está mais limpa; agora vale atacar a confiabilidade operacional
 
 Resultado parcial desta faixa: **presentation monopoly** avançou de metadata/status para health
 operacional completo, e a Faixa E ganhou cobertura executável para facades secundárias.
+
+---
+
+## 17) Checkpoint de continuação — critérios 2.0 e multi-runtime sem mutex global
+
+### Avaliação aplicada
+
+- O documento ganhou gates objetivos para declarar a Arquitetura 2.0, cobrindo fronteira pública do
+  agent, monopólio de `presentation`, propagação explícita de `runtimeId`, governança de estado
+  global, facades congeladas e validação operacional.
+- A ordem de ataque foi atualizada: as Faixas A-D saíram do caminho crítico e a próxima onda passa a
+  focar G1/G2/E2/F2/D2.
+- A Faixa G foi refinada para separar “dois runtimes registrados” de “dois runtimes operando sem
+  colisão de estado process-wide”.
+
+### Transformações aplicadas
+
+- `server/routes/copilot-api/dialog.js` deixou de usar `_turnInFlight` global e passou a usar
+  `turnInFlightByRuntime`, chaveado por `deps.runtimeId`.
+- O mesmo endpoint ainda rejeita concorrência duplicada dentro do mesmo runtime, mas não bloqueia um
+  segundo runtime independente no mesmo processo HTTP.
+- `server/routes/sdk/observability.js` passou a anexar metadata runtime também em:
+  - validação inválida de `/observability/log-level`;
+  - `/observability/audit/flush`;
+  - `/observability/audit-tail`;
+  - `/observability/otel-status`;
+  - `/observability/events/catalog`;
+  - `/observability/events/dead-letter`.
+- `test_copilot_api_multi_runtime` agora comprova que um turno pendente em `runtimeId=default` gera
+  `429` apenas para outro turno do mesmo runtime, enquanto `runtimeId=audit` responde normalmente.
+- `test_sdk_runtime_projection_routes` cobre por HTTP real os endpoints remanescentes de
+  observability, garantindo que todos ecoem fallback explícito de runtime.
+- `test_arch_contracts` passou a bloquear retorno de `_turnInFlight`/mutex global em
+  `copilot-api/dialog` e respostas triviais de observability sem `buildObservabilityRuntimeMeta()`.
