@@ -24,8 +24,8 @@ describe('presentation/runtime-lifecycle', () => {
                     { id: 'repl', status: 'ok' },
                 ],
             }),
-            bootMetrics: [{ id: 'repl', attempts: 1, avgDurationMs: 12 }],
-            shutdownHandlers: [{ name: 'terminal', priority: 10 }],
+            bootMetrics: /** @type {any} */ ([{ id: 'repl', attempts: 1, avgDurationMs: 12 }]),
+            shutdownHandlers: /** @type {any} */ ([{ name: 'terminal', priority: 10 }]),
             activeTimers: [{ id: 'metrics', type: 'interval', registeredAt: 1, ageMs: 1234 }],
             lastShutdownReport: /** @type {any} */ ({
                 reason: 'test',
@@ -39,7 +39,7 @@ describe('presentation/runtime-lifecycle', () => {
                     { name: 'slow', status: 'timeout' },
                 ],
             }),
-            shutdownMetrics: [{ name: 'slow', attempts: 1, avgDurationMs: 99 }],
+            shutdownMetrics: /** @type {any} */ ([{ name: 'slow', attempts: 1, avgDurationMs: 99 }]),
         });
 
         expect(summary).toEqual({

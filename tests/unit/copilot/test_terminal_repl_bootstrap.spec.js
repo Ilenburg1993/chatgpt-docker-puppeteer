@@ -16,7 +16,9 @@ describe('terminal/repl dialog bootstrap', () => {
                     throw new Error('READY lento');
                 }),
                 printlnFn,
-                logFn,
+                logFn: /** @type {typeof import('../../../src/copilot/observability/index.js').log} */ (
+                    /** @type {unknown} */ (logFn)
+                ),
             }),
         ).resolves.toBeUndefined();
 

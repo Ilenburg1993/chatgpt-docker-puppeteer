@@ -11,7 +11,7 @@
 
 import { getWorkspaceContext } from '#copilot/boot';
 import { getMcpStatus } from '#copilot/bridges';
-import { defaultErrorTracker, getToolStats } from '#copilot/observability';
+import { defaultErrorTracker } from '#copilot/observability';
 import { sendRuntimeDialogTurnForRuntime } from '../../presentation/runtime-dialog.js';
 import { buildRuntimeLifecycleSummary, readRuntimeLifecycleSnapshot } from '../../presentation/runtime-lifecycle.js';
 import {
@@ -36,6 +36,7 @@ import {
     getShowToolActivity,
     getShowUsage,
 } from '../../presentation/runtime-ui-state-store.js';
+import { readToolStatsProjection } from '../../presentation/system-metrics.js';
 import { readTerminalActivityHistory, readTerminalActivitySnapshot } from '../activity-state.js';
 import {
     answerTerminalPendingQuestion,
@@ -755,8 +756,8 @@ export async function readTerminalDiagnoseProjection({ hubSessionId = null, runt
 
     const todos = await listActiveRuntimeTodosProjection({ limit: 5 }).catch(() => []);
 
-    const topToolStats = Object.entries(getToolStats())
-        .sort(([, a], [, b]) => Number(b['avgLatencyMs'] ?? 0) - Number(a['avgLatencyMs'] ?? 0))
+    const topToolStats = readToolStatsProjection()
+        .entries.sort(([, a], [, b]) => Number(b['avgLatencyMs'] ?? 0) - Number(a['avgLatencyMs'] ?? 0))
         .slice(0, 5);
 
     return {
@@ -807,7 +808,7 @@ export async function readTerminalDiagnoseProjection({ hubSessionId = null, runt
 export function readTerminalMetricsProjection(runtimeId) {
     const base = readTerminalRuntimeBase(runtimeId);
     const pr = /** @type {Record<string, any> | null} */ (base.lastPrInfo ?? null);
-    const toolStats = getToolStats();
+    const toolStats = readToolStatsProjection().stats;
     let toolCallCount = 0;
     let toolErrorCount = 0;
     for (const stat of Object.values(toolStats)) {
@@ -835,6 +836,15 @@ export function readTerminalMetricsProjection(runtimeId) {
             buffered: Number(errorStats.buffered ?? 0),
         },
     };
+}
+
+/**
+ * Projeção de estatísticas de tools para comandos locais do terminal.
+ *
+ * @returns {ReturnType<typeof readToolStatsProjection>}
+ */
+export function readTerminalToolStatsProjection() {
+    return readToolStatsProjection();
 }
 
 /**

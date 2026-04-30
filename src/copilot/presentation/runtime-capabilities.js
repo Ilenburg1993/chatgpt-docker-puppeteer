@@ -19,6 +19,7 @@ import { buildRuntimeRouteMetaPayload } from './runtime-meta.js';
  */
 
 /** @typedef {import('./runtime-meta.js').RuntimeRouteMeta} RuntimeCapabilitiesMeta */
+/** @typedef {RuntimeCapabilitiesMeta & { agent: CapabilityAgent }} RuntimeCapabilitiesRouteDeps */
 
 /**
  * Payload estável para bordas.
@@ -53,4 +54,14 @@ export function buildAgentRuntimeCapabilities(agent, meta) {
         ...buildRuntimeRouteMetaPayload(meta),
         ...readAgentRuntimeCapabilities(agent, { healthSnapshot: getAgentHealthSnapshotCompat(agent) }),
     };
+}
+
+/**
+ * Monta a projection de capabilities a partir das deps runtime-aware da rota.
+ *
+ * @param {RuntimeCapabilitiesRouteDeps} deps
+ * @returns {RuntimeCapabilitiesPayload}
+ */
+export function buildAgentRuntimeCapabilitiesFromRoute(deps) {
+    return buildAgentRuntimeCapabilities(deps.agent, deps);
 }

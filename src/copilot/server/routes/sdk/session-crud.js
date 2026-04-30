@@ -51,6 +51,26 @@ function listActiveSessions(routeDeps) {
 }
 
 /**
+ * Anexa metadata canônica de runtime às respostas do adapter SDK.
+ *
+ * @template {Record<string, unknown>} T
+ * @param {SdkRouteDeps} routeDeps
+ * @param {T} payload
+ * @returns {T & {
+ *     runtimeId?: string;
+ *     requestedRuntimeId?: string | null;
+ *     runtimeFound?: boolean;
+ *     usedDefaultRuntimeFallback?: boolean;
+ * }}
+ */
+function withRuntimeMeta(routeDeps, payload) {
+    return {
+        ...payload,
+        ...routeDeps.sdkRuntimeProjection.buildRuntimeRouteMetaPayload(routeDeps),
+    };
+}
+
+/**
  * Valida e normaliza `provider` usando o boundary canônico do SDK.
  *
  * @param {SdkRouteDeps} routeDeps
@@ -65,7 +85,7 @@ function normalizeRouteProvider(routeDeps, provider, res) {
             /** @type {import('#copilot/sdk/types').ProviderConfig} */ (/** @type {unknown} */ (provider)),
         );
     } catch (error) {
-        res.status(400).json({ ok: false, error: toProviderValidationMessage(error) });
+        res.status(400).json(withRuntimeMeta(routeDeps, { ok: false, error: toProviderValidationMessage(error) }));
         return undefined;
     }
 }
@@ -88,7 +108,7 @@ function toProviderValidationMessage(error) {
 router.get('/sessions/active', (_req, res) => {
     const routeDeps = resolveSdkRouteSharedDeps(/** @type {Req} */ (_req));
     const active = listActiveSessions(routeDeps);
-    res.json({ ok: true, count: active.length, sessions: active });
+    res.json(withRuntimeMeta(routeDeps, { ok: true, count: active.length, sessions: active }));
 });
 
 /**
@@ -103,6 +123,7 @@ router.get('/sessions/last', (req, res) => {
         });
         res.json({
             ok: true,
+            ...routeDeps.sdkRuntimeProjection.buildRuntimeRouteMetaPayload(routeDeps),
             lastSessionId: meta.lastSessionId,
             canonicalSessionId: meta.canonicalSessionId,
             sharedBinding: meta.sharedBinding,
@@ -120,7 +141,7 @@ router.get('/sessions/binding', (req, res) => {
             getForegroundSessionId: routeDeps.sdkSession.getForegroundClientSessionId,
             getLastSessionId: routeDeps.sdkSession.getLastClientSessionId,
         });
-        res.json({ ok: true, ...meta });
+        res.json(withRuntimeMeta(routeDeps, { ok: true, ...meta }));
     });
 });
 
@@ -140,6 +161,7 @@ router.get('/sessions/foreground', (req, res) => {
         });
         res.json({
             ok: true,
+            ...routeDeps.sdkRuntimeProjection.buildRuntimeRouteMetaPayload(routeDeps),
             foregroundSessionId: meta.foregroundSessionId,
             canonicalSessionId: meta.canonicalSessionId,
             sharedBinding: meta.sharedBinding,
@@ -156,7 +178,12 @@ router.put('/sessions/foreground/:id', (req, res) => {
         const { id } = req.params;
         await routeDeps.sdkSession.setForegroundClientSessionId(id);
         routeDeps.sdkSessionOwnership.rememberSdkSessionOwnership(id);
-        res.json(routeDeps.sdkSessionOwnership.attachSdkSessionOwnership({ ok: true, foregroundSessionId: id }, id));
+        res.json(
+            withRuntimeMeta(
+                routeDeps,
+                routeDeps.sdkSessionOwnership.attachSdkSessionOwnership({ ok: true, foregroundSessionId: id }, id),
+            ),
+        );
     });
 });
 
@@ -188,7 +215,7 @@ router.get('/sessions', (req, res) => {
             ...routeDeps.sdkSessionOwnership.attachSdkSessionOwnership(s, s.sessionId),
             isActive: active.has(s.sessionId),
         }));
-        res.json({ ok: true, count: enriched.length, sessions: enriched });
+        res.json(withRuntimeMeta(routeDeps, { ok: true, count: enriched.length, sessions: enriched }));
     });
 });
 
@@ -255,7 +282,7 @@ router.post(
             if (model !== undefined) {
                 const modelResult = validateModel(model);
                 if (!modelResult.ok) {
-                    res.status(400).json({ ok: false, error: modelResult.error });
+                    res.status(400).json(withRuntimeMeta(routeDeps, { ok: false, error: modelResult.error }));
                     return;
                 }
                 safeModel = modelResult.model;
@@ -265,10 +292,12 @@ router.post(
                 return;
             }
             if (safeProvider !== undefined && safeModel === undefined) {
-                res.status(400).json({
-                    ok: false,
-                    error: 'Campo "model" é obrigatório quando "provider" customizado é informado.',
-                });
+                res.status(400).json(
+                    withRuntimeMeta(routeDeps, {
+                        ok: false,
+                        error: 'Campo "model" é obrigatório quando "provider" customizado é informado.',
+                    }),
+                );
                 return;
             }
 
@@ -303,14 +332,17 @@ router.post(
             routeDeps.sdkSessionOwnership.rememberSdkSessionOwnership(session.sessionId);
 
             res.status(201).json(
-                routeDeps.sdkSessionOwnership.attachSdkSessionOwnership(
-                    {
-                        ok: true,
-                        sessionId: session.sessionId,
-                        model: safeModel ?? null,
-                        workspacePath: session.workspacePath ?? null,
-                    },
-                    session.sessionId,
+                withRuntimeMeta(
+                    routeDeps,
+                    routeDeps.sdkSessionOwnership.attachSdkSessionOwnership(
+                        {
+                            ok: true,
+                            sessionId: session.sessionId,
+                            model: safeModel ?? null,
+                            workspacePath: session.workspacePath ?? null,
+                        },
+                        session.sessionId,
+                    ),
                 ),
             );
         });
@@ -336,23 +368,26 @@ router.get('/sessions/:id', (req, res) => {
         const entry = routeDeps.sdkSession.getClientSession(id);
 
         if (!meta && !entry) {
-            res.status(404).json({ ok: false, error: `Sessão "${id}" não encontrada.` });
+            res.status(404).json(withRuntimeMeta(routeDeps, { ok: false, error: `Sessão "${id}" não encontrada.` }));
             return;
         }
 
         res.json(
-            routeDeps.sdkSessionOwnership.attachSdkSessionOwnership(
-                {
-                    ok: true,
-                    sessionId: id,
-                    isActive: Boolean(entry),
-                    model: entry?.model ?? null,
-                    messagesCount: entry?.messagesCount ?? 0,
-                    activeMs: entry ? Date.now() - entry.createdAt : null,
-                    workspacePath: entry?.session.workspacePath ?? null,
-                    metadata: meta ?? null,
-                },
-                id,
+            withRuntimeMeta(
+                routeDeps,
+                routeDeps.sdkSessionOwnership.attachSdkSessionOwnership(
+                    {
+                        ok: true,
+                        sessionId: id,
+                        isActive: Boolean(entry),
+                        model: entry?.model ?? null,
+                        messagesCount: entry?.messagesCount ?? 0,
+                        activeMs: entry ? Date.now() - entry.createdAt : null,
+                        workspacePath: entry?.session.workspacePath ?? null,
+                        metadata: meta ?? null,
+                    },
+                    id,
+                ),
             ),
         );
     });
@@ -369,12 +404,15 @@ router.get('/sessions/:id', (req, res) => {
  * @type {import('express').RequestHandler}
  */
 function _requireAdminForDestructive(req, res, next) {
-    const adminToken = resolveSdkRouteSharedDeps(req).bridgeAdminToken;
+    const routeDeps = resolveSdkRouteSharedDeps(req);
+    const adminToken = routeDeps.bridgeAdminToken;
     if (!adminToken) return next(); // token não configurado — comportamento legado (dev)
     const authHeader = req.headers['x-admin-token'] ?? req.headers['authorization'] ?? '';
     const provided = String(authHeader).replace(/^Bearer\s+/i, '');
     if (provided !== adminToken) {
-        res.status(403).json({ ok: false, error: 'Forbidden: token admin inválido ou ausente.' });
+        res.status(403).json(
+            withRuntimeMeta(routeDeps, { ok: false, error: 'Forbidden: token admin inválido ou ausente.' }),
+        );
         return;
     }
     return next();
@@ -392,10 +430,12 @@ router.delete('/sessions/:id', _requireAdminForDestructive, (req, res) => {
         // SEC-N10 (fix): exigir confirmação explícita para operação irreversível
         const confirmHeader = req.headers['x-confirm-delete'];
         if (confirmHeader !== 'true') {
-            res.status(400).json({
-                ok: false,
-                error: 'Operação irreversível. Adicione o header "X-Confirm-Delete: true" para confirmar.',
-            });
+            res.status(400).json(
+                withRuntimeMeta(routeDeps, {
+                    ok: false,
+                    error: 'Operação irreversível. Adicione o header "X-Confirm-Delete: true" para confirmar.',
+                }),
+            );
             return;
         }
 
@@ -406,7 +446,13 @@ router.delete('/sessions/:id', _requireAdminForDestructive, (req, res) => {
         const client = await routeDeps.sdkSession.getClient();
         await client.deleteSession(id);
         routeDeps.sdkObservability.log('INFO', `[sdk-api] Sessão deletada: ${id}`);
-        res.json({ ok: true, message: `Sessão "${id}" deletada permanentemente.`, sharedBinding });
+        res.json(
+            withRuntimeMeta(routeDeps, {
+                ok: true,
+                message: `Sessão "${id}" deletada permanentemente.`,
+                sharedBinding,
+            }),
+        );
     });
 });
 
@@ -424,21 +470,25 @@ router.post('/sessions/:id/disconnect', (req, res) => {
 
         const entry = routeDeps.sdkSession.getClientSession(id);
         if (!entry) {
-            res.status(404).json({
-                ok: false,
-                error: `Sessão "${id}" não está ativa no registry.`,
-            });
+            res.status(404).json(
+                withRuntimeMeta(routeDeps, {
+                    ok: false,
+                    error: `Sessão "${id}" não está ativa no registry.`,
+                }),
+            );
             return;
         }
 
         await routeDeps.sdkSession.disconnectClientSession(id);
         const sharedBinding = routeDeps.sdkSessionOwnership.forgetSdkSessionOwnership(id);
         routeDeps.sdkObservability.log('INFO', `[sdk-api] Sessão desconectada (preservada em disco): ${id}`);
-        res.json({
-            ok: true,
-            message: `Sessão "${id}" desconectada. Use POST /sessions/${id}/resume para retomar.`,
-            sharedBinding,
-        });
+        res.json(
+            withRuntimeMeta(routeDeps, {
+                ok: true,
+                message: `Sessão "${id}" desconectada. Use POST /sessions/${id}/resume para retomar.`,
+                sharedBinding,
+            }),
+        );
     });
 });
 
@@ -497,7 +547,7 @@ router.post('/sessions/:id/resume', validateBody(ResumeSessionBodySchema), (req,
         if (model !== undefined) {
             const modelResult = validateModel(model);
             if (!modelResult.ok) {
-                res.status(400).json({ ok: false, error: modelResult.error });
+                res.status(400).json(withRuntimeMeta(routeDeps, { ok: false, error: modelResult.error }));
                 return;
             }
             safeModel = modelResult.model;
@@ -507,10 +557,12 @@ router.post('/sessions/:id/resume', validateBody(ResumeSessionBodySchema), (req,
             return;
         }
         if (safeProvider !== undefined && safeModel === undefined) {
-            res.status(400).json({
-                ok: false,
-                error: 'Campo "model" é obrigatório quando "provider" customizado é informado.',
-            });
+            res.status(400).json(
+                withRuntimeMeta(routeDeps, {
+                    ok: false,
+                    error: 'Campo "model" é obrigatório quando "provider" customizado é informado.',
+                }),
+            );
             return;
         }
 
@@ -544,13 +596,16 @@ router.post('/sessions/:id/resume', validateBody(ResumeSessionBodySchema), (req,
         );
         routeDeps.sdkSessionOwnership.rememberSdkSessionOwnership(session.sessionId);
         res.json(
-            routeDeps.sdkSessionOwnership.attachSdkSessionOwnership(
-                {
-                    ok: true,
-                    sessionId: session.sessionId,
-                    workspacePath: session.workspacePath ?? null,
-                },
-                session.sessionId,
+            withRuntimeMeta(
+                routeDeps,
+                routeDeps.sdkSessionOwnership.attachSdkSessionOwnership(
+                    {
+                        ok: true,
+                        sessionId: session.sessionId,
+                        workspacePath: session.workspacePath ?? null,
+                    },
+                    session.sessionId,
+                ),
             ),
         );
     });
@@ -568,7 +623,7 @@ router.get('/sessions/:id/compaction-history', (req, res) => {
         const routeDeps = resolveSdkRouteSharedDeps(req);
         const { id } = req.params;
         const history = routeDeps.sdkObservability.getCompactionHistory(String(id));
-        res.json({ ok: true, sessionId: id, entries: history, count: history.length });
+        res.json(withRuntimeMeta(routeDeps, { ok: true, sessionId: id, entries: history, count: history.length }));
     });
 });
 

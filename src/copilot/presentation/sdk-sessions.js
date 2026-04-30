@@ -8,7 +8,6 @@
  *   projete metadados diferentes.
  */
 
-import { readAgentRuntimeStatusSnapshot } from '#copilot/agent';
 import { CONVERSATION_STORE } from '#copilot/conversation-hub';
 import {
     container,
@@ -18,6 +17,7 @@ import {
     setSharedSdkSessionId,
 } from '#copilot/core';
 import { clearSharedSdkSessionOwnership, syncSharedSdkSessionOwnership } from './runtime-ownership.js';
+import { readAgentStatusSnapshot, readAgentStatusSnapshotForRuntime } from './runtime-status.js';
 
 /**
  * Obtém o ConversationStore se estiver registrado no container.
@@ -156,7 +156,7 @@ export async function resolveSdkRuntimeProjection(agent, client, connectionState
     const sharedBinding = getSdkSessionBindingProjection();
     const runtimeStatus =
         typeof (/** @type {{ getStatusSnapshot?: unknown }} */ (agent).getStatusSnapshot) === 'function'
-            ? readAgentRuntimeStatusSnapshot(/** @type {import('../agent/types.js').IAlwaysAliveAgent} */ (agent))
+            ? readAgentStatusSnapshot(/** @type {import('../agent/types.js').IAlwaysAliveAgent} */ (agent))
             : /** @type {Record<string, unknown>} */ (agent);
     const runtimeSessionId = typeof runtimeStatus['sessionId'] === 'string' ? runtimeStatus['sessionId'] : null;
     let foregroundSessionId = null;
@@ -180,6 +180,62 @@ export async function resolveSdkRuntimeProjection(agent, client, connectionState
             sharedBinding.sdkSessionId ?? runtimeSessionId ?? foregroundSessionId ?? lastSessionId ?? null,
         sharedBinding,
         runtimeMatchesShared: Boolean(runtimeSessionId && runtimeSessionId === sharedBinding.sdkSessionId),
+    };
+}
+
+/**
+ * Resolve a projeção canônica de runtime/ownership da sessão SDK a partir de `runtimeId`, sem exigir que a rota HTTP
+ * receba a instância viva do agent.
+ *
+ * @param {string | null | undefined} runtimeId
+ * @param {{
+ *     getForegroundSessionId?: () => Promise<string | null | undefined>;
+ *     getLastSessionId?: () => Promise<string | null | undefined>;
+ * } | null} client
+ * @param {string | null} connectionState
+ * @returns {Promise<{
+ *     connectionState: string | null;
+ *     runtimeSessionId: string | null;
+ *     foregroundSessionId: string | null;
+ *     lastSessionId: string | null;
+ *     canonicalSessionId: string | null;
+ *     sharedBinding: { hubSessionId: string | null; sdkSessionId: string | null; isBound: boolean };
+ *     runtimeMatchesShared: boolean;
+ *     runtimeId: string;
+ *     requestedRuntimeId: string | null;
+ *     runtimeFound: boolean;
+ *     usedDefaultRuntimeFallback: boolean;
+ * }>}
+ */
+export async function resolveSdkRuntimeProjectionForRuntime(runtimeId, client, connectionState) {
+    const sharedBinding = getSdkSessionBindingProjection();
+    const runtimeStatus = readAgentStatusSnapshotForRuntime(runtimeId);
+    const runtimeSessionId = typeof runtimeStatus['sessionId'] === 'string' ? runtimeStatus['sessionId'] : null;
+    let foregroundSessionId = null;
+    let lastSessionId = null;
+
+    if (client?.getForegroundSessionId && client?.getLastSessionId) {
+        const meta = await resolveSdkSessionRouteMeta({
+            getForegroundSessionId: client.getForegroundSessionId.bind(client),
+            getLastSessionId: client.getLastSessionId.bind(client),
+        });
+        foregroundSessionId = meta.foregroundSessionId;
+        lastSessionId = meta.lastSessionId;
+    }
+
+    return {
+        connectionState,
+        runtimeSessionId,
+        foregroundSessionId,
+        lastSessionId,
+        canonicalSessionId:
+            sharedBinding.sdkSessionId ?? runtimeSessionId ?? foregroundSessionId ?? lastSessionId ?? null,
+        sharedBinding,
+        runtimeMatchesShared: Boolean(runtimeSessionId && runtimeSessionId === sharedBinding.sdkSessionId),
+        runtimeId: runtimeStatus.runtimeId,
+        requestedRuntimeId: runtimeStatus.requestedRuntimeId,
+        runtimeFound: runtimeStatus.runtimeFound,
+        usedDefaultRuntimeFallback: runtimeStatus.usedDefaultRuntimeFallback,
     };
 }
 

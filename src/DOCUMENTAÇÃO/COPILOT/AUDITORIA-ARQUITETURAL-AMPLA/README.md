@@ -22,66 +22,68 @@ existentes em `DOCUMENTAÇÃO/`, com foco em responder de forma sistemática e c
 
 ## Documentos já gerados nesta fase inicial
 
-| Ordem | Documento                                                             | Papel                                                                                        |
-| ----- | --------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
-| 00    | `00-PRE-AUDITORIA-PLANO-MESTRE.md`                                    | documento central de pré-auditoria, hipóteses, escopo, método e plano de investigação        |
-| 01    | `01-INVENTARIO-ESTRUTURAL-MODULOS-E-ESCALA.md`                        | inventário de módulos, pastas, subpastas, escala e árvore estrutural completa                |
-| 02    | `02-INVENTARIO-COMPLETO-DE-ARQUIVOS-PARTE-A.md`                       | inventário completo de arquivos, parte A                                                     |
-| 03    | `03-INVENTARIO-COMPLETO-DE-ARQUIVOS-PARTE-B.md`                       | inventário completo de arquivos, parte B                                                     |
-| 04    | `04-GRAFOS-E-FRONTEIRAS.md`                                           | grafos de topologia, fluxo, fronteiras e plano da auditoria                                  |
-| 05    | `05-TAXONOMIA-ARQUITETURAL-POR-MODULO.md`                             | classificação arquitetural por módulo: missão atual, missão ideal, risco e direção           |
-| 06    | `06-COMPOSITION-ROOTS-E-BOOT.md`                                      | análise dos entrypoints, roots, boot phases, host terminal, host HTTP e runtime wiring       |
-| 07    | `07-SDK-E-FRONTEIRA-VANILLA.md`                                       | auditoria da camada SDK como SSOT do vendor, boundary vanilla e gaps funcionais              |
-| 08    | `08-AGENT-RUNTIME-E-FRONTEIRAS.md`                                    | auditoria do runtime vivo do agente, `AgentContext`, registry e façades                      |
-| 09    | `09-HOOKS-E-POLICIES.md`                                              | auditoria do módulo de hooks como owner de callbacks, policies e composition do SDK          |
-| 10    | `10-EVENTS-E-TRADUCAO-DE-SINAIS.md`                                   | auditoria do eixo `events/` + `event-handlers/` e da tradução do vanilla do SDK              |
-| 11    | `11-PRESENTATION-SHARED-EDGE-LAYER.md`                                | auditoria de `presentation/` como camada compartilhada de projeções e accessors              |
-| 12    | `12-SERVER-HTTP-SSE-SOCKET-BOUNDARY.md`                               | auditoria de `server/` como borda HTTP/SSE/Socket e adapter de protocolo                     |
-| 13    | `13-TERMINAL-UX-E-CONSUMO-DO-RUNTIME.md`                              | auditoria de `terminal/` como UX humana e consumidor do runtime                              |
-| 14    | `14-CONVERSATION-HUB-E-PERSISTENCIA.md`                               | auditoria do domínio multi-sessão, store persistente e sincronização conversacional          |
-| 15    | `15-TOOLS-E-EXECUCAO-OPERACIONAL.md`                                  | auditoria de `tools/` como domínio de capabilities executáveis do runtime                    |
-| 16    | `16-BRIDGES-INFRA-CHANNEL-PLUGINS.md`                                 | auditoria do eixo `bridges/` + `infra/` + `channel/` + `plugins/`                            |
-| 17    | `17-CONFIG-TYPES-DIALOG-E-ARTEFATOS.md`                               | auditoria de `config/`, `types/`, `dialog/` e dos artefatos internos da árvore               |
-| 18    | `18-OBSERVABILITY-AUDIT-E-LOGS.md`                                    | auditoria do eixo `observability/` + `audit/` + `logs/`                                      |
-| 19    | `19-MATRIZ-DE-COMUNICACAO-CROSS-MODULE.md`                            | matriz de comunicação entre módulos, seams, consumers e fluxos macro                         |
-| 20    | `20-MATRIZ-DE-DUPLICACOES-E-SOBREPOSICOES.md`                         | owners concorrentes, overlaps e duplicações arquiteturais críticas                           |
-| 21    | `21-MATRIZ-DE-FRONTEIRAS-E-DECISOES.md`                               | demarcação de soberania, limites de módulo e decisões estruturais                            |
-| 22    | `22-SITUACAO-IDEAL-ALVO.md`                                           | arquitetura TO-BE consolidada para `src/copilot/`                                            |
-| 23    | `23-ROADMAP-MACRO-FAIXAS-E-FASES.md`                                  | programa macro da revolução arquitetural em faixas e fases                                   |
-| 24    | `24-ROADMAP-SUBFASES-E-ORDEM-DE-ATAQUE.md`                            | backlog extenso de subfases, ondas e ordem de ataque                                         |
-| 25    | `25-SUMARIO-EXECUTIVO-E-DECISOES-ESTRUTURAIS.md`                      | síntese final da auditoria e das decisões estruturais                                        |
-| 26    | `26-SCORE-INICIAL-DE-MATURIDADE-POR-MODULO.md`                        | baseline quantitativa inicial de maturidade arquitetural por módulo                          |
-| 27    | `27-CHECKLIST-DE-SEAMS-OFICIAIS-POR-MODULO.md`                        | checklist canônico de seams oficiais, tolerados, proibidos e exceções por módulo             |
-| 28    | `28-INVENTARIO-DE-ANTI-OWNERS-E-ARTEFATOS.md`                         | inventário oficial de anti-owners e artefatos arquiteturalmente perigosos                    |
-| 29    | `29-SUPERFICIES-PUBLICAS-CANONICAS-BASELINE.md`                       | baseline inicial das superfícies públicas dos módulos mais críticos                          |
-| 30    | `30-BASELINE-ARQUITETURAL-CONGELADA-BLOCO-A.md`                       | congelamento executivo da baseline arquitetural do Bloco A                                   |
-| 31    | `31-INVENTARIO-FINAL-DE-CAPABILITIES-SDK-PENDENTES.md`                | inventário factual inicial do Bloco B sobre capabilities SDK pendentes/parciais              |
-| 32    | `32-BLOCO-B-W10-W15-TRANSFORMACAO-INICIAL-SDK-BOUNDARY.md`            | registro da primeira onda efetiva de código do Bloco B no boundary SDK                       |
-| 33    | `33-BLOCO-B-W10-PROPAGACAO-LIFECYCLE-CONFIG.md`                       | checkpoint da segunda subonda do Bloco B, focada em propagation por lifecycle/config         |
-| 34    | `34-BLOCO-B-W9-CLIENT-SIDE-SESSIONFS-SURFACE.md`                      | checkpoint da terceira subonda do Bloco B, focada na surface client-side de SessionFs        |
-| 35    | `35-POLITICA-DE-VALIDACAO-ESCOPADA-COPILOT.md`                        | política operacional de validação focada em `src/copilot/` durante a revolução               |
-| 36    | `36-BLOCO-B-W10-SESSIONFS-RUNTIME-WIRING-INICIAL.md`                  | checkpoint da promoção inicial de SessionFs ao runtime real                                  |
-| 37    | `37-BLOCO-B-W11-SESSIONFS-OBSERVABILIDADE-E-SOBERANIA.md`             | checkpoint da observabilidade e da soberania estrutural de SessionFs                         |
-| 38    | `38-BLOCO-B-W12-SDK-METRICAS-NO-EVENTBUS.md`                          | checkpoint da projeção das métricas do SDK no EventBus canônico                              |
-| 39    | `39-BLOCO-B-W13-RECOVERY-POR-SDKERRORKIND.md`                         | checkpoint da política de recovery por `SdkErrorKind` no client/boundary SDK                 |
-| 40    | `40-BLOCO-B-W13-RECOVERY-NO-LIFECYCLE-E-UNIFICACAO-CLIENT-SESSION.md` | checkpoint da extensão do recovery ao lifecycle e da unificação do singleton session wrapper |
-| 41    | `41-BLOCO-B-W13-TAXONOMIA-RECONNECT-E-CONVERGENCIA.md`                | checkpoint da taxonomia de reconnect e da convergência entre SDK, agent e terminal           |
-| 42    | `42-MAPEAMENTO-LIFECYCLE-AGENT-VS-SDK.md`                             | mapeamento detalhado da fronteira de lifecycle entre SDK vanilla e runtime vivo do agent     |
-| 43    | `43-BLOCO-B-W13-WATCHDOG-ONLY-TURNS-E-RESUME-AUTO-SANITIZATION.md`    | checkpoint da correção do timeout de turno longo e do saneamento do resume com `model=auto`  |
-| 44    | `44-MAPEAMENTO-LIFECYCLE-ADJACENTE-KEEPALIVE-CLEANUP-BOOT.md`         | mapeamento da família adjacente de lifecycle e da nova fronteira semântica do keepalive      |
-| 45    | `45-MAPEAMENTO-HISTORY-CAPABILITY-AGENT-VS-SDK.md`                    | mapeamento da capability `getMessages` e remoção da sondagem crua em `agent/session/*`       |
-| 46    | `46-MAPEAMENTO-RUNTIME-STATE-E-BOOT-SDK-BRIDGES.md`                   | mapeamento do runtime-state sem `state-io` inline e das bridges semânticas de boot do SDK    |
-| 47    | `47-MAPEAMENTO-DIALOG-BOOT-RECOVERY-E-RUNTIME-STATE.md`               | mapeamento da recuperação do dialog loop sem `state-io` direto em `boot-steps.js`            |
-| 48    | `48-MAPEAMENTO-ALWAYSALIVE-RUNTIME-CONTROLS-E-DIALOG.md`              | mapeamento da delegação de `AlwaysAliveAgent` para `runtime-controls` e `dialog-runtime`     |
-| 49    | `49-MAPEAMENTO-ALWAYSALIVE-RUNTIME-GOVERNANCE-E-CAPABILITIES.md`      | mapeamento da delegação de governança/capabilities para `agent-runtime-controls`             |
-| 50    | `50-MAPEAMENTO-BOOTSTEPS-SHADOW-REAPER-RUNTIME-STATE.md`              | mapeamento da extração do reaper de shadow de `boot-steps` para `agent-runtime-state`        |
-| 51    | `51-BUGFIX-RECURSAO-ALWAYSALIVE-RUNTIME-CONTROLS-LLMB.md`             | correção do stack overflow no boot da LLM-B por recursão entre `AlwaysAliveAgent` e façades  |
-| 52    | `52-AUDITORIA-BOOT-LIFECYCLE-SHUTDOWN-LLMB.md`                        | auditoria profunda do ciclo `terminal:llm-b`, boot, lifecycle, recursos e shutdown           |
-| 53    | `53-ROADMAP-BOOT-LIFECYCLE-SHUTDOWN-LLMB.md`                          | roadmap por faixas para transformar boot/lifecycle/shutdown em runtime lifecycle auditável   |
-| 54    | `54-MAPEAMENTO-CLEANUP-PROTECTED-SESSIONS-E-PROVIDER-BOUNDARY.md`     | cleanup defensivo de sessões protegidas e validação canônica de `provider` nas bordas        |
-| 55    | `55-MAPEAMENTO-LOOP-MANAGER-E-HEALTH-RUNTIME-STATE-BOUNDARY.md`       | convergência de `loop-manager` e `health-check` para façades semânticas de runtime-state     |
-| 56    | `56-MAPEAMENTO-TURN-EXECUTOR-RUNTIME-STATE-BOUNDARY.md`               | convergência do `turn-executor` para a fronteira semântica de runtime-state                  |
-| 57    | `57-AUDITORIA-GERAL-SRC-COPILOT-AGENT-GRAFOS-ASIS-TOBE-ROADMAP.md`    | auditoria geral de `src/copilot/agent` com grafos AS-IS/TO-BE e roadmap consolidado          |
+| Ordem | Documento                                                              | Papel                                                                                        |
+| ----- | ---------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| 00    | `00-PRE-AUDITORIA-PLANO-MESTRE.md`                                     | documento central de pré-auditoria, hipóteses, escopo, método e plano de investigação        |
+| 01    | `01-INVENTARIO-ESTRUTURAL-MODULOS-E-ESCALA.md`                         | inventário de módulos, pastas, subpastas, escala e árvore estrutural completa                |
+| 02    | `02-INVENTARIO-COMPLETO-DE-ARQUIVOS-PARTE-A.md`                        | inventário completo de arquivos, parte A                                                     |
+| 03    | `03-INVENTARIO-COMPLETO-DE-ARQUIVOS-PARTE-B.md`                        | inventário completo de arquivos, parte B                                                     |
+| 04    | `04-GRAFOS-E-FRONTEIRAS.md`                                            | grafos de topologia, fluxo, fronteiras e plano da auditoria                                  |
+| 05    | `05-TAXONOMIA-ARQUITETURAL-POR-MODULO.md`                              | classificação arquitetural por módulo: missão atual, missão ideal, risco e direção           |
+| 06    | `06-COMPOSITION-ROOTS-E-BOOT.md`                                       | análise dos entrypoints, roots, boot phases, host terminal, host HTTP e runtime wiring       |
+| 07    | `07-SDK-E-FRONTEIRA-VANILLA.md`                                        | auditoria da camada SDK como SSOT do vendor, boundary vanilla e gaps funcionais              |
+| 08    | `08-AGENT-RUNTIME-E-FRONTEIRAS.md`                                     | auditoria do runtime vivo do agente, `AgentContext`, registry e façades                      |
+| 09    | `09-HOOKS-E-POLICIES.md`                                               | auditoria do módulo de hooks como owner de callbacks, policies e composition do SDK          |
+| 10    | `10-EVENTS-E-TRADUCAO-DE-SINAIS.md`                                    | auditoria do eixo `events/` + `event-handlers/` e da tradução do vanilla do SDK              |
+| 11    | `11-PRESENTATION-SHARED-EDGE-LAYER.md`                                 | auditoria de `presentation/` como camada compartilhada de projeções e accessors              |
+| 12    | `12-SERVER-HTTP-SSE-SOCKET-BOUNDARY.md`                                | auditoria de `server/` como borda HTTP/SSE/Socket e adapter de protocolo                     |
+| 13    | `13-TERMINAL-UX-E-CONSUMO-DO-RUNTIME.md`                               | auditoria de `terminal/` como UX humana e consumidor do runtime                              |
+| 14    | `14-CONVERSATION-HUB-E-PERSISTENCIA.md`                                | auditoria do domínio multi-sessão, store persistente e sincronização conversacional          |
+| 15    | `15-TOOLS-E-EXECUCAO-OPERACIONAL.md`                                   | auditoria de `tools/` como domínio de capabilities executáveis do runtime                    |
+| 16    | `16-BRIDGES-INFRA-CHANNEL-PLUGINS.md`                                  | auditoria do eixo `bridges/` + `infra/` + `channel/` + `plugins/`                            |
+| 17    | `17-CONFIG-TYPES-DIALOG-E-ARTEFATOS.md`                                | auditoria de `config/`, `types/`, `dialog/` e dos artefatos internos da árvore               |
+| 18    | `18-OBSERVABILITY-AUDIT-E-LOGS.md`                                     | auditoria do eixo `observability/` + `audit/` + `logs/`                                      |
+| 19    | `19-MATRIZ-DE-COMUNICACAO-CROSS-MODULE.md`                             | matriz de comunicação entre módulos, seams, consumers e fluxos macro                         |
+| 20    | `20-MATRIZ-DE-DUPLICACOES-E-SOBREPOSICOES.md`                          | owners concorrentes, overlaps e duplicações arquiteturais críticas                           |
+| 21    | `21-MATRIZ-DE-FRONTEIRAS-E-DECISOES.md`                                | demarcação de soberania, limites de módulo e decisões estruturais                            |
+| 22    | `22-SITUACAO-IDEAL-ALVO.md`                                            | arquitetura TO-BE consolidada para `src/copilot/`                                            |
+| 23    | `23-ROADMAP-MACRO-FAIXAS-E-FASES.md`                                   | programa macro da revolução arquitetural em faixas e fases                                   |
+| 24    | `24-ROADMAP-SUBFASES-E-ORDEM-DE-ATAQUE.md`                             | backlog extenso de subfases, ondas e ordem de ataque                                         |
+| 25    | `25-SUMARIO-EXECUTIVO-E-DECISOES-ESTRUTURAIS.md`                       | síntese final da auditoria e das decisões estruturais                                        |
+| 26    | `26-SCORE-INICIAL-DE-MATURIDADE-POR-MODULO.md`                         | baseline quantitativa inicial de maturidade arquitetural por módulo                          |
+| 27    | `27-CHECKLIST-DE-SEAMS-OFICIAIS-POR-MODULO.md`                         | checklist canônico de seams oficiais, tolerados, proibidos e exceções por módulo             |
+| 28    | `28-INVENTARIO-DE-ANTI-OWNERS-E-ARTEFATOS.md`                          | inventário oficial de anti-owners e artefatos arquiteturalmente perigosos                    |
+| 29    | `29-SUPERFICIES-PUBLICAS-CANONICAS-BASELINE.md`                        | baseline inicial das superfícies públicas dos módulos mais críticos                          |
+| 30    | `30-BASELINE-ARQUITETURAL-CONGELADA-BLOCO-A.md`                        | congelamento executivo da baseline arquitetural do Bloco A                                   |
+| 31    | `31-INVENTARIO-FINAL-DE-CAPABILITIES-SDK-PENDENTES.md`                 | inventário factual inicial do Bloco B sobre capabilities SDK pendentes/parciais              |
+| 32    | `32-BLOCO-B-W10-W15-TRANSFORMACAO-INICIAL-SDK-BOUNDARY.md`             | registro da primeira onda efetiva de código do Bloco B no boundary SDK                       |
+| 33    | `33-BLOCO-B-W10-PROPAGACAO-LIFECYCLE-CONFIG.md`                        | checkpoint da segunda subonda do Bloco B, focada em propagation por lifecycle/config         |
+| 34    | `34-BLOCO-B-W9-CLIENT-SIDE-SESSIONFS-SURFACE.md`                       | checkpoint da terceira subonda do Bloco B, focada na surface client-side de SessionFs        |
+| 35    | `35-POLITICA-DE-VALIDACAO-ESCOPADA-COPILOT.md`                         | política operacional de validação focada em `src/copilot/` durante a revolução               |
+| 36    | `36-BLOCO-B-W10-SESSIONFS-RUNTIME-WIRING-INICIAL.md`                   | checkpoint da promoção inicial de SessionFs ao runtime real                                  |
+| 37    | `37-BLOCO-B-W11-SESSIONFS-OBSERVABILIDADE-E-SOBERANIA.md`              | checkpoint da observabilidade e da soberania estrutural de SessionFs                         |
+| 38    | `38-BLOCO-B-W12-SDK-METRICAS-NO-EVENTBUS.md`                           | checkpoint da projeção das métricas do SDK no EventBus canônico                              |
+| 39    | `39-BLOCO-B-W13-RECOVERY-POR-SDKERRORKIND.md`                          | checkpoint da política de recovery por `SdkErrorKind` no client/boundary SDK                 |
+| 40    | `40-BLOCO-B-W13-RECOVERY-NO-LIFECYCLE-E-UNIFICACAO-CLIENT-SESSION.md`  | checkpoint da extensão do recovery ao lifecycle e da unificação do singleton session wrapper |
+| 41    | `41-BLOCO-B-W13-TAXONOMIA-RECONNECT-E-CONVERGENCIA.md`                 | checkpoint da taxonomia de reconnect e da convergência entre SDK, agent e terminal           |
+| 42    | `42-MAPEAMENTO-LIFECYCLE-AGENT-VS-SDK.md`                              | mapeamento detalhado da fronteira de lifecycle entre SDK vanilla e runtime vivo do agent     |
+| 43    | `43-BLOCO-B-W13-WATCHDOG-ONLY-TURNS-E-RESUME-AUTO-SANITIZATION.md`     | checkpoint da correção do timeout de turno longo e do saneamento do resume com `model=auto`  |
+| 44    | `44-MAPEAMENTO-LIFECYCLE-ADJACENTE-KEEPALIVE-CLEANUP-BOOT.md`          | mapeamento da família adjacente de lifecycle e da nova fronteira semântica do keepalive      |
+| 45    | `45-MAPEAMENTO-HISTORY-CAPABILITY-AGENT-VS-SDK.md`                     | mapeamento da capability `getMessages` e remoção da sondagem crua em `agent/session/*`       |
+| 46    | `46-MAPEAMENTO-RUNTIME-STATE-E-BOOT-SDK-BRIDGES.md`                    | mapeamento do runtime-state sem `state-io` inline e das bridges semânticas de boot do SDK    |
+| 47    | `47-MAPEAMENTO-DIALOG-BOOT-RECOVERY-E-RUNTIME-STATE.md`                | mapeamento da recuperação do dialog loop sem `state-io` direto em `boot-steps.js`            |
+| 48    | `48-MAPEAMENTO-ALWAYSALIVE-RUNTIME-CONTROLS-E-DIALOG.md`               | mapeamento da delegação de `AlwaysAliveAgent` para `runtime-controls` e `dialog-runtime`     |
+| 49    | `49-MAPEAMENTO-ALWAYSALIVE-RUNTIME-GOVERNANCE-E-CAPABILITIES.md`       | mapeamento da delegação de governança/capabilities para `agent-runtime-controls`             |
+| 50    | `50-MAPEAMENTO-BOOTSTEPS-SHADOW-REAPER-RUNTIME-STATE.md`               | mapeamento da extração do reaper de shadow de `boot-steps` para `agent-runtime-state`        |
+| 51    | `51-BUGFIX-RECURSAO-ALWAYSALIVE-RUNTIME-CONTROLS-LLMB.md`              | correção do stack overflow no boot da LLM-B por recursão entre `AlwaysAliveAgent` e façades  |
+| 52    | `52-AUDITORIA-BOOT-LIFECYCLE-SHUTDOWN-LLMB.md`                         | auditoria profunda do ciclo `terminal:llm-b`, boot, lifecycle, recursos e shutdown           |
+| 53    | `53-ROADMAP-BOOT-LIFECYCLE-SHUTDOWN-LLMB.md`                           | roadmap por faixas para transformar boot/lifecycle/shutdown em runtime lifecycle auditável   |
+| 54    | `54-MAPEAMENTO-CLEANUP-PROTECTED-SESSIONS-E-PROVIDER-BOUNDARY.md`      | cleanup defensivo de sessões protegidas e validação canônica de `provider` nas bordas        |
+| 55    | `55-MAPEAMENTO-LOOP-MANAGER-E-HEALTH-RUNTIME-STATE-BOUNDARY.md`        | convergência de `loop-manager` e `health-check` para façades semânticas de runtime-state     |
+| 56    | `56-MAPEAMENTO-TURN-EXECUTOR-RUNTIME-STATE-BOUNDARY.md`                | convergência do `turn-executor` para a fronteira semântica de runtime-state                  |
+| 57    | `57-AUDITORIA-GERAL-SRC-COPILOT-AGENT-GRAFOS-ASIS-TOBE-ROADMAP.md`     | auditoria geral de `src/copilot/agent` com grafos AS-IS/TO-BE e roadmap consolidado          |
+| 58    | `58-AVALIACAO-FALTANTE-NOVA-ARQUITETURA-AGENT-E-INTEGRACAO-COPILOT.md` | avaliação consolidada do faltante por faixas (A–G), checkpoints e critérios de conclusão     |
+| 59    | `59-MATRIZ-FACADES-CRITICAS-E-CONTRATOS-DE-BYPASS.md`                  | matriz de ownership das facades críticas e mapa dos contratos anti-bypass                    |
 
 ---
 

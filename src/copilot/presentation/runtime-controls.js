@@ -78,6 +78,19 @@ export function readAgentRuntimeControlState(runtimeId) {
 }
 
 /**
+ * Lê estado de controle usando o runtime já resolvido pela borda HTTP.
+ *
+ * Use em rotas que recebem `CopilotApiRouteDeps`; isso preserva bindings injetáveis e evita reabrir o registry por
+ * `runtimeId` quando a rota já selecionou/fallbackou o runtime.
+ *
+ * @param {{ agent: import('../agent/always-alive.js').AlwaysAliveAgent }} deps
+ * @returns {ReturnType<typeof readRuntimeControlState>}
+ */
+export function readAgentRuntimeControlStateFromRoute(deps) {
+    return readRuntimeControlState(deps.agent);
+}
+
+/**
  * @param {string | null | undefined} [runtimeId]
  * @returns {Promise<void>}
  */

@@ -3,6 +3,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+    buildAgentHealthHttpResponse,
     buildAgentModuleHealth,
     buildLegacyAgentHealth,
     getAgentHealthHttpStatus,
@@ -60,6 +61,22 @@ describe('presentation/runtime-health', () => {
                 model: 'gpt-5-mini',
                 shuttingDown: false,
                 lifecycle: expect.objectContaining({ shuttingDown: false }),
+            }),
+        );
+    });
+
+    it('projeta resposta HTTP de health com metadata runtime canônica', () => {
+        const response = buildAgentHealthHttpResponse('missing-runtime-id');
+
+        expect(response.statusCode).toBeGreaterThanOrEqual(200);
+        expect(response.statusCode).toBeLessThanOrEqual(503);
+        expect(response.body).toEqual(
+            expect.objectContaining({
+                runtimeId: expect.any(String),
+                requestedRuntimeId: 'missing-runtime-id',
+                runtimeFound: false,
+                usedDefaultRuntimeFallback: true,
+                status: expect.any(String),
             }),
         );
     });

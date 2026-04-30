@@ -9,7 +9,7 @@
 
 import { listAgentRuntimeWebhooks, registerAgentRuntimeWebhook, unregisterAgentRuntimeWebhook } from '#copilot/agent';
 import { resolveAgentRuntimeSelection } from './agent-runtime.js';
-import { buildRuntimeRouteMetaFromSelection } from './runtime-meta.js';
+import { buildRuntimeRouteMetaFromSelection, buildRuntimeRouteMetaPayload } from './runtime-meta.js';
 
 /**
  * @param {string | null | undefined} [runtimeId]
@@ -53,4 +53,82 @@ export function registerRuntimeWebhook(url, runtimeId) {
  */
 export function unregisterRuntimeWebhook(id, runtimeId) {
     return unregisterAgentRuntimeWebhook(resolveRuntimeWebhookSelection(runtimeId).agent, id);
+}
+
+/**
+ * Projeção HTTP canônica para listagem de webhooks por runtime.
+ *
+ * @param {string | null | undefined} [runtimeId]
+ * @returns {{
+ *     ok: true;
+ *     runtimeId: string;
+ *     requestedRuntimeId?: string | null;
+ *     runtimeFound?: boolean;
+ *     usedDefaultRuntimeFallback?: boolean;
+ *     count: number;
+ *     webhooks: { id: string; url: string }[];
+ * }}
+ */
+export function buildRuntimeWebhooksListHttpPayload(runtimeId) {
+    const selection = resolveRuntimeWebhookSelection(runtimeId);
+    const webhooks = listAgentRuntimeWebhooks(selection.agent);
+    return {
+        ok: true,
+        runtimeId: selection.runtimeId,
+        ...buildRuntimeRouteMetaPayload(selection),
+        count: webhooks.length,
+        webhooks,
+    };
+}
+
+/**
+ * Projeção HTTP canônica para confirmação de registro de webhook por runtime.
+ *
+ * @param {string} url
+ * @param {string | null | undefined} [runtimeId]
+ * @returns {{
+ *     ok: true;
+ *     runtimeId: string;
+ *     requestedRuntimeId?: string | null;
+ *     runtimeFound?: boolean;
+ *     usedDefaultRuntimeFallback?: boolean;
+ *     id: string;
+ *     url: string;
+ * }}
+ */
+export function registerRuntimeWebhookHttp(url, runtimeId) {
+    const selection = resolveRuntimeWebhookSelection(runtimeId);
+    const result = registerAgentRuntimeWebhook(selection.agent, url);
+    return {
+        ok: true,
+        runtimeId: selection.runtimeId,
+        ...buildRuntimeRouteMetaPayload(selection),
+        ...result,
+    };
+}
+
+/**
+ * Projeção HTTP canônica para remoção de webhook por runtime.
+ *
+ * @param {string} id
+ * @param {string | null | undefined} [runtimeId]
+ * @returns {{
+ *     ok: true;
+ *     runtimeId: string;
+ *     requestedRuntimeId?: string | null;
+ *     runtimeFound?: boolean;
+ *     usedDefaultRuntimeFallback?: boolean;
+ *     id: string;
+ * } | null}
+ */
+export function unregisterRuntimeWebhookHttp(id, runtimeId) {
+    const selection = resolveRuntimeWebhookSelection(runtimeId);
+    const removed = unregisterAgentRuntimeWebhook(selection.agent, id);
+    if (!removed) return null;
+    return {
+        ok: true,
+        runtimeId: selection.runtimeId,
+        ...buildRuntimeRouteMetaPayload(selection),
+        id,
+    };
 }

@@ -97,7 +97,13 @@ function createFakeRpc() {
             deselect: vi.fn(async () => ({})),
         },
         compaction: {
-            compact: vi.fn(async () => ({ success: true, tokensFreed: 500, messagesRemoved: 3 })),
+            compact: vi.fn(
+                /** @returns {Promise<any>} */ async () => ({
+                    success: true,
+                    tokensFreed: 500,
+                    messagesRemoved: 3,
+                }),
+            ),
         },
     };
 }

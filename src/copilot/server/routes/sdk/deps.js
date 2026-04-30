@@ -66,11 +66,19 @@ import {
 import { getAllTools } from '#copilot/tools';
 import { resolveAgentRuntimeSelection } from '../../../presentation/agent-runtime.js';
 import { resolveOptionalDialogTimeout } from '../../../presentation/dialog-timeout-policy.js';
+import { buildRuntimeRouteMetaPayload } from '../../../presentation/runtime-meta.js';
 import { resolveRequestedRuntimeId } from '../../../presentation/runtime-request.js';
-import { readAgentStatusSnapshot, readAgentStatusValue } from '../../../presentation/runtime-status.js';
+import { resolveAgentSdkActiveSessionEntry } from '../../../presentation/runtime-sdk-session.js';
+import {
+    readAgentStatusSnapshot,
+    readAgentStatusSnapshotForRuntime,
+    readAgentStatusValue,
+    readAgentStatusValueForRuntime,
+} from '../../../presentation/runtime-status.js';
 import {
     paginateAgentRuntimeToolsProjection,
     readAgentRuntimeToolsProjection,
+    readAgentRuntimeToolsProjectionForRuntime,
 } from '../../../presentation/runtime-tools.js';
 import {
     attachSdkSessionOwnership,
@@ -78,6 +86,7 @@ import {
     forgetSdkSessionOwnership,
     rememberSdkSessionOwnership,
     resolveSdkRuntimeProjection,
+    resolveSdkRuntimeProjectionForRuntime,
     resolveSdkSessionRouteMeta,
 } from '../../../presentation/sdk-sessions.js';
 
@@ -125,20 +134,29 @@ const sdkSessionUiOps = Object.freeze({
     sessionUiSelect,
 });
 
+const sdkRuntimeSessionOps = Object.freeze({
+    resolveAgentSdkActiveSessionEntry,
+});
+
 const sdkSessionOwnershipOps = Object.freeze({
     attachSdkSessionOwnership,
     clearSdkRuntimeBinding,
     forgetSdkSessionOwnership,
     rememberSdkSessionOwnership,
     resolveSdkRuntimeProjection,
+    resolveSdkRuntimeProjectionForRuntime,
     resolveSdkSessionRouteMeta,
 });
 
 const sdkRuntimeProjectionOps = Object.freeze({
+    buildRuntimeRouteMetaPayload,
     paginateAgentRuntimeToolsProjection,
     readAgentRuntimeToolsProjection,
+    readAgentRuntimeToolsProjectionForRuntime,
     readAgentStatusSnapshot,
+    readAgentStatusSnapshotForRuntime,
     readAgentStatusValue,
+    readAgentStatusValueForRuntime,
 });
 
 const sdkObservabilityOps = Object.freeze({
@@ -201,6 +219,7 @@ function resolveMetricsStore() {
  *     sdkSessionRpc: typeof sdkSessionRpcOps;
  *     sdkSessionEvents: typeof sdkSessionEventOps;
  *     sdkSessionUi: typeof sdkSessionUiOps;
+ *     sdkRuntimeSession: typeof sdkRuntimeSessionOps;
  *     sdkSessionOwnership: typeof sdkSessionOwnershipOps;
  *     sdkRuntimeProjection: typeof sdkRuntimeProjectionOps;
  *     sdkObservability: typeof sdkObservabilityOps;
@@ -228,6 +247,7 @@ export function buildDefaultSdkRouteSharedDeps(runtimeId) {
         sdkSessionRpc: sdkSessionRpcOps,
         sdkSessionEvents: sdkSessionEventOps,
         sdkSessionUi: sdkSessionUiOps,
+        sdkRuntimeSession: sdkRuntimeSessionOps,
         sdkSessionOwnership: sdkSessionOwnershipOps,
         sdkRuntimeProjection: sdkRuntimeProjectionOps,
         sdkObservability: sdkObservabilityOps,

@@ -34,10 +34,12 @@ import { withErrorHandler as _withErrorHandler } from './middleware.js';
  * Dependências injetáveis do router de observabilidade.
  *
  * @typedef {object} ObservabilityRouterDeps
- * @property {import('#copilot/agent').AlwaysAliveAgent} agent - Instância do agente.
  * @property {ReturnType<import('./deps.js').buildDefaultSdkRouteSharedDeps>['sdkObservability']} sdkObservability
  * @property {ReturnType<import('./deps.js').buildDefaultSdkRouteSharedDeps>['sdkRuntimeProjection']} sdkRuntimeProjection
  * @property {string} [runtimeId] - Runtime alvo resolvido na borda.
+ * @property {string | null} [requestedRuntimeId] - Runtime solicitado antes de fallback.
+ * @property {boolean} [runtimeFound] - Se o runtime solicitado foi encontrado.
+ * @property {boolean} [usedDefaultRuntimeFallback] - Se a resposta caiu para o runtime default.
  */
 
 /** @typedef {ObservabilityRouterDeps | ((req: Req) => ObservabilityRouterDeps)} ObservabilityRouterBinding */
@@ -49,6 +51,19 @@ import { withErrorHandler as _withErrorHandler } from './middleware.js';
  */
 function resolveObservabilityRouterDeps(binding, req) {
     return typeof binding === 'function' ? binding(req) : binding;
+}
+
+/**
+ * @param {ObservabilityRouterDeps} routeDeps
+ * @returns {{
+ *     runtimeId?: string;
+ *     requestedRuntimeId?: string | null;
+ *     runtimeFound?: boolean;
+ *     usedDefaultRuntimeFallback?: boolean;
+ * }}
+ */
+function buildObservabilityRuntimeMeta(routeDeps) {
+    return routeDeps.sdkRuntimeProjection.buildRuntimeRouteMetaPayload(routeDeps);
 }
 
 /**
@@ -84,7 +99,8 @@ export default function createObservabilityRouter(deps) {
 
     router.get('/observability/health', (req, res) =>
         withErrorHandler(req, res, async () => {
-            const { sdkObservability, sdkRuntimeProjection } = resolveObservabilityRouterDeps(deps, req);
+            const routeDeps = resolveObservabilityRouterDeps(deps, req);
+            const { requestedRuntimeId, runtimeId, sdkObservability, sdkRuntimeProjection } = routeDeps;
             const metrics = sdkObservability.defaultMetrics.getSummary();
             const errorStats = sdkObservability.defaultErrorTracker.getStats();
             const recentErrors = sdkObservability.defaultErrorTracker.getErrors(5);
@@ -92,9 +108,8 @@ export default function createObservabilityRouter(deps) {
             /** @type {Record<string, unknown> | null} */
             let agentSnapshot = null;
             let agentAvailable = false;
-            const { agent, runtimeId } = resolveObservabilityRouterDeps(deps, req);
             try {
-                agentSnapshot = sdkRuntimeProjection.readAgentStatusSnapshot(agent);
+                agentSnapshot = sdkRuntimeProjection.readAgentStatusSnapshotForRuntime(requestedRuntimeId ?? runtimeId);
                 agentAvailable = true;
             } catch (e) {
                 logSwallowed(e, 'api.observability.getAgent');
@@ -110,7 +125,9 @@ export default function createObservabilityRouter(deps) {
                     status: componentStatus(agentAvailable, hasRecentAgentErrors),
                     ...(agentSnapshot
                         ? {
-                              details: sdkRuntimeProjection.readAgentStatusValue(agent),
+                              details: sdkRuntimeProjection.readAgentStatusValueForRuntime(
+                                  requestedRuntimeId ?? runtimeId,
+                              ),
                           }
                         : { details: 'not started' }),
                 },
@@ -141,7 +158,7 @@ export default function createObservabilityRouter(deps) {
 
             res.status(overallHealthy ? 200 : 503).json({
                 ok: overallHealthy,
-                ...(runtimeId ? { runtimeId } : {}),
+                ...buildObservabilityRuntimeMeta(routeDeps),
                 status: overallStatus,
                 agent: agentSnapshot,
                 components,
@@ -170,7 +187,8 @@ export default function createObservabilityRouter(deps) {
 
     router.get('/observability/metrics', (req, res) =>
         withErrorHandler(req, res, async () => {
-            const { sdkObservability } = resolveObservabilityRouterDeps(deps, req);
+            const routeDeps = resolveObservabilityRouterDeps(deps, req);
+            const { sdkObservability } = routeDeps;
             const summary = sdkObservability.defaultMetrics.getSummary();
             // GAP-ROUTE-001: filtro opcional por prefixo de counter (ex: ?prefix=tool.)
             const prefix = typeof req.query?.['prefix'] === 'string' ? req.query['prefix'] : '';
@@ -180,9 +198,14 @@ export default function createObservabilityRouter(deps) {
                 for (const [k, v] of Object.entries(summary.counters)) {
                     if (k.startsWith(prefix)) filtered[k] = v;
                 }
-                return res.json({ ok: true, ...summary, counters: filtered });
+                return res.json({
+                    ok: true,
+                    ...buildObservabilityRuntimeMeta(routeDeps),
+                    ...summary,
+                    counters: filtered,
+                });
             }
-            return res.json({ ok: true, ...summary });
+            return res.json({ ok: true, ...buildObservabilityRuntimeMeta(routeDeps), ...summary });
         }),
     );
 
@@ -195,11 +218,13 @@ export default function createObservabilityRouter(deps) {
      */
     router.get('/observability/quota', (req, res) =>
         withErrorHandler(req, res, async () => {
-            const { sdkObservability } = resolveObservabilityRouterDeps(deps, req);
+            const routeDeps = resolveObservabilityRouterDeps(deps, req);
+            const { sdkObservability } = routeDeps;
             const { snapshots, ts } = sdkObservability.getLastQuotaSnapshots();
             const hasData = Object.keys(snapshots).length > 0;
             res.json({
                 ok: true,
+                ...buildObservabilityRuntimeMeta(routeDeps),
                 quotaSnapshots: snapshots,
                 lastUpdated: ts || null,
                 hasData,
@@ -211,11 +236,12 @@ export default function createObservabilityRouter(deps) {
 
     router.get('/observability/errors', (req, res) =>
         withErrorHandler(req, res, async () => {
-            const { sdkObservability } = resolveObservabilityRouterDeps(deps, req);
+            const routeDeps = resolveObservabilityRouterDeps(deps, req);
+            const { sdkObservability } = routeDeps;
             const n = Math.min(Number(req.query['n']) || 20, 100);
             const source = typeof req.query['source'] === 'string' ? req.query['source'] : undefined;
             const errors = sdkObservability.defaultErrorTracker.getErrors(n, source);
-            res.json({ ok: true, errors, count: errors.length });
+            res.json({ ok: true, ...buildObservabilityRuntimeMeta(routeDeps), errors, count: errors.length });
         }),
     );
 
@@ -223,8 +249,13 @@ export default function createObservabilityRouter(deps) {
 
     router.get('/observability/errors/stats', (req, res) =>
         withErrorHandler(req, res, async () => {
-            const { sdkObservability } = resolveObservabilityRouterDeps(deps, req);
-            res.json({ ok: true, ...sdkObservability.defaultErrorTracker.getStats() });
+            const routeDeps = resolveObservabilityRouterDeps(deps, req);
+            const { sdkObservability } = routeDeps;
+            res.json({
+                ok: true,
+                ...buildObservabilityRuntimeMeta(routeDeps),
+                ...sdkObservability.defaultErrorTracker.getStats(),
+            });
         }),
     );
 
@@ -232,11 +263,12 @@ export default function createObservabilityRouter(deps) {
 
     router.get('/observability/logs', (req, res) =>
         withErrorHandler(req, res, async () => {
-            const { sdkObservability } = resolveObservabilityRouterDeps(deps, req);
+            const routeDeps = resolveObservabilityRouterDeps(deps, req);
+            const { sdkObservability } = routeDeps;
             const n = Math.min(Number(req.query['n']) || 50, 200);
             const level = typeof req.query['level'] === 'string' ? req.query['level'].toUpperCase() : undefined;
             const entries = sdkObservability.getRecentLogs(n, level);
-            res.json({ ok: true, entries, count: entries.length });
+            res.json({ ok: true, ...buildObservabilityRuntimeMeta(routeDeps), entries, count: entries.length });
         }),
     );
 
@@ -244,10 +276,11 @@ export default function createObservabilityRouter(deps) {
 
     router.post('/observability/errors/clear', (req, res) =>
         withErrorHandler(req, res, async () => {
-            const { sdkObservability } = resolveObservabilityRouterDeps(deps, req);
+            const routeDeps = resolveObservabilityRouterDeps(deps, req);
+            const { sdkObservability } = routeDeps;
             sdkObservability.defaultErrorTracker.clearErrors();
             sdkObservability.log('INFO', '[observability] Error buffer cleared via API');
-            res.json({ ok: true });
+            res.json({ ok: true, ...buildObservabilityRuntimeMeta(routeDeps) });
         }),
     );
 
@@ -263,9 +296,10 @@ export default function createObservabilityRouter(deps) {
             }
             const { log: obsLog } = await import('#copilot/observability/logger');
             obsLog.setLevel(/** @type {import('#copilot/observability/logger').LogLevel} */ (level.toUpperCase()));
-            const { sdkObservability } = resolveObservabilityRouterDeps(deps, req);
+            const routeDeps = resolveObservabilityRouterDeps(deps, req);
+            const { sdkObservability } = routeDeps;
             sdkObservability.log('INFO', `[observability] Log level changed to ${level.toUpperCase()} via API`);
-            res.json({ ok: true, level: level.toUpperCase() });
+            res.json({ ok: true, ...buildObservabilityRuntimeMeta(routeDeps), level: level.toUpperCase() });
         }),
     );
 
@@ -273,14 +307,15 @@ export default function createObservabilityRouter(deps) {
 
     router.get('/observability/audit', (req, res) =>
         withErrorHandler(req, res, async () => {
-            const { sdkObservability } = resolveObservabilityRouterDeps(deps, req);
+            const routeDeps = resolveObservabilityRouterDeps(deps, req);
+            const { sdkObservability } = routeDeps;
             const n = Math.min(Number(req.query['n']) || 50, 200);
             const type = typeof req.query['type'] === 'string' ? req.query['type'] : undefined;
             let entries = sdkObservability.defaultAuditLog.getLast(n);
             if (type) {
                 entries = entries.filter((e) => e.type === type);
             }
-            res.json({ ok: true, entries, count: entries.length });
+            res.json({ ok: true, ...buildObservabilityRuntimeMeta(routeDeps), entries, count: entries.length });
         }),
     );
 

@@ -19,10 +19,9 @@ import { z } from 'zod';
 
 import { resolveRequestedRuntimeId } from '../../presentation/runtime-request.js';
 import {
-    listRuntimeWebhooks,
-    registerRuntimeWebhook,
-    resolveRuntimeWebhookSelection,
-    unregisterRuntimeWebhook,
+    buildRuntimeWebhooksListHttpPayload,
+    registerRuntimeWebhookHttp,
+    unregisterRuntimeWebhookHttp,
 } from '../../presentation/runtime-webhooks.js';
 import { validate } from '../middleware/validate.js';
 
@@ -42,17 +41,7 @@ const router = Router();
  * Lista todos os webhooks registrados no agente Always-Alive.
  */
 router.get('/webhooks', (/** @type {Req} */ req, /** @type {Res} */ res) => {
-    const selection = resolveRuntimeWebhookSelection(resolveRequestedRuntimeId(req));
-    const list = listRuntimeWebhooks(selection.requestedRuntimeId ?? selection.runtimeId);
-    res.json({
-        ok: true,
-        runtimeId: selection.runtimeId,
-        requestedRuntimeId: selection.requestedRuntimeId,
-        runtimeFound: selection.runtimeFound,
-        usedDefaultRuntimeFallback: selection.usedDefaultRuntimeFallback,
-        count: list.length,
-        webhooks: list,
-    });
+    res.json(buildRuntimeWebhooksListHttpPayload(resolveRequestedRuntimeId(req)));
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -76,16 +65,7 @@ router.post('/webhooks', validate({ body: webhookBodySchema }), (/** @type {Req}
         return;
     }
 
-    const selection = resolveRuntimeWebhookSelection(runtimeId);
-    const result = registerRuntimeWebhook(url, selection.requestedRuntimeId ?? selection.runtimeId);
-    res.status(201).json({
-        ok: true,
-        runtimeId: selection.runtimeId,
-        requestedRuntimeId: selection.requestedRuntimeId,
-        runtimeFound: selection.runtimeFound,
-        usedDefaultRuntimeFallback: selection.usedDefaultRuntimeFallback,
-        ...result,
-    });
+    res.status(201).json(registerRuntimeWebhookHttp(url, runtimeId));
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -102,20 +82,12 @@ router.delete(
     validate({ params: webhookParamsSchema }),
     (/** @type {Req} */ req, /** @type {Res} */ res) => {
         const id = /** @type {string} */ (req.params['id']);
-        const selection = resolveRuntimeWebhookSelection(resolveRequestedRuntimeId(req));
-        const removed = unregisterRuntimeWebhook(id, selection.requestedRuntimeId ?? selection.runtimeId);
-        if (!removed) {
+        const payload = unregisterRuntimeWebhookHttp(id, resolveRequestedRuntimeId(req));
+        if (!payload) {
             res.status(404).json({ ok: false, error: `Webhook '${id}' não encontrado` });
             return;
         }
-        res.json({
-            ok: true,
-            runtimeId: selection.runtimeId,
-            requestedRuntimeId: selection.requestedRuntimeId,
-            runtimeFound: selection.runtimeFound,
-            usedDefaultRuntimeFallback: selection.usedDefaultRuntimeFallback,
-            id,
-        });
+        res.json(payload);
     },
 );
 

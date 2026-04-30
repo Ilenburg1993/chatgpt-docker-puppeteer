@@ -352,6 +352,7 @@ describe('agent-sdk-access facade', () => {
     it('observeAgentSdkSessionLifecycle normaliza eventos vanilla no contrato interno do agent', () => {
         const handlers = /** @type {Record<string, (event: unknown) => void>} */ ({});
         const off = vi.fn();
+        /** @type {unknown[]} */
         const normalized = [];
 
         client.on = vi.fn((event, handler) => {

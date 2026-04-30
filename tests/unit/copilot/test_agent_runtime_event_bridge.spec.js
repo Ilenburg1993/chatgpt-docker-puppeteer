@@ -49,11 +49,17 @@ describe('agent-runtime-event-bridge facade', () => {
         });
 
         assert.equal(unsubs.length, 3);
-        assert.equal(calls[0].emitter, agent);
-        assert.equal(calls[0].map.ready, 'agent:ready');
-        assert.equal(calls[1].emitter, dialogLoop);
-        assert.equal(calls[1].map.reply, 'agent:dialog:reply');
-        assert.equal(calls[2].emitter, handoff);
-        assert.equal(calls[2].map['handoff.accepted'], 'agent:handoff:accepted');
+        const agentCall = calls[0];
+        const dialogCall = calls[1];
+        const handoffCall = calls[2];
+        assert.ok(agentCall);
+        assert.ok(dialogCall);
+        assert.ok(handoffCall);
+        assert.equal(agentCall.emitter, agent);
+        assert.equal(agentCall.map.ready, 'agent:ready');
+        assert.equal(dialogCall.emitter, dialogLoop);
+        assert.equal(dialogCall.map.reply, 'agent:dialog:reply');
+        assert.equal(handoffCall.emitter, handoff);
+        assert.equal(handoffCall.map['handoff.accepted'], 'agent:handoff:accepted');
     });
 });

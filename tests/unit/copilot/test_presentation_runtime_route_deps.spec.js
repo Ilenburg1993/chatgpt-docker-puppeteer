@@ -122,14 +122,27 @@ vi.mock('../../../src/copilot/presentation/agent-runtime.js', () => ({
     }),
 }));
 
+vi.mock('../../../src/copilot/presentation/runtime-sdk-session.js', () => ({
+    resolveAgentSdkActiveSessionEntry: vi.fn(() => null),
+}));
+
 vi.mock('../../../src/copilot/presentation/runtime-status.js', () => ({
     readAgentStatusSnapshot: vi.fn(() => ({ status: 'idle' })),
+    readAgentStatusSnapshotForRuntime: vi.fn(() => ({
+        status: 'idle',
+        runtimeId: 'default',
+        requestedRuntimeId: null,
+        runtimeFound: true,
+        usedDefaultRuntimeFallback: false,
+    })),
     readAgentStatusValue: vi.fn(() => 'idle'),
+    readAgentStatusValueForRuntime: vi.fn(() => 'idle'),
 }));
 
 vi.mock('../../../src/copilot/presentation/runtime-tools.js', () => ({
     paginateAgentRuntimeToolsProjection: vi.fn((projection) => projection),
     readAgentRuntimeToolsProjection: vi.fn(() => ({ ok: true, tools: [] })),
+    readAgentRuntimeToolsProjectionForRuntime: vi.fn(() => ({ ok: true, tools: [] })),
 }));
 
 vi.mock('../../../src/copilot/presentation/sdk-sessions.js', () => ({
@@ -138,6 +151,7 @@ vi.mock('../../../src/copilot/presentation/sdk-sessions.js', () => ({
     forgetSdkSessionOwnership: vi.fn(() => ({ hubSessionId: null, sdkSessionId: null, isBound: false })),
     rememberSdkSessionOwnership: vi.fn(),
     resolveSdkRuntimeProjection: vi.fn(async () => ({})),
+    resolveSdkRuntimeProjectionForRuntime: vi.fn(async () => ({})),
     resolveSdkSessionRouteMeta: vi.fn(async () => ({})),
 }));
 
@@ -181,8 +195,13 @@ describe('server/routes/sdk/deps.js', () => {
         expect(deps.sdkSession.getClient).toBe(mocks.getClient);
         expect(deps.sdkSessionUi.getSessionCapabilities).toBe(mocks.getSessionCapabilities);
         expect(deps.sdkSessionUi.sessionUiConfirm).toBe(mocks.sessionUiConfirm);
+        expect(deps.sdkRuntimeSession).toHaveProperty('resolveAgentSdkActiveSessionEntry');
         expect(deps.sdkRuntimeProjection).toHaveProperty('readAgentRuntimeToolsProjection');
+        expect(deps.sdkRuntimeProjection).toHaveProperty('readAgentRuntimeToolsProjectionForRuntime');
+        expect(deps.sdkRuntimeProjection).toHaveProperty('readAgentStatusSnapshotForRuntime');
+        expect(deps.sdkRuntimeProjection).toHaveProperty('buildRuntimeRouteMetaPayload');
         expect(deps.sdkSessionOwnership).toHaveProperty('resolveSdkRuntimeProjection');
+        expect(deps.sdkSessionOwnership).toHaveProperty('resolveSdkRuntimeProjectionForRuntime');
         expect(deps.sdkObservability).toHaveProperty('getCompactionHistory');
         expect(deps.sdkHooks.registry.list).toBeTypeOf('function');
     });

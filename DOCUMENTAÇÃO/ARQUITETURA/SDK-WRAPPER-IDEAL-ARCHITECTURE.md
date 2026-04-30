@@ -1404,3 +1404,101 @@ incluindo:
 - grafo operacional boot→loop→health→cleanup;
 - grafo TO-BE por camadas (orchestration, seams, ports, infra);
 - roadmap consolidado do que falta, alinhado aos checkpoints 42–56.
+
+### 10.26 Checkpoint complementar — `session/lifecycle` desacoplado do barrel de models por porta explícita (2026-04-29)
+
+Estado complementar validado na continuação da Faixa B (SDK model/session):
+
+- `sdk/session/lifecycle.js` deixou de resolver `model="auto"` por import lazy do barrel
+  `../models/index.js`;
+- foi criada a porta `sdk/session/model-resolution-port.js`, owner de:
+  - `setSessionAutoModelResolver()`;
+  - `resolveSessionAutoModel()`;
+- foi criado `sdk/models/session-resolution-adapter.js` para manter a estratégia baseada em catálogo
+  dentro do domínio de models, com factory injetável:
+  - `createSessionAutoModelResolver({ listModelsFn, resolveModelIdAutoFn })`;
+  - `resolveSessionAutoModelFromCatalog()`.
+
+Contratos e validação:
+
+- `tests/unit/copilot/contracts/test_arch_contracts.spec.js` ganhou proteção explícita para impedir
+  retorno de dependência `session/lifecycle -> models/index`;
+- testes novos:
+  - `tests/unit/copilot/sdk/test_sdk_session_model_resolution_port.spec.js`;
+  - `tests/unit/copilot/sdk/test_sdk_models_session_resolution_adapter.spec.js`;
+- lote focado `sdk/session` + contratos ✅;
+- `npm run typecheck:strict:src.copilot` ✅;
+- `eslint` focado ✅.
+
+Leitura arquitetural:
+
+- `session/lifecycle` passa a depender de uma interface semântica de resolução, não de um barrel de
+  domínio amplo;
+- `models` mantém ownership da estratégia de catálogo, mas agora via adapter explícito e
+  dependências injetáveis, reduzindo acoplamento estrutural para as próximas ondas de multi-runtime.
+
+### 10.27 Checkpoint complementar — rotas `health`/`webhooks` em regime projection-first (2026-04-29)
+
+Estado complementar validado na trilha de **presentation monopoly final**:
+
+- `presentation/runtime-health.js` passou a fornecer `buildAgentHealthHttpResponse(runtimeId)` para
+  encapsular metadata de runtime + health snapshot + status HTTP;
+- `server/routes/health.js` deixou de montar payload ad hoc de `runtimeId/requestedRuntimeId/...` e
+  passou a consumir o helper canônico;
+- `presentation/runtime-webhooks.js` passou a fornecer projections HTTP canônicas:
+  - `buildRuntimeWebhooksListHttpPayload(runtimeId)`;
+  - `registerRuntimeWebhookHttp(url, runtimeId)`;
+  - `unregisterRuntimeWebhookHttp(id, runtimeId)`;
+- `server/routes/webhooks.js` migrou para essas projections e removeu montagem manual de metadata.
+
+Contratos/validação deste checkpoint:
+
+- `tests/unit/copilot/contracts/test_arch_contracts.spec.js` ampliado para bloquear regressões em
+  `health.js`/`webhooks.js`;
+- suíte focada de presentation/routes/contracts verde;
+- `npm run typecheck:strict:src.copilot` ✅;
+- `eslint` focado ✅;
+- `madge src/copilot --circular` e `madge src/copilot/agent --circular` ✅ (sem ciclos).
+
+### 10.28 Checkpoint complementar — `runtime-wiring` convergido para superfície pública `#copilot/agent` (2026-04-29)
+
+Estado complementar validado na Faixa A (fronteira externa/composition root):
+
+- `src/copilot/runtime-wiring.js` deixou de importar `./agent/index.js` por caminho relativo e
+  passou a consumir `#copilot/agent` como fronteira pública única para os símbolos usados no
+  composition root (`getAgent`, `alwaysAliveAgent`, `configureHookTools`, `setHub`,
+  `setPermissionAgent`).
+
+Contrato anti-regressão:
+
+- `tests/unit/copilot/contracts/test_arch_contracts.spec.js` ganhou verificação explícita para
+  impedir retorno de import relativo de internals de `agent` em `runtime-wiring`.
+
+Validação:
+
+- `test_arch_contracts` + `test_facade_bypass_matrix` + `test_bootstrap` ✅;
+- `npm run typecheck:strict:src.copilot` ✅;
+- `eslint` focado ✅.
+
+### 10.29 Checkpoint complementar — `copilot-api` com runtime metadata canônica ponta-a-ponta (2026-04-30)
+
+Estado complementar validado nas trilhas **presentation monopoly** + **multi-runtime preparedness**:
+
+- `server/routes/copilot-api/control.js` passou a incluir runtime metadata canônica em respostas e
+  projeções de erro dos eixos de controle (`start/stop/permissions/steer/health`);
+- `server/routes/copilot-api/dialog.js` e `server/routes/copilot-api/tasks.js` passaram a anexar
+  metadata canônica nas respostas de sucesso/erro dos fluxos de diálogo/tarefas/elicitation;
+- `server/routes/copilot-api/stream.js` passou a incluir metadata no evento `connected` do canal
+  `/stream/tasks`.
+
+Contrato arquitetural:
+
+- `tests/unit/copilot/contracts/test_arch_contracts.spec.js` ganhou verificação dedicada para uso de
+  `buildRuntimeRouteMetaPayload` em `copilot-api/{control,dialog,tasks,stream}`.
+
+Validação:
+
+- `test_copilot_api_runtime_metadata` (novo) + suites focadas de copilot-api/contracts ✅;
+- `npm run typecheck:strict:src.copilot` ✅;
+- `eslint` focado ✅;
+- `madge src/copilot --circular` e `madge src/copilot/agent --circular` ✅.

@@ -66,6 +66,8 @@ const _sessionsTracker = new SseConnectionTracker('sessions/stream');
 
 /**
  * @typedef {{
+ *     key: string;
+ *     runtimeId: string;
  *     sessionId: string;
  *     sessionRef: NonNullable<ReturnType<SdkRouteDeps['sdkSession']['getClientSession']>>['session'];
  *     pool: SseClientPool;
@@ -80,6 +82,35 @@ const _sessionStreamStates = new Map();
 const MAX_PROMPT_BYTES = 512_000;
 
 /**
+ * @template {Record<string, unknown>} T
+ * @param {SdkRouteDeps} routeDeps
+ * @param {T} payload
+ * @returns {T & {
+ *     runtimeId?: string;
+ *     requestedRuntimeId?: string | null;
+ *     runtimeFound?: boolean;
+ *     usedDefaultRuntimeFallback?: boolean;
+ * }}
+ */
+function withRuntimeMeta(routeDeps, payload) {
+    return {
+        ...payload,
+        ...routeDeps.sdkRuntimeProjection.buildRuntimeRouteMetaPayload(routeDeps),
+    };
+}
+
+/**
+ * @template {Record<string, unknown>} T
+ * @param {SdkRouteDeps} routeDeps
+ * @param {T} payload
+ * @param {string} sessionId
+ * @returns {ReturnType<typeof withRuntimeMeta>}
+ */
+function withSessionRuntimeMeta(routeDeps, payload, sessionId) {
+    return withRuntimeMeta(routeDeps, routeDeps.sdkSessionOwnership.attachSdkSessionOwnership(payload, sessionId));
+}
+
+/**
  * @param {SdkRouteDeps} routeDeps
  * @param {string} id
  * @param {Res} res
@@ -91,29 +122,18 @@ function getActiveSessionEntryOrReply(routeDeps, id, res) {
         return entry;
     }
 
-    const agentSessionId =
-        typeof routeDeps.agent?.sessionId === 'string'
-            ? routeDeps.agent.sessionId
-            : (routeDeps.agent?.sessionId ?? null);
-    const agentHandles =
-        typeof (/** @type {{ getSdkHandles?: unknown }} */ (routeDeps.agent).getSdkHandles) === 'function'
-            ? /** @type {{ session?: NonNullable<ReturnType<SdkRouteDeps['sdkSession']['getClientSession']>>['session'] | null }} */ (
-                  /** @type {{ getSdkHandles: () => unknown }} */ (routeDeps.agent).getSdkHandles()
-              )
-            : null;
-    if (agentSessionId === id && agentHandles?.session) {
-        const agentWithModel = /** @type {{ getModel?: () => string }} */ (/** @type {unknown} */ (routeDeps.agent));
-        return /** @type {NonNullable<ReturnType<SdkRouteDeps['sdkSession']['getClientSession']>>} */ ({
-            session: agentHandles.session,
-            model: typeof agentWithModel.getModel === 'function' ? agentWithModel.getModel() : 'unknown',
-            createdAt: Date.now(),
-            messagesCount: 0,
-        });
+    const runtimeEntry = routeDeps.sdkRuntimeSession.resolveAgentSdkActiveSessionEntry(
+        routeDeps.requestedRuntimeId ?? routeDeps.runtimeId,
+        id,
+    );
+    if (runtimeEntry) {
+        return /** @type {NonNullable<ReturnType<SdkRouteDeps['sdkSession']['getClientSession']>>} */ (runtimeEntry);
     }
 
     {
         res.status(404).json({
             ok: false,
+            ...routeDeps.sdkRuntimeProjection.buildRuntimeRouteMetaPayload(routeDeps),
             error: `Sessão "${id}" não está ativa. Use POST /api/sdk/sessions/${id}/resume primeiro.`,
         });
         return null;
@@ -147,17 +167,19 @@ function ensureSessionStreamState(routeDeps, id, entry) {
     if (!entry) {
         throw new Error(`Sessão "${id}" não está ativa para stream SSE.`);
     }
-    const existing = _sessionStreamStates.get(id);
+    const runtimeId = routeDeps.runtimeId || 'default';
+    const key = `${runtimeId}:${id}`;
+    const existing = _sessionStreamStates.get(key);
     if (existing && existing.sessionRef === entry.session) return existing;
 
     if (existing) {
         existing.pool.closeAll();
         existing.unsubscribe();
-        _sessionStreamStates.delete(id);
+        _sessionStreamStates.delete(key);
     }
 
     const pool = new SseClientPool(new SseReplayBuffer(), {
-        name: `sdk.session.stream.${id}`,
+        name: `sdk.session.stream.${runtimeId}.${id}`,
         metrics: routeDeps.metrics,
     });
 
@@ -165,13 +187,13 @@ function ensureSessionStreamState(routeDeps, id, entry) {
         entry.session,
         (/** @type {RouteSessionEvent} */ event) => {
             const type = /** @type {string} */ (event?.type ?? 'message');
-            const payload = standardizeSsePayload(event);
+            const payload = standardizeSsePayload({ ...event, runtimeId });
             pool.broadcast('message', payload, { replayEvent: 'message', filterEvent: type });
         },
     );
 
-    const state = { sessionId: id, sessionRef: entry.session, pool, unsubscribe };
-    _sessionStreamStates.set(id, state);
+    const state = { key, runtimeId, sessionId: id, sessionRef: entry.session, pool, unsubscribe };
+    _sessionStreamStates.set(key, state);
     return state;
 }
 
@@ -183,8 +205,11 @@ function ensureSessionStreamState(routeDeps, id, entry) {
 function maybeDisposeSessionStreamState(routeDeps, state) {
     if (state.pool.size > 0) return;
     state.unsubscribe();
-    _sessionStreamStates.delete(state.sessionId);
-    routeDeps.sdkObservability.log('INFO', `[sdk-api] SSE stream encerrado: sessão ${state.sessionId}`);
+    _sessionStreamStates.delete(state.key);
+    routeDeps.sdkObservability.log(
+        'INFO',
+        `[sdk-api] SSE stream encerrado: runtime ${state.runtimeId} sessão ${state.sessionId}`,
+    );
 }
 
 /**
@@ -271,21 +296,30 @@ router.post(
                 rawTimeoutMs !== undefined &&
                 (typeof rawTimeoutMs !== 'number' || !Number.isFinite(rawTimeoutMs) || rawTimeoutMs < 0)
             ) {
-                res.status(400).json({
-                    ok: false,
-                    error: 'Campo "timeoutMs" deve ser um número finito maior ou igual a zero.',
-                });
+                res.status(400).json(
+                    withRuntimeMeta(routeDeps, {
+                        ok: false,
+                        error: 'Campo "timeoutMs" deve ser um número finito maior ou igual a zero.',
+                    }),
+                );
                 return;
             }
 
             if (!prompt || typeof prompt !== 'string') {
-                res.status(400).json({ ok: false, error: 'Campo "prompt" (string) é obrigatório.' });
+                res.status(400).json(
+                    withRuntimeMeta(routeDeps, { ok: false, error: 'Campo "prompt" (string) é obrigatório.' }),
+                );
                 return;
             }
 
             // C14-04: limit máximo de bytes em prompt para evitar uso excessivo de tokens
             if (Buffer.byteLength(prompt, 'utf8') > MAX_PROMPT_BYTES) {
-                res.status(400).json({ ok: false, error: `Prompt excede o limite de ${MAX_PROMPT_BYTES} bytes.` });
+                res.status(400).json(
+                    withRuntimeMeta(routeDeps, {
+                        ok: false,
+                        error: `Prompt excede o limite de ${MAX_PROMPT_BYTES} bytes.`,
+                    }),
+                );
                 return;
             }
 
@@ -326,7 +360,8 @@ router.post(
                     event
                 );
                 res.json(
-                    routeDeps.sdkSessionOwnership.attachSdkSessionOwnership(
+                    withSessionRuntimeMeta(
+                        routeDeps,
                         {
                             ok: true,
                             sessionId: id,
@@ -343,12 +378,7 @@ router.post(
                 );
             } else {
                 const messageId = await sendSession(entry.session, /** @type {never} */ (messageOptions));
-                res.json(
-                    routeDeps.sdkSessionOwnership.attachSdkSessionOwnership(
-                        { ok: true, sessionId: id, messageId, enqueued: true },
-                        id,
-                    ),
-                );
+                res.json(withSessionRuntimeMeta(routeDeps, { ok: true, sessionId: id, messageId, enqueued: true }, id));
             }
         });
     },
@@ -379,7 +409,7 @@ router.get('/sessions/:id/stream', (req, res) => {
 
     // C14-03: limitar streams SSE simultâneos
     if (!_sessionsTracker.accept()) {
-        res.status(503).json({ ok: false, error: 'Máximo de clientes SSE atingido' });
+        res.status(503).json(withRuntimeMeta(routeDeps, { ok: false, error: 'Máximo de clientes SSE atingido' }));
         return;
     }
 
@@ -397,11 +427,9 @@ router.get('/sessions/:id/stream', (req, res) => {
         maxLifetimeMs: 24 * 60 * 60 * 1000,
     });
 
-    sse.send(
-        'connected',
-        routeDeps.sdkSessionOwnership.attachSdkSessionOwnership({ sessionId: id, timestamp: Date.now() }, id),
-        { skipBuffer: true },
-    );
+    sse.send('connected', withSessionRuntimeMeta(routeDeps, { sessionId: id, timestamp: Date.now() }, id), {
+        skipBuffer: true,
+    });
 
     // GAP-SE-007 (STREAMING-EVENTS-AUDIT Fase 4.2): filtro de eventos via ?events= query param
     const eventFilter = createEventFilter(typeof req.query['events'] === 'string' ? req.query['events'] : undefined);
@@ -431,7 +459,7 @@ router.post('/sessions/:id/model', validateBody(SetModelBodySchema), (req, res) 
         const { model, reasoningEffort } = req.body ?? {};
         const modelValidation = validateModel(model);
         if (!modelValidation.ok) {
-            res.status(400).json({ ok: false, error: modelValidation.error });
+            res.status(400).json(withRuntimeMeta(routeDeps, { ok: false, error: modelValidation.error }));
             return;
         }
         const safeModel = modelValidation.model;
@@ -440,7 +468,8 @@ router.post('/sessions/:id/model', validateBody(SetModelBodySchema), (req, res) 
         await setSessionModel(entry.session, safeModel, routeDeps.sdkSession.pickDefined({ reasoningEffort }));
         routeDeps.sdkObservability.log('INFO', `[sdk-api] modelo alterado: sessão ${id} → ${safeModel}`);
         res.json(
-            routeDeps.sdkSessionOwnership.attachSdkSessionOwnership(
+            withSessionRuntimeMeta(
+                routeDeps,
                 { ok: true, sessionId: id, model: safeModel, reasoningEffort: reasoningEffort ?? null },
                 id,
             ),
@@ -464,7 +493,8 @@ router.post('/sessions/:id/log', validateBody(LogMessageBodySchema), (req, res) 
         if (!entry) return;
         await entry.session.log(message, routeDeps.sdkSession.pickDefined({ level, ephemeral }));
         res.json(
-            routeDeps.sdkSessionOwnership.attachSdkSessionOwnership(
+            withSessionRuntimeMeta(
+                routeDeps,
                 { ok: true, sessionId: id, message: 'Log emitido na timeline da sessão.' },
                 id,
             ),
@@ -488,10 +518,7 @@ router.post('/sessions/:id/abort', (req, res) => {
         await abortSession(entry.session);
         routeDeps.sdkObservability.log('INFO', `[sdk-api] abort solicitado: sessão ${id}`);
         res.json(
-            routeDeps.sdkSessionOwnership.attachSdkSessionOwnership(
-                { ok: true, sessionId: id, message: 'Processamento abortado.' },
-                id,
-            ),
+            withSessionRuntimeMeta(routeDeps, { ok: true, sessionId: id, message: 'Processamento abortado.' }, id),
         );
     });
 });
@@ -510,12 +537,7 @@ router.get('/sessions/:id/messages', (req, res) => {
         const entry = getActiveSessionEntryOrReply(routeDeps, id, res);
         if (!entry) return;
         const messages = await getSessionMessages(entry.session);
-        res.json(
-            routeDeps.sdkSessionOwnership.attachSdkSessionOwnership(
-                { ok: true, sessionId: id, count: messages.length, messages },
-                id,
-            ),
-        );
+        res.json(withSessionRuntimeMeta(routeDeps, { ok: true, sessionId: id, count: messages.length, messages }, id));
     });
 });
 
@@ -533,7 +555,7 @@ router.get('/sessions/:id/workspace/files', (req, res) => {
         const entry = getActiveSessionEntryOrReply(routeDeps, id, res);
         if (!entry) return;
         const result = await routeDeps.sdkSessionRpc.workspaceListFiles(entry.session);
-        res.json(routeDeps.sdkSessionOwnership.attachSdkSessionOwnership({ ok: true, sessionId: id, result }, id));
+        res.json(withSessionRuntimeMeta(routeDeps, { ok: true, sessionId: id, result }, id));
     });
 });
 
@@ -550,13 +572,13 @@ router.get('/sessions/:id/workspace/file', (req, res) => {
         const id = /** @type {string} */ (req.params['id']);
         const validation = validateWorkspacePath(req.query['path']);
         if (!validation.ok) {
-            res.status(400).json({ ok: false, error: validation.error });
+            res.status(400).json(withRuntimeMeta(routeDeps, { ok: false, error: validation.error }));
             return;
         }
         const entry = getActiveSessionEntryOrReply(routeDeps, id, res);
         if (!entry) return;
         const result = await routeDeps.sdkSessionRpc.workspaceReadFile(entry.session, validation.path);
-        res.json(routeDeps.sdkSessionOwnership.attachSdkSessionOwnership({ ok: true, sessionId: id, result }, id));
+        res.json(withSessionRuntimeMeta(routeDeps, { ok: true, sessionId: id, result }, id));
     });
 });
 
@@ -574,13 +596,13 @@ router.post('/sessions/:id/workspace/file', validateBody(WorkspaceCreateFileBody
         const { path, content } = req.body ?? {};
         const validation = validateWorkspacePath(path);
         if (!validation.ok) {
-            res.status(400).json({ ok: false, error: validation.error });
+            res.status(400).json(withRuntimeMeta(routeDeps, { ok: false, error: validation.error }));
             return;
         }
         const entry = getActiveSessionEntryOrReply(routeDeps, id, res);
         if (!entry) return;
         const result = await routeDeps.sdkSessionRpc.workspaceCreateFile(entry.session, validation.path, content);
-        res.json(routeDeps.sdkSessionOwnership.attachSdkSessionOwnership({ ok: true, sessionId: id, result }, id));
+        res.json(withSessionRuntimeMeta(routeDeps, { ok: true, sessionId: id, result }, id));
     });
 });
 
@@ -600,7 +622,8 @@ router.get('/sessions/:id/ui/capabilities', (req, res) => {
         const capabilities = routeDeps.sdkSessionUi.getSessionCapabilities(entry.session);
         const available = routeDeps.sdkSessionUi.isSessionUiElicitationAvailable(entry.session);
         res.json(
-            routeDeps.sdkSessionOwnership.attachSdkSessionOwnership(
+            withSessionRuntimeMeta(
+                routeDeps,
                 { ok: true, sessionId: id, capabilities, elicitationAvailable: available },
                 id,
             ),
@@ -623,7 +646,7 @@ router.post('/sessions/:id/ui/elicitation', validateBody(ElicitationBodySchema),
         const entry = getActiveSessionEntryOrReply(routeDeps, id, res);
         if (!entry) return;
         const result = await routeDeps.sdkSessionUi.sessionUiElicitation(entry.session, { message, requestedSchema });
-        res.json(routeDeps.sdkSessionOwnership.attachSdkSessionOwnership({ ok: true, sessionId: id, result }, id));
+        res.json(withSessionRuntimeMeta(routeDeps, { ok: true, sessionId: id, result }, id));
     });
 });
 
@@ -642,7 +665,7 @@ router.post('/sessions/:id/ui/confirm', validateBody(UiConfirmBodySchema), (req,
         const entry = getActiveSessionEntryOrReply(routeDeps, id, res);
         if (!entry) return;
         const result = await routeDeps.sdkSessionUi.sessionUiConfirm(entry.session, message);
-        res.json(routeDeps.sdkSessionOwnership.attachSdkSessionOwnership({ ok: true, sessionId: id, result }, id));
+        res.json(withSessionRuntimeMeta(routeDeps, { ok: true, sessionId: id, result }, id));
     });
 });
 
@@ -661,7 +684,7 @@ router.post('/sessions/:id/ui/select', validateBody(UiSelectBodySchema), (req, r
         const entry = getActiveSessionEntryOrReply(routeDeps, id, res);
         if (!entry) return;
         const result = await routeDeps.sdkSessionUi.sessionUiSelect(entry.session, message, options);
-        res.json(routeDeps.sdkSessionOwnership.attachSdkSessionOwnership({ ok: true, sessionId: id, result }, id));
+        res.json(withSessionRuntimeMeta(routeDeps, { ok: true, sessionId: id, result }, id));
     });
 });
 
@@ -680,7 +703,7 @@ router.post('/sessions/:id/ui/input', validateBody(UiInputBodySchema), (req, res
         const entry = getActiveSessionEntryOrReply(routeDeps, id, res);
         if (!entry) return;
         const result = await routeDeps.sdkSessionUi.sessionUiInput(entry.session, message, options);
-        res.json(routeDeps.sdkSessionOwnership.attachSdkSessionOwnership({ ok: true, sessionId: id, result }, id));
+        res.json(withSessionRuntimeMeta(routeDeps, { ok: true, sessionId: id, result }, id));
     });
 });
 
@@ -703,7 +726,7 @@ router.post('/sessions/:id/permissions/:requestId', validateBody(PermissionDecis
             requestId,
             req.body.result,
         );
-        res.json(routeDeps.sdkSessionOwnership.attachSdkSessionOwnership({ ok: true, sessionId: id, result }, id));
+        res.json(withSessionRuntimeMeta(routeDeps, { ok: true, sessionId: id, result }, id));
     });
 });
 
@@ -722,7 +745,7 @@ router.post('/sessions/:id/tools/:requestId', validateBody(HandlePendingToolCall
         const entry = getActiveSessionEntryOrReply(routeDeps, id, res);
         if (!entry) return;
         const result = await routeDeps.sdkSessionRpc.toolsHandlePendingCall(entry.session, requestId, req.body);
-        res.json(routeDeps.sdkSessionOwnership.attachSdkSessionOwnership({ ok: true, sessionId: id, result }, id));
+        res.json(withSessionRuntimeMeta(routeDeps, { ok: true, sessionId: id, result }, id));
     });
 });
 
@@ -741,7 +764,7 @@ router.post('/sessions/:id/commands/:requestId', validateBody(HandlePendingComma
         const entry = getActiveSessionEntryOrReply(routeDeps, id, res);
         if (!entry) return;
         const result = await routeDeps.sdkSessionRpc.commandsHandlePending(entry.session, requestId, req.body);
-        res.json(routeDeps.sdkSessionOwnership.attachSdkSessionOwnership({ ok: true, sessionId: id, result }, id));
+        res.json(withSessionRuntimeMeta(routeDeps, { ok: true, sessionId: id, result }, id));
     });
 });
 
@@ -759,7 +782,7 @@ router.post('/sessions/:id/compaction/compact', (req, res) => {
         const entry = getActiveSessionEntryOrReply(routeDeps, id, res);
         if (!entry) return;
         const result = await routeDeps.sdkSessionRpc.compactionCompact(entry.session);
-        res.json(routeDeps.sdkSessionOwnership.attachSdkSessionOwnership({ ok: true, sessionId: id, result }, id));
+        res.json(withSessionRuntimeMeta(routeDeps, { ok: true, sessionId: id, result }, id));
     });
 });
 
@@ -782,7 +805,7 @@ router.post('/sessions/:id/shell/exec', validateBody(ShellExecBodySchema), (req,
             command,
             routeDeps.sdkSession.pickDefined({ cwd, timeout }),
         );
-        res.json(routeDeps.sdkSessionOwnership.attachSdkSessionOwnership({ ok: true, sessionId: id, result }, id));
+        res.json(withSessionRuntimeMeta(routeDeps, { ok: true, sessionId: id, result }, id));
     });
 });
 
@@ -801,7 +824,7 @@ router.post('/sessions/:id/shell/:processId/kill', validateBody(ShellKillBodySch
         const entry = getActiveSessionEntryOrReply(routeDeps, id, res);
         if (!entry) return;
         const result = await routeDeps.sdkSessionRpc.shellKill(entry.session, processId, req.body?.signal);
-        res.json(routeDeps.sdkSessionOwnership.attachSdkSessionOwnership({ ok: true, sessionId: id, result }, id));
+        res.json(withSessionRuntimeMeta(routeDeps, { ok: true, sessionId: id, result }, id));
     });
 });
 

@@ -181,16 +181,14 @@ describe('F115 — keepalive usa client.ping() como recurso primário', () => {
         expect(ka).toBeInstanceOf(SessionKeepalive);
     });
 
-    it('getClient callback é suportado na interface de callbacks', async () => {
+    it('performKeepalive callback é suportado na interface de callbacks', async () => {
         const { SessionKeepalive } =
             await import('/workspaces/chatgpt-docker-puppeteer/src/copilot/agent/session/keepalive.js');
         const ka = new SessionKeepalive({ intervalMs: 9_999_999, idleThresholdMs: 0 });
-        // Não deve lançar ao registrar callbacks com getClient
+        // Não deve lançar ao registrar callbacks com a interface semântica atual.
         expect(() => {
-            // Verifica que start aceita callbacks incluindo getClient
             ka.start({
-                getSession: () => null,
-                getClient: () => makeMockClient(),
+                performKeepalive: async () => null,
                 isIdle: () => false,
                 isDialogLoopActive: () => true,
             });
@@ -204,15 +202,18 @@ describe('F115 — keepalive usa client.ping() como recurso primário', () => {
         // Usa idleThresholdMs=0 para garantir que tick age imediatamente
         const ka = new SessionKeepalive({ intervalMs: 9_999_999, idleThresholdMs: 0 });
         const mockClient = makeMockClient();
-        let keepaliveCalledWith = /** @type {number | null} */ (null);
+        /** @type {{ ts: number; strategy: 'client.ping' | 'session.send' } | null} */
+        let keepaliveCalledWith = null;
 
         ka.start({
-            getSession: () => null,
-            getClient: () => mockClient,
+            performKeepalive: async () => {
+                await mockClient.ping();
+                return 'client.ping';
+            },
             isIdle: () => true,
             isDialogLoopActive: () => false,
-            onKeepalive: (ts) => {
-                keepaliveCalledWith = ts;
+            onKeepalive: (info) => {
+                keepaliveCalledWith = info;
             },
         });
 

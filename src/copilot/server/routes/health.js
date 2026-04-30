@@ -12,7 +12,7 @@
 import { Router } from 'express';
 import { toError } from '../../core/error-handlers.js';
 import { handleHubHealth } from '../../presentation/conversation-hub.js';
-import { getAgentHealthHttpStatus, resolveAgentHealthSelection } from '../../presentation/runtime-health.js';
+import { buildAgentHealthHttpResponse } from '../../presentation/runtime-health.js';
 import { resolveRequestedRuntimeId } from '../../presentation/runtime-request.js';
 import { handleHealth } from '../../presentation/system-config.js';
 import { callHandler } from '../handler-bridge.js';
@@ -32,17 +32,8 @@ export function createHealthRouter() {
     router.get('/hub-health', (req, res, next) => callHandler(handleHubHealth, req, res, next));
     router.get('/health/agent', (req, res) => {
         try {
-            const runtimeId = resolveRequestedRuntimeId(req);
-            const selection = resolveAgentHealthSelection(runtimeId);
-            const health = selection.health;
-
-            res.status(getAgentHealthHttpStatus(health)).json({
-                runtimeId: selection.runtimeId,
-                requestedRuntimeId: selection.requestedRuntimeId,
-                runtimeFound: selection.runtimeFound,
-                usedDefaultRuntimeFallback: selection.usedDefaultRuntimeFallback,
-                ...health,
-            });
+            const response = buildAgentHealthHttpResponse(resolveRequestedRuntimeId(req));
+            res.status(response.statusCode).json(response.body);
         } catch (error) {
             res.status(503).json({
                 ok: false,

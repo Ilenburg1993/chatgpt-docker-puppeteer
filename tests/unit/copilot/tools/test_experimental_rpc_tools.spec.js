@@ -6,7 +6,7 @@ const mocks = vi.hoisted(() => ({
     log: vi.fn(),
     withSkipPermission: vi.fn((tool) => tool),
     toError: vi.fn((error) => (error instanceof Error ? error : new Error(String(error)))),
-    fleetStart: vi.fn(async () => ({ ok: true })),
+    fleetStart: vi.fn(/** @returns {Promise<any>} */ async () => ({ ok: true })),
     agentList: vi.fn(async () => ({ agents: [{ name: 'auditor' }] })),
     agentGetCurrent: vi.fn(async () => ({ agent: { name: 'auditor' } })),
     agentSelect: vi.fn(async () => ({ selected: true })),

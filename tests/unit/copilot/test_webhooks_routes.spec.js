@@ -11,16 +11,32 @@ const mocks = vi.hoisted(() => ({
         const value = typeof req.query?.runtimeId === 'string' ? req.query.runtimeId : null;
         return value;
     }),
-    resolveRuntimeWebhookSelection: vi.fn((runtimeId) => ({
+    buildRuntimeWebhooksListHttpPayload: vi.fn((runtimeId) => ({
+        ok: true,
         requestedRuntimeId: runtimeId ?? null,
         runtimeId: runtimeId === 'missing' ? 'default' : (runtimeId ?? 'default'),
         runtimeFound: runtimeId !== 'missing',
         usedDefaultRuntimeFallback: runtimeId === 'missing',
-        agent: {},
+        count: 1,
+        webhooks: [{ id: 'wh-1', url: 'https://example.test/hook' }],
     })),
-    listRuntimeWebhooks: vi.fn(() => [{ id: 'wh-1', url: 'https://example.test/hook' }]),
-    registerRuntimeWebhook: vi.fn((url) => ({ id: 'wh-1', url })),
-    unregisterRuntimeWebhook: vi.fn(() => true),
+    registerRuntimeWebhookHttp: vi.fn((url, runtimeId) => ({
+        ok: true,
+        requestedRuntimeId: runtimeId ?? null,
+        runtimeId: runtimeId === 'missing' ? 'default' : (runtimeId ?? 'default'),
+        runtimeFound: runtimeId !== 'missing',
+        usedDefaultRuntimeFallback: runtimeId === 'missing',
+        id: 'wh-1',
+        url,
+    })),
+    unregisterRuntimeWebhookHttp: vi.fn((id, runtimeId) => ({
+        ok: true,
+        requestedRuntimeId: runtimeId ?? null,
+        runtimeId: runtimeId === 'missing' ? 'default' : (runtimeId ?? 'default'),
+        runtimeFound: runtimeId !== 'missing',
+        usedDefaultRuntimeFallback: runtimeId === 'missing',
+        id,
+    })),
 }));
 
 vi.mock('../../../src/copilot/presentation/runtime-request.js', () => ({
@@ -28,10 +44,9 @@ vi.mock('../../../src/copilot/presentation/runtime-request.js', () => ({
 }));
 
 vi.mock('../../../src/copilot/presentation/runtime-webhooks.js', () => ({
-    resolveRuntimeWebhookSelection: mocks.resolveRuntimeWebhookSelection,
-    listRuntimeWebhooks: mocks.listRuntimeWebhooks,
-    registerRuntimeWebhook: mocks.registerRuntimeWebhook,
-    unregisterRuntimeWebhook: mocks.unregisterRuntimeWebhook,
+    buildRuntimeWebhooksListHttpPayload: mocks.buildRuntimeWebhooksListHttpPayload,
+    registerRuntimeWebhookHttp: mocks.registerRuntimeWebhookHttp,
+    unregisterRuntimeWebhookHttp: mocks.unregisterRuntimeWebhookHttp,
 }));
 
 const { webhooksRouter } = await import('../../../src/copilot/server/routes/webhooks.js');

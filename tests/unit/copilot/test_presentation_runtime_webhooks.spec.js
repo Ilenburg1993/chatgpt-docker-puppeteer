@@ -72,4 +72,39 @@ describe('presentation/runtime-webhooks.js', () => {
             }),
         );
     });
+
+    it('projeta payload HTTP canônico para list/register/unregister', async () => {
+        const mod = await import('../../../src/copilot/presentation/runtime-webhooks.js');
+
+        expect(mod.buildRuntimeWebhooksListHttpPayload('missing')).toEqual(
+            expect.objectContaining({
+                ok: true,
+                runtimeId: 'default',
+                requestedRuntimeId: 'missing',
+                runtimeFound: false,
+                usedDefaultRuntimeFallback: true,
+                count: 1,
+                webhooks: [{ id: 'wh-1', url: 'https://example.test/hook' }],
+            }),
+        );
+
+        expect(mod.registerRuntimeWebhookHttp('https://hook.test/new', 'missing')).toEqual(
+            expect.objectContaining({
+                ok: true,
+                runtimeId: 'default',
+                requestedRuntimeId: 'missing',
+                id: 'wh-1',
+                url: 'https://hook.test/new',
+            }),
+        );
+
+        expect(mod.unregisterRuntimeWebhookHttp('wh-1', 'missing')).toEqual(
+            expect.objectContaining({
+                ok: true,
+                runtimeId: 'default',
+                requestedRuntimeId: 'missing',
+                id: 'wh-1',
+            }),
+        );
+    });
 });

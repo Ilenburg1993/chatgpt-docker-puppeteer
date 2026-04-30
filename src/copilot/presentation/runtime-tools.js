@@ -8,8 +8,18 @@
  */
 
 import { readAgentRuntimeTools } from '#copilot/agent';
+import { resolveAgentRuntimeSelection } from './agent-runtime.js';
+import { buildRuntimeRouteMetaFromSelection } from './runtime-meta.js';
 
 /** @typedef {ReturnType<typeof readAgentRuntimeTools>} AgentRuntimeToolsSnapshot */
+/**
+ * @typedef {{
+ *     requestedRuntimeId: string | null;
+ *     runtimeId: string;
+ *     runtimeFound: boolean;
+ *     usedDefaultRuntimeFallback: boolean;
+ * }} AgentRuntimeSelectionMeta
+ */
 
 /**
  * @param {unknown} value
@@ -38,6 +48,24 @@ function parseCategory(value) {
  */
 export function readAgentRuntimeToolsProjection(agent, options = {}) {
     return readAgentRuntimeTools(agent, options);
+}
+
+/**
+ * Resolve o runtime na camada de apresentação e devolve a projeção HTTP-safe de tools.
+ *
+ * Rotas de borda devem preferir esta função a receber o singleton cru do agent só para listar ferramentas. Isso deixa
+ * fallback multi-runtime, runtime não encontrado e metadados de seleção concentrados em `presentation/`.
+ *
+ * @param {string | null | undefined} [runtimeId]
+ * @param {{ allTools?: unknown[]; requireRegistry?: boolean }} [options]
+ * @returns {AgentRuntimeToolsSnapshot & AgentRuntimeSelectionMeta}
+ */
+export function readAgentRuntimeToolsProjectionForRuntime(runtimeId, options = {}) {
+    const selection = resolveAgentRuntimeSelection(runtimeId);
+    return {
+        ...readAgentRuntimeTools(selection.runtime, options),
+        ...buildRuntimeRouteMetaFromSelection(selection),
+    };
 }
 
 /**

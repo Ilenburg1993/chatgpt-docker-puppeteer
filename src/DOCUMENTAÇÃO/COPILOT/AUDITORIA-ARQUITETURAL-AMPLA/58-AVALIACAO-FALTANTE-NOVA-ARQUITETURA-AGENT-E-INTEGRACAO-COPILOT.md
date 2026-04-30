@@ -1,8 +1,7 @@
 # 58 — Avaliação do faltante para a nova arquitetura de `src/copilot/agent` e integração com `src/copilot`
 
-**Data:** 2026-04-29  
-**Escopo:** `src/copilot/agent/**` e suas fronteiras com `presentation`, `terminal`, `server`,
-`conversation-hub`, `sdk`, `tools`, `hooks`, `observability`, `core` e `boot`.
+**Data:** 2026-04-29 **Escopo:** `src/copilot/agent/**` e suas fronteiras com `presentation`,
+`terminal`, `server`, `conversation-hub`, `sdk`, `tools`, `hooks`, `observability`, `core` e `boot`.
 
 ---
 
@@ -173,7 +172,7 @@ regras por camada.
 - [x] Exportar `classifyAgentError` pelo barrel público do agent.
 - [x] Criar contrato estrutural proibindo `agent/facades/*` e `agent/error-policy.js` fora de
       `agent`.
-- [ ] Auditar `server`, `terminal`, `channel` e `runtime-wiring` para reduzir imports diretos do
+- [x] Auditar `server`, `terminal`, `channel` e `runtime-wiring` para reduzir imports diretos do
       singleton quando uma projection de `presentation` bastar.
 
 ### Faixa B — Remover ciclos globais do SDK
@@ -181,10 +180,10 @@ regras por camada.
 - [x] Remover dependência estática de `sdk/session/client.js` dentro do eixo de models;
 - [x] Criar `sdk/models/client-provider.js` como porta interna de provider de client;
 - [x] Registrar o provider em `sdk/session/client.js`, preservando a API pública;
-- [ ] Separar `sdk/models/helpers.js` em:
+- [x] Separar `sdk/models/helpers.js` em:
   - helpers puros de catálogo/model metadata;
   - adapter de lifecycle que recebe dependências por parâmetro;
-- [ ] Fazer `session/lifecycle.js` depender de uma interface de resolução, não do barrel de models;
+- [x] Fazer `session/lifecycle.js` depender de uma interface de resolução, não do barrel de models;
 - [x] Validar `madge src/copilot --circular` sem ciclos globais.
 
 ### Faixa C — Consolidar estado de diálogo
@@ -202,33 +201,56 @@ regras por camada.
 - [x] Criar snapshot de timers ativos no diagnóstico;
 - [x] Conectar métricas agregadas por fase de boot/shutdown;
 - [x] Atualizar validação de superfície obrigatória para cobrir novos exports públicos do agent;
-- [ ] Reexecutar teste live `terminal:llm-b` com boot, diálogo e `/quit`.
+- [x] Reexecutar teste live `terminal:llm-b` com boot, diálogo e `/quit`.
 
 ### Faixa E — Congelar facades/ports
 
-- [ ] Criar matriz de facades críticas e donos:
+- [x] Criar matriz de facades críticas e donos:
   - `agent-runtime-state`: persistência semântica;
   - `agent-runtime-controls`: controles/mutações;
   - `agent-sdk-access`: lifecycle vanilla SDK;
   - `agent-sdk-runtime`: eventos/send/read de sessão;
   - `agent-health-access`: input consolidado de health;
   - portas finas de observability/tools/hooks/mcp/conversation.
-- [ ] Para cada uma, adicionar teste de export público e teste de bypass.
+- [x] Criar contrato de export público mínimo para facades críticas no barrel `#copilot/agent`.
+- [x] Para cada uma, adicionar teste de bypass.
 - [ ] Reduzir imports cruzados entre facades quando houver caminho de query mais simples.
+  - [x] Remover leituras voláteis remanescentes (`status/sessionId/dialogLoopActive/dialogPaused`)
+        em `channel`, `runtime-wiring`, `runtime-host`, `runtime-sdk-session` e capability snapshot,
+        substituindo por `readRuntimeControlState`, `readAgentStatusSnapshot` e projections de
+        `presentation`.
 
 ### Faixa F — Presentation monopoly final
 
 - [ ] Server routes passam a usar somente `presentation/*`;
-- [ ] Terminal handlers passam a usar somente `presentation/*` para payloads/status;
+  - [x] `server/routes/sdk/{agent,client,observability,session-messaging}.js` não montam mais
+        status/session/tools a partir de estado vivo do `agent`; usam projections/capabilities
+        runtime-aware em `presentation/*`.
+  - [x] `server/routes/copilot-api/{control,dialog,tasks,stream}.js` propagam metadata de runtime
+        (`runtimeId/requestedRuntimeId/runtimeFound/usedDefaultRuntimeFallback`) via helpers de
+        `presentation/runtime-meta`.
+- [x] Terminal handlers passam a usar somente `presentation/*` para payloads/status;
+  - [x] `/tools` deixou de consultar `observability` diretamente e passou a consumir
+        `readTerminalToolStatsProjection()`, que usa projection compartilhada em
+        `presentation/system-metrics`.
 - [ ] `presentation/runtime-overview` vira a leitura padrão para status/health/context/pr;
-- [ ] Criar contratos impedindo payload ad hoc de status/health fora de `presentation`.
+- [x] Criar contratos impedindo payload ad hoc de status/health fora de `presentation`.
 
 ### Faixa G — Preparação para multi-runtime/multi-agent
 
 - [ ] Garantir que todo endpoint aceita/propaga `runtimeId`;
-- [ ] Separar default runtime de runtime selecionado em projections e comandos;
+  - [x] `copilot-api` principal propaga metadata de runtime em status/session/capabilities,
+        dialog/tasks/stream e fallback explícito;
+  - [x] rotas SDK de client/agent/observability agora ecoam metadata canônica também em endpoints
+        globais (`ping/auth/models/metrics/errors/logs/audit`);
+  - [x] rotas SDK de sessão CRUD/messaging/hooks propagam metadata canônica de runtime em respostas
+        HTTP e eventos iniciais SSE;
+  - [x] broadcasts SSE de `copilot-api`, `sdk/agent`, `sdk/hooks` e `sdk/session` carregam
+        `runtimeId` no payload, e streams de sessão SDK passam a ser chaveados por
+        `runtimeId:sessionId` para evitar colisão entre runtimes.
+- [x] Separar default runtime de runtime selecionado em projections e comandos;
 - [ ] Evitar estado global implícito fora de `runtime-registry`;
-- [ ] Criar teste de dois runtimes registrados com fallback explícito.
+- [x] Criar teste de dois runtimes registrados com fallback explícito.
 
 ---
 
@@ -274,6 +296,45 @@ Critério de conclusão da migração:
 - `npm run typecheck:strict:src.copilot`: **verde**.
 - `npx eslint src/copilot ... --max-warnings=0`: **verde**.
 - `npx madge src/copilot --extensions js --circular`: **0 ciclos globais**.
+
+---
+
+## 15) Checkpoint de continuação — SSE e session routes multi-runtime hardened
+
+### Transformações aplicadas
+
+- `channel/client.js`, `runtime-wiring.js`, `presentation/runtime-sdk-session.js`,
+  `agent/facades/agent-runtime-capabilities.js` e `agent/lifecycle/runtime-host.js` deixaram de ler
+  propriedades voláteis do agent diretamente (`status/sessionId/dialogLoopActive/dialogPaused`) e
+  passaram a consumir snapshots/projections canônicas.
+- `server/routes/sdk/session-crud.js` passou a anexar metadata de runtime em respostas de
+  `active/last/binding/foreground/list/create/detail/delete/disconnect/resume/compaction-history`,
+  incluindo falhas de validação de provider/model e endpoints destrutivos.
+- `server/routes/sdk/session-messaging.js` passou a anexar metadata de runtime nas respostas de
+  `send/stream/model/log/abort/messages/workspace/ui/permissions/tools/commands/compaction/shell`.
+- O estado SSE de `/api/sdk/sessions/:id/stream` deixou de ser global por `sessionId` e passou a ser
+  chaveado por `runtimeId:sessionId`, evitando colisão quando dois runtimes têm sessões com o mesmo
+  identificador.
+- Broadcasts SSE de `copilot-api/stream`, `sdk/agent`, `sdk/hooks` e `sdk/session` passaram a
+  incluir `runtimeId` no payload padronizado, não apenas no evento inicial `connected`.
+- Respostas de limite SSE (`429/503`) passaram a devolver metadata runtime quando a rota já consegue
+  resolver o runtime.
+- `test_arch_contracts` foi ampliado para bloquear regressão de:
+  - leitura direta de propriedades voláteis nas bordas;
+  - SSE sem `runtimeId` em broadcasts;
+  - stream SDK de sessão indexado apenas por `sessionId`.
+
+### Validação executada
+
+- `npm run typecheck:strict:src.copilot`: **verde**.
+- `eslint` focado em `src/copilot` e contratos alterados: **verde**.
+- testes focados:
+  - `test_arch_contracts`;
+  - `test_sdk_route_session_ownership`;
+  - `test_sdk_runtime_projection_routes`;
+  - `test_copilot_api_runtime_metadata`;
+  - `test_llm_bridge_client`;
+  - `test_presentation_runtime_sdk_session`. Resultado: **98/98 testes verdes**.
 - `npx madge src/copilot/agent --extensions js --circular`: **0 ciclos internos**.
 - `npx vitest run --config vitest.copilot.config.js tests/unit/copilot --testTimeout=60000`: **4303
   testes passaram, 28 skipped**.
@@ -307,3 +368,214 @@ agent e SDK já está mais limpa; agora vale atacar a confiabilidade operacional
 
 - `npm run typecheck:strict:src.copilot`: **verde** após os ajustes de lifecycle.
 - Testes focados de boot/surface/shutdown/lifecycle/diagnose/bootstrap: **verdes**.
+
+---
+
+## 8) Checkpoint de continuação — monopoly de presentation nas rotas SDK
+
+### Transformações aplicadas
+
+- `presentation/runtime-tools.js` ganhou `readAgentRuntimeToolsProjectionForRuntime(runtimeId)`.
+- `presentation/runtime-status.js` ganhou leituras `readAgentStatusSnapshotForRuntime()` e
+  `readAgentStatusValueForRuntime()`.
+- `presentation/sdk-sessions.js` ganhou `resolveSdkRuntimeProjectionForRuntime()`, removendo a
+  necessidade de passar o singleton vivo do agent para rotas de status/start/state.
+- `presentation/runtime-sdk-session.js` ganhou `resolveAgentSdkActiveSessionEntry()`, encapsulando o
+  fallback da sessão permanente do AlwaysAlive quando ela ainda não está no registry SDK.
+- `agent/facades/agent-health-access.js` passou a ser exportado pelo barrel público do agent e a
+  matriz mínima de facades críticas passou a ter contrato de export em `test_arch_contracts`.
+- `server/routes/sdk/{agent,client,observability,session-messaging}.js` passaram a consumir essas
+  projections/capabilities por `runtimeId`.
+- `tests/unit/copilot/contracts/test_arch_contracts.spec.js` agora bloqueia regressões nas rotas SDK
+  que voltem a ler `agent.status`, `agent.sessionId`, `routeDeps.agent` ou projections antigas com
+  `agent` cru.
+
+### Validação executada
+
+- `npm run typecheck:strict:src.copilot`: **verde**.
+- Testes focados de rotas/projections/contratos: `test_sdk_runtime_projection_routes`,
+  `test_presentation_runtime_route_deps`, `test_presentation_runtime_status`, `test_arch_contracts`:
+  **verdes**.
+
+---
+
+## 9) Checkpoint de continuação — Faixa B com interface explícita de model resolution
+
+### Transformações aplicadas
+
+- `sdk/session/lifecycle.js` deixou de acionar resolução de `model="auto"` por import lazy do barrel
+  `../models/index.js`.
+- Foi criada a porta `sdk/session/model-resolution-port.js`, com:
+  - `setSessionAutoModelResolver()` para injeção de estratégia;
+  - `resolveSessionAutoModel()` para consumo canônico no lifecycle.
+- Foi criado o adapter `sdk/models/session-resolution-adapter.js`, mantendo a resolução baseada em
+  catálogo no domínio de models e oferecendo factory injetável:
+  - `createSessionAutoModelResolver({ listModelsFn, resolveModelIdAutoFn })`;
+  - `resolveSessionAutoModelFromCatalog()`.
+- Contratos arquiteturais foram ampliados em `test_arch_contracts` para garantir:
+  - ausência de `models/index` no lifecycle de sessão;
+  - dependência explícita da porta `session/model-resolution-port`;
+  - presença do adapter dedicado de resolução no domínio `models`.
+
+### Validação executada
+
+- `npm run typecheck:strict:src.copilot`: **verde**.
+- `eslint` focado em sdk/session/models + contratos: **verde**.
+- testes focados:
+  - `test_sdk_session_core_lifecycle`;
+  - `test_sdk_session_model_resolution_port`;
+  - `test_sdk_models_session_resolution_adapter`;
+  - `test_arch_contracts`. Resultado: **58/58 testes verdes**.
+
+---
+
+## 10) Checkpoint de continuação — validação live `terminal:llm-b` (Faixa D)
+
+### Execução realizada
+
+- comando: `npm run terminal:llm-b`;
+- evidências observadas no runtime:
+  - boot completo do terminal/server/hub/eventbus;
+  - `AlwaysAliveAgent` inicializado com sessão retomada;
+  - runtime em `model="auto"` preservado até o SDK;
+  - loop de diálogo iniciado com `READY`.
+- encerramento controlado por comando interativo: `/quit`.
+
+### Resultado
+
+- shutdown gracioso concluído com handlers executados (`timers`, `hub`, `agent.stop`, `server`,
+  `eventbus`, `audit.flush`, `event-collector.flush`);
+- processo finalizou com **exit code 0**;
+- item pendente da Faixa D (“reexecutar teste live com `/quit`”) passa a concluído.
+
+---
+
+## 11) Checkpoint de continuação — presentation monopoly em `health` e `webhooks`
+
+### Transformações aplicadas
+
+- `presentation/runtime-health.js` ganhou `buildAgentHealthHttpResponse(runtimeId)`, encapsulando:
+  - resolução de runtime alvo;
+  - metadata de fallback;
+  - status HTTP derivado do snapshot canônico de health.
+- `server/routes/health.js` deixou de montar payload de runtime/health manualmente e passou a
+  consumir a projection HTTP de `presentation`.
+- `presentation/runtime-webhooks.js` ganhou projections HTTP canônicas:
+  - `buildRuntimeWebhooksListHttpPayload(runtimeId)`;
+  - `registerRuntimeWebhookHttp(url, runtimeId)`;
+  - `unregisterRuntimeWebhookHttp(id, runtimeId)`.
+- `server/routes/webhooks.js` deixou de montar metadata ad hoc de runtime e passou a consumir apenas
+  essas projections.
+- `test_arch_contracts` foi ampliado para bloquear regressões nas rotas `health/webhooks` que voltem
+  a montar payload runtime manualmente.
+
+### Validação executada
+
+- `npm run typecheck:strict:src.copilot`: **verde**.
+- `eslint` focado (`presentation/runtime-{health,webhooks}` + rotas + contratos): **verde**.
+- testes focados:
+  - `test_presentation_runtime_health`;
+  - `test_presentation_runtime_webhooks`;
+  - `test_webhooks_routes`;
+  - `test_arch_contracts`. Resultado: **50/50 testes verdes**.
+- `madge src/copilot --extensions js --circular`: **0 ciclos globais**.
+- `madge src/copilot/agent --extensions js --circular`: **0 ciclos internos**.
+
+---
+
+## 12) Checkpoint de continuação — fechamento da Faixa A em `runtime-wiring`
+
+### Transformações aplicadas
+
+- `runtime-wiring.js` deixou de importar `./agent/index.js` diretamente e passou a consumir a
+  superfície pública `#copilot/agent` para:
+  - `getAgent`;
+  - `alwaysAliveAgent`;
+  - `configureHookTools`;
+  - `setHub`;
+  - `setPermissionAgent`.
+- Contrato arquitetural em `test_arch_contracts` ampliado para bloquear regressão que volte a abrir
+  import relativo interno de `agent` no composition root.
+
+### Validação executada
+
+- `npm run typecheck:strict:src.copilot`: **verde**.
+- `eslint` focado (`runtime-wiring` + contratos): **verde**.
+- testes focados:
+  - `test_arch_contracts`;
+  - `test_facade_bypass_matrix`;
+  - `test_bootstrap`. Resultado: **49/49 testes verdes**.
+
+---
+
+## 13) Checkpoint de continuação — `copilot-api` com propagação canônica de runtime metadata (Faixa F/G)
+
+### Transformações aplicadas
+
+- `server/routes/copilot-api/control.js` passou a propagar metadata de runtime em respostas de
+  `health/start/stop/permissions/steer` (incluindo falhas), usando `buildRuntimeRouteMetaPayload`;
+- `server/routes/copilot-api/dialog.js` passou a propagar metadata runtime em
+  `dialog/start|turn|stop`, inclusive em erros de validação/projeção;
+- `server/routes/copilot-api/tasks.js` passou a propagar metadata runtime em `send/answer`,
+  `answer/clear-shadow` e endpoints de `elicitation`;
+- `server/routes/copilot-api/stream.js` passou a incluir metadata de runtime no evento inicial
+  `connected` do canal dedicado `/stream/tasks`;
+- `test_arch_contracts` foi ampliado com bloco dedicado para garantir uso de
+  `buildRuntimeRouteMetaPayload` nas rotas `copilot-api` principais.
+
+### Validação executada
+
+- `npm run typecheck:strict:src.copilot`: **verde**;
+- `eslint` focado em `copilot-api/*` + contratos + novo teste: **verde**;
+- testes focados:
+  - `test_copilot_api_runtime_metadata` (novo);
+  - `test_copilot_api_runtime_errors`;
+  - `test_agent_health_routes`;
+  - `test_arch_contracts`. Resultado: **63/63 testes verdes**;
+- `madge src/copilot --extensions js --circular`: **0 ciclos globais**;
+- `madge src/copilot/agent --extensions js --circular`: **0 ciclos internos**.
+
+---
+
+## 14) Checkpoint de continuação — Faixa F/G em terminal e rotas SDK globais
+
+### Transformações aplicadas
+
+- `presentation/system-metrics.js` ganhou `readToolStatsProjection()`, uma leitura compartilhada de
+  estatísticas de tools com fallback defensivo para ambientes de teste/mocks sem
+  `getStatsByCategory`.
+- `terminal/frontend/llm-b-frontend.js` deixou de importar `getToolStats()` diretamente de
+  `observability`; `/diagnose`, `/metrics` e a nova `readTerminalToolStatsProjection()` passam pela
+  projection compartilhada.
+- `terminal/commands/tools.js` deixou de acessar `observability` e passou a renderizar apenas a
+  projection do frontend do terminal.
+- `server/routes/sdk/deps.js` expôs `buildRuntimeRouteMetaPayload` dentro do adapter SDK.
+- `server/routes/sdk/{client,agent,observability}.js` passaram a ecoar metadata canônica de runtime
+  também nos endpoints antes tratados como globais:
+  - `/ping`, `/auth`, `/models`, `/client/stop`, `/client/force-stop`;
+  - `/agent/telemetry`, `/agent/telemetry/clear`, `/agent/stream`;
+  - `/observability/metrics`, `/quota`, `/errors`, `/errors/stats`, `/logs`, `/log-level`, `/audit`.
+- `server/routes/copilot-api/{control,dialog,tasks}.js` deixaram de consultar
+  `agent.status/sessionId/dialogLoopActive` diretamente e passaram a consultar
+  `readAgentRuntimeControlStateFromRoute()`, preservando o runtime já resolvido/injetado pela rota.
+- `tests/unit/copilot/test_copilot_api_multi_runtime.spec.js` cobre dois runtimes registrados e
+  fallback explícito para runtime inexistente.
+- `tests/unit/copilot/terminal/test_commands_tools.spec.js` cobre o contrato do comando `/tools` via
+  projection, incluindo estado vazio.
+- `test_arch_contracts` foi ampliado para bloquear regressões em:
+  - `/tools` importando `#copilot/observability`;
+  - `copilot-api` lendo `agent.status/sessionId/dialogLoopActive` diretamente;
+  - rotas SDK que deixem de expor helper de metadata runtime.
+
+### Validação executada
+
+- `npm run typecheck:strict:src.copilot`: **verde**.
+- Testes focados:
+  - `test_arch_contracts`;
+  - `test_commands_tools`;
+  - `test_commands_diagnose`;
+  - `test_commands_metrics_usage`;
+  - `test_sdk_runtime_projection_routes`;
+  - `test_presentation_runtime_route_deps`;
+  - `test_copilot_api_multi_runtime`. Resultado: **verdes**.
+- `npx madge src/copilot --extensions js --circular`: **0 ciclos globais**.

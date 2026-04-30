@@ -19,7 +19,7 @@ describe('sdk/http-request hardening', () => {
         const server = http.createServer((_req, res) => {
             res.end('ok');
         });
-        await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+        await new Promise((resolve) => server.listen(0, '127.0.0.1', () => resolve(undefined)));
         try {
             const address = server.address();
             assert.ok(address && typeof address === 'object');
@@ -27,7 +27,7 @@ describe('sdk/http-request hardening', () => {
             assert.equal(result.statusCode, 200);
             assert.equal(result.body, 'ok');
         } finally {
-            await new Promise((resolve) => server.close(resolve));
+            await new Promise((resolve) => server.close(() => resolve(undefined)));
         }
     });
 });

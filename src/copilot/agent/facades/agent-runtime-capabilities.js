@@ -269,8 +269,8 @@ export function readAgentRuntimeCapabilities(agent, options = {}) {
             stateFromCheck(dialogOk, typeof agent.startDialogLoop === 'function'),
             {
                 details: {
-                    active: Boolean(agent.dialogLoopActive),
-                    paused: Boolean(agent.dialogPaused),
+                    active: Boolean(health?.['dialogLoopActive'] ?? snap['dialogLoopActive']),
+                    paused: Boolean(readPath(checks, ['dialog', 'paused']) ?? snap['dialogPaused']),
                     pendingQuestion: Boolean(health?.['pendingQuestion']),
                     pendingQuestionKind: health?.['pendingQuestionKind'] ?? null,
                     provider: dialogFactory?.['provider'] ?? null,

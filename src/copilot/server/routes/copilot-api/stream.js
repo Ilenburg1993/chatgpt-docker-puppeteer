@@ -21,8 +21,9 @@ import {
     SseConnectionTracker,
     standardizeSsePayload,
 } from '../../../infra/sse/utils.js';
+import { buildRuntimeRouteMetaPayload } from '../../../presentation/runtime-meta.js';
 import { resolveCopilotApiRouteBinding } from '../../../presentation/runtime-request.js';
-import { buildAgentConnectedSsePayload } from '../../../presentation/runtime-status.js';
+import { buildAgentConnectedSsePayloadFromRoute } from '../../../presentation/runtime-status.js';
 
 /**
  * @typedef {import('express').Request} Req
@@ -118,7 +119,10 @@ export function registerStreamRoutes(bridge, binding) {
 
         /** @type {(eventName: AgentEventName, data: unknown) => void} */
         const broadcastStreamEvent = (eventName, data) => {
-            const payload = standardizeSsePayload(data ?? {});
+            const payload = standardizeSsePayload({
+                .../** @type {object} */ (data ?? {}),
+                runtimeId: state.runtimeId,
+            });
             state.streamPool.broadcast(eventName, payload, { replayEvent: eventName, filterEvent: eventName });
             // FASE-15.2: publicar no barramento de fanout para propagação inter-processo
             eventFanout.publish('bridge', eventName, /** @type {object} */ (payload));
@@ -126,7 +130,10 @@ export function registerStreamRoutes(bridge, binding) {
 
         /** @type {(eventName: AgentEventName, data: unknown) => void} */
         const broadcastTaskEvent = (eventName, data) => {
-            const payload = standardizeSsePayload(data ?? {});
+            const payload = standardizeSsePayload({
+                .../** @type {object} */ (data ?? {}),
+                runtimeId: state.runtimeId,
+            });
             state.taskPool.broadcast(eventName, payload, { replayEvent: eventName, filterEvent: eventName });
         };
 
@@ -191,7 +198,11 @@ export function registerStreamRoutes(bridge, binding) {
         const state = ensureRuntimeState(deps);
         // BUG-EVDUP-03 (fix): verificar limite de conexões SSE antes de aceitar
         if (!tracker.accept()) {
-            res.status(429).json({ ok: false, error: 'Limite de clientes SSE atingido' });
+            res.status(429).json({
+                ok: false,
+                ...buildRuntimeRouteMetaPayload(deps),
+                error: 'Limite de clientes SSE atingido',
+            });
             return;
         }
 
@@ -213,7 +224,7 @@ export function registerStreamRoutes(bridge, binding) {
         });
 
         // Evento inicial com snapshot do estado atual
-        sse.send('connected', buildAgentConnectedSsePayload(state.agent, deps), { skipBuffer: true });
+        sse.send('connected', buildAgentConnectedSsePayloadFromRoute(deps), { skipBuffer: true });
 
         const client = state.streamPool.addClient(sse, { filter: eventFilter });
 
@@ -231,7 +242,11 @@ export function registerStreamRoutes(bridge, binding) {
         const deps = resolveCopilotApiRouteBinding(binding, req);
         const state = ensureRuntimeState(deps);
         if (!taskTracker.accept()) {
-            res.status(429).json({ ok: false, error: 'Limite de clientes SSE task atingido' });
+            res.status(429).json({
+                ok: false,
+                ...buildRuntimeRouteMetaPayload(deps),
+                error: 'Limite de clientes SSE task atingido',
+            });
             return;
         }
 
@@ -241,7 +256,11 @@ export function registerStreamRoutes(bridge, binding) {
             tracker: taskTracker,
         });
 
-        sse.send('connected', { timestamp: Date.now(), channel: 'tasks' }, { skipBuffer: true });
+        sse.send(
+            'connected',
+            { timestamp: Date.now(), channel: 'tasks', ...buildRuntimeRouteMetaPayload(deps) },
+            { skipBuffer: true },
+        );
 
         const client = state.taskPool.addClient(sse);
 

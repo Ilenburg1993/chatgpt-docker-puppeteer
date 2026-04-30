@@ -7,10 +7,17 @@
  *   `terminal/` e `server/` recebem as dependências já compostas.
  */
 
-import { ALWAYS_ALIVE_AGENT } from '#copilot/agent';
+import {
+    ALWAYS_ALIVE_AGENT,
+    alwaysAliveAgent,
+    configureHookTools,
+    getAgent,
+    readRuntimeControlState,
+    setHub,
+    setPermissionAgent,
+} from '#copilot/agent';
 import { BRIDGE_AGENT, FALLBACK_AGENT, NERV_BRIDGE_AGENT, PERMISSION_AGENT } from '#copilot/bridges';
 import { CONVERSATION_STORE, HUB } from '#copilot/conversation-hub';
-import { alwaysAliveAgent, configureHookTools, getAgent, setHub, setPermissionAgent } from './agent/index.js';
 import { setBridgeAgent } from './channel/client.js';
 import { conversationHub } from './conversation-hub/hub.js';
 import { setFallbackAgent } from './conversation-hub/orchestrator.js';
@@ -63,7 +70,7 @@ export function wireCopilotRuntimeDI({ broadcastSse }) {
         'copilot.agent.stop',
         async () => {
             const agent = getAgent();
-            if (agent.status === 'stopped') return;
+            if (readRuntimeControlState(agent).status === 'stopped') return;
             await agent.stop({ preserveDialogLoopIntent: true });
             log('INFO', '[runtime-wiring] AlwaysAliveAgent parado com intenção de dialog loop preservada.');
         },

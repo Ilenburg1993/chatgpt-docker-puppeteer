@@ -78,7 +78,7 @@ describe('SessionKeepalive', () => {
         const ka = new SessionKeepalive({ intervalMs: 100, idleThresholdMs: 0 });
 
         ka.start({
-            performKeepalive: vi.fn(async () => 'client.ping'),
+            performKeepalive: vi.fn(/** @returns {Promise<'client.ping'>} */ async () => 'client.ping'),
             isIdle: () => true,
             isDialogLoopActive: () => false,
             onKeepalive,

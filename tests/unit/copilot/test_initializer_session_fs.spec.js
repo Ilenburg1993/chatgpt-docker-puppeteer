@@ -5,22 +5,26 @@ const mocks = vi.hoisted(() => ({
     buildCustomAgentsConfig: vi.fn(() => []),
     buildSystemMessage: vi.fn(() => ({ mode: 'append', content: 'ctx' })),
     canReadAgentSdkSessionMessages: vi.fn(() => true),
-    createAgentSdkSessionByClient: vi.fn(async (_client, options) => ({
-        session: { sessionId: 'new-sess' },
-        isResumed: false,
-        options,
-    })),
+    createAgentSdkSessionByClient: vi.fn(
+        /** @returns {Promise<any>} */ async (_client, options) => ({
+            session: { sessionId: 'new-sess' },
+            isResumed: false,
+            options,
+        }),
+    ),
     getAgentConfiguredSessionFsHandler: vi.fn(() => vi.fn()),
     loadAgentSdkToolsConfigAsync: vi.fn(async () => undefined),
     pickDefinedAgentSdkOptions: vi.fn((value) => value),
     readAgentSdkSessionMessages: vi.fn(async () => []),
-    resumeOrCreateAgentSdkSession: vi.fn(async (_client, _savedSessionId, options) => ({
-        session: { sessionId: 'new-sess' },
-        isResumed: false,
-        options,
-    })),
+    resumeOrCreateAgentSdkSession: vi.fn(
+        /** @returns {Promise<any>} */ async (_client, _savedSessionId, options) => ({
+            session: { sessionId: 'new-sess' },
+            isResumed: false,
+            options,
+        }),
+    ),
     persistState: vi.fn(async () => ({ ok: true })),
-    readState: vi.fn(async () => null),
+    readState: vi.fn(/** @returns {Promise<unknown>} */ async () => null),
     buildHookSystemContextSafe: vi.fn(async () => 'hook ctx'),
 }));
 

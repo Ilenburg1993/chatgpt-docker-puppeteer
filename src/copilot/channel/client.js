@@ -8,6 +8,7 @@
  * @see module:copilot/channel/inject
  */
 
+import { readRuntimeControlState } from '#copilot/agent';
 import { LLM_B_TURN_TIMEOUT_MS } from '#copilot/config';
 import { BridgeError } from '#copilot/core';
 import {
@@ -599,13 +600,14 @@ export class LlmBridgeClient {
      */
     getAgentStatus() {
         const agent = requireAgent();
+        const controlState = readRuntimeControlState(/** @type {any} */ (agent));
         return {
-            status: String(agent.status ?? 'unknown'),
-            sessionId: agent.sessionId ?? null,
-            model: typeof agent.model === 'string' ? agent.model : null,
-            queueSize: Number(agent.queueSize ?? 0),
-            dialogLoopActive: Boolean(agent.dialogLoopActive),
-            dialogPaused: Boolean(agent.dialogPaused),
+            status: controlState.status,
+            sessionId: controlState.sessionId,
+            model: controlState.model !== 'unknown' ? controlState.model : null,
+            queueSize: controlState.queueSize,
+            dialogLoopActive: controlState.dialogLoopActive,
+            dialogPaused: controlState.dialogPaused,
         };
     }
 }

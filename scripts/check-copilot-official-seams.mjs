@@ -229,10 +229,11 @@ export function checkOfficialSeams() {
             }
 
             if (rule.regex) {
+                const regex = rule.regex;
                 content.forEach((line, index) => {
                     if (isCommentOnly(line)) return;
-                    rule.regex.lastIndex = 0;
-                    if (rule.regex?.test(line)) {
+                    regex.lastIndex = 0;
+                    if (regex.test(line)) {
                         findings.push({
                             file: rel,
                             line: index + 1,

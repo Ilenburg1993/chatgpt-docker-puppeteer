@@ -5,6 +5,7 @@ import { clearSharedSessionBinding, setSharedHubSessionId, setSharedSdkSessionId
 import express from 'express';
 import request from 'supertest';
 
+import { buildRuntimeRouteMetaPayload } from '../../../src/copilot/presentation/runtime-meta.js';
 import {
     paginateAgentRuntimeToolsProjection,
     readAgentRuntimeToolsProjection,
@@ -66,14 +67,40 @@ function createMockAgent() {
  * @returns {any}
  */
 function routeDeps(overrides = {}) {
+    const agent = overrides.agent ?? createMockAgent();
     return {
         sdkSessionOwnership: {
             clearSdkRuntimeBinding,
             resolveSdkRuntimeProjection,
+            resolveSdkRuntimeProjectionForRuntime: (
+                /** @type {string | null | undefined} */ _runtimeId,
+                /** @type {Parameters<typeof resolveSdkRuntimeProjection>[1]} */ client,
+                /** @type {string | null} */ connectionState,
+            ) => resolveSdkRuntimeProjection(agent, client, connectionState),
         },
         sdkRuntimeProjection: {
+            buildRuntimeRouteMetaPayload,
             paginateAgentRuntimeToolsProjection,
             readAgentRuntimeToolsProjection,
+            readAgentStatusSnapshotForRuntime: () => ({
+                status: typeof agent.status === 'string' ? agent.status : 'stopped',
+                sessionId: typeof agent.sessionId === 'string' ? agent.sessionId : null,
+                runtimeId: 'default',
+                requestedRuntimeId: null,
+                runtimeFound: true,
+                usedDefaultRuntimeFallback: false,
+            }),
+            readAgentRuntimeToolsProjectionForRuntime: (
+                /** @type {string | null | undefined} */ runtimeId,
+                /** @type {{ allTools?: unknown[]; requireRegistry?: boolean }} */ options = {},
+            ) => ({
+                ...readAgentRuntimeToolsProjection(agent, options),
+                requestedRuntimeId: runtimeId ?? null,
+                runtimeId: runtimeId ?? 'default',
+                runtimeFound: true,
+                usedDefaultRuntimeFallback: false,
+                defaultRuntimeId: 'default',
+            }),
         },
         sdkObservability: {
             log: () => {},
@@ -121,6 +148,33 @@ describe('sdk runtime projection routes', () => {
             sdkSessionId: 'sdk-shared',
             isBound: true,
         });
+    });
+
+    it('rotas client globais propagam fallback explícito de runtime', async () => {
+        const app = express();
+        app.use(
+            createClientRouter(
+                routeDeps({
+                    agent: createMockAgent(),
+                    getClient: async () => createMockClient(),
+                    getClientState: () => 'connected',
+                    stopClient: async () => [],
+                    forceStopClient: async () => {},
+                    allTools: [],
+                    runtimeId: 'default',
+                    requestedRuntimeId: 'missing-runtime',
+                    runtimeFound: false,
+                    usedDefaultRuntimeFallback: true,
+                }),
+            ),
+        );
+
+        const res = await request(app).get('/models').expect(200);
+
+        assert.equal(res.body.runtimeId, 'default');
+        assert.equal(res.body.requestedRuntimeId, 'missing-runtime');
+        assert.equal(res.body.runtimeFound, false);
+        assert.equal(res.body.usedDefaultRuntimeFallback, true);
     });
 
     it('POST /client/stop limpa o sdk binding preservando hubSessionId', async () => {

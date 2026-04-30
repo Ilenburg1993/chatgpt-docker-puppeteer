@@ -21,14 +21,14 @@ function fakeSession(capabilities = {}) {
     return {
         sessionId: 's1',
         capabilities,
-        on: vi.fn((eventType, handler) => {
+        on: vi.fn((/** @type {string} */ eventType, /** @type {(event: unknown) => void} */ handler) => {
             handlers[eventType] = handlers[eventType] ?? [];
             handlers[eventType].push(handler);
             return () => {
                 handlers[eventType] = (handlers[eventType] ?? []).filter((item) => item !== handler);
             };
         }),
-        emit(eventType, event) {
+        emit(/** @type {string} */ eventType, /** @type {unknown} */ event) {
             for (const handler of handlers[eventType] ?? []) handler(event);
         },
     };

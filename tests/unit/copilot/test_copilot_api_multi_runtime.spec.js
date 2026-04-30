@@ -1,0 +1,162 @@
+// @ts-check
+
+import assert from 'node:assert/strict';
+import { afterEach, beforeEach, describe, it } from 'vitest';
+
+import { alwaysAliveAgent, clearAgentRuntimeRegistry, registerAgentRuntime } from '#copilot/agent';
+import express from 'express';
+import supertest from 'supertest';
+
+import { createCopilotApiRouter } from '../../../src/copilot/server/routes/copilot-api/index.js';
+
+/**
+ * @param {string} sessionId
+ * @param {string} model
+ * @returns {any}
+ */
+function createRuntime(sessionId, model) {
+    return {
+        status: 'idle',
+        sessionId,
+        dialogLoopActive: true,
+        dialogPaused: false,
+        getPermissionMode: () => 'approve_all',
+        getStatusSnapshot: () => ({
+            status: 'idle',
+            sessionId,
+            model,
+            permissionMode: 'approve_all',
+            isResumed: true,
+            resumeCount: 1,
+            sendCount: 2,
+            startedAt: 123,
+            queueSize: 0,
+            oldestTaskWaitMs: 0,
+            starvationAlert: false,
+        }),
+        getHealthSnapshot: () => ({
+            ok: true,
+            healthy: true,
+            status: 'healthy',
+            agentStatus: 'idle',
+            sessionId,
+            model,
+            reasoningEffort: 'medium',
+            dialogLoopActive: true,
+            pendingQuestion: false,
+            pendingQuestionKind: null,
+            pendingQuestionShadow: false,
+            pendingQuestionShadowKind: null,
+            pendingQuestionShadowState: null,
+            pendingQuestionShadowExpired: false,
+            pendingQuestionShadowAgeMs: null,
+            pendingQuestionShadowExpiresAt: null,
+            pendingQuestionShadowRemainingMs: null,
+            queueSize: 0,
+            oldestTaskWaitMs: 0,
+            starvationAlert: false,
+            backgroundPendingCount: 0,
+            backgroundPendingLabels: [],
+            riskFlags: [],
+            recommendedAction: 'none',
+            uptime: 100,
+            issues: [],
+            bootReport: null,
+            startReport: null,
+            sdkResources: null,
+            checks: {
+                runtime: { ok: true, status: 'idle', operational: true },
+                client: { ok: true, available: true },
+                session: { ok: true, active: true, resumed: true },
+                dialog: { ok: true, active: true, attached: true, paused: false },
+                queue: { ok: true, size: 0, oldestTaskWaitMs: 0, starvationAlert: false },
+                io: {
+                    ok: true,
+                    pendingQuestion: false,
+                    pendingQuestionKind: null,
+                    pendingQuestionShadow: false,
+                    pendingQuestionShadowKind: null,
+                    pendingQuestionShadowState: null,
+                    pendingQuestionShadowExpired: false,
+                    pendingQuestionShadowAgeMs: null,
+                    pendingQuestionShadowExpiresAt: null,
+                    pendingQuestionShadowRemainingMs: null,
+                    waitingForInput: false,
+                    keepaliveRunning: true,
+                    backgroundPendingCount: 0,
+                },
+                background: { ok: true, pendingCount: 0, warnThreshold: 8, labels: [] },
+                sdkResources: {
+                    ok: true,
+                    available: true,
+                    allCoreResourcesAvailable: true,
+                    allRuntimeResourcesAvailable: true,
+                    missingResources: [],
+                },
+                boot: {
+                    ok: true,
+                    reportAvailable: true,
+                    failedSteps: 0,
+                    degradedSteps: 0,
+                    lastCompletedAt: 456,
+                },
+                quota: { ok: true, configured: true, running: true },
+            },
+            ts: Date.now(),
+        }),
+        getSdkResourceSnapshot: () => ({
+            resources: {
+                clientAvailable: true,
+                sessionAvailable: true,
+                toolRegistryAvailable: true,
+            },
+            missingResources: [],
+            allCoreResourcesAvailable: true,
+            allRuntimeResourcesAvailable: true,
+        }),
+        getToolRegistryEntriesSnapshot: () => [],
+        listWebhooks: () => [],
+        getHandoffManager: () => ({}),
+    };
+}
+
+describe('copilot-api multi-runtime propagation', () => {
+    beforeEach(() => {
+        clearAgentRuntimeRegistry();
+    });
+
+    afterEach(() => {
+        clearAgentRuntimeRegistry();
+        registerAgentRuntime(alwaysAliveAgent);
+    });
+
+    it('status/session/capabilities selecionam runtime explícito e fazem fallback declarativo', async () => {
+        registerAgentRuntime(createRuntime('default-session', 'gpt-5-mini'), 'default');
+        registerAgentRuntime(createRuntime('audit-session', 'gpt-5'), 'audit');
+
+        const app = express();
+        app.use(createCopilotApiRouter());
+
+        const status = await supertest(app).get('/status?runtimeId=audit').expect(200);
+        assert.equal(status.body.runtimeId, 'audit');
+        assert.equal(status.body.requestedRuntimeId, 'audit');
+        assert.equal(status.body.runtimeFound, true);
+        assert.equal(status.body.sessionId, 'audit-session');
+        assert.equal(status.body.model, 'gpt-5');
+
+        const session = await supertest(app).get('/session?runtimeId=audit').expect(200);
+        assert.equal(session.body.runtimeId, 'audit');
+        assert.equal(session.body.sessionId, 'audit-session');
+
+        const capabilities = await supertest(app).get('/capabilities?runtimeId=audit').expect(200);
+        assert.equal(capabilities.body.runtimeId, 'audit');
+        assert.equal(capabilities.body.capabilities['sdk.session'].details.sessionId, 'audit-session');
+
+        const fallback = await supertest(app).get('/status?runtimeId=missing').expect(200);
+        assert.equal(fallback.body.runtimeId, 'default');
+        assert.equal(fallback.body.requestedRuntimeId, 'missing');
+        assert.equal(fallback.body.runtimeFound, false);
+        assert.equal(fallback.body.usedDefaultRuntimeFallback, true);
+        assert.equal(fallback.body.sessionId, 'default-session');
+    });
+});

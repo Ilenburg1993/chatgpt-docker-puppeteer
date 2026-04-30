@@ -50,6 +50,9 @@ const _agentTracker = new SseConnectionTracker('agent/stream');
  * @property {ReturnType<import('./deps.js').buildDefaultSdkRouteSharedDeps>['sdkSessionOwnership']} sdkSessionOwnership
  * @property {ReturnType<import('./deps.js').buildDefaultSdkRouteSharedDeps>['sdkObservability']} sdkObservability
  * @property {string} [runtimeId] - Runtime alvo resolvido na borda.
+ * @property {string | null} [requestedRuntimeId] - Runtime solicitado antes de fallback.
+ * @property {boolean} [runtimeFound] - Se o runtime solicitado foi encontrado.
+ * @property {boolean} [usedDefaultRuntimeFallback] - Se a resposta caiu para o runtime default.
  */
 
 /** @typedef {AgentRouterDeps | ((req: Req) => AgentRouterDeps)} AgentRouterBinding */
@@ -61,6 +64,19 @@ const _agentTracker = new SseConnectionTracker('agent/stream');
  */
 function resolveAgentRouterDeps(binding, req) {
     return typeof binding === 'function' ? binding(req) : binding;
+}
+
+/**
+ * @param {AgentRouterDeps} routeDeps
+ * @returns {{
+ *     runtimeId?: string;
+ *     requestedRuntimeId?: string | null;
+ *     runtimeFound?: boolean;
+ *     usedDefaultRuntimeFallback?: boolean;
+ * }}
+ */
+function buildAgentRuntimeMeta(routeDeps) {
+    return routeDeps.sdkRuntimeProjection.buildRuntimeRouteMetaPayload(routeDeps);
 }
 
 /**
@@ -107,7 +123,10 @@ export default function createAgentRouter(deps) {
 
         const unsubscribe = client.on((event) => {
             const type = /** @type {string} */ (event?.type ?? 'lifecycle');
-            const payload = standardizeSsePayload(event);
+            const payload = standardizeSsePayload({
+                .../** @type {object} */ (event ?? {}),
+                runtimeId: key,
+            });
             pool.broadcast('lifecycle', payload, { replayEvent: 'lifecycle', filterEvent: type });
         });
 
@@ -145,21 +164,20 @@ export default function createAgentRouter(deps) {
      */
     router.get('/agent/info', (_req, res) => {
         void withErrorHandler(/** @type {Req} */ (_req), res, async () => {
-            const { agent, getClient, runtimeId, sdkSessionOwnership } = resolveAgentRouterDeps(
-                deps,
-                /** @type {Req} */ (_req),
-            );
-            const client = agent.status !== 'stopped' ? await getClient() : null;
-            const runtimeProjection = await sdkSessionOwnership.resolveSdkRuntimeProjection(
-                agent,
+            const routeDeps = resolveAgentRouterDeps(deps, /** @type {Req} */ (_req));
+            const { getClient, runtimeId, sdkRuntimeProjection, sdkSessionOwnership } = routeDeps;
+            const status = sdkRuntimeProjection.readAgentStatusSnapshotForRuntime(runtimeId);
+            const client = status['status'] !== 'stopped' ? await getClient() : null;
+            const runtimeProjection = await sdkSessionOwnership.resolveSdkRuntimeProjectionForRuntime(
+                runtimeId,
                 client,
                 client?.getState?.() ?? null,
             );
             res.json({
                 ok: true,
-                ...(runtimeId ? { runtimeId } : {}),
-                running: agent.status !== 'stopped',
-                sessionId: agent.sessionId ?? null,
+                ...buildAgentRuntimeMeta(routeDeps),
+                running: status['status'] !== 'stopped',
+                sessionId: typeof status['sessionId'] === 'string' ? status['sessionId'] : null,
                 uptime: Math.floor(process.uptime()),
                 pid: process.pid,
                 nodeVersion: process.version,
@@ -178,8 +196,11 @@ export default function createAgentRouter(deps) {
      * ?category=hook&page=1&limit=20 para filtragem e paginação.
      */
     router.get('/agent/tools', (req, res) => {
-        const { agent, sdkRuntimeProjection } = resolveAgentRouterDeps(deps, req);
-        const projection = sdkRuntimeProjection.readAgentRuntimeToolsProjection(agent, { requireRegistry: true });
+        const { requestedRuntimeId, runtimeId, sdkRuntimeProjection } = resolveAgentRouterDeps(deps, req);
+        const projection = sdkRuntimeProjection.readAgentRuntimeToolsProjectionForRuntime(
+            requestedRuntimeId ?? runtimeId,
+            { requireRegistry: true },
+        );
         if (!projection.ok) {
             res.status(503).json({ ok: false, error: projection.error });
             return;
@@ -205,8 +226,9 @@ export default function createAgentRouter(deps) {
      * @param {import('express').Response} res
      */
     function handleGetTelemetry(_req, res) {
-        const { metrics, runtimeId } = resolveAgentRouterDeps(deps, /** @type {Req} */ (_req));
-        res.json({ ok: true, ...(runtimeId ? { runtimeId } : {}), summary: metrics.getSummary() });
+        const routeDeps = resolveAgentRouterDeps(deps, /** @type {Req} */ (_req));
+        const { metrics } = routeDeps;
+        res.json({ ok: true, ...buildAgentRuntimeMeta(routeDeps), summary: metrics.getSummary() });
     }
 
     router.get('/agent/telemetry', handleGetTelemetry);
@@ -215,10 +237,11 @@ export default function createAgentRouter(deps) {
      * Reseta o store de telemetria do agente. Útil após deploy ou manutenção.
      */
     router.post('/agent/telemetry/clear', (_req, res) => {
-        const { metrics, sdkObservability } = resolveAgentRouterDeps(deps, /** @type {Req} */ (_req));
+        const routeDeps = resolveAgentRouterDeps(deps, /** @type {Req} */ (_req));
+        const { metrics, sdkObservability } = routeDeps;
         metrics.reset();
         sdkObservability.log('INFO', '[sdk-api] telemetria resetada via POST /agent/telemetry/clear');
-        res.json({ ok: true, message: 'Telemetria resetada com sucesso' });
+        res.json({ ok: true, ...buildAgentRuntimeMeta(routeDeps), message: 'Telemetria resetada com sucesso' });
     });
 
     // ─────────────────────────────────────────────────────────────────────────────
@@ -234,11 +257,16 @@ export default function createAgentRouter(deps) {
      */
     router.get('/agent/state', (req, res) => {
         void withErrorHandler(req, res, async () => {
-            const { agent, getClient, runtimeId, sdkSessionOwnership } = resolveAgentRouterDeps(deps, req);
+            const routeDeps = resolveAgentRouterDeps(deps, req);
+            const { getClient, runtimeId, sdkSessionOwnership } = routeDeps;
             const client = await getClient();
             const state = client.getState();
-            const runtimeProjection = await sdkSessionOwnership.resolveSdkRuntimeProjection(agent, client, state);
-            res.json({ ok: true, state, ...(runtimeId ? { runtimeId } : {}), ...runtimeProjection });
+            const runtimeProjection = await sdkSessionOwnership.resolveSdkRuntimeProjectionForRuntime(
+                runtimeId,
+                client,
+                state,
+            );
+            res.json({ ok: true, state, ...buildAgentRuntimeMeta(routeDeps), ...runtimeProjection });
         });
     });
 
@@ -262,9 +290,13 @@ export default function createAgentRouter(deps) {
     router.get('/agent/stream', (req, res) => {
         void withErrorHandler(req, res, async () => {
             const routeDeps = resolveAgentRouterDeps(deps, req);
-            const { runtimeId, sdkObservability } = routeDeps;
+            const { sdkObservability } = routeDeps;
             if (!_agentTracker.accept()) {
-                res.status(429).json({ ok: false, error: 'Limite de clientes SSE atingido' });
+                res.status(429).json({
+                    ok: false,
+                    ...buildAgentRuntimeMeta(routeDeps),
+                    error: 'Limite de clientes SSE atingido',
+                });
                 return;
             }
             const state = await ensureAgentStreamState(routeDeps);
@@ -281,7 +313,7 @@ export default function createAgentRouter(deps) {
             sse.send(
                 'connected',
                 {
-                    ...(runtimeId ? { runtimeId } : {}),
+                    ...buildAgentRuntimeMeta(routeDeps),
                     state: state.client.getState(),
                     timestamp: Date.now(),
                 },

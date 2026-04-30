@@ -46,8 +46,11 @@ describe('presentation/index.js — contrato', () => {
         expect(typeof presentation.readAgentStatusSnapshot).toBe('function');
         expect(typeof presentation.readAgentStatusValue).toBe('function');
         expect(typeof presentation.buildAgentStatusHttpPayload).toBe('function');
+        expect(typeof presentation.buildAgentStatusHttpPayloadFromRoute).toBe('function');
         expect(typeof presentation.buildAgentSessionHttpPayload).toBe('function');
+        expect(typeof presentation.buildAgentSessionHttpPayloadFromRoute).toBe('function');
         expect(typeof presentation.buildAgentConnectedSsePayload).toBe('function');
+        expect(typeof presentation.buildAgentConnectedSsePayloadFromRoute).toBe('function');
         expect(typeof presentation.agentControl).toBe('object');
         expect(typeof presentation.systemConfigPresentation).toBe('object');
         expect(typeof presentation.systemMetricsPresentation).toBe('object');

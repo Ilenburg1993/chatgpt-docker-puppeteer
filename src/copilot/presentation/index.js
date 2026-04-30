@@ -17,6 +17,7 @@ export * from './runtime-controls.js';
 export * from './runtime-dialog.js';
 export * from './runtime-file-context.js';
 export {
+    buildAgentHealthHttpResponse,
     buildAgentModuleHealth,
     buildLegacyAgentHealth,
     getAgentHealthHttpStatus,
@@ -31,8 +32,11 @@ export * from './runtime-route-deps.js';
 export * from './runtime-sdk-session.js';
 export {
     buildAgentConnectedSsePayload,
+    buildAgentConnectedSsePayloadFromRoute,
     buildAgentSessionHttpPayload,
+    buildAgentSessionHttpPayloadFromRoute,
     buildAgentStatusHttpPayload,
+    buildAgentStatusHttpPayloadFromRoute,
     readAgentStatusSnapshot,
     readAgentStatusValue,
 } from './runtime-status.js';

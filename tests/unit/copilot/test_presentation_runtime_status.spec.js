@@ -4,8 +4,11 @@ import { describe, expect, it } from 'vitest';
 
 import {
     buildAgentConnectedSsePayload,
+    buildAgentConnectedSsePayloadFromRoute,
     buildAgentSessionHttpPayload,
+    buildAgentSessionHttpPayloadFromRoute,
     buildAgentStatusHttpPayload,
+    buildAgentStatusHttpPayloadFromRoute,
     readAgentStatusSnapshot,
     readAgentStatusValue,
 } from '../../../src/copilot/presentation/runtime-status.js';
@@ -124,6 +127,39 @@ describe('presentation/runtime-status', () => {
                 requestedRuntimeId: 'missing',
                 runtimeFound: false,
                 usedDefaultRuntimeFallback: true,
+                timestamp: expect.any(Number),
+            }),
+        );
+    });
+
+    it('builders FromRoute usam agent + metadata das deps runtime-aware', () => {
+        const deps = {
+            agent,
+            runtimeId: 'default',
+            requestedRuntimeId: 'missing',
+            runtimeFound: false,
+            usedDefaultRuntimeFallback: true,
+        };
+
+        expect(buildAgentStatusHttpPayloadFromRoute(deps)).toEqual(
+            expect.objectContaining({
+                status: 'processing',
+                runtimeId: 'default',
+                requestedRuntimeId: 'missing',
+                runtimeFound: false,
+            }),
+        );
+        expect(buildAgentSessionHttpPayloadFromRoute(deps)).toEqual(
+            expect.objectContaining({
+                sessionId: 'sess-123',
+                runtimeId: 'default',
+                requestedRuntimeId: 'missing',
+            }),
+        );
+        expect(buildAgentConnectedSsePayloadFromRoute(deps)).toEqual(
+            expect.objectContaining({
+                sessionId: 'sess-123',
+                runtimeId: 'default',
                 timestamp: expect.any(Number),
             }),
         );

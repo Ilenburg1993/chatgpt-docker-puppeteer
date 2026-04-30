@@ -27,6 +27,7 @@ export {
     readTerminalResumeProjection,
     readTerminalRuntimeBase,
     readTerminalStatusProjection,
+    readTerminalToolStatsProjection,
     readTerminalUsageNowProjection,
     recallTerminalMemoriesProjection,
     rememberTerminalMemoryProjection,

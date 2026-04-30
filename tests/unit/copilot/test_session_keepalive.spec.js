@@ -42,7 +42,7 @@ describe.skip('SessionKeepalive', async () => {
         it('deve iniciar e parar sem erros', () => {
             ka = new SessionKeepalive({ intervalMs: 60_000 });
             ka.start({
-                getSession: () => null,
+                performKeepalive: async () => null,
                 isIdle: () => true,
                 isDialogLoopActive: () => false,
             });
@@ -54,7 +54,7 @@ describe.skip('SessionKeepalive', async () => {
         it('start duplicado é no-op', () => {
             ka = new SessionKeepalive({ intervalMs: 60_000 });
             const cbs = {
-                getSession: () => null,
+                performKeepalive: async () => null,
                 isIdle: () => true,
                 isDialogLoopActive: () => false,
             };
@@ -79,7 +79,7 @@ describe.skip('SessionKeepalive', async () => {
         });
     });
 
-    describe('M-02: getClient opcional para ping keepalive', () => {
+    describe('M-02: performKeepalive semântico', () => {
         /** @type {InstanceType<typeof SessionKeepalive>} */
         let ka;
 
@@ -87,21 +87,20 @@ describe.skip('SessionKeepalive', async () => {
             ka?.stop();
         });
 
-        it('deve aceitar callbacks sem getClient (backward compat)', () => {
+        it('deve aceitar callback performKeepalive que não toca o SDK', () => {
             ka = new SessionKeepalive({ intervalMs: 60_000 });
             ka.start({
-                getSession: () => null,
+                performKeepalive: async () => null,
                 isIdle: () => true,
                 isDialogLoopActive: () => false,
             });
             assert.equal(ka.running, true);
         });
 
-        it('deve aceitar callbacks com getClient', () => {
+        it('deve aceitar callback performKeepalive baseado em client.ping', () => {
             ka = new SessionKeepalive({ intervalMs: 60_000 });
             ka.start({
-                getSession: () => null,
-                getClient: () => ({ ping: async () => {} }),
+                performKeepalive: async () => 'client.ping',
                 isIdle: () => true,
                 isDialogLoopActive: () => false,
             });

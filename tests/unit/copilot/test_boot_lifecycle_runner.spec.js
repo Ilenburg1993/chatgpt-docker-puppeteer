@@ -34,8 +34,12 @@ describe('boot/lifecycle-runner', () => {
         const report = await runCopilotBootPlan(plan, {
             emit: (event) => events.push(event.type),
             phaseHandlers: {
-                one: () => order.push('one'),
-                two: async () => order.push('two'),
+                one: () => {
+                    order.push('one');
+                },
+                two: async () => {
+                    order.push('two');
+                },
             },
         });
 
@@ -62,7 +66,12 @@ describe('boot/lifecycle-runner', () => {
         await expect(
             runCopilotBootPlan(plan, {
                 phaseHandlers: {
-                    one: { run: () => {}, rollback: () => rollbacks.push('one') },
+                    one: {
+                        run: () => {},
+                        rollback: () => {
+                            rollbacks.push('one');
+                        },
+                    },
                     two: {
                         run: () => {
                             throw new Error('boom');
@@ -89,8 +98,12 @@ describe('boot/lifecycle-runner', () => {
                 phaseHandlers: {
                     one: {
                         run: (ctx) => {
-                            ctx.registerRollback('socket', () => rollbacks.push('socket'));
-                            ctx.registerRollback('listener', () => rollbacks.push('listener'));
+                            ctx.registerRollback('socket', () => {
+                                rollbacks.push('socket');
+                            });
+                            ctx.registerRollback('listener', () => {
+                                rollbacks.push('listener');
+                            });
                             throw new Error('partial boom');
                         },
                     },

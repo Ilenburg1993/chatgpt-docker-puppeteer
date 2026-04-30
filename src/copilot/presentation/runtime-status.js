@@ -16,10 +16,16 @@
  */
 
 import { readAgentRuntimeStatusSnapshot, readAgentRuntimeStatusValue } from '#copilot/agent';
+import { resolveAgentRuntimeSelection } from './agent-runtime.js';
 import { buildRuntimeLifecycleSummary, readRuntimeLifecycleSnapshot } from './runtime-lifecycle.js';
-import { buildRuntimeRouteMetaPayload } from './runtime-meta.js';
+import { buildRuntimeRouteMetaFromSelection, buildRuntimeRouteMetaPayload } from './runtime-meta.js';
 
 /** @typedef {import('./runtime-meta.js').RuntimeRouteMeta} RuntimeStatusMeta */
+/**
+ * @typedef {RuntimeStatusMeta & {
+ *     agent: AlwaysAliveAgentLike;
+ * }} RuntimeStatusRouteDeps
+ */
 
 /**
  * Lê o snapshot bruto do agent em formato seguro para projections compartilhadas.
@@ -39,6 +45,36 @@ export function readAgentStatusSnapshot(agent) {
  */
 export function readAgentStatusValue(agent) {
     return readAgentRuntimeStatusValue(agent);
+}
+
+/**
+ * Lê o snapshot do runtime selecionado sem expor a instância viva do agent para rotas de borda.
+ *
+ * @param {string | null | undefined} [runtimeId]
+ * @returns {Record<string, unknown> & {
+ *     runtimeId: string;
+ *     requestedRuntimeId: string | null;
+ *     runtimeFound: boolean;
+ *     usedDefaultRuntimeFallback: boolean;
+ * }}
+ */
+export function readAgentStatusSnapshotForRuntime(runtimeId) {
+    const selection = resolveAgentRuntimeSelection(runtimeId);
+    return {
+        ...readAgentStatusSnapshot(selection.runtime),
+        ...buildRuntimeRouteMetaFromSelection(selection),
+    };
+}
+
+/**
+ * Retorna somente o status textual do runtime selecionado.
+ *
+ * @param {string | null | undefined} [runtimeId]
+ * @returns {string}
+ */
+export function readAgentStatusValueForRuntime(runtimeId) {
+    const selection = resolveAgentRuntimeSelection(runtimeId);
+    return readAgentStatusValue(selection.runtime);
 }
 
 /**
@@ -63,6 +99,16 @@ export function buildAgentStatusHttpPayload(agent, meta) {
         lifecycleSummary: buildRuntimeLifecycleSummary(lifecycle),
         ...readAgentStatusSnapshot(agent),
     };
+}
+
+/**
+ * Projection HTTP-safe do endpoint /status a partir das deps runtime-aware da rota.
+ *
+ * @param {RuntimeStatusRouteDeps} deps
+ * @returns {ReturnType<typeof buildAgentStatusHttpPayload>}
+ */
+export function buildAgentStatusHttpPayloadFromRoute(deps) {
+    return buildAgentStatusHttpPayload(deps.agent, deps);
 }
 
 /**
@@ -99,6 +145,16 @@ export function buildAgentSessionHttpPayload(agent, meta) {
 }
 
 /**
+ * Projection HTTP-safe do endpoint /session a partir das deps runtime-aware da rota.
+ *
+ * @param {RuntimeStatusRouteDeps} deps
+ * @returns {ReturnType<typeof buildAgentSessionHttpPayload>}
+ */
+export function buildAgentSessionHttpPayloadFromRoute(deps) {
+    return buildAgentSessionHttpPayload(deps.agent, deps);
+}
+
+/**
  * Payload canônico do evento SSE `connected` do runtime.
  *
  * @param {AlwaysAliveAgentLike} agent
@@ -117,4 +173,14 @@ export function buildAgentConnectedSsePayload(agent, meta) {
         ...readAgentStatusSnapshot(agent),
         timestamp: Date.now(),
     };
+}
+
+/**
+ * Payload canônico do evento SSE `connected` a partir das deps runtime-aware da rota.
+ *
+ * @param {RuntimeStatusRouteDeps} deps
+ * @returns {ReturnType<typeof buildAgentConnectedSsePayload>}
+ */
+export function buildAgentConnectedSsePayloadFromRoute(deps) {
+    return buildAgentConnectedSsePayload(deps.agent, deps);
 }

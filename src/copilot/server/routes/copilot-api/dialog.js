@@ -15,11 +15,13 @@ import { LLM_B_TURN_TIMEOUT_MS } from '#copilot/config';
 import { log } from '#copilot/observability';
 import { projectAgentHttpError } from '../../../presentation/agent-http-errors.js';
 import { resolveOptionalDialogTimeout } from '../../../presentation/dialog-timeout-policy.js';
+import { readAgentRuntimeControlStateFromRoute } from '../../../presentation/runtime-controls.js';
 import {
     sendRuntimeDialogTurnOnActiveLoop,
     startRuntimeDialogLoop,
     stopRuntimeDialogLoopAuthorized,
 } from '../../../presentation/runtime-dialog.js';
+import { buildRuntimeRouteMetaPayload } from '../../../presentation/runtime-meta.js';
 import { resolveCopilotApiRouteBinding } from '../../../presentation/runtime-request.js';
 
 /**
@@ -55,26 +57,34 @@ export function registerDialogRoutes(bridge, binding) {
      * Padrão §15.8: todas as iterações usam o mesmo PR (sem custo por turno).
      */
     bridge.post('/dialog/start', async (/** @type {Req} */ req, /** @type {Res} */ res) => {
-        const { agent } = resolveCopilotApiRouteBinding(binding, req);
+        const deps = resolveCopilotApiRouteBinding(binding, req);
+        const { agent } = deps;
+        const runtimeMeta = buildRuntimeRouteMetaPayload(deps);
         const { bootPrompt } = req.body ?? {};
+        const controlState = readAgentRuntimeControlStateFromRoute(deps);
 
-        if (agent.status !== 'idle') {
+        if (controlState.status !== 'idle') {
             // G2-API-08: incluir dialogLoopActive para o cliente distinguir entre estados
             return res.status(409).json({
                 ok: false,
-                error: `Agente não está idle. Status: '${agent.status}'.`,
-                dialogLoopActive: agent.dialogLoopActive ?? false,
+                ...runtimeMeta,
+                error: `Agente não está idle. Status: '${controlState.status}'.`,
+                dialogLoopActive: controlState.dialogLoopActive,
             });
         }
 
         try {
             await startRuntimeDialogLoop(bootPrompt ?? undefined, agent);
-            return res.json({ ok: true, message: 'Modo diálogo ativo. Use POST /dialog/turn para interagir.' });
+            return res.json({
+                ok: true,
+                ...runtimeMeta,
+                message: 'Modo diálogo ativo. Use POST /dialog/turn para interagir.',
+            });
         } catch (err) {
             const msg = err instanceof Error ? err.message : String(err);
             log('ERROR', `[copilot-api/dialog/start] falhou: ${msg}`);
             const projection = projectAgentHttpError(err);
-            return res.status(projection.status).json(projection.body);
+            return res.status(projection.status).json({ ...runtimeMeta, ...projection.body });
         }
     });
 
@@ -89,11 +99,14 @@ export function registerDialogRoutes(bridge, binding) {
      * inatividade/stall. Quando omitido, o timeout é adaptativo.
      */
     bridge.post('/dialog/turn', async (/** @type {Req} */ req, /** @type {Res} */ res) => {
-        const { agent } = resolveCopilotApiRouteBinding(binding, req);
+        const deps = resolveCopilotApiRouteBinding(binding, req);
+        const { agent } = deps;
+        const runtimeMeta = buildRuntimeRouteMetaPayload(deps);
         // G2-API-09: rate limiting — rejeitar imediatamente se já há turno HTTP em andamento
         if (_turnInFlight) {
             return res.status(429).json({
                 ok: false,
+                ...runtimeMeta,
                 error: 'Turno já em andamento. Aguarde a resposta antes de enviar outro.',
             });
         }
@@ -102,7 +115,9 @@ export function registerDialogRoutes(bridge, binding) {
         const { message, timeout: rawTimeout } = req.body ?? {};
 
         if (!message || typeof message !== 'string') {
-            return res.status(400).json({ ok: false, error: 'Campo "message" (string) é obrigatório.' });
+            return res
+                .status(400)
+                .json({ ok: false, ...runtimeMeta, error: 'Campo "message" (string) é obrigatório.' });
         }
         if (
             rawTimeout !== undefined &&
@@ -113,6 +128,7 @@ export function registerDialogRoutes(bridge, binding) {
         ) {
             return res.status(400).json({
                 ok: false,
+                ...runtimeMeta,
                 error: `"timeout" deve ser número finito entre 0 e ${MAX_DIALOG_TIMEOUT_MS}.`,
             });
         }
@@ -138,6 +154,7 @@ export function registerDialogRoutes(bridge, binding) {
             );
             return res.json({
                 ok: true,
+                ...runtimeMeta,
                 reply,
                 timeoutPolicy: {
                     timeoutMs: timeoutDecision.timeoutMs,
@@ -150,8 +167,9 @@ export function registerDialogRoutes(bridge, binding) {
             const projection = projectAgentHttpError(err, { timeoutStatus: 504 });
             log('WARN', `[copilot-api/dialog/turn] falhou (${projection.status}): ${msg}`);
             return res.status(projection.status).json({
+                ...runtimeMeta,
                 ...projection.body,
-                dialogLoopActive: agent.dialogLoopActive ?? false,
+                dialogLoopActive: readAgentRuntimeControlStateFromRoute(deps).dialogLoopActive,
             });
         } finally {
             _turnInFlight = false;
@@ -169,20 +187,27 @@ export function registerDialogRoutes(bridge, binding) {
      * Returns: { ok: true, message: string }
      */
     bridge.post('/dialog/stop', async (/** @type {Req} */ req, /** @type {Res} */ res) => {
-        const { agent } = resolveCopilotApiRouteBinding(binding, req);
+        const deps = resolveCopilotApiRouteBinding(binding, req);
+        const { agent } = deps;
+        const runtimeMeta = buildRuntimeRouteMetaPayload(deps);
         const { force } = req.body ?? {};
         if (!force) {
             return res.status(403).json({
                 ok: false,
+                ...runtimeMeta,
                 error: 'Dialog loop é permanente (DL-PERM). Use { force: true } apenas com autorização explícita do usuário.',
             });
         }
         try {
             await stopRuntimeDialogLoopAuthorized(agent);
-            return res.json({ ok: true, message: 'Modo diálogo encerrado por autorização do usuário.' });
+            return res.json({
+                ok: true,
+                ...runtimeMeta,
+                message: 'Modo diálogo encerrado por autorização do usuário.',
+            });
         } catch (err) {
             const projection = projectAgentHttpError(err);
-            return res.status(projection.status).json(projection.body);
+            return res.status(projection.status).json({ ...runtimeMeta, ...projection.body });
         }
     });
 }

@@ -4,8 +4,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
     persistStateWithPolicy: vi.fn(async () => ({ ok: true, value: undefined })),
-    readState: vi.fn(() => null),
-    readStateAsync: vi.fn(async () => null),
+    readState: vi.fn(/** @returns {unknown} */ () => null),
+    readStateAsync: vi.fn(/** @returns {Promise<unknown>} */ async () => null),
     createSnapshot: vi.fn((data) => ({ snapshotId: 'snap-test', createdAt: 1, ...data })),
     saveSnapshotAsync: vi.fn(async () => '/tmp/snap-test.json'),
 }));

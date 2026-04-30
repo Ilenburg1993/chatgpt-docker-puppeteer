@@ -18,10 +18,15 @@ import { log } from '#copilot/observability';
 import { createRequire } from 'node:module';
 import { toError } from '../../../core/error-handlers.js';
 import { projectAgentHttpError } from '../../../presentation/agent-http-errors.js';
-import { buildAgentRuntimeCapabilities } from '../../../presentation/runtime-capabilities.js';
+import { buildAgentRuntimeCapabilitiesFromRoute } from '../../../presentation/runtime-capabilities.js';
+import { readAgentRuntimeControlStateFromRoute } from '../../../presentation/runtime-controls.js';
 import { getAgentHealthHttpStatus, getAgentHealthSnapshotCompat } from '../../../presentation/runtime-health.js';
+import { buildRuntimeRouteMetaPayload } from '../../../presentation/runtime-meta.js';
 import { resolveCopilotApiRouteBinding } from '../../../presentation/runtime-request.js';
-import { buildAgentSessionHttpPayload, buildAgentStatusHttpPayload } from '../../../presentation/runtime-status.js';
+import {
+    buildAgentSessionHttpPayloadFromRoute,
+    buildAgentStatusHttpPayloadFromRoute,
+} from '../../../presentation/runtime-status.js';
 import { sanitizeHttpErrorMessage } from '../../middleware/error-handler.js';
 
 // UPG-PROP-07 (fix): ler versão do SDK uma vez no carregamento do módulo para incluir no /health
@@ -58,54 +63,64 @@ export function registerControlRoutes(bridge, binding) {
 
     bridge.get('/status', (/** @type {Req} */ req, /** @type {Res} */ res) => {
         const deps = resolveCopilotApiRouteBinding(binding, req);
-        res.json(buildAgentStatusHttpPayload(deps.agent, deps));
+        res.json(buildAgentStatusHttpPayloadFromRoute(deps));
     });
     bridge.get('/health', (/** @type {Req} */ req, /** @type {Res} */ res) => {
-        const { agent, runtimeId } = resolveCopilotApiRouteBinding(binding, req);
-        _handleHealth(res, agent, runtimeId);
+        const deps = resolveCopilotApiRouteBinding(binding, req);
+        _handleHealth(res, deps);
     });
     bridge.get('/session', (/** @type {Req} */ req, /** @type {Res} */ res) => {
         const deps = resolveCopilotApiRouteBinding(binding, req);
-        _handleSession(res, deps.agent, deps);
+        _handleSession(res, deps);
     });
     bridge.get('/capabilities', (/** @type {Req} */ req, /** @type {Res} */ res) => {
         const deps = resolveCopilotApiRouteBinding(binding, req);
-        res.json(buildAgentRuntimeCapabilities(deps.agent, deps));
+        res.json(buildAgentRuntimeCapabilitiesFromRoute(deps));
     });
     // SEC-API-001: POST /start e /stop protegidas com requireAdmin (defesa em profundidade)
     bridge.post('/start', requireAdmin, (/** @type {Req} */ req, /** @type {Res} */ res) =>
-        _handleStart(res, resolveCopilotApiRouteBinding(binding, req).agent),
+        _handleStart(res, resolveCopilotApiRouteBinding(binding, req)),
     );
     bridge.post('/stop', requireAdmin, (/** @type {Req} */ req, /** @type {Res} */ res) =>
-        _handleStop(res, resolveCopilotApiRouteBinding(binding, req).agent),
+        _handleStop(res, resolveCopilotApiRouteBinding(binding, req)),
     );
     bridge.get('/permissions', (/** @type {Req} */ req, /** @type {Res} */ res) =>
-        _handleGetPermissions(res, resolveCopilotApiRouteBinding(binding, req).agent),
+        _handleGetPermissions(res, resolveCopilotApiRouteBinding(binding, req)),
     );
     bridge.post('/permissions', requireAdmin, (/** @type {Req} */ req, /** @type {Res} */ res) =>
-        _handleSetPermissions(req, res, resolveCopilotApiRouteBinding(binding, req).agent),
+        _handleSetPermissions(req, res, resolveCopilotApiRouteBinding(binding, req)),
     );
 
     // GAP-SE-001b (STREAMING-EVENTS-AUDIT Fase 2.2): endpoint de steering (immediate mode)
     bridge.post('/steer', (/** @type {Req} */ req, /** @type {Res} */ res) =>
-        _handleSteer(req, res, resolveCopilotApiRouteBinding(binding, req).agent),
+        _handleSteer(req, res, resolveCopilotApiRouteBinding(binding, req)),
     );
 
     // E3.2 — Dashboard de compliance: decisões de hooks e estatísticas
-    bridge.get('/compliance', (_req, /** @type {Res} */ res) => {
+    bridge.get('/compliance', (/** @type {Req} */ req, /** @type {Res} */ res) => {
+        const runtimeMeta = buildRuntimeRouteMetaPayload(resolveCopilotApiRouteBinding(binding, req));
         try {
             const data = globalAuditTrail.toJSON();
-            res.json({ ok: true, ...data });
+            res.json({ ok: true, ...runtimeMeta, ...data });
         } catch (e) {
-            res.status(500).json({ ok: false, error: sanitizeHttpErrorMessage(toError(e).message, 500) });
+            res.status(500).json({
+                ...runtimeMeta,
+                ok: false,
+                error: sanitizeHttpErrorMessage(toError(e).message, 500),
+            });
         }
     });
-    bridge.get('/compliance/stats', (_req, /** @type {Res} */ res) => {
+    bridge.get('/compliance/stats', (/** @type {Req} */ req, /** @type {Res} */ res) => {
+        const runtimeMeta = buildRuntimeRouteMetaPayload(resolveCopilotApiRouteBinding(binding, req));
         try {
             const stats = globalAuditTrail.stats();
-            res.json({ ok: true, ...stats });
+            res.json({ ok: true, ...runtimeMeta, ...stats });
         } catch (e) {
-            res.status(500).json({ ok: false, error: sanitizeHttpErrorMessage(toError(e).message, 500) });
+            res.status(500).json({
+                ...runtimeMeta,
+                ok: false,
+                error: sanitizeHttpErrorMessage(toError(e).message, 500),
+            });
         }
     });
 }
@@ -147,10 +162,10 @@ function _makeAdminAuthMiddleware() {
  * Health check: 200 = operacional, 503 = parado.
  *
  * @param {Res} res
- * @param {RuntimeRouteDeps['agent']} agent
- * @param {string | null | undefined} [runtimeId]
+ * @param {RuntimeRouteDeps} deps
  */
-function _handleHealth(res, agent, runtimeId) {
+function _handleHealth(res, deps) {
+    const { agent } = deps;
     const health = getAgentHealthSnapshotCompat(agent);
 
     // ARCH-04: verificar conectividade do ConversationStore (SQLite)
@@ -168,8 +183,8 @@ function _handleHealth(res, agent, runtimeId) {
     })();
 
     res.status(getAgentHealthHttpStatus(health)).json({
+        ...buildRuntimeRouteMetaPayload(deps),
         ...health,
-        ...(runtimeId ? { runtimeId } : {}),
         // G2-API-14: permissionMode para rastreabilidade de configuração de auditoria
         permissionMode: typeof agent.getPermissionMode === 'function' ? agent.getPermissionMode() : 'approve_all',
         channelVersion: CHANNEL_VERSION,
@@ -187,66 +202,80 @@ function _handleHealth(res, agent, runtimeId) {
 
 /**
  * @param {Res} res
- * @param {RuntimeRouteDeps['agent']} agent
- * @param {string | RuntimeRouteDeps | null | undefined} [runtimeIdOrDeps]
+ * @param {RuntimeRouteDeps} deps
  */
-function _handleSession(res, agent, runtimeIdOrDeps) {
-    res.json(buildAgentSessionHttpPayload(agent, runtimeIdOrDeps));
+function _handleSession(res, deps) {
+    res.json(buildAgentSessionHttpPayloadFromRoute(deps));
 }
 
 /**
  * @param {Res} res
- * @param {RuntimeRouteDeps['agent']} agent
+ * @param {RuntimeRouteDeps} deps
  * @returns {Promise<void>}
  */
-async function _handleStart(res, agent) {
+async function _handleStart(res, deps) {
+    const { agent } = deps;
+    const runtimeMeta = buildRuntimeRouteMetaPayload(deps);
     try {
-        if (agent.status !== 'stopped') {
-            return void res.json({ ok: true, message: 'Agente já está ativo.', status: agent.status });
+        const currentState = readAgentRuntimeControlStateFromRoute(deps);
+        if (currentState.status !== 'stopped') {
+            return void res.json({
+                ok: true,
+                ...runtimeMeta,
+                message: 'Agente já está ativo.',
+                status: currentState.status,
+            });
         }
         await agent.start();
-        return void res.json({ ok: true, sessionId: agent.sessionId, status: agent.status });
+        const nextState = readAgentRuntimeControlStateFromRoute(deps);
+        return void res.json({ ok: true, ...runtimeMeta, sessionId: nextState.sessionId, status: nextState.status });
     } catch (e) {
         log('ERROR', `[copilot-api/control/start] ${toError(e).message}`);
         const projection = projectAgentHttpError(e);
-        return void res.status(projection.status).json(projection.body);
+        return void res.status(projection.status).json({ ...runtimeMeta, ...projection.body });
     }
 }
 
 /**
  * @param {Res} res
- * @param {RuntimeRouteDeps['agent']} agent
+ * @param {RuntimeRouteDeps} deps
  * @returns {Promise<void>}
  */
-async function _handleStop(res, agent) {
+async function _handleStop(res, deps) {
+    const { agent } = deps;
+    const runtimeMeta = buildRuntimeRouteMetaPayload(deps);
     try {
-        if (agent.dialogLoopActive) {
+        const currentState = readAgentRuntimeControlStateFromRoute(deps);
+        if (currentState.dialogLoopActive) {
             await agent.stopDialogLoop?.({ authorized: true, reason: 'authorized_stop' });
         }
         await agent.stop();
-        return void res.json({ ok: true, message: 'Agente parado.' });
+        return void res.json({ ok: true, ...runtimeMeta, message: 'Agente parado.' });
     } catch (e) {
         log('ERROR', `[copilot-api/control/stop] ${toError(e).message}`);
         const projection = projectAgentHttpError(e);
-        return void res.status(projection.status).json(projection.body);
+        return void res.status(projection.status).json({ ...runtimeMeta, ...projection.body });
     }
 }
 
 /**
  * @param {Res} res
- * @param {RuntimeRouteDeps['agent']} agent
+ * @param {RuntimeRouteDeps} deps
  */
-function _handleGetPermissions(res, agent) {
+function _handleGetPermissions(res, deps) {
+    const { agent } = deps;
     const mode = typeof agent.getPermissionMode === 'function' ? agent.getPermissionMode() : 'approve_all';
-    res.json({ ok: true, mode });
+    res.json({ ok: true, ...buildRuntimeRouteMetaPayload(deps), mode });
 }
 
 /**
  * @param {Req} req
  * @param {Res} res
- * @param {RuntimeRouteDeps['agent']} agent
+ * @param {RuntimeRouteDeps} deps
  */
-function _handleSetPermissions(req, res, agent) {
+function _handleSetPermissions(req, res, deps) {
+    const { agent } = deps;
+    const runtimeMeta = buildRuntimeRouteMetaPayload(deps);
     const { mode, allowTools, denyTools, denyShell } = req.body ?? {};
     const validModes = ['approve_all', 'audit_only', 'selective'];
     const toolNameRe = /^[a-zA-Z0-9_]+$/;
@@ -279,23 +308,26 @@ function _handleSetPermissions(req, res, agent) {
 
     if (!mode || !validModes.includes(mode)) {
         return void res.status(400).json({
+            ...runtimeMeta,
             ok: false,
             error: `Campo "mode" inválido. Valores aceitos: ${validModes.join(', ')}.`,
         });
     }
     if (denyShell !== undefined && typeof denyShell !== 'boolean') {
-        return void res.status(400).json({ ok: false, error: 'Campo "denyShell" deve ser boolean.' });
+        return void res.status(400).json({ ...runtimeMeta, ok: false, error: 'Campo "denyShell" deve ser boolean.' });
     }
     const allowNames = sanitizeToolNames(allowTools, 'allowTools');
     if (!allowNames.ok) {
-        return void res.status(400).json({ ok: false, error: allowNames.error });
+        return void res.status(400).json({ ...runtimeMeta, ok: false, error: allowNames.error });
     }
     const denyNames = sanitizeToolNames(denyTools, 'denyTools');
     if (!denyNames.ok) {
-        return void res.status(400).json({ ok: false, error: denyNames.error });
+        return void res.status(400).json({ ...runtimeMeta, ok: false, error: denyNames.error });
     }
     if (typeof agent.setPermissionMode !== 'function') {
-        return void res.status(501).json({ ok: false, error: 'setPermissionMode não disponível nesta instância.' });
+        return void res
+            .status(501)
+            .json({ ...runtimeMeta, ok: false, error: 'setPermissionMode não disponível nesta instância.' });
     }
     try {
         const before = typeof agent.getPermissionMode === 'function' ? agent.getPermissionMode() : 'approve_all';
@@ -307,11 +339,11 @@ function _handleSetPermissions(req, res, agent) {
         agent.setPermissionMode(mode, opts);
         const after = typeof agent.getPermissionMode === 'function' ? agent.getPermissionMode() : mode;
         log('INFO', `[copilot-api/control/permissions] modo: ${before} → ${after}`);
-        return void res.json({ ok: true, before, after });
+        return void res.json({ ok: true, ...runtimeMeta, before, after });
     } catch (e) {
         log('ERROR', `[copilot-api/control/permissions] ${toError(e).message}`);
         const projection = projectAgentHttpError(e);
-        return void res.status(projection.status).json(projection.body);
+        return void res.status(projection.status).json({ ...runtimeMeta, ...projection.body });
     }
 }
 
@@ -320,22 +352,28 @@ function _handleSetPermissions(req, res, agent) {
  *
  * @param {Req} req
  * @param {Res} res
- * @param {RuntimeRouteDeps['agent']} agent
+ * @param {RuntimeRouteDeps} deps
  */
-async function _handleSteer(req, res, agent) {
+async function _handleSteer(req, res, deps) {
+    const { agent } = deps;
+    const runtimeMeta = buildRuntimeRouteMetaPayload(deps);
     const { message } = req.body ?? {};
     if (!message || typeof message !== 'string') {
-        return void res.status(400).json({ ok: false, error: 'Campo "message" (string) é obrigatório.' });
+        return void res
+            .status(400)
+            .json({ ...runtimeMeta, ok: false, error: 'Campo "message" (string) é obrigatório.' });
     }
     if (typeof agent.steerMessage !== 'function') {
-        return void res.status(501).json({ ok: false, error: 'steerMessage não disponível nesta instância.' });
+        return void res
+            .status(501)
+            .json({ ...runtimeMeta, ok: false, error: 'steerMessage não disponível nesta instância.' });
     }
     try {
         const messageId = await agent.steerMessage(message);
-        return void res.json({ ok: true, messageId });
+        return void res.json({ ok: true, ...runtimeMeta, messageId });
     } catch (e) {
         log('ERROR', `[copilot-api/control/steer] ${toError(e).message}`);
         const projection = projectAgentHttpError(e);
-        return void res.status(projection.status).json(projection.body);
+        return void res.status(projection.status).json({ ...runtimeMeta, ...projection.body });
     }
 }

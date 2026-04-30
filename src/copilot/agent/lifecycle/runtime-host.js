@@ -15,6 +15,7 @@
  */
 
 import { SHUTDOWN_PRIORITY, TimeoutError, registerShutdownHandler, runShutdown, toError } from '#copilot/core';
+import { readRuntimeControlState } from '../agent-runtime-surface.js';
 import { listSdkCatalogModels } from '../facades/agent-model-config.js';
 import { ensureAgentSdkClientStarted, pingAgentSdkClient, stopAgentSdkClient } from '../facades/agent-sdk-access.js';
 
@@ -114,7 +115,7 @@ export function registerRuntimeProcessSignals({ shutdown }) {
  * Registra IPC básico para o runtime compatível.
  *
  * @param {{
- *     agent: { status: string };
+ *     agent: Parameters<typeof readRuntimeControlState>[0];
  *     shutdown: (signal?: string) => Promise<unknown>;
  *     log: (level: 'INFO' | 'WARN' | 'ERROR' | 'DEBUG', message: string) => void;
  * }} options
@@ -128,7 +129,7 @@ export function registerRuntimeIpcHost({ agent, shutdown, log }) {
         if (cmd === 'ping') {
             process.send?.({ ok: true, pong: true });
         } else if (cmd === 'status') {
-            process.send?.({ ok: true, status: agent.status });
+            process.send?.({ ok: true, status: readRuntimeControlState(agent).status });
         } else if (cmd === 'stop') {
             log('INFO', '[copilot/runtime-host] IPC stop recebido — encerrando...');
             void shutdown('IPC:stop');

@@ -18,6 +18,7 @@ export {
     startAgentDialogLoop,
     stopAgentDialogLoopAuthorized,
 } from './agent-dialog-runtime.js';
+export { readAgentHealthInputSnapshot } from './agent-health-access.js';
 export {
     getModel,
     getReasoningEffort,

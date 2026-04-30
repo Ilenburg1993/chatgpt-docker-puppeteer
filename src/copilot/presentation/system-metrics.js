@@ -271,16 +271,49 @@ export async function handleGetAudit({ summary: wantSummary = 0, limit = 50, ses
 /**
  * GET /tool-stats — estatísticas detalhadas por tool.
  *
+ * @returns {{
+ *     stats: Record<string, any>;
+ *     entries: [string, Record<string, any>][];
+ *     tools: Record<string, any>[];
+ *     byCategory: Record<string, any>;
+ *     toolCount: number;
+ * }}
+ */
+export function readToolStatsProjection() {
+    const stats = getToolStats();
+    const entries = /** @type {[string, Record<string, any>][]} */ (Object.entries(stats));
+    const tools = entries.map(([name, s]) => ({ name, ...s }));
+    let byCategory;
+    try {
+        byCategory = getStatsByCategory();
+    } catch {
+        byCategory = {};
+    }
+    return {
+        stats,
+        entries,
+        tools,
+        byCategory,
+        toolCount: entries.length,
+    };
+}
+
+/**
+ * GET /tool-stats — estatísticas detalhadas por tool.
+ *
  * @returns {HandlerResult}
  */
 export function handleGetToolStats() {
-    const stats = getToolStats();
-    const entries = Object.entries(stats).map(([name, s]) => ({ name, ...s }));
-    const byCategory = getStatsByCategory();
+    const projection = readToolStatsProjection();
     return {
         status: 200,
         cors: true,
-        body: { ok: true, toolCount: entries.length, tools: entries, byCategory },
+        body: {
+            ok: true,
+            toolCount: projection.toolCount,
+            tools: projection.tools,
+            byCategory: projection.byCategory,
+        },
     };
 }
 

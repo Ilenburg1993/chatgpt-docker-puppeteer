@@ -159,7 +159,10 @@ describe('agent-dialog-controller › dialogStop', () => {
         ctx.status = 'idle';
         ctx.setSession(/** @type {any} */ ({ sessionId: 'sess-1' }));
 
-        /** @type {{ isIdle?: () => boolean; onKeepalive?: (ts: number) => void } | null} */
+        /** @type {{
+    isIdle?: () => boolean;
+    onKeepalive?: (info: { ts: number; strategy: 'client.ping' | 'session.send' }) => void;
+} | null} */
         let keepaliveOptions = null;
         ctx.startKeepalive = (options = {}) => {
             keepaliveOptions = options;
@@ -173,9 +176,10 @@ describe('agent-dialog-controller › dialogStop', () => {
         if (!keepaliveOptions) {
             throw new Error('dialogStop não forneceu opções de keepalive');
         }
-        const restartOptions = /** @type {{ isIdle?: () => boolean; onKeepalive?: (ts: number) => void }} */ (
-            keepaliveOptions
-        );
+        const restartOptions = /** @type {{
+    isIdle?: () => boolean;
+    onKeepalive?: (info: { ts: number; strategy: 'client.ping' | 'session.send' }) => void;
+}} */ (keepaliveOptions);
         assert.equal(typeof restartOptions.onKeepalive, 'function');
     });
 });

@@ -15,6 +15,8 @@ import { randomUUID } from 'node:crypto';
 import { toError } from '../../../core/error-handlers.js';
 import { projectAgentHttpError } from '../../../presentation/agent-http-errors.js';
 import { resolveOptionalDialogTimeout } from '../../../presentation/dialog-timeout-policy.js';
+import { readAgentRuntimeControlStateFromRoute } from '../../../presentation/runtime-controls.js';
+import { buildRuntimeRouteMetaPayload } from '../../../presentation/runtime-meta.js';
 import { resolveCopilotApiRouteBinding } from '../../../presentation/runtime-request.js';
 
 /**
@@ -51,11 +53,16 @@ export function registerTaskRoutes(bridge, binding) {
      * Body: { message: string, waitForResponse?: boolean, timeoutMs?: number, attachments?: Array }
      */
     bridge.post('/send', async (/** @type {Req} */ req, /** @type {Res} */ res) => {
-        const { agent } = resolveCopilotApiRouteBinding(binding, req);
+        const deps = resolveCopilotApiRouteBinding(binding, req);
+        const { agent } = deps;
+        const runtimeMeta = buildRuntimeRouteMetaPayload(deps);
         const { message, waitForResponse = false, timeoutMs: rawTimeoutMs, attachments } = req.body ?? {};
+        const controlState = readAgentRuntimeControlStateFromRoute(deps);
 
         if (!message || typeof message !== 'string') {
-            return res.status(400).json({ ok: false, error: 'Campo "message" (string) é obrigatório.' });
+            return res
+                .status(400)
+                .json({ ...runtimeMeta, ok: false, error: 'Campo "message" (string) é obrigatório.' });
         }
 
         if (
@@ -63,6 +70,7 @@ export function registerTaskRoutes(bridge, binding) {
             (typeof rawTimeoutMs !== 'number' || !Number.isFinite(rawTimeoutMs) || rawTimeoutMs < 0)
         ) {
             return res.status(400).json({
+                ...runtimeMeta,
                 ok: false,
                 error: 'Campo "timeoutMs" deve ser um número finito maior ou igual a zero.',
             });
@@ -76,10 +84,12 @@ export function registerTaskRoutes(bridge, binding) {
             allowDisabled: true,
         });
 
-        if (agent.status === 'stopped') {
-            return res
-                .status(503)
-                .json({ ok: false, error: 'Agente não está ativo. Use POST /api/copilot/start primeiro.' });
+        if (controlState.status === 'stopped') {
+            return res.status(503).json({
+                ...runtimeMeta,
+                ok: false,
+                error: 'Agente não está ativo. Use POST /api/copilot/start primeiro.',
+            });
         }
 
         try {
@@ -102,6 +112,7 @@ export function registerTaskRoutes(bridge, binding) {
                         `[copilot-api/tasks/send] waitForResponse timeout=${timeoutDecision.timeoutMs ?? 'disabled'} strategy=${timeoutDecision.strategy} reasons=${timeoutDecision.reasons.join('+')}`,
                     );
                     return res.json({
+                        ...runtimeMeta,
                         ok: true,
                         response: raceResult,
                         timeoutPolicy: {
@@ -120,17 +131,18 @@ export function registerTaskRoutes(bridge, binding) {
                                 ? `Timeout após ${timeoutDecision.timeoutMs}ms`
                                 : 'Operação abortada aguardando resposta do agente',
                     });
-                    return res.status(projection.status).json(projection.body);
+                    return res.status(projection.status).json({ ...runtimeMeta, ...projection.body });
                 }
             }
 
             // GAP-03 (fix): verificar se a fila está cheia antes de retornar ok:true
-            const queueSize = /** @type {{ queueSize?: number }} */ (agent).queueSize ?? null;
+            const queueSize = controlState.queueSize;
             const maxQueueSize =
                 /** @type {{ constructor?: { MAX_QUEUE_SIZE?: number } }} */ (agent).constructor?.MAX_QUEUE_SIZE ??
                 null;
-            if (queueSize !== null && maxQueueSize !== null && queueSize >= maxQueueSize) {
+            if (maxQueueSize !== null && queueSize >= maxQueueSize) {
                 return res.status(429).json({
+                    ...runtimeMeta,
                     ok: false,
                     error: `Fila cheia (${queueSize}/${maxQueueSize} tarefas). Tente novamente mais tarde.`,
                 });
@@ -162,17 +174,23 @@ export function registerTaskRoutes(bridge, binding) {
             await new Promise((resolve) => queueMicrotask(() => resolve(undefined)));
             if (settled && earlyCatch !== null) {
                 const projection = projectAgentHttpError(earlyCatch);
-                return res.status(projection.status).json(projection.body);
+                return res.status(projection.status).json({ ...runtimeMeta, ...projection.body });
             }
             // Erros tardios apenas logados
             sendPromise.catch((/** @type {unknown} */ e) => {
                 log('WARN', `[copilot-api/tasks/send] Tarefa assíncrona falhou: ${toError(e).message}`);
             });
-            return res.json({ ok: true, taskId, message: 'Mensagem enfileirada.', status: agent.status });
+            return res.json({
+                ...runtimeMeta,
+                ok: true,
+                taskId,
+                message: 'Mensagem enfileirada.',
+                status: readAgentRuntimeControlStateFromRoute(deps).status,
+            });
         } catch (e) {
             log('ERROR', `[copilot-api/tasks/send] ${toError(e).message}`);
             const projection = projectAgentHttpError(e);
-            return res.status(projection.status).json(projection.body);
+            return res.status(projection.status).json({ ...runtimeMeta, ...projection.body });
         }
     });
 
@@ -184,18 +202,22 @@ export function registerTaskRoutes(bridge, binding) {
      * Body: { answer: string }
      */
     bridge.post('/answer', (/** @type {Req} */ req, /** @type {Res} */ res) => {
-        const { agent } = resolveCopilotApiRouteBinding(binding, req);
+        const deps = resolveCopilotApiRouteBinding(binding, req);
+        const { agent } = deps;
+        const runtimeMeta = buildRuntimeRouteMetaPayload(deps);
         const { answer } = req.body ?? {};
 
         if (!answer || typeof answer !== 'string') {
-            return res.status(400).json({ ok: false, error: 'Campo "answer" (string) é obrigatório.' });
+            return res.status(400).json({ ...runtimeMeta, ok: false, error: 'Campo "answer" (string) é obrigatório.' });
         }
 
         const answered = agent.answerPendingQuestion(answer);
         if (!answered) {
-            return res.status(409).json({ ok: false, error: 'Não há pergunta pendente do modelo no momento.' });
+            return res
+                .status(409)
+                .json({ ...runtimeMeta, ok: false, error: 'Não há pergunta pendente do modelo no momento.' });
         }
-        return res.json({ ok: true, message: 'Resposta enviada ao modelo.' });
+        return res.json({ ...runtimeMeta, ok: true, message: 'Resposta enviada ao modelo.' });
     });
 
     // ─── POST /answer/clear-shadow ───────────────────────────────────────────
@@ -204,9 +226,12 @@ export function registerTaskRoutes(bridge, binding) {
      * Limpa explicitamente a shadow persistida de `ask_user` restaurada do disco.
      */
     bridge.post('/answer/clear-shadow', (_req, /** @type {Res} */ res) => {
-        const { agent } = resolveCopilotApiRouteBinding(binding, /** @type {Req} */ (_req));
+        const deps = resolveCopilotApiRouteBinding(binding, /** @type {Req} */ (_req));
+        const { agent } = deps;
+        const runtimeMeta = buildRuntimeRouteMetaPayload(deps);
         if (typeof agent.clearPendingQuestionShadow !== 'function') {
             return res.status(501).json({
+                ...runtimeMeta,
                 ok: false,
                 error: 'Esta instância do agente não suporta limpeza explícita de shadow ask_user.',
             });
@@ -214,51 +239,71 @@ export function registerTaskRoutes(bridge, binding) {
 
         const cleared = agent.clearPendingQuestionShadow();
         if (!cleared) {
-            return res.status(409).json({ ok: false, error: 'Não há shadow persistida do modelo no momento.' });
+            return res
+                .status(409)
+                .json({ ...runtimeMeta, ok: false, error: 'Não há shadow persistida do modelo no momento.' });
         }
-        return res.json({ ok: true, message: 'Shadow persistida de ask_user limpa.' });
+        return res.json({ ...runtimeMeta, ok: true, message: 'Shadow persistida de ask_user limpa.' });
     });
 
     // ─── GET /elicitation ───────────────────────────────────────────────────
 
     bridge.get('/elicitation', (/** @type {Req} */ req, /** @type {Res} */ res) => {
-        const { agent } = resolveCopilotApiRouteBinding(binding, req);
+        const deps = resolveCopilotApiRouteBinding(binding, req);
+        const { agent } = deps;
+        const runtimeMeta = buildRuntimeRouteMetaPayload(deps);
         if (typeof agent.listPendingSdkElicitations !== 'function') {
-            return res.status(501).json({ ok: false, error: 'Esta instância não suporta provider-side elicitation.' });
+            return res
+                .status(501)
+                .json({ ...runtimeMeta, ok: false, error: 'Esta instância não suporta provider-side elicitation.' });
         }
-        return res.json({ ok: true, entries: agent.listPendingSdkElicitations() });
+        return res.json({ ...runtimeMeta, ok: true, entries: agent.listPendingSdkElicitations() });
     });
 
     // ─── GET /elicitation/:id ───────────────────────────────────────────────
 
     bridge.get('/elicitation/:id', (/** @type {Req} */ req, /** @type {Res} */ res) => {
-        const { agent } = resolveCopilotApiRouteBinding(binding, req);
+        const deps = resolveCopilotApiRouteBinding(binding, req);
+        const { agent } = deps;
+        const runtimeMeta = buildRuntimeRouteMetaPayload(deps);
         if (typeof agent.getPendingSdkElicitation !== 'function') {
-            return res.status(501).json({ ok: false, error: 'Esta instância não suporta provider-side elicitation.' });
+            return res
+                .status(501)
+                .json({ ...runtimeMeta, ok: false, error: 'Esta instância não suporta provider-side elicitation.' });
         }
         const id = /** @type {string} */ (req.params['id']);
         const entry = agent.getPendingSdkElicitation(id);
         if (!entry) {
-            return res.status(404).json({ ok: false, error: 'Elicitation pendente não encontrada.' });
+            return res.status(404).json({ ...runtimeMeta, ok: false, error: 'Elicitation pendente não encontrada.' });
         }
-        return res.json({ ok: true, entry });
+        return res.json({ ...runtimeMeta, ok: true, entry });
     });
 
     // ─── POST /elicitation/:id/respond ──────────────────────────────────────
 
     bridge.post('/elicitation/:id/respond', (/** @type {Req} */ req, /** @type {Res} */ res) => {
-        const { agent } = resolveCopilotApiRouteBinding(binding, req);
+        const deps = resolveCopilotApiRouteBinding(binding, req);
+        const { agent } = deps;
+        const runtimeMeta = buildRuntimeRouteMetaPayload(deps);
         if (typeof agent.resolvePendingSdkElicitation !== 'function') {
-            return res.status(501).json({ ok: false, error: 'Esta instância não suporta provider-side elicitation.' });
+            return res
+                .status(501)
+                .json({ ...runtimeMeta, ok: false, error: 'Esta instância não suporta provider-side elicitation.' });
         }
 
         const id = /** @type {string} */ (req.params['id']);
         const { action, content } = req.body ?? {};
         if (action !== 'accept' && action !== 'decline' && action !== 'cancel') {
-            return res.status(400).json({ ok: false, error: 'Campo "action" deve ser accept | decline | cancel.' });
+            return res
+                .status(400)
+                .json({ ...runtimeMeta, ok: false, error: 'Campo "action" deve ser accept | decline | cancel.' });
         }
         if (content !== undefined && (typeof content !== 'object' || content === null || Array.isArray(content))) {
-            return res.status(400).json({ ok: false, error: 'Campo "content" deve ser um objeto quando fornecido.' });
+            return res.status(400).json({
+                ...runtimeMeta,
+                ok: false,
+                error: 'Campo "content" deve ser um objeto quando fornecido.',
+            });
         }
 
         const ok = agent.resolvePendingSdkElicitation(id, {
@@ -266,8 +311,8 @@ export function registerTaskRoutes(bridge, binding) {
             ...(content !== undefined ? { content } : {}),
         });
         if (!ok) {
-            return res.status(409).json({ ok: false, error: 'Elicitation não está mais pendente.' });
+            return res.status(409).json({ ...runtimeMeta, ok: false, error: 'Elicitation não está mais pendente.' });
         }
-        return res.json({ ok: true, message: 'Resposta de elicitation enviada ao SDK.' });
+        return res.json({ ...runtimeMeta, ok: true, message: 'Resposta de elicitation enviada ao SDK.' });
     });
 }

@@ -22,6 +22,9 @@ import { INFINITE_SESSION_DEFAULTS, REASONING_EFFORTS } from '../constants.js';
 import { getSdkRecoveryPolicy, toSdkOperationError } from '../errors.js';
 import { log } from '../logger.js';
 import { emitSdkOperationMetric } from '../telemetry/operation-metrics.js';
+import { resolveSessionAutoModel, setSessionAutoModelResolver } from './model-resolution-port.js';
+
+export { setSessionAutoModelResolver };
 /**
  * @typedef {import('@github/copilot-sdk').CopilotSession} CopilotSession
  *
@@ -35,36 +38,6 @@ import { emitSdkOperationMetric } from '../telemetry/operation-metrics.js';
  */
 
 /**
- * @typedef {(fallback: string) => Promise<string>} AutoModelResolver
- */
-
-/**
- * Resolver default carregado de forma lazy para quebrar o ciclo estático `session/lifecycle -> models -> client ->
- * lifecycle`. A fronteira pública segue igual; apenas o acoplamento de import deixa de ser eager.
- *
- * @param {string} fallback
- * @returns {Promise<string>}
- */
-async function defaultAutoModelResolver(fallback) {
-    const { listModels, resolveModelIdAuto } = await import('../models/index.js');
-    const availableModels = await listModels();
-    return resolveModelIdAuto(availableModels, 'auto', fallback);
-}
-
-/** @type {AutoModelResolver} */
-let autoModelResolver = defaultAutoModelResolver;
-
-/**
- * Injeta um resolver de modelo automático. Use em testes ou runtimes que já possuem um ModelRuntime isolado.
- *
- * @param {AutoModelResolver | null | undefined} resolver
- * @returns {void}
- */
-export function setSessionAutoModelResolver(resolver) {
-    autoModelResolver = typeof resolver === 'function' ? resolver : defaultAutoModelResolver;
-}
-
-/**
  * Resolve `model: "auto"` sem depender estaticamente do pacote de models.
  *
  * Mantido como utilitário explícito para fluxos que precisam de um modelo concreto. A criação/retomada canônica de
@@ -76,7 +49,7 @@ export function setSessionAutoModelResolver(resolver) {
  */
 export async function resolveSessionCreateModel(model, fallback = 'gpt-5-mini') {
     if (model !== 'auto') return model;
-    return autoModelResolver(fallback);
+    return resolveSessionAutoModel(fallback);
 }
 
 /**

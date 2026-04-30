@@ -10,7 +10,7 @@
  * @see EventBus
  */
 
-import { getToolStats } from '#copilot/observability';
+import { readTerminalToolStatsProjection } from '../frontend/index.js';
 
 /**
  * @typedef {object} ToolsContext
@@ -26,8 +26,7 @@ import { getToolStats } from '#copilot/observability';
  * @returns {void}
  */
 export function cmdTools({ println }) {
-    const stats = getToolStats();
-    const entries = Object.entries(stats);
+    const { entries } = readTerminalToolStatsProjection();
 
     if (entries.length === 0) {
         println('\n  \x1b[33m⚠️  Nenhuma tool registrada ainda.\x1b[0m\n');

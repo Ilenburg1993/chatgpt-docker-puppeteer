@@ -58,7 +58,10 @@ function ensureHookRuntimeState(routeDeps) {
     });
 
     const listener = (/** @type {unknown} */ ev) => {
-        const payload = standardizeSsePayload(/** @type {object} */ (ev ?? {}));
+        const payload = standardizeSsePayload({
+            .../** @type {object} */ (ev ?? {}),
+            runtimeId: runtimeKey,
+        });
         pool.broadcast('hook', payload, { replayEvent: 'hook', filterEvent: 'hook' });
     };
 
@@ -115,8 +118,14 @@ const withErrorHandler = _withErrorHandler.bind(null, 'sdk-api/hooks');
  *         .then(({ hooks }) => hooks.forEach((h) => console.log(h.name)));
  */
 router.get('/hooks/registry', (_req, res) => {
-    const hooks = resolveSdkRouteSharedDeps(/** @type {Req} */ (_req)).sdkHooks.registry.list();
-    res.json({ ok: true, count: hooks.length, hooks });
+    const routeDeps = resolveSdkRouteSharedDeps(/** @type {Req} */ (_req));
+    const hooks = routeDeps.sdkHooks.registry.list();
+    res.json({
+        ok: true,
+        ...routeDeps.sdkRuntimeProjection.buildRuntimeRouteMetaPayload(routeDeps),
+        count: hooks.length,
+        hooks,
+    });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -139,11 +148,15 @@ router.get('/hooks/registry', (_req, res) => {
  */
 router.get('/hooks/events', (req, res) => {
     void withErrorHandler(req, res, async () => {
+        const routeDeps = resolveSdkRouteSharedDeps(req);
         if (!_hooksTracker.accept()) {
-            res.status(429).json({ ok: false, error: 'Limite de clientes SSE atingido' });
+            res.status(429).json({
+                ok: false,
+                ...routeDeps.sdkRuntimeProjection.buildRuntimeRouteMetaPayload(routeDeps),
+                error: 'Limite de clientes SSE atingido',
+            });
             return;
         }
-        const routeDeps = resolveSdkRouteSharedDeps(req);
         const runtimeState = ensureHookRuntimeState(routeDeps);
 
         // GAP-EVARCH-01 (fix): usar createSseWriter para setup padronizado
@@ -157,7 +170,11 @@ router.get('/hooks/events', (req, res) => {
 
         sse.send(
             'connected',
-            { timestamp: Date.now(), message: 'hooks/events stream iniciado' },
+            {
+                timestamp: Date.now(),
+                message: 'hooks/events stream iniciado',
+                ...routeDeps.sdkRuntimeProjection.buildRuntimeRouteMetaPayload(routeDeps),
+            },
             {
                 skipBuffer: true,
             },

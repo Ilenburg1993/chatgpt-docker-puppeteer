@@ -17,8 +17,8 @@ describe('terminal/bootstrap-lifecycle', () => {
     it('registra SIGTERM e SIGINT em modo headless', async () => {
         /** @type {Record<string, (...args: unknown[]) => void>} */
         const listeners = {};
-        const runShutdownFn = vi.fn(async () => {});
-        const exit = vi.fn();
+        const runShutdownFn = vi.fn(async (/** @type {string | undefined} */ _reason) => {});
+        const exit = vi.fn((/** @type {number | undefined} */ _code) => {});
 
         registerTerminalShutdownSignals({
             processLike: {
@@ -26,7 +26,7 @@ describe('terminal/bootstrap-lifecycle', () => {
                 on: (event, listener) => {
                     listeners[event] = listener;
                 },
-                exit: /** @type {(code?: number) => never} */ (exit),
+                exit: /** @type {(code?: number) => never} */ (/** @type {unknown} */ (exit)),
             },
             runShutdownFn,
             logFn: vi.fn(),
@@ -53,7 +53,9 @@ describe('terminal/bootstrap-lifecycle', () => {
                 on: (event, listener) => {
                     listeners[event] = listener;
                 },
-                exit: /** @type {(code?: number) => never} */ (vi.fn()),
+                exit: /** @type {(code?: number) => never} */ (
+                    /** @type {unknown} */ (vi.fn((/** @type {number | undefined} */ _code) => {}))
+                ),
             },
             runShutdownFn: vi.fn(async () => {}),
             logFn: vi.fn(),
@@ -64,9 +66,9 @@ describe('terminal/bootstrap-lifecycle', () => {
     });
 
     it('executa shutdown central antes de sair em falha fatal de boot', async () => {
-        const runShutdownFn = vi.fn(async () => {});
+        const runShutdownFn = vi.fn(async (/** @type {string | undefined} */ _reason) => {});
         const errorFn = vi.fn();
-        const exitFn = vi.fn();
+        const exitFn = vi.fn((/** @type {number | undefined} */ _code) => {});
 
         await assert.rejects(
             () =>
@@ -74,7 +76,7 @@ describe('terminal/bootstrap-lifecycle', () => {
                     runShutdownFn,
                     errorFn,
                     logFn: vi.fn(),
-                    exitFn: /** @type {(code?: number) => never} */ (exitFn),
+                    exitFn: /** @type {(code?: number) => never} */ (/** @type {unknown} */ (exitFn)),
                 }),
             /process\.exit retornou inesperadamente/,
         );

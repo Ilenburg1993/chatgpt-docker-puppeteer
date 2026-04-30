@@ -14,7 +14,7 @@ import {
 } from '#copilot/agent';
 import { resolveAgentRuntimeSelection } from './agent-runtime.js';
 import { readRuntimeLifecycleSnapshot } from './runtime-lifecycle.js';
-import { buildRuntimeRouteMetaFromSelection } from './runtime-meta.js';
+import { buildRuntimeRouteMetaFromSelection, buildRuntimeRouteMetaPayload } from './runtime-meta.js';
 import { readAgentStatusSnapshot } from './runtime-status.js';
 
 /**
@@ -99,6 +99,31 @@ export function resolveAgentHealthSelection(runtimeId) {
         requestedRuntimeId: target.requestedRuntimeId,
         runtimeFound: target.runtimeFound,
         usedDefaultRuntimeFallback: target.usedDefaultRuntimeFallback,
+    };
+}
+
+/**
+ * Constrói payload HTTP canônico de `/health/agent` com metadata de runtime e health consolidado.
+ *
+ * @param {string | null | undefined} [runtimeId]
+ * @returns {{
+ *     statusCode: number;
+ *     body: import('../agent/types.js').AgentHealthSnapshot & {
+ *         runtimeId?: string;
+ *         requestedRuntimeId?: string | null;
+ *         runtimeFound?: boolean;
+ *         usedDefaultRuntimeFallback?: boolean;
+ *     };
+ * }}
+ */
+export function buildAgentHealthHttpResponse(runtimeId) {
+    const selection = resolveAgentHealthSelection(runtimeId);
+    return {
+        statusCode: getAgentHealthHttpStatus(selection.health),
+        body: {
+            ...buildRuntimeRouteMetaPayload(selection),
+            ...selection.health,
+        },
     };
 }
 

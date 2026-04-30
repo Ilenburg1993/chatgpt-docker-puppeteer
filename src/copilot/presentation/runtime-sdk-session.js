@@ -23,6 +23,7 @@ import {
     updateAgentSdkPlan as updateAgentSdkPlanOnAgent,
 } from '#copilot/agent';
 import { getAgentRuntimeOrDefault } from './agent-runtime.js';
+import { readAgentStatusSnapshot } from './runtime-status.js';
 
 /**
  * @param {string | null | undefined} [runtimeId]
@@ -30,6 +31,47 @@ import { getAgentRuntimeOrDefault } from './agent-runtime.js';
  */
 export function getAgentSdkSessionTarget(runtimeId) {
     return getAgentRuntimeOrDefault(runtimeId);
+}
+
+/**
+ * Resolve a sessão SDK viva hospedada pelo runtime do agent, em formato compatível com o registry de sessões do SDK.
+ *
+ * Este é o fallback usado por rotas HTTP quando a sessão permanente do AlwaysAlive ainda não está registrada no
+ * `session-registry`, mas o runtime possui handles SDK válidos.
+ *
+ * @param {string | null | undefined} runtimeId
+ * @param {string} sessionId
+ * @returns {{
+ *     session: NonNullable<ReturnType<import('#copilot/sdk').getClientSession>>['session'];
+ *     model: string;
+ *     createdAt: number;
+ *     messagesCount: number;
+ * } | null}
+ */
+export function resolveAgentSdkActiveSessionEntry(runtimeId, sessionId) {
+    const agent = getAgentSdkSessionTarget(runtimeId);
+    const snap = readAgentStatusSnapshot(agent);
+    const agentSessionId = typeof snap['sessionId'] === 'string' ? snap['sessionId'] : null;
+    const handles =
+        typeof (/** @type {{ getSdkHandles?: unknown }} */ (agent).getSdkHandles) === 'function'
+            ? /** @type {{ session?: NonNullable<ReturnType<import('#copilot/sdk').getClientSession>>['session'] | null }} */ (
+                  /** @type {{ getSdkHandles: () => unknown }} */ (agent).getSdkHandles()
+              )
+            : null;
+    if (agentSessionId !== sessionId || !handles?.session) return null;
+
+    const agentWithModel = /** @type {{ getModel?: () => string }} */ (/** @type {unknown} */ (agent));
+    return {
+        session: handles.session,
+        model:
+            typeof snap['model'] === 'string'
+                ? snap['model']
+                : typeof agentWithModel.getModel === 'function'
+                  ? agentWithModel.getModel()
+                  : 'unknown',
+        createdAt: Date.now(),
+        messagesCount: 0,
+    };
 }
 
 /**
