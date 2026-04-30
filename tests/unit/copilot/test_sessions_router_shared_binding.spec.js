@@ -67,4 +67,34 @@ describe('sessions router shared sdk binding', () => {
         assert.equal(res.body.id, 'hub-created');
         assert.equal(calls[0]?.sdkSessionId, 'sdk-shared-1');
     });
+
+    it('GET /sessions/:sessionId e DELETE /sessions/:sessionId delegam pelo presentation hub boundary', async () => {
+        /** @type {string[]} */
+        const closed = [];
+        container.register(
+            CONVERSATION_STORE,
+            () =>
+                /** @type {any} */ ({
+                    createHubSession: () => 'hub-created',
+                    getHubSession: (/** @type {string} */ id) => (id === 'hub-1' ? { id, title: 'Hub 1' } : null),
+                    closeHubSession: (/** @type {string} */ id) => {
+                        closed.push(id);
+                    },
+                }),
+            'singleton',
+        );
+
+        const app = express();
+        app.use(express.json());
+        app.use(createSessionsRouter());
+
+        const getRes = await request(app).get('/sessions/hub-1').expect(200);
+        assert.equal(getRes.body.session.id, 'hub-1');
+
+        await request(app).get('/sessions/missing').expect(404);
+
+        const deleteRes = await request(app).delete('/sessions/hub-1').expect(200);
+        assert.equal(deleteRes.body.closed, 'hub-1');
+        assert.deepEqual(closed, ['hub-1']);
+    });
 });

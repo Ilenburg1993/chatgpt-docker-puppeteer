@@ -15,22 +15,17 @@
  * @module copilot/server/routes/sessions
  */
 
-import { CONVERSATION_STORE } from '#copilot/conversation-hub';
-import { container, getSharedSdkSessionId, toError } from '#copilot/core';
 import { Router } from 'express';
 import { z } from 'zod';
-import { handleListSessions, handleListTurns, VALID_HUB_SESSION_STATUS } from '../../presentation/conversation-hub.js';
+import {
+    handleCloseHubSession,
+    handleCreateHubSession,
+    handleGetHubSession,
+    handleListSessions,
+    handleListTurns,
+} from '../../presentation/conversation-hub.js';
 import { bridgeHandler } from '../handler-bridge.js';
-import { sanitizeHttpErrorMessage } from '../middleware/error-handler.js';
 import { validate } from '../middleware/validate.js';
-
-/**
- * @typedef {import('express').Request} Req
- *
- * @typedef {import('express').Response} Res
- *
- * @typedef {import('express').NextFunction} NextFn
- */
 
 /**
  * Cria o router de gerenciamento de hub sessions.
@@ -51,23 +46,10 @@ export function createSessionsRouter() {
     );
 
     // ── GET /sessions/:sessionId — obtém session individual ───────────────────
-    router.get('/sessions/:sessionId', (/** @type {Req} */ req, /** @type {Res} */ res) => {
-        const sessionId = String(req.params['sessionId'] ?? '');
-        if (!sessionId) {
-            res.status(400).json({ ok: false, error: 'sessionId obrigatório' });
-            return;
-        }
-        try {
-            const sessionField = container.resolve(CONVERSATION_STORE).getHubSession(sessionId);
-            if (!sessionField) {
-                res.status(404).json({ ok: false, error: `Session não encontrada: ${sessionId}` });
-                return;
-            }
-            res.json({ ok: true, session: sessionField });
-        } catch (e) {
-            res.status(500).json({ ok: false, error: sanitizeHttpErrorMessage(toError(e).message, 500) });
-        }
-    });
+    router.get(
+        '/sessions/:sessionId',
+        bridgeHandler(handleGetHubSession, (req) => ({ sessionId: req.params['sessionId'] ?? '' })),
+    );
 
     const createSessionSchema = z.object({
         title: z.string().optional(),
@@ -79,25 +61,11 @@ export function createSessionsRouter() {
     router.post(
         '/sessions',
         validate({ body: createSessionSchema }),
-        (/** @type {Req} */ req, /** @type {Res} */ res) => {
-            const { title, sdkSessionId, metadata } =
-                /** @type {{ title?: string; sdkSessionId?: string; metadata?: Record<string, unknown> }} */ (req.body);
-            try {
-                /** @type {{ title?: string; sdkSessionId?: string; metadata?: object }} */
-                const hubOpts = {};
-                if (title) hubOpts.title = title;
-                if (sdkSessionId) hubOpts.sdkSessionId = sdkSessionId;
-                else {
-                    const activeSdkSessionId = getSharedSdkSessionId();
-                    if (activeSdkSessionId) hubOpts.sdkSessionId = activeSdkSessionId;
-                }
-                if (metadata) hubOpts.metadata = metadata;
-                const id = container.resolve(CONVERSATION_STORE).createHubSession(hubOpts);
-                res.status(201).json({ ok: true, id });
-            } catch (e) {
-                res.status(500).json({ ok: false, error: sanitizeHttpErrorMessage(toError(e).message, 500) });
-            }
-        },
+        bridgeHandler(handleCreateHubSession, (req) => ({
+            body: /** @type {{ title?: string; sdkSessionId?: string; metadata?: Record<string, unknown> }} */ (
+                req.body
+            ),
+        })),
     );
 
     const sessionParamsSchema = z.object({ sessionId: z.string().min(1) });
@@ -106,20 +74,7 @@ export function createSessionsRouter() {
     router.delete(
         '/sessions/:sessionId',
         validate({ params: sessionParamsSchema }),
-        (/** @type {Req} */ req, /** @type {Res} */ res) => {
-            const sessionId = String(req.params['sessionId'] ?? '');
-            try {
-                const existing = container.resolve(CONVERSATION_STORE).getHubSession(sessionId);
-                if (!existing) {
-                    res.status(404).json({ ok: false, error: `Session não encontrada: ${sessionId}` });
-                    return;
-                }
-                container.resolve(CONVERSATION_STORE).closeHubSession(sessionId);
-                res.json({ ok: true, closed: sessionId });
-            } catch (e) {
-                res.status(500).json({ ok: false, error: sanitizeHttpErrorMessage(toError(e).message, 500) });
-            }
-        },
+        bridgeHandler(handleCloseHubSession, (req) => ({ sessionId: req.params['sessionId'] ?? '' })),
     );
 
     // ── GET /sessions/:sessionId/turns — lista turnos paginados ───────────────
@@ -131,8 +86,6 @@ export function createSessionsRouter() {
             offset: req.query['offset'] !== undefined ? Number(req.query['offset']) : 0,
         })),
     );
-
-    void VALID_HUB_SESSION_STATUS; // referência simbólica do contrato canônico de status
 
     return router;
 }

@@ -10,6 +10,10 @@ describe('P4 — superfícies compartilhadas de sessions/memory/hub-health', () 
 
         assert.ok(src.includes('../../presentation/conversation-hub.js'));
         assert.ok(!src.includes('../../terminal/handlers/dialog.js'));
+        assert.ok(!src.includes('CONVERSATION_STORE'));
+        assert.ok(!src.includes('container.resolve'));
+        assert.ok(!src.includes('getSharedSdkSessionId'));
+        assert.ok(!src.includes('sanitizeHttpErrorMessage'));
     });
 
     it('server/routes/memory.js não depende mais de terminal/handlers/dialog.js', async () => {

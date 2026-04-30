@@ -7,8 +7,8 @@
  *   e terminal passam a consumir a mesma SSOT de presentation para operações ligadas ao `ConversationHub`.
  */
 
-import { conversationHub, conversationStore } from '#copilot/conversation-hub';
-import { getHubSessionId, toError } from '#copilot/core';
+import { CONVERSATION_STORE, conversationHub, conversationStore } from '#copilot/conversation-hub';
+import { container, getHubSessionId, getSharedSdkSessionId, toError } from '#copilot/core';
 
 /**
  * @typedef {import('./types.js').HandlerResult} HandlerResult
@@ -16,6 +16,13 @@ import { getHubSessionId, toError } from '#copilot/core';
 
 /** Statuses válidos para filtragem de sessions do hub. */
 export const VALID_HUB_SESSION_STATUS = /** @type {const} */ (['active', 'closed', 'error']);
+
+/**
+ * @returns {import('../conversation-hub/store.js').ConversationStore}
+ */
+function getConversationStore() {
+    return container.has(CONVERSATION_STORE) ? container.resolve(CONVERSATION_STORE) : conversationStore;
+}
 
 /**
  * Lista hub_sessions persistidas.
@@ -35,7 +42,7 @@ export function handleListSessions({ limit = 20, offset = 0, status } = {}) {
                 status: /** @type {import('../conversation-hub/store-helpers.js').HubSessionStatus} */ (status),
             }),
         };
-        const sessions = conversationStore.listHubSessions(opts);
+        const sessions = getConversationStore().listHubSessions(opts);
         return { status: 200, cors: true, body: { ok: true, sessions, current: getHubSessionId() } };
     } catch (e) {
         return { status: 500, body: { ok: false, error: toError(e).message } };
@@ -55,8 +62,9 @@ export function handleListTurns(params) {
     const limit = typeof rawLimit === 'number' && !isNaN(rawLimit) ? rawLimit : 50;
     const offset = typeof rawOffset === 'number' && !isNaN(rawOffset) ? rawOffset : 0;
     try {
-        const turns = conversationStore.readTurns(sessionId, { limit, offset });
-        const totalCount = conversationStore.countTurns(sessionId);
+        const store = getConversationStore();
+        const turns = store.readTurns(sessionId, { limit, offset });
+        const totalCount = store.countTurns(sessionId);
         return { status: 200, cors: true, body: { ok: true, turns, sessionId, totalCount } };
     } catch (e) {
         return { status: 500, body: { ok: false, error: toError(e).message } };
@@ -75,7 +83,7 @@ export function handleStoreMemory(body) {
     }
     try {
         const hubSessionId = typeof body.hubSessionId === 'string' ? body.hubSessionId : getHubSessionId();
-        const id = conversationStore.storeMemory({
+        const id = getConversationStore().storeMemory({
             content: body.content,
             tag: body.tag ?? 'geral',
             ...(hubSessionId ? { hubSessionId } : {}),
@@ -94,7 +102,7 @@ export function handleStoreMemory(body) {
  */
 export function handleRecallMemories({ tag, search, limit = 20 } = {}) {
     try {
-        const memories = conversationStore.recallMemories({
+        const memories = getConversationStore().recallMemories({
             ...(tag ? { tag } : {}),
             ...(search ? { search } : {}),
             limit: isNaN(/** @type {number} */ (limit)) ? 20 : /** @type {number} */ (limit),
@@ -113,8 +121,79 @@ export function handleRecallMemories({ tag, search, limit = 20 } = {}) {
  */
 export function handleDeleteMemory({ memoryId }) {
     try {
-        const deleted = conversationStore.deleteMemory(memoryId);
+        const deleted = getConversationStore().deleteMemory(memoryId);
         return { status: deleted ? 200 : 404, cors: true, body: { ok: deleted, id: memoryId } };
+    } catch (e) {
+        return { status: 500, body: { ok: false, error: toError(e).message } };
+    }
+}
+
+/**
+ * Retorna uma hub session específica.
+ *
+ * @param {{ sessionId?: string }} params
+ * @returns {HandlerResult}
+ */
+export function handleGetHubSession({ sessionId = '' } = {}) {
+    if (!sessionId) {
+        return { status: 400, body: { ok: false, error: 'sessionId obrigatório' } };
+    }
+    try {
+        const session = getConversationStore().getHubSession(sessionId);
+        if (!session) {
+            return { status: 404, body: { ok: false, error: `Session não encontrada: ${sessionId}` } };
+        }
+        return { status: 200, body: { ok: true, session } };
+    } catch (e) {
+        return { status: 500, body: { ok: false, error: toError(e).message } };
+    }
+}
+
+/**
+ * Cria uma nova hub session.
+ *
+ * @param {{ body?: { title?: string; sdkSessionId?: string; metadata?: Record<string, unknown> } }} params
+ * @returns {HandlerResult}
+ */
+export function handleCreateHubSession({ body = {} } = {}) {
+    const { title, sdkSessionId, metadata } = body;
+    try {
+        /** @type {{ title?: string; sdkSessionId?: string; metadata?: object }} */
+        const hubOpts = {};
+        if (title) hubOpts.title = title;
+        if (sdkSessionId) {
+            hubOpts.sdkSessionId = sdkSessionId;
+        } else {
+            const activeSdkSessionId = getSharedSdkSessionId();
+            if (activeSdkSessionId) hubOpts.sdkSessionId = activeSdkSessionId;
+        }
+        if (metadata) hubOpts.metadata = metadata;
+
+        const id = getConversationStore().createHubSession(hubOpts);
+        return { status: 201, body: { ok: true, id } };
+    } catch (e) {
+        return { status: 500, body: { ok: false, error: toError(e).message } };
+    }
+}
+
+/**
+ * Fecha uma hub session existente.
+ *
+ * @param {{ sessionId?: string }} params
+ * @returns {HandlerResult}
+ */
+export function handleCloseHubSession({ sessionId = '' } = {}) {
+    if (!sessionId) {
+        return { status: 400, body: { ok: false, error: 'sessionId obrigatório' } };
+    }
+    try {
+        const store = getConversationStore();
+        const existing = store.getHubSession(sessionId);
+        if (!existing) {
+            return { status: 404, body: { ok: false, error: `Session não encontrada: ${sessionId}` } };
+        }
+        store.closeHubSession(sessionId);
+        return { status: 200, body: { ok: true, closed: sessionId } };
     } catch (e) {
         return { status: 500, body: { ok: false, error: toError(e).message } };
     }
@@ -130,8 +209,9 @@ export function handleHubHealth() {
         return { status: 503, body: { ok: false, error: 'ConversationHub não inicializado' } };
     }
     try {
-        const activeSessions = conversationStore.countHubSessions({ status: 'active' });
-        const totalSessions = conversationStore.countHubSessions();
+        const store = getConversationStore();
+        const activeSessions = store.countHubSessions({ status: 'active' });
+        const totalSessions = store.countHubSessions();
         return {
             status: 200,
             body: {

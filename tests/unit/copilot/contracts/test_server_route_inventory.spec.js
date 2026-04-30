@@ -104,4 +104,17 @@ describe('contracts/server-route-inventory — rotas agent-runtime vs hub/server
         assert.match(src, /router\.get\(['"]\/ws\/info['"]/);
         assert.match(src, /getCopilotNamespace\(\)/);
     });
+
+    it('sessions.js é adapter HTTP fino sobre presentation/conversation-hub', () => {
+        const src = readRoute('sessions.js');
+
+        assert.match(src, /presentation\/conversation-hub\.js/);
+        assert.match(src, /bridgeHandler\(handleGetHubSession/);
+        assert.match(src, /bridgeHandler\(handleCreateHubSession/);
+        assert.match(src, /bridgeHandler\(handleCloseHubSession/);
+        assert.doesNotMatch(src, /CONVERSATION_STORE/);
+        assert.doesNotMatch(src, /container/);
+        assert.doesNotMatch(src, /getSharedSdkSessionId/);
+        assert.doesNotMatch(src, /sanitizeHttpErrorMessage/);
+    });
 });

@@ -264,6 +264,8 @@ regras por camada.
   - [x] `server/routes/copilot-api/{control,dialog,tasks,stream}.js` propagam metadata de runtime
         (`runtimeId/requestedRuntimeId/runtimeFound/usedDefaultRuntimeFallback`) via helpers de
         `presentation/runtime-meta`.
+  - [x] `server/routes/sessions.js` deixou de abrir `CONVERSATION_STORE`, `container` e
+        `getSharedSdkSessionId`; CRUD de hub session passou para `presentation/conversation-hub`.
 - [x] Terminal handlers passam a usar somente `presentation/*` para payloads/status;
   - [x] `/tools` deixou de consultar `observability` diretamente e passou a consumir
         `readTerminalToolStatsProjection()`, que usa projection compartilhada em
@@ -744,3 +746,47 @@ operacional completo, e a Faixa E ganhou cobertura executável para facades secu
   nas rotas mais sensíveis a colisão.
 - A Faixa F ganhou inventário executável de rotas, reduzindo ambiguidade entre payload operacional
   de agent e payload meramente HTTP/hub.
+
+---
+
+## 19) Checkpoint de continuação — sessions hub CRUD por presentation
+
+### Investigação detalhada
+
+Após o inventário de rotas, a maior dívida concreta de Faixa F estava em
+`server/routes/sessions.js`. A rota era hub-only, portanto não deveria receber metadata de runtime,
+mas ainda abria infraestrutura diretamente:
+
+- `CONVERSATION_STORE`;
+- `container.resolve`;
+- `getSharedSdkSessionId`;
+- sanitização HTTP local de erros.
+
+Isso não quebrava multi-runtime, mas mantinha uma ambiguidade arquitetural: a rota era classificada
+como hub-only, porém ainda continha regra de domínio e acesso DI direto que deveriam viver em
+`presentation/conversation-hub`.
+
+### Transformações aplicadas
+
+- `presentation/conversation-hub.js` ganhou handlers canônicos para:
+  - `handleGetHubSession`;
+  - `handleCreateHubSession`;
+  - `handleCloseHubSession`.
+- `server/routes/sessions.js` virou adapter HTTP fino usando `bridgeHandler` para todos os caminhos
+  de CRUD de hub session.
+- A lógica de fallback para `sdkSessionId` compartilhado foi movida para `presentation`, preservando
+  o comportamento de `POST /sessions` sem body explícito.
+- `test_sessions_router_shared_binding` passou a cobrir também `GET /sessions/:sessionId` e
+  `DELETE /sessions/:sessionId`.
+- `test_p4_terminal_shared_conversation_hub` e `test_server_route_inventory` agora bloqueiam
+  regressão de `sessions.js` reabrindo `CONVERSATION_STORE`, `container`, `getSharedSdkSessionId` ou
+  sanitização local.
+
+### O que ainda falta, objetivamente
+
+- **Faixa F:** revisar `server/routes/{agent,config,git,memory,observability}.js` para separar o que
+  já é bridge fina de presentation do que ainda contém regra de domínio local.
+- **Faixa G:** concluir o mapeamento de Maps/Sets module-level, classificando cada global como
+  registry, terminal-local, SSE connection state, cache defensivo, singleton compatível ou dívida.
+- **Faixa E:** reduzir imports cruzados permitidos entre facades quando algum deles puder ser
+  substituído por query mais simples ou projection já existente.
