@@ -69,5 +69,6 @@ export function resolveCopilotApiRouteBinding(binding, req) {
         requestedRuntimeId: null,
         runtimeFound: true,
         usedDefaultRuntimeFallback: false,
+        runtimeFallbackWarning: null,
     };
 }

@@ -17,6 +17,7 @@ import { buildRuntimeRouteMetaFromSelection } from './runtime-meta.js';
  *     requestedRuntimeId: string | null;
  *     runtimeFound: boolean;
  *     usedDefaultRuntimeFallback: boolean;
+ *     runtimeFallbackWarning?: string | null;
  * }} CopilotApiRouteDeps
  *
  * @param {string | null | undefined} [runtimeId]

@@ -204,9 +204,9 @@ ${statsLines}
 ${C.bold}${C.cyan}╚══════════════════════════════════════════════════════════════╝${C.reset}
 `);
 
-    if (configProjection.usedDefaultRuntimeFallback) {
+    if (configProjection.runtimeFallbackWarning) {
         println(
-            `${C.yellow}  Nota: runtime solicitado ${configProjection.requestedRuntimeId ?? '(desconhecido)'} não encontrado; diagnóstico exibido para o runtime default (${configProjection.runtimeId}).${C.reset}`,
+            `${C.yellow}  Nota: ${configProjection.runtimeFallbackWarning} Diagnóstico exibido para o runtime default (${configProjection.runtimeId}).${C.reset}`,
         );
     }
 }
