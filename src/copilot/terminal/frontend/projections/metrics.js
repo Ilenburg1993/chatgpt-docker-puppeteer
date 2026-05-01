@@ -19,6 +19,7 @@ import { normalizeTerminalModelBillingProjection, readTerminalRuntimeBase } from
  *     runtimeId: string;
  *     runtimeFound: boolean;
  *     usedDefaultRuntimeFallback: boolean;
+ *     runtimeFallbackWarning: string | null;
  *     runtimeSessionId: string | null;
  *     contextWindow: import('./shared.js').ContextWindowProjection | null;
  *     pr: Record<string, any> | null;
@@ -53,6 +54,7 @@ export function readTerminalMetricsProjection(runtimeId) {
         runtimeId: base.runtimeId,
         runtimeFound: base.runtimeFound,
         usedDefaultRuntimeFallback: base.usedDefaultRuntimeFallback,
+        runtimeFallbackWarning: base.runtimeFallbackWarning,
         runtimeSessionId: base.runtimeSessionId,
         contextWindow: base.contextWindow,
         pr,

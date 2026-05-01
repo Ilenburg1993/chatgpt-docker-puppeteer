@@ -1,8 +1,8 @@
 # 100 — Mapeamento completo dos fluxos de `src/copilot` (AS-IS 2026-05)
 
-**Data:** 2026-05-01
-**Escopo:** todos os fluxos arquiteturais ativos em `src/copilot/**`
-**Objetivo:** consolidar mapa único de fluxo, ownership e fronteiras para orientar canonicidade total.
+**Data:** 2026-05-01 **Escopo:** todos os fluxos arquiteturais ativos em `src/copilot/**`
+**Objetivo:** consolidar mapa único de fluxo, ownership e fronteiras para orientar canonicidade
+total.
 
 ---
 
@@ -10,7 +10,8 @@
 
 Esta leitura combina:
 
-- inventários executáveis (`module-map.js`) de `agent/{dialog,session,lifecycle}`, `terminal`, `server`, `server/routes`;
+- inventários executáveis (`module-map.js`) de `agent/{dialog,session,lifecycle}`, `terminal`,
+  `server`, `server/routes`;
 - contratos de boot (`boot/contract.js`) e runtime selection (`presentation/agent-runtime.js`);
 - READMEs canônicos de `src/copilot/*`;
 - varredura de imports e sinais de compat/fallback/bypass;
@@ -153,4 +154,7 @@ SDK SessionEvent
 
 ## 5) Conclusão factual
 
-O sistema já opera majoritariamente em fluxo canônico por camada, mas ainda possui **rotas paralelas controladas** para compatibilidade e resiliência operacional. O próximo passo não é “inventar nova topologia”: é **fechar os paralelos remanescentes com governança e migração incremental**, preservando o caminho para multi-runtime e multi-agent.
+O sistema já opera majoritariamente em fluxo canônico por camada, mas ainda possui **rotas paralelas
+controladas** para compatibilidade e resiliência operacional. O próximo passo não é “inventar nova
+topologia”: é **fechar os paralelos remanescentes com governança e migração incremental**,
+preservando o caminho para multi-runtime e multi-agent.

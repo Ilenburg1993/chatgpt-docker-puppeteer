@@ -1,13 +1,14 @@
 # 102 — Situação ideal unificada canônica (multi-runtime + multi-agent)
 
-**Data:** 2026-05-01
-**Objetivo:** definir o TO-BE unificado para todos os fluxos de `src/copilot` sem perda de funcionalidade e com espaço de expansão futura.
+**Data:** 2026-05-01 **Objetivo:** definir o TO-BE unificado para todos os fluxos de `src/copilot`
+sem perda de funcionalidade e com espaço de expansão futura.
 
 ---
 
 ## 1) Princípio orientador
 
-> Qualquer capacidade deve nascer no owner canônico da camada, ser projetada por superfície pública estável e chegar às bordas como adapter fino.
+> Qualquer capacidade deve nascer no owner canônico da camada, ser projetada por superfície pública
+> estável e chegar às bordas como adapter fino.
 
 ---
 

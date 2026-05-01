@@ -127,14 +127,6 @@ export function readAgentRuntimeOverviewProjection(runtimeId) {
     const interactionState = readRuntimeInteractionState(base.agent);
     const prBudget = readRuntimePrBudgetSnapshot(base.agent);
 
-    // Onda E2: registra telemetria de fallback de runtime (chamada via projection)
-    recordRuntimeFallback(
-        base.runtimeId,
-        base.requestedRuntimeId,
-        'runtime-overview.readAgentRuntimeOverviewProjection',
-        base.usedDefaultRuntimeFallback,
-    );
-
     return {
         requestedRuntimeId: base.requestedRuntimeId,
         runtimeId: base.runtimeId,

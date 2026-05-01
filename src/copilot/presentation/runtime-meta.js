@@ -10,6 +10,7 @@
  *     requestedRuntimeId?: string | null;
  *     runtimeFound?: boolean;
  *     usedDefaultRuntimeFallback?: boolean;
+ *     runtimeFallbackWarning?: string | null;
  * }} RuntimeRouteMeta
  *
  *
@@ -18,8 +19,25 @@
  *     requestedRuntimeId: string | null;
  *     runtimeFound: boolean;
  *     usedDefaultRuntimeFallback: boolean;
+ *     runtimeFallbackWarning?: string | null;
  * }} RuntimeRouteSelectionMeta
  */
+
+/**
+ * @param {RuntimeRouteMeta | string | null | undefined} meta
+ * @returns {string | null}
+ */
+export function buildRuntimeFallbackWarning(meta) {
+    const runtimeMeta = normalizeRuntimeRouteMeta(meta);
+    if (!runtimeMeta.usedDefaultRuntimeFallback) return null;
+    const requested = runtimeMeta.requestedRuntimeId;
+    const runtimeId = runtimeMeta.runtimeId;
+    if (typeof requested !== 'string' || requested.trim().length === 0) return null;
+    if (typeof runtimeId !== 'string' || runtimeId.trim().length === 0) {
+        return `Runtime '${requested}' não encontrado; fallback para runtime default.`;
+    }
+    return `Runtime '${requested}' não encontrado; fallback para '${runtimeId}'.`;
+}
 
 /**
  * Normaliza metadata antiga (`runtimeId` string) e metadata estruturada (`RuntimeRouteMeta`).
@@ -44,10 +62,12 @@ export function normalizeRuntimeRouteMeta(meta) {
  *     requestedRuntimeId?: string | null;
  *     runtimeFound?: boolean;
  *     usedDefaultRuntimeFallback?: boolean;
+ *     runtimeFallbackWarning?: string | null;
  * }}
  */
 export function buildRuntimeRouteMetaPayload(meta) {
     const runtimeMeta = normalizeRuntimeRouteMeta(meta);
+    const runtimeFallbackWarning = buildRuntimeFallbackWarning(runtimeMeta);
     return {
         ...(runtimeMeta.runtimeId ? { runtimeId: runtimeMeta.runtimeId } : {}),
         ...(runtimeMeta.requestedRuntimeId !== undefined ? { requestedRuntimeId: runtimeMeta.requestedRuntimeId } : {}),
@@ -55,6 +75,7 @@ export function buildRuntimeRouteMetaPayload(meta) {
         ...(runtimeMeta.usedDefaultRuntimeFallback !== undefined
             ? { usedDefaultRuntimeFallback: runtimeMeta.usedDefaultRuntimeFallback }
             : {}),
+        ...(runtimeFallbackWarning !== null ? { runtimeFallbackWarning } : {}),
     };
 }
 
@@ -68,10 +89,12 @@ export function buildRuntimeRouteMetaPayload(meta) {
  * @returns {RuntimeRouteSelectionMeta}
  */
 export function buildRuntimeRouteMetaFromSelection(selection) {
+    const runtimeFallbackWarning = buildRuntimeFallbackWarning(selection);
     return {
         runtimeId: selection.runtimeId,
         requestedRuntimeId: selection.requestedRuntimeId,
         runtimeFound: selection.runtimeFound,
         usedDefaultRuntimeFallback: selection.usedDefaultRuntimeFallback,
+        runtimeFallbackWarning,
     };
 }

@@ -44,6 +44,21 @@ describe('presentation/runtime-meta', () => {
             usedDefaultRuntimeFallback: true,
         });
 
+        expect(
+            buildRuntimeRouteMetaPayload({
+                runtimeId: 'default',
+                requestedRuntimeId: 'missing',
+                runtimeFound: false,
+                usedDefaultRuntimeFallback: true,
+            }),
+        ).toEqual({
+            runtimeId: 'default',
+            requestedRuntimeId: 'missing',
+            runtimeFound: false,
+            usedDefaultRuntimeFallback: true,
+            runtimeFallbackWarning: "Runtime 'missing' não encontrado; fallback para 'default'.",
+        });
+
         expect(buildRuntimeRouteMetaPayload(undefined)).toEqual({});
     });
 
@@ -60,6 +75,7 @@ describe('presentation/runtime-meta', () => {
             requestedRuntimeId: 'missing',
             runtimeFound: false,
             usedDefaultRuntimeFallback: true,
+            runtimeFallbackWarning: "Runtime 'missing' não encontrado; fallback para 'default'.",
         });
     });
 });

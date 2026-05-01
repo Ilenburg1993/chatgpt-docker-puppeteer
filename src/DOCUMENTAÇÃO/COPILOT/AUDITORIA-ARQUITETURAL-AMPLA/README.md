@@ -23,7 +23,7 @@ existentes em `DOCUMENTAÇÃO/`, com foco em responder de forma sistemática e c
 ## Documentos já gerados nesta fase inicial
 
 | Ordem | Documento                                                              | Papel                                                                                                   |
-| ----- | ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| ----- | ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- | --- | --- | ------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
 | 00    | `00-PRE-AUDITORIA-PLANO-MESTRE.md`                                     | documento central de pré-auditoria, hipóteses, escopo, método e plano de investigação                   |
 | 01    | `01-INVENTARIO-ESTRUTURAL-MODULOS-E-ESCALA.md`                         | inventário de módulos, pastas, subpastas, escala e árvore estrutural completa                           |
 | 02    | `02-INVENTARIO-COMPLETO-DE-ARQUIVOS-PARTE-A.md`                        | inventário completo de arquivos, parte A                                                                |
@@ -117,10 +117,11 @@ existentes em `DOCUMENTAÇÃO/`, com foco em responder de forma sistemática e c
 | 90    | `90-BLOCO-K-W87.2-CHECKPOINT-SESSION-SNAPSHOT-STORE-SEAM.md`           | checkpoint da extração do IO/schema de snapshots para seam dedicada `snapshot-store.js`                 |
 | 91    | `91-BLOCO-N-W109-TAXONOMIA-ORGANIZACAO-FISICA-AGENT-DIALOG.md`         | checkpoint inicial da F9 com README/module-map/contrato de organização física em `agent/dialog`         |
 | 92    | `92-BLOCO-N-W113-TAXONOMIA-ORGANIZACAO-FISICA-AGENT-SESSION.md`        | checkpoint inicial da F9/W113 com README/module-map/contrato de organização física em `agent/session`   |
-| 93    | `93-BLOCO-N-W113-TAXONOMIA-ORGANIZACAO-FISICA-AGENT-LIFECYCLE.md`      | checkpoint inicial da F9/W113 com README/module-map/contrato de organização física em `agent/lifecycle` |  | 100 | `100-MAPEAMENTO-COMPLETO-FLUXOS-SRC-COPILOT-2026-05.md` | catálogo completo AS-IS de fluxos em `src/copilot` com owners, estados e leitura consolidada |
+| 93    | `93-BLOCO-N-W113-TAXONOMIA-ORGANIZACAO-FISICA-AGENT-LIFECYCLE.md`      | checkpoint inicial da F9/W113 com README/module-map/contrato de organização física em `agent/lifecycle` |     | 100 | `100-MAPEAMENTO-COMPLETO-FLUXOS-SRC-COPILOT-2026-05.md` | catálogo completo AS-IS de fluxos em `src/copilot` com owners, estados e leitura consolidada |
 | 101   | `101-MATRIZ-FLUXOS-CANONICOS-VS-PARALELOS-SRC-COPILOT.md`              | matriz de classificação de fluxos canônicos/paralelos com priorização objetiva de convergência          |
 | 102   | `102-SITUACAO-IDEAL-UNIFICADA-CANONICA-MULTIRUNTIME-MULTIAGENT.md`     | situação ideal unificada para canonicidade total e expansão multi-runtime/multi-agent                   |
 | 103   | `103-PLANO-EXECUCAO-CONVERGENCIA-CANONICA-GERAL.md`                    | plano executivo por ondas para convergência canônica geral com execução iniciada nesta rodada           |
+
 ## Próximos documentos previstos
 
 Os artefatos planejados para a auditoria ampla estão listados no documento 00, mas a espinha dorsal

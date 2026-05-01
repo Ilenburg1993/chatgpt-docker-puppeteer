@@ -1,7 +1,7 @@
 # 103 — Plano de execução para convergência canônica geral (`src/copilot`)
 
-**Data:** 2026-05-01
-**Objetivo:** executar a transição final para fluxo canônico unificado em todas as camadas.
+**Data:** 2026-05-01 **Objetivo:** executar a transição final para fluxo canônico unificado em todas
+as camadas.
 
 ---
 
@@ -22,7 +22,8 @@
 
 Ações:
 
-1. criar contrato de fronteira para manter `#copilot/channel` isolado no gateway de diálogo do terminal;
+1. criar contrato de fronteira para manter `#copilot/channel` isolado no gateway de diálogo do
+   terminal;
 2. reforçar regra de composição em `server/routes/sdk/*` (via `deps.js`);
 3. documentar matriz de fluxos e prioridade de convergência.
 
@@ -37,7 +38,8 @@ Critério de pronto:
 
 Ações:
 
-1. padronizar metadata `requestedRuntimeId/runtimeId/runtimeFound/usedDefaultRuntimeFallback` em todas as bordas;
+1. padronizar metadata `requestedRuntimeId/runtimeId/runtimeFound/usedDefaultRuntimeFallback` em
+   todas as bordas;
 2. elevar fallback silencioso a warning canônico de projection;
 3. adicionar testes de regressão para fallback e runtime inexistente.
 
@@ -105,7 +107,8 @@ Critério de pronto:
 - mapeamento e matriz de fluxos publicados (docs 100/101);
 - TO-BE unificado publicado (doc 102);
 - plano executivo detalhado publicado (doc 103);
-- onda E1 iniciada com criação de contrato arquitetural novo (ver `tests/unit/copilot/contracts/test_canonical_flow_governance.spec.js`).
+- onda E1 iniciada com criação de contrato arquitetural novo (ver
+  `tests/unit/copilot/contracts/test_canonical_flow_governance.spec.js`).
 
 ---
 

@@ -327,7 +327,8 @@ Subfaixas:
 2. evitar bypass de composição nas bordas SDK/HTTP;
 3. reduzir fallback SSE genérico conforme adapters dedicados cobrirem novos eventos;
 4. eliminar timeline dual (bridge history vs session history) nas projections de UX;
-5. reforçar metadata de fallback runtime (`requestedRuntimeId`, `runtimeId`, `usedDefaultRuntimeFallback`) em todos os comandos críticos.
+5. reforçar metadata de fallback runtime (`requestedRuntimeId`, `runtimeId`,
+   `usedDefaultRuntimeFallback`) em todos os comandos críticos.
 
 Pronto quando: o terminal permanece borda fina, runtime-aware e 100% alinhada ao fluxo canônico
 compartilhado de `src/copilot`.

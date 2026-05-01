@@ -3,6 +3,7 @@
  * Helpers compartilhados das projection families do terminal frontend.
  */
 
+import { buildRuntimeFallbackWarning } from '../../../presentation/runtime-meta.js';
 import {
     normalizeAgentContextWindowProjection,
     readAgentRuntimeOverviewProjection,
@@ -27,6 +28,7 @@ import { readTerminalSessionBinding } from '../gateways/agent-runtime.js';
  *     runtimeId: string;
  *     runtimeFound: boolean;
  *     usedDefaultRuntimeFallback: boolean;
+ *     runtimeFallbackWarning: string | null;
  *     agentRuntimes: {
  *         runtimeId: string;
  *         status: string;
@@ -75,8 +77,10 @@ export function normalizeContextWindowProjection(raw) {
 export function readTerminalRuntimeBase(runtimeId) {
     const runtime = readAgentRuntimeOverviewProjection(runtimeId);
     const binding = readTerminalSessionBinding();
+    const runtimeFallbackWarning = buildRuntimeFallbackWarning(runtime);
     return {
         ...runtime,
+        runtimeFallbackWarning,
         binding,
         runtimeSessionId: runtime.runtimeSessionId ?? binding.sdkSessionId ?? null,
     };

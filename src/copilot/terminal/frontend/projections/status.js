@@ -49,6 +49,7 @@ import {
  *     runtimeId: string;
  *     runtimeFound: boolean;
  *     usedDefaultRuntimeFallback: boolean;
+ *     runtimeFallbackWarning: string | null;
  *     agentRuntimes: import('./shared.js').TerminalRuntimeBase['agentRuntimes'];
  *     runtimeTopologyLabel: string;
  *     runtimeSessionId: string | null;
@@ -100,6 +101,7 @@ export function readTerminalStatusProjection({ hubSessionId = null, injectPort, 
         runtimeId: base.runtimeId,
         runtimeFound: base.runtimeFound,
         usedDefaultRuntimeFallback: base.usedDefaultRuntimeFallback,
+        runtimeFallbackWarning: base.runtimeFallbackWarning,
         agentRuntimes: base.agentRuntimes,
         runtimeTopologyLabel: formatTerminalRuntimeTopology(base.agentRuntimes),
         runtimeSessionId: base.runtimeSessionId,

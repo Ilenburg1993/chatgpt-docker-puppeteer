@@ -3,17 +3,16 @@
  * @module copilot/presentation/runtime-fallback-telemetry
  * @file Centraliza telemetria e logging de fallback implícito de runtime.
  *
- *   Onda E2: transformar fallback implícito em fallback explícito e auditável.
- *   Este módulo registra TODAS as instâncias de fallback para runtime default, permitindo
- *   que diagnósticos, auditorias e testes comprovem que fallback é intencional e rastreável.
+ *   Onda E2: transformar fallback implícito em fallback explícito e auditável. Este módulo registra TODAS as instâncias
+ *   de fallback para runtime default, permitindo que diagnósticos, auditorias e testes comprovem que fallback é
+ *   intencional e rastreável.
  *
  *   Uso:
+ *
  *   - recordRuntimeFallback(runtimeId, caller) — registra um fallback
  *   - getRuntimeFallbackStats() — retorna estatísticas acumuladas
  *   - clearRuntimeFallbackLog() — limpa para testes
  */
-
-import { log } from '#copilot/observability';
 
 /**
  * @typedef {{
@@ -60,11 +59,15 @@ export function recordRuntimeFallback(runtimeId, requestedRuntimeId, caller, use
 
     if (usedFallback && requestedRuntimeId) {
         const callerKey = caller || 'unknown';
-        _stats.byCallee.set(callerKey, ((_stats.byCallee.get(callerKey) ?? 0) + 1));
-        _stats.byRequestedId.set(requestedRuntimeId, ((_stats.byRequestedId.get(requestedRuntimeId) ?? 0) + 1));
+        _stats.byCallee.set(callerKey, (_stats.byCallee.get(callerKey) ?? 0) + 1);
+        _stats.byRequestedId.set(requestedRuntimeId, (_stats.byRequestedId.get(requestedRuntimeId) ?? 0) + 1);
 
         // Log warning para tornar explícito
-        log('WARN', `[RuntimeFallback] ${caller} solicitou runtime "${requestedRuntimeId}" mas não encontrado; usando "${runtimeId}"`);
+        if (typeof console?.warn === 'function') {
+            console.warn(
+                `[RuntimeFallback] ${caller} solicitou runtime "${requestedRuntimeId}" mas não encontrado; usando "${runtimeId}"`,
+            );
+        }
     }
 }
 

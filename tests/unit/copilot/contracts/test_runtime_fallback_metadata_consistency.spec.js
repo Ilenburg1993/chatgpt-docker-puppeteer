@@ -3,21 +3,23 @@
  * @module copilot/contracts/test_runtime_fallback_metadata_consistency
  * @file Valida que metadata de fallback de runtime está presente em todas as projections críticas.
  *
- *   Onda E2: garantir que fallback implícito é transformado em fallback explícito e auditável.
- *   Este contrato verifica que TODA resposta que envolve seleção de runtime inclui:
+ *   Onda E2: garantir que fallback implícito é transformado em fallback explícito e auditável. Este contrato verifica que
+ *   TODA resposta que envolve seleção de runtime inclui:
+ *
  *   - requestedRuntimeId (o que foi solicitado)
  *   - runtimeId (o que foi usado)
  *   - runtimeFound (se o runtime solicitado foi encontrado)
  *   - usedDefaultRuntimeFallback (se houve fallback)
+ *   - runtimeFallbackWarning (aviso canônico quando houve fallback)
  */
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { readTerminalStatusProjection } from '#copilot/terminal/frontend/projections/status';
 import {
     clearRuntimeFallbackLog,
     getRuntimeFallbackLog,
     getRuntimeFallbackStats,
 } from '#copilot/presentation/runtime-fallback-telemetry';
+import { readTerminalStatusProjection } from '#copilot/terminal/frontend/projections/status';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 describe('Contract: Runtime Fallback Metadata Consistency (Onda E2)', () => {
     beforeEach(() => {
@@ -40,12 +42,23 @@ describe('Contract: Runtime Fallback Metadata Consistency (Onda E2)', () => {
         expect(proj).toHaveProperty('runtimeId');
         expect(proj).toHaveProperty('runtimeFound');
         expect(proj).toHaveProperty('usedDefaultRuntimeFallback');
+        expect(proj).toHaveProperty('runtimeFallbackWarning');
 
         // Tipos corretos
         expect(typeof proj.runtimeId).toBe('string');
         expect(typeof proj.runtimeFound).toBe('boolean');
         expect(typeof proj.usedDefaultRuntimeFallback).toBe('boolean');
+        expect(proj.runtimeFallbackWarning === null || typeof proj.runtimeFallbackWarning === 'string').toBe(true);
         expect(proj.requestedRuntimeId === null || typeof proj.requestedRuntimeId === 'string').toBe(true);
+    });
+
+    it('Contract 1B: runtimeFallbackWarning aparece quando runtime solicitado não existe', () => {
+        const proj = readTerminalStatusProjection({ runtimeId: 'missing-runtime-id-for-contract' });
+
+        expect(proj.requestedRuntimeId).toBe('missing-runtime-id-for-contract');
+        expect(proj.runtimeFound).toBe(false);
+        expect(proj.usedDefaultRuntimeFallback).toBe(true);
+        expect(proj.runtimeFallbackWarning).toContain('missing-runtime-id-for-contract');
     });
 
     // ─────────────────────────────────────────────────────────────────────────────
@@ -121,5 +134,14 @@ describe('Contract: Runtime Fallback Metadata Consistency (Onda E2)', () => {
         expect(proj.runtimeId).toBeDefined();
         expect(proj.runtimeId).not.toBe('');
         expect(typeof proj.runtimeId).toBe('string');
+    });
+
+    it('Contract 3C: runtimeFallbackWarning segue invariantes de fallback', () => {
+        const ok = readTerminalStatusProjection();
+        if (ok.usedDefaultRuntimeFallback) {
+            expect(typeof ok.runtimeFallbackWarning).toBe('string');
+        } else {
+            expect(ok.runtimeFallbackWarning).toBeNull();
+        }
     });
 });

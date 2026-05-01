@@ -15,6 +15,7 @@ import { normalizeTerminalModelBillingProjection, readTerminalRuntimeBase } from
  *     runtimeId: string;
  *     runtimeFound: boolean;
  *     usedDefaultRuntimeFallback: boolean;
+ *     runtimeFallbackWarning: string | null;
  *     runtimeSessionId: string | null;
  *     binding: { hubSessionId: string | null; sdkSessionId: string | null };
  * }}
@@ -30,6 +31,7 @@ export function readTerminalUsageNowProjection(runtimeId) {
         runtimeId: base.runtimeId,
         runtimeFound: base.runtimeFound,
         usedDefaultRuntimeFallback: base.usedDefaultRuntimeFallback,
+        runtimeFallbackWarning: base.runtimeFallbackWarning,
         runtimeSessionId: base.runtimeSessionId,
         binding: base.binding,
     };

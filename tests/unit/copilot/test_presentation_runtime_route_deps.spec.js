@@ -182,6 +182,7 @@ describe('presentation/runtime-route-deps.js', () => {
             requestedRuntimeId: null,
             runtimeFound: true,
             usedDefaultRuntimeFallback: false,
+            runtimeFallbackWarning: null,
         });
     });
 
@@ -192,6 +193,7 @@ describe('presentation/runtime-route-deps.js', () => {
         expect(deps.runtimeId).toBe('default');
         expect(deps.runtimeFound).toBe(false);
         expect(deps.usedDefaultRuntimeFallback).toBe(true);
+        expect(deps.runtimeFallbackWarning).toContain("Runtime 'alt' não encontrado");
         expect(deps.agent).toBe(mocks.agent);
     });
 });

@@ -37,6 +37,7 @@ import { readTerminalRuntimeBase } from './shared.js';
  *     runtimeId: string;
  *     runtimeFound: boolean;
  *     usedDefaultRuntimeFallback: boolean;
+ *     runtimeFallbackWarning: string | null;
  *     agentRuntimes: import('./shared.js').TerminalRuntimeBase['agentRuntimes'];
  *     runtimeSessionId: string | null;
  * }}
@@ -57,6 +58,7 @@ export function readTerminalConfigProjection(runtimeId) {
         runtimeId: base.runtimeId,
         runtimeFound: base.runtimeFound,
         usedDefaultRuntimeFallback: base.usedDefaultRuntimeFallback,
+        runtimeFallbackWarning: base.runtimeFallbackWarning,
         agentRuntimes: base.agentRuntimes,
         runtimeSessionId: base.runtimeSessionId,
     };
