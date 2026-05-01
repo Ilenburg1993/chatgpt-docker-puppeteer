@@ -29,10 +29,12 @@ const SERVER_ROUTE_INVENTORY = {
     presentationBridge: ['agent.js', 'config.js', 'git.js', 'memory.js', 'observability.js'],
     routerInfra: [
         'copilot-api/index.js',
+        'module-map.js',
         'sdk/deps.js',
         'sdk/index.js',
         'sdk/middleware.js',
         'sdk/session-middleware.js',
+        'sdk/session-schemas.js',
         'sdk/sessions.js',
     ],
 };

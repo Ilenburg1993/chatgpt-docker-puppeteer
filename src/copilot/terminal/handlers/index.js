@@ -26,6 +26,14 @@ export {
     handleRecallMemories,
     handleStoreMemory,
 } from './dialog.js';
+export {
+    TERMINAL_HANDLER_MODULE_LAYOUT,
+    buildTerminalHandlerModuleScorecard,
+    getTerminalHandlerModuleDescriptor,
+    getTerminalHandlerModuleRole,
+    listTerminalHandlerModulesByRisk,
+    listTerminalHandlerModulesByRole,
+} from './module-map.js';
 export * from './shared.js';
 export {
     getInfiniteSessionConfig,

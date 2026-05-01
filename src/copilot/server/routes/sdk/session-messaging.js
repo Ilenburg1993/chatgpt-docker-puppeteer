@@ -31,13 +31,13 @@ import {
     setSdkSessionStreamState,
 } from '../../runtime-state/sdk-session-stream.js';
 import { resolveSdkRouteSharedDeps } from './deps.js';
+import { rateLimitMiddleware, validateBody, validateModel, withErrorHandler } from './session-middleware.js';
 import {
     ElicitationBodySchema,
     HandlePendingCommandBodySchema,
     HandlePendingToolCallBodySchema,
     LogMessageBodySchema,
     PermissionDecisionBodySchema,
-    rateLimitMiddleware,
     SendMessageBodySchema,
     SetModelBodySchema,
     ShellExecBodySchema,
@@ -45,11 +45,8 @@ import {
     UiConfirmBodySchema,
     UiInputBodySchema,
     UiSelectBodySchema,
-    validateBody,
-    validateModel,
-    withErrorHandler,
     WorkspaceCreateFileBodySchema,
-} from './session-middleware.js';
+} from './session-schemas.js';
 
 /**
  * @typedef {import('express').Request} Req

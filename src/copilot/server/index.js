@@ -23,6 +23,15 @@ export {
     listServerModulesByRole,
     SERVER_MODULE_LAYOUT,
 } from './module-map.js';
+export {
+    buildServerRouteModuleScorecard,
+    getServerRouteModuleDescriptor,
+    getServerRouteModuleRole,
+    listServerRouteModulesByRisk,
+    listServerRouteModulesByRole,
+    listServerRouteModulesBySurface,
+    SERVER_ROUTE_MODULE_LAYOUT,
+} from './routes/module-map.js';
 
 /**
  * @typedef {object} CopilotServerOptions

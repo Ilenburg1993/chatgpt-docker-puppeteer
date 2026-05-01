@@ -8,14 +8,8 @@
 
 import { Router } from 'express';
 import { resolveSdkRouteSharedDeps } from './deps.js';
-import {
-    CreateSessionBodySchema,
-    rateLimitMiddleware,
-    ResumeSessionBodySchema,
-    validateBody,
-    validateModel,
-    withErrorHandler,
-} from './session-middleware.js';
+import { rateLimitMiddleware, validateBody, validateModel, withErrorHandler } from './session-middleware.js';
+import { CreateSessionBodySchema, ResumeSessionBodySchema } from './session-schemas.js';
 
 /**
  * @typedef {import('express').Request} Req

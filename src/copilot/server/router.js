@@ -23,6 +23,16 @@ import { createSessionsRouter } from './routes/sessions.js';
 import { createSseRouter } from './routes/sse.js';
 import { webhooksRouter } from './routes/webhooks.js';
 
+export {
+    buildServerRouteModuleScorecard,
+    getServerRouteModuleDescriptor,
+    getServerRouteModuleRole,
+    listServerRouteModulesByRisk,
+    listServerRouteModulesByRole,
+    listServerRouteModulesBySurface,
+    SERVER_ROUTE_MODULE_LAYOUT,
+} from './routes/module-map.js';
+
 /**
  * Monta todos os routers do servidor copilot no app Express.
  *

@@ -3,6 +3,10 @@
 `server/routes/sdk/` is the HTTP/SSE adapter for SDK-facing operations. It is not a runtime, not an
 agent host, and not a second presentation layer.
 
+Use `../module-map.js` as the executable inventory for this directory. The map marks oversized route
+files as `risk: 'hotspot'` so physical decomposition can happen in a controlled order without
+changing public endpoints.
+
 ## Hard Rules
 
 - `deps.js` is the only composition root in this directory.
@@ -43,3 +47,13 @@ without inventing local semantics:
 Function-valued SDK capabilities (`tools[].handler`, `onPermissionRequest`, `onUserInputRequest`,
 `hooks`, `onEvent`, trace context callbacks) remain process-local capabilities. They enter through
 `deps.js`, hooks, tools registry or agent ports, not through JSON request bodies.
+
+## Current Hotspots
+
+- `session-messaging.js`: split by messaging, stream, workspace, UI/permissions/tools, compaction
+  and shell.
+- `session-crud.js`: split by inventory/foreground, create/resume and destructive operations.
+- `observability.js`: split by health/metrics, errors/logs, audit and event catalog.
+- `agent.js` and `client.js`: split SSE/control helpers from pure HTTP route registration.
+- `session-middleware.js`: schemas already live in `session-schemas.js`; keep future growth focused
+  on middleware helpers only.

@@ -253,18 +253,22 @@ estejam registrados no roadmap e cobertos por contrato de remoção.
   `boot/*`, `policies/*`, `state/*`, `wiring/*` e `watchdogs/*`; shims de raiz removidos)
 - W112: migrar imports internos do dialog para as novas subpastas e reduzir deep imports de testes
   (**iniciada** com contrato anti-import de shims em código de produção)
-- W113: aplicar a mesma taxonomia em `agent/session` e `agent/lifecycle` (\*\*concluída para
+- W113: aplicar a mesma taxonomia em `agent/session` e `agent/lifecycle` (**concluída para
   `agent/session` com migração física para `boot/`, `initializers/`, `lifecycle/`, `state/`,
   `wiring/`, `history/` e `context/` sem shims; concluída para `agent/lifecycle` com migração física
   para `orchestrators/`, `entrypoints/`, `process-host/`, `setup/`, `policies/`, `teardown/` e
-  `state/` sem shims)
+  `state/` sem shims**)
 - W114: aplicar a taxonomia nas bordas `server`/`terminal`, preservando adapters finos (**iniciada
   com `module-map.js`, README local e contratos anti-órfão para as raízes `server/` e `terminal/`;
-  próxima subonda: `terminal/handlers` e `server/routes`**)
-- W115: criar scorecard de organização física por diretório quente
-- W116: remover shims legados e congelar baseline 2.1 de navegação estrutural (\*\*concluída para
+  avançada com taxonomia recursiva para `terminal/handlers` e `server/routes`, incluindo
+  classificação por `surface`, `role`, `tier` e `risk`; próxima subonda: decomposição física dos
+  hotspots de `server/routes/sdk` e `server/routes/copilot-api`**)
+- W115: criar scorecard de organização física por diretório quente (**iniciada em beta para
+  `server/routes` e `terminal/handlers`, com agregação por role/surface/risk e contratos de
+  consulta**)
+- W116: remover shims legados e congelar baseline 2.1 de navegação estrutural (**concluída para
   `agent/dialog`, `agent/session` e `agent/lifecycle`; próxima aplicação prevista nas bordas
-  `server`/`terminal`)
+  `server`/`terminal`**)
 
 ---
 

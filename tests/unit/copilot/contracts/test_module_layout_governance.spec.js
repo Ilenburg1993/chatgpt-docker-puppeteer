@@ -32,6 +32,20 @@ import {
     listServerModulesByRole,
 } from '../../../../src/copilot/server/module-map.js';
 import {
+    SERVER_ROUTE_MODULE_LAYOUT,
+    buildServerRouteModuleScorecard,
+    getServerRouteModuleRole,
+    listServerRouteModulesByRisk,
+    listServerRouteModulesBySurface,
+} from '../../../../src/copilot/server/routes/module-map.js';
+import {
+    TERMINAL_HANDLER_MODULE_LAYOUT,
+    buildTerminalHandlerModuleScorecard,
+    getTerminalHandlerModuleRole,
+    listTerminalHandlerModulesByRisk,
+    listTerminalHandlerModulesByRole,
+} from '../../../../src/copilot/terminal/handlers/module-map.js';
+import {
     TERMINAL_MODULE_LAYOUT,
     getTerminalModuleRole,
     listTerminalModulesByRole,
@@ -42,8 +56,10 @@ const AGENT_ROOT = join(ROOT, 'agent');
 const DIALOG_ROOT = join(ROOT, 'agent/dialog');
 const LIFECYCLE_ROOT = join(ROOT, 'agent/lifecycle');
 const SERVER_ROOT = join(ROOT, 'server');
+const SERVER_ROUTES_ROOT = join(ROOT, 'server/routes');
 const SESSION_ROOT = join(ROOT, 'agent/session');
 const TERMINAL_ROOT = join(ROOT, 'terminal');
+const TERMINAL_HANDLERS_ROOT = join(ROOT, 'terminal/handlers');
 
 /**
  * @param {string} dir
@@ -84,6 +100,14 @@ function listTopLevelDirectories(dir) {
         .filter((entry) => entry.isDirectory())
         .map((entry) => `${entry.name}/`)
         .sort();
+}
+
+/**
+ * @param {string} file
+ * @returns {number}
+ */
+function countLines(file) {
+    return readFileSync(file, 'utf8').split('\n').length;
 }
 
 describe('W109 — module layout governance: agent/dialog', () => {
@@ -414,6 +438,8 @@ describe('W114 — module layout governance: server root', () => {
         assert.match(index, /SERVER_MODULE_LAYOUT/);
         assert.match(index, /getServerModuleRole/);
         assert.match(index, /listServerModulesByRole/);
+        assert.match(index, /SERVER_ROUTE_MODULE_LAYOUT/);
+        assert.match(index, /getServerRouteModuleRole/);
     });
 
     it('mantem runtime-state separado da superficie de router', () => {
@@ -421,5 +447,172 @@ describe('W114 — module layout governance: server root', () => {
         assert.equal(runtimeState.length, 1);
         assert.equal(runtimeState[0]?.kind, 'directory');
         assert.equal(runtimeState[0]?.public, false);
+    });
+});
+
+describe('W114.4 — module layout governance: terminal/handlers', () => {
+    it('declara todos os arquivos JS existentes no module-map', () => {
+        const expected = listJsFilesRecursive(TERMINAL_HANDLERS_ROOT)
+            .map((abs) => relative(TERMINAL_HANDLERS_ROOT, abs).replace(/\\/g, '/'))
+            .sort();
+        const declared = TERMINAL_HANDLER_MODULE_LAYOUT.map((entry) => entry.path).sort();
+
+        assert.deepEqual(declared, expected, 'terminal/handlers/module-map.js deve cobrir todos os arquivos JS');
+    });
+
+    it('nao declara arquivos inexistentes', () => {
+        const missing = TERMINAL_HANDLER_MODULE_LAYOUT.filter(
+            (entry) => !existsSync(join(TERMINAL_HANDLERS_ROOT, entry.path)),
+        ).map((entry) => entry.path);
+
+        assert.deepEqual(missing, [], `Arquivos declarados e ausentes: ${missing.join(', ')}`);
+    });
+
+    it('mantem o diretorio como adapter fino de presentation', () => {
+        assert.equal(getTerminalHandlerModuleRole('index.js'), 'barrel');
+        assert.equal(getTerminalHandlerModuleRole('module-map.js'), 'inventory');
+        assert.equal(getTerminalHandlerModuleRole('shared.js'), 'type-contract');
+
+        const adapters = listTerminalHandlerModulesByRole('presentation-adapter')
+            .map((entry) => entry.path)
+            .sort();
+        assert.deepEqual(adapters, ['agent.js', 'dialog.js', 'system-config.js', 'system-metrics.js']);
+    });
+
+    it('nao normaliza hotspots no terminal handlers', () => {
+        assert.deepEqual(listTerminalHandlerModulesByRisk('hotspot'), []);
+        assert.deepEqual(listTerminalHandlerModulesByRisk('watch'), []);
+    });
+
+    it('README local documenta os papeis arquiteturais declarados', () => {
+        const readme = readFileSync(join(TERMINAL_HANDLERS_ROOT, 'README.md'), 'utf8');
+        const roles = [...new Set(TERMINAL_HANDLER_MODULE_LAYOUT.map((entry) => entry.role))];
+        const missingRoles = roles.filter((role) => !readme.includes(`\`${role}\``));
+
+        assert.deepEqual(missingRoles, [], `README sem papel declarado: ${missingRoles.join(', ')}`);
+    });
+
+    it('barrel publico exporta o mapa de layout', () => {
+        const index = readFileSync(join(TERMINAL_HANDLERS_ROOT, 'index.js'), 'utf8');
+        assert.match(index, /TERMINAL_HANDLER_MODULE_LAYOUT/);
+        assert.match(index, /getTerminalHandlerModuleRole/);
+        assert.match(index, /listTerminalHandlerModulesByRole/);
+        assert.match(index, /buildTerminalHandlerModuleScorecard/);
+    });
+
+    it('scorecard beta confirma maturidade de adapter fino', () => {
+        const scorecard = buildTerminalHandlerModuleScorecard();
+
+        assert.equal(scorecard.total, TERMINAL_HANDLER_MODULE_LAYOUT.length);
+        assert.equal(scorecard.byRisk['stable'], TERMINAL_HANDLER_MODULE_LAYOUT.length);
+        assert.deepEqual(scorecard.hotspots, []);
+        assert.deepEqual(scorecard.adapters, ['agent.js', 'dialog.js', 'system-config.js', 'system-metrics.js']);
+    });
+});
+
+describe('W114.4 — module layout governance: server/routes', () => {
+    it('declara todos os arquivos JS existentes no module-map recursivo', () => {
+        const expected = listJsFilesRecursive(SERVER_ROUTES_ROOT)
+            .map((abs) => relative(SERVER_ROUTES_ROOT, abs).replace(/\\/g, '/'))
+            .sort();
+        const declared = SERVER_ROUTE_MODULE_LAYOUT.filter((entry) => entry.kind === 'file')
+            .map((entry) => entry.path)
+            .sort();
+
+        assert.deepEqual(declared, expected, 'server/routes/module-map.js deve cobrir todos os arquivos JS');
+    });
+
+    it('nao declara arquivos ou diretorios inexistentes', () => {
+        const missing = SERVER_ROUTE_MODULE_LAYOUT.filter(
+            (entry) => !existsSync(join(SERVER_ROUTES_ROOT, entry.path)),
+        ).map((entry) => entry.path);
+
+        assert.deepEqual(missing, [], `Arquivos declarados e ausentes: ${missing.join(', ')}`);
+    });
+
+    it('mantem sub-superficies copilot-api e sdk explicitas', () => {
+        assert.equal(getServerRouteModuleRole('module-map.js'), 'inventory');
+        assert.equal(getServerRouteModuleRole('copilot-api/'), 'surface');
+        assert.equal(getServerRouteModuleRole('sdk/'), 'surface');
+        assert.equal(getServerRouteModuleRole('sdk/deps.js'), 'sdk-deps');
+        assert.equal(getServerRouteModuleRole('sdk/session-middleware.js'), 'sdk-middleware');
+        assert.equal(getServerRouteModuleRole('sdk/session-schemas.js'), 'sdk-schema');
+    });
+
+    it('separa rotas por surface para orientar decomposicao futura', () => {
+        const root = listServerRouteModulesBySurface('root');
+        const copilotApi = listServerRouteModulesBySurface('copilot-api');
+        const sdk = listServerRouteModulesBySurface('sdk');
+
+        assert.ok(root.length > 8);
+        assert.ok(copilotApi.some((entry) => entry.path === 'copilot-api/control.js'));
+        assert.ok(sdk.some((entry) => entry.path === 'sdk/session-messaging.js'));
+    });
+
+    it('marca arquivos grandes como watch ou hotspot', () => {
+        const offenders = SERVER_ROUTE_MODULE_LAYOUT.filter((entry) => entry.kind === 'file')
+            .filter((entry) => entry.path !== 'module-map.js')
+            .filter((entry) => countLines(join(SERVER_ROUTES_ROOT, entry.path)) > 220)
+            .filter((entry) => entry.risk === 'stable')
+            .map((entry) => entry.path)
+            .sort();
+
+        assert.deepEqual(offenders, [], `Arquivos grandes marcados como stable: ${offenders.join(', ')}`);
+    });
+
+    it('marca arquivos muito grandes como hotspot', () => {
+        const offenders = SERVER_ROUTE_MODULE_LAYOUT.filter((entry) => entry.kind === 'file')
+            .filter((entry) => entry.path !== 'module-map.js')
+            .filter((entry) => countLines(join(SERVER_ROUTES_ROOT, entry.path)) > 300)
+            .filter((entry) => entry.risk !== 'hotspot')
+            .map((entry) => entry.path)
+            .sort();
+
+        assert.deepEqual(offenders, [], `Arquivos muito grandes sem hotspot: ${offenders.join(', ')}`);
+    });
+
+    it('hotspots atuais ficam nomeados para as proximas subondas', () => {
+        const hotspots = listServerRouteModulesByRisk('hotspot')
+            .map((entry) => entry.path)
+            .sort();
+
+        assert.deepEqual(hotspots, [
+            'copilot-api/control.js',
+            'copilot-api/tasks.js',
+            'sdk/',
+            'sdk/agent.js',
+            'sdk/client.js',
+            'sdk/observability.js',
+            'sdk/session-crud.js',
+            'sdk/session-messaging.js',
+        ]);
+    });
+
+    it('scorecard beta torna risco e surfaces consultaveis por contrato', () => {
+        const scorecard = buildServerRouteModuleScorecard();
+
+        assert.equal(scorecard.total, SERVER_ROUTE_MODULE_LAYOUT.length);
+        assert.equal(scorecard.bySurface['root'], listServerRouteModulesBySurface('root').length);
+        assert.equal(scorecard.bySurface['sdk'], listServerRouteModulesBySurface('sdk').length);
+        assert.equal(scorecard.byRisk['hotspot'], listServerRouteModulesByRisk('hotspot').length);
+        assert.ok((scorecard.byRisk['watch'] ?? 0) >= 1);
+        assert.ok(scorecard.hotspots.includes('sdk/session-messaging.js'));
+        assert.ok(scorecard.watch.includes('sdk/session-middleware.js'));
+    });
+
+    it('README local documenta os papeis arquiteturais declarados', () => {
+        const readme = readFileSync(join(SERVER_ROUTES_ROOT, 'README.md'), 'utf8');
+        const roles = [...new Set(SERVER_ROUTE_MODULE_LAYOUT.map((entry) => entry.role))];
+        const missingRoles = roles.filter((role) => !readme.includes(`\`${role}\``));
+
+        assert.deepEqual(missingRoles, [], `README sem papel declarado: ${missingRoles.join(', ')}`);
+    });
+
+    it('router publico exporta o mapa de rotas', () => {
+        const router = readFileSync(join(SERVER_ROOT, 'router.js'), 'utf8');
+        assert.match(router, /SERVER_ROUTE_MODULE_LAYOUT/);
+        assert.match(router, /getServerRouteModuleRole/);
+        assert.match(router, /listServerRouteModulesBySurface/);
+        assert.match(router, /buildServerRouteModuleScorecard/);
     });
 });
