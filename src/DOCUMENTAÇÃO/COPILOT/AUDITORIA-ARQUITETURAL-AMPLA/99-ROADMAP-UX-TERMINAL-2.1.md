@@ -1,6 +1,6 @@
 # 99 — Roadmap UX Terminal 2.1
 
-**Data:** 2026-05-01  
+**Data:** 2026-05-01
 **Escopo:** transformação contínua de `src/copilot/terminal`.
 
 ---
@@ -109,13 +109,13 @@ Pronto quando: `repl.js` for composition fina e testes de comando continuarem es
 
 Subfaixas:
 
-1. `frontend/projections/status.js`;
-2. `frontend/projections/now.js`;
-3. `frontend/projections/metrics.js`;
-4. `frontend/projections/usage.js`;
-5. `frontend/projections/config.js`;
-6. `frontend/projections/sdk-session.js`;
-7. `llm-b-frontend.js` vira composition/compat temporário;
+1. `frontend/projections/status.js` (**feito**);
+2. `frontend/projections/now.js` (**parcial: activity/display já migrados; diagnose/history/context ainda vivem no compat layer**);
+3. `frontend/projections/metrics.js` (**feito**);
+4. `frontend/projections/usage.js` (**feito**);
+5. `frontend/projections/config.js` (**feito**);
+6. `frontend/projections/sdk-session.js` (**feito**);
+7. `llm-b-frontend.js` vira composition/compat temporário (**parcial: `frontend/index.js` já aponta para as novas families; imports novos devem preferir `projections/*.js`, mas o arquivo legado ainda mantém parte das projections e operações**);
 8. remover compat após migração.
 
 Pronto quando: nenhuma projection family crítica fica escondida no mesmo arquivo gigante.

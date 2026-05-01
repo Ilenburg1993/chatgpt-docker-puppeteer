@@ -1,46 +1,60 @@
 // @ts-check
 
 export {
+    formatTerminalRuntimeTopology,
+    normalizeContextWindowProjection,
+    normalizeTerminalModelBillingProjection,
+    readTerminalRuntimeBase,
+} from './projections/shared.js';
+
+export { readTerminalStatusProjection } from './projections/status.js';
+
+export {
     answerPendingTerminalQuestion,
     clearPendingTerminalQuestionShadow,
     clearTerminalHistory,
-    deleteTerminalPlanProjection,
     forgetTerminalMemoryProjection,
-    formatTerminalRuntimeTopology,
-    listTerminalAvailableModelsProjection,
     listTerminalSnapshotsProjection,
     loadTerminalSnapshotProjection,
-    normalizeContextWindowProjection,
-    normalizeTerminalModelBillingProjection,
     readTerminalActivityProjection,
-    readTerminalConfigProjection,
     readTerminalContextProjection,
     readTerminalCountProjection,
     readTerminalDbHistoryProjection,
     readTerminalDbSessionsProjection,
     readTerminalDiagnoseProjection,
     readTerminalDisplayProjection,
-    readTerminalErrorsProjection,
     readTerminalHistoryProjection,
-    readTerminalMetricsProjection,
-    readTerminalModelStatsProjection,
-    readTerminalPlanProjection,
     readTerminalResumeListProjection,
     readTerminalResumeProjection,
-    readTerminalRuntimeBase,
-    readTerminalStatusProjection,
-    readTerminalToolStatsProjection,
-    readTerminalUsageNowProjection,
     recallTerminalMemoriesProjection,
     rememberTerminalMemoryProjection,
     requestTerminalCompactionProjection,
     saveTerminalSnapshotProjection,
     searchTerminalTurnsProjection,
+} from './projections/now.js';
+
+export {
+    listTerminalAvailableModelsProjection,
+    readTerminalConfigProjection,
+    readTerminalModelStatsProjection,
     setTerminalModelProjection,
-    setTerminalPlanModeProjection,
     setTerminalReasoningProjection,
+} from './projections/config.js';
+
+export {
+    readTerminalErrorsProjection,
+    readTerminalMetricsProjection,
+    readTerminalToolStatsProjection,
+} from './projections/metrics.js';
+
+export { readTerminalUsageNowProjection } from './projections/usage.js';
+
+export {
+    deleteTerminalPlanProjection,
+    readTerminalPlanProjection,
+    setTerminalPlanModeProjection,
     updateTerminalPlanProjection,
-} from './llm-b-frontend.js';
+} from './projections/sdk-session.js';
 
 export {
     deleteTerminalSdkPlanProjection,

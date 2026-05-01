@@ -9,12 +9,13 @@ Consumer layer canônica do terminal.
 
 ## Arquivos
 
-| Arquivo                     | Função                                                                                     |
-| --------------------------- | ------------------------------------------------------------------------------------------ |
-| `llm-b-runtime.js`          | gateway de runtime: agent, hub, snapshots, binding de sessão, operações do dialog loop     |
-| `llm-b-frontend.js`         | projections orientadas à UX do terminal (`/status`, `/plan`, `/metrics`, `/session`, etc.) |
-| `sdk-session-projection.js` | consumo vanilla de `mode/plan` da sessão SDK para comandos e UX do terminal                |
-| `index.js`                  | barrel público do submódulo                                                                |
+| Arquivo                     | Função                                                                                   |
+| --------------------------- | ---------------------------------------------------------------------------------------- |
+| `llm-b-runtime.js`          | gateway de runtime: agent, hub, snapshots, binding de sessão, operações do dialog loop   |
+| `llm-b-frontend.js`         | compat shim temporário com projections legadas e operações ainda não fatiadas            |
+| `projections/`              | famílias de projections fatiadas (`status`, `config`, `metrics`, `usage`, `sdk-session`) |
+| `sdk-session-projection.js` | consumo vanilla de `mode/plan` da sessão SDK para comandos e UX do terminal              |
+| `index.js`                  | barrel público do submódulo                                                              |
 
 ## Regra de uso
 
@@ -25,6 +26,8 @@ Consumer layer canônica do terminal.
 - Não deve recriar semântica do SDK (ex.: mode/plan, streaming, usage).
 - `sdk-session-projection.js` é a fonte preferida quando o problema for especificamente `mode/plan`
   vanilla.
+- Para novas leituras de UX, prefira `projections/*.js`; `llm-b-frontend.js` permanece apenas como
+  compatibilidade transitória até a migração completa.
 
 ## Heurística prática
 
