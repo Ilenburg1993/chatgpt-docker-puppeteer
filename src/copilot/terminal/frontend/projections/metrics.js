@@ -15,7 +15,10 @@ import { normalizeTerminalModelBillingProjection, readTerminalRuntimeBase } from
  *     snap: Record<string, unknown>;
  *     health: Record<string, any> | null;
  *     binding: { hubSessionId: string | null; sdkSessionId: string | null };
+ *     requestedRuntimeId: string | null;
  *     runtimeId: string;
+ *     runtimeFound: boolean;
+ *     usedDefaultRuntimeFallback: boolean;
  *     runtimeSessionId: string | null;
  *     contextWindow: import('./shared.js').ContextWindowProjection | null;
  *     pr: Record<string, any> | null;
@@ -46,7 +49,10 @@ export function readTerminalMetricsProjection(runtimeId) {
         snap: base.snap,
         health: base.health,
         binding: base.binding,
+        requestedRuntimeId: base.requestedRuntimeId,
         runtimeId: base.runtimeId,
+        runtimeFound: base.runtimeFound,
+        usedDefaultRuntimeFallback: base.usedDefaultRuntimeFallback,
         runtimeSessionId: base.runtimeSessionId,
         contextWindow: base.contextWindow,
         pr,

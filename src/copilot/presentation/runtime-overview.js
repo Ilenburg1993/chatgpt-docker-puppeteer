@@ -15,6 +15,7 @@ import {
     readRuntimePrBudgetSnapshot,
 } from '#copilot/agent';
 import { listKnownAgentRuntimes, resolveAgentRuntimeSelection } from './agent-runtime.js';
+import { recordRuntimeFallback } from './runtime-fallback-telemetry.js';
 
 /**
  * @typedef {{ tokens: number; tokenLimit: number; utilization: number }} ContextWindowProjection
@@ -63,6 +64,15 @@ export function readAgentRuntimeOverview(runtimeId) {
     const health = readAgentRuntimeHealthSnapshot(agent);
     const runtimeSessionId = readRuntimeControlState(agent).sessionId;
     const contextWindow = normalizeAgentContextWindowProjection(snap['contextWindow'] ?? snap['contextState'] ?? null);
+
+    // Onda E2: registra telemetria de fallback de runtime
+    recordRuntimeFallback(
+        selection.runtimeId,
+        selection.requestedRuntimeId,
+        'runtime-overview.readAgentRuntimeOverview',
+        selection.usedDefaultRuntimeFallback,
+    );
+
     return {
         agent,
         requestedRuntimeId: selection.requestedRuntimeId,
@@ -116,6 +126,15 @@ export function readAgentRuntimeOverviewProjection(runtimeId) {
     const controlState = readRuntimeControlState(base.agent);
     const interactionState = readRuntimeInteractionState(base.agent);
     const prBudget = readRuntimePrBudgetSnapshot(base.agent);
+
+    // Onda E2: registra telemetria de fallback de runtime (chamada via projection)
+    recordRuntimeFallback(
+        base.runtimeId,
+        base.requestedRuntimeId,
+        'runtime-overview.readAgentRuntimeOverviewProjection',
+        base.usedDefaultRuntimeFallback,
+    );
+
     return {
         requestedRuntimeId: base.requestedRuntimeId,
         runtimeId: base.runtimeId,

@@ -306,3 +306,28 @@ fluxo único, audível e validado para responder sem quebrar o contrato do SDK.
 8. W126/W127 — interrupções SDK e narrativa live de arquivos/tools;
 9. W128 — compatibilidade fina de `ask_user`, elicitation e `SessionUiApi`;
 10. W122/W123 — decomposição das projections/gateways mantendo esses contratos novos.
+
+---
+
+## W129 — Convergência canônica cross-`src/copilot` (terminal como borda exemplar)
+
+**Objetivo:** sincronizar a evolução do terminal com o plano global de convergência canônica de
+`src/copilot`, evitando nova divergência entre UX local e arquiteturas compartilhadas.
+
+Referências diretas:
+
+- `100-MAPEAMENTO-COMPLETO-FLUXOS-SRC-COPILOT-2026-05.md`
+- `101-MATRIZ-FLUXOS-CANONICOS-VS-PARALELOS-SRC-COPILOT.md`
+- `102-SITUACAO-IDEAL-UNIFICADA-CANONICA-MULTIRUNTIME-MULTIAGENT.md`
+- `103-PLANO-EXECUCAO-CONVERGENCIA-CANONICA-GERAL.md`
+
+Subfaixas:
+
+1. manter `#copilot/channel` isolado em `frontend/gateways/dialog.js`;
+2. evitar bypass de composição nas bordas SDK/HTTP;
+3. reduzir fallback SSE genérico conforme adapters dedicados cobrirem novos eventos;
+4. eliminar timeline dual (bridge history vs session history) nas projections de UX;
+5. reforçar metadata de fallback runtime (`requestedRuntimeId`, `runtimeId`, `usedDefaultRuntimeFallback`) em todos os comandos críticos.
+
+Pronto quando: o terminal permanece borda fina, runtime-aware e 100% alinhada ao fluxo canônico
+compartilhado de `src/copilot`.
