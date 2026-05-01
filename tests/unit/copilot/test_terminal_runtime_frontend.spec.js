@@ -217,14 +217,14 @@ vi.mock('#copilot/conversation-hub', () => ({
     },
 }));
 
-/** @type {typeof import('../../../src/copilot/terminal/frontend/llm-b-runtime.js')} */
+/** @type {typeof import('../../../src/copilot/terminal/frontend/index.js')} */
 let runtime;
 
 beforeAll(async () => {
-    runtime = await import('../../../src/copilot/terminal/frontend/llm-b-runtime.js');
+    runtime = await import('../../../src/copilot/terminal/frontend/index.js');
 });
 
-describe('terminal/frontend/llm-b-runtime', () => {
+describe('terminal/frontend/index', () => {
     it('projeta o estado canônico do runtime do terminal', () => {
         const state = runtime.readTerminalRuntimeState();
 

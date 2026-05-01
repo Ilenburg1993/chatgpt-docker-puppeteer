@@ -3,19 +3,17 @@
 import { readFileSync } from 'node:fs';
 import { expect, test } from 'vitest';
 
-const SRC = readFileSync(
-    '/workspaces/chatgpt-docker-puppeteer/src/copilot/terminal/frontend/llm-b-frontend.js',
-    'utf8',
-);
+const SRC = readFileSync('/workspaces/chatgpt-docker-puppeteer/src/copilot/terminal/frontend/index.js', 'utf8');
 
 const SRC_NOW = readFileSync(
     '/workspaces/chatgpt-docker-puppeteer/src/copilot/terminal/frontend/projections/now.js',
     'utf8',
 );
 
-test('llm-b-frontend é shim puro: re-exporta apenas de ./projections/', () => {
-    // Shim só deve ter re-exports de projections/ ou sdk-session-projection
+test('frontend/index.js reexporta apenas famílias canônicas do frontend', () => {
+    // Barrel deve apontar apenas para projections/, gateways/ e sdk-session-projection
     expect(SRC).toMatch(/from '\.\/projections\//);
+    expect(SRC).toMatch(/from '\.\/gateways\//);
     // Não deve conter nenhuma implementação direta (função export function)
     expect(SRC).not.toMatch(/^export\s+(async\s+)?function\s+/m);
     // Não deve importar de agentes/canais/hubs/core diretamente
@@ -25,8 +23,10 @@ test('llm-b-frontend é shim puro: re-exporta apenas de ./projections/', () => {
     expect(SRC).not.toMatch(/from '#copilot\/core'/);
 });
 
-test('projections/now.js usa gateway llm-b-runtime em vez de agent/channel/hub/core diretos', () => {
-    expect(SRC_NOW).toMatch(/from '\.\.\/llm-b-runtime\.js'/);
+test('projections/now.js usa gateways especializados em vez de shim agregado', () => {
+    expect(SRC_NOW).toMatch(/from '\.\.\/gateways\/agent-runtime\.js'/);
+    expect(SRC_NOW).toMatch(/from '\.\.\/gateways\/dialog\.js'/);
+    expect(SRC_NOW).toMatch(/from '\.\.\/gateways\/hub\.js'/);
     expect(SRC_NOW).not.toMatch(/from '#copilot\/agent'/);
     expect(SRC_NOW).not.toMatch(/from '#copilot\/channel'/);
     expect(SRC_NOW).not.toMatch(/from '#copilot\/conversation-hub'/);

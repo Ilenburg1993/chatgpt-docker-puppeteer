@@ -22,7 +22,7 @@ vi.mock('../../../src/copilot/presentation/runtime-ui-state-store.js', () => ({
     getLastSdkPlanOperation: mocks.getLastSdkPlanOperation,
 }));
 
-vi.mock('../../../src/copilot/terminal/frontend/llm-b-runtime.js', () => ({
+vi.mock('../../../src/copilot/terminal/frontend/gateways/sdk-session.js', () => ({
     deleteTerminalSdkPlan: mocks.deleteTerminalSdkPlan,
     getTerminalSdkSessionMode: mocks.getTerminalSdkSessionMode,
     readTerminalSdkPlan: mocks.readTerminalSdkPlan,

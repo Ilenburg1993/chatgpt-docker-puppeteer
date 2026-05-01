@@ -38,7 +38,7 @@ vi.mock('../../../src/copilot/presentation/runtime-ui-state-store.js', () => ({
     getShowIntentActivity,
 }));
 
-vi.mock('../../../src/copilot/terminal/frontend/llm-b-runtime.js', () => ({
+vi.mock('../../../src/copilot/terminal/frontend/gateways/agent-runtime.js', () => ({
     readTerminalRuntimeState,
 }));
 

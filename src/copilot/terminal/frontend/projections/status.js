@@ -12,7 +12,7 @@ import {
 } from '../../../presentation/runtime-ui-state-store.js';
 import { readTerminalActivitySnapshot } from '../../activity-state.js';
 import { listTerminalElicitations, readTerminalPermissionSummary } from '../../sdk-interactions.js';
-import { readTerminalTurnCount } from '../llm-b-runtime.js';
+import { readTerminalTurnCount } from '../gateways/dialog.js';
 import {
     formatTerminalRuntimeTopology,
     normalizeTerminalModelBillingProjection,

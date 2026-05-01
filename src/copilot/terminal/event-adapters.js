@@ -11,7 +11,7 @@
 import { getBusy } from '../presentation/runtime-ui-state-store.js';
 import { setupTerminalAgentRuntimeEventListeners } from './agent-runtime-events.js';
 import { buildUserPrompt } from './dialog/index.js';
-import { readTerminalAgentRuntimeEventHost } from './frontend/llm-b-runtime.js';
+import { readTerminalAgentRuntimeEventHost } from './frontend/gateways/agent-runtime.js';
 import { setupTerminalSdkSessionEventListeners } from './sdk-session-events.js';
 
 /**

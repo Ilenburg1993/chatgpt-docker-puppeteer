@@ -4,7 +4,7 @@
  * @file Policy local para rotear input humano quando há pergunta pendente do runtime.
  */
 
-import { answerTerminalPendingQuestion, readTerminalRuntimeState } from './frontend/llm-b-runtime.js';
+import { answerTerminalPendingQuestion, readTerminalRuntimeState } from './frontend/gateways/agent-runtime.js';
 
 /**
  * @typedef {'answered' | 'answer_failed' | 'empty' | 'no_pending' | 'protocol_controlled' | 'invalid_choice'} TerminalPendingAnswerReason

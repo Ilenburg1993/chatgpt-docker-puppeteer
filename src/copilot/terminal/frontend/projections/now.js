@@ -21,25 +21,25 @@ import { readTerminalActivityHistory, readTerminalActivitySnapshot } from '../..
 import { readTerminalDisplayState } from '../../display-policy.js';
 import {
     answerTerminalPendingQuestion,
-    canSearchTerminalHubTurns,
-    clearTerminalHistoryFeed,
     clearTerminalPendingQuestionShadow,
     createTerminalSnapshot,
-    deleteTerminalHubMemory,
-    isTerminalHubReady,
     listTerminalSnapshots,
     loadTerminalSnapshot,
-    readTerminalHistoryFeed,
+    readTerminalSessionBinding,
+    saveTerminalSnapshot,
+} from '../gateways/agent-runtime.js';
+import { clearTerminalHistoryFeed, readTerminalHistoryFeed, seedTerminalHistoryFeed } from '../gateways/dialog.js';
+import {
+    canSearchTerminalHubTurns,
+    deleteTerminalHubMemory,
+    isTerminalHubReady,
     readTerminalHubMemories,
     readTerminalHubSession,
     readTerminalHubSessions,
     readTerminalHubTurns,
-    readTerminalSessionBinding,
-    saveTerminalSnapshot,
     searchTerminalHubTurns,
-    seedTerminalHistoryFeed,
     storeTerminalHubMemory,
-} from '../llm-b-runtime.js';
+} from '../gateways/hub.js';
 import { readTerminalRuntimeBase } from './shared.js';
 
 // ---------------------------------------------------------------------------
@@ -80,10 +80,15 @@ export function readTerminalDisplayProjection() {
 export function readTerminalHistoryProjection(limitPairs = 10) {
     return readTerminalHistoryFeed()
         .slice(-limitPairs * 2)
-        .map((turn, index) => ({
-            ...turn,
-            timestamp: turn.timestamp ?? Date.now() + index,
-        }));
+        .map(
+            (
+                /** @type {{ role: string; content: string; timestamp?: number }} */ turn,
+                /** @type {number} */ index,
+            ) => ({
+                ...turn,
+                timestamp: turn.timestamp ?? Date.now() + index,
+            }),
+        );
 }
 
 /**

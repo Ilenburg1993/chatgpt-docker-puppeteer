@@ -4,14 +4,11 @@
  *
  * Compat shim — re-exporta de sub-facades em sdk/ por domínio.
  *
- * Decomposição realizada em W125 (2026-03-21):
- *   sdk/client.js      — client, lifecycle events, handles, status ctx-wrapped
- *   sdk/models.js      — model registry, catálogo, stats, experimental
- *   sdk/tools.js       — tools registry, configuração, carregamento
- *   sdk/quota.js       — quota monitor, rate-limit, recovery policy
- *   sdk/sessions.js    — CRUD de sessões via client + ctx-wrapped session ops
- *   sdk/workspace-ops.js — arquivos de workspace, shell, agentes customizados
- *   sdk/ui-ops.js      — UI elicitation, confirmações, inputs, permissões
+ * Decomposição realizada em W125 (2026-03-21): sdk/client.js — client, lifecycle events, handles, status ctx-wrapped
+ * sdk/models.js — model registry, catálogo, stats, experimental sdk/tools.js — tools registry, configuração,
+ * carregamento sdk/quota.js — quota monitor, rate-limit, recovery policy sdk/sessions.js — CRUD de sessões via client +
+ * ctx-wrapped session ops sdk/workspace-ops.js — arquivos de workspace, shell, agentes customizados sdk/ui-ops.js — UI
+ * elicitation, confirmações, inputs, permissões
  *
  * @module copilot/agent/facades/agent-sdk-access
  * @see module:copilot/agent/facades/sdk/client

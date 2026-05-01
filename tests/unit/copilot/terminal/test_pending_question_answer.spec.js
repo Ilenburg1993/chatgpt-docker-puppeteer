@@ -7,7 +7,7 @@ const runtimeMocks = vi.hoisted(() => ({
     readTerminalRuntimeState: vi.fn(),
 }));
 
-vi.mock('../../../../src/copilot/terminal/frontend/llm-b-runtime.js', () => runtimeMocks);
+vi.mock('../../../../src/copilot/terminal/frontend/gateways/agent-runtime.js', () => runtimeMocks);
 
 import { tryAnswerTerminalPendingQuestionInput } from '../../../../src/copilot/terminal/pending-question-answer.js';
 

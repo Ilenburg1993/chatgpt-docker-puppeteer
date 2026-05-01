@@ -68,8 +68,8 @@ import {
     readTerminalHandoffHistory,
     readTerminalRuntimeControlState,
     resumeTerminalDialogLoop,
-    stopTerminalDialogMode,
-} from './frontend/llm-b-runtime.js';
+} from './frontend/gateways/agent-runtime.js';
+import { stopTerminalDialogMode } from './frontend/gateways/dialog.js';
 import { clearRateLimiters } from './rate-limiter-state.js';
 
 /** @type {number} */

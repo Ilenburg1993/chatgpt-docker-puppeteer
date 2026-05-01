@@ -17,7 +17,7 @@ import {
     notifyTerminalHubTurn,
     readTerminalHubStore,
     readTerminalHubTurn,
-} from '../frontend/llm-b-runtime.js';
+} from '../frontend/gateways/hub.js';
 
 /** @type {{ hubSessionId: string; userTurn: object; llmBTurn: object }[]} */
 const _pendingNotifications = [];

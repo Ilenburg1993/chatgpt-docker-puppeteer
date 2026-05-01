@@ -70,7 +70,7 @@ vi.mock('../../../src/copilot/terminal/activity-state.js', () => ({
     markTerminalActivityIdle: vi.fn(),
     recordTerminalActivity: vi.fn(),
 }));
-vi.mock('../../../src/copilot/terminal/frontend/llm-b-runtime.js', () => ({
+vi.mock('../../../src/copilot/terminal/frontend/gateways/agent-runtime.js', () => ({
     readTerminalDialogStreamMeta: vi.fn(() => ({ model: 'gpt-5-mini', reasoningEffort: 'medium' })),
     readTerminalRuntimeControlState: vi.fn(() => ({
         status: 'idle',
@@ -102,8 +102,10 @@ vi.mock('../../../src/copilot/terminal/frontend/llm-b-runtime.js', () => ({
         contextWindow: null,
         lastPrInfo: null,
     })),
-    runTerminalDialogTurn: vi.fn(async () => 'ok'),
     startTerminalAgentRuntime: vi.fn(async () => undefined),
+}));
+vi.mock('../../../src/copilot/terminal/frontend/gateways/dialog.js', () => ({
+    runTerminalDialogTurn: vi.fn(async () => 'ok'),
     startTerminalDialogMode: vi.fn(async () => undefined),
 }));
 vi.mock('../../../src/copilot/terminal/dialog/engine-persistence.js', () => ({
@@ -147,7 +149,7 @@ describe('terminal/dialog/engine.js — contrato', () => {
     });
 
     it('pausa o boot do dialog loop quando a policy SDK bloqueia reconnect por auth', async () => {
-        const runtime = await import('../../../src/copilot/terminal/frontend/llm-b-runtime.js');
+        const runtime = await import('../../../src/copilot/terminal/frontend/gateways/agent-runtime.js');
         const nerv = await import('#copilot/bridges');
 
         vi.mocked(runtime.readTerminalRuntimeControlState).mockReturnValue({
@@ -192,7 +194,7 @@ describe('terminal/dialog/engine.js — contrato', () => {
     });
 
     it('pausa o boot do dialog loop quando a policy SDK bloqueia reconnect por rate_limit', async () => {
-        const runtime = await import('../../../src/copilot/terminal/frontend/llm-b-runtime.js');
+        const runtime = await import('../../../src/copilot/terminal/frontend/gateways/agent-runtime.js');
         const nerv = await import('#copilot/bridges');
 
         vi.mocked(runtime.readTerminalRuntimeControlState).mockReturnValue({

@@ -33,7 +33,7 @@ vi.mock('../../../src/copilot/terminal/dialog/index.js', () => ({
     buildUserPrompt: mocks.buildUserPrompt,
 }));
 
-vi.mock('../../../src/copilot/terminal/frontend/llm-b-runtime.js', () => ({
+vi.mock('../../../src/copilot/terminal/frontend/gateways/agent-runtime.js', () => ({
     readTerminalAgentRuntimeEventHost: mocks.readTerminalAgentRuntimeEventHost,
 }));
 

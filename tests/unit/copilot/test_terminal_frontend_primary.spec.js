@@ -385,14 +385,14 @@ vi.mock('../../../src/copilot/tools/todo/store.js', async (importOriginal) => ({
     }),
 }));
 
-/** @type {typeof import('../../../src/copilot/terminal/frontend/llm-b-frontend.js')} */
+/** @type {typeof import('../../../src/copilot/terminal/frontend/index.js')} */
 let frontend;
 
 beforeAll(async () => {
-    frontend = await import('../../../src/copilot/terminal/frontend/llm-b-frontend.js');
+    frontend = await import('../../../src/copilot/terminal/frontend/index.js');
 });
 
-describe('terminal/frontend/llm-b-frontend', () => {
+describe('terminal/frontend/index', () => {
     it('constrói status projection com binding compartilhado e workspace', () => {
         const projection = frontend.readTerminalStatusProjection({ hubSessionId: null, injectPort: 3009 });
 

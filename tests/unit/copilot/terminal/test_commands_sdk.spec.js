@@ -14,19 +14,23 @@ const runtimeMocks = vi.hoisted(() => ({
     listTerminalSdkModels: vi.fn(async () => ({ models: [{ id: 'gpt-5-mini', supportedReasoningEfforts: ['high'] }] })),
     listTerminalSdkTools: vi.fn(async () => ({ tools: [{ name: 'read_file', description: 'Read files' }] })),
     listTerminalSdkWorkspaceFiles: vi.fn(async () => ({ files: [{ path: 'plan.md' }] })),
-    readTerminalRuntimeState: vi.fn(() => ({
-        runtimeId: 'default',
-        sessionId: 'sdk-1',
-        model: 'gpt-5-mini',
-        reasoningEffort: 'high',
-    })),
     readTerminalSdkWorkspaceFile: vi.fn(async (path) => ({ path, content: 'hello' })),
     requestTerminalSdkElicitation: vi.fn(async () => ({ action: 'accept', content: { answer: 'ok' } })),
     resolveTerminalSdkPendingElicitation: vi.fn(() => true),
     selectTerminalSdkSessionUi: vi.fn(async (_message, options) => options[0] ?? null),
 }));
 
-vi.mock('../../../../src/copilot/terminal/frontend/llm-b-runtime.js', () => runtimeMocks);
+const agentRuntimeMocks = vi.hoisted(() => ({
+    readTerminalRuntimeState: vi.fn(() => ({
+        runtimeId: 'default',
+        sessionId: 'sdk-1',
+        model: 'gpt-5-mini',
+        reasoningEffort: 'high',
+    })),
+}));
+
+vi.mock('../../../../src/copilot/terminal/frontend/gateways/sdk-session.js', () => runtimeMocks);
+vi.mock('../../../../src/copilot/terminal/frontend/gateways/agent-runtime.js', () => agentRuntimeMocks);
 
 import { cmdElicitation, cmdPermission, cmdSdk, cmdWorkspace } from '../../../../src/copilot/terminal/commands/sdk.js';
 import {

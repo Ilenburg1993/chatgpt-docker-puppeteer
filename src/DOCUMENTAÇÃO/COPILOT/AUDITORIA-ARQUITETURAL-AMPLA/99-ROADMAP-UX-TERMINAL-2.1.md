@@ -1,7 +1,6 @@
 # 99 — Roadmap UX Terminal 2.1
 
-**Data:** 2026-05-01
-**Escopo:** transformação contínua de `src/copilot/terminal`.
+**Data:** 2026-05-01 **Escopo:** transformação contínua de `src/copilot/terminal`.
 
 ---
 
@@ -110,13 +109,14 @@ Pronto quando: `repl.js` for composition fina e testes de comando continuarem es
 Subfaixas:
 
 1. `frontend/projections/status.js` (**feito**);
-2. `frontend/projections/now.js` (**parcial: activity/display já migrados; diagnose/history/context ainda vivem no compat layer**);
+2. `frontend/projections/now.js` (**feito**);
 3. `frontend/projections/metrics.js` (**feito**);
 4. `frontend/projections/usage.js` (**feito**);
 5. `frontend/projections/config.js` (**feito**);
 6. `frontend/projections/sdk-session.js` (**feito**);
-7. `llm-b-frontend.js` vira composition/compat temporário (**parcial: `frontend/index.js` já aponta para as novas families; imports novos devem preferir `projections/*.js`, mas o arquivo legado ainda mantém parte das projections e operações**);
-8. remover compat após migração.
+7. `frontend/index.js` vira barrel/composition canônico (**feito**);
+8. remover compat após migração (**feito: `llm-b-frontend.js` removido; testes e consumidores
+   migrados para `index.js`/`projections/*.js`**).
 
 Pronto quando: nenhuma projection family crítica fica escondida no mesmo arquivo gigante.
 
@@ -128,11 +128,12 @@ Pronto quando: nenhuma projection family crítica fica escondida no mesmo arquiv
 
 Subfaixas:
 
-1. gateway de agent runtime;
-2. gateway de conversation hub;
-3. gateway de SDK session binding;
-4. gateway de dialog loop;
-5. contratos anti-deep-domain para comandos/dialog.
+1. gateway de agent runtime (**feito: `frontend/gateways/agent-runtime.js`**);
+2. gateway de conversation hub (**feito: `frontend/gateways/hub.js`**);
+3. gateway de SDK session binding (**feito: `frontend/gateways/sdk-session.js`**);
+4. gateway de dialog loop (**feito: `frontend/gateways/dialog.js`**);
+5. contratos anti-deep-domain para comandos/dialog (**feito: consumidores internos migrados para
+   gateways; `llm-b-runtime.js` removido**).
 
 Pronto quando: comandos e dialog consomem gateways sem conhecer topologia interna.
 

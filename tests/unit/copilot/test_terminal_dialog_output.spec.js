@@ -27,7 +27,7 @@ vi.mock('../../../src/copilot/presentation/runtime-ui-state-store.js', () => ({
 vi.mock('../../../src/copilot/terminal/activity-state.js', () => ({
     readTerminalActivitySnapshot: vi.fn(() => ({ phase: 'boot', label: 'initial' })),
 }));
-vi.mock('../../../src/copilot/terminal/frontend/llm-b-runtime.js', () => ({
+vi.mock('../../../src/copilot/terminal/frontend/gateways/agent-runtime.js', () => ({
     readTerminalDialogStreamMeta: vi.fn(() => ({ model: 'gpt-5-mini', reasoningEffort: 'medium' })),
     readTerminalRuntimeState: vi.fn(() => ({
         dialogLoopActive: true,

@@ -14,7 +14,7 @@ import {
     readTerminalSdkPlan,
     setTerminalSdkSessionMode,
     updateTerminalSdkPlan,
-} from './llm-b-runtime.js';
+} from './gateways/sdk-session.js';
 
 /**
  * @param {string | null | undefined} [runtimeId]

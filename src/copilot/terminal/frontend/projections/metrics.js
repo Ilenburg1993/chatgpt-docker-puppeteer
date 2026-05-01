@@ -6,7 +6,7 @@
 import { defaultErrorTracker } from '#copilot/observability';
 import { readToolStatsProjection } from '../../../presentation/system-metrics.js';
 import { readTerminalActivitySnapshot } from '../../activity-state.js';
-import { readTerminalTurnCount } from '../llm-b-runtime.js';
+import { readTerminalTurnCount } from '../gateways/dialog.js';
 import { normalizeTerminalModelBillingProjection, readTerminalRuntimeBase } from './shared.js';
 
 /**

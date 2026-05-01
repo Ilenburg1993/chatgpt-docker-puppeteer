@@ -34,9 +34,9 @@ import {
     readTerminalAgentRuntimeEventHost,
     readTerminalDialogStreamMeta,
     readTerminalRuntimeState,
-    stopTerminalDialogMode,
-    writeTerminalHubSystemTurn,
-} from './frontend/llm-b-runtime.js';
+} from './frontend/gateways/agent-runtime.js';
+import { stopTerminalDialogMode } from './frontend/gateways/dialog.js';
+import { writeTerminalHubSystemTurn } from './frontend/gateways/hub.js';
 import { setupTerminalTaskStreamListeners } from './task-stream-events.js';
 
 /** @type {boolean} */

@@ -28,10 +28,9 @@ import {
     readTerminalDialogStreamMeta,
     readTerminalRuntimeControlState,
     readTerminalRuntimeState,
-    runTerminalDialogTurn,
     startTerminalAgentRuntime,
-    startTerminalDialogMode,
-} from '../frontend/llm-b-runtime.js';
+} from '../frontend/gateways/agent-runtime.js';
+import { runTerminalDialogTurn, startTerminalDialogMode } from '../frontend/gateways/dialog.js';
 import { normalizeTerminalModelBillingProjection } from '../frontend/projections/shared.js';
 import { drainPendingNotifications, getPersistenceFailureCount, persistTurnToHub } from './engine-persistence.js';
 import {

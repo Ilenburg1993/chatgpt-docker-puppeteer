@@ -39,7 +39,7 @@ const readTerminalRuntimeState = vi.fn(() => ({
     pendingQuestionShadowRemainingMs: null,
 }));
 
-vi.mock('../../../../src/copilot/terminal/frontend/llm-b-runtime.js', () => ({
+vi.mock('../../../../src/copilot/terminal/frontend/gateways/agent-runtime.js', () => ({
     readTerminalRuntimeState,
     readTerminalDialogStreamMeta: vi.fn(() => ({ model: 'gpt-5-mini', reasoningEffort: 'high' })),
 }));

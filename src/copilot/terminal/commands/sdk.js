@@ -6,6 +6,7 @@
  */
 
 import { toError } from '#copilot/core';
+import { readTerminalRuntimeState } from '../frontend/gateways/agent-runtime.js';
 import {
     compactTerminalSdkSession,
     confirmTerminalSdkSessionUi,
@@ -16,12 +17,11 @@ import {
     listTerminalSdkModels,
     listTerminalSdkTools,
     listTerminalSdkWorkspaceFiles,
-    readTerminalRuntimeState,
     readTerminalSdkWorkspaceFile,
     requestTerminalSdkElicitation,
     resolveTerminalSdkPendingElicitation,
     selectTerminalSdkSessionUi,
-} from '../frontend/llm-b-runtime.js';
+} from '../frontend/gateways/sdk-session.js';
 import {
     classifyTerminalSdkQuota,
     clearTerminalElicitation,

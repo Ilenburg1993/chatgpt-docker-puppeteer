@@ -354,14 +354,22 @@ describe('W114 — module layout governance: terminal root', () => {
     });
 
     it('declara os subdiretorios arquiteturais da raiz', () => {
-        const expected = ['commands/', 'dialog/', 'frontend/', 'handlers/'];
+        const expected = [
+            'commands/',
+            'dialog/',
+            'frontend/',
+            'frontend/gateways/',
+            'frontend/projections/',
+            'handlers/',
+        ];
         const declared = TERMINAL_MODULE_LAYOUT.filter((entry) => entry.kind === 'directory')
             .map((entry) => entry.path)
             .sort();
+        const expectedTopLevel = expected.filter((path) => !path.slice(0, -1).includes('/'));
 
         assert.deepEqual(declared, expected);
         assert.deepEqual(
-            expected.filter((path) => !listTopLevelDirectories(TERMINAL_ROOT).includes(path)),
+            expectedTopLevel.filter((path) => !listTopLevelDirectories(TERMINAL_ROOT).includes(path)),
             [],
         );
     });

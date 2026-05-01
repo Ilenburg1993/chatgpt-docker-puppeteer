@@ -32,7 +32,7 @@ import {
 } from '../presentation/runtime-ui-state-store.js';
 import { recordTerminalActivity } from './activity-state.js';
 import { broadcastSse, buildUserPrompt, println } from './dialog/index.js';
-import { readTerminalRuntimeState } from './frontend/llm-b-runtime.js';
+import { readTerminalRuntimeState } from './frontend/gateways/agent-runtime.js';
 import { createTerminalPendingQuestionReplayState } from './pending-question-replay.js';
 import { buildTerminalToolActivityPresentation, compactTerminalToolText } from './tool-activity-presenter.js';
 
