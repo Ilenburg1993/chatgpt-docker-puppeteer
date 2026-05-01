@@ -272,6 +272,18 @@ estejam registrados no roadmap e cobertos por contrato de remoção.
 - W116: remover shims legados e congelar baseline 2.1 de navegação estrutural (**concluída para
   `agent/dialog`, `agent/session` e `agent/lifecycle`; próxima aplicação prevista nas bordas
   `server`/`terminal`**)
+- W117: abrir faixa UX/terminal com auditoria AS-IS, situação ideal e roadmap próprio (**iniciada
+  nos docs 97–99; primeira correção aplicada em typecheck strict para UX/model billing,
+  `/display preset`, pending question replay e testes associados; scorecard/risk do terminal root
+  implementado**)
+- W118–W125: executar roadmap UX Terminal 2.1 (**planejado no doc 99: scorecard de risco do terminal
+  root, status/now/usage unificados, display density policy, pending question replay, decomposição
+  de `repl.js`, `frontend`, boot e event adapters; W118 iniciou com projection comum de
+  billing/modelo e topologia de runtimes em `/status`/`/now` e foi estendido para pós-turno,
+  `/usage now` e `/metrics`; W119 iniciou com `terminal/display-policy.js` governando presets,
+  toggles e densidade do waiting prompt; W120 iniciou com `terminal/pending-question-replay.js` para
+  suprimir protocolo e deduplicar replays curtos, e ganhou `terminal/pending-question-answer.js`
+  para rotear respostas interativas sem deadlock de fila**)
 
 ---
 
