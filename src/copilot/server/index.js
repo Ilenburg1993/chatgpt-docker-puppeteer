@@ -17,6 +17,13 @@ import { createCopilotApp, registerErrorHandler } from './app.js';
 import { mountCopilotRoutes } from './router.js';
 import { createCopilotSocket } from './socket/index.js';
 
+export {
+    getServerModuleDescriptor,
+    getServerModuleRole,
+    listServerModulesByRole,
+    SERVER_MODULE_LAYOUT,
+} from './module-map.js';
+
 /**
  * @typedef {object} CopilotServerOptions
  * @property {number} [port] - Porta de escuta. Default: LLM_B_TERMINAL_PORT (3009)

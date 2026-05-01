@@ -258,8 +258,9 @@ estejam registrados no roadmap e cobertos por contrato de remoção.
   `wiring/`, `history/` e `context/` sem shims; concluída para `agent/lifecycle` com migração física
   para `orchestrators/`, `entrypoints/`, `process-host/`, `setup/`, `policies/`, `teardown/` e
   `state/` sem shims)
-- W114: aplicar a taxonomia nas bordas `server`/`terminal`, preservando adapters finos (**próxima
-  onda após fechamento de `agent/lifecycle`**)
+- W114: aplicar a taxonomia nas bordas `server`/`terminal`, preservando adapters finos (**iniciada
+  com `module-map.js`, README local e contratos anti-órfão para as raízes `server/` e `terminal/`;
+  próxima subonda: `terminal/handlers` e `server/routes`**)
 - W115: criar scorecard de organização física por diretório quente
 - W116: remover shims legados e congelar baseline 2.1 de navegação estrutural (\*\*concluída para
   `agent/dialog`, `agent/session` e `agent/lifecycle`; próxima aplicação prevista nas bordas

@@ -26,12 +26,24 @@ import {
     getSessionModuleRole,
     listSessionModulesByRole,
 } from '../../../../src/copilot/agent/session/module-map.js';
+import {
+    SERVER_MODULE_LAYOUT,
+    getServerModuleRole,
+    listServerModulesByRole,
+} from '../../../../src/copilot/server/module-map.js';
+import {
+    TERMINAL_MODULE_LAYOUT,
+    getTerminalModuleRole,
+    listTerminalModulesByRole,
+} from '../../../../src/copilot/terminal/module-map.js';
 
 const ROOT = new URL('../../../../src/copilot/', import.meta.url).pathname;
 const AGENT_ROOT = join(ROOT, 'agent');
 const DIALOG_ROOT = join(ROOT, 'agent/dialog');
 const LIFECYCLE_ROOT = join(ROOT, 'agent/lifecycle');
+const SERVER_ROOT = join(ROOT, 'server');
 const SESSION_ROOT = join(ROOT, 'agent/session');
+const TERMINAL_ROOT = join(ROOT, 'terminal');
 
 /**
  * @param {string} dir
@@ -50,6 +62,28 @@ function listJsFilesRecursive(dir) {
         }
     }
     return files;
+}
+
+/**
+ * @param {string} dir
+ * @returns {string[]}
+ */
+function listTopLevelJsFiles(dir) {
+    return readdirSync(dir, { withFileTypes: true })
+        .filter((entry) => entry.isFile() && entry.name.endsWith('.js'))
+        .map((entry) => entry.name)
+        .sort();
+}
+
+/**
+ * @param {string} dir
+ * @returns {string[]}
+ */
+function listTopLevelDirectories(dir) {
+    return readdirSync(dir, { withFileTypes: true })
+        .filter((entry) => entry.isDirectory())
+        .map((entry) => `${entry.name}/`)
+        .sort();
 }
 
 describe('W109 — module layout governance: agent/dialog', () => {
@@ -280,5 +314,112 @@ describe('W113 — module layout governance: agent/lifecycle', () => {
         assert.match(index, /LIFECYCLE_MODULE_LAYOUT/);
         assert.match(index, /getLifecycleModuleRole/);
         assert.match(index, /listLifecycleModulesByRole/);
+    });
+});
+
+describe('W114 — module layout governance: terminal root', () => {
+    it('declara todos os arquivos JS da raiz no module-map', () => {
+        const expected = listTopLevelJsFiles(TERMINAL_ROOT);
+        const declared = TERMINAL_MODULE_LAYOUT.filter((entry) => entry.kind === 'file')
+            .map((entry) => entry.path)
+            .sort();
+
+        assert.deepEqual(declared, expected, 'terminal/module-map.js deve cobrir todos os JS da raiz');
+    });
+
+    it('declara os subdiretorios arquiteturais da raiz', () => {
+        const expected = ['commands/', 'dialog/', 'frontend/', 'handlers/'];
+        const declared = TERMINAL_MODULE_LAYOUT.filter((entry) => entry.kind === 'directory')
+            .map((entry) => entry.path)
+            .sort();
+
+        assert.deepEqual(declared, expected);
+        assert.deepEqual(
+            expected.filter((path) => !listTopLevelDirectories(TERMINAL_ROOT).includes(path)),
+            [],
+        );
+    });
+
+    it('mantem entrypoint, orquestrador, REPL e adapters navegaveis', () => {
+        assert.equal(getTerminalModuleRole('bootstrap.js'), 'entrypoint');
+        assert.equal(getTerminalModuleRole('index.js'), 'orchestrator');
+        assert.equal(getTerminalModuleRole('repl.js'), 'repl');
+        assert.equal(getTerminalModuleRole('agent-runtime-events.js'), 'event-adapter');
+        assert.equal(getTerminalModuleRole('terminal-agent-wiring.js'), 'wiring');
+    });
+
+    it('README local documenta os papeis arquiteturais declarados', () => {
+        const readme = readFileSync(join(TERMINAL_ROOT, 'README.md'), 'utf8');
+        const roles = [...new Set(TERMINAL_MODULE_LAYOUT.map((entry) => entry.role))];
+        const missingRoles = roles.filter((role) => !readme.includes(`\`${role}\``));
+
+        assert.deepEqual(missingRoles, [], `README sem papel declarado: ${missingRoles.join(', ')}`);
+    });
+
+    it('index publico exporta o mapa de layout', () => {
+        const index = readFileSync(join(TERMINAL_ROOT, 'index.js'), 'utf8');
+        assert.match(index, /TERMINAL_MODULE_LAYOUT/);
+        assert.match(index, /getTerminalModuleRole/);
+        assert.match(index, /listTerminalModulesByRole/);
+    });
+
+    it('mantem fallback SSE explicitamente fora da superficie publica', () => {
+        const fallbacks = listTerminalModulesByRole('fallback');
+        assert.equal(fallbacks.length, 1);
+        assert.equal(fallbacks[0]?.public, false);
+        assert.equal(fallbacks[0]?.tier, 'internal');
+    });
+});
+
+describe('W114 — module layout governance: server root', () => {
+    it('declara todos os arquivos JS da raiz no module-map', () => {
+        const expected = listTopLevelJsFiles(SERVER_ROOT);
+        const declared = SERVER_MODULE_LAYOUT.filter((entry) => entry.kind === 'file')
+            .map((entry) => entry.path)
+            .sort();
+
+        assert.deepEqual(declared, expected, 'server/module-map.js deve cobrir todos os JS da raiz');
+    });
+
+    it('declara os subdiretorios arquiteturais da raiz', () => {
+        const expected = ['middleware/', 'routes/', 'runtime-state/', 'socket/'];
+        const declared = SERVER_MODULE_LAYOUT.filter((entry) => entry.kind === 'directory')
+            .map((entry) => entry.path)
+            .sort();
+
+        assert.deepEqual(declared, expected);
+        assert.deepEqual(
+            expected.filter((path) => !listTopLevelDirectories(SERVER_ROOT).includes(path)),
+            [],
+        );
+    });
+
+    it('mantem server owner, app factory e router navegaveis', () => {
+        assert.equal(getServerModuleRole('index.js'), 'entrypoint');
+        assert.equal(getServerModuleRole('app.js'), 'app-factory');
+        assert.equal(getServerModuleRole('router.js'), 'router');
+        assert.equal(getServerModuleRole('handler-bridge.js'), 'compat');
+    });
+
+    it('README local documenta os papeis arquiteturais declarados', () => {
+        const readme = readFileSync(join(SERVER_ROOT, 'README.md'), 'utf8');
+        const roles = [...new Set(SERVER_MODULE_LAYOUT.map((entry) => entry.role))];
+        const missingRoles = roles.filter((role) => !readme.includes(`\`${role}\``));
+
+        assert.deepEqual(missingRoles, [], `README sem papel declarado: ${missingRoles.join(', ')}`);
+    });
+
+    it('index publico exporta o mapa de layout', () => {
+        const index = readFileSync(join(SERVER_ROOT, 'index.js'), 'utf8');
+        assert.match(index, /SERVER_MODULE_LAYOUT/);
+        assert.match(index, /getServerModuleRole/);
+        assert.match(index, /listServerModulesByRole/);
+    });
+
+    it('mantem runtime-state separado da superficie de router', () => {
+        const runtimeState = listServerModulesByRole('runtime-state');
+        assert.equal(runtimeState.length, 1);
+        assert.equal(runtimeState[0]?.kind, 'directory');
+        assert.equal(runtimeState[0]?.public, false);
     });
 });

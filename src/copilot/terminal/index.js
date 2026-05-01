@@ -49,6 +49,13 @@ import {
 import { startRepl } from './repl.js';
 import { registerAgentEventListeners } from './terminal-agent-wiring.js';
 
+export {
+    getTerminalModuleDescriptor,
+    getTerminalModuleRole,
+    listTerminalModulesByRole,
+    TERMINAL_MODULE_LAYOUT,
+} from './module-map.js';
+
 /**
  * F10.3: Imprime o banner de diagnóstico do modo de operação do terminal host.
  *

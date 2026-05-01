@@ -23,8 +23,12 @@ Ele consome:
 
 ## Estrutura recomendada
 
+Use `module-map.js` como inventário executável da raiz. O mapa diferencia arquivos de boot,
+orquestração, REPL, adapters de evento, estado local e subdiretórios de superfície.
+
 | Área                                     | Função                                                                     |
 | ---------------------------------------- | -------------------------------------------------------------------------- |
+| `module-map.js`                          | inventário executável da raiz do terminal                                  |
 | `frontend/`                              | consumer layer canônica do runtime para o terminal                         |
 | `dialog/`                                | prompt dinâmico, output helpers, waiting UX, engine de diálogo             |
 | `commands/`                              | comandos REPL finos, orientados a operações do runtime                     |
@@ -36,6 +40,25 @@ Ele consome:
 | `agent-sse-fallback.js`                  | fallback SSE para eventos do agent ainda não tratados manualmente          |
 | `terminal-agent-wiring.js`               | SSE + wiring de alto nível entre terminal e agent                          |
 | `index.js` / `bootstrap.js`              | boot do terminal                                                           |
+
+## Papéis da raiz
+
+| Papel              | Arquivos/diretórios                                                         |
+| ------------------ | --------------------------------------------------------------------------- |
+| `entrypoint`       | `bootstrap.js`, `module-map.js`                                             |
+| `boot`             | `bootstrap-lifecycle.js`                                                    |
+| `orchestrator`     | `index.js`                                                                  |
+| `repl`             | `repl.js`, `repl-listeners.js`                                              |
+| `event-adapter`    | `agent-runtime-events.js`, `sdk-session-events.js`, `task-stream-events.js` |
+| `wiring`           | `terminal-agent-wiring.js`                                                  |
+| `fallback`         | `agent-sse-fallback.js`                                                     |
+| `sdk-adapter`      | `sdk-interactions.js`                                                       |
+| `state`            | `activity-state.js`, `rate-limiter-state.js`                                |
+| `store`            | `alias-store.js`                                                            |
+| `command-surface`  | `commands/`                                                                 |
+| `dialog-surface`   | `dialog/`                                                                   |
+| `frontend-surface` | `frontend/`                                                                 |
+| `handler-surface`  | `handlers/`                                                                 |
 
 ## Lifecycle e ownership
 
