@@ -112,6 +112,42 @@ function buildPendingQuestionMeta({ kind, askedAt, allowFreeform, choices }) {
 }
 
 /**
+ * Normaliza a resposta humana para o contrato `UserInputResponse` do SDK.
+ *
+ * O SDK distingue uma resposta digitada livremente (`wasFreeform=true`) de uma escolha selecionada
+ * (`wasFreeform=false`). Para UX de terminal, também aceitamos índices 1-based como atalho para `choices`.
+ *
+ * @param {string} rawAnswer
+ * @param {string[] | undefined} choices
+ * @param {boolean} allowFreeform
+ * @returns {{
+ *           ok: true;
+ *           answer: string;
+ *           wasFreeform: boolean;
+ *       }
+ *     | {
+ *           ok: false;
+ *           reason: 'choice_required';
+ *       }}
+ */
+function normalizeUserInputAnswer(rawAnswer, choices, allowFreeform) {
+    const answer = rawAnswer.trim();
+    if (Array.isArray(choices) && choices.length > 0) {
+        const numericIndex = Number(answer);
+        if (Number.isInteger(numericIndex) && numericIndex >= 1 && numericIndex <= choices.length) {
+            return { ok: true, answer: choices[numericIndex - 1] ?? answer, wasFreeform: false };
+        }
+        if (choices.includes(answer)) {
+            return { ok: true, answer, wasFreeform: false };
+        }
+        if (!allowFreeform) {
+            return { ok: false, reason: 'choice_required' };
+        }
+    }
+    return { ok: true, answer, wasFreeform: true };
+}
+
+/**
  * Handler principal chamado pelo SDK quando o modelo usa `ask_user`.
  *
  * Delega para o handler especializado conforme o modo ativo:
@@ -190,8 +226,24 @@ function handleInteractiveQuestion({ question, choices, allowFreeform, kind = 'q
             protocolControlled: questionKind !== 'question',
             ...(choices !== undefined && { choices }),
             resolve: (/** @type {string} */ answer) => {
+                const normalized = normalizeUserInputAnswer(answer, choices, allowFreeform);
+                if (!normalized.ok) {
+                    log(
+                        'WARN',
+                        `[AlwaysAlive] Resposta rejeitada: pergunta exige uma das opções (${(choices ?? []).join(' | ')}).`,
+                    );
+                    ctx.emit('question.answer_rejected', {
+                        question,
+                        choices,
+                        answer,
+                        reason: normalized.reason,
+                        ts: Date.now(),
+                    });
+                    return false;
+                }
                 ctx.setStatus('processing');
-                resolve({ answer, wasFreeform: true });
+                resolve({ answer: normalized.answer, wasFreeform: normalized.wasFreeform });
+                return true;
             },
         };
         ctx.setPendingQuestion(pq);

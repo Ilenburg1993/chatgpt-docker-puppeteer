@@ -9,12 +9,16 @@ const mocks = vi.hoisted(() => ({
                 ? {
                       ts: 222,
                       model: 'gpt-5',
+                      configuredModel: 'gpt-5.4',
+                      modelMismatch: true,
                       cost: 7,
                       quotaSnapshots: [{ remaining: 3 }],
                   }
                 : {
                       ts: 111,
                       model: 'gpt-5-mini',
+                      configuredModel: 'gpt-5-mini',
+                      modelMismatch: false,
                       cost: 1,
                       quotaSnapshots: [{ remaining: 9 }],
                   };
@@ -64,6 +68,8 @@ describe('presentation/system-metrics runtime-aware handlers', () => {
         expect(body.sessionId).toBe('sess-alt');
         expect(body.sendCount).toBe(99);
         expect(body.lastPrModel).toBe('gpt-5');
+        expect(body.lastPrConfiguredModel).toBe('gpt-5.4');
+        expect(body.lastPrModelMismatch).toBe(true);
         expect(mocks.readAgentRuntimeOverview).toHaveBeenCalledWith('alt');
     });
 

@@ -25,7 +25,7 @@ export { cmdForget, cmdRecall, cmdRemember } from './memory.js';
 export { cmdMetrics } from './metrics.js';
 export { cmdPlan } from './plan.js';
 export { cmdResume } from './resume.js';
-export { cmdElicitation, cmdSdk, cmdWorkspace } from './sdk.js';
+export { cmdElicitation, cmdPermission, cmdSdk, cmdWorkspace } from './sdk.js';
 export { cmdSearch } from './search.js';
 export {
     cmdAnswer,
@@ -35,6 +35,7 @@ export {
     cmdDbHistory,
     cmdDbSessions,
     cmdHistory,
+    cmdNow,
     cmdSessionList,
     cmdSessionRestore,
     cmdSessionSave,

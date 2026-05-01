@@ -11,35 +11,31 @@
  */
 
 import {
-    getShowIntentActivity,
-    getShowStreaming,
-    getShowThinking,
-    getShowToolActivity,
-    getShowUsage,
-    setShowIntentActivity,
-    setShowStreaming,
-    setShowThinking,
-    setShowToolActivity,
-    setShowUsage,
-} from '../../presentation/runtime-ui-state-store.js';
+    applyTerminalDisplayPreset,
+    isTerminalDisplayPresetName,
+    isTerminalDisplayToggle,
+    listTerminalDisplayPresets,
+    listTerminalDisplayToggles,
+    readTerminalDisplayState,
+    readTerminalPromptDisplayPolicy,
+    TERMINAL_DISPLAY_TOGGLE_KEYS,
+    writeTerminalDisplayState,
+    writeTerminalDisplayToggle,
+} from '../display-policy.js';
 
 /**
  * @typedef {object} DisplayContext
  * @property {(text: string) => void} println
  */
 
-/** @type {Record<string, { get: () => boolean; set: (v: boolean) => void; label: string }>} */
-const TOGGLES = {
-    thinking: { get: getShowThinking, set: setShowThinking, label: '💭 Thinking (raciocínio)' },
-    streaming: { get: getShowStreaming, set: setShowStreaming, label: '📡 Streaming (resposta incremental)' },
-    usage: { get: getShowUsage, set: setShowUsage, label: '📊 Usage (tokens pós-turno)' },
-    tools: { get: getShowToolActivity, set: setShowToolActivity, label: '🔧 Tool activity (início/fim/progresso)' },
-    intent: {
-        get: getShowIntentActivity,
-        set: setShowIntentActivity,
-        label: '🧭 Intent (o que a LLM-B está tentando fazer)',
-    },
-};
+/**
+ * @returns {string}
+ */
+function presetUsageLabel() {
+    return listTerminalDisplayPresets()
+        .map((preset) => preset.name)
+        .join('|');
+}
 
 /**
  * Comando `/display [toggle] [on|off]`.
@@ -59,14 +55,29 @@ export function cmdDisplay({ println }, arg, rest) {
 
     // Sem args: exibir status de todos
     if (!toggle) {
+        const state = readTerminalDisplayState();
+        const promptPolicy = readTerminalPromptDisplayPolicy(state);
         println('\n  \x1b[36mDisplay Toggles:\x1b[0m');
+        println(`  \x1b[90mpreset atual: ${promptPolicy.density}\x1b[0m`);
         println('  ─────────────────────────────────────');
-        for (const [key, t] of Object.entries(TOGGLES)) {
-            const status = t.get() ? '\x1b[32m● on\x1b[0m' : '\x1b[31m○ off\x1b[0m';
-            println(`  ${t.label.padEnd(36)} ${status}    \x1b[90m/display ${key} [on|off]\x1b[0m`);
+        for (const toggleDef of listTerminalDisplayToggles()) {
+            const status = state[toggleDef.key] ? '\x1b[32m● on\x1b[0m' : '\x1b[31m○ off\x1b[0m';
+            println(`  ${toggleDef.label.padEnd(36)} ${status}    \x1b[90m${toggleDef.command}\x1b[0m`);
         }
         println('  ─────────────────────────────────────');
-        println('  \x1b[90m/display all on  ·  /display all off\x1b[0m\n');
+        println('  \x1b[90m/display all on  ·  /display all off\x1b[0m');
+        println(`  \x1b[90m/display preset <${presetUsageLabel()}>\x1b[0m\n`);
+        return;
+    }
+
+    if (toggle === 'preset') {
+        const presetName = value;
+        if (!isTerminalDisplayPresetName(presetName)) {
+            println(`  \x1b[33mUso: /display preset <${presetUsageLabel()}>\x1b[0m`);
+            return;
+        }
+        const preset = applyTerminalDisplayPreset(presetName);
+        println(`  ✅ Preset aplicado: \x1b[36m${preset.name}\x1b[0m — ${preset.description}`);
         return;
     }
 
@@ -74,9 +85,13 @@ export function cmdDisplay({ println }, arg, rest) {
     if (toggle === 'all') {
         if (value === 'on' || value === 'off') {
             const newVal = value === 'on';
-            for (const t of Object.values(TOGGLES)) {
-                t.set(newVal);
-            }
+            writeTerminalDisplayState({
+                thinking: newVal,
+                streaming: newVal,
+                usage: newVal,
+                tools: newVal,
+                intent: newVal,
+            });
             println(`  ✅ Todos os toggles: \x1b[${newVal ? '32m● on' : '31m○ off'}\x1b[0m`);
             return;
         }
@@ -85,20 +100,21 @@ export function cmdDisplay({ println }, arg, rest) {
     }
 
     // Toggle específico
-    const entry = TOGGLES[toggle];
-    if (!entry) {
-        const valid = Object.keys(TOGGLES).join(', ');
+    if (!isTerminalDisplayToggle(toggle)) {
+        const valid = TERMINAL_DISPLAY_TOGGLE_KEYS.join(', ');
         println(`  \x1b[31mToggle desconhecido: "${toggle}". Válidos: ${valid}, all\x1b[0m`);
         return;
     }
+    const entry = listTerminalDisplayToggles().find((candidate) => candidate.key === toggle);
 
     if (value === 'on' || value === 'off') {
         const newVal = value === 'on';
-        entry.set(newVal);
-        println(`  ✅ ${entry.label}: \x1b[${newVal ? '32m● on' : '31m○ off'}\x1b[0m`);
+        writeTerminalDisplayToggle(toggle, newVal);
+        println(`  ✅ ${entry?.label ?? toggle}: \x1b[${newVal ? '32m● on' : '31m○ off'}\x1b[0m`);
     } else if (!value) {
-        const status = entry.get() ? '\x1b[32m● on\x1b[0m' : '\x1b[31m○ off\x1b[0m';
-        println(`  ${entry.label}: ${status}`);
+        const state = readTerminalDisplayState();
+        const status = state[toggle] ? '\x1b[32m● on\x1b[0m' : '\x1b[31m○ off\x1b[0m';
+        println(`  ${entry?.label ?? toggle}: ${status}`);
     } else {
         println(`  \x1b[33mUso: /display ${toggle} on  |  /display ${toggle} off\x1b[0m`);
     }

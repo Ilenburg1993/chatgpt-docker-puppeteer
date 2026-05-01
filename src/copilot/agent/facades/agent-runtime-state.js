@@ -84,6 +84,19 @@ export function persistAgentRuntimeStatePartial(data, options = {}) {
  *     clearPendingQuestionShadow: () => void;
  *     setPendingQuestionShadow?: ((shadow: import('../types.js').PendingQuestionShadow) => void) | undefined;
  *     setSendCount?: ((count: number) => void) | undefined;
+ *     setLastPrInfo?:
+ *         | ((
+ *               info: {
+ *                   model?: string;
+ *                   configuredModel?: string;
+ *                   modelMismatch?: boolean;
+ *                   sessionId?: string | null;
+ *                   cost?: number;
+ *                   quotaSnapshots?: Record<string, unknown>;
+ *                   ts: number;
+ *               } | null,
+ *           ) => void)
+ *         | undefined;
  *     getPendingQuestionSnapshot?: (() => AgentRuntimePendingQuestionSnapshot | null) | undefined;
  *     getModelSnapshot?: (() => string) | undefined;
  *     getRuntimeStatus?: (() => string) | undefined;
@@ -233,7 +246,15 @@ export async function resetAgentRuntimeGracefulShutdownFlag() {
 /**
  * Persiste o último snapshot de consumo PR do runtime.
  *
- * @param {{ model?: string; cost?: number; quotaSnapshots?: Record<string, unknown>; ts: number }} info
+ * @param {{
+ *     model?: string;
+ *     configuredModel?: string;
+ *     modelMismatch?: boolean;
+ *     sessionId?: string | null;
+ *     cost?: number;
+ *     quotaSnapshots?: Record<string, unknown>;
+ *     ts: number;
+ * }} info
  * @returns {Promise<
  *     import('../error-policy.js').AgentPolicyResult<import('../lifecycle/state/state-io.js').AliveAgentState>
  * >}

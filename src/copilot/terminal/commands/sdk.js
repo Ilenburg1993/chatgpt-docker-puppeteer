@@ -25,8 +25,12 @@ import {
 import {
     classifyTerminalSdkQuota,
     clearTerminalElicitation,
+    clearTerminalPermission,
     getTerminalElicitation,
+    getTerminalPermission,
     listTerminalElicitations,
+    listTerminalPermissions,
+    readTerminalPermissionSummary,
 } from '../sdk-interactions.js';
 import { callWithRuntimeTarget, extractRuntimeTarget } from './runtime-target.js';
 
@@ -113,14 +117,96 @@ function defaultElicitationSchema() {
 }
 
 /**
+ * @param {unknown} value
+ * @returns {value is string | number | boolean | string[]}
+ */
+function isElicitationFieldValue(value) {
+    if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+        return Number.isFinite(value) || typeof value !== 'number';
+    }
+    return Array.isArray(value) && value.every((item) => typeof item === 'string');
+}
+
+/**
+ * @param {unknown} schema
+ * @returns {schema is { type: 'object'; properties: Record<string, unknown>; required?: string[] }}
+ */
+function isElicitationSchema(schema) {
+    const obj = objectOrNull(schema);
+    return obj?.['type'] === 'object' && objectOrNull(obj['properties']) !== null;
+}
+
+/**
+ * @param {Record<string, string | number | boolean | string[]> | undefined} content
+ * @param {unknown} schema
+ * @returns {{ ok: true } | { ok: false; error: string }}
+ */
+function validateElicitationContent(content, schema) {
+    if (!content) return { ok: true };
+    for (const [key, value] of Object.entries(content)) {
+        if (!isElicitationFieldValue(value)) {
+            return {
+                ok: false,
+                error: `Campo "${key}" deve ser string, number, boolean ou string[].`,
+            };
+        }
+    }
+    if (!isElicitationSchema(schema)) return { ok: true };
+    const required = Array.isArray(schema.required) ? schema.required : [];
+    for (const key of required) {
+        if (!(key in content)) {
+            return { ok: false, error: `Campo obrigatório ausente: "${key}".` };
+        }
+    }
+    for (const [key, field] of Object.entries(schema.properties)) {
+        if (!(key in content)) continue;
+        const fieldObj = objectOrNull(field);
+        if (!fieldObj) continue;
+        const value = content[key];
+        const type = fieldObj['type'];
+        if (type === 'string' && typeof value !== 'string') {
+            return { ok: false, error: `Campo "${key}" deve ser string.` };
+        }
+        if ((type === 'number' || type === 'integer') && typeof value !== 'number') {
+            return { ok: false, error: `Campo "${key}" deve ser ${type}.` };
+        }
+        if (type === 'integer' && !Number.isInteger(value)) {
+            return { ok: false, error: `Campo "${key}" deve ser integer.` };
+        }
+        if (type === 'boolean' && typeof value !== 'boolean') {
+            return { ok: false, error: `Campo "${key}" deve ser boolean.` };
+        }
+        if (type === 'array' && !Array.isArray(value)) {
+            return { ok: false, error: `Campo "${key}" deve ser string[].` };
+        }
+        if (typeof value === 'string' && Array.isArray(fieldObj['enum']) && !fieldObj['enum'].includes(value)) {
+            return { ok: false, error: `Campo "${key}" deve ser uma das opções: ${fieldObj['enum'].join(' | ')}.` };
+        }
+        if (typeof value === 'string' && Array.isArray(fieldObj['oneOf'])) {
+            const allowed = fieldObj['oneOf']
+                .map((item) => objectOrNull(item)?.['const'])
+                .filter((item) => typeof item === 'string');
+            if (allowed.length > 0 && !allowed.includes(value)) {
+                return { ok: false, error: `Campo "${key}" deve ser uma das opções: ${allowed.join(' | ')}.` };
+            }
+        }
+    }
+    return { ok: true };
+}
+
+/**
  * @param {string | undefined} action
  * @param {string[]} rest
+ * @param {unknown} [schema]
  * @returns {{ ok: true; result: import('../../presentation/types.js').RuntimeElicitationResult }
  *     | { ok: false; error: string }}
  */
-function parseElicitationResult(action, rest) {
+function parseElicitationResult(action, rest, schema) {
     if (action !== 'accept' && action !== 'decline' && action !== 'cancel') {
         return { ok: false, error: 'Ação deve ser accept | decline | cancel.' };
+    }
+    if (action !== 'accept' && rest.join(' ').trim()) {
+        return { ok: false, error: 'JSON content só é aceito para action=accept.' };
     }
     if (action !== 'accept') {
         return { ok: true, result: { action } };
@@ -129,19 +215,14 @@ function parseElicitationResult(action, rest) {
     if (parsed.error) {
         return { ok: false, error: parsed.error };
     }
-    return {
-        ok: true,
-        result: {
-            action,
-            ...(parsed.json
-                ? {
-                      content: /** @type {Record<string, string | number | boolean | string[]>} */ (
-                          /** @type {unknown} */ (parsed.json)
-                      ),
-                  }
-                : {}),
-        },
-    };
+    const content = parsed.json
+        ? /** @type {Record<string, string | number | boolean | string[]>} */ (/** @type {unknown} */ (parsed.json))
+        : undefined;
+    const validation = validateElicitationContent(content, schema);
+    if (!validation.ok) {
+        return { ok: false, error: validation.error };
+    }
+    return { ok: true, result: { action, ...(content ? { content } : {}) } };
 }
 
 /**
@@ -164,10 +245,15 @@ export async function cmdSdk({ println }, arg = '') {
             println(`\n  \x1b[32m✓ SDK compaction solicitada.\x1b[0m\n  \x1b[90m${pretty(result, 700)}\x1b[0m\n`);
         } else {
             const state = readTerminalRuntimeState(runtimeId);
+            const pendingElicitations = listTerminalElicitations().length;
+            const permissionSummary = readTerminalPermissionSummary();
             println('\n  \x1b[36mSDK Runtime\x1b[0m');
             println(`  runtime  \x1b[90m${state.runtimeId}\x1b[0m`);
             println(`  session  \x1b[90m${state.sessionId ?? '-'}\x1b[0m`);
             println(`  model    \x1b[33m${state.model}\x1b[0m  reasoning=\x1b[33m${state.reasoningEffort}\x1b[0m`);
+            println(
+                `  waits    \x1b[90melicitation=${pendingElicitations} · permission=${permissionSummary.pending}${permissionSummary.latest ? ` (${permissionSummary.latest.permissionType})` : ''}\x1b[0m`,
+            );
             await renderSdkQuota({ println }, runtimeId, { compact: true });
             println('  \x1b[90mUso: /sdk models | /sdk tools [model] | /sdk quota | /sdk compact\x1b[0m\n');
         }
@@ -324,7 +410,7 @@ export async function cmdElicitation({ println }, arg = '') {
                 println(`\x1b[31m  JSON inválido: ${parsed.error}\x1b[0m`);
                 return;
             }
-            const result = callWithRuntimeTarget(
+            const result = await callWithRuntimeTarget(
                 inputTerminalSdkSessionUi,
                 runtimeId,
                 message,
@@ -355,7 +441,7 @@ export async function cmdElicitation({ println }, arg = '') {
                 println('\x1b[33m  Elicitation não encontrada.\x1b[0m');
                 return;
             }
-            const parsedResult = parseElicitationResult(action, jsonRest);
+            const parsedResult = parseElicitationResult(action, jsonRest, entry.requestedSchema);
             if (!parsedResult.ok) {
                 println(`\x1b[31m  Resposta inválida: ${parsedResult.error}\x1b[0m`);
                 return;
@@ -382,10 +468,16 @@ export async function cmdElicitation({ println }, arg = '') {
             );
             println(`\n  \x1b[32m✓ Elicitation SDK concluída.\x1b[0m\n  \x1b[90m${pretty(result, 1500)}\x1b[0m\n`);
         } else if (sub === 'request-json') {
-            const message = rest.shift() ?? 'Informe os dados solicitados.';
-            const parsed = parseJsonObject(rest);
+            const { left, right } = splitAtDoubleDash(rest);
+            const message =
+                (right.length > 0 ? left.join(' ').trim() : rest.shift()) ?? 'Informe os dados solicitados.';
+            const parsed = parseJsonObject(right.length > 0 ? right : rest);
             if (parsed.error || !parsed.json) {
                 println(`\x1b[31m  JSON inválido: ${parsed.error ?? 'schema ausente'}\x1b[0m`);
+                return;
+            }
+            if (!isElicitationSchema(parsed.json)) {
+                println('\x1b[31m  Schema inválido: esperado { "type": "object", "properties": { ... } }.\x1b[0m');
                 return;
             }
             const result = await callWithRuntimeTarget(requestTerminalSdkElicitation, runtimeId, message, parsed.json);
@@ -404,7 +496,7 @@ export async function cmdElicitation({ println }, arg = '') {
                 }
             }
             println(
-                '  \x1b[90mUso: /elicitation [list|all|capabilities|confirm <msg>|select <msg> -- a|b|c|input <msg> -- {json}|show latest|clear <id>|request <msg>|request-json <msg> <schemaJson>|respond <id> <accept|decline|cancel> [json]]\x1b[0m',
+                '  \x1b[90mUso: /elicitation [list|all|capabilities|confirm <msg>|select <msg> -- a|b|c|input <msg> -- {json}|show latest|clear <id>|request <msg>|request-json <msg> -- <schemaJson>|respond <id> <accept|decline|cancel> [json]]\x1b[0m',
             );
             println(
                 '  \x1b[90mask_user = conversa READY/REPLY; elicitation = formulário/URL estruturado do SDK; confirm/select/input = conveniências de session.ui.*.\x1b[0m\n',
@@ -413,6 +505,41 @@ export async function cmdElicitation({ println }, arg = '') {
     } catch (e) {
         println(`\n  \x1b[31m✗ Elicitation SDK: ${toError(e).message}\x1b[0m\n`);
     }
+}
+
+/**
+ * @param {CommandContext} ctx
+ * @param {string} [arg]
+ * @returns {Promise<void>}
+ */
+export async function cmdPermission({ println }, arg = '') {
+    const [sub = 'list', ...rest] = arg.trim().split(/\s+/).filter(Boolean);
+    if (sub === 'show') {
+        renderPermissionEntry({ println }, getTerminalPermission(rest[0] || 'latest'));
+        return;
+    }
+    if (sub === 'clear') {
+        const ok = clearTerminalPermission(rest[0] || 'latest');
+        println(ok ? '\x1b[32m  Permissão removida da UX local.\x1b[0m' : '\x1b[33m  Permissão não encontrada.\x1b[0m');
+        return;
+    }
+
+    const entries = listTerminalPermissions({ includeCompleted: sub === 'all' });
+    if (entries.length === 0) {
+        println('\n  \x1b[90mNenhuma permissão SDK pendente na UX local.\x1b[0m');
+    } else {
+        println(`\n  \x1b[36mPermissões SDK (${entries.length})\x1b[0m`);
+        for (const entry of entries) {
+            const statusColor =
+                entry.status === 'pending' ? '\x1b[33m' : entry.granted === false ? '\x1b[31m' : '\x1b[90m';
+            const result = entry.granted == null ? entry.result : entry.granted ? 'approved' : 'not-approved';
+            println(
+                `  ${statusColor}${entry.id}\x1b[0m  ${entry.permissionType}  \x1b[90m${entry.status}${result ? ` · ${result}` : ''}\x1b[0m`,
+            );
+        }
+    }
+    println('  \x1b[90mUso: /permission [list|all|show latest|clear <id>|clear all]\x1b[0m');
+    println('  \x1b[90mPermissões são decididas pelo SDK/hook; este comando é observabilidade operacional.\x1b[0m\n');
 }
 
 /**
@@ -441,4 +568,25 @@ function renderElicitationEntry({ println }, entry) {
             ? '\n  \x1b[90mResponda com /elicitation respond <id> <accept|decline|cancel> [json]\x1b[0m\n'
             : '',
     );
+}
+
+/**
+ * @param {CommandContext} ctx
+ * @param {ReturnType<typeof getTerminalPermission>} entry
+ * @returns {void}
+ */
+function renderPermissionEntry({ println }, entry) {
+    if (!entry) {
+        println('\x1b[33m  Permissão não encontrada.\x1b[0m');
+        return;
+    }
+    println(`\n  \x1b[36mPermissão ${entry.id}\x1b[0m`);
+    println(`  status  \x1b[33m${entry.status}\x1b[0m`);
+    println(`  type    \x1b[33m${entry.permissionType}\x1b[0m`);
+    if (entry.requestId) println(`  request \x1b[90m${entry.requestId}\x1b[0m`);
+    if (entry.granted !== null) println(`  granted \x1b[33m${String(entry.granted)}\x1b[0m`);
+    if (entry.result) println(`  result  \x1b[33m${entry.result}\x1b[0m`);
+    println(`  created \x1b[90m${new Date(entry.createdAt).toISOString()}\x1b[0m`);
+    if (entry.completedAt) println(`  done    \x1b[90m${new Date(entry.completedAt).toISOString()}\x1b[0m`);
+    println(`\n  data:\n${pretty(entry.data, 2500)}\n`);
 }

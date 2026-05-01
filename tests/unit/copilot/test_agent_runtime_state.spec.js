@@ -174,6 +174,8 @@ describe('agent-runtime-state facade', () => {
                 pendingTurnConsumedPR: true,
                 lastPrConsumedAt: 123,
                 lastPrModel: 'gpt-5',
+                lastPrConfiguredModel: '',
+                lastPrModelMismatch: false,
                 lastPrCost: 0.5,
                 lastQuotaSnapshots: { main: { remainingPercentage: 80 } },
             },
@@ -206,11 +208,21 @@ describe('agent-runtime-state facade', () => {
     it('restaura sendCount e limpa shadow ausente durante boot persistido', async () => {
         const ctx = {
             setSendCount: vi.fn(),
+            setLastPrInfo: vi.fn(),
             clearPendingQuestionShadow: vi.fn(),
             hasPendingQuestionShadow: () => false,
         };
 
-        mocks.readStateAsync.mockResolvedValueOnce({ sendCount: 42 });
+        mocks.readStateAsync.mockResolvedValueOnce({
+            sendCount: 42,
+            sessionId: 'sdk-live',
+            lastPrConsumedAt: 1000,
+            lastPrModel: 'claude-haiku-4.5',
+            lastPrConfiguredModel: 'gpt-5.4',
+            lastPrModelMismatch: true,
+            lastPrCost: 0.33,
+            lastQuotaSnapshots: { premium_interactions: { remainingPercentage: 99.1 } },
+        });
         const result = await restoreAgentRuntimePersistentBootState(/** @type {any} */ (ctx));
 
         expect(result).toEqual({
@@ -219,6 +231,17 @@ describe('agent-runtime-state facade', () => {
             pendingQuestionShadowExpired: false,
         });
         expect(ctx.setSendCount).toHaveBeenCalledWith(42);
+        expect(ctx.setLastPrInfo).toHaveBeenCalledWith(
+            expect.objectContaining({
+                ts: 1000,
+                model: 'claude-haiku-4.5',
+                configuredModel: 'gpt-5.4',
+                modelMismatch: true,
+                sessionId: 'sdk-live',
+                cost: 0.33,
+                quotaSnapshots: { premium_interactions: { remainingPercentage: 99.1 } },
+            }),
+        );
         expect(ctx.clearPendingQuestionShadow).toHaveBeenCalledTimes(1);
     });
 

@@ -9,13 +9,35 @@ import { readFile } from 'node:fs/promises';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 
 vi.mock('#copilot/bridges', () => ({ emitNerv: vi.fn() }));
-vi.mock('#copilot/config', () => ({
-    LLM_B_BOOT_TIMEOUT_MS: 60_000,
-    LLM_B_TURN_TIMEOUT_MS: 120_000,
-    LLM_B_BOOT_PROMPT: undefined,
-}));
-vi.mock('#copilot/core', () => ({ container: { resolve: vi.fn(() => ({})) }, toError: (/** @type {any} */ e) => e }));
-vi.mock('#copilot/observability', () => ({ log: vi.fn(), METRICS_STORE: Symbol.for('METRICS_STORE') }));
+vi.mock('#copilot/config', async (importOriginal) => {
+    const actual = /** @type {any} */ (await importOriginal());
+    return {
+        ...actual,
+        LLM_B_BOOT_TIMEOUT_MS: 60_000,
+        LLM_B_TURN_TIMEOUT_MS: 120_000,
+        LLM_B_BOOT_PROMPT: undefined,
+        LLM_B_DIALOG_QUEUE_MAX: 10,
+    };
+});
+vi.mock('#copilot/core', async (importOriginal) => {
+    const actual = /** @type {any} */ (await importOriginal());
+    return {
+        ...actual,
+        container: { resolve: vi.fn(() => ({})) },
+        toError: (/** @type {any} */ e) => e,
+        registerShutdownHandler: vi.fn(),
+        runShutdown: vi.fn(async () => []),
+        isShuttingDown: vi.fn(() => false),
+    };
+});
+vi.mock('#copilot/observability', async (importOriginal) => {
+    const actual = /** @type {any} */ (await importOriginal());
+    return {
+        ...actual,
+        log: vi.fn(),
+        METRICS_STORE: Symbol.for('METRICS_STORE'),
+    };
+});
 vi.mock('../../../src/copilot/presentation/dialog-timeout-policy.js', () => ({
     resolveOptionalDialogTimeout: vi.fn(() => ({
         timeoutMs: null,
@@ -36,6 +58,13 @@ vi.mock('../../../src/copilot/presentation/runtime-ui-state-store.js', () => ({
     getShowThinking: vi.fn(() => false),
     getShowUsage: vi.fn(() => false),
     setBusy: vi.fn(),
+    setShowStreaming: vi.fn(),
+    setShowThinking: vi.fn(),
+    setShowUsage: vi.fn(),
+    getShowToolActivity: vi.fn(() => false),
+    setShowToolActivity: vi.fn(),
+    getShowIntentActivity: vi.fn(() => false),
+    setShowIntentActivity: vi.fn(),
 }));
 vi.mock('../../../src/copilot/terminal/activity-state.js', () => ({
     markTerminalActivityIdle: vi.fn(),

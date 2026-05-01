@@ -28,10 +28,13 @@ const runtimeMocks = vi.hoisted(() => ({
 
 vi.mock('../../../../src/copilot/terminal/frontend/llm-b-runtime.js', () => runtimeMocks);
 
-import { cmdElicitation, cmdSdk, cmdWorkspace } from '../../../../src/copilot/terminal/commands/sdk.js';
+import { cmdElicitation, cmdPermission, cmdSdk, cmdWorkspace } from '../../../../src/copilot/terminal/commands/sdk.js';
 import {
     clearTerminalElicitation,
+    clearTerminalPermissions,
     recordTerminalElicitationPending,
+    recordTerminalPermissionCompleted,
+    recordTerminalPermissionRequested,
 } from '../../../../src/copilot/terminal/sdk-interactions.js';
 
 function mockCtx() {
@@ -46,6 +49,7 @@ function mockCtx() {
 describe('terminal/commands/sdk', () => {
     beforeEach(() => {
         clearTerminalElicitation('all');
+        clearTerminalPermissions();
         vi.clearAllMocks();
     });
 
@@ -129,6 +133,60 @@ describe('terminal/commands/sdk', () => {
         const input = mockCtx();
         await cmdElicitation({ println: input.println }, 'input Nome do projeto -- {"title":"Nome"}');
         expect(runtimeMocks.inputTerminalSdkSessionUi).toHaveBeenCalledWith('Nome do projeto', { title: 'Nome' });
-        expect(input.output()).toContain('session.ui.input');
+        expect(input.output()).toContain('Nome do projeto:typed');
+        expect(input.output()).not.toContain('[object Promise]');
+    });
+
+    it('/elicitation valida content contra schema SDK antes de responder', async () => {
+        recordTerminalElicitationPending({
+            requestId: 'el-schema',
+            message: 'Informe ambiente',
+            mode: 'form',
+            requestedSchema: {
+                type: 'object',
+                properties: { env: { type: 'string', enum: ['dev', 'prod'] } },
+                required: ['env'],
+            },
+        });
+
+        const invalid = mockCtx();
+        await cmdElicitation({ println: invalid.println }, 'respond el-schema accept {"env":"stage"}');
+        expect(invalid.output()).toContain('dev | prod');
+        expect(runtimeMocks.resolveTerminalSdkPendingElicitation).not.toHaveBeenCalled();
+
+        const valid = mockCtx();
+        await cmdElicitation({ println: valid.println }, 'respond el-schema accept {"env":"prod"}');
+        expect(runtimeMocks.resolveTerminalSdkPendingElicitation).toHaveBeenCalledWith('el-schema', {
+            action: 'accept',
+            content: { env: 'prod' },
+        });
+    });
+
+    it('/permission lista, detalha e limpa permissões SDK observadas', async () => {
+        recordTerminalPermissionRequested({
+            requestId: 'perm-1',
+            permissionType: 'file_write',
+            path: 'src/a.js',
+        });
+        recordTerminalPermissionCompleted({
+            requestId: 'perm-1',
+            granted: true,
+            result: 'approved',
+        });
+
+        const list = mockCtx();
+        await cmdPermission({ println: list.println }, 'all');
+        expect(list.output()).toContain('perm-1');
+        expect(list.output()).toContain('file_write');
+        expect(list.output()).toContain('approved');
+
+        const show = mockCtx();
+        await cmdPermission({ println: show.println }, 'show perm-1');
+        expect(show.output()).toContain('Permissão perm-1');
+        expect(show.output()).toContain('file_write');
+
+        const clear = mockCtx();
+        await cmdPermission({ println: clear.println }, 'clear perm-1');
+        expect(clear.output()).toContain('removida');
     });
 });

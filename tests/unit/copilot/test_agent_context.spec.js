@@ -541,7 +541,9 @@ describe('AgentContext', () => {
         ctx.setPendingQuestion({
             question: 'Qual o status?',
             allowFreeform: true,
-            resolve: (answer) => answers.push(answer),
+            resolve: (answer) => {
+                answers.push(answer);
+            },
             askedAt: Date.now(),
             kind: 'ready',
             protocolControlled: true,

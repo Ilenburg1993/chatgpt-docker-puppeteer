@@ -24,6 +24,7 @@ import {
 } from '../../presentation/runtime-ui-state-store.js';
 import { describeSdkRecoveryPolicy, getSdkRecoveryPolicy } from '../../presentation/sdk-recovery-policy.js';
 import { markTerminalActivityIdle, recordTerminalActivity } from '../activity-state.js';
+import { normalizeTerminalModelBillingProjection } from '../frontend/llm-b-frontend.js';
 import {
     readTerminalDialogStreamMeta,
     readTerminalRuntimeControlState,
@@ -408,12 +409,24 @@ async function _executeTurn(message, actor) {
         if (getShowUsage()) {
             const latestRuntimeState = readTerminalRuntimeState();
             const ctxWin = latestRuntimeState.contextWindow;
-            const prInfo = latestRuntimeState.lastPrInfo;
+            const prInfo = /** @type {Record<string, unknown> | null} */ (latestRuntimeState.lastPrInfo);
             if (ctxWin || prInfo) {
                 const parts = [];
                 if (prInfo) {
-                    if (prInfo.model) parts.push(`modelo=\x1b[36m${prInfo.model}\x1b[0m`);
-                    if (typeof prInfo.cost === 'number') parts.push(`custo=\x1b[33m${prInfo.cost.toFixed(4)}\x1b[0m`);
+                    const modelBilling = normalizeTerminalModelBillingProjection(prInfo, latestRuntimeState.model);
+                    if (modelBilling.mismatch) {
+                        if (modelBilling.configuredModel) {
+                            parts.push(`modeloCfg=\x1b[35m${modelBilling.configuredModel}\x1b[0m`);
+                        }
+                        if (modelBilling.billedModel) {
+                            parts.push(`modeloCobrado=\x1b[36m${modelBilling.billedModel}\x1b[0m`);
+                        }
+                    } else if (modelBilling.displayModel !== '-') {
+                        parts.push(`modelo=\x1b[36m${modelBilling.displayModel}\x1b[0m`);
+                    }
+                    if (modelBilling.cost !== null) {
+                        parts.push(`custo=\x1b[33m${modelBilling.cost.toFixed(4)}\x1b[0m`);
+                    }
                 }
                 if (ctxWin) {
                     parts.push(`ctx=${(ctxWin.utilization * 100).toFixed(0)}%`);

@@ -417,6 +417,16 @@ describe('terminal/frontend/llm-b-frontend', () => {
                 isDefault: false,
             },
         ]);
+        expect(projection.runtimeTopologyLabel).toBe('*default:gpt-5/waiting_for_input  •  -alt:gpt-5-mini/processing');
+        expect(projection.modelBilling).toEqual(
+            expect.objectContaining({
+                billedModel: 'gpt-5',
+                configuredModel: null,
+                mismatch: false,
+                cost: 0.1234,
+                displayModel: 'gpt-5',
+            }),
+        );
         expect(projection.sdkSessionId).toBe('sdk-1');
         expect(projection.hubSessionId).toBe('hub-1');
         expect(projection.turnCount).toBe(9);

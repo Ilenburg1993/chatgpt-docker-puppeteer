@@ -67,7 +67,7 @@ describe('boot-wiring › pipeline nomeado', () => {
     });
 
     it('runner de boot usa policy por step e criticidade explícita', () => {
-        assert.match(SRC, /import \{ withAgentErrorPolicy \} from '\.\.\/error-policy\.js'/);
+        assert.match(SRC, /import \{ withAgentErrorPolicy \} from '\.\.\/\.\.\/error-policy\.js'/);
         assert.match(SRC, /async function runBootStepWithPolicy\(/);
         assert.match(SRC, /required: true/);
         assert.match(SRC, /required: false/);

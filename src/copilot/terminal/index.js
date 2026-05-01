@@ -50,8 +50,10 @@ import { startRepl } from './repl.js';
 import { registerAgentEventListeners } from './terminal-agent-wiring.js';
 
 export {
+    buildTerminalModuleScorecard,
     getTerminalModuleDescriptor,
     getTerminalModuleRole,
+    listTerminalModulesByRisk,
     listTerminalModulesByRole,
     TERMINAL_MODULE_LAYOUT,
 } from './module-map.js';

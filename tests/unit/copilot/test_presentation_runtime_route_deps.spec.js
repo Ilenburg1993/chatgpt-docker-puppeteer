@@ -19,9 +19,16 @@ const mocks = vi.hoisted(() => ({
     sessionUiSelect: vi.fn(),
 }));
 
-vi.mock('#copilot/core', () => ({
-    container: { resolve: mocks.resolve },
-}));
+vi.mock('#copilot/core', async (importOriginal) => {
+    const actual = /** @type {any} */ (await importOriginal());
+    return {
+        ...actual,
+        container: { resolve: mocks.resolve },
+        registerShutdownHandler: vi.fn(),
+        runShutdown: vi.fn(async () => []),
+        isShuttingDown: vi.fn(() => false),
+    };
+});
 
 vi.mock('#copilot/audit', () => ({
     defaultAuditLog: {
@@ -36,12 +43,17 @@ vi.mock('#copilot/bridges', () => ({
     nervEventBusAdapter: { isMounted: false },
 }));
 
-vi.mock('#copilot/config', () => ({
-    BRIDGE_ADMIN_TOKEN: undefined,
-    LLM_B_TURN_TIMEOUT_MS: 120_000,
-    OTEL_EXPORTER_OTLP_ENDPOINT: undefined,
-    SDK_API_TOKEN: null,
-}));
+vi.mock('#copilot/config', async (importOriginal) => {
+    const actual = /** @type {any} */ (await importOriginal());
+    return {
+        ...actual,
+        BRIDGE_ADMIN_TOKEN: undefined,
+        LLM_B_TURN_TIMEOUT_MS: 120_000,
+        LLM_B_DIALOG_QUEUE_MAX: 10,
+        OTEL_EXPORTER_OTLP_ENDPOINT: undefined,
+        SDK_API_TOKEN: null,
+    };
+});
 
 vi.mock('#copilot/hooks', () => ({
     defaultBus: { on: vi.fn(), off: vi.fn() },
@@ -73,6 +85,12 @@ vi.mock('#copilot/sdk', () => ({
     commandsHandlePending: vi.fn(),
     compactionCompact: vi.fn(),
     createClientSession: vi.fn(),
+    createTool: vi.fn(() => ({})),
+    createToolSync: vi.fn(() => ({})),
+    getToolsConfig: vi.fn(() => ({})),
+    loadToolsConfigAsync: vi.fn(async () => ({})),
+    patchToolsConfig: vi.fn(),
+    createToolRegistryAdapter: vi.fn(() => ({})),
     disconnectClientSession: vi.fn(),
     getClient: mocks.getClient,
     getClientSession: vi.fn(),

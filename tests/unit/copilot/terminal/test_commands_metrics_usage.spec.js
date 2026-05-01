@@ -216,4 +216,30 @@ describe('commands/metrics + usage', () => {
         expect(ctx.output()).toContain('Modo: sdk=');
         expect(ctx.output()).toContain('gpt-4.1-mini');
     });
+
+    it('cmdMetrics e cmdUsage usam projection comum para mismatch de billing', () => {
+        const previous = defaultRuntime.lastPrInfo;
+        defaultRuntime.lastPrInfo = {
+            model: 'gpt-5-mini',
+            configuredModel: 'gpt-5',
+            modelMismatch: true,
+            cost: 0.0789,
+            ts: Date.now(),
+        };
+        try {
+            const metricsCtx = mockCtx();
+            const usageCtx = mockCtx();
+
+            cmdMetrics({ println: metricsCtx.println });
+            cmdUsage({ println: usageCtx.println }, 'now');
+
+            expect(metricsCtx.output()).toContain('mismatch');
+            expect(metricsCtx.output()).toContain('cfg=gpt-5');
+            expect(metricsCtx.output()).toContain('cobrado=gpt-5-mini');
+            expect(usageCtx.output()).toContain('cfg=');
+            expect(usageCtx.output()).toContain('cobrado=');
+        } finally {
+            defaultRuntime.lastPrInfo = previous;
+        }
+    });
 });

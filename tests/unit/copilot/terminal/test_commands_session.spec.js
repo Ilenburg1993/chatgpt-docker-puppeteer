@@ -6,7 +6,7 @@
  * testa saída via println mock.
  */
 
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const answerPendingQuestion = vi.fn((/** @type {string} */ _arg) => true);
 const clearPendingQuestionShadow = vi.fn(() => true);
@@ -229,6 +229,7 @@ vi.mock('#copilot/conversation-hub', () => ({
 
 const {
     cmdStatus,
+    cmdNow,
     cmdHistory,
     cmdDbHistory,
     cmdDbSessions,
@@ -253,6 +254,19 @@ function mockCtx() {
 }
 
 describe('commands/session — sync commands', () => {
+    beforeEach(() => {
+        answerPendingQuestion.mockClear();
+        answerPendingQuestion.mockReturnValue(true);
+        altAnswerPendingQuestion.mockClear();
+        altAnswerPendingQuestion.mockReturnValue(true);
+        defaultRuntime.pendingQuestion = null;
+        defaultRuntime.pendingQuestionKind = null;
+        defaultRuntime.pendingQuestionShadowExpired = true;
+        defaultRuntime.pendingQuestionShadowState = 'expired';
+        altRuntime.pendingQuestion = null;
+        altRuntime.pendingQuestionKind = null;
+    });
+
     it('cmdStatus imprime status do agente', () => {
         const ctx = mockCtx();
         cmdStatus({ hubSessionId: 'hub-1', injectPort: 3009, println: ctx.println });
@@ -267,6 +281,32 @@ describe('commands/session — sync commands', () => {
         expect(ctx.output()).toContain('perfil modelo');
         expect(ctx.output()).toContain('runtime id');
         expect(ctx.output()).toContain('*default:gpt-5-mini/idle');
+        expect(ctx.output()).toContain('billing/modelo');
+        expect(ctx.output()).toContain('último PR');
+    });
+
+    it('cmdStatus destaca mismatch de modelo cobrado/configurado', () => {
+        const prev = defaultRuntime.lastPrInfo;
+        defaultRuntime.lastPrInfo = {
+            ts: Date.now(),
+            model: 'claude-haiku-4.5',
+            configuredModel: 'gpt-5.4',
+            modelMismatch: true,
+            cost: 0.33,
+        };
+        const ctx = mockCtx();
+        cmdStatus({ hubSessionId: 'hub-1', injectPort: 3009, println: ctx.println });
+        expect(ctx.output()).toContain('mismatch');
+        expect(ctx.output()).toContain('cobrado=claude-haiku-4.5');
+        defaultRuntime.lastPrInfo = prev ?? null;
+    });
+
+    it('cmdNow imprime snapshot operacional compacto', () => {
+        const ctx = mockCtx();
+        cmdNow({ hubSessionId: 'hub-1', injectPort: 3009, println: ctx.println });
+        expect(ctx.output()).toContain('[now]');
+        expect(ctx.output()).toContain('runtime=default');
+        expect(ctx.output()).toContain('loop=off');
     });
 
     it('cmdStatus aceita runtimeId explícito na sintaxe do REPL', () => {
@@ -312,12 +352,30 @@ describe('commands/session — sync commands', () => {
     });
 
     it('cmdAnswer envia resposta pendente', () => {
+        defaultRuntime.pendingQuestion = {
+            question: 'Responder default?',
+            kind: 'question',
+            allowFreeform: true,
+            askedAt: 1,
+            protocolControlled: false,
+        };
+        defaultRuntime.pendingQuestionKind = 'question';
+        defaultRuntime.pendingQuestionShadowExpired = false;
+        defaultRuntime.pendingQuestionShadowState = null;
         const ctx = mockCtx();
         cmdAnswer({ println: ctx.println }, 'sim');
         expect(ctx.output()).toContain('Resposta enviada');
     });
 
     it('cmdAnswer aceita runtimeId explícito e usa o runtime alvo', () => {
+        altRuntime.pendingQuestion = {
+            question: 'Responder alt?',
+            kind: 'question',
+            allowFreeform: true,
+            askedAt: 1,
+            protocolControlled: false,
+        };
+        altRuntime.pendingQuestionKind = 'question';
         const ctx = mockCtx();
         cmdAnswer({ println: ctx.println }, '--runtime alt resposta-alt');
         expect(altAnswerPendingQuestion).toHaveBeenCalledWith('resposta-alt');
@@ -325,10 +383,30 @@ describe('commands/session — sync commands', () => {
     });
 
     it('cmdAnswer explica quando só resta shadow expirada', () => {
-        answerPendingQuestion.mockReturnValueOnce(false);
+        defaultRuntime.pendingQuestion = null;
+        defaultRuntime.pendingQuestionKind = null;
+        defaultRuntime.pendingQuestionShadowExpired = true;
+        defaultRuntime.pendingQuestionShadowState = 'expired';
         const ctx = mockCtx();
         cmdAnswer({ println: ctx.println }, 'sim');
         expect(ctx.output()).toContain('shadow expirada');
+    });
+
+    it('cmdAnswer não intercepta pergunta de protocolo do dialog loop', () => {
+        defaultRuntime.pendingQuestion = {
+            question: 'READY: aguardando próxima mensagem',
+            kind: 'ready',
+            allowFreeform: true,
+            askedAt: 1,
+            protocolControlled: true,
+        };
+        defaultRuntime.pendingQuestionKind = 'ready';
+
+        const ctx = mockCtx();
+        cmdAnswer({ println: ctx.println }, 'mensagem');
+
+        expect(answerPendingQuestion).not.toHaveBeenCalled();
+        expect(ctx.output()).toContain('Digite o texto normalmente');
     });
 
     it('cmdClearShadow limpa shadow persistida restaurada', () => {

@@ -26,6 +26,8 @@ import { getHubSessionId } from '../presentation/runtime-ui-state-store.js';
 import { markTerminalActivityIdle, recordTerminalActivity } from './activity-state.js';
 import { registerUnhandledAgentSseFallback } from './agent-sse-fallback.js';
 import { broadcastSse, ensureDialogLoop, println } from './dialog/index.js';
+import { createTerminalHandledAgentEventsSet } from './event-adapter-events.js';
+import { setupTerminalHeadlessEventAdapters } from './event-adapters.js';
 import {
     abortTerminalCurrentMessage,
     pingTerminalDialogWatchdog,
@@ -35,7 +37,6 @@ import {
     stopTerminalDialogMode,
     writeTerminalHubSystemTurn,
 } from './frontend/llm-b-runtime.js';
-import { recordTerminalElicitationCompleted, recordTerminalElicitationPending } from './sdk-interactions.js';
 import { setupTerminalTaskStreamListeners } from './task-stream-events.js';
 
 /** @type {boolean} */
@@ -67,6 +68,9 @@ export function registerAgentEventListeners(printBanner) {
     if (_agentListenersRegistered) return;
     _agentListenersRegistered = true;
     const agentEvents = readTerminalAgentRuntimeEventHost();
+    if (!process.stdin.isTTY) {
+        setupTerminalHeadlessEventAdapters();
+    }
     agentEvents.on(EMITTER_DIALOG_STALLED, async (/** @type {{ stalledMs: number }} */ evt) => {
         const secs = Math.round(evt.stalledMs / 1000);
         recordTerminalActivity('system', 'Watchdog disparou', {
@@ -251,33 +255,6 @@ export function registerAgentEventListeners(printBanner) {
         }
     });
 
-    agentEvents.on('elicitation.pending', (evt) => {
-        const entry = recordTerminalElicitationPending(evt);
-        recordTerminalActivity('system', 'Elicitation SDK pendente', {
-            detail: `${entry.mode}: ${entry.message.slice(0, 120)}`,
-            source: 'sdk',
-            severity: 'warn',
-        });
-        println(`\n\x1b[36m  [sdk elicitation]\x1b[0m \x1b[33m${entry.id}\x1b[0m — ${entry.message}`);
-        if (entry.url) println(`  \x1b[36m${entry.url}\x1b[0m`);
-        println('  \x1b[90m/elicitation show latest  ·  /elicitation list\x1b[0m');
-        broadcastSse('elicitation.pending', entry);
-    });
-
-    agentEvents.on('elicitation.completed', (evt) => {
-        const entry = recordTerminalElicitationCompleted(evt);
-        if (entry) {
-            recordTerminalActivity('system', 'Elicitation SDK concluída', {
-                detail: entry.id,
-                source: 'sdk',
-            });
-        }
-        broadcastSse('elicitation.completed', {
-            ...(evt && typeof evt === 'object' ? evt : {}),
-            timestamp: Date.now(),
-        });
-    });
-
     // AB.4: SSE 'cache.hit'
     agentEvents.on(
         'session.compaction_complete',
@@ -327,49 +304,5 @@ export function registerAgentEventListeners(printBanner) {
     // BUG-EVDUP-01 (fix): auto-wiring genérico para AGENT_EVENTS sem handler específico.
     // Garante que novos eventos adicionados a AGENT_EVENTS sejam automaticamente broadcast
     // no terminal SSE sem necessidade de wiring manual em cada adição.
-    /** @type {Set<string>} */
-    const handledEvents = new Set([
-        'dialog.stalled',
-        'dialog.reply',
-        'dialog.loop.changed',
-        'dialog.ready',
-        'dialog.stopped',
-        'session.usage',
-        'session.compaction_complete',
-        'elicitation.pending',
-        'elicitation.completed',
-        'question.pending',
-        'stopped',
-        'tool.execution_start',
-        'tool.execution_partial_result',
-        'tool.execution_progress',
-        'tool.execution_complete',
-        'session.error',
-        'session.info',
-        'session.warning',
-        'session.model_changed',
-        'session.context_changed',
-        'session.mode_changed',
-        'session.plan_changed',
-        'session.task_complete',
-        'session.truncation',
-        'session.snapshot_rewind',
-        'session.shutdown',
-        'session.handoff',
-        'session.workspace_file_changed',
-        'exit_plan_mode.completed',
-        'session.compaction_start',
-        'assistant.intent',
-        'assistant.reasoning_complete',
-        'subagent.started',
-        'subagent.completed',
-        'subagent.failed',
-        'ready',
-        'session.fatal',
-        'task.delta',
-        'task.completed',
-        'task.error',
-        'task.reasoning',
-    ]);
-    registerUnhandledAgentSseFallback({ agent: agentEvents, handledEvents });
+    registerUnhandledAgentSseFallback({ agent: agentEvents, handledEvents: createTerminalHandledAgentEventsSet() });
 }

@@ -2,8 +2,9 @@
 /**
  * Estado de UX terminal para interações SDK que não pertencem ao protocolo READY/REPLY.
  *
- * `ask_user` é tratado pelo dialog loop porque ele transporta a conversa viva da LLM-B. `elicitation` é tratado aqui
- * porque é formulário/URL estruturado do SDK, normalmente correlacionado a tools/MCP/UI.
+ * `ask_user` é tratado pelo dialog loop porque ele transporta a conversa viva da LLM-B. `elicitation` e permissões SDK
+ * são tratados aqui porque representam interrupções estruturadas do operador, normalmente correlacionadas a
+ * tools/MCP/UI.
  *
  * @module copilot/terminal/sdk-interactions
  */
@@ -30,11 +31,30 @@
  * @property {SdkInteractionStatus} status
  */
 
+/**
+ * @typedef {object} TerminalPermissionEntry
+ * @property {string} id
+ * @property {string | null} requestId
+ * @property {string} permissionType
+ * @property {Record<string, unknown>} data
+ * @property {boolean | null} granted
+ * @property {string | null} result
+ * @property {number} createdAt
+ * @property {number | null} completedAt
+ * @property {SdkInteractionStatus} status
+ */
+
 /** @type {Map<string, TerminalElicitationEntry>} */
 const _elicitations = new Map();
 
 /** @type {string | null} */
 let _latestElicitationId = null;
+
+/** @type {Map<string, TerminalPermissionEntry>} */
+const _permissions = new Map();
+
+/** @type {string | null} */
+let _latestPermissionId = null;
 
 /**
  * @param {unknown} value
@@ -146,6 +166,113 @@ export function clearTerminalElicitation(id) {
         _latestElicitationId = listTerminalElicitations({ includeCompleted: true })[0]?.id ?? null;
     }
     return deleted;
+}
+
+/**
+ * @param {unknown} evt
+ * @returns {TerminalPermissionEntry}
+ */
+export function recordTerminalPermissionRequested(evt) {
+    const data = objectOrNull(evt) ?? {};
+    const requestId = stringOr(data['requestId'], '');
+    const permissionType = stringOr(data['permissionType'], stringOr(data['type'], 'unknown'));
+    const id = requestId || `permission-${permissionType}-${Date.now().toString(36)}`;
+    const entry = {
+        id,
+        requestId: requestId || null,
+        permissionType,
+        data,
+        granted: null,
+        result: null,
+        createdAt: typeof data['ts'] === 'number' ? data['ts'] : Date.now(),
+        completedAt: null,
+        status: /** @type {SdkInteractionStatus} */ ('pending'),
+    };
+    _permissions.set(id, entry);
+    _latestPermissionId = id;
+    return entry;
+}
+
+/**
+ * @param {unknown} evt
+ * @returns {TerminalPermissionEntry | null}
+ */
+export function recordTerminalPermissionCompleted(evt) {
+    const data = objectOrNull(evt) ?? {};
+    const requestId = stringOr(data['requestId'], '') || stringOr(objectOrNull(data['data'])?.['requestId'], '');
+    const permissionType = stringOr(
+        data['permissionType'],
+        stringOr(objectOrNull(data['data'])?.['permissionType'], ''),
+    );
+    const entry =
+        (requestId ? _permissions.get(requestId) : null) ??
+        [..._permissions.values()]
+            .filter((candidate) => candidate.status === 'pending')
+            .find((candidate) => !permissionType || candidate.permissionType === permissionType) ??
+        null;
+    if (!entry) return null;
+    const grantedValue = data['granted'] ?? data['approved'] ?? objectOrNull(data['data'])?.['granted'];
+    entry.status = 'completed';
+    entry.completedAt = typeof data['ts'] === 'number' ? data['ts'] : Date.now();
+    entry.granted = typeof grantedValue === 'boolean' ? grantedValue : null;
+    entry.result = stringOr(data['result'], stringOr(objectOrNull(data['data'])?.['result'], '')) || null;
+    entry.data = { ...entry.data, completion: data };
+    return entry;
+}
+
+/**
+ * @param {{ includeCompleted?: boolean }} [opts]
+ * @returns {TerminalPermissionEntry[]}
+ */
+export function listTerminalPermissions(opts = {}) {
+    return [..._permissions.values()]
+        .filter((entry) => opts.includeCompleted || entry.status === 'pending')
+        .sort((a, b) => b.createdAt - a.createdAt);
+}
+
+/**
+ * @param {string | null | undefined} id
+ * @returns {TerminalPermissionEntry | null}
+ */
+export function getTerminalPermission(id) {
+    const resolved = !id || id === 'latest' ? _latestPermissionId : id;
+    return resolved ? (_permissions.get(resolved) ?? null) : null;
+}
+
+/**
+ * @param {string | null | undefined} id
+ * @returns {boolean}
+ */
+export function clearTerminalPermission(id) {
+    if (id === 'all') {
+        clearTerminalPermissions();
+        return true;
+    }
+    const resolved = !id || id === 'latest' ? _latestPermissionId : id;
+    if (!resolved) return false;
+    const deleted = _permissions.delete(resolved);
+    if (_latestPermissionId === resolved) {
+        _latestPermissionId = listTerminalPermissions({ includeCompleted: true })[0]?.id ?? null;
+    }
+    return deleted;
+}
+
+/**
+ * @returns {{ pending: number; latest: TerminalPermissionEntry | null }}
+ */
+export function readTerminalPermissionSummary() {
+    return {
+        pending: listTerminalPermissions().length,
+        latest: _latestPermissionId ? (_permissions.get(_latestPermissionId) ?? null) : null,
+    };
+}
+
+/**
+ * @returns {void}
+ */
+export function clearTerminalPermissions() {
+    _permissions.clear();
+    _latestPermissionId = null;
 }
 
 /**

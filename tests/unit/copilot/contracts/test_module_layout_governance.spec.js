@@ -47,7 +47,9 @@ import {
 } from '../../../../src/copilot/terminal/handlers/module-map.js';
 import {
     TERMINAL_MODULE_LAYOUT,
+    buildTerminalModuleScorecard,
     getTerminalModuleRole,
+    listTerminalModulesByRisk,
     listTerminalModulesByRole,
 } from '../../../../src/copilot/terminal/module-map.js';
 
@@ -385,6 +387,8 @@ describe('W114 — module layout governance: terminal root', () => {
         assert.match(index, /TERMINAL_MODULE_LAYOUT/);
         assert.match(index, /getTerminalModuleRole/);
         assert.match(index, /listTerminalModulesByRole/);
+        assert.match(index, /listTerminalModulesByRisk/);
+        assert.match(index, /buildTerminalModuleScorecard/);
     });
 
     it('mantem fallback SSE explicitamente fora da superficie publica', () => {
@@ -392,6 +396,47 @@ describe('W114 — module layout governance: terminal root', () => {
         assert.equal(fallbacks.length, 1);
         assert.equal(fallbacks[0]?.public, false);
         assert.equal(fallbacks[0]?.tier, 'internal');
+    });
+
+    it('marca arquivos grandes da raiz como watch ou hotspot', () => {
+        const offenders = TERMINAL_MODULE_LAYOUT.filter((entry) => entry.kind === 'file')
+            .filter((entry) => entry.path !== 'module-map.js')
+            .filter((entry) => countLines(join(TERMINAL_ROOT, entry.path)) > 220)
+            .filter((entry) => entry.risk === 'stable')
+            .map((entry) => entry.path)
+            .sort();
+
+        assert.deepEqual(offenders, [], `Arquivos grandes do terminal marcados como stable: ${offenders.join(', ')}`);
+    });
+
+    it('marca arquivos muito grandes da raiz como hotspot', () => {
+        const offenders = TERMINAL_MODULE_LAYOUT.filter((entry) => entry.kind === 'file')
+            .filter((entry) => entry.path !== 'module-map.js')
+            .filter((entry) => countLines(join(TERMINAL_ROOT, entry.path)) > 300)
+            .filter((entry) => entry.risk !== 'hotspot')
+            .map((entry) => entry.path)
+            .sort();
+
+        assert.deepEqual(offenders, [], `Arquivos muito grandes do terminal sem hotspot: ${offenders.join(', ')}`);
+    });
+
+    it('scorecard beta expõe hotspots reais do terminal root', () => {
+        const scorecard = buildTerminalModuleScorecard();
+
+        assert.equal(scorecard.total, TERMINAL_MODULE_LAYOUT.length);
+        assert.equal(scorecard.byRisk['hotspot'], listTerminalModulesByRisk('hotspot').length);
+        assert.deepEqual(scorecard.watch, ['alias-store.js', 'display-policy.js', 'sdk-interactions.js']);
+        assert.deepEqual(scorecard.hotspots, [
+            'agent-runtime-events.js',
+            'commands/',
+            'dialog/',
+            'frontend/',
+            'index.js',
+            'repl-command-router.js',
+            'repl.js',
+            'sdk-session-events.js',
+            'terminal-agent-wiring.js',
+        ]);
     });
 });
 

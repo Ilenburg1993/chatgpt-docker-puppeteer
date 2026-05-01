@@ -55,7 +55,8 @@
  * @property {string} question - Texto da pergunta
  * @property {string[]} [choices] - Opções disponíveis (se houver)
  * @property {boolean} allowFreeform - Se permite resposta livre
- * @property {(answer: string) => void} resolve - Resolver a Promise do SDK
+ * @property {(answer: string) => boolean | void} resolve - Resolver a Promise do SDK. Retorna `false` quando a resposta
+ *   foi rejeitada localmente, por exemplo uma resposta livre para uma pergunta choice-only.
  * @property {number} askedAt - Timestamp em ms
  * @property {PendingQuestionKind} kind - Classificação semântica da pergunta no protocolo do dialog loop.
  * @property {boolean} protocolControlled - `true` quando a pergunta foi emitida como parte do protocolo READY/REPLY.
@@ -105,7 +106,15 @@
  * @typedef {Object} AgentMetricsState
  * @property {number} sendCount - Total de mensagens enviadas nesta sessão.
  * @property {{ snapshot: AgentStatusSnapshot; at: number } | null} statusSnapshotCache - Cache temporário do snapshot.
- * @property {{ model?: string; cost?: number; quotaSnapshots?: Record<string, unknown>; ts: number } | null} lastPrInfo
+ * @property {{
+ *     model?: string;
+ *     configuredModel?: string;
+ *     modelMismatch?: boolean;
+ *     sessionId?: string | null;
+ *     cost?: number;
+ *     quotaSnapshots?: Record<string, unknown>;
+ *     ts: number;
+ * } | null} lastPrInfo
  *   - Último snapshot de billing/quota.
  */
 

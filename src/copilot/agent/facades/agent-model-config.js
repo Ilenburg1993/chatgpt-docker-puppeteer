@@ -14,6 +14,23 @@ import { toError } from '../../core/error-handlers.js';
 import { log } from '../ports/logging-port.js';
 import { trySetLiveSessionModel } from '../runtime-contracts.js';
 import { readAgentRuntimeStatusSnapshot } from '../runtime/status-readers.js';
+import { persistAgentRuntimeStatePartial } from './agent-runtime-state.js';
+
+/**
+ * @param {import('../agent-context.js').AgentContext} ctx
+ * @param {Partial<import('../lifecycle/state/state-io.js').AliveAgentState>} partial
+ * @param {{ label: string; description: string }} meta
+ * @returns {void}
+ */
+function persistRuntimeConfigChange(ctx, partial, meta) {
+    const task = persistAgentRuntimeStatePartial(partial, { label: meta.label }).then((result) => {
+        if (!result.ok) {
+            throw result.error;
+        }
+        return undefined;
+    });
+    void ctx.trackBackgroundTask(task, meta);
+}
 
 /**
  * Retorna o ID do modelo atual configurado no contexto.
@@ -35,6 +52,14 @@ export function getModel(ctx) {
 export function setModel(ctx, modelId) {
     ctx.setModel(modelId);
     trySetLiveSessionModel(ctx.getSessionSnapshot(), modelId, 'AlwaysAlive');
+    persistRuntimeConfigChange(
+        ctx,
+        { model: modelId },
+        {
+            label: 'runtime.config.model',
+            description: 'Persist current runtime model after operator change',
+        },
+    );
 }
 
 /**
@@ -157,4 +182,15 @@ export function getReasoningEffort(ctx) {
  */
 export function setReasoningEffort(ctx, effort) {
     ctx.setReasoningEffort(effort);
+    if (effort === undefined) {
+        return;
+    }
+    persistRuntimeConfigChange(
+        ctx,
+        { reasoningEffort: effort },
+        {
+            label: 'runtime.config.reasoning',
+            description: 'Persist current runtime reasoning effort after operator change',
+        },
+    );
 }

@@ -9,11 +9,7 @@
  * @see EventBus
  */
 
-import { getBusy } from '../presentation/runtime-ui-state-store.js';
-import { setupTerminalAgentRuntimeEventListeners } from './agent-runtime-events.js';
-import { buildUserPrompt } from './dialog/index.js';
-import { readTerminalAgentRuntimeEventHost } from './frontend/llm-b-runtime.js';
-import { setupTerminalSdkSessionEventListeners } from './sdk-session-events.js';
+import { setupTerminalInteractiveEventAdapters } from './event-adapters.js';
 
 /**
  * Registra listeners de eventos do AlwaysAliveAgent para exibição no terminal.
@@ -22,20 +18,5 @@ import { setupTerminalSdkSessionEventListeners } from './sdk-session-events.js';
  * @returns {() => void} Função de cleanup
  */
 export function setupAgentListeners(rl) {
-    const agentRuntimeEvents = readTerminalAgentRuntimeEventHost();
-    const refreshPromptIfIdle = () => {
-        if (getBusy()) return;
-        rl.setPrompt(buildUserPrompt());
-        rl.prompt();
-    };
-    const cleanupAgentRuntimeEvents = setupTerminalAgentRuntimeEventListeners({ agent: agentRuntimeEvents, rl });
-    const cleanupSdkSessionEvents = setupTerminalSdkSessionEventListeners({
-        agent: agentRuntimeEvents,
-        refreshPromptIfIdle,
-    });
-
-    return () => {
-        cleanupAgentRuntimeEvents();
-        cleanupSdkSessionEvents();
-    };
+    return setupTerminalInteractiveEventAdapters(rl);
 }

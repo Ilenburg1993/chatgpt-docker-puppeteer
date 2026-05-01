@@ -69,6 +69,42 @@ export function wireInteractionEvents(session, { emit }) {
             emit('permission.completed', { granted, data, ts: evt?.timestamp ?? Date.now() });
         }),
 
+        // ── user_input.requested / completed ─────────────────────────────
+        onSessionEvent(session, SESSION_EVENTS.USER_INPUT_REQUESTED, (evt) => {
+            const raw = /** @type {Record<string, unknown>} */ (/** @type {unknown} */ (evt));
+            const data = /** @type {Record<string, unknown>} */ (raw['data'] ?? {});
+            const requestId = /** @type {string | undefined} */ (data['requestId']);
+            const question = /** @type {string | undefined} */ (data['question']);
+            const choices = Array.isArray(data['choices']) ? /** @type {string[]} */ (data['choices']) : undefined;
+            const allowFreeform = data['allowFreeform'] !== false;
+            log('INFO', `[interaction-events] user_input.requested: requestId=${requestId ?? '?'}`);
+            emit('user_input.requested', {
+                requestId,
+                question: question ?? '',
+                ...(choices !== undefined ? { choices } : {}),
+                allowFreeform,
+                toolCallId: data['toolCallId'] ?? null,
+                data,
+                ts: evt?.timestamp ?? Date.now(),
+            });
+        }),
+
+        onSessionEvent(session, SESSION_EVENTS.USER_INPUT_COMPLETED, (evt) => {
+            const raw = /** @type {Record<string, unknown>} */ (/** @type {unknown} */ (evt));
+            const data = /** @type {Record<string, unknown>} */ (raw['data'] ?? {});
+            const requestId = /** @type {string | undefined} */ (data['requestId']);
+            const answer = /** @type {string | undefined} */ (data['answer']);
+            const wasFreeform = typeof data['wasFreeform'] === 'boolean' ? data['wasFreeform'] : undefined;
+            log('DEBUG', `[interaction-events] user_input.completed: requestId=${requestId ?? '?'}`);
+            emit('user_input.completed', {
+                requestId,
+                answer: answer ?? '',
+                ...(wasFreeform !== undefined ? { wasFreeform } : {}),
+                data,
+                ts: evt?.timestamp ?? Date.now(),
+            });
+        }),
+
         // ── subagent.started ─────────────────────────────────────────────
         onSessionEvent(session, SESSION_EVENTS.SUBAGENT_STARTED, (evt) => {
             const raw = /** @type {Record<string, unknown>} */ (/** @type {unknown} */ (evt));
@@ -112,6 +148,41 @@ export function wireInteractionEvents(session, { emit }) {
             const agentName = /** @type {string | undefined} */ (data['agentName'] ?? data['name']);
             log('DEBUG', `[interaction-events] subagent.deselected: ${agentName ?? '?'}`);
             emit('subagent.deselected', { agentName, data, ts: evt?.timestamp ?? Date.now() });
+        }),
+
+        // ── external_tool.requested / completed ────────────────────────
+        onSessionEvent(session, SESSION_EVENTS.EXTERNAL_TOOL_REQUESTED, (evt) => {
+            const raw = /** @type {Record<string, unknown>} */ (/** @type {unknown} */ (evt));
+            const data = /** @type {Record<string, unknown>} */ (raw['data'] ?? {});
+            const toolName = /** @type {string | undefined} */ (data['toolName'] ?? data['name']);
+            const requestId = /** @type {string | undefined} */ (data['requestId']);
+            log(
+                'INFO',
+                `[interaction-events] external_tool.requested: ${toolName ?? '?'} requestId=${requestId ?? '?'}`,
+            );
+            emit('external_tool.requested', { toolName, requestId, data, ts: evt?.timestamp ?? Date.now() });
+        }),
+
+        onSessionEvent(session, SESSION_EVENTS.EXTERNAL_TOOL_COMPLETED, (evt) => {
+            const raw = /** @type {Record<string, unknown>} */ (/** @type {unknown} */ (evt));
+            const data = /** @type {Record<string, unknown>} */ (raw['data'] ?? {});
+            const toolName = /** @type {string | undefined} */ (data['toolName'] ?? data['name']);
+            const requestId = /** @type {string | undefined} */ (data['requestId']);
+            const success = /** @type {boolean | undefined} */ (data['success']);
+            log(
+                'DEBUG',
+                `[interaction-events] external_tool.completed: ${toolName ?? '?'} requestId=${requestId ?? '?'}`,
+            );
+            emit('external_tool.completed', { toolName, requestId, success, data, ts: evt?.timestamp ?? Date.now() });
+        }),
+
+        // ── pending_messages.modified ───────────────────────────────────
+        onSessionEvent(session, SESSION_EVENTS.PENDING_MESSAGES_MODIFIED, (evt) => {
+            const raw = /** @type {Record<string, unknown>} */ (/** @type {unknown} */ (evt));
+            const data = /** @type {Record<string, unknown>} */ (raw['data'] ?? {});
+            const count = /** @type {number | undefined} */ (data['count']);
+            log('DEBUG', `[interaction-events] pending_messages.modified count=${count ?? '?'}`);
+            emit('pending_messages.modified', { count, data, ts: evt?.timestamp ?? Date.now() });
         }),
 
         // ── exit_plan_mode.completed ───────────────────────────────────

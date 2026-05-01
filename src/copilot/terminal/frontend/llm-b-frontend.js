@@ -30,14 +30,11 @@ import {
     getLastSdkPlanChangedAt,
     getLastSdkPlanOperation,
     getSdkSessionMode,
-    getShowIntentActivity,
-    getShowStreaming,
-    getShowThinking,
-    getShowToolActivity,
-    getShowUsage,
 } from '../../presentation/runtime-ui-state-store.js';
 import { readToolStatsProjection } from '../../presentation/system-metrics.js';
 import { readTerminalActivityHistory, readTerminalActivitySnapshot } from '../activity-state.js';
+import { readTerminalDisplayState } from '../display-policy.js';
+import { listTerminalElicitations, readTerminalPermissionSummary } from '../sdk-interactions.js';
 import {
     answerTerminalPendingQuestion,
     canSearchTerminalHubTurns,
@@ -74,6 +71,16 @@ import {
  */
 
 /**
+ * @typedef {{
+ *     billedModel: string | null;
+ *     configuredModel: string | null;
+ *     mismatch: boolean;
+ *     cost: number | null;
+ *     at: string | null;
+ *     displayModel: string;
+ * }} TerminalModelBillingProjection
+ *
+ *
  * @typedef {{
  *     requestedRuntimeId: string | null;
  *     runtimeId: string;
@@ -139,6 +146,46 @@ export function readTerminalRuntimeBase(runtimeId) {
 }
 
 /**
+ * Normaliza a última medição de consumo/modelo para comandos do terminal.
+ *
+ * @param {Record<string, any> | null | undefined} lastPrInfo
+ * @param {string | null | undefined} fallbackModel
+ * @returns {TerminalModelBillingProjection}
+ */
+export function normalizeTerminalModelBillingProjection(lastPrInfo, fallbackModel) {
+    const billedModel = typeof lastPrInfo?.['model'] === 'string' ? lastPrInfo['model'] : null;
+    const configuredModel = typeof lastPrInfo?.['configuredModel'] === 'string' ? lastPrInfo['configuredModel'] : null;
+    const mismatch =
+        Boolean(lastPrInfo?.['modelMismatch']) ||
+        Boolean(billedModel && configuredModel && billedModel !== configuredModel);
+    return {
+        billedModel,
+        configuredModel,
+        mismatch,
+        cost: typeof lastPrInfo?.['cost'] === 'number' ? Number(lastPrInfo['cost']) : null,
+        at: typeof lastPrInfo?.['ts'] === 'number' ? new Date(lastPrInfo['ts']).toISOString() : null,
+        displayModel: billedModel ?? configuredModel ?? fallbackModel ?? '-',
+    };
+}
+
+/**
+ * Renderiza a topologia multi-runtime numa forma compacta e estável para comandos do terminal.
+ *
+ * @param {TerminalRuntimeBase['agentRuntimes']} runtimes
+ * @returns {string}
+ */
+export function formatTerminalRuntimeTopology(runtimes) {
+    return Array.isArray(runtimes) && runtimes.length > 0
+        ? runtimes
+              .map((runtime) => {
+                  const marker = runtime.isDefault ? '*' : '-';
+                  return `${marker}${runtime.runtimeId}:${runtime.model}/${runtime.status}`;
+              })
+              .join('  •  ')
+        : '(nenhum runtime registrado)';
+}
+
+/**
  * Projeção de status do terminal/LLM-B para UX local.
  *
  * @param {{ hubSessionId?: string | null; injectPort?: number; runtimeId?: string | null }} input
@@ -157,6 +204,8 @@ export function readTerminalRuntimeBase(runtimeId) {
  *     pendingQuestionShadowAgeMs: number | null;
  *     pendingQuestionShadowExpiresAt: number | null;
  *     pendingQuestionShadowRemainingMs: number | null;
+ *     lastPrInfo: Record<string, any> | null;
+ *     modelBilling: TerminalModelBillingProjection;
  *     recommendedAction: import('../../presentation/types.js').RuntimeRecommendedAction | null;
  *     sdkSessionMode: 'interactive' | 'plan' | 'autopilot' | 'shell' | null;
  *     sdkPlanOperation: 'create' | 'update' | 'delete' | null;
@@ -175,12 +224,16 @@ export function readTerminalRuntimeBase(runtimeId) {
  *         sessionId: string | null;
  *         isDefault: boolean;
  *     }[];
+ *     runtimeTopologyLabel: string;
  *     runtimeSessionId: string | null;
  *     workspace: ReturnType<typeof getWorkspaceContext>;
  *     turnCount: number;
  *     activity: import('../activity-state.js').TerminalActivitySnapshot;
  *     lifecycle: ReturnType<typeof readRuntimeLifecycleSnapshot>;
  *     lifecycleSummary: ReturnType<typeof buildRuntimeLifecycleSummary>;
+ *     pendingElicitations: number;
+ *     pendingPermissions: number;
+ *     latestPermissionType: string | null;
  * }}
  */
 export function readTerminalStatusProjection({ hubSessionId = null, injectPort, runtimeId = null } = {}) {
@@ -191,6 +244,8 @@ export function readTerminalStatusProjection({ hubSessionId = null, injectPort, 
         typeof base.health?.['recommendedAction'] === 'string' ? base.health['recommendedAction'] : null
     );
     const lifecycle = readRuntimeLifecycleSnapshot();
+    const modelBilling = normalizeTerminalModelBillingProjection(base.lastPrInfo, String(base.snap['model'] ?? ''));
+    const permissionSummary = readTerminalPermissionSummary();
     return {
         snap: base.snap,
         health: base.health,
@@ -206,6 +261,8 @@ export function readTerminalStatusProjection({ hubSessionId = null, injectPort, 
         pendingQuestionShadowAgeMs: base.pendingQuestionShadowAgeMs,
         pendingQuestionShadowExpiresAt: base.pendingQuestionShadowExpiresAt,
         pendingQuestionShadowRemainingMs: base.pendingQuestionShadowRemainingMs,
+        lastPrInfo: base.lastPrInfo,
+        modelBilling,
         recommendedAction,
         sdkSessionMode: getSdkSessionMode(),
         sdkPlanOperation: getLastSdkPlanOperation(),
@@ -218,12 +275,16 @@ export function readTerminalStatusProjection({ hubSessionId = null, injectPort, 
         runtimeFound: base.runtimeFound,
         usedDefaultRuntimeFallback: base.usedDefaultRuntimeFallback,
         agentRuntimes: base.agentRuntimes,
+        runtimeTopologyLabel: formatTerminalRuntimeTopology(base.agentRuntimes),
         runtimeSessionId: base.runtimeSessionId,
         workspace: getWorkspaceContext(),
         turnCount: readTerminalTurnCount(),
         activity: readTerminalActivitySnapshot(),
         lifecycle,
         lifecycleSummary: buildRuntimeLifecycleSummary(lifecycle),
+        pendingElicitations: listTerminalElicitations().length,
+        pendingPermissions: permissionSummary.pending,
+        latestPermissionType: permissionSummary.latest?.permissionType ?? null,
     };
 }
 
@@ -249,13 +310,7 @@ export function readTerminalActivityProjection(limit = 10) {
  * @returns {{ thinking: boolean; streaming: boolean; usage: boolean; tools: boolean; intent: boolean }}
  */
 export function readTerminalDisplayProjection() {
-    return {
-        thinking: getShowThinking(),
-        streaming: getShowStreaming(),
-        usage: getShowUsage(),
-        tools: getShowToolActivity(),
-        intent: getShowIntentActivity(),
-    };
+    return readTerminalDisplayState();
 }
 
 /**
@@ -798,6 +853,7 @@ export async function readTerminalDiagnoseProjection({ hubSessionId = null, runt
  *     runtimeSessionId: string | null;
  *     contextWindow: ContextWindowProjection | null;
  *     pr: Record<string, any> | null;
+ *     modelBilling: TerminalModelBillingProjection;
  *     turnCount: number;
  *     toolCallCount: number;
  *     toolErrorCount: number;
@@ -808,6 +864,7 @@ export async function readTerminalDiagnoseProjection({ hubSessionId = null, runt
 export function readTerminalMetricsProjection(runtimeId) {
     const base = readTerminalRuntimeBase(runtimeId);
     const pr = /** @type {Record<string, any> | null} */ (base.lastPrInfo ?? null);
+    const modelBilling = normalizeTerminalModelBillingProjection(pr, String(base.snap['model'] ?? base.model ?? ''));
     const toolStats = readToolStatsProjection().stats;
     let toolCallCount = 0;
     let toolErrorCount = 0;
@@ -827,6 +884,7 @@ export function readTerminalMetricsProjection(runtimeId) {
         runtimeSessionId: base.runtimeSessionId,
         contextWindow: base.contextWindow,
         pr,
+        modelBilling,
         turnCount: readTerminalTurnCount(),
         toolCallCount,
         toolErrorCount,
@@ -879,6 +937,7 @@ export function readTerminalErrorsProjection(limit) {
  * @returns {{
  *     contextWindow: ContextWindowProjection | null;
  *     pr: Record<string, any> | null;
+ *     modelBilling: TerminalModelBillingProjection;
  *     runtimeId: string;
  *     runtimeSessionId: string | null;
  *     binding: { hubSessionId: string | null; sdkSessionId: string | null };
@@ -886,9 +945,11 @@ export function readTerminalErrorsProjection(limit) {
  */
 export function readTerminalUsageNowProjection(runtimeId) {
     const base = readTerminalRuntimeBase(runtimeId);
+    const pr = /** @type {Record<string, any> | null} */ (base.lastPrInfo ?? null);
     return {
         contextWindow: base.contextWindow,
-        pr: /** @type {Record<string, any> | null} */ (base.lastPrInfo ?? null),
+        pr,
+        modelBilling: normalizeTerminalModelBillingProjection(pr, String(base.snap['model'] ?? base.model ?? '')),
         runtimeId: base.runtimeId,
         runtimeSessionId: base.runtimeSessionId,
         binding: base.binding,

@@ -25,7 +25,6 @@ import {
     EMITTER_TOOL_EXECUTION_PROGRESS,
     EMITTER_TOOL_EXECUTION_START,
 } from '#copilot/events';
-import { DialogProtocol } from '../dialog/protocol.js';
 import {
     getShowIntentActivity,
     getShowStreaming,
@@ -33,6 +32,9 @@ import {
 } from '../presentation/runtime-ui-state-store.js';
 import { recordTerminalActivity } from './activity-state.js';
 import { broadcastSse, buildUserPrompt, println } from './dialog/index.js';
+import { readTerminalRuntimeState } from './frontend/llm-b-runtime.js';
+import { createTerminalPendingQuestionReplayState } from './pending-question-replay.js';
+import { buildTerminalToolActivityPresentation, compactTerminalToolText } from './tool-activity-presenter.js';
 
 /**
  * @typedef {{
@@ -44,41 +46,71 @@ import { broadcastSse, buildUserPrompt, println } from './dialog/index.js';
 /**
  * @param {{
  *     agent: AgentEventHost;
- *     rl: import('readline').Interface;
+ *     rl?: import('readline').Interface | null;
  * }} input
  * @returns {() => void}
  */
-export function setupTerminalAgentRuntimeEventListeners({ agent, rl }) {
+export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null }) {
     /**
      * @type {Map<
      *     string,
-     *     { name: string; t0: number; lastProgress?: number | null; lastProgressMessage?: string | null }
+     *     {
+     *         name: string;
+     *         t0: number;
+     *         presentation: import('./tool-activity-presenter.js').TerminalToolActivityPresentation;
+     *         lastProgress?: number | null;
+     *         lastProgressMessage?: string | null;
+     *     }
      * >}
      */
     const activeTools = new Map();
+    const pendingQuestionReplay = createTerminalPendingQuestionReplayState();
+
+    /**
+     * @param {string} question
+     * @param {string[]} [choices=[]] Default is `[]`
+     * @param {'event' | 'replay'} [source='event'] Default is `'event'`
+     * @returns {void}
+     */
+    function renderPendingQuestion(question, choices = [], source = 'event') {
+        const decision = pendingQuestionReplay.shouldRender({ question, choices, source });
+        if (!decision.render) {
+            return;
+        }
+
+        recordTerminalActivity(
+            'question',
+            source === 'replay' ? 'Pergunta pendente restaurada' : 'LLM-B solicitou input',
+            {
+                detail: question.slice(0, 160),
+                source: 'agent',
+            },
+        );
+
+        rl?.pause();
+        println(`\n⚡ LLM-B perguntou: "${question}"`);
+        if (choices.length > 0) {
+            println(`   Opções: ${choices.join(' | ')}`);
+            const indexed = choices.map((choice, idx) => `${idx + 1}) ${choice}`).join('    ');
+            println(`   Escolha rápida: ${indexed}`);
+        }
+        if (rl) {
+            println('   → Responda digitando normalmente. Sua próxima mensagem será a resposta.');
+            println('   → Dica: use /status para contexto completo ou /answer <texto> para resposta explícita.');
+        } else {
+            println('   → Modo headless: responda via POST /inject ou pelo cliente conectado.');
+        }
+        rl?.resume();
+        if (rl) {
+            rl.setPrompt(buildUserPrompt());
+            rl.prompt();
+        }
+    }
 
     const onQuestion = (/** @type {Record<string, unknown>} */ evt) => {
         const question = /** @type {string} */ (evt?.['question'] ?? '');
         const choices = /** @type {string[]} */ (evt?.['choices'] ?? []);
-
-        if (DialogProtocol.isProtocolMessage(question)) {
-            return;
-        }
-
-        recordTerminalActivity('question', 'LLM-B solicitou input', {
-            detail: question.slice(0, 160),
-            source: 'agent',
-        });
-
-        rl.pause();
-        println(`\n⚡ LLM-B perguntou: "${question}"`);
-        if (choices.length > 0) {
-            println(`   Opções: ${choices.join(' | ')}`);
-        }
-        println('   → Responda digitando normalmente. Sua próxima mensagem será a resposta.');
-        rl.resume();
-        rl.setPrompt(buildUserPrompt());
-        rl.prompt();
+        renderPendingQuestion(question, choices, 'event');
     };
 
     const onStopped = () => {
@@ -88,32 +120,48 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl }) {
             source: 'agent',
         });
         println('[llm-b] ⚠️  Agente parado. Use /restart para reiniciar.');
-        rl.setPrompt(buildUserPrompt());
-        rl.prompt();
+        if (rl) {
+            rl.setPrompt(buildUserPrompt());
+            rl.prompt();
+        }
     };
 
     const onToolStart = (/** @type {Record<string, unknown>} */ evt) => {
         const toolCallId = /** @type {string} */ (evt?.['toolCallId'] ?? '');
         const name = /** @type {string} */ (evt?.['toolName'] ?? evt?.['name'] ?? 'tool');
-        activeTools.set(toolCallId, { name, t0: Date.now(), lastProgress: null, lastProgressMessage: null });
+        const presentation = buildTerminalToolActivityPresentation(evt, name);
+        activeTools.set(toolCallId, {
+            name,
+            t0: Date.now(),
+            presentation,
+            lastProgress: null,
+            lastProgressMessage: null,
+        });
         recordTerminalActivity('tool', 'Executando tool', {
-            detail: name,
+            detail: presentation.detail,
             toolName: name,
             source: 'sdk',
         });
         if (getShowToolActivity()) {
-            println(`  \x1b[90m🔧 ${name}\x1b[0m \x1b[33m(executando…)\x1b[0m`);
+            println(`  \x1b[90m🔧 ${name}\x1b[0m \x1b[33m${presentation.startLine}\x1b[0m`);
         }
-        broadcastSse('tool.start', { toolCallId, toolName: name });
+        broadcastSse('tool.start', {
+            toolCallId,
+            toolName: name,
+            operation: presentation.operation,
+            path: presentation.path,
+        });
     };
 
     const onToolProgress = (/** @type {Record<string, unknown>} */ evt) => {
         const toolCallId = /** @type {string} */ (evt?.['toolCallId'] ?? '');
         const entry = activeTools.get(toolCallId);
         const name = entry?.name ?? /** @type {string} */ (evt?.['toolName'] ?? evt?.['name'] ?? 'tool');
+        const presentation = entry?.presentation ?? buildTerminalToolActivityPresentation(evt, name);
         const progress = typeof evt?.['progress'] === 'number' ? Number(evt['progress']) : null;
         const progressMessage = typeof evt?.['progressMessage'] === 'string' ? evt['progressMessage'] : null;
-        const effectiveDetail = progressMessage ?? (progress !== null ? `${name} · ${progress}%` : name);
+        const effectiveDetail =
+            progressMessage ?? (progress !== null ? `${presentation.detail} · ${progress}%` : presentation.detail);
         const shouldPrint =
             getShowToolActivity() &&
             ((progress !== null &&
@@ -132,20 +180,28 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl }) {
         });
         if (shouldPrint) {
             const suffix = progressMessage ?? (progress !== null ? `${progress}%` : '');
-            println(`  \x1b[90m↳ ${name}\x1b[0m ${suffix}`.trimEnd());
+            println(`  \x1b[90m↳ ${presentation.progressLinePrefix}\x1b[0m ${suffix}`.trimEnd());
         }
-        broadcastSse('tool.progress', { toolCallId, toolName: name, progress, progressMessage });
+        broadcastSse('tool.progress', {
+            toolCallId,
+            toolName: name,
+            operation: presentation.operation,
+            path: presentation.path,
+            progress,
+            progressMessage,
+        });
     };
 
     const onToolPartialResult = (/** @type {{ toolCallId?: string; partialOutput?: string }} */ evt) => {
         const toolCallId = evt?.toolCallId ?? '';
         const entry = activeTools.get(toolCallId);
         const name = entry?.name ?? 'tool';
+        const presentation = entry?.presentation ?? buildTerminalToolActivityPresentation({}, name);
         const partialOutput = typeof evt?.partialOutput === 'string' ? evt.partialOutput : '';
         if (!partialOutput) return;
-        const preview = partialOutput.replace(/\s+/g, ' ').trim().slice(0, 120);
+        const preview = compactTerminalToolText(partialOutput, 120);
         recordTerminalActivity('tool', 'Streaming de saída da tool', {
-            detail: preview ? `${name} · ${preview}` : name,
+            detail: preview ? `${presentation.detail} · ${preview}` : presentation.detail,
             toolName: name,
             source: 'sdk',
             recordHistory: false,
@@ -153,12 +209,14 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl }) {
         if (getShowStreaming()) {
             for (const line of partialOutput.split('\n')) {
                 if (!line) continue;
-                println(`  \x1b[90m↳ ${name}\x1b[0m ${line}`);
+                println(`  \x1b[90m↳ ${presentation.progressLinePrefix}\x1b[0m ${line}`);
             }
         }
         broadcastSse('tool.partial_result', {
             toolCallId,
             toolName: name,
+            operation: presentation.operation,
+            path: presentation.path,
             partialOutput,
         });
     };
@@ -169,21 +227,24 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl }) {
         const entry = activeTools.get(toolCallId);
         activeTools.delete(toolCallId);
         const name = entry?.name ?? 'tool';
+        const presentation = entry?.presentation ?? buildTerminalToolActivityPresentation(evt, name);
         const dur = entry ? ((Date.now() - entry.t0) / 1000).toFixed(1) : '?';
         const icon = success ? '\x1b[32m✅\x1b[0m' : '\x1b[31m❌\x1b[0m';
         recordTerminalActivity('tool', success ? 'Tool concluída' : 'Tool falhou', {
-            detail: `${name} · ${dur}s`,
+            detail: presentation.completeLine(success, `${dur}s`),
             toolName: name,
             progress: success ? 100 : null,
             severity: success ? 'info' : 'error',
             source: 'sdk',
         });
         if (getShowToolActivity()) {
-            println(`  ${icon} \x1b[90m${name}\x1b[0m \x1b[90m(${dur}s)\x1b[0m`);
+            println(`  ${icon} \x1b[90m${name}\x1b[0m \x1b[90m${presentation.completeLine(success, `${dur}s`)}\x1b[0m`);
         }
         broadcastSse('tool.complete', {
             toolCallId,
             toolName: name,
+            operation: presentation.operation,
+            path: presentation.path,
             success,
             durationMs: entry ? Date.now() - entry.t0 : 0,
         });
@@ -289,6 +350,15 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl }) {
     agent.on(EMITTER_SUBAGENT_STARTED, onSubagentStarted);
     agent.on(EMITTER_SUBAGENT_COMPLETED, onSubagentCompleted);
     agent.on(EMITTER_SUBAGENT_FAILED, onSubagentFailed);
+
+    const runtimeState = readTerminalRuntimeState();
+    if (runtimeState.pendingQuestion && runtimeState.pendingQuestionKind !== 'ready') {
+        renderPendingQuestion(
+            runtimeState.pendingQuestion.question,
+            runtimeState.pendingQuestion.choices ?? [],
+            'replay',
+        );
+    }
 
     return () => {
         agent.off('question.pending', onQuestion);

@@ -22,6 +22,7 @@ import { executeSendToLlmB } from './send-pipeline.js';
 /**
  * @typedef {{
  *     sessionId?: string | null;
+ *     model?: string;
  *     dialogLoopActive?: boolean;
  *     sendDialogTurn?(content: string, opts?: { timeout?: number }): Promise<string>;
  *     getPermissionMode?(): string;

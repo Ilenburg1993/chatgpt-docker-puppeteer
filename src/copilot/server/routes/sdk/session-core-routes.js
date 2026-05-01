@@ -185,6 +185,19 @@ export function registerSessionCoreRoutes(router) {
             const entry = getActiveSessionEntryOrReply(routeDeps, id, res);
             if (!entry) return;
             await setSessionModel(entry.session, safeModel, routeDeps.sdkSession.pickDefined({ reasoningEffort }));
+
+            const runtimeSnapshot = routeDeps.sdkRuntimeProjection.readAgentStatusSnapshotForRuntime(
+                routeDeps.runtimeId,
+            );
+            const runtimeSessionId =
+                typeof runtimeSnapshot?.['sessionId'] === 'string' ? runtimeSnapshot['sessionId'] : null;
+            if (runtimeSessionId === id) {
+                routeDeps.sdkRuntimeProjection.setRuntimeModelProjection(safeModel, routeDeps.runtimeId);
+                if (reasoningEffort !== undefined) {
+                    routeDeps.sdkRuntimeProjection.setRuntimeReasoningProjection(reasoningEffort, routeDeps.runtimeId);
+                }
+            }
+
             routeDeps.sdkObservability.log('INFO', `[sdk-api] modelo alterado: sessão ${id} → ${safeModel}`);
             res.json(
                 withSessionRuntimeMeta(

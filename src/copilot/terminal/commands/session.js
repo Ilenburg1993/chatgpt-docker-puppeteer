@@ -11,7 +11,6 @@
 
 import { toError } from '#copilot/core';
 import {
-    answerPendingTerminalQuestion,
     clearPendingTerminalQuestionShadow,
     clearTerminalHistory,
     listTerminalSnapshotsProjection,
@@ -26,6 +25,7 @@ import {
     readTerminalStatusProjection,
     saveTerminalSnapshotProjection,
 } from '../frontend/index.js';
+import { tryAnswerTerminalPendingQuestionInput } from '../pending-question-answer.js';
 import { callWithRuntimeTarget, extractRuntimeTarget, withRuntimeTarget } from './runtime-target.js';
 
 /**
@@ -114,19 +114,17 @@ export function cmdStatus({ hubSessionId, injectPort, println }, arg = '') {
           ? `${lifecycle.shutdown.status === 'ok' ? '\x1b[32m' : '\x1b[31m'}${lifecycle.shutdown.status}\x1b[0m \x1b[90m${lifecycle.shutdown.handlers} handlers · ${lifecycle.shutdown.durationMs}ms${lifecycle.shutdown.failedHandler ? ` · falha=${lifecycle.shutdown.failedHandler}` : ''}\x1b[0m`
           : `\x1b[90mparado · ${lifecycle.registeredShutdownHandlers} handlers registrados\x1b[0m`;
     const modelMeta = configProjection.modelMeta;
+    const modelBilling = projection.modelBilling;
     const display = readTerminalDisplayProjection();
-    const runtimeTopology =
-        Array.isArray(configProjection.agentRuntimes) && configProjection.agentRuntimes.length > 0
-            ? configProjection.agentRuntimes
-                  .map((runtime) => {
-                      const marker = runtime.isDefault ? '*' : '-';
-                      return `${marker}${runtime.runtimeId}:${runtime.model}/${runtime.status}`;
-                  })
-                  .join('  •  ')
-            : '(nenhum runtime registrado)';
     const activitySeverityColor =
         activity.severity === 'error' ? '\x1b[31m' : activity.severity === 'warn' ? '\x1b[33m' : '\x1b[32m';
     const activityProgress = typeof activity.progress === 'number' ? ` (${activity.progress}%)` : '';
+    const sdkInterruptions = [
+        projection.pendingElicitations > 0 ? `elicitation=${projection.pendingElicitations}` : null,
+        projection.pendingPermissions > 0
+            ? `permission=${projection.pendingPermissions}${projection.latestPermissionType ? ` (${projection.latestPermissionType})` : ''}`
+            : null,
+    ].filter(Boolean);
     println(`
   \x1b[36mStatus do Terminal LLM-B\x1b[0m
   ─────────────────────────────────────
@@ -134,6 +132,7 @@ export function cmdStatus({ hubSessionId, injectPort, println }, arg = '') {
         health           ${health ? `${healthColor}${health['status']}\x1b[0m` : '\x1b[90m(n/d)\x1b[0m'}
   dialog loop      ${active ? '\x1b[32m● ativo\x1b[0m' : '\x1b[31m○ inativo\x1b[0m'}
   ask_user         ${askUserStatus}
+  sdk interrupts   ${sdkInterruptions.length > 0 ? `\x1b[33m${sdkInterruptions.join(' · ')}\x1b[0m` : '\x1b[90m(nenhum)\x1b[0m'}
   modelo           \x1b[36m${snap['model']}\x1b[0m
   reasoning        \x1b[35m${effort}\x1b[0m
     modo SDK         ${sdkModeColor}${sdkMode}\x1b[0m
@@ -143,7 +142,7 @@ export function cmdStatus({ hubSessionId, injectPort, println }, arg = '') {
         ação sugerida    ${projection.recommendedAction ?? 'none'}
     runtime session  \x1b[90m${projection.runtimeSessionId ?? '(sem runtime)'}\x1b[0m
     runtime id       \x1b[90m${projection.runtimeId}\x1b[0m
-    runtimes         \x1b[90m${runtimeTopology}\x1b[0m
+    runtimes         \x1b[90m${projection.runtimeTopologyLabel}\x1b[0m
     sdk session      \x1b[90m${projection.sdkSessionId ?? '(sem sdk)'}\x1b[0m
     hub session      \x1b[90m${projection.hubSessionId ?? '(sem hub)'}\x1b[0m
     turnos (memória) ${projection.turnCount}
@@ -153,6 +152,9 @@ export function cmdStatus({ hubSessionId, injectPort, println }, arg = '') {
         boot             ${bootLine}
         shutdown         ${shutdownLine}
         display          \x1b[90mthinking=${display.thinking ? 'on' : 'off'} · streaming=${display.streaming ? 'on' : 'off'} · usage=${display.usage ? 'on' : 'off'} · tools=${display.tools ? 'on' : 'off'} · intent=${display.intent ? 'on' : 'off'}\x1b[0m
+          último PR         \x1b[90m${modelBilling.at ?? '(sem consumo ainda)'}\x1b[0m
+          billing/modelo    ${modelBilling.mismatch ? `\x1b[31mmismatch\x1b[0m \x1b[90m(cfg=${modelBilling.configuredModel ?? '-'} · cobrado=${modelBilling.billedModel ?? '-'})\x1b[0m` : `\x1b[32mok\x1b[0m \x1b[90m(${modelBilling.displayModel})\x1b[0m`}
+          custo último PR   \x1b[90m${modelBilling.cost == null ? '(n/d)' : modelBilling.cost.toFixed(4)}\x1b[0m
         perfil modelo    \x1b[90m${modelMeta ? `cost=${modelMeta.costTier ?? 'n/a'} · speed=${modelMeta.speedTier ?? 'n/a'} · ctx=${typeof modelMeta.contextWindow === 'number' ? modelMeta.contextWindow.toLocaleString('pt-BR') : 'n/a'}` : '(sem metadata local)'}\x1b[0m
   ─────────────────────────────────────
   workspace        \x1b[90m${ws.cwd}\x1b[0m
@@ -201,10 +203,72 @@ export function cmdStatus({ hubSessionId, injectPort, println }, arg = '') {
             '  \x1b[90mNota: a sessão SDK está em plan mode vanilla; use /plan off para voltar a interactive.\x1b[0m',
         );
     }
+    if (projection.pendingElicitations > 0) {
+        println('  \x1b[33mAção: há elicitation pendente; use /elicitation list e /elicitation show latest.\x1b[0m');
+    }
+    if (projection.pendingPermissions > 0) {
+        println(
+            '  \x1b[33mAção: há permissão SDK pendente; acompanhe /activity e aguarde o hook/runtime decidir.\x1b[0m',
+        );
+    }
+    if (modelBilling.mismatch) {
+        println(
+            '  \x1b[33mAção recomendada: valide fallback/model switch com /sdk quota, /status e um turno curto de confirmação.\x1b[0m',
+        );
+    }
     if (projection.usedDefaultRuntimeFallback) {
         println(
             `  \x1b[33mNota: runtime solicitado ${projection.requestedRuntimeId ?? '(desconhecido)'} não encontrado; usando runtime default (${projection.runtimeId}).\x1b[0m`,
         );
+    }
+}
+
+/**
+ * Snapshot operacional rápido para uso frequente durante investigação/live-debug.
+ *
+ * @param {SessionContext} ctx
+ * @param {string} [arg]
+ * @returns {void}
+ */
+export function cmdNow({ hubSessionId, injectPort, println }, arg = '') {
+    const { runtimeId } = extractRuntimeTarget(arg);
+    const projection = readTerminalStatusProjection(
+        withRuntimeTarget(
+            {
+                hubSessionId: hubSessionId ?? null,
+                ...(typeof injectPort === 'number' ? { injectPort } : {}),
+            },
+            runtimeId,
+        ),
+    );
+    const mode = projection.sdkSessionMode ?? 'interactive';
+    const state = String(projection.snap['status'] ?? 'unknown');
+    const ask = projection.pendingQuestion
+        ? `ASK:${projection.pendingQuestionKind ?? 'question'}`
+        : projection.pendingQuestionShadowState
+          ? `SHADOW:${projection.pendingQuestionShadowState}`
+          : 'ASK:none';
+    const sdkWait = [
+        projection.pendingElicitations > 0 ? `ELICIT:${projection.pendingElicitations}` : null,
+        projection.pendingPermissions > 0 ? `PERM:${projection.pendingPermissions}` : null,
+    ]
+        .filter(Boolean)
+        .join(' ');
+    const queue = Number(projection.snap['queueSize'] ?? 0);
+    const modelBilling = projection.modelBilling;
+    const mismatchLabel = modelBilling.mismatch
+        ? `mismatch(cfg=${modelBilling.configuredModel ?? '-'}|bill=${modelBilling.billedModel ?? '-'})`
+        : `model=${modelBilling.displayModel}`;
+
+    println(
+        `\x1b[36m[now]\x1b[0m runtime=${projection.runtimeId} status=${state} loop=${projection.dialogLoopActive ? 'on' : 'off'} mode=${mode} queue=${queue} ${ask}${sdkWait ? ` ${sdkWait}` : ''} ${mismatchLabel}`,
+    );
+    if (projection.activity?.label) {
+        const detail = projection.activity.detail ? ` · ${projection.activity.detail}` : '';
+        println(`\x1b[90m[now]\x1b[0m atividade=${projection.activity.phase}:${projection.activity.label}${detail}`);
+    }
+    if (projection.recommendedAction) {
+        println(`\x1b[90m[now]\x1b[0m recommended=${projection.recommendedAction}`);
     }
 }
 
@@ -367,13 +431,21 @@ export function cmdClear({ println }) {
  */
 export function cmdAnswer({ println }, arg) {
     const { runtimeId, arg: answer } = extractRuntimeTarget(arg);
-    const ok = callWithRuntimeTarget(answerPendingTerminalQuestion, runtimeId, answer);
-    if (ok) {
-        println(`[answer] Resposta enviada: "${answer}"`);
+    const result = tryAnswerTerminalPendingQuestionInput(answer, runtimeId);
+    if (result.ok) {
+        println(`[answer] Resposta enviada: "${result.answer}"`);
+        return;
+    }
+    if (result.reason === 'empty') {
+        println('[answer] Uso: /answer <texto>');
+        return;
+    }
+    if (result.reason === 'protocol_controlled') {
+        println('[answer] O runtime aguarda uma mensagem de diálogo. Digite o texto normalmente, sem /answer.');
         return;
     }
     const projection = readTerminalStatusProjection(withRuntimeTarget({}, runtimeId));
-    if (projection.pendingQuestionShadowExpired) {
+    if (result.shadowExpired || projection.pendingQuestionShadowExpired) {
         println('[answer] Nenhuma pergunta viva. Há uma shadow expirada de ask_user pendente de limpeza.');
         return;
     }

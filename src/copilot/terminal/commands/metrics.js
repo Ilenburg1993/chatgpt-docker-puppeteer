@@ -29,7 +29,6 @@ export function cmdMetrics({ println }, arg = '') {
     const configProjection = callWithRuntimeTarget(readTerminalConfigProjection, runtimeId);
     const {
         snap,
-        pr,
         turnCount,
         contextWindow,
         toolCallCount,
@@ -38,6 +37,7 @@ export function cmdMetrics({ println }, arg = '') {
         binding,
         runtimeSessionId,
         activity,
+        modelBilling,
     } = projection;
 
     // ── Session info ─────────────────────────────────────────────────
@@ -57,9 +57,11 @@ export function cmdMetrics({ println }, arg = '') {
     }
 
     // ── Billing ──────────────────────────────────────────────────────
-    const lastModel = pr?.['model'] ?? '-';
-    const lastCost = pr?.['cost'];
-    const costStr = typeof lastCost === 'number' ? `$${lastCost.toFixed(4)}` : '-';
+    const lastModel = modelBilling.mismatch
+        ? `cfg=${modelBilling.configuredModel ?? '-'} · cobrado=${modelBilling.billedModel ?? '-'}`
+        : modelBilling.displayModel;
+    const costStr = modelBilling.cost === null ? '-' : `$${modelBilling.cost.toFixed(4)}`;
+    const billingStatus = modelBilling.mismatch ? '\x1b[31mmismatch\x1b[0m' : '\x1b[32mok\x1b[0m';
 
     println(`
   \x1b[36mMétricas da Sessão\x1b[0m
@@ -77,7 +79,7 @@ export function cmdMetrics({ println }, arg = '') {
   ─────────────────────────────────────
   turns       ${turnCount}
   contexto    ${ctxStr}
-  último PR   ${lastModel} · ${costStr}
+  último PR   ${lastModel} · ${costStr} · ${billingStatus}
 
   \x1b[35m🔧 Ferramentas\x1b[0m
   ─────────────────────────────────────

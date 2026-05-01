@@ -48,6 +48,9 @@ export { KNOWN_SDK_EVENTS } from '../../../event-handlers/catch-all.js';
  * @property {(contextState: { tokens: number; tokenLimit: number; utilization: number } | null) => void} onContextState
  * @property {(prInfo: {
  *     model?: string;
+ *     configuredModel?: string;
+ *     modelMismatch?: boolean;
+ *     sessionId?: string | null;
  *     cost?: number;
  *     quotaSnapshots?: Record<string, unknown>;
  *     ts: number;

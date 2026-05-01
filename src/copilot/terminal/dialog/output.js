@@ -11,6 +11,7 @@
 import { LLM_B_BOOT_PROMPT, LLM_B_TURN_TIMEOUT_MS } from '#copilot/config';
 import { getSdkSessionMode } from '../../presentation/runtime-ui-state-store.js';
 import { readTerminalActivitySnapshot } from '../activity-state.js';
+import { readTerminalPromptDisplayPolicy } from '../display-policy.js';
 import { readTerminalDialogStreamMeta, readTerminalRuntimeState } from '../frontend/llm-b-runtime.js';
 
 // ─── Configuração ─────────────────────────────────────────────────────────────
@@ -39,11 +40,13 @@ function shortenPromptToken(value, max = 18) {
  */
 export function buildUserPrompt() {
     const state = readTerminalRuntimeState();
+    const promptPolicy = readTerminalPromptDisplayPolicy();
     const { model, reasoningEffort } = state;
     /** @type {string[]} */
     const tags = [];
 
-    if (!state.dialogLoopActive) {
+    const bootstrapping = state.status === 'starting';
+    if (!state.dialogLoopActive && !bootstrapping) {
         tags.push('\x1b[31m[NOLOOP]\x1b[0m');
     }
     const sdkMode = getSdkSessionMode();
@@ -53,7 +56,7 @@ export function buildUserPrompt() {
     if (state.dialogPaused) {
         tags.push('\x1b[31m[PAUSED]\x1b[0m');
     }
-    if (state.queueSize > 0) {
+    if (promptPolicy.showQueueTag && state.queueSize > 0) {
         tags.push(`\x1b[90m[Q:${state.queueSize}]\x1b[0m`);
     }
     if (state.pendingQuestion && state.pendingQuestionKind && state.pendingQuestionKind !== 'ready') {
@@ -67,7 +70,9 @@ export function buildUserPrompt() {
                   : state.pendingQuestionShadowState === 'fresh'
                     ? '\x1b[36m[SHADOW:FRESH]\x1b[0m'
                     : '\x1b[33m[SHADOW]\x1b[0m';
-        tags.push(shadowTag);
+        if (state.pendingQuestionShadowState === 'expired' || promptPolicy.showNonCriticalShadowTag) {
+            tags.push(shadowTag);
+        }
     }
 
     return `\x1b[32mvocê\x1b[0m\x1b[90m[\x1b[36m${model}\x1b[90m/\x1b[35m${reasoningEffort}\x1b[90m]\x1b[0m${tags.join('')}\x1b[90m›\x1b[0m `;
@@ -80,10 +85,28 @@ export function buildUserPrompt() {
  */
 export function buildWaitingPrompt() {
     const { model, reasoningEffort } = readTerminalDialogStreamMeta();
+    const promptPolicy = readTerminalPromptDisplayPolicy();
     const activity = readTerminalActivitySnapshot();
+    const runtime = readTerminalRuntimeState();
     const phase = shortenPromptToken(activity.phase.toUpperCase(), 10);
     const label = shortenPromptToken(activity.label, 16);
-    return `\x1b[90m⏳[${phase}:${label}]\x1b[0m \x1b[90m[\x1b[36m${model}\x1b[90m/\x1b[35m${reasoningEffort}\x1b[90m]\x1b[0m `;
+    const sevColor =
+        activity.severity === 'error' ? '\x1b[31m' : activity.severity === 'warn' ? '\x1b[33m' : '\x1b[90m';
+    /** @type {string[]} */
+    const tags = [];
+    if (promptPolicy.showQueueTag && runtime.queueSize > 0) tags.push(`Q:${runtime.queueSize}`);
+    if (runtime.pendingQuestion && runtime.pendingQuestionKind && runtime.pendingQuestionKind !== 'ready') {
+        tags.push(`ASK:${runtime.pendingQuestionKind.toUpperCase()}`);
+    }
+    if (promptPolicy.showNonCriticalShadowTag && runtime.pendingQuestionShadowState === 'expiring_soon') {
+        tags.push('SHDW:SOON');
+    }
+    if (runtime.pendingQuestionShadowState === 'expired') tags.push('SHDW:EXP');
+    const tagsStr = tags.length > 0 ? ` \x1b[90m[${tags.join('|')}]\x1b[0m` : '';
+    if (!promptPolicy.showWaitingActivity) {
+        return `\x1b[90m⏳\x1b[0m${tagsStr} \x1b[90m[\x1b[36m${model}\x1b[90m/\x1b[35m${reasoningEffort}\x1b[90m]\x1b[0m `;
+    }
+    return `${sevColor}⏳[${phase}:${label}]\x1b[0m${tagsStr} \x1b[90m[\x1b[36m${model}\x1b[90m/\x1b[35m${reasoningEffort}\x1b[90m]\x1b[0m `;
 }
 
 /** Separador visual entre turnos — 72 colunas. */

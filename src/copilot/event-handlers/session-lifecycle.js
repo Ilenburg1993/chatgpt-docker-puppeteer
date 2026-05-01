@@ -100,6 +100,52 @@ export function wireSessionLifecycleEvents(session, { emit }) {
             emit('session.tools_updated', { count, ts: evt?.timestamp ?? Date.now() });
         }),
 
+        // ── session.skills_loaded ────────────────────────────────────────
+        onSessionEvent(session, SESSION_EVENTS.SESSION_SKILLS_LOADED, (evt) => {
+            const data = /** @type {Record<string, unknown>} */ (evt?.data ?? {});
+            const skills = /** @type {unknown[] | undefined} */ (data['skills']);
+            const enabled = Array.isArray(skills)
+                ? skills.filter((skill) => {
+                      const rec =
+                          skill && typeof skill === 'object' ? /** @type {Record<string, unknown>} */ (skill) : {};
+                      return rec['enabled'] !== false;
+                  }).length
+                : 0;
+            const count = Array.isArray(skills) ? skills.length : 0;
+            log('INFO', `[session-lifecycle] skills_loaded: ${enabled}/${count} enabled`);
+            emit('session.skills_loaded', { count, enabled, data, ts: evt?.timestamp ?? Date.now() });
+        }),
+
+        // ── session.extensions_loaded ────────────────────────────────────
+        onSessionEvent(session, SESSION_EVENTS.SESSION_EXTENSIONS_LOADED, (evt) => {
+            const data = /** @type {Record<string, unknown>} */ (evt?.data ?? {});
+            const extensions = /** @type {unknown[] | undefined} */ (data['extensions']);
+            const count = Array.isArray(extensions) ? extensions.length : 0;
+            log('INFO', `[session-lifecycle] extensions_loaded: ${count}`);
+            emit('session.extensions_loaded', { count, data, ts: evt?.timestamp ?? Date.now() });
+        }),
+
+        // ── session.mcp_servers_loaded ───────────────────────────────────
+        onSessionEvent(session, SESSION_EVENTS.SESSION_MCP_SERVERS_LOADED, (evt) => {
+            const data = /** @type {Record<string, unknown>} */ (evt?.data ?? {});
+            const servers = /** @type {unknown[] | undefined} */ (data['servers'] ?? data['mcpServers']);
+            const count = Array.isArray(servers) ? servers.length : 0;
+            log('INFO', `[session-lifecycle] mcp_servers_loaded: ${count}`);
+            emit('session.mcp_servers_loaded', { count, data, ts: evt?.timestamp ?? Date.now() });
+        }),
+
+        // ── session.background_tasks_changed ─────────────────────────────
+        onSessionEvent(session, SESSION_EVENTS.SESSION_BACKGROUND_TASKS_CHANGED, (evt) => {
+            const data = /** @type {Record<string, unknown>} */ (evt?.data ?? {});
+            const count = Number(data['count'] ?? data['pendingCount'] ?? data['backgroundPendingCount'] ?? 0);
+            log('DEBUG', `[session-lifecycle] background_tasks_changed: ${Number.isFinite(count) ? count : '?'}`);
+            emit('session.background_tasks_changed', {
+                count: Number.isFinite(count) ? count : 0,
+                data,
+                ts: evt?.timestamp ?? Date.now(),
+            });
+        }),
+
         // ── session.snapshot_rewind ──────────────────────────────────────
         onSessionEvent(session, SESSION_EVENTS.SESSION_SNAPSHOT_REWIND, (evt) => {
             const data = evt?.data ?? {};

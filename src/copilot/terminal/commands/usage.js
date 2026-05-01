@@ -48,11 +48,13 @@ export function cmdUsage({ println }, arg) {
             println('\n  \x1b[33m⚠️  Dados de context window não disponíveis.\x1b[0m');
         }
 
-        const pr = projection.pr;
-        if (pr) {
-            const model = pr['model'] ?? 'unknown';
-            const cost = typeof pr['cost'] === 'number' ? pr['cost'].toFixed(4) : '?';
-            println(`      Último turno: modelo=\x1b[36m${model}\x1b[0m · custo=\x1b[33m${cost}\x1b[0m`);
+        const modelBilling = projection.modelBilling;
+        if (projection.pr) {
+            const cost = modelBilling.cost === null ? '?' : modelBilling.cost.toFixed(4);
+            const modelLabel = modelBilling.mismatch
+                ? `cfg=\x1b[35m${modelBilling.configuredModel ?? '-'}\x1b[0m · cobrado=\x1b[36m${modelBilling.billedModel ?? '-'}\x1b[0m`
+                : `modelo=\x1b[36m${modelBilling.displayModel}\x1b[0m`;
+            println(`      Último turno: ${modelLabel} · custo=\x1b[33m${cost}\x1b[0m`);
         }
         if (projection.runtimeSessionId || projection.binding.sdkSessionId || projection.binding.hubSessionId) {
             println(

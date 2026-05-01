@@ -104,7 +104,7 @@ describe('Faixa B1 — session-lifecycle handlers', () => {
         const emit = vi.fn();
         const unsubs = wireSessionLifecycleEvents(/** @type {any} */ (session), { emit });
         expect(Array.isArray(unsubs)).toBe(true);
-        expect(unsubs.length).toBe(7);
+        expect(unsubs.length).toBe(11);
         unsubs.forEach((u) => expect(typeof u).toBe('function'));
     });
 
@@ -179,6 +179,30 @@ describe('Faixa B1 — session-lifecycle handlers', () => {
         wireSessionLifecycleEvents(/** @type {any} */ (session), { emit });
         session._emit('session.tools_updated', { tools: ['a', 'b', 'c'] });
         expect(emit).toHaveBeenCalledWith('session.tools_updated', expect.objectContaining({ count: 3 }));
+    });
+
+    it('emite session loaded/background events com contadores', async () => {
+        const { wireSessionLifecycleEvents } = await import('#copilot/event-handlers/session-lifecycle');
+        const session = createMockSession();
+        const emit = vi.fn();
+        wireSessionLifecycleEvents(/** @type {any} */ (session), { emit });
+
+        session._emit('session.skills_loaded', {
+            skills: [
+                { name: 'a', enabled: true },
+                { name: 'b', enabled: false },
+            ],
+        });
+        expect(emit).toHaveBeenCalledWith('session.skills_loaded', expect.objectContaining({ count: 2, enabled: 1 }));
+
+        session._emit('session.extensions_loaded', { extensions: ['gh'] });
+        expect(emit).toHaveBeenCalledWith('session.extensions_loaded', expect.objectContaining({ count: 1 }));
+
+        session._emit('session.mcp_servers_loaded', { servers: ['github', 'filesystem'] });
+        expect(emit).toHaveBeenCalledWith('session.mcp_servers_loaded', expect.objectContaining({ count: 2 }));
+
+        session._emit('session.background_tasks_changed', { pendingCount: 4 });
+        expect(emit).toHaveBeenCalledWith('session.background_tasks_changed', expect.objectContaining({ count: 4 }));
     });
 
     it('emite session.snapshot_rewind', async () => {
@@ -333,13 +357,13 @@ describe('Faixa B3 — tool-lifecycle handlers', () => {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 describe('Faixa B4 — interaction-events handlers', () => {
-    it('wireInteractionEvents retorna array de 12 unsubscribe functions', async () => {
+    it('wireInteractionEvents retorna array de 17 unsubscribe functions', async () => {
         const { wireInteractionEvents } = await import('#copilot/event-handlers/interaction-events');
         const session = createMockSession();
         const emit = vi.fn();
         const unsubs = wireInteractionEvents(/** @type {any} */ (session), { emit });
         expect(Array.isArray(unsubs)).toBe(true);
-        expect(unsubs.length).toBe(12);
+        expect(unsubs.length).toBe(17);
     });
 
     it('emite skill.invoked', async () => {
@@ -394,6 +418,37 @@ describe('Faixa B4 — interaction-events handlers', () => {
         expect(emit).toHaveBeenCalledWith('permission.completed', expect.objectContaining({ granted: true }));
     });
 
+    it('emite user_input.requested e user_input.completed conforme contrato SDK', async () => {
+        const { wireInteractionEvents } = await import('#copilot/event-handlers/interaction-events');
+        const session = createMockSession();
+        const emit = vi.fn();
+        wireInteractionEvents(/** @type {any} */ (session), { emit });
+
+        session._emit('user_input.requested', {
+            requestId: 'ui-1',
+            question: 'Escolha?',
+            choices: ['A', 'B'],
+            allowFreeform: false,
+            toolCallId: 'tool-1',
+        });
+        expect(emit).toHaveBeenCalledWith(
+            'user_input.requested',
+            expect.objectContaining({
+                requestId: 'ui-1',
+                question: 'Escolha?',
+                choices: ['A', 'B'],
+                allowFreeform: false,
+                toolCallId: 'tool-1',
+            }),
+        );
+
+        session._emit('user_input.completed', { requestId: 'ui-1', answer: 'B', wasFreeform: false });
+        expect(emit).toHaveBeenCalledWith(
+            'user_input.completed',
+            expect.objectContaining({ requestId: 'ui-1', answer: 'B', wasFreeform: false }),
+        );
+    });
+
     it('emite subagent lifecycle events', async () => {
         const { wireInteractionEvents } = await import('#copilot/event-handlers/interaction-events');
         const session = createMockSession();
@@ -417,6 +472,28 @@ describe('Faixa B4 — interaction-events handlers', () => {
 
         session._emit('subagent.deselected', { agentName: 'code-agent' });
         expect(emit).toHaveBeenCalledWith('subagent.deselected', expect.objectContaining({ agentName: 'code-agent' }));
+    });
+
+    it('emite external_tool e pending_messages para UX/observabilidade', async () => {
+        const { wireInteractionEvents } = await import('#copilot/event-handlers/interaction-events');
+        const session = createMockSession();
+        const emit = vi.fn();
+        wireInteractionEvents(/** @type {any} */ (session), { emit });
+
+        session._emit('external_tool.requested', { toolName: 'browser.open', requestId: 'ext-1' });
+        expect(emit).toHaveBeenCalledWith(
+            'external_tool.requested',
+            expect.objectContaining({ toolName: 'browser.open', requestId: 'ext-1' }),
+        );
+
+        session._emit('external_tool.completed', { toolName: 'browser.open', requestId: 'ext-1', success: true });
+        expect(emit).toHaveBeenCalledWith(
+            'external_tool.completed',
+            expect.objectContaining({ toolName: 'browser.open', requestId: 'ext-1', success: true }),
+        );
+
+        session._emit('pending_messages.modified', { count: 2 });
+        expect(emit).toHaveBeenCalledWith('pending_messages.modified', expect.objectContaining({ count: 2 }));
     });
 
     it('loga WARN ao receber subagent.failed', async () => {

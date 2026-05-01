@@ -67,6 +67,7 @@ import { getAllTools } from '#copilot/tools';
 import { resolveAgentRuntimeSelection } from '../../../presentation/agent-runtime.js';
 import { resolveOptionalDialogTimeout } from '../../../presentation/dialog-timeout-policy.js';
 import { buildRuntimeRouteMetaPayload } from '../../../presentation/runtime-meta.js';
+import { setRuntimeModelProjection, setRuntimeReasoningProjection } from '../../../presentation/runtime-models.js';
 import { resolveRequestedRuntimeId } from '../../../presentation/runtime-request.js';
 import { resolveAgentSdkActiveSessionEntry } from '../../../presentation/runtime-sdk-session.js';
 import {
@@ -157,6 +158,8 @@ const sdkRuntimeProjectionOps = Object.freeze({
     readAgentStatusSnapshotForRuntime,
     readAgentStatusValue,
     readAgentStatusValueForRuntime,
+    setRuntimeModelProjection,
+    setRuntimeReasoningProjection,
 });
 
 const sdkObservabilityOps = Object.freeze({

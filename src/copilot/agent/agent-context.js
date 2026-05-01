@@ -1076,7 +1076,10 @@ export class AgentContext {
         if (question === null) {
             return false;
         }
-        question.resolve(answer);
+        const resolved = question.resolve(answer);
+        if (resolved === false) {
+            return false;
+        }
         this.clearPendingQuestion();
         return true;
     }

@@ -23,6 +23,19 @@ import { persistStateWithPolicy, readState, readStateAsync } from '../lifecycle/
  *     clearPendingQuestionShadow: () => void;
  *     setPendingQuestionShadow?: ((shadow: import('../types.js').PendingQuestionShadow) => void) | undefined;
  *     setSendCount?: ((count: number) => void) | undefined;
+ *     setLastPrInfo?:
+ *         | ((
+ *               info: {
+ *                   model?: string;
+ *                   configuredModel?: string;
+ *                   modelMismatch?: boolean;
+ *                   sessionId?: string | null;
+ *                   cost?: number;
+ *                   quotaSnapshots?: Record<string, unknown>;
+ *                   ts: number;
+ *               } | null,
+ *           ) => void)
+ *         | undefined;
  *     getPendingQuestionSnapshot?:
  *         | (() => import('../facades/agent-runtime-state.js').AgentRuntimePendingQuestionSnapshot | null)
  *         | undefined;
@@ -84,6 +97,20 @@ export async function restoreAgentRuntimePersistentBootState(ctx) {
     const persistedState = await readStateAsync();
     const sendCount = persistedState?.sendCount ?? 0;
     ctx.setSendCount?.(sendCount);
+
+    if (typeof persistedState?.lastPrConsumedAt === 'number') {
+        ctx.setLastPrInfo?.({
+            ts: persistedState.lastPrConsumedAt,
+            ...(persistedState.lastPrModel ? { model: persistedState.lastPrModel } : {}),
+            ...(persistedState.lastPrConfiguredModel ? { configuredModel: persistedState.lastPrConfiguredModel } : {}),
+            ...(typeof persistedState.lastPrModelMismatch === 'boolean'
+                ? { modelMismatch: persistedState.lastPrModelMismatch }
+                : {}),
+            ...(typeof persistedState.sessionId === 'string' ? { sessionId: persistedState.sessionId } : {}),
+            ...(typeof persistedState.lastPrCost === 'number' ? { cost: persistedState.lastPrCost } : {}),
+            ...(persistedState.lastQuotaSnapshots ? { quotaSnapshots: persistedState.lastQuotaSnapshots } : {}),
+        });
+    }
 
     if (!persistedState?.pendingQuestion || !persistedState.pendingQuestionMeta) {
         ctx.clearPendingQuestionShadow();

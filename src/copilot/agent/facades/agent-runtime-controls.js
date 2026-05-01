@@ -54,7 +54,15 @@ import { createSnapshot, listSnapshotsAsync, loadSnapshotAsync, saveSnapshotAsyn
  *         | null
  *         | undefined;
  *     lastPrInfo?:
- *         | { model?: string; cost?: number; quotaSnapshots?: Record<string, unknown>; ts: number }
+ *         | {
+ *               model?: string;
+ *               configuredModel?: string;
+ *               modelMismatch?: boolean;
+ *               sessionId?: string | null;
+ *               cost?: number;
+ *               quotaSnapshots?: Record<string, unknown>;
+ *               ts: number;
+ *           }
  *         | null
  *         | undefined;
  *     pendingQuestion?: import('../types.js').PendingQuestion | null | undefined;
@@ -85,7 +93,15 @@ import { createSnapshot, listSnapshotsAsync, loadSnapshotAsync, saveSnapshotAsyn
  *     dialogLoopActive: boolean;
  *     sessionId: string | null;
  *     prMetrics: { boots: number; resumesWithPR: number; resumesZeroPR: number; totalPR: number };
- *     lastPrInfo: { model?: string; cost?: number; quotaSnapshots?: Record<string, unknown>; ts: number } | null;
+ *     lastPrInfo: {
+ *         model?: string;
+ *         configuredModel?: string;
+ *         modelMismatch?: boolean;
+ *         sessionId?: string | null;
+ *         cost?: number;
+ *         quotaSnapshots?: Record<string, unknown>;
+ *         ts: number;
+ *     } | null;
  * }} AgentRuntimePrBudgetSnapshot
  *
  *

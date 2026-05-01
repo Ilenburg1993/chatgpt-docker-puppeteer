@@ -25,7 +25,15 @@ export async function resetAgentRuntimeGracefulShutdownFlag() {
 /**
  * Persiste o último snapshot de consumo PR do runtime.
  *
- * @param {{ model?: string; cost?: number; quotaSnapshots?: Record<string, unknown>; ts: number }} info
+ * @param {{
+ *     model?: string;
+ *     configuredModel?: string;
+ *     modelMismatch?: boolean;
+ *     sessionId?: string | null;
+ *     cost?: number;
+ *     quotaSnapshots?: Record<string, unknown>;
+ *     ts: number;
+ * }} info
  * @returns {Promise<
  *     import('../error-policy.js').AgentPolicyResult<import('../lifecycle/state/state-io.js').AliveAgentState>
  * >}
@@ -36,6 +44,8 @@ export async function persistAgentRuntimePrConsumptionSnapshot(info) {
             pendingTurnConsumedPR: true,
             lastPrConsumedAt: info.ts,
             lastPrModel: info.model ?? '',
+            lastPrConfiguredModel: info.configuredModel ?? '',
+            lastPrModelMismatch: Boolean(info.modelMismatch),
             lastPrCost: info.cost ?? 0,
             lastQuotaSnapshots: info.quotaSnapshots ?? null,
         },

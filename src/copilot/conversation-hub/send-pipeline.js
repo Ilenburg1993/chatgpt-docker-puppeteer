@@ -73,7 +73,14 @@ export async function executeSendToLlmB(hubSessionId, message, opts, deps) {
         useStructured,
     });
     const timeoutMs = timeoutDecision.timeoutMs;
-    const modelLabel = opts.model ?? COPILOT_MODEL;
+    const runtimeModelLabel = (() => {
+        const activeAgent = agent ?? fallbackAgent;
+        const modelFromAgent =
+            activeAgent && typeof activeAgent === 'object' && typeof activeAgent['model'] === 'string'
+                ? String(activeAgent['model'])
+                : null;
+        return modelFromAgent ?? opts.model ?? COPILOT_MODEL;
+    })();
 
     const messageContent = typeof message === 'string' ? message : JSON.stringify(message);
 
@@ -155,7 +162,7 @@ export async function executeSendToLlmB(hubSessionId, message, opts, deps) {
             role: 'llm_b',
             content: `[ERRO] ${toError(err).message}`,
             ...(sdkSessionId !== undefined && { sdkSessionId }),
-            model: modelLabel,
+            model: runtimeModelLabel,
             durationMs: Date.now() - startTime,
             metadata: { error: true, errorMessage: toError(err).message },
         });
@@ -169,7 +176,7 @@ export async function executeSendToLlmB(hubSessionId, message, opts, deps) {
         role: 'llm_b',
         content: llmBResponse,
         ...(sdkSessionId !== undefined && { sdkSessionId }),
-        model: modelLabel,
+        model: runtimeModelLabel,
         structured: llmBStructured,
         durationMs,
         metadata: parseError !== null ? { parseError } : null,

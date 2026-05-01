@@ -225,6 +225,25 @@ describe('HubOrchestrator sendToLlmB', () => {
         orch.destroy();
     });
 
+    it('persiste turn de LLM-B com modelo efetivo do runtime quando disponível', async () => {
+        const agent = createMockAgent({
+            model: 'gpt-5.4',
+            dialogLoopActive: false,
+        });
+        const orch = new HubOrchestrator(store, agent);
+        orch.init(/** @type {any} */ (createMockBridge()));
+
+        const id = orch.createSession();
+        await orch.sendToLlmB(id, 'modelo efetivo');
+
+        const turns = orch.readHistory(id);
+        const llmBTurn = [...turns].reverse().find((turn) => turn.role === 'llm_b');
+        expect(llmBTurn).toBeTruthy();
+        expect(llmBTurn?.model).toBe('gpt-5.4');
+
+        orch.destroy();
+    });
+
     it('persiste erro como turn de LLM-B quando bridge lança', async () => {
         const bridge = createMockBridge({
             chat: vi.fn(async () => {
