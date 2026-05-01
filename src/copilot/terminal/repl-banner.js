@@ -1,0 +1,32 @@
+// @ts-check
+/**
+ * @module copilot/terminal/repl-banner
+ * @file Banner operacional do REPL LLM-B.
+ */
+
+/**
+ * @param {number} injectPort
+ * @returns {string}
+ */
+export function buildTerminalReplBanner(injectPort) {
+    return `
+\x1b[36m╔══════════════════════════════════════════════════════════════════════════╗\x1b[0m
+\x1b[36m║\x1b[0m  💬  \x1b[1mTerminal LLM-B\x1b[0m  \x1b[90m—\x1b[0m  Sessão Permanente                            \x1b[36m║\x1b[0m
+\x1b[36m╚══════════════════════════════════════════════════════════════════════════╝\x1b[0m
+    \x1b[33m/status\x1b[0m · \x1b[33m/now\x1b[0m · \x1b[33m/history [n]\x1b[0m · \x1b[33m/db-history [n] [offset]\x1b[0m · \x1b[33m/db-sessions [n]\x1b[0m · \x1b[33m/who\x1b[0m · \x1b[33m/clear\x1b[0m · \x1b[33m/clear-shadow\x1b[0m · \x1b[33m/restart\x1b[0m
+    \x1b[33m/activity [n]\x1b[0m \x1b[90m← atividade atual + timeline\x1b[0m
+  \x1b[33m/model [list|id]\x1b[0m · \x1b[33m/reasoning [low|medium|high|xhigh|off]\x1b[0m · \x1b[33m/count\x1b[0m
+    \x1b[33m/attach [path|clear]\x1b[0m · \x1b[33m/context\x1b[0m · \x1b[33m/compact\x1b[0m · \x1b[33m/plan [on|off|autopilot|read|clear]\x1b[0m · \x1b[33m/resume [id]\x1b[0m
+  \x1b[33m/pause\x1b[0m · \x1b[33m/dialog-resume [bootPrompt]\x1b[0m · \x1b[33m/handoff\x1b[0m \x1b[90m← pausa/retoma/handoff\x1b[0m
+  \x1b[33m/thinking [on|off]\x1b[0m · \x1b[33m/usage [on|off|now]\x1b[0m \x1b[90m← F18/F20: thinking display + usage\x1b[0m
+  \x1b[33m/tools\x1b[0m · \x1b[33m/errors [n]\x1b[0m · \x1b[33m/audit [n]\x1b[0m \x1b[90m← F22: tool stats, error tracker, audit log\x1b[0m
+  \x1b[33m/sdk [status|models|tools|quota|compact]\x1b[0m · \x1b[33m/workspace [list|read|write]\x1b[0m · \x1b[33m/elicitation\x1b[0m · \x1b[33m/permission\x1b[0m
+  \x1b[33m/display [toggle] [on|off]\x1b[0m · \x1b[33m/metrics\x1b[0m · \x1b[33m/export [path]\x1b[0m \x1b[90m← F24: display, metrics, export\x1b[0m
+  \x1b[33m/remember [tag:] texto\x1b[0m · \x1b[33m/recall [tag]\x1b[0m · \x1b[33m/recall ?busca\x1b[0m · \x1b[33m/forget <id>\x1b[0m
+  \x1b[33m/skills [list|add <path>|remove <path>|reload]\x1b[0m
+  \x1b[36m/gh issue list\x1b[0m · \x1b[36m/gh pr list\x1b[0m · \x1b[36m/gh run list\x1b[0m · \x1b[36m/git status\x1b[0m · \x1b[36m/git log\x1b[0m · \x1b[36m/alias\x1b[0m · \x1b[36m/help\x1b[0m
+  \x1b[90mPOST :${injectPort}/inject  ·  POST :${injectPort}/pipeline  ·  GET :${injectPort}/events  ·  GET :${injectPort}/sessions  ·  POST/GET/DELETE :${injectPort}/memory\x1b[0m
+  \x1b[90mGET :${injectPort}/gh/issues  ·  GET :${injectPort}/gh/prs  ·  GET :${injectPort}/gh/ci  ·  GET :${injectPort}/git/status  ·  GET :${injectPort}/git/log\x1b[0m
+  \x1b[90mGET :${injectPort}/config  ·  GET :${injectPort}/health  |  @caminho/arquivo → embed automático\x1b[0m
+`;
+}
