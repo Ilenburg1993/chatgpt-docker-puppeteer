@@ -23,12 +23,25 @@ Fachadas finas do `AlwaysAliveAgent`.
 | `agent-runtime-todos.js`        | query           | projections da capacidade TODO                                                                                                                                  |
 | `agent-runtime-tools.js`        | query           | tools disponíveis no runtime do agent                                                                                                                           |
 | `agent-runtime-webhooks.js`     | mutation        | operações de webhook do runtime                                                                                                                                 |
-| `agent-sdk-access.js`           | infra           | handles crus do SDK + operações vanilla de alto valor (status, quota, models/tools, mode, plan, workspace, elicitation, pending calls, shell, sessions, agents) |
+| `agent-sdk-access.js`           | infra           | façade pública compat que agrega `sdk/*.js` por domínio (client, models, tools, quota, sessions, workspace, UI) e preserva a borda canônica do runtime             |
 | `agent-sdk-runtime.js`          | infra           | operações de sessão SDK ativa dentro do runtime                                                                                                                 |
 | `agent-sdk-session.js`          | mutation        | operações vanilla de sessão SDK (`mode` e `plan`)                                                                                                               |
 | `agent-session-ops.js`          | lifecycle       | operações diretas de sessão (abort, log, watchdog, histórico)                                                                                                   |
 | `agent-webhook-ops.js`          | mutation        | operações de webhook/integração expostas pela fachada do agente                                                                                                 |
 | `index.js`                      | barrel          | barrel canônico das façades modernas reexportadas por `agent/index.js`                                                                                          |
+
+### Subárvore `sdk/`
+
+- `sdk/client.js` — client, lifecycle e handles/health
+- `sdk/models.js` — catálogo/model stats/experimental flags
+- `sdk/tools.js` — registry/config/load de tools
+- `sdk/quota.js` — quota monitor e recovery policy
+- `sdk/sessions.js` — CRUD/foreground/list/resume de sessões
+- `sdk/workspace-ops.js` — workspace files, shell e custom agents
+- `sdk/ui-ops.js` — elicitation, session.ui e pendências SDK
+
+`agent-sdk-access.js` permanece como **façade pública canônica** para callers do runtime; a pasta
+`sdk/` existe para evitar monólito interno, não para reabrir bypasss arbitrários.
 
 Os owners acima são protegidos por `tests/unit/copilot/contracts/test_facade_bypass_matrix.spec.js`.
 Qualquer import cruzado entre facades precisa estar declarado na matriz executável antes de ser
