@@ -261,8 +261,10 @@ estejam registrados no roadmap e cobertos por contrato de remoção.
 - W114: aplicar a taxonomia nas bordas `server`/`terminal`, preservando adapters finos (**iniciada
   com `module-map.js`, README local e contratos anti-órfão para as raízes `server/` e `terminal/`;
   avançada com taxonomia recursiva para `terminal/handlers` e `server/routes`, incluindo
-  classificação por `surface`, `role`, `tier` e `risk`; próxima subonda: decomposição física dos
-  hotspots de `server/routes/sdk` e `server/routes/copilot-api`**)
+  classificação por `surface`, `role`, `tier` e `risk`; iniciada decomposição física de
+  `server/routes/sdk/session-messaging.js` com seams de metadata, send, stream state e workspace;
+  próxima subonda: separar as rotas por família em `session-messaging` e avançar para
+  `session-crud`/`observability`**)
 - W115: criar scorecard de organização física por diretório quente (**iniciada em beta para
   `server/routes` e `terminal/handlers`, com agregação por role/surface/risk e contratos de
   consulta**)

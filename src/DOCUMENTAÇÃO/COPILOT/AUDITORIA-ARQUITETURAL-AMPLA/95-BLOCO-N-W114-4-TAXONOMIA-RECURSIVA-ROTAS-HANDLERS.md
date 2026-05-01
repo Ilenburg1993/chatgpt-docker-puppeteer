@@ -37,7 +37,9 @@ compatibilidade:
 5. `sdk/session-schemas.js` separa os schemas Zod de `sdk/session-middleware.js`, reduzindo um dos
    hotspots antes da decomposição maior de sessions;
 6. scorecards beta em `server/routes/module-map.js` e `terminal/handlers/module-map.js` agregam
-   contagens por papel, superfície e risco, antecipando a W115.
+   contagens por papel, superfície e risco, antecipando a W115;
+7. `sdk/session-messaging.js` iniciou decomposição física com helpers próprios para route metadata,
+   send sem timeout, estado de SSE e validação de workspace.
 
 ---
 
@@ -46,7 +48,8 @@ compatibilidade:
 ### SDK API
 
 1. `sdk/session-messaging.js` — messaging, stream, workspace, UI, permissions, tools, compaction e
-   shell no mesmo arquivo.
+   shell no mesmo arquivo; já teve helpers internos separados, mas ainda deve ter rotas por família
+   extraídas.
 2. `sdk/session-crud.js` — inventory, foreground, create/resume, delete/disconnect e compaction
    history no mesmo arquivo.
 3. `sdk/observability.js` — health, metrics, quota, errors, logs, audit e event catalog juntos.
@@ -64,8 +67,8 @@ compatibilidade:
 
 ## 4) Próxima execução recomendada
 
-1. Extrair `server/routes/sdk/session-messaging` para subpastas ou seams locais por família:
-   `messaging`, `stream`, `workspace`, `ui`, `permissions-tools`, `compaction`, `shell`.
+1. Extrair as rotas de `server/routes/sdk/session-messaging` para subpastas ou seams locais por
+   família: `messaging`, `stream`, `workspace`, `ui`, `permissions-tools`, `compaction`, `shell`.
 2. Extrair `server/routes/sdk/session-crud` para `inventory`, `foreground`, `lifecycle` e
    `destructive`.
 3. Extrair `server/routes/sdk/observability` para `health-metrics`, `errors-logs`, `audit` e

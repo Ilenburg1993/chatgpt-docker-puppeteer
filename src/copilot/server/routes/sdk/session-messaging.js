@@ -9,14 +9,7 @@
  */
 
 import { Router } from 'express';
-import { SseReplayBuffer } from '../../../infra/sse/replay-buffer.js';
-import { SseClientPool } from '../../../infra/sse/stream-hub.js';
-import {
-    createEventFilter,
-    createSseWriter,
-    SseConnectionTracker,
-    standardizeSsePayload,
-} from '../../../infra/sse/utils.js';
+import { createEventFilter, createSseWriter } from '../../../infra/sse/utils.js';
 import {
     abortSession,
     getSessionMessages,
@@ -24,14 +17,9 @@ import {
     sendSessionAndWait,
     setSessionModel,
 } from '../../../sdk/session/wrapper.js';
-import {
-    buildSdkSessionStreamKey,
-    deleteSdkSessionStreamState,
-    getSdkSessionStreamState,
-    setSdkSessionStreamState,
-} from '../../runtime-state/sdk-session-stream.js';
 import { resolveSdkRouteSharedDeps } from './deps.js';
 import { rateLimitMiddleware, validateBody, validateModel, withErrorHandler } from './session-middleware.js';
+import { getActiveSessionEntryOrReply, withRuntimeMeta, withSessionRuntimeMeta } from './session-route-helpers.js';
 import {
     ElicitationBodySchema,
     HandlePendingCommandBodySchema,
@@ -47,6 +35,9 @@ import {
     UiSelectBodySchema,
     WorkspaceCreateFileBodySchema,
 } from './session-schemas.js';
+import { MAX_PROMPT_BYTES, sendAndWaitWithoutTimeout } from './session-send-helpers.js';
+import { ensureSessionStreamState, maybeDisposeSessionStreamState, sessionsTracker } from './session-stream-state.js';
+import { validateWorkspacePath } from './session-workspace-helpers.js';
 
 /**
  * @typedef {import('express').Request} Req
@@ -55,206 +46,10 @@ import {
  *
  * @typedef {ReturnType<typeof resolveSdkRouteSharedDeps>} SdkRouteDeps
  *
- * @typedef {{ type?: string; data?: { message?: string; stack?: string }; [key: string]: unknown }} RouteSessionEvent
- *
  * @typedef {{ prompt: string; attachments?: unknown; mode?: unknown; [key: string]: unknown }} RouteMessageOptions
- *
- * @typedef {RouteSessionEvent & { type: 'assistant.message' }} RouteAssistantMessageEvent
  */
 
 const router = Router();
-
-// C14-03: limite de SSE streams simultâneos por /sessions/:id/stream
-const _sessionsTracker = new SseConnectionTracker('sessions/stream');
-
-/**
- * @typedef {{
- *     key: string;
- *     runtimeId: string;
- *     sessionId: string;
- *     sessionRef: NonNullable<ReturnType<SdkRouteDeps['sdkSession']['getClientSession']>>['session'];
- *     pool: SseClientPool;
- *     unsubscribe: () => void;
- * }} SessionStreamState
- */
-
-// C14-04: limite máximo de bytes aceitos em prompt para evitar uso excessivo de tokens
-const MAX_PROMPT_BYTES = 512_000;
-
-/**
- * @template {Record<string, unknown>} T
- * @param {SdkRouteDeps} routeDeps
- * @param {T} payload
- * @returns {T & {
- *     runtimeId?: string;
- *     requestedRuntimeId?: string | null;
- *     runtimeFound?: boolean;
- *     usedDefaultRuntimeFallback?: boolean;
- * }}
- */
-function withRuntimeMeta(routeDeps, payload) {
-    return {
-        ...payload,
-        ...routeDeps.sdkRuntimeProjection.buildRuntimeRouteMetaPayload(routeDeps),
-    };
-}
-
-/**
- * @template {Record<string, unknown>} T
- * @param {SdkRouteDeps} routeDeps
- * @param {T} payload
- * @param {string} sessionId
- * @returns {ReturnType<typeof withRuntimeMeta>}
- */
-function withSessionRuntimeMeta(routeDeps, payload, sessionId) {
-    return withRuntimeMeta(routeDeps, routeDeps.sdkSessionOwnership.attachSdkSessionOwnership(payload, sessionId));
-}
-
-/**
- * @param {SdkRouteDeps} routeDeps
- * @param {string} id
- * @param {Res} res
- * @returns {NonNullable<ReturnType<SdkRouteDeps['sdkSession']['getClientSession']>> | null}
- */
-function getActiveSessionEntryOrReply(routeDeps, id, res) {
-    const entry = routeDeps.sdkSession.getClientSession(id);
-    if (entry) {
-        return entry;
-    }
-
-    const runtimeEntry = routeDeps.sdkRuntimeSession.resolveAgentSdkActiveSessionEntry(
-        routeDeps.requestedRuntimeId ?? routeDeps.runtimeId,
-        id,
-    );
-    if (runtimeEntry) {
-        return /** @type {NonNullable<ReturnType<SdkRouteDeps['sdkSession']['getClientSession']>>} */ (runtimeEntry);
-    }
-
-    {
-        res.status(404).json({
-            ok: false,
-            ...routeDeps.sdkRuntimeProjection.buildRuntimeRouteMetaPayload(routeDeps),
-            error: `Sessão "${id}" não está ativa. Use POST /api/sdk/sessions/${id}/resume primeiro.`,
-        });
-        return null;
-    }
-}
-
-/**
- * Mantém o endpoint HTTP alinhado à semântica do SDK: o caminho é relativo ao workspace virtual da sessão.
- *
- * @param {unknown} value
- * @returns {{ ok: true; path: string } | { ok: false; error: string }}
- */
-function validateWorkspacePath(value) {
-    if (typeof value !== 'string' || value.trim() === '') {
-        return { ok: false, error: 'Campo "path" deve ser string relativa não-vazia.' };
-    }
-    const path = value.trim();
-    if (path.startsWith('/') || path.includes('\\') || path.split('/').includes('..')) {
-        return { ok: false, error: 'Campo "path" deve ser relativo ao workspace SDK e não pode conter "..".' };
-    }
-    return { ok: true, path };
-}
-
-/**
- * @param {SdkRouteDeps} routeDeps
- * @param {string} id
- * @param {ReturnType<SdkRouteDeps['sdkSession']['getClientSession']>} entry
- * @returns {SessionStreamState}
- */
-function ensureSessionStreamState(routeDeps, id, entry) {
-    if (!entry) {
-        throw new Error(`Sessão "${id}" não está ativa para stream SSE.`);
-    }
-    const runtimeId = routeDeps.runtimeId || 'default';
-    const key = buildSdkSessionStreamKey(runtimeId, id);
-    const existing = /** @type {SessionStreamState | undefined} */ (getSdkSessionStreamState(key));
-    if (existing && existing.sessionRef === entry.session) return existing;
-
-    if (existing) {
-        existing.pool.closeAll();
-        existing.unsubscribe();
-        deleteSdkSessionStreamState(key);
-    }
-
-    const pool = new SseClientPool(new SseReplayBuffer(), {
-        name: `sdk.session.stream.${runtimeId}.${id}`,
-        metrics: routeDeps.metrics,
-    });
-
-    const unsubscribe = routeDeps.sdkSessionEvents.onAllSessionEvents(
-        entry.session,
-        (/** @type {RouteSessionEvent} */ event) => {
-            const type = /** @type {string} */ (event?.type ?? 'message');
-            const payload = standardizeSsePayload({ ...event, runtimeId });
-            pool.broadcast('message', payload, { replayEvent: 'message', filterEvent: type });
-        },
-    );
-
-    const state = { key, runtimeId, sessionId: id, sessionRef: entry.session, pool, unsubscribe };
-    setSdkSessionStreamState(key, state);
-    return state;
-}
-
-/**
- * @param {SdkRouteDeps} routeDeps
- * @param {SessionStreamState} state
- * @returns {void}
- */
-function maybeDisposeSessionStreamState(routeDeps, state) {
-    if (state.pool.size > 0) return;
-    state.unsubscribe();
-    deleteSdkSessionStreamState(state.key);
-    routeDeps.sdkObservability.log(
-        'INFO',
-        `[sdk-api] SSE stream encerrado: runtime ${state.runtimeId} sessão ${state.sessionId}`,
-    );
-}
-
-/**
- * @param {SdkRouteDeps} routeDeps
- * @param {NonNullable<ReturnType<SdkRouteDeps['sdkSession']['getClientSession']>>['session']} session
- * @param {RouteMessageOptions} messageOptions
- * @returns {Promise<RouteAssistantMessageEvent | undefined>}
- */
-async function sendAndWaitWithoutTimeout(routeDeps, session, messageOptions) {
-    /** @type {RouteAssistantMessageEvent | undefined} */
-    let lastAssistantMessage;
-
-    /** @type {() => void} */
-    let resolveIdle = () => {};
-    /** @type {(error: Error) => void} */
-    let rejectIdle = () => {};
-
-    const idlePromise = new Promise((resolve, reject) => {
-        resolveIdle = () => resolve(undefined);
-        rejectIdle = (error) => reject(error);
-    });
-
-    const unsubscribe = routeDeps.sdkSessionEvents.onAllSessionEvents(
-        session,
-        (/** @type {RouteSessionEvent} */ event) => {
-            if (event.type === 'assistant.message') {
-                lastAssistantMessage = /** @type {RouteAssistantMessageEvent} */ (event);
-            } else if (event.type === 'session.idle') {
-                resolveIdle();
-            } else if (event.type === 'session.error') {
-                const error = new Error(event.data?.message ?? 'Erro desconhecido na sessão SDK.');
-                if (event.data?.stack) error.stack = event.data.stack;
-                rejectIdle(error);
-            }
-        },
-    );
-
-    try {
-        await sendSession(session, /** @type {never} */ (messageOptions));
-        await idlePromise;
-        return lastAssistantMessage;
-    } finally {
-        unsubscribe();
-    }
-}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // POST /sessions/:id/send
@@ -408,7 +203,7 @@ router.get('/sessions/:id/stream', (req, res) => {
     const { id } = req.params;
 
     // C14-03: limitar streams SSE simultâneos
-    if (!_sessionsTracker.accept()) {
+    if (!sessionsTracker.accept()) {
         res.status(503).json(withRuntimeMeta(routeDeps, { ok: false, error: 'Máximo de clientes SSE atingido' }));
         return;
     }
@@ -423,7 +218,7 @@ router.get('/sessions/:id/stream', (req, res) => {
     const sse = createSseWriter(req, res, {
         heartbeatMs: 15_000,
         replayBuffer: state.pool.replayBuffer,
-        tracker: _sessionsTracker,
+        tracker: sessionsTracker,
         maxLifetimeMs: 24 * 60 * 60 * 1000,
     });
 

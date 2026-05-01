@@ -51,7 +51,8 @@ Function-valued SDK capabilities (`tools[].handler`, `onPermissionRequest`, `onU
 ## Current Hotspots
 
 - `session-messaging.js`: split by messaging, stream, workspace, UI/permissions/tools, compaction
-  and shell.
+  and shell. Route metadata, send helpers, stream state and workspace path validation already live
+  in dedicated helper modules.
 - `session-crud.js`: split by inventory/foreground, create/resume and destructive operations.
 - `observability.js`: split by health/metrics, errors/logs, audit and event catalog.
 - `agent.js` and `client.js`: split SSE/control helpers from pure HTTP route registration.

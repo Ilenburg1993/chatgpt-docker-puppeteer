@@ -16,6 +16,8 @@
  *     | 'sdk-deps'
  *     | 'sdk-middleware'
  *     | 'sdk-schema'
+ *     | 'sdk-session-helper'
+ *     | 'sdk-session-stream'
  *     | 'sse-route'
  *     | 'health-registry'
  *     | 'module-health'
@@ -354,6 +356,46 @@ export const SERVER_ROUTE_MODULE_LAYOUT = Object.freeze([
         risk: 'stable',
         public: false,
         summary: 'Schemas Zod dos bodies HTTP de sessoes SDK.',
+    },
+    {
+        path: 'sdk/session-route-helpers.js',
+        kind: 'file',
+        role: 'sdk-session-helper',
+        surface: 'sdk',
+        tier: 'secondary',
+        risk: 'stable',
+        public: false,
+        summary: 'Metadata runtime, ownership de sessao e lookup ativo para rotas SDK.',
+    },
+    {
+        path: 'sdk/session-send-helpers.js',
+        kind: 'file',
+        role: 'sdk-session-helper',
+        surface: 'sdk',
+        tier: 'secondary',
+        risk: 'stable',
+        public: false,
+        summary: 'Helpers de envio de mensagem, timeout desabilitado e limite de prompt.',
+    },
+    {
+        path: 'sdk/session-stream-state.js',
+        kind: 'file',
+        role: 'sdk-session-stream',
+        surface: 'sdk',
+        tier: 'secondary',
+        risk: 'stable',
+        public: false,
+        summary: 'Estado local e lifecycle do SSE de sessoes SDK.',
+    },
+    {
+        path: 'sdk/session-workspace-helpers.js',
+        kind: 'file',
+        role: 'sdk-session-helper',
+        surface: 'sdk',
+        tier: 'secondary',
+        risk: 'stable',
+        public: false,
+        summary: 'Validacao de caminhos do workspace virtual SDK.',
     },
     {
         path: 'sdk/sessions.js',

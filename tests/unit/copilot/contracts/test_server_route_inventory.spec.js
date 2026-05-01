@@ -34,7 +34,11 @@ const SERVER_ROUTE_INVENTORY = {
         'sdk/index.js',
         'sdk/middleware.js',
         'sdk/session-middleware.js',
+        'sdk/session-route-helpers.js',
         'sdk/session-schemas.js',
+        'sdk/session-send-helpers.js',
+        'sdk/session-stream-state.js',
+        'sdk/session-workspace-helpers.js',
         'sdk/sessions.js',
     ],
 };

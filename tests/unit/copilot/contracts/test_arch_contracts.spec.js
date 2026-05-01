@@ -544,17 +544,20 @@ describe('W4-9 — streams SSE propagam runtimeId em connected e broadcasts', ()
         const agentSrc = readSrc('server/routes/sdk/agent.js');
         const hooksSrc = readSrc('server/routes/sdk/hooks.js');
         const sessionSrc = readSrc('server/routes/sdk/session-messaging.js');
+        const sessionStreamSrc = readSrc('server/routes/sdk/session-stream-state.js');
 
         assert.match(agentSrc, /runtimeId:\s*key/);
         assert.match(agentSrc, /runtime-state\/sdk-agent-stream\.js/);
         assert.match(hooksSrc, /runtimeId:\s*runtimeKey/);
         assert.match(hooksSrc, /runtime-state\/sdk-hooks-stream\.js/);
-        assert.match(sessionSrc, /runtime-state\/sdk-session-stream\.js/);
-        assert.match(sessionSrc, /const key = buildSdkSessionStreamKey\(runtimeId, id\)/);
-        assert.match(sessionSrc, /standardizeSsePayload\(\{\s*\.\.\.event,\s*runtimeId\s*\}/);
+        assert.match(sessionSrc, /session-stream-state\.js/);
+        assert.match(sessionStreamSrc, /runtime-state\/sdk-session-stream\.js/);
+        assert.match(sessionStreamSrc, /const key = buildSdkSessionStreamKey\(runtimeId, id\)/);
+        assert.match(sessionStreamSrc, /standardizeSsePayload\(\{\s*\.\.\.event,\s*runtimeId\s*\}/);
         assert.doesNotMatch(agentSrc, /^\s*(?:const|let)\s+\w+\s*=\s*new Map\(/m);
         assert.doesNotMatch(hooksSrc, /^\s*(?:const|let)\s+\w+\s*=\s*new Map\(/m);
         assert.doesNotMatch(sessionSrc, /^\s*(?:const|let)\s+\w+\s*=\s*new Map\(/m);
+        assert.doesNotMatch(sessionStreamSrc, /^\s*(?:const|let)\s+\w+\s*=\s*new Map\(/m);
         assert.doesNotMatch(sessionSrc, /_sessionStreamStates\.get\(id\)/);
         assert.doesNotMatch(sessionSrc, /_sessionStreamStates\.set\(id,/);
     });

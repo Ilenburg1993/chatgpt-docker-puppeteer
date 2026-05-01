@@ -39,6 +39,7 @@ describe('contracts/runtime-state-registry-inventory — registries explícitos 
             'server/routes/sdk/agent.js',
             'server/routes/sdk/hooks.js',
             'server/routes/sdk/session-messaging.js',
+            'server/routes/sdk/session-stream-state.js',
         ];
         const violations = files.filter((rel) => /^\s*(?:const|let)\s+\w+\s*=\s*new Map\(/m.test(readSrc(rel)));
         assert.deepEqual(
@@ -53,7 +54,8 @@ describe('contracts/runtime-state-registry-inventory — registries explícitos 
         assert.match(readSrc('server/routes/copilot-api/stream.js'), /runtime-state\/copilot-api-stream\.js/);
         assert.match(readSrc('server/routes/sdk/agent.js'), /runtime-state\/sdk-agent-stream\.js/);
         assert.match(readSrc('server/routes/sdk/hooks.js'), /runtime-state\/sdk-hooks-stream\.js/);
-        assert.match(readSrc('server/routes/sdk/session-messaging.js'), /runtime-state\/sdk-session-stream\.js/);
+        assert.match(readSrc('server/routes/sdk/session-messaging.js'), /session-stream-state\.js/);
+        assert.match(readSrc('server/routes/sdk/session-stream-state.js'), /runtime-state\/sdk-session-stream\.js/);
         assert.match(readSrc('server/routes/sdk/session-middleware.js'), /runtime-state\/sdk-session-rate-limit\.js/);
         assert.doesNotMatch(
             readSrc('server/routes/sdk/session-middleware.js'),

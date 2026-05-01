@@ -43,6 +43,7 @@ describe('contracts/runtime-state-governance — estado vivo multi-runtime é ex
         const agentSrc = readSrc('server/routes/sdk/agent.js');
         const hooksSrc = readSrc('server/routes/sdk/hooks.js');
         const sessionSrc = readSrc('server/routes/sdk/session-messaging.js');
+        const sessionStreamSrc = readSrc('server/routes/sdk/session-stream-state.js');
 
         assert.match(agentSrc, /const key = routeDeps\.runtimeId \?\? ['"]default['"]/);
         assert.match(agentSrc, /runtime-state\/sdk-agent-stream\.js/);
@@ -56,11 +57,13 @@ describe('contracts/runtime-state-governance — estado vivo multi-runtime é ex
         assert.match(hooksSrc, /setSdkHooksRuntimeState\(runtimeKey, state\)/);
         assert.doesNotMatch(hooksSrc, /^\s*(?:const|let)\s+\w+\s*=\s*new Map\(/m);
 
-        assert.match(sessionSrc, /const runtimeId = routeDeps\.runtimeId \|\| ['"]default['"]/);
-        assert.match(sessionSrc, /runtime-state\/sdk-session-stream\.js/);
-        assert.match(sessionSrc, /const key = buildSdkSessionStreamKey\(runtimeId, id\)/);
-        assert.match(sessionSrc, /getSdkSessionStreamState\(key\)/);
-        assert.match(sessionSrc, /setSdkSessionStreamState\(key, state\)/);
+        assert.match(sessionSrc, /session-stream-state\.js/);
+        assert.match(sessionStreamSrc, /const runtimeId = routeDeps\.runtimeId \|\| ['"]default['"]/);
+        assert.match(sessionStreamSrc, /runtime-state\/sdk-session-stream\.js/);
+        assert.match(sessionStreamSrc, /const key = buildSdkSessionStreamKey\(runtimeId, id\)/);
+        assert.match(sessionStreamSrc, /getSdkSessionStreamState\(key\)/);
+        assert.match(sessionStreamSrc, /setSdkSessionStreamState\(key, state\)/);
         assert.doesNotMatch(sessionSrc, /^\s*(?:const|let)\s+\w+\s*=\s*new Map\(/m);
+        assert.doesNotMatch(sessionStreamSrc, /^\s*(?:const|let)\s+\w+\s*=\s*new Map\(/m);
     });
 });

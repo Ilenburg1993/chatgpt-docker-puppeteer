@@ -537,6 +537,8 @@ describe('W114.4 — module layout governance: server/routes', () => {
         assert.equal(getServerRouteModuleRole('sdk/deps.js'), 'sdk-deps');
         assert.equal(getServerRouteModuleRole('sdk/session-middleware.js'), 'sdk-middleware');
         assert.equal(getServerRouteModuleRole('sdk/session-schemas.js'), 'sdk-schema');
+        assert.equal(getServerRouteModuleRole('sdk/session-route-helpers.js'), 'sdk-session-helper');
+        assert.equal(getServerRouteModuleRole('sdk/session-stream-state.js'), 'sdk-session-stream');
     });
 
     it('separa rotas por surface para orientar decomposicao futura', () => {
