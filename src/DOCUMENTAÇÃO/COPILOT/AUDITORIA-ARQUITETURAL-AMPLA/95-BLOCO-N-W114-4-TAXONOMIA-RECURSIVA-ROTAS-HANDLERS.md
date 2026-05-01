@@ -39,7 +39,10 @@ compatibilidade:
 6. scorecards beta em `server/routes/module-map.js` e `terminal/handlers/module-map.js` agregam
    contagens por papel, superfície e risco, antecipando a W115;
 7. `sdk/session-messaging.js` iniciou decomposição física com helpers próprios para route metadata,
-   send sem timeout, estado de SSE e validação de workspace.
+   send sem timeout, estado de SSE e validação de workspace;
+8. `sdk/session-messaging.js` foi consolidado como composition router, com famílias explícitas em
+   `session-core-routes.js`, `session-workspace-routes.js`, `session-ui-routes.js` e
+   `session-rpc-routes.js`.
 
 ---
 
@@ -47,13 +50,12 @@ compatibilidade:
 
 ### SDK API
 
-1. `sdk/session-messaging.js` — messaging, stream, workspace, UI, permissions, tools, compaction e
-   shell no mesmo arquivo; já teve helpers internos separados, mas ainda deve ter rotas por família
-   extraídas.
-2. `sdk/session-crud.js` — inventory, foreground, create/resume, delete/disconnect e compaction
+1. `sdk/session-crud.js` — inventory, foreground, create/resume, delete/disconnect e compaction
    history no mesmo arquivo.
-3. `sdk/observability.js` — health, metrics, quota, errors, logs, audit e event catalog juntos.
-4. `sdk/agent.js` e `sdk/client.js` — HTTP control e SSE/helper logic no mesmo módulo.
+2. `sdk/observability.js` — health, metrics, quota, errors, logs, audit e event catalog juntos.
+3. `sdk/agent.js` e `sdk/client.js` — HTTP control e SSE/helper logic no mesmo módulo.
+4. `sdk/session-core-routes.js` — watch menor para eventual split de send/stream se voltar a
+   crescer.
 5. `sdk/session-middleware.js` — deixou de conter schemas; permanece como `watch` para rate-limit,
    error wrapper e model sanitizer.
 
@@ -67,13 +69,11 @@ compatibilidade:
 
 ## 4) Próxima execução recomendada
 
-1. Extrair as rotas de `server/routes/sdk/session-messaging` para subpastas ou seams locais por
-   família: `messaging`, `stream`, `workspace`, `ui`, `permissions-tools`, `compaction`, `shell`.
-2. Extrair `server/routes/sdk/session-crud` para `inventory`, `foreground`, `lifecycle` e
+1. Extrair `server/routes/sdk/session-crud` para `inventory`, `foreground`, `lifecycle` e
    `destructive`.
-3. Extrair `server/routes/sdk/observability` para `health-metrics`, `errors-logs`, `audit` e
+2. Extrair `server/routes/sdk/observability` para `health-metrics`, `errors-logs`, `audit` e
    `events`.
-4. Depois repetir o mesmo padrão em `copilot-api/control` e `copilot-api/tasks`.
+3. Depois repetir o mesmo padrão em `copilot-api/control` e `copilot-api/tasks`.
 
 Critério: cada movimento físico deve preservar endpoints públicos, manter o router composition
 estável e atualizar o module map antes de alterar novos arquivos.

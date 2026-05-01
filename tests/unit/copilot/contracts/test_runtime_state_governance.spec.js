@@ -42,7 +42,7 @@ describe('contracts/runtime-state-governance — estado vivo multi-runtime é ex
     it('sdk agent/hooks/session streams não colidem entre runtimes', () => {
         const agentSrc = readSrc('server/routes/sdk/agent.js');
         const hooksSrc = readSrc('server/routes/sdk/hooks.js');
-        const sessionSrc = readSrc('server/routes/sdk/session-messaging.js');
+        const sessionSrc = readSrc('server/routes/sdk/session-core-routes.js');
         const sessionStreamSrc = readSrc('server/routes/sdk/session-stream-state.js');
 
         assert.match(agentSrc, /const key = routeDeps\.runtimeId \?\? ['"]default['"]/);

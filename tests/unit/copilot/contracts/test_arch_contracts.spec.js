@@ -543,7 +543,7 @@ describe('W4-9 — streams SSE propagam runtimeId em connected e broadcasts', ()
     it('sdk agent/hooks/session streams anexam runtimeId aos broadcasts e não colidem por sessionId global', () => {
         const agentSrc = readSrc('server/routes/sdk/agent.js');
         const hooksSrc = readSrc('server/routes/sdk/hooks.js');
-        const sessionSrc = readSrc('server/routes/sdk/session-messaging.js');
+        const sessionSrc = readSrc('server/routes/sdk/session-core-routes.js');
         const sessionStreamSrc = readSrc('server/routes/sdk/session-stream-state.js');
 
         assert.match(agentSrc, /runtimeId:\s*key/);

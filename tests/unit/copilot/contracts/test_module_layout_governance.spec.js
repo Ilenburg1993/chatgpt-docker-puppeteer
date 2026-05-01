@@ -537,7 +537,9 @@ describe('W114.4 — module layout governance: server/routes', () => {
         assert.equal(getServerRouteModuleRole('sdk/deps.js'), 'sdk-deps');
         assert.equal(getServerRouteModuleRole('sdk/session-middleware.js'), 'sdk-middleware');
         assert.equal(getServerRouteModuleRole('sdk/session-schemas.js'), 'sdk-schema');
+        assert.equal(getServerRouteModuleRole('sdk/session-core-routes.js'), 'sdk-session-route-family');
         assert.equal(getServerRouteModuleRole('sdk/session-route-helpers.js'), 'sdk-session-helper');
+        assert.equal(getServerRouteModuleRole('sdk/session-rpc-routes.js'), 'sdk-session-route-family');
         assert.equal(getServerRouteModuleRole('sdk/session-stream-state.js'), 'sdk-session-stream');
     });
 
@@ -586,7 +588,6 @@ describe('W114.4 — module layout governance: server/routes', () => {
             'sdk/client.js',
             'sdk/observability.js',
             'sdk/session-crud.js',
-            'sdk/session-messaging.js',
         ]);
     });
 
@@ -598,7 +599,7 @@ describe('W114.4 — module layout governance: server/routes', () => {
         assert.equal(scorecard.bySurface['sdk'], listServerRouteModulesBySurface('sdk').length);
         assert.equal(scorecard.byRisk['hotspot'], listServerRouteModulesByRisk('hotspot').length);
         assert.ok((scorecard.byRisk['watch'] ?? 0) >= 1);
-        assert.ok(scorecard.hotspots.includes('sdk/session-messaging.js'));
+        assert.ok(scorecard.watch.includes('sdk/session-core-routes.js'));
         assert.ok(scorecard.watch.includes('sdk/session-middleware.js'));
     });
 

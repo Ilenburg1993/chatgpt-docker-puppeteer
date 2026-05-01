@@ -50,9 +50,10 @@ Function-valued SDK capabilities (`tools[].handler`, `onPermissionRequest`, `onU
 
 ## Current Hotspots
 
-- `session-messaging.js`: split by messaging, stream, workspace, UI/permissions/tools, compaction
-  and shell. Route metadata, send helpers, stream state and workspace path validation already live
-  in dedicated helper modules.
+- `session-messaging.js`: now only composes route families. Core behavior lives in
+  `session-core-routes.js`; workspace, UI and RPC helpers live in dedicated family modules.
+- `session-core-routes.js`: still combines send, stream, model/log/abort/messages; keep it under
+  watch and split send/stream if it grows.
 - `session-crud.js`: split by inventory/foreground, create/resume and destructive operations.
 - `observability.js`: split by health/metrics, errors/logs, audit and event catalog.
 - `agent.js` and `client.js`: split SSE/control helpers from pure HTTP route registration.

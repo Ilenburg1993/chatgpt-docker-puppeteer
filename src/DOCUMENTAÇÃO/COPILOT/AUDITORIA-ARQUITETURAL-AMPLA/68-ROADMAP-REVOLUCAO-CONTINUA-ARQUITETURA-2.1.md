@@ -263,8 +263,9 @@ estejam registrados no roadmap e cobertos por contrato de remoção.
   avançada com taxonomia recursiva para `terminal/handlers` e `server/routes`, incluindo
   classificação por `surface`, `role`, `tier` e `risk`; iniciada decomposição física de
   `server/routes/sdk/session-messaging.js` com seams de metadata, send, stream state e workspace;
-  próxima subonda: separar as rotas por família em `session-messaging` e avançar para
-  `session-crud`/`observability`**)
+  consolidada com `session-messaging.js` como composition router e famílias
+  `session-core-routes.js`, `session-workspace-routes.js`, `session-ui-routes.js` e
+  `session-rpc-routes.js`; próxima subonda: avançar para `session-crud`/`observability`**)
 - W115: criar scorecard de organização física por diretório quente (**iniciada em beta para
   `server/routes` e `terminal/handlers`, com agregação por role/surface/risk e contratos de
   consulta**)

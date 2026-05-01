@@ -16,23 +16,24 @@ streams e delegam para owners canônicos.
 
 ## Mapa atual de papéis
 
-| Papel                | Arquivos/diretórios                                                                                                        |
-| -------------------- | -------------------------------------------------------------------------------------------------------------------------- |
-| `inventory`          | `module-map.js`                                                                                                            |
-| `root-route`         | `agent.js`, `config.js`, `git.js`, `health.js`, `memory.js`, `observability.js`, `sessions.js`, `webhooks.js`              |
-| `compat-reexport`    | `agent-health.js`                                                                                                          |
-| `sse-route`          | `sse.js`                                                                                                                   |
-| `module-health`      | `health-modules.js`                                                                                                        |
-| `health-registry`    | `health-registry.js`                                                                                                       |
-| `surface`            | `copilot-api/`, `sdk/`                                                                                                     |
-| `copilot-api-route`  | `copilot-api/*.js`                                                                                                         |
-| `sdk-composition`    | `sdk/index.js`, `sdk/sessions.js`                                                                                          |
-| `sdk-deps`           | `sdk/deps.js`                                                                                                              |
-| `sdk-middleware`     | `sdk/middleware.js`, `sdk/session-middleware.js`                                                                           |
-| `sdk-schema`         | `sdk/session-schemas.js`                                                                                                   |
-| `sdk-session-helper` | `sdk/session-route-helpers.js`, `sdk/session-send-helpers.js`, `sdk/session-workspace-helpers.js`                          |
-| `sdk-session-stream` | `sdk/session-stream-state.js`                                                                                              |
-| `sdk-route`          | `sdk/agent.js`, `sdk/client.js`, `sdk/hooks.js`, `sdk/observability.js`, `sdk/session-crud.js`, `sdk/session-messaging.js` |
+| Papel                      | Arquivos/diretórios                                                                                                      |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| `inventory`                | `module-map.js`                                                                                                          |
+| `root-route`               | `agent.js`, `config.js`, `git.js`, `health.js`, `memory.js`, `observability.js`, `sessions.js`, `webhooks.js`            |
+| `compat-reexport`          | `agent-health.js`                                                                                                        |
+| `sse-route`                | `sse.js`                                                                                                                 |
+| `module-health`            | `health-modules.js`                                                                                                      |
+| `health-registry`          | `health-registry.js`                                                                                                     |
+| `surface`                  | `copilot-api/`, `sdk/`                                                                                                   |
+| `copilot-api-route`        | `copilot-api/*.js`                                                                                                       |
+| `sdk-composition`          | `sdk/index.js`, `sdk/sessions.js`, `sdk/session-messaging.js`                                                            |
+| `sdk-deps`                 | `sdk/deps.js`                                                                                                            |
+| `sdk-middleware`           | `sdk/middleware.js`, `sdk/session-middleware.js`                                                                         |
+| `sdk-schema`               | `sdk/session-schemas.js`                                                                                                 |
+| `sdk-session-helper`       | `sdk/session-route-helpers.js`, `sdk/session-send-helpers.js`, `sdk/session-workspace-helpers.js`                        |
+| `sdk-session-route-family` | `sdk/session-core-routes.js`, `sdk/session-workspace-routes.js`, `sdk/session-ui-routes.js`, `sdk/session-rpc-routes.js` |
+| `sdk-session-stream`       | `sdk/session-stream-state.js`                                                                                            |
+| `sdk-route`                | `sdk/agent.js`, `sdk/client.js`, `sdk/hooks.js`, `sdk/observability.js`, `sdk/session-crud.js`                           |
 
 ## Risco e próxima decomposição
 
@@ -42,11 +43,10 @@ deve começar por ali.
 
 Prioridade atual:
 
-1. `sdk/session-messaging.js`: helpers de metadata, send, stream state e workspace já foram
-   separados; próximo corte é separar as próprias rotas por messaging, workspace,
-   UI/permissions/tools, compaction e shell.
-2. `sdk/session-crud.js`: separar inventory/foreground, create/resume e destructive operations.
-3. `sdk/observability.js`: separar health/metrics, errors/logs, audit e event catalog.
+1. `sdk/session-crud.js`: separar inventory/foreground, create/resume e destructive operations.
+2. `sdk/observability.js`: separar health/metrics, errors/logs, audit e event catalog.
+3. `sdk/session-core-routes.js`: se voltar a crescer, separar `send` e `stream` em famílias
+   próprias.
 4. `sdk/session-middleware.js`: schemas já foram separados em `sdk/session-schemas.js`; próximo
    corte, se voltar a crescer, é dividir rate-limit, error wrapper e model sanitizer.
 5. `copilot-api/control.js` e `copilot-api/tasks.js`: separar lifecycle/control de payloads

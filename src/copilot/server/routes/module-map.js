@@ -17,6 +17,7 @@
  *     | 'sdk-middleware'
  *     | 'sdk-schema'
  *     | 'sdk-session-helper'
+ *     | 'sdk-session-route-family'
  *     | 'sdk-session-stream'
  *     | 'sse-route'
  *     | 'health-registry'
@@ -330,12 +331,22 @@ export const SERVER_ROUTE_MODULE_LAYOUT = Object.freeze([
     {
         path: 'sdk/session-messaging.js',
         kind: 'file',
-        role: 'sdk-route',
+        role: 'sdk-composition',
         surface: 'sdk',
         tier: 'secondary',
-        risk: 'hotspot',
+        risk: 'stable',
         public: false,
-        summary: 'Messaging, stream, workspace, UI, permissions, tools, compaction e shell de sessoes SDK.',
+        summary: 'Composition router das familias de rotas de sessoes SDK.',
+    },
+    {
+        path: 'sdk/session-core-routes.js',
+        kind: 'file',
+        role: 'sdk-session-route-family',
+        surface: 'sdk',
+        tier: 'secondary',
+        risk: 'watch',
+        public: false,
+        summary: 'Send, stream, model, log, abort e messages de sessoes SDK.',
     },
     {
         path: 'sdk/session-middleware.js',
@@ -368,6 +379,16 @@ export const SERVER_ROUTE_MODULE_LAYOUT = Object.freeze([
         summary: 'Metadata runtime, ownership de sessao e lookup ativo para rotas SDK.',
     },
     {
+        path: 'sdk/session-rpc-routes.js',
+        kind: 'file',
+        role: 'sdk-session-route-family',
+        surface: 'sdk',
+        tier: 'secondary',
+        risk: 'stable',
+        public: false,
+        summary: 'Permissions, tools, commands, compaction e shell de sessoes SDK.',
+    },
+    {
         path: 'sdk/session-send-helpers.js',
         kind: 'file',
         role: 'sdk-session-helper',
@@ -386,6 +407,26 @@ export const SERVER_ROUTE_MODULE_LAYOUT = Object.freeze([
         risk: 'stable',
         public: false,
         summary: 'Estado local e lifecycle do SSE de sessoes SDK.',
+    },
+    {
+        path: 'sdk/session-ui-routes.js',
+        kind: 'file',
+        role: 'sdk-session-route-family',
+        surface: 'sdk',
+        tier: 'secondary',
+        risk: 'stable',
+        public: false,
+        summary: 'Capabilities e operacoes UI de sessoes SDK.',
+    },
+    {
+        path: 'sdk/session-workspace-routes.js',
+        kind: 'file',
+        role: 'sdk-session-route-family',
+        surface: 'sdk',
+        tier: 'secondary',
+        risk: 'stable',
+        public: false,
+        summary: 'Rotas de workspace virtual de sessoes SDK.',
     },
     {
         path: 'sdk/session-workspace-helpers.js',

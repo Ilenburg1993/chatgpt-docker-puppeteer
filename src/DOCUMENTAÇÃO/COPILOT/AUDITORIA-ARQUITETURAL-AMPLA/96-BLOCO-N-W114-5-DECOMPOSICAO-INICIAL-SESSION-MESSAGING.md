@@ -1,7 +1,7 @@
 # 96 — Bloco N / W114.5: decomposição inicial de `sdk/session-messaging`
 
 **Data:** 2026-05-01 **Escopo:** `src/copilot/server/routes/sdk/session-messaging.js` **Status:**
-checkpoint executável inicial
+checkpoint executável consolidado
 
 ---
 
@@ -29,28 +29,33 @@ Foram extraídos quatro seams locais:
 Com isso, `session-messaging.js` caiu de 834 para cerca de 635 linhas e passou a ser mais claramente
 um router/coordenador.
 
+Em seguida, o corte de famílias foi aplicado:
+
+5. `session-core-routes.js` — send, stream, model, log, abort e messages.
+6. `session-workspace-routes.js` — list/read/write do workspace virtual.
+7. `session-ui-routes.js` — capabilities, elicitation, confirm, select e input.
+8. `session-rpc-routes.js` — permissions, tools, commands, compaction e shell.
+
+Após esse corte, `session-messaging.js` ficou com cerca de 23 linhas e passou a ser apenas o
+composition router público da superfície histórica.
+
 ---
 
 ## 3) Contratos atualizados
 
-- `server/routes/module-map.js` declara os novos seams com papéis `sdk-session-helper` e
-  `sdk-session-stream`;
+- `server/routes/module-map.js` declara os novos seams com papéis `sdk-session-helper`,
+  `sdk-session-stream` e `sdk-session-route-family`;
 - `test_server_route_inventory.spec.js` cobre os novos arquivos no inventário histórico;
 - `test_module_layout_governance.spec.js` valida os novos papéis e mantém a marcação de
-  `session-messaging.js` como hotspot até que as rotas sejam separadas por família.
+  `session-core-routes.js` como `watch` e retira `session-messaging.js` do conjunto de hotspots.
 
 ---
 
 ## 4) Próxima etapa
 
-Extrair registro de rotas por família, preservando o router público:
+Próximo alvo recomendado:
 
-1. `session-messaging/send-routes.js`;
-2. `session-messaging/stream-routes.js`;
-3. `session-messaging/workspace-routes.js`;
-4. `session-messaging/ui-routes.js`;
-5. `session-messaging/permission-tool-routes.js`;
-6. `session-messaging/compaction-shell-routes.js`.
-
-Critério: nenhum endpoint público deve mudar; `session-messaging.js` deve virar composition router
-de famílias.
+1. separar `session-crud.js` por inventory/foreground, create/resume e destructive operations;
+2. manter `session-core-routes.js` sob watch para eventual corte `send-routes` e `stream-routes`;
+3. aplicar a mesma regra física nos hotspots `sdk/observability.js`, `sdk/client.js` e
+   `sdk/agent.js`.
