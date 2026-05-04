@@ -116,6 +116,64 @@ describe('copilot-api runtime metadata propagation', () => {
         assert.equal(clearRes.body.runtimeId, 'default');
     });
 
+    it('task route /elicitation/:id/respond aplica validação/schema defaults antes de resolver', async () => {
+        /** @type {import('../../../src/copilot/presentation/types.js').RuntimeElicitationResult[]} */
+        const resolved = [];
+        const deps =
+            /** @type {import('../../../src/copilot/presentation/runtime-route-deps.js').CopilotApiRouteDeps} */ ({
+                runtimeId: 'default',
+                requestedRuntimeId: 'missing',
+                runtimeFound: false,
+                usedDefaultRuntimeFallback: true,
+                agent: /** @type {any} */ ({
+                    getPendingSdkElicitation: () => ({
+                        id: 'el-1',
+                        requestedSchema: {
+                            type: 'object',
+                            properties: {
+                                env: { type: 'string', default: 'dev', enum: ['dev', 'prod'] },
+                                tags: {
+                                    type: 'array',
+                                    items: {
+                                        anyOf: [
+                                            { const: 'fast', title: 'fast' },
+                                            { const: 'safe', title: 'safe' },
+                                        ],
+                                    },
+                                },
+                            },
+                            required: ['env'],
+                        },
+                    }),
+                    resolvePendingSdkElicitation: (
+                        /** @type {string} */ _id,
+                        /** @type {import('../../../src/copilot/presentation/types.js').RuntimeElicitationResult} */ result,
+                    ) => {
+                        resolved.push(result);
+                        return true;
+                    },
+                }),
+            });
+
+        const app = createApp(registerTaskRoutes, deps);
+
+        const badRes = await supertest(app)
+            .post('/elicitation/el-1/respond')
+            .send({ action: 'accept', content: { tags: ['fast', 'noisy'] } });
+        assert.equal(badRes.status, 400);
+        assert.equal(badRes.body.runtimeId, 'default');
+        assert.match(String(badRes.body.error ?? ''), /fast \| safe/);
+
+        const okRes = await supertest(app)
+            .post('/elicitation/el-1/respond')
+            .send({ action: 'accept', content: { tags: ['fast', 'safe'] } });
+        assert.equal(okRes.status, 200);
+        assert.deepEqual(resolved[0], {
+            action: 'accept',
+            content: { env: 'dev', tags: ['fast', 'safe'] },
+        });
+    });
+
     it('dialog routes incluem runtime metadata em start/turn/stop', async () => {
         const deps =
             /** @type {import('../../../src/copilot/presentation/runtime-route-deps.js').CopilotApiRouteDeps} */ ({

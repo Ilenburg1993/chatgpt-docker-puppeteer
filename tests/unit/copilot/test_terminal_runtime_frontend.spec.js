@@ -5,8 +5,10 @@ import { beforeAll, describe, expect, it, vi } from 'vitest';
 const stopDialogMode = vi.fn(async () => {});
 const startDialogMode = vi.fn(async () => {});
 const dialogTurn = vi.fn(async () => 'ok');
-const clearHistory = vi.fn();
-const seedHistory = vi.fn();
+const liveHistory = [{ role: 'user', content: 'oi' }];
+const clearHistory = vi.fn(() => {
+    liveHistory.length = 0;
+});
 const pauseDialogLoop = vi.fn(async () => {});
 const resumeDialogLoop = vi.fn(async () => {});
 const stopDialogLoop = vi.fn(async () => {});
@@ -192,9 +194,8 @@ vi.mock('#copilot/agent', () => ({
 vi.mock('#copilot/channel', () => ({
     llmBridgeClient: {
         turnCount: 12,
-        history: [{ role: 'user', content: 'oi' }],
+        history: liveHistory,
         clearHistory,
-        seedHistory,
         stopDialogMode,
         startDialogMode,
         dialogTurn,
@@ -256,20 +257,22 @@ describe('terminal/frontend/index', () => {
         expect(runtime.readTerminalHandoffHistory('alt')).toHaveLength(1);
     });
 
-    it('encapsula operações de dialog mode e histórico do channel', async () => {
+    it('encapsula operações de dialog mode e histórico pela timeline canônica', async () => {
         await runtime.startTerminalDialogMode('boot', { onReady: vi.fn() });
         await runtime.runTerminalDialogTurn('mensagem', { timeout: 1000, onDelta: vi.fn() });
         await runtime.stopTerminalDialogMode();
-        runtime.clearTerminalHistoryFeed();
-        runtime.seedTerminalHistoryFeed('assistant', 'seed');
+        const timelineBeforeClear = runtime.readTerminalTimelineProjection();
+        runtime.clearTerminalHistory();
+        const timelineAfterClear = runtime.readTerminalTimelineProjection();
 
         expect(startDialogMode).toHaveBeenCalled();
         expect(dialogTurn).toHaveBeenCalled();
         expect(stopDialogMode).toHaveBeenCalled();
         expect(clearHistory).toHaveBeenCalled();
-        expect(seedHistory).toHaveBeenCalledWith('assistant', 'seed');
-        expect(runtime.readTerminalTurnCount()).toBe(12);
-        expect(runtime.readTerminalHistoryFeed()).toHaveLength(1);
+        expect(timelineBeforeClear.timelineSource).toBe('bridge');
+        expect(timelineBeforeClear.turns).toHaveLength(1);
+        expect(timelineAfterClear.timelineSource).toBe('empty');
+        expect(timelineAfterClear.turns).toHaveLength(0);
     });
 
     it('encapsula operações do agente e do hub', async () => {

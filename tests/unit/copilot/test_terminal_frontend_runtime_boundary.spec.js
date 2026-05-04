@@ -9,6 +9,10 @@ const SRC_NOW = readFileSync(
     '/workspaces/chatgpt-docker-puppeteer/src/copilot/terminal/frontend/projections/now.js',
     'utf8',
 );
+const SRC_TIMELINE = readFileSync(
+    '/workspaces/chatgpt-docker-puppeteer/src/copilot/terminal/frontend/projections/timeline.js',
+    'utf8',
+);
 
 test('frontend/index.js reexporta apenas famílias canônicas do frontend', () => {
     // Barrel deve apontar apenas para projections/, gateways/ e sdk-session-projection
@@ -21,14 +25,24 @@ test('frontend/index.js reexporta apenas famílias canônicas do frontend', () =
     expect(SRC).not.toMatch(/from '#copilot\/channel'/);
     expect(SRC).not.toMatch(/from '#copilot\/conversation-hub'/);
     expect(SRC).not.toMatch(/from '#copilot\/core'/);
+    expect(SRC).not.toMatch(/readTerminalHistoryFeed/);
+    expect(SRC).not.toMatch(/seedTerminalHistoryFeed/);
+    expect(SRC).not.toMatch(/clearTerminalHistoryFeed/);
+    expect(SRC).not.toMatch(/readTerminalTurnCount/);
 });
 
-test('projections/now.js usa gateways especializados em vez de shim agregado', () => {
+test('projections/now.js e timeline.js usam gateways especializados em vez de shim agregado', () => {
     expect(SRC_NOW).toMatch(/from '\.\.\/gateways\/agent-runtime\.js'/);
-    expect(SRC_NOW).toMatch(/from '\.\.\/gateways\/dialog\.js'/);
     expect(SRC_NOW).toMatch(/from '\.\.\/gateways\/hub\.js'/);
+    expect(SRC_TIMELINE).toMatch(/from '\.\.\/gateways\/agent-runtime\.js'/);
+    expect(SRC_TIMELINE).toMatch(/from '\.\.\/gateways\/dialog\.js'/);
+    expect(SRC_TIMELINE).toMatch(/from '\.\.\/gateways\/hub\.js'/);
     expect(SRC_NOW).not.toMatch(/from '#copilot\/agent'/);
     expect(SRC_NOW).not.toMatch(/from '#copilot\/channel'/);
     expect(SRC_NOW).not.toMatch(/from '#copilot\/conversation-hub'/);
     expect(SRC_NOW).not.toMatch(/from '#copilot\/core'/);
+    expect(SRC_TIMELINE).not.toMatch(/from '#copilot\/agent'/);
+    expect(SRC_TIMELINE).not.toMatch(/from '#copilot\/channel'/);
+    expect(SRC_TIMELINE).not.toMatch(/from '#copilot\/conversation-hub'/);
+    expect(SRC_TIMELINE).not.toMatch(/from '#copilot\/core'/);
 });

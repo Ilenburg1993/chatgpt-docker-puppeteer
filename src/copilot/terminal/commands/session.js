@@ -23,6 +23,7 @@ import {
     readTerminalDisplayProjection,
     readTerminalHistoryProjection,
     readTerminalStatusProjection,
+    readTerminalTimelineProjection,
     saveTerminalSnapshotProjection,
 } from '../frontend/index.js';
 import { tryAnswerTerminalPendingQuestionInput } from '../pending-question-answer.js';
@@ -142,10 +143,12 @@ export function cmdStatus({ hubSessionId, injectPort, println }, arg = '') {
         ação sugerida    ${projection.recommendedAction ?? 'none'}
     runtime session  \x1b[90m${projection.runtimeSessionId ?? '(sem runtime)'}\x1b[0m
     runtime id       \x1b[90m${projection.runtimeId}\x1b[0m
+    runtime profile  \x1b[90m${projection.agentProfileId ?? '(sem profile)'}\x1b[0m
     runtimes         \x1b[90m${projection.runtimeTopologyLabel}\x1b[0m
+    timeline         \x1b[90m${projection.timelineSource} · ${projection.timelineAuthority} · ${projection.timelineReconciliationStatus} · ${projection.timelineTurnCount} turns\x1b[0m
     sdk session      \x1b[90m${projection.sdkSessionId ?? '(sem sdk)'}\x1b[0m
     hub session      \x1b[90m${projection.hubSessionId ?? '(sem hub)'}\x1b[0m
-    turnos (memória) ${projection.turnCount}
+    turnos canon     ${projection.turnCount} \x1b[90m(persistidos=${projection.persistedTimelineTurnCount} · bridge=${projection.bridgeTurnCount} · live-tail=${projection.liveBridgeTailCount})\x1b[0m
     inject port      ${projection.injectPort}
         atividade atual  ${activitySeverityColor}${activity.label}\x1b[0m${activityProgress}
         fase/source      \x1b[90m${activity.phase} · ${activity.source}\x1b[0m
@@ -221,6 +224,11 @@ export function cmdStatus({ hubSessionId, injectPort, println }, arg = '') {
             `  \x1b[33mNota: runtime solicitado ${projection.requestedRuntimeId ?? '(desconhecido)'} não encontrado; usando runtime default (${projection.runtimeId}).\x1b[0m`,
         );
     }
+    if (projection.timelineReconciliationStatus === 'diverged') {
+        println(
+            '  \x1b[33mNota: timeline do bridge divergiu da persistência; a UX está priorizando o hub como autoridade canônica.\x1b[0m',
+        );
+    }
 }
 
 /**
@@ -261,7 +269,7 @@ export function cmdNow({ hubSessionId, injectPort, println }, arg = '') {
         : `model=${modelBilling.displayModel}`;
 
     println(
-        `\x1b[36m[now]\x1b[0m runtime=${projection.runtimeId} status=${state} loop=${projection.dialogLoopActive ? 'on' : 'off'} mode=${mode} queue=${queue} ${ask}${sdkWait ? ` ${sdkWait}` : ''} ${mismatchLabel}`,
+        `\x1b[36m[now]\x1b[0m runtime=${projection.runtimeId} status=${state} loop=${projection.dialogLoopActive ? 'on' : 'off'} mode=${mode} queue=${queue} ${ask}${sdkWait ? ` ${sdkWait}` : ''} timeline=${projection.timelineSource}:${projection.timelineReconciliationStatus} ${mismatchLabel}`,
     );
     if (projection.activity?.label) {
         const detail = projection.activity.detail ? ` · ${projection.activity.detail}` : '';
@@ -276,21 +284,33 @@ export function cmdNow({ hubSessionId, injectPort, println }, arg = '') {
  * Exibe o histórico de conversa local.
  *
  * @param {SessionContext} ctx
- * @param {number} [n] - Número de pares a exibir
+ * @param {number | string} [n] - Número de pares a exibir ou argumento cru do REPL
  * @returns {void}
  */
 export function cmdHistory({ println }, n = 10) {
-    const hist = readTerminalHistoryProjection(n);
+    const rawArg = typeof n === 'number' ? String(n) : n;
+    const { runtimeId, arg } = extractRuntimeTarget(rawArg ?? '');
+    const requestedLimit = typeof n === 'number' ? n : Number(arg) || 10;
+    const timeline = readTerminalTimelineProjection({ limitPairs: requestedLimit, runtimeId });
+    const hist = readTerminalHistoryProjection(requestedLimit, runtimeId);
     if (hist.length === 0) {
         println('[history] Histórico vazio.');
         return;
     }
-    println(`\n── Histórico (últimos ${Math.floor(hist.length / 2)} pares) ──`);
+    println(
+        `\n── Histórico (${timeline.timelineSource} · ${timeline.timelineAuthority} · ${timeline.reconciliationStatus}) ──`,
+    );
     for (const turn of hist) {
         const ts = new Date(turn.timestamp).toLocaleTimeString('pt-BR');
-        const roleLabel = turn.role === 'user' ? '👤' : '🧠';
+        const roleLabel = turn.role === 'user' ? '👤' : turn.rawRole === 'llm_a' ? '🤖' : '🧠';
+        const sourceLabel = turn.persisted ? '' : ' \x1b[33m[live]\x1b[0m';
         const preview = turn.content.slice(0, 160) + (turn.content.length > 160 ? '…' : '');
-        println(`  [${ts}] ${roleLabel} ${preview}`);
+        println(`  [${ts}] ${roleLabel}${sourceLabel} ${preview}`);
+    }
+    if (timeline.reconciliationStatus === 'diverged') {
+        println(
+            '  \x1b[33mNota: histórico do bridge divergiu; exibindo a timeline persistida como fonte oficial.\x1b[0m',
+        );
     }
     println('─────────────────────────────────');
 }
@@ -315,7 +335,7 @@ export function cmdDbHistory({ hubSessionId, println }, n = 20, offset = 0) {
             println('\x1b[90m  /db-history: Nenhum turno persistido ainda.\x1b[0m');
             return;
         }
-        const offsetLabel = offset > 0 ? ` (offset ${offset})` : '';
+        const offsetLabel = offset > 0 ? ` (offset recente ${offset})` : '';
         println(`\n  \x1b[36mÚltimos ${turns.length} turnos da sessão atual${offsetLabel}\x1b[0m`);
         println('  ─────────────────────────────────────────────────');
         for (const t of turns) {
@@ -326,6 +346,9 @@ export function cmdDbHistory({ hubSessionId, println }, n = 20, offset = 0) {
             const preview = content.slice(0, 160) + (content.length > 160 ? '…' : '');
             println(`  \x1b[90m[${ts}]\x1b[0m ${emoji}  ${preview}`);
         }
+        println(
+            `  \x1b[90mwindow=${projection.effectiveOffset}..${projection.effectiveOffset + turns.length - 1} de ${projection.totalTurns} turnos persistidos\x1b[0m`,
+        );
         println('  ─────────────────────────────────────────────────\n');
     } catch (e) {
         println(`\x1b[31m  /db-history erro: ${toError(e).message}\x1b[0m`);

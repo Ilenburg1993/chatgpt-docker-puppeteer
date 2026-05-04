@@ -30,6 +30,10 @@ export function cmdMetrics({ println }, arg = '') {
     const {
         snap,
         turnCount,
+        bridgeTurnCount,
+        timelineSource,
+        timelineAuthority,
+        timelineReconciliationStatus,
         contextWindow,
         toolCallCount,
         toolErrorCount,
@@ -77,7 +81,8 @@ export function cmdMetrics({ println }, arg = '') {
 
   \x1b[35m📊 Uso\x1b[0m
   ─────────────────────────────────────
-  turns       ${turnCount}
+  turns       ${turnCount} \x1b[90m(timeline canônica)\x1b[0m
+  bridge/live ${bridgeTurnCount} \x1b[90m(${timelineSource} · ${timelineAuthority} · ${timelineReconciliationStatus})\x1b[0m
   contexto    ${ctxStr}
   último PR   ${lastModel} · ${costStr} · ${billingStatus}
 

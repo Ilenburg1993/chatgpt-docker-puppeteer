@@ -408,6 +408,7 @@ describe('terminal/frontend/index', () => {
                 model: 'gpt-5',
                 sessionId: 'runtime-123',
                 isDefault: true,
+                agentProfileId: null,
             },
             {
                 runtimeId: 'alt',
@@ -415,6 +416,7 @@ describe('terminal/frontend/index', () => {
                 model: 'gpt-5-mini',
                 sessionId: 'runtime-alt',
                 isDefault: false,
+                agentProfileId: null,
             },
         ]);
         expect(projection.runtimeTopologyLabel).toBe('*default:gpt-5/waiting_for_input  •  -alt:gpt-5-mini/processing');
@@ -429,7 +431,8 @@ describe('terminal/frontend/index', () => {
         );
         expect(projection.sdkSessionId).toBe('sdk-1');
         expect(projection.hubSessionId).toBe('hub-1');
-        expect(projection.turnCount).toBe(9);
+        expect(projection.turnCount).toBe(2);
+        expect(projection.bridgeTurnCount).toBe(2);
         expect(projection.workspace.currentBranch).toBe('main');
         expect(projection.pendingQuestionKind).toBe('question');
         expect(projection.pendingQuestionShadowExpired).toBe(true);
@@ -460,6 +463,16 @@ describe('terminal/frontend/index', () => {
         expect(config.currentModel).toBe('gpt-5-mini');
         expect(context.usedTokens).toBe(8000);
         expect(context.maxTokens).toBe(64000);
+        expect(context.timelineSource).toBe('hub');
+    });
+
+    it('expõe timeline canônica reconciliada com autoridade persistida', () => {
+        const timeline = frontend.readTerminalTimelineProjection();
+
+        expect(timeline.timelineSource).toBe('hub');
+        expect(timeline.timelineAuthority).toBe('persistent');
+        expect(timeline.reconciliationStatus).toBe('diverged');
+        expect(timeline.turns[0]?.content).toBe('a');
     });
 
     it('expõe fallback explícito quando o runtime solicitado não existe', () => {
@@ -597,6 +610,7 @@ describe('terminal/frontend/index', () => {
 
         expect(context.isRealData).toBe(true);
         expect(context.workspace.currentBranch).toBe('main');
+        expect(context.timelineAuthority).toBe('persistent');
         expect(errors.stats.total).toBe(3);
         expect(errors.recent[0]?.message).toBe('kaboom');
         expect(compact.ok).toBe(true);

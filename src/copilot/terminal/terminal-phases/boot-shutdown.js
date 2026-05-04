@@ -1,0 +1,55 @@
+// @ts-check
+/**
+ * @module copilot/terminal/terminal-phases/boot-shutdown
+ * @file Registro dos shutdown handlers do terminal.
+ */
+
+import { registerShutdownHandler, SHUTDOWN_PRIORITY } from '#copilot/core';
+import { log } from '#copilot/observability';
+import { rollbackTerminalPinnedContextPhase } from './boot-pinned.js';
+
+/**
+ * Registra os shutdown handlers centrais do terminal.
+ *
+ * @param {import('../index.js').TerminalBootContext} ctx
+ * @param {{
+ *     rollbackRuntimeListenersPhase: () => Promise<void>;
+ *     rollbackPinnedContextPhaseFn?: typeof rollbackTerminalPinnedContextPhase;
+ *     registerShutdownHandlerFn?: typeof registerShutdownHandler;
+ *     logFn?: (level: 'DEBUG' | 'INFO' | 'WARN' | 'ERROR' | 'FATAL', message: string) => void;
+ * }} deps
+ * @returns {void}
+ */
+export function registerTerminalShutdownHandlers(ctx, deps) {
+    const rollbackRuntimeListenersPhase = deps.rollbackRuntimeListenersPhase;
+    const rollbackPinnedContextPhaseFn = deps.rollbackPinnedContextPhaseFn ?? rollbackTerminalPinnedContextPhase;
+    const registerShutdownHandlerFn = deps.registerShutdownHandlerFn ?? registerShutdownHandler;
+    const logFn = deps.logFn ?? log;
+
+    registerShutdownHandlerFn(
+        'terminal.reflectionTimer',
+        async () => {
+            await rollbackRuntimeListenersPhase();
+            logFn('INFO', '[TerminalServer] Reflection timer cancelado via shutdown handler.');
+        },
+        SHUTDOWN_PRIORITY.RUNTIME_CRITICAL,
+    );
+
+    registerShutdownHandlerFn(
+        'terminal.pinnedFilesLoader',
+        async () => {
+            await rollbackPinnedContextPhaseFn(ctx);
+            logFn('INFO', '[TerminalServer] PinnedFilesLoader desligado via shutdown handler.');
+        },
+        SHUTDOWN_PRIORITY.TERMINAL_RESOURCE,
+    );
+
+    registerShutdownHandlerFn(
+        'terminal.activityEmitter',
+        async () => {
+            await rollbackRuntimeListenersPhase();
+            logFn('INFO', '[TerminalServer] Activity emitter desacoplado via shutdown handler.');
+        },
+        SHUTDOWN_PRIORITY.TERMINAL_ACTIVITY,
+    );
+}

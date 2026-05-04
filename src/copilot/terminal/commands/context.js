@@ -85,6 +85,19 @@ export function cmdContext({ println }, arg = '') {
     println(`  cwd    \x1b[90m${ws.cwd}\x1b[0m`);
     if (ws.gitRoot) println(`  git    \x1b[90m${ws.gitRoot}\x1b[0m  branch: \x1b[32m${ws.currentBranch ?? '?'}\x1b[0m`);
 
+    println(`\x1b[36m  ─── Timeline canônica ───────────────────────────────────────────\x1b[0m`);
+    println(
+        `  source/autoridade: \x1b[90m${projection.timelineSource} · ${projection.timelineAuthority} · ${projection.reconciliationStatus}\x1b[0m`,
+    );
+    println(
+        `  persistidos/live : \x1b[90m${projection.persistedTurnCount} persistidos · ${projection.bridgeTurnCount} bridge · ${projection.liveBridgeTailCount} live-tail\x1b[0m`,
+    );
+    if (projection.reconciliationStatus === 'diverged') {
+        println(
+            '\x1b[33m  Nota: bridge e persistência divergiram; o terminal está priorizando a timeline persistida até nova reconciliação.\x1b[0m',
+        );
+    }
+
     println('');
 }
 

@@ -181,7 +181,8 @@ describe('commands/metrics + usage', () => {
         expect(ctx.output()).toContain('hub sessão');
         expect(ctx.output()).toContain('modo sdk');
         expect(ctx.output()).not.toContain('plan local');
-        expect(ctx.output()).toContain('11');
+        expect(ctx.output()).toContain('timeline canônica');
+        expect(ctx.output()).toContain('bridge/live 0');
         expect(ctx.output()).toContain('Atividade');
         expect(ctx.output()).toContain('Processando mensagem');
     });

@@ -13,6 +13,10 @@ const mocks = vi.hoisted(() => ({
     println: vi.fn(),
     setLastSdkPlanOperation: vi.fn(),
     setSdkSessionMode: vi.fn(),
+    beginTerminalTurnTrace: vi.fn(),
+    completeTerminalTurnTrace: vi.fn(),
+    recordTerminalTurnFileActivity: vi.fn(),
+    recordTerminalTurnToolActivity: vi.fn(),
 }));
 
 vi.mock('../../../src/copilot/terminal/activity-state.js', () => ({
@@ -27,6 +31,13 @@ vi.mock('../../../src/copilot/terminal/dialog/index.js', () => ({
 vi.mock('../../../src/copilot/presentation/runtime-ui-state-store.js', () => ({
     setLastSdkPlanOperation: mocks.setLastSdkPlanOperation,
     setSdkSessionMode: mocks.setSdkSessionMode,
+}));
+
+vi.mock('../../../src/copilot/terminal/turn-trace-state.js', () => ({
+    beginTerminalTurnTrace: mocks.beginTerminalTurnTrace,
+    completeTerminalTurnTrace: mocks.completeTerminalTurnTrace,
+    recordTerminalTurnFileActivity: mocks.recordTerminalTurnFileActivity,
+    recordTerminalTurnToolActivity: mocks.recordTerminalTurnToolActivity,
 }));
 
 function createAgentHost() {
@@ -100,6 +111,11 @@ describe('terminal/sdk-session-events.js — contrato', () => {
         expect(mocks.broadcastSse).toHaveBeenCalledWith(
             'assistant.turn_start',
             expect.objectContaining({ turnId: 'turn-1' }),
+        );
+        expect(mocks.beginTerminalTurnTrace).toHaveBeenCalledWith({ turnId: 'turn-1' });
+        expect(mocks.completeTerminalTurnTrace).toHaveBeenCalledWith({ turnId: 'turn-1' });
+        expect(mocks.recordTerminalTurnFileActivity).toHaveBeenCalledWith(
+            expect.objectContaining({ path: 'files/plan.md', operation: 'edit', source: 'sdk' }),
         );
         expect(mocks.broadcastSse).toHaveBeenCalledWith(
             'session.workspace_file_changed',
@@ -177,6 +193,13 @@ describe('terminal/sdk-session-events.js — contrato', () => {
             'tool',
             'Tool solicitou ação do usuário',
             expect.objectContaining({ toolName: 'workspace.write', severity: 'warn' }),
+        );
+        expect(mocks.recordTerminalTurnToolActivity).toHaveBeenCalledWith(
+            expect.objectContaining({
+                toolName: 'workspace.write',
+                operation: 'run',
+                status: 'user_requested',
+            }),
         );
         expect(mocks.broadcastSse).toHaveBeenCalledWith(
             'elicitation.pending',

@@ -166,6 +166,41 @@ describe('terminal/commands/sdk', () => {
         });
     });
 
+    it('/elicitation aplica defaults e valida arrays anyOf na borda terminal', async () => {
+        recordTerminalElicitationPending({
+            requestId: 'el-defaults',
+            message: 'Escolha ambiente e tags',
+            mode: 'form',
+            requestedSchema: {
+                type: 'object',
+                properties: {
+                    env: { type: 'string', default: 'dev', enum: ['dev', 'prod'] },
+                    tags: {
+                        type: 'array',
+                        items: {
+                            anyOf: [
+                                { const: 'fast', title: 'fast' },
+                                { const: 'safe', title: 'safe' },
+                            ],
+                        },
+                    },
+                },
+                required: ['env'],
+            },
+        });
+
+        const invalid = mockCtx();
+        await cmdElicitation({ println: invalid.println }, 'respond el-defaults accept {"tags":["fast","noisy"]}');
+        expect(invalid.output()).toContain('fast | safe');
+
+        const valid = mockCtx();
+        await cmdElicitation({ println: valid.println }, 'respond el-defaults accept {"tags":["fast","safe"]}');
+        expect(runtimeMocks.resolveTerminalSdkPendingElicitation).toHaveBeenCalledWith('el-defaults', {
+            action: 'accept',
+            content: { env: 'dev', tags: ['fast', 'safe'] },
+        });
+    });
+
     it('/permission lista, detalha e limpa permissões SDK observadas', async () => {
         recordTerminalPermissionRequested({
             requestId: 'perm-1',

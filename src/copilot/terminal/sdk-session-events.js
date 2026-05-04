@@ -43,6 +43,12 @@ import {
     recordTerminalPermissionCompleted,
     recordTerminalPermissionRequested,
 } from './sdk-interactions.js';
+import {
+    beginTerminalTurnTrace,
+    completeTerminalTurnTrace,
+    recordTerminalTurnFileActivity,
+    recordTerminalTurnToolActivity,
+} from './turn-trace-state.js';
 
 /**
  * @typedef {{
@@ -78,6 +84,7 @@ function stringOr(value, fallback) {
 export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfIdle }) {
     const onAssistantTurnStart = (/** @type {{ turnId?: string | null }} */ evt) => {
         const turnId = evt?.turnId ?? null;
+        beginTerminalTurnTrace({ turnId });
         recordTerminalActivity('turn', 'Turno do assistente iniciado', {
             detail: turnId ? `turnId=${turnId}` : 'processando resposta',
             source: 'sdk',
@@ -91,6 +98,7 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
 
     const onAssistantTurnEnd = (/** @type {{ turnId?: string | null }} */ evt) => {
         const turnId = evt?.turnId ?? null;
+        completeTerminalTurnTrace({ turnId });
         recordTerminalActivity('turn', 'Turno do assistente concluído', {
             detail: turnId ? `turnId=${turnId}` : 'resposta concluída',
             source: 'sdk',
@@ -474,6 +482,13 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
     const onWorkspaceFileChanged = (/** @type {{ path?: string; operation?: 'create' | 'update' | string }} */ evt) => {
         const path = evt?.path ?? '(path desconhecido)';
         const operation = evt?.operation ?? 'unknown';
+        if (path && path !== '(path desconhecido)') {
+            recordTerminalTurnFileActivity({
+                path,
+                operation: operation === 'create' ? 'write' : operation === 'update' ? 'edit' : 'unknown',
+                source: 'sdk',
+            });
+        }
         recordTerminalActivity('system', 'Workspace da sessão alterado', {
             detail: `${operation} · ${path}`,
             source: 'sdk',
@@ -490,6 +505,13 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
     const onToolUserRequested = (/** @type {{ toolName?: string; requestId?: string }} */ evt) => {
         const toolName = evt?.toolName ?? 'tool';
         const requestId = evt?.requestId ?? null;
+        recordTerminalTurnToolActivity({
+            toolName,
+            operation: 'run',
+            target: requestId,
+            source: 'sdk',
+            status: 'user_requested',
+        });
         recordTerminalActivity('tool', 'Tool solicitou ação do usuário', {
             detail: `${toolName}${requestId ? ` · ${requestId}` : ''}`,
             toolName,
@@ -506,6 +528,13 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
     const onExternalToolRequested = (/** @type {{ toolName?: string; requestId?: string }} */ evt) => {
         const toolName = evt?.toolName ?? 'external_tool';
         const requestId = evt?.requestId ?? null;
+        recordTerminalTurnToolActivity({
+            toolName,
+            operation: 'run',
+            target: requestId,
+            source: 'sdk',
+            status: 'requested',
+        });
         recordTerminalActivity('tool', 'External tool solicitada', {
             detail: `${toolName}${requestId ? ` · ${requestId}` : ''}`,
             toolName,
@@ -521,6 +550,14 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
         const toolName = evt?.toolName ?? 'external_tool';
         const requestId = evt?.requestId ?? null;
         const success = evt?.success !== false;
+        recordTerminalTurnToolActivity({
+            toolName,
+            operation: 'run',
+            target: requestId,
+            source: 'sdk',
+            status: success ? 'completed' : 'failed',
+            success,
+        });
         recordTerminalActivity('tool', success ? 'External tool concluída' : 'External tool falhou', {
             detail: `${toolName}${requestId ? ` · ${requestId}` : ''}`,
             toolName,

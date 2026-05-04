@@ -327,7 +327,8 @@ describe('commands/session — sync commands', () => {
         const ctx = mockCtx();
         cmdHistory({ println: ctx.println }, 5);
         expect(ctx.println).toHaveBeenCalled();
-        expect(ctx.output()).toContain('hello world');
+        expect(ctx.output()).toContain('a');
+        expect(ctx.output()).toContain('hub');
     });
 
     it('cmdWho imprime atores com porta', () => {

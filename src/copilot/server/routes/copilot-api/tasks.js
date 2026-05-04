@@ -12,6 +12,7 @@
 import { LLM_B_TURN_TIMEOUT_MS } from '#copilot/config';
 import { log } from '#copilot/observability';
 import { randomUUID } from 'node:crypto';
+import { normalizeElicitationResultWithSchema } from '../../../core/elicitation-schema.js';
 import { toError } from '../../../core/error-handlers.js';
 import { projectAgentHttpError } from '../../../presentation/agent-http-errors.js';
 import { resolveOptionalDialogTimeout } from '../../../presentation/dialog-timeout-policy.js';
@@ -293,6 +294,33 @@ export function registerTaskRoutes(bridge, binding) {
 
         const id = /** @type {string} */ (req.params['id']);
         const { action, content } = req.body ?? {};
+        if (typeof agent.getPendingSdkElicitation === 'function') {
+            const entry = agent.getPendingSdkElicitation(id);
+            if (!entry) {
+                return res
+                    .status(404)
+                    .json({ ...runtimeMeta, ok: false, error: 'Elicitation pendente não encontrada.' });
+            }
+            try {
+                const result = normalizeElicitationResultWithSchema(
+                    {
+                        action,
+                        ...(content !== undefined ? { content } : {}),
+                    },
+                    entry.requestedSchema,
+                    { context: '[copilot-api/tasks]' },
+                );
+                const ok = agent.resolvePendingSdkElicitation(id, result);
+                if (!ok) {
+                    return res
+                        .status(409)
+                        .json({ ...runtimeMeta, ok: false, error: 'Elicitation não está mais pendente.' });
+                }
+                return res.json({ ...runtimeMeta, ok: true, message: 'Resposta de elicitation enviada ao SDK.' });
+            } catch (error) {
+                return res.status(400).json({ ...runtimeMeta, ok: false, error: toError(error).message });
+            }
+        }
         if (action !== 'accept' && action !== 'decline' && action !== 'cancel') {
             return res
                 .status(400)

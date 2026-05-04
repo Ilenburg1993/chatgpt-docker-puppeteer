@@ -116,10 +116,28 @@ export function readTerminalHubSessions(opts = {}) {
  * @returns {Record<string, unknown>[]}
  */
 export function readTerminalHubTurns(hubSessionId, opts = {}) {
+    if (typeof conversationStore.readTurns !== 'function') {
+        return [];
+    }
     return conversationStore.readTurns(hubSessionId, {
         limit: opts.limit ?? 20,
         offset: opts.offset ?? 0,
     });
+}
+
+/**
+ * Conta quantos turnos existem em uma hub session.
+ *
+ * Mantém fallback defensivo para mocks/stores antigos que ainda não exponham `countTurns`.
+ *
+ * @param {string} hubSessionId
+ * @returns {number}
+ */
+export function countTerminalHubTurns(hubSessionId) {
+    if (typeof conversationStore.countTurns === 'function') {
+        return Number(conversationStore.countTurns(hubSessionId) ?? 0);
+    }
+    return readTerminalHubTurns(hubSessionId, { limit: 9_999, offset: 0 }).length;
 }
 
 /**

@@ -6,6 +6,7 @@
  */
 
 import { toError } from '#copilot/core';
+import { isRuntimeElicitationSchema, normalizeElicitationContentWithSchema } from '../../core/elicitation-schema.js';
 import { readTerminalRuntimeState } from '../frontend/gateways/agent-runtime.js';
 import {
     compactTerminalSdkSession,
@@ -117,84 +118,6 @@ function defaultElicitationSchema() {
 }
 
 /**
- * @param {unknown} value
- * @returns {value is string | number | boolean | string[]}
- */
-function isElicitationFieldValue(value) {
-    if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
-        return Number.isFinite(value) || typeof value !== 'number';
-    }
-    return Array.isArray(value) && value.every((item) => typeof item === 'string');
-}
-
-/**
- * @param {unknown} schema
- * @returns {schema is { type: 'object'; properties: Record<string, unknown>; required?: string[] }}
- */
-function isElicitationSchema(schema) {
-    const obj = objectOrNull(schema);
-    return obj?.['type'] === 'object' && objectOrNull(obj['properties']) !== null;
-}
-
-/**
- * @param {Record<string, string | number | boolean | string[]> | undefined} content
- * @param {unknown} schema
- * @returns {{ ok: true } | { ok: false; error: string }}
- */
-function validateElicitationContent(content, schema) {
-    if (!content) return { ok: true };
-    for (const [key, value] of Object.entries(content)) {
-        if (!isElicitationFieldValue(value)) {
-            return {
-                ok: false,
-                error: `Campo "${key}" deve ser string, number, boolean ou string[].`,
-            };
-        }
-    }
-    if (!isElicitationSchema(schema)) return { ok: true };
-    const required = Array.isArray(schema.required) ? schema.required : [];
-    for (const key of required) {
-        if (!(key in content)) {
-            return { ok: false, error: `Campo obrigatório ausente: "${key}".` };
-        }
-    }
-    for (const [key, field] of Object.entries(schema.properties)) {
-        if (!(key in content)) continue;
-        const fieldObj = objectOrNull(field);
-        if (!fieldObj) continue;
-        const value = content[key];
-        const type = fieldObj['type'];
-        if (type === 'string' && typeof value !== 'string') {
-            return { ok: false, error: `Campo "${key}" deve ser string.` };
-        }
-        if ((type === 'number' || type === 'integer') && typeof value !== 'number') {
-            return { ok: false, error: `Campo "${key}" deve ser ${type}.` };
-        }
-        if (type === 'integer' && !Number.isInteger(value)) {
-            return { ok: false, error: `Campo "${key}" deve ser integer.` };
-        }
-        if (type === 'boolean' && typeof value !== 'boolean') {
-            return { ok: false, error: `Campo "${key}" deve ser boolean.` };
-        }
-        if (type === 'array' && !Array.isArray(value)) {
-            return { ok: false, error: `Campo "${key}" deve ser string[].` };
-        }
-        if (typeof value === 'string' && Array.isArray(fieldObj['enum']) && !fieldObj['enum'].includes(value)) {
-            return { ok: false, error: `Campo "${key}" deve ser uma das opções: ${fieldObj['enum'].join(' | ')}.` };
-        }
-        if (typeof value === 'string' && Array.isArray(fieldObj['oneOf'])) {
-            const allowed = fieldObj['oneOf']
-                .map((item) => objectOrNull(item)?.['const'])
-                .filter((item) => typeof item === 'string');
-            if (allowed.length > 0 && !allowed.includes(value)) {
-                return { ok: false, error: `Campo "${key}" deve ser uma das opções: ${allowed.join(' | ')}.` };
-            }
-        }
-    }
-    return { ok: true };
-}
-
-/**
  * @param {string | undefined} action
  * @param {string[]} rest
  * @param {unknown} [schema]
@@ -218,11 +141,11 @@ function parseElicitationResult(action, rest, schema) {
     const content = parsed.json
         ? /** @type {Record<string, string | number | boolean | string[]>} */ (/** @type {unknown} */ (parsed.json))
         : undefined;
-    const validation = validateElicitationContent(content, schema);
-    if (!validation.ok) {
-        return { ok: false, error: validation.error };
+    const normalized = normalizeElicitationContentWithSchema(content, schema);
+    if (!normalized.ok) {
+        return { ok: false, error: normalized.error };
     }
-    return { ok: true, result: { action, ...(content ? { content } : {}) } };
+    return { ok: true, result: { action, ...(normalized.content ? { content: normalized.content } : {}) } };
 }
 
 /**
@@ -476,7 +399,7 @@ export async function cmdElicitation({ println }, arg = '') {
                 println(`\x1b[31m  JSON inválido: ${parsed.error ?? 'schema ausente'}\x1b[0m`);
                 return;
             }
-            if (!isElicitationSchema(parsed.json)) {
+            if (!isRuntimeElicitationSchema(parsed.json)) {
                 println('\x1b[31m  Schema inválido: esperado { "type": "object", "properties": { ... } }.\x1b[0m');
                 return;
             }

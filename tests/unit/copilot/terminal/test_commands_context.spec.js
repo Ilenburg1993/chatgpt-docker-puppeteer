@@ -21,6 +21,13 @@ const frontendMocks = vi.hoisted(() => ({
             gitRoot: '/workspaces/test',
             currentBranch: 'main',
         },
+        timelineSource: 'empty',
+        timelineAuthority: 'none',
+        reconciliationStatus: 'empty',
+        hasPersistentHistory: false,
+        persistedTurnCount: 0,
+        bridgeTurnCount: 0,
+        liveBridgeTailCount: 0,
     })),
     requestTerminalCompactionProjection: vi.fn(async () => ({
         ok: true,
@@ -60,6 +67,13 @@ describe('terminal/commands/cmdContext', () => {
                 gitRoot: '/workspaces/test',
                 currentBranch: 'main',
             },
+            timelineSource: 'empty',
+            timelineAuthority: 'none',
+            reconciliationStatus: 'empty',
+            hasPersistentHistory: false,
+            persistedTurnCount: 0,
+            bridgeTurnCount: 0,
+            liveBridgeTailCount: 0,
         });
     });
 
@@ -88,6 +102,13 @@ describe('terminal/commands/cmdContext', () => {
                 gitRoot: '/workspaces/test',
                 currentBranch: 'main',
             },
+            timelineSource: 'bridge',
+            timelineAuthority: 'transport',
+            reconciliationStatus: 'bridge_only',
+            hasPersistentHistory: false,
+            persistedTurnCount: 0,
+            bridgeTurnCount: 1,
+            liveBridgeTailCount: 0,
         });
         cmdContext({ println });
         const output = lines.join('\n');
@@ -109,6 +130,13 @@ describe('terminal/commands/cmdContext', () => {
                 gitRoot: '/workspaces/test',
                 currentBranch: 'main',
             },
+            timelineSource: 'hub',
+            timelineAuthority: 'persistent',
+            reconciliationStatus: 'aligned',
+            hasPersistentHistory: true,
+            persistedTurnCount: 1,
+            bridgeTurnCount: 1,
+            liveBridgeTailCount: 0,
         });
         cmdContext({ println });
         const output = lines.join('\n');
@@ -130,6 +158,13 @@ describe('terminal/commands/cmdContext', () => {
                 gitRoot: '/workspaces/test',
                 currentBranch: 'main',
             },
+            timelineSource: 'hub',
+            timelineAuthority: 'persistent',
+            reconciliationStatus: 'aligned',
+            hasPersistentHistory: true,
+            persistedTurnCount: 1,
+            bridgeTurnCount: 1,
+            liveBridgeTailCount: 0,
         });
         cmdContext({ println });
         const output = lines.join('\n');
@@ -150,6 +185,13 @@ describe('terminal/commands/cmdContext', () => {
                 gitRoot: '/workspaces/test',
                 currentBranch: 'main',
             },
+            timelineSource: 'hub',
+            timelineAuthority: 'persistent',
+            reconciliationStatus: 'aligned',
+            hasPersistentHistory: true,
+            persistedTurnCount: 1,
+            bridgeTurnCount: 1,
+            liveBridgeTailCount: 0,
         });
         cmdContext({ println });
         const output = lines.join('\n');
@@ -170,12 +212,22 @@ describe('terminal/commands/cmdContext', () => {
                 gitRoot: '/workspaces/test',
                 currentBranch: 'main',
             },
+            timelineSource: 'mixed',
+            timelineAuthority: 'reconciled',
+            reconciliationStatus: 'bridge_tail',
+            hasPersistentHistory: true,
+            persistedTurnCount: 2,
+            bridgeTurnCount: 3,
+            liveBridgeTailCount: 1,
         });
         cmdContext({ println });
         const output = lines.join('\n');
         expect(output).toContain('Workspace');
         expect(output).toContain('/workspaces/test');
         expect(output).toContain('main');
+        expect(output).toContain('Timeline canônica');
+        expect(output).toContain('mixed');
+        expect(output).toContain('bridge_tail');
     });
 });
 

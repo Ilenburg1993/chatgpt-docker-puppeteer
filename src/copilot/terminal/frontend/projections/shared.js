@@ -24,6 +24,7 @@ import { readTerminalSessionBinding } from '../gateways/agent-runtime.js';
  *
  *
  * @typedef {{
+ *     agentProfileId: string | null;
  *     requestedRuntimeId: string | null;
  *     runtimeId: string;
  *     runtimeFound: boolean;
@@ -35,6 +36,7 @@ import { readTerminalSessionBinding } from '../gateways/agent-runtime.js';
  *         model: string;
  *         sessionId: string | null;
  *         isDefault: boolean;
+ *         agentProfileId: string | null;
  *     }[];
  *     snap: Record<string, unknown>;
  *     health: Record<string, any> | null;

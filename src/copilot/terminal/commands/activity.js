@@ -7,6 +7,60 @@ import { readTerminalActivityProjection } from '../frontend/index.js';
  */
 
 /**
+ * @param {ActivityContext['println']} println
+ * @param {string} title
+ * @param {any} trace
+ * @returns {void}
+ */
+function printTurnTraceSummary(println, title, trace) {
+    const stateColor = trace.status === 'active' ? '\x1b[33m' : trace.status === 'completed' ? '\x1b[32m' : '\x1b[31m';
+    println(`  \x1b[36m${title}\x1b[0m
+  ─────────────────────────────────────
+  trace           \x1b[90m${trace.traceId}\x1b[0m
+  status          ${stateColor}${trace.status}\x1b[0m
+  tools           \x1b[90m${trace.toolCount}\x1b[0m
+  arquivos        \x1b[90m${trace.fileCount}\x1b[0m`);
+
+    if (trace.files.length > 0) {
+        println('  arquivos tocados');
+        for (const file of trace.files.slice(0, 5)) {
+            println(`    - ${file.operation} · ${file.path}${file.count > 1 ? ` ×${file.count}` : ''}`);
+        }
+    }
+
+    if (trace.tools.length > 0) {
+        println('  tools');
+        for (const tool of trace.tools.slice(0, 5)) {
+            const target = tool.path ?? tool.target;
+            println(
+                `    - ${tool.toolName} · ${tool.operation}${target ? ` · ${target}` : ''}${tool.status ? ` · ${tool.status}` : ''}`,
+            );
+        }
+    }
+
+    println('  ─────────────────────────────────────');
+}
+
+/**
+ * @param {any[]} recent
+ * @returns {any | null}
+ */
+function pickMostUsefulRecentTurnTrace(recent) {
+    for (const entry of recent) {
+        if (entry.fileCount > 0) return entry;
+        if (
+            entry.tools.some(
+                /** @param {{ operation?: string; path?: string | null; target?: string | null }} tool */ (tool) =>
+                    tool.operation !== 'unknown' || Boolean(tool.path) || Boolean(tool.target),
+            )
+        ) {
+            return entry;
+        }
+    }
+    return recent[0] ?? null;
+}
+
+/**
  * Exibe a atividade atual do terminal + timeline recente.
  *
  * @param {ActivityContext} ctx
@@ -17,6 +71,9 @@ export function cmdActivity({ println }, arg) {
     const limit = Number(arg);
     const projection = readTerminalActivityProjection(Number.isFinite(limit) && limit > 0 ? limit : 10);
     const current = projection.current;
+    const activeTurnTrace = projection.turnTrace.current ?? projection.turnTrace.recent[0] ?? null;
+    const recentNonCurrent = projection.turnTrace.recent.filter((entry) => entry.traceId !== activeTurnTrace?.traceId);
+    const latestCompletedTurnTrace = pickMostUsefulRecentTurnTrace(recentNonCurrent);
     const severityColor =
         current.severity === 'error' ? '\x1b[31m' : current.severity === 'warn' ? '\x1b[33m' : '\x1b[32m';
     const progressLabel = typeof current.progress === 'number' ? ` · ${current.progress}%` : '';
@@ -29,6 +86,14 @@ export function cmdActivity({ println }, arg) {
   source          \x1b[90m${current.source}\x1b[0m
   idade           \x1b[90m${Math.round(current.ageMs / 1000)}s\x1b[0m
   ─────────────────────────────────────`);
+
+    if (activeTurnTrace) {
+        printTurnTraceSummary(println, 'Resumo do turno atual', activeTurnTrace);
+    }
+
+    if (latestCompletedTurnTrace && latestCompletedTurnTrace.traceId !== activeTurnTrace?.traceId) {
+        printTurnTraceSummary(println, 'Último turno concluído', latestCompletedTurnTrace);
+    }
 
     if (projection.history.length === 0) {
         println('  \x1b[90mSem histórico de atividade ainda.\x1b[0m\n');

@@ -6,9 +6,7 @@
  * sessão e busca full-text.
  */
 
-import { getWorkspaceContext } from '#copilot/boot';
 import { getMcpStatus } from '#copilot/bridges';
-import { sendRuntimeDialogTurnForRuntime } from '../../../presentation/runtime-dialog.js';
 import { readRuntimeLifecycleSnapshot } from '../../../presentation/runtime-lifecycle.js';
 import { listActiveRuntimeTodosProjection } from '../../../presentation/runtime-todos.js';
 import {
@@ -19,6 +17,7 @@ import {
 import { readToolStatsProjection } from '../../../presentation/system-metrics.js';
 import { readTerminalActivityHistory, readTerminalActivitySnapshot } from '../../activity-state.js';
 import { readTerminalDisplayState } from '../../display-policy.js';
+import { readTerminalTurnTraceProjection } from '../../turn-trace-state.js';
 import {
     answerTerminalPendingQuestion,
     clearTerminalPendingQuestionShadow,
@@ -28,9 +27,9 @@ import {
     readTerminalSessionBinding,
     saveTerminalSnapshot,
 } from '../gateways/agent-runtime.js';
-import { clearTerminalHistoryFeed, readTerminalHistoryFeed, seedTerminalHistoryFeed } from '../gateways/dialog.js';
 import {
     canSearchTerminalHubTurns,
+    countTerminalHubTurns,
     deleteTerminalHubMemory,
     isTerminalHubReady,
     readTerminalHubMemories,
@@ -41,6 +40,7 @@ import {
     storeTerminalHubMemory,
 } from '../gateways/hub.js';
 import { readTerminalRuntimeBase } from './shared.js';
+import { readTerminalTimelineProjection } from './timeline.js';
 
 // ---------------------------------------------------------------------------
 // Activity & display
@@ -51,12 +51,14 @@ import { readTerminalRuntimeBase } from './shared.js';
  * @returns {{
  *     current: import('../../activity-state.js').TerminalActivitySnapshot;
  *     history: import('../../activity-state.js').TerminalActivityHistoryEntry[];
+ *     turnTrace: ReturnType<typeof readTerminalTurnTraceProjection>;
  * }}
  */
 export function readTerminalActivityProjection(limit = 10) {
     return {
         current: readTerminalActivitySnapshot(),
         history: readTerminalActivityHistory(limit),
+        turnTrace: readTerminalTurnTraceProjection(3),
     };
 }
 
@@ -65,116 +67,6 @@ export function readTerminalActivityProjection(limit = 10) {
  */
 export function readTerminalDisplayProjection() {
     return readTerminalDisplayState();
-}
-
-// ---------------------------------------------------------------------------
-// History & context
-// ---------------------------------------------------------------------------
-
-/**
- * Retorna o histórico em memória do bridge LLM-A ↔ LLM-B.
- *
- * @param {number} [limitPairs=10] Default is `10`
- * @returns {{ role: string; content: string; timestamp: number }[]}
- */
-export function readTerminalHistoryProjection(limitPairs = 10) {
-    return readTerminalHistoryFeed()
-        .slice(-limitPairs * 2)
-        .map(
-            (
-                /** @type {{ role: string; content: string; timestamp?: number }} */ turn,
-                /** @type {number} */ index,
-            ) => ({
-                ...turn,
-                timestamp: turn.timestamp ?? Date.now() + index,
-            }),
-        );
-}
-
-/**
- * Projeção consolidada do uso de contexto da LLM-B para o terminal.
- *
- * @param {string | null | undefined} [runtimeId]
- * @returns {{
- *     hasHistory: boolean;
- *     totalChars: number;
- *     turnCount: number;
- *     usedTokens: number;
- *     maxTokens: number;
- *     utilization: number;
- *     isRealData: boolean;
- *     workspace: ReturnType<typeof getWorkspaceContext>;
- * }}
- */
-export function readTerminalContextProjection(runtimeId) {
-    const base = readTerminalRuntimeBase(runtimeId);
-    const history = /** @type {{ role: string; content: string }[]} */ (readTerminalHistoryFeed());
-
-    let totalChars = 0;
-    let turnCount = 0;
-    for (const turn of history) {
-        const text = typeof turn.content === 'string' ? turn.content : JSON.stringify(turn.content);
-        totalChars += text.length;
-        turnCount += 1;
-    }
-
-    const isRealData = Boolean(base.contextWindow);
-    const usedTokens = isRealData ? (base.contextWindow?.tokens ?? 0) : Math.ceil(totalChars / 4);
-    const maxTokens = isRealData ? (base.contextWindow?.tokenLimit ?? 0) : 128_000;
-    const utilization = isRealData ? (base.contextWindow?.utilization ?? 0) : Math.min(usedTokens / maxTokens, 1);
-
-    return {
-        hasHistory: history.length > 0,
-        totalChars,
-        turnCount,
-        usedTokens,
-        maxTokens,
-        utilization,
-        isRealData,
-        workspace: getWorkspaceContext(),
-    };
-}
-
-/**
- * Solicita compactação ao runtime da LLM-B e reconstrói o histórico local com o resumo final.
- *
- * @param {string | null | undefined} [runtimeId]
- * @returns {Promise<{ ok: boolean; reply: string | null; estimatedTokens: number | null; runtimeId: string | null }>}
- */
-export async function requestTerminalCompactionProjection(runtimeId) {
-    const base = readTerminalRuntimeBase(runtimeId);
-    const resolvedRuntimeId = base.runtimeId;
-    const reply = await sendRuntimeDialogTurnForRuntime(
-        '[SISTEMA] Compacte toda esta conversa em um resumo técnico denso. Preserve: ' +
-            'todos os fatos, código, decisões, estados e contexto de arquivos discutidos. ' +
-            'Responda APENAS com esse resumo. Após isso, considere o resumo como o novo ' +
-            'contexto inicial desta sessão.',
-        'user',
-        undefined,
-        runtimeId,
-    );
-    if (!reply) {
-        return { ok: false, reply: null, estimatedTokens: null, runtimeId: resolvedRuntimeId };
-    }
-
-    clearTerminalHistoryFeed();
-    seedTerminalHistoryFeed('assistant', reply);
-
-    return {
-        ok: true,
-        reply,
-        estimatedTokens: Math.ceil((reply?.length ?? 0) / 4),
-        runtimeId: resolvedRuntimeId,
-    };
-}
-
-/**
- * Limpa o histórico em memória do canal.
- *
- * @returns {void}
- */
-export function clearTerminalHistory() {
-    clearTerminalHistoryFeed();
 }
 
 // ---------------------------------------------------------------------------
@@ -205,31 +97,6 @@ export function clearPendingTerminalQuestionShadow(runtimeId) {
 // ---------------------------------------------------------------------------
 // Database / hub history
 // ---------------------------------------------------------------------------
-
-/**
- * Lê turnos persistidos da hub session atual.
- *
- * @param {{ hubSessionId?: string | null; limit?: number; offset?: number }} input
- * @returns {{
- *     available: boolean;
- *     reason: string | null;
- *     turns: Record<string, any>[];
- *     limit: number;
- *     offset: number;
- * }}
- */
-export function readTerminalDbHistoryProjection({ hubSessionId = null, limit = 20, offset = 0 }) {
-    if (!hubSessionId) {
-        return { available: false, reason: 'no-hub-session', turns: [], limit, offset };
-    }
-    return {
-        available: true,
-        reason: null,
-        turns: readTerminalHubTurns(hubSessionId, { limit, offset }),
-        limit,
-        offset,
-    };
-}
 
 /**
  * Lista sessões persistidas no hub com a sessão atual marcada separadamente.
@@ -273,14 +140,15 @@ export function readTerminalCountProjection({ hubSessionId = null }) {
             memories: 0,
         };
     }
-    const turns = readTerminalHubTurns(hubSessionId, { limit: 9999, offset: 0 });
+    const totalTurns = countTerminalHubTurns(hubSessionId);
+    const turns = readTerminalHubTurns(hubSessionId, { limit: Math.max(totalTurns, 1), offset: 0 });
     const memories = readTerminalHubMemories({ limit: 9999 });
     return {
         available: true,
         reason: null,
         hubSessionId,
         sdkSessionId: binding.sdkSessionId,
-        turns: turns.length,
+        turns: totalTurns,
         userTurns: turns.filter((turn) => turn['role'] === 'user').length,
         llmBTurns: turns.filter((turn) => turn['role'] === 'llm_b').length,
         memories: memories.length,
@@ -459,7 +327,9 @@ export function readTerminalResumeProjection({ token, limitTurns = 50 }) {
         return { found: false, reason: 'session-not-found', target: null, turns: [], summaryPrompt: null };
     }
     const targetId = typeof target['id'] === 'string' ? target['id'] : '';
-    const turns = readTerminalHubTurns(targetId, { limit: limitTurns, offset: 0 });
+    const totalTurns = countTerminalHubTurns(targetId);
+    const effectiveOffset = Math.max(totalTurns - limitTurns, 0);
+    const turns = readTerminalHubTurns(targetId, { limit: limitTurns, offset: effectiveOffset });
     if (turns.length === 0) {
         return { found: false, reason: 'session-empty', target, turns, summaryPrompt: null };
     }
@@ -522,6 +392,14 @@ export function searchTerminalTurnsProjection({ query, hubSessionId = null, limi
  *     sdkSessionMode: 'interactive' | 'plan' | 'autopilot' | 'shell' | null;
  *     sdkPlanOperation: 'create' | 'update' | 'delete' | null;
  *     sdkPlanChangedAt: number | null;
+ *     timeline: {
+ *         source: import('./timeline.js').TerminalTimelineSource;
+ *         authority: import('./timeline.js').TerminalTimelineAuthority;
+ *         reconciliationStatus: import('./timeline.js').TerminalTimelineReconciliation;
+ *         turnCount: number;
+ *         persistedTurnCount: number;
+ *         liveBridgeTailCount: number;
+ *     };
  * }>}
  */
 export async function readTerminalDiagnoseProjection({ hubSessionId = null, runtimeId = null } = {}) {
@@ -547,6 +425,7 @@ export async function readTerminalDiagnoseProjection({ hubSessionId = null, runt
     const topToolStats = readToolStatsProjection()
         .entries.sort(([, a], [, b]) => Number(b['avgLatencyMs'] ?? 0) - Number(a['avgLatencyMs'] ?? 0))
         .slice(0, 5);
+    const timeline = readTerminalTimelineProjection({ limitPairs: 10, runtimeId });
 
     return {
         snap: base.snap,
@@ -571,5 +450,13 @@ export async function readTerminalDiagnoseProjection({ hubSessionId = null, runt
         sdkSessionMode: getSdkSessionMode(),
         sdkPlanOperation: getLastSdkPlanOperation(),
         sdkPlanChangedAt: getLastSdkPlanChangedAt(),
+        timeline: {
+            source: timeline.timelineSource,
+            authority: timeline.timelineAuthority,
+            reconciliationStatus: timeline.reconciliationStatus,
+            turnCount: timeline.turns.length,
+            persistedTurnCount: timeline.totalPersistedTurns,
+            liveBridgeTailCount: timeline.liveBridgeTailCount,
+        },
     };
 }

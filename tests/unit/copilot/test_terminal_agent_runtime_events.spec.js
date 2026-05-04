@@ -21,6 +21,8 @@ const readTerminalRuntimeState = vi.fn(
             pendingQuestionKind: null,
         }),
 );
+const recordTerminalTurnToolActivity = vi.fn();
+const completeTerminalTurnToolCall = vi.fn();
 
 vi.mock('../../../src/copilot/terminal/dialog/index.js', () => ({
     println,
@@ -40,6 +42,11 @@ vi.mock('../../../src/copilot/presentation/runtime-ui-state-store.js', () => ({
 
 vi.mock('../../../src/copilot/terminal/frontend/gateways/agent-runtime.js', () => ({
     readTerminalRuntimeState,
+}));
+
+vi.mock('../../../src/copilot/terminal/turn-trace-state.js', () => ({
+    recordTerminalTurnToolActivity,
+    completeTerminalTurnToolCall,
 }));
 
 describe('terminal/agent-runtime-events.js — contrato', () => {
@@ -107,6 +114,15 @@ describe('terminal/agent-runtime-events.js — contrato', () => {
                 toolName: 'workspace.read_file',
             }),
         );
+        expect(recordTerminalTurnToolActivity).toHaveBeenCalledWith(
+            expect.objectContaining({
+                toolName: 'workspace.read_file',
+                operation: 'read',
+                path: 'src/copilot/terminal/repl.js',
+                toolCallId: 'tool-1',
+            }),
+        );
+        expect(completeTerminalTurnToolCall).toHaveBeenCalledWith({ toolCallId: 'tool-1', success: true });
         expect(broadcastSse).toHaveBeenCalledWith(
             'tool.start',
             expect.objectContaining({

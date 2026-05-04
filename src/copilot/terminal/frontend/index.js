@@ -12,26 +12,30 @@ export { readTerminalStatusProjection } from './projections/status.js';
 export {
     answerPendingTerminalQuestion,
     clearPendingTerminalQuestionShadow,
-    clearTerminalHistory,
     forgetTerminalMemoryProjection,
     listTerminalSnapshotsProjection,
     loadTerminalSnapshotProjection,
     readTerminalActivityProjection,
-    readTerminalContextProjection,
     readTerminalCountProjection,
-    readTerminalDbHistoryProjection,
     readTerminalDbSessionsProjection,
     readTerminalDiagnoseProjection,
     readTerminalDisplayProjection,
-    readTerminalHistoryProjection,
     readTerminalResumeListProjection,
     readTerminalResumeProjection,
     recallTerminalMemoriesProjection,
     rememberTerminalMemoryProjection,
-    requestTerminalCompactionProjection,
     saveTerminalSnapshotProjection,
     searchTerminalTurnsProjection,
 } from './projections/now.js';
+
+export {
+    clearTerminalHistory,
+    readTerminalContextProjection,
+    readTerminalDbHistoryProjection,
+    readTerminalHistoryProjection,
+    readTerminalTimelineProjection,
+    requestTerminalCompactionProjection,
+} from './projections/timeline.js';
 
 export {
     listTerminalAvailableModelsProjection,
@@ -83,15 +87,7 @@ export {
     writeTerminalHubSystemTurn,
 } from './gateways/hub.js';
 
-export {
-    clearTerminalHistoryFeed,
-    readTerminalHistoryFeed,
-    readTerminalTurnCount,
-    runTerminalDialogTurn,
-    seedTerminalHistoryFeed,
-    startTerminalDialogMode,
-    stopTerminalDialogMode,
-} from './gateways/dialog.js';
+export { runTerminalDialogTurn, startTerminalDialogMode, stopTerminalDialogMode } from './gateways/dialog.js';
 
 export {
     abortTerminalCurrentMessage,

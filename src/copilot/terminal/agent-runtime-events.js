@@ -35,6 +35,7 @@ import { broadcastSse, buildUserPrompt, println } from './dialog/index.js';
 import { readTerminalRuntimeState } from './frontend/gateways/agent-runtime.js';
 import { createTerminalPendingQuestionReplayState } from './pending-question-replay.js';
 import { buildTerminalToolActivityPresentation, compactTerminalToolText } from './tool-activity-presenter.js';
+import { completeTerminalTurnToolCall, recordTerminalTurnToolActivity } from './turn-trace-state.js';
 
 /**
  * @typedef {{
@@ -137,6 +138,15 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null }) {
             lastProgress: null,
             lastProgressMessage: null,
         });
+        recordTerminalTurnToolActivity({
+            toolName: name,
+            operation: presentation.operation,
+            path: presentation.path,
+            target: presentation.target,
+            source: 'sdk',
+            status: 'started',
+            toolCallId,
+        });
         recordTerminalActivity('tool', 'Executando tool', {
             detail: presentation.detail,
             toolName: name,
@@ -230,6 +240,9 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null }) {
         const presentation = entry?.presentation ?? buildTerminalToolActivityPresentation(evt, name);
         const dur = entry ? ((Date.now() - entry.t0) / 1000).toFixed(1) : '?';
         const icon = success ? '\x1b[32m✅\x1b[0m' : '\x1b[31m❌\x1b[0m';
+        if (toolCallId) {
+            completeTerminalTurnToolCall({ toolCallId, success });
+        }
         recordTerminalActivity('tool', success ? 'Tool concluída' : 'Tool falhou', {
             detail: presentation.completeLine(success, `${dur}s`),
             toolName: name,

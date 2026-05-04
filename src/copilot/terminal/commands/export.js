@@ -12,7 +12,7 @@ import { WORKSPACE_ROOT } from '#copilot/boot';
 import { writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { toError } from '../../core/error-handlers.js';
-import { readTerminalHistoryFeed } from '../frontend/index.js';
+import { readTerminalTimelineProjection } from '../frontend/index.js';
 
 /**
  * @typedef {object} ExportContext
@@ -27,8 +27,8 @@ import { readTerminalHistoryFeed } from '../frontend/index.js';
  * @returns {Promise<void>}
  */
 export async function cmdExport({ println }, arg) {
-    const hist = readTerminalHistoryFeed();
-    if (hist.length === 0) {
+    const projection = readTerminalTimelineProjection({ limitPairs: 500 });
+    if (projection.turns.length === 0) {
         println('  \x1b[33mHistórico vazio — nada para exportar.\x1b[0m');
         return;
     }
@@ -38,12 +38,16 @@ export async function cmdExport({ println }, arg) {
     const filePath = arg?.trim() ? resolve(WORKSPACE_ROOT, arg.trim()) : join(WORKSPACE_ROOT, defaultName);
 
     const lines = [`# Conversa LLM-B — ${new Date().toLocaleString('pt-BR')}`, ''];
-    lines.push(`> ${hist.length} mensagens · exportado em ${new Date().toISOString()}`, '');
+    lines.push(
+        `> ${projection.turns.length} mensagens · timeline=${projection.timelineSource}/${projection.reconciliationStatus} · exportado em ${new Date().toISOString()}`,
+        '',
+    );
 
-    for (const turn of hist) {
+    for (const turn of projection.turns) {
         const time = new Date(turn.timestamp ?? Date.now()).toLocaleTimeString('pt-BR');
-        const role = turn.role === 'user' ? '👤 Usuário' : '🧠 LLM-B';
+        const role = turn.role === 'user' ? '👤 Usuário' : turn.rawRole === 'llm_a' ? '🤖 LLM-A' : '🧠 LLM-B';
         lines.push(`## ${role} — ${time}`, '');
+        lines.push(`> origem=${turn.origin}${turn.persisted ? ' · persistido' : ' · vivo'}`, '');
         lines.push(turn.content, '');
         lines.push('---', '');
     }
@@ -51,7 +55,7 @@ export async function cmdExport({ println }, arg) {
     try {
         await writeFile(filePath, lines.join('\n'), 'utf-8');
         println(`  \x1b[32m✅ Exportado: ${filePath}\x1b[0m`);
-        println(`  \x1b[90m${hist.length} mensagens salvas como Markdown.\x1b[0m`);
+        println(`  \x1b[90m${projection.turns.length} mensagens salvas como Markdown.\x1b[0m`);
     } catch (e) {
         println(`  \x1b[31m❌ Erro ao exportar: ${toError(e).message ?? e}\x1b[0m`);
     }

@@ -6,8 +6,8 @@
 import { defaultErrorTracker } from '#copilot/observability';
 import { readToolStatsProjection } from '../../../presentation/system-metrics.js';
 import { readTerminalActivitySnapshot } from '../../activity-state.js';
-import { readTerminalTurnCount } from '../gateways/dialog.js';
 import { normalizeTerminalModelBillingProjection, readTerminalRuntimeBase } from './shared.js';
+import { readTerminalTimelineProjection } from './timeline.js';
 
 /**
  * @param {string | null | undefined} [runtimeId]
@@ -25,6 +25,10 @@ import { normalizeTerminalModelBillingProjection, readTerminalRuntimeBase } from
  *     pr: Record<string, any> | null;
  *     modelBilling: import('./shared.js').TerminalModelBillingProjection;
  *     turnCount: number;
+ *     bridgeTurnCount: number;
+ *     timelineSource: import('./timeline.js').TerminalTimelineSource;
+ *     timelineAuthority: import('./timeline.js').TerminalTimelineAuthority;
+ *     timelineReconciliationStatus: import('./timeline.js').TerminalTimelineReconciliation;
  *     toolCallCount: number;
  *     toolErrorCount: number;
  *     errorStats: { total: number; buffered: number };
@@ -33,6 +37,7 @@ import { normalizeTerminalModelBillingProjection, readTerminalRuntimeBase } from
  */
 export function readTerminalMetricsProjection(runtimeId) {
     const base = readTerminalRuntimeBase(runtimeId);
+    const timeline = readTerminalTimelineProjection({ limitPairs: 10, runtimeId: runtimeId ?? null });
     const pr = /** @type {Record<string, any> | null} */ (base.lastPrInfo ?? null);
     const modelBilling = normalizeTerminalModelBillingProjection(pr, String(base.snap['model'] ?? base.model ?? ''));
     const toolStats = readToolStatsProjection().stats;
@@ -59,7 +64,11 @@ export function readTerminalMetricsProjection(runtimeId) {
         contextWindow: base.contextWindow,
         pr,
         modelBilling,
-        turnCount: readTerminalTurnCount(),
+        turnCount: timeline.turns.length,
+        bridgeTurnCount: timeline.bridgeTurnCount,
+        timelineSource: timeline.timelineSource,
+        timelineAuthority: timeline.timelineAuthority,
+        timelineReconciliationStatus: timeline.reconciliationStatus,
         toolCallCount,
         toolErrorCount,
         activity: readTerminalActivitySnapshot(),

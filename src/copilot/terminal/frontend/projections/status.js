@@ -12,12 +12,12 @@ import {
 } from '../../../presentation/runtime-ui-state-store.js';
 import { readTerminalActivitySnapshot } from '../../activity-state.js';
 import { listTerminalElicitations, readTerminalPermissionSummary } from '../../sdk-interactions.js';
-import { readTerminalTurnCount } from '../gateways/dialog.js';
 import {
     formatTerminalRuntimeTopology,
     normalizeTerminalModelBillingProjection,
     readTerminalRuntimeBase,
 } from './shared.js';
+import { readTerminalTimelineProjection } from './timeline.js';
 
 /**
  * @param {{ hubSessionId?: string | null; injectPort?: number; runtimeId?: string | null }} input
@@ -45,6 +45,7 @@ import {
  *     injectPort: number | null;
  *     hubSessionId: string | null;
  *     sdkSessionId: string | null;
+ *     agentProfileId: string | null;
  *     requestedRuntimeId: string | null;
  *     runtimeId: string;
  *     runtimeFound: boolean;
@@ -55,12 +56,19 @@ import {
  *     runtimeSessionId: string | null;
  *     workspace: ReturnType<typeof getWorkspaceContext>;
  *     turnCount: number;
+ *     bridgeTurnCount: number;
  *     activity: import('../../activity-state.js').TerminalActivitySnapshot;
  *     lifecycle: ReturnType<typeof readRuntimeLifecycleSnapshot>;
  *     lifecycleSummary: ReturnType<typeof buildRuntimeLifecycleSummary>;
  *     pendingElicitations: number;
  *     pendingPermissions: number;
  *     latestPermissionType: string | null;
+ *     timelineSource: import('./timeline.js').TerminalTimelineSource;
+ *     timelineAuthority: import('./timeline.js').TerminalTimelineAuthority;
+ *     timelineReconciliationStatus: import('./timeline.js').TerminalTimelineReconciliation;
+ *     timelineTurnCount: number;
+ *     persistedTimelineTurnCount: number;
+ *     liveBridgeTailCount: number;
  * }}
  */
 export function readTerminalStatusProjection({ hubSessionId = null, injectPort, runtimeId = null } = {}) {
@@ -73,6 +81,7 @@ export function readTerminalStatusProjection({ hubSessionId = null, injectPort, 
     const lifecycle = readRuntimeLifecycleSnapshot();
     const modelBilling = normalizeTerminalModelBillingProjection(base.lastPrInfo, String(base.snap['model'] ?? ''));
     const permissionSummary = readTerminalPermissionSummary();
+    const timeline = readTerminalTimelineProjection({ limitPairs: 10, runtimeId });
     return {
         snap: base.snap,
         health: base.health,
@@ -97,6 +106,7 @@ export function readTerminalStatusProjection({ hubSessionId = null, injectPort, 
         injectPort: typeof injectPort === 'number' ? injectPort : null,
         hubSessionId: hubSessionId ?? base.binding.hubSessionId ?? null,
         sdkSessionId: base.binding.sdkSessionId,
+        agentProfileId: base.agentProfileId,
         requestedRuntimeId: base.requestedRuntimeId,
         runtimeId: base.runtimeId,
         runtimeFound: base.runtimeFound,
@@ -106,7 +116,14 @@ export function readTerminalStatusProjection({ hubSessionId = null, injectPort, 
         runtimeTopologyLabel: formatTerminalRuntimeTopology(base.agentRuntimes),
         runtimeSessionId: base.runtimeSessionId,
         workspace: getWorkspaceContext(),
-        turnCount: readTerminalTurnCount(),
+        turnCount: timeline.turns.length,
+        bridgeTurnCount: timeline.bridgeTurnCount,
+        timelineSource: timeline.timelineSource,
+        timelineAuthority: timeline.timelineAuthority,
+        timelineReconciliationStatus: timeline.reconciliationStatus,
+        timelineTurnCount: timeline.turns.length,
+        persistedTimelineTurnCount: timeline.totalPersistedTurns,
+        liveBridgeTailCount: timeline.liveBridgeTailCount,
         activity: readTerminalActivitySnapshot(),
         lifecycle,
         lifecycleSummary: buildRuntimeLifecycleSummary(lifecycle),

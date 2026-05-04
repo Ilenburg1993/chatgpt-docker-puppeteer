@@ -39,15 +39,15 @@ export {
 } from './module-map.js';
 
 // Re-export das fases decompostas para consumidores que usam importação explícita
+export { printStandaloneBanner } from './terminal-phases/boot-banner.js';
 export { rollbackTerminalHttpServerPhase, runTerminalHttpServerPhase } from './terminal-phases/boot-http.js';
 export { runTerminalConversationHubPhase } from './terminal-phases/boot-hub.js';
 export {
-    printStandaloneBanner,
     rollbackTerminalRuntimeListenersPhase,
     runTerminalRuntimeListenersPhase,
-    startReflectionLoop,
 } from './terminal-phases/boot-listeners.js';
 export { rollbackTerminalPinnedContextPhase, runTerminalPinnedContextPhase } from './terminal-phases/boot-pinned.js';
+export { startReflectionLoop, stopReflectionLoop } from './terminal-phases/boot-reflection-loop.js';
 
 // T-20: estado do reflection timer migrado para terminal-phases/boot-listeners.js
 

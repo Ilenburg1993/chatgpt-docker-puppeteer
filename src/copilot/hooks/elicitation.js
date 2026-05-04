@@ -11,6 +11,7 @@
  * @module copilot/hooks/elicitation
  */
 
+import { normalizeElicitationResultWithSchema } from '../core/elicitation-schema.js';
 import { log } from './logger.js';
 
 /**
@@ -54,24 +55,13 @@ import { log } from './logger.js';
 
 /**
  * @param {unknown} value
+ * @param {import('#copilot/sdk/types.js').ElicitationSchema | undefined} [requestedSchema]
  * @returns {ElicitationResult}
  */
-function normalizeElicitationResult(value) {
-    const raw = value && typeof value === 'object' ? /** @type {Record<string, unknown>} */ (value) : null;
-    const action = raw?.['action'];
-    if (action !== 'accept' && action !== 'decline' && action !== 'cancel') {
-        throw new TypeError('[hooks/elicitation] result.action deve ser accept | decline | cancel.');
-    }
-    const content = raw?.['content'];
-    if (content !== undefined && (typeof content !== 'object' || content === null || Array.isArray(content))) {
-        throw new TypeError('[hooks/elicitation] result.content deve ser um objeto quando fornecido.');
-    }
-    return /** @type {ElicitationResult} */ ({
-        action,
-        ...(content !== undefined
-            ? { content: /** @type {Record<string, string | number | boolean | string[]>} */ (content) }
-            : {}),
-    });
+function normalizeElicitationResult(value, requestedSchema) {
+    return /** @type {ElicitationResult} */ (
+        normalizeElicitationResultWithSchema(value, requestedSchema, { context: '[hooks/elicitation]' })
+    );
 }
 
 /**
@@ -127,7 +117,7 @@ export function createQueuedElicitationHandler(options = {}) {
     function resolvePending(id, result) {
         const queued = pending.get(id);
         if (!queued) return false;
-        const normalized = normalizeElicitationResult(result);
+        const normalized = normalizeElicitationResult(result, queued.entry.requestedSchema);
         pending.delete(id);
         queued.resolve(normalized);
         onCompleted?.({
