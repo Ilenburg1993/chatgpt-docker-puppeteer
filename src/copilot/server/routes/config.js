@@ -24,8 +24,8 @@ import {
     handleSetSkills,
     handleSetToolsConfig,
 } from '../../presentation/system-config.js';
-import { bridgeHandler } from '../handler-bridge.js';
 import { validate } from '../middleware/validate.js';
+import { createPresentationRoute } from './presentation-route.js';
 
 // ── Zod schemas (S-C-03 fix) ──────────────────────────────────────────────
 const infiniteSessionBodySchema = z.object({
@@ -62,28 +62,32 @@ export function createConfigRouter() {
     const router = Router();
 
     // GET
-    router.get('/', bridgeHandler(handleGetConfig));
-    router.get('/skills', bridgeHandler(handleGetSkills));
-    router.get('/tools', bridgeHandler(handleGetToolsConfig));
-    router.get('/tools/custom', bridgeHandler(handleGetCustomTools));
+    router.get('/', createPresentationRoute(handleGetConfig));
+    router.get('/skills', createPresentationRoute(handleGetSkills));
+    router.get('/tools', createPresentationRoute(handleGetToolsConfig));
+    router.get('/tools/custom', createPresentationRoute(handleGetCustomTools));
 
     // PUT
     router.put(
         '/infinite-session',
         validate({ body: infiniteSessionBodySchema }),
-        bridgeHandler(handleSetInfiniteSessionConfig),
+        createPresentationRoute(handleSetInfiniteSessionConfig),
     );
-    router.put('/skills', validate({ body: skillsBodySchema }), bridgeHandler(handleSetSkills));
-    router.put('/tools', validate({ body: toolsConfigBodySchema }), bridgeHandler(handleSetToolsConfig));
+    router.put('/skills', validate({ body: skillsBodySchema }), createPresentationRoute(handleSetSkills));
+    router.put('/tools', validate({ body: toolsConfigBodySchema }), createPresentationRoute(handleSetToolsConfig));
 
     // POST
-    router.post('/tools/custom', validate({ body: customToolBodySchema }), bridgeHandler(handleRegisterCustomTool));
+    router.post(
+        '/tools/custom',
+        validate({ body: customToolBodySchema }),
+        createPresentationRoute(handleRegisterCustomTool),
+    );
 
     // DELETE /tools/custom/:name — nome pode conter chars especiais, usa decodeURIComponent
     router.delete(
         '/tools/custom/:name',
         validate({ params: customToolParamsSchema }),
-        bridgeHandler(handleDeleteCustomTool, (req) => ({
+        createPresentationRoute(handleDeleteCustomTool, (req) => ({
             name: decodeURIComponent(String(req.params['name'] ?? '')),
         })),
     );

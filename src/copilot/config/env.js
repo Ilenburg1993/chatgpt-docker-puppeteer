@@ -15,6 +15,7 @@
  */
 
 import { resolve } from 'node:path';
+import { COPILOT_CANONICAL_OTEL_SOURCE_NAME } from '../boot/contract.js';
 
 // ── Helpers ──────────────────────────────────────────────────
 
@@ -150,7 +151,7 @@ export const COPILOT_EVENTS_MAX_BYTES = envInt('COPILOT_EVENTS_MAX_BYTES', 5 * 1
 export const COPILOT_OTEL_DISABLED = envBool('COPILOT_OTEL_DISABLED', false);
 export const COPILOT_OTEL_ENDPOINT = envOpt('COPILOT_OTEL_ENDPOINT');
 export const COPILOT_OTEL_EXPORTER_TYPE = envOpt('COPILOT_OTEL_EXPORTER_TYPE');
-export const COPILOT_OTEL_SOURCE_NAME = envStr('COPILOT_OTEL_SOURCE_NAME', 'copilot-sdk-agent');
+export const COPILOT_OTEL_SOURCE_NAME = envStr('COPILOT_OTEL_SOURCE_NAME', COPILOT_CANONICAL_OTEL_SOURCE_NAME);
 export const COPILOT_OTEL_CAPTURE_CONTENT = envBool('COPILOT_OTEL_CAPTURE_CONTENT', false);
 export const OTEL_EXPORTER_OTLP_ENDPOINT = envOpt('OTEL_EXPORTER_OTLP_ENDPOINT');
 

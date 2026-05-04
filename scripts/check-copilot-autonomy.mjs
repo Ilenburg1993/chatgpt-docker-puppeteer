@@ -8,7 +8,7 @@
  * 1. Nenhum arquivo em src/copilot/ importa de fora do módulo copilot
  * 2. Os entry points de boot existem e exportam corretamente
  * 3. PM2 entry points resolvem para arquivos existentes
- * 4. Arquivos de boot e entrada compatível existem
+ * 4. Arquivos de wiring removidos permanecem removidos
  * 5. bootstrap.js implementa modo único (sem parâmetro mode/context)
  *
  * Arquitetura Onda 2.7: copilot é ferramenta DEV-only. Boot canônico: terminal/bootstrap.js → bootCopilot() →
@@ -27,10 +27,6 @@ import {
     COPILOT_BOOT_MODE,
     COPILOT_CANONICAL_BOOT_ENTRYPOINT,
     COPILOT_CANONICAL_PM2_PROCESS,
-    COPILOT_COMPAT_BOOT_ENTRYPOINT,
-    COPILOT_COMPAT_PM2_ENV_FLAG,
-    COPILOT_COMPAT_PM2_PROCESS,
-    COPILOT_TERMINAL_PM2_ENV_FLAG,
     SDK_VANILLA_CAPABILITY_BASELINE,
 } from '../src/copilot/boot/index.js';
 
@@ -65,10 +61,8 @@ if (output.trim()) {
 
 // terminal/bootstrap.js = canônico (único modo real)
 // bootstrap.js = delegante (chama bootCopilot sem args)
-// agent.js = entrypoint compatível operacional (não é segundo runtime)
 const ENTRY_POINTS = [
     { path: 'src/copilot/bootstrap.js', note: 'delegante (modo único)' },
-    { path: COPILOT_COMPAT_BOOT_ENTRYPOINT, note: 'compat operacional PM2/manual' },
     { path: COPILOT_CANONICAL_BOOT_ENTRYPOINT, note: 'CANÔNICO — boot via terminal:llm-b' },
 ];
 
@@ -84,10 +78,7 @@ for (const { path: entry, note } of ENTRY_POINTS) {
 
 // ── Check 3: PM2 entry points resolvem ──────────────────────────────────────
 
-const PM2_ENTRIES = [
-    { name: COPILOT_COMPAT_PM2_PROCESS, script: `./${COPILOT_COMPAT_BOOT_ENTRYPOINT}` },
-    { name: COPILOT_CANONICAL_PM2_PROCESS, script: `./${COPILOT_CANONICAL_BOOT_ENTRYPOINT}` },
-];
+const PM2_ENTRIES = [{ name: COPILOT_CANONICAL_PM2_PROCESS, script: `./${COPILOT_CANONICAL_BOOT_ENTRYPOINT}` }];
 
 for (const { name, script } of PM2_ENTRIES) {
     const full = resolve(script);
@@ -99,21 +90,20 @@ for (const { name, script } of PM2_ENTRIES) {
     }
 }
 
-// ── Check 3b: PM2 compat não pode competir com boot canônico ────────────────
+// ── Check 3b: PM2 aponta apenas para o boot canônico ────────────────────────
 
 const ecosystemSrc = readFileSync(resolve('ecosystem.config.cjs'), 'utf-8');
-const hasCompatFlag = ecosystemSrc.includes(`process.env.${COPILOT_COMPAT_PM2_ENV_FLAG} === 'true'`);
-const excludesTerminalProcess = ecosystemSrc.includes(`process.env.${COPILOT_TERMINAL_PM2_ENV_FLAG} !== 'true'`);
 const canonicalPm2UsesTerminalBootstrap = new RegExp(
     `name:\\s*['"]${COPILOT_CANONICAL_PM2_PROCESS}['"][\\s\\S]*?script:\\s*['"]\\./${COPILOT_CANONICAL_BOOT_ENTRYPOINT}['"]`,
 ).test(ecosystemSrc);
+const hasRemovedCompatProcess = /name:\s*['"]copilot-sdk-agent['"]/.test(ecosystemSrc);
 
-if (hasCompatFlag && excludesTerminalProcess && canonicalPm2UsesTerminalBootstrap) {
-    console.log(
-        `✅ Check 3b: PM2 compat é opt-in por ${COPILOT_COMPAT_PM2_ENV_FLAG} e não compete com ${COPILOT_CANONICAL_PM2_PROCESS}.`,
-    );
+if (!hasRemovedCompatProcess && canonicalPm2UsesTerminalBootstrap) {
+    console.log(`✅ Check 3b: PM2 expõe apenas ${COPILOT_CANONICAL_PM2_PROCESS} para o runtime Copilot.`);
 } else {
-    console.error('❌ Check 3b FALHOU — PM2 compat/canônico não seguem o contrato de boot único.');
+    console.error(
+        '❌ Check 3b FALHOU — ecosystem PM2 ainda referencia trilha compat ou não aponta para o boot canônico.',
+    );
     errors++;
 }
 

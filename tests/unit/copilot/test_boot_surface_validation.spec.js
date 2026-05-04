@@ -42,7 +42,6 @@ describe('copilot/boot/surface-validation', () => {
                 { id: 'runtime-wiring' },
                 { id: 'boot-surface-validation' },
                 { id: 'terminal-init' },
-                { id: 'compat-runtime-host' },
             ],
         };
         const phaseHandlers = {
@@ -125,7 +124,5 @@ function buildSurface(names) {
  * @returns {Record<string, () => void>}
  */
 function buildHandlersForPlan(plan) {
-    return Object.fromEntries(
-        plan.phases.filter((phase) => phase.id !== 'compat-runtime-host').map((phase) => [phase.id, () => undefined]),
-    );
+    return Object.fromEntries(plan.phases.map((phase) => [phase.id, () => undefined]));
 }

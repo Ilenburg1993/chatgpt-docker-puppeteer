@@ -18,7 +18,7 @@ import {
     handleGitLog,
     handleGitStatus,
 } from '../../presentation/system-metrics.js';
-import { bridgeHandler } from '../handler-bridge.js';
+import { createPresentationRoute } from './presentation-route.js';
 
 /**
  * Cria o router de Git/GitHub do servidor copilot.
@@ -29,10 +29,10 @@ export function createGitRouter() {
     const router = Router();
 
     // Git
-    router.get('/git/status', bridgeHandler(handleGitStatus));
+    router.get('/git/status', createPresentationRoute(handleGitStatus));
     router.get(
         '/git/log',
-        bridgeHandler(handleGitLog, (req) => ({
+        createPresentationRoute(handleGitLog, (req) => ({
             n: Number(req.query['n'] ?? 20),
         })),
     );
@@ -40,21 +40,21 @@ export function createGitRouter() {
     // GitHub
     router.get(
         '/gh/issues',
-        bridgeHandler(handleGhIssues, (req) => ({
+        createPresentationRoute(handleGhIssues, (req) => ({
             state: String(req.query['state'] ?? 'open'),
             limit: Number(req.query['limit'] ?? 15),
         })),
     );
     router.get(
         '/gh/prs',
-        bridgeHandler(handleGhPrs, (req) => ({
+        createPresentationRoute(handleGhPrs, (req) => ({
             state: String(req.query['state'] ?? 'open'),
             limit: Number(req.query['limit'] ?? 15),
         })),
     );
     router.get(
         '/gh/ci',
-        bridgeHandler(handleGhCi, (req) => ({
+        createPresentationRoute(handleGhCi, (req) => ({
             limit: Number(req.query['limit'] ?? 15),
         })),
     );

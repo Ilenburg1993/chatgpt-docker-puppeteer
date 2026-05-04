@@ -2,7 +2,10 @@
 
 import { describe, expect, it, vi } from 'vitest';
 
-import { bridgeHandler, callHandler } from '../../../src/copilot/server/handler-bridge.js';
+import {
+    callPresentationHandler,
+    createPresentationRoute,
+} from '../../../src/copilot/server/routes/presentation-route.js';
 
 /**
  * @returns {{
@@ -38,22 +41,27 @@ function createHttpHarness() {
     return { req, res, next, status, json, type, send };
 }
 
-describe('server/handler-bridge runtimeId propagation', () => {
-    it('callHandler injeta runtimeId canônico extraído do request', () => {
+describe('server/routes/presentation-route runtimeId propagation', () => {
+    it('callPresentationHandler injeta runtimeId canônico extraído do request', () => {
         const { req, res, next, status, json } = createHttpHarness();
         req.headers = { 'x-agent-runtime-id': 'alt' };
 
-        callHandler((params) => ({ status: 200, body: { ok: true, runtimeId: params.runtimeId } }), req, res, next);
+        callPresentationHandler(
+            (params) => ({ status: 200, body: { ok: true, runtimeId: params.runtimeId } }),
+            req,
+            res,
+            next,
+        );
 
         expect(status).toHaveBeenCalledWith(200);
         expect(json).toHaveBeenCalledWith({ ok: true, runtimeId: 'alt' });
     });
 
-    it('bridgeHandler preserva runtimeId mesmo com paramsExtractor customizado', () => {
+    it('createPresentationRoute preserva runtimeId mesmo com paramsExtractor customizado', () => {
         const { req, res, next, status, json } = createHttpHarness();
         req.query = { runtimeId: 'query-alt', n: '5' };
 
-        const handler = bridgeHandler(
+        const handler = createPresentationRoute(
             (params) => ({ status: 200, body: params }),
             (request) => ({ n: Number(request.query['n'] ?? 0), custom: true }),
         );
@@ -68,7 +76,7 @@ describe('server/handler-bridge runtimeId propagation', () => {
         const { req, res, next, status, json } = createHttpHarness();
         req.query = { runtimeId: 'query-default' };
 
-        const handler = bridgeHandler(
+        const handler = createPresentationRoute(
             (params) => ({ status: 200, body: params }),
             () => ({ runtimeId: 'forced-alt', custom: true }),
         );
@@ -83,7 +91,7 @@ describe('server/handler-bridge runtimeId propagation', () => {
         const { req, res, next, status, json } = createHttpHarness();
         req.query = { runtimeId: 'query-default' };
 
-        const handler = bridgeHandler(
+        const handler = createPresentationRoute(
             (params) => ({ status: 200, body: params }),
             () => ({ runtimeId: '  forced-alt  ' }),
         );
@@ -96,7 +104,7 @@ describe('server/handler-bridge runtimeId propagation', () => {
 
     it('envia HandlerResult textual sem serializar como JSON', () => {
         const { req, res, next, status, json, type, send } = createHttpHarness();
-        const handler = bridgeHandler(() => ({
+        const handler = createPresentationRoute(() => ({
             status: 200,
             contentType: 'text/plain; version=0.0.4; charset=utf-8',
             body: '# HELP metric\nmetric 1\n',

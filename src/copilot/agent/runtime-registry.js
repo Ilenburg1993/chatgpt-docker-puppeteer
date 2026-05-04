@@ -9,6 +9,8 @@
 
 /**
  * @typedef {import('./always-alive.js').AlwaysAliveAgent} AgentRuntime
+ *
+ * @typedef {{ agentProfileId?: string | null }} AgentRuntimeRegistrationOptions
  */
 
 /** @type {'default'} */
@@ -16,6 +18,9 @@ export const DEFAULT_AGENT_RUNTIME_ID = 'default';
 
 /** @type {Map<string, AgentRuntime>} */
 const _runtimeRegistry = new Map();
+
+/** @type {Map<string, string | null>} */
+const _runtimeProfileRegistry = new Map();
 
 /** @type {string} */
 let _defaultRuntimeId = DEFAULT_AGENT_RUNTIME_ID;
@@ -25,10 +30,20 @@ let _defaultRuntimeId = DEFAULT_AGENT_RUNTIME_ID;
  *
  * @param {AgentRuntime} runtime
  * @param {string} [runtimeId='default'] Default is `'default'`
+ * @param {AgentRuntimeRegistrationOptions} [options]
  * @returns {AgentRuntime}
  */
-export function registerAgentRuntime(runtime, runtimeId = DEFAULT_AGENT_RUNTIME_ID) {
+export function registerAgentRuntime(runtime, runtimeId = DEFAULT_AGENT_RUNTIME_ID, options = {}) {
     _runtimeRegistry.set(runtimeId, runtime);
+    const currentProfile = _runtimeProfileRegistry.get(runtimeId) ?? null;
+    const requestedProfile = options.agentProfileId;
+    const normalizedProfile =
+        requestedProfile === undefined
+            ? currentProfile
+            : typeof requestedProfile === 'string' && requestedProfile.trim().length > 0
+              ? requestedProfile.trim()
+              : null;
+    _runtimeProfileRegistry.set(runtimeId, normalizedProfile);
     return runtime;
 }
 
@@ -39,6 +54,7 @@ export function registerAgentRuntime(runtime, runtimeId = DEFAULT_AGENT_RUNTIME_
  * @returns {boolean}
  */
 export function unregisterAgentRuntime(runtimeId = DEFAULT_AGENT_RUNTIME_ID) {
+    _runtimeProfileRegistry.delete(runtimeId);
     return _runtimeRegistry.delete(runtimeId);
 }
 
@@ -65,10 +81,24 @@ export function getRegisteredAgentRuntime(runtimeId = DEFAULT_AGENT_RUNTIME_ID) 
 /**
  * Retorna todos os runtimes registrados com seus respectivos ids.
  *
- * @returns {{ runtimeId: string; runtime: AgentRuntime }[]}
+ * @returns {{ runtimeId: string; runtime: AgentRuntime; agentProfileId: string | null }[]}
  */
 export function listAgentRuntimes() {
-    return Array.from(_runtimeRegistry.entries(), ([runtimeId, runtime]) => ({ runtimeId, runtime }));
+    return Array.from(_runtimeRegistry.entries(), ([runtimeId, runtime]) => ({
+        runtimeId,
+        runtime,
+        agentProfileId: _runtimeProfileRegistry.get(runtimeId) ?? null,
+    }));
+}
+
+/**
+ * Retorna o profile lógico associado a um runtime registrado.
+ *
+ * @param {string} [runtimeId='default'] Default is `'default'`
+ * @returns {string | null}
+ */
+export function getAgentRuntimeProfileId(runtimeId = DEFAULT_AGENT_RUNTIME_ID) {
+    return _runtimeProfileRegistry.get(runtimeId) ?? null;
 }
 
 /**
@@ -110,5 +140,6 @@ export function getDefaultRegisteredAgentRuntime() {
  */
 export function clearAgentRuntimeRegistry() {
     _runtimeRegistry.clear();
+    _runtimeProfileRegistry.clear();
     _defaultRuntimeId = DEFAULT_AGENT_RUNTIME_ID;
 }

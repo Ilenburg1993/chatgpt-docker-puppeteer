@@ -23,6 +23,7 @@
  *     | 'health-registry'
  *     | 'module-health'
  *     | 'compat-reexport'
+ *     | 'route-adapter'
  *     | 'inventory'
  *     | 'docs'
  *     | 'surface'} ServerRouteModuleRole
@@ -57,6 +58,16 @@ export const SERVER_ROUTE_MODULE_LAYOUT = Object.freeze([
         risk: 'stable',
         public: true,
         summary: 'Inventario executavel recursivo das rotas HTTP/SSE.',
+    },
+    {
+        path: 'presentation-route.js',
+        kind: 'file',
+        role: 'route-adapter',
+        surface: 'root',
+        tier: 'primary',
+        risk: 'stable',
+        public: false,
+        summary: 'Adapter canônico entre handlers de presentation e RequestHandlers Express.',
     },
     {
         path: 'agent.js',

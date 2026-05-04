@@ -45,6 +45,7 @@ export function normalizeAgentContextWindowProjection(raw) {
  * @param {string | null | undefined} [runtimeId]
  * @returns {{
  *     agent: import('../agent/always-alive.js').AlwaysAliveAgent;
+ *     agentProfileId: string | null;
  *     requestedRuntimeId: string | null;
  *     runtimeId: string;
  *     runtimeFound: boolean;
@@ -60,6 +61,8 @@ export function readAgentRuntimeOverview(runtimeId) {
     const selection = resolveAgentRuntimeSelection(runtimeId);
     const agent = selection.runtime;
     const agentRuntimes = listKnownAgentRuntimes();
+    const agentProfileId =
+        agentRuntimes.find((runtime) => runtime.runtimeId === selection.runtimeId)?.agentProfileId ?? null;
     const snap = readAgentRuntimeStatusSnapshot(agent);
     const health = readAgentRuntimeHealthSnapshot(agent);
     const runtimeSessionId = readRuntimeControlState(agent).sessionId;
@@ -75,6 +78,7 @@ export function readAgentRuntimeOverview(runtimeId) {
 
     return {
         agent,
+        agentProfileId,
         requestedRuntimeId: selection.requestedRuntimeId,
         runtimeId: selection.runtimeId,
         runtimeFound: selection.runtimeFound,
@@ -92,6 +96,7 @@ export function readAgentRuntimeOverview(runtimeId) {
  *
  * @param {string | null | undefined} [runtimeId]
  * @returns {{
+ *     agentProfileId: string | null;
  *     requestedRuntimeId: string | null;
  *     runtimeId: string;
  *     runtimeFound: boolean;
@@ -128,6 +133,7 @@ export function readAgentRuntimeOverviewProjection(runtimeId) {
     const prBudget = readRuntimePrBudgetSnapshot(base.agent);
 
     return {
+        agentProfileId: base.agentProfileId,
         requestedRuntimeId: base.requestedRuntimeId,
         runtimeId: base.runtimeId,
         runtimeFound: base.runtimeFound,

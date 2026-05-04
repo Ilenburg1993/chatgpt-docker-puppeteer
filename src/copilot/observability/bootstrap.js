@@ -19,7 +19,7 @@ import { HOOKS_LOGGER } from '#copilot/hooks';
 import { SDK_LOGGER, TOOLS_BUILDER } from '#copilot/sdk';
 import { TOOLS_LOGGER, TOOLS_METRICS } from '#copilot/tools';
 import { setAuditLogger } from '../audit/logger.js';
-import { container, wireLegacySetters } from '../core/di-container.js';
+import { container } from '../core/di-container.js';
 import { registerErrorHandlerDeps } from '../core/error-handlers.js';
 import { createEventBus } from '../core/event-bus.js';
 import { SHUTDOWN_PRIORITY } from '../core/shutdown-priorities.js';
@@ -146,19 +146,17 @@ export function bootstrapObservability() {
         SHUTDOWN_PRIORITY.OBSERVABILITY_DETACH,
     );
 
-    // K-5: wiring centralizado — resolve tokens e invoca setters legados
-    wireLegacySetters(container, [
-        { token: SHUTDOWN_LOGGER, setter: setShutdownLogger },
-        { token: DB_LOGGER, setter: setDbLogger },
-        { token: SDK_LOGGER, setter: setSdkLogger },
-        {
-            token: AUDIT_LOGGER,
-            setter: (fn) => setAuditLogger(/** @type {Parameters<typeof setAuditLogger>[0]} */ (fn), LOG_DIR),
-        },
-        { token: HOOKS_LOGGER, setter: setHooksLogger },
-        { token: TOOLS_LOGGER, setter: setToolsLogger },
-        { token: TOOLS_METRICS, setter: setToolsMetrics },
-    ]);
+    setShutdownLogger(log);
+    setDbLogger(log);
+    setSdkLogger(log);
+    setAuditLogger(log, LOG_DIR);
+    setHooksLogger(log);
+    setToolsLogger(log);
+    setToolsMetrics({
+        getSummary: () => defaultMetrics.getSummary(),
+        getToolStats,
+        recordToolCall,
+    });
 }
 
 /**
@@ -171,12 +169,6 @@ export function bootstrapObservability() {
 export function bootstrapLateDeps(deps) {
     if (deps.buildTool) {
         container.register(TOOLS_BUILDER, () => deps.buildTool, 'singleton');
-        // K-5: wiring centralizado
-        wireLegacySetters(container, [
-            {
-                token: TOOLS_BUILDER,
-                setter: (fn) => setCustomToolsBuilder(/** @type {Parameters<typeof setCustomToolsBuilder>[0]} */ (fn)),
-            },
-        ]);
+        setCustomToolsBuilder(/** @type {Parameters<typeof setCustomToolsBuilder>[0]} */ (deps.buildTool));
     }
 }

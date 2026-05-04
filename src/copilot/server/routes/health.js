@@ -15,9 +15,9 @@ import { handleHubHealth } from '../../presentation/conversation-hub.js';
 import { buildAgentHealthHttpResponse } from '../../presentation/runtime-health.js';
 import { resolveRequestedRuntimeId } from '../../presentation/runtime-request.js';
 import { handleHealth } from '../../presentation/system-config.js';
-import { callHandler } from '../handler-bridge.js';
 import { sanitizeHttpErrorMessage } from '../middleware/error-handler.js';
 import { getCopilotNamespace } from '../socket/hub-ns.js';
+import { callPresentationHandler } from './presentation-route.js';
 
 /**
  * Cria o router de health do servidor copilot. Rotas: GET /health, GET /hub-health, GET /ws/info
@@ -28,8 +28,8 @@ export function createHealthRouter() {
     const router = Router();
 
     // Auth-exempt: skipAuth no route-table original
-    router.get('/health', (req, res, next) => callHandler(handleHealth, req, res, next));
-    router.get('/hub-health', (req, res, next) => callHandler(handleHubHealth, req, res, next));
+    router.get('/health', (req, res, next) => callPresentationHandler(handleHealth, req, res, next));
+    router.get('/hub-health', (req, res, next) => callPresentationHandler(handleHubHealth, req, res, next));
     router.get('/health/agent', (req, res) => {
         try {
             const response = buildAgentHealthHttpResponse(resolveRequestedRuntimeId(req));

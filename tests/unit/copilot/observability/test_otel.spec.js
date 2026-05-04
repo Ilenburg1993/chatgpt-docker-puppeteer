@@ -28,7 +28,7 @@ vi.mock('#copilot/config/env', () => ({
         return envOverrides.COPILOT_OTEL_EXPORTER_TYPE ?? undefined;
     },
     get COPILOT_OTEL_SOURCE_NAME() {
-        return envOverrides.COPILOT_OTEL_SOURCE_NAME ?? 'copilot-sdk-agent';
+        return envOverrides.COPILOT_OTEL_SOURCE_NAME ?? 'llm-b-terminal';
     },
     get COPILOT_OTEL_CAPTURE_CONTENT() {
         return envOverrides.COPILOT_OTEL_CAPTURE_CONTENT ?? false;
@@ -82,7 +82,7 @@ describe('otel.js', () => {
 
         it('inclui sourceName e captureContent', () => {
             const cfg = mod.buildTelemetryConfig();
-            expect(cfg?.sourceName).toBe('copilot-sdk-agent');
+            expect(cfg?.sourceName).toBe('llm-b-terminal');
             expect(cfg?.captureContent).toBe(false);
         });
     });

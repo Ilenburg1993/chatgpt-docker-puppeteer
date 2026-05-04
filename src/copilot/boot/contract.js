@@ -4,8 +4,8 @@
  *
  * Contrato declarativo dos entrypoints operacionais do Copilot local.
  *
- * O boot real tem uma unica trilha: terminal/bootstrap.js -> bootCopilot() -> startTerminalServer() ->
- * startCopilotServer(). Entrypoints historicos podem existir para automacao/PM2, mas nao representam segundo runtime.
+ * O boot real tem uma única trilha: terminal/bootstrap.js -> bootCopilot() -> startTerminalServer() ->
+ * startCopilotServer(). Não existe entrypoint compatível paralelo.
  *
  * @module copilot/boot/contract
  */
@@ -14,13 +14,9 @@ export const COPILOT_BOOT_MODE = 'terminal-runtime';
 
 export const COPILOT_CANONICAL_BOOT_ENTRYPOINT = 'src/copilot/terminal/bootstrap.js';
 
-export const COPILOT_COMPAT_BOOT_ENTRYPOINT = 'src/copilot/agent.js';
-
 export const COPILOT_CANONICAL_PM2_PROCESS = 'llm-b-terminal';
 
-export const COPILOT_COMPAT_PM2_PROCESS = 'copilot-sdk-agent';
-
-export const COPILOT_COMPAT_PM2_ENV_FLAG = 'COPILOT_SDK_AGENT_COMPAT_ENABLED';
+export const COPILOT_CANONICAL_OTEL_SOURCE_NAME = COPILOT_CANONICAL_PM2_PROCESS;
 
 export const COPILOT_TERMINAL_PM2_ENV_FLAG = 'COPILOT_TERMINAL_ENABLED';
 
@@ -38,10 +34,7 @@ export const COPILOT_BOOT_RULES = Object.freeze({
     serverOwnership: 'server/index.js owns HTTP/Socket.IO only; it never starts terminal UX or the agent by itself.',
     terminalOwnership:
         'terminal/index.js owns REPL/SSE UX and composes the server through injected startCopilotServer.',
-    compatEntrypoint:
-        'agent.js is an operational compatibility entrypoint and must delegate to bootCopilot without creating a second mode.',
-    pm2Compatibility:
-        'copilot-sdk-agent is opt-in compatibility only and must not be enabled together with llm-b-terminal.',
+    pm2Ownership: 'PM2 must start only llm-b-terminal for the Copilot runtime.',
     bootConfigOwnership:
         'boot/config.js is the canonical place for workspace, skill directories, host, port and boot variable policy.',
 });
@@ -97,10 +90,8 @@ export const SDK_VANILLA_CAPABILITY_BASELINE = Object.freeze([
  * @returns {{
  *     mode: string;
  *     canonicalEntrypoint: string;
- *     compatEntrypoint: string;
  *     canonicalPm2Process: string;
- *     compatPm2Process: string;
- *     compatPm2EnvFlag: string;
+ *     canonicalOtelSourceName: string;
  *     terminalPm2EnvFlag: string;
  *     phases: readonly string[];
  *     rules: Readonly<Record<string, string>>;
@@ -111,10 +102,8 @@ export function readCopilotBootContract() {
     return {
         mode: COPILOT_BOOT_MODE,
         canonicalEntrypoint: COPILOT_CANONICAL_BOOT_ENTRYPOINT,
-        compatEntrypoint: COPILOT_COMPAT_BOOT_ENTRYPOINT,
         canonicalPm2Process: COPILOT_CANONICAL_PM2_PROCESS,
-        compatPm2Process: COPILOT_COMPAT_PM2_PROCESS,
-        compatPm2EnvFlag: COPILOT_COMPAT_PM2_ENV_FLAG,
+        canonicalOtelSourceName: COPILOT_CANONICAL_OTEL_SOURCE_NAME,
         terminalPm2EnvFlag: COPILOT_TERMINAL_PM2_ENV_FLAG,
         phases: COPILOT_BOOT_PHASES,
         rules: COPILOT_BOOT_RULES,

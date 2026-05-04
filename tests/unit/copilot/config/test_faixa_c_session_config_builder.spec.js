@@ -492,6 +492,7 @@ describe('ClientOptionsBuilder', () => {
             expect(opts.useLoggedInUser).toBe(false);
             expect(opts.telemetry).toMatchObject({
                 otlpEndpoint: 'http://localhost:4318',
+                sourceName: 'llm-b-terminal',
                 captureContent: true,
             });
         } finally {

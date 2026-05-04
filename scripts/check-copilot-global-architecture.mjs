@@ -63,12 +63,17 @@ const SDK_ROUTE_COMPOSITION_MODULES = new Set([
 
 /** @type {Set<string>} */
 const REMOVED_COMPAT_ENTRYPOINTS = new Set([
+    'agent.js',
     'agent/infra/task-executor.js',
     'agent/queue-processor.js',
     'boot-contract.js',
+    'boot/compat-entrypoint.js',
     'config/system-prompt.js',
     'events/create-emitter.js',
     'events/legacy-events.js',
+    'observability/bootstrap-legacy.js',
+    'runtime-legacy-compat.js',
+    'server/handler-bridge.js',
     'terminal/dialog.js',
     'terminal/file-context.js',
     'terminal/state.js',

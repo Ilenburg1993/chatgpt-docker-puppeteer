@@ -121,11 +121,18 @@ export function requireAgentRuntime(runtimeId) {
 /**
  * Lista runtimes conhecidos em formato seguro para projections compartilhadas.
  *
- * @returns {{ runtimeId: string; status: string; model: string; sessionId: string | null; isDefault: boolean }[]}
+ * @returns {{
+ *     runtimeId: string;
+ *     status: string;
+ *     model: string;
+ *     sessionId: string | null;
+ *     isDefault: boolean;
+ *     agentProfileId: string | null;
+ * }[]}
  */
 export function listKnownAgentRuntimes() {
     const defaultRuntimeId = readDefaultAgentRuntimeId();
-    return listAgentRuntimes().map(({ runtimeId, runtime }) => {
+    return listAgentRuntimes().map(({ runtimeId, runtime, agentProfileId = null }) => {
         const state = readRuntimeControlState(runtime);
         return {
             runtimeId,
@@ -133,6 +140,7 @@ export function listKnownAgentRuntimes() {
             model: state.model,
             sessionId: state.sessionId,
             isDefault: runtimeId === defaultRuntimeId,
+            agentProfileId,
         };
     });
 }

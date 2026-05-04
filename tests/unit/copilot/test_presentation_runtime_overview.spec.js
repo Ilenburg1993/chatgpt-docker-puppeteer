@@ -43,12 +43,13 @@ describe('presentation/runtime-overview', () => {
             getHealthSnapshot: () => ({ ok: true, status: 'healthy' }),
         });
 
-        registerAgentRuntime(runtime, 'default');
+        registerAgentRuntime(runtime, 'default', { agentProfileId: 'always-alive' });
         setDefaultAgentRuntimeId('default');
 
         const overview = readDefaultAgentRuntimeOverview();
 
         expect(overview.agent).toBe(runtime);
+        expect(overview.agentProfileId).toBe('always-alive');
         expect(overview.requestedRuntimeId).toBeNull();
         expect(overview.runtimeId).toBe('default');
         expect(overview.runtimeFound).toBe(true);
@@ -63,6 +64,7 @@ describe('presentation/runtime-overview', () => {
                 model: 'gpt-5-mini',
                 sessionId: 'sess-1',
                 isDefault: true,
+                agentProfileId: 'always-alive',
             },
         ]);
     });

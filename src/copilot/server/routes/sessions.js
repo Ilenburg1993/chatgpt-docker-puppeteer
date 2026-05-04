@@ -24,8 +24,8 @@ import {
     handleListSessions,
     handleListTurns,
 } from '../../presentation/conversation-hub.js';
-import { bridgeHandler } from '../handler-bridge.js';
 import { validate } from '../middleware/validate.js';
+import { createPresentationRoute } from './presentation-route.js';
 
 /**
  * Cria o router de gerenciamento de hub sessions.
@@ -38,7 +38,7 @@ export function createSessionsRouter() {
     // ── GET /sessions — lista sessions paginadas ──────────────────────────────
     router.get(
         '/sessions',
-        bridgeHandler(handleListSessions, (req) => ({
+        createPresentationRoute(handleListSessions, (req) => ({
             limit: req.query['limit'] !== undefined ? Number(req.query['limit']) : 20,
             offset: req.query['offset'] !== undefined ? Number(req.query['offset']) : 0,
             status: typeof req.query['status'] === 'string' ? req.query['status'] : undefined,
@@ -48,7 +48,7 @@ export function createSessionsRouter() {
     // ── GET /sessions/:sessionId — obtém session individual ───────────────────
     router.get(
         '/sessions/:sessionId',
-        bridgeHandler(handleGetHubSession, (req) => ({ sessionId: req.params['sessionId'] ?? '' })),
+        createPresentationRoute(handleGetHubSession, (req) => ({ sessionId: req.params['sessionId'] ?? '' })),
     );
 
     const createSessionSchema = z.object({
@@ -61,7 +61,7 @@ export function createSessionsRouter() {
     router.post(
         '/sessions',
         validate({ body: createSessionSchema }),
-        bridgeHandler(handleCreateHubSession, (req) => ({
+        createPresentationRoute(handleCreateHubSession, (req) => ({
             body: /** @type {{ title?: string; sdkSessionId?: string; metadata?: Record<string, unknown> }} */ (
                 req.body
             ),
@@ -74,13 +74,13 @@ export function createSessionsRouter() {
     router.delete(
         '/sessions/:sessionId',
         validate({ params: sessionParamsSchema }),
-        bridgeHandler(handleCloseHubSession, (req) => ({ sessionId: req.params['sessionId'] ?? '' })),
+        createPresentationRoute(handleCloseHubSession, (req) => ({ sessionId: req.params['sessionId'] ?? '' })),
     );
 
     // ── GET /sessions/:sessionId/turns — lista turnos paginados ───────────────
     router.get(
         '/sessions/:sessionId/turns',
-        bridgeHandler(handleListTurns, (req) => ({
+        createPresentationRoute(handleListTurns, (req) => ({
             sessionId: req.params['sessionId'] ?? '',
             limit: req.query['limit'] !== undefined ? Number(req.query['limit']) : 50,
             offset: req.query['offset'] !== undefined ? Number(req.query['offset']) : 0,

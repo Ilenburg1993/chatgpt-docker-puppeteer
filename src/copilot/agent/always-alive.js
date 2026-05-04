@@ -1212,7 +1212,7 @@ export function getAgent() {
     if (!_alwaysAliveAgent) {
         _alwaysAliveAgent = new AlwaysAliveAgent();
     }
-    registerAgentRuntime(_alwaysAliveAgent);
+    registerAgentRuntime(_alwaysAliveAgent, 'default', { agentProfileId: 'always-alive' });
     ensureAgentEventBusBridge(_alwaysAliveAgent, {
         isCurrentAgent: (agent) => agent === _alwaysAliveAgent,
     });

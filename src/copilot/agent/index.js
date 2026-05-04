@@ -38,6 +38,7 @@ export { classifyAgentError } from './error-policy.js';
 export {
     DEFAULT_AGENT_RUNTIME_ID,
     clearAgentRuntimeRegistry,
+    getAgentRuntimeProfileId,
     getDefaultAgentRuntimeId,
     getDefaultRegisteredAgentRuntime,
     getRegisteredAgentRuntime,

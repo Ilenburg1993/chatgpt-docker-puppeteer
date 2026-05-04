@@ -84,8 +84,6 @@ export const COPILOT_BOOT_REQUIRED_SURFACES = Object.freeze({
     ]),
 });
 
-const DOCUMENTAL_PHASES_WITHOUT_HANDLER = new Set(['compat-runtime-host']);
-
 /**
  * Valida superfícies carregadas do SDK/agent/terminal e a cobertura dos phase handlers do boot plan.
  *
@@ -154,9 +152,7 @@ function buildSurfaceGroupReport(name, surface, expected) {
  * @returns {CopilotBootSurfaceGroupReport}
  */
 function buildPhaseHandlerGroupReport(plan, phaseHandlers) {
-    const expected = (plan?.phases ?? [])
-        .map((phase) => phase.id)
-        .filter((phaseId) => !DOCUMENTAL_PHASES_WITHOUT_HANDLER.has(phaseId));
+    const expected = (plan?.phases ?? []).map((phase) => phase.id);
     const available = expected.filter((phaseId) => phaseHandlers?.[phaseId] !== undefined);
     const missing = expected.filter((phaseId) => phaseHandlers?.[phaseId] === undefined);
     return {

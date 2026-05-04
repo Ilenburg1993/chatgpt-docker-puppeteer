@@ -14,7 +14,7 @@
  * - `COPILOT_OTEL_DISABLED` — desabilitar completamente
  * - `COPILOT_OTEL_ENDPOINT` — OTLP HTTP endpoint (ex: http://localhost:4318)
  * - `COPILOT_OTEL_EXPORTER_TYPE` — `file` (padrão) ou `otlp-http`
- * - `COPILOT_OTEL_SOURCE_NAME` — nome da instrumentação (padrão: copilot-sdk-agent)
+ * - `COPILOT_OTEL_SOURCE_NAME` — nome da instrumentação (padrão: llm-b-terminal)
  * - `COPILOT_OTEL_CAPTURE_CONTENT` — capturar conteúdo de mensagens (padrão: false)
  *
  * @module copilot/observability/otel

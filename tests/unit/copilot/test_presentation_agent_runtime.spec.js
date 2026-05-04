@@ -44,7 +44,7 @@ describe('presentation/agent-runtime', () => {
             model: 'gpt-5-mini',
             sessionId: 'audit-1',
         });
-        registerAgentRuntime(auditRuntime, 'audit');
+        registerAgentRuntime(auditRuntime, 'audit', { agentProfileId: 'auditor' });
         setDefaultAgentRuntimeId('audit');
 
         expect(getDefaultAgentRuntime()).toBe(auditRuntime);
@@ -68,6 +68,7 @@ describe('presentation/agent-runtime', () => {
                 model: 'gpt-5-mini',
                 sessionId: 'audit-1',
                 isDefault: true,
+                agentProfileId: 'auditor',
             },
         ]);
     });

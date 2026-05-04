@@ -8,6 +8,7 @@ import { describe, it } from 'vitest';
 const COPILOT_ROOT = new URL('../../../../src/copilot/', import.meta.url).pathname;
 const TERMINAL_FRONTEND_ROOT = join(COPILOT_ROOT, 'terminal/frontend');
 const SDK_ROUTES_ROOT = join(COPILOT_ROOT, 'server/routes/sdk');
+const SERVER_ROUTES_ROOT = join(COPILOT_ROOT, 'server/routes');
 
 /**
  * @param {string} dir
@@ -66,6 +67,22 @@ describe('canonical flow governance', () => {
         );
     });
 
+    it('terminal/frontend/index.js não reexporta helpers crus do feed do bridge', () => {
+        const src = readFileSync(join(TERMINAL_FRONTEND_ROOT, 'index.js'), 'utf8');
+        const forbidden = [
+            'readTerminalHistoryFeed',
+            'seedTerminalHistoryFeed',
+            'clearTerminalHistoryFeed',
+            'readTerminalTurnCount',
+        ].filter((symbol) => src.includes(symbol));
+
+        assert.deepEqual(
+            forbidden,
+            [],
+            `Barrel público do frontend expõe bypass cru do bridge: ${forbidden.join(', ')}`,
+        );
+    });
+
     it('server/routes/sdk mantém composição por deps sem imports de domínio proibidos', () => {
         const files = listJsFilesRecursive(SDK_ROUTES_ROOT);
         const forbiddenRoots = [
@@ -93,5 +110,42 @@ describe('canonical flow governance', () => {
         }
 
         assert.deepEqual(offenders, [], `Bypass de composição em rotas SDK detectado:\n${offenders.join('\n')}`);
+    });
+
+    it('server/routes raiz usa apenas o adapter canônico presentation-route.js', () => {
+        const files = listJsFilesRecursive(SERVER_ROUTES_ROOT);
+        const offenders = [];
+
+        for (const abs of files) {
+            const rel = relative(SERVER_ROUTES_ROOT, abs).replace(/\\/g, '/');
+            if (rel.includes('/')) continue;
+            if (rel === 'agent-health.js' || rel === 'module-map.js' || rel === 'presentation-route.js') continue;
+
+            for (const spec of readImportSpecifiers(abs)) {
+                if (spec === '../handler-bridge.js') {
+                    offenders.push(rel);
+                }
+            }
+        }
+
+        assert.deepEqual(
+            offenders,
+            [],
+            `Rotas raiz ainda importam trilha removida handler-bridge.js: ${offenders.join(', ')}`,
+        );
+    });
+
+    it('wireLegacySetters foi removido do código de produção do copilot', () => {
+        const files = listJsFilesRecursive(COPILOT_ROOT);
+        const offenders = [];
+
+        for (const abs of files) {
+            const rel = relative(COPILOT_ROOT, abs).replace(/\\/g, '/');
+            const src = readFileSync(abs, 'utf8');
+            if (!src.includes('wireLegacySetters')) continue;
+            offenders.push(rel);
+        }
+
+        assert.deepEqual(offenders, [], `wireLegacySetters ainda existe no runtime: ${offenders.join(', ')}`);
     });
 });

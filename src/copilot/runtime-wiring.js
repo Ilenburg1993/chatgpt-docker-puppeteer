@@ -3,8 +3,8 @@
  * @module copilot/runtime-wiring
  * @file Composition root do runtime Copilot.
  *
- *   Este módulo pode conhecer `agent/`, `channel/`, `conversation-hub/` e adapters legados porque não é borda.
- *   `terminal/` e `server/` recebem as dependências já compostas.
+ *   Este módulo pode conhecer `agent/`, `channel/` e `conversation-hub/` porque não é borda. `terminal/` e `server/`
+ *   recebem as dependências já compostas.
  */
 
 import {
@@ -13,8 +13,6 @@ import {
     configureHookTools,
     getAgent,
     readRuntimeControlState,
-    setHub,
-    setPermissionAgent,
 } from '#copilot/agent';
 import { BRIDGE_AGENT, FALLBACK_AGENT, NERV_BRIDGE_AGENT, PERMISSION_AGENT } from '#copilot/bridges';
 import { CONVERSATION_STORE, HUB } from '#copilot/conversation-hub';
@@ -22,16 +20,18 @@ import { setBridgeAgent } from './channel/client.js';
 import { conversationHub } from './conversation-hub/hub.js';
 import { setFallbackAgent } from './conversation-hub/orchestrator.js';
 import { conversationStore } from './conversation-hub/store.js';
-import { container, wireLegacySetters } from './core/di-container.js';
+import { container } from './core/di-container.js';
 import { SHUTDOWN_PRIORITY } from './core/shutdown-priorities.js';
 import { registerShutdownHandler } from './core/shutdown.js';
 import { log } from './observability/logger.js';
+import { setHub } from './tools/hub-tools.js';
+import { setPermissionAgent } from './tools/permission-tools.js';
 
 /** @type {boolean} */
 let _runtimeDiWired = false;
 
 /**
- * Registra tokens DI do agent/tools stack e injeta setters legados.
+ * Registra tokens DI do agent/tools stack e aplica as injeções explícitas de composição necessárias.
  *
  * @param {{ broadcastSse: (event: string, payload?: unknown) => void }} deps
  * @returns {void}
@@ -49,12 +49,10 @@ export function wireCopilotRuntimeDI({ broadcastSse }) {
     container.register(BRIDGE_AGENT, () => alwaysAliveAgent, 'singleton');
     container.register(NERV_BRIDGE_AGENT, () => alwaysAliveAgent, 'singleton');
 
-    wireLegacySetters(container, [
-        { token: HUB, setter: setHub },
-        { token: PERMISSION_AGENT, setter: setPermissionAgent },
-        { token: FALLBACK_AGENT, setter: setFallbackAgent },
-        { token: BRIDGE_AGENT, setter: setBridgeAgent },
-    ]);
+    setHub(conversationHub);
+    setPermissionAgent(alwaysAliveAgent);
+    setFallbackAgent(alwaysAliveAgent);
+    setBridgeAgent(alwaysAliveAgent);
 
     container.validateRequired([
         ALWAYS_ALIVE_AGENT,

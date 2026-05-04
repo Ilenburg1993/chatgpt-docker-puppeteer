@@ -13,9 +13,9 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { handleDeleteMemory, handleRecallMemories, handleStoreMemory } from '../../presentation/conversation-hub.js';
-import { bridgeHandler } from '../handler-bridge.js';
 import { writeRateMiddleware } from '../middleware/rate-limiter.js';
 import { validate } from '../middleware/validate.js';
+import { createPresentationRoute } from './presentation-route.js';
 
 // ── Zod schemas (S-C-03 fix) ──────────────────────────────────────────────
 const storeMemoryBodySchema = z.object({
@@ -39,7 +39,7 @@ export function createMemoryRouter() {
     // GET /memory?tag=&search=&limit=
     router.get(
         '/',
-        bridgeHandler(handleRecallMemories, (req) => ({
+        createPresentationRoute(handleRecallMemories, (req) => ({
             tag: req.query['tag'] ?? null,
             search: req.query['search'] ?? null,
             limit: Number(req.query['limit'] ?? 20),
@@ -47,15 +47,23 @@ export function createMemoryRouter() {
     );
 
     // POST /memory — rate limit write
-    router.post('/', writeRateMiddleware, validate({ body: storeMemoryBodySchema }), bridgeHandler(handleStoreMemory));
+    router.post(
+        '/',
+        writeRateMiddleware,
+        validate({ body: storeMemoryBodySchema }),
+        createPresentationRoute(handleStoreMemory),
+    );
 
     // DELETE /memory/:memoryId
     router.delete(
         '/:memoryId',
         validate({ params: memoryParamsSchema }),
-        bridgeHandler(/** @type {import('../handler-bridge.js').CopilotHandler} */ (handleDeleteMemory), (req) => ({
-            memoryId: req.params['memoryId'] ?? '',
-        })),
+        createPresentationRoute(
+            /** @type {import('./presentation-route.js').PresentationHandler} */ (handleDeleteMemory),
+            (req) => ({
+                memoryId: req.params['memoryId'] ?? '',
+            }),
+        ),
     );
 
     return router;

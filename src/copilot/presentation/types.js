@@ -5,7 +5,7 @@
  */
 
 /**
- * Resultado comum produzido por handlers de presentation e adaptado por `server/handler-bridge`.
+ * Resultado comum produzido por handlers de presentation e adaptado por `server/routes/presentation-route`.
  *
  * @typedef {{
  *     status: number;

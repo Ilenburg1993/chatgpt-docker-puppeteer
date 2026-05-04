@@ -9,6 +9,7 @@
  * @module copilot/sdk/session/client-options
  */
 
+import { COPILOT_CANONICAL_OTEL_SOURCE_NAME } from '../../boot/contract.js';
 import { log } from '../logger.js';
 import { buildConfiguredClientSessionFsConfig, getConfiguredSessionIdleTimeoutSeconds } from './session-fs.js';
 
@@ -322,8 +323,9 @@ export function buildCopilotClientOptionsFromEnv(overrides = {}) {
     if (process.env['COPILOT_OTEL_EXPORTER_TYPE']) {
         telemetry.exporterType = process.env['COPILOT_OTEL_EXPORTER_TYPE'];
     }
-    if (process.env['COPILOT_OTEL_SOURCE_NAME']) {
-        telemetry.sourceName = process.env['COPILOT_OTEL_SOURCE_NAME'];
+    const telemetrySourceName = process.env['COPILOT_OTEL_SOURCE_NAME'] || COPILOT_CANONICAL_OTEL_SOURCE_NAME;
+    if (telemetrySourceName) {
+        telemetry.sourceName = telemetrySourceName;
     }
     const captureContent = parseBooleanEnv(process.env['OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT']);
     if (captureContent !== undefined) telemetry.captureContent = captureContent;

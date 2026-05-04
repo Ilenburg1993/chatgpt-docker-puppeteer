@@ -6,6 +6,7 @@ import { getAgent, resetAgent } from '../../../../src/copilot/agent/always-alive
 import {
     clearAgentRuntimeRegistry,
     DEFAULT_AGENT_RUNTIME_ID,
+    getAgentRuntimeProfileId,
     getDefaultAgentRuntimeId,
     getDefaultRegisteredAgentRuntime,
     getRegisteredAgentRuntime,
@@ -29,15 +30,19 @@ describe('agent/runtime-registry', () => {
         expect(hasAgentRuntime()).toBe(true);
         expect(getRegisteredAgentRuntime()).toBe(agent);
         expect(getDefaultRegisteredAgentRuntime()).toBe(agent);
-        expect(listAgentRuntimes()).toEqual([{ runtimeId: DEFAULT_AGENT_RUNTIME_ID, runtime: agent }]);
+        expect(getAgentRuntimeProfileId()).toBe('always-alive');
+        expect(listAgentRuntimes()).toEqual([
+            { runtimeId: DEFAULT_AGENT_RUNTIME_ID, runtime: agent, agentProfileId: 'always-alive' },
+        ]);
     });
 
-    it('suporta runtimes nomeados e troca explícita do runtime default', () => {
+    it('suporta runtimes nomeados, metadata de profile e troca explícita do runtime default', () => {
         const auditRuntime = /** @type {any} */ ({ status: 'idle', model: 'gpt-5-mini', sessionId: 'audit-1' });
-        registerAgentRuntime(auditRuntime, 'audit');
+        registerAgentRuntime(auditRuntime, 'audit', { agentProfileId: 'auditor' });
 
         expect(hasAgentRuntime('audit')).toBe(true);
         expect(getRegisteredAgentRuntime('audit')).toBe(auditRuntime);
+        expect(getAgentRuntimeProfileId('audit')).toBe('auditor');
 
         setDefaultAgentRuntimeId('audit');
 
@@ -46,6 +51,7 @@ describe('agent/runtime-registry', () => {
 
         unregisterAgentRuntime('audit');
         expect(getRegisteredAgentRuntime('audit')).toBeNull();
+        expect(getAgentRuntimeProfileId('audit')).toBeNull();
         expect(getDefaultRegisteredAgentRuntime()).toBeNull();
     });
 

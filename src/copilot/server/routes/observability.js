@@ -24,8 +24,8 @@ import {
     handleMetrics,
     handleSystemReset,
 } from '../../presentation/system-metrics.js';
-import { bridgeHandler } from '../handler-bridge.js';
 import { writeRateMiddleware } from '../middleware/rate-limiter.js';
+import { createPresentationRoute } from './presentation-route.js';
 
 /**
  * Cria o router de observabilidade do servidor copilot.
@@ -36,15 +36,15 @@ export function createObservabilityRouter() {
     const router = Router();
 
     // GET /errors — rate limited (F14.1/F15.2)
-    router.get('/errors', writeRateMiddleware, bridgeHandler(handleGetErrors));
+    router.get('/errors', writeRateMiddleware, createPresentationRoute(handleGetErrors));
 
     // GET /tool-stats — rate limited (F14.3/F15.2)
-    router.get('/tool-stats', writeRateMiddleware, bridgeHandler(handleGetToolStats));
+    router.get('/tool-stats', writeRateMiddleware, createPresentationRoute(handleGetToolStats));
 
     // GET /history?limit=
     router.get(
         '/history',
-        bridgeHandler(handleGetHistory, (req) => ({
+        createPresentationRoute(handleGetHistory, (req) => ({
             limit: Number(req.query['limit'] ?? 50),
         })),
     );
@@ -52,7 +52,7 @@ export function createObservabilityRouter() {
     // GET /thinking?limit= — lista thinkings capturados como artefatos colapsados.
     router.get(
         '/thinking',
-        bridgeHandler(handleGetThinkingHistory, (req) => ({
+        createPresentationRoute(handleGetThinkingHistory, (req) => ({
             limit: Number(req.query['limit'] ?? 20),
         })),
     );
@@ -60,7 +60,7 @@ export function createObservabilityRouter() {
     // GET /thinking/:thinkingId — abre um thinking completo (`latest` ou sufixo curto aceito).
     router.get(
         '/thinking/:thinkingId',
-        bridgeHandler(handleGetThinkingEntry, (req) => ({
+        createPresentationRoute(handleGetThinkingEntry, (req) => ({
             id: String(req.params['thinkingId'] ?? 'latest'),
         })),
     );
@@ -69,7 +69,7 @@ export function createObservabilityRouter() {
     router.get(
         '/audit',
         writeRateMiddleware,
-        bridgeHandler(handleGetAudit, (req) => ({
+        createPresentationRoute(handleGetAudit, (req) => ({
             summary: Number(req.query['summary'] ?? 0),
             limit: Number(req.query['limit'] ?? 50),
             ...(req.query['sessionId'] ? { sessionId: String(req.query['sessionId']) } : {}),
@@ -80,10 +80,10 @@ export function createObservabilityRouter() {
     // GET /sessions/:sessionId/turns?limit=&offset= (movido para sessions.js na Onda 4.1)
 
     // POST /system/reset — emergency reset (limpa rate limiters e error tracker)
-    router.post('/system/reset', bridgeHandler(handleSystemReset));
+    router.post('/system/reset', createPresentationRoute(handleSystemReset));
 
     // GET /metrics — retorna texto (Prometheus/plain) preservando contentType do HandlerResult.
-    router.get('/metrics', bridgeHandler(handleMetrics));
+    router.get('/metrics', createPresentationRoute(handleMetrics));
 
     return router;
 }

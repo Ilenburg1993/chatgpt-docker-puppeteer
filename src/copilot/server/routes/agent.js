@@ -24,9 +24,9 @@ import {
     handleRejectHandoff,
 } from '../../presentation/agent-control.js';
 import { handleGetPrBudget, handleGetQuota } from '../../presentation/system-metrics.js';
-import { bridgeHandler } from '../handler-bridge.js';
 import { injectRateMiddleware, writeRateMiddleware } from '../middleware/rate-limiter.js';
 import { validate } from '../middleware/validate.js';
+import { createPresentationRoute } from './presentation-route.js';
 
 // ── Zod schemas (S-C-03 fix) ──────────────────────────────────────────────
 const injectBodyBaseSchema = z
@@ -85,36 +85,41 @@ export function createAgentRouter() {
     const router = Router();
 
     // GET — sem body
-    router.get('/context', bridgeHandler(handleGetContext));
-    router.get('/quota', bridgeHandler(handleGetQuota));
-    router.get('/pr-budget', bridgeHandler(handleGetPrBudget));
-    router.get('/handoff', bridgeHandler(handleGetHandoffs));
+    router.get('/context', createPresentationRoute(handleGetContext));
+    router.get('/quota', createPresentationRoute(handleGetQuota));
+    router.get('/pr-budget', createPresentationRoute(handleGetPrBudget));
+    router.get('/handoff', createPresentationRoute(handleGetHandoffs));
 
     // POST /inject — rate limit inject
-    router.post('/inject', injectRateMiddleware, validate({ body: injectBodySchema }), bridgeHandler(handleInject));
+    router.post(
+        '/inject',
+        injectRateMiddleware,
+        validate({ body: injectBodySchema }),
+        createPresentationRoute(handleInject),
+    );
 
     // POST /pipeline — rate limit write
     router.post(
         '/pipeline',
         writeRateMiddleware,
         validate({ body: pipelineBodySchema }),
-        bridgeHandler(handlePipeline),
+        createPresentationRoute(handlePipeline),
     );
 
     // POST /dialog
-    router.post('/dialog/pause', bridgeHandler(handleDialogPause));
-    router.post('/dialog/resume', bridgeHandler(handleDialogResume));
+    router.post('/dialog/pause', createPresentationRoute(handleDialogPause));
+    router.post('/dialog/resume', createPresentationRoute(handleDialogResume));
 
     // Handoff com parâmetro de rota
     router.post(
         '/handoff/:handoffId/accept',
         validate({ params: handoffParamsSchema }),
-        bridgeHandler(handleAcceptHandoff, (req) => ({ handoffId: req.params['handoffId'] ?? '' })),
+        createPresentationRoute(handleAcceptHandoff, (req) => ({ handoffId: req.params['handoffId'] ?? '' })),
     );
     router.post(
         '/handoff/:handoffId/reject',
         validate({ params: handoffParamsSchema, body: rejectBodySchema }),
-        bridgeHandler(handleRejectHandoff, (req) => ({
+        createPresentationRoute(handleRejectHandoff, (req) => ({
             handoffId: req.params['handoffId'] ?? '',
             body: req.body,
         })),

@@ -8,8 +8,7 @@
 /**
  * @typedef {'file' | 'directory'} ServerModuleKind
  *
- * @typedef {'entrypoint' | 'app-factory' | 'router' | 'middleware' | 'runtime-state' | 'socket' | 'compat'} ServerModuleRole
- *
+ * @typedef {'entrypoint' | 'app-factory' | 'router' | 'middleware' | 'runtime-state' | 'socket'} ServerModuleRole
  *
  * @typedef {'primary' | 'secondary' | 'internal'} ServerModuleTier
  *
@@ -56,14 +55,6 @@ export const SERVER_MODULE_LAYOUT = Object.freeze([
         tier: 'primary',
         public: true,
         summary: 'Composition root dos routers HTTP do Copilot.',
-    },
-    {
-        path: 'handler-bridge.js',
-        kind: 'file',
-        role: 'compat',
-        tier: 'secondary',
-        public: false,
-        summary: 'Adapter compatível para handlers legados compartilhados com terminal.',
     },
     {
         path: 'middleware/',

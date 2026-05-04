@@ -58,7 +58,7 @@ export {
 } from './timer-registry.js';
 
 // ─── DI Container ─────────────────────────────────────────────────────────────
-export { container, wireLegacySetters } from './di-container.js';
+export { container } from './di-container.js';
 export * from './di-tokens.js';
 export { createContainer, createToken } from './di.js';
 

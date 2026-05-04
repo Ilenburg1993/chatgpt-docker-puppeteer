@@ -12,7 +12,7 @@ import { readCopilotBootConfig } from './config.js';
 /**
  * @typedef {{
  *     id: string;
- *     owner: 'bootstrap' | 'terminal' | 'server' | 'compat-runtime-host';
+ *     owner: 'bootstrap' | 'terminal' | 'server';
  *     responsibility: string;
  *     timeoutMs: number;
  * }} CopilotBootPlanPhase
@@ -110,12 +110,6 @@ export function createCopilotBootPlan(config = readCopilotBootConfig()) {
                 owner: 'terminal',
                 responsibility: 'abrir host REPL/HTTP e disparar bootstrap do dialog loop sem bloquear o boot',
                 timeoutMs: 10_000,
-            },
-            {
-                id: 'compat-runtime-host',
-                owner: 'compat-runtime-host',
-                responsibility: 'hospedar sinais, IPC e shutdown do entrypoint compatível sem virar segundo boot',
-                timeoutMs: 5_000,
             },
         ],
     };

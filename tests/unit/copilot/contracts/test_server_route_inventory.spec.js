@@ -30,6 +30,7 @@ const SERVER_ROUTE_INVENTORY = {
     hubOnly: ['sessions.js', 'sse.js'],
     serverOnly: ['health-modules.js', 'health-registry.js'],
     presentationBridge: ['agent.js', 'config.js', 'git.js', 'memory.js', 'observability.js'],
+    routeAdapter: ['presentation-route.js'],
     routerInfra: [
         'copilot-api/index.js',
         'module-map.js',
@@ -119,9 +120,9 @@ describe('contracts/server-route-inventory — rotas agent-runtime vs hub/server
         const src = readRoute('sessions.js');
 
         assert.match(src, /presentation\/conversation-hub\.js/);
-        assert.match(src, /bridgeHandler\(handleGetHubSession/);
-        assert.match(src, /bridgeHandler\(handleCreateHubSession/);
-        assert.match(src, /bridgeHandler\(handleCloseHubSession/);
+        assert.match(src, /createPresentationRoute\(handleGetHubSession/);
+        assert.match(src, /createPresentationRoute\(handleCreateHubSession/);
+        assert.match(src, /createPresentationRoute\(handleCloseHubSession/);
         assert.doesNotMatch(src, /CONVERSATION_STORE/);
         assert.doesNotMatch(src, /container/);
         assert.doesNotMatch(src, /getSharedSdkSessionId/);

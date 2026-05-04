@@ -48,7 +48,6 @@ export const BOOT_CONFIG_ENV_KEYS = Object.freeze([
     ...SESSION_FS_ENV_KEYS,
     'COPILOT_SDK_ENABLED',
     'COPILOT_TERMINAL_ENABLED',
-    'COPILOT_SDK_AGENT_COMPAT_ENABLED',
     'LLM_B_TERMINAL_HOST',
     'LLM_B_TERMINAL_PORT',
     'LLM_B_TERMINAL_TOKEN',
@@ -157,14 +156,11 @@ function envBool(key, fallback) {
  *     };
  *     pm2: {
  *         canonicalProcess: string;
- *         compatProcess: string;
- *         compatEnabled: boolean;
  *         terminalEnabled: boolean;
  *     };
  *     skills: ReturnType<import('./skills.js').readBootSkillConfig>;
  *     entrypoints: {
  *         canonical: string;
- *         compat: string;
  *     };
  *     phases: readonly string[];
  *     rules: Readonly<Record<string, string>>;
@@ -239,14 +235,11 @@ export function readCopilotBootConfig() {
         },
         pm2: {
             canonicalProcess: contract.canonicalPm2Process,
-            compatProcess: contract.compatPm2Process,
-            compatEnabled: envBool(contract.compatPm2EnvFlag, false),
             terminalEnabled: envBool(contract.terminalPm2EnvFlag, false),
         },
         skills: readBootSkillConfig(),
         entrypoints: {
             canonical: contract.canonicalEntrypoint,
-            compat: contract.compatEntrypoint,
         },
         phases: contract.phases,
         rules: contract.rules,

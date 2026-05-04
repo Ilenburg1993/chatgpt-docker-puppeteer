@@ -47,13 +47,22 @@ describe('copilot/boot — contrato central de boot', () => {
         expect(config.paths.pluginsDir).toContain('/src/copilot/plugins');
         expect(config.paths.toolsConfigFile).toContain('tools-config.json');
         expect(config.paths.customToolsFile).toContain('custom-tools.json');
+        expect(config.pm2.canonicalProcess).toBe('llm-b-terminal');
         expect(plan.workspaceRoot).toBe(config.workspace.root);
         expect(plan.phases.map((phase) => phase.id)).toContain('terminal-pinned-context');
         expect(plan.phases.map((phase) => phase.id)).toContain('sdk-preflight');
         expect(plan.phases.map((phase) => phase.id)).toContain('boot-surface-validation');
         expect(plan.phases.map((phase) => phase.id)).toContain('copilot-http-server');
         expect(plan.phases.map((phase) => phase.id)).toContain('repl');
-        expect(plan.phases.map((phase) => phase.id)).toContain('compat-runtime-host');
+        expect(config.entrypoints).toEqual({ canonical: 'src/copilot/terminal/bootstrap.js' });
         expect(plan.phases.every((phase) => typeof phase.timeoutMs === 'number' && phase.timeoutMs > 0)).toBe(true);
+    });
+
+    it('alinha source name OTEL canônico ao processo PM2 canônico', async () => {
+        const mod = await import('../../../src/copilot/boot/index.js');
+        const contract = mod.readCopilotBootContract();
+
+        expect(contract.canonicalOtelSourceName).toBe(contract.canonicalPm2Process);
+        expect(contract.canonicalOtelSourceName).toBe('llm-b-terminal');
     });
 });
