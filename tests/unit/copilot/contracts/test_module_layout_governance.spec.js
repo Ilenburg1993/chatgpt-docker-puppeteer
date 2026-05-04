@@ -399,11 +399,11 @@ describe('W114 — module layout governance: terminal root', () => {
         assert.match(index, /buildTerminalModuleScorecard/);
     });
 
-    it('mantem fallback SSE explicitamente fora da superficie publica', () => {
-        const fallbacks = listTerminalModulesByRole('fallback');
-        assert.equal(fallbacks.length, 1);
-        assert.equal(fallbacks[0]?.public, false);
-        assert.equal(fallbacks[0]?.tier, 'internal');
+    it('mantem passthrough SSE explicitamente fora da superficie publica', () => {
+        const passthroughs = listTerminalModulesByRole('passthrough');
+        assert.equal(passthroughs.length, 1);
+        assert.equal(passthroughs[0]?.public, false);
+        assert.equal(passthroughs[0]?.tier, 'internal');
     });
 
     it('marca arquivos grandes da raiz como watch ou hotspot', () => {
@@ -444,6 +444,7 @@ describe('W114 — module layout governance: terminal root', () => {
             'repl.js',
             'sdk-session-events.js',
             'terminal-agent-wiring.js',
+            'turn-trace-state.js',
         ]);
     });
 });
@@ -475,7 +476,14 @@ describe('W114 — module layout governance: server root', () => {
         assert.equal(getServerModuleRole('index.js'), 'entrypoint');
         assert.equal(getServerModuleRole('app.js'), 'app-factory');
         assert.equal(getServerModuleRole('router.js'), 'router');
-        assert.equal(getServerModuleRole('handler-bridge.js'), 'compat');
+        assert.equal(getServerModuleRole('handler-bridge.js'), undefined);
+    });
+
+    it('mantem adapter canônico de presentation separado na árvore de routes', () => {
+        const descriptor = SERVER_ROUTE_MODULE_LAYOUT.find((entry) => entry.path === 'presentation-route.js');
+
+        assert.equal(getServerRouteModuleRole('presentation-route.js'), 'route-adapter');
+        assert.equal(descriptor?.risk, 'stable');
     });
 
     it('README local documenta os papeis arquiteturais declarados', () => {

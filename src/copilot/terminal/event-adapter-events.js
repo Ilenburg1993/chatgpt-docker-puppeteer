@@ -2,11 +2,13 @@
 /**
  * Contratos de cobertura dos adapters explícitos do terminal.
  *
- * O fallback SSE só deve retransmitir eventos que não tenham UX/SSE dedicado. Esta lista é a SSOT local para impedir
- * duplicidade entre adapters específicos e fallback genérico.
+ * O terminal só deve retransmitir via passthrough SSE eventos que ainda não tenham UX/SSE dedicada. Esta lista é a SSOT
+ * local para impedir duplicidade entre adapters específicos, passthrough residual e eventos deliberadamente ignorados.
  *
  * @module copilot/terminal/event-adapter-events
  */
+
+import { AGENT_EVENTS } from '#copilot/events';
 
 /** @type {ReadonlySet<string>} */
 export const TERMINAL_EXPLICIT_AGENT_EVENTS = new Set([
@@ -34,6 +36,7 @@ export const TERMINAL_EXPLICIT_AGENT_EVENTS = new Set([
     'session.info',
     'session.warning',
     'session.model_changed',
+    'session.title_changed',
     'session.context_changed',
     'session.mode_changed',
     'session.plan_changed',
@@ -70,8 +73,57 @@ export const TERMINAL_EXPLICIT_AGENT_EVENTS = new Set([
 ]);
 
 /**
+ * Eventos do agent que ainda precisam chegar ao SSE do terminal, mas semântica local rica ainda não possuem adapter
+ * dedicado. Esta lista é a janela de transição restante; qualquer evento aqui deve ter owner explícito no roadmap.
+ *
+ * @type {ReadonlySet<string>}
+ */
+export const TERMINAL_AGENT_SSE_PASSTHROUGH_EVENTS = new Set([
+    'dialog.boot_recovery',
+    'dialog.paused',
+    'dialog.pre_stall_warning',
+    'dialog.recovery',
+    'dialog.resumed',
+    'dialog.turn_end',
+    'dialog.turn_start',
+    'dialog.turn_timeout',
+    'handoff.accepted',
+    'handoff.received',
+    'handoff.rejected',
+    'mcp.reconnected',
+    'permission.mode_changed',
+    'pr.consumed',
+    'pr.fallback_model',
+    'question.answered',
+    'quota.warning',
+    'session.token_budget_warning',
+    'system.message',
+    'task.queued',
+    'task.started',
+]);
+
+/**
  * @returns {Set<string>}
  */
 export function createTerminalHandledAgentEventsSet() {
     return new Set(TERMINAL_EXPLICIT_AGENT_EVENTS);
+}
+
+/**
+ * @returns {Set<string>}
+ */
+export function createTerminalPassthroughAgentEventsSet() {
+    return new Set(TERMINAL_AGENT_SSE_PASSTHROUGH_EVENTS);
+}
+
+/**
+ * Retorna os eventos do agent que ainda não têm coverage explícita nem passthrough permitido no terminal. Eles devem
+ * ser tratados como ignorados localmente para evitar duplicidade/ruído no SSE.
+ *
+ * @returns {string[]}
+ */
+export function listTerminalIgnoredAgentEvents() {
+    const explicit = TERMINAL_EXPLICIT_AGENT_EVENTS;
+    const passthrough = TERMINAL_AGENT_SSE_PASSTHROUGH_EVENTS;
+    return AGENT_EVENTS.filter((event) => !explicit.has(event) && !passthrough.has(event)).sort();
 }

@@ -24,9 +24,12 @@ import { log } from '#copilot/observability';
 import { logSwallowed } from '../core/error-handlers.js';
 import { getHubSessionId } from '../presentation/runtime-ui-state-store.js';
 import { markTerminalActivityIdle, recordTerminalActivity } from './activity-state.js';
-import { registerUnhandledAgentSseFallback } from './agent-sse-fallback.js';
+import { registerTerminalAgentSsePassthrough } from './agent-sse-passthrough.js';
 import { broadcastSse, ensureDialogLoop, println } from './dialog/index.js';
-import { createTerminalHandledAgentEventsSet } from './event-adapter-events.js';
+import {
+    createTerminalHandledAgentEventsSet,
+    createTerminalPassthroughAgentEventsSet,
+} from './event-adapter-events.js';
 import { setupTerminalHeadlessEventAdapters } from './event-adapters.js';
 import {
     abortTerminalCurrentMessage,
@@ -301,8 +304,9 @@ export function registerAgentEventListeners(printBanner) {
 
     setupTerminalTaskStreamListeners({ agent: agentEvents });
 
-    // BUG-EVDUP-01 (fix): auto-wiring genérico para AGENT_EVENTS sem handler específico.
-    // Garante que novos eventos adicionados a AGENT_EVENTS sejam automaticamente broadcast
-    // no terminal SSE sem necessidade de wiring manual em cada adição.
-    registerUnhandledAgentSseFallback({ agent: agentEvents, handledEvents: createTerminalHandledAgentEventsSet() });
+    registerTerminalAgentSsePassthrough({
+        agent: agentEvents,
+        handledEvents: createTerminalHandledAgentEventsSet(),
+        passthroughEvents: createTerminalPassthroughAgentEventsSet(),
+    });
 }

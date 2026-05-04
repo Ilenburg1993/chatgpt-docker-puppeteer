@@ -427,10 +427,54 @@ async function _doInjectToLlmB(message, opts) {
         throw e;
     }
 
+    const trimmedBody = body.trim();
+
+    if (statusCode === 408 || statusCode === 504) {
+        const e = new BridgeError(
+            `[inject-llmb] Timeout aguardando resposta da LLM-B (HTTP ${statusCode})`,
+            'LLM_B_TIMEOUT',
+        );
+        recordToolCall('channel.inject', Date.now() - _startMs, false);
+        throw e;
+    }
+
+    if (!trimmedBody) {
+        if (statusCode === 409) {
+            throw new BridgeError(
+                '[inject-llmb] LLM-B está ocupada processando outra mensagem. Tente novamente em instantes.',
+                'LLM_B_BUSY',
+            );
+        }
+
+        if (statusCode === 503) {
+            throw new BridgeError(
+                '[inject-llmb] Terminal LLM-B não está disponível. Inicie com: npm run terminal:llm-b',
+                'LLM_B_UNAVAILABLE',
+            );
+        }
+
+        if (statusCode >= 500) {
+            const e = new BridgeError(
+                `[inject-llmb] Terminal respondeu HTTP ${statusCode} sem corpo JSON`,
+                'LLM_B_ERROR',
+            );
+            recordToolCall('channel.inject', Date.now() - _startMs, false);
+            throw e;
+        }
+    }
+
     let parsed;
     try {
         parsed = /** @type {Record<string, unknown>} */ (JSON.parse(body));
     } catch {
+        if (statusCode === 408 || statusCode === 504) {
+            const e = new BridgeError(
+                `[inject-llmb] Timeout aguardando resposta da LLM-B (HTTP ${statusCode})`,
+                'LLM_B_TIMEOUT',
+            );
+            recordToolCall('channel.inject', Date.now() - _startMs, false);
+            throw e;
+        }
         const e = new BridgeError(
             `[inject-llmb] Resposta inválida do terminal (status ${statusCode}): ${body.slice(0, 200)}`,
             'LLM_B_INVALID_RESPONSE',

@@ -20,7 +20,7 @@
  *     | 'event-adapter'
  *     | 'state'
  *     | 'store'
- *     | 'fallback'
+ *     | 'passthrough'
  *     | 'sdk-adapter'
  *     | 'wiring'} TerminalModuleRole
  *
@@ -166,7 +166,7 @@ export const TERMINAL_MODULE_LAYOUT = Object.freeze([
         tier: 'secondary',
         risk: 'stable',
         public: false,
-        summary: 'Contrato de cobertura dos eventos tratados por adapters explícitos antes do fallback SSE.',
+        summary: 'Matriz de cobertura dos eventos do agent: adapters explícitos, passthrough residual e ignorados.',
     },
     {
         path: 'agent-runtime-events.js',
@@ -196,13 +196,13 @@ export const TERMINAL_MODULE_LAYOUT = Object.freeze([
         summary: 'Renderiza e transmite eventos de streaming de tarefas internas.',
     },
     {
-        path: 'agent-sse-fallback.js',
+        path: 'agent-sse-passthrough.js',
         kind: 'file',
-        role: 'fallback',
+        role: 'passthrough',
         tier: 'internal',
         risk: 'stable',
         public: false,
-        summary: 'Fallback SSE explícito para eventos do agent ainda sem adapter dedicado.',
+        summary: 'Passthrough SSE explícito e estreito para eventos do agent ainda sem adapter dedicado.',
     },
     {
         path: 'sdk-interactions.js',
@@ -257,6 +257,15 @@ export const TERMINAL_MODULE_LAYOUT = Object.freeze([
         risk: 'stable',
         public: false,
         summary: 'Policy de roteamento de input humano para ask_user pendente sem deadlock de fila.',
+    },
+    {
+        path: 'turn-trace-state.js',
+        kind: 'file',
+        role: 'state',
+        tier: 'secondary',
+        risk: 'hotspot',
+        public: true,
+        summary: 'Estado canônico de resumo por turno para tools, arquivos tocados e activity projections.',
     },
     {
         path: 'rate-limiter-state.js',

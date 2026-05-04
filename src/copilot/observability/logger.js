@@ -20,6 +20,11 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { toError } from '../core/error-handlers.js';
 
+/** @type {boolean} */
+let _stdoutUnavailable = false;
+/** @type {boolean} */
+let _stderrUnavailable = false;
+
 // ─── Paths isolados ───────────────────────────────────────────────────────────
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -86,9 +91,61 @@ function cleanOldFiles(prefix) {
             });
         }
     } catch (e) {
-        console.error(
+        safeEmergencyConsoleWrite(
+            'stderr',
             `[copilot/logger] Erro na limpeza (${prefix}): ${e instanceof Error ? toError(e).message : String(e)}`,
         );
+    }
+}
+
+/**
+ * @param {unknown} error
+ * @returns {boolean}
+ */
+function isBrokenConsoleError(error) {
+    const candidate = /** @type {{ code?: string; message?: string; name?: string }} */ (error);
+    const code = typeof candidate?.code === 'string' ? candidate.code : '';
+    const message = String(candidate?.message ?? error ?? '');
+    return (
+        code === 'EIO' ||
+        code === 'EPIPE' ||
+        code === 'ERR_STREAM_DESTROYED' ||
+        message.includes('write EIO') ||
+        message.includes('broken pipe')
+    );
+}
+
+/**
+ * @param {'stdout' | 'stderr'} channel
+ * @param {string} line
+ * @returns {void}
+ */
+function safeEmergencyConsoleWrite(channel, line) {
+    const stream = channel === 'stderr' ? process.stderr : process.stdout;
+    if (!stream) return;
+    if (channel === 'stdout' && _stdoutUnavailable) return;
+    if (channel === 'stderr' && _stderrUnavailable) return;
+
+    try {
+        stream.write(`${line}\n`);
+    } catch (error) {
+        if (isBrokenConsoleError(error)) {
+            if (channel === 'stdout') _stdoutUnavailable = true;
+            else _stderrUnavailable = true;
+        }
+    }
+}
+
+/**
+ * @param {string} filePath
+ * @param {string} content
+ * @returns {void}
+ */
+function safeAppendFileSync(filePath, content) {
+    try {
+        fs.appendFileSync(filePath, content, 'utf-8');
+    } catch {
+        // Silencioso: logging nunca deve derrubar o runtime.
     }
 }
 
@@ -112,7 +169,8 @@ function rotateFile(filePath, prefix, maxSize) {
             cleanOldFiles(prefix);
         }
     } catch (e) {
-        console.error(
+        safeEmergencyConsoleWrite(
+            'stderr',
             `[copilot/logger] Erro ao rotacionar ${prefix}: ${e instanceof Error ? toError(e).message : String(e)}`,
         );
     }
@@ -217,14 +275,10 @@ function log(level, msg, metaOrTaskId = '-') {
             ...(meta.extra ?? {}),
         };
         const jsonLine = JSON.stringify(jsonEntry);
-        console.log(jsonLine);
         _logRingBuffer.push({ ts, level, taskId, msg: String(content) });
         if (_logRingBuffer.length > RING_BUFFER_SIZE) _logRingBuffer.shift();
-        try {
-            fs.appendFileSync(LOG_FILE, `${jsonLine}\n`, 'utf-8');
-        } catch (_) {
-            // Silencioso — console.log já logou
-        }
+        safeAppendFileSync(LOG_FILE, `${jsonLine}\n`);
+        safeEmergencyConsoleWrite(levelValue >= (LOG_LEVELS['ERROR'] ?? 3) ? 'stderr' : 'stdout', jsonLine);
     } else {
         // F110.4: human-readable para dev
         // GAP-ERR-COLOR: Apply red ANSI for ERROR and FATAL messages
@@ -233,14 +287,10 @@ function log(level, msg, metaOrTaskId = '-') {
         const colorCode = isError ? '\x1b[31m' : ''; // Red for errors
         const resetCode = isError ? '\x1b[0m' : ''; // Reset after error
         const line = `${colorCode}[${ts}] ${level.padEnd(5)} [${taskId}]${sidTag} [copilot] ${content}${resetCode}`;
-        console.log(line);
         _logRingBuffer.push({ ts, level, taskId, msg: String(content) });
         if (_logRingBuffer.length > RING_BUFFER_SIZE) _logRingBuffer.shift();
-        try {
-            fs.appendFileSync(LOG_FILE, `${line}\n`, 'utf-8');
-        } catch (_) {
-            // Silencioso — console.log já logou
-        }
+        safeAppendFileSync(LOG_FILE, `${line}\n`);
+        safeEmergencyConsoleWrite(isError ? 'stderr' : 'stdout', line);
     }
 }
 
@@ -294,8 +344,8 @@ function audit(action, details) {
     const entry = `[${ts}] [AUDIT] ${action} | ${JSON.stringify(details)}\n`;
     try {
         fs.appendFileSync(AUDIT_FILE, entry, 'utf-8');
-    } catch (_) {
-        console.error(`[copilot/logger] [CRITICAL_AUDIT_FAIL] ${entry}`);
+    } catch {
+        safeEmergencyConsoleWrite('stderr', `[copilot/logger] [CRITICAL_AUDIT_FAIL] ${entry.trimEnd()}`);
     }
 }
 
