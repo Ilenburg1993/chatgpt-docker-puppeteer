@@ -6,15 +6,17 @@
 
 - Diretórios totais (incluindo raiz): **69**
 - Arquivos totais: **541**
-- Arquivos raiz imediatos em `src/copilot/`: **4**
+- Arquivos raiz imediatos em `src/copilot/`: **3**
 - Módulos de primeiro nível: **24**
 
 ## 2. Arquivos raiz imediatos
 
 - `src/copilot/README.md`
-- `src/copilot/agent.js`
 - `src/copilot/bootstrap.js`
 - `src/copilot/runtime-wiring.js`
+
+> Atualização 2026-05-04: `src/copilot/agent.js` foi removido; `terminal/bootstrap.js` é o único
+> owner executável do runtime local.
 
 ## 3. Módulos de primeiro nível e escala
 

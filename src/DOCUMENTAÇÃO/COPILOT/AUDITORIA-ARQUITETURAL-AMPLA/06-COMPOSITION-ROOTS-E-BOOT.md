@@ -27,7 +27,7 @@ Este documento existe para separar com precisão:
 3. **composition root**;
 4. **host de borda humana**;
 5. **owner do servidor HTTP**;
-6. **host compatível de processo do runtime**.
+6. **sem host compatível paralelo** — o runtime local possui um único owner executável.
 
 ---
 
@@ -37,14 +37,13 @@ Este documento existe para separar com precisão:
 
 | Arquivo                                       | Papel observado                                                 |
 | --------------------------------------------- | --------------------------------------------------------------- |
-| `src/copilot/agent.js`                        | entrypoint operacional de compatibilidade                       |
 | `src/copilot/terminal/bootstrap.js`           | entrypoint canônico do Terminal Permanente LLM-B                |
 | `src/copilot/bootstrap.js`                    | entrypoint canônico do módulo copilot                           |
 | `src/copilot/runtime-wiring.js`               | composition root do runtime Copilot                             |
 | `src/copilot/terminal/index.js`               | host da borda terminal; orquestra server, hub, REPL e listeners |
 | `src/copilot/server/index.js`                 | owner do servidor HTTP/Socket.IO                                |
 | `src/copilot/boot/config.js`                  | painel canônico de configuração de boot                         |
-| `src/copilot/agent/lifecycle/runtime-host.js` | helpers do host compatível de processo                          |
+| `src/copilot/agent/lifecycle/runtime-host.js` | helpers de host do runtime já integrados ao fluxo canônico      |
 
 ## 2.2 Hierarquia factual atual
 
@@ -64,14 +63,7 @@ npm run terminal:llm-b / PM2 llm-b-terminal
         -> startRepl()
 ```
 
-Em paralelo, existe um caminho compatível:
-
-```text
-src/copilot/agent.js
-  -> bootCopilot()
-```
-
-E existe um helper de host compatível de processo:
+E existe um helper de host de processo reutilizado pelo fluxo canônico:
 
 ```text
 src/copilot/agent/lifecycle/runtime-host.js
@@ -363,31 +355,17 @@ runtime por conta própria.
 
 ## 4.6 `src/copilot/agent.js`
 
-### Papel atual observado
+### Status atual
 
-É um **entrypoint operacional de compatibilidade**.
+**Removido em 2026-05-04**.
 
-Ele:
+### Decisão arquitetural
 
-- importa `bootCopilot()`;
-- avisa no `console.warn` que é compatível e que o caminho canônico é outro;
-- delega completamente ao boot canônico.
+O runtime local passa a admitir um único owner executável:
 
-### Diagnóstico
+- `src/copilot/terminal/bootstrap.js`
 
-Esse é o perfil correto de um compat shim.
-
-### Situação ideal
-
-`agent.js` deve continuar sendo apenas:
-
-- um adaptador de compatibilidade;
-- um ponto de deprecação explícita;
-- sem qualquer lógica de boot própria.
-
-### Risco atual
-
-**baixo**, mas o risco tende a crescer se alguém voltar a colocar lógica exclusiva nele.
+Qualquer reintrodução de entrypoint paralelo deve ser tratada como regressão arquitetural.
 
 ### Decisão preliminar
 

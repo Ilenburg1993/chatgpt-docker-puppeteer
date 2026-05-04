@@ -163,8 +163,8 @@ Com isso, o frontend do terminal já consegue propagar `runtimeId` explícito ta
 de `mode/plan`, diagnóstico, métricas e snapshots sem voltar a chamar essas capabilities diretamente
 no runtime.
 
-`server/handler-bridge.js` já propaga esse `runtimeId` canônico também para os handlers
-compartilhados legados de:
+`server/routes/presentation-route.js` já propaga esse `runtimeId` canônico também para os handlers
+compartilhados de:
 
 - `agent-control.js`
 - `system-metrics.js`

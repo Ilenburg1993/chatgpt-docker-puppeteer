@@ -61,19 +61,46 @@ Critério de pronto:
 
 - uma narrativa canônica de histórico por runtime.
 
+### Progresso atual da E3
+
+- `terminal/frontend/projections/timeline.js` criado como family canônica de reconciliação entre hub
+  persistido e bridge vivo;
+- `/status`, `/history`, `/context`, `/export` e `metrics` passaram a consumir metadata de timeline
+  reconciliada (`timelineSource`, `timelineAuthority`, `reconciliationStatus`) em vez de depender
+  implicitamente do feed cru do bridge;
+- `frontend/index.js` deixou de reexportar helpers crus do bridge history, reduzindo o bypass
+  público e forçando consumo por projection.
+
 ## Onda E4 — Redução de compat paths
 
 **Meta:** reduzir caminhos paralelos controlados.
 
 Ações:
 
-1. planejar sunset do `server/handler-bridge.js`;
-2. reduzir dependência de `wireLegacySetters`;
+1. migrar os consumers remanescentes de setters locais para DI pura quando isso não romper
+   isolamento de camada;
+2. reduzir o uso de overrides mutáveis de composição fora de testes;
 3. consolidar política PM2/compat entrypoint com guardrails de execução única.
 
 Critério de pronto:
 
-- compat paths com uso residual mínimo e janela de remoção definida.
+### Progresso atual da E4
+
+`presentation/` em rotas raiz; canônico; import;
+
+- `runtime-legacy-compat.js`, `observability/bootstrap-legacy.js`, `server/handler-bridge.js`,
+  `boot/compat-entrypoint.js` e o processo PM2 `copilot-sdk-agent` foram removidos.
+  - rotas raiz não podem recriar shim paralelo ao `presentation-route.js`;
+  - `wireLegacySetters` não deve reaparecer no runtime.
+- no terminal, `agent-sse-fallback.js` foi substituído por `agent-sse-passthrough.js`, reduzindo o
+  fluxo residual a uma allowlist explícita de eventos raw ainda sem adapter dedicado;
+- no terminal, o hotspot `terminal-phases/boot-listeners.js` foi fatiado em `boot-banner.js`,
+  `boot-reflection-loop.js` e `boot-shutdown.js`, reduzindo acoplamento entre política de boot e
+  wiring vivo.
+- no canal LLM-A ↔ LLM-B, o contrato de timeout do `channel/inject.js` foi endurecido para tratar
+  HTTP `408/504` como timeout canônico em vez de `invalid response`;
+- `observability/logger.js` passou a tratar stdout/stderr quebrados como detalhe operacional da
+  borda, não como falha fatal do runtime.
 
 ## Onda E5 — Multi-runtime/multi-agent readiness
 
@@ -89,6 +116,21 @@ Critério de pronto:
 
 - runtimes múltiplos e profiles preparados sem quebrar default runtime.
 
+### Progresso atual da E5
+
+- `agent/runtime-registry.js` passou a aceitar metadata opcional `agentProfileId` por runtime, sem
+  quebrar a API atual baseada em `runtimeId`;
+- o runtime default lazy agora se registra explicitamente com profile `always-alive`;
+- `presentation/runtime-overview.js`, `presentation/agent-runtime.js` e `/status` do terminal já
+  propagam `agentProfileId`, preparando a UX e a topologia para múltiplos runtimes/perfis sem criar
+  um segundo owner operacional.
+
+### Progresso transversal relevante desta rodada
+
+- a normalização de `ElicitationResult` foi centralizada em `core/elicitation-schema.js`, com
+  aplicação consistente em terminal, hooks da fila pendente e rota compat de resposta HTTP;
+- isso reduz fluxos paralelos onde cada borda aceitava um subconjunto diferente do mesmo contrato.
+
 ---
 
 ## 3) Priorização objetiva (próximas 2 semanas)
@@ -98,6 +140,7 @@ Critério de pronto:
 3. **E3** (em paralelo de baixo risco com E2)
 4. **E4**
 5. **E5**
+6. **hardening operacional** (`channel/inject`, logger, fronteiras SSE/TTY)
 
 ---
 
@@ -108,7 +151,8 @@ Critério de pronto:
 - TO-BE unificado publicado (doc 102);
 - plano executivo detalhado publicado (doc 103);
 - onda E1 iniciada com criação de contrato arquitetural novo (ver
-  `tests/unit/copilot/contracts/test_canonical_flow_governance.spec.js`).
+  `tests/unit/copilot/contracts/test_canonical_flow_governance.spec.js`);
+- onda E4 iniciada com migração do adapter HTTP raiz para `server/routes/presentation-route.js`.
 
 ---
 
@@ -137,4 +181,6 @@ O plano está completo quando:
 - todos os fluxos críticos operam em caminho canônico único;
 - paralelos PR = 0;
 - paralelos PC com sunset explícito;
+- runtime headless continua funcional mesmo sem TTY vivo e o transporte `/inject` preserva erro
+  semântico consistente em timeout;
 - multi-runtime/multi-agent preparado com contratos e isolamento comprovado.

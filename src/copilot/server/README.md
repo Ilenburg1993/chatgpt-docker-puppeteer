@@ -12,23 +12,22 @@ presentation ou terminal.
 2. Use `module-map.js` para o inventário executável da raiz.
 3. Leia `app.js` para app/middleware base e `router.js` para composição de routers.
 4. Desça por subdiretório: `routes/`, `middleware/`, `runtime-state/` e `socket/`.
-5. Trate `handler-bridge.js` como adapter de compatibilidade de handlers, não como domínio.
+5. Trate `routes/presentation-route.js` como adapter canônico de handlers de `presentation/`.
 
 ## Mapa atual de papéis
 
-| Papel           | Arquivos/diretórios         |
-| --------------- | --------------------------- |
-| `entrypoint`    | `index.js`, `module-map.js` |
-| `app-factory`   | `app.js`                    |
-| `router`        | `router.js`, `routes/`      |
-| `middleware`    | `middleware/`               |
-| `runtime-state` | `runtime-state/`            |
-| `socket`        | `socket/`                   |
-| `compat`        | `handler-bridge.js`         |
+| Papel           | Arquivos/diretórios            |
+| --------------- | ------------------------------ |
+| `entrypoint`    | `index.js`, `module-map.js`    |
+| `app-factory`   | `app.js`                       |
+| `router`        | `router.js`, `routes/`         |
+| `middleware`    | `middleware/`                  |
+| `runtime-state` | `runtime-state/`               |
+| `socket`        | `socket/`                      |
+| `route-adapter` | `routes/presentation-route.js` |
 
 ## Regra para novos arquivos
 
 Todo novo arquivo funcional na raiz de `server/` precisa aparecer em `module-map.js`. Na dúvida,
 prefira subpastas semânticas: routers em `routes/`, estado de borda em `runtime-state/`, middleware
-em `middleware/`, Socket.IO em `socket/`, e adapters compatíveis em uma trilha explicitamente
-classificada.
+em `middleware/`, Socket.IO em `socket/` e adapters canônicos de rota em `routes/`.

@@ -66,7 +66,6 @@ npm run terminal:llm-b
 Regras:
 
 - `terminal/bootstrap.js` é o entrypoint canônico para execução local e PM2 `llm-b-terminal`;
-- `src/copilot/agent.js` é entrypoint operacional de compatibilidade, não um segundo runtime;
 - `server/index.js` é dono apenas de HTTP/Socket.IO e nunca inicia REPL ou agent sozinho;
 - `terminal/index.js` é o host da UX local e compõe o server por injeção;
 - `boot/` registra o contrato vivo de boot, resolve workspace/skills/porta/token e guarda o baseline

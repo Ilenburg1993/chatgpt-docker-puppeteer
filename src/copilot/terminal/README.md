@@ -41,42 +41,44 @@ declara `risk` e scorecard para orientar a ordem de decomposição.
 | `repl-command-parser.js`                 | parser puro de comandos slash e aliases resolvidos                         |
 | `repl-listeners.js`                      | tradução de eventos do agente/SDK para UX local                            |
 | `repl-multiline.js`                      | estado de input multiline por continuação com barra invertida              |
+| `terminal-phases/`                       | fases de boot do terminal e submódulos finos de banner/reflection/shutdown |
 | `event-adapters.js`                      | composition root canônico dos adapters de eventos para REPL/headless       |
-| `event-adapter-events.js`                | contrato de eventos cobertos por adapters antes do fallback SSE            |
+| `event-adapter-events.js`                | matriz de eventos cobertos, em passthrough e ignorados no terminal         |
 | `sdk-session-events.js`                  | tradução dedicada dos sinais vanilla da sessão SDK para stdout/SSE         |
 | `agent-runtime-events.js`                | tradução dedicada dos sinais normalizados do runtime/agent para stdout/SSE |
 | `tool-activity-presenter.js`             | narrativa operacional de tools, arquivos e comandos para o streaming live  |
+| `turn-trace-state.js`                    | resumo canônico por turno de tools/arquivos tocados para `/activity`       |
 | `task-stream-events.js`                  | render e SSE do streaming de tarefas internas (`task.*`)                   |
-| `agent-sse-fallback.js`                  | fallback SSE para eventos do agent ainda não tratados manualmente          |
+| `agent-sse-passthrough.js`               | passthrough SSE explícito e estreito para eventos sem adapter dedicado     |
 | `terminal-agent-wiring.js`               | SSE + wiring de alto nível entre terminal e agent                          |
 | `index.js` / `bootstrap.js`              | boot do terminal                                                           |
 
 ## Papéis da raiz
 
-| Papel              | Arquivos/diretórios                                                                                                           |
-| ------------------ | ----------------------------------------------------------------------------------------------------------------------------- |
-| `entrypoint`       | `bootstrap.js`, `module-map.js`                                                                                               |
-| `boot`             | `bootstrap-lifecycle.js`                                                                                                      |
-| `orchestrator`     | `index.js`                                                                                                                    |
-| `repl`             | `repl.js`, `repl-banner.js`, `repl-command-parser.js`, `repl-listeners.js`, `repl-multiline.js`                               |
-| `event-adapter`    | `event-adapters.js`, `event-adapter-events.js`, `agent-runtime-events.js`, `sdk-session-events.js`, `task-stream-events.js`   |
-| `wiring`           | `terminal-agent-wiring.js`                                                                                                    |
-| `fallback`         | `agent-sse-fallback.js`                                                                                                       |
-| `sdk-adapter`      | `sdk-interactions.js`                                                                                                         |
-| `state`            | `activity-state.js`, `display-policy.js`, `pending-question-answer.js`, `pending-question-replay.js`, `rate-limiter-state.js` |
-| `store`            | `alias-store.js`                                                                                                              |
-| `command-surface`  | `commands/`                                                                                                                   |
-| `dialog-surface`   | `dialog/`                                                                                                                     |
-| `frontend-surface` | `frontend/`                                                                                                                   |
-| `handler-surface`  | `handlers/`                                                                                                                   |
+| Papel              | Arquivos/diretórios                                                                                                                                  |
+| ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `entrypoint`       | `bootstrap.js`, `module-map.js`                                                                                                                      |
+| `boot`             | `bootstrap-lifecycle.js`                                                                                                                             |
+| `orchestrator`     | `index.js`                                                                                                                                           |
+| `repl`             | `repl.js`, `repl-banner.js`, `repl-command-parser.js`, `repl-listeners.js`, `repl-multiline.js`                                                      |
+| `event-adapter`    | `event-adapters.js`, `event-adapter-events.js`, `agent-runtime-events.js`, `sdk-session-events.js`, `task-stream-events.js`                          |
+| `wiring`           | `terminal-agent-wiring.js`                                                                                                                           |
+| `passthrough`      | `agent-sse-passthrough.js`                                                                                                                           |
+| `sdk-adapter`      | `sdk-interactions.js`                                                                                                                                |
+| `state`            | `activity-state.js`, `display-policy.js`, `pending-question-answer.js`, `pending-question-replay.js`, `rate-limiter-state.js`, `turn-trace-state.js` |
+| `store`            | `alias-store.js`                                                                                                                                     |
+| `command-surface`  | `commands/`                                                                                                                                          |
+| `dialog-surface`   | `dialog/`                                                                                                                                            |
+| `frontend-surface` | `frontend/`                                                                                                                                          |
+| `handler-surface`  | `handlers/`                                                                                                                                          |
 
 ## Riscos da raiz
 
-| Risco     | Arquivos/diretórios                                                                                                                        |
-| --------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| `hotspot` | `index.js`, `repl.js`, `terminal-agent-wiring.js`, `agent-runtime-events.js`, `sdk-session-events.js`, `commands/`, `dialog/`, `frontend/` |
-| `watch`   | `alias-store.js`, `display-policy.js`                                                                                                      |
-| `stable`  | arquivos pequenos de boot, estado, fallback, handlers e adapters já finos                                                                  |
+| Risco     | Arquivos/diretórios                                                                                                                                               |
+| --------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `hotspot` | `index.js`, `repl.js`, `terminal-agent-wiring.js`, `agent-runtime-events.js`, `sdk-session-events.js`, `turn-trace-state.js`, `commands/`, `dialog/`, `frontend/` |
+| `watch`   | `alias-store.js`, `display-policy.js`                                                                                                                             |
+| `stable`  | arquivos pequenos de boot, estado, passthrough, handlers e adapters já finos                                                                                      |
 
 Regra local: arquivos acima de 300 linhas precisam ser `hotspot`; arquivos acima de 220 linhas
 precisam ser ao menos `watch`. O scorecard exportado por `module-map.js` deve ser consultado antes
@@ -92,6 +94,9 @@ de novas features em UX.
 - O boot do terminal é dividido em fases exportadas por `terminal/index.js`, para que o
   `BootLifecycleReport` diferencie aliases, runtime config, pinned context, ConversationHub, HTTP
   server, listeners e REPL.
+- Dentro de `terminal-phases/`, `boot-banner.js`, `boot-reflection-loop.js` e `boot-shutdown.js`
+  isolam a política operacional do boot, mantendo `boot-listeners.js` focado no wiring vivo da fase
+  `terminal-runtime-listeners`.
 - `server/index.js` é o único owner do HTTP server; o terminal injeta `startCopilotServer`, mas não
   registra segundo shutdown handler para fechar o mesmo server.
 - Timers do terminal devem ser registrados em `core/timer-registry.js` e handlers explícitos devem
@@ -148,13 +153,16 @@ Deve sair do `terminal/` quando virar:
 - `sdk-session-events.js` reflete sinais vanilla da sessão SDK ao operador;
 - `agent-runtime-events.js` reflete sinais já normalizados pelo runtime/agent ao operador;
 - `event-adapters.js` é a via preferencial única para registrar adapters em modo REPL ou headless;
-- `event-adapter-events.js` governa quais eventos não podem cair no fallback SSE genérico;
+- `event-adapter-events.js` governa a matriz “adapter explícito / passthrough SSE / ignorado” dos
+  eventos do agent no terminal;
 - `sdk-interactions.js` rastreia `elicitation` e permissões SDK para `/status`, `/now` e comandos;
 - `tool-activity-presenter.js` normaliza a narrativa live de tools, caminhos de arquivos e
   operações;
+- `turn-trace-state.js` reconcilia `assistant.turn_*`, tools e alterações de workspace em um resumo
+  por turno exibido por `/activity`;
 - `task-stream-events.js` concentra a narrativa do streaming de tarefas internas do runtime;
-- `agent-sse-fallback.js` explicita o fallback de broadcast SSE para eventos do agent ainda não
-  tratados;
+- `agent-sse-passthrough.js` transmite apenas a janela residual de eventos do agent que ainda não
+  ganharam adapter dedicado, eliminando o fallback genérico por default;
 - `repl-listeners.js` agora orquestra essas duas fronteiras em vez de acumular toda a semântica
   sozinho.
 
@@ -169,3 +177,10 @@ Se houver dúvida entre `frontend/` e `dialog/`:
 
 - **`frontend/` responde “de onde vem a verdade consumida pelo terminal?”**
 - **`dialog/` responde “como essa verdade vira prompt, espera, render e envio?”**
+
+## Nota operacional importante
+
+O terminal pode rodar de forma destacada/headless (task, PM2, processo órfão, painel fechado). Por
+isso, **logging e observabilidade não podem depender de um TTY vivo** para manter `/inject`, SSE,
+health ou rotas HTTP funcionais. stdout/stderr são sinks oportunistas; o fluxo canônico do runtime
+precisa continuar funcional mesmo quando esses streams estão indisponíveis.

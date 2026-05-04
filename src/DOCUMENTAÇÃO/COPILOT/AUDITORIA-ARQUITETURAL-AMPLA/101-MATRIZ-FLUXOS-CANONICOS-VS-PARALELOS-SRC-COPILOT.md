@@ -21,25 +21,26 @@ Pontuação:
 
 ## 2) Matriz consolidada
 
-| Domínio           | Fluxo                                               | Classe |   I |   D |   P | Evidência principal                          | Ação recomendada                                  |
-| ----------------- | --------------------------------------------------- | -----: | --: | --: | --: | -------------------------------------------- | ------------------------------------------------- |
-| Boot              | `terminal/bootstrap.js -> bootCopilot`              |      C |   5 |   1 |   5 | `boot/contract.js`                           | manter como único owner executável                |
-| Boot              | `agent.js -> bootCopilot`                           |     PC |   3 |   3 |   9 | `agent.js`, `boot/README.md`                 | manter compat com telemetria e sunset criteria    |
-| Boot/PM2          | processo `copilot-sdk-agent`                        |     PC |   2 |   4 |   8 | `boot/contract.js`                           | bloquear execução simultânea com `llm-b-terminal` |
-| DI wiring         | `wireLegacySetters(...)`                            |     PC |   3 |   3 |   9 | `runtime-wiring.js`, `core/di-container.js`  | migrar progressivamente para DI puro              |
-| Runtime           | `agent/runtime-registry.js` + default runtime       |      C |   5 |   2 |  10 | `agent/runtime-registry.js`                  | ampliar cobertura multi-runtime                   |
-| Runtime selection | fallback para runtime default                       |     PR |   4 |   4 |  16 | `presentation/agent-runtime.js`              | tornar fallback explícito em todas as bordas      |
-| SDK boundary      | `sdk/*` + `event-handlers/*`                        |      C |   5 |   1 |   5 | `sdk/README.md`, `event-handlers/README.md`  | preservar soberania vanilla                       |
-| Agent facade      | `agent-sdk-access.js` + `facades/sdk/*`             |      C |   5 |   2 |  10 | `agent/facades/README.md`                    | manter entrypoint único público                   |
-| Server SDK routes | composição por `sdk/deps.js`                        |      C |   5 |   2 |  10 | `server/routes/sdk/README.md`                | endurecer contratos anti-import direto            |
-| Server            | `handler-bridge.js`                                 |     PC |   2 |   4 |   8 | `server/module-map.js`                       | reduzir usos restantes e descomissionar           |
-| Terminal frontend | gateways + projections                              |      C |   5 |   1 |   5 | `terminal/frontend/index.js`, `README.md`    | manter padrão explícito                           |
-| Terminal events   | adapters dedicados                                  |      C |   4 |   2 |   8 | `event-adapters.js`                          | ampliar cobertura de eventos sem fallback         |
-| Terminal events   | `agent-sse-fallback.js`                             |     PC |   3 |   4 |  12 | `terminal/module-map.js`                     | reduzir escopo progressivamente                   |
-| Dialog transport  | `frontend/gateways/dialog.js -> #copilot/channel`   |      C |   4 |   2 |   8 | `gateway/dialog.js`                          | manter isolamento nesse gateway                   |
-| Timeline dual     | histórico `llmBridgeClient` vs histórico SDK sessão |     PR |   4 |   4 |  16 | `gateway/dialog.js`, `agent/session/history` | unificar narrativa no plano de estado/projeção    |
-| Observability     | EventBus bridge coverage                            |      C |   4 |   2 |   8 | `events/catalog.md`, runtime event bridge    | manter mapeamento declarativo                     |
-| Conversation Hub  | store/orchestrator/socket                           |      C |   4 |   2 |   8 | `conversation-hub/README.md`                 | separar ainda mais domínio x protocolo            |
+| Domínio           | Fluxo                                               | Classe |   I |   D |   P | Evidência principal                               | Ação recomendada                               |
+| ----------------- | --------------------------------------------------- | -----: | --: | --: | --: | ------------------------------------------------- | ---------------------------------------------- |
+| Boot              | `terminal/bootstrap.js -> bootCopilot`              |      C |   5 |   1 |   5 | `boot/contract.js`                                | manter como único owner executável             |
+| Boot              | nenhum entrypoint compat residual                   |      — |   0 |   0 |   0 | `boot/contract.js`, `terminal/bootstrap.js`       | removido — manter bloqueio contratual          |
+| Boot/PM2          | nenhum paralelo residual                            |      — |   0 |   0 |   0 | `boot/contract.js`                                | removido — apenas `llm-b-terminal` permanece   |
+| DI wiring         | setters explícitos de composição                    |     PC |   1 |   2 |   2 | `runtime-wiring.js`, `observability/bootstrap.js` | migrar consumers restantes para DI pura        |
+| Runtime           | `agent/runtime-registry.js` + default runtime       |      C |   5 |   2 |  10 | `agent/runtime-registry.js`                       | ampliar cobertura multi-runtime                |
+| Runtime selection | fallback para runtime default                       |     PR |   4 |   4 |  16 | `presentation/agent-runtime.js`                   | tornar fallback explícito em todas as bordas   |
+| SDK boundary      | `sdk/*` + `event-handlers/*`                        |      C |   5 |   1 |   5 | `sdk/README.md`, `event-handlers/README.md`       | preservar soberania vanilla                    |
+| Agent facade      | `agent-sdk-access.js` + `facades/sdk/*`             |      C |   5 |   2 |  10 | `agent/facades/README.md`                         | manter entrypoint único público                |
+| Server SDK routes | composição por `sdk/deps.js`                        |      C |   5 |   2 |  10 | `server/routes/sdk/README.md`                     | endurecer contratos anti-import direto         |
+| Server            | nenhum shim HTTP residual                           |      — |   0 |   0 |   0 | `server/routes/presentation-route.js`             | removido — adapter canônico único              |
+| Logging           | stdout/stderr como sink operacional implícito       |     PR |   4 |   4 |  16 | `observability/logger.js`                         | tornar logger resiliente a TTY quebrado        |
+| Terminal frontend | gateways + projections                              |      C |   5 |   1 |   5 | `terminal/frontend/index.js`, `README.md`         | manter padrão explícito                        |
+| Terminal events   | adapters dedicados                                  |      C |   4 |   2 |   8 | `event-adapters.js`                               | ampliar cobertura de eventos sem fallback      |
+| Terminal events   | `agent-sse-passthrough.js`                          |     PC |   2 |   3 |   6 | `terminal/module-map.js`, `event-adapter-events`  | migrar allowlist residual para adapters/ignore |
+| Dialog transport  | `frontend/gateways/dialog.js -> #copilot/channel`   |      C |   4 |   2 |   8 | `gateway/dialog.js`                               | manter isolamento nesse gateway                |
+| Timeline dual     | histórico `llmBridgeClient` vs histórico SDK sessão |     PR |   4 |   4 |  16 | `gateway/dialog.js`, `agent/session/history`      | unificar narrativa no plano de estado/projeção |
+| Observability     | EventBus bridge coverage                            |      C |   4 |   2 |   8 | `events/catalog.md`, runtime event bridge         | manter mapeamento declarativo                  |
+| Conversation Hub  | store/orchestrator/socket                           |      C |   4 |   2 |   8 | `conversation-hub/README.md`                      | separar ainda mais domínio x protocolo         |
 
 ---
 
@@ -47,11 +48,8 @@ Pontuação:
 
 1. **Fallback de runtime default implícito** (`P=16`)
 2. **Timeline dual channel-history vs sdk-history** (`P=16`)
-3. **Fallback SSE genérico em terminal** (`P=12`)
-4. **Legacy setters no runtime wiring** (`P=9`)
-5. **Entrypoint compat `agent.js` ainda ativo** (`P=9`)
-6. **Processo PM2 compat paralelo** (`P=8`)
-7. **Handler bridge em server** (`P=8`)
+3. **stdout/stderr como sink operacional implícito** (`P=16`)
+4. **Setters explícitos no runtime wiring** (`P=2`)
 
 ---
 
@@ -76,4 +74,5 @@ Pontuação:
 ## 5) Meta operacional
 
 **Meta 2.1:** reduzir os paralelos `PR` para zero e manter apenas `PC` estritamente necessários, com
-sunset explícito.
+sunset explícito. Na prática, isso agora significa fechar principalmente: fallback implícito de
+runtime, timeline dual e o residual de passthrough SSE ainda sem adapter dedicado.

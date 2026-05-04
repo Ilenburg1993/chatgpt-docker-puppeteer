@@ -51,9 +51,8 @@ Snapshot levantado a partir do filesystem vivo:
 - **69 diretórios** (incluindo a raiz `src/copilot/`)
 - **541 arquivos**
 - **24 módulos/pastas de primeiro nível**
-- **4 arquivos raiz imediatos**:
+- **3 arquivos raiz imediatos**:
   - `src/copilot/README.md`
-  - `src/copilot/agent.js`
   - `src/copilot/bootstrap.js`
   - `src/copilot/runtime-wiring.js`
 
@@ -64,9 +63,11 @@ Os arquivos-raiz indicam uma estrutura importante já existente:
 | Arquivo             | Papel atual                                                                                                   |
 | ------------------- | ------------------------------------------------------------------------------------------------------------- |
 | `README.md`         | mapa canônico do runtime e da direção arquitetural desejada                                                   |
-| `agent.js`          | entrypoint compatível; delega ao boot canônico                                                                |
 | `bootstrap.js`      | entrypoint canônico do módulo Copilot; orquestra observability, DI, preflight, runtime wiring e host terminal |
 | `runtime-wiring.js` | composition root do runtime Copilot já montado                                                                |
+
+Atualização 2026-05-04: o antigo `src/copilot/agent.js` foi removido para eliminar o último
+entrypoint compatível paralelo do runtime local.
 
 Conclusão preliminar: `src/copilot/` **já possui um centro de composição explícito**, mas esse
 centro convive com muitas superfícies laterais e históricos de compatibilidade que merecem

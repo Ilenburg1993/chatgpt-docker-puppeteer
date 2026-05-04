@@ -9,12 +9,12 @@ Consumer layer canônica do terminal.
 
 ## Arquivos
 
-| Arquivo                     | Função                                                                                                    |
-| --------------------------- | --------------------------------------------------------------------------------------------------------- |
-| `gateways/`                 | gateways canônicos especializados (`agent-runtime`, `dialog`, `hub`, `sdk-session`)                       |
-| `projections/`              | famílias de projections fatiadas (`shared`, `status`, `now`, `config`, `metrics`, `usage`, `sdk-session`) |
-| `sdk-session-projection.js` | consumo vanilla de `mode/plan` da sessão SDK para comandos e UX do terminal                               |
-| `index.js`                  | barrel público do submódulo                                                                               |
+| Arquivo                     | Função                                                                                                                |
+| --------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| `gateways/`                 | gateways canônicos especializados (`agent-runtime`, `dialog`, `hub`, `sdk-session`)                                   |
+| `projections/`              | famílias de projections fatiadas (`shared`, `status`, `timeline`, `now`, `config`, `metrics`, `usage`, `sdk-session`) |
+| `sdk-session-projection.js` | consumo vanilla de `mode/plan` da sessão SDK para comandos e UX do terminal                                           |
+| `index.js`                  | barrel público do submódulo                                                                                           |
 
 ## Regra de uso
 
@@ -25,6 +25,11 @@ Consumer layer canônica do terminal.
 - Não deve recriar semântica do SDK (ex.: mode/plan, streaming, usage).
 - `sdk-session-projection.js` é a fonte preferida quando o problema for especificamente `mode/plan`
   vanilla.
+- `projections/timeline.js` é a fonte preferida quando o problema for histórico, contexto,
+  compactação, export e reconciliação entre bridge vivo e persistência do hub.
+- `frontend/index.js` **não** deve reexportar helpers crus do feed do bridge
+  (`readTerminalHistoryFeed`, `seedTerminalHistoryFeed`, `clearTerminalHistoryFeed`,
+  `readTerminalTurnCount`); o consumo público deve passar por projections canônicas de timeline.
 - Para leituras/ações internas, prefira imports explícitos de `gateways/*.js` e `projections/*.js`.
 - Para consumo público do submódulo, use `frontend/index.js`.
 

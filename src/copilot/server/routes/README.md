@@ -10,9 +10,11 @@ streams e delegam para owners canônicos.
 
 1. Comece em `../router.js`, onde os routers são montados no Express app.
 2. Use `module-map.js` como inventário executável recursivo.
-3. Leia as rotas de raiz para endpoints históricos e compatíveis.
+3. Leia as rotas de raiz para endpoints históricos ainda expostos.
 4. Leia `copilot-api/` para a superfície do AlwaysAliveAgent.
 5. Leia `sdk/` como adapter HTTP/SSE do SDK; `sdk/deps.js` é o composition root desse subdomínio.
+6. Para rotas raiz que delegam para `presentation/`, use `presentation-route.js` como adapter
+   canônico.
 
 ## Mapa atual de papéis
 
@@ -21,6 +23,7 @@ streams e delegam para owners canônicos.
 | `inventory`                | `module-map.js`                                                                                                          |
 | `root-route`               | `agent.js`, `config.js`, `git.js`, `health.js`, `memory.js`, `observability.js`, `sessions.js`, `webhooks.js`            |
 | `compat-reexport`          | `agent-health.js`                                                                                                        |
+| `route-adapter`            | `presentation-route.js`                                                                                                  |
 | `sse-route`                | `sse.js`                                                                                                                 |
 | `module-health`            | `health-modules.js`                                                                                                      |
 | `health-registry`          | `health-registry.js`                                                                                                     |
@@ -57,4 +60,5 @@ Prioridade atual:
 Todo novo arquivo JS sob `server/routes/` precisa aparecer em `module-map.js`. Arquivos acima de 300
 linhas devem ser marcados como `hotspot`; arquivos acima de 220 linhas, no mínimo como `watch`,
 exceto inventários e documentação. Rotas não devem criar projection própria quando já existir owner
-em `presentation/`.
+em `presentation/`. Rotas raiz que retornam `HandlerResult` de `presentation/` devem passar pelo
+adapter canônico `presentation-route.js`.

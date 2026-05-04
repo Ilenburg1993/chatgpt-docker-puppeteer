@@ -46,14 +46,14 @@ SDK SessionEvent
 
 ## 3.1 Fluxos de bootstrap, host e ciclo de vida
 
-| ID        | Fluxo                          | Caminho factual                                                                     | Owner atual                            | Estado                           |
-| --------- | ------------------------------ | ----------------------------------------------------------------------------------- | -------------------------------------- | -------------------------------- |
-| F-BOOT-01 | Boot canônico terminal runtime | `terminal/bootstrap.js -> bootCopilot -> startTerminalServer -> startCopilotServer` | `boot/` + `terminal/` + `server/`      | **Canônico**                     |
-| F-BOOT-02 | Entrypoint compat              | `agent.js -> bootCopilot()`                                                         | `boot/`                                | **Paralelo controlado (compat)** |
-| F-BOOT-03 | PM2 compat                     | `copilot-sdk-agent` (flag opt-in)                                                   | `boot/contract.js`                     | **Paralelo controlado (compat)** |
-| F-BOOT-04 | Runtime DI wiring              | `runtime-wiring.js` + `wireLegacySetters`                                           | `runtime-wiring` + `core/di-container` | **Canônico com legado residual** |
-| F-LC-01   | Lifecycle start/stop/init      | `agent/lifecycle/orchestrators/agent-lifecycle.js`                                  | `agent/lifecycle`                      | **Canônico**                     |
-| F-LC-02   | Process host / sinais          | `agent/lifecycle/process-host/runtime-host.js`                                      | `agent/lifecycle`                      | **Canônico**                     |
+| ID        | Fluxo                          | Caminho factual                                                                     | Owner atual                       | Estado             |
+| --------- | ------------------------------ | ----------------------------------------------------------------------------------- | --------------------------------- | ------------------ |
+| F-BOOT-01 | Boot canônico terminal runtime | `terminal/bootstrap.js -> bootCopilot -> startTerminalServer -> startCopilotServer` | `boot/` + `terminal/` + `server/` | **Canônico**       |
+| F-BOOT-02 | Entrypoint compat              | removido                                                                            | `boot/`                           | **Eliminado**      |
+| F-BOOT-03 | PM2 canônico                   | `llm-b-terminal`                                                                    | `boot/contract.js`                | **Canônico único** |
+| F-BOOT-04 | Runtime composition            | `runtime-wiring.js` com injeções explícitas de composição                           | `runtime-wiring`                  | **Canônico único** |
+| F-LC-01   | Lifecycle start/stop/init      | `agent/lifecycle/orchestrators/agent-lifecycle.js`                                  | `agent/lifecycle`                 | **Canônico**       |
+| F-LC-02   | Process host / sinais          | `agent/lifecycle/process-host/runtime-host.js`                                      | `agent/lifecycle`                 | **Canônico**       |
 
 ## 3.2 Fluxos SDK -> runtime
 
@@ -87,26 +87,27 @@ SDK SessionEvent
 
 ## 3.5 Fluxos de borda server
 
-| ID       | Fluxo                    | Caminho factual                                                            | Owner atual            | Estado                            |
-| -------- | ------------------------ | -------------------------------------------------------------------------- | ---------------------- | --------------------------------- |
-| F-SRV-01 | HTTP app/router          | `server/app.js` + `server/router.js`                                       | `server/`              | **Canônico**                      |
-| F-SRV-02 | Copilot API routes       | `server/routes/copilot-api/*`                                              | `server/routes`        | **Canônico**                      |
-| F-SRV-03 | SDK API routes           | `server/routes/sdk/*` via `sdk/deps.js`                                    | `server/routes/sdk`    | **Canônico**                      |
-| F-SRV-04 | SSE global/critical/task | `server/routes/sse.js` + `copilot-api/stream.js` + `sdk/session-stream.js` | `server/routes`        | **Canônico**                      |
-| F-SRV-05 | Runtime state registries | `server/runtime-state/*`                                                   | `server/runtime-state` | **Canônico (base multi-runtime)** |
-| F-SRV-06 | Handler bridge legado    | `server/handler-bridge.js`                                                 | `server/`              | **Paralelo controlado (compat)**  |
+| ID       | Fluxo                            | Caminho factual                                                            | Owner atual            | Estado                            |
+| -------- | -------------------------------- | -------------------------------------------------------------------------- | ---------------------- | --------------------------------- |
+| F-SRV-01 | HTTP app/router                  | `server/app.js` + `server/router.js`                                       | `server/`              | **Canônico**                      |
+| F-SRV-02 | Copilot API routes               | `server/routes/copilot-api/*`                                              | `server/routes`        | **Canônico**                      |
+| F-SRV-03 | SDK API routes                   | `server/routes/sdk/*` via `sdk/deps.js`                                    | `server/routes/sdk`    | **Canônico**                      |
+| F-SRV-04 | SSE global/critical/task         | `server/routes/sse.js` + `copilot-api/stream.js` + `sdk/session-stream.js` | `server/routes`        | **Canônico**                      |
+| F-SRV-05 | Runtime state registries         | `server/runtime-state/*`                                                   | `server/runtime-state` | **Canônico (base multi-runtime)** |
+| F-SRV-06 | Presentation route adapter       | `server/routes/presentation-route.js`                                      | `server/routes/`       | **Canônico único**                |
+| F-SRV-07 | Adapter canônico de presentation | `server/routes/presentation-route.js`                                      | `server/routes`        | **Canônico**                      |
 
 ## 3.6 Fluxos de borda terminal
 
-| ID        | Fluxo                     | Caminho factual                                                                        | Owner atual                               | Estado                             |
-| --------- | ------------------------- | -------------------------------------------------------------------------------------- | ----------------------------------------- | ---------------------------------- |
-| F-TERM-01 | REPL lifecycle            | `terminal/repl*.js`                                                                    | `terminal/`                               | **Canônico**                       |
-| F-TERM-02 | Command routing           | `terminal/repl-command-router.js` + `commands/*`                                       | `terminal/commands`                       | **Canônico**                       |
-| F-TERM-03 | Frontend projections      | `terminal/frontend/projections/*`                                                      | `terminal/frontend`                       | **Canônico**                       |
-| F-TERM-04 | Frontend gateways         | `terminal/frontend/gateways/*`                                                         | `terminal/frontend`                       | **Canônico**                       |
-| F-TERM-05 | Runtime events adapters   | `terminal/agent-runtime-events.js` + `sdk-session-events.js` + `task-stream-events.js` | `terminal/`                               | **Canônico**                       |
-| F-TERM-06 | SSE fallback genérico     | `terminal/agent-sse-fallback.js`                                                       | `terminal/`                               | **Paralelo controlado (fallback)** |
-| F-TERM-07 | Dialog bridge LLM-A↔LLM-B | `terminal/frontend/gateways/dialog.js -> #copilot/channel`                             | `terminal/frontend/gateways` + `channel/` | **Canônico (ponte dedicada)**      |
+| ID        | Fluxo                     | Caminho factual                                                                        | Owner atual                               | Estado                                    |
+| --------- | ------------------------- | -------------------------------------------------------------------------------------- | ----------------------------------------- | ----------------------------------------- |
+| F-TERM-01 | REPL lifecycle            | `terminal/repl*.js`                                                                    | `terminal/`                               | **Canônico**                              |
+| F-TERM-02 | Command routing           | `terminal/repl-command-router.js` + `commands/*`                                       | `terminal/commands`                       | **Canônico**                              |
+| F-TERM-03 | Frontend projections      | `terminal/frontend/projections/*`                                                      | `terminal/frontend`                       | **Canônico**                              |
+| F-TERM-04 | Frontend gateways         | `terminal/frontend/gateways/*`                                                         | `terminal/frontend`                       | **Canônico**                              |
+| F-TERM-05 | Runtime events adapters   | `terminal/agent-runtime-events.js` + `sdk-session-events.js` + `task-stream-events.js` | `terminal/`                               | **Canônico**                              |
+| F-TERM-06 | SSE passthrough explícito | `terminal/agent-sse-passthrough.js`                                                    | `terminal/`                               | **Paralelo controlado (janela residual)** |
+| F-TERM-07 | Dialog bridge LLM-A↔LLM-B | `terminal/frontend/gateways/dialog.js -> #copilot/channel`                             | `terminal/frontend/gateways` + `channel/` | **Canônico (ponte dedicada)**             |
 
 ## 3.7 Fluxos de transporte e persistência
 
@@ -142,19 +143,22 @@ SDK SessionEvent
 
 - `presentation/agent-control.js` e parte das rotas SDK continuam hotspots;
 - `terminal/index.js`, `repl.js`, `terminal-agent-wiring.js` ainda densos;
-- coexistência de compat paths (entrypoint, handler-bridge, setters legados).
+- alguns pontos de composição ainda usam setters explícitos, mas sem wrappers compatíveis ou
+  entrypoints paralelos.
 
 ### 4.3 Frágil (paralelos tolerados por necessidade)
 
-- fallback SSE genérico ainda necessário;
+- passthrough SSE residual ainda existe, mas restrito a uma allowlist explícita e auditável;
 - fallback implícito para runtime default quando `runtimeId` não existe;
-- trilha compat PM2/entrypoint ainda viva para operação legada.
+- logger/observability ainda precisavam de hardening para sobreviver a stdout/stderr quebrado em
+  runtime headless ou destacado.
 
 ---
 
 ## 5) Conclusão factual
 
-O sistema já opera majoritariamente em fluxo canônico por camada, mas ainda possui **rotas paralelas
-controladas** para compatibilidade e resiliência operacional. O próximo passo não é “inventar nova
-topologia”: é **fechar os paralelos remanescentes com governança e migração incremental**,
-preservando o caminho para multi-runtime e multi-agent.
+O sistema já opera majoritariamente em fluxo canônico por camada e os caminhos compatíveis centrais
+de boot/PM2/shim HTTP foram removidos. O próximo passo não é “inventar nova topologia”: é **fechar
+os paralelos remanescentes de runtime selection/timeline e endurecer as fronteiras operacionais
+(transport, logging, passthrough SSE residual)**, preservando o caminho para multi-runtime e
+multi-agent.

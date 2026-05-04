@@ -87,16 +87,27 @@ Pronto quando: operador nunca perde pergunta viva e nunca recebe spam em reconex
 
 **Objetivo:** separar lifecycle readline de catálogo/dispatch/parsing.
 
+Atualização recente:
+
+- `repl.js` já opera como composition root fino, delegando bootstrap assíncrono do dialog loop para
+  `launchTerminalDialogLoopBootstrap()` e o lifecycle readline para `repl-lifecycle.js`;
+- `repl-command-router.js` concentra `CMD_ROUTES`/`dispatchCmd`, removendo o catálogo de comandos do
+  root do REPL;
+- ainda resta isolar o parsing de input humano/attachments/resposta pendente em seam explícita, hoje
+  concentrada em `repl-lifecycle.js`.
+
 Subfaixas:
 
 1. `repl/banner.js` (**feito como `terminal/repl-banner.js`, sem shim temporário**);
-2. `repl/command-router.js`;
+2. `repl/command-router.js` (**feito como `terminal/repl-command-router.js`**);
 3. `repl/input-parser.js` (**em andamento: comandos slash extraídos em
-   `terminal/repl-command-parser.js`; input humano/attachments ainda ficam no composition root**);
+   `terminal/repl-command-parser.js`; input humano/attachments/resposta pendente ainda ficam no
+   lifecycle**);
 4. `repl/multiline.js` (**feito como `terminal/repl-multiline.js`, com reset explícito em
    `SIGINT`**);
-5. `repl/lifecycle.js`;
-6. remover shims e atualizar imports.
+5. `repl/lifecycle.js` (**feito como `terminal/repl-lifecycle.js`**);
+6. remover shims e atualizar imports (**feito: `repl.js` delega para router/lifecycle e não mantém
+   mais catálogo/lifecycle inline**).
 
 Pronto quando: `repl.js` for composition fina e testes de comando continuarem estáveis.
 
@@ -105,6 +116,15 @@ Pronto quando: `repl.js` for composition fina e testes de comando continuarem es
 ## W122 — Decomposição de `frontend/llm-b-frontend.js`
 
 **Objetivo:** separar projection families.
+
+Atualização recente:
+
+- histórico/contexto/export/status/metrics agora convergem pela family explícita
+  `frontend/projections/timeline.js`, que reconcilia hub persistido + bridge vivo;
+- `frontend/index.js` deixou de expor helpers crus do feed do bridge, preservando a timeline
+  reconciliada como caminho público preferencial.
+- `/status` passou a exibir `runtime profile`, preparando a UX do terminal para cenários futuros de
+  multi-runtime/multi-agent sem reabrir deep-domain.
 
 Subfaixas:
 
@@ -143,15 +163,27 @@ Pronto quando: comandos e dialog consomem gateways sem conhecer topologia intern
 
 **Objetivo:** tornar o composition root pequeno e transacional.
 
+Atualização recente:
+
+- `index.js` já opera como pipeline de fases (`init`, `aliases`, `runtime-config`, `pinned-context`,
+  `conversation-hub`, `http-server`, `runtime-listeners`, `repl`);
+- o hotspot anterior `terminal-phases/boot-listeners.js` foi fatiado em módulos menores para banner,
+  reflection loop e shutdown handler, preservando a fase de runtime listeners como composition root
+  fino.
+
 Subfaixas:
 
-1. mover banner standalone para `boot/banner.js`;
-2. mover reflection loop para `boot/reflection-loop.js`;
-3. mover pinned context bridge para `boot/pinned-context.js`;
-4. mover conversation hub phase para `boot/conversation-hub-phase.js`;
-5. mover runtime listeners phase para `boot/runtime-listeners-phase.js`;
-6. mover shutdown handlers para `boot/shutdown.js`;
-7. manter `index.js` como pipeline de fases.
+1. mover banner standalone para módulo dedicado (**feito como `terminal-phases/boot-banner.js`**);
+2. mover reflection loop para módulo dedicado (**feito como
+   `terminal-phases/boot-reflection-loop.js`**);
+3. mover pinned context bridge para `boot/pinned-context.js` (**feito semanticamente como
+   `terminal-phases/boot-pinned.js`**);
+4. mover conversation hub phase para `boot/conversation-hub-phase.js` (**feito semanticamente como
+   `terminal-phases/boot-hub.js`**);
+5. mover runtime listeners phase para `boot/runtime-listeners-phase.js` (**feito semanticamente como
+   `terminal-phases/boot-listeners.js`**);
+6. mover shutdown handlers para módulo dedicado (**feito como `terminal-phases/boot-shutdown.js`**);
+7. manter `index.js` como pipeline de fases (**feito**).
 
 Pronto quando: boot/shutdown continua observável e `index.js` perde responsabilidade operacional
 detalhada.
@@ -172,7 +204,26 @@ Subfaixas:
    no adapter**);
 3. fatiar `terminal-agent-wiring.js` por watchdog/SSE/recovery/listeners (**parcial:
    `event-adapters.js` virou composition root canônico para registrar adapters em REPL/headless**);
-4. manter fallback explícito e auditável.
+4. substituir fallback genérico por passthrough explícito e auditável.
+
+Sugestões adicionais a partir da revisão atual:
+
+- separar o fluxo de `tool.user_requested`/`permission.*` em adapter ou presenter dedicado, para
+  reduzir o volume cognitivo remanescente em `sdk-session-events.js`;
+- criar resumo por turno de arquivos tocados reaproveitando a narrativa já inferida por
+  `tool-activity-presenter.js`, evitando novo parser paralelo em `/activity`;
+- explicitar uma matriz “evento coberto por adapter” vs “evento em passthrough SSE” vs “evento
+  ignorado no terminal” como artefato de contrato para impedir regressão silenciosa na expansão
+  multi-runtime.
+
+Checkpoint recente:
+
+- `/activity` agora consome `turn-trace-state.js`, que reconcilia `assistant.turn_start/end`, tool
+  lifecycle e `session.workspace_file_changed` em resumo por turno sem parser paralelo;
+- `agent-runtime-events.js` e `sdk-session-events.js` passaram a alimentar esse resumo canônico,
+  preparando o terreno para fatiar adapters sem perder contexto operacional ao vivo.
+- `agent-sse-fallback.js` foi removido em favor de `agent-sse-passthrough.js`, reduzindo o fluxo
+  residual do terminal a uma allowlist explícita de eventos raw ainda sem adapter dedicado.
 
 Pronto quando: cada adapter tem owner e contrato visual claro.
 
@@ -243,7 +294,8 @@ Subfaixas:
 1. criar `terminal/tool-activity-presenter.js` (**feito**);
 2. enriquecer `agent-runtime-events.js` com operação/caminho em stdout/SSE (**feito**);
 3. expandir heurística para shell commands que mencionam arquivos;
-4. integrar arquivos tocados ao `/activity` com resumo por turno;
+4. integrar arquivos tocados ao `/activity` com resumo por turno (**feito via `turn-trace-state.js`,
+   ainda com espaço para enriquecer shell commands sem `path` explícito**);
 5. estudar painel “turn trace” para listar read/write/edit por resposta.
 
 Pronto quando: um operador consegue acompanhar ao vivo quais arquivos estão sendo lidos/editados sem
@@ -255,6 +307,15 @@ precisar abrir logs.
 
 **Objetivo:** alinhar a UX terminal ao contrato real de
 `node_modules/@github/copilot-sdk/dist/types.d.ts`.
+
+Atualização recente:
+
+- a validação de conteúdo de elicitation deixou de ser detalhe local do comando do terminal e agora
+  usa helper compartilhado em `core/elicitation-schema.js`;
+- a mesma normalização/defaults passou a ser aplicada no resolvedor canônico da fila de elicitation
+  (`hooks/elicitation.js`), reduzindo bypasss de callers alternativos;
+- a rota compat `/api/copilot/elicitation/:id/respond` agora responde `400` quando o payload não
+  respeita o schema pendente, em vez de encaminhar conteúdo inválido diretamente ao SDK.
 
 Achado atual:
 
@@ -286,8 +347,11 @@ Subfaixas:
 4. validar content de `/elicitation respond accept` contra contrato básico do SDK (**feito: valores
    primitivos/string[], required, tipos simples, enum e oneOf**);
 5. propagar e adaptar `user_input.requested/completed` para atividade/SSE do terminal (**feito**);
-6. ampliar validação de schema para arrays `items.enum/items.anyOf` e defaults;
-7. conectar essas mesmas regras às rotas HTTP de SDK UI, evitando divergência entre terminal e API.
+6. ampliar validação de schema para arrays `items.enum/items.anyOf` e defaults (**feito via
+   `core/elicitation-schema.js`, com cobertura em terminal + hooks**);
+7. conectar essas mesmas regras às rotas HTTP de SDK UI, evitando divergência entre terminal e API
+   (**parcial: helper compartilhado já cobre a rota compat `/api/copilot/elicitation/:id/respond)`;
+   ainda vale estudar migração/sunset do caminho compat para uma superfície HTTP única do SDK**).
 
 Pronto quando: a LLM-B pode pedir choice-only, formulário SDK ou input textual e o operador tem um
 fluxo único, audível e validado para responder sem quebrar o contrato do SDK.
@@ -325,10 +389,28 @@ Subfaixas:
 
 1. manter `#copilot/channel` isolado em `frontend/gateways/dialog.js`;
 2. evitar bypass de composição nas bordas SDK/HTTP;
-3. reduzir fallback SSE genérico conforme adapters dedicados cobrirem novos eventos;
+3. reduzir o passthrough SSE residual conforme adapters dedicados cobrirem novos eventos;
 4. eliminar timeline dual (bridge history vs session history) nas projections de UX;
 5. reforçar metadata de fallback runtime (`requestedRuntimeId`, `runtimeId`,
    `usedDefaultRuntimeFallback`) em todos os comandos críticos.
+
+Checkpoint atual:
+
+- timeline canônica extraída para `frontend/projections/timeline.js` (**feito**);
+- `/history`, `/context`, `/export`, `/status`, `/now` e diagnose agora expõem origem/autoridade da
+  timeline (**feito na primeira onda da E3**);
+- `/db-history` corrigido para ler a cauda persistida em vez da cabeça histórica (**feito**);
+- reconciliação bridge↔hub já detecta `aligned`, `bridge_tail` e `diverged` (**feito**);
+- camada HTTP canônica consolidada em `server/routes/presentation-route.js`; o antigo
+  `server/handler-bridge.js` foi removido (**feito**);
+- boot compatível `src/copilot/agent.js` / `boot/compat-entrypoint.js` e o processo PM2
+  `copilot-sdk-agent` foram removidos; `llm-b-terminal` é o único owner executável (**feito**);
+- smoke test live do `/inject` revelou uma fronteira operacional residual fora da UX pura: o logger
+  ainda assumia stdout/stderr vivos e podia derrubar o request path com `write EIO` em runtime
+  destacado; a correção agora trata TTY quebrado como detalhe do sink, não como falha do fluxo
+  canônico.
+- ainda falta decidir se `bridge_tail` deve ser persistido eagerly, lazy ou somente por sync
+  lifecycle (**pendente**).
 
 Pronto quando: o terminal permanece borda fina, runtime-aware e 100% alinhada ao fluxo canônico
 compartilhado de `src/copilot`.

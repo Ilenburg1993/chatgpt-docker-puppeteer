@@ -215,7 +215,6 @@
 **Arquivos**
 
 - `server/app.js`
-- `server/handler-bridge.js`
 - `server/index.js`
 - `server/middleware/auth.js`
 - `server/middleware/cors.js`
