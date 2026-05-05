@@ -29,9 +29,21 @@ const runtimeGatewayMocks = vi.hoisted(() => ({
     })),
 }));
 
+const sdkInteractionMocks = vi.hoisted(() => ({
+    readTerminalElicitationSummary: vi.fn(() => ({ pending: 0, latest: null })),
+    readTerminalPermissionSummary: vi.fn(() => ({ pending: 0, latest: null })),
+    readTerminalUserInputSummary: vi.fn(() => ({ pending: 0, latest: null })),
+}));
+
 vi.mock('../../../../src/copilot/terminal/frontend/gateways/agent-runtime.js', () => ({
     readTerminalRuntimeControlState: runtimeGatewayMocks.readTerminalRuntimeControlState,
     readTerminalRuntimeState: runtimeGatewayMocks.readTerminalRuntimeState,
+}));
+
+vi.mock('../../../../src/copilot/terminal/sdk-interactions.js', () => ({
+    readTerminalElicitationSummary: sdkInteractionMocks.readTerminalElicitationSummary,
+    readTerminalPermissionSummary: sdkInteractionMocks.readTerminalPermissionSummary,
+    readTerminalUserInputSummary: sdkInteractionMocks.readTerminalUserInputSummary,
 }));
 
 import {
@@ -51,6 +63,9 @@ function mockCtx() {
 describe('terminal/commands/menu', () => {
     beforeEach(() => {
         vi.clearAllMocks();
+        sdkInteractionMocks.readTerminalElicitationSummary.mockReturnValue({ pending: 0, latest: null });
+        sdkInteractionMocks.readTerminalPermissionSummary.mockReturnValue({ pending: 0, latest: null });
+        sdkInteractionMocks.readTerminalUserInputSummary.mockReturnValue({ pending: 0, latest: null });
     });
 
     it('lista command palette contextual quando chamado sem argumentos', async () => {
@@ -101,6 +116,42 @@ describe('terminal/commands/menu', () => {
         expect(ids).toContain('clear-shadow');
         expect(ids).toContain('compact');
         expect(entries.find((entry) => entry.id === 'answer')?.hot).toBe(true);
+    });
+
+    it('inclui atalhos HOT para interrupções SDK pendentes', () => {
+        sdkInteractionMocks.readTerminalElicitationSummary.mockReturnValue(
+            /** @type {any} */ ({ pending: 2, latest: { mode: 'form' } }),
+        );
+        sdkInteractionMocks.readTerminalPermissionSummary.mockReturnValue(
+            /** @type {any} */ ({ pending: 1, latest: { permissionType: 'file_write' } }),
+        );
+        sdkInteractionMocks.readTerminalUserInputSummary.mockReturnValue(
+            /** @type {any} */ ({ pending: 1, latest: { kind: 'question' } }),
+        );
+        runtimeGatewayMocks.readTerminalRuntimeState.mockReturnValue(
+            /** @type {any} */ ({
+                runtimeId: 'default',
+                status: 'idle',
+                model: 'gpt-5-mini',
+                reasoningEffort: 'high',
+                sessionId: 'sess-1',
+                dialogLoopActive: true,
+                dialogPaused: false,
+                queueSize: 0,
+                pendingQuestion: null,
+                pendingQuestionKind: null,
+                pendingQuestionShadowState: null,
+                contextWindow: null,
+                lastPrInfo: null,
+            }),
+        );
+
+        const entries = buildTerminalSmartMenuEntries();
+        const ids = entries.map((entry) => entry.id);
+
+        expect(ids).toContain('sdk-ask-user');
+        expect(ids).toContain('elicitation-latest');
+        expect(ids).toContain('permission-latest');
     });
 
     it('resolve seleção por número e id', () => {

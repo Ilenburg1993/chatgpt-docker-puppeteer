@@ -11,7 +11,11 @@ import {
     getSdkSessionMode,
 } from '../../../presentation/runtime-ui-state-store.js';
 import { readTerminalActivitySnapshot } from '../../activity-state.js';
-import { listTerminalElicitations, readTerminalPermissionSummary } from '../../sdk-interactions.js';
+import {
+    readTerminalElicitationSummary,
+    readTerminalPermissionSummary,
+    readTerminalUserInputSummary,
+} from '../../sdk-interactions.js';
 import {
     formatTerminalRuntimeTopology,
     normalizeTerminalModelBillingProjection,
@@ -63,8 +67,11 @@ import { readTerminalTimelineProjection } from './timeline.js';
  *     lifecycle: ReturnType<typeof readRuntimeLifecycleSnapshot>;
  *     lifecycleSummary: ReturnType<typeof buildRuntimeLifecycleSummary>;
  *     pendingElicitations: number;
+ *     latestElicitationMode: string | null;
  *     pendingPermissions: number;
  *     latestPermissionType: string | null;
+ *     pendingUserInputs: number;
+ *     latestUserInputKind: 'question' | 'ready' | 'reply' | 'protocol' | null;
  *     timelineSource: import('./timeline.js').TerminalTimelineSource;
  *     timelineAuthority: import('./timeline.js').TerminalTimelineAuthority;
  *     timelineReconciliationStatus: import('./timeline.js').TerminalTimelineReconciliation;
@@ -90,7 +97,9 @@ export function readTerminalStatusProjection({ hubSessionId = null, injectPort, 
     );
     const lifecycle = readRuntimeLifecycleSnapshot();
     const modelBilling = normalizeTerminalModelBillingProjection(base.lastPrInfo, String(base.snap['model'] ?? ''));
+    const elicitationSummary = readTerminalElicitationSummary();
     const permissionSummary = readTerminalPermissionSummary();
+    const userInputSummary = readTerminalUserInputSummary();
     const timeline = readTerminalTimelineProjection({ limitPairs: 10, runtimeId });
     return {
         snap: base.snap,
@@ -147,8 +156,11 @@ export function readTerminalStatusProjection({ hubSessionId = null, injectPort, 
         activity: readTerminalActivitySnapshot(),
         lifecycle,
         lifecycleSummary: buildRuntimeLifecycleSummary(lifecycle),
-        pendingElicitations: listTerminalElicitations().length,
+        pendingElicitations: elicitationSummary.pending,
+        latestElicitationMode: elicitationSummary.latest?.mode ?? null,
         pendingPermissions: permissionSummary.pending,
         latestPermissionType: permissionSummary.latest?.permissionType ?? null,
+        pendingUserInputs: userInputSummary.pending,
+        latestUserInputKind: userInputSummary.latest?.kind ?? null,
     };
 }

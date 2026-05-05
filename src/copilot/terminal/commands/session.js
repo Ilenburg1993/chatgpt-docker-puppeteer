@@ -120,9 +120,14 @@ export function cmdStatus({ hubSessionId, injectPort, println }, arg = '') {
         activity.severity === 'error' ? '\x1b[31m' : activity.severity === 'warn' ? '\x1b[33m' : '\x1b[32m';
     const activityProgress = typeof activity.progress === 'number' ? ` (${activity.progress}%)` : '';
     const sdkInterruptions = [
-        projection.pendingElicitations > 0 ? `elicitation=${projection.pendingElicitations}` : null,
+        projection.pendingElicitations > 0
+            ? `elicitation=${projection.pendingElicitations}${projection.latestElicitationMode ? ` (${projection.latestElicitationMode})` : ''}`
+            : null,
         projection.pendingPermissions > 0
             ? `permission=${projection.pendingPermissions}${projection.latestPermissionType ? ` (${projection.latestPermissionType})` : ''}`
+            : null,
+        projection.pendingUserInputs > 0
+            ? `ask_user=${projection.pendingUserInputs}${projection.latestUserInputKind ? ` (${projection.latestUserInputKind})` : ''}`
             : null,
     ].filter(Boolean);
     const timelineSyncLabel =
@@ -247,6 +252,11 @@ export function cmdStatus({ hubSessionId, injectPort, println }, arg = '') {
             '  \x1b[33mAção: há permissão SDK pendente; acompanhe /activity e aguarde o hook/runtime decidir.\x1b[0m',
         );
     }
+    if (projection.pendingUserInputs > 0) {
+        println(
+            '  \x1b[33mAção: há ask_user pendente do SDK; responda via conversa normal ou use /answer <texto>.\x1b[0m',
+        );
+    }
     if (modelBilling.mismatch) {
         println(
             '  \x1b[33mAção recomendada: valide fallback/model switch com /sdk quota, /status e um turno curto de confirmação.\x1b[0m',
@@ -306,6 +316,7 @@ export function cmdNow({ hubSessionId, injectPort, println }, arg = '') {
     const sdkWait = [
         projection.pendingElicitations > 0 ? `ELICIT:${projection.pendingElicitations}` : null,
         projection.pendingPermissions > 0 ? `PERM:${projection.pendingPermissions}` : null,
+        projection.pendingUserInputs > 0 ? `ASKSDK:${projection.pendingUserInputs}` : null,
     ]
         .filter(Boolean)
         .join(' ');

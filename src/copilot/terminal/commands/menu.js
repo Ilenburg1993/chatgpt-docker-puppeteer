@@ -9,6 +9,11 @@
  */
 
 import { readTerminalRuntimeControlState, readTerminalRuntimeState } from '../frontend/gateways/agent-runtime.js';
+import {
+    readTerminalElicitationSummary,
+    readTerminalPermissionSummary,
+    readTerminalUserInputSummary,
+} from '../sdk-interactions.js';
 import { terminalActionChip, terminalThemeBadge, terminalThemeText } from '../ui-theme.js';
 
 /**
@@ -27,6 +32,9 @@ import { terminalActionChip, terminalThemeBadge, terminalThemeText } from '../ui
 export function buildTerminalSmartMenuEntries() {
     const control = readTerminalRuntimeControlState();
     const state = readTerminalRuntimeState();
+    const elicitation = readTerminalElicitationSummary();
+    const permission = readTerminalPermissionSummary();
+    const userInput = readTerminalUserInputSummary();
     const entries = /** @type {TerminalSmartMenuEntry[]} */ ([]);
 
     entries.push(
@@ -89,6 +97,36 @@ export function buildTerminalSmartMenuEntries() {
             label: 'Responder pergunta pendente',
             commandLine: '/answer ',
             description: `Tipo: ${state.pendingQuestionKind} · cole a resposta após /answer`,
+            hot: true,
+        });
+    }
+
+    if (userInput.pending > 0 && (!state.pendingQuestion || state.pendingQuestionKind === 'ready')) {
+        entries.push({
+            id: 'sdk-ask-user',
+            label: 'Inspecionar ask_user SDK',
+            commandLine: '/status',
+            description: `${userInput.pending} pendente(s) (${userInput.latest?.kind ?? 'question'})`,
+            hot: true,
+        });
+    }
+
+    if (elicitation.pending > 0) {
+        entries.push({
+            id: 'elicitation-latest',
+            label: 'Revisar elicitation pendente',
+            commandLine: '/elicitation show latest',
+            description: `${elicitation.pending} pendente(s) · modo ${elicitation.latest?.mode ?? 'form'}`,
+            hot: true,
+        });
+    }
+
+    if (permission.pending > 0) {
+        entries.push({
+            id: 'permission-latest',
+            label: 'Revisar permissão pendente',
+            commandLine: '/permission show latest',
+            description: `${permission.pending} pendente(s)${permission.latest?.permissionType ? ` · ${permission.latest.permissionType}` : ''}`,
             hot: true,
         });
     }

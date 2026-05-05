@@ -47,6 +47,8 @@ import {
     recordTerminalElicitationPending,
     recordTerminalPermissionCompleted,
     recordTerminalPermissionRequested,
+    recordTerminalUserInputCompleted,
+    recordTerminalUserInputRequested,
 } from './sdk-interactions.js';
 import {
     beginTerminalTurnTrace,
@@ -282,6 +284,7 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
         const allowFreeform = evt?.allowFreeform !== false;
         const requestId = evt?.requestId ?? null;
         const kind = DialogProtocol.classify(question);
+        const tracked = recordTerminalUserInputRequested(evt);
         if (requestId && kind !== 'question') {
             suppressedProtocolRequestIds.add(requestId);
         }
@@ -302,6 +305,12 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
             toolCallId: evt?.toolCallId ?? null,
             timestamp: Date.now(),
         });
+        if (shouldPrintSessionNarration('important')) {
+            const optionsLabel = choices.length > 0 ? ` · opções=${choices.length}` : '';
+            println(
+                `  ${terminalThemeBadge('question', 'ASK')} ${terminalThemeText('question', tracked.question.slice(0, 120))}${terminalThemeText('muted', optionsLabel)}`,
+            );
+        }
         refreshPromptIfIdle();
     };
 
@@ -311,10 +320,12 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
         const requestId = evt?.requestId ?? null;
         if (requestId && suppressedProtocolRequestIds.has(requestId)) {
             suppressedProtocolRequestIds.delete(requestId);
+            recordTerminalUserInputCompleted(evt);
             refreshPromptIfIdle();
             return;
         }
         const wasFreeform = evt?.wasFreeform === true;
+        recordTerminalUserInputCompleted(evt);
         recordTerminalActivity('question', 'ask_user SDK respondido', {
             detail: `${requestId ?? 'sem requestId'}${wasFreeform ? ' · freeform' : ' · choice/protocolo'}`,
             source: 'sdk',

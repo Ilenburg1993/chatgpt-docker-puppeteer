@@ -11,6 +11,8 @@
 
 /** @typedef {'pending' | 'completed' | 'cleared'} SdkInteractionStatus */
 
+/** @typedef {'question' | 'ready' | 'reply' | 'protocol'} TerminalSdkUserInputKind */
+
 /**
  * @typedef {object} TerminalElicitationEntry
  * @property {string} id
@@ -26,6 +28,23 @@
  * @property {Record<string, unknown>} data
  * @property {'accept' | 'decline' | 'cancel' | null} resultAction
  * @property {Record<string, unknown> | null} resultContent
+ * @property {number} createdAt
+ * @property {number | null} completedAt
+ * @property {SdkInteractionStatus} status
+ */
+
+/**
+ * @typedef {object} TerminalSdkUserInputEntry
+ * @property {string} id
+ * @property {string | null} requestId
+ * @property {string} question
+ * @property {string[]} choices
+ * @property {boolean} allowFreeform
+ * @property {string | null} toolCallId
+ * @property {TerminalSdkUserInputKind} kind
+ * @property {Record<string, unknown>} data
+ * @property {string | null} answer
+ * @property {boolean | null} wasFreeform
  * @property {number} createdAt
  * @property {number | null} completedAt
  * @property {SdkInteractionStatus} status
@@ -56,6 +75,12 @@ const _permissions = new Map();
 /** @type {string | null} */
 let _latestPermissionId = null;
 
+/** @type {Map<string, TerminalSdkUserInputEntry>} */
+const _userInputs = new Map();
+
+/** @type {string | null} */
+let _latestUserInputId = null;
+
 /**
  * @param {unknown} value
  * @param {string} fallback
@@ -79,6 +104,28 @@ function objectOrNull(value) {
  */
 function elicitationActionOrNull(value) {
     return value === 'accept' || value === 'decline' || value === 'cancel' ? value : null;
+}
+
+/**
+ * @param {unknown} value
+ * @returns {string[]}
+ */
+function arrayOfStrings(value) {
+    return Array.isArray(value)
+        ? value.map((item) => (typeof item === 'string' ? item.trim() : '')).filter((item) => item.length > 0)
+        : [];
+}
+
+/**
+ * @param {string} question
+ * @returns {TerminalSdkUserInputKind}
+ */
+function classifyUserInputKind(question) {
+    const normalized = question.trim().toUpperCase();
+    if (normalized.startsWith('READY:')) return 'ready';
+    if (normalized.startsWith('REPLY:')) return 'reply';
+    if (normalized.startsWith('PROTO:')) return 'protocol';
+    return 'question';
 }
 
 /**
@@ -138,6 +185,16 @@ export function listTerminalElicitations(opts = {}) {
     return [..._elicitations.values()]
         .filter((entry) => opts.includeCompleted || entry.status === 'pending')
         .sort((a, b) => b.createdAt - a.createdAt);
+}
+
+/**
+ * @returns {{ pending: number; latest: TerminalElicitationEntry | null }}
+ */
+export function readTerminalElicitationSummary() {
+    return {
+        pending: listTerminalElicitations().length,
+        latest: _latestElicitationId ? (_elicitations.get(_latestElicitationId) ?? null) : null,
+    };
 }
 
 /**
@@ -265,6 +322,83 @@ export function readTerminalPermissionSummary() {
         pending: listTerminalPermissions().length,
         latest: _latestPermissionId ? (_permissions.get(_latestPermissionId) ?? null) : null,
     };
+}
+
+/**
+ * @param {unknown} evt
+ * @returns {TerminalSdkUserInputEntry}
+ */
+export function recordTerminalUserInputRequested(evt) {
+    const data = objectOrNull(evt) ?? {};
+    const requestId = stringOr(data['requestId'], '');
+    const question = stringOr(data['question'], '(sem pergunta)');
+    const id = requestId || `user-input-${Date.now().toString(36)}`;
+    const entry = {
+        id,
+        requestId: requestId || null,
+        question,
+        choices: arrayOfStrings(data['choices']),
+        allowFreeform: data['allowFreeform'] !== false,
+        toolCallId: stringOr(data['toolCallId'], '') || null,
+        kind: classifyUserInputKind(question),
+        data,
+        answer: null,
+        wasFreeform: null,
+        createdAt: typeof data['ts'] === 'number' ? data['ts'] : Date.now(),
+        completedAt: null,
+        status: /** @type {SdkInteractionStatus} */ ('pending'),
+    };
+    _userInputs.set(id, entry);
+    _latestUserInputId = id;
+    return entry;
+}
+
+/**
+ * @param {unknown} evt
+ * @returns {TerminalSdkUserInputEntry | null}
+ */
+export function recordTerminalUserInputCompleted(evt) {
+    const data = objectOrNull(evt) ?? {};
+    const requestId = stringOr(data['requestId'], '');
+    const entry =
+        (requestId ? _userInputs.get(requestId) : null) ??
+        [..._userInputs.values()].find((candidate) => candidate.status === 'pending') ??
+        null;
+    if (!entry) return null;
+    entry.status = 'completed';
+    entry.completedAt = typeof data['ts'] === 'number' ? data['ts'] : Date.now();
+    entry.answer = stringOr(data['answer'], '') || null;
+    entry.wasFreeform = data['wasFreeform'] === true;
+    entry.data = { ...entry.data, completion: data };
+    return entry;
+}
+
+/**
+ * @param {{ includeCompleted?: boolean }} [opts]
+ * @returns {TerminalSdkUserInputEntry[]}
+ */
+export function listTerminalUserInputs(opts = {}) {
+    return [..._userInputs.values()]
+        .filter((entry) => opts.includeCompleted || entry.status === 'pending')
+        .sort((a, b) => b.createdAt - a.createdAt);
+}
+
+/**
+ * @returns {{ pending: number; latest: TerminalSdkUserInputEntry | null }}
+ */
+export function readTerminalUserInputSummary() {
+    return {
+        pending: listTerminalUserInputs().length,
+        latest: _latestUserInputId ? (_userInputs.get(_latestUserInputId) ?? null) : null,
+    };
+}
+
+/**
+ * @returns {void}
+ */
+export function clearTerminalUserInputs() {
+    _userInputs.clear();
+    _latestUserInputId = null;
 }
 
 /**

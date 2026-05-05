@@ -32,7 +32,9 @@ import {
     getTerminalPermission,
     listTerminalElicitations,
     listTerminalPermissions,
+    readTerminalElicitationSummary,
     readTerminalPermissionSummary,
+    readTerminalUserInputSummary,
 } from '../sdk-interactions.js';
 import { callWithRuntimeTarget, extractRuntimeTarget } from './runtime-target.js';
 
@@ -171,14 +173,15 @@ export async function cmdSdk({ println }, arg = '') {
             println(`\n  \x1b[32mâœ“ SDK compaction solicitada.\x1b[0m\n  \x1b[90m${pretty(result, 700)}\x1b[0m\n`);
         } else {
             const state = readTerminalRuntimeState(runtimeId);
-            const pendingElicitations = listTerminalElicitations().length;
+            const pendingElicitations = readTerminalElicitationSummary();
             const permissionSummary = readTerminalPermissionSummary();
+            const userInputSummary = readTerminalUserInputSummary();
             println('\n  \x1b[36mSDK Runtime\x1b[0m');
             println(`  runtime  \x1b[90m${state.runtimeId}\x1b[0m`);
             println(`  session  \x1b[90m${state.sessionId ?? '-'}\x1b[0m`);
             println(`  model    \x1b[33m${state.model}\x1b[0m  reasoning=\x1b[33m${state.reasoningEffort}\x1b[0m`);
             println(
-                `  waits    \x1b[90melicitation=${pendingElicitations} Â· permission=${permissionSummary.pending}${permissionSummary.latest ? ` (${permissionSummary.latest.permissionType})` : ''}\x1b[0m`,
+                `  waits    \x1b[90melicitation=${pendingElicitations.pending}${pendingElicitations.latest?.mode ? ` (${pendingElicitations.latest.mode})` : ''} · permission=${permissionSummary.pending}${permissionSummary.latest ? ` (${permissionSummary.latest.permissionType})` : ''} · ask_user=${userInputSummary.pending}${userInputSummary.latest?.kind ? ` (${userInputSummary.latest.kind})` : ''}\x1b[0m`,
             );
             await renderSdkQuota({ println }, runtimeId, { compact: true });
             println(
@@ -499,7 +502,8 @@ export async function cmdElicitation({ println }, arg = '') {
  * @returns {Promise<void>}
  */
 export async function cmdPermission({ println }, arg = '') {
-    const [sub = 'list', ...rest] = arg.trim().split(/\s+/).filter(Boolean);
+    const { arg: cleanArg } = extractRuntimeTarget(arg);
+    const [sub = 'list', ...rest] = cleanArg.trim().split(/\s+/).filter(Boolean);
     if (sub === 'show') {
         renderPermissionEntry({ println }, getTerminalPermission(rest[0] || 'latest'));
         return;

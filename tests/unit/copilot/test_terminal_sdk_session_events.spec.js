@@ -19,6 +19,12 @@ const mocks = vi.hoisted(() => ({
     recordTerminalTurnFileActivity: vi.fn(),
     recordTerminalTurnToolActivity: vi.fn(),
     getTerminalDetailLevel: vi.fn(() => 'detailed'),
+    recordTerminalUserInputRequested: vi.fn((evt) => ({
+        id: evt?.requestId ?? 'ui-1',
+        question: evt?.question ?? '(sem pergunta)',
+        kind: 'question',
+    })),
+    recordTerminalUserInputCompleted: vi.fn(() => null),
 }));
 
 vi.mock('../../../src/copilot/terminal/activity-state.js', () => ({
@@ -46,6 +52,15 @@ vi.mock('../../../src/copilot/terminal/turn-trace-state.js', () => ({
 vi.mock('../../../src/copilot/terminal/ui-preferences.js', () => ({
     getTerminalDetailLevel: mocks.getTerminalDetailLevel,
 }));
+
+vi.mock('../../../src/copilot/terminal/sdk-interactions.js', async () => {
+    const actual = await vi.importActual('../../../src/copilot/terminal/sdk-interactions.js');
+    return {
+        ...actual,
+        recordTerminalUserInputRequested: mocks.recordTerminalUserInputRequested,
+        recordTerminalUserInputCompleted: mocks.recordTerminalUserInputCompleted,
+    };
+});
 
 function createAgentHost() {
     /** @type {Map<string, Function[]>} */
@@ -258,10 +273,16 @@ describe('terminal/sdk-session-events.js — contrato', () => {
             'ask_user SDK solicitado',
             expect.objectContaining({ detail: expect.stringContaining('Escolha?'), severity: 'warn' }),
         );
+        expect(mocks.recordTerminalUserInputRequested).toHaveBeenCalledWith(
+            expect.objectContaining({ requestId: 'ui-1' }),
+        );
         expect(mocks.recordTerminalActivity).toHaveBeenCalledWith(
             'question',
             'ask_user SDK respondido',
             expect.objectContaining({ detail: 'ui-1 · choice/protocolo' }),
+        );
+        expect(mocks.recordTerminalUserInputCompleted).toHaveBeenCalledWith(
+            expect.objectContaining({ requestId: 'ui-1' }),
         );
         expect(mocks.recordTerminalActivity).toHaveBeenCalledWith(
             'tool',

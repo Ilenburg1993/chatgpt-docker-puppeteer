@@ -618,3 +618,51 @@ Implementado nesta rodada:
 
 Pronto quando: cada resposta da LLM-B pode ser acompanhada não só pelo texto gerado, mas também por
 um fechamento claro do trabalho operacional realizado no turno.
+
+---
+
+## W134 — Unificação da observabilidade live de interrupções SDK (`ask_user`, `elicitation`, `permission`)
+
+**Objetivo:** consolidar a UX live de interrupções SDK para que o operador veja o estado completo do
+que está bloqueando ou aguardando input humano, sem precisar cruzar mentalmente múltiplas
+superfícies.
+
+Diagnóstico do fluxo anterior (como aparecia ao usuário):
+
+- `elicitation` e `permission` já tinham estado local rastreável e comandos dedicados;
+- `ask_user` do SDK era narrado em atividade/SSE, porém sem trilha canônica equivalente para resumo
+  operacional em `/status`, `/now` e `/menu`;
+- a command palette não priorizava explicitamente interrupções SDK pendentes (`elicitation`/
+  `permission`/`ask_user`) como atalhos HOT;
+- o snapshot curto (`/now`) e o status completo (`/status`) ainda não mostravam a foto unificada de
+  todas as categorias de espera humana.
+
+Situação ideal:
+
+- uma única leitura operacional para interrupções SDK, com estado pendente + último tipo relevante;
+- `/status` e `/now` mostrando o mesmo modelo mental do operador;
+- `/menu` promovendo ações HOT para resolver pendências imediatamente;
+- rastreabilidade canônica para `user_input.requested/completed` (não apenas impressão transitória).
+
+Implementado nesta rodada:
+
+1. `sdk-interactions.js` passou a rastrear `user_input` (`requested/completed`) com estado próprio
+   (`pending/completed`) e resumo canônico (`readTerminalUserInputSummary`);
+2. `sdk-session-events.js` agora persiste eventos `user_input` no estado canônico e mantém narrativa
+   live do ASK para o operador;
+3. `frontend/projections/status.js` foi ampliado com novos campos: `pendingUserInputs`,
+   `latestUserInputKind`, `latestElicitationMode`;
+4. `/status` e `/now` exibem interrupções SDK de forma unificada (`ELICIT`, `PERM`, `ASKSDK`) com
+   ações sugeridas;
+5. `/menu` recebeu atalhos HOT contextuais para `ask_user`, `elicitation` e `permission` pendentes;
+6. `/sdk status` passou a refletir o mesmo resumo de waits da camada canônica.
+
+Validação:
+
+- testes focados verdes: `test_commands_menu.spec.js`, `test_commands_sdk.spec.js`,
+  `test_terminal_sdk_session_events.spec.js`, `test_commands_session.spec.js`;
+- suíte terminal ampla verde (`55 passed | 1 skipped`);
+- lint, format e typecheck strict limpos após patch.
+
+Pronto quando: o operador consegue identificar e agir sobre qualquer interrupção SDK em segundos,
+usando `/now`, `/status` ou `/menu`, sem perder contexto da conversa live.
