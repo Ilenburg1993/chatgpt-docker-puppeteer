@@ -336,7 +336,7 @@
     "start": "node --strip-types index.js",
     "start:container": "NODE_ENV=development NODE_OPTIONS='--strip-types --inspect=0.0.0.0:9229 --enable-source-maps --trace-warnings --trace-uncaught --unhandled-rejections=strict' node index.js",
     "summarize-code": "python3 agents/code_explainer/generate_summary.py",
-    "terminal:llm-b": "COPILOT_LOG_LEVEL=INFO COPILOT_SDK_ENABLED=true node --strip-types src/copilot/terminal/bootstrap.js",
+    "terminal:llm-b": "COPILOT_LOG_LEVEL=INFO COPILOT_SDK_ENABLED=true node --disable-warning=ExperimentalWarning --strip-types src/copilot/terminal/bootstrap.js",
     "test": "npm run test:unit && npm run test:integration && npm run test:regression",
     "test:check-schemas": "node scripts/check-schema-coverage.mjs",
     "test:copilot": "env -u NO_COLOR NODE_COMPILE_CACHE=${NODE_COMPILE_CACHE:-/home/node/.cache/node-compile} npx vitest run --config vitest.copilot.config.js",

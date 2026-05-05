@@ -12,6 +12,7 @@
 import { toError } from '../../core/error-handlers.js';
 import { toSdkOperationError } from '../errors.js';
 import { log } from '../logger.js';
+import { modelGetCurrent, modelSwitchTo } from '../rpc/session.js';
 import { emitSdkOperationMetric } from '../telemetry/operation-metrics.js';
 
 /**
@@ -39,6 +40,92 @@ function assertSession(session, caller) {
     if (!session || typeof session !== 'object' || !('sessionId' in session)) {
         throw new TypeError(`[session-lifecycle/${caller}] Sessão inválida ou não fornecida.`);
     }
+}
+
+/**
+ * @param {CopilotSession} session
+ * @param {string} model
+ * @param {{ reasoningEffort?: ReasoningEffort }} [options]
+ * @returns {Promise<{
+ *     requestedModel: string;
+ *     effectiveModel: string | null;
+ *     verifiedSwitch: boolean;
+ *     usedRpcFallback: boolean;
+ * }>}
+ */
+async function verifySessionModelSwitch(session, model, options) {
+    /**
+     * @type {{
+     *     requestedModel: string;
+     *     effectiveModel: string | null;
+     *     verifiedSwitch: boolean;
+     *     usedRpcFallback: boolean;
+     * }}
+     */
+    const result = {
+        requestedModel: model,
+        effectiveModel: null,
+        verifiedSwitch: false,
+        usedRpcFallback: false,
+    };
+
+    const hasModelGetCurrent = Boolean(
+        session.rpc &&
+        typeof session.rpc === 'object' &&
+        session.rpc.model &&
+        typeof session.rpc.model === 'object' &&
+        typeof session.rpc.model.getCurrent === 'function',
+    );
+
+    if (!hasModelGetCurrent) {
+        return result;
+    }
+
+    try {
+        const current = await modelGetCurrent(session);
+        result.effectiveModel = current.modelId;
+        result.verifiedSwitch = current.modelId === model;
+    } catch (error) {
+        log('WARN', `[session-lifecycle] model.getCurrent falhou após setModel: ${toError(error).message}`);
+        return result;
+    }
+
+    if (result.verifiedSwitch) {
+        return result;
+    }
+
+    const hasModelSwitchTo = Boolean(
+        session.rpc &&
+        typeof session.rpc === 'object' &&
+        session.rpc.model &&
+        typeof session.rpc.model === 'object' &&
+        typeof session.rpc.model.switchTo === 'function',
+    );
+
+    if (!hasModelSwitchTo) {
+        return result;
+    }
+
+    log(
+        'WARN',
+        `[session-lifecycle] setModel não convergiu para '${model}' (atual='${result.effectiveModel ?? '?'}') — tentando rpc.model.switchTo().`,
+    );
+
+    try {
+        await modelSwitchTo(
+            session,
+            model,
+            options?.reasoningEffort ? { reasoningEffort: options.reasoningEffort } : undefined,
+        );
+        result.usedRpcFallback = true;
+        const current = await modelGetCurrent(session);
+        result.effectiveModel = current.modelId;
+        result.verifiedSwitch = current.modelId === model;
+    } catch (error) {
+        log('WARN', `[session-lifecycle] rpc.model.switchTo fallback falhou: ${toError(error).message}`);
+    }
+
+    return result;
 }
 
 // ─── Wrappers públicos ────────────────────────────────────────────────────────
@@ -164,7 +251,12 @@ export async function sendSession(session, messageOptions) {
  * @param {CopilotSession} session - Sessão ativa
  * @param {string} model - ID do modelo (ex: 'gpt-4.1', 'claude-sonnet-4-5')
  * @param {{ reasoningEffort?: ReasoningEffort }} [options] - Opções do novo modelo
- * @returns {Promise<void>}
+ * @returns {Promise<{
+ *     requestedModel: string;
+ *     effectiveModel: string | null;
+ *     verifiedSwitch: boolean;
+ *     usedRpcFallback: boolean;
+ * }>}
  * @throws {TypeError} Se a sessão for inválida ou model não for string
  * @throws {Error} Se a comunicação com o SDK falhar
  */
@@ -181,6 +273,10 @@ export async function setSessionModel(session, model, options) {
         sessionId: session.sessionId,
         attributes: { model },
     });
+    Reflect.set(session, '__copilotConfiguredModel', model);
+    if (options?.reasoningEffort) {
+        Reflect.set(session, '__copilotConfiguredReasoningEffort', options.reasoningEffort);
+    }
     try {
         await session.setModel(model, options);
     } catch (error) {
@@ -194,14 +290,35 @@ export async function setSessionModel(session, model, options) {
         });
         throw sdkError;
     }
+    const verification = await verifySessionModelSwitch(session, model, options);
+    if (verification.effectiveModel) {
+        Reflect.set(session, '__copilotEffectiveModel', verification.effectiveModel);
+    }
+    Reflect.set(session, '__copilotModelVerified', verification.verifiedSwitch);
     emitSdkOperationMetric({
         operation: 'session.setModel',
         status: 'succeeded',
         sessionId: session.sessionId,
         durationMs: Date.now() - startedAt,
-        attributes: { model },
+        attributes: {
+            model,
+            verifiedSwitch: verification.verifiedSwitch,
+            ...(verification.effectiveModel ? { effectiveModel: verification.effectiveModel } : {}),
+            ...(verification.usedRpcFallback ? { usedRpcFallback: true } : {}),
+        },
     });
-    log('INFO', `[session-lifecycle] Modelo alterado para '${model}': sessionId='${session.sessionId}'`);
+    if (verification.verifiedSwitch) {
+        log(
+            'INFO',
+            `[session-lifecycle] Modelo alterado para '${model}': sessionId='${session.sessionId}', effective='${verification.effectiveModel ?? model}'${verification.usedRpcFallback ? ' [rpc-fallback]' : ''}`,
+        );
+    } else {
+        log(
+            'WARN',
+            `[session-lifecycle] Solicitação de troca para '${model}' concluída sem verificação positiva: sessionId='${session.sessionId}', effective='${verification.effectiveModel ?? '?'}'`,
+        );
+    }
+    return verification;
 }
 
 /**

@@ -59,6 +59,7 @@ import {
  * @property {number} [lastPrConsumedAt] - Timestamp do último PR consumido (ms)
  * @property {string} [lastPrModel] - Modelo que consumiu o último PR
  * @property {string} [lastPrConfiguredModel] - Modelo configurado no runtime no momento do consumo
+ * @property {string} [lastPrEffectiveModel] - Modelo efetivo observado na sessão viva / SDK
  * @property {boolean} [lastPrModelMismatch] - `true` quando modelo cobrado difere do configurado
  * @property {number} [lastPrCost] - Custo reportado pelo SDK no último PR
  * @property {Record<string, unknown> | null} [lastQuotaSnapshots] - Snapshots de cota do último `assistant.usage`

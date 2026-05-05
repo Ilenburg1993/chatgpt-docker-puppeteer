@@ -7,6 +7,7 @@
 
 import { SESSION_EVENTS } from '#copilot/events';
 import { log } from '#copilot/observability';
+import { DialogProtocol } from '../dialog/protocol.js';
 import { onSessionEvent } from '../sdk/session/events.js';
 
 /**
@@ -77,7 +78,8 @@ export function wireInteractionEvents(session, { emit }) {
             const question = /** @type {string | undefined} */ (data['question']);
             const choices = Array.isArray(data['choices']) ? /** @type {string[]} */ (data['choices']) : undefined;
             const allowFreeform = data['allowFreeform'] !== false;
-            log('INFO', `[interaction-events] user_input.requested: requestId=${requestId ?? '?'}`);
+            const kind = DialogProtocol.classify(question ?? '');
+            log('DEBUG', `[interaction-events] user_input.requested: requestId=${requestId ?? '?'} kind=${kind}`);
             emit('user_input.requested', {
                 requestId,
                 question: question ?? '',

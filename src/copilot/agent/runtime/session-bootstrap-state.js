@@ -28,6 +28,7 @@ import { persistStateWithPolicy, readState, readStateAsync } from '../lifecycle/
  *               info: {
  *                   model?: string;
  *                   configuredModel?: string;
+ *                   effectiveModel?: string;
  *                   modelMismatch?: boolean;
  *                   sessionId?: string | null;
  *                   cost?: number;
@@ -103,6 +104,7 @@ export async function restoreAgentRuntimePersistentBootState(ctx) {
             ts: persistedState.lastPrConsumedAt,
             ...(persistedState.lastPrModel ? { model: persistedState.lastPrModel } : {}),
             ...(persistedState.lastPrConfiguredModel ? { configuredModel: persistedState.lastPrConfiguredModel } : {}),
+            ...(persistedState.lastPrEffectiveModel ? { effectiveModel: persistedState.lastPrEffectiveModel } : {}),
             ...(typeof persistedState.lastPrModelMismatch === 'boolean'
                 ? { modelMismatch: persistedState.lastPrModelMismatch }
                 : {}),

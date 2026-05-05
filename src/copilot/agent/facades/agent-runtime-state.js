@@ -89,6 +89,7 @@ export function persistAgentRuntimeStatePartial(data, options = {}) {
  *               info: {
  *                   model?: string;
  *                   configuredModel?: string;
+ *                   effectiveModel?: string;
  *                   modelMismatch?: boolean;
  *                   sessionId?: string | null;
  *                   cost?: number;
@@ -249,6 +250,7 @@ export async function resetAgentRuntimeGracefulShutdownFlag() {
  * @param {{
  *     model?: string;
  *     configuredModel?: string;
+ *     effectiveModel?: string;
  *     modelMismatch?: boolean;
  *     sessionId?: string | null;
  *     cost?: number;

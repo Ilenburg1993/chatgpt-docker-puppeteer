@@ -28,6 +28,7 @@ export async function resetAgentRuntimeGracefulShutdownFlag() {
  * @param {{
  *     model?: string;
  *     configuredModel?: string;
+ *     effectiveModel?: string;
  *     modelMismatch?: boolean;
  *     sessionId?: string | null;
  *     cost?: number;
@@ -45,6 +46,7 @@ export async function persistAgentRuntimePrConsumptionSnapshot(info) {
             lastPrConsumedAt: info.ts,
             lastPrModel: info.model ?? '',
             lastPrConfiguredModel: info.configuredModel ?? '',
+            lastPrEffectiveModel: info.effectiveModel ?? '',
             lastPrModelMismatch: Boolean(info.modelMismatch),
             lastPrCost: info.cost ?? 0,
             lastQuotaSnapshots: info.quotaSnapshots ?? null,

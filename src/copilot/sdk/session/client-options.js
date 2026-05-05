@@ -87,6 +87,40 @@ function parseLogLevelEnv(raw) {
     return undefined;
 }
 
+/**
+ * @param {string | undefined} current
+ * @param {string} flag
+ * @returns {string}
+ */
+function appendNodeOption(current, flag) {
+    const normalized = current?.trim() ?? '';
+    if (normalized.includes(flag)) {
+        return normalized;
+    }
+    return normalized.length > 0 ? `${normalized} ${flag}` : flag;
+}
+
+/**
+ * @param {Record<string, string | undefined>} env
+ * @returns {Record<string, string | undefined>}
+ */
+function normalizeCliSpawnEnv(env) {
+    const next = { ...env };
+    const shouldNormalizeColorEnv = parseBooleanEnv(process.env['COPILOT_CLI_NORMALIZE_COLOR_ENV']) ?? true;
+    const shouldDisableExperimentalWarning =
+        parseBooleanEnv(process.env['COPILOT_CLI_DISABLE_EXPERIMENTAL_WARNING']) ?? true;
+
+    if (shouldNormalizeColorEnv && next['FORCE_COLOR'] && next['NO_COLOR']) {
+        delete next['NO_COLOR'];
+    }
+
+    if (shouldDisableExperimentalWarning) {
+        next['NODE_OPTIONS'] = appendNodeOption(next['NODE_OPTIONS'], '--disable-warning=ExperimentalWarning');
+    }
+
+    return next;
+}
+
 export class ClientOptionsBuilder {
     /** @type {Partial<CopilotClientOptions>} */
     #opts = {};
@@ -142,10 +176,11 @@ export class ClientOptionsBuilder {
         /** @type {Record<string, string | undefined>} */
         const filtered = {};
         const allowedPrefixes = ['COPILOT_', 'GITHUB_', 'OTEL_', 'NODE_'];
+        const allowedKeys = new Set(['FORCE_COLOR', 'NO_COLOR']);
         const extraSet = new Set(extraKeys);
 
         for (const [key, value] of Object.entries(process.env)) {
-            if (extraSet.has(key) || allowedPrefixes.some((p) => key.startsWith(p))) {
+            if (extraSet.has(key) || allowedKeys.has(key) || allowedPrefixes.some((p) => key.startsWith(p))) {
                 filtered[key] = value;
             }
         }
@@ -159,7 +194,7 @@ export class ClientOptionsBuilder {
 
     /** @param {Record<string, string | undefined>} env @returns {this} */
     env(env) {
-        this.#opts.env = env;
+        this.#opts.env = normalizeCliSpawnEnv(env);
         return this;
     }
 
@@ -264,7 +299,10 @@ export class ClientOptionsBuilder {
 
     /** @returns {Partial<CopilotClientOptions>} */
     build() {
-        return { ...this.#opts };
+        return {
+            ...this.#opts,
+            ...(this.#opts.env ? { env: normalizeCliSpawnEnv(this.#opts.env) } : {}),
+        };
     }
 }
 

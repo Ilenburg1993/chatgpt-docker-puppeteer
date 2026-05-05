@@ -516,7 +516,7 @@ export function answerPendingQuestion(ctx, host, answer) {
         span?.end();
         return false;
     }
-    log('INFO', `[AlwaysAlive] Respondendo pergunta pendente: "${answer.slice(0, 80)}..."`);
+    log('DEBUG', `[AlwaysAlive] Respondendo pergunta pendente: "${answer.slice(0, 80)}..."`);
     ctx.resolvePendingQuestion(answer);
     void ctx.trackBackgroundTask(
         persistAgentRuntimeStatePartial(

@@ -34,6 +34,7 @@ export const TERMINAL_EVENTS = /** @type {const} */ ({
     SHOW_STREAMING_CHANGED: 'showStreaming:changed',
     SHOW_TOOL_ACTIVITY_CHANGED: 'showToolActivity:changed',
     SHOW_INTENT_ACTIVITY_CHANGED: 'showIntentActivity:changed',
+    SHOW_SESSION_ACTIVITY_CHANGED: 'showSessionActivity:changed',
 });
 
 let _busy = false;
@@ -208,6 +209,17 @@ export function getShowIntentActivity() {
 export function setShowIntentActivity(value) {
     _showIntentActivity = value;
     stateEmitter.emit(TERMINAL_EVENTS.SHOW_INTENT_ACTIVITY_CHANGED, value);
+}
+
+let _showSessionActivity = false;
+/** @returns {boolean} */
+export function getShowSessionActivity() {
+    return _showSessionActivity;
+}
+/** @param {boolean} value @returns {void} */
+export function setShowSessionActivity(value) {
+    _showSessionActivity = value;
+    stateEmitter.emit(TERMINAL_EVENTS.SHOW_SESSION_ACTIVITY_CHANGED, value);
 }
 
 const MAX_INJECT_HISTORY = TERMINAL_MAX_INJECT_HISTORY;

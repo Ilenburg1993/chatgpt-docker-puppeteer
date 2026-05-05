@@ -42,6 +42,10 @@ function makeSession(sessionId) {
             input: async (/** @type {string} */ message) => `${message}:typed`,
         },
         rpc: {
+            model: {
+                getCurrent: async () => ({ modelId: 'gpt-4.1' }),
+                switchTo: async () => ({ ok: true }),
+            },
             ui: {
                 elicitation: async (/** @type {{ message: string; requestedSchema: object }} */ params) => ({
                     action: 'accept',
@@ -326,6 +330,11 @@ describe('sdk routes session ownership SSOT', () => {
             .expect(200);
 
         assert.equal(res.body.sessionId, 'sdk-msg');
+        assert.equal(res.body.model, 'gpt-4.1');
+        assert.equal(res.body.requestedModel, 'gpt-4.1');
+        assert.equal(res.body.effectiveModel, 'gpt-4.1');
+        assert.equal(res.body.verifiedSwitch, true);
+        assert.equal(res.body.modelMismatch, false);
         assert.equal(res.body.reasoningEffort, 'high');
         assert.deepEqual(modelCalls, [{ model: 'gpt-4.1', options: { reasoningEffort: 'high' } }]);
         assert.equal(res.body.isSharedSdkSession, true);

@@ -11,6 +11,7 @@
  */
 
 import { SessionError } from '#copilot/core';
+import { setSessionModel } from '#copilot/sdk';
 import { toError } from '../core/error-handlers.js';
 import { log } from './ports/logging-port.js';
 
@@ -67,9 +68,10 @@ function isPromiseLike(value) {
  * @param {CopilotSession | null | undefined} session
  * @param {string} modelId
  * @param {string} [logLabel='AlwaysAlive'] Default is `'AlwaysAlive'`
- * @returns {boolean} `true` quando a sessão suportava `setModel()` e a chamada foi executada sem erro.
+ * @param {{ reasoningEffort?: 'low' | 'medium' | 'high' | 'xhigh' | undefined }} [options]
+ * @returns {boolean} `true` quando a sessão suportava troca de modelo e a chamada assíncrona foi disparada.
  */
-export function trySetLiveSessionModel(session, modelId, logLabel = 'AlwaysAlive') {
+export function trySetLiveSessionModel(session, modelId, logLabel = 'AlwaysAlive', options) {
     if (session === null || session === undefined || (typeof session !== 'object' && typeof session !== 'function')) {
         return false;
     }
@@ -80,9 +82,14 @@ export function trySetLiveSessionModel(session, modelId, logLabel = 'AlwaysAlive
     }
 
     try {
-        const maybeResult = Reflect.apply(maybeSetModel, session, [modelId]);
-        const shouldTrackAsyncFailure = isPromiseLike(maybeResult) === true;
-        if (shouldTrackAsyncFailure) {
+        const maybeResult = setSessionModel(
+            /** @type {CopilotSession} */ (session),
+            modelId,
+            options?.reasoningEffort
+                ? { reasoningEffort: /** @type {'low' | 'medium' | 'high'} */ (options.reasoningEffort) }
+                : undefined,
+        );
+        if (isPromiseLike(maybeResult) === true) {
             void Promise.resolve(maybeResult).catch((error) => {
                 log('WARN', `[${logLabel}] setModel live async falhou: ${toError(error).message}`);
             });

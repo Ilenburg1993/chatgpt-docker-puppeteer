@@ -109,6 +109,7 @@
  * @property {{
  *     model?: string;
  *     configuredModel?: string;
+ *     effectiveModel?: string;
  *     modelMismatch?: boolean;
  *     sessionId?: string | null;
  *     cost?: number;

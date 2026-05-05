@@ -410,6 +410,7 @@ module.exports = {
                       name: 'llm-b-terminal',
                       cwd: projectRoot,
                       script: './src/copilot/terminal/bootstrap.js',
+                      node_args: ['--disable-warning=ExperimentalWarning'],
                       wait_ready: false,
                       exec_mode: 'fork',
                       instances: 1,

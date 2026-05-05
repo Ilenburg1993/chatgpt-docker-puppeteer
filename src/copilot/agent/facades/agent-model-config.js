@@ -51,7 +51,23 @@ export function getModel(ctx) {
  */
 export function setModel(ctx, modelId) {
     ctx.setModel(modelId);
-    trySetLiveSessionModel(ctx.getSessionSnapshot(), modelId, 'AlwaysAlive');
+    const reasoningEffort = ctx.getReasoningEffortSnapshot();
+    trySetLiveSessionModel(ctx.getSessionSnapshot(), modelId, 'AlwaysAlive', { reasoningEffort });
+    const previousPrInfo = ctx.getLastPrInfoSnapshot?.() ?? null;
+    const previousEffectiveModel =
+        typeof previousPrInfo?.effectiveModel === 'string' ? previousPrInfo.effectiveModel : undefined;
+    const previousBilledModel = typeof previousPrInfo?.model === 'string' ? previousPrInfo.model : undefined;
+    const observedModel = previousEffectiveModel ?? previousBilledModel;
+    const sessionId = ctx.getSessionSnapshot()?.sessionId ?? previousPrInfo?.sessionId ?? null;
+    ctx.setLastPrInfo({
+        ...(previousPrInfo ?? { ts: Date.now() }),
+        configuredModel: modelId,
+        ...(previousEffectiveModel ? { effectiveModel: previousEffectiveModel } : {}),
+        ...(previousBilledModel ? { model: previousBilledModel } : {}),
+        modelMismatch: Boolean(observedModel && observedModel !== modelId),
+        sessionId,
+        ts: Date.now(),
+    });
     persistRuntimeConfigChange(
         ctx,
         { model: modelId },

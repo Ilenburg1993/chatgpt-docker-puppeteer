@@ -392,6 +392,23 @@ describe('ClientOptionsBuilder', () => {
         }
     });
 
+    it('envPassthrough() normaliza conflito NO_COLOR/FORCE_COLOR e injeta disable-warning no child CLI', () => {
+        const original = { ...process.env };
+        try {
+            process.env.FORCE_COLOR = '1';
+            process.env.NO_COLOR = '1';
+            delete process.env.COPILOT_CLI_DISABLE_EXPERIMENTAL_WARNING;
+
+            const opts = new ClientOptionsBuilder().envPassthrough().build();
+
+            expect(opts.env?.FORCE_COLOR).toBe('1');
+            expect(opts.env?.NO_COLOR).toBeUndefined();
+            expect(opts.env?.NODE_OPTIONS).toContain('--disable-warning=ExperimentalWarning');
+        } finally {
+            process.env = original;
+        }
+    });
+
     it('onListModels() define handler BYOK', () => {
         const handler = vi.fn(() => []);
         const opts = new ClientOptionsBuilder().onListModels(handler).build();
@@ -483,6 +500,8 @@ describe('ClientOptionsBuilder', () => {
             process.env.COPILOT_GITHUB_TOKEN = 'ghp_env';
             process.env.OTEL_EXPORTER_OTLP_ENDPOINT = 'http://localhost:4318';
             process.env.OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT = 'true';
+            process.env.FORCE_COLOR = '1';
+            process.env.NO_COLOR = '1';
             const opts = buildCopilotClientOptionsFromEnv();
             expect(opts.cliPath).toBe('/opt/copilot');
             expect(opts.cliArgs).toEqual(['--stdio']);
@@ -490,6 +509,8 @@ describe('ClientOptionsBuilder', () => {
             expect(opts.autoStart).toBe(false);
             expect(opts.gitHubToken).toBe('ghp_env');
             expect(opts.useLoggedInUser).toBe(false);
+            expect(opts.env?.NO_COLOR).toBeUndefined();
+            expect(opts.env?.NODE_OPTIONS).toContain('--disable-warning=ExperimentalWarning');
             expect(opts.telemetry).toMatchObject({
                 otlpEndpoint: 'http://localhost:4318',
                 sourceName: 'llm-b-terminal',

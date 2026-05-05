@@ -42,6 +42,9 @@ describe('agent/facades/agent-model-config', () => {
         const ctx = {
             setModel: vi.fn(),
             getSessionSnapshot: vi.fn(() => ({ sessionId: 'sdk-1' })),
+            getReasoningEffortSnapshot: vi.fn(() => 'high'),
+            getLastPrInfoSnapshot: vi.fn(() => null),
+            setLastPrInfo: vi.fn(),
             trackBackgroundTask: vi.fn((task, meta) => {
                 tracked.push({ task, meta });
                 return Promise.resolve();
@@ -51,7 +54,17 @@ describe('agent/facades/agent-model-config', () => {
         setModel(/** @type {any} */ (ctx), 'gpt-5.4');
 
         expect(ctx.setModel).toHaveBeenCalledWith('gpt-5.4');
-        expect(trySetLiveSessionModel).toHaveBeenCalledWith({ sessionId: 'sdk-1' }, 'gpt-5.4', 'AlwaysAlive');
+        expect(trySetLiveSessionModel).toHaveBeenCalledWith({ sessionId: 'sdk-1' }, 'gpt-5.4', 'AlwaysAlive', {
+            reasoningEffort: 'high',
+        });
+        expect(ctx.setLastPrInfo).toHaveBeenCalledWith(
+            expect.objectContaining({
+                configuredModel: 'gpt-5.4',
+                sessionId: 'sdk-1',
+                modelMismatch: false,
+                ts: expect.any(Number),
+            }),
+        );
         expect(persistAgentRuntimeStatePartial).toHaveBeenCalledWith(
             { model: 'gpt-5.4' },
             { label: 'runtime.config.model' },
@@ -87,5 +100,28 @@ describe('agent/facades/agent-model-config', () => {
             expect.objectContaining({ label: 'runtime.config.reasoning' }),
         );
         await Promise.all(tracked.map((entry) => entry.task));
+    });
+
+    it('marca mismatch quando o último modelo observado difere do configurado', async () => {
+        const { setModel } = await import('../../../../src/copilot/agent/facades/agent-model-config.js');
+        const ctx = {
+            setModel: vi.fn(),
+            getSessionSnapshot: vi.fn(() => ({ sessionId: 'sdk-2' })),
+            getReasoningEffortSnapshot: vi.fn(() => 'high'),
+            getLastPrInfoSnapshot: vi.fn(() => ({ model: 'claude-haiku-4.5', ts: 10 })),
+            setLastPrInfo: vi.fn(),
+            trackBackgroundTask: vi.fn(() => Promise.resolve()),
+        };
+
+        setModel(/** @type {any} */ (ctx), 'gpt-5.4');
+
+        expect(ctx.setLastPrInfo).toHaveBeenCalledWith(
+            expect.objectContaining({
+                configuredModel: 'gpt-5.4',
+                model: 'claude-haiku-4.5',
+                modelMismatch: true,
+                sessionId: 'sdk-2',
+            }),
+        );
     });
 });

@@ -5,7 +5,8 @@
  * Proxy local de logger para o módulo SDK. Permite que `observability/logger` seja injetado em runtime (via bootstrap),
  * evitando dependência direta de L1 → L2.
  *
- * Fallback: console.error (nenhum log é perdido antes do bootstrap).
+ * Fallback: WARN+ apenas no console cru. INFO/DEBUG antes do bootstrap tendem a poluir o terminal interativo e o boot
+ * do subprocesso CLI; assim, preservamos erros importantes sem degradar a UX realtime.
  *
  * @module copilot/sdk/logger
  * @see EventBus
@@ -24,7 +25,6 @@ let _log = (level, msg, meta) => {
     const line = `[sdk] ${level}: ${msg}${meta ? ` ${meta}` : ''}`;
     if (level === 'ERROR' || level === 'FATAL') console.error(line);
     else if (level === 'WARN') console.warn(line);
-    else console.log(line);
 };
 
 /**

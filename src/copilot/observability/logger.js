@@ -188,6 +188,8 @@ const LOG_LEVELS = /** @type {Record<string, number>} */ ({
 
 let configuredLevel = COPILOT_LOG_LEVEL;
 let minLevel = LOG_LEVELS[configuredLevel] ?? LOG_LEVELS['INFO'];
+let configuredConsoleLevel = configuredLevel;
+let consoleMinLevel = minLevel;
 
 // ─── API pública — log ────────────────────────────────────────────────────────
 
@@ -278,7 +280,9 @@ function log(level, msg, metaOrTaskId = '-') {
         _logRingBuffer.push({ ts, level, taskId, msg: String(content) });
         if (_logRingBuffer.length > RING_BUFFER_SIZE) _logRingBuffer.shift();
         safeAppendFileSync(LOG_FILE, `${jsonLine}\n`);
-        safeEmergencyConsoleWrite(levelValue >= (LOG_LEVELS['ERROR'] ?? 3) ? 'stderr' : 'stdout', jsonLine);
+        if (levelValue >= (consoleMinLevel ?? LOG_LEVELS['INFO'] ?? 1)) {
+            safeEmergencyConsoleWrite(levelValue >= (LOG_LEVELS['ERROR'] ?? 3) ? 'stderr' : 'stdout', jsonLine);
+        }
     } else {
         // F110.4: human-readable para dev
         // GAP-ERR-COLOR: Apply red ANSI for ERROR and FATAL messages
@@ -290,7 +294,9 @@ function log(level, msg, metaOrTaskId = '-') {
         _logRingBuffer.push({ ts, level, taskId, msg: String(content) });
         if (_logRingBuffer.length > RING_BUFFER_SIZE) _logRingBuffer.shift();
         safeAppendFileSync(LOG_FILE, `${line}\n`);
-        safeEmergencyConsoleWrite(isError ? 'stderr' : 'stdout', line);
+        if (levelValue >= (consoleMinLevel ?? LOG_LEVELS['INFO'] ?? 1)) {
+            safeEmergencyConsoleWrite(isError ? 'stderr' : 'stdout', line);
+        }
     }
 }
 
@@ -300,6 +306,13 @@ function log(level, msg, metaOrTaskId = '-') {
  * @returns {string}
  */
 log.getLevel = () => configuredLevel;
+
+/**
+ * Retorna o nível atualmente visível no console.
+ *
+ * @returns {string}
+ */
+log.getConsoleLevel = () => configuredConsoleLevel;
 
 /**
  * Define o nível de log dinamicamente.
@@ -316,6 +329,23 @@ log.setLevel = (newLevel) => {
     } else {
         log('WARN', `[copilot/logger] Nível inválido: ${newLevel}. Válidos: DEBUG, INFO, WARN, ERROR, FATAL`);
     }
+};
+
+/**
+ * Define o nível mínimo apenas para saída de console, preservando o nível completo de arquivo.
+ *
+ * @param {LogLevel} newLevel
+ * @returns {void}
+ */
+log.setConsoleLevel = (newLevel) => {
+    const upper = newLevel.toUpperCase();
+    if (LOG_LEVELS[upper] !== undefined) {
+        configuredConsoleLevel = upper;
+        consoleMinLevel = LOG_LEVELS[upper];
+        log('INFO', `[copilot/logger] Console log level alterado para: ${upper}`);
+        return;
+    }
+    log('WARN', `[copilot/logger] Console log level inválido: ${newLevel}. Válidos: DEBUG, INFO, WARN, ERROR, FATAL`);
 };
 
 log.debug = (/** @type {string | Error | Record<string, unknown>} */ msg, /** @type {string} */ taskId = '-') =>

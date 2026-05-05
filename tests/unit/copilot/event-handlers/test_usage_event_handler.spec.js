@@ -40,7 +40,8 @@ describe('event-handlers/usage wireUsageEvent', () => {
         const onPrInfo = vi.fn();
         const session = {
             sessionId: 'sdk-123',
-            model: 'gpt-5.4',
+            __copilotConfiguredModel: 'gpt-5.4',
+            __copilotEffectiveModel: 'claude-haiku-4.5',
         };
 
         wireUsageEvent(/** @type {any} */ (session), { emit, onPrInfo });
@@ -58,6 +59,7 @@ describe('event-handlers/usage wireUsageEvent', () => {
             expect.objectContaining({
                 model: 'claude-haiku-4.5',
                 configuredModel: 'gpt-5.4',
+                effectiveModel: 'claude-haiku-4.5',
                 modelMismatch: true,
                 sessionId: 'sdk-123',
                 cost: 0.33,
@@ -70,10 +72,11 @@ describe('event-handlers/usage wireUsageEvent', () => {
             expect.objectContaining({
                 model: 'claude-haiku-4.5',
                 configuredModel: 'gpt-5.4',
+                effectiveModel: 'claude-haiku-4.5',
                 modelMismatch: true,
             }),
         );
-        expect(mocks.log).toHaveBeenCalledWith('INFO', expect.stringContaining('[MODEL_MISMATCH]'));
+        expect(mocks.log).toHaveBeenCalledWith('WARN', expect.stringContaining('[MODEL_MISMATCH]'));
     });
 
     it('não marca mismatch quando billedModel e configuredModel coincidem', async () => {
@@ -91,6 +94,7 @@ describe('event-handlers/usage wireUsageEvent', () => {
         const session = {
             sessionId: 'sdk-456',
             model: 'gpt-5.4',
+            __copilotEffectiveModel: 'gpt-5.4',
         };
 
         wireUsageEvent(/** @type {any} */ (session), { emit, onPrInfo });
@@ -106,11 +110,13 @@ describe('event-handlers/usage wireUsageEvent', () => {
             expect.objectContaining({
                 model: 'gpt-5.4',
                 configuredModel: 'gpt-5.4',
+                effectiveModel: 'gpt-5.4',
                 sessionId: 'sdk-456',
                 cost: 0.1,
             }),
         );
         expect(onPrInfo.mock.calls[0]?.[0]?.modelMismatch ?? false).toBe(false);
+        expect(mocks.log).toHaveBeenCalledWith('DEBUG', expect.any(String));
         const logLine = String(mocks.log.mock.calls[0]?.[1] ?? '');
         expect(logLine.includes('[MODEL_MISMATCH]')).toBe(false);
     });

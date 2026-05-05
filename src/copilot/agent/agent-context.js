@@ -825,7 +825,16 @@ export class AgentContext {
     /**
      * Atualiza o último snapshot de consumo de PR/quota conhecido.
      *
-     * @param {{ model?: string; cost?: number; quotaSnapshots?: Record<string, unknown>; ts: number } | null} info
+     * @param {{
+     *     model?: string;
+     *     configuredModel?: string;
+     *     effectiveModel?: string;
+     *     modelMismatch?: boolean;
+     *     sessionId?: string | null;
+     *     cost?: number;
+     *     quotaSnapshots?: Record<string, unknown>;
+     *     ts: number;
+     * } | null} info
      * @returns {void}
      */
     setLastPrInfo(info) {
@@ -1404,7 +1413,16 @@ export class AgentContext {
     /**
      * Retorna uma cópia rasa do último snapshot de PR/quota conhecido.
      *
-     * @returns {{ model?: string; cost?: number; quotaSnapshots?: Record<string, unknown>; ts: number } | null}
+     * @returns {{
+     *     model?: string;
+     *     configuredModel?: string;
+     *     effectiveModel?: string;
+     *     modelMismatch?: boolean;
+     *     sessionId?: string | null;
+     *     cost?: number;
+     *     quotaSnapshots?: Record<string, unknown>;
+     *     ts: number;
+     * } | null}
      */
     getLastPrInfoSnapshot() {
         return this.metricsState.lastPrInfo ? { ...this.metricsState.lastPrInfo } : null;

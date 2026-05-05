@@ -184,25 +184,46 @@ export function registerSessionCoreRoutes(router) {
             const safeModel = modelValidation.model;
             const entry = getActiveSessionEntryOrReply(routeDeps, id, res);
             if (!entry) return;
-            await setSessionModel(entry.session, safeModel, routeDeps.sdkSession.pickDefined({ reasoningEffort }));
+            const verification = await setSessionModel(
+                entry.session,
+                safeModel,
+                routeDeps.sdkSession.pickDefined({ reasoningEffort }),
+            );
+
+            const effectiveModel = verification.effectiveModel ?? safeModel;
+            const modelMismatch =
+                verification.effectiveModel !== null && verification.effectiveModel !== verification.requestedModel;
 
             const runtimeSnapshot = routeDeps.sdkRuntimeProjection.readAgentStatusSnapshotForRuntime(
                 routeDeps.runtimeId,
             );
             const runtimeSessionId =
                 typeof runtimeSnapshot?.['sessionId'] === 'string' ? runtimeSnapshot['sessionId'] : null;
-            if (runtimeSessionId === id) {
-                routeDeps.sdkRuntimeProjection.setRuntimeModelProjection(safeModel, routeDeps.runtimeId);
+            if (runtimeSessionId === id && verification.verifiedSwitch) {
+                routeDeps.sdkRuntimeProjection.setRuntimeModelProjection(effectiveModel, routeDeps.runtimeId);
                 if (reasoningEffort !== undefined) {
                     routeDeps.sdkRuntimeProjection.setRuntimeReasoningProjection(reasoningEffort, routeDeps.runtimeId);
                 }
             }
 
-            routeDeps.sdkObservability.log('INFO', `[sdk-api] modelo alterado: sessão ${id} → ${safeModel}`);
+            routeDeps.sdkObservability.log(
+                verification.verifiedSwitch ? 'INFO' : 'WARN',
+                `[sdk-api] modelo solicitado: sessão ${id} → ${verification.requestedModel} (effective=${effectiveModel}, verified=${verification.verifiedSwitch}${verification.usedRpcFallback ? ', rpc-fallback=true' : ''})`,
+            );
             res.json(
                 withSessionRuntimeMeta(
                     routeDeps,
-                    { ok: true, sessionId: id, model: safeModel, reasoningEffort: reasoningEffort ?? null },
+                    {
+                        ok: true,
+                        sessionId: id,
+                        model: effectiveModel,
+                        requestedModel: verification.requestedModel,
+                        effectiveModel: verification.effectiveModel,
+                        verifiedSwitch: verification.verifiedSwitch,
+                        usedRpcFallback: verification.usedRpcFallback,
+                        modelMismatch,
+                        reasoningEffort: reasoningEffort ?? null,
+                    },
                     id,
                 ),
             );

@@ -57,6 +57,7 @@ import { createSnapshot, listSnapshotsAsync, loadSnapshotAsync, saveSnapshotAsyn
  *         | {
  *               model?: string;
  *               configuredModel?: string;
+ *               effectiveModel?: string;
  *               modelMismatch?: boolean;
  *               sessionId?: string | null;
  *               cost?: number;
@@ -96,6 +97,7 @@ import { createSnapshot, listSnapshotsAsync, loadSnapshotAsync, saveSnapshotAsyn
  *     lastPrInfo: {
  *         model?: string;
  *         configuredModel?: string;
+ *         effectiveModel?: string;
  *         modelMismatch?: boolean;
  *         sessionId?: string | null;
  *         cost?: number;

@@ -160,7 +160,8 @@ function normalizeUserInputAnswer(rawAnswer, choices, allowFreeform) {
  * @returns {Promise<{ answer: string; wasFreeform: boolean }>}
  */
 export async function handleUserInputRequest({ question, choices, allowFreeform }, ctx) {
-    log('INFO', `[AlwaysAlive] Modelo tem pergunta: "${question.slice(0, 120)}"`);
+    const kind = DialogProtocol.classify(question);
+    log(kind === 'question' ? 'INFO' : 'DEBUG', `[AlwaysAlive] Modelo tem pergunta: "${question.slice(0, 120)}"`);
 
     const shouldHandleProtocol =
         typeof ctx.shouldHandleProtocolInput === 'function'
