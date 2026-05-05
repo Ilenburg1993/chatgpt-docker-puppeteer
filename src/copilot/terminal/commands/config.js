@@ -15,6 +15,7 @@ import {
     listTerminalAvailableModelsProjection,
     readTerminalConfigProjection,
     readTerminalModelStatsProjection,
+    readTerminalRuntimeState,
     setTerminalModelProjection,
     setTerminalReasoningProjection,
 } from '../frontend/index.js';
@@ -24,6 +25,26 @@ import { callWithRuntimeTarget, extractRuntimeTarget } from './runtime-target.js
 
 /** Esforços de raciocínio válidos. @type {readonly ReasoningEffort[]} */
 const VALID_EFFORTS = /** @type {const} */ (['low', 'medium', 'high', 'xhigh']);
+
+/**
+ * @param {ReturnType<typeof readTerminalRuntimeState>} state
+ * @returns {{ observedModel: string | null; configuredModel: string | null; modelMismatch: boolean }}
+ */
+function resolveObservedModelState(state) {
+    const lastPrInfo = /** @type {Record<string, unknown> | null} */ (state.lastPrInfo ?? null);
+    const configuredModel = typeof lastPrInfo?.['configuredModel'] === 'string' ? lastPrInfo['configuredModel'] : null;
+    const effectiveModel = typeof lastPrInfo?.['effectiveModel'] === 'string' ? lastPrInfo['effectiveModel'] : null;
+    const billedModel = typeof lastPrInfo?.['model'] === 'string' ? lastPrInfo['model'] : null;
+    const modelMismatch =
+        Boolean(lastPrInfo?.['modelMismatch']) ||
+        Boolean(configuredModel && effectiveModel && configuredModel !== effectiveModel) ||
+        Boolean(configuredModel && billedModel && configuredModel !== billedModel);
+    return {
+        observedModel: effectiveModel ?? billedModel,
+        configuredModel,
+        modelMismatch,
+    };
+}
 
 /**
  * @typedef {object} ConfigContext
@@ -114,7 +135,10 @@ export async function cmdModel({ println }, arg) {
         reasoningAdjusted,
         modelMeta,
     } = callWithRuntimeTarget(setTerminalModelProjection, runtimeId, trimmed);
-    println(`\n  🔄  Modelo trocado: \x1b[90m${previous}\x1b[0m → \x1b[36m${trimmed}\x1b[0m`);
+    const runtimeState = callWithRuntimeTarget(readTerminalRuntimeState, runtimeId);
+    const observed = resolveObservedModelState(runtimeState);
+
+    println(`\n  🔄  Modelo configurado: \x1b[90m${previous}\x1b[0m → \x1b[36m${trimmed}\x1b[0m`);
     if (modelMeta) {
         const ctxLabel = typeof modelMeta.contextWindow === 'number' ? modelMeta.contextWindow.toLocaleString() : 'n/a';
         println(
@@ -126,7 +150,22 @@ export async function cmdModel({ println }, arg) {
             `  \x1b[33mReasoning ajustado: ${previousReasoningEffort} → ${currentReasoningEffort} (modelo sem suporte explícito a reasoning effort).\x1b[0m`,
         );
     }
-    println('  \x1b[90mEfetivo no próximo turno. Use /restart para reiniciar o loop com o novo modelo.\x1b[0m\n');
+    if (observed.observedModel && observed.observedModel !== trimmed) {
+        println(
+            `  \x1b[33mÚltimo modelo efetivo observado na sessão: ${observed.observedModel}. A troca para ${trimmed} ainda precisa ser confirmada pelo SDK/usage.\x1b[0m`,
+        );
+    } else if (observed.modelMismatch && observed.configuredModel === trimmed) {
+        println(
+            `  \x1b[33mHá mismatch entre o modelo configurado e o efetivo observado. Use /status, /sdk status ou um turno curto para revalidar a sessão.\x1b[0m`,
+        );
+    } else {
+        println(
+            '  \x1b[90mA sessão SDK será revalidada no próximo turno. Use /status ou /sdk status para conferir o modelo efetivo.\x1b[0m',
+        );
+    }
+    println(
+        '  \x1b[90mUse /restart apenas se quiser rebalancear o loop; não é mais a confirmação primária de modelo.\x1b[0m\n',
+    );
 }
 
 // ─── /reasoning ──────────────────────────────────────────────────────────────

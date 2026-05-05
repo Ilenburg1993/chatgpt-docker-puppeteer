@@ -22,6 +22,7 @@ export { cmdGh } from './gh.js';
 export { cmdGit } from './git.js';
 export { cmdHelp } from './help.js';
 export { cmdForget, cmdRecall, cmdRemember } from './memory.js';
+export { cmdMenu } from './menu.js';
 export { cmdMetrics } from './metrics.js';
 export { cmdPlan } from './plan.js';
 export { cmdResume } from './resume.js';

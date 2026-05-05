@@ -420,6 +420,22 @@ describe('terminal/frontend/index', () => {
         expect(notifyTerminalTurn).toHaveBeenCalled();
     });
 
+    it('prefere effectiveModel no stream meta quando há mismatch', async () => {
+        defaultRuntime.lastPrInfo = {
+            model: 'claude-haiku-4.5',
+            configuredModel: 'gpt-5.4',
+            effectiveModel: 'claude-haiku-4.5',
+            modelMismatch: true,
+            ts: Date.now(),
+        };
+        defaultRuntime.model = 'gpt-5.4';
+
+        expect(runtime.readTerminalDialogStreamMeta()).toEqual({
+            model: 'claude-haiku-4.5',
+            reasoningEffort: 'high',
+        });
+    });
+
     it('encapsula mode/plan vanilla da sessão SDK por runtime explícito', async () => {
         expect(await runtime.getTerminalSdkSessionMode('alt')).toEqual({ mode: 'plan' });
         expect(await runtime.setTerminalSdkSessionMode('autopilot', 'alt')).toEqual({ mode: 'autopilot' });

@@ -67,6 +67,8 @@ export function cmdHelp({ injectPort, println }) {
   \x1b[33m/audit [n]\x1b[0m                           — últimas N entradas do audit log (default: 10)
   \x1b[33m/display [toggle] [on|off]\x1b[0m           — gerencia toggles de exibição (thinking, streaming, usage, tools, intent)
   \x1b[33m/display preset <default|minimal|verbose|debug|focus>\x1b[0m — aplica presets de UX
+  \x1b[33m/display theme <elegant|vivid|mono>\x1b[0m — ajusta paleta visual (sóbria, contraste alto, sem cor)
+  \x1b[33m/menu [n|id|run n]\x1b[0m                  — command palette inteligente (pseudo-botões/dropdown no terminal)
   \x1b[33m/metrics\x1b[0m                             — métricas consolidadas da sessão (turns, tokens, billing, inject/prompt)
   \x1b[33m/export [path]\x1b[0m                       — exporta conversa como Markdown
   \x1b[33m/resume\x1b[0m                              — lista últimas sessões do hub (para retomar)

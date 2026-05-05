@@ -9,10 +9,12 @@
  */
 
 import { LLM_B_BOOT_PROMPT, LLM_B_TURN_TIMEOUT_MS } from '#copilot/config';
-import { getSdkSessionMode } from '../../presentation/runtime-ui-state-store.js';
+import readline from 'node:readline';
+import { getBusy, getRl, getSdkSessionMode } from '../../presentation/runtime-ui-state-store.js';
 import { readTerminalActivitySnapshot } from '../activity-state.js';
 import { readTerminalPromptDisplayPolicy } from '../display-policy.js';
 import { readTerminalDialogStreamMeta, readTerminalRuntimeState } from '../frontend/gateways/agent-runtime.js';
+import { terminalThemeText } from '../ui-theme.js';
 
 // ─── Configuração ─────────────────────────────────────────────────────────────
 
@@ -21,6 +23,9 @@ export const TURN_TIMEOUT_MS = LLM_B_TURN_TIMEOUT_MS;
 
 export const PROMPT_USER = '\x1b[32mvocê\x1b[0m\x1b[90m›\x1b[0m ';
 export const PROMPT_WAITING = '     ';
+
+/** @type {number} */
+let _terminalRenderLockDepth = 0;
 
 /**
  * Limita o tamanho de detalhes embutidos no prompt.
@@ -34,6 +39,26 @@ function shortenPromptToken(value, max = 18) {
 }
 
 /**
+ * @param {ReturnType<typeof readTerminalRuntimeState>} state
+ * @returns {{ displayModel: string; configuredModel: string | null; mismatch: boolean }}
+ */
+function resolvePromptModelProjection(state) {
+    const lastPrInfo = /** @type {Record<string, unknown> | null} */ (state.lastPrInfo ?? null);
+    const configuredModel = typeof lastPrInfo?.['configuredModel'] === 'string' ? lastPrInfo['configuredModel'] : null;
+    const effectiveModel = typeof lastPrInfo?.['effectiveModel'] === 'string' ? lastPrInfo['effectiveModel'] : null;
+    const billedModel = typeof lastPrInfo?.['model'] === 'string' ? lastPrInfo['model'] : null;
+    const mismatch =
+        Boolean(lastPrInfo?.['modelMismatch']) ||
+        Boolean(configuredModel && billedModel && configuredModel !== billedModel) ||
+        Boolean(configuredModel && effectiveModel && configuredModel !== effectiveModel);
+    return {
+        displayModel: effectiveModel ?? billedModel ?? configuredModel ?? state.model,
+        configuredModel,
+        mismatch,
+    };
+}
+
+/**
  * Constrói o prompt interativo dinâmico do terminal.
  *
  * @returns {string}
@@ -41,41 +66,52 @@ function shortenPromptToken(value, max = 18) {
 export function buildUserPrompt() {
     const state = readTerminalRuntimeState();
     const promptPolicy = readTerminalPromptDisplayPolicy();
-    const { model, reasoningEffort } = state;
+    const { reasoningEffort } = state;
+    const modelProjection = resolvePromptModelProjection(state);
+    const model = modelProjection.displayModel || state.model;
     /** @type {string[]} */
     const tags = [];
 
     const bootstrapping = state.status === 'starting';
     if (!state.dialogLoopActive && !bootstrapping) {
-        tags.push('\x1b[31m[NOLOOP]\x1b[0m');
+        tags.push(terminalThemeText('error', '[NOLOOP]'));
     }
     const sdkMode = getSdkSessionMode();
     if (sdkMode && sdkMode !== 'interactive') {
-        tags.push(`\x1b[35m[MODE:${sdkMode.toUpperCase()}]\x1b[0m`);
+        tags.push(terminalThemeText('thinking', `[MODE:${sdkMode.toUpperCase()}]`));
     }
     if (state.dialogPaused) {
-        tags.push('\x1b[31m[PAUSED]\x1b[0m');
+        tags.push(terminalThemeText('error', '[PAUSED]'));
     }
     if (promptPolicy.showQueueTag && state.queueSize > 0) {
-        tags.push(`\x1b[90m[Q:${state.queueSize}]\x1b[0m`);
+        tags.push(terminalThemeText('muted', `[Q:${state.queueSize}]`));
     }
     if (state.pendingQuestion && state.pendingQuestionKind && state.pendingQuestionKind !== 'ready') {
-        tags.push(`\x1b[36m[ASK:${state.pendingQuestionKind.toUpperCase()}]\x1b[0m`);
+        tags.push(terminalThemeText('question', `[ASK:${state.pendingQuestionKind.toUpperCase()}]`));
     } else if (state.pendingQuestionShadowState) {
         const shadowTag =
             state.pendingQuestionShadowState === 'expired'
-                ? '\x1b[31m[SHADOW:EXPIRED]\x1b[0m'
+                ? terminalThemeText('error', '[SHADOW:EXPIRED]')
                 : state.pendingQuestionShadowState === 'expiring_soon'
-                  ? '\x1b[33m[SHADOW:SOON]\x1b[0m'
+                  ? terminalThemeText('warn', '[SHADOW:SOON]')
                   : state.pendingQuestionShadowState === 'fresh'
-                    ? '\x1b[36m[SHADOW:FRESH]\x1b[0m'
-                    : '\x1b[33m[SHADOW]\x1b[0m';
+                    ? terminalThemeText('question', '[SHADOW:FRESH]')
+                    : terminalThemeText('warn', '[SHADOW]');
         if (state.pendingQuestionShadowState === 'expired' || promptPolicy.showNonCriticalShadowTag) {
             tags.push(shadowTag);
         }
     }
+    if (
+        modelProjection.mismatch &&
+        modelProjection.configuredModel &&
+        modelProjection.displayModel !== modelProjection.configuredModel
+    ) {
+        tags.push(
+            terminalThemeText('error', `[MODEL:${modelProjection.configuredModel}→${modelProjection.displayModel}]`),
+        );
+    }
 
-    return `\x1b[32mvocê\x1b[0m\x1b[90m[\x1b[36m${model}\x1b[90m/\x1b[35m${reasoningEffort}\x1b[90m]\x1b[0m${tags.join('')}\x1b[90m›\x1b[0m `;
+    return `${terminalThemeText('success', 'você')}${terminalThemeText('muted', '[')}${terminalThemeText('info', model)}${terminalThemeText('muted', '/')}${terminalThemeText('thinking', reasoningEffort)}${terminalThemeText('muted', ']')}${tags.join('')}${terminalThemeText('muted', '›')} `;
 }
 
 /**
@@ -90,8 +126,7 @@ export function buildWaitingPrompt() {
     const runtime = readTerminalRuntimeState();
     const phase = shortenPromptToken(activity.phase.toUpperCase(), 10);
     const label = shortenPromptToken(activity.label, 16);
-    const sevColor =
-        activity.severity === 'error' ? '\x1b[31m' : activity.severity === 'warn' ? '\x1b[33m' : '\x1b[90m';
+    const sevRole = activity.severity === 'error' ? 'error' : activity.severity === 'warn' ? 'warn' : 'muted';
     /** @type {string[]} */
     const tags = [];
     if (promptPolicy.showQueueTag && runtime.queueSize > 0) tags.push(`Q:${runtime.queueSize}`);
@@ -102,15 +137,61 @@ export function buildWaitingPrompt() {
         tags.push('SHDW:SOON');
     }
     if (runtime.pendingQuestionShadowState === 'expired') tags.push('SHDW:EXP');
-    const tagsStr = tags.length > 0 ? ` \x1b[90m[${tags.join('|')}]\x1b[0m` : '';
+    const tagsStr = tags.length > 0 ? ` ${terminalThemeText('muted', `[${tags.join('|')}]`)}` : '';
     if (!promptPolicy.showWaitingActivity) {
-        return `\x1b[90m⏳\x1b[0m${tagsStr} \x1b[90m[\x1b[36m${model}\x1b[90m/\x1b[35m${reasoningEffort}\x1b[90m]\x1b[0m `;
+        return `${terminalThemeText('muted', '⏳')}${tagsStr} ${terminalThemeText('muted', '[')}${terminalThemeText('info', model)}${terminalThemeText('muted', '/')}${terminalThemeText('thinking', reasoningEffort)}${terminalThemeText('muted', ']')} `;
     }
-    return `${sevColor}⏳[${phase}:${label}]\x1b[0m${tagsStr} \x1b[90m[\x1b[36m${model}\x1b[90m/\x1b[35m${reasoningEffort}\x1b[90m]\x1b[0m `;
+    return `${terminalThemeText(sevRole, `⏳[${phase}:${label}]`)}${tagsStr} ${terminalThemeText('muted', '[')}${terminalThemeText('info', model)}${terminalThemeText('muted', '/')}${terminalThemeText('thinking', reasoningEffort)}${terminalThemeText('muted', ']')} `;
 }
 
 /** Separador visual entre turnos — 72 colunas. */
 export const SEPARATOR = '\x1b[90m  ' + '─'.repeat(70) + '\x1b[0m';
+
+/**
+ * @returns {void}
+ */
+function clearTerminalLine() {
+    if (!process.stdout.isTTY) return;
+    readline.clearLine(process.stdout, 0);
+    readline.cursorTo(process.stdout, 0);
+}
+
+/**
+ * @returns {void}
+ */
+function redrawPromptIfInteractive() {
+    const rl = getRl();
+    if (!rl || getBusy() || _terminalRenderLockDepth > 0) return;
+    rl.setPrompt(buildUserPrompt());
+    rl.prompt();
+}
+
+/**
+ * Ativa lock de renderização para impedir redraw de prompt enquanto há escrita contínua no terminal.
+ *
+ * @returns {void}
+ */
+export function beginTerminalRenderLock() {
+    _terminalRenderLockDepth += 1;
+}
+
+/**
+ * Libera lock de renderização previamente ativado.
+ *
+ * @returns {void}
+ */
+export function endTerminalRenderLock() {
+    if (_terminalRenderLockDepth > 0) {
+        _terminalRenderLockDepth -= 1;
+    }
+}
+
+/**
+ * @returns {boolean}
+ */
+export function isTerminalRenderLocked() {
+    return _terminalRenderLockDepth > 0;
+}
 
 /**
  * Boot prompt padrão enviado à LLM-B ao iniciar o dialog loop. Pode ser sobrescrito pela variável de ambiente
@@ -150,7 +231,76 @@ export const BOOT_PROMPT = LLM_B_BOOT_PROMPT ?? DEFAULT_BOOT_PROMPT;
  * @returns {void}
  */
 export function println(text) {
+    if (getRl()) {
+        clearTerminalLine();
+        process.stdout.write(`${text}\n`);
+        redrawPromptIfInteractive();
+        return;
+    }
     process.stdout.write(`\r${text}\n`);
+}
+
+/**
+ * Escreve uma linha transitória sem quebra, limpando o prompt atual quando necessário.
+ *
+ * @param {string} text
+ * @returns {void}
+ */
+export function writeInlineStatus(text) {
+    if (isTerminalRenderLocked()) return;
+    clearTerminalLine();
+    process.stdout.write(text);
+}
+
+/**
+ * Escreve texto bruto no terminal. Pode opcionalmente limpar a linha interativa antes do primeiro write de um bloco.
+ *
+ * @param {string} text
+ * @param {{ clearPromptLine?: boolean }} [options]
+ * @returns {void}
+ */
+export function writeTerminalRaw(text, options = {}) {
+    if (options.clearPromptLine === true) {
+        clearTerminalLine();
+    }
+    process.stdout.write(text);
+}
+
+/**
+ * Escreve chunk multi-linha prefixando cada linha com o marcador visual do bloco atual.
+ *
+ * @param {string} linePrefix
+ * @param {string} chunk
+ * @param {{ clearPromptLine?: boolean }} [options]
+ * @returns {void}
+ */
+export function writeTerminalPrefixedChunk(linePrefix, chunk, options = {}) {
+    const lines = chunk.split('\n');
+    /** @type {string[]} */
+    const out = [];
+    for (let i = 0; i < lines.length; i += 1) {
+        if (i > 0) {
+            out.push('\n');
+        }
+        if (linePrefix.length > 0) {
+            out.push(linePrefix);
+        }
+        out.push(/** @type {string} */ (lines[i]));
+    }
+    if (linePrefix.length === 0 && options.clearPromptLine === true) {
+        clearTerminalLine();
+    }
+    writeTerminalRaw(out.join(''), { clearPromptLine: linePrefix.length > 0 && options.clearPromptLine === true });
+}
+
+/**
+ * Limpa a linha transitória atual do terminal.
+ *
+ * @returns {void}
+ */
+export function clearInlineStatus() {
+    if (isTerminalRenderLocked()) return;
+    clearTerminalLine();
 }
 
 /**

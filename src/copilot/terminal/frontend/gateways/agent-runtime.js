@@ -234,8 +234,18 @@ export function readTerminalSessionBinding() {
  */
 export function readTerminalDialogStreamMeta(runtimeId) {
     const state = readTerminalRuntimeState(runtimeId);
+    const lastPrInfo = /** @type {Record<string, unknown> | null} */ (state.lastPrInfo ?? null);
+    const configuredModel = typeof lastPrInfo?.['configuredModel'] === 'string' ? lastPrInfo['configuredModel'] : null;
+    const effectiveModel = typeof lastPrInfo?.['effectiveModel'] === 'string' ? lastPrInfo['effectiveModel'] : null;
+    const billedModel = typeof lastPrInfo?.['model'] === 'string' ? lastPrInfo['model'] : null;
+    const mismatch =
+        Boolean(lastPrInfo?.['modelMismatch']) ||
+        Boolean(configuredModel && billedModel && configuredModel !== billedModel) ||
+        Boolean(configuredModel && effectiveModel && configuredModel !== effectiveModel);
     return {
-        model: state.model,
+        model: mismatch
+            ? (effectiveModel ?? billedModel ?? state.model)
+            : (effectiveModel ?? billedModel ?? state.model),
         reasoningEffort: state.reasoningEffort,
     };
 }

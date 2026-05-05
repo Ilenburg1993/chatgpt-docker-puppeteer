@@ -10,7 +10,16 @@
 
 import { appendThinkingHistoryChunk, finalizeThinkingHistoryEntry } from '../../presentation/runtime-ui-state-store.js';
 import { recordTerminalActivity } from '../activity-state.js';
-import { SEPARATOR, println } from './output.js';
+import { terminalThemeText } from '../ui-theme.js';
+import {
+    beginTerminalRenderLock,
+    clearInlineStatus,
+    endTerminalRenderLock,
+    println,
+    SEPARATOR,
+    writeTerminalPrefixedChunk,
+    writeTerminalRaw,
+} from './output.js';
 import { broadcastSse } from './sse.js';
 
 /**
@@ -34,6 +43,7 @@ import { broadcastSse } from './sse.js';
  * @property {boolean} showStreaming
  * @property {number | null | undefined} [timeoutMs]
  * @property {'explicit' | 'adaptive' | 'disabled' | undefined} [timeoutStrategy]
+ * @property {boolean} renderLockActive
  */
 
 /**
@@ -59,7 +69,28 @@ export function createDisplayState({ model, effort, turnStartTime, showStreaming
         effort,
         showThinking,
         showStreaming,
+        renderLockActive: false,
     };
+}
+
+/**
+ * @param {TurnDisplayState} state
+ * @returns {void}
+ */
+function ensureRenderLock(state) {
+    if (state.renderLockActive) return;
+    beginTerminalRenderLock();
+    state.renderLockActive = true;
+}
+
+/**
+ * @param {TurnDisplayState} state
+ * @returns {void}
+ */
+function releaseRenderLock(state) {
+    if (!state.renderLockActive) return;
+    endTerminalRenderLock();
+    state.renderLockActive = false;
 }
 
 /**
@@ -93,14 +124,14 @@ function flushReasoningSummary(state) {
     const shortId = (entry?.id ?? getThinkingEntryId(state)).slice(-12);
 
     if (state.showThinking) {
-        process.stdout.write('\x1b[0m\n');
+        writeTerminalRaw('\x1b[0m\n');
         println(
-            `  \x1b[35m└── thinking #${shortId}\x1b[0m  \x1b[90m${(durationMs / 1000).toFixed(1)}s · ${state.reasoningChars} chars · ${state.model}/${state.effort}\x1b[0m`,
+            `  ${terminalThemeText('thinking', `└── thinking #${shortId}`)}  ${terminalThemeText('muted', `${(durationMs / 1000).toFixed(1)}s · ${state.reasoningChars} chars · ${state.model}/${state.effort}`)}`,
         );
         if (preview) {
-            println(`  \x1b[90m    ${preview}\x1b[0m`);
+            println(`  ${terminalThemeText('muted', `    ${preview}`)}`);
         }
-        println(`  \x1b[90m    /thinking show ${shortId}  ·  /thinking latest\x1b[0m`);
+        println(`  ${terminalThemeText('muted', `    /thinking show ${shortId}  ·  /thinking latest`)}`);
         println('');
     }
     broadcastSse('reasoning.complete', {
@@ -124,6 +155,7 @@ export function createReasoningCallback(state) {
             state.reasoningStarted = true;
             state.reasoningId = rId;
             state.thinkingEntryId = `dialog-${rId ?? state.turnStartTime}`;
+            ensureRenderLock(state);
             recordTerminalActivity('thinking', 'Raciocinando', {
                 detail: `${state.model} · ${state.effort}`,
                 source: 'dialog',
@@ -136,10 +168,9 @@ export function createReasoningCallback(state) {
                 });
                 println(SEPARATOR);
                 println(
-                    `  \x1b[90m[${tsNow}]\x1b[0m  💭  \x1b[35mThinking capturado\x1b[0m  \x1b[90m· ${state.model} · ${state.effort}\x1b[0m`,
+                    `  ${terminalThemeText('muted', `[${tsNow}]`)}  💭  ${terminalThemeText('thinking', 'Thinking capturado')}  ${terminalThemeText('muted', `· ${state.model} · ${state.effort}`)}`,
                 );
                 println('');
-                process.stdout.write('  \x1b[35m│\x1b[0m  \x1b[2m\x1b[37m');
             }
         }
         state.reasoningChars += chunk.length;
@@ -154,11 +185,10 @@ export function createReasoningCallback(state) {
             effort: state.effort,
         });
         if (state.showThinking) {
-            const lines = chunk.split('\n');
-            for (let i = 0; i < lines.length; i++) {
-                if (i > 0) process.stdout.write('\n  \x1b[35m│\x1b[0m  \x1b[2m\x1b[37m');
-                process.stdout.write(/** @type {string} */ (lines[i]));
-            }
+            writeTerminalPrefixedChunk(
+                `  ${terminalThemeText('thinking', '│')}  ${terminalThemeText('muted', '')}`,
+                chunk,
+            );
         }
         broadcastSse('reasoning', { chunk, reasoningId: rId });
     };
@@ -190,6 +220,7 @@ export function createDeltaCallback(state) {
         if (!state.streamingStarted) {
             state.streamingStarted = true;
             state.firstChunkTime = state.firstChunkTime || Date.now();
+            ensureRenderLock(state);
             recordTerminalActivity('streaming', 'Transmitindo resposta', {
                 detail: `${state.model} · ${state.effort}`,
                 source: 'dialog',
@@ -197,7 +228,7 @@ export function createDeltaCallback(state) {
             if (state.reasoningStarted) {
                 flushReasoningSummary(state);
             } else {
-                process.stdout.write('\r\x1b[K');
+                clearInlineStatus();
             }
             const tsNow = new Date().toLocaleTimeString('pt-BR', {
                 hour: '2-digit',
@@ -206,16 +237,11 @@ export function createDeltaCallback(state) {
             });
             println(SEPARATOR);
             println(
-                `  \x1b[90m[${tsNow}]\x1b[0m  🧠  \x1b[32mLLM-B\x1b[0m  \x1b[90m·\x1b[0m  \x1b[36m${state.model}\x1b[0m  \x1b[90m·\x1b[0m  \x1b[35m${state.effort}\x1b[0m`,
+                `  ${terminalThemeText('muted', `[${tsNow}]`)}  🧠  ${terminalThemeText('success', 'LLM-B')}  ${terminalThemeText('muted', '·')}  ${terminalThemeText('info', state.model)}  ${terminalThemeText('muted', '·')}  ${terminalThemeText('thinking', state.effort)}`,
             );
             println('');
-            process.stdout.write('  \x1b[32m│\x1b[0m  ');
         }
-        const lines = chunk.split('\n');
-        for (let i = 0; i < lines.length; i++) {
-            if (i > 0) process.stdout.write('\n  \x1b[32m│\x1b[0m  ');
-            process.stdout.write(/** @type {string} */ (lines[i]));
-        }
+        writeTerminalPrefixedChunk(`  ${terminalThemeText('success', '│')}  `, chunk);
     };
 }
 
@@ -243,7 +269,7 @@ export function renderStreamingFooter(state, durationMs) {
                   : `\x1b[31m${secs}s\x1b[0m`;
         const ttft =
             state.firstChunkTime > 0 ? ((state.firstChunkTime - state.turnStartTime) / 1000).toFixed(1) + 's TTFT' : '';
-        process.stdout.write('\n');
+        writeTerminalRaw('\n');
         println(`  \x1b[90m└── ${secsColor}${ttft ? `  \x1b[90m·\x1b[0m  \x1b[90m${ttft}\x1b[0m` : ''}\x1b[0m`);
         println('');
     }
@@ -251,4 +277,5 @@ export function renderStreamingFooter(state, durationMs) {
     if (state.reasoningStarted && !state.streamingStarted) {
         flushReasoningSummary(state);
     }
+    releaseRenderLock(state);
 }

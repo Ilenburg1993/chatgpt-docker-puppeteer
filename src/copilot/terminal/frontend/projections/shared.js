@@ -16,6 +16,7 @@ import { readTerminalSessionBinding } from '../gateways/agent-runtime.js';
  * @typedef {{
  *     billedModel: string | null;
  *     configuredModel: string | null;
+ *     effectiveModel: string | null;
  *     mismatch: boolean;
  *     cost: number | null;
  *     at: string | null;
@@ -98,16 +99,19 @@ export function readTerminalRuntimeBase(runtimeId) {
 export function normalizeTerminalModelBillingProjection(lastPrInfo, fallbackModel) {
     const billedModel = typeof lastPrInfo?.['model'] === 'string' ? lastPrInfo['model'] : null;
     const configuredModel = typeof lastPrInfo?.['configuredModel'] === 'string' ? lastPrInfo['configuredModel'] : null;
+    const effectiveModel = typeof lastPrInfo?.['effectiveModel'] === 'string' ? lastPrInfo['effectiveModel'] : null;
     const mismatch =
         Boolean(lastPrInfo?.['modelMismatch']) ||
-        Boolean(billedModel && configuredModel && billedModel !== configuredModel);
+        Boolean(billedModel && configuredModel && billedModel !== configuredModel) ||
+        Boolean(effectiveModel && configuredModel && effectiveModel !== configuredModel);
     return {
         billedModel,
         configuredModel,
+        effectiveModel,
         mismatch,
         cost: typeof lastPrInfo?.['cost'] === 'number' ? Number(lastPrInfo['cost']) : null,
         at: typeof lastPrInfo?.['ts'] === 'number' ? new Date(lastPrInfo['ts']).toISOString() : null,
-        displayModel: billedModel ?? configuredModel ?? fallbackModel ?? '-',
+        displayModel: effectiveModel ?? billedModel ?? configuredModel ?? fallbackModel ?? '-',
     };
 }
 

@@ -60,11 +60,15 @@ const readTerminalErrorsProjection = vi.fn(() => ({
         { timestamp: 1713250001000, errorType: 'Error', source: 'sdk', message: 'oops' },
     ],
 }));
+const readTerminalRuntimeState = vi.fn(() => ({
+    lastPrInfo: { model: 'claude-haiku-4.5', configuredModel: 'gpt-4.1', modelMismatch: true, ts: 10 },
+}));
 
 vi.mock('../../../../src/copilot/terminal/frontend/index.js', () => ({
     readTerminalConfigProjection,
     readTerminalModelStatsProjection,
     listTerminalAvailableModelsProjection,
+    readTerminalRuntimeState,
     setTerminalModelProjection,
     setTerminalReasoningProjection,
     readTerminalErrorsProjection,
@@ -145,6 +149,7 @@ describe('terminal commands config/errors com frontend canônico', () => {
         expect(setTerminalModelProjection).toHaveBeenCalledWith('gpt-4.1');
         expect(ctx.output()).toContain('Reasoning ajustado');
         expect(ctx.output()).toContain('reasoning=no');
+        expect(ctx.output()).toContain('Último modelo efetivo observado na sessão: claude-haiku-4.5');
     });
 
     it('cmdErrors usa projection de erros do frontend', () => {

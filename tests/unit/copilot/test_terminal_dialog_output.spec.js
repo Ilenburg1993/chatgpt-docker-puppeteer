@@ -12,6 +12,8 @@ vi.mock('#copilot/config', () => ({
     LLM_B_TURN_TIMEOUT_MS: 120_000,
 }));
 vi.mock('../../../src/copilot/presentation/runtime-ui-state-store.js', () => ({
+    getBusy: vi.fn(() => false),
+    getRl: vi.fn(() => null),
     getSdkSessionMode: vi.fn(() => 'interactive'),
     getShowThinking: vi.fn(() => false),
     setShowThinking: vi.fn(),
@@ -23,6 +25,8 @@ vi.mock('../../../src/copilot/presentation/runtime-ui-state-store.js', () => ({
     setShowToolActivity: vi.fn(),
     getShowIntentActivity: vi.fn(() => false),
     setShowIntentActivity: vi.fn(),
+    getShowSessionActivity: vi.fn(() => false),
+    setShowSessionActivity: vi.fn(),
 }));
 vi.mock('../../../src/copilot/terminal/activity-state.js', () => ({
     readTerminalActivitySnapshot: vi.fn(() => ({ phase: 'boot', label: 'initial' })),

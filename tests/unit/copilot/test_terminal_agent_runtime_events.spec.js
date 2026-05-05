@@ -10,6 +10,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const println = vi.fn();
 const buildUserPrompt = vi.fn(() => 'prompt> ');
 const broadcastSse = vi.fn();
+const writeInlineStatus = vi.fn();
 const recordTerminalActivity = vi.fn();
 const getShowToolActivity = vi.fn(() => true);
 const getShowStreaming = vi.fn(() => true);
@@ -28,6 +29,7 @@ vi.mock('../../../src/copilot/terminal/dialog/index.js', () => ({
     println,
     buildUserPrompt,
     broadcastSse,
+    writeInlineStatus,
 }));
 
 vi.mock('../../../src/copilot/terminal/activity-state.js', () => ({
@@ -170,8 +172,49 @@ describe('terminal/agent-runtime-events.js — contrato', () => {
             'tool.start',
             expect.objectContaining({ toolCallId: 'tool-headless', operation: 'write', path: 'tmp/live.md' }),
         );
-        expect(println).toHaveBeenCalledWith('\n⚡ LLM-B perguntou: "Confirmar operação?"');
+        expect(println).toHaveBeenCalledWith(expect.stringContaining('LLM-B perguntou: "Confirmar operação?"'));
         expect(buildUserPrompt).not.toHaveBeenCalled();
+    });
+
+    it('suprime tool narration para ask_user protocolar', async () => {
+        const { setupTerminalAgentRuntimeEventListeners } =
+            await import('../../../src/copilot/terminal/agent-runtime-events.js');
+        /** @type {Map<string, Function[]>} */
+        const listeners = new Map();
+        const rl = {
+            pause: vi.fn(),
+            resume: vi.fn(),
+            setPrompt: vi.fn(),
+            prompt: vi.fn(),
+        };
+        const agent = {
+            on: vi.fn((event, handler) => {
+                const list = listeners.get(event) ?? [];
+                list.push(handler);
+                listeners.set(event, list);
+            }),
+            off: vi.fn(),
+        };
+
+        setupTerminalAgentRuntimeEventListeners({ agent: /** @type {any} */ (agent), rl: /** @type {any} */ (rl) });
+        listeners.get('tool.execution_start')?.[0]?.({
+            toolCallId: 'ask-1',
+            toolName: 'ask_user',
+            args: { prompt: 'READY: aguardando próxima mensagem' },
+        });
+        listeners.get('tool.execution_complete')?.[0]?.({
+            toolCallId: 'ask-1',
+            toolName: 'ask_user',
+            success: true,
+        });
+
+        expect(println).not.toHaveBeenCalledWith(expect.stringContaining('ask_user'));
+        expect(broadcastSse).not.toHaveBeenCalledWith('tool.start', expect.objectContaining({ toolCallId: 'ask-1' }));
+        expect(recordTerminalActivity).not.toHaveBeenCalledWith(
+            'tool',
+            'Executando tool',
+            expect.objectContaining({ toolName: 'ask_user' }),
+        );
     });
 
     it('reanuncia pergunta pendente viva ao registrar listeners do terminal', async () => {
@@ -205,9 +248,14 @@ describe('terminal/agent-runtime-events.js — contrato', () => {
 
         setupTerminalAgentRuntimeEventListeners({ agent: /** @type {any} */ (agent), rl: /** @type {any} */ (rl) });
 
-        expect(println).toHaveBeenCalledWith('\n⚡ LLM-B perguntou: "Qual arquivo devo revisar agora?"');
-        expect(println).toHaveBeenCalledWith('   Opções: A | B');
-        expect(println).toHaveBeenCalledWith('   Escolha rápida: 1) A    2) B');
+        expect(println).toHaveBeenCalledWith(
+            expect.stringContaining('LLM-B perguntou: "Qual arquivo devo revisar agora?"'),
+        );
+        expect(
+            println.mock.calls.some(([line]) => String(line).includes('OPTIONS') && String(line).includes('A | B')),
+        ).toBe(true);
+        expect(println).toHaveBeenCalledWith(expect.stringContaining('SELECT'));
+        expect(println).toHaveBeenCalledWith(expect.stringContaining('[1] A   [2] B'));
         expect(rl.pause).toHaveBeenCalled();
         expect(rl.resume).toHaveBeenCalled();
         expect(rl.setPrompt).toHaveBeenCalledWith('prompt> ');
@@ -250,7 +298,9 @@ describe('terminal/agent-runtime-events.js — contrato', () => {
         });
 
         expect(println).toHaveBeenCalledTimes(5);
-        expect(println).toHaveBeenCalledWith('\n⚡ LLM-B perguntou: "Qual arquivo devo revisar agora?"');
+        expect(println).toHaveBeenCalledWith(
+            expect.stringContaining('LLM-B perguntou: "Qual arquivo devo revisar agora?"'),
+        );
     });
 
     it('não reanuncia protocolo READY como pergunta visível', async () => {
@@ -312,9 +362,13 @@ describe('terminal/agent-runtime-events.js — contrato', () => {
 
         setupTerminalAgentRuntimeEventListeners({ agent: /** @type {any} */ (agent), rl: /** @type {any} */ (rl) });
 
-        expect(println).toHaveBeenCalledWith('\n⚡ LLM-B perguntou: "Você confirma aplicar o patch mínimo?"');
-        expect(println).toHaveBeenCalledWith('   Opções: sim | não');
-        expect(println).toHaveBeenCalledWith('   Escolha rápida: 1) sim    2) não');
+        expect(println).toHaveBeenCalledWith(
+            expect.stringContaining('LLM-B perguntou: "Você confirma aplicar o patch mínimo?"'),
+        );
+        expect(
+            println.mock.calls.some(([line]) => String(line).includes('OPTIONS') && String(line).includes('sim | não')),
+        ).toBe(true);
+        expect(println).toHaveBeenCalledWith(expect.stringContaining('[1] sim   [2] não'));
         expect(rl.pause).toHaveBeenCalled();
         expect(rl.resume).toHaveBeenCalled();
     });

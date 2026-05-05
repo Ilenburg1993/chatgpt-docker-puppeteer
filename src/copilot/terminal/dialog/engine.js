@@ -37,10 +37,12 @@ import {
     BOOT_PROMPT,
     buildUserPrompt,
     buildWaitingPrompt,
+    clearInlineStatus,
     printExchange,
     println,
     SEPARATOR,
     TURN_TIMEOUT_MS,
+    writeInlineStatus,
 } from './output.js';
 import { broadcastSse } from './sse.js';
 import {
@@ -70,6 +72,35 @@ export function getTurnQueueDepth() {
 let _sendTurnMutex = Promise.resolve(null);
 /** @type {Promise<void> | null} */
 let _ensureDialogLoopInFlight = null;
+
+const WAITING_FRAMES = ['⏳', '⌛', '⏳'];
+
+/**
+ * @param {{
+ *     startedAt: number;
+ *     model: string;
+ *     effort: string;
+ *     timeoutMs: number | null;
+ *     timeoutStrategy: 'explicit' | 'adaptive' | 'disabled';
+ * }} opts
+ * @returns {string}
+ */
+function formatLiveWaitingStatus({ startedAt, model, effort, timeoutMs, timeoutStrategy }) {
+    const elapsedMs = Math.max(0, Date.now() - startedAt);
+    const elapsed = `${(elapsedMs / 1000).toFixed(1)}s`;
+    const frame = WAITING_FRAMES[Math.floor(elapsedMs / 600) % WAITING_FRAMES.length] ?? '⏳';
+    const elapsedRatio = timeoutMs && timeoutMs > 0 ? elapsedMs / timeoutMs : 0;
+    const elapsedColor = elapsedRatio >= 0.85 ? '\x1b[31m' : elapsedRatio >= 0.6 ? '\x1b[33m' : '\x1b[90m';
+    const timeoutLabel = timeoutMs === null ? 'watchdog' : `${Math.max(1, Math.round(timeoutMs / 1000))}s`;
+    const strategyLabel = timeoutStrategy === 'disabled' ? 'no-timeout' : timeoutStrategy;
+    const quickActions =
+        elapsedMs >= 30_000
+            ? ' \x1b[90m[/status] [/errors] [/restart]\x1b[0m'
+            : elapsedMs >= 15_000
+              ? ' \x1b[90m[/status] [/errors]\x1b[0m'
+              : '';
+    return `  \x1b[90m${frame} aguardando \x1b[36m${model}\x1b[90m · \x1b[35m${effort}\x1b[90m · ${elapsedColor}${elapsed}\x1b[0m\x1b[90m · ${timeoutLabel}/${strategyLabel}…\x1b[0m${quickActions}`;
+}
 
 /**
  * READY pendente significa que o SDK já entregou o `ask_user` controlado pelo protocolo e o loop está semanticamente
@@ -283,6 +314,7 @@ export function sendTurn(message, actor = 'user') {
  * @returns {Promise<string | null>}
  */
 async function _executeTurn(message, actor) {
+    const t0 = Date.now();
     const runtimeState = readTerminalRuntimeState();
     const ctxState = runtimeState.contextWindow;
     if (ctxState) {
@@ -298,6 +330,24 @@ async function _executeTurn(message, actor) {
         }
     }
 
+    const metricsSummary = (() => {
+        try {
+            return container.resolve(METRICS_STORE).getSummary();
+        } catch {
+            return null;
+        }
+    })();
+    const timeoutDecision = resolveOptionalDialogTimeout({
+        explicitTimeoutMs: 0,
+        allowDisabled: true,
+        defaultTimeoutMs: TURN_TIMEOUT_MS,
+        queueDepth: runtimeState.queueSize,
+        contextUtilization: runtimeState.contextWindow?.utilization,
+        recentP50Ms: Number(metricsSummary?.dialog?.turnLatency?.p50 ?? 0),
+        recentP95Ms: Number(metricsSummary?.dialog?.turnLatency?.p95 ?? 0),
+        recentP99Ms: Number(metricsSummary?.dialog?.turnLatency?.p99 ?? 0),
+    });
+
     setBusy(true);
     recordTerminalActivity('turn', actor === 'llm-a' ? 'Processando mensagem da LLM-A' : 'Processando mensagem', {
         detail: message.slice(0, 120),
@@ -305,11 +355,25 @@ async function _executeTurn(message, actor) {
     });
     broadcastSse('busy', { busy: true, actor });
     const rl = getRl();
+    /** @type {NodeJS.Timeout | null} */
+    let waitingTicker = null;
     if (rl) {
         const { model, reasoningEffort } = readTerminalDialogStreamMeta();
         const effort = reasoningEffort;
-        process.stdout.write(`  \x1b[90m⏳ aguardando \x1b[36m${model}\x1b[90m · \x1b[35m${effort}\x1b[90m…\x1b[0m`);
+        const renderWaitingStatus = () =>
+            writeInlineStatus(
+                formatLiveWaitingStatus({
+                    startedAt: t0,
+                    model,
+                    effort,
+                    timeoutMs: timeoutDecision.timeoutMs,
+                    timeoutStrategy: timeoutDecision.strategy,
+                }),
+            );
+        renderWaitingStatus();
         rl.setPrompt(buildWaitingPrompt());
+        waitingTicker = setInterval(renderWaitingStatus, 1000);
+        if (typeof waitingTicker.unref === 'function') waitingTicker.unref();
     }
 
     let enrichedMessage = message;
@@ -326,7 +390,6 @@ async function _executeTurn(message, actor) {
         }
     }
 
-    const t0 = Date.now();
     try {
         await ensureDialogLoop();
 
@@ -348,23 +411,6 @@ async function _executeTurn(message, actor) {
         const showThinking = getShowThinking();
         const { model, reasoningEffort } = readTerminalDialogStreamMeta();
         const effort = reasoningEffort;
-        const metricsSummary = (() => {
-            try {
-                return container.resolve(METRICS_STORE).getSummary();
-            } catch {
-                return null;
-            }
-        })();
-        const timeoutDecision = resolveOptionalDialogTimeout({
-            explicitTimeoutMs: 0,
-            allowDisabled: true,
-            defaultTimeoutMs: TURN_TIMEOUT_MS,
-            queueDepth: runtimeState.queueSize,
-            contextUtilization: runtimeState.contextWindow?.utilization,
-            recentP50Ms: Number(metricsSummary?.dialog?.turnLatency?.p50 ?? 0),
-            recentP95Ms: Number(metricsSummary?.dialog?.turnLatency?.p95 ?? 0),
-            recentP99Ms: Number(metricsSummary?.dialog?.turnLatency?.p99 ?? 0),
-        });
         const displayState = createDisplayState({
             model,
             effort,
@@ -465,6 +511,9 @@ async function _executeTurn(message, actor) {
         }
         return null;
     } finally {
+        if (waitingTicker !== null) {
+            clearInterval(waitingTicker);
+        }
         setBusy(false);
         if (readTerminalRuntimeControlState().dialogLoopActive) {
             markTerminalActivityIdle();
@@ -472,6 +521,7 @@ async function _executeTurn(message, actor) {
         broadcastSse('busy', { busy: false });
         const rl = getRl();
         if (rl) {
+            clearInlineStatus();
             rl.setPrompt(buildUserPrompt());
             rl.prompt();
         }

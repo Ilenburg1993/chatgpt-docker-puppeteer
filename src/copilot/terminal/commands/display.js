@@ -22,6 +22,12 @@ import {
     writeTerminalDisplayState,
     writeTerminalDisplayToggle,
 } from '../display-policy.js';
+import {
+    getTerminalThemeName,
+    isTerminalThemeName,
+    listTerminalThemeProfiles,
+    setTerminalThemeName,
+} from '../ui-theme.js';
 
 /**
  * @typedef {object} DisplayContext
@@ -34,6 +40,15 @@ import {
 function presetUsageLabel() {
     return listTerminalDisplayPresets()
         .map((preset) => preset.name)
+        .join('|');
+}
+
+/**
+ * @returns {string}
+ */
+function themeUsageLabel() {
+    return listTerminalThemeProfiles()
+        .map((theme) => theme.name)
         .join('|');
 }
 
@@ -57,8 +72,10 @@ export function cmdDisplay({ println }, arg, rest) {
     if (!toggle) {
         const state = readTerminalDisplayState();
         const promptPolicy = readTerminalPromptDisplayPolicy(state);
+        const themeName = getTerminalThemeName();
         println('\n  \x1b[36mDisplay Toggles:\x1b[0m');
         println(`  \x1b[90mpreset atual: ${promptPolicy.density}\x1b[0m`);
+        println(`  \x1b[90mtema atual: ${themeName}\x1b[0m`);
         println('  ─────────────────────────────────────');
         for (const toggleDef of listTerminalDisplayToggles()) {
             const status = state[toggleDef.key] ? '\x1b[32m● on\x1b[0m' : '\x1b[31m○ off\x1b[0m';
@@ -67,6 +84,23 @@ export function cmdDisplay({ println }, arg, rest) {
         println('  ─────────────────────────────────────');
         println('  \x1b[90m/display all on  ·  /display all off\x1b[0m');
         println(`  \x1b[90m/display preset <${presetUsageLabel()}>\x1b[0m\n`);
+        println(`  \x1b[90m/display theme <${themeUsageLabel()}>\x1b[0m\n`);
+        return;
+    }
+
+    if (toggle === 'theme') {
+        if (!value) {
+            println(`  Tema atual: \x1b[36m${getTerminalThemeName()}\x1b[0m`);
+            println(`  \x1b[90mUso: /display theme <${themeUsageLabel()}>\x1b[0m`);
+            return;
+        }
+        if (!isTerminalThemeName(value)) {
+            println(`  \x1b[33mUso: /display theme <${themeUsageLabel()}>\x1b[0m`);
+            return;
+        }
+        setTerminalThemeName(value);
+        const selected = listTerminalThemeProfiles().find((theme) => theme.name === value);
+        println(`  ✅ Tema aplicado: \x1b[36m${value}\x1b[0m — ${selected?.description ?? 'paleta visual atualizada'}`);
         return;
     }
 
@@ -91,6 +125,7 @@ export function cmdDisplay({ println }, arg, rest) {
                 usage: newVal,
                 tools: newVal,
                 intent: newVal,
+                session: newVal,
             });
             println(`  ✅ Todos os toggles: \x1b[${newVal ? '32m● on' : '31m○ off'}\x1b[0m`);
             return;

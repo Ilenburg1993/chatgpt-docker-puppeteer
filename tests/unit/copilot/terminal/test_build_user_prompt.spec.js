@@ -8,6 +8,7 @@ const getShowStreaming = vi.fn(() => true);
 const getShowUsage = vi.fn(() => true);
 const getShowToolActivity = vi.fn(() => true);
 const getShowIntentActivity = vi.fn(() => true);
+const getShowSessionActivity = vi.fn(() => false);
 const readTerminalActivitySnapshot = vi.fn(() => ({
     phase: 'turn',
     label: 'Processando mensagem',
@@ -55,11 +56,13 @@ vi.mock('../../../../src/copilot/presentation/runtime-ui-state-store.js', () => 
     getShowUsage,
     getShowToolActivity,
     getShowIntentActivity,
+    getShowSessionActivity,
     setShowThinking: vi.fn(),
     setShowStreaming: vi.fn(),
     setShowUsage: vi.fn(),
     setShowToolActivity: vi.fn(),
     setShowIntentActivity: vi.fn(),
+    setShowSessionActivity: vi.fn(),
 }));
 
 describe('terminal/dialog/output buildUserPrompt', () => {
@@ -71,6 +74,7 @@ describe('terminal/dialog/output buildUserPrompt', () => {
         getShowUsage.mockReturnValue(true);
         getShowToolActivity.mockReturnValue(true);
         getShowIntentActivity.mockReturnValue(true);
+        getShowSessionActivity.mockReturnValue(false);
     });
 
     it('inclui modelo e reasoning no prompt', async () => {
@@ -117,6 +121,27 @@ describe('terminal/dialog/output buildUserPrompt', () => {
         expect(prompt).not.toContain('[ASK:READY]');
         expect(prompt).toContain('gpt-5-mini');
         expect(prompt).toContain('high');
+    });
+
+    it('prefere modelo efetivo observado quando há mismatch com o configurado', async () => {
+        readTerminalRuntimeState.mockReturnValueOnce(
+            /** @type {any} */ ({
+                ...readTerminalRuntimeState(),
+                model: 'gpt-5.4',
+                lastPrInfo: {
+                    model: 'claude-haiku-4.5',
+                    configuredModel: 'gpt-5.4',
+                    effectiveModel: 'claude-haiku-4.5',
+                    modelMismatch: true,
+                    ts: Date.now(),
+                },
+            }),
+        );
+        const { buildUserPrompt } = await import('../../../../src/copilot/terminal/dialog/output.js');
+        const prompt = buildUserPrompt();
+
+        expect(prompt).toContain('claude-haiku-4.5');
+        expect(prompt).toContain('[MODEL:gpt-5.4→claude-haiku-4.5]');
     });
 
     it('inclui marcador SHADOW quando só há shadow expirada', async () => {

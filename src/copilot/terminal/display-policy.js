@@ -9,11 +9,13 @@
 
 import {
     getShowIntentActivity,
+    getShowSessionActivity,
     getShowStreaming,
     getShowThinking,
     getShowToolActivity,
     getShowUsage,
     setShowIntentActivity,
+    setShowSessionActivity,
     setShowStreaming,
     setShowThinking,
     setShowToolActivity,
@@ -21,7 +23,7 @@ import {
 } from '../presentation/runtime-ui-state-store.js';
 
 /**
- * @typedef {'thinking' | 'streaming' | 'usage' | 'tools' | 'intent'} TerminalDisplayToggle
+ * @typedef {'thinking' | 'streaming' | 'usage' | 'tools' | 'intent' | 'session'} TerminalDisplayToggle
  *
  * @typedef {Record<TerminalDisplayToggle, boolean>} TerminalDisplayState
  *
@@ -53,7 +55,14 @@ import {
  */
 
 /** @type {readonly TerminalDisplayToggle[]} */
-export const TERMINAL_DISPLAY_TOGGLE_KEYS = Object.freeze(['thinking', 'streaming', 'usage', 'tools', 'intent']);
+export const TERMINAL_DISPLAY_TOGGLE_KEYS = Object.freeze([
+    'thinking',
+    'streaming',
+    'usage',
+    'tools',
+    'intent',
+    'session',
+]);
 
 /** @type {Record<TerminalDisplayToggle, TerminalDisplayToggleDescriptor>} */
 const TOGGLE_DESCRIPTORS = Object.freeze({
@@ -62,6 +71,11 @@ const TOGGLE_DESCRIPTORS = Object.freeze({
     usage: { key: 'usage', label: 'Usage (tokens pós-turno)', command: '/display usage [on|off]' },
     tools: { key: 'tools', label: 'Tool activity (início/fim/progresso)', command: '/display tools [on|off]' },
     intent: { key: 'intent', label: 'Intent (o que a LLM-B está tentando fazer)', command: '/display intent [on|off]' },
+    session: {
+        key: 'session',
+        label: 'Session notices (modo/model/contexto)',
+        command: '/display session [on|off]',
+    },
 });
 
 /** @type {Record<TerminalDisplayPresetName, TerminalDisplayPresetDescriptor>} */
@@ -70,31 +84,66 @@ export const TERMINAL_DISPLAY_PRESETS = Object.freeze({
         name: 'default',
         label: 'Default',
         description: 'Equilíbrio operacional: resposta incremental, usage, tools e intent.',
-        state: Object.freeze({ thinking: false, streaming: true, usage: true, tools: true, intent: true }),
+        state: Object.freeze({
+            thinking: false,
+            streaming: true,
+            usage: true,
+            tools: true,
+            intent: true,
+            session: false,
+        }),
     },
     minimal: {
         name: 'minimal',
         label: 'Minimal',
         description: 'Prompt limpo para leitura longa; só estados críticos aparecem.',
-        state: Object.freeze({ thinking: false, streaming: false, usage: false, tools: false, intent: false }),
+        state: Object.freeze({
+            thinking: false,
+            streaming: false,
+            usage: false,
+            tools: false,
+            intent: false,
+            session: false,
+        }),
     },
     verbose: {
         name: 'verbose',
         label: 'Verbose',
         description: 'Exibe todos os sinais humanos úteis durante turnos normais.',
-        state: Object.freeze({ thinking: true, streaming: true, usage: true, tools: true, intent: true }),
+        state: Object.freeze({
+            thinking: true,
+            streaming: true,
+            usage: true,
+            tools: true,
+            intent: true,
+            session: true,
+        }),
     },
     debug: {
         name: 'debug',
         label: 'Debug',
         description: 'Mesmo volume do verbose, reservado para troubleshooting.',
-        state: Object.freeze({ thinking: true, streaming: true, usage: true, tools: true, intent: true }),
+        state: Object.freeze({
+            thinking: true,
+            streaming: true,
+            usage: true,
+            tools: true,
+            intent: true,
+            session: true,
+        }),
     },
     focus: {
         name: 'focus',
         label: 'Focus',
         description: 'Oculta streaming/intent, mantendo usage e lifecycle de tools.',
-        state: Object.freeze({ thinking: false, streaming: false, usage: true, tools: true, intent: false }),
+        state: Object.freeze({
+            thinking: false,
+            streaming: false,
+            usage: true,
+            tools: true,
+            intent: false,
+            session: false,
+        }),
     },
 });
 
@@ -105,6 +154,7 @@ const TOGGLE_ACCESSORS = Object.freeze({
     usage: { get: getShowUsage, set: setShowUsage },
     tools: { get: getShowToolActivity, set: setShowToolActivity },
     intent: { get: getShowIntentActivity, set: setShowIntentActivity },
+    session: { get: getShowSessionActivity, set: setShowSessionActivity },
 });
 
 /**
@@ -149,6 +199,7 @@ export function readTerminalDisplayState() {
         usage: getShowUsage(),
         tools: getShowToolActivity(),
         intent: getShowIntentActivity(),
+        session: getShowSessionActivity(),
     };
 }
 

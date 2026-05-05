@@ -78,11 +78,13 @@ export {
     BOOT_PROMPT,
     buildUserPrompt,
     buildWaitingPrompt,
+    clearInlineStatus,
     printExchange,
     println,
     PROMPT_USER,
     PROMPT_WAITING,
     SEPARATOR,
     TURN_TIMEOUT_MS,
+    writeInlineStatus,
 } from './output.js';
 export { broadcastSse, CRITICAL_EVENTS, nextSseEventId } from './sse.js';

@@ -34,7 +34,12 @@ import {
     EMITTER_SESSION_WARNING,
     EMITTER_SESSION_WORKSPACE_FILE_CHANGED,
 } from '#copilot/events';
-import { setLastSdkPlanOperation, setSdkSessionMode } from '../presentation/runtime-ui-state-store.js';
+import { DialogProtocol } from '../dialog/protocol.js';
+import {
+    getShowSessionActivity,
+    setLastSdkPlanOperation,
+    setSdkSessionMode,
+} from '../presentation/runtime-ui-state-store.js';
 import { recordTerminalActivity } from './activity-state.js';
 import { broadcastSse, println } from './dialog/index.js';
 import {
@@ -82,6 +87,20 @@ function stringOr(value, fallback) {
  * @returns {() => void}
  */
 export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfIdle }) {
+    /** @type {Set<string>} */
+    const suppressedProtocolRequestIds = new Set();
+
+    /**
+     * @param {'critical' | 'important' | 'verbose'} level
+     * @returns {boolean}
+     */
+    function shouldPrintSessionNarration(level) {
+        if (level === 'critical' || level === 'important') {
+            return true;
+        }
+        return getShowSessionActivity();
+    }
+
     const onAssistantTurnStart = (/** @type {{ turnId?: string | null }} */ evt) => {
         const turnId = evt?.turnId ?? null;
         beginTerminalTurnTrace({ turnId });
@@ -119,8 +138,10 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
             source: 'sdk',
             recordHistory: false,
         });
-        println(`  \x1b[90mℹ️  [${infoType}] ${message}\x1b[0m`);
-        if (evt?.url) println(`  \x1b[90m    ${evt.url}\x1b[0m`);
+        if (shouldPrintSessionNarration('verbose')) {
+            println(`  \x1b[90mℹ️  [${infoType}] ${message}\x1b[0m`);
+            if (evt?.url) println(`  \x1b[90m    ${evt.url}\x1b[0m`);
+        }
         broadcastSse('session.info', { infoType, message, url: evt?.url, timestamp: Date.now() });
     };
 
@@ -205,6 +226,15 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
         const question = evt?.question ?? '(sem pergunta)';
         const choices = Array.isArray(evt?.choices) ? evt.choices : [];
         const allowFreeform = evt?.allowFreeform !== false;
+        const requestId = evt?.requestId ?? null;
+        const kind = DialogProtocol.classify(question);
+        if (requestId && kind !== 'question') {
+            suppressedProtocolRequestIds.add(requestId);
+        }
+        if (kind !== 'question') {
+            refreshPromptIfIdle();
+            return;
+        }
         recordTerminalActivity('question', 'ask_user SDK solicitado', {
             detail: `${question.slice(0, 160)}${choices.length > 0 ? ` · choices=${choices.join('|')}` : ''}`,
             source: 'sdk',
@@ -225,6 +255,11 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
         /** @type {{ requestId?: string; answer?: string; wasFreeform?: boolean }} */ evt,
     ) => {
         const requestId = evt?.requestId ?? null;
+        if (requestId && suppressedProtocolRequestIds.has(requestId)) {
+            suppressedProtocolRequestIds.delete(requestId);
+            refreshPromptIfIdle();
+            return;
+        }
         const wasFreeform = evt?.wasFreeform === true;
         recordTerminalActivity('question', 'ask_user SDK respondido', {
             detail: `${requestId ?? 'sem requestId'}${wasFreeform ? ' · freeform' : ' · choice/protocolo'}`,
@@ -263,9 +298,11 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
             detail: `${previousModel} → ${newModel}${reasoningEffort ? ` · ${reasoningEffort}` : ''}`,
             source: 'sdk',
         });
-        println(
-            `  \x1b[36m🧠 Modelo SDK: ${previousModel} → ${newModel}${reasoningEffort ? ` · ${reasoningEffort}` : ''}\x1b[0m`,
-        );
+        if (shouldPrintSessionNarration('verbose')) {
+            println(
+                `  \x1b[36m🧠 Modelo SDK: ${previousModel} → ${newModel}${reasoningEffort ? ` · ${reasoningEffort}` : ''}\x1b[0m`,
+            );
+        }
         broadcastSse('session.model_changed', {
             previousModel,
             newModel,
@@ -282,7 +319,7 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
             source: 'sdk',
             recordHistory: false,
         });
-        println(`  \x1b[90m🪪 Título da sessão: ${title}\x1b[0m`);
+        if (shouldPrintSessionNarration('verbose')) println(`  \x1b[90m🪪 Título da sessão: ${title}\x1b[0m`);
         broadcastSse('session.title_changed', {
             title,
             timestamp: Date.now(),
@@ -297,7 +334,8 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
             detail: `${cwd}${branch}${repository}`,
             source: 'sdk',
         });
-        println(`  \x1b[90m📁 Contexto SDK: ${cwd}${branch}${repository}\x1b[0m`);
+        if (shouldPrintSessionNarration('verbose'))
+            println(`  \x1b[90m📁 Contexto SDK: ${cwd}${branch}${repository}\x1b[0m`);
         broadcastSse('session.context_changed', {
             cwd: evt?.cwd,
             branch: evt?.branch,
@@ -316,7 +354,9 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
             detail: `${previousMode} → ${newMode ?? 'unknown'}`,
             source: 'sdk',
         });
-        println(`  \x1b[35m🧭 Modo SDK: ${previousMode} → ${newMode ?? 'unknown'}\x1b[0m`);
+        if (shouldPrintSessionNarration('verbose')) {
+            println(`  \x1b[35m🧭 Modo SDK: ${previousMode} → ${newMode ?? 'unknown'}\x1b[0m`);
+        }
         broadcastSse('session.mode_changed', {
             previousMode,
             newMode,
@@ -332,7 +372,7 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
             detail: operation ? `plan ${operation}` : 'plan modificado',
             source: 'sdk',
         });
-        println(`  \x1b[33m📝 Plan SDK: ${operation ?? 'alterado'}\x1b[0m`);
+        if (shouldPrintSessionNarration('verbose')) println(`  \x1b[33m📝 Plan SDK: ${operation ?? 'alterado'}\x1b[0m`);
         broadcastSse('session.plan_changed', { operation, timestamp: Date.now() });
         refreshPromptIfIdle();
     };
@@ -344,7 +384,7 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
             source: 'sdk',
             recordHistory: false,
         });
-        println(`  \x1b[90m🧰 Tools SDK atualizadas: ${count}\x1b[0m`);
+        if (shouldPrintSessionNarration('verbose')) println(`  \x1b[90m🧰 Tools SDK atualizadas: ${count}\x1b[0m`);
         broadcastSse('session.tools_updated', { count, timestamp: Date.now() });
     };
 
@@ -356,7 +396,8 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
             source: 'sdk',
             recordHistory: false,
         });
-        println(`  \x1b[90m🎛️  Skills SDK: ${enabled}/${count} habilitadas\x1b[0m`);
+        if (shouldPrintSessionNarration('verbose'))
+            println(`  \x1b[90m🎛️  Skills SDK: ${enabled}/${count} habilitadas\x1b[0m`);
         broadcastSse('session.skills_loaded', { count, enabled, timestamp: Date.now() });
     };
 
@@ -377,7 +418,7 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
             source: 'sdk',
             recordHistory: false,
         });
-        println(`  \x1b[90mMCP servers carregados: ${count}\x1b[0m`);
+        if (shouldPrintSessionNarration('verbose')) println(`  \x1b[90mMCP servers carregados: ${count}\x1b[0m`);
         broadcastSse('session.mcp_servers_loaded', { count, timestamp: Date.now() });
     };
 
@@ -398,7 +439,9 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
             detail: summary || 'SDK sinalizou task_complete',
             source: 'sdk',
         });
-        println(`  \x1b[32m🏁 Task concluída${summary ? `: ${summary}` : ''}\x1b[0m`);
+        if (shouldPrintSessionNarration('important')) {
+            println(`  \x1b[32m🏁 Task concluída${summary ? `: ${summary}` : ''}\x1b[0m`);
+        }
         broadcastSse('session.task_complete', {
             summary: summary || null,
             timestamp: Date.now(),
@@ -469,7 +512,9 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
             detail: `${fromAgent} → ${toAgent}${reason ? ` · ${reason}` : ''}`,
             source: 'sdk',
         });
-        println(`  \x1b[36m🔁 Handoff SDK: ${fromAgent} → ${toAgent}${reason ? ` · ${reason}` : ''}\x1b[0m`);
+        if (shouldPrintSessionNarration('important')) {
+            println(`  \x1b[36m🔁 Handoff SDK: ${fromAgent} → ${toAgent}${reason ? ` · ${reason}` : ''}\x1b[0m`);
+        }
         broadcastSse('session.handoff', {
             fromAgent,
             toAgent,
@@ -494,7 +539,8 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
             source: 'sdk',
             recordHistory: false,
         });
-        println(`  \x1b[90m🗂️  Workspace file ${operation}: ${path}\x1b[0m`);
+        if (shouldPrintSessionNarration('verbose'))
+            println(`  \x1b[90m🗂️  Workspace file ${operation}: ${path}\x1b[0m`);
         broadcastSse('session.workspace_file_changed', {
             path,
             operation,
@@ -540,7 +586,9 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
             toolName,
             source: 'sdk',
         });
-        println(`  \x1b[90m↗ external tool: ${toolName}${requestId ? ` (${requestId})` : ''}\x1b[0m`);
+        if (shouldPrintSessionNarration('verbose')) {
+            println(`  \x1b[90m↗ external tool: ${toolName}${requestId ? ` (${requestId})` : ''}\x1b[0m`);
+        }
         broadcastSse('external_tool.requested', { toolName, requestId, timestamp: Date.now() });
     };
 
@@ -564,9 +612,11 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
             source: 'sdk',
             severity: success ? 'info' : 'error',
         });
-        println(
-            `  ${success ? '\x1b[32m✓' : '\x1b[31m✗'} external tool:\x1b[0m ${toolName}${requestId ? ` \x1b[90m(${requestId})\x1b[0m` : ''}`,
-        );
+        if (shouldPrintSessionNarration('verbose')) {
+            println(
+                `  ${success ? '\x1b[32m✓' : '\x1b[31m✗'} external tool:\x1b[0m ${toolName}${requestId ? ` \x1b[90m(${requestId})\x1b[0m` : ''}`,
+            );
+        }
         broadcastSse('external_tool.completed', { toolName, requestId, success, timestamp: Date.now() });
     };
 
@@ -580,7 +630,9 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
             severity,
             recordHistory: severity === 'warn',
         });
-        println(`  \x1b[90mMCP ${serverName}: ${status}\x1b[0m`);
+        if (shouldPrintSessionNarration(severity === 'warn' ? 'important' : 'verbose')) {
+            println(`  \x1b[90mMCP ${serverName}: ${status}\x1b[0m`);
+        }
         broadcastSse('mcp.server.status_changed', { serverName, status, timestamp: Date.now() });
     };
 
@@ -605,7 +657,9 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
             detail: requestId ? `requestId=${requestId}` : 'sem requestId',
             source: 'sdk',
         });
-        println(`  \x1b[32m✓ OAuth MCP concluído${requestId ? ` (${requestId})` : ''}\x1b[0m`);
+        if (shouldPrintSessionNarration('important')) {
+            println(`  \x1b[32m✓ OAuth MCP concluído${requestId ? ` (${requestId})` : ''}\x1b[0m`);
+        }
         broadcastSse('mcp.oauth.completed', { requestId, timestamp: Date.now() });
         refreshPromptIfIdle();
     };
@@ -625,7 +679,11 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
             detail: evt?.requestId ? `requestId=${evt.requestId}` : 'SDK saiu do plan mode',
             source: 'sdk',
         });
-        println(`  \x1b[32m✅ SDK concluiu saída do plan mode${evt?.requestId ? ` (${evt.requestId})` : ''}\x1b[0m`);
+        if (shouldPrintSessionNarration('important')) {
+            println(
+                `  \x1b[32m✅ SDK concluiu saída do plan mode${evt?.requestId ? ` (${evt.requestId})` : ''}\x1b[0m`,
+            );
+        }
         broadcastSse('exit_plan_mode.completed', {
             requestId: evt?.requestId,
             timestamp: Date.now(),

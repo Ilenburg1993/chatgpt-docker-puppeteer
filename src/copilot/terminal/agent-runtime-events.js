@@ -31,11 +31,12 @@ import {
     getShowToolActivity,
 } from '../presentation/runtime-ui-state-store.js';
 import { recordTerminalActivity } from './activity-state.js';
-import { broadcastSse, buildUserPrompt, println } from './dialog/index.js';
+import { broadcastSse, buildUserPrompt, println, writeInlineStatus } from './dialog/index.js';
 import { readTerminalRuntimeState } from './frontend/gateways/agent-runtime.js';
 import { createTerminalPendingQuestionReplayState } from './pending-question-replay.js';
 import { buildTerminalToolActivityPresentation, compactTerminalToolText } from './tool-activity-presenter.js';
 import { completeTerminalTurnToolCall, recordTerminalTurnToolActivity } from './turn-trace-state.js';
+import { terminalActionChip, terminalThemeBadge, terminalThemeText } from './ui-theme.js';
 
 /**
  * @typedef {{
@@ -68,6 +69,26 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null }) {
     const pendingQuestionReplay = createTerminalPendingQuestionReplayState();
 
     /**
+     * @param {string} toolName
+     * @returns {boolean}
+     */
+    function shouldSuppressToolNarration(toolName) {
+        return toolName === 'ask_user';
+    }
+
+    /**
+     * @param {import('./tool-activity-presenter.js').TerminalToolOperation} operation
+     * @returns {'fileRead' | 'fileWrite' | 'fileEdit' | 'fileDelete' | 'tool'}
+     */
+    function mapOperationRole(operation) {
+        if (operation === 'read') return 'fileRead';
+        if (operation === 'write') return 'fileWrite';
+        if (operation === 'edit') return 'fileEdit';
+        if (operation === 'delete') return 'fileDelete';
+        return 'tool';
+    }
+
+    /**
      * @param {string} question
      * @param {string[]} [choices=[]] Default is `[]`
      * @param {'event' | 'replay'} [source='event'] Default is `'event'`
@@ -89,17 +110,28 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null }) {
         );
 
         rl?.pause();
-        println(`\n⚡ LLM-B perguntou: "${question}"`);
+        println(
+            `\n${terminalThemeBadge('question', 'QUESTION')} ${terminalThemeText('question', `LLM-B perguntou: "${question}"`)}`,
+        );
         if (choices.length > 0) {
-            println(`   Opções: ${choices.join(' | ')}`);
-            const indexed = choices.map((choice, idx) => `${idx + 1}) ${choice}`).join('    ');
-            println(`   Escolha rápida: ${indexed}`);
+            println(`   ${terminalThemeBadge('info', 'OPTIONS')} ${choices.join(' | ')}`);
+            const maxInlineChoices = 6;
+            const visibleChoices = choices.slice(0, maxInlineChoices);
+            const indexed = visibleChoices.map((choice, idx) => `[${idx + 1}] ${choice}`).join('   ');
+            const overflow = choices.length > maxInlineChoices ? `   … +${choices.length - maxInlineChoices}` : '';
+            println(`   ${terminalThemeBadge('info', 'SELECT')} ${indexed}${overflow}`);
         }
         if (rl) {
-            println('   → Responda digitando normalmente. Sua próxima mensagem será a resposta.');
-            println('   → Dica: use /status para contexto completo ou /answer <texto> para resposta explícita.');
+            println(
+                `   ${terminalThemeText('muted', '→ Responda digitando normalmente. Sua próxima mensagem será usada como resposta.')}`,
+            );
+            println(
+                `   ${terminalThemeText('muted', '→ Ações rápidas:')} ${terminalActionChip('/status')} ${terminalActionChip('/answer <texto>')} ${terminalActionChip('/clear-shadow')}`,
+            );
         } else {
-            println('   → Modo headless: responda via POST /inject ou pelo cliente conectado.');
+            println(
+                `   ${terminalThemeText('muted', '→ Modo headless: responda via POST /inject ou pelo cliente conectado.')}`,
+            );
         }
         rl?.resume();
         if (rl) {
@@ -130,6 +162,9 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null }) {
     const onToolStart = (/** @type {Record<string, unknown>} */ evt) => {
         const toolCallId = /** @type {string} */ (evt?.['toolCallId'] ?? '');
         const name = /** @type {string} */ (evt?.['toolName'] ?? evt?.['name'] ?? 'tool');
+        if (shouldSuppressToolNarration(name)) {
+            return;
+        }
         const presentation = buildTerminalToolActivityPresentation(evt, name);
         activeTools.set(toolCallId, {
             name,
@@ -153,7 +188,11 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null }) {
             source: 'sdk',
         });
         if (getShowToolActivity()) {
-            println(`  \x1b[90m🔧 ${name}\x1b[0m \x1b[33m${presentation.startLine}\x1b[0m`);
+            const operationRole = mapOperationRole(presentation.operation);
+            const opLabel = presentation.operation.toUpperCase();
+            println(
+                `  ${terminalThemeBadge('tool', 'TOOL')} ${terminalThemeBadge(operationRole, opLabel)} ${terminalThemeText('tool', name)} ${terminalThemeText('muted', '·')} ${terminalThemeText(operationRole, presentation.startLine)}`,
+            );
         }
         broadcastSse('tool.start', {
             toolCallId,
@@ -167,6 +206,9 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null }) {
         const toolCallId = /** @type {string} */ (evt?.['toolCallId'] ?? '');
         const entry = activeTools.get(toolCallId);
         const name = entry?.name ?? /** @type {string} */ (evt?.['toolName'] ?? evt?.['name'] ?? 'tool');
+        if (shouldSuppressToolNarration(name)) {
+            return;
+        }
         const presentation = entry?.presentation ?? buildTerminalToolActivityPresentation(evt, name);
         const progress = typeof evt?.['progress'] === 'number' ? Number(evt['progress']) : null;
         const progressMessage = typeof evt?.['progressMessage'] === 'string' ? evt['progressMessage'] : null;
@@ -190,7 +232,9 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null }) {
         });
         if (shouldPrint) {
             const suffix = progressMessage ?? (progress !== null ? `${progress}%` : '');
-            println(`  \x1b[90m↳ ${presentation.progressLinePrefix}\x1b[0m ${suffix}`.trimEnd());
+            println(
+                `  ${terminalThemeText('muted', '↳')} ${terminalThemeText('tool', presentation.progressLinePrefix)} ${terminalThemeText('muted', suffix)}`.trimEnd(),
+            );
         }
         broadcastSse('tool.progress', {
             toolCallId,
@@ -206,6 +250,9 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null }) {
         const toolCallId = evt?.toolCallId ?? '';
         const entry = activeTools.get(toolCallId);
         const name = entry?.name ?? 'tool';
+        if (shouldSuppressToolNarration(name)) {
+            return;
+        }
         const presentation = entry?.presentation ?? buildTerminalToolActivityPresentation({}, name);
         const partialOutput = typeof evt?.partialOutput === 'string' ? evt.partialOutput : '';
         if (!partialOutput) return;
@@ -219,7 +266,9 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null }) {
         if (getShowStreaming()) {
             for (const line of partialOutput.split('\n')) {
                 if (!line) continue;
-                println(`  \x1b[90m↳ ${presentation.progressLinePrefix}\x1b[0m ${line}`);
+                println(
+                    `  ${terminalThemeText('muted', '↳')} ${terminalThemeText('tool', presentation.progressLinePrefix)} ${terminalThemeText('muted', line)}`,
+                );
             }
         }
         broadcastSse('tool.partial_result', {
@@ -237,9 +286,13 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null }) {
         const entry = activeTools.get(toolCallId);
         activeTools.delete(toolCallId);
         const name = entry?.name ?? 'tool';
+        if (shouldSuppressToolNarration(name)) {
+            return;
+        }
         const presentation = entry?.presentation ?? buildTerminalToolActivityPresentation(evt, name);
         const dur = entry ? ((Date.now() - entry.t0) / 1000).toFixed(1) : '?';
-        const icon = success ? '\x1b[32m✅\x1b[0m' : '\x1b[31m❌\x1b[0m';
+        const icon = success ? terminalThemeText('success', '✅') : terminalThemeText('error', '❌');
+        const operationRole = mapOperationRole(presentation.operation);
         if (toolCallId) {
             completeTerminalTurnToolCall({ toolCallId, success });
         }
@@ -251,7 +304,10 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null }) {
             source: 'sdk',
         });
         if (getShowToolActivity()) {
-            println(`  ${icon} \x1b[90m${name}\x1b[0m \x1b[90m${presentation.completeLine(success, `${dur}s`)}\x1b[0m`);
+            const statusBadge = success ? terminalThemeBadge('success', 'DONE') : terminalThemeBadge('error', 'FAIL');
+            println(
+                `  ${icon} ${statusBadge} ${terminalThemeText('tool', name)} ${terminalThemeText('muted', '·')} ${terminalThemeText(operationRole, presentation.completeLine(success, `${dur}s`))}`,
+            );
         }
         broadcastSse('tool.complete', {
             toolCallId,
@@ -280,7 +336,7 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null }) {
             detail: 'Reduzindo uso de contexto da sessão',
             source: 'agent',
         });
-        println(`  \x1b[33m🗜️  Compactando context window…\x1b[0m`);
+        println(`  ${terminalThemeText('warn', '🗜️  Compactando context window…')}`);
         broadcastSse('compaction.start', {});
     };
 
@@ -299,10 +355,10 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null }) {
         if (success && pre !== undefined && post !== undefined) {
             const pct = ((1 - post / pre) * 100).toFixed(0);
             println(
-                `  \x1b[32m🗜️  Compactação concluída: ${pre.toLocaleString('pt-BR')} → ${post.toLocaleString('pt-BR')} tokens (-${pct}%)\x1b[0m`,
+                `  ${terminalThemeText('success', `🗜️  Compactação concluída: ${pre.toLocaleString('pt-BR')} → ${post.toLocaleString('pt-BR')} tokens (-${pct}%)`)}`,
             );
         } else if (!success) {
-            println(`  \x1b[31m🗜️  Compactação falhou\x1b[0m`);
+            println(`  ${terminalThemeText('error', '🗜️  Compactação falhou')}`);
         }
         broadcastSse('compaction.complete', { success, pre, post });
     };
@@ -316,7 +372,7 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null }) {
                 recordHistory: false,
             });
             if (getShowIntentActivity()) {
-                process.stdout.write(`\r  \x1b[90m⏳ ${intent}\x1b[0m\x1b[K`);
+                writeInlineStatus(`  \x1b[90m⏳ ${intent}\x1b[0m\x1b[K`);
             }
         }
     };

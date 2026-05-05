@@ -39,6 +39,7 @@ import {
     cmdGit as _cmdGit,
     cmdHelp as _cmdHelp,
     cmdHistory as _cmdHistory,
+    cmdMenu as _cmdMenu,
     cmdMetrics as _cmdMetrics,
     cmdModel as _cmdModel,
     cmdNow as _cmdNow,
@@ -71,6 +72,7 @@ import {
 } from './frontend/gateways/agent-runtime.js';
 import { stopTerminalDialogMode } from './frontend/gateways/dialog.js';
 import { clearRateLimiters } from './rate-limiter-state.js';
+import { parseTerminalReplCommand } from './repl-command-parser.js';
 
 /** @type {number} */
 const INJECT_PORT = readCopilotBootConfig().server.port;
@@ -277,6 +279,19 @@ export const CMD_ROUTES = [
     [['display'], (_, arg, rest) => _cmdDisplay({ println }, arg, rest)],
     [['export'], (_, arg) => _cmdExport({ println }, arg)],
     [['metrics'], (_, arg) => _cmdMetrics({ println }, arg)],
+    [
+        ['menu'],
+        (_, arg, rest, rl, injectServer, cleanup) =>
+            _cmdMenu({ println }, arg, rest, {
+                executeCommandLine: async (commandLine) => {
+                    const parsed = parseTerminalReplCommand(commandLine);
+                    if (!parsed) return false;
+                    if (parsed.command.toLowerCase() === 'menu') return false;
+                    await dispatchCmd(parsed.command, parsed.arg, parsed.rest, rl, injectServer, cleanup);
+                    return true;
+                },
+            }),
+    ],
     [['search'], (ctx, arg) => _cmdSearch({ println, hubSessionId: ctx.hubSessionId }, arg)],
     [['session'], (_, arg, rest) => _cmdSessionDispatch(arg, rest)],
     [['quit', 'exit'], (_, _2, _3, rl, injectServer, cleanup) => _cmdQuit(rl, injectServer, cleanup)],

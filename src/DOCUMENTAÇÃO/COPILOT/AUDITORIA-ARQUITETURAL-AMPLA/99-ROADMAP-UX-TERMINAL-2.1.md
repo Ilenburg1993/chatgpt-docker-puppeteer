@@ -449,3 +449,93 @@ Observação transversal alinhada ao plano geral:
 
 Pronto quando: o terminal permanece borda fina, runtime-aware e 100% alinhada ao fluxo canônico
 compartilhado de `src/copilot`.
+
+---
+
+## W130 — Hardening de streaming/output live (dialog)
+
+**Objetivo:** eliminar glitches de render ao vivo no dialog loop (flicker/interleaving/prompt drift)
+sem quebrar o contrato canônico de `terminal/dialog/*`.
+
+Achado atual (rodada 2026-05-05):
+
+- havia escrita fragmentada de chunks ao vivo durante reasoning/streaming, sujeita a interleaving;
+- faltava guarda explícita entre redraw de prompt e blocos de streaming contínuo;
+- alguns contratos de teste de `output.js` ficaram incompletos após introdução da policy de sessão
+  (`getShowSessionActivity`).
+
+Situação ideal:
+
+- toda escrita de stream passa por helpers canônicos de `output.js`;
+- redraw de prompt é suspenso enquanto blocos live estão ativos;
+- indicadores inline de espera são úteis para operador (tempo/estratégia) sem corromper stream;
+- contratos de teste cobrem lifecycle de lock e exports públicos do output.
+
+Subfaixas:
+
+1. centralizar escrita raw/prefixed em `output.js` (**feito**);
+2. introduzir render lock explícito e usar no ciclo de streaming/reasoning (**feito**);
+3. tornar `writeInlineStatus/clearInlineStatus` lock-aware para evitar corrupção de stream
+   (**feito**);
+4. adicionar ticker live de espera no `dialog/engine` com elapsed + timeout/strategy (**feito**);
+5. corrigir mocks de contrato (`test_terminal_dialog_output.spec.js`) para incluir policy de sessão
+   (**feito**);
+6. ampliar testes de lifecycle do lock (`test_turn_display.spec.js`) e validar suíte terminal ampla
+   (**feito: bateria `test_terminal_*.spec.js` + `terminal/test_*.spec.js` verde**).
+
+Pronto quando: o dialog live preserva legibilidade sob streaming longo, mantém prompt estável e
+continua compatível com os contratos canônicos da camada terminal.
+
+---
+
+## W131 — UX visual elegante/sóbria + semântica de tool/file/thinking
+
+**Objetivo:** elevar a UX do terminal para um padrão “bonito, coerente e rápido” sem romper o
+contrato TTY/headless e sem duplicar lógica fora das camadas canônicas.
+
+Achados da auditoria geral (rodada 2026-05-05):
+
+- havia boa cobertura funcional, mas a linguagem visual estava fragmentada (cores/ícones/textos
+  distribuídos);
+- faltava camada canônica de tema para garantir consistência entre prompt, palette, tools e
+  perguntas pendentes;
+- o terminal já expunha tool lifecycle e arquivo-alvo, porém com semântica visual irregular em
+  diferentes renderizadores.
+
+Implementado nesta faixa:
+
+1. **Sistema de tema terminal canônico** (`ui-theme.js`) com perfis:
+
+- `elegant` (padrão sóbrio),
+- `vivid` (alto contraste),
+- `mono` (sem cor / log-clean).
+
+2. **Comando de ajuste em runtime**:
+
+- `/display theme <elegant|vivid|mono>`
+- status do tema exibido em `/display`.
+
+3. **Menu inteligente** com paleta consistente:
+
+- chips/actions/hot markers reaproveitando a camada de tema.
+
+4. **Narrativa de runtime events refinada**:
+
+- pending question com `QUESTION/OPTIONS/SELECT` claros,
+- tools com badges semânticos (`TOOL`, operação READ/WRITE/EDIT/DELETE),
+- melhor distinção visual de progresso/parciais/conclusão.
+
+5. **Prompt e waiting prompt tematizados**:
+
+- tags de estado preservadas (`ASK`, `SHADOW`, `MODEL mismatch`, `NOLOOP`, etc.),
+- semântica visual centralizada e ajustável por tema.
+
+Validação:
+
+- bateria terminal ampla verde (`test_terminal_*.spec.js` + `terminal/test_*.spec.js`),
+- cobertura dedicada para `/display theme` adicionada,
+- lint/format limpos nos arquivos tocados.
+
+Pronto quando: todas as superfícies críticas do terminal (prompt, waiting, menu, tools, questions,
+thinking/streaming) permanecem semanticamente consistentes sob qualquer tema, com baixa fadiga
+visual em sessões longas.

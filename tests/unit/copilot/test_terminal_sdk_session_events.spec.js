@@ -5,7 +5,7 @@
  * Contrato: terminal/sdk-session-events.js
  */
 
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
     recordTerminalActivity: vi.fn(),
@@ -13,6 +13,7 @@ const mocks = vi.hoisted(() => ({
     println: vi.fn(),
     setLastSdkPlanOperation: vi.fn(),
     setSdkSessionMode: vi.fn(),
+    getShowSessionActivity: vi.fn(() => false),
     beginTerminalTurnTrace: vi.fn(),
     completeTerminalTurnTrace: vi.fn(),
     recordTerminalTurnFileActivity: vi.fn(),
@@ -31,6 +32,7 @@ vi.mock('../../../src/copilot/terminal/dialog/index.js', () => ({
 vi.mock('../../../src/copilot/presentation/runtime-ui-state-store.js', () => ({
     setLastSdkPlanOperation: mocks.setLastSdkPlanOperation,
     setSdkSessionMode: mocks.setSdkSessionMode,
+    getShowSessionActivity: mocks.getShowSessionActivity,
 }));
 
 vi.mock('../../../src/copilot/terminal/turn-trace-state.js', () => ({
@@ -66,6 +68,11 @@ function createAgentHost() {
 }
 
 describe('terminal/sdk-session-events.js — contrato', () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+        mocks.getShowSessionActivity.mockReturnValue(false);
+    });
+
     it('importa sem erros', async () => {
         const mod = await import('../../../src/copilot/terminal/sdk-session-events.js');
         expect(mod).toBeTruthy();
@@ -95,7 +102,30 @@ describe('terminal/sdk-session-events.js — contrato', () => {
             'session.mode_changed',
             expect.objectContaining({ previousMode: 'interactive', newMode: 'plan' }),
         );
+        expect(mocks.println).not.toHaveBeenCalledWith(expect.stringContaining('Modo SDK: interactive → plan'));
         expect(refreshPromptIfIdle).toHaveBeenCalled();
+    });
+
+    it('mantém session.model_changed silencioso por default e só narra em modo verbose', async () => {
+        const { setupTerminalSdkSessionEventListeners } =
+            await import('../../../src/copilot/terminal/sdk-session-events.js');
+        const agent = createAgentHost();
+
+        setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfIdle: vi.fn() });
+        agent.emit('session.model_changed', { previousModel: 'auto', newModel: 'gpt-5.4', reasoningEffort: 'high' });
+
+        expect(mocks.recordTerminalActivity).toHaveBeenCalledWith(
+            'system',
+            'Modelo SDK alterado',
+            expect.objectContaining({ detail: 'auto → gpt-5.4 · high' }),
+        );
+        expect(mocks.println).not.toHaveBeenCalledWith(expect.stringContaining('Modelo SDK: auto → gpt-5.4'));
+
+        mocks.println.mockClear();
+        mocks.getShowSessionActivity.mockReturnValue(true);
+        agent.emit('session.model_changed', { previousModel: 'gpt-5.4', newModel: 'gpt-5.5', reasoningEffort: 'high' });
+
+        expect(mocks.println).toHaveBeenCalledWith(expect.stringContaining('Modelo SDK: gpt-5.4 → gpt-5.5'));
     });
 
     it('surfa workspace_file_changed e assistant.turn_start/end para a UX local', async () => {
@@ -130,6 +160,7 @@ describe('terminal/sdk-session-events.js — contrato', () => {
             'Workspace da sessão alterado',
             expect.objectContaining({ detail: 'update · files/plan.md' }),
         );
+        expect(mocks.println).not.toHaveBeenCalledWith(expect.stringContaining('Workspace file update: files/plan.md'));
     });
 
     it('surfa elicitation, permission e sidechannel SDK como narrativa operacional', async () => {
@@ -228,6 +259,32 @@ describe('terminal/sdk-session-events.js — contrato', () => {
         expect(refreshPromptIfIdle).toHaveBeenCalled();
     });
 
+    it('suprime READY/REPLY protocolar de ask_user da narrativa terminal', async () => {
+        const { setupTerminalSdkSessionEventListeners } =
+            await import('../../../src/copilot/terminal/sdk-session-events.js');
+        const agent = createAgentHost();
+        const refreshPromptIfIdle = vi.fn();
+
+        setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfIdle });
+        mocks.recordTerminalActivity.mockClear();
+        mocks.broadcastSse.mockClear();
+        refreshPromptIfIdle.mockClear();
+        agent.emit('user_input.requested', {
+            requestId: 'proto-1',
+            question: 'READY: aguardando próxima mensagem',
+            allowFreeform: true,
+        });
+        agent.emit('user_input.completed', {
+            requestId: 'proto-1',
+            answer: 'CONTINUE_DIALOG_LOOP',
+            wasFreeform: false,
+        });
+
+        expect(mocks.recordTerminalActivity).not.toHaveBeenCalled();
+        expect(mocks.broadcastSse).not.toHaveBeenCalled();
+        expect(refreshPromptIfIdle).toHaveBeenCalled();
+    });
+
     it('surfa loaded/background SDK events para atividade e SSE', async () => {
         const { setupTerminalSdkSessionEventListeners } =
             await import('../../../src/copilot/terminal/sdk-session-events.js');
@@ -261,6 +318,22 @@ describe('terminal/sdk-session-events.js — contrato', () => {
             'session.background_tasks_changed',
             expect.objectContaining({ count: 4 }),
         );
+        expect(mocks.println).not.toHaveBeenCalledWith(expect.stringContaining('Skills SDK'));
+        expect(mocks.println).not.toHaveBeenCalledWith(expect.stringContaining('Tools SDK atualizadas'));
+    });
+
+    it('mostra narrativa verbose de sessão quando o toggle session está ativo', async () => {
+        mocks.getShowSessionActivity.mockReturnValue(true);
+        const { setupTerminalSdkSessionEventListeners } =
+            await import('../../../src/copilot/terminal/sdk-session-events.js');
+        const agent = createAgentHost();
+
+        setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfIdle: vi.fn() });
+        agent.emit('session.skills_loaded', { count: 3, enabled: 2 });
+        agent.emit('session.tools_updated', { count: 92 });
+
+        expect(mocks.println).toHaveBeenCalledWith(expect.stringContaining('Skills SDK: 2/3 habilitadas'));
+        expect(mocks.println).toHaveBeenCalledWith(expect.stringContaining('Tools SDK atualizadas: 92'));
     });
 
     it('cleanup remove listeners vanilla registrados', async () => {
