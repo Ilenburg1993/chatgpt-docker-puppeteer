@@ -132,6 +132,10 @@ export async function withErrorHandler(req, res, fn) {
         const code = body.code;
         log('ERROR', `[sdk-api/sessions] ${req.method} ${req.path} → ${status} ${code}: ${toError(e).message}`);
         if (!res.headersSent) {
+            if (status === 500) {
+                res.status(500).json({ ...body, ...buildSessionRouteRuntimeMeta(req) });
+                return;
+            }
             res.status(status).json({ ...body, ...buildSessionRouteRuntimeMeta(req) });
         }
     }

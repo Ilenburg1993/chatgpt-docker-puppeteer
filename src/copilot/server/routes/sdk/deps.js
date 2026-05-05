@@ -77,10 +77,7 @@ import { resolveOptionalDialogTimeout } from '../../../presentation/dialog-timeo
 import { buildRuntimeRouteMetaPayload } from '../../../presentation/runtime-meta.js';
 import { setRuntimeModelProjection, setRuntimeReasoningProjection } from '../../../presentation/runtime-models.js';
 import { resolveRequestedRuntimeId } from '../../../presentation/runtime-request.js';
-import {
-    readAgentSdkSystemPromptProjection,
-    resolveAgentSdkActiveSessionEntry,
-} from '../../../presentation/runtime-sdk-session.js';
+import * as runtimeSdkSessionOps from '../../../presentation/runtime-sdk-session.js';
 import {
     readAgentStatusSnapshot,
     readAgentStatusSnapshotForRuntime,
@@ -146,13 +143,25 @@ const sdkSessionUiOps = Object.freeze({
     sessionUiSelect,
 });
 
+const runtimeSdkSessionNamespace = { ...runtimeSdkSessionOps };
+
 const sdkRuntimeSessionOps = Object.freeze({
-    resolveAgentSdkActiveSessionEntry,
+    resolveAgentSdkActiveSessionEntry: runtimeSdkSessionNamespace.resolveAgentSdkActiveSessionEntry,
 });
 
 const sdkSystemPromptOps = Object.freeze({
     getSystemPromptSdkCompatibility,
-    readAgentSdkSystemPromptProjection,
+    readAgentSdkSystemPromptProjection:
+        runtimeSdkSessionNamespace.readAgentSdkSystemPromptProjection ??
+        (async () => ({
+            systemPrompt: await readSystemPromptStatus(),
+            binding: null,
+            freshness: null,
+            sessionId: null,
+            sessionAvailable: false,
+            instructionSources: null,
+            instructionSourcesError: 'readAgentSdkSystemPromptProjection unavailable',
+        })),
     readSessionInstructionSources,
     readSystemPromptStatus,
 });

@@ -12,7 +12,9 @@
 import { WORKSPACE_ROOT } from '#copilot/boot';
 import { log } from '#copilot/observability';
 import { DEFAULT_EXCLUDED_TOOLS } from './defaults.js';
-import { COPILOT_MCP_HTTP_TIMEOUT_MS, COPILOT_MCP_SERVERS, COPILOT_MCP_STDIO_TIMEOUT_MS, GITHUB_TOKEN } from './env.js';
+import * as env from './env.js';
+
+const envValues = { ...env };
 
 /**
  * @typedef {object} McpServerConfig
@@ -30,10 +32,13 @@ import { COPILOT_MCP_HTTP_TIMEOUT_MS, COPILOT_MCP_SERVERS, COPILOT_MCP_STDIO_TIM
  */
 
 /** Timeout padrão para tool calls stdio MCP (ms). Configurável via COPILOT_MCP_STDIO_TIMEOUT_MS. */
-const MCP_STDIO_TIMEOUT_MS = COPILOT_MCP_STDIO_TIMEOUT_MS;
+const MCP_STDIO_TIMEOUT_MS = envValues.COPILOT_MCP_STDIO_TIMEOUT_MS ?? 30_000;
 
 /** Timeout padrão para tool calls HTTP MCP (ms). Configurável via COPILOT_MCP_HTTP_TIMEOUT_MS. */
-const MCP_HTTP_TIMEOUT_MS = COPILOT_MCP_HTTP_TIMEOUT_MS;
+const MCP_HTTP_TIMEOUT_MS = envValues.COPILOT_MCP_HTTP_TIMEOUT_MS ?? 15_000;
+
+/** Token GitHub opcional para servidores MCP que o exigem. */
+const GITHUB_TOKEN = envValues.GITHUB_TOKEN ?? '';
 
 /**
  * Mapa de servidores MCP pré-configurados para este workspace.
@@ -92,7 +97,7 @@ export const MCP_SERVERS = {
     },
 };
 
-const DEFAULT_ENABLED = COPILOT_MCP_SERVERS.split(',').filter(Boolean);
+const DEFAULT_ENABLED = (envValues.COPILOT_MCP_SERVERS ?? '').split(',').filter(Boolean);
 
 /**
  * Constrói o objeto `mcpServers` para injetar na SessionConfig.
