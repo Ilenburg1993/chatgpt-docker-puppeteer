@@ -285,6 +285,7 @@ describe('commands/session — sync commands', () => {
         expect(ctx.output()).not.toContain('plan local');
         expect(ctx.output()).toContain('bg tasks');
         expect(ctx.output()).toContain('display');
+        expect(ctx.output()).toContain('permission mode');
         expect(ctx.output()).toContain('shadow expirada');
         expect(ctx.output()).toContain('perfil modelo');
         expect(ctx.output()).toContain('runtime id');
@@ -318,6 +319,7 @@ describe('commands/session — sync commands', () => {
         expect(ctx.output()).toContain('[now]');
         expect(ctx.output()).toContain('runtime=default');
         expect(ctx.output()).toContain('loop=off');
+        expect(ctx.output()).toContain('PM:approve_all');
     });
 
     it('cmdStatus aceita runtimeId explícito na sintaxe do REPL', () => {

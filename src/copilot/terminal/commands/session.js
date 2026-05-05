@@ -130,6 +130,11 @@ export function cmdStatus({ hubSessionId, injectPort, println }, arg = '') {
             ? `ask_user=${projection.pendingUserInputs}${projection.latestUserInputKind ? ` (${projection.latestUserInputKind})` : ''}`
             : null,
     ].filter(Boolean);
+    const sdkCapabilitiesUi =
+        projection.sdkCapabilities && typeof projection.sdkCapabilities['ui'] === 'object'
+            ? /** @type {Record<string, unknown>} */ (projection.sdkCapabilities['ui'])
+            : null;
+    const uiElicitationFlag = sdkCapabilitiesUi ? sdkCapabilitiesUi['elicitation'] === true : null;
     const timelineSyncLabel =
         projection.timelineSyncStatus === 'scheduled' || projection.timelineSyncStatus === 'inflight'
             ? ` · sync=${projection.timelineSyncStatus}:${projection.timelineSyncPendingCount}`
@@ -167,9 +172,11 @@ export function cmdStatus({ hubSessionId, injectPort, println }, arg = '') {
   dialog loop      ${active ? '\x1b[32m● ativo\x1b[0m' : '\x1b[31m○ inativo\x1b[0m'}
   ask_user         ${askUserStatus}
   sdk interrupts   ${sdkInterruptions.length > 0 ? `\x1b[33m${sdkInterruptions.join(' · ')}\x1b[0m` : '\x1b[90m(nenhum)\x1b[0m'}
+    sdk ui           \x1b[90melicitation=${uiElicitationFlag == null ? 'n/a' : uiElicitationFlag ? 'available' : 'unavailable'}\x1b[0m
   modelo           \x1b[36m${snap['model']}\x1b[0m
   reasoning        \x1b[35m${effort}\x1b[0m
     modo SDK         ${sdkModeColor}${sdkMode}\x1b[0m
+        permission mode  \x1b[33m${projection.permissionMode}\x1b[0m
     plan arquivo     ${sdkPlanOpLabel}
         bg tasks         ${health?.['backgroundPendingCount'] ?? 0}
         issues           ${Array.isArray(health?.['issues']) ? health['issues'].length : 0}
@@ -317,6 +324,7 @@ export function cmdNow({ hubSessionId, injectPort, println }, arg = '') {
         projection.pendingElicitations > 0 ? `ELICIT:${projection.pendingElicitations}` : null,
         projection.pendingPermissions > 0 ? `PERM:${projection.pendingPermissions}` : null,
         projection.pendingUserInputs > 0 ? `ASKSDK:${projection.pendingUserInputs}` : null,
+        `PM:${projection.permissionMode}`,
     ]
         .filter(Boolean)
         .join(' ');

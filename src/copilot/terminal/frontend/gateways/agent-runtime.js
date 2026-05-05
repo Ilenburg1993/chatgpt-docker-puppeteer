@@ -21,8 +21,10 @@ import {
     pingDefaultAgentDialogWatchdog,
     readAgentHandoffHistory,
     readAgentRuntimeControlState,
+    readAgentRuntimePermissionMode,
     resumeAgentDialogLoop,
     saveAgentRuntimeSnapshot,
+    setAgentRuntimePermissionMode,
     startAgentRuntime,
     stopAgentRuntimeDialogLoopAuthorized,
 } from '../../../presentation/runtime-controls.js';
@@ -96,6 +98,23 @@ export function readTerminalRuntimeState(runtimeId) {
  */
 export function readTerminalRuntimeControlState(runtimeId) {
     return readAgentRuntimeControlState(runtimeId);
+}
+
+/**
+ * @param {string | null | undefined} [runtimeId]
+ * @returns {'approve_all' | 'audit_only' | 'selective'}
+ */
+export function readTerminalRuntimePermissionMode(runtimeId) {
+    return readAgentRuntimePermissionMode(runtimeId);
+}
+
+/**
+ * @param {'approve_all' | 'audit_only' | 'selective'} mode
+ * @param {string | null | undefined} [runtimeId]
+ * @returns {'approve_all' | 'audit_only' | 'selective'}
+ */
+export function setTerminalRuntimePermissionMode(mode, runtimeId) {
+    return setAgentRuntimePermissionMode(mode, runtimeId);
 }
 
 // ---------------------------------------------------------------------------

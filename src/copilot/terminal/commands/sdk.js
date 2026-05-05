@@ -7,12 +7,17 @@
 
 import { toError } from '#copilot/core';
 import { isRuntimeElicitationSchema, normalizeElicitationContentWithSchema } from '../../core/elicitation-schema.js';
-import { readTerminalRuntimeState } from '../frontend/gateways/agent-runtime.js';
+import {
+    readTerminalRuntimePermissionMode,
+    readTerminalRuntimeState,
+    setTerminalRuntimePermissionMode,
+} from '../frontend/gateways/agent-runtime.js';
 import {
     compactTerminalSdkSession,
     confirmTerminalSdkSessionUi,
     createTerminalSdkWorkspaceFile,
     getTerminalSdkQuota,
+    getTerminalSdkSessionCapabilities,
     inputTerminalSdkSessionUi,
     isTerminalSdkSessionUiElicitationAvailable,
     listTerminalSdkModels,
@@ -187,6 +192,31 @@ function renderSdkWaitsSummary({ println }) {
 
 /**
  * @param {CommandContext} ctx
+ * @param {string | null | undefined} runtimeId
+ * @returns {void}
+ */
+function renderSdkCapabilitiesSummary({ println }, runtimeId) {
+    const capabilities = callWithRuntimeTarget(getTerminalSdkSessionCapabilities, runtimeId);
+    const caps = objectOrNull(capabilities) ?? {};
+    const ui = objectOrNull(caps['ui']) ?? {};
+    const tools = objectOrNull(caps['tools']) ?? {};
+    const plan = objectOrNull(caps['plan']) ?? {};
+
+    println('\n  \x1b[36mSDK Capabilities\x1b[0m');
+    println(
+        `  ui       \x1b[90melicitation=${String(ui['elicitation'] ?? false)} · confirm=${String(ui['confirm'] ?? false)} · select=${String(ui['select'] ?? false)} · input=${String(ui['input'] ?? false)}\x1b[0m`,
+    );
+    println(
+        `  tools    \x1b[90mworkspace=${String(tools['workspace'] ?? false)} · list=${String(tools['list'] ?? false)} · quota=${String(tools['quota'] ?? false)}\x1b[0m`,
+    );
+    println(
+        `  plan     \x1b[90mread=${String(plan['read'] ?? false)} · write=${String(plan['write'] ?? false)} · delete=${String(plan['delete'] ?? false)}\x1b[0m`,
+    );
+    println(`  raw      \x1b[90m${pretty(capabilities, 1200)}\x1b[0m\n`);
+}
+
+/**
+ * @param {CommandContext} ctx
  * @param {string} [arg]
  * @returns {Promise<void>}
  */
@@ -202,6 +232,8 @@ export async function cmdSdk({ println }, arg = '') {
             await renderSdkQuota({ println }, runtimeId);
         } else if (sub === 'prompt') {
             await renderSdkSystemPrompt({ println }, runtimeId);
+        } else if (sub === 'capabilities' || sub === 'caps') {
+            renderSdkCapabilitiesSummary({ println }, runtimeId);
         } else if (sub === 'waits') {
             renderSdkWaitsSummary({ println });
         } else if (sub === 'compact') {
@@ -221,7 +253,7 @@ export async function cmdSdk({ println }, arg = '') {
             );
             await renderSdkQuota({ println }, runtimeId, { compact: true });
             println(
-                '  \x1b[90mUso: /sdk models | /sdk tools [model] | /sdk quota | /sdk prompt | /sdk waits | /sdk compact\x1b[0m\n',
+                '  \x1b[90mUso: /sdk models | /sdk tools [model] | /sdk quota | /sdk prompt | /sdk capabilities | /sdk waits | /sdk compact\x1b[0m\n',
             );
         }
     } catch (e) {
@@ -538,8 +570,24 @@ export async function cmdElicitation({ println }, arg = '') {
  * @returns {Promise<void>}
  */
 export async function cmdPermission({ println }, arg = '') {
-    const { arg: cleanArg } = extractRuntimeTarget(arg);
+    const { runtimeId, arg: cleanArg } = extractRuntimeTarget(arg);
     const [sub = 'list', ...rest] = cleanArg.trim().split(/\s+/).filter(Boolean);
+    if (sub === 'mode') {
+        const next = rest[0];
+        if (!next) {
+            const current = readTerminalRuntimePermissionMode(runtimeId);
+            println(`\n  \x1b[36mPermission mode\x1b[0m  \x1b[33m${current}\x1b[0m`);
+            println('  \x1b[90mUso: /permission mode <approve_all|audit_only|selective>\x1b[0m\n');
+            return;
+        }
+        if (next !== 'approve_all' && next !== 'audit_only' && next !== 'selective') {
+            println('  \x1b[33mUso: /permission mode <approve_all|audit_only|selective>\x1b[0m');
+            return;
+        }
+        const updated = setTerminalRuntimePermissionMode(next, runtimeId);
+        println(`\n  \x1b[32m✓ Permission mode atualizado:\x1b[0m \x1b[33m${updated}\x1b[0m\n`);
+        return;
+    }
     if (sub === 'show') {
         renderPermissionEntry({ println }, getTerminalPermission(rest[0] || 'latest'));
         return;
@@ -564,7 +612,9 @@ export async function cmdPermission({ println }, arg = '') {
             );
         }
     }
-    println('  \x1b[90mUso: /permission [list|all|show latest|clear <id>|clear all]\x1b[0m');
+    println(
+        '  \x1b[90mUso: /permission [list|all|show latest|clear <id>|clear all|mode [approve_all|audit_only|selective]]\x1b[0m',
+    );
     println('  \x1b[90mPermissões são decididas pelo SDK/hook; este comando é observabilidade operacional.\x1b[0m\n');
 }
 

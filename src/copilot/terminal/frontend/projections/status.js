@@ -16,6 +16,7 @@ import {
     readTerminalPermissionSummary,
     readTerminalUserInputSummary,
 } from '../../sdk-interactions.js';
+import { getTerminalSdkSessionCapabilities } from '../gateways/sdk-session.js';
 import {
     formatTerminalRuntimeTopology,
     normalizeTerminalModelBillingProjection,
@@ -72,6 +73,8 @@ import { readTerminalTimelineProjection } from './timeline.js';
  *     latestPermissionType: string | null;
  *     pendingUserInputs: number;
  *     latestUserInputKind: 'question' | 'ready' | 'reply' | 'protocol' | null;
+ *     permissionMode: 'approve_all' | 'audit_only' | 'selective';
+ *     sdkCapabilities: Record<string, unknown> | null;
  *     timelineSource: import('./timeline.js').TerminalTimelineSource;
  *     timelineAuthority: import('./timeline.js').TerminalTimelineAuthority;
  *     timelineReconciliationStatus: import('./timeline.js').TerminalTimelineReconciliation;
@@ -100,6 +103,18 @@ export function readTerminalStatusProjection({ hubSessionId = null, injectPort, 
     const elicitationSummary = readTerminalElicitationSummary();
     const permissionSummary = readTerminalPermissionSummary();
     const userInputSummary = readTerminalUserInputSummary();
+    const permissionMode =
+        base.snap['permissionMode'] === 'audit_only' || base.snap['permissionMode'] === 'selective'
+            ? /** @type {'approve_all' | 'audit_only' | 'selective'} */ (base.snap['permissionMode'])
+            : 'approve_all';
+    const sdkCapabilities = (() => {
+        try {
+            const value = getTerminalSdkSessionCapabilities(runtimeId);
+            return value && typeof value === 'object' ? /** @type {Record<string, unknown>} */ (value) : null;
+        } catch {
+            return null;
+        }
+    })();
     const timeline = readTerminalTimelineProjection({ limitPairs: 10, runtimeId });
     return {
         snap: base.snap,
@@ -162,5 +177,7 @@ export function readTerminalStatusProjection({ hubSessionId = null, injectPort, 
         latestPermissionType: permissionSummary.latest?.permissionType ?? null,
         pendingUserInputs: userInputSummary.pending,
         latestUserInputKind: userInputSummary.latest?.kind ?? null,
+        permissionMode,
+        sdkCapabilities,
     };
 }

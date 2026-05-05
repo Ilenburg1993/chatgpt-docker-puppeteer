@@ -33,6 +33,11 @@ const runtimeMocks = vi.hoisted(() => ({
         },
     })),
     readTerminalSdkWorkspaceFile: vi.fn(async (path) => ({ path, content: 'hello' })),
+    getTerminalSdkSessionCapabilities: vi.fn(() => ({
+        ui: { elicitation: true, confirm: true, select: true, input: true },
+        tools: { workspace: true, list: true, quota: true },
+        plan: { read: true, write: true, delete: true },
+    })),
     requestTerminalSdkElicitation: vi.fn(async () => ({ action: 'accept', content: { answer: 'ok' } })),
     resolveTerminalSdkPendingElicitation: vi.fn(() => true),
     selectTerminalSdkSessionUi: vi.fn(async (_message, options) => options[0] ?? null),
@@ -45,6 +50,8 @@ const agentRuntimeMocks = vi.hoisted(() => ({
         model: 'gpt-5-mini',
         reasoningEffort: 'high',
     })),
+    readTerminalRuntimePermissionMode: vi.fn(() => 'approve_all'),
+    setTerminalRuntimePermissionMode: vi.fn((mode) => mode),
 }));
 
 vi.mock('../../../../src/copilot/terminal/frontend/gateways/sdk-session.js', () => runtimeMocks);
@@ -85,6 +92,15 @@ describe('terminal/commands/sdk', () => {
         expect(ctx.output()).toContain('sdk-1');
         expect(ctx.output()).toContain('chat');
         expect(ctx.output()).toContain('ask_user=0');
+    });
+
+    it('/sdk capabilities exibe capacidades consolidadas da sessão SDK', async () => {
+        const ctx = mockCtx();
+        await cmdSdk({ println: ctx.println }, 'capabilities');
+        expect(runtimeMocks.getTerminalSdkSessionCapabilities).toHaveBeenCalled();
+        expect(ctx.output()).toContain('SDK Capabilities');
+        expect(ctx.output()).toContain('elicitation=true');
+        expect(ctx.output()).toContain('workspace=true');
     });
 
     it('/sdk waits mostra painel unificado de interrupções SDK', async () => {
@@ -276,5 +292,17 @@ describe('terminal/commands/sdk', () => {
         const clear = mockCtx();
         await cmdPermission({ println: clear.println }, 'clear perm-1');
         expect(clear.output()).toContain('removida');
+    });
+
+    it('/permission mode lê e altera o modo de governança do runtime', async () => {
+        const show = mockCtx();
+        await cmdPermission({ println: show.println }, 'mode');
+        expect(agentRuntimeMocks.readTerminalRuntimePermissionMode).toHaveBeenCalled();
+        expect(show.output()).toContain('approve_all');
+
+        const set = mockCtx();
+        await cmdPermission({ println: set.println }, 'mode audit_only');
+        expect(agentRuntimeMocks.setTerminalRuntimePermissionMode).toHaveBeenCalledWith('audit_only', null);
+        expect(set.output()).toContain('Permission mode atualizado');
     });
 });

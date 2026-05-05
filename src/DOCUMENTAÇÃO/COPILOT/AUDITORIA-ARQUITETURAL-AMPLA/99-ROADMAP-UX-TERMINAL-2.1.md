@@ -708,3 +708,52 @@ Validação:
 
 Pronto quando: operador consegue sair de “detectei um bloqueio” para “executei o comando certo” em
 um único passo cognitivo, mantendo fluxo live fluido e elegante.
+
+---
+
+## W136 — Exposição canônica de governança/runtime-capabilities no terminal
+
+**Objetivo:** após auditoria geral de
+`terminal + sdk + camadas intermediárias (agent/presentation)`, eliminar “zonas cegas” operacionais
+onde o runtime já possuía estado/capacidade canônica, mas o TTY ainda não mostrava ou não permitia
+ação direta.
+
+Diagnóstico da auditoria:
+
+- o runtime já publicava `permissionMode` no snapshot canônico do agent, mas isso ainda não era
+  surfaced de forma explícita no painel operacional principal;
+- a sessão SDK já oferecia `getSdkSessionCapabilities()`, porém faltava uma leitura terminal clara e
+  acionável da matriz de capabilities;
+- o comando `/permission` era forte para observabilidade de requests pendentes, mas não expunha
+  governança ativa por runtime (`approve_all|audit_only|selective`).
+
+Situação ideal:
+
+- operador consegue ler governança de permissões e capacidades SDK sem sair do fluxo local;
+- `/status` e `/now` refletem esse estado de governança no mesmo modelo mental de operação live;
+- comandos de SDK/permissão continuam alinhados à arquitetura canônica (gateway → presentation →
+  agent) sem acoplamento ad-hoc.
+
+Implementado nesta rodada:
+
+1. `presentation/runtime-controls.js` passou a expor leitura/mutação canônica de permission mode por
+   runtime;
+2. `frontend/gateways/agent-runtime.js` recebeu wrappers terminal para
+   `read/setTerminalRuntimePermissionMode`;
+3. `frontend/projections/status.js` foi ampliado com `permissionMode` + `sdkCapabilities`;
+4. `/sdk` ganhou `capabilities` (`/sdk capabilities` | `/sdk caps`) com resumo legível + payload
+   raw;
+5. `/permission` ganhou `mode` (`/permission mode [approve_all|audit_only|selective]`);
+6. `/status` e `/now` passaram a exibir governança (`permission mode` / `PM:<mode>`), mantendo o
+   fluxo compacto/detalhado consistente;
+7. `/help` atualizado com as novas superfícies operacionais.
+
+Validação:
+
+- testes focados verdes (`test_commands_sdk`, `test_commands_session`, `test_commands_menu`,
+  `test_terminal_sdk_session_events`);
+- suíte terminal ampla verde (`55 passed | 1 skipped`, `377 passed | 1 skipped` tests);
+- format/lint/typecheck strict limpos.
+
+Pronto quando: toda decisão operacional relevante sobre waits, governança e capacidade da sessão SDK
+fica disponível no terminal em tempo real, sem depender de endpoint HTTP paralelo.

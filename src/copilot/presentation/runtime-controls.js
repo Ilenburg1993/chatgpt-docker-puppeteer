@@ -22,6 +22,7 @@ import {
     onceRuntimeEvent,
     pauseRuntimeDialogLoop,
     readRuntimeControlState,
+    readRuntimePermissionMode,
     resumeRuntimeDialogLoop,
     saveRuntimeSnapshot,
     setRuntimeBackgroundCompactionThreshold,
@@ -75,6 +76,25 @@ export function pingDefaultAgentDialogWatchdog() {
  */
 export function readAgentRuntimeControlState(runtimeId) {
     return readRuntimeControlState(getAgentRuntimeControlsTarget(runtimeId));
+}
+
+/**
+ * @param {string | null | undefined} [runtimeId]
+ * @returns {'approve_all' | 'audit_only' | 'selective'}
+ */
+export function readAgentRuntimePermissionMode(runtimeId) {
+    return readRuntimePermissionMode(getAgentRuntimeControlsTarget(runtimeId));
+}
+
+/**
+ * @param {'approve_all' | 'audit_only' | 'selective'} mode
+ * @param {string | null | undefined} [runtimeId]
+ * @returns {'approve_all' | 'audit_only' | 'selective'}
+ */
+export function setAgentRuntimePermissionMode(mode, runtimeId) {
+    const target = getAgentRuntimeControlsTarget(runtimeId);
+    target.setPermissionMode?.(mode);
+    return readRuntimePermissionMode(target);
 }
 
 /**
