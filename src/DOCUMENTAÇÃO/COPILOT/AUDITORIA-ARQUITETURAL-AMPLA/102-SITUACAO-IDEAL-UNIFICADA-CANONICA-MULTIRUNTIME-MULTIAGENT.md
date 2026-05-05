@@ -1,7 +1,7 @@
 # 102 — Situação ideal unificada canônica (multi-runtime + multi-agent)
 
-**Data:** 2026-05-01 **Objetivo:** definir o TO-BE unificado para todos os fluxos de `src/copilot`
-sem perda de funcionalidade e com espaço de expansão futura.
+**Data:** 2026-05-01 **Atualização:** 2026-05-04 **Objetivo:** definir o TO-BE unificado para todos
+os fluxos de `src/copilot` sem perda de funcionalidade e com espaço de expansão futura.
 
 ---
 
@@ -54,6 +54,8 @@ Cross-cutting: events/*, event-handlers/*, observability/*, audit/*
 4. **Runtime selection explícita**: toda borda informa `requestedRuntimeId`, `runtimeId`, fallback.
 5. **Event translation única**: sessão SDK sempre entra por `event-handlers/*`.
 6. **Fallbacks temporários com sunset**: sem fallback indefinido.
+7. **Erro HTTP canônico por domínio**: toda rota que resolve runtime/session/webhook usa projector
+   compartilhado e não deixa erro semântico escapar para handler genérico.
 
 ---
 
@@ -82,6 +84,16 @@ Cada runtime deve possuir envelope padrão:
 - fallback para runtime default só ocorre com metadata explícita;
 - payloads de status/diagnose sempre evidenciam fallback;
 - fallback silencioso passa a ser violação contratual.
+
+## 5.4 Classes de targeting por superfície
+
+| Superfície                          | Runtime explícito inexistente | Sem `runtimeId` explícito        | Contrato ideal                              |
+| ----------------------------------- | ----------------------------- | -------------------------------- | ------------------------------------------- |
+| Operações mutáveis SDK/agent        | `404 AGENT_RUNTIME_NOT_FOUND` | usa runtime default registrado   | falha estrita com metadata mínima           |
+| Leituras SDK auxiliares             | `404 AGENT_RUNTIME_NOT_FOUND` | usa runtime default registrado   | mesma projeção de erro das mutações         |
+| Status/health/overview informativos | resposta com fallback marcado | usa runtime default registrado   | warning explícito, nunca fallback invisível |
+| Terminal UX                         | mostra runtime solicitado     | usa runtime ativo/default        | prompt/status evidenciam mismatch/fallback  |
+| SSE/streams                         | recusa antes de abrir stream  | stream por runtime default/ativo | canal isolado por `runtimeId`               |
 
 ---
 
@@ -113,7 +125,10 @@ Cada runtime deve possuir envelope padrão:
 
 - routers 100% adapters;
 - `server/routes/sdk/*` sempre via `deps.js`;
-- zero payload de domínio montado ad hoc fora de `presentation`.
+- `withErrorHandler`/projectors canônicos em todas as rotas que resolvem deps;
+- zero payload de domínio montado ad hoc fora de `presentation`;
+- erro `AGENT_RUNTIME_NOT_FOUND` sempre inclui `requestedRuntimeId`, `runtimeFound=false` e
+  `usedDefaultRuntimeFallback=false`.
 
 ## 7.2 Terminal
 
@@ -135,7 +150,8 @@ Cada runtime deve possuir envelope padrão:
 2. fluxos PC com sunset e telemetria;
 3. cobertura contratual dos boundaries críticos;
 4. suporte a múltiplos runtimes com isolamento comprovado;
-5. profile multi-agent endereçável sem quebrar default runtime.
+5. profile multi-agent endereçável sem quebrar default runtime;
+6. rotas HTTP auxiliares e streams recusam runtime explícito inexistente antes de tocar estado vivo.
 
 ---
 

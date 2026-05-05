@@ -1,8 +1,8 @@
 # 100 — Mapeamento completo dos fluxos de `src/copilot` (AS-IS 2026-05)
 
-**Data:** 2026-05-01 **Escopo:** todos os fluxos arquiteturais ativos em `src/copilot/**`
-**Objetivo:** consolidar mapa único de fluxo, ownership e fronteiras para orientar canonicidade
-total.
+**Data:** 2026-05-01 **Atualização:** 2026-05-04 **Escopo:** todos os fluxos arquiteturais ativos em
+`src/copilot/**` **Objetivo:** consolidar mapa único de fluxo, ownership e fronteiras para orientar
+canonicidade total.
 
 ---
 
@@ -91,7 +91,7 @@ SDK SessionEvent
 | -------- | -------------------------------- | -------------------------------------------------------------------------- | ---------------------- | --------------------------------- |
 | F-SRV-01 | HTTP app/router                  | `server/app.js` + `server/router.js`                                       | `server/`              | **Canônico**                      |
 | F-SRV-02 | Copilot API routes               | `server/routes/copilot-api/*`                                              | `server/routes`        | **Canônico**                      |
-| F-SRV-03 | SDK API routes                   | `server/routes/sdk/*` via `sdk/deps.js`                                    | `server/routes/sdk`    | **Canônico**                      |
+| F-SRV-03 | SDK API routes                   | `server/routes/sdk/*` via `sdk/deps.js` + erro HTTP canônico               | `server/routes/sdk`    | **Canônico endurecido**           |
 | F-SRV-04 | SSE global/critical/task         | `server/routes/sse.js` + `copilot-api/stream.js` + `sdk/session-stream.js` | `server/routes`        | **Canônico**                      |
 | F-SRV-05 | Runtime state registries         | `server/runtime-state/*`                                                   | `server/runtime-state` | **Canônico (base multi-runtime)** |
 | F-SRV-06 | Presentation route adapter       | `server/routes/presentation-route.js`                                      | `server/routes/`       | **Canônico único**                |
@@ -108,6 +108,7 @@ SDK SessionEvent
 | F-TERM-05 | Runtime events adapters   | `terminal/agent-runtime-events.js` + `sdk-session-events.js` + `task-stream-events.js` | `terminal/`                               | **Canônico**                              |
 | F-TERM-06 | SSE passthrough explícito | `terminal/agent-sse-passthrough.js`                                                    | `terminal/`                               | **Paralelo controlado (janela residual)** |
 | F-TERM-07 | Dialog bridge LLM-A↔LLM-B | `terminal/frontend/gateways/dialog.js -> #copilot/channel`                             | `terminal/frontend/gateways` + `channel/` | **Canônico (ponte dedicada)**             |
+| F-TERM-08 | Timeline reconciliada     | `terminal/frontend/projections/timeline.js -> gateways/{hub,dialog}`                   | `terminal/frontend/projections`           | **Canônico com sync lazy para Hub**       |
 
 ## 3.7 Fluxos de transporte e persistência
 
@@ -125,6 +126,17 @@ SDK SessionEvent
 | F-OBS-02 | Event bridge coverage | `agent/facades/agent-runtime-event-bridge.js` + `hooks` + `hub` bridges | `agent` + `hooks` + `hub` | **Canônico**              |
 | F-OBS-03 | Audit pipeline        | `audit/*`                                                               | `audit/`                  | **Canônico**              |
 | F-OBS-04 | NERV bridge           | `bridges/nerv-event-bus-adapter.js`                                     | `bridges/`                | **Canônico (integração)** |
+
+## 3.9 Fluxos de system prompt e instruções do SDK
+
+| ID          | Fluxo                                | Caminho factual                                                                                                       | Owner atual                  | Estado                                         |
+| ----------- | ------------------------------------ | --------------------------------------------------------------------------------------------------------------------- | ---------------------------- | ---------------------------------------------- |
+| F-PROMPT-01 | Montagem declarativa estática        | `config/system-prompt/builders.js -> buildSystemMessage()`                                                            | `config/system-prompt`       | **Canônico**                                   |
+| F-PROMPT-02 | Sessão viva com auto-reload          | `config/system-prompt/live-builders.js -> buildLiveSystemMessage() -> SectionTransformFn`                             | `config/system-prompt` + SDK | **Canônico endurecido**                        |
+| F-PROMPT-03 | Injeção em create/resume             | `agent/session/initializers/initializer.js -> buildLiveSystemMessage() -> createSession/resumeSession(systemMessage)` | `agent/session` + `config/`  | **Canônico**                                   |
+| F-PROMPT-04 | Configuração declarativa do usuário  | `config/system-prompt/user-config.js` (`env` + `system-prompt.json` + arquivos append)                                | `config/system-prompt`       | **Canônico**                                   |
+| F-PROMPT-05 | Introspecção das fontes de instrução | `config/system-prompt/sdk-introspection.js -> session.rpc.instructions.getSources()`                                  | `config/system-prompt` + SDK | **Canônico (novo)**                            |
+| F-PROMPT-06 | Replace total em sessão viva         | `mode:'replace'`                                                                                                      | SDK                          | **Paralelo de risco residual (limite do SDK)** |
 
 ---
 
@@ -145,20 +157,40 @@ SDK SessionEvent
 - `terminal/index.js`, `repl.js`, `terminal-agent-wiring.js` ainda densos;
 - alguns pontos de composição ainda usam setters explícitos, mas sem wrappers compatíveis ou
   entrypoints paralelos.
+- system prompt agora possui owner canônico explícito em `config/system-prompt/*`; a dívida
+  remanescente é a limitação do SDK para recarregar **replace total** em sessão já aberta.
+- rotas SDK agora convergem para erro semântico `AGENT_RUNTIME_NOT_FOUND` em runtime explícito
+  inexistente, incluindo leituras auxiliares de `agent`, `hooks` e `observability`; a dívida
+  remanescente é reduzir o tamanho dos handlers, não a semântica de targeting;
+- a rota operacional de webhooks também usa payload de erro com metadata canônica quando o runtime
+  solicitado não existe.
 
 ### 4.3 Frágil (paralelos tolerados por necessidade)
 
 - passthrough SSE residual ainda existe, mas restrito a uma allowlist explícita e auditável;
-- fallback implícito para runtime default quando `runtimeId` não existe;
-- logger/observability ainda precisavam de hardening para sobreviver a stdout/stderr quebrado em
-  runtime headless ou destacado.
+- timeline dual foi reduzida a janela controlada de transporte: `bridge_only`/`bridge_tail` são
+  exibidos imediatamente e materializados no Conversation Hub por sync lazy deduplicado, com estado
+  operacional, retry, TTL e métricas expostas na UX do terminal;
+- fallback para runtime default sobrevive apenas como comportamento informativo em projections de
+  leitura que carregam metadata explícita (`status/health/overview`); o adapter operacional `/sdk/*`
+  e suas leituras auxiliares passam a falhar semanticamente com `AGENT_RUNTIME_NOT_FOUND` quando
+  recebem `runtimeId` explícito inexistente;
+- logger/observability já foram endurecidos para sobreviver a stdout/stderr quebrado em runtime
+  headless ou destacado.
+- `mode:'replace'` no system prompt continua existente por compatibilidade e casos avançados, mas
+  não oferece reload total de sessão viva sem `resume/create`; `append/customize` com transforms
+  cobrem o caminho canônico de auto-reload.
 
 ---
 
 ## 5) Conclusão factual
 
 O sistema já opera majoritariamente em fluxo canônico por camada e os caminhos compatíveis centrais
-de boot/PM2/shim HTTP foram removidos. O próximo passo não é “inventar nova topologia”: é **fechar
-os paralelos remanescentes de runtime selection/timeline e endurecer as fronteiras operacionais
-(transport, logging, passthrough SSE residual)**, preservando o caminho para multi-runtime e
-multi-agent.
+de boot/PM2/shim HTTP foram removidos. Em 2026-05-04, a auditoria confirmou que o maior gap
+funcional da E2 estava nas rotas SDK auxiliares que resolviam dependências fora do projetor de erro;
+esse gap foi corrigido em `agent`, `hooks` e `observability`. A sequência E3 fechou a timeline viva:
+projection reconciliada, sync lazy, retry, TTL e métricas estão implementados. O próximo passo não é
+“inventar nova topologia”: é **reduzir o passthrough SSE residual**, preservando o caminho para
+multi-runtime e multi-agent. No eixo de configuração, `config/system-prompt` passou a ter fluxo
+único: default `append`, barrel puro, config declarativa do usuário e auto-reload por transform do
+SDK em sessões vivas.

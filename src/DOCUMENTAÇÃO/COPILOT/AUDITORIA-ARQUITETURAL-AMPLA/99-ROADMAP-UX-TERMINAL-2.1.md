@@ -224,6 +224,22 @@ Checkpoint recente:
   preparando o terreno para fatiar adapters sem perder contexto operacional ao vivo.
 - `agent-sse-fallback.js` foi removido em favor de `agent-sse-passthrough.js`, reduzindo o fluxo
   residual do terminal a uma allowlist explícita de eventos raw ainda sem adapter dedicado.
+- `/sdk prompt` agora expõe o status canônico do system prompt modular + instruction sources da
+  sessão SDK ativa, sem abrir parser paralelo fora de `config/system-prompt/status.js` e
+  `presentation/runtime-sdk-session.js`.
+- `/sdk prompt` agora também mostra `binding` e `freshness` do prompt persistido pela sessão SDK,
+  transformando a diagnose de reload live/staleness em UX terminal canônica em vez de inspeção ad
+  hoc em logs/estado bruto.
+- `/status`, `/metrics`, `/health` e `/config` agora também promovem `systemPromptBinding` /
+  `systemPromptFreshness`, e `/metrics` correlaciona o último `/inject` com digest/frescor do
+  prompt; isso fecha a diagnose do ciclo live numa cadeia única
+  `config -> runtime-overview -> adapters`, sem dashboards paralelos.
+- rodada 2026-05-05: a auditoria profunda do `/inject` convergiu a policy de timeout de
+  `presentation`/`terminal`/`channel` para `core/dialog-timeout-policy.js`, aceitou watchdog-only
+  (`timeout=0/null`) fim a fim, anexou diagnósticos estruturados do turno
+  (`preflight/context/attachments/dialog`, `autoStarted`, `recoveredInputChannel`) e passou a
+  filtrar o último inject por `runtimeId` em `/metrics`, evitando troubleshooting cruzado entre
+  runtimes.
 
 Pronto quando: cada adapter tem owner e contrato visual claro.
 
@@ -380,11 +396,6 @@ fluxo único, audível e validado para responder sem quebrar o contrato do SDK.
 
 Referências diretas:
 
-- `100-MAPEAMENTO-COMPLETO-FLUXOS-SRC-COPILOT-2026-05.md`
-- `101-MATRIZ-FLUXOS-CANONICOS-VS-PARALELOS-SRC-COPILOT.md`
-- `102-SITUACAO-IDEAL-UNIFICADA-CANONICA-MULTIRUNTIME-MULTIAGENT.md`
-- `103-PLANO-EXECUCAO-CONVERGENCIA-CANONICA-GERAL.md`
-
 Subfaixas:
 
 1. manter `#copilot/channel` isolado em `frontend/gateways/dialog.js`;
@@ -396,21 +407,45 @@ Subfaixas:
 
 Checkpoint atual:
 
-- timeline canônica extraída para `frontend/projections/timeline.js` (**feito**);
-- `/history`, `/context`, `/export`, `/status`, `/now` e diagnose agora expõem origem/autoridade da
-  timeline (**feito na primeira onda da E3**);
-- `/db-history` corrigido para ler a cauda persistida em vez da cabeça histórica (**feito**);
-- reconciliação bridge↔hub já detecta `aligned`, `bridge_tail` e `diverged` (**feito**);
+timeline (**feito na primeira onda da E3**); projection canônica, com dedupe por assinatura,
+metadata `terminal.timeline_sync` e exposição do
+
+Observação transversal alinhada ao plano geral:
+
+- a regra 2.1 de barrels puros (`index.js` apenas import/export + JSDoc/tipagem) passou a valer como
+  guideline explícita fora do terminal também; a rodada de `config/system-prompt` serviu como
+  referência concreta dessa migração, removendo lógica operacional do barrel e deslocando-a para
+  builders/live-builders/registry. estado `scheduled/inflight/synced/failed` em `/status`, `/now`,
+  `/history`, `/context` e `/export` (**feito na segunda onda da E3**);
+- o sync lazy ganhou retry por turno, retentativa lifecycle pós-falha, TTL/limite de cache e
+  telemetria exposta em `/metrics`, removendo o último resíduo operacional da E3 (**feito na
+  terceira onda da E3**);
 - camada HTTP canônica consolidada em `server/routes/presentation-route.js`; o antigo
   `server/handler-bridge.js` foi removido (**feito**);
 - boot compatível `src/copilot/agent.js` / `boot/compat-entrypoint.js` e o processo PM2
   `copilot-sdk-agent` foram removidos; `llm-b-terminal` é o único owner executável (**feito**);
+- o adapter `/sdk/*` agora falha estritamente com `AGENT_RUNTIME_NOT_FOUND` quando um `runtimeId`
+  explícito é inválido, evitando que terminal/bordas administrativas operem sem querer sobre o
+  runtime default errado (**feito fora do terminal, mas relevante para W129**);
+- as rotas SDK auxiliares de leitura que ainda escapavam do projector canônico (`agent/tools`,
+  `agent/telemetry`, `hooks/registry`, `observability/otel-status`, `events/catalog`,
+  `events/dead-letter`) agora também falham com `AGENT_RUNTIME_NOT_FOUND` e metadata explícita,
+  mantendo a UX terminal alinhada às bordas HTTP (**feito fora do terminal, mas relevante para
+  W129**);
+- a borda HTTP de webhooks agora também inclui metadata canônica de runtime ausente no erro
+  `AGENT_RUNTIME_NOT_FOUND`, evitando uma exceção de payload em relação ao restante das superfícies
+  operacionais (**feito fora do terminal, mas relevante para W129**);
 - smoke test live do `/inject` revelou uma fronteira operacional residual fora da UX pura: o logger
   ainda assumia stdout/stderr vivos e podia derrubar o request path com `write EIO` em runtime
   destacado; a correção agora trata TTY quebrado como detalhe do sink, não como falha do fluxo
   canônico.
-- ainda falta decidir se `bridge_tail` deve ser persistido eagerly, lazy ou somente por sync
-  lifecycle (**pendente**).
+- decisão de persistência da cauda viva fechada como **lazy sync**: o terminal mantém leitura
+  imediata do bridge, mas materializa a cauda no Hub sem bloquear a UX. O ciclo associado está
+  completo: retry, backoff, TTL, cache bound, métrica e UX de falha estão implementados.
+- a auditoria de latência do `/inject` deixou de depender apenas do histórico bruto: o último inject
+  agora carrega outcome, timeout efetivo e correlação com digest/frescor do system prompt também em
+  `/metrics`, reduzindo a necessidade de inspeção manual do estado interno para separar gargalo de
+  runtime vs prompt stale.
 
 Pronto quando: o terminal permanece borda fina, runtime-aware e 100% alinhada ao fluxo canônico
 compartilhado de `src/copilot`.

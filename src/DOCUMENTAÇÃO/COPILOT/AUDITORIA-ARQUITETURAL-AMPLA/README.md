@@ -121,6 +121,9 @@ existentes em `DOCUMENTAÇÃO/`, com foco em responder de forma sistemática e c
 | 101   | `101-MATRIZ-FLUXOS-CANONICOS-VS-PARALELOS-SRC-COPILOT.md`              | matriz de classificação de fluxos canônicos/paralelos com priorização objetiva de convergência          |
 | 102   | `102-SITUACAO-IDEAL-UNIFICADA-CANONICA-MULTIRUNTIME-MULTIAGENT.md`     | situação ideal unificada para canonicidade total e expansão multi-runtime/multi-agent                   |
 | 103   | `103-PLANO-EXECUCAO-CONVERGENCIA-CANONICA-GERAL.md`                    | plano executivo por ondas para convergência canônica geral com execução iniciada nesta rodada           |
+| 104   | `104-AUDITORIA-GERAL-SRC-COPILOT-2026-05-04.md`                        | auditoria geral atualizada, bug corrigido, gaps remanescentes e próxima transformação recomendada       |
+| 105   | `105-CHECKPOINT-E3-TIMELINE-SYNC-LAZY-2026-05-04.md`                   | checkpoint da segunda transformação E3: cauda viva da timeline sincronizada lazy no Hub                 |
+| 106   | `106-FECHAMENTO-E3-TIMELINE-SEM-RESIDUOS-2026-05-04.md`                | fechamento total dos resíduos associados à timeline unificada E3                                        |
 
 ## Próximos documentos previstos
 
