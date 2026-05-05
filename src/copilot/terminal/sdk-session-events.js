@@ -54,6 +54,8 @@ import {
     recordTerminalTurnFileActivity,
     recordTerminalTurnToolActivity,
 } from './turn-trace-state.js';
+import { getTerminalDetailLevel } from './ui-preferences.js';
+import { terminalThemeBadge, terminalThemeText } from './ui-theme.js';
 
 /**
  * @typedef {{
@@ -77,6 +79,57 @@ function eventObject(evt) {
  */
 function stringOr(value, fallback) {
     return typeof value === 'string' && value.length > 0 ? value : fallback;
+}
+
+/**
+ * @param {string} value
+ * @param {number} [max=36] Default is `36`
+ * @returns {string}
+ */
+function compactSummaryText(value, max = 36) {
+    return value.length <= max ? value : `${value.slice(0, Math.max(0, max - 1))}…`;
+}
+
+/**
+ * @param {import('./turn-trace-state.js').TerminalTurnTraceSnapshot | null} trace
+ * @returns {void}
+ */
+function renderTurnTraceSummary(trace) {
+    if (!trace || (trace.tools.length === 0 && trace.files.length === 0)) {
+        return;
+    }
+    const compactDetail = getTerminalDetailLevel() === 'compact';
+    const toolItems = trace.tools.slice(0, compactDetail ? 2 : 3).map((tool) => {
+        const target = tool.path ?? tool.target ?? tool.toolName;
+        const label = compactDetail
+            ? `${tool.operation.toUpperCase()} ${compactSummaryText(target ?? tool.toolName, 28)}`
+            : `${tool.operation.toUpperCase()} ${tool.toolName} · ${compactSummaryText(target ?? tool.toolName, 46)}`;
+        return terminalThemeText('tool', label);
+    });
+    const fileItems = trace.files.slice(0, compactDetail ? 2 : 3).map((file) => {
+        const label = compactDetail
+            ? compactSummaryText(file.path, 24)
+            : `${file.operation.toUpperCase()} ${compactSummaryText(file.path, 42)}`;
+        return terminalThemeText('info', label);
+    });
+    const headline = [
+        trace.tools.length > 0 ? `${trace.tools.length} tool(s)` : null,
+        trace.files.length > 0 ? `${trace.files.length} arquivo(s)` : null,
+    ]
+        .filter(Boolean)
+        .join(' · ');
+
+    println(`  ${terminalThemeBadge('info', 'TURN')} ${terminalThemeText('muted', headline)}`);
+    if (toolItems.length > 0) {
+        println(
+            `   ${terminalThemeBadge('tool', compactDetail ? 'OPS' : 'TOOLS')} ${toolItems.join(terminalThemeText('muted', '  ·  '))}`,
+        );
+    }
+    if (fileItems.length > 0) {
+        println(
+            `   ${terminalThemeBadge('fileRead', compactDetail ? 'FILES' : 'FILES')} ${fileItems.join(terminalThemeText('muted', '  ·  '))}`,
+        );
+    }
 }
 
 /**
@@ -117,12 +170,13 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
 
     const onAssistantTurnEnd = (/** @type {{ turnId?: string | null }} */ evt) => {
         const turnId = evt?.turnId ?? null;
-        completeTerminalTurnTrace({ turnId });
+        const trace = completeTerminalTurnTrace({ turnId });
         recordTerminalActivity('turn', 'Turno do assistente concluído', {
             detail: turnId ? `turnId=${turnId}` : 'resposta concluída',
             source: 'sdk',
             recordHistory: false,
         });
+        renderTurnTraceSummary(trace);
         broadcastSse('assistant.turn_end', {
             turnId,
             timestamp: Date.now(),

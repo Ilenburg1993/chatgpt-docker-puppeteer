@@ -584,3 +584,37 @@ Validação:
 
 Pronto quando: o operador consegue alternar entre uma UX densa e uma UX minimalista elegante sem
 perder coerência semântica nem rastreabilidade ao vivo.
+
+---
+
+## W133 — Resumo pós-turno de tools/arquivos no fluxo canônico do SDK
+
+**Objetivo:** fechar o ciclo de observabilidade live do terminal com um resumo elegante do que a
+LLM-B realmente fez em cada turno, sem depender apenas da narrativa incremental durante a execução.
+
+Diagnóstico da situação anterior:
+
+- tools e arquivos já eram narrados ao vivo, mas a visão consolidada do turno exigia reconstrução
+  mental pelo operador;
+- o estado canônico do turno já existia em `turn-trace-state.js`, porém ainda não era promovido a
+  uma superfície visual elegante no encerramento do turno;
+- havia oportunidade clara de aumentar a legibilidade sem criar outro parser/estado paralelo.
+
+Situação ideal:
+
+- ao final do turno do assistente, o terminal exibe um resumo curto e confiável com contagem de
+  tools e arquivos tocados;
+- o resumo usa exclusivamente o snapshot retornado por `completeTerminalTurnTrace()`;
+- `compact` e `detailed` controlam a densidade desse resumo, preservando a mesma semântica base.
+
+Implementado nesta rodada:
+
+1. `sdk-session-events.js` passou a capturar o snapshot retornado por
+   `completeTerminalTurnTrace({ turnId })`;
+2. foi criado um renderer local e canônico de resumo pós-turno com badges `TURN/TOOLS/FILES`;
+3. o renderer usa `ui-preferences.js` para sintetizar ou expandir a densidade conforme o modo ativo;
+4. a cobertura de `test_terminal_sdk_session_events.spec.js` agora valida a emissão do resumo com
+   tool/file reais do turno.
+
+Pronto quando: cada resposta da LLM-B pode ser acompanhada não só pelo texto gerado, mas também por
+um fechamento claro do trabalho operacional realizado no turno.

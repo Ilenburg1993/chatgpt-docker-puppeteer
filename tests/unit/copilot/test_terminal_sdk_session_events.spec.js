@@ -18,6 +18,7 @@ const mocks = vi.hoisted(() => ({
     completeTerminalTurnTrace: vi.fn(),
     recordTerminalTurnFileActivity: vi.fn(),
     recordTerminalTurnToolActivity: vi.fn(),
+    getTerminalDetailLevel: vi.fn(() => 'detailed'),
 }));
 
 vi.mock('../../../src/copilot/terminal/activity-state.js', () => ({
@@ -40,6 +41,10 @@ vi.mock('../../../src/copilot/terminal/turn-trace-state.js', () => ({
     completeTerminalTurnTrace: mocks.completeTerminalTurnTrace,
     recordTerminalTurnFileActivity: mocks.recordTerminalTurnFileActivity,
     recordTerminalTurnToolActivity: mocks.recordTerminalTurnToolActivity,
+}));
+
+vi.mock('../../../src/copilot/terminal/ui-preferences.js', () => ({
+    getTerminalDetailLevel: mocks.getTerminalDetailLevel,
 }));
 
 function createAgentHost() {
@@ -71,6 +76,8 @@ describe('terminal/sdk-session-events.js — contrato', () => {
     beforeEach(() => {
         vi.clearAllMocks();
         mocks.getShowSessionActivity.mockReturnValue(false);
+        mocks.getTerminalDetailLevel.mockReturnValue('detailed');
+        mocks.completeTerminalTurnTrace.mockReturnValue(null);
     });
 
     it('importa sem erros', async () => {
@@ -132,6 +139,39 @@ describe('terminal/sdk-session-events.js — contrato', () => {
         const { setupTerminalSdkSessionEventListeners } =
             await import('../../../src/copilot/terminal/sdk-session-events.js');
         const agent = createAgentHost();
+        mocks.completeTerminalTurnTrace.mockReturnValue({
+            traceId: 'turn:turn-1',
+            turnId: 'turn-1',
+            source: 'assistant',
+            status: 'completed',
+            startedAt: 1,
+            updatedAt: 2,
+            finishedAt: 3,
+            toolCount: 1,
+            fileCount: 1,
+            tools: [
+                {
+                    toolName: 'workspace.read_file',
+                    operation: 'read',
+                    path: 'files/plan.md',
+                    target: 'files/plan.md',
+                    source: 'sdk',
+                    status: 'completed',
+                    success: true,
+                    count: 1,
+                    updatedAt: 2,
+                },
+            ],
+            files: [
+                {
+                    path: 'files/plan.md',
+                    operation: 'edit',
+                    source: 'sdk',
+                    count: 1,
+                    updatedAt: 2,
+                },
+            ],
+        });
 
         setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfIdle: vi.fn() });
         agent.emit('assistant.turn_start', { turnId: 'turn-1' });
@@ -160,6 +200,9 @@ describe('terminal/sdk-session-events.js — contrato', () => {
             'Workspace da sessão alterado',
             expect.objectContaining({ detail: 'update · files/plan.md' }),
         );
+        expect(mocks.println).toHaveBeenCalledWith(expect.stringContaining('TURN'));
+        expect(mocks.println).toHaveBeenCalledWith(expect.stringContaining('workspace.read_file'));
+        expect(mocks.println).toHaveBeenCalledWith(expect.stringContaining('files/plan.md'));
         expect(mocks.println).not.toHaveBeenCalledWith(expect.stringContaining('Workspace file update: files/plan.md'));
     });
 
