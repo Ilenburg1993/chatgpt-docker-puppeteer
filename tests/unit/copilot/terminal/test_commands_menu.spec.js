@@ -150,6 +150,7 @@ describe('terminal/commands/menu', () => {
         const ids = entries.map((entry) => entry.id);
 
         expect(ids).toContain('sdk-ask-user');
+        expect(ids).toContain('sdk-waits');
         expect(ids).toContain('elicitation-latest');
         expect(ids).toContain('permission-latest');
     });

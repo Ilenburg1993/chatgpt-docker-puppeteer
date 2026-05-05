@@ -666,3 +666,45 @@ Validação:
 
 Pronto quando: o operador consegue identificar e agir sobre qualquer interrupção SDK em segundos,
 usando `/now`, `/status` ou `/menu`, sem perder contexto da conversa live.
+
+---
+
+## W135 — Cockpit rápido de interrupções via `/sdk waits` + palette HOT
+
+**Objetivo:** reduzir ainda mais o tempo de decisão operacional em sessões live criando um painel
+curto e acionável para interrupções SDK, sem exigir leitura extensa do `/status` completo.
+
+Diagnóstico da situação anterior:
+
+- o estado unificado de interrupções já existia, porém ainda distribuído entre `/status`, `/now` e
+  comandos especializados;
+- faltava uma superfície curta dedicada ao operador para responder “o que está pendente e qual o
+  próximo comando?” em uma só leitura;
+- havia um ruído visual residual no `/sdk status` (separadores corrompidos) que prejudicava a
+  elegância da operação.
+
+Situação ideal:
+
+- `/sdk waits` funciona como cockpit de interrupções em 3-6 linhas;
+- cada categoria pendente (`elicitation`, `permission`, `ask_user`) vem com ação imediata
+  recomendada;
+- a command palette fornece atalho HOT para esse cockpit sempre que há pendência;
+- `/sdk status` mantém legibilidade impecável e consistente com o cockpit.
+
+Implementado nesta rodada:
+
+1. criação de `renderSdkWaitsSummary()` em `commands/sdk.js`;
+2. novo subcomando público `/sdk waits` com resumo + ações rápidas;
+3. correção dos separadores corrompidos no resumo `waits` do `/sdk status`;
+4. atualização do help de uso do `/sdk` para incluir `waits`;
+5. inclusão do atalho HOT `sdk-waits` no `/menu` quando houver interrupções pendentes.
+
+Validação:
+
+- testes focados verdes com cobertura nova em `test_commands_sdk.spec.js` e
+  `test_commands_menu.spec.js`;
+- regressão terminal ampla verde (`55 passed | 1 skipped`);
+- format/lint/typecheck strict limpos.
+
+Pronto quando: operador consegue sair de “detectei um bloqueio” para “executei o comando certo” em
+um único passo cognitivo, mantendo fluxo live fluido e elegante.

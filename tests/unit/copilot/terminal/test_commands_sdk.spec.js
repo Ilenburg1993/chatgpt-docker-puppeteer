@@ -54,9 +54,11 @@ import { cmdElicitation, cmdPermission, cmdSdk, cmdWorkspace } from '../../../..
 import {
     clearTerminalElicitation,
     clearTerminalPermissions,
+    clearTerminalUserInputs,
     recordTerminalElicitationPending,
     recordTerminalPermissionCompleted,
     recordTerminalPermissionRequested,
+    recordTerminalUserInputRequested,
 } from '../../../../src/copilot/terminal/sdk-interactions.js';
 
 function mockCtx() {
@@ -72,6 +74,7 @@ describe('terminal/commands/sdk', () => {
     beforeEach(() => {
         clearTerminalElicitation('all');
         clearTerminalPermissions();
+        clearTerminalUserInputs();
         vi.clearAllMocks();
     });
 
@@ -81,6 +84,24 @@ describe('terminal/commands/sdk', () => {
         expect(ctx.output()).toContain('SDK Runtime');
         expect(ctx.output()).toContain('sdk-1');
         expect(ctx.output()).toContain('chat');
+        expect(ctx.output()).toContain('ask_user=0');
+    });
+
+    it('/sdk waits mostra painel unificado de interrupções SDK', async () => {
+        recordTerminalElicitationPending({ requestId: 'el-wait', message: 'Informe branch', mode: 'form' });
+        recordTerminalPermissionRequested({ requestId: 'perm-wait', permissionType: 'file_write' });
+        recordTerminalUserInputRequested({ requestId: 'ui-wait', question: 'Qual ambiente?' });
+
+        const ctx = mockCtx();
+        await cmdSdk({ println: ctx.println }, 'waits');
+
+        expect(ctx.output()).toContain('SDK Waits');
+        expect(ctx.output()).toContain('3 pendência(s)');
+        expect(ctx.output()).toContain('elicitation=1');
+        expect(ctx.output()).toContain('permission=1');
+        expect(ctx.output()).toContain('ask_user=1');
+        expect(ctx.output()).toContain('/elicitation show latest');
+        expect(ctx.output()).toContain('/permission show latest');
     });
 
     it('/sdk prompt exibe status canônico do system prompt e instruction sources', async () => {

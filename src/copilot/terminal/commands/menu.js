@@ -111,6 +111,16 @@ export function buildTerminalSmartMenuEntries() {
         });
     }
 
+    if (userInput.pending > 0 || elicitation.pending > 0 || permission.pending > 0) {
+        entries.push({
+            id: 'sdk-waits',
+            label: 'Painel de interrupções SDK',
+            commandLine: '/sdk waits',
+            description: 'Resumo unificado de waits e ações rápidas',
+            hot: true,
+        });
+    }
+
     if (elicitation.pending > 0) {
         entries.push({
             id: 'elicitation-latest',

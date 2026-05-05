@@ -153,6 +153,40 @@ function parseElicitationResult(action, rest, schema) {
 
 /**
  * @param {CommandContext} ctx
+ * @returns {void}
+ */
+function renderSdkWaitsSummary({ println }) {
+    const pendingElicitations = readTerminalElicitationSummary();
+    const permissionSummary = readTerminalPermissionSummary();
+    const userInputSummary = readTerminalUserInputSummary();
+    const totalPending = pendingElicitations.pending + permissionSummary.pending + userInputSummary.pending;
+    const headlineColor = totalPending > 0 ? '\x1b[33m' : '\x1b[32m';
+
+    println(`\n  \x1b[36mSDK Waits\x1b[0m`);
+    println(
+        `  status   ${headlineColor}${totalPending > 0 ? `${totalPending} pendência(s)` : 'nenhuma pendência'}\x1b[0m`,
+    );
+    println(
+        `  waits    \x1b[90melicitation=${pendingElicitations.pending}${pendingElicitations.latest?.mode ? ` (${pendingElicitations.latest.mode})` : ''} · permission=${permissionSummary.pending}${permissionSummary.latest ? ` (${permissionSummary.latest.permissionType})` : ''} · ask_user=${userInputSummary.pending}${userInputSummary.latest?.kind ? ` (${userInputSummary.latest.kind})` : ''}\x1b[0m`,
+    );
+
+    if (pendingElicitations.pending > 0) {
+        println('  ação     \x1b[90m/elicitation show latest · /elicitation list\x1b[0m');
+    }
+    if (permissionSummary.pending > 0) {
+        println('  ação     \x1b[90m/permission show latest · /permission all\x1b[0m');
+    }
+    if (userInputSummary.pending > 0) {
+        println('  ação     \x1b[90m/answer <texto> ou responda na conversa ativa\x1b[0m');
+    }
+    if (totalPending === 0) {
+        println('  \x1b[90mSem bloqueios de input humano do SDK no momento.\x1b[0m');
+    }
+    println('');
+}
+
+/**
+ * @param {CommandContext} ctx
  * @param {string} [arg]
  * @returns {Promise<void>}
  */
@@ -168,6 +202,8 @@ export async function cmdSdk({ println }, arg = '') {
             await renderSdkQuota({ println }, runtimeId);
         } else if (sub === 'prompt') {
             await renderSdkSystemPrompt({ println }, runtimeId);
+        } else if (sub === 'waits') {
+            renderSdkWaitsSummary({ println });
         } else if (sub === 'compact') {
             const result = await callWithRuntimeTarget(compactTerminalSdkSession, runtimeId);
             println(`\n  \x1b[32m✓ SDK compaction solicitada.\x1b[0m\n  \x1b[90m${pretty(result, 700)}\x1b[0m\n`);
@@ -181,11 +217,11 @@ export async function cmdSdk({ println }, arg = '') {
             println(`  session  \x1b[90m${state.sessionId ?? '-'}\x1b[0m`);
             println(`  model    \x1b[33m${state.model}\x1b[0m  reasoning=\x1b[33m${state.reasoningEffort}\x1b[0m`);
             println(
-                `  waits    \x1b[90melicitation=${pendingElicitations.pending}${pendingElicitations.latest?.mode ? ` (${pendingElicitations.latest.mode})` : ''} � permission=${permissionSummary.pending}${permissionSummary.latest ? ` (${permissionSummary.latest.permissionType})` : ''} � ask_user=${userInputSummary.pending}${userInputSummary.latest?.kind ? ` (${userInputSummary.latest.kind})` : ''}\x1b[0m`,
+                `  waits    \x1b[90melicitation=${pendingElicitations.pending}${pendingElicitations.latest?.mode ? ` (${pendingElicitations.latest.mode})` : ''} · permission=${permissionSummary.pending}${permissionSummary.latest ? ` (${permissionSummary.latest.permissionType})` : ''} · ask_user=${userInputSummary.pending}${userInputSummary.latest?.kind ? ` (${userInputSummary.latest.kind})` : ''}\x1b[0m`,
             );
             await renderSdkQuota({ println }, runtimeId, { compact: true });
             println(
-                '  \x1b[90mUso: /sdk models | /sdk tools [model] | /sdk quota | /sdk prompt | /sdk compact\x1b[0m\n',
+                '  \x1b[90mUso: /sdk models | /sdk tools [model] | /sdk quota | /sdk prompt | /sdk waits | /sdk compact\x1b[0m\n',
             );
         }
     } catch (e) {
