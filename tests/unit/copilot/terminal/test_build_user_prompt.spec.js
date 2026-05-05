@@ -222,4 +222,51 @@ describe('terminal/dialog/output buildUserPrompt', () => {
         expect(prompt).not.toContain('TURN');
         expect(prompt).not.toContain('Processando');
     });
+
+    it('compacta tags do prompt quando detalhe terminal está em modo compact', async () => {
+        const prefs = await import('../../../../src/copilot/terminal/ui-preferences.js');
+        prefs.setTerminalDetailLevel('compact');
+        readTerminalRuntimeState.mockReturnValueOnce(
+            /** @type {any} */ ({
+                ...readTerminalRuntimeState(),
+                model: 'gpt-5.4',
+                queueSize: 3,
+                pendingQuestion: { question: 'Q', kind: 'question' },
+                pendingQuestionKind: 'question',
+                lastPrInfo: {
+                    model: 'claude-haiku-4.5',
+                    configuredModel: 'gpt-5.4',
+                    effectiveModel: 'claude-haiku-4.5',
+                    modelMismatch: true,
+                    ts: Date.now(),
+                },
+            }),
+        );
+
+        const { buildUserPrompt } = await import('../../../../src/copilot/terminal/dialog/output.js');
+        const prompt = buildUserPrompt();
+
+        expect(prompt).toContain('[ASK]');
+        expect(prompt).toContain('[MM]');
+        expect(prompt).toContain('[Q:3]');
+        expect(prompt).not.toContain('[ASK:QUESTION]');
+        expect(prompt).not.toContain('[MODEL:gpt-5.4→claude-haiku-4.5]');
+
+        prefs.setTerminalDetailLevel('detailed');
+    });
+
+    it('compacta prompt de espera quando detalhe terminal está em modo compact', async () => {
+        const prefs = await import('../../../../src/copilot/terminal/ui-preferences.js');
+        prefs.setTerminalDetailLevel('compact');
+
+        const { buildWaitingPrompt } = await import('../../../../src/copilot/terminal/dialog/output.js');
+        const prompt = buildWaitingPrompt();
+
+        expect(prompt).toContain('gpt-5-mini');
+        expect(prompt).toContain('high');
+        expect(prompt).not.toContain('TURN');
+        expect(prompt).not.toContain('Processando');
+
+        prefs.setTerminalDetailLevel('detailed');
+    });
 });

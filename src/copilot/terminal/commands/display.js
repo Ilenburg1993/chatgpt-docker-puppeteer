@@ -23,6 +23,12 @@ import {
     writeTerminalDisplayToggle,
 } from '../display-policy.js';
 import {
+    getTerminalDetailLevel,
+    isTerminalDetailLevel,
+    listTerminalDetailLevels,
+    setTerminalDetailLevel,
+} from '../ui-preferences.js';
+import {
     getTerminalThemeName,
     isTerminalThemeName,
     listTerminalThemeProfiles,
@@ -53,6 +59,13 @@ function themeUsageLabel() {
 }
 
 /**
+ * @returns {string}
+ */
+function detailUsageLabel() {
+    return listTerminalDetailLevels().join('|');
+}
+
+/**
  * Comando `/display [toggle] [on|off]`.
  *
  * - Sem args: mostra status de todos os toggles.
@@ -73,9 +86,11 @@ export function cmdDisplay({ println }, arg, rest) {
         const state = readTerminalDisplayState();
         const promptPolicy = readTerminalPromptDisplayPolicy(state);
         const themeName = getTerminalThemeName();
+        const detailLevel = getTerminalDetailLevel();
         println('\n  \x1b[36mDisplay Toggles:\x1b[0m');
         println(`  \x1b[90mpreset atual: ${promptPolicy.density}\x1b[0m`);
         println(`  \x1b[90mtema atual: ${themeName}\x1b[0m`);
+        println(`  \x1b[90mnível de detalhe: ${detailLevel}\x1b[0m`);
         println('  ─────────────────────────────────────');
         for (const toggleDef of listTerminalDisplayToggles()) {
             const status = state[toggleDef.key] ? '\x1b[32m● on\x1b[0m' : '\x1b[31m○ off\x1b[0m';
@@ -85,6 +100,24 @@ export function cmdDisplay({ println }, arg, rest) {
         println('  \x1b[90m/display all on  ·  /display all off\x1b[0m');
         println(`  \x1b[90m/display preset <${presetUsageLabel()}>\x1b[0m\n`);
         println(`  \x1b[90m/display theme <${themeUsageLabel()}>\x1b[0m\n`);
+        println(`  \x1b[90m/display detail <${detailUsageLabel()}>\x1b[0m\n`);
+        return;
+    }
+
+    if (toggle === 'detail') {
+        if (!value) {
+            println(`  Nível de detalhe atual: \x1b[36m${getTerminalDetailLevel()}\x1b[0m`);
+            println(`  \x1b[90mUso: /display detail <${detailUsageLabel()}>\x1b[0m`);
+            return;
+        }
+        if (!isTerminalDetailLevel(value)) {
+            println(`  \x1b[33mUso: /display detail <${detailUsageLabel()}>\x1b[0m`);
+            return;
+        }
+        setTerminalDetailLevel(value);
+        println(
+            `  ✅ Detalhe aplicado: \x1b[36m${value}\x1b[0m — ${value === 'compact' ? 'menos ruído, mais síntese' : 'máximo contexto operacional'}`,
+        );
         return;
     }
 

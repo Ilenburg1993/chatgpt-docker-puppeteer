@@ -539,3 +539,48 @@ Validação:
 Pronto quando: todas as superfícies críticas do terminal (prompt, waiting, menu, tools, questions,
 thinking/streaming) permanecem semanticamente consistentes sob qualquer tema, com baixa fadiga
 visual em sessões longas.
+
+---
+
+## W132 — UX live ajustável por nível de detalhe (`compact|detailed`)
+
+**Objetivo:** tornar a UX do terminal adaptável ao contexto operacional sem abrir caminhos
+paralelos: `detailed` para auditoria/diagnóstico e `compact` para sessões longas de diálogo ao vivo
+com menor fadiga visual.
+
+Diagnóstico da situação anterior:
+
+- o terminal já tinha tema, prompt rico e narrativa elegante, mas ainda faltava uma alavanca
+  canônica de densidade textual;
+- waiting prompt, pending question e tool lifecycle seguiam semanticamente corretos, porém sempre em
+  densidade relativamente alta;
+- para sessões longas live, ainda havia espaço para uma UX mais enxuta sem perder rastreabilidade.
+
+Situação ideal:
+
+- `compact` reduz tags, hints e linhas secundárias ao mínimo útil;
+- `detailed` preserva contexto completo para engenharia/auditoria;
+- progressos de tools podem usar linha inline transitória em vez de empilhar narrativa longa quando
+  o operador quer foco na conversa;
+- a alternância entre modos é pública, explícita e canônica via comando do terminal.
+
+Implementado nesta rodada:
+
+1. **Preferência canônica de detalhe** (`ui-preferences.js`) com leitura por env e mutação em
+   runtime;
+2. **Comando público** `/display detail <compact|detailed>` integrado ao painel `/display`;
+3. **Prompt do usuário** com tags sintetizadas no modo compacto (`[ASK]`, `[MM]`, `SHDW` curto, MODE
+   curto etc.);
+4. **Waiting prompt** reduzido no modo compacto, preservando modelo/reasoning e sinais essenciais;
+5. **Pending question** com badges/choices mais curtos no modo compacto, mantendo pick numérico;
+6. **Tool progress live** com `writeInlineStatus()` em `compact` e narrativa expandida em
+   `detailed`.
+
+Validação:
+
+- testes dedicados adicionados para `/display detail`, `buildUserPrompt/buildWaitingPrompt` em modo
+  compacto e progress inline em `agent-runtime-events`;
+- suíte terminal ampla verde após a mudança (`55 passed | 1 skipped`).
+
+Pronto quando: o operador consegue alternar entre uma UX densa e uma UX minimalista elegante sem
+perder coerência semântica nem rastreabilidade ao vivo.

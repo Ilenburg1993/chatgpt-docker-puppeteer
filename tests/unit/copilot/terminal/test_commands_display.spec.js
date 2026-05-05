@@ -37,6 +37,7 @@ import {
     listTerminalDisplayPresets,
     readTerminalPromptDisplayPolicy,
 } from '../../../../src/copilot/terminal/display-policy.js';
+import { getTerminalDetailLevel, setTerminalDetailLevel } from '../../../../src/copilot/terminal/ui-preferences.js';
 import { getTerminalThemeName, setTerminalThemeName } from '../../../../src/copilot/terminal/ui-theme.js';
 
 function ctx() {
@@ -51,6 +52,7 @@ describe('terminal/commands/display', () => {
     beforeEach(() => {
         vi.clearAllMocks();
         setTerminalThemeName('elegant');
+        setTerminalDetailLevel('detailed');
     });
 
     it('mostra ajuda com presets quando chamado sem argumentos', () => {
@@ -61,6 +63,7 @@ describe('terminal/commands/display', () => {
         expect(c.output()).toContain('tema atual');
         expect(c.output()).toContain('/display preset <default|minimal|verbose|debug|focus>');
         expect(c.output()).toContain('/display theme <elegant|vivid|mono>');
+        expect(c.output()).toContain('/display detail <compact|detailed>');
     });
 
     it('declara presets como contrato reutilizável de UX', () => {
@@ -132,5 +135,19 @@ describe('terminal/commands/display', () => {
         const c = ctx();
         cmdDisplay({ println: c.println }, 'theme', ['neon']);
         expect(c.output()).toContain('Uso: /display theme');
+    });
+
+    it('aplica nível de detalhe compact/detailed', () => {
+        const c = ctx();
+
+        cmdDisplay({ println: c.println }, 'detail', ['compact']);
+        expect(getTerminalDetailLevel()).toBe('compact');
+        expect(c.output()).toContain('Detalhe aplicado');
+    });
+
+    it('valida uso de detalhe inválido', () => {
+        const c = ctx();
+        cmdDisplay({ println: c.println }, 'detail', ['verbose']);
+        expect(c.output()).toContain('Uso: /display detail');
     });
 });

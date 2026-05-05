@@ -31,11 +31,12 @@ import {
     getShowToolActivity,
 } from '../presentation/runtime-ui-state-store.js';
 import { recordTerminalActivity } from './activity-state.js';
-import { broadcastSse, buildUserPrompt, println, writeInlineStatus } from './dialog/index.js';
+import { broadcastSse, buildUserPrompt, clearInlineStatus, println, writeInlineStatus } from './dialog/index.js';
 import { readTerminalRuntimeState } from './frontend/gateways/agent-runtime.js';
 import { createTerminalPendingQuestionReplayState } from './pending-question-replay.js';
 import { buildTerminalToolActivityPresentation, compactTerminalToolText } from './tool-activity-presenter.js';
 import { completeTerminalTurnToolCall, recordTerminalTurnToolActivity } from './turn-trace-state.js';
+import { getTerminalDetailLevel } from './ui-preferences.js';
 import { terminalActionChip, terminalThemeBadge, terminalThemeText } from './ui-theme.js';
 
 /**
@@ -99,6 +100,8 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null }) {
         if (!decision.render) {
             return;
         }
+        const compactDetail = getTerminalDetailLevel() === 'compact';
+        const questionText = compactDetail ? compactTerminalToolText(question, 96) : question;
 
         recordTerminalActivity(
             'question',
@@ -111,23 +114,31 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null }) {
 
         rl?.pause();
         println(
-            `\n${terminalThemeBadge('question', 'QUESTION')} ${terminalThemeText('question', `LLM-B perguntou: "${question}"`)}`,
+            `\n${terminalThemeBadge('question', compactDetail ? 'ASK' : 'QUESTION')} ${terminalThemeText('question', `LLM-B perguntou: "${questionText}"`)}`,
         );
         if (choices.length > 0) {
-            println(`   ${terminalThemeBadge('info', 'OPTIONS')} ${choices.join(' | ')}`);
             const maxInlineChoices = 6;
             const visibleChoices = choices.slice(0, maxInlineChoices);
-            const indexed = visibleChoices.map((choice, idx) => `[${idx + 1}] ${choice}`).join('   ');
+            const indexed = visibleChoices
+                .map((choice, idx) => `[${idx + 1}] ${compactDetail ? compactTerminalToolText(choice, 20) : choice}`)
+                .join('   ');
             const overflow = choices.length > maxInlineChoices ? `   … +${choices.length - maxInlineChoices}` : '';
-            println(`   ${terminalThemeBadge('info', 'SELECT')} ${indexed}${overflow}`);
+            if (!compactDetail) {
+                println(`   ${terminalThemeBadge('info', 'OPTIONS')} ${choices.join(' | ')}`);
+            }
+            println(`   ${terminalThemeBadge('info', compactDetail ? 'PICK' : 'SELECT')} ${indexed}${overflow}`);
         }
         if (rl) {
             println(
-                `   ${terminalThemeText('muted', '→ Responda digitando normalmente. Sua próxima mensagem será usada como resposta.')}`,
+                compactDetail
+                    ? `   ${terminalThemeText('muted', '→')} ${terminalActionChip('/answer')} ${terminalActionChip('/status')} ${terminalActionChip('/clear-shadow')}`
+                    : `   ${terminalThemeText('muted', '→ Responda digitando normalmente. Sua próxima mensagem será usada como resposta.')}`,
             );
-            println(
-                `   ${terminalThemeText('muted', '→ Ações rápidas:')} ${terminalActionChip('/status')} ${terminalActionChip('/answer <texto>')} ${terminalActionChip('/clear-shadow')}`,
-            );
+            if (!compactDetail) {
+                println(
+                    `   ${terminalThemeText('muted', '→ Ações rápidas:')} ${terminalActionChip('/status')} ${terminalActionChip('/answer <texto>')} ${terminalActionChip('/clear-shadow')}`,
+                );
+            }
         } else {
             println(
                 `   ${terminalThemeText('muted', '→ Modo headless: responda via POST /inject ou pelo cliente conectado.')}`,
@@ -165,6 +176,7 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null }) {
         if (shouldSuppressToolNarration(name)) {
             return;
         }
+        const compactDetail = getTerminalDetailLevel() === 'compact';
         const presentation = buildTerminalToolActivityPresentation(evt, name);
         activeTools.set(toolCallId, {
             name,
@@ -191,7 +203,9 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null }) {
             const operationRole = mapOperationRole(presentation.operation);
             const opLabel = presentation.operation.toUpperCase();
             println(
-                `  ${terminalThemeBadge('tool', 'TOOL')} ${terminalThemeBadge(operationRole, opLabel)} ${terminalThemeText('tool', name)} ${terminalThemeText('muted', '·')} ${terminalThemeText(operationRole, presentation.startLine)}`,
+                compactDetail
+                    ? `  ${terminalThemeBadge('tool', 'TOOL')} ${terminalThemeBadge(operationRole, opLabel)} ${terminalThemeText('tool', compactTerminalToolText(name, 28))} ${terminalThemeText('muted', '·')} ${terminalThemeText(operationRole, compactTerminalToolText(presentation.startLine, 86))}`
+                    : `  ${terminalThemeBadge('tool', 'TOOL')} ${terminalThemeBadge(operationRole, opLabel)} ${terminalThemeText('tool', name)} ${terminalThemeText('muted', '·')} ${terminalThemeText(operationRole, presentation.startLine)}`,
             );
         }
         broadcastSse('tool.start', {
@@ -209,6 +223,7 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null }) {
         if (shouldSuppressToolNarration(name)) {
             return;
         }
+        const compactDetail = getTerminalDetailLevel() === 'compact';
         const presentation = entry?.presentation ?? buildTerminalToolActivityPresentation(evt, name);
         const progress = typeof evt?.['progress'] === 'number' ? Number(evt['progress']) : null;
         const progressMessage = typeof evt?.['progressMessage'] === 'string' ? evt['progressMessage'] : null;
@@ -232,9 +247,13 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null }) {
         });
         if (shouldPrint) {
             const suffix = progressMessage ?? (progress !== null ? `${progress}%` : '');
-            println(
-                `  ${terminalThemeText('muted', '↳')} ${terminalThemeText('tool', presentation.progressLinePrefix)} ${terminalThemeText('muted', suffix)}`.trimEnd(),
-            );
+            const progressLine =
+                `  ${terminalThemeText('muted', '↳')} ${terminalThemeText('tool', compactDetail ? compactTerminalToolText(presentation.progressLinePrefix, 56) : presentation.progressLinePrefix)} ${terminalThemeText('muted', suffix)}`.trimEnd();
+            if (compactDetail) {
+                writeInlineStatus(progressLine);
+            } else {
+                println(progressLine);
+            }
         }
         broadcastSse('tool.progress', {
             toolCallId,
@@ -289,10 +308,14 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null }) {
         if (shouldSuppressToolNarration(name)) {
             return;
         }
+        const compactDetail = getTerminalDetailLevel() === 'compact';
         const presentation = entry?.presentation ?? buildTerminalToolActivityPresentation(evt, name);
         const dur = entry ? ((Date.now() - entry.t0) / 1000).toFixed(1) : '?';
         const icon = success ? terminalThemeText('success', '✅') : terminalThemeText('error', '❌');
         const operationRole = mapOperationRole(presentation.operation);
+        if (compactDetail) {
+            clearInlineStatus();
+        }
         if (toolCallId) {
             completeTerminalTurnToolCall({ toolCallId, success });
         }
@@ -306,7 +329,9 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null }) {
         if (getShowToolActivity()) {
             const statusBadge = success ? terminalThemeBadge('success', 'DONE') : terminalThemeBadge('error', 'FAIL');
             println(
-                `  ${icon} ${statusBadge} ${terminalThemeText('tool', name)} ${terminalThemeText('muted', '·')} ${terminalThemeText(operationRole, presentation.completeLine(success, `${dur}s`))}`,
+                compactDetail
+                    ? `  ${icon} ${statusBadge} ${terminalThemeText('tool', compactTerminalToolText(name, 28))} ${terminalThemeText('muted', '·')} ${terminalThemeText(operationRole, compactTerminalToolText(presentation.completeLine(success, `${dur}s`), 88))}`
+                    : `  ${icon} ${statusBadge} ${terminalThemeText('tool', name)} ${terminalThemeText('muted', '·')} ${terminalThemeText(operationRole, presentation.completeLine(success, `${dur}s`))}`,
             );
         }
         broadcastSse('tool.complete', {

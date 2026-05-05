@@ -24,6 +24,7 @@ const readTerminalRuntimeState = vi.fn(
 );
 const recordTerminalTurnToolActivity = vi.fn();
 const completeTerminalTurnToolCall = vi.fn();
+const getTerminalDetailLevel = vi.fn(() => 'detailed');
 
 vi.mock('../../../src/copilot/terminal/dialog/index.js', () => ({
     println,
@@ -51,9 +52,14 @@ vi.mock('../../../src/copilot/terminal/turn-trace-state.js', () => ({
     completeTerminalTurnToolCall,
 }));
 
+vi.mock('../../../src/copilot/terminal/ui-preferences.js', () => ({
+    getTerminalDetailLevel,
+}));
+
 describe('terminal/agent-runtime-events.js — contrato', () => {
     beforeEach(() => {
         vi.clearAllMocks();
+        getTerminalDetailLevel.mockReturnValue('detailed');
         readTerminalRuntimeState.mockReturnValue(
             /** @type {any} */ ({
                 pendingQuestion: null,
@@ -141,6 +147,49 @@ describe('terminal/agent-runtime-events.js — contrato', () => {
                 success: true,
             }),
         );
+    });
+
+    it('usa progresso inline e pergunta compacta quando detalhe terminal está em compact', async () => {
+        getTerminalDetailLevel.mockReturnValue('compact');
+        const { setupTerminalAgentRuntimeEventListeners } =
+            await import('../../../src/copilot/terminal/agent-runtime-events.js');
+        /** @type {Map<string, Function[]>} */
+        const listeners = new Map();
+        const rl = {
+            pause: vi.fn(),
+            resume: vi.fn(),
+            setPrompt: vi.fn(),
+            prompt: vi.fn(),
+        };
+        const agent = {
+            on: vi.fn((event, handler) => {
+                const list = listeners.get(event) ?? [];
+                list.push(handler);
+                listeners.set(event, list);
+            }),
+            off: vi.fn(),
+        };
+
+        setupTerminalAgentRuntimeEventListeners({ agent: /** @type {any} */ (agent), rl: /** @type {any} */ (rl) });
+        listeners.get('question.pending')?.[0]?.({
+            question:
+                'Confirme se deseja abrir o arquivo src/copilot/terminal/dialog/output.js e resumir as mudanças mais recentes com bastante detalhe',
+            choices: ['sim, abrir e resumir', 'não agora'],
+        });
+        listeners.get('tool.execution_start')?.[0]?.({
+            toolCallId: 'tool-compact',
+            toolName: 'workspace.read_file',
+            args: { path: 'src/copilot/terminal/dialog/output.js' },
+        });
+        listeners.get('tool.execution_progress')?.[0]?.({
+            toolCallId: 'tool-compact',
+            progressMessage: 'abrindo arquivo grande',
+        });
+
+        expect(println).toHaveBeenCalledWith(expect.stringContaining('ASK'));
+        expect(println).toHaveBeenCalledWith(expect.stringContaining('PICK'));
+        expect(writeInlineStatus).toHaveBeenCalledWith(expect.stringContaining('workspace.read_file'));
+        expect(writeInlineStatus).toHaveBeenCalledWith(expect.stringContaining('abrindo arquivo grande'));
     });
 
     it('funciona em modo headless sem readline e ainda emite SSE de tools', async () => {

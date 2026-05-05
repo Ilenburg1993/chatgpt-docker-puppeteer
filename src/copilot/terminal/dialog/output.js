@@ -14,6 +14,7 @@ import { getBusy, getRl, getSdkSessionMode } from '../../presentation/runtime-ui
 import { readTerminalActivitySnapshot } from '../activity-state.js';
 import { readTerminalPromptDisplayPolicy } from '../display-policy.js';
 import { readTerminalDialogStreamMeta, readTerminalRuntimeState } from '../frontend/gateways/agent-runtime.js';
+import { getTerminalDetailLevel } from '../ui-preferences.js';
 import { terminalThemeText } from '../ui-theme.js';
 
 // ─── Configuração ─────────────────────────────────────────────────────────────
@@ -66,9 +67,13 @@ function resolvePromptModelProjection(state) {
 export function buildUserPrompt() {
     const state = readTerminalRuntimeState();
     const promptPolicy = readTerminalPromptDisplayPolicy();
+    const detailLevel = getTerminalDetailLevel();
+    const compactDetail = detailLevel === 'compact';
     const { reasoningEffort } = state;
     const modelProjection = resolvePromptModelProjection(state);
-    const model = modelProjection.displayModel || state.model;
+    const model = compactDetail
+        ? shortenPromptToken(modelProjection.displayModel || state.model, 14)
+        : modelProjection.displayModel || state.model;
     /** @type {string[]} */
     const tags = [];
 
@@ -78,7 +83,12 @@ export function buildUserPrompt() {
     }
     const sdkMode = getSdkSessionMode();
     if (sdkMode && sdkMode !== 'interactive') {
-        tags.push(terminalThemeText('thinking', `[MODE:${sdkMode.toUpperCase()}]`));
+        tags.push(
+            terminalThemeText(
+                'thinking',
+                compactDetail ? `[M:${sdkMode.toUpperCase()}]` : `[MODE:${sdkMode.toUpperCase()}]`,
+            ),
+        );
     }
     if (state.dialogPaused) {
         tags.push(terminalThemeText('error', '[PAUSED]'));
@@ -87,15 +97,17 @@ export function buildUserPrompt() {
         tags.push(terminalThemeText('muted', `[Q:${state.queueSize}]`));
     }
     if (state.pendingQuestion && state.pendingQuestionKind && state.pendingQuestionKind !== 'ready') {
-        tags.push(terminalThemeText('question', `[ASK:${state.pendingQuestionKind.toUpperCase()}]`));
+        tags.push(
+            terminalThemeText('question', compactDetail ? '[ASK]' : `[ASK:${state.pendingQuestionKind.toUpperCase()}]`),
+        );
     } else if (state.pendingQuestionShadowState) {
         const shadowTag =
             state.pendingQuestionShadowState === 'expired'
-                ? terminalThemeText('error', '[SHADOW:EXPIRED]')
+                ? terminalThemeText('error', compactDetail ? '[SHDW]' : '[SHADOW:EXPIRED]')
                 : state.pendingQuestionShadowState === 'expiring_soon'
-                  ? terminalThemeText('warn', '[SHADOW:SOON]')
+                  ? terminalThemeText('warn', compactDetail ? '[SHDW]' : '[SHADOW:SOON]')
                   : state.pendingQuestionShadowState === 'fresh'
-                    ? terminalThemeText('question', '[SHADOW:FRESH]')
+                    ? terminalThemeText('question', compactDetail ? '[SHDW]' : '[SHADOW:FRESH]')
                     : terminalThemeText('warn', '[SHADOW]');
         if (state.pendingQuestionShadowState === 'expired' || promptPolicy.showNonCriticalShadowTag) {
             tags.push(shadowTag);
@@ -107,7 +119,10 @@ export function buildUserPrompt() {
         modelProjection.displayModel !== modelProjection.configuredModel
     ) {
         tags.push(
-            terminalThemeText('error', `[MODEL:${modelProjection.configuredModel}→${modelProjection.displayModel}]`),
+            terminalThemeText(
+                'error',
+                compactDetail ? '[MM]' : `[MODEL:${modelProjection.configuredModel}→${modelProjection.displayModel}]`,
+            ),
         );
     }
 
@@ -122,8 +137,10 @@ export function buildUserPrompt() {
 export function buildWaitingPrompt() {
     const { model, reasoningEffort } = readTerminalDialogStreamMeta();
     const promptPolicy = readTerminalPromptDisplayPolicy();
+    const detailLevel = getTerminalDetailLevel();
     const activity = readTerminalActivitySnapshot();
     const runtime = readTerminalRuntimeState();
+    const compactDetail = detailLevel === 'compact';
     const phase = shortenPromptToken(activity.phase.toUpperCase(), 10);
     const label = shortenPromptToken(activity.label, 16);
     const sevRole = activity.severity === 'error' ? 'error' : activity.severity === 'warn' ? 'warn' : 'muted';
@@ -138,7 +155,7 @@ export function buildWaitingPrompt() {
     }
     if (runtime.pendingQuestionShadowState === 'expired') tags.push('SHDW:EXP');
     const tagsStr = tags.length > 0 ? ` ${terminalThemeText('muted', `[${tags.join('|')}]`)}` : '';
-    if (!promptPolicy.showWaitingActivity) {
+    if (!promptPolicy.showWaitingActivity || compactDetail) {
         return `${terminalThemeText('muted', '⏳')}${tagsStr} ${terminalThemeText('muted', '[')}${terminalThemeText('info', model)}${terminalThemeText('muted', '/')}${terminalThemeText('thinking', reasoningEffort)}${terminalThemeText('muted', ']')} `;
     }
     return `${terminalThemeText(sevRole, `⏳[${phase}:${label}]`)}${tagsStr} ${terminalThemeText('muted', '[')}${terminalThemeText('info', model)}${terminalThemeText('muted', '/')}${terminalThemeText('thinking', reasoningEffort)}${terminalThemeText('muted', ']')} `;
