@@ -10,12 +10,21 @@ import { getWorkspaceContext } from '#copilot/boot';
 import { sendRuntimeDialogTurnForRuntime } from '../../../presentation/runtime-dialog.js';
 import { readTerminalSessionBinding } from '../gateways/agent-runtime.js';
 import { clearTerminalHistoryFeed, readTerminalHistoryFeed, seedTerminalHistoryFeed } from '../gateways/dialog.js';
-import { countTerminalHubTurns, readTerminalHubTurns } from '../gateways/hub.js';
+import { countTerminalHubTurns, readTerminalHubTurns, writeTerminalHubTimelineTurn } from '../gateways/hub.js';
 import { readTerminalRuntimeBase } from './shared.js';
 
 /** @typedef {'hub' | 'bridge' | 'mixed' | 'empty'} TerminalTimelineSource */
 /** @typedef {'persistent' | 'transport' | 'reconciled' | 'none'} TerminalTimelineAuthority */
 /** @typedef {'persistent_only' | 'bridge_only' | 'aligned' | 'bridge_tail' | 'diverged' | 'empty'} TerminalTimelineReconciliation */
+/** @typedef {'none' | 'lazy'} TerminalTimelineSyncPolicy */
+/** @typedef {'disabled' | 'not_needed' | 'unavailable' | 'scheduled' | 'inflight' | 'synced' | 'failed'} TerminalTimelineSyncStatus */
+
+const TIMELINE_SYNC_CACHE_TTL_MS = 10 * 60 * 1000;
+const TIMELINE_SYNC_MAX_CACHE_ENTRIES = 500;
+const TIMELINE_SYNC_WRITE_MAX_ATTEMPTS = 3;
+const TIMELINE_SYNC_WRITE_RETRY_DELAYS_MS = [0, 25, 100];
+const TIMELINE_SYNC_FAILURE_MAX_LIFECYCLE_ATTEMPTS = 3;
+const TIMELINE_SYNC_FAILURE_RETRY_DELAYS_MS = [1_000, 5_000, 15_000];
 
 /**
  * @typedef {{
@@ -29,6 +38,172 @@ import { readTerminalRuntimeBase } from './shared.js';
  *     sdkTurnId: string | null;
  * }} TerminalTimelineTurn
  */
+
+/**
+ * @typedef {{
+ *     policy: TerminalTimelineSyncPolicy;
+ *     status: TerminalTimelineSyncStatus;
+ *     reason: string | null;
+ *     pendingCount: number;
+ *     syncedCount: number;
+ *     failedCount: number;
+ *     key: string | null;
+ *     lastError: string | null;
+ *     attempts: number;
+ *     nextRetryAt: number | null;
+ *     cacheExpiresAt: number | null;
+ * }} TerminalTimelineSyncState
+ */
+
+/**
+ * @typedef {{
+ *     scheduledTotal: number;
+ *     inflightCount: number;
+ *     syncedTotal: number;
+ *     failedTotal: number;
+ *     retryTotal: number;
+ *     cacheExpiredTotal: number;
+ *     cacheEvictedTotal: number;
+ *     turnsScheduledTotal: number;
+ *     turnsSyncedTotal: number;
+ *     turnsFailedTotal: number;
+ *     completedCacheSize: number;
+ *     failureCacheSize: number;
+ *     lastScheduledAt: number | null;
+ *     lastSyncedAt: number | null;
+ *     lastFailedAt: number | null;
+ *     lastDurationMs: number | null;
+ *     lastError: string | null;
+ * }} TerminalTimelineSyncTelemetry
+ */
+
+/** @type {Map<string, { promise: Promise<number>; startedAt: number; pendingCount: number; attempts: number }>} */
+const _timelineSyncInflight = new Map();
+
+/** @type {Map<string, { syncedCount: number; at: number; expiresAt: number }>} */
+const _timelineSyncCompleted = new Map();
+
+/**
+ * @type {Map<
+ *     string,
+ *     {
+ *         failedCount: number;
+ *         at: number;
+ *         error: string;
+ *         attempts: number;
+ *         nextRetryAt: number | null;
+ *         expiresAt: number;
+ *     }
+ * >}
+ */
+const _timelineSyncFailures = new Map();
+
+/** @type {TerminalTimelineSyncTelemetry} */
+const _timelineSyncTelemetry = {
+    scheduledTotal: 0,
+    inflightCount: 0,
+    syncedTotal: 0,
+    failedTotal: 0,
+    retryTotal: 0,
+    cacheExpiredTotal: 0,
+    cacheEvictedTotal: 0,
+    turnsScheduledTotal: 0,
+    turnsSyncedTotal: 0,
+    turnsFailedTotal: 0,
+    completedCacheSize: 0,
+    failureCacheSize: 0,
+    lastScheduledAt: null,
+    lastSyncedAt: null,
+    lastFailedAt: null,
+    lastDurationMs: null,
+    lastError: null,
+};
+
+/**
+ * @param {string} name
+ * @param {number} [delta=1] Default is `1`
+ * @returns {void}
+ */
+function recordTimelineSyncCounter(name, delta = 1) {
+    void import('#copilot/observability')
+        .then((mod) => {
+            mod.defaultMetrics?.recordCounter?.(`terminal.timeline_sync.${name}`, delta);
+        })
+        .catch(() => {});
+}
+
+/**
+ * @param {string} name
+ * @param {number} value
+ * @returns {void}
+ */
+function recordTimelineSyncGauge(name, value) {
+    void import('#copilot/observability')
+        .then((mod) => {
+            mod.defaultMetrics?.recordGauge?.(`terminal.timeline_sync.${name}`, value);
+        })
+        .catch(() => {});
+}
+
+/**
+ * @returns {void}
+ */
+function refreshTimelineSyncGauges() {
+    _timelineSyncTelemetry.inflightCount = _timelineSyncInflight.size;
+    _timelineSyncTelemetry.completedCacheSize = _timelineSyncCompleted.size;
+    _timelineSyncTelemetry.failureCacheSize = _timelineSyncFailures.size;
+    recordTimelineSyncGauge('inflight', _timelineSyncInflight.size);
+    recordTimelineSyncGauge('completed_cache_size', _timelineSyncCompleted.size);
+    recordTimelineSyncGauge('failure_cache_size', _timelineSyncFailures.size);
+}
+
+/**
+ * @param {number} ms
+ * @returns {Promise<void>}
+ */
+function sleep(ms) {
+    if (ms <= 0) return Promise.resolve();
+    return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * @template T
+ * @param {Map<string, T>} map
+ * @returns {void}
+ */
+function enforceTimelineSyncCacheLimit(map) {
+    while (map.size > TIMELINE_SYNC_MAX_CACHE_ENTRIES) {
+        const firstKey = map.keys().next().value;
+        if (typeof firstKey !== 'string') return;
+        map.delete(firstKey);
+        _timelineSyncTelemetry.cacheEvictedTotal += 1;
+        recordTimelineSyncCounter('cache_evicted');
+    }
+}
+
+/**
+ * @param {number} [now]
+ * @returns {void}
+ */
+function pruneTimelineSyncCaches(now = Date.now()) {
+    for (const [key, entry] of _timelineSyncCompleted) {
+        if (entry.expiresAt <= now) {
+            _timelineSyncCompleted.delete(key);
+            _timelineSyncTelemetry.cacheExpiredTotal += 1;
+            recordTimelineSyncCounter('cache_expired');
+        }
+    }
+    for (const [key, entry] of _timelineSyncFailures) {
+        if (entry.expiresAt <= now) {
+            _timelineSyncFailures.delete(key);
+            _timelineSyncTelemetry.cacheExpiredTotal += 1;
+            recordTimelineSyncCounter('cache_expired');
+        }
+    }
+    enforceTimelineSyncCacheLimit(_timelineSyncCompleted);
+    enforceTimelineSyncCacheLimit(_timelineSyncFailures);
+    refreshTimelineSyncGauges();
+}
 
 /**
  * @param {unknown} value
@@ -113,6 +288,290 @@ function buildTimelineSignature(turn) {
 }
 
 /**
+ * @param {unknown} value
+ * @returns {TerminalTimelineSyncPolicy}
+ */
+function normalizeTimelineSyncPolicy(value) {
+    return value === 'none' ? 'none' : 'lazy';
+}
+
+/**
+ * @param {TerminalTimelineTurn} turn
+ * @returns {'llm_a' | 'llm_b' | 'user'}
+ */
+function mapTimelineTurnToHubRole(turn) {
+    if (turn.role === 'assistant') return 'llm_b';
+    if (turn.role === 'llm_a') return 'llm_a';
+    if (turn.origin === 'bridge' && turn.role === 'user') return 'llm_a';
+    return 'user';
+}
+
+/**
+ * @param {string} hubSessionId
+ * @param {TerminalTimelineTurn[]} turns
+ * @returns {string}
+ */
+function buildTimelineSyncKey(hubSessionId, turns) {
+    return `${hubSessionId}:${turns.map(buildTimelineSignature).join('\u241e')}`;
+}
+
+/**
+ * @param {string} hubSessionId
+ * @param {TerminalTimelineTurn[]} turns
+ * @param {string | null | undefined} sdkSessionId
+ * @returns {Promise<number>}
+ */
+async function persistBridgeTailToHub(hubSessionId, turns, sdkSessionId) {
+    let syncedCount = 0;
+    for (const turn of turns) {
+        let lastError = null;
+        for (let attempt = 1; attempt <= TIMELINE_SYNC_WRITE_MAX_ATTEMPTS; attempt += 1) {
+            try {
+                await writeTerminalHubTimelineTurn(hubSessionId, {
+                    role: mapTimelineTurnToHubRole(turn),
+                    content: turn.content,
+                    sdkSessionId: sdkSessionId ?? null,
+                    metadata: {
+                        source: 'terminal.timeline_sync',
+                        syncPolicy: 'lazy',
+                        originalOrigin: turn.origin,
+                        originalRole: turn.rawRole,
+                        originalTimestamp: turn.timestamp,
+                        signature: buildTimelineSignature(turn),
+                    },
+                });
+                lastError = null;
+                break;
+            } catch (error) {
+                lastError = error;
+                if (attempt < TIMELINE_SYNC_WRITE_MAX_ATTEMPTS) {
+                    _timelineSyncTelemetry.retryTotal += 1;
+                    recordTimelineSyncCounter('retry');
+                    await sleep(TIMELINE_SYNC_WRITE_RETRY_DELAYS_MS[attempt - 1] ?? 0);
+                }
+            }
+        }
+        if (lastError) {
+            throw lastError instanceof Error ? lastError : new Error(String(lastError));
+        }
+        syncedCount += 1;
+    }
+    return syncedCount;
+}
+
+/**
+ * @param {{
+ *     policy: TerminalTimelineSyncPolicy;
+ *     hubSessionId: string | null;
+ *     sdkSessionId: string | null | undefined;
+ *     reconciliationStatus: TerminalTimelineReconciliation;
+ *     bridgeTurns: TerminalTimelineTurn[];
+ *     liveBridgeTail: TerminalTimelineTurn[];
+ * }} input
+ * @returns {TerminalTimelineSyncState}
+ */
+function maybeScheduleTimelineSync(input) {
+    const { policy, hubSessionId, sdkSessionId, reconciliationStatus, bridgeTurns, liveBridgeTail } = input;
+    const now = Date.now();
+    pruneTimelineSyncCaches(now);
+    if (policy === 'none') {
+        return {
+            policy,
+            status: 'disabled',
+            reason: 'policy-none',
+            pendingCount: 0,
+            syncedCount: 0,
+            failedCount: 0,
+            key: null,
+            lastError: null,
+            attempts: 0,
+            nextRetryAt: null,
+            cacheExpiresAt: null,
+        };
+    }
+    if (!hubSessionId) {
+        return {
+            policy,
+            status: 'unavailable',
+            reason: 'no-hub-session',
+            pendingCount: 0,
+            syncedCount: 0,
+            failedCount: 0,
+            key: null,
+            lastError: null,
+            attempts: 0,
+            nextRetryAt: null,
+            cacheExpiresAt: null,
+        };
+    }
+    const turnsToSync =
+        reconciliationStatus === 'bridge_tail'
+            ? liveBridgeTail
+            : reconciliationStatus === 'bridge_only'
+              ? bridgeTurns
+              : [];
+    if (turnsToSync.length === 0) {
+        return {
+            policy,
+            status: 'not_needed',
+            reason: reconciliationStatus,
+            pendingCount: 0,
+            syncedCount: 0,
+            failedCount: 0,
+            key: null,
+            lastError: null,
+            attempts: 0,
+            nextRetryAt: null,
+            cacheExpiresAt: null,
+        };
+    }
+
+    const key = buildTimelineSyncKey(hubSessionId, turnsToSync);
+    const completed = _timelineSyncCompleted.get(key);
+    if (completed) {
+        return {
+            policy,
+            status: 'synced',
+            reason: 'already-synced',
+            pendingCount: 0,
+            syncedCount: completed.syncedCount,
+            failedCount: 0,
+            key,
+            lastError: null,
+            attempts: 0,
+            nextRetryAt: null,
+            cacheExpiresAt: completed.expiresAt,
+        };
+    }
+    const failure = _timelineSyncFailures.get(key);
+    if (failure) {
+        if (failure.attempts >= TIMELINE_SYNC_FAILURE_MAX_LIFECYCLE_ATTEMPTS || (failure.nextRetryAt ?? 0) > now) {
+            return {
+                policy,
+                status: 'failed',
+                reason:
+                    failure.attempts >= TIMELINE_SYNC_FAILURE_MAX_LIFECYCLE_ATTEMPTS
+                        ? 'max-retries-exhausted'
+                        : 'retry-backoff',
+                pendingCount: turnsToSync.length,
+                syncedCount: 0,
+                failedCount: failure.failedCount,
+                key,
+                lastError: failure.error,
+                attempts: failure.attempts,
+                nextRetryAt: failure.nextRetryAt,
+                cacheExpiresAt: failure.expiresAt,
+            };
+        }
+        _timelineSyncFailures.delete(key);
+        _timelineSyncTelemetry.retryTotal += 1;
+        recordTimelineSyncCounter('lifecycle_retry');
+    }
+    const inflight = _timelineSyncInflight.get(key);
+    if (inflight) {
+        return {
+            policy,
+            status: 'inflight',
+            reason: 'already-inflight',
+            pendingCount: inflight.pendingCount,
+            syncedCount: 0,
+            failedCount: 0,
+            key,
+            lastError: null,
+            attempts: inflight.attempts,
+            nextRetryAt: null,
+            cacheExpiresAt: null,
+        };
+    }
+
+    const lifecycleAttempt = (failure?.attempts ?? 0) + 1;
+    const startedAt = Date.now();
+    const syncPromise = persistBridgeTailToHub(hubSessionId, turnsToSync, sdkSessionId);
+    _timelineSyncInflight.set(key, {
+        promise: syncPromise,
+        startedAt,
+        pendingCount: turnsToSync.length,
+        attempts: lifecycleAttempt,
+    });
+    _timelineSyncTelemetry.scheduledTotal += 1;
+    _timelineSyncTelemetry.turnsScheduledTotal += turnsToSync.length;
+    _timelineSyncTelemetry.lastScheduledAt = startedAt;
+    recordTimelineSyncCounter('scheduled');
+    recordTimelineSyncCounter('turns_scheduled', turnsToSync.length);
+    refreshTimelineSyncGauges();
+    void syncPromise
+        .then((syncedCount) => {
+            const at = Date.now();
+            _timelineSyncCompleted.set(key, { syncedCount, at, expiresAt: at + TIMELINE_SYNC_CACHE_TTL_MS });
+            _timelineSyncFailures.delete(key);
+            _timelineSyncTelemetry.syncedTotal += 1;
+            _timelineSyncTelemetry.turnsSyncedTotal += syncedCount;
+            _timelineSyncTelemetry.lastSyncedAt = at;
+            _timelineSyncTelemetry.lastDurationMs = at - startedAt;
+            _timelineSyncTelemetry.lastError = null;
+            recordTimelineSyncCounter('synced');
+            recordTimelineSyncCounter('turns_synced', syncedCount);
+            recordTimelineSyncGauge('last_duration_ms', at - startedAt);
+            recordTimelineSyncGauge('last_synced_count', syncedCount);
+            pruneTimelineSyncCaches(at);
+        })
+        .catch((error) => {
+            const at = Date.now();
+            const attempts = lifecycleAttempt;
+            const canRetry = attempts < TIMELINE_SYNC_FAILURE_MAX_LIFECYCLE_ATTEMPTS;
+            const retryDelay =
+                TIMELINE_SYNC_FAILURE_RETRY_DELAYS_MS[
+                    Math.min(attempts - 1, TIMELINE_SYNC_FAILURE_RETRY_DELAYS_MS.length - 1)
+                ] ?? 0;
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            _timelineSyncFailures.set(key, {
+                failedCount: turnsToSync.length,
+                at,
+                error: errorMessage,
+                attempts,
+                nextRetryAt: canRetry ? at + retryDelay : null,
+                expiresAt: at + TIMELINE_SYNC_CACHE_TTL_MS,
+            });
+            _timelineSyncTelemetry.failedTotal += 1;
+            _timelineSyncTelemetry.turnsFailedTotal += turnsToSync.length;
+            _timelineSyncTelemetry.lastFailedAt = at;
+            _timelineSyncTelemetry.lastDurationMs = at - startedAt;
+            _timelineSyncTelemetry.lastError = errorMessage;
+            recordTimelineSyncCounter('failed');
+            recordTimelineSyncCounter('turns_failed', turnsToSync.length);
+            recordTimelineSyncGauge('last_duration_ms', at - startedAt);
+            recordTimelineSyncGauge('last_failed_count', turnsToSync.length);
+            pruneTimelineSyncCaches(at);
+        })
+        .finally(() => {
+            _timelineSyncInflight.delete(key);
+            refreshTimelineSyncGauges();
+        });
+
+    return {
+        policy,
+        status: 'scheduled',
+        reason: reconciliationStatus,
+        pendingCount: turnsToSync.length,
+        syncedCount: 0,
+        failedCount: 0,
+        key,
+        lastError: null,
+        attempts: lifecycleAttempt,
+        nextRetryAt: null,
+        cacheExpiresAt: null,
+    };
+}
+
+/**
+ * @returns {TerminalTimelineSyncTelemetry}
+ */
+export function readTerminalTimelineSyncTelemetry() {
+    pruneTimelineSyncCaches();
+    return { ..._timelineSyncTelemetry };
+}
+
+/**
  * Retorna o maior overlap em que o final do hub coincide com o início do bridge.
  *
  * @param {TerminalTimelineTurn[]} persistedTurns
@@ -152,7 +611,12 @@ function readLatestTerminalHubTurnsWindow(hubSessionId, limitTurns, newestOffset
 }
 
 /**
- * @param {{ limitPairs?: number; runtimeId?: string | null; newestOffset?: number }} [input]
+ * @param {{
+ *     limitPairs?: number;
+ *     runtimeId?: string | null;
+ *     newestOffset?: number;
+ *     syncPolicy?: TerminalTimelineSyncPolicy;
+ * }} [input]
  * @returns {{
  *     requestedRuntimeId: string | null;
  *     runtimeId: string;
@@ -169,14 +633,21 @@ function readLatestTerminalHubTurnsWindow(hubSessionId, limitTurns, newestOffset
  *     bridgeTurnCount: number;
  *     liveBridgeTailCount: number;
  *     overlapCount: number;
+ *     sync: TerminalTimelineSyncState;
  *     turns: TerminalTimelineTurn[];
  * }}
  */
-export function readTerminalTimelineProjection({ limitPairs = 10, runtimeId = null, newestOffset = 0 } = {}) {
+export function readTerminalTimelineProjection({
+    limitPairs = 10,
+    runtimeId = null,
+    newestOffset = 0,
+    syncPolicy = 'lazy',
+} = {}) {
     const base = readTerminalRuntimeBase(runtimeId);
     const binding = readTerminalSessionBinding();
     const hubSessionId = binding.hubSessionId ?? base.binding.hubSessionId ?? null;
     const limitTurns = Math.max(1, Math.trunc(limitPairs * 2));
+    const policy = normalizeTimelineSyncPolicy(syncPolicy);
 
     const bridgeTurns = readTerminalHistoryFeed().slice(-limitTurns).map(mapBridgeTimelineTurn);
 
@@ -201,6 +672,8 @@ export function readTerminalTimelineProjection({ limitPairs = 10, runtimeId = nu
     let turns = [];
     let overlapCount = 0;
     let liveBridgeTailCount = 0;
+    /** @type {TerminalTimelineTurn[]} */
+    let liveBridgeTail = [];
 
     if (persistedTurns.length > 0) {
         turns = persistedTurns;
@@ -213,13 +686,13 @@ export function readTerminalTimelineProjection({ limitPairs = 10, runtimeId = nu
             if (overlapCount === bridgeTurns.length) {
                 reconciliationStatus = 'aligned';
             } else if (overlapCount > 0) {
-                const liveTail = bridgeTurns.slice(overlapCount);
-                if (liveTail.length > 0) {
-                    turns = [...persistedTurns, ...liveTail];
+                liveBridgeTail = bridgeTurns.slice(overlapCount);
+                if (liveBridgeTail.length > 0) {
+                    turns = [...persistedTurns, ...liveBridgeTail];
                     timelineSource = 'mixed';
                     timelineAuthority = 'reconciled';
                     reconciliationStatus = 'bridge_tail';
-                    liveBridgeTailCount = liveTail.length;
+                    liveBridgeTailCount = liveBridgeTail.length;
                 } else {
                     reconciliationStatus = 'aligned';
                 }
@@ -233,6 +706,15 @@ export function readTerminalTimelineProjection({ limitPairs = 10, runtimeId = nu
         timelineAuthority = 'transport';
         reconciliationStatus = 'bridge_only';
     }
+
+    const sync = maybeScheduleTimelineSync({
+        policy,
+        hubSessionId,
+        sdkSessionId: binding.sdkSessionId,
+        reconciliationStatus,
+        bridgeTurns,
+        liveBridgeTail,
+    });
 
     return {
         requestedRuntimeId: base.requestedRuntimeId,
@@ -250,6 +732,7 @@ export function readTerminalTimelineProjection({ limitPairs = 10, runtimeId = nu
         bridgeTurnCount: bridgeTurns.length,
         liveBridgeTailCount,
         overlapCount,
+        sync,
         turns,
     };
 }
@@ -281,6 +764,14 @@ export function readTerminalHistoryProjection(limitPairs = 10, runtimeId) {
  *     persistedTurnCount: number;
  *     bridgeTurnCount: number;
  *     liveBridgeTailCount: number;
+ *     syncStatus: TerminalTimelineSyncStatus;
+ *     syncReason: string | null;
+ *     syncPendingCount: number;
+ *     syncSyncedCount: number;
+ *     syncFailedCount: number;
+ *     syncLastError: string | null;
+ *     syncAttempts: number;
+ *     syncNextRetryAt: number | null;
  * }}
  */
 export function readTerminalContextProjection(runtimeId) {
@@ -314,6 +805,14 @@ export function readTerminalContextProjection(runtimeId) {
         persistedTurnCount: timeline.totalPersistedTurns,
         bridgeTurnCount: timeline.bridgeTurnCount,
         liveBridgeTailCount: timeline.liveBridgeTailCount,
+        syncStatus: timeline.sync.status,
+        syncReason: timeline.sync.reason,
+        syncPendingCount: timeline.sync.pendingCount,
+        syncSyncedCount: timeline.sync.syncedCount,
+        syncFailedCount: timeline.sync.failedCount,
+        syncLastError: timeline.sync.lastError,
+        syncAttempts: timeline.sync.attempts,
+        syncNextRetryAt: timeline.sync.nextRetryAt,
     };
 }
 

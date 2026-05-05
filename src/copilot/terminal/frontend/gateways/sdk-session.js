@@ -22,6 +22,7 @@ import {
     listAgentSdkTools,
     listAgentSdkWorkspaceFiles,
     readAgentSdkPlan,
+    readAgentSdkSystemPromptProjection,
     readAgentSdkWorkspaceFile,
     requestAgentSdkElicitation,
     resolveAgentSdkPendingElicitation,
@@ -107,6 +108,14 @@ export async function listTerminalSdkTools(options, runtimeId) {
  */
 export async function getTerminalSdkQuota(runtimeId) {
     return getAgentSdkQuota(runtimeId);
+}
+
+/**
+ * @param {string | null | undefined} [runtimeId]
+ * @returns {Promise<Awaited<ReturnType<typeof readAgentSdkSystemPromptProjection>>>}
+ */
+export async function readTerminalSdkSystemPromptProjection(runtimeId) {
+    return readAgentSdkSystemPromptProjection(runtimeId);
 }
 
 // ---------------------------------------------------------------------------

@@ -87,6 +87,20 @@ function createMockObservability() {
 function routeDeps(overrides = {}) {
     const agent = overrides.agent ?? createMockAgent();
     return {
+        sdkSystemPrompt: {
+            readAgentSdkSystemPromptProjection: async () => ({
+                sessionId: 'sdk-runtime',
+                sessionAvailable: true,
+                instructionSources: { sources: [{ type: 'system', origin: 'sdk' }] },
+                instructionSourcesError: null,
+                systemPrompt: {
+                    effectiveMode: 'append',
+                    effectiveLiveMode: 'customize',
+                    liveReloadMechanism: 'sdk-transform',
+                    revision: { digest: 'route-digest' },
+                },
+            }),
+        },
         sdkSessionOwnership: {
             clearSdkRuntimeBinding,
             resolveSdkRuntimeProjection,
@@ -276,6 +290,27 @@ describe('sdk runtime projection routes', () => {
             sdkSessionId: 'sdk-shared',
             isBound: true,
         });
+    });
+
+    it('GET /agent/system-prompt expõe status do prompt e instruction sources da sessão ativa', async () => {
+        const app = express();
+        app.use(
+            createAgentRouter(
+                routeDeps({
+                    agent: createMockAgent(),
+                    metrics: /** @type {any} */ ({ getSummary: () => ({}) }),
+                    getClient: async () => createMockClient(),
+                }),
+            ),
+        );
+
+        const res = await request(app).get('/agent/system-prompt').expect(200);
+
+        assert.equal(res.body.sessionId, 'sdk-runtime');
+        assert.equal(res.body.systemPrompt.effectiveMode, 'append');
+        assert.equal(res.body.systemPrompt.effectiveLiveMode, 'customize');
+        assert.equal(res.body.systemPrompt.revision.digest, 'route-digest');
+        assert.deepEqual(res.body.instructionSources, { sources: [{ type: 'system', origin: 'sdk' }] });
     });
 
     it('GET /agent/state expõe state + binding canônico na mesma resposta', async () => {

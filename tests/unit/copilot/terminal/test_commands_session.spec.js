@@ -33,6 +33,8 @@ const defaultRuntime = /** @type {any} */ ({
         dialogPaused: false,
         pendingQuestion: null,
         contextWindow: 128000,
+        systemPromptBinding: { digest: 'bound-default' },
+        systemPromptFreshness: { isStale: false, reason: 'binding ok', recommendedAction: 'none' },
     }),
     dialogPrMetrics: null,
     answerPendingQuestion,
@@ -67,6 +69,12 @@ const altRuntime = /** @type {any} */ ({
         dialogPaused: false,
         pendingQuestion: 'Responder alt?',
         contextWindow: 64000,
+        systemPromptBinding: { digest: 'bound-alt' },
+        systemPromptFreshness: {
+            isStale: true,
+            reason: 'snapshot estático defasado',
+            recommendedAction: 'resume-session',
+        },
     }),
     dialogPrMetrics: null,
     answerPendingQuestion: altAnswerPendingQuestion,
@@ -283,6 +291,9 @@ describe('commands/session — sync commands', () => {
         expect(ctx.output()).toContain('*default:gpt-5-mini/idle');
         expect(ctx.output()).toContain('billing/modelo');
         expect(ctx.output()).toContain('último PR');
+        expect(ctx.output()).toContain('prompt digest');
+        expect(ctx.output()).toContain('prompt frescor');
+        expect(ctx.output()).toContain('binding ok');
     });
 
     it('cmdStatus destaca mismatch de modelo cobrado/configurado', () => {
@@ -315,6 +326,7 @@ describe('commands/session — sync commands', () => {
         expect(ctx.output()).toContain('runtime id');
         expect(ctx.output()).toContain('alt');
         expect(ctx.output()).toContain('gpt-4.1-mini');
+        expect(ctx.output()).toContain('resume-session');
     });
 
     it('cmdStatus avisa quando o runtime solicitado cai em fallback para o default', () => {

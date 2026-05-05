@@ -74,6 +74,8 @@ const defaultRuntime = /** @type {any} */ ({
         dialogPaused: false,
         pendingQuestion: 'Ready?',
         contextState: { tokens: 32000, tokenLimit: 128000, utilization: 0.25 },
+        systemPromptBinding: { digest: 'bound-default' },
+        systemPromptFreshness: { isStale: false, reason: 'binding ok', recommendedAction: 'none' },
     }),
     getHealthSnapshot: () => ({
         status: 'healthy',
@@ -124,6 +126,12 @@ const altRuntime = /** @type {any} */ ({
         dialogPaused: true,
         pendingQuestion: null,
         contextState: { tokens: 8000, tokenLimit: 64000, utilization: 0.125 },
+        systemPromptBinding: { digest: 'bound-alt' },
+        systemPromptFreshness: {
+            isStale: true,
+            reason: 'snapshot estático defasado',
+            recommendedAction: 'resume-session',
+        },
     }),
     getHealthSnapshot: () => ({
         status: 'degraded',
@@ -440,6 +448,10 @@ describe('terminal/frontend/index', () => {
         expect(projection.pendingQuestionShadowAgeMs).toBe(1200);
         expect(projection.pendingQuestionShadowRemainingMs).toBe(0);
         expect(projection.recommendedAction).toBe('clear_pending_question_shadow');
+        expect(projection.systemPromptBinding).toEqual(expect.objectContaining({ digest: 'bound-default' }));
+        expect(projection.systemPromptFreshness).toEqual(
+            expect.objectContaining({ isStale: false, recommendedAction: 'none' }),
+        );
         expect(projection.activity.label).toBeTruthy();
         expect(projection.lifecycle).toEqual(expect.objectContaining({ shuttingDown: expect.any(Boolean) }));
         expect(projection.lifecycleSummary).toEqual(
@@ -457,6 +469,10 @@ describe('terminal/frontend/index', () => {
         expect(status.runtimeFound).toBe(true);
         expect(status.runtimeSessionId).toBe('runtime-alt');
         expect(status.pendingQuestion).toBe(false);
+        expect(status.systemPromptBinding).toEqual(expect.objectContaining({ digest: 'bound-alt' }));
+        expect(status.systemPromptFreshness).toEqual(
+            expect.objectContaining({ isStale: true, recommendedAction: 'resume-session' }),
+        );
         expect(config.runtimeId).toBe('alt');
         expect(config.requestedRuntimeId).toBe('alt');
         expect(config.runtimeFound).toBe(true);
@@ -514,6 +530,10 @@ describe('terminal/frontend/index', () => {
         expect(projection.toolErrorCount).toBe(2);
         expect(projection.errorStats.total).toBe(3);
         expect(projection.binding.sdkSessionId).toBe('sdk-1');
+        expect(projection.systemPromptBinding).toEqual(expect.objectContaining({ digest: 'bound-default' }));
+        expect(projection.systemPromptFreshness).toEqual(
+            expect.objectContaining({ isStale: false, recommendedAction: 'none' }),
+        );
     });
 
     it('projeta diagnose/metrics/usage por runtime explícito', async () => {

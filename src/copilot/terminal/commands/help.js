@@ -25,7 +25,7 @@ export function cmdHelp({ injectPort, println }) {
   \x1b[36m╔═══════════════════════ Terminal LLM-B — Ajuda ═══════════════════════╗\x1b[0m
 
   \x1b[1mComandos de Sessão\x1b[0m
-  \x1b[33m/status\x1b[0m                              — status do agente + modelo + reasoning
+  \x1b[33m/status\x1b[0m                              — status do agente + modelo + reasoning + binding/frescor do prompt
   \x1b[33m/now\x1b[0m                                 — snapshot operacional curto (loop/ask/model mismatch)
   \x1b[33m/activity [n]\x1b[0m                        — atividade atual da LLM-B + timeline recente
   \x1b[33m/history [n]\x1b[0m                         — últimos N turnos em memória
@@ -59,7 +59,7 @@ export function cmdHelp({ injectPort, println }) {
   \x1b[33m/thinking show <id>|latest\x1b[0m          — abre thinking completo capturado
   \x1b[33m/usage [on|off|now]\x1b[0m                  — toggle usage pós-turno ou snapshot instantâneo
   \x1b[33m/tools\x1b[0m                               — lista ferramentas registradas com stats
-  \x1b[33m/sdk [status|models|tools|quota|compact]\x1b[0m — catálogo/quota/ops SDK via Agent
+  \x1b[33m/sdk [status|models|tools|quota|prompt|compact]\x1b[0m — catálogo/quota/prompt/ops SDK via Agent
   \x1b[33m/workspace [list|read|write]\x1b[0m          — workspace virtual da sessão SDK
   \x1b[33m/elicitation [list|show|request]\x1b[0m      — formulários/URL estruturados do SDK
   \x1b[33m/permission [list|all|show|clear]\x1b[0m     — permissões SDK observadas no terminal
@@ -67,7 +67,7 @@ export function cmdHelp({ injectPort, println }) {
   \x1b[33m/audit [n]\x1b[0m                           — últimas N entradas do audit log (default: 10)
   \x1b[33m/display [toggle] [on|off]\x1b[0m           — gerencia toggles de exibição (thinking, streaming, usage, tools, intent)
   \x1b[33m/display preset <default|minimal|verbose|debug|focus>\x1b[0m — aplica presets de UX
-  \x1b[33m/metrics\x1b[0m                             — métricas consolidadas da sessão (turns, tokens, billing)
+  \x1b[33m/metrics\x1b[0m                             — métricas consolidadas da sessão (turns, tokens, billing, inject/prompt)
   \x1b[33m/export [path]\x1b[0m                       — exporta conversa como Markdown
   \x1b[33m/resume\x1b[0m                              — lista últimas sessões do hub (para retomar)
   \x1b[33m/resume <sessionId>\x1b[0m                  — injeta resumo de sessão anterior como contexto

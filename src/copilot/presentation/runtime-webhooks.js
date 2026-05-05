@@ -8,7 +8,7 @@
  */
 
 import { listAgentRuntimeWebhooks, registerAgentRuntimeWebhook, unregisterAgentRuntimeWebhook } from '#copilot/agent';
-import { resolveAgentRuntimeSelection } from './agent-runtime.js';
+import { requireAgentRuntimeSelection } from './agent-runtime.js';
 import { buildRuntimeRouteMetaFromSelection, buildRuntimeRouteMetaPayload } from './runtime-meta.js';
 
 /**
@@ -22,7 +22,7 @@ import { buildRuntimeRouteMetaFromSelection, buildRuntimeRouteMetaPayload } from
  * }}
  */
 export function resolveRuntimeWebhookSelection(runtimeId) {
-    const selection = resolveAgentRuntimeSelection(runtimeId);
+    const selection = requireAgentRuntimeSelection(runtimeId);
     return {
         agent: selection.runtime,
         ...buildRuntimeRouteMetaFromSelection(selection),

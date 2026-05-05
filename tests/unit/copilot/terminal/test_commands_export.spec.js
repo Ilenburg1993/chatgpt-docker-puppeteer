@@ -5,6 +5,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const readTerminalTimelineProjection = vi.fn(() => ({
     timelineSource: 'hub',
     reconciliationStatus: 'aligned',
+    sync: {
+        status: 'not_needed',
+    },
     turns: [
         {
             role: 'user',
@@ -63,6 +66,9 @@ describe('terminal/commands/export', () => {
         readTerminalTimelineProjection.mockReturnValueOnce({
             timelineSource: 'empty',
             reconciliationStatus: 'empty',
+            sync: {
+                status: 'not_needed',
+            },
             turns: [],
         });
         const ctx = mockCtx();

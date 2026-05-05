@@ -8,7 +8,7 @@
  */
 
 import { readAgentRuntimeTools } from '#copilot/agent';
-import { resolveAgentRuntimeSelection } from './agent-runtime.js';
+import { requireAgentRuntimeSelection } from './agent-runtime.js';
 import { buildRuntimeRouteMetaFromSelection } from './runtime-meta.js';
 
 /** @typedef {ReturnType<typeof readAgentRuntimeTools>} AgentRuntimeToolsSnapshot */
@@ -61,7 +61,7 @@ export function readAgentRuntimeToolsProjection(agent, options = {}) {
  * @returns {AgentRuntimeToolsSnapshot & AgentRuntimeSelectionMeta}
  */
 export function readAgentRuntimeToolsProjectionForRuntime(runtimeId, options = {}) {
-    const selection = resolveAgentRuntimeSelection(runtimeId);
+    const selection = requireAgentRuntimeSelection(runtimeId);
     return {
         ...readAgentRuntimeTools(selection.runtime, options),
         ...buildRuntimeRouteMetaFromSelection(selection),

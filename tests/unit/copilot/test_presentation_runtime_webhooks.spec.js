@@ -25,14 +25,23 @@ vi.mock('#copilot/agent', () => ({
 }));
 
 vi.mock('../../../src/copilot/presentation/agent-runtime.js', () => ({
-    resolveAgentRuntimeSelection: (/** @type {string | null | undefined} */ runtimeId) => ({
-        requestedRuntimeId: runtimeId ?? null,
-        runtimeId: runtimeId === 'missing' ? 'default' : (runtimeId ?? 'default'),
-        runtime: mocks.agent,
-        runtimeFound: runtimeId !== 'missing',
-        usedDefaultRuntimeFallback: runtimeId === 'missing',
-        defaultRuntimeId: 'default',
-    }),
+    requireAgentRuntimeSelection: (/** @type {string | null | undefined} */ runtimeId) => {
+        if (runtimeId === 'missing') {
+            throw Object.assign(new Error("Runtime 'missing' não encontrado."), {
+                name: 'NotFoundError',
+                code: 'AGENT_RUNTIME_NOT_FOUND',
+                status: 404,
+            });
+        }
+        return {
+            requestedRuntimeId: runtimeId ?? null,
+            runtimeId: runtimeId ?? 'default',
+            runtime: mocks.agent,
+            runtimeFound: true,
+            usedDefaultRuntimeFallback: false,
+            defaultRuntimeId: 'default',
+        };
+    },
 }));
 
 describe('presentation/runtime-webhooks.js', () => {
@@ -60,49 +69,42 @@ describe('presentation/runtime-webhooks.js', () => {
         expect(mocks.unregisterWebhook).toHaveBeenCalledWith('wh-1');
     });
 
-    it('expõe fallback explícito quando o runtime pedido não existe', async () => {
+    it('rejeita runtimeId explícito inexistente em vez de cair silenciosamente no default', async () => {
         const mod = await import('../../../src/copilot/presentation/runtime-webhooks.js');
 
-        expect(mod.resolveRuntimeWebhookSelection('missing')).toEqual(
-            expect.objectContaining({
-                requestedRuntimeId: 'missing',
-                runtimeId: 'default',
-                runtimeFound: false,
-                usedDefaultRuntimeFallback: true,
-            }),
-        );
+        expect(() => mod.resolveRuntimeWebhookSelection('missing')).toThrow("Runtime 'missing' não encontrado.");
     });
 
-    it('projeta payload HTTP canônico para list/register/unregister', async () => {
+    it('projeta payload HTTP canônico para list/register/unregister quando o runtime existe', async () => {
         const mod = await import('../../../src/copilot/presentation/runtime-webhooks.js');
 
-        expect(mod.buildRuntimeWebhooksListHttpPayload('missing')).toEqual(
+        expect(mod.buildRuntimeWebhooksListHttpPayload('alt')).toEqual(
             expect.objectContaining({
                 ok: true,
-                runtimeId: 'default',
-                requestedRuntimeId: 'missing',
-                runtimeFound: false,
-                usedDefaultRuntimeFallback: true,
+                runtimeId: 'alt',
+                requestedRuntimeId: 'alt',
+                runtimeFound: true,
+                usedDefaultRuntimeFallback: false,
                 count: 1,
                 webhooks: [{ id: 'wh-1', url: 'https://example.test/hook' }],
             }),
         );
 
-        expect(mod.registerRuntimeWebhookHttp('https://hook.test/new', 'missing')).toEqual(
+        expect(mod.registerRuntimeWebhookHttp('https://hook.test/new', 'alt')).toEqual(
             expect.objectContaining({
                 ok: true,
-                runtimeId: 'default',
-                requestedRuntimeId: 'missing',
+                runtimeId: 'alt',
+                requestedRuntimeId: 'alt',
                 id: 'wh-1',
                 url: 'https://hook.test/new',
             }),
         );
 
-        expect(mod.unregisterRuntimeWebhookHttp('wh-1', 'missing')).toEqual(
+        expect(mod.unregisterRuntimeWebhookHttp('wh-1', 'alt')).toEqual(
             expect.objectContaining({
                 ok: true,
-                runtimeId: 'default',
-                requestedRuntimeId: 'missing',
+                runtimeId: 'alt',
+                requestedRuntimeId: 'alt',
                 id: 'wh-1',
             }),
         );

@@ -98,3 +98,22 @@ export function buildRuntimeRouteMetaFromSelection(selection) {
         runtimeFallbackWarning,
     };
 }
+
+/**
+ * Projeta metadata canônica para cenários em que um `runtimeId` explícito foi pedido mas não existe.
+ *
+ * Não informa `runtimeId` efetivo nem fallback, porque a operação deve falhar de forma estrita nessas superfícies.
+ *
+ * @param {string | null | undefined} requestedRuntimeId
+ * @returns {{ requestedRuntimeId?: string | null; runtimeFound?: boolean; usedDefaultRuntimeFallback?: boolean }}
+ */
+export function buildMissingRuntimeRouteMeta(requestedRuntimeId) {
+    if (typeof requestedRuntimeId !== 'string' || requestedRuntimeId.trim().length === 0) {
+        return {};
+    }
+    return {
+        requestedRuntimeId: requestedRuntimeId.trim(),
+        runtimeFound: false,
+        usedDefaultRuntimeFallback: false,
+    };
+}

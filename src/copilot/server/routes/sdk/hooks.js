@@ -120,13 +120,15 @@ const withErrorHandler = _withErrorHandler.bind(null, 'sdk-api/hooks');
  *         .then(({ hooks }) => hooks.forEach((h) => console.log(h.name)));
  */
 router.get('/hooks/registry', (_req, res) => {
-    const routeDeps = resolveSdkRouteSharedDeps(/** @type {Req} */ (_req));
-    const hooks = routeDeps.sdkHooks.registry.list();
-    res.json({
-        ok: true,
-        ...routeDeps.sdkRuntimeProjection.buildRuntimeRouteMetaPayload(routeDeps),
-        count: hooks.length,
-        hooks,
+    void withErrorHandler(/** @type {Req} */ (_req), res, async () => {
+        const routeDeps = resolveSdkRouteSharedDeps(/** @type {Req} */ (_req));
+        const hooks = routeDeps.sdkHooks.registry.list();
+        res.json({
+            ok: true,
+            ...routeDeps.sdkRuntimeProjection.buildRuntimeRouteMetaPayload(routeDeps),
+            count: hooks.length,
+            hooks,
+        });
     });
 });
 

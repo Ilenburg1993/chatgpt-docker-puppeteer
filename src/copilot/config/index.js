@@ -11,17 +11,7 @@
 // Profile builders (buildAlwaysAliveConfig etc.) movidos para '#copilot/hooks/presets/profiles'.
 // Cf. PARTE-21C Faixa H: eliminação de violações L2→L3.
 
-/**
- * AH.1 — Ferramentas excluídas por padrão em sessões always-alive.
- *
- * Mantido localmente neste barrel porque há contratos estruturais que validam a superfície pública de
- * `#copilot/config`.
- *
- * @type {readonly string[]}
- */
-export const DEFAULT_EXCLUDED_TOOLS = /** @type {readonly string[]} */ (
-    Object.freeze(['powershell', 'web_fetch', 'web_search', 'memory'])
-);
+export { DEFAULT_EXCLUDED_TOOLS } from './defaults.js';
 
 // ─── Env (variáveis de ambiente e constantes de configuração) ─────────────────
 export * from './env.js';
@@ -40,15 +30,43 @@ export {
     buildAlwaysAliveSystemMessage,
     buildAppendSystemMessage,
     buildHookContextAppendMessage,
+    buildHookContextMessage,
+    buildLiveSystemMessage,
     buildReplaceSystemMessage,
+    buildSystemMessage,
+    buildSystemPromptBindingSnapshot,
+    buildSystemPromptProfile,
+    evaluateSystemPromptFreshness,
+    getSystemPromptSdkCompatibility,
+    readResolvedSystemPromptUserConfig,
+    readResolvedSystemPromptUserConfigSync,
+    readSessionInstructionSources,
+    readSystemPromptStatus,
+    readSystemPromptStatusSync,
 } from './system-prompt/index.js';
 
 // ─── Novo módulo modular de system prompt (Faixa I) ──────────────────────────
 export {
+    SYSTEM_PROMPT_CONFIG_PATH,
+    SYSTEM_PROMPT_DEFAULT_COLLABORATION_CONTRACT,
+    SYSTEM_PROMPT_DEFAULT_ENGINEERING_DOCTRINE,
+    SYSTEM_PROMPT_DEFAULT_EVOLUTION_LOOP,
+    SYSTEM_PROMPT_DEFAULT_FOCUS_PATHS,
+    SYSTEM_PROMPT_DEFAULT_MODE,
+    SYSTEM_PROMPT_DEFAULT_NORTH_STAR,
+    SYSTEM_PROMPT_DEFAULT_OBJECTIVE,
+    SYSTEM_PROMPT_DEFAULT_PERSONALITY,
+    SYSTEM_PROMPT_DEFAULT_RELOAD_STRATEGY,
     SECTIONS as SYSTEM_PROMPT_MODULAR_SECTIONS,
-    buildHookContextMessage,
-    buildSystemMessage,
+    getSystemPromptConfigFilePath,
     getMode as getSystemPromptMode,
+    normalizeSystemPromptMode,
+    normalizeSystemPromptReloadStrategy,
+    readSystemPromptModeState,
+    readUserAppendContent,
+    readUserAppendContentSync,
+    renderSystemPromptProfileBlock,
+    resetMode as resetSystemPromptMode,
     setMode as setSystemPromptMode,
 } from './system-prompt/index.js';
 

@@ -74,6 +74,6 @@ describe('presentation/agent-runtime', () => {
     });
 
     it('lança erro quando requireAgentRuntime recebe id inexistente', () => {
-        expect(() => requireAgentRuntime('missing')).toThrow('AGENT_RUNTIME_NOT_FOUND:missing');
+        expect(() => requireAgentRuntime('missing')).toThrow("Runtime 'missing' não encontrado.");
     });
 });

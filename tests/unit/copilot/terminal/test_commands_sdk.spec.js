@@ -14,6 +14,24 @@ const runtimeMocks = vi.hoisted(() => ({
     listTerminalSdkModels: vi.fn(async () => ({ models: [{ id: 'gpt-5-mini', supportedReasoningEfforts: ['high'] }] })),
     listTerminalSdkTools: vi.fn(async () => ({ tools: [{ name: 'read_file', description: 'Read files' }] })),
     listTerminalSdkWorkspaceFiles: vi.fn(async () => ({ files: [{ path: 'plan.md' }] })),
+    readTerminalSdkSystemPromptProjection: vi.fn(async () => ({
+        sessionId: 'sdk-1',
+        sessionAvailable: true,
+        instructionSources: { sources: [{ type: 'system', origin: 'sdk' }] },
+        instructionSourcesError: null,
+        systemPrompt: {
+            effectiveMode: 'append',
+            effectiveLiveMode: 'customize',
+            liveReloadMechanism: 'sdk-transform',
+            configPath: '/tmp/system-prompt.json',
+            autoReload: true,
+            sections: Array.from({ length: 10 }, (_, idx) => ({ sectionId: `s${idx + 1}` })),
+            appendFiles: [{ path: '/tmp/user.md', exists: true }],
+            limitations: ['mode=replace exige resume total apenas quando usado explicitamente.'],
+            sdkCompatibility: { supportsCustomizeMode: true, supportsInstructionSourcesRpc: true },
+            revision: { digest: 'abcd1234efgh5678' },
+        },
+    })),
     readTerminalSdkWorkspaceFile: vi.fn(async (path) => ({ path, content: 'hello' })),
     requestTerminalSdkElicitation: vi.fn(async () => ({ action: 'accept', content: { answer: 'ok' } })),
     resolveTerminalSdkPendingElicitation: vi.fn(() => true),
@@ -63,6 +81,16 @@ describe('terminal/commands/sdk', () => {
         expect(ctx.output()).toContain('SDK Runtime');
         expect(ctx.output()).toContain('sdk-1');
         expect(ctx.output()).toContain('chat');
+    });
+
+    it('/sdk prompt exibe status canônico do system prompt e instruction sources', async () => {
+        const ctx = mockCtx();
+        await cmdSdk({ println: ctx.println }, 'prompt');
+        expect(runtimeMocks.readTerminalSdkSystemPromptProjection).toHaveBeenCalled();
+        expect(ctx.output()).toContain('System Prompt SDK');
+        expect(ctx.output()).toContain('sdk-transform');
+        expect(ctx.output()).toContain('abcd1234efgh5678');
+        expect(ctx.output()).toContain('Instruction sources');
     });
 
     it('/sdk models e /sdk tools consultam o Agent SDK facade', async () => {

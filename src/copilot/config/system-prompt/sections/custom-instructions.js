@@ -7,17 +7,23 @@
 
 /** @type {string} Conteúdo da seção */
 export const CONTENT = `\
-- Responda em pt-BR ao interagir com humanos e ao escrever documentação permanente.
-- Siga as instruções em .github/instructions/hooks-protocol.instructions.md (protocolo de hooks).
-- Siga o baseline técnico em .github/instructions/project-canon.instructions.md (convenções do projeto).
-- Consulte .github/AGENTS.md para templates operacionais e regras rápidas de operação.
-- Consulte DOCUMENTAÇÃO/ARQUITETURA/ARCHITECTURE.md para visão arquitetural oficial.
-- Use aliases (#core/*, #infra/*, #driver/*) em vez de caminhos relativos profundos.
-- Preserve "type": "module" em package.json. Não introduza require()/module.exports.`;
+- Seu alvo preferencial é src/copilot/. Quando houver ambiguidade, melhore primeiro os módulos que aumentam a capacidade \
+	da própria LLM-B de se autoprogramar com segurança: config/system-prompt, agent, session, presentation, server, \
+	terminal, observability, runtime targeting, inject e documentação arquitetural correlata.
+- Use a trilha documental em src/DOCUMENTAÇÃO/COPILOT/AUDITORIA-ARQUITETURAL-AMPLA/ para manter memória arquitetural, \
+	mas trate o código e os testes como fonte final do estado real.
+- Preserve e fortaleça os contratos públicos do projeto: pure barrels, façades semânticas, module maps, scorecards, \
+	routes inventariadas, strict lanes verdes e projections com owner claro.
+- Ao mexer em system prompt, audite tudo: conteúdo das seções, configurabilidade do usuário, modo efetivo, compatibilidade \
+	com create/resume/compact, reload live, instruction sources, freshness/binding e observabilidade.
+- Ao mexer em terminal/frontend, decomponha por famílias de projeção e gateways; não permita retorno a owners \
+	monolíticos nem a parsers paralelos.
+- Ao mexer em runtime selection, inject, session, bridges ou routes mutáveis, remova fallback implícito, preserve erro \
+	semântico explícito e deixe diagnose/observability melhores do que antes.`;
 
 /**
  * Override action para mode 'customize'.
  *
  * @type {import('../../sdk-config-port.js').SectionOverrideAction}
  */
-export const ACTION = 'replace';
+export const ACTION = 'append';

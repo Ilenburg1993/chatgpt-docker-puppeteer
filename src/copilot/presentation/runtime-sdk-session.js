@@ -22,7 +22,8 @@ import {
     setAgentSdkSessionMode as setAgentSdkSessionModeOnAgent,
     updateAgentSdkPlan as updateAgentSdkPlanOnAgent,
 } from '#copilot/agent';
-import { getAgentRuntimeOrDefault } from './agent-runtime.js';
+import { readSessionInstructionSources, readSystemPromptStatus } from '#copilot/config';
+import { requireAgentRuntimeSelection } from './agent-runtime.js';
 import { readAgentStatusSnapshot } from './runtime-status.js';
 
 /**
@@ -30,7 +31,7 @@ import { readAgentStatusSnapshot } from './runtime-status.js';
  * @returns {import('#copilot/agent').AlwaysAliveAgent}
  */
 export function getAgentSdkSessionTarget(runtimeId) {
-    return getAgentRuntimeOrDefault(runtimeId);
+    return requireAgentRuntimeSelection(runtimeId).runtime;
 }
 
 /**
@@ -72,6 +73,77 @@ export function resolveAgentSdkActiveSessionEntry(runtimeId, sessionId) {
         createdAt: Date.now(),
         messagesCount: 0,
     };
+}
+
+/**
+ * Lê a projeção canônica do system prompt para o runtime alvo, incluindo o status local do prompt modular e as
+ * instruction sources da sessão SDK viva quando disponíveis.
+ *
+ * @param {string | null | undefined} [runtimeId]
+ * @returns {Promise<{
+ *     systemPrompt: Awaited<ReturnType<typeof readSystemPromptStatus>>;
+ *     binding: Record<string, unknown> | null;
+ *     freshness: Record<string, unknown> | null;
+ *     sessionId: string | null;
+ *     sessionAvailable: boolean;
+ *     instructionSources: unknown | null;
+ *     instructionSourcesError: string | null;
+ * }>}
+ */
+export async function readAgentSdkSystemPromptProjection(runtimeId) {
+    const agent = getAgentSdkSessionTarget(runtimeId);
+    const snap = readAgentStatusSnapshot(agent);
+    const sessionId = typeof snap['sessionId'] === 'string' ? snap['sessionId'] : null;
+    const binding =
+        snap['systemPromptBinding'] && typeof snap['systemPromptBinding'] === 'object'
+            ? /** @type {Record<string, unknown>} */ (snap['systemPromptBinding'])
+            : null;
+    const freshness =
+        snap['systemPromptFreshness'] && typeof snap['systemPromptFreshness'] === 'object'
+            ? /** @type {Record<string, unknown>} */ (snap['systemPromptFreshness'])
+            : null;
+    const handles =
+        typeof (/** @type {{ getSdkHandles?: unknown }} */ (agent).getSdkHandles) === 'function'
+            ? /** @type {{ session?: import('#copilot/sdk/types').CopilotSession | null }} */ (
+                  /** @type {{ getSdkHandles: () => unknown }} */ (agent).getSdkHandles()
+              )
+            : null;
+    const session = handles?.session ?? null;
+    const systemPrompt = await readSystemPromptStatus();
+
+    if (!session) {
+        return {
+            systemPrompt,
+            binding,
+            freshness,
+            sessionId,
+            sessionAvailable: false,
+            instructionSources: null,
+            instructionSourcesError: null,
+        };
+    }
+
+    try {
+        return {
+            systemPrompt,
+            binding,
+            freshness,
+            sessionId,
+            sessionAvailable: true,
+            instructionSources: await readSessionInstructionSources(session),
+            instructionSourcesError: null,
+        };
+    } catch (error) {
+        return {
+            systemPrompt,
+            binding,
+            freshness,
+            sessionId,
+            sessionAvailable: true,
+            instructionSources: null,
+            instructionSourcesError: error instanceof Error ? error.message : String(error),
+        };
+    }
 }
 
 /**

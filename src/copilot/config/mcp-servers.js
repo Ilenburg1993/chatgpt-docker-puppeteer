@@ -10,14 +10,9 @@
  */
 
 import { WORKSPACE_ROOT } from '#copilot/boot';
-import {
-    COPILOT_MCP_HTTP_TIMEOUT_MS,
-    COPILOT_MCP_SERVERS,
-    COPILOT_MCP_STDIO_TIMEOUT_MS,
-    DEFAULT_EXCLUDED_TOOLS,
-    GITHUB_TOKEN,
-} from '#copilot/config';
 import { log } from '#copilot/observability';
+import { DEFAULT_EXCLUDED_TOOLS } from './defaults.js';
+import { COPILOT_MCP_HTTP_TIMEOUT_MS, COPILOT_MCP_SERVERS, COPILOT_MCP_STDIO_TIMEOUT_MS, GITHUB_TOKEN } from './env.js';
 
 /**
  * @typedef {object} McpServerConfig

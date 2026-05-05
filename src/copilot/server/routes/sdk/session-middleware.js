@@ -10,7 +10,6 @@
 
 import { log } from '#copilot/observability';
 import { toError } from '../../../core/error-handlers.js';
-import { sanitizeHttpErrorMessage } from '../../middleware/error-handler.js';
 import {
     deleteSdkSessionRateLimitWindow,
     getSdkSessionRateLimitWindow,
@@ -18,6 +17,7 @@ import {
     setSdkSessionRateLimitWindow,
 } from '../../runtime-state/sdk-session-rate-limit.js';
 import { resolveSdkRouteSharedDeps } from './deps.js';
+import { buildSdkRuntimeErrorMeta, projectSdkHttpError } from './middleware.js';
 
 export {
     CreateSessionBodySchema,
@@ -56,8 +56,8 @@ function buildSessionRouteRuntimeMeta(req) {
     try {
         const routeDeps = resolveSdkRouteSharedDeps(req);
         return routeDeps.sdkRuntimeProjection.buildRuntimeRouteMetaPayload(routeDeps);
-    } catch {
-        return {};
+    } catch (error) {
+        return buildSdkRuntimeErrorMeta(req, error);
     }
 }
 
@@ -127,13 +127,12 @@ export async function withErrorHandler(req, res, fn) {
     try {
         await fn();
     } catch (e) {
-        log('ERROR', `[sdk-api/sessions] ${req.method} ${req.path} → ${toError(e).message}`);
+        const projection = projectSdkHttpError(req, e);
+        const { status, body } = projection;
+        const code = body.code;
+        log('ERROR', `[sdk-api/sessions] ${req.method} ${req.path} → ${status} ${code}: ${toError(e).message}`);
         if (!res.headersSent) {
-            res.status(500).json({
-                ok: false,
-                ...buildSessionRouteRuntimeMeta(req),
-                error: sanitizeHttpErrorMessage(toError(e).message, 500),
-            });
+            res.status(status).json({ ...body, ...buildSessionRouteRuntimeMeta(req) });
         }
     }
 }

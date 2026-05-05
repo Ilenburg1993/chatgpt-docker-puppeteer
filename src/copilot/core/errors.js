@@ -128,6 +128,24 @@ export class ValidationError extends CopilotError {
 }
 
 /**
+ * Erro de recurso inexistente. Útil para faltas semânticas na borda HTTP, como runtime/session/webhook ausente.
+ *
+ * @extends {CopilotError}
+ */
+export class NotFoundError extends CopilotError {
+    /**
+     * @param {string} message - Mensagem descritiva do erro.
+     * @param {string} [code='NOT_FOUND'] - Código semântico do erro. Default is `'NOT_FOUND'`
+     */
+    constructor(message, code = 'NOT_FOUND') {
+        super(message, code);
+        this.name = 'NotFoundError';
+        /** @type {number} */
+        this.status = 404;
+    }
+}
+
+/**
  * Erro de transição de estado inválida (ex: FSM do AgentContext).
  *
  * @extends {CopilotError}

@@ -33,6 +33,7 @@
 
 import { Router } from 'express';
 import { resolveSdkRouteSharedDeps } from './deps.js';
+import { projectSdkHttpError } from './middleware.js';
 import crudRouter from './session-crud.js';
 import messagingRouter from './session-messaging.js';
 
@@ -41,19 +42,27 @@ const router = Router();
 // SEC-N06/UPG-N19 (fix): autenticação opcional por token Bearer para SDK routes
 // Configurar via variável de ambiente SDK_API_TOKEN. Endpoints são públicos se não configurado.
 router.use((req, res, next) => {
-    const routeDeps = resolveSdkRouteSharedDeps(req);
-    const sdkApiToken = routeDeps.sdkApiToken;
-    if (!sdkApiToken) return next();
+    try {
+        const routeDeps = resolveSdkRouteSharedDeps(req);
+        const sdkApiToken = routeDeps.sdkApiToken;
+        if (!sdkApiToken) return next();
 
-    const authHeader = req.headers['authorization'] ?? '';
-    if (authHeader !== `Bearer ${sdkApiToken}`) {
-        return res.status(401).json({
-            ok: false,
-            ...routeDeps.sdkRuntimeProjection.buildRuntimeRouteMetaPayload(routeDeps),
-            error: 'Unauthorized',
-        });
+        const authHeader = req.headers['authorization'] ?? '';
+        if (authHeader !== `Bearer ${sdkApiToken}`) {
+            return res.status(401).json({
+                ok: false,
+                ...routeDeps.sdkRuntimeProjection.buildRuntimeRouteMetaPayload(routeDeps),
+                error: 'Unauthorized',
+            });
+        }
+        return next();
+    } catch (error) {
+        const projection = projectSdkHttpError(req, error);
+        if (projection.body.code === 'AGENT_RUNTIME_NOT_FOUND') {
+            return res.status(projection.status).json(projection.body);
+        }
+        return next(error);
     }
-    return next();
 });
 
 // CRUD routes must come first (sessions/active, sessions/last, sessions/foreground

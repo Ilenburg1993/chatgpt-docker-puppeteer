@@ -67,6 +67,8 @@ import {
  * @property {boolean} [gracefulShutdown] - F56.1: true se o último shutdown foi graceful (via stop()); false se
  *   crash/reboot
  * @property {number} [lastAskUserAt] - F56.2: timestamp do último ask_user recebido (ms)
+ * @property {import('../../../config/system-prompt/freshness.js').SystemPromptBindingSnapshot | null} [systemPromptBinding]
+ *   Binding persistido do system prompt aplicado à sessão SDK atual
  */
 
 // ─── Cache in-process ────────────────────────────────────────────────────────
@@ -342,5 +344,6 @@ function _defaultState() {
         model: 'gpt-5-mini',
         pendingQuestion: null,
         pendingQuestionMeta: null,
+        systemPromptBinding: null,
     };
 }

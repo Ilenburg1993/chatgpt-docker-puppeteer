@@ -197,6 +197,10 @@
  *   contexto do SDK (ou null se não disponível)
  * @property {string | null} lastCheckpointPath - Último caminho de checkpoint do SDK (ou null se nenhum ainda)
  * @property {'approve_all' | 'audit_only' | 'selective'} permissionMode - Modo de permissão ativo
+ * @property {import('../config/system-prompt/freshness.js').SystemPromptBindingSnapshot | null} [systemPromptBinding]
+ *   Binding persistido do system prompt aplicado à sessão atual
+ * @property {import('../config/system-prompt/freshness.js').SystemPromptFreshness | null} [systemPromptFreshness]
+ *   Frescor avaliado do binding do system prompt em relação à revisão atual
  */
 
 /**

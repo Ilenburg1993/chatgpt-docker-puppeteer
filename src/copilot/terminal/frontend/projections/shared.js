@@ -59,6 +59,8 @@ import { readTerminalSessionBinding } from '../gateways/agent-runtime.js';
  *     pendingQuestionShadowAgeMs: number | null;
  *     pendingQuestionShadowExpiresAt: number | null;
  *     pendingQuestionShadowRemainingMs: number | null;
+ *     systemPromptBinding: Record<string, unknown> | null;
+ *     systemPromptFreshness: Record<string, unknown> | null;
  *     lastPrInfo: Record<string, any> | null;
  *     dialogPrMetrics: Record<string, any> | null;
  * }} TerminalRuntimeBase

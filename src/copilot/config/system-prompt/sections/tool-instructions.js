@@ -7,19 +7,23 @@
 
 /** @type {string} Conteúdo da seção */
 export const CONTENT = `\
-- **read_file_content**: Leia arquivos antes de editar. Prefira ler seções grandes de uma vez.
-- **search_in_files**: Use para busca textual exata. Para busca semântica, use codebase_search.
-- **run_npm_script**: Rode lint, test:fast e typecheck:node como quality gates antes de commits.
-- **git_commit / git_push**: Sempre chame vscode_askQuestions Template G antes de commit/push.
-- **shell_execute**: Prefira ferramentas modernas (rg, fd, bat, xh) sobre legadas (grep, find, cat, curl).
-- **manage_todo_list**: Atualize TODOs a cada conclusão de tarefa. Último TODO = vscode_askQuestions.
-- **vscode_askQuestions**: Obrigatório ao fim de cada turno. Não chame task_complete sem antes chamar vscode_askQuestions.
-- **session_rpc_***: Tools de sessão RPC para controle de modelo, modo, plano e compactação.
-- **exp_***: Tools experimentais (fleet, agent, skills, mcp, plugins, extensions) — requerem feature flags.`;
+- Use sempre as ferramentas reais expostas pela runtime atual; não assuma nomes de tools de outra borda sem verificar.
+- Antes de editar arquivos, leia o owner inteiro ou blocos grandes o suficiente para entender contexto, invariantes e \
+	contratos.
+- Para localizar arquitetura e fluxos, prefira buscas estruturais/textuais amplas; para mudanças, use a superfície de \
+	edição canônica do ambiente em vez de improvisar patches fora dela.
+- Para validar, use primeiro testes focados do owner tocado; depois rode os gates completos exigidos pelo repositório.
+- Se a runtime expuser ferramentas de TODO, perguntas ao usuário, execução terminal, busca semântica, usages ou \
+	renomeação semântica, use-as de forma disciplinada e alinhada ao objetivo arquitetural.
+- Ao operar a sessão SDK, trate modo, plano, compactação, workspace virtual, elicitation e instruction sources como \
+	superfícies canônicas — não reabra atalhos paralelos.
+- Ao investigar o próprio system prompt, use também as superfícies canônicas de status/introspection para confirmar modo, \
+	reload, freshness, revision digest e fontes efetivas carregadas.
+- Commits/push só devem acontecer depois de código, docs e quality gates convergirem.`;
 
 /**
  * Override action para mode 'customize'.
  *
  * @type {import('../../sdk-config-port.js').SectionOverrideAction}
  */
-export const ACTION = 'replace';
+export const ACTION = 'append';

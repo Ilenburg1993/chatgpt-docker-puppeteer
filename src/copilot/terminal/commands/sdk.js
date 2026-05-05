@@ -18,6 +18,7 @@ import {
     listTerminalSdkModels,
     listTerminalSdkTools,
     listTerminalSdkWorkspaceFiles,
+    readTerminalSdkSystemPromptProjection,
     readTerminalSdkWorkspaceFile,
     requestTerminalSdkElicitation,
     resolveTerminalSdkPendingElicitation,
@@ -163,6 +164,8 @@ export async function cmdSdk({ println }, arg = '') {
             await renderSdkTools({ println }, rest[0], runtimeId);
         } else if (sub === 'quota') {
             await renderSdkQuota({ println }, runtimeId);
+        } else if (sub === 'prompt') {
+            await renderSdkSystemPrompt({ println }, runtimeId);
         } else if (sub === 'compact') {
             const result = await callWithRuntimeTarget(compactTerminalSdkSession, runtimeId);
             println(`\n  \x1b[32m✓ SDK compaction solicitada.\x1b[0m\n  \x1b[90m${pretty(result, 700)}\x1b[0m\n`);
@@ -178,7 +181,9 @@ export async function cmdSdk({ println }, arg = '') {
                 `  waits    \x1b[90melicitation=${pendingElicitations} · permission=${permissionSummary.pending}${permissionSummary.latest ? ` (${permissionSummary.latest.permissionType})` : ''}\x1b[0m`,
             );
             await renderSdkQuota({ println }, runtimeId, { compact: true });
-            println('  \x1b[90mUso: /sdk models | /sdk tools [model] | /sdk quota | /sdk compact\x1b[0m\n');
+            println(
+                '  \x1b[90mUso: /sdk models | /sdk tools [model] | /sdk quota | /sdk prompt | /sdk compact\x1b[0m\n',
+            );
         }
     } catch (e) {
         println(`\n  \x1b[31m✗ SDK: ${toError(e).message}\x1b[0m\n`);
@@ -249,6 +254,64 @@ async function renderSdkQuota({ println }, runtimeId, opts = {}) {
     }
     if (Object.keys(snapshots).length === 0) println('  \x1b[90mSem snapshots de quota no retorno SDK.\x1b[0m');
     if (!opts.compact) println('');
+}
+
+/**
+ * @param {CommandContext} ctx
+ * @param {string | null | undefined} runtimeId
+ * @returns {Promise<void>}
+ */
+async function renderSdkSystemPrompt({ println }, runtimeId) {
+    const projection = await callWithRuntimeTarget(readTerminalSdkSystemPromptProjection, runtimeId);
+    const status = objectOrNull(projection['systemPrompt']) ?? {};
+    const binding = objectOrNull(projection['binding']) ?? {};
+    const freshness = objectOrNull(projection['freshness']) ?? {};
+    const sections = Array.isArray(status['sections']) ? status['sections'] : [];
+    const appendFiles = Array.isArray(status['appendFiles']) ? status['appendFiles'] : [];
+    const sdkCompatibility = objectOrNull(status['sdkCompatibility']) ?? {};
+    const revision = objectOrNull(status['revision']) ?? {};
+    const limitations = Array.isArray(status['limitations']) ? status['limitations'] : [];
+
+    println('\n  \x1b[36mSystem Prompt SDK\x1b[0m');
+    println(
+        `  mode     \x1b[33m${String(status['effectiveMode'] ?? '?')}\x1b[0m  live=\x1b[33m${String(status['effectiveLiveMode'] ?? '?')}\x1b[0m  reload=\x1b[33m${String(status['liveReloadMechanism'] ?? '?')}\x1b[0m`,
+    );
+    println(
+        `  config   \x1b[90m${String(status['configPath'] ?? '-')}\x1b[0m  autoReload=\x1b[33m${String(status['autoReload'] ?? false)}\x1b[0m`,
+    );
+    println(
+        `  sdk      \x1b[90mcustomize=${String(sdkCompatibility['supportsCustomizeMode'] ?? false)} · sourcesRpc=${String(sdkCompatibility['supportsInstructionSourcesRpc'] ?? false)}\x1b[0m`,
+    );
+    println(
+        `  digest   \x1b[90m${String(revision['digest'] ?? '-')}\x1b[0m  sections=\x1b[33m${sections.length}\x1b[0m  appendFiles=\x1b[33m${appendFiles.length}\x1b[0m`,
+    );
+    println(
+        `  session  \x1b[90m${String(projection['sessionId'] ?? '-')}\x1b[0m  sources=\x1b[33m${projection['sessionAvailable'] ? 'available' : 'none'}\x1b[0m`,
+    );
+    println(
+        `  binding  \x1b[90m${String(binding['digest'] ?? '-')}[0m  stale=\x1b[33m${String(Boolean(freshness['isStale']))}[0m  action=\x1b[33m${String(freshness['recommendedAction'] ?? 'none')}[0m`,
+    );
+
+    if (freshness['reason']) {
+        println(`  \x1b[90m${String(freshness['reason'])}[0m`);
+    }
+
+    if (limitations.length > 0) {
+        println('  \x1b[36mLimitações\x1b[0m');
+        for (const limitation of limitations.slice(0, 4)) {
+            println(`  \x1b[90m• ${String(limitation)}\x1b[0m`);
+        }
+    }
+
+    if (projection['instructionSources']) {
+        println(
+            `  \x1b[36mInstruction sources\x1b[0m\n  \x1b[90m${pretty(projection['instructionSources'], 1200)}\x1b[0m`,
+        );
+    } else if (projection['instructionSourcesError']) {
+        println(`  \x1b[33mInstruction sources indisponíveis:\x1b[0m ${String(projection['instructionSourcesError'])}`);
+    }
+
+    println('');
 }
 
 /**

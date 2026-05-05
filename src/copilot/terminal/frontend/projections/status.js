@@ -36,6 +36,8 @@ import { readTerminalTimelineProjection } from './timeline.js';
  *     pendingQuestionShadowAgeMs: number | null;
  *     pendingQuestionShadowExpiresAt: number | null;
  *     pendingQuestionShadowRemainingMs: number | null;
+ *     systemPromptBinding: Record<string, unknown> | null;
+ *     systemPromptFreshness: Record<string, unknown> | null;
  *     lastPrInfo: Record<string, any> | null;
  *     modelBilling: import('./shared.js').TerminalModelBillingProjection;
  *     recommendedAction: import('../../../presentation/types.js').RuntimeRecommendedAction | null;
@@ -69,6 +71,14 @@ import { readTerminalTimelineProjection } from './timeline.js';
  *     timelineTurnCount: number;
  *     persistedTimelineTurnCount: number;
  *     liveBridgeTailCount: number;
+ *     timelineSyncStatus: import('./timeline.js').TerminalTimelineSyncStatus;
+ *     timelineSyncReason: string | null;
+ *     timelineSyncPendingCount: number;
+ *     timelineSyncSyncedCount: number;
+ *     timelineSyncFailedCount: number;
+ *     timelineSyncLastError: string | null;
+ *     timelineSyncAttempts: number;
+ *     timelineSyncNextRetryAt: number | null;
  * }}
  */
 export function readTerminalStatusProjection({ hubSessionId = null, injectPort, runtimeId = null } = {}) {
@@ -97,6 +107,8 @@ export function readTerminalStatusProjection({ hubSessionId = null, injectPort, 
         pendingQuestionShadowAgeMs: base.pendingQuestionShadowAgeMs,
         pendingQuestionShadowExpiresAt: base.pendingQuestionShadowExpiresAt,
         pendingQuestionShadowRemainingMs: base.pendingQuestionShadowRemainingMs,
+        systemPromptBinding: base.systemPromptBinding,
+        systemPromptFreshness: base.systemPromptFreshness,
         lastPrInfo: base.lastPrInfo,
         modelBilling,
         recommendedAction,
@@ -124,6 +136,14 @@ export function readTerminalStatusProjection({ hubSessionId = null, injectPort, 
         timelineTurnCount: timeline.turns.length,
         persistedTimelineTurnCount: timeline.totalPersistedTurns,
         liveBridgeTailCount: timeline.liveBridgeTailCount,
+        timelineSyncStatus: timeline.sync.status,
+        timelineSyncReason: timeline.sync.reason,
+        timelineSyncPendingCount: timeline.sync.pendingCount,
+        timelineSyncSyncedCount: timeline.sync.syncedCount,
+        timelineSyncFailedCount: timeline.sync.failedCount,
+        timelineSyncLastError: timeline.sync.lastError,
+        timelineSyncAttempts: timeline.sync.attempts,
+        timelineSyncNextRetryAt: timeline.sync.nextRetryAt,
         activity: readTerminalActivitySnapshot(),
         lifecycle,
         lifecycleSummary: buildRuntimeLifecycleSummary(lifecycle),

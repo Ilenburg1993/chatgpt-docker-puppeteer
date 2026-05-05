@@ -10,7 +10,15 @@
 
 import { defaultAuditLog, getAuditTail } from '#copilot/audit';
 import { getMcpStatus, nervEventBusAdapter } from '#copilot/bridges';
-import { BRIDGE_ADMIN_TOKEN, LLM_B_TURN_TIMEOUT_MS, OTEL_EXPORTER_OTLP_ENDPOINT, SDK_API_TOKEN } from '#copilot/config';
+import {
+    BRIDGE_ADMIN_TOKEN,
+    getSystemPromptSdkCompatibility,
+    LLM_B_TURN_TIMEOUT_MS,
+    OTEL_EXPORTER_OTLP_ENDPOINT,
+    readSessionInstructionSources,
+    readSystemPromptStatus,
+    SDK_API_TOKEN,
+} from '#copilot/config';
 import { container } from '#copilot/core';
 import { defaultBus, SDK_HOOKS } from '#copilot/hooks';
 import {
@@ -64,12 +72,15 @@ import {
     workspaceReadFile,
 } from '#copilot/sdk';
 import { getAllTools } from '#copilot/tools';
-import { resolveAgentRuntimeSelection } from '../../../presentation/agent-runtime.js';
+import { requireAgentRuntimeSelection } from '../../../presentation/agent-runtime.js';
 import { resolveOptionalDialogTimeout } from '../../../presentation/dialog-timeout-policy.js';
 import { buildRuntimeRouteMetaPayload } from '../../../presentation/runtime-meta.js';
 import { setRuntimeModelProjection, setRuntimeReasoningProjection } from '../../../presentation/runtime-models.js';
 import { resolveRequestedRuntimeId } from '../../../presentation/runtime-request.js';
-import { resolveAgentSdkActiveSessionEntry } from '../../../presentation/runtime-sdk-session.js';
+import {
+    readAgentSdkSystemPromptProjection,
+    resolveAgentSdkActiveSessionEntry,
+} from '../../../presentation/runtime-sdk-session.js';
 import {
     readAgentStatusSnapshot,
     readAgentStatusSnapshotForRuntime,
@@ -137,6 +148,13 @@ const sdkSessionUiOps = Object.freeze({
 
 const sdkRuntimeSessionOps = Object.freeze({
     resolveAgentSdkActiveSessionEntry,
+});
+
+const sdkSystemPromptOps = Object.freeze({
+    getSystemPromptSdkCompatibility,
+    readAgentSdkSystemPromptProjection,
+    readSessionInstructionSources,
+    readSystemPromptStatus,
 });
 
 const sdkSessionOwnershipOps = Object.freeze({
@@ -223,6 +241,7 @@ function resolveMetricsStore() {
  *     sdkSessionEvents: typeof sdkSessionEventOps;
  *     sdkSessionUi: typeof sdkSessionUiOps;
  *     sdkRuntimeSession: typeof sdkRuntimeSessionOps;
+ *     sdkSystemPrompt: typeof sdkSystemPromptOps;
  *     sdkSessionOwnership: typeof sdkSessionOwnershipOps;
  *     sdkRuntimeProjection: typeof sdkRuntimeProjectionOps;
  *     sdkObservability: typeof sdkObservabilityOps;
@@ -233,7 +252,7 @@ function resolveMetricsStore() {
  * }}
  */
 export function buildDefaultSdkRouteSharedDeps(runtimeId) {
-    const selection = resolveAgentRuntimeSelection(runtimeId);
+    const selection = requireAgentRuntimeSelection(runtimeId);
     return {
         agent: selection.runtime,
         runtimeId: selection.runtimeId,
@@ -251,6 +270,7 @@ export function buildDefaultSdkRouteSharedDeps(runtimeId) {
         sdkSessionEvents: sdkSessionEventOps,
         sdkSessionUi: sdkSessionUiOps,
         sdkRuntimeSession: sdkRuntimeSessionOps,
+        sdkSystemPrompt: sdkSystemPromptOps,
         sdkSessionOwnership: sdkSessionOwnershipOps,
         sdkRuntimeProjection: sdkRuntimeProjectionOps,
         sdkObservability: sdkObservabilityOps,

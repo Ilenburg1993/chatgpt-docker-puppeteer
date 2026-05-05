@@ -363,34 +363,40 @@ export default function createObservabilityRouter(deps) {
     // ─── GET /observability/otel-status ──────────────────────────────────────────
 
     router.get('/observability/otel-status', (_req, res) => {
-        const routeDeps = resolveObservabilityRouterDeps(deps, /** @type {Req} */ (_req));
-        const { sdkObservability } = routeDeps;
-        res.json({
-            ok: true,
-            ...buildObservabilityRuntimeMeta(routeDeps),
-            enabled: sdkObservability.isOtelEnabled(),
-            endpoint: sdkObservability.otelExporterOtlpEndpoint ?? null,
-            traceFile: sdkObservability.defaultOtelFile,
-            spanTypes: ['session.boot'],
+        void withErrorHandler(/** @type {Req} */ (_req), res, async () => {
+            const routeDeps = resolveObservabilityRouterDeps(deps, /** @type {Req} */ (_req));
+            const { sdkObservability } = routeDeps;
+            res.json({
+                ok: true,
+                ...buildObservabilityRuntimeMeta(routeDeps),
+                enabled: sdkObservability.isOtelEnabled(),
+                endpoint: sdkObservability.otelExporterOtlpEndpoint ?? null,
+                traceFile: sdkObservability.defaultOtelFile,
+                spanTypes: ['session.boot'],
+            });
         });
     });
 
     // ─── GET /observability/events/catalog ───────────────────────────────────────
 
     router.get('/observability/events/catalog', (_req, res) => {
-        const routeDeps = resolveObservabilityRouterDeps(deps, /** @type {Req} */ (_req));
-        const { sdkObservability } = routeDeps;
-        res.json({ ok: true, ...buildObservabilityRuntimeMeta(routeDeps), catalog: sdkObservability.getCatalog() });
+        void withErrorHandler(/** @type {Req} */ (_req), res, async () => {
+            const routeDeps = resolveObservabilityRouterDeps(deps, /** @type {Req} */ (_req));
+            const { sdkObservability } = routeDeps;
+            res.json({ ok: true, ...buildObservabilityRuntimeMeta(routeDeps), catalog: sdkObservability.getCatalog() });
+        });
     });
 
     // ─── GET /observability/events/dead-letter ────────────────────────────────────
 
     router.get('/observability/events/dead-letter', (req, res) => {
-        const routeDeps = resolveObservabilityRouterDeps(deps, req);
-        const { sdkObservability } = routeDeps;
-        const limit = Math.min(Number(req.query['limit']) || 50, 200);
-        const entries = sdkObservability.getDeadLetters(limit);
-        res.json({ ok: true, ...buildObservabilityRuntimeMeta(routeDeps), entries, count: entries.length });
+        void withErrorHandler(req, res, async () => {
+            const routeDeps = resolveObservabilityRouterDeps(deps, req);
+            const { sdkObservability } = routeDeps;
+            const limit = Math.min(Number(req.query['limit']) || 50, 200);
+            const entries = sdkObservability.getDeadLetters(limit);
+            res.json({ ok: true, ...buildObservabilityRuntimeMeta(routeDeps), entries, count: entries.length });
+        });
     });
 
     return router;

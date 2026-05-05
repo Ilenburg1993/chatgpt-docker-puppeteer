@@ -8,7 +8,8 @@
  *
  * - GET /sdk/ping, /sdk/status, /sdk/auth, /sdk/models, /sdk/tools, /sdk/client/*
  * - GET /sdk/sessions, /sdk/sessions/active, /sdk/sessions/last, /sdk/sessions/:id e sub-rotas
- * - GET /sdk/agent/info, /sdk/agent/tools, /sdk/agent/telemetry, /sdk/agent/state, /sdk/agent/stream
+ * - GET /sdk/agent/info, /sdk/agent/system-prompt, /sdk/agent/tools, /sdk/agent/telemetry, /sdk/agent/state,
+ *   /sdk/agent/stream
  * - GET /sdk/hooks (introspecção de hooks)
  * - GET /sdk/metrics, /sdk/errors, /sdk/health, /sdk/log-level
  *

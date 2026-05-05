@@ -2,8 +2,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
     buildAuditingPermissionHandler: vi.fn((handler) => handler ?? (async () => ({ kind: 'approved' }))),
+    buildSystemPromptBindingSnapshot: vi.fn((status, sessionId) => ({ digest: status.revision.digest, sessionId })),
     buildCustomAgentsConfig: vi.fn(() => []),
-    buildSystemMessage: vi.fn(() => ({ mode: 'append', content: 'ctx' })),
+    buildLiveSystemMessage: vi.fn(async () => ({ mode: 'customize', sections: {} })),
+    readSystemPromptStatus: vi.fn(async () => ({ revision: { digest: 'prompt-digest' } })),
     canReadAgentSdkSessionMessages: vi.fn(() => true),
     createAgentSdkSessionByClient: vi.fn(
         /** @returns {Promise<any>} */ async (_client, options) => ({
@@ -44,7 +46,11 @@ vi.mock('../../../src/copilot/config/agent.js', () => ({
     ROTATION_MAX_UTIL: 0.95,
     SESSION_MAX_AGE_MS: 86_400_000,
 }));
-vi.mock('../../../src/copilot/config/system-prompt/index.js', () => ({ buildSystemMessage: mocks.buildSystemMessage }));
+vi.mock('../../../src/copilot/config/system-prompt/index.js', () => ({
+    buildLiveSystemMessage: mocks.buildLiveSystemMessage,
+    buildSystemPromptBindingSnapshot: mocks.buildSystemPromptBindingSnapshot,
+    readSystemPromptStatus: mocks.readSystemPromptStatus,
+}));
 vi.mock('../../../src/copilot/agent/facades/agent-sdk-access.js', () => ({
     AGENT_SDK_DEFAULT_MODEL: 'gpt-5-mini',
     canReadAgentSdkSessionMessages: mocks.canReadAgentSdkSessionMessages,
@@ -110,6 +116,7 @@ describe('agent/session/initializer — sessionFs wiring', () => {
             expect.objectContaining({
                 model: 'gpt-5-mini',
                 reasoningEffort: 'high',
+                systemPromptBinding: expect.objectContaining({ digest: 'prompt-digest', sessionId: 'resolved-sess' }),
             }),
             expect.objectContaining({ label: 'session.initializer.create' }),
         );
@@ -148,6 +155,7 @@ describe('agent/session/initializer — sessionFs wiring', () => {
             expect.objectContaining({
                 model: 'auto',
                 reasoningEffort: 'high',
+                systemPromptBinding: expect.objectContaining({ digest: 'prompt-digest', sessionId: 'saved-sess' }),
             }),
             expect.objectContaining({ label: 'session.initializer.resume' }),
         );

@@ -13,6 +13,7 @@
 
 import { AGENT_EVENTS } from '#copilot/events';
 import { STATUS_SNAPSHOT_TTL_MS } from '../../config/agent.js';
+import { evaluateSystemPromptFreshness, readSystemPromptStatusSync } from '../../config/system-prompt/index.js';
 import { readAgentRuntimePersistedStateSync } from '../facades/agent-runtime-state.js';
 import { buildStatusSnapshot } from '../ports/snapshot-port.js';
 
@@ -36,6 +37,13 @@ export function getStatusSnapshot(ctx, host) {
     }
     const state = readAgentRuntimePersistedStateSync();
     const queue = ctx.getQueueSnapshot();
+    const systemPromptStatus = readSystemPromptStatusSync();
+    const systemPromptBinding = state?.systemPromptBinding ?? null;
+    const systemPromptFreshness = evaluateSystemPromptFreshness(
+        systemPromptStatus,
+        systemPromptBinding,
+        host.sessionId,
+    );
     const snapshot = buildStatusSnapshot({
         status: ctx.getRuntimeStatus(),
         sessionId: host.sessionId,
@@ -51,6 +59,8 @@ export function getStatusSnapshot(ctx, host) {
         contextWindow: ctx.getContextStateSnapshot(),
         lastCheckpointPath: ctx.getLastCheckpointPathSnapshot(),
         permissionMode: ctx.getPermissionModeSnapshot(),
+        systemPromptBinding,
+        systemPromptFreshness,
     });
     ctx.cacheStatusSnapshot(snapshot);
     return snapshot;

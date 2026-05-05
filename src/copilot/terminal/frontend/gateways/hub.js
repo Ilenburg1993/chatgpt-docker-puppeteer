@@ -162,6 +162,27 @@ export async function writeTerminalHubSystemTurn(hubSessionId, content) {
 }
 
 /**
+ * Persiste um turno reconciliado da timeline do terminal no hub.
+ *
+ * @param {string} hubSessionId
+ * @param {{
+ *     role: 'llm_a' | 'llm_b' | 'user';
+ *     content: string;
+ *     sdkSessionId?: string | null;
+ *     metadata?: object | null;
+ * }} turn
+ * @returns {Promise<number>}
+ */
+export async function writeTerminalHubTimelineTurn(hubSessionId, turn) {
+    return conversationStore.writeTurn(hubSessionId, {
+        role: turn.role,
+        content: turn.content,
+        ...(turn.sdkSessionId ? { sdkSessionId: turn.sdkSessionId } : {}),
+        ...(turn.metadata ? { metadata: turn.metadata } : {}),
+    });
+}
+
+/**
  * Emite uma notificação de turno do terminal para o hub/orchestrator.
  *
  * @param {string} hubSessionId

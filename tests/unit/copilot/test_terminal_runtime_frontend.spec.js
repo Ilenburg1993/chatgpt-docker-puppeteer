@@ -1,10 +1,11 @@
 // @ts-check
 
-import { beforeAll, describe, expect, it, vi } from 'vitest';
+import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const stopDialogMode = vi.fn(async () => {});
 const startDialogMode = vi.fn(async () => {});
 const dialogTurn = vi.fn(async () => 'ok');
+/** @type {{ role: string; content: string; timestamp?: number }[]} */
 const liveHistory = [{ role: 'user', content: 'oi' }];
 const clearHistory = vi.fn(() => {
     liveHistory.length = 0;
@@ -19,7 +20,32 @@ const notifyTerminalTurn = vi.fn();
 const createHubSession = vi.fn(() => 'hub-1');
 const getHubSession = vi.fn(() => ({ id: 'hub-1', title: 'Hub' }));
 const getTurn = vi.fn(() => ({ turn_number: 7 }));
-const writeTurn = vi.fn(async () => 42);
+/** @type {Record<string, unknown>[]} */
+const persistedTurns = [];
+const countTurns = vi.fn(() => persistedTurns.length);
+const readTurns = vi.fn(
+    (/** @type {string} */ _hubSessionId, /** @type {{ limit?: number; offset?: number }} */ opts = {}) => {
+        const limit = typeof opts.limit === 'number' ? opts.limit : 20;
+        const offset = typeof opts.offset === 'number' ? opts.offset : 0;
+        return persistedTurns.slice(offset, offset + limit);
+    },
+);
+const writeTurn = vi.fn(
+    async (
+        /** @type {string} */ _hubSessionId,
+        /** @type {{ role?: string; content?: string; metadata?: object | null; sdkSessionId?: string | null }} */ opts = {},
+    ) => {
+        persistedTurns.push({
+            id: 40 + persistedTurns.length,
+            role: opts.role ?? 'user',
+            content: opts.content ?? '',
+            created_at: Date.now() + persistedTurns.length,
+            metadata: opts.metadata ? JSON.stringify(opts.metadata) : null,
+            sdk_session_id: opts.sdkSessionId ?? null,
+        });
+        return 42;
+    },
+);
 const defaultGetSdkSessionMode = vi.fn(async () => ({ mode: 'interactive' }));
 const defaultSetSdkSessionMode = vi.fn(async (/** @type {any} */ mode) => ({ mode }));
 const defaultGetSdkSessionCapabilities = vi.fn(() => ({ ui: { elicitation: true } }));
@@ -214,15 +240,31 @@ vi.mock('#copilot/conversation-hub', () => ({
         createHubSession,
         getHubSession,
         getTurn,
+        readTurns,
+        countTurns,
         writeTurn,
     },
 }));
 
 /** @type {typeof import('../../../src/copilot/terminal/frontend/index.js')} */
 let runtime;
+/** @type {typeof import('../../../src/copilot/core/shared-state.js')} */
+let sharedState;
 
 beforeAll(async () => {
     runtime = await import('../../../src/copilot/terminal/frontend/index.js');
+    sharedState = await import('../../../src/copilot/core/shared-state.js');
+});
+
+beforeEach(() => {
+    liveHistory.length = 0;
+    liveHistory.push({ role: 'user', content: 'oi' });
+    persistedTurns.length = 0;
+    readTurns.mockClear();
+    countTurns.mockClear();
+    writeTurn.mockClear();
+    clearHistory.mockClear();
+    sharedState.clearSharedSessionBinding();
 });
 
 describe('terminal/frontend/index', () => {
@@ -273,6 +315,76 @@ describe('terminal/frontend/index', () => {
         expect(timelineBeforeClear.turns).toHaveLength(1);
         expect(timelineAfterClear.timelineSource).toBe('empty');
         expect(timelineAfterClear.turns).toHaveLength(0);
+    });
+
+    it('sincroniza lazy timeline bridge_only para o Hub sem criar pending user espúrio', async () => {
+        sharedState.setSharedHubSessionId('hub-sync-bridge-only');
+        sharedState.setSharedSdkSessionId('sdk-sync-bridge-only');
+        liveHistory.length = 0;
+        liveHistory.push(
+            { role: 'user', content: 'pergunta viva', timestamp: 1710000000000 },
+            { role: 'assistant', content: 'resposta viva', timestamp: 1710000001000 },
+        );
+
+        const timeline = runtime.readTerminalTimelineProjection({ limitPairs: 5 });
+        await new Promise((resolve) => setImmediate(resolve));
+
+        expect(timeline.reconciliationStatus).toBe('bridge_only');
+        expect(timeline.sync.status).toBe('scheduled');
+        expect(timeline.sync.pendingCount).toBe(2);
+        expect(runtime.readTerminalTimelineSyncTelemetry()).toEqual(
+            expect.objectContaining({
+                scheduledTotal: expect.any(Number),
+                turnsSyncedTotal: expect.any(Number),
+                completedCacheSize: expect.any(Number),
+            }),
+        );
+        expect(writeTurn).toHaveBeenCalledWith(
+            'hub-sync-bridge-only',
+            expect.objectContaining({
+                role: 'llm_a',
+                content: 'pergunta viva',
+                sdkSessionId: 'sdk-sync-bridge-only',
+                metadata: expect.objectContaining({
+                    source: 'terminal.timeline_sync',
+                    originalOrigin: 'bridge',
+                    originalRole: 'user',
+                }),
+            }),
+        );
+        expect(writeTurn).toHaveBeenCalledWith(
+            'hub-sync-bridge-only',
+            expect.objectContaining({
+                role: 'llm_b',
+                content: 'resposta viva',
+                sdkSessionId: 'sdk-sync-bridge-only',
+                metadata: expect.objectContaining({
+                    source: 'terminal.timeline_sync',
+                    originalOrigin: 'bridge',
+                    originalRole: 'assistant',
+                }),
+            }),
+        );
+    });
+
+    it('retenta falha transitória do sync lazy e expõe telemetria', async () => {
+        sharedState.setSharedHubSessionId('hub-sync-retry');
+        sharedState.setSharedSdkSessionId('sdk-sync-retry');
+        liveHistory.length = 0;
+        liveHistory.push({ role: 'assistant', content: 'turno com retry', timestamp: 1710000002000 });
+        writeTurn.mockImplementationOnce(async () => {
+            throw new Error('transient hub failure');
+        });
+
+        const timeline = runtime.readTerminalTimelineProjection({ limitPairs: 5 });
+        await new Promise((resolve) => setTimeout(resolve, 30));
+        const telemetry = runtime.readTerminalTimelineSyncTelemetry();
+
+        expect(timeline.sync.status).toBe('scheduled');
+        expect(writeTurn).toHaveBeenCalledTimes(2);
+        expect(telemetry.retryTotal).toBeGreaterThanOrEqual(1);
+        expect(telemetry.turnsSyncedTotal).toBeGreaterThanOrEqual(1);
+        expect(telemetry.lastError).toBeNull();
     });
 
     it('encapsula operações do agente e do hub', async () => {

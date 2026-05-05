@@ -20,7 +20,11 @@ import { WORKSPACE_ROOT, readBootSkillConfig } from '#copilot/boot';
 import { buildCustomAgentsConfig } from '#copilot/config';
 import { toError } from '#copilot/core';
 import { SESSION_MAX_AGE_MS } from '../../../config/agent.js';
-import { buildSystemMessage } from '../../../config/system-prompt/index.js';
+import {
+    buildLiveSystemMessage,
+    buildSystemPromptBindingSnapshot,
+    readSystemPromptStatus,
+} from '../../../config/system-prompt/index.js';
 import {
     persistAgentRuntimeStatePartial,
     readAgentRuntimePersistedStateAsync,
@@ -178,9 +182,10 @@ export async function initOrResumeSession(client, sessionOptions) {
     const createSessionFsHandler = getAgentConfiguredSessionFsHandler();
 
     /** @type {import('#copilot/sdk/types').SystemMessageConfig | undefined} */
-    const systemMessage = injectContext
-        ? buildSystemMessage({ extraContext: await buildHookSystemContextSafe() })
-        : buildSystemMessage();
+    const systemMessage = await buildLiveSystemMessage({
+        ...(injectContext ? { getExtraContext: buildHookSystemContextSafe } : {}),
+    });
+    const systemPromptStatus = await readSystemPromptStatus();
 
     /** @type {Record<string, unknown>} */
     const opts = {
@@ -264,6 +269,7 @@ export async function initOrResumeSession(client, sessionOptions) {
                 resumedAt: Date.now(),
                 resumeCount: (state?.resumeCount ?? 0) + 1,
                 model: effectiveModel,
+                systemPromptBinding: buildSystemPromptBindingSnapshot(systemPromptStatus, result.session.sessionId),
                 ...(effectiveReasoningEffort !== undefined ? { reasoningEffort: effectiveReasoningEffort } : {}),
             },
             { label: 'session.initializer.resume' },
@@ -281,6 +287,7 @@ export async function initOrResumeSession(client, sessionOptions) {
                 resumeCount: 0,
                 sendCount: 0,
                 model: effectiveModel,
+                systemPromptBinding: buildSystemPromptBindingSnapshot(systemPromptStatus, result.session.sessionId),
                 ...(effectiveReasoningEffort !== undefined ? { reasoningEffort: effectiveReasoningEffort } : {}),
                 pendingQuestion: null,
                 pendingQuestionMeta: null,

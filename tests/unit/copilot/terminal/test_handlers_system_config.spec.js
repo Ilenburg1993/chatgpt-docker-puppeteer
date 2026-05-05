@@ -15,7 +15,12 @@ const defaultRuntime = /** @type {any} */ ({
     reasoningEffort: 'high',
     dialogLoopActive: false,
     status: 'idle',
-    getStatusSnapshot: () => ({ contextWindow: 128000, lastCheckpointPath: null }),
+    getStatusSnapshot: () => ({
+        contextWindow: 128000,
+        lastCheckpointPath: null,
+        systemPromptBinding: { digest: 'bound-default' },
+        systemPromptFreshness: { isStale: false, reason: 'ok', recommendedAction: 'none' },
+    }),
     getHealthSnapshot: () => ({
         ok: true,
         healthy: true,
@@ -138,6 +143,10 @@ describe('handlers/system-config — handleHealth', () => {
         expect(body.backgroundPendingCount).toBe(0);
         expect(body.keepaliveRunning).toBe(true);
         expect(body.quotaMonitorRunning).toBe(true);
+        expect(body.systemPromptBinding).toEqual(expect.objectContaining({ digest: 'bound-default' }));
+        expect(body.systemPromptFreshness).toEqual(
+            expect.objectContaining({ isStale: false, recommendedAction: 'none' }),
+        );
         expect(body.shuttingDown).toBe(false);
         expect(body.lifecycle).toEqual(
             expect.objectContaining({
@@ -159,6 +168,10 @@ describe('handlers/system-config — handleGetConfig', () => {
         expect(body.runtimeId).toBe('default');
         expect(Array.isArray(body.agentRuntimes)).toBe(true);
         expect(body.model).toBe('test-model');
+        expect(body.systemPromptBinding).toEqual(expect.objectContaining({ digest: 'bound-default' }));
+        expect(body.systemPromptFreshness).toEqual(
+            expect.objectContaining({ isStale: false, recommendedAction: 'none' }),
+        );
         expect(body).toHaveProperty('sdkSessionMode');
         expect(body).toHaveProperty('sdkPlanOperation');
     });

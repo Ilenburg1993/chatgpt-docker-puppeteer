@@ -28,6 +28,12 @@ const frontendMocks = vi.hoisted(() => ({
         persistedTurnCount: 0,
         bridgeTurnCount: 0,
         liveBridgeTailCount: 0,
+        syncStatus: 'not_needed',
+        syncReason: 'empty',
+        syncPendingCount: 0,
+        syncSyncedCount: 0,
+        syncFailedCount: 0,
+        syncLastError: null,
     })),
     requestTerminalCompactionProjection: vi.fn(async () => ({
         ok: true,
@@ -74,6 +80,12 @@ describe('terminal/commands/cmdContext', () => {
             persistedTurnCount: 0,
             bridgeTurnCount: 0,
             liveBridgeTailCount: 0,
+            syncStatus: 'not_needed',
+            syncReason: 'empty',
+            syncPendingCount: 0,
+            syncSyncedCount: 0,
+            syncFailedCount: 0,
+            syncLastError: null,
         });
     });
 
@@ -109,6 +121,12 @@ describe('terminal/commands/cmdContext', () => {
             persistedTurnCount: 0,
             bridgeTurnCount: 1,
             liveBridgeTailCount: 0,
+            syncStatus: 'unavailable',
+            syncReason: 'no-hub-session',
+            syncPendingCount: 0,
+            syncSyncedCount: 0,
+            syncFailedCount: 0,
+            syncLastError: null,
         });
         cmdContext({ println });
         const output = lines.join('\n');
@@ -137,6 +155,12 @@ describe('terminal/commands/cmdContext', () => {
             persistedTurnCount: 1,
             bridgeTurnCount: 1,
             liveBridgeTailCount: 0,
+            syncStatus: 'not_needed',
+            syncReason: 'aligned',
+            syncPendingCount: 0,
+            syncSyncedCount: 0,
+            syncFailedCount: 0,
+            syncLastError: null,
         });
         cmdContext({ println });
         const output = lines.join('\n');
@@ -165,6 +189,12 @@ describe('terminal/commands/cmdContext', () => {
             persistedTurnCount: 1,
             bridgeTurnCount: 1,
             liveBridgeTailCount: 0,
+            syncStatus: 'not_needed',
+            syncReason: 'aligned',
+            syncPendingCount: 0,
+            syncSyncedCount: 0,
+            syncFailedCount: 0,
+            syncLastError: null,
         });
         cmdContext({ println });
         const output = lines.join('\n');
@@ -192,6 +222,12 @@ describe('terminal/commands/cmdContext', () => {
             persistedTurnCount: 1,
             bridgeTurnCount: 1,
             liveBridgeTailCount: 0,
+            syncStatus: 'not_needed',
+            syncReason: 'aligned',
+            syncPendingCount: 0,
+            syncSyncedCount: 0,
+            syncFailedCount: 0,
+            syncLastError: null,
         });
         cmdContext({ println });
         const output = lines.join('\n');
@@ -219,6 +255,12 @@ describe('terminal/commands/cmdContext', () => {
             persistedTurnCount: 2,
             bridgeTurnCount: 3,
             liveBridgeTailCount: 1,
+            syncStatus: 'scheduled',
+            syncReason: 'bridge_tail',
+            syncPendingCount: 1,
+            syncSyncedCount: 0,
+            syncFailedCount: 0,
+            syncLastError: null,
         });
         cmdContext({ println });
         const output = lines.join('\n');
@@ -228,6 +270,8 @@ describe('terminal/commands/cmdContext', () => {
         expect(output).toContain('Timeline canônica');
         expect(output).toContain('mixed');
         expect(output).toContain('bridge_tail');
+        expect(output).toContain('sync Hub');
+        expect(output).toContain('scheduled');
     });
 });
 

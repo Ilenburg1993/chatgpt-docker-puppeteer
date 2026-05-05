@@ -138,6 +138,23 @@ vi.mock('../../../src/copilot/presentation/agent-runtime.js', () => ({
         usedDefaultRuntimeFallback: runtimeId === 'alt',
         defaultRuntimeId: 'default',
     }),
+    requireAgentRuntimeSelection: (/** @type {string | null | undefined} */ runtimeId) => {
+        if (runtimeId === 'alt') {
+            throw Object.assign(new Error("Runtime 'alt' não encontrado."), {
+                name: 'NotFoundError',
+                code: 'AGENT_RUNTIME_NOT_FOUND',
+                status: 404,
+            });
+        }
+        return {
+            requestedRuntimeId: runtimeId ?? null,
+            runtimeId: runtimeId ?? 'default',
+            runtime: mocks.agent,
+            runtimeFound: true,
+            usedDefaultRuntimeFallback: false,
+            defaultRuntimeId: 'default',
+        };
+    },
 }));
 
 vi.mock('../../../src/copilot/presentation/runtime-sdk-session.js', () => ({
@@ -224,5 +241,10 @@ describe('server/routes/sdk/deps.js', () => {
         expect(deps.sdkSessionOwnership).toHaveProperty('resolveSdkRuntimeProjectionForRuntime');
         expect(deps.sdkObservability).toHaveProperty('getCompactionHistory');
         expect(deps.sdkHooks.registry.list).toBeTypeOf('function');
+    });
+
+    it('rejeita runtimeId explícito inexistente em vez de cair no default', async () => {
+        const mod = await import('../../../src/copilot/server/routes/sdk/deps.js');
+        expect(() => mod.buildDefaultSdkRouteSharedDeps('alt')).toThrow("Runtime 'alt' não encontrado.");
     });
 });

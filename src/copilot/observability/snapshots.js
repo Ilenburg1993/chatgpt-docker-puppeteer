@@ -41,6 +41,8 @@ import { STARVATION_THRESHOLD_MS } from '../config/agent.js';
  * @property {{ tokens: number; tokenLimit: number; utilization: number } | null} contextWindow - Uso de contexto
  * @property {string | null} lastCheckpointPath - Último caminho de checkpoint
  * @property {'approve_all' | 'audit_only' | 'selective'} permissionMode - Modo de permissão ativo
+ * @property {import('../config/system-prompt/freshness.js').SystemPromptBindingSnapshot | null} [systemPromptBinding]
+ * @property {import('../config/system-prompt/freshness.js').SystemPromptFreshness | null} [systemPromptFreshness]
  */
 
 /** Tempo máximo (ms) antes de considerar uma tarefa em starvation. */
@@ -71,6 +73,8 @@ export function buildStatusSnapshot(params) {
         contextWindow,
         lastCheckpointPath,
         permissionMode,
+        systemPromptBinding = null,
+        systemPromptFreshness = null,
     } = params;
 
     const now = Date.now();
@@ -101,5 +105,7 @@ export function buildStatusSnapshot(params) {
         contextWindow,
         lastCheckpointPath,
         permissionMode,
+        systemPromptBinding,
+        systemPromptFreshness,
     };
 }

@@ -16,7 +16,7 @@ import {
     setRuntimeModel,
     setRuntimeReasoningEffort,
 } from '#copilot/agent';
-import { resolveAgentRuntimeSelection } from './agent-runtime.js';
+import { requireAgentRuntimeSelection } from './agent-runtime.js';
 
 /**
  * @param {string} modelId
@@ -37,7 +37,7 @@ export function readRuntimeModelMetadata(modelId) {
  * @returns {Promise<{ currentModel: string; models: RuntimeModelInfo[] }>}
  */
 export async function listRuntimeAvailableModelsProjection(runtimeId) {
-    const selection = resolveAgentRuntimeSelection(runtimeId);
+    const selection = requireAgentRuntimeSelection(runtimeId);
     const currentModel = readRuntimeModelSelection(selection.runtime).model;
     return { currentModel, models: await listSdkCatalogModels() };
 }
@@ -47,7 +47,7 @@ export async function listRuntimeAvailableModelsProjection(runtimeId) {
  * @returns {{ currentModel: string; stats: ReturnType<typeof readSdkModelStats> }}
  */
 export function readRuntimeModelStatsProjection(runtimeId) {
-    const selection = resolveAgentRuntimeSelection(runtimeId);
+    const selection = requireAgentRuntimeSelection(runtimeId);
     return {
         currentModel: readRuntimeModelSelection(selection.runtime).model,
         stats: readSdkModelStats(),
@@ -68,7 +68,7 @@ export function readRuntimeModelStatsProjection(runtimeId) {
  * }}
  */
 export function setRuntimeModelProjection(modelId, runtimeId) {
-    const selection = resolveAgentRuntimeSelection(runtimeId);
+    const selection = requireAgentRuntimeSelection(runtimeId);
     const agent = selection.runtime;
     const before = readRuntimeModelSelection(agent);
     const previousModel = before.model;
@@ -98,7 +98,7 @@ export function setRuntimeModelProjection(modelId, runtimeId) {
  * @returns {{ previousReasoningEffort: string; currentReasoningEffort: string; runtimeId: string }}
  */
 export function setRuntimeReasoningProjection(effort, runtimeId) {
-    const selection = resolveAgentRuntimeSelection(runtimeId);
+    const selection = requireAgentRuntimeSelection(runtimeId);
     const agent = selection.runtime;
     const previousReasoningEffort = String(readRuntimeModelSelection(agent).reasoningEffort ?? 'off');
     setRuntimeReasoningEffort(agent, effort);

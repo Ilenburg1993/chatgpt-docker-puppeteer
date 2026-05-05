@@ -17,6 +17,8 @@ import { validateUrlString } from '#copilot/core';
 import { Router } from 'express';
 import { z } from 'zod';
 
+import { projectAgentHttpError } from '../../presentation/agent-http-errors.js';
+import { buildMissingRuntimeRouteMeta } from '../../presentation/runtime-meta.js';
 import { resolveRequestedRuntimeId } from '../../presentation/runtime-request.js';
 import {
     buildRuntimeWebhooksListHttpPayload,
@@ -33,6 +35,25 @@ import { validate } from '../middleware/validate.js';
 
 const router = Router();
 
+/**
+ * @param {unknown} error
+ * @param {Req} req
+ * @param {Res} res
+ * @returns {boolean}
+ */
+function maybeSendRuntimeTargetingError(error, req, res) {
+    const projection = projectAgentHttpError(error, {
+        fallbackStatus: 500,
+        statusByCode: { AGENT_RUNTIME_NOT_FOUND: 404 },
+    });
+    if (projection.body.code !== 'AGENT_RUNTIME_NOT_FOUND') return false;
+    res.status(projection.status).json({
+        ...projection.body,
+        ...buildMissingRuntimeRouteMeta(resolveRequestedRuntimeId(req)),
+    });
+    return true;
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // GET /webhooks
 // ─────────────────────────────────────────────────────────────────────────────
@@ -41,7 +62,11 @@ const router = Router();
  * Lista todos os webhooks registrados no agente Always-Alive.
  */
 router.get('/webhooks', (/** @type {Req} */ req, /** @type {Res} */ res) => {
-    res.json(buildRuntimeWebhooksListHttpPayload(resolveRequestedRuntimeId(req)));
+    try {
+        res.json(buildRuntimeWebhooksListHttpPayload(resolveRequestedRuntimeId(req)));
+    } catch (error) {
+        if (!maybeSendRuntimeTargetingError(error, req, res)) throw error;
+    }
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -65,7 +90,11 @@ router.post('/webhooks', validate({ body: webhookBodySchema }), (/** @type {Req}
         return;
     }
 
-    res.status(201).json(registerRuntimeWebhookHttp(url, runtimeId));
+    try {
+        res.status(201).json(registerRuntimeWebhookHttp(url, runtimeId));
+    } catch (error) {
+        if (!maybeSendRuntimeTargetingError(error, req, res)) throw error;
+    }
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -82,7 +111,13 @@ router.delete(
     validate({ params: webhookParamsSchema }),
     (/** @type {Req} */ req, /** @type {Res} */ res) => {
         const id = /** @type {string} */ (req.params['id']);
-        const payload = unregisterRuntimeWebhookHttp(id, resolveRequestedRuntimeId(req));
+        let payload;
+        try {
+            payload = unregisterRuntimeWebhookHttp(id, resolveRequestedRuntimeId(req));
+        } catch (error) {
+            if (maybeSendRuntimeTargetingError(error, req, res)) return;
+            throw error;
+        }
         if (!payload) {
             res.status(404).json({ ok: false, error: `Webhook '${id}' não encontrado` });
             return;

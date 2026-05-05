@@ -34,6 +34,7 @@ export {
     readTerminalDbHistoryProjection,
     readTerminalHistoryProjection,
     readTerminalTimelineProjection,
+    readTerminalTimelineSyncTelemetry,
     requestTerminalCompactionProjection,
 } from './projections/timeline.js';
 
@@ -85,6 +86,7 @@ export {
     searchTerminalHubTurns,
     storeTerminalHubMemory,
     writeTerminalHubSystemTurn,
+    writeTerminalHubTimelineTurn,
 } from './gateways/hub.js';
 
 export { runTerminalDialogTurn, startTerminalDialogMode, stopTerminalDialogMode } from './gateways/dialog.js';

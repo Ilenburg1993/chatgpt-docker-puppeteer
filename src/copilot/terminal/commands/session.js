@@ -21,7 +21,6 @@ import {
     readTerminalDbHistoryProjection,
     readTerminalDbSessionsProjection,
     readTerminalDisplayProjection,
-    readTerminalHistoryProjection,
     readTerminalStatusProjection,
     readTerminalTimelineProjection,
     saveTerminalSnapshotProjection,
@@ -126,6 +125,35 @@ export function cmdStatus({ hubSessionId, injectPort, println }, arg = '') {
             ? `permission=${projection.pendingPermissions}${projection.latestPermissionType ? ` (${projection.latestPermissionType})` : ''}`
             : null,
     ].filter(Boolean);
+    const timelineSyncLabel =
+        projection.timelineSyncStatus === 'scheduled' || projection.timelineSyncStatus === 'inflight'
+            ? ` · sync=${projection.timelineSyncStatus}:${projection.timelineSyncPendingCount}`
+            : projection.timelineSyncStatus === 'synced'
+              ? ` · sync=synced:${projection.timelineSyncSyncedCount}`
+              : projection.timelineSyncStatus === 'failed'
+                ? ` · sync=failed:${projection.timelineSyncFailedCount}`
+                : ` · sync=${projection.timelineSyncStatus}`;
+    const promptBindingDigest =
+        typeof projection.systemPromptBinding?.['digest'] === 'string'
+            ? projection.systemPromptBinding['digest']
+            : null;
+    const promptFreshness = projection.systemPromptFreshness;
+    const promptIsStale = typeof promptFreshness?.['isStale'] === 'boolean' ? promptFreshness['isStale'] : null;
+    const promptFreshnessReason = typeof promptFreshness?.['reason'] === 'string' ? promptFreshness['reason'] : null;
+    const promptRecommendedAction =
+        promptFreshness?.['recommendedAction'] === 'none' ||
+        promptFreshness?.['recommendedAction'] === 'observe-live-reload' ||
+        promptFreshness?.['recommendedAction'] === 'resume-session'
+            ? promptFreshness['recommendedAction']
+            : 'none';
+    const promptFreshnessLabel =
+        promptIsStale === true
+            ? '\x1b[31mstale\x1b[0m'
+            : promptRecommendedAction === 'observe-live-reload'
+              ? '\x1b[33mlive-reload\x1b[0m'
+              : promptIsStale === false
+                ? '\x1b[32mok\x1b[0m'
+                : '\x1b[90m(n/d)\x1b[0m';
     println(`
   \x1b[36mStatus do Terminal LLM-B\x1b[0m
   ─────────────────────────────────────
@@ -145,7 +173,9 @@ export function cmdStatus({ hubSessionId, injectPort, println }, arg = '') {
     runtime id       \x1b[90m${projection.runtimeId}\x1b[0m
     runtime profile  \x1b[90m${projection.agentProfileId ?? '(sem profile)'}\x1b[0m
     runtimes         \x1b[90m${projection.runtimeTopologyLabel}\x1b[0m
-    timeline         \x1b[90m${projection.timelineSource} · ${projection.timelineAuthority} · ${projection.timelineReconciliationStatus} · ${projection.timelineTurnCount} turns\x1b[0m
+    timeline         \x1b[90m${projection.timelineSource} · ${projection.timelineAuthority} · ${projection.timelineReconciliationStatus} · ${projection.timelineTurnCount} turns${timelineSyncLabel}\x1b[0m
+    prompt digest    \x1b[90m${promptBindingDigest ?? '(sem binding)'}\x1b[0m
+    prompt frescor   ${promptFreshnessLabel} \x1b[90m(${promptRecommendedAction})\x1b[0m
     sdk session      \x1b[90m${projection.sdkSessionId ?? '(sem sdk)'}\x1b[0m
     hub session      \x1b[90m${projection.hubSessionId ?? '(sem hub)'}\x1b[0m
     turnos canon     ${projection.turnCount} \x1b[90m(persistidos=${projection.persistedTimelineTurnCount} · bridge=${projection.bridgeTurnCount} · live-tail=${projection.liveBridgeTailCount})\x1b[0m
@@ -179,6 +209,9 @@ export function cmdStatus({ hubSessionId, injectPort, println }, arg = '') {
     }
     if (activity.detail) {
         println(`  atividade info  \x1b[90m${activity.detail}\x1b[0m`);
+    }
+    if (promptFreshnessReason) {
+        println(`  prompt reason   \x1b[90m${promptFreshnessReason}\x1b[0m`);
     }
     if (activityProjection.history.length > 0) {
         println(
@@ -229,6 +262,20 @@ export function cmdStatus({ hubSessionId, injectPort, println }, arg = '') {
             '  \x1b[33mNota: timeline do bridge divergiu da persistência; a UX está priorizando o hub como autoridade canônica.\x1b[0m',
         );
     }
+    if (projection.timelineSyncStatus === 'scheduled' || projection.timelineSyncStatus === 'inflight') {
+        println(
+            `  \x1b[90mTimeline sync: ${projection.timelineSyncStatus} (${projection.timelineSyncPendingCount} turnos pendentes para materializar no Hub).\x1b[0m`,
+        );
+    }
+    if (projection.timelineSyncStatus === 'failed') {
+        const retryLabel =
+            typeof projection.timelineSyncNextRetryAt === 'number'
+                ? ` próxima tentativa=${new Date(projection.timelineSyncNextRetryAt).toLocaleTimeString('pt-BR')}`
+                : '';
+        println(
+            `  \x1b[33mTimeline sync falhou: ${projection.timelineSyncLastError ?? 'erro desconhecido'}${retryLabel}.\x1b[0m`,
+        );
+    }
 }
 
 /**
@@ -269,7 +316,7 @@ export function cmdNow({ hubSessionId, injectPort, println }, arg = '') {
         : `model=${modelBilling.displayModel}`;
 
     println(
-        `\x1b[36m[now]\x1b[0m runtime=${projection.runtimeId} status=${state} loop=${projection.dialogLoopActive ? 'on' : 'off'} mode=${mode} queue=${queue} ${ask}${sdkWait ? ` ${sdkWait}` : ''} timeline=${projection.timelineSource}:${projection.timelineReconciliationStatus} ${mismatchLabel}`,
+        `\x1b[36m[now]\x1b[0m runtime=${projection.runtimeId} status=${state} loop=${projection.dialogLoopActive ? 'on' : 'off'} mode=${mode} queue=${queue} ${ask}${sdkWait ? ` ${sdkWait}` : ''} timeline=${projection.timelineSource}:${projection.timelineReconciliationStatus}:sync=${projection.timelineSyncStatus} ${mismatchLabel}`,
     );
     if (projection.activity?.label) {
         const detail = projection.activity.detail ? ` · ${projection.activity.detail}` : '';
@@ -292,7 +339,7 @@ export function cmdHistory({ println }, n = 10) {
     const { runtimeId, arg } = extractRuntimeTarget(rawArg ?? '');
     const requestedLimit = typeof n === 'number' ? n : Number(arg) || 10;
     const timeline = readTerminalTimelineProjection({ limitPairs: requestedLimit, runtimeId });
-    const hist = readTerminalHistoryProjection(requestedLimit, runtimeId);
+    const hist = timeline.turns;
     if (hist.length === 0) {
         println('[history] Histórico vazio.');
         return;
@@ -311,6 +358,13 @@ export function cmdHistory({ println }, n = 10) {
         println(
             '  \x1b[33mNota: histórico do bridge divergiu; exibindo a timeline persistida como fonte oficial.\x1b[0m',
         );
+    }
+    if (timeline.sync.status === 'scheduled' || timeline.sync.status === 'inflight') {
+        println(
+            `  \x1b[90mSync Hub: ${timeline.sync.status} (${timeline.sync.pendingCount} turnos live aguardando persistência).\x1b[0m`,
+        );
+    } else if (timeline.sync.status === 'failed') {
+        println(`  \x1b[33mSync Hub falhou: ${timeline.sync.lastError ?? 'erro desconhecido'}.\x1b[0m`);
     }
     println('─────────────────────────────────');
 }

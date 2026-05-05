@@ -10,6 +10,9 @@
 
 import { CopilotError, toError } from '#copilot/core';
 import { log } from '#copilot/observability';
+import { buildMissingRuntimeRouteMeta } from '../../../presentation/runtime-meta.js';
+import { resolveRequestedRuntimeId } from '../../../presentation/runtime-request.js';
+import { sanitizeHttpErrorMessage } from '../../middleware/error-handler.js';
 
 /**
  * F245.3: Mapa de CopilotError subclasses → HTTP status codes.
@@ -19,6 +22,7 @@ import { log } from '#copilot/observability';
 const ERROR_STATUS_MAP = new Map([
     ['ValidationError', 400],
     ['ConfigError', 400],
+    ['NotFoundError', 404],
     ['ToolError', 422],
     ['SessionError', 409],
     ['TimeoutError', 504],
@@ -37,6 +41,10 @@ function resolveHttpStatus(err) {
     if (err instanceof CopilotError) {
         return ERROR_STATUS_MAP.get(err.name) ?? 500;
     }
+    const status = /** @type {{ status?: unknown }} */ (/** @type {unknown} */ (err)).status;
+    if (typeof status === 'number' && Number.isFinite(status)) {
+        return status;
+    }
     return 500;
 }
 
@@ -50,21 +58,54 @@ function resolveErrorCode(err) {
     if (err instanceof CopilotError && typeof err.code === 'string') {
         return err.code;
     }
+    const code = /** @type {{ code?: unknown }} */ (/** @type {unknown} */ (err)).code;
+    if (typeof code === 'string') {
+        return code;
+    }
     return 'INTERNAL_ERROR';
 }
 
 /**
- * F136: Sanitiza mensagem de erro para resposta HTTP — strip stack traces e paths internos.
- *
- * @param {string} message
- * @returns {string}
+ * @param {import('express').Request} req
+ * @param {unknown} err
+ * @returns {{ requestedRuntimeId?: string | null; runtimeFound?: boolean; usedDefaultRuntimeFallback?: boolean }}
  */
-function sanitizeErrorMessage(message) {
-    if (process.env['NODE_ENV'] === 'production') {
-        return 'Internal server error';
+export function buildSdkRuntimeErrorMeta(req, err) {
+    if (resolveErrorCode(err) !== 'AGENT_RUNTIME_NOT_FOUND') {
+        return {};
     }
-    // Mesmo em dev, remover paths absolutos do sistema
-    return message.replace(/\/workspaces\/[^\s)]+/g, '<workspace>').replace(/\/home\/[^\s)]+/g, '<home>');
+    return buildMissingRuntimeRouteMeta(resolveRequestedRuntimeId(req));
+}
+
+/**
+ * @param {import('express').Request} req
+ * @param {unknown} err
+ * @returns {{
+ *     status: number;
+ *     body: {
+ *         ok: false;
+ *         error: string;
+ *         code: string;
+ *         status: number;
+ *         requestedRuntimeId?: string | null;
+ *         runtimeFound?: boolean;
+ *         usedDefaultRuntimeFallback?: boolean;
+ *     };
+ * }}
+ */
+export function projectSdkHttpError(req, err) {
+    const status = resolveHttpStatus(err);
+    const code = resolveErrorCode(err);
+    return {
+        status,
+        body: {
+            ok: false,
+            ...buildSdkRuntimeErrorMeta(req, err),
+            error: sanitizeHttpErrorMessage(toError(err).message, status),
+            code,
+            status,
+        },
+    };
 }
 
 /**
@@ -80,11 +121,12 @@ export async function withErrorHandler(prefix, req, res, fn) {
     try {
         await fn();
     } catch (e) {
-        const status = resolveHttpStatus(e);
-        const code = resolveErrorCode(e);
+        const projection = projectSdkHttpError(req, e);
+        const { status, body } = projection;
+        const code = body.code;
         log('ERROR', `[${prefix}] ${req.method} ${req.path} → ${status} ${code}: ${toError(e).message}`);
         if (!res.headersSent) {
-            res.status(status).json({ ok: false, error: sanitizeErrorMessage(toError(e).message), code, status });
+            res.status(status).json(body);
         }
     }
 }

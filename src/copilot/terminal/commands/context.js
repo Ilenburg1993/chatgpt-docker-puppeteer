@@ -92,10 +92,20 @@ export function cmdContext({ println }, arg = '') {
     println(
         `  persistidos/live : \x1b[90m${projection.persistedTurnCount} persistidos · ${projection.bridgeTurnCount} bridge · ${projection.liveBridgeTailCount} live-tail\x1b[0m`,
     );
+    println(
+        `  sync Hub         : \x1b[90m${projection.syncStatus}${projection.syncPendingCount > 0 ? ` · pendentes=${projection.syncPendingCount}` : ''}${projection.syncSyncedCount > 0 ? ` · gravados=${projection.syncSyncedCount}` : ''}${projection.syncFailedCount > 0 ? ` · falhas=${projection.syncFailedCount}` : ''}\x1b[0m`,
+    );
     if (projection.reconciliationStatus === 'diverged') {
         println(
             '\x1b[33m  Nota: bridge e persistência divergiram; o terminal está priorizando a timeline persistida até nova reconciliação.\x1b[0m',
         );
+    }
+    if (projection.syncStatus === 'failed') {
+        const retryLabel =
+            typeof projection.syncNextRetryAt === 'number'
+                ? ` próxima tentativa=${new Date(projection.syncNextRetryAt).toLocaleTimeString('pt-BR')}`
+                : '';
+        println(`\x1b[33m  Sync Hub falhou: ${projection.syncLastError ?? 'erro desconhecido'}${retryLabel}.\x1b[0m`);
     }
 
     println('');

@@ -39,7 +39,7 @@ export async function cmdExport({ println }, arg) {
 
     const lines = [`# Conversa LLM-B — ${new Date().toLocaleString('pt-BR')}`, ''];
     lines.push(
-        `> ${projection.turns.length} mensagens · timeline=${projection.timelineSource}/${projection.reconciliationStatus} · exportado em ${new Date().toISOString()}`,
+        `> ${projection.turns.length} mensagens · timeline=${projection.timelineSource}/${projection.reconciliationStatus} · sync=${projection.sync.status} · exportado em ${new Date().toISOString()}`,
         '',
     );
 

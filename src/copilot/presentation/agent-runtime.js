@@ -16,6 +16,7 @@ import {
     getDefaultAgentRuntimeId as readDefaultAgentRuntimeId,
     readRuntimeControlState,
 } from '#copilot/agent';
+import { NotFoundError } from '#copilot/core';
 import { normalizeRuntimeId } from './runtime-targeting.js';
 
 /**
@@ -104,18 +105,61 @@ export function resolveAgentRuntimeSelection(runtimeId) {
 }
 
 /**
+ * @param {string | null | undefined} [runtimeId]
+ * @returns {NotFoundError}
+ */
+export function createAgentRuntimeNotFoundError(runtimeId) {
+    const normalizedRuntimeId = normalizeRuntimeId(runtimeId) ?? readDefaultAgentRuntimeId();
+    return new NotFoundError(`Runtime '${normalizedRuntimeId}' não encontrado.`, 'AGENT_RUNTIME_NOT_FOUND');
+}
+
+/**
+ * Resolve a seleção do runtime e lança quando um runtime explícito não existir.
+ *
+ * Superfícies operacionais/mutáveis devem preferir esta API para evitar fallback silencioso quando o chamador pediu um
+ * runtime específico.
+ *
+ * @param {string | null | undefined} [runtimeId]
+ * @returns {{
+ *     requestedRuntimeId: string | null;
+ *     runtimeId: string;
+ *     runtime: AgentRuntime;
+ *     runtimeFound: true;
+ *     usedDefaultRuntimeFallback: false;
+ *     defaultRuntimeId: string;
+ * }}
+ */
+export function requireAgentRuntimeSelection(runtimeId) {
+    const selection = resolveAgentRuntimeSelection(runtimeId);
+    if (selection.requestedRuntimeId !== null && !selection.runtimeFound) {
+        throw createAgentRuntimeNotFoundError(selection.requestedRuntimeId);
+    }
+    return {
+        requestedRuntimeId: selection.requestedRuntimeId,
+        runtimeId: selection.runtimeId,
+        runtime: selection.runtime,
+        runtimeFound: true,
+        usedDefaultRuntimeFallback: false,
+        defaultRuntimeId: selection.defaultRuntimeId,
+    };
+}
+
+/**
+ * @param {unknown} error
+ * @returns {boolean}
+ */
+export function isAgentRuntimeNotFoundError(error) {
+    return error instanceof NotFoundError && error.code === 'AGENT_RUNTIME_NOT_FOUND';
+}
+
+/**
  * Retorna um runtime específico e lança se ele não existir.
  *
  * @param {string | null | undefined} [runtimeId]
  * @returns {AgentRuntime}
  */
 export function requireAgentRuntime(runtimeId) {
-    const runtime = getAgentRuntime(runtimeId);
-    const resolvedRuntimeId = resolveAgentRuntimeId(runtimeId);
-    if (!runtime) {
-        throw new Error(`AGENT_RUNTIME_NOT_FOUND:${resolvedRuntimeId}`);
-    }
-    return runtime;
+    return requireAgentRuntimeSelection(runtimeId).runtime;
 }
 
 /**

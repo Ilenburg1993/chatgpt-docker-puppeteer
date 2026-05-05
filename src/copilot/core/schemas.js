@@ -28,6 +28,18 @@ export const PendingQuestionShadowSchema = z.object({
     expiresAt: z.number(),
 });
 
+export const SystemPromptBindingSnapshotSchema = z.object({
+    sessionId: z.string().nullable(),
+    digest: z.string(),
+    configuredMode: z.enum(['append', 'customize', 'replace']),
+    effectiveMode: z.enum(['append', 'customize', 'replace']),
+    effectiveLiveMode: z.enum(['append', 'customize', 'replace']),
+    liveReloadEnabled: z.boolean(),
+    liveReloadMechanism: z.enum(['sdk-transform', 'static-snapshot']),
+    reloadStrategy: z.enum(['sdk-transform', 'static']),
+    boundAt: z.number(),
+});
+
 // ─── Snapshot (session/state/snapshot.js) ──────────────────────────────────────────
 
 /**
@@ -86,6 +98,7 @@ export const AliveAgentStateSchema = z
         reasoningEffort: z.enum(['low', 'medium', 'high', 'xhigh']).optional(),
         pendingQuestion: z.string().nullable(),
         pendingQuestionMeta: PendingQuestionMetaSchema.nullable().optional(),
+        systemPromptBinding: SystemPromptBindingSnapshotSchema.nullable().optional(),
     })
     .passthrough();
 

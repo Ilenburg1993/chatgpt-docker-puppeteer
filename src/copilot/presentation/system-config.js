@@ -62,6 +62,8 @@ export function handleHealth(params = {}) {
         model,
         reasoningEffort,
         dialogPaused,
+        systemPromptBinding,
+        systemPromptFreshness,
     } = readAgentRuntimeOverviewProjection(requestedRuntimeId);
     const healthRecord = health && typeof health === 'object' ? /** @type {Record<string, unknown>} */ (health) : null;
     const healthChecks =
@@ -121,6 +123,8 @@ export function handleHealth(params = {}) {
             sseClients: getSseClients().size,
             model,
             reasoningEffort,
+            systemPromptBinding,
+            systemPromptFreshness,
             contextWindow: snapshot['contextWindow'],
             backgroundPendingCount: healthRecord?.['backgroundPendingCount'] ?? 0,
             keepaliveRunning: ioChecks?.['keepaliveRunning'] ?? false,
@@ -191,6 +195,8 @@ export function handleGetConfig(params = {}) {
         reasoningEffort,
         dialogLoopActive,
         dialogPaused,
+        systemPromptBinding,
+        systemPromptFreshness,
     } = readAgentRuntimeOverviewProjection(requestedRuntimeId);
     return {
         status: 200,
@@ -208,6 +214,8 @@ export function handleGetConfig(params = {}) {
             sdkPlanOperation: readRuntimeLastSdkPlanOperation(),
             dialogLoopActive,
             dialogPaused,
+            systemPromptBinding,
+            systemPromptFreshness,
             busy: readRuntimeBusyState(),
             hubSessionId: readRuntimeHubSessionId(),
             port: bootConfig.server.port,

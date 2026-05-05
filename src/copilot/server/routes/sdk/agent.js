@@ -9,6 +9,7 @@
  * Endpoints:
  *
  * - GET /agent/info — Info do agente (status, uptime, PID, sessionId)
+ * - GET /agent/system-prompt — status/introspecção do system prompt + instruction sources da sessão ativa
  * - GET /agent/tools — ToolsRegistry rico com metadados
  * - GET /agent/telemetry — Resumo de telemetria (sessões, erros)
  * - POST /agent/telemetry/clear — Reseta store de telemetria
@@ -52,6 +53,7 @@ const _agentTracker = new SseConnectionTracker('agent/stream');
  * @property {import('#copilot/observability/metrics.js').MetricsStore} metrics - Store de métricas.
  * @property {() => Promise<import('#copilot/sdk/types').CopilotClient>} getClient - Factory do SDK client.
  * @property {ReturnType<import('./deps.js').buildDefaultSdkRouteSharedDeps>['sdkRuntimeProjection']} sdkRuntimeProjection
+ * @property {ReturnType<import('./deps.js').buildDefaultSdkRouteSharedDeps>['sdkSystemPrompt']} sdkSystemPrompt
  * @property {ReturnType<import('./deps.js').buildDefaultSdkRouteSharedDeps>['sdkSessionOwnership']} sdkSessionOwnership
  * @property {ReturnType<import('./deps.js').buildDefaultSdkRouteSharedDeps>['sdkObservability']} sdkObservability
  * @property {string} [runtimeId] - Runtime alvo resolvido na borda.
@@ -190,6 +192,29 @@ export default function createAgentRouter(deps) {
     });
 
     // ─────────────────────────────────────────────────────────────────────────────
+    // GET /agent/system-prompt
+    // ─────────────────────────────────────────────────────────────────────────────
+
+    /**
+     * Retorna o status efetivo do system prompt modular e, quando existir sessão SDK viva, as instruction sources que o
+     * próprio SDK reporta para o runtime alvo.
+     */
+    router.get('/agent/system-prompt', (_req, res) => {
+        void withErrorHandler(/** @type {Req} */ (_req), res, async () => {
+            const routeDeps = resolveAgentRouterDeps(deps, /** @type {Req} */ (_req));
+            const projection = await routeDeps.sdkSystemPrompt.readAgentSdkSystemPromptProjection(
+                routeDeps.requestedRuntimeId ?? routeDeps.runtimeId,
+            );
+
+            res.json({
+                ok: true,
+                ...buildAgentRuntimeMeta(routeDeps),
+                ...projection,
+            });
+        });
+    });
+
+    // ─────────────────────────────────────────────────────────────────────────────
     // GET /agent/tools
     // ─────────────────────────────────────────────────────────────────────────────
 
@@ -198,23 +223,25 @@ export default function createAgentRouter(deps) {
      * ?category=hook&page=1&limit=20 para filtragem e paginação.
      */
     router.get('/agent/tools', (req, res) => {
-        const { requestedRuntimeId, runtimeId, sdkRuntimeProjection } = resolveAgentRouterDeps(deps, req);
-        const projection = sdkRuntimeProjection.readAgentRuntimeToolsProjectionForRuntime(
-            requestedRuntimeId ?? runtimeId,
-            { requireRegistry: true },
-        );
-        if (!projection.ok) {
-            res.status(503).json({ ok: false, error: projection.error });
-            return;
-        }
+        void withErrorHandler(req, res, async () => {
+            const { requestedRuntimeId, runtimeId, sdkRuntimeProjection } = resolveAgentRouterDeps(deps, req);
+            const projection = sdkRuntimeProjection.readAgentRuntimeToolsProjectionForRuntime(
+                requestedRuntimeId ?? runtimeId,
+                { requireRegistry: true },
+            );
+            if (!projection.ok) {
+                res.status(503).json({ ok: false, error: projection.error });
+                return;
+            }
 
-        res.json(
-            sdkRuntimeProjection.paginateAgentRuntimeToolsProjection(projection, {
-                category: req.query['category'],
-                page: req.query['page'],
-                limit: req.query['limit'],
-            }),
-        );
+            res.json(
+                sdkRuntimeProjection.paginateAgentRuntimeToolsProjection(projection, {
+                    category: req.query['category'],
+                    page: req.query['page'],
+                    limit: req.query['limit'],
+                }),
+            );
+        });
     });
 
     // ─────────────────────────────────────────────────────────────────────────────
@@ -228,9 +255,11 @@ export default function createAgentRouter(deps) {
      * @param {import('express').Response} res
      */
     function handleGetTelemetry(_req, res) {
-        const routeDeps = resolveAgentRouterDeps(deps, /** @type {Req} */ (_req));
-        const { metrics } = routeDeps;
-        res.json({ ok: true, ...buildAgentRuntimeMeta(routeDeps), summary: metrics.getSummary() });
+        void withErrorHandler(/** @type {Req} */ (_req), res, async () => {
+            const routeDeps = resolveAgentRouterDeps(deps, /** @type {Req} */ (_req));
+            const { metrics } = routeDeps;
+            res.json({ ok: true, ...buildAgentRuntimeMeta(routeDeps), summary: metrics.getSummary() });
+        });
     }
 
     router.get('/agent/telemetry', handleGetTelemetry);
@@ -239,11 +268,13 @@ export default function createAgentRouter(deps) {
      * Reseta o store de telemetria do agente. Útil após deploy ou manutenção.
      */
     router.post('/agent/telemetry/clear', (_req, res) => {
-        const routeDeps = resolveAgentRouterDeps(deps, /** @type {Req} */ (_req));
-        const { metrics, sdkObservability } = routeDeps;
-        metrics.reset();
-        sdkObservability.log('INFO', '[sdk-api] telemetria resetada via POST /agent/telemetry/clear');
-        res.json({ ok: true, ...buildAgentRuntimeMeta(routeDeps), message: 'Telemetria resetada com sucesso' });
+        void withErrorHandler(/** @type {Req} */ (_req), res, async () => {
+            const routeDeps = resolveAgentRouterDeps(deps, /** @type {Req} */ (_req));
+            const { metrics, sdkObservability } = routeDeps;
+            metrics.reset();
+            sdkObservability.log('INFO', '[sdk-api] telemetria resetada via POST /agent/telemetry/clear');
+            res.json({ ok: true, ...buildAgentRuntimeMeta(routeDeps), message: 'Telemetria resetada com sucesso' });
+        });
     });
 
     // ─────────────────────────────────────────────────────────────────────────────

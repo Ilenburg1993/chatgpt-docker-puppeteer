@@ -122,6 +122,8 @@ export function readAgentRuntimeOverview(runtimeId) {
  *     pendingQuestionShadowAgeMs: number | null;
  *     pendingQuestionShadowExpiresAt: number | null;
  *     pendingQuestionShadowRemainingMs: number | null;
+ *     systemPromptBinding: Record<string, unknown> | null;
+ *     systemPromptFreshness: Record<string, unknown> | null;
  *     lastPrInfo: Record<string, any> | null;
  *     dialogPrMetrics: Record<string, any> | null;
  * }}
@@ -131,6 +133,14 @@ export function readAgentRuntimeOverviewProjection(runtimeId) {
     const controlState = readRuntimeControlState(base.agent);
     const interactionState = readRuntimeInteractionState(base.agent);
     const prBudget = readRuntimePrBudgetSnapshot(base.agent);
+    const systemPromptBinding =
+        base.snap['systemPromptBinding'] && typeof base.snap['systemPromptBinding'] === 'object'
+            ? /** @type {Record<string, unknown>} */ (base.snap['systemPromptBinding'])
+            : null;
+    const systemPromptFreshness =
+        base.snap['systemPromptFreshness'] && typeof base.snap['systemPromptFreshness'] === 'object'
+            ? /** @type {Record<string, unknown>} */ (base.snap['systemPromptFreshness'])
+            : null;
 
     return {
         agentProfileId: base.agentProfileId,
@@ -159,6 +169,8 @@ export function readAgentRuntimeOverviewProjection(runtimeId) {
         pendingQuestionShadowAgeMs: interactionState.pendingQuestionShadowAgeMs,
         pendingQuestionShadowExpiresAt: interactionState.pendingQuestionShadowExpiresAt,
         pendingQuestionShadowRemainingMs: interactionState.pendingQuestionShadowRemainingMs,
+        systemPromptBinding,
+        systemPromptFreshness,
         lastPrInfo: /** @type {Record<string, any> | null} */ (prBudget.lastPrInfo),
         dialogPrMetrics: /** @type {Record<string, any> | null} */ (prBudget.prMetrics),
     };
