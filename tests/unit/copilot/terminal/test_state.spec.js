@@ -16,14 +16,17 @@ import {
     addAttachment,
     appendThinkingHistoryChunk,
     clearAttachments,
+    clearInjectHistory,
     clearThinkingHistory,
     finalizeThinkingHistoryEntry,
     getAttachmentQueue,
     getBusy,
     getHubSessionId,
     getInjectHistory,
+    getInjectHistoryForRuntime,
     getLastSdkPlanChangedAt,
     getLastSdkPlanOperation,
+    getLatestInjectHistoryEntryForRuntime,
     getLatestThinkingHistoryEntry,
     getSdkSessionMode,
     getShowIntentActivity,
@@ -206,6 +209,9 @@ describe('state attachment queue', () => {
 });
 
 describe('state inject history (circular buffer)', () => {
+    beforeEach(() => clearInjectHistory());
+    afterEach(() => clearInjectHistory());
+
     /** @returns {import('../../../../src/copilot/presentation/runtime-ui-state-store.js').InjectHistoryEntry} */
     const mkEntry = (from = 'test') => ({
         ts: Date.now(),
@@ -227,6 +233,19 @@ describe('state inject history (circular buffer)', () => {
         for (let i = 0; i < 10; i++) recordInjectHistory(mkEntry(`src-${i}`));
         const hist = getInjectHistory(3);
         expect(hist.length).toBeLessThanOrEqual(3);
+    });
+
+    it('filtra histórico de inject por runtimeId', () => {
+        recordInjectHistory({ ...mkEntry('default-src'), runtimeId: 'default' });
+        recordInjectHistory({ ...mkEntry('alt-src'), runtimeId: 'alt' });
+        recordInjectHistory({ ...mkEntry('default-src-2'), runtimeId: 'default' });
+
+        expect(getInjectHistoryForRuntime('default', 10).map((entry) => entry.from)).toEqual([
+            'default-src',
+            'default-src-2',
+        ]);
+        expect(getInjectHistoryForRuntime('alt', 10).map((entry) => entry.from)).toEqual(['alt-src']);
+        expect(getLatestInjectHistoryEntryForRuntime('alt')?.from).toBe('alt-src');
     });
 });
 

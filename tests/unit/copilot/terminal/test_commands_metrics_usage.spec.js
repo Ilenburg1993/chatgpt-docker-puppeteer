@@ -1,6 +1,10 @@
 // @ts-check
 
 import { describe, expect, it, vi } from 'vitest';
+import {
+    clearRuntimeInjectHistory,
+    recordRuntimeInjectHistory,
+} from '../../../../src/copilot/presentation/runtime-ui-state.js';
 
 const defaultRuntime = /** @type {any} */ ({
     sessionId: 'runtime-456',
@@ -13,6 +17,8 @@ const defaultRuntime = /** @type {any} */ ({
         model: 'gpt-5-mini',
         reasoningEffort: 'medium',
         contextState: { tokens: 64000, tokenLimit: 128000, utilization: 0.5 },
+        systemPromptBinding: { digest: 'bound-default' },
+        systemPromptFreshness: { isStale: false, reason: 'binding ok', recommendedAction: 'none' },
     }),
     getHealthSnapshot: () => ({
         status: 'healthy',
@@ -33,6 +39,12 @@ const altRuntime = /** @type {any} */ ({
         model: 'gpt-4.1-mini',
         reasoningEffort: 'low',
         contextState: { tokens: 1000, tokenLimit: 2000, utilization: 0.5 },
+        systemPromptBinding: { digest: 'bound-alt' },
+        systemPromptFreshness: {
+            isStale: true,
+            reason: 'snapshot estático defasado',
+            recommendedAction: 'resume-session',
+        },
     }),
     getHealthSnapshot: () => ({
         status: 'healthy',
@@ -172,6 +184,82 @@ function mockCtx() {
 }
 
 describe('commands/metrics + usage', () => {
+    it('cmdMetrics mostra diagnósticos do último inject do runtime selecionado', () => {
+        clearRuntimeInjectHistory();
+        recordRuntimeInjectHistory({
+            ts: Date.now(),
+            from: 'llm-a',
+            message: 'default inject',
+            replySnippet: 'ok',
+            durationMs: 321,
+            timeoutMs: null,
+            timeoutStrategy: 'disabled',
+            transportTimeoutMs: 28000,
+            transportTimeoutStrategy: 'adaptive',
+            runtimeId: 'default',
+            promptDigest: 'digest-default',
+            promptFreshnessReason: 'binding ok',
+            promptRecommendedAction: 'none',
+            promptIsStale: false,
+            diagnostics: {
+                preflightDurationMs: 12,
+                contextEmbeddingDurationMs: 34,
+                attachmentEmbeddingDurationMs: 0,
+                dialogDurationMs: 275,
+                runtimeDialog: {
+                    autoStarted: false,
+                    recoveredInputChannel: true,
+                },
+            },
+            outcome: 'completed',
+            ok: true,
+        });
+        recordRuntimeInjectHistory({
+            ts: Date.now(),
+            from: 'llm-a',
+            message: 'alt inject',
+            replySnippet: 'ok-alt',
+            durationMs: 111,
+            timeoutMs: 5000,
+            timeoutStrategy: 'explicit',
+            transportTimeoutMs: 15000,
+            transportTimeoutStrategy: 'explicit',
+            runtimeId: 'alt',
+            promptDigest: 'digest-alt',
+            promptFreshnessReason: 'snapshot estático defasado',
+            promptRecommendedAction: 'resume-session',
+            promptIsStale: true,
+            diagnostics: {
+                preflightDurationMs: 5,
+                contextEmbeddingDurationMs: 0,
+                attachmentEmbeddingDurationMs: 0,
+                dialogDurationMs: 100,
+                runtimeDialog: {
+                    autoStarted: true,
+                    recoveredInputChannel: false,
+                },
+            },
+            outcome: 'completed',
+            ok: true,
+        });
+        const ctx = mockCtx();
+
+        try {
+            cmdMetrics({ println: ctx.println }, '--runtime alt');
+
+            expect(ctx.output()).toContain('transporte');
+            expect(ctx.output()).toContain('digest-alt');
+            expect(ctx.output()).toContain('resume-session');
+            expect(ctx.output()).toContain('preflight=5ms');
+            expect(ctx.output()).toContain('dialog=100ms');
+            expect(ctx.output()).toContain('autostart=yes');
+            expect(ctx.output()).toContain('recovery=no');
+            expect(ctx.output()).not.toContain('digest-default');
+        } finally {
+            clearRuntimeInjectHistory();
+        }
+    });
+
     it('cmdMetrics exibe binding sdk/hub e agregados', () => {
         const ctx = mockCtx();
 
@@ -184,6 +272,8 @@ describe('commands/metrics + usage', () => {
         expect(ctx.output()).toContain('timeline canônica');
         expect(ctx.output()).toContain('bridge/live 0');
         expect(ctx.output()).toContain('Atividade');
+        expect(ctx.output()).toContain('Inject');
+        expect(ctx.output()).toContain('binding ok');
         expect(ctx.output()).toContain('Processando mensagem');
     });
 

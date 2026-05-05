@@ -4,10 +4,11 @@
  */
 
 import { defaultErrorTracker } from '#copilot/observability';
+import { readRuntimeLatestInjectHistoryEntryForRuntime } from '../../../presentation/runtime-ui-state.js';
 import { readToolStatsProjection } from '../../../presentation/system-metrics.js';
 import { readTerminalActivitySnapshot } from '../../activity-state.js';
 import { normalizeTerminalModelBillingProjection, readTerminalRuntimeBase } from './shared.js';
-import { readTerminalTimelineProjection } from './timeline.js';
+import { readTerminalTimelineProjection, readTerminalTimelineSyncTelemetry } from './timeline.js';
 
 /**
  * @param {string | null | undefined} [runtimeId]
@@ -22,13 +23,19 @@ import { readTerminalTimelineProjection } from './timeline.js';
  *     runtimeFallbackWarning: string | null;
  *     runtimeSessionId: string | null;
  *     contextWindow: import('./shared.js').ContextWindowProjection | null;
+ *     systemPromptBinding: Record<string, unknown> | null;
+ *     systemPromptFreshness: Record<string, unknown> | null;
  *     pr: Record<string, any> | null;
  *     modelBilling: import('./shared.js').TerminalModelBillingProjection;
+ *     latestInject: import('../../../presentation/runtime-ui-state-store.js').InjectHistoryEntry | null;
  *     turnCount: number;
  *     bridgeTurnCount: number;
  *     timelineSource: import('./timeline.js').TerminalTimelineSource;
  *     timelineAuthority: import('./timeline.js').TerminalTimelineAuthority;
  *     timelineReconciliationStatus: import('./timeline.js').TerminalTimelineReconciliation;
+ *     timelineSyncStatus: import('./timeline.js').TerminalTimelineSyncStatus;
+ *     timelineSyncPendingCount: number;
+ *     timelineSyncTelemetry: import('./timeline.js').TerminalTimelineSyncTelemetry;
  *     toolCallCount: number;
  *     toolErrorCount: number;
  *     errorStats: { total: number; buffered: number };
@@ -40,6 +47,7 @@ export function readTerminalMetricsProjection(runtimeId) {
     const timeline = readTerminalTimelineProjection({ limitPairs: 10, runtimeId: runtimeId ?? null });
     const pr = /** @type {Record<string, any> | null} */ (base.lastPrInfo ?? null);
     const modelBilling = normalizeTerminalModelBillingProjection(pr, String(base.snap['model'] ?? base.model ?? ''));
+    const latestInject = readRuntimeLatestInjectHistoryEntryForRuntime(base.runtimeId);
     const toolStats = readToolStatsProjection().stats;
     let toolCallCount = 0;
     let toolErrorCount = 0;
@@ -62,13 +70,19 @@ export function readTerminalMetricsProjection(runtimeId) {
         runtimeFallbackWarning: base.runtimeFallbackWarning,
         runtimeSessionId: base.runtimeSessionId,
         contextWindow: base.contextWindow,
+        systemPromptBinding: base.systemPromptBinding,
+        systemPromptFreshness: base.systemPromptFreshness,
         pr,
         modelBilling,
+        latestInject,
         turnCount: timeline.turns.length,
         bridgeTurnCount: timeline.bridgeTurnCount,
         timelineSource: timeline.timelineSource,
         timelineAuthority: timeline.timelineAuthority,
         timelineReconciliationStatus: timeline.reconciliationStatus,
+        timelineSyncStatus: timeline.sync.status,
+        timelineSyncPendingCount: timeline.sync.pendingCount,
+        timelineSyncTelemetry: readTerminalTimelineSyncTelemetry(),
         toolCallCount,
         toolErrorCount,
         activity: readTerminalActivitySnapshot(),

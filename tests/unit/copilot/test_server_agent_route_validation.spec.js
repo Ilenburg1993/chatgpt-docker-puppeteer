@@ -81,6 +81,36 @@ describe('server/routes/agent validation', () => {
         });
     });
 
+    it('aceita POST /inject com timeout=0 para watchdog-only', async () => {
+        const app = await createApp();
+
+        const res = await request(app)
+            .post('/inject')
+            .send({ message: 'watchdog only', timeout: 0, from: 'llm-a' })
+            .expect(200);
+
+        expect(res.body.ok).toBe(true);
+        expect(handleInject).toHaveBeenCalledTimes(1);
+        expect(handleInject.mock.calls[0]?.[0]).toMatchObject({
+            body: { message: 'watchdog only', timeout: 0, from: 'llm-a' },
+        });
+    });
+
+    it('aceita POST /inject com timeout=null para desabilitar timeout absoluto', async () => {
+        const app = await createApp();
+
+        const res = await request(app)
+            .post('/inject')
+            .send({ message: 'watchdog via null', timeout: null })
+            .expect(200);
+
+        expect(res.body.ok).toBe(true);
+        expect(handleInject).toHaveBeenCalledTimes(1);
+        expect(handleInject.mock.calls[0]?.[0]).toMatchObject({
+            body: { message: 'watchdog via null', timeout: null },
+        });
+    });
+
     it('rejeita POST /inject sem message nem content', async () => {
         const app = await createApp();
 

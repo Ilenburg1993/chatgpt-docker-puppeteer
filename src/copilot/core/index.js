@@ -87,6 +87,14 @@ export {
 // ─── Cache ────────────────────────────────────────────────────────────────────
 export { createCache } from './cache.js';
 
+// ─── Timeouts ─────────────────────────────────────────────────────────────────
+export {
+    computeAdaptiveDialogTimeout,
+    computeAdaptiveTransportTimeout,
+    resolveOptionalDialogTimeout,
+    resolveOptionalTransportTimeout,
+} from './dialog-timeout-policy.js';
+
 // ─── Mutex ────────────────────────────────────────────────────────────────────
 export { createMutex, createMutexPool, withMutex } from './mutex.js';
 

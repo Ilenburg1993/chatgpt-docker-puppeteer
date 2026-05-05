@@ -219,14 +219,30 @@ const MAX_INJECT_HISTORY = TERMINAL_MAX_INJECT_HISTORY;
  *     message: string;
  *     replySnippet: string | null;
  *     durationMs: number;
- *     timeoutMs?: number;
- *     timeoutStrategy?: 'explicit' | 'adaptive';
+ *     timeoutMs?: number | null;
+ *     timeoutStrategy?: 'explicit' | 'adaptive' | 'disabled';
+ *     timeoutReasons?: string[];
+ *     runtimeId?: string | null;
+ *     promptDigest?: string | null;
+ *     promptBindingDigest?: string | null;
+ *     promptIsStale?: boolean | null;
+ *     promptFreshnessReason?: string | null;
+ *     promptRecommendedAction?: 'none' | 'observe-live-reload' | 'resume-session' | null;
+ *     transportTimeoutMs?: number | null;
+ *     transportTimeoutStrategy?: 'explicit' | 'adaptive' | 'disabled';
+ *     transportTimeoutReasons?: string[];
+ *     diagnostics?: Record<string, unknown> | null;
  *     outcome?: 'completed' | 'null_reply' | 'timeout' | 'error';
  *     ok: boolean;
  * }} InjectHistoryEntry
  */
 /** @type {InjectHistoryEntry[]} */
 let _injectHistory = [];
+
+/** @returns {void} */
+export function clearInjectHistory() {
+    _injectHistory = [];
+}
 
 /**
  * @param {InjectHistoryEntry} entry
@@ -246,6 +262,39 @@ export function recordInjectHistory(entry) {
 export function getInjectHistory(n = 50) {
     const limit = Math.min(Math.max(1, n), MAX_INJECT_HISTORY);
     return _injectHistory.slice(-limit);
+}
+
+/**
+ * @param {string | null | undefined} runtimeId
+ * @param {number} [n=50] Default is `50`
+ * @returns {InjectHistoryEntry[]}
+ */
+export function getInjectHistoryForRuntime(runtimeId, n = 50) {
+    const targetRuntimeId = runtimeId ?? 'default';
+    const limit = Math.min(Math.max(1, n), MAX_INJECT_HISTORY);
+    return _injectHistory.filter((entry) => (entry.runtimeId ?? 'default') === targetRuntimeId).slice(-limit);
+}
+
+/**
+ * @returns {InjectHistoryEntry | null}
+ */
+export function getLatestInjectHistoryEntry() {
+    return _injectHistory.length > 0 ? (_injectHistory.at(-1) ?? null) : null;
+}
+
+/**
+ * @param {string | null | undefined} runtimeId
+ * @returns {InjectHistoryEntry | null}
+ */
+export function getLatestInjectHistoryEntryForRuntime(runtimeId) {
+    const targetRuntimeId = runtimeId ?? 'default';
+    for (let index = _injectHistory.length - 1; index >= 0; index--) {
+        const entry = _injectHistory[index] ?? null;
+        if (entry && (entry.runtimeId ?? 'default') === targetRuntimeId) {
+            return entry;
+        }
+    }
+    return null;
 }
 
 const MAX_THINKING_HISTORY = 120;

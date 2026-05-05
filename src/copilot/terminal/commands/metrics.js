@@ -34,7 +34,12 @@ export function cmdMetrics({ println }, arg = '') {
         timelineSource,
         timelineAuthority,
         timelineReconciliationStatus,
+        timelineSyncStatus,
+        timelineSyncPendingCount,
+        timelineSyncTelemetry,
         contextWindow,
+        systemPromptBinding,
+        systemPromptFreshness,
         toolCallCount,
         toolErrorCount,
         errorStats,
@@ -42,6 +47,7 @@ export function cmdMetrics({ println }, arg = '') {
         runtimeSessionId,
         activity,
         modelBilling,
+        latestInject,
     } = projection;
 
     // ── Session info ─────────────────────────────────────────────────
@@ -66,6 +72,76 @@ export function cmdMetrics({ println }, arg = '') {
         : modelBilling.displayModel;
     const costStr = modelBilling.cost === null ? '-' : `$${modelBilling.cost.toFixed(4)}`;
     const billingStatus = modelBilling.mismatch ? '\x1b[31mmismatch\x1b[0m' : '\x1b[32mok\x1b[0m';
+    const promptDigest = typeof systemPromptBinding?.['digest'] === 'string' ? systemPromptBinding['digest'] : null;
+    const promptIsStale =
+        typeof systemPromptFreshness?.['isStale'] === 'boolean' ? systemPromptFreshness['isStale'] : null;
+    const promptReason =
+        typeof systemPromptFreshness?.['reason'] === 'string' ? systemPromptFreshness['reason'] : '(sem motivo)';
+    const promptAction =
+        systemPromptFreshness?.['recommendedAction'] === 'none' ||
+        systemPromptFreshness?.['recommendedAction'] === 'observe-live-reload' ||
+        systemPromptFreshness?.['recommendedAction'] === 'resume-session'
+            ? systemPromptFreshness['recommendedAction']
+            : 'none';
+    const promptLabel =
+        promptIsStale === true
+            ? '\x1b[31mstale\x1b[0m'
+            : promptAction === 'observe-live-reload'
+              ? '\x1b[33mlive-reload\x1b[0m'
+              : promptIsStale === false
+                ? '\x1b[32mok\x1b[0m'
+                : '\x1b[90m(n/d)\x1b[0m';
+    const latestInjectOutcome = latestInject?.outcome ?? (latestInject?.ok ? 'completed' : 'error');
+    const latestInjectTimeout =
+        typeof latestInject?.timeoutMs === 'number'
+            ? ` / timeout=${latestInject.timeoutMs}ms${latestInject.timeoutStrategy ? ` (${latestInject.timeoutStrategy})` : ''}`
+            : '';
+    const latestInjectPrompt = latestInject?.promptDigest ?? promptDigest ?? '-';
+    const latestInjectFreshness =
+        latestInject?.promptIsStale === true
+            ? 'stale'
+            : latestInject?.promptRecommendedAction === 'observe-live-reload'
+              ? 'live-reload'
+              : latestInject?.promptIsStale === false
+                ? 'ok'
+                : 'n/d';
+    const latestInjectReason = latestInject?.promptFreshnessReason ?? promptReason;
+    const latestInjectDiagnostics =
+        latestInject?.diagnostics && typeof latestInject.diagnostics === 'object' ? latestInject.diagnostics : null;
+    const latestInjectRuntimeDialog =
+        latestInjectDiagnostics?.['runtimeDialog'] && typeof latestInjectDiagnostics['runtimeDialog'] === 'object'
+            ? /** @type {Record<string, unknown>} */ (latestInjectDiagnostics['runtimeDialog'])
+            : null;
+    const latestInjectPreflightMs =
+        typeof latestInjectDiagnostics?.['preflightDurationMs'] === 'number'
+            ? latestInjectDiagnostics['preflightDurationMs']
+            : null;
+    const latestInjectContextMs =
+        typeof latestInjectDiagnostics?.['contextEmbeddingDurationMs'] === 'number'
+            ? latestInjectDiagnostics['contextEmbeddingDurationMs']
+            : null;
+    const latestInjectAttachmentsMs =
+        typeof latestInjectDiagnostics?.['attachmentEmbeddingDurationMs'] === 'number'
+            ? latestInjectDiagnostics['attachmentEmbeddingDurationMs']
+            : null;
+    const latestInjectDialogMs =
+        typeof latestInjectDiagnostics?.['dialogDurationMs'] === 'number'
+            ? latestInjectDiagnostics['dialogDurationMs']
+            : null;
+    const latestInjectAutoStart =
+        typeof latestInjectRuntimeDialog?.['autoStarted'] === 'boolean'
+            ? latestInjectRuntimeDialog['autoStarted']
+            : null;
+    const latestInjectRecovery =
+        typeof latestInjectRuntimeDialog?.['recoveredInputChannel'] === 'boolean'
+            ? latestInjectRuntimeDialog['recoveredInputChannel']
+            : null;
+    const latestInjectTransport =
+        typeof latestInject?.transportTimeoutMs === 'number'
+            ? `${latestInject.transportTimeoutMs}ms${latestInject.transportTimeoutStrategy ? ` (${latestInject.transportTimeoutStrategy})` : ''}`
+            : latestInject?.transportTimeoutStrategy === 'disabled'
+              ? `disabled (${latestInject.transportTimeoutStrategy})`
+              : 'n/d';
 
     println(`
   \x1b[36mMétricas da Sessão\x1b[0m
@@ -83,8 +159,10 @@ export function cmdMetrics({ println }, arg = '') {
   ─────────────────────────────────────
   turns       ${turnCount} \x1b[90m(timeline canônica)\x1b[0m
   bridge/live ${bridgeTurnCount} \x1b[90m(${timelineSource} · ${timelineAuthority} · ${timelineReconciliationStatus})\x1b[0m
+  sync Hub    ${timelineSyncStatus} \x1b[90m(pendentes=${timelineSyncPendingCount} · agendados=${timelineSyncTelemetry.scheduledTotal} · gravados=${timelineSyncTelemetry.turnsSyncedTotal} · falhas=${timelineSyncTelemetry.failedTotal} · retries=${timelineSyncTelemetry.retryTotal} · cache=${timelineSyncTelemetry.completedCacheSize}/${timelineSyncTelemetry.failureCacheSize})\x1b[0m
   contexto    ${ctxStr}
   último PR   ${lastModel} · ${costStr} · ${billingStatus}
+  prompt      ${promptLabel} \x1b[90m(digest=${promptDigest ?? '-'} · ação=${promptAction})\x1b[0m
 
   \x1b[35m🔧 Ferramentas\x1b[0m
   ─────────────────────────────────────
@@ -101,6 +179,15 @@ export function cmdMetrics({ println }, arg = '') {
   fase        ${activity.phase}
   label       ${activity.label}${typeof activity.progress === 'number' ? ` (${activity.progress}%)` : ''}
   detalhe     ${activity.detail ?? '\x1b[90m(nenhum)\x1b[0m'}
+
+  \x1b[35m🚀 Inject\x1b[0m
+  ─────────────────────────────────────
+  último      ${latestInject ? `${latestInjectOutcome} · ${latestInject.durationMs}ms${latestInjectTimeout}` : '\x1b[90m(nenhum)\x1b[0m'}
+    transporte  \x1b[90m${latestInjectTransport}\x1b[0m
+  prompt      \x1b[90m${latestInjectPrompt} · ${latestInjectFreshness}\x1b[0m
+  motivo      \x1b[90m${latestInjectReason}\x1b[0m
+    fases       \x1b[90mpreflight=${latestInjectPreflightMs ?? '-'}ms · context=${latestInjectContextMs ?? '-'}ms · attachments=${latestInjectAttachmentsMs ?? '-'}ms · dialog=${latestInjectDialogMs ?? '-'}ms\x1b[0m
+    runtime     \x1b[90mautostart=${latestInjectAutoStart === null ? 'n/d' : latestInjectAutoStart ? 'yes' : 'no'} · recovery=${latestInjectRecovery === null ? 'n/d' : latestInjectRecovery ? 'yes' : 'no'}\x1b[0m
   ═════════════════════════════════════
 `);
 }

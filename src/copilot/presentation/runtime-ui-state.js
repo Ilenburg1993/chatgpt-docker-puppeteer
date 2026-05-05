@@ -9,10 +9,14 @@
 
 import { getFileCacheStats } from './runtime-file-context.js';
 import {
+    clearInjectHistory,
     getBusy,
     getHubSessionId,
     getInjectHistory,
+    getInjectHistoryForRuntime,
     getLastSdkPlanOperation,
+    getLatestInjectHistoryEntry,
+    getLatestInjectHistoryEntryForRuntime,
     getLatestThinkingHistoryEntry,
     getSdkSessionMode,
     getThinkingHistory,
@@ -46,6 +50,33 @@ export function readRuntimeLastSdkPlanOperation() {
  */
 export function readRuntimeInjectHistory(limit) {
     return getInjectHistory(limit);
+}
+
+/**
+ * @param {string | null | undefined} runtimeId
+ * @param {number} [limit]
+ * @returns {ReturnType<typeof getInjectHistoryForRuntime>}
+ */
+export function readRuntimeInjectHistoryForRuntime(runtimeId, limit) {
+    return getInjectHistoryForRuntime(runtimeId, limit);
+}
+
+/** @returns {ReturnType<typeof getLatestInjectHistoryEntry>} */
+export function readRuntimeLatestInjectHistoryEntry() {
+    return getLatestInjectHistoryEntry();
+}
+
+/**
+ * @param {string | null | undefined} runtimeId
+ * @returns {ReturnType<typeof getLatestInjectHistoryEntryForRuntime>}
+ */
+export function readRuntimeLatestInjectHistoryEntryForRuntime(runtimeId) {
+    return getLatestInjectHistoryEntryForRuntime(runtimeId);
+}
+
+/** @returns {void} */
+export function clearRuntimeInjectHistory() {
+    clearInjectHistory();
 }
 
 /**

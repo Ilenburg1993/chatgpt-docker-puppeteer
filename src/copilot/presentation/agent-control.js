@@ -11,7 +11,7 @@ import { LLM_B_TURN_TIMEOUT_MS } from '#copilot/config';
 import { container, toError } from '#copilot/core';
 import { log, METRICS_STORE } from '#copilot/observability';
 import { projectAgentHttpError } from './agent-http-errors.js';
-import { computeAdaptiveDialogTimeout } from './dialog-timeout-policy.js';
+import { resolveOptionalDialogTimeout } from './dialog-timeout-policy.js';
 import {
     getAgentHandoffManager,
     getAgentRuntimeControlsTarget,
@@ -25,8 +25,10 @@ import {
     MAX_EMBED_BYTES,
     readRuntimeFileContext,
     sendRuntimeDialogTurn,
+    sendRuntimeDialogTurnWithDiagnostics,
 } from './runtime-dialog.js';
 import { readAgentRuntimeOverview } from './runtime-overview.js';
+import { readAgentStatusSnapshot } from './runtime-status.js';
 import { readRuntimeIdFromParams } from './runtime-targeting.js';
 import { recordRuntimeInjectHistory } from './runtime-ui-state.js';
 
@@ -62,7 +64,7 @@ function resolveMetricsStoreSafe() {
 /**
  * @param {string | null | undefined} runtimeId
  * @param {number | undefined} explicitTimeoutMs
- * @returns {{ timeoutMs: number; strategy: 'explicit' | 'adaptive'; reasons: string[] }}
+ * @returns {{ timeoutMs: number | null; strategy: 'explicit' | 'adaptive' | 'disabled'; reasons: string[] }}
  */
 function resolveInjectTimeout(runtimeId, explicitTimeoutMs) {
     const metrics = resolveMetricsStoreSafe();
@@ -70,7 +72,7 @@ function resolveInjectTimeout(runtimeId, explicitTimeoutMs) {
     const runtime = readAgentRuntimeOverview(runtimeId);
     const injectAttempts = Number(summary?.inject?.attemptsTotal ?? 0);
     const injectTimeouts = Number(summary?.inject?.timeoutsTotal ?? 0);
-    return computeAdaptiveDialogTimeout({
+    return resolveOptionalDialogTimeout({
         explicitTimeoutMs,
         defaultTimeoutMs: LLM_B_TURN_TIMEOUT_MS,
         queueDepth: Number(runtime.snap?.['queueSize'] ?? 0),
@@ -79,6 +81,9 @@ function resolveInjectTimeout(runtimeId, explicitTimeoutMs) {
         recentP95Ms: Number(summary?.inject?.latency?.p95 ?? summary?.dialog?.turnLatency?.p95 ?? 0),
         recentP99Ms: Number(summary?.inject?.latency?.p99 ?? summary?.dialog?.turnLatency?.p99 ?? 0),
         recentTimeoutRate: injectAttempts > 0 ? injectTimeouts / injectAttempts : 0,
+        payloadChars: 0,
+        phase: 'inject',
+        allowDisabled: true,
     });
 }
 
@@ -312,22 +317,40 @@ export async function handleInject(params = {}) {
     const rawFrom = body['from'] ?? 'llm-a';
     const from = typeof rawFrom === 'string' && ALLOWED_FROM.has(rawFrom) ? rawFrom : 'llm-a';
     const explicitTimeoutMs =
-        typeof body['timeout'] === 'number' && Number.isFinite(body['timeout']) && body['timeout'] > 0
-            ? body['timeout']
-            : undefined;
+        body['timeout'] === null
+            ? 0
+            : typeof body['timeout'] === 'number' && Number.isFinite(body['timeout']) && body['timeout'] >= 0
+              ? body['timeout']
+              : undefined;
     const timeoutDecision = resolveInjectTimeout(runtimeId, explicitTimeoutMs);
     const timeout = timeoutDecision.timeoutMs;
+    const agent = getAgent(runtimeId);
+    const agentSnapshot = readAgentStatusSnapshot(agent);
+    const promptBinding =
+        agentSnapshot['systemPromptBinding'] && typeof agentSnapshot['systemPromptBinding'] === 'object'
+            ? /** @type {Record<string, unknown>} */ (agentSnapshot['systemPromptBinding'])
+            : null;
+    const promptFreshness =
+        agentSnapshot['systemPromptFreshness'] && typeof agentSnapshot['systemPromptFreshness'] === 'object'
+            ? /** @type {Record<string, unknown>} */ (agentSnapshot['systemPromptFreshness'])
+            : null;
     log(
         'INFO',
-        `[agent-control] /inject accepted (trace=${traceId}, runtime=${runtimeId ?? 'default'}, from=${from}, timeout=${timeout}ms, strategy=${timeoutDecision.strategy}, reasons=${timeoutDecision.reasons.join('+')})`,
+        `[agent-control] /inject accepted (trace=${traceId}, runtime=${runtimeId ?? 'default'}, from=${from}, timeout=${timeout === null ? 'watchdog-only' : `${timeout}ms`}, strategy=${timeoutDecision.strategy}, reasons=${timeoutDecision.reasons.join('+')})`,
     );
 
+    const injectStartedAt = Date.now();
+    const preflightStartedAt = injectStartedAt;
+    let contextEmbeddingDurationMs = 0;
+    let attachmentEmbeddingDurationMs = 0;
     let enrichedMessage = message;
     const contextFiles = Array.isArray(body['context_files']) ? body['context_files'] : [];
     if (contextFiles.length > 0) {
         try {
+            const contextStartedAt = Date.now();
             const ctxs = await Promise.all(contextFiles.map(readRuntimeFileContext));
             enrichedMessage = embedRuntimeMultiple(ctxs, message);
+            contextEmbeddingDurationMs = Date.now() - contextStartedAt;
         } catch (embedErr) {
             return {
                 status: 400,
@@ -340,7 +363,9 @@ export async function handleInject(params = {}) {
     if (rawAttachments.length > 0) {
         let embedParts;
         try {
+            const attachmentsStartedAt = Date.now();
             embedParts = await Promise.all(rawAttachments.map(attachmentToRuntimeEmbed));
+            attachmentEmbeddingDurationMs = Date.now() - attachmentsStartedAt;
         } catch (attErr) {
             return {
                 status: 400,
@@ -364,12 +389,26 @@ export async function handleInject(params = {}) {
     }
 
     const t0 = Date.now();
+    const preflightDurationMs = t0 - preflightStartedAt;
     const metrics = resolveMetricsStoreSafe();
     try {
-        const reply = await sendRuntimeDialogTurn(enrichedMessage, from, { timeout, traceId }, getAgent(runtimeId));
+        const { reply, diagnostics } = await sendRuntimeDialogTurnWithDiagnostics(
+            enrichedMessage,
+            from,
+            { timeout, traceId },
+            agent,
+        );
         const durationMs = Date.now() - t0;
         const outcome = reply !== null ? 'completed' : 'null_reply';
         metrics?.recordInjectTurn?.(durationMs, reply !== null, reply !== null ? 'completed' : 'error');
+        const injectDiagnostics = {
+            preflightDurationMs,
+            contextEmbeddingDurationMs,
+            attachmentEmbeddingDurationMs,
+            dialogDurationMs: durationMs,
+            totalDurationMs: Date.now() - injectStartedAt,
+            runtimeDialog: diagnostics,
+        };
         recordRuntimeInjectHistory({
             ts: t0,
             traceId,
@@ -379,12 +418,26 @@ export async function handleInject(params = {}) {
             durationMs,
             timeoutMs: timeout,
             timeoutStrategy: timeoutDecision.strategy,
+            timeoutReasons: timeoutDecision.reasons,
+            transportTimeoutMs: null,
+            runtimeId: runtimeId ?? 'default',
+            promptDigest: typeof promptBinding?.['digest'] === 'string' ? promptBinding['digest'] : null,
+            promptBindingDigest: typeof promptBinding?.['digest'] === 'string' ? promptBinding['digest'] : null,
+            promptIsStale: typeof promptFreshness?.['isStale'] === 'boolean' ? promptFreshness['isStale'] : null,
+            promptFreshnessReason: typeof promptFreshness?.['reason'] === 'string' ? promptFreshness['reason'] : null,
+            promptRecommendedAction:
+                promptFreshness?.['recommendedAction'] === 'none' ||
+                promptFreshness?.['recommendedAction'] === 'observe-live-reload' ||
+                promptFreshness?.['recommendedAction'] === 'resume-session'
+                    ? promptFreshness['recommendedAction']
+                    : null,
+            diagnostics: injectDiagnostics,
             outcome,
             ok: reply !== null,
         });
         log(
             'INFO',
-            `[agent-control] /inject resolved (trace=${traceId}, duration=${durationMs}ms, ok=${reply !== null})`,
+            `[agent-control] /inject resolved (trace=${traceId}, duration=${durationMs}ms, preflight=${preflightDurationMs}ms, autoStart=${diagnostics.autoStarted}, recovery=${diagnostics.recoveredInputChannel}, ok=${reply !== null})`,
         );
         return {
             status: reply !== null ? 200 : 409,
@@ -397,11 +450,30 @@ export async function handleInject(params = {}) {
                 timeoutMs: timeout,
                 timeoutStrategy: timeoutDecision.strategy,
                 timeoutReasons: timeoutDecision.reasons,
+                promptDigest: typeof promptBinding?.['digest'] === 'string' ? promptBinding['digest'] : null,
+                promptFreshness: promptFreshness,
+                diagnostics: injectDiagnostics,
             },
         };
     } catch (e) {
         const projection = projectAgentHttpError(e);
         const durationMs = Date.now() - t0;
+        const runtimeDialogDiagnostics =
+            e &&
+            typeof e === 'object' &&
+            'injectDiagnostics' in e &&
+            e['injectDiagnostics'] &&
+            typeof e['injectDiagnostics'] === 'object'
+                ? /** @type {Record<string, unknown>} */ (e['injectDiagnostics'])
+                : null;
+        const injectDiagnostics = {
+            preflightDurationMs,
+            contextEmbeddingDurationMs,
+            attachmentEmbeddingDurationMs,
+            dialogDurationMs: durationMs,
+            totalDurationMs: Date.now() - injectStartedAt,
+            runtimeDialog: runtimeDialogDiagnostics,
+        };
         const isTimeout = String(projection.body?.code ?? '') === 'DIALOG_TIMEOUT' || projection.status === 504;
         metrics?.recordInjectTurn?.(durationMs, false, isTimeout ? 'timeout' : 'error');
         recordRuntimeInjectHistory({
@@ -413,12 +485,26 @@ export async function handleInject(params = {}) {
             durationMs,
             timeoutMs: timeout,
             timeoutStrategy: timeoutDecision.strategy,
+            timeoutReasons: timeoutDecision.reasons,
+            transportTimeoutMs: null,
+            runtimeId: runtimeId ?? 'default',
+            promptDigest: typeof promptBinding?.['digest'] === 'string' ? promptBinding['digest'] : null,
+            promptBindingDigest: typeof promptBinding?.['digest'] === 'string' ? promptBinding['digest'] : null,
+            promptIsStale: typeof promptFreshness?.['isStale'] === 'boolean' ? promptFreshness['isStale'] : null,
+            promptFreshnessReason: typeof promptFreshness?.['reason'] === 'string' ? promptFreshness['reason'] : null,
+            promptRecommendedAction:
+                promptFreshness?.['recommendedAction'] === 'none' ||
+                promptFreshness?.['recommendedAction'] === 'observe-live-reload' ||
+                promptFreshness?.['recommendedAction'] === 'resume-session'
+                    ? promptFreshness['recommendedAction']
+                    : null,
+            diagnostics: injectDiagnostics,
             outcome: isTimeout ? 'timeout' : 'error',
             ok: false,
         });
         log(
             'WARN',
-            `[agent-control] /inject failed (trace=${traceId}, duration=${durationMs}ms, code=${String(projection.body?.code ?? 'unknown')})`,
+            `[agent-control] /inject failed (trace=${traceId}, duration=${durationMs}ms, preflight=${preflightDurationMs}ms, code=${String(projection.body?.code ?? 'unknown')})`,
         );
         return {
             ...projection,
@@ -430,6 +516,9 @@ export async function handleInject(params = {}) {
                           timeoutMs: timeout,
                           timeoutStrategy: timeoutDecision.strategy,
                           timeoutReasons: timeoutDecision.reasons,
+                          promptDigest: typeof promptBinding?.['digest'] === 'string' ? promptBinding['digest'] : null,
+                          promptFreshness: promptFreshness,
+                          diagnostics: injectDiagnostics,
                       }
                     : projection.body,
         };

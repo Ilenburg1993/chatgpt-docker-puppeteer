@@ -43,6 +43,35 @@ export { MAX_EMBED_BYTES };
  *         durationMs: number;
  *     }>;
  * }} RuntimeDialogTarget
+ *
+ *
+ * @typedef {{
+ *     status: string;
+ *     dialogLoopActive: boolean;
+ *     dialogPaused: boolean;
+ *     queueSize: number;
+ *     sessionId: string | null;
+ * }} RuntimeDialogStateSnapshot
+ *
+ *
+ * @typedef {{
+ *     traceId: string | null;
+ *     from: string;
+ *     initialState: RuntimeDialogStateSnapshot;
+ *     finalState: RuntimeDialogStateSnapshot;
+ *     autoStarted: boolean;
+ *     autoStartDurationMs: number;
+ *     recoveredInputChannel: boolean;
+ *     recovery: {
+ *         recovered: boolean;
+ *         reason: string;
+ *         strategy: string;
+ *         prConsumed: boolean;
+ *         durationMs: number;
+ *     } | null;
+ *     dispatchDurationMs: number;
+ *     totalDurationMs: number;
+ * }} RuntimeDialogTurnDiagnostics
  */
 
 /**
@@ -59,6 +88,21 @@ function resolveRuntimeDialogTarget(runtime) {
  */
 function traceLabel(traceId) {
     return traceId ? `trace=${traceId}` : 'trace=none';
+}
+
+/**
+ * @param {RuntimeDialogTarget} agent
+ * @returns {RuntimeDialogStateSnapshot}
+ */
+function readRuntimeDialogStateSnapshot(agent) {
+    const state = readRuntimeControlState(/** @type {import('#copilot/agent').AlwaysAliveAgent} */ (agent));
+    return {
+        status: state.status,
+        dialogLoopActive: state.dialogLoopActive,
+        dialogPaused: state.dialogPaused,
+        queueSize: state.queueSize,
+        sessionId: state.sessionId,
+    };
 }
 
 /**
@@ -108,13 +152,33 @@ export async function sendRuntimeDialogTurnOnActiveLoop(message, options, runtim
  * @returns {Promise<string>}
  */
 export async function sendRuntimeDialogTurn(message, from, options, runtime) {
+    const result = await sendRuntimeDialogTurnWithDiagnostics(message, from, options, runtime);
+    return result.reply;
+}
+
+/**
+ * @param {string} message
+ * @param {string} from
+ * @param {{ timeout?: number | null; signal?: AbortSignal; traceId?: string }} [options]
+ * @param {RuntimeDialogTarget | null | undefined} [runtime]
+ * @returns {Promise<{ reply: string; diagnostics: RuntimeDialogTurnDiagnostics }>}
+ */
+export async function sendRuntimeDialogTurnWithDiagnostics(message, from, options, runtime) {
     const agent = resolveRuntimeDialogTarget(runtime);
-    const state = readRuntimeControlState(/** @type {import('#copilot/agent').AlwaysAliveAgent} */ (agent));
+    const state = readRuntimeDialogStateSnapshot(agent);
     const { traceId } = options ?? {};
+    const startedAt = Date.now();
+    let autoStarted = false;
+    let autoStartDurationMs = 0;
+    /** @type {RuntimeDialogTurnDiagnostics['recovery']} */
+    let recovery = null;
 
     if (!state.dialogLoopActive && !state.dialogPaused) {
         log('INFO', `[runtime-dialog] auto-starting dialog loop before turn (${traceLabel(traceId)}, from=${from})`);
+        autoStarted = true;
+        const autoStartAt = Date.now();
         await startRuntimeDialogLoop(undefined, agent);
+        autoStartDurationMs = Date.now() - autoStartAt;
     } else if (state.dialogLoopActive && !state.dialogPaused && state.status === 'idle') {
         const interaction = readRuntimeInteractionState(
             /** @type {import('#copilot/agent').AlwaysAliveAgent} */ (agent),
@@ -124,7 +188,7 @@ export async function sendRuntimeDialogTurn(message, from, options, runtime) {
                 'WARN',
                 `[runtime-dialog] active loop sem pending READY antes do turno; solicitando recovery ao Agent (${traceLabel(traceId)}, from=${from})`,
             );
-            await recoverAgentDialogInputChannel(agent, {
+            recovery = await recoverAgentDialogInputChannel(agent, {
                 reason: 'input_channel_missing',
                 ...(traceId ? { traceId } : {}),
             });
@@ -132,7 +196,42 @@ export async function sendRuntimeDialogTurn(message, from, options, runtime) {
     }
 
     void from;
-    return sendRuntimeDialogTurnOnActiveLoop(message, options, agent);
+    const dispatchStartedAt = Date.now();
+    try {
+        const reply = await sendRuntimeDialogTurnOnActiveLoop(message, options, agent);
+        return {
+            reply,
+            diagnostics: {
+                traceId: traceId ?? null,
+                from,
+                initialState: state,
+                finalState: readRuntimeDialogStateSnapshot(agent),
+                autoStarted,
+                autoStartDurationMs,
+                recoveredInputChannel: Boolean(recovery?.recovered),
+                recovery,
+                dispatchDurationMs: Date.now() - dispatchStartedAt,
+                totalDurationMs: Date.now() - startedAt,
+            },
+        };
+    } catch (error) {
+        const normalized = error instanceof Error ? error : new Error(String(error));
+        Object.assign(normalized, {
+            injectDiagnostics: {
+                traceId: traceId ?? null,
+                from,
+                initialState: state,
+                finalState: readRuntimeDialogStateSnapshot(agent),
+                autoStarted,
+                autoStartDurationMs,
+                recoveredInputChannel: Boolean(recovery?.recovered),
+                recovery,
+                dispatchDurationMs: Date.now() - dispatchStartedAt,
+                totalDurationMs: Date.now() - startedAt,
+            },
+        });
+        throw normalized;
+    }
 }
 
 /**

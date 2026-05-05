@@ -34,7 +34,7 @@ const injectBodyBaseSchema = z
         message: z.string().trim().min(1).max(64_000).optional(),
         content: z.string().trim().min(1).max(64_000).optional(),
         from: z.string().optional(),
-        timeout: z.number().int().min(1).max(300_000).optional(),
+        timeout: z.number().int().min(0).max(300_000).nullable().optional(),
         context_files: z.array(z.string().min(1)).max(32).optional(),
         attachments: z.array(z.object({}).passthrough()).max(32).optional(),
         metadata: z.record(z.string(), z.unknown()).optional(),

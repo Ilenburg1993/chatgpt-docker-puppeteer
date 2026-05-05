@@ -83,6 +83,46 @@ describe('presentation/runtime-dialog.js', () => {
         expect(mocks.agent.sendDialogTurn).toHaveBeenCalledWith('oi', { traceId: 't1' });
     });
 
+    it('expõe diagnósticos estruturados do turno quando auto-starta o loop', async () => {
+        const mod = await import('../../../src/copilot/presentation/runtime-dialog.js');
+
+        const result = await mod.sendRuntimeDialogTurnWithDiagnostics('oi', 'llm-a', {
+            timeout: null,
+            traceId: 'diag-1',
+        });
+
+        expect(result.reply).toBe('reply:oi');
+        expect(result.diagnostics.traceId).toBe('diag-1');
+        expect(result.diagnostics.autoStarted).toBe(true);
+        expect(result.diagnostics.autoStartDurationMs).toBeGreaterThanOrEqual(0);
+        expect(result.diagnostics.recoveredInputChannel).toBe(false);
+        expect(result.diagnostics.initialState.dialogLoopActive).toBe(false);
+        expect(result.diagnostics.finalState.dialogLoopActive).toBe(false);
+        expect(result.diagnostics.dispatchDurationMs).toBeGreaterThanOrEqual(0);
+        expect(result.diagnostics.totalDurationMs).toBeGreaterThanOrEqual(result.diagnostics.dispatchDurationMs);
+        expect(mocks.agent.sendDialogTurn).toHaveBeenCalledWith('oi', { timeout: null, traceId: 'diag-1' });
+    });
+
+    it('anexa injectDiagnostics ao erro quando o envio falha', async () => {
+        mocks.agent.dialogLoopActive = true;
+        mocks.agent.status = 'idle';
+        mocks.agent.sendDialogTurn.mockRejectedValueOnce(new Error('boom'));
+        const mod = await import('../../../src/copilot/presentation/runtime-dialog.js');
+
+        await expect(
+            mod.sendRuntimeDialogTurnWithDiagnostics('oi', 'system', {
+                traceId: 'diag-error',
+            }),
+        ).rejects.toMatchObject({
+            message: 'boom',
+            injectDiagnostics: expect.objectContaining({
+                traceId: 'diag-error',
+                from: 'system',
+                recoveredInputChannel: true,
+            }),
+        });
+    });
+
     it('encerra o dialog loop com autorização explícita', async () => {
         const mod = await import('../../../src/copilot/presentation/runtime-dialog.js');
 
