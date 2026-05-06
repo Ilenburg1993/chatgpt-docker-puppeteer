@@ -17,7 +17,9 @@ describe('audit/pipeline-permission buildAuditingPermissionHandler', () => {
             await import('../../../src/copilot/audit/pipeline-permission.js');
         setAuditBus({
             emitHook: (_name, _sessionId, _input, output) =>
-                events.push(output && typeof output === 'object' ? /** @type {Record<string, unknown>} */ (output) : {}),
+                events.push(
+                    output && typeof output === 'object' ? /** @type {Record<string, unknown>} */ (output) : {},
+                ),
         });
 
         const handler = buildAuditingPermissionHandler(async () => ({ kind: 'approve-once' }));
@@ -33,7 +35,9 @@ describe('audit/pipeline-permission buildAuditingPermissionHandler', () => {
             await import('../../../src/copilot/audit/pipeline-permission.js');
         setAuditBus({
             emitHook: (_name, _sessionId, _input, output) =>
-                events.push(output && typeof output === 'object' ? /** @type {Record<string, unknown>} */ (output) : {}),
+                events.push(
+                    output && typeof output === 'object' ? /** @type {Record<string, unknown>} */ (output) : {},
+                ),
         });
 
         const handler = buildAuditingPermissionHandler(async () => ({ kind: 'reject' }));
