@@ -7,6 +7,7 @@
 
 import { SESSION_EVENTS } from '#copilot/events';
 import { log } from '#copilot/observability';
+import { normalizeElicitationCompletedEvent, normalizeElicitationPendingEvent } from '#copilot/sdk';
 import { onSessionEvents } from '../sdk/session/events.js';
 
 /**
@@ -129,32 +130,36 @@ export function wireSdkResponseEvents(session, { emit }) {
                 });
             },
             [SESSION_EVENTS.ELICITATION_REQUESTED]: (evt) => {
-                const data = /** @type {Record<string, unknown>} */ (evt?.data ?? {});
-                const requestId = data['requestId'];
-                const message = data['message'];
-                const mode = data['mode'] ?? (data['url'] ? 'url' : 'form');
-                const requestedSchema = data['requestedSchema'];
-                const url = data['url'];
-                const toolCallId = data['toolCallId'];
-                const elicitationSource = data['elicitationSource'];
+                const normalized = normalizeElicitationPendingEvent(evt);
                 emit('elicitation.pending', {
-                    requestId,
-                    message: typeof message === 'string' ? message : '',
-                    mode,
-                    requestedSchema: requestedSchema ?? null,
-                    url: url ?? null,
-                    toolCallId: toolCallId ?? null,
-                    elicitationSource: elicitationSource ?? null,
-                    data,
-                    ts: Date.now(),
+                    requestId: normalized.requestId,
+                    sessionId: normalized.sessionId,
+                    message: normalized.message,
+                    mode: normalized.mode,
+                    requestedSchema: normalized.requestedSchema,
+                    url: normalized.url,
+                    toolCallId: normalized.toolCallId,
+                    elicitationSource: normalized.elicitationSource,
+                    actionable: normalized.actionable,
+                    providerRequest: normalized.providerRequest,
+                    data: normalized.data,
+                    ts: normalized.ts,
                 });
-                log('INFO', `[session-event-wirer] elicitation.pending requestId=${requestId ?? '?'}`);
+                log('INFO', `[session-event-wirer] elicitation.pending requestId=${normalized.requestId ?? '?'}`);
             },
             [SESSION_EVENTS.ELICITATION_COMPLETED]: (evt) => {
-                const data = /** @type {Record<string, unknown>} */ (evt?.data ?? {});
-                const requestId = data['requestId'];
-                emit('elicitation.completed', { requestId, data, ts: Date.now() });
-                log('DEBUG', `[session-event-wirer] elicitation.completed requestId=${requestId ?? '?'}`);
+                const normalized = normalizeElicitationCompletedEvent(evt);
+                emit('elicitation.completed', {
+                    requestId: normalized.requestId,
+                    sessionId: normalized.sessionId,
+                    action: normalized.action,
+                    content: normalized.content,
+                    actionable: normalized.actionable,
+                    providerRequest: normalized.providerRequest,
+                    data: normalized.data,
+                    ts: normalized.ts,
+                });
+                log('DEBUG', `[session-event-wirer] elicitation.completed requestId=${normalized.requestId ?? '?'}`);
             },
             [SESSION_EVENTS.SESSION_TRUNCATION]: (evt) => {
                 const d = /** @type {Record<string, unknown>} */ (evt?.data ?? {});

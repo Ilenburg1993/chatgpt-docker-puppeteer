@@ -72,7 +72,7 @@ import { readTerminalTimelineProjection } from './timeline.js';
  *     pendingPermissions: number;
  *     latestPermissionType: string | null;
  *     pendingUserInputs: number;
- *     latestUserInputKind: 'question' | 'ready' | 'reply' | 'protocol' | null;
+ *     latestUserInputKind: 'question' | 'ready' | 'reply' | 'stopped' | null;
  *     permissionMode: 'approve_all' | 'audit_only' | 'selective';
  *     sdkCapabilities: Record<string, unknown> | null;
  *     timelineSource: import('./timeline.js').TerminalTimelineSource;

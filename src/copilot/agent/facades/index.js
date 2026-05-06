@@ -119,6 +119,7 @@ export {
     isSdkSessionUiElicitationAvailable,
     killSdkShell,
     listPendingSdkElicitations,
+    listPendingSdkPermissions,
     listSdkAgents,
     listSdkBuiltInTools,
     listSdkModels,

@@ -104,6 +104,7 @@ export {
     inputSdkSessionUi,
     isSdkSessionUiElicitationAvailable,
     listPendingSdkElicitations,
+    listPendingSdkPermissions,
     requestSdkElicitation,
     resolvePendingSdkElicitation,
     selectSdkSessionUi,

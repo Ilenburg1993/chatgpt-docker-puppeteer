@@ -18,6 +18,7 @@ import {
     EMITTER_AGENT_BACKGROUND_IDLE,
     EMITTER_PERMISSION_MODE_CHANGED,
 } from '#copilot/events';
+import { normalizeElicitationCompletedEvent, normalizeElicitationPendingEvent } from '#copilot/sdk';
 import { MESSAGES_CACHE_TTL_MS } from '../config/agent.js';
 import { WebhookManager } from '../infra/webhooks.js';
 import { BackgroundTasks } from './background-tasks.js';
@@ -53,8 +54,10 @@ import { SessionKeepalive } from './session/lifecycle/keepalive.js';
  *     createSdkElicitation: (host: AgentContextFactoryHost) => {
  *         handler: import('#copilot/sdk/types').ElicitationHandler;
  *         resolvePending: (id: string, result: import('#copilot/sdk/types').ElicitationResult) => boolean;
- *         listPending: (opts?: { sessionId?: string }) => import('../hooks/elicitation.js').QueuedElicitationEntry[];
- *         getPending: (id: string) => import('../hooks/elicitation.js').QueuedElicitationEntry | null;
+ *         listPending: (opts?: {
+ *             sessionId?: string;
+ *         }) => import('../sdk/session/elicitation.js').QueuedElicitationEntry[];
+ *         getPending: (id: string) => import('../sdk/session/elicitation.js').QueuedElicitationEntry | null;
  *         clearPending: (id: string, result?: import('#copilot/sdk/types').ElicitationResult) => boolean;
  *         pendingCount: () => number;
  *     };
@@ -87,18 +90,21 @@ export const defaultAgentContextFactories = Object.freeze({
                 defaultMetrics.recordCounter('sdk.elicitation.provider.pending.total');
                 defaultMetrics.recordGauge('sdk.elicitation.provider.pending.current', queued.pendingCount());
                 host.invalidateStatusSnapshot();
-                host.emitter.emit('elicitation.pending', {
-                    requestId: entry.id,
-                    sessionId: entry.sessionId,
-                    message: entry.message,
-                    mode: entry.mode,
-                    requestedSchema: entry.requestedSchema ?? null,
-                    url: entry.url ?? null,
-                    elicitationSource: entry.elicitationSource ?? null,
-                    providerRequest: true,
-                    actionable: true,
-                    ts: entry.createdAt,
-                });
+                host.emitter.emit(
+                    'elicitation.pending',
+                    normalizeElicitationPendingEvent({
+                        requestId: entry.id,
+                        sessionId: entry.sessionId,
+                        message: entry.message,
+                        mode: entry.mode,
+                        requestedSchema: entry.requestedSchema ?? null,
+                        url: entry.url ?? null,
+                        elicitationSource: entry.elicitationSource ?? null,
+                        providerRequest: true,
+                        actionable: true,
+                        ts: entry.createdAt,
+                    }),
+                );
             },
             onCompleted: (entry) => {
                 const waitMs = Math.max(0, entry.completedAt - entry.createdAt);
@@ -107,16 +113,19 @@ export const defaultAgentContextFactories = Object.freeze({
                 defaultMetrics.recordGauge('sdk.elicitation.provider.pending.current', queued.pendingCount());
                 defaultMetrics.recordGauge('sdk.elicitation.provider.last_wait_ms', waitMs);
                 host.invalidateStatusSnapshot();
-                host.emitter.emit('elicitation.completed', {
-                    requestId: entry.id,
-                    sessionId: entry.sessionId,
-                    providerRequest: true,
-                    actionable: true,
-                    data: entry.result,
-                    action: entry.result.action,
-                    content: entry.result.content ?? null,
-                    ts: entry.completedAt,
-                });
+                host.emitter.emit(
+                    'elicitation.completed',
+                    normalizeElicitationCompletedEvent({
+                        requestId: entry.id,
+                        sessionId: entry.sessionId,
+                        providerRequest: true,
+                        actionable: true,
+                        data: entry.result,
+                        action: entry.result.action,
+                        content: entry.result.content ?? null,
+                        ts: entry.completedAt,
+                    }),
+                );
             },
         });
         return queued;
@@ -182,7 +191,7 @@ export const defaultAgentContextFactories = Object.freeze({
             runtimeAuthority: 'agent',
         },
         'sdk.elicitation-provider': {
-            provider: 'hooks/elicitation',
+            provider: 'sdk/session/elicitation',
             factory: 'defaultAgentContextFactories.createSdkElicitation',
             sdkFirst: true,
             runtimeAuthority: 'agent',

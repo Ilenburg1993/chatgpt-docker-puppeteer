@@ -164,7 +164,32 @@ export {
 } from './constants.js';
 
 // ─── Faixa 2: Tools & Permissions (rev.4) ────────────────────────────────────
-export { approveAll, createAllowlistPermissionHandler } from './session/permissions.js';
+export {
+    createQueuedElicitationHandler,
+    normalizeElicitationCompletedEvent,
+    normalizeElicitationPendingEvent,
+    normalizeElicitationResult,
+} from './session/elicitation.js';
+export {
+    classifyPermissionDecision,
+    normalizePermissionCompletedEvent,
+    normalizePermissionRequestedEvent,
+} from './session/permission-events.js';
+export { approveAll, createAllowlistPermissionHandler, createPermissionHandler } from './session/permissions.js';
+export {
+    normalizeModeChangedEvent,
+    normalizeModelChangedEvent,
+    normalizePlanChangedEvent,
+    normalizeToolsUpdatedEvent,
+} from './session/session-events.js';
+export {
+    classifyUserInputQuestionKind,
+    createQueuedInputHandler,
+    createReadlineInputHandler,
+    createStaticInputHandler,
+    normalizeUserInputCompletedEvent,
+    normalizeUserInputRequestedEvent,
+} from './session/user-input.js';
 export { defineTool } from './tools/core.js';
 
 /**
@@ -190,7 +215,6 @@ export function createTool(options) {
 export function createToolSync(options) {
     return createToolSyncCore(options);
 }
-// Nota: createPermissionHandler já exportado via #copilot/hooks/permission acima
 
 // ─── Faixa 3: SystemMessage Builder (rev.4) ──────────────────────────────────
 export {
@@ -282,11 +306,13 @@ export {
     // Faixa 8: Advanced RPC subsystems
     compactionCompact,
     createSessionRpcFacade,
+    instructionSourcesGet,
     modeGet,
     modelGetCurrent,
     modelSwitchTo,
     modeSet,
     permissionsHandlePending,
+    permissionsListPending,
     planDelete,
     planRead,
     planUpdate,

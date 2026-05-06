@@ -30,6 +30,7 @@ import {
     sendAgentSdkSessionAndWait,
 } from '../facades/agent-sdk-runtime.js';
 import { log } from '../ports/logging-port.js';
+import { resolveAgentUserInput } from '../ports/tool-port.js';
 import { startSpan, startSpanImmediate } from '../ports/tracing-port.js';
 
 /**
@@ -510,8 +511,14 @@ export function answerPendingQuestion(ctx, host, answer) {
         had_pending: String(ctx.hasPendingQuestion()),
     });
     if (!ctx.hasPendingQuestion()) {
-        // F68: emite evento para que hook-tools resolva via listener (sem import cross-boundary)
-        host.emit(EMITTER_QUESTION_ANSWERED, { answer, hadPending: false });
+        const resolvedViaTool = resolveAgentUserInput(answer);
+        // Mantemos o evento para observabilidade/metricas, incluindo o resultado do fallback tool-side.
+        host.emit(EMITTER_QUESTION_ANSWERED, { answer, hadPending: false, resolvedViaTool });
+        if (resolvedViaTool) {
+            log('INFO', '[AlwaysAlive] answerPendingQuestion() roteou resposta para request_user_input pendente.');
+            span?.end();
+            return true;
+        }
         log('WARN', '[AlwaysAlive] answerPendingQuestion() chamado sem pergunta pendente.');
         span?.end();
         return false;

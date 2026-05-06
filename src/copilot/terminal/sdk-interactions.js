@@ -9,9 +9,19 @@
  * @module copilot/terminal/sdk-interactions
  */
 
+import {
+    classifyUserInputQuestionKind,
+    normalizeElicitationCompletedEvent,
+    normalizeElicitationPendingEvent,
+    normalizePermissionCompletedEvent,
+    normalizePermissionRequestedEvent,
+    normalizeUserInputCompletedEvent,
+    normalizeUserInputRequestedEvent,
+} from '#copilot/sdk';
+
 /** @typedef {'pending' | 'completed' | 'cleared'} SdkInteractionStatus */
 
-/** @typedef {'question' | 'ready' | 'reply' | 'protocol'} TerminalSdkUserInputKind */
+/** @typedef {'question' | 'ready' | 'reply' | 'stopped'} TerminalSdkUserInputKind */
 
 /**
  * @typedef {object} TerminalElicitationEntry
@@ -83,15 +93,6 @@ let _latestUserInputId = null;
 
 /**
  * @param {unknown} value
- * @param {string} fallback
- * @returns {string}
- */
-function stringOr(value, fallback) {
-    return typeof value === 'string' && value.length > 0 ? value : fallback;
-}
-
-/**
- * @param {unknown} value
  * @returns {Record<string, unknown> | null}
  */
 function objectOrNull(value) {
@@ -99,58 +100,28 @@ function objectOrNull(value) {
 }
 
 /**
- * @param {unknown} value
- * @returns {'accept' | 'decline' | 'cancel' | null}
- */
-function elicitationActionOrNull(value) {
-    return value === 'accept' || value === 'decline' || value === 'cancel' ? value : null;
-}
-
-/**
- * @param {unknown} value
- * @returns {string[]}
- */
-function arrayOfStrings(value) {
-    return Array.isArray(value)
-        ? value.map((item) => (typeof item === 'string' ? item.trim() : '')).filter((item) => item.length > 0)
-        : [];
-}
-
-/**
- * @param {string} question
- * @returns {TerminalSdkUserInputKind}
- */
-function classifyUserInputKind(question) {
-    const normalized = question.trim().toUpperCase();
-    if (normalized.startsWith('READY:')) return 'ready';
-    if (normalized.startsWith('REPLY:')) return 'reply';
-    if (normalized.startsWith('PROTO:')) return 'protocol';
-    return 'question';
-}
-
-/**
  * @param {unknown} evt
  * @returns {TerminalElicitationEntry}
  */
 export function recordTerminalElicitationPending(evt) {
-    const data = objectOrNull(evt) ?? {};
-    const requestId = stringOr(data['requestId'], '');
+    const normalized = normalizeElicitationPendingEvent(evt);
+    const requestId = normalized.requestId ?? '';
     const id = requestId || `elicitation-${Date.now().toString(36)}`;
     const entry = {
         id,
         requestId: requestId || null,
-        message: stringOr(data['message'], '(sem mensagem)'),
-        mode: stringOr(data['mode'], data['url'] ? 'url' : 'form'),
-        requestedSchema: objectOrNull(data['requestedSchema']),
-        url: stringOr(data['url'], '') || null,
-        toolCallId: stringOr(data['toolCallId'], '') || null,
-        source: stringOr(data['elicitationSource'], '') || null,
-        actionable: data['actionable'] === true,
-        providerRequest: data['providerRequest'] === true,
-        data,
+        message: normalized.message || '(sem mensagem)',
+        mode: normalized.mode,
+        requestedSchema: normalized.requestedSchema,
+        url: normalized.url,
+        toolCallId: normalized.toolCallId,
+        source: normalized.elicitationSource,
+        actionable: normalized.actionable,
+        providerRequest: normalized.providerRequest,
+        data: normalized.data,
         resultAction: null,
         resultContent: null,
-        createdAt: typeof data['ts'] === 'number' ? data['ts'] : Date.now(),
+        createdAt: normalized.ts,
         completedAt: null,
         status: /** @type {SdkInteractionStatus} */ ('pending'),
     };
@@ -164,16 +135,16 @@ export function recordTerminalElicitationPending(evt) {
  * @returns {TerminalElicitationEntry | null}
  */
 export function recordTerminalElicitationCompleted(evt) {
-    const data = objectOrNull(evt) ?? {};
-    const requestId = stringOr(data['requestId'], '');
+    const normalized = normalizeElicitationCompletedEvent(evt);
+    const requestId = normalized.requestId ?? '';
     if (!requestId) return null;
     const entry = _elicitations.get(requestId) ?? null;
     if (!entry) return null;
     entry.status = 'completed';
-    entry.completedAt = typeof data['ts'] === 'number' ? data['ts'] : Date.now();
-    entry.resultAction =
-        elicitationActionOrNull(data['action']) ?? elicitationActionOrNull(objectOrNull(data['data'])?.['action']);
-    entry.resultContent = objectOrNull(data['content']) ?? objectOrNull(objectOrNull(data['data'])?.['content']);
+    entry.completedAt = normalized.ts;
+    entry.resultAction = normalized.action;
+    entry.resultContent = normalized.content;
+    entry.data = { ...entry.data, completion: normalized.data };
     return entry;
 }
 
@@ -230,18 +201,18 @@ export function clearTerminalElicitation(id) {
  * @returns {TerminalPermissionEntry}
  */
 export function recordTerminalPermissionRequested(evt) {
-    const data = objectOrNull(evt) ?? {};
-    const requestId = stringOr(data['requestId'], '');
-    const permissionType = stringOr(data['permissionType'], stringOr(data['type'], 'unknown'));
+    const normalized = normalizePermissionRequestedEvent(evt);
+    const requestId = normalized.requestId ?? '';
+    const permissionType = normalized.permissionType;
     const id = requestId || `permission-${permissionType}-${Date.now().toString(36)}`;
     const entry = {
         id,
         requestId: requestId || null,
         permissionType,
-        data,
+        data: normalized.data,
         granted: null,
         result: null,
-        createdAt: typeof data['ts'] === 'number' ? data['ts'] : Date.now(),
+        createdAt: normalized.ts,
         completedAt: null,
         status: /** @type {SdkInteractionStatus} */ ('pending'),
     };
@@ -255,15 +226,9 @@ export function recordTerminalPermissionRequested(evt) {
  * @returns {TerminalPermissionEntry | null}
  */
 export function recordTerminalPermissionCompleted(evt) {
-    const data = objectOrNull(evt) ?? {};
-    const requestId = stringOr(data['requestId'], '') || stringOr(objectOrNull(data['data'])?.['requestId'], '');
-    const permissionType = stringOr(
-        data['permissionType'],
-        stringOr(
-            objectOrNull(data['data'])?.['permissionType'],
-            stringOr(data['type'], stringOr(objectOrNull(data['data'])?.['type'], '')),
-        ),
-    );
+    const normalized = normalizePermissionCompletedEvent(evt);
+    const requestId = normalized.requestId ?? '';
+    const permissionType = normalized.permissionType;
     const entry =
         (requestId ? _permissions.get(requestId) : null) ??
         [..._permissions.values()]
@@ -271,12 +236,11 @@ export function recordTerminalPermissionCompleted(evt) {
             .find((candidate) => !permissionType || candidate.permissionType === permissionType) ??
         null;
     if (!entry) return null;
-    const grantedValue = data['granted'] ?? data['approved'] ?? objectOrNull(data['data'])?.['granted'];
     entry.status = 'completed';
-    entry.completedAt = typeof data['ts'] === 'number' ? data['ts'] : Date.now();
-    entry.granted = typeof grantedValue === 'boolean' ? grantedValue : null;
-    entry.result = stringOr(data['result'], stringOr(objectOrNull(data['data'])?.['result'], '')) || null;
-    entry.data = { ...entry.data, completion: data };
+    entry.completedAt = normalized.ts;
+    entry.granted = normalized.granted;
+    entry.result = normalized.resultKind;
+    entry.data = { ...entry.data, completion: normalized.data, decision: normalized.decision };
     return entry;
 }
 
@@ -332,22 +296,22 @@ export function readTerminalPermissionSummary() {
  * @returns {TerminalSdkUserInputEntry}
  */
 export function recordTerminalUserInputRequested(evt) {
-    const data = objectOrNull(evt) ?? {};
-    const requestId = stringOr(data['requestId'], '');
-    const question = stringOr(data['question'], '(sem pergunta)');
+    const normalized = normalizeUserInputRequestedEvent(evt);
+    const requestId = normalized.requestId ?? '';
+    const question = normalized.question || '(sem pergunta)';
     const id = requestId || `user-input-${Date.now().toString(36)}`;
     const entry = {
         id,
         requestId: requestId || null,
         question,
-        choices: arrayOfStrings(data['choices']),
-        allowFreeform: data['allowFreeform'] !== false,
-        toolCallId: stringOr(data['toolCallId'], '') || null,
-        kind: classifyUserInputKind(question),
-        data,
+        choices: normalized.choices,
+        allowFreeform: normalized.allowFreeform,
+        toolCallId: normalized.toolCallId,
+        kind: classifyUserInputQuestionKind(question),
+        data: normalized.data,
         answer: null,
         wasFreeform: null,
-        createdAt: typeof data['ts'] === 'number' ? data['ts'] : Date.now(),
+        createdAt: normalized.ts,
         completedAt: null,
         status: /** @type {SdkInteractionStatus} */ ('pending'),
     };
@@ -361,18 +325,18 @@ export function recordTerminalUserInputRequested(evt) {
  * @returns {TerminalSdkUserInputEntry | null}
  */
 export function recordTerminalUserInputCompleted(evt) {
-    const data = objectOrNull(evt) ?? {};
-    const requestId = stringOr(data['requestId'], '');
+    const normalized = normalizeUserInputCompletedEvent(evt);
+    const requestId = normalized.requestId ?? '';
     const entry =
         (requestId ? _userInputs.get(requestId) : null) ??
         [..._userInputs.values()].find((candidate) => candidate.status === 'pending') ??
         null;
     if (!entry) return null;
     entry.status = 'completed';
-    entry.completedAt = typeof data['ts'] === 'number' ? data['ts'] : Date.now();
-    entry.answer = stringOr(data['answer'], '') || null;
-    entry.wasFreeform = data['wasFreeform'] === true;
-    entry.data = { ...entry.data, completion: data };
+    entry.completedAt = normalized.ts;
+    entry.answer = normalized.answer || null;
+    entry.wasFreeform = normalized.wasFreeform;
+    entry.data = { ...entry.data, completion: normalized.data };
     return entry;
 }
 

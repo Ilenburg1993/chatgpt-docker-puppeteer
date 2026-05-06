@@ -9,6 +9,7 @@
  */
 
 import { SESSION_EVENTS as SE } from '#copilot/events';
+import { normalizePermissionCompletedEvent, normalizePermissionRequestedEvent } from '#copilot/sdk';
 import { onSessionEvent } from '../../sdk/session/events.js';
 import { log } from '../logger.js';
 
@@ -29,14 +30,33 @@ export function attachInteractionHandlers(ctx) {
     unsubs.push(
         onSessionEvent(session, SE.PERMISSION_REQUESTED, (event) => {
             if (persist && persistSet.has('permission.requested')) {
-                persistEvent({ type: event.type, sessionId, ts: event.timestamp, data: event.data });
+                const normalized = normalizePermissionRequestedEvent(event);
+                persistEvent({
+                    type: event.type,
+                    sessionId,
+                    ts: normalized.ts,
+                    requestId: normalized.requestId,
+                    permissionType: normalized.permissionType,
+                    data: normalized.data,
+                });
             }
         }),
     );
     unsubs.push(
         onSessionEvent(session, SE.PERMISSION_COMPLETED, (event) => {
             if (persist && persistSet.has('permission.completed')) {
-                persistEvent({ type: event.type, sessionId, ts: event.timestamp, data: event.data });
+                const normalized = normalizePermissionCompletedEvent(event);
+                persistEvent({
+                    type: event.type,
+                    sessionId,
+                    ts: normalized.ts,
+                    requestId: normalized.requestId,
+                    permissionType: normalized.permissionType,
+                    granted: normalized.granted,
+                    result: normalized.resultKind,
+                    decision: normalized.decision,
+                    data: normalized.data,
+                });
             }
         }),
     );

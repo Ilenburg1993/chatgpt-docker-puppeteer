@@ -69,10 +69,11 @@ export function bindAgentSessionTools(session) {
  * Resolve uma resposta pendente de input do usuário através do canal legado de hook-tools.
  *
  * @param {string} answer
+ * @param {string | undefined} [requestId]
  * @returns {boolean}
  */
-export function resolveAgentUserInput(answer) {
-    return resolveUserInput(answer);
+export function resolveAgentUserInput(answer, requestId) {
+    return resolveUserInput(answer, requestId);
 }
 
 /**

@@ -12,6 +12,7 @@ import {
     getSessionCapabilities,
     isSessionUiElicitationAvailable,
     permissionsHandlePending,
+    permissionsListPending,
     sessionUiConfirm,
     sessionUiElicitation,
     sessionUiInput,
@@ -121,6 +122,16 @@ export function resolvePendingSdkElicitation(ctx, id, result) {
  */
 export async function handleSdkPendingPermission(ctx, requestId, result) {
     return permissionsHandlePending(requireSession(ctx, 'handleSdkPendingPermission'), requestId, result);
+}
+
+/**
+ * Lista permissões pendentes via superfície RPC da sessão, quando disponível.
+ *
+ * @param {unknown} ctx
+ * @returns {Promise<{ available: boolean; source: string | null; requests: unknown[] }>}
+ */
+export async function listPendingSdkPermissions(ctx) {
+    return permissionsListPending(requireSession(ctx, 'listPendingSdkPermissions'));
 }
 
 /**

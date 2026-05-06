@@ -57,14 +57,6 @@ const _injectTimestamps = [];
 let _injectWindowStartIndex = 0;
 
 /**
- * @param {number} value
- * @returns {number}
- */
-function _roundToSecond(value) {
-    return Math.ceil(value / 1000) * 1000;
-}
-
-/**
  * @param {number} durationMs
  * @returns {void}
  */

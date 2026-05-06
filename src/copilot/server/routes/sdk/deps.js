@@ -12,10 +12,8 @@ import { defaultAuditLog, getAuditTail } from '#copilot/audit';
 import { getMcpStatus, nervEventBusAdapter } from '#copilot/bridges';
 import {
     BRIDGE_ADMIN_TOKEN,
-    getSystemPromptSdkCompatibility,
     LLM_B_TURN_TIMEOUT_MS,
     OTEL_EXPORTER_OTLP_ENDPOINT,
-    readSessionInstructionSources,
     readSystemPromptStatus,
     SDK_API_TOKEN,
 } from '#copilot/config';
@@ -150,7 +148,6 @@ const sdkRuntimeSessionOps = Object.freeze({
 });
 
 const sdkSystemPromptOps = Object.freeze({
-    getSystemPromptSdkCompatibility,
     readAgentSdkSystemPromptProjection:
         runtimeSdkSessionNamespace.readAgentSdkSystemPromptProjection ??
         (async () => ({
@@ -162,7 +159,6 @@ const sdkSystemPromptOps = Object.freeze({
             instructionSources: null,
             instructionSourcesError: 'readAgentSdkSystemPromptProjection unavailable',
         })),
-    readSessionInstructionSources,
     readSystemPromptStatus,
 });
 

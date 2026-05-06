@@ -22,6 +22,7 @@ import {
     inputTerminalSdkSessionUi,
     isTerminalSdkSessionUiElicitationAvailable,
     listTerminalSdkModels,
+    listTerminalSdkPendingPermissions,
     listTerminalSdkTools,
     listTerminalSdkWorkspaceFiles,
     readTerminalSdkSystemPromptProjection,
@@ -42,6 +43,7 @@ import {
     readTerminalPermissionSummary,
     readTerminalUserInputSummary,
     recordTerminalPermissionCompleted,
+    recordTerminalPermissionRequested,
 } from '../sdk-interactions.js';
 import { callWithRuntimeTarget, extractRuntimeTarget } from './runtime-target.js';
 
@@ -235,6 +237,23 @@ function parsePermissionDecision(raw) {
 }
 
 /**
+ * @param {{ kind: string } & Record<string, unknown>} result
+ * @returns {string | null}
+ */
+function validatePermissionDecisionResult(result) {
+    if (result.kind === 'approve-for-session' && !objectOrNull(result['approval'])) {
+        return 'approve-for-session exige payload JSON com "approval" object.';
+    }
+    if (result.kind === 'approve-for-location') {
+        if (!objectOrNull(result['approval'])) return 'approve-for-location exige payload JSON com "approval" object.';
+        if (typeof result['locationKey'] !== 'string' || result['locationKey'].trim().length === 0) {
+            return 'approve-for-location exige payload JSON com "locationKey" string.';
+        }
+    }
+    return null;
+}
+
+/**
  * @param {CommandContext} ctx
  * @param {string} [arg]
  * @returns {Promise<void>}
@@ -379,7 +398,7 @@ async function renderSdkSystemPrompt({ println }, runtimeId) {
         `  session  \x1b[90m${String(projection['sessionId'] ?? '-')}\x1b[0m  sources=\x1b[33m${projection['sessionAvailable'] ? 'available' : 'none'}\x1b[0m`,
     );
     println(
-        `  binding  \x1b[90m${String(binding['digest'] ?? '-')}[0m  stale=\x1b[33m${String(Boolean(freshness['isStale']))}[0m  action=\x1b[33m${String(freshness['recommendedAction'] ?? 'none')}[0m`,
+        `  binding  \x1b[90m${String(binding['digest'] ?? '-')}\x1b[0m  stale=\x1b[33m${String(Boolean(freshness['isStale']))}\x1b[0m  action=\x1b[33m${String(freshness['recommendedAction'] ?? 'none')}\x1b[0m`,
     );
 
     if (freshness['reason']) {
@@ -642,11 +661,16 @@ export async function cmdPermission({ println }, arg = '') {
                 return;
             }
         }
-        const result = await handleTerminalSdkPendingPermission(
-            entry.requestId,
-            /** @type {{ kind: string } & Record<string, unknown>} */ ({ kind: decision.kind, ...payload }),
-            runtimeId,
-        );
+        const permissionResult = /** @type {{ kind: string } & Record<string, unknown>} */ ({
+            ...decision,
+            ...payload,
+        });
+        const validationError = validatePermissionDecisionResult(permissionResult);
+        if (validationError) {
+            println(`  \x1b[33m${validationError}\x1b[0m`);
+            return;
+        }
+        const result = await handleTerminalSdkPendingPermission(entry.requestId, permissionResult, runtimeId);
         recordTerminalPermissionCompleted({
             requestId: entry.requestId,
             permissionType: entry.permissionType,
@@ -659,6 +683,44 @@ export async function cmdPermission({ println }, arg = '') {
         );
         println(`  \x1b[90m${pretty(result, 700)}\x1b[0m\n`);
         return;
+    }
+    if (sub === 'pending') {
+        const remote = await callWithRuntimeTarget(listTerminalSdkPendingPermissions, runtimeId);
+        if (!remote.available) {
+            println('\n  \x1b[33mListagem ativa de permissões pendentes indisponível no SDK atual.\x1b[0m');
+            println('  \x1b[90mFallback operacional: usando estado observado local (/permission list).\x1b[0m\n');
+        } else {
+            const requests = Array.isArray(remote.requests) ? remote.requests : [];
+            println(`\n  \x1b[36mPermissões pendentes via RPC (${requests.length})\x1b[0m`);
+            println(`  \x1b[90msource: ${remote.source ?? 'unknown'}\x1b[0m`);
+            if (requests.length === 0) {
+                println('  \x1b[32mNenhuma permissão pendente reportada pela sessão SDK.\x1b[0m\n');
+                return;
+            }
+            for (const item of requests) {
+                const obj = objectOrNull(item) ?? {};
+                const requestId =
+                    (typeof obj['requestId'] === 'string' && obj['requestId']) ||
+                    (typeof obj['id'] === 'string' && obj['id']) ||
+                    'unknown';
+                const permissionType =
+                    (typeof obj['permissionType'] === 'string' && obj['permissionType']) ||
+                    (typeof obj['type'] === 'string' && obj['type']) ||
+                    'unknown';
+                recordTerminalPermissionRequested({
+                    data: {
+                        ...obj,
+                        requestId,
+                        permissionType,
+                        source: remote.source ?? 'permissions.listPending',
+                    },
+                    ts: Date.now(),
+                });
+                println(`  \x1b[33m${requestId}\x1b[0m  ${permissionType}`);
+            }
+            println('');
+            return;
+        }
     }
     if (sub === 'clear') {
         const ok = clearTerminalPermission(rest[0] || 'latest');
@@ -681,7 +743,7 @@ export async function cmdPermission({ println }, arg = '') {
         }
     }
     println(
-        '  \x1b[90mUso: /permission [list|all|show latest|clear <id>|clear all|mode [approve_all|audit_only|selective]|respond <id> <decision> [json]]\x1b[0m',
+        '  \x1b[90mUso: /permission [list|pending|all|show latest|clear <id>|clear all|mode [approve_all|audit_only|selective]|respond <id> <decision> [json]]\x1b[0m',
     );
     println('  \x1b[90mPermissões são decididas pelo SDK/hook; este comando é observabilidade operacional.\x1b[0m\n');
 }

@@ -129,12 +129,17 @@ export function stepWireHandoff(agentEmitter, ctx, state) {
  * @returns {void}
  */
 export function stepWireQuestionAnsweredRelay(agentEmitter, ctx, state) {
-    const onQuestionAnswered = (/** @type {{ answer?: string }} */ evt) => {
+    const onQuestionAnswered = (
+        /** @type {{ answer?: string; requestId?: string; resolvedViaTool?: boolean }} */ evt,
+    ) => {
         if (typeof evt?.answer !== 'string') {
             return;
         }
+        if (evt.resolvedViaTool === true) {
+            return;
+        }
         const answer = evt.answer;
-        void ctx.trackBackgroundTask(Promise.resolve(resolveAgentUserInput(answer)), {
+        void ctx.trackBackgroundTask(Promise.resolve(resolveAgentUserInput(answer, evt.requestId)), {
             label: 'hooks.question_answered.relay',
             description: 'Relay question.answered answers into hook tools resolver',
         });

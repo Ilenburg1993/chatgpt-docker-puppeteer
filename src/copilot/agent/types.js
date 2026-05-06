@@ -720,11 +720,11 @@
  *     | undefined} inputSdkSessionUi
  *   - Solicita entrada textual via `session.ui.input()` ou fallback compatível
  *
- * @property {((options?: { sessionId?: string }) => import('../hooks/elicitation.js').QueuedElicitationEntry[])
+ * @property {((options?: { sessionId?: string }) => import('../sdk/session/elicitation.js').QueuedElicitationEntry[])
  *     | undefined} listPendingSdkElicitations
  *   - Lista solicitações de elicitation pendentes do SDK
  *
- * @property {((id: string) => import('../hooks/elicitation.js').QueuedElicitationEntry | null) | undefined} getPendingSdkElicitation
+ * @property {((id: string) => import('../sdk/session/elicitation.js').QueuedElicitationEntry | null) | undefined} getPendingSdkElicitation
  *   - Lê uma solicitação de elicitation pendente por id
  *
  * @property {((id: string, result: import('#copilot/sdk/types').ElicitationResult) => boolean) | undefined} resolvePendingSdkElicitation
@@ -733,6 +733,9 @@
  * @property {((requestId: string, result: { kind: string } & Record<string, unknown>) => Promise<unknown>)
  *     | undefined} handleSdkPendingPermission
  *   - Resolve permissão pendente do SDK
+ *
+ * @property {(() => Promise<{ available: boolean; source: string | null; requests: unknown[] }>) | undefined} listPendingSdkPermissions
+ *   - Lista permissões pendentes via surface RPC do SDK quando disponível
  *
  * @property {((
  *           requestId: string,

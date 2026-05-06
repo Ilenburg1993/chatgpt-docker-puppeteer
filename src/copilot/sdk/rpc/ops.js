@@ -279,7 +279,7 @@ export async function commandsHandlePending(session, requestId, options) {
  *
  * @param {CopilotSession} session
  * @param {string} requestId
- * @param {PermissionRequestResolution} result - Resultado da permissão (approved, denied-*)
+ * @param {PermissionRequestResolution} result - Resultado da permissão (`approve-once`, `reject`, etc.)
  * @returns {Promise<HandleResult>}
  */
 export async function permissionsHandlePending(session, requestId, result) {
@@ -306,6 +306,54 @@ export async function permissionsHandlePending(session, requestId, result) {
         );
     } catch (error) {
         throw toSdkOperationError('permissions.handlePendingPermissionRequest', error);
+    }
+}
+
+/**
+ * Lista permissões pendentes da sessão quando o namespace RPC oferece um método de listagem.
+ *
+ * Mantém compatibilidade com múltiplas assinaturas do SDK e retorna um envelope estável para camadas superiores
+ * (agent/presentation/terminal).
+ *
+ * @param {CopilotSession} session
+ * @returns {Promise<{ available: boolean; source: string | null; requests: unknown[] }>}
+ */
+export async function permissionsListPending(session) {
+    assertRpcSession(session, 'permissions.listPendingPermissionRequests');
+    const permissions = /** @type {Record<string, unknown>} */ (
+        /** @type {unknown} */ (session.rpc?.permissions ?? {})
+    );
+
+    /** @type {((...args: unknown[]) => Promise<unknown>) | null} */
+    let listFn = null;
+    /** @type {string | null} */
+    let source = null;
+
+    if (typeof permissions['listPendingPermissionRequests'] === 'function') {
+        listFn = /** @type {(...args: unknown[]) => Promise<unknown>} */ (permissions['listPendingPermissionRequests']);
+        source = 'permissions.listPendingPermissionRequests';
+    } else if (typeof permissions['listPendingRequests'] === 'function') {
+        listFn = /** @type {(...args: unknown[]) => Promise<unknown>} */ (permissions['listPendingRequests']);
+        source = 'permissions.listPendingRequests';
+    }
+
+    if (!listFn || !source) {
+        return { available: false, source: null, requests: [] };
+    }
+
+    appLog('DEBUG', `[sdk/rpc] ${source}: sessionId='${session.sessionId}'`);
+    try {
+        const raw = await listFn.call(session.rpc.permissions);
+        const requests = Array.isArray(raw)
+            ? raw
+            : Array.isArray(/** @type {Record<string, unknown>} */ (/** @type {unknown} */ (raw))['requests'])
+              ? /** @type {unknown[]} */ (
+                    /** @type {Record<string, unknown>} */ (/** @type {unknown} */ (raw))['requests']
+                )
+              : [];
+        return { available: true, source, requests };
+    } catch (error) {
+        throw toSdkOperationError(source, error);
     }
 }
 

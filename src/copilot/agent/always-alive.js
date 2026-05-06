@@ -64,6 +64,7 @@ import {
     killSdkShell,
     listAvailableModels,
     listPendingSdkElicitations,
+    listPendingSdkPermissions,
     listSdkAgents,
     listSdkBuiltInTools,
     listSdkModels,
@@ -781,7 +782,7 @@ export class AlwaysAliveAgent extends EventEmitter {
      * Lista solicitações de elicitation pendentes vindas do SDK para este runtime.
      *
      * @param {{ sessionId?: string }} [options]
-     * @returns {import('../hooks/elicitation.js').QueuedElicitationEntry[]}
+     * @returns {import('../sdk/session/elicitation.js').QueuedElicitationEntry[]}
      */
     listPendingSdkElicitations(options = {}) {
         return listPendingSdkElicitations(this.ctx, options.sessionId);
@@ -791,7 +792,7 @@ export class AlwaysAliveAgent extends EventEmitter {
      * Retorna uma solicitação de elicitation pendente por id.
      *
      * @param {string} id
-     * @returns {import('../hooks/elicitation.js').QueuedElicitationEntry | null}
+     * @returns {import('../sdk/session/elicitation.js').QueuedElicitationEntry | null}
      */
     getPendingSdkElicitation(id) {
         return getPendingSdkElicitation(this.ctx, id);
@@ -817,6 +818,15 @@ export class AlwaysAliveAgent extends EventEmitter {
      */
     async handleSdkPendingPermission(requestId, result) {
         return handleSdkPendingPermission(this.ctx, requestId, result);
+    }
+
+    /**
+     * Lista permissões pendentes via RPC da sessão SDK quando a surface suporta listagem ativa.
+     *
+     * @returns {Promise<{ available: boolean; source: string | null; requests: unknown[] }>}
+     */
+    async listPendingSdkPermissions() {
+        return listPendingSdkPermissions(this.ctx);
     }
 
     /**

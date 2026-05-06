@@ -7,6 +7,12 @@
 
 import { SESSION_EVENTS } from '#copilot/events';
 import { log } from '#copilot/observability';
+import {
+    normalizePermissionCompletedEvent,
+    normalizePermissionRequestedEvent,
+    normalizeUserInputCompletedEvent,
+    normalizeUserInputRequestedEvent,
+} from '#copilot/sdk';
 import { DialogProtocol } from '../dialog/protocol.js';
 import { onSessionEvent } from '../sdk/session/events.js';
 
@@ -54,67 +60,59 @@ export function wireInteractionEvents(session, { emit }) {
 
         // ── permission.requested ─────────────────────────────────────────
         onSessionEvent(session, SESSION_EVENTS.PERMISSION_REQUESTED, (evt) => {
-            const raw = /** @type {Record<string, unknown>} */ (/** @type {unknown} */ (evt));
-            const data = /** @type {Record<string, unknown>} */ (raw['data'] ?? {});
-            const permissionType = /** @type {string | undefined} */ (data['permissionType'] ?? data['type']);
-            const requestId = /** @type {string | undefined} */ (data['requestId']);
-            log('INFO', `[interaction-events] permission.requested: ${permissionType ?? '?'}`);
-            emit('permission.requested', { requestId, permissionType, data, ts: evt?.timestamp ?? Date.now() });
+            const normalized = normalizePermissionRequestedEvent(evt);
+            log('INFO', `[interaction-events] permission.requested: ${normalized.permissionType}`);
+            emit('permission.requested', {
+                requestId: normalized.requestId,
+                permissionType: normalized.permissionType,
+                data: normalized.data,
+                ts: normalized.ts,
+            });
         }),
 
         // ── permission.completed ─────────────────────────────────────────
         onSessionEvent(session, SESSION_EVENTS.PERMISSION_COMPLETED, (evt) => {
-            const raw = /** @type {Record<string, unknown>} */ (/** @type {unknown} */ (evt));
-            const data = /** @type {Record<string, unknown>} */ (raw['data'] ?? {});
-            const granted = /** @type {boolean | undefined} */ (data['granted'] ?? data['approved']);
-            const requestId = /** @type {string | undefined} */ (data['requestId']);
-            const permissionType = /** @type {string | undefined} */ (data['permissionType'] ?? data['type']);
-            const result = /** @type {string | undefined} */ (data['result']);
-            log('INFO', `[interaction-events] permission.completed: granted=${granted ?? '?'}`);
+            const normalized = normalizePermissionCompletedEvent(evt);
+            log('INFO', `[interaction-events] permission.completed: granted=${normalized.granted ?? '?'}`);
             emit('permission.completed', {
-                requestId,
-                permissionType,
-                result,
-                granted,
-                data,
-                ts: evt?.timestamp ?? Date.now(),
+                requestId: normalized.requestId,
+                permissionType: normalized.permissionType,
+                result: normalized.resultKind,
+                granted: normalized.granted,
+                decision: normalized.decision,
+                data: normalized.data,
+                ts: normalized.ts,
             });
         }),
 
         // ── user_input.requested / completed ─────────────────────────────
         onSessionEvent(session, SESSION_EVENTS.USER_INPUT_REQUESTED, (evt) => {
-            const raw = /** @type {Record<string, unknown>} */ (/** @type {unknown} */ (evt));
-            const data = /** @type {Record<string, unknown>} */ (raw['data'] ?? {});
-            const requestId = /** @type {string | undefined} */ (data['requestId']);
-            const question = /** @type {string | undefined} */ (data['question']);
-            const choices = Array.isArray(data['choices']) ? /** @type {string[]} */ (data['choices']) : undefined;
-            const allowFreeform = data['allowFreeform'] !== false;
-            const kind = DialogProtocol.classify(question ?? '');
-            log('DEBUG', `[interaction-events] user_input.requested: requestId=${requestId ?? '?'} kind=${kind}`);
+            const normalized = normalizeUserInputRequestedEvent(evt);
+            const kind = DialogProtocol.classify(normalized.question);
+            log(
+                'DEBUG',
+                `[interaction-events] user_input.requested: requestId=${normalized.requestId ?? '?'} kind=${kind}`,
+            );
             emit('user_input.requested', {
-                requestId,
-                question: question ?? '',
-                ...(choices !== undefined ? { choices } : {}),
-                allowFreeform,
-                toolCallId: data['toolCallId'] ?? null,
-                data,
-                ts: evt?.timestamp ?? Date.now(),
+                requestId: normalized.requestId,
+                question: normalized.question,
+                choices: normalized.choices,
+                allowFreeform: normalized.allowFreeform,
+                toolCallId: normalized.toolCallId,
+                data: normalized.data,
+                ts: normalized.ts,
             });
         }),
 
         onSessionEvent(session, SESSION_EVENTS.USER_INPUT_COMPLETED, (evt) => {
-            const raw = /** @type {Record<string, unknown>} */ (/** @type {unknown} */ (evt));
-            const data = /** @type {Record<string, unknown>} */ (raw['data'] ?? {});
-            const requestId = /** @type {string | undefined} */ (data['requestId']);
-            const answer = /** @type {string | undefined} */ (data['answer']);
-            const wasFreeform = typeof data['wasFreeform'] === 'boolean' ? data['wasFreeform'] : undefined;
-            log('DEBUG', `[interaction-events] user_input.completed: requestId=${requestId ?? '?'}`);
+            const normalized = normalizeUserInputCompletedEvent(evt);
+            log('DEBUG', `[interaction-events] user_input.completed: requestId=${normalized.requestId ?? '?'}`);
             emit('user_input.completed', {
-                requestId,
-                answer: answer ?? '',
-                ...(wasFreeform !== undefined ? { wasFreeform } : {}),
-                data,
-                ts: evt?.timestamp ?? Date.now(),
+                requestId: normalized.requestId,
+                answer: normalized.answer,
+                ...(normalized.wasFreeform !== null ? { wasFreeform: normalized.wasFreeform } : {}),
+                data: normalized.data,
+                ts: normalized.ts,
             });
         }),
 

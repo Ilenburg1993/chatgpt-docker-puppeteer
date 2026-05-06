@@ -8,6 +8,7 @@
 
 import { SESSION_EVENTS } from '#copilot/events';
 import { log } from '#copilot/observability';
+import { normalizeModelChangedEvent, normalizeToolsUpdatedEvent } from '#copilot/sdk';
 import { onSessionEvent } from '../sdk/session/events.js';
 
 /**
@@ -77,27 +78,28 @@ export function wireSessionLifecycleEvents(session, { emit }) {
 
         // ── session.model_change ─────────────────────────────────────────
         onSessionEvent(session, SESSION_EVENTS.SESSION_MODEL_CHANGE, (evt) => {
-            const data = evt?.data ?? {};
-            const previousModel = /** @type {string | undefined} */ (data['previousModel']);
-            const newModel = /** @type {string | undefined} */ (data['newModel']);
-            const reasoningEffort = /** @type {string | undefined} */ (data['reasoningEffort']);
-            log('INFO', `[session-lifecycle] model_change: ${previousModel ?? '?'} → ${newModel ?? '?'}`);
+            const normalized = normalizeModelChangedEvent(evt);
+            log(
+                'INFO',
+                `[session-lifecycle] model_change: ${normalized.previousModel ?? '?'} → ${normalized.newModel}`,
+            );
             emit('session.model_changed', {
-                previousModel,
-                newModel,
-                reasoningEffort,
-                ts: evt?.timestamp ?? Date.now(),
+                previousModel: normalized.previousModel,
+                newModel: normalized.newModel,
+                reasoningEffort: normalized.reasoningEffort,
+                ts: normalized.ts,
             });
         }),
 
         // ── session.tools_updated ────────────────────────────────────────
         onSessionEvent(session, SESSION_EVENTS.SESSION_TOOLS_UPDATED, (evt) => {
-            const raw = /** @type {Record<string, unknown>} */ (/** @type {unknown} */ (evt));
-            const data = /** @type {Record<string, unknown>} */ (raw['data'] ?? {});
-            const tools = /** @type {unknown[] | undefined} */ (data['tools']);
-            const count = Array.isArray(tools) ? tools.length : 0;
-            log('INFO', `[session-lifecycle] tools_updated: ${count} tools`);
-            emit('session.tools_updated', { count, ts: evt?.timestamp ?? Date.now() });
+            const normalized = normalizeToolsUpdatedEvent(evt);
+            log('INFO', `[session-lifecycle] tools_updated: ${normalized.count} tools`);
+            emit('session.tools_updated', {
+                count: normalized.count,
+                tools: normalized.tools,
+                ts: normalized.ts,
+            });
         }),
 
         // ── session.skills_loaded ────────────────────────────────────────

@@ -20,6 +20,7 @@ import {
     isAgentSdkSessionUiElicitationAvailable,
     listAgentSdkModels,
     listAgentSdkPendingElicitations,
+    listAgentSdkPendingPermissions,
     listAgentSdkTools,
     listAgentSdkWorkspaceFiles,
     readAgentSdkPlan,
@@ -261,4 +262,14 @@ export function resolveTerminalSdkPendingElicitation(id, result, runtimeId) {
  */
 export async function handleTerminalSdkPendingPermission(requestId, result, runtimeId) {
     return handleAgentSdkPendingPermission(requestId, result, runtimeId);
+}
+
+/**
+ * Lista permissões pendentes via RPC quando disponível na sessão SDK.
+ *
+ * @param {string | null | undefined} [runtimeId]
+ * @returns {Promise<{ available: boolean; source: string | null; requests: unknown[] }>}
+ */
+export async function listTerminalSdkPendingPermissions(runtimeId) {
+    return listAgentSdkPendingPermissions(runtimeId);
 }

@@ -7,6 +7,7 @@
 
 import { SESSION_EVENTS } from '#copilot/events';
 import { log } from '#copilot/observability';
+import { normalizeModeChangedEvent, normalizePlanChangedEvent } from '#copilot/sdk';
 import { onSessionEvent } from '../sdk/session/events.js';
 
 /**
@@ -17,23 +18,20 @@ import { onSessionEvent } from '../sdk/session/events.js';
 export function wireModeAndToolEvents(session, { emit }) {
     return [
         onSessionEvent(session, SESSION_EVENTS.SESSION_MODE_CHANGED, (evt) => {
-            const data = /** @type {Record<string, unknown>} */ (evt?.data ?? {});
-            const previousMode = /** @type {string | undefined} */ (data['previousMode']);
-            const newMode = /** @type {string | undefined} */ (data['newMode']);
-            log('INFO', `[AlwaysAlive] Modo mudou: ${previousMode ?? '?'} → ${newMode ?? '?'}`);
+            const normalized = normalizeModeChangedEvent(evt);
+            log('INFO', `[AlwaysAlive] Modo mudou: ${normalized.previousMode ?? '?'} → ${normalized.newMode}`);
             emit('session.mode_changed', {
-                previousMode,
-                newMode,
-                ts: evt?.timestamp ?? Date.now(),
+                previousMode: normalized.previousMode,
+                newMode: normalized.newMode,
+                ts: normalized.ts,
             });
         }),
         onSessionEvent(session, SESSION_EVENTS.SESSION_PLAN_CHANGED, (evt) => {
-            const data = /** @type {Record<string, unknown>} */ (evt?.data ?? {});
-            const operation = /** @type {'create' | 'update' | 'delete' | undefined} */ (data['operation']);
-            log('INFO', `[AlwaysAlive] Plano da sessão mudou: ${operation ?? '?'}`);
+            const normalized = normalizePlanChangedEvent(evt);
+            log('INFO', `[AlwaysAlive] Plano da sessão mudou: ${normalized.operation}`);
             emit('session.plan_changed', {
-                operation,
-                ts: evt?.timestamp ?? Date.now(),
+                operation: normalized.operation,
+                ts: normalized.ts,
             });
         }),
     ];

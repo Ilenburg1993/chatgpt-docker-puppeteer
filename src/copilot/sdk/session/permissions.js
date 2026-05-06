@@ -9,7 +9,8 @@
  *
  * @module copilot/sdk/permissions
  * @see EventBus
- * @see module:copilot/hooks/permission-handler
+ * Este módulo é o núcleo canônico de policy de permissões na arquitetura 2.x.
+ * Camadas legacy (ex.: hooks/permission-handler) devem delegar para cá.
  */
 
 import { approveAll } from '@github/copilot-sdk';
@@ -103,6 +104,14 @@ function extractKind(request) {
 }
 
 /**
+ * @param {PermissionRequest} request
+ * @returns {string}
+ */
+function extractPath(request) {
+    return /** @type {{ path?: string }} */ (request)?.path ?? 'desconhecido';
+}
+
+/**
  * Extrai o nome da tool de um PermissionRequest.
  *
  * @param {PermissionRequest} request
@@ -160,6 +169,19 @@ export function createPermissionHandler(config) {
             const kind = extractKind(request);
             const toolName = extractToolName(request);
             const sessionId = invocation?.sessionId ?? 'unknown';
+
+            // Política canônica: content-exclusion-check nunca é auto-aprovado.
+            if (kind === 'content-exclusion-check') {
+                const path = extractPath(request);
+                log(
+                    'WARN',
+                    `[sdk/permissions] NEGADO sessionId='${sessionId}' kind='${kind}' path='${path}' (content-exclusion-policy)`,
+                );
+                return /** @type {PermissionRequestResult} */ ({
+                    kind: 'reject',
+                    feedback: `Arquivo bloqueado pela política de exclusão de conteúdo: ${path}`,
+                });
+            }
 
             // 1. Custom handler pré-avaliação
             if (onRequest) {

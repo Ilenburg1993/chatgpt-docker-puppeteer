@@ -285,7 +285,7 @@ export const SERVER_ROUTE_MODULE_LAYOUT = Object.freeze([
         role: 'sdk-deps',
         surface: 'sdk',
         tier: 'primary',
-        risk: 'watch',
+        risk: 'hotspot',
         public: false,
         summary: 'Composition root de dependencias da SDK API.',
     },

@@ -340,3 +340,17 @@ export function resolveAgentSdkPendingElicitation(id, result, runtimeId) {
 export async function handleAgentSdkPendingPermission(requestId, result, runtimeId) {
     return getAgentSdkSessionTarget(runtimeId).handleSdkPendingPermission(requestId, result);
 }
+
+/**
+ * Lista permissões pendentes via RPC quando a sessão suporta listagem ativa.
+ *
+ * @param {string | null | undefined} [runtimeId]
+ * @returns {Promise<{ available: boolean; source: string | null; requests: unknown[] }>}
+ */
+export async function listAgentSdkPendingPermissions(runtimeId) {
+    const target = getAgentSdkSessionTarget(runtimeId);
+    if (typeof target.listPendingSdkPermissions !== 'function') {
+        return { available: false, source: null, requests: [] };
+    }
+    return target.listPendingSdkPermissions();
+}

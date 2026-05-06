@@ -14,9 +14,8 @@
  */
 
 import { AGENT_DENY_SHELL_TOOLS } from '#copilot/config';
-import { createAuditOnlyPermission, createPermissionHandler } from '#copilot/hooks';
 import { log } from '#copilot/observability';
-import { approveAll } from '#copilot/sdk';
+import { approveAll, createPermissionHandler } from '#copilot/sdk';
 import { PERMISSION_MODE } from '../config/agent.js';
 
 /** @type {RegExp} */
@@ -161,7 +160,7 @@ export class PermissionController {
                 this.#mode = 'approve_all';
                 break;
             case 'audit_only':
-                this.#policyHandler = createAuditOnlyPermission();
+                this.#policyHandler = createPermissionHandler({ auditMode: true });
                 this.#mode = 'audit_only';
                 break;
             case 'selective': {

@@ -12,10 +12,10 @@
  */
 
 import { attachBus, defaultBus } from '../../hooks/bus.js';
-import { createQueuedElicitationHandler } from '../../hooks/elicitation.js';
 import { composePreToolUseHandlers, createHooks } from '../../hooks/factory.js';
 import { createSessionHooks } from '../../hooks/session-hooks.js';
 import { createRuntimeDisableHook } from '../../hooks/tool-interceptor.js';
+import { createQueuedElicitationHandler } from '../../sdk/session/elicitation.js';
 
 export { createQueuedElicitationHandler };
 

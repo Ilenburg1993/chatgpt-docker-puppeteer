@@ -12,6 +12,7 @@
 
 import { assertRpcSession } from './rpc/guards.js';
 import {
+    instructionSourcesGet,
     modeGet,
     modelGetCurrent,
     modelSwitchTo,
@@ -26,6 +27,7 @@ import {
 } from './rpc/session.js';
 
 export {
+    instructionSourcesGet,
     modeGet,
     modelGetCurrent,
     modelSwitchTo,
@@ -47,6 +49,7 @@ export {
     compactionCompact,
     compactionCompactTyped,
     permissionsHandlePending,
+    permissionsListPending,
     shellExec,
     shellKill,
     toolsHandlePendingCall,
@@ -126,6 +129,9 @@ import { agentDeselect, agentList, agentSelect, compactionCompactTyped } from '.
  *         message: string,
  *         options?: { level?: 'info' | 'warning' | 'error'; ephemeral?: boolean; url?: string },
  *     ) => Promise<LogResult>;
+ *     instructions: {
+ *         getSources: () => Promise<unknown>;
+ *     };
  *     agent: {
  *         list: () => Promise<AgentListResult>;
  *         select: (name: string) => Promise<AgentSelectResult>;
@@ -159,6 +165,9 @@ export function createSessionRpcFacade(session) {
             createFile: (path, content) => workspaceCreateFile(session, path, content),
         },
         log: (message, options) => /** @type {Promise<LogResult>} */ (sessionLog(session, message, options)),
+        instructions: {
+            getSources: () => instructionSourcesGet(session),
+        },
         agent: {
             list: () => /** @type {Promise<AgentListResult>} */ (agentList(session)),
             select: (name) => /** @type {Promise<AgentSelectResult>} */ (agentSelect(session, name)),

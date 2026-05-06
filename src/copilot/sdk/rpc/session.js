@@ -35,6 +35,8 @@ import { assertRpcSession } from './guards.js';
  * @typedef {{ success?: boolean }} WorkspaceCreateResult
  *
  * @typedef {{ eventId: string; [k: string]: unknown }} LogResult
+ *
+ * @typedef {unknown} InstructionSourcesResult
  */
 
 /**
@@ -305,6 +307,32 @@ export async function planDelete(session) {
             attributes: { errorKind: sdkError.kind },
         });
         throw sdkError;
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// INSTRUCTIONS subsystem
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * Lê as fontes de instrução/system prompt reportadas pela sessão SDK.
+ *
+ * @param {CopilotSession} session
+ * @returns {Promise<InstructionSourcesResult>}
+ */
+export async function instructionSourcesGet(session) {
+    assertRpcSession(session, 'instructions.getSources');
+    const rpc = /** @type {{ instructions?: { getSources?: () => Promise<InstructionSourcesResult> } }} */ (
+        session.rpc
+    );
+    if (typeof rpc.instructions?.getSources !== 'function') {
+        throw new TypeError('[sdk/rpc/instructions.getSources] RPC indisponível nesta sessão SDK.');
+    }
+    appLog('DEBUG', `[sdk/rpc] instructions.getSources: sessionId='${session.sessionId}'`);
+    try {
+        return await rpc.instructions.getSources();
+    } catch (error) {
+        throw toSdkOperationError('instructions.getSources', error);
     }
 }
 
