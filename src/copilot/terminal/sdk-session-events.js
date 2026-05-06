@@ -20,6 +20,7 @@ import {
     EMITTER_ASSISTANT_TURN_END,
     EMITTER_ASSISTANT_TURN_START,
     EMITTER_EXIT_PLAN_MODE_COMPLETED,
+    EMITTER_PERMISSION_MODE_CHANGED,
     EMITTER_SESSION_CONTEXT_CHANGED,
     EMITTER_SESSION_HANDOFF,
     EMITTER_SESSION_INFO,
@@ -265,6 +266,22 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
             `  ${ok ? '\x1b[32m✓' : '\x1b[33m•'} Permissão:\x1b[0m ${entry?.permissionType ?? 'unknown'} ${granted == null ? '' : granted ? '\x1b[32maprovada\x1b[0m' : '\x1b[33mnão aprovada\x1b[0m'}`,
         );
         broadcastSse('permission.completed', { ...data, timestamp: Date.now() });
+        refreshPromptIfIdle();
+    };
+
+    const onPermissionModeChanged = (/** @type {{ mode?: string }} */ evt) => {
+        const mode = typeof evt?.mode === 'string' ? evt.mode : 'approve_all';
+        recordTerminalActivity('system', 'Modo de permissão alterado', {
+            detail: mode,
+            source: 'sdk',
+            severity: 'warn',
+        });
+        if (shouldPrintSessionNarration('important')) {
+            println(
+                `  ${terminalThemeBadge('warn', 'PERM')} ${terminalThemeText('warn', `permission.mode_changed → ${mode}`)}`,
+            );
+        }
+        broadcastSse('permission.mode_changed', { mode, timestamp: Date.now() });
         refreshPromptIfIdle();
     };
 
@@ -777,6 +794,7 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
     agent.on('elicitation.completed', onElicitationCompleted);
     agent.on('permission.requested', onPermissionRequested);
     agent.on('permission.completed', onPermissionCompleted);
+    agent.on(EMITTER_PERMISSION_MODE_CHANGED, onPermissionModeChanged);
     agent.on('user_input.requested', onUserInputRequested);
     agent.on('user_input.completed', onUserInputCompleted);
     agent.on(EMITTER_SESSION_MODEL_CHANGED, onSessionModelChanged);
@@ -814,6 +832,7 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
         agent.off('elicitation.completed', onElicitationCompleted);
         agent.off('permission.requested', onPermissionRequested);
         agent.off('permission.completed', onPermissionCompleted);
+        agent.off(EMITTER_PERMISSION_MODE_CHANGED, onPermissionModeChanged);
         agent.off('user_input.requested', onUserInputRequested);
         agent.off('user_input.completed', onUserInputCompleted);
         agent.off(EMITTER_SESSION_MODEL_CHANGED, onSessionModelChanged);

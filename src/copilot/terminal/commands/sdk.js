@@ -18,6 +18,7 @@ import {
     createTerminalSdkWorkspaceFile,
     getTerminalSdkQuota,
     getTerminalSdkSessionCapabilities,
+    handleTerminalSdkPendingPermission,
     inputTerminalSdkSessionUi,
     isTerminalSdkSessionUiElicitationAvailable,
     listTerminalSdkModels,
@@ -40,6 +41,7 @@ import {
     readTerminalElicitationSummary,
     readTerminalPermissionSummary,
     readTerminalUserInputSummary,
+    recordTerminalPermissionCompleted,
 } from '../sdk-interactions.js';
 import { callWithRuntimeTarget, extractRuntimeTarget } from './runtime-target.js';
 
@@ -213,6 +215,23 @@ function renderSdkCapabilitiesSummary({ println }, runtimeId) {
         `  plan     \x1b[90mread=${String(plan['read'] ?? false)} · write=${String(plan['write'] ?? false)} · delete=${String(plan['delete'] ?? false)}\x1b[0m`,
     );
     println(`  raw      \x1b[90m${pretty(capabilities, 1200)}\x1b[0m\n`);
+}
+
+/**
+ * @param {string | undefined} raw
+ * @returns {{
+ *     kind: 'approve-once' | 'approve-for-session' | 'approve-for-location' | 'reject' | 'user-not-available';
+ * } | null}
+ */
+function parsePermissionDecision(raw) {
+    const value = (raw ?? '').trim().toLowerCase();
+    if (!value) return null;
+    if (value === 'approve' || value === 'approve-once') return { kind: 'approve-once' };
+    if (value === 'approve-for-session' || value === 'session') return { kind: 'approve-for-session' };
+    if (value === 'approve-for-location' || value === 'location') return { kind: 'approve-for-location' };
+    if (value === 'reject' || value === 'deny') return { kind: 'reject' };
+    if (value === 'user-not-available' || value === 'unavailable') return { kind: 'user-not-available' };
+    return null;
 }
 
 /**
@@ -592,6 +611,55 @@ export async function cmdPermission({ println }, arg = '') {
         renderPermissionEntry({ println }, getTerminalPermission(rest[0] || 'latest'));
         return;
     }
+    if (sub === 'respond' || sub === 'resolve') {
+        const idArg = rest[0];
+        const actionArg = rest[1];
+        const payloadArg = rest.slice(2).join(' ').trim();
+        const entry = getTerminalPermission(idArg || 'latest');
+        if (!entry || !entry.requestId) {
+            println('  \x1b[33mPermissão não encontrada ou sem requestId canônico para responder.\x1b[0m');
+            return;
+        }
+        const decision = parsePermissionDecision(actionArg);
+        if (!decision) {
+            println(
+                '  \x1b[33mUso: /permission respond <id|latest> <approve-once|approve-for-session|approve-for-location|reject|user-not-available> [json]\x1b[0m',
+            );
+            return;
+        }
+        /** @type {Record<string, unknown>} */
+        let payload = {};
+        if (payloadArg) {
+            try {
+                const parsed = JSON.parse(payloadArg);
+                if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+                    println('  \x1b[33mPayload opcional deve ser um JSON object.\x1b[0m');
+                    return;
+                }
+                payload = /** @type {Record<string, unknown>} */ (parsed);
+            } catch (error) {
+                println(`  \x1b[31mJSON inválido:\x1b[0m ${error instanceof Error ? error.message : String(error)}`);
+                return;
+            }
+        }
+        const result = await handleTerminalSdkPendingPermission(
+            entry.requestId,
+            /** @type {{ kind: string } & Record<string, unknown>} */ ({ kind: decision.kind, ...payload }),
+            runtimeId,
+        );
+        recordTerminalPermissionCompleted({
+            requestId: entry.requestId,
+            permissionType: entry.permissionType,
+            result: decision.kind,
+            granted: decision.kind !== 'reject' && decision.kind !== 'user-not-available',
+            ts: Date.now(),
+        });
+        println(
+            `\n  \x1b[32m✓ Resposta de permissão enviada:\x1b[0m \x1b[90m${entry.requestId}\x1b[0m · ${decision.kind}`,
+        );
+        println(`  \x1b[90m${pretty(result, 700)}\x1b[0m\n`);
+        return;
+    }
     if (sub === 'clear') {
         const ok = clearTerminalPermission(rest[0] || 'latest');
         println(ok ? '\x1b[32m  Permissão removida da UX local.\x1b[0m' : '\x1b[33m  Permissão não encontrada.\x1b[0m');
@@ -613,7 +681,7 @@ export async function cmdPermission({ println }, arg = '') {
         }
     }
     println(
-        '  \x1b[90mUso: /permission [list|all|show latest|clear <id>|clear all|mode [approve_all|audit_only|selective]]\x1b[0m',
+        '  \x1b[90mUso: /permission [list|all|show latest|clear <id>|clear all|mode [approve_all|audit_only|selective]|respond <id> <decision> [json]]\x1b[0m',
     );
     println('  \x1b[90mPermissões são decididas pelo SDK/hook; este comando é observabilidade operacional.\x1b[0m\n');
 }
@@ -664,5 +732,10 @@ function renderPermissionEntry({ println }, entry) {
     if (entry.result) println(`  result  \x1b[33m${entry.result}\x1b[0m`);
     println(`  created \x1b[90m${new Date(entry.createdAt).toISOString()}\x1b[0m`);
     if (entry.completedAt) println(`  done    \x1b[90m${new Date(entry.completedAt).toISOString()}\x1b[0m`);
+    if (entry.status === 'pending' && entry.requestId) {
+        println(
+            '  \x1b[90mAção: /permission respond <id> <approve-once|approve-for-session|approve-for-location|reject|user-not-available>\x1b[0m',
+        );
+    }
     println(`\n  data:\n${pretty(entry.data, 2500)}\n`);
 }

@@ -15,6 +15,7 @@ import {
     getAgentSdkQuota,
     getAgentSdkSessionCapabilities,
     getAgentSdkSessionMode,
+    handleAgentSdkPendingPermission,
     inputAgentSdkSessionUi,
     isAgentSdkSessionUiElicitationAvailable,
     listAgentSdkModels,
@@ -250,4 +251,14 @@ export function getTerminalSdkPendingElicitation(id, runtimeId) {
  */
 export function resolveTerminalSdkPendingElicitation(id, result, runtimeId) {
     return resolveAgentSdkPendingElicitation(id, result, runtimeId);
+}
+
+/**
+ * @param {string} requestId
+ * @param {{ kind: string } & Record<string, unknown>} result
+ * @param {string | null | undefined} [runtimeId]
+ * @returns {Promise<unknown>}
+ */
+export async function handleTerminalSdkPendingPermission(requestId, result, runtimeId) {
+    return handleAgentSdkPendingPermission(requestId, result, runtimeId);
 }

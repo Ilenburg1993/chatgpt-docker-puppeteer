@@ -259,7 +259,10 @@ export function recordTerminalPermissionCompleted(evt) {
     const requestId = stringOr(data['requestId'], '') || stringOr(objectOrNull(data['data'])?.['requestId'], '');
     const permissionType = stringOr(
         data['permissionType'],
-        stringOr(objectOrNull(data['data'])?.['permissionType'], ''),
+        stringOr(
+            objectOrNull(data['data'])?.['permissionType'],
+            stringOr(data['type'], stringOr(objectOrNull(data['data'])?.['type'], '')),
+        ),
     );
     const entry =
         (requestId ? _permissions.get(requestId) : null) ??

@@ -238,6 +238,9 @@ describe('terminal/sdk-session-events.js — contrato', () => {
             requestId: 'perm-1',
             permissionType: 'file_write',
         });
+        agent.emit('permission.mode_changed', {
+            mode: 'audit_only',
+        });
         agent.emit('user_input.requested', {
             requestId: 'ui-1',
             question: 'Escolha?',
@@ -267,6 +270,11 @@ describe('terminal/sdk-session-events.js — contrato', () => {
             'question',
             'Permissão SDK solicitada',
             expect.objectContaining({ detail: 'file_write · perm-1', severity: 'warn' }),
+        );
+        expect(mocks.recordTerminalActivity).toHaveBeenCalledWith(
+            'system',
+            'Modo de permissão alterado',
+            expect.objectContaining({ detail: 'audit_only', source: 'sdk' }),
         );
         expect(mocks.recordTerminalActivity).toHaveBeenCalledWith(
             'question',
@@ -303,6 +311,10 @@ describe('terminal/sdk-session-events.js — contrato', () => {
         expect(mocks.broadcastSse).toHaveBeenCalledWith(
             'permission.requested',
             expect.objectContaining({ id: 'perm-1', permissionType: 'file_write' }),
+        );
+        expect(mocks.broadcastSse).toHaveBeenCalledWith(
+            'permission.mode_changed',
+            expect.objectContaining({ mode: 'audit_only' }),
         );
         expect(mocks.broadcastSse).toHaveBeenCalledWith(
             'user_input.requested',
@@ -410,6 +422,7 @@ describe('terminal/sdk-session-events.js — contrato', () => {
         expect(agent.count('session.workspace_file_changed')).toBeGreaterThan(0);
         expect(agent.count('elicitation.pending')).toBeGreaterThan(0);
         expect(agent.count('permission.requested')).toBeGreaterThan(0);
+        expect(agent.count('permission.mode_changed')).toBeGreaterThan(0);
         expect(agent.count('user_input.requested')).toBeGreaterThan(0);
         expect(agent.count('session.skills_loaded')).toBeGreaterThan(0);
         dispose();
@@ -417,6 +430,7 @@ describe('terminal/sdk-session-events.js — contrato', () => {
         expect(agent.count('session.workspace_file_changed')).toBe(0);
         expect(agent.count('elicitation.pending')).toBe(0);
         expect(agent.count('permission.requested')).toBe(0);
+        expect(agent.count('permission.mode_changed')).toBe(0);
         expect(agent.count('user_input.requested')).toBe(0);
         expect(agent.count('session.skills_loaded')).toBe(0);
     });

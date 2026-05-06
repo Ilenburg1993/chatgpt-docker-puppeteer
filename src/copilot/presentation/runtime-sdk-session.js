@@ -330,3 +330,13 @@ export function getAgentSdkPendingElicitation(id, runtimeId) {
 export function resolveAgentSdkPendingElicitation(id, result, runtimeId) {
     return getAgentSdkSessionTarget(runtimeId).resolvePendingSdkElicitation(id, result);
 }
+
+/**
+ * @param {string} requestId
+ * @param {{ kind: string } & Record<string, unknown>} result
+ * @param {string | null | undefined} [runtimeId]
+ * @returns {Promise<unknown>}
+ */
+export async function handleAgentSdkPendingPermission(requestId, result, runtimeId) {
+    return getAgentSdkSessionTarget(runtimeId).handleSdkPendingPermission(requestId, result);
+}

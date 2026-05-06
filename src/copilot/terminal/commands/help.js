@@ -62,7 +62,7 @@ export function cmdHelp({ injectPort, println }) {
   \x1b[33m/sdk [status|models|tools|quota|prompt|capabilities|waits|compact]\x1b[0m — catálogo/quota/capabilities/ops SDK via Agent
   \x1b[33m/workspace [list|read|write]\x1b[0m          — workspace virtual da sessão SDK
   \x1b[33m/elicitation [list|show|request]\x1b[0m      — formulários/URL estruturados do SDK
-  \x1b[33m/permission [list|all|show|clear|mode]\x1b[0m — permissões SDK observadas + governança por runtime
+  \x1b[33m/permission [list|all|show|clear|mode|respond]\x1b[0m — permissões SDK observadas + governança + resposta manual
   \x1b[33m/errors [n]\x1b[0m                          — mostra últimos N erros rastreados (default: 10)
   \x1b[33m/audit [n]\x1b[0m                           — últimas N entradas do audit log (default: 10)
   \x1b[33m/display [toggle] [on|off]\x1b[0m           — gerencia toggles de exibição (thinking, streaming, usage, tools, intent)

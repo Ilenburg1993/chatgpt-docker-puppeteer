@@ -38,6 +38,7 @@ const runtimeMocks = vi.hoisted(() => ({
         tools: { workspace: true, list: true, quota: true },
         plan: { read: true, write: true, delete: true },
     })),
+    handleTerminalSdkPendingPermission: vi.fn(async (requestId, result) => ({ requestId, result, ok: true })),
     requestTerminalSdkElicitation: vi.fn(async () => ({ action: 'accept', content: { answer: 'ok' } })),
     resolveTerminalSdkPendingElicitation: vi.fn(() => true),
     selectTerminalSdkSessionUi: vi.fn(async (_message, options) => options[0] ?? null),
@@ -292,6 +293,26 @@ describe('terminal/commands/sdk', () => {
         const clear = mockCtx();
         await cmdPermission({ println: clear.println }, 'clear perm-1');
         expect(clear.output()).toContain('removida');
+    });
+
+    it('/permission respond envia decisão para pending permission via runtime gateway', async () => {
+        recordTerminalPermissionRequested({
+            requestId: 'perm-pending',
+            permissionType: 'shell',
+        });
+
+        const respond = mockCtx();
+        await cmdPermission(
+            { println: respond.println },
+            'respond perm-pending approve-for-session {"reason":"manual"}',
+        );
+
+        expect(runtimeMocks.handleTerminalSdkPendingPermission).toHaveBeenCalledWith(
+            'perm-pending',
+            expect.objectContaining({ kind: 'approve-for-session', reason: 'manual' }),
+            null,
+        );
+        expect(respond.output()).toContain('Resposta de permissão enviada');
     });
 
     it('/permission mode lê e altera o modo de governança do runtime', async () => {

@@ -57,8 +57,9 @@ export function wireInteractionEvents(session, { emit }) {
             const raw = /** @type {Record<string, unknown>} */ (/** @type {unknown} */ (evt));
             const data = /** @type {Record<string, unknown>} */ (raw['data'] ?? {});
             const permissionType = /** @type {string | undefined} */ (data['permissionType'] ?? data['type']);
+            const requestId = /** @type {string | undefined} */ (data['requestId']);
             log('INFO', `[interaction-events] permission.requested: ${permissionType ?? '?'}`);
-            emit('permission.requested', { permissionType, data, ts: evt?.timestamp ?? Date.now() });
+            emit('permission.requested', { requestId, permissionType, data, ts: evt?.timestamp ?? Date.now() });
         }),
 
         // ── permission.completed ─────────────────────────────────────────
@@ -66,8 +67,18 @@ export function wireInteractionEvents(session, { emit }) {
             const raw = /** @type {Record<string, unknown>} */ (/** @type {unknown} */ (evt));
             const data = /** @type {Record<string, unknown>} */ (raw['data'] ?? {});
             const granted = /** @type {boolean | undefined} */ (data['granted'] ?? data['approved']);
+            const requestId = /** @type {string | undefined} */ (data['requestId']);
+            const permissionType = /** @type {string | undefined} */ (data['permissionType'] ?? data['type']);
+            const result = /** @type {string | undefined} */ (data['result']);
             log('INFO', `[interaction-events] permission.completed: granted=${granted ?? '?'}`);
-            emit('permission.completed', { granted, data, ts: evt?.timestamp ?? Date.now() });
+            emit('permission.completed', {
+                requestId,
+                permissionType,
+                result,
+                granted,
+                data,
+                ts: evt?.timestamp ?? Date.now(),
+            });
         }),
 
         // ── user_input.requested / completed ─────────────────────────────

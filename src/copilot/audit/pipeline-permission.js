@@ -10,9 +10,9 @@
  */
 
 import { logSwallowed, toError } from '#copilot/core';
-import { approveAll } from '#copilot/sdk';
+import { approveAll, PERMISSION_COMPLETED_KINDS, PERMISSION_RESULTS } from '#copilot/sdk';
 import { appendFile, mkdir, rename, stat } from 'node:fs/promises';
-import { join, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { getLogDir, log } from './logger.js';
 
 /** @param {string} key @param {number} def @returns {number} */
@@ -101,7 +101,7 @@ export function logToolAudit(entry) {
 
     void (async () => {
         try {
-            await mkdir(join(TOOL_PERMISSIONS_LOG, '..'), { recursive: true });
+            await mkdir(dirname(TOOL_PERMISSIONS_LOG), { recursive: true });
             if (_permLogBytes < 0) {
                 try {
                     const { size } = await stat(TOOL_PERMISSIONS_LOG);
@@ -120,6 +120,21 @@ export function logToolAudit(entry) {
             logSwallowed(e, 'audit.pipeline.logPermission');
         }
     })();
+}
+
+/**
+ * @param {unknown} kind
+ * @returns {boolean}
+ */
+function isApprovedPermissionKind(kind) {
+    return (
+        kind === PERMISSION_RESULTS.APPROVE_ONCE ||
+        kind === PERMISSION_RESULTS.APPROVE_FOR_SESSION ||
+        kind === PERMISSION_RESULTS.APPROVE_FOR_LOCATION ||
+        kind === PERMISSION_COMPLETED_KINDS.APPROVED ||
+        kind === PERMISSION_COMPLETED_KINDS.APPROVED_FOR_SESSION ||
+        kind === PERMISSION_COMPLETED_KINDS.APPROVED_FOR_LOCATION
+    );
 }
 
 /**
@@ -157,7 +172,7 @@ export function buildAuditingPermissionHandler(baseHandler) {
                 result = await approveAll(request, invocation);
             }
 
-            const decision = result?.kind === 'approved' ? 'approved' : 'denied';
+            const decision = isApprovedPermissionKind(result?.kind) ? 'approved' : 'denied';
             logToolAudit({ tool: toolName, decision, highRisk });
 
             const sessionId = typeof invocation?.sessionId === 'string' ? invocation.sessionId : '';
