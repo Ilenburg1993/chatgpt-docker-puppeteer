@@ -462,7 +462,7 @@ export class AlwaysAliveAgent extends EventEmitter {
      *
      * @param {string} message - Mensagem a enviar
      * @param {{
-     *     timeoutMs?: number;
+     *     timeoutMs?: number | null;
      *     attachments?: import('#copilot/sdk/types').MessageOptions['attachments'];
      *     signal?: AbortSignal;
      * }} [opts]
@@ -482,7 +482,7 @@ export class AlwaysAliveAgent extends EventEmitter {
      * Variante interna de sendMessage() usada pelo DialogLoopManager para enviar o boot prompt.
      *
      * @param {string} message
-     * @param {{ timeoutMs?: number }} [opts]
+     * @param {{ timeoutMs?: number | null }} [opts]
      * @returns {Promise<string>}
      */
     sendMessageDialogBoot(message, opts = {}) {

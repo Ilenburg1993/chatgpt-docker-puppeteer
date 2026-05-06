@@ -6,13 +6,13 @@
  *   Esta camada retira de `terminal/` a propriedade semântica sobre leitura, embedding e cache de arquivos.
  */
 
-import { readdir, readFile, stat } from 'node:fs/promises';
-import { extname, join as pathJoin, resolve as pathResolve } from 'node:path';
+import { extname, resolve as pathResolve } from 'node:path';
 import { logSwallowed, toError } from '../core/error-handlers.js';
-import { ToolError } from '../core/errors.js';
+import { readText } from '../infra/io-engine.js';
+import { scanDirectory } from '../infra/io-scanner.js';
 
-/** Limite total de bytes embutidos por envio (64 KB). */
-export const MAX_EMBED_BYTES = 65_536;
+/** Limite informativo histórico. Não bloqueia embedding em operações da LLM-B. */
+export const MAX_EMBED_BYTES = Number.POSITIVE_INFINITY;
 
 /** TTL do cache de file-context em ms (30 segundos). */
 const FILE_CACHE_TTL_MS = 30_000;
@@ -105,12 +105,12 @@ export function detectLang(filePath) {
 /**
  * Lê um arquivo e retorna seu contexto estruturado para embedding.
  *
- * AB.1: Usa cache em memória com TTL de 30s para evitar re-leituras desnecessárias. Emite erro se o arquivo não
- * existir, não for legível ou exceder `MAX_EMBED_BYTES`.
+ * AB.1: Usa cache em memória com TTL de 30s para evitar re-leituras desnecessárias. Emite erro se o arquivo não existir
+ * ou não for legível. Tamanho é metadata informativa, não bloqueio.
  *
  * @param {string} filePath - Caminho (absoluto ou relativo ao cwd)
  * @returns {Promise<FileContext>}
- * @throws {Error} Se o arquivo não existir ou exceder o limite de tamanho
+ * @throws {Error} Se o arquivo não existir
  */
 export async function readFileContext(filePath) {
     const absPath = pathResolve(filePath);
@@ -129,17 +129,11 @@ export async function readFileContext(filePath) {
     }
     _fileCacheMisses++;
 
-    const info = await stat(absPath);
-    if (info.size > MAX_EMBED_BYTES) {
-        throw new ToolError(
-            `Arquivo muito grande para embed: ${filePath} (${(info.size / 1024).toFixed(1)} KB > 64 KB)`,
-        );
-    }
-    const content = await readFile(absPath, 'utf-8');
+    const file = await readText(absPath);
     const ctx = {
         path: filePath,
-        content,
-        size: info.size,
+        content: file.content,
+        size: file.bytesRead,
         lang: detectLang(filePath),
     };
     _fileCache.set(absPath, { ctx, expiresAt: now + FILE_CACHE_TTL_MS });
@@ -167,22 +161,16 @@ export function embedContextBlock(ctx, message) {
 /**
  * Embute múltiplos arquivos no início da mensagem, empilhados em ordem.
  *
- * Respeita `MAX_EMBED_BYTES` total: se o total acumulado exceder o limite, para de adicionar novos arquivos e retorna o
- * que couber.
+ * Mantém todos os arquivos informados. `MAX_EMBED_BYTES` permanece apenas como dado informativo histórico.
  *
  * @param {FileContext[]} ctxs - Lista de contextos na ordem desejada
  * @param {string} message - Mensagem original do usuário
  * @returns {string} Mensagem enriquecida com blocos de arquivo
  */
 export function embedMultiple(ctxs, message) {
-    let totalBytes = 0;
     const blocks = [];
     for (const ctx of ctxs) {
-        if (totalBytes + ctx.size > MAX_EMBED_BYTES) {
-            break;
-        }
         blocks.push(buildBlock(ctx));
-        totalBytes += ctx.size;
     }
     if (blocks.length === 0) return message;
     return `${blocks.join('\n\n')}\n\n${message}`;
@@ -217,8 +205,8 @@ export function extractAtReferences(message) {
 /**
  * Lê os arquivos de um diretório (shallow, não recursivo) e retorna seus contextos.
  *
- * Respeita `MAX_EMBED_BYTES` total: para de adicionar arquivos quando o limite é atingido. Ignora arquivos binários e
- * sub-diretórios. Lança erro se o diretório não existir.
+ * Lê todos os arquivos legíveis do diretório. Ignora arquivos binários e sub-diretórios. Lança erro se o diretório não
+ * existir.
  *
  * @param {string} dirPath - Caminho do diretório (absoluto ou relativo ao cwd)
  * @returns {Promise<FileContext[]>} Lista de contextos dos arquivos lidos
@@ -226,30 +214,25 @@ export function extractAtReferences(message) {
  */
 export async function readDirectoryContext(dirPath) {
     const absPath = pathResolve(dirPath);
-    const entries = await readdir(absPath, { withFileTypes: true });
-    const files = entries.filter((e) => e.isFile()).map((e) => pathJoin(absPath, e.name));
+    const scan = await scanDirectory(absPath, { showHidden: true, recursive: false });
+    const files = scan.entries.filter((entry) => entry.type === 'file');
 
-    const statResults = await Promise.allSettled(
-        files.map(async (filePath) => {
-            const info = await stat(filePath);
-            return { filePath, size: info.size };
-        }),
-    );
-
-    let totalBytes = 0;
     /** @type {FileContext[]} */
     const ctxs = [];
 
-    for (const result of statResults) {
-        if (result.status !== 'fulfilled') continue;
-        const { filePath, size } = result.value;
-        if (size === 0 || totalBytes + size > MAX_EMBED_BYTES) continue;
+    for (const entry of files) {
+        if ((entry.size ?? 0) === 0) continue;
         try {
-            const content = await readFile(filePath, 'utf-8');
+            const file = await readText(entry.absolutePath);
+            const content = file.content;
             if (content.includes('\0')) continue;
-            const ctx = { path: filePath, content, size, lang: detectLang(filePath) };
+            const ctx = {
+                path: entry.absolutePath,
+                content,
+                size: entry.size ?? file.bytesRead,
+                lang: detectLang(entry.absolutePath),
+            };
             ctxs.push(ctx);
-            totalBytes += size;
         } catch (e) {
             logSwallowed(e, 'runtimeFileContext.readFile');
         }

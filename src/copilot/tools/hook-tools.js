@@ -128,10 +128,9 @@ const hookGetAuditTailTool = buildTool({
             .number()
             .int()
             .min(1)
-            .max(200)
             .optional()
             .default(20)
-            .describe('Número de linhas a retornar (padrão: 20, máximo: 200)'),
+            .describe('Número sugerido de linhas a retornar (padrão histórico: 20)'),
         source: z
             .enum(['sdk', 'compliance', 'auto'])
             .optional()

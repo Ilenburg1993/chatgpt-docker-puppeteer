@@ -105,16 +105,6 @@ export function registerDialogRoutes(bridge, binding) {
         const { agent } = deps;
         const runtimeMeta = buildRuntimeRouteMetaPayload(deps);
         const runtimeKey = deps.runtimeId ?? 'default';
-        // G2-API-09: rate limiting — rejeitar imediatamente se já há turno HTTP em andamento
-        if (hasDialogTurnInFlight(runtimeKey)) {
-            return res.status(429).json({
-                ok: false,
-                ...runtimeMeta,
-                error: 'Turno já em andamento. Aguarde a resposta antes de enviar outro.',
-            });
-        }
-
-        const MAX_DIALOG_TIMEOUT_MS = 300_000;
         const { message, timeout: rawTimeout } = req.body ?? {};
 
         if (!message || typeof message !== 'string') {
@@ -124,15 +114,12 @@ export function registerDialogRoutes(bridge, binding) {
         }
         if (
             rawTimeout !== undefined &&
-            (typeof rawTimeout !== 'number' ||
-                !Number.isFinite(rawTimeout) ||
-                rawTimeout < 0 ||
-                rawTimeout > MAX_DIALOG_TIMEOUT_MS)
+            (typeof rawTimeout !== 'number' || !Number.isFinite(rawTimeout) || rawTimeout < 0)
         ) {
             return res.status(400).json({
                 ok: false,
                 ...runtimeMeta,
-                error: `"timeout" deve ser número finito entre 0 e ${MAX_DIALOG_TIMEOUT_MS}.`,
+                error: '"timeout" deve ser número finito maior ou igual a 0.',
             });
         }
 
@@ -143,6 +130,15 @@ export function registerDialogRoutes(bridge, binding) {
             phase: 'dialog',
             allowDisabled: true,
         });
+
+        if (hasDialogTurnInFlight(runtimeKey)) {
+            return res.status(409).json({
+                ok: false,
+                ...runtimeMeta,
+                error: `Já existe um turno de diálogo em andamento para runtime '${runtimeKey}'.`,
+                dialogLoopActive: readAgentRuntimeControlStateFromRoute(deps).dialogLoopActive,
+            });
+        }
 
         markDialogTurnInFlight(runtimeKey);
         try {

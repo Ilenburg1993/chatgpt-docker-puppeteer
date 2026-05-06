@@ -40,25 +40,25 @@ const execFileAsync = promisify(execFile);
  * Executa um comando de shell via execFile de forma assíncrona (não bloqueia event loop).
  *
  * @param {string[]} argv — argv[0] é o executável, resto são args
- * @param {number} [timeoutMs]
+ * @param {number} [advisoryTimeoutMs]
  * @returns {Promise<{ stdout: string; exitCode: number; error?: string }>}
  */
-async function safeExec(argv, timeoutMs = 60_000) {
+async function safeExec(argv, advisoryTimeoutMs = 60_000) {
     const [cmd, ...args] = argv;
+    log('DEBUG', `[copilot/code-tools] advisoryTimeout=${advisoryTimeoutMs}ms argv=${argv.join(' ')}`);
     try {
         const { stdout } = await execFileAsync(cmd ?? 'echo', args, {
             cwd: ROOT,
             encoding: 'utf8',
-            timeout: timeoutMs,
-            maxBuffer: 4 * 1024 * 1024,
+            maxBuffer: 1024 * 1024 * 1024,
         });
-        return { stdout: stdout.slice(0, 4000), exitCode: 0 };
+        return { stdout, exitCode: 0 };
     } catch (e) {
         const ex = toExecError(e);
         return {
-            stdout: (ex.stdout ?? '').slice(0, 2000),
+            stdout: ex.stdout ?? '',
             exitCode: typeof ex.code === 'number' ? ex.code : (ex.status ?? 1),
-            error: (ex.stderr ?? ex.message ?? '').slice(0, 2000),
+            error: ex.stderr ?? ex.message ?? '',
         };
     }
 }

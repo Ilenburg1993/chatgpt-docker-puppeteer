@@ -163,12 +163,14 @@ function parseElicitationResult(action, rest, schema) {
 
 /**
  * @param {CommandContext} ctx
+ * @param {string | null | undefined} runtimeId
  * @returns {void}
  */
-function renderSdkWaitsSummary({ println }) {
-    const pendingElicitations = readTerminalElicitationSummary();
-    const permissionSummary = readTerminalPermissionSummary();
-    const userInputSummary = readTerminalUserInputSummary();
+function renderSdkWaitsSummary({ println }, runtimeId) {
+    const scopedRuntimeId = runtimeId ?? null;
+    const pendingElicitations = readTerminalElicitationSummary({ runtimeId: scopedRuntimeId });
+    const permissionSummary = readTerminalPermissionSummary({ runtimeId: scopedRuntimeId });
+    const userInputSummary = readTerminalUserInputSummary({ runtimeId: scopedRuntimeId });
     const totalPending = pendingElicitations.pending + permissionSummary.pending + userInputSummary.pending;
     const headlineColor = totalPending > 0 ? '\x1b[33m' : '\x1b[32m';
 
@@ -274,15 +276,15 @@ export async function cmdSdk({ println }, arg = '') {
         } else if (sub === 'capabilities' || sub === 'caps') {
             renderSdkCapabilitiesSummary({ println }, runtimeId);
         } else if (sub === 'waits') {
-            renderSdkWaitsSummary({ println });
+            renderSdkWaitsSummary({ println }, runtimeId);
         } else if (sub === 'compact') {
             const result = await callWithRuntimeTarget(compactTerminalSdkSession, runtimeId);
             println(`\n  \x1b[32m✓ SDK compaction solicitada.\x1b[0m\n  \x1b[90m${pretty(result, 700)}\x1b[0m\n`);
         } else {
             const state = readTerminalRuntimeState(runtimeId);
-            const pendingElicitations = readTerminalElicitationSummary();
-            const permissionSummary = readTerminalPermissionSummary();
-            const userInputSummary = readTerminalUserInputSummary();
+            const pendingElicitations = readTerminalElicitationSummary({ runtimeId: state.runtimeId });
+            const permissionSummary = readTerminalPermissionSummary({ runtimeId: state.runtimeId });
+            const userInputSummary = readTerminalUserInputSummary({ runtimeId: state.runtimeId });
             println('\n  \x1b[36mSDK Runtime\x1b[0m');
             println(`  runtime  \x1b[90m${state.runtimeId}\x1b[0m`);
             println(`  session  \x1b[90m${state.sessionId ?? '-'}\x1b[0m`);
@@ -529,7 +531,7 @@ export async function cmdElicitation({ println }, arg = '') {
             println(`  elicitation  ${ok ? '\x1b[32mavailable\x1b[0m' : '\x1b[33munavailable\x1b[0m'}`);
             println('');
         } else if (sub === 'show') {
-            renderElicitationEntry({ println }, getTerminalElicitation(rest[0] || 'latest'));
+            renderElicitationEntry({ println }, getTerminalElicitation(rest[0] || 'latest', { runtimeId }));
         } else if (sub === 'clear') {
             const ok = clearTerminalElicitation(rest[0] || 'latest');
             println(
@@ -539,7 +541,7 @@ export async function cmdElicitation({ println }, arg = '') {
             );
         } else if (sub === 'respond') {
             const [id = 'latest', action, ...jsonRest] = rest;
-            const entry = getTerminalElicitation(id);
+            const entry = getTerminalElicitation(id, { runtimeId });
             if (!entry) {
                 println('\x1b[33m  Elicitation não encontrada.\x1b[0m');
                 return;
@@ -586,7 +588,7 @@ export async function cmdElicitation({ println }, arg = '') {
             const result = await callWithRuntimeTarget(requestTerminalSdkElicitation, runtimeId, message, parsed.json);
             println(`\n  \x1b[32m✓ Elicitation SDK concluída.\x1b[0m\n  \x1b[90m${pretty(result, 1500)}\x1b[0m\n`);
         } else {
-            const entries = listTerminalElicitations({ includeCompleted: sub === 'all' });
+            const entries = listTerminalElicitations({ includeCompleted: sub === 'all', runtimeId });
             if (entries.length === 0) {
                 println('\n  \x1b[90mNenhuma elicitation pendente na UX local.\x1b[0m');
             } else {
@@ -635,14 +637,14 @@ export async function cmdPermission({ println }, arg = '') {
         return;
     }
     if (sub === 'show') {
-        renderPermissionEntry({ println }, getTerminalPermission(rest[0] || 'latest'));
+        renderPermissionEntry({ println }, getTerminalPermission(rest[0] || 'latest', { runtimeId }));
         return;
     }
     if (sub === 'respond' || sub === 'resolve') {
         const idArg = rest[0];
         const actionArg = rest[1];
         const payloadArg = rest.slice(2).join(' ').trim();
-        const entry = getTerminalPermission(idArg || 'latest');
+        const entry = getTerminalPermission(idArg || 'latest', { runtimeId });
         if (!entry || !entry.requestId) {
             println('  \x1b[33mPermissão não encontrada ou sem requestId canônico para responder.\x1b[0m');
             return;
@@ -694,6 +696,7 @@ export async function cmdPermission({ println }, arg = '') {
     }
     if (sub === 'pending') {
         const remote = await callWithRuntimeTarget(listTerminalSdkPendingPermissions, runtimeId);
+        const resolvedRuntimeId = readTerminalRuntimeState(runtimeId).runtimeId;
         if (!remote.available) {
             println('\n  \x1b[33mListagem ativa de permissões pendentes indisponível no SDK atual.\x1b[0m');
             println('  \x1b[90mFallback operacional: usando estado observado local (/permission list).\x1b[0m\n');
@@ -720,8 +723,10 @@ export async function cmdPermission({ println }, arg = '') {
                         ...obj,
                         requestId,
                         permissionType,
+                        runtimeId: resolvedRuntimeId,
                         source: remote.source ?? 'permissions.listPending',
                     },
+                    runtimeId: resolvedRuntimeId,
                     ts: Date.now(),
                 });
                 println(`  \x1b[33m${requestId}\x1b[0m  ${permissionType}`);
@@ -731,7 +736,7 @@ export async function cmdPermission({ println }, arg = '') {
         }
     }
     if (sub === 'cockpit' || sub === 'panel') {
-        renderPermissionCockpit({ println });
+        renderPermissionCockpit({ println }, runtimeId);
         return;
     }
     if (sub === 'clear') {
@@ -740,7 +745,7 @@ export async function cmdPermission({ println }, arg = '') {
         return;
     }
 
-    const entries = listTerminalPermissions({ includeCompleted: sub === 'all' });
+    const entries = listTerminalPermissions({ includeCompleted: sub === 'all', runtimeId });
     if (entries.length === 0) {
         println('\n  \x1b[90mNenhuma permissão SDK pendente na UX local.\x1b[0m');
     } else {
@@ -816,17 +821,19 @@ function renderPermissionEntry({ println }, entry) {
 
 /**
  * @param {CommandContext} ctx
+ * @param {string | null | undefined} runtimeId
  * @returns {void}
  */
-function renderPermissionCockpit({ println }) {
-    const pending = listTerminalPermissions();
+function renderPermissionCockpit({ println }, runtimeId) {
+    const scopedRuntimeId = runtimeId ?? null;
+    const pending = listTerminalPermissions({ runtimeId: scopedRuntimeId });
     const byType = new Map();
     for (const entry of pending) {
         const key = entry.permissionType || 'unknown';
         byType.set(key, (byType.get(key) ?? 0) + 1);
     }
     const typeRows = [...byType.entries()].sort((a, b) => b[1] - a[1]);
-    const latest = readTerminalPermissionSummary().latest;
+    const latest = readTerminalPermissionSummary({ runtimeId: scopedRuntimeId }).latest;
     const modeChanges = listTerminalPermissionModeHistory({ limit: 4 });
 
     println('\n  \x1b[36mPermission cockpit\x1b[0m');

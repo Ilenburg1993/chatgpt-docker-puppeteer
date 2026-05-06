@@ -2,7 +2,7 @@
 /**
  * src/copilot/tools/web-tools.js
  *
- * Custom Tools para acesso web. Inclui proteção SSRF (OWASP A10), rate-limit interno e validação de content-type.
+ * Custom Tools para acesso web. Inclui proteção SSRF (OWASP A10), telemetria de volume e validação de content-type.
  *
  * @module copilot/tools/web-tools
  * @see EventBus
@@ -22,7 +22,6 @@ import { buildTool } from './tool-factory.js';
 
 /** @type {Map<number, number>} minute-bucket → request count */
 const RATE_WINDOW = new Map();
-const MAX_REQUESTS_PER_MINUTE = 20;
 
 /**
  * Reset util para testes — limpa buckets de rate-limit em memória.
@@ -34,14 +33,13 @@ export function resetWebToolsRateLimitWindowForTests() {
 }
 
 /**
- * Verifica e registra rate limit.
+ * Registra volume local. Limite é informativo e não bloqueia operações da LLM-B.
  *
- * @returns {boolean} true se dentro do limite, false se excedido
+ * @returns {boolean} Sempre true.
  */
 function checkRateLimit() {
     const bucket = Math.floor(Date.now() / 60_000);
     const count = RATE_WINDOW.get(bucket) ?? 0;
-    if (count >= MAX_REQUESTS_PER_MINUTE) return false;
     RATE_WINDOW.set(bucket, count + 1);
     // Remove buckets mais antigos para não crescer indefinidamente
     for (const [k] of RATE_WINDOW) {
@@ -62,33 +60,16 @@ const webFetchTool = buildTool({
         'Fetch web local com proteção SSRF. Em runtimes com built-in do CLI (`web_fetch`), a built-in prevalece. ' +
         'Busca o conteúdo de uma URL pública (HTTP/HTTPS). Apenas texto (text/*). ' +
         'Bloqueado para IPs privados, localhost e esquemas não-HTTP (proteção SSRF). ' +
-        'Limite: 20 requisições/minuto.',
+        'Volume/timeout são informativos e não bloqueiam a operação.',
     parameters: z.object({
         url: z.string().url().describe('URL completa da página a buscar (https:// recomendado)'),
-        maxBytes: z
-            .number()
-            .int()
-            .min(1)
-            .max(512_000)
-            .optional()
-            .default(131_072)
-            .describe('Tamanho máximo da resposta em bytes (padrão 128 KB, máx 512 KB)'),
-        timeoutMs: z
-            .number()
-            .int()
-            .min(1000)
-            .max(30_000)
-            .optional()
-            .default(10_000)
-            .describe('Timeout em ms (padrão 10 s, máx 30 s)'),
+        maxBytes: z.number().int().min(1).optional().describe('Tamanho informativo da resposta em bytes.'),
+        timeoutMs: z.number().int().min(0).optional().describe('Timeout informativo em ms; não aborta a operação.'),
     }),
     handler: async (
         /** @type {{ url: string; maxBytes?: number; timeoutMs?: number }} */ { url, maxBytes, timeoutMs },
     ) => {
-        // Rate limit
-        if (!checkRateLimit()) {
-            return { success: false, error: `Rate limit excedido: máx ${MAX_REQUESTS_PER_MINUTE} req/min.` };
-        }
+        checkRateLimit();
 
         // Parse + validate URL
         let parsed;
@@ -104,24 +85,14 @@ const webFetchTool = buildTool({
             return { success: false, error: `URL bloqueada por política de segurança: ${reason}` };
         }
 
-        const limit = maxBytes ?? 131_072;
-        const timeout = timeoutMs ?? 10_000;
+        const advisoryLimit = maxBytes ?? null;
 
         try {
-            const controller = new AbortController();
-            const timer = setTimeout(() => controller.abort(), timeout);
-
-            let response;
-            try {
-                response = await fetch(parsed.toString(), {
-                    method: 'GET',
-                    signal: controller.signal,
-                    redirect: 'follow',
-                    headers: { 'User-Agent': 'github-copilot-agent/1.0' },
-                });
-            } finally {
-                clearTimeout(timer);
-            }
+            const response = await fetch(parsed.toString(), {
+                method: 'GET',
+                redirect: 'follow',
+                headers: { 'User-Agent': 'github-copilot-agent/1.0' },
+            });
 
             // Validate redirect target (prevent header-injection redirect to internal)
             const finalUrl = response.url ? new URL(response.url) : parsed;
@@ -139,7 +110,6 @@ const webFetchTool = buildTool({
                 };
             }
 
-            // Read with size limit
             const reader = response.body?.getReader();
             if (!reader) return { success: false, error: 'Resposta sem corpo.' };
 
@@ -149,11 +119,6 @@ const webFetchTool = buildTool({
                 const { done, value } = await reader.read();
                 if (done) break;
                 received += value.byteLength;
-                if (received > limit) {
-                    void reader.cancel();
-                    chunks.push(value.slice(0, value.byteLength - (received - limit)));
-                    break;
-                }
                 chunks.push(value);
             }
 
@@ -176,13 +141,15 @@ const webFetchTool = buildTool({
                 url: response.url,
                 status: response.status,
                 contentType,
-                truncated: received > limit,
+                truncated: false,
+                advisoryMaxBytes: advisoryLimit,
+                advisoryTimeoutMs: timeoutMs ?? null,
+                bytesRead: received,
                 length: text.length,
                 content: text,
             };
         } catch (e) {
-            const msg =
-                toError(e).name === 'AbortError' ? `Timeout após ${timeout}ms` : (toError(e).message ?? String(e));
+            const msg = toError(e).message ?? String(e);
             log('WARN', `[copilot/web_fetch] Erro: ${msg}`);
             return { success: false, error: msg };
         }
@@ -201,46 +168,29 @@ const webSearchTool = buildTool({
     description:
         'Realiza busca na web via DuckDuckGo e retorna os primeiros resultados (título, URL, snippet). ' +
         'Use quando precisar de informações atuais da web que não estão no workspace. ' +
-        'Não requer API key. Limite: 20 requisições/minuto (pool compartilhado com web_fetch).',
+        'Não requer API key. Volume de uso é registrado como telemetria, sem rate-limit local bloqueante.',
     parameters: z.object({
-        query: z.string().min(1).max(400).describe('Consulta de busca'),
-        maxResults: z
-            .number()
-            .int()
-            .min(1)
-            .max(10)
-            .optional()
-            .default(5)
-            .describe('Número máximo de resultados a retornar (padrão 5, máx 10)'),
+        query: z.string().min(1).describe('Consulta de busca'),
+        maxResults: z.number().int().min(1).optional().describe('Número sugerido de resultados a retornar.'),
     }),
     handler: async (/** @type {{ query: string; maxResults?: number }} */ { query, maxResults }) => {
-        if (!checkRateLimit()) {
-            return { success: false, error: `Rate limit excedido: máx ${MAX_REQUESTS_PER_MINUTE} req/min.` };
-        }
+        checkRateLimit();
 
-        const limit = maxResults ?? 5;
+        const limit =
+            typeof maxResults === 'number' && Number.isFinite(maxResults) ? maxResults : Number.POSITIVE_INFINITY;
 
         // F4.4 (UPG-09): tenta DDG Instant Answer JSON API primeiro (não requer JS, sem scraping frágil)
         const jsonUrl = `https://api.duckduckgo.com/?q=${encodeURIComponent(query)}&format=json&no_html=1&skip_disambig=1`;
 
         try {
-            const controller = new AbortController();
-            const timer = setTimeout(() => controller.abort(), 15_000);
-
-            let response;
-            try {
-                response = await fetch(jsonUrl, {
-                    method: 'GET',
-                    signal: controller.signal,
-                    redirect: 'follow',
-                    headers: {
-                        'User-Agent': 'github-copilot-agent/1.0',
-                        Accept: 'application/json',
-                    },
-                });
-            } finally {
-                clearTimeout(timer);
-            }
+            const response = await fetch(jsonUrl, {
+                method: 'GET',
+                redirect: 'follow',
+                headers: {
+                    'User-Agent': 'github-copilot-agent/1.0',
+                    Accept: 'application/json',
+                },
+            });
 
             if (response.ok) {
                 /** @type {Record<string, unknown>} */
@@ -298,7 +248,12 @@ const webSearchTool = buildTool({
                         'INFO',
                         `[copilot/web_search] DDG JSON API: query="${query}" → ${safeResults.length} resultados`,
                     );
-                    return { success: true, query, results: safeResults.slice(0, limit) };
+                    return {
+                        success: true,
+                        query,
+                        results: safeResults.slice(0, limit),
+                        advisoryMaxResults: maxResults ?? null,
+                    };
                 }
                 // Sem resultados JSON — cai para HTML scraping
                 log(
@@ -307,8 +262,9 @@ const webSearchTool = buildTool({
                 );
             }
         } catch (e) {
-            if (toError(e).name === 'AbortError') {
-                return { success: false, error: 'Timeout (15s)' };
+            const err = toError(e);
+            if (err.name === 'AbortError') {
+                return { success: false, error: err.message || 'AbortError' };
             }
             log('WARN', `[copilot/web_search] DDG JSON API falhou (${toError(e).message ?? e}) — usando HTML scraping`);
         }
@@ -317,23 +273,14 @@ const webSearchTool = buildTool({
         const searchUrl = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`;
 
         try {
-            const controller = new AbortController();
-            const timer = setTimeout(() => controller.abort(), 15_000);
-
-            let response;
-            try {
-                response = await fetch(searchUrl, {
-                    method: 'GET',
-                    signal: controller.signal,
-                    redirect: 'follow',
-                    headers: {
-                        'User-Agent': 'Mozilla/5.0 (compatible; github-copilot-agent/1.0)',
-                        Accept: 'text/html',
-                    },
-                });
-            } finally {
-                clearTimeout(timer);
-            }
+            const response = await fetch(searchUrl, {
+                method: 'GET',
+                redirect: 'follow',
+                headers: {
+                    'User-Agent': 'Mozilla/5.0 (compatible; github-copilot-agent/1.0)',
+                    Accept: 'text/html',
+                },
+            });
 
             if (!response.ok) {
                 return { success: false, error: `DDG retornou status ${response.status}` };
@@ -393,7 +340,7 @@ const webSearchTool = buildTool({
             log('INFO', `[copilot/web_search] query="${query}" → ${safeHtmlResults.length} resultados`);
             return { success: true, query, results: safeHtmlResults };
         } catch (e) {
-            const msg = toError(e).name === 'AbortError' ? 'Timeout (15s)' : (toError(e).message ?? String(e));
+            const msg = toError(e).message ?? String(e);
             log('WARN', `[copilot/web_search] Erro: ${msg}`);
             return { success: false, error: msg };
         }

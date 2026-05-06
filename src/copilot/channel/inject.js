@@ -11,7 +11,7 @@
  */
 
 import { readCopilotBootConfig } from '#copilot/boot';
-import { LLM_B_BOOT_TIMEOUT_MS, LLM_B_TURN_TIMEOUT_MS } from '#copilot/config';
+import { LLM_B_TURN_TIMEOUT_MS } from '#copilot/config';
 import { BridgeError, resolveOptionalDialogTimeout, resolveOptionalTransportTimeout, toError } from '#copilot/core';
 import { log, recordToolCall } from '#copilot/observability';
 import http from 'node:http';
@@ -30,20 +30,10 @@ const DEFAULT_PORT = (() => {
 
 /** Timeout padrão para aguardar resposta (ms). */
 const DEFAULT_TIMEOUT_MS = LLM_B_TURN_TIMEOUT_MS;
-const DEFAULT_BOOT_WAIT_MS = LLM_B_BOOT_TIMEOUT_MS;
 const INJECT_LATENCY_HISTORY_SIZE = 120;
 
 /** @type {number[]} */
 const _injectLatencyHistory = [];
-
-/**
- * Limite de injeções por segundo (client-side). Configurável via INJECT_RATE_LIMIT_PER_SEC. Default: 30 req/s. Protege
- * contra flood acidental.
- */
-const INJECT_RATE_PER_SEC = (() => {
-    const raw = parseInt(process.env['INJECT_RATE_LIMIT_PER_SEC'] ?? '', 10);
-    return Number.isFinite(raw) && raw > 0 ? raw : 30;
-})();
 
 /** @type {number[]} Timestamps das últimas injeções (sliding window). */
 const _injectTimestamps = [];
@@ -79,9 +69,9 @@ function _estimateInjectP95() {
 }
 
 /**
- * Verifica se a próxima injeção é permitida pelo rate limiter client-side. Usa sliding window de 1s.
+ * Registra telemetria local de volume sem bloquear a próxima injeção.
  *
- * @returns {boolean} true se permitido
+ * @returns {boolean} Sempre true; limites de LLM-B são informativos.
  */
 function _checkClientRateLimit() {
     const now = Date.now();
@@ -91,11 +81,6 @@ function _checkClientRateLimit() {
         (_injectTimestamps[_injectWindowStartIndex] ?? 0) < windowStart
     ) {
         _injectWindowStartIndex++;
-    }
-
-    const activeCount = _injectTimestamps.length - _injectWindowStartIndex;
-    if (activeCount >= INJECT_RATE_PER_SEC) {
-        return false;
     }
 
     _injectTimestamps.push(now);
@@ -112,7 +97,7 @@ function _checkClientRateLimit() {
  * @property {string} [from] - ator remetente (default: 'llm-a')
  * @property {number | null} [timeoutMs] - timeout semântico do turno em ms (padrão adaptativo). Use 0/null para
  *   watchdog-only (sem timeout absoluto)
- * @property {number} [transportTimeoutMs] - timeout de transporte HTTP (padrão adaptativo, maior que `timeoutMs`)
+ * @property {number | null} [transportTimeoutMs] - timeout de transporte HTTP informativo; null desabilita bloqueio
  * @property {number} [port] - porta do terminal (default: porta canônica do boot)
  * @property {import('#copilot/sdk/types').MessageOptions['attachments']} [attachments] - Anexos (arquivos, imagens) a
  *   enviar junto com a mensagem
@@ -174,18 +159,8 @@ function httpRequest(method, path, body, port, timeoutMs) {
                 headers,
             },
             (res) => {
-                // BUG-N06 (fix): limitar corpo da resposta a 2 MB para evitar acúmulo irrestrito
-                const MAX_RESPONSE_BYTES = 2 * 1024 * 1024;
                 let data = '';
-                let received = 0;
                 res.on('data', (/** @type {Buffer} */ chunk) => {
-                    received += chunk.length;
-                    if (received > MAX_RESPONSE_BYTES) {
-                        req.destroy(
-                            new BridgeError('Resposta do terminal excede limite de 2 MB', 'LLM_B_RESPONSE_TOO_LARGE'),
-                        );
-                        return;
-                    }
                     data += chunk.toString('utf8');
                 });
                 res.on('end', () => resolve({ statusCode: res.statusCode ?? 0, body: data }));
@@ -250,13 +225,7 @@ export async function injectToLlmB(message, opts = {}) {
     const retryDelayMs = opts.retryDelayMs ?? 1_500;
     const retryOn503 = opts.retryOn503 ?? false;
 
-    // F96: client-side rate limiting — rejeitar antes de enviar ao servidor
-    if (!_checkClientRateLimit()) {
-        throw new BridgeError(
-            `[inject-llmb] Rate limit client-side excedido (${INJECT_RATE_PER_SEC} req/s). Aguarde antes de reenviar.`,
-            'LLM_B_RATE_LIMITED',
-        );
-    }
+    _checkClientRateLimit();
 
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
         try {
@@ -438,15 +407,18 @@ async function _doInjectToLlmB(message, opts) {
 /**
  * Aguarda até o terminal LLM-B estar pronto, com polling periódico.
  *
- * @param {{ maxWaitMs?: number; pollIntervalMs?: number; port?: number }} [opts]
+ * @param {{ maxWaitMs?: number | null; pollIntervalMs?: number; port?: number }} [opts]
  * @returns {Promise<void>}
  * @throws {BridgeError} Se o terminal não ficar pronto dentro do tempo máximo
  */
 export async function waitForLlmBReady(opts = {}) {
-    const maxWaitMs = opts.maxWaitMs ?? Math.max(30_000, Math.min(DEFAULT_BOOT_WAIT_MS, 120_000));
+    const maxWaitMs =
+        typeof opts.maxWaitMs === 'number' && Number.isFinite(opts.maxWaitMs) && opts.maxWaitMs > 0
+            ? opts.maxWaitMs
+            : null;
     const pollIntervalMs = opts.pollIntervalMs ?? 2_000;
     const port = opts.port ?? DEFAULT_PORT;
-    const deadline = Date.now() + maxWaitMs;
+    const deadline = maxWaitMs === null ? Number.POSITIVE_INFINITY : Date.now() + maxWaitMs;
 
     while (Date.now() < deadline) {
         const h = await checkLlmBHealth({ port });

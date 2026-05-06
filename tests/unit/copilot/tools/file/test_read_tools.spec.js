@@ -69,6 +69,7 @@ describe('tools/file/readFileContentTool', () => {
         const handler = /** @type {any} */ (getHandler(readFileContentTool));
         const r = await handler({ path: fileA, encoding: 'utf8' });
         expect(r.success).toBe(true);
+        expect(r.io?.operation).toBe('read');
         expect(r.content).toContain('line1');
         expect(r.content).toContain('line4');
     });
@@ -80,6 +81,14 @@ describe('tools/file/readFileContentTool', () => {
         expect(r.content).toContain('line2');
         expect(r.content).toContain('line3');
         expect(r.content).not.toContain('line1');
+    });
+
+    it('retorna conteúdo vazio quando startLine passa do fim do arquivo', async () => {
+        const handler = /** @type {any} */ (getHandler(readFileContentTool));
+        const r = await handler({ path: fileA, startLine: 99, encoding: 'utf8' });
+        expect(r.success).toBe(true);
+        expect(r.content).toBe('');
+        expect(r.returnedLines.start).toBeGreaterThan(r.returnedLines.end);
     });
 
     it('suporta encoding base64', async () => {
@@ -116,6 +125,7 @@ describe('tools/file/listDirectoryTool', () => {
         const handler = /** @type {any} */ (getHandler(listDirectoryTool));
         const r = await handler({ path: tmpDir, recursive: false, depth: 3, showHidden: false });
         expect(r.success).toBe(true);
+        expect(r.io?.engine).toBe('io-scanner.fs.readdir');
         expect(r.entries.length).toBeGreaterThanOrEqual(3); // a.txt, b.txt, sub
         const names = r.entries.map((/** @type {{ name: string }} */ e) => e.name);
         expect(names).toContain('a.txt');
@@ -170,6 +180,7 @@ describe('tools/file/searchInFilesTool', () => {
             maxResults: 10,
         });
         expect(r.success).toBe(true);
+        expect(r.io?.operation).toBe('search');
         expect(r.output).toContain('line2');
     });
 
@@ -187,7 +198,7 @@ describe('tools/file/searchInFilesTool', () => {
         expect(r.output).toContain('line3');
     });
 
-    it('rejeita pattern longo (>500 chars)', async () => {
+    it('aceita pattern longo como operação não bloqueante', async () => {
         const handler = /** @type {any} */ (getHandler(searchInFilesTool));
         const r = await handler({
             pattern: 'x'.repeat(501),
@@ -197,8 +208,8 @@ describe('tools/file/searchInFilesTool', () => {
             contextLines: 2,
             maxResults: 50,
         });
-        expect(r.success).toBe(false);
-        expect(r.error).toContain('500');
+        expect(r.success).toBe(true);
+        expect(r.matchCount).toBe(0);
     });
 
     it('retorna matchCount=0 para padrão sem match', async () => {
@@ -227,6 +238,7 @@ describe('tools/file/diffFilesTool', () => {
         const handler = /** @type {any} */ (getHandler(diffFilesTool));
         const r = await handler({ path_a: fileA, path_b: fileB, context_lines: 3 });
         expect(r.success).toBe(true);
+        expect(r.io?.operation).toBe('diff');
         expect(r.identical).toBe(false);
         expect(r.diff).toContain('MODIFIED');
     });

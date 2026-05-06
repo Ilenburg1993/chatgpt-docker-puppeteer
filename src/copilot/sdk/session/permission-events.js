@@ -64,6 +64,7 @@ export function classifyPermissionDecision(kind, granted) {
  * @returns {{
  *     requestId: string | null;
  *     permissionType: string;
+ *     runtimeId: string | null;
  *     data: Record<string, unknown>;
  *     ts: number;
  * }}
@@ -77,6 +78,12 @@ export function normalizePermissionRequestedEvent(eventOrData) {
         stringOr(data['type'], '') ||
         stringOr(root['permissionType'], '') ||
         stringOr(root['type'], 'unknown');
+    const runtimeId =
+        stringOr(root['runtimeId'], '') ||
+        stringOr(root['sourceRuntime'], '') ||
+        stringOr(data['runtimeId'], '') ||
+        stringOr(data['sourceRuntime'], '') ||
+        null;
     const ts =
         typeof root['timestamp'] === 'number'
             ? root['timestamp']
@@ -86,6 +93,7 @@ export function normalizePermissionRequestedEvent(eventOrData) {
     return {
         requestId,
         permissionType,
+        runtimeId,
         data: Object.keys(data).length > 0 ? data : root,
         ts,
     };
@@ -96,6 +104,7 @@ export function normalizePermissionRequestedEvent(eventOrData) {
  * @returns {{
  *     requestId: string | null;
  *     permissionType: string;
+ *     runtimeId: string | null;
  *     resultKind: string | null;
  *     granted: boolean | null;
  *     decision: 'approved' | 'denied' | 'unknown';
@@ -112,6 +121,12 @@ export function normalizePermissionCompletedEvent(eventOrData) {
         stringOr(data['permissionType'], '') ||
         stringOr(root['type'], '') ||
         stringOr(data['type'], 'unknown');
+    const runtimeId =
+        stringOr(root['runtimeId'], '') ||
+        stringOr(root['sourceRuntime'], '') ||
+        stringOr(data['runtimeId'], '') ||
+        stringOr(data['sourceRuntime'], '') ||
+        null;
     const resultKind = stringOr(root['result'], '') || stringOr(data['result'], '') || null;
     const granted =
         boolOrNull(root['granted']) ??
@@ -128,6 +143,7 @@ export function normalizePermissionCompletedEvent(eventOrData) {
     return {
         requestId,
         permissionType,
+        runtimeId,
         resultKind,
         granted,
         decision,

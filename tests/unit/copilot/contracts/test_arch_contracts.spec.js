@@ -473,14 +473,13 @@ describe('W4-9 — copilot-api routes propagam runtime metadata canônica', () =
         assert.match(tasksSrc, /buildRuntimeRouteMetaPayload/);
     });
 
-    it('dialog/turn usa gate de concorrência por runtimeId, não mutex global do processo', () => {
+    it('dialog/turn usa registry explícito por runtimeId, não gate local process-wide', () => {
         const dialogSrc = readSrc('server/routes/copilot-api/dialog.js');
 
         assert.match(dialogSrc, /runtime-state\/copilot-api-dialog\.js/);
-        assert.match(dialogSrc, /hasDialogTurnInFlight\(/);
-        assert.match(dialogSrc, /markDialogTurnInFlight\(/);
-        assert.match(dialogSrc, /clearDialogTurnInFlight\(/);
-        assert.match(dialogSrc, /deps\.runtimeId\s*\?\?\s*['"]default['"]/);
+        assert.match(dialogSrc, /hasDialogTurnInFlight\(runtimeKey\)/);
+        assert.match(dialogSrc, /markDialogTurnInFlight\(runtimeKey\)/);
+        assert.match(dialogSrc, /clearDialogTurnInFlight\(runtimeKey\)/);
         assert.doesNotMatch(dialogSrc, /^\s*(?:const|let)\s+\w+\s*=\s*new Map\(/m);
         assert.doesNotMatch(dialogSrc, /\b_turnInFlight\b/);
         assert.doesNotMatch(dialogSrc, /let\s+\w*turnInFlight\w*\s*=\s*false/);

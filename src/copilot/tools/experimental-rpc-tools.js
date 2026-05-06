@@ -14,7 +14,7 @@
  */
 
 import { COPILOT_RPC_TIMEOUT_MS } from '#copilot/config';
-import { TimeoutError, toError } from '#copilot/core';
+import { toError } from '#copilot/core';
 import { createTool } from '#copilot/sdk';
 import { z } from 'zod';
 import { log } from './logger.js';
@@ -68,43 +68,16 @@ function getSession() {
 }
 
 /**
- * Executa uma Promise com timeout e garante cleanup do timer em sucesso/falha.
- *
- * @template T
- * @param {Promise<T>} promise
- * @param {number} timeoutMs
- * @param {string} label
- * @returns {Promise<T>}
- */
-async function withTimeout(promise, timeoutMs, label) {
-    /** @type {ReturnType<typeof setTimeout> | null} */
-    let timer = null;
-    try {
-        return await Promise.race([
-            promise,
-            new Promise((_resolve, reject) => {
-                timer = setTimeout(() => reject(new TimeoutError(`${label} timeout (${timeoutMs}ms)`)), timeoutMs);
-            }),
-        ]);
-    } finally {
-        if (timer !== null) {
-            clearTimeout(timer);
-        }
-    }
-}
-
-/**
  * Resolve timeout efetivo para operações experimentais.
  *
- * `null` desabilita timeout absoluto (usar somente em operações potencialmente longas por natureza).
+ * Retorna sempre `null`: timeouts experimentais da LLM-B são apenas informativos.
  *
  * @param {number | null | undefined} timeoutMs
  * @returns {number | null}
  */
 function resolveExperimentalTimeoutMs(timeoutMs) {
-    if (timeoutMs === null) return null;
-    if (typeof timeoutMs === 'number' && Number.isFinite(timeoutMs) && timeoutMs > 0) return timeoutMs;
-    return COPILOT_RPC_TIMEOUT_MS;
+    void timeoutMs;
+    return null;
 }
 
 /**
@@ -123,10 +96,10 @@ async function wrapExp(toolName, fn, opts = {}) {
     } catch (e) {
         return { error: toError(e).message };
     }
-    const timeoutMs = resolveExperimentalTimeoutMs(opts.timeoutMs);
+    resolveExperimentalTimeoutMs(opts.timeoutMs);
     try {
-        const result =
-            timeoutMs === null ? await fn(session) : await withTimeout(fn(session), timeoutMs, 'Experimental RPC');
+        log('DEBUG', `[${toolName}] experimentalRpcTimeout=disabled advisory=${COPILOT_RPC_TIMEOUT_MS}ms`);
+        const result = await fn(session);
         return /** @type {T} */ (result);
     } catch (e) {
         log('ERROR', `[${toolName}] ${toError(e).message}`);

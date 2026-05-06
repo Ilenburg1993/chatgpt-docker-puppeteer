@@ -11,7 +11,6 @@
  * @see module:copilot/agent/dialog/watchdog
  */
 
-import { LLM_B_TURN_TIMEOUT_MS } from '#copilot/config';
 import { SessionError } from '#copilot/core';
 import {
     EMITTER_LOOP_CHANGED,
@@ -271,10 +270,10 @@ export class DialogLoopManager extends EventEmitter {
      *
      * @param {string} message
      * @param {{ timeout?: number | null; signal?: AbortSignal; traceId?: string }} [opts] `timeout: null` desabilita o
-     *   inactivity guard — use somente quando o watchdog de loop for o guardião de stall.
+     *   inactivity guard. Este é o default para não impor limite bloqueante às operações da LLM-B.
      * @returns {Promise<string>}
      */
-    sendTurn(message, { timeout = LLM_B_TURN_TIMEOUT_MS, signal, traceId } = {}) {
+    sendTurn(message, { timeout = null, signal, traceId } = {}) {
         if (!this.#state.canSendTurn) {
             return Promise.reject(
                 new SessionError('[DialogLoopManager] Dialog loop não está ativo.', 'DIALOG_NOT_ACTIVE'),

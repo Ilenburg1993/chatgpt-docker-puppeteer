@@ -6,7 +6,7 @@
 #
 # Goal: keep good quality while reducing latency/overhead for day-to-day work.
 
-model_reasoning_effort = "medium"
+model_reasoning_effort = "high"
 approval_policy = "never"
 sandbox_mode = "danger-full-access"
 web_search = "cached"

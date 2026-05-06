@@ -9,7 +9,6 @@
  */
 
 import { readRuntimeControlState } from '#copilot/agent';
-import { LLM_B_TURN_TIMEOUT_MS } from '#copilot/config';
 import { BridgeError } from '#copilot/core';
 import {
     EMITTER_QUESTION_PENDING,
@@ -147,8 +146,8 @@ function createInactivityGuard(timeoutMs, onTimeout) {
  * @typedef {Object} ChatOptions
  * @property {(chunk: string, taskId: string) => void} [onDelta] - Callback por chunk de streaming
  * @property {(question: object) => void} [onQuestion] - Callback quando modelo faz pergunta
- * @property {number | null} [timeoutMs] - Timeout em ms. `null` = sem timeout por inatividade (default:
- *   `LLM_B_TURN_TIMEOUT_MS`). Use `null` somente quando o watchdog for o único guardião de stall.
+ * @property {number | null} [timeoutMs] - Timeout em ms. `null` = sem timeout por inatividade. Este é o default para
+ *   não impor limite bloqueante à LLM-B.
  * @property {import('#copilot/sdk/types').MessageOptions['attachments']} [attachments] - Anexos (arquivos, imagens) a
  *   enviar junto com a mensagem
  * @property {number} [retries] - F11.4: número máximo de tentativas em caso de timeout/erro transiente (default: 0)
@@ -195,14 +194,7 @@ export class LlmBridgeClient {
      * @throws {Error} Se o agente não estiver ativo ou a tarefa falhar
      */
     async chat(message, opts = {}) {
-        const {
-            onDelta,
-            onQuestion,
-            timeoutMs = LLM_B_TURN_TIMEOUT_MS,
-            attachments,
-            retries = 0,
-            retryDelayMs = 1_500,
-        } = opts;
+        const { onDelta, onQuestion, timeoutMs = null, attachments, retries = 0, retryDelayMs = 1_500 } = opts;
 
         // F11.4: wrapper de retry — tenta no máximo `retries+1` vezes em erros de timeout ou busy
         for (let attempt = 0; attempt <= retries; attempt++) {
@@ -237,7 +229,7 @@ export class LlmBridgeClient {
      * @returns {Promise<ChatResult>}
      */
     async #chatOnce(message, opts = {}) {
-        const { onDelta, onQuestion, timeoutMs = LLM_B_TURN_TIMEOUT_MS, attachments } = opts;
+        const { onDelta, onQuestion, timeoutMs = null, attachments } = opts;
         const startedAt = Date.now();
 
         if (requireAgent().status === 'stopped') {

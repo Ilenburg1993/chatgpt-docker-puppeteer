@@ -2,8 +2,8 @@
 /**
  * src/copilot/tools/shell/executor.js
  *
- * Funções de execução de processos: tokenização de comandos, truncamento de output, execução unitária e pipeline (pipe)
- * com timeout e sandboxing.
+ * Funções de execução de processos: tokenização de comandos, captura integral de output, execução unitária e pipeline
+ * (pipe) com sandboxing.
  *
  * @module copilot/tools/shell/executor
  * @see EventBus
@@ -16,11 +16,11 @@ import { safeEnv } from './sandbox.js';
 
 const execFileAsync = promisify(execFile);
 
-/** Limite máximo de bytes no output retornado */
-export const MAX_OUTPUT_BYTES = 10_000;
+/** Valor histórico mantido apenas como telemetria/advisory. Não bloqueia nem trunca output. */
+export const ADVISORY_OUTPUT_BYTES = 10_000;
 
-/** Timeout máximo permitido em ms (120s) */
-export const MAX_TIMEOUT_MS = 120_000;
+/** Valor histórico mantido apenas como telemetria/advisory. Não encerra processos. */
+export const ADVISORY_TIMEOUT_MS = 120_000;
 
 /**
  * BUG-H01 (fix): tokeniza um comando shell respeitando aspas simples e duplas. Exemplo: tokenizeShell('echo "hello
@@ -55,16 +55,13 @@ export function tokenizeShell(command) {
 }
 
 /**
- * Trunca string para MAX_OUTPUT_BYTES, adicionando aviso se truncado.
+ * Preserva output integral. O nome é mantido por compatibilidade com chamadas existentes.
  *
  * @param {string} text
  * @returns {string}
  */
 export function truncateOutput(text) {
-    if (Buffer.byteLength(text, 'utf8') <= MAX_OUTPUT_BYTES) return text;
-    // Usar subarray (zero-copy view) em vez do deprecated buf.slice()
-    const truncated = Buffer.from(text, 'utf8').subarray(0, MAX_OUTPUT_BYTES).toString('utf8');
-    return truncated + `\n\n[OUTPUT TRUNCADO — limite de ${MAX_OUTPUT_BYTES} bytes atingido]`;
+    return text;
 }
 
 /**
@@ -72,7 +69,7 @@ export function truncateOutput(text) {
  *
  * @param {string} file - Executável (ex: 'sh', 'node', 'npm')
  * @param {string[]} args - Argumentos passados ao execFile
- * @param {{ cwd: string; timeoutMs: number }} opts
+ * @param {{ cwd: string; timeoutMs?: number | null }} opts
  * @returns {Promise<{ exitCode: number; stdout: string; stderr: string; durationMs: number }>}
  */
 export async function runProcess(file, args, { cwd, timeoutMs }) {
@@ -80,8 +77,10 @@ export async function runProcess(file, args, { cwd, timeoutMs }) {
     try {
         const { stdout, stderr } = await execFileAsync(file, args, {
             cwd,
-            timeout: timeoutMs,
-            maxBuffer: MAX_OUTPUT_BYTES * 4,
+            ...(typeof timeoutMs === 'number' && Number.isFinite(timeoutMs) && timeoutMs > 0
+                ? { timeout: timeoutMs }
+                : {}),
+            maxBuffer: 1024 * 1024 * 1024,
             env: safeEnv(),
             killSignal: 'SIGTERM',
         });
@@ -107,7 +106,7 @@ export async function runProcess(file, args, { cwd, timeoutMs }) {
  * e validado individualmente antes da execução.
  *
  * @param {{ file: string; args: string[] }[]} stages - Etapas da pipeline (cmd1 | cmd2)
- * @param {{ cwd: string; timeoutMs: number }} opts
+ * @param {{ cwd: string; timeoutMs?: number | null }} opts
  * @returns {Promise<{ exitCode: number; stdout: string; stderr: string; durationMs: number }>}
  */
 export async function runPipeline(stages, { cwd, timeoutMs }) {
@@ -144,18 +143,21 @@ export async function runPipeline(stages, { cwd, timeoutMs }) {
             stderr += d;
         });
 
-        const timer = setTimeout(() => {
-            for (const p of procs) p.kill('SIGTERM');
-            resolve({
-                exitCode: 124,
-                stdout: truncateOutput(stdout),
-                stderr: 'Timeout',
-                durationMs: Date.now() - start,
-            });
-        }, timeoutMs);
+        const timer =
+            typeof timeoutMs === 'number' && Number.isFinite(timeoutMs) && timeoutMs > 0
+                ? setTimeout(() => {
+                      for (const p of procs) p.kill('SIGTERM');
+                      resolve({
+                          exitCode: 124,
+                          stdout: truncateOutput(stdout),
+                          stderr: 'Timeout',
+                          durationMs: Date.now() - start,
+                      });
+                  }, timeoutMs)
+                : null;
 
         lastProc.on('close', (code) => {
-            clearTimeout(timer);
+            if (timer) clearTimeout(timer);
             resolve({
                 exitCode: code ?? 1,
                 stdout: truncateOutput(stdout),

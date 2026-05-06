@@ -12,7 +12,7 @@
 import { createTool } from '#copilot/sdk';
 import { z } from 'zod';
 import { withSkipPermission } from '../tool-factory.js';
-import { MAX_LIST, PRIORITY_ORDER, isOverdue, readStore, sanitize, zPriority, zStatus } from './store.js';
+import { PRIORITY_ORDER, isOverdue, readStore, sanitize, zPriority, zStatus } from './store.js';
 
 // ---------------------------------------------------------------------------
 // Tool: todo_list
@@ -42,7 +42,6 @@ export const todoListTool = withSkipPermission(
                         .describe('null = apenas raiz; string = subtarefas deste pai; omitido = todas'),
                     text: z
                         .string()
-                        .max(200)
                         .optional()
                         .describe('Busca de texto em título, descrição e notas (case-insensitive)'),
                     overdue_only: z.boolean().optional().describe('Se true, retorna apenas tarefas vencidas'),
@@ -50,10 +49,8 @@ export const todoListTool = withSkipPermission(
                         .number()
                         .int()
                         .min(1)
-                        .max(MAX_LIST)
                         .optional()
-                        .default(50)
-                        .describe('Máximo de resultados'),
+                        .describe('Quantidade sugerida de resultados; omitido retorna todos.'),
                 })
             )
         ),
@@ -111,16 +108,16 @@ export const todoListTool = withSkipPermission(
                 return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
             });
 
-            const limit = args.limit ?? 50;
             const total = filtered.length;
-            filtered = filtered.slice(0, limit);
+            const returnedTasks = typeof args.limit === 'number' ? filtered.slice(0, args.limit) : filtered;
 
             return {
                 success: true,
-                tasks: filtered,
+                tasks: returnedTasks,
                 total,
-                returned: filtered.length,
-                has_more: total > limit,
+                returned: returnedTasks.length,
+                has_more: false,
+                advisoryLimit: args.limit ?? null,
             };
         },
     }),
@@ -146,7 +143,6 @@ export const todoSearchTool = withSkipPermission(
                     query: z
                         .string()
                         .min(1)
-                        .max(500)
                         .describe('Texto de busca. Múltiplos termos separados por espaço (AND implícito)'),
                     status: zStatus.optional().describe('Filtrar por status após a busca'),
                     priority: zPriority.optional().describe('Filtrar por prioridade após a busca'),
@@ -154,10 +150,8 @@ export const todoSearchTool = withSkipPermission(
                         .number()
                         .int()
                         .min(1)
-                        .max(MAX_LIST)
                         .optional()
-                        .default(20)
-                        .describe('Máximo de resultados'),
+                        .describe('Quantidade sugerida de resultados; omitido retorna todos.'),
                 })
             )
         ),
@@ -202,10 +196,17 @@ export const todoSearchTool = withSkipPermission(
             });
 
             const total = scored.length;
-            const limit = args.limit ?? 20;
-            const results = scored.slice(0, limit).map(({ task, score }) => ({ ...task, _score: score }));
+            const limited = typeof args.limit === 'number' ? scored.slice(0, args.limit) : scored;
+            const results = limited.map(({ task, score }) => ({ ...task, _score: score }));
 
-            return { success: true, query: args.query, results, total, returned: results.length };
+            return {
+                success: true,
+                query: args.query,
+                results,
+                total,
+                returned: results.length,
+                advisoryLimit: args.limit ?? null,
+            };
         },
     }),
 );

@@ -21,17 +21,17 @@ export const execFileAsync = promisify(execFile);
 /** Raiz canonica do workspace definida pelo boot. */
 export const WORKSPACE_ROOT = BOOT_WORKSPACE_ROOT;
 
-/** Limite máximo de bytes retornados por read_file_content */
-export const MAX_CONTENT_BYTES = 80_000;
+/** Limite informativo histórico de bytes para read_file_content. Não bloqueia nem trunca operações da LLM-B. */
+export const MAX_CONTENT_BYTES = Number.POSITIVE_INFINITY;
 
-/** Limite máximo de bytes retornados por search_in_file */
-export const MAX_SEARCH_OUTPUT = 20_000;
+/** Limite informativo histórico de bytes para search_in_files. Não bloqueia nem trunca operações da LLM-B. */
+export const MAX_SEARCH_OUTPUT = Number.POSITIVE_INFINITY;
 
-/** Limite máximo de entradas retornadas por list_directory */
-export const MAX_LIST_ENTRIES = 500;
+/** Limite informativo histórico de entradas para list_directory. Não bloqueia operações da LLM-B. */
+export const MAX_LIST_ENTRIES = Number.POSITIVE_INFINITY;
 
-/** Limite máximo de bytes para diffs retornados por diff_files. */
-export const MAX_DIFF_OUTPUT = 64_000;
+/** Limite informativo histórico de bytes para diff_files. Não bloqueia nem trunca operações da LLM-B. */
+export const MAX_DIFF_OUTPUT = Number.POSITIVE_INFINITY;
 
 // MELHORIA-10 (fix): verificação lazy da disponibilidade de ripgrep (cache single-check)
 /** @type {boolean | null} */

@@ -91,6 +91,7 @@ export function classifyUserInputQuestionKind(question) {
  * @param {unknown} eventOrData
  * @returns {{
  *     requestId: string | null;
+ *     runtimeId: string | null;
  *     question: string;
  *     choices: string[];
  *     allowFreeform: boolean;
@@ -105,6 +106,12 @@ export function normalizeUserInputRequestedEvent(eventOrData) {
     const payload = Object.keys(data).length > 0 ? data : root;
     return {
         requestId: stringOr(payload['requestId'], '') || null,
+        runtimeId:
+            stringOr(root['runtimeId'], '') ||
+            stringOr(root['sourceRuntime'], '') ||
+            stringOr(payload['runtimeId'], '') ||
+            stringOr(payload['sourceRuntime'], '') ||
+            null,
         question: stringOr(payload['question'], ''),
         choices: arrayOfStrings(payload['choices']),
         allowFreeform: payload['allowFreeform'] !== false,
@@ -118,6 +125,7 @@ export function normalizeUserInputRequestedEvent(eventOrData) {
  * @param {unknown} eventOrData
  * @returns {{
  *     requestId: string | null;
+ *     runtimeId: string | null;
  *     answer: string;
  *     wasFreeform: boolean | null;
  *     data: Record<string, unknown>;
@@ -130,6 +138,12 @@ export function normalizeUserInputCompletedEvent(eventOrData) {
     const payload = Object.keys(data).length > 0 ? data : root;
     return {
         requestId: stringOr(payload['requestId'], '') || null,
+        runtimeId:
+            stringOr(root['runtimeId'], '') ||
+            stringOr(root['sourceRuntime'], '') ||
+            stringOr(payload['runtimeId'], '') ||
+            stringOr(payload['sourceRuntime'], '') ||
+            null,
         answer: stringOr(payload['answer'], ''),
         wasFreeform: typeof payload['wasFreeform'] === 'boolean' ? payload['wasFreeform'] : null,
         data: payload,

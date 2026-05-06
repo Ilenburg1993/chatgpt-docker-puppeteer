@@ -175,12 +175,13 @@ describe('handlers/agent — handlePipeline validação', () => {
         expect(result.status).toBe(400);
     });
 
-    it('rejeita >20 steps', async () => {
+    it('aceita mais de 20 steps sem limite bloqueante', async () => {
         const steps = Array.from({ length: 21 }, (_, i) => ({ prompt: `p${i}` }));
+        mockSendAgentDialogTurn.mockResolvedValue('ok');
         const result = await handlePipeline({ steps });
         const body = bodyOf(/** @type {{ body: any }} */ (result));
-        expect(result.status).toBe(400);
-        expect(body.error).toContain('20');
+        expect(result.status).toBe(200);
+        expect(body.results.length).toBe(21);
     });
 
     it('executa pipeline com 1 step no runtime default', async () => {
@@ -193,7 +194,7 @@ describe('handlers/agent — handlePipeline validação', () => {
         expect(mockSendAgentDialogTurn).toHaveBeenCalledWith(
             defaultRuntime,
             'test',
-            expect.objectContaining({ timeout: expect.any(Number), traceId: expect.any(String) }),
+            expect.objectContaining({ timeout: null, traceId: expect.any(String) }),
         );
     });
 
@@ -206,7 +207,7 @@ describe('handlers/agent — handlePipeline validação', () => {
         expect(mockSendAgentDialogTurn).toHaveBeenLastCalledWith(
             altRuntime,
             'alt-turn',
-            expect.objectContaining({ timeout: expect.any(Number), traceId: expect.any(String) }),
+            expect.objectContaining({ timeout: null, traceId: expect.any(String) }),
         );
     });
 });
@@ -239,7 +240,7 @@ describe('handlers/agent — handleInject validação', () => {
         );
     });
 
-    it('propaga timeout explícito para o runtime dialog', async () => {
+    it('mantém timeout explícito como informativo e envia runtime dialog sem bloqueio', async () => {
         mockSendAgentDialogTurn.mockResolvedValueOnce('com-timeout');
         const result = await handleInject({ body: { message: 'hello', timeout: 2500 } });
         const body = bodyOf(/** @type {{ body: any }} */ (result));
@@ -249,7 +250,7 @@ describe('handlers/agent — handleInject validação', () => {
         expect(mockSendAgentDialogTurn).toHaveBeenLastCalledWith(
             defaultRuntime,
             'hello',
-            expect.objectContaining({ timeout: 2500, traceId: expect.any(String) }),
+            expect.objectContaining({ timeout: null, traceId: expect.any(String) }),
         );
     });
 

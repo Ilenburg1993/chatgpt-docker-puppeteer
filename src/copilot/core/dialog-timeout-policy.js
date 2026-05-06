@@ -33,6 +33,7 @@
  *     timeoutMs: number | null;
  *     strategy: 'explicit' | 'adaptive' | 'disabled';
  *     reasons: string[];
+ *     advisoryTimeoutMs?: number;
  * }} OptionalDialogTimeoutDecision
  *
  *
@@ -175,15 +176,20 @@ export function computeAdaptiveDialogTimeout(input) {
  * @returns {OptionalDialogTimeoutDecision}
  */
 export function resolveOptionalDialogTimeout(input) {
-    if (input.allowDisabled && input.explicitTimeoutMs === 0) {
+    const advisory = computeAdaptiveDialogTimeout(input);
+    if (input.allowDisabled) {
         return {
             timeoutMs: null,
             strategy: 'disabled',
-            reasons: ['caller_disabled'],
+            reasons: [
+                input.explicitTimeoutMs === 0 ? 'caller_disabled' : 'non_blocking_llmb',
+                ...advisory.reasons.map((reason) => `advisory:${reason}`),
+            ],
+            advisoryTimeoutMs: advisory.timeoutMs,
         };
     }
 
-    return computeAdaptiveDialogTimeout(input);
+    return advisory;
 }
 
 /**
@@ -243,13 +249,18 @@ export function computeAdaptiveTransportTimeout(input) {
  * @returns {OptionalDialogTimeoutDecision}
  */
 export function resolveOptionalTransportTimeout(input) {
-    if (input.allowDisabled && input.explicitTransportTimeoutMs === 0) {
+    const advisory = computeAdaptiveTransportTimeout(input);
+    if (input.allowDisabled) {
         return {
             timeoutMs: null,
             strategy: 'disabled',
-            reasons: ['caller_disabled'],
+            reasons: [
+                input.explicitTransportTimeoutMs === 0 ? 'caller_disabled' : 'non_blocking_llmb',
+                ...advisory.reasons.map((reason) => `advisory:${reason}`),
+            ],
+            advisoryTimeoutMs: advisory.timeoutMs,
         };
     }
 
-    return computeAdaptiveTransportTimeout(input);
+    return advisory;
 }

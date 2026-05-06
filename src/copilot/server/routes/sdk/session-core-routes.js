@@ -12,10 +12,10 @@ import {
     setSessionModel,
 } from '../../../sdk/session/wrapper.js';
 import { resolveSdkRouteSharedDeps } from './deps.js';
-import { rateLimitMiddleware, validateBody, validateModel, withErrorHandler } from './session-middleware.js';
+import { validateBody, validateModel, withErrorHandler } from './session-middleware.js';
 import { getActiveSessionEntryOrReply, withRuntimeMeta, withSessionRuntimeMeta } from './session-route-helpers.js';
 import { LogMessageBodySchema, SendMessageBodySchema, SetModelBodySchema } from './session-schemas.js';
-import { MAX_PROMPT_BYTES, sendAndWaitWithoutTimeout } from './session-send-helpers.js';
+import { sendAndWaitWithoutTimeout } from './session-send-helpers.js';
 import { ensureSessionStreamState, maybeDisposeSessionStreamState, sessionsTracker } from './session-stream-state.js';
 
 /**
@@ -29,111 +29,95 @@ import { ensureSessionStreamState, maybeDisposeSessionStreamState, sessionsTrack
  * @returns {void}
  */
 export function registerSessionCoreRoutes(router) {
-    router.post(
-        '/sessions/:id/send',
-        rateLimitMiddleware(30, 'session_send'),
-        validateBody(SendMessageBodySchema),
-        (req, res) => {
-            void withErrorHandler(req, res, async () => {
-                const routeDeps = resolveSdkRouteSharedDeps(req);
-                const id = /** @type {string} */ (req.params['id']);
-                const { prompt, waitForResponse = true, attachments } = req.body ?? {};
-                const rawTimeoutMs = (req.body ?? {}).timeoutMs;
-                const rawMode = (req.body ?? {}).mode;
-                /** @type {'immediate' | 'enqueue' | undefined} */
-                const mode = rawMode === 'immediate' || rawMode === 'enqueue' ? rawMode : undefined;
+    router.post('/sessions/:id/send', validateBody(SendMessageBodySchema), (req, res) => {
+        void withErrorHandler(req, res, async () => {
+            const routeDeps = resolveSdkRouteSharedDeps(req);
+            const id = /** @type {string} */ (req.params['id']);
+            const { prompt, waitForResponse = true, attachments } = req.body ?? {};
+            const rawTimeoutMs = (req.body ?? {}).timeoutMs;
+            const rawMode = (req.body ?? {}).mode;
+            /** @type {'immediate' | 'enqueue' | undefined} */
+            const mode = rawMode === 'immediate' || rawMode === 'enqueue' ? rawMode : undefined;
 
-                if (
-                    rawTimeoutMs !== undefined &&
-                    (typeof rawTimeoutMs !== 'number' || !Number.isFinite(rawTimeoutMs) || rawTimeoutMs < 0)
-                ) {
-                    res.status(400).json(
-                        withRuntimeMeta(routeDeps, {
-                            ok: false,
-                            error: 'Campo "timeoutMs" deve ser um número finito maior ou igual a zero.',
-                        }),
-                    );
-                    return;
-                }
+            if (
+                rawTimeoutMs !== undefined &&
+                (typeof rawTimeoutMs !== 'number' || !Number.isFinite(rawTimeoutMs) || rawTimeoutMs < 0)
+            ) {
+                res.status(400).json(
+                    withRuntimeMeta(routeDeps, {
+                        ok: false,
+                        error: 'Campo "timeoutMs" deve ser um número finito maior ou igual a zero.',
+                    }),
+                );
+                return;
+            }
 
-                if (!prompt || typeof prompt !== 'string') {
-                    res.status(400).json(
-                        withRuntimeMeta(routeDeps, { ok: false, error: 'Campo "prompt" (string) é obrigatório.' }),
-                    );
-                    return;
-                }
+            if (!prompt || typeof prompt !== 'string') {
+                res.status(400).json(
+                    withRuntimeMeta(routeDeps, { ok: false, error: 'Campo "prompt" (string) é obrigatório.' }),
+                );
+                return;
+            }
 
-                if (Buffer.byteLength(prompt, 'utf8') > MAX_PROMPT_BYTES) {
-                    res.status(400).json(
-                        withRuntimeMeta(routeDeps, {
-                            ok: false,
-                            error: `Prompt excede o limite de ${MAX_PROMPT_BYTES} bytes.`,
-                        }),
-                    );
-                    return;
-                }
-
-                const timeoutDecision = routeDeps.sdkSessionPolicy.resolveOptionalDialogTimeout({
-                    explicitTimeoutMs: rawTimeoutMs,
-                    defaultTimeoutMs: routeDeps.sdkSessionPolicy.defaultDialogTimeoutMs,
-                    payloadChars: prompt.length,
-                    phase: 'dialog',
-                    allowDisabled: true,
-                });
-
-                const entry = getActiveSessionEntryOrReply(routeDeps, id, res);
-                if (!entry) return;
-
-                routeDeps.sdkSession.incrementSessionMessageCount(id);
-
-                /** @type {RouteMessageOptions} */
-                const messageOptions = {
-                    prompt,
-                    ...(attachments ? { attachments } : {}),
-                    ...(mode !== undefined ? { mode } : {}),
-                };
-
-                if (waitForResponse) {
-                    const event =
-                        timeoutDecision.timeoutMs !== null
-                            ? await sendSessionAndWait(
-                                  entry.session,
-                                  /** @type {never} */ (messageOptions),
-                                  timeoutDecision.timeoutMs,
-                              )
-                            : await sendAndWaitWithoutTimeout(routeDeps, entry.session, messageOptions);
-                    routeDeps.sdkObservability.log(
-                        'INFO',
-                        `[sdk-api] session.send timeout=${timeoutDecision.timeoutMs ?? 'disabled'} strategy=${timeoutDecision.strategy} reasons=${timeoutDecision.reasons.join('+')} session=${id}`,
-                    );
-                    const assistantEvent =
-                        /** @type {{ data?: { content?: string; messageId?: string } } | undefined} */ (event);
-                    res.json(
-                        withSessionRuntimeMeta(
-                            routeDeps,
-                            {
-                                ok: true,
-                                sessionId: id,
-                                content: assistantEvent?.data?.content ?? null,
-                                messageId: assistantEvent?.data?.messageId ?? null,
-                                timeoutPolicy: {
-                                    timeoutMs: timeoutDecision.timeoutMs,
-                                    strategy: timeoutDecision.strategy,
-                                    reasons: timeoutDecision.reasons,
-                                },
-                            },
-                            id,
-                        ),
-                    );
-                } else {
-                    const messageId = await sendSession(entry.session, /** @type {never} */ (messageOptions));
-                    res.json(
-                        withSessionRuntimeMeta(routeDeps, { ok: true, sessionId: id, messageId, enqueued: true }, id),
-                    );
-                }
+            const timeoutDecision = routeDeps.sdkSessionPolicy.resolveOptionalDialogTimeout({
+                explicitTimeoutMs: rawTimeoutMs,
+                defaultTimeoutMs: routeDeps.sdkSessionPolicy.defaultDialogTimeoutMs,
+                payloadChars: prompt.length,
+                phase: 'dialog',
+                allowDisabled: true,
             });
-        },
-    );
+
+            const entry = getActiveSessionEntryOrReply(routeDeps, id, res);
+            if (!entry) return;
+
+            routeDeps.sdkSession.incrementSessionMessageCount(id);
+
+            /** @type {RouteMessageOptions} */
+            const messageOptions = {
+                prompt,
+                ...(attachments ? { attachments } : {}),
+                ...(mode !== undefined ? { mode } : {}),
+            };
+
+            if (waitForResponse) {
+                const event =
+                    timeoutDecision.timeoutMs !== null
+                        ? await sendSessionAndWait(
+                              entry.session,
+                              /** @type {never} */ (messageOptions),
+                              timeoutDecision.timeoutMs,
+                          )
+                        : await sendAndWaitWithoutTimeout(routeDeps, entry.session, messageOptions);
+                routeDeps.sdkObservability.log(
+                    'INFO',
+                    `[sdk-api] session.send timeout=${timeoutDecision.timeoutMs ?? 'disabled'} strategy=${timeoutDecision.strategy} reasons=${timeoutDecision.reasons.join('+')} session=${id}`,
+                );
+                const assistantEvent = /** @type {{ data?: { content?: string; messageId?: string } } | undefined} */ (
+                    event
+                );
+                res.json(
+                    withSessionRuntimeMeta(
+                        routeDeps,
+                        {
+                            ok: true,
+                            sessionId: id,
+                            content: assistantEvent?.data?.content ?? null,
+                            messageId: assistantEvent?.data?.messageId ?? null,
+                            timeoutPolicy: {
+                                timeoutMs: timeoutDecision.timeoutMs,
+                                strategy: timeoutDecision.strategy,
+                                reasons: timeoutDecision.reasons,
+                            },
+                        },
+                        id,
+                    ),
+                );
+            } else {
+                const messageId = await sendSession(entry.session, /** @type {never} */ (messageOptions));
+                res.json(withSessionRuntimeMeta(routeDeps, { ok: true, sessionId: id, messageId, enqueued: true }, id));
+            }
+        });
+    });
 
     router.get('/sessions/:id/stream', (req, res) => {
         const routeDeps = resolveSdkRouteSharedDeps(req);

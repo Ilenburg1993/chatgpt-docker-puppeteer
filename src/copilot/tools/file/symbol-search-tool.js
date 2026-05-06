@@ -12,11 +12,13 @@
 
 import { z } from 'zod';
 import { toError, toExecError } from '../../core/error-handlers.js';
+import { buildIoMeta, withIoMeta } from '../../core/io-contracts.js';
+import { publishIoOperation } from '../../infra/io-observability.js';
 import { log } from '../logger.js';
 import { buildTool } from '../tool-factory.js';
-import { MAX_SEARCH_OUTPUT, WORKSPACE_ROOT, execFileAsync, isRgAvailable, validatePath } from './shared.js';
+import { WORKSPACE_ROOT, execFileAsync, isRgAvailable, validatePath } from './shared.js';
 
-const RG_TIMEOUT_MS = 30_000;
+const RG_TIMEOUT_MS = undefined;
 
 /**
  * Tipos de símbolo suportados e seus padrões ripgrep por linguagem.
@@ -120,7 +122,6 @@ export const workspaceSymbolSearchTool = buildTool({
         name: z
             .string()
             .min(1)
-            .max(200)
             .describe('Nome ou prefixo/substring do símbolo a buscar (ex: "validatePath", "MyClass")'),
         kind: z
             .enum(['function', 'class', 'variable', 'export', 'type', 'all'])
@@ -139,14 +140,7 @@ export const workspaceSymbolSearchTool = buildTool({
             .optional()
             .describe('Glob de arquivos a incluir (ex: "*.ts", "src/**/*.js"). Sobrescreve padrão automático por kind'),
         caseSensitive: z.boolean().optional().default(false).describe('Busca sensível a maiúsculas. Default: false'),
-        maxResults: z
-            .number()
-            .int()
-            .min(1)
-            .max(200)
-            .optional()
-            .default(30)
-            .describe('Número máximo de declarações a retornar (1-200). Default: 30'),
+        maxResults: z.number().int().min(1).optional().describe('Número máximo sugerido de declarações a retornar.'),
     }),
     handler: async ({ name: symbolName, kind, path: searchPath, includePattern, caseSensitive, maxResults }) => {
         // Validação de path
@@ -169,7 +163,6 @@ export const workspaceSymbolSearchTool = buildTool({
             '-e',
             pattern,
             ...(caseSensitive ? [] : ['--ignore-case']),
-            `--max-count=${maxResults ?? 30}`,
             ...globs.flatMap((g) => ['--glob', g]),
             '--glob=!node_modules',
             '--glob=!.git',
@@ -190,34 +183,66 @@ export const workspaceSymbolSearchTool = buildTool({
             const { stdout } = await execFileAsync('rg', rgArgs, {
                 cwd: WORKSPACE_ROOT,
                 timeout: RG_TIMEOUT_MS,
-                maxBuffer: MAX_SEARCH_OUTPUT * 4,
+                maxBuffer: 1024 * 1024 * 1024,
             });
 
-            const output = stdout.slice(0, MAX_SEARCH_OUTPUT);
+            const output = stdout;
             const lines = output.split('\n').filter(Boolean);
+            const io = buildIoMeta({
+                operation: 'search',
+                target: resolved,
+                targetKind: 'workspace',
+                bytesRead: Buffer.byteLength(output, 'utf8'),
+                engine: 'rg.symbol-search',
+                advisoryLimits: {
+                    requestedMaxResults: maxResults ?? null,
+                    limitMode: 'informative',
+                    symbolLength: symbolName.length,
+                },
+            });
+            publishIoOperation(io, { success: true });
 
-            return {
-                success: true,
-                symbol: symbolName,
-                kind: resolvedKind,
-                searchPath: resolved,
-                matchCount: lines.length,
-                output,
-                truncated: stdout.length >= MAX_SEARCH_OUTPUT,
-            };
-        } catch (err) {
-            const ex = toExecError(err);
-            // exit code 1 + sem stderr = "nenhum resultado encontrado" — comportamento normal do rg
-            if ((ex.code === 1 || ex.status === 1) && !ex.stderr) {
-                return {
+            return withIoMeta(
+                {
                     success: true,
                     symbol: symbolName,
                     kind: resolvedKind,
                     searchPath: resolved,
-                    matchCount: 0,
-                    output: '',
-                    message: `Nenhuma declaração de "${symbolName}" (${resolvedKind}) encontrada em ${resolved}`,
-                };
+                    matchCount: lines.length,
+                    output,
+                    truncated: false,
+                },
+                io,
+            );
+        } catch (err) {
+            const ex = toExecError(err);
+            // exit code 1 + sem stderr = "nenhum resultado encontrado" — comportamento normal do rg
+            if ((ex.code === 1 || ex.status === 1) && !ex.stderr) {
+                const io = buildIoMeta({
+                    operation: 'search',
+                    target: resolved,
+                    targetKind: 'workspace',
+                    bytesRead: 0,
+                    engine: 'rg.symbol-search',
+                    advisoryLimits: {
+                        requestedMaxResults: maxResults ?? null,
+                        limitMode: 'informative',
+                        symbolLength: symbolName.length,
+                    },
+                });
+                publishIoOperation(io, { success: true });
+                return withIoMeta(
+                    {
+                        success: true,
+                        symbol: symbolName,
+                        kind: resolvedKind,
+                        searchPath: resolved,
+                        matchCount: 0,
+                        output: '',
+                        message: `Nenhuma declaração de "${symbolName}" (${resolvedKind}) encontrada em ${resolved}`,
+                    },
+                    io,
+                );
             }
             return { success: false, error: toError(err).message };
         }

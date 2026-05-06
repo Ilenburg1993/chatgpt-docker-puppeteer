@@ -139,13 +139,17 @@ describe('agent/facades/agent-model-config', () => {
         setModel(/** @type {any} */ (ctx), 'auto');
 
         expect(ctx.setModel).toHaveBeenCalledWith('auto');
-        expect(trySetLiveSessionModel).toHaveBeenCalledWith({ sessionId: 'sdk-auto' }, 'auto', 'AlwaysAlive', undefined);
+        expect(trySetLiveSessionModel).toHaveBeenCalledWith(
+            { sessionId: 'sdk-auto' },
+            'auto',
+            'AlwaysAlive',
+            undefined,
+        );
     });
 
     it('expõe policy Auto com preferência local e último modelo observado', async () => {
-        const { readRuntimeAutoModelPolicy } = await import(
-            '../../../../src/copilot/agent/facades/agent-model-config.js'
-        );
+        const { readRuntimeAutoModelPolicy } =
+            await import('../../../../src/copilot/agent/facades/agent-model-config.js');
         const policy = readRuntimeAutoModelPolicy(
             /** @type {any} */ ({
                 getStatusSnapshot: () => ({ model: 'auto', reasoningEffort: 'high' }),

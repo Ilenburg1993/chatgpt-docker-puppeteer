@@ -341,7 +341,7 @@ export default function createObservabilityRouter(deps) {
         withErrorHandler(req, res, async () => {
             const routeDeps = resolveObservabilityRouterDeps(deps, req);
             const { sdkObservability } = routeDeps;
-            const n = Math.min(Math.max(Number(req.query['n']) || 50, 1), 500);
+            const n = Math.max(Number(req.query['n']) || 50, 1);
             const sessionId = typeof req.query['sessionId'] === 'string' ? req.query['sessionId'] : undefined;
             const tool = typeof req.query['tool'] === 'string' ? req.query['tool'] : undefined;
             let entries = sdkObservability.getAuditTail(n);

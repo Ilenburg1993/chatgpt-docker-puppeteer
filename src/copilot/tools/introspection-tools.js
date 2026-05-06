@@ -317,10 +317,9 @@ const getTelemetryTool = createTool({
                     .number()
                     .int()
                     .min(1)
-                    .max(100)
                     .optional()
                     .default(10)
-                    .describe('Número de chamadas recentes a incluir no resultado'),
+                    .describe('Número sugerido de chamadas recentes a incluir no resultado'),
                 toolName: z.string().optional().describe('Filtrar histórico por nome específico de tool'),
             })
         )
@@ -477,21 +476,14 @@ const getToolHealthTool = createTool({
                 .optional()
                 .default('calls')
                 .describe('Campo para ordenação descendente'),
-            limit: z
-                .number()
-                .int()
-                .min(1)
-                .max(50)
-                .optional()
-                .default(20)
-                .describe('Número máximo de tools no resultado'),
+            limit: z.number().int().min(1).optional().default(20).describe('Número sugerido de tools no resultado'),
         })
     ),
     handler: async (
         /** @type {{ tool_name?: string; sort_by?: 'calls' | 'errors' | 'latency' | 'error_rate'; limit?: number }} */ {
             tool_name,
             sort_by = 'calls',
-            limit = 20,
+            limit,
         },
     ) => {
         const stats = getToolStats();
@@ -511,7 +503,7 @@ const getToolHealthTool = createTool({
                 const bv = /** @type {number} */ (b[/** @type {keyof typeof b} */ (sortKey)] ?? 0);
                 return bv - av;
             })
-            .slice(0, limit)
+            .slice(0, typeof limit === 'number' ? limit : undefined)
             .map(([name, s]) => ({ name, ...s }));
 
         const total = Object.values(stats).reduce((acc, s) => acc + s.calls, 0);

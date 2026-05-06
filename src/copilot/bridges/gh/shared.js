@@ -14,8 +14,8 @@ import { promisify } from 'node:util';
 
 const execFileAsync = promisify(execFile);
 
-/** Timeout padrão para chamadas ao gh CLI (ms). */
-const DEFAULT_TIMEOUT_MS = LLM_B_GH_TIMEOUT_MS;
+/** Timeout histórico para chamadas ao gh CLI (ms), mantido apenas como telemetria/advisory. */
+const ADVISORY_DEFAULT_TIMEOUT_MS = LLM_B_GH_TIMEOUT_MS;
 
 /** Repo padrão override (ex: "owner/repo"). Auto-detect se vazio. */
 const ENV_REPO = LLM_B_GH_DEFAULT_REPO;
@@ -25,15 +25,14 @@ const ENV_REPO = LLM_B_GH_DEFAULT_REPO;
  *
  * @param {string[]} args
  * @param {object} [opts]
- * @param {number} [opts.timeoutMs]
+ * @param {number} [opts.timeoutMs] Valor informativo; não encerra o comando.
  * @param {boolean} [opts.lenient] - se true, retorna string vazia em caso de erro
  * @returns {Promise<string>}
  */
 export async function runGh(args, opts = {}) {
-    const timeoutMs = opts.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+    void (opts.timeoutMs ?? ADVISORY_DEFAULT_TIMEOUT_MS);
     const { stdout } = await execFileAsync('gh', args, {
-        timeout: timeoutMs,
-        maxBuffer: 4 * 1024 * 1024,
+        maxBuffer: 1024 * 1024 * 1024,
     });
     return stdout.trim();
 }

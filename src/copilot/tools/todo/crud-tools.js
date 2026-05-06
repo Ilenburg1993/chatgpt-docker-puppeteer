@@ -82,15 +82,11 @@ export const todoUpdateTool = createTool({
         /** @type {unknown} */ (
             z.object({
                 id: zId,
-                title: z.string().min(1).max(500).optional().describe('Novo título'),
-                description: z.string().max(5000).optional().describe('Nova descrição'),
+                title: z.string().min(1).optional().describe('Novo título'),
+                description: z.string().optional().describe('Nova descrição'),
                 priority: zPriority.optional().describe('Nova prioridade'),
-                tags: z.array(z.string().max(100)).max(20).optional().describe('Substituir lista de tags'),
-                add_tags: z
-                    .array(z.string().max(100))
-                    .max(20)
-                    .optional()
-                    .describe('Adicionar tags (merge com existentes)'),
+                tags: z.array(z.string()).optional().describe('Substituir lista de tags'),
+                add_tags: z.array(z.string()).optional().describe('Adicionar tags (merge com existentes)'),
                 remove_tags: z.array(z.string()).optional().describe('Remover tags específicas'),
                 due_date: z
                     .string()
@@ -98,8 +94,8 @@ export const todoUpdateTool = createTool({
                     .nullable()
                     .optional()
                     .describe('Nova data vencimento ISO 8601 (null para remover)'),
-                notes: z.string().max(10000).optional().describe('Novas notas (substitui completamente)'),
-                append_notes: z.string().max(5000).optional().describe('Adicionar ao final das notas existentes'),
+                notes: z.string().optional().describe('Novas notas (substitui completamente)'),
+                append_notes: z.string().optional().describe('Adicionar ao final das notas existentes'),
                 metadata: z
                     .record(z.string(), z.unknown())
                     .optional()
@@ -180,12 +176,12 @@ export const todoAddSubtaskTool = createTool({
         /** @type {unknown} */ (
             z.object({
                 parent_id: z.string().min(1).describe('ID da tarefa pai'),
-                title: z.string().min(1).max(500).describe('Título da subtarefa'),
-                description: z.string().max(5000).optional().describe('Descrição da subtarefa'),
+                title: z.string().min(1).describe('Título da subtarefa'),
+                description: z.string().optional().describe('Descrição da subtarefa'),
                 priority: zPriority.optional().default('medium').describe('Prioridade da subtarefa'),
-                tags: z.array(z.string().max(100)).max(10).optional().describe('Tags da subtarefa'),
+                tags: z.array(z.string()).optional().describe('Tags da subtarefa'),
                 due_date: z.string().datetime({ offset: true }).optional().describe('Data de vencimento ISO 8601'),
-                notes: z.string().max(5000).optional().describe('Notas livres da subtarefa'),
+                notes: z.string().optional().describe('Notas livres da subtarefa'),
             })
         )
     ),

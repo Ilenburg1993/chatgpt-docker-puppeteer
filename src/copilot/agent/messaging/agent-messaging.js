@@ -20,7 +20,7 @@ import {
     EMITTER_TASK_QUEUED,
     EMITTER_TASK_STARTED,
 } from '#copilot/events';
-import { TASK_TIMEOUT_MS as DEFAULT_TASK_TIMEOUT_MS, MAX_TASK_RETRIES } from '../../config/agent.js';
+import { TASK_TIMEOUT_MS as ADVISORY_TASK_TIMEOUT_MS, MAX_TASK_RETRIES } from '../../config/agent.js';
 import { withAgentErrorPolicy } from '../error-policy.js';
 import { persistAgentRuntimeStatePartial } from '../facades/agent-runtime-state.js';
 import {
@@ -44,11 +44,12 @@ import { startSpan, startSpanImmediate } from '../ports/tracing-port.js';
 /**
  * Normaliza timeouts externos antes de repassar ao SDK.
  *
- * @param {number | undefined} timeoutMs
- * @returns {number | undefined}
+ * @param {number | null | undefined} timeoutMs
+ * @returns {number | null}
  */
 function normalizeTimeoutMs(timeoutMs) {
-    return typeof timeoutMs === 'number' && Number.isFinite(timeoutMs) && timeoutMs > 0 ? timeoutMs : undefined;
+    void timeoutMs;
+    return null;
 }
 
 /**
@@ -68,7 +69,7 @@ function unwrapTaskError(error) {
 }
 
 /**
- * @param {number} timeoutMs
+ * @param {number | null} timeoutMs
  * @param {() => void} onTimeout
  * @returns {{ ping: () => void; clear: () => void }}
  */
@@ -78,6 +79,7 @@ function createInactivityGuard(timeoutMs, onTimeout) {
     let disposed = false;
 
     const arm = () => {
+        if (timeoutMs === null) return;
         if (disposed) return;
         if (handle) clearTimeout(handle);
         handle = setTimeout(() => {
@@ -110,13 +112,13 @@ function createInactivityGuard(timeoutMs, onTimeout) {
  *
  * @param {import('#copilot/sdk/types').CopilotSession} session
  * @param {import('#copilot/sdk/types').MessageOptions} sendOpts
- * @param {number} timeoutMs
+ * @param {number | null} timeoutMs
  * @returns {Promise<import('#copilot/sdk/types').AssistantMessageEvent | undefined>}
  */
 async function sendAndWaitWithInactivityTimeout(session, sendOpts, timeoutMs) {
     if (typeof session.send !== 'function') {
         if (typeof session.sendAndWait === 'function') {
-            return sendAgentSdkSessionAndWait(session, sendOpts, timeoutMs);
+            return sendAgentSdkSessionAndWait(session, sendOpts);
         }
         throw new Error('session.send is not a function');
     }
@@ -198,7 +200,7 @@ async function sendAndWaitWithInactivityTimeout(session, sendOpts, timeoutMs) {
  * @typedef {object} QueuedTask
  * @property {string} id
  * @property {string} message
- * @property {number} [timeoutMs]
+ * @property {number | null} [timeoutMs]
  * @property {import('#copilot/sdk/types').MessageOptions['attachments']} [attachments]
  * @property {number} enqueuedAt
  * @property {number} [attempts] - Número de tentativas realizadas (para limitar reintentos após reconexão)
@@ -213,7 +215,7 @@ async function sendAndWaitWithInactivityTimeout(session, sendOpts, timeoutMs) {
  * @param {MessagingHost} host
  * @param {string} message
  * @param {{
- *     timeoutMs?: number;
+ *     timeoutMs?: number | null;
  *     attachments?: import('#copilot/sdk/types').MessageOptions['attachments'];
  *     signal?: AbortSignal;
  *     resolve: (v: string | PromiseLike<string>) => void;
@@ -228,7 +230,7 @@ export function enqueueTask(ctx, host, message, { timeoutMs, attachments, signal
         resolve,
         reject,
         enqueuedAt: Date.now(),
-        ...(safeTimeoutMs !== undefined ? { timeoutMs: safeTimeoutMs } : {}),
+        timeoutMs: safeTimeoutMs,
         ...(attachments !== undefined ? { attachments } : {}),
     });
     try {
@@ -247,7 +249,7 @@ export function enqueueTask(ctx, host, message, { timeoutMs, attachments, signal
  * @param {MessagingHost} host
  * @param {string} message
  * @param {{
- *     timeoutMs?: number;
+ *     timeoutMs?: number | null;
  *     attachments?: import('#copilot/sdk/types').MessageOptions['attachments'];
  *     signal?: AbortSignal;
  * }} [opts]
@@ -284,7 +286,7 @@ export function sendMessage(ctx, host, message, { timeoutMs, attachments, signal
  * @param {AgentContext} ctx
  * @param {MessagingHost} host
  * @param {string} message
- * @param {{ timeoutMs?: number }} [opts]
+ * @param {{ timeoutMs?: number | null }} [opts]
  * @returns {Promise<string>}
  */
 export function sendMessageDialogBoot(ctx, host, message, opts = {}) {
@@ -361,7 +363,11 @@ export async function executeTask(session, task, callbacks) {
             prompt: task.message,
             ...(task.attachments !== undefined ? { attachments: task.attachments } : {}),
         });
-        const effectiveTimeoutMs = task.timeoutMs ?? DEFAULT_TASK_TIMEOUT_MS;
+        const effectiveTimeoutMs = task.timeoutMs ?? null;
+        log(
+            'DEBUG',
+            `[agent-messaging] task timeout disabled; advisory=${ADVISORY_TASK_TIMEOUT_MS}ms taskId=${task.id}`,
+        );
         const execution = await withAgentErrorPolicy(
             () => sendAndWaitWithInactivityTimeout(session, sendOpts, effectiveTimeoutMs),
             {

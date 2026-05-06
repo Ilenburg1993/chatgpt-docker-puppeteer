@@ -9,40 +9,25 @@
  * @see module:copilot/tools/file/shared
  */
 
-import { randomBytes } from 'node:crypto';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import { z } from 'zod';
 import { toError } from '../../core/error-handlers.js';
+import { withIoMeta } from '../../core/io-contracts.js';
+import {
+    copyFileLocked,
+    createOrReplaceFileAtomic,
+    deleteFileLocked,
+    moveFileLocked,
+    patchTextLocked,
+    writeFileAtomic,
+} from '../../infra/io-engine.js';
 import { log } from '../logger.js';
 import { buildTool } from '../tool-factory.js';
 import { validatePath } from './shared.js';
 
-const MAX_WRITE_CONTENT_BYTES = 2 * 1024 * 1024;
-const MAX_PATCH_SEGMENT_CHARS = 200_000;
-
-/**
- * Escrita atômica: grava em arquivo temporário e renomeia (evita corrupção se crash durante write).
- *
- * @param {string} filePath - Caminho final do arquivo
- * @param {string | Buffer} content - Conteúdo a escrever
- * @param {BufferEncoding} [encoding] - Encoding (utf8 se string)
- * @returns {Promise<void>}
- */
-async function atomicWrite(filePath, content, encoding) {
-    const tmpPath = `${filePath}.${randomBytes(4).toString('hex')}.tmp`;
-    try {
-        await fs.writeFile(tmpPath, content, encoding);
-        await fs.rename(tmpPath, filePath);
-    } catch (error) {
-        try {
-            await fs.unlink(tmpPath);
-        } catch {
-            // noop: best-effort cleanup
-        }
-        throw error;
-    }
-}
+const ADVISORY_WRITE_CONTENT_BYTES = 2 * 1024 * 1024;
+const ADVISORY_PATCH_SEGMENT_CHARS = 200_000;
 
 // ---------------------------------------------------------------------------
 // Tool: write_file_content
@@ -78,18 +63,22 @@ const writeFileContentTool = buildTool({
                 return { success: false, error: 'Arquivo não encontrado. Use create_file para criar um novo arquivo.' };
             }
             const buf = encoding === 'base64' ? Buffer.from(content, 'base64') : Buffer.from(content, 'utf8');
-            if (buf.byteLength > MAX_WRITE_CONTENT_BYTES) {
-                return {
-                    success: false,
-                    error: `Conteúdo excede limite de ${MAX_WRITE_CONTENT_BYTES} bytes para escrita única.`,
-                };
-            }
-            await atomicWrite(resolved, buf);
-            return {
-                success: true,
-                path: resolved,
-                bytesWritten: buf.length,
-            };
+            const writeResult = await writeFileAtomic(resolved, buf, {
+                riskClass: 'high',
+                advisoryLimits: {
+                    advisoryWriteContentBytes: ADVISORY_WRITE_CONTENT_BYTES,
+                    contentBytes: buf.byteLength,
+                    limitMode: 'informative',
+                },
+            });
+            return withIoMeta(
+                {
+                    success: true,
+                    path: resolved,
+                    bytesWritten: buf.length,
+                },
+                writeResult.io,
+            );
         } catch (err) {
             return { success: false, error: toError(err).message };
         }
@@ -143,18 +132,25 @@ const createFileTool = buildTool({
             if (createParentDirs) {
                 await fs.mkdir(path.dirname(resolved), { recursive: true });
             }
-            if (Buffer.byteLength(content ?? '', 'utf8') > MAX_WRITE_CONTENT_BYTES) {
-                return {
-                    success: false,
-                    error: `Conteúdo excede limite de ${MAX_WRITE_CONTENT_BYTES} bytes para criação única.`,
-                };
-            }
-            await atomicWrite(resolved, content ?? '', 'utf8');
-            return {
-                success: true,
-                path: resolved,
-                bytesWritten: (content ?? '').length,
-            };
+            const contentBytes = Buffer.byteLength(content ?? '', 'utf8');
+            const writeResult = await createOrReplaceFileAtomic(resolved, content ?? '', {
+                encoding: 'utf8',
+                createParentDirs: false,
+                riskClass: overwrite ? 'high' : 'medium',
+                advisoryLimits: {
+                    advisoryWriteContentBytes: ADVISORY_WRITE_CONTENT_BYTES,
+                    contentBytes,
+                    limitMode: 'informative',
+                },
+            });
+            return withIoMeta(
+                {
+                    success: true,
+                    path: resolved,
+                    bytesWritten: writeResult.bytesWritten,
+                },
+                writeResult.io,
+            );
         } catch (err) {
             return { success: false, error: toError(err).message };
         }
@@ -186,8 +182,8 @@ const deleteFileTool = buildTool({
             if (stats.isDirectory()) {
                 return { success: false, error: 'É um diretório. delete_file só opera em arquivos.' };
             }
-            await fs.unlink(resolved);
-            return { success: true, path: resolved, deleted: true };
+            const deleted = await deleteFileLocked(resolved);
+            return { success: true, ...deleted };
         } catch (err) {
             return { success: false, error: toError(err).message };
         }
@@ -213,7 +209,7 @@ const copyFileTool = buildTool({
         const src = await validatePath(source, { mode: 'read' });
         if (!src.ok) return { success: false, error: src.reason };
 
-        const dst = await validatePath(destination);
+        const dst = await validatePath(destination, { mode: 'write' });
         if (!dst.ok) return { success: false, error: dst.reason };
 
         log('INFO', `[copilot/copy_file] ${src.resolved} → ${dst.resolved}`);
@@ -230,10 +226,17 @@ const copyFileTool = buildTool({
                     /* dest does not exist — ok */
                 }
             }
-            await fs.mkdir(path.dirname(dst.resolved), { recursive: true });
-            await fs.copyFile(src.resolved, dst.resolved);
-            const stats = await fs.stat(dst.resolved);
-            return { success: true, source: src.resolved, destination: dst.resolved, bytesWritten: stats.size };
+            const copyResult = await copyFileLocked(src.resolved, dst.resolved, { overwrite });
+            return withIoMeta(
+                {
+                    success: true,
+                    source: src.resolved,
+                    destination: dst.resolved,
+                    bytesWritten: copyResult.bytesWritten,
+                    lockWaitMs: copyResult.lockWaitMs,
+                },
+                copyResult.io,
+            );
         } catch (err) {
             return { success: false, error: toError(err).message };
         }
@@ -259,7 +262,7 @@ const moveFileTool = buildTool({
         const src = await validatePath(source, { mode: 'read' });
         if (!src.ok) return { success: false, error: src.reason };
 
-        const dst = await validatePath(destination);
+        const dst = await validatePath(destination, { mode: 'write' });
         if (!dst.ok) return { success: false, error: dst.reason };
 
         log('INFO', `[copilot/move_file] ${src.resolved} → ${dst.resolved}`);
@@ -276,20 +279,11 @@ const moveFileTool = buildTool({
                     /* dest does not exist — ok */
                 }
             }
-            await fs.mkdir(path.dirname(dst.resolved), { recursive: true });
-            try {
-                await fs.rename(src.resolved, dst.resolved);
-            } catch (e) {
-                const errCode = /** @type {{ code?: unknown }} */ (e)?.code;
-                // Fallback para cross-device move (EXDEV).
-                if (errCode === 'EXDEV') {
-                    await fs.copyFile(src.resolved, dst.resolved);
-                    await fs.unlink(src.resolved);
-                } else {
-                    throw e;
-                }
-            }
-            return { success: true, source: src.resolved, destination: dst.resolved };
+            const moveResult = await moveFileLocked(src.resolved, dst.resolved, { overwrite });
+            return withIoMeta(
+                { success: true, source: src.resolved, destination: dst.resolved, lockWaitMs: moveResult.lockWaitMs },
+                moveResult.io,
+            );
         } catch (err) {
             return { success: false, error: toError(err).message };
         }
@@ -322,7 +316,6 @@ const patchFileTool = buildTool({
             .number()
             .int()
             .min(1)
-            .max(5000)
             .optional()
             .describe('Se definido, força contagem exata esperada de ocorrências antes de aplicar o patch.'),
     }),
@@ -330,52 +323,30 @@ const patchFileTool = buildTool({
         const v = await validatePath(filePath, { mode: 'write' });
         if (!v.ok) return { success: false, error: v.reason };
 
-        if (old_string.length > MAX_PATCH_SEGMENT_CHARS || new_string.length > MAX_PATCH_SEGMENT_CHARS) {
-            return {
-                success: false,
-                error: `old_string/new_string excedem limite de ${MAX_PATCH_SEGMENT_CHARS} caracteres.`,
-            };
-        }
-
         try {
             await fs.access(v.resolved);
         } catch {
             return { success: false, error: `Arquivo não encontrado: ${v.resolved}` };
         }
 
-        let content;
         try {
-            content = await fs.readFile(v.resolved, 'utf8');
-        } catch (e) {
-            return { success: false, error: `Erro ao ler arquivo: ${toError(e).message}` };
-        }
-
-        const occurrences = content.split(old_string).length - 1;
-        if (occurrences === 0) {
-            return { success: false, error: 'old_string não encontrado no arquivo.' };
-        }
-        if (expected_occurrences !== undefined && expected_occurrences !== occurrences) {
-            return {
-                success: false,
-                error: `expected_occurrences=${expected_occurrences}, mas encontrado=${occurrences}.`,
-            };
-        }
-        if (!replace_all && expected_occurrences === undefined && occurrences > 1) {
-            return {
-                success: false,
-                error: `old_string encontrado ${occurrences} vezes. Inclua mais contexto para identificar unicamente.`,
-            };
-        }
-
-        // BUG-HIGH-01 fix: escapar padrões especiais de substituição ($&, $', $`, $$, $n)
-        const safeNewString = new_string.replace(/\$/g, '$$$$');
-        const updated = replace_all
-            ? content.split(old_string).join(safeNewString)
-            : content.replace(old_string, safeNewString);
-        try {
-            await atomicWrite(v.resolved, updated, 'utf8');
+            const patchResult = await patchTextLocked(v.resolved, {
+                oldString: old_string,
+                newString: new_string,
+                replaceAll: replace_all,
+                expectedOccurrences: expected_occurrences,
+                advisoryLimits: {
+                    advisoryPatchSegmentChars: ADVISORY_PATCH_SEGMENT_CHARS,
+                    oldStringChars: old_string.length,
+                    newStringChars: new_string.length,
+                    limitMode: 'informative',
+                },
+            });
             log('INFO', `[copilot/patch_file] Patch aplicado: ${v.resolved}`);
-            return { success: true, path: v.resolved, replacedOccurrences: replace_all ? occurrences : 1 };
+            return withIoMeta(
+                { success: true, path: v.resolved, replacedOccurrences: patchResult.replacedOccurrences },
+                patchResult.io,
+            );
         } catch (e) {
             return { success: false, error: `Erro ao escrever arquivo: ${toError(e).message}` };
         }

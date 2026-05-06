@@ -68,6 +68,7 @@ import {
     clearTerminalElicitation,
     clearTerminalPermissions,
     clearTerminalUserInputs,
+    getTerminalPermission,
     recordTerminalElicitationPending,
     recordTerminalPermissionCompleted,
     recordTerminalPermissionModeChanged,
@@ -125,6 +126,32 @@ describe('terminal/commands/sdk', () => {
         expect(ctx.output()).toContain('ask_user=1');
         expect(ctx.output()).toContain('/elicitation show latest');
         expect(ctx.output()).toContain('/permission show latest');
+    });
+
+    it('/sdk waits respeita runtimeId para elicitation/permission/user_input', async () => {
+        recordTerminalElicitationPending({
+            requestId: 'el-default',
+            runtimeId: 'default',
+            message: 'Default',
+            mode: 'form',
+        });
+        recordTerminalPermissionRequested({ requestId: 'perm-default', runtimeId: 'default', permissionType: 'shell' });
+        recordTerminalUserInputRequested({ requestId: 'ui-default', runtimeId: 'default', question: 'Default?' });
+
+        recordTerminalElicitationPending({ requestId: 'el-audit', runtimeId: 'audit', message: 'Audit', mode: 'form' });
+        recordTerminalPermissionRequested({
+            requestId: 'perm-audit',
+            runtimeId: 'audit',
+            permissionType: 'file_write',
+        });
+        recordTerminalUserInputRequested({ requestId: 'ui-audit', runtimeId: 'audit', question: 'Audit?' });
+
+        const ctx = mockCtx();
+        await cmdSdk({ println: ctx.println }, 'waits --runtime audit');
+
+        expect(ctx.output()).toContain('elicitation=1');
+        expect(ctx.output()).toContain('permission=1');
+        expect(ctx.output()).toContain('ask_user=1');
     });
 
     it('/sdk prompt exibe status canônico do system prompt e instruction sources', async () => {
@@ -318,6 +345,50 @@ describe('terminal/commands/sdk', () => {
         expect(respond.output()).toContain('Resposta de permissão enviada');
     });
 
+    it('/permission integra request → respond → completed com correlação por requestId', async () => {
+        recordTerminalPermissionRequested({
+            requestId: 'perm-e2e-1',
+            permissionType: 'file_write',
+            data: { path: 'src/copilot/terminal/commands/sdk.js' },
+        });
+
+        const respond = mockCtx();
+        await cmdPermission(
+            { println: respond.println },
+            'respond perm-e2e-1 approve-once {"reason":"operator-approved"}',
+        );
+
+        expect(runtimeMocks.handleTerminalSdkPendingPermission).toHaveBeenCalledWith(
+            'perm-e2e-1',
+            expect.objectContaining({ kind: 'approve-once', reason: 'operator-approved' }),
+            null,
+        );
+
+        recordTerminalPermissionCompleted({
+            requestId: 'perm-e2e-1',
+            permissionType: 'file_write',
+            result: 'approve-once',
+            granted: true,
+            data: { finalizedBy: 'sdk-event' },
+        });
+
+        const entry = getTerminalPermission('perm-e2e-1');
+        expect(entry).not.toBeNull();
+        expect(entry?.status).toBe('completed');
+        expect(entry?.granted).toBe(true);
+        expect(entry?.result).toBe('approve-once');
+        expect(entry?.data).toEqual(
+            expect.objectContaining({
+                completion: expect.objectContaining({ finalizedBy: 'sdk-event' }),
+            }),
+        );
+
+        const show = mockCtx();
+        await cmdPermission({ println: show.println }, 'show perm-e2e-1');
+        expect(show.output()).toContain('Permissão perm-e2e-1');
+        expect(show.output()).toContain('approve-once');
+    });
+
     it('/permission respond valida decisões persistentes que exigem approval', async () => {
         recordTerminalPermissionRequested({
             requestId: 'perm-persistent',
@@ -366,6 +437,66 @@ describe('terminal/commands/sdk', () => {
         await cmdPermission({ println: set.println }, 'mode audit_only');
         expect(agentRuntimeMocks.setTerminalRuntimePermissionMode).toHaveBeenCalledWith('audit_only', null);
         expect(set.output()).toContain('Permission mode atualizado');
+    });
+
+    it('/permission show/respond latest respeita runtimeId e evita bleed entre runtimes', async () => {
+        recordTerminalPermissionRequested({
+            requestId: 'perm-default-1',
+            runtimeId: 'default',
+            permissionType: 'shell',
+        });
+        recordTerminalPermissionRequested({
+            requestId: 'perm-audit-1',
+            runtimeId: 'audit',
+            permissionType: 'file_write',
+        });
+
+        const showAudit = mockCtx();
+        await cmdPermission({ println: showAudit.println }, 'show latest --runtime audit');
+        expect(showAudit.output()).toContain('Permissão perm-audit-1');
+
+        const respondAudit = mockCtx();
+        await cmdPermission({ println: respondAudit.println }, 'respond latest approve-once --runtime audit');
+        expect(runtimeMocks.handleTerminalSdkPendingPermission).toHaveBeenCalledWith(
+            'perm-audit-1',
+            { kind: 'approve-once' },
+            'audit',
+        );
+    });
+
+    it('/elicitation show/respond latest respeita runtimeId e evita bleed entre runtimes', async () => {
+        recordTerminalElicitationPending({
+            requestId: 'el-default-1',
+            runtimeId: 'default',
+            message: 'Default',
+            mode: 'form',
+            requestedSchema: { type: 'object', properties: { answer: { type: 'string' } } },
+        });
+        recordTerminalElicitationPending({
+            requestId: 'el-audit-1',
+            runtimeId: 'audit',
+            message: 'Audit',
+            mode: 'form',
+            requestedSchema: { type: 'object', properties: { answer: { type: 'string' } } },
+        });
+
+        const showAudit = mockCtx();
+        await cmdElicitation({ println: showAudit.println }, 'show latest --runtime audit');
+        expect(showAudit.output()).toContain('Elicitation el-audit-1');
+
+        const respondAudit = mockCtx();
+        await cmdElicitation(
+            { println: respondAudit.println },
+            'respond latest accept {"answer":"ok"} --runtime audit',
+        );
+        expect(runtimeMocks.resolveTerminalSdkPendingElicitation).toHaveBeenCalledWith(
+            'el-audit-1',
+            {
+                action: 'accept',
+                content: { answer: 'ok' },
+            },
+            'audit',
+        );
     });
 
     it('/permission cockpit exibe pendências por tipo e histórico de mode changes', async () => {

@@ -7,7 +7,6 @@
  *   interface operacional da LLM-B, mas removendo a dependência direta de `server/` em `terminal/handlers/agent.js`.
  */
 
-import { LLM_B_TURN_TIMEOUT_MS } from '#copilot/config';
 import { container, toError } from '#copilot/core';
 import { log, METRICS_STORE } from '#copilot/observability';
 import { projectAgentHttpError } from './agent-http-errors.js';
@@ -74,7 +73,7 @@ function resolveInjectTimeout(runtimeId, explicitTimeoutMs) {
     const injectTimeouts = Number(summary?.inject?.timeoutsTotal ?? 0);
     return resolveOptionalDialogTimeout({
         explicitTimeoutMs,
-        defaultTimeoutMs: LLM_B_TURN_TIMEOUT_MS,
+        defaultTimeoutMs: 0,
         queueDepth: Number(runtime.snap?.['queueSize'] ?? 0),
         contextUtilization: Number(runtime.contextWindow?.utilization ?? 0),
         recentP50Ms: Number(summary?.inject?.latency?.p50 ?? summary?.dialog?.turnLatency?.p50 ?? 0),
@@ -181,17 +180,6 @@ export async function handlePipeline(params = {}) {
         return { status: 400, body: { ok: false, error: '"steps" deve ser um array não vazio' } };
     }
 
-    const MAX_PIPELINE_STEPS = 20;
-    if (steps.length > MAX_PIPELINE_STEPS) {
-        return {
-            status: 400,
-            body: {
-                ok: false,
-                error: `Máximo ${MAX_PIPELINE_STEPS} steps por pipeline (recebido: ${steps.length})`,
-            },
-        };
-    }
-
     const rawGlobalFrom = body['from'] ?? 'llm-a';
     const globalFrom = typeof rawGlobalFrom === 'string' && ALLOWED_FROM.has(rawGlobalFrom) ? rawGlobalFrom : 'llm-a';
     /** @type {{ step: number; prompt: string; reply: string | null; durationMs: number }[]} */
@@ -215,8 +203,7 @@ export async function handlePipeline(params = {}) {
         const timeoutDecision = resolveInjectTimeout(runtimeId, explicitTimeoutMs);
 
         if (waitMs > 0) {
-            const MAX_WAIT_MS = 30_000;
-            await new Promise((r) => setTimeout(r, Math.min(waitMs, MAX_WAIT_MS)));
+            await new Promise((r) => setTimeout(r, waitMs));
         }
 
         const t0 = Date.now();

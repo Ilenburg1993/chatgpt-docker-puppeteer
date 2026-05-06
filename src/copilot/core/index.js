@@ -86,6 +86,15 @@ export {
 
 // ─── Cache ────────────────────────────────────────────────────────────────────
 export { createCache } from './cache.js';
+export {
+    IO_POLICY_VERSION,
+    buildIoMeta,
+    createIoTraceId,
+    ioFail,
+    ioOk,
+    toIoError,
+    withIoMeta,
+} from './io-contracts.js';
 
 // ─── Timeouts ─────────────────────────────────────────────────────────────────
 export {

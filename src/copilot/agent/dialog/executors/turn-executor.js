@@ -271,7 +271,7 @@ export function dispatchTurnToHost(emitter, opts) {
  * @param {TurnEmitter} emitter
  * @param {TurnHost} host
  * @param {string} message
- * @param {number} timeout
+ * @param {number | null} timeout
  * @param {string} [stopReason]
  * @param {AbortSignal} [signal] - F41B.5: AbortSignal para cancelar o restart
  * @returns {Promise<string>}
@@ -292,7 +292,7 @@ export function waitForRestartAndReply(emitter, host, message, timeout, stopReas
         let settled = false;
 
         const cleanup = () => {
-            clearTimeout(retryTimeout);
+            if (retryTimeout) clearTimeout(retryTimeout);
             emitter.off(EMITTER_LOOP_READY, onRetryReady);
             if (onRetryPending) emitter.off(EMITTER_QUESTION_PENDING, onRetryPending);
             if (onRetryReply) emitter.off(EMITTER_LOOP_REPLY, onRetryReply);
@@ -322,14 +322,17 @@ export function waitForRestartAndReply(emitter, host, message, timeout, stopReas
         };
         if (signal) signal.addEventListener('abort', onAbort, { once: true });
 
-        const retryTimeout = setTimeout(() => {
-            settleReject(
-                new SessionError(
-                    `[DialogLoopManager] Timeout aguardando restart após stopped (${stopReason ?? 'unknown'})`,
-                    'DIALOG_RESTART_TIMEOUT',
-                ),
-            );
-        }, timeout);
+        const retryTimeout =
+            timeout === null
+                ? null
+                : setTimeout(() => {
+                      settleReject(
+                          new SessionError(
+                              `[DialogLoopManager] Timeout aguardando restart após stopped (${stopReason ?? 'unknown'})`,
+                              'DIALOG_RESTART_TIMEOUT',
+                          ),
+                      );
+                  }, timeout);
 
         const onRetryReady = () => {
             onRetryPending = () => {

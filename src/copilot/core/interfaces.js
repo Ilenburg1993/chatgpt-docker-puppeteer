@@ -45,7 +45,7 @@
  * @property {(opts?: { shutdownTimeoutMs?: number }) => Promise<void>} stop - Para o agente graciosamente
  * @property {(
  *     message: string,
- *     opts?: { timeoutMs?: number; attachments?: unknown; signal?: AbortSignal; taskId?: string },
+ *     opts?: { timeoutMs?: number | null; attachments?: unknown; signal?: AbortSignal; taskId?: string },
  * ) => Promise<unknown>} sendMessage
  *   - Envia mensagem ao modelo
  *

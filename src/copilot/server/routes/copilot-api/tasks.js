@@ -136,19 +136,6 @@ export function registerTaskRoutes(bridge, binding) {
                 }
             }
 
-            // GAP-03 (fix): verificar se a fila está cheia antes de retornar ok:true
-            const queueSize = controlState.queueSize;
-            const maxQueueSize =
-                /** @type {{ constructor?: { MAX_QUEUE_SIZE?: number } }} */ (agent).constructor?.MAX_QUEUE_SIZE ??
-                null;
-            if (maxQueueSize !== null && queueSize >= maxQueueSize) {
-                return res.status(429).json({
-                    ...runtimeMeta,
-                    ok: false,
-                    error: `Fila cheia (${queueSize}/${maxQueueSize} tarefas). Tente novamente mais tarde.`,
-                });
-            }
-
             // Enfileira sem aguardar — G2-API-07: retornar taskId para rastreabilidade no SSE
             const taskId = randomUUID();
             const sendOptions =

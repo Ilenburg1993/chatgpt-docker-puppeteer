@@ -263,8 +263,7 @@ export function describeSdkRecoveryPolicy(policy, error) {
                 return {
                     label: '[sdk quota]',
                     headline: message,
-                    detail:
-                        'Limite de sessão do SDK bloqueou o turno; terminal, HTTP, status e comandos locais seguem disponíveis.',
+                    detail: 'Limite de sessão do SDK bloqueou o turno; terminal, HTTP, status e comandos locais seguem disponíveis.',
                     actionHint:
                         'Aguarde o reset indicado pelo SDK; /model auto não contorna limite de sessão ativo. Depois do reset, use /restart.',
                 };
@@ -273,8 +272,7 @@ export function describeSdkRecoveryPolicy(policy, error) {
                 return {
                     label: '[sdk quota]',
                     headline: message,
-                    detail:
-                        'Limite semanal/modelo do SDK bloqueou o turno; terminal e host local continuam vivos e podem trocar a seleção de modelo.',
+                    detail: 'Limite semanal/modelo do SDK bloqueou o turno; terminal e host local continuam vivos e podem trocar a seleção de modelo.',
                     actionHint:
                         'Use /model auto seguido de /restart para delegar a seleção ao Copilot, ou aguarde o reset semanal se precisar de escolha manual.',
                 };
@@ -282,8 +280,7 @@ export function describeSdkRecoveryPolicy(policy, error) {
             return {
                 label: '[sdk quota]',
                 headline: message,
-                detail:
-                    'Rate limit do SDK bloqueou o turno; terminal, HTTP, status e comandos locais seguem disponíveis.',
+                detail: 'Rate limit do SDK bloqueou o turno; terminal, HTTP, status e comandos locais seguem disponíveis.',
                 actionHint:
                     'Se a mensagem indicar limite semanal/modelo, use /model auto seguido de /restart; se indicar reset de sessão, aguarde o reset.',
             };

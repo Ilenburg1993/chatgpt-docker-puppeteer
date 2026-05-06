@@ -81,11 +81,12 @@ describe('file-context embedMultiple', () => {
         expect(result.endsWith('msg')).toBe(true);
     });
 
-    it('respeita MAX_EMBED_BYTES — trunca quando excede', () => {
+    it('mantém arquivos grandes porque MAX_EMBED_BYTES é apenas informativo', () => {
         const bigCtx = { path: 'big.js', content: 'x'.repeat(70_000), size: 70_000, lang: 'js' };
         const result = embedMultiple([bigCtx], 'msg');
-        // 70KB excede 64KB, então não deve incluir o arquivo
-        expect(result).toBe('msg');
+        expect(result).toContain('big.js');
+        expect(result).toContain('x'.repeat(1_000));
+        expect(result.endsWith('msg')).toBe(true);
     });
 
     it('retorna apenas mensagem se lista vazia', () => {

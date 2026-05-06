@@ -7,10 +7,10 @@
  * @module copilot/infra/storage
  */
 
-import { randomBytes } from 'node:crypto';
 import { existsSync } from 'node:fs';
-import { mkdir, readFile, rename, unlink, writeFile } from 'node:fs/promises';
-import { dirname, join } from 'node:path';
+import { mkdir } from 'node:fs/promises';
+import { dirname } from 'node:path';
+import { readText, writeFileAtomic } from './io-engine.js';
 
 /**
  * Lê e parse um arquivo JSON. Retorna `defaultValue` se o arquivo não existir ou for inválido.
@@ -22,8 +22,8 @@ import { dirname, join } from 'node:path';
  */
 export async function readJson(filePath, defaultValue) {
     try {
-        const raw = await readFile(filePath, 'utf-8');
-        return JSON.parse(raw);
+        const raw = await readText(filePath);
+        return JSON.parse(raw.content);
     } catch {
         return defaultValue;
     }
@@ -44,18 +44,11 @@ export async function writeJson(filePath, data) {
         await mkdir(dir, { recursive: true });
     }
     const content = JSON.stringify(data, null, 2) + '\n';
-    const tmpPath = join(dir, `.tmp-${randomBytes(8).toString('hex')}`);
-    try {
-        await writeFile(tmpPath, content, 'utf-8');
-        await rename(tmpPath, filePath);
-    } catch (err) {
-        try {
-            await unlink(tmpPath);
-        } catch {
-            /* ignore cleanup */
-        }
-        throw err;
-    }
+    await writeFileAtomic(filePath, content, {
+        encoding: 'utf8',
+        riskClass: 'medium',
+        advisoryLimits: { structured: 'json' },
+    });
 }
 
 /**

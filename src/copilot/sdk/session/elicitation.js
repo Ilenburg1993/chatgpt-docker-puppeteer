@@ -102,6 +102,7 @@ export function normalizeElicitationResult(value, requestedSchema, options = {})
  * @returns {{
  *     requestId: string | null;
  *     sessionId: string | null;
+ *     runtimeId: string | null;
  *     message: string;
  *     mode: string;
  *     requestedSchema: Record<string, unknown> | null;
@@ -122,6 +123,12 @@ export function normalizeElicitationPendingEvent(eventOrData) {
     return {
         requestId: stringOr(payload['requestId'], '') || null,
         sessionId: stringOr(payload['sessionId'], '') || null,
+        runtimeId:
+            stringOr(root['runtimeId'], '') ||
+            stringOr(root['sourceRuntime'], '') ||
+            stringOr(payload['runtimeId'], '') ||
+            stringOr(payload['sourceRuntime'], '') ||
+            null,
         message: stringOr(payload['message'], ''),
         mode: stringOr(payload['mode'], payload['url'] ? 'url' : 'form'),
         requestedSchema: objectOrNull(payload['requestedSchema']),
@@ -140,6 +147,7 @@ export function normalizeElicitationPendingEvent(eventOrData) {
  * @returns {{
  *     requestId: string | null;
  *     sessionId: string | null;
+ *     runtimeId: string | null;
  *     action: 'accept' | 'decline' | 'cancel' | null;
  *     content: Record<string, unknown> | null;
  *     actionable: boolean;
@@ -159,6 +167,12 @@ export function normalizeElicitationCompletedEvent(eventOrData) {
     return {
         requestId: stringOr(payload['requestId'], '') || null,
         sessionId: stringOr(payload['sessionId'], '') || null,
+        runtimeId:
+            stringOr(root['runtimeId'], '') ||
+            stringOr(root['sourceRuntime'], '') ||
+            stringOr(payload['runtimeId'], '') ||
+            stringOr(payload['sourceRuntime'], '') ||
+            null,
         action: action === 'accept' || action === 'decline' || action === 'cancel' ? action : null,
         content: objectOrNull(content),
         actionable: payload['actionable'] === true,

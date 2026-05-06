@@ -79,20 +79,17 @@ export function mountCopilotNamespace(io, orchestrator, store) {
 }
 
 /**
- * Cria rate-limiter para injects com buckets por socket e por IP.
+ * Cria telemetria de volume para injects com buckets por socket e por IP. Não bloqueia operações da LLM-B.
  *
  * @returns {(socketId: string, ip: string) => boolean}
  */
 function _createInjectRateLimiter() {
     /** @type {Map<string, { count: number; resetAt: number }>} */
     const _socketBuckets = new Map();
-    const INJECT_LIMIT = 10;
     const INJECT_WINDOW_MS = 60_000;
 
     /** @type {Map<string, { count: number; resetAt: number }>} */
     const _ipBuckets = new Map();
-    const IP_INJECT_LIMIT = 30;
-
     return function checkSocketInjectRate(socketId, ip) {
         const now = Date.now();
         for (const [key, b] of _socketBuckets) {
@@ -102,9 +99,7 @@ function _createInjectRateLimiter() {
             if (now >= b.resetAt) _ipBuckets.delete(key);
         }
         const ipBucket = _ipBuckets.get(ip) ?? { count: 0, resetAt: now + INJECT_WINDOW_MS };
-        if (ipBucket.count >= IP_INJECT_LIMIT) return false;
         const bucket = _socketBuckets.get(socketId) ?? { count: 0, resetAt: now + INJECT_WINDOW_MS };
-        if (bucket.count >= INJECT_LIMIT) return false;
         bucket.count++;
         _socketBuckets.set(socketId, bucket);
         ipBucket.count++;
@@ -256,14 +251,10 @@ function _handleUserInject(socket, orchestrator, store, clientId, clientIp, chec
             return;
         }
         if (!checkRate(clientId, clientIp)) {
-            socket.emit(HUB_EVENTS.ERROR_INJECT, { reason: 'Rate limit excedido. Tente novamente em breve.' });
-            log('WARN', `[hub-ns] Rate limit atingido pelo socket ${clientId}`);
-            return;
+            log('DEBUG', `[hub-ns] Inject volume alto observado pelo socket ${clientId}; operação liberada.`);
         }
-        const MAX_INJECT_CONTENT = 32_000;
         const rawContent = typeof data.content === 'string' ? data.content : String(data.content ?? '');
         const safeContent = rawContent
-            .slice(0, MAX_INJECT_CONTENT)
             .replace(/^\s*\[SYSTEM[^\]]*\]/gim, '[BLOCKED]')
             .replace(/^\s*SYSTEM:/gim, '[BLOCKED]');
 
@@ -542,10 +533,13 @@ function _authorizeSocketSession(socket, store, hubSessionId, action) {
  * @returns {import('../../conversation-hub/store-helpers.js').HubSession[]}
  */
 function _listAuthorizedSessions(store, principal, opts = {}) {
-    const requestedLimit = Math.max(1, Math.min(opts.limit ?? 20, 100));
+    const requestedLimit =
+        typeof opts.limit === 'number' && Number.isFinite(opts.limit) && opts.limit > 0
+            ? Math.trunc(opts.limit)
+            : Number.POSITIVE_INFINITY;
     const requestedOffset = Math.max(0, opts.offset ?? 0);
-    const targetCount = requestedLimit + requestedOffset;
-    const pageSize = Math.max(50, targetCount * 3);
+    const targetCount = Number.isFinite(requestedLimit) ? requestedLimit + requestedOffset : Number.POSITIVE_INFINITY;
+    const pageSize = Number.isFinite(targetCount) ? Math.max(50, targetCount * 3) : 1_000;
     /** @type {import('../../conversation-hub/store-helpers.js').HubSession[]} */
     const authorized = [];
 
@@ -566,7 +560,9 @@ function _listAuthorizedSessions(store, principal, opts = {}) {
         if (batch.length < pageSize) break;
     }
 
-    return authorized.slice(requestedOffset, requestedOffset + requestedLimit);
+    return Number.isFinite(requestedLimit)
+        ? authorized.slice(requestedOffset, requestedOffset + requestedLimit)
+        : authorized.slice(requestedOffset);
 }
 
 /**

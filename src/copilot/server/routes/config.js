@@ -43,8 +43,8 @@ const toolsConfigBodySchema = z.object({
 });
 
 const customToolBodySchema = z.object({
-    name: z.string().min(1).max(128),
-    description: z.string().min(1).max(1024),
+    name: z.string().min(1),
+    description: z.string().min(1),
     handlerId: z.string().min(1),
     parameters: z.record(z.string(), z.unknown()).optional(),
 });

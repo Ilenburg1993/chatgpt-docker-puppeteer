@@ -14,26 +14,30 @@ module maps.
 
 ## 2) Achados corrigidos nesta rodada
 
-| ID                | Severidade | Área                           | Evidência                                                                                                                                                   | Status    |
-| ----------------- | ---------- | ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------- | --------- |
-| BUG-2026-05-06-01 | Alto       | SDK boundary / system prompt   | `config/system-prompt/sdk-introspection.js` chamava `session.rpc.instructions.getSources()` fora de `sdk/`, quebrando `check:crude`.                        | Corrigido |
-| GAP-2026-05-06-02 | Médio      | Terminal module map            | `ui-preferences.js` e `ui-theme.js` existiam na raiz do terminal, mas não estavam declarados em `terminal/module-map.js`.                                   | Corrigido |
-| GAP-2026-05-06-03 | Médio      | Hotspot governance             | `terminal/sdk-interactions.js` e `server/routes/sdk/deps.js` passaram de 300 LOC e seguiam como `watch`.                                                    | Corrigido |
-| GAP-2026-05-06-04 | Médio      | Permissions contracts          | `hooks/permission-handler.js` precisava consumir o núcleo via barrel canônico `#copilot/sdk` para satisfazer a migração F19 e evitar bypass documental.     | Corrigido |
-| BUG-2026-05-06-05 | Baixo      | Typecheck strict               | `channel/inject.js` mantinha o helper morto `_roundToSecond()`, quebrando `typecheck:strict:src.copilot` por `TS6133`.                                      | Corrigido |
-| BUG-2026-05-06-06 | Médio      | Terminal SSE adapters          | `permission.mode_changed` tinha adapter dedicado em `sdk-session-events.js`, mas ainda estava no passthrough SSE residual.                                  | Corrigido |
-| BUG-2026-05-06-07 | Médio      | Permission respond             | `/permission respond approve-for-session` aceitava payload sem `approval`, deixando o terminal enviar decisão inválida ao RPC do SDK.                       | Corrigido |
-| GAP-2026-05-06-08 | Baixo      | System prompt HTTP adapter     | `server/routes/sdk/deps.js` expunha helpers avulsos de system prompt além da projection canônica usada pela rota.                                           | Corrigido |
-| GAP-2026-05-06-09 | Alto       | Elicitation canonical flow     | `hooks/elicitation.js` ainda concentrava fila provider-side; terminal, server e event-handlers consumiam shapes parcialmente ad-hoc.                        | Corrigido |
-| GAP-2026-05-06-10 | Alto       | User input canonical flow      | `ask_user`/`user_input` ainda dependia de factories em `hooks/user-input.js` e parsing local em `interaction-events`/`sdk-interactions`.                    | Corrigido |
-| GAP-2026-05-06-11 | Médio      | Permission pending active list | `/permission pending` ainda dependia exclusivamente de estado observado local, sem consulta ativa via sessão SDK quando disponível.                         | Corrigido |
-| BUG-2026-05-06-12 | Médio      | Permission RPC → terminal UX   | `/permission pending` exibia requests vindos do RPC ativo, mas não hidratava o estado local; `/permission respond <id>` podia falhar para request RPC-only. | Corrigido |
-| GAP-2026-05-06-13 | Baixo      | Elicitation ownership docs     | JSDoc/provider em `agent/*` ainda apontavam `hooks/elicitation` como owner mesmo após a promoção para `sdk/session/elicitation.js`.                         | Corrigido |
-| GAP-2026-05-06-14 | Médio      | Permission cockpit operacional | Faltava cockpit curto no terminal para consolidar modo atual, últimas mudanças de mode e pendências por tipo com ações rápidas.                             | Corrigido |
-| GAP-2026-05-06-15 | Médio      | HTTP `/answer` fallback tool   | Faltava teste de integração HTTP garantindo que `/answer` cobre fallback `request_user_input` sem `ask_user` vivo.                                          | Corrigido |
-| GAP-2026-05-06-16 | Médio      | Stream runtime targeting       | `/stream` e `/stream/tasks` podiam abrir SSE com fallback default mesmo com `runtimeId` explícito inexistente, mascarando erro de targeting operacional.    | Corrigido |
-| GAP-2026-05-06-17 | Médio      | System prompt projection drift | Status/freshness/binding/compat/instruction sources eram consumidos por shapes fragmentados entre terminal/server/presentation sem envelope público único.  | Corrigido |
-| GAP-2026-05-06-18 | Alto       | Stream runtime isolation proof | Faltava prova executável de que streams simultâneos em runtimes diferentes não vazam eventos entre si.                                                      | Corrigido |
+| ID                | Severidade | Área                                | Evidência                                                                                                                                                               | Status    |
+| ----------------- | ---------- | ----------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------- |
+| BUG-2026-05-06-01 | Alto       | SDK boundary / system prompt        | `config/system-prompt/sdk-introspection.js` chamava `session.rpc.instructions.getSources()` fora de `sdk/`, quebrando `check:crude`.                                    | Corrigido |
+| GAP-2026-05-06-02 | Médio      | Terminal module map                 | `ui-preferences.js` e `ui-theme.js` existiam na raiz do terminal, mas não estavam declarados em `terminal/module-map.js`.                                               | Corrigido |
+| GAP-2026-05-06-03 | Médio      | Hotspot governance                  | `terminal/sdk-interactions.js` e `server/routes/sdk/deps.js` passaram de 300 LOC e seguiam como `watch`.                                                                | Corrigido |
+| GAP-2026-05-06-04 | Médio      | Permissions contracts               | `hooks/permission-handler.js` precisava consumir o núcleo via barrel canônico `#copilot/sdk` para satisfazer a migração F19 e evitar bypass documental.                 | Corrigido |
+| BUG-2026-05-06-05 | Baixo      | Typecheck strict                    | `channel/inject.js` mantinha o helper morto `_roundToSecond()`, quebrando `typecheck:strict:src.copilot` por `TS6133`.                                                  | Corrigido |
+| BUG-2026-05-06-06 | Médio      | Terminal SSE adapters               | `permission.mode_changed` tinha adapter dedicado em `sdk-session-events.js`, mas ainda estava no passthrough SSE residual.                                              | Corrigido |
+| BUG-2026-05-06-07 | Médio      | Permission respond                  | `/permission respond approve-for-session` aceitava payload sem `approval`, deixando o terminal enviar decisão inválida ao RPC do SDK.                                   | Corrigido |
+| GAP-2026-05-06-08 | Baixo      | System prompt HTTP adapter          | `server/routes/sdk/deps.js` expunha helpers avulsos de system prompt além da projection canônica usada pela rota.                                                       | Corrigido |
+| GAP-2026-05-06-09 | Alto       | Elicitation canonical flow          | `hooks/elicitation.js` ainda concentrava fila provider-side; terminal, server e event-handlers consumiam shapes parcialmente ad-hoc.                                    | Corrigido |
+| GAP-2026-05-06-10 | Alto       | User input canonical flow           | `ask_user`/`user_input` ainda dependia de factories em `hooks/user-input.js` e parsing local em `interaction-events`/`sdk-interactions`.                                | Corrigido |
+| GAP-2026-05-06-11 | Médio      | Permission pending active list      | `/permission pending` ainda dependia exclusivamente de estado observado local, sem consulta ativa via sessão SDK quando disponível.                                     | Corrigido |
+| BUG-2026-05-06-12 | Médio      | Permission RPC → terminal UX        | `/permission pending` exibia requests vindos do RPC ativo, mas não hidratava o estado local; `/permission respond <id>` podia falhar para request RPC-only.             | Corrigido |
+| GAP-2026-05-06-13 | Baixo      | Elicitation ownership docs          | JSDoc/provider em `agent/*` ainda apontavam `hooks/elicitation` como owner mesmo após a promoção para `sdk/session/elicitation.js`.                                     | Corrigido |
+| GAP-2026-05-06-14 | Médio      | Permission cockpit operacional      | Faltava cockpit curto no terminal para consolidar modo atual, últimas mudanças de mode e pendências por tipo com ações rápidas.                                         | Corrigido |
+| GAP-2026-05-06-15 | Médio      | HTTP `/answer` fallback tool        | Faltava teste de integração HTTP garantindo que `/answer` cobre fallback `request_user_input` sem `ask_user` vivo.                                                      | Corrigido |
+| GAP-2026-05-06-16 | Médio      | Stream runtime targeting            | `/stream` e `/stream/tasks` podiam abrir SSE com fallback default mesmo com `runtimeId` explícito inexistente, mascarando erro de targeting operacional.                | Corrigido |
+| GAP-2026-05-06-17 | Médio      | System prompt projection drift      | Status/freshness/binding/compat/instruction sources eram consumidos por shapes fragmentados entre terminal/server/presentation sem envelope público único.              | Corrigido |
+| GAP-2026-05-06-18 | Alto       | Stream runtime isolation proof      | Faltava prova executável de que streams simultâneos em runtimes diferentes não vazam eventos entre si.                                                                  | Corrigido |
+| GAP-2026-05-06-19 | Médio      | Permissions E2E requestId           | Faltava prova executável do fluxo `permission.requested → /permission respond → permission.completed` com correlação explícita por `requestId`.                         | Corrigido |
+| GAP-2026-05-06-20 | Alto       | Permission store runtime bleed      | Estado local de permissions no terminal era global; `show/respond latest` podia mirar request de runtime diferente em cenários multi-runtime.                           | Corrigido |
+| GAP-2026-05-06-21 | Alto       | Elicitation/UserInput runtime bleed | Estado local de `elicitation` e `user_input` no terminal era compartilhado entre runtimes; `/sdk waits` e `/elicitation latest` podiam mirar fila de runtime diferente. | Corrigido |
+
 ### Correções aplicadas
 
 - Criada a façade SDK `instructionSourcesGet(session)` em `sdk/rpc/session.js`.
@@ -93,10 +97,33 @@ module maps.
 - `tests/unit/copilot/test_copilot_api_multi_runtime.spec.js` passou a validar isolamento real de
   SSE por runtime: dois streams paralelos (`default` e `audit`) recebem apenas eventos emitidos no
   emitter do runtime correspondente, com `runtimeId`/`sourceRuntime` correlacionados.
+- `tests/unit/copilot/terminal/test_commands_sdk.spec.js` ganhou cobertura do fluxo
+  `permission.requested → /permission respond → permission.completed` validando correlação pelo
+  mesmo `requestId`, atualização do mesmo registro e preservação de payload de `completion`.
+- `sdk/session/permission-events.js` passou a normalizar `runtimeId`/`sourceRuntime` em
+  `permission.requested` e `permission.completed`.
+- `event-handlers/interaction-events.js` passou a propagar `runtimeId` nos eventos `permission.*`.
+- `terminal/sdk-interactions.js` passou a armazenar permissões com `runtimeId` e filtrar
+  `list/get/summary` por runtime alvo.
+- `terminal/commands/sdk.js` passou a respeitar runtime alvo em
+  `/permission show|respond latest|cockpit` e no painel `/sdk waits`.
+- Teste adicionado em `tests/unit/copilot/terminal/test_commands_sdk.spec.js` comprovando que
+  `/permission show latest --runtime audit` e `/permission respond latest --runtime audit` não vazam
+  para requests do runtime `default`.
+- `sdk/session/elicitation.js` e `sdk/session/user-input.js` passaram a normalizar `runtimeId` com
+  fallback para `sourceRuntime`.
+- `event-handlers/interaction-events.js` e `event-handlers/sdk-responses.js` passaram a propagar
+  `runtimeId` nos eventos `user_input.*` e `elicitation.*`.
+- `terminal/sdk-interactions.js` passou a armazenar e filtrar `elicitation` e `user_input` por
+  runtime alvo.
+- `terminal/commands/sdk.js` passou a respeitar runtime alvo em `/sdk waits` e
+  `/elicitation show|respond|list`, evitando bleed cross-runtime.
+- Testes adicionados/ajustados em `tests/unit/copilot/terminal/test_commands_sdk.spec.js` cobrindo
+  isolamento runtime-aware de `elicitation` e `ask_user` no painel `/sdk waits`.
 - `config/system-prompt/projection.js` passou a definir envelope público único de projection
   (`status`, `sdkCompatibility`, `binding`, `freshness`, `session`, `instructionSources`,
-  `ownership`, `revision`) e `presentation/runtime-sdk-session.js` passou a retornar esse envelope em
-  `projection` sem quebrar campos legados.
+  `ownership`, `revision`) e `presentation/runtime-sdk-session.js` passou a retornar esse envelope
+  em `projection` sem quebrar campos legados.
 - `terminal/commands/sdk.js` passou a consumir preferencialmente `projection` com fallback para os
   campos legados (`systemPrompt`, `binding`, `freshness`, `instructionSources`).
 - `server/routes/sdk/deps.js` alinhou o fallback para retornar a mesma estrutura de `projection`
@@ -271,16 +298,15 @@ Auditoria complementar solicitada sobre o comportamento observado no Copilot van
 - Fonte oficial validada: GitHub Copilot distingue limite de sessão e limite semanal de 7 dias.
   Limite de sessão exige aguardar reset; limite semanal pode continuar com seleção `Auto` quando
   ainda há premium requests disponíveis.
-- O caminho canônico atual já preserva `model="auto"` até `createSession()`/`resumeSession()` do
-  SDK e omite `reasoningEffort` nesse caso.
+- O caminho canônico atual já preserva `model="auto"` até `createSession()`/`resumeSession()` do SDK
+  e omite `reasoningEffort` nesse caso.
 - Gap corrigido: o terminal/recovery policy não deve sugerir `/model auto` como se fosse contorno
   universal para todo `429`.
-- `presentation/sdk-recovery-policy.js` e `sdk/errors.js` passaram a diferenciar
-  `session`, `weekly_model` e `unknown` como subescopos de rate limit.
+- `presentation/sdk-recovery-policy.js` e `sdk/errors.js` passaram a diferenciar `session`,
+  `weekly_model` e `unknown` como subescopos de rate limit.
 - `hooks/session-hooks.js` deixou de agendar fallback automático quando o SDK informa limite de
   sessão com reset temporal.
-- Documento dedicado criado:
-  `2026-05-06-AUDITORIA-AUTO-MODEL-E-RATE-LIMIT-COPILOT-SDK.md`.
+- Documento dedicado criado: `2026-05-06-AUDITORIA-AUTO-MODEL-E-RATE-LIMIT-COPILOT-SDK.md`.
 
 Nota de governança: não há transformação para evadir rate limit ou burlar termos. A convergência
 implementada maximiza uso permitido via Auto model, fallback explícito, mensagens corretas e
@@ -301,8 +327,8 @@ Auditoria complementar sobre `model auto`:
   efetivo/cobrado observado.
 - Catálogo local de modelos foi atualizado para IDs atuais observados no SDK, incluindo `gpt-5.4`,
   `gpt-5.3-codex`, `gpt-5.2-codex`, `gpt-5.2`, `gpt-5.4-mini` e `claude-haiku-4.5`.
-- `usage` passou a normalizar `effectiveModel=auto` para o `billedModel` concreto quando
-  disponível, evitando perda de rastreabilidade.
+- `usage` passou a normalizar `effectiveModel=auto` para o `billedModel` concreto quando disponível,
+  evitando perda de rastreabilidade.
 
 Teste live:
 
@@ -320,3 +346,38 @@ Próxima fatia de convergência arquitetural, mantendo baixo risco e alta coerê
 2. retomar `R1` de permissions (`/permission pending` e cockpit curto);
 3. só depois disso, voltar a transforms mais profundas em hotspots como
    `terminal/sdk-session-events` e `terminal/commands/sdk`.
+
+## 9) Reflexão e análise profunda — próximos passos em `src/copilot`
+
+Com os gaps P0–P3 já fechados, o maior risco arquitetural residual está menos em funcionalidade
+faltante e mais em **coesão por runtime** e **densidade de composition roots**. O próximo ciclo deve
+seguir esta ordem para manter segurança de rollout:
+
+1. **Isolamento por runtime nas stores de UX terminal (`sdk-interactions`)**
+   - **Permissions, elicitation e user_input já foram isolados por runtime** nesta rodada.
+   - Próximo passo: completar isolamento multi-runtime de rate-limit e capability/profile snapshot
+     para fechar `R5[~]` de ponta a ponta.
+
+2. **Fatiamento semântico dos hotspots R4 (sem refactor cosmético)**
+   - `terminal/sdk-session-events.js`: separar adapters de evento, renderers e side effects SSE.
+   - `terminal/commands/sdk.js`: extrair submódulos (`permissions`, `elicitation`, `workspace`,
+     `system-prompt`) com contratos pequenos e testáveis.
+
+3. **Prova multi-runtime de rate-limit e capability snapshots**
+   - Fechar os itens `R5[~]` com testes que demonstrem ausência de bleed de recovery policy e
+     snapshots entre runtimes distintos sob carga de quota/rate-limit.
+
+Essa sequência maximiza convergência canônica 2.2, reduz risco de regressão e prepara o terreno para
+evolução de UX sem reintroduzir owners paralelos fora do SDK.
+
+## 10) Atualização complementar 2026-05-06 — runtime-aware de `elicitation` e `ask_user`
+
+- `npm run typecheck:strict:src.copilot`: verde.
+- `node_modules/.bin/eslint` nos arquivos alterados: verde.
+- `node_modules/.bin/vitest run --config vitest.copilot.config.js` com:
+  - `tests/unit/copilot/terminal/test_commands_sdk.spec.js`
+  - `tests/unit/copilot/test_terminal_sdk_session_events.spec.js`
+  - `tests/unit/copilot/test_terminal_agent_runtime_events.spec.js`
+
+Resultado factual: verde (`41` testes passando), incluindo cobertura nova de isolamento
+`elicitation/user_input` por `runtimeId` em `/sdk waits` e `/elicitation latest`.

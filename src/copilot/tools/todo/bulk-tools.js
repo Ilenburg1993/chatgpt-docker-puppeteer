@@ -30,12 +30,12 @@ export const todoBulkUpdateTool = createTool({
     parameters: /** @type {import('#copilot/sdk/types').ZodSchema<any>} */ (
         /** @type {unknown} */ (
             z.object({
-                ids: z.array(zId).min(1).max(100).describe('Lista de IDs de tarefas a atualizar (máximo 100)'),
+                ids: z.array(zId).min(1).describe('Lista de IDs de tarefas a atualizar'),
                 status: zStatus
                     .optional()
                     .describe('Novo status a aplicar a todas (máquina de estados ignorada em bulk)'),
                 priority: zPriority.optional().describe('Nova prioridade a aplicar a todas'),
-                add_tags: z.array(z.string().max(100)).max(10).optional().describe('Tags a adicionar a todas'),
+                add_tags: z.array(z.string()).optional().describe('Tags a adicionar a todas'),
                 remove_tags: z.array(z.string()).optional().describe('Tags a remover de todas'),
                 completed_by: z.string().optional().describe('Identificador de quem concluiu (agente, usuário, etc.)'),
             })
@@ -199,19 +199,18 @@ export const todoImportTool = createTool({
                 tasks: z
                     .array(
                         z.object({
-                            title: z.string().min(1).max(500),
-                            description: z.string().max(5000).optional(),
+                            title: z.string().min(1),
+                            description: z.string().optional(),
                             status: zStatus.optional(),
                             priority: zPriority.optional(),
-                            tags: z.array(z.string().max(100)).max(20).optional(),
+                            tags: z.array(z.string()).optional(),
                             due_date: z.string().datetime({ offset: true }).optional(),
-                            notes: z.string().max(10000).optional(),
+                            notes: z.string().optional(),
                             metadata: z.record(z.string(), z.unknown()).optional(),
                         }),
                     )
                     .min(1)
-                    .max(50)
-                    .describe('Array de tarefas a importar (máximo 50 por chamada)'),
+                    .describe('Array de tarefas a importar'),
                 default_priority: zPriority
                     .optional()
                     .default('medium')

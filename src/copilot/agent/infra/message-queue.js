@@ -27,7 +27,7 @@ import { log } from '../ports/logging-port.js';
  * @property {function(string): void} resolve - Callback de resolução da Promise
  * @property {function(Error): void} reject - Callback de rejeição da Promise
  * @property {number} enqueuedAt - Timestamp em ms do momento de enqueue
- * @property {number} [timeoutMs] - Timeout personalizado para sendAndWait (ms). `undefined` = usa padrão do SDK (60 s).
+ * @property {number | null} [timeoutMs] - Timeout informativo; null desabilita bloqueio local.
  * @property {import('#copilot/sdk/types').MessageOptions['attachments']} [attachments] - Anexos adicionais
  */
 

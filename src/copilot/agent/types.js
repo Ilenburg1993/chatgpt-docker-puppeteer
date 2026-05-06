@@ -162,7 +162,7 @@
  * @property {function(string): void} resolve - Callback de resolução
  * @property {function(Error): void} reject - Callback de erro
  * @property {number} enqueuedAt - Timestamp em ms
- * @property {number} [timeoutMs] - Timeout personalizado para sendAndWait (ms). undefined = usa padrão de 60s do SDK.
+ * @property {number | null} [timeoutMs] - Timeout informativo; null desabilita bloqueio local.
  * @property {import('#copilot/sdk/types').MessageOptions['attachments']} [attachments] - Anexos (arquivos, imagens,
  *   seleções) a enviar junto com a mensagem.
  */
@@ -631,7 +631,7 @@
  * @property {(
  *     message: string,
  *     opts?: {
- *         timeoutMs?: number;
+ *         timeoutMs?: number | null;
  *         attachments?: import('#copilot/sdk/types').MessageOptions['attachments'];
  *         signal?: AbortSignal;
  *         taskId?: string;
@@ -639,8 +639,8 @@
  * ) => Promise<string>} sendMessage
  *   - Envia mensagem ao agente
  *
- * @property {(message: string, opts?: { timeoutMs?: number }) => Promise<string>} sendMessageDialogBoot - Envia o boot
- *   prompt ignorando o guard do dialog loop (uso exclusivo do DialogLoopManager durante boot)
+ * @property {(message: string, opts?: { timeoutMs?: number | null }) => Promise<string>} sendMessageDialogBoot - Envia
+ *   o boot prompt ignorando o guard do dialog loop (uso exclusivo do DialogLoopManager durante boot)
  * @property {(answer: string) => boolean} answerPendingQuestion - Responde a uma pergunta pendente do SDK
  * @property {(bootPrompt?: string) => Promise<void>} startDialogLoop - Inicia o dialog loop contínuo
  * @property {(text: string, opts?: { timeout?: number }) => Promise<string>} sendDialogTurn - Envia um turn ao dialog

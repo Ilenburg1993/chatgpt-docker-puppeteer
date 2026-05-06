@@ -163,6 +163,13 @@ Documentos adicionados/atualizados nesta rodada:
   preservando `/permission respond <id>` como borda única; `terminal:llm-b` bootou e respondeu
   `/status`, `/sdk waits`, `/permission pending`, `/health` e `/config` sob bloqueio externo de rate
   limit.
+- Nova trilha read/write (investigação profunda):
+  - `2026-05-06-AUDITORIA-READ-WRITE-AS-IS-SRC-COPILOT.md` — inventário factual AS-IS de
+    leitura/escrita, gaps e riscos operacionais.
+  - `2026-05-06-ARQUITETURA-ALVO-READ-WRITE-NODE24.md` — proposta TO-BE com contracts canônicos,
+    cache/indexação e capacidades Node 24+.
+  - `2026-05-06-ROADMAP-READ-WRITE-ULTRAFAST.md` — roadmap faseado (R0–R7) para convergência
+    read/write robusta, segura e de alta performance.
 
 ## Próximos documentos previstos
 

@@ -92,10 +92,12 @@ export function setModel(ctx, modelId) {
 export function readRuntimeAutoModelPolicy(runtime) {
     const selection = readRuntimeModelSelection(runtime);
     const snap = readAgentRuntimeStatusSnapshot(runtime);
-    const runtimeWithPrInfo = /** @type {{
-        getLastPrInfoSnapshot?: () => Record<string, unknown> | null;
-        lastPrInfo?: Record<string, unknown> | null;
-    }} */ (runtime);
+    const runtimeWithPrInfo = /**
+     * @type {{
+     *     getLastPrInfoSnapshot?: () => Record<string, unknown> | null;
+     *     lastPrInfo?: Record<string, unknown> | null;
+     * }}
+     */ (runtime);
     const explicitPrInfo =
         typeof runtimeWithPrInfo.getLastPrInfoSnapshot === 'function'
             ? runtimeWithPrInfo.getLastPrInfoSnapshot()

@@ -65,6 +65,7 @@ export function wireInteractionEvents(session, { emit }) {
             emit('permission.requested', {
                 requestId: normalized.requestId,
                 permissionType: normalized.permissionType,
+                runtimeId: normalized.runtimeId,
                 data: normalized.data,
                 ts: normalized.ts,
             });
@@ -77,6 +78,7 @@ export function wireInteractionEvents(session, { emit }) {
             emit('permission.completed', {
                 requestId: normalized.requestId,
                 permissionType: normalized.permissionType,
+                runtimeId: normalized.runtimeId,
                 result: normalized.resultKind,
                 granted: normalized.granted,
                 decision: normalized.decision,
@@ -95,6 +97,7 @@ export function wireInteractionEvents(session, { emit }) {
             );
             emit('user_input.requested', {
                 requestId: normalized.requestId,
+                runtimeId: normalized.runtimeId,
                 question: normalized.question,
                 choices: normalized.choices,
                 allowFreeform: normalized.allowFreeform,
@@ -109,6 +112,7 @@ export function wireInteractionEvents(session, { emit }) {
             log('DEBUG', `[interaction-events] user_input.completed: requestId=${normalized.requestId ?? '?'}`);
             emit('user_input.completed', {
                 requestId: normalized.requestId,
+                runtimeId: normalized.runtimeId,
                 answer: normalized.answer,
                 ...(normalized.wasFreeform !== null ? { wasFreeform: normalized.wasFreeform } : {}),
                 data: normalized.data,

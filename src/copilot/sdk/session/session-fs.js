@@ -10,17 +10,15 @@
  */
 
 import {
-    appendFile as fsAppendFile,
     mkdir as fsMkdir,
     readFile as fsReadFile,
     readdir as fsReaddir,
-    rename as fsRename,
     rm as fsRm,
     stat as fsStat,
-    writeFile as fsWriteFile,
 } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { readCopilotSessionFsBootConfig } from '../../boot/session-fs.js';
+import { appendTextLocked, createOrReplaceFileAtomic, moveFileLocked } from '../../infra/io-engine.js';
 import { classifySdkError } from '../errors.js';
 import { log } from '../logger.js';
 import { emitSdkOperationMetric } from '../telemetry/operation-metrics.js';
@@ -172,8 +170,13 @@ export function createLocalSessionFsProvider(rootDir, options = {}) {
                 'session.fs.writeFile',
                 async () => {
                     const target = resolveWithinRoot(root, path);
-                    await fsMkdir(dirname(target), { recursive: true });
-                    await fsWriteFile(target, content, { encoding: 'utf8', mode });
+                    await createOrReplaceFileAtomic(target, content, {
+                        encoding: 'utf8',
+                        createParentDirs: true,
+                        riskClass: 'medium',
+                        advisoryLimits: { source: 'session.fs' },
+                        ...(mode === undefined ? {} : { mode }),
+                    });
                 },
                 createOperationContext(sessionId, {
                     provider: 'local',
@@ -188,7 +191,11 @@ export function createLocalSessionFsProvider(rootDir, options = {}) {
                 async () => {
                     const target = resolveWithinRoot(root, path);
                     await fsMkdir(dirname(target), { recursive: true });
-                    await fsAppendFile(target, content, { encoding: 'utf8', mode });
+                    await appendTextLocked(target, content, {
+                        encoding: 'utf8',
+                        advisoryLimits: { source: 'session.fs' },
+                        ...(mode === undefined ? {} : { mode }),
+                    });
                 },
                 createOperationContext(sessionId, {
                     provider: 'local',
@@ -282,8 +289,7 @@ export function createLocalSessionFsProvider(rootDir, options = {}) {
                 async () => {
                     const srcTarget = resolveWithinRoot(root, src);
                     const destTarget = resolveWithinRoot(root, dest);
-                    await fsMkdir(dirname(destTarget), { recursive: true });
-                    await fsRename(srcTarget, destTarget);
+                    await moveFileLocked(srcTarget, destTarget, { overwrite: true });
                 },
                 createOperationContext(sessionId, {
                     provider: 'local',

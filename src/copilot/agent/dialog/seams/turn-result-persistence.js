@@ -14,7 +14,6 @@ import {
     EMITTER_LOOP_STOPPED,
     EMITTER_QUESTION_PENDING,
 } from '#copilot/events';
-import { LLM_B_TURN_TIMEOUT_MS } from '../../../config/env.js';
 import { log } from '../../ports/logging-port.js';
 import { METRICS_STORE } from '../../ports/metrics-port.js';
 
@@ -30,7 +29,7 @@ import { METRICS_STORE } from '../../ports/metrics-port.js';
  *     pendingListenerRef: { current: ((arg: unknown) => void) | null };
  *     resolve: (v: string) => void;
  *     reject: (e: Error) => void;
- *     waitForRestartAndReplyFn: (message: string, timeout: number, stopReason?: string) => Promise<string>;
+ *     waitForRestartAndReplyFn: (message: string, timeout: number | null, stopReason?: string) => Promise<string>;
  *     tryUseReplyFallback?: () => boolean;
  *     traceId?: string;
  *     castListener: (fn: (evt: any) => void) => (evt: unknown) => void;
@@ -126,9 +125,7 @@ export function buildTurnResolutionListenersImpl(emitter, opts) {
                 'INFO',
                 `[DialogLoopManager] Dialog loop parado sem autorização (${stopEvt?.reason ?? 'unknown'}) — aguardando restart automático.`,
             );
-            waitForRestartAndReplyFn(opts.message, timeout ?? LLM_B_TURN_TIMEOUT_MS, stopEvt?.reason)
-                .then(resolve)
-                .catch(reject);
+            waitForRestartAndReplyFn(opts.message, timeout, stopEvt?.reason).then(resolve).catch(reject);
         }
     });
 
@@ -159,7 +156,7 @@ export function buildTurnResolutionListenersImpl(emitter, opts) {
  *     onStopOuter: (evt: unknown) => void;
  *     resolve: (v: string) => void;
  *     reject: (e: Error) => void;
- *     waitForRestartAndReplyFn: (message: string, timeout: number, stopReason?: string) => Promise<string>;
+ *     waitForRestartAndReplyFn: (message: string, timeout: number | null, stopReason?: string) => Promise<string>;
  *     onDispatch?: () => void;
  *     tryUseReplyFallback?: () => boolean;
  *     traceId?: string;
@@ -314,9 +311,7 @@ export function dispatchTurnToHostImpl(emitter, opts) {
                 if (stopEvt2?.authorized) {
                     reject(new SessionError('[DialogLoopManager] Diálogo encerrado.', 'DIALOG_ENDED'));
                 } else {
-                    waitForRestartAndReplyFn(message, timeout ?? LLM_B_TURN_TIMEOUT_MS, stopEvt2?.reason)
-                        .then(resolve)
-                        .catch(reject);
+                    waitForRestartAndReplyFn(message, timeout, stopEvt2?.reason).then(resolve).catch(reject);
                 }
             });
             if (opts.signal) {

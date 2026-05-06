@@ -18,6 +18,7 @@ import { DB_LOGGER, EVENT_BUS, SHUTDOWN_LOGGER } from '#copilot/core';
 import { HOOKS_LOGGER } from '#copilot/hooks';
 import { SDK_LOGGER, TOOLS_BUILDER } from '#copilot/sdk';
 import { TOOLS_LOGGER, TOOLS_METRICS } from '#copilot/tools';
+import { channel } from 'node:diagnostics_channel';
 import { setAuditLogger } from '../audit/logger.js';
 import { container } from '../core/di-container.js';
 import { registerErrorHandlerDeps } from '../core/error-handlers.js';
@@ -44,6 +45,36 @@ import { getToolStats, recordToolCall } from './tool-stats.js';
 
 /** @type {boolean} */
 let _obsBooted = false;
+const ioOperationChannel = channel('copilot.io.operation');
+
+/**
+ * @param {unknown} message
+ * @returns {void}
+ */
+function recordIoOperationMetric(message) {
+    if (!message || typeof message !== 'object') return;
+    const payload = /** @type {{ success?: unknown; io?: import('../core/io-contracts.js').IoMeta }} */ (message);
+    const io = payload.io;
+    if (!io || typeof io !== 'object') return;
+
+    const success = payload.success !== false;
+    const durationMs = Math.max(0, Math.round(io.durationMs ?? 0));
+    const engine = io.engine ?? 'unknown';
+    const metricName = `io.${io.operation}.${engine}`;
+
+    defaultMetrics.recordToolCall(metricName, durationMs, success);
+    defaultMetrics.recordCounter(`copilot.io.${io.operation}.${success ? 'success' : 'error'}_total`);
+    if (typeof io.bytesRead === 'number') {
+        defaultMetrics.recordCounter('copilot.io.bytes_read_total', io.bytesRead);
+    }
+    if (typeof io.bytesWritten === 'number') {
+        defaultMetrics.recordCounter('copilot.io.bytes_written_total', io.bytesWritten);
+    }
+    const lockWait = io.advisoryLimits?.['lockWaitMs'];
+    if (typeof lockWait === 'number') {
+        defaultMetrics.recordGauge('copilot.io.lock_wait_ms.last', lockWait);
+    }
+}
 
 /**
  * @param {import('../sdk/types.js').SdkOperationMetric} metric
@@ -118,6 +149,7 @@ export function bootstrapObservability() {
 
     // Runtime canônico de observabilidade sobre EventBus.
     if (bus) attachObservabilityBusRuntime({ bus, metrics: defaultMetrics });
+    ioOperationChannel.subscribe(recordIoOperationMetric);
     setShutdownEventEmitter(emitShutdownLifecycleEvent);
 
     // FAIXA-0: Shutdown handlers para singletons de observabilidade
@@ -142,6 +174,14 @@ export function bootstrapObservability() {
         'observability.busRuntime.detach',
         async () => {
             detachObservabilityBusRuntime();
+        },
+        SHUTDOWN_PRIORITY.OBSERVABILITY_DETACH,
+    );
+
+    registerShutdownHandler(
+        'observability.ioMetrics.detach',
+        async () => {
+            ioOperationChannel.unsubscribe(recordIoOperationMetric);
         },
         SHUTDOWN_PRIORITY.OBSERVABILITY_DETACH,
     );

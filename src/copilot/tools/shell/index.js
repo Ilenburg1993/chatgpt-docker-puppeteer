@@ -10,8 +10,7 @@
  * - skipPermission: false em todas as tools (requerem aprovação explícita)
  * - Cwd restrito a /workspaces/ (sem saída para /etc, /usr, /root, etc.)
  * - Blocklist de comandos perigosos (rm -rf, dd, mkfs, etc.)
- * - Timeout máximo configurável por chamada (default: 30s, máx: 120s)
- * - Output truncado a MAX_OUTPUT_BYTES para evitar overflow de contexto
+ * - Timeouts e volume de output são informativos; não bloqueiam a operação da LLM-B
  * - Nunca executar como root (verificação em runtime)
  * - Variáveis de ambiente sensíveis removidas do sub-processo
  *
@@ -26,7 +25,7 @@ import * as path from 'node:path';
 import { z } from 'zod';
 import { log } from '../logger.js';
 import { recordToolCall } from '../metrics-proxy.js';
-import { MAX_TIMEOUT_MS, runPipeline, runProcess, tokenizeShell } from './executor.js';
+import { ADVISORY_TIMEOUT_MS, runPipeline, runProcess, tokenizeShell } from './executor.js';
 import {
     ALLOWED_EXECUTABLES,
     ALLOWED_NPM_SCRIPTS,
@@ -57,7 +56,7 @@ const execCommandTool = createTool({
     name: 'exec_command',
     description:
         'Executa um comando shell no workspace. O comando é executado via /bin/sh com sandbox de segurança: ' +
-        'cwd restrito ao workspace, blocklist de comandos perigosos, timeout máximo de 120s e output limitado. ' +
+        'cwd restrito ao workspace e blocklist de comandos perigosos. Timeout/output são informativos e não bloqueiam. ' +
         'Use para diagnósticos, verificações de estado, e comandos de desenvolvimento. ' +
         'Exemplos: "ls -la src/", "node --version", "git status", "cat config.json".',
     parameters: sdkParam(
@@ -73,9 +72,8 @@ const execCommandTool = createTool({
                 .number()
                 .int()
                 .min(1)
-                .max(120)
                 .optional()
-                .describe('Timeout em segundos (1-120). Default: 30.'),
+                .describe('Timeout informativo em segundos. Default histórico: 30.'),
         }),
     ),
     handler: async (
@@ -93,18 +91,17 @@ const execCommandTool = createTool({
             return { success: false, error: cwdCheck.reason ?? 'CWD inválido' };
         }
 
-        const timeoutMs = Math.min(timeoutSeconds * 1000, MAX_TIMEOUT_MS);
-        log('INFO', `[ShellTools] exec_command: ${command} (cwd=${cwdCheck.resolved}, timeout=${timeoutMs}ms)`);
+        const advisoryTimeoutMs = timeoutSeconds * 1000;
+        log(
+            'INFO',
+            `[ShellTools] exec_command: ${command} (cwd=${cwdCheck.resolved}, advisoryTimeout=${advisoryTimeoutMs}ms)`,
+        );
 
         // UPG-01: detectar pipeline simples (cmd1 | cmd2) e executar via spawn explícito sem shell.
         // Apenas pipes simples (sem subshell, sem redireção, sem ;/&) são permitidos.
         // Cada segmento é validado individualmente pela blocklist antes de executar.
         const pipeSegments = command.split('|').map((/** @type {string} */ s) => s.trim());
         if (pipeSegments.length > 1) {
-            // Permitir no máximo 5 estágios para evitar abuso
-            if (pipeSegments.length > 5) {
-                return { success: false, error: 'Pipeline muito longa (máx. 5 estágios).' };
-            }
             // Validar cada segmento individualmente
             for (const seg of pipeSegments) {
                 const segCheck = checkCommandBlocklist(seg.trim());
@@ -121,13 +118,15 @@ const execCommandTool = createTool({
                 const [file, ...args] = parts;
                 return { file: file ?? '', args };
             });
-            const result = await runPipeline(stages, { cwd: cwdCheck.resolved, timeoutMs });
+            const result = await runPipeline(stages, { cwd: cwdCheck.resolved, timeoutMs: null });
             return {
                 success: result.exitCode === 0,
                 exitCode: result.exitCode,
                 stdout: result.stdout,
                 stderr: result.stderr,
                 durationMs: result.durationMs,
+                advisoryTimeoutMs,
+                advisoryPipelineStages: pipeSegments.length,
             };
         }
 
@@ -167,7 +166,7 @@ const execCommandTool = createTool({
         });
         const result = await runProcess(executable, execArgs, {
             cwd: cwdCheck.resolved,
-            timeoutMs,
+            timeoutMs: null,
         });
 
         // F6.4: registrar execução no audit de tools para observabilidade
@@ -185,6 +184,8 @@ const execCommandTool = createTool({
             stdout: result.stdout,
             stderr: result.stderr,
             durationMs: result.durationMs,
+            advisoryTimeoutMs,
+            advisoryHistoricalTimeoutMs: ADVISORY_TIMEOUT_MS,
         };
     },
 });
@@ -214,9 +215,8 @@ const runNpmScriptTool = createTool({
                 .number()
                 .int()
                 .min(1)
-                .max(120)
                 .optional()
-                .describe('Timeout em segundos (1-120). Default: 60.'),
+                .describe('Timeout informativo em segundos. Default histórico: 60.'),
         }),
     ),
     handler: async (/** @type {{ script: string; timeoutSeconds?: number }} */ { script, timeoutSeconds = 60 }) => {
@@ -229,8 +229,8 @@ const runNpmScriptTool = createTool({
             };
         }
 
-        const timeoutMs = Math.min(timeoutSeconds * 1000, MAX_TIMEOUT_MS);
-        log('INFO', `[ShellTools] run_npm_script: npm run ${script} (timeout=${timeoutMs}ms)`);
+        const advisoryTimeoutMs = timeoutSeconds * 1000;
+        log('INFO', `[ShellTools] run_npm_script: npm run ${script} (advisoryTimeout=${advisoryTimeoutMs}ms)`);
 
         const _npmAuditId = `npm-${Date.now()}`;
         defaultAuditLog.recordToolStart({
@@ -240,7 +240,7 @@ const runNpmScriptTool = createTool({
         });
         const result = await runProcess('npm', ['run', script], {
             cwd: WORKSPACE_ROOT,
-            timeoutMs,
+            timeoutMs: null,
         });
 
         // F6.4: audit log de execução npm
@@ -259,6 +259,8 @@ const runNpmScriptTool = createTool({
             stderr: result.stderr,
             durationMs: result.durationMs,
             script,
+            advisoryTimeoutMs,
+            advisoryHistoricalTimeoutMs: ADVISORY_TIMEOUT_MS,
         };
     },
 });
@@ -287,9 +289,8 @@ const runNodeFileTool = createTool({
                 .number()
                 .int()
                 .min(1)
-                .max(120)
                 .optional()
-                .describe('Timeout em segundos (1-120). Default: 30.'),
+                .describe('Timeout informativo em segundos. Default histórico: 30.'),
         }),
     ),
     handler: async (
@@ -323,8 +324,8 @@ const runNodeFileTool = createTool({
             return { success: false, error: `Acesso negado: arquivo fora do workspace (${resolved})` };
         }
 
-        const timeoutMs = Math.min(timeoutSeconds * 1000, MAX_TIMEOUT_MS);
-        log('INFO', `[ShellTools] run_node_file: node ${resolved} (timeout=${timeoutMs}ms)`);
+        const advisoryTimeoutMs = timeoutSeconds * 1000;
+        log('INFO', `[ShellTools] run_node_file: node ${resolved} (advisoryTimeout=${advisoryTimeoutMs}ms)`);
 
         const _nodeAuditId = `node-${Date.now()}`;
         defaultAuditLog.recordToolStart({
@@ -334,7 +335,7 @@ const runNodeFileTool = createTool({
         });
         const result = await runProcess('node', [resolved, ...args], {
             cwd: WORKSPACE_ROOT,
-            timeoutMs,
+            timeoutMs: null,
         });
 
         // F6.4: audit log de execução node
@@ -353,6 +354,8 @@ const runNodeFileTool = createTool({
             stderr: result.stderr,
             durationMs: result.durationMs,
             filePath: resolved,
+            advisoryTimeoutMs,
+            advisoryHistoricalTimeoutMs: ADVISORY_TIMEOUT_MS,
         };
     },
 });

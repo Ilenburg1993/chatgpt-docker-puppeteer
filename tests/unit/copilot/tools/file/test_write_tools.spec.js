@@ -106,6 +106,7 @@ describe('F35 — write_file_content (F181-F182)', () => {
         const result = await handler({ path: 'file.txt', content: 'hello', encoding: 'utf8' });
 
         expect(result).toMatchObject({ success: true, path: '/workspace/file.txt' });
+        expect(result.io?.operation).toBe('write');
         expect(result.bytesWritten).toBe(5);
         expect(fsMock.writeFile).toHaveBeenCalledOnce();
         expect(fsMock.rename).toHaveBeenCalledOnce();
@@ -271,6 +272,24 @@ describe('F35 — create_file (F184)', () => {
         expect(result.bytesWritten).toBe(0);
     });
 
+    it('retorna bytes escritos reais para UTF-8 multibyte', async () => {
+        pathOk('/workspace/unicode.txt');
+        fsMock.access.mockRejectedValue(new Error('ENOENT'));
+        fsMock.mkdir.mockResolvedValue(undefined);
+        fsMock.writeFile.mockResolvedValue(undefined);
+        fsMock.rename.mockResolvedValue(undefined);
+
+        const result = await handler({
+            path: 'unicode.txt',
+            content: 'ação 🚀',
+            createParentDirs: true,
+            overwrite: false,
+        });
+
+        expect(result.success).toBe(true);
+        expect(result.bytesWritten).toBe(Buffer.byteLength('ação 🚀', 'utf8'));
+    });
+
     it('falha se validatePath rejeita', async () => {
         pathFail('Blocked');
 
@@ -300,6 +319,7 @@ describe('F35 — delete_file (F185)', () => {
         const result = await handler({ path: 'doomed.txt' });
 
         expect(result).toMatchObject({ success: true, deleted: true });
+        expect(result.io?.operation).toBe('delete');
         expect(fsMock.unlink).toHaveBeenCalledWith('/workspace/doomed.txt');
     });
 
@@ -351,7 +371,9 @@ describe('F35 — copy_file (F186)', () => {
         const result = await handler({ source: 'src.txt', destination: 'dst.txt', overwrite: false });
 
         expect(result).toMatchObject({ success: true, bytesWritten: 42 });
+        expect(result.io?.operation).toBe('copy');
         expect(fsMock.copyFile).toHaveBeenCalledWith('/workspace/src.txt', '/workspace/dst.txt');
+        expect(mockValidatePath.mock.calls[1]?.[1]).toEqual({ mode: 'write' });
     });
 
     it('falha se destino existe e overwrite=false', async () => {
@@ -406,6 +428,7 @@ describe('F35 — move_file (F186)', () => {
             source: '/workspace/old.txt',
             destination: '/workspace/new.txt',
         });
+        expect(mockValidatePath.mock.calls[1]?.[1]).toEqual({ mode: 'write' });
     });
 
     it('falha se destino existe sem overwrite', async () => {

@@ -29,6 +29,7 @@ import {
  * @typedef {object} TerminalElicitationEntry
  * @property {string} id
  * @property {string | null} requestId
+ * @property {string | null} runtimeId
  * @property {string} message
  * @property {string} mode
  * @property {Record<string, unknown> | null} requestedSchema
@@ -49,6 +50,7 @@ import {
  * @typedef {object} TerminalSdkUserInputEntry
  * @property {string} id
  * @property {string | null} requestId
+ * @property {string | null} runtimeId
  * @property {string} question
  * @property {string[]} choices
  * @property {boolean} allowFreeform
@@ -66,6 +68,7 @@ import {
  * @typedef {object} TerminalPermissionEntry
  * @property {string} id
  * @property {string | null} requestId
+ * @property {string | null} runtimeId
  * @property {string} permissionType
  * @property {Record<string, unknown>} data
  * @property {boolean | null} granted
@@ -105,16 +108,26 @@ function objectOrNull(value) {
 }
 
 /**
+ * @param {unknown} value
+ * @returns {string | null}
+ */
+function normalizeRuntimeId(value) {
+    return typeof value === 'string' && value.trim().length > 0 ? value : null;
+}
+
+/**
  * @param {unknown} evt
  * @returns {TerminalElicitationEntry}
  */
 export function recordTerminalElicitationPending(evt) {
     const normalized = normalizeElicitationPendingEvent(evt);
     const requestId = normalized.requestId ?? '';
+    const runtimeId = normalizeRuntimeId(normalized.runtimeId);
     const id = requestId || `elicitation-${Date.now().toString(36)}`;
     const entry = {
         id,
         requestId: requestId || null,
+        runtimeId,
         message: normalized.message || '(sem mensagem)',
         mode: normalized.mode,
         requestedSchema: normalized.requestedSchema,
@@ -142,8 +155,14 @@ export function recordTerminalElicitationPending(evt) {
 export function recordTerminalElicitationCompleted(evt) {
     const normalized = normalizeElicitationCompletedEvent(evt);
     const requestId = normalized.requestId ?? '';
-    if (!requestId) return null;
-    const entry = _elicitations.get(requestId) ?? null;
+    const runtimeId = normalizeRuntimeId(normalized.runtimeId);
+    const entry =
+        (requestId ? _elicitations.get(requestId) : null) ??
+        [..._elicitations.values()]
+            .filter((candidate) => candidate.status === 'pending')
+            .filter((candidate) => !runtimeId || candidate.runtimeId === runtimeId)
+            .find(() => true) ??
+        null;
     if (!entry) return null;
     entry.status = 'completed';
     entry.completedAt = normalized.ts;
@@ -154,32 +173,51 @@ export function recordTerminalElicitationCompleted(evt) {
 }
 
 /**
- * @param {{ includeCompleted?: boolean }} [opts]
+ * @param {{ includeCompleted?: boolean; runtimeId?: string | null }} [opts]
  * @returns {TerminalElicitationEntry[]}
  */
 export function listTerminalElicitations(opts = {}) {
+    const runtimeId = normalizeRuntimeId(opts.runtimeId);
     return [..._elicitations.values()]
         .filter((entry) => opts.includeCompleted || entry.status === 'pending')
+        .filter((entry) => !runtimeId || entry.runtimeId === runtimeId)
         .sort((a, b) => b.createdAt - a.createdAt);
 }
 
 /**
+ * @param {{ runtimeId?: string | null }} [opts]
  * @returns {{ pending: number; latest: TerminalElicitationEntry | null }}
  */
-export function readTerminalElicitationSummary() {
+export function readTerminalElicitationSummary(opts = {}) {
+    const runtimeId = normalizeRuntimeId(opts.runtimeId);
+    const pendingEntries = listTerminalElicitations({ runtimeId });
+    const latest = runtimeId
+        ? (listTerminalElicitations({ includeCompleted: true, runtimeId })[0] ?? null)
+        : _latestElicitationId
+          ? (_elicitations.get(_latestElicitationId) ?? null)
+          : null;
     return {
-        pending: listTerminalElicitations().length,
-        latest: _latestElicitationId ? (_elicitations.get(_latestElicitationId) ?? null) : null,
+        pending: pendingEntries.length,
+        latest,
     };
 }
 
 /**
  * @param {string | null | undefined} id
+ * @param {{ runtimeId?: string | null }} [opts]
  * @returns {TerminalElicitationEntry | null}
  */
-export function getTerminalElicitation(id) {
-    const resolved = !id || id === 'latest' ? _latestElicitationId : id;
-    return resolved ? (_elicitations.get(resolved) ?? null) : null;
+export function getTerminalElicitation(id, opts = {}) {
+    const runtimeId = normalizeRuntimeId(opts.runtimeId);
+    const wantsLatest = !id || id === 'latest';
+    if (wantsLatest) {
+        return listTerminalElicitations({ includeCompleted: true, runtimeId })[0] ?? null;
+    }
+    const resolved = id;
+    const entry = _elicitations.get(resolved) ?? null;
+    if (!entry) return null;
+    if (runtimeId && entry.runtimeId !== runtimeId) return null;
+    return entry;
 }
 
 /**
@@ -209,10 +247,12 @@ export function recordTerminalPermissionRequested(evt) {
     const normalized = normalizePermissionRequestedEvent(evt);
     const requestId = normalized.requestId ?? '';
     const permissionType = normalized.permissionType;
+    const runtimeId = normalizeRuntimeId(normalized.runtimeId);
     const id = requestId || `permission-${permissionType}-${Date.now().toString(36)}`;
     const entry = {
         id,
         requestId: requestId || null,
+        runtimeId,
         permissionType,
         data: normalized.data,
         granted: null,
@@ -234,10 +274,12 @@ export function recordTerminalPermissionCompleted(evt) {
     const normalized = normalizePermissionCompletedEvent(evt);
     const requestId = normalized.requestId ?? '';
     const permissionType = normalized.permissionType;
+    const runtimeId = normalizeRuntimeId(normalized.runtimeId);
     const entry =
         (requestId ? _permissions.get(requestId) : null) ??
         [..._permissions.values()]
             .filter((candidate) => candidate.status === 'pending')
+            .filter((candidate) => !runtimeId || candidate.runtimeId === runtimeId)
             .find((candidate) => !permissionType || candidate.permissionType === permissionType) ??
         null;
     if (!entry) return null;
@@ -250,22 +292,33 @@ export function recordTerminalPermissionCompleted(evt) {
 }
 
 /**
- * @param {{ includeCompleted?: boolean }} [opts]
+ * @param {{ includeCompleted?: boolean; runtimeId?: string | null }} [opts]
  * @returns {TerminalPermissionEntry[]}
  */
 export function listTerminalPermissions(opts = {}) {
+    const runtimeId = normalizeRuntimeId(opts.runtimeId);
     return [..._permissions.values()]
-        .filter((entry) => opts.includeCompleted || entry.status === 'pending')
+        .filter((entry) => (opts.includeCompleted ? true : entry.status === 'pending'))
+        .filter((entry) => !runtimeId || entry.runtimeId === runtimeId)
         .sort((a, b) => b.createdAt - a.createdAt);
 }
 
 /**
  * @param {string | null | undefined} id
+ * @param {{ runtimeId?: string | null }} [opts]
  * @returns {TerminalPermissionEntry | null}
  */
-export function getTerminalPermission(id) {
-    const resolved = !id || id === 'latest' ? _latestPermissionId : id;
-    return resolved ? (_permissions.get(resolved) ?? null) : null;
+export function getTerminalPermission(id, opts = {}) {
+    const runtimeId = normalizeRuntimeId(opts.runtimeId);
+    const wantsLatest = !id || id === 'latest';
+    if (wantsLatest) {
+        return listTerminalPermissions({ includeCompleted: true, runtimeId })[0] ?? null;
+    }
+    const resolved = id;
+    const entry = _permissions.get(resolved) ?? null;
+    if (!entry) return null;
+    if (runtimeId && entry.runtimeId !== runtimeId) return null;
+    return entry;
 }
 
 /**
@@ -287,12 +340,16 @@ export function clearTerminalPermission(id) {
 }
 
 /**
+ * @param {{ runtimeId?: string | null }} [opts]
  * @returns {{ pending: number; latest: TerminalPermissionEntry | null }}
  */
-export function readTerminalPermissionSummary() {
+export function readTerminalPermissionSummary(opts = {}) {
+    const runtimeId = normalizeRuntimeId(opts.runtimeId);
+    const pendingEntries = listTerminalPermissions({ runtimeId });
+    const latest = listTerminalPermissions({ includeCompleted: true, runtimeId })[0] ?? null;
     return {
-        pending: listTerminalPermissions().length,
-        latest: _latestPermissionId ? (_permissions.get(_latestPermissionId) ?? null) : null,
+        pending: pendingEntries.length,
+        latest,
     };
 }
 
@@ -339,10 +396,12 @@ export function recordTerminalUserInputRequested(evt) {
     const normalized = normalizeUserInputRequestedEvent(evt);
     const requestId = normalized.requestId ?? '';
     const question = normalized.question || '(sem pergunta)';
+    const runtimeId = normalizeRuntimeId(normalized.runtimeId);
     const id = requestId || `user-input-${Date.now().toString(36)}`;
     const entry = {
         id,
         requestId: requestId || null,
+        runtimeId,
         question,
         choices: normalized.choices,
         allowFreeform: normalized.allowFreeform,
@@ -367,9 +426,13 @@ export function recordTerminalUserInputRequested(evt) {
 export function recordTerminalUserInputCompleted(evt) {
     const normalized = normalizeUserInputCompletedEvent(evt);
     const requestId = normalized.requestId ?? '';
+    const runtimeId = normalizeRuntimeId(normalized.runtimeId);
     const entry =
         (requestId ? _userInputs.get(requestId) : null) ??
-        [..._userInputs.values()].find((candidate) => candidate.status === 'pending') ??
+        [..._userInputs.values()]
+            .filter((candidate) => candidate.status === 'pending')
+            .filter((candidate) => !runtimeId || candidate.runtimeId === runtimeId)
+            .find(() => true) ??
         null;
     if (!entry) return null;
     entry.status = 'completed';
@@ -381,22 +444,32 @@ export function recordTerminalUserInputCompleted(evt) {
 }
 
 /**
- * @param {{ includeCompleted?: boolean }} [opts]
+ * @param {{ includeCompleted?: boolean; runtimeId?: string | null }} [opts]
  * @returns {TerminalSdkUserInputEntry[]}
  */
 export function listTerminalUserInputs(opts = {}) {
+    const runtimeId = normalizeRuntimeId(opts.runtimeId);
     return [..._userInputs.values()]
         .filter((entry) => opts.includeCompleted || entry.status === 'pending')
+        .filter((entry) => !runtimeId || entry.runtimeId === runtimeId)
         .sort((a, b) => b.createdAt - a.createdAt);
 }
 
 /**
+ * @param {{ runtimeId?: string | null }} [opts]
  * @returns {{ pending: number; latest: TerminalSdkUserInputEntry | null }}
  */
-export function readTerminalUserInputSummary() {
+export function readTerminalUserInputSummary(opts = {}) {
+    const runtimeId = normalizeRuntimeId(opts.runtimeId);
+    const pendingEntries = listTerminalUserInputs({ runtimeId });
+    const latest = runtimeId
+        ? (listTerminalUserInputs({ includeCompleted: true, runtimeId })[0] ?? null)
+        : _latestUserInputId
+          ? (_userInputs.get(_latestUserInputId) ?? null)
+          : null;
     return {
-        pending: listTerminalUserInputs().length,
-        latest: _latestUserInputId ? (_userInputs.get(_latestUserInputId) ?? null) : null,
+        pending: pendingEntries.length,
+        latest,
     };
 }
 

@@ -21,27 +21,32 @@ import { withSkipPermission } from '../tool-factory.js';
 const execAsync = promisify(execFile);
 
 const ROOT = WORKSPACE_ROOT;
-const GIT_CMD_TIMEOUT_MS = 15_000;
-const GIT_PUSH_TIMEOUT_MS = 30_000;
+const ADVISORY_GIT_CMD_TIMEOUT_MS = 15_000;
+const ADVISORY_GIT_PUSH_TIMEOUT_MS = 30_000;
 
 /**
  * F3.8 (LEVE-11): executa `git` com args separados (sem interpolação shell) — seguro para valores fornecidos pelo
  * usuário (ex: mensagem de commit, paths).
  *
  * @param {string[]} args - Argumentos para `git` (ex: ['commit', '-m', message])
- * @param {number} [timeoutMs]
+ * @param {number} [advisoryTimeoutMs]
  * @returns {Promise<{ stdout: string; exitCode: number; error?: string }>}
  */
-async function safeGitArgs(args, timeoutMs = GIT_CMD_TIMEOUT_MS) {
+async function safeGitArgs(args, advisoryTimeoutMs = ADVISORY_GIT_CMD_TIMEOUT_MS) {
+    log('DEBUG', `[copilot/git] advisoryTimeout=${advisoryTimeoutMs}ms git ${args.join(' ')}`);
     try {
-        const { stdout } = await execAsync('git', args, { cwd: ROOT, encoding: 'utf8', timeout: timeoutMs });
-        return { stdout: stdout.slice(0, 4000), exitCode: 0 };
+        const { stdout } = await execAsync('git', args, {
+            cwd: ROOT,
+            encoding: 'utf8',
+            maxBuffer: 1024 * 1024 * 1024,
+        });
+        return { stdout, exitCode: 0 };
     } catch (e) {
         const ex = toExecError(e);
         return {
-            stdout: (ex.stdout ?? '').slice(0, 2000),
+            stdout: ex.stdout ?? '',
             exitCode: typeof ex.code === 'number' ? ex.code : 1,
-            error: (ex.stderr ?? ex.message ?? '').slice(0, 1000),
+            error: ex.stderr ?? ex.message ?? '',
         };
     }
 }
@@ -84,8 +89,6 @@ const gitDiffTool = createTool({
         if (staged) args.push('--staged');
         if (filePath) args.push('--', filePath);
         const r = await safeGitArgs(args);
-        // Trunca a 200 linhas sem usar pipe shell
-        r.stdout = r.stdout.split('\n').slice(0, 200).join('\n');
         return { output: r.stdout, error: r.error };
     },
 });
@@ -172,7 +175,7 @@ const gitPushTool = createTool({
         const args = ['push'];
         if (setUpstream) args.push('--set-upstream');
         args.push(safeRemote);
-        const r = await safeGitArgs(args, GIT_PUSH_TIMEOUT_MS);
+        const r = await safeGitArgs(args, ADVISORY_GIT_PUSH_TIMEOUT_MS);
         log('INFO', `[copilot/git_push] remote=${safeRemote} exitCode=${r.exitCode}`);
         return { success: r.exitCode === 0, output: r.stdout, error: r.error };
     },
@@ -220,7 +223,7 @@ const gitLogTool = createTool({
     parameters: /** @type {import('#copilot/sdk/types').ZodSchema<any>} */ (
         /** @type {unknown} */ (
             z.object({
-                n: z.number().int().min(1).max(50).optional().default(10).describe('Número de commits a retornar'),
+                n: z.number().int().min(1).optional().default(10).describe('Número sugerido de commits a retornar'),
                 oneline: z.boolean().optional().default(true).describe('Se true, formato compacto (--oneline)'),
             })
         )

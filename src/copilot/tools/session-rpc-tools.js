@@ -19,7 +19,7 @@
  */
 
 import { COPILOT_RPC_TIMEOUT_MS } from '#copilot/config';
-import { TimeoutError, toError } from '#copilot/core';
+import { toError } from '#copilot/core';
 import { createTool } from '#copilot/sdk';
 import { z } from 'zod';
 import { log } from './logger.js';
@@ -76,43 +76,16 @@ function getRpc() {
 const RPC_TIMEOUT_MS = COPILOT_RPC_TIMEOUT_MS;
 
 /**
- * Executa uma Promise com timeout e garante cleanup do timer em sucesso/falha.
- *
- * @template T
- * @param {Promise<T>} promise
- * @param {number} timeoutMs
- * @param {string} label
- * @returns {Promise<T>}
- */
-async function withTimeout(promise, timeoutMs, label) {
-    /** @type {ReturnType<typeof setTimeout> | null} */
-    let timer = null;
-    try {
-        return await Promise.race([
-            promise,
-            new Promise((_resolve, reject) => {
-                timer = setTimeout(() => reject(new TimeoutError(`${label} timeout (${timeoutMs}ms)`)), timeoutMs);
-            }),
-        ]);
-    } finally {
-        if (timer !== null) {
-            clearTimeout(timer);
-        }
-    }
-}
-
-/**
  * Resolve timeout efetivo para uma chamada RPC.
  *
- * `null` desabilita timeout absoluto (usar somente quando a operação for naturalmente longa e legítima).
+ * Retorna sempre `null`: timeouts de RPC da LLM-B são apenas informativos.
  *
  * @param {number | null | undefined} timeoutMs
  * @returns {number | null}
  */
 function resolveRpcTimeoutMs(timeoutMs) {
-    if (timeoutMs === null) return null;
-    if (typeof timeoutMs === 'number' && Number.isFinite(timeoutMs) && timeoutMs > 0) return timeoutMs;
-    return RPC_TIMEOUT_MS;
+    void timeoutMs;
+    return null;
 }
 
 /**
@@ -128,10 +101,10 @@ function resolveRpcTimeoutMs(timeoutMs) {
 async function wrapRpc(toolName, fn, opts = {}) {
     const r = getRpc();
     if (!r.ok) return { error: r.error };
-    const timeoutMs = resolveRpcTimeoutMs(opts.timeoutMs);
+    resolveRpcTimeoutMs(opts.timeoutMs);
     try {
-        // GAP-TOOLS-003: timeout para evitar RPC travada indefinidamente em operações curtas de controle.
-        const result = timeoutMs === null ? await fn(r.rpc) : await withTimeout(fn(r.rpc), timeoutMs, 'RPC');
+        log('DEBUG', `[${toolName}] rpcTimeout=disabled advisory=${RPC_TIMEOUT_MS}ms`);
+        const result = await fn(r.rpc);
         return /** @type {T} */ (result);
     } catch (e) {
         log('ERROR', `[${toolName}] ${toError(e).message}`);

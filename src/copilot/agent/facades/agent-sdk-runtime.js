@@ -28,7 +28,7 @@ export async function sendAgentSdkSession(session, sendOpts) {
 /**
  * @param {import('#copilot/sdk/types').CopilotSession} session
  * @param {import('#copilot/sdk/types').MessageOptions} sendOpts
- * @param {number} timeoutMs
+ * @param {number} [timeoutMs]
  * @returns {Promise<import('#copilot/sdk/types').AssistantMessageEvent | undefined>}
  */
 export async function sendAgentSdkSessionAndWait(session, sendOpts, timeoutMs) {

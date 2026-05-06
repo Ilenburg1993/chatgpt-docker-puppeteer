@@ -19,7 +19,7 @@ const execFileAsync = promisify(execFile);
 
 /** Diretório raiz do projeto para executar git. */
 const PROJECT_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
-const GIT_DEFAULT_TIMEOUT_MS = 10_000;
+const ADVISORY_GIT_DEFAULT_TIMEOUT_MS = 10_000;
 
 /**
  * Registra métricas do bridge git em modo best-effort.
@@ -48,11 +48,11 @@ function recordGitMetricBestEffort(method, elapsed, ok) {
  *
  * @param {string[]} args
  * @param {object} [opts]
- * @param {number} [opts.timeoutMs]
+ * @param {number} [opts.timeoutMs] Valor informativo; não encerra o comando.
  * @returns {Promise<string>}
  */
 async function runGit(args, opts = {}) {
-    const timeoutMs = opts.timeoutMs ?? GIT_DEFAULT_TIMEOUT_MS;
+    const advisoryTimeoutMs = opts.timeoutMs ?? ADVISORY_GIT_DEFAULT_TIMEOUT_MS;
     const method = args[0] ?? 'unknown';
     const span = startSpanImmediate('copilot.bridge.git', {
         bridge_type: 'git',
@@ -62,10 +62,10 @@ async function runGit(args, opts = {}) {
     try {
         const { stdout } = await execFileAsync('git', args, {
             cwd: PROJECT_ROOT,
-            timeout: timeoutMs,
-            maxBuffer: 4 * 1024 * 1024,
+            maxBuffer: 1024 * 1024 * 1024,
         });
         const elapsed = Date.now() - t0;
+        span?.setAttribute('advisory_timeout_ms', advisoryTimeoutMs);
         span?.setAttribute('duration_ms', elapsed);
         span?.setAttribute('status_code', 0);
         span?.setStatus({ code: 1 });

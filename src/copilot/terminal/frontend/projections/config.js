@@ -64,7 +64,9 @@ export function readTerminalConfigProjection(runtimeId) {
         sdkPlanChangedAt: getLastSdkPlanChangedAt(),
         modelMeta: readRuntimeModelMetadata(currentModel),
         autoModelPolicy,
-        observedModelMeta: autoModelPolicy.observedModel ? readRuntimeModelMetadata(autoModelPolicy.observedModel) : null,
+        observedModelMeta: autoModelPolicy.observedModel
+            ? readRuntimeModelMetadata(autoModelPolicy.observedModel)
+            : null,
         binding: base.binding,
         requestedRuntimeId: base.requestedRuntimeId,
         runtimeId: base.runtimeId,

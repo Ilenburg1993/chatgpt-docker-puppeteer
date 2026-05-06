@@ -7,7 +7,7 @@
  * Valida:
  *
  * - webTools exporta array com web_fetch_local (sempre) + web_search (quando habilitado)
- * - web_fetch_local: URL válida, URL inválida, SSRF blocked, content-type blocked, timeout, rate limit
+ * - web_fetch_local: URL válida, URL inválida, SSRF blocked, content-type blocked, advisory timeout/rate telemetry
  * - web_search: resultados DDG JSON API, fallback HTML scraping, SSRF filter nos resultados
  * - Rate limiting compartilhado entre web_fetch e web_search
  */
@@ -199,7 +199,7 @@ describe('web-tools', () => {
             expect(result.error).toMatch(/content-type/i);
         });
 
-        it('retorna erro em timeout (AbortError)', async () => {
+        it('retorna erro de AbortError externo sem timeout local bloqueante', async () => {
             fetchSpy.mockRejectedValueOnce(
                 Object.assign(new Error('The operation was aborted'), { name: 'AbortError' }),
             );
@@ -208,7 +208,7 @@ describe('web-tools', () => {
             const result = await tool.handler({ url: 'https://slow.example.com', timeoutMs: 1000 });
 
             expect(result.success).toBe(false);
-            expect(result.error).toMatch(/timeout/i);
+            expect(result.error).toMatch(/abort/i);
         });
 
         it('retorna erro em falha de rede', async () => {
@@ -233,7 +233,7 @@ describe('web-tools', () => {
             expect(result.error).toMatch(/redirect bloqueado/i);
         });
 
-        it('indica truncated quando resposta excede maxBytes', async () => {
+        it('mantém resposta integral quando excede maxBytes informativo', async () => {
             const bigBody = 'x'.repeat(1000);
             fetchSpy.mockResolvedValueOnce(mockResponse(bigBody, { url: 'https://example.com/big' }));
 
@@ -241,7 +241,9 @@ describe('web-tools', () => {
             const result = await tool.handler({ url: 'https://example.com/big', maxBytes: 100 });
 
             expect(result.success).toBe(true);
-            expect(result.truncated).toBe(true);
+            expect(result.truncated).toBe(false);
+            expect(result.content.length).toBe(1000);
+            expect(result.advisoryMaxBytes).toBe(100);
         });
 
         it('retorna erro para resposta sem corpo', async () => {
@@ -339,14 +341,14 @@ describe('web-tools', () => {
             expect(result.results.every((/** @type {{ url: string }} */ r) => !r.url.includes('127.0.0.1'))).toBe(true);
         });
 
-        it('retorna erro em timeout', async () => {
+        it('retorna erro de AbortError externo sem timeout local bloqueante', async () => {
             fetchSpy.mockRejectedValueOnce(Object.assign(new Error('Aborted'), { name: 'AbortError' }));
 
             const tool = findSearch();
             const result = await tool.handler({ query: 'slow query' });
 
             expect(result.success).toBe(false);
-            expect(result.error).toMatch(/timeout/i);
+            expect(result.error).toMatch(/abort/i);
         });
 
         it('retorna erro quando DDG HTML retorna status não-OK', async () => {

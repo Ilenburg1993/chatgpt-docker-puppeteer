@@ -207,13 +207,13 @@ describe('git-tools', () => {
             expect(args).toContain('src/test.js');
         });
 
-        it('trunca a 200 linhas', async () => {
+        it('retorna diff completo sem truncar', async () => {
             const lines = Array.from({ length: 300 }, (_, i) => `line-${i}`).join('\n');
             mockGitOutput(lines);
 
             const result = await find().handler({});
             const outputLines = result.output.split('\n');
-            expect(outputLines.length).toBeLessThanOrEqual(200);
+            expect(outputLines.length).toBe(300);
         });
     });
 

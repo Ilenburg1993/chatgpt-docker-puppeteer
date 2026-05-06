@@ -31,21 +31,18 @@ const getTasksTool = createTool({
         /** @type {unknown} */ (
             z.object({
                 status: z.string().optional().describe('Filtrar por status (pending, running, done, failed)'),
-                limit: z
-                    .number()
-                    .int()
-                    .min(1)
-                    .max(50)
-                    .optional()
-                    .default(10)
-                    .describe('Número máximo de tarefas a retornar'),
+                limit: z.number().int().min(1).optional().describe('Número sugerido de tarefas a retornar'),
             })
         )
     ),
     handler: async (/** @type {{ status?: string; limit?: number }} */ { status, limit }) => {
         try {
             const port = SERVER_PORT;
-            const url = `http://127.0.0.1:${port}/api/tasks?limit=${limit ?? 10}${status ? `&status=${status}` : ''}`;
+            const query = new URLSearchParams();
+            if (typeof limit === 'number') query.set('limit', String(limit));
+            if (status) query.set('status', status);
+            const suffix = query.toString() ? `?${query.toString()}` : '';
+            const url = `http://127.0.0.1:${port}/api/tasks${suffix}`;
             const { statusCode, body } = await httpRequest('GET', url);
             if (statusCode !== 200) return { tasks: [], total: 0, error: `HTTP ${statusCode}` };
             const data = JSON.parse(body);
@@ -71,14 +68,7 @@ const addTaskTool = createTool({
             z.object({
                 target: z.string().describe('URL ou identificador do alvo da tarefa'),
                 user_message: z.string().describe('Instrução da tarefa (o que o agente deve fazer)'),
-                priority: z
-                    .number()
-                    .int()
-                    .min(0)
-                    .max(100)
-                    .optional()
-                    .default(50)
-                    .describe('Prioridade (0=baixa, 100=urgente)'),
+                priority: z.number().int().min(0).optional().default(50).describe('Prioridade sugerida'),
                 model: z.string().optional().describe('Modelo a usar nesta tarefa (ex: gpt-4.1)'),
             })
         )

@@ -19,8 +19,8 @@ import { createPresentationRoute } from './presentation-route.js';
 
 // ── Zod schemas (S-C-03 fix) ──────────────────────────────────────────────
 const storeMemoryBodySchema = z.object({
-    content: z.string().min(1).max(32_000),
-    tag: z.string().max(128).optional(),
+    content: z.string().min(1),
+    tag: z.string().optional(),
     metadata: z.record(z.string(), z.unknown()).optional(),
 });
 

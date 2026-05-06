@@ -8,15 +8,15 @@
  * @see EventBus
  */
 
-import { isUtf8 } from 'node:buffer';
-import * as fs from 'node:fs';
-import { readdir as fsReaddir, stat as fsStat } from 'node:fs/promises';
-import * as path from 'node:path';
+import { stat as fsStat } from 'node:fs/promises';
 import { z } from 'zod';
 import { toError } from '../../core/error-handlers.js';
+import { withIoMeta } from '../../core/io-contracts.js';
+import { readBytes, readText } from '../../infra/io-engine.js';
+import { scanDirectory } from '../../infra/io-scanner.js';
 import { log } from '../logger.js';
 import { buildTool } from '../tool-factory.js';
-import { MAX_CONTENT_BYTES, MAX_LIST_ENTRIES, WORKSPACE_ROOT, concatChunks, validatePath } from './shared.js';
+import { WORKSPACE_ROOT, validatePath } from './shared.js';
 
 // ---------------------------------------------------------------------------
 // Tool: read_file_content
@@ -29,7 +29,7 @@ const readFileContentTool = buildTool({
     name: 'read_file_content',
     description:
         'Lê o conteúdo de um arquivo no workspace. Arquivos de texto são retornados como string. ' +
-        'Arquivos binários retornam uma indicação de tipo. Output limitado a 80KB.',
+        'Arquivos de texto são retornados como string. Arquivos binários retornam uma indicação de tipo.',
     parameters: z.object({
         path: z.string().describe('Caminho do arquivo (relativo ao workspace ou absoluto dentro de /workspaces/)'),
         startLine: z
@@ -64,62 +64,35 @@ const readFileContentTool = buildTool({
             if (stats.isDirectory()) return { success: false, error: 'É um diretório, use list_directory.' };
 
             if (encoding === 'base64') {
-                const chunks = /** @type {Buffer[]} */ ([]);
-                await new Promise((resolve, reject) => {
-                    const stream = fs.createReadStream(resolved, { end: MAX_CONTENT_BYTES - 1 });
-                    stream.on('data', (chunk) => chunks.push(/** @type {Buffer} */ (chunk)));
-                    stream.on('end', resolve);
-                    stream.on('error', reject);
-                });
-                // concatChunks computa totalLength automaticamente — evita segunda passagem interna
-                const raw = concatChunks(chunks);
-                return {
+                const raw = await readBytes(resolved);
+                return withIoMeta(
+                    {
+                        success: true,
+                        path: resolved,
+                        size: stats.size,
+                        encoding: 'base64',
+                        content: raw.content.toString('base64'),
+                        truncated: false,
+                    },
+                    raw.io,
+                );
+            }
+
+            const text = await readText(resolved, { startLine, endLine });
+            const truncated = false;
+
+            return withIoMeta(
+                {
                     success: true,
                     path: resolved,
                     size: stats.size,
-                    encoding: 'base64',
-                    content: raw.toString('base64'),
-                    truncated: stats.size > MAX_CONTENT_BYTES,
-                };
-            }
-
-            const textChunks = /** @type {Buffer[]} */ ([]);
-            await new Promise((resolve, reject) => {
-                const stream = fs.createReadStream(resolved, { end: MAX_CONTENT_BYTES * 3 - 1 });
-                stream.on('data', (chunk) => textChunks.push(/** @type {Buffer} */ (chunk)));
-                stream.on('end', resolve);
-                stream.on('error', reject);
-            });
-            // concatChunks computa totalLength automaticamente — evita segunda passagem interna
-            const rawText = concatChunks(textChunks);
-            // Detectar arquivo binário antes de tentar decodificar como UTF-8
-            if (!isUtf8(rawText)) {
-                return {
-                    success: false,
-                    error: 'Arquivo binário detectado (bytes inválidos para UTF-8). Use encoding: "base64" para ler arquivos binários.',
-                };
-            }
-            const text = rawText.toString('utf8');
-            const lines = text.split('\n');
-            const total = lines.length;
-
-            const s = (startLine ?? 1) - 1;
-            const e = endLine ?? total;
-            const slice = lines.slice(s, e).join('\n');
-            const streamTruncated = stats.size > MAX_CONTENT_BYTES * 3;
-            const contentTruncated = slice.length > MAX_CONTENT_BYTES;
-            const truncated = streamTruncated || contentTruncated;
-
-            return {
-                success: true,
-                path: resolved,
-                size: stats.size,
-                totalLines: total,
-                returnedLines: { start: s + 1, end: Math.min(e, total) },
-                content: truncated ? slice.slice(0, MAX_CONTENT_BYTES) + '\n[... conteúdo truncado ...]' : slice,
-                truncated,
-                ...(streamTruncated ? { truncationReason: 'input_stream_limit' } : {}),
-            };
+                    totalLines: text.totalLines,
+                    returnedLines: text.returnedLines,
+                    content: text.content,
+                    truncated,
+                },
+                { ...text.io, truncated },
+            );
         } catch (err) {
             return { success: false, error: toError(err).message };
         }
@@ -145,10 +118,9 @@ const listDirectoryTool = buildTool({
             .number()
             .int()
             .min(1)
-            .max(8)
             .optional()
             .default(3)
-            .describe('Profundidade máxima para listagem recursiva (1-8)'),
+            .describe('Profundidade máxima para listagem recursiva. Informativa e controlada pelo caller.'),
         showHidden: z.boolean().optional().default(false).describe('Incluir arquivos/diretórios ocultos (dotfiles)'),
         filter: z.string().optional().describe('Glob pattern para filtrar entradas (ex: *.js, *.md)'),
     }),
@@ -170,75 +142,40 @@ const listDirectoryTool = buildTool({
         try {
             const stats = await fsStat(resolved);
             if (!stats.isDirectory()) return { success: false, error: 'Não é um diretório, use read_file_content.' };
-
-            let remainingEntries = MAX_LIST_ENTRIES;
+            const scan = await scanDirectory(resolved, {
+                workspaceRoot: WORKSPACE_ROOT,
+                recursive,
+                depth,
+                showHidden,
+                filter,
+            });
 
             /**
-             * @param {string} dir
-             * @param {number} currentDepth
-             * @returns {Promise<DirEntry[]>}
+             * @param {import('../../infra/io-scanner.js').IoScanEntry} entry
+             * @returns {DirEntry}
              */
-            async function readDir(dir, currentDepth) {
-                /** @type {string[]} */
-                let entries;
-                try {
-                    entries = await fsReaddir(dir);
-                } catch {
-                    return [];
-                }
-                entries.sort((a, b) => a.localeCompare(b));
-
-                /** @type {DirEntry[]} */
-                const result = [];
-                for (const name of entries) {
-                    if (remainingEntries <= 0) break;
-                    if (!showHidden && name.startsWith('.')) continue;
-                    if (filter) {
-                        const globMatch = filter.startsWith('*.') ? name.endsWith(filter.slice(1)) : name === filter;
-                        if (!globMatch) {
-                            try {
-                                if (!(await fsStat(path.join(dir, name))).isDirectory()) continue;
-                            } catch {
-                                continue;
-                            }
-                        }
-                    }
-                    if (remainingEntries <= 0) break;
-
-                    const full = path.join(dir, name);
-                    const rel = path.relative(WORKSPACE_ROOT, full);
-                    let entryStats;
-                    try {
-                        entryStats = await fsStat(full);
-                    } catch {
-                        continue;
-                    }
-                    const isDir = entryStats.isDirectory();
-                    /** @type {DirEntry} */
-                    const entry = {
-                        name,
-                        type: isDir ? 'dir' : 'file',
-                        path: rel,
-                    };
-                    if (!isDir) entry.size = entryStats.size;
-                    if (isDir && recursive && currentDepth < (depth ?? 3)) {
-                        entry.children = await readDir(full, currentDepth + 1);
-                    }
-                    result.push(entry);
-                    remainingEntries -= 1;
-                }
-                return result;
-            }
-
-            const entries = await readDir(resolved, 1);
-            return {
-                success: true,
-                path: resolved,
-                count: entries.length,
-                truncated: remainingEntries <= 0,
-                scannedBudget: MAX_LIST_ENTRIES - remainingEntries,
-                entries,
+            const toLegacyEntry = (entry) => {
+                const legacy = /** @type {DirEntry} */ ({
+                    name: entry.name,
+                    type: entry.type === 'directory' ? 'dir' : entry.type,
+                    path: entry.path,
+                });
+                if (entry.size !== undefined) legacy.size = entry.size;
+                if (entry.children) legacy.children = entry.children.map(toLegacyEntry);
+                return legacy;
             };
+            const entries = scan.entries.map(toLegacyEntry);
+            return withIoMeta(
+                {
+                    success: true,
+                    path: resolved,
+                    count: entries.length,
+                    truncated: false,
+                    scannedBudget: scan.scannedEntries,
+                    entries,
+                },
+                { ...scan.io, truncated: false },
+            );
         } catch (err) {
             return { success: false, error: toError(err).message };
         }

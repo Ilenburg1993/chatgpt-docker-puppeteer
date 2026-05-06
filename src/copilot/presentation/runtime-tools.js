@@ -78,7 +78,7 @@ export function paginateAgentRuntimeToolsProjection(projection, query = {}) {
     const filtered = category ? projection.tools.filter((tool) => tool.category === category) : [...projection.tools];
     const total = filtered.length;
     const page = parsePositiveInt(query.page) ?? 1;
-    const limit = Math.min(200, parsePositiveInt(query.limit) ?? Math.max(1, total));
+    const limit = parsePositiveInt(query.limit) ?? Math.max(1, total);
     const start = (page - 1) * limit;
     const tools = filtered.slice(start, start + limit);
 

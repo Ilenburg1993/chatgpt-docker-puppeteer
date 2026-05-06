@@ -2,8 +2,8 @@
 
 Data: 2026-05-06
 
-Escopo: `src/copilot`, especialmente criação/retomada de sessão SDK, fallback de modelo,
-recovery policy do terminal e integração live LLM-B.
+Escopo: `src/copilot`, especialmente criação/retomada de sessão SDK, fallback de modelo, recovery
+policy do terminal e integração live LLM-B.
 
 ## 1) Fonte externa canônica
 
@@ -25,8 +25,8 @@ repetir reconnects que aumentam consumo.
   `src/copilot/config/agent.js`.
 - `createSession()` e `resumeSession()` já preservam `model: "auto"` até o SDK e omitem
   `reasoningEffort` quando o modelo efetivo será decidido pelo próprio Copilot.
-- `resolveSessionCreateModel()` continua existindo para fluxos que precisam de modelo concreto,
-  mas não é usado no caminho canônico de criação/retomada da sessão.
+- `resolveSessionCreateModel()` continua existindo para fluxos que precisam de modelo concreto, mas
+  não é usado no caminho canônico de criação/retomada da sessão.
 - O teste live com `terminal:llm-b` observou erro de sessão:
   `Please wait for your limit to reset in 18 minutes`. Esse caso não deve recomendar Auto como
   contorno imediato.
@@ -38,10 +38,10 @@ ação adequada.
 
 Correções:
 
-- `presentation/sdk-recovery-policy.js` passou a classificar subescopos:
-  `session`, `weekly_model` e `unknown`.
-- Mensagens de limite de sessão agora orientam aguardar o reset e deixam explícito que
-  `/model auto` não contorna limite de sessão ativo.
+- `presentation/sdk-recovery-policy.js` passou a classificar subescopos: `session`, `weekly_model` e
+  `unknown`.
+- Mensagens de limite de sessão agora orientam aguardar o reset e deixam explícito que `/model auto`
+  não contorna limite de sessão ativo.
 - Mensagens de limite semanal/modelo recomendam `/model auto` + `/restart` como uso permitido da
   política nativa do Copilot.
 - `sdk/errors.js` ganhou a mesma classificação semântica para decisões internas.
@@ -121,9 +121,8 @@ Foi adicionado um contrato local de observabilidade, não de bypass:
 - `selectionAuthority="github-copilot"`;
 - `canForcePreference=false`;
 - critérios públicos e classes excluídas projetados no SDK;
-- overrides declarativos via ambiente para auditoria controlada:
-  `COPILOT_AUTO_PREFERRED_MODEL`, `COPILOT_AUTO_PREFERRED_REASONING_EFFORT` e
-  `COPILOT_AUTO_PREFERENCE_ENABLED`.
+- overrides declarativos via ambiente para auditoria controlada: `COPILOT_AUTO_PREFERRED_MODEL`,
+  `COPILOT_AUTO_PREFERRED_REASONING_EFFORT` e `COPILOT_AUTO_PREFERENCE_ENABLED`.
 
 Arquivos principais:
 
@@ -138,15 +137,15 @@ Arquivos principais:
 
 Novo `npm run terminal:llm-b` validou:
 
-- `/model` com `model=auto` mostra autoridade GitHub Copilot, preferência local
-  `gpt-5.4/high`, último modelo observado e se a preferência foi satisfeita;
-- `/model list` retornou modelos disponíveis, incluindo `gpt-5.4`, `gpt-5.3-codex`,
-  `gpt-5.2-codex`, `gpt-5.2`, `gpt-5.4-mini`, `gpt-5-mini`, `gpt-4.1`,
-  `claude-sonnet-4.6`, `claude-sonnet-4.5`, `claude-haiku-4.5`, `claude-sonnet-4` e `auto`;
+- `/model` com `model=auto` mostra autoridade GitHub Copilot, preferência local `gpt-5.4/high`,
+  último modelo observado e se a preferência foi satisfeita;
+- `/model list` retornou modelos disponíveis, incluindo `gpt-5.4`, `gpt-5.3-codex`, `gpt-5.2-codex`,
+  `gpt-5.2`, `gpt-5.4-mini`, `gpt-5-mini`, `gpt-4.1`, `claude-sonnet-4.6`, `claude-sonnet-4.5`,
+  `claude-haiku-4.5`, `claude-sonnet-4` e `auto`;
 - tentativa manual `/model gpt-5.4` atualizou a configuração local, mas o SDK live não convergiu
   positivamente para o modelo concreto nessa sessão; o runtime continuou reportando `auto`;
-- retorno para `/model auto` preservou a seleção nativa do Copilot e explicou que
-  `gpt-5.4/high` é preferência local observável, não parâmetro oficial forçado;
+- retorno para `/model auto` preservou a seleção nativa do Copilot e explicou que `gpt-5.4/high` é
+  preferência local observável, não parâmetro oficial forçado;
 - turno curto `Responda exatamente: OK-AUTO-POLICY` completou com roteamento efetivo para
   `claude-haiku-4.5`.
 

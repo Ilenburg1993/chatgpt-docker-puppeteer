@@ -15,6 +15,7 @@
  *     source: 'env' | 'default';
  * }} AutoModelPreference
  *
+ *
  * @typedef {{
  *     configuredModel: string;
  *     observedModel: string | null;
@@ -60,7 +61,7 @@ export const DEFAULT_AUTO_MODEL_PREFERENCE = Object.freeze({
 const VALID_REASONING_EFFORTS = Object.freeze(['low', 'medium', 'high', 'xhigh']);
 
 /**
- * @param {NodeJS.ProcessEnv | Record<string, string | undefined>} [env=process.env]
+ * @param {NodeJS.ProcessEnv | Record<string, string | undefined>} [env=process.env] Default is `process.env`
  * @returns {AutoModelPreference}
  */
 export function readAutoModelPreference(env = process.env) {

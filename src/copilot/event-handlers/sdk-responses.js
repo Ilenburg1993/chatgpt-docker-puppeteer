@@ -134,6 +134,7 @@ export function wireSdkResponseEvents(session, { emit }) {
                 emit('elicitation.pending', {
                     requestId: normalized.requestId,
                     sessionId: normalized.sessionId,
+                    runtimeId: normalized.runtimeId,
                     message: normalized.message,
                     mode: normalized.mode,
                     requestedSchema: normalized.requestedSchema,
@@ -152,6 +153,7 @@ export function wireSdkResponseEvents(session, { emit }) {
                 emit('elicitation.completed', {
                     requestId: normalized.requestId,
                     sessionId: normalized.sessionId,
+                    runtimeId: normalized.runtimeId,
                     action: normalized.action,
                     content: normalized.content,
                     actionable: normalized.actionable,

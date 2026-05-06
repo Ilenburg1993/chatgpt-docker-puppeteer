@@ -63,18 +63,8 @@ export function subscribeSse(path, port, onEvent) {
             (res) => {
                 reconnectMs = 1_000;
                 let buf = '';
-                const MAX_BUF_BYTES = 256 * 1024;
                 res.on('data', (/** @type {Buffer} */ chunk) => {
                     const chunkStr = chunk.toString();
-                    if (buf.length + chunkStr.length > MAX_BUF_BYTES) {
-                        log(
-                            'WARN',
-                            `[inject] SSE buffer overflow (${path}) — reconectando stream para evitar truncamento silencioso`,
-                        );
-                        buf = '';
-                        req.destroy(new Error(`SSE buffer overflow (${path})`));
-                        return;
-                    }
                     buf += chunkStr;
                     const blocks = buf.split(/\r?\n\r?\n/);
                     buf = blocks.pop() ?? '';

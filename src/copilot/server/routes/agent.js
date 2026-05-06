@@ -24,19 +24,18 @@ import {
     handleRejectHandoff,
 } from '../../presentation/agent-control.js';
 import { handleGetPrBudget, handleGetQuota } from '../../presentation/system-metrics.js';
-import { injectRateMiddleware, writeRateMiddleware } from '../middleware/rate-limiter.js';
 import { validate } from '../middleware/validate.js';
 import { createPresentationRoute } from './presentation-route.js';
 
 // ── Zod schemas (S-C-03 fix) ──────────────────────────────────────────────
 const injectBodyBaseSchema = z
     .object({
-        message: z.string().trim().min(1).max(64_000).optional(),
-        content: z.string().trim().min(1).max(64_000).optional(),
+        message: z.string().trim().min(1).optional(),
+        content: z.string().trim().min(1).optional(),
         from: z.string().optional(),
-        timeout: z.number().int().min(0).max(300_000).nullable().optional(),
-        context_files: z.array(z.string().min(1)).max(32).optional(),
-        attachments: z.array(z.object({}).passthrough()).max(32).optional(),
+        timeout: z.number().int().min(0).nullable().optional(),
+        context_files: z.array(z.string().min(1)).optional(),
+        attachments: z.array(z.object({}).passthrough()).optional(),
         metadata: z.record(z.string(), z.unknown()).optional(),
     })
     .passthrough();
@@ -57,14 +56,13 @@ const pipelineBodySchema = z
             .array(
                 z
                     .object({
-                        prompt: z.string().trim().min(1).max(64_000),
+                        prompt: z.string().trim().min(1),
                         from: z.string().optional(),
-                        waitMs: z.number().int().min(0).max(30_000).optional(),
+                        waitMs: z.number().int().min(0).optional(),
                     })
                     .passthrough(),
             )
-            .min(1)
-            .max(20),
+            .min(1),
     })
     .passthrough();
 
@@ -91,20 +89,10 @@ export function createAgentRouter() {
     router.get('/handoff', createPresentationRoute(handleGetHandoffs));
 
     // POST /inject — rate limit inject
-    router.post(
-        '/inject',
-        injectRateMiddleware,
-        validate({ body: injectBodySchema }),
-        createPresentationRoute(handleInject),
-    );
+    router.post('/inject', validate({ body: injectBodySchema }), createPresentationRoute(handleInject));
 
     // POST /pipeline — rate limit write
-    router.post(
-        '/pipeline',
-        writeRateMiddleware,
-        validate({ body: pipelineBodySchema }),
-        createPresentationRoute(handlePipeline),
-    );
+    router.post('/pipeline', validate({ body: pipelineBodySchema }), createPresentationRoute(handlePipeline));
 
     // POST /dialog
     router.post('/dialog/pause', createPresentationRoute(handleDialogPause));

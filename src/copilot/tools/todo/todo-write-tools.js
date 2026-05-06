@@ -30,25 +30,20 @@ export const todoCreateTool = createTool({
     parameters: /** @type {import('#copilot/sdk/types').ZodSchema<any>} */ (
         /** @type {unknown} */ (
             z.object({
-                title: z.string().min(1).max(500).describe('Título da tarefa (obrigatório)'),
-                description: z.string().max(5000).optional().describe('Descrição detalhada da tarefa'),
+                title: z.string().min(1).describe('Título da tarefa (obrigatório)'),
+                description: z.string().optional().describe('Descrição detalhada da tarefa'),
                 priority: zPriority
                     .optional()
                     .default('medium')
                     .describe('Prioridade: critical | high | medium | low | none'),
-                tags: z
-                    .array(z.string().max(100))
-                    .max(20)
-                    .optional()
-                    .default([])
-                    .describe('Lista de tags/labels para categorização'),
+                tags: z.array(z.string()).optional().default([]).describe('Lista de tags/labels para categorização'),
                 due_date: z
                     .string()
                     .datetime({ offset: true })
                     .optional()
                     .describe('Data de vencimento ISO 8601 (ex: 2026-04-01T18:00:00Z)'),
                 parent_id: z.string().optional().describe('ID da tarefa pai para criar como subtarefa'),
-                notes: z.string().max(10000).optional().describe('Notas livres associadas à tarefa'),
+                notes: z.string().optional().describe('Notas livres associadas à tarefa'),
                 metadata: z
                     .record(z.string(), z.unknown())
                     .optional()

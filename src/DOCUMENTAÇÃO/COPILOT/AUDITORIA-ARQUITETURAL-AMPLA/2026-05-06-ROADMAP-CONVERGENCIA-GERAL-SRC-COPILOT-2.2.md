@@ -22,10 +22,14 @@ maps.
 - [x] Expandir `/permission respond` guiado com validação por tipo de permissão. - 2026-05-06:
       terminal valida `approval` em `approve-for-session` e `approval` + `locationKey` em
       `approve-for-location` antes de chamar o RPC.
-- [x] Expor cockpit curto: modo atual, últimas mudanças, pendências por tipo e quick actions. - 2026-05-06:
-      comando `/permission cockpit` no terminal com agregação de pendências por tipo, latest
-      request, histórico local de `permission.mode_changed` e atalhos operacionais.
-- [ ] Criar teste de integração request → respond → completed com `requestId` correlacionado.
+- [x] Expor cockpit curto: modo atual, últimas mudanças, pendências por tipo e quick actions. -
+      2026-05-06: comando `/permission cockpit` no terminal com agregação de pendências por tipo,
+      latest request, histórico local de `permission.mode_changed` e atalhos operacionais.
+- [x] Criar teste de integração request → respond → completed com `requestId` correlacionado. -
+      2026-05-06: cobertura adicionada em `tests/unit/copilot/terminal/test_commands_sdk.spec.js`
+      validando a correlação `permission.requested` → `/permission respond` →
+      `permission.completed`, com atualização do mesmo registro por `requestId` e preservação de
+      `completion` no estado local.
 
 ## R2 — System prompt projection única
 
@@ -92,13 +96,23 @@ Prioridade sugerida:
 - [x] Provar isolamento de stream por `runtimeId`. - 2026-05-06: teste de integração
       `tests/unit/copilot/test_copilot_api_multi_runtime.spec.js` passou a abrir dois SSE streams
       simultâneos (`default` e `audit`) e validar que cada stream recebe apenas o evento `status`
-      emitido pelo seu runtime (`runtimeId`/`sourceRuntime` correlacionados), sem bleed cross-runtime.
+      emitido pelo seu runtime (`runtimeId`/`sourceRuntime` correlacionados), sem bleed
+      cross-runtime.
+- [x] Isolar estado terminal de permissions por `runtimeId`. - 2026-05-06: `permission.requested` e
+      `permission.completed` passaram a propagar `runtimeId` no contrato canônico do SDK/events;
+      `sdk-interactions` e `/permission` (`show/latest/respond/cockpit/waits`) agora filtram por
+      runtime, evitando bleed operacional entre filas de aprovação simultâneas.
+- [x] Isolar estado terminal de `elicitation` e `user_input` por `runtimeId`. - 2026-05-06:
+      `normalizeElicitation*` e `normalizeUserInput*` passaram a propagar `runtimeId`; emitters de
+      `interaction-events`/`sdk-responses` carregam o campo; `sdk-interactions` e comandos
+      `/sdk waits` + `/elicitation show|respond|list` passaram a filtrar por runtime alvo, evitando
+      bleed entre filas paralelas de runtimes diferentes.
 - [~] Provar isolamento de rate-limit por `runtimeId`. - 2026-05-06: subescopo de rate limit
-      (`session` vs `weekly_model` vs `unknown`) agora é classificado em `sdk/errors.js` e
-      `presentation/sdk-recovery-policy.js`; ainda falta prova multi-runtime real.
+  (`session` vs `weekly_model` vs `unknown`) agora é classificado em `sdk/errors.js` e
+  `presentation/sdk-recovery-policy.js`; ainda falta prova multi-runtime real.
 - [~] Separar profile/capability snapshot por runtime/agent profile. - 2026-05-06: policy Auto,
-      metadata de modelo observado e preferência local `gpt-5.4/high` passaram a ser projetadas por
-      runtime; ainda falta exercitar múltiplos runtimes vivos em paralelo.
+  metadata de modelo observado e preferência local `gpt-5.4/high` passaram a ser projetadas por
+  runtime; ainda falta exercitar múltiplos runtimes vivos em paralelo.
 - [x] Garantir que fallback para runtime default continue explícito e metadata-rich. - 2026-05-06:
       projection de config agora usa o runtime efetivamente resolvido para policy Auto e metadata,
       evitando `NotFoundError` quando a chamada cai no default.
@@ -112,16 +126,16 @@ Prioridade sugerida:
 
 ## Próximo corte operacional recomendado
 
-1. retomar `R1` (`/permission pending` e cockpit curto);
-2. adicionar teste de integração HTTP cobrindo `/answer` com fallback `request_user_input`;
-3. só então voltar ao fatiamento de hotspots (`R4`).
+1. provar isolamento de rate-limit por `runtimeId` com teste multi-runtime real (`R5[~]`);
+2. provar isolamento de capability/profile snapshot por `runtimeId` (`R5[~]`);
+3. só então voltar ao fatiamento de hotspots (`R4`) com seams semânticos.
 
 Atualização complementar desta rodada:
 
 1. Teste HTTP de integração para `/answer` com fallback canônico `request_user_input` adicionado em
-      `tests/unit/copilot/test_copilot_api_answer_fallback.spec.js`.
+   `tests/unit/copilot/test_copilot_api_answer_fallback.spec.js`.
 2. O fallback confirma `question.answered` com `hadPending=false` e `resolvedViaTool=true`,
-      preservando `/answer` como borda única de input humano também quando não existe `ask_user` vivo.
+   preservando `/answer` como borda única de input humano também quando não existe `ask_user` vivo.
 
 Atualização operacional após teste live:
 
@@ -151,9 +165,9 @@ Reteste live adicional:
 
 Reteste Auto model e preferência local:
 
-1. Critérios oficiais do `Auto` foram documentados: disponibilidade, saúde operacional,
-   performance, redução de rate limit/latência/erros, políticas administrativas, plano e exclusão
-   de modelos com multiplicador premium maior que `1`.
+1. Critérios oficiais do `Auto` foram documentados: disponibilidade, saúde operacional, performance,
+   redução de rate limit/latência/erros, políticas administrativas, plano e exclusão de modelos com
+   multiplicador premium maior que `1`.
 2. SDK local agora expõe policy Auto observável com autoridade `GitHub Copilot`,
    `canForcePreference=false` e preferência local default `gpt-5.4/high`.
 3. `/model` e `/status` mostram último modelo efetivo/cobrado, preferência local e metadata do
