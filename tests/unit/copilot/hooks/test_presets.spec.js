@@ -28,7 +28,7 @@ vi.mock('#copilot/tools/introspection-tools', () => ({
 }));
 
 vi.mock('../../../src/copilot/hooks/permission-handler.js', () => ({
-    createPermissionHandler: vi.fn(() => vi.fn().mockResolvedValue({ kind: 'approved' })),
+    createPermissionHandler: vi.fn(() => vi.fn().mockResolvedValue({ kind: 'approve-once' })),
 }));
 
 vi.mock('../../../src/copilot/hooks/error-handler.js', () => ({

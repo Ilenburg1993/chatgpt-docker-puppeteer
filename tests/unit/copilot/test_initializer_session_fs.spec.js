@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
-    buildAuditingPermissionHandler: vi.fn((handler) => handler ?? (async () => ({ kind: 'approved' }))),
+    buildAuditingPermissionHandler: vi.fn((handler) => handler ?? (async () => ({ kind: 'approve-once' }))),
     buildSystemPromptBindingSnapshot: vi.fn((status, sessionId) => ({ digest: status.revision.digest, sessionId })),
     buildCustomAgentsConfig: vi.fn(() => []),
     buildLiveSystemMessage: vi.fn(async () => ({ mode: 'customize', sections: {} })),

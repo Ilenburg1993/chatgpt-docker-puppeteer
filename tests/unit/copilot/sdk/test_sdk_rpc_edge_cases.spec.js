@@ -112,7 +112,10 @@ describe('F41 — assertSession error messages', () => {
         ['shellKill', (/** @type {any} */ s) => shellKill(s, 'p1')],
         ['uiElicitation', (/** @type {any} */ s) => uiElicitation(s, 'msg', { type: 'object' })],
         ['commandsHandlePending', (/** @type {any} */ s) => commandsHandlePending(s, 'r1')],
-        ['permissionsHandlePending', (/** @type {any} */ s) => permissionsHandlePending(s, 'r1', { kind: 'approved' })],
+        [
+            'permissionsHandlePending',
+            (/** @type {any} */ s) => permissionsHandlePending(s, 'r1', { kind: 'approve-once' }),
+        ],
         ['toolsHandlePendingCall', (/** @type {any} */ s) => toolsHandlePendingCall(s, 'r1')],
     ];
 

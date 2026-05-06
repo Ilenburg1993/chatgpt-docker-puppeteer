@@ -42,10 +42,12 @@ vi.mock('@github/copilot-sdk', () => ({
 
 import {
     createSessionRpcFacade,
+    instructionSourcesGet,
     modeGet,
     modelGetCurrent,
     modelSwitchTo,
     modeSet,
+    permissionsListPending,
     planDelete,
     planRead,
     planUpdate,
@@ -78,6 +80,9 @@ function fakeSession(rpcOverrides = {}) {
                 listFiles: vi.fn().mockResolvedValue({ files: ['a.txt', 'b.txt'] }),
                 readFile: vi.fn().mockResolvedValue({ content: 'hello' }),
                 createFile: vi.fn().mockResolvedValue({}),
+            },
+            instructions: {
+                getSources: vi.fn().mockResolvedValue({ sources: [{ type: 'system', origin: 'sdk' }] }),
             },
             log: vi.fn().mockResolvedValue({ eventId: 'evt-123' }),
             ...rpcOverrides,
@@ -399,6 +404,20 @@ describe('sdk/rpc — Core Subsystems', () => {
         });
     });
 
+    describe('instructions.getSources', () => {
+        it('lê instruction sources pela façade SDK', async () => {
+            const s = fakeSession();
+            const result = await instructionSourcesGet(s);
+            expect(s.rpc.instructions.getSources).toHaveBeenCalledOnce();
+            expect(result).toEqual({ sources: [{ type: 'system', origin: 'sdk' }] });
+        });
+
+        it('rejeita quando namespace instructions está indisponível', async () => {
+            const s = fakeSession({ instructions: {} });
+            await expect(instructionSourcesGet(s)).rejects.toThrow('instructions.getSources');
+        });
+    });
+
     // ─── createSessionRpcFacade ────────────────────────────────────────────
 
     describe('createSessionRpcFacade', () => {
@@ -416,6 +435,7 @@ describe('sdk/rpc — Core Subsystems', () => {
             expect(facade.workspace.listFiles).toBeTypeOf('function');
             expect(facade.workspace.readFile).toBeTypeOf('function');
             expect(facade.workspace.createFile).toBeTypeOf('function');
+            expect(facade.instructions.getSources).toBeTypeOf('function');
             expect(facade.log).toBeTypeOf('function');
         });
 
@@ -447,21 +467,53 @@ describe('sdk/rpc — Core Subsystems', () => {
             expect(result.eventId).toBe('evt-123');
         });
 
+        it('facade.instructions.getSources delega para instructionSourcesGet', async () => {
+            const s = fakeSession();
+            const facade = createSessionRpcFacade(s);
+            const result = await facade.instructions.getSources();
+            expect(result).toEqual({ sources: [{ type: 'system', origin: 'sdk' }] });
+            expect(s.rpc.instructions.getSources).toHaveBeenCalledOnce();
+        });
+
         it('rejeita sessão inválida', () => {
             expect(() => createSessionRpcFacade(null)).toThrow(TypeError);
+        });
+    });
+
+    describe('permissions.listPending', () => {
+        it('retorna available=false quando namespace não expõe listagem', async () => {
+            const s = fakeSession({ permissions: {} });
+            const result = await permissionsListPending(s);
+            expect(result).toEqual({ available: false, source: null, requests: [] });
+        });
+
+        it('retorna requests quando listPendingPermissionRequests está disponível', async () => {
+            const listPendingPermissionRequests = vi
+                .fn()
+                .mockResolvedValue([{ requestId: 'perm-1', permissionType: 'file_write' }]);
+            const s = fakeSession({
+                permissions: { handlePendingPermissionRequest: vi.fn(), listPendingPermissionRequests },
+            });
+            const result = await permissionsListPending(s);
+            expect(listPendingPermissionRequests).toHaveBeenCalledOnce();
+            expect(result.available).toBe(true);
+            expect(result.source).toBe('permissions.listPendingPermissionRequests');
+            expect(result.requests).toHaveLength(1);
         });
     });
 
     // ─── Barrel re-export ──────────────────────────────────────────────────
 
     describe('barrel re-export', () => {
-        it('exporta todos os 12 símbolos via barrel', async () => {
+        it('exporta todos os símbolos via barrel', async () => {
             const barrel = await import('#copilot/sdk');
             expect(barrel.createSessionRpcFacade).toBeTypeOf('function');
+            expect(barrel.instructionSourcesGet).toBeTypeOf('function');
             expect(barrel.modelGetCurrent).toBeTypeOf('function');
             expect(barrel.modelSwitchTo).toBeTypeOf('function');
             expect(barrel.modeGet).toBeTypeOf('function');
             expect(barrel.modeSet).toBeTypeOf('function');
+            expect(barrel.permissionsListPending).toBeTypeOf('function');
             expect(barrel.planRead).toBeTypeOf('function');
             expect(barrel.planUpdate).toBeTypeOf('function');
             expect(barrel.planDelete).toBeTypeOf('function');

@@ -224,6 +224,7 @@ describe('F86 - Barrel complete export coverage', () => {
             'commandsHandlePending',
             'compactionCompact',
             'createSessionRpcFacade',
+            'instructionSourcesGet',
             'modeGet',
             'modeSet',
             'modelGetCurrent',

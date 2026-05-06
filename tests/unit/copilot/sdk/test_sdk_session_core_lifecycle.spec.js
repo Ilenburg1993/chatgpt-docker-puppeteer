@@ -23,7 +23,7 @@ vi.mock('@github/copilot-sdk', () => {
 
     return {
         CopilotClient: MockCopilotClient,
-        approveAll: vi.fn().mockResolvedValue({ kind: 'approved' }),
+        approveAll: vi.fn().mockResolvedValue({ kind: 'approve-once' }),
     };
 });
 

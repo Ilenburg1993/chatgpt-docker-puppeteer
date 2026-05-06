@@ -424,9 +424,9 @@ describe('agent-sdk-access facade', () => {
         await expect(inputSdkSessionUi(ctx, 'Nome?')).resolves.toBe('Nome?:input');
         expect(getSdkSessionCapabilities(ctx)).toEqual({ ui: { elicitation: true } });
         expect(isSdkSessionUiElicitationAvailable(ctx)).toBe(true);
-        await expect(handleSdkPendingPermission(ctx, 'perm-1', { kind: 'approved' })).resolves.toEqual({
+        await expect(handleSdkPendingPermission(ctx, 'perm-1', { kind: 'approve-once' })).resolves.toEqual({
             requestId: 'perm-1',
-            result: { kind: 'approved' },
+            result: { kind: 'approve-once' },
         });
         await expect(handleSdkPendingToolCall(ctx, 'tool-1', { result: 'ok' })).resolves.toEqual({
             requestId: 'tool-1',

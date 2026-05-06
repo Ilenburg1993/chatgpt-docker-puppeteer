@@ -12,6 +12,11 @@ const runtimeMocks = vi.hoisted(() => ({
     inputTerminalSdkSessionUi: vi.fn(async (message) => `${message}:typed`),
     isTerminalSdkSessionUiElicitationAvailable: vi.fn(() => true),
     listTerminalSdkModels: vi.fn(async () => ({ models: [{ id: 'gpt-5-mini', supportedReasoningEfforts: ['high'] }] })),
+    listTerminalSdkPendingPermissions: vi.fn(async () => ({
+        available: true,
+        source: 'permissions.listPendingPermissionRequests',
+        requests: [{ requestId: 'perm-rpc-1', permissionType: 'file_write' }],
+    })),
     listTerminalSdkTools: vi.fn(async () => ({ tools: [{ name: 'read_file', description: 'Read files' }] })),
     listTerminalSdkWorkspaceFiles: vi.fn(async () => ({ files: [{ path: 'plan.md' }] })),
     readTerminalSdkSystemPromptProjection: vi.fn(async () => ({
@@ -302,14 +307,49 @@ describe('terminal/commands/sdk', () => {
         });
 
         const respond = mockCtx();
-        await cmdPermission(
-            { println: respond.println },
-            'respond perm-pending approve-for-session {"reason":"manual"}',
-        );
+        await cmdPermission({ println: respond.println }, 'respond perm-pending approve-once {"reason":"manual"}');
 
         expect(runtimeMocks.handleTerminalSdkPendingPermission).toHaveBeenCalledWith(
             'perm-pending',
-            expect.objectContaining({ kind: 'approve-for-session', reason: 'manual' }),
+            expect.objectContaining({ kind: 'approve-once', reason: 'manual' }),
+            null,
+        );
+        expect(respond.output()).toContain('Resposta de permissão enviada');
+    });
+
+    it('/permission respond valida decisões persistentes que exigem approval', async () => {
+        recordTerminalPermissionRequested({
+            requestId: 'perm-persistent',
+            permissionType: 'write',
+        });
+
+        const invalid = mockCtx();
+        await cmdPermission({ println: invalid.println }, 'respond perm-persistent approve-for-session {"reason":"x"}');
+
+        expect(runtimeMocks.handleTerminalSdkPendingPermission).not.toHaveBeenCalled();
+        expect(invalid.output()).toContain('approval');
+    });
+
+    it('/permission pending usa listagem ativa via SDK RPC quando disponível', async () => {
+        const ctx = mockCtx();
+        await cmdPermission({ println: ctx.println }, 'pending');
+
+        expect(runtimeMocks.listTerminalSdkPendingPermissions).toHaveBeenCalledOnce();
+        expect(ctx.output()).toContain('pendentes via RPC');
+        expect(ctx.output()).toContain('perm-rpc-1');
+        expect(ctx.output()).toContain('file_write');
+    });
+
+    it('/permission pending hidrata estado local para permitir respond por RPC-only request', async () => {
+        const pending = mockCtx();
+        await cmdPermission({ println: pending.println }, 'pending');
+
+        const respond = mockCtx();
+        await cmdPermission({ println: respond.println }, 'respond perm-rpc-1 approve-once');
+
+        expect(runtimeMocks.handleTerminalSdkPendingPermission).toHaveBeenCalledWith(
+            'perm-rpc-1',
+            { kind: 'approve-once' },
             null,
         );
         expect(respond.output()).toContain('Resposta de permissão enviada');

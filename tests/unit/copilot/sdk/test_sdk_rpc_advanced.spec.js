@@ -263,20 +263,20 @@ describe('sdk/rpc — Advanced Subsystems', () => {
     describe('permissionsHandlePending', () => {
         it('resolve permissão aprovada', async () => {
             const s = fakeSession();
-            const result = await permissionsHandlePending(s, 'req-003', { kind: 'approved' });
+            const result = await permissionsHandlePending(s, 'req-003', { kind: 'approve-once' });
             expect(result.success).toBe(true);
             expect(s.rpc.permissions.handlePendingPermissionRequest).toHaveBeenCalledWith({
                 requestId: 'req-003',
-                result: { kind: 'approved' },
+                result: { kind: 'approve-once' },
             });
         });
 
         it('resolve permissão negada', async () => {
             const s = fakeSession();
-            await permissionsHandlePending(s, 'req-004', { kind: 'denied-interactively-by-user', feedback: 'nope' });
+            await permissionsHandlePending(s, 'req-004', { kind: 'reject', feedback: 'nope' });
             expect(s.rpc.permissions.handlePendingPermissionRequest).toHaveBeenCalledWith({
                 requestId: 'req-004',
-                result: { kind: 'denied-interactively-by-user', feedback: 'nope' },
+                result: { kind: 'reject', feedback: 'nope' },
             });
         });
 
@@ -287,7 +287,7 @@ describe('sdk/rpc — Advanced Subsystems', () => {
 
         it('rejeita requestId vazio', async () => {
             const s = fakeSession();
-            await expect(permissionsHandlePending(s, '', { kind: 'approved' })).rejects.toThrow('string não-vazia');
+            await expect(permissionsHandlePending(s, '', { kind: 'approve-once' })).rejects.toThrow('string não-vazia');
         });
     });
 

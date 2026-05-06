@@ -9,7 +9,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Mock do SDK
 vi.mock('@github/copilot-sdk', () => ({
-    approveAll: Object.assign(async () => ({ kind: 'approved' }), { _isMockApproveAll: true }),
+    approveAll: Object.assign(async () => ({ kind: 'approve-once' }), { _isMockApproveAll: true }),
     CopilotClient: vi.fn(),
     SYSTEM_PROMPT_SECTIONS: {
         identity: { description: 'Identity' },

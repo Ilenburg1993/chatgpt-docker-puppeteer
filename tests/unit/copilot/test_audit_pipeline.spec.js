@@ -167,7 +167,7 @@ describe('audit/pipeline › isHighRiskTool', () => {
 
 describe('audit/pipeline › buildAuditingPermissionHandler', () => {
     it('delega ao baseHandler quando fornecido', async () => {
-        const base = vi.fn().mockResolvedValue({ kind: 'approved' });
+        const base = vi.fn().mockResolvedValue({ kind: 'approve-once' });
         const handler = buildAuditingPermissionHandler(base);
 
         const result = await handler(
@@ -176,7 +176,7 @@ describe('audit/pipeline › buildAuditingPermissionHandler', () => {
         );
 
         expect(base).toHaveBeenCalled();
-        expect(result).toEqual({ kind: 'approved' });
+        expect(result).toEqual({ kind: 'approve-once' });
     });
 
     it('usa approveAll como fallback quando baseHandler é undefined', async () => {
@@ -202,7 +202,7 @@ describe('audit/pipeline › buildAuditingPermissionHandler', () => {
     });
 
     it('extrai toolName de request.tool quando toolName ausente', async () => {
-        const base = vi.fn().mockResolvedValue({ kind: 'approved' });
+        const base = vi.fn().mockResolvedValue({ kind: 'approve-once' });
         const handler = buildAuditingPermissionHandler(base);
 
         await handler(/** @type {any} */ ({ tool: 'my_tool' }), /** @type {any} */ ({ sessionId: 's1' }));

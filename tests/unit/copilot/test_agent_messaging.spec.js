@@ -16,6 +16,7 @@ import {
     sendMessage,
     sendMessageDialogBoot,
 } from '../../../src/copilot/agent/messaging/agent-messaging.js';
+import { requestUserInputTool } from '../../../src/copilot/tools/hook-tools.js';
 
 describe('agent-messaging › sendMessage', () => {
     /** @returns {{ ctx: AgentContext; host: EventEmitter & { emit: any } }} */
@@ -167,6 +168,23 @@ describe('agent-messaging › answerPendingQuestion', () => {
         assert.equal(resolved, 'my answer');
         assert.equal(ctx.pendingQuestion, null);
         assert.ok(answered);
+    });
+
+    it('retorna true quando responde request_user_input pendente mesmo sem ask_user vivo', async () => {
+        const emitter = new EventEmitter();
+        const ctx = new AgentContext(emitter);
+        ctx.pendingQuestion = null;
+
+        const handler = /** @type {{ handler: (args: { question: string }) => Promise<any> }} */ (requestUserInputTool)
+            .handler;
+        const pending = handler({ question: 'Qual próximo passo?' });
+
+        const result = answerPendingQuestion(ctx, emitter, 'seguir backlog');
+        assert.equal(result, true);
+
+        const resolved = await pending;
+        assert.equal(resolved.status, 'resolved');
+        assert.equal(resolved.answer, 'seguir backlog');
     });
 });
 
