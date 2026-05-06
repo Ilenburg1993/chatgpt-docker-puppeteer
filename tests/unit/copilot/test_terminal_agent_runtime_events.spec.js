@@ -25,6 +25,7 @@ const readTerminalRuntimeState = vi.fn(
 const recordTerminalTurnToolActivity = vi.fn();
 const completeTerminalTurnToolCall = vi.fn();
 const getTerminalDetailLevel = vi.fn(() => 'detailed');
+const recordToolCall = vi.fn();
 
 vi.mock('../../../src/copilot/terminal/dialog/index.js', () => ({
     println,
@@ -50,6 +51,10 @@ vi.mock('../../../src/copilot/terminal/frontend/gateways/agent-runtime.js', () =
 vi.mock('../../../src/copilot/terminal/turn-trace-state.js', () => ({
     recordTerminalTurnToolActivity,
     completeTerminalTurnToolCall,
+}));
+
+vi.mock('../../../src/copilot/observability/index.js', () => ({
+    recordToolCall,
 }));
 
 vi.mock('../../../src/copilot/terminal/ui-preferences.js', () => ({
@@ -131,6 +136,7 @@ describe('terminal/agent-runtime-events.js — contrato', () => {
             }),
         );
         expect(completeTerminalTurnToolCall).toHaveBeenCalledWith({ toolCallId: 'tool-1', success: true });
+        expect(recordToolCall).toHaveBeenCalledWith('sdk.workspace.read_file', expect.any(Number), true);
         expect(broadcastSse).toHaveBeenCalledWith(
             'tool.start',
             expect.objectContaining({

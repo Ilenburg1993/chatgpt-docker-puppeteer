@@ -224,9 +224,11 @@ Correção aplicada neste corte:
 Gaps abertos para o próximo corte:
 
 1. Unificar ou expor claramente duas superfícies: workspace virtual SDK versus FS local canônico.
+   Tratado no corte seguinte com `/fs` para FS local canônico e `/workspace` explicitamente virtual.
 2. Fazer o roteamento natural preferir tools semânticas (`list_directory`, `read_file_content`,
    `search_in_files`) quando o usuário pedir read/write/search/scan, em vez de cair em `bash/grep`
-   sem explicação.
+   sem explicação. Parcialmente tratado no corte seguinte com instruções de prompt; falta reteste
+   live de seleção natural do modelo.
 3. Corrigir `/tools` para refletir tool events observados por `/activity`, ou renomear o comando
    para deixar claro que ele mostra apenas registry persistido.
 4. Normalizar a apresentação de quota: warning semanal em porcentagem versus `/sdk quota` em
@@ -240,3 +242,88 @@ Conclusão:
   virtual;
 - o próximo melhor ponto de ataque é consolidar a semântica de workspace/FS local para eliminar esse
   caminho paralelo percebido.
+
+## 11) Tratamento pós-live — `/fs` local canônico e preferência por file-tools
+
+Correções aplicadas:
+
+- criado comando `/fs` (`/files`) para operações locais reais de filesystem, separado de
+  `/workspace`;
+- `/fs list|scan` chama `list_directory` e publica metadata do scanner canônico;
+- `/fs read` chama `read_file_content`;
+- `/fs search` chama `search_in_files`;
+- `/fs create` chama `create_file`;
+- `/fs write` chama `write_file_content`;
+- banner e `/help` passaram a divulgar `/fs [list|read|search|create|write]`;
+- `tool_instructions` do system prompt passou a orientar a LLM-B a preferir file-tools semânticas
+  para read/write/search/scan no FS real, usando `bash`/`grep` apenas quando a operação for
+  realmente shell ou quando a tool semântica estiver indisponível.
+
+Validação automatizada:
+
+- `tests/unit/copilot/terminal/test_commands_fs.spec.js` cobre criação, leitura, listagem/scan,
+  busca e overwrite no FS local real do workspace;
+- `tests/unit/copilot/terminal/test_commands_sdk.spec.js` continua travando `/workspace` como SDK
+  virtual;
+- teste focado: verde (`2` arquivos, `24` testes);
+- `npm run typecheck:strict:src.copilot`: verde;
+- `npm run lint`: verde.
+
+Estado do gap:
+
+- superfície humana/terminal: tratada, pois agora há comandos distintos e testados para SDK virtual
+  e FS local canônico;
+- superfície de prompt/roteamento: parcialmente tratada, pois a instrução foi reforçada; ainda exige
+  reteste live com LLM-B para confirmar se o modelo efetivamente escolhe file-tools semânticas em
+  turno natural;
+- `/tools` versus `/activity`: ainda pendente.
+
+## 12) Reteste pós-correção — `/fs`, leitura semântica natural e `/tools`
+
+Comando executado:
+
+```bash
+npm run terminal:llm-b
+```
+
+Comandos/ações validados:
+
+- `/fs create tmp/copilot-live-fs-canonical.md LIVE_FS_CANONICAL`;
+- `/fs read tmp/copilot-live-fs-canonical.md`;
+- `/fs list tmp --recursive --depth 1`;
+- `/fs search LIVE_FS_CANONICAL tmp`;
+- turno natural: “Leia o arquivo ... usando a ferramenta semântica de leitura de arquivos, não
+  bash/cat...”;
+- `/activity 5`;
+- `/tools`.
+
+Resultado factual:
+
+- `/fs create/read/list/search` funcionou no REPL vivo e materializou no FS local real;
+- as operações reportaram motores canônicos (`io-engine.atomic-write`, `io-engine.fs.readFile.text`,
+  `io-scanner.fs.readdir`, `rg`);
+- o turno natural usou `view` como leitura semântica do runtime, não `bash`/`cat`, e respondeu
+  `LIVE_FS_CANONICAL`;
+- `/activity 5` registrou
+  `view · read · /workspaces/.../tmp/copilot-live-fs-canonical.md · completed`;
+- `/tools` listou as métricas `io.*` emitidas por `/fs`.
+
+Correção adicional aplicada após o reteste:
+
+- `terminal/agent-runtime-events.js` passou a registrar cada `tool.execution_complete` no
+  `tool-stats` com prefixo `sdk.<toolName>`;
+- isso fecha a divergência principal entre `/activity` e `/tools`: tools conversacionais como
+  `view`, `bash` e `grep` passam a aparecer em `/tools` após conclusão do turno;
+- eventos genéricos sem nome estável são ignorados para não gerar a métrica placeholder `sdk.tool`;
+- a mensagem de `/tools` foi renomeada de "registradas" para "observadas", alinhando a UX à nova
+  semântica consolidada;
+- teste unitário ampliado em `tests/unit/copilot/test_terminal_agent_runtime_events.spec.js`.
+
+Estado atualizado:
+
+- `/workspace`: SDK virtual, explicitamente rotulado;
+- `/fs`: filesystem local real, canônico para operador humano;
+- turno natural: prefere leitura semântica quando instruído, com `view` como alias/runtime tool
+  válido;
+- `/activity`: timeline detalhada por turno;
+- `/tools`: métricas instrumentadas de I/O local e tools SDK observadas no runtime.

@@ -62,6 +62,6 @@ describe('commands/tools', () => {
 
         cmdTools({ println: ctx.println });
 
-        expect(ctx.output()).toContain('Nenhuma tool registrada');
+        expect(ctx.output()).toContain('Nenhuma tool observada');
     });
 });

@@ -400,6 +400,81 @@ Backlog reordenado após este corte:
 3. R7: evoluir scanner para `.gitignore`, denylist e include/exclude canônicos.
 4. R5/R6: só iniciar cache L1/FTS depois dos gates verdes e dos benchmarks mínimos.
 
+## Atualização 2026-05-06 - Corte A.3 gap live FS local versus workspace virtual
+
+Gap tratado:
+
+- O reteste live mostrou que `/workspace write/read/list` opera no workspace virtual do SDK e não
+  materializa arquivos no filesystem real visível por `bash`, `grep` ou pelas file-tools locais.
+- O mesmo reteste mostrou que a LLM-B, ao receber uma tarefa natural de read/write/search/scan,
+  escolheu `bash`/`grep` em vez das file-tools semânticas, reabrindo um caminho paralelo
+  operacional.
+
+Transformações aplicadas:
+
+- Novo comando terminal `/fs` com aliases `/files`, operando exclusivamente sobre o FS local
+  canônico por meio das file-tools:
+  - `/fs list|scan [path] [--recursive] [--hidden] [--depth n]` usa `list_directory` e
+    `infra/io-scanner`;
+  - `/fs read <path>` usa `read_file_content` e `io-engine.readText`;
+  - `/fs search <pattern> [path]` usa `search_in_files`;
+  - `/fs create <path> <content>` usa `create_file`;
+  - `/fs write <path> <content>` usa `write_file_content`.
+- Banner e `/help` agora exibem `/fs` ao lado de `/workspace`, deixando as duas superfícies
+  separadas: SDK virtual versus filesystem local.
+- `config/system-prompt/sections/tool-instructions.js` passou a instruir a LLM-B a preferir
+  `list_directory`, `read_file_content`, `search_in_files`, `create_file`, `write_file_content` e
+  `patch_file` para operações de arquivo, usando `bash`/`grep` apenas quando a operação for
+  realmente shell ou quando a tool semântica estiver indisponível.
+- A documentação live foi atualizada para reclassificar o gap e registrar o tratamento.
+
+Validação executada:
+
+- `npm exec vitest -- run --config vitest.copilot.config.js tests/unit/copilot/terminal/test_commands_fs.spec.js tests/unit/copilot/terminal/test_commands_sdk.spec.js`:
+  verde (`2` arquivos, `24` testes).
+- `npm run typecheck:strict:src.copilot`: verde.
+- `npm run lint`: verde.
+
+Reteste live executado:
+
+- `npm run terminal:llm-b`;
+- `/fs create tmp/copilot-live-fs-canonical.md LIVE_FS_CANONICAL`;
+- `/fs read tmp/copilot-live-fs-canonical.md`;
+- `/fs list tmp --recursive --depth 1`;
+- `/fs search LIVE_FS_CANONICAL tmp`;
+- turno natural pedindo leitura semântica sem `bash/cat`;
+- `/activity 5`;
+- `/tools`.
+
+Resultado do reteste:
+
+- `/fs` criou, leu, listou e buscou no filesystem real do workspace, com metadata observável:
+  `io=write · engine=io-engine.atomic-write`, `io=read · engine=io-engine.fs.readFile.text`,
+  `io=scan · engine=io-scanner.fs.readdir` e `io=search · engine=rg`;
+- no turno natural, a LLM-B não usou `bash`/`cat`; usou a leitura semântica exposta pelo runtime
+  como `view`, tocando o mesmo arquivo local e retornando `LIVE_FS_CANONICAL`;
+- `/activity` mostrou o evento vivo `view · read · ... · completed`;
+- `/tools` já refletia as operações `/fs` via métricas `io.*`, mas ainda não refletia o `view`
+  conversacional.
+
+Transformação adicional aplicada:
+
+- `terminal/agent-runtime-events.js` agora registra `tool.execution_complete` em `tool-stats` como
+  `sdk.<toolName>`, preservando duração e sucesso;
+- com isso, `/tools` passa a consolidar tanto métricas locais de I/O (`io.*`) quanto tools vivas do
+  turno conversacional (`sdk.view`, `sdk.bash`, `sdk.grep`, etc.);
+- eventos genéricos sem `toolName`/`name` e sem entrada ativa não são registrados como `sdk.tool`,
+  evitando métricas placeholder sem valor operacional;
+- a UX textual de `/tools` foi ajustada de "registradas" para "observadas", pois a projeção agora é
+  métrica consolidada, não apenas catálogo/registry;
+- o teste de `terminal/agent-runtime-events` foi ampliado para travar esse contrato.
+
+Backlog remanescente específico:
+
+1. Investigar affordances/descriptions/allowlist se algum modelo voltar a preferir shell para
+   read/write/search/scan sem pedido explícito do usuário.
+2. Normalizar a apresentação de quota semanal versus `/sdk quota`.
+
 ## Dependências candidatas por decisão
 
 | Dependência           | Decisão atual       | Condição para entrada                             |

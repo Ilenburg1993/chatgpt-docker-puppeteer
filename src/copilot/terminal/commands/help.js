@@ -58,9 +58,10 @@ export function cmdHelp({ injectPort, println }) {
   \x1b[33m/thinking list [n]\x1b[0m                  — lista thinkings capturados (colapsados)
   \x1b[33m/thinking show <id>|latest\x1b[0m          — abre thinking completo capturado
   \x1b[33m/usage [on|off|now]\x1b[0m                  — toggle usage pós-turno ou snapshot instantâneo
-  \x1b[33m/tools\x1b[0m                               — lista ferramentas registradas com stats
+  \x1b[33m/tools\x1b[0m                               — lista ferramentas observadas com stats
   \x1b[33m/sdk [status|models|tools|quota|prompt|capabilities|waits|compact]\x1b[0m — catálogo/quota/capabilities/ops SDK via Agent
   \x1b[33m/workspace [list|read|write]\x1b[0m          — workspace virtual da sessão SDK
+  \x1b[33m/fs [list|read|search|create|write]\x1b[0m   — filesystem local canônico via file-tools
   \x1b[33m/elicitation [list|show|request]\x1b[0m      — formulários/URL estruturados do SDK
   \x1b[33m/permission [list|all|show|clear|mode|respond]\x1b[0m — permissões SDK observadas + governança + resposta manual
   \x1b[33m/errors [n]\x1b[0m                          — mostra últimos N erros rastreados (default: 10)

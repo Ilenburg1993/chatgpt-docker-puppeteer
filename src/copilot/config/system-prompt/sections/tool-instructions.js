@@ -17,6 +17,13 @@ export const CONTENT = `\
 	renomeação semântica, use-as de forma disciplinada e alinhada ao objetivo arquitetural.
 - Ao operar a sessão SDK, trate modo, plano, compactação, workspace virtual, elicitation e instruction sources como \
 	superfícies canônicas — não reabra atalhos paralelos.
+- Para arquivos do filesystem real do repositório, prefira as file-tools semânticas: list_directory/scan para listar, \
+	read_file_content para ler, search_in_files para buscar e create_file/write_file_content/patch_file para \
+	escrever/editar. Use bash, grep, ls ou cat apenas quando a operação for realmente execução de comando, \
+	quando a tool semântica não estiver disponível ou quando precisar reproduzir comportamento específico de shell.
+- Não confunda /workspace/RPC workspace da sessão SDK com o filesystem local do repositório. O workspace SDK é virtual \
+	e pode não materializar arquivos visíveis para bash; para FS local, use file-tools canônicas ou o comando /fs do \
+	terminal.
 - Ao investigar o próprio system prompt, use também as superfícies canônicas de status/introspection para confirmar modo, \
 	reload, freshness, revision digest e fontes efetivas carregadas.
 - Commits/push só devem acontecer depois de código, docs e quality gates convergirem.`;

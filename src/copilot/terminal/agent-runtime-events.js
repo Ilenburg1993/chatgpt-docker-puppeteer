@@ -25,6 +25,7 @@ import {
     EMITTER_TOOL_EXECUTION_PROGRESS,
     EMITTER_TOOL_EXECUTION_START,
 } from '#copilot/events';
+import { recordToolCall } from '#copilot/observability';
 import {
     getShowIntentActivity,
     getShowStreaming,
@@ -304,13 +305,27 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null }) {
         const success = Boolean(evt?.['success']);
         const entry = activeTools.get(toolCallId);
         activeTools.delete(toolCallId);
-        const name = entry?.name ?? 'tool';
+        const eventName =
+            typeof evt?.['toolName'] === 'string' && evt['toolName'].length > 0
+                ? evt['toolName']
+                : typeof evt?.['name'] === 'string' && evt['name'].length > 0
+                  ? evt['name']
+                  : null;
+        const name = entry?.name ?? eventName ?? 'tool';
         if (shouldSuppressToolNarration(name)) {
             return;
         }
         const compactDetail = getTerminalDetailLevel() === 'compact';
         const presentation = entry?.presentation ?? buildTerminalToolActivityPresentation(evt, name);
-        const dur = entry ? ((Date.now() - entry.t0) / 1000).toFixed(1) : '?';
+        const durationMs = entry
+            ? Date.now() - entry.t0
+            : Number.isFinite(Number(evt?.['durationMs']))
+              ? Number(evt?.['durationMs'])
+              : 0;
+        if (entry || eventName) {
+            recordToolCall(`sdk.${name}`, durationMs, success);
+        }
+        const dur = durationMs > 0 ? (durationMs / 1000).toFixed(1) : '?';
         const icon = success ? terminalThemeText('success', '✅') : terminalThemeText('error', '❌');
         const operationRole = mapOperationRole(presentation.operation);
         if (compactDetail) {

@@ -4,7 +4,7 @@
  *
  * Comando `/tools` do REPL terminal LLM-B.
  *
- * Lista as tools registradas com statisticas de uso (invocações, erros, latência).
+ * Lista as tools observadas com estatísticas de uso (invocações, erros, latência).
  *
  * @module copilot/terminal/commands/tools
  * @see EventBus
@@ -29,11 +29,11 @@ export function cmdTools({ println }) {
     const { entries } = readTerminalToolStatsProjection();
 
     if (entries.length === 0) {
-        println('\n  \x1b[33m⚠️  Nenhuma tool registrada ainda.\x1b[0m\n');
+        println('\n  \x1b[33m⚠️  Nenhuma tool observada ainda.\x1b[0m\n');
         return;
     }
 
-    println(`\n  \x1b[36m🔧 ${entries.length} tool(s) registrada(s):\x1b[0m\n`);
+    println(`\n  \x1b[36m🔧 ${entries.length} tool(s) observada(s):\x1b[0m\n`);
 
     for (const [name, data] of entries) {
         const d = /** @type {{ calls?: number; errors?: number; avgLatencyMs?: number }} */ (data);
