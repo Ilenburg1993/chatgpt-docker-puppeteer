@@ -449,7 +449,9 @@ export async function cmdWorkspace({ println }, arg = '') {
                 return;
             }
             const result = await callWithRuntimeTarget(readTerminalSdkWorkspaceFile, runtimeId, path);
-            println(`\n  \x1b[36m${path}\x1b[0m\n${pretty(result, 4000)}\n`);
+            println(
+                `\n  \x1b[36m${path}\x1b[0m  \x1b[90m(SDK virtual; não FS local)\x1b[0m\n${pretty(result, 4000)}\n`,
+            );
         } else if (sub === 'write') {
             const path = rest.shift();
             const content = rest.join(' ');
@@ -458,12 +460,12 @@ export async function cmdWorkspace({ println }, arg = '') {
                 return;
             }
             const result = await callWithRuntimeTarget(createTerminalSdkWorkspaceFile, runtimeId, path, content);
-            println(`\n  \x1b[32m✓ Arquivo escrito no workspace SDK:\x1b[0m \x1b[33m${path}\x1b[0m`);
+            println(`\n  \x1b[32m✓ Arquivo escrito no workspace SDK virtual:\x1b[0m \x1b[33m${path}\x1b[0m`);
             println(`  \x1b[90m${pretty(result, 500)}\x1b[0m\n`);
         } else {
             const result = await callWithRuntimeTarget(listTerminalSdkWorkspaceFiles, runtimeId);
             const files = arrayFromSdkList(result);
-            println(`\n  \x1b[36mWorkspace SDK (${files.length || 'retorno bruto'})\x1b[0m`);
+            println(`\n  \x1b[36mWorkspace SDK virtual (${files.length || 'retorno bruto'})\x1b[0m`);
             if (files.length > 0) {
                 for (const file of files.slice(0, 80)) {
                     const f = objectOrNull(file) ?? {};
@@ -473,7 +475,9 @@ export async function cmdWorkspace({ println }, arg = '') {
             } else {
                 println(`  \x1b[90m${pretty(result, 1500)}\x1b[0m`);
             }
-            println('  \x1b[90mUso: /workspace list | read <path> | write <path> <content>\x1b[0m\n');
+            println(
+                '  \x1b[90mUso: /workspace list | read <path> | write <path> <content> — não materializa no FS local\x1b[0m\n',
+            );
         }
     } catch (e) {
         println(`\n  \x1b[31m✗ Workspace SDK: ${toError(e).message}\x1b[0m\n`);

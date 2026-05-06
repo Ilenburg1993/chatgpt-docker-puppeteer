@@ -171,3 +171,72 @@ Conclusão:
 - a seleção `Auto` é utilizável e auditável;
 - não há evidência de preferência vinculante `Auto + gpt-5.4/high` no SDK atual; a implementação
   correta é observabilidade, não promessa de roteamento.
+
+## 10) Reteste live 2026-05-06 — read/write/search/scan e comunicação Codex ↔ LLM-B ↔ usuário
+
+Comando executado:
+
+```bash
+npm run terminal:llm-b
+```
+
+Comandos/ações validados:
+
+- `/status`
+- `/workspace list tmp`
+- `/workspace write tmp/copilot-live-io-test.md LIVE_IO_OK terminal llm-b canonical io scan search`
+- `/workspace read tmp/copilot-live-io-test.md`
+- turno natural pedindo list/read/search do token `LIVE_IO_OK`;
+- turno natural explícito com `bash`: criar `tmp/copilot-live-io-real.md`, listar e buscar
+  `LIVE_IO_OK_REAL`;
+- `/tools`
+- `/activity 8`
+- `/sdk quota`
+- `/model list`
+
+Resultado factual:
+
+- boot completo em standalone e dialog loop ativo;
+- `/status` reportou `health=healthy`, `ask_user=ready`, `permission mode=approve_all`, runtime
+  default e branch `main`;
+- `model=auto` permaneceu ativo, com roteamento efetivo observado para `claude-haiku-4.5`;
+- `/status` mostrou policy Auto com preferência local `gpt-5.4/high`, mas billing/model real
+  `claude-haiku-4.5`;
+- o event collector seguiu emitindo `weekly remaining=0.0%`, reset em `2026-05-11T00:00:00.000Z`;
+- `/sdk quota` retornou snapshot de `chat`, `completions` e `premium_interactions`, mostrando que a
+  leitura de quota do SDK e o warning semanal ainda têm escalas/unidades diferentes;
+- `/model list` retornou `auto`, modelos Claude e modelos GPT incluindo `gpt-5.4`;
+- `/workspace write/read/list` funcionou, mas no workspace virtual SDK, não no FS local;
+- quando a LLM-B usou tools locais (`bash`, `view`, `grep`) para ler/buscar o arquivo criado por
+  `/workspace write`, o arquivo não existia no FS real;
+- um segundo turno com `bash` explícito criou `tmp/copilot-live-io-real.md` no FS local, listou e
+  encontrou `LIVE_IO_OK_REAL` via `grep` com sucesso;
+- streaming/tool events apareceram em tempo real (`bash`, `view`, `grep`);
+- `/activity 8` mostrou o último turno concluído com `bash · run · completed`;
+- `/tools` reportou “Nenhuma tool registrada ainda”, apesar de `/activity` mostrar tool events.
+
+Correção aplicada neste corte:
+
+- a UI de `/workspace` passou a explicitar “Workspace SDK virtual” e “não FS local”, incluindo read,
+  write e usage text;
+- teste unitário de `/workspace` agora trava essa semântica para evitar regressão de UX.
+
+Gaps abertos para o próximo corte:
+
+1. Unificar ou expor claramente duas superfícies: workspace virtual SDK versus FS local canônico.
+2. Fazer o roteamento natural preferir tools semânticas (`list_directory`, `read_file_content`,
+   `search_in_files`) quando o usuário pedir read/write/search/scan, em vez de cair em `bash/grep`
+   sem explicação.
+3. Corrigir `/tools` para refletir tool events observados por `/activity`, ou renomear o comando
+   para deixar claro que ele mostra apenas registry persistido.
+4. Normalizar a apresentação de quota: warning semanal em porcentagem versus `/sdk quota` em
+   unidades brutas ainda induz leitura ambígua.
+
+Conclusão:
+
+- comunicação live Codex ↔ terminal ↔ LLM-B ↔ usuário está funcional e com streaming de tool events;
+- write/list/search reais funcionam quando a LLM-B usa tool local `bash`;
+- `/workspace` não deve ser usado como prova de materialização no FS local enquanto permanecer SDK
+  virtual;
+- o próximo melhor ponto de ataque é consolidar a semântica de workspace/FS local para eliminar esse
+  caminho paralelo percebido.

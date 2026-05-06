@@ -175,19 +175,22 @@ describe('terminal/commands/sdk', () => {
         expect(tools.output()).toContain('read_file');
     });
 
-    it('/workspace lista, lê e escreve no workspace virtual SDK', async () => {
+    it('/workspace lista, lê e escreve no workspace virtual SDK, deixando claro que não é FS local', async () => {
         const list = mockCtx();
         await cmdWorkspace({ println: list.println }, 'list');
+        expect(list.output()).toContain('Workspace SDK virtual');
         expect(list.output()).toContain('plan.md');
 
         const read = mockCtx();
         await cmdWorkspace({ println: read.println }, 'read plan.md');
         expect(runtimeMocks.readTerminalSdkWorkspaceFile).toHaveBeenCalledWith('plan.md');
+        expect(read.output()).toContain('não FS local');
         expect(read.output()).toContain('hello');
 
         const write = mockCtx();
         await cmdWorkspace({ println: write.println }, 'write notes.md oi');
         expect(runtimeMocks.createTerminalSdkWorkspaceFile).toHaveBeenCalledWith('notes.md', 'oi');
+        expect(write.output()).toContain('workspace SDK virtual');
         expect(write.output()).toContain('notes.md');
     });
 
