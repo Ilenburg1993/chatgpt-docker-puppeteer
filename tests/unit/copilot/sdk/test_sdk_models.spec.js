@@ -156,6 +156,13 @@ describe('F76 - listModels / getModelById', () => {
 });
 
 describe('known model catalog', () => {
+    it('inclui modelos atuais de Auto model selection como metadata estática', () => {
+        expect(KNOWN_MODELS.some((model) => model.id === 'gpt-5.4')).toBe(true);
+        expect(KNOWN_MODELS.some((model) => model.id === 'gpt-5.3-codex')).toBe(true);
+        expect(KNOWN_MODELS.some((model) => model.id === 'claude-haiku-4.5')).toBe(true);
+        expect(KNOWN_MODELS.some((model) => model.id === 'grok-code-fast-1')).toBe(true);
+    });
+
     it('inclui claude-sonnet-4-5 como fallback estático', () => {
         expect(KNOWN_MODELS.some((model) => model.id === 'claude-sonnet-4-5')).toBe(true);
     });
@@ -185,6 +192,13 @@ describe('model runtime factory', () => {
         expect(runtimeB.registry.get('local-only-model')).toBeUndefined();
         expect(runtimeA.statsTracker.getStats('gpt-4.1')?.totalCalls).toBe(1);
         expect(runtimeB.statsTracker.getStats('gpt-4.1')).toBeNull();
+    });
+
+    it('resolve metadata para IDs atuais e aliases legados', () => {
+        const runtime = createModelRuntime();
+
+        expect(runtime.registry.get('claude-haiku-4.5')?.id).toBe('claude-haiku-4.5');
+        expect(runtime.registry.get('gpt54')?.id).toBe('gpt-5.4');
     });
 });
 

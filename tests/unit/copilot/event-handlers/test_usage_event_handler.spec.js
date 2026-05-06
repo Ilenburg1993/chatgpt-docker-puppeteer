@@ -120,4 +120,47 @@ describe('event-handlers/usage wireUsageEvent', () => {
         const logLine = String(mocks.log.mock.calls[0]?.[1] ?? '');
         expect(logLine.includes('[MODEL_MISMATCH]')).toBe(false);
     });
+
+    it('normaliza effectiveModel=auto para o modelo cobrado concreto quando Auto roteia', async () => {
+        /** @type {(evt: any) => void} */
+        let usageHandler = () => {};
+        mocks.onSessionEvent.mockImplementation((_session, _eventType, handler) => {
+            usageHandler = handler;
+            return () => {};
+        });
+
+        const { wireUsageEvent } = await import('../../../../src/copilot/event-handlers/usage.js');
+
+        const emit = vi.fn();
+        const onPrInfo = vi.fn();
+        const session = {
+            sessionId: 'sdk-auto',
+            __copilotConfiguredModel: 'auto',
+            __copilotEffectiveModel: 'auto',
+        };
+
+        wireUsageEvent(/** @type {any} */ (session), { emit, onPrInfo });
+
+        usageHandler({
+            data: {
+                model: 'claude-haiku-4.5',
+                cost: 0.33,
+            },
+        });
+
+        expect(onPrInfo).toHaveBeenCalledWith(
+            expect.objectContaining({
+                model: 'claude-haiku-4.5',
+                configuredModel: 'auto',
+                effectiveModel: 'claude-haiku-4.5',
+                modelMismatch: true,
+            }),
+        );
+        expect(emit).toHaveBeenCalledWith(
+            'pr.consumed',
+            expect.objectContaining({
+                effectiveModel: 'claude-haiku-4.5',
+            }),
+        );
+    });
 });

@@ -45,6 +45,7 @@ export {
     buildSystemMessage,
     buildSystemPromptBindingSnapshot,
     buildSystemPromptProfile,
+    buildSystemPromptPublicProjection,
     evaluateSystemPromptFreshness,
     getSystemPromptSdkCompatibility,
     readResolvedSystemPromptUserConfig,

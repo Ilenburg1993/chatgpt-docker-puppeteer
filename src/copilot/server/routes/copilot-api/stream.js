@@ -52,6 +52,23 @@ import {
  * @returns {void}
  */
 export function registerStreamRoutes(bridge, binding) {
+    /**
+     * @param {RuntimeRouteDeps} deps
+     * @param {Res} res
+     * @returns {boolean}
+     */
+    function ensureStreamRuntimeTarget(deps, res) {
+        if (deps.requestedRuntimeId && deps.runtimeFound === false) {
+            res.status(404).json({
+                ok: false,
+                ...buildRuntimeRouteMetaPayload(deps),
+                error: `Runtime '${deps.requestedRuntimeId}' não encontrado para stream operacional.`,
+            });
+            return false;
+        }
+        return true;
+    }
+
     /** @type {ReadonlyArray<AgentEventName>} */
     const TASK_EVENTS = /** @type {AgentEventName[]} */ ([
         'task.started',
@@ -124,6 +141,7 @@ export function registerStreamRoutes(bridge, binding) {
             const payload = standardizeSsePayload({
                 .../** @type {object} */ (data ?? {}),
                 runtimeId: state.runtimeId,
+                sourceRuntime: state.runtimeId,
             });
             state.streamPool.broadcast(eventName, payload, { replayEvent: eventName, filterEvent: eventName });
             // FASE-15.2: publicar no barramento de fanout para propagação inter-processo
@@ -135,6 +153,7 @@ export function registerStreamRoutes(bridge, binding) {
             const payload = standardizeSsePayload({
                 .../** @type {object} */ (data ?? {}),
                 runtimeId: state.runtimeId,
+                sourceRuntime: state.runtimeId,
             });
             state.taskPool.broadcast(eventName, payload, { replayEvent: eventName, filterEvent: eventName });
         };
@@ -197,6 +216,9 @@ export function registerStreamRoutes(bridge, binding) {
      */
     bridge.get('/stream', (/** @type {Req} */ req, /** @type {Res} */ res) => {
         const deps = resolveCopilotApiRouteBinding(binding, req);
+        if (!ensureStreamRuntimeTarget(deps, res)) {
+            return;
+        }
         const state = ensureRuntimeState(deps);
         // BUG-EVDUP-03 (fix): verificar limite de conexões SSE antes de aceitar
         if (!tracker.accept()) {
@@ -242,6 +264,9 @@ export function registerStreamRoutes(bridge, binding) {
 
     bridge.get('/stream/tasks', (/** @type {Req} */ req, /** @type {Res} */ res) => {
         const deps = resolveCopilotApiRouteBinding(binding, req);
+        if (!ensureStreamRuntimeTarget(deps, res)) {
+            return;
+        }
         const state = ensureRuntimeState(deps);
         if (!taskTracker.accept()) {
             res.status(429).json({

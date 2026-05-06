@@ -114,6 +114,7 @@ class ModelRegistry {
      * @returns {string}
      */
     resolveId(idOrAlias) {
+        if (this.#catalog.has(idOrAlias)) return idOrAlias;
         return this.#aliases.get(idOrAlias) ?? idOrAlias;
     }
 
@@ -162,7 +163,7 @@ class ModelRegistry {
         /** @type {ModelMeta[]} */
         const result = [];
         for (const sdk of sdkModels) {
-            const existing = this.#catalog.get(sdk.id);
+            const existing = this.get(sdk.id);
             if (existing) {
                 result.push(existing);
             } else {

@@ -10,6 +10,7 @@
 
 import {
     listSdkCatalogModels,
+    readRuntimeAutoModelPolicy,
     readRuntimeModelSelection,
     readSdkModelMetadata,
     readSdkModelStats,
@@ -52,6 +53,15 @@ export function readRuntimeModelStatsProjection(runtimeId) {
         currentModel: readRuntimeModelSelection(selection.runtime).model,
         stats: readSdkModelStats(),
     };
+}
+
+/**
+ * @param {string | null | undefined} [runtimeId]
+ * @returns {ReturnType<typeof readRuntimeAutoModelPolicy>}
+ */
+export function readRuntimeAutoModelPolicyProjection(runtimeId) {
+    const selection = requireAgentRuntimeSelection(runtimeId);
+    return readRuntimeAutoModelPolicy(selection.runtime);
 }
 
 /**

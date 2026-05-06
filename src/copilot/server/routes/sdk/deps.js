@@ -150,15 +150,39 @@ const sdkRuntimeSessionOps = Object.freeze({
 const sdkSystemPromptOps = Object.freeze({
     readAgentSdkSystemPromptProjection:
         runtimeSdkSessionNamespace.readAgentSdkSystemPromptProjection ??
-        (async () => ({
-            systemPrompt: await readSystemPromptStatus(),
-            binding: null,
-            freshness: null,
-            sessionId: null,
-            sessionAvailable: false,
-            instructionSources: null,
-            instructionSourcesError: 'readAgentSdkSystemPromptProjection unavailable',
-        })),
+        (async () => {
+            const status = await readSystemPromptStatus();
+            return {
+                systemPrompt: status,
+                binding: null,
+                freshness: null,
+                sessionId: null,
+                sessionAvailable: false,
+                instructionSources: null,
+                instructionSourcesError: 'readAgentSdkSystemPromptProjection unavailable',
+                projection: {
+                    status,
+                    sdkCompatibility:
+                        status?.sdkCompatibility && typeof status.sdkCompatibility === 'object'
+                            ? status.sdkCompatibility
+                            : null,
+                    binding: null,
+                    freshness: null,
+                    session: { id: null, available: false },
+                    instructionSources: {
+                        value: null,
+                        error: 'readAgentSdkSystemPromptProjection unavailable',
+                        available: false,
+                    },
+                    revision: { digest: null },
+                    ownership: {
+                        policyOwner: 'config/system-prompt',
+                        rpcOwner: 'sdk/rpc',
+                        projectionOwner: 'presentation/runtime-sdk-session',
+                    },
+                },
+            };
+        }),
     readSystemPromptStatus,
 });
 

@@ -3,6 +3,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+    classifyRuntimeSdkRateLimitScope,
     describeSdkRecoveryPolicy,
     getSdkRecoveryPolicy,
 } from '../../../src/copilot/presentation/sdk-recovery-policy.js';
@@ -28,6 +29,28 @@ describe('presentation/sdk-recovery-policy', () => {
         expect(message.detail).toContain('terminal');
         expect(message.actionHint).toContain('/model auto');
         expect(message.actionHint).toContain('/restart');
+        expect(classifyRuntimeSdkRateLimitScope(error)).toBe('weekly_model');
+    });
+
+    it('descreve rate_limit de sessão sem sugerir auto como contorno', () => {
+        const error = Object.assign(
+            new Error(
+                "You've hit your rate limit. Please wait for your limit to reset in 18 minutes. Learn More: https://docs.github.com/copilot/concepts/rate-limits.",
+            ),
+            { status: 429 },
+        );
+        const policy = getSdkRecoveryPolicy(error, 'session');
+        const message = describeSdkRecoveryPolicy(policy, error);
+
+        expect(policy).toMatchObject({
+            kind: 'rate_limit',
+            allowReconnect: false,
+            resetCircuit: true,
+        });
+        expect(classifyRuntimeSdkRateLimitScope(error)).toBe('session');
+        expect(message.detail).toContain('Limite de sessão');
+        expect(message.actionHint).toContain('Aguarde o reset');
+        expect(message.actionHint).toContain('não contorna limite de sessão');
     });
 
     it('descreve auth sem confundir com indisponibilidade de boot local', () => {

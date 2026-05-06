@@ -37,10 +37,11 @@ export function wireUsageEvent(session, { emit, onPrInfo }) {
                   : typeof sessionRecord.__copilotConfiguredModel === 'string'
                     ? sessionRecord.__copilotConfiguredModel
                     : undefined;
-        const effectiveModel =
+        const rawEffectiveModel =
             typeof sessionRecord.__copilotEffectiveModel === 'string'
                 ? sessionRecord.__copilotEffectiveModel
                 : billedModel;
+        const effectiveModel = rawEffectiveModel === 'auto' && billedModel ? billedModel : rawEffectiveModel;
         const modelMismatch =
             Boolean(billedModel && configuredModel && billedModel !== configuredModel) ||
             Boolean(effectiveModel && configuredModel && effectiveModel !== configuredModel);

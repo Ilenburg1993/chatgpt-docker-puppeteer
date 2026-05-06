@@ -2,19 +2,32 @@
 
 import { describe, expect, it, vi } from 'vitest';
 
-const readTerminalConfigProjection = vi.fn(() => ({
-    currentModel: 'gpt-5',
-    currentReasoningEffort: 'high',
-    modelMeta: {
-        costTier: 'high',
-        speedTier: 'fast',
-        contextWindow: 128000,
-        supportsReasoning: true,
-        supportsVision: true,
-    },
-    binding: { hubSessionId: 'hub-1', sdkSessionId: 'sdk-1' },
-    runtimeSessionId: 'sdk-1',
-}));
+const readTerminalConfigProjection = vi.fn(
+    /** @returns {any} */ () => ({
+        currentModel: 'gpt-5',
+        currentReasoningEffort: 'high',
+        modelMeta: {
+            costTier: 'high',
+            speedTier: 'fast',
+            contextWindow: 128000,
+            supportsReasoning: true,
+            supportsVision: true,
+        },
+        autoModelPolicy: {
+            configuredModel: 'gpt-5',
+            observedModel: null,
+            preferredModel: 'gpt-5.4',
+            preferredReasoningEffort: 'high',
+            preferenceSatisfied: null,
+            selectionAuthority: 'github-copilot',
+            canForcePreference: false,
+            criteria: [],
+            excludedByAuto: [],
+        },
+        binding: { hubSessionId: 'hub-1', sdkSessionId: 'sdk-1' },
+        runtimeSessionId: 'sdk-1',
+    }),
+);
 const readTerminalModelStatsProjection = vi.fn(() => ({
     currentModel: 'gpt-5',
     stats: [{ modelId: 'gpt-5', totalCalls: 4, avgLatencyMs: 120, successRate: 0.75, totalTokens: 987 }],
@@ -41,13 +54,15 @@ const setTerminalModelProjection = vi.fn((modelId) => ({
                   supportsReasoning: false,
                   supportsVision: false,
               }
-            : {
-                  costTier: 'high',
-                  speedTier: 'fast',
-                  contextWindow: 128000,
-                  supportsReasoning: true,
-                  supportsVision: true,
-              },
+            : modelId === 'auto'
+              ? null
+              : {
+                    costTier: 'high',
+                    speedTier: 'fast',
+                    contextWindow: 128000,
+                    supportsReasoning: true,
+                    supportsVision: true,
+                },
 }));
 const setTerminalReasoningProjection = vi.fn((effort) => ({
     previousReasoningEffort: 'high',
@@ -94,6 +109,31 @@ describe('terminal commands config/errors com frontend canônico', () => {
         expect(ctx.output()).toContain('gpt-5');
         expect(ctx.output()).toContain('caps: reasoning=yes');
         expect(readTerminalConfigProjection).toHaveBeenCalled();
+    });
+
+    it('cmdModel sem args explica Auto quando configurado', async () => {
+        readTerminalConfigProjection.mockReturnValueOnce({
+            currentModel: 'auto',
+            currentReasoningEffort: 'high',
+            modelMeta: null,
+            autoModelPolicy: {
+                configuredModel: 'auto',
+                observedModel: 'claude-haiku-4.5',
+                preferredModel: 'gpt-5.4',
+                preferredReasoningEffort: 'high',
+                preferenceSatisfied: false,
+                selectionAuthority: 'github-copilot',
+                canForcePreference: false,
+                criteria: [],
+                excludedByAuto: [],
+            },
+        });
+        const ctx = mockCtx();
+
+        await cmdModel({ println: ctx.println });
+
+        expect(ctx.output()).toContain('preferência local=gpt-5.4/high');
+        expect(ctx.output()).toContain('último efetivo=claude-haiku-4.5');
     });
 
     it('cmdModel stats usa stats projection', async () => {
@@ -150,6 +190,16 @@ describe('terminal commands config/errors com frontend canônico', () => {
         expect(ctx.output()).toContain('Reasoning ajustado');
         expect(ctx.output()).toContain('reasoning=no');
         expect(ctx.output()).toContain('Último modelo efetivo observado na sessão: claude-haiku-4.5');
+    });
+
+    it('cmdModel auto preserva roteamento nativo e explica preferência advisory', async () => {
+        const ctx = mockCtx();
+
+        await cmdModel({ println: ctx.println }, 'auto');
+
+        expect(setTerminalModelProjection).toHaveBeenCalledWith('auto');
+        expect(ctx.output()).toContain('Auto usa roteamento nativo do Copilot');
+        expect(ctx.output()).toContain('gpt-5.4/high');
     });
 
     it('cmdErrors usa projection de erros do frontend', () => {

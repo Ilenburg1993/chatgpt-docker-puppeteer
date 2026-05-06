@@ -142,5 +142,17 @@ describe('presentation/runtime-sdk-session', () => {
         expect(projection.freshness).toEqual({ isStale: false, reason: 'ok', recommendedAction: 'none' });
         expect(projection.instructionSources).toEqual({ sources: [{ type: 'system', origin: 'sdk' }] });
         expect(projection.instructionSourcesError).toBeNull();
+        const unified = /** @type {Record<string, unknown>} */ (projection.projection);
+        const unifiedStatus = /** @type {{ effectiveMode?: string }} */ (unified['status']);
+        const unifiedSession = /** @type {{ id?: string; available?: boolean }} */ (unified['session']);
+        const unifiedSources = /** @type {{ value?: unknown }} */ (unified['instructionSources']);
+        const unifiedOwnership = /** @type {{ policyOwner?: string }} */ (unified['ownership']);
+
+        expect(unifiedStatus.effectiveMode).toBe('append');
+        expect(unifiedSession).toEqual({ id: 'sdk-default', available: true });
+        expect(unifiedSources.value).toEqual({
+            sources: [{ type: 'system', origin: 'sdk' }],
+        });
+        expect(unifiedOwnership.policyOwner).toBe('config/system-prompt');
     });
 });

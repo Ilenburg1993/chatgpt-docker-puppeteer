@@ -158,6 +158,12 @@ vi.mock('#copilot/agent', () => ({
     readRuntimeControlState: readMockRuntimeControlState,
     readRuntimeInteractionState: readMockRuntimeInteractionState,
     readRuntimePrBudgetSnapshot: readMockRuntimePrBudgetSnapshot,
+    readRuntimeAutoModelPolicy: (/** @type {typeof defaultRuntime} */ runtime) => ({
+        configuredModel: runtime.model,
+        observedModel: runtime.lastPrInfo?.effectiveModel ?? runtime.lastPrInfo?.model ?? null,
+        selectionAuthority: 'github-copilot',
+        canForcePreference: false,
+    }),
     answerRuntimePendingQuestion: (/** @type {typeof defaultRuntime} */ runtime, /** @type {string} */ answer) =>
         runtime.answerPendingQuestion?.(answer) ?? false,
     clearRuntimePendingQuestionShadow: (/** @type {typeof defaultRuntime} */ runtime) =>

@@ -781,6 +781,31 @@ describe('hooks/session-lifecycle › createSessionHooks', () => {
         delete process.env['COPILOT_FALLBACK_MODEL'];
     });
 
+    it('onErrorOccurred: não agenda fallback quando o SDK indica limite de sessão', () => {
+        process.env['COPILOT_FALLBACK_MODEL'] = 'gpt-3.5-turbo';
+        let scheduled = null;
+        let emitted = false;
+        const ctx = makeCtx({
+            scheduleFallback: (/** @type {string} */ m) => {
+                scheduled = m;
+            },
+            emit: () => {
+                emitted = true;
+            },
+        });
+        const { onErrorOccurred } = createSessionHooks(ctx);
+        onErrorOccurred(
+            errorInput({
+                error: "You've hit your rate limit. Please wait for your limit to reset in 18 minutes.",
+                errorContext: 'rate_limit',
+            }),
+            { sessionId: 'sess' },
+        );
+        assert.strictEqual(scheduled, null);
+        assert.strictEqual(emitted, true);
+        delete process.env['COPILOT_FALLBACK_MODEL'];
+    });
+
     it('onErrorOccurred: retorna retry para erro recuperável', async () => {
         const ctx = makeCtx();
         const { onErrorOccurred } = createSessionHooks(ctx);

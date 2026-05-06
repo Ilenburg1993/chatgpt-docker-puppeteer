@@ -175,9 +175,10 @@ describe('agent-messaging › answerPendingQuestion', () => {
         const ctx = new AgentContext(emitter);
         ctx.pendingQuestion = null;
 
-        const handler = /** @type {{ handler: (args: { question: string }) => Promise<any> }} */ (requestUserInputTool)
-            .handler;
-        const pending = handler({ question: 'Qual próximo passo?' });
+        const handler = /** @type {(args: { question: string }, context?: unknown) => Promise<any>} */ (
+            /** @type {unknown} */ (requestUserInputTool.handler)
+        );
+        const pending = handler({ question: 'Qual próximo passo?' }, {});
 
         const result = answerPendingQuestion(ctx, emitter, 'seguir backlog');
         assert.equal(result, true);

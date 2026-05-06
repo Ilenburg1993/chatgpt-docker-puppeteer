@@ -225,6 +225,12 @@ vi.mock('#copilot/agent', () => ({
         model: runtime.model,
         reasoningEffort: runtime.reasoningEffort,
     }),
+    readRuntimeAutoModelPolicy: (/** @type {any} */ runtime) => ({
+        configuredModel: runtime.model,
+        observedModel: runtime.lastPrInfo?.effectiveModel ?? runtime.lastPrInfo?.model ?? null,
+        selectionAuthority: 'github-copilot',
+        canForcePreference: false,
+    }),
     setRuntimeModel: (/** @type {any} */ runtime, /** @type {string} */ modelId) => runtime.setModel(modelId),
     setRuntimeReasoningEffort: (/** @type {any} */ runtime, /** @type {any} */ effort) =>
         runtime.setReasoningEffort(effort),

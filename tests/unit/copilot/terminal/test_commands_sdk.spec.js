@@ -70,6 +70,7 @@ import {
     clearTerminalUserInputs,
     recordTerminalElicitationPending,
     recordTerminalPermissionCompleted,
+    recordTerminalPermissionModeChanged,
     recordTerminalPermissionRequested,
     recordTerminalUserInputRequested,
 } from '../../../../src/copilot/terminal/sdk-interactions.js';
@@ -365,5 +366,24 @@ describe('terminal/commands/sdk', () => {
         await cmdPermission({ println: set.println }, 'mode audit_only');
         expect(agentRuntimeMocks.setTerminalRuntimePermissionMode).toHaveBeenCalledWith('audit_only', null);
         expect(set.output()).toContain('Permission mode atualizado');
+    });
+
+    it('/permission cockpit exibe pendências por tipo e histórico de mode changes', async () => {
+        recordTerminalPermissionRequested({ requestId: 'perm-a', permissionType: 'file_write' });
+        recordTerminalPermissionRequested({ requestId: 'perm-b', permissionType: 'file_write' });
+        recordTerminalPermissionRequested({ requestId: 'perm-c', permissionType: 'shell' });
+        recordTerminalPermissionModeChanged({ mode: 'audit_only', ts: Date.now() - 2000 });
+        recordTerminalPermissionModeChanged({ mode: 'selective', ts: Date.now() - 1000 });
+
+        const ctx = mockCtx();
+        await cmdPermission({ println: ctx.println }, 'cockpit');
+
+        expect(ctx.output()).toContain('Permission cockpit');
+        expect(ctx.output()).toContain('pendentes');
+        expect(ctx.output()).toContain('file_write=2');
+        expect(ctx.output()).toContain('shell=1');
+        expect(ctx.output()).toContain('mode log');
+        expect(ctx.output()).toContain('selective');
+        expect(ctx.output()).toContain('/permission pending');
     });
 });

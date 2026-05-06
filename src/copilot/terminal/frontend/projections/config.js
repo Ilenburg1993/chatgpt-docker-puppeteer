@@ -5,6 +5,7 @@
 
 import {
     listRuntimeAvailableModelsProjection,
+    readRuntimeAutoModelPolicyProjection,
     readRuntimeModelMetadata,
     readRuntimeModelStatsProjection,
     setRuntimeModelProjection,
@@ -32,6 +33,14 @@ import { readTerminalRuntimeBase } from './shared.js';
  *         supportsReasoning?: boolean;
  *         supportsVision?: boolean;
  *     } | null;
+ *     autoModelPolicy: ReturnType<typeof readRuntimeAutoModelPolicyProjection>;
+ *     observedModelMeta: {
+ *         costTier?: string;
+ *         speedTier?: string;
+ *         contextWindow?: number;
+ *         supportsReasoning?: boolean;
+ *         supportsVision?: boolean;
+ *     } | null;
  *     binding: { hubSessionId: string | null; sdkSessionId: string | null };
  *     requestedRuntimeId: string | null;
  *     runtimeId: string;
@@ -46,6 +55,7 @@ export function readTerminalConfigProjection(runtimeId) {
     const base = readTerminalRuntimeBase(runtimeId);
     const currentModel = String(base.model ?? base.snap['model'] ?? 'unknown');
     const currentReasoningEffort = String(base.reasoningEffort ?? base.snap['reasoningEffort'] ?? 'off');
+    const autoModelPolicy = readRuntimeAutoModelPolicyProjection(base.runtimeId);
     return {
         currentModel,
         currentReasoningEffort,
@@ -53,6 +63,8 @@ export function readTerminalConfigProjection(runtimeId) {
         sdkPlanOperation: getLastSdkPlanOperation(),
         sdkPlanChangedAt: getLastSdkPlanChangedAt(),
         modelMeta: readRuntimeModelMetadata(currentModel),
+        autoModelPolicy,
+        observedModelMeta: autoModelPolicy.observedModel ? readRuntimeModelMetadata(autoModelPolicy.observedModel) : null,
         binding: base.binding,
         requestedRuntimeId: base.requestedRuntimeId,
         runtimeId: base.runtimeId,

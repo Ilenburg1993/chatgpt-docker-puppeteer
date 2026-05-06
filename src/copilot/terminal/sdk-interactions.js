@@ -21,6 +21,8 @@ import {
 
 /** @typedef {'pending' | 'completed' | 'cleared'} SdkInteractionStatus */
 
+/** @typedef {{ mode: 'approve_all' | 'audit_only' | 'selective'; ts: number }} TerminalPermissionModeEntry */
+
 /** @typedef {'question' | 'ready' | 'reply' | 'stopped'} TerminalSdkUserInputKind */
 
 /**
@@ -84,6 +86,9 @@ const _permissions = new Map();
 
 /** @type {string | null} */
 let _latestPermissionId = null;
+
+/** @type {TerminalPermissionModeEntry[]} */
+const _permissionModeHistory = [];
 
 /** @type {Map<string, TerminalSdkUserInputEntry>} */
 const _userInputs = new Map();
@@ -292,6 +297,41 @@ export function readTerminalPermissionSummary() {
 }
 
 /**
+ * @param {unknown} mode
+ * @returns {'approve_all' | 'audit_only' | 'selective'}
+ */
+function normalizePermissionMode(mode) {
+    if (mode === 'audit_only' || mode === 'selective') return mode;
+    return 'approve_all';
+}
+
+/**
+ * @param {unknown} evt
+ * @returns {TerminalPermissionModeEntry}
+ */
+export function recordTerminalPermissionModeChanged(evt) {
+    const data = objectOrNull(evt) ?? {};
+    const entry = {
+        mode: normalizePermissionMode(data['mode']),
+        ts: typeof data['ts'] === 'number' && Number.isFinite(data['ts']) ? data['ts'] : Date.now(),
+    };
+    _permissionModeHistory.unshift(entry);
+    if (_permissionModeHistory.length > 30) {
+        _permissionModeHistory.length = 30;
+    }
+    return entry;
+}
+
+/**
+ * @param {{ limit?: number }} [opts]
+ * @returns {TerminalPermissionModeEntry[]}
+ */
+export function listTerminalPermissionModeHistory(opts = {}) {
+    const limit = typeof opts.limit === 'number' && Number.isFinite(opts.limit) && opts.limit > 0 ? opts.limit : 5;
+    return _permissionModeHistory.slice(0, limit);
+}
+
+/**
  * @param {unknown} evt
  * @returns {TerminalSdkUserInputEntry}
  */
@@ -374,6 +414,7 @@ export function clearTerminalUserInputs() {
 export function clearTerminalPermissions() {
     _permissions.clear();
     _latestPermissionId = null;
+    _permissionModeHistory.length = 0;
 }
 
 /**

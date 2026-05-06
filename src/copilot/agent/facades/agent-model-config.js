@@ -9,7 +9,7 @@
  * @see EventBus
  */
 
-import { listModels, modelRegistry, modelStatsTracker } from '#copilot/sdk';
+import { describeAutoModelPolicy, listModels, modelRegistry, modelStatsTracker } from '#copilot/sdk';
 import { toError } from '../../core/error-handlers.js';
 import { log } from '../ports/logging-port.js';
 import { trySetLiveSessionModel } from '../runtime-contracts.js';
@@ -52,7 +52,12 @@ export function getModel(ctx) {
 export function setModel(ctx, modelId) {
     ctx.setModel(modelId);
     const reasoningEffort = ctx.getReasoningEffortSnapshot();
-    trySetLiveSessionModel(ctx.getSessionSnapshot(), modelId, 'AlwaysAlive', { reasoningEffort });
+    trySetLiveSessionModel(
+        ctx.getSessionSnapshot(),
+        modelId,
+        'AlwaysAlive',
+        modelId === 'auto' ? undefined : { reasoningEffort },
+    );
     const previousPrInfo = ctx.getLastPrInfoSnapshot?.() ?? null;
     const previousEffectiveModel =
         typeof previousPrInfo?.effectiveModel === 'string' ? previousPrInfo.effectiveModel : undefined;
@@ -76,6 +81,40 @@ export function setModel(ctx, modelId) {
             description: 'Persist current runtime model after operator change',
         },
     );
+}
+
+/**
+ * Explica a política local de `model="auto"` sem assumir controle do roteamento interno do Copilot.
+ *
+ * @param {import('../types.js').IAlwaysAliveAgent} runtime
+ * @returns {ReturnType<typeof describeAutoModelPolicy>}
+ */
+export function readRuntimeAutoModelPolicy(runtime) {
+    const selection = readRuntimeModelSelection(runtime);
+    const snap = readAgentRuntimeStatusSnapshot(runtime);
+    const runtimeWithPrInfo = /** @type {{
+        getLastPrInfoSnapshot?: () => Record<string, unknown> | null;
+        lastPrInfo?: Record<string, unknown> | null;
+    }} */ (runtime);
+    const explicitPrInfo =
+        typeof runtimeWithPrInfo.getLastPrInfoSnapshot === 'function'
+            ? runtimeWithPrInfo.getLastPrInfoSnapshot()
+            : (runtimeWithPrInfo.lastPrInfo ?? null);
+    const lastPrInfo =
+        explicitPrInfo ??
+        (snap['lastPrInfo'] && typeof snap['lastPrInfo'] === 'object'
+            ? /** @type {Record<string, unknown>} */ (snap['lastPrInfo'])
+            : null);
+    const observedModel =
+        typeof lastPrInfo?.['effectiveModel'] === 'string'
+            ? lastPrInfo['effectiveModel']
+            : typeof lastPrInfo?.['model'] === 'string'
+              ? lastPrInfo['model']
+              : null;
+    return describeAutoModelPolicy({
+        configuredModel: selection.model,
+        observedModel,
+    });
 }
 
 /**

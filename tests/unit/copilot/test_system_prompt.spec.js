@@ -14,6 +14,7 @@ describe('system-prompt › exportações do módulo', () => {
         assert.ok(typeof m.buildAlwaysAliveSystemMessage === 'function');
         assert.ok(typeof m.buildLiveSystemMessage === 'function');
         assert.ok(typeof m.getSystemPromptSdkCompatibility === 'function');
+        assert.ok(typeof m.buildSystemPromptPublicProjection === 'function');
         assert.ok(typeof m.readSystemPromptStatus === 'function');
         assert.ok(typeof m.readResolvedSystemPromptUserConfigSync === 'function');
     });

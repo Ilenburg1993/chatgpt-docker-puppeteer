@@ -12,6 +12,12 @@ vi.mock('#copilot/agent', () => ({
     readRuntimeModelSelection: vi.fn(() => ({ model: 'gpt-5-mini', reasoningEffort: 'high' })),
     readSdkModelMetadata: vi.fn(() => ({ supportsReasoning: true })),
     readSdkModelStats: vi.fn(() => ({ total: 1 })),
+    readRuntimeAutoModelPolicy: vi.fn(() => ({
+        configuredModel: 'gpt-5-mini',
+        observedModel: null,
+        selectionAuthority: 'github-copilot',
+        canForcePreference: false,
+    })),
     setRuntimeModel: vi.fn(),
     setRuntimeReasoningEffort: vi.fn(),
     readAgentRuntimeTools: vi.fn(() => ({ ok: true, source: 'registry', count: 1, tools: [{ name: 'read_file' }] })),

@@ -192,6 +192,12 @@ vi.mock('#copilot/agent', () => ({
         prMetrics: runtime.dialogPrMetrics ?? { boots: 0, resumesWithPR: 0, resumesZeroPR: 0, totalPR: 0 },
         lastPrInfo: runtime.lastPrInfo ?? null,
     }),
+    readRuntimeAutoModelPolicy: (/** @type {any} */ runtime) => ({
+        configuredModel: runtime.model,
+        observedModel: runtime.lastPrInfo?.effectiveModel ?? runtime.lastPrInfo?.model ?? null,
+        selectionAuthority: 'github-copilot',
+        canForcePreference: false,
+    }),
     pauseRuntimeDialogLoop: (/** @type {any} */ runtime) => runtime.pauseDialogLoop(),
     resumeRuntimeDialogLoop: (/** @type {any} */ runtime) => runtime.resumeDialogLoop(),
     readAgentSdkSessionMode: (/** @type {any} */ runtime) => runtime.getSdkSessionMode(),

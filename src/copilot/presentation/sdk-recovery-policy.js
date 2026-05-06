@@ -10,6 +10,7 @@
 
 /** @typedef {'rate_limit' | 'quota_exhausted' | 'auth' | 'network' | 'timeout' | 'unknown'} RuntimeSdkErrorKind */
 /** @typedef {'connection' | 'session'} RuntimeSdkRecoveryScope */
+/** @typedef {'session' | 'weekly_model' | 'unknown'} RuntimeSdkRateLimitScope */
 
 /**
  * @typedef {{
@@ -64,6 +65,46 @@ function getRuntimeSdkErrorFingerprint(error) {
         };
     }
     return { code: '', errorType: '', message: lower(error), status: null };
+}
+
+/**
+ * Diferencia os dois limites públicos do Copilot:
+ *
+ * - limite de sessão: precisa aguardar reset;
+ * - limite semanal/modelo: pode ser mitigado com seleção Auto quando a conta ainda tem premium requests.
+ *
+ * Mantém `kind='rate_limit'` estável para retry/reconnect, mas permite uma UX mais correta.
+ *
+ * @param {unknown} error
+ * @returns {RuntimeSdkRateLimitScope}
+ */
+export function classifyRuntimeSdkRateLimitScope(error) {
+    const fp = getRuntimeSdkErrorFingerprint(error);
+    const haystack = `${fp.code} ${fp.errorType} ${fp.message}`;
+
+    if (
+        haystack.includes('weekly') ||
+        haystack.includes('7-day') ||
+        haystack.includes('premium request') ||
+        haystack.includes('premium requests') ||
+        haystack.includes('auto model') ||
+        haystack.includes('model choice') ||
+        haystack.includes('model selection')
+    ) {
+        return 'weekly_model';
+    }
+
+    if (
+        haystack.includes('session limit') ||
+        haystack.includes('wait for your limit to reset') ||
+        haystack.includes('wait until it resets') ||
+        /\breset in \d+/.test(haystack) ||
+        /\breset\s+(?:em|in)\s+\d+/.test(haystack)
+    ) {
+        return 'session';
+    }
+
+    return 'unknown';
 }
 
 /**
@@ -218,12 +259,33 @@ export function describeSdkRecoveryPolicy(policy, error) {
                 actionHint: 'Reautentique o Copilot/GitHub e use /restart para tentar novamente.',
             };
         case 'rate_limit':
+            if (classifyRuntimeSdkRateLimitScope(error) === 'session') {
+                return {
+                    label: '[sdk quota]',
+                    headline: message,
+                    detail:
+                        'Limite de sessão do SDK bloqueou o turno; terminal, HTTP, status e comandos locais seguem disponíveis.',
+                    actionHint:
+                        'Aguarde o reset indicado pelo SDK; /model auto não contorna limite de sessão ativo. Depois do reset, use /restart.',
+                };
+            }
+            if (classifyRuntimeSdkRateLimitScope(error) === 'weekly_model') {
+                return {
+                    label: '[sdk quota]',
+                    headline: message,
+                    detail:
+                        'Limite semanal/modelo do SDK bloqueou o turno; terminal e host local continuam vivos e podem trocar a seleção de modelo.',
+                    actionHint:
+                        'Use /model auto seguido de /restart para delegar a seleção ao Copilot, ou aguarde o reset semanal se precisar de escolha manual.',
+                };
+            }
             return {
                 label: '[sdk quota]',
                 headline: message,
-                detail: 'Rate limit do SDK bloqueou o primeiro turno; terminal, HTTP, status e comandos locais seguem disponíveis.',
+                detail:
+                    'Rate limit do SDK bloqueou o turno; terminal, HTTP, status e comandos locais seguem disponíveis.',
                 actionHint:
-                    'Aguarde o reset indicado pelo SDK ou use /model auto seguido de /restart para uma nova tentativa controlada.',
+                    'Se a mensagem indicar limite semanal/modelo, use /model auto seguido de /restart; se indicar reset de sessão, aguarde o reset.',
             };
         case 'quota_exhausted':
             return {

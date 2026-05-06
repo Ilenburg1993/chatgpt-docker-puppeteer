@@ -9,6 +9,7 @@
  */
 
 /** @typedef {'rate_limit' | 'quota_exhausted' | 'auth' | 'network' | 'timeout' | 'unknown'} SdkErrorKind */
+/** @typedef {'session' | 'weekly_model' | 'unknown'} SdkRateLimitScope */
 
 /** @typedef {'connection' | 'session'} SdkRecoveryScope */
 
@@ -50,6 +51,41 @@ export function getSdkErrorFingerprint(error) {
         };
     }
     return { code: '', errorType: '', message: lower(error), status: null };
+}
+
+/**
+ * Refina `rate_limit` sem mudar a categoria operacional principal.
+ *
+ * @param {unknown} error
+ * @returns {SdkRateLimitScope}
+ */
+export function classifySdkRateLimitScope(error) {
+    const fp = getSdkErrorFingerprint(error);
+    const haystack = `${fp.code} ${fp.errorType} ${fp.message}`;
+
+    if (
+        haystack.includes('weekly') ||
+        haystack.includes('7-day') ||
+        haystack.includes('premium request') ||
+        haystack.includes('premium requests') ||
+        haystack.includes('auto model') ||
+        haystack.includes('model choice') ||
+        haystack.includes('model selection')
+    ) {
+        return 'weekly_model';
+    }
+
+    if (
+        haystack.includes('session limit') ||
+        haystack.includes('wait for your limit to reset') ||
+        haystack.includes('wait until it resets') ||
+        /\breset in \d+/.test(haystack) ||
+        /\breset\s+(?:em|in)\s+\d+/.test(haystack)
+    ) {
+        return 'session';
+    }
+
+    return 'unknown';
 }
 
 /**

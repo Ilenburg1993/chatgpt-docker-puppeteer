@@ -1,6 +1,8 @@
 // @ts-check
 
 import assert from 'node:assert/strict';
+import { EventEmitter } from 'node:events';
+import { createServer } from 'node:http';
 import { afterEach, beforeEach, describe, it } from 'vitest';
 
 import { alwaysAliveAgent, clearAgentRuntimeRegistry, registerAgentRuntime } from '#copilot/agent';
@@ -122,6 +124,17 @@ function createRuntime(sessionId, model) {
 }
 
 /**
+ * @param {string} sessionId
+ * @param {string} model
+ * @returns {any}
+ */
+function createEmitterRuntime(sessionId, model) {
+    const base = createRuntime(sessionId, model);
+    const emitter = new EventEmitter();
+    return Object.assign(emitter, base);
+}
+
+/**
  * @template T
  * @returns {{ promise: Promise<T>; resolve: (value: T) => void; reject: (reason?: unknown) => void }}
  */
@@ -135,6 +148,69 @@ function deferred() {
         reject = rej;
     });
     return { promise, resolve, reject };
+}
+
+/**
+ * @param {string} baseUrl
+ * @param {string} runtimeId
+ * @param {(signal: AbortSignal) => void} onConnected
+ * @returns {Promise<Record<string, unknown>>}
+ */
+async function waitStatusEvent(baseUrl, runtimeId, onConnected) {
+    const controller = new AbortController();
+    const response = await fetch(`${baseUrl}/stream?runtimeId=${encodeURIComponent(runtimeId)}`, {
+        headers: { Accept: 'text/event-stream' },
+        signal: controller.signal,
+    });
+    assert.equal(response.status, 200);
+    assert.ok(response.body);
+
+    const decoder = new TextDecoder();
+    const reader = response.body.getReader();
+    let buf = '';
+    let connected = false;
+
+    try {
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            buf += decoder.decode(value, { stream: true });
+
+            const chunks = buf.split('\n\n');
+            buf = chunks.pop() ?? '';
+
+            for (const chunk of chunks) {
+                const lines = chunk
+                    .split('\n')
+                    .map((line) => line.trimEnd())
+                    .filter(Boolean);
+                const evt =
+                    lines
+                        .find((line) => line.startsWith('event:'))
+                        ?.slice(6)
+                        .trim() ?? 'message';
+                const dataLine =
+                    lines
+                        .find((line) => line.startsWith('data:'))
+                        ?.slice(5)
+                        .trim() ?? '{}';
+                /** @type {Record<string, unknown>} */
+                const data = JSON.parse(dataLine);
+                if (evt === 'connected' && !connected) {
+                    connected = true;
+                    onConnected(controller.signal);
+                }
+                if (evt === 'status') {
+                    controller.abort();
+                    return data;
+                }
+            }
+        }
+    } finally {
+        controller.abort();
+    }
+
+    throw new Error(`Status event não recebido para runtime '${runtimeId}'.`);
 }
 
 describe('copilot-api multi-runtime propagation', () => {
@@ -153,23 +229,24 @@ describe('copilot-api multi-runtime propagation', () => {
 
         const app = express();
         app.use(createCopilotApiRouter());
+        const http = /** @type {any} */ (supertest(app));
 
-        const status = await supertest(app).get('/status?runtimeId=audit').expect(200);
+        const status = await http.get('/status?runtimeId=audit').expect(200);
         assert.equal(status.body.runtimeId, 'audit');
         assert.equal(status.body.requestedRuntimeId, 'audit');
         assert.equal(status.body.runtimeFound, true);
         assert.equal(status.body.sessionId, 'audit-session');
         assert.equal(status.body.model, 'gpt-5');
 
-        const session = await supertest(app).get('/session?runtimeId=audit').expect(200);
+        const session = await http.get('/session?runtimeId=audit').expect(200);
         assert.equal(session.body.runtimeId, 'audit');
         assert.equal(session.body.sessionId, 'audit-session');
 
-        const capabilities = await supertest(app).get('/capabilities?runtimeId=audit').expect(200);
+        const capabilities = await http.get('/capabilities?runtimeId=audit').expect(200);
         assert.equal(capabilities.body.runtimeId, 'audit');
         assert.equal(capabilities.body.capabilities['sdk.session'].details.sessionId, 'audit-session');
 
-        const fallback = await supertest(app).get('/status?runtimeId=missing').expect(200);
+        const fallback = await http.get('/status?runtimeId=missing').expect(200);
         assert.equal(fallback.body.runtimeId, 'default');
         assert.equal(fallback.body.requestedRuntimeId, 'missing');
         assert.equal(fallback.body.runtimeFound, false);
@@ -195,21 +272,15 @@ describe('copilot-api multi-runtime propagation', () => {
         const app = express();
         app.use(express.json());
         app.use(createCopilotApiRouter());
+        const http = /** @type {any} */ (supertest(app));
 
-        const firstDefaultTurn = (async () =>
-            supertest(app).post('/dialog/turn?runtimeId=default').send({ message: 'um' }))();
+        const firstDefaultTurn = (async () => http.post('/dialog/turn?runtimeId=default').send({ message: 'um' }))();
         await defaultStarted.promise;
 
-        const busyDefault = await supertest(app)
-            .post('/dialog/turn?runtimeId=default')
-            .send({ message: 'dois' })
-            .expect(429);
+        const busyDefault = await http.post('/dialog/turn?runtimeId=default').send({ message: 'dois' }).expect(429);
         assert.equal(busyDefault.body.runtimeId, 'default');
 
-        const auditTurn = await supertest(app)
-            .post('/dialog/turn?runtimeId=audit')
-            .send({ message: 'livre' })
-            .expect(200);
+        const auditTurn = await http.post('/dialog/turn?runtimeId=audit').send({ message: 'livre' }).expect(200);
         assert.equal(auditTurn.body.runtimeId, 'audit');
         assert.equal(auditTurn.body.reply, 'audit:livre');
 
@@ -218,5 +289,43 @@ describe('copilot-api multi-runtime propagation', () => {
         assert.equal(firstDefault.status, 200);
         assert.equal(firstDefault.body.runtimeId, 'default');
         assert.equal(firstDefault.body.reply, 'default:um');
+    });
+
+    it('stream entrega eventos isolados por runtimeId', async () => {
+        const defaultRuntime = createEmitterRuntime('default-session', 'gpt-5-mini');
+        const auditRuntime = createEmitterRuntime('audit-session', 'gpt-5');
+
+        registerAgentRuntime(defaultRuntime, 'default');
+        registerAgentRuntime(auditRuntime, 'audit');
+
+        const app = express();
+        app.use(createCopilotApiRouter());
+        const server = createServer(app);
+
+        await new Promise((resolve) => server.listen(0, () => resolve(undefined)));
+        try {
+            const address = server.address();
+            assert.ok(address && typeof address === 'object' && 'port' in address);
+            const baseUrl = `http://127.0.0.1:${address.port}`;
+
+            const defaultConnected = deferred();
+            const auditConnected = deferred();
+
+            const defaultEventPromise = waitStatusEvent(baseUrl, 'default', () => defaultConnected.resolve(undefined));
+            const auditEventPromise = waitStatusEvent(baseUrl, 'audit', () => auditConnected.resolve(undefined));
+
+            await Promise.all([defaultConnected.promise, auditConnected.promise]);
+
+            defaultRuntime.emit('status', {});
+            auditRuntime.emit('status', {});
+
+            const [defaultEvent, auditEvent] = await Promise.all([defaultEventPromise, auditEventPromise]);
+            assert.equal(defaultEvent.runtimeId, 'default');
+            assert.equal(defaultEvent.sourceRuntime, 'default');
+            assert.equal(auditEvent.runtimeId, 'audit');
+            assert.equal(auditEvent.sourceRuntime, 'audit');
+        } finally {
+            await new Promise((resolve, reject) => server.close((err) => (err ? reject(err) : resolve(undefined))));
+        }
     });
 });

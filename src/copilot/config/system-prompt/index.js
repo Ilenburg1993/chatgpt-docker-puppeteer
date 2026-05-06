@@ -44,6 +44,7 @@ export {
     SYSTEM_PROMPT_DEFAULT_OBJECTIVE,
     SYSTEM_PROMPT_DEFAULT_PERSONALITY,
 } from './profile.js';
+export { buildSystemPromptPublicProjection } from './projection.js';
 export { getSystemPromptSdkCompatibility, readSessionInstructionSources } from './sdk-introspection.js';
 export { SECTIONS, SYSTEM_PROMPT_SECTION_FILES, SYSTEM_PROMPT_SECTION_ORDER } from './sections-registry.js';
 export { readSystemPromptStatus, readSystemPromptStatusSync } from './status.js';

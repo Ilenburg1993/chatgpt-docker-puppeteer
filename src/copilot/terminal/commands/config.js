@@ -66,10 +66,28 @@ function resolveObservedModelState(state) {
  */
 export async function cmdModel({ println }, arg) {
     const { runtimeId, arg: cleanArg } = extractRuntimeTarget(arg);
-    const { currentModel: current, modelMeta: meta } = callWithRuntimeTarget(readTerminalConfigProjection, runtimeId);
+    const {
+        currentModel: current,
+        modelMeta: meta,
+        autoModelPolicy,
+    } = callWithRuntimeTarget(readTerminalConfigProjection, runtimeId);
 
     if (!cleanArg || cleanArg.trim() === '') {
         println(`\n  🤖  Modelo ativo: \x1b[36m${current}\x1b[0m`);
+        if (current === 'auto' && autoModelPolicy) {
+            println(
+                `  \x1b[90m    auto: autoridade=GitHub Copilot · preferência local=${autoModelPolicy.preferredModel}/${autoModelPolicy.preferredReasoningEffort} (${autoModelPolicy.canForcePreference ? 'forçável' : 'advisory'})\x1b[0m`,
+            );
+            if (autoModelPolicy.observedModel) {
+                const satisfied =
+                    autoModelPolicy.preferenceSatisfied === true
+                        ? 'preferência atendida'
+                        : autoModelPolicy.preferenceSatisfied === false
+                          ? 'roteamento diferente'
+                          : 'sem conclusão';
+                println(`  \x1b[90m    último efetivo=${autoModelPolicy.observedModel} · ${satisfied}\x1b[0m`);
+            }
+        }
         if (meta) {
             const contextWindowLabel =
                 typeof meta.contextWindow === 'number' ? meta.contextWindow.toLocaleString() : 'n/a';
@@ -139,6 +157,11 @@ export async function cmdModel({ println }, arg) {
     const observed = resolveObservedModelState(runtimeState);
 
     println(`\n  🔄  Modelo configurado: \x1b[90m${previous}\x1b[0m → \x1b[36m${trimmed}\x1b[0m`);
+    if (trimmed === 'auto') {
+        println(
+            '  \x1b[90mAuto usa roteamento nativo do Copilot; gpt-5.4/high é preferência local observável, não parâmetro oficial forçado.\x1b[0m',
+        );
+    }
     if (modelMeta) {
         const ctxLabel = typeof modelMeta.contextWindow === 'number' ? modelMeta.contextWindow.toLocaleString() : 'n/a';
         println(

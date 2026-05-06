@@ -142,6 +142,12 @@ vi.mock('#copilot/agent', () => ({
     readRuntimeControlState: readMockRuntimeControlState,
     readRuntimeInteractionState: readMockRuntimeInteractionState,
     readRuntimePrBudgetSnapshot: readMockRuntimePrBudgetSnapshot,
+    readRuntimeAutoModelPolicy: (/** @type {typeof defaultRuntime} */ runtime) => ({
+        configuredModel: runtime.model,
+        observedModel: runtime.lastPrInfo?.effectiveModel ?? runtime.lastPrInfo?.model ?? null,
+        selectionAuthority: 'github-copilot',
+        canForcePreference: false,
+    }),
     readAgentRuntimeTodoSummaries: vi.fn(async () => []),
     readSdkModelMetadata: () => null,
 }));

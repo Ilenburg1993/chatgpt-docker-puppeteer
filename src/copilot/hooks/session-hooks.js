@@ -18,7 +18,7 @@
 
 import { defaultAuditLog } from '#copilot/audit';
 import { getCopilotFallbackModel } from '#copilot/config';
-import { modelSelector } from '#copilot/sdk';
+import { classifySdkRateLimitScope, modelSelector } from '#copilot/sdk';
 import { hostname } from 'node:os';
 import { createErrorHandler } from './error-handler.js';
 import { log } from './logger.js';
@@ -98,20 +98,28 @@ export function createSessionHooks(ctx) {
 
             const isRateOrQuotaError = input.errorContext === 'rate_limit' || input.errorContext === 'quota';
             if (isRateOrQuotaError) {
-                const currentModel = getModel() ?? 'unknown';
-                const envFallback = getCopilotFallbackModel();
-                const fallbackModel =
-                    envFallback && envFallback !== currentModel
-                        ? envFallback
-                        : (modelSelector.suggestFallback(currentModel)?.id ?? null);
-                if (fallbackModel && fallbackModel !== currentModel) {
+                const rateLimitScope = classifySdkRateLimitScope(input.error);
+                if (rateLimitScope === 'session') {
                     log(
                         'WARN',
-                        `[hooks/session-lifecycle] rate_limit/quota — próxima reconexão usará model fallback: ${fallbackModel}`,
+                        '[hooks/session-lifecycle] rate_limit de sessão — fallback de modelo não será agendado; aguardando reset do SDK.',
                     );
-                    scheduleFallback(fallbackModel);
                 } else {
-                    log('WARN', '[hooks/session-lifecycle] rate_limit/quota sem fallback disponível.');
+                    const currentModel = getModel() ?? 'unknown';
+                    const envFallback = getCopilotFallbackModel();
+                    const fallbackModel =
+                        envFallback && envFallback !== currentModel
+                            ? envFallback
+                            : (modelSelector.suggestFallback(currentModel)?.id ?? null);
+                    if (fallbackModel && fallbackModel !== currentModel) {
+                        log(
+                            'WARN',
+                            `[hooks/session-lifecycle] rate_limit/quota — próxima reconexão usará model fallback: ${fallbackModel}`,
+                        );
+                        scheduleFallback(fallbackModel);
+                    } else {
+                        log('WARN', '[hooks/session-lifecycle] rate_limit/quota sem fallback disponível.');
+                    }
                 }
             }
 

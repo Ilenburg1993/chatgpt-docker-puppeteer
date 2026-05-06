@@ -92,6 +92,7 @@ export {
     readRuntimeControlState,
     readRuntimeGovernanceState,
     readRuntimeInteractionState,
+    readRuntimeAutoModelPolicy,
     readRuntimeModelSelection,
     readRuntimePermissionMode,
     readRuntimePrBudgetSnapshot,

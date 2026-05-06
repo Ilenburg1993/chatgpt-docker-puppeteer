@@ -47,6 +47,7 @@ import {
     recordTerminalElicitationCompleted,
     recordTerminalElicitationPending,
     recordTerminalPermissionCompleted,
+    recordTerminalPermissionModeChanged,
     recordTerminalPermissionRequested,
     recordTerminalUserInputCompleted,
     recordTerminalUserInputRequested,
@@ -271,6 +272,7 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
 
     const onPermissionModeChanged = (/** @type {{ mode?: string }} */ evt) => {
         const mode = typeof evt?.mode === 'string' ? evt.mode : 'approve_all';
+        recordTerminalPermissionModeChanged({ mode, ts: Date.now() });
         recordTerminalActivity('system', 'Modo de permissão alterado', {
             detail: mode,
             source: 'sdk',

@@ -113,7 +113,12 @@ export function cmdStatus({ hubSessionId, injectPort, println }, arg = '') {
         : lifecycle.shutdown
           ? `${lifecycle.shutdown.status === 'ok' ? '\x1b[32m' : '\x1b[31m'}${lifecycle.shutdown.status}\x1b[0m \x1b[90m${lifecycle.shutdown.handlers} handlers · ${lifecycle.shutdown.durationMs}ms${lifecycle.shutdown.failedHandler ? ` · falha=${lifecycle.shutdown.failedHandler}` : ''}\x1b[0m`
           : `\x1b[90mparado · ${lifecycle.registeredShutdownHandlers} handlers registrados\x1b[0m`;
-    const modelMeta = configProjection.modelMeta;
+    const modelMeta = configProjection.modelMeta ?? configProjection.observedModelMeta;
+    const autoPolicy = configProjection.autoModelPolicy;
+    const autoPolicyLine =
+        configProjection.currentModel === 'auto'
+            ? `        auto policy      \x1b[90mpref=${autoPolicy.preferredModel}/${autoPolicy.preferredReasoningEffort} · autoridade=GitHub Copilot · último=${autoPolicy.observedModel ?? 'n/d'}\x1b[0m`
+            : '';
     const modelBilling = projection.modelBilling;
     const display = readTerminalDisplayProjection();
     const activitySeverityColor =
@@ -201,7 +206,7 @@ export function cmdStatus({ hubSessionId, injectPort, println }, arg = '') {
           billing/modelo    ${modelBilling.mismatch ? `\x1b[31mmismatch\x1b[0m \x1b[90m(cfg=${modelBilling.configuredModel ?? '-'} · cobrado=${modelBilling.billedModel ?? '-'})\x1b[0m` : `\x1b[32mok\x1b[0m \x1b[90m(${modelBilling.displayModel})\x1b[0m`}
           custo último PR   \x1b[90m${modelBilling.cost == null ? '(n/d)' : modelBilling.cost.toFixed(4)}\x1b[0m
         perfil modelo    \x1b[90m${modelMeta ? `cost=${modelMeta.costTier ?? 'n/a'} · speed=${modelMeta.speedTier ?? 'n/a'} · ctx=${typeof modelMeta.contextWindow === 'number' ? modelMeta.contextWindow.toLocaleString('pt-BR') : 'n/a'}` : '(sem metadata local)'}\x1b[0m
-  ─────────────────────────────────────
+${autoPolicyLine ? `${autoPolicyLine}\n` : ''}  ─────────────────────────────────────
   workspace        \x1b[90m${ws.cwd}\x1b[0m
   git root         \x1b[90m${ws.gitRoot ?? '(não é git repo)'}\x1b[0m
   branch           ${branchStr}

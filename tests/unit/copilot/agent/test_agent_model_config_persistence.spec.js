@@ -124,4 +124,41 @@ describe('agent/facades/agent-model-config', () => {
             }),
         );
     });
+
+    it('preserva model auto nativo sem enviar reasoningEffort para setModel live', async () => {
+        const { setModel } = await import('../../../../src/copilot/agent/facades/agent-model-config.js');
+        const ctx = {
+            setModel: vi.fn(),
+            getSessionSnapshot: vi.fn(() => ({ sessionId: 'sdk-auto' })),
+            getReasoningEffortSnapshot: vi.fn(() => 'high'),
+            getLastPrInfoSnapshot: vi.fn(() => null),
+            setLastPrInfo: vi.fn(),
+            trackBackgroundTask: vi.fn(() => Promise.resolve()),
+        };
+
+        setModel(/** @type {any} */ (ctx), 'auto');
+
+        expect(ctx.setModel).toHaveBeenCalledWith('auto');
+        expect(trySetLiveSessionModel).toHaveBeenCalledWith({ sessionId: 'sdk-auto' }, 'auto', 'AlwaysAlive', undefined);
+    });
+
+    it('expõe policy Auto com preferência local e último modelo observado', async () => {
+        const { readRuntimeAutoModelPolicy } = await import(
+            '../../../../src/copilot/agent/facades/agent-model-config.js'
+        );
+        const policy = readRuntimeAutoModelPolicy(
+            /** @type {any} */ ({
+                getStatusSnapshot: () => ({ model: 'auto', reasoningEffort: 'high' }),
+                getLastPrInfoSnapshot: () => ({ effectiveModel: 'claude-haiku-4.5' }),
+            }),
+        );
+
+        expect(policy).toMatchObject({
+            configuredModel: 'auto',
+            observedModel: 'claude-haiku-4.5',
+            preferredModel: 'gpt-5.4',
+            preferredReasoningEffort: 'high',
+            canForcePreference: false,
+        });
+    });
 });

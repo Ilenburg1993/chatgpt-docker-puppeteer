@@ -112,6 +112,14 @@ export {
 } from './models/registry.js';
 
 export {
+    COPILOT_AUTO_MODEL_EXCLUDED_CLASSES,
+    COPILOT_AUTO_MODEL_PUBLIC_CRITERIA,
+    DEFAULT_AUTO_MODEL_PREFERENCE,
+    describeAutoModelPolicy,
+    readAutoModelPreference,
+} from './models/auto-policy.js';
+
+export {
     buildReasoningConfig,
     filterEnabledModels,
     filterModels,
@@ -137,6 +145,7 @@ export {
 
 export {
     classifySdkError,
+    classifySdkRateLimitScope,
     getSdkErrorFingerprint,
     getSdkRecoveryPolicy,
     isSdkQuotaOrRateLimitError,

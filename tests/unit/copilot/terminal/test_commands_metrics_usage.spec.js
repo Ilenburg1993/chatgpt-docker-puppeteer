@@ -118,6 +118,12 @@ vi.mock('#copilot/agent', () => ({
         pendingQuestionShadowRemainingMs: null,
     })),
     readRuntimePrBudgetSnapshot: readMockRuntimePrBudgetSnapshot,
+    readRuntimeAutoModelPolicy: (/** @type {typeof defaultRuntime} */ runtime) => ({
+        configuredModel: runtime.model,
+        observedModel: runtime.lastPrInfo?.effectiveModel ?? runtime.lastPrInfo?.model ?? null,
+        selectionAuthority: 'github-copilot',
+        canForcePreference: false,
+    }),
     readAgentRuntimeTodoSummaries: vi.fn(async () => []),
     readSdkModelMetadata: () => null,
     createRuntimeSnapshot: vi.fn(),

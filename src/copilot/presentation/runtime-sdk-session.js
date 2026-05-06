@@ -22,7 +22,11 @@ import {
     setAgentSdkSessionMode as setAgentSdkSessionModeOnAgent,
     updateAgentSdkPlan as updateAgentSdkPlanOnAgent,
 } from '#copilot/agent';
-import { readSessionInstructionSources, readSystemPromptStatus } from '#copilot/config';
+import {
+    buildSystemPromptPublicProjection,
+    readSessionInstructionSources,
+    readSystemPromptStatus,
+} from '#copilot/config';
 import { requireAgentRuntimeSelection } from './agent-runtime.js';
 import { readAgentStatusSnapshot } from './runtime-status.js';
 
@@ -88,6 +92,7 @@ export function resolveAgentSdkActiveSessionEntry(runtimeId, sessionId) {
  *     sessionAvailable: boolean;
  *     instructionSources: unknown | null;
  *     instructionSourcesError: string | null;
+ *     projection: Record<string, unknown>;
  * }>}
  */
 export async function readAgentSdkSystemPromptProjection(runtimeId) {
@@ -112,6 +117,15 @@ export async function readAgentSdkSystemPromptProjection(runtimeId) {
     const systemPrompt = await readSystemPromptStatus();
 
     if (!session) {
+        const projection = buildSystemPromptPublicProjection({
+            systemPrompt,
+            binding,
+            freshness,
+            sessionId,
+            sessionAvailable: false,
+            instructionSources: null,
+            instructionSourcesError: null,
+        });
         return {
             systemPrompt,
             binding,
@@ -120,20 +134,42 @@ export async function readAgentSdkSystemPromptProjection(runtimeId) {
             sessionAvailable: false,
             instructionSources: null,
             instructionSourcesError: null,
+            projection,
         };
     }
 
     try {
+        const instructionSources = await readSessionInstructionSources(session);
+        const projection = buildSystemPromptPublicProjection({
+            systemPrompt,
+            binding,
+            freshness,
+            sessionId,
+            sessionAvailable: true,
+            instructionSources,
+            instructionSourcesError: null,
+        });
         return {
             systemPrompt,
             binding,
             freshness,
             sessionId,
             sessionAvailable: true,
-            instructionSources: await readSessionInstructionSources(session),
+            instructionSources,
             instructionSourcesError: null,
+            projection,
         };
     } catch (error) {
+        const instructionSourcesError = error instanceof Error ? error.message : String(error);
+        const projection = buildSystemPromptPublicProjection({
+            systemPrompt,
+            binding,
+            freshness,
+            sessionId,
+            sessionAvailable: true,
+            instructionSources: null,
+            instructionSourcesError,
+        });
         return {
             systemPrompt,
             binding,
@@ -141,7 +177,8 @@ export async function readAgentSdkSystemPromptProjection(runtimeId) {
             sessionId,
             sessionAvailable: true,
             instructionSources: null,
-            instructionSourcesError: error instanceof Error ? error.message : String(error),
+            instructionSourcesError,
+            projection,
         };
     }
 }

@@ -38,6 +38,7 @@ import {
     getTerminalElicitation,
     getTerminalPermission,
     listTerminalElicitations,
+    listTerminalPermissionModeHistory,
     listTerminalPermissions,
     readTerminalElicitationSummary,
     readTerminalPermissionSummary,
@@ -372,14 +373,23 @@ async function renderSdkQuota({ println }, runtimeId, opts = {}) {
  */
 async function renderSdkSystemPrompt({ println }, runtimeId) {
     const projection = await callWithRuntimeTarget(readTerminalSdkSystemPromptProjection, runtimeId);
-    const status = objectOrNull(projection['systemPrompt']) ?? {};
-    const binding = objectOrNull(projection['binding']) ?? {};
-    const freshness = objectOrNull(projection['freshness']) ?? {};
+    const unified = objectOrNull(projection['projection']) ?? {};
+    const status = objectOrNull(unified['status']) ?? objectOrNull(projection['systemPrompt']) ?? {};
+    const binding = objectOrNull(unified['binding']) ?? objectOrNull(projection['binding']) ?? {};
+    const freshness = objectOrNull(unified['freshness']) ?? objectOrNull(projection['freshness']) ?? {};
+    const session = objectOrNull(unified['session']) ?? {};
+    const sourcesEnvelope = objectOrNull(unified['instructionSources']) ?? {};
     const sections = Array.isArray(status['sections']) ? status['sections'] : [];
     const appendFiles = Array.isArray(status['appendFiles']) ? status['appendFiles'] : [];
-    const sdkCompatibility = objectOrNull(status['sdkCompatibility']) ?? {};
+    const sdkCompatibility =
+        objectOrNull(unified['sdkCompatibility']) ?? objectOrNull(status['sdkCompatibility']) ?? {};
     const revision = objectOrNull(status['revision']) ?? {};
     const limitations = Array.isArray(status['limitations']) ? status['limitations'] : [];
+    const instructionSources = sourcesEnvelope['value'] ?? projection['instructionSources'];
+    const instructionSourcesError = sourcesEnvelope['error'] ?? projection['instructionSourcesError'];
+    const sessionId = typeof session['id'] === 'string' ? session['id'] : projection['sessionId'];
+    const sessionAvailable =
+        typeof session['available'] === 'boolean' ? session['available'] : Boolean(projection['sessionAvailable']);
 
     println('\n  \x1b[36mSystem Prompt SDK\x1b[0m');
     println(
@@ -395,7 +405,7 @@ async function renderSdkSystemPrompt({ println }, runtimeId) {
         `  digest   \x1b[90m${String(revision['digest'] ?? '-')}\x1b[0m  sections=\x1b[33m${sections.length}\x1b[0m  appendFiles=\x1b[33m${appendFiles.length}\x1b[0m`,
     );
     println(
-        `  session  \x1b[90m${String(projection['sessionId'] ?? '-')}\x1b[0m  sources=\x1b[33m${projection['sessionAvailable'] ? 'available' : 'none'}\x1b[0m`,
+        `  session  \x1b[90m${String(sessionId ?? '-')}\x1b[0m  sources=\x1b[33m${sessionAvailable ? 'available' : 'none'}\x1b[0m`,
     );
     println(
         `  binding  \x1b[90m${String(binding['digest'] ?? '-')}\x1b[0m  stale=\x1b[33m${String(Boolean(freshness['isStale']))}\x1b[0m  action=\x1b[33m${String(freshness['recommendedAction'] ?? 'none')}\x1b[0m`,
@@ -412,12 +422,10 @@ async function renderSdkSystemPrompt({ println }, runtimeId) {
         }
     }
 
-    if (projection['instructionSources']) {
-        println(
-            `  \x1b[36mInstruction sources\x1b[0m\n  \x1b[90m${pretty(projection['instructionSources'], 1200)}\x1b[0m`,
-        );
-    } else if (projection['instructionSourcesError']) {
-        println(`  \x1b[33mInstruction sources indisponíveis:\x1b[0m ${String(projection['instructionSourcesError'])}`);
+    if (instructionSources) {
+        println(`  \x1b[36mInstruction sources\x1b[0m\n  \x1b[90m${pretty(instructionSources, 1200)}\x1b[0m`);
+    } else if (instructionSourcesError) {
+        println(`  \x1b[33mInstruction sources indisponíveis:\x1b[0m ${String(instructionSourcesError)}`);
     }
 
     println('');
@@ -722,6 +730,10 @@ export async function cmdPermission({ println }, arg = '') {
             return;
         }
     }
+    if (sub === 'cockpit' || sub === 'panel') {
+        renderPermissionCockpit({ println });
+        return;
+    }
     if (sub === 'clear') {
         const ok = clearTerminalPermission(rest[0] || 'latest');
         println(ok ? '\x1b[32m  Permissão removida da UX local.\x1b[0m' : '\x1b[33m  Permissão não encontrada.\x1b[0m');
@@ -743,7 +755,7 @@ export async function cmdPermission({ println }, arg = '') {
         }
     }
     println(
-        '  \x1b[90mUso: /permission [list|pending|all|show latest|clear <id>|clear all|mode [approve_all|audit_only|selective]|respond <id> <decision> [json]]\x1b[0m',
+        '  \x1b[90mUso: /permission [list|pending|cockpit|all|show latest|clear <id>|clear all|mode [approve_all|audit_only|selective]|respond <id> <decision> [json]]\x1b[0m',
     );
     println('  \x1b[90mPermissões são decididas pelo SDK/hook; este comando é observabilidade operacional.\x1b[0m\n');
 }
@@ -800,4 +812,51 @@ function renderPermissionEntry({ println }, entry) {
         );
     }
     println(`\n  data:\n${pretty(entry.data, 2500)}\n`);
+}
+
+/**
+ * @param {CommandContext} ctx
+ * @returns {void}
+ */
+function renderPermissionCockpit({ println }) {
+    const pending = listTerminalPermissions();
+    const byType = new Map();
+    for (const entry of pending) {
+        const key = entry.permissionType || 'unknown';
+        byType.set(key, (byType.get(key) ?? 0) + 1);
+    }
+    const typeRows = [...byType.entries()].sort((a, b) => b[1] - a[1]);
+    const latest = readTerminalPermissionSummary().latest;
+    const modeChanges = listTerminalPermissionModeHistory({ limit: 4 });
+
+    println('\n  \x1b[36mPermission cockpit\x1b[0m');
+    println(`  pendentes  \x1b[33m${pending.length}\x1b[0m`);
+    if (latest) {
+        println(
+            `  latest     \x1b[90m${latest.id}\x1b[0m ${latest.permissionType}${latest.requestId ? ` � requestId=${latest.requestId}` : ''}`,
+        );
+    } else {
+        println('  latest     \x1b[90m(nenhuma permiss�o observada)\x1b[0m');
+    }
+
+    if (typeRows.length > 0) {
+        println('  por tipo   \x1b[90m' + typeRows.map(([type, count]) => `${type}=${count}`).join(' � ') + '\x1b[0m');
+    } else {
+        println('  por tipo   \x1b[90m(nenhuma pend�ncia)\x1b[0m');
+    }
+
+    if (modeChanges.length > 0) {
+        println('  mode log');
+        for (const item of modeChanges) {
+            println(`    \x1b[90m${new Date(item.ts).toLocaleTimeString('pt-BR')}\x1b[0m  ${item.mode}`);
+        }
+    } else {
+        println('  mode log   \x1b[90m(sem mudan�as recentes no runtime local)\x1b[0m');
+    }
+
+    println('  quick      \x1b[90m/permission pending � /permission show latest � /permission mode selective\x1b[0m');
+    if (latest?.requestId && latest.status === 'pending') {
+        println(`  quick      \x1b[90m/permission respond ${latest.id} approve-once\x1b[0m`);
+    }
+    println('');
 }

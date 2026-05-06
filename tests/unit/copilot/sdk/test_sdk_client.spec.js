@@ -111,7 +111,7 @@ vi.mock('@github/copilot-sdk', () => {
     };
 });
 
-import { getSdkRecoveryPolicy } from '../../../../src/copilot/sdk/errors.js';
+import { classifySdkRateLimitScope, getSdkRecoveryPolicy } from '../../../../src/copilot/sdk/errors.js';
 import { listModels } from '../../../../src/copilot/sdk/models/helpers.js';
 import {
     _injectClientForTest,
@@ -261,6 +261,21 @@ describe('sdk/errors › getSdkRecoveryPolicy', () => {
             kind: 'auth',
             tripCircuit: false,
         });
+    });
+
+    it('refina rate_limit entre sessão e semanal/modelo sem alterar kind operacional', () => {
+        expect(
+            classifySdkRateLimitScope({
+                status: 429,
+                message: "You've hit your rate limit. Please wait for your limit to reset in 18 minutes.",
+            }),
+        ).toBe('session');
+        expect(
+            classifySdkRateLimitScope({
+                status: 429,
+                message: 'You have reached your weekly rate limit. Please switch to auto model.',
+            }),
+        ).toBe('weekly_model');
     });
 
     it('classifica network/timeout como transitórios com backoff', () => {
