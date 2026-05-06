@@ -125,6 +125,35 @@ existentes em `DOCUMENTAÇÃO/`, com foco em responder de forma sistemática e c
 | 105   | `105-CHECKPOINT-E3-TIMELINE-SYNC-LAZY-2026-05-04.md`                   | checkpoint da segunda transformação E3: cauda viva da timeline sincronizada lazy no Hub                 |
 | 106   | `106-FECHAMENTO-E3-TIMELINE-SEM-RESIDUOS-2026-05-04.md`                | fechamento total dos resíduos associados à timeline unificada E3                                        |
 
+## Rodada viva 2026-05-06
+
+Documentos adicionados/atualizados nesta rodada:
+
+- `2026-05-05-ROADMAP-PERMISSIONS-END-TO-END.md` — recebeu addendum pós-validação ampla.
+- `2026-05-06-AUDITORIA-GERAL-SRC-COPILOT-FLUXOS-PARALELOS-E-GAPS.md` — auditoria geral atual com
+  bugs/gaps corrigidos, fluxos paralelos remanescentes e evidência de validação.
+- `2026-05-06-ROADMAP-CONVERGENCIA-GERAL-SRC-COPILOT-2.2.md` — roadmap 2.2 expandindo permissions
+  para SDK RPC, system prompt, terminal, SSE, elicitation, `ask_user`, hotspots e multi-runtime.
+- `2026-05-06-VALIDACAO-FLUXO-CANONICO-2.2-ELICITATION-E-USER-INPUT.md` — checkpoint factual da
+  convergência de `elicitation` + `user_input` para surface canônica do SDK.
+- `2026-05-06-VALIDACAO-LIVE-TERMINAL-LLM-B-COMUNICACAO.md` — validação live do `terminal:llm-b`,
+  comandos REPL, health/config HTTP e limitação externa por rate limit.
+- Rodada complementar sem hotspots: padronização de permission decision kinds pelo pacote direto
+  `@github/copilot-sdk@0.3.0`, validação de `/permission respond`, remoção de duplicidade SSE em
+  `permission.mode_changed` e poda de helpers paralelos de system prompt no adapter HTTP.
+- Rodada complementar seguinte: `hooks/elicitation.js` e `hooks/user-input.js` viraram compat
+  layers; o owner semântico passou a ser `sdk/session/elicitation.js` e `sdk/session/user-input.js`.
+- Rodada complementar atual: `terminal/sdk-interactions.js` alinhou taxonomia de `ask_user` ao
+  `DialogProtocol` (`question|ready|reply|stopped`) e `agent/messaging/answerPendingQuestion()`
+  passou a tratar `request_user_input` como fallback canônico sem abrir uma segunda borda HTTP.
+- Rodada complementar atual (permissions P2): `/permission pending` passou a consultar listagem
+  ativa via SDK RPC quando disponível, com fallback explícito para estado observado local quando o
+  namespace `permissions` não expõe listagem.
+- Rodada live atual: `/permission pending` também hidrata o estado local com requests vindos do RPC,
+  preservando `/permission respond <id>` como borda única; `terminal:llm-b` bootou e respondeu
+  `/status`, `/sdk waits`, `/permission pending`, `/health` e `/config` sob bloqueio externo de rate
+  limit.
+
 ## Próximos documentos previstos
 
 Os artefatos planejados para a auditoria ampla estão listados no documento 00, mas a espinha dorsal
