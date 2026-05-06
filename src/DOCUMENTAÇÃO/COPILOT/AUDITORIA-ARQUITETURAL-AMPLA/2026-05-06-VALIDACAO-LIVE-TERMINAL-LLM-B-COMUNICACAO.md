@@ -55,6 +55,15 @@ Impacto:
 - comunicação local/HTTP/REPL permaneceu íntegra;
 - o terminal preservou operação em `NOLOOP` e não entrou em restart loop.
 
+Atualização 2026-05-06:
+
+- esse erro foi classificado como limite de sessão, não como limite semanal/modelo;
+- o terminal/recovery policy agora deixa explícito que `/model auto` não contorna limite de sessão
+  ativo;
+- fallback automático de modelo não é mais agendado quando a mensagem do SDK indica aguardar reset;
+- `/model auto` segue recomendado apenas quando a mensagem indicar limite semanal/modelo, alinhado
+  à política oficial do Copilot.
+
 ## 5) Correções aplicadas a partir da auditoria live
 
 - `/permission pending` passou a hidratar o estado local do terminal com requests vindos do RPC
@@ -85,4 +94,80 @@ Pendente por bloqueio externo:
 - `npm run typecheck:strict:src.copilot`: verde.
 - `npm run lint`: verde.
 - `npm run check:copilot:guardrails`: verde.
-- `npm run test:copilot:unit`: verde (`145` arquivos, `2.416` testes).
+- `npm run test:copilot:unit`: verde (`146` arquivos, `2.426` testes).
+
+## 8) Reteste live 2026-05-06 — Auto model funcional
+
+Comando executado:
+
+```bash
+npm run terminal:llm-b
+```
+
+Comandos/ações validados:
+
+- `/status`
+- `/sdk quota`
+- turno curto: `Responda exatamente: OK-LIVE`
+- `GET http://127.0.0.1:3009/health`
+- `GET http://127.0.0.1:3009/config`
+- `/exit`
+
+Resultado factual:
+
+- boot completo em standalone;
+- `GET /health` retornou `ok=true`, `healthStatus=healthy`, boot `13/13`;
+- `GET /config` retornou `ok=true`, runtime default, `model="auto"` e prompt freshness `ok`;
+- `model="auto"` foi preservado como configuração e o SDK roteou para `claude-haiku-4.5`;
+- `/sdk quota` respondeu snapshots de `chat`, `completions` e `premium_interactions`;
+- houve warning de quota semanal baixa (`weekly remaining=0.0%`, reset em `2026-05-11`), mas o
+  turno curto funcionou via seleção Auto;
+- resposta live recebida em cerca de `2.3s`, confirmando canal conversacional, rendering e retorno
+  ao prompt;
+- o processo foi encerrado via `/exit`.
+
+Sinal importante:
+
+- o comportamento observado confirma a hipótese operacional: `Auto` pode manter um caminho
+  permitido quando a escolha manual/modelo premium está limitada, mas isso é diferente de limite de
+  sessão com mensagem de aguardar reset.
+
+## 9) Reteste live 2026-05-06 — policy Auto e metadata observada
+
+Comandos/ações validados:
+
+- `/model`
+- `/model list`
+- `/model gpt-5.4`
+- `/model auto`
+- turno curto: `Responda exatamente: OK-AUTO-POLICY`
+- turno curto pós-correção: `Responda exatamente: OK-USAGE-NORMALIZED`
+- `/status`
+- `GET http://127.0.0.1:3009/health`
+- `GET http://127.0.0.1:3009/config`
+- `/exit`
+
+Resultado factual:
+
+- `/model` em `auto` passou a exibir policy Auto: autoridade GitHub Copilot, preferência local
+  `gpt-5.4/high`, último modelo observado e status de satisfação da preferência;
+- `/model list` retornou `auto`, modelos Claude disponíveis e modelos GPT incluindo `gpt-5.4`;
+- `/model gpt-5.4` configurou preferência local, mas o SDK live não confirmou convergência da
+  sessão para o modelo concreto; a sessão permaneceu observada como `auto`;
+- `/model auto` restaurou explicitamente roteamento nativo do Copilot e informou que
+  `gpt-5.4/high` é preferência observável, não parâmetro oficial forçado;
+- o turno `OK-AUTO-POLICY` completou com roteamento real para `claude-haiku-4.5`;
+- após correção de `usage`, o turno `OK-USAGE-NORMALIZED` preservou no `/status` o modelo concreto
+  cobrado/observado;
+- `/status` passou a mostrar metadata do modelo observado (`cost=medium`, `speed=fast`,
+  `ctx=200.000`) mesmo com `model=auto`;
+- `GET /health` permaneceu saudável e `GET /config` continuou projetando runtime default com
+  `model=auto`.
+
+Conclusão:
+
+- a borda live Codex ↔ terminal ↔ LLM-B ↔ usuário está estável para comandos locais, HTTP e turnos
+  curtos sob `Auto`;
+- a seleção `Auto` é utilizável e auditável;
+- não há evidência de preferência vinculante `Auto + gpt-5.4/high` no SDK atual; a implementação
+  correta é observabilidade, não promessa de roteamento.

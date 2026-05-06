@@ -149,6 +149,16 @@ Documentos adicionados/atualizados nesta rodada:
 - Rodada complementar atual (permissions P2): `/permission pending` passou a consultar listagem
   ativa via SDK RPC quando disponível, com fallback explícito para estado observado local quando o
   namespace `permissions` não expõe listagem.
+- Rodada complementar atual (R3 runtime targeting): `/stream` e `/stream/tasks` passaram a rejeitar
+  `runtimeId` explícito inexistente com `404` antes da abertura do SSE, removendo fallback
+  silencioso em superfície operacional.
+- Rodada complementar atual (R5 stream isolation): teste multi-runtime passou a provar isolamento
+  real por `runtimeId` com dois streams SSE simultâneos (`default`/`audit`) sem bleed de eventos
+  cross-runtime.
+- Rodada complementar atual (R2 projection única): `config/system-prompt/projection.js` define
+  envelope público canônico (`status`, `sdkCompatibility`, `binding`, `freshness`, `session`,
+  `instructionSources`, `ownership`) e `runtime-sdk-session`/terminal/server passaram a consumir
+  esse shape com compatibilidade legada.
 - Rodada live atual: `/permission pending` também hidrata o estado local com requests vindos do RPC,
   preservando `/permission respond <id>` como borda única; `terminal:llm-b` bootou e respondeu
   `/status`, `/sdk waits`, `/permission pending`, `/health` e `/config` sob bloqueio externo de rate

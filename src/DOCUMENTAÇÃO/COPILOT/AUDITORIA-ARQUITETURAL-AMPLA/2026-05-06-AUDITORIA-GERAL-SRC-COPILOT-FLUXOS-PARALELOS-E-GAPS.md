@@ -29,7 +29,11 @@ module maps.
 | GAP-2026-05-06-11 | Médio      | Permission pending active list | `/permission pending` ainda dependia exclusivamente de estado observado local, sem consulta ativa via sessão SDK quando disponível.                         | Corrigido |
 | BUG-2026-05-06-12 | Médio      | Permission RPC → terminal UX   | `/permission pending` exibia requests vindos do RPC ativo, mas não hidratava o estado local; `/permission respond <id>` podia falhar para request RPC-only. | Corrigido |
 | GAP-2026-05-06-13 | Baixo      | Elicitation ownership docs     | JSDoc/provider em `agent/*` ainda apontavam `hooks/elicitation` como owner mesmo após a promoção para `sdk/session/elicitation.js`.                         | Corrigido |
-
+| GAP-2026-05-06-14 | Médio      | Permission cockpit operacional | Faltava cockpit curto no terminal para consolidar modo atual, últimas mudanças de mode e pendências por tipo com ações rápidas.                             | Corrigido |
+| GAP-2026-05-06-15 | Médio      | HTTP `/answer` fallback tool   | Faltava teste de integração HTTP garantindo que `/answer` cobre fallback `request_user_input` sem `ask_user` vivo.                                          | Corrigido |
+| GAP-2026-05-06-16 | Médio      | Stream runtime targeting       | `/stream` e `/stream/tasks` podiam abrir SSE com fallback default mesmo com `runtimeId` explícito inexistente, mascarando erro de targeting operacional.    | Corrigido |
+| GAP-2026-05-06-17 | Médio      | System prompt projection drift | Status/freshness/binding/compat/instruction sources eram consumidos por shapes fragmentados entre terminal/server/presentation sem envelope público único.  | Corrigido |
+| GAP-2026-05-06-18 | Alto       | Stream runtime isolation proof | Faltava prova executável de que streams simultâneos em runtimes diferentes não vazam eventos entre si.                                                      | Corrigido |
 ### Correções aplicadas
 
 - Criada a façade SDK `instructionSourcesGet(session)` em `sdk/rpc/session.js`.
@@ -71,9 +75,32 @@ module maps.
   RPC quando disponível, fallback explícito para estado observado local quando indisponível.
 - `/permission pending` agora também hidrata o estado local do terminal com requests vindos do RPC
   ativo, mantendo `/permission respond <id>` como a única borda operacional de resolução.
+- `terminal/sdk-interactions.js` passou a manter histórico local de `permission.mode_changed`
+  (`listTerminalPermissionModeHistory`) para governança operacional do terminal.
+- `terminal/commands/sdk.js` passou a expor `/permission cockpit` com agregação por tipo, latest
+  request, mode log e quick actions.
 - JSDoc/provider de `agent/context-factories.js`, `agent/types.js` e `agent/always-alive.js` foram
   alinhados para `sdk/session/elicitation.js`, removendo o último sinal documental de ownership em
   `hooks/elicitation`.
+- Teste HTTP de integração adicionado em
+  `tests/unit/copilot/test_copilot_api_answer_fallback.spec.js` validando `/answer` quando
+  `answerPendingQuestion()` resolve via `request_user_input` fallback (`resolvedViaTool=true`).
+- `server/routes/copilot-api/stream.js` passou a validar targeting estrito e retornar `404` quando
+  `requestedRuntimeId` explícito não existe, antes de abrir conexão SSE.
+- Teste dedicado adicionado em
+  `tests/unit/copilot/test_copilot_api_stream_runtime_targeting.spec.js` cobrindo `/stream` e
+  `/stream/tasks` com runtime ausente.
+- `tests/unit/copilot/test_copilot_api_multi_runtime.spec.js` passou a validar isolamento real de
+  SSE por runtime: dois streams paralelos (`default` e `audit`) recebem apenas eventos emitidos no
+  emitter do runtime correspondente, com `runtimeId`/`sourceRuntime` correlacionados.
+- `config/system-prompt/projection.js` passou a definir envelope público único de projection
+  (`status`, `sdkCompatibility`, `binding`, `freshness`, `session`, `instructionSources`,
+  `ownership`, `revision`) e `presentation/runtime-sdk-session.js` passou a retornar esse envelope em
+  `projection` sem quebrar campos legados.
+- `terminal/commands/sdk.js` passou a consumir preferencialmente `projection` com fallback para os
+  campos legados (`systemPrompt`, `binding`, `freshness`, `instructionSources`).
+- `server/routes/sdk/deps.js` alinhou o fallback para retornar a mesma estrutura de `projection`
+  quando a implementação principal estiver indisponível.
 - A divergência aparente com o pacote transitivo `@github/copilot` foi descartada: a fonte canônica
   deste projeto é o pacote direto `@github/copilot-sdk@0.3.0`, onde `approve-once`/`reject` seguem
   sendo o contrato de `PermissionRequestResult`.
@@ -198,6 +225,25 @@ Rodada complementar de convergência em permissions pending (SDK-first):
 
 Resultado factual adicional: verde (`112` testes passando).
 
+Rodada complementar de runtime targeting em streams operacionais:
+
+- `node_modules/.bin/vitest run --config vitest.copilot.config.js` com:
+  - `tests/unit/copilot/test_copilot_api_stream_runtime_targeting.spec.js`
+  - `tests/unit/copilot/test_copilot_api_multi_runtime.spec.js`
+  - `tests/unit/copilot/test_copilot_api_answer_fallback.spec.js`
+  - `tests/unit/copilot/terminal/test_commands_sdk.spec.js`
+
+Resultado factual: verde (`22` testes passando).
+
+Rodada complementar de prova de isolamento SSE por runtime:
+
+- `node_modules/.bin/vitest run --config vitest.copilot.config.js` com:
+  - `tests/unit/copilot/test_copilot_api_multi_runtime.spec.js`
+  - `tests/unit/copilot/test_copilot_api_stream_runtime_targeting.spec.js`
+  - `tests/unit/copilot/test_http_bridge_stream.spec.js`
+
+Resultado factual: verde (`5` testes passando, `1` skipped).
+
 Rodada live terminal/LLM-B e correção RPC-only permissions:
 
 - `npm run terminal:llm-b`: boot completo em modo standalone, `GET /health` e `GET /config`
@@ -216,9 +262,57 @@ Rodada final do turno:
 - `npm run typecheck:strict:src.copilot`: verde.
 - `npm run lint`: verde.
 - `npm run check:copilot:guardrails`: verde.
-- `npm run test:copilot:unit`: verde (`145` arquivos, `2.416` testes).
+- `npm run test:copilot:unit`: verde (`146` arquivos, `2.426` testes).
 
-## 6) Próximo corte recomendado
+## 7) Atualização 2026-05-06 — Auto model e rate limits
+
+Auditoria complementar solicitada sobre o comportamento observado no Copilot vanilla do VS Code:
+
+- Fonte oficial validada: GitHub Copilot distingue limite de sessão e limite semanal de 7 dias.
+  Limite de sessão exige aguardar reset; limite semanal pode continuar com seleção `Auto` quando
+  ainda há premium requests disponíveis.
+- O caminho canônico atual já preserva `model="auto"` até `createSession()`/`resumeSession()` do
+  SDK e omite `reasoningEffort` nesse caso.
+- Gap corrigido: o terminal/recovery policy não deve sugerir `/model auto` como se fosse contorno
+  universal para todo `429`.
+- `presentation/sdk-recovery-policy.js` e `sdk/errors.js` passaram a diferenciar
+  `session`, `weekly_model` e `unknown` como subescopos de rate limit.
+- `hooks/session-hooks.js` deixou de agendar fallback automático quando o SDK informa limite de
+  sessão com reset temporal.
+- Documento dedicado criado:
+  `2026-05-06-AUDITORIA-AUTO-MODEL-E-RATE-LIMIT-COPILOT-SDK.md`.
+
+Nota de governança: não há transformação para evadir rate limit ou burlar termos. A convergência
+implementada maximiza uso permitido via Auto model, fallback explícito, mensagens corretas e
+preservação do host local.
+
+## 7.1) Atualização 2026-05-06 — critérios do `Auto` e preferência `gpt-5.4/high`
+
+Auditoria complementar sobre `model auto`:
+
+- Fonte oficial validada: a seleção `Auto` considera disponibilidade, saúde operacional em tempo
+  real, performance, redução de rate limits/latência/erros, políticas administrativas, plano e
+  exclusão de modelos com multiplicador premium maior que `1`.
+- Inspeção local do SDK confirmou que o contrato público de sessão expõe `model` e
+  `reasoningEffort`, mas não expõe campo público de preferência como `modelPreference`.
+- Implementado contrato local `auto-policy` para projetar critérios oficiais, autoridade
+  `github-copilot`, `canForcePreference=false` e preferência observável `gpt-5.4/high`.
+- `/model`, `/status` e `/config` passaram a carregar essa policy junto com o último modelo
+  efetivo/cobrado observado.
+- Catálogo local de modelos foi atualizado para IDs atuais observados no SDK, incluindo `gpt-5.4`,
+  `gpt-5.3-codex`, `gpt-5.2-codex`, `gpt-5.2`, `gpt-5.4-mini` e `claude-haiku-4.5`.
+- `usage` passou a normalizar `effectiveModel=auto` para o `billedModel` concreto quando
+  disponível, evitando perda de rastreabilidade.
+
+Teste live:
+
+- `npm run terminal:llm-b` com `model=auto` roteou para `claude-haiku-4.5`;
+- `/model gpt-5.4` não teve convergência positiva da sessão SDK live, reforçando que a preferência
+  local não deve ser tratada como controle vinculante do roteador `Auto`;
+- turnos curtos `OK-AUTO-POLICY` e `OK-USAGE-NORMALIZED` completaram e preservaram metadata
+  observada no `/status`.
+
+## 8) Próximo corte recomendado
 
 Próxima fatia de convergência arquitetural, mantendo baixo risco e alta coerência com 2.2:
 
