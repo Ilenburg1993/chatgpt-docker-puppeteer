@@ -34,7 +34,8 @@ import { setSdkMetricEmitter } from '../sdk/telemetry/operation-metrics.js';
 import { setCustomToolsBuilder } from '../sdk/tools/custom.js';
 import { setToolsLogger } from '../tools/logger.js';
 import { setToolsMetrics } from '../tools/metrics-proxy.js';
-import { ERROR_TRACKER, EVENT_COLLECTOR, METRICS_STORE } from './di-tokens.js';
+import { defaultConvergenceTraceStore } from './convergence-trace-store.js';
+import { CONVERGENCE_TRACE_STORE, ERROR_TRACKER, EVENT_COLLECTOR, METRICS_STORE } from './di-tokens.js';
 import { defaultErrorTracker } from './error-tracker.js';
 import { attachObservabilityBusRuntime, detachObservabilityBusRuntime } from './event-bus-runtime.js';
 import { defaultEventCollector } from './event-collector.js';
@@ -82,7 +83,11 @@ function recordIoOperationMetric(message) {
  */
 function emitSdkMetric(metric) {
     const bus = container.has(EVENT_BUS) ? container.resolve(EVENT_BUS) : null;
-    projectSdkOperationMetric(metric, { metrics: defaultMetrics, bus });
+    projectSdkOperationMetric(metric, {
+        metrics: defaultMetrics,
+        bus,
+        convergenceTraceStore: defaultConvergenceTraceStore,
+    });
 }
 
 /**
@@ -136,6 +141,7 @@ export function bootstrapObservability() {
     container.register(METRICS_STORE, () => defaultMetrics, 'singleton');
     container.register(ERROR_TRACKER, () => defaultErrorTracker, 'singleton');
     container.register(EVENT_COLLECTOR, () => defaultEventCollector, 'singleton');
+    container.register(CONVERGENCE_TRACE_STORE, () => defaultConvergenceTraceStore, 'singleton');
 
     // Event Bus global — singleton cross-module
     container.register(EVENT_BUS, () => createEventBus(), 'singleton');

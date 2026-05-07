@@ -97,4 +97,13 @@ describe('terminal/commands/fs', () => {
         expect(write.output()).toContain('FS local escrito');
         await expect(readFile(join(WORKSPACE, fileRel), 'utf8')).resolves.toBe('second value');
     });
+
+    it('/fs read exibe guidance acionável quando tool falha', async () => {
+        const ctx = mockCtx();
+        await cmdFs(ctx, 'read tmp/inexistente.md');
+
+        expect(ctx.output()).toContain('FS local');
+        expect(ctx.output()).toContain('Próximos passos:');
+        expect(ctx.output()).toContain('/status');
+    });
 });

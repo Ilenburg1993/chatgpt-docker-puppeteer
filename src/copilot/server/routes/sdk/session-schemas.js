@@ -162,3 +162,26 @@ export const WorkspaceCreateFileBodySchema = z.object({
     path: z.string().min(1),
     content: z.string(),
 });
+
+/** Schema para POST /sessions/:id/workspace/materialize body */
+export const WorkspaceMaterializeBodySchema = z.object({
+    path: z.string().min(1),
+    destinationPath: z.string().min(1).optional(),
+    overwrite: z.boolean().optional(),
+});
+
+/** Schema para POST /sessions/:id/workspace/mirror body */
+export const WorkspaceMirrorBodySchema = z.object({
+    destinationRoot: z.string().min(1).optional(),
+    overwrite: z.boolean().optional(),
+    maxFiles: z.number().int().positive().optional(),
+    pageSize: z.number().int().positive().optional(),
+    cursor: z.string().min(1).optional(),
+});
+
+/** Schema para POST /sessions/:id/workspace/promote body */
+export const WorkspacePromoteBodySchema = z.object({
+    sourcePath: z.string().min(1),
+    destinationPath: z.string().min(1).optional(),
+    overwrite: z.boolean().optional(),
+});

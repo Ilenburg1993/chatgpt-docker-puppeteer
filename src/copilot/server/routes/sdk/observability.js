@@ -20,6 +20,7 @@
  * @see EventBus
  */
 
+import { decideSdkFsRouting, hasCanonicalLocalFsTools } from '#copilot/core';
 import { Router } from 'express';
 import { logSwallowed } from '../../../core/error-handlers.js';
 import { withErrorHandler as _withErrorHandler } from './middleware.js';
@@ -36,6 +37,8 @@ import { withErrorHandler as _withErrorHandler } from './middleware.js';
  * @typedef {object} ObservabilityRouterDeps
  * @property {ReturnType<import('./deps.js').buildDefaultSdkRouteSharedDeps>['sdkObservability']} sdkObservability
  * @property {ReturnType<import('./deps.js').buildDefaultSdkRouteSharedDeps>['sdkRuntimeProjection']} sdkRuntimeProjection
+ * @property {ReturnType<import('./deps.js').buildDefaultSdkRouteSharedDeps>['allTools']} allTools
+ * @property {ReturnType<import('./deps.js').buildDefaultSdkRouteSharedDeps>['sdkSessionRpc']} sdkSessionRpc
  * @property {string} [runtimeId] - Runtime alvo resolvido na borda.
  * @property {string | null} [requestedRuntimeId] - Runtime solicitado antes de fallback.
  * @property {boolean} [runtimeFound] - Se o runtime solicitado foi encontrado.
@@ -64,6 +67,72 @@ function resolveObservabilityRouterDeps(binding, req) {
  */
 function buildObservabilityRuntimeMeta(routeDeps) {
     return routeDeps.sdkRuntimeProjection.buildRuntimeRouteMetaPayload(routeDeps);
+}
+
+/**
+ * @param {Record<string, number>} counters
+ * @param {Record<string, { value: number; ts: number }>} gauges
+ * @returns {Record<string, unknown>}
+ */
+function buildConvergenceProjection(counters, gauges) {
+    /**
+     * @type {Record<
+     *     string,
+     *     {
+     *         total: number;
+     *         statuses: Record<string, number>;
+     *         phases: Record<string, Record<string, number>>;
+     *         bytesTotal: number;
+     *         lastBytes: number | null;
+     *     }
+     * >}
+     */
+    const operations = {};
+    for (const [key, value] of Object.entries(counters)) {
+        const phaseMatch = /^sdk\.operation\.(workspace\.[^.]+)\.phase\.([^.]+)\.([^.]+)$/u.exec(key);
+        if (phaseMatch) {
+            const [, operation, phase, status] = phaseMatch;
+            if (!operation || !phase || !status) continue;
+            const entry = (operations[operation] ??= {
+                total: 0,
+                statuses: {},
+                phases: {},
+                bytesTotal: 0,
+                lastBytes: null,
+            });
+            const phaseEntry = (entry.phases[phase] ??= {});
+            phaseEntry[status] = (phaseEntry[status] ?? 0) + value;
+            continue;
+        }
+
+        const statusMatch = /^sdk\.operation\.(workspace\.[^.]+)\.([^.]+)$/u.exec(key);
+        if (!statusMatch) continue;
+        const [, operation, status] = statusMatch;
+        if (!operation || !status) continue;
+        const entry = (operations[operation] ??= {
+            total: 0,
+            statuses: {},
+            phases: {},
+            bytesTotal: 0,
+            lastBytes: null,
+        });
+        if (status === 'bytes_total') {
+            entry.bytesTotal += value;
+        } else if (status === 'total') {
+            entry.total += value;
+        } else {
+            entry.statuses[status] = (entry.statuses[status] ?? 0) + value;
+        }
+    }
+
+    for (const [key, gauge] of Object.entries(gauges)) {
+        const match = /^sdk\.operation\.(workspace\.[^.]+)\.last_bytes$/u.exec(key);
+        const operation = match?.[1];
+        if (!operation || !operations[operation]) continue;
+        operations[operation].lastBytes = gauge.value;
+    }
+
+    return operations;
 }
 
 /**
@@ -118,6 +187,21 @@ export default function createObservabilityRouter(deps) {
             const mcpStatus = sdkObservability.getMcpStatus();
             const nervMounted = sdkObservability.nervEventBusAdapter.isMounted;
             const hasRecentAgentErrors = recentErrors.some((e) => e.source === 'agent');
+            const loadedToolNames = Array.isArray(routeDeps.allTools)
+                ? routeDeps.allTools.map((tool) => String(tool.name ?? '')).filter(Boolean)
+                : [];
+            const sdkFsRouting = decideSdkFsRouting({
+                canonicalFsReady: hasCanonicalLocalFsTools(loadedToolNames),
+                sdkWorkspaceAvailable: typeof routeDeps.sdkSessionRpc?.workspaceReadFile === 'function',
+            });
+            const convergenceTraceSnapshot =
+                typeof routeDeps.sdkObservability.convergenceTraceStore?.getSnapshot === 'function'
+                    ? routeDeps.sdkObservability.convergenceTraceStore.getSnapshot({ limit: 20 })
+                    : null;
+            const convergenceRecentFailures =
+                convergenceTraceSnapshot?.traces.filter(
+                    (trace) => trace.status === 'failed' || trace.status === 'mixed',
+                ).length ?? 0;
 
             /** @type {Record<string, { status: string; details?: string }>} */
             const components = {
@@ -147,6 +231,12 @@ export default function createObservabilityRouter(deps) {
                     status: 'healthy',
                     details: `${Object.keys(metrics.tools).length} tools tracked`,
                 },
+                convergence: {
+                    status: convergenceRecentFailures > 0 ? 'degraded' : 'healthy',
+                    details: convergenceTraceSnapshot
+                        ? `${convergenceTraceSnapshot.totalTraces} traces, ${convergenceRecentFailures} recent failures/mixed`
+                        : 'trace store unavailable',
+                },
             };
 
             const overallHealthy = Object.values(components).every((c) => c.status !== 'unhealthy');
@@ -169,6 +259,7 @@ export default function createObservabilityRouter(deps) {
                     otelEnabled: sdkObservability.isOtelEnabled(),
                     otelFile: sdkObservability.defaultOtelFile,
                 },
+                sdkFsRouting,
                 snapshot: {
                     toolsTracked: Object.keys(metrics.tools).length,
                     totalTokensIn: metrics.tokens.inputTokens,
@@ -206,6 +297,49 @@ export default function createObservabilityRouter(deps) {
                 });
             }
             return res.json({ ok: true, ...buildObservabilityRuntimeMeta(routeDeps), ...summary });
+        }),
+    );
+
+    // ─── GET /observability/convergence ─────────────────────────────────────────
+
+    router.get('/observability/convergence', (req, res) =>
+        withErrorHandler(req, res, async () => {
+            const routeDeps = resolveObservabilityRouterDeps(deps, req);
+            const summary = routeDeps.sdkObservability.defaultMetrics.getSummary();
+            const traceId = typeof req.query?.['traceId'] === 'string' ? req.query['traceId'] : undefined;
+            const operation = typeof req.query?.['operation'] === 'string' ? req.query['operation'] : undefined;
+            const limitRaw = typeof req.query?.['limit'] === 'string' ? Number(req.query['limit']) : undefined;
+            const limit = Number.isFinite(limitRaw) && Number(limitRaw) > 0 ? Number(limitRaw) : undefined;
+            const counters =
+                summary.counters && typeof summary.counters === 'object'
+                    ? /** @type {Record<string, number>} */ (summary.counters)
+                    : {};
+            const gauges =
+                summary.gauges && typeof summary.gauges === 'object'
+                    ? /** @type {Record<string, { value: number; ts: number }>} */ (summary.gauges)
+                    : {};
+            const traceSnapshot =
+                typeof routeDeps.sdkObservability.convergenceTraceStore?.getSnapshot === 'function'
+                    ? routeDeps.sdkObservability.convergenceTraceStore.getSnapshot({
+                          ...(traceId ? { traceId } : {}),
+                          ...(operation ? { operation } : {}),
+                          ...(limit !== undefined ? { limit } : {}),
+                      })
+                    : null;
+            return res.json({
+                ok: true,
+                ...buildObservabilityRuntimeMeta(routeDeps),
+                convergence: {
+                    operations: buildConvergenceProjection(counters, gauges),
+                    traceStore: traceSnapshot,
+                    counters: Object.fromEntries(
+                        Object.entries(counters).filter(([key]) => key.startsWith('sdk.operation.workspace.')),
+                    ),
+                    gauges: Object.fromEntries(
+                        Object.entries(gauges).filter(([key]) => key.startsWith('sdk.operation.workspace.')),
+                    ),
+                },
+            });
         }),
     );
 

@@ -158,6 +158,24 @@ describe('web-tools', () => {
             expect(result.content).toContain('Hello');
             expect(result.status).toBe(200);
             expect(result.contentType).toBe('text/html');
+            expect(result.io?.operation).toBe('fetch');
+        });
+
+        it('sanitiza conteúdo textual em web_fetch_local', async () => {
+            fetchSpy.mockResolvedValueOnce(
+                mockResponse('token Bearer abcdefghijklmnopqrstuvwxyz1234567890', {
+                    url: 'https://example.com/token',
+                }),
+            );
+
+            const tool = findFetch();
+            const result = await tool.handler({ url: 'https://example.com/token' });
+
+            expect(result.success).toBe(true);
+            expect(result.content).toContain('Bearer [redacted]');
+            expect(result.content).not.toContain('abcdefghijklmnopqrstuvwxyz1234567890');
+            expect(result.sanitized).toBe(true);
+            expect(result.redactions).toBeGreaterThanOrEqual(1);
         });
 
         it('rejeita URL inválida', async () => {
@@ -292,6 +310,32 @@ describe('web-tools', () => {
             expect(result.query).toBe('Node.js');
             expect(result.results.length).toBeGreaterThanOrEqual(1);
             expect(result.results[0].url).toBe('https://nodejs.org');
+            expect(result.io?.operation).toBe('search');
+        });
+
+        it('sanitiza snippets de web_search', async () => {
+            const ddgResponse = {
+                RelatedTopics: [
+                    {
+                        FirstURL: 'https://safe.example.com',
+                        Text: 'Token - Bearer abcdefghijklmnopqrstuvwxyz1234567890',
+                    },
+                ],
+            };
+
+            fetchSpy.mockResolvedValueOnce({
+                ok: true,
+                json: async () => ddgResponse,
+            });
+
+            const tool = findSearch();
+            const result = await tool.handler({ query: 'token' });
+
+            expect(result.success).toBe(true);
+            expect(result.results[0].snippet).toContain('Bearer [redacted]');
+            expect(result.results[0].snippet).not.toContain('abcdefghijklmnopqrstuvwxyz1234567890');
+            expect(result.sanitized).toBe(true);
+            expect(result.redactions).toBeGreaterThanOrEqual(1);
         });
 
         it('cai para HTML scraping quando JSON API retorna 0 resultados', async () => {

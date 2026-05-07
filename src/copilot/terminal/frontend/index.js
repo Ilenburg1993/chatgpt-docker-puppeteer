@@ -9,6 +9,8 @@ export {
 
 export { readTerminalStatusProjection } from './projections/status.js';
 
+export { readTerminalLiveFlowProjection } from './projections/live.js';
+
 export {
     answerPendingTerminalQuestion,
     clearPendingTerminalQuestionShadow,

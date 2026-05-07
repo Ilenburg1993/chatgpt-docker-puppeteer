@@ -13,6 +13,7 @@
 import { z } from 'zod';
 import { toError, toExecError } from '../../core/error-handlers.js';
 import { buildIoMeta, withIoMeta } from '../../core/io-contracts.js';
+import { sanitizeIoTextOutput } from '../../core/io-policy.js';
 import { publishIoOperation } from '../../infra/io-observability.js';
 import { log } from '../logger.js';
 import { buildTool } from '../tool-factory.js';
@@ -186,7 +187,8 @@ export const workspaceSymbolSearchTool = buildTool({
                 maxBuffer: 1024 * 1024 * 1024,
             });
 
-            const output = stdout;
+            const sanitized = sanitizeIoTextOutput({ text: stdout });
+            const output = sanitized.text;
             const lines = output.split('\n').filter(Boolean);
             const io = buildIoMeta({
                 operation: 'search',
@@ -198,6 +200,7 @@ export const workspaceSymbolSearchTool = buildTool({
                     requestedMaxResults: maxResults ?? null,
                     limitMode: 'informative',
                     symbolLength: symbolName.length,
+                    redactions: sanitized.redactions,
                 },
             });
             publishIoOperation(io, { success: true });
@@ -210,9 +213,11 @@ export const workspaceSymbolSearchTool = buildTool({
                     searchPath: resolved,
                     matchCount: lines.length,
                     output,
+                    sanitized: sanitized.sanitized,
+                    redactions: sanitized.redactions,
                     truncated: false,
                 },
-                io,
+                { ...io, policyVersion: sanitized.policyVersion },
             );
         } catch (err) {
             const ex = toExecError(err);

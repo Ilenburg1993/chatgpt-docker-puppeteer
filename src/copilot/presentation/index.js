@@ -16,6 +16,7 @@ export * from './runtime-capabilities.js';
 export * from './runtime-controls.js';
 export * from './runtime-dialog.js';
 export * from './runtime-file-context.js';
+export * from './runtime-file-routing.js';
 export {
     buildAgentHealthHttpResponse,
     buildAgentModuleHealth,

@@ -70,6 +70,15 @@ export const TERMINAL_MODULE_LAYOUT = Object.freeze([
         summary: 'Lifecycle fatal de boot, sinais e shutdown por falha de bootstrap.',
     },
     {
+        path: 'auto-briefing.js',
+        kind: 'file',
+        role: 'frontend-surface',
+        tier: 'secondary',
+        risk: 'stable',
+        public: false,
+        summary: 'Briefing operacional canônico para boot, status, doctor e falhas de comando.',
+    },
+    {
         path: 'module-map.js',
         kind: 'file',
         role: 'entrypoint',
@@ -185,6 +194,15 @@ export const TERMINAL_MODULE_LAYOUT = Object.freeze([
         risk: 'hotspot',
         public: false,
         summary: 'Adapta sinais vanilla da sessão SDK para a UX do terminal.',
+    },
+    {
+        path: 'io-activity-events.js',
+        kind: 'file',
+        role: 'event-adapter',
+        tier: 'secondary',
+        risk: 'watch',
+        public: false,
+        summary: 'Adapta diagnostics_channel de I/O real para /activity, SSE e narrativa live do terminal.',
     },
     {
         path: 'task-stream-events.js',
@@ -337,7 +355,7 @@ export const TERMINAL_MODULE_LAYOUT = Object.freeze([
         tier: 'secondary',
         risk: 'stable',
         public: false,
-        summary: 'Famílias de projeção: shared, status, now, config, metrics, usage, sdk-session.',
+        summary: 'Famílias de projeção: shared, status, live, now, config, metrics, usage, sdk-session.',
     },
     {
         path: 'frontend/gateways/',

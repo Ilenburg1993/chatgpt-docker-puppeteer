@@ -5,8 +5,12 @@
  * @module copilot/terminal/commands/sdk
  */
 
-import { toError } from '#copilot/core';
+import { randomUUID } from 'node:crypto';
+
+import { CANONICAL_LOCAL_FS_TOOL_NAMES, decideSdkFsRouting, toError } from '#copilot/core';
+import { fileReadTools, fileWriteTools } from '#copilot/tools';
 import { isRuntimeElicitationSchema, normalizeElicitationContentWithSchema } from '../../core/elicitation-schema.js';
+import { buildFailureRecoveryLines, buildTerminalOperationalGuidance } from '../auto-briefing.js';
 import {
     readTerminalRuntimePermissionMode,
     readTerminalRuntimeState,
@@ -71,6 +75,292 @@ function arrayFromSdkList(value) {
     if (Array.isArray(data['tools'])) return data['tools'];
     if (Array.isArray(data['files'])) return data['files'];
     return [];
+}
+
+/**
+ * @param {{ handler?: Function }} tool
+ * @returns {Function}
+ */
+function getToolHandler(tool) {
+    if (typeof tool?.handler === 'function') return tool.handler;
+    throw new TypeError('[terminal/workspace] tool sem handler executável.');
+}
+
+/**
+ * @param {import('#copilot/sdk/types').Tool[]} tools
+ * @param {string} name
+ * @returns {import('#copilot/sdk/types').Tool}
+ */
+function findTool(tools, name) {
+    const tool = tools.find((candidate) => candidate.name === name);
+    if (!tool) throw new TypeError(`[terminal/workspace] tool canônica ausente: ${name}`);
+    return tool;
+}
+
+const createFileTool = findTool(fileWriteTools, 'create_file');
+const writeFileContentTool = findTool(fileWriteTools, 'write_file_content');
+const readFileContentTool = findTool(fileReadTools, 'read_file_content');
+
+/**
+ * @param {unknown} value
+ * @returns {string | null}
+ */
+function workspaceReadContent(value) {
+    if (typeof value === 'string') return value;
+    const data = objectOrNull(value);
+    if (!data) return null;
+    if (typeof data['content'] === 'string') return data['content'];
+    if (typeof data['text'] === 'string') return data['text'];
+    return null;
+}
+
+/**
+ * @param {unknown} value
+ * @returns {string[]}
+ */
+function workspaceListPaths(value) {
+    return arrayFromSdkList(value)
+        .map((item) => {
+            if (typeof item === 'string') return item;
+            const entry = objectOrNull(item);
+            if (!entry) return null;
+            const path = entry['path'] ?? entry['name'] ?? null;
+            return typeof path === 'string' ? path : null;
+        })
+        .filter((item) => typeof item === 'string');
+}
+
+/**
+ * @param {unknown} value
+ * @returns {string | null}
+ */
+function localReadContent(value) {
+    if (typeof value === 'string') return value;
+    const data = objectOrNull(value);
+    if (!data || data['success'] === false) return null;
+    if (typeof data['content'] === 'string') return data['content'];
+    if (typeof data['text'] === 'string') return data['text'];
+    return null;
+}
+
+/**
+ * @param {Record<string, unknown>} result
+ * @returns {string}
+ */
+function ioSummary(result) {
+    const io = objectOrNull(result['io']) ?? {};
+    const operation = typeof io['operation'] === 'string' ? io['operation'] : null;
+    const engine = typeof io['engine'] === 'string' ? io['engine'] : null;
+    if (!operation && !engine) return '';
+    return `io=${operation ?? '-'} · engine=${engine ?? '-'}`;
+}
+
+/**
+ * @param {string[]} rest
+ * @returns {{ overwrite: boolean; to: string | null }}
+ */
+function parseWorkspaceMaterializeFlags(rest) {
+    let overwrite = false;
+    let to = null;
+    for (let i = 0; i < rest.length; i++) {
+        const token = rest[i];
+        if (token === '--overwrite') {
+            overwrite = true;
+            continue;
+        }
+        if (token === '--to') {
+            const candidate = rest[i + 1] ?? '';
+            if (candidate.trim()) {
+                to = candidate.trim();
+                i += 1;
+            }
+        }
+    }
+    return { overwrite, to };
+}
+
+/**
+ * @param {{ println: (text: string) => void }} ctx
+ * @param {{ destinationPath: string; content: string; overwrite: boolean }} payload
+ * @returns {Promise<Record<string, unknown>>}
+ */
+async function materializeWorkspaceFile(ctx, payload) {
+    void ctx;
+    const tool = payload.overwrite ? writeFileContentTool : createFileTool;
+    const args = payload.overwrite
+        ? { path: payload.destinationPath, content: payload.content, encoding: 'utf8' }
+        : {
+              path: payload.destinationPath,
+              content: payload.content,
+              overwrite: false,
+              createParentDirs: true,
+          };
+    const result = await getToolHandler(tool)(args);
+    return objectOrNull(result) ?? { success: false, error: 'materialização retornou payload inválido.' };
+}
+
+/**
+ * @param {string} sourcePath
+ * @returns {Promise<{ content: string; raw: Record<string, unknown> } | null>}
+ */
+async function readLocalFileForWorkspace(sourcePath) {
+    const result = await getToolHandler(readFileContentTool)({ path: sourcePath, encoding: 'utf8' });
+    const raw = objectOrNull(result) ?? {};
+    const content = localReadContent(result);
+    return content === null ? null : { content, raw };
+}
+
+/**
+ * @param {unknown} error
+ * @returns {boolean}
+ */
+function isWorkspaceMissingError(error) {
+    const message = toError(error).message.toLowerCase();
+    return (
+        message.includes('enoent') ||
+        message.includes('not found') ||
+        message.includes('no such file') ||
+        message.includes('missing')
+    );
+}
+
+/**
+ * @param {{ println: (text: string) => void }} ctx
+ * @param {{ sourcePath: string; destinationPath: string; overwrite: boolean; runtimeId?: string | null }} payload
+ * @returns {Promise<
+ *     | { ok: true; traceId: string; result: unknown; bytes: number; action: 'created' | 'overwritten' }
+ *     | { ok: false; traceId: string; reason: string; conflict?: boolean }
+ * >}
+ */
+async function promoteLocalFileToWorkspace(ctx, payload) {
+    void ctx;
+    const traceId = randomUUID();
+    const local = await readLocalFileForWorkspace(payload.sourcePath);
+    if (!local) {
+        return { ok: false, traceId, reason: 'arquivo local não textual/indisponível para promoção' };
+    }
+
+    if (!payload.overwrite) {
+        try {
+            await callWithRuntimeTarget(readTerminalSdkWorkspaceFile, payload.runtimeId, payload.destinationPath);
+            return {
+                ok: false,
+                traceId,
+                reason: 'destino já existe no workspace SDK; use --overwrite para substituir',
+                conflict: true,
+            };
+        } catch (error) {
+            if (!isWorkspaceMissingError(error)) throw error;
+        }
+    }
+
+    const result = await callWithRuntimeTarget(
+        createTerminalSdkWorkspaceFile,
+        payload.runtimeId,
+        payload.destinationPath,
+        local.content,
+    );
+    return {
+        ok: true,
+        traceId,
+        result,
+        bytes: Buffer.byteLength(local.content, 'utf8'),
+        action: payload.overwrite ? 'overwritten' : 'created',
+    };
+}
+
+/**
+ * @param {import('#copilot/sdk/types').Tool[]} tools
+ * @param {string} name
+ * @returns {boolean}
+ */
+function hasTool(tools, name) {
+    return tools.some((tool) => tool.name === name);
+}
+
+/**
+ * @param {CommandContext} ctx
+ * @param {string | null | undefined} runtimeId
+ * @returns {Promise<void>}
+ */
+async function renderSdkDoctor({ println }, runtimeId) {
+    const capabilities = callWithRuntimeTarget(getTerminalSdkSessionCapabilities, runtimeId);
+    const caps = objectOrNull(capabilities) ?? {};
+    const sdkTools = objectOrNull(caps['tools']) ?? {};
+    const sdkWorkspaceAvailable = sdkTools['workspace'] === true;
+
+    const localFsToolNames = [...CANONICAL_LOCAL_FS_TOOL_NAMES];
+    const localFsToolsReady = localFsToolNames.every(
+        (name) => hasTool(fileReadTools, name) || hasTool(fileWriteTools, name),
+    );
+
+    const promptProjection = await callWithRuntimeTarget(readTerminalSdkSystemPromptProjection, runtimeId);
+    const instructionSourcesAvailable =
+        Boolean(promptProjection['instructionSources']) || !promptProjection['instructionSourcesError'];
+
+    const routing = decideSdkFsRouting({
+        canonicalFsReady: localFsToolsReady,
+        sdkWorkspaceAvailable,
+    });
+    const routingMode = routing.mode;
+    const guidance = buildTerminalOperationalGuidance({
+        sdkFsRouting: routing,
+        toolLoad: {
+            hasCanonicalLocalFsTools: localFsToolsReady,
+        },
+        instructionLoad: {
+            sectionsMissingFileCount: 0,
+            appendFileMissingCount: instructionSourcesAvailable ? 0 : 1,
+        },
+    });
+
+    println('\n  \x1b[36mSDK Doctor — roteamento SDK x FS\x1b[0m');
+    println(
+        `  surfaces   \x1b[90msdk.workspace=${String(sdkWorkspaceAvailable)} · local.fs.canônico=${String(localFsToolsReady)} · instructionSources=${String(instructionSourcesAvailable)}\x1b[0m`,
+    );
+    println(`  mode       \x1b[33m${routingMode}\x1b[0m`);
+    if (routingMode === 'local-fs-primary') {
+        println('  decis�o    \x1b[32mFS local can�nico prim�rio (SDK workspace como auxiliar).\x1b[0m');
+    } else if (routingMode === 'sdk-workspace-only') {
+        println('  decis�o    \x1b[33mFallback em workspace SDK at� recuperar file-tools locais.\x1b[0m');
+    } else {
+        println('  decis�o    \x1b[31mDegradado: restaurar boot/load antes de operar em arquivo.\x1b[0m');
+    }
+    println(`  dom�nio    \x1b[90m${guidance.domainHint}\x1b[0m`);
+    println(`  contexto   \x1b[90m${guidance.contextHint}\x1b[0m`);
+    if (guidance.warnings.length > 0) {
+        println(`  aten��o    \x1b[33m${guidance.warnings.join(' | ')}\x1b[0m`);
+    }
+    println(`  razão      \x1b[90m${routing.reason}\x1b[0m`);
+    println(`  local fs   \x1b[90m${localFsToolNames.join(', ')}\x1b[0m`);
+    println('');
+}
+
+/**
+ * @param {(line: string) => void} println
+ * @param {string | null | undefined} runtimeId
+ * @returns {Promise<void>}
+ */
+async function renderCommandFailureGuidance(println, runtimeId) {
+    const capabilities = callWithRuntimeTarget(getTerminalSdkSessionCapabilities, runtimeId);
+    const caps = objectOrNull(capabilities) ?? {};
+    const sdkTools = objectOrNull(caps['tools']) ?? {};
+    const sdkWorkspaceAvailable = sdkTools['workspace'] === true;
+    const localFsToolsReady = [...CANONICAL_LOCAL_FS_TOOL_NAMES].every(
+        (name) => hasTool(fileReadTools, name) || hasTool(fileWriteTools, name),
+    );
+    const routing = decideSdkFsRouting({
+        canonicalFsReady: localFsToolsReady,
+        sdkWorkspaceAvailable,
+    });
+    const guidance = buildTerminalOperationalGuidance({
+        sdkFsRouting: routing,
+        toolLoad: { hasCanonicalLocalFsTools: localFsToolsReady },
+        instructionLoad: { sectionsMissingFileCount: 0, appendFileMissingCount: 0 },
+    });
+    for (const line of buildFailureRecoveryLines(guidance)) {
+        println(`  \x1b[90m${line}\x1b[0m`);
+    }
 }
 
 /**
@@ -273,6 +563,8 @@ export async function cmdSdk({ println }, arg = '') {
             await renderSdkQuota({ println }, runtimeId);
         } else if (sub === 'prompt') {
             await renderSdkSystemPrompt({ println }, runtimeId);
+        } else if (sub === 'doctor') {
+            await renderSdkDoctor({ println }, runtimeId);
         } else if (sub === 'capabilities' || sub === 'caps') {
             renderSdkCapabilitiesSummary({ println }, runtimeId);
         } else if (sub === 'waits') {
@@ -294,7 +586,7 @@ export async function cmdSdk({ println }, arg = '') {
             );
             await renderSdkQuota({ println }, runtimeId, { compact: true });
             println(
-                '  \x1b[90mUso: /sdk models | /sdk tools [model] | /sdk quota | /sdk prompt | /sdk capabilities | /sdk waits | /sdk compact\x1b[0m\n',
+                '  \x1b[90mUso: /sdk models | /sdk tools [model] | /sdk quota | /sdk prompt | /sdk capabilities | /sdk waits | /sdk doctor | /sdk compact\x1b[0m\n',
             );
         }
     } catch (e) {
@@ -462,6 +754,121 @@ export async function cmdWorkspace({ println }, arg = '') {
             const result = await callWithRuntimeTarget(createTerminalSdkWorkspaceFile, runtimeId, path, content);
             println(`\n  \x1b[32m✓ Arquivo escrito no workspace SDK virtual:\x1b[0m \x1b[33m${path}\x1b[0m`);
             println(`  \x1b[90m${pretty(result, 500)}\x1b[0m\n`);
+        } else if (sub === 'sync' || sub === 'materialize') {
+            const sourcePath = rest[0] ?? '';
+            if (!sourcePath.trim()) {
+                println('\x1b[33m  Uso: /workspace sync <sdkPath> [--to <localPath>] [--overwrite]\x1b[0m');
+                return;
+            }
+            const flags = parseWorkspaceMaterializeFlags(rest.slice(1));
+            const destinationPath = flags.to ?? sourcePath;
+            const readResult = await callWithRuntimeTarget(readTerminalSdkWorkspaceFile, runtimeId, sourcePath);
+            const content = workspaceReadContent(readResult);
+            if (content === null) {
+                println('\n  \x1b[31m✗ Workspace SDK: conteúdo não textual/indisponível para materialização.\x1b[0m');
+                println(`  \x1b[90m${pretty(readResult, 900)}\x1b[0m\n`);
+                await renderCommandFailureGuidance(println, runtimeId);
+                return;
+            }
+
+            const writeResult = await materializeWorkspaceFile(
+                { println },
+                {
+                    destinationPath,
+                    content,
+                    overwrite: flags.overwrite,
+                },
+            );
+            if (writeResult['success'] !== true) {
+                println(
+                    `\n  \x1b[31m✗ Materialização SDK→FS falhou:\x1b[0m ${String(writeResult['error'] ?? 'erro desconhecido')}`,
+                );
+                println(
+                    '  \x1b[90mUse --overwrite para substituir arquivo local já existente quando apropriado.\x1b[0m\n',
+                );
+                await renderCommandFailureGuidance(println, runtimeId);
+                return;
+            }
+
+            println(
+                `\n  \x1b[32m✓ SDK→FS materializado:\x1b[0m \x1b[33m${sourcePath}\x1b[0m → \x1b[33m${destinationPath}\x1b[0m`,
+            );
+            const io = ioSummary(writeResult);
+            if (io) println(`  \x1b[90m${io}\x1b[0m`);
+            println(`  \x1b[90mbytes=${String(writeResult['bytesWritten'] ?? content.length)}\x1b[0m\n`);
+        } else if (sub === 'mirror' || sub === 'sync-all') {
+            const flags = parseWorkspaceMaterializeFlags(rest);
+            const targetRoot = flags.to ?? '.copilot/sdk-workspace-mirror';
+            const listResult = await callWithRuntimeTarget(listTerminalSdkWorkspaceFiles, runtimeId);
+            const files = workspaceListPaths(listResult);
+            if (files.length === 0) {
+                println('\n  \x1b[33mWorkspace SDK virtual vazio ou sem paths materializáveis.\x1b[0m');
+                println(`  \x1b[90m${pretty(listResult, 900)}\x1b[0m\n`);
+                return;
+            }
+
+            let ok = 0;
+            let fail = 0;
+            for (const sourcePath of files) {
+                const readResult = await callWithRuntimeTarget(readTerminalSdkWorkspaceFile, runtimeId, sourcePath);
+                const content = workspaceReadContent(readResult);
+                if (content === null) {
+                    fail += 1;
+                    println(`  \x1b[31m✗ skip\x1b[0m ${sourcePath} (conteúdo não textual)`);
+                    continue;
+                }
+                const destinationPath = `${targetRoot.replace(/\/$/u, '')}/${sourcePath}`;
+                const writeResult = await materializeWorkspaceFile(
+                    { println },
+                    { destinationPath, content, overwrite: flags.overwrite },
+                );
+                if (writeResult['success'] === true) {
+                    ok += 1;
+                    println(`  \x1b[32m✓\x1b[0m ${sourcePath} ? ${destinationPath}`);
+                } else {
+                    fail += 1;
+                    println(`  \x1b[31m✗\x1b[0m ${sourcePath} (${String(writeResult['error'] ?? 'erro')})`);
+                }
+            }
+
+            println(
+                `\n  \x1b[36mMirror SDK→FS concluído\x1b[0m  \x1b[90mok=${ok} · fail=${fail} · root=${targetRoot}\x1b[0m\n`,
+            );
+        } else if (sub === 'promote' || sub === 'push' || sub === 'import') {
+            const sourcePath = rest[0] ?? '';
+            if (!sourcePath.trim()) {
+                println('\x1b[33m  Uso: /workspace promote <localPath> [--to <sdkPath>] [--overwrite]\x1b[0m');
+                return;
+            }
+            const flags = parseWorkspaceMaterializeFlags(rest.slice(1));
+            const destinationPath = flags.to ?? sourcePath;
+            const result = await promoteLocalFileToWorkspace(
+                { println },
+                {
+                    sourcePath,
+                    destinationPath,
+                    overwrite: flags.overwrite,
+                    runtimeId,
+                },
+            );
+            if (!result.ok) {
+                println(`\n  \x1b[31m✗ Promoção FS→SDK falhou:\x1b[0m ${result.reason}`);
+                if (result.conflict) {
+                    println(
+                        '  \x1b[90mpolítica=fail-if-exists · ação=conflict · use --overwrite com intenção explícita\x1b[0m',
+                    );
+                }
+                println(`  \x1b[90mtraceId=${result.traceId}\x1b[0m\n`);
+                await renderCommandFailureGuidance(println, runtimeId);
+                return;
+            }
+
+            println(
+                `\n  \x1b[32m✓ FS→SDK promovido:\x1b[0m \x1b[33m${sourcePath}\x1b[0m → \x1b[33m${destinationPath}\x1b[0m`,
+            );
+            println(
+                `  \x1b[90mpolítica=${flags.overwrite ? 'overwrite' : 'fail-if-exists'} · ação=${result.action} · bytes=${result.bytes} · traceId=${result.traceId}\x1b[0m\n`,
+            );
         } else {
             const result = await callWithRuntimeTarget(listTerminalSdkWorkspaceFiles, runtimeId);
             const files = arrayFromSdkList(result);
@@ -475,12 +882,19 @@ export async function cmdWorkspace({ println }, arg = '') {
             } else {
                 println(`  \x1b[90m${pretty(result, 1500)}\x1b[0m`);
             }
+            println('  \x1b[90mUso: /workspace list | read <path> | write <path> <content>\x1b[0m');
             println(
-                '  \x1b[90mUso: /workspace list | read <path> | write <path> <content> — não materializa no FS local\x1b[0m\n',
+                '  \x1b[90m     /workspace sync <sdkPath> [--to <localPath>] [--overwrite] · /workspace mirror [--to <localDir>] [--overwrite]\x1b[0m',
+            );
+            println('  \x1b[90m     /workspace promote <localPath> [--to <sdkPath>] [--overwrite]\x1b[0m');
+            println(
+                '  \x1b[90mObs: list/read/write operam no workspace SDK virtual; sync/mirror materializam no FS local canônico; promote faz FS→SDK com auditoria.\x1b[0m\n',
             );
         }
     } catch (e) {
-        println(`\n  \x1b[31m✗ Workspace SDK: ${toError(e).message}\x1b[0m\n`);
+        println(`\n  \x1b[31m✗ Workspace SDK: ${toError(e).message}\x1b[0m`);
+        await renderCommandFailureGuidance(println, runtimeId);
+        println('');
     }
 }
 
@@ -844,16 +1258,16 @@ function renderPermissionCockpit({ println }, runtimeId) {
     println(`  pendentes  \x1b[33m${pending.length}\x1b[0m`);
     if (latest) {
         println(
-            `  latest     \x1b[90m${latest.id}\x1b[0m ${latest.permissionType}${latest.requestId ? ` � requestId=${latest.requestId}` : ''}`,
+            `  latest     \x1b[90m${latest.id}\x1b[0m ${latest.permissionType}${latest.requestId ? ` · requestId=${latest.requestId}` : ''}`,
         );
     } else {
-        println('  latest     \x1b[90m(nenhuma permiss�o observada)\x1b[0m');
+        println('  latest     \x1b[90m(nenhuma permissão observada)\x1b[0m');
     }
 
     if (typeRows.length > 0) {
-        println('  por tipo   \x1b[90m' + typeRows.map(([type, count]) => `${type}=${count}`).join(' � ') + '\x1b[0m');
+        println('  por tipo   \x1b[90m' + typeRows.map(([type, count]) => `${type}=${count}`).join(' · ') + '\x1b[0m');
     } else {
-        println('  por tipo   \x1b[90m(nenhuma pend�ncia)\x1b[0m');
+        println('  por tipo   \x1b[90m(nenhuma pendência)\x1b[0m');
     }
 
     if (modeChanges.length > 0) {
@@ -862,10 +1276,10 @@ function renderPermissionCockpit({ println }, runtimeId) {
             println(`    \x1b[90m${new Date(item.ts).toLocaleTimeString('pt-BR')}\x1b[0m  ${item.mode}`);
         }
     } else {
-        println('  mode log   \x1b[90m(sem mudan�as recentes no runtime local)\x1b[0m');
+        println('  mode log   \x1b[90m(sem mudanças recentes no runtime local)\x1b[0m');
     }
 
-    println('  quick      \x1b[90m/permission pending � /permission show latest � /permission mode selective\x1b[0m');
+    println('  quick      \x1b[90m/permission pending · /permission show latest · /permission mode selective\x1b[0m');
     if (latest?.requestId && latest.status === 'pending') {
         println(`  quick      \x1b[90m/permission respond ${latest.id} approve-once\x1b[0m`);
     }

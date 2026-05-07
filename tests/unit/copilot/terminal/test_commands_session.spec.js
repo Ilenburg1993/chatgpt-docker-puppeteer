@@ -244,6 +244,7 @@ vi.mock('#copilot/conversation-hub', () => ({
 const {
     cmdStatus,
     cmdNow,
+    cmdLive,
     cmdHistory,
     cmdDbHistory,
     cmdDbSessions,
@@ -301,6 +302,11 @@ describe('commands/session — sync commands', () => {
         expect(ctx.output()).toContain('prompt digest');
         expect(ctx.output()).toContain('prompt frescor');
         expect(ctx.output()).toContain('binding ok');
+        expect(ctx.output()).toContain('tools load');
+        expect(ctx.output()).toContain('instr. load');
+        expect(ctx.output()).toContain('sdk↔fs route');
+        expect(ctx.output()).toContain('coleta ctx');
+        expect(ctx.output()).toContain('/sdk doctor');
     });
 
     it('cmdStatus destaca mismatch de modelo cobrado/configurado', () => {
@@ -324,8 +330,20 @@ describe('commands/session — sync commands', () => {
         cmdNow({ hubSessionId: 'hub-1', injectPort: 3009, println: ctx.println });
         expect(ctx.output()).toContain('[now]');
         expect(ctx.output()).toContain('runtime=default');
+        expect(ctx.output()).toContain('live=');
+        expect(ctx.output()).toContain('sse=');
         expect(ctx.output()).toContain('loop=off');
         expect(ctx.output()).toContain('PM:approve_all');
+    });
+
+    it('cmdLive imprime fluxo operacional live consolidado', () => {
+        const ctx = mockCtx();
+        cmdLive({ hubSessionId: 'hub-1', injectPort: 3009, println: ctx.println });
+        expect(ctx.output()).toContain('Terminal Live Flow');
+        expect(ctx.output()).toContain('estado');
+        expect(ctx.output()).toContain('streaming');
+        expect(ctx.output()).toContain('sse');
+        expect(ctx.output()).toContain('trace');
     });
 
     it('cmdStatus aceita runtimeId explícito na sintaxe do REPL', () => {

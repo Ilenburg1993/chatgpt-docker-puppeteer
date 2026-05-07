@@ -204,6 +204,16 @@ vi.mock('../../../../src/copilot/terminal/activity-state.js', () => ({
     readTerminalActivityHistory: () => [],
 }));
 
+vi.mock('../../../../src/copilot/tools/introspection-tools.js', () => ({
+    readIntrospectionRegistrySnapshot: () => ({
+        total: 6,
+        categories: { file: 6 },
+        disabled: [],
+        hasCanonicalLocalFsTools: true,
+        hasSdkWorkspaceTooling: true,
+    }),
+}));
+
 const { cmdDiagnose } = await import('../../../../src/copilot/terminal/commands/diagnose.js');
 
 function mockCtx() {
@@ -236,6 +246,8 @@ describe('commands/diagnose', () => {
         expect(ctx.output()).toContain('Shutdown');
         expect(ctx.output()).toContain('Timers');
         expect(ctx.output()).toContain('Lifecycle mx');
+        expect(ctx.output()).toContain('sdk↔fs route');
+        expect(ctx.output()).toContain('local-fs-primary');
     });
 
     it('aceita runtimeId explícito no comando', async () => {

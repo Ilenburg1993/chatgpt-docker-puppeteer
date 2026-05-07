@@ -277,7 +277,7 @@ describe('copilot-api multi-runtime propagation', () => {
         const firstDefaultTurn = (async () => http.post('/dialog/turn?runtimeId=default').send({ message: 'um' }))();
         await defaultStarted.promise;
 
-        const busyDefault = await http.post('/dialog/turn?runtimeId=default').send({ message: 'dois' }).expect(429);
+        const busyDefault = await http.post('/dialog/turn?runtimeId=default').send({ message: 'dois' }).expect(409);
         assert.equal(busyDefault.body.runtimeId, 'default');
 
         const auditTurn = await http.post('/dialog/turn?runtimeId=audit').send({ message: 'livre' }).expect(200);

@@ -14,6 +14,7 @@ import { PinnedFilesLoader } from '../../config/pinned-files.js';
 import { container } from '../../core/di-container.js';
 import { recordTerminalActivity, terminalActivityEmitter } from '../activity-state.js';
 import { broadcastSse } from '../dialog/index.js';
+import { setupTerminalIoActivityEvents } from '../io-activity-events.js';
 
 /**
  * @param {import('../index.js').TerminalBootContext} ctx
@@ -62,6 +63,7 @@ export async function runTerminalPinnedContextPhase(ctx) {
         });
     };
     terminalActivityEmitter.on('activity:changed', ctx.activityChangedHandler);
+    ctx.disposeIoActivityEvents = setupTerminalIoActivityEvents();
 }
 
 /**
@@ -78,6 +80,8 @@ export async function rollbackTerminalPinnedContextPhase(ctx) {
         terminalActivityEmitter.off('activity:changed', ctx.activityChangedHandler);
         ctx.activityChangedHandler = null;
     }
+    ctx.disposeIoActivityEvents?.();
+    ctx.disposeIoActivityEvents = null;
     if (pinnedLoader && ctx.pinnedFilesChangedHandler) {
         if (typeof pinnedLoader.off === 'function') {
             pinnedLoader.off('changed', ctx.pinnedFilesChangedHandler);

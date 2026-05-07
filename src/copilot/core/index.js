@@ -95,6 +95,18 @@ export {
     toIoError,
     withIoMeta,
 } from './io-contracts.js';
+export {
+    DEFAULT_BLOCKED_PATH_SEGMENTS,
+    DEFAULT_BLOCKED_READ_PATH_PATTERNS,
+    DEFAULT_BLOCKED_WRITE_PATH_PATTERNS,
+    IO_POLICY_VERSION as IO_PATH_POLICY_VERSION,
+    evaluateIoPathPolicy,
+    evaluateIoPathPolicyAsync,
+    evaluateIoUrlPolicy,
+    resolveIoAdvisoryLimits,
+    sanitizeIoTextOutput,
+} from './io-policy.js';
+export { CANONICAL_LOCAL_FS_TOOL_NAMES, decideSdkFsRouting, hasCanonicalLocalFsTools } from './sdk-fs-routing.js';
 
 // ─── Timeouts ─────────────────────────────────────────────────────────────────
 export {

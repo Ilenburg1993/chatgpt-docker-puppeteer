@@ -433,7 +433,7 @@ describe('W114 — module layout governance: terminal root', () => {
 
         assert.equal(scorecard.total, TERMINAL_MODULE_LAYOUT.length);
         assert.equal(scorecard.byRisk['hotspot'], listTerminalModulesByRisk('hotspot').length);
-        assert.deepEqual(scorecard.watch, ['alias-store.js', 'display-policy.js']);
+        assert.deepEqual(scorecard.watch, ['alias-store.js', 'display-policy.js', 'io-activity-events.js']);
         assert.deepEqual(scorecard.hotspots, [
             'agent-runtime-events.js',
             'commands/',
@@ -651,6 +651,7 @@ describe('W114.4 — module layout governance: server/routes', () => {
             'sdk/deps.js',
             'sdk/observability.js',
             'sdk/session-crud.js',
+            'sdk/session-workspace-routes.js',
         ]);
     });
 

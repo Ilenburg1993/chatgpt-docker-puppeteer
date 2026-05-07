@@ -16,6 +16,8 @@
  *     | 'search'
  *     | 'diff'
  *     | 'parse'
+ *     | 'stat'
+ *     | 'mkdir'
  *     | 'index'
  *     | 'scan'
  *     | 'fetch'

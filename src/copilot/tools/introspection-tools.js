@@ -187,6 +187,47 @@ export function registerForIntrospection(tools, registry = null) {
 
     log('DEBUG', `[introspection] ${tools.length} tools registradas para introspecção.`);
 }
+
+/**
+ * Retorna snapshot canônico do estado de carga de tools observado pela introspecção.
+ *
+ * Útil para `/status`, `/diagnose` e validação de boot/load sem executar uma tool em loop.
+ *
+ * @returns {{
+ *     total: number;
+ *     names: string[];
+ *     categories: Record<string, number>;
+ *     disabled: string[];
+ *     hasCanonicalLocalFsTools: boolean;
+ *     hasSdkWorkspaceTooling: boolean;
+ * }}
+ */
+export function readIntrospectionRegistrySnapshot() {
+    const names = _registeredTools.map((tool) => tool.name).sort((a, b) => a.localeCompare(b));
+    /** @type {Record<string, number>} */
+    const categories = {};
+    for (const metadata of _toolNameToMetadataMap.values()) {
+        categories[metadata.category] = (categories[metadata.category] ?? 0) + 1;
+    }
+    const requiredLocalFs = [
+        'list_directory',
+        'read_file_content',
+        'search_in_files',
+        'create_file',
+        'write_file_content',
+        'patch_file',
+    ];
+    const hasCanonicalLocalFsTools = requiredLocalFs.every((name) => names.includes(name));
+    const hasSdkWorkspaceTooling = names.includes('workspace_read') || names.includes('workspace_write');
+    return {
+        total: names.length,
+        names,
+        categories,
+        disabled: getDisabledTools(),
+        hasCanonicalLocalFsTools,
+        hasSdkWorkspaceTooling,
+    };
+}
 /**
  * Reseta o estado de introspecção para isolamento de testes.
  *

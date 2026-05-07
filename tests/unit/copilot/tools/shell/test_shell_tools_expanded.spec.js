@@ -68,13 +68,13 @@ describe('F36 — exec_command pipelines (UPG-01)', () => {
         expect(result.success).toBe(true);
     });
 
-    it('bloqueia pipeline com >5 estágios', async () => {
+    it('permite pipeline com >5 estágios; limite histórico é apenas informativo', async () => {
         const cmd = 'echo a | cat | cat | cat | cat | cat';
 
         const result = await callTool(execCommandTool, { command: cmd });
 
-        expect(result.success).toBe(false);
-        expect(result.error).toContain('5 estágios');
+        expect(result.success).toBe(true);
+        expect(result.stdout).toContain('a');
     });
 
     it('pipeline com segmento bloqueado falha', async () => {

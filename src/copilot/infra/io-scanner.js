@@ -11,6 +11,7 @@
 import { lstat, readdir } from 'node:fs/promises';
 import { basename, join, relative } from 'node:path';
 import { buildIoMeta, createIoTraceId } from '../core/io-contracts.js';
+import { DEFAULT_BLOCKED_PATH_SEGMENTS } from '../core/io-policy.js';
 import { nowIoMs, publishIoOperation } from './io-observability.js';
 
 /**
@@ -56,6 +57,8 @@ function classifyStats(stats) {
  *     showHidden?: boolean;
  *     filter?: string;
  *     traceId?: string;
+ *     blockedSegments?: readonly string[];
+ *     respectDenylist?: boolean;
  * }} [options]
  * @returns {Promise<{
  *     path: string;
@@ -70,6 +73,10 @@ export async function scanDirectory(rootPath, options = {}) {
     const recursive = Boolean(options.recursive);
     const maxDepth = Math.max(1, options.depth ?? 3);
     const showHidden = Boolean(options.showHidden);
+    const respectDenylist = options.respectDenylist !== false;
+    const blockedSegments = new Set(
+        (options.blockedSegments ?? DEFAULT_BLOCKED_PATH_SEGMENTS).map((segment) => segment.toLowerCase()),
+    );
     let scannedEntries = 0;
 
     /**
@@ -85,6 +92,7 @@ export async function scanDirectory(rootPath, options = {}) {
 
         for (const name of names) {
             if (!showHidden && name.startsWith('.')) continue;
+            if (respectDenylist && blockedSegments.has(name.toLowerCase())) continue;
             const absolutePath = join(dir, name);
             let stats;
             try {
@@ -132,6 +140,7 @@ export async function scanDirectory(rootPath, options = {}) {
                 showHidden,
                 scannedEntries,
                 limitMode: 'informative',
+                denylist: respectDenylist ? 'enabled' : 'disabled',
             },
         });
         publishIoOperation(io, { success: true });

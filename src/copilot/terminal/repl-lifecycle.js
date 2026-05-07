@@ -11,11 +11,14 @@
  * @see module:copilot/terminal/repl-command-router
  */
 
+import { toError } from '#copilot/core';
 import { log } from '#copilot/observability';
 import readline from 'node:readline';
 import { extractAtReferences } from '../presentation/runtime-file-context.js';
 import { addAttachment, setRl } from '../presentation/runtime-ui-state-store.js';
+import { buildTerminalOperationalGuidance } from './auto-briefing.js';
 import { buildUserPrompt, println, sendTurn } from './dialog/index.js';
+import { readTerminalStatusProjection } from './frontend/index.js';
 import { tryAnswerTerminalPendingQuestionInput } from './pending-question-answer.js';
 import { buildTerminalReplBanner } from './repl-banner.js';
 import { parseTerminalReplCommand } from './repl-command-parser.js';
@@ -64,6 +67,22 @@ export async function runReplLifecycle(injectServer, { injectPort, onReady }) {
 
     println(buildTerminalReplBanner(injectPort));
     println('\x1b[90m  Iniciando sessão com LLM-B…\x1b[0m');
+    try {
+        const projection = readTerminalStatusProjection({ injectPort });
+        const guidance = buildTerminalOperationalGuidance({
+            sdkFsRouting: projection.sdkFsRouting,
+            toolLoad: projection.toolLoad,
+            instructionLoad: projection.instructionLoad,
+        });
+        println(`\x1b[90m  [auto-brief] route=${guidance.mode} · ${guidance.summary}\x1b[0m`);
+        println(`\x1b[90m  [auto-brief] ${guidance.domainHint}\x1b[0m`);
+        println(`\x1b[90m  [auto-brief] ${guidance.contextHint}\x1b[0m`);
+        if (guidance.warnings.length > 0) {
+            println(`\x1b[33m  [auto-brief] atenção: ${guidance.warnings.join(' | ')}\x1b[0m`);
+        }
+    } catch (e) {
+        log('WARN', `[TerminalServer] Auto-briefing indisponível no boot: ${toError(e).message}`);
+    }
 
     if (onReady) void onReady();
 

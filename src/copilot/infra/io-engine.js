@@ -392,6 +392,114 @@ export async function appendTextLocked(filePath, content, options = {}) {
 }
 
 /**
+ * Stat canônico com observabilidade. Leitura metadata-only, sem bloqueio por tamanho.
+ *
+ * @param {string} filePath
+ * @param {{ traceId?: string; advisoryLimits?: Record<string, unknown> }} [options]
+ * @returns {Promise<{
+ *     path: string;
+ *     stats: import('node:fs').Stats;
+ *     io: import('../core/io-contracts.js').IoMeta;
+ * }>}
+ */
+export async function statPath(filePath, options = {}) {
+    const traceId = options.traceId ?? createIoTraceId();
+    const startedAt = nowIoMs();
+    try {
+        const stats = await fs.stat(filePath);
+        const io = publishAndReturn(
+            buildIoMeta({
+                operation: 'stat',
+                target: filePath,
+                targetKind: stats.isDirectory() ? 'directory' : 'file',
+                durationMs: elapsedMs(startedAt),
+                engine: 'io-engine.fs.stat',
+                riskClass: 'low',
+                traceId,
+                ...(options.advisoryLimits !== undefined ? { advisoryLimits: options.advisoryLimits } : {}),
+            }),
+            true,
+        );
+        return { path: filePath, stats, io };
+    } catch (error) {
+        publishAndReturn(
+            buildIoMeta({
+                operation: 'stat',
+                target: filePath,
+                targetKind: 'unknown',
+                durationMs: elapsedMs(startedAt),
+                engine: 'io-engine.fs.stat',
+                riskClass: 'low',
+                traceId,
+            }),
+            false,
+            error,
+        );
+        throw error;
+    }
+}
+
+/**
+ * Cria diretório com lock por path, preservando a semântica do SDK SessionFsProvider.mkdir().
+ *
+ * @param {string} dirPath
+ * @param {{ recursive?: boolean; mode?: number; traceId?: string; advisoryLimits?: Record<string, unknown> }} [options]
+ * @returns {Promise<{
+ *     path: string;
+ *     created: true;
+ *     io: import('../core/io-contracts.js').IoMeta;
+ *     lockWaitMs: number;
+ * }>}
+ */
+export async function mkdirPathLocked(dirPath, options = {}) {
+    const traceId = options.traceId ?? createIoTraceId();
+    const startedAt = nowIoMs();
+    try {
+        const { waitMs } = await withIoResourceLock(dirPath, async () =>
+            fs.mkdir(
+                dirPath,
+                options.mode === undefined
+                    ? { recursive: Boolean(options.recursive) }
+                    : { recursive: Boolean(options.recursive), mode: options.mode },
+            ),
+        );
+        const io = publishAndReturn(
+            buildIoMeta({
+                operation: 'mkdir',
+                target: dirPath,
+                targetKind: 'directory',
+                durationMs: elapsedMs(startedAt),
+                engine: 'io-engine.fs.mkdir',
+                riskClass: 'medium',
+                traceId,
+                advisoryLimits: {
+                    ...(options.advisoryLimits ?? {}),
+                    lockWaitMs: waitMs,
+                    recursive: Boolean(options.recursive),
+                },
+            }),
+            true,
+        );
+        return withIoMeta({ path: dirPath, created: /** @type {const} */ (true), lockWaitMs: waitMs }, io);
+    } catch (error) {
+        publishAndReturn(
+            buildIoMeta({
+                operation: 'mkdir',
+                target: dirPath,
+                targetKind: 'directory',
+                durationMs: elapsedMs(startedAt),
+                engine: 'io-engine.fs.mkdir',
+                riskClass: 'medium',
+                traceId,
+            }),
+            false,
+            error,
+        );
+        throw error;
+    }
+}
+
+/**
  * Remove arquivo com lock por path.
  *
  * @param {string} filePath
@@ -429,6 +537,61 @@ export async function deleteFileLocked(filePath) {
                 targetKind: 'file',
                 durationMs: elapsedMs(startedAt),
                 engine: 'io-engine.fs.unlink',
+                riskClass: 'high',
+                traceId,
+            }),
+            false,
+            error,
+        );
+        throw error;
+    }
+}
+
+/**
+ * Remove arquivo ou diretório com lock por path. Usado por Session FS para cobrir `rm` recursivo sem bypass.
+ *
+ * @param {string} filePath
+ * @param {{ recursive?: boolean; force?: boolean; traceId?: string }} [options]
+ * @returns {Promise<{
+ *     path: string;
+ *     deleted: true;
+ *     io: import('../core/io-contracts.js').IoMeta;
+ *     lockWaitMs: number;
+ * }>}
+ */
+export async function removePathLocked(filePath, options = {}) {
+    const traceId = options.traceId ?? createIoTraceId();
+    const startedAt = nowIoMs();
+    try {
+        const { waitMs } = await withIoResourceLock(filePath, async () =>
+            fs.rm(filePath, { recursive: Boolean(options.recursive), force: Boolean(options.force) }),
+        );
+        const io = publishAndReturn(
+            buildIoMeta({
+                operation: 'delete',
+                target: filePath,
+                targetKind: 'unknown',
+                durationMs: elapsedMs(startedAt),
+                engine: 'io-engine.fs.rm',
+                riskClass: 'high',
+                traceId,
+                advisoryLimits: {
+                    lockWaitMs: waitMs,
+                    recursive: Boolean(options.recursive),
+                    force: Boolean(options.force),
+                },
+            }),
+            true,
+        );
+        return withIoMeta({ path: filePath, deleted: /** @type {const} */ (true), lockWaitMs: waitMs }, io);
+    } catch (error) {
+        publishAndReturn(
+            buildIoMeta({
+                operation: 'delete',
+                target: filePath,
+                targetKind: 'unknown',
+                durationMs: elapsedMs(startedAt),
+                engine: 'io-engine.fs.rm',
                 riskClass: 'high',
                 traceId,
             }),

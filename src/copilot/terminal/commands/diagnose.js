@@ -64,6 +64,7 @@ export async function cmdDiagnose({ hubSessionId, println }, arg = '') {
         activity,
         display,
         lifecycle,
+        sdkFsRouting,
     } = await readTerminalDiagnoseProjection(withRuntimeTarget({ hubSessionId: hubSessionId ?? null }, runtimeId));
 
     const agentStatusColor =
@@ -156,6 +157,12 @@ export async function cmdDiagnose({ hubSessionId, println }, arg = '') {
         slowestBootPhase || slowestShutdownHandler
             ? `${slowestBootPhase ? `boot=${slowestBootPhase.id}/${slowestBootPhase.avgDurationMs}ms avg` : 'boot=n/d'} ${C.grey}·${C.reset} ${slowestShutdownHandler ? `shutdown=${slowestShutdownHandler.name}/${slowestShutdownHandler.avgDurationMs}ms avg` : 'shutdown=n/d'}`
             : `${C.grey}n/d${C.reset}`;
+    const sdkFsRouteModeColor =
+        sdkFsRouting.mode === 'local-fs-primary'
+            ? C.green
+            : sdkFsRouting.mode === 'sdk-workspace-only'
+              ? C.yellow
+              : C.red;
 
     println(`
 ${C.bold}${C.cyan}╔══════════════════════════════════════════════════════════════╗${C.reset}
@@ -195,6 +202,7 @@ ${C.cyan}  INFRAESTRUTURA${C.reset}
     Lifecycle mx  ${lifecycleMetricsLine}
     Uptime        ${C.grey}${Math.floor(uptimeSec / 60)}m ${uptimeSec % 60}s${C.reset}
     Memória RSS   ${memMB > 400 ? C.yellow : C.grey}${memMB}MB${C.reset}
+    sdk↔fs route  ${sdkFsRouteModeColor}${sdkFsRouting.mode}${C.reset} ${C.grey}(${sdkFsRouting.reason})${C.reset}
 
 ${C.cyan}  TODOs PENDENTES (top-5)${C.reset}
 ${todoLines}

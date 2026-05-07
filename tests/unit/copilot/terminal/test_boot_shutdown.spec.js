@@ -26,6 +26,7 @@ describe('terminal/terminal-phases/boot-shutdown', () => {
                 pinnedFilesChangedHandler: null,
                 activityChangedHandler: null,
                 terminalActivityChangedHandler: null,
+                disposeIoActivityEvents: null,
                 copilotServer: null,
                 todoCleanupTimer: null,
             }),

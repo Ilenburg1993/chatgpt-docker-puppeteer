@@ -9,9 +9,9 @@
  */
 
 import { WORKSPACE_ROOT as BOOT_WORKSPACE_ROOT } from '#copilot/boot';
+import { DEFAULT_BLOCKED_READ_PATH_PATTERNS, evaluateIoPathPolicyAsync } from '#copilot/core';
 import { isAscii, isUtf8 } from 'node:buffer';
 import { execFile } from 'node:child_process';
-import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { promisify } from 'node:util';
 import { log } from '../logger.js';
@@ -59,45 +59,7 @@ export async function isRgAvailable() {
  *
  * @type {RegExp[]}
  */
-export const BLOCKED_PATTERNS_SECRETS = [
-    /\.env$/i,
-    /\.env\./i,
-    /\.pem$/i,
-    /\.key$/i,
-    /secret/i,
-    /\.passwd$/i,
-    /credentials/i,
-    /\.pfx$/i,
-    /\.p12$/i,
-    /id_rsa/i,
-    /id_ed25519/i,
-    /\.npmrc$/i,
-    /\.netrc$/i,
-];
-
-/**
- * Padrões adicionais bloqueados apenas para operações de ESCRITA (executáveis que não devem ser criados/sobrescritos).
- *
- * @type {RegExp[]}
- */
-const BLOCKED_PATTERNS_WRITE_ONLY = [
-    /\.exe$/i,
-    /\.bat$/i,
-    /\.cmd$/i,
-    /\.sh$/i,
-    /\.ps1$/i,
-    /\.msi$/i,
-    /\.dll$/i,
-    /\.so$/i,
-    /\.dylib$/i,
-];
-
-/**
- * Todos os padrões bloqueados (secrets + executáveis) — para operações de escrita.
- *
- * @type {RegExp[]}
- */
-const BLOCKED_PATTERNS = [...BLOCKED_PATTERNS_SECRETS, ...BLOCKED_PATTERNS_WRITE_ONLY];
+export const BLOCKED_PATTERNS_SECRETS = [...DEFAULT_BLOCKED_READ_PATH_PATTERNS];
 
 /**
  * Verifica se um caminho está dentro do workspace autorizado e não é um arquivo bloqueado.
@@ -116,41 +78,19 @@ export async function validatePath(filePath, opts) {
 
     const mode = opts?.mode ?? 'write';
     const normalizedWorkspaceRoot = path.resolve(WORKSPACE_ROOT);
-    const resolved = path.isAbsolute(filePath)
-        ? path.resolve(filePath)
-        : path.resolve(normalizedWorkspaceRoot, filePath);
-
-    // SEC-04 / BUG-H06 (fix): resolver symlinks antes de verificar containment.
-    // F3.4 (BUG-MOD-08): usar realpath assíncrono para não bloquear o event loop.
-    let realResolved = resolved;
-    try {
-        realResolved = await fs.promises.realpath(resolved);
-    } catch {
-        try {
-            const parentDir = await fs.promises.realpath(path.dirname(resolved));
-            realResolved = path.join(parentDir, path.basename(resolved));
-        } catch {
-            // Diretório pai também não existe; usar o caminho resolvido normalmente
-        }
+    const policy = await evaluateIoPathPolicyAsync(filePath, {
+        workspaceRoot: normalizedWorkspaceRoot,
+        mode,
+    });
+    if (!policy.ok) {
+        return {
+            ok: false,
+            reason: `Acesso negado: ${policy.reason}`,
+            resolved: '',
+        };
     }
 
-    const relativeToWorkspace = path.relative(normalizedWorkspaceRoot, realResolved);
-
-    // Impede traversal fora do workspace
-    if (relativeToWorkspace.startsWith('..') || path.isAbsolute(relativeToWorkspace)) {
-        return { ok: false, reason: `Acesso negado: caminho fora do workspace (${realResolved})`, resolved };
-    }
-
-    // Impede acesso a arquivos bloqueados
-    const patterns = mode === 'read' ? BLOCKED_PATTERNS_SECRETS : BLOCKED_PATTERNS;
-    const basename = path.basename(resolved);
-    for (const pattern of patterns) {
-        if (pattern.test(basename)) {
-            return { ok: false, reason: `Acesso negado: arquivo protegido (${basename})`, resolved };
-        }
-    }
-
-    return { ok: true, resolved };
+    return { ok: true, resolved: policy.realPath };
 }
 
 // ---------------------------------------------------------------------------

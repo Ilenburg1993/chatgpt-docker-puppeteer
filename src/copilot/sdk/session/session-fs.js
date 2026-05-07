@@ -9,16 +9,19 @@
  * @module copilot/sdk/session/session-fs
  */
 
-import {
-    mkdir as fsMkdir,
-    readFile as fsReadFile,
-    readdir as fsReaddir,
-    rm as fsRm,
-    stat as fsStat,
-} from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { readCopilotSessionFsBootConfig } from '../../boot/session-fs.js';
-import { appendTextLocked, createOrReplaceFileAtomic, moveFileLocked } from '../../infra/io-engine.js';
+import { evaluateIoPathPolicyAsync } from '../../core/io-policy.js';
+import {
+    appendTextLocked,
+    createOrReplaceFileAtomic,
+    mkdirPathLocked,
+    moveFileLocked,
+    readText,
+    removePathLocked,
+    statPath,
+} from '../../infra/io-engine.js';
+import { scanDirectory } from '../../infra/io-scanner.js';
 import { classifySdkError } from '../errors.js';
 import { log } from '../logger.js';
 import { emitSdkOperationMetric } from '../telemetry/operation-metrics.js';
@@ -42,6 +45,15 @@ function safePathDepth(path) {
     } catch {
         return undefined;
     }
+}
+
+/**
+ * @param {unknown} error
+ * @returns {boolean}
+ */
+function isNotFoundError(error) {
+    const code = /** @type {{ code?: unknown }} */ (error ?? {}).code;
+    return code === 'ENOENT' || code === 'ENOTDIR';
 }
 
 /**
@@ -101,11 +113,22 @@ function normalizeRelativeSegments(inputPath) {
 /**
  * @param {string} rootDir
  * @param {string} inputPath
- * @returns {string}
+ * @param {'read' | 'write'} [mode]
+ * @returns {Promise<string>}
  */
-function resolveWithinRoot(rootDir, inputPath) {
-    const segments = normalizeRelativeSegments(inputPath);
-    return resolve(rootDir, ...segments);
+async function resolveWithinRoot(rootDir, inputPath, mode = 'read') {
+    const policy = await evaluateIoPathPolicyAsync(inputPath, {
+        workspaceRoot: rootDir,
+        mode,
+    });
+
+    if (!policy.ok) {
+        const error = new Error(`[sdk/session-fs] ${policy.reason}`);
+        /** @type {{ code?: string }} */ (error).code = 'EINVAL';
+        throw error;
+    }
+
+    return policy.realPath;
 }
 
 /**
@@ -159,8 +182,9 @@ export function createLocalSessionFsProvider(rootDir, options = {}) {
             return instrumentSessionFsOperation(
                 'session.fs.readFile',
                 async () => {
-                    const target = resolveWithinRoot(root, path);
-                    return fsReadFile(target, 'utf8');
+                    const target = await resolveWithinRoot(root, path, 'read');
+                    const result = await readText(target, { advisoryLimits: { source: 'session.fs' } });
+                    return result.content;
                 },
                 createOperationContext(sessionId, { provider: 'local', pathDepth: safePathDepth(path) }),
             );
@@ -169,7 +193,7 @@ export function createLocalSessionFsProvider(rootDir, options = {}) {
             return instrumentSessionFsOperation(
                 'session.fs.writeFile',
                 async () => {
-                    const target = resolveWithinRoot(root, path);
+                    const target = await resolveWithinRoot(root, path, 'write');
                     await createOrReplaceFileAtomic(target, content, {
                         encoding: 'utf8',
                         createParentDirs: true,
@@ -189,8 +213,11 @@ export function createLocalSessionFsProvider(rootDir, options = {}) {
             return instrumentSessionFsOperation(
                 'session.fs.appendFile',
                 async () => {
-                    const target = resolveWithinRoot(root, path);
-                    await fsMkdir(dirname(target), { recursive: true });
+                    const target = await resolveWithinRoot(root, path, 'write');
+                    await mkdirPathLocked(dirname(target), {
+                        recursive: true,
+                        advisoryLimits: { source: 'session.fs.parent' },
+                    });
                     await appendTextLocked(target, content, {
                         encoding: 'utf8',
                         advisoryLimits: { source: 'session.fs' },
@@ -209,10 +236,13 @@ export function createLocalSessionFsProvider(rootDir, options = {}) {
                 'session.fs.exists',
                 async () => {
                     try {
-                        await fsStat(resolveWithinRoot(root, path));
+                        await statPath(await resolveWithinRoot(root, path, 'read'), {
+                            advisoryLimits: { source: 'session.fs' },
+                        });
                         return true;
-                    } catch {
-                        return false;
+                    } catch (error) {
+                        if (isNotFoundError(error)) return false;
+                        throw error;
                     }
                 },
                 createOperationContext(sessionId, { provider: 'local', pathDepth: safePathDepth(path) }),
@@ -222,8 +252,8 @@ export function createLocalSessionFsProvider(rootDir, options = {}) {
             return instrumentSessionFsOperation(
                 'session.fs.stat',
                 async () => {
-                    const target = resolveWithinRoot(root, path);
-                    const stats = await fsStat(target);
+                    const target = await resolveWithinRoot(root, path, 'read');
+                    const { stats } = await statPath(target, { advisoryLimits: { source: 'session.fs' } });
                     return {
                         isFile: stats.isFile(),
                         isDirectory: stats.isDirectory(),
@@ -239,8 +269,12 @@ export function createLocalSessionFsProvider(rootDir, options = {}) {
             return instrumentSessionFsOperation(
                 'session.fs.mkdir',
                 async () => {
-                    const target = resolveWithinRoot(root, path);
-                    await fsMkdir(target, { recursive, mode });
+                    const target = await resolveWithinRoot(root, path, 'write');
+                    await mkdirPathLocked(target, {
+                        recursive,
+                        advisoryLimits: { source: 'session.fs' },
+                        ...(mode === undefined ? {} : { mode }),
+                    });
                 },
                 createOperationContext(sessionId, {
                     provider: 'local',
@@ -252,7 +286,15 @@ export function createLocalSessionFsProvider(rootDir, options = {}) {
         async readdir(path) {
             return instrumentSessionFsOperation(
                 'session.fs.readdir',
-                async () => fsReaddir(resolveWithinRoot(root, path)),
+                async () => {
+                    const target = await resolveWithinRoot(root, path, 'read');
+                    const scan = await scanDirectory(target, {
+                        workspaceRoot: root,
+                        showHidden: true,
+                        recursive: false,
+                    });
+                    return scan.entries.map((entry) => entry.name);
+                },
                 createOperationContext(sessionId, { provider: 'local', pathDepth: safePathDepth(path) }),
             );
         },
@@ -260,11 +302,18 @@ export function createLocalSessionFsProvider(rootDir, options = {}) {
             return instrumentSessionFsOperation(
                 'session.fs.readdirWithTypes',
                 async () => {
-                    const entries = await fsReaddir(resolveWithinRoot(root, path), { withFileTypes: true });
-                    return entries.map((entry) => ({
-                        name: entry.name,
-                        type: entry.isDirectory() ? 'directory' : 'file',
-                    }));
+                    const target = await resolveWithinRoot(root, path, 'read');
+                    const scan = await scanDirectory(target, {
+                        workspaceRoot: root,
+                        showHidden: true,
+                        recursive: false,
+                    });
+                    return scan.entries
+                        .filter((entry) => entry.type === 'file' || entry.type === 'directory')
+                        .map((entry) => ({
+                            name: entry.name,
+                            type: entry.type,
+                        }));
                 },
                 createOperationContext(sessionId, { provider: 'local', pathDepth: safePathDepth(path) }),
             );
@@ -273,7 +322,7 @@ export function createLocalSessionFsProvider(rootDir, options = {}) {
             return instrumentSessionFsOperation(
                 'session.fs.rm',
                 async () => {
-                    await fsRm(resolveWithinRoot(root, path), { recursive, force });
+                    await removePathLocked(await resolveWithinRoot(root, path, 'write'), { recursive, force });
                 },
                 createOperationContext(sessionId, {
                     provider: 'local',
@@ -287,8 +336,8 @@ export function createLocalSessionFsProvider(rootDir, options = {}) {
             return instrumentSessionFsOperation(
                 'session.fs.rename',
                 async () => {
-                    const srcTarget = resolveWithinRoot(root, src);
-                    const destTarget = resolveWithinRoot(root, dest);
+                    const srcTarget = await resolveWithinRoot(root, src, 'read');
+                    const destTarget = await resolveWithinRoot(root, dest, 'write');
                     await moveFileLocked(srcTarget, destTarget, { overwrite: true });
                 },
                 createOperationContext(sessionId, {

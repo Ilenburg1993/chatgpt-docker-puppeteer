@@ -11,8 +11,16 @@
  */
 
 import { WEB_SEARCH_DISABLED } from '#copilot/config';
-import { logSwallowed, toError, validateUrl } from '#copilot/core';
+import {
+    buildIoMeta,
+    evaluateIoUrlPolicy,
+    logSwallowed,
+    sanitizeIoTextOutput,
+    toError,
+    withIoMeta,
+} from '#copilot/core';
 import { z } from 'zod';
+import { publishIoOperation } from '../infra/io-observability.js';
 import { log } from './logger.js';
 import { buildTool } from './tool-factory.js';
 
@@ -48,6 +56,26 @@ function checkRateLimit() {
     return true;
 }
 
+/**
+ * @param {{ title: string; url: string; snippet: string }[]} results
+ * @returns {{ results: { title: string; url: string; snippet: string }[]; redactions: number; sanitized: boolean }}
+ */
+function sanitizeWebSearchResults(results) {
+    let redactions = 0;
+    let sanitized = false;
+    return {
+        results: results.map((result) => {
+            const title = sanitizeIoTextOutput({ text: result.title });
+            const snippet = sanitizeIoTextOutput({ text: result.snippet });
+            redactions += title.redactions + snippet.redactions;
+            sanitized = sanitized || title.sanitized || snippet.sanitized;
+            return { ...result, title: title.text, snippet: snippet.text };
+        }),
+        redactions,
+        sanitized,
+    };
+}
+
 // ─── Tool: web_fetch_local ───────────────────────────────────────────────────
 
 /**
@@ -71,19 +99,12 @@ const webFetchTool = buildTool({
     ) => {
         checkRateLimit();
 
-        // Parse + validate URL
-        let parsed;
-        try {
-            parsed = new URL(url);
-        } catch {
-            return { success: false, error: 'URL inválida.' };
+        const inputUrlDecision = evaluateIoUrlPolicy({ input: url });
+        if (!inputUrlDecision.ok || !inputUrlDecision.url) {
+            log('WARN', `[copilot/web_fetch] URL bloqueada: ${inputUrlDecision.reason} (${url})`);
+            return { success: false, error: `URL bloqueada por política de segurança: ${inputUrlDecision.reason}` };
         }
-
-        const { safe, reason } = validateUrl(parsed);
-        if (!safe) {
-            log('WARN', `[copilot/web_fetch] URL bloqueada: ${reason} (${url})`);
-            return { success: false, error: `URL bloqueada por política de segurança: ${reason}` };
-        }
+        const parsed = inputUrlDecision.url;
 
         const advisoryLimit = maxBytes ?? null;
 
@@ -96,8 +117,8 @@ const webFetchTool = buildTool({
 
             // Validate redirect target (prevent header-injection redirect to internal)
             const finalUrl = response.url ? new URL(response.url) : parsed;
-            const redirectCheck = validateUrl(finalUrl);
-            if (!redirectCheck.safe) {
+            const redirectCheck = evaluateIoUrlPolicy({ input: finalUrl.toString() });
+            if (!redirectCheck.ok) {
                 log('WARN', `[copilot/web_fetch] Redirect bloqueado para host privado: ${finalUrl.hostname}`);
                 return { success: false, error: `Redirect bloqueado: ${redirectCheck.reason}` };
             }
@@ -135,19 +156,41 @@ const webFetchTool = buildTool({
                 })(),
             );
 
-            log('INFO', `[copilot/web_fetch] ${url} → ${response.status} (${text.length} chars)`);
-            return {
-                success: true,
-                url: response.url,
-                status: response.status,
-                contentType,
+            const sanitized = sanitizeIoTextOutput({ text });
+            const io = buildIoMeta({
+                operation: 'fetch',
+                target: response.url,
+                targetKind: 'url',
+                bytesRead: Buffer.byteLength(sanitized.text, 'utf8'),
+                engine: 'fetch',
                 truncated: false,
-                advisoryMaxBytes: advisoryLimit,
-                advisoryTimeoutMs: timeoutMs ?? null,
-                bytesRead: received,
-                length: text.length,
-                content: text,
-            };
+                advisoryLimits: {
+                    requestedMaxBytes: advisoryLimit,
+                    advisoryTimeoutMs: timeoutMs ?? null,
+                    redactions: sanitized.redactions,
+                    policyDecision: inputUrlDecision.ok ? 'allow' : 'deny',
+                    policyVersion: inputUrlDecision.policyVersion,
+                },
+            });
+            publishIoOperation(io, { success: true });
+            log('INFO', `[copilot/web_fetch] ${url} → ${response.status} (${sanitized.text.length} chars)`);
+            return withIoMeta(
+                {
+                    success: true,
+                    url: response.url,
+                    status: response.status,
+                    contentType,
+                    truncated: false,
+                    advisoryMaxBytes: advisoryLimit,
+                    advisoryTimeoutMs: timeoutMs ?? null,
+                    bytesRead: received,
+                    length: sanitized.text.length,
+                    content: sanitized.text,
+                    sanitized: sanitized.sanitized,
+                    redactions: sanitized.redactions,
+                },
+                { ...io, policyVersion: sanitized.policyVersion },
+            );
         } catch (e) {
             const msg = toError(e).message ?? String(e);
             log('WARN', `[copilot/web_fetch] Erro: ${msg}`);
@@ -239,21 +282,40 @@ const webSearchTool = buildTool({
                     // F6.4 (BUG-LEVE-04): filtrar URLs privadas/SSRF nos resultados DDG (JSON API)
                     const safeResults = results.filter((r) => {
                         try {
-                            return validateUrl(new URL(r.url)).safe;
+                            return evaluateIoUrlPolicy({ input: r.url }).ok;
                         } catch {
                             return false;
                         }
                     });
+                    const sanitizedResults = sanitizeWebSearchResults(safeResults.slice(0, limit));
+                    const io = buildIoMeta({
+                        operation: 'search',
+                        target: jsonUrl,
+                        targetKind: 'url',
+                        bytesRead: Buffer.byteLength(JSON.stringify(sanitizedResults.results), 'utf8'),
+                        engine: 'duckduckgo.json',
+                        advisoryLimits: {
+                            requestedMaxResults: maxResults ?? null,
+                            limitMode: 'informative',
+                            redactions: sanitizedResults.redactions,
+                        },
+                    });
+                    publishIoOperation(io, { success: true });
                     log(
                         'INFO',
                         `[copilot/web_search] DDG JSON API: query="${query}" → ${safeResults.length} resultados`,
                     );
-                    return {
-                        success: true,
-                        query,
-                        results: safeResults.slice(0, limit),
-                        advisoryMaxResults: maxResults ?? null,
-                    };
+                    return withIoMeta(
+                        {
+                            success: true,
+                            query,
+                            results: sanitizedResults.results,
+                            advisoryMaxResults: maxResults ?? null,
+                            sanitized: sanitizedResults.sanitized,
+                            redactions: sanitizedResults.redactions,
+                        },
+                        io,
+                    );
                 }
                 // Sem resultados JSON — cai para HTML scraping
                 log(
@@ -332,13 +394,37 @@ const webSearchTool = buildTool({
             // F6.4 (BUG-LEVE-04): filtrar URLs privadas/SSRF nos resultados DDG (HTML scraping)
             const safeHtmlResults = results.filter((r) => {
                 try {
-                    return validateUrl(new URL(r.url)).safe;
+                    return evaluateIoUrlPolicy({ input: r.url }).ok;
                 } catch {
                     return false;
                 }
             });
+            const sanitizedResults = sanitizeWebSearchResults(safeHtmlResults);
+            const io = buildIoMeta({
+                operation: 'search',
+                target: searchUrl,
+                targetKind: 'url',
+                bytesRead: Buffer.byteLength(JSON.stringify(sanitizedResults.results), 'utf8'),
+                engine: 'duckduckgo.html',
+                advisoryLimits: {
+                    requestedMaxResults: maxResults ?? null,
+                    limitMode: 'informative',
+                    redactions: sanitizedResults.redactions,
+                },
+            });
+            publishIoOperation(io, { success: true });
             log('INFO', `[copilot/web_search] query="${query}" → ${safeHtmlResults.length} resultados`);
-            return { success: true, query, results: safeHtmlResults };
+            return withIoMeta(
+                {
+                    success: true,
+                    query,
+                    results: sanitizedResults.results,
+                    advisoryMaxResults: maxResults ?? null,
+                    sanitized: sanitizedResults.sanitized,
+                    redactions: sanitizedResults.redactions,
+                },
+                io,
+            );
         } catch (e) {
             const msg = toError(e).message ?? String(e);
             log('WARN', `[copilot/web_search] Erro: ${msg}`);

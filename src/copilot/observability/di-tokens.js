@@ -27,3 +27,10 @@ export const ERROR_TRACKER = createToken('ERROR_TRACKER');
  * @type {import('../core/di.js').Token<import('./event-collector.js').EventCollector>}
  */
 export const EVENT_COLLECTOR = createToken('EVENT_COLLECTOR');
+
+/**
+ * Store de traces de convergência SDK↔FS.
+ *
+ * @type {import('../core/di.js').Token<import('./convergence-trace-store.js').ConvergenceTraceStore>}
+ */
+export const CONVERGENCE_TRACE_STORE = createToken('CONVERGENCE_TRACE_STORE');

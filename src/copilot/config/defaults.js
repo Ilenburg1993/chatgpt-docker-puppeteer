@@ -14,6 +14,4 @@
  *
  * @type {readonly string[]}
  */
-export const DEFAULT_EXCLUDED_TOOLS = /** @type {readonly string[]} */ (
-    Object.freeze(['powershell', 'web_fetch', 'web_search', 'memory'])
-);
+export const DEFAULT_EXCLUDED_TOOLS = Object.freeze([]);

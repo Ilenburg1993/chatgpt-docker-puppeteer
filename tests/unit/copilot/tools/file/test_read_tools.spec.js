@@ -74,6 +74,18 @@ describe('tools/file/readFileContentTool', () => {
         expect(r.content).toContain('line4');
     });
 
+    it('sanitiza segredos textuais na leitura canônica', async () => {
+        fs.writeFileSync(fileA, 'token=Bearer abcdefghijklmnopqrstuvwxyz1234567890\n');
+        const handler = /** @type {any} */ (getHandler(readFileContentTool));
+        const r = await handler({ path: fileA, encoding: 'utf8' });
+
+        expect(r.success).toBe(true);
+        expect(r.content).toContain('Bearer [redacted]');
+        expect(r.content).not.toContain('abcdefghijklmnopqrstuvwxyz1234567890');
+        expect(r.sanitized).toBe(true);
+        expect(r.redactions).toBeGreaterThanOrEqual(1);
+    });
+
     it('suporta startLine e endLine', async () => {
         const handler = /** @type {any} */ (getHandler(readFileContentTool));
         const r = await handler({ path: fileA, startLine: 2, endLine: 3, encoding: 'utf8' });
@@ -182,6 +194,25 @@ describe('tools/file/searchInFilesTool', () => {
         expect(r.success).toBe(true);
         expect(r.io?.operation).toBe('search');
         expect(r.output).toContain('line2');
+    });
+
+    it('sanitiza segredos textuais em saída de busca', async () => {
+        fs.writeFileSync(path.join(tmpDir, 'token.txt'), 'token=Bearer abcdefghijklmnopqrstuvwxyz1234567890\n');
+        const handler = /** @type {any} */ (getHandler(searchInFilesTool));
+        const r = await handler({
+            pattern: 'Bearer',
+            path: tmpDir,
+            isRegex: false,
+            caseSensitive: false,
+            contextLines: 0,
+            maxResults: 10,
+        });
+
+        expect(r.success).toBe(true);
+        expect(r.output).toContain('Bearer [redacted]');
+        expect(r.output).not.toContain('abcdefghijklmnopqrstuvwxyz1234567890');
+        expect(r.sanitized).toBe(true);
+        expect(r.redactions).toBeGreaterThanOrEqual(1);
     });
 
     it('busca regex', async () => {

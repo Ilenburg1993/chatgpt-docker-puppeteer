@@ -232,10 +232,10 @@ describe('always-alive › dialog loop: protocolo 0-PR', async () => {
         );
     });
 
-    it('sendTurn() tem timeout configurável (padrão via LLM_B_TURN_TIMEOUT_MS)', () => {
+    it('sendTurn() opera sem timeout bloqueante e mantém timeout apenas como advisory', () => {
         assert.ok(
-            dlmSourceCode.includes('timeout = LLM_B_TURN_TIMEOUT_MS'),
-            'sendTurn deve usar timeout padrão configurado por LLM_B_TURN_TIMEOUT_MS',
+            dlmSourceCode.includes('timeout = null') || dlmSourceCode.includes('timeout ?? null'),
+            'sendTurn deve manter timeout bloqueante desabilitado para LLM-B',
         );
     });
 

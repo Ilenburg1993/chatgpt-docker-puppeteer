@@ -1,6 +1,7 @@
 // @ts-check
 
 import { readTerminalActivityProjection } from '../frontend/index.js';
+import { readTerminalIoActivityProjection } from '../io-activity-events.js';
 
 /**
  * @typedef {{ println: (text: string) => void }} ActivityContext
@@ -24,7 +25,9 @@ function printTurnTraceSummary(println, title, trace) {
     if (trace.files.length > 0) {
         println('  arquivos tocados');
         for (const file of trace.files.slice(0, 5)) {
-            println(`    - ${file.operation} · ${file.path}${file.count > 1 ? ` ×${file.count}` : ''}`);
+            println(
+                `    - ${file.operation} · ${file.path}${file.count > 1 ? ` ×${file.count}` : ''} · ${file.source}`,
+            );
         }
     }
 
@@ -33,7 +36,7 @@ function printTurnTraceSummary(println, title, trace) {
         for (const tool of trace.tools.slice(0, 5)) {
             const target = tool.path ?? tool.target;
             println(
-                `    - ${tool.toolName} · ${tool.operation}${target ? ` · ${target}` : ''}${tool.status ? ` · ${tool.status}` : ''}`,
+                `    - ${tool.toolName} · ${tool.operation}${target ? ` · ${target}` : ''}${tool.status ? ` · ${tool.status}` : ''} · ${tool.source}`,
             );
         }
     }
@@ -70,6 +73,7 @@ function pickMostUsefulRecentTurnTrace(recent) {
 export function cmdActivity({ println }, arg) {
     const limit = Number(arg);
     const projection = readTerminalActivityProjection(Number.isFinite(limit) && limit > 0 ? limit : 10);
+    const recentIo = readTerminalIoActivityProjection(Number.isFinite(limit) && limit > 0 ? limit : 10);
     const current = projection.current;
     const activeTurnTrace = projection.turnTrace.current ?? projection.turnTrace.recent[0] ?? null;
     const recentNonCurrent = projection.turnTrace.recent.filter((entry) => entry.traceId !== activeTurnTrace?.traceId);
@@ -93,6 +97,28 @@ export function cmdActivity({ println }, arg) {
 
     if (latestCompletedTurnTrace && latestCompletedTurnTrace.traceId !== activeTurnTrace?.traceId) {
         printTurnTraceSummary(println, 'Último turno concluído', latestCompletedTurnTrace);
+    }
+
+    if (recentIo.length > 0) {
+        println('  \x1b[36mI/O real recente\x1b[0m');
+        for (const entry of recentIo.slice(0, 8)) {
+            const ts = new Date(entry.timestamp).toLocaleTimeString('pt-BR', {
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit',
+            });
+            const sev = entry.success ? '\x1b[90m' : '\x1b[31m';
+            const bytes =
+                typeof entry.bytesRead === 'number'
+                    ? ` · read=${entry.bytesRead}B`
+                    : typeof entry.bytesWritten === 'number'
+                      ? ` · write=${entry.bytesWritten}B`
+                      : '';
+            const duration = typeof entry.durationMs === 'number' ? ` · ${entry.durationMs}ms` : '';
+            const engine = entry.engine ? ` · ${entry.engine}` : '';
+            println(`  ${sev}[${ts}]\x1b[0m ${entry.operation} · ${entry.target}${bytes}${duration}${engine}`);
+        }
+        println('  ─────────────────────────────────────');
     }
 
     if (projection.history.length === 0) {

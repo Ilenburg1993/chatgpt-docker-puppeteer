@@ -85,6 +85,7 @@ export { startReflectionLoop, stopReflectionLoop } from './terminal-phases/boot-
  *           previous?: import('./activity-state.js').TerminalActivitySnapshot,
  *       ) => void)
  *     | null} terminalActivityChangedHandler
+ * @property {(() => void) | null} disposeIoActivityEvents
  * @property {TerminalCopilotServer | null} copilotServer
  * @property {NodeJS.Timeout | null} todoCleanupTimer
  */
@@ -116,6 +117,7 @@ export function createTerminalBootContext(options = {}) {
         pinnedFilesChangedHandler: null,
         activityChangedHandler: null,
         terminalActivityChangedHandler: null,
+        disposeIoActivityEvents: null,
         copilotServer: null,
         todoCleanupTimer: null,
     };

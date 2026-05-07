@@ -8,6 +8,7 @@
 
 import { extname, resolve as pathResolve } from 'node:path';
 import { logSwallowed, toError } from '../core/error-handlers.js';
+import { evaluateIoPathPolicyAsync } from '../core/io-policy.js';
 import { readText } from '../infra/io-engine.js';
 import { scanDirectory } from '../infra/io-scanner.js';
 
@@ -113,7 +114,11 @@ export function detectLang(filePath) {
  * @throws {Error} Se o arquivo não existir
  */
 export async function readFileContext(filePath) {
-    const absPath = pathResolve(filePath);
+    const policy = await evaluateIoPathPolicyAsync(filePath, { workspaceRoot: process.cwd(), mode: 'read' });
+    if (!policy.ok) {
+        throw new Error(policy.reason);
+    }
+    const absPath = pathResolve(policy.realPath);
 
     const now = Date.now();
     const cached = _fileCache.get(absPath);
@@ -213,7 +218,11 @@ export function extractAtReferences(message) {
  * @throws {Error} Se o diretório não existir ou não for legível
  */
 export async function readDirectoryContext(dirPath) {
-    const absPath = pathResolve(dirPath);
+    const policy = await evaluateIoPathPolicyAsync(dirPath, { workspaceRoot: process.cwd(), mode: 'read' });
+    if (!policy.ok) {
+        throw new Error(policy.reason);
+    }
+    const absPath = pathResolve(policy.realPath);
     const scan = await scanDirectory(absPath, { showHidden: true, recursive: false });
     const files = scan.entries.filter((entry) => entry.type === 'file');
 

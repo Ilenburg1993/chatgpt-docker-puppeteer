@@ -21,22 +21,16 @@ describe('copilot/config — DEFAULT_EXCLUDED_TOOLS structural', () => {
         assert.ok(CONFIG_SRC.includes('export const DEFAULT_EXCLUDED_TOOLS'));
     });
 
-    it('deve excluir powershell por default', () => {
-        assert.ok(CONFIG_SRC.includes("'powershell'"));
-    });
-
-    it('deve excluir web_fetch por default', () => {
-        assert.ok(CONFIG_SRC.includes("'web_fetch'"));
-    });
-
-    it('deve excluir web_search por default', () => {
-        assert.ok(CONFIG_SRC.includes("'web_search'"));
-    });
-
-    it('deve excluir memory por default', () => {
-        const match = CONFIG_SRC.match(/DEFAULT_EXCLUDED_TOOLS[\s\S]*?\[([^\]]+)\]/);
+    it('não deve excluir nenhuma tool por default', () => {
+        const match = CONFIG_SRC.match(/DEFAULT_EXCLUDED_TOOLS[\s\S]*?\[([^\]]*)\]/);
         assert.ok(match, 'DEFAULT_EXCLUDED_TOOLS deve ser um array');
-        assert.ok(match[1]?.includes("'memory'"));
+        const values =
+            match[1]
+                ?.split(',')
+                .map((part) => part.trim())
+                .filter(Boolean)
+                .filter((part) => !part.startsWith('//')) ?? [];
+        assert.equal(values.length, 0);
     });
 });
 

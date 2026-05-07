@@ -24,6 +24,20 @@ vi.mock('#copilot/core', async (importOriginal) => {
     return {
         ...actual,
         container: { resolve: mocks.resolve },
+        DEFAULT_BLOCKED_READ_PATH_PATTERNS: actual.DEFAULT_BLOCKED_READ_PATH_PATTERNS ?? [],
+        DEFAULT_BLOCKED_WRITE_PATH_PATTERNS: actual.DEFAULT_BLOCKED_WRITE_PATH_PATTERNS ?? [],
+        evaluateIoPathPolicyAsync:
+            actual.evaluateIoPathPolicyAsync ??
+            vi.fn(async () => ({
+                ok: true,
+                absolutePath: process.cwd(),
+                relativePath: '.',
+                workspaceRoot: process.cwd(),
+                policyVersion: 'test',
+                blockedSegments: [],
+                realPath: process.cwd(),
+                symlinkResolved: false,
+            })),
         registerShutdownHandler: vi.fn(),
         runShutdown: vi.fn(async () => []),
         isShuttingDown: vi.fn(() => false),
@@ -70,6 +84,17 @@ vi.mock('#copilot/observability', () => ({
     defaultMetrics: {
         getSummary: vi.fn(() => ({ tools: {}, tokens: {}, sessions: {}, gauges: {}, counters: {} })),
     },
+    defaultConvergenceTraceStore: {
+        clear: vi.fn(),
+        getSnapshot: vi.fn(() => ({
+            totalTraces: 0,
+            operations: {},
+            traces: [],
+            selectedTrace: null,
+            updatedAt: null,
+        })),
+        recordMetric: vi.fn(),
+    },
     getCatalog: vi.fn(() => ({})),
     getCompactionHistory: vi.fn(() => []),
     getDeadLetters: vi.fn(() => []),
@@ -92,6 +117,7 @@ vi.mock('#copilot/sdk', () => ({
     patchToolsConfig: vi.fn(),
     createToolRegistryAdapter: vi.fn(() => ({})),
     disconnectClientSession: vi.fn(),
+    emitSdkOperationMetric: vi.fn(),
     getClient: mocks.getClient,
     getClientSession: vi.fn(),
     getClientState: mocks.getClientState,
@@ -240,7 +266,9 @@ describe('server/routes/sdk/deps.js', () => {
         expect(deps.sdkSessionOwnership).toHaveProperty('resolveSdkRuntimeProjection');
         expect(deps.sdkSessionOwnership).toHaveProperty('resolveSdkRuntimeProjectionForRuntime');
         expect(deps.sdkObservability).toHaveProperty('getCompactionHistory');
+        expect(deps.sdkObservability).toHaveProperty('convergenceTraceStore');
         expect(deps.sdkHooks.registry.list).toBeTypeOf('function');
+        expect(deps.sdkTelemetry.emitOperationMetric).toBeTypeOf('function');
     });
 
     it('rejeita runtimeId explícito inexistente em vez de cair no default', async () => {

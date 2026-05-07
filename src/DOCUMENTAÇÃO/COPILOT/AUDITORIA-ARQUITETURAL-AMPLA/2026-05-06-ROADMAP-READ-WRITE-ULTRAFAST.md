@@ -8,6 +8,127 @@ por continuidade explícita e em convergência incremental
 Migrar as superfícies de leitura, escrita, busca, scan, parsing e indexação de `src/copilot` para
 uma arquitetura única, segura, observável e otimizada para Node 24+.
 
+## Organização executiva canônica (leitura obrigatória antes da execução)
+
+Esta seção consolida o estado real e a ordem de ataque atual para evitar execução ad hoc, reduzir
+retrabalho e manter convergência arquitetural entre runtime, terminal, SDK e file-tools.
+
+### Estado consolidado por eixo (snapshot pós A.8)
+
+| Eixo | Status consolidado | Observação executiva                                                                      |
+| ---- | ------------------ | ----------------------------------------------------------------------------------------- |
+| R0   | Concluído          | Base de investigação/documentos canônicos estabelecida                                    |
+| R1   | Concluído parcial  | Contrato `io` estabilizado; faltam snapshots semânticos                                   |
+| R2   | Parcial avançado   | Policy path/url/advisory/sanitização + symlink/denylist central; faltam redirects         |
+| R3   | Concluído parcial  | Engine madura; falta threshold formal `readFile` vs stream/FileHandle                     |
+| R4   | Concluído parcial  | Locks + bateria destrutiva principal; faltam cenários recursivos/de diretórios            |
+| R5   | Não iniciado       | Cache L1 depende de R2 + benchmark + invalidação provada                                  |
+| R6   | Não iniciado       | FTS/L2 bloqueado por R2/R7 e critérios de benchmark                                       |
+| R7   | Parcial            | Scanner existe com denylist central; faltam `.gitignore` e watcher strategy               |
+| R8   | Não iniciado       | Parsing de alto volume ainda em fase de intenção                                          |
+| R9   | Parcial avançado   | Trace store por `traceId` + health degraded; faltam SLOs persistentes                     |
+| R10  | Parcial            | Web fetch/search no envelope `io`; faltam cache HTTP/provider robusto                     |
+| R11  | Parcial avançado   | Session FS usa provider SDK-first com policy/engine/scanner em read/stat/readdir/mkdir/rm |
+| R12  | Não iniciado       | Benchmarks e gates de evidência ainda não consolidados                                    |
+| R13  | Concluído parcial  | SDK↔FS bidirecional no terminal + HTTP; falta paginação/stream e hardening final          |
+| R14  | Parcial avançado   | Terminal mostra tool lifecycle, I/O real e projeção live de loop/stream/SSE/trace         |
+
+### Ordem de execução canônica (A9 → A13)
+
+> Regra: cada corte só inicia se os critérios de saída do corte anterior estiverem cumpridos.
+
+#### Corte A.9 — Governança de erro e orientação contextual automática (P0)
+
+Objetivo: fechar o loop de guidance para LLM-B/usuário durante falhas operacionais.
+
+Escopo:
+
+1. Propagar `auto-briefing` para mensagens de erro de `/workspace` e `/fs`.
+2. Sugerir próximo comando orientado pelo último evento de `/activity`.
+3. Expor severidade estruturada do guidance em payload consumível.
+
+Critério de saída:
+
+- erro operacional sempre retorna orientação acionável;
+- guidance de continuidade não depende de memória implícita do operador/modelo.
+
+#### Corte A.10 — R2 de verdade: policy transversal única (P0)
+
+Objetivo: remover definitivamente divergência entre adapters de I/O.
+
+Escopo:
+
+1. Extrair policy compartilhada canônica (`path`, `symlink`, `denylist`, `limites`, `sanitização`).
+2. Aplicar policy em file-tools, runtime-file-context, Session FS e convergência SDK↔FS.
+3. Definir contrato de URL policy no mesmo namespace conceitual.
+
+Critério de saída:
+
+- nenhuma borda de leitura/escrita/scan/fetch aplica política própria divergente.
+
+#### Corte A.11 — Convergência reversa `fs->sdk` com auditoria (P1)
+
+Objetivo: completar bidirecionalidade controlada entre domínios.
+
+Escopo:
+
+1. Endpoint/control plane para promoção `fs->sdk` com política de conflito explícita.
+2. Correlação por `traceId` nas duas direções (`sdk->fs` e `fs->sdk`).
+3. Auditoria de overwrite/conflict com motivo e ação tomada.
+
+Critério de saída:
+
+- sincronização bidirecional disponível sem bypass de policy e sem engine paralela.
+
+#### Corte A.12 — Observabilidade unificada e endpoint analítico (P1)
+
+Objetivo: tornar convergência e I/O auditáveis por operação, fase e latência.
+
+Escopo:
+
+1. Endpoint dedicado `/observability/convergence` (agregação por `traceId`).
+2. Métricas por fase/item com contadores/histogramas (`prom-client`).
+3. Projeções de saúde com severidade operacional e degradação explícita.
+
+Critério de saída:
+
+- possível responder, com evidência, "onde falhou", "quanto custou" e "qual fase degradou".
+
+#### Corte A.13 — Performance e indexação orientadas por evidência (P1/P2)
+
+Objetivo: ativar R5/R6/R7/R12 sem suposição.
+
+Escopo:
+
+1. Benchmarks formais (`readFile` vs stream, L1 strategy, scan frio/quente, rg vs FTS).
+2. Critérios de adoção para L1 e L2 com rollback definido.
+3. Planejamento de paginação/stream em mirror para workspaces grandes.
+
+Critério de saída:
+
+- decisões de arquitetura de performance passam a ser justificadas por números versionáveis.
+
+### Backlog consolidado único (ativo)
+
+Este backlog substitui o uso de múltiplos backlogs dispersos por corte para planejamento corrente.
+
+1. **A.9/P0** — Guidance de erro acionável em `/workspace` e `/fs` + próximo comando recomendado.
+2. **A.10/P0** — Policy única de I/O (R2) aplicada em todas as bordas.
+3. **A.11/P1** — Fluxo reverso `fs->sdk` com conflito auditável e correlação `traceId`.
+4. **A.12/P1** — Endpoint analítico `/observability/convergence` + métricas com histogramas.
+5. **A.13/P1/P2** — Benchmarks e thresholds para liberar L1/L2/watcher sem "escuro".
+6. **A.14/P0/P1** — Visibilidade live plena no terminal: tool, I/O real, arquivos lidos/editados,
+   SSE e `/activity`.
+
+### Regras de execução para evitar "no escuro"
+
+1. Nenhuma nova dependência entra sem benchmark e critério de rollback.
+2. Nenhuma borda nova de I/O nasce fora de `io-engine` + adapters canônicos.
+3. Todo corte novo deve declarar entrada, saída e impacto em R2/R9/R13.
+4. Toda mudança de UX operacional precisa reduzir ambiguidade para LLM-B e operador humano.
+5. Backlogs por corte antigos permanecem como histórico; o planejamento vivo é o backlog consolidado
+   acima.
+
 ## R0 - Investigação e planejamento
 
 Status: concluído neste corte documental.
@@ -61,13 +182,15 @@ tome a melhor decisão possível, mas nunca ser bloqueante.
 
 Tarefas:
 
-- [ ] Extrair regras de `validatePath()` para `core/io-policy` ou `infra/io-policy`.
-- [ ] Compartilhar denylist de segredos, executáveis, diretórios e symlinks.
-- [ ] Definir limites por operação em configuração central.
-- [ ] Unificar truncamento por bytes e UTF-8 safe.
-- [ ] Unificar sanitização de output sensível.
-- [ ] Incluir URL policy do `web-tools` na mesma família conceitual.
-- [ ] Criar testes de path traversal, symlink, byte nulo e arquivo bloqueado.
+- [x] Extrair regras de `validatePath()` para `core/io-policy` ou `infra/io-policy`.
+- [x] Compartilhar denylist de segredos, executáveis, diretórios e symlinks.
+- [x] Definir limites por operação em configuração central.
+- [~] Unificar truncamento por bytes e UTF-8 safe. - limites são advisory; truncamento bloqueante
+  foi removido.
+- [x] Unificar sanitização de output sensível.
+- [~] Incluir URL policy do `web-tools` na mesma família conceitual. - fetch/search usam envelope
+  `io`; faltam redirects/cache.
+- [x] Criar testes de path traversal, symlink, byte nulo e arquivo bloqueado.
 
 Critério de pronto:
 
@@ -108,10 +231,8 @@ Tarefas:
 - [x] Implementar lock exclusive para write/delete/move/patch.
 - [x] Medir `lock.waitMs`.
 - [x] Adicionar timeout e abort de lock pendente.
-- [~] Criar testes de duas escritas simultâneas no mesmo arquivo. - 2026-05-06: testes novos cobrem
-  copy aguardando lock ativo no source e lock pendente com timeout/abort; ainda falta bateria
-  específica write vs write.
-- [ ] Criar testes de write versus move/delete.
+- [x] Criar testes de duas escritas simultâneas no mesmo arquivo.
+- [x] Criar testes de write versus move/delete.
 - [ ] Avaliar `worker_threads.locks` apenas como spike futuro.
 
 Critério de pronto:
@@ -167,8 +288,8 @@ Prioridade: P1/P2 Risco: médio Objetivo: manter índice atualizado com custo ba
 Tarefas:
 
 - [~] Criar `infra/io-scanner` com `.gitignore`, denylist e include/exclude. - 2026-05-06: scanner
-  comum existe com depth, hidden, filtro simples e metadata `io`; `.gitignore`/denylist seguem para
-  R2/R7.
+  comum existe com depth, hidden, filtro simples, metadata `io` e denylist central; `.gitignore`
+  segue para R7.
 - [ ] Usar `fsPromises.opendir` ou `fsPromises.glob` de Node 24 como baseline.
 - [ ] Limitar concorrência com `p-limit`.
 - [ ] Avaliar `watchman`, `fsPromises.watch`, `inotify-tools` e watcher Node puro.
@@ -251,12 +372,12 @@ Tarefas:
 - [x] Migrar `runtime-file-context` para `ioEngine.readText`. - 2026-05-06: attachments e diretórios
       passam pela engine canônica de leitura.
 - [x] Migrar `readDirectoryContext` para scanner/listagem comum.
-- [~] Migrar `createLocalSessionFsProvider` para engine ou adapter de policy equivalente. -
-  2026-05-06: `writeFile`, `appendFile` e `rename` usam engine/locks; `rm`, `readFile`, `stat` e
-  `readdir` ainda usam FS direto por compatibilidade.
+- [x] Migrar `createLocalSessionFsProvider` para engine ou adapter de policy equivalente. -
+      2026-05-06: `writeFile`, `appendFile`, `rename`, `rm`, `readFile`, `stat` e `readdir` usam
+      engine/scanner/policy; `mkdir` também passa por engine dedicada com lock e observability.
 - [x] Adicionar atomic write ao Session FS.
-- [~] Adicionar limites e lock ao Session FS. - 2026-05-06: writes/appends/renames têm locks e
-  metadata; faltam timeout/abort e lock para remoção recursiva.
+- [~] Adicionar limites e lock ao Session FS. - 2026-05-06: writes/appends/renames/mkdir/rm têm
+  locks e metadata; faltam timeout/abort padronizados em todas as operações compostas.
 - [ ] Unificar métricas SDK com metadata `io`.
 
 Critério de pronto:
@@ -474,6 +595,803 @@ Backlog remanescente específico:
 1. Investigar affordances/descriptions/allowlist se algum modelo voltar a preferir shell para
    read/write/search/scan sem pedido explícito do usuário.
 2. Normalizar a apresentação de quota semanal versus `/sdk quota`.
+
+## Atualização 2026-05-06 - Corte A.4 integração SDK↔FS e prova de boot/load
+
+Diagnóstico aprofundado executado:
+
+- A distinção entre `/workspace` (SDK virtual) e FS local não é bug acidental; é separação de
+  domínios da própria sessão SDK versus filesystem do processo local.
+- O risco operacional não está na distinção em si, e sim na ausência de telemetria/UX explícita que
+  force decisão canônica de roteamento (`local-fs-primary` versus fallback).
+- Mesmo com instruções no system prompt, sem evidência visível de carga de tools/instruções o modelo
+  pode cair em heurística de shell (`bash/grep`) em tarefas naturais de arquivo.
+
+Transformações aplicadas neste corte:
+
+- `/status` passou a expor três linhas canônicas novas:
+  - `tools load`: total de tools registradas e prontidão de file-tools locais;
+  - `instr. load`: mecanismo efetivo de reload + cobertura de arquivos de seção/append;
+  - `sdk↔fs route`: modo operacional calculado (`local-fs-primary`, `sdk-workspace-only`,
+    `degraded`) e motivo.
+- `readTerminalStatusProjection()` agora agrega snapshot de carga real de tools via introspecção e
+  status síncrono do system prompt para validar instruções efetivamente carregadas no boot/load.
+- `introspection-tools` ganhou snapshot público canônico de registro
+  (`readIntrospectionRegistrySnapshot`) para evitar diagnóstico por inferência indireta.
+- `cmdSdk` recebeu `doctor` para orientar o operador e o runtime sobre qual superfície usar,
+  reduzindo ambiguidades da LLM-B ao alternar entre workspace SDK e FS local.
+- `cmdWorkspace` foi saneado (texto/encoding e mensagens) para explicitar materialização `SDK→FS` e
+  remover ruído de UX durante incidentes.
+
+Situação ideal formalizada (target-state):
+
+1. A distinção SDK virtual vs FS local permanece explícita (não fundir superfícies fisicamente).
+2. A decisão de roteamento passa a ser canônica e observável em runtime (`sdkFsRouting.mode`).
+3. File-tools locais são o caminho padrão para operações em repositório real.
+4. Workspace SDK vira superfície auxiliar (plano/scratch/contexto), com ponte explícita de
+   materialização.
+5. Em degradação, fallback para SDK workspace é permitido, porém sinalizado como exceção
+   operacional.
+
+Backlog incremental pós A.4 (nova onda de ataque):
+
+1. Evoluir `sdkFsRouting` para política compartilhada em `core/io-policy` (R2), removendo lógica
+   duplicada de roteamento entre comandos.
+2. Integrar decisão de roteamento com allowlist/affordance de tools para reduzir ainda mais fallback
+   indevido para shell em turnos naturais.
+3. Expor esse diagnóstico também em `/diagnose` e endpoint operacional de health para monitoramento
+   contínuo.
+4. Criar testes de regressão para cenário degradado (`sdk-workspace-only` e `degraded`) com mocks de
+   carga parcial de tools.
+5. Conectar validação de carga no boot phase para emitir alerta early quando file-tools canônicas
+   não registrarem.
+
+## Análise profunda 2026-05-06 - relação SDK workspace virtual vs FS local
+
+Diagnóstico causal consolidado (estado atual):
+
+- A superfície `workspace.*` do SDK (RPC `workspaces`/`workspace`) foi desenhada para estado de
+  sessão e colaboração runtime-level, não para persistência obrigatória no filesystem do
+  repositório.
+- O comando `/workspace` no terminal opera sobre essa API virtual por design, enquanto `/fs` opera
+  via file-tools canônicas (`read_file_content`, `list_directory`, `create_file`,
+  `write_file_content`, `patch_file`) e `io-engine` local.
+- Essa distinção trouxe isolamento útil, porém criou duas consequências:
+  1. risco de expectativa incorreta de materialização automática no FS local;
+  2. risco de bifurcação operacional (fluxo SDK virtual separado do fluxo canônico de I/O local).
+
+Conclusão arquitetural:
+
+- A distinção é tecnicamente válida e deve ser preservada como fronteira de domínio.
+- O problema real não é existir fronteira; é faltar um caminho canônico de convergência entre os
+  dois domínios.
+
+Situação ideal (alvo):
+
+- Manter os dois domínios explicitamente separados:
+  - `SDK Workspace Domain`: efêmero/virtual/session-scoped;
+  - `Local FS Domain`: persistente/repositório/guardrails de I/O.
+- Introduzir uma ponte canônica e observável de convergência `sdk->fs`, sem bypass de policy:
+  - leitura na borda SDK via `workspace.readFile`;
+  - escrita no FS local exclusivamente via file-tools/`io-engine`;
+  - telemetria e UX explicitando quando ocorreu materialização.
+- No médio prazo, estender para fluxo bidirecional seguro (`fs->sdk`) com política explícita de
+  conflito/overwrite.
+
+## R13 - Convergência canônica SDK ↔ FS (novo eixo)
+
+Prioridade: P0/P1 Risco: médio Objetivo: convergir os domínios sem criar engine paralela.
+
+Tarefas:
+
+- [x] Adicionar materialização canônica `sdk->fs` no comando `/workspace`:
+  - `/workspace sync <sdkPath> [--to <localPath>] [--overwrite]`;
+  - `/workspace mirror [--to <localDir>] [--overwrite]`.
+- [x] Garantir que materialização use apenas file-tools canônicas
+      (`create_file`/`write_file_content`).
+- [x] Atualizar banner/help para explicitar operações virtuais versus operações materializadas.
+- [x] Cobrir com testes unitários de comandos SDK.
+- [x] Adicionar endpoint HTTP de convergência (`/sessions/:id/workspace/materialize`) com envelope
+      `io`.
+- [x] Adicionar fluxo reverso opcional `fs->sdk` com política de conflito explícita e auditoria.
+- [x] Unificar métricas de convergência em `emitSdkOperationMetric()` + `io.*` com correlação por
+      traceId.
+
+Critério de pronto:
+
+- Usuário consegue promover estado do workspace virtual para FS local sem shell ad-hoc;
+- promoção passa pelas mesmas políticas de I/O local;
+- não há nova engine paralela de escrita/leitura fora de `io-engine` + adapters.
+
+## R14 - Visibilidade operacional live no terminal
+
+Prioridade: P0/P1 Risco: médio Objetivo: tornar cada tool e cada operação real de I/O visível ao
+operador humano e à LLM-B, sem criar painel paralelo.
+
+Diagnóstico:
+
+- O terminal já tinha lifecycle de tools via eventos normalizados do agent
+  (`tool.execution_start/progress/complete`), com narrativa em stdout, SSE e `turn-trace-state`.
+- A engine de I/O (`io-engine`, `io-scanner`, `web-tools`, search tools) publicava
+  `copilot.io.operation` via `diagnostics_channel`, mas esse sinal ficava restrito a
+  metrics/observability; o terminal não via necessariamente o arquivo realmente
+  lido/escrito/escaneado.
+- Isso criava uma lacuna UX: a tool podia ser exibida, mas o caminho real tocado pela engine não
+  aparecia sempre em `/activity` ou na timeline live.
+
+Tarefas:
+
+- [x] Criar adapter canônico `terminal/io-activity-events.js` para consumir `copilot.io.operation`.
+- [x] Registrar operações reais em `activity-state` com `source=io`.
+- [x] Registrar arquivos tocados em `turn-trace-state` com `source=io`.
+- [x] Emitir SSE `io.operation` para clientes live.
+- [x] Mostrar linha terminal compacta/detalhada quando `showToolActivity` está ativo.
+- [~] Deduplicar narrativas tool-vs-I/O quando o mesmo arquivo aparece nos dois sinais. - iniciado
+  via source distinta; resta UX de agrupamento por `toolCallId`/`traceId`.
+- [ ] Correlacionar `io.traceId` com `toolCallId` quando o SDK expuser essa amarra no payload local.
+- [x] Expor seção dedicada em `/activity` para "I/O real recente" separada de "tools declaradas".
+- [x] Criar `/live` como projeção curta do fluxo contínuo: loop, streaming, SSE, tools, arquivos,
+      timeline e I/O real.
+
+Critério de pronto:
+
+- operador vê em tempo real qual tool iniciou, qual operação real de I/O ocorreu e qual arquivo/URL
+  foi tocado;
+- SSE e `/activity` carregam a mesma verdade operacional;
+- a visibilidade vem de signals canônicos (`tool.*`, `copilot.io.operation`, `turn-trace-state`),
+  não de parsing de stdout ou heurística ad hoc.
+
+## Atualização 2026-05-06 - Corte A.4 aplicado (convergência SDK->FS no terminal)
+
+Transformações aplicadas:
+
+- `terminal/commands/sdk.js` recebeu ponte canônica de convergência:
+  - novo `/workspace sync` para materializar um arquivo do workspace virtual no FS local;
+  - novo `/workspace mirror` para materializar lote de arquivos do workspace virtual em diretório
+    local.
+- A ponte usa somente file-tools canônicas de escrita (`create_file`/`write_file_content`), mantendo
+  políticas e observabilidade do `io-engine` local.
+- `/workspace` passou a comunicar explicitamente o contrato:
+  - `list/read/write` permanecem virtuais;
+  - `sync/mirror` materializam no FS local.
+- `terminal/commands/help.js` e `terminal/repl-banner.js` foram atualizados para refletir os novos
+  subcomandos.
+- `tests/unit/copilot/terminal/test_commands_sdk.spec.js` foi ampliado com cobertura de:
+  - materialização unitária (`sync`);
+  - materialização em lote (`mirror`) e modo `--overwrite`.
+
+Backlog imediato pós A.4:
+
+1. Expor convergência SDK↔FS também na borda HTTP (routes SDK), não só no terminal.
+2. Introduzir correlação de métricas entre operação SDK de leitura e operação local `io.write`.
+3. Definir política oficial de resolução de conflito para futura convergência `fs->sdk`.
+
+## Atualização 2026-05-06 - Corte A.5 policy compartilhada + convergência HTTP SDK->FS
+
+Transformações aplicadas:
+
+- A decisão de roteamento SDK↔FS foi extraída para policy compartilhada em `core/sdk-fs-routing.js`,
+  com:
+  - `CANONICAL_LOCAL_FS_TOOL_NAMES` (fonte única do contrato mínimo de FS local);
+  - `hasCanonicalLocalFsTools()` para avaliação determinística da superfície local;
+  - `decideSdkFsRouting()` para decisão canônica (`local-fs-primary`, `sdk-workspace-only`,
+    `degraded`).
+- `terminal/frontend/projections/status.js` e `terminal/commands/sdk.js` passaram a consumir a
+  policy comum, removendo decisões duplicadas e reduzindo risco de drift entre `/status` e
+  `/sdk doctor`.
+- A borda HTTP ganhou convergência explícita com novo endpoint:
+  - `POST /sdk/sessions/:id/workspace/materialize`;
+  - lê arquivo no workspace virtual via `workspaceReadFile`;
+  - materializa no FS local exclusivamente via file-tools canônicas (`create_file` ou
+    `write_file_content`).
+- Novo schema HTTP `WorkspaceMaterializeBodySchema` em `session-schemas.js` com validação de payload
+  canônico.
+- Cobertura de regressão adicionada em
+  `tests/unit/copilot/test_sdk_workspace_materialize_route.spec.js` para:
+  - materialização com `overwrite=false` (create);
+  - materialização com `overwrite=true` (write);
+  - rejeição de path inválido no domínio SDK.
+
+Impacto arquitetural do corte:
+
+1. Terminal e API HTTP passam a compartilhar o mesmo princípio de roteamento, sem heurísticas locais
+   conflitantes.
+2. A convergência SDK->FS deixa de ser exclusiva do REPL e passa a existir na borda HTTP oficial.
+3. Continua sem engine paralela: escrita local permanece restrita a adapters/file-tools canônicas.
+
+Backlog pós A.5:
+
+1. Expor `sdkFsRouting` também no `/diagnose` e em endpoint HTTP de health para monitoramento
+   contínuo.
+2. Evoluir endpoint de convergência para lote (`mirror`) no plano HTTP com envelope `io` por item.
+3. Implementar fluxo reverso controlado (`fs->sdk`) com política explícita de conflito/auditoria.
+4. Correlacionar leitura SDK + escrita local com `traceId` único em métricas
+   `emitSdkOperationMetric()` + `io.*`.
+
+## Atualização 2026-05-06 - Corte A.6 diagnose/health + convergência HTTP em lote
+
+Transformações aplicadas:
+
+- `POST /sdk/sessions/:id/workspace/mirror` adicionado em `session-workspace-routes.js` para
+  materialização em lote SDK→FS:
+  - lista paths no workspace virtual via `workspaceListFiles`;
+  - lê conteúdo por item via `workspaceReadFile`;
+  - escreve no FS local exclusivamente com file-tools canônicas (`create_file` /
+    `write_file_content`);
+  - retorna envelope por item (`ok|failed|skipped`) com `io` e sumário agregado.
+- `readTerminalDiagnoseProjection()` passou a incluir `sdkFsRouting` derivado de policy canônica e
+  snapshot de boot/load de tools.
+- `/diagnose` agora exibe linha explícita `sdk↔fs route` com modo e razão de roteamento.
+- `/observability/health` passou a expor `sdkFsRouting`, consolidando monitoramento contínuo da
+  fronteira SDK virtual vs FS local na borda HTTP.
+- `WorkspaceMirrorBodySchema` foi adicionado para formalizar payload da convergência em lote.
+
+Cobertura adicionada:
+
+- `tests/unit/copilot/test_sdk_workspace_materialize_route.spec.js` expandido com:
+  - sucesso de `workspace/mirror`;
+  - caso `skipped` para conteúdo não textual.
+- `tests/unit/copilot/terminal/test_commands_diagnose.spec.js` reforçado para validar presença de
+  `sdk↔fs route` no output.
+- Novo: `tests/unit/copilot/test_observability_sdk_fs_routing.spec.js` para contrato de
+  `sdkFsRouting` em `/observability/health`.
+
+Backlog pós A.6:
+
+1. Correlacionar `workspaceReadFile` e `io.write` por `traceId` único no caminho mirror/materialize.
+2. Implementar fluxo reverso opcional `fs->sdk` com política explícita de conflito/auditoria.
+3. Expor métricas de convergência por item (latência, bytes, erro) em `emitSdkOperationMetric()`.
+4. Evoluir mirror HTTP para paginação/stream para workspaces virtuais muito grandes.
+
+## Atualização 2026-05-06 - Corte A.7 correlação por traceId + métricas por fase/item
+
+Transformações aplicadas:
+
+- `session-workspace-routes.js` passou a gerar `traceId` canônico por item de convergência SDK→FS:
+  - `materialize`: `traceId` único por operação;
+  - `mirror`: `traceId` único por arquivo processado.
+- Foram adicionadas emissões explícitas de `emitSdkOperationMetric()` na borda HTTP para cada fase:
+  - `phase=read_sdk` (leitura no workspace virtual);
+  - `phase=write_local` (escrita no FS local via file-tools canônicas).
+- Cada fase agora emite `started/succeeded/failed` com atributos de correlação (`traceId`,
+  `sdkPath`, `localPath`, `overwrite`, `bytes`, `destinationRoot` quando aplicável).
+- O payload de resposta da convergência passou a carregar `traceId`:
+  - `materialize.result.traceId`;
+  - `mirror.result.items[].traceId`.
+
+Cobertura adicionada:
+
+- `tests/unit/copilot/test_sdk_workspace_materialize_route.spec.js` reforçado para validar:
+  - presença de `traceId` em `materialize` e `mirror`;
+  - emissão de métricas de convergência via `emitSdkOperationMetric` durante execução.
+
+Impacto arquitetural do corte:
+
+1. A convergência SDK→FS deixa de ser “caixa-preta” e passa a ser rastreável por item/fase.
+2. A correlação entre leitura virtual e escrita local fica observável em métricas de SDK sem nova
+   engine.
+3. O sistema passa a suportar debugging operacional de gargalo/falha por arquivo com identificador
+   estável.
+
+Backlog pós A.7:
+
+1. Persistir/agrupar métricas de convergência por `traceId` em endpoint analítico dedicado
+   (`/observability/convergence`).
+2. Adicionar paginação/stream em `workspace/mirror` para workspaces muito grandes com emissão
+   progressiva.
+3. Evoluir convergência reversa `fs->sdk` mantendo o mesmo contrato de correlação `traceId`.
+4. Integrar contadores/histogramas (`prom-client`) para SLO de convergência por fase
+   (`read_sdk`/`write_local`).
+
+## Atualização 2026-05-06 - Corte A.8 auto-briefing operacional para LLM-B
+
+Transformações aplicadas:
+
+- Foi criado um módulo canônico de guidance em `terminal/auto-briefing.js`, com contrato único para
+  orientar:
+  - domínio primário de operação (`local-fs-primary`, `sdk-workspace-only`, `degraded`);
+  - caminho de coleta de contexto operacional mínimo;
+  - alertas de degradação de tools/instruções carregadas.
+- `repl-lifecycle` passou a emitir auto-briefing no boot do terminal:
+  - mostra rota operacional ativa;
+  - mostra domínio recomendado (`/fs` vs `/workspace` + materialização);
+  - mostra fluxo de descoberta de contexto
+    (`/status -> /sdk doctor -> /tools -> /activity 5 -> /workspace list -> /fs list`).
+- `/status` passou a exibir guidance operacional explícito e persistente:
+  - `guia operação`;
+  - `domínio ativo`;
+  - `coleta ctx`;
+  - `atenção boot` quando houver sinais de carga incompleta.
+- `/sdk doctor` foi alinhado ao mesmo guidance canônico, reduzindo drift textual e instruções
+  conflitantes.
+
+Cobertura adicionada:
+
+- Novo teste unitário `tests/unit/copilot/terminal/test_auto_briefing.spec.js` para contrato do
+  helper em cenários nominal e degradado.
+- `tests/unit/copilot/terminal/test_commands_session.spec.js` ampliado para garantir presença de
+  guidance de coleta de contexto no `/status`.
+- `tests/unit/copilot/terminal/test_commands_sdk.spec.js` ampliado para garantir hint de contexto no
+  `/sdk doctor`.
+
+Impacto arquitetural do corte:
+
+1. A LLM-B passa a receber instrução operacional mínima automaticamente no boot (sem depender de
+   memória implícita).
+2. Operador, runtime e modelo convergem para a mesma orientação de domínio e troubleshooting.
+3. A coleta de contexto necessária deixa de ser tácita e vira contrato explícito e recorrente.
+
+Backlog pós A.8:
+
+1. Propagar o mesmo guidance para respostas de erro de comandos `/workspace` e `/fs` (mensagens
+   acionáveis por falha).
+2. Expor severidade estruturada do `auto-briefing` em endpoint HTTP para consumo por painel externo.
+3. Conectar `auto-briefing` com métricas de adesão (quantas sessões seguiram rota canônica sem
+   fallback shell).
+4. Evoluir o bloco de contexto para sugerir próximos comandos com base no erro mais recente
+   (`/activity`).
+
+## Atualização 2026-05-06 - Corte A.9 guidance acionável em falhas de comando
+
+Transformações aplicadas:
+
+- `/workspace sync` e erros gerais de `/workspace` passaram a emitir guidance de recuperação
+  automático, reutilizando o contrato canônico de `auto-briefing` (`buildFailureRecoveryLines`).
+- `/fs` passou a anexar guidance operacional em falhas de tool e exceções de execução, incluindo
+  trilha mínima de coleta de contexto (`/status -> /sdk doctor -> /tools -> /activity 5`).
+- O guidance agora explicita domínio ativo (`local-fs` vs `sdk-workspace`) durante incidentes,
+  reduzindo ambiguidade para LLM-B e operador humano.
+
+Cobertura adicionada:
+
+- `tests/unit/copilot/terminal/test_commands_sdk.spec.js`:
+  - novo caso para `workspace sync` com conteúdo não textual, validando presença de
+    `Próximos passos`.
+- `tests/unit/copilot/terminal/test_commands_fs.spec.js`:
+  - novo caso de falha em `/fs read`, validando guidance acionável no erro.
+
+Impacto arquitetural do corte:
+
+1. O guidance de recuperação deixa de ser apenas de boot/status/doctor e passa a existir no ponto de
+   falha real.
+2. A LLM-B recebe automaticamente orientação suficiente para continuar coleta de contexto sem
+   tentativa "no escuro".
+3. O operador humano mantém previsibilidade de troubleshooting com a mesma linguagem operacional
+   canônica.
+
+Backlog pós A.9:
+
+1. Expor severidade estruturada do guidance em endpoint HTTP de observabilidade.
+2. Conectar guidance com eventos recentes (`/activity`) para recomendação contextual de próximo
+   comando.
+3. Instrumentar métrica de adesão à rota canônica (evitar fallback shell indevido).
+4. Iniciar execução do corte A.10 (R2): policy transversal única de path/url/limites/sanitização.
+
+## Atualização 2026-05-06 - Corte A.10.1 policy transversal + fim de exclusão default de tools
+
+Transformações aplicadas:
+
+- Foi criado `core/io-policy.js` como base canônica de policy de path, com contrato unificado
+  (`evaluateIoPathPolicy`) e versionamento explícito de policy (`IO_POLICY_VERSION`).
+- `tools/file/shared.js` passou a usar `evaluateIoPathPolicy` no fluxo de validação de path,
+  preservando os checks complementares já existentes (symlink, protected files e byte nulo),
+  reduzindo divergência entre adapters.
+- `sdk/session/session-fs.js` passou a consumir a mesma policy canônica para resolução de paths,
+  removendo parte da validação local ad hoc e convergindo Session FS com file-tools.
+- As exclusões default de tools foram removidas das configurações canônicas:
+  - `config/defaults.js`: `DEFAULT_EXCLUDED_TOOLS = []`;
+  - `config/index.js`: `DEFAULT_EXCLUDED_TOOLS = []`.
+- Contrato operacional alinhado: nenhuma tool é excluída a priori; exclusão passa a ser decisão
+  dinâmica de runtime (usuário/operador/LLM-B), conforme solicitado.
+
+Cobertura atualizada:
+
+- Ajustes em testes de contrato estrutural para refletir `DEFAULT_EXCLUDED_TOOLS` vazio.
+
+Impacto arquitetural:
+
+1. Redução de drift de policy entre file-tools e Session FS.
+2. Maior previsibilidade para a LLM-B: disponibilidade máxima de tools por default.
+3. Denylist deixa de ser viés de boot e vira decisão explícita em runtime.
+
+Backlog pós A.10.1:
+
+1. Expandir `core/io-policy` para URL policy e limites/sanitização de output (convergência total de
+   R2).
+2. Integrar a policy canônica também em runtime-file-context e bordas HTTP de convergência SDK↔FS.
+3. Adicionar testes dedicados de path traversal/symlink/byte nulo em `core/io-policy`.
+4. Adicionar telemetria de decisão de policy (`policyVersion`, `decision`, `reason`) em
+   métricas/diagnostics.
+
+## Atualização 2026-05-06 - Corte A.10.2 policy URL + limites advisory + sanitização canônica
+
+Transformações aplicadas:
+
+- `core/io-policy.js` foi expandido para cobrir o núcleo transversal restante do R2:
+  - `evaluateIoUrlPolicy()` para validação canônica de URL (reuso de `security/url-validator`);
+  - `resolveIoAdvisoryLimits()` para limites por operação em modo informativo (`advisory=true`, não
+    bloqueante);
+  - `sanitizeIoTextOutput()` para sanitização de saída sensível em contrato único.
+- `core/index.js` passou a exportar os novos contratos de policy, evitando imports paralelos ad hoc.
+- `tools/web-tools.js` migrou validação de URL para `evaluateIoUrlPolicy()`, incluindo verificação
+  de redirect com a mesma policy canônica.
+- `server/routes/sdk/session-workspace-routes.js` foi consolidado com as rotas de convergência
+  (`materialize`/`mirror`) e passou a aplicar `evaluateIoPathPolicy()` para destino local, com
+  metadata de policy no envelope `io`.
+- `tests/unit/copilot/core/test_io_policy.spec.js` foi ampliado para cobrir URL policy, limites
+  advisory e sanitização.
+
+Impacto arquitetural:
+
+1. R2 deixa de estar restrito a path-only e passa a ter núcleo canônico para URL + limites +
+   sanitização.
+2. Web e convergência SDK↔FS passam a compartilhar a mesma família de policy (`io-policy`) em vez de
+   validações isoladas.
+3. O contrato de limites permanece pró-LLM (informativo), preservando liberdade operacional sem
+   bloqueio artificial.
+
+Backlog pós A.10.2:
+
+1. Propagar `sanitizeIoTextOutput()` para todas as bordas textuais de saída sensível
+   (file-tools/read/search/attachments).
+2. Expor `policyVersion/decision/reason` em diagnósticos e observabilidade HTTP de forma
+   padronizada.
+3. Concluir bateria dedicada de concorrência destrutiva (R4: write-vs-write e write-vs-move/delete).
+4. Evoluir para A.11 (`fs->sdk`) mantendo o mesmo contrato de policy + `traceId` bidirecional.
+
+## Atualização 2026-05-06 - Corte A.10.3 consolidação de gates, SDK e observability
+
+Transformações aplicadas:
+
+- `session-workspace-routes.js` foi reestruturado para o fluxo HTTP real da aplicação, preservando a
+  borda Express-like existente e evitando bypass de arquitetura via imports diretos do SDK:
+  - dependências de rota entram por `resolveSdkRouteSharedDeps()`;
+  - leitura/listagem do workspace SDK usam helpers oficiais da sessão;
+  - escrita local continua passando exclusivamente por file-tools canônicas
+    (`create_file`/`write_file_content`);
+  - métricas de convergência são emitidas por dependência de telemetry
+    (`sdkTelemetry.emitOperationMetric`).
+- A decisão `sdk↔fs` foi exposta para presentation por um adapter dedicado
+  (`presentation/runtime-file-routing.js`), removendo acoplamento indevido de frontend terminal com
+  `core`.
+- `session-setup.js` passou a aplicar policy dinâmica de tool em runtime mesmo quando denylist,
+  allowlist e exclusões default estão vazias. Isso mantém a regra operacional: **nenhum
+  limite/default bloqueia a LLM-B**, mas o operador ainda pode desabilitar tools dinamicamente.
+- `sdk-introspection.js` foi tornado tolerante a mocks parciais do SDK, com introspecção defensiva
+  por export opcional. O objetivo é compatibilidade real com o SDK sem fragilizar os testes quando o
+  provider é parcial.
+- `todo_list` manteve `limit` como recorte informativo e corrigiu `has_more` por total real,
+  evitando semântica bloqueante disfarçada.
+- Module maps e contratos de governança foram atualizados para reconhecer:
+  - `sdk/session-workspace-routes.js` como hotspot oficial de convergência SDK↔FS;
+  - `terminal/auto-briefing.js` como superfície frontend estável.
+
+Validação executada:
+
+- `npm run typecheck:strict:src.copilot`: passou.
+- `npm run lint`: passou.
+- `npm run test:copilot`: passou com `341` arquivos de teste executados, `20` ignorados, `4634`
+  testes aprovados e `33` ignorados.
+- Validações focadas adicionais:
+  - contratos de module layout;
+  - fronteira frontend terminal;
+  - rotas de materialização/mirror SDK→FS;
+  - dependências de presentation runtime;
+  - regressões de timeout/limites não bloqueantes da LLM-B.
+
+Impacto arquitetural:
+
+1. O corte A.10 deixa de ser apenas policy declarada e passa a atravessar boot, terminal, HTTP, SDK
+   deps, presentation e testes de contrato.
+2. A convergência SDK→FS permanece canônica: SDK lê/lista; file-tools escrevem no FS; telemetry
+   correlaciona.
+3. A remoção de limites bloqueantes foi estabilizada nos testes: timeouts, tamanho de resposta,
+   pipeline shell e wait defaults deixam de interromper a operação por regra artificial.
+4. A próxima frente natural é A.11 (`fs->sdk`) com a mesma disciplina: conflito explícito,
+   auditoria, `traceId` bidirecional e zero arquitetura paralela.
+
+## Atualização 2026-05-06 - Corte A.11 fluxo reverso FS→SDK + A.12 analítico inicial
+
+Transformações aplicadas:
+
+- A borda HTTP ganhou o fluxo reverso `POST /sdk/sessions/:id/workspace/promote`:
+  - lê arquivo do FS local exclusivamente via file-tool canônica `read_file_content`;
+  - valida o path local por `evaluateIoPathPolicy()`;
+  - valida o destino no domínio SDK por `validateWorkspacePath()`;
+  - escreve no workspace virtual via `workspaceCreateFile()`;
+  - mantém `overwrite=false` como política `fail-if-exists` com resposta `409` auditável;
+  - mantém `overwrite=true` como ação explícita `overwritten`.
+- O terminal ganhou `/workspace promote <localPath> [--to <sdkPath>] [--overwrite]`, fechando a
+  bidirecionalidade operacional ao lado de `/workspace sync` e `/workspace mirror`.
+- A auditoria do reverso inclui `direction=fs->sdk`, política solicitada, ação tomada, conflito e
+  `traceId`.
+- Métricas SDK passaram a materializar atributos de convergência em counters/gauges:
+  - `phase` (`read_local`, `conflict_check`, `write_sdk`, além das fases SDK→FS já existentes);
+  - `bytes_total` e `last_bytes`.
+- Foi adicionado o endpoint inicial `GET /sdk/observability/convergence`, que agrega counters/gauges
+  de `workspace.materialize`, `workspace.mirror` e `workspace.promote` por operação, status, fase e
+  bytes.
+- UX operacional atualizada:
+  - `/help`;
+  - banner do REPL;
+  - `auto-briefing` de domínio/convergência.
+- `WorkspaceMirrorBodySchema.maxFiles` deixou de impor teto bloqueante; permanece apenas como
+  parâmetro positivo informativo/advisory quando a paginação/stream futura for implementada.
+
+Validação executada:
+
+- `npm exec vitest -- run --config vitest.copilot.config.js tests/unit/copilot/test_sdk_workspace_materialize_route.spec.js tests/unit/copilot/terminal/test_commands_sdk.spec.js tests/unit/copilot/test_observability_sdk_fs_routing.spec.js tests/unit/copilot/observability/test_sdk_metric_bridge.spec.js tests/unit/copilot/terminal/test_auto_briefing.spec.js`:
+  `5` arquivos, `42` testes aprovados.
+- `npm run typecheck:strict:src.copilot`: passou.
+
+Impacto arquitetural:
+
+1. R13 agora tem bidirecionalidade real sem engine paralela: local lê via file-tools, SDK escreve
+   via RPC oficial.
+2. Conflito deixa de ser comportamento implícito do SDK e passa a ser contrato HTTP/terminal
+   auditável.
+3. R9/A.12 avança de health routing para análise consultável por operação/fase, ainda sem
+   prom-client/histogramas formais.
+4. A disciplina pró-LLM permanece: parâmetros de volume são informativos; não há teto artificial
+   novo bloqueando a operação.
+
+Backlog pós A.11:
+
+1. Adicionar paginação/stream real para `workspace/mirror` e futura promoção em lote, mantendo
+   `maxFiles` advisory.
+2. Persistir/agrupar eventos por `traceId` além dos counters agregados. Resolvido em memória no
+   corte A.12.1; persistência em disco/SQLite segue pendente.
+3. Adicionar histogramas/SLO por fase de convergência. Parcial em A.12.1 com histograma por fase no
+   trace store; SLO formal/persistente segue pendente.
+4. Expandir sanitização canônica para payloads textuais de leitura/busca onde ainda houver retorno
+   bruto. Parcial em A.10.4 para read/search/symbol/web.
+
+## Atualização 2026-05-06 - Corte A.12.1 trace store, health e paginação de mirror
+
+Transformações aplicadas:
+
+- Foi criado `observability/convergence-trace-store.js`, store em memória para eventos de
+  convergência SDK↔FS:
+  - agrega por `traceId`;
+  - preserva timeline por fase;
+  - calcula status operacional (`running`, `succeeded`, `failed`, `mixed`);
+  - agrega bytes e histogramas por fase com `metrics-histogram`;
+  - mantém ring buffer limitado por traces/eventos para não crescer indefinidamente.
+- `sdk-metric-bridge` passou a alimentar o trace store além dos counters/gauges existentes.
+- `bootstrapObservability()` registra `CONVERGENCE_TRACE_STORE` no DI e injeta o store na ponte SDK.
+- `GET /sdk/observability/convergence` agora expõe:
+  - agregação por operação/fase/counter legado;
+  - snapshot do trace store;
+  - filtros `traceId`, `operation` e `limit`.
+- `GET /sdk/observability/health` ganhou componente `convergence`, degradando health quando há
+  traces recentes `failed` ou `mixed`.
+- `POST /sdk/sessions/:id/workspace/mirror` ganhou paginação explícita:
+  - `pageSize` + `cursor`;
+  - `nextCursor`;
+  - `totalFiles`, `returnedFiles`, `offset`;
+  - `maxFiles` permanece apenas advisory/informativo, sem teto oculto.
+
+Validação executada:
+
+- `npm exec vitest -- run --config vitest.copilot.config.js tests/unit/copilot/observability/test_convergence_trace_store.spec.js tests/unit/copilot/observability/test_sdk_metric_bridge.spec.js tests/unit/copilot/test_observability_sdk_fs_routing.spec.js`:
+  `3` arquivos, `7` testes aprovados.
+- `npm exec vitest -- run --config vitest.copilot.config.js tests/unit/copilot/test_sdk_workspace_materialize_route.spec.js tests/unit/copilot/test_observability_sdk_fs_routing.spec.js tests/unit/copilot/observability/test_convergence_trace_store.spec.js tests/unit/copilot/observability/test_sdk_metric_bridge.spec.js`:
+  `4` arquivos, `18` testes aprovados.
+- `npm run typecheck:strict:src.copilot`: passou.
+
+Impacto arquitetural:
+
+1. A.12 deixa de depender apenas de counters globais; agora existe timeline consultável por
+   `traceId`.
+2. Health passa a refletir degradação real de convergência, não só disponibilidade estática de
+   rotas/tools.
+3. Mirror HTTP deixa de ser uma operação indivisível para workspaces grandes e passa a suportar
+   paginação explícita.
+4. Não houve nova dependência: histogramas usam a infraestrutura interna existente.
+
+## Atualização 2026-05-06 - Corte A.10.4 sanitização textual + R10 web no envelope `io`
+
+Transformações aplicadas:
+
+- `read_file_content` passou a aplicar `sanitizeIoTextOutput()` em conteúdo UTF-8.
+- `search_in_files` passou a combinar filtro legado de linhas sensíveis com sanitização canônica.
+- `workspace_symbol_search` passou a sanitizar output textual do `rg`.
+- `web_fetch_local` passou a retornar envelope `io` (`operation=fetch`, `targetKind=url`,
+  `engine=fetch`) e conteúdo sanitizado.
+- `web_search` passou a retornar envelope `io` (`operation=search`, `targetKind=url`, engine DDG
+  JSON/HTML) e sanitizar títulos/snippets.
+- Payloads passaram a expor `sanitized` e `redactions` quando aplicável.
+
+Validação executada:
+
+- `npm exec vitest -- run --config vitest.copilot.config.js tests/unit/copilot/tools/file/test_read_tools.spec.js tests/unit/copilot/tools/test_web_tools.spec.js`:
+  `2` arquivos, `43` testes aprovados.
+- `npm run typecheck:strict:src.copilot`: passou.
+
+Impacto arquitetural:
+
+1. R2 avança para a borda de output, não apenas input policy.
+2. R10 deixa de estar fora do contrato `io` nas respostas bem-sucedidas.
+3. A LLM-B recebe conteúdo útil sem bloquear a operação e com redaction explícita quando necessário.
+
+## Atualização 2026-05-06 - Corte R4 bateria destrutiva principal
+
+Transformações aplicadas:
+
+- `tests/unit/copilot/infra/test_io_engine.spec.js` passou a cobrir:
+  - `writeFileAtomic` aguardando lock ativo no mesmo arquivo;
+  - `moveFileLocked` aguardando lock ativo no source;
+  - `deleteFileLocked` aguardando lock ativo no arquivo.
+- A bateria complementa os cenários já existentes de `copyFileLocked`, timeout e abort de lock.
+
+Validação executada:
+
+- `npm exec vitest -- run --config vitest.copilot.config.js tests/unit/copilot/infra/test_io_engine.spec.js tests/unit/copilot/core/test_io_policy.spec.js tests/unit/copilot/tools/file/test_read_tools.spec.js tests/unit/copilot/tools/test_web_tools.spec.js`:
+  `4` arquivos, `62` testes aprovados.
+- `npm run typecheck:strict:src.copilot`: passou.
+
+Impacto arquitetural:
+
+1. A serialização por recurso passa a estar provada nos conflitos destrutivos mais importantes.
+2. Ainda ficam para uma rodada futura cenários de diretórios/remoções recursivas e stress de alta
+   concorrência.
+
+## Atualização 2026-05-06 - Corte A.10.5 hardening R2 + R11 Session FS sem bypass
+
+Transformações aplicadas:
+
+- `core/io-policy.js` ganhou a variante assíncrona `evaluateIoPathPolicyAsync()`:
+  - resolve `realpath` do alvo ou do diretório pai para cobrir symlink em arquivo existente e
+    criação de path novo;
+  - bloqueia symlink que resolve fora do workspace/root isolado;
+  - centraliza padrões sensíveis de leitura e padrões extras de escrita (`.sh`, `.exe`, bibliotecas
+    nativas etc.);
+  - adiciona modo por operação (`read`, `write`, `append`, `delete`, `move`, `copy`, `patch`,
+    `mkdir`, `stat`);
+  - retorna `realPath` e `symlinkResolved` para adapters usarem a mesma chave operacional.
+- `tools/file/shared.validatePath()` deixou de manter regras próprias de realpath/regex e passou a
+  delegar para a policy central.
+- `presentation/runtime-file-context` passou a validar attachments e diretórios com a policy
+  assíncrona, usando `realPath` antes de chamar `io-engine.readText()` ou `io-scanner`.
+- `session-workspace-routes` passou a validar materialize/mirror/promote com policy assíncrona,
+  separando modo de leitura (`promote` local) e escrita (`materialize`/`mirror` local).
+- `io-scanner` passou a respeitar a denylist central mesmo com `showHidden=true`, evitando scan
+  acidental de `.git` e `node_modules` quando o operador pede arquivos ocultos.
+- `io-engine` ganhou:
+  - `statPath()` com `operation=stat`;
+  - `mkdirPathLocked()` para criação de diretório com lock e metadata `io`;
+  - `removePathLocked()` para remoção de arquivo/diretório com lock e metadata `io`.
+- `createLocalSessionFsProvider` agora usa:
+  - `readText()` para `readFile`;
+  - `statPath()` para `exists` e `stat`;
+  - `scanDirectory()` para `readdir` e `readdirWithTypes`;
+  - `mkdirPathLocked()` para `appendFile` criar parent directories e para `mkdir`;
+  - `removePathLocked()` para `rm`;
+  - preservando o contrato nativo `SessionFsProvider` do SDK; o SDK continua dono do adapter RPC via
+    `createSessionFsAdapter()`.
+- Auditoria SDK-first local confirmou:
+  - `CopilotClientOptions.sessionFs` e `createSessionFsHandler(session)` são o ponto canônico para
+    Session FS;
+  - Workspaces RPC oficial cobre `listFiles`, `readFile` e `createFile`; mirror/materialize/promote
+    seguem como extensão local apenas para convergência e conflito, não como substituto do SDK;
+  - tools continuam registradas via `defineTool()` pela wrapper local, mantendo
+    `ToolInvocation`/trace do SDK.
+
+Validação executada:
+
+- `npm run typecheck:strict:src.copilot`: passou antes e depois do corte.
+- `npm exec vitest -- run --config vitest.copilot.config.js tests/unit/copilot/core/test_io_policy.spec.js tests/unit/copilot/infra/test_io_engine.spec.js tests/unit/copilot/sdk/test_sdk_session_fs.spec.js tests/unit/copilot/terminal/test_file_context.spec.js tests/unit/copilot/test_sdk_workspace_materialize_route.spec.js`:
+  `5` arquivos, `57` testes aprovados.
+- `npm exec vitest -- run --config vitest.copilot.config.js tests/unit/copilot/sdk/test_sdk_session_fs.spec.js tests/unit/copilot/infra/test_io_engine.spec.js`:
+  `2` arquivos, `16` testes aprovados.
+
+Impacto arquitetural:
+
+1. R2 deixa de depender de duplicação em file-tools; symlink, denylist e padrões sensíveis passam a
+   morar no core.
+2. R7 herda a mesma denylist durante scan, preparando `.gitignore` sem reimplementar regras de
+   proteção.
+3. R11 fica muito mais próximo do pronto: Session FS lê, lista, faz stat e remove pelo mesmo eixo
+   observável do FS local.
+4. Ainda ficam como próximos alvos naturais:
+   - `.gitignore` canônico no scanner;
+   - timeout/abort uniforme nas operações compostas da engine;
+   - cache HTTP/redirect SSRF em R10;
+   - benchmarks A.13 para liberar L1/L2.
+
+## Atualização 2026-05-06 - Corte A.10.6 compatibilidade SDK-first SessionFs
+
+Transformações aplicadas:
+
+- `mkdirPathLocked()` foi promovido para a engine canônica, com `operation=mkdir`, lock por path e
+  metadata informativa (`recursive`, `lockWaitMs`, `source`).
+- `createLocalSessionFsProvider.appendFile()` deixou de chamar `node:fs/promises.mkdir` diretamente
+  para parent directory e passou a usar `mkdirPathLocked()`.
+- `createLocalSessionFsProvider.mkdir()` passou a usar `mkdirPathLocked()` mantendo a assinatura
+  esperada pelo `SessionFsProvider` do SDK (`path`, `recursive`, `mode`).
+- `createLocalSessionFsProvider.exists()` agora retorna `false` somente para `ENOENT`/`ENOTDIR`;
+  erros de policy, symlink e segurança são propagados no provider, enquanto o adapter oficial do SDK
+  preserva seu contrato `exists=false`.
+- `readdirWithTypes()` não converte mais `symlink`/`other` em `file`; só expõe `file` e `directory`,
+  que são os únicos tipos declarados no RPC gerado do SDK.
+
+Critério arquitetural:
+
+- SDK-first mantido: implementamos um `SessionFsProvider` robusto e deixamos o SDK adaptar esse
+  provider para RPC.
+- Não foi criada rota paralela para Session FS; a ampliação está no provider local, nas policies e
+  na engine.
+- Divergências conhecidas do SDK foram documentadas em teste: `createSessionFsAdapter().exists()`
+  engole erros do provider e retorna `false`, por contrato do vendor.
+
+## Atualização 2026-05-06 - Corte A.14.1 visibilidade live de I/O real no terminal
+
+Transformações aplicadas:
+
+- Novo adapter `terminal/io-activity-events.js` consome o canal `diagnostics_channel`
+  `copilot.io.operation`.
+- A fase `runTerminalPinnedContextPhase()` conecta esse adapter junto do bridge canônico de
+  `activity.changed`, e o rollback o desinscreve para evitar subscriber global vazando.
+- Cada operação real da engine passa a:
+  - atualizar `activity-state` com `source=io`;
+  - alimentar `turn-trace-state` com arquivos tocados;
+  - emitir SSE `io.operation`;
+  - imprimir narrativa terminal `[IO]` quando a preferência `showToolActivity` está ativa.
+- `/activity` ganhou seção "I/O real recente", exibindo operação, alvo, bytes, duração e engine,
+  além de mostrar `source` nos resumos de tools/arquivos do turno.
+- O módulo respeita o fluxo canônico: não executa I/O, não substitui lifecycle do SDK/agent e não
+  cria painel paralelo.
+
+Impacto arquitetural:
+
+1. Tool lifecycle e engine lifecycle deixam de estar parcialmente desacoplados na UX.
+2. `/activity` passa a refletir arquivos realmente lidos/escritos pela engine, inclusive quando a
+   tool declarada não carregava path suficiente no payload.
+3. R9/R14 ficam alinhados: diagnostics_channel continua sendo a fonte técnica; terminal vira
+   consumidor de projeção.
+
+Validação associada:
+
+- `tests/unit/copilot/terminal/test_io_activity_events.spec.js` cobre projeção para activity/turn
+  trace/stdout/SSE e cleanup do subscriber.
+
+## Atualização 2026-05-06 - Corte A.14.2 fluxo live contínuo do terminal
+
+Diagnóstico tratado:
+
+- O terminal já tinha peças maduras de UX live (`/status`, `/now`, `/activity`, streaming, thinking,
+  SSE e trace de turno), mas a leitura operacional exigia correlacionar manualmente várias
+  superfícies.
+- Isso deixava o fluxo de "session eternal" menos fluido para operador humano e para LLM-B: era
+  possível ver cada parte, mas não havia uma visão curta única de loop, streaming, sessão, SSE,
+  timeline, tools, arquivos e I/O real.
+
+Transformações aplicadas:
+
+- Foi criada a projeção `terminal/frontend/projections/live.js`, que compõe apenas fontes canônicas
+  existentes: `readTerminalStatusProjection`, `readTerminalActivityProjection`,
+  `readTerminalTimelineProjection`, `readTerminalIoActivityProjection`, display policy e estado SSE.
+- Novo comando `/live [n]`:
+  - mostra estado do loop (`ready`, `active-turn`, `waiting-human`, `paused`, `offline`,
+    `recovering`);
+  - exibe runtime, SDK/session, permission mode, toggles de streaming/thinking/tools/intent/usage;
+  - mostra clientes SSE, replay buffer, reconciliação da timeline, tools/arquivos do turno e I/O
+    real recente;
+  - lista eventos recentes para debugging fluido sem sair do terminal.
+- `/now` passou a carregar `live=<estado>` e contagem resumida de clientes SSE.
+- Banner e `/help` passaram a divulgar `/live`.
+
+Impacto arquitetural:
+
+1. R14 avança de "eventos visíveis" para "fluxo contínuo legível".
+2. Nenhum fluxo paralelo foi criado: `/live` é uma projeção, não uma nova engine.
+3. A UX passa a ter uma superfície curta para acompanhar session eternal/dialog loop/streaming antes
+   de recorrer ao `/status` detalhado ou ao `/activity`.
+
+Validação associada:
+
+- `tests/unit/copilot/terminal/test_commands_session.spec.js` cobre `/live` e o enriquecimento de
+  `/now`.
 
 ## Dependências candidatas por decisão
 

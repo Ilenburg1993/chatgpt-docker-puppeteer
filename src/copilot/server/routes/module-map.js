@@ -435,9 +435,9 @@ export const SERVER_ROUTE_MODULE_LAYOUT = Object.freeze([
         role: 'sdk-session-route-family',
         surface: 'sdk',
         tier: 'secondary',
-        risk: 'stable',
+        risk: 'hotspot',
         public: false,
-        summary: 'Rotas de workspace virtual de sessoes SDK.',
+        summary: 'Rotas de convergencia entre workspace virtual SDK e FS local canônico.',
     },
     {
         path: 'sdk/session-workspace-helpers.js',

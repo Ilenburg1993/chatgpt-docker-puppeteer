@@ -15,6 +15,8 @@
  * @typedef {import('../core/event-bus.js').EventBus} EventBus
  *
  * @typedef {import('./metrics.js').MetricsStore} MetricsStore
+ *
+ * @typedef {import('./convergence-trace-store.js').ConvergenceTraceStore} ConvergenceTraceStore
  */
 
 /**
@@ -29,10 +31,10 @@ export function normalizeSdkMetricSegment(value) {
  * Materializa uma métrica da SDK Wrapper Layer no `MetricsStore` e, opcionalmente, no `EventBus` canônico de runtime.
  *
  * @param {SdkOperationMetric} metric
- * @param {{ metrics: MetricsStore; bus?: EventBus | null }} deps
+ * @param {{ metrics: MetricsStore; bus?: EventBus | null; convergenceTraceStore?: ConvergenceTraceStore | null }} deps
  * @returns {void}
  */
-export function projectSdkOperationMetric(metric, { metrics, bus }) {
+export function projectSdkOperationMetric(metric, { metrics, bus, convergenceTraceStore }) {
     const op = normalizeSdkMetricSegment(metric.operation);
     const status = normalizeSdkMetricSegment(metric.status);
 
@@ -53,9 +55,24 @@ export function projectSdkOperationMetric(metric, { metrics, bus }) {
         metrics.recordCounter(`sdk.operation.${op}.action.${normalizeSdkMetricSegment(action)}`);
     }
 
+    const phase = metric.attributes?.['phase'];
+    if (typeof phase === 'string' && phase) {
+        const normalizedPhase = normalizeSdkMetricSegment(phase);
+        metrics.recordCounter(`sdk.operation.${op}.phase.${normalizedPhase}.total`);
+        metrics.recordCounter(`sdk.operation.${op}.phase.${normalizedPhase}.${status}`);
+    }
+
+    const bytes = metric.attributes?.['bytes'];
+    if (typeof bytes === 'number' && Number.isFinite(bytes) && bytes >= 0) {
+        metrics.recordCounter(`sdk.operation.${op}.bytes_total`, bytes);
+        metrics.recordGauge(`sdk.operation.${op}.last_bytes`, bytes);
+    }
+
     if (metric.operation === 'session.sendAndWait' && typeof metric.durationMs === 'number') {
         metrics.recordSdkDialogTurn(metric.durationMs, metric.status === 'succeeded');
     }
+
+    convergenceTraceStore?.recordMetric(metric);
 
     bus?.emit({
         type: 'sdk:operation:metric',

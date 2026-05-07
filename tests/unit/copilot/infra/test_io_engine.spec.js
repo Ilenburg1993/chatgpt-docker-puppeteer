@@ -1,6 +1,6 @@
 // @ts-check
 
-import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -8,8 +8,12 @@ import { afterEach, describe, expect, it } from 'vitest';
 import {
     copyFileLocked,
     createOrReplaceFileAtomic,
+    deleteFileLocked,
+    mkdirPathLocked,
+    moveFileLocked,
     readText,
     withIoResourceLock,
+    writeFileAtomic,
 } from '../../../../src/copilot/infra/io-engine.js';
 import { scanDirectory } from '../../../../src/copilot/infra/io-scanner.js';
 
@@ -100,6 +104,141 @@ describe('infra/io-engine', () => {
         await expect(readFile(destination, 'utf8')).resolves.toBe('source');
     });
 
+    it('writeFileAtomic aguarda lock ativo no mesmo arquivo antes de escrever', async () => {
+        const dir = await createTempDir();
+        const file = join(dir, 'write-vs-write.txt');
+        await writeFile(file, 'before', 'utf8');
+
+        /** @type {() => void} */
+        let release = () => {};
+        const holder = withIoResourceLock(
+            file,
+            () =>
+                new Promise((resolve) => {
+                    release = () => resolve(undefined);
+                }),
+        );
+        let written = false;
+        const write = writeFileAtomic(file, 'after').then((result) => {
+            written = true;
+            return result;
+        });
+
+        await new Promise((resolve) => setTimeout(resolve, 20));
+        expect(written).toBe(false);
+        await expect(readFile(file, 'utf8')).resolves.toBe('before');
+
+        release();
+        await holder;
+        const result = await write;
+
+        expect(written).toBe(true);
+        expect(result.lockWaitMs).toBeGreaterThanOrEqual(1);
+        await expect(readFile(file, 'utf8')).resolves.toBe('after');
+    });
+
+    it('moveFileLocked aguarda lock ativo no source antes de mover', async () => {
+        const dir = await createTempDir();
+        const source = join(dir, 'write-vs-move.txt');
+        const destination = join(dir, 'moved.txt');
+        await writeFile(source, 'source', 'utf8');
+
+        /** @type {() => void} */
+        let release = () => {};
+        const holder = withIoResourceLock(
+            source,
+            () =>
+                new Promise((resolve) => {
+                    release = () => resolve(undefined);
+                }),
+        );
+        let moved = false;
+        const move = moveFileLocked(source, destination).then((result) => {
+            moved = true;
+            return result;
+        });
+
+        await new Promise((resolve) => setTimeout(resolve, 20));
+        expect(moved).toBe(false);
+        await expect(readFile(source, 'utf8')).resolves.toBe('source');
+
+        release();
+        await holder;
+        const result = await move;
+
+        expect(moved).toBe(true);
+        expect(result.lockWaitMs).toBeGreaterThanOrEqual(1);
+        await expect(readFile(destination, 'utf8')).resolves.toBe('source');
+        await expect(readFile(source, 'utf8')).rejects.toMatchObject({ code: 'ENOENT' });
+    });
+
+    it('mkdirPathLocked aguarda lock ativo no diretório antes de criar', async () => {
+        const dir = await createTempDir();
+        const nested = join(dir, 'locked-dir');
+
+        /** @type {() => void} */
+        let release = () => {};
+        const holder = withIoResourceLock(
+            nested,
+            () =>
+                new Promise((resolve) => {
+                    release = () => resolve(undefined);
+                }),
+        );
+        let created = false;
+        const creation = mkdirPathLocked(nested, { recursive: true }).then((result) => {
+            created = true;
+            return result;
+        });
+
+        await new Promise((resolve) => setTimeout(resolve, 20));
+        expect(created).toBe(false);
+
+        release();
+        await holder;
+        const result = await creation;
+
+        expect(created).toBe(true);
+        expect(result.lockWaitMs).toBeGreaterThanOrEqual(1);
+        await expect(stat(nested)).resolves.toMatchObject({ isDirectory: expect.any(Function) });
+        expect((await stat(nested)).isDirectory()).toBe(true);
+        expect(result.io.operation).toBe('mkdir');
+        expect(result.io.engine).toBe('io-engine.fs.mkdir');
+    });
+
+    it('deleteFileLocked aguarda lock ativo no arquivo antes de deletar', async () => {
+        const dir = await createTempDir();
+        const file = join(dir, 'write-vs-delete.txt');
+        await writeFile(file, 'source', 'utf8');
+
+        /** @type {() => void} */
+        let release = () => {};
+        const holder = withIoResourceLock(
+            file,
+            () =>
+                new Promise((resolve) => {
+                    release = () => resolve(undefined);
+                }),
+        );
+        let deleted = false;
+        const deletion = deleteFileLocked(file).then((result) => {
+            deleted = true;
+            return result;
+        });
+
+        await new Promise((resolve) => setTimeout(resolve, 20));
+        expect(deleted).toBe(false);
+        await expect(readFile(file, 'utf8')).resolves.toBe('source');
+
+        release();
+        await holder;
+        const result = await deletion;
+
+        expect(deleted).toBe(true);
+        expect(result.lockWaitMs).toBeGreaterThanOrEqual(1);
+        await expect(readFile(file, 'utf8')).rejects.toMatchObject({ code: 'ENOENT' });
+    });
+
     it('withIoResourceLock respeita timeout enquanto aguarda lock anterior', async () => {
         const dir = await createTempDir();
         const resource = join(dir, 'busy.txt');
@@ -172,6 +311,10 @@ describe('infra/io-engine', () => {
         await writeFile(join(dir, '.hidden.txt'), 'hidden', 'utf8');
         await mkdir(join(dir, 'sub'), { recursive: true });
         await writeFile(join(dir, 'sub', 'nested.md'), 'nested', 'utf8');
+        await mkdir(join(dir, '.git'), { recursive: true });
+        await writeFile(join(dir, '.git', 'config'), 'protected', 'utf8');
+        await mkdir(join(dir, 'node_modules'), { recursive: true });
+        await writeFile(join(dir, 'node_modules', 'pkg.js'), 'protected', 'utf8');
 
         const shallow = await scanDirectory(dir, { workspaceRoot: dir, recursive: false });
         expect(shallow.io.operation).toBe('scan');
@@ -190,5 +333,8 @@ describe('infra/io-engine', () => {
 
         const withHidden = await scanDirectory(dir, { workspaceRoot: dir, showHidden: true });
         expect(withHidden.entries.map((entry) => entry.name)).toContain('.hidden.txt');
+        expect(withHidden.entries.map((entry) => entry.name)).not.toContain('.git');
+        expect(withHidden.entries.map((entry) => entry.name)).not.toContain('node_modules');
+        expect(withHidden.io.advisoryLimits).toMatchObject({ denylist: 'enabled' });
     });
 });

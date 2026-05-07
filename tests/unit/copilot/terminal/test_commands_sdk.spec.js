@@ -49,6 +49,27 @@ const runtimeMocks = vi.hoisted(() => ({
     selectTerminalSdkSessionUi: vi.fn(async (_message, options) => options[0] ?? null),
 }));
 
+const fileToolMocks = vi.hoisted(() => ({
+    readFileHandler: vi.fn(async ({ path }) => ({
+        success: true,
+        path,
+        content: `LOCAL:${String(path ?? '')}`,
+        io: { operation: 'read', engine: 'io-engine.fs.readFile.text' },
+    })),
+    createFileHandler: vi.fn(async ({ path, content }) => ({
+        success: true,
+        path,
+        bytesWritten: Buffer.byteLength(String(content ?? ''), 'utf8'),
+        io: { operation: 'write', engine: 'io-engine.atomic-write' },
+    })),
+    writeFileHandler: vi.fn(async ({ path, content }) => ({
+        success: true,
+        path,
+        bytesWritten: Buffer.byteLength(String(content ?? ''), 'utf8'),
+        io: { operation: 'write', engine: 'io-engine.atomic-write' },
+    })),
+}));
+
 const agentRuntimeMocks = vi.hoisted(() => ({
     readTerminalRuntimeState: vi.fn(() => ({
         runtimeId: 'default',
@@ -62,6 +83,18 @@ const agentRuntimeMocks = vi.hoisted(() => ({
 
 vi.mock('../../../../src/copilot/terminal/frontend/gateways/sdk-session.js', () => runtimeMocks);
 vi.mock('../../../../src/copilot/terminal/frontend/gateways/agent-runtime.js', () => agentRuntimeMocks);
+vi.mock('#copilot/tools', () => ({
+    fileReadTools: [
+        { name: 'list_directory', handler: vi.fn(async () => ({ entries: [] })) },
+        { name: 'read_file_content', handler: fileToolMocks.readFileHandler },
+        { name: 'search_in_files', handler: vi.fn(async () => ({ matches: [] })) },
+    ],
+    fileWriteTools: [
+        { name: 'create_file', handler: fileToolMocks.createFileHandler },
+        { name: 'write_file_content', handler: fileToolMocks.writeFileHandler },
+        { name: 'patch_file', handler: vi.fn(async () => ({ success: true })) },
+    ],
+}));
 
 import { cmdElicitation, cmdPermission, cmdSdk, cmdWorkspace } from '../../../../src/copilot/terminal/commands/sdk.js';
 import {
@@ -109,6 +142,16 @@ describe('terminal/commands/sdk', () => {
         expect(ctx.output()).toContain('SDK Capabilities');
         expect(ctx.output()).toContain('elicitation=true');
         expect(ctx.output()).toContain('workspace=true');
+    });
+
+    it('/sdk doctor valida roteamento entre workspace SDK e FS canônico', async () => {
+        const ctx = mockCtx();
+        await cmdSdk({ println: ctx.println }, 'doctor');
+        expect(ctx.output()).toContain('SDK Doctor');
+        expect(ctx.output()).toContain('local-fs-primary');
+        expect(ctx.output()).toContain('/fs');
+        expect(ctx.output()).toContain('contexto');
+        expect(ctx.output()).toContain('/activity 5');
     });
 
     it('/sdk waits mostra painel unificado de interrupções SDK', async () => {
@@ -192,6 +235,101 @@ describe('terminal/commands/sdk', () => {
         expect(runtimeMocks.createTerminalSdkWorkspaceFile).toHaveBeenCalledWith('notes.md', 'oi');
         expect(write.output()).toContain('workspace SDK virtual');
         expect(write.output()).toContain('notes.md');
+    });
+
+    it('/workspace sync materializa arquivo do workspace SDK no FS local canônico via file-tools', async () => {
+        runtimeMocks.readTerminalSdkWorkspaceFile.mockResolvedValueOnce({ path: 'plan.md', content: 'PLANO' });
+
+        const ctx = mockCtx();
+        await cmdWorkspace({ println: ctx.println }, 'sync plan.md --to tmp/plan-local.md');
+
+        expect(runtimeMocks.readTerminalSdkWorkspaceFile).toHaveBeenCalledWith('plan.md');
+        expect(fileToolMocks.createFileHandler).toHaveBeenCalledWith(
+            expect.objectContaining({
+                path: 'tmp/plan-local.md',
+                content: 'PLANO',
+                overwrite: false,
+                createParentDirs: true,
+            }),
+        );
+        expect(ctx.output()).toContain('SDK');
+        expect(ctx.output()).toContain('materializado');
+    });
+
+    it('/workspace sync exibe guidance acionável quando conteúdo não é textual', async () => {
+        runtimeMocks.readTerminalSdkWorkspaceFile.mockResolvedValueOnce({ path: 'plan.md' });
+
+        const ctx = mockCtx();
+        await cmdWorkspace({ println: ctx.println }, 'sync plan.md --to tmp/plan-local.md');
+
+        expect(ctx.output()).toContain('conteúdo não textual');
+        expect(ctx.output()).toContain('Próximos passos:');
+        expect(ctx.output()).toContain('/status');
+    });
+
+    it('/workspace mirror materializa múltiplos arquivos em root local e usa overwrite quando solicitado', async () => {
+        runtimeMocks.listTerminalSdkWorkspaceFiles.mockResolvedValueOnce({
+            files: [{ path: 'a.md' }, { path: 'dir/b.md' }],
+        });
+        runtimeMocks.readTerminalSdkWorkspaceFile
+            .mockResolvedValueOnce({ path: 'a.md', content: 'A' })
+            .mockResolvedValueOnce({ path: 'dir/b.md', content: 'B' });
+
+        const ctx = mockCtx();
+        await cmdWorkspace({ println: ctx.println }, 'mirror --to tmp/sdk-mirror --overwrite');
+
+        expect(fileToolMocks.writeFileHandler).toHaveBeenNthCalledWith(
+            1,
+            expect.objectContaining({ path: 'tmp/sdk-mirror/a.md', content: 'A', encoding: 'utf8' }),
+        );
+        expect(fileToolMocks.writeFileHandler).toHaveBeenNthCalledWith(
+            2,
+            expect.objectContaining({ path: 'tmp/sdk-mirror/dir/b.md', content: 'B', encoding: 'utf8' }),
+        );
+        expect(ctx.output()).toContain('Mirror SDK');
+        expect(ctx.output()).toContain('ok=2');
+    });
+
+    it('/workspace promote promove arquivo local para workspace SDK com conflito auditável', async () => {
+        runtimeMocks.readTerminalSdkWorkspaceFile.mockRejectedValueOnce(new Error('ENOENT: no such file'));
+
+        const ctx = mockCtx();
+        await cmdWorkspace({ println: ctx.println }, 'promote tmp/local.md --to notes/from-local.md');
+
+        expect(fileToolMocks.readFileHandler).toHaveBeenCalledWith(
+            expect.objectContaining({ path: 'tmp/local.md', encoding: 'utf8' }),
+        );
+        expect(runtimeMocks.createTerminalSdkWorkspaceFile).toHaveBeenCalledWith(
+            'notes/from-local.md',
+            'LOCAL:tmp/local.md',
+        );
+        expect(ctx.output()).toContain('FS');
+        expect(ctx.output()).toContain('promovido');
+        expect(ctx.output()).toContain('fail-if-exists');
+        expect(ctx.output()).toContain('traceId=');
+
+        runtimeMocks.readTerminalSdkWorkspaceFile.mockResolvedValueOnce({
+            path: 'notes/from-local.md',
+            content: 'exists',
+        });
+        const conflict = mockCtx();
+        await cmdWorkspace({ println: conflict.println }, 'promote tmp/local.md --to notes/from-local.md');
+
+        expect(conflict.output()).toContain('ação=conflict');
+        expect(conflict.output()).toContain('--overwrite');
+    });
+
+    it('/workspace promote permite overwrite explícito no workspace SDK', async () => {
+        const ctx = mockCtx();
+        await cmdWorkspace({ println: ctx.println }, 'promote tmp/local.md --to notes/from-local.md --overwrite');
+
+        expect(runtimeMocks.readTerminalSdkWorkspaceFile).not.toHaveBeenCalled();
+        expect(runtimeMocks.createTerminalSdkWorkspaceFile).toHaveBeenCalledWith(
+            'notes/from-local.md',
+            'LOCAL:tmp/local.md',
+        );
+        expect(ctx.output()).toContain('overwrite');
+        expect(ctx.output()).toContain('ação=overwritten');
     });
 
     it('/elicitation lista pendências e dispara request estruturado', async () => {

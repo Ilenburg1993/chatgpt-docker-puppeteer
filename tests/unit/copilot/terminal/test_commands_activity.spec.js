@@ -104,6 +104,25 @@ vi.mock('../../../../src/copilot/terminal/frontend/index.js', () => ({
     })),
 }));
 
+vi.mock('../../../../src/copilot/terminal/io-activity-events.js', () => ({
+    readTerminalIoActivityProjection: vi.fn(() => [
+        {
+            timestamp: 2,
+            success: true,
+            operation: 'read',
+            target: 'src/copilot/terminal/repl.js',
+            targets: ['src/copilot/terminal/repl.js'],
+            engine: 'io-engine.fs.readFile.text',
+            targetKind: 'file',
+            durationMs: 7,
+            bytesRead: 42,
+            bytesWritten: null,
+            riskClass: 'low',
+            error: null,
+        },
+    ]),
+}));
+
 const { cmdActivity } = await import('../../../../src/copilot/terminal/commands/activity.js');
 
 function mockCtx() {
@@ -127,6 +146,8 @@ describe('terminal/commands/activity', () => {
         expect(ctx.output()).toContain('Último turno concluído');
         expect(ctx.output()).toContain('arquivos tocados');
         expect(ctx.output()).toContain('workspace.read_file');
+        expect(ctx.output()).toContain('I/O real recente');
+        expect(ctx.output()).toContain('io-engine.fs.readFile.text');
         expect(ctx.output()).toContain('turn:turn-1');
         expect(ctx.output()).toContain(
             '/workspaces/chatgpt-docker-puppeteer/src/copilot/terminal/commands/activity.js',

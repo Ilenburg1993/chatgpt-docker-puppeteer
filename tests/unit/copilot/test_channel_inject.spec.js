@@ -32,14 +32,12 @@ describe('copilot/channel/inject.js — structural', () => {
 
     // ─── Security ───────────────────────────────────────────────────────────────
 
-    it('deve limitar tamanho da resposta HTTP (MAX_RESPONSE_BYTES)', () => {
-        assert.ok(SRC.includes('MAX_RESPONSE_BYTES'));
-        // Check the limit is reasonable (2 MB)
-        assert.ok(SRC.includes('2 * 1024 * 1024') || SRC.includes('2_097_152'));
+    it('não deve impor limite bloqueante de tamanho na resposta HTTP da LLM-B', () => {
+        assert.ok(!SRC.includes('MAX_RESPONSE_BYTES'));
     });
 
-    it('deve usar BridgeError para respostas excessivas', () => {
-        assert.ok(SRC.includes('LLM_B_RESPONSE_TOO_LARGE'));
+    it('não deve emitir erro bloqueante para resposta grande da LLM-B', () => {
+        assert.ok(!SRC.includes('LLM_B_RESPONSE_TOO_LARGE'));
     });
 
     it('deve ter timeout no request HTTP', () => {
@@ -145,8 +143,8 @@ describe('copilot/channel/inject.js — structural', () => {
 
     // ─── waitForLlmBReady ───────────────────────────────────────────────────────
 
-    it('waitForLlmBReady deve ter maxWaitMs default (30s)', () => {
-        assert.ok(SRC.includes('30_000') || SRC.includes('30000'));
+    it('waitForLlmBReady não deve ter maxWaitMs bloqueante por default', () => {
+        assert.ok(SRC.includes('Number.POSITIVE_INFINITY'));
     });
 
     it('waitForLlmBReady deve usar polling com intervalo', () => {

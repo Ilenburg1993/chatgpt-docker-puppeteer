@@ -4,12 +4,15 @@
  */
 
 import { getWorkspaceContext } from '#copilot/boot';
+import { readSystemPromptStatusSync } from '#copilot/config';
+import { buildRuntimeSdkFsRoutingProjection } from '../../../presentation/runtime-file-routing.js';
 import { buildRuntimeLifecycleSummary, readRuntimeLifecycleSnapshot } from '../../../presentation/runtime-lifecycle.js';
 import {
     getLastSdkPlanChangedAt,
     getLastSdkPlanOperation,
     getSdkSessionMode,
 } from '../../../presentation/runtime-ui-state-store.js';
+import { readIntrospectionRegistrySnapshot } from '../../../tools/introspection-tools.js';
 import { readTerminalActivitySnapshot } from '../../activity-state.js';
 import {
     readTerminalElicitationSummary,
@@ -23,6 +26,14 @@ import {
     readTerminalRuntimeBase,
 } from './shared.js';
 import { readTerminalTimelineProjection } from './timeline.js';
+
+/**
+ * @param {unknown} value
+ * @returns {Record<string, unknown> | null}
+ */
+function objectOrNull(value) {
+    return value && typeof value === 'object' ? /** @type {Record<string, unknown>} */ (value) : null;
+}
 
 /**
  * @param {{ hubSessionId?: string | null; injectPort?: number; runtimeId?: string | null }} input
@@ -75,6 +86,26 @@ import { readTerminalTimelineProjection } from './timeline.js';
  *     latestUserInputKind: 'question' | 'ready' | 'reply' | 'stopped' | null;
  *     permissionMode: 'approve_all' | 'audit_only' | 'selective';
  *     sdkCapabilities: Record<string, unknown> | null;
+ *     toolLoad: {
+ *         total: number;
+ *         categories: Record<string, number>;
+ *         disabled: string[];
+ *         hasCanonicalLocalFsTools: boolean;
+ *         hasSdkWorkspaceTooling: boolean;
+ *     };
+ *     instructionLoad: {
+ *         liveReloadMechanism: 'sdk-transform' | 'static-snapshot';
+ *         sectionCount: number;
+ *         sectionsMissingFileCount: number;
+ *         appendFileMissingCount: number;
+ *         sdkSupportsInstructionSourcesRpc: boolean;
+ *     };
+ *     sdkFsRouting: {
+ *         canonicalFsReady: boolean;
+ *         sdkWorkspaceAvailable: boolean;
+ *         mode: 'local-fs-primary' | 'sdk-workspace-only' | 'degraded';
+ *         reason: string;
+ *     };
  *     timelineSource: import('./timeline.js').TerminalTimelineSource;
  *     timelineAuthority: import('./timeline.js').TerminalTimelineAuthority;
  *     timelineReconciliationStatus: import('./timeline.js').TerminalTimelineReconciliation;
@@ -115,6 +146,28 @@ export function readTerminalStatusProjection({ hubSessionId = null, injectPort, 
             return null;
         }
     })();
+    const toolLoadSnapshot = readIntrospectionRegistrySnapshot();
+    const promptStatus = readSystemPromptStatusSync();
+    const toolLoad = {
+        total: toolLoadSnapshot.total,
+        categories: toolLoadSnapshot.categories,
+        disabled: toolLoadSnapshot.disabled,
+        hasCanonicalLocalFsTools: toolLoadSnapshot.hasCanonicalLocalFsTools,
+        hasSdkWorkspaceTooling: toolLoadSnapshot.hasSdkWorkspaceTooling,
+    };
+    const sectionsMissingFileCount = promptStatus.sections.filter((section) => section.file.exists !== true).length;
+    const appendFileMissingCount = promptStatus.appendFiles.filter((file) => file.exists !== true).length;
+    const instructionLoad = {
+        liveReloadMechanism: promptStatus.liveReloadMechanism,
+        sectionCount: promptStatus.sectionCount,
+        sectionsMissingFileCount,
+        appendFileMissingCount,
+        sdkSupportsInstructionSourcesRpc: promptStatus.sdkCompatibility.supportsInstructionSourcesRpc,
+    };
+    const sdkWorkspaceAvailable =
+        objectOrNull(sdkCapabilities?.['tools'])?.['workspace'] === true || toolLoad.hasSdkWorkspaceTooling;
+    const canonicalFsReady = toolLoad.hasCanonicalLocalFsTools;
+    const sdkFsRouting = buildRuntimeSdkFsRoutingProjection({ canonicalFsReady, sdkWorkspaceAvailable });
     const timeline = readTerminalTimelineProjection({ limitPairs: 10, runtimeId });
     return {
         snap: base.snap,
@@ -179,5 +232,8 @@ export function readTerminalStatusProjection({ hubSessionId = null, injectPort, 
         latestUserInputKind: userInputSummary.latest?.kind ?? null,
         permissionMode,
         sdkCapabilities,
+        toolLoad,
+        instructionLoad,
+        sdkFsRouting,
     };
 }

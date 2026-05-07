@@ -21,6 +21,7 @@ import { container } from '#copilot/core';
 import { defaultBus, SDK_HOOKS } from '#copilot/hooks';
 import {
     DEFAULT_OTEL_FILE,
+    defaultConvergenceTraceStore,
     defaultErrorTracker,
     defaultMetrics,
     getCatalog,
@@ -38,6 +39,7 @@ import {
     compactionCompact,
     createClientSession,
     disconnectClientSession,
+    emitSdkOperationMetric,
     forceStopClient,
     getClient,
     getClientSession,
@@ -225,6 +227,7 @@ const sdkObservabilityOps = Object.freeze({
     log,
     nervEventBusAdapter,
     otelExporterOtlpEndpoint: OTEL_EXPORTER_OTLP_ENDPOINT,
+    convergenceTraceStore: defaultConvergenceTraceStore,
 });
 
 const sdkHookOps = Object.freeze({
@@ -236,6 +239,10 @@ const sdkHookOps = Object.freeze({
 const sdkSessionPolicyOps = Object.freeze({
     defaultDialogTimeoutMs: LLM_B_TURN_TIMEOUT_MS,
     resolveOptionalDialogTimeout,
+});
+
+const sdkTelemetryOps = Object.freeze({
+    emitOperationMetric: emitSdkOperationMetric,
 });
 
 /**
@@ -276,6 +283,7 @@ function resolveMetricsStore() {
  *     sdkObservability: typeof sdkObservabilityOps;
  *     sdkHooks: typeof sdkHookOps;
  *     sdkSessionPolicy: typeof sdkSessionPolicyOps;
+ *     sdkTelemetry: typeof sdkTelemetryOps;
  *     sdkApiToken: string | null;
  *     bridgeAdminToken: string | undefined;
  * }}
@@ -305,6 +313,7 @@ export function buildDefaultSdkRouteSharedDeps(runtimeId) {
         sdkObservability: sdkObservabilityOps,
         sdkHooks: sdkHookOps,
         sdkSessionPolicy: sdkSessionPolicyOps,
+        sdkTelemetry: sdkTelemetryOps,
         sdkApiToken: SDK_API_TOKEN,
         bridgeAdminToken: BRIDGE_ADMIN_TOKEN,
     };

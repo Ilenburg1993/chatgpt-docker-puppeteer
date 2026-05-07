@@ -35,6 +35,9 @@ export {
     UiInputBodySchema,
     UiSelectBodySchema,
     WorkspaceCreateFileBodySchema,
+    WorkspaceMaterializeBodySchema,
+    WorkspaceMirrorBodySchema,
+    WorkspacePromoteBodySchema,
 } from './session-schemas.js';
 
 /**

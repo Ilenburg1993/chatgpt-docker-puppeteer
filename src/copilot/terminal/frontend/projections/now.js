@@ -7,6 +7,7 @@
  */
 
 import { getMcpStatus } from '#copilot/bridges';
+import { buildRuntimeSdkFsRoutingProjection } from '../../../presentation/runtime-file-routing.js';
 import { readRuntimeLifecycleSnapshot } from '../../../presentation/runtime-lifecycle.js';
 import { listActiveRuntimeTodosProjection } from '../../../presentation/runtime-todos.js';
 import {
@@ -15,6 +16,7 @@ import {
     getSdkSessionMode,
 } from '../../../presentation/runtime-ui-state-store.js';
 import { readToolStatsProjection } from '../../../presentation/system-metrics.js';
+import { readIntrospectionRegistrySnapshot } from '../../../tools/introspection-tools.js';
 import { readTerminalActivityHistory, readTerminalActivitySnapshot } from '../../activity-state.js';
 import { readTerminalDisplayState } from '../../display-policy.js';
 import { readTerminalTurnTraceProjection } from '../../turn-trace-state.js';
@@ -400,6 +402,12 @@ export function searchTerminalTurnsProjection({ query, hubSessionId = null, limi
  *         persistedTurnCount: number;
  *         liveBridgeTailCount: number;
  *     };
+ *     sdkFsRouting: {
+ *         canonicalFsReady: boolean;
+ *         sdkWorkspaceAvailable: boolean;
+ *         mode: 'local-fs-primary' | 'sdk-workspace-only' | 'degraded';
+ *         reason: string;
+ *     };
  * }>}
  */
 export async function readTerminalDiagnoseProjection({ hubSessionId = null, runtimeId = null } = {}) {
@@ -425,6 +433,11 @@ export async function readTerminalDiagnoseProjection({ hubSessionId = null, runt
     const topToolStats = readToolStatsProjection()
         .entries.sort(([, a], [, b]) => Number(b['avgLatencyMs'] ?? 0) - Number(a['avgLatencyMs'] ?? 0))
         .slice(0, 5);
+    const toolLoadSnapshot = readIntrospectionRegistrySnapshot();
+    const sdkFsRouting = buildRuntimeSdkFsRoutingProjection({
+        canonicalFsReady: toolLoadSnapshot.hasCanonicalLocalFsTools,
+        sdkWorkspaceAvailable: toolLoadSnapshot.hasSdkWorkspaceTooling,
+    });
     const timeline = readTerminalTimelineProjection({ limitPairs: 10, runtimeId });
 
     return {
@@ -458,5 +471,6 @@ export async function readTerminalDiagnoseProjection({ hubSessionId = null, runt
             persistedTurnCount: timeline.totalPersistedTurns,
             liveBridgeTailCount: timeline.liveBridgeTailCount,
         },
+        sdkFsRouting,
     };
 }

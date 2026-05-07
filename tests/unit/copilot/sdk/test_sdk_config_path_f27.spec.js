@@ -18,6 +18,7 @@ import { describe, expect, it } from 'vitest';
 
 const ROOT = '/workspaces/chatgpt-docker-puppeteer';
 const SRC = join(ROOT, 'src/copilot');
+const DEFAULTS_SOURCE = readFileSync(join(SRC, 'config/defaults.js'), 'utf8');
 
 // ─── F132: zero-bypass intacto após mudanças ───────────────────────────────────
 
@@ -68,24 +69,10 @@ describe('F129 — DEFAULT_EXCLUDED_TOOLS acessível via config barrel', () => {
         expect(Object.isFrozen(tools)).toBe(true);
     });
 
-    it('DEFAULT_EXCLUDED_TOOLS inclui powershell (padrão de segurança)', async () => {
-        const cfg = await import('#copilot/config');
-        expect(/** @type {readonly string[]} */ (cfg.DEFAULT_EXCLUDED_TOOLS)).toContain('powershell');
-    });
-
-    it('DEFAULT_EXCLUDED_TOOLS inclui web_fetch', async () => {
-        const cfg = await import('#copilot/config');
-        expect(/** @type {readonly string[]} */ (cfg.DEFAULT_EXCLUDED_TOOLS)).toContain('web_fetch');
-    });
-
-    it('DEFAULT_EXCLUDED_TOOLS inclui web_search', async () => {
-        const cfg = await import('#copilot/config');
-        expect(/** @type {readonly string[]} */ (cfg.DEFAULT_EXCLUDED_TOOLS)).toContain('web_search');
-    });
-
-    it('DEFAULT_EXCLUDED_TOOLS inclui memory', async () => {
-        const cfg = await import('#copilot/config');
-        expect(/** @type {readonly string[]} */ (cfg.DEFAULT_EXCLUDED_TOOLS)).toContain('memory');
+    it('não deve conter exclusões default de tools', () => {
+        const match = DEFAULTS_SOURCE.match(/DEFAULT_EXCLUDED_TOOLS\s*=\s*Object\.freeze\((\[[^\]]*\])\)/);
+        expect(match).toBeTruthy();
+        expect(match?.[1]).toBe('[]');
     });
 });
 

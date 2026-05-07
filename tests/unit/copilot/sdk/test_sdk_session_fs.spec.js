@@ -1,6 +1,7 @@
 // @ts-check
 
-import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { createSessionFsAdapter } from '@github/copilot-sdk';
+import { mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -82,6 +83,29 @@ describe('sdk/session-fs', () => {
         );
     });
 
+    it('createLocalSessionFsProvider cria diretórios pela engine canônica e mantém compatibilidade com o adapter do SDK', async () => {
+        const rootDir = await createTempDir();
+        const provider = createLocalSessionFsProvider(rootDir);
+        const adapter = createSessionFsAdapter(provider);
+
+        await expect(adapter.mkdir({ path: 'nested/deep', recursive: true })).resolves.toBeUndefined();
+        await expect(provider.writeFile('nested/deep/file.txt', 'ok')).resolves.toBeUndefined();
+
+        await expect(provider.stat('nested/deep')).resolves.toMatchObject({
+            isFile: false,
+            isDirectory: true,
+        });
+        await expect(readFile(join(rootDir, 'nested/deep/file.txt'), 'utf8')).resolves.toBe('ok');
+        expect(metrics.map((metric) => `${metric.operation}:${metric.status}`)).toEqual(
+            expect.arrayContaining([
+                'session.fs.mkdir:started',
+                'session.fs.mkdir:succeeded',
+                'session.fs.writeFile:started',
+                'session.fs.writeFile:succeeded',
+            ]),
+        );
+    });
+
     it('createLocalSessionFsProvider bloqueia path traversal', async () => {
         const rootDir = await createTempDir();
         const provider = createLocalSessionFsProvider(rootDir);
@@ -89,6 +113,51 @@ describe('sdk/session-fs', () => {
         expect(metrics.map((metric) => `${metric.operation}:${metric.status}`)).toEqual(
             expect.arrayContaining(['session.fs.writeFile:started', 'session.fs.writeFile:failed']),
         );
+    });
+
+    it('createLocalSessionFsProvider bloqueia symlink que escapa do root isolado', async () => {
+        const rootDir = await createTempDir();
+        const outsideDir = await createTempDir();
+        const outsideFile = join(outsideDir, 'outside.txt');
+        await writeFile(outsideFile, 'outside', 'utf8');
+        await symlink(outsideFile, join(rootDir, 'link.txt'));
+        const provider = createLocalSessionFsProvider(rootDir);
+
+        await expect(provider.readFile('link.txt')).rejects.toThrow(/symlink/i);
+        expect(metrics.map((metric) => `${metric.operation}:${metric.status}`)).toEqual(
+            expect.arrayContaining(['session.fs.readFile:started', 'session.fs.readFile:failed']),
+        );
+    });
+
+    it('provider.exists propaga erro de policy enquanto o adapter do SDK preserva contrato exists=false', async () => {
+        const rootDir = await createTempDir();
+        const outsideDir = await createTempDir();
+        const outsideFile = join(outsideDir, 'outside.txt');
+        await writeFile(outsideFile, 'outside', 'utf8');
+        await symlink(outsideFile, join(rootDir, 'link.txt'));
+        const provider = createLocalSessionFsProvider(rootDir);
+        const adapter = createSessionFsAdapter(provider);
+
+        await expect(provider.exists('link.txt')).rejects.toThrow(/symlink/i);
+        await expect(adapter.exists({ path: 'link.txt' })).resolves.toEqual({ exists: false });
+        expect(metrics.map((metric) => `${metric.operation}:${metric.status}`)).toEqual(
+            expect.arrayContaining([
+                'session.fs.exists:started',
+                'session.fs.exists:failed',
+                'session.fs.exists:started',
+                'session.fs.exists:failed',
+            ]),
+        );
+    });
+
+    it('readdirWithTypes não converte symlink em arquivo no contrato do SDK', async () => {
+        const rootDir = await createTempDir();
+        const provider = createLocalSessionFsProvider(rootDir);
+        await provider.writeFile('notes/a.txt', 'hello');
+        await symlink(join(rootDir, 'notes/a.txt'), join(rootDir, 'notes/link.txt'));
+
+        await expect(provider.readdir('notes')).resolves.toEqual(['a.txt', 'link.txt']);
+        await expect(provider.readdirWithTypes('notes')).resolves.toEqual([{ name: 'a.txt', type: 'file' }]);
     });
 
     it('createWorkspaceSessionFsHandler isola por sessionId', async () => {

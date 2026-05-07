@@ -10,6 +10,7 @@
  */
 
 import { toError } from '#copilot/core';
+import { buildTerminalOperationalGuidance } from '../auto-briefing.js';
 import {
     clearPendingTerminalQuestionShadow,
     clearTerminalHistory,
@@ -21,6 +22,7 @@ import {
     readTerminalDbHistoryProjection,
     readTerminalDbSessionsProjection,
     readTerminalDisplayProjection,
+    readTerminalLiveFlowProjection,
     readTerminalStatusProjection,
     readTerminalTimelineProjection,
     saveTerminalSnapshotProjection,
@@ -169,6 +171,25 @@ export function cmdStatus({ hubSessionId, injectPort, println }, arg = '') {
               : promptIsStale === false
                 ? '\x1b[32mok\x1b[0m'
                 : '\x1b[90m(n/d)\x1b[0m';
+    const toolLoad = projection.toolLoad;
+    const toolLoadColor = toolLoad.hasCanonicalLocalFsTools ? '\x1b[32m' : '\x1b[33m';
+    const instructionLoad = projection.instructionLoad;
+    const instructionLoadColor =
+        instructionLoad.sectionsMissingFileCount === 0 && instructionLoad.appendFileMissingCount === 0
+            ? '\x1b[32m'
+            : '\x1b[33m';
+    const sdkFsRouting = projection.sdkFsRouting;
+    const operationalGuidance = buildTerminalOperationalGuidance({
+        sdkFsRouting,
+        toolLoad,
+        instructionLoad,
+    });
+    const sdkFsRoutingColor =
+        sdkFsRouting.mode === 'local-fs-primary'
+            ? '\x1b[32m'
+            : sdkFsRouting.mode === 'sdk-workspace-only'
+              ? '\x1b[33m'
+              : '\x1b[31m';
     println(`
   \x1b[36mStatus do Terminal LLM-B\x1b[0m
   ─────────────────────────────────────
@@ -193,6 +214,9 @@ export function cmdStatus({ hubSessionId, injectPort, println }, arg = '') {
     timeline         \x1b[90m${projection.timelineSource} · ${projection.timelineAuthority} · ${projection.timelineReconciliationStatus} · ${projection.timelineTurnCount} turns${timelineSyncLabel}\x1b[0m
     prompt digest    \x1b[90m${promptBindingDigest ?? '(sem binding)'}\x1b[0m
     prompt frescor   ${promptFreshnessLabel} \x1b[90m(${promptRecommendedAction})\x1b[0m
+    tools load       ${toolLoadColor}${toolLoad.total} registradas\x1b[0m \x1b[90m(fsCanônico=${toolLoad.hasCanonicalLocalFsTools} · sdkWorkspace=${toolLoad.hasSdkWorkspaceTooling} · disabled=${toolLoad.disabled.length})\x1b[0m
+    instr. load      ${instructionLoadColor}${instructionLoad.liveReloadMechanism}\x1b[0m \x1b[90m(sections=${instructionLoad.sectionCount} · missingSectionFile=${instructionLoad.sectionsMissingFileCount} · missingAppendFile=${instructionLoad.appendFileMissingCount} · sourcesRpc=${instructionLoad.sdkSupportsInstructionSourcesRpc})\x1b[0m
+    sdk↔fs route     ${sdkFsRoutingColor}${sdkFsRouting.mode}\x1b[0m \x1b[90m${sdkFsRouting.reason}\x1b[0m
     sdk session      \x1b[90m${projection.sdkSessionId ?? '(sem sdk)'}\x1b[0m
     hub session      \x1b[90m${projection.hubSessionId ?? '(sem hub)'}\x1b[0m
     turnos canon     ${projection.turnCount} \x1b[90m(persistidos=${projection.persistedTimelineTurnCount} · bridge=${projection.bridgeTurnCount} · live-tail=${projection.liveBridgeTailCount})\x1b[0m
@@ -229,6 +253,12 @@ ${autoPolicyLine ? `${autoPolicyLine}\n` : ''}  ──────────�
     }
     if (promptFreshnessReason) {
         println(`  prompt reason   \x1b[90m${promptFreshnessReason}\x1b[0m`);
+    }
+    println(`  guia operação  \x1b[90m${operationalGuidance.summary}\x1b[0m`);
+    println(`  domínio ativo  \x1b[90m${operationalGuidance.domainHint}\x1b[0m`);
+    println(`  coleta ctx     \x1b[90m${operationalGuidance.contextHint}\x1b[0m`);
+    if (operationalGuidance.warnings.length > 0) {
+        println(`  atenção boot   \x1b[33m${operationalGuidance.warnings.join(' | ')}\x1b[0m`);
     }
     if (activityProjection.history.length > 0) {
         println(
@@ -335,12 +365,22 @@ export function cmdNow({ hubSessionId, injectPort, println }, arg = '') {
         .join(' ');
     const queue = Number(projection.snap['queueSize'] ?? 0);
     const modelBilling = projection.modelBilling;
+    const live = readTerminalLiveFlowProjection(
+        withRuntimeTarget(
+            {
+                hubSessionId: hubSessionId ?? null,
+                ...(typeof injectPort === 'number' ? { injectPort } : {}),
+                limit: 4,
+            },
+            runtimeId,
+        ),
+    );
     const mismatchLabel = modelBilling.mismatch
         ? `mismatch(cfg=${modelBilling.configuredModel ?? '-'}|bill=${modelBilling.billedModel ?? '-'})`
         : `model=${modelBilling.displayModel}`;
 
     println(
-        `\x1b[36m[now]\x1b[0m runtime=${projection.runtimeId} status=${state} loop=${projection.dialogLoopActive ? 'on' : 'off'} mode=${mode} queue=${queue} ${ask}${sdkWait ? ` ${sdkWait}` : ''} timeline=${projection.timelineSource}:${projection.timelineReconciliationStatus}:sync=${projection.timelineSyncStatus} ${mismatchLabel}`,
+        `\x1b[36m[now]\x1b[0m runtime=${projection.runtimeId} live=${live.state} status=${state} loop=${projection.dialogLoopActive ? 'on' : 'off'} mode=${mode} queue=${queue} ${ask}${sdkWait ? ` ${sdkWait}` : ''} timeline=${projection.timelineSource}:${projection.timelineReconciliationStatus}:sync=${projection.timelineSyncStatus} sse=${live.sse.clients}/${live.sse.criticalClients} ${mismatchLabel}`,
     );
     if (projection.activity?.label) {
         const detail = projection.activity.detail ? ` · ${projection.activity.detail}` : '';
@@ -349,6 +389,111 @@ export function cmdNow({ hubSessionId, injectPort, println }, arg = '') {
     if (projection.recommendedAction) {
         println(`\x1b[90m[now]\x1b[0m recommended=${projection.recommendedAction}`);
     }
+}
+
+/**
+ * Exibe a linha do tempo operacional live do terminal: loop, streaming, SSE, tools, arquivos e I/O real.
+ *
+ * @param {SessionContext} ctx
+ * @param {string} [arg]
+ * @returns {void}
+ */
+export function cmdLive({ hubSessionId, injectPort, println }, arg = '') {
+    const { runtimeId, arg: rest } = extractRuntimeTarget(arg);
+    const requestedLimit = Number(rest) || 6;
+    const projection = readTerminalLiveFlowProjection(
+        withRuntimeTarget(
+            {
+                hubSessionId: hubSessionId ?? null,
+                ...(typeof injectPort === 'number' ? { injectPort } : {}),
+                limit: requestedLimit,
+            },
+            runtimeId,
+        ),
+    );
+    const status = projection.status;
+    const current = projection.activity.current;
+    const activeTrace = projection.turnTrace.current ?? projection.turnTrace.recent[0] ?? null;
+    const stateColor =
+        projection.state === 'ready'
+            ? '\x1b[32m'
+            : projection.state === 'active-turn'
+              ? '\x1b[36m'
+              : projection.state === 'waiting-human' || projection.state === 'paused'
+                ? '\x1b[33m'
+                : '\x1b[31m';
+    const streamFlags = [
+        `streaming=${projection.stream.streaming ? 'on' : 'off'}`,
+        `thinking=${projection.stream.thinking ? 'on' : 'off'}`,
+        `tools=${projection.stream.toolActivity ? 'on' : 'off'}`,
+        `intent=${projection.stream.intent ? 'on' : 'off'}`,
+        `usage=${projection.stream.usage ? 'on' : 'off'}`,
+    ].join(' · ');
+
+    println(`
+  \x1b[36mTerminal Live Flow\x1b[0m
+  ─────────────────────────────────────
+  estado          ${stateColor}${projection.state}\x1b[0m \x1b[90m${projection.summary}\x1b[0m
+  runtime         \x1b[90m${status.runtimeId} · ${String(status.snap['status'] ?? 'unknown')} · loop=${status.dialogLoopActive ? 'on' : 'off'} · paused=${status.snap['dialogPaused'] ? 'yes' : 'no'}\x1b[0m
+  sdk/session     \x1b[90mmode=${status.sdkSessionMode ?? 'interactive'} · session=${status.sdkSessionId ?? '(sem sdk)'} · permission=${status.permissionMode}\x1b[0m
+  streaming       \x1b[90m${streamFlags}\x1b[0m
+  sse             \x1b[90mclients=${projection.sse.clients} · critical=${projection.sse.criticalClients} · replayLastId=${projection.sse.replayLastId}\x1b[0m
+  timeline        \x1b[90m${projection.timeline.timelineSource} · ${projection.timeline.reconciliationStatus} · sync=${projection.timeline.sync.status} · turns=${projection.counters.timelineTurns}\x1b[0m
+  atividade       \x1b[90m${current.phase}:${current.label}${current.detail ? ` · ${current.detail}` : ''}\x1b[0m
+  trace           \x1b[90mtools=${projection.counters.toolCount} · arquivos=${projection.counters.fileCount} · ioRecent=${projection.counters.recentIoCount}\x1b[0m
+  ─────────────────────────────────────`);
+
+    if (activeTrace && (activeTrace.tools.length > 0 || activeTrace.files.length > 0)) {
+        println('  turno observado');
+        for (const tool of activeTrace.tools.slice(0, 5)) {
+            const target = tool.path ?? tool.target;
+            println(
+                `    - tool ${tool.toolName} · ${tool.operation}${target ? ` · ${target}` : ''} · ${tool.status} · ${tool.source}`,
+            );
+        }
+        for (const file of activeTrace.files.slice(0, 5)) {
+            println(
+                `    - file ${file.operation} · ${file.path} · ${file.source}${file.count > 1 ? ` x${file.count}` : ''}`,
+            );
+        }
+    }
+
+    if (projection.recentIo.length > 0) {
+        println('  I/O real');
+        for (const entry of projection.recentIo.slice(0, 6)) {
+            const ts = new Date(entry.timestamp).toLocaleTimeString('pt-BR', {
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit',
+            });
+            const statusLabel = entry.success ? 'ok' : 'fail';
+            const bytes =
+                typeof entry.bytesRead === 'number'
+                    ? ` · read=${entry.bytesRead}B`
+                    : typeof entry.bytesWritten === 'number'
+                      ? ` · write=${entry.bytesWritten}B`
+                      : '';
+            const duration = typeof entry.durationMs === 'number' ? ` · ${entry.durationMs}ms` : '';
+            println(`    - [${ts}] ${statusLabel} · ${entry.operation} · ${entry.target}${bytes}${duration}`);
+        }
+    }
+
+    if (projection.activity.history.length > 0) {
+        println('  eventos recentes');
+        for (const entry of projection.activity.history.slice(0, 6)) {
+            const ts = new Date(entry.ts).toLocaleTimeString('pt-BR', {
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit',
+            });
+            const progress = typeof entry.progress === 'number' ? ` (${entry.progress}%)` : '';
+            println(
+                `    - [${ts}] ${entry.phase}:${entry.label}${progress}${entry.detail ? ` · ${entry.detail}` : ''}`,
+            );
+        }
+    }
+
+    println('');
 }
 
 /**

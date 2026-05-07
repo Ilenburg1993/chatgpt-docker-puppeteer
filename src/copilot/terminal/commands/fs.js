@@ -10,6 +10,7 @@
 
 import { fileReadTools, fileWriteTools } from '#copilot/tools';
 import { toError } from '../../core/error-handlers.js';
+import { buildFailureRecoveryLines, buildTerminalOperationalGuidance } from '../auto-briefing.js';
 
 /**
  * @typedef {{ println: (text: string) => void }} CommandContext
@@ -40,6 +41,12 @@ const readFileContentTool = findTool(fileReadTools, 'read_file_content');
 const searchInFilesTool = findTool(fileReadTools, 'search_in_files');
 const createFileTool = findTool(fileWriteTools, 'create_file');
 const writeFileContentTool = findTool(fileWriteTools, 'write_file_content');
+
+const FS_FAILURE_GUIDANCE = buildTerminalOperationalGuidance({
+    sdkFsRouting: { mode: 'local-fs-primary', reason: '/fs opera no filesystem local canônico.' },
+    toolLoad: { hasCanonicalLocalFsTools: true },
+    instructionLoad: { sectionsMissingFileCount: 0, appendFileMissingCount: 0 },
+});
 
 /**
  * @param {{ handler?: Function }} tool
@@ -87,7 +94,11 @@ function ioSummary(result) {
  * @param {Record<string, unknown>} result
  */
 function printFailure({ println }, result) {
-    println(`\n  \x1b[31m✗ FS local: ${String(result['error'] ?? 'operação falhou')}\x1b[0m\n`);
+    println(`\n  \x1b[31m✗ FS local: ${String(result['error'] ?? 'operação falhou')}\x1b[0m`);
+    for (const line of buildFailureRecoveryLines(FS_FAILURE_GUIDANCE)) {
+        println(`  \x1b[90m${line}\x1b[0m`);
+    }
+    println('');
 }
 
 /**
@@ -251,6 +262,10 @@ export async function cmdFs(ctx, arg = '') {
             );
         }
     } catch (e) {
-        ctx.println(`\n  \x1b[31m✗ FS local: ${toError(e).message}\x1b[0m\n`);
+        ctx.println(`\n  \x1b[31m✗ FS local: ${toError(e).message}\x1b[0m`);
+        for (const line of buildFailureRecoveryLines(FS_FAILURE_GUIDANCE)) {
+            ctx.println(`  \x1b[90m${line}\x1b[0m`);
+        }
+        ctx.println('');
     }
 }

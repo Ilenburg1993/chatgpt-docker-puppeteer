@@ -11,6 +11,7 @@
 import { z } from 'zod';
 import { toError, toExecError } from '../../core/error-handlers.js';
 import { buildIoMeta, withIoMeta } from '../../core/io-contracts.js';
+import { sanitizeIoTextOutput } from '../../core/io-policy.js';
 import { diffText } from '../../infra/io-engine.js';
 import { publishIoOperation } from '../../infra/io-observability.js';
 import { log } from '../logger.js';
@@ -24,10 +25,11 @@ const RG_TIMEOUT_MS = undefined;
  */
 function sanitizeSearchOutput(stdout) {
     const SENSITIVE_LINE_RE = /-----BEGIN [A-Z ]+-----|ey[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,}/;
-    return stdout
+    const lineFiltered = stdout
         .split('\n')
         .filter((line) => !SENSITIVE_LINE_RE.test(line))
         .join('\n');
+    return sanitizeIoTextOutput({ text: lineFiltered });
 }
 
 /**
@@ -129,13 +131,14 @@ const searchInFilesTool = buildTool({
                 const io = buildIoMeta({
                     operation: 'search',
                     target: resolved,
-                    bytesRead: Buffer.byteLength(filteredOutput, 'utf8'),
+                    bytesRead: Buffer.byteLength(filteredOutput.text, 'utf8'),
                     engine: 'rg',
                     truncated: false,
                     advisoryLimits: {
                         requestedMaxResults: maxResults ?? null,
                         limitMode: 'informative',
                         patternLength: pattern.length,
+                        redactions: filteredOutput.redactions,
                     },
                 });
                 publishIoOperation(io, { success: true });
@@ -144,12 +147,14 @@ const searchInFilesTool = buildTool({
                         success: true,
                         pattern,
                         searchPath: resolved,
-                        output: filteredOutput,
+                        output: filteredOutput.text,
                         truncated: false,
                         engine: 'rg',
-                        matchCount: filteredOutput.split('\n').filter(Boolean).length,
+                        matchCount: filteredOutput.text.split('\n').filter(Boolean).length,
+                        sanitized: filteredOutput.sanitized,
+                        redactions: filteredOutput.redactions,
                     },
-                    io,
+                    { ...io, policyVersion: filteredOutput.policyVersion },
                 );
             }
 
@@ -172,13 +177,14 @@ const searchInFilesTool = buildTool({
             const io = buildIoMeta({
                 operation: 'search',
                 target: resolved,
-                bytesRead: Buffer.byteLength(filteredOutput, 'utf8'),
+                bytesRead: Buffer.byteLength(filteredOutput.text, 'utf8'),
                 engine: 'grep',
                 truncated: false,
                 advisoryLimits: {
                     requestedMaxResults: maxResults ?? null,
                     limitMode: 'informative',
                     patternLength: pattern.length,
+                    redactions: filteredOutput.redactions,
                 },
             });
             publishIoOperation(io, { success: true });
@@ -187,12 +193,14 @@ const searchInFilesTool = buildTool({
                     success: true,
                     pattern,
                     searchPath: resolved,
-                    output: filteredOutput,
+                    output: filteredOutput.text,
                     truncated: false,
                     engine: 'grep',
-                    matchCount: filteredOutput.split('\n').filter(Boolean).length,
+                    matchCount: filteredOutput.text.split('\n').filter(Boolean).length,
+                    sanitized: filteredOutput.sanitized,
+                    redactions: filteredOutput.redactions,
                 },
-                io,
+                { ...io, policyVersion: filteredOutput.policyVersion },
             );
         } catch (err) {
             const ex = toExecError(err);

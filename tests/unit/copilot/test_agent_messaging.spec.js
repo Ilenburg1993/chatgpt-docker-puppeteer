@@ -106,7 +106,7 @@ describe('agent-messaging › enqueueTask', () => {
         assert.ok(taskId.startsWith('task-'));
     });
 
-    it('remove timeoutMs invalido antes de enfileirar', () => {
+    it('normaliza timeoutMs invalido como advisory desabilitado', () => {
         const emitter = new EventEmitter();
         const ctx = new AgentContext(emitter);
 
@@ -117,10 +117,10 @@ describe('agent-messaging › enqueueTask', () => {
         });
 
         const task = ctx.messageQueue.shift();
-        assert.equal(task?.timeoutMs, undefined);
+        assert.equal(task?.timeoutMs, null);
     });
 
-    it('preserva timeoutMs positivo finito', () => {
+    it('trata timeoutMs positivo finito como advisory não bloqueante', () => {
         const emitter = new EventEmitter();
         const ctx = new AgentContext(emitter);
 
@@ -131,7 +131,7 @@ describe('agent-messaging › enqueueTask', () => {
         });
 
         const task = ctx.messageQueue.shift();
-        assert.equal(task?.timeoutMs, 1234);
+        assert.equal(task?.timeoutMs, null);
     });
 });
 

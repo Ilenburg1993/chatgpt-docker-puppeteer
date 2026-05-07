@@ -116,7 +116,7 @@ export const todoListTool = withSkipPermission(
                 tasks: returnedTasks,
                 total,
                 returned: returnedTasks.length,
-                has_more: false,
+                has_more: returnedTasks.length < total,
                 advisoryLimit: args.limit ?? null,
             };
         },

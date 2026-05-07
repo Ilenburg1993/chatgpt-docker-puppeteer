@@ -175,6 +175,7 @@ describe('agent-runtime-state facade', () => {
                 lastPrConsumedAt: 123,
                 lastPrModel: 'gpt-5',
                 lastPrConfiguredModel: '',
+                lastPrEffectiveModel: '',
                 lastPrModelMismatch: false,
                 lastPrCost: 0.5,
                 lastQuotaSnapshots: { main: { remainingPercentage: 80 } },

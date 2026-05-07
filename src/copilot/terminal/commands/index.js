@@ -37,6 +37,7 @@ export {
     cmdDbHistory,
     cmdDbSessions,
     cmdHistory,
+    cmdLive,
     cmdNow,
     cmdSessionList,
     cmdSessionRestore,

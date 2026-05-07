@@ -14,13 +14,12 @@
 /**
  * Ferramentas excluídas por padrão em sessões always-alive.
  *
- * Mantida explicitamente neste barrel por contrato estrutural legado de testes/consumidores do SDK.
+ * Política canônica A.10: nenhuma tool é excluída a priori. Exclusões devem ser decididas dinamicamente em runtime por
+ * usuário/operador/LLM.
  *
  * @type {readonly string[]}
  */
-export const DEFAULT_EXCLUDED_TOOLS = /** @type {readonly string[]} */ (
-    Object.freeze(['powershell', 'web_fetch', 'web_search', 'memory'])
-);
+export const DEFAULT_EXCLUDED_TOOLS = /** @type {readonly string[]} */ (Object.freeze([]));
 
 // ─── Env (variáveis de ambiente e constantes de configuração) ─────────────────
 export * from './env.js';

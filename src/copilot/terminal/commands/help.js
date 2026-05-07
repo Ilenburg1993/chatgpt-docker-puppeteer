@@ -27,6 +27,7 @@ export function cmdHelp({ injectPort, println }) {
   \x1b[1mComandos de Sessão\x1b[0m
   \x1b[33m/status\x1b[0m                              — status do agente + modelo + reasoning + binding/frescor do prompt
   \x1b[33m/now\x1b[0m                                 — snapshot operacional curto (loop/ask/model mismatch)
+  \x1b[33m/live [n]\x1b[0m                             — fluxo live: loop, streaming, SSE, tools, arquivos e I/O real
   \x1b[33m/activity [n]\x1b[0m                        — atividade atual da LLM-B + timeline recente
   \x1b[33m/history [n]\x1b[0m                         — últimos N turnos em memória
   \x1b[33m/db-history [n]\x1b[0m                      — últimos N turnos (SQLite)
@@ -60,7 +61,7 @@ export function cmdHelp({ injectPort, println }) {
   \x1b[33m/usage [on|off|now]\x1b[0m                  — toggle usage pós-turno ou snapshot instantâneo
   \x1b[33m/tools\x1b[0m                               — lista ferramentas observadas com stats
   \x1b[33m/sdk [status|models|tools|quota|prompt|capabilities|waits|compact]\x1b[0m — catálogo/quota/capabilities/ops SDK via Agent
-  \x1b[33m/workspace [list|read|write]\x1b[0m          — workspace virtual da sessão SDK
+  \x1b[33m/workspace [list|read|write|sync|mirror|promote]\x1b[0m — workspace SDK + convergência SDK↔FS auditável
   \x1b[33m/fs [list|read|search|create|write]\x1b[0m   — filesystem local canônico via file-tools
   \x1b[33m/elicitation [list|show|request]\x1b[0m      — formulários/URL estruturados do SDK
   \x1b[33m/permission [list|all|show|clear|mode|respond]\x1b[0m — permissões SDK observadas + governança + resposta manual

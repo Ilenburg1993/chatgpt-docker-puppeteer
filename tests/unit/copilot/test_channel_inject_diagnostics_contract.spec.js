@@ -89,7 +89,7 @@ describe('channel/inject.js — diagnostics contract', () => {
         assert.equal(result.promptDigest, 'sha256:abc123');
         assert.equal(result.timeoutMs, null);
         assert.equal(result.timeoutStrategy, 'disabled');
-        assert.equal(result.transportTimeoutStrategy, 'adaptive');
+        assert.equal(result.transportTimeoutStrategy, 'disabled');
         assert.deepEqual(result.promptFreshness, {
             isStale: false,
             reason: 'binding ok',

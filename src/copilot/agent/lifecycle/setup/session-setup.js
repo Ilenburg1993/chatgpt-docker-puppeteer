@@ -240,11 +240,6 @@ export function buildSessionHooks(ctx, host) {
 
     const toolsConfig = getAgentSdkToolsConfig();
     const defaultRuntimeDenylist = [...DEFAULT_EXCLUDED_TOOLS, ...toolsConfig.denylist];
-    const hasRuntimeToolPolicy = defaultRuntimeDenylist.length > 0 || toolsConfig.allowlist !== null;
-
-    if (!hasRuntimeToolPolicy) {
-        return { busHooks };
-    }
 
     return {
         busHooks: withAgentRuntimeToolPolicy(busHooks, (toolName) => {

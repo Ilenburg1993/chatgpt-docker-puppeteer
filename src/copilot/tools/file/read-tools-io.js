@@ -12,6 +12,7 @@ import { stat as fsStat } from 'node:fs/promises';
 import { z } from 'zod';
 import { toError } from '../../core/error-handlers.js';
 import { withIoMeta } from '../../core/io-contracts.js';
+import { sanitizeIoTextOutput } from '../../core/io-policy.js';
 import { readBytes, readText } from '../../infra/io-engine.js';
 import { scanDirectory } from '../../infra/io-scanner.js';
 import { log } from '../logger.js';
@@ -79,6 +80,7 @@ const readFileContentTool = buildTool({
             }
 
             const text = await readText(resolved, { startLine, endLine });
+            const sanitized = sanitizeIoTextOutput({ text: text.content });
             const truncated = false;
 
             return withIoMeta(
@@ -88,10 +90,12 @@ const readFileContentTool = buildTool({
                     size: stats.size,
                     totalLines: text.totalLines,
                     returnedLines: text.returnedLines,
-                    content: text.content,
+                    content: sanitized.text,
+                    sanitized: sanitized.sanitized,
+                    redactions: sanitized.redactions,
                     truncated,
                 },
-                { ...text.io, truncated },
+                { ...text.io, truncated, policyVersion: sanitized.policyVersion },
             );
         } catch (err) {
             return { success: false, error: toError(err).message };

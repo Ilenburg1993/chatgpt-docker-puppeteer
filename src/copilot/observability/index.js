@@ -31,6 +31,7 @@ export {
 } from './event-collector.js';
 
 // ─── Metrics ─────────────────────────────────────────────────────────────────
+export { createConvergenceTraceStore, defaultConvergenceTraceStore } from './convergence-trace-store.js';
 export { createMetricsStore, defaultMetrics } from './metrics.js';
 
 // ─── Error Tracker ────────────────────────────────────────────────────────────
@@ -69,4 +70,4 @@ export { getStatsByCategory, getToolStats, recordToolCall, wrapWithStats } from 
 export { clearDeadLetters, getCatalog, getDeadLetters, recordDeadLetter } from './event-catalog.js';
 
 // ─── DI Tokens ────────────────────────────────────────────────────────────────
-export { ERROR_TRACKER, EVENT_COLLECTOR, METRICS_STORE } from './di-tokens.js';
+export { CONVERGENCE_TRACE_STORE, ERROR_TRACKER, EVENT_COLLECTOR, METRICS_STORE } from './di-tokens.js';
