@@ -14,6 +14,17 @@ import { logSwallowed } from '../core/error-handlers.js';
 import { recordToolCall } from '../observability/tool-stats.js';
 
 const ioOperationChannel = channel('copilot.io.operation');
+const ioCacheChannel = channel('copilot.io.cache');
+const ioIndexChannel = channel('copilot.io.index');
+const ioScopeChannel = channel('copilot.io.scope');
+const ioScanChannel = channel('copilot.io.scan');
+
+const lifecycleChannels = {
+    cache: ioCacheChannel,
+    index: ioIndexChannel,
+    scope: ioScopeChannel,
+    scan: ioScanChannel,
+};
 
 /**
  * @returns {number}
@@ -47,5 +58,26 @@ export function publishIoOperation(io, opts) {
         recordToolCall(metricName, durationMs, opts.success);
     } catch (error) {
         logSwallowed(error, 'io-observability.metrics');
+    }
+}
+
+/**
+ * Publica eventos de lifecycle mais granulares sem acoplar `infra/` a collectors específicos.
+ *
+ * @param {'cache' | 'index' | 'scope' | 'scan'} domain
+ * @param {string} phase
+ * @param {Record<string, unknown>} payload
+ * @returns {void}
+ */
+export function publishIoLifecycleEvent(domain, phase, payload = {}) {
+    try {
+        lifecycleChannels[domain].publish({
+            ts: Date.now(),
+            domain,
+            phase,
+            ...payload,
+        });
+    } catch (error) {
+        logSwallowed(error, `io-observability.lifecycle.${domain}.${phase}`);
     }
 }

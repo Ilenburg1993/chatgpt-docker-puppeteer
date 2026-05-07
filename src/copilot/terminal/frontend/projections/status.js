@@ -5,6 +5,7 @@
 
 import { getWorkspaceContext } from '#copilot/boot';
 import { readSystemPromptStatusSync } from '#copilot/config';
+import { readIoRuntimeHealthSnapshot } from '../../../infra/io-health.js';
 import { buildRuntimeSdkFsRoutingProjection } from '../../../presentation/runtime-file-routing.js';
 import { buildRuntimeLifecycleSummary, readRuntimeLifecycleSnapshot } from '../../../presentation/runtime-lifecycle.js';
 import {
@@ -106,6 +107,7 @@ function objectOrNull(value) {
  *         mode: 'local-fs-primary' | 'sdk-workspace-only' | 'degraded';
  *         reason: string;
  *     };
+ *     ioRuntime: ReturnType<typeof readIoRuntimeHealthSnapshot>;
  *     timelineSource: import('./timeline.js').TerminalTimelineSource;
  *     timelineAuthority: import('./timeline.js').TerminalTimelineAuthority;
  *     timelineReconciliationStatus: import('./timeline.js').TerminalTimelineReconciliation;
@@ -168,6 +170,7 @@ export function readTerminalStatusProjection({ hubSessionId = null, injectPort, 
         objectOrNull(sdkCapabilities?.['tools'])?.['workspace'] === true || toolLoad.hasSdkWorkspaceTooling;
     const canonicalFsReady = toolLoad.hasCanonicalLocalFsTools;
     const sdkFsRouting = buildRuntimeSdkFsRoutingProjection({ canonicalFsReady, sdkWorkspaceAvailable });
+    const ioRuntime = readIoRuntimeHealthSnapshot();
     const timeline = readTerminalTimelineProjection({ limitPairs: 10, runtimeId });
     return {
         snap: base.snap,
@@ -235,5 +238,6 @@ export function readTerminalStatusProjection({ hubSessionId = null, injectPort, 
         toolLoad,
         instructionLoad,
         sdkFsRouting,
+        ioRuntime,
     };
 }

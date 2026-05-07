@@ -190,6 +190,150 @@ const COPILOT_MIGRATIONS = [
                 WHERE sdk_turn_id IS NOT NULL;
         `,
     },
+    {
+        version: 8,
+        name: 'create_convergence_trace_events',
+        // A.15: persistência durável de eventos de convergência SDK↔FS por traceId
+        // Ring-buffer in-memory permanece como L1; SQLite é o L2 que sobrevive a restart.
+        up: `
+            CREATE TABLE IF NOT EXISTS copilot_convergence_trace_events (
+                id           INTEGER PRIMARY KEY AUTOINCREMENT,
+                trace_id     TEXT NOT NULL,
+                operation    TEXT NOT NULL,
+                phase        TEXT NOT NULL,
+                direction    TEXT,
+                status       TEXT NOT NULL,
+                bytes_read   INTEGER,
+                bytes_written INTEGER,
+                duration_ms  INTEGER,
+                error_msg    TEXT,
+                created_at_ms INTEGER NOT NULL
+            ) STRICT;
+            CREATE INDEX IF NOT EXISTS idx_conv_trace_trace_id
+                ON copilot_convergence_trace_events(trace_id);
+            CREATE INDEX IF NOT EXISTS idx_conv_trace_created
+                ON copilot_convergence_trace_events(created_at_ms DESC);
+            CREATE INDEX IF NOT EXISTS idx_conv_trace_op_status
+                ON copilot_convergence_trace_events(operation, status);
+        `,
+    },
+    {
+        version: 9,
+        name: 'create_io_cache_l2_entries',
+        // A.13.x/L2 prep: estrutura durável para cache de leitura de arquivos (bytes/text/json)
+        up: `
+            CREATE TABLE IF NOT EXISTS copilot_io_cache_l2 (
+                cache_key       TEXT PRIMARY KEY,
+                file_path       TEXT NOT NULL,
+                cache_kind      TEXT NOT NULL,
+                payload         BLOB NOT NULL,
+                encoding        TEXT,
+                size_bytes      INTEGER NOT NULL,
+                created_at_ms   INTEGER NOT NULL,
+                expires_at_ms   INTEGER NOT NULL,
+                mtime_ms        INTEGER,
+                ctime_ms        INTEGER,
+                meta_json       TEXT,
+                last_accessed_ms INTEGER NOT NULL
+            ) STRICT;
+            CREATE INDEX IF NOT EXISTS idx_io_cache_l2_path
+                ON copilot_io_cache_l2(file_path);
+            CREATE INDEX IF NOT EXISTS idx_io_cache_l2_expires
+                ON copilot_io_cache_l2(expires_at_ms);
+            CREATE INDEX IF NOT EXISTS idx_io_cache_l2_access
+                ON copilot_io_cache_l2(last_accessed_ms);
+        `,
+    },
+    {
+        version: 10,
+        name: 'create_io_index_l2',
+        // A.20/A.21: índice persistente separado do cache blob L2. Guarda metadados, FTS textual, símbolos e imports.
+        up: `
+            CREATE TABLE IF NOT EXISTS copilot_io_index_files (
+                file_path       TEXT PRIMARY KEY,
+                workspace_root  TEXT NOT NULL,
+                relative_path   TEXT NOT NULL,
+                file_name       TEXT NOT NULL,
+                extension       TEXT NOT NULL,
+                content_kind    TEXT NOT NULL,
+                size_bytes      INTEGER NOT NULL,
+                mtime_ms        REAL NOT NULL,
+                ctime_ms        REAL,
+                content_hash    TEXT,
+                line_count      INTEGER NOT NULL DEFAULT 0,
+                symbol_count    INTEGER NOT NULL DEFAULT 0,
+                import_count    INTEGER NOT NULL DEFAULT 0,
+                status          TEXT NOT NULL,
+                parse_error     TEXT,
+                indexed_at_ms   INTEGER NOT NULL,
+                refreshed_at_ms INTEGER NOT NULL,
+                metadata_json   TEXT
+            ) STRICT;
+            CREATE INDEX IF NOT EXISTS idx_io_index_files_workspace
+                ON copilot_io_index_files(workspace_root, relative_path);
+            CREATE INDEX IF NOT EXISTS idx_io_index_files_status
+                ON copilot_io_index_files(status, indexed_at_ms DESC);
+            CREATE INDEX IF NOT EXISTS idx_io_index_files_ext
+                ON copilot_io_index_files(extension);
+
+            CREATE VIRTUAL TABLE IF NOT EXISTS copilot_io_index_fts USING fts5(
+                file_path UNINDEXED,
+                relative_path,
+                content,
+                tokenize='porter unicode61 remove_diacritics 1'
+            );
+
+            CREATE TABLE IF NOT EXISTS copilot_io_index_symbols (
+                id           INTEGER PRIMARY KEY AUTOINCREMENT,
+                file_path    TEXT NOT NULL,
+                symbol_name  TEXT NOT NULL,
+                symbol_kind  TEXT NOT NULL,
+                exported     INTEGER NOT NULL DEFAULT 0,
+                line         INTEGER NOT NULL DEFAULT 0,
+                doc_comment  TEXT,
+                FOREIGN KEY (file_path) REFERENCES copilot_io_index_files(file_path) ON DELETE CASCADE
+            ) STRICT;
+            CREATE INDEX IF NOT EXISTS idx_io_index_symbols_name
+                ON copilot_io_index_symbols(symbol_name);
+            CREATE INDEX IF NOT EXISTS idx_io_index_symbols_file
+                ON copilot_io_index_symbols(file_path);
+
+            CREATE TABLE IF NOT EXISTS copilot_io_index_imports (
+                id              INTEGER PRIMARY KEY AUTOINCREMENT,
+                file_path       TEXT NOT NULL,
+                source          TEXT NOT NULL,
+                specifiers_json TEXT NOT NULL,
+                is_dynamic      INTEGER NOT NULL DEFAULT 0,
+                line            INTEGER NOT NULL DEFAULT 0,
+                FOREIGN KEY (file_path) REFERENCES copilot_io_index_files(file_path) ON DELETE CASCADE
+            ) STRICT;
+            CREATE INDEX IF NOT EXISTS idx_io_index_imports_source
+                ON copilot_io_index_imports(source);
+            CREATE INDEX IF NOT EXISTS idx_io_index_imports_file
+                ON copilot_io_index_imports(file_path);
+        `,
+    },
+    {
+        version: 11,
+        name: 'create_io_index_chunks',
+        // A.19/A.22: chunks textuais persistentes para leitura/pesquisa incremental e respostas pagináveis.
+        up: `
+            CREATE TABLE IF NOT EXISTS copilot_io_index_chunks (
+                id             INTEGER PRIMARY KEY AUTOINCREMENT,
+                file_path      TEXT NOT NULL,
+                chunk_index    INTEGER NOT NULL,
+                start_line     INTEGER NOT NULL,
+                end_line       INTEGER NOT NULL,
+                content        TEXT NOT NULL,
+                content_hash   TEXT NOT NULL,
+                created_at_ms  INTEGER NOT NULL,
+                FOREIGN KEY (file_path) REFERENCES copilot_io_index_files(file_path) ON DELETE CASCADE,
+                UNIQUE(file_path, chunk_index)
+            ) STRICT;
+            CREATE INDEX IF NOT EXISTS idx_io_index_chunks_file
+                ON copilot_io_index_chunks(file_path, chunk_index);
+        `,
+    },
 ];
 
 export { COPILOT_MIGRATIONS };

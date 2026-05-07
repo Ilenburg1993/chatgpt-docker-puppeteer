@@ -8,6 +8,34 @@
  */
 
 export {
+    getIoCacheStats,
+    getIoL1Cache,
+    getVerifiedIoL1Entry,
+    invalidateIoCachePath,
+    invalidateIoCacheSubtree,
+    makeBytesKey,
+    makeTextKey,
+    normalizeIoCacheKey,
+    resetIoL1CacheForTest,
+} from './io-cache.js';
+
+export { createIoL2SqliteCache, isIoL2Cache } from './io-cache-l2-sqlite.js';
+
+export { getIoL2Cache, getIoL2CacheStats, resetIoL2CacheForTest } from './io-cache-l2-registry.js';
+
+export { aggregateIoCacheTierStats, buildIoCacheTierPlan } from './io-cache-tiering.js';
+export {
+    buildIoIndexForDirectory,
+    findIoIndexSymbol,
+    getIoIndex,
+    getIoIndexStats,
+    invalidateIoIndexPath,
+    resetIoIndexForTest,
+    searchIoIndex,
+} from './io-index-registry.js';
+export { createIoIndexSqlite, isIoIndex } from './io-index-sqlite.js';
+
+export {
     appendTextLocked,
     copyFileLocked,
     createOrReplaceFileAtomic,
@@ -18,12 +46,45 @@ export {
     readBytes,
     readLines,
     readText,
+    readTextChunks,
     withIoResourceLock,
     writeFileAtomic,
 } from './io-engine.js';
+export { readIoRuntimeHealthSnapshot } from './io-health.js';
 export { getIoLockStats, withIoResourceLocks } from './io-locks.js';
-export { nowIoMs, publishIoOperation } from './io-observability.js';
+export { nowIoMs, publishIoLifecycleEvent, publishIoOperation } from './io-observability.js';
+export {
+    buildOutline,
+    extractJsonSchema,
+    extractMarkdownOutline,
+    extractTopComments,
+    getParserCacheStats,
+    invalidateParserCache,
+    parseAndCacheSymbols,
+    parseFileForContext,
+    parseFileSymbols,
+} from './io-parser.js';
+export {
+    endSessionScope,
+    getSessionScopeStats,
+    listSessionScopes,
+    startSessionScope,
+    warmCacheForPaths,
+    warmFromDirectory,
+    warmRecentPaths,
+} from './io-prefetch.js';
 export { getIoScanBasename, scanDirectory } from './io-scanner.js';
+export {
+    closeScope,
+    declareScope,
+    findSymbol,
+    getScopeContext,
+    getScopeStats,
+    getScopeSymbolIndex,
+    invalidateScopePath,
+    listScopes,
+    refreshScope,
+} from './io-session-scope.js';
 export { acquireLock, releaseLock } from './lockfile.js';
 export { AsyncQueue } from './queue.js';
 export {

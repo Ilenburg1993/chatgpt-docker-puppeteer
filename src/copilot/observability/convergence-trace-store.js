@@ -10,6 +10,136 @@
 
 import { createHistogram } from './metrics-histogram.js';
 
+// ─── Persistência SQLite (opcional, L2) ──────────────────────────────────────
+
+/** @type {import('better-sqlite3').Database | null} */
+let _persistenceDb = null;
+
+/**
+ * Inicializa a persistência SQLite do trace-store de convergência. Deve ser chamado uma vez no bootstrap (após
+ * `ensureCopilotDbDir` + `getCopilotDb`). Idempotente — chamadas extras com o mesmo banco são ignoradas.
+ *
+ * @param {import('better-sqlite3').Database} db
+ * @returns {void}
+ */
+export function initConvergenceTracePersistence(db) {
+    if (_persistenceDb === db) return;
+    _persistenceDb = db;
+}
+
+/**
+ * Retorna snapshot paginado de eventos persistidos no SQLite para o `traceId` ou operação especificados. Funciona mesmo
+ * quando o ring-buffer in-memory foi rotacionado (dados históricos).
+ *
+ * @param {{
+ *     traceId?: string;
+ *     operation?: string;
+ *     status?: string;
+ *     limit?: number;
+ *     offsetMs?: number;
+ * }} [options]
+ * @returns {{
+ *     events: {
+ *         id: number;
+ *         traceId: string;
+ *         operation: string;
+ *         phase: string;
+ *         direction: string | null;
+ *         status: string;
+ *         bytesRead: number | null;
+ *         bytesWritten: number | null;
+ *         durationMs: number | null;
+ *         errorMsg: string | null;
+ *         createdAtMs: number;
+ *     }[];
+ *     total: number;
+ * } | null}
+ *   null se a persistência não estiver inicializada
+ */
+export function getPersistedSnapshot(options = {}) {
+    if (!_persistenceDb) return null;
+    const db = _persistenceDb;
+
+    const limit = typeof options.limit === 'number' && options.limit > 0 ? Math.floor(options.limit) : 100;
+    const conditions = /** @type {string[]} */ ([]);
+    const params = /** @type {unknown[]} */ ([]);
+
+    if (options.traceId) {
+        conditions.push('trace_id = ?');
+        params.push(options.traceId);
+    }
+    if (options.operation) {
+        conditions.push('operation = ?');
+        params.push(options.operation);
+    }
+    if (options.status) {
+        conditions.push('status = ?');
+        params.push(options.status);
+    }
+    if (options.offsetMs) {
+        conditions.push('created_at_ms >= ?');
+        params.push(options.offsetMs);
+    }
+
+    const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+    const events = /** @type {any[]} */ (
+        db
+            .prepare(`SELECT * FROM copilot_convergence_trace_events ${where} ORDER BY created_at_ms DESC LIMIT ?`)
+            .all(...params, limit)
+    );
+    const countRow = /** @type {{ n: number }} */ (
+        db.prepare(`SELECT COUNT(*) AS n FROM copilot_convergence_trace_events ${where}`).get(...params)
+    );
+    return {
+        events: events.map((row) => ({
+            id: row.id,
+            traceId: row.trace_id,
+            operation: row.operation,
+            phase: row.phase,
+            direction: row.direction,
+            status: row.status,
+            bytesRead: row.bytes_read,
+            bytesWritten: row.bytes_written,
+            durationMs: row.duration_ms,
+            errorMsg: row.error_msg,
+            createdAtMs: row.created_at_ms,
+        })),
+        total: countRow?.n ?? 0,
+    };
+}
+
+/**
+ * @param {string} traceId
+ * @param {ConvergenceTraceEvent} event
+ * @returns {void}
+ */
+function persistEvent(traceId, event) {
+    if (!_persistenceDb) return;
+    try {
+        _persistenceDb
+            .prepare(
+                `INSERT INTO copilot_convergence_trace_events
+                    (trace_id, operation, phase, direction, status, bytes_read, bytes_written, duration_ms, error_msg, created_at_ms)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            )
+            .run(
+                traceId,
+                event.operation,
+                event.phase,
+                // bytes split heuristic: direction from localPath/sdkPath presence
+                event.localPath && event.sdkPath ? 'sdk->fs' : event.localPath ? 'fs->sdk' : null,
+                event.status,
+                event.bytes, // stored as bytes_read for convergence events (read+write aggregated)
+                null,
+                event.durationMs,
+                event.reason,
+                event.ts,
+            );
+    } catch {
+        // Persistence failure is non-fatal — ring-buffer continues
+    }
+}
+
 const DEFAULT_MAX_TRACES = 500;
 const DEFAULT_MAX_EVENTS_PER_TRACE = 80;
 const CONVERGENCE_OPERATION_PREFIX = 'workspace.';
@@ -188,6 +318,7 @@ export function createConvergenceTraceStore(
         if (trace.events.length > maxEventsPerTrace) trace.events.shift();
         trace.status = resolveTraceStatus(trace);
         updatedAt = event.ts;
+        persistEvent(traceId, event);
     }
 
     /**

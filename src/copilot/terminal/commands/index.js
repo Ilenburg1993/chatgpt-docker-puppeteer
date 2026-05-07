@@ -27,6 +27,7 @@ export { cmdMenu } from './menu.js';
 export { cmdMetrics } from './metrics.js';
 export { cmdPlan } from './plan.js';
 export { cmdResume } from './resume.js';
+export { cmdScope } from './scope.js';
 export { cmdElicitation, cmdPermission, cmdSdk, cmdWorkspace } from './sdk.js';
 export { cmdSearch } from './search.js';
 export {

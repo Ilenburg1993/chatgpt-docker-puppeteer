@@ -31,7 +31,11 @@ import { TOOLS_LOGGER, TOOLS_METRICS } from '#copilot/tools';
 import { runCopilotSdkBootPreflight } from './agent/lifecycle/process-host/runtime-host.js';
 import { COPILOT_MODEL, PING_TIMEOUT_MS } from './config/agent.js';
 import { container } from './core/di-container.js';
-import { bootstrapLateDeps, bootstrapObservability } from './observability/bootstrap.js';
+import {
+    bootstrapConvergencePersistence,
+    bootstrapLateDeps,
+    bootstrapObservability,
+} from './observability/bootstrap.js';
 import { log } from './observability/logger.js';
 import { startCopilotServer } from './server/index.js';
 
@@ -101,6 +105,14 @@ export async function bootCopilot() {
             observability: async () => {
                 bootstrapObservability();
                 container.resolve(ERROR_TRACKER).registerGlobalHandlers();
+
+                // A.15: persistência SQLite do trace-store de convergência — conecta L2 durável
+                try {
+                    const { getCopilotDb } = await import('./db/sqlite.js');
+                    bootstrapConvergencePersistence(getCopilotDb());
+                } catch {
+                    // SQLite indisponível não deve bloquear o boot; ring-buffer in-memory continua
+                }
             },
             'late-deps': async () => {
                 const { buildTool } = await import('./tools/index.js');

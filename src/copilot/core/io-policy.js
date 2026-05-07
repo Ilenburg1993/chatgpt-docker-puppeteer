@@ -5,6 +5,12 @@ import { validateUrlString } from './security/url-validator.js';
 
 export const IO_POLICY_VERSION = '2026-05-06.r2.a10.1';
 
+/**
+ * Número máximo de redirects HTTP permitidos por política canônica. O valor é informativo; adaptadores que suportam
+ * redirect manual devem respeitá-lo.
+ */
+export const IO_URL_MAX_REDIRECTS = 5;
+
 /** @type {Readonly<Record<string, { maxBytes: number; maxLines: number }>>} */
 export const IO_OPERATION_ADVISORY_LIMITS = Object.freeze({
     read: Object.freeze({ maxBytes: 256 * 1024, maxLines: 2_000 }),
@@ -251,6 +257,7 @@ export function resolveIoAdvisoryLimits(options = {}) {
  *     input: string;
  *     allowPrivateNetworks?: boolean;
  *     allowLocalhost?: boolean;
+ *     maxRedirects?: number;
  * }} options
  */
 export function evaluateIoUrlPolicy(options) {
@@ -280,6 +287,10 @@ export function evaluateIoUrlPolicy(options) {
     return {
         ok: true,
         url: validation.parsed,
+        maxRedirects:
+            typeof options.maxRedirects === 'number' && options.maxRedirects >= 0
+                ? options.maxRedirects
+                : IO_URL_MAX_REDIRECTS,
         policyVersion: IO_POLICY_VERSION,
     };
 }

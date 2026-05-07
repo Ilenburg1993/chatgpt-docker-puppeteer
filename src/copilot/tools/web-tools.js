@@ -14,6 +14,7 @@ import { WEB_SEARCH_DISABLED } from '#copilot/config';
 import {
     buildIoMeta,
     evaluateIoUrlPolicy,
+    IO_URL_MAX_REDIRECTS,
     logSwallowed,
     sanitizeIoTextOutput,
     toError,
@@ -79,6 +80,60 @@ function sanitizeWebSearchResults(results) {
 // ─── Tool: web_fetch_local ───────────────────────────────────────────────────
 
 /**
+ * Segue redirects HTTP manualmente, validando cada URL intermediária com `evaluateIoUrlPolicy`. Respeita o limite
+ * canônico de redirects em vez de delegar ao `fetch(redirect:'follow')` sem controle.
+ *
+ * @param {string} startUrl
+ * @param {number} maxRedirects
+ * @returns {Promise<{ response: Response; finalUrl: string; redirectCount: number }>}
+ * @throws {Error} Se o número de redirects exceder o limite ou uma URL intermediária for bloqueada.
+ */
+async function fetchWithRedirectPolicy(startUrl, maxRedirects) {
+    const AGENT_HEADERS = { 'User-Agent': 'github-copilot-agent/1.0' };
+    let currentUrl = startUrl;
+    let redirectCount = 0;
+
+    for (;;) {
+        const response = await fetch(currentUrl, {
+            method: 'GET',
+            redirect: 'manual',
+            headers: AGENT_HEADERS,
+        });
+
+        const status = response.status;
+        if (status >= 300 && status < 400) {
+            if (redirectCount >= maxRedirects) {
+                throw new Error(`Too many redirects (limit: ${maxRedirects})`);
+            }
+            const location = response.headers.get('location');
+            if (!location) {
+                throw new Error(`Redirect ${status} sem cabeçalho Location (${currentUrl})`);
+            }
+            // Resolve relative locations
+            const resolvedUrl = new URL(location, currentUrl).toString();
+            const check = evaluateIoUrlPolicy({ input: resolvedUrl });
+            if (!check.ok || !check.url) {
+                throw new Error(`Redirect bloqueado por policy: ${check.reason} (→ ${resolvedUrl})`);
+            }
+            currentUrl = check.url.toString();
+            redirectCount += 1;
+            continue;
+        }
+
+        const responseUrl = typeof response.url === 'string' && response.url ? response.url : currentUrl;
+        if (responseUrl !== currentUrl) {
+            const check = evaluateIoUrlPolicy({ input: responseUrl });
+            if (!check.ok || !check.url) {
+                throw new Error(`Redirect bloqueado por policy: ${check.reason} (→ ${responseUrl})`);
+            }
+            currentUrl = check.url.toString();
+        }
+
+        return { response, finalUrl: currentUrl, redirectCount };
+    }
+}
+
+/**
  * Tool: web_fetch_local — busca o conteúdo de uma URL pública com proteção SSRF.
  */
 const webFetchTool = buildTool({
@@ -107,20 +162,16 @@ const webFetchTool = buildTool({
         const parsed = inputUrlDecision.url;
 
         const advisoryLimit = maxBytes ?? null;
+        const maxRedirects = inputUrlDecision.maxRedirects ?? IO_URL_MAX_REDIRECTS;
 
         try {
-            const response = await fetch(parsed.toString(), {
-                method: 'GET',
-                redirect: 'follow',
-                headers: { 'User-Agent': 'github-copilot-agent/1.0' },
-            });
+            const { response, finalUrl, redirectCount } = await fetchWithRedirectPolicy(
+                parsed.toString(),
+                maxRedirects,
+            );
 
-            // Validate redirect target (prevent header-injection redirect to internal)
-            const finalUrl = response.url ? new URL(response.url) : parsed;
-            const redirectCheck = evaluateIoUrlPolicy({ input: finalUrl.toString() });
-            if (!redirectCheck.ok) {
-                log('WARN', `[copilot/web_fetch] Redirect bloqueado para host privado: ${finalUrl.hostname}`);
-                return { success: false, error: `Redirect bloqueado: ${redirectCheck.reason}` };
+            if (redirectCount > 0) {
+                log('INFO', `[copilot/web_fetch] ${redirectCount} redirect(s) seguido(s) → ${finalUrl}`);
             }
 
             const contentType = response.headers.get('content-type') ?? '';
@@ -159,7 +210,7 @@ const webFetchTool = buildTool({
             const sanitized = sanitizeIoTextOutput({ text });
             const io = buildIoMeta({
                 operation: 'fetch',
-                target: response.url,
+                target: finalUrl,
                 targetKind: 'url',
                 bytesRead: Buffer.byteLength(sanitized.text, 'utf8'),
                 engine: 'fetch',
@@ -170,14 +221,19 @@ const webFetchTool = buildTool({
                     redactions: sanitized.redactions,
                     policyDecision: inputUrlDecision.ok ? 'allow' : 'deny',
                     policyVersion: inputUrlDecision.policyVersion,
+                    redirectCount,
+                    maxRedirects,
                 },
             });
             publishIoOperation(io, { success: true });
-            log('INFO', `[copilot/web_fetch] ${url} → ${response.status} (${sanitized.text.length} chars)`);
+            log(
+                'INFO',
+                `[copilot/web_fetch] ${url} → ${response.status} · ${sanitized.text.length} chars · redirects=${redirectCount}`,
+            );
             return withIoMeta(
                 {
                     success: true,
-                    url: response.url,
+                    url: finalUrl,
                     status: response.status,
                     contentType,
                     truncated: false,
@@ -188,6 +244,8 @@ const webFetchTool = buildTool({
                     content: sanitized.text,
                     sanitized: sanitized.sanitized,
                     redactions: sanitized.redactions,
+                    redirectCount,
+                    maxRedirects,
                 },
                 { ...io, policyVersion: sanitized.policyVersion },
             );

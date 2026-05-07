@@ -13,6 +13,7 @@ import { toError, toExecError } from '../../core/error-handlers.js';
 import { buildIoMeta, withIoMeta } from '../../core/io-contracts.js';
 import { sanitizeIoTextOutput } from '../../core/io-policy.js';
 import { diffText } from '../../infra/io-engine.js';
+import { getIoIndexStats, searchIoIndex } from '../../infra/io-index-registry.js';
 import { publishIoOperation } from '../../infra/io-observability.js';
 import { log } from '../logger.js';
 import { buildTool } from '../tool-factory.js';
@@ -30,6 +31,41 @@ function sanitizeSearchOutput(stdout) {
         .filter((line) => !SENSITIVE_LINE_RE.test(line))
         .join('\n');
     return sanitizeIoTextOutput({ text: lineFiltered });
+}
+
+/**
+ * @param {{
+ *     pattern: string;
+ *     isRegex?: boolean;
+ *     caseSensitive?: boolean;
+ *     includePattern?: string;
+ *     excludePattern?: string;
+ * }} opts
+ */
+function canUseIndexSearch(opts) {
+    return (
+        opts.pattern.trim().length > 0 &&
+        !opts.isRegex &&
+        !opts.caseSensitive &&
+        !opts.includePattern &&
+        !opts.excludePattern
+    );
+}
+
+/**
+ * @param {{ filePath: string; relativePath: string; snippet: string }[]} rows
+ */
+function formatIndexSearchRows(rows) {
+    return rows
+        .map((row) => {
+            const snippet = String(row.snippet ?? '')
+                .replaceAll('[', '')
+                .replaceAll(']', '')
+                .replace(/\s+/gu, ' ')
+                .trim();
+            return `${row.relativePath || row.filePath}: ${snippet}`;
+        })
+        .join('\n');
 }
 
 /**
@@ -121,6 +157,48 @@ const searchInFilesTool = buildTool({
         ];
 
         try {
+            const indexStats = getIoIndexStats();
+            if (canUseIndexSearch({ pattern, isRegex, caseSensitive, includePattern, excludePattern })) {
+                const freshFiles = 'freshFiles' in indexStats ? Number(indexStats.freshFiles ?? 0) : 0;
+                const indexRows =
+                    Boolean(indexStats?.available) && freshFiles > 0
+                        ? searchIoIndex(pattern, { pathPrefix: resolved })
+                        : [];
+                if (indexRows.length > 0) {
+                    const output = formatIndexSearchRows(indexRows);
+                    const filteredOutput = sanitizeSearchOutput(output);
+                    const io = buildIoMeta({
+                        operation: 'search',
+                        target: resolved,
+                        bytesRead: Buffer.byteLength(filteredOutput.text, 'utf8'),
+                        engine: 'fts5-index',
+                        truncated: false,
+                        advisoryLimits: {
+                            requestedMaxResults: maxResults ?? null,
+                            limitMode: 'informative',
+                            patternLength: pattern.length,
+                            redactions: filteredOutput.redactions,
+                            fallback: 'rg-on-index-miss-or-complex-query',
+                        },
+                    });
+                    publishIoOperation(io, { success: true });
+                    return withIoMeta(
+                        {
+                            success: true,
+                            pattern,
+                            searchPath: resolved,
+                            output: filteredOutput.text,
+                            truncated: false,
+                            engine: 'fts5-index',
+                            matchCount: indexRows.length,
+                            sanitized: filteredOutput.sanitized,
+                            redactions: filteredOutput.redactions,
+                        },
+                        { ...io, policyVersion: filteredOutput.policyVersion },
+                    );
+                }
+            }
+
             if (await isRgAvailable()) {
                 const { stdout, stderr: _stderr } = await execFileAsync('rg', rgArgs, {
                     cwd: WORKSPACE_ROOT,

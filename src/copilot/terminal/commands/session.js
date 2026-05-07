@@ -190,6 +190,13 @@ export function cmdStatus({ hubSessionId, injectPort, println }, arg = '') {
             : sdkFsRouting.mode === 'sdk-workspace-only'
               ? '\x1b[33m'
               : '\x1b[31m';
+    const ioRuntime = projection.ioRuntime;
+    const ioHitRatio = Number(ioRuntime.cache.aggregate.hitRatio || 0).toFixed(3);
+    const ioL1 = ioRuntime.cache.l1;
+    const ioL2 = ioRuntime.cache.l2;
+    const ioIndex = /** @type {Record<string, unknown>} */ (ioRuntime.index ?? {});
+    const ioCacheLine = `l1=${ioL1['enabled'] ? 'on' : 'off'} entries=${ioL1['size'] ?? 0} bytes=${ioL1['bytesStored'] ?? 0} · l2=${ioL2['enabled'] ? 'on' : 'off'} entries=${ioL2['size'] ?? 0} · hitRatio=${ioHitRatio}`;
+    const ioScopeLine = `scopes=${ioRuntime.scopes.active} · parser=${ioRuntime.parser.size}/${ioRuntime.parser.maxSize} · index=${ioIndex['available'] ? 'on' : 'empty'}:${ioIndex['files'] ?? 0}`;
     println(`
   \x1b[36mStatus do Terminal LLM-B\x1b[0m
   ─────────────────────────────────────
@@ -217,6 +224,8 @@ export function cmdStatus({ hubSessionId, injectPort, println }, arg = '') {
     tools load       ${toolLoadColor}${toolLoad.total} registradas\x1b[0m \x1b[90m(fsCanônico=${toolLoad.hasCanonicalLocalFsTools} · sdkWorkspace=${toolLoad.hasSdkWorkspaceTooling} · disabled=${toolLoad.disabled.length})\x1b[0m
     instr. load      ${instructionLoadColor}${instructionLoad.liveReloadMechanism}\x1b[0m \x1b[90m(sections=${instructionLoad.sectionCount} · missingSectionFile=${instructionLoad.sectionsMissingFileCount} · missingAppendFile=${instructionLoad.appendFileMissingCount} · sourcesRpc=${instructionLoad.sdkSupportsInstructionSourcesRpc})\x1b[0m
     sdk↔fs route     ${sdkFsRoutingColor}${sdkFsRouting.mode}\x1b[0m \x1b[90m${sdkFsRouting.reason}\x1b[0m
+    io cache         \x1b[90m${ioCacheLine}\x1b[0m
+    io scope         \x1b[90m${ioScopeLine}\x1b[0m
     sdk session      \x1b[90m${projection.sdkSessionId ?? '(sem sdk)'}\x1b[0m
     hub session      \x1b[90m${projection.hubSessionId ?? '(sem hub)'}\x1b[0m
     turnos canon     ${projection.turnCount} \x1b[90m(persistidos=${projection.persistedTimelineTurnCount} · bridge=${projection.bridgeTurnCount} · live-tail=${projection.liveBridgeTailCount})\x1b[0m
@@ -429,6 +438,9 @@ export function cmdLive({ hubSessionId, injectPort, println }, arg = '') {
         `intent=${projection.stream.intent ? 'on' : 'off'}`,
         `usage=${projection.stream.usage ? 'on' : 'off'}`,
     ].join(' · ');
+    const ioRuntime = status.ioRuntime;
+    const cacheHitRatio = Number(ioRuntime.cache.aggregate.hitRatio || 0).toFixed(3);
+    const ioIndex = /** @type {Record<string, unknown>} */ (ioRuntime.index ?? {});
 
     println(`
   \x1b[36mTerminal Live Flow\x1b[0m
@@ -439,6 +451,7 @@ export function cmdLive({ hubSessionId, injectPort, println }, arg = '') {
   streaming       \x1b[90m${streamFlags}\x1b[0m
   sse             \x1b[90mclients=${projection.sse.clients} · critical=${projection.sse.criticalClients} · replayLastId=${projection.sse.replayLastId}\x1b[0m
   timeline        \x1b[90m${projection.timeline.timelineSource} · ${projection.timeline.reconciliationStatus} · sync=${projection.timeline.sync.status} · turns=${projection.counters.timelineTurns}\x1b[0m
+  cache/scope     \x1b[90ml1=${ioRuntime.cache.l1['enabled'] ? 'on' : 'off'}:${ioRuntime.cache.l1['size'] ?? 0} · l2=${ioRuntime.cache.l2['enabled'] ? 'on' : 'off'}:${ioRuntime.cache.l2['size'] ?? 0} · hitRatio=${cacheHitRatio} · index=${ioIndex['available'] ? 'on' : 'empty'}:${ioIndex['files'] ?? 0} · scopes=${ioRuntime.scopes.active} · parser=${ioRuntime.parser.size}/${ioRuntime.parser.maxSize}\x1b[0m
   atividade       \x1b[90m${current.phase}:${current.label}${current.detail ? ` · ${current.detail}` : ''}\x1b[0m
   trace           \x1b[90mtools=${projection.counters.toolCount} · arquivos=${projection.counters.fileCount} · ioRecent=${projection.counters.recentIoCount}\x1b[0m
   ─────────────────────────────────────`);

@@ -6,6 +6,7 @@ import {
     evaluateIoPathPolicy,
     evaluateIoPathPolicyAsync,
     evaluateIoUrlPolicy,
+    IO_URL_MAX_REDIRECTS,
     resolveIoAdvisoryLimits,
     sanitizeIoTextOutput,
 } from '../../../../src/copilot/core/io-policy.js';
@@ -102,6 +103,39 @@ describe('core/io-policy evaluateIoUrlPolicy', () => {
         expect(result.ok).toBe(false);
         if (result.ok) return;
         expect(result.code).toBe('URL_BLOCKED');
+    });
+
+    it('IO_URL_MAX_REDIRECTS is exported and is a positive number', () => {
+        expect(typeof IO_URL_MAX_REDIRECTS).toBe('number');
+        expect(IO_URL_MAX_REDIRECTS).toBeGreaterThan(0);
+    });
+
+    it('ok result includes maxRedirects defaulting to IO_URL_MAX_REDIRECTS', () => {
+        const result = evaluateIoUrlPolicy({ input: 'https://example.com/page' });
+        expect(result.ok).toBe(true);
+        if (!result.ok) return;
+        expect(result.maxRedirects).toBe(IO_URL_MAX_REDIRECTS);
+    });
+
+    it('ok result respects caller-supplied maxRedirects', () => {
+        const result = evaluateIoUrlPolicy({ input: 'https://example.com/page', maxRedirects: 2 });
+        expect(result.ok).toBe(true);
+        if (!result.ok) return;
+        expect(result.maxRedirects).toBe(2);
+    });
+
+    it('ok result allows maxRedirects=0 (disable follows)', () => {
+        const result = evaluateIoUrlPolicy({ input: 'https://example.com/page', maxRedirects: 0 });
+        expect(result.ok).toBe(true);
+        if (!result.ok) return;
+        expect(result.maxRedirects).toBe(0);
+    });
+
+    it('blocked result does not include maxRedirects', () => {
+        const result = evaluateIoUrlPolicy({ input: 'http://192.168.1.1/admin' });
+        expect(result.ok).toBe(false);
+        // @ts-expect-error – maxRedirects só existe em ok:true
+        expect(result.maxRedirects).toBeUndefined();
     });
 });
 

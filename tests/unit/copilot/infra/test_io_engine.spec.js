@@ -12,6 +12,7 @@ import {
     mkdirPathLocked,
     moveFileLocked,
     readText,
+    readTextChunks,
     withIoResourceLock,
     writeFileAtomic,
 } from '../../../../src/copilot/infra/io-engine.js';
@@ -45,6 +46,37 @@ describe('infra/io-engine', () => {
         expect(result.totalLines).toBe(3);
         expect(result.returnedLines).toEqual({ start: 4, end: 3 });
         expect(result.io.engine).toBe('io-engine.fs.readFile.text');
+    });
+
+    it('readText reutiliza cache completo e ainda respeita ranges posteriores', async () => {
+        const dir = await createTempDir();
+        const file = join(dir, 'cached-range.txt');
+        await writeFile(file, 'one\ntwo\nthree', 'utf8');
+
+        const full = await readText(file);
+        const range = await readText(file, { startLine: 2, endLine: 2 });
+
+        expect(full.content).toBe('one\ntwo\nthree');
+        expect(range.content).toBe('two');
+        expect(range.totalLines).toBe(3);
+        expect(range.returnedLines).toEqual({ start: 2, end: 2 });
+        expect(range.io.cache).toBe('l1-hit');
+    });
+
+    it('readTextChunks pagina leitura por linhas com metadados observáveis', async () => {
+        const dir = await createTempDir();
+        const file = join(dir, 'chunks.txt');
+        await writeFile(file, 'l1\nl2\nl3\nl4\nl5', 'utf8');
+
+        const result = await readTextChunks(file, { chunkLines: 2, startLine: 2, endLine: 5 });
+
+        expect(result.totalLines).toBe(5);
+        expect(result.chunks).toEqual([
+            { index: 0, startLine: 2, endLine: 3, content: 'l2\nl3', bytes: 5 },
+            { index: 1, startLine: 4, endLine: 5, content: 'l4\nl5', bytes: 5 },
+        ]);
+        expect(result.io.engine).toBe('io-engine.fs.createReadStream.textChunks');
+        expect(result.io.advisoryLimits?.limitMode).toBe('informative');
     });
 
     it('createOrReplaceFileAtomic reporta bytes reais de UTF-8 multibyte', async () => {
@@ -308,18 +340,25 @@ describe('infra/io-engine', () => {
     it('scanDirectory centraliza listagem, filtro, hidden e metadata de scan', async () => {
         const dir = await createTempDir();
         await writeFile(join(dir, 'visible.txt'), 'visible', 'utf8');
+        await writeFile(join(dir, 'ignored.log'), 'ignored', 'utf8');
+        await writeFile(join(dir, '.gitignore'), 'ignored.log\n', 'utf8');
         await writeFile(join(dir, '.hidden.txt'), 'hidden', 'utf8');
         await mkdir(join(dir, 'sub'), { recursive: true });
         await writeFile(join(dir, 'sub', 'nested.md'), 'nested', 'utf8');
+        await writeFile(join(dir, 'sub', 'skip.tmp'), 'skip', 'utf8');
         await mkdir(join(dir, '.git'), { recursive: true });
         await writeFile(join(dir, '.git', 'config'), 'protected', 'utf8');
         await mkdir(join(dir, 'node_modules'), { recursive: true });
         await writeFile(join(dir, 'node_modules', 'pkg.js'), 'protected', 'utf8');
 
-        const shallow = await scanDirectory(dir, { workspaceRoot: dir, recursive: false });
+        const shallow = await scanDirectory(dir, { workspaceRoot: dir, recursive: false, respectGitignore: true });
         expect(shallow.io.operation).toBe('scan');
         expect(shallow.io.engine).toBe('io-scanner.fs.readdir');
         expect(shallow.entries.map((entry) => entry.name)).toEqual(['sub', 'visible.txt']);
+        expect(shallow.entries.some((entry) => entry.name === 'ignored.log')).toBe(false);
+        expect(shallow.entries.find((entry) => entry.name === 'visible.txt')?.fingerprint).toMatchObject({
+            size: 'visible'.length,
+        });
 
         const visibleOnly = await scanDirectory(dir, {
             workspaceRoot: dir,
@@ -331,10 +370,27 @@ describe('infra/io-engine', () => {
         expect(sub?.children?.map((entry) => entry.name)).toEqual(['nested.md']);
         expect(visibleOnly.entries.some((entry) => entry.name === '.hidden.txt')).toBe(false);
 
-        const withHidden = await scanDirectory(dir, { workspaceRoot: dir, showHidden: true });
+        const withHidden = await scanDirectory(dir, { workspaceRoot: dir, showHidden: true, respectGitignore: true });
         expect(withHidden.entries.map((entry) => entry.name)).toContain('.hidden.txt');
         expect(withHidden.entries.map((entry) => entry.name)).not.toContain('.git');
         expect(withHidden.entries.map((entry) => entry.name)).not.toContain('node_modules');
-        expect(withHidden.io.advisoryLimits).toMatchObject({ denylist: 'enabled' });
+        expect(withHidden.io.advisoryLimits).toMatchObject({ denylist: 'enabled', gitignore: 'enabled' });
+
+        const included = await scanDirectory(dir, {
+            workspaceRoot: dir,
+            recursive: true,
+            depth: 2,
+            include: ['*.md'],
+            exclude: ['skip.tmp'],
+            concurrency: 2,
+        });
+        const includedSub = included.entries.find((entry) => entry.name === 'sub');
+        expect(includedSub?.children?.map((entry) => entry.name)).toEqual(['nested.md']);
+        expect(included.io.advisoryLimits).toMatchObject({
+            includePatternCount: 1,
+            excludePatternCount: 1,
+            concurrency: 2,
+            fingerprint: true,
+        });
     });
 });

@@ -10,7 +10,11 @@ import { randomUUID } from 'node:crypto';
 import { CANONICAL_LOCAL_FS_TOOL_NAMES, decideSdkFsRouting, toError } from '#copilot/core';
 import { fileReadTools, fileWriteTools } from '#copilot/tools';
 import { isRuntimeElicitationSchema, normalizeElicitationContentWithSchema } from '../../core/elicitation-schema.js';
-import { buildFailureRecoveryLines, buildTerminalOperationalGuidance } from '../auto-briefing.js';
+import {
+    buildActivityAwareGuidance,
+    buildFailureRecoveryLines,
+    buildTerminalOperationalGuidance,
+} from '../auto-briefing.js';
 import {
     readTerminalRuntimePermissionMode,
     readTerminalRuntimeState,
@@ -35,6 +39,7 @@ import {
     resolveTerminalSdkPendingElicitation,
     selectTerminalSdkSessionUi,
 } from '../frontend/gateways/sdk-session.js';
+import { readTerminalIoActivityProjection } from '../io-activity-events.js';
 import {
     classifyTerminalSdkQuota,
     clearTerminalElicitation,
@@ -353,11 +358,21 @@ async function renderCommandFailureGuidance(println, runtimeId) {
         canonicalFsReady: localFsToolsReady,
         sdkWorkspaceAvailable,
     });
-    const guidance = buildTerminalOperationalGuidance({
-        sdkFsRouting: routing,
-        toolLoad: { hasCanonicalLocalFsTools: localFsToolsReady },
-        instructionLoad: { sectionsMissingFileCount: 0, appendFileMissingCount: 0 },
+    const [lastIoEntry = null] = readTerminalIoActivityProjection(1);
+    const guidance = buildActivityAwareGuidance({
+        mode: routing.mode,
+        lastIoEntry: lastIoEntry
+            ? {
+                  operation: lastIoEntry.operation,
+                  target: lastIoEntry.target,
+                  success: lastIoEntry.success,
+                  engine: lastIoEntry.engine,
+              }
+            : null,
     });
+    if (guidance.nextCommand) {
+        println(`  \x1b[33m? ${guidance.nextCommand}\x1b[0m`);
+    }
     for (const line of buildFailureRecoveryLines(guidance)) {
         println(`  \x1b[90m${line}\x1b[0m`);
     }

@@ -14,6 +14,7 @@ import { toError } from '../../core/error-handlers.js';
 import { withIoMeta } from '../../core/io-contracts.js';
 import { sanitizeIoTextOutput } from '../../core/io-policy.js';
 import { readBytes, readText } from '../../infra/io-engine.js';
+import { warmReadThroughContext } from '../../infra/io-prefetch.js';
 import { scanDirectory } from '../../infra/io-scanner.js';
 import { log } from '../logger.js';
 import { buildTool } from '../tool-factory.js';
@@ -80,6 +81,12 @@ const readFileContentTool = buildTool({
             }
 
             const text = await readText(resolved, { startLine, endLine });
+            const readThrough = await warmReadThroughContext(resolved, {
+                workspaceRoot: WORKSPACE_ROOT,
+                relatedImports: true,
+                concurrency: 4,
+                silent: true,
+            });
             const sanitized = sanitizeIoTextOutput({ text: text.content });
             const truncated = false;
 
@@ -91,6 +98,7 @@ const readFileContentTool = buildTool({
                     totalLines: text.totalLines,
                     returnedLines: text.returnedLines,
                     content: sanitized.text,
+                    readThrough,
                     sanitized: sanitized.sanitized,
                     redactions: sanitized.redactions,
                     truncated,

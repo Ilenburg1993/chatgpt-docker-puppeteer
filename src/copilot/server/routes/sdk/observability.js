@@ -23,6 +23,7 @@
 import { decideSdkFsRouting, hasCanonicalLocalFsTools } from '#copilot/core';
 import { Router } from 'express';
 import { logSwallowed } from '../../../core/error-handlers.js';
+import { readIoRuntimeHealthSnapshot } from '../../../infra/io-health.js';
 import { withErrorHandler as _withErrorHandler } from './middleware.js';
 
 /**
@@ -202,6 +203,10 @@ export default function createObservabilityRouter(deps) {
                 convergenceTraceSnapshot?.traces.filter(
                     (trace) => trace.status === 'failed' || trace.status === 'mixed',
                 ).length ?? 0;
+            const ioRuntime = readIoRuntimeHealthSnapshot();
+            const l1HitRatio = Number(ioRuntime.cache.aggregate.hitRatio || 0);
+            const l2Enabled = Boolean(ioRuntime.cache.l2?.['enabled']);
+            const ioIndex = /** @type {Record<string, unknown>} */ (ioRuntime.index ?? {});
 
             /** @type {Record<string, { status: string; details?: string }>} */
             const components = {
@@ -237,6 +242,22 @@ export default function createObservabilityRouter(deps) {
                         ? `${convergenceTraceSnapshot.totalTraces} traces, ${convergenceRecentFailures} recent failures/mixed`
                         : 'trace store unavailable',
                 },
+                io_cache: {
+                    status: 'healthy',
+                    details: `l1=${ioRuntime.cache.l1?.['enabled'] ? 'on' : 'off'} · l2=${l2Enabled ? 'on' : 'off'} · hitRatio=${l1HitRatio.toFixed(3)}`,
+                },
+                io_parser: {
+                    status: 'healthy',
+                    details: `symbols=${ioRuntime.parser.size}/${ioRuntime.parser.maxSize}`,
+                },
+                io_index: {
+                    status: ioIndex['available'] ? 'healthy' : 'degraded',
+                    details: `available=${ioIndex['available'] ? 'yes' : 'no'} · files=${ioIndex['files'] ?? 0} · symbols=${ioIndex['symbols'] ?? 0}`,
+                },
+                io_scope: {
+                    status: 'healthy',
+                    details: `${ioRuntime.scopes.active} active scopes`,
+                },
             };
 
             const overallHealthy = Object.values(components).every((c) => c.status !== 'unhealthy');
@@ -268,6 +289,7 @@ export default function createObservabilityRouter(deps) {
                     sessions: metrics.sessions,
                     gauges: metrics.gauges,
                     lastError: recentErrors.length ? recentErrors[recentErrors.length - 1] : null,
+                    ioRuntime,
                 },
                 ts: Date.now(),
             });

@@ -100,6 +100,7 @@ export {
     DEFAULT_BLOCKED_READ_PATH_PATTERNS,
     DEFAULT_BLOCKED_WRITE_PATH_PATTERNS,
     IO_POLICY_VERSION as IO_PATH_POLICY_VERSION,
+    IO_URL_MAX_REDIRECTS,
     evaluateIoPathPolicy,
     evaluateIoPathPolicyAsync,
     evaluateIoUrlPolicy,

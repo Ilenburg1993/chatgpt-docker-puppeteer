@@ -10,7 +10,8 @@
 
 import { fileReadTools, fileWriteTools } from '#copilot/tools';
 import { toError } from '../../core/error-handlers.js';
-import { buildFailureRecoveryLines, buildTerminalOperationalGuidance } from '../auto-briefing.js';
+import { buildActivityAwareGuidance, buildFailureRecoveryLines } from '../auto-briefing.js';
+import { readTerminalIoActivityProjection } from '../io-activity-events.js';
 
 /**
  * @typedef {{ println: (text: string) => void }} CommandContext
@@ -42,11 +43,25 @@ const searchInFilesTool = findTool(fileReadTools, 'search_in_files');
 const createFileTool = findTool(fileWriteTools, 'create_file');
 const writeFileContentTool = findTool(fileWriteTools, 'write_file_content');
 
-const FS_FAILURE_GUIDANCE = buildTerminalOperationalGuidance({
-    sdkFsRouting: { mode: 'local-fs-primary', reason: '/fs opera no filesystem local canônico.' },
-    toolLoad: { hasCanonicalLocalFsTools: true },
-    instructionLoad: { sectionsMissingFileCount: 0, appendFileMissingCount: 0 },
-});
+/**
+ * Constrói guidance dinâmico de falha para o FS local, orientado pela última operação de I/O.
+ *
+ * @returns {ReturnType<typeof buildActivityAwareGuidance>}
+ */
+function buildFsDynamicGuidance() {
+    const [lastEntry = null] = readTerminalIoActivityProjection(1);
+    return buildActivityAwareGuidance({
+        mode: 'local-fs-primary',
+        lastIoEntry: lastEntry
+            ? {
+                  operation: lastEntry.operation,
+                  target: lastEntry.target,
+                  success: lastEntry.success,
+                  engine: lastEntry.engine,
+              }
+            : null,
+    });
+}
 
 /**
  * @param {{ handler?: Function }} tool
@@ -95,7 +110,11 @@ function ioSummary(result) {
  */
 function printFailure({ println }, result) {
     println(`\n  \x1b[31m✗ FS local: ${String(result['error'] ?? 'operação falhou')}\x1b[0m`);
-    for (const line of buildFailureRecoveryLines(FS_FAILURE_GUIDANCE)) {
+    const guidance = buildFsDynamicGuidance();
+    if (guidance.nextCommand) {
+        println(`  \x1b[33m→ ${guidance.nextCommand}\x1b[0m`);
+    }
+    for (const line of buildFailureRecoveryLines(guidance)) {
         println(`  \x1b[90m${line}\x1b[0m`);
     }
     println('');
@@ -263,7 +282,11 @@ export async function cmdFs(ctx, arg = '') {
         }
     } catch (e) {
         ctx.println(`\n  \x1b[31m✗ FS local: ${toError(e).message}\x1b[0m`);
-        for (const line of buildFailureRecoveryLines(FS_FAILURE_GUIDANCE)) {
+        const guidance = buildFsDynamicGuidance();
+        if (guidance.nextCommand) {
+            ctx.println(`  \x1b[33m→ ${guidance.nextCommand}\x1b[0m`);
+        }
+        for (const line of buildFailureRecoveryLines(guidance)) {
             ctx.println(`  \x1b[90m${line}\x1b[0m`);
         }
         ctx.println('');

@@ -34,7 +34,7 @@ import { setSdkMetricEmitter } from '../sdk/telemetry/operation-metrics.js';
 import { setCustomToolsBuilder } from '../sdk/tools/custom.js';
 import { setToolsLogger } from '../tools/logger.js';
 import { setToolsMetrics } from '../tools/metrics-proxy.js';
-import { defaultConvergenceTraceStore } from './convergence-trace-store.js';
+import { defaultConvergenceTraceStore, initConvergenceTracePersistence } from './convergence-trace-store.js';
 import { CONVERGENCE_TRACE_STORE, ERROR_TRACKER, EVENT_COLLECTOR, METRICS_STORE } from './di-tokens.js';
 import { defaultErrorTracker } from './error-tracker.js';
 import { attachObservabilityBusRuntime, detachObservabilityBusRuntime } from './event-bus-runtime.js';
@@ -217,4 +217,15 @@ export function bootstrapLateDeps(deps) {
         container.register(TOOLS_BUILDER, () => deps.buildTool, 'singleton');
         setCustomToolsBuilder(/** @type {Parameters<typeof setCustomToolsBuilder>[0]} */ (deps.buildTool));
     }
+}
+
+/**
+ * Habilita persistência SQLite no trace-store de convergência. Deve ser chamado após `bootstrapObservability()` e após
+ * `ensureCopilotDbDir()` + `getCopilotDb()`.
+ *
+ * @param {import('better-sqlite3').Database} db
+ * @returns {void}
+ */
+export function bootstrapConvergencePersistence(db) {
+    initConvergenceTracePersistence(db);
 }

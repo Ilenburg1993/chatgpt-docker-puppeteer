@@ -24,7 +24,13 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { afterEach, beforeEach, describe, it } from 'vitest';
 
-import { fileReadTools, fileTools, fileWriteTools } from '../../../src/copilot/tools/file/index.js';
+import {
+    fileReadTools,
+    fileTools,
+    fileWriteTools,
+    indexTools,
+    scopeTools,
+} from '../../../src/copilot/tools/file/index.js';
 import { allTools } from '../../../src/copilot/tools/index.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -89,9 +95,12 @@ describe('fileTools — exportações do módulo', () => {
         assert.equal(fileWriteTools.length, 6);
     });
 
-    it('fileTools = fileReadTools + fileWriteTools', () => {
+    it('fileTools = fileReadTools + indexTools + scopeTools + fileWriteTools', () => {
         assert.ok(Array.isArray(fileTools));
-        assert.equal(fileTools.length, fileReadTools.length + fileWriteTools.length);
+        assert.equal(
+            fileTools.length,
+            fileReadTools.length + indexTools.length + scopeTools.length + fileWriteTools.length,
+        );
     });
 
     it('fileReadTools inclui read_file_content, list_directory, search_in_files, diff_files', () => {
