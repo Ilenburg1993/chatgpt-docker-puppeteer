@@ -1,0 +1,48 @@
+{
+  "timestamp": "2026-05-07T05:57:52.574Z",
+  "threshold": 20,
+  "results": [
+    {
+      "label": "readBytes:small:cold",
+      "p50ms": 0.6805510000000083,
+      "p95ms": 1.7478299999999933,
+      "opsPerSec": 1164,
+      "samples": 50
+    },
+    {
+      "label": "readBytes:small:hot",
+      "p50ms": 0.008101000000010572,
+      "p95ms": 0.04950400000001309,
+      "opsPerSec": 67517,
+      "samples": 50
+    },
+    {
+      "label": "readText:medium:hot",
+      "p50ms": 0.12470899999999574,
+      "p95ms": 0.3102230000000077,
+      "opsPerSec": 3921,
+      "samples": 50
+    },
+    {
+      "label": "warmCacheForPaths:3files",
+      "p50ms": 3.4693570000000022,
+      "p95ms": 5.294392999999957,
+      "opsPerSec": 262,
+      "samples": 5
+    },
+    {
+      "label": "parseSymbols:small:cold",
+      "p50ms": 4.583840000000009,
+      "p95ms": 6.439376999999979,
+      "opsPerSec": 214,
+      "samples": 10
+    },
+    {
+      "label": "parseSymbols:small:hot",
+      "p50ms": 0.0008000000000265572,
+      "p95ms": 0.0012000000000398359,
+      "opsPerSec": 1048130,
+      "samples": 50
+    }
+  ]
+}

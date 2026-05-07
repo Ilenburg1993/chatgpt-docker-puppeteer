@@ -1,0 +1,157 @@
+{
+  "timestamp": "2026-05-07T05:28:02.565Z",
+  "thresholds": {
+    "l1_speedup_vs_fs_min": 10,
+    "stream_overhead_factor": 1.5
+  },
+  "environment": {
+    "node": "v24.14.0",
+    "lruCacheAvailable": true
+  },
+  "results": [
+    {
+      "name": "fs.readFile [small]",
+      "hz": 2904.3723722963264,
+      "mean_ms": 344.30846730901635,
+      "p99_ms": 720.5249999999523,
+      "samples": 1453,
+      "size_label": "small"
+    },
+    {
+      "name": "stream.read [small]",
+      "hz": 3374.571549470089,
+      "mean_ms": 296.33391538461547,
+      "p99_ms": 776.3279999999213,
+      "samples": 1690,
+      "size_label": "small"
+    },
+    {
+      "name": "io-engine.readBytes miss [small]",
+      "hz": 3068.453530105373,
+      "mean_ms": 325.89706514657865,
+      "p99_ms": 651.3230000000476,
+      "samples": 1535,
+      "size_label": "small"
+    },
+    {
+      "name": "io-engine.readBytes hit [small]",
+      "hz": 392563.849255586,
+      "mean_ms": 2.5473563138742596,
+      "p99_ms": 7.5010000000474975,
+      "samples": 196282,
+      "size_label": "small"
+    },
+    {
+      "name": "l1-cache.get [small]",
+      "hz": 4821918.590294756,
+      "mean_ms": 0.00020738632999999936,
+      "p99_ms": 0.000622158989999998,
+      "samples": 100000,
+      "size_label": "small"
+    },
+    {
+      "name": "lru-cache.get [small]",
+      "hz": 29227622.090353604,
+      "mean_ms": 0.00003421421000000009,
+      "p99_ms": 0.00010264263000000027,
+      "samples": 100000,
+      "size_label": "small"
+    },
+    {
+      "name": "fs.readFile [medium]",
+      "hz": 2635.874478266424,
+      "mean_ms": 379.3807361637665,
+      "p99_ms": 901.5309999999772,
+      "samples": 1319,
+      "size_label": "medium"
+    },
+    {
+      "name": "stream.read [medium]",
+      "hz": 1862.852453083258,
+      "mean_ms": 536.8111673819752,
+      "p99_ms": 1392.4500000002809,
+      "samples": 932,
+      "size_label": "medium"
+    },
+    {
+      "name": "io-engine.readBytes miss [medium]",
+      "hz": 2263.782310165513,
+      "mean_ms": 441.7385874558259,
+      "p99_ms": 1154.6410000000833,
+      "samples": 1132,
+      "size_label": "medium"
+    },
+    {
+      "name": "io-engine.readBytes hit [medium]",
+      "hz": 389931.0064559727,
+      "mean_ms": 2.5645562508323136,
+      "p99_ms": 7.300000000213913,
+      "samples": 194966,
+      "size_label": "medium"
+    },
+    {
+      "name": "l1-cache.get [medium]",
+      "hz": 4568760.624081776,
+      "mean_ms": 0.00021887773999999807,
+      "p99_ms": 0.0006566332199999942,
+      "samples": 100000,
+      "size_label": "medium"
+    },
+    {
+      "name": "lru-cache.get [medium]",
+      "hz": 36529720.39786609,
+      "mean_ms": 0.000027374970000000758,
+      "p99_ms": 0.00008212491000000227,
+      "samples": 100000,
+      "size_label": "medium"
+    },
+    {
+      "name": "fs.readFile [large]",
+      "hz": 888.3073718630418,
+      "mean_ms": 1125.736464285674,
+      "p99_ms": 6678.935999999339,
+      "samples": 448,
+      "size_label": "large"
+    },
+    {
+      "name": "stream.read [large]",
+      "hz": 345.4692797284054,
+      "mean_ms": 2894.6133815028684,
+      "p99_ms": 7482.364999999845,
+      "samples": 173,
+      "size_label": "large"
+    },
+    {
+      "name": "io-engine.readBytes miss [large]",
+      "hz": 902.7594009484467,
+      "mean_ms": 1107.7148561946756,
+      "p99_ms": 4598.1629999996585,
+      "samples": 452,
+      "size_label": "large"
+    },
+    {
+      "name": "io-engine.readBytes hit [large]",
+      "hz": 392030.8372366594,
+      "mean_ms": 2.550819744305789,
+      "p99_ms": 7.101000000147906,
+      "samples": 196016,
+      "size_label": "large"
+    },
+    {
+      "name": "l1-cache.get [large]",
+      "hz": 7734216.436478449,
+      "mean_ms": 0.00012929557999999814,
+      "p99_ms": 0.00038788673999999443,
+      "samples": 100000,
+      "size_label": "large"
+    },
+    {
+      "name": "lru-cache.get [large]",
+      "hz": 95280109.22912875,
+      "mean_ms": 0.000010495369999998729,
+      "p99_ms": 0.00003148610999999619,
+      "samples": 100000,
+      "size_label": "large"
+    }
+  ]
+}

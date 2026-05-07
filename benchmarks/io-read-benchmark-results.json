@@ -1,0 +1,181 @@
+{
+  "timestamp": "2026-05-07T17:47:05.606Z",
+  "thresholds": {
+    "l1_speedup_vs_fs_min": 10,
+    "stream_overhead_factor": 1.5
+  },
+  "environment": {
+    "node": "v24.14.0",
+    "lruCacheAvailable": true
+  },
+  "results": [
+    {
+      "name": "fs.readFile [small]",
+      "hz": 2668.81659334618,
+      "mean_ms": 374.6979101123593,
+      "p99_ms": 716.8439999999237,
+      "samples": 1335,
+      "size_label": "small"
+    },
+    {
+      "name": "stream.read [small]",
+      "hz": 3135.3201810664464,
+      "mean_ms": 318.94669196428305,
+      "p99_ms": 677.7409999999691,
+      "samples": 1568,
+      "size_label": "small"
+    },
+    {
+      "name": "io-engine.readBytes miss [small]",
+      "hz": 1078.973615086371,
+      "mean_ms": 926.8067226277362,
+      "p99_ms": 7058.231999999862,
+      "samples": 548,
+      "size_label": "small"
+    },
+    {
+      "name": "io-engine.readBytes hit [small]",
+      "hz": 288280.86359682673,
+      "mean_ms": 3.4688393378706657,
+      "p99_ms": 28.302000000167027,
+      "samples": 144141,
+      "size_label": "small"
+    },
+    {
+      "name": "l1-cache.get [small]",
+      "hz": 7921499.210266135,
+      "mean_ms": 0.00012623873000000004,
+      "p99_ms": 0.00037871619000000013,
+      "samples": 100000,
+      "size_label": "small"
+    },
+    {
+      "name": "map.get baseline [small]",
+      "hz": 63560789.857226975,
+      "mean_ms": 0.000015732969999999114,
+      "p99_ms": 0.000047198909999997344,
+      "samples": 100000,
+      "size_label": "small"
+    },
+    {
+      "name": "lru-cache.get [small]",
+      "hz": 21305662.10753864,
+      "mean_ms": 0.000046935880000000906,
+      "p99_ms": 0.0001408076400000027,
+      "samples": 100000,
+      "size_label": "small"
+    },
+    {
+      "name": "fs.readFile [medium]",
+      "hz": 2411.9843721957095,
+      "mean_ms": 414.5963844241938,
+      "p99_ms": 864.0529999997852,
+      "samples": 1207,
+      "size_label": "medium"
+    },
+    {
+      "name": "stream.read [medium]",
+      "hz": 1648.0518675522637,
+      "mean_ms": 606.7770193939527,
+      "p99_ms": 1201.0739999996076,
+      "samples": 825,
+      "size_label": "medium"
+    },
+    {
+      "name": "io-engine.readBytes miss [medium]",
+      "hz": 1245.9698475296843,
+      "mean_ms": 802.5876404494418,
+      "p99_ms": 1533.6939999997412,
+      "samples": 623,
+      "size_label": "medium"
+    },
+    {
+      "name": "io-engine.readBytes hit [medium]",
+      "hz": 378341.6240145586,
+      "mean_ms": 2.643113885776205,
+      "p99_ms": 7.101000000147906,
+      "samples": 189172,
+      "size_label": "medium"
+    },
+    {
+      "name": "l1-cache.get [medium]",
+      "hz": 13289718.249999397,
+      "mean_ms": 0.00007524613999999928,
+      "p99_ms": 0.00022573841999999785,
+      "samples": 100000,
+      "size_label": "medium"
+    },
+    {
+      "name": "map.get baseline [medium]",
+      "hz": 65197336.036848284,
+      "mean_ms": 0.000015338050000000293,
+      "p99_ms": 0.000046014150000000875,
+      "samples": 100000,
+      "size_label": "medium"
+    },
+    {
+      "name": "lru-cache.get [medium]",
+      "hz": 18901229.92193225,
+      "mean_ms": 0.00005290661,
+      "p99_ms": 0.00015871983,
+      "samples": 100000,
+      "size_label": "medium"
+    },
+    {
+      "name": "fs.readFile [large]",
+      "hz": 858.4235754943448,
+      "mean_ms": 1164.9260674418508,
+      "p99_ms": 5288.661999999931,
+      "samples": 430,
+      "size_label": "large"
+    },
+    {
+      "name": "stream.read [large]",
+      "hz": 273.2522561311872,
+      "mean_ms": 3659.6221167883214,
+      "p99_ms": 8965.81199999946,
+      "samples": 137,
+      "size_label": "large"
+    },
+    {
+      "name": "io-engine.readBytes miss [large]",
+      "hz": 584.9317963835721,
+      "mean_ms": 1709.6010273037793,
+      "p99_ms": 6228.925000000345,
+      "samples": 293,
+      "size_label": "large"
+    },
+    {
+      "name": "io-engine.readBytes hit [large]",
+      "hz": 376041.84732702124,
+      "mean_ms": 2.6592785008056814,
+      "p99_ms": 7.39999999950669,
+      "samples": 188021,
+      "size_label": "large"
+    },
+    {
+      "name": "l1-cache.get [large]",
+      "hz": 12994396.166652638,
+      "mean_ms": 0.0000769562500000029,
+      "p99_ms": 0.00023086875000000873,
+      "samples": 100000,
+      "size_label": "large"
+    },
+    {
+      "name": "map.get baseline [large]",
+      "hz": 106500355.7111947,
+      "mean_ms": 0.000009389639999999417,
+      "p99_ms": 0.000028168919999998254,
+      "samples": 100000,
+      "size_label": "large"
+    },
+    {
+      "name": "lru-cache.get [large]",
+      "hz": 29828237.079597734,
+      "mean_ms": 0.00003352528000000348,
+      "p99_ms": 0.00010057584000001043,
+      "samples": 100000,
+      "size_label": "large"
+    }
+  ]
+}

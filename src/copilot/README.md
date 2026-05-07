@@ -46,6 +46,7 @@ SDK/agent events
 | `conversation-hub/` | store/orquestração de sessões/turnos persistidos                                         |
 | `hooks/`            | policies e callbacks configuráveis sobre a sessão SDK                                    |
 | `tools/`            | custom tools registradas sobre a superfície do SDK                                       |
+| `infra/`            | primitivas compartilhadas de I/O, cache, índice, locks, storage e SSE                    |
 | `config/`           | defaults, builders e configuração declarativa                                            |
 | `core/`             | erros, constantes, contratos centrais e utilitários base                                 |
 
@@ -135,6 +136,8 @@ sdk/generated/session-events.d.ts
 - `sdk/README.md`
 - `event-handlers/README.md`
 - `observability/README.md`
+- `infra/README.md`
+- `tools/file/README.md`
 - `terminal/README.md`
 - `terminal/frontend/README.md`
 - `terminal/dialog/README.md`

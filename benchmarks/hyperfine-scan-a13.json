@@ -1,0 +1,34 @@
+{
+  "results": [
+    {
+      "command": "node --input-type=module -e \"import { scanDirectory } from './src/copilot/infra/io-scanner.js'; await scanDirectory('src/copilot', { recursive: true, depth: 3, showHidden: false });\"",
+      "mean": 0.27112998596,
+      "stddev": 0.010180834026922282,
+      "median": 0.27098821806000006,
+      "user": 0.19448968,
+      "system": 0.11123651999999999,
+      "min": 0.25456249356000005,
+      "max": 0.29179056256,
+      "times": [
+        0.29179056256, 0.27572916056, 0.26798702956000003, 0.27788340856000004, 0.27299787356000005, 0.27479469556,
+        0.26101605056000005, 0.25456249356000005, 0.26556002256000005, 0.26897856256
+      ],
+      "exit_codes": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+    },
+    {
+      "command": "node --input-type=module -e \"import { scanDirectory } from './src/copilot/infra/io-scanner.js'; await scanDirectory('src/copilot', { recursive: true, depth: 3, showHidden: true });\"",
+      "mean": 0.26963452126000004,
+      "stddev": 0.007540967161223538,
+      "median": 0.26823909706000004,
+      "user": 0.20134848,
+      "system": 0.10584162,
+      "min": 0.25826416456000006,
+      "max": 0.28278521456000005,
+      "times": [
+        0.27467909456000006, 0.28278521456000005, 0.27978665556000004, 0.26366251156000003, 0.26775121956000003,
+        0.26682416256, 0.26388940056000004, 0.26872697456000005, 0.26997581456, 0.25826416456000006
+      ],
+      "exit_codes": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+    }
+  ]
+}

@@ -13,27 +13,68 @@ uma arquitetura única, segura, observável e otimizada para Node 24+.
 Esta seção consolida o estado real e a ordem de ataque atual para evitar execução ad hoc, reduzir
 retrabalho e manter convergência arquitetural entre runtime, terminal, SDK e file-tools.
 
-### Estado consolidado por eixo (snapshot pós A.8)
+### Estado consolidado por eixo (snapshot 2026-05-07 pós A.13.3)
 
-| Eixo | Status consolidado | Observação executiva                                                                      |
-| ---- | ------------------ | ----------------------------------------------------------------------------------------- |
-| R0   | Concluído          | Base de investigação/documentos canônicos estabelecida                                    |
-| R1   | Concluído parcial  | Contrato `io` estabilizado; faltam snapshots semânticos                                   |
-| R2   | Parcial avançado   | Policy path/url/advisory/sanitização + symlink/denylist central; faltam redirects         |
-| R3   | Concluído parcial  | Engine madura; falta threshold formal `readFile` vs stream/FileHandle                     |
-| R4   | Concluído parcial  | Locks + bateria destrutiva principal; faltam cenários recursivos/de diretórios            |
-| R5   | Não iniciado       | Cache L1 depende de R2 + benchmark + invalidação provada                                  |
-| R6   | Não iniciado       | FTS/L2 bloqueado por R2/R7 e critérios de benchmark                                       |
-| R7   | Parcial            | Scanner existe com denylist central; faltam `.gitignore` e watcher strategy               |
-| R8   | Não iniciado       | Parsing de alto volume ainda em fase de intenção                                          |
-| R9   | Parcial avançado   | Trace store por `traceId` + health degraded; faltam SLOs persistentes                     |
-| R10  | Parcial            | Web fetch/search no envelope `io`; faltam cache HTTP/provider robusto                     |
-| R11  | Parcial avançado   | Session FS usa provider SDK-first com policy/engine/scanner em read/stat/readdir/mkdir/rm |
-| R12  | Não iniciado       | Benchmarks e gates de evidência ainda não consolidados                                    |
-| R13  | Concluído parcial  | SDK↔FS bidirecional no terminal + HTTP; falta paginação/stream e hardening final          |
-| R14  | Parcial avançado   | Terminal mostra tool lifecycle, I/O real e projeção live de loop/stream/SSE/trace         |
+| Eixo | Status consolidado      | Observação executiva                                                                                         |
+| ---- | ----------------------- | ------------------------------------------------------------------------------------------------------------ |
+| R0   | Concluído               | Base de investigação/documentos canônicos estabelecida                                                       |
+| R1   | Concluído parcial       | Contrato `io` estabilizado; faltam snapshots semânticos e contrato de cache/index no envelope                |
+| R2   | Parcial avançado        | Policy path/url/advisory/sanitização + symlink/denylist central; faltam redirects/cache HTTP e output global |
+| R3   | Concluído parcial       | Engine madura; falta formalizar `FileHandle`/chunked read e opções `flush`/durability                        |
+| R4   | Concluído parcial       | Locks por recurso funcionam; faltam stress, diretórios recursivos e spike `worker_threads.locks`             |
+| R5   | **Concluído técnico**   | `lru-cache@11`, TTL, max bytes, fingerprint mtime/size e invalidação; falta observability/health por tier    |
+| R6   | **Iniciado parcial**    | L2 SQLite cache feature-flagged; FTS5 de arquivos, chunks e freshness ainda pendentes                        |
+| R7   | Parcial                 | Scanner comum existe com denylist; faltam `.gitignore` via `ignore`, `p-limit`, `fsPromises.glob` e watchers |
+| R8   | **Iniciado parcial**    | Parser Babel/JSON/MD existe; faltam streaming JSON/JSONL, TS AST mais profundo e L2 simbólico persistente    |
+| R9   | Parcial avançado        | Trace store por `traceId`; faltam prom-client/histogramas formais para I/O/cache/index                       |
+| R10  | Parcial                 | Web fetch/search no envelope `io`; falta cache HTTP L1/L2, ETag, cache negativo e provider robusto           |
+| R11  | Parcial avançado        | Session FS SDK-first usa provider canônico; faltam abort/timeout uniforme e métricas `io` completas          |
+| R12  | Parcial                 | Benchmarks Node/hyperfine existem; faltam JSON grande, FTS real, L2 soak e gates CI obrigatórios             |
+| R13  | Concluído parcial       | SDK↔FS bidirecional; falta stream/paginação progressiva, conflict UI e histórico persistente exposto         |
+| R14  | Parcial avançado        | Terminal mostra lifecycle, I/O real e `/live`; falta agrupamento por `traceId/toolCallId`                    |
+| R15  | **Novo eixo ativo**     | Scope LLM-B e prefetch existem; faltam política sem bloqueio, HTTP/terminal UX e integração no auto-briefing |
+| R16  | **Novo eixo ativo**     | Cache tiers L1/L2/L3 planejados; falta control plane e health por tier                                       |
+| R17  | **Novo eixo planejado** | Indexação textual/simbólica persistente precisa unificar FTS5, parser, hashes e scanner                      |
+| R18  | **Novo eixo planejado** | Grandes arquivos precisam `FileHandle`, streaming, chunking, JSONL e backpressure                            |
+
+### Documentos de governança 2026-05-07
+
+Este roadmap permanece como trilha histórica e backlog vivo. A avaliação atual foi separada em três
+documentos menores para reduzir ambiguidade antes da próxima rodada de implementação:
+
+- `2026-05-07-AS-IS-IO-READ-WRITE-SCOPE-CACHE.md` — situação atual real por superfície.
+- `2026-05-07-ARQUITETURA-ALVO-IO-INTELIGENTE-L1-L2-L3.md` — target-state completo para I/O, cache,
+  indexação, parsing, scope e observability.
+- `2026-05-07-ROADMAP-IO-INTELIGENTE-COMPLETO.md` — ordem de execução recomendada, gates e critérios
+  de pronto.
+
+Leitura executiva: não iniciar novas transformações amplas sem antes usar esses três documentos como
+base de decisão.
+
+### Próxima ordem de execução canônica (A.16 → A.23)
+
+1. **A.16/P0 — limpar e fechar contratos do que já existe**: remover limites bloqueantes de
+   `scope-tools`, corrigir docs/typedefs divergentes, expor cache tier stats em health e travar
+   typecheck/testes do corte atual.
+2. **A.17/P0 — scanner canônico 2.0**: `.gitignore` com `ignore`, concorrência com `p-limit`,
+   baseline `fsPromises.glob`, fallback `opendir/readdir`, fingerprints rápidos com `xxhash-wasm`.
+3. **A.18/P0/P1 — observability de cache/index**: `diagnostics_channel` por tier, métricas
+   `prom-client`, `/observability/health` com L1/L2/parser/scope/index e `/live` com cache/index.
+4. **A.19/P1 — L2 soak e schema de índice**: medir `IO_L2_CACHE_ENABLED=1`, separar cache blob de
+   índice textual, criar tabelas `files/chunks/symbols/fts`.
+5. **A.20/P1 — FTS5 + fallback `rg`**: FTS para busca textual comum quando índice fresco; `rg` segue
+   canônico para regex complexa e fallback.
+6. **A.21/P1 — scope LLM-B integrado**: declarar/refresh/context/find-symbol via terminal, HTTP e
+   auto-briefing, sem criar arquitetura paralela.
+7. **A.22/P1/P2 — grandes arquivos e parsing streaming**: `FileHandle.readLines`,
+   `readableWebStream`, JSONL/stream JSON, thresholds e backpressure.
+8. **A.23/P2 — watcher strategy**: `fsPromises.watch` com debounce/batch e fallback; avaliar
+   `@parcel/watcher`/`chokidar` somente se Node puro falhar por evidência.
 
 ### Ordem de execução canônica (A9 → A13)
+
+> Histórico preservado para rastreabilidade. A ordem executiva viva a partir de 2026-05-07 é **A.16
+> → A.23**, definida acima e detalhada em `2026-05-07-ROADMAP-IO-INTELIGENTE-COMPLETO.md`.
 
 > Regra: cada corte só inicia se os critérios de saída do corte anterior estiverem cumpridos.
 
@@ -247,11 +288,13 @@ Prioridade: P1 Risco: médio Objetivo: reduzir leituras repetidas sem entregar c
 
 Tarefas:
 
-- [ ] Definir cache key com realpath, operação, opções, size e mtime.
-- [ ] Implementar L1 por bytes e TTL.
-- [ ] Invalidar por path em write/delete/move/patch.
-- [ ] Adicionar stats: hits, misses, evictions, stale, bytes.
-- [ ] Migrar `runtime-file-context` para o cache comum.
+- [~] Definir cache key com realpath, operação, opções, size e mtime. - 2026-05-07: chave atual usa
+  path normalizado + operação/range; `size/mtime` seguem pendentes.
+- [x] Implementar L1 por bytes e TTL.
+- [x] Invalidar por path em write/delete/move/patch.
+- [x] Adicionar stats: hits, misses, evictions, stale, bytes.
+- [x] Migrar `runtime-file-context` para o cache comum. - 2026-05-07: fluxo já usa
+      `ioEngine.readText()`, herdando L1 sem bypass.
 - [ ] Benchmark da implementação caseira versus `lru-cache`.
 - [ ] Promover `lru-cache` a dependência direta apenas se vencer em simplicidade/performance.
 
@@ -267,7 +310,8 @@ Prioridade: P1 Risco: alto Objetivo: criar busca textual incremental para worksp
 
 Tarefas:
 
-- [ ] Definir schema `copilot_io_files`, `copilot_io_file_chunks`, `copilot_io_fts`.
+- [~] Definir schema `copilot_io_files`, `copilot_io_file_chunks`, `copilot_io_fts`. - 2026-05-07:
+  preparado schema inicial de `copilot_io_cache_l2` (migração v9) para fase L2; FTS ainda pendente.
 - [ ] Escolher `copilot.sqlite` versus `copilot-io.sqlite` após benchmark de contenção.
 - [ ] Implementar scan frio de `src/copilot`.
 - [ ] Implementar reindex incremental por mtime/size/hash rápido.
@@ -392,12 +436,18 @@ Prioridade: P1 contínuo Risco: baixo/médio Objetivo: transformar escolhas em e
 
 Tarefas:
 
-- [ ] Criar benchmark com `hyperfine` para `rg`, FTS, scan frio e scan quente.
-- [ ] Criar benchmark Node com `perf_hooks` ou `tinybench` se promovido.
-- [ ] Medir `readFile` versus stream por tamanho.
-- [ ] Medir LRU caseira versus `lru-cache`.
-- [ ] Medir JSON.parse versus `stream-json` em payloads grandes.
-- [ ] Só então alterar `package.json` e, se necessário, Dockerfile.
+- [~] Criar benchmark com `hyperfine` para `rg`, FTS, scan frio e scan quente. - 2026-05-07: `rg` e
+  scan (`scanDirectory` com `showHidden` on/off) medidos e versionados em
+  `benchmarks/hyperfine-rg-a13.json` e `benchmarks/hyperfine-scan-a13.json`; FTS segue pendente.
+- [x] Criar benchmark Node com `perf_hooks` ou `tinybench` se promovido. - 2026-05-07:
+      `benchmarks/io-read-benchmark.mjs` com `tinybench`.
+- [x] Medir `readFile` versus stream por tamanho. - 2026-05-07: medido para 4KB/256KB/2MB.
+- [x] Medir LRU caseira versus `lru-cache`. - 2026-05-07: benchmark opcional adicionado em
+      `benchmarks/io-read-benchmark.mjs` (detecção dinâmica); microbench de `get` coletado em
+      `benchmarks/io-read-benchmark-results.with-lru.json`; - **2026-05-07 Corte A.13 ousado**:
+      `lru-cache@11` **promovido a dependência real**; `io-cache.js` refatorado para `LRUCache`;
+      cache L1 hot 58x mais rápido que cold (`0.008ms` p50 vs `0.681ms`).
+- [x] Só então alterar `package.json` — **feito**: `lru-cache` em `dependencies`.
 - [ ] Rodar gates:
   - `npm run test:copilot:unit`;
   - `npm run typecheck:strict:src.copilot`;
@@ -1395,16 +1445,226 @@ Validação associada:
 
 ## Dependências candidatas por decisão
 
-| Dependência           | Decisão atual       | Condição para entrada                             |
-| --------------------- | ------------------- | ------------------------------------------------- |
-| `lru-cache`           | Não adicionar ainda | Benchmark ou complexidade justificar L1 por bytes |
-| `stream-json`         | Candidata forte     | JSON/JSONL grande virar caso real de runtime      |
-| `fast-json-stringify` | Candidata moderada  | Respostas estáveis aparecerem como gargalo        |
-| `@parcel/watcher`     | Candidata futura    | Watchman/fs.watch falharem em portabilidade       |
-| `chokidar`            | Candidata futura    | Necessidade de watcher JS multiplataforma         |
-| `tinybench`           | Candidata dev       | Benchmarks JS virarem gate permanente             |
+| Dependência           | Decisão atual                          | Condição operacional                                                                |
+| --------------------- | -------------------------------------- | ----------------------------------------------------------------------------------- |
+| `lru-cache`           | **Promovida**                          | Já é L1 canônico; manter gates de hit/miss, TTL, max bytes e stale probe            |
+| `@babel/parser`       | **Promovida**                          | Parser simbólico JS/TS canônico; avaliar `@babel/traverse` só se traversal profundo |
+| `ignore`              | **Disponível, pendente de integração** | Usar no scanner A.17 para `.gitignore`/ignore files reais                           |
+| `p-limit`             | **Disponível, pendente de integração** | Usar no scanner/prefetch para concorrência explícita e observável                   |
+| `prom-client`         | **Disponível, pendente de integração** | Promover métricas formais de I/O/cache/index quando nomes/SLOs estabilizarem        |
+| `xxhash-wasm`         | **Disponível, pendente de integração** | Fingerprint rápido para índice incremental; benchmark antes de tornar obrigatório   |
+| `stream-json`         | Candidata forte                        | JSON/JSONL > 1MB ou payload streaming virar caso real medido                        |
+| `fast-json-stringify` | Candidata moderada                     | Só entra se serialização de respostas estáveis aparecer como gargalo em benchmark   |
+| `@parcel/watcher`     | Candidata futura                       | Entra apenas se `fsPromises.watch`/Node puro falhar em portabilidade/latência       |
+| `chokidar`            | Candidata futura                       | Alternativa JS apenas se watcher nativo + `@parcel/watcher` não atenderem           |
+| `tinybench`           | Promovida de fato em benchmark         | Consolidar script/gate CI se benchmarks virarem obrigatórios                        |
+
+## Atualização 2026-05-07 - Corte A.9 aplicado — auto-briefing contextual
+
+Diagnóstico tratado:
+
+- O guidance de falha em `/fs` era estático (`FS_FAILURE_GUIDANCE`), incapaz de adaptar
+  recomendações ao que acabou de acontecer (ex.: leitura falha vs escrita ok).
+- `TerminalOperationalGuidance` não tinha `severity` nem `nextCommand`, forçando o consumidor a
+  inferir prioridade e próxima ação de forma manual.
+
+Transformações aplicadas:
+
+- `src/copilot/terminal/auto-briefing.js`:
+  - Adicionado campo `severity: 'info' | 'warn' | 'error'` ao typedef `TerminalOperationalGuidance`.
+  - Adicionado campo `nextCommand: string | null` — sugestão de próxima ação operacional.
+  - Nova função exportada `buildActivityAwareGuidance({ mode, warnings?, lastIoEntry? })`: lê o
+    último evento de I/O real e deriva `nextCommand` contextual (falha de leitura →
+    `/status → /fs read <target>`; escrita ok → `/fs read <target>`; ausência de histórico →
+    `/activity 5 → /fs list → /status`).
+  - Função interna `deriveNextCommand(mode, lastEntry)` encapsula toda a lógica de decisão.
+  - `buildTerminalOperationalGuidance` passa a retornar `severity` e `nextCommand` em todos os
+    modos.
+  - `buildFailureRecoveryLines` emite linha `Próximo: <cmd>` quando `guidance.nextCommand` existe.
+
+- `src/copilot/terminal/commands/fs.js`:
+  - Removida constante estática `FS_FAILURE_GUIDANCE`.
+  - Adicionada função `buildFsDynamicGuidance()` que lê último evento via
+    `readTerminalIoActivityProjection(1)` e delega a `buildActivityAwareGuidance`.
+  - `printFailure` e bloco `catch` de `cmdFs` agora mostram `guidance.nextCommand` com cor amarela
+    antes das linhas de recovery.
+
+- `src/copilot/terminal/commands/sdk.js`:
+  - `renderCommandFailureGuidance` atualizado para usar `buildActivityAwareGuidance` com o
+    `lastIoEntry` mais recente.
+  - `guidance.nextCommand` exibido antes das linhas de recovery.
+
+Testes adicionados:
+
+- `tests/unit/copilot/terminal/test_auto_briefing.spec.js`: 9 novos casos cobrindo: severity
+  info/warn/error por modo e warnings, nextCommand por modo, `buildActivityAwareGuidance` sem e com
+  lastIoEntry, escalonamento por warnings, degraded sempre severity error, e linha `Próximo:` em
+  buildFailureRecoveryLines.
+
+Validação:
+
+- Todos os 12 testes de test_auto_briefing.spec.js passando.
+- Zero erros de typecheck nos arquivos modificados.
+
+---
+
+## Atualização 2026-05-07 - Corte A.10 aplicado — URL policy maxRedirects + redirect manual
+
+Diagnóstico tratado:
+
+- `web_fetch_local` usava `fetch(url, { redirect: 'follow' })` sem limite de hops. Apenas a URL
+  final era verificada por `evaluateIoUrlPolicy`, deixando URLs intermediárias sem validação SSRF e
+  sem controle de profundidade de cadeia de redirects.
+- `evaluateIoUrlPolicy` não retornava `maxRedirects`, tornando a política de redirects implícita e
+  não transportável entre camadas.
+
+Transformações aplicadas:
+
+- `src/copilot/core/io-policy.js`:
+  - Exportada constante `IO_URL_MAX_REDIRECTS = 5` como valor canônico da política.
+  - `evaluateIoUrlPolicy` aceita parâmetro opcional `maxRedirects` e retorna `maxRedirects` no
+    resultado `ok: true` (default: `IO_URL_MAX_REDIRECTS`; `0` desabilita redirects).
+
+- `src/copilot/core/index.js`:
+  - `IO_URL_MAX_REDIRECTS` adicionado ao barrel do core para importação via `#copilot/core`.
+
+- `src/copilot/tools/web-tools.js`:
+  - Nova função interna `fetchWithRedirectPolicy(startUrl, maxRedirects)`: segue cada redirect
+    individualmente com `redirect: 'manual'`, valida cada URL intermediária com
+    `evaluateIoUrlPolicy` e lança erro ao exceder o limite.
+  - `web_fetch_local` substitui `redirect: 'follow'` por `fetchWithRedirectPolicy`.
+  - `redirectCount` e `maxRedirects` incluídos no retorno e no payload `buildIoMeta`.
+
+Testes adicionados:
+
+- `tests/unit/copilot/core/test_io_policy.spec.js`: 5 novos casos: `IO_URL_MAX_REDIRECTS` é número
+  positivo, resultado ok inclui `maxRedirects` canônico, aceita `maxRedirects` personalizado, aceita
+  `maxRedirects=0`, resultado blocked não expõe `maxRedirects`.
+
+Validação:
+
+- 29/29 testes passando (17 em test_io_policy + 12 em test_auto_briefing).
+- Zero erros de typecheck em io-policy.js, web-tools.js e core/index.js.
+
+---
+
+## Atualização 2026-05-07 - Corte A.15 — Persistência SQLite do trace-store de convergência
+
+Diagnóstico tratado:
+
+- O `convergence-trace-store.js` operava exclusivamente com um ring-buffer in-memory
+  (`maxTraces=500`). Após restart ou rotação do buffer, eventos históricos de convergência SDK↔FS
+  eram perdidos.
+- O backlog pós A.11 registrava explicitamente: "Persistir/agrupar eventos por `traceId` além dos
+  counters agregados. Resolvido em memória no corte A.12.1; persistência em disco/SQLite segue
+  pendente."
+
+Transformações aplicadas:
+
+- `src/copilot/db/migrations.js`:
+  - Migração v8 `create_convergence_trace_events` cria tabela `copilot_convergence_trace_events` com
+    campos: `trace_id`, `operation`, `phase`, `direction`, `status`, `bytes_read`, `bytes_written`,
+    `duration_ms`, `error_msg`, `created_at_ms`.
+  - Índices em `trace_id`, `created_at_ms DESC` e `(operation, status)` para queries analíticas.
+
+- `src/copilot/observability/convergence-trace-store.js`:
+  - Módulo-level `_persistenceDb` — nulo por padrão; ativado por
+    `initConvergenceTracePersistence(db)`.
+  - `initConvergenceTracePersistence(db)`: idempotente, conecta SQLite como L2 durável.
+  - `persistEvent(traceId, event)`: persiste cada evento no SQLite após gravação no ring-buffer L1.
+    Falha de escrita é não-fatal — ring-buffer continua sem interrupção.
+  - `getPersistedSnapshot(options)`: query histórica no SQLite com filtros `traceId`, `operation`,
+    `status`, `offsetMs` e `limit`. Retorna `null` quando persistência não está inicializada.
+  - `recordMetric()` chama `persistEvent` após cada evento gravado no ring-buffer.
+
+- `src/copilot/observability/bootstrap.js`:
+  - `bootstrapConvergencePersistence(db)`: novo export que delega para
+    `initConvergenceTracePersistence`.
+  - `bootstrapObservability` fase `observability` agora chama
+    `bootstrapConvergencePersistence(getCopilotDb())` via import dinâmico. Falha SQLite não bloqueia
+    o boot.
+
+- `src/copilot/observability/index.js`:
+  - Novos exports: `initConvergenceTracePersistence`, `getPersistedSnapshot`,
+    `bootstrapConvergencePersistence`.
+
+Testes adicionados:
+
+- `tests/unit/copilot/observability/test_convergence_trace_store.spec.js`: 4 novos casos cobrindo:
+  null quando não inicializado, persistência ativada com banco em memória, filtro por operation, e
+  respeito ao `limit` com `total` correto.
+
+Validação:
+
+- 176/176 testes passando (suite completa de observabilidade + core policy + terminal briefing).
+- Zero erros de typecheck nos arquivos modificados.
+
+Impacto arquitetural:
+
+1. Ring-buffer in-memory permanece L1 — acesso rápido para queries recentes e aggregation.
+2. SQLite é L2 durável — eventos sobrevivem a restarts; histórico consultável por `traceId`
+   ilimitado.
+3. Falha de persistência é não-fatal: degradação silenciosa sem interromper o fluxo crítico.
+4. `getPersistedSnapshot` complementa `getSnapshot` para queries analíticas além do janela do
+   ring-buffer.
+
+---
 
 ## Critério de pronto final
+
+---
+
+## Atualização 2026-05-07 — Corte R5 — Cache L1 para io-engine
+
+### Contexto
+
+R5 implementa o cache L1 em memória para todas as operações de leitura do `io-engine`, com
+invalidação automática em qualquer escrita destrutiva. Objetivo: eliminar releituras redundantes de
+arquivos que não mudaram, reduzindo latência e pressão no fs do Node.js.
+
+### Arquivos criados/modificados
+
+- **`src/copilot/infra/io-cache.js`** (NOVO — ~240 linhas):
+  - Singleton `getIoL1Cache()` com `Map` próprio para suportar iteração de prefixo na invalidação.
+  - TTL por entrada: `IO_L1_CACHE_TTL_MS` (default 60s via env). LRU eviction com
+    `IO_L1_CACHE_MAX_ENTRIES` (default 2000).
+  - Chaves: `{normalized}::read:bytes`, `{normalized}::read:text`,
+    `{normalized}::read:text:{s}:{e}`.
+  - `invalidate(filePath)`: itera `Map.entries()` removendo todas as chaves com prefixo
+    `{normalized}::`.
+  - Stats: `{ hits, misses, evictions, invalidations, size, bytesStored, ttlMs }`.
+  - `resetIoL1CacheForTest()`: destrói singleton para isolamento de testes.
+
+- **`src/copilot/infra/io-engine.js`** (MODIFICADO):
+  - `readBytes`: hit retorna buffer com `cache: 'l1-hit'`; miss armazena e retorna
+    `cache: 'l1-miss'`.
+  - `readText`: armazena texto COMPLETO no cache; hit reaplica slice. Ranges distintos compartilham
+    a mesma entrada.
+  - `writeFileAtomic`, `appendTextLocked`, `deleteFileLocked`, `patchTextLocked`:
+    `invalidateIoCachePath(filePath)` antes do `publishAndReturn`.
+  - `copyFileLocked`: invalida `destination`. `moveFileLocked`: invalida `source` e `destination`.
+
+- **`src/copilot/infra/index.js`**: novos exports `getIoCacheStats`, `getIoL1Cache`,
+  `invalidateIoCachePath`, `makeBytesKey`, `makeTextKey`, `normalizeIoCacheKey`,
+  `resetIoL1CacheForTest`.
+
+### Testes adicionados
+
+- `tests/unit/copilot/infra/test_io_cache.spec.js` (NOVO — 15 testes): normalizeIoCacheKey,
+  makeBytesKey/makeTextKey, hit/miss/stats, invalidação isolada, getIoCacheStats, TTL/LRU
+  accounting.
+
+### Validação
+
+- 26/26 testes passando em `tests/unit/copilot/infra/` (15 novos + 11 existentes).
+
+### Invariantes de cache
+
+1. Apenas leituras populam o cache — operações destrutivas nunca armazenam.
+2. Toda escrita invalida o cache do path afetado antes de completar.
+3. `moveFileLocked` invalida source E destination.
+4. TTL e LRU são configuráveis por env sem code change.
+5. Falha de cache nunca propaga exceção para o caller.
 
 - `src/copilot` tem um contrato único de I/O.
 - File-tools são adapters, não engines.
@@ -1415,6 +1675,328 @@ Validação associada:
 - RAG permanece busca semântica complementar.
 - Observabilidade mostra latência, engine, cache, lock, truncamento e erro.
 - Dockerfile e dependências refletem evidência, não intenção.
+
+## Atualização 2026-05-07 — Corte A.13 — Performance orientada por evidência
+
+Transformações aplicadas:
+
+- Benchmark formal de leitura criado em `benchmarks/io-read-benchmark.mjs` cobrindo:
+  - `fs.readFile` vs `stream.ReadStream`;
+  - `io-engine.readBytes` miss (cold) vs hit (warm);
+  - acesso direto ao L1 (`l1-cache.get`) com medição dedicada.
+- Resultados versionáveis persistidos em `benchmarks/io-read-benchmark-results.json`.
+- Documento de decisão arquitetural criado em `benchmarks/A13-io-performance-decisions.md`, com:
+  - gates quantitativos de adoção/rollback para R5;
+  - threshold operacional para stream;
+  - critérios de ativação para R6/R7;
+  - plano de paginação/stream para mirror em workspaces grandes.
+
+Resumo dos resultados (Node 24, devcontainer Debian 12):
+
+- `io-engine.readBytes` hit ficou entre ~350K e ~370K op/s;
+- speedup L1 vs `fs.readFile` entre **1452x** e **5773x**;
+- ratio hit/miss do `io-engine` entre **126x** e **408x**.
+
+Decisões consolidadas:
+
+1. **R5 adotado** com base em evidência quantitativa (ganho >100x em hit/miss).
+2. **Stream não promovido por padrão** para arquivos pequenos/médios; manter `readFile` default.
+3. **R6/R7 permanecem condicionais** a evidência de latência/frequência em produção.
+4. **R12 avançou para parcial** com gates iniciais já definidos e artefatos versionados.
+
+Backlog pós A.13:
+
+1. Benchmark comparativo da LRU caseira versus `lru-cache`.
+2. Benchmark com `hyperfine` para `rg`/scan frio-quente e base de decisão de FTS.
+3. Formalização de threshold `FileHandle/chunked read` para payloads >10MB.
+4. Fechar pendência de cache key com `size/mtime` no R5.
+
+## Atualização 2026-05-07 — Corte A.13.1 — Testes contínuos (hyperfine + LRU opcional)
+
+Transformações aplicadas:
+
+- `benchmarks/io-read-benchmark.mjs` passou a suportar `--out=<path>` para persistência versionável
+  dos resultados e comparação opcional com `lru-cache` via detecção dinâmica (sem dependência
+  obrigatória no projeto).
+- Nova rodada de benchmark `io-read` executada e persistida em:
+  - `benchmarks/io-read-benchmark-results.json`;
+  - `benchmarks/io-read-benchmark-results.with-lru.json`.
+- Benchmarks `hyperfine` adicionados para R12:
+  - `benchmarks/hyperfine-rg-a13.json` (`rg` em `src/copilot`);
+  - `benchmarks/hyperfine-scan-a13.json` (`scanDirectory` recursivo com `showHidden` off/on).
+
+Resultados consolidados da rodada contínua:
+
+- `rg` ficou na faixa de ~9–10ms para padrões testados em `src/copilot` (bem abaixo do gatilho atual
+  de adoção de FTS para R6).
+- `scanDirectory` em `src/copilot` (depth=3) ficou em ~0.28s (`showHidden=false`) e ~0.36s
+  (`showHidden=true`), sem evidência de necessidade imediata de watcher no estado atual.
+- Microbench opcional de cache apontou `lru-cache.get` acima da LRU atual (Map) em lookup isolado;
+  decisão de dependência permanece condicionada ao benchmark de integração end-to-end (R5/R12), não
+  apenas microbench de `get`.
+
+Validação executada:
+
+- `node benchmarks/io-read-benchmark.mjs --out=benchmarks/io-read-benchmark-results.json`.
+- `npm exec --yes --package=lru-cache@11 -- node benchmarks/io-read-benchmark.mjs --out=benchmarks/io-read-benchmark-results.with-lru.json`.
+- `hyperfine --warmup 3 --runs 10 --export-json benchmarks/hyperfine-rg-a13.json ...`.
+- `hyperfine --warmup 3 --runs 10 --export-json benchmarks/hyperfine-scan-a13.json ...`.
+- `npm exec eslint benchmarks/io-read-benchmark.mjs`.
+- `npm run typecheck:strict:src.copilot`.
+
+Backlog incremental pós A.13.1:
+
+1. Medir benchmark de integração de LRU (hit/miss/eviction/invalidation) antes de promover
+   `lru-cache` para dependência direta. **[CONCLUÍDO — Corte A.13 ousado, veja abaixo]**
+2. Adicionar benchmark `hyperfine` para cenário FTS real (quando schema R6 existir).
+3. Formalizar threshold de `FileHandle/chunked read` para arquivos >10MB em workload real.
+4. Fechar chave de cache com `mtime/size` para reduzir risco residual de stale em edge cases.
+
+---
+
+## Atualização 2026-05-07 — Corte A.13 ousado: LRU real + Babel parser + Session Scope LLM-B
+
+**Motivação**: A LLM-B precisa de sistema de I/O inteligente para declarar escopos de trabalho,
+pré-aquecer cache e navegar símbolos sem ler todos os arquivos no contexto.
+
+### Módulos entregues
+
+| Módulo                                  | Status        | Descrição                                                                        |
+| --------------------------------------- | ------------- | -------------------------------------------------------------------------------- |
+| `src/copilot/infra/io-cache.js`         | ✅ Refatorado | `LRUCache` do lru-cache@11; `maxSize` em bytes; TTL; evictions contadas          |
+| `src/copilot/infra/io-prefetch.js`      | ✅ Novo       | Prefetch paralelo com concorrência; session scopes nomeados; `warmFromDirectory` |
+| `src/copilot/infra/io-parser.js`        | ✅ Novo       | @babel/parser; extrai símbolos/imports/exports JS/TS; JSON schema; MD outline    |
+| `src/copilot/infra/io-session-scope.js` | ✅ Novo       | API LLM-B: `declareScope`, `findSymbol`, `getScopeContext`, `refreshScope`       |
+| `src/copilot/infra/index.js`            | ✅ Atualizado | Barrel exports com 20+ novos símbolos                                            |
+| `benchmarks/ci-gate.mjs`                | ✅ Novo       | Gate de regressão CI/CD com thresholds configuráveis (padrão 20%)                |
+
+### Testes
+
+| Suite                           | Testes    | Status |
+| ------------------------------- | --------- | ------ |
+| `test_io_cache.spec.js`         | 15/15     | ✅     |
+| `test_io_parser.spec.js`        | 15/15     | ✅     |
+| `test_io_prefetch.spec.js`      | 9/9       | ✅     |
+| `test_io_session_scope.spec.js` | 11/11     | ✅     |
+| `test_io_engine.spec.js`        | 11/11     | ✅     |
+| **Total**                       | **61/61** | ✅     |
+
+### Benchmarks CI Gate (iterações=50)
+
+| Métrica                      | p50     | p95     | ops/s     |
+| ---------------------------- | ------- | ------- | --------- |
+| readBytes:small:cold         | 0.681ms | 1.748ms | 1.164     |
+| readBytes:small:hot (L1 hit) | 0.008ms | 0.050ms | 67.517    |
+| readText:medium:hot          | 0.125ms | 0.310ms | 3.921     |
+| parseSymbols:small:hot       | 0.001ms | 0.001ms | 1.048.130 |
+
+**L1 cache hit: 58x mais rápido que cold read.** **Parser LRU hit: ~1M ops/s (sub-microsegundo).**
+
+### Próximos passos recomendados
+
+1. Fechar chave de cache com `mtime/size` (reduz stale em edge cases de escrita concorrente).
+2. Medir JSON.parse vs `stream-json` para payloads >1MB (R8 passo 2).
+3. Implementar watcher strategy (R7) para invalidação automática de L1 + parser cache via
+   `fs.watch`.
+4. Implementar L2 cache (SQLite ou memória persistida) para símbolos entre restarts (R6).
+5. Integrar `io-session-scope` com LLM-B API endpoint para declaração via HTTP.
+
+## Atualização 2026-05-07 — Corte A.13.2 — benchmark contínuo e robustez de evidência
+
+Transformações aplicadas:
+
+- `benchmarks/io-read-benchmark.mjs` recebeu cenário adicional `map.get baseline [size]` para
+  comparação explícita entre:
+  - lookup do L1 canônico (`l1-cache.get`),
+  - baseline de `Map#get` puro,
+  - `lru-cache.get` em instância sintética.
+- Nova rodada formal de benchmark Node executada com saída versionada em
+  `benchmarks/io-read-benchmark-results.json`.
+- Nova rodada `hyperfine` executada para R12:
+  - `benchmarks/hyperfine-rg-a13.json`;
+  - `benchmarks/hyperfine-scan-a13.json`.
+
+Resultados consolidados da rodada:
+
+- `l1-cache.get` entre ~7.4M e ~8.3M op/s;
+- `map.get baseline` entre ~13.7M e ~14.8M op/s;
+- `lru-cache.get` sintético entre ~17.0M e ~17.7M op/s;
+- `rg "io-engine" src/copilot/` em ~11ms mean;
+- `scanDirectory` depth=3 em ~270ms mean (`showHidden` off/on).
+
+Leitura executiva:
+
+1. O hot path de cache permanece em ordem de milhões de op/s; não há sinal de gargalo crítico no
+   lookup do L1 canônico.
+2. R6 segue **não liberado por latência** nesta rodada (busca textual `rg` muito abaixo do gatilho
+   atual).
+3. R7 segue **não liberado por custo de scan** nesta rodada; watcher continua condicionado à
+   frequência de re-scan por path.
+4. A decisão de arquitetura permanece evidência-first, sem ativação prematura de complexidade.
+
+## Atualização 2026-05-07 — Corte A.13.3 — preparação L2/L3 + integração de tools para LLM-B
+
+Transformações aplicadas:
+
+- Fundação de cache L2 (SQLite) adicionada de forma **gradual e feature-flagged**:
+  - `src/copilot/infra/io-cache-l2-sqlite.js` com TTL, `maxEntries`, invalidação por path e stats;
+  - `src/copilot/infra/io-cache-l2-registry.js` com ativação por `IO_L2_CACHE_ENABLED=1`;
+  - migração DB v9 `create_io_cache_l2_entries` em `src/copilot/db/migrations.js`.
+- `io-engine` recebeu preparação para tiered cache sem quebrar fluxo atual:
+  - read-through opcional em L2 após miss de L1;
+  - write-through para L2 em leituras bem-sucedidas quando L2 ativo;
+  - invalidação destrutiva unificada L1+L2 (`invalidateIoCacheTiers`).
+- Planejamento canônico de tiers criado em `src/copilot/infra/io-cache-tiering.js`:
+  - plano `l1/l2/l3` com recomendações por contexto;
+  - agregação de stats cross-tier para observabilidade futura.
+- Integração de tools para continuidade operacional da LLM-B:
+  - novo módulo `src/copilot/tools/file/scope-tools.js` com:
+    - `workspace_scope_declare`;
+    - `workspace_scope_refresh`;
+    - `workspace_scope_context`;
+    - `workspace_scope_find_symbol`.
+  - `src/copilot/tools/file/index.js` atualizado para publicar e registrar essas tools no conjunto
+    canônico de file-tools.
+
+Validação incremental prevista/executada no corte:
+
+- testes unitários de `io-cache-l2-sqlite`, `io-cache-tiering`, `scope-tools`;
+- reteste de `io-engine` e `io-cache` para preservar contrato de cache hit/miss;
+- `npm run typecheck:strict:src.copilot` após integração.
+
+Backlog incremental pós A.13.3:
+
+1. Expor stats L2/L3 no `/observability/health` em formato canônico por tier.
+2. Rodar soak test com `IO_L2_CACHE_ENABLED=1` e medir hit-ratio real por workspace.
+3. Definir contrato de invalidação distribuída para L3 apenas após evidência de necessidade.
+4. Integrar sugestões automáticas de `/workspace_scope_context` no guidance da LLM-B
+   (auto-briefing).
+
+## Atualização 2026-05-07 — Revisão documental profunda AS-IS/TO-BE/roadmap
+
+Objetivo deste corte documental:
+
+- estabilizar a visão corrente antes de novas transformações amplas;
+- distinguir o que já existe, o que está parcial e o que ainda é alvo ideal;
+- explicitar a ordem canônica para leitura, escrita, busca, scope, parsing, indexação, cache
+  L1/L2/L3, buffer, watcher, observability e UX da LLM-B.
+
+Diagnóstico consolidado:
+
+1. O núcleo de I/O local já é real: `io-engine`, `io-policy`, `io-locks`, `io-scanner`,
+   `io-observability`, file-tools e Session FS convergem para uma superfície comum.
+2. O cache L1 deixou de ser intenção e virou componente técnico relevante: `lru-cache@11`, max
+   bytes, TTL, stale probe por `mtime/size`, hooks de invalidação e integração com
+   `readBytes/readText`.
+3. O L2 SQLite existe como cache feature-flagged (`IO_L2_CACHE_ENABLED=1`), mas ainda não é índice
+   textual/simbólico nem surface de observability completa.
+4. O parser Babel e o scope LLM-B existem, mas ainda precisam endurecer contratos: limites devem ser
+   informativos, `scope-tools` precisam abandonar tetos Zod bloqueantes, e o scope precisa aparecer
+   em terminal/HTTP/auto-briefing.
+5. O scanner ainda é a peça mais importante para fechar R6/R7/R17: falta `.gitignore`, concorrência,
+   fingerprints, freshness e watcher strategy.
+6. A busca ainda é `rg`/`grep` sem índice de arquivos. Isso é aceitável pelos benchmarks atuais, mas
+   não é o estado ideal para workspaces grandes e sessões longas.
+7. A UX live do terminal já mostra tool/I/O real, mas ainda não agrupa por `traceId`/`toolCallId`
+   nem mostra saúde de cache/index/scope no mesmo plano.
+
+Documentos gerados neste corte:
+
+- `2026-05-07-AS-IS-IO-READ-WRITE-SCOPE-CACHE.md`;
+- `2026-05-07-ARQUITETURA-ALVO-IO-INTELIGENTE-L1-L2-L3.md`;
+- `2026-05-07-ROADMAP-IO-INTELIGENTE-COMPLETO.md`.
+
+Decisão executiva:
+
+- próxima implementação deve começar por A.16, não por FTS/watcher diretamente;
+- A.16 deve limpar contratos existentes, remover limites bloqueantes restantes, expor health/stats e
+  rodar gates;
+- apenas depois o scanner 2.0 e o índice L2/FTS devem ser promovidos.
+
+## Atualização 2026-05-07 — Corte A.16/A.17/A.21 — scope visível, scanner 2.0 parcial e invalidação automática
+
+Transformações aplicadas:
+
+- A.16 avançou para estado operacional:
+  - `scope-tools` deixou de impor tetos bloqueantes para `maxFiles`, `concurrency`, `include`,
+    `exclude` e `modifiedPaths`;
+  - limites passaram a ser `advisoryLimits` informativos;
+  - `workspace_scope_declare` aplica `include`, `exclude` e `recursive` de fato;
+  - `io-health` consolida L1/L2/L3, parser e scopes ativos;
+  - `/status`, `/live` e `/observability/health` mostram saúde básica de cache/scope/parser.
+- A.17 recebeu scanner 2.0 parcial:
+  - `ignore` + `.gitignore` sob opção explícita;
+  - `p-limit` para concorrência de `lstat`;
+  - filtros `include/exclude`;
+  - fingerprint inicial `mtimeMs + size`;
+  - `maxFiles` permanece advisory e não corta escopo.
+- A.21 recebeu UX terminal e simetria de tools:
+  - novo `/scope list|declare|context|find|refresh|close`;
+  - `/help` e banner do REPL atualizados;
+  - tools novas `workspace_scope_list` e `workspace_scope_close`;
+  - invalidação automática: escrita/invalidação pela `io-engine` remove símbolo stale dos escopos
+    afetados e marca `invalidated`, permitindo `refreshScope` reindexar a versão nova.
+- A.24 recebeu correção oportunista de segurança:
+  - `web_fetch_local` passou a seguir redirects manualmente com `redirect: 'manual'`;
+  - cada `Location` intermediário é validado por `evaluateIoUrlPolicy`;
+  - `response.url` final também é validado, cobrindo runtimes/mocks que entregam URL final privada
+    mesmo sem status 3xx.
+
+Validação executada nesta rodada:
+
+- `npm run typecheck:strict:src.copilot`;
+- `npx vitest run tests/unit/copilot/infra/test_io_engine.spec.js tests/unit/copilot/tools/file/test_read_tools.spec.js tests/unit/copilot/infra/test_io_prefetch.spec.js tests/unit/copilot/infra/test_io_session_scope.spec.js tests/unit/copilot/tools/file/test_scope_tools.spec.js tests/unit/copilot/terminal/test_commands_session.spec.js tests/unit/copilot/test_observability_sdk_fs_routing.spec.js --reporter=dot`;
+- `npx vitest run tests/unit/copilot/terminal/test_commands_scope.spec.js tests/unit/copilot/terminal/test_commands_session.spec.js tests/unit/copilot/infra/test_io_engine.spec.js tests/unit/copilot/infra/test_io_session_scope.spec.js tests/unit/copilot/infra/test_io_prefetch.spec.js tests/unit/copilot/tools/file/test_scope_tools.spec.js --reporter=dot`;
+- `npx vitest run tests/unit/copilot/tools/file/test_scope_tools.spec.js tests/unit/copilot/terminal/test_commands_scope.spec.js tests/unit/copilot/infra/test_io_session_scope.spec.js --reporter=dot`.
+- `npm run test:copilot:unit`.
+- `npm run lint`.
+- `npm run format:check`.
+
+Pendências remanescentes:
+
+1. A.17: completar `realpath`/symlink, hash opcional e eventos `scan.start/progress/complete/error`.
+2. A.18: criar canais próprios `copilot.io.cache`, `copilot.io.index`, `copilot.io.scope` e métricas
+   `prom-client`.
+3. A.19/A.20: separar schema de cache blob versus índice e decidir FTS por benchmark.
+4. A.21: persistir símbolos em L2 e integrar recomendações de scope no auto-briefing.
+5. A.22/A.23: formalizar grandes arquivos/chunking e watcher strategy.
+
+## Atualização 2026-05-07 — Corte A.20/A.21 — índice L2 local com metadados, FTS e símbolos
+
+Transformações aplicadas:
+
+- Separação explícita de funções:
+  - L1 = cache quente em memória do processo;
+  - L2 cache blob = payloads persistidos para reduzir cold reads;
+  - L2 índice = metadados pesquisáveis, FTS textual, símbolos Babel e imports;
+  - L3 = camada futura para compartilhamento/distribuição multi-runtime.
+- Novo índice persistente:
+  - `src/copilot/infra/io-index-sqlite.js`;
+  - `src/copilot/infra/io-index-registry.js`;
+  - migration v10 `create_io_index_l2`.
+- Metadados persistidos por arquivo:
+  - workspace root, path relativo, nome, extensão, content kind;
+  - size/mtime/ctime, SHA-256, linhas, contagem de símbolos/imports;
+  - status, parse error, timestamps e `metadata_json` com fingerprint/trace.
+- Superfícies canônicas novas:
+  - infra: `buildIoIndexForDirectory`, `getIoIndexStats`, `searchIoIndex`, `findIoIndexSymbol`,
+    `invalidateIoIndexPath`;
+  - tools: `workspace_index_build`, `workspace_index_status`, `workspace_index_search`,
+    `workspace_index_find_symbol`.
+- Integração automática:
+  - `workspace_scope_declare`/`declareScope` em diretório constroem índice por padrão
+    (`indexMode: auto`);
+  - hooks de invalidação da `io-engine` removem índice stale por path.
+- Observability:
+  - `/observability/health`, `/status` e `/live` passam a expor disponibilidade/contagem do índice.
+
+Pendências remanescentes:
+
+1. Comparação incremental por fingerprint antes de reindexar.
+2. Chunks persistentes para arquivos grandes e busca paginável.
+3. Engine selector de `search_in_files`: FTS quando fresco, `rg` quando regex/fallback.
+4. Benchmarks FTS vs `rg` em `src/copilot` e workloads grandes.
+5. Canais dedicados `copilot.io.index` e métricas `prom-client`.
 
 ## Referências consultadas
 
