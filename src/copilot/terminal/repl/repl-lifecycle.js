@@ -15,9 +15,16 @@ import { toError } from '#copilot/core';
 import { log } from '#copilot/observability';
 import readline from 'node:readline';
 import { extractAtReferences } from '../../presentation/runtime-file-context.js';
-import { addAttachment, setRl } from '../../presentation/runtime-ui-state-store.js';
+import { addAttachment, getBusy, setRl } from '../../presentation/runtime-ui-state-store.js';
 import { buildTerminalOperationalGuidance } from '../auto-briefing.js';
-import { buildUserPrompt, println, resetStatusRowState, sendTurn } from '../dialog/index.js';
+import {
+    buildUserPrompt,
+    buildWaitingPrompt,
+    getTurnQueueDepth,
+    println,
+    resetStatusRowState,
+    sendTurn,
+} from '../dialog/index.js';
 import { readTerminalStatusProjection } from '../frontend/index.js';
 import { readTerminalDisplayState, resolveTerminalBootDisplayPreset } from '../state/display-policy.js';
 import { tryAnswerTerminalPendingQuestionInput } from '../state/pending-question-answer.js';
@@ -25,6 +32,11 @@ import { setupTerminalLiveStatusLine } from './live-status-line.js';
 import { buildTerminalReplBanner } from './repl-banner.js';
 import { parseTerminalReplCommand } from './repl-command-parser.js';
 import { CMD_ROUTES, dispatchCmd, isReadlineOpen } from './repl-command-router.js';
+import {
+    formatTerminalQueuedTurnNotice,
+    isTerminalEscapeCommand,
+    isTerminalImmediateCommand,
+} from './repl-input-routing.js';
 import { setupAgentListeners } from './repl-listeners.js';
 import { createTerminalMultilineInputState } from './repl-multiline.js';
 
@@ -117,6 +129,64 @@ export async function runReplLifecycle(injectServer, { injectPort, onReady }) {
     let lineQueue = Promise.resolve();
 
     /**
+     * @returns {void}
+     */
+    function refreshPrompt() {
+        if (!isReadlineOpen(rl)) return;
+        rl.setPrompt(getBusy() || getTurnQueueDepth() > 0 ? buildWaitingPrompt() : buildUserPrompt());
+        rl.prompt();
+    }
+
+    /**
+     * @param {ReturnType<typeof tryAnswerTerminalPendingQuestionInput>} pendingAnswer
+     * @returns {void}
+     */
+    function printPendingAnswerResult(pendingAnswer) {
+        println(
+            pendingAnswer.ok
+                ? `\x1b[90m  [answer] Resposta enviada para pergunta pendente (${pendingAnswer.runtimeId}).\x1b[0m`
+                : `\x1b[31m  [answer] Falha ao responder pergunta pendente (${pendingAnswer.runtimeId}).\x1b[0m`,
+        );
+    }
+
+    /**
+     * @param {ReturnType<typeof parseTerminalReplCommand>} command
+     * @returns {void}
+     */
+    function dispatchImmediateCommand(command) {
+        if (!command) return;
+        void dispatchCmd(command.command, command.arg, command.rest, rl, injectServer, cleanup)
+            .catch((e) => {
+                log('ERROR', `[TerminalServer] Comando imediato falhou: ${toError(e).message}`);
+            })
+            .finally(() => {
+                refreshPrompt();
+            });
+    }
+
+    /**
+     * @param {string} finalMessage
+     * @returns {void}
+     */
+    function queueUserTurn(finalMessage) {
+        const queuedBefore = getTurnQueueDepth();
+        const turn = sendTurn(finalMessage, 'user');
+        if (queuedBefore > 0 || getBusy()) {
+            println(formatTerminalQueuedTurnNotice({ queueDepth: queuedBefore + 1 }));
+        }
+        void turn
+            .then((reply) => {
+                if (reply === null) {
+                    println('\x1b[33m  [fila] Mensagem não produziu resposta. Veja /errors ou /status.\x1b[0m');
+                }
+            })
+            .catch((e) => {
+                log('ERROR', `[TerminalServer] Turno enfileirado falhou: ${toError(e).message}`);
+            });
+        refreshPrompt();
+    }
+
+    /**
      * @param {string} line
      * @returns {Promise<void>}
      */
@@ -153,15 +223,8 @@ export async function runReplLifecycle(injectServer, { injectPort, onReady }) {
 
         const pendingAnswer = tryAnswerTerminalPendingQuestionInput(trimmed);
         if (pendingAnswer.routed) {
-            println(
-                pendingAnswer.ok
-                    ? `\x1b[90m  [answer] Resposta enviada para pergunta pendente (${pendingAnswer.runtimeId}).\x1b[0m`
-                    : `\x1b[31m  [answer] Falha ao responder pergunta pendente (${pendingAnswer.runtimeId}).\x1b[0m`,
-            );
-            if (isReadlineOpen(rl)) {
-                rl.setPrompt(buildUserPrompt());
-                rl.prompt();
-            }
+            printPendingAnswerResult(pendingAnswer);
+            refreshPrompt();
             return;
         }
 
@@ -181,7 +244,7 @@ export async function runReplLifecycle(injectServer, { injectPort, onReady }) {
             return;
         }
 
-        await sendTurn(finalMessage, 'user');
+        queueUserTurn(finalMessage);
     }
 
     rl.on('line', (line) => {
@@ -190,13 +253,20 @@ export async function runReplLifecycle(injectServer, { injectPort, onReady }) {
         const trimmedForEscape = line.trim();
         if (trimmedForEscape.startsWith('/')) {
             const escapeCmd = parseTerminalReplCommand(trimmedForEscape, resolve);
-            const ESCAPE_COMMANDS = new Set(['quit', 'exit', 'restart', 'emergency-reset', 'ereset']);
-            if (escapeCmd && ESCAPE_COMMANDS.has(escapeCmd.command.toLowerCase())) {
-                void dispatchCmd(escapeCmd.command, escapeCmd.arg, escapeCmd.rest, rl, injectServer, cleanup).catch(
-                    (e) => {
-                        log('ERROR', `[TerminalServer] Escape command falhou: ${toError(e).message}`);
-                    },
-                );
+            if (escapeCmd && isTerminalEscapeCommand(escapeCmd.command)) {
+                dispatchImmediateCommand(escapeCmd);
+                return;
+            }
+            if (escapeCmd && isTerminalImmediateCommand(escapeCmd.command)) {
+                dispatchImmediateCommand(escapeCmd);
+                return;
+            }
+        }
+        if (!multilineInput.hasPending() && trimmedForEscape && !trimmedForEscape.startsWith('/')) {
+            const pendingAnswer = tryAnswerTerminalPendingQuestionInput(trimmedForEscape);
+            if (pendingAnswer.routed) {
+                printPendingAnswerResult(pendingAnswer);
+                refreshPrompt();
                 return;
             }
         }

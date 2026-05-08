@@ -292,8 +292,13 @@ export function sendTurn(message, actor = 'user') {
         return Promise.resolve(null);
     }
 
+    const attachments = actor === 'user' ? getAttachmentQueue() : [];
+    if (attachments.length > 0) {
+        clearAttachments();
+    }
+
     _turnQueueDepth++;
-    const next = _sendTurnMutex.then(() => _executeTurn(message, actor)).catch(() => null);
+    const next = _sendTurnMutex.then(() => _executeTurn(message, actor, attachments)).catch(() => null);
     _sendTurnMutex = next.then(
         () => null,
         () => null,
@@ -312,9 +317,10 @@ export function sendTurn(message, actor = 'user') {
  *
  * @param {string} message
  * @param {string} actor
+ * @param {string[]} attachments
  * @returns {Promise<string | null>}
  */
-async function _executeTurn(message, actor) {
+async function _executeTurn(message, actor, attachments = []) {
     const t0 = Date.now();
     const runtimeState = readTerminalRuntimeState();
     const ctxState = runtimeState.contextWindow;
@@ -401,11 +407,9 @@ async function _executeTurn(message, actor) {
 
     let enrichedMessage = message;
 
-    const queue = getAttachmentQueue();
-    if (queue.length > 0) {
-        clearAttachments();
+    if (attachments.length > 0) {
         try {
-            const ctxs = await Promise.all(queue.map(readFileContext));
+            const ctxs = await Promise.all(attachments.map(readFileContext));
             enrichedMessage = embedMultiple(ctxs, enrichedMessage);
             println(`\x1b[90m  📎 ${ctxs.length} arquivo(s) embutido(s): ${ctxs.map((c) => c.path).join(', ')}\x1b[0m`);
         } catch (embedErr) {

@@ -447,7 +447,6 @@ describe('W114 — module layout governance: terminal root', () => {
         assert.equal(scorecard.byRisk['hotspot'], listTerminalModulesByRisk('hotspot').length);
         assert.deepEqual(scorecard.watch, [
             'events/io-activity-events.js',
-            'repl/repl-lifecycle.js',
             'state/activity-state.js',
             'stores/',
             'stores/alias-store.js',
@@ -463,6 +462,7 @@ describe('W114 — module layout governance: terminal root', () => {
             'index.js',
             'repl/',
             'repl/repl-command-router.js',
+            'repl/repl-lifecycle.js',
             'repl/repl.js',
             'state/',
             'state/display-policy.js',

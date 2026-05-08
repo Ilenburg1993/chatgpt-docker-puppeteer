@@ -18,13 +18,18 @@ import {
 
 /** @type {Promise<typeof import('./engine.js')> | null} */
 let _engineModulePromise = null;
+/** @type {typeof import('./engine.js') | null} */
+let _engineModule = null;
 
 /**
  * @returns {Promise<typeof import('./engine.js')>}
  */
 function loadEngineModule() {
     if (_engineModulePromise === null) {
-        _engineModulePromise = import('./engine.js');
+        _engineModulePromise = import('./engine.js').then((mod) => {
+            _engineModule = mod;
+            return mod;
+        });
     }
     return _engineModulePromise;
 }
@@ -53,7 +58,7 @@ export async function sendTurn(message, actor = 'user') {
  * @returns {number}
  */
 export function getTurnQueueDepth() {
-    return 0;
+    return _engineModule?.getTurnQueueDepth() ?? 0;
 }
 
 /**

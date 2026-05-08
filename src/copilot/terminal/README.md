@@ -39,6 +39,7 @@ também declara `risk` e scorecard para orientar a ordem de decomposição.
 | `presentation/runtime-ui-state-store.js` | estado de UI compartilhado usado pelo terminal e outras bordas             |
 | `repl/repl-banner.js`                    | banner operacional do REPL e lista compacta de comandos/endpoints          |
 | `repl/repl-command-parser.js`            | parser puro de comandos slash e aliases resolvidos                         |
+| `repl/repl-input-routing.js`             | policy de comandos imediatos e fila durante input concorrente              |
 | `repl/repl-listeners.js`                 | tradução de eventos do agente/SDK para UX local                            |
 | `repl/repl-multiline.js`                 | estado de input multiline por continuação com barra invertida              |
 | `repl/live-status-line.js`               | linha viva permanente com heartbeat, modelo, esforço e atividade atual     |
