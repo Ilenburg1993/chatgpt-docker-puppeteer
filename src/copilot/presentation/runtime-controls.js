@@ -26,6 +26,7 @@ import {
     resumeRuntimeDialogLoop,
     saveRuntimeSnapshot,
     setRuntimeBackgroundCompactionThreshold,
+    steerRuntimeMessage,
     startRuntime,
     stopAgentDialogLoopAuthorized,
 } from '#copilot/agent';
@@ -124,6 +125,16 @@ export async function startAgentRuntime(runtimeId) {
  */
 export async function abortAgentRuntimeCurrentMessage(runtimeId) {
     await abortRuntimeCurrentMessage(getAgentRuntimeControlsTarget(runtimeId));
+}
+
+/**
+ * @param {string} prompt
+ * @param {string | null | undefined} [runtimeId]
+ * @param {{ signal?: AbortSignal }} [opts]
+ * @returns {Promise<string>}
+ */
+export async function steerAgentRuntimeMessage(prompt, runtimeId, opts = {}) {
+    return steerRuntimeMessage(getAgentRuntimeControlsTarget(runtimeId), prompt, opts);
 }
 
 /**

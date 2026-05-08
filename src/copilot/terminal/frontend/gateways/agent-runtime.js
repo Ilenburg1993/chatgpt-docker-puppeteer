@@ -26,6 +26,7 @@ import {
     saveAgentRuntimeSnapshot,
     setAgentRuntimePermissionMode,
     startAgentRuntime,
+    steerAgentRuntimeMessage,
     stopAgentRuntimeDialogLoopAuthorized,
 } from '../../../presentation/runtime-controls.js';
 import { readAgentRuntimeOverviewProjection } from '../../../presentation/runtime-overview.js';
@@ -135,6 +136,18 @@ export async function startTerminalAgentRuntime(runtimeId) {
  */
 export async function abortTerminalCurrentMessage(runtimeId) {
     await abortAgentRuntimeCurrentMessage(runtimeId);
+}
+
+/**
+ * Envia uma intervenção em modo SDK immediate para o turno ativo.
+ *
+ * @param {string} prompt
+ * @param {string | null | undefined} [runtimeId]
+ * @param {{ signal?: AbortSignal }} [opts]
+ * @returns {Promise<string>}
+ */
+export async function steerTerminalMessage(prompt, runtimeId, opts = {}) {
+    return steerAgentRuntimeMessage(prompt, runtimeId, opts);
 }
 
 /**

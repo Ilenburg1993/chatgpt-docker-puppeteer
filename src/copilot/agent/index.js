@@ -112,6 +112,7 @@ export {
     setRuntimeReasoningEffort,
     startAgentDialogLoop,
     startRuntime,
+    steerRuntimeMessage,
     stopAgentDialogLoopAuthorized,
     syncRuntimeSdkSessionOwnership,
     unregisterAgentRuntimeWebhook,

@@ -55,6 +55,17 @@ também declara `risk` e scorecard para orientar a ordem de decomposição.
 | `wiring/terminal-agent-wiring.js`        | SSE + wiring de alto nível entre terminal e agent                          |
 | `index.js` / `bootstrap.js`              | boot do terminal                                                           |
 
+## Intervenção Imediata
+
+O terminal diferencia três intenções de input concorrente:
+
+- mensagem normal: entra na fila canônica do dialog loop;
+- `/steer <msg>`: usa o modo SDK immediate para redirecionar o turno ativo;
+- `/interrupt <msg>`: aborta o turno SDK atual e enfileira a mensagem como substituta.
+
+`/abort` está disponível para abortar o turno ativo sem criar uma substituição. Esses comandos
+furam a fila local do REPL para evitar deadlocks em turnos longos ou degradados.
+
 ## Papéis da raiz
 
 | Papel              | Arquivos/diretórios                                                                            |

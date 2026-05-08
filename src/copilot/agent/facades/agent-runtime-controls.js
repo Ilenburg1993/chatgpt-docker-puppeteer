@@ -40,6 +40,7 @@ import { createSnapshot, listSnapshotsAsync, loadSnapshotAsync, saveSnapshotAsyn
  *     isDialogLoopPaused?: (() => boolean) | undefined;
  *     start?: (() => Promise<void>) | undefined;
  *     abortCurrentMessage?: (() => Promise<void>) | undefined;
+ *     steerMessage?: ((prompt: string, opts?: { signal?: AbortSignal }) => Promise<string>) | undefined;
  *     answerPendingQuestion?: ((answer: string) => boolean) | undefined;
  *     clearPendingQuestionShadow?: (() => void) | undefined;
  *     on?: ((event: string, handler: (...args: any[]) => void) => unknown) | undefined;
@@ -297,6 +298,17 @@ export async function startRuntime(runtime) {
 export async function abortRuntimeCurrentMessage(runtime) {
     if (typeof runtime.abortCurrentMessage !== 'function') throw new Error('AGENT_RUNTIME_ABORT_UNAVAILABLE');
     await runtime.abortCurrentMessage();
+}
+
+/**
+ * @param {AgentRuntimeControlsTarget} runtime
+ * @param {string} prompt
+ * @param {{ signal?: AbortSignal }} [opts]
+ * @returns {Promise<string>}
+ */
+export async function steerRuntimeMessage(runtime, prompt, opts = {}) {
+    if (typeof runtime.steerMessage !== 'function') throw new Error('AGENT_RUNTIME_STEER_UNAVAILABLE');
+    return runtime.steerMessage(prompt, opts);
 }
 
 /**

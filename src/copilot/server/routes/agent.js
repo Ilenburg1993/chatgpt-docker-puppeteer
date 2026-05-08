@@ -33,6 +33,11 @@ const injectBodyBaseSchema = z
         message: z.string().trim().min(1).optional(),
         content: z.string().trim().min(1).optional(),
         from: z.string().optional(),
+        mode: z
+            .enum(['queue', 'turn', 'dialog', 'steer', 'immediate', 'interrupt', 'abort-and-queue', 'abort_and_queue'])
+            .optional(),
+        delivery: z.string().optional(),
+        strategy: z.string().optional(),
         timeout: z.number().int().min(0).nullable().optional(),
         context_files: z.array(z.string().min(1)).optional(),
         attachments: z.array(z.object({}).passthrough()).optional(),

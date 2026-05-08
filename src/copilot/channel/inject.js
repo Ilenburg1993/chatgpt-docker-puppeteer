@@ -95,6 +95,9 @@ function _checkClientRateLimit() {
 /**
  * @typedef {Object} InjectOpts
  * @property {string} [from] - ator remetente (default: 'llm-a')
+ * @property {'queue' | 'turn' | 'dialog' | 'steer' | 'immediate' | 'interrupt' | 'abort-and-queue' | 'abort_and_queue'} [mode]
+ *   - modo de entrega: `queue` aguarda um turno; `steer` injeta no turno SDK ativo; `interrupt` aborta o turno ativo e
+ *     enfileira a nova mensagem como substituta.
  * @property {number | null} [timeoutMs] - timeout semântico do turno em ms (padrão adaptativo). Use 0/null para
  *   watchdog-only (sem timeout absoluto)
  * @property {number | null} [transportTimeoutMs] - timeout de transporte HTTP informativo; null desabilita bloqueio
@@ -110,6 +113,8 @@ function _checkClientRateLimit() {
  * @typedef {Object} InjectResult
  * @property {boolean} ok - true se a resposta foi obtida com sucesso
  * @property {string} reply - Resposta de LLM-B
+ * @property {'queue' | 'steer' | 'interrupt' | string | undefined} [mode] - modo efetivo retornado pela borda
+ * @property {string | undefined} [messageId] - id SDK retornado por modo `steer`
  * @property {number} durationMs - Duração da chamada em ms
  * @property {string} from - Ator remetente
  * @property {string | undefined} [traceId] - traceId retornado pela borda canônica do terminal
@@ -282,7 +287,13 @@ async function _doInjectToLlmB(message, opts) {
     const attachments = opts.attachments;
     const _startMs = Date.now();
 
-    const payload = { message, from, timeout: timeoutMs, ...(attachments !== undefined ? { attachments } : {}) };
+    const payload = {
+        message,
+        from,
+        timeout: timeoutMs,
+        ...(typeof opts.mode === 'string' ? { mode: opts.mode } : {}),
+        ...(attachments !== undefined ? { attachments } : {}),
+    };
     let statusCode;
     let body;
     try {
@@ -384,6 +395,8 @@ async function _doInjectToLlmB(message, opts) {
     return {
         ok: true,
         reply: /** @type {string} */ (parsed['reply'] ?? ''),
+        ...(typeof parsed['mode'] === 'string' ? { mode: parsed['mode'] } : {}),
+        ...(typeof parsed['messageId'] === 'string' ? { messageId: parsed['messageId'] } : {}),
         durationMs: /** @type {number} */ (parsed['durationMs'] ?? durationMs),
         from: /** @type {string} */ (parsed['from'] ?? from),
         ...(typeof parsed['traceId'] === 'string' ? { traceId: parsed['traceId'] } : {}),

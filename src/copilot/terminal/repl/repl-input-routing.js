@@ -11,6 +11,7 @@
 const TERMINAL_ESCAPE_COMMANDS = new Set(['quit', 'exit', 'restart', 'emergency-reset', 'ereset']);
 
 const TERMINAL_IMMEDIATE_COMMANDS = new Set([
+    'abort',
     'answer',
     'status',
     'now',
@@ -22,7 +23,9 @@ const TERMINAL_IMMEDIATE_COMMANDS = new Set([
     'tools',
     'menu',
     'elicitation',
+    'interrupt',
     'permission',
+    'steer',
 ]);
 
 /**

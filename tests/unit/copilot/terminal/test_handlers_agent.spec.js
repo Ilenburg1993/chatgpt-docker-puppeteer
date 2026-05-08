@@ -11,6 +11,10 @@ import { describe, expect, it, vi } from 'vitest';
 const mockStartAgentDialogLoop = vi.fn(async () => {});
 const mockSendAgentDialogTurn = vi.fn(async () => 'reply');
 const mockStopAgentDialogLoopAuthorized = vi.fn(async () => {});
+const mockAbortRuntimeCurrentMessage = vi.fn(async (/** @type {any} */ runtime) => runtime.abortCurrentMessage?.());
+const mockSteerRuntimeMessage = vi.fn(async (/** @type {any} */ runtime, /** @type {string} */ prompt) => {
+    return runtime.steerMessage?.(prompt) ?? 'msg-steer';
+});
 
 const defaultRuntime = /** @type {any} */ ({
     dialogLoopActive: false,
@@ -20,6 +24,8 @@ const defaultRuntime = /** @type {any} */ ({
     sessionId: 'sess-default',
     pauseDialogLoop: vi.fn(async () => {}),
     resumeDialogLoop: vi.fn(async () => {}),
+    abortCurrentMessage: vi.fn(async () => {}),
+    steerMessage: vi.fn(async (/** @type {string} */ _prompt) => 'msg-default-steer'),
     pingDialogWatchdog: vi.fn(),
     getStatusSnapshot: () => ({
         status: 'idle',
@@ -50,6 +56,8 @@ const altRuntime = /** @type {any} */ ({
     sessionId: 'sess-alt',
     pauseDialogLoop: vi.fn(async () => {}),
     resumeDialogLoop: vi.fn(async () => {}),
+    abortCurrentMessage: vi.fn(async () => {}),
+    steerMessage: vi.fn(async (/** @type {string} */ _prompt) => 'msg-alt-steer'),
     pingDialogWatchdog: vi.fn(),
     getStatusSnapshot: () => ({
         status: 'processing',
@@ -118,6 +126,8 @@ vi.mock('#copilot/agent', () => ({
         return 'retry';
     },
     readRuntimeControlState: readMockRuntimeControlState,
+    abortRuntimeCurrentMessage: mockAbortRuntimeCurrentMessage,
+    steerRuntimeMessage: mockSteerRuntimeMessage,
     pauseRuntimeDialogLoop: vi.fn(async (/** @type {any} */ runtime) => runtime.pauseDialogLoop?.()),
     resumeRuntimeDialogLoop: vi.fn(async (/** @type {any} */ runtime) => runtime.resumeDialogLoop?.()),
     getRuntimeHandoffManager: (/** @type {any} */ runtime) => runtime.getHandoffManager(),
@@ -264,6 +274,38 @@ describe('handlers/agent — handleInject validação', () => {
         expect(mockSendAgentDialogTurn).toHaveBeenLastCalledWith(
             altRuntime,
             'hello from body',
+            expect.objectContaining({ traceId: expect.any(String) }),
+        );
+    });
+
+    it('modo steer envia intervenção SDK immediate sem aguardar reply', async () => {
+        const result = await handleInject({ body: { message: 'mude o rumo agora', mode: 'steer' } });
+        const body = bodyOf(/** @type {{ body: any }} */ (result));
+        expect(result.status).toBe(202);
+        expect(body.ok).toBe(true);
+        expect(body.mode).toBe('steer');
+        expect(body.reply).toBeNull();
+        expect(body.messageId).toBe('msg-default-steer');
+        expect(mockSteerRuntimeMessage).toHaveBeenLastCalledWith(defaultRuntime, 'mude o rumo agora', {});
+        expect(mockSendAgentDialogTurn).not.toHaveBeenCalledWith(
+            defaultRuntime,
+            'mude o rumo agora',
+            expect.anything(),
+        );
+    });
+
+    it('modo interrupt aborta turno ativo antes de enfileirar a substituição', async () => {
+        mockSendAgentDialogTurn.mockResolvedValueOnce('substituida');
+        const result = await handleInject({ runtimeId: 'alt', body: { message: 'substitua o plano', mode: 'interrupt' } });
+        const body = bodyOf(/** @type {{ body: any }} */ (result));
+        expect(result.status).toBe(200);
+        expect(body.ok).toBe(true);
+        expect(body.mode).toBe('interrupt');
+        expect(body.reply).toBe('substituida');
+        expect(mockAbortRuntimeCurrentMessage).toHaveBeenLastCalledWith(altRuntime);
+        expect(mockSendAgentDialogTurn).toHaveBeenLastCalledWith(
+            altRuntime,
+            'substitua o plano',
             expect.objectContaining({ traceId: expect.any(String) }),
         );
     });

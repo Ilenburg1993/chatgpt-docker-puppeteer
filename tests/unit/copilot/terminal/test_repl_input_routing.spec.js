@@ -16,6 +16,9 @@ describe('terminal/repl/repl-input-routing.js', () => {
 
     it('classifica comandos operacionais seguros para execucao imediata durante turno ativo', () => {
         expect(isTerminalImmediateCommand('answer')).toBe(true);
+        expect(isTerminalImmediateCommand('abort')).toBe(true);
+        expect(isTerminalImmediateCommand('interrupt')).toBe(true);
+        expect(isTerminalImmediateCommand('steer')).toBe(true);
         expect(isTerminalImmediateCommand('status')).toBe(true);
         expect(isTerminalImmediateCommand('elicitation')).toBe(true);
         expect(isTerminalImmediateCommand('restart')).toBe(false);

@@ -103,10 +103,22 @@ para limpar o multiline.
 - A fila terminal (`MAX_TURN_QUEUE_SIZE`) ainda retorna `null` para rejeição; a UX agora avisa, mas
   uma futura melhoria pode retornar objeto estruturado.
 
+## Rodada complementar — steer e interrupção
+
+A investigação foi aprofundada em
+`2026-05-08-AUDITORIA-DIALOG-LOOP-STEER-E-INTERRUPCAO.md`.
+
+Resultado aplicado: o canal principal `/inject` passou a aceitar `mode=queue|steer|interrupt`, e o
+terminal ganhou comandos imediatos `/steer`, `/interrupt` e `/abort`. Com isso, a LLM-A e o humano
+têm a mesma semântica canônica para “próximo turno”, “intervenção no turno atual” e “abort +
+substituição”.
+
 ## Arquivos alterados nesta rodada
 
 - `src/copilot/terminal/repl/repl-lifecycle.js`
 - `src/copilot/terminal/repl/repl-input-routing.js`
+- `src/copilot/presentation/agent-control.js`
+- `src/copilot/channel/inject.js`
 - `src/copilot/terminal/dialog/engine.js`
 - `src/copilot/terminal/dialog/index.js`
 - `src/copilot/terminal/module-map.js`

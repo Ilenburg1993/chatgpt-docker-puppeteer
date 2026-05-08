@@ -244,7 +244,7 @@ const MAX_INJECT_HISTORY = TERMINAL_MAX_INJECT_HISTORY;
  *     transportTimeoutStrategy?: 'explicit' | 'adaptive' | 'disabled';
  *     transportTimeoutReasons?: string[];
  *     diagnostics?: Record<string, unknown> | null;
- *     outcome?: 'completed' | 'null_reply' | 'timeout' | 'error';
+ *     outcome?: 'completed' | 'null_reply' | 'timeout' | 'error' | 'steered' | 'interrupted';
  *     ok: boolean;
  * }} InjectHistoryEntry
  */

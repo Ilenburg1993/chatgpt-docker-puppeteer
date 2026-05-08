@@ -12,11 +12,13 @@ import { log, METRICS_STORE } from '#copilot/observability';
 import { projectAgentHttpError } from './agent-http-errors.js';
 import { resolveOptionalDialogTimeout } from './dialog-timeout-policy.js';
 import {
+    abortAgentRuntimeCurrentMessage,
     getAgentHandoffManager,
     getAgentRuntimeControlsTarget,
     pauseAgentDialogLoop,
     readAgentRuntimeControlState,
     resumeAgentDialogLoop,
+    steerAgentRuntimeMessage,
 } from './runtime-controls.js';
 import {
     attachmentToRuntimeEmbed,
@@ -41,6 +43,62 @@ import { recordRuntimeInjectHistory } from './runtime-ui-state.js';
  * @type {ReadonlySet<string>}
  */
 const ALLOWED_FROM = new Set(['llm-a', 'user', 'system', 'llm_a']);
+
+/** @type {ReadonlySet<string>} */
+const INJECT_MODE_ALIASES = new Set([
+    'queue',
+    'turn',
+    'dialog',
+    'steer',
+    'immediate',
+    'interrupt',
+    'abort-and-queue',
+    'abort_and_queue',
+]);
+
+/** @type {Map<string, Promise<void>>} */
+const _injectInterventionQueues = new Map();
+
+/**
+ * @param {unknown} rawMode
+ * @returns {'queue' | 'steer' | 'interrupt'}
+ */
+function resolveInjectMode(rawMode) {
+    if (typeof rawMode !== 'string') return 'queue';
+    const normalized = rawMode.trim().toLowerCase();
+    if (!INJECT_MODE_ALIASES.has(normalized)) return 'queue';
+    if (normalized === 'steer' || normalized === 'immediate') return 'steer';
+    if (normalized === 'interrupt' || normalized === 'abort-and-queue' || normalized === 'abort_and_queue') {
+        return 'interrupt';
+    }
+    return 'queue';
+}
+
+/**
+ * Serializa sequências curtas de intervenção por runtime para evitar interleaving entre `abort` e envio substituto.
+ *
+ * @template T
+ * @param {string | null | undefined} runtimeId
+ * @param {() => Promise<T>} operation
+ * @returns {Promise<T>}
+ */
+async function runInjectInterventionSequence(runtimeId, operation) {
+    const key = runtimeId ?? 'default';
+    const previous = _injectInterventionQueues.get(key) ?? Promise.resolve();
+    const next = previous.catch(() => {}).then(operation);
+    const guard = next.then(
+        () => {},
+        () => {},
+    );
+    _injectInterventionQueues.set(key, guard);
+    try {
+        return await next;
+    } finally {
+        if (_injectInterventionQueues.get(key) === guard) {
+            _injectInterventionQueues.delete(key);
+        }
+    }
+}
 
 /**
  * @returns {string}
@@ -255,6 +313,7 @@ export async function handlePipeline(params = {}) {
  *               message?: string;
  *               content?: string;
  *               from?: string;
+ *               mode?: 'queue' | 'turn' | 'dialog' | 'steer' | 'immediate' | 'interrupt' | 'abort-and-queue' | 'abort_and_queue';
  *               timeout?: number;
  *               context_files?: string[];
  *               attachments?: {
@@ -270,6 +329,7 @@ export async function handlePipeline(params = {}) {
  *           message?: string;
  *           content?: string;
  *           from?: string;
+ *           mode?: 'queue' | 'turn' | 'dialog' | 'steer' | 'immediate' | 'interrupt' | 'abort-and-queue' | 'abort_and_queue';
  *           timeout?: number;
  *           context_files?: string[];
  *           attachments?: {
@@ -303,6 +363,7 @@ export async function handleInject(params = {}) {
 
     const rawFrom = body['from'] ?? 'llm-a';
     const from = typeof rawFrom === 'string' && ALLOWED_FROM.has(rawFrom) ? rawFrom : 'llm-a';
+    const injectMode = resolveInjectMode(body['mode'] ?? body['delivery'] ?? body['strategy']);
     const explicitTimeoutMs =
         body['timeout'] === null
             ? 0
@@ -323,7 +384,7 @@ export async function handleInject(params = {}) {
             : null;
     log(
         'INFO',
-        `[agent-control] /inject accepted (trace=${traceId}, runtime=${runtimeId ?? 'default'}, from=${from}, timeout=${timeout === null ? 'watchdog-only' : `${timeout}ms`}, strategy=${timeoutDecision.strategy}, reasons=${timeoutDecision.reasons.join('+')})`,
+        `[agent-control] /inject accepted (trace=${traceId}, runtime=${runtimeId ?? 'default'}, from=${from}, mode=${injectMode}, timeout=${timeout === null ? 'watchdog-only' : `${timeout}ms`}, strategy=${timeoutDecision.strategy}, reasons=${timeoutDecision.reasons.join('+')})`,
     );
 
     const injectStartedAt = Date.now();
@@ -379,69 +440,157 @@ export async function handleInject(params = {}) {
     const preflightDurationMs = t0 - preflightStartedAt;
     const metrics = resolveMetricsStoreSafe();
     try {
-        const { reply, diagnostics } = await sendRuntimeDialogTurnWithDiagnostics(
-            enrichedMessage,
-            from,
-            { timeout, traceId },
-            agent,
-        );
-        const durationMs = Date.now() - t0;
-        const outcome = reply !== null ? 'completed' : 'null_reply';
-        metrics?.recordInjectTurn?.(durationMs, reply !== null, reply !== null ? 'completed' : 'error');
-        const injectDiagnostics = {
-            preflightDurationMs,
-            contextEmbeddingDurationMs,
-            attachmentEmbeddingDurationMs,
-            dialogDurationMs: durationMs,
-            totalDurationMs: Date.now() - injectStartedAt,
-            runtimeDialog: diagnostics,
-        };
-        recordRuntimeInjectHistory({
-            ts: t0,
-            traceId,
-            from,
-            message: message.slice(0, 200),
-            replySnippet: reply ? reply.slice(0, 200) : null,
-            durationMs,
-            timeoutMs: timeout,
-            timeoutStrategy: timeoutDecision.strategy,
-            timeoutReasons: timeoutDecision.reasons,
-            transportTimeoutMs: null,
-            runtimeId: runtimeId ?? 'default',
-            promptDigest: typeof promptBinding?.['digest'] === 'string' ? promptBinding['digest'] : null,
-            promptBindingDigest: typeof promptBinding?.['digest'] === 'string' ? promptBinding['digest'] : null,
-            promptIsStale: typeof promptFreshness?.['isStale'] === 'boolean' ? promptFreshness['isStale'] : null,
-            promptFreshnessReason: typeof promptFreshness?.['reason'] === 'string' ? promptFreshness['reason'] : null,
-            promptRecommendedAction:
-                promptFreshness?.['recommendedAction'] === 'none' ||
-                promptFreshness?.['recommendedAction'] === 'observe-live-reload' ||
-                promptFreshness?.['recommendedAction'] === 'resume-session'
-                    ? promptFreshness['recommendedAction']
-                    : null,
-            diagnostics: injectDiagnostics,
-            outcome,
-            ok: reply !== null,
-        });
-        log(
-            'INFO',
-            `[agent-control] /inject resolved (trace=${traceId}, duration=${durationMs}ms, preflight=${preflightDurationMs}ms, autoStart=${diagnostics.autoStarted}, recovery=${diagnostics.recoveredInputChannel}, ok=${reply !== null})`,
-        );
-        return {
-            status: reply !== null ? 200 : 409,
-            body: {
-                ok: reply !== null,
-                reply: reply ?? null,
-                durationMs,
-                from,
+        if (injectMode === 'steer') {
+            const messageId = await steerAgentRuntimeMessage(enrichedMessage, runtimeId);
+            const durationMs = Date.now() - t0;
+            const injectDiagnostics = {
+                preflightDurationMs,
+                contextEmbeddingDurationMs,
+                attachmentEmbeddingDurationMs,
+                dialogDurationMs: 0,
+                totalDurationMs: Date.now() - injectStartedAt,
+                mode: injectMode,
+                sdkMessageId: messageId,
+                runtimeDialog: null,
+            };
+            metrics?.recordInjectTurn?.(durationMs, true, 'completed');
+            recordRuntimeInjectHistory({
+                ts: t0,
                 traceId,
+                from,
+                message: message.slice(0, 200),
+                replySnippet: null,
+                durationMs,
                 timeoutMs: timeout,
                 timeoutStrategy: timeoutDecision.strategy,
                 timeoutReasons: timeoutDecision.reasons,
+                transportTimeoutMs: null,
+                runtimeId: runtimeId ?? 'default',
                 promptDigest: typeof promptBinding?.['digest'] === 'string' ? promptBinding['digest'] : null,
-                promptFreshness: promptFreshness,
+                promptBindingDigest: typeof promptBinding?.['digest'] === 'string' ? promptBinding['digest'] : null,
+                promptIsStale: typeof promptFreshness?.['isStale'] === 'boolean' ? promptFreshness['isStale'] : null,
+                promptFreshnessReason: typeof promptFreshness?.['reason'] === 'string' ? promptFreshness['reason'] : null,
+                promptRecommendedAction:
+                    promptFreshness?.['recommendedAction'] === 'none' ||
+                    promptFreshness?.['recommendedAction'] === 'observe-live-reload' ||
+                    promptFreshness?.['recommendedAction'] === 'resume-session'
+                        ? promptFreshness['recommendedAction']
+                        : null,
                 diagnostics: injectDiagnostics,
-            },
+                outcome: 'steered',
+                ok: true,
+            });
+            log(
+                'INFO',
+                `[agent-control] /inject steered current turn (trace=${traceId}, duration=${durationMs}ms, messageId=${messageId || '-'})`,
+            );
+            return {
+                status: 202,
+                body: {
+                    ok: true,
+                    mode: injectMode,
+                    messageId,
+                    reply: null,
+                    durationMs,
+                    from,
+                    traceId,
+                    timeoutMs: timeout,
+                    timeoutStrategy: timeoutDecision.strategy,
+                    timeoutReasons: timeoutDecision.reasons,
+                    promptDigest: typeof promptBinding?.['digest'] === 'string' ? promptBinding['digest'] : null,
+                    promptFreshness: promptFreshness,
+                    diagnostics: injectDiagnostics,
+                },
+            };
+        }
+
+        /**
+         * @param {number} abortDurationMs
+         * @returns {Promise<HandlerResult>}
+         */
+        const executeQueuedInjectTurn = async (abortDurationMs = 0) => {
+            const { reply, diagnostics } = await sendRuntimeDialogTurnWithDiagnostics(
+                enrichedMessage,
+                from,
+                { timeout, traceId },
+                agent,
+            );
+            const durationMs = Date.now() - t0;
+            const outcome = reply !== null ? 'completed' : 'null_reply';
+            metrics?.recordInjectTurn?.(durationMs, reply !== null, reply !== null ? 'completed' : 'error');
+            const injectDiagnostics = {
+                preflightDurationMs,
+                contextEmbeddingDurationMs,
+                attachmentEmbeddingDurationMs,
+                dialogDurationMs: durationMs,
+                totalDurationMs: Date.now() - injectStartedAt,
+                mode: injectMode,
+                abortDurationMs,
+                runtimeDialog: diagnostics,
+            };
+            recordRuntimeInjectHistory({
+                ts: t0,
+                traceId,
+                from,
+                message: message.slice(0, 200),
+                replySnippet: reply ? reply.slice(0, 200) : null,
+                durationMs,
+                timeoutMs: timeout,
+                timeoutStrategy: timeoutDecision.strategy,
+                timeoutReasons: timeoutDecision.reasons,
+                transportTimeoutMs: null,
+                runtimeId: runtimeId ?? 'default',
+                promptDigest: typeof promptBinding?.['digest'] === 'string' ? promptBinding['digest'] : null,
+                promptBindingDigest: typeof promptBinding?.['digest'] === 'string' ? promptBinding['digest'] : null,
+                promptIsStale: typeof promptFreshness?.['isStale'] === 'boolean' ? promptFreshness['isStale'] : null,
+                promptFreshnessReason: typeof promptFreshness?.['reason'] === 'string' ? promptFreshness['reason'] : null,
+                promptRecommendedAction:
+                    promptFreshness?.['recommendedAction'] === 'none' ||
+                    promptFreshness?.['recommendedAction'] === 'observe-live-reload' ||
+                    promptFreshness?.['recommendedAction'] === 'resume-session'
+                        ? promptFreshness['recommendedAction']
+                        : null,
+                diagnostics: injectDiagnostics,
+                outcome,
+                ok: reply !== null,
+            });
+            log(
+                'INFO',
+                `[agent-control] /inject resolved (trace=${traceId}, mode=${injectMode}, duration=${durationMs}ms, preflight=${preflightDurationMs}ms, autoStart=${diagnostics.autoStarted}, recovery=${diagnostics.recoveredInputChannel}, ok=${reply !== null})`,
+            );
+            return {
+                status: reply !== null ? 200 : 409,
+                body: {
+                    ok: reply !== null,
+                    mode: injectMode,
+                    reply: reply ?? null,
+                    durationMs,
+                    from,
+                    traceId,
+                    timeoutMs: timeout,
+                    timeoutStrategy: timeoutDecision.strategy,
+                    timeoutReasons: timeoutDecision.reasons,
+                    promptDigest: typeof promptBinding?.['digest'] === 'string' ? promptBinding['digest'] : null,
+                    promptFreshness: promptFreshness,
+                    diagnostics: injectDiagnostics,
+                },
+            };
         };
+
+        if (injectMode === 'interrupt') {
+            return await runInjectInterventionSequence(runtimeId, async () => {
+                const abortStartedAt = Date.now();
+                await abortAgentRuntimeCurrentMessage(runtimeId);
+                const abortDurationMs = Date.now() - abortStartedAt;
+                log(
+                    'INFO',
+                    `[agent-control] /inject interrupted current turn before queueing replacement (trace=${traceId}, abort=${abortDurationMs}ms)`,
+                );
+                return executeQueuedInjectTurn(abortDurationMs);
+            });
+        }
+
+        return await executeQueuedInjectTurn(0);
     } catch (e) {
         const projection = projectAgentHttpError(e);
         const durationMs = Date.now() - t0;
@@ -459,6 +608,7 @@ export async function handleInject(params = {}) {
             attachmentEmbeddingDurationMs,
             dialogDurationMs: durationMs,
             totalDurationMs: Date.now() - injectStartedAt,
+            mode: injectMode,
             runtimeDialog: runtimeDialogDiagnostics,
         };
         const isTimeout = String(projection.body?.code ?? '') === 'DIALOG_TIMEOUT' || projection.status === 504;
@@ -491,7 +641,7 @@ export async function handleInject(params = {}) {
         });
         log(
             'WARN',
-            `[agent-control] /inject failed (trace=${traceId}, duration=${durationMs}ms, preflight=${preflightDurationMs}ms, code=${String(projection.body?.code ?? 'unknown')})`,
+            `[agent-control] /inject failed (trace=${traceId}, mode=${injectMode}, duration=${durationMs}ms, preflight=${preflightDurationMs}ms, code=${String(projection.body?.code ?? 'unknown')})`,
         );
         return {
             ...projection,
@@ -499,6 +649,7 @@ export async function handleInject(params = {}) {
                 projection.body && typeof projection.body === 'object'
                     ? {
                           ...projection.body,
+                          mode: injectMode,
                           traceId,
                           timeoutMs: timeout,
                           timeoutStrategy: timeoutDecision.strategy,

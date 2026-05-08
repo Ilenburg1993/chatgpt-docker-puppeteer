@@ -104,4 +104,47 @@ describe('channel/inject.js — diagnostics contract', () => {
             },
         });
     });
+
+    it('propaga modo steer no payload e retorna messageId sem exigir reply', async () => {
+        /** @type {Record<string, unknown> | null} */
+        let receivedPayload = null;
+        const server = createServer((req, res) => {
+            if (req.url === '/health') {
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ ok: true, dialogLoopActive: true, busy: false }));
+                return;
+            }
+
+            if (req.url === '/inject' && req.method === 'POST') {
+                let body = '';
+                req.on('data', (chunk) => {
+                    body += chunk.toString('utf8');
+                });
+                req.on('end', () => {
+                    receivedPayload = /** @type {Record<string, unknown>} */ (JSON.parse(body));
+                    res.writeHead(202, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ ok: true, mode: 'steer', reply: null, messageId: 'msg-123' }));
+                });
+                return;
+            }
+
+            res.writeHead(404);
+            res.end();
+        });
+
+        const port = await listen(server);
+        const result = await injectToLlmB('corrija o rumo', {
+            port,
+            retries: 0,
+            timeoutMs: 0,
+            mode: 'steer',
+        });
+
+        assert.equal(result.ok, true);
+        assert.equal(result.reply, '');
+        assert.equal(result.mode, 'steer');
+        assert.equal(result.messageId, 'msg-123');
+        assert.equal(receivedPayload?.['mode'], 'steer');
+        assert.equal(receivedPayload?.['message'], 'corrija o rumo');
+    });
 });

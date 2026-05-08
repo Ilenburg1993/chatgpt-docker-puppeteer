@@ -65,14 +65,16 @@ import {
     cmdWho as _cmdWho,
     cmdWorkspace as _cmdWorkspace,
 } from '../commands/index.js';
-import { ensureDialogLoop, println } from '../dialog/index.js';
+import { ensureDialogLoop, getTurnQueueDepth, println, sendTurn } from '../dialog/index.js';
 import {
+    abortTerminalCurrentMessage,
     offTerminalAgentRuntimeEvent,
     onceTerminalAgentRuntimeEvent,
     pauseTerminalDialogLoop,
     readTerminalHandoffHistory,
     readTerminalRuntimeControlState,
     resumeTerminalDialogLoop,
+    steerTerminalMessage,
 } from '../frontend/gateways/agent-runtime.js';
 import { stopTerminalDialogMode } from '../frontend/gateways/dialog.js';
 import { clearRateLimiters } from '../state/rate-limiter-state.js';
@@ -82,6 +84,8 @@ import { parseTerminalReplCommand } from './repl-command-parser.js';
 const INJECT_PORT = readCopilotBootConfig().server.port;
 
 const RESTART_WAIT_TIMEOUT_MS = Math.max(15_000, Math.min(120_000, Math.round(LLM_B_BOOT_TIMEOUT_MS * 0.5)));
+/** @type {Promise<void>} */
+let _terminalInterventionQueue = Promise.resolve();
 
 /**
  * @typedef {{ hubSessionId: string | null; injectPort: number }} CmdCtx
@@ -161,6 +165,85 @@ async function _cmdDialogResume() {
     } catch (e) {
         println(`\x1b[31m  Erro ao retomar: ${toError(e).message}\x1b[0m`);
     }
+}
+
+/**
+ * @returns {Promise<boolean>} true quando o abort foi aceito pelo runtime.
+ */
+async function _cmdAbortCurrentTurn() {
+    try {
+        await abortTerminalCurrentMessage();
+        println('\x1b[33m  [abort] Turno SDK ativo abortado. A próxima mensagem da fila poderá prosseguir.\x1b[0m');
+        return true;
+    } catch (e) {
+        println(`\x1b[31m  [abort] Falha ao abortar turno ativo: ${toError(e).message}\x1b[0m`);
+        return false;
+    }
+}
+
+/**
+ * @template T
+ * @param {() => Promise<T>} operation
+ * @returns {Promise<T>}
+ */
+async function runTerminalInterventionSequence(operation) {
+    const next = _terminalInterventionQueue.catch(() => {}).then(operation);
+    _terminalInterventionQueue = next.then(
+        () => {},
+        () => {},
+    );
+    return next;
+}
+
+/**
+ * Envia uma mensagem em modo SDK immediate, preservando o turno atual no comando.
+ *
+ * @param {string} message
+ * @returns {Promise<void>}
+ */
+async function _cmdSteer(message) {
+    const prompt = message.trim();
+    if (!prompt) {
+        println('\x1b[33m  Uso: /steer <mensagem imediata para o turno ativo>\x1b[0m');
+        return;
+    }
+    try {
+        const messageId = await steerTerminalMessage(prompt);
+        println(
+            `\x1b[36m  [steer] Intervenção imediata enviada ao SDK${messageId ? ` (messageId=${messageId})` : ''}.\x1b[0m`,
+        );
+    } catch (e) {
+        println(`\x1b[31m  [steer] Falha ao enviar intervenção imediata: ${toError(e).message}\x1b[0m`);
+    }
+}
+
+/**
+ * Aborta o turno SDK atual e enfileira uma substituição como próximo turno canônico.
+ *
+ * @param {string} message
+ * @returns {Promise<void>}
+ */
+async function _cmdInterrupt(message) {
+    await runTerminalInterventionSequence(async () => {
+        const prompt = message.trim();
+        if (!prompt) {
+            await _cmdAbortCurrentTurn();
+            return;
+        }
+        const aborted = await _cmdAbortCurrentTurn();
+        if (!aborted) {
+            println('\x1b[31m  [interrupt] Mensagem substituta não foi enviada porque o abort falhou.\x1b[0m');
+            return;
+        }
+        const queuedBefore = getTurnQueueDepth();
+        const turn = sendTurn(prompt, 'user');
+        println(
+            `\x1b[36m  [interrupt] Mensagem substituta enfileirada para a LLM-B (posição ${Math.max(1, queuedBefore + 1)}).\x1b[0m`,
+        );
+        void turn.catch((e) => {
+            println(`\x1b[31m  [interrupt] Turno substituto falhou: ${toError(e).message}\x1b[0m`);
+        });
+    });
 }
 
 function _cmdHandoff() {
@@ -286,6 +369,9 @@ export const CMD_ROUTES = [
     [['resume'], (ctx, arg) => _cmdResume({ println, hubSessionId: ctx.hubSessionId }, arg)],
     [['pause'], () => _cmdPauseDialogLoop()],
     [['dialog-resume'], () => _cmdDialogResume()],
+    [['abort'], () => runTerminalInterventionSequence(_cmdAbortCurrentTurn)],
+    [['steer'], (_, arg) => _cmdSteer(arg)],
+    [['interrupt'], (_, arg) => _cmdInterrupt(arg)],
     [['handoff'], () => _cmdHandoff()],
     [['skills'], (_, arg) => _cmdSkills({ println }, arg)],
     [['thinking'], (_, arg) => _cmdThinking({ println }, arg)],
