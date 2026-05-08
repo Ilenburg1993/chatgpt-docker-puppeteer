@@ -10,7 +10,7 @@
  * @see module:copilot/lib/url-validator
  */
 
-import { WEB_SEARCH_DISABLED } from '#copilot/config';
+import { getWebRateLimitPolicy, WEB_FETCH_DISABLED, WEB_SEARCH_DISABLED } from '#copilot/config';
 import {
     buildIoMeta,
     evaluateIoUrlPolicy,
@@ -42,19 +42,27 @@ export function resetWebToolsRateLimitWindowForTests() {
 }
 
 /**
- * Registra volume local. Limite é informativo e não bloqueia operações da LLM-B.
+ * Registra volume local. Aplica limite por minuto para evitar abuso acidental.
  *
- * @returns {boolean} Sempre true.
+ * @returns {{ ok: boolean; count: number; limit: number; bucket: number; enforced: boolean }}
  */
 function checkRateLimit() {
+    const policy = getWebRateLimitPolicy();
     const bucket = Math.floor(Date.now() / 60_000);
     const count = RATE_WINDOW.get(bucket) ?? 0;
-    RATE_WINDOW.set(bucket, count + 1);
+    const next = count + 1;
+    RATE_WINDOW.set(bucket, next);
     // Remove buckets mais antigos para não crescer indefinidamente
     for (const [k] of RATE_WINDOW) {
         if (k < bucket - 1) RATE_WINDOW.delete(k);
     }
-    return true;
+    return {
+        ok: !policy.enforced || next <= policy.perMinute,
+        count: next,
+        limit: policy.perMinute,
+        bucket,
+        enforced: policy.enforced,
+    };
 }
 
 /**
@@ -85,10 +93,11 @@ function sanitizeWebSearchResults(results) {
  *
  * @param {string} startUrl
  * @param {number} maxRedirects
+ * @param {{ signal?: AbortSignal }} [opts]
  * @returns {Promise<{ response: Response; finalUrl: string; redirectCount: number }>}
  * @throws {Error} Se o número de redirects exceder o limite ou uma URL intermediária for bloqueada.
  */
-async function fetchWithRedirectPolicy(startUrl, maxRedirects) {
+async function fetchWithRedirectPolicy(startUrl, maxRedirects, opts = {}) {
     const AGENT_HEADERS = { 'User-Agent': 'github-copilot-agent/1.0' };
     let currentUrl = startUrl;
     let redirectCount = 0;
@@ -98,6 +107,7 @@ async function fetchWithRedirectPolicy(startUrl, maxRedirects) {
             method: 'GET',
             redirect: 'manual',
             headers: AGENT_HEADERS,
+            ...(opts.signal ? { signal: opts.signal } : {}),
         });
 
         const status = response.status;
@@ -152,7 +162,20 @@ const webFetchTool = buildTool({
     handler: async (
         /** @type {{ url: string; maxBytes?: number; timeoutMs?: number }} */ { url, maxBytes, timeoutMs },
     ) => {
-        checkRateLimit();
+        const rate = checkRateLimit();
+        if (!rate.ok) {
+            return {
+                success: false,
+                error: `Rate limit local excedido (${rate.count}/${rate.limit} req/min). Tente novamente em instantes.`,
+            };
+        }
+
+        if (!rate.enforced && rate.count > rate.limit) {
+            log(
+                'WARN',
+                `[copilot/web_fetch] Volume alto detectado (${rate.count}/${rate.limit} req/min) em modo advisory.`,
+            );
+        }
 
         const inputUrlDecision = evaluateIoUrlPolicy({ input: url });
         if (!inputUrlDecision.ok || !inputUrlDecision.url) {
@@ -163,11 +186,19 @@ const webFetchTool = buildTool({
 
         const advisoryLimit = maxBytes ?? null;
         const maxRedirects = inputUrlDecision.maxRedirects ?? IO_URL_MAX_REDIRECTS;
+        const timeoutBudgetMs =
+            typeof timeoutMs === 'number' && Number.isFinite(timeoutMs) && timeoutMs > 0 ? timeoutMs : null;
+        const controller = timeoutBudgetMs !== null ? new AbortController() : null;
+        const timeoutHandle =
+            controller && timeoutBudgetMs !== null
+                ? setTimeout(() => controller.abort(new Error('Timeout')), timeoutBudgetMs)
+                : null;
 
         try {
             const { response, finalUrl, redirectCount } = await fetchWithRedirectPolicy(
                 parsed.toString(),
                 maxRedirects,
+                controller ? { signal: controller.signal } : {},
             );
 
             if (redirectCount > 0) {
@@ -187,11 +218,20 @@ const webFetchTool = buildTool({
 
             let received = 0;
             const chunks = /** @type {Uint8Array[]} */ ([]);
-            while (true) {
-                const { done, value } = await reader.read();
-                if (done) break;
-                received += value.byteLength;
-                chunks.push(value);
+            // FIX WT-WEB-02: aplicar advisoryLimit no loop; FIX WT-WEB-03: releaseLock() em finally
+            try {
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    received += value.byteLength;
+                    chunks.push(value);
+                    if (advisoryLimit !== null && received >= advisoryLimit) {
+                        log('INFO', `[copilot/web_fetch] advisoryLimit ${advisoryLimit}B atingido — truncando.`);
+                        break;
+                    }
+                }
+            } finally {
+                reader.releaseLock();
             }
 
             const text = new TextDecoder().decode(
@@ -253,6 +293,8 @@ const webFetchTool = buildTool({
             const msg = toError(e).message ?? String(e);
             log('WARN', `[copilot/web_fetch] Erro: ${msg}`);
             return { success: false, error: msg };
+        } finally {
+            if (timeoutHandle) clearTimeout(timeoutHandle);
         }
     },
 });
@@ -275,7 +317,20 @@ const webSearchTool = buildTool({
         maxResults: z.number().int().min(1).optional().describe('Número sugerido de resultados a retornar.'),
     }),
     handler: async (/** @type {{ query: string; maxResults?: number }} */ { query, maxResults }) => {
-        checkRateLimit();
+        const rate = checkRateLimit();
+        if (!rate.ok) {
+            return {
+                success: false,
+                error: `Rate limit local excedido (${rate.count}/${rate.limit} req/min). Tente novamente em instantes.`,
+            };
+        }
+
+        if (!rate.enforced && rate.count > rate.limit) {
+            log(
+                'WARN',
+                `[copilot/web_search] Volume alto detectado (${rate.count}/${rate.limit} req/min) em modo advisory.`,
+            );
+        }
 
         const limit =
             typeof maxResults === 'number' && Number.isFinite(maxResults) ? maxResults : Number.POSITIVE_INFINITY;
@@ -284,9 +339,10 @@ const webSearchTool = buildTool({
         const jsonUrl = `https://api.duckduckgo.com/?q=${encodeURIComponent(query)}&format=json&no_html=1&skip_disambig=1`;
 
         try {
+            // FIX WT-WEB-01: redirect: 'follow' bypassa SSRF policy — usar 'error' para que redirecionamentos inesperados lancem erro
             const response = await fetch(jsonUrl, {
                 method: 'GET',
-                redirect: 'follow',
+                redirect: 'error',
                 headers: {
                     'User-Agent': 'github-copilot-agent/1.0',
                     Accept: 'application/json',
@@ -393,9 +449,10 @@ const webSearchTool = buildTool({
         const searchUrl = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`;
 
         try {
+            // FIX WT-WEB-01: redirect: 'follow' bypassa SSRF policy — usar 'error' para evitar SSRF por redirect
             const response = await fetch(searchUrl, {
                 method: 'GET',
-                redirect: 'follow',
+                redirect: 'error',
                 headers: {
                     'User-Agent': 'Mozilla/5.0 (compatible; github-copilot-agent/1.0)',
                     Accept: 'text/html',
@@ -494,5 +551,8 @@ const webSearchTool = buildTool({
 /**
  * @type {import('#copilot/sdk/types').Tool<any>[]}
  */
-// WEB-01-FIX: web_search habilitado por padrão — desativar via WEB_SEARCH_DISABLED=true
-export const webTools = [webFetchTool, ...(WEB_SEARCH_DISABLED ? [] : [webSearchTool])];
+// WEB-01-FIX: tools web habilitadas por padrão e controladas por env flags.
+export const webTools = [
+    ...(WEB_FETCH_DISABLED ? [] : [webFetchTool]),
+    ...(WEB_SEARCH_DISABLED ? [] : [webSearchTool]),
+];

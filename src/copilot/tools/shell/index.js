@@ -19,13 +19,14 @@
  */
 
 import { defaultAuditLog } from '#copilot/audit';
+import { getShellTimeoutPolicy } from '#copilot/config';
 import { createTool } from '#copilot/sdk';
-import { realpathSync } from 'node:fs';
+import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import { z } from 'zod';
 import { log } from '../logger.js';
 import { recordToolCall } from '../metrics-proxy.js';
-import { ADVISORY_TIMEOUT_MS, runPipeline, runProcess, tokenizeShell } from './executor.js';
+import { ADVISORY_TIMEOUT_MS, runPipeline, runProcess, splitPipelineSegments, tokenizeShell } from './executor.js';
 import {
     ALLOWED_EXECUTABLES,
     ALLOWED_NPM_SCRIPTS,
@@ -34,6 +35,65 @@ import {
     hasShellMetaOutsideQuotes,
     validateCwd,
 } from './sandbox.js';
+
+/**
+ * Resolve o timeout de execução considerando policy runtime e override por chamada.
+ *
+ * @param {number | undefined} timeoutSeconds
+ * @param {boolean | undefined} enforceTimeout
+ * @param {number} fallbackSeconds
+ * @returns {{ advisoryTimeoutMs: number; timeoutMs: number | null; timeoutEnforced: boolean }}
+ */
+function resolveTimeoutConfig(timeoutSeconds, enforceTimeout, fallbackSeconds) {
+    const policy = getShellTimeoutPolicy();
+    const effectiveSeconds =
+        typeof timeoutSeconds === 'number' && Number.isFinite(timeoutSeconds) && timeoutSeconds > 0
+            ? Math.floor(timeoutSeconds)
+            : fallbackSeconds > 0
+              ? fallbackSeconds
+              : policy.defaultSeconds;
+    const timeoutEnforced = typeof enforceTimeout === 'boolean' ? enforceTimeout : policy.enforced;
+    const advisoryTimeoutMs = effectiveSeconds * 1000;
+    return {
+        advisoryTimeoutMs,
+        timeoutMs: timeoutEnforced ? advisoryTimeoutMs : null,
+        timeoutEnforced,
+    };
+}
+
+/**
+ * Resolve caminho real garantindo restrição ao workspace, sem I/O síncrono.
+ *
+ * @param {string} resolved
+ * @returns {Promise<{ ok: true; resolved: string } | { ok: false; reason: string }>}
+ */
+async function resolveWorkspaceRealPathSafe(resolved) {
+    let realResolved;
+    try {
+        realResolved = await fs.realpath(resolved);
+    } catch {
+        const parent = path.dirname(resolved);
+        try {
+            const parentReal = await fs.realpath(parent);
+            realResolved = path.join(parentReal, path.basename(resolved));
+        } catch {
+            return { ok: false, reason: `Acesso negado: caminho não resolvível com segurança (${resolved})` };
+        }
+    }
+
+    let rootReal;
+    try {
+        rootReal = await fs.realpath(WORKSPACE_ROOT);
+    } catch {
+        rootReal = WORKSPACE_ROOT;
+    }
+
+    if (!realResolved.startsWith(rootReal + path.sep) && realResolved !== rootReal) {
+        return { ok: false, reason: `Acesso negado: arquivo fora do workspace (${resolved})` };
+    }
+
+    return { ok: true, resolved: realResolved };
+}
 
 /**
  * Cast auxiliar que resolve inferência de tipo do SDK `defineTool<T>`.
@@ -74,10 +134,19 @@ const execCommandTool = createTool({
                 .min(1)
                 .optional()
                 .describe('Timeout informativo em segundos. Default histórico: 30.'),
+            enforceTimeout: z
+                .boolean()
+                .optional()
+                .describe('Se true, aplica timeout hard nesta execução. Se omitido, usa política runtime.'),
         }),
     ),
     handler: async (
-        /** @type {{ command: string; cwd?: string; timeoutSeconds?: number }} */ { command, cwd, timeoutSeconds = 30 },
+        /** @type {{ command: string; cwd?: string; timeoutSeconds?: number; enforceTimeout?: boolean }} */ {
+            command,
+            cwd,
+            timeoutSeconds,
+            enforceTimeout,
+        },
     ) => {
         const blockCheck = checkCommandBlocklist(command);
         if (!blockCheck.ok) {
@@ -85,22 +154,23 @@ const execCommandTool = createTool({
             return { success: false, error: blockCheck.reason ?? 'Comando bloqueado' };
         }
 
-        const cwdCheck = validateCwd(cwd);
+        const cwdCheck = await validateCwd(cwd);
         if (!cwdCheck.ok) {
             log('WARN', `[ShellTools] exec_command cwd inválido: ${cwdCheck.reason}`);
             return { success: false, error: cwdCheck.reason ?? 'CWD inválido' };
         }
 
-        const advisoryTimeoutMs = timeoutSeconds * 1000;
+        const timeoutConfig = resolveTimeoutConfig(timeoutSeconds, enforceTimeout, 30);
+        const advisoryTimeoutMs = timeoutConfig.advisoryTimeoutMs;
         log(
             'INFO',
-            `[ShellTools] exec_command: ${command} (cwd=${cwdCheck.resolved}, advisoryTimeout=${advisoryTimeoutMs}ms)`,
+            `[ShellTools] exec_command: ${command} (cwd=${cwdCheck.resolved}, advisoryTimeout=${advisoryTimeoutMs}ms, enforced=${timeoutConfig.timeoutEnforced})`,
         );
 
         // UPG-01: detectar pipeline simples (cmd1 | cmd2) e executar via spawn explícito sem shell.
         // Apenas pipes simples (sem subshell, sem redireção, sem ;/&) são permitidos.
         // Cada segmento é validado individualmente pela blocklist antes de executar.
-        const pipeSegments = command.split('|').map((/** @type {string} */ s) => s.trim());
+        const pipeSegments = splitPipelineSegments(command);
         if (pipeSegments.length > 1) {
             // Validar cada segmento individualmente
             for (const seg of pipeSegments) {
@@ -118,7 +188,7 @@ const execCommandTool = createTool({
                 const [file, ...args] = parts;
                 return { file: file ?? '', args };
             });
-            const result = await runPipeline(stages, { cwd: cwdCheck.resolved, timeoutMs: null });
+            const result = await runPipeline(stages, { cwd: cwdCheck.resolved, timeoutMs: timeoutConfig.timeoutMs });
             return {
                 success: result.exitCode === 0,
                 exitCode: result.exitCode,
@@ -126,6 +196,7 @@ const execCommandTool = createTool({
                 stderr: result.stderr,
                 durationMs: result.durationMs,
                 advisoryTimeoutMs,
+                timeoutEnforced: timeoutConfig.timeoutEnforced,
                 advisoryPipelineStages: pipeSegments.length,
             };
         }
@@ -158,7 +229,7 @@ const execCommandTool = createTool({
             };
         }
 
-        const _auditId = `exec-${Date.now()}`;
+        const _auditId = `exec-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
         defaultAuditLog.recordToolStart({
             toolCallId: _auditId,
             toolName: 'shell.exec_command',
@@ -166,7 +237,7 @@ const execCommandTool = createTool({
         });
         const result = await runProcess(executable, execArgs, {
             cwd: cwdCheck.resolved,
-            timeoutMs: null,
+            timeoutMs: timeoutConfig.timeoutMs,
         });
 
         // F6.4: registrar execução no audit de tools para observabilidade
@@ -185,6 +256,7 @@ const execCommandTool = createTool({
             stderr: result.stderr,
             durationMs: result.durationMs,
             advisoryTimeoutMs,
+            timeoutEnforced: timeoutConfig.timeoutEnforced,
             advisoryHistoricalTimeoutMs: ADVISORY_TIMEOUT_MS,
         };
     },
@@ -217,9 +289,19 @@ const runNpmScriptTool = createTool({
                 .min(1)
                 .optional()
                 .describe('Timeout informativo em segundos. Default histórico: 60.'),
+            enforceTimeout: z
+                .boolean()
+                .optional()
+                .describe('Se true, aplica timeout hard nesta execução. Se omitido, usa política runtime.'),
         }),
     ),
-    handler: async (/** @type {{ script: string; timeoutSeconds?: number }} */ { script, timeoutSeconds = 60 }) => {
+    handler: async (
+        /** @type {{ script: string; timeoutSeconds?: number; enforceTimeout?: boolean }} */ {
+            script,
+            timeoutSeconds,
+            enforceTimeout,
+        },
+    ) => {
         if (!ALLOWED_NPM_SCRIPTS.has(script)) {
             const allowed = [...ALLOWED_NPM_SCRIPTS].join(', ');
             log('WARN', `[ShellTools] run_npm_script bloqueado: script "${script}" não está na whitelist`);
@@ -229,10 +311,14 @@ const runNpmScriptTool = createTool({
             };
         }
 
-        const advisoryTimeoutMs = timeoutSeconds * 1000;
-        log('INFO', `[ShellTools] run_npm_script: npm run ${script} (advisoryTimeout=${advisoryTimeoutMs}ms)`);
+        const timeoutConfig = resolveTimeoutConfig(timeoutSeconds, enforceTimeout, 60);
+        const advisoryTimeoutMs = timeoutConfig.advisoryTimeoutMs;
+        log(
+            'INFO',
+            `[ShellTools] run_npm_script: npm run ${script} (advisoryTimeout=${advisoryTimeoutMs}ms, enforced=${timeoutConfig.timeoutEnforced})`,
+        );
 
-        const _npmAuditId = `npm-${Date.now()}`;
+        const _npmAuditId = `npm-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
         defaultAuditLog.recordToolStart({
             toolCallId: _npmAuditId,
             toolName: 'shell.run_npm_script',
@@ -240,7 +326,7 @@ const runNpmScriptTool = createTool({
         });
         const result = await runProcess('npm', ['run', script], {
             cwd: WORKSPACE_ROOT,
-            timeoutMs: null,
+            timeoutMs: timeoutConfig.timeoutMs,
         });
 
         // F6.4: audit log de execução npm
@@ -260,6 +346,7 @@ const runNpmScriptTool = createTool({
             durationMs: result.durationMs,
             script,
             advisoryTimeoutMs,
+            timeoutEnforced: timeoutConfig.timeoutEnforced,
             advisoryHistoricalTimeoutMs: ADVISORY_TIMEOUT_MS,
         };
     },
@@ -291,13 +378,18 @@ const runNodeFileTool = createTool({
                 .min(1)
                 .optional()
                 .describe('Timeout informativo em segundos. Default histórico: 30.'),
+            enforceTimeout: z
+                .boolean()
+                .optional()
+                .describe('Se true, aplica timeout hard nesta execução. Se omitido, usa política runtime.'),
         }),
     ),
     handler: async (
-        /** @type {{ filePath: string; args?: string[]; timeoutSeconds?: number }} */ {
+        /** @type {{ filePath: string; args?: string[]; timeoutSeconds?: number; enforceTimeout?: boolean }} */ {
             filePath,
             args = [],
-            timeoutSeconds = 30,
+            timeoutSeconds,
+            enforceTimeout,
         },
     ) => {
         // Valida extensão
@@ -307,35 +399,29 @@ const runNodeFileTool = createTool({
 
         // Valida caminho — SEC-TOOLS-001: resolve symlinks para bloquear traversal via link simbólico
         const resolved = path.isAbsolute(filePath) ? filePath : path.resolve(WORKSPACE_ROOT, filePath);
-        let realResolved;
-        try {
-            realResolved = realpathSync(resolved);
-        } catch {
-            realResolved = resolved; // arquivo não existe ainda
-        }
-        const rootReal = (() => {
-            try {
-                return realpathSync(WORKSPACE_ROOT);
-            } catch {
-                return WORKSPACE_ROOT;
-            }
-        })();
-        if (!realResolved.startsWith(rootReal + path.sep) && realResolved !== rootReal) {
-            return { success: false, error: `Acesso negado: arquivo fora do workspace (${resolved})` };
+        const pathCheck = await resolveWorkspaceRealPathSafe(resolved);
+        if (!pathCheck.ok) {
+            return { success: false, error: pathCheck.reason };
         }
 
-        const advisoryTimeoutMs = timeoutSeconds * 1000;
-        log('INFO', `[ShellTools] run_node_file: node ${resolved} (advisoryTimeout=${advisoryTimeoutMs}ms)`);
+        const safeResolved = pathCheck.resolved;
 
-        const _nodeAuditId = `node-${Date.now()}`;
+        const timeoutConfig = resolveTimeoutConfig(timeoutSeconds, enforceTimeout, 30);
+        const advisoryTimeoutMs = timeoutConfig.advisoryTimeoutMs;
+        log(
+            'INFO',
+            `[ShellTools] run_node_file: node ${safeResolved} (advisoryTimeout=${advisoryTimeoutMs}ms, enforced=${timeoutConfig.timeoutEnforced})`,
+        );
+
+        const _nodeAuditId = `node-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
         defaultAuditLog.recordToolStart({
             toolCallId: _nodeAuditId,
             toolName: 'shell.run_node_file',
-            args: { filePath: resolved, args },
+            args: { filePath: safeResolved, args },
         });
-        const result = await runProcess('node', [resolved, ...args], {
+        const result = await runProcess('node', [safeResolved, ...args], {
             cwd: WORKSPACE_ROOT,
-            timeoutMs: null,
+            timeoutMs: timeoutConfig.timeoutMs,
         });
 
         // F6.4: audit log de execução node
@@ -353,8 +439,9 @@ const runNodeFileTool = createTool({
             stdout: result.stdout,
             stderr: result.stderr,
             durationMs: result.durationMs,
-            filePath: resolved,
+            filePath: safeResolved,
             advisoryTimeoutMs,
+            timeoutEnforced: timeoutConfig.timeoutEnforced,
             advisoryHistoricalTimeoutMs: ADVISORY_TIMEOUT_MS,
         };
     },

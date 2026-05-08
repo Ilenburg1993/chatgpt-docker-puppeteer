@@ -43,7 +43,9 @@ export {
 
 export {
     agentDeselect,
+    agentGetCurrent,
     agentList,
+    agentReload,
     agentSelect,
     commandsHandlePending,
     compactionCompact,
@@ -56,7 +58,14 @@ export {
     uiElicitation,
 } from './rpc/ops.js';
 
-import { agentDeselect, agentList, agentSelect, compactionCompactTyped } from './rpc/ops.js';
+import {
+    agentDeselect,
+    agentGetCurrent,
+    agentList,
+    agentReload,
+    agentSelect,
+    compactionCompactTyped,
+} from './rpc/ops.js';
 
 /**
  * @typedef {import('@github/copilot-sdk').CopilotSession} CopilotSession
@@ -95,9 +104,13 @@ import { agentDeselect, agentList, agentSelect, compactionCompactTyped } from '.
  *
  * @typedef {{ agents: AgentInfo[] }} AgentListResult
  *
+ * @typedef {{ agent: AgentInfo | null }} AgentCurrentResult
+ *
  * @typedef {{ agent: AgentInfo }} AgentSelectResult
  *
  * @typedef {{}} AgentDeselectResult
+ *
+ * @typedef {{ agents: AgentInfo[] }} AgentReloadResult
  */
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -134,8 +147,10 @@ import { agentDeselect, agentList, agentSelect, compactionCompactTyped } from '.
  *     };
  *     agent: {
  *         list: () => Promise<AgentListResult>;
+ *         getCurrent: () => Promise<AgentCurrentResult>;
  *         select: (name: string) => Promise<AgentSelectResult>;
  *         deselect: () => Promise<AgentDeselectResult>;
+ *         reload: () => Promise<AgentReloadResult>;
  *     };
  *     compaction: {
  *         compact: () => Promise<CompactionResult>;
@@ -170,8 +185,10 @@ export function createSessionRpcFacade(session) {
         },
         agent: {
             list: () => /** @type {Promise<AgentListResult>} */ (agentList(session)),
+            getCurrent: () => /** @type {Promise<AgentCurrentResult>} */ (agentGetCurrent(session)),
             select: (name) => /** @type {Promise<AgentSelectResult>} */ (agentSelect(session, name)),
             deselect: () => /** @type {Promise<AgentDeselectResult>} */ (agentDeselect(session)),
+            reload: () => /** @type {Promise<AgentReloadResult>} */ (agentReload(session)),
         },
         compaction: {
             compact: () => /** @type {Promise<CompactionResult>} */ (compactionCompactTyped(session)),

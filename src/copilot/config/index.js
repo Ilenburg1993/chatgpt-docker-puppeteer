@@ -82,11 +82,21 @@ export {
 export {
     buildCustomAgentsConfig,
     getCustomAgent,
+    getEffectiveSdkAgentSelection,
     listAvailableSdkAgents,
     listCustomAgents,
+    MAESTRO_AGENT_NAME,
     registerCustomAgent,
     removeCustomAgent,
 } from './custom-agents.js';
+
+export {
+    OPERATIONAL_PROFILES,
+    loadOperationalProfile,
+    resolveOperationalAgentSelection,
+} from './operational-profiles.js';
+
+export { TOOL_ALIASES, getAllToolNames, normalizeAgentToolList, resolveToolName } from './tool-aliases.js';
 
 export {
     CONTEXT_UTIL_BLOCK_THRESHOLD,

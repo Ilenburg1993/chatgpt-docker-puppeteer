@@ -109,4 +109,24 @@ describe('terminal/dialog/turn-display', () => {
         renderStreamingFooter(state, 20);
         expect(isTerminalRenderLocked()).toBe(false);
     });
+
+    it('não prefixa cada chunk de streaming no meio da mesma linha', () => {
+        const state = createDisplayState({
+            model: 'gpt-5-mini',
+            effort: 'high',
+            turnStartTime: Date.now(),
+            showStreaming: true,
+            showThinking: false,
+        });
+
+        const onDelta = createDeltaCallback(state);
+        onDelta('Olá ');
+        onDelta('mundo.');
+        renderStreamingFooter(state, 20);
+
+        const output = writeSpy.mock.calls.map(([chunk]) => String(chunk)).join('');
+        const prefixCount = [...output.matchAll(/│/g)].length;
+        expect(prefixCount).toBe(1);
+        expect(output).toContain('Olá mundo.');
+    });
 });

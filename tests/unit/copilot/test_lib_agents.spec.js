@@ -90,7 +90,7 @@ describe('createReadOnlyAgent', () => {
             extraTools: ['custom_tool'],
         });
         assert.ok(Array.isArray(agent.tools));
-        assert.ok(/** @type {string[]} */ (agent.tools).includes('read_file'));
+        assert.ok(/** @type {string[]} */ (agent.tools).includes('read_file_content'));
         assert.ok(/** @type {string[]} */ (agent.tools).includes('custom_tool'));
     });
 
@@ -245,9 +245,9 @@ describe('READ_ONLY_TOOLS', () => {
         assert.ok(READ_ONLY_TOOLS.every((t) => typeof t === 'string'));
     });
 
-    it('deve incluir read_file e grep_search', () => {
-        assert.ok(READ_ONLY_TOOLS.includes('read_file'));
-        assert.ok(READ_ONLY_TOOLS.includes('grep_search'));
+    it('deve incluir ferramentas canônicas de leitura e busca', () => {
+        assert.ok(READ_ONLY_TOOLS.includes('read_file_content'));
+        assert.ok(READ_ONLY_TOOLS.includes('search_in_files'));
     });
 
     it('deve ter ao menos 4 ferramentas', () => {

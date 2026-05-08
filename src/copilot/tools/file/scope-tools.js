@@ -65,6 +65,7 @@ export const workspaceScopeDeclareTool = buildTool({
     parameters: ScopeDeclareParameters,
     handler: async ({
         sessionId,
+        scopeName,
         directory,
         maxFiles,
         parseSymbols,
@@ -75,17 +76,20 @@ export const workspaceScopeDeclareTool = buildTool({
         recursive,
         awaitReady,
     }) => {
-        const scope = declareScope({
-            sessionId,
-            directory,
-            maxFiles,
-            parseSymbols,
-            indexMode,
-            concurrency,
-            include,
-            exclude,
-            recursive,
-        });
+        const effectiveSessionId = scopeName?.trim() ? scopeName.trim() : sessionId;
+        const scope = await Promise.resolve(
+            declareScope({
+                sessionId: effectiveSessionId,
+                directory,
+                maxFiles,
+                parseSymbols,
+                indexMode,
+                concurrency,
+                include,
+                exclude,
+                recursive,
+            }),
+        );
         const advisoryLimits = {
             requestedMaxFiles: maxFiles ?? null,
             requestedConcurrency: concurrency ?? null,
@@ -95,10 +99,10 @@ export const workspaceScopeDeclareTool = buildTool({
             limitMode: 'informative',
         };
 
-        if (awaitReady) {
+        if (awaitReady && typeof scope.awaitReady === 'function') {
             const stats = await scope.awaitReady();
             return {
-                sessionId,
+                sessionId: effectiveSessionId,
                 scope,
                 stats,
                 advisoryLimits,
@@ -106,7 +110,7 @@ export const workspaceScopeDeclareTool = buildTool({
         }
 
         return {
-            sessionId,
+            sessionId: effectiveSessionId,
             scope,
             advisoryLimits,
         };

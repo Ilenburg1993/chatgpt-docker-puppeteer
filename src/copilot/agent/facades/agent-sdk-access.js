@@ -51,6 +51,8 @@ export {
     readAgentSdkModelStats,
 } from './sdk/models.js';
 
+export { formatValidationResult, validateAgentContracts } from './sdk/agent-contract.js';
+
 export {
     createAgentSdkToolsRegistry,
     getAgentSdkToolsConfig,

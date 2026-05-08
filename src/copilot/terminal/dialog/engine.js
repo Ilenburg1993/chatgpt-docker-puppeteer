@@ -74,6 +74,7 @@ let _sendTurnMutex = Promise.resolve(null);
 let _ensureDialogLoopInFlight = null;
 
 const WAITING_FRAMES = ['⏳', '⌛', '⏳'];
+const LIVE_TURN_NARRATION_INTERVAL_MS = 10_000;
 
 /**
  * @param {{
@@ -357,9 +358,13 @@ async function _executeTurn(message, actor) {
     const rl = getRl();
     /** @type {NodeJS.Timeout | null} */
     let waitingTicker = null;
+    /** @type {{ firstOutputAt: number; lastNarrationAt: number; model: string; effort: string }} */
+    const liveTurnSignal = { firstOutputAt: 0, lastNarrationAt: 0, model: '-', effort: '-' };
     if (rl) {
         const { model, reasoningEffort } = readTerminalDialogStreamMeta();
         const effort = reasoningEffort;
+        liveTurnSignal.model = model;
+        liveTurnSignal.effort = effort;
         const renderWaitingStatus = () =>
             writeInlineStatus(
                 formatLiveWaitingStatus({
@@ -370,9 +375,27 @@ async function _executeTurn(message, actor) {
                     timeoutStrategy: timeoutDecision.strategy,
                 }),
             );
+        const narrateWaitingStatus = () => {
+            const now = Date.now();
+            const elapsedMs = Math.max(0, now - t0);
+            if (liveTurnSignal.firstOutputAt > 0 || elapsedMs < LIVE_TURN_NARRATION_INTERVAL_MS) return;
+            if (now - liveTurnSignal.lastNarrationAt < LIVE_TURN_NARRATION_INTERVAL_MS) return;
+            liveTurnSignal.lastNarrationAt = now;
+            recordTerminalActivity('thinking', 'LLM-B trabalhando', {
+                detail: `${liveTurnSignal.model} · ${liveTurnSignal.effort} · ${(elapsedMs / 1000).toFixed(0)}s sem delta visível`,
+                source: 'dialog',
+                recordHistory: false,
+            });
+            println(
+                `  \x1b[90m↳ LLM-B ainda trabalhando · ${liveTurnSignal.model}/${liveTurnSignal.effort} · ${(elapsedMs / 1000).toFixed(0)}s sem saída incremental\x1b[0m`,
+            );
+        };
         renderWaitingStatus();
         rl.setPrompt(buildWaitingPrompt());
-        waitingTicker = setInterval(renderWaitingStatus, 1000);
+        waitingTicker = setInterval(() => {
+            renderWaitingStatus();
+            narrateWaitingStatus();
+        }, 1000);
         if (typeof waitingTicker.unref === 'function') waitingTicker.unref();
     }
 
@@ -421,11 +444,19 @@ async function _executeTurn(message, actor) {
         displayState.timeoutMs = timeoutDecision.timeoutMs;
         displayState.timeoutStrategy = timeoutDecision.strategy;
 
+        const renderReasoningChunk = createReasoningCallback(displayState);
         /** @type {(chunk: string, reasoningId: string | null) => void} */
-        const onReasoning = createReasoningCallback(displayState);
+        const onReasoning = (chunk, reasoningId) => {
+            if (liveTurnSignal.firstOutputAt === 0) liveTurnSignal.firstOutputAt = Date.now();
+            renderReasoningChunk(chunk, reasoningId);
+        };
 
+        const renderDeltaChunk = createDeltaCallback(displayState);
         /** @type {(chunk: string) => void} */
-        const onDelta = createDeltaCallback(displayState);
+        const onDelta = (chunk) => {
+            if (liveTurnSignal.firstOutputAt === 0) liveTurnSignal.firstOutputAt = Date.now();
+            renderDeltaChunk(chunk);
+        };
 
         const reply = await runTerminalDialogTurn(enrichedMessage, {
             timeout: timeoutDecision.timeoutMs,

@@ -136,36 +136,64 @@ describe('F47 — buildCustomAgentsConfig', () => {
     it('retorna array de agents filtrados por enabled', () => {
         const agents = mod.buildCustomAgentsConfig(['task', 'explore']);
         expect(agents).toBeDefined();
-        expect(agents?.length).toBe(2);
+        expect(agents?.length).toBe(3);
         const names = agents?.map((a) => a.name);
+        expect(names?.[0]).toBe('agent-full');
         expect(names).toContain('task');
         expect(names).toContain('explore');
     });
 
-    it('retorna undefined para enabled vazio', () => {
-        expect(mod.buildCustomAgentsConfig([])).toBeUndefined();
+    it('preserva maestro mesmo com enabled vazio', () => {
+        expect(mod.buildCustomAgentsConfig([])?.map((agent) => agent.name)).toEqual(['agent-full']);
     });
 
-    it('retorna undefined se todos os names são desconhecidos', () => {
-        expect(mod.buildCustomAgentsConfig(['nope', 'nada'])).toBeUndefined();
+    it('preserva maestro se todos os nomes explícitos são desconhecidos', () => {
+        expect(mod.buildCustomAgentsConfig(['nope', 'nada'])?.map((agent) => agent.name)).toEqual(['agent-full']);
     });
 
-    it('default usa COPILOT_CUSTOM_AGENTS (task,explore,diagnostic)', () => {
+    it('default usa seleção efetiva com maestro obrigatório', () => {
         const agents = mod.buildCustomAgentsConfig();
         expect(agents).toBeDefined();
-        expect(agents?.length).toBe(3);
+        expect(agents?.map((agent) => agent.name)).toEqual(['agent-full', 'task', 'explore', 'diagnostic']);
     });
 });
 
 describe('F47 — listAvailableSdkAgents', () => {
     it('retorna nomes de todos os SDK agents', () => {
         const names = mod.listAvailableSdkAgents();
-        expect(names.length).toBeGreaterThanOrEqual(6);
+        expect(names.length).toBeGreaterThanOrEqual(7);
+        expect(names).toContain('agent-full');
         expect(names).toContain('task');
         expect(names).toContain('explore');
         expect(names).toContain('diagnostic');
         expect(names).toContain('planner');
         expect(names).toContain('git-ops');
         expect(names).toContain('shell-ops');
+    });
+});
+
+describe('F47 — canonical built-in tools', () => {
+    it('BUILTIN_AGENTS usa nomes canônicos de filesystem', () => {
+        expect(mod.getCustomAgent('auditor')?.tools).toEqual([
+            'list_directory',
+            'search_in_files',
+            'read_file_content',
+        ]);
+        expect(mod.getCustomAgent('docs')?.tools).toEqual(['read_file_content', 'list_directory']);
+        expect(mod.getCustomAgent('reviewer')?.tools).toEqual([
+            'list_directory',
+            'search_in_files',
+            'read_file_content',
+        ]);
+    });
+
+    it('agent-full é registrado como maestro full-access', () => {
+        const agents = mod.buildCustomAgentsConfig(['agent-full']);
+        expect(agents?.[0]).toMatchObject({
+            name: 'agent-full',
+            priority: 'maestro',
+            tools: null,
+            infer: true,
+        });
     });
 });

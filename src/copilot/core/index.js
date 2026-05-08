@@ -107,7 +107,13 @@ export {
     resolveIoAdvisoryLimits,
     sanitizeIoTextOutput,
 } from './io-policy.js';
-export { CANONICAL_LOCAL_FS_TOOL_NAMES, decideSdkFsRouting, hasCanonicalLocalFsTools } from './sdk-fs-routing.js';
+export {
+    CANONICAL_LOCAL_FS_TOOL_NAMES,
+    LEGACY_SDK_LOCAL_FS_TOOL_NAMES,
+    buildCanonicalLocalFsExcludedTools,
+    decideSdkFsRouting,
+    hasCanonicalLocalFsTools,
+} from './sdk-fs-routing.js';
 
 // ─── Timeouts ─────────────────────────────────────────────────────────────────
 export {

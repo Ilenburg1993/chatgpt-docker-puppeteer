@@ -378,8 +378,11 @@ describe('terminal/sdk-session-events.js — contrato', () => {
         );
         expect(mocks.recordTerminalActivity).toHaveBeenCalledWith(
             'system',
-            'Tools SDK atualizadas',
-            expect.objectContaining({ detail: '92 tool(s)', recordHistory: false }),
+            'Tools dinâmicas SDK atualizadas',
+            expect.objectContaining({
+                detail: '92 tool(s) reportada(s) pelo evento SDK; registry local segue em /tools',
+                recordHistory: false,
+            }),
         );
         expect(mocks.recordTerminalActivity).toHaveBeenCalledWith(
             'system',
@@ -395,7 +398,7 @@ describe('terminal/sdk-session-events.js — contrato', () => {
             expect.objectContaining({ count: 4 }),
         );
         expect(mocks.println).not.toHaveBeenCalledWith(expect.stringContaining('Skills SDK'));
-        expect(mocks.println).not.toHaveBeenCalledWith(expect.stringContaining('Tools SDK atualizadas'));
+        expect(mocks.println).not.toHaveBeenCalledWith(expect.stringContaining('Tools dinâmicas SDK atualizadas'));
     });
 
     it('mostra narrativa verbose de sessão quando o toggle session está ativo', async () => {
@@ -409,7 +412,7 @@ describe('terminal/sdk-session-events.js — contrato', () => {
         agent.emit('session.tools_updated', { count: 92 });
 
         expect(mocks.println).toHaveBeenCalledWith(expect.stringContaining('Skills SDK: 2/3 habilitadas'));
-        expect(mocks.println).toHaveBeenCalledWith(expect.stringContaining('Tools SDK atualizadas: 92'));
+        expect(mocks.println).toHaveBeenCalledWith(expect.stringContaining('Tools dinâmicas SDK atualizadas: 92'));
     });
 
     it('cleanup remove listeners vanilla registrados', async () => {

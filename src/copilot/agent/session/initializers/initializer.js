@@ -2,11 +2,11 @@
 /**
  * src/copilot/agent/session/initializers/initializer.js
  *
- * Inicializador de sessão persistente para o Always-Alive Agent. Preserva o sessionId em disco e retoma sessões após
+ * Inicializador de sessão persistente para o agente sempre vivo. Preserva o sessionId em disco e retoma sessões após
  * reinicializações (PM2/reboot).
  *
- * I/O de estado persistido consumido via façade `agent-runtime-state` (que delega ao `state-io`). Logging de auditoria
- * delegado a `infra/tool-audit-logger.js`.
+ * Entrada/saída de estado persistido consumida via fachada `agent-runtime-state` (que delega ao `state-io`). Registro
+ * de auditoria delegado a `infra/tool-audit-logger.js`.
  *
  * @module copilot/agent/session/initializer
  * @see EventBus
@@ -17,8 +17,8 @@
 
 import { buildAuditingPermissionHandler } from '#copilot/audit';
 import { WORKSPACE_ROOT, readBootSkillConfig } from '#copilot/boot';
-import { buildCustomAgentsConfig } from '#copilot/config';
-import { toError } from '#copilot/core';
+import { MAESTRO_AGENT_NAME, buildCustomAgentsConfig } from '#copilot/config';
+import { buildCanonicalLocalFsExcludedTools, toError } from '#copilot/core';
 import { SESSION_MAX_AGE_MS } from '../../../config/agent.js';
 import {
     buildLiveSystemMessage,
@@ -33,11 +33,13 @@ import {
     AGENT_SDK_DEFAULT_MODEL,
     canReadAgentSdkSessionMessages,
     createAgentSdkSessionByClient,
+    formatValidationResult,
     getAgentConfiguredSessionFsHandler,
     loadAgentSdkToolsConfigAsync,
     pickDefinedAgentSdkOptions,
     readAgentSdkSessionMessages,
     resumeOrCreateAgentSdkSession,
+    validateAgentContracts,
 } from '../../facades/agent-sdk-access.js';
 import { log } from '../../ports/logging-port.js';
 import { defaultMetrics } from '../../ports/metrics-port.js';
@@ -52,11 +54,11 @@ export { SessionJsonSchema, buildHookSystemContext, buildHookSystemContextSafe }
  * @typedef {import('#copilot/sdk/types').CopilotSession} CopilotSession
  */
 
-// F51: Carrega configuração de tools persistida (async).
+// F51: Carrega configuração persistida de ferramentas (assíncrono).
 await loadAgentSdkToolsConfigAsync();
 
 /**
- * Threshold dinâmico de compaction — configurável em runtime via PUT /config/infinite-session.
+ * Limiar dinâmico de compactação — configurável em tempo de execução via PUT /config/infinite-session.
  *
  * **Singleton de módulo**: este valor é compartilhado por todas as chamadas a `initOrResumeSession()` no mesmo
  * processo. Em um cenário futuro multi-agent, cada instância deveria receber o threshold via opções em vez de depender
@@ -67,6 +69,18 @@ await loadAgentSdkToolsConfigAsync();
 let _backgroundCompactionThreshold = 0.75;
 
 const RESUMED_SESSION_HEALTH_TIMEOUT_MS = 5_000;
+
+/** @type {{ errors: string[]; warnings: string[]; contractLog: Record<string, any> } | null} */
+let _lastAgentContractValidation = null;
+
+/**
+ * Retorna o último resultado de validação de contratos dos agentes customizados SDK.
+ *
+ * @returns {{ errors: string[]; warnings: string[]; contractLog: Record<string, any> } | null}
+ */
+export function getLastAgentContractValidation() {
+    return _lastAgentContractValidation;
+}
 
 /**
  * Verifica se uma sessao retomada responde a uma chamada leve antes de declarar sucesso.
@@ -102,7 +116,7 @@ async function _validateResumedSession(session) {
 }
 
 /**
- * Atualiza o threshold de compaction. Aplicado na próxima sessão criada/retomada.
+ * Atualiza o limiar de compactação. Aplicado na próxima sessão criada/retomada.
  *
  * @param {number} threshold - Valor entre 0.1 e 1.0
  * @returns {void}
@@ -153,18 +167,20 @@ function _validateSessionForResume(sessionId, lastActivityMs) {
  * 2. Se existir → tenta `resumeSession()`.
  * 3. Se não existir ou der erro → cria nova sessão e persiste o ID.
  *
- * Sempre injeta o contexto do hook system (session-briefing.md + session.json) como `systemMessage.sections.guidelines`
- * para que o agente SDK herde o protocolo operacional da sessão principal do VS Code Copilot.
+ * Sempre injeta o contexto do sistema de hooks (session-briefing.md + session.json) como
+ * `systemMessage.sections.guidelines` para que o agente SDK herde o protocolo operacional da sessão principal do VS
+ * Code Copilot.
  *
  * @param {CopilotClient} client - Instância do CopilotClient
  * @param {object} sessionOptions - Opções para createSession/resumeSession
- * @param {string} [sessionOptions.model] - Modelo a usar (default: 'gpt-5-mini')
+ * @param {string} [sessionOptions.model] - Modelo a usar (padrão: 'gpt-5-mini')
  * @param {'low' | 'medium' | 'high' | 'xhigh'} [sessionOptions.reasoningEffort] - Esforço de raciocínio para o3/o4-mini
  * @param {import('#copilot/sdk/types').PermissionHandler} [sessionOptions.onPermissionRequest]
  * @param {Function} [sessionOptions.onUserInputRequest]
  * @param {object} [sessionOptions.hooks]
- * @param {import('#copilot/sdk/types').Tool[]} [sessionOptions.tools] - Custom Tools a registrar na sessão
- * @param {boolean} [sessionOptions.injectHookContext] - Injetar contexto do hook system (default: true)
+ * @param {import('#copilot/sdk/types').Tool[]} [sessionOptions.tools] - Ferramentas customizadas a registrar na sessão
+ * @param {string[]} [sessionOptions.excludedTools] - Denylist adicional de tools expostas ao modelo na sessão SDK
+ * @param {boolean} [sessionOptions.injectHookContext] - Injetar contexto do sistema de hooks (padrão: true)
  * @param {Record<string, unknown>} [sessionOptions.mcpServers] - Configurações de servidores MCP nativos
  * @returns {Promise<{
  *     session: CopilotSession;
@@ -186,12 +202,35 @@ export async function initOrResumeSession(client, sessionOptions) {
         ...(injectContext ? { getExtraContext: buildHookSystemContextSafe } : {}),
     });
     const systemPromptStatus = await readSystemPromptStatus();
+    const customAgents = buildCustomAgentsConfig();
+    const availableToolNameList = /** @type {string[]} */ (
+        (Array.isArray(sessionOptions.tools) ? sessionOptions.tools : [])
+            .map((tool) => (tool && typeof tool === 'object' ? /** @type {{ name?: unknown }} */ (tool).name : null))
+            .filter((name) => typeof name === 'string' && name.length > 0)
+    );
+    const availableToolNames = new Set(availableToolNameList);
+    const excludedTools = buildCanonicalLocalFsExcludedTools(
+        availableToolNameList,
+        Array.isArray(sessionOptions.excludedTools) ? sessionOptions.excludedTools : [],
+    );
+    const agentContractValidation = validateAgentContracts(customAgents ?? [], availableToolNames);
+    _lastAgentContractValidation = agentContractValidation;
+    const validationSummary = formatValidationResult(agentContractValidation);
+    if (agentContractValidation.errors.length > 0) {
+        log('ERROR', validationSummary);
+        throw new Error(`Validação de contrato de agente falhou: ${agentContractValidation.errors.join('; ')}`);
+    }
+    if (agentContractValidation.warnings.length > 0) {
+        log('WARN', validationSummary);
+    } else {
+        log('INFO', validationSummary);
+    }
 
     /** @type {Record<string, unknown>} */
     const opts = {
         model,
         streaming: true,
-        // Threshold dinâmico lido da variável de módulo (configurável via setBackgroundCompactionThreshold).
+        // Limiar dinâmico lido da variável de módulo (configurável via setBackgroundCompactionThreshold).
         infiniteSessions: { enabled: true, backgroundCompactionThreshold: _backgroundCompactionThreshold },
         // Diretório de trabalho para o SDK contextualizar ferramentas de busca.
         workingDirectory: WORKSPACE_ROOT,
@@ -201,15 +240,20 @@ export async function initOrResumeSession(client, sessionOptions) {
             reasoningEffort: sessionOptions.reasoningEffort,
             onUserInputRequest: sessionOptions.onUserInputRequest,
             createSessionFsHandler,
+            includeSubAgentStreamingEvents: true,
             hooks: sessionOptions.hooks,
             tools: sessionOptions.tools,
             mcpServers: sessionOptions.mcpServers,
             systemMessage,
+            excludedTools,
         }),
-        // AH.6: wrapper de permissão com audit logging de ferramentas de alto risco
+        // AH.6: envoltório de permissão com registro de auditoria de ferramentas de alto risco
         onPermissionRequest: buildAuditingPermissionHandler(sessionOptions.onPermissionRequest),
-        // L1: sub-agentes customizados especializados (task, explore, diagnostic)
-        customAgents: buildCustomAgentsConfig(),
+        agent: MAESTRO_AGENT_NAME,
+        // O maestro governa por `agent` + hooks de policy. `defaultAgent.excludedTools` é namespace de tools nativas
+        // do SDK; nomes das nossas tools customizadas geram warnings "Unknown tool name" e não bloqueiam o default.
+        // L1: sub-agentes customizados especializados, sempre comandados pelo maestro.
+        customAgents,
     };
 
     // F43.2 (GAP-SD-03): verificar se a sessão deve ser rotacionada antes de tentar retomada
@@ -255,12 +299,13 @@ export async function initOrResumeSession(client, sessionOptions) {
     }
     const effectiveReasoningEffort =
         result.reasoningEffort ??
+        sessionOptions.reasoningEffort ??
         (state?.reasoningEffort === 'low' ||
         state?.reasoningEffort === 'medium' ||
         state?.reasoningEffort === 'high' ||
         state?.reasoningEffort === 'xhigh'
             ? state.reasoningEffort
-            : sessionOptions.reasoningEffort);
+            : undefined);
 
     // SYNC-SM-01 (fix): usar writeStateAsync nas chamadas dentro de funções async para não bloquear o event loop
     if (result.isResumed) {

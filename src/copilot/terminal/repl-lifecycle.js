@@ -17,8 +17,10 @@ import readline from 'node:readline';
 import { extractAtReferences } from '../presentation/runtime-file-context.js';
 import { addAttachment, setRl } from '../presentation/runtime-ui-state-store.js';
 import { buildTerminalOperationalGuidance } from './auto-briefing.js';
-import { buildUserPrompt, println, sendTurn } from './dialog/index.js';
+import { buildUserPrompt, println, resetStatusRowState, sendTurn } from './dialog/index.js';
+import { readTerminalDisplayState, resolveTerminalBootDisplayPreset } from './display-policy.js';
 import { readTerminalStatusProjection } from './frontend/index.js';
+import { setupTerminalLiveStatusLine } from './live-status-line.js';
 import { tryAnswerTerminalPendingQuestionInput } from './pending-question-answer.js';
 import { buildTerminalReplBanner } from './repl-banner.js';
 import { parseTerminalReplCommand } from './repl-command-parser.js';
@@ -64,21 +66,41 @@ export async function runReplLifecycle(injectServer, { injectPort, onReady }) {
     setRl(rl);
 
     const cleanup = setupAgentListeners(rl);
+    const cleanupLiveStatusLine = setupTerminalLiveStatusLine();
 
     println(buildTerminalReplBanner(injectPort));
     println('\x1b[90m  Iniciando sessão com LLM-B…\x1b[0m');
     try {
         const projection = readTerminalStatusProjection({ injectPort });
-        const guidance = buildTerminalOperationalGuidance({
-            sdkFsRouting: projection.sdkFsRouting,
-            toolLoad: projection.toolLoad,
-            instructionLoad: projection.instructionLoad,
-        });
-        println(`\x1b[90m  [auto-brief] route=${guidance.mode} · ${guidance.summary}\x1b[0m`);
-        println(`\x1b[90m  [auto-brief] ${guidance.domainHint}\x1b[0m`);
-        println(`\x1b[90m  [auto-brief] ${guidance.contextHint}\x1b[0m`);
-        if (guidance.warnings.length > 0) {
-            println(`\x1b[33m  [auto-brief] atenção: ${guidance.warnings.join(' | ')}\x1b[0m`);
+        const displayState = readTerminalDisplayState();
+        const displayPreset = resolveTerminalBootDisplayPreset();
+        println(
+            `\x1b[90m  [auto-brief] display=${displayPreset} · thinking=${displayState.thinking ? 'on' : 'off'} · streaming=${displayState.streaming ? 'on' : 'off'} · session=${displayState.session ? 'on' : 'off'}\x1b[0m`,
+        );
+        const projectedModel = typeof projection.snap['model'] === 'string' ? projection.snap['model'] : null;
+        const projectedReasoning =
+            typeof projection.snap['reasoningEffort'] === 'string' ? projection.snap['reasoningEffort'] : null;
+        if (projectedModel || projectedReasoning) {
+            println(
+                `\x1b[90m  [auto-brief] capacidade=${projectedModel ?? '-'} · reasoning=${projectedReasoning ?? '-'}\x1b[0m`,
+            );
+        }
+        if (Number(projection.toolLoad?.total ?? 0) <= 0) {
+            println(
+                '\x1b[90m  [auto-brief] route=booting · Aguardando bootstrap do registry local antes de avaliar FS canônico.\x1b[0m',
+            );
+        } else {
+            const guidance = buildTerminalOperationalGuidance({
+                sdkFsRouting: projection.sdkFsRouting,
+                toolLoad: projection.toolLoad,
+                instructionLoad: projection.instructionLoad,
+            });
+            println(`\x1b[90m  [auto-brief] route=${guidance.mode} · ${guidance.summary}\x1b[0m`);
+            println(`\x1b[90m  [auto-brief] ${guidance.domainHint}\x1b[0m`);
+            println(`\x1b[90m  [auto-brief] ${guidance.contextHint}\x1b[0m`);
+            if (guidance.warnings.length > 0) {
+                println(`\x1b[33m  [auto-brief] atenção: ${guidance.warnings.join(' | ')}\x1b[0m`);
+            }
         }
     } catch (e) {
         log('WARN', `[TerminalServer] Auto-briefing indisponível no boot: ${toError(e).message}`);
@@ -91,8 +113,14 @@ export async function runReplLifecycle(injectServer, { injectPort, onReady }) {
 
     const PROMPT_CONTINUATION = '\x1b[90m  ...\x1b[0m ';
     const multilineInput = createTerminalMultilineInputState();
+    /** @type {Promise<void>} */
+    let lineQueue = Promise.resolve();
 
-    rl.on('line', async (line) => {
+    /**
+     * @param {string} line
+     * @returns {Promise<void>}
+     */
+    async function handleLine(line) {
         const multiline = multilineInput.acceptLine(line);
         if (!multiline.complete) {
             rl.setPrompt(PROMPT_CONTINUATION);
@@ -143,16 +171,63 @@ export async function runReplLifecycle(injectServer, { injectPort, onReady }) {
             addAttachment(p);
             println(`\x1b[90m  📎 @${p} adicionado à fila de attachments\x1b[0m`);
         }
-        const finalMessage = atPaths.length > 0 ? strippedMessage || trimmed : trimmed;
+        const finalMessage = atPaths.length > 0 ? strippedMessage : trimmed;
+        if (!finalMessage.trim()) {
+            println('\x1b[33m  [attach] Arquivo(s) anexados. Escreva uma mensagem para enviar o turno.\x1b[0m');
+            if (isReadlineOpen(rl)) {
+                rl.setPrompt(buildUserPrompt());
+                rl.prompt();
+            }
+            return;
+        }
 
         await sendTurn(finalMessage, 'user');
+    }
+
+    rl.on('line', (line) => {
+        // ESCAPE-BYPASS: comandos críticos de saída/restart executam IMEDIATAMENTE, sem entrar na fila serializada.
+        // Isso garante que /quit e /restart funcionem mesmo se um sendTurn anterior estiver travado na fila.
+        const trimmedForEscape = line.trim();
+        if (trimmedForEscape.startsWith('/')) {
+            const escapeCmd = parseTerminalReplCommand(trimmedForEscape, resolve);
+            const ESCAPE_COMMANDS = new Set(['quit', 'exit', 'restart', 'emergency-reset', 'ereset']);
+            if (escapeCmd && ESCAPE_COMMANDS.has(escapeCmd.command.toLowerCase())) {
+                void dispatchCmd(escapeCmd.command, escapeCmd.arg, escapeCmd.rest, rl, injectServer, cleanup).catch(
+                    (e) => {
+                        log('ERROR', `[TerminalServer] Escape command falhou: ${toError(e).message}`);
+                    },
+                );
+                return;
+            }
+        }
+        lineQueue = lineQueue
+            .then(() => handleLine(line))
+            .catch((e) => {
+                log('ERROR', `[TerminalServer] Falha ao processar linha do REPL: ${toError(e).message}`);
+                if (isReadlineOpen(rl)) {
+                    rl.setPrompt(buildUserPrompt());
+                    rl.prompt();
+                }
+            });
     });
 
     rl.on('close', () => {
-        cleanup();
-        setRl(null);
-        println('[terminal] readline fechado. Inject server continua ativo.');
-        log('INFO', '[TerminalServer] readline encerrado.');
+        // Resetar estado da linha de status para evitar layout corrupido na próxima sessão readline
+        resetStatusRowState();
+        try {
+            cleanupLiveStatusLine();
+        } catch (e) {
+            log('WARN', `[TerminalServer] cleanup da linha viva falhou: ${toError(e).message}`);
+        }
+        try {
+            cleanup();
+        } catch (e) {
+            log('WARN', `[TerminalServer] cleanup de listeners falhou: ${toError(e).message}`);
+        } finally {
+            setRl(null);
+            println('[terminal] readline fechado. Inject server continua ativo.');
+            log('INFO', '[TerminalServer] readline encerrado.');
+        }
     });
 
     rl.on('SIGINT', () => {

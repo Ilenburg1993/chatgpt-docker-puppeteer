@@ -6,17 +6,17 @@
  *
  * Valida:
  *
- * - sessionRpcTools exporta array com 8 tools
+ * - sessionRpcTools exporta array com 10 tools
  * - setSessionRpc injeta o RPC handle
- * - Todas as tools retornam erro quando RPC indisponível
+ * - Todas as ferramentas retornam erro quando RPC indisponível
  * - session_mode_get: retorna modo atual
  * - session_mode_set: muda modo
  * - session_plan_read: lê plan.md
  * - session_plan_update: atualiza plan.md
  * - session_plan_delete: remove plan.md
  * - session_agent_list: lista agentes
- * - session_agent_select: seleciona agente, deselect com nome vazio
- * - session_compact: aciona compaction
+ * - session_agent_select: bloqueia especialistas e reforça o maestro
+ * - session_compact: aciona compactação
  * - wrapRpc: timeout, erro genérico
  */
 
@@ -37,6 +37,7 @@ vi.mock('#copilot/config/env', () => ({
     COPILOT_MCP_SERVERS: '',
     COPILOT_CUSTOM_AGENTS: '',
     COPILOT_DISABLED_AGENTS: '',
+    COPILOT_OPERATIONAL_PROFILE: 'production',
 }));
 
 vi.mock('#copilot/core', async (importOriginal) => {
@@ -93,8 +94,11 @@ function createFakeRpc() {
             list: vi.fn(async () => ({
                 agents: [{ name: 'auditor', displayName: 'Auditor', description: 'Audit agent' }],
             })),
+            getCurrent: vi.fn(async () => ({ agent: { name: 'agent-full' } })),
             select: vi.fn(async (/** @type {string} */ name) => ({ agent: { name } })),
-            deselect: vi.fn(async () => ({})),
+            reload: vi.fn(async () => ({
+                agents: [{ name: 'agent-full', displayName: 'Maestro', description: 'Maestro' }],
+            })),
         },
         compaction: {
             compact: vi.fn(
@@ -133,9 +137,9 @@ describe('session-rpc-tools', () => {
     // ── Exports ───────────────────────────────────────────────────────────
 
     describe('exports', () => {
-        it('sessionRpcTools é array com 8 tools', () => {
+        it('sessionRpcTools é array com 10 tools', () => {
             expect(Array.isArray(mod.sessionRpcTools)).toBe(true);
-            expect(mod.sessionRpcTools.length).toBe(8);
+            expect(mod.sessionRpcTools.length).toBe(10);
         });
 
         it('contém as tools esperadas', () => {
@@ -146,7 +150,9 @@ describe('session-rpc-tools', () => {
             expect(names).toContain('session_plan_update');
             expect(names).toContain('session_plan_delete');
             expect(names).toContain('session_agent_list');
+            expect(names).toContain('session_agent_current');
             expect(names).toContain('session_agent_select');
+            expect(names).toContain('session_agent_reload');
             expect(names).toContain('session_compact');
         });
     });
@@ -245,20 +251,40 @@ describe('session-rpc-tools', () => {
     // ── session_agent_select ──────────────────────────────────────────────
 
     describe('session_agent_select', () => {
-        it('seleciona agente por nome', async () => {
+        it('bloqueia seleção direta de especialista', async () => {
             const tool = mod.sessionRpcTools.find((t) => t.name === 'session_agent_select');
             const result = await /** @type {any} */ (tool).handler({ name: 'auditor' });
 
-            expect(result.agent.name).toBe('auditor');
-            expect(fakeRpc.agent.select).toHaveBeenCalledWith('auditor');
+            expect(result.error).toMatch(/bloqueada/);
+            expect(fakeRpc.agent.select).not.toHaveBeenCalled();
         });
 
-        it('deselect com nome vazio', async () => {
+        it('nome vazio reforça o maestro', async () => {
             const tool = mod.sessionRpcTools.find((t) => t.name === 'session_agent_select');
             const result = await /** @type {any} */ (tool).handler({ name: '' });
 
-            expect(result.selected).toBe(null);
-            expect(fakeRpc.agent.deselect).toHaveBeenCalled();
+            expect(result.agent.name).toBe('agent-full');
+            expect(fakeRpc.agent.select).toHaveBeenCalledWith('agent-full');
+        });
+    });
+
+    describe('session_agent_current', () => {
+        it('retorna maestro atual sem reforço quando já ativo', async () => {
+            const tool = mod.sessionRpcTools.find((t) => t.name === 'session_agent_current');
+            const result = await /** @type {any} */ (tool).handler({});
+
+            expect(result).toEqual({ agent: { name: 'agent-full' }, enforced: false });
+        });
+    });
+
+    describe('session_agent_reload', () => {
+        it('recarrega agentes e reativa maestro', async () => {
+            const tool = mod.sessionRpcTools.find((t) => t.name === 'session_agent_reload');
+            const result = await /** @type {any} */ (tool).handler({});
+
+            expect(result.selectedAgent.name).toBe('agent-full');
+            expect(fakeRpc.agent.reload).toHaveBeenCalled();
+            expect(fakeRpc.agent.select).toHaveBeenCalledWith('agent-full');
         });
     });
 
@@ -310,7 +336,7 @@ describe('session-rpc-tools', () => {
         });
 
         it('timeout do RPC é informativo e não bloqueia a operação', async () => {
-            fakeRpc.plan.read.mockResolvedValueOnce({ content: 'ok' });
+            fakeRpc.plan.read.mockResolvedValueOnce({ exists: true, filePath: 'plan.md', content: 'ok' });
 
             const tool = mod.sessionRpcTools.find((t) => t.name === 'session_plan_read');
             const result = await /** @type {any} */ (tool).handler({ timeoutMs: 1 });

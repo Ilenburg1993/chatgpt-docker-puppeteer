@@ -9,6 +9,7 @@
  * @see EventBus
  */
 
+import { COPILOT_OPERATIONAL_PROFILE, getEffectiveSdkAgentSelection } from '#copilot/config';
 import { toError } from '#copilot/core';
 import { buildTerminalOperationalGuidance } from '../auto-briefing.js';
 import {
@@ -136,6 +137,7 @@ export function cmdStatus({ hubSessionId, injectPort, println }, arg = '') {
         projection.pendingUserInputs > 0
             ? `ask_user=${projection.pendingUserInputs}${projection.latestUserInputKind ? ` (${projection.latestUserInputKind})` : ''}`
             : null,
+        projection.pendingStructuredUserInputs > 0 ? `request_user_input=${projection.pendingStructuredUserInputs}` : null,
     ].filter(Boolean);
     const sdkCapabilitiesUi =
         projection.sdkCapabilities && typeof projection.sdkCapabilities['ui'] === 'object'
@@ -197,6 +199,10 @@ export function cmdStatus({ hubSessionId, injectPort, println }, arg = '') {
     const ioIndex = /** @type {Record<string, unknown>} */ (ioRuntime.index ?? {});
     const ioCacheLine = `l1=${ioL1['enabled'] ? 'on' : 'off'} entries=${ioL1['size'] ?? 0} bytes=${ioL1['bytesStored'] ?? 0} · l2=${ioL2['enabled'] ? 'on' : 'off'} entries=${ioL2['size'] ?? 0} · hitRatio=${ioHitRatio}`;
     const ioScopeLine = `scopes=${ioRuntime.scopes.active} · parser=${ioRuntime.parser.size}/${ioRuntime.parser.maxSize} · index=${ioIndex['available'] ? 'on' : 'empty'}:${ioIndex['files'] ?? 0}`;
+    const agentSelection = getEffectiveSdkAgentSelection();
+    const customAgentsLine = agentSelection.enabled.length
+        ? `${agentSelection.enabled.join(', ')}${agentSelection.disabled.length ? ` · disabled=${agentSelection.disabled.join(', ')}` : ''}`
+        : '(none)';
     println(`
   \x1b[36mStatus do Terminal LLM-B\x1b[0m
   ─────────────────────────────────────
@@ -224,6 +230,7 @@ export function cmdStatus({ hubSessionId, injectPort, println }, arg = '') {
     tools load       ${toolLoadColor}${toolLoad.total} registradas\x1b[0m \x1b[90m(fsCanônico=${toolLoad.hasCanonicalLocalFsTools} · sdkWorkspace=${toolLoad.hasSdkWorkspaceTooling} · disabled=${toolLoad.disabled.length})\x1b[0m
     instr. load      ${instructionLoadColor}${instructionLoad.liveReloadMechanism}\x1b[0m \x1b[90m(sections=${instructionLoad.sectionCount} · missingSectionFile=${instructionLoad.sectionsMissingFileCount} · missingAppendFile=${instructionLoad.appendFileMissingCount} · sourcesRpc=${instructionLoad.sdkSupportsInstructionSourcesRpc})\x1b[0m
     sdk↔fs route     ${sdkFsRoutingColor}${sdkFsRouting.mode}\x1b[0m \x1b[90m${sdkFsRouting.reason}\x1b[0m
+    custom agents   \x1b[90mprofile=${COPILOT_OPERATIONAL_PROFILE} · ${customAgentsLine}\x1b[0m
     io cache         \x1b[90m${ioCacheLine}\x1b[0m
     io scope         \x1b[90m${ioScopeLine}\x1b[0m
     sdk session      \x1b[90m${projection.sdkSessionId ?? '(sem sdk)'}\x1b[0m
@@ -306,6 +313,11 @@ ${autoPolicyLine ? `${autoPolicyLine}\n` : ''}  ──────────�
     if (projection.pendingUserInputs > 0) {
         println(
             '  \x1b[33mAção: há ask_user pendente do SDK; responda via conversa normal ou use /answer <texto>.\x1b[0m',
+        );
+    }
+    if (projection.pendingStructuredUserInputs > 0) {
+        println(
+            '  \x1b[33mAção: há request_user_input pendente; digite a resposta normalmente ou use /answer <texto>.\x1b[0m',
         );
     }
     if (modelBilling.mismatch) {

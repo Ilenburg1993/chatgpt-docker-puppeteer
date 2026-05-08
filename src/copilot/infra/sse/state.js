@@ -22,8 +22,9 @@ const _serverSseClients = new Set();
 /** @type {Set<import('node:http').ServerResponse>} */
 const _serverSseCriticalClients = new Set();
 
-/** Buffer de replay SSE dedicado ao servidor — preenchido pelo createSseWriter. */
-const _serverReplayBuffer = new SseReplayBuffer();
+/** Buffer de replay SSE dedicado ao servidor — preenchido pelo createSseWriter. (lazy init) */
+/** @type {SseReplayBuffer | null} */
+let _serverReplayBuffer = null;
 
 /**
  * Retorna o Set de clientes SSE do servidor (endpoint GET /events).
@@ -44,7 +45,7 @@ export function getSseCriticalClients() {
 }
 
 /**
- * Retorna o buffer de replay SSE do servidor.
+ * Retorna o buffer de replay SSE do servidor (lazy-initialized para evitar TDZ em ciclos de import).
  *
  * Nota: na camada server, este buffer é gerenciado pelo createSseWriter (infra/sse/utils.js), que chama
  * replayBuffer.push() automaticamente a cada evento enviado.
@@ -52,5 +53,8 @@ export function getSseCriticalClients() {
  * @returns {SseReplayBuffer}
  */
 export function getTerminalReplayBuffer() {
+    if (!_serverReplayBuffer) {
+        _serverReplayBuffer = new SseReplayBuffer();
+    }
     return _serverReplayBuffer;
 }

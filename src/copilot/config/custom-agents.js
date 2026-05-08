@@ -1,6 +1,7 @@
 // @ts-check
-import { COPILOT_CUSTOM_AGENTS, COPILOT_DISABLED_AGENTS } from '#copilot/config';
 import { ConfigError } from '#copilot/core';
+import { COPILOT_CUSTOM_AGENTS, COPILOT_DISABLED_AGENTS, COPILOT_OPERATIONAL_PROFILE } from './env.js';
+import { resolveOperationalAgentSelection } from './operational-profiles.js';
 /**
  * src/copilot/config/custom-agents.js
  *
@@ -14,6 +15,8 @@ import { ConfigError } from '#copilot/core';
  * @see module:copilot/lib/agents
  * @see module:copilot/session-initializer
  */
+
+export const MAESTRO_AGENT_NAME = 'agent-full';
 
 /**
  * @typedef {Object} CustomAgentConfig
@@ -36,7 +39,7 @@ const BUILTIN_AGENTS = new Map([
         {
             name: 'auditor',
             description: 'Agente de auditoria de código — analisa, busca e reporta sem modificar arquivos',
-            tools: ['glob', 'grep', 'view'],
+            tools: ['list_directory', 'search_in_files', 'read_file_content'],
             infer: true,
             prompt: `Você é um auditor de código especializado.
 Sua função é analisar código-fonte, identificar problemas de qualidade, segurança e conformidade,
@@ -47,7 +50,7 @@ Regras operacionais:
 - Cite sempre o arquivo:linha de cada ocorrência encontrada
 - Classifique problemas como: CRÍTICO | ALTO | MÉDIO | BAIXO | INFO
 - Finalize com um resumo executivo com contadores por severidade
-- Use a ferramenta grep para buscas textuais e glob para descoberta de arquivos`,
+- Use search_in_files para buscas textuais e list_directory para descoberta de arquivos`,
         },
     ],
     [
@@ -55,7 +58,7 @@ Regras operacionais:
         {
             name: 'docs',
             description: 'Agente de documentação — lê código e gera/atualiza JSDoc, README e comentários',
-            tools: ['view', 'glob'],
+            tools: ['read_file_content', 'list_directory'],
             infer: true,
             prompt: `Você é um especialista em documentação técnica de software.
 Sua função é ler código-fonte e gerar documentação clara, precisa e bem estruturada.
@@ -64,7 +67,7 @@ Regras operacionais:
 - Produza JSDoc completo: @param, @returns, @throws, @example quando relevante
 - Use tipagem explícita em todos os @param e @returns
 - Para READMEs: estruture com seções padrão (Visão geral, Instalação, Uso, API, Contribuição)
-- Mantenha deutsch técnico preciso mas acessível
+- Mantenha português técnico preciso mas acessível
 - Não invente comportamentos — documente apenas o que o código faz`,
         },
     ],
@@ -72,12 +75,12 @@ Regras operacionais:
         'reviewer',
         {
             name: 'reviewer',
-            description: 'Agente de revisão de PR — analisa diff e produz comentários de review',
-            tools: ['glob', 'grep', 'view'],
+            description: 'Agente de revisão de PR — analisa diff e produz comentários de revisão',
+            tools: ['list_directory', 'search_in_files', 'read_file_content'],
             infer: true,
             prompt: `Você é um revisor de código experiente.
 Analise alterações de código com foco em:
-1. Corretude lógica e edge cases
+1. Corretude lógica e casos limite
 2. Segurança (OWASP Top 10)
 3. Performance e complexidade algorítmica
 4. Cobertura de testes
@@ -110,7 +113,8 @@ export function listCustomAgents() {
 }
 
 /**
- * Registra ou sobrescreve um agente customizado em runtime. Útil para testes e extensão dinâmica sem reinicialização.
+ * Registra ou sobrescreve um agente customizado em tempo de execução. Útil para testes e extensão dinâmica sem
+ * reinicialização.
  *
  * @param {CustomAgentConfig} config
  * @returns {void}
@@ -134,7 +138,7 @@ export function registerCustomAgent(config) {
 
 /**
  * Remove um agente customizado pelo nome. Agentes built-in podem ser removidos (operação destrutiva, não reversível em
- * runtime).
+ * tempo de execução).
  *
  * @param {string} name - Nome do agente, sem at-sign no prefixo
  * @returns {boolean} true se existia e foi removido
@@ -144,22 +148,24 @@ export function removeCustomAgent(name) {
 }
 
 // ---------------------------------------------------------------------------
-// SDK Integration — CustomAgentConfig para SessionConfig.customAgents
+// Integração SDK — CustomAgentConfig para SessionConfig.customAgents
 // ---------------------------------------------------------------------------
 
 /**
  * Configuração estrutural compatível com `SessionConfig.customAgents` do SDK.
  *
- * `config/` não importa tipos do wrapper interno do runtime; quando o agent montar a sessão, o adapter SDK valida esse
- * objeto contra o SDK canônico.
+ * `config/` não importa tipos do envoltório interno do tempo de execução; quando o agente montar a sessão, o adaptador
+ * SDK valida esse objeto contra o SDK canônico.
  *
  * @typedef {object} SdkCustomAgentConfig
  * @property {string} name
  * @property {string} [displayName]
  * @property {string} description
- * @property {string[]} tools
+ * @property {string[] | null | undefined} [tools]
+ * @property {{ must?: string[]; should?: string[]; optional?: string[] }} [toolTiers]
  * @property {string} prompt
  * @property {boolean} [infer]
+ * @property {'maestro'} [priority]
  */
 
 /**
@@ -172,53 +178,149 @@ export function removeCustomAgent(name) {
  */
 const SDK_AGENTS = [
     {
-        name: 'task',
-        displayName: 'Task Agent',
+        name: MAESTRO_AGENT_NAME,
+        displayName: 'Maestro (orquestrador com acesso total)',
         description:
-            'Execute development commands like tests, builds, linters. Returns brief summary on success, full output on failure.',
-        tools: ['bash', 'write_bash', 'read_bash', 'stop_bash'],
-        prompt: `You are a command execution agent that runs development commands and reports results efficiently.
+            'Agente maestro com acesso total: coordena operações complexas, delega a especialistas e mantém o contexto operacional.',
+        tools: null,
+        priority: 'maestro',
+        prompt: `Você é o maestro de orquestração desta base de código Node.js. Você tem acesso total e irrestrito a todas as ferramentas e capacidades registradas na sessão SDK.
 
-Execute commands: tests (npm run test), builds, linting, dependency installs.
+CAPACIDADES SDK SOB SEU COMANDO:
+1. Seleção de modelo: você pode solicitar troca de modelo quando a tarefa exigir raciocínio mais profundo ou resposta mais rápida.
+2. Esforço de raciocínio: você pode operar com esforço baixo, médio, alto ou xhigh conforme a complexidade.
+3. Transmissão incremental: você deve manter feedback incremental e claro durante tarefas longas.
+4. Sessões infinitas: seu contexto persiste entre retomadas; preserve continuidade operacional.
+5. Habilidades: use skills carregadas em skillDirectories quando elas forem relevantes.
+6. Ferramentas customizadas: você tem acesso total a todas as ferramentas registradas, inclusive arquivo, workspace, git, npm, shell, hub, sessão, permissões, escopos e índice.
+7. MCP: você pode usar todos os servidores MCP configurados na sessão.
+8. Auditoria de permissões: avalie risco de forma explícita e escale decisões incertas.
+9. Hooks e interceptadores: respeite a auditoria de pré/pós-ferramenta e reporte decisões de risco.
+10. Sistema de arquivos de sessão: use validação normalizada de caminhos e prefira ferramentas canônicas.
+11. Delegação: você pode delegar a especialistas, mas permanece sempre no comando.
+12. Execução assíncrona: acompanhe processos e tarefas em segundo plano até o fechamento.
+13. Modos de sessão: use session_mode_set quando planejamento, revisão ou execução contínua forem necessários.
 
-CRITICAL output format:
-- SUCCESS: one-line summary (e.g., "All 247 tests passed")
-- FAILURE: full error output with stack traces
-- Do NOT fix errors or make suggestions — just execute and report
-- Do NOT retry on failure`,
+PAPEL:
+- Orquestrar tarefas complexas em etapas verificáveis.
+- Delegar a especialistas sem abandonar o controle: explore, task, diagnostic, planner, git-ops e shell-ops são auxiliares.
+- Monitorar progresso, integrar resultados e decidir próximos passos.
+- Manter contexto entre delegações e sintetizar evidências.
+- Escalar riscos de segurança, ambiguidades reais e decisões de produto.
+- Auditar operações sensíveis e preservar os fluxos canônicos do projeto.
+
+ÁRVORE DE DELEGAÇÃO:
+1. Exploração de código, busca e leitura: delegue a explore.
+2. Execução de testes, compilações, lint e comandos: delegue a task ou shell-ops.
+3. Git, diff, branch, commit e push: delegue a git-ops.
+4. Saúde, logs, PM2, portas e ambiente: delegue a diagnostic.
+5. Planejamento complexo: delegue a planner.
+6. Síntese, arquitetura, aprovação e integração: resolva diretamente como maestro.
+
+REGRAS:
+- O maestro nunca deve sair do comando nem se deselecionar.
+- Antes de delegar, valide se a ferramenta necessária existe na sessão.
+- Use nomes canônicos de ferramentas; aliases legados são apenas compatibilidade.
+- Registre intenção para operações arriscadas sempre que a ferramenta de intenção estiver disponível.
+- Reporte o resultado de cada delegação e integre a conclusão ao plano.
+- Não crie fluxos paralelos quando já houver fluxo canônico.
+- Preserve invariantes: sem operações críticas concorrentes sobre o mesmo estado, sem retorno alternativo silencioso e sem escrita fora do escopo.`,
+        infer: true,
+    },
+    {
+        name: 'task',
+        displayName: 'Executor de tarefas',
+        description: 'Executa testes, compilações, linters e comandos de desenvolvimento com relatório objetivo.',
+        tools: ['exec_command', 'run_npm_script', 'run_node_file', 'lint_check', 'run_tests', 'typecheck'],
+        toolTiers: {
+            must: ['exec_command', 'run_npm_script', 'run_node_file'],
+            should: ['lint_check', 'run_tests', 'typecheck'],
+        },
+        prompt: `Você é um agente executor de comandos de desenvolvimento.
+
+Execute testes, compilações, lint, typecheck, scripts npm e comandos pontuais autorizados.
+
+Formato obrigatório:
+- SUCESSO: resumo em uma linha.
+- FALHA: saída completa relevante, incluindo rastros de pilha.
+- Não corrija erros por conta própria; execute e reporte.
+- Não repita comando em falha sem instrução do maestro.`,
         infer: true,
     },
     {
         name: 'explore',
-        displayName: 'Explore Agent',
-        description: 'Fast codebase exploration. Uses grep, glob, bash. Safe to call in parallel.',
-        tools: ['grep', 'glob', 'bash', 'str_replace_editor'],
-        prompt: `You are an exploration agent specialized in rapid codebase analysis.
+        displayName: 'Explorador de base de código',
+        description: 'Exploração rápida de base de código com ferramentas canônicas de arquivo, índice e escopo.',
+        tools: [
+            'list_directory',
+            'read_file_content',
+            'search_in_files',
+            'workspace_symbol_search',
+            'workspace_index_build',
+            'workspace_index_search',
+            'workspace_index_find_symbol',
+            'workspace_scope_context',
+            'workspace_scope_find_symbol',
+            'workspace_scope_list',
+            // compatibilidade legada para ambientes onde os nomes canônicos não estão disponíveis
+            'grep',
+            'glob',
+            'view',
+            'str_replace_editor',
+            'bash',
+        ],
+        toolTiers: {
+            must: ['list_directory', 'read_file_content', 'search_in_files'],
+            should: [
+                'workspace_symbol_search',
+                'workspace_index_build',
+                'workspace_index_search',
+                'workspace_index_find_symbol',
+                'workspace_scope_context',
+                'workspace_scope_find_symbol',
+                'workspace_scope_list',
+            ],
+            optional: ['grep', 'glob', 'view', 'str_replace_editor', 'bash'],
+        },
+        prompt: `Você é um agente de exploração especializado em análise rápida de base de código.
 
-Use grep for text patterns, glob for file discovery, str_replace_editor (view) for file contents,
-bash for commands grep/glob can't handle (find, ls, git log, wc).
+Use primeiro as ferramentas canônicas: list_directory, read_file_content, search_in_files,
+workspace_symbol_search, workspace_index_* e workspace_scope_*.
+Use aliases legados somente como compatibilidade.
 
-CRITICAL: Maximize parallel tool calling — always call independent tools simultaneously.
-Keep answers under 300 words for simple questions. Cite file paths and line numbers.`,
+Regra crítica: maximize chamadas paralelas para leituras independentes.
+Responda de forma curta em perguntas simples e cite arquivo:linha sempre que possível.`,
         infer: true,
     },
     {
         name: 'diagnostic',
-        displayName: 'Diagnostic Agent',
-        description: 'System diagnostics: PM2, health checks, ports, logs. Read-only.',
-        tools: ['bash', 'read_bash', 'grep', 'glob'],
-        prompt: `You are a system diagnostic agent for this Node.js project.
+        displayName: 'Diagnóstico de sistema',
+        description: 'Diagnóstico de sistema: PM2, verificações de saúde, portas e logs. Somente leitura.',
+        tools: [
+            'exec_command',
+            'get_system_health',
+            'search_in_files',
+            'list_directory',
+            'workspace_scope_context',
+            'grep',
+            'glob',
+        ],
+        toolTiers: {
+            must: ['exec_command', 'get_system_health'],
+            should: ['search_in_files', 'list_directory', 'workspace_scope_context'],
+            optional: ['grep', 'glob'],
+        },
+        prompt: `Você é um agente de diagnóstico de sistema para este projeto Node.js.
 
-Capabilities: PM2 status, health checks (npm run health:core), port inspection (lsof),
-log file analysis, queue status, environment validation.
+Capacidades: status PM2, verificações de saúde, inspeção de portas, análise de logs, filas e ambiente.
 
-Output format: ✅ OK / ⚠️ WARNING / ❌ ERROR sections with specific values and PIDs.
-Highlight critical issues. Suggest fixes but do NOT execute them unless explicitly asked.`,
+Formato: seções OK / AVISO / ERRO com valores concretos e PIDs quando houver.
+Destaque problemas críticos. Sugira correções, mas não as execute sem ordem do maestro.`,
         infer: true,
     },
     {
         name: 'planner',
-        displayName: 'Planner Agent',
+        displayName: 'Agente planejador',
         description: 'Estrutura planos detalhados de execução antes de agir. Ideal para tarefas complexas multi-etapa.',
         tools: [
             'session_mode_set',
@@ -226,9 +328,18 @@ Highlight critical issues. Suggest fixes but do NOT execute them unless explicit
             'session_plan_update',
             'get_tasks',
             'add_task',
+            'list_directory',
+            'search_in_files',
+            'workspace_scope_context',
+            // compatibilidade legada
             'grep',
             'glob',
         ],
+        toolTiers: {
+            must: ['session_mode_set', 'session_plan_read', 'session_plan_update'],
+            should: ['get_tasks', 'add_task', 'list_directory', 'search_in_files', 'workspace_scope_context'],
+            optional: ['grep', 'glob'],
+        },
         prompt: `Você é um agente de planejamento que estrutura o trabalho antes de executar.
 
 Processo obrigatório:
@@ -251,7 +362,7 @@ Formato do plano.md:
     },
     {
         name: 'git-ops',
-        displayName: 'Git Operations Agent',
+        displayName: 'Agente de operações Git',
         description: 'Operações git: status, diff, commit, branch, push. Sempre verifica antes de confirmar.',
         tools: [
             'git_status',
@@ -263,6 +374,10 @@ Formato do plano.md:
             'git_push',
             'report_intent',
         ],
+        toolTiers: {
+            must: ['git_status', 'git_diff', 'git_changed_files', 'git_log'],
+            should: ['git_create_branch', 'git_commit', 'git_push', 'report_intent'],
+        },
         prompt: `Você é um agente especializado em operações Git para este projeto.
 
 Regras operacionais:
@@ -277,7 +392,7 @@ Formato de relatório: [STATUS] branch | staged/unstaged | última ação`,
     },
     {
         name: 'shell-ops',
-        displayName: 'Shell Operations Agent',
+        displayName: 'Agente de operações de shell',
         description:
             'Execução de scripts, npm, node e diagnósticos de sistema. Confirma antes de comandos destrutivos.',
         tools: [
@@ -290,6 +405,10 @@ Formato de relatório: [STATUS] branch | staged/unstaged | última ação`,
             'get_system_health',
             'report_intent',
         ],
+        toolTiers: {
+            must: ['exec_command', 'run_npm_script', 'run_node_file'],
+            should: ['lint_check', 'run_tests', 'typecheck', 'get_system_health', 'report_intent'],
+        },
         prompt: `Você é um agente de operações de shell para este projeto Node.js 24+.
 
 Capacidades: executar scripts npm, rodar arquivos Node.js, lint, testes, typecheck, diagnóstico de saúde.
@@ -304,34 +423,63 @@ Regras:
 ];
 
 /**
- * Nomes dos SDK agents habilitados por padrão.
+ * Nomes dos agentes SDK habilitados por padrão.
  *
  * Pode ser sobrescrito via `COPILOT_CUSTOM_AGENTS=task,explore,diagnostic` (CSV).
  *
- * @type {string[]}
+ * @type {ReturnType<typeof resolveOperationalAgentSelection>}
  */
-const DEFAULT_SDK_AGENTS = COPILOT_CUSTOM_AGENTS.split(',').filter(Boolean);
+const DEFAULT_AGENT_SELECTION = resolveOperationalAgentSelection({
+    profileName: COPILOT_OPERATIONAL_PROFILE,
+    customAgentsCsv: COPILOT_CUSTOM_AGENTS,
+    disabledAgentsCsv: COPILOT_DISABLED_AGENTS,
+});
+
+const DEFAULT_SDK_AGENTS = enforceMaestroFirst(DEFAULT_AGENT_SELECTION.enabled);
 
 // GAP-Q03 fix: COPILOT_DISABLED_AGENTS permite desabilitar sub-agentes sem remover de COPILOT_CUSTOM_AGENTS
-const DISABLED_AGENTS = new Set(COPILOT_DISABLED_AGENTS.split(',').filter(Boolean));
+const DISABLED_AGENTS = new Set(DEFAULT_AGENT_SELECTION.disabled.filter((name) => name !== MAESTRO_AGENT_NAME));
 
 /**
  * Constrói o array `customAgents` para injetar em `SessionConfig.customAgents`.
  *
- * @param {string[]} [enabled] - Nomes dos agentes a incluir. Default: DEFAULT_SDK_AGENTS.
- * @returns {SdkCustomAgentConfig[] | undefined} Array de agentes ou undefined se vazio.
+ * @param {string[]} [enabled] - Nomes dos agentes a incluir. Padrão: DEFAULT_SDK_AGENTS.
+ * @returns {SdkCustomAgentConfig[]} Array de agentes; o maestro é sempre preservado.
  */
 export function buildCustomAgentsConfig(enabled = DEFAULT_SDK_AGENTS) {
-    if (enabled.length === 0) return undefined;
-    const agents = SDK_AGENTS.filter((a) => enabled.includes(a.name) && !DISABLED_AGENTS.has(a.name));
-    return agents.length > 0 ? agents : undefined;
+    const enabledSet = new Set(enforceMaestroFirst(enabled));
+    const agents = SDK_AGENTS.filter((a) => enabledSet.has(a.name) && !DISABLED_AGENTS.has(a.name));
+    return agents;
 }
 
 /**
- * Lista os nomes dos SDK agents disponíveis para SessionConfig.
+ * Lista os nomes dos agentes SDK disponíveis para SessionConfig.
  *
  * @returns {string[]}
  */
 export function listAvailableSdkAgents() {
     return SDK_AGENTS.map((a) => a.name);
+}
+
+/**
+ * Retorna a seleção efetiva de agentes SDK após perfil operacional e env CSV.
+ *
+ * @returns {{ profile: string; enabled: string[]; disabled: string[] }}
+ */
+export function getEffectiveSdkAgentSelection() {
+    return {
+        profile: DEFAULT_AGENT_SELECTION.profile.name,
+        enabled: [...DEFAULT_SDK_AGENTS],
+        disabled: [...DISABLED_AGENTS],
+    };
+}
+
+/**
+ * Garante que o maestro esteja sempre presente e sempre na primeira posição.
+ *
+ * @param {string[]} names
+ * @returns {string[]}
+ */
+function enforceMaestroFirst(names) {
+    return [MAESTRO_AGENT_NAME, ...names.filter((name) => name && name !== MAESTRO_AGENT_NAME)];
 }

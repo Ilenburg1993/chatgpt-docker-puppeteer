@@ -48,6 +48,27 @@
 - Limites de volume para a LLM-B são informativos, não bloqueantes. Segurança fica nas policies de
   path e permissões.
 
+## Operação do índice
+
+Comandos humanos no terminal permanente LLM-B:
+
+- `/index status`: mostra disponibilidade, arquivos, símbolos, imports, chunks e frescor.
+- `/index build src/copilot --concurrency 8`: constrói/atualiza o índice L2 de `src/copilot`.
+- `/index search "termo"`: busca FTS5 quando o índice está disponível.
+- `/index symbol alphaHelper`: consulta símbolos persistidos.
+- `/index clear`: limpa o índice local.
+
+Comandos shell equivalentes:
+
+- `npm run copilot:index:status`
+- `npm run copilot:index:build`
+- `npm run copilot:index -- build src/copilot --ext js --ext md --concurrency 8 --json`
+- `npm run copilot:index -- search "termo" --json`
+
+A poda de arquivos removidos é automática em builds completos. Em builds parciais com
+`--include`/`--exclude`, a poda é desativada por segurança para não apagar entradas fora da fatia
+materializada.
+
 ## Links relacionados
 
 - Hub superior: `../README.md`.

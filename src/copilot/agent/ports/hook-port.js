@@ -62,7 +62,11 @@ export function buildAgentBusHooks(input) {
  * função mantém a tradução `agent policy -> SDK preToolUse hook` dentro da porta.
  *
  * @param {NonNullable<import('#copilot/sdk/types').SessionConfig['hooks']>} busHooks
- * @param {(toolName: string) => boolean} isToolDisabled
+ * @param {(
+ *     toolName: string,
+ *     input?: import('../../hooks/types.js').PreToolUseHookInput,
+ *     invocation?: import('../../hooks/types.js').InvocationContext,
+ * ) => boolean} isToolDisabled
  * @returns {NonNullable<import('#copilot/sdk/types').SessionConfig['hooks']>}
  */
 export function withAgentRuntimeToolPolicy(busHooks, isToolDisabled) {

@@ -59,6 +59,9 @@ export class DialogWatchdog {
     /** @type {boolean} F41B.7: flag para evitar múltiplos avisos pré-stall no mesmo ciclo */
     #preStallEmitted = false;
 
+    /** @type {boolean} FIX: flag one-shot para evitar onStall sendo disparado a cada tick enquanto travado */
+    #stallEmitted = false;
+
     /** @type {ReturnType<typeof setInterval> | null} */
     #timer = null;
 
@@ -88,6 +91,7 @@ export class DialogWatchdog {
         }
         this.#lastActivity = Date.now();
         this.#preStallEmitted = false;
+        this.#stallEmitted = false;
         this.#timer = setInterval(() => {
             const stalledMs = Date.now() - this.#lastActivity;
             // F41B.7: aviso pré-stall a 80% do threshold
@@ -101,7 +105,12 @@ export class DialogWatchdog {
             }
             if (stalledMs > this.#stallThresholdMs) {
                 log('WARN', `[DialogWatchdog] Dialog loop inativo há ${Math.round(stalledMs / 1000)}s`);
-                this.#onStall(stalledMs);
+                // FIX: guard one-shot — evita onStall ser chamado a cada tick enquanto o loop permanece travado.
+                // Com intervalMs=5min e loop travado por horas, sem guard: 24+ chamadas de onStall.
+                if (!this.#stallEmitted) {
+                    this.#stallEmitted = true;
+                    this.#onStall(stalledMs);
+                }
             }
         }, this.#intervalMs);
     }
@@ -114,6 +123,7 @@ export class DialogWatchdog {
     ping() {
         this.#lastActivity = Date.now();
         this.#preStallEmitted = false;
+        this.#stallEmitted = false;
     }
 
     /**

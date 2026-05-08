@@ -3,14 +3,17 @@
 import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
+import * as ioCacheL2Registry from '../../../../src/copilot/infra/io-cache-l2-registry.js';
+import { resetIoL1CacheForTest } from '../../../../src/copilot/infra/io-cache.js';
 import {
     copyFileLocked,
     createOrReplaceFileAtomic,
     deleteFileLocked,
     mkdirPathLocked,
     moveFileLocked,
+    readBytes,
     readText,
     readTextChunks,
     withIoResourceLock,
@@ -22,6 +25,8 @@ import { scanDirectory } from '../../../../src/copilot/infra/io-scanner.js';
 const TEMP_DIRS = [];
 
 afterEach(async () => {
+    vi.restoreAllMocks();
+    resetIoL1CacheForTest();
     while (TEMP_DIRS.length > 0) {
         const dir = TEMP_DIRS.pop();
         if (dir) await rm(dir, { recursive: true, force: true });
@@ -61,6 +66,60 @@ describe('infra/io-engine', () => {
         expect(range.totalLines).toBe(3);
         expect(range.returnedLines).toEqual({ start: 2, end: 2 });
         expect(range.io.cache).toBe('l1-hit');
+    });
+
+    it('readBytes usa L2 em miss de L1 e reaquece L1 para próxima leitura', async () => {
+        const dir = await createTempDir();
+        const file = join(dir, 'l2-hit.bin');
+        const payload = Buffer.from('L2_PAYLOAD', 'utf8');
+        await writeFile(file, payload);
+        const fileStat = await stat(file);
+
+        const l2Mock = {
+            get: vi.fn(() => ({
+                key: 'mock-key',
+                path: file,
+                kind: 'bytes',
+                payload,
+                sizeBytes: payload.length,
+                mtimeMs: Number(fileStat.mtimeMs),
+                createdAtMs: Date.now(),
+                expiresAtMs: Date.now() + 60_000,
+            })),
+            set: vi.fn(),
+            invalidatePath: vi.fn(),
+        };
+        vi.spyOn(ioCacheL2Registry, 'getIoL2Cache').mockReturnValue(/** @type {any} */ (l2Mock));
+
+        const first = await readBytes(file);
+        expect(first.content.toString('utf8')).toBe('L2_PAYLOAD');
+        expect(first.io.cache).toBe('l2-hit');
+        expect(l2Mock.get).toHaveBeenCalledTimes(1);
+
+        const second = await readBytes(file);
+        expect(second.content.toString('utf8')).toBe('L2_PAYLOAD');
+        expect(second.io.cache).toBe('l1-hit');
+        expect(l2Mock.get).toHaveBeenCalledTimes(1);
+    });
+
+    it('writeFileAtomic não falha quando invalidação L2 lança erro (best-effort)', async () => {
+        const dir = await createTempDir();
+        const file = join(dir, 'invalidate-best-effort.txt');
+        await writeFile(file, 'before', 'utf8');
+
+        const l2Mock = {
+            get: vi.fn(() => null),
+            set: vi.fn(),
+            invalidatePath: vi.fn(() => {
+                throw new Error('l2 invalidate failed');
+            }),
+        };
+        vi.spyOn(ioCacheL2Registry, 'getIoL2Cache').mockReturnValue(/** @type {any} */ (l2Mock));
+
+        const result = await writeFileAtomic(file, 'after');
+        expect(result.bytesWritten).toBe(Buffer.byteLength('after', 'utf8'));
+        await expect(readFile(file, 'utf8')).resolves.toBe('after');
+        expect(l2Mock.invalidatePath).toHaveBeenCalled();
     });
 
     it('readTextChunks pagina leitura por linhas com metadados observáveis', async () => {

@@ -2,7 +2,7 @@
 
 import Database from 'better-sqlite3';
 import { mkdtempSync, rmSync } from 'node:fs';
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
@@ -105,5 +105,39 @@ describe('createIoIndexSqlite', () => {
         expect(second.indexed).toBe(0);
         expect(second.unchanged).toBe(3);
         expect(second.skipped).toBeGreaterThanOrEqual(3);
+    });
+
+    it('remove do índice arquivos deletados em build completo', async () => {
+        expect(tmpDir).toBeTruthy();
+        const db = new Database(':memory:');
+        const index = createIoIndexSqlite({ db });
+        await index.indexDirectory(/** @type {string} */ (tmpDir), { extensions: ['.js', '.md'], recursive: true });
+
+        await rm(join(/** @type {string} */ (tmpDir), 'notes.md'));
+        const second = await index.indexDirectory(/** @type {string} */ (tmpDir), {
+            extensions: ['.js', '.md'],
+            recursive: true,
+        });
+
+        expect(second.pruned).toBe(1);
+        expect(index.getStats().files).toBe(2);
+        expect(index.search('semantic index token')).toEqual([]);
+    });
+
+    it('não poda entradas fora de build parcial com include', async () => {
+        expect(tmpDir).toBeTruthy();
+        const db = new Database(':memory:');
+        const index = createIoIndexSqlite({ db });
+        await index.indexDirectory(/** @type {string} */ (tmpDir), { extensions: ['.js', '.md'], recursive: true });
+
+        const second = await index.indexDirectory(/** @type {string} */ (tmpDir), {
+            extensions: ['.js', '.md'],
+            include: ['alpha.js'],
+            recursive: true,
+        });
+
+        expect(second.pruned).toBe(0);
+        expect(index.getStats().files).toBe(3);
+        expect(index.search('semantic index token').length).toBeGreaterThanOrEqual(1);
     });
 });

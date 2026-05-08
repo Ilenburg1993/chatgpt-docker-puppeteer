@@ -9,8 +9,7 @@ const mocks = vi.hoisted(() => ({
     fleetStart: vi.fn(/** @returns {Promise<any>} */ async () => ({ ok: true })),
     agentList: vi.fn(async () => ({ agents: [{ name: 'auditor' }] })),
     agentGetCurrent: vi.fn(async () => ({ agent: { name: 'auditor' } })),
-    agentSelect: vi.fn(async () => ({ selected: true })),
-    agentDeselect: vi.fn(async () => ({ selected: false })),
+    agentSelect: vi.fn(async (_session, name) => ({ agent: { name } })),
     agentReload: vi.fn(async () => ({ reloaded: true })),
     skillsList: vi.fn(async () => ({ skills: [] })),
     skillsEnable: vi.fn(async () => ({ enabled: true })),
@@ -32,6 +31,7 @@ vi.mock('#copilot/config/env', () => ({
     COPILOT_MCP_SERVERS: '',
     COPILOT_CUSTOM_AGENTS: '',
     COPILOT_DISABLED_AGENTS: '',
+    COPILOT_OPERATIONAL_PROFILE: 'production',
 }));
 
 vi.mock('#copilot/core', async (importOriginal) => {
@@ -67,7 +67,6 @@ vi.mock('#copilot/sdk', () => ({
     agentList: mocks.agentList,
     agentGetCurrent: mocks.agentGetCurrent,
     agentSelect: mocks.agentSelect,
-    agentDeselect: mocks.agentDeselect,
     agentReload: mocks.agentReload,
     skillsList: mocks.skillsList,
     skillsEnable: mocks.skillsEnable,
@@ -148,5 +147,30 @@ describe('experimental-rpc-tools', () => {
         expect(result.ok).toBe(true);
         expect(result.started).toBe(3);
         vi.useRealTimers();
+    });
+
+    it('bloqueia seleção direta de especialista e preserva o maestro', async () => {
+        const tool = mod.experimentalRpcTools.find((t) => t.name === 'exp_agent_select');
+        const result = await /** @type {any} */ (tool).handler({ name: 'auditor' });
+
+        expect(result.error).toMatch(/bloqueada/i);
+        expect(result.enforcedAgent).toBe('agent-full');
+        expect(mocks.agentSelect).not.toHaveBeenCalled();
+    });
+
+    it('seleciona agent-full quando seleção experimental pede o maestro', async () => {
+        const tool = mod.experimentalRpcTools.find((t) => t.name === 'exp_agent_select');
+        const result = await /** @type {any} */ (tool).handler({ name: 'agent-full' });
+
+        expect(result.agent.name).toBe('agent-full');
+        expect(mocks.agentSelect).toHaveBeenCalledWith(expect.anything(), 'agent-full');
+    });
+
+    it('exp_agent_deselect reforça agent-full em vez de deselecionar', async () => {
+        const tool = mod.experimentalRpcTools.find((t) => t.name === 'exp_agent_deselect');
+        const result = await /** @type {any} */ (tool).handler({});
+
+        expect(result.agent.name).toBe('agent-full');
+        expect(mocks.agentSelect).toHaveBeenCalledWith(expect.anything(), 'agent-full');
     });
 });

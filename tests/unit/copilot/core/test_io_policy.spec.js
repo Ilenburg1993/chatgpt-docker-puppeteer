@@ -95,7 +95,7 @@ describe('core/io-policy evaluateIoUrlPolicy', () => {
         const result = evaluateIoUrlPolicy({ input: 'https://example.com/docs' });
         expect(result.ok).toBe(true);
         if (!result.ok) return;
-        expect(result.url.hostname).toBe('example.com');
+        expect(result.url?.hostname).toBe('example.com');
     });
 
     it('rejects localhost URL by default', () => {
@@ -134,8 +134,7 @@ describe('core/io-policy evaluateIoUrlPolicy', () => {
     it('blocked result does not include maxRedirects', () => {
         const result = evaluateIoUrlPolicy({ input: 'http://192.168.1.1/admin' });
         expect(result.ok).toBe(false);
-        // @ts-expect-error – maxRedirects só existe em ok:true
-        expect(result.maxRedirects).toBeUndefined();
+        expect('maxRedirects' in result ? result.maxRedirects : undefined).toBeUndefined();
     });
 });
 

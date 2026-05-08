@@ -23,6 +23,7 @@ import { readCopilotBootConfig } from '#copilot/boot';
 import { log } from '#copilot/observability';
 import { recordTerminalActivity } from './activity-state.js';
 import { loadAliasesAsync } from './alias-store.js';
+import { applyTerminalBootDisplayPreset } from './display-policy.js';
 import { startRepl } from './repl.js';
 import { runTerminalHttpServerPhase } from './terminal-phases/boot-http.js';
 import { runTerminalConversationHubPhase } from './terminal-phases/boot-hub.js';
@@ -132,11 +133,12 @@ export function createTerminalBootContext(options = {}) {
  * @returns {Promise<void>}
  */
 export async function runTerminalInitPhase(ctx) {
+    const displayPreset = applyTerminalBootDisplayPreset();
     recordTerminalActivity('boot', 'Inicializando terminal', {
-        detail: 'Preparando aliases, DI, hub e servidor HTTP',
+        detail: `Preparando aliases, DI, hub e servidor HTTP · display=${displayPreset.name}`,
         source: 'terminal',
     });
-    log('INFO', '[TerminalServer] Iniciando terminal permanente LLM-B…');
+    log('INFO', `[TerminalServer] Iniciando terminal permanente LLM-B (display=${displayPreset.name})…`);
     void ctx;
 }
 

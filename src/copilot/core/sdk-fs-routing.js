@@ -33,6 +33,33 @@ export const CANONICAL_LOCAL_FS_TOOL_NAMES = Object.freeze([
 ]);
 
 /**
+ * Built-ins legadas de FS do SDK/CLI que competem com a nossa superfície canônica local.
+ *
+ * Elas continuam úteis como compatibilidade em runtimes antigos, mas numa sessão LLM-B SDK-first do projeto elas devem
+ * ficar fora da superfície de escolha do modelo sempre que `CANONICAL_LOCAL_FS_TOOL_NAMES` estiver disponível. A
+ * execução real deve passar por `src/copilot/tools/file/*`, onde ficam política de path, I/O engine, auditoria e
+ * metadados `io`.
+ *
+ * @type {readonly string[]}
+ */
+export const LEGACY_SDK_LOCAL_FS_TOOL_NAMES = Object.freeze(['view', 'glob', 'grep', 'create', 'edit']);
+
+/**
+ * Constrói a denylist de superfície de sessão para privilegiar FS local canônico sem remover handlers internos.
+ *
+ * @param {readonly string[]} toolNames
+ * @param {readonly string[]} [baseExcluded=[]] Default is `[]`
+ * @returns {string[]}
+ */
+export function buildCanonicalLocalFsExcludedTools(toolNames, baseExcluded = []) {
+    const excluded = new Set(baseExcluded);
+    if (hasCanonicalLocalFsTools(toolNames)) {
+        for (const name of LEGACY_SDK_LOCAL_FS_TOOL_NAMES) excluded.add(name);
+    }
+    return [...excluded].sort();
+}
+
+/**
  * Avalia se os nomes de tools carregados cobrem a superfície canônica de FS local.
  *
  * @param {readonly string[]} toolNames

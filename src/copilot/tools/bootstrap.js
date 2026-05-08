@@ -20,7 +20,7 @@ import { log, wrapWithStats } from '#copilot/observability';
 import { buildCustomTools, registerTools } from '#copilot/sdk';
 import { codeTools } from './code-tools.js';
 import { experimentalRpcTools, setExperimentalSession } from './experimental-rpc-tools.js';
-import { fileReadTools, fileWriteTools } from './file/index.js';
+import { fileReadTools, fileWriteTools, indexTools, scopeTools } from './file/index.js';
 import { gitTools } from './git/index.js';
 import { configureHookTools, hookTools } from './hook-tools.js';
 import { hubTools, setHub } from './hub-tools.js';
@@ -69,6 +69,8 @@ export function bootstrapTools(registry, mcpTools) {
         [hubTools, { category: 'hub', tags: ['conversation', 'llm-b', 'dialog', 'persistent'] }],
         [introspectionTools, { category: 'introspection', tags: ['meta', 'telemetry'], readOnly: true }],
         [fileReadTools, { category: 'file', tags: ['filesystem', 'io', 'read'], readOnly: true }],
+        [indexTools, { category: 'file-index', tags: ['filesystem', 'io', 'index'], readOnly: true }],
+        [scopeTools, { category: 'file-scope', tags: ['filesystem', 'io', 'scope'], readOnly: true }],
         [fileWriteTools, { category: 'file', tags: ['filesystem', 'io', 'write'] }],
         [shellTools, { category: 'shell', tags: ['exec', 'system', 'npm', 'node'] }],
         [webTools, { category: 'web', tags: ['http', 'fetch', 'ssrf-protected'] }],

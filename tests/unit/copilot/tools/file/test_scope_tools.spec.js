@@ -79,6 +79,36 @@ describe('tools/file/scope-tools', () => {
         expect(out.sessionId).toBe('s1');
     });
 
+    it('workspace_scope_declare usa scopeName como sessionId efetivo quando fornecido', async () => {
+        const handler = getHandler(workspaceScopeDeclareTool);
+        mocks.declareScope.mockResolvedValue({ scopeId: 'scope-feature-a', files: [], symbols: new Map() });
+
+        const out = await handler({
+            sessionId: 'session-default',
+            scopeName: 'feature-a',
+            directory: 'src',
+        });
+
+        expect(mocks.declareScope).toHaveBeenCalledWith(
+            expect.objectContaining({
+                sessionId: 'feature-a',
+                directory: 'src',
+            }),
+        );
+        expect(out.sessionId).toBe('feature-a');
+    });
+
+    it('workspace_scope_declare aguarda awaitReady quando solicitado', async () => {
+        const handler = getHandler(workspaceScopeDeclareTool);
+        const awaitReadyFn = vi.fn().mockResolvedValue({ ready: true });
+        mocks.declareScope.mockResolvedValue({ sessionId: 's-await', awaitReady: awaitReadyFn });
+
+        const out = await handler({ sessionId: 's-await', directory: 'src/copilot', awaitReady: true });
+
+        expect(awaitReadyFn).toHaveBeenCalledTimes(1);
+        expect(out.sessionId).toBe('s-await');
+    });
+
     it('delegates list/refresh/context/find/close calls', async () => {
         mocks.listScopes.mockReturnValue(['abc']);
         mocks.getScopeStats.mockReturnValue({ sessionId: 'abc', ready: true });

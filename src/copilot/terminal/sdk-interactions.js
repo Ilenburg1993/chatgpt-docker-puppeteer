@@ -25,6 +25,11 @@ import {
 
 /** @typedef {'question' | 'ready' | 'reply' | 'stopped'} TerminalSdkUserInputKind */
 
+const MAX_COMPLETED_INTERACTIONS_PER_KIND = 100;
+const COMPLETED_INTERACTION_TTL_MS = 30 * 60_000;
+
+let _syntheticInteractionSeq = 0;
+
 /**
  * @typedef {object} TerminalElicitationEntry
  * @property {string} id
@@ -116,6 +121,57 @@ function normalizeRuntimeId(value) {
 }
 
 /**
+ * @param {string} prefix
+ * @returns {string}
+ */
+function nextSyntheticInteractionId(prefix) {
+    _syntheticInteractionSeq += 1;
+    return `${prefix}-${Date.now().toString(36)}-${_syntheticInteractionSeq.toString(36)}`;
+}
+
+/**
+ * @param {Map<string, { id: string; status: SdkInteractionStatus; createdAt: number; completedAt: number | null }>} map
+ * @param {string | null} latestId
+ * @param {number} [now]
+ * @returns {string | null}
+ */
+function pruneCompletedInteractionMap(map, latestId, now = Date.now()) {
+    const completed = [...map.values()]
+        .filter((entry) => entry.status !== 'pending')
+        .sort((a, b) => (b.completedAt ?? b.createdAt) - (a.completedAt ?? a.createdAt));
+    const toDelete = new Set();
+    for (const entry of completed) {
+        const completedAt = entry.completedAt ?? entry.createdAt;
+        if (now - completedAt > COMPLETED_INTERACTION_TTL_MS) {
+            toDelete.add(entry.id);
+        }
+    }
+    for (const entry of completed.slice(MAX_COMPLETED_INTERACTIONS_PER_KIND)) {
+        toDelete.add(entry.id);
+    }
+    for (const id of toDelete) {
+        map.delete(id);
+    }
+    if (latestId && map.has(latestId)) return latestId;
+    return [...map.values()].sort((a, b) => b.createdAt - a.createdAt)[0]?.id ?? null;
+}
+
+/**
+ * Limita retenção de interações SDK concluídas sem apagar waits pendentes.
+ *
+ * Sessões longas podem produzir milhares de eventos de elicitation/permissão/user_input. A UI só precisa de histórico
+ * recente; pendências vivas são sempre preservadas.
+ *
+ * @param {number} [now]
+ * @returns {void}
+ */
+export function pruneTerminalSdkInteractions(now = Date.now()) {
+    _latestElicitationId = pruneCompletedInteractionMap(_elicitations, _latestElicitationId, now);
+    _latestPermissionId = pruneCompletedInteractionMap(_permissions, _latestPermissionId, now);
+    _latestUserInputId = pruneCompletedInteractionMap(_userInputs, _latestUserInputId, now);
+}
+
+/**
  * @param {unknown} evt
  * @returns {TerminalElicitationEntry}
  */
@@ -123,7 +179,7 @@ export function recordTerminalElicitationPending(evt) {
     const normalized = normalizeElicitationPendingEvent(evt);
     const requestId = normalized.requestId ?? '';
     const runtimeId = normalizeRuntimeId(normalized.runtimeId);
-    const id = requestId || `elicitation-${Date.now().toString(36)}`;
+    const id = requestId || nextSyntheticInteractionId('elicitation');
     const entry = {
         id,
         requestId: requestId || null,
@@ -145,6 +201,7 @@ export function recordTerminalElicitationPending(evt) {
     };
     _elicitations.set(id, entry);
     _latestElicitationId = id;
+    pruneTerminalSdkInteractions();
     return entry;
 }
 
@@ -169,6 +226,7 @@ export function recordTerminalElicitationCompleted(evt) {
     entry.resultAction = normalized.action;
     entry.resultContent = normalized.content;
     entry.data = { ...entry.data, completion: normalized.data };
+    pruneTerminalSdkInteractions(normalized.ts);
     return entry;
 }
 
@@ -248,7 +306,7 @@ export function recordTerminalPermissionRequested(evt) {
     const requestId = normalized.requestId ?? '';
     const permissionType = normalized.permissionType;
     const runtimeId = normalizeRuntimeId(normalized.runtimeId);
-    const id = requestId || `permission-${permissionType}-${Date.now().toString(36)}`;
+    const id = requestId || nextSyntheticInteractionId(`permission-${permissionType}`);
     const entry = {
         id,
         requestId: requestId || null,
@@ -263,6 +321,7 @@ export function recordTerminalPermissionRequested(evt) {
     };
     _permissions.set(id, entry);
     _latestPermissionId = id;
+    pruneTerminalSdkInteractions();
     return entry;
 }
 
@@ -288,6 +347,7 @@ export function recordTerminalPermissionCompleted(evt) {
     entry.granted = normalized.granted;
     entry.result = normalized.resultKind;
     entry.data = { ...entry.data, completion: normalized.data, decision: normalized.decision };
+    pruneTerminalSdkInteractions(normalized.ts);
     return entry;
 }
 
@@ -397,7 +457,7 @@ export function recordTerminalUserInputRequested(evt) {
     const requestId = normalized.requestId ?? '';
     const question = normalized.question || '(sem pergunta)';
     const runtimeId = normalizeRuntimeId(normalized.runtimeId);
-    const id = requestId || `user-input-${Date.now().toString(36)}`;
+    const id = requestId || nextSyntheticInteractionId('user-input');
     const entry = {
         id,
         requestId: requestId || null,
@@ -416,6 +476,7 @@ export function recordTerminalUserInputRequested(evt) {
     };
     _userInputs.set(id, entry);
     _latestUserInputId = id;
+    pruneTerminalSdkInteractions();
     return entry;
 }
 
@@ -440,6 +501,7 @@ export function recordTerminalUserInputCompleted(evt) {
     entry.answer = normalized.answer || null;
     entry.wasFreeform = normalized.wasFreeform;
     entry.data = { ...entry.data, completion: normalized.data };
+    pruneTerminalSdkInteractions(normalized.ts);
     return entry;
 }
 

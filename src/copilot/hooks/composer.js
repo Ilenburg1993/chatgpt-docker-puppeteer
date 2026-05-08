@@ -178,7 +178,9 @@ export function conditional(predicate, handler, elseHandler) {
  * @param {(input: unknown) => string} keyFn
  * @returns {T}
  */
-export function memoize(handler, keyFn) {
+export function memoize(handler, keyFn, { maxSize = 500 } = {}) {
+    // FIX FINDING-HOOKS-006: sem maxSize o Map crescia indefinidamente com chaves únicas por invocação.
+    // Evicção LRU simples: remover a entrada mais antiga quando o cache atingir maxSize.
     /** @type {Map<string, unknown>} */
     const cache = new Map();
 
@@ -188,6 +190,13 @@ export function memoize(handler, keyFn) {
             return cache.get(key);
         }
         const result = await handler(input, invocation);
+        if (cache.size >= maxSize) {
+            // Evict oldest entry (Map preserves insertion order)
+            const oldestKey = cache.keys().next().value;
+            if (typeof oldestKey === 'string') {
+                cache.delete(oldestKey);
+            }
+        }
         cache.set(key, result);
         return result;
     };

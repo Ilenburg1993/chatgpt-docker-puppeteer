@@ -5,6 +5,7 @@
  */
 
 import { answerTerminalPendingQuestion, readTerminalRuntimeState } from './frontend/gateways/agent-runtime.js';
+import { hasPendingUserInputRequests } from '../tools/user-input-state.js';
 
 /**
  * @typedef {'answered' | 'answer_failed' | 'empty' | 'no_pending' | 'protocol_controlled' | 'invalid_choice'} TerminalPendingAnswerReason
@@ -77,6 +78,10 @@ export function tryAnswerTerminalPendingQuestionInput(rawAnswer, runtimeId, opti
         return { ...resultBase, routed: false, ok: false, reason: 'empty' };
     }
     if (!pending) {
+        if (hasPendingUserInputRequests()) {
+            const ok = answerTerminalPendingQuestion(answer, runtimeId);
+            return { ...resultBase, routed: true, ok, reason: ok ? 'answered' : 'answer_failed' };
+        }
         return { ...resultBase, routed: false, ok: false, reason: 'no_pending' };
     }
     if (protocolControlled && options.allowProtocolControlled !== true) {

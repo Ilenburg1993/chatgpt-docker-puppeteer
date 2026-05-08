@@ -65,29 +65,79 @@
  *   código de produção — use `buildTool` que já encapsula o `defineTool`.
  */
 
+import { COPILOT_LOG_LEVEL } from '#copilot/config';
 import { createTool as sdkCreateTool } from '#copilot/sdk';
 import { createRequire } from 'node:module';
+
+/** @type {typeof import('zod-to-json-schema').zodToJsonSchema | null} */
+let _zodConverter = null;
+/** @type {boolean} */
+let _zodConverterAttempted = false;
 
 /**
  * @returns {typeof import('zod-to-json-schema').zodToJsonSchema | null}
  */
 function loadZodToJsonSchema() {
-    const fn = /**
-     * @type {typeof loadZodToJsonSchema & {
-     *     _converter?: typeof import('zod-to-json-schema').zodToJsonSchema | null;
-     *     _attempted?: boolean;
-     * }}
-     */ (loadZodToJsonSchema);
-    if (fn._converter || fn._attempted) return fn._converter ?? null;
-    fn._attempted = true;
+    if (_zodConverter || _zodConverterAttempted) return _zodConverter;
+    _zodConverterAttempted = true;
     try {
         const requireFromHere = createRequire(import.meta.url);
         const mod = requireFromHere('zod-to-json-schema');
-        fn._converter = mod.zodToJsonSchema ?? mod.default ?? null;
+        _zodConverter = mod.zodToJsonSchema ?? mod.default ?? null;
     } catch {
-        fn._converter = null;
+        _zodConverter = null;
     }
-    return fn._converter ?? null;
+    return _zodConverter;
+}
+
+/**
+ * Determina se o erro permite fallback para tool plain (ciclo/TDZ/export indisponível).
+ *
+ * @param {unknown} err
+ * @returns {boolean}
+ */
+function isRecoverableToolFactoryError(err) {
+    if (!(err instanceof Error)) return false;
+    const e = /** @type {Error & { code?: string }} */ (err);
+    if (
+        e.code === 'ERR_MODULE_NOT_FOUND' ||
+        e.code === 'ERR_PACKAGE_PATH_NOT_EXPORTED' ||
+        e.code === 'ERR_UNKNOWN_EXPORT'
+    ) {
+        return true;
+    }
+    // Ciclos/TDZ em ESM podem lançar ReferenceError durante inicialização do barrel.
+    if (e instanceof ReferenceError) {
+        return true;
+    }
+    return false;
+}
+
+/**
+ * Converte schemas Zod v4 usando a API nativa de JSON Schema do próprio pacote `zod`.
+ *
+ * `zod-to-json-schema` trabalha bem com Zod v3, mas pode retornar apenas `$schema` para schemas v4. Como a maior parte
+ * das tools do projeto importa `zod` diretamente, este caminho precisa ser preferencial para `_zod`.
+ *
+ * @param {import('zod').ZodType | import('zod/v3').ZodTypeAny | Record<string, unknown>} parameters
+ * @returns {Record<string, unknown> | undefined}
+ */
+function tryZodV4ToJsonSchema(parameters) {
+    if (!('_zod' in parameters)) return undefined;
+    try {
+        const requireFromHere = createRequire(import.meta.url);
+        const mod = requireFromHere('zod');
+        const toJSONSchema =
+            typeof mod?.z?.toJSONSchema === 'function'
+                ? mod.z.toJSONSchema
+                : typeof mod?.toJSONSchema === 'function'
+                  ? mod.toJSONSchema
+                  : null;
+        if (!toJSONSchema) return undefined;
+        return /** @type {Record<string, unknown>} */ (toJSONSchema(parameters));
+    } catch {
+        return undefined;
+    }
 }
 
 /**
@@ -128,10 +178,7 @@ function createTool(options) {
         }
         return /** @type {ReturnType<typeof sdkCreateTool>} */ (makePlainTool(options));
     } catch (err) {
-        if (
-            (err instanceof ReferenceError && /initialization|initializ/i.test(err.message)) ||
-            (err instanceof Error && /defineTool.*export|No "defineTool" export/i.test(err.message))
-        ) {
+        if (isRecoverableToolFactoryError(err)) {
             return /** @type {ReturnType<typeof sdkCreateTool>} */ (makePlainTool(options));
         }
         throw err;
@@ -152,7 +199,7 @@ function logToolFactory(level, message) {
         console.warn(line);
     } else if (level === 'INFO') {
         console.info(line);
-    } else if (process.env['COPILOT_LOG_LEVEL'] === 'DEBUG') {
+    } else if (COPILOT_LOG_LEVEL === 'DEBUG') {
         console.debug(line);
     }
 }
@@ -188,6 +235,8 @@ function normalizeParameters(parameters, toolName = 'unknown') {
     // H1-FIX: Usar instanceof ZodType quando possível para melhor compatibilidade com versões futuras.
     if ('_def' in parameters || '_zod' in parameters) {
         try {
+            const zodV4Schema = tryZodV4ToJsonSchema(parameters);
+            if (zodV4Schema) return zodV4Schema;
             const converter = loadZodToJsonSchema();
             if (!converter) {
                 throw new Error('zod-to-json-schema indisponível');
@@ -267,5 +316,7 @@ export function buildTool({
  * @returns {import('#copilot/sdk/types').Tool<TArgs>} A mesma tool com `skipPermission: true`
  */
 export function withSkipPermission(tool) {
-    return Object.assign(tool, /** @type {Record<string, unknown>} */ ({ skipPermission: true }));
+    // FIX TF-01: Object.assign mutava o objeto original — todos os importadores passavam a ter skipPermission=true.
+    // Solução: spread cria cópia rasa sem afetar a referência original.
+    return /** @type {import('#copilot/sdk/types').Tool<TArgs>} */ ({ ...tool, skipPermission: true });
 }

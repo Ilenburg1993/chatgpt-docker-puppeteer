@@ -22,8 +22,21 @@ import path from 'node:path';
  * }} IoL2CacheRow
  */
 
-const DEFAULT_TTL_MS = Number(process.env['IO_L2_CACHE_TTL_MS'] || 5 * 60 * 1000);
-const DEFAULT_MAX_ENTRIES = Number(process.env['IO_L2_CACHE_MAX_ENTRIES'] || 100_000);
+/**
+ * @param {string} key
+ * @param {number} fallback
+ * @returns {number}
+ */
+function readEnvPositiveInt(key, fallback) {
+    const raw = process.env[key];
+    if (raw === undefined || raw === null || String(raw).trim() === '') return fallback;
+    const parsed = Number(raw);
+    if (!Number.isFinite(parsed) || parsed <= 0) return fallback;
+    return Math.floor(parsed);
+}
+
+const DEFAULT_TTL_MS = readEnvPositiveInt('IO_L2_CACHE_TTL_MS', 5 * 60 * 1000);
+const DEFAULT_MAX_ENTRIES = readEnvPositiveInt('IO_L2_CACHE_MAX_ENTRIES', 100_000);
 
 /**
  * @param {string} filePath

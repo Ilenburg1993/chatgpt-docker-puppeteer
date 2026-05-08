@@ -1,0 +1,113 @@
+{
+    "snapshotId": "snap-1778204922636-5b464b5b",
+    "createdAt": 1778204922636,
+    "sessionId": "be9a4c66-e884-4f13-86ff-a13583ffb57d",
+    "model": "auto",
+    "status": "idle",
+    "sendCount": 1,
+    "dialogLoopActive": true,
+    "dialogPaused": false,
+    "pendingQuestion": null,
+    "pendingQuestionMeta": null,
+    "pendingQuestionShadow": null,
+    "stateSnapshot": {
+        "sessionId": "be9a4c66-e884-4f13-86ff-a13583ffb57d",
+        "startedAt": 1778204738602,
+        "resumedAt": 1778204738602,
+        "resumeCount": 0,
+        "sendCount": 0,
+        "model": "auto",
+        "pendingQuestion": null,
+        "pendingQuestionMeta": null,
+        "systemPromptBinding": {
+            "sessionId": "be9a4c66-e884-4f13-86ff-a13583ffb57d",
+            "digest": "96c3c7d50d6b867c",
+            "configuredMode": "append",
+            "effectiveMode": "append",
+            "effectiveLiveMode": "customize",
+            "liveReloadEnabled": true,
+            "liveReloadMechanism": "sdk-transform",
+            "reloadStrategy": "sdk-transform",
+            "boundAt": 1778204738602
+        },
+        "gracefulShutdown": false,
+        "reasoningEffort": "xhigh",
+        "dialogLoopActive": true,
+        "dialogPaused": false,
+        "pendingTurnConsumedPR": true,
+        "lastPrConsumedAt": 1778204786916,
+        "lastPrModel": "claude-sonnet-4.6",
+        "lastPrConfiguredModel": "auto",
+        "lastPrEffectiveModel": "claude-sonnet-4.6",
+        "lastPrModelMismatch": false,
+        "lastPrCost": 1,
+        "lastQuotaSnapshots": {
+            "chat": {
+                "isUnlimitedEntitlement": true,
+                "entitlementRequests": -1,
+                "usedRequests": 0,
+                "usageAllowedWithExhaustedQuota": false,
+                "overage": 0,
+                "overageAllowedWithExhaustedQuota": false,
+                "remainingPercentage": 100,
+                "resetDate": "2026-06-01T00:00:00.000Z"
+            },
+            "completions": {
+                "isUnlimitedEntitlement": true,
+                "entitlementRequests": -1,
+                "usedRequests": 0,
+                "usageAllowedWithExhaustedQuota": false,
+                "overage": 0,
+                "overageAllowedWithExhaustedQuota": false,
+                "remainingPercentage": 100,
+                "resetDate": "2026-06-01T00:00:00.000Z"
+            },
+            "premium_interactions": {
+                "isUnlimitedEntitlement": false,
+                "entitlementRequests": 300,
+                "usedRequests": 79,
+                "usageAllowedWithExhaustedQuota": true,
+                "overage": 0,
+                "overageAllowedWithExhaustedQuota": true,
+                "remainingPercentage": 73.6,
+                "resetDate": "2026-06-01T00:00:00.000Z"
+            },
+            "session": {
+                "isUnlimitedEntitlement": false,
+                "entitlementRequests": 0,
+                "usedRequests": 0,
+                "usageAllowedWithExhaustedQuota": false,
+                "overage": 0,
+                "overageAllowedWithExhaustedQuota": false,
+                "remainingPercentage": 73.3,
+                "resetDate": "2026-05-08T03:44:02.000Z"
+            },
+            "weekly": {
+                "isUnlimitedEntitlement": false,
+                "entitlementRequests": 0,
+                "usedRequests": 0,
+                "usageAllowedWithExhaustedQuota": false,
+                "overage": 0,
+                "overageAllowedWithExhaustedQuota": false,
+                "remainingPercentage": 0.1,
+                "resetDate": "2026-05-11T00:00:00.000Z"
+            }
+        },
+        "lastAskUserAt": 1778204745031,
+        "prMetrics": {
+            "boots": 1,
+            "resumesWithPR": 0,
+            "resumesZeroPR": 0,
+            "totalPR": 1
+        },
+        "pendingTurnMessage": "Teste obrigatório de tools canônicas locais. Use necessariamente e exatamente estas tools do SDK/local FS, nesta ordem, sem usar bash/shell/exec_command/npm/cat/sed/grep/view/glob/workspace/create/edit: 1) read_file_content para ler src/copilot/terminal/tool-activity-presenter.js; 2) create_file para criar tmp/llmb-canonical-live-20260507-2245.md com conteúdo \"alpha canonical fs\"; 3) write_file_content para sobrescrever o mesmo arquivo com \"beta canonical fs\"; 4) patch_file para trocar \"beta\" por \"gamma\"; 5) read_file_content para ler o arquivo final. Depois responda em PT-BR com uma tabela curta: tool usada, alvo, sucesso, e diga se alguma tool legada apareceu.",
+        "pendingTurnTs": 1778204758775
+    },
+    "prMetrics": {
+        "boots": 1,
+        "resumesWithPR": 0,
+        "resumesZeroPR": 0,
+        "totalPR": 1
+    },
+    "reason": "auto-shutdown"
+}

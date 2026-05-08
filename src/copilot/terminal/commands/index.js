@@ -50,3 +50,4 @@ export { cmdSkills } from './skills.js';
 export { cmdThinking } from './thinking.js';
 export { cmdTools } from './tools.js';
 export { cmdUsage } from './usage.js';
+export { cmdIndex } from './workspace-index.js';

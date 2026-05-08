@@ -34,8 +34,10 @@ vi.mock('../../../../src/copilot/presentation/runtime-ui-state-store.js', () => 
 
 import { cmdDisplay } from '../../../../src/copilot/terminal/commands/display.js';
 import {
+    applyTerminalBootDisplayPreset,
     listTerminalDisplayPresets,
     readTerminalPromptDisplayPolicy,
+    resolveTerminalBootDisplayPreset,
 } from '../../../../src/copilot/terminal/display-policy.js';
 import { getTerminalDetailLevel, setTerminalDetailLevel } from '../../../../src/copilot/terminal/ui-preferences.js';
 import { getTerminalThemeName, setTerminalThemeName } from '../../../../src/copilot/terminal/ui-theme.js';
@@ -61,7 +63,7 @@ describe('terminal/commands/display', () => {
         expect(c.output()).toContain('Display Toggles');
         expect(c.output()).toContain('preset atual');
         expect(c.output()).toContain('tema atual');
-        expect(c.output()).toContain('/display preset <default|minimal|verbose|debug|focus>');
+        expect(c.output()).toContain('/display preset <default|minimal|verbose|debug|full|focus>');
         expect(c.output()).toContain('/display theme <elegant|vivid|mono>');
         expect(c.output()).toContain('/display detail <compact|detailed>');
     });
@@ -72,6 +74,7 @@ describe('terminal/commands/display', () => {
             'minimal',
             'verbose',
             'debug',
+            'full',
             'focus',
         ]);
         expect(
@@ -111,6 +114,18 @@ describe('terminal/commands/display', () => {
         expect(stateStore.setShowUsage).toHaveBeenCalledWith(true);
         expect(stateStore.setShowToolActivity).toHaveBeenCalledWith(true);
         expect(stateStore.setShowIntentActivity).toHaveBeenCalledWith(true);
+        expect(stateStore.setShowSessionActivity).toHaveBeenCalledWith(true);
+    });
+
+    it('aplica preset full como padrão de boot e valida fallback', () => {
+        expect(resolveTerminalBootDisplayPreset(undefined)).toBe('full');
+        expect(resolveTerminalBootDisplayPreset('xpto')).toBe('full');
+        expect(resolveTerminalBootDisplayPreset('minimal')).toBe('minimal');
+
+        const preset = applyTerminalBootDisplayPreset('full');
+        expect(preset.name).toBe('full');
+        expect(stateStore.setShowThinking).toHaveBeenCalledWith(true);
+        expect(stateStore.setShowStreaming).toHaveBeenCalledWith(true);
         expect(stateStore.setShowSessionActivity).toHaveBeenCalledWith(true);
     });
 

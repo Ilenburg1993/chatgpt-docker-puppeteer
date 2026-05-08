@@ -106,8 +106,24 @@ export class DialogLoopManager extends EventEmitter {
     constructor(options = {}) {
         super();
         const runtimeKit = createDialogLoopRuntimeKit(options, {
-            onStall: (stalledMs) => this.emit(EMITTER_LOOP_STALLED, { stalledMs }),
-            onPreStallWarning: (stalledMs) => this.emit(EMITTER_LOOP_PRE_STALL_WARNING, { stalledMs }),
+            onStall: (stalledMs) => {
+                if (this.#shouldSuppressWatchdogEscalation()) {
+                    log(
+                        'INFO',
+                        '[DialogLoopManager] Watchdog stall suprimido: aguardando input humano legítimo (pending question kind=question).',
+                    );
+                    this.#watchdogSupervisor.ping();
+                    return;
+                }
+                this.emit(EMITTER_LOOP_STALLED, { stalledMs });
+            },
+            onPreStallWarning: (stalledMs) => {
+                if (this.#shouldSuppressWatchdogEscalation()) {
+                    this.#watchdogSupervisor.ping();
+                    return;
+                }
+                this.emit(EMITTER_LOOP_PRE_STALL_WARNING, { stalledMs });
+            },
         });
 
         this.#turnQueue = runtimeKit.turnQueue;
@@ -248,21 +264,31 @@ export class DialogLoopManager extends EventEmitter {
             model: this.#host?.getModel() ?? '',
         });
 
-        await runDialogLoopBoot({
-            emitter: this,
-            host: this.#host,
-            state: this.#state,
-            bootTimeoutMs: this.#bootTimeoutMs,
-            watchdogSupervisor: this.#watchdogSupervisor,
-            modelFallback: this.#modelFallback,
-            costLedger: this.#costLedger,
-            bootCircuit: this.#bootCircuit,
-            ...(bootPrompt !== undefined && { bootPrompt }),
-            emit: (event, payload) => this.emit(event, payload),
-            trackPersistedState: (data, meta) => this.#trackPersistedState(data, meta),
-            persistPrMetrics: (label, description) => this.#persistPrMetrics(label, description),
-            endLoopSpan: (success) => this.#endLoopSpan(success),
-        });
+        // FIX P0-2: try/catch em torno do boot para evitar #active=true orphaned se boot lançar.
+        try {
+            await runDialogLoopBoot({
+                emitter: this,
+                host: this.#host,
+                state: this.#state,
+                bootTimeoutMs: this.#bootTimeoutMs,
+                watchdogSupervisor: this.#watchdogSupervisor,
+                modelFallback: this.#modelFallback,
+                costLedger: this.#costLedger,
+                bootCircuit: this.#bootCircuit,
+                ...(bootPrompt !== undefined && { bootPrompt }),
+                emit: (event, payload) => this.emit(event, payload),
+                trackPersistedState: (data, meta) => this.#trackPersistedState(data, meta),
+                persistPrMetrics: (label, description) => this.#persistPrMetrics(label, description),
+                endLoopSpan: (success) => this.#endLoopSpan(success),
+            });
+        } catch (err) {
+            this.#state.deactivate();
+            this.#endLoopSpan(false);
+            this.#watchdogSupervisor.clear();
+            this.emit(EMITTER_LOOP_CHANGED, { active: false, ts: Date.now(), reason: 'boot_failed' });
+            this.#bootCircuit.recordFailure();
+            throw err;
+        }
     }
 
     /**
@@ -330,24 +356,41 @@ export class DialogLoopManager extends EventEmitter {
 
         // F41B.1: Aguardar mutex drenar dentro do timeout antes de desativar.
         // O timer de shutdown só força desativação se o turno em andamento não terminar a tempo.
-        await Promise.race([
-            this.#turnQueue.drain(),
-            new Promise((resolve) => {
-                const timer = setTimeout(() => {
-                    log(
-                        'WARN',
-                        `[DialogLoopManager] stop() timeout após ${shutdownTimeoutMs}ms — forçando forceDeactivate().`,
-                    );
-                    this.forceDeactivate();
-                    resolve(undefined);
-                }, shutdownTimeoutMs);
-                // Se o mutex resolver antes do timeout, limpar o timer
-                void this.#turnQueue.drain().then(() => {
-                    clearTimeout(timer);
-                    resolve(undefined);
-                });
-            }),
-        ]);
+        // FIX P0-1: drain() extraído para uma única Promise — evita dupla chamada simultânea.
+        const drainPromise = this.#turnQueue.drain();
+        /** @type {boolean} */
+        let timedOut = false;
+        /** @type {ReturnType<typeof setTimeout> | null} */
+        let shutdownTimer = null;
+        void drainPromise.finally(() => {
+            if (shutdownTimer !== null) clearTimeout(shutdownTimer);
+        });
+        try {
+            await Promise.race([
+                drainPromise,
+                new Promise((resolve) => {
+                    shutdownTimer = setTimeout(() => {
+                        timedOut = true;
+                        log(
+                            'WARN',
+                            `[DialogLoopManager] stop() timeout após ${shutdownTimeoutMs}ms — forçando forceDeactivate().`,
+                        );
+                        this.forceDeactivate();
+                        resolve(undefined);
+                    }, shutdownTimeoutMs);
+                }),
+            ]);
+        } finally {
+            if (shutdownTimer !== null) {
+                clearTimeout(shutdownTimer);
+            }
+        }
+
+        // O timeout já executou forceDeactivate(), que emite `stopped` e desativa o loop.
+        // Evita dupla emissão de `stopped` com reason divergente (`force_deactivate` + `authorized_stop`).
+        if (timedOut) {
+            return;
+        }
 
         this.#state.finishStop();
         this.#endLoopSpan(true);
@@ -360,6 +403,22 @@ export class DialogLoopManager extends EventEmitter {
         );
         this.#watchdogSupervisor.stop();
         this.emit('stopped', { reason, authorized: true });
+    }
+
+    /**
+     * Indica se o watchdog deve suprimir escalonamento por stall.
+     *
+     * Regra: quando o loop está ativo e há pergunta pendente de tipo `question` (input humano), inatividade não deve
+     * ser tratada como travamento do loop.
+     *
+     * @returns {boolean}
+     */
+    #shouldSuppressWatchdogEscalation() {
+        if (!this.#state.active || this.#state.stopping) {
+            return false;
+        }
+        const pending = this.#host?.getPendingQuestionSnapshot?.();
+        return pending?.kind === 'question' && pending.protocolControlled !== true;
     }
 
     /**

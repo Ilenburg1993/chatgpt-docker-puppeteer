@@ -2,14 +2,14 @@
 /**
  * src/copilot/agent/facades/sdk/workspace-ops.js
  *
- * Sub-facade: arquivos de workspace, shell e agentes customizados.
+ * Sub-fachada: arquivos de workspace, shell e agentes customizados.
  *
  * @module copilot/agent/facades/sdk/workspace-ops
  */
 
+import { MAESTRO_AGENT_NAME } from '#copilot/config';
 import {
     compactionCompact,
-    deselectAgent,
     getCurrentAgent,
     listAgents,
     reloadAgents,
@@ -87,10 +87,16 @@ export async function listSdkAgents(ctx) {
 
 /**
  * @param {unknown} ctx
- * @returns {Promise<Awaited<ReturnType<typeof getCurrentAgent>>>}
+ * @returns {Promise<{ agent: unknown; enforced: boolean; previousAgent?: unknown }>}
  */
 export async function getCurrentSdkAgent(ctx) {
-    return getCurrentAgent(requireSession(ctx, 'getCurrentSdkAgent'));
+    const session = requireSession(ctx, 'getCurrentSdkAgent');
+    const current = await getCurrentAgent(session);
+    if (current.agent?.name === MAESTRO_AGENT_NAME) {
+        return { ...current, enforced: false };
+    }
+    const selected = await selectAgent(session, MAESTRO_AGENT_NAME);
+    return { agent: selected.agent, previousAgent: current.agent ?? null, enforced: true };
 }
 
 /**
@@ -99,21 +105,27 @@ export async function getCurrentSdkAgent(ctx) {
  * @returns {Promise<Awaited<ReturnType<typeof selectAgent>>>}
  */
 export async function selectSdkAgent(ctx, name) {
-    return selectAgent(requireSession(ctx, 'selectSdkAgent'), name);
+    if (name && name !== MAESTRO_AGENT_NAME) {
+        throw new Error(`Seleção direta de "${name}" bloqueada. O agente ativo obrigatório é "${MAESTRO_AGENT_NAME}".`);
+    }
+    return selectAgent(requireSession(ctx, 'selectSdkAgent'), MAESTRO_AGENT_NAME);
 }
 
 /**
  * @param {unknown} ctx
- * @returns {Promise<Awaited<ReturnType<typeof deselectAgent>>>}
+ * @returns {Promise<Awaited<ReturnType<typeof selectAgent>>>}
  */
 export async function deselectSdkAgent(ctx) {
-    return deselectAgent(requireSession(ctx, 'deselectSdkAgent'));
+    return selectAgent(requireSession(ctx, 'deselectSdkAgent'), MAESTRO_AGENT_NAME);
 }
 
 /**
  * @param {unknown} ctx
- * @returns {Promise<Awaited<ReturnType<typeof reloadAgents>>>}
+ * @returns {Promise<{ agents: unknown[]; selectedAgent: unknown }>}
  */
 export async function reloadSdkAgents(ctx) {
-    return reloadAgents(requireSession(ctx, 'reloadSdkAgents'));
+    const session = requireSession(ctx, 'reloadSdkAgents');
+    const result = await reloadAgents(session);
+    const selected = await selectAgent(session, MAESTRO_AGENT_NAME);
+    return { ...result, selectedAgent: selected.agent };
 }

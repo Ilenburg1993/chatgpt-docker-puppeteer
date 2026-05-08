@@ -1,6 +1,6 @@
 # Roadmap completo 2026-05-07 — I/O inteligente, cache, scope e indexação
 
-Escopo: `src/copilot/**`  
+Escopo: `src/copilot/**`
 Regra: este roadmap deve ser executado antes de novas expansões paralelas de read/write/search/scan.
 
 ## Ordem executiva
@@ -53,6 +53,12 @@ Contrato de disponibilidade:
   invalidação.
 - `/status`, `/live` e `/observability/health` expõem disponibilidade (`available`), contagem de
   arquivos, símbolos e estado básico.
+- `/index` no terminal permanente expõe a mesma camada do índice para operação humana: `status`,
+  `build`, `search`, `symbol` e `clear`.
+- `scripts/copilot-io-index.mjs` e os scripts `npm run copilot:index:*` expõem a mesma camada para
+  shell/automação.
+- Builds completos fazem poda segura de arquivos removidos. Builds parciais com `include/exclude`
+  não podam por padrão para não apagar entradas fora da fatia intencional.
 
 Metadados persistidos por arquivo:
 
@@ -69,10 +75,28 @@ Superfícies canônicas:
   - `buildIoIndexForDirectory`;
   - `searchIoIndex`, `findIoIndexSymbol`, `invalidateIoIndexPath`.
 - Tools:
-  - `workspace_index_build`;
-  - `workspace_index_status`;
-  - `workspace_index_search`;
+- `workspace_index_build`;
+- `workspace_index_status`;
+- `workspace_index_search`;
 - `workspace_index_find_symbol`.
+
+Comandos operacionais:
+
+- Humano no REPL:
+  - `/index status`;
+  - `/index build src/copilot --concurrency 8`;
+  - `/index search "io-engine"`;
+  - `/index symbol buildIoIndexForDirectory`.
+- Shell:
+  - `npm run copilot:index:status`;
+  - `npm run copilot:index:build`;
+  - `npm run copilot:index -- build src/copilot --ext js --ext md --concurrency 8 --json`;
+  - `npm run copilot:index -- search "read-through" --json`.
+- LLM-B:
+  - `workspace_index_status`;
+  - `workspace_index_build` com `{ "directory": "src/copilot", "concurrency": 8 }`;
+  - `workspace_index_search`;
+  - `workspace_index_find_symbol`.
 
 ## Integração LLM-B — read-through, buffer e base única
 
@@ -119,16 +143,22 @@ Implementado:
   - `copilot.io.scan`.
 - `io-index-sqlite` agora faz reindex incremental por `mtimeMs + size` quando o registro existente
   está `fresh`.
+- `io-index-sqlite` agora poda arquivos removidos durante builds completos e preserva entradas fora
+  de builds parciais com `include/exclude`.
 - `io-index-sqlite` cria e preenche `copilot_io_index_chunks`, com chunks textuais por linhas, hash
   por chunk e metadados de linha.
 - `io-engine` expõe `readTextChunks`, API canônica para leitura paginada/streamável em linhas.
+- `/index` no terminal e `npm run copilot:index` no shell tornam a atualização do índice
+  reproduzível fora das tools LLM-B.
+- `io-scanner` corrigido para não segurar slots de concorrência enquanto desce recursivamente em
+  diretórios; isso elimina starvation/deadlock em árvores reais.
 
 Decisão: chunks e incrementalidade pertencem ao L2 índice, não ao L2 blob cache. O cache blob
 continua otimizando payloads; o índice materializa consulta, navegação e decomposição.
 
 ### A.16 — Fechamento do corte atual
 
-Prioridade: P0  
+Prioridade: P0
 Objetivo: estabilizar os componentes já criados antes de adicionar complexidade.
 
 Tarefas:
@@ -157,7 +187,7 @@ Critério de pronto:
 
 ### A.17 — Scanner canônico 2.0
 
-Prioridade: P0/P1  
+Prioridade: P0/P1
 Objetivo: criar base confiável para indexação incremental.
 
 Tarefas:
@@ -169,10 +199,11 @@ Tarefas:
 - [ ] Benchmarkar `readdir/lstat` atual vs `fsPromises.glob` vs `rg --files`.
 - [x] Publicar eventos `scan.start`, `scan.progress`, `scan.complete`, `scan.error`.
 - [ ] Adicionar testes:
-  - `.gitignore`;
-  - denylist;
+  - [x] `.gitignore`;
+  - [x] denylist;
   - [x] symlink;
-  - rename/delete;
+  - [x] delete/poda no índice;
+  - [x] árvore com muitos diretórios e baixa concorrência sem starvation;
   - diretório grande sintético.
 
 Critério de pronto:
@@ -183,7 +214,7 @@ Critério de pronto:
 
 ### A.18 — Observability de cache, scanner e índice
 
-Prioridade: P1  
+Prioridade: P1
 Objetivo: tornar performance auditável.
 
 Tarefas:
@@ -212,7 +243,7 @@ Critério de pronto:
 
 ### A.19 — L2 soak e separação cache vs índice
 
-Prioridade: P1  
+Prioridade: P1
 Objetivo: decidir ativação real de L2 por evidência.
 
 Tarefas:
@@ -235,7 +266,7 @@ Critério de pronto:
 
 ### A.20 — Índice FTS5 de arquivos
 
-Prioridade: P1/P2  
+Prioridade: P1/P2
 Objetivo: acelerar busca textual comum sem perder fallback `rg`.
 
 Tarefas:
@@ -244,6 +275,10 @@ Tarefas:
       `copilot_io_index_imports`, `copilot_io_index_fts`.
 - [x] Implementar build frio de diretório via `buildIoIndexForDirectory`/`workspace_index_build`.
 - [x] Implementar reindex incremental por fingerprint `mtime/size` para registros `fresh`.
+- [x] Implementar poda de entradas deletadas em builds completos.
+- [x] Desativar poda automática em builds parciais com `include/exclude`.
+- [x] Expor `/index status|build|search|symbol|clear` no terminal LLM-B.
+- [x] Expor `npm run copilot:index:*` para operação shell.
 - [ ] Evoluir incrementalidade para hash rápido opcional sob threshold (`xxhash-wasm`) quando
       `mtime/size` não forem suficientes.
 - [ ] Integrar `search_in_files` com engine selector:
@@ -262,7 +297,7 @@ Critério de pronto:
 
 ### A.21 — Índice simbólico persistente e scope LLM-B
 
-Prioridade: P1  
+Prioridade: P1
 Objetivo: transformar scope em ferramenta cotidiana da LLM-B.
 
 Tarefas:
@@ -289,7 +324,7 @@ Critério de pronto:
 
 ### A.22 — Grandes arquivos, buffer e parsing streaming
 
-Prioridade: P1/P2  
+Prioridade: P1/P2
 Objetivo: manter o loop responsivo com payloads grandes.
 
 Tarefas:
@@ -316,7 +351,7 @@ Critério de pronto:
 
 ### A.23 — Watcher strategy
 
-Prioridade: P2  
+Prioridade: P2
 Objetivo: manter cache/índice fresco com baixo custo.
 
 Tarefas:
@@ -335,7 +370,7 @@ Critério de pronto:
 
 ### A.24 — Web cache e provider search robusto
 
-Prioridade: P2  
+Prioridade: P2
 Objetivo: alinhar web read/search ao mesmo padrão.
 
 Tarefas:
@@ -363,13 +398,134 @@ Antes de encerrar qualquer corte:
 - `npm run format:check` quando houver alteração documental ampla;
 - benchmark versionado quando a decisão for performance/dependência.
 
+## Avaliação do scanner antes da primeira formação do índice
+
+Status em 2026-05-07, antes do primeiro build completo de `src/copilot`:
+
+- Traversal usa `readdir/lstat`, ordenação determinística, concorrência via `p-limit` e eventos
+  `diagnostics_channel`.
+- Segurança usa denylist canônica (`.git`, `.env`, `.ssh`, `node_modules` etc.) antes de descer na
+  árvore.
+- `.gitignore` raiz é respeitado quando `respectGitignore=true`.
+- Fingerprint por arquivo usa `realpath + mtimeMs + size`, suficiente para skip incremental barato.
+- Symlinks são preservados como entradas próprias e não são seguidos implicitamente.
+- O índice consome exclusivamente o scanner canônico; não há traversal paralelo no build L2.
+- A poda do índice ocorre somente em builds completos; builds filtrados materializam fatias sem
+  apagar o restante.
+
+Conclusão: o sistema está pronto para formar a primeira versão local do índice de `src/copilot`,
+desde que os gates de typecheck/testes/lint/format desta rodada passem. Pendências não bloqueantes
+para a primeira versão: benchmark `rg --files`/`fsPromises.glob`, hash `xxhash-wasm` opcional,
+ranking híbrido e watcher.
+
+## Primeira formação do índice local
+
+Executado em 2026-05-07 após hardening e gates focados:
+
+- Comando de formação:
+  `node --input-type=module -e "... buildIoIndexForDirectory('src/copilot') ..."` e validação
+  operacional via `npm run copilot:index:build`.
+- Primeiro build completo:
+  - `scannedEntries=791`;
+  - `candidateFiles=685`;
+  - `indexed=685`;
+  - `failed=0`;
+  - `pruned=0`;
+  - `durationMs=6971`.
+- Estado final persistido:
+  - `files=685`;
+  - `freshFiles=685`;
+  - `failedFiles=0`;
+  - `bytesIndexed=4484249`;
+  - `symbols=3853`;
+  - `imports=1901`;
+  - `chunks=991`.
+- Rebuild incremental via `npm run copilot:index:build`:
+  - `indexed=0`;
+  - `unchanged=685`;
+  - `failed=0`;
+  - `durationMs=105`.
+- Após a suíte unitária completa, o índice foi limpo e reconstruído somente para `src/copilot`,
+  removendo resíduos temporários de testes:
+  - `files=685`;
+  - `freshFiles=685`;
+  - `failedFiles=0`;
+  - `symbols=3853`;
+  - `imports=1901`;
+  - `chunks=991`.
+
+Conclusão operacional: a primeira versão do índice L2 de `src/copilot` está formada, persistida em
+`data/copilot.sqlite`, consultável por `/index`, por `npm run copilot:index` e pelas tools
+`workspace_index_*`.
+
+## Atualização 2026-05-07 — Hardening de fechamento A.16 (bugfix + robustez de contrato)
+
+Transformações aplicadas nesta rodada de estabilização:
+
+- `workspace_scope_declare` ficou resiliente ao contrato interno sync/async de `declareScope`:
+  - normalização por `await Promise.resolve(...)`;
+  - remoção de drift de lint (`await-thenable`) sem quebrar compatibilidade.
+- `workspace_scope_declare` passou a suportar `scopeName` como alias canônico de agrupamento:
+  - quando fornecido, vira `sessionId` efetivo do escopo;
+  - mantém compatibilidade com `sessionId` legado.
+- `io-engine` recebeu hardening de invalidação por tier:
+  - invalidação de L1 e L2 agora é best-effort por camada;
+  - falha de cache não interrompe mutações canônicas de I/O.
+- `io-cache-l2-registry` e `io-cache-l2-sqlite` passaram a sanitizar env numérico:
+  - `IO_L2_CACHE_TTL_MS`, `IO_L2_CACHE_MAX_ENTRIES` e `IO_L2_CACHE_PRUNE_MS` agora usam parser
+    positivo com fallback seguro;
+  - evita `NaN`, negativos e configuração inválida degradando comportamento em runtime.
+
+Validação executada:
+
+- `vitest` focado em infra/scope/web/terminal (A.16): verde;
+- `npm run typecheck:strict:src.copilot`: verde;
+- `npm run lint` nos módulos alterados: verde.
+
+Impacto no roadmap:
+
+1. A.16 avança em robustez de contrato sem introduzir nova engine paralela.
+2. L2 fica melhor preparado para soak de A.19 sem risco de configuração inválida por env.
+3. Scope para LLM-B reduz ambiguidade operacional (`scopeName`) e melhora estabilidade do handler.
+
+## Atualização 2026-05-07 — A.16.1 estabilização de invalidação por tier + integração L1/L2
+
+Transformações aplicadas nesta rodada:
+
+- `io-engine` recebeu hardening adicional de invalidação de cache por tier:
+  - `invalidateIoCacheTiers()` e `invalidateIoCacheTierSubtrees()` agora tratam falha de L1 e L2
+    como **best-effort** isolado por camada;
+  - erro de cache não interrompe `write/append/delete/move/copy/patch/removePath`.
+- Testes de integração em `test_io_engine.spec.js` foram ampliados para travar dois contratos críticos:
+  - read-through de L2 para `readBytes` com reaqueciemento de L1 na leitura subsequente;
+  - mutação canônica (`writeFileAtomic`) continua concluindo mesmo quando `invalidatePath` do L2
+    lança erro.
+
+Validação executada:
+
+- `vitest` focado:
+  - `tests/unit/copilot/infra/test_io_engine.spec.js`;
+  - `tests/unit/copilot/infra/test_io_cache_l2_registry.spec.js`;
+  - `tests/unit/copilot/infra/test_io_cache_l2_sqlite.spec.js`;
+  - `tests/unit/copilot/tools/file/test_scope_tools.spec.js`;
+  - `tests/unit/copilot/tools/file/test_read_tools.spec.js`.
+- `npm run typecheck:strict:src.copilot`: verde.
+
+Impacto no roadmap:
+
+1. A.16 ganha robustez real de mutação em cenários degradados de cache L2.
+2. A.19 (soak de L2) passa a iniciar com contrato de falha mais seguro para produção.
+3. A integração L1/L2 deixa de depender de inferência e fica explicitamente coberta por teste.
+
 ## Backlog de bugs/gaps encontrados na revisão
 
-- `scope-tools` contém limites Zod bloqueantes e precisa virar advisory.
-- `scope-tools` recebe `include/exclude/recursive`, mas handler ainda não aplica todos.
+- `scope-tools` já teve limites bloqueantes convertidos em advisory; acompanhar regressões de UX em
+  operações muito grandes.
+- `scope-tools` já aplica `include/exclude/recursive`; falta soak em workspaces grandes.
 - `io-cache` ainda deve expor stats em health/live.
 - `io-cache-l2` precisa métrica/health e soak com flag ativa.
-- `io-scanner` precisa `.gitignore`, `ignore`, `p-limit`, fingerprints e benchmark de engine.
+- `io-scanner` já usa `.gitignore`, `ignore`, `p-limit` e fingerprints; falta benchmark de engine.
+- `/index` e `npm run copilot:index` existem; falta soak operacional em sessões longas reais.
 - `search_in_files` precisa seletor FTS/rg quando FTS existir.
 - `workspace_symbol_search` deve eventualmente consumir índice simbólico quando fresco.
 - `readText` precisa estratégia formal para grandes arquivos e range reads.

@@ -7,13 +7,19 @@ const runtimeMocks = vi.hoisted(() => ({
     readTerminalRuntimeState: vi.fn(),
 }));
 
+const hookToolMocks = vi.hoisted(() => ({
+    hasPendingUserInputRequests: vi.fn(() => false),
+}));
+
 vi.mock('../../../../src/copilot/terminal/frontend/gateways/agent-runtime.js', () => runtimeMocks);
+vi.mock('../../../../src/copilot/tools/user-input-state.js', () => hookToolMocks);
 
 import { tryAnswerTerminalPendingQuestionInput } from '../../../../src/copilot/terminal/pending-question-answer.js';
 
 describe('terminal/pending-question-answer', () => {
     beforeEach(() => {
         vi.clearAllMocks();
+        hookToolMocks.hasPendingUserInputRequests.mockReturnValue(false);
         runtimeMocks.readTerminalRuntimeState.mockReturnValue({
             runtimeId: 'default',
             pendingQuestionKind: 'question',
@@ -40,6 +46,35 @@ describe('terminal/pending-question-answer', () => {
         const result = tryAnswerTerminalPendingQuestionInput('stage', null);
 
         expect(result).toMatchObject({ routed: false, ok: false, reason: 'invalid_choice' });
+        expect(runtimeMocks.answerTerminalPendingQuestion).not.toHaveBeenCalled();
+    });
+
+    it('roteia linha comum para request_user_input pendente quando não há ask_user vivo', () => {
+        runtimeMocks.readTerminalRuntimeState.mockReturnValue({
+            runtimeId: 'default',
+            pendingQuestionKind: null,
+            pendingQuestionShadowExpired: false,
+            pendingQuestion: null,
+        });
+        hookToolMocks.hasPendingUserInputRequests.mockReturnValue(true);
+
+        const result = tryAnswerTerminalPendingQuestionInput('seguir com main', null);
+
+        expect(result).toMatchObject({ routed: true, ok: true, reason: 'answered', answer: 'seguir com main' });
+        expect(runtimeMocks.answerTerminalPendingQuestion).toHaveBeenCalledWith('seguir com main', null);
+    });
+
+    it('mantém mensagem como turno normal quando não há ask_user nem request_user_input pendentes', () => {
+        runtimeMocks.readTerminalRuntimeState.mockReturnValue({
+            runtimeId: 'default',
+            pendingQuestionKind: null,
+            pendingQuestionShadowExpired: false,
+            pendingQuestion: null,
+        });
+
+        const result = tryAnswerTerminalPendingQuestionInput('nova tarefa', null);
+
+        expect(result).toMatchObject({ routed: false, ok: false, reason: 'no_pending' });
         expect(runtimeMocks.answerTerminalPendingQuestion).not.toHaveBeenCalled();
     });
 });

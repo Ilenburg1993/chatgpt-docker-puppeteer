@@ -64,6 +64,7 @@ export function cmdHelp({ injectPort, println }) {
   \x1b[33m/workspace [list|read|write|sync|mirror|promote]\x1b[0m — workspace SDK + convergência SDK↔FS auditável
   \x1b[33m/fs [list|read|search|create|write]\x1b[0m   — filesystem local canônico via file-tools
   \x1b[33m/scope [list|declare|context|find|refresh|close]\x1b[0m — escopos inteligentes: cache, parse, índice e contexto
+  \x1b[33m/index [status|build|search|symbol|clear]\x1b[0m — índice L2 local: FTS, símbolos, imports e poda segura
   \x1b[33m/elicitation [list|show|request]\x1b[0m      — formulários/URL estruturados do SDK
   \x1b[33m/permission [list|all|show|clear|mode|respond]\x1b[0m — permissões SDK observadas + governança + resposta manual
   \x1b[33m/errors [n]\x1b[0m                          — mostra últimos N erros rastreados (default: 10)

@@ -64,7 +64,7 @@ const workspaceRouteMocks = vi.hoisted(() => {
 });
 
 vi.mock('#copilot/sdk', async (importOriginal) => {
-    const actual = await importOriginal();
+    const actual = /** @type {Record<string, unknown>} */ (await importOriginal());
     return {
         ...actual,
         emitSdkOperationMetric: workspaceRouteMocks.emitSdkOperationMetric,
@@ -220,10 +220,7 @@ describe('sdk session workspace routes — materialize', () => {
             }),
         );
         workspaceRouteMocks.routeDeps.sdkSessionRpc.workspaceReadFile.mockImplementationOnce(
-            async (_session, path) => ({
-                path,
-                content: null,
-            }),
+            async (_session, path) => /** @type {any} */ ({ path, content: null }),
         );
 
         const res = await request(createApp())

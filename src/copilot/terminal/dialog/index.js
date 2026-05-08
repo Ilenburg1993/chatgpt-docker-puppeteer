@@ -83,6 +83,7 @@ export {
     println,
     PROMPT_USER,
     PROMPT_WAITING,
+    resetStatusRowState,
     SEPARATOR,
     TURN_TIMEOUT_MS,
     writeInlineStatus,

@@ -9,8 +9,6 @@
  * @see module:copilot/tools/file/shared
  */
 
-import * as fs from 'node:fs/promises';
-import * as path from 'node:path';
 import { z } from 'zod';
 import { toError } from '../../core/error-handlers.js';
 import { withIoMeta } from '../../core/io-contracts.js';
@@ -57,13 +55,9 @@ const writeFileContentTool = buildTool({
         log('INFO', `[copilot/write_file_content] ${resolved}`);
 
         try {
-            try {
-                await fs.access(resolved);
-            } catch {
-                return { success: false, error: 'Arquivo não encontrado. Use create_file para criar um novo arquivo.' };
-            }
             const buf = encoding === 'base64' ? Buffer.from(content, 'base64') : Buffer.from(content, 'utf8');
             const writeResult = await writeFileAtomic(resolved, buf, {
+                requireExists: true,
                 riskClass: 'high',
                 advisoryLimits: {
                     advisoryWriteContentBytes: ADVISORY_WRITE_CONTENT_BYTES,
@@ -118,24 +112,11 @@ const createFileTool = buildTool({
         log('INFO', `[copilot/create_file] ${resolved}`);
 
         try {
-            if (!overwrite) {
-                try {
-                    await fs.access(resolved);
-                    return {
-                        success: false,
-                        error: 'Arquivo já existe. Passe overwrite: true para sobrescrever ou use write_file_content.',
-                    };
-                } catch {
-                    /* file does not exist — ok */
-                }
-            }
-            if (createParentDirs) {
-                await fs.mkdir(path.dirname(resolved), { recursive: true });
-            }
             const contentBytes = Buffer.byteLength(content ?? '', 'utf8');
             const writeResult = await createOrReplaceFileAtomic(resolved, content ?? '', {
                 encoding: 'utf8',
-                createParentDirs: false,
+                createParentDirs,
+                failIfExists: !overwrite,
                 riskClass: overwrite ? 'high' : 'medium',
                 advisoryLimits: {
                     advisoryWriteContentBytes: ADVISORY_WRITE_CONTENT_BYTES,
@@ -178,13 +159,13 @@ const deleteFileTool = buildTool({
         log('INFO', `[copilot/delete_file] ${resolved}`);
 
         try {
-            const stats = await fs.stat(resolved);
-            if (stats.isDirectory()) {
-                return { success: false, error: 'É um diretório. delete_file só opera em arquivos.' };
-            }
             const deleted = await deleteFileLocked(resolved);
             return { success: true, ...deleted };
         } catch (err) {
+            const e = /** @type {{ code?: unknown }} */ (err);
+            if (e.code === 'EISDIR' || e.code === 'EPERM') {
+                return { success: false, error: 'É um diretório. delete_file só opera em arquivos.' };
+            }
             return { success: false, error: toError(err).message };
         }
     },
@@ -215,17 +196,6 @@ const copyFileTool = buildTool({
         log('INFO', `[copilot/copy_file] ${src.resolved} → ${dst.resolved}`);
 
         try {
-            if (!overwrite) {
-                try {
-                    await fs.access(dst.resolved);
-                    return {
-                        success: false,
-                        error: 'Destino já existe. Passe overwrite: true para sobrescrever.',
-                    };
-                } catch {
-                    /* dest does not exist — ok */
-                }
-            }
             const copyResult = await copyFileLocked(src.resolved, dst.resolved, { overwrite });
             return withIoMeta(
                 {
@@ -268,17 +238,6 @@ const moveFileTool = buildTool({
         log('INFO', `[copilot/move_file] ${src.resolved} → ${dst.resolved}`);
 
         try {
-            if (!overwrite) {
-                try {
-                    await fs.access(dst.resolved);
-                    return {
-                        success: false,
-                        error: 'Destino já existe. Passe overwrite: true para sobrescrever.',
-                    };
-                } catch {
-                    /* dest does not exist — ok */
-                }
-            }
             const moveResult = await moveFileLocked(src.resolved, dst.resolved, { overwrite });
             return withIoMeta(
                 { success: true, source: src.resolved, destination: dst.resolved, lockWaitMs: moveResult.lockWaitMs },
@@ -322,12 +281,6 @@ const patchFileTool = buildTool({
     handler: async ({ path: filePath, old_string, new_string, replace_all, expected_occurrences }) => {
         const v = await validatePath(filePath, { mode: 'write' });
         if (!v.ok) return { success: false, error: v.reason };
-
-        try {
-            await fs.access(v.resolved);
-        } catch {
-            return { success: false, error: `Arquivo não encontrado: ${v.resolved}` };
-        }
 
         try {
             const patchResult = await patchTextLocked(v.resolved, {

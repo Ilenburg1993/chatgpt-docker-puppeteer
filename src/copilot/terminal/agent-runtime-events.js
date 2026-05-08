@@ -35,6 +35,7 @@ import { recordTerminalActivity } from './activity-state.js';
 import { broadcastSse, buildUserPrompt, clearInlineStatus, println, writeInlineStatus } from './dialog/index.js';
 import { readTerminalRuntimeState } from './frontend/gateways/agent-runtime.js';
 import { createTerminalPendingQuestionReplayState } from './pending-question-replay.js';
+import { isExternalToolInFlight } from './sdk-session-events.js';
 import { buildTerminalToolActivityPresentation, compactTerminalToolText } from './tool-activity-presenter.js';
 import { completeTerminalTurnToolCall, recordTerminalTurnToolActivity } from './turn-trace-state.js';
 import { getTerminalDetailLevel } from './ui-preferences.js';
@@ -46,6 +47,8 @@ import { terminalActionChip, terminalThemeBadge, terminalThemeText } from './ui-
  *     off: (event: string, handler: (...args: any[]) => void) => void;
  * }} AgentEventHost
  */
+
+const TOOL_HEARTBEAT_INTERVAL_MS = 10_000;
 
 /**
  * @param {{
@@ -64,11 +67,41 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null }) {
      *         presentation: import('./tool-activity-presenter.js').TerminalToolActivityPresentation;
      *         lastProgress?: number | null;
      *         lastProgressMessage?: string | null;
+     *         lastSignalAt: number;
+     *         lastHeartbeatAt: number;
      *     }
      * >}
      */
     const activeTools = new Map();
     const pendingQuestionReplay = createTerminalPendingQuestionReplayState();
+    const toolHeartbeatTimer = setInterval(() => {
+        if (activeTools.size === 0) return;
+        const now = Date.now();
+        const compactDetail = getTerminalDetailLevel() === 'compact';
+        for (const [toolCallId, entry] of activeTools.entries()) {
+            const elapsedMs = now - entry.t0;
+            if (elapsedMs < TOOL_HEARTBEAT_INTERVAL_MS) continue;
+            if (now - entry.lastHeartbeatAt < TOOL_HEARTBEAT_INTERVAL_MS) continue;
+            entry.lastHeartbeatAt = now;
+            const elapsed = (elapsedMs / 1000).toFixed(0);
+            const sinceSignal = ((now - entry.lastSignalAt) / 1000).toFixed(0);
+            recordTerminalActivity('tool', 'Tool em andamento', {
+                detail: `${entry.presentation.detail} · ${elapsed}s ativos · ${sinceSignal}s sem progresso`,
+                toolName: entry.name,
+                source: 'sdk',
+                recordHistory: false,
+            });
+            if (getShowToolActivity()) {
+                const line =
+                    `  ${terminalThemeText('muted', '↳')} ${terminalThemeText('tool', compactDetail ? compactTerminalToolText(entry.name, 32) : entry.name)} ${terminalThemeText('muted', `ainda executando · ${elapsed}s · ${toolCallId || 'sem id'}`)}`.trimEnd();
+                if (compactDetail) writeInlineStatus(line);
+                else println(line);
+            }
+        }
+    }, TOOL_HEARTBEAT_INTERVAL_MS);
+    if (typeof toolHeartbeatTimer.unref === 'function') {
+        toolHeartbeatTimer.unref();
+    }
 
     /**
      * @param {string} toolName
@@ -177,14 +210,21 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null }) {
         if (shouldSuppressToolNarration(name)) {
             return;
         }
+        // Evita duplicidade visual: ferramentas externas já foram anunciadas em external_tool.requested
+        if (isExternalToolInFlight(name)) {
+            return;
+        }
         const compactDetail = getTerminalDetailLevel() === 'compact';
         const presentation = buildTerminalToolActivityPresentation(evt, name);
+        const startedAt = Date.now();
         activeTools.set(toolCallId, {
             name,
-            t0: Date.now(),
+            t0: startedAt,
             presentation,
             lastProgress: null,
             lastProgressMessage: null,
+            lastSignalAt: startedAt,
+            lastHeartbeatAt: 0,
         });
         recordTerminalTurnToolActivity({
             toolName: name,
@@ -205,8 +245,8 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null }) {
             const opLabel = presentation.operation.toUpperCase();
             println(
                 compactDetail
-                    ? `  ${terminalThemeBadge('tool', 'TOOL')} ${terminalThemeBadge(operationRole, opLabel)} ${terminalThemeText('tool', compactTerminalToolText(name, 28))} ${terminalThemeText('muted', '·')} ${terminalThemeText(operationRole, compactTerminalToolText(presentation.startLine, 86))}`
-                    : `  ${terminalThemeBadge('tool', 'TOOL')} ${terminalThemeBadge(operationRole, opLabel)} ${terminalThemeText('tool', name)} ${terminalThemeText('muted', '·')} ${terminalThemeText(operationRole, presentation.startLine)}`,
+                    ? `  ${terminalThemeBadge('tool', 'TOOL')} ${terminalThemeBadge(operationRole, opLabel)} ${terminalThemeText('tool', compactTerminalToolText(presentation.displayToolName, 28))} ${terminalThemeText('muted', '·')} ${terminalThemeText(operationRole, compactTerminalToolText(presentation.startLine, 86))}`
+                    : `  ${terminalThemeBadge('tool', 'TOOL')} ${terminalThemeBadge(operationRole, opLabel)} ${terminalThemeText('tool', presentation.displayToolName)} ${terminalThemeText('muted', '·')} ${terminalThemeText(operationRole, presentation.startLine)}`,
             );
         }
         broadcastSse('tool.start', {
@@ -238,6 +278,7 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null }) {
         if (entry) {
             entry.lastProgress = progress;
             entry.lastProgressMessage = progressMessage;
+            entry.lastSignalAt = Date.now();
         }
         recordTerminalActivity('tool', 'Executando tool', {
             detail: effectiveDetail,
@@ -276,6 +317,9 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null }) {
         const presentation = entry?.presentation ?? buildTerminalToolActivityPresentation({}, name);
         const partialOutput = typeof evt?.partialOutput === 'string' ? evt.partialOutput : '';
         if (!partialOutput) return;
+        if (entry) {
+            entry.lastSignalAt = Date.now();
+        }
         const preview = compactTerminalToolText(partialOutput, 120);
         recordTerminalActivity('tool', 'Streaming de saída da tool', {
             detail: preview ? `${presentation.detail} · ${preview}` : presentation.detail,
@@ -315,6 +359,10 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null }) {
         if (shouldSuppressToolNarration(name)) {
             return;
         }
+        // Evita duplicidade visual: ferramentas externas já foram anunciadas em external_tool.completed
+        if (isExternalToolInFlight(name)) {
+            return;
+        }
         const compactDetail = getTerminalDetailLevel() === 'compact';
         const presentation = entry?.presentation ?? buildTerminalToolActivityPresentation(evt, name);
         const durationMs = entry
@@ -345,8 +393,8 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null }) {
             const statusBadge = success ? terminalThemeBadge('success', 'DONE') : terminalThemeBadge('error', 'FAIL');
             println(
                 compactDetail
-                    ? `  ${icon} ${statusBadge} ${terminalThemeText('tool', compactTerminalToolText(name, 28))} ${terminalThemeText('muted', '·')} ${terminalThemeText(operationRole, compactTerminalToolText(presentation.completeLine(success, `${dur}s`), 88))}`
-                    : `  ${icon} ${statusBadge} ${terminalThemeText('tool', name)} ${terminalThemeText('muted', '·')} ${terminalThemeText(operationRole, presentation.completeLine(success, `${dur}s`))}`,
+                    ? `  ${icon} ${statusBadge} ${terminalThemeText('tool', compactTerminalToolText(presentation.displayToolName, 28))} ${terminalThemeText('muted', '·')} ${terminalThemeText(operationRole, compactTerminalToolText(presentation.completeLine(success, `${dur}s`), 88))}`
+                    : `  ${icon} ${statusBadge} ${terminalThemeText('tool', presentation.displayToolName)} ${terminalThemeText('muted', '·')} ${terminalThemeText(operationRole, presentation.completeLine(success, `${dur}s`))}`,
             );
         }
         broadcastSse('tool.complete', {
@@ -470,6 +518,7 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null }) {
     }
 
     return () => {
+        clearInterval(toolHeartbeatTimer);
         agent.off('question.pending', onQuestion);
         agent.off('stopped', onStopped);
         agent.off('tool.execution_start', onToolStart);

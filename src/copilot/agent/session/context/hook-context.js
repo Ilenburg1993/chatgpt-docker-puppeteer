@@ -171,8 +171,8 @@ export async function buildHookSystemContext() {
                 `- close_key: \`\`${closeKey}\`\``,
                 `- strict_turn_close: ${strictClose}`,
                 '',
-                '**Protocolo obrigatório**: Encerre cada turno com `vscode_askQuestions`.',
-                'Não inicie task_complete sem chamar vscode_askQuestions antes.',
+                '**Protocolo de continuidade**: no terminal LLM-B, use `ask_user` READY/REPLY para manter o loop vivo.',
+                '`request_user_input`/`vscode_askQuestions` só é obrigatório em fluxos de hooks externos ou decisões humanas estruturadas.',
             ].join('\n'),
         );
     } catch (e) {

@@ -8,6 +8,8 @@
  * @module copilot/terminal/tool-activity-presenter
  */
 
+import { resolveToolName } from '#copilot/config';
+
 const FILE_OPERATION_PATTERNS = /** @type {const} */ ([
     { match: /\b(read|view|open|cat|show)\b/i, operation: 'read', label: 'lendo arquivo' },
     { match: /\b(write|create|save)\b/i, operation: 'write', label: 'escrevendo arquivo' },
@@ -21,6 +23,8 @@ const FILE_OPERATION_PATTERNS = /** @type {const} */ ([
  *
  * @typedef {{
  *     toolName: string;
+ *     canonicalToolName: string | null;
+ *     displayToolName: string;
  *     operation: TerminalToolOperation;
  *     label: string;
  *     path: string | null;
@@ -69,12 +73,23 @@ function inferPath(args) {
 }
 
 /**
+ * @param {unknown} args
+ * @returns {string | null}
+ */
+function inferQuestion(args) {
+    const data = objectOrNull(args);
+    if (!data) return null;
+    return stringOrNull(data['question']) ?? stringOrNull(data['message']) ?? stringOrNull(data['prompt']);
+}
+
+/**
  * @param {string} toolName
  * @param {string | null} path
  * @returns {{ operation: TerminalToolOperation; label: string }}
  */
 function inferOperation(toolName, path) {
-    const normalized = toolName.replace(/[_:-]+/g, ' ');
+    const canonical = resolveToolName(toolName) ?? toolName;
+    const normalized = `${toolName} ${canonical}`.replace(/[_:-]+/g, ' ');
     for (const pattern of FILE_OPERATION_PATTERNS) {
         if (pattern.match.test(normalized)) {
             return {
@@ -107,16 +122,26 @@ export function compactTerminalToolText(text, max = 140) {
  */
 export function buildTerminalToolActivityPresentation(evt, fallbackName = 'tool') {
     const toolName = stringOrNull(evt['toolName']) ?? stringOrNull(evt['name']) ?? fallbackName;
-    const path = inferPath(evt['args'] ?? evt['arguments'] ?? evt['input'] ?? evt['data']);
+    const canonicalToolName = resolveToolName(toolName);
+    const displayToolName =
+        canonicalToolName && canonicalToolName !== toolName ? `${toolName} -> ${canonicalToolName}` : toolName;
+    const toolArgs = evt['args'] ?? evt['arguments'] ?? evt['input'] ?? evt['data'];
+    const isStructuredInputTool = (canonicalToolName ?? toolName) === 'request_user_input';
+    const questionPreview = isStructuredInputTool ? inferQuestion(toolArgs) : null;
+    const path = isStructuredInputTool ? null : inferPath(toolArgs);
     const { operation, label } = inferOperation(toolName, path);
-    const target = path ?? stringOrNull(evt['mcpServerName']) ?? stringOrNull(evt['requestId']) ?? null;
+    const target = questionPreview ?? path ?? stringOrNull(evt['mcpServerName']) ?? stringOrNull(evt['requestId']) ?? null;
     const targetSuffix = target ? ` · ${target}` : '';
-    const detail = `${label}${targetSuffix}`;
-    const startLine = target ? `${label}: ${target}` : label;
-    const progressLinePrefix = target ? `${toolName} · ${target}` : toolName;
+    const aliasSuffix = displayToolName !== toolName ? ` · alias ${displayToolName}` : '';
+    const effectiveLabel = isStructuredInputTool ? 'aguardando decisão humana' : label;
+    const detail = `${effectiveLabel}${targetSuffix}${aliasSuffix}`;
+    const startLine = target ? `${effectiveLabel}: ${target}` : effectiveLabel;
+    const progressLinePrefix = target ? `${displayToolName} · ${target}` : displayToolName;
 
     return {
         toolName,
+        canonicalToolName,
+        displayToolName,
         operation,
         label,
         path,
@@ -126,7 +151,7 @@ export function buildTerminalToolActivityPresentation(evt, fallbackName = 'tool'
         progressLinePrefix,
         completeLine(success, durationLabel) {
             const outcome = success ? 'concluído' : 'falhou';
-            return `${label} ${outcome}${targetSuffix} (${durationLabel})`;
+            return `${effectiveLabel} ${outcome}${targetSuffix} (${durationLabel})`;
         },
     };
 }

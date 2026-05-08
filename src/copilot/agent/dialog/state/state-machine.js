@@ -70,10 +70,17 @@ export class DialogLoopStateMachine {
 
     /**
      * Marca o loop como inativo após falha, stop, reconnect ou shutdown.
+     *
+     * FIX: reseta também #resuming e #paused para evitar:
+     *
+     * - #resuming=true permanente após notifyReconnect() durante resume -> deadlock em beginResume()
+     * - #paused=true fantasma após reconnect com loop inativo -> loop nunca reinicia
      */
     deactivate() {
         this.#active = false;
         this.#stopping = false;
+        this.#resuming = false;
+        this.#paused = false;
     }
 
     /**
@@ -82,7 +89,6 @@ export class DialogLoopStateMachine {
      * @returns {DialogStopTransition}
      */
     beginStop() {
-        if (!this.#active) return 'inactive';
         if (this.#stopping) return 'already-stopping';
         this.#stopping = true;
         return 'started';
@@ -130,10 +136,14 @@ export class DialogLoopStateMachine {
 
     /**
      * Prepara restart do loop durante resume com PR.
+     *
+     * FIX: reseta também #resuming para evitar que uma falha de resume deixe #resuming=true, bloqueando futuros
+     * beginResume().
      */
     prepareResumeRestart() {
         this.#active = false;
         this.#paused = false;
         this.#stopping = false;
+        this.#resuming = false;
     }
 }

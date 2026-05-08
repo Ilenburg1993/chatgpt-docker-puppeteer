@@ -20,8 +20,14 @@
  */
 
 import { readCopilotBootConfig } from '#copilot/boot';
-import { DEFAULT_EXCLUDED_TOOLS, SessionConfigBuilder } from '#copilot/config';
-import { container } from '#copilot/core';
+import {
+    DEFAULT_EXCLUDED_TOOLS,
+    MAESTRO_AGENT_NAME,
+    SessionConfigBuilder,
+    buildCustomAgentsConfig,
+} from '#copilot/config';
+import { buildCanonicalLocalFsExcludedTools, container } from '#copilot/core';
+import { AgentToolPolicy } from '#copilot/sdk';
 import { log } from '../../ports/logging-port.js';
 import { METRICS_STORE } from '../../ports/metrics-port.js';
 
@@ -240,9 +246,15 @@ export function buildSessionHooks(ctx, host) {
 
     const toolsConfig = getAgentSdkToolsConfig();
     const defaultRuntimeDenylist = [...DEFAULT_EXCLUDED_TOOLS, ...toolsConfig.denylist];
+    const customAgents = buildCustomAgentsConfig() ?? [];
+    const agentPolicy = new AgentToolPolicy(customAgents, toolsConfig);
 
     return {
-        busHooks: withAgentRuntimeToolPolicy(busHooks, (toolName) => {
+        busHooks: withAgentRuntimeToolPolicy(busHooks, (toolName, input, invocation) => {
+            const agentName = getHookAgentName(input, invocation);
+            if (agentName === MAESTRO_AGENT_NAME) {
+                return false;
+            }
             if (isAgentToolDisabled(toolName)) {
                 return true;
             }
@@ -252,9 +264,26 @@ export function buildSessionHooks(ctx, host) {
             if (toolsConfig.allowlist !== null) {
                 return !toolsConfig.allowlist.includes(toolName);
             }
-            return false;
+            if (!agentName) {
+                return false;
+            }
+            return !agentPolicy.isToolAllowedForAgent(agentName, toolName);
         }),
     };
+}
+
+/**
+ * @param {import('../../../hooks/types.js').PreToolUseHookInput | undefined} input
+ * @param {import('../../../hooks/types.js').InvocationContext | undefined} invocation
+ * @returns {string | null}
+ */
+function getHookAgentName(input, invocation) {
+    const inputAgent = typeof input?.agentName === 'string' && input.agentName ? input.agentName : null;
+    const invocationAgent =
+        typeof invocation?.agentName === 'string' && invocation.agentName ? invocation.agentName : null;
+    const nestedAgent =
+        typeof invocation?.agent?.name === 'string' && invocation.agent.name ? invocation.agent.name : null;
+    return inputAgent ?? invocationAgent ?? nestedAgent;
 }
 
 /**
@@ -277,7 +306,13 @@ export function buildSessionOptions(ctx, host, { tools, busHooks }) {
         .workingDirectory(bootConfig.workspace.root)
         .skillDirectories(bootConfig.skills.skillDirectories)
         .onPermissionRequest(getPermissionHandler(ctx))
-        .tools(tools);
+        .tools(tools)
+        .excludedTools(
+            buildCanonicalLocalFsExcludedTools(
+                tools.map((tool) => tool.name),
+                DEFAULT_EXCLUDED_TOOLS,
+            ),
+        );
 
     builder.hooks(busHooks);
     if (mcpConfig) {

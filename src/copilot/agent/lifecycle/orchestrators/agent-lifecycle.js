@@ -516,14 +516,16 @@ export async function agentStop(
 
         if (ctx.isProcessing() || ctx.isWaitingForInput()) {
             log('INFO', `[AlwaysAlive] Aguardando tarefa atual terminar (até ${shutdownTimeoutMs}ms)...`);
+            // FIX: extrair onIdle para escopo externo — remover no finally em path de timeout
+            /** @type {(() => void) | null} */
+            let onIdle = null;
             /** @type {ReturnType<typeof setTimeout> | null} */
             let shutdownTimeoutHandle = null;
             try {
                 await Promise.race([
                     new Promise((resolve) => {
-                        const onIdle = () => {
+                        onIdle = () => {
                             if (!ctx.isProcessing() && !ctx.isWaitingForInput()) {
-                                host.off(EMITTER_STATUS, onIdle);
                                 resolve(undefined);
                             }
                         };
@@ -534,6 +536,10 @@ export async function agentStop(
                     }),
                 ]);
             } finally {
+                if (onIdle !== null) {
+                    host.off(EMITTER_STATUS, onIdle);
+                    onIdle = null;
+                }
                 if (shutdownTimeoutHandle !== null) {
                     clearTimeout(shutdownTimeoutHandle);
                 }

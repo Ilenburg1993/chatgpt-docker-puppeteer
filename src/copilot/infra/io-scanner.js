@@ -173,59 +173,62 @@ export async function scanDirectory(rootPath, options = {}) {
         const names = await readdir(dir);
         names.sort((a, b) => a.localeCompare(b));
         const entries = await Promise.all(
-            names.map((name) =>
-                limit(async () => {
-                    if (!showHidden && name.startsWith('.')) return null;
-                    if (respectDenylist && blockedSegments.has(name.toLowerCase())) return null;
-                    const absolutePath = join(dir, name);
-                    if (matchesAnyPattern(absolutePath, workspaceRoot, excludePatterns)) return null;
-                    const relativePath = relative(workspaceRoot, absolutePath).replace(/\\/g, '/');
-                    if (respectGitignore && relativePath && gitignore.ignores(relativePath)) return null;
-                    let stats;
-                    try {
-                        stats = await lstat(absolutePath);
-                    } catch {
-                        return null;
-                    }
-                    const type = classifyStats(stats);
-                    const isDirectory = type === 'directory';
-                    const includeByPattern =
-                        includePatterns.length === 0 || matchesAnyPattern(absolutePath, workspaceRoot, includePatterns);
-                    const includeEntry = (matchesFilter(name, options.filter) && includeByPattern) || isDirectory;
-                    if (!includeEntry) return null;
+            names.map(async (name) => {
+                if (!showHidden && name.startsWith('.')) return null;
+                if (respectDenylist && blockedSegments.has(name.toLowerCase())) return null;
+                const absolutePath = join(dir, name);
+                if (matchesAnyPattern(absolutePath, workspaceRoot, excludePatterns)) return null;
+                const relativePath = relative(workspaceRoot, absolutePath).replace(/\\/g, '/');
+                if (respectGitignore && relativePath && gitignore.ignores(relativePath)) return null;
+                let stats;
+                try {
+                    stats = await limit(() => lstat(absolutePath));
+                } catch {
+                    return null;
+                }
+                const type = classifyStats(stats);
+                const isDirectory = type === 'directory';
+                const includeByPattern =
+                    includePatterns.length === 0 || matchesAnyPattern(absolutePath, workspaceRoot, includePatterns);
+                const includeEntry = (matchesFilter(name, options.filter) && includeByPattern) || isDirectory;
+                if (!includeEntry) return null;
 
-                    const entry = /** @type {IoScanEntry} */ ({
-                        name,
-                        type,
-                        path: options.workspaceRoot ? relative(options.workspaceRoot, absolutePath) : absolutePath,
-                        absolutePath,
+                const entry = /** @type {IoScanEntry} */ ({
+                    name,
+                    type,
+                    path: options.workspaceRoot ? relative(options.workspaceRoot, absolutePath) : absolutePath,
+                    absolutePath,
+                });
+                if (type === 'file') entry.size = stats.size;
+                if (includeFingerprint && type === 'file') {
+                    const canonicalPath = await limit(() => realpath(absolutePath)).catch(() => absolutePath);
+                    entry.fingerprint = {
+                        realpath: canonicalPath,
+                        mtimeMs: stats.mtimeMs,
+                        size: stats.size,
+                    };
+                }
+                scannedEntries += 1;
+                if (scannedEntries % 500 === 0) {
+                    publishIoLifecycleEvent('scan', 'progress', {
+                        traceId,
+                        rootPath,
+                        scannedEntries,
+                        currentPath: absolutePath,
                     });
-                    if (type === 'file') entry.size = stats.size;
-                    if (includeFingerprint && type === 'file') {
-                        const canonicalPath = await realpath(absolutePath).catch(() => absolutePath);
-                        entry.fingerprint = {
-                            realpath: canonicalPath,
-                            mtimeMs: stats.mtimeMs,
-                            size: stats.size,
-                        };
-                    }
-                    scannedEntries += 1;
-                    if (scannedEntries % 500 === 0) {
-                        publishIoLifecycleEvent('scan', 'progress', {
-                            traceId,
-                            rootPath,
-                            scannedEntries,
-                            currentPath: absolutePath,
-                        });
-                    }
-                    if (isDirectory && recursive && currentDepth < maxDepth) {
-                        entry.children = await scan(absolutePath, currentDepth + 1);
-                    }
-                    return entry;
-                }),
-            ),
+                }
+                return entry;
+            }),
         );
-        return entries.filter((entry) => entry !== null);
+        const visibleEntries = entries.filter((entry) => entry !== null);
+        await Promise.all(
+            visibleEntries.map(async (entry) => {
+                if (entry.type === 'directory' && recursive && currentDepth < maxDepth) {
+                    entry.children = await scan(entry.absolutePath, currentDepth + 1);
+                }
+            }),
+        );
+        return visibleEntries;
     }
 
     try {

@@ -57,4 +57,43 @@ describe('terminal/activity-state', () => {
         expect(history).toHaveLength(0);
         expect(readTerminalActivitySnapshot().label).toBe('Gerando resposta');
     });
+
+    it('mantém foco em tool ativa quando eventos periféricos de sistema chegam', () => {
+        clearTerminalActivityHistory();
+        recordTerminalActivity('tool', 'Executando tool', {
+            detail: 'executando comando',
+            toolName: 'bash',
+            source: 'sdk',
+        });
+        recordTerminalActivity('system', 'Background tasks SDK alteradas', {
+            detail: '0 pendente(s)',
+            source: 'sdk',
+            recordHistory: false,
+        });
+
+        const snap = readTerminalActivitySnapshot();
+
+        expect(snap.phase).toBe('tool');
+        expect(snap.label).toBe('Executando tool');
+        expect(snap.toolName).toBe('bash');
+    });
+
+    it('libera foco de tool ao receber conclusão da mesma tool', () => {
+        clearTerminalActivityHistory();
+        recordTerminalActivity('tool', 'Executando tool', {
+            detail: 'executando comando',
+            toolName: 'bash',
+            source: 'sdk',
+        });
+        recordTerminalActivity('tool', 'Tool concluída', {
+            detail: 'executando comando concluído',
+            toolName: 'bash',
+            source: 'sdk',
+        });
+
+        const snap = readTerminalActivitySnapshot();
+
+        expect(snap.phase).toBe('tool');
+        expect(snap.label).toBe('Tool concluída');
+    });
 });

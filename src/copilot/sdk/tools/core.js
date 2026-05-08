@@ -60,6 +60,31 @@ function loadZodToJsonSchema() {
     return state.converter;
 }
 
+/**
+ * Converte Zod v4 pela API nativa do pacote `zod`. O conversor `zod-to-json-schema` cobre Zod v3, mas em v4 pode gerar
+ * schema vazio, o que deixa a tool praticamente invisível para o modelo.
+ *
+ * @param {import('zod/v3').ZodTypeAny | Record<string, unknown>} schema
+ * @returns {Record<string, unknown> | undefined}
+ */
+function tryZodV4ToJsonSchema(schema) {
+    if (!schema || !('_zod' in schema)) return undefined;
+    try {
+        const requireFromHere = createRequire(import.meta.url);
+        const mod = requireFromHere('zod');
+        const toJSONSchema =
+            typeof mod?.z?.toJSONSchema === 'function'
+                ? mod.z.toJSONSchema
+                : typeof mod?.toJSONSchema === 'function'
+                  ? mod.toJSONSchema
+                  : null;
+        if (!toJSONSchema) return undefined;
+        return /** @type {Record<string, unknown>} */ (toJSONSchema(schema));
+    } catch {
+        return undefined;
+    }
+}
+
 // Re-export do SDK para compat — consumers preferem usar createTool()
 export { defineTool };
 
@@ -90,6 +115,9 @@ function tryZodToJsonSchema(schema, toolName) {
     // Detecta Zod v3 (`_def`) ou v4 (`_zod`)
     const isZod = '_def' in schema || '_zod' in schema;
     if (!isZod) return /** @type {Record<string, unknown>} */ (schema);
+
+    const zodV4Schema = tryZodV4ToJsonSchema(schema);
+    if (zodV4Schema) return zodV4Schema;
 
     const converter = loadZodToJsonSchema();
     if (!converter) {

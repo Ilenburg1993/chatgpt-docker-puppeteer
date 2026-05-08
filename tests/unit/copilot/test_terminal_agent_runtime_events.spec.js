@@ -5,7 +5,7 @@
  * Contrato: terminal/agent-runtime-events.js
  */
 
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const println = vi.fn();
 const buildUserPrompt = vi.fn(() => 'prompt> ');
@@ -64,6 +64,7 @@ vi.mock('../../../src/copilot/terminal/ui-preferences.js', () => ({
 describe('terminal/agent-runtime-events.js — contrato', () => {
     beforeEach(() => {
         vi.clearAllMocks();
+        vi.useRealTimers();
         getTerminalDetailLevel.mockReturnValue('detailed');
         readTerminalRuntimeState.mockReturnValue(
             /** @type {any} */ ({
@@ -71,6 +72,10 @@ describe('terminal/agent-runtime-events.js — contrato', () => {
                 pendingQuestionKind: null,
             }),
         );
+    });
+
+    afterEach(() => {
+        vi.useRealTimers();
     });
 
     it('importa sem erros', async () => {
@@ -270,6 +275,45 @@ describe('terminal/agent-runtime-events.js — contrato', () => {
             'Executando tool',
             expect.objectContaining({ toolName: 'ask_user' }),
         );
+    });
+
+    it('reanuncia automaticamente tool longa sem progresso visível', async () => {
+        vi.useFakeTimers();
+        vi.setSystemTime(new Date('2026-05-07T22:00:00.000-03:00'));
+        const { setupTerminalAgentRuntimeEventListeners } =
+            await import('../../../src/copilot/terminal/agent-runtime-events.js');
+        /** @type {Map<string, Function[]>} */
+        const listeners = new Map();
+        const agent = {
+            on: vi.fn((event, handler) => {
+                const list = listeners.get(event) ?? [];
+                list.push(handler);
+                listeners.set(event, list);
+            }),
+            off: vi.fn(),
+        };
+
+        const cleanup = setupTerminalAgentRuntimeEventListeners({ agent: /** @type {any} */ (agent), rl: null });
+        listeners.get('tool.execution_start')?.[0]?.({
+            toolCallId: 'bash-long',
+            toolName: 'bash',
+        });
+        println.mockClear();
+        recordTerminalActivity.mockClear();
+
+        await vi.advanceTimersByTimeAsync(10_000);
+
+        expect(recordTerminalActivity).toHaveBeenCalledWith(
+            'tool',
+            'Tool em andamento',
+            expect.objectContaining({
+                toolName: 'bash',
+                detail: expect.stringContaining('10s ativos'),
+            }),
+        );
+        expect(println).toHaveBeenCalledWith(expect.stringContaining('ainda executando · 10s · bash-long'));
+
+        cleanup();
     });
 
     it('reanuncia pergunta pendente viva ao registrar listeners do terminal', async () => {

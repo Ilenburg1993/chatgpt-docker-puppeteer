@@ -14,6 +14,7 @@ import {
     getSdkSessionMode,
 } from '../../../presentation/runtime-ui-state-store.js';
 import { readIntrospectionRegistrySnapshot } from '../../../tools/introspection-tools.js';
+import { getPendingUserInputCount } from '../../../tools/user-input-state.js';
 import { readTerminalActivitySnapshot } from '../../activity-state.js';
 import {
     readTerminalElicitationSummary,
@@ -84,6 +85,7 @@ function objectOrNull(value) {
  *     pendingPermissions: number;
  *     latestPermissionType: string | null;
  *     pendingUserInputs: number;
+ *     pendingStructuredUserInputs: number;
  *     latestUserInputKind: 'question' | 'ready' | 'reply' | 'stopped' | null;
  *     permissionMode: 'approve_all' | 'audit_only' | 'selective';
  *     sdkCapabilities: Record<string, unknown> | null;
@@ -232,6 +234,7 @@ export function readTerminalStatusProjection({ hubSessionId = null, injectPort, 
         pendingPermissions: permissionSummary.pending,
         latestPermissionType: permissionSummary.latest?.permissionType ?? null,
         pendingUserInputs: userInputSummary.pending,
+        pendingStructuredUserInputs: getPendingUserInputCount(),
         latestUserInputKind: userInputSummary.latest?.kind ?? null,
         permissionMode,
         sdkCapabilities,

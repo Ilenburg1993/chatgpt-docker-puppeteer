@@ -64,7 +64,7 @@ describe('observability/sdk-metric-bridge', () => {
         assert.equal(summary.counters['sdk.operation.workspace.promote.phase.write_sdk.succeeded'], 1);
         assert.equal(summary.counters['sdk.operation.workspace.promote.bytes_total'], 42);
         assert.equal(gauges['sdk.operation.workspace.promote.last_bytes']?.value, 42);
-        assert.equal(traceSnapshot.selectedTrace?.phases.write_sdk.succeeded, 1);
+        assert.equal(traceSnapshot.selectedTrace?.phases.write_sdk?.succeeded, 1);
         assert.equal(traceSnapshot.selectedTrace?.bytes, 42);
     });
 });

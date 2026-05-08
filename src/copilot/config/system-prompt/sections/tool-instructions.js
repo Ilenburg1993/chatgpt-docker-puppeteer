@@ -21,6 +21,9 @@ export const CONTENT = `\
 	read_file_content para ler, search_in_files para buscar e create_file/write_file_content/patch_file para \
 	escrever/editar. Use bash, grep, ls ou cat apenas quando a operação for realmente execução de comando, \
 	quando a tool semântica não estiver disponível ou quando precisar reproduzir comportamento específico de shell.
+- Nomes como view, glob, grep, bash e str_replace_editor são aliases legados. Quando a tool canônica equivalente estiver \
+	disponível, chame explicitamente list_directory, read_file_content, search_in_files, exec_command ou patch_file; use \
+	aliases apenas para compatibilidade com runtimes antigas.
 - Não confunda /workspace/RPC workspace da sessão SDK com o filesystem local do repositório. O workspace SDK é virtual \
 	e pode não materializar arquivos visíveis para bash; para FS local, use file-tools canônicas ou o comando /fs do \
 	terminal.

@@ -13,7 +13,7 @@
  * @see module:copilot/sdk/feature-flags
  */
 
-import { COPILOT_RPC_TIMEOUT_MS } from '#copilot/config';
+import { COPILOT_RPC_TIMEOUT_MS, MAESTRO_AGENT_NAME } from '#copilot/config';
 import { toError } from '#copilot/core';
 import { createTool } from '#copilot/sdk';
 import { z } from 'zod';
@@ -21,7 +21,6 @@ import { log } from './logger.js';
 import { withSkipPermission } from './tool-factory.js';
 
 import {
-    agentDeselect,
     agentGetCurrent,
     agentList,
     agentReload,
@@ -150,7 +149,8 @@ const expAgentGetCurrentTool = createTool({
 
 const expAgentSelectTool = createTool({
     name: 'exp_agent_select',
-    description: '[Experimental] Seleciona um agente por nome. ' + 'Requer feature flag "agents" habilitado.',
+    description:
+        '[Experimental] Reforça o agente maestro obrigatório. Selecionar outro agente diretamente é bloqueado.',
     parameters: /** @type {import('#copilot/sdk/types').ZodSchema<{ name: string }>} */ (
         /** @type {unknown} */ (
             z.object({
@@ -158,18 +158,24 @@ const expAgentSelectTool = createTool({
             })
         )
     ),
-    handler: async (/** @type {{ name: string }} */ { name }) =>
-        wrapExp('exp_agent_select', (s) => agentSelect(s, name)),
+    handler: async (/** @type {{ name: string }} */ { name }) => {
+        if (name !== MAESTRO_AGENT_NAME) {
+            return {
+                error: `Seleção direta de "${name}" bloqueada. O agente ativo obrigatório é "${MAESTRO_AGENT_NAME}".`,
+                enforcedAgent: MAESTRO_AGENT_NAME,
+            };
+        }
+        return wrapExp('exp_agent_select', (s) => agentSelect(s, MAESTRO_AGENT_NAME));
+    },
 });
 
 const expAgentDeselectTool = createTool({
     name: 'exp_agent_deselect',
-    description:
-        '[Experimental] Deseleciona o agente ativo (volta ao padrão). ' + 'Requer feature flag "agents" habilitado.',
+    description: '[Experimental] Bloqueia deseleção do maestro e reforça agent-full como agente ativo obrigatório.',
     parameters: /** @type {import('#copilot/sdk/types').ZodSchema<Record<string, never>>} */ (
         /** @type {unknown} */ (z.object({}))
     ),
-    handler: async () => wrapExp('exp_agent_deselect', (s) => agentDeselect(s)),
+    handler: async () => wrapExp('exp_agent_deselect', (s) => agentSelect(s, MAESTRO_AGENT_NAME)),
 });
 
 const expAgentReloadTool = createTool({

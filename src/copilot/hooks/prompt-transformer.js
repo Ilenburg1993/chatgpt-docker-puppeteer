@@ -134,19 +134,25 @@ export function createSensitiveDataRedactor() {
     });
 }
 
+/** @security FIX HOOKS-004: limit prefix/suffix to prevent prompt injection. */
+const MAX_INJECT_LEN = 2000;
+
 /**
  * Hook que envolve o prompt com contexto de sistema adicional como prefixo ou sufixo. UPG-PT-001: retorna identidade
  * early se prefix e suffix forem ambos vazios.
  *
  * @param {{ prefix?: string; suffix?: string }} opts
  * @returns {UserPromptSubmittedHandler}
+ * @security FIX HOOKS-004: prefix e suffix são truncados a MAX_INJECT_LEN (2000 chars) para prevenir prompt injection.
  */
 export function createContextInjector(opts) {
     const { prefix = '', suffix = '' } = opts;
-    if (!prefix && !suffix) {
+    const safePrefix = prefix.slice(0, MAX_INJECT_LEN);
+    const safeSuffix = suffix.slice(0, MAX_INJECT_LEN);
+    if (!safePrefix && !safeSuffix) {
         return createPromptTransformer({ transformFn: (p) => p });
     }
     return createPromptTransformer({
-        transformFn: (p) => `${prefix}${prefix ? '\n' : ''}${p}${suffix ? '\n' : ''}${suffix}`,
+        transformFn: (p) => `${safePrefix}${safePrefix ? '\n' : ''}${p}${safeSuffix ? '\n' : ''}${safeSuffix}`,
     });
 }

@@ -9,6 +9,7 @@
  */
 
 import { readTerminalRuntimeControlState, readTerminalRuntimeState } from '../frontend/gateways/agent-runtime.js';
+import { getPendingUserInputCount } from '../../tools/user-input-state.js';
 import {
     readTerminalElicitationSummary,
     readTerminalPermissionSummary,
@@ -35,6 +36,7 @@ export function buildTerminalSmartMenuEntries() {
     const elicitation = readTerminalElicitationSummary();
     const permission = readTerminalPermissionSummary();
     const userInput = readTerminalUserInputSummary();
+    const structuredUserInputPending = getPendingUserInputCount();
     const entries = /** @type {TerminalSmartMenuEntry[]} */ ([]);
 
     entries.push(
@@ -101,17 +103,20 @@ export function buildTerminalSmartMenuEntries() {
         });
     }
 
-    if (userInput.pending > 0 && (!state.pendingQuestion || state.pendingQuestionKind === 'ready')) {
+    if (
+        (userInput.pending > 0 || structuredUserInputPending > 0) &&
+        (!state.pendingQuestion || state.pendingQuestionKind === 'ready')
+    ) {
         entries.push({
             id: 'sdk-ask-user',
-            label: 'Inspecionar ask_user SDK',
+            label: 'Inspecionar input humano SDK',
             commandLine: '/status',
-            description: `${userInput.pending} pendente(s) (${userInput.latest?.kind ?? 'question'})`,
+            description: `ask_user=${userInput.pending} · request_user_input=${structuredUserInputPending}`,
             hot: true,
         });
     }
 
-    if (userInput.pending > 0 || elicitation.pending > 0 || permission.pending > 0) {
+    if (userInput.pending > 0 || structuredUserInputPending > 0 || elicitation.pending > 0 || permission.pending > 0) {
         entries.push({
             id: 'sdk-waits',
             label: 'Painel de interrupções SDK',

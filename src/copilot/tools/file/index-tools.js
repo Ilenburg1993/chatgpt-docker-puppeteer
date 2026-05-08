@@ -21,6 +21,10 @@ const IndexBuildParameters = z.object({
     exclude: z.array(z.string().min(1)).optional().describe('Padrões exclude para scan.'),
     extensions: z.array(z.string().min(1)).optional().describe('Extensões textuais a indexar.'),
     concurrency: z.number().int().positive().optional().describe('Concorrência sugerida/advisory.'),
+    pruneMissing: z
+        .boolean()
+        .optional()
+        .describe('Remove do índice arquivos ausentes no filesystem quando o build representa uma fatia completa.'),
 });
 
 const IndexSearchParameters = z.object({
@@ -36,7 +40,17 @@ export const workspaceIndexBuildTool = buildTool({
     description:
         'Constrói/atualiza o índice L2 local de arquivos: metadados, FTS textual, símbolos Babel e imports. Não substitui rg; torna busca/indexação observáveis.',
     parameters: IndexBuildParameters,
-    handler: async ({ directory, recursive, depth, respectGitignore, include, exclude, extensions, concurrency }) => {
+    handler: async ({
+        directory,
+        recursive,
+        depth,
+        respectGitignore,
+        include,
+        exclude,
+        extensions,
+        concurrency,
+        pruneMissing,
+    }) => {
         /** @type {Parameters<typeof buildIoIndexForDirectory>[1]} */
         const options = {};
         if (recursive !== undefined) options.recursive = recursive;
@@ -46,6 +60,7 @@ export const workspaceIndexBuildTool = buildTool({
         if (exclude !== undefined) options.exclude = exclude;
         if (extensions !== undefined) options.extensions = extensions;
         if (concurrency !== undefined) options.concurrency = concurrency;
+        if (pruneMissing !== undefined) options.pruneMissing = pruneMissing;
         return buildIoIndexForDirectory(directory, options);
     },
 });

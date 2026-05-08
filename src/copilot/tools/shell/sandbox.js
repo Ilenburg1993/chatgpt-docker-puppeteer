@@ -11,7 +11,7 @@
 
 import { WORKSPACE_ROOT as BOOT_WORKSPACE_ROOT } from '#copilot/boot';
 import { COPILOT_ALLOWED_EXECUTABLES, COPILOT_NPM_SCRIPT_ALLOWLIST } from '#copilot/config';
-import { realpathSync } from 'node:fs';
+import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 
 /** Raiz canonica do workspace definida pelo boot. */
@@ -54,6 +54,8 @@ export function hasShellMetaOutsideQuotes(command) {
 const BLOCKED_COMMAND_PATTERNS = [
     /\brm\s+-[a-z]*r[a-z]*f|rm\s+-[a-z]*f[a-z]*r/i, // rm -rf / rm -fr (flags combinadas)
     /\brm\s+(-\w+\s+){1,4}-[rf]/i, // BUG-MED-10 (fix): rm -r -f / rm -f -r (flags separadas)
+    /\brm\b[^\n]*--recursive\b[^\n]*--force\b/i, // rm --recursive --force
+    /\brm\b[^\n]*--force\b[^\n]*--recursive\b/i, // rm --force --recursive
     /\bdd\b/,
     /\bmkfs\b/,
     /\bformat\b/,
@@ -78,6 +80,7 @@ const BLOCKED_COMMAND_PATTERNS = [
     // SEC-01 (fix): bloquear comandos de enumeração de ambiente que expõem variáveis sensíveis
     /\bprintenv\b/,
     /\benv\b\s*$/, // 'env' sem args lista todas as variáveis
+    /\benv\b\s+(-0|--null)\b/i, // env -0 / env --null
     /\bset\b\s*$/, // shell builtin 'set' sem args lista todas as variáveis
 ];
 
@@ -139,29 +142,45 @@ export const ALLOWED_EXECUTABLES = (() => {
     return list.length > 0 ? new Set(list) : null;
 })();
 
+/** @type {Promise<string> | null} */
+let _rootRealPromise = null;
+
+/**
+ * @returns {Promise<string>}
+ */
+async function getWorkspaceRootRealPath() {
+    if (!_rootRealPromise) {
+        _rootRealPromise = fs.realpath(WORKSPACE_ROOT).catch(() => WORKSPACE_ROOT);
+    }
+    return _rootRealPromise;
+}
+
 /**
  * Verifica se um cwd é seguro (dentro do workspace). SEC-TOOLS-001: resolve symlinks antes de comparar para evitar path
  * traversal via symlink.
  *
  * @param {string | undefined} cwd
- * @returns {{ ok: boolean; reason?: string; resolved: string }}
+ * @returns {Promise<{ ok: boolean; reason?: string; resolved: string }>}
  */
-export function validateCwd(cwd) {
+export async function validateCwd(cwd) {
     const resolved = cwd ? (path.isAbsolute(cwd) ? cwd : path.resolve(WORKSPACE_ROOT, cwd)) : WORKSPACE_ROOT;
-    // Resolve symlinks para bloquear travessia via link simbólico
+    const rootReal = await getWorkspaceRootRealPath();
+
+    // Resolve symlinks para bloquear travessia via link simbólico.
+    // Se o target não existir, valida o diretório pai real para impedir bypass por parent symlink.
     let real;
     try {
-        real = realpathSync(resolved);
+        real = await fs.realpath(resolved);
     } catch {
-        real = resolved; // diretório ainda não existe — falha posterior ou ok para criação
-    }
-    const rootReal = (() => {
+        const parent = path.dirname(resolved);
         try {
-            return realpathSync(WORKSPACE_ROOT);
+            const parentReal = await fs.realpath(parent);
+            real = path.join(parentReal, path.basename(resolved));
         } catch {
-            return WORKSPACE_ROOT;
+            return { ok: false, reason: `Cwd não resolvível com segurança: ${resolved}`, resolved };
         }
-    })();
+    }
+
     if (!real.startsWith(rootReal + path.sep) && real !== rootReal) {
         return { ok: false, reason: `Cwd fora do workspace: ${resolved}`, resolved };
     }
@@ -192,6 +211,13 @@ export function checkCommandBlocklist(command) {
  * @returns {Record<string, string>}
  */
 export function safeEnv() {
+    /** @type {{ expiresAt: number; env: Record<string, string> } | null} */
+    const cache = /** @type {any} */ (safeEnv)._cache ?? null;
+    const now = Date.now();
+    if (cache && cache.expiresAt > now) {
+        return cache.env;
+    }
+
     const env = { ...process.env };
     // Lista explícita de variáveis sensíveis conhecidas
     const sensitiveExact = new Set([
@@ -219,5 +245,11 @@ export function safeEnv() {
             delete env[key];
         }
     }
-    return /** @type {Record<string, string>} */ (env);
+
+    const sanitized = /** @type {Record<string, string>} */ (env);
+    /** @type {any} */ (safeEnv)._cache = {
+        expiresAt: now + 1000,
+        env: sanitized,
+    };
+    return sanitized;
 }

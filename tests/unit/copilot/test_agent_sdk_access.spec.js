@@ -398,10 +398,18 @@ describe('agent-sdk-access facade', () => {
 
     it('operações de custom agents delegam para a camada sdk canônica sobre a sessão atual', async () => {
         await expect(listSdkAgents(ctx)).resolves.toEqual({ agents: [{ name: 'agent:sdk-session-1' }] });
-        await expect(getCurrentSdkAgent(ctx)).resolves.toEqual({ agent: { name: 'current:sdk-session-1' } });
-        await expect(selectSdkAgent(ctx, 'reviewer')).resolves.toEqual({ agent: { name: 'reviewer' } });
-        await expect(deselectSdkAgent(ctx)).resolves.toEqual({});
-        await expect(reloadSdkAgents(ctx)).resolves.toEqual({ agents: [{ name: 'reloaded:sdk-session-1' }] });
+        await expect(getCurrentSdkAgent(ctx)).resolves.toEqual({
+            agent: { name: 'agent-full' },
+            previousAgent: { name: 'current:sdk-session-1' },
+            enforced: true,
+        });
+        await expect(selectSdkAgent(ctx, 'reviewer')).rejects.toThrow(/agent-full|obrigatório/i);
+        await expect(selectSdkAgent(ctx, 'agent-full')).resolves.toEqual({ agent: { name: 'agent-full' } });
+        await expect(deselectSdkAgent(ctx)).resolves.toEqual({ agent: { name: 'agent-full' } });
+        await expect(reloadSdkAgents(ctx)).resolves.toEqual({
+            agents: [{ name: 'reloaded:sdk-session-1' }],
+            selectedAgent: { name: 'agent-full' },
+        });
     });
 
     it('operações session RPC avançadas ficam disponíveis pela facade do agent', async () => {

@@ -7,13 +7,14 @@
  * Responsabilidades:
  *
  * - `hook_get_audit_tail` — lê as últimas N linhas do audit.jsonl para diagnóstico
- * - `request_user_input` — implementa o padrão "vscode_askQuestions" para LLM-B: força o modelo a sempre perguntar ao
- *   usuário qual é o próximo passo, garantindo o loop de interação contínua análogo ao protocolo de hooks.
+ * - `request_user_input` — wrapper de pergunta estruturada para decisões humanas explícitas; não substitui o protocolo
+ *   vivo `ask_user` READY/REPLY do terminal LLM-B.
  *
  * **ARQUITETURA DO `request_user_input`**: O SDK Copilot inclui nativamente a tool `ask_user` que chama
  * `onUserInputRequest`. Esta tool `request_user_input` é um wrapper semântico mais rico — com campo `choices` tipado e
  * `context` para o usuário entender o estado atual. Quando o agente LLM-B a invoca, o retorno é o input recebido via
- * `POST /api/copilot/answer` (ou equivalente na interface ativa).
+ * `POST /api/copilot/answer` (ou equivalente na interface ativa). A continuidade ordinária do terminal permanente
+ * permanece no `ask_user`; esta tool só deve ser chamada quando uma decisão estruturada for realmente necessária.
  *
  * @module copilot/tools/hook-tools
  * @see EventBus
@@ -31,6 +32,15 @@ import { z } from 'zod';
 import { toError } from '../core/error-handlers.js';
 import { log } from './logger.js';
 import { buildTool, withSkipPermission } from './tool-factory.js';
+import {
+    deletePendingUserInputResolver,
+    getPendingUserInputCount,
+    getPendingUserInputIds,
+    hasPendingUserInputRequests as hasPendingUserInputRequestsState,
+    nextUserInputRequestId,
+    registerPendingUserInputResolver,
+    resolvePendingUserInput,
+} from './user-input-state.js';
 const execFileAsync = promisify(execFile);
 
 /**
@@ -46,18 +56,6 @@ const ROOT = resolve(fileURLToPath(import.meta.url), '../../../../');
  * @type {string}
  */
 const HOOK_STATE_DIR = join(ROOT, '.github', 'hooks', 'state');
-
-/**
- * ARCH-N01 (fix): Resolver pendente para suspensão real do SDK via request_user_input. Usamos Map<string, (answer:
- * string) => void> em vez de singleton para evitar race condition quando múltiplos turnos chamam a tool simultaneamente
- * — cada chamada recebe requestId único.
- *
- * @type {Map<string, (answer: string) => void>}
- */
-const _pendingInputResolvers = new Map();
-
-/** Contador incremental para IDs únicos de request. @type {number} */
-let _pendingInputSeq = 0;
 
 // ─── ARCH-03: Injeção de broadcastSse para evitar dependência circular ────────
 
@@ -88,15 +86,7 @@ export function configureHookTools({ broadcastSse }) {
  * @returns {boolean} true se havia uma Promise pendente resolvida, false se fila vazia
  */
 export function resolveUserInput(answer, requestId) {
-    if (_pendingInputResolvers.size === 0) return false;
-    // Usar requestId específico se fornecido; caso contrário, resolver o mais antigo (primeiro inserido)
-    const id = requestId ?? _pendingInputResolvers.keys().next().value;
-    if (!id) return false;
-    const fn = _pendingInputResolvers.get(id);
-    if (!fn) return false;
-    _pendingInputResolvers.delete(id);
-    fn(answer);
-    return true;
+    return resolvePendingUserInput(answer, requestId);
 }
 
 /**
@@ -105,7 +95,20 @@ export function resolveUserInput(answer, requestId) {
  * @returns {string[]}
  */
 export function getPendingInputIds() {
-    return [..._pendingInputResolvers.keys()];
+    return getPendingUserInputIds();
+}
+
+/**
+ * Indica se há ao menos uma chamada `request_user_input` suspensa aguardando resposta humana.
+ *
+ * Usado pela borda terminal para rotear uma linha digitada pelo operador para a Promise suspensa antes de abrir um
+ * turno novo. Isso evita o congelamento aparente em que a LLM-B fica aguardando a tool enquanto o terminal trata a
+ * resposta como mensagem comum.
+ *
+ * @returns {boolean}
+ */
+export function hasPendingUserInputRequests() {
+    return hasPendingUserInputRequestsState();
 }
 
 // ─── Tool: hook_get_audit_tail ────────────────────────────────────────────────
@@ -200,8 +203,8 @@ const hookGetAuditTailTool = buildTool({
  *
  * Implementa o padrão "vscode_askQuestions" para LLM-B.
  *
- * INSTRUÇÕES AO MODELO (parte obrigatória do system prompt): "Ao final de qualquer resposta, SEMPRE use
- * request_user_input para perguntar ao usuário qual é o próximo passo. Nunca encerre sem chamar esta ferramenta."
+ * INSTRUÇÕES AO MODELO: use esta tool quando precisar de uma decisão humana estruturada. No terminal LLM-B, a
+ * continuidade ordinária da conversa é responsabilidade do protocolo nativo `ask_user` READY/REPLY.
  *
  * Quando invocada, o SDK suspende a execução via onUserInputRequest até que o usuário responda via POST
  * /api/copilot/answer (ou interface equivalente).
@@ -210,9 +213,9 @@ const requestUserInputTool = buildTool({
     name: 'request_user_input',
     description:
         'Solicita input interativo ao usuário. ' +
-        'OBRIGATÓRIO: use SEMPRE ao final de cada resposta para perguntar qual é o próximo passo. ' +
-        'Nunca encerre uma resposta sem chamar esta ferramenta — ela garante a continuidade da sessão. ' +
-        'É o equivalente ao vscode_askQuestions do protocolo de hooks: o agente não avança sem resposta.',
+        'Use apenas quando precisar de uma decisão humana estruturada, com pergunta e opções. ' +
+        'No terminal LLM-B, não chame automaticamente ao fim de toda resposta; a continuidade normal usa ask_user READY/REPLY. ' +
+        'É compatível com o padrão vscode_askQuestions do protocolo de hooks quando esse fluxo estiver ativo.',
     parameters: z.object({
         question: z.string().describe('Pergunta principal ao usuário (clara e objetiva)'),
         context: z.string().optional().describe('Contexto adicional — resumo do que foi feito para o usuário avaliar'),
@@ -240,23 +243,23 @@ const requestUserInputTool = buildTool({
         log('INFO', `[hook-tools/request_user_input] Pergunta: "${fullQuestion.slice(0, 100)}"`);
 
         // RF-029: gerar ID único para este request de input
-        const requestId = `input_${++_pendingInputSeq}`;
+        const requestId = nextUserInputRequestId();
 
         // ARCH-N01 (fix): suspensão real — a Promise só resolve quando resolveUserInput() for chamado,
         // o que ocorre via answerPendingQuestion() no agente (POST /api/copilot/answer).
         // Isso garante que o modelo não continua processamento até receber a resposta do usuário.
         return new Promise((resolve, reject) => {
             // RF-029: se já há muitos requests pendentes (>5), rejeitar para evitar acúmulo indefinido
-            if (_pendingInputResolvers.size >= 5) {
+            if (getPendingUserInputCount() >= 5) {
                 reject(
                     new Error(
                         `[hook-tools] Limite de requests de input simultâneos atingido (5). ` +
-                            `Requests pendentes: ${[..._pendingInputResolvers.keys()].join(', ')}`,
+                            `Requests pendentes: ${getPendingUserInputIds().join(', ')}`,
                     ),
                 );
                 return;
             }
-            _pendingInputResolvers.set(requestId, (answer) => {
+            registerPendingUserInputResolver(requestId, (answer) => {
                 clearTimeout(autoCleanupTimer);
                 resolve({
                     requestId,
@@ -270,8 +273,7 @@ const requestUserInputTool = buildTool({
             });
             // BUG-P2-06: auto-cleanup após 10min para evitar memory leak se resolver nunca é chamado
             const autoCleanupTimer = setTimeout(() => {
-                if (_pendingInputResolvers.has(requestId)) {
-                    _pendingInputResolvers.delete(requestId);
+                if (deletePendingUserInputResolver(requestId)) {
                     resolve({
                         requestId,
                         question: fullQuestion,

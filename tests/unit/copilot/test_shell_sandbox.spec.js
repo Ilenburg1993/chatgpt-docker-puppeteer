@@ -169,24 +169,24 @@ describe('checkCommandBlocklist', () => {
 // ─── validateCwd ─────────────────────────────────────────────────────────────
 
 describe('validateCwd', () => {
-    it('aceita cwd undefined (usa WORKSPACE_ROOT)', () => {
-        const result = validateCwd(undefined);
+    it('aceita cwd undefined (usa WORKSPACE_ROOT)', async () => {
+        const result = await validateCwd(undefined);
         assert.ok(result.ok);
         assert.equal(result.resolved, WORKSPACE_ROOT);
     });
 
-    it('aceita caminho absoluto dentro do workspace', () => {
-        const result = validateCwd(WORKSPACE_ROOT + '/src');
+    it('aceita caminho absoluto dentro do workspace', async () => {
+        const result = await validateCwd(WORKSPACE_ROOT + '/src');
         assert.ok(result.ok);
     });
 
-    it('rejeita caminho absoluto fora do workspace', () => {
-        const result = validateCwd('/etc');
+    it('rejeita caminho absoluto fora do workspace', async () => {
+        const result = await validateCwd('/etc');
         assert.ok(!result.ok);
     });
 
-    it('rejeita traversal relativo', () => {
-        const result = validateCwd('../../etc');
+    it('rejeita traversal relativo', async () => {
+        const result = await validateCwd('../../etc');
         assert.ok(!result.ok);
     });
 });

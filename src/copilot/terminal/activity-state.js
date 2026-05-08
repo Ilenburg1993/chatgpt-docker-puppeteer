@@ -9,6 +9,7 @@
 import { EventEmitter } from 'node:events';
 
 const MAX_ACTIVITY_HISTORY = 100;
+const FOCUSED_ACTIVITY_MAX_AGE_MS = 10 * 60_000;
 
 /**
  * @typedef {'idle'
@@ -65,6 +66,9 @@ let _currentActivity = {
     ageMs: 0,
 };
 
+/** @type {TerminalActivitySnapshot | null} */
+let _focusedActivity = null;
+
 /** @type {TerminalActivityHistoryEntry[]} */
 let _activityHistory = [];
 
@@ -97,6 +101,71 @@ function pushHistory(snapshot) {
     if (_activityHistory.length > MAX_ACTIVITY_HISTORY) {
         _activityHistory = _activityHistory.slice(-MAX_ACTIVITY_HISTORY);
     }
+}
+
+/**
+ * @param {TerminalActivityPhase} phase
+ * @param {string} label
+ * @returns {boolean}
+ */
+function isTerminalActivityCompletion(phase, label) {
+    if (phase === 'idle') return true;
+    const normalized = label.toLowerCase();
+    return (
+        normalized.includes('conclu') ||
+        normalized.includes('falh') ||
+        normalized.includes('encerrad') ||
+        normalized.includes('respondid') ||
+        normalized.includes('aprovad') ||
+        normalized.includes('rejeitad')
+    );
+}
+
+/**
+ * @param {TerminalActivityPhase} phase
+ * @returns {boolean}
+ */
+function isFocusableTerminalActivityPhase(phase) {
+    return (
+        phase === 'boot' ||
+        phase === 'turn' ||
+        phase === 'thinking' ||
+        phase === 'streaming' ||
+        phase === 'tool' ||
+        phase === 'task' ||
+        phase === 'compaction' ||
+        phase === 'question' ||
+        phase === 'subagent' ||
+        phase === 'error'
+    );
+}
+
+/**
+ * @param {TerminalActivitySnapshot} activity
+ * @returns {void}
+ */
+function updateFocusedActivity(activity) {
+    if (isTerminalActivityCompletion(activity.phase, activity.label)) {
+        if (!activity.toolName || _focusedActivity?.toolName === activity.toolName) {
+            _focusedActivity = null;
+        }
+        return;
+    }
+    if (isFocusableTerminalActivityPhase(activity.phase)) {
+        _focusedActivity = activity;
+    }
+}
+
+/**
+ * @returns {TerminalActivitySnapshot | null}
+ */
+function readFocusedActivity() {
+    if (!_focusedActivity) return null;
+    if (Date.now() - _focusedActivity.updatedAt > FOCUSED_ACTIVITY_MAX_AGE_MS) {
+        _focusedActivity = null;
+        return null;
+    }
+    return withAge(_focusedActivity);
 }
 
 /**
@@ -145,6 +214,7 @@ export function recordTerminalActivity(phase, label, opts = {}) {
     });
     const prev = _currentActivity;
     _currentActivity = next;
+    updateFocusedActivity(next);
     if (recordHistory && !sameSemanticPayload) {
         pushHistory(next);
     }
@@ -164,7 +234,7 @@ export function markTerminalActivityIdle(detail = 'Aguardando próxima mensagem'
  * @returns {TerminalActivitySnapshot}
  */
 export function readTerminalActivitySnapshot() {
-    return withAge(_currentActivity);
+    return readFocusedActivity() ?? withAge(_currentActivity);
 }
 
 /**

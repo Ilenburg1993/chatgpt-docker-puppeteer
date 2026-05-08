@@ -30,19 +30,35 @@ import { nowIoMs, publishIoOperation } from './io-observability.js';
 
 /** @param {string} filePath */
 function invalidateIoCacheTiers(filePath) {
-    invalidateIoCachePath(filePath);
+    try {
+        invalidateIoCachePath(filePath);
+    } catch {
+        // best-effort: falha em cache não pode interromper mutação canônica
+    }
     const l2 = getIoL2Cache();
     if (l2) {
-        l2.invalidatePath(filePath);
+        try {
+            l2.invalidatePath(filePath);
+        } catch {
+            // best-effort: falha em L2 não pode interromper mutação canônica
+        }
     }
 }
 
 /** @param {string} filePath */
 function invalidateIoCacheTierSubtrees(filePath) {
-    invalidateIoCacheSubtree(filePath);
+    try {
+        invalidateIoCacheSubtree(filePath);
+    } catch {
+        // best-effort: falha em cache não pode interromper mutação canônica
+    }
     const l2 = getIoL2Cache();
     if (l2) {
-        l2.invalidatePath(filePath);
+        try {
+            l2.invalidatePath(filePath);
+        } catch {
+            // best-effort: falha em L2 não pode interromper mutação canônica
+        }
     }
 }
 
@@ -649,6 +665,8 @@ export async function readTextChunks(filePath, options = {}) {
  *     riskClass?: import('../core/io-contracts.js').IoRiskClass;
  *     traceId?: string;
  *     mode?: number;
+ *     requireExists?: boolean;
+ *     failIfExists?: boolean;
  *     lockTimeoutMs?: number;
  *     signal?: AbortSignal;
  *     advisoryLimits?: Record<string, unknown>;
@@ -668,6 +686,30 @@ export async function writeFileAtomic(filePath, content, options = {}) {
         const { value, waitMs } = await withIoResourceLock(
             filePath,
             async () => {
+                if (options.requireExists) {
+                    try {
+                        await fs.access(filePath);
+                    } catch {
+                        const err = new Error(`Arquivo não encontrado: ${filePath}`);
+                        /** @type {{ code?: string }} */ (err).code = 'ENOENT';
+                        throw err;
+                    }
+                }
+
+                if (options.failIfExists) {
+                    try {
+                        await fs.access(filePath);
+                        const err = new Error(`Destino já existe: ${filePath}`);
+                        /** @type {{ code?: string }} */ (err).code = 'EEXIST';
+                        throw err;
+                    } catch (accessError) {
+                        const code = /** @type {{ code?: unknown }} */ (accessError)?.code;
+                        if (code !== 'ENOENT') {
+                            throw accessError;
+                        }
+                    }
+                }
+
                 await writeAtomicUnlocked(filePath, payload, options.mode === undefined ? {} : { mode: options.mode });
                 return { path: filePath, bytesWritten: bytes };
             },
@@ -719,7 +761,12 @@ export async function writeFileAtomic(filePath, content, options = {}) {
  */
 export async function createOrReplaceFileAtomic(filePath, content, options = {}) {
     if (options.createParentDirs !== false) {
-        await fs.mkdir(dirname(filePath), { recursive: true });
+        await mkdirPathLocked(dirname(filePath), {
+            recursive: true,
+            advisoryLimits: {
+                operation: 'createOrReplaceFileAtomic.parentMkdir',
+            },
+        });
     }
     return writeFileAtomic(filePath, content, options);
 }

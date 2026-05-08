@@ -47,6 +47,19 @@ Todas as tools desta pasta devem convergir para as mesmas bases:
 - Novas tools devem ser exportadas em `index.js` e cobertas por testes unitários.
 - Limites de volume expostos à LLM-B devem permanecer informativos.
 
+## Operação pela LLM-B
+
+A LLM-B deve preferir as tools canônicas quando quiser atualizar ou consultar o índice:
+
+- `workspace_index_status`: verificar se o índice está disponível/fresco.
+- `workspace_index_build`: atualizar uma árvore, normalmente `src/copilot`, com `respectGitignore`
+  ativo e `pruneMissing` automático.
+- `workspace_index_search`: busca textual FTS5.
+- `workspace_index_find_symbol`: busca simbólica persistida.
+
+Para operação humana no REPL, a superfície equivalente é `/index status|build|search|symbol|clear`.
+Para automação shell, use `npm run copilot:index -- ...`.
+
 ## Entradas principais
 
 - `index.js`: barrel e composição final de `fileTools`.

@@ -21,7 +21,8 @@
  * @see module:copilot/agent/permission-controller
  */
 
-import { ConfigError } from '#copilot/core';
+import { defaultAuditLog } from '#copilot/audit';
+import { ConfigError, toError } from '#copilot/core';
 import { z } from 'zod';
 import { log } from './logger.js';
 import { buildTool } from './tool-factory.js';
@@ -42,9 +43,17 @@ let _agent = null;
  * Injeta o AlwaysAliveAgent para evitar import circular. Chamado em `bootstrapTools()`.
  *
  * @param {PermissionAgent} agent
+ * @param {{ force?: boolean }} [options]
  * @returns {void}
  */
-export function setPermissionAgent(agent) {
+export function setPermissionAgent(agent, options = {}) {
+    if (_agent && _agent !== agent && !options.force) {
+        log(
+            'WARN',
+            '[permission-tools] setPermissionAgent ignorado: agent já injetado. Use force=true para reinjeção.',
+        );
+        return;
+    }
     _agent = agent;
 }
 
@@ -72,9 +81,31 @@ const permissionModeGetTool = buildTool({
     parameters: z.object({}),
     requiresApproval: false,
     handler: async () => {
-        const mode = requireAgent().getPermissionMode();
-        log('INFO', `[permission_mode_get] modo atual: ${mode}`);
-        return { mode };
+        const auditId = `perm-get-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+        defaultAuditLog.recordToolStart({
+            toolCallId: auditId,
+            toolName: 'permission.permission_mode_get',
+            args: {},
+        });
+        try {
+            const agent = requireAgent();
+            const mode = agent.getPermissionMode();
+            log('INFO', `[permission_mode_get] modo atual: ${mode}`);
+            defaultAuditLog.recordToolComplete({
+                toolCallId: auditId,
+                success: true,
+                resultContent: mode,
+            });
+            return { mode };
+        } catch (err) {
+            const message = toError(err).message;
+            defaultAuditLog.recordToolComplete({
+                toolCallId: auditId,
+                success: false,
+                resultContent: message,
+            });
+            return { success: false, error: message };
+        }
     },
 });
 
@@ -134,26 +165,49 @@ const permissionModeSetTool = buildTool({
          * }}
          */ { mode, allowTools, denyTools, denyShell },
     ) => {
-        const before = requireAgent().getPermissionMode();
-        /** @type {{ allowTools?: string[]; denyTools?: string[]; denyShell?: boolean }} */
-        const opts = {};
-        if (allowTools?.length) opts.allowTools = allowTools;
-        if (denyTools?.length) opts.denyTools = denyTools;
-        if (denyShell) opts.denyShell = denyShell;
-        requireAgent().setPermissionMode(mode, opts);
-        const after = requireAgent().getPermissionMode();
-        log('INFO', `[permission_mode_set] ${before} → ${after}`);
-        return {
-            ok: true,
-            before,
-            after,
-            note:
-                mode === 'approve_all'
-                    ? 'Todas as tools serão aprovadas automaticamente.'
-                    : mode === 'audit_only'
-                      ? 'Todas as tools serão aprovadas, mas cada decisão será registrada no audit log.'
-                      : 'Modo seletivo ativo. Use allowTools/denyTools para controle granular.',
-        };
+        const auditId = `perm-set-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+        defaultAuditLog.recordToolStart({
+            toolCallId: auditId,
+            toolName: 'permission.permission_mode_set',
+            args: { mode, allowTools, denyTools, denyShell },
+        });
+
+        try {
+            const agent = requireAgent();
+            const before = agent.getPermissionMode();
+            /** @type {{ allowTools?: string[]; denyTools?: string[]; denyShell?: boolean }} */
+            const opts = {};
+            if (allowTools?.length) opts.allowTools = allowTools;
+            if (denyTools?.length) opts.denyTools = denyTools;
+            if (denyShell) opts.denyShell = denyShell;
+            agent.setPermissionMode(mode, opts);
+            const after = agent.getPermissionMode();
+            log('INFO', `[permission_mode_set] ${before} → ${after}`);
+            defaultAuditLog.recordToolComplete({
+                toolCallId: auditId,
+                success: true,
+                resultContent: `${before} -> ${after}`,
+            });
+            return {
+                ok: true,
+                before,
+                after,
+                note:
+                    mode === 'approve_all'
+                        ? 'Todas as tools serão aprovadas automaticamente.'
+                        : mode === 'audit_only'
+                          ? 'Todas as tools serão aprovadas, mas cada decisão será registrada no audit log.'
+                          : 'Modo seletivo ativo. Use allowTools/denyTools para controle granular.',
+            };
+        } catch (err) {
+            const message = toError(err).message;
+            defaultAuditLog.recordToolComplete({
+                toolCallId: auditId,
+                success: false,
+                resultContent: message,
+            });
+            return { ok: false, error: message };
+        }
     },
 });
 

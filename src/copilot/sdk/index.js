@@ -185,6 +185,7 @@ export {
     normalizePermissionRequestedEvent,
 } from './session/permission-events.js';
 export { approveAll, createAllowlistPermissionHandler, createPermissionHandler } from './session/permissions.js';
+export { AgentToolPolicy } from './tools/agent-policy.js';
 export {
     normalizeModeChangedEvent,
     normalizeModelChangedEvent,

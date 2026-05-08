@@ -20,6 +20,11 @@ vi.mock('#copilot/sdk/index', () => ({
     createTool: vi.fn(() => ({ name: 'mock-tool', execute: vi.fn() })),
     createToolSync: vi.fn(() => ({ name: 'mock-tool-sync', execute: vi.fn() })),
     defineTool: vi.fn(() => ({ name: 'mock-defined', execute: vi.fn() })),
+    AgentToolPolicy: class {
+        isToolAllowedForAgent() {
+            return true;
+        }
+    },
 }));
 vi.mock('../../../src/copilot/agent/facades/agent-sdk-access.js', () => ({
     createAgentSdkToolsRegistry: vi.fn(() => new Map()),
@@ -169,6 +174,22 @@ describe('session-setup (F63)', () => {
             expect(options.injectHookContext).toBe(true);
             expect(typeof options.onPermissionRequest).toBe('function');
             expect(typeof options.onUserInputRequest).toBe('function');
+        });
+
+        it('oculta built-ins legadas de FS na superfície de sessão quando as file-tools canônicas existem', () => {
+            const tools = /** @type {any} */ ([
+                { name: 'list_directory' },
+                { name: 'read_file_content' },
+                { name: 'search_in_files' },
+                { name: 'create_file' },
+                { name: 'write_file_content' },
+                { name: 'patch_file' },
+            ]);
+            const busHooks = /** @type {any} */ ({ mock: true });
+
+            const options = buildSessionOptions(ctx, host, { tools, busHooks });
+
+            expect(options.excludedTools).toEqual(['create', 'edit', 'glob', 'grep', 'view']);
         });
 
         it('omite reasoningEffort quando o modelo não suporta a capability e normaliza o ctx', () => {

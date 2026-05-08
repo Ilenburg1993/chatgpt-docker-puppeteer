@@ -1,7 +1,7 @@
 // @ts-check
 
 import { channel } from 'node:diagnostics_channel';
-import { mkdtemp, realpath, rm, symlink, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, realpath, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -69,5 +69,64 @@ describe('infra/io-scanner', () => {
 
         expect(entry?.type).toBe('symlink');
         expect(entry?.fingerprint).toBeUndefined();
+    });
+
+    it('respeita .gitignore quando solicitado', async () => {
+        const dir = await createTempDir();
+        await writeFile(join(dir, '.gitignore'), 'ignored.txt\nnested/private.md\n', 'utf8');
+        await mkdir(join(dir, 'nested'), { recursive: true });
+        await writeFile(join(dir, 'visible.txt'), 'visible', 'utf8');
+        await writeFile(join(dir, 'ignored.txt'), 'ignored', 'utf8');
+        await writeFile(join(dir, 'nested', 'private.md'), 'private', 'utf8');
+
+        const result = await scanDirectory(dir, {
+            workspaceRoot: dir,
+            recursive: true,
+            respectGitignore: true,
+            showHidden: true,
+        });
+        const names = JSON.stringify(result.entries);
+
+        expect(names).toContain('visible.txt');
+        expect(names).not.toContain('ignored.txt');
+        expect(names).not.toContain('private.md');
+    });
+
+    it('aplica denylist canônica durante scan recursivo', async () => {
+        const dir = await createTempDir();
+        await mkdir(join(dir, 'node_modules'), { recursive: true });
+        await writeFile(join(dir, 'node_modules', 'dep.js'), 'module.exports = 1;', 'utf8');
+        await writeFile(join(dir, 'source.js'), 'export const ok = true;', 'utf8');
+
+        const result = await scanDirectory(dir, {
+            workspaceRoot: dir,
+            recursive: true,
+            respectDenylist: true,
+            showHidden: true,
+        });
+        const names = JSON.stringify(result.entries);
+
+        expect(names).toContain('source.js');
+        expect(names).not.toContain('node_modules');
+        expect(names).not.toContain('dep.js');
+    });
+
+    it('não prende slots de concorrência ao descer em muitos diretórios', async () => {
+        const dir = await createTempDir();
+        for (let i = 0; i < 12; i++) {
+            await mkdir(join(dir, `dir-${i}`), { recursive: true });
+            await writeFile(join(dir, `dir-${i}`, 'file.txt'), `file ${i}`, 'utf8');
+        }
+
+        const result = await Promise.race([
+            scanDirectory(dir, { workspaceRoot: dir, recursive: true, concurrency: 2 }),
+            new Promise((_, reject) => {
+                setTimeout(() => reject(new Error('scan timeout')), 2_000);
+            }),
+        ]);
+        const entries = /** @type {Awaited<ReturnType<typeof scanDirectory>>} */ (result).entries;
+
+        expect(JSON.stringify(entries)).toContain('dir-11');
+        expect(JSON.stringify(entries)).toContain('file.txt');
     });
 });

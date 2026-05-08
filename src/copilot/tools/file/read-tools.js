@@ -10,13 +10,13 @@
 
 import { withSkipPermission } from '../tool-factory.js';
 
-export { listDirectoryTool, readFileContentTool } from './read-tools-io.js';
-export { diffFilesTool, searchInFilesTool } from './read-tools-search.js';
-export { symbolSearchTools, workspaceSymbolSearchTool } from './symbol-search-tool.js';
-
 import { listDirectoryTool, readFileContentTool } from './read-tools-io.js';
 import { diffFilesTool, searchInFilesTool } from './read-tools-search.js';
 import { workspaceSymbolSearchTool } from './symbol-search-tool.js';
+
+export { listDirectoryTool, readFileContentTool } from './read-tools-io.js';
+export { diffFilesTool, searchInFilesTool } from './read-tools-search.js';
+export { symbolSearchTools, workspaceSymbolSearchTool } from './symbol-search-tool.js';
 
 /**
  * @type {import('#copilot/sdk/types').Tool<any>[]}

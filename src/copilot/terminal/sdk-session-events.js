@@ -41,6 +41,7 @@ import {
     setLastSdkPlanOperation,
     setSdkSessionMode,
 } from '../presentation/runtime-ui-state-store.js';
+import { classifyPermissionDecision } from '../sdk/session/permission-events.js';
 import { recordTerminalActivity } from './activity-state.js';
 import { broadcastSse, println } from './dialog/index.js';
 import {
@@ -134,6 +135,37 @@ function renderTurnTraceSummary(trace) {
             `   ${terminalThemeBadge('fileRead', compactDetail ? 'FILES' : 'FILES')} ${fileItems.join(terminalThemeText('muted', '  ·  '))}`,
         );
     }
+}
+
+/**
+ * Rastreamento de ferramentas externas em processamento para evitar duplicidade visual.
+ *
+ * @type {Set<string>}
+ */
+const externalToolsInFlight = new Set();
+
+/**
+ * @param {string} toolName
+ * @returns {boolean}
+ */
+export function isExternalToolInFlight(toolName) {
+    return externalToolsInFlight.has(toolName);
+}
+
+/**
+ * @param {string} toolName
+ * @returns {void}
+ */
+export function markExternalToolInFlight(toolName) {
+    externalToolsInFlight.add(toolName);
+}
+
+/**
+ * @param {string} toolName
+ * @returns {void}
+ */
+export function unmarkExternalToolInFlight(toolName) {
+    externalToolsInFlight.delete(toolName);
 }
 
 /**
@@ -256,17 +288,38 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
         const entry = recordTerminalPermissionCompleted(evt);
         const data = eventObject(evt);
         const granted = data['granted'] ?? data['approved'] ?? entry?.granted;
+        const decision = classifyPermissionDecision(
+            entry?.result ?? null,
+            typeof granted === 'boolean' ? granted : null,
+        );
+
+        // Detecta autoaprovação/autonegação por regras/política do hook
+        const wasDeniedByPolicy =
+            entry?.result === 'denied-by-rules' ||
+            entry?.result === 'denied-by-permission-request-hook' ||
+            entry?.result === 'denied-by-content-exclusion-policy';
+
         const ok = granted === true || entry?.result === 'approved';
-        const label = ok ? 'Permissão SDK aprovada' : 'Permissão SDK concluída';
+        const label = ok
+            ? 'Permissão SDK aprovada'
+            : wasDeniedByPolicy
+              ? 'Permissão SDK negada (política)'
+              : 'Permissão SDK concluída';
+
         recordTerminalActivity('system', label, {
-            detail: entry ? `${entry.permissionType}${entry.result ? ` · ${entry.result}` : ''}` : 'sem request local',
+            detail: entry
+                ? `${entry.permissionType}${entry.result ? ` · ${entry.result}` : ''} ${wasDeniedByPolicy ? '[autoaprovado por política]' : ''}`.trim()
+                : 'sem request local',
             source: 'sdk',
             severity: ok || granted == null ? 'info' : 'warn',
         });
+
+        const resultLabel = granted == null ? '' : granted ? '\x1b[32maprovada\x1b[0m' : '\x1b[31mnão aprovada\x1b[0m';
+        const policyIndicator = wasDeniedByPolicy ? ' \x1b[90m(política)\x1b[0m' : '';
         println(
-            `  ${ok ? '\x1b[32m✓' : '\x1b[33m•'} Permissão:\x1b[0m ${entry?.permissionType ?? 'unknown'} ${granted == null ? '' : granted ? '\x1b[32maprovada\x1b[0m' : '\x1b[33mnão aprovada\x1b[0m'}`,
+            `  ${ok ? '\x1b[32m✓' : '\x1b[33m•'} Permissão:\x1b[0m ${entry?.permissionType ?? 'unknown'} ${resultLabel}${policyIndicator}`,
         );
-        broadcastSse('permission.completed', { ...data, timestamp: Date.now() });
+        broadcastSse('permission.completed', { ...data, timestamp: Date.now(), decision, wasDeniedByPolicy });
         refreshPromptIfIdle();
     };
 
@@ -463,12 +516,14 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
 
     const onSessionToolsUpdated = (/** @type {{ count?: number }} */ evt) => {
         const count = Number(evt?.count ?? 0);
-        recordTerminalActivity('system', 'Tools SDK atualizadas', {
-            detail: `${count} tool(s)`,
+        recordTerminalActivity('system', 'Tools dinâmicas SDK atualizadas', {
+            detail: `${count} tool(s) reportada(s) pelo evento SDK; registry local segue em /tools`,
             source: 'sdk',
             recordHistory: false,
         });
-        if (shouldPrintSessionNarration('verbose')) println(`  \x1b[90m🧰 Tools SDK atualizadas: ${count}\x1b[0m`);
+        if (shouldPrintSessionNarration('verbose')) {
+            println(`  \x1b[90m🧰 Tools dinâmicas SDK atualizadas: ${count} (registry local: /tools)\x1b[0m`);
+        }
         broadcastSse('session.tools_updated', { count, timestamp: Date.now() });
     };
 
@@ -658,6 +713,7 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
     const onExternalToolRequested = (/** @type {{ toolName?: string; requestId?: string }} */ evt) => {
         const toolName = evt?.toolName ?? 'external_tool';
         const requestId = evt?.requestId ?? null;
+        markExternalToolInFlight(toolName);
         recordTerminalTurnToolActivity({
             toolName,
             operation: 'run',
@@ -682,6 +738,7 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
         const toolName = evt?.toolName ?? 'external_tool';
         const requestId = evt?.requestId ?? null;
         const success = evt?.success !== false;
+        unmarkExternalToolInFlight(toolName);
         recordTerminalTurnToolActivity({
             toolName,
             operation: 'run',

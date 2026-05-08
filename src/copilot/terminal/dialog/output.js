@@ -29,6 +29,14 @@ export const PROMPT_WAITING = '     ';
 let _terminalRenderLockDepth = 0;
 
 /**
+ * Indica se há uma linha reservada para status acima do prompt (layout: [status][prompt]). Quando true,
+ * writeInlineStatus usa ANSI save/restore para escrever 1 linha acima sem mover o cursor do usuário.
+ *
+ * @type {boolean}
+ */
+let _statusRowReserved = false;
+
+/**
  * Limita o tamanho de detalhes embutidos no prompt.
  *
  * @param {string} value
@@ -249,8 +257,16 @@ export const BOOT_PROMPT = LLM_B_BOOT_PROMPT ?? DEFAULT_BOOT_PROMPT;
  */
 export function println(text) {
     if (getRl()) {
+        if (_statusRowReserved) {
+            // Limpa a linha de status acima sem mover o cursor (ANSI save/restore)
+            process.stdout.write('\x1b[s\x1b[1A\r\x1b[K\x1b[u');
+            _statusRowReserved = false;
+        }
         clearTerminalLine();
         process.stdout.write(`${text}\n`);
+        // Re-reserva a linha de status acima do novo prompt
+        process.stdout.write('\n');
+        _statusRowReserved = true;
         redrawPromptIfInteractive();
         return;
     }
@@ -258,15 +274,34 @@ export function println(text) {
 }
 
 /**
- * Escreve uma linha transitória sem quebra, limpando o prompt atual quando necessário.
+ * Escreve uma linha transitória de status SEM deslocar o cursor do usuário.
+ *
+ * Quando o readline está ativo, usa uma linha reservada ACIMA do prompt via ANSI save/restore. O cursor do usuário
+ * permanece exatamente onde estava, garantindo digitação independente.
  *
  * @param {string} text
  * @returns {void}
  */
 export function writeInlineStatus(text) {
     if (isTerminalRenderLocked()) return;
-    clearTerminalLine();
-    process.stdout.write(text);
+    if (!process.stdout.isTTY) return;
+    const rl = getRl();
+    if (!rl) {
+        clearTerminalLine();
+        process.stdout.write(text);
+        return;
+    }
+    if (!_statusRowReserved) {
+        // Estabelece a linha reservada acima do prompt:
+        // limpa o prompt atual, adiciona linha em branco (status), redesenha prompt abaixo.
+        clearTerminalLine();
+        process.stdout.write('\n'); // linha de status (em branco por enquanto)
+        rl.setPrompt(buildUserPrompt());
+        rl.prompt(); // redesenha prompt na nova posição (abaixo da linha de status)
+        _statusRowReserved = true;
+    }
+    // Escreve status 1 linha acima sem tocar no cursor do usuário
+    process.stdout.write(`\x1b[s\x1b[1A\r\x1b[K${text}\x1b[u`);
 }
 
 /**
@@ -311,13 +346,36 @@ export function writeTerminalPrefixedChunk(linePrefix, chunk, options = {}) {
 }
 
 /**
- * Limpa a linha transitória atual do terminal.
+ * Limpa a linha de status sem mover o cursor do usuário.
+ *
+ * Quando readline está ativo e há linha reservada, usa ANSI save/restore para limpar a linha acima sem deslocar o
+ * cursor do usuário.
  *
  * @returns {void}
  */
 export function clearInlineStatus() {
     if (isTerminalRenderLocked()) return;
-    clearTerminalLine();
+    if (!process.stdout.isTTY) {
+        clearTerminalLine();
+        return;
+    }
+    const rl = getRl();
+    if (!rl || !_statusRowReserved) {
+        clearTerminalLine();
+        return;
+    }
+    // Limpa linha de status acima sem mover cursor do usuário
+    process.stdout.write('\x1b[s\x1b[1A\r\x1b[K\x1b[u');
+    // Mantém _statusRowReserved = true: a linha em branco reservada permanece acima do prompt
+}
+
+/**
+ * Reseta o estado da linha de status reservada. Deve ser chamado quando o readline é fechado.
+ *
+ * @returns {void}
+ */
+export function resetStatusRowState() {
+    _statusRowReserved = false;
 }
 
 /**

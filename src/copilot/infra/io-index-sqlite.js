@@ -259,6 +259,7 @@ export function createIoIndexSqlite(options) {
         indexed: 0,
         skipped: 0,
         failed: 0,
+        pruned: 0,
         searches: 0,
         invalidations: 0,
         errors: 0,
@@ -323,6 +324,12 @@ export function createIoIndexSqlite(options) {
         WHERE file_path = ?
         LIMIT 1
     `);
+    const stmtListIndexedUnderPath = db.prepare(`
+        SELECT file_path as filePath, extension
+        FROM copilot_io_index_files
+        WHERE file_path = ? OR file_path LIKE ?
+        ORDER BY file_path ASC
+    `);
     const stmtCountFiles = db.prepare(`
         SELECT
             COUNT(*) as total,
@@ -371,6 +378,33 @@ export function createIoIndexSqlite(options) {
         stmtDeleteSymbols.run(filePath, prefix);
         stmtDeleteImports.run(filePath, prefix);
         stmtDeleteFile.run(filePath, prefix);
+    }
+
+    /**
+     * Remove do índice arquivos que pertencem à mesma fatia do scan, mas não existem mais no filesystem.
+     *
+     * A poda fica desabilitada automaticamente quando `include`/`exclude` estão ativos, porque esses filtros podem
+     * materializar uma visão parcial intencional. Em builds completos, ela evita que FTS/símbolos respondam por
+     * arquivos já removidos.
+     *
+     * @param {string} rootPath
+     * @param {Set<string>} currentFilePaths
+     * @param {readonly string[]} extensions
+     * @returns {number}
+     */
+    function pruneMissingRows(rootPath, currentFilePaths, extensions) {
+        const normalizedRoot = normalizeIndexPath(rootPath);
+        const rows = /** @type {{ filePath: string; extension: string }[]} */ (
+            stmtListIndexedUnderPath.all(normalizedRoot, `${normalizedRoot}/%`)
+        );
+        let pruned = 0;
+        for (const row of rows) {
+            if (extensions.length > 0 && !extensions.includes(String(row.extension).toLowerCase())) continue;
+            if (currentFilePaths.has(row.filePath)) continue;
+            clearFileRows(row.filePath);
+            pruned += 1;
+        }
+        return pruned;
     }
 
     /**
@@ -540,6 +574,7 @@ export function createIoIndexSqlite(options) {
          *     exclude?: readonly string[];
          *     extensions?: readonly string[];
          *     concurrency?: number;
+         *     pruneMissing?: boolean;
          * }} [options]
          */
         async indexDirectory(rootPath, options = {}) {
@@ -576,6 +611,12 @@ export function createIoIndexSqlite(options) {
             const files = flattenScanEntries(scan.entries).filter((entry) =>
                 shouldIndexFile(entry.absolutePath, extensions),
             );
+            const currentFilePaths = new Set(files.map((entry) => normalizeIndexPath(entry.absolutePath)));
+            const maySafelyPrune =
+                (options.include?.length ?? 0) === 0 &&
+                (options.exclude?.length ?? 0) === 0 &&
+                options.pruneMissing !== false;
+            const pruned = maySafelyPrune ? pruneMissingRows(rootPath, currentFilePaths, extensions) : 0;
 
             let failed = 0;
             let unchanged = 0;
@@ -633,6 +674,7 @@ export function createIoIndexSqlite(options) {
             stats.builds += 1;
             stats.skipped += skipped + unchanged;
             stats.failed += failed;
+            stats.pruned += pruned;
             publishIoLifecycleEvent('index', 'build.complete', {
                 traceId,
                 rootPath,
@@ -643,6 +685,7 @@ export function createIoIndexSqlite(options) {
                 unchanged,
                 skipped,
                 failed,
+                pruned,
                 durationMs: Math.max(0, Date.now() - startedAt),
             });
 
@@ -656,6 +699,8 @@ export function createIoIndexSqlite(options) {
                 skipped: skipped + unchanged,
                 unchanged,
                 failed,
+                pruned,
+                pruneMissing: maySafelyPrune,
                 durationMs: Math.max(0, Date.now() - startedAt),
                 limitMode: 'informative',
             };

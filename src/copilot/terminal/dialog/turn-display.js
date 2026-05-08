@@ -17,7 +17,6 @@ import {
     endTerminalRenderLock,
     println,
     SEPARATOR,
-    writeTerminalPrefixedChunk,
     writeTerminalRaw,
 } from './output.js';
 import { broadcastSse } from './sse.js';
@@ -33,8 +32,11 @@ import { broadcastSse } from './sse.js';
  * @property {string | null} thinkingEntryId
  * @property {number} thinkingStartTime
  * @property {boolean} reasoningSummaryRendered
+ * @property {number} lastReasoningProgressAt
  * @property {boolean} streamingStarted
  * @property {number} streamingChars
+ * @property {string} streamingBuffer
+ * @property {boolean} streamingLineOpen
  * @property {number} firstChunkTime
  * @property {number} turnStartTime
  * @property {string} model
@@ -61,8 +63,11 @@ export function createDisplayState({ model, effort, turnStartTime, showStreaming
         thinkingEntryId: null,
         thinkingStartTime: Date.now(),
         reasoningSummaryRendered: false,
+        lastReasoningProgressAt: 0,
         streamingStarted: false,
         streamingChars: 0,
+        streamingBuffer: '',
+        streamingLineOpen: false,
         firstChunkTime: 0,
         turnStartTime,
         model,
@@ -102,17 +107,6 @@ function getThinkingEntryId(state) {
 }
 
 /**
- * @param {string} value
- * @param {number} [max=96] Default is `96`
- * @returns {string}
- */
-function compactPreview(value, max = 96) {
-    const normalized = value.replace(/\s+/g, ' ').trim();
-    if (!normalized) return '';
-    return normalized.length <= max ? normalized : `${normalized.slice(0, Math.max(0, max - 1))}…`;
-}
-
-/**
  * @param {TurnDisplayState} state
  * @returns {void}
  */
@@ -120,7 +114,6 @@ function flushReasoningSummary(state) {
     if (!state.reasoningStarted || state.reasoningSummaryRendered) return;
     const durationMs = Date.now() - state.thinkingStartTime;
     const entry = finalizeThinkingHistoryEntry(getThinkingEntryId(state), { durationMs, status: 'completed' });
-    const preview = compactPreview(entry?.content ?? state.reasoningContent);
     const shortId = (entry?.id ?? getThinkingEntryId(state)).slice(-12);
 
     if (state.showThinking) {
@@ -128,10 +121,10 @@ function flushReasoningSummary(state) {
         println(
             `  ${terminalThemeText('thinking', `└── thinking #${shortId}`)}  ${terminalThemeText('muted', `${(durationMs / 1000).toFixed(1)}s · ${state.reasoningChars} chars · ${state.model}/${state.effort}`)}`,
         );
-        if (preview) {
-            println(`  ${terminalThemeText('muted', `    ${preview}`)}`);
-        }
-        println(`  ${terminalThemeText('muted', `    /thinking show ${shortId}  ·  /thinking latest`)}`);
+        println(
+            `  ${terminalThemeText('muted', '    conteúdo de reasoning não é despejado automaticamente; acompanhe o estado pela linha viva.')}`,
+        );
+        println(`  ${terminalThemeText('muted', `    /thinking latest  ·  id ${shortId}`)}`);
         println('');
     }
     broadcastSse('reasoning.complete', {
@@ -185,13 +178,57 @@ export function createReasoningCallback(state) {
             effort: state.effort,
         });
         if (state.showThinking) {
-            writeTerminalPrefixedChunk(
-                `  ${terminalThemeText('thinking', '│')}  ${terminalThemeText('muted', '')}`,
-                chunk,
-            );
+            const now = Date.now();
+            if (now - state.lastReasoningProgressAt >= 1_000) {
+                state.lastReasoningProgressAt = now;
+                recordTerminalActivity('thinking', 'Raciocinando', {
+                    detail: `${state.reasoningChars} chars capturados · ${state.model}/${state.effort}`,
+                    source: 'dialog',
+                    recordHistory: false,
+                });
+            }
         }
         broadcastSse('reasoning', { chunk, reasoningId: rId });
     };
+}
+
+/**
+ * @param {TurnDisplayState} state
+ * @param {{ force?: boolean }} [opts]
+ * @returns {void}
+ */
+function flushStreamingBuffer(state, opts = {}) {
+    if (!state.streamingBuffer) return;
+    if (!opts.force && state.streamingBuffer.length < 48 && !/[\n.!?:;]\s*$/.test(state.streamingBuffer)) return;
+    writeStreamingText(state, state.streamingBuffer);
+    state.streamingBuffer = '';
+}
+
+/**
+ * Escreve streaming preservando uma única margem visual por linha real. O SDK pode entregar chunks pequenos; prefixar
+ * cada flush criaria `│` no meio das frases.
+ *
+ * @param {TurnDisplayState} state
+ * @param {string} text
+ * @returns {void}
+ */
+function writeStreamingText(state, text) {
+    const prefix = `  ${terminalThemeText('success', '│')}  `;
+    let rest = text;
+    while (rest.length > 0) {
+        if (!state.streamingLineOpen) {
+            writeTerminalRaw(prefix);
+            state.streamingLineOpen = true;
+        }
+        const newlineIndex = rest.indexOf('\n');
+        if (newlineIndex === -1) {
+            writeTerminalRaw(rest);
+            return;
+        }
+        writeTerminalRaw(rest.slice(0, newlineIndex + 1));
+        state.streamingLineOpen = false;
+        rest = rest.slice(newlineIndex + 1);
+    }
 }
 
 /**
@@ -241,7 +278,8 @@ export function createDeltaCallback(state) {
             );
             println('');
         }
-        writeTerminalPrefixedChunk(`  ${terminalThemeText('success', '│')}  `, chunk);
+        state.streamingBuffer += chunk;
+        flushStreamingBuffer(state);
     };
 }
 
@@ -259,6 +297,7 @@ export function renderStreamingFooter(state, durationMs) {
         });
     }
     if (state.streamingStarted) {
+        flushStreamingBuffer(state, { force: true });
         const secs = (durationMs / 1000).toFixed(1);
         const secsNum = durationMs / 1000;
         const secsColor =

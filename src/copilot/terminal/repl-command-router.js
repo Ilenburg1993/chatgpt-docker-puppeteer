@@ -40,6 +40,7 @@ import {
     cmdGit as _cmdGit,
     cmdHelp as _cmdHelp,
     cmdHistory as _cmdHistory,
+    cmdIndex as _cmdIndex,
     cmdLive as _cmdLive,
     cmdMenu as _cmdMenu,
     cmdMetrics as _cmdMetrics,
@@ -182,6 +183,12 @@ function _cmdHandoff() {
 }
 
 /**
+ * Timeout máximo para graceful shutdown no /quit. Após este prazo, força saída. Garante que /quit nunca fique travado
+ * esperando um dialog loop em estado degradado.
+ */
+const QUIT_SHUTDOWN_TIMEOUT_MS = 8_000;
+
+/**
  * @param {import('node:readline').Interface} rl
  * @param {import('node:http').Server} injectServer
  * @param {() => void} cleanup
@@ -191,7 +198,17 @@ async function _cmdQuit(rl, injectServer, cleanup) {
     println('[terminal] Encerrando sessão…');
     cleanup();
     try {
-        await runShutdown('terminal.quit');
+        // Hard timeout: se runShutdown não completar em QUIT_SHUTDOWN_TIMEOUT_MS, sai mesmo assim.
+        // Evita travamento de /quit quando o dialog loop está em estado degradado (ex.: after freeze).
+        await Promise.race([
+            runShutdown('terminal.quit'),
+            new Promise((_, reject) =>
+                setTimeout(
+                    () => reject(new Error(`Shutdown timeout após ${QUIT_SHUTDOWN_TIMEOUT_MS}ms`)),
+                    QUIT_SHUTDOWN_TIMEOUT_MS,
+                ),
+            ),
+        ]);
     } catch (e) {
         logSwallowed(e, 'terminal.repl.stopLoop');
     }
@@ -277,6 +294,7 @@ export const CMD_ROUTES = [
     [['workspace', 'ws'], (_, arg) => _cmdWorkspace({ println }, arg)],
     [['fs', 'files'], (_, arg) => _cmdFs({ println }, arg)],
     [['scope', 'scopes'], (ctx, arg) => _cmdScope({ println, hubSessionId: ctx.hubSessionId }, arg)],
+    [['index', 'idx'], (_, arg) => _cmdIndex({ println }, arg)],
     [['elicitation', 'elicit'], (_, arg) => _cmdElicitation({ println }, arg)],
     [['permission', 'perm'], (_, arg) => _cmdPermission({ println }, arg)],
     [['usage'], (_, arg) => _cmdUsage({ println }, arg)],

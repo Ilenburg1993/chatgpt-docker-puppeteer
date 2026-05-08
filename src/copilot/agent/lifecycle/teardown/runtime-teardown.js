@@ -56,8 +56,17 @@ export function detachRuntimeObservers(ctx) {
     }
 
     const sessionEventUnsubscribers = ctx.getSessionEventUnsubscribersSnapshot();
+    // FIX: try/catch em cada unsub() — uma exceção isolada não interrompe as demais limpezas.
     for (const unsub of sessionEventUnsubscribers) {
-        unsub();
+        try {
+            unsub();
+        } catch (e) {
+            log(
+                'WARN',
+                '[runtime-teardown] unsub falhou (continuando limpeza): ' +
+                    (e instanceof Error ? e.message : String(e)),
+            );
+        }
     }
     ctx.clearSessionEventUnsubscribers();
 }

@@ -14,6 +14,7 @@ const mocks = vi.hoisted(() => ({
             options,
         }),
     ),
+    formatValidationResult: vi.fn(() => 'Agent contracts OK'),
     getAgentConfiguredSessionFsHandler: vi.fn(() => vi.fn()),
     loadAgentSdkToolsConfigAsync: vi.fn(async () => undefined),
     pickDefinedAgentSdkOptions: vi.fn((value) => value),
@@ -25,6 +26,7 @@ const mocks = vi.hoisted(() => ({
             options,
         }),
     ),
+    validateAgentContracts: vi.fn(() => ({ errors: [], warnings: [], contractLog: {} })),
     persistState: vi.fn(async () => ({ ok: true })),
     readState: vi.fn(/** @returns {Promise<unknown>} */ async () => null),
     buildHookSystemContextSafe: vi.fn(async () => 'hook ctx'),
@@ -35,8 +37,29 @@ vi.mock('#copilot/boot', () => ({
     WORKSPACE_ROOT: '/workspace',
     readBootSkillConfig: vi.fn(() => ({ skillDirectories: ['/skills'] })),
 }));
-vi.mock('#copilot/config', () => ({ buildCustomAgentsConfig: mocks.buildCustomAgentsConfig }));
+vi.mock('#copilot/config', () => ({
+    MAESTRO_AGENT_NAME: 'agent-full',
+    buildCustomAgentsConfig: mocks.buildCustomAgentsConfig,
+}));
 vi.mock('#copilot/core', () => ({
+    buildCanonicalLocalFsExcludedTools: (
+        /** @type {string[]} */ toolNames,
+        /** @type {string[]} */ baseExcluded = [],
+    ) => {
+        const excluded = new Set(baseExcluded);
+        const hasCanonicalFs = [
+            'list_directory',
+            'read_file_content',
+            'search_in_files',
+            'create_file',
+            'write_file_content',
+            'patch_file',
+        ].every((name) => toolNames.includes(name));
+        if (hasCanonicalFs) {
+            for (const name of ['view', 'glob', 'grep', 'create', 'edit']) excluded.add(name);
+        }
+        return [...excluded].sort();
+    },
     toError: (/** @type {unknown} */ error) => (error instanceof Error ? error : new Error(String(error))),
 }));
 vi.mock('../../../src/copilot/config/agent.js', () => ({
@@ -55,11 +78,13 @@ vi.mock('../../../src/copilot/agent/facades/agent-sdk-access.js', () => ({
     AGENT_SDK_DEFAULT_MODEL: 'gpt-5-mini',
     canReadAgentSdkSessionMessages: mocks.canReadAgentSdkSessionMessages,
     createAgentSdkSessionByClient: mocks.createAgentSdkSessionByClient,
+    formatValidationResult: mocks.formatValidationResult,
     getAgentConfiguredSessionFsHandler: mocks.getAgentConfiguredSessionFsHandler,
     loadAgentSdkToolsConfigAsync: mocks.loadAgentSdkToolsConfigAsync,
     pickDefinedAgentSdkOptions: mocks.pickDefinedAgentSdkOptions,
     readAgentSdkSessionMessages: mocks.readAgentSdkSessionMessages,
     resumeOrCreateAgentSdkSession: mocks.resumeOrCreateAgentSdkSession,
+    validateAgentContracts: mocks.validateAgentContracts,
 }));
 vi.mock('../../../src/copilot/agent/facades/agent-runtime-state.js', () => ({
     persistAgentRuntimeStatePartial: mocks.persistState,
@@ -96,6 +121,46 @@ describe('agent/session/initializer — sessionFs wiring', () => {
                 workingDirectory: '/workspace',
             }),
         );
+    });
+
+    it('injeta maestro e streaming de subagentes sem poluir defaultAgent com tools locais', async () => {
+        const { initOrResumeSession } = await import('../../../src/copilot/agent/session/initializers/initializer.js');
+        const toolA = { name: 'read_file_content' };
+        const toolB = { name: 'exec_command' };
+
+        await initOrResumeSession(/** @type {any} */ ({}), { tools: /** @type {any} */ ([toolA, toolB]) });
+
+        const sessionOptions = mocks.resumeOrCreateAgentSdkSession.mock.calls.at(-1)?.[2];
+        expect(mocks.resumeOrCreateAgentSdkSession).toHaveBeenCalledWith(
+            expect.anything(),
+            null,
+            expect.objectContaining({
+                agent: 'agent-full',
+                includeSubAgentStreamingEvents: true,
+            }),
+        );
+        expect(sessionOptions ? Reflect.get(sessionOptions, 'defaultAgent') : undefined).toBeUndefined();
+    });
+
+    it('oculta built-ins legadas de FS quando as file-tools canônicas locais estão presentes', async () => {
+        const { initOrResumeSession } = await import('../../../src/copilot/agent/session/initializers/initializer.js');
+        const tools = [
+            { name: 'list_directory' },
+            { name: 'read_file_content' },
+            { name: 'search_in_files' },
+            { name: 'create_file' },
+            { name: 'write_file_content' },
+            { name: 'patch_file' },
+            { name: 'exec_command' },
+        ];
+
+        await initOrResumeSession(/** @type {any} */ ({}), {
+            tools: /** @type {any} */ (tools),
+            excludedTools: ['web_fetch'],
+        });
+
+        const sessionOptions = mocks.resumeOrCreateAgentSdkSession.mock.calls.at(-1)?.[2];
+        expect(sessionOptions?.excludedTools).toEqual(['create', 'edit', 'glob', 'grep', 'view', 'web_fetch']);
     });
 
     it('persiste o modelo efetivo resolvido em vez do placeholder auto', async () => {
@@ -165,5 +230,38 @@ describe('agent/session/initializer — sessionFs wiring', () => {
                 reasoningEffort: 'high',
             }),
         );
+    });
+
+    it('prioriza reasoning explícito de boot sobre reasoning persistido antigo ao retomar', async () => {
+        const { initOrResumeSession } = await import('../../../src/copilot/agent/session/initializers/initializer.js');
+        mocks.readState.mockResolvedValueOnce({
+            sessionId: 'saved-sess',
+            model: 'auto',
+            reasoningEffort: 'high',
+            startedAt: Date.now(),
+            resumedAt: Date.now(),
+            resumeCount: 1,
+        });
+        mocks.resumeOrCreateAgentSdkSession.mockResolvedValueOnce({
+            session: {
+                sessionId: 'saved-sess',
+                getMessages: vi.fn(async () => []),
+            },
+            isResumed: true,
+        });
+
+        const result = await initOrResumeSession(/** @type {any} */ ({}), {
+            model: 'auto',
+            reasoningEffort: 'xhigh',
+        });
+
+        expect(mocks.persistState).toHaveBeenCalledWith(
+            expect.objectContaining({
+                model: 'auto',
+                reasoningEffort: 'xhigh',
+            }),
+            expect.objectContaining({ label: 'session.initializer.resume' }),
+        );
+        expect(result).toEqual(expect.objectContaining({ model: 'auto', reasoningEffort: 'xhigh' }));
     });
 });

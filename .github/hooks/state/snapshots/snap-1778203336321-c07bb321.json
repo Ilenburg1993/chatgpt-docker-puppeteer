@@ -1,0 +1,121 @@
+{
+    "snapshotId": "snap-1778203336321-c07bb321",
+    "createdAt": 1778203336321,
+    "sessionId": "c551ffa2-42a6-47c1-b1e6-34d143175c55",
+    "model": "auto",
+    "status": "waiting_for_input",
+    "sendCount": 1,
+    "dialogLoopActive": true,
+    "dialogPaused": false,
+    "pendingQuestion": "READY: aguardando próxima mensagem",
+    "pendingQuestionMeta": {
+        "kind": "ready",
+        "askedAt": 1778203294283,
+        "allowFreeform": true,
+        "protocolControlled": true
+    },
+    "pendingQuestionShadow": null,
+    "stateSnapshot": {
+        "sessionId": "c551ffa2-42a6-47c1-b1e6-34d143175c55",
+        "startedAt": 1778203287759,
+        "resumedAt": 1778203287759,
+        "resumeCount": 0,
+        "sendCount": 0,
+        "model": "auto",
+        "pendingQuestion": "READY: aguardando próxima mensagem",
+        "pendingQuestionMeta": {
+            "kind": "ready",
+            "askedAt": 1778203294283,
+            "allowFreeform": true,
+            "protocolControlled": true
+        },
+        "systemPromptBinding": {
+            "sessionId": "c551ffa2-42a6-47c1-b1e6-34d143175c55",
+            "digest": "891c012d7be840c0",
+            "configuredMode": "append",
+            "effectiveMode": "append",
+            "effectiveLiveMode": "customize",
+            "liveReloadEnabled": true,
+            "liveReloadMechanism": "sdk-transform",
+            "reloadStrategy": "sdk-transform",
+            "boundAt": 1778203287759
+        },
+        "gracefulShutdown": false,
+        "reasoningEffort": "xhigh",
+        "dialogLoopActive": true,
+        "dialogPaused": false,
+        "pendingTurnConsumedPR": true,
+        "lastPrConsumedAt": 1778203294266,
+        "lastPrModel": "claude-sonnet-4.6",
+        "lastPrConfiguredModel": "auto",
+        "lastPrEffectiveModel": "claude-sonnet-4.6",
+        "lastPrModelMismatch": false,
+        "lastPrCost": 1,
+        "lastQuotaSnapshots": {
+            "chat": {
+                "isUnlimitedEntitlement": true,
+                "entitlementRequests": -1,
+                "usedRequests": 0,
+                "usageAllowedWithExhaustedQuota": false,
+                "overage": 0,
+                "overageAllowedWithExhaustedQuota": false,
+                "remainingPercentage": 100,
+                "resetDate": "2026-06-01T00:00:00.000Z"
+            },
+            "completions": {
+                "isUnlimitedEntitlement": true,
+                "entitlementRequests": -1,
+                "usedRequests": 0,
+                "usageAllowedWithExhaustedQuota": false,
+                "overage": 0,
+                "overageAllowedWithExhaustedQuota": false,
+                "remainingPercentage": 100,
+                "resetDate": "2026-06-01T00:00:00.000Z"
+            },
+            "premium_interactions": {
+                "isUnlimitedEntitlement": false,
+                "entitlementRequests": 300,
+                "usedRequests": 75,
+                "usageAllowedWithExhaustedQuota": true,
+                "overage": 0,
+                "overageAllowedWithExhaustedQuota": true,
+                "remainingPercentage": 75.1,
+                "resetDate": "2026-06-01T00:00:00.000Z"
+            },
+            "session": {
+                "isUnlimitedEntitlement": false,
+                "entitlementRequests": 0,
+                "usedRequests": 0,
+                "usageAllowedWithExhaustedQuota": false,
+                "overage": 0,
+                "overageAllowedWithExhaustedQuota": false,
+                "remainingPercentage": 77.5,
+                "resetDate": "2026-05-08T03:44:02.000Z"
+            },
+            "weekly": {
+                "isUnlimitedEntitlement": false,
+                "entitlementRequests": 0,
+                "usedRequests": 0,
+                "usageAllowedWithExhaustedQuota": false,
+                "overage": 0,
+                "overageAllowedWithExhaustedQuota": false,
+                "remainingPercentage": 0.2,
+                "resetDate": "2026-05-11T00:00:00.000Z"
+            }
+        },
+        "lastAskUserAt": 1778203294283,
+        "prMetrics": {
+            "boots": 1,
+            "resumesWithPR": 0,
+            "resumesZeroPR": 0,
+            "totalPR": 1
+        }
+    },
+    "prMetrics": {
+        "boots": 1,
+        "resumesWithPR": 0,
+        "resumesZeroPR": 0,
+        "totalPR": 1
+    },
+    "reason": "auto-shutdown"
+}

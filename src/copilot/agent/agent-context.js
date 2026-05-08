@@ -1931,6 +1931,9 @@ export class AgentContext {
      * @param {StatusEmitterLike} emitter
      */
     setStatus(status, emitter) {
+        if (this.status === status) {
+            return;
+        }
         const allowed = AgentContext.STATUS_TRANSITIONS[this.status];
         if (allowed && !allowed.has(status)) {
             log('WARN', `[AgentContext] Transição de status inválida: ${this.status} → ${status}`);

@@ -257,7 +257,9 @@ describe('terminal/commands/sdk', () => {
     });
 
     it('/workspace sync exibe guidance acionável quando conteúdo não é textual', async () => {
-        runtimeMocks.readTerminalSdkWorkspaceFile.mockResolvedValueOnce({ path: 'plan.md' });
+        runtimeMocks.readTerminalSdkWorkspaceFile.mockResolvedValueOnce(
+            /** @type {any} */ ({ path: 'plan.md', content: null }),
+        );
 
         const ctx = mockCtx();
         await cmdWorkspace({ println: ctx.println }, 'sync plan.md --to tmp/plan-local.md');

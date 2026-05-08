@@ -85,6 +85,7 @@
  * @property {unknown} toolArgs
  * @property {number} timestamp
  * @property {string} cwd
+ * @property {string} [agentName]
  */
 
 /**
@@ -132,6 +133,8 @@
 /**
  * @typedef {object} InvocationContext
  * @property {string} sessionId
+ * @property {string} [agentName]
+ * @property {{ name?: string }} [agent]
  */
 
 // ─── Outputs dos hooks ────────────────────────────────────────────────────────

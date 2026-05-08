@@ -21,7 +21,7 @@ export {
 
 export { createIoL2SqliteCache, isIoL2Cache } from './io-cache-l2-sqlite.js';
 
-export { getIoL2Cache, getIoL2CacheStats, resetIoL2CacheForTest } from './io-cache-l2-registry.js';
+export { getIoL2Cache, getIoL2CacheHealth, getIoL2CacheStats, resetIoL2CacheForTest } from './io-cache-l2-registry.js';
 
 export { aggregateIoCacheTierStats, buildIoCacheTierPlan } from './io-cache-tiering.js';
 export {

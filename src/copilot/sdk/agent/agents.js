@@ -34,12 +34,20 @@ import {
  * @type {string[]}
  */
 export const READ_ONLY_TOOLS = [
-    'read_file',
+    'read_file_content',
     'list_directory',
-    'grep_search',
-    'file_search',
-    'semantic_search',
-    'get_errors',
+    'search_in_files',
+    'workspace_symbol_search',
+    'workspace_index_search',
+    'workspace_index_find_symbol',
+    'workspace_scope_context',
+    'workspace_scope_find_symbol',
+    'workspace_scope_list',
+    'git_status',
+    'git_diff',
+    'git_changed_files',
+    'git_log',
+    'get_system_health',
 ];
 
 // ─── Factory principal ────────────────────────────────────────────────────────

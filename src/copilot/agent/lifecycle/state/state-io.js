@@ -97,6 +97,9 @@ let _readStatePromise = null;
  */
 let _writeQueue = Promise.resolve();
 
+/** FIX state-io Bug 1: contador de geração — detecta clearState() chamado durante write em voo. */
+let _clearGen = 0;
+
 // ─── API pública ─────────────────────────────────────────────────────────────
 
 /**
@@ -154,12 +157,16 @@ export function writeState(updates) {
  * @throws {Error} Se a escrita em disco falhar após retry interno
  */
 export async function writeStateAsync(updates) {
-    const resultPromise = _writeQueue
-        .then(() => _doWriteState(updates))
-        .catch((err) => {
-            log('WARN', `[PersistentSession] writeStateAsync retry após falha: ${err?.message ?? err}`);
+    // FIX state-io Bug 2: retry original executava FORA do chain da fila serial (concorrente com próxima escrita).
+    // Solução: mover try/retry para dentro do .then() — permanece serializado.
+    const resultPromise = _writeQueue.then(async () => {
+        try {
+            return await _doWriteState(updates);
+        } catch (err) {
+            log('WARN', `[PersistentSession] writeStateAsync retry após falha: ${toError(err).message}`);
             return _doWriteState(updates);
-        });
+        }
+    });
 
     _writeQueue = resultPromise.then(
         () => undefined,
@@ -176,10 +183,14 @@ export async function writeStateAsync(updates) {
  * @returns {Promise<AliveAgentState>}
  */
 async function _doWriteState(updates) {
+    // FIX state-io Bug 1: capturar geração antes do I/O — se clearState() for chamado durante o write, não restaurar cache stale.
+    const genAtStart = _clearGen;
     const current = (await readStateAsync()) ?? _defaultState();
     const next = /** @type {AliveAgentState} */ ({ ...current, ...updates });
     await writeStateFileJson(next);
-    _stateCache = next;
+    if (_clearGen === genAtStart) {
+        _stateCache = next;
+    }
     return next;
 }
 
@@ -195,6 +206,7 @@ export function clearState() {
     _stateCache = null;
     _readStatePromise = null;
     resetStateFileIoCache();
+    _clearGen++;  // FIX Bug 1: invalidar writes em voo
     _writeQueue = Promise.resolve();
     clearStateAsync().catch((e) => logSwallowed(e, 'stateIo.clearState.asyncFallback'));
 }

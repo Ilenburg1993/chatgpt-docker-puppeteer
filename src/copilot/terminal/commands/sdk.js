@@ -10,6 +10,7 @@ import { randomUUID } from 'node:crypto';
 import { CANONICAL_LOCAL_FS_TOOL_NAMES, decideSdkFsRouting, toError } from '#copilot/core';
 import { fileReadTools, fileWriteTools } from '#copilot/tools';
 import { isRuntimeElicitationSchema, normalizeElicitationContentWithSchema } from '../../core/elicitation-schema.js';
+import { getPendingUserInputCount } from '../../tools/user-input-state.js';
 import {
     buildActivityAwareGuidance,
     buildFailureRecoveryLines,
@@ -476,7 +477,9 @@ function renderSdkWaitsSummary({ println }, runtimeId) {
     const pendingElicitations = readTerminalElicitationSummary({ runtimeId: scopedRuntimeId });
     const permissionSummary = readTerminalPermissionSummary({ runtimeId: scopedRuntimeId });
     const userInputSummary = readTerminalUserInputSummary({ runtimeId: scopedRuntimeId });
-    const totalPending = pendingElicitations.pending + permissionSummary.pending + userInputSummary.pending;
+    const structuredInputPending = getPendingUserInputCount();
+    const totalPending =
+        pendingElicitations.pending + permissionSummary.pending + userInputSummary.pending + structuredInputPending;
     const headlineColor = totalPending > 0 ? '\x1b[33m' : '\x1b[32m';
 
     println(`\n  \x1b[36mSDK Waits\x1b[0m`);
@@ -484,7 +487,7 @@ function renderSdkWaitsSummary({ println }, runtimeId) {
         `  status   ${headlineColor}${totalPending > 0 ? `${totalPending} pendência(s)` : 'nenhuma pendência'}\x1b[0m`,
     );
     println(
-        `  waits    \x1b[90melicitation=${pendingElicitations.pending}${pendingElicitations.latest?.mode ? ` (${pendingElicitations.latest.mode})` : ''} · permission=${permissionSummary.pending}${permissionSummary.latest ? ` (${permissionSummary.latest.permissionType})` : ''} · ask_user=${userInputSummary.pending}${userInputSummary.latest?.kind ? ` (${userInputSummary.latest.kind})` : ''}\x1b[0m`,
+        `  waits    \x1b[90melicitation=${pendingElicitations.pending}${pendingElicitations.latest?.mode ? ` (${pendingElicitations.latest.mode})` : ''} · permission=${permissionSummary.pending}${permissionSummary.latest ? ` (${permissionSummary.latest.permissionType})` : ''} · ask_user=${userInputSummary.pending}${userInputSummary.latest?.kind ? ` (${userInputSummary.latest.kind})` : ''} · request_user_input=${structuredInputPending}\x1b[0m`,
     );
 
     if (pendingElicitations.pending > 0) {
@@ -495,6 +498,9 @@ function renderSdkWaitsSummary({ println }, runtimeId) {
     }
     if (userInputSummary.pending > 0) {
         println('  ação     \x1b[90m/answer <texto> ou responda na conversa ativa\x1b[0m');
+    }
+    if (structuredInputPending > 0) {
+        println('  ação     \x1b[90mdigite a resposta normalmente; o REPL destrava request_user_input pendente\x1b[0m');
     }
     if (totalPending === 0) {
         println('  \x1b[90mSem bloqueios de input humano do SDK no momento.\x1b[0m');
@@ -592,12 +598,13 @@ export async function cmdSdk({ println }, arg = '') {
             const pendingElicitations = readTerminalElicitationSummary({ runtimeId: state.runtimeId });
             const permissionSummary = readTerminalPermissionSummary({ runtimeId: state.runtimeId });
             const userInputSummary = readTerminalUserInputSummary({ runtimeId: state.runtimeId });
+            const structuredInputPending = getPendingUserInputCount();
             println('\n  \x1b[36mSDK Runtime\x1b[0m');
             println(`  runtime  \x1b[90m${state.runtimeId}\x1b[0m`);
             println(`  session  \x1b[90m${state.sessionId ?? '-'}\x1b[0m`);
             println(`  model    \x1b[33m${state.model}\x1b[0m  reasoning=\x1b[33m${state.reasoningEffort}\x1b[0m`);
             println(
-                `  waits    \x1b[90melicitation=${pendingElicitations.pending}${pendingElicitations.latest?.mode ? ` (${pendingElicitations.latest.mode})` : ''} · permission=${permissionSummary.pending}${permissionSummary.latest ? ` (${permissionSummary.latest.permissionType})` : ''} · ask_user=${userInputSummary.pending}${userInputSummary.latest?.kind ? ` (${userInputSummary.latest.kind})` : ''}\x1b[0m`,
+                `  waits    \x1b[90melicitation=${pendingElicitations.pending}${pendingElicitations.latest?.mode ? ` (${pendingElicitations.latest.mode})` : ''} · permission=${permissionSummary.pending}${permissionSummary.latest ? ` (${permissionSummary.latest.permissionType})` : ''} · ask_user=${userInputSummary.pending}${userInputSummary.latest?.kind ? ` (${userInputSummary.latest.kind})` : ''} · request_user_input=${structuredInputPending}\x1b[0m`,
             );
             await renderSdkQuota({ println }, runtimeId, { compact: true });
             println(

@@ -18,7 +18,7 @@
  * Em versões futuras do SDK, verificar se novos métodos públicos estão disponíveis como substitutos.
  */
 
-import { COPILOT_RPC_TIMEOUT_MS } from '#copilot/config';
+import { COPILOT_RPC_TIMEOUT_MS, MAESTRO_AGENT_NAME } from '#copilot/config';
 import { toError } from '#copilot/core';
 import { createTool } from '#copilot/sdk';
 import { z } from 'zod';
@@ -251,6 +251,30 @@ const sessionAgentListTool = createTool({
         }),
 });
 
+// ─── session_agent_current ────────────────────────────────────────────────────
+
+/**
+ * Tool: session_agent_current — retorna o agente ativo e reforça o maestro quando necessário.
+ */
+const sessionAgentCurrentTool = createTool({
+    name: 'session_agent_current',
+    description:
+        'Retorna o agente customizado ativo na sessão. Se o SDK informar outro agente ou nenhum agente, reforça agent-full como maestro.',
+    parameters: /** @type {import('#copilot/sdk/types').ZodSchema<Record<string, never>>} */ (
+        /** @type {unknown} */ (z.object({}))
+    ),
+    handler: async () =>
+        wrapRpc('session_agent_current', async (rpc) => {
+            const current = await rpc.agent.getCurrent();
+            if (current.agent?.name === MAESTRO_AGENT_NAME) {
+                return { agent: current.agent, enforced: false };
+            }
+            const selected = await rpc.agent.select(MAESTRO_AGENT_NAME);
+            log('INFO', `[session_agent_current] maestro reforçado: ${selected.agent.name}`);
+            return { agent: selected.agent, previousAgent: current.agent ?? null, enforced: true };
+        }),
+});
+
 // ─── session_agent_select ─────────────────────────────────────────────────────
 
 /**
@@ -259,9 +283,7 @@ const sessionAgentListTool = createTool({
 const sessionAgentSelectTool = createTool({
     name: 'session_agent_select',
     description:
-        'Seleciona um sub-agente pelo nome para o turno atual (ex: "auditor", "docs", "reviewer"). ' +
-        'Passe name="" ou null para voltar ao agente padrão. ' +
-        'O agente selecionado tem suas próprias instruções e ferramentas disponíveis.',
+        'Reforça o agente maestro agent-full na sessão atual. Selecionar outro agente diretamente é bloqueado; especialistas devem ser usados por delegação do maestro.',
     parameters: /** @type {import('#copilot/sdk/types').ZodSchema<{ name: string }>} */ (
         /** @type {unknown} */ (
             z.object({
@@ -271,14 +293,35 @@ const sessionAgentSelectTool = createTool({
     ),
     handler: async (/** @type {{ name: string }} */ { name }) =>
         wrapRpc('session_agent_select', async (rpc) => {
-            if (!name) {
-                await rpc.agent.deselect();
-                log('INFO', '[session_agent_select] agente deselecionado (padrão)');
-                return { selected: null };
+            if (name && name !== MAESTRO_AGENT_NAME) {
+                return {
+                    error: `Seleção direta de "${name}" bloqueada. O agente ativo obrigatório é "${MAESTRO_AGENT_NAME}".`,
+                    enforcedAgent: MAESTRO_AGENT_NAME,
+                };
             }
-            const result = await rpc.agent.select(name);
+            const result = await rpc.agent.select(MAESTRO_AGENT_NAME);
             log('INFO', `[session_agent_select] selecionado: ${result.agent.name}`);
             return result;
+        }),
+});
+
+// ─── session_agent_reload ─────────────────────────────────────────────────────
+
+/**
+ * Tool: session_agent_reload — recarrega agentes SDK e reativa o maestro.
+ */
+const sessionAgentReloadTool = createTool({
+    name: 'session_agent_reload',
+    description: 'Recarrega a lista de agentes customizados do SDK e reativa agent-full como maestro obrigatório.',
+    parameters: /** @type {import('#copilot/sdk/types').ZodSchema<Record<string, never>>} */ (
+        /** @type {unknown} */ (z.object({}))
+    ),
+    handler: async () =>
+        wrapRpc('session_agent_reload', async (rpc) => {
+            const reloaded = await rpc.agent.reload();
+            const selected = await rpc.agent.select(MAESTRO_AGENT_NAME);
+            log('INFO', `[session_agent_reload] ${reloaded.agents.length} agentes recarregados; maestro ativo.`);
+            return { ...reloaded, selectedAgent: selected.agent };
         }),
 });
 
@@ -326,6 +369,8 @@ export const sessionRpcTools = [
     sessionPlanUpdateTool,
     sessionPlanDeleteTool,
     withSkipPermission(sessionAgentListTool),
+    withSkipPermission(sessionAgentCurrentTool),
     sessionAgentSelectTool,
+    sessionAgentReloadTool,
     sessionCompactTool,
 ];

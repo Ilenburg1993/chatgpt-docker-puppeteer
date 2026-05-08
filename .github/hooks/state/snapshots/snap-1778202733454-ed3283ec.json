@@ -1,0 +1,113 @@
+{
+    "snapshotId": "snap-1778202733454-ed3283ec",
+    "createdAt": 1778202733454,
+    "sessionId": "cbd89734-c139-48d8-95a5-818715f43b1a",
+    "model": "auto",
+    "status": "processing",
+    "sendCount": 4,
+    "dialogLoopActive": true,
+    "dialogPaused": false,
+    "pendingQuestion": null,
+    "pendingQuestionMeta": null,
+    "pendingQuestionShadow": null,
+    "stateSnapshot": {
+        "sessionId": "cbd89734-c139-48d8-95a5-818715f43b1a",
+        "startedAt": 1778191258373,
+        "resumedAt": 1778202653691,
+        "resumeCount": 3,
+        "sendCount": 3,
+        "model": "auto",
+        "reasoningEffort": "xhigh",
+        "pendingQuestion": null,
+        "pendingQuestionMeta": null,
+        "systemPromptBinding": {
+            "sessionId": "cbd89734-c139-48d8-95a5-818715f43b1a",
+            "digest": "891c012d7be840c0",
+            "configuredMode": "append",
+            "effectiveMode": "append",
+            "effectiveLiveMode": "customize",
+            "liveReloadEnabled": true,
+            "liveReloadMechanism": "sdk-transform",
+            "reloadStrategy": "sdk-transform",
+            "boundAt": 1778202653691
+        },
+        "gracefulShutdown": false,
+        "dialogLoopActive": true,
+        "dialogPaused": false,
+        "pendingTurnConsumedPR": true,
+        "lastPrConsumedAt": 1778202667082,
+        "lastPrModel": "claude-sonnet-4.6",
+        "lastPrCost": 1,
+        "lastQuotaSnapshots": {
+            "chat": {
+                "isUnlimitedEntitlement": true,
+                "entitlementRequests": -1,
+                "usedRequests": 0,
+                "usageAllowedWithExhaustedQuota": false,
+                "overage": 0,
+                "overageAllowedWithExhaustedQuota": false,
+                "remainingPercentage": 100,
+                "resetDate": "2026-06-01T00:00:00.000Z"
+            },
+            "completions": {
+                "isUnlimitedEntitlement": true,
+                "entitlementRequests": -1,
+                "usedRequests": 0,
+                "usageAllowedWithExhaustedQuota": false,
+                "overage": 0,
+                "overageAllowedWithExhaustedQuota": false,
+                "remainingPercentage": 100,
+                "resetDate": "2026-06-01T00:00:00.000Z"
+            },
+            "premium_interactions": {
+                "isUnlimitedEntitlement": false,
+                "entitlementRequests": 300,
+                "usedRequests": 73,
+                "usageAllowedWithExhaustedQuota": true,
+                "overage": 0,
+                "overageAllowedWithExhaustedQuota": true,
+                "remainingPercentage": 75.7,
+                "resetDate": "2026-06-01T00:00:00.000Z"
+            },
+            "session": {
+                "isUnlimitedEntitlement": false,
+                "entitlementRequests": 0,
+                "usedRequests": 0,
+                "usageAllowedWithExhaustedQuota": false,
+                "overage": 0,
+                "overageAllowedWithExhaustedQuota": false,
+                "remainingPercentage": 78.6,
+                "resetDate": "2026-05-08T03:44:02.000Z"
+            },
+            "weekly": {
+                "isUnlimitedEntitlement": false,
+                "entitlementRequests": 0,
+                "usedRequests": 0,
+                "usageAllowedWithExhaustedQuota": false,
+                "overage": 0,
+                "overageAllowedWithExhaustedQuota": false,
+                "remainingPercentage": 0.2,
+                "resetDate": "2026-05-11T00:00:00.000Z"
+            }
+        },
+        "lastAskUserAt": 1778202143974,
+        "prMetrics": {
+            "boots": 1,
+            "resumesWithPR": 0,
+            "resumesZeroPR": 0,
+            "totalPR": 1
+        },
+        "pendingTurnMessage": "Faça um auto diagnóstico de sua situação, após este boot. Tome todo o contexto necessário. Identifique bugs e gaps para sua operação. Seu código está em src\\copilot, onde devemos trabalhar continuamente.",
+        "pendingTurnTs": 1778191345387,
+        "lastPrConfiguredModel": "auto",
+        "lastPrModelMismatch": false,
+        "lastPrEffectiveModel": "claude-sonnet-4.6"
+    },
+    "prMetrics": {
+        "boots": 0,
+        "resumesWithPR": 0,
+        "resumesZeroPR": 0,
+        "totalPR": 0
+    },
+    "reason": "auto-shutdown"
+}

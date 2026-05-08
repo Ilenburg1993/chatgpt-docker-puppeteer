@@ -5,7 +5,7 @@
  * F94 — Schemas Zod para validação de dados persistidos e payloads HTTP.
  *
  * Centraliza definições de schema para evitar duplicação de lógica de validação manual em cada módulo que faz
- * JSON.parse de arquivos ou payloads. Cada schema é exported como constante nomeada para uso com `z.safeParse()`.
+ * JSON.parse de arquivos ou payloads. Cada schema é exportado como constante nomeada para uso com `z.safeParse()`.
  *
  * @module copilot/core/schemas
  * @see EventBus
@@ -102,7 +102,7 @@ export const AliveAgentStateSchema = z
     })
     .passthrough();
 
-// ─── Custom Tools (sdk/custom-tools.js) ──────────────────────────────────────
+// ─── Ferramentas Customizadas (sdk/custom-tools.js) ──────────────────────────
 
 /**
  * Schema para uma definição de custom tool.
@@ -119,10 +119,10 @@ export const CustomToolDefinitionSchema = z.object({
  */
 export const CustomToolsFileSchema = z.array(CustomToolDefinitionSchema);
 
-// ─── Tools State (sdk/tools-state.js) ────────────────────────────────────────
+// ─── Estado De Ferramentas (sdk/tools-state.js) ──────────────────────────────
 
 /**
- * Schema para tools-config.json (allowlist/denylist).
+ * Schema para tools-config.json (listas de permissão/negação).
  */
 export const ToolsConfigSchema = z.object({
     allowlist: z.array(z.string()).nullable(),
@@ -139,7 +139,7 @@ export const AliasConfigSchema = z.record(z.string(), z.string());
 // ─── Channel Inject (channel/inject.js) ──────────────────────────────────────
 
 /**
- * Schema para o payload do inject /inject endpoint (parsed HTTP body).
+ * Schema para a carga útil do endpoint /inject (corpo HTTP parseado).
  */
 export const InjectResponseSchema = z.object({
     ok: z.boolean(),
@@ -156,4 +156,56 @@ export const HealthResponseSchema = z.object({
     busy: z.boolean().optional(),
     hubSessionId: z.string().nullable().optional(),
     agentStatus: z.string().optional(),
+});
+
+// ─── Contratos De Agente (config/tool-aliases.js + agent/facades/sdk/agent-contract.js) ──
+
+/**
+ * Schema para uma configuração de agente customizado (SDK_AGENTS).
+ *
+ * Usado em validateAgentContracts() para validar estrutura antes de passar ao SDK.
+ */
+export const SdkCustomAgentConfigSchema = z.object({
+    name: z.string().min(1),
+    displayName: z.string().optional(),
+    description: z.string().min(1),
+    tools: z.array(z.string()).min(1).nullable().optional(),
+    toolTiers: z
+        .object({
+            must: z.array(z.string()).optional(),
+            should: z.array(z.string()).optional(),
+            optional: z.array(z.string()).optional(),
+        })
+        .optional(),
+    prompt: z.string().min(1),
+    infer: z.boolean().optional(),
+    priority: z.enum(['maestro']).optional(),
+});
+
+/**
+ * Schema para validação de múltiplos agentes em SessionConfig.customAgents.
+ */
+export const SessionCustomAgentsSchema = z.array(SdkCustomAgentConfigSchema).min(0);
+
+/**
+ * Schema para o resultado de validação de contrato de agente. Usado em agent-contract.js formatValidationResult() e
+ * testes.
+ */
+export const AgentContractValidationResultSchema = z.object({
+    errors: z.array(z.string()),
+    warnings: z.array(z.string()),
+    contractLog: z.record(
+        z.string(),
+        z.object({
+            name: z.string(),
+            displayName: z.string(),
+            toolsRequested: z.array(z.string()),
+            toolsResolved: z.array(z.string()),
+            unresolvedTools: z.array(z.string()),
+            wildcard: z.boolean().optional(),
+            status: z.enum(['ok', 'warning', 'error']),
+            errors: z.array(z.string()),
+            warnings: z.array(z.string()),
+        }),
+    ),
 });

@@ -76,6 +76,28 @@ export function registerAgentEventListeners(printBanner) {
     }
     agentEvents.on(EMITTER_DIALOG_STALLED, async (/** @type {{ stalledMs: number }} */ evt) => {
         const secs = Math.round(evt.stalledMs / 1000);
+        const runtimeState = readTerminalRuntimeState();
+        const waitingHumanInput =
+            runtimeState.status === 'waiting_for_input' && runtimeState.pendingQuestionKind === 'question';
+
+        if (waitingHumanInput) {
+            recordTerminalActivity('system', 'Watchdog ignorado (input humano pendente)', {
+                detail: `${secs}s em waiting_for_input/question`,
+                source: 'watchdog',
+            });
+            log(
+                'INFO',
+                `[TerminalServer] Watchdog stall ignorado (${secs}s): runtime aguardando input humano (pendingQuestionKind=question).`,
+            );
+            pingTerminalDialogWatchdog();
+            broadcastSse('dialog.stalled', {
+                stalledMs: evt.stalledMs,
+                ignored: true,
+                reason: 'waiting_for_input_question',
+            });
+            return;
+        }
+
         recordTerminalActivity('system', 'Watchdog disparou', {
             detail: `${secs}s sem progresso`,
             severity: 'warn',
@@ -85,22 +107,37 @@ export function registerAgentEventListeners(printBanner) {
 
         // F52 (PARTE-9): Zero-PR Watchdog Recovery — tentar recuperar SEM consumir PR.
         // 1. Abortar mensagem travada (session.abort — 0 PR)
-        await abortTerminalCurrentMessage();
+        // BUG-WDOG-01: sem try/catch, abortTerminalCurrentMessage() rejeita propagando
+        // como unhandled rejection no listener de evento, silenciando o watchdog recovery.
+        try {
+            await abortTerminalCurrentMessage();
+        } catch (e) {
+            logSwallowed(e, 'terminal.wiring.watchdog.abort');
+        }
 
         // 2. Aguardar janela adaptativa para o ask_user reaparecer (0 PR se reaparecer)
         const recovered = await new Promise((resolve) => {
-            const timeout = setTimeout(() => resolve(false), WATCHDOG_RECOVERY_WAIT_MS);
+            let settled = false;
+            const settle = (/** @type {boolean} */ value) => {
+                if (settled) return;
+                settled = true;
+                resolve(value);
+            };
+            const timeout = setTimeout(() => settle(false), WATCHDOG_RECOVERY_WAIT_MS);
             const check = () => {
                 if (readTerminalRuntimeState().pendingQuestionKind === 'ready') {
                     clearTimeout(timeout);
-                    resolve(true);
+                    settle(true);
                 }
             };
-            // Verificar imediatamente e a cada 500ms
+            // BUG-WDOG-02: check() imediato pode resolver a Promise antes do setInterval ser
+            // criado, deixando interval e timeout cleanup pendentes por WATCHDOG_RECOVERY_WAIT_MS.
+            // Solução: verificar `settled` antes de criar o interval.
             check();
+            if (settled) return;
             const interval = setInterval(() => {
                 check();
-                if (readTerminalRuntimeState().pendingQuestionKind === 'ready') clearInterval(interval);
+                if (settled) clearInterval(interval);
             }, 500);
             setTimeout(() => clearInterval(interval), WATCHDOG_RECOVERY_WAIT_MS + 100);
         });

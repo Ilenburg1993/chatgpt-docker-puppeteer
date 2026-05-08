@@ -86,10 +86,17 @@ export const LLM_B_DIALOG_QUEUE_MAX = envInt('LLM_B_DIALOG_QUEUE_MAX', 10);
 export const LLM_B_WATCHDOG_MS = envInt('LLM_B_WATCHDOG_MS', 5 * 60 * 1_000);
 export const LLM_B_WATCHDOG_STALL_MS = envInt('LLM_B_WATCHDOG_STALL_MS', 15 * 60 * 1_000);
 export const MAX_WEBHOOKS = envInt('MAX_WEBHOOKS', 50);
+export const WEB_FETCH_DISABLED = envBool('WEB_FETCH_DISABLED', false);
 export const WEB_SEARCH_DISABLED = envBool('WEB_SEARCH_DISABLED', false);
+export const WEB_RATE_LIMIT_ENFORCED = envBool('WEB_RATE_LIMIT_ENFORCED', false);
+export const WEB_RATE_LIMIT_PER_MINUTE = envInt('WEB_RATE_LIMIT_PER_MINUTE', 240);
 export const WEBHOOK_ALLOW_PRIVATE_HOSTS = envBool('WEBHOOK_ALLOW_PRIVATE_HOSTS', false);
 export const WEBHOOK_MAX_RETRIES = envInt('WEBHOOK_MAX_RETRIES', 2);
 export const WEBHOOK_TIMEOUT_MS = envInt('WEBHOOK_TIMEOUT_MS', 5_000);
+export const SHELL_TIMEOUT_ENFORCED = envBool('SHELL_TIMEOUT_ENFORCED', false);
+export const SHELL_TIMEOUT_DEFAULT_SECONDS = envInt('SHELL_TIMEOUT_DEFAULT_SECONDS', 30);
+export const SHELL_OUTPUT_TRUNCATE_ENFORCED = envBool('SHELL_OUTPUT_TRUNCATE_ENFORCED', false);
+export const SHELL_OUTPUT_MAX_BYTES = envInt('SHELL_OUTPUT_MAX_BYTES', 2 * 1024 * 1024);
 
 // ── SDK Client ───────────────────────────────────────────────
 
@@ -103,11 +110,9 @@ export const SDK_API_TOKEN = envOpt('SDK_API_TOKEN') ?? null;
 
 // ── Config: Custom Agents ────────────────────────────────────
 
-export const COPILOT_CUSTOM_AGENTS = envStr(
-    'COPILOT_CUSTOM_AGENTS',
-    'task,explore,diagnostic,planner,git-ops,shell-ops',
-);
+export const COPILOT_CUSTOM_AGENTS = envStr('COPILOT_CUSTOM_AGENTS', '');
 export const COPILOT_DISABLED_AGENTS = envStr('COPILOT_DISABLED_AGENTS', '');
+export const COPILOT_OPERATIONAL_PROFILE = envStr('COPILOT_OPERATIONAL_PROFILE', 'production');
 
 // ── Config: MCP Servers ──────────────────────────────────────
 
@@ -186,6 +191,9 @@ export const TERMINAL_SHOW_USAGE = envBool('TERMINAL_SHOW_USAGE', false);
 export const TERMINAL_SHOW_STREAMING = process.env['TERMINAL_SHOW_STREAMING'] !== 'false';
 export const TERMINAL_SHOW_TOOL_ACTIVITY = process.env['TERMINAL_SHOW_TOOL_ACTIVITY'] !== 'false';
 export const TERMINAL_SHOW_INTENT_ACTIVITY = process.env['TERMINAL_SHOW_INTENT_ACTIVITY'] !== 'false';
+export const TERMINAL_DISPLAY_PRESET = envStr('TERMINAL_DISPLAY_PRESET', 'full');
+export const TERMINAL_LIVE_STATUS_ENABLED = envBool('TERMINAL_LIVE_STATUS_ENABLED', true);
+export const TERMINAL_LIVE_STATUS_INTERVAL_MS = envInt('TERMINAL_LIVE_STATUS_INTERVAL_MS', 1_000);
 export const TERMINAL_MAX_INJECT_HISTORY = envInt('TERMINAL_MAX_INJECT_HISTORY', 100);
 export const TERMINAL_MAX_LISTENERS = envInt('TERMINAL_MAX_LISTENERS', 25);
 export const TERMINAL_MAX_ATTACHMENTS = envInt('TERMINAL_MAX_ATTACHMENTS', 50);
@@ -208,6 +216,45 @@ export const MAX_QUEUE_SIZE = 100;
  */
 export function getCopilotFallbackModel() {
     return process.env['COPILOT_FALLBACK_MODEL'] ?? null;
+}
+
+/**
+ * Política dinâmica de timeout para shell tools (lida em runtime, sem reinício).
+ *
+ * @returns {{ enforced: boolean; defaultSeconds: number }}
+ */
+export function getShellTimeoutPolicy() {
+    const enforced = process.env['SHELL_TIMEOUT_ENFORCED'] === 'true' || process.env['SHELL_TIMEOUT_ENFORCED'] === '1';
+    const parsed = Number(process.env['SHELL_TIMEOUT_DEFAULT_SECONDS'] ?? SHELL_TIMEOUT_DEFAULT_SECONDS);
+    const defaultSeconds = Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : SHELL_TIMEOUT_DEFAULT_SECONDS;
+    return { enforced, defaultSeconds };
+}
+
+/**
+ * Política dinâmica de truncamento de output shell (lida em runtime, sem reinício).
+ *
+ * @returns {{ enforced: boolean; maxBytes: number }}
+ */
+export function getShellOutputPolicy() {
+    const enforced =
+        process.env['SHELL_OUTPUT_TRUNCATE_ENFORCED'] === 'true' ||
+        process.env['SHELL_OUTPUT_TRUNCATE_ENFORCED'] === '1';
+    const parsed = Number(process.env['SHELL_OUTPUT_MAX_BYTES'] ?? SHELL_OUTPUT_MAX_BYTES);
+    const maxBytes = Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : SHELL_OUTPUT_MAX_BYTES;
+    return { enforced, maxBytes };
+}
+
+/**
+ * Política dinâmica de rate-limit web (lida em runtime, sem reinício).
+ *
+ * @returns {{ enforced: boolean; perMinute: number }}
+ */
+export function getWebRateLimitPolicy() {
+    const enforced =
+        process.env['WEB_RATE_LIMIT_ENFORCED'] === 'true' || process.env['WEB_RATE_LIMIT_ENFORCED'] === '1';
+    const parsed = Number(process.env['WEB_RATE_LIMIT_PER_MINUTE'] ?? WEB_RATE_LIMIT_PER_MINUTE);
+    const perMinute = Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : WEB_RATE_LIMIT_PER_MINUTE;
+    return { enforced, perMinute };
 }
 
 // ─── IConfigProvider singleton (Faixa 3.2 — AC-5-06) ────────────────────────

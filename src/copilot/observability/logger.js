@@ -224,6 +224,9 @@ export function getRecentLogs(n = 50, level) {
 /** Detecta modo produção para output JSON-line. */
 const _isProduction = process.env['NODE_ENV'] === 'production';
 
+/** FIX OBS-001: throttle de rotação — checagem a cada 5 segundos para não bloquear o event loop em hot path. */
+let _lastRotateCheck = 0;
+
 /**
  * Log operacional isolado do copilot. Mesma assinatura de `#core/logger → log`.
  *
@@ -239,7 +242,11 @@ function log(level, msg, metaOrTaskId = '-') {
     const _minLevel = minLevel ?? LOG_LEVELS['INFO'] ?? 1;
     if (levelValue < _minLevel) return;
 
-    rotateFile(LOG_FILE, 'copilot_agent_', MAX_LOG_SIZE);
+    const _nowMs = Date.now();
+    if (_nowMs - _lastRotateCheck > 5000) {
+        _lastRotateCheck = _nowMs;
+        rotateFile(LOG_FILE, 'copilot_agent_', MAX_LOG_SIZE);
+    }
 
     const ts = new Date().toISOString();
 

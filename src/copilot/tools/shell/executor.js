@@ -9,6 +9,7 @@
  * @see EventBus
  */
 
+import { getShellOutputPolicy } from '#copilot/config';
 import { execFile, spawn } from 'node:child_process';
 import { promisify } from 'node:util';
 import { toExecError } from '../../core/error-handlers.js';
@@ -22,6 +23,9 @@ export const ADVISORY_OUTPUT_BYTES = 10_000;
 /** Valor histórico mantido apenas como telemetria/advisory. Não encerra processos. */
 export const ADVISORY_TIMEOUT_MS = 120_000;
 
+/** Limite de captura em memória por stream (stdout/stderr) para evitar crescimento ilimitado. */
+export const CAPTURE_MAX_BYTES = 2 * 1024 * 1024;
+
 /**
  * BUG-H01 (fix): tokeniza um comando shell respeitando aspas simples e duplas. Exemplo: tokenizeShell('echo "hello
  * world"') → ['echo', 'hello world']
@@ -34,9 +38,22 @@ export function tokenizeShell(command) {
     let current = '';
     let inSingle = false;
     let inDouble = false;
+    let escaped = false;
 
     for (let i = 0; i < command.length; i++) {
         const ch = command[i];
+
+        if (escaped) {
+            current += ch;
+            escaped = false;
+            continue;
+        }
+
+        if (ch === '\\' && !inSingle) {
+            escaped = true;
+            continue;
+        }
+
         if (ch === "'" && !inDouble) {
             inSingle = !inSingle;
         } else if (ch === '"' && !inSingle) {
@@ -55,13 +72,93 @@ export function tokenizeShell(command) {
 }
 
 /**
+ * Divide pipeline `cmd1 | cmd2 | ...` respeitando aspas e escape.
+ *
+ * @param {string} command
+ * @returns {string[]}
+ */
+export function splitPipelineSegments(command) {
+    /** @type {string[]} */
+    const segments = [];
+    let current = '';
+    let inSingle = false;
+    let inDouble = false;
+    let escaped = false;
+
+    for (let i = 0; i < command.length; i++) {
+        const ch = command[i];
+
+        if (escaped) {
+            current += ch;
+            escaped = false;
+            continue;
+        }
+
+        if (ch === '\\' && !inSingle) {
+            escaped = true;
+            current += ch;
+            continue;
+        }
+
+        if (ch === "'" && !inDouble) {
+            inSingle = !inSingle;
+            current += ch;
+            continue;
+        }
+
+        if (ch === '"' && !inSingle) {
+            inDouble = !inDouble;
+            current += ch;
+            continue;
+        }
+
+        if (ch === '|' && !inSingle && !inDouble) {
+            const trimmed = current.trim();
+            if (trimmed.length > 0) segments.push(trimmed);
+            current = '';
+            continue;
+        }
+
+        current += ch;
+    }
+
+    const trimmed = current.trim();
+    if (trimmed.length > 0) segments.push(trimmed);
+    return segments;
+}
+
+/**
+ * Acumula dados de stream com limite em bytes.
+ *
+ * @param {string} current
+ * @param {Buffer | string} chunk
+ * @param {number} maxBytes
+ * @returns {string}
+ */
+function appendCaptured(current, chunk, maxBytes) {
+    if (current.length >= maxBytes) {
+        return current;
+    }
+    const text = String(chunk);
+    const next = current + text;
+    if (next.length <= maxBytes) {
+        return next;
+    }
+    return next.slice(0, maxBytes);
+}
+
+/**
  * Preserva output integral. O nome é mantido por compatibilidade com chamadas existentes.
  *
  * @param {string} text
  * @returns {string}
  */
 export function truncateOutput(text) {
-    return text;
+    const policy = getShellOutputPolicy();
+    if (!policy.enforced || text.length <= policy.maxBytes) {
+        return text;
+    }
+    return `${text.slice(0, policy.maxBytes)}\n[output truncated: ${text.length - policy.maxBytes} chars omitted]`;
 }
 
 /**
@@ -80,7 +177,8 @@ export async function runProcess(file, args, { cwd, timeoutMs }) {
             ...(typeof timeoutMs === 'number' && Number.isFinite(timeoutMs) && timeoutMs > 0
                 ? { timeout: timeoutMs }
                 : {}),
-            maxBuffer: 1024 * 1024 * 1024,
+            // FIX P0-4: reduzido de 1 GiB para 10 MiB — evita OOM/DoS por input malicioso.
+            maxBuffer: 10 * 1024 * 1024,
             env: safeEnv(),
             killSignal: 'SIGTERM',
         });
@@ -112,12 +210,24 @@ export async function runProcess(file, args, { cwd, timeoutMs }) {
 export async function runPipeline(stages, { cwd, timeoutMs }) {
     const start = Date.now();
     return new Promise((resolve) => {
+        let finished = false;
+
+        /** @param {{ exitCode: number; stdout: string; stderr: string; durationMs: number }} result */
+        const finalize = (result) => {
+            if (finished) return;
+            finished = true;
+            resolve(result);
+        };
+
         /** @type {import('node:child_process').ChildProcess[]} */
         const procs = stages.map((s, i) =>
             spawn(s.file, s.args, {
                 cwd,
                 env: safeEnv(),
-                stdio: i === 0 ? ['pipe', 'pipe', 'pipe'] : ['pipe', 'pipe', 'pipe'],
+                // FIX P0-3: processos intermediários usam 'ignore' para stderr — evita deadlock por
+                // buffer cheio de pipe não consumido (kernel pipe buffer ~64KB). Último processo
+                // mantém 'pipe' para captura normal.
+                stdio: ['pipe', 'pipe', i === stages.length - 1 ? 'pipe' : 'ignore'],
             }),
         );
 
@@ -137,20 +247,38 @@ export async function runPipeline(stages, { cwd, timeoutMs }) {
         let stdout = '';
         let stderr = '';
         lastProc.stdout?.on('data', (d) => {
-            stdout += d;
+            stdout = appendCaptured(stdout, d, CAPTURE_MAX_BYTES);
         });
         lastProc.stderr?.on('data', (d) => {
-            stderr += d;
+            stderr = appendCaptured(stderr, d, CAPTURE_MAX_BYTES);
         });
+
+        for (const proc of procs) {
+            proc.on('error', (error) => {
+                finalize({
+                    exitCode: 1,
+                    stdout: truncateOutput(stdout),
+                    stderr: truncateOutput(`${stderr}\n${error.message}`.trim()),
+                    durationMs: Date.now() - start,
+                });
+            });
+        }
 
         const timer =
             typeof timeoutMs === 'number' && Number.isFinite(timeoutMs) && timeoutMs > 0
                 ? setTimeout(() => {
                       for (const p of procs) p.kill('SIGTERM');
-                      resolve({
+                      setTimeout(() => {
+                          for (const p of procs) {
+                              if (p.exitCode === null && !p.killed) {
+                                  p.kill('SIGKILL');
+                              }
+                          }
+                      }, 750).unref();
+                      finalize({
                           exitCode: 124,
                           stdout: truncateOutput(stdout),
-                          stderr: 'Timeout',
+                          stderr: truncateOutput(`${stderr}\nTimeout`.trim()),
                           durationMs: Date.now() - start,
                       });
                   }, timeoutMs)
@@ -158,7 +286,7 @@ export async function runPipeline(stages, { cwd, timeoutMs }) {
 
         lastProc.on('close', (code) => {
             if (timer) clearTimeout(timer);
-            resolve({
+            finalize({
                 exitCode: code ?? 1,
                 stdout: truncateOutput(stdout),
                 stderr: truncateOutput(stderr),

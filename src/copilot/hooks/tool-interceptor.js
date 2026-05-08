@@ -119,10 +119,12 @@ export function createArgSanitizerHook(rules = {}) {
             log('DEBUG', `[hooks/tool-interceptor] ${toolName} args: ${JSON.stringify(safeArgs)}`);
         }
 
+        // FIX HOOKS-001: Não retornar permissionDecision — deixar para hooks de permissão especializados.
+        // Retornar 'allow' aqui bloqueava deny hooks posteriores em composeHandlers().
         if (modified) {
-            return { permissionDecision: 'allow', modifiedArgs: args };
+            return { modifiedArgs: args };
         }
-        return { permissionDecision: 'allow' };
+        return {};
     };
 }
 
@@ -252,12 +254,13 @@ export function createTimingEnricherHook() {
  * GAP-TOOLS-004: Cria um hook `onPreToolUse` que bloqueia tools desabilitadas em runtime via `isToolDisabled()` do
  * introspection-tools.
  *
- * @param {(name: string) => boolean} isDisabledFn - Função que recebe o nome da tool e verifica se está desabilitado
+ * @param {(name: string, input?: PreToolUseHookInput, invocation?: InvocationContext) => boolean} isDisabledFn - Função
+ *   que recebe o nome da tool e verifica se está desabilitado
  * @returns {PreToolUseHandler}
  */
 export function createRuntimeDisableHook(isDisabledFn) {
-    return async function onPreToolUse(input) {
-        if (isDisabledFn(input.toolName)) {
+    return async function onPreToolUse(input, invocation) {
+        if (isDisabledFn(input.toolName, input, invocation)) {
             log('WARN', `[hooks/tool-interceptor] tool desabilitada em runtime: ${input.toolName}`);
             return { permissionDecision: 'deny' };
         }

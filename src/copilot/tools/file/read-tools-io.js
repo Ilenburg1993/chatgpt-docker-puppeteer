@@ -31,7 +31,7 @@ const readFileContentTool = buildTool({
     name: 'read_file_content',
     description:
         'Lê o conteúdo de um arquivo no workspace. Arquivos de texto são retornados como string. ' +
-        'Arquivos de texto são retornados como string. Arquivos binários retornam uma indicação de tipo.',
+        'Arquivos binários retornam conteúdo em base64 quando essa codificação é solicitada.',
     parameters: z.object({
         path: z.string().describe('Caminho do arquivo (relativo ao workspace ou absoluto dentro de /workspaces/)'),
         startLine: z

@@ -7,6 +7,7 @@
  *   os toggles impactam prompt/waiting/adapters do terminal.
  */
 
+import { TERMINAL_DISPLAY_PRESET } from '../config/env.js';
 import {
     getShowIntentActivity,
     getShowSessionActivity,
@@ -27,7 +28,7 @@ import {
  *
  * @typedef {Record<TerminalDisplayToggle, boolean>} TerminalDisplayState
  *
- * @typedef {'default' | 'minimal' | 'verbose' | 'debug' | 'focus'} TerminalDisplayPresetName
+ * @typedef {'default' | 'minimal' | 'verbose' | 'debug' | 'focus' | 'full'} TerminalDisplayPresetName
  *
  * @typedef {{
  *     key: TerminalDisplayToggle;
@@ -123,6 +124,19 @@ export const TERMINAL_DISPLAY_PRESETS = Object.freeze({
         name: 'debug',
         label: 'Debug',
         description: 'Mesmo volume do verbose, reservado para troubleshooting.',
+        state: Object.freeze({
+            thinking: true,
+            streaming: true,
+            usage: true,
+            tools: true,
+            intent: true,
+            session: true,
+        }),
+    },
+    full: {
+        name: 'full',
+        label: 'Full',
+        description: 'Capacidade máxima: resposta incremental, atividade, sessão e raciocínio capturado.',
         state: Object.freeze({
             thinking: true,
             streaming: true,
@@ -238,6 +252,29 @@ export function applyTerminalDisplayPreset(presetName) {
     const preset = readTerminalDisplayPreset(presetName);
     writeTerminalDisplayState(preset.state);
     return preset;
+}
+
+/**
+ * Resolve o preset visual inicial do terminal. Valor inválido cai para `full`, que é o padrão operacional da LLM-B.
+ *
+ * @param {string | undefined} [value]
+ * @returns {TerminalDisplayPresetName}
+ */
+export function resolveTerminalBootDisplayPreset(value = TERMINAL_DISPLAY_PRESET) {
+    const normalized = String(value || '')
+        .trim()
+        .toLowerCase();
+    return isTerminalDisplayPresetName(normalized) ? normalized : 'full';
+}
+
+/**
+ * Aplica o preset visual inicial do terminal.
+ *
+ * @param {string | undefined} [value]
+ * @returns {TerminalDisplayPresetDescriptor}
+ */
+export function applyTerminalBootDisplayPreset(value = TERMINAL_DISPLAY_PRESET) {
+    return applyTerminalDisplayPreset(resolveTerminalBootDisplayPreset(value));
 }
 
 /**

@@ -171,6 +171,15 @@ Documentos adicionados/atualizados nesta rodada:
   - `2026-05-06-ROADMAP-READ-WRITE-ULTRAFAST.md` — roadmap faseado (R0–R7) para convergência
     read/write robusta, segura e de alta performance.
 
+## Rodada viva 2026-05-07 — Custom agents SDK-first
+
+- `2026-05-07-ROADMAP-CUSTOM-AGENTS-SDK-FIRST.md` — revisão canônica do documento externo de custom
+  agents, com AS-IS corrigido, bugs reais encontrados, decisões SDK-first, implementação aplicada e
+  roadmap restante.
+- Resultado de código associado: profile `production` agora carrega `agent-full`, `terminal_light`
+  mantém maestro no terminal, contratos de agentes validam contra o registry real e o bootstrap de
+  tools passou a registrar capabilities de índice/escopo de filesystem.
+
 ## Próximos documentos previstos
 
 Os artefatos planejados para a auditoria ampla estão listados no documento 00, mas a espinha dorsal
