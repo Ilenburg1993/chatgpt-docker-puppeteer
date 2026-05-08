@@ -21,10 +21,10 @@
 
 import { readCopilotBootConfig } from '#copilot/boot';
 import { log } from '#copilot/observability';
-import { recordTerminalActivity } from './activity-state.js';
-import { loadAliasesAsync } from './alias-store.js';
-import { applyTerminalBootDisplayPreset } from './display-policy.js';
-import { startRepl } from './repl.js';
+import { startRepl } from './repl/repl.js';
+import { recordTerminalActivity } from './state/activity-state.js';
+import { applyTerminalBootDisplayPreset } from './state/display-policy.js';
+import { loadAliasesAsync } from './stores/alias-store.js';
 import { runTerminalHttpServerPhase } from './terminal-phases/boot-http.js';
 import { runTerminalConversationHubPhase } from './terminal-phases/boot-hub.js';
 import { runTerminalRuntimeListenersPhase } from './terminal-phases/boot-listeners.js';
@@ -77,13 +77,13 @@ export { startReflectionLoop, stopReflectionLoop } from './terminal-phases/boot-
  * @property {(() => void) | null} disposePinnedBridge
  * @property {((evt: { file: string; type: string }) => void) | null} pinnedFilesChangedHandler
  * @property {((
- *           current: import('./activity-state.js').TerminalActivitySnapshot,
- *           previous?: import('./activity-state.js').TerminalActivitySnapshot,
+ *           current: import('./state/activity-state.js').TerminalActivitySnapshot,
+ *           previous?: import('./state/activity-state.js').TerminalActivitySnapshot,
  *       ) => void)
  *     | null} activityChangedHandler
  * @property {((
- *           activity: import('./activity-state.js').TerminalActivitySnapshot,
- *           previous?: import('./activity-state.js').TerminalActivitySnapshot,
+ *           activity: import('./state/activity-state.js').TerminalActivitySnapshot,
+ *           previous?: import('./state/activity-state.js').TerminalActivitySnapshot,
  *       ) => void)
  *     | null} terminalActivityChangedHandler
  * @property {(() => void) | null} disposeIoActivityEvents

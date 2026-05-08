@@ -24,7 +24,7 @@ Copilot SDK session
       -> presentation/agent-runtime.js (accessor compartilhado do runtime)
         -> terminal/frontend/      (consumer layer / projections)
           -> terminal/dialog/      (prompt, waiting, render, SSE)
-            -> terminal/repl.js    (operador)
+            -> terminal/repl/repl.js    (operador)
 
 Em paralelo:
 
@@ -116,8 +116,8 @@ Em resumo:
   `presentation/agent-runtime.js`
 - se for consumo de runtime: `terminal/frontend/`
 - se for render/prompt/SSE: `terminal/dialog/`
-- se for reação visível a eventos do runtime: `terminal/repl-listeners.js` e
-  `terminal/sdk-session-events.js`
+- se for reação visível a eventos do runtime: `terminal/repl/repl-listeners.js` e
+  `terminal/events/sdk-session-events.js`
 
 ### “Quero saber por que um evento aparece no terminal”
 
@@ -126,7 +126,7 @@ sdk/generated/session-events.d.ts
   -> src/copilot/event-handlers/
     -> src/copilot/agent/session/wiring/event-wirer.js
       -> AlwaysAliveAgent EventEmitter
-        -> terminal/sdk-session-events.js ou terminal/repl-listeners.js
+        -> terminal/events/sdk-session-events.js ou terminal/repl/repl-listeners.js
 ```
 
 ## READMEs locais recomendados

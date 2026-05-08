@@ -3,7 +3,7 @@
  * @module copilot/terminal/repl
  * @file Composition root do REPL terminal LLM-B.
  *
- *   src/copilot/terminal/repl.js
+ *   src/copilot/terminal/repl/repl.js
  *
  *   Responsabilidades:
  *
@@ -22,8 +22,8 @@
 import { readCopilotBootConfig } from '#copilot/boot';
 import { toError } from '#copilot/core';
 import { log } from '#copilot/observability';
-import { recordTerminalActivity } from './activity-state.js';
-import { ensureDialogLoop, println } from './dialog/index.js';
+import { ensureDialogLoop, println } from '../dialog/index.js';
+import { recordTerminalActivity } from '../state/activity-state.js';
 import { runReplLifecycle } from './repl-lifecycle.js';
 export { setupAgentListeners } from './repl-listeners.js';
 

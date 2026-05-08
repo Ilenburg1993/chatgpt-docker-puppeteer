@@ -68,7 +68,7 @@ vi.mock('../../../src/copilot/presentation/runtime-ui-state-store.js', () => ({
     getShowSessionActivity: vi.fn(() => false),
     setShowSessionActivity: vi.fn(),
 }));
-vi.mock('../../../src/copilot/terminal/activity-state.js', () => ({
+vi.mock('../../../src/copilot/terminal/state/activity-state.js', () => ({
     markTerminalActivityIdle: vi.fn(),
     recordTerminalActivity: vi.fn(),
 }));

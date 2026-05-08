@@ -28,7 +28,7 @@ import {
     readTerminalTimelineProjection,
     saveTerminalSnapshotProjection,
 } from '../frontend/index.js';
-import { tryAnswerTerminalPendingQuestionInput } from '../pending-question-answer.js';
+import { tryAnswerTerminalPendingQuestionInput } from '../state/pending-question-answer.js';
 import { callWithRuntimeTarget, extractRuntimeTarget, withRuntimeTarget } from './runtime-target.js';
 
 /**
@@ -137,7 +137,9 @@ export function cmdStatus({ hubSessionId, injectPort, println }, arg = '') {
         projection.pendingUserInputs > 0
             ? `ask_user=${projection.pendingUserInputs}${projection.latestUserInputKind ? ` (${projection.latestUserInputKind})` : ''}`
             : null,
-        projection.pendingStructuredUserInputs > 0 ? `request_user_input=${projection.pendingStructuredUserInputs}` : null,
+        projection.pendingStructuredUserInputs > 0
+            ? `request_user_input=${projection.pendingStructuredUserInputs}`
+            : null,
     ].filter(Boolean);
     const sdkCapabilitiesUi =
         projection.sdkCapabilities && typeof projection.sdkCapabilities['ui'] === 'object'

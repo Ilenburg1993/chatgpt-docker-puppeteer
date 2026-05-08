@@ -23,7 +23,6 @@ import {
     setBusy,
 } from '../../presentation/runtime-ui-state-store.js';
 import { describeSdkRecoveryPolicy, getSdkRecoveryPolicy } from '../../presentation/sdk-recovery-policy.js';
-import { markTerminalActivityIdle, recordTerminalActivity } from '../activity-state.js';
 import {
     readTerminalDialogStreamMeta,
     readTerminalRuntimeControlState,
@@ -32,6 +31,7 @@ import {
 } from '../frontend/gateways/agent-runtime.js';
 import { runTerminalDialogTurn, startTerminalDialogMode } from '../frontend/gateways/dialog.js';
 import { normalizeTerminalModelBillingProjection } from '../frontend/projections/shared.js';
+import { markTerminalActivityIdle, recordTerminalActivity } from '../state/activity-state.js';
 import { drainPendingNotifications, getPersistenceFailureCount, persistTurnToHub } from './engine-persistence.js';
 import {
     BOOT_PROMPT,

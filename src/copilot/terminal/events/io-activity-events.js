@@ -10,11 +10,11 @@
 
 import { channel } from 'node:diagnostics_channel';
 import { relative } from 'node:path';
-import { getShowToolActivity } from '../presentation/runtime-ui-state-store.js';
-import { recordTerminalActivity } from './activity-state.js';
-import { broadcastSse, println } from './dialog/index.js';
-import { recordTerminalTurnFileActivity } from './turn-trace-state.js';
-import { terminalThemeBadge, terminalThemeText } from './ui-theme.js';
+import { getShowToolActivity } from '../../presentation/runtime-ui-state-store.js';
+import { broadcastSse, println } from '../dialog/index.js';
+import { recordTerminalActivity } from '../state/activity-state.js';
+import { recordTerminalTurnFileActivity } from '../state/turn-trace-state.js';
+import { terminalThemeBadge, terminalThemeText } from '../state/ui-theme.js';
 
 const ioOperationChannel = channel('copilot.io.operation');
 const MAX_RECENT_IO_OPERATIONS = 80;
@@ -23,7 +23,7 @@ const MAX_RECENT_IO_OPERATIONS = 80;
  * @typedef {{
  *     ts?: number;
  *     success?: boolean;
- *     io?: import('../core/io-contracts.js').IoMeta;
+ *     io?: import('../../core/io-contracts.js').IoMeta;
  *     error?: { name?: string; message?: string };
  * }} TerminalIoOperationMessage
  *
@@ -61,7 +61,7 @@ function normalizeIoMessage(value) {
 
 /**
  * @param {string} operation
- * @returns {import('./turn-trace-state.js').TerminalTurnTraceOperation}
+ * @returns {import('../state/turn-trace-state.js').TerminalTurnTraceOperation}
  */
 function mapIoOperationToTurnOperation(operation) {
     if (operation === 'read' || operation === 'fetch') return 'read';
@@ -74,7 +74,7 @@ function mapIoOperationToTurnOperation(operation) {
 }
 
 /**
- * @param {import('./turn-trace-state.js').TerminalTurnTraceOperation} operation
+ * @param {import('../state/turn-trace-state.js').TerminalTurnTraceOperation} operation
  * @returns {'fileRead' | 'fileWrite' | 'fileEdit' | 'fileDelete' | 'tool'}
  */
 function mapTurnOperationToRole(operation) {
@@ -118,7 +118,7 @@ function formatBytes(bytes) {
 }
 
 /**
- * @param {import('../core/io-contracts.js').IoMeta} io
+ * @param {import('../../core/io-contracts.js').IoMeta} io
  * @returns {string[]}
  */
 function extractTouchedTargets(io) {

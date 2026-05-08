@@ -2,7 +2,7 @@
 /**
  * tests/unit/copilot/test_terminal_agent_runtime_events.spec.js
  *
- * Contrato: terminal/agent-runtime-events.js
+ * Contrato: terminal/events/agent-runtime-events.js
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -34,7 +34,7 @@ vi.mock('../../../src/copilot/terminal/dialog/index.js', () => ({
     writeInlineStatus,
 }));
 
-vi.mock('../../../src/copilot/terminal/activity-state.js', () => ({
+vi.mock('../../../src/copilot/terminal/state/activity-state.js', () => ({
     recordTerminalActivity,
 }));
 
@@ -48,7 +48,7 @@ vi.mock('../../../src/copilot/terminal/frontend/gateways/agent-runtime.js', () =
     readTerminalRuntimeState,
 }));
 
-vi.mock('../../../src/copilot/terminal/turn-trace-state.js', () => ({
+vi.mock('../../../src/copilot/terminal/state/turn-trace-state.js', () => ({
     recordTerminalTurnToolActivity,
     completeTerminalTurnToolCall,
 }));
@@ -57,11 +57,11 @@ vi.mock('../../../src/copilot/observability/index.js', () => ({
     recordToolCall,
 }));
 
-vi.mock('../../../src/copilot/terminal/ui-preferences.js', () => ({
+vi.mock('../../../src/copilot/terminal/state/ui-preferences.js', () => ({
     getTerminalDetailLevel,
 }));
 
-describe('terminal/agent-runtime-events.js — contrato', () => {
+describe('terminal/events/agent-runtime-events.js — contrato', () => {
     beforeEach(() => {
         vi.clearAllMocks();
         vi.useRealTimers();
@@ -79,18 +79,18 @@ describe('terminal/agent-runtime-events.js — contrato', () => {
     });
 
     it('importa sem erros', async () => {
-        const mod = await import('../../../src/copilot/terminal/agent-runtime-events.js');
+        const mod = await import('../../../src/copilot/terminal/events/agent-runtime-events.js');
         expect(mod).toBeTruthy();
     });
 
     it('exporta setupTerminalAgentRuntimeEventListeners', async () => {
-        const mod = await import('../../../src/copilot/terminal/agent-runtime-events.js');
+        const mod = await import('../../../src/copilot/terminal/events/agent-runtime-events.js');
         expect(typeof mod.setupTerminalAgentRuntimeEventListeners).toBe('function');
     });
 
     it('apresenta tools de arquivo com alvo e operação durante streaming', async () => {
         const { setupTerminalAgentRuntimeEventListeners } =
-            await import('../../../src/copilot/terminal/agent-runtime-events.js');
+            await import('../../../src/copilot/terminal/events/agent-runtime-events.js');
         /** @type {Map<string, Function[]>} */
         const listeners = new Map();
         const rl = {
@@ -112,7 +112,7 @@ describe('terminal/agent-runtime-events.js — contrato', () => {
         listeners.get('tool.execution_start')?.[0]?.({
             toolCallId: 'tool-1',
             toolName: 'workspace.read_file',
-            args: { path: 'src/copilot/terminal/repl.js' },
+            args: { path: 'src/copilot/terminal/repl/repl.js' },
         });
         listeners.get('tool.execution_progress')?.[0]?.({
             toolCallId: 'tool-1',
@@ -123,12 +123,14 @@ describe('terminal/agent-runtime-events.js — contrato', () => {
             success: true,
         });
 
-        expect(println).toHaveBeenCalledWith(expect.stringContaining('lendo arquivo: src/copilot/terminal/repl.js'));
+        expect(println).toHaveBeenCalledWith(
+            expect.stringContaining('lendo arquivo: src/copilot/terminal/repl/repl.js'),
+        );
         expect(recordTerminalActivity).toHaveBeenCalledWith(
             'tool',
             'Executando tool',
             expect.objectContaining({
-                detail: 'lendo arquivo · src/copilot/terminal/repl.js',
+                detail: 'lendo arquivo · src/copilot/terminal/repl/repl.js',
                 toolName: 'workspace.read_file',
             }),
         );
@@ -136,7 +138,7 @@ describe('terminal/agent-runtime-events.js — contrato', () => {
             expect.objectContaining({
                 toolName: 'workspace.read_file',
                 operation: 'read',
-                path: 'src/copilot/terminal/repl.js',
+                path: 'src/copilot/terminal/repl/repl.js',
                 toolCallId: 'tool-1',
             }),
         );
@@ -147,14 +149,14 @@ describe('terminal/agent-runtime-events.js — contrato', () => {
             expect.objectContaining({
                 toolName: 'workspace.read_file',
                 operation: 'read',
-                path: 'src/copilot/terminal/repl.js',
+                path: 'src/copilot/terminal/repl/repl.js',
             }),
         );
         expect(broadcastSse).toHaveBeenCalledWith(
             'tool.complete',
             expect.objectContaining({
                 operation: 'read',
-                path: 'src/copilot/terminal/repl.js',
+                path: 'src/copilot/terminal/repl/repl.js',
                 success: true,
             }),
         );
@@ -163,7 +165,7 @@ describe('terminal/agent-runtime-events.js — contrato', () => {
     it('usa progresso inline e pergunta compacta quando detalhe terminal está em compact', async () => {
         getTerminalDetailLevel.mockReturnValue('compact');
         const { setupTerminalAgentRuntimeEventListeners } =
-            await import('../../../src/copilot/terminal/agent-runtime-events.js');
+            await import('../../../src/copilot/terminal/events/agent-runtime-events.js');
         /** @type {Map<string, Function[]>} */
         const listeners = new Map();
         const rl = {
@@ -205,7 +207,7 @@ describe('terminal/agent-runtime-events.js — contrato', () => {
 
     it('funciona em modo headless sem readline e ainda emite SSE de tools', async () => {
         const { setupTerminalAgentRuntimeEventListeners } =
-            await import('../../../src/copilot/terminal/agent-runtime-events.js');
+            await import('../../../src/copilot/terminal/events/agent-runtime-events.js');
         /** @type {Map<string, Function[]>} */
         const listeners = new Map();
         const agent = {
@@ -238,7 +240,7 @@ describe('terminal/agent-runtime-events.js — contrato', () => {
 
     it('suprime tool narration para ask_user protocolar', async () => {
         const { setupTerminalAgentRuntimeEventListeners } =
-            await import('../../../src/copilot/terminal/agent-runtime-events.js');
+            await import('../../../src/copilot/terminal/events/agent-runtime-events.js');
         /** @type {Map<string, Function[]>} */
         const listeners = new Map();
         const rl = {
@@ -281,7 +283,7 @@ describe('terminal/agent-runtime-events.js — contrato', () => {
         vi.useFakeTimers();
         vi.setSystemTime(new Date('2026-05-07T22:00:00.000-03:00'));
         const { setupTerminalAgentRuntimeEventListeners } =
-            await import('../../../src/copilot/terminal/agent-runtime-events.js');
+            await import('../../../src/copilot/terminal/events/agent-runtime-events.js');
         /** @type {Map<string, Function[]>} */
         const listeners = new Map();
         const agent = {
@@ -327,7 +329,7 @@ describe('terminal/agent-runtime-events.js — contrato', () => {
             }),
         );
         const { setupTerminalAgentRuntimeEventListeners } =
-            await import('../../../src/copilot/terminal/agent-runtime-events.js');
+            await import('../../../src/copilot/terminal/events/agent-runtime-events.js');
         /** @type {Map<string, Function[]>} */
         const listeners = new Map();
         const rl = {
@@ -372,7 +374,7 @@ describe('terminal/agent-runtime-events.js — contrato', () => {
             }),
         );
         const { setupTerminalAgentRuntimeEventListeners } =
-            await import('../../../src/copilot/terminal/agent-runtime-events.js');
+            await import('../../../src/copilot/terminal/events/agent-runtime-events.js');
         /** @type {Map<string, Function[]>} */
         const listeners = new Map();
         const rl = {
@@ -413,7 +415,7 @@ describe('terminal/agent-runtime-events.js — contrato', () => {
             }),
         );
         const { setupTerminalAgentRuntimeEventListeners } =
-            await import('../../../src/copilot/terminal/agent-runtime-events.js');
+            await import('../../../src/copilot/terminal/events/agent-runtime-events.js');
         const rl = {
             pause: vi.fn(),
             resume: vi.fn(),
@@ -447,7 +449,7 @@ describe('terminal/agent-runtime-events.js — contrato', () => {
             }),
         );
         const { setupTerminalAgentRuntimeEventListeners } =
-            await import('../../../src/copilot/terminal/agent-runtime-events.js');
+            await import('../../../src/copilot/terminal/events/agent-runtime-events.js');
         const rl = {
             pause: vi.fn(),
             resume: vi.fn(),

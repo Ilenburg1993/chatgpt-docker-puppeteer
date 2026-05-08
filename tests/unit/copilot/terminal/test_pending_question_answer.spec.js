@@ -14,7 +14,7 @@ const hookToolMocks = vi.hoisted(() => ({
 vi.mock('../../../../src/copilot/terminal/frontend/gateways/agent-runtime.js', () => runtimeMocks);
 vi.mock('../../../../src/copilot/tools/user-input-state.js', () => hookToolMocks);
 
-import { tryAnswerTerminalPendingQuestionInput } from '../../../../src/copilot/terminal/pending-question-answer.js';
+import { tryAnswerTerminalPendingQuestionInput } from '../../../../src/copilot/terminal/state/pending-question-answer.js';
 
 describe('terminal/pending-question-answer', () => {
     beforeEach(() => {

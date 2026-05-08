@@ -49,7 +49,7 @@ SDK SessionEvent
   `node_modules/@github/copilot-sdk/dist/generated/session-events.d.ts`.
 - Se a dúvida é **"qual é a forma estável usada internamente?"**, olhe esta pasta.
 - Se a dúvida é **"como isso aparece para o operador do terminal?"**, olhe
-  `terminal/sdk-session-events.js` e `terminal/repl-listeners.js`.
+  `terminal/events/sdk-session-events.js` e `terminal/repl/repl-listeners.js`.
 
 ## Critério de fronteira com `agent/` e `observability/`
 

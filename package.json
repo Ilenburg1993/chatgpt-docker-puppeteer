@@ -84,6 +84,8 @@
     "#copilot/config/*": "./src/copilot/config/*.js",
     "#copilot/boot": "./src/copilot/boot/index.js",
     "#copilot/boot/*": "./src/copilot/boot/*.js",
+    "#copilot/terminal/alias-store": "./src/copilot/terminal/stores/alias-store.js",
+    "#copilot/terminal/rate-limiter-state": "./src/copilot/terminal/state/rate-limiter-state.js",
     "#copilot/terminal/*": "./src/copilot/terminal/*.js",
     "#copilot/session-manager": "./src/copilot/agent/session-initializer.js",
     "#copilot/config/tools-state": "./src/copilot/sdk/tools-state.js",

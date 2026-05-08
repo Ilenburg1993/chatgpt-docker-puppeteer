@@ -4,8 +4,8 @@
  * @file Policy local para rotear input humano quando há pergunta pendente do runtime.
  */
 
-import { answerTerminalPendingQuestion, readTerminalRuntimeState } from './frontend/gateways/agent-runtime.js';
-import { hasPendingUserInputRequests } from '../tools/user-input-state.js';
+import { hasPendingUserInputRequests } from '../../tools/user-input-state.js';
+import { answerTerminalPendingQuestion, readTerminalRuntimeState } from '../frontend/gateways/agent-runtime.js';
 
 /**
  * @typedef {'answered' | 'answer_failed' | 'empty' | 'no_pending' | 'protocol_controlled' | 'invalid_choice'} TerminalPendingAnswerReason
@@ -17,7 +17,7 @@ import { hasPendingUserInputRequests } from '../tools/user-input-state.js';
  *     reason: TerminalPendingAnswerReason;
  *     runtimeId: string | null;
  *     answer: string;
- *     pendingQuestionKind: import('../presentation/types.js').RuntimePendingQuestionKind | null;
+ *     pendingQuestionKind: import('../../presentation/types.js').RuntimePendingQuestionKind | null;
  *     pendingQuestionText: string | null;
  *     protocolControlled: boolean;
  *     shadowExpired: boolean;
@@ -26,7 +26,7 @@ import { hasPendingUserInputRequests } from '../tools/user-input-state.js';
 
 /**
  * @param {string} answer
- * @param {import('../presentation/types.js').RuntimePendingQuestion} pending
+ * @param {import('../../presentation/types.js').RuntimePendingQuestion} pending
  * @returns {{ ok: true; answer: string } | { ok: false; reason: 'invalid_choice' }}
  */
 function normalizePendingQuestionAnswer(answer, pending) {

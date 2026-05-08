@@ -12,9 +12,9 @@ import { CONFIG_PINNED_FILES_CHANGED } from '#copilot/events';
 import { log } from '#copilot/observability';
 import { PinnedFilesLoader } from '../../config/pinned-files.js';
 import { container } from '../../core/di-container.js';
-import { recordTerminalActivity, terminalActivityEmitter } from '../activity-state.js';
 import { broadcastSse } from '../dialog/index.js';
-import { setupTerminalIoActivityEvents } from '../io-activity-events.js';
+import { setupTerminalIoActivityEvents } from '../events/io-activity-events.js';
+import { recordTerminalActivity, terminalActivityEmitter } from '../state/activity-state.js';
 
 /**
  * @param {import('../index.js').TerminalBootContext} ctx

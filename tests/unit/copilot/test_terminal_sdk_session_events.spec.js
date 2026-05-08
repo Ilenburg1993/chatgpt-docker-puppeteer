@@ -2,7 +2,7 @@
 /**
  * tests/unit/copilot/test_terminal_sdk_session_events.spec.js
  *
- * Contrato: terminal/sdk-session-events.js
+ * Contrato: terminal/events/sdk-session-events.js
  */
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -27,7 +27,7 @@ const mocks = vi.hoisted(() => ({
     recordTerminalUserInputCompleted: vi.fn(() => null),
 }));
 
-vi.mock('../../../src/copilot/terminal/activity-state.js', () => ({
+vi.mock('../../../src/copilot/terminal/state/activity-state.js', () => ({
     recordTerminalActivity: mocks.recordTerminalActivity,
 }));
 
@@ -42,19 +42,19 @@ vi.mock('../../../src/copilot/presentation/runtime-ui-state-store.js', () => ({
     getShowSessionActivity: mocks.getShowSessionActivity,
 }));
 
-vi.mock('../../../src/copilot/terminal/turn-trace-state.js', () => ({
+vi.mock('../../../src/copilot/terminal/state/turn-trace-state.js', () => ({
     beginTerminalTurnTrace: mocks.beginTerminalTurnTrace,
     completeTerminalTurnTrace: mocks.completeTerminalTurnTrace,
     recordTerminalTurnFileActivity: mocks.recordTerminalTurnFileActivity,
     recordTerminalTurnToolActivity: mocks.recordTerminalTurnToolActivity,
 }));
 
-vi.mock('../../../src/copilot/terminal/ui-preferences.js', () => ({
+vi.mock('../../../src/copilot/terminal/state/ui-preferences.js', () => ({
     getTerminalDetailLevel: mocks.getTerminalDetailLevel,
 }));
 
-vi.mock('../../../src/copilot/terminal/sdk-interactions.js', async () => {
-    const actual = await vi.importActual('../../../src/copilot/terminal/sdk-interactions.js');
+vi.mock('../../../src/copilot/terminal/state/sdk-interactions.js', async () => {
+    const actual = await vi.importActual('../../../src/copilot/terminal/state/sdk-interactions.js');
     return {
         ...actual,
         recordTerminalUserInputRequested: mocks.recordTerminalUserInputRequested,
@@ -87,7 +87,7 @@ function createAgentHost() {
     };
 }
 
-describe('terminal/sdk-session-events.js — contrato', () => {
+describe('terminal/events/sdk-session-events.js — contrato', () => {
     beforeEach(() => {
         vi.clearAllMocks();
         mocks.getShowSessionActivity.mockReturnValue(false);
@@ -96,18 +96,18 @@ describe('terminal/sdk-session-events.js — contrato', () => {
     });
 
     it('importa sem erros', async () => {
-        const mod = await import('../../../src/copilot/terminal/sdk-session-events.js');
+        const mod = await import('../../../src/copilot/terminal/events/sdk-session-events.js');
         expect(mod).toBeTruthy();
     });
 
     it('exporta setupTerminalSdkSessionEventListeners', async () => {
-        const mod = await import('../../../src/copilot/terminal/sdk-session-events.js');
+        const mod = await import('../../../src/copilot/terminal/events/sdk-session-events.js');
         expect(typeof mod.setupTerminalSdkSessionEventListeners).toBe('function');
     });
 
     it('reflete session.mode_changed no estado e no SSE vanilla', async () => {
         const { setupTerminalSdkSessionEventListeners } =
-            await import('../../../src/copilot/terminal/sdk-session-events.js');
+            await import('../../../src/copilot/terminal/events/sdk-session-events.js');
         const agent = createAgentHost();
         const refreshPromptIfIdle = vi.fn();
 
@@ -130,7 +130,7 @@ describe('terminal/sdk-session-events.js — contrato', () => {
 
     it('mantém session.model_changed silencioso por default e só narra em modo verbose', async () => {
         const { setupTerminalSdkSessionEventListeners } =
-            await import('../../../src/copilot/terminal/sdk-session-events.js');
+            await import('../../../src/copilot/terminal/events/sdk-session-events.js');
         const agent = createAgentHost();
 
         setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfIdle: vi.fn() });
@@ -152,7 +152,7 @@ describe('terminal/sdk-session-events.js — contrato', () => {
 
     it('surfa workspace_file_changed e assistant.turn_start/end para a UX local', async () => {
         const { setupTerminalSdkSessionEventListeners } =
-            await import('../../../src/copilot/terminal/sdk-session-events.js');
+            await import('../../../src/copilot/terminal/events/sdk-session-events.js');
         const agent = createAgentHost();
         mocks.completeTerminalTurnTrace.mockReturnValue({
             traceId: 'turn:turn-1',
@@ -223,7 +223,7 @@ describe('terminal/sdk-session-events.js — contrato', () => {
 
     it('surfa elicitation, permission e sidechannel SDK como narrativa operacional', async () => {
         const { setupTerminalSdkSessionEventListeners } =
-            await import('../../../src/copilot/terminal/sdk-session-events.js');
+            await import('../../../src/copilot/terminal/events/sdk-session-events.js');
         const agent = createAgentHost();
         const refreshPromptIfIdle = vi.fn();
 
@@ -337,7 +337,7 @@ describe('terminal/sdk-session-events.js — contrato', () => {
 
     it('suprime READY/REPLY protocolar de ask_user da narrativa terminal', async () => {
         const { setupTerminalSdkSessionEventListeners } =
-            await import('../../../src/copilot/terminal/sdk-session-events.js');
+            await import('../../../src/copilot/terminal/events/sdk-session-events.js');
         const agent = createAgentHost();
         const refreshPromptIfIdle = vi.fn();
 
@@ -363,7 +363,7 @@ describe('terminal/sdk-session-events.js — contrato', () => {
 
     it('surfa loaded/background SDK events para atividade e SSE', async () => {
         const { setupTerminalSdkSessionEventListeners } =
-            await import('../../../src/copilot/terminal/sdk-session-events.js');
+            await import('../../../src/copilot/terminal/events/sdk-session-events.js');
         const agent = createAgentHost();
 
         setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfIdle: vi.fn() });
@@ -404,7 +404,7 @@ describe('terminal/sdk-session-events.js — contrato', () => {
     it('mostra narrativa verbose de sessão quando o toggle session está ativo', async () => {
         mocks.getShowSessionActivity.mockReturnValue(true);
         const { setupTerminalSdkSessionEventListeners } =
-            await import('../../../src/copilot/terminal/sdk-session-events.js');
+            await import('../../../src/copilot/terminal/events/sdk-session-events.js');
         const agent = createAgentHost();
 
         setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfIdle: vi.fn() });
@@ -417,7 +417,7 @@ describe('terminal/sdk-session-events.js — contrato', () => {
 
     it('cleanup remove listeners vanilla registrados', async () => {
         const { setupTerminalSdkSessionEventListeners } =
-            await import('../../../src/copilot/terminal/sdk-session-events.js');
+            await import('../../../src/copilot/terminal/events/sdk-session-events.js');
         const agent = createAgentHost();
         const dispose = setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfIdle: vi.fn() });
 

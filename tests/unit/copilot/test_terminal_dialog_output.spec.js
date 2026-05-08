@@ -28,7 +28,7 @@ vi.mock('../../../src/copilot/presentation/runtime-ui-state-store.js', () => ({
     getShowSessionActivity: vi.fn(() => false),
     setShowSessionActivity: vi.fn(),
 }));
-vi.mock('../../../src/copilot/terminal/activity-state.js', () => ({
+vi.mock('../../../src/copilot/terminal/state/activity-state.js', () => ({
     readTerminalActivitySnapshot: vi.fn(() => ({ phase: 'boot', label: 'initial' })),
 }));
 vi.mock('../../../src/copilot/terminal/frontend/gateways/agent-runtime.js', () => ({

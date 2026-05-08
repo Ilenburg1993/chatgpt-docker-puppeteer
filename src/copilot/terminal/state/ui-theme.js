@@ -1,6 +1,6 @@
 // @ts-check
 /**
- * src/copilot/terminal/ui-theme.js
+ * src/copilot/terminal/state/ui-theme.js
  *
  * Sistema de tema visual do terminal (ANSI) com foco em UX elegante e sóbria.
  *

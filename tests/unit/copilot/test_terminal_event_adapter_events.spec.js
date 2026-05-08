@@ -15,7 +15,7 @@ describe('terminal/event-adapter-events.js — contrato', () => {
             createTerminalHandledAgentEventsSet,
             createTerminalPassthroughAgentEventsSet,
             listTerminalIgnoredAgentEvents,
-        } = await import('../../../src/copilot/terminal/event-adapter-events.js');
+        } = await import('../../../src/copilot/terminal/events/event-adapter-events.js');
 
         const handled = createTerminalHandledAgentEventsSet();
         const passthrough = createTerminalPassthroughAgentEventsSet();

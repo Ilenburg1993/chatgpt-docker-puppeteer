@@ -1,6 +1,6 @@
 // @ts-check
 /**
- * src/copilot/terminal/task-stream-events.js
+ * src/copilot/terminal/events/task-stream-events.js
  *
  * Tradução do streaming de tarefas internas do runtime (`task.*`) para stdout/SSE local do terminal.
  *
@@ -17,9 +17,9 @@ import {
     appendThinkingHistoryChunk,
     finalizeThinkingHistoryEntry,
     getShowThinking,
-} from '../presentation/runtime-ui-state-store.js';
-import { recordTerminalActivity } from './activity-state.js';
-import { println } from './dialog/index.js';
+} from '../../presentation/runtime-ui-state-store.js';
+import { println } from '../dialog/index.js';
+import { recordTerminalActivity } from '../state/activity-state.js';
 
 /**
  * @typedef {{

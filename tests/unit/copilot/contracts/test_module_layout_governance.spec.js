@@ -346,21 +346,33 @@ describe('W113 — module layout governance: agent/lifecycle', () => {
 describe('W114 — module layout governance: terminal root', () => {
     it('declara todos os arquivos JS da raiz no module-map', () => {
         const expected = listTopLevelJsFiles(TERMINAL_ROOT);
-        const declared = TERMINAL_MODULE_LAYOUT.filter((entry) => entry.kind === 'file')
+        const declaredRoot = TERMINAL_MODULE_LAYOUT.filter((entry) => entry.kind === 'file')
+            .map((entry) => entry.path)
+            .filter((path) => !path.includes('/'))
+            .sort();
+        const missingDeclared = TERMINAL_MODULE_LAYOUT.filter((entry) => entry.kind === 'file')
+            .filter((entry) => !existsSync(join(TERMINAL_ROOT, entry.path)))
             .map((entry) => entry.path)
             .sort();
 
-        assert.deepEqual(declared, expected, 'terminal/module-map.js deve cobrir todos os JS da raiz');
+        assert.deepEqual(declaredRoot, expected, 'terminal/module-map.js deve cobrir todos os JS da raiz');
+        assert.deepEqual(missingDeclared, [], `Arquivos declarados e ausentes: ${missingDeclared.join(', ')}`);
     });
 
     it('declara os subdiretorios arquiteturais da raiz', () => {
         const expected = [
             'commands/',
             'dialog/',
+            'events/',
             'frontend/',
             'frontend/gateways/',
             'frontend/projections/',
             'handlers/',
+            'repl/',
+            'state/',
+            'stores/',
+            'terminal-phases/',
+            'wiring/',
         ];
         const declared = TERMINAL_MODULE_LAYOUT.filter((entry) => entry.kind === 'directory')
             .map((entry) => entry.path)
@@ -377,9 +389,9 @@ describe('W114 — module layout governance: terminal root', () => {
     it('mantem entrypoint, orquestrador, REPL e adapters navegaveis', () => {
         assert.equal(getTerminalModuleRole('bootstrap.js'), 'entrypoint');
         assert.equal(getTerminalModuleRole('index.js'), 'orchestrator');
-        assert.equal(getTerminalModuleRole('repl.js'), 'repl');
-        assert.equal(getTerminalModuleRole('agent-runtime-events.js'), 'event-adapter');
-        assert.equal(getTerminalModuleRole('terminal-agent-wiring.js'), 'wiring');
+        assert.equal(getTerminalModuleRole('repl/repl.js'), 'repl');
+        assert.equal(getTerminalModuleRole('events/agent-runtime-events.js'), 'event-adapter');
+        assert.equal(getTerminalModuleRole('wiring/terminal-agent-wiring.js'), 'wiring');
     });
 
     it('README local documenta os papeis arquiteturais declarados', () => {
@@ -433,19 +445,31 @@ describe('W114 — module layout governance: terminal root', () => {
 
         assert.equal(scorecard.total, TERMINAL_MODULE_LAYOUT.length);
         assert.equal(scorecard.byRisk['hotspot'], listTerminalModulesByRisk('hotspot').length);
-        assert.deepEqual(scorecard.watch, ['alias-store.js', 'display-policy.js', 'io-activity-events.js']);
+        assert.deepEqual(scorecard.watch, [
+            'events/io-activity-events.js',
+            'repl/repl-lifecycle.js',
+            'state/activity-state.js',
+            'stores/',
+            'stores/alias-store.js',
+            'terminal-phases/',
+        ]);
         assert.deepEqual(scorecard.hotspots, [
-            'agent-runtime-events.js',
             'commands/',
             'dialog/',
+            'events/',
+            'events/agent-runtime-events.js',
+            'events/sdk-session-events.js',
             'frontend/',
             'index.js',
-            'repl-command-router.js',
-            'repl.js',
-            'sdk-interactions.js',
-            'sdk-session-events.js',
-            'terminal-agent-wiring.js',
-            'turn-trace-state.js',
+            'repl/',
+            'repl/repl-command-router.js',
+            'repl/repl.js',
+            'state/',
+            'state/display-policy.js',
+            'state/sdk-interactions.js',
+            'state/turn-trace-state.js',
+            'wiring/',
+            'wiring/terminal-agent-wiring.js',
         ]);
     });
 });

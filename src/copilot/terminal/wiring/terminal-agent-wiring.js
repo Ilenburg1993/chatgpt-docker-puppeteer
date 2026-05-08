@@ -1,6 +1,6 @@
 // @ts-check
 /**
- * src/copilot/terminal/terminal-agent-wiring.js
+ * src/copilot/terminal/wiring/terminal-agent-wiring.js
  *
  * Wiring de eventos do AlwaysAliveAgent → terminal server (SSE broadcast, watchdog, streaming). Extração de
  * `registerAgentEventListeners` do `index.js` para separação de responsabilidades.
@@ -21,26 +21,26 @@ import {
     EMITTER_SESSION_USAGE,
 } from '#copilot/events';
 import { log } from '#copilot/observability';
-import { logSwallowed } from '../core/error-handlers.js';
-import { getHubSessionId } from '../presentation/runtime-ui-state-store.js';
-import { markTerminalActivityIdle, recordTerminalActivity } from './activity-state.js';
-import { registerTerminalAgentSsePassthrough } from './agent-sse-passthrough.js';
-import { broadcastSse, ensureDialogLoop, println } from './dialog/index.js';
+import { logSwallowed } from '../../core/error-handlers.js';
+import { getHubSessionId } from '../../presentation/runtime-ui-state-store.js';
+import { broadcastSse, ensureDialogLoop, println } from '../dialog/index.js';
+import { registerTerminalAgentSsePassthrough } from '../events/agent-sse-passthrough.js';
 import {
     createTerminalHandledAgentEventsSet,
     createTerminalPassthroughAgentEventsSet,
-} from './event-adapter-events.js';
-import { setupTerminalHeadlessEventAdapters } from './event-adapters.js';
+} from '../events/event-adapter-events.js';
+import { setupTerminalHeadlessEventAdapters } from '../events/event-adapters.js';
+import { setupTerminalTaskStreamListeners } from '../events/task-stream-events.js';
 import {
     abortTerminalCurrentMessage,
     pingTerminalDialogWatchdog,
     readTerminalAgentRuntimeEventHost,
     readTerminalDialogStreamMeta,
     readTerminalRuntimeState,
-} from './frontend/gateways/agent-runtime.js';
-import { stopTerminalDialogMode } from './frontend/gateways/dialog.js';
-import { writeTerminalHubSystemTurn } from './frontend/gateways/hub.js';
-import { setupTerminalTaskStreamListeners } from './task-stream-events.js';
+} from '../frontend/gateways/agent-runtime.js';
+import { stopTerminalDialogMode } from '../frontend/gateways/dialog.js';
+import { writeTerminalHubSystemTurn } from '../frontend/gateways/hub.js';
+import { markTerminalActivityIdle, recordTerminalActivity } from '../state/activity-state.js';
 
 /** @type {boolean} */
 let _agentListenersRegistered = false;

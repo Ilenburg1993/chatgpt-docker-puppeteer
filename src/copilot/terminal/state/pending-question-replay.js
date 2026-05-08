@@ -4,7 +4,7 @@
  * @file Policy local para replay/dedupe de perguntas pendentes no terminal.
  */
 
-import { DialogProtocol } from '../dialog/protocol.js';
+import { DialogProtocol } from '../../dialog/protocol.js';
 
 /**
  * @typedef {'event' | 'replay'} TerminalPendingQuestionSource

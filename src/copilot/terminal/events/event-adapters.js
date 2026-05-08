@@ -8,10 +8,10 @@
  * @module copilot/terminal/event-adapters
  */
 
-import { getBusy } from '../presentation/runtime-ui-state-store.js';
+import { getBusy } from '../../presentation/runtime-ui-state-store.js';
+import { buildUserPrompt } from '../dialog/index.js';
+import { readTerminalAgentRuntimeEventHost } from '../frontend/gateways/agent-runtime.js';
 import { setupTerminalAgentRuntimeEventListeners } from './agent-runtime-events.js';
-import { buildUserPrompt } from './dialog/index.js';
-import { readTerminalAgentRuntimeEventHost } from './frontend/gateways/agent-runtime.js';
 import { setupTerminalSdkSessionEventListeners } from './sdk-session-events.js';
 
 /**

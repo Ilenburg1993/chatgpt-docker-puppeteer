@@ -15,12 +15,12 @@ import {
 } from '../../../presentation/runtime-ui-state-store.js';
 import { readIntrospectionRegistrySnapshot } from '../../../tools/introspection-tools.js';
 import { getPendingUserInputCount } from '../../../tools/user-input-state.js';
-import { readTerminalActivitySnapshot } from '../../activity-state.js';
+import { readTerminalActivitySnapshot } from '../../state/activity-state.js';
 import {
     readTerminalElicitationSummary,
     readTerminalPermissionSummary,
     readTerminalUserInputSummary,
-} from '../../sdk-interactions.js';
+} from '../../state/sdk-interactions.js';
 import { getTerminalSdkSessionCapabilities } from '../gateways/sdk-session.js';
 import {
     formatTerminalRuntimeTopology,
@@ -77,7 +77,7 @@ function objectOrNull(value) {
  *     workspace: ReturnType<typeof getWorkspaceContext>;
  *     turnCount: number;
  *     bridgeTurnCount: number;
- *     activity: import('../../activity-state.js').TerminalActivitySnapshot;
+ *     activity: import('../../state/activity-state.js').TerminalActivitySnapshot;
  *     lifecycle: ReturnType<typeof readRuntimeLifecycleSnapshot>;
  *     lifecycleSummary: ReturnType<typeof buildRuntimeLifecycleSummary>;
  *     pendingElicitations: number;

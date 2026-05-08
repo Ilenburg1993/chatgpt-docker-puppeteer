@@ -40,7 +40,7 @@ vi.mock('../../../../src/copilot/terminal/frontend/gateways/agent-runtime.js', (
     readTerminalRuntimeState: runtimeGatewayMocks.readTerminalRuntimeState,
 }));
 
-vi.mock('../../../../src/copilot/terminal/sdk-interactions.js', () => ({
+vi.mock('../../../../src/copilot/terminal/state/sdk-interactions.js', () => ({
     readTerminalElicitationSummary: sdkInteractionMocks.readTerminalElicitationSummary,
     readTerminalPermissionSummary: sdkInteractionMocks.readTerminalPermissionSummary,
     readTerminalUserInputSummary: sdkInteractionMocks.readTerminalUserInputSummary,

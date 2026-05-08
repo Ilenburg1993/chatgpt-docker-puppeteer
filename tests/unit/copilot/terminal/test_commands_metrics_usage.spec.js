@@ -163,7 +163,7 @@ vi.mock('#copilot/observability', () => ({
     defaultErrorTracker: { getStats: () => ({ total: 2, buffered: 1 }) },
 }));
 
-vi.mock('../../../../src/copilot/terminal/activity-state.js', () => ({
+vi.mock('../../../../src/copilot/terminal/state/activity-state.js', () => ({
     readTerminalActivitySnapshot: () => ({
         phase: 'turn',
         label: 'Processando mensagem',

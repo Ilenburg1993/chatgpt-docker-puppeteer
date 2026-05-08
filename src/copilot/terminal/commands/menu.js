@@ -8,14 +8,14 @@
  * @module copilot/terminal/commands/menu
  */
 
-import { readTerminalRuntimeControlState, readTerminalRuntimeState } from '../frontend/gateways/agent-runtime.js';
 import { getPendingUserInputCount } from '../../tools/user-input-state.js';
+import { readTerminalRuntimeControlState, readTerminalRuntimeState } from '../frontend/gateways/agent-runtime.js';
 import {
     readTerminalElicitationSummary,
     readTerminalPermissionSummary,
     readTerminalUserInputSummary,
-} from '../sdk-interactions.js';
-import { terminalActionChip, terminalThemeBadge, terminalThemeText } from '../ui-theme.js';
+} from '../state/sdk-interactions.js';
+import { terminalActionChip, terminalThemeBadge, terminalThemeText } from '../state/ui-theme.js';
 
 /**
  * @typedef {{

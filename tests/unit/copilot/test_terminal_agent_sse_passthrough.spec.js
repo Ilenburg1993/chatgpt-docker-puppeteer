@@ -15,18 +15,18 @@ vi.mock('../../../src/copilot/terminal/dialog/index.js', () => ({
 
 describe('terminal/agent-sse-passthrough.js — contrato', () => {
     it('importa sem erros', async () => {
-        const mod = await import('../../../src/copilot/terminal/agent-sse-passthrough.js');
+        const mod = await import('../../../src/copilot/terminal/events/agent-sse-passthrough.js');
         expect(mod).toBeTruthy();
     });
 
     it('exporta registerTerminalAgentSsePassthrough', async () => {
-        const mod = await import('../../../src/copilot/terminal/agent-sse-passthrough.js');
+        const mod = await import('../../../src/copilot/terminal/events/agent-sse-passthrough.js');
         expect(typeof mod.registerTerminalAgentSsePassthrough).toBe('function');
     });
 
     it('só retransmite eventos explicitamente permitidos para passthrough', async () => {
         const { registerTerminalAgentSsePassthrough } =
-            await import('../../../src/copilot/terminal/agent-sse-passthrough.js');
+            await import('../../../src/copilot/terminal/events/agent-sse-passthrough.js');
 
         /** @type {Map<string, Function[]>} */
         const listeners = new Map();

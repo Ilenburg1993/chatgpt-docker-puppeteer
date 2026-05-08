@@ -188,7 +188,7 @@ vi.mock('../../../../src/copilot/tools/todo/store.js', async (importOriginal) =>
     }),
 }));
 
-vi.mock('../../../../src/copilot/terminal/activity-state.js', () => ({
+vi.mock('../../../../src/copilot/terminal/state/activity-state.js', () => ({
     readTerminalActivitySnapshot: () => ({
         phase: 'tool',
         label: 'Executando tool',

@@ -6,7 +6,7 @@
  *   Gerencia a criação do readline, tab completion, eventos `line`/`close`/`SIGINT` e o loop de input principal. Extrai a
  *   responsabilidade de lifecycle do composition root (repl.js).
  *
- *   src/copilot/terminal/repl-lifecycle.js
+ *   src/copilot/terminal/repl/repl-lifecycle.js
  * @see module:copilot/terminal/repl
  * @see module:copilot/terminal/repl-command-router
  */
@@ -14,21 +14,21 @@
 import { toError } from '#copilot/core';
 import { log } from '#copilot/observability';
 import readline from 'node:readline';
-import { extractAtReferences } from '../presentation/runtime-file-context.js';
-import { addAttachment, setRl } from '../presentation/runtime-ui-state-store.js';
-import { buildTerminalOperationalGuidance } from './auto-briefing.js';
-import { buildUserPrompt, println, resetStatusRowState, sendTurn } from './dialog/index.js';
-import { readTerminalDisplayState, resolveTerminalBootDisplayPreset } from './display-policy.js';
-import { readTerminalStatusProjection } from './frontend/index.js';
+import { extractAtReferences } from '../../presentation/runtime-file-context.js';
+import { addAttachment, setRl } from '../../presentation/runtime-ui-state-store.js';
+import { buildTerminalOperationalGuidance } from '../auto-briefing.js';
+import { buildUserPrompt, println, resetStatusRowState, sendTurn } from '../dialog/index.js';
+import { readTerminalStatusProjection } from '../frontend/index.js';
+import { readTerminalDisplayState, resolveTerminalBootDisplayPreset } from '../state/display-policy.js';
+import { tryAnswerTerminalPendingQuestionInput } from '../state/pending-question-answer.js';
 import { setupTerminalLiveStatusLine } from './live-status-line.js';
-import { tryAnswerTerminalPendingQuestionInput } from './pending-question-answer.js';
 import { buildTerminalReplBanner } from './repl-banner.js';
 import { parseTerminalReplCommand } from './repl-command-parser.js';
 import { CMD_ROUTES, dispatchCmd, isReadlineOpen } from './repl-command-router.js';
 import { setupAgentListeners } from './repl-listeners.js';
 import { createTerminalMultilineInputState } from './repl-multiline.js';
 
-import { resolve } from './alias-store.js';
+import { resolve } from '../stores/alias-store.js';
 
 /**
  * Executa o lifecycle completo do REPL readline para o terminal permanente.

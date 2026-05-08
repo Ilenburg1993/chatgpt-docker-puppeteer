@@ -12,9 +12,9 @@ import { log } from '#copilot/observability';
 import { readFile, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { logSwallowed } from '../core/error-handlers.js';
-import { safeJsonParse } from '../core/safe-json.js';
-import { AliasConfigSchema } from '../core/schemas.js';
+import { logSwallowed } from '../../core/error-handlers.js';
+import { safeJsonParse } from '../../core/safe-json.js';
+import { AliasConfigSchema } from '../../core/schemas.js';
 
 /** Aliases built-in (não podem ser removidos, apenas sobrescritos). @type {Record<string, string>} */
 const BUILTIN_ALIASES = /** @type {Record<string, string>} */ ({

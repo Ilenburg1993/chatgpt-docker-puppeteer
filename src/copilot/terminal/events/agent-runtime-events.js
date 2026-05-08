@@ -1,6 +1,6 @@
 // @ts-check
 /**
- * src/copilot/terminal/agent-runtime-events.js
+ * src/copilot/terminal/events/agent-runtime-events.js
  *
  * Tradução dos sinais já normalizados do runtime/agent para a UX local do terminal.
  *
@@ -30,16 +30,16 @@ import {
     getShowIntentActivity,
     getShowStreaming,
     getShowToolActivity,
-} from '../presentation/runtime-ui-state-store.js';
-import { recordTerminalActivity } from './activity-state.js';
-import { broadcastSse, buildUserPrompt, clearInlineStatus, println, writeInlineStatus } from './dialog/index.js';
-import { readTerminalRuntimeState } from './frontend/gateways/agent-runtime.js';
-import { createTerminalPendingQuestionReplayState } from './pending-question-replay.js';
+} from '../../presentation/runtime-ui-state-store.js';
+import { broadcastSse, buildUserPrompt, clearInlineStatus, println, writeInlineStatus } from '../dialog/index.js';
+import { readTerminalRuntimeState } from '../frontend/gateways/agent-runtime.js';
+import { recordTerminalActivity } from '../state/activity-state.js';
+import { createTerminalPendingQuestionReplayState } from '../state/pending-question-replay.js';
+import { completeTerminalTurnToolCall, recordTerminalTurnToolActivity } from '../state/turn-trace-state.js';
+import { getTerminalDetailLevel } from '../state/ui-preferences.js';
+import { terminalActionChip, terminalThemeBadge, terminalThemeText } from '../state/ui-theme.js';
 import { isExternalToolInFlight } from './sdk-session-events.js';
 import { buildTerminalToolActivityPresentation, compactTerminalToolText } from './tool-activity-presenter.js';
-import { completeTerminalTurnToolCall, recordTerminalTurnToolActivity } from './turn-trace-state.js';
-import { getTerminalDetailLevel } from './ui-preferences.js';
-import { terminalActionChip, terminalThemeBadge, terminalThemeText } from './ui-theme.js';
 
 /**
  * @typedef {{

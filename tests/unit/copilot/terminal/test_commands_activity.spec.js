@@ -46,8 +46,8 @@ vi.mock('../../../../src/copilot/terminal/frontend/index.js', () => ({
                     {
                         toolName: 'workspace.read_file',
                         operation: 'read',
-                        path: 'src/copilot/terminal/repl.js',
-                        target: 'src/copilot/terminal/repl.js',
+                        path: 'src/copilot/terminal/repl/repl.js',
+                        target: 'src/copilot/terminal/repl/repl.js',
                         source: 'sdk',
                         status: 'completed',
                         success: true,
@@ -57,7 +57,7 @@ vi.mock('../../../../src/copilot/terminal/frontend/index.js', () => ({
                 ],
                 files: [
                     {
-                        path: 'src/copilot/terminal/repl.js',
+                        path: 'src/copilot/terminal/repl/repl.js',
                         operation: 'read',
                         source: 'sdk',
                         count: 2,
@@ -104,14 +104,14 @@ vi.mock('../../../../src/copilot/terminal/frontend/index.js', () => ({
     })),
 }));
 
-vi.mock('../../../../src/copilot/terminal/io-activity-events.js', () => ({
+vi.mock('../../../../src/copilot/terminal/events/io-activity-events.js', () => ({
     readTerminalIoActivityProjection: vi.fn(() => [
         {
             timestamp: 2,
             success: true,
             operation: 'read',
-            target: 'src/copilot/terminal/repl.js',
-            targets: ['src/copilot/terminal/repl.js'],
+            target: 'src/copilot/terminal/repl/repl.js',
+            targets: ['src/copilot/terminal/repl/repl.js'],
             engine: 'io-engine.fs.readFile.text',
             targetKind: 'file',
             durationMs: 7,

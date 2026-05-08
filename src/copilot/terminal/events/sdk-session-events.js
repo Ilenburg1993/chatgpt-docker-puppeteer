@@ -1,6 +1,6 @@
 // @ts-check
 /**
- * src/copilot/terminal/sdk-session-events.js
+ * src/copilot/terminal/events/sdk-session-events.js
  *
  * Tradução dos sinais vanilla da sessão SDK para UX local do terminal.
  *
@@ -35,15 +35,15 @@ import {
     EMITTER_SESSION_WARNING,
     EMITTER_SESSION_WORKSPACE_FILE_CHANGED,
 } from '#copilot/events';
-import { DialogProtocol } from '../dialog/protocol.js';
+import { DialogProtocol } from '../../dialog/protocol.js';
 import {
     getShowSessionActivity,
     setLastSdkPlanOperation,
     setSdkSessionMode,
-} from '../presentation/runtime-ui-state-store.js';
-import { classifyPermissionDecision } from '../sdk/session/permission-events.js';
-import { recordTerminalActivity } from './activity-state.js';
-import { broadcastSse, println } from './dialog/index.js';
+} from '../../presentation/runtime-ui-state-store.js';
+import { classifyPermissionDecision } from '../../sdk/session/permission-events.js';
+import { broadcastSse, println } from '../dialog/index.js';
+import { recordTerminalActivity } from '../state/activity-state.js';
 import {
     recordTerminalElicitationCompleted,
     recordTerminalElicitationPending,
@@ -52,15 +52,15 @@ import {
     recordTerminalPermissionRequested,
     recordTerminalUserInputCompleted,
     recordTerminalUserInputRequested,
-} from './sdk-interactions.js';
+} from '../state/sdk-interactions.js';
 import {
     beginTerminalTurnTrace,
     completeTerminalTurnTrace,
     recordTerminalTurnFileActivity,
     recordTerminalTurnToolActivity,
-} from './turn-trace-state.js';
-import { getTerminalDetailLevel } from './ui-preferences.js';
-import { terminalThemeBadge, terminalThemeText } from './ui-theme.js';
+} from '../state/turn-trace-state.js';
+import { getTerminalDetailLevel } from '../state/ui-preferences.js';
+import { terminalThemeBadge, terminalThemeText } from '../state/ui-theme.js';
 
 /**
  * @typedef {{
@@ -96,7 +96,7 @@ function compactSummaryText(value, max = 36) {
 }
 
 /**
- * @param {import('./turn-trace-state.js').TerminalTurnTraceSnapshot | null} trace
+ * @param {import('../state/turn-trace-state.js').TerminalTurnTraceSnapshot | null} trace
  * @returns {void}
  */
 function renderTurnTraceSummary(trace) {

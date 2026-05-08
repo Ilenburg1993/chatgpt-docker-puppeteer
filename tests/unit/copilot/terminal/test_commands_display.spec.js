@@ -38,9 +38,12 @@ import {
     listTerminalDisplayPresets,
     readTerminalPromptDisplayPolicy,
     resolveTerminalBootDisplayPreset,
-} from '../../../../src/copilot/terminal/display-policy.js';
-import { getTerminalDetailLevel, setTerminalDetailLevel } from '../../../../src/copilot/terminal/ui-preferences.js';
-import { getTerminalThemeName, setTerminalThemeName } from '../../../../src/copilot/terminal/ui-theme.js';
+} from '../../../../src/copilot/terminal/state/display-policy.js';
+import {
+    getTerminalDetailLevel,
+    setTerminalDetailLevel,
+} from '../../../../src/copilot/terminal/state/ui-preferences.js';
+import { getTerminalThemeName, setTerminalThemeName } from '../../../../src/copilot/terminal/state/ui-theme.js';
 
 function ctx() {
     const lines = /** @type {string[]} */ ([]);

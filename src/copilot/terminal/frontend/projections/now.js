@@ -17,9 +17,9 @@ import {
 } from '../../../presentation/runtime-ui-state-store.js';
 import { readToolStatsProjection } from '../../../presentation/system-metrics.js';
 import { readIntrospectionRegistrySnapshot } from '../../../tools/introspection-tools.js';
-import { readTerminalActivityHistory, readTerminalActivitySnapshot } from '../../activity-state.js';
-import { readTerminalDisplayState } from '../../display-policy.js';
-import { readTerminalTurnTraceProjection } from '../../turn-trace-state.js';
+import { readTerminalActivityHistory, readTerminalActivitySnapshot } from '../../state/activity-state.js';
+import { readTerminalDisplayState } from '../../state/display-policy.js';
+import { readTerminalTurnTraceProjection } from '../../state/turn-trace-state.js';
 import {
     answerTerminalPendingQuestion,
     clearTerminalPendingQuestionShadow,
@@ -51,8 +51,8 @@ import { readTerminalTimelineProjection } from './timeline.js';
 /**
  * @param {number} [limit=10] Default is `10`
  * @returns {{
- *     current: import('../../activity-state.js').TerminalActivitySnapshot;
- *     history: import('../../activity-state.js').TerminalActivityHistoryEntry[];
+ *     current: import('../../state/activity-state.js').TerminalActivitySnapshot;
+ *     history: import('../../state/activity-state.js').TerminalActivityHistoryEntry[];
  *     turnTrace: ReturnType<typeof readTerminalTurnTraceProjection>;
  * }}
  */
@@ -388,7 +388,7 @@ export function searchTerminalTurnsProjection({ query, hubSessionId = null, limi
  *     hub: { ready: boolean; activeHubSessionId: string | null; summary: string };
  *     todos: { id: string; title: string; status: string }[];
  *     topToolStats: [string, Record<string, any>][];
- *     activity: import('../../activity-state.js').TerminalActivitySnapshot;
+ *     activity: import('../../state/activity-state.js').TerminalActivitySnapshot;
  *     display: ReturnType<typeof readTerminalDisplayProjection>;
  *     lifecycle: ReturnType<typeof readRuntimeLifecycleSnapshot>;
  *     sdkSessionMode: 'interactive' | 'plan' | 'autopilot' | 'shell' | null;

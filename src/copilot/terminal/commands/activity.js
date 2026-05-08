@@ -1,7 +1,7 @@
 // @ts-check
 
+import { readTerminalIoActivityProjection } from '../events/io-activity-events.js';
 import { readTerminalActivityProjection } from '../frontend/index.js';
-import { readTerminalIoActivityProjection } from '../io-activity-events.js';
 
 /**
  * @typedef {{ println: (text: string) => void }} ActivityContext

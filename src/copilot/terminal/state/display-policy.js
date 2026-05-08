@@ -7,7 +7,7 @@
  *   os toggles impactam prompt/waiting/adapters do terminal.
  */
 
-import { TERMINAL_DISPLAY_PRESET } from '../config/env.js';
+import { TERMINAL_DISPLAY_PRESET } from '../../config/env.js';
 import {
     getShowIntentActivity,
     getShowSessionActivity,
@@ -21,7 +21,7 @@ import {
     setShowThinking,
     setShowToolActivity,
     setShowUsage,
-} from '../presentation/runtime-ui-state-store.js';
+} from '../../presentation/runtime-ui-state-store.js';
 
 /**
  * @typedef {'thinking' | 'streaming' | 'usage' | 'tools' | 'intent' | 'session'} TerminalDisplayToggle

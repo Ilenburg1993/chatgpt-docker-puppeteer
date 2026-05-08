@@ -11,11 +11,11 @@
 import { LLM_B_BOOT_PROMPT, LLM_B_TURN_TIMEOUT_MS } from '#copilot/config';
 import readline from 'node:readline';
 import { getBusy, getRl, getSdkSessionMode } from '../../presentation/runtime-ui-state-store.js';
-import { readTerminalActivitySnapshot } from '../activity-state.js';
-import { readTerminalPromptDisplayPolicy } from '../display-policy.js';
 import { readTerminalDialogStreamMeta, readTerminalRuntimeState } from '../frontend/gateways/agent-runtime.js';
-import { getTerminalDetailLevel } from '../ui-preferences.js';
-import { terminalThemeText } from '../ui-theme.js';
+import { readTerminalActivitySnapshot } from '../state/activity-state.js';
+import { readTerminalPromptDisplayPolicy } from '../state/display-policy.js';
+import { getTerminalDetailLevel } from '../state/ui-preferences.js';
+import { terminalThemeText } from '../state/ui-theme.js';
 
 // ─── Configuração ─────────────────────────────────────────────────────────────
 

@@ -45,7 +45,7 @@ vi.mock('../../../../src/copilot/terminal/frontend/gateways/agent-runtime.js', (
     readTerminalDialogStreamMeta: vi.fn(() => ({ model: 'gpt-5-mini', reasoningEffort: 'high' })),
 }));
 
-vi.mock('../../../../src/copilot/terminal/activity-state.js', () => ({
+vi.mock('../../../../src/copilot/terminal/state/activity-state.js', () => ({
     readTerminalActivitySnapshot,
 }));
 
@@ -224,7 +224,7 @@ describe('terminal/dialog/output buildUserPrompt', () => {
     });
 
     it('compacta tags do prompt quando detalhe terminal está em modo compact', async () => {
-        const prefs = await import('../../../../src/copilot/terminal/ui-preferences.js');
+        const prefs = await import('../../../../src/copilot/terminal/state/ui-preferences.js');
         prefs.setTerminalDetailLevel('compact');
         readTerminalRuntimeState.mockReturnValueOnce(
             /** @type {any} */ ({
@@ -256,7 +256,7 @@ describe('terminal/dialog/output buildUserPrompt', () => {
     });
 
     it('compacta prompt de espera quando detalhe terminal está em modo compact', async () => {
-        const prefs = await import('../../../../src/copilot/terminal/ui-preferences.js');
+        const prefs = await import('../../../../src/copilot/terminal/state/ui-preferences.js');
         prefs.setTerminalDetailLevel('compact');
 
         const { buildWaitingPrompt } = await import('../../../../src/copilot/terminal/dialog/output.js');

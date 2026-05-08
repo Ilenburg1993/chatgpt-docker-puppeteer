@@ -1,6 +1,6 @@
 // @ts-check
 /**
- * src/copilot/terminal/ui-preferences.js
+ * src/copilot/terminal/state/ui-preferences.js
  *
  * Preferências de UX terminal em runtime (não persistidas em disco).
  *

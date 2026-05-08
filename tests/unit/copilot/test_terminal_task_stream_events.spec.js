@@ -17,7 +17,7 @@ const mocks = vi.hoisted(() => ({
     finalizeThinkingHistoryEntry: vi.fn(),
 }));
 
-vi.mock('../../../src/copilot/terminal/activity-state.js', () => ({
+vi.mock('../../../src/copilot/terminal/state/activity-state.js', () => ({
     recordTerminalActivity: mocks.recordTerminalActivity,
 }));
 
@@ -45,19 +45,19 @@ describe('terminal/task-stream-events.js — contrato', () => {
     });
 
     it('importa sem erros', async () => {
-        const mod = await import('../../../src/copilot/terminal/task-stream-events.js');
+        const mod = await import('../../../src/copilot/terminal/events/task-stream-events.js');
         expect(mod).toBeTruthy();
     });
 
     it('exporta setupTerminalTaskStreamListeners', async () => {
-        const mod = await import('../../../src/copilot/terminal/task-stream-events.js');
+        const mod = await import('../../../src/copilot/terminal/events/task-stream-events.js');
         expect(typeof mod.setupTerminalTaskStreamListeners).toBe('function');
     });
 
     it('consome chunk em task.reasoning como thinking colapsado de tarefa interna', async () => {
         const stdoutSpy = vi.spyOn(process.stdout, 'write').mockReturnValue(true);
         const { setupTerminalTaskStreamListeners } =
-            await import('../../../src/copilot/terminal/task-stream-events.js');
+            await import('../../../src/copilot/terminal/events/task-stream-events.js');
         const agent = new EventEmitter();
 
         setupTerminalTaskStreamListeners({ agent });
@@ -80,7 +80,7 @@ describe('terminal/task-stream-events.js — contrato', () => {
     it('registra task.delta sem imprimir streaming bruto no terminal', async () => {
         const stdoutSpy = vi.spyOn(process.stdout, 'write').mockReturnValue(true);
         const { setupTerminalTaskStreamListeners } =
-            await import('../../../src/copilot/terminal/task-stream-events.js');
+            await import('../../../src/copilot/terminal/events/task-stream-events.js');
         const agent = new EventEmitter();
 
         setupTerminalTaskStreamListeners({ agent });
@@ -106,7 +106,7 @@ describe('terminal/task-stream-events.js — contrato', () => {
         const stdoutSpy = vi.spyOn(process.stdout, 'write').mockReturnValue(true);
         mocks.getShowThinking.mockReturnValue(false);
         const { setupTerminalTaskStreamListeners } =
-            await import('../../../src/copilot/terminal/task-stream-events.js');
+            await import('../../../src/copilot/terminal/events/task-stream-events.js');
         const agent = new EventEmitter();
 
         setupTerminalTaskStreamListeners({ agent });
@@ -135,7 +135,7 @@ describe('terminal/task-stream-events.js — contrato', () => {
             status: 'completed',
         });
         const { setupTerminalTaskStreamListeners } =
-            await import('../../../src/copilot/terminal/task-stream-events.js');
+            await import('../../../src/copilot/terminal/events/task-stream-events.js');
         const agent = new EventEmitter();
 
         setupTerminalTaskStreamListeners({ agent });

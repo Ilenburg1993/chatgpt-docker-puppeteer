@@ -1,6 +1,6 @@
 // @ts-check
 /**
- * src/copilot/terminal/repl-listeners.js
+ * src/copilot/terminal/repl/repl-listeners.js
  *
  * Listeners de eventos do AlwaysAliveAgent para exibição no terminal REPL. Extraído de repl.js (F103) para reduzir
  * complexidade.
@@ -9,7 +9,7 @@
  * @see EventBus
  */
 
-import { setupTerminalInteractiveEventAdapters } from './event-adapters.js';
+import { setupTerminalInteractiveEventAdapters } from '../events/event-adapters.js';
 
 /**
  * Registra listeners de eventos do AlwaysAliveAgent para exibição no terminal.

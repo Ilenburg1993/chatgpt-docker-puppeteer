@@ -9,8 +9,8 @@
  */
 
 import { appendThinkingHistoryChunk, finalizeThinkingHistoryEntry } from '../../presentation/runtime-ui-state-store.js';
-import { recordTerminalActivity } from '../activity-state.js';
-import { terminalThemeText } from '../ui-theme.js';
+import { recordTerminalActivity } from '../state/activity-state.js';
+import { terminalThemeText } from '../state/ui-theme.js';
 import {
     beginTerminalRenderLock,
     clearInlineStatus,

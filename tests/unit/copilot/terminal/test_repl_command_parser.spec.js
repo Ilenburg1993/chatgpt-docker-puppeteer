@@ -2,7 +2,7 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { parseTerminalReplCommand } from '../../../../src/copilot/terminal/repl-command-parser.js';
+import { parseTerminalReplCommand } from '../../../../src/copilot/terminal/repl/repl-command-parser.js';
 
 describe('terminal/repl-command-parser', () => {
     it('ignora input humano comum', () => {

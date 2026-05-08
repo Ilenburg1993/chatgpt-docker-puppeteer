@@ -1,6 +1,6 @@
 // @ts-check
 /**
- * src/copilot/terminal/agent-sse-passthrough.js
+ * src/copilot/terminal/events/agent-sse-passthrough.js
  *
  * Passthrough SSE explícito e estreito para eventos do agent ainda sem adapter dedicado no terminal.
  *
@@ -8,7 +8,7 @@
  */
 
 import { AGENT_EVENTS } from '#copilot/events';
-import { broadcastSse } from './dialog/index.js';
+import { broadcastSse } from '../dialog/index.js';
 
 /**
  * @typedef {{

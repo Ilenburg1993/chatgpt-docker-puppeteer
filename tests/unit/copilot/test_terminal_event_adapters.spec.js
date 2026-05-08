@@ -21,11 +21,11 @@ vi.mock('../../../src/copilot/presentation/runtime-ui-state-store.js', () => ({
     getBusy: mocks.getBusy,
 }));
 
-vi.mock('../../../src/copilot/terminal/agent-runtime-events.js', () => ({
+vi.mock('../../../src/copilot/terminal/events/agent-runtime-events.js', () => ({
     setupTerminalAgentRuntimeEventListeners: mocks.setupTerminalAgentRuntimeEventListeners,
 }));
 
-vi.mock('../../../src/copilot/terminal/sdk-session-events.js', () => ({
+vi.mock('../../../src/copilot/terminal/events/sdk-session-events.js', () => ({
     setupTerminalSdkSessionEventListeners: mocks.setupTerminalSdkSessionEventListeners,
 }));
 
@@ -44,7 +44,7 @@ describe('terminal/event-adapters.js — contrato', () => {
 
     it('registra adapters runtime + SDK por uma suite única em modo interativo', async () => {
         const { setupTerminalInteractiveEventAdapters } =
-            await import('../../../src/copilot/terminal/event-adapters.js');
+            await import('../../../src/copilot/terminal/events/event-adapters.js');
         const rl = { setPrompt: vi.fn(), prompt: vi.fn() };
 
         const cleanup = setupTerminalInteractiveEventAdapters(/** @type {any} */ (rl));
@@ -63,7 +63,8 @@ describe('terminal/event-adapters.js — contrato', () => {
     });
 
     it('registra os mesmos adapters em headless sem readline/prompt', async () => {
-        const { setupTerminalHeadlessEventAdapters } = await import('../../../src/copilot/terminal/event-adapters.js');
+        const { setupTerminalHeadlessEventAdapters } =
+            await import('../../../src/copilot/terminal/events/event-adapters.js');
 
         setupTerminalHeadlessEventAdapters();
         const sdkArgs = /** @type {{ refreshPromptIfIdle: () => void }} */ (

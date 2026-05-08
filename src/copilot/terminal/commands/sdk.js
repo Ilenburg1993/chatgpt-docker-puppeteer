@@ -16,6 +16,7 @@ import {
     buildFailureRecoveryLines,
     buildTerminalOperationalGuidance,
 } from '../auto-briefing.js';
+import { readTerminalIoActivityProjection } from '../events/io-activity-events.js';
 import {
     readTerminalRuntimePermissionMode,
     readTerminalRuntimeState,
@@ -40,7 +41,6 @@ import {
     resolveTerminalSdkPendingElicitation,
     selectTerminalSdkSessionUi,
 } from '../frontend/gateways/sdk-session.js';
-import { readTerminalIoActivityProjection } from '../io-activity-events.js';
 import {
     classifyTerminalSdkQuota,
     clearTerminalElicitation,
@@ -55,7 +55,7 @@ import {
     readTerminalUserInputSummary,
     recordTerminalPermissionCompleted,
     recordTerminalPermissionRequested,
-} from '../sdk-interactions.js';
+} from '../state/sdk-interactions.js';
 import { callWithRuntimeTarget, extractRuntimeTarget } from './runtime-target.js';
 
 /**

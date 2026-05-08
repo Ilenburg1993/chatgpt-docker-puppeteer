@@ -107,7 +107,7 @@ import {
     recordTerminalPermissionModeChanged,
     recordTerminalPermissionRequested,
     recordTerminalUserInputRequested,
-} from '../../../../src/copilot/terminal/sdk-interactions.js';
+} from '../../../../src/copilot/terminal/state/sdk-interactions.js';
 
 function mockCtx() {
     /** @type {string[]} */

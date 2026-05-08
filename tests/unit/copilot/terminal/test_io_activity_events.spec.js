@@ -10,11 +10,11 @@ const broadcastSse = vi.fn();
 const println = vi.fn();
 const getShowToolActivity = vi.fn(() => true);
 
-vi.mock('../../../../src/copilot/terminal/activity-state.js', () => ({
+vi.mock('../../../../src/copilot/terminal/state/activity-state.js', () => ({
     recordTerminalActivity,
 }));
 
-vi.mock('../../../../src/copilot/terminal/turn-trace-state.js', () => ({
+vi.mock('../../../../src/copilot/terminal/state/turn-trace-state.js', () => ({
     recordTerminalTurnFileActivity,
 }));
 
@@ -35,10 +35,10 @@ describe('terminal/io-activity-events', () => {
 
     it('projeta operações reais de I/O para activity, turn trace, stdout e SSE', async () => {
         const { clearTerminalIoActivityProjection, readTerminalIoActivityProjection, setupTerminalIoActivityEvents } =
-            await import('../../../../src/copilot/terminal/io-activity-events.js');
+            await import('../../../../src/copilot/terminal/events/io-activity-events.js');
         clearTerminalIoActivityProjection();
         const cleanup = setupTerminalIoActivityEvents();
-        const target = join(process.cwd(), 'src/copilot/terminal/io-activity-events.js');
+        const target = join(process.cwd(), 'src/copilot/terminal/events/io-activity-events.js');
 
         try {
             channel('copilot.io.operation').publish({
@@ -61,7 +61,7 @@ describe('terminal/io-activity-events', () => {
 
         expect(recordTerminalTurnFileActivity).toHaveBeenCalledWith(
             expect.objectContaining({
-                path: 'src/copilot/terminal/io-activity-events.js',
+                path: 'src/copilot/terminal/events/io-activity-events.js',
                 operation: 'read',
                 source: 'io',
                 timestamp: 123,
@@ -71,7 +71,7 @@ describe('terminal/io-activity-events', () => {
             'tool',
             'I/O read concluído',
             expect.objectContaining({
-                detail: expect.stringContaining('src/copilot/terminal/io-activity-events.js'),
+                detail: expect.stringContaining('src/copilot/terminal/events/io-activity-events.js'),
                 toolName: 'io.read',
                 source: 'io',
                 progress: 100,
@@ -84,7 +84,7 @@ describe('terminal/io-activity-events', () => {
                 timestamp: 123,
                 success: true,
                 operation: 'read',
-                target: 'src/copilot/terminal/io-activity-events.js',
+                target: 'src/copilot/terminal/events/io-activity-events.js',
                 bytesRead: 42,
                 engine: 'io-engine.fs.readFile.text',
             }),
@@ -92,7 +92,7 @@ describe('terminal/io-activity-events', () => {
         expect(readTerminalIoActivityProjection(1)).toEqual([
             expect.objectContaining({
                 operation: 'read',
-                target: 'src/copilot/terminal/io-activity-events.js',
+                target: 'src/copilot/terminal/events/io-activity-events.js',
                 bytesRead: 42,
             }),
         ]);
@@ -100,7 +100,7 @@ describe('terminal/io-activity-events', () => {
 
     it('remove subscriber no cleanup e não deixa evento global vazando', async () => {
         const { clearTerminalIoActivityProjection, setupTerminalIoActivityEvents } =
-            await import('../../../../src/copilot/terminal/io-activity-events.js');
+            await import('../../../../src/copilot/terminal/events/io-activity-events.js');
         clearTerminalIoActivityProjection();
         const cleanup = setupTerminalIoActivityEvents();
         cleanup();

@@ -10,7 +10,7 @@ import {
     readTerminalTurnTraceProjection,
     recordTerminalTurnFileActivity,
     recordTerminalTurnToolActivity,
-} from '../../../../src/copilot/terminal/turn-trace-state.js';
+} from '../../../../src/copilot/terminal/state/turn-trace-state.js';
 
 describe('terminal/turn-trace-state', () => {
     beforeEach(() => {
@@ -22,12 +22,12 @@ describe('terminal/turn-trace-state', () => {
         recordTerminalTurnToolActivity({
             toolName: 'workspace.read_file',
             operation: 'read',
-            path: 'src/copilot/terminal/repl.js',
+            path: 'src/copilot/terminal/repl/repl.js',
             toolCallId: 'tool-1',
             timestamp: 20,
         });
         recordTerminalTurnFileActivity({
-            path: 'src/copilot/terminal/repl.js',
+            path: 'src/copilot/terminal/repl/repl.js',
             operation: 'read',
             source: 'sdk',
             timestamp: 30,
@@ -40,7 +40,7 @@ describe('terminal/turn-trace-state', () => {
         expect(trace?.toolCount).toBe(1);
         expect(trace?.fileCount).toBe(1);
         expect(trace?.tools[0]?.status).toBe('completed');
-        expect(trace?.files[0]?.path).toBe('src/copilot/terminal/repl.js');
+        expect(trace?.files[0]?.path).toBe('src/copilot/terminal/repl/repl.js');
     });
 
     it('fecha o turno e move o resumo para o histórico recente', () => {

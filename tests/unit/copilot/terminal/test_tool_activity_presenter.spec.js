@@ -2,13 +2,13 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { buildTerminalToolActivityPresentation } from '../../../../src/copilot/terminal/tool-activity-presenter.js';
+import { buildTerminalToolActivityPresentation } from '../../../../src/copilot/terminal/events/tool-activity-presenter.js';
 
 describe('terminal/tool-activity-presenter', () => {
     it('explicita alias legado e mantém operação canônica inferida', () => {
         const presentation = buildTerminalToolActivityPresentation({
             toolName: 'view',
-            args: { path: 'src/copilot/terminal/live-status-line.js' },
+            args: { path: 'src/copilot/terminal/repl/live-status-line.js' },
         });
 
         expect(presentation.toolName).toBe('view');
@@ -22,7 +22,7 @@ describe('terminal/tool-activity-presenter', () => {
     it('não adiciona ruído de alias para tool já canônica', () => {
         const presentation = buildTerminalToolActivityPresentation({
             toolName: 'read_file_content',
-            args: { path: 'src/copilot/terminal/activity-state.js' },
+            args: { path: 'src/copilot/terminal/state/activity-state.js' },
         });
 
         expect(presentation.canonicalToolName).toBe('read_file_content');

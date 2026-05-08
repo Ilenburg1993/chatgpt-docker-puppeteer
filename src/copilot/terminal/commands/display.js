@@ -21,19 +21,19 @@ import {
     TERMINAL_DISPLAY_TOGGLE_KEYS,
     writeTerminalDisplayState,
     writeTerminalDisplayToggle,
-} from '../display-policy.js';
+} from '../state/display-policy.js';
 import {
     getTerminalDetailLevel,
     isTerminalDetailLevel,
     listTerminalDetailLevels,
     setTerminalDetailLevel,
-} from '../ui-preferences.js';
+} from '../state/ui-preferences.js';
 import {
     getTerminalThemeName,
     isTerminalThemeName,
     listTerminalThemeProfiles,
     setTerminalThemeName,
-} from '../ui-theme.js';
+} from '../state/ui-theme.js';
 
 /**
  * @typedef {object} DisplayContext

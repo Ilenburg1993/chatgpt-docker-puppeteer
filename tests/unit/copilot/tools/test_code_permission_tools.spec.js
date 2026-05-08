@@ -80,7 +80,7 @@ describe('F46 — permission-tools', () => {
 
     it('setPermissionAgent + handler get retorna modo do agente', async () => {
         const fakeAgent = { getPermissionMode: vi.fn(() => 'approve_all'), setPermissionMode: vi.fn() };
-        mod.setPermissionAgent(/** @type {any} */ (fakeAgent));
+        mod.setPermissionAgent(/** @type {any} */ (fakeAgent), { force: true });
         const getTool = /** @type {any} */ (
             mod.permissionTools.find((/** @type {any} */ t) => t.name === 'permission_mode_get')
         );
@@ -96,7 +96,7 @@ describe('F46 — permission-tools', () => {
                 currentMode = mode;
             }),
         };
-        mod.setPermissionAgent(/** @type {any} */ (fakeAgent));
+        mod.setPermissionAgent(/** @type {any} */ (fakeAgent), { force: true });
         const setTool = /** @type {any} */ (
             mod.permissionTools.find((/** @type {any} */ t) => t.name === 'permission_mode_set')
         );
@@ -111,7 +111,7 @@ describe('F46 — permission-tools', () => {
             getPermissionMode: vi.fn().mockReturnValueOnce('approve_all').mockReturnValueOnce('selective'),
             setPermissionMode: vi.fn(),
         };
-        mod.setPermissionAgent(/** @type {any} */ (fakeAgent));
+        mod.setPermissionAgent(/** @type {any} */ (fakeAgent), { force: true });
         const setTool = /** @type {any} */ (
             mod.permissionTools.find((/** @type {any} */ t) => t.name === 'permission_mode_set')
         );

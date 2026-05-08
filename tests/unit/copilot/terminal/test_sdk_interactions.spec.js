@@ -10,7 +10,7 @@ import {
     pruneTerminalSdkInteractions,
     recordTerminalElicitationCompleted,
     recordTerminalElicitationPending,
-} from '../../../../src/copilot/terminal/sdk-interactions.js';
+} from '../../../../src/copilot/terminal/state/sdk-interactions.js';
 
 describe('terminal/sdk-interactions', () => {
     beforeEach(() => {

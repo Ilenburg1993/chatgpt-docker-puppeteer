@@ -6,7 +6,7 @@
  *   Extrai CMD_ROUTES, _cmdRouteMap e dispatchCmd do composition root (repl.js), bem como as funções de comando locais
  *   que não são delegates diretos dos módulos de commands/index.js.
  *
- *   src/copilot/terminal/repl-command-router.js
+ *   src/copilot/terminal/repl/repl-command-router.js
  * @see module:copilot/terminal/repl
  */
 
@@ -14,8 +14,8 @@ import { readCopilotBootConfig } from '#copilot/boot';
 import { LLM_B_BOOT_TIMEOUT_MS } from '#copilot/config';
 import { runShutdown, toError } from '#copilot/core';
 import { EMITTER_DIALOG_READY } from '#copilot/events';
-import { logSwallowed } from '../core/error-handlers.js';
-import { getHubSessionId, setRl } from '../presentation/runtime-ui-state-store.js';
+import { logSwallowed } from '../../core/error-handlers.js';
+import { getHubSessionId, setRl } from '../../presentation/runtime-ui-state-store.js';
 import {
     cmdActivity as _cmdActivity,
     cmdAlias as _cmdAlias,
@@ -64,8 +64,8 @@ import {
     cmdUsage as _cmdUsage,
     cmdWho as _cmdWho,
     cmdWorkspace as _cmdWorkspace,
-} from './commands/index.js';
-import { ensureDialogLoop, println } from './dialog/index.js';
+} from '../commands/index.js';
+import { ensureDialogLoop, println } from '../dialog/index.js';
 import {
     offTerminalAgentRuntimeEvent,
     onceTerminalAgentRuntimeEvent,
@@ -73,9 +73,9 @@ import {
     readTerminalHandoffHistory,
     readTerminalRuntimeControlState,
     resumeTerminalDialogLoop,
-} from './frontend/gateways/agent-runtime.js';
-import { stopTerminalDialogMode } from './frontend/gateways/dialog.js';
-import { clearRateLimiters } from './rate-limiter-state.js';
+} from '../frontend/gateways/agent-runtime.js';
+import { stopTerminalDialogMode } from '../frontend/gateways/dialog.js';
+import { clearRateLimiters } from '../state/rate-limiter-state.js';
 import { parseTerminalReplCommand } from './repl-command-parser.js';
 
 /** @type {number} */

@@ -2,7 +2,7 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { createTerminalMultilineInputState } from '../../../../src/copilot/terminal/repl-multiline.js';
+import { createTerminalMultilineInputState } from '../../../../src/copilot/terminal/repl/repl-multiline.js';
 
 describe('terminal/repl-multiline', () => {
     it('devolve linha simples imediatamente', () => {

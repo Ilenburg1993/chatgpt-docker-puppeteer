@@ -265,7 +265,11 @@ estejam registrados no roadmap e cobertos por contrato de remoção.
   `server/routes/sdk/session-messaging.js` com seams de metadata, send, stream state e workspace;
   consolidada com `session-messaging.js` como composition router e famílias
   `session-core-routes.js`, `session-workspace-routes.js`, `session-ui-routes.js` e
-  `session-rpc-routes.js`; próxima subonda: avançar para `session-crud`/`observability`**)
+  `session-rpc-routes.js`; avançada na borda `terminal/` com migração física sem shims para
+  `events/`, `repl/`, `state/`, `stores/` e `wiring/`, deixando a raiz focada em entrypoint,
+  bootstrap, composition root e `module-map.js`; próxima subonda: avançar para
+  `session-crud`/`observability` em `server/routes` e decomposição local dos hotspots
+  `events/sdk-session-events.js` e `state/sdk-interactions.js`**)
 - W115: criar scorecard de organização física por diretório quente (**iniciada em beta para
   `server/routes` e `terminal/handlers`, com agregação por role/surface/risk e contratos de
   consulta**)
@@ -275,15 +279,17 @@ estejam registrados no roadmap e cobertos por contrato de remoção.
 - W117: abrir faixa UX/terminal com auditoria AS-IS, situação ideal e roadmap próprio (**iniciada
   nos docs 97–99; primeira correção aplicada em typecheck strict para UX/model billing,
   `/display preset`, pending question replay e testes associados; scorecard/risk do terminal root
-  implementado**)
+  implementado; reorganização física da borda terminal aplicada sem shims em `events/`, `repl/`,
+  `state/`, `stores/` e `wiring/`, com `README.md`, `module-map.js` e contratos atualizados**)
 - W118–W125: executar roadmap UX Terminal 2.1 (**planejado no doc 99: scorecard de risco do terminal
   root, status/now/usage unificados, display density policy, pending question replay, decomposição
   de `repl.js`, `frontend`, boot e event adapters; W118 iniciou com projection comum de
   billing/modelo e topologia de runtimes em `/status`/`/now` e foi estendido para pós-turno,
-  `/usage now` e `/metrics`; W119 iniciou com `terminal/display-policy.js` governando presets,
-  toggles e densidade do waiting prompt; W120 iniciou com `terminal/pending-question-replay.js` para
-  suprimir protocolo e deduplicar replays curtos, e ganhou `terminal/pending-question-answer.js`
-  para rotear respostas interativas sem deadlock de fila**)
+  `/usage now` e `/metrics`; W119 iniciou com `terminal/state/display-policy.js` governando presets,
+  toggles e densidade do waiting prompt; W120 iniciou com
+  `terminal/state/pending-question-replay.js` para suprimir protocolo e deduplicar replays curtos, e
+  ganhou `terminal/state/pending-question-answer.js` para rotear respostas interativas sem deadlock
+  de fila**)
 
 ---
 

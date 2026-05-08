@@ -16,7 +16,7 @@ import {
     resetAliases,
     resolve,
     setAlias,
-} from '../../../../src/copilot/terminal/alias-store.js';
+} from '../../../../src/copilot/terminal/stores/alias-store.js';
 
 describe('alias-store resolve', () => {
     beforeEach(() => resetAliases());

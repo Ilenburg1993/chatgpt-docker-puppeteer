@@ -31,7 +31,7 @@ describe('P4 — superfícies compartilhadas de realtime', () => {
 
     it('terminal/rate-limiter-state.js virou adapter fino da camada shared', async () => {
         const src = await readFile(
-            new URL('../../../src/copilot/terminal/rate-limiter-state.js', import.meta.url),
+            new URL('../../../src/copilot/terminal/state/rate-limiter-state.js', import.meta.url),
             'utf8',
         );
 

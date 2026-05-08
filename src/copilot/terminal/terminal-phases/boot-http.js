@@ -6,8 +6,8 @@
  *   Sobe o servidor Copilot HTTP/Socket com as opções de hub quando disponível, e faz teardown no rollback.
  */
 
-import { recordTerminalActivity } from '../activity-state.js';
 import { isTerminalHubReady, readTerminalHubOrchestrator, readTerminalHubStore } from '../frontend/gateways/hub.js';
+import { recordTerminalActivity } from '../state/activity-state.js';
 
 /**
  * @param {import('../index.js').TerminalBootContext} ctx

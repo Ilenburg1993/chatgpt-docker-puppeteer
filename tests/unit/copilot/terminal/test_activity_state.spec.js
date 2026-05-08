@@ -8,7 +8,7 @@ import {
     readTerminalActivityHistory,
     readTerminalActivitySnapshot,
     recordTerminalActivity,
-} from '../../../../src/copilot/terminal/activity-state.js';
+} from '../../../../src/copilot/terminal/state/activity-state.js';
 
 describe('terminal/activity-state', () => {
     it('registra atividade atual com progress e histórico', () => {

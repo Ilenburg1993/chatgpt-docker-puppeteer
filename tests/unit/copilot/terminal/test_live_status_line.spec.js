@@ -6,7 +6,7 @@ const mocks = vi.hoisted(() => ({
     activity: {
         phase: 'tool',
         label: 'Executando tool',
-        detail: 'lendo arquivo · src/copilot/terminal/repl-lifecycle.js',
+        detail: 'lendo arquivo · src/copilot/terminal/repl/repl-lifecycle.js',
         source: 'sdk',
         severity: 'info',
         progress: /** @type {number | null} */ (null),
@@ -35,7 +35,7 @@ vi.mock('#copilot/config', () => ({
     TERMINAL_LIVE_STATUS_ENABLED: true,
     TERMINAL_LIVE_STATUS_INTERVAL_MS: 1000,
 }));
-vi.mock('../../../../src/copilot/terminal/activity-state.js', () => ({
+vi.mock('../../../../src/copilot/terminal/state/activity-state.js', () => ({
     readTerminalActivitySnapshot: vi.fn(() => mocks.activity),
 }));
 vi.mock('../../../../src/copilot/terminal/dialog/output.js', () => ({
@@ -49,7 +49,7 @@ vi.mock('../../../../src/copilot/terminal/frontend/gateways/agent-runtime.js', (
 vi.mock('../../../../src/copilot/presentation/runtime-ui-state-store.js', () => ({
     getBusy: vi.fn(() => mocks.busy),
 }));
-vi.mock('../../../../src/copilot/terminal/ui-theme.js', () => ({
+vi.mock('../../../../src/copilot/terminal/state/ui-theme.js', () => ({
     terminalThemeText: vi.fn((_role, text) => text),
 }));
 
@@ -62,7 +62,7 @@ describe('terminal/live-status-line', () => {
         mocks.activity = {
             phase: 'tool',
             label: 'Executando tool',
-            detail: 'lendo arquivo · src/copilot/terminal/repl-lifecycle.js',
+            detail: 'lendo arquivo · src/copilot/terminal/repl/repl-lifecycle.js',
             source: 'sdk',
             severity: 'info',
             progress: /** @type {number | null} */ (null),
@@ -89,7 +89,8 @@ describe('terminal/live-status-line', () => {
     });
 
     it('formata a linha viva com fase, tool, detalhe, tempo e modelo efetivo', async () => {
-        const { formatTerminalLiveStatusLine } = await import('../../../../src/copilot/terminal/live-status-line.js');
+        const { formatTerminalLiveStatusLine } =
+            await import('../../../../src/copilot/terminal/repl/live-status-line.js');
 
         const line = formatTerminalLiveStatusLine({ now: Date.parse('2026-05-07T22:00:12.000-03:00') });
 
@@ -102,7 +103,8 @@ describe('terminal/live-status-line', () => {
     });
 
     it('renderiza continuamente enquanto há operação ativa', async () => {
-        const { setupTerminalLiveStatusLine } = await import('../../../../src/copilot/terminal/live-status-line.js');
+        const { setupTerminalLiveStatusLine } =
+            await import('../../../../src/copilot/terminal/repl/live-status-line.js');
 
         const cleanup = setupTerminalLiveStatusLine({ intervalMs: 1000 });
         expect(mocks.writeInlineStatus).toHaveBeenCalledTimes(1);
@@ -114,7 +116,8 @@ describe('terminal/live-status-line', () => {
     });
 
     it('limpa a linha quando a atividade volta a idle', async () => {
-        const { setupTerminalLiveStatusLine } = await import('../../../../src/copilot/terminal/live-status-line.js');
+        const { setupTerminalLiveStatusLine } =
+            await import('../../../../src/copilot/terminal/repl/live-status-line.js');
 
         const cleanup = setupTerminalLiveStatusLine({ intervalMs: 1000 });
         mocks.activity = {
@@ -131,7 +134,8 @@ describe('terminal/live-status-line', () => {
     });
 
     it('não mantém heartbeat para atividade concluída quando runtime aguarda input', async () => {
-        const { setupTerminalLiveStatusLine } = await import('../../../../src/copilot/terminal/live-status-line.js');
+        const { setupTerminalLiveStatusLine } =
+            await import('../../../../src/copilot/terminal/repl/live-status-line.js');
         mocks.activity = {
             ...mocks.activity,
             phase: 'tool',
