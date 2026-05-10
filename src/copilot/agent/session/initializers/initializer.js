@@ -18,7 +18,7 @@
 import { buildAuditingPermissionHandler } from '#copilot/audit';
 import { WORKSPACE_ROOT, readBootSkillConfig } from '#copilot/boot';
 import { MAESTRO_AGENT_NAME, buildCustomAgentsConfig } from '#copilot/config';
-import { buildCanonicalLocalFsExcludedTools, toError } from '#copilot/core';
+import { buildCanonicalLocalSurfaceExcludedTools, toError } from '#copilot/core';
 import { SESSION_MAX_AGE_MS } from '../../../config/agent.js';
 import {
     buildLiveSystemMessage,
@@ -209,7 +209,7 @@ export async function initOrResumeSession(client, sessionOptions) {
             .filter((name) => typeof name === 'string' && name.length > 0)
     );
     const availableToolNames = new Set(availableToolNameList);
-    const excludedTools = buildCanonicalLocalFsExcludedTools(
+    const excludedTools = buildCanonicalLocalSurfaceExcludedTools(
         availableToolNameList,
         Array.isArray(sessionOptions.excludedTools) ? sessionOptions.excludedTools : [],
     );

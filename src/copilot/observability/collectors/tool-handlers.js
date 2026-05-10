@@ -10,6 +10,7 @@
 
 import { globalAuditBuffer } from '#copilot/audit';
 import { SESSION_EVENTS as SE } from '#copilot/events';
+import { introspectToolTargets } from '../../core/tool-target-introspection.js';
 import { onSessionEvent } from '../../sdk/session/events.js';
 import { log } from '../logger.js';
 
@@ -33,6 +34,8 @@ export function attachToolHandlers(ctx) {
     unsubs.push(
         onSessionEvent(session, SE.TOOL_EXECUTION_START, (event) => {
             const { toolCallId, toolName, mcpServerName } = event.data;
+            const toolArgs = /** @type {Record<string, unknown>} */ (event.data.arguments ?? {});
+            const targetMeta = introspectToolTargets({ args: toolArgs });
             const _now = Date.now();
             for (const [id, entry] of pending) {
                 if (_now - entry.startTs > _PENDING_TTL_MS) pending.delete(id);
@@ -41,7 +44,7 @@ export function attachToolHandlers(ctx) {
                 toolName,
                 mcpServerName: mcpServerName ?? null,
                 startTs: Date.now(),
-                toolArgs: /** @type {Record<string, unknown>} */ (event.data.arguments ?? {}),
+                toolArgs,
             });
             if (persist && persistSet.has('tool.execution_start')) {
                 persistEvent({
@@ -51,7 +54,8 @@ export function attachToolHandlers(ctx) {
                     toolName,
                     toolCallId,
                     mcpServerName: mcpServerName ?? null,
-                    toolArgs: event.data.arguments ?? {},
+                    toolArgs,
+                    targetMeta,
                     parentToolCallId: event.data.parentToolCallId ?? null,
                 });
             }
@@ -66,6 +70,10 @@ export function attachToolHandlers(ctx) {
             pending.delete(toolCallId);
             const durationMs = pendingEntry ? Date.now() - pendingEntry.startTs : 0;
             const toolName = pendingEntry?.toolName ?? toolCallId;
+            const targetMeta = introspectToolTargets({
+                args: pendingEntry?.toolArgs ?? event.data.arguments ?? {},
+                result: event.data.result ?? null,
+            });
 
             metrics?.recordToolCall(toolName, durationMs, success);
             if (!success && errorTracker) {
@@ -94,6 +102,7 @@ export function attachToolHandlers(ctx) {
                     toolName,
                     durationMs,
                     success: event.data.success,
+                    targetMeta,
                 });
             }
 

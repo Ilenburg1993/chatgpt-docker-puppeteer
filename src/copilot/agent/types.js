@@ -512,6 +512,8 @@
  *     protocolControlled: boolean;
  *     choices?: string[];
  * } | null} getPendingQuestionSnapshot
+ * @property {(() => PendingQuestionShadow | null) | undefined} [getPendingQuestionShadowSnapshot]
+ * @property {(() => boolean) | undefined} [isPendingQuestionShadowExpired]
  * @property {((event: string | symbol, listener: (...args: any[]) => void) => void) | undefined} [on]
  * @property {((event: string | symbol, listener: (...args: any[]) => void) => void) | undefined} [once]
  * @property {((event: string | symbol, listener: (...args: any[]) => void) => void) | undefined} [off]

@@ -17,8 +17,15 @@ import { ConfigError } from '#copilot/core';
  */
 
 /**
+ * Tool extendida com o campo `instructions` usado internamente. O campo não existe no tipo oficial do SDK — é injetado
+ * no registry para guiar o LLM sobre como usar a ferramenta.
+ *
+ * @typedef {Tool & { instructions?: string }} ExtendedTool
+ */
+
+/**
  * @typedef {object} ToolEntry
- * @property {Tool} tool - Instância da ferramenta SDK
+ * @property {ExtendedTool} tool - Instância da ferramenta (pode conter instructions)
  * @property {string} category - Categoria funcional (ex: 'code', 'git', 'session', 'task', 'hook')
  * @property {string[]} [tags] - Tags adicionais para filtro
  * @property {boolean} [readOnly] - Se true, a ferramenta não modifica estado externo

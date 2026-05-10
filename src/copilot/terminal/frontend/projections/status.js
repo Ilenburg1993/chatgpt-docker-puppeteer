@@ -94,7 +94,21 @@ function objectOrNull(value) {
  *         categories: Record<string, number>;
  *         disabled: string[];
  *         hasCanonicalLocalFsTools: boolean;
+ *         hasCanonicalLocalExecTools: boolean;
  *         hasSdkWorkspaceTooling: boolean;
+ *         hasLegacySdkShellToolsLoaded: boolean;
+ *         toolContract: {
+ *             ok: boolean;
+ *             errorCount: number;
+ *             warningCount: number;
+ *             metadataCoverage: {
+ *                 descriptionPct: number;
+ *                 parametersPct: number;
+ *                 categoryPct: number;
+ *                 tagsPct: number;
+ *                 instructionsPct: number;
+ *             };
+ *         };
  *     };
  *     instructionLoad: {
  *         liveReloadMechanism: 'sdk-transform' | 'static-snapshot';
@@ -157,7 +171,15 @@ export function readTerminalStatusProjection({ hubSessionId = null, injectPort, 
         categories: toolLoadSnapshot.categories,
         disabled: toolLoadSnapshot.disabled,
         hasCanonicalLocalFsTools: toolLoadSnapshot.hasCanonicalLocalFsTools,
+        hasCanonicalLocalExecTools: toolLoadSnapshot.hasCanonicalLocalExecTools,
         hasSdkWorkspaceTooling: toolLoadSnapshot.hasSdkWorkspaceTooling,
+        hasLegacySdkShellToolsLoaded: toolLoadSnapshot.hasLegacySdkShellToolsLoaded,
+        toolContract: {
+            ok: toolLoadSnapshot.toolContract.ok,
+            errorCount: toolLoadSnapshot.toolContract.errorCount,
+            warningCount: toolLoadSnapshot.toolContract.warningCount,
+            metadataCoverage: toolLoadSnapshot.toolContract.metadataCoverage,
+        },
     };
     const sectionsMissingFileCount = promptStatus.sections.filter((section) => section.file.exists !== true).length;
     const appendFileMissingCount = promptStatus.appendFiles.filter((file) => file.exists !== true).length;

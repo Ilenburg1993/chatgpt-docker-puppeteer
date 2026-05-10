@@ -200,6 +200,16 @@ export function recordTerminalActivity(phase, label, opts = {}) {
         _currentActivity.detail === detail &&
         _currentActivity.severity === severity &&
         _currentActivity.progress === progress;
+    if (sameSemanticPayload) {
+        _currentActivity = withAge({
+            ..._currentActivity,
+            updatedAt: timestamp,
+            ageMs: 0,
+        });
+        updateFocusedActivity(_currentActivity);
+        return _currentActivity;
+    }
+
     const next = withAge({
         phase,
         label,
@@ -215,7 +225,7 @@ export function recordTerminalActivity(phase, label, opts = {}) {
     const prev = _currentActivity;
     _currentActivity = next;
     updateFocusedActivity(next);
-    if (recordHistory && !sameSemanticPayload) {
+    if (recordHistory) {
         pushHistory(next);
     }
     terminalActivityEmitter.emit('activity:changed', next, prev);

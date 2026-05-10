@@ -143,7 +143,9 @@ export const AliasConfigSchema = z.record(z.string(), z.string());
  */
 export const InjectResponseSchema = z.object({
     ok: z.boolean(),
-    reply: z.string().optional(),
+    reply: z.string().nullable().optional(),
+    mode: z.string().optional(),
+    messageId: z.string().optional(),
     error: z.string().optional(),
 });
 

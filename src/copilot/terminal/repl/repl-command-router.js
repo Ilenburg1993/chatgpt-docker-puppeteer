@@ -11,11 +11,18 @@
  */
 
 import { readCopilotBootConfig } from '#copilot/boot';
-import { LLM_B_BOOT_TIMEOUT_MS } from '#copilot/config';
+import { getTerminalInterventionPolicy, LLM_B_BOOT_TIMEOUT_MS } from '#copilot/config';
 import { runShutdown, toError } from '#copilot/core';
 import { EMITTER_DIALOG_READY } from '#copilot/events';
 import { logSwallowed } from '../../core/error-handlers.js';
-import { getHubSessionId, setRl } from '../../presentation/runtime-ui-state-store.js';
+import {
+    clearRuntimeInterventionMailbox,
+    consumeRuntimeInterventionMailbox,
+    enqueueRuntimeInterventionMailbox,
+    getHubSessionId,
+    readRuntimeInterventionMailboxSummary,
+    setRl,
+} from '../../presentation/runtime-ui-state-store.js';
 import {
     cmdActivity as _cmdActivity,
     cmdAlias as _cmdAlias,
@@ -68,15 +75,18 @@ import {
 import { ensureDialogLoop, getTurnQueueDepth, println, sendTurn } from '../dialog/index.js';
 import {
     abortTerminalCurrentMessage,
+    answerTerminalPendingQuestion,
     offTerminalAgentRuntimeEvent,
     onceTerminalAgentRuntimeEvent,
     pauseTerminalDialogLoop,
     readTerminalHandoffHistory,
     readTerminalRuntimeControlState,
+    readTerminalRuntimeState,
     resumeTerminalDialogLoop,
     steerTerminalMessage,
 } from '../frontend/gateways/agent-runtime.js';
 import { stopTerminalDialogMode } from '../frontend/gateways/dialog.js';
+import { deliverEntryAsTurnIfIdle } from '../mailbox-drain.js';
 import { clearRateLimiters } from '../state/rate-limiter-state.js';
 import { parseTerminalReplCommand } from './repl-command-parser.js';
 
@@ -196,6 +206,25 @@ async function runTerminalInterventionSequence(operation) {
 }
 
 /**
+ * Tenta aplicar intervenção imediatamente em `ask_user` pendente (zero-PR).
+ *
+ * @param {string} message
+ * @returns {boolean}
+ */
+function tryApplyImmediateTerminalZeroPr(message) {
+    const runtime = readTerminalRuntimeState(null);
+    const pending = runtime.pendingQuestion;
+    const pendingKind = runtime.pendingQuestionKind;
+    const protocolControlled = Boolean(
+        pending && (pending.protocolControlled === true || (pendingKind !== null && pendingKind !== 'question')),
+    );
+    if (!pending || protocolControlled) {
+        return false;
+    }
+    return answerTerminalPendingQuestion(message, null);
+}
+
+/**
  * Envia uma mensagem em modo SDK immediate, preservando o turno atual no comando.
  *
  * @param {string} message
@@ -207,11 +236,33 @@ async function _cmdSteer(message) {
         println('\x1b[33m  Uso: /steer <mensagem imediata para o turno ativo>\x1b[0m');
         return;
     }
+    const interventionPolicy = getTerminalInterventionPolicy();
+    if (interventionPolicy.enabled && !interventionPolicy.allowSteer) {
+        if (tryApplyImmediateTerminalZeroPr(prompt)) {
+            println('\x1b[36m  [zero-pr] intervenção aplicada imediatamente no ask_user pendente.\x1b[0m');
+            return;
+        }
+        println('\x1b[33m  [steer] Bloqueado por política zero-PR para evitar consumo implícito de PR.\x1b[0m');
+        const queued = enqueueRuntimeInterventionMailbox({
+            runtimeId: null,
+            source: 'terminal',
+            modeHint: 'steer',
+            message: prompt,
+        });
+        println(
+            `\x1b[36m  [mailbox] intervenção registrada para próxima ask_user (fila=${queued.queueSize}${queued.dropped > 0 ? ` · descartadas=${queued.dropped}` : ''}).\x1b[0m`,
+        );
+        println(
+            '\x1b[90m  Use /abort para interromper sem PR, ou /turn <mensagem> para abrir novo turno explicitamente.\x1b[0m',
+        );
+        return;
+    }
     try {
         const messageId = await steerTerminalMessage(prompt);
         println(
-            `\x1b[36m  [steer] Intervenção imediata enviada ao SDK${messageId ? ` (messageId=${messageId})` : ''}.\x1b[0m`,
+            `\x1b[36m  [steer] Intervenção immediate enviada ao SDK${messageId ? ` (messageId=${messageId})` : ''}.\x1b[0m`,
         );
+        println('\x1b[90m  Observação: /steer pode consumir PR via SDK immediate.\x1b[0m');
     } catch (e) {
         println(`\x1b[31m  [steer] Falha ao enviar intervenção imediata: ${toError(e).message}\x1b[0m`);
     }
@@ -230,6 +281,32 @@ async function _cmdInterrupt(message) {
             await _cmdAbortCurrentTurn();
             return;
         }
+        const interventionPolicy = getTerminalInterventionPolicy();
+        if (interventionPolicy.enabled && !interventionPolicy.allowQueueFallback) {
+            if (tryApplyImmediateTerminalZeroPr(prompt)) {
+                println('\x1b[36m  [zero-pr] intervenção aplicada imediatamente no ask_user pendente.\x1b[0m');
+                return;
+            }
+            const aborted = await _cmdAbortCurrentTurn();
+            if (!aborted) {
+                println('\x1b[31m  [interrupt] Abort falhou; nenhuma substituição foi aplicada.\x1b[0m');
+                return;
+            }
+            const queued = enqueueRuntimeInterventionMailbox({
+                runtimeId: null,
+                source: 'terminal',
+                modeHint: 'interrupt',
+                message: prompt,
+            });
+            println(
+                '\x1b[33m  [interrupt] Política zero-PR ativa: substituição não foi enfileirada como turno para evitar consumo de PR.\x1b[0m',
+            );
+            println(
+                `\x1b[36m  [mailbox] mensagem substituta registrada para próxima ask_user (fila=${queued.queueSize}${queued.dropped > 0 ? ` · descartadas=${queued.dropped}` : ''}).\x1b[0m`,
+            );
+            println('\x1b[90m  Se precisar abrir novo turno manualmente, use /turn <mensagem>.\x1b[0m');
+            return;
+        }
         const aborted = await _cmdAbortCurrentTurn();
         if (!aborted) {
             println('\x1b[31m  [interrupt] Mensagem substituta não foi enviada porque o abort falhou.\x1b[0m');
@@ -244,6 +321,96 @@ async function _cmdInterrupt(message) {
             println(`\x1b[31m  [interrupt] Turno substituto falhou: ${toError(e).message}\x1b[0m`);
         });
     });
+}
+
+/**
+ * Operações do mailbox zero-PR de intervenção.
+ *
+ * @param {string} arg
+ * @returns {void}
+ */
+function _cmdMailbox(arg) {
+    const [subRaw] = arg.trim().split(/\s+/).filter(Boolean);
+    const sub = (subRaw ?? 'status').toLowerCase();
+    if (sub === 'clear') {
+        const removed = clearRuntimeInterventionMailbox(null);
+        println(`\x1b[32m  [mailbox] limpo (${removed} item(ns) removido(s)).\x1b[0m`);
+        return;
+    }
+    if (sub === 'consume' || sub === 'pop') {
+        const entry = consumeRuntimeInterventionMailbox(null);
+        if (!entry) {
+            println('\x1b[33m  [mailbox] vazio.\x1b[0m');
+            return;
+        }
+        println(
+            `\x1b[36m  [mailbox] consumido ${entry.id} (${entry.source}/${entry.modeHint}) · ${entry.message.slice(0, 140)}\x1b[0m`,
+        );
+        deliverEntryAsTurnIfIdle(entry, 'manual_consume');
+        return;
+    }
+    const summary = readRuntimeInterventionMailboxSummary(null);
+    const latest = summary.latest;
+    println(
+        `\x1b[36m  [mailbox] fila=${summary.queueSize} · descartadas=${summary.dropped} · runtime=${summary.runtimeId}\x1b[0m`,
+    );
+    if (latest) {
+        println(
+            `\x1b[90m  latest=${latest.id} (${latest.source}/${latest.modeHint}) merges=${latest.mergedCount} · ${latest.message.slice(0, 180)}\x1b[0m`,
+        );
+    }
+    println('\x1b[90m  comandos: /mailbox status | /mailbox consume | /mailbox clear\x1b[0m');
+}
+
+/**
+ * Envia explicitamente uma mensagem como novo turno na fila canônica.
+ *
+ * Este comando existe para casos em que o operador quer conscientemente consumir PR.
+ *
+ * @param {string} message
+ * @returns {Promise<void>}
+ */
+async function _cmdTurn(message) {
+    const prompt = message.trim();
+    if (!prompt) {
+        println('\x1b[33m  Uso: /turn <mensagem>\x1b[0m');
+        return;
+    }
+    const queuedBefore = getTurnQueueDepth();
+    const turn = sendTurn(prompt, 'user');
+    println(
+        `\x1b[36m  [turn] Mensagem enfileirada explicitamente (posição ${Math.max(1, queuedBefore + 1)}). Este caminho pode consumir PR.\x1b[0m`,
+    );
+    void turn.catch((e) => {
+        println(`\x1b[31m  [turn] Falha no turno enfileirado: ${toError(e).message}\x1b[0m`);
+    });
+}
+
+/**
+ * Enfileira uma intervenção na mailbox zero-PR sem abrir novo turno SDK.
+ *
+ * @param {string} message
+ * @returns {void}
+ */
+function _cmdQueueMailbox(message) {
+    const prompt = message.trim();
+    if (!prompt) {
+        println('\x1b[33m  Uso: /queue <mensagem>\x1b[0m');
+        return;
+    }
+    if (tryApplyImmediateTerminalZeroPr(prompt)) {
+        println('\x1b[36m  [queue] intervenção aplicada imediatamente no ask_user pendente (zero-PR).\x1b[0m');
+        return;
+    }
+    const queued = enqueueRuntimeInterventionMailbox({
+        runtimeId: null,
+        source: 'terminal',
+        modeHint: 'queue',
+        message: prompt,
+    });
+    println(
+        `\x1b[36m  [queue] intervenção enfileirada no mailbox zero-PR (fila=${queued.queueSize}${queued.dropped > 0 ? ` · descartadas=${queued.dropped}` : ''}).\x1b[0m`,
+    );
 }
 
 function _cmdHandoff() {
@@ -372,10 +539,13 @@ export const CMD_ROUTES = [
     [['abort'], () => runTerminalInterventionSequence(_cmdAbortCurrentTurn)],
     [['steer'], (_, arg) => _cmdSteer(arg)],
     [['interrupt'], (_, arg) => _cmdInterrupt(arg)],
+    [['mailbox', 'ivbox'], (_, arg) => _cmdMailbox(arg)],
+    [['queue'], (_, arg) => _cmdQueueMailbox(arg)],
+    [['turn'], (_, arg) => _cmdTurn(arg)],
     [['handoff'], () => _cmdHandoff()],
     [['skills'], (_, arg) => _cmdSkills({ println }, arg)],
     [['thinking'], (_, arg) => _cmdThinking({ println }, arg)],
-    [['tools'], () => _cmdTools({ println })],
+    [['tools'], (_, arg) => _cmdTools({ println }, arg)],
     [['sdk'], (_, arg) => _cmdSdk({ println }, arg)],
     [['workspace', 'ws'], (_, arg) => _cmdWorkspace({ println }, arg)],
     [['fs', 'files'], (_, arg) => _cmdFs({ println }, arg)],

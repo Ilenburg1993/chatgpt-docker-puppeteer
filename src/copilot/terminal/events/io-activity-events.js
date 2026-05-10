@@ -12,12 +12,47 @@ import { channel } from 'node:diagnostics_channel';
 import { relative } from 'node:path';
 import { getShowToolActivity } from '../../presentation/runtime-ui-state-store.js';
 import { broadcastSse, println } from '../dialog/index.js';
+import { getActiveToolCallRegistry } from '../state/active-tool-call-registry.js';
 import { recordTerminalActivity } from '../state/activity-state.js';
 import { recordTerminalTurnFileActivity } from '../state/turn-trace-state.js';
 import { terminalThemeBadge, terminalThemeText } from '../state/ui-theme.js';
+import { buildToolLifecycleIoOp } from './tool-lifecycle-event.js';
 
 const ioOperationChannel = channel('copilot.io.operation');
 const MAX_RECENT_IO_OPERATIONS = 80;
+
+/**
+ * F1.2: Dedup window para absorver triple-firing das camadas de cache de I/O. Para a mesma operação+alvo, apenas a
+ * primeira ocorrência dentro da janela é registrada. Entradas subsequentes dentro da janela atualizam bytes/duração se
+ * forem maiores/menores.
+ */
+const IO_DEDUP_WINDOW_MS = 60;
+/** @type {Map<string, number>} */
+const _ioDedupWindow = new Map();
+
+/**
+ * @param {string} operation
+ * @param {string} primaryTarget
+ * @returns {boolean} true se deve suprimir (é duplicata dentro da janela)
+ */
+function isDuplicateIoOperation(operation, primaryTarget) {
+    const key = `${operation}::${primaryTarget}`;
+    const now = Date.now();
+    const lastTs = _ioDedupWindow.get(key);
+    if (lastTs !== undefined && now - lastTs <= IO_DEDUP_WINDOW_MS) {
+        return true;
+    }
+    _ioDedupWindow.set(key, now);
+    // Prune periódico: remover entradas antigas para evitar crescimento ilimitado
+    if (_ioDedupWindow.size > 200) {
+        for (const [k, ts] of _ioDedupWindow.entries()) {
+            if (now - ts > IO_DEDUP_WINDOW_MS * 10) {
+                _ioDedupWindow.delete(k);
+            }
+        }
+    }
+    return false;
+}
 
 /**
  * @typedef {{
@@ -157,6 +192,10 @@ function handleIoOperation(message) {
     const touchedTargets = extractTouchedTargets(io);
     const primaryTarget =
         touchedTargets[0] ?? (typeof io.target === 'string' ? compactTargetPath(io.target) : 'unknown');
+    // F1.2: absorver triple-firing de camadas de cache de I/O
+    if (isDuplicateIoOperation(io.operation, primaryTarget)) {
+        return;
+    }
     const byteLabel = formatBytes(io.bytesRead ?? io.bytesWritten);
     const durationLabel = typeof io.durationMs === 'number' ? `${Math.max(0, Math.round(io.durationMs))}ms` : null;
     const extra = [byteLabel, durationLabel, io.engine].filter(Boolean).join(' · ');
@@ -209,6 +248,18 @@ function handleIoOperation(message) {
     broadcastSse('io.operation', {
         ...entry,
     });
+
+    // F3.2: correlate I/O operation with active tool call in registry
+    const _activeRegistry = getActiveToolCallRegistry();
+    const _inFlight = _activeRegistry ? _activeRegistry.getAllInFlight() : [];
+    const _correlated = _inFlight.length > 0 ? _inFlight[0] : null;
+    broadcastSse(
+        'tool.lifecycle',
+        buildToolLifecycleIoOp(entry, {
+            correlatedToolCallId: _correlated?.toolCallId ?? null,
+            correlatedToolName: _correlated?.toolName ?? null,
+        }),
+    );
 }
 
 /**
@@ -252,4 +303,9 @@ export const __test__ = {
     compactTargetPath,
     extractTouchedTargets,
     mapIoOperationToTurnOperation,
+    handleIoOperation,
+    isDuplicateIoOperation,
+    get ioDedupWindow() {
+        return _ioDedupWindow;
+    },
 };

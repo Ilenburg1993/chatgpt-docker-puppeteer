@@ -26,7 +26,7 @@ import {
     SessionConfigBuilder,
     buildCustomAgentsConfig,
 } from '#copilot/config';
-import { buildCanonicalLocalFsExcludedTools, container } from '#copilot/core';
+import { buildCanonicalLocalSurfaceExcludedTools, container } from '#copilot/core';
 import { AgentToolPolicy } from '#copilot/sdk';
 import { log } from '../../ports/logging-port.js';
 import { METRICS_STORE } from '../../ports/metrics-port.js';
@@ -308,7 +308,7 @@ export function buildSessionOptions(ctx, host, { tools, busHooks }) {
         .onPermissionRequest(getPermissionHandler(ctx))
         .tools(tools)
         .excludedTools(
-            buildCanonicalLocalFsExcludedTools(
+            buildCanonicalLocalSurfaceExcludedTools(
                 tools.map((tool) => tool.name),
                 DEFAULT_EXCLUDED_TOOLS,
             ),

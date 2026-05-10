@@ -141,6 +141,26 @@ function tryZodV4ToJsonSchema(parameters) {
 }
 
 /**
+ * Valida se o JSON Schema produzido é útil para parâmetros de tool.
+ *
+ * Alguns conversores podem retornar apenas `{ $schema: ... }` em cenários de compatibilidade, o que deixa a tool com
+ * contrato praticamente invisível para o modelo.
+ *
+ * @param {unknown} schema
+ * @returns {schema is Record<string, unknown>}
+ */
+function isUsableToolParameterSchema(schema) {
+    if (!schema || typeof schema !== 'object' || Array.isArray(schema)) return false;
+    const data = /** @type {Record<string, unknown>} */ (schema);
+    if (typeof data['type'] === 'string') return true;
+    if (typeof data['$ref'] === 'string') return true;
+    if (data['properties'] && typeof data['properties'] === 'object') return true;
+    if (Array.isArray(data['anyOf']) || Array.isArray(data['oneOf']) || Array.isArray(data['allOf'])) return true;
+    if ('additionalProperties' in data) return true;
+    return false;
+}
+
+/**
  * Fallback estritamente local para a janela de TDZ do barrel em ciclos ESM/Vitest.
  *
  * @param {{
@@ -236,7 +256,7 @@ function normalizeParameters(parameters, toolName = 'unknown') {
     if ('_def' in parameters || '_zod' in parameters) {
         try {
             const zodV4Schema = tryZodV4ToJsonSchema(parameters);
-            if (zodV4Schema) return zodV4Schema;
+            if (isUsableToolParameterSchema(zodV4Schema)) return zodV4Schema;
             const converter = loadZodToJsonSchema();
             if (!converter) {
                 throw new Error('zod-to-json-schema indisponível');
@@ -244,6 +264,9 @@ function normalizeParameters(parameters, toolName = 'unknown') {
             const jsonSchema = /** @type {Record<string, unknown>} */ (
                 converter(/** @type {import('zod/v3').ZodTypeAny} */ (parameters))
             );
+            if (!isUsableToolParameterSchema(jsonSchema)) {
+                throw new Error('JSON Schema inválido/incompleto após conversão Zod');
+            }
             return jsonSchema;
         } catch (err) {
             const message = /** @type {Error} */ (err).message;
@@ -256,7 +279,7 @@ function normalizeParameters(parameters, toolName = 'unknown') {
         }
     }
 
-    return /** @type {Record<string, unknown>} */ (parameters);
+    return isUsableToolParameterSchema(parameters) ? /** @type {Record<string, unknown>} */ (parameters) : undefined;
 }
 
 /**

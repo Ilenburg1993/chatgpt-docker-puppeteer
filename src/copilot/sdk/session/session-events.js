@@ -75,6 +75,10 @@ export function normalizeModelChangedEvent(eventOrData) {
  * @typedef {object} ToolSummary
  * @property {string} name Nome canônico da tool (namespacedName > name).
  * @property {string | null} description Descrição curta ou `null`.
+ * @property {string | null} rawName Nome bruto (`name`) recebido do SDK.
+ * @property {string | null} namespacedName Nome namespaced recebido do SDK.
+ * @property {boolean} hasParameters Indica presença de JSON schema em `parameters`.
+ * @property {boolean} hasInstructions Indica presença de texto em `instructions`.
  */
 
 /**
@@ -101,9 +105,13 @@ export function normalizeToolsUpdatedEvent(eventOrData) {
     /** @type {ToolSummary[]} */
     const tools = rawTools.map((t) => {
         const rec = objectOrEmpty(t);
-        const name = stringOr(rec['namespacedName'], '') || stringOr(rec['name'], '') || stringOr(t, 'unknown');
+        const rawName = stringOr(rec['name'], '') || null;
+        const namespacedName = stringOr(rec['namespacedName'], '') || null;
+        const name = namespacedName || rawName || stringOr(t, 'unknown');
         const description = stringOr(rec['description'], '') || null;
-        return { name, description };
+        const hasParameters = Boolean(rec['parameters'] && typeof rec['parameters'] === 'object');
+        const hasInstructions = typeof rec['instructions'] === 'string' && rec['instructions'].trim().length > 0;
+        return { name, description, rawName, namespacedName, hasParameters, hasInstructions };
     });
 
     const ts = tsOrNow(root['timestamp'] ?? root['ts'] ?? data['ts']);

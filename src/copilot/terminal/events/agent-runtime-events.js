@@ -35,12 +35,21 @@ import { broadcastSse, buildUserPrompt, clearInlineStatus, println, writeInlineS
 import { readTerminalRuntimeState } from '../frontend/gateways/agent-runtime.js';
 import { recordTerminalActivity } from '../state/activity-state.js';
 import { createTerminalPendingQuestionReplayState } from '../state/pending-question-replay.js';
-import { completeTerminalTurnToolCall, recordTerminalTurnToolActivity } from '../state/turn-trace-state.js';
+import { createToolCallRegistry } from '../state/tool-call-registry.js';
+import {
+    completeTerminalTurnToolCall,
+    recordTerminalTurnFileActivity,
+    recordTerminalTurnToolActivity,
+} from '../state/turn-trace-state.js';
 import { getTerminalDetailLevel } from '../state/ui-preferences.js';
 import { terminalActionChip, terminalThemeBadge, terminalThemeText } from '../state/ui-theme.js';
-import { isExternalToolInFlight } from './sdk-session-events.js';
 import { buildTerminalToolActivityPresentation, compactTerminalToolText } from './tool-activity-presenter.js';
-
+import {
+    buildToolLifecycleComplete,
+    buildToolLifecyclePartialResult,
+    buildToolLifecycleProgress,
+    buildToolLifecycleStart,
+} from './tool-lifecycle-event.js';
 /**
  * @typedef {{
  *     on: (event: string, handler: (...args: any[]) => void) => void;
@@ -54,10 +63,13 @@ const TOOL_HEARTBEAT_INTERVAL_MS = 10_000;
  * @param {{
  *     agent: AgentEventHost;
  *     rl?: import('readline').Interface | null;
+ *     registry?: ReturnType<import('../state/tool-call-registry.js').createToolCallRegistry> | null;
  * }} input
  * @returns {() => void}
  */
-export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null }) {
+export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, registry = null }) {
+    // Garante sempre um registry session-scoped — em produção é injetado pelo event-adapters.js
+    const _reg = registry ?? createToolCallRegistry();
     /**
      * @type {Map<
      *     string,
@@ -211,14 +223,19 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null }) {
             return;
         }
         // Evita duplicidade visual: ferramentas externas já foram anunciadas em external_tool.requested
-        if (isExternalToolInFlight(name)) {
+        if (_reg.isNameInFlight(name)) {
             return;
+        }
+        // Registra tool nativa no ToolCallRegistry para correlação io_op → toolCallId
+        if (toolCallId) {
+            _reg.register(toolCallId, name, 'native');
         }
         const compactDetail = getTerminalDetailLevel() === 'compact';
         const presentation = buildTerminalToolActivityPresentation(evt, name);
+        const canonicalName = presentation.canonicalToolName ?? name;
         const startedAt = Date.now();
         activeTools.set(toolCallId, {
-            name,
+            name: canonicalName,
             t0: startedAt,
             presentation,
             lastProgress: null,
@@ -227,7 +244,7 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null }) {
             lastHeartbeatAt: 0,
         });
         recordTerminalTurnToolActivity({
-            toolName: name,
+            toolName: canonicalName,
             operation: presentation.operation,
             path: presentation.path,
             target: presentation.target,
@@ -235,9 +252,17 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null }) {
             status: 'started',
             toolCallId,
         });
+        for (const fileTarget of presentation.fileTargets) {
+            if (!fileTarget || fileTarget === presentation.path) continue;
+            recordTerminalTurnFileActivity({
+                path: fileTarget,
+                operation: presentation.operation,
+                source: 'sdk',
+            });
+        }
         recordTerminalActivity('tool', 'Executando tool', {
             detail: presentation.detail,
-            toolName: name,
+            toolName: canonicalName,
             source: 'sdk',
         });
         if (getShowToolActivity()) {
@@ -254,7 +279,29 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null }) {
             toolName: name,
             operation: presentation.operation,
             path: presentation.path,
+            target: presentation.target,
+            fileTargets: presentation.fileTargets,
+            urlTargets: presentation.urlTargets,
+            searchTerms: presentation.searchTerms,
+            lineRange: presentation.lineRange,
+            patchFiles: presentation.patchFiles,
         });
+        broadcastSse(
+            'tool.lifecycle',
+            buildToolLifecycleStart({
+                toolCallId,
+                toolName: name,
+                canonicalName,
+                operation: presentation.operation,
+                path: presentation.path,
+                target: presentation.target,
+                fileTargets: presentation.fileTargets,
+                urlTargets: presentation.urlTargets,
+                searchTerms: presentation.searchTerms,
+                lineRange: presentation.lineRange,
+                patchFiles: presentation.patchFiles,
+            }),
+        );
     };
 
     const onToolProgress = (/** @type {Record<string, unknown>} */ evt) => {
@@ -302,9 +349,32 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null }) {
             toolName: name,
             operation: presentation.operation,
             path: presentation.path,
+            target: presentation.target,
+            fileTargets: presentation.fileTargets,
+            urlTargets: presentation.urlTargets,
+            searchTerms: presentation.searchTerms,
+            lineRange: presentation.lineRange,
+            patchFiles: presentation.patchFiles,
             progress,
             progressMessage,
         });
+        broadcastSse(
+            'tool.lifecycle',
+            buildToolLifecycleProgress({
+                toolCallId,
+                toolName: name,
+                operation: presentation.operation,
+                path: presentation.path,
+                target: presentation.target,
+                fileTargets: presentation.fileTargets,
+                urlTargets: presentation.urlTargets,
+                searchTerms: presentation.searchTerms,
+                lineRange: presentation.lineRange,
+                patchFiles: presentation.patchFiles,
+                progress,
+                progressMessage,
+            }),
+        );
     };
 
     const onToolPartialResult = (/** @type {{ toolCallId?: string; partialOutput?: string }} */ evt) => {
@@ -340,13 +410,36 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null }) {
             toolName: name,
             operation: presentation.operation,
             path: presentation.path,
+            target: presentation.target,
+            fileTargets: presentation.fileTargets,
+            urlTargets: presentation.urlTargets,
+            searchTerms: presentation.searchTerms,
+            lineRange: presentation.lineRange,
+            patchFiles: presentation.patchFiles,
             partialOutput,
         });
+        broadcastSse(
+            'tool.lifecycle',
+            buildToolLifecyclePartialResult({
+                toolCallId,
+                toolName: name,
+                operation: presentation.operation,
+                path: presentation.path,
+                target: presentation.target,
+                fileTargets: presentation.fileTargets,
+                urlTargets: presentation.urlTargets,
+                searchTerms: presentation.searchTerms,
+                lineRange: presentation.lineRange,
+                patchFiles: presentation.patchFiles,
+                partialOutput,
+            }),
+        );
     };
 
     const onToolComplete = (/** @type {Record<string, unknown>} */ evt) => {
         const toolCallId = /** @type {string} */ (evt?.['toolCallId'] ?? '');
         const success = Boolean(evt?.['success']);
+        const requestId = typeof evt?.['requestId'] === 'string' ? evt['requestId'] : null;
         const entry = activeTools.get(toolCallId);
         activeTools.delete(toolCallId);
         const eventName =
@@ -360,20 +453,33 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null }) {
             return;
         }
         // Evita duplicidade visual: ferramentas externas já foram anunciadas em external_tool.completed
-        if (isExternalToolInFlight(name)) {
+        if (
+            _reg.isNameInFlight(name) ||
+            _reg.wasNameRecentlyCompleted(name, requestId) ||
+            _reg.wasRecentlyCompleted(toolCallId, requestId)
+        ) {
             return;
         }
+        // Completa tool nativa no ToolCallRegistry (após guard; externals são completadas em onExternalToolCompleted)
+        if (toolCallId && _reg.getEntry(toolCallId)?.kind === 'native') {
+            _reg.complete(toolCallId, success);
+        }
         const compactDetail = getTerminalDetailLevel() === 'compact';
-        const presentation = entry?.presentation ?? buildTerminalToolActivityPresentation(evt, name);
+        const completionPresentation = buildTerminalToolActivityPresentation(evt, name);
+        const presentation =
+            completionPresentation.target || completionPresentation.path
+                ? completionPresentation
+                : (entry?.presentation ?? completionPresentation);
+        const canonicalName = presentation.canonicalToolName ?? name;
         const durationMs = entry
             ? Date.now() - entry.t0
             : Number.isFinite(Number(evt?.['durationMs']))
               ? Number(evt?.['durationMs'])
               : 0;
         if (entry || eventName) {
-            recordToolCall(`sdk.${name}`, durationMs, success);
+            recordToolCall(`sdk.${canonicalName}`, durationMs, success);
         }
-        const dur = durationMs > 0 ? (durationMs / 1000).toFixed(1) : '?';
+        const dur = durationMs > 0 ? `${(durationMs / 1000).toFixed(1)}s` : 'n/d';
         const icon = success ? terminalThemeText('success', '✅') : terminalThemeText('error', '❌');
         const operationRole = mapOperationRole(presentation.operation);
         if (compactDetail) {
@@ -382,19 +488,43 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null }) {
         if (toolCallId) {
             completeTerminalTurnToolCall({ toolCallId, success });
         }
-        recordTerminalActivity('tool', success ? 'Tool concluída' : 'Tool falhou', {
-            detail: presentation.completeLine(success, `${dur}s`),
-            toolName: name,
+        const hasOnlyCallIdTarget =
+            typeof presentation.target === 'string' &&
+            presentation.target.length > 0 &&
+            presentation.target === toolCallId;
+        const lowFidelityGeneric =
+            canonicalName === 'tool' &&
+            presentation.operation === 'unknown' &&
+            presentation.fileTargets.length === 0 &&
+            presentation.urlTargets.length === 0 &&
+            presentation.searchTerms.length === 0 &&
+            (hasOnlyCallIdTarget || !presentation.target);
+        const lowFidelitySuffix =
+            lowFidelityGeneric && toolCallId ? ` · callId=${compactTerminalToolText(toolCallId, 28)}` : '';
+        const completionDetail = `${presentation.completeLine(success, dur)}${lowFidelitySuffix}`;
+
+        const activityLabel = lowFidelityGeneric
+            ? success
+                ? 'Tool concluída (metadados parciais)'
+                : 'Tool falhou (metadados parciais)'
+            : success
+              ? 'Tool concluída'
+              : 'Tool falhou';
+        recordTerminalActivity('tool', activityLabel, {
+            detail: completionDetail,
+            toolName: canonicalName,
             progress: success ? 100 : null,
             severity: success ? 'info' : 'error',
             source: 'sdk',
         });
         if (getShowToolActivity()) {
             const statusBadge = success ? terminalThemeBadge('success', 'DONE') : terminalThemeBadge('error', 'FAIL');
+            const renderedName =
+                lowFidelityGeneric && toolCallId ? `tool#${toolCallId.slice(-8)}` : presentation.displayToolName;
             println(
                 compactDetail
-                    ? `  ${icon} ${statusBadge} ${terminalThemeText('tool', compactTerminalToolText(presentation.displayToolName, 28))} ${terminalThemeText('muted', '·')} ${terminalThemeText(operationRole, compactTerminalToolText(presentation.completeLine(success, `${dur}s`), 88))}`
-                    : `  ${icon} ${statusBadge} ${terminalThemeText('tool', presentation.displayToolName)} ${terminalThemeText('muted', '·')} ${terminalThemeText(operationRole, presentation.completeLine(success, `${dur}s`))}`,
+                    ? `  ${icon} ${statusBadge} ${terminalThemeText('tool', compactTerminalToolText(renderedName, 28))} ${terminalThemeText('muted', '·')} ${terminalThemeText(operationRole, compactTerminalToolText(completionDetail, 88))}`
+                    : `  ${icon} ${statusBadge} ${terminalThemeText('tool', renderedName)} ${terminalThemeText('muted', '·')} ${terminalThemeText(operationRole, completionDetail)}`,
             );
         }
         broadcastSse('tool.complete', {
@@ -402,9 +532,33 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null }) {
             toolName: name,
             operation: presentation.operation,
             path: presentation.path,
+            target: presentation.target,
+            fileTargets: presentation.fileTargets,
+            urlTargets: presentation.urlTargets,
+            searchTerms: presentation.searchTerms,
+            lineRange: presentation.lineRange,
+            patchFiles: presentation.patchFiles,
             success,
             durationMs: entry ? Date.now() - entry.t0 : 0,
         });
+        broadcastSse(
+            'tool.lifecycle',
+            buildToolLifecycleComplete({
+                toolCallId,
+                toolName: name,
+                canonicalName,
+                operation: presentation.operation,
+                path: presentation.path,
+                target: presentation.target,
+                fileTargets: presentation.fileTargets,
+                urlTargets: presentation.urlTargets,
+                searchTerms: presentation.searchTerms,
+                lineRange: presentation.lineRange,
+                patchFiles: presentation.patchFiles,
+                success,
+                durationMs: durationMs > 0 ? durationMs : 0,
+            }),
+        );
     };
 
     const onSessionError = (/** @type {Record<string, unknown>} */ evt) => {
@@ -519,18 +673,18 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null }) {
 
     return () => {
         clearInterval(toolHeartbeatTimer);
-        agent.off('question.pending', onQuestion);
-        agent.off('stopped', onStopped);
-        agent.off('tool.execution_start', onToolStart);
+        agent.off(EMITTER_QUESTION_PENDING, onQuestion);
+        agent.off(EMITTER_STOPPED, onStopped);
+        agent.off(EMITTER_TOOL_EXECUTION_START, onToolStart);
         agent.off(EMITTER_TOOL_EXECUTION_PARTIAL_RESULT, onToolPartialResult);
-        agent.off('tool.execution_progress', onToolProgress);
-        agent.off('tool.execution_complete', onToolComplete);
-        agent.off('session.error', onSessionError);
-        agent.off('session.compaction_start', onCompactionStart);
-        agent.off('session.compaction_complete', onCompactionComplete);
-        agent.off('assistant.intent', onIntent);
-        agent.off('subagent.started', onSubagentStarted);
-        agent.off('subagent.completed', onSubagentCompleted);
-        agent.off('subagent.failed', onSubagentFailed);
+        agent.off(EMITTER_TOOL_EXECUTION_PROGRESS, onToolProgress);
+        agent.off(EMITTER_TOOL_EXECUTION_COMPLETE, onToolComplete);
+        agent.off(EMITTER_SESSION_ERROR, onSessionError);
+        agent.off(EMITTER_SESSION_COMPACTION_START, onCompactionStart);
+        agent.off(EMITTER_SESSION_COMPACTION_COMPLETE, onCompactionComplete);
+        agent.off(EMITTER_ASSISTANT_INTENT, onIntent);
+        agent.off(EMITTER_SUBAGENT_STARTED, onSubagentStarted);
+        agent.off(EMITTER_SUBAGENT_COMPLETED, onSubagentCompleted);
+        agent.off(EMITTER_SUBAGENT_FAILED, onSubagentFailed);
     };
 }

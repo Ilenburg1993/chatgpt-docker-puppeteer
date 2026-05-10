@@ -19,30 +19,53 @@ import {
     EMITTER_ASSISTANT_REASONING_COMPLETE,
     EMITTER_ASSISTANT_TURN_END,
     EMITTER_ASSISTANT_TURN_START,
+    EMITTER_ELICITATION_COMPLETED,
+    EMITTER_ELICITATION_PENDING,
     EMITTER_EXIT_PLAN_MODE_COMPLETED,
+    EMITTER_EXTERNAL_TOOL_COMPLETED,
+    EMITTER_EXTERNAL_TOOL_REQUESTED,
+    EMITTER_MCP_OAUTH_COMPLETED,
+    EMITTER_MCP_OAUTH_REQUIRED,
+    EMITTER_MCP_SERVER_STATUS_CHANGED,
+    EMITTER_PENDING_MESSAGES_MODIFIED,
+    EMITTER_PERMISSION_COMPLETED,
     EMITTER_PERMISSION_MODE_CHANGED,
+    EMITTER_PERMISSION_REQUESTED,
+    EMITTER_SESSION_BACKGROUND_TASKS_CHANGED,
     EMITTER_SESSION_CONTEXT_CHANGED,
+    EMITTER_SESSION_EXTENSIONS_LOADED,
     EMITTER_SESSION_HANDOFF,
     EMITTER_SESSION_INFO,
+    EMITTER_SESSION_MCP_SERVERS_LOADED,
     EMITTER_SESSION_MODE_CHANGED,
     EMITTER_SESSION_MODEL_CHANGED,
     EMITTER_SESSION_PLAN_CHANGED,
     EMITTER_SESSION_SHUTDOWN,
+    EMITTER_SESSION_SKILLS_LOADED,
     EMITTER_SESSION_SNAPSHOT_REWIND,
     EMITTER_SESSION_TASK_COMPLETE,
     EMITTER_SESSION_TITLE_CHANGED,
+    EMITTER_SESSION_TOOLS_UPDATED,
     EMITTER_SESSION_TRUNCATION,
     EMITTER_SESSION_WARNING,
     EMITTER_SESSION_WORKSPACE_FILE_CHANGED,
+    EMITTER_TOOL_USER_REQUESTED,
+    EMITTER_USER_INPUT_COMPLETED,
+    EMITTER_USER_INPUT_REQUESTED,
 } from '#copilot/events';
 import { DialogProtocol } from '../../dialog/protocol.js';
 import {
+    consumeRuntimeInterventionMailbox,
+    enqueueRuntimeInterventionMailbox,
     getShowSessionActivity,
+    readRuntimeInterventionMailboxSummary,
     setLastSdkPlanOperation,
     setSdkSessionMode,
 } from '../../presentation/runtime-ui-state-store.js';
 import { classifyPermissionDecision } from '../../sdk/session/permission-events.js';
 import { broadcastSse, println } from '../dialog/index.js';
+import { answerTerminalPendingQuestion } from '../frontend/gateways/agent-runtime.js';
+import { drainMailboxToTurnIfIdle } from '../mailbox-drain.js';
 import { recordTerminalActivity } from '../state/activity-state.js';
 import {
     recordTerminalElicitationCompleted,
@@ -53,6 +76,7 @@ import {
     recordTerminalUserInputCompleted,
     recordTerminalUserInputRequested,
 } from '../state/sdk-interactions.js';
+import { createToolCallRegistry } from '../state/tool-call-registry.js';
 import {
     beginTerminalTurnTrace,
     completeTerminalTurnTrace,
@@ -61,6 +85,12 @@ import {
 } from '../state/turn-trace-state.js';
 import { getTerminalDetailLevel } from '../state/ui-preferences.js';
 import { terminalThemeBadge, terminalThemeText } from '../state/ui-theme.js';
+import { buildTerminalToolActivityPresentation } from './tool-activity-presenter.js';
+import {
+    buildToolLifecycleExternalCompleted,
+    buildToolLifecycleExternalRequested,
+    buildToolLifecycleUserRequested,
+} from './tool-lifecycle-event.js';
 
 /**
  * @typedef {{
@@ -138,46 +168,47 @@ function renderTurnTraceSummary(trace) {
 }
 
 /**
- * Rastreamento de ferramentas externas em processamento para evitar duplicidade visual.
- *
- * @type {Set<string>}
- */
-const externalToolsInFlight = new Set();
-
-/**
- * @param {string} toolName
- * @returns {boolean}
- */
-export function isExternalToolInFlight(toolName) {
-    return externalToolsInFlight.has(toolName);
-}
-
-/**
- * @param {string} toolName
- * @returns {void}
- */
-export function markExternalToolInFlight(toolName) {
-    externalToolsInFlight.add(toolName);
-}
-
-/**
- * @param {string} toolName
- * @returns {void}
- */
-export function unmarkExternalToolInFlight(toolName) {
-    externalToolsInFlight.delete(toolName);
-}
-
-/**
  * @param {{
  *     agent: AgentEventHost;
  *     refreshPromptIfIdle: () => void;
+ *     registry?: ReturnType<import('../state/tool-call-registry.js').createToolCallRegistry> | null;
  * }} input
  * @returns {() => void}
  */
-export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfIdle }) {
-    /** @type {Set<string>} */
-    const suppressedProtocolRequestIds = new Set();
+export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfIdle, registry = null }) {
+    // Garante sempre um registry session-scoped — em produção é injetado pelo event-adapters.js
+    const _reg = registry ?? createToolCallRegistry();
+    /**
+     * Requests de protocolo suprimidas para não poluir UI de ask_user. Bounded+TTL para evitar crescimento sem limite
+     * em sessões muito longas.
+     *
+     * @type {Map<string, number>}
+     */
+    const suppressedProtocolRequestIds = new Map();
+
+    const SUPPRESSED_PROTOCOL_TTL_MS = 10 * 60_000;
+    const SUPPRESSED_PROTOCOL_MAX = 512;
+
+    /**
+     * @param {number} [now]
+     * @returns {void}
+     */
+    function pruneSuppressedProtocolRequestIds(now = Date.now()) {
+        for (const [requestId, ts] of suppressedProtocolRequestIds.entries()) {
+            if (now - ts > SUPPRESSED_PROTOCOL_TTL_MS) {
+                suppressedProtocolRequestIds.delete(requestId);
+            }
+        }
+        if (suppressedProtocolRequestIds.size > SUPPRESSED_PROTOCOL_MAX) {
+            const overflow = suppressedProtocolRequestIds.size - SUPPRESSED_PROTOCOL_MAX;
+            let removed = 0;
+            for (const requestId of suppressedProtocolRequestIds.keys()) {
+                suppressedProtocolRequestIds.delete(requestId);
+                removed++;
+                if (removed >= overflow) break;
+            }
+        }
+    }
 
     /**
      * @param {'critical' | 'important' | 'verbose'} level
@@ -193,11 +224,6 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
     const onAssistantTurnStart = (/** @type {{ turnId?: string | null }} */ evt) => {
         const turnId = evt?.turnId ?? null;
         beginTerminalTurnTrace({ turnId });
-        recordTerminalActivity('turn', 'Turno do assistente iniciado', {
-            detail: turnId ? `turnId=${turnId}` : 'processando resposta',
-            source: 'sdk',
-            recordHistory: false,
-        });
         broadcastSse('assistant.turn_start', {
             turnId,
             timestamp: Date.now(),
@@ -216,6 +242,12 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
         broadcastSse('assistant.turn_end', {
             turnId,
             timestamp: Date.now(),
+        });
+        // Drenar entradas stranded do mailbox zero-PR: se o modelo completou sem chamar ask_user,
+        // as entradas não serão consumidas automaticamente. Usar setImmediate para aguardar
+        // setBusy(false) do engine.js antes de verificar o estado de ociosidade.
+        setImmediate(() => {
+            drainMailboxToTurnIfIdle('turn_end');
         });
         refreshPromptIfIdle();
     };
@@ -344,6 +376,7 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
         /**
          * @type {{
          *     requestId?: string;
+         *     runtimeId?: string | null;
          *     question?: string;
          *     choices?: string[];
          *     allowFreeform?: boolean;
@@ -358,7 +391,8 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
         const kind = DialogProtocol.classify(question);
         const tracked = recordTerminalUserInputRequested(evt);
         if (requestId && kind !== 'question') {
-            suppressedProtocolRequestIds.add(requestId);
+            pruneSuppressedProtocolRequestIds();
+            suppressedProtocolRequestIds.set(requestId, Date.now());
         }
         if (kind !== 'question') {
             refreshPromptIfIdle();
@@ -382,6 +416,47 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
             println(
                 `  ${terminalThemeBadge('question', 'ASK')} ${terminalThemeText('question', tracked.question.slice(0, 120))}${terminalThemeText('muted', optionsLabel)}`,
             );
+        }
+
+        const runtimeId = typeof evt?.runtimeId === 'string' && evt.runtimeId.trim().length > 0 ? evt.runtimeId : null;
+        const mailboxEntry = consumeRuntimeInterventionMailbox(runtimeId);
+        if (mailboxEntry) {
+            const answered = answerTerminalPendingQuestion(mailboxEntry.message, runtimeId);
+            if (answered) {
+                const mailboxSummary = readRuntimeInterventionMailboxSummary(runtimeId);
+                recordTerminalActivity('question', 'Mailbox zero-PR aplicado em ask_user', {
+                    detail: `${mailboxEntry.source}/${mailboxEntry.modeHint}${mailboxEntry.mergedCount > 0 ? ` · merges=${mailboxEntry.mergedCount}` : ''}`,
+                    source: 'sdk',
+                    severity: 'info',
+                    recordHistory: false,
+                });
+                println(
+                    `  ${terminalThemeBadge('info', 'MAILBOX')} ${terminalThemeText('info', `intervenção aplicada automaticamente (${mailboxEntry.source}/${mailboxEntry.modeHint})`)}${terminalThemeText('muted', ` · fila restante=${mailboxSummary.queueSize}`)}`,
+                );
+                broadcastSse('intervention.mailbox.applied', {
+                    runtimeId,
+                    entryId: mailboxEntry.id,
+                    source: mailboxEntry.source,
+                    modeHint: mailboxEntry.modeHint,
+                    mergedCount: mailboxEntry.mergedCount,
+                    queueSize: mailboxSummary.queueSize,
+                    dropped: mailboxSummary.dropped,
+                    timestamp: Date.now(),
+                });
+            } else {
+                enqueueRuntimeInterventionMailbox({
+                    runtimeId,
+                    source: mailboxEntry.source,
+                    modeHint: mailboxEntry.modeHint,
+                    message: mailboxEntry.message,
+                });
+                recordTerminalActivity('question', 'Mailbox zero-PR não aplicado (requeued)', {
+                    detail: `${mailboxEntry.id} · pending answer route unavailable`,
+                    source: 'sdk',
+                    severity: 'warn',
+                    recordHistory: false,
+                });
+            }
         }
         refreshPromptIfIdle();
     };
@@ -639,6 +714,9 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
             reason,
             timestamp: Date.now(),
         });
+        // Limpeza defensiva em shutdown para não carregar estado órfão em sessões subsequentes.
+        suppressedProtocolRequestIds.clear();
+        _reg.clear();
     };
 
     const onSessionHandoff = (
@@ -707,58 +785,160 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
             `\n  \x1b[33m🧩 Tool aguarda usuário:\x1b[0m ${toolName}${requestId ? ` \x1b[90m(${requestId})\x1b[0m` : ''}`,
         );
         broadcastSse('tool.user_requested', { toolName, requestId, timestamp: Date.now() });
+        broadcastSse('tool.lifecycle', buildToolLifecycleUserRequested({ toolName, requestId: requestId ?? null }));
         refreshPromptIfIdle();
     };
 
-    const onExternalToolRequested = (/** @type {{ toolName?: string; requestId?: string }} */ evt) => {
-        const toolName = evt?.toolName ?? 'external_tool';
-        const requestId = evt?.requestId ?? null;
-        markExternalToolInFlight(toolName);
-        recordTerminalTurnToolActivity({
-            toolName,
-            operation: 'run',
-            target: requestId,
-            source: 'sdk',
-            status: 'requested',
-        });
-        recordTerminalActivity('tool', 'External tool solicitada', {
-            detail: `${toolName}${requestId ? ` · ${requestId}` : ''}`,
-            toolName,
-            source: 'sdk',
-        });
-        if (shouldPrintSessionNarration('verbose')) {
-            println(`  \x1b[90m↗ external tool: ${toolName}${requestId ? ` (${requestId})` : ''}\x1b[0m`);
-        }
-        broadcastSse('external_tool.requested', { toolName, requestId, timestamp: Date.now() });
-    };
-
-    const onExternalToolCompleted = (
-        /** @type {{ toolName?: string; requestId?: string; success?: boolean }} */ evt,
+    const onExternalToolRequested = (
+        /** @type {{ toolName?: string; requestId?: string; toolCallId?: string; data?: Record<string, unknown> }} */ evt,
     ) => {
         const toolName = evt?.toolName ?? 'external_tool';
         const requestId = evt?.requestId ?? null;
-        const success = evt?.success !== false;
-        unmarkExternalToolInFlight(toolName);
+        // toolCallId real do SDK (obrigatório na spec oficial); fallback para ID sintético se ausente
+        const toolCallId = evt?.toolCallId ?? (requestId ? `ext:${requestId}` : `ext:${toolName}:${Date.now()}`);
+        const presentation = buildTerminalToolActivityPresentation(evt ?? {}, toolName);
+        const displayToolName = presentation.canonicalToolName ?? toolName;
+        _reg.register(toolCallId, displayToolName, 'external', { requestId });
         recordTerminalTurnToolActivity({
-            toolName,
-            operation: 'run',
-            target: requestId,
+            toolName: displayToolName,
+            operation: presentation.operation,
+            path: presentation.path,
+            target: presentation.target ?? requestId,
+            source: 'sdk',
+            status: 'requested',
+            toolCallId,
+        });
+        for (const fileTarget of presentation.fileTargets) {
+            recordTerminalTurnFileActivity({
+                path: fileTarget,
+                operation: presentation.operation,
+                source: 'sdk',
+            });
+        }
+        recordTerminalActivity('tool', 'External tool solicitada', {
+            detail: presentation.detail || `${displayToolName}${requestId ? ` · ${requestId}` : ''}`,
+            toolName: displayToolName,
+            source: 'sdk',
+        });
+        if (shouldPrintSessionNarration('verbose')) {
+            const targetLabel = presentation.target || presentation.path || requestId || '';
+            println(`  \x1b[90m↗ external tool: ${displayToolName}${targetLabel ? ` · ${targetLabel}` : ''}\x1b[0m`);
+        }
+        broadcastSse('external_tool.requested', {
+            toolName: displayToolName,
+            requestId,
+            toolCallId,
+            operation: presentation.operation,
+            path: presentation.path,
+            target: presentation.target,
+            fileTargets: presentation.fileTargets,
+            urlTargets: presentation.urlTargets,
+            searchTerms: presentation.searchTerms,
+            lineRange: presentation.lineRange,
+            patchFiles: presentation.patchFiles,
+            timestamp: Date.now(),
+        });
+        broadcastSse(
+            'tool.lifecycle',
+            buildToolLifecycleExternalRequested({
+                toolName: displayToolName,
+                requestId: requestId ?? '',
+                toolCallId,
+                operation: presentation.operation,
+                path: presentation.path,
+                target: presentation.target,
+                fileTargets: presentation.fileTargets,
+                urlTargets: presentation.urlTargets,
+                searchTerms: presentation.searchTerms,
+                lineRange: presentation.lineRange,
+                patchFiles: presentation.patchFiles,
+            }),
+        );
+    };
+
+    const onExternalToolCompleted = (
+        /**
+         * @type {{
+         *     toolName?: string;
+         *     requestId?: string;
+         *     toolCallId?: string;
+         *     success?: boolean;
+         *     data?: Record<string, unknown>;
+         * }}
+         */ evt,
+    ) => {
+        const originalToolName = evt?.toolName ?? 'external_tool';
+        const requestId = evt?.requestId ?? null;
+        const success = evt?.success !== false;
+        const evtToolCallId = evt?.toolCallId ?? null;
+        let toolName;
+        /** @type {string | null} */
+        let resolvedToolCallId = evtToolCallId;
+        {
+            const entry = _reg.resolveByRequestId(requestId);
+            const resolvedName = entry?.toolName ?? _reg.resolveNameByRequestId(requestId);
+            toolName = originalToolName === 'external_tool' && resolvedName ? resolvedName : originalToolName;
+            if (entry) {
+                resolvedToolCallId = entry.toolCallId;
+                _reg.complete(entry.toolCallId, success);
+            } else {
+                toolName = originalToolName;
+            }
+        }
+        const completionPresentation = buildTerminalToolActivityPresentation(evt ?? {}, toolName);
+        const displayToolName = completionPresentation.canonicalToolName ?? toolName;
+        recordTerminalTurnToolActivity({
+            toolName: displayToolName,
+            operation: completionPresentation.operation,
+            path: completionPresentation.path,
+            target: completionPresentation.target ?? requestId,
             source: 'sdk',
             status: success ? 'completed' : 'failed',
             success,
+            toolCallId: resolvedToolCallId,
         });
         recordTerminalActivity('tool', success ? 'External tool concluída' : 'External tool falhou', {
-            detail: `${toolName}${requestId ? ` · ${requestId}` : ''}`,
-            toolName,
+            detail: completionPresentation.detail || `${displayToolName}${requestId ? ` · ${requestId}` : ''}`,
+            toolName: displayToolName,
             source: 'sdk',
             severity: success ? 'info' : 'error',
         });
         if (shouldPrintSessionNarration('verbose')) {
             println(
-                `  ${success ? '\x1b[32m✓' : '\x1b[31m✗'} external tool:\x1b[0m ${toolName}${requestId ? ` \x1b[90m(${requestId})\x1b[0m` : ''}`,
+                `  ${success ? '\x1b[32m✓' : '\x1b[31m✗'} external tool:\x1b[0m ${displayToolName}${requestId ? ` \x1b[90m(${requestId})\x1b[0m` : ''}`,
             );
         }
-        broadcastSse('external_tool.completed', { toolName, requestId, success, timestamp: Date.now() });
+        broadcastSse('external_tool.completed', {
+            toolName: displayToolName,
+            requestId,
+            success,
+            operation: completionPresentation.operation,
+            path: completionPresentation.path,
+            target: completionPresentation.target,
+            fileTargets: completionPresentation.fileTargets,
+            urlTargets: completionPresentation.urlTargets,
+            searchTerms: completionPresentation.searchTerms,
+            lineRange: completionPresentation.lineRange,
+            patchFiles: completionPresentation.patchFiles,
+            timestamp: Date.now(),
+        });
+        broadcastSse(
+            'tool.lifecycle',
+            buildToolLifecycleExternalCompleted({
+                toolName: displayToolName,
+                requestId: requestId ?? '',
+                toolCallId: resolvedToolCallId,
+                success,
+                operation: completionPresentation.operation,
+                path: completionPresentation.path,
+                target: completionPresentation.target,
+                fileTargets: completionPresentation.fileTargets,
+                urlTargets: completionPresentation.urlTargets,
+                searchTerms: completionPresentation.searchTerms,
+                lineRange: completionPresentation.lineRange,
+                patchFiles: completionPresentation.patchFiles,
+            }),
+        );
     };
 
     const onMcpServerStatusChanged = (/** @type {{ serverName?: string; status?: string }} */ evt) => {
@@ -849,36 +1029,36 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
     agent.on(EMITTER_ASSISTANT_TURN_END, onAssistantTurnEnd);
     agent.on(EMITTER_SESSION_INFO, onSessionInfo);
     agent.on(EMITTER_SESSION_WARNING, onSessionWarning);
-    agent.on('elicitation.pending', onElicitationPending);
-    agent.on('elicitation.completed', onElicitationCompleted);
-    agent.on('permission.requested', onPermissionRequested);
-    agent.on('permission.completed', onPermissionCompleted);
+    agent.on(EMITTER_ELICITATION_PENDING, onElicitationPending);
+    agent.on(EMITTER_ELICITATION_COMPLETED, onElicitationCompleted);
+    agent.on(EMITTER_PERMISSION_REQUESTED, onPermissionRequested);
+    agent.on(EMITTER_PERMISSION_COMPLETED, onPermissionCompleted);
     agent.on(EMITTER_PERMISSION_MODE_CHANGED, onPermissionModeChanged);
-    agent.on('user_input.requested', onUserInputRequested);
-    agent.on('user_input.completed', onUserInputCompleted);
+    agent.on(EMITTER_USER_INPUT_REQUESTED, onUserInputRequested);
+    agent.on(EMITTER_USER_INPUT_COMPLETED, onUserInputCompleted);
     agent.on(EMITTER_SESSION_MODEL_CHANGED, onSessionModelChanged);
     agent.on(EMITTER_SESSION_TITLE_CHANGED, onSessionTitleChanged);
     agent.on(EMITTER_SESSION_CONTEXT_CHANGED, onSessionContextChanged);
     agent.on(EMITTER_SESSION_MODE_CHANGED, onSessionModeChanged);
     agent.on(EMITTER_SESSION_PLAN_CHANGED, onSessionPlanChanged);
-    agent.on('session.tools_updated', onSessionToolsUpdated);
-    agent.on('session.skills_loaded', onSessionSkillsLoaded);
-    agent.on('session.extensions_loaded', onSessionExtensionsLoaded);
-    agent.on('session.mcp_servers_loaded', onSessionMcpServersLoaded);
-    agent.on('session.background_tasks_changed', onSessionBackgroundTasksChanged);
+    agent.on(EMITTER_SESSION_TOOLS_UPDATED, onSessionToolsUpdated);
+    agent.on(EMITTER_SESSION_SKILLS_LOADED, onSessionSkillsLoaded);
+    agent.on(EMITTER_SESSION_EXTENSIONS_LOADED, onSessionExtensionsLoaded);
+    agent.on(EMITTER_SESSION_MCP_SERVERS_LOADED, onSessionMcpServersLoaded);
+    agent.on(EMITTER_SESSION_BACKGROUND_TASKS_CHANGED, onSessionBackgroundTasksChanged);
     agent.on(EMITTER_SESSION_TASK_COMPLETE, onSessionTaskComplete);
     agent.on(EMITTER_SESSION_TRUNCATION, onSessionTruncation);
     agent.on(EMITTER_SESSION_SNAPSHOT_REWIND, onSessionSnapshotRewind);
     agent.on(EMITTER_SESSION_SHUTDOWN, onSessionShutdown);
     agent.on(EMITTER_SESSION_HANDOFF, onSessionHandoff);
     agent.on(EMITTER_SESSION_WORKSPACE_FILE_CHANGED, onWorkspaceFileChanged);
-    agent.on('tool.user_requested', onToolUserRequested);
-    agent.on('external_tool.requested', onExternalToolRequested);
-    agent.on('external_tool.completed', onExternalToolCompleted);
-    agent.on('mcp.server.status_changed', onMcpServerStatusChanged);
-    agent.on('mcp.oauth.required', onMcpOauthRequired);
-    agent.on('mcp.oauth.completed', onMcpOauthCompleted);
-    agent.on('pending_messages.modified', onPendingMessagesModified);
+    agent.on(EMITTER_TOOL_USER_REQUESTED, onToolUserRequested);
+    agent.on(EMITTER_EXTERNAL_TOOL_REQUESTED, onExternalToolRequested);
+    agent.on(EMITTER_EXTERNAL_TOOL_COMPLETED, onExternalToolCompleted);
+    agent.on(EMITTER_MCP_SERVER_STATUS_CHANGED, onMcpServerStatusChanged);
+    agent.on(EMITTER_MCP_OAUTH_REQUIRED, onMcpOauthRequired);
+    agent.on(EMITTER_MCP_OAUTH_COMPLETED, onMcpOauthCompleted);
+    agent.on(EMITTER_PENDING_MESSAGES_MODIFIED, onPendingMessagesModified);
     agent.on(EMITTER_EXIT_PLAN_MODE_COMPLETED, onExitPlanModeCompleted);
     agent.on(EMITTER_ASSISTANT_REASONING_COMPLETE, onAssistantReasoningComplete);
 
@@ -887,36 +1067,36 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
         agent.off(EMITTER_ASSISTANT_TURN_END, onAssistantTurnEnd);
         agent.off(EMITTER_SESSION_INFO, onSessionInfo);
         agent.off(EMITTER_SESSION_WARNING, onSessionWarning);
-        agent.off('elicitation.pending', onElicitationPending);
-        agent.off('elicitation.completed', onElicitationCompleted);
-        agent.off('permission.requested', onPermissionRequested);
-        agent.off('permission.completed', onPermissionCompleted);
+        agent.off(EMITTER_ELICITATION_PENDING, onElicitationPending);
+        agent.off(EMITTER_ELICITATION_COMPLETED, onElicitationCompleted);
+        agent.off(EMITTER_PERMISSION_REQUESTED, onPermissionRequested);
+        agent.off(EMITTER_PERMISSION_COMPLETED, onPermissionCompleted);
         agent.off(EMITTER_PERMISSION_MODE_CHANGED, onPermissionModeChanged);
-        agent.off('user_input.requested', onUserInputRequested);
-        agent.off('user_input.completed', onUserInputCompleted);
+        agent.off(EMITTER_USER_INPUT_REQUESTED, onUserInputRequested);
+        agent.off(EMITTER_USER_INPUT_COMPLETED, onUserInputCompleted);
         agent.off(EMITTER_SESSION_MODEL_CHANGED, onSessionModelChanged);
         agent.off(EMITTER_SESSION_TITLE_CHANGED, onSessionTitleChanged);
         agent.off(EMITTER_SESSION_CONTEXT_CHANGED, onSessionContextChanged);
         agent.off(EMITTER_SESSION_MODE_CHANGED, onSessionModeChanged);
         agent.off(EMITTER_SESSION_PLAN_CHANGED, onSessionPlanChanged);
-        agent.off('session.tools_updated', onSessionToolsUpdated);
-        agent.off('session.skills_loaded', onSessionSkillsLoaded);
-        agent.off('session.extensions_loaded', onSessionExtensionsLoaded);
-        agent.off('session.mcp_servers_loaded', onSessionMcpServersLoaded);
-        agent.off('session.background_tasks_changed', onSessionBackgroundTasksChanged);
+        agent.off(EMITTER_SESSION_TOOLS_UPDATED, onSessionToolsUpdated);
+        agent.off(EMITTER_SESSION_SKILLS_LOADED, onSessionSkillsLoaded);
+        agent.off(EMITTER_SESSION_EXTENSIONS_LOADED, onSessionExtensionsLoaded);
+        agent.off(EMITTER_SESSION_MCP_SERVERS_LOADED, onSessionMcpServersLoaded);
+        agent.off(EMITTER_SESSION_BACKGROUND_TASKS_CHANGED, onSessionBackgroundTasksChanged);
         agent.off(EMITTER_SESSION_TASK_COMPLETE, onSessionTaskComplete);
         agent.off(EMITTER_SESSION_TRUNCATION, onSessionTruncation);
         agent.off(EMITTER_SESSION_SNAPSHOT_REWIND, onSessionSnapshotRewind);
         agent.off(EMITTER_SESSION_SHUTDOWN, onSessionShutdown);
         agent.off(EMITTER_SESSION_HANDOFF, onSessionHandoff);
         agent.off(EMITTER_SESSION_WORKSPACE_FILE_CHANGED, onWorkspaceFileChanged);
-        agent.off('tool.user_requested', onToolUserRequested);
-        agent.off('external_tool.requested', onExternalToolRequested);
-        agent.off('external_tool.completed', onExternalToolCompleted);
-        agent.off('mcp.server.status_changed', onMcpServerStatusChanged);
-        agent.off('mcp.oauth.required', onMcpOauthRequired);
-        agent.off('mcp.oauth.completed', onMcpOauthCompleted);
-        agent.off('pending_messages.modified', onPendingMessagesModified);
+        agent.off(EMITTER_TOOL_USER_REQUESTED, onToolUserRequested);
+        agent.off(EMITTER_EXTERNAL_TOOL_REQUESTED, onExternalToolRequested);
+        agent.off(EMITTER_EXTERNAL_TOOL_COMPLETED, onExternalToolCompleted);
+        agent.off(EMITTER_MCP_SERVER_STATUS_CHANGED, onMcpServerStatusChanged);
+        agent.off(EMITTER_MCP_OAUTH_REQUIRED, onMcpOauthRequired);
+        agent.off(EMITTER_MCP_OAUTH_COMPLETED, onMcpOauthCompleted);
+        agent.off(EMITTER_PENDING_MESSAGES_MODIFIED, onPendingMessagesModified);
         agent.off(EMITTER_EXIT_PLAN_MODE_COMPLETED, onExitPlanModeCompleted);
         agent.off(EMITTER_ASSISTANT_REASONING_COMPLETE, onAssistantReasoningComplete);
     };

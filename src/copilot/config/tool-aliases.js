@@ -151,7 +151,7 @@ export function getAllToolNames(toolName) {
  *
  * @example
  *     normalizeAgentToolList(['view', 'grep', 'bash']);
- *     // → { canonical: ['bash', 'read_file_content', 'search_in_files'], unresolved: [] }
+ *     // → { canonical: ['exec_command', 'read_file_content', 'search_in_files'], unresolved: [] }
  *
  *     normalizeAgentToolList(['view', 'unknown_tool']);
  *     // → { canonical: ['read_file_content'], unresolved: ['unknown_tool'] }
@@ -175,5 +175,44 @@ export function normalizeAgentToolList(toolNames) {
     return {
         canonical: Array.from(canonical).sort(),
         unresolved,
+    };
+}
+
+/**
+ * @typedef {{
+ *     originalName: string;
+ *     scopePrefix: string | null;
+ *     rawName: string;
+ *     canonicalName: string;
+ *     isKnownAlias: boolean;
+ * }} NormalizedObservedToolName
+ */
+
+/**
+ * Normaliza nomes observados em runtime/telemetria, preservando prefixo de escopo quando existir.
+ *
+ * Exemplos:
+ *
+ * - `sdk.bash` -> `{ scopePrefix: 'sdk', rawName: 'bash', canonicalName: 'exec_command' }`
+ * - `exec_command` -> `{ scopePrefix: null, rawName: 'exec_command', canonicalName: 'exec_command' }`
+ * - `channel.inject` -> `{ scopePrefix: 'channel', rawName: 'inject', canonicalName: 'inject' }`
+ *
+ * @param {string} toolName
+ * @returns {NormalizedObservedToolName}
+ */
+export function normalizeObservedToolName(toolName) {
+    const originalName = String(toolName || '').trim();
+    const dotIndex = originalName.indexOf('.');
+    const hasScopedPrefix = dotIndex > 0 && dotIndex < originalName.length - 1;
+    const scopePrefix = hasScopedPrefix ? originalName.slice(0, dotIndex) : null;
+    const rawName = hasScopedPrefix ? originalName.slice(dotIndex + 1) : originalName;
+    const resolved = resolveToolName(rawName);
+    const canonicalName = resolved ?? rawName;
+    return {
+        originalName,
+        scopePrefix,
+        rawName,
+        canonicalName,
+        isKnownAlias: resolved !== null,
     };
 }

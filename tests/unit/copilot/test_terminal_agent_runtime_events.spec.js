@@ -123,14 +123,12 @@ describe('terminal/events/agent-runtime-events.js — contrato', () => {
             success: true,
         });
 
-        expect(println).toHaveBeenCalledWith(
-            expect.stringContaining('lendo arquivo: src/copilot/terminal/repl/repl.js'),
-        );
+        expect(println).toHaveBeenCalledWith(expect.stringContaining('lendo arquivo'));
         expect(recordTerminalActivity).toHaveBeenCalledWith(
             'tool',
             'Executando tool',
             expect.objectContaining({
-                detail: 'lendo arquivo · src/copilot/terminal/repl/repl.js',
+                detail: 'lendo arquivo · arquivo: src/copilot/terminal/repl/repl.js',
                 toolName: 'workspace.read_file',
             }),
         );
@@ -298,7 +296,7 @@ describe('terminal/events/agent-runtime-events.js — contrato', () => {
         const cleanup = setupTerminalAgentRuntimeEventListeners({ agent: /** @type {any} */ (agent), rl: null });
         listeners.get('tool.execution_start')?.[0]?.({
             toolCallId: 'bash-long',
-            toolName: 'bash',
+            toolName: 'exec_command',
         });
         println.mockClear();
         recordTerminalActivity.mockClear();

@@ -14,6 +14,10 @@ const mocks = vi.hoisted(() => ({
     setLastSdkPlanOperation: vi.fn(),
     setSdkSessionMode: vi.fn(),
     getShowSessionActivity: vi.fn(() => false),
+    consumeRuntimeInterventionMailbox: /** @type {any} */ (vi.fn(() => null)),
+    enqueueRuntimeInterventionMailbox: vi.fn(),
+    readRuntimeInterventionMailboxSummary: vi.fn(() => ({ queueSize: 0, dropped: 0, runtimeId: 'default' })),
+    answerTerminalPendingQuestion: vi.fn(() => true),
     beginTerminalTurnTrace: vi.fn(),
     completeTerminalTurnTrace: vi.fn(),
     recordTerminalTurnFileActivity: vi.fn(),
@@ -40,6 +44,13 @@ vi.mock('../../../src/copilot/presentation/runtime-ui-state-store.js', () => ({
     setLastSdkPlanOperation: mocks.setLastSdkPlanOperation,
     setSdkSessionMode: mocks.setSdkSessionMode,
     getShowSessionActivity: mocks.getShowSessionActivity,
+    consumeRuntimeInterventionMailbox: mocks.consumeRuntimeInterventionMailbox,
+    enqueueRuntimeInterventionMailbox: mocks.enqueueRuntimeInterventionMailbox,
+    readRuntimeInterventionMailboxSummary: mocks.readRuntimeInterventionMailboxSummary,
+}));
+
+vi.mock('../../../src/copilot/terminal/frontend/gateways/agent-runtime.js', () => ({
+    answerTerminalPendingQuestion: mocks.answerTerminalPendingQuestion,
 }));
 
 vi.mock('../../../src/copilot/terminal/state/turn-trace-state.js', () => ({
@@ -93,6 +104,17 @@ describe('terminal/events/sdk-session-events.js — contrato', () => {
         mocks.getShowSessionActivity.mockReturnValue(false);
         mocks.getTerminalDetailLevel.mockReturnValue('detailed');
         mocks.completeTerminalTurnTrace.mockReturnValue(null);
+        mocks.consumeRuntimeInterventionMailbox.mockReturnValue(null);
+        mocks.enqueueRuntimeInterventionMailbox.mockReturnValue({
+            enqueued: true,
+            merged: false,
+            runtimeId: 'default',
+            queueSize: 1,
+            dropped: 0,
+            entryId: 'iv-requeued',
+        });
+        mocks.readRuntimeInterventionMailboxSummary.mockReturnValue({ queueSize: 0, dropped: 0, runtimeId: 'default' });
+        mocks.answerTerminalPendingQuestion.mockReturnValue(true);
     });
 
     it('importa sem erros', async () => {
@@ -359,6 +381,80 @@ describe('terminal/events/sdk-session-events.js — contrato', () => {
         expect(mocks.recordTerminalActivity).not.toHaveBeenCalled();
         expect(mocks.broadcastSse).not.toHaveBeenCalled();
         expect(refreshPromptIfIdle).toHaveBeenCalled();
+    });
+
+    it('drena mailbox zero-PR em ask_user humano e responde sem session.send', async () => {
+        const { setupTerminalSdkSessionEventListeners } =
+            await import('../../../src/copilot/terminal/events/sdk-session-events.js');
+        const agent = createAgentHost();
+        const refreshPromptIfIdle = vi.fn();
+        mocks.consumeRuntimeInterventionMailbox.mockReturnValueOnce({
+            id: 'iv-1',
+            ts: Date.now(),
+            runtimeId: 'default',
+            source: 'llm-a',
+            modeHint: 'queue',
+            message: 'aplique esta intervenção sem PR',
+            mergedCount: 0,
+        });
+        mocks.readRuntimeInterventionMailboxSummary.mockReturnValueOnce({
+            queueSize: 0,
+            dropped: 0,
+            runtimeId: 'default',
+        });
+
+        setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfIdle });
+        agent.emit('user_input.requested', {
+            requestId: 'ui-mailbox',
+            question: 'Pode confirmar?',
+            allowFreeform: true,
+        });
+
+        expect(mocks.consumeRuntimeInterventionMailbox).toHaveBeenCalledWith(null);
+        expect(mocks.answerTerminalPendingQuestion).toHaveBeenCalledWith('aplique esta intervenção sem PR', null);
+        expect(mocks.enqueueRuntimeInterventionMailbox).not.toHaveBeenCalled();
+        expect(mocks.broadcastSse).toHaveBeenCalledWith(
+            'intervention.mailbox.applied',
+            expect.objectContaining({ entryId: 'iv-1', source: 'llm-a', modeHint: 'queue', queueSize: 0 }),
+        );
+        expect(refreshPromptIfIdle).toHaveBeenCalled();
+    });
+
+    it('recoloca entrada no mailbox quando a resposta zero-PR não pode ser aplicada', async () => {
+        const { setupTerminalSdkSessionEventListeners } =
+            await import('../../../src/copilot/terminal/events/sdk-session-events.js');
+        const agent = createAgentHost();
+        mocks.answerTerminalPendingQuestion.mockReturnValueOnce(false);
+        mocks.consumeRuntimeInterventionMailbox.mockReturnValueOnce({
+            id: 'iv-2',
+            ts: Date.now(),
+            runtimeId: 'default',
+            source: 'terminal',
+            modeHint: 'interrupt',
+            message: 'não perder esta substituição',
+            mergedCount: 1,
+        });
+
+        setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfIdle: vi.fn() });
+        agent.emit('user_input.requested', {
+            requestId: 'ui-requeue',
+            question: 'Pergunta real?',
+            allowFreeform: true,
+            runtimeId: 'default',
+        });
+
+        expect(mocks.answerTerminalPendingQuestion).toHaveBeenCalledWith('não perder esta substituição', 'default');
+        expect(mocks.enqueueRuntimeInterventionMailbox).toHaveBeenCalledWith({
+            runtimeId: 'default',
+            source: 'terminal',
+            modeHint: 'interrupt',
+            message: 'não perder esta substituição',
+        });
+        expect(mocks.recordTerminalActivity).toHaveBeenCalledWith(
+            'question',
+            'Mailbox zero-PR não aplicado (requeued)',
+            expect.objectContaining({ severity: 'warn', source: 'sdk' }),
+        );
     });
 
     it('surfa loaded/background SDK events para atividade e SSE', async () => {

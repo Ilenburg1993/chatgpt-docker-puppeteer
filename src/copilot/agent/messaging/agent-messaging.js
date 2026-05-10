@@ -245,6 +245,9 @@ export function enqueueTask(ctx, host, message, { timeoutMs, attachments, signal
 /**
  * Envia uma mensagem ao agente (enfileira para processamento sequencial).
  *
+ * Esta é a fila de tarefas do agente/SDK. Ela não é o mailbox zero-PR de intervenção do produto: ao processar a task, o
+ * executor chama `session.send()` e pode gerar `assistant.usage` / `pr.consumed`.
+ *
  * @param {AgentContext} ctx
  * @param {MessagingHost} host
  * @param {string} message
@@ -346,6 +349,8 @@ export async function executeTask(session, task, callbacks) {
         emit('tool.execution_complete', {
             toolCallId,
             toolName: /** @type {string | null} */ (payload?.['toolName'] ?? null),
+            args: payload?.['arguments'] ?? payload?.['args'] ?? null,
+            result: payload?.['result'] ?? payload?.['output'] ?? null,
             success: /** @type {boolean} */ (payload?.['success'] ?? false),
             taskId: task.id,
         });
@@ -483,6 +488,9 @@ export function processQueue(ctx, host, callbacks) {
 
 /**
  * Envia uma mensagem em modo "steering" (immediate).
+ *
+ * Caminho SDK direto: usa `session.send({ mode: 'immediate' })` e, portanto, não é zero-PR garantido. As rotas de
+ * controle bloqueiam esse caminho por default para origens operacionais e preservam a intenção no mailbox.
  *
  * @param {AgentContext} ctx
  * @param {MessagingHost} host

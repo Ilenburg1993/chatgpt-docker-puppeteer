@@ -266,6 +266,8 @@ export function ensureDialogLoopAttached(ctx, host) {
         sendMessageDialogBoot: (msg, opts) => host.sendMessageDialogBoot(msg, opts),
         answerPendingQuestion: (answer) => host.answerPendingQuestion(answer),
         getPendingQuestionSnapshot: () => ctx.getPendingQuestionSnapshot(),
+        getPendingQuestionShadowSnapshot: () => ctx.getPendingQuestionShadowSnapshot(),
+        isPendingQuestionShadowExpired: () => ctx.isPendingQuestionShadowExpired(),
         on: (event, listener) => host.on(event, listener),
         once: (event, listener) => host.once(event, listener),
         off: (event, listener) => host.off(event, listener),

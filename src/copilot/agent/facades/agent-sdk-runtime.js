@@ -5,6 +5,10 @@
  *
  *   Esta camada evita que módulos quentes (`messaging`, `history-sync`, `keepalive`, `dialog/*`) precisem importar
  *   diretamente a superfície do SDK, mesmo quando o acesso é via barrel.
+ *
+ *   Importante para o contrato zero-PR: `sendAgentSdkSession*()` é o caminho direto do SDK e pode produzir eventos de
+ *   usage/PR. A fila paralela zero-PR do produto é o mailbox do runtime, drenado em `ask_user(kind=question)` por
+ *   `answerPendingQuestion`, não esta façade.
  */
 
 import {

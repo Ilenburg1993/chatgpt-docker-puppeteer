@@ -10,6 +10,7 @@
 
 import { defaultAuditLog } from '#copilot/audit';
 import { gitLog, gitStatus, listIssues, listPrs, listRuns } from '#copilot/bridges';
+import { normalizeObservedToolName } from '#copilot/config';
 import { container, toError } from '#copilot/core';
 import { ERROR_TRACKER, getStatsByCategory, getToolStats, METRICS_STORE } from '#copilot/observability';
 import { getSseClients } from '../infra/sse/state.js';
@@ -275,14 +276,74 @@ export async function handleGetAudit({ summary: wantSummary = 0, limit = 50, ses
  *     stats: Record<string, any>;
  *     entries: [string, Record<string, any>][];
  *     tools: Record<string, any>[];
+ *     canonicalEntries: [string, Record<string, any>][];
+ *     canonicalTools: Record<string, any>[];
  *     byCategory: Record<string, any>;
  *     toolCount: number;
+ *     canonicalToolCount: number;
  * }}
  */
 export function readToolStatsProjection() {
     const stats = getToolStats();
     const entries = /** @type {[string, Record<string, any>][]} */ (Object.entries(stats));
     const tools = entries.map(([name, s]) => ({ name, ...s }));
+    /**
+     * @type {Map<
+     *     string,
+     *     {
+     *         name: string;
+     *         aliases: Set<string>;
+     *         calls: number;
+     *         errors: number;
+     *         totalMsApprox: number;
+     *         lastCallIso: string | null;
+     *         lastOk: boolean;
+     *     }
+     * >}
+     */
+    const canonicalMap = new Map();
+
+    for (const [name, s] of entries) {
+        const normalized = normalizeObservedToolName(name);
+        const key = normalized.scopePrefix
+            ? `${normalized.scopePrefix}.${normalized.canonicalName}`
+            : normalized.canonicalName;
+        const current = canonicalMap.get(key) ?? {
+            name: key,
+            aliases: new Set(),
+            calls: 0,
+            errors: 0,
+            totalMsApprox: 0,
+            lastCallIso: null,
+            lastOk: true,
+        };
+        const calls = Number(s.calls ?? 0);
+        const errors = Number(s.errors ?? 0);
+        const avgLatencyMs = Number(s.avgLatencyMs ?? 0);
+        current.calls += calls;
+        current.errors += errors;
+        current.totalMsApprox += calls * avgLatencyMs;
+        current.aliases.add(name);
+        if (typeof s.lastCallIso === 'string') {
+            if (!current.lastCallIso || s.lastCallIso > current.lastCallIso) current.lastCallIso = s.lastCallIso;
+        }
+        if (s.lastOk === false) current.lastOk = false;
+        canonicalMap.set(key, current);
+    }
+
+    const canonicalTools = [...canonicalMap.values()]
+        .map((item) => ({
+            name: item.name,
+            aliases: [...item.aliases].sort(),
+            calls: item.calls,
+            errors: item.errors,
+            avgLatencyMs: item.calls > 0 ? Math.round(item.totalMsApprox / item.calls) : 0,
+            errorRate: item.calls > 0 ? Number(((item.errors / item.calls) * 100).toFixed(1)) : 0,
+            lastCallIso: item.lastCallIso,
+            lastOk: item.lastOk,
+        }))
+        .sort((a, b) => b.calls - a.calls || a.name.localeCompare(b.name));
+
     let byCategory;
     try {
         byCategory = getStatsByCategory();
@@ -293,8 +354,11 @@ export function readToolStatsProjection() {
         stats,
         entries,
         tools,
+        canonicalEntries: canonicalTools.map((tool) => [tool.name, tool]),
+        canonicalTools,
         byCategory,
         toolCount: entries.length,
+        canonicalToolCount: canonicalTools.length,
     };
 }
 
@@ -311,7 +375,9 @@ export function handleGetToolStats() {
         body: {
             ok: true,
             toolCount: projection.toolCount,
+            canonicalToolCount: projection.canonicalToolCount,
             tools: projection.tools,
+            canonicalTools: projection.canonicalTools,
             byCategory: projection.byCategory,
         },
     };

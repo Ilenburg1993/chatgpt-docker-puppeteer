@@ -135,3 +135,31 @@ export const EMITTER_AGENT_BACKGROUND_IDLE = 'agent.background.idle';
 
 // ── Plan Mode / External Tools ──────────────────────────────
 export const EMITTER_EXIT_PLAN_MODE_COMPLETED = 'exit_plan_mode.completed';
+export const EMITTER_EXTERNAL_TOOL_REQUESTED = 'external_tool.requested';
+export const EMITTER_EXTERNAL_TOOL_COMPLETED = 'external_tool.completed';
+export const EMITTER_TOOL_USER_REQUESTED = 'tool.user_requested';
+export const EMITTER_PENDING_MESSAGES_MODIFIED = 'pending_messages.modified';
+
+// ── Elicitation ──────────────────────────────────────────────
+export const EMITTER_ELICITATION_PENDING = 'elicitation.pending';
+export const EMITTER_ELICITATION_COMPLETED = 'elicitation.completed';
+
+// ── Permission ───────────────────────────────────────────────
+export const EMITTER_PERMISSION_REQUESTED = 'permission.requested';
+export const EMITTER_PERMISSION_COMPLETED = 'permission.completed';
+
+// ── User Input ───────────────────────────────────────────────
+export const EMITTER_USER_INPUT_REQUESTED = 'user_input.requested';
+export const EMITTER_USER_INPUT_COMPLETED = 'user_input.completed';
+
+// ── Session Tools / Skills / Extensions ─────────────────────
+export const EMITTER_SESSION_TOOLS_UPDATED = 'session.tools_updated';
+export const EMITTER_SESSION_SKILLS_LOADED = 'session.skills_loaded';
+export const EMITTER_SESSION_EXTENSIONS_LOADED = 'session.extensions_loaded';
+export const EMITTER_SESSION_MCP_SERVERS_LOADED = 'session.mcp_servers_loaded';
+export const EMITTER_SESSION_BACKGROUND_TASKS_CHANGED = 'session.background_tasks_changed';
+
+// ── MCP OAuth ───────────────────────────────────────────────
+export const EMITTER_MCP_SERVER_STATUS_CHANGED = 'mcp.server.status_changed';
+export const EMITTER_MCP_OAUTH_REQUIRED = 'mcp.oauth.required';
+export const EMITTER_MCP_OAUTH_COMPLETED = 'mcp.oauth.completed';

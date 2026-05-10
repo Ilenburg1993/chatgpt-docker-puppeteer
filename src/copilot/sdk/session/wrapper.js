@@ -24,7 +24,7 @@ import { emitSdkOperationMetric } from '../telemetry/operation-metrics.js';
  *
  * @typedef {import('@github/copilot-sdk').MessageOptions} MessageOptions
  *
- * @typedef {'low' | 'medium' | 'high'} ReasoningEffort
+ * @typedef {'low' | 'medium' | 'high' | 'xhigh'} ReasoningEffort
  */
 
 // ─── Validação interna ────────────────────────────────────────────────────────

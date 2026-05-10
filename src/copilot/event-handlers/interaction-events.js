@@ -171,11 +171,18 @@ export function wireInteractionEvents(session, { emit }) {
             const data = /** @type {Record<string, unknown>} */ (raw['data'] ?? {});
             const toolName = /** @type {string | undefined} */ (data['toolName'] ?? data['name']);
             const requestId = /** @type {string | undefined} */ (data['requestId']);
+            const toolCallId = /** @type {string | undefined} */ (data['toolCallId']);
             log(
                 'INFO',
-                `[interaction-events] external_tool.requested: ${toolName ?? '?'} requestId=${requestId ?? '?'}`,
+                `[interaction-events] external_tool.requested: ${toolName ?? '?'} requestId=${requestId ?? '?'} toolCallId=${toolCallId ?? '?'}`,
             );
-            emit('external_tool.requested', { toolName, requestId, data, ts: evt?.timestamp ?? Date.now() });
+            emit('external_tool.requested', {
+                toolName,
+                requestId,
+                toolCallId,
+                data,
+                ts: evt?.timestamp ?? Date.now(),
+            });
         }),
 
         onSessionEvent(session, SESSION_EVENTS.EXTERNAL_TOOL_COMPLETED, (evt) => {
@@ -184,11 +191,19 @@ export function wireInteractionEvents(session, { emit }) {
             const toolName = /** @type {string | undefined} */ (data['toolName'] ?? data['name']);
             const requestId = /** @type {string | undefined} */ (data['requestId']);
             const success = /** @type {boolean | undefined} */ (data['success']);
+            const toolCallId = /** @type {string | undefined} */ (data['toolCallId']);
             log(
                 'DEBUG',
                 `[interaction-events] external_tool.completed: ${toolName ?? '?'} requestId=${requestId ?? '?'}`,
             );
-            emit('external_tool.completed', { toolName, requestId, success, data, ts: evt?.timestamp ?? Date.now() });
+            emit('external_tool.completed', {
+                toolName,
+                requestId,
+                toolCallId,
+                success,
+                data,
+                ts: evt?.timestamp ?? Date.now(),
+            });
         }),
 
         // ── pending_messages.modified ───────────────────────────────────

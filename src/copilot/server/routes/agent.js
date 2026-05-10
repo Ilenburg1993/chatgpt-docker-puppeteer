@@ -34,7 +34,22 @@ const injectBodyBaseSchema = z
         content: z.string().trim().min(1).optional(),
         from: z.string().optional(),
         mode: z
-            .enum(['queue', 'turn', 'dialog', 'steer', 'immediate', 'interrupt', 'abort-and-queue', 'abort_and_queue'])
+            .enum([
+                'queue',
+                'mailbox',
+                'defer',
+                'deferred',
+                'turn',
+                'dialog',
+                'auto',
+                'steer',
+                'immediate',
+                'intervene',
+                'interrupt',
+                'abort',
+                'abort-and-queue',
+                'abort_and_queue',
+            ])
             .optional(),
         delivery: z.string().optional(),
         strategy: z.string().optional(),
@@ -46,10 +61,13 @@ const injectBodyBaseSchema = z
     .passthrough();
 
 const injectBodySchema = injectBodyBaseSchema.refine(
-    (/** @type {{ message?: unknown; content?: unknown }} */ body) =>
-        typeof body.message === 'string' || typeof body.content === 'string',
+    (/** @type {{ message?: unknown; content?: unknown; mode?: unknown }} */ body) =>
+        // mode=abort não exige payload textual porque é uma intervenção zero-PR.
+        (typeof body.mode === 'string' && body.mode.trim().toLowerCase() === 'abort') ||
+        typeof body.message === 'string' ||
+        typeof body.content === 'string',
     {
-        message: 'Campo "message" ou "content" é obrigatório.',
+        message: 'Campo "message" ou "content" é obrigatório (exceto quando mode=abort).',
         path: ['message'],
     },
 );

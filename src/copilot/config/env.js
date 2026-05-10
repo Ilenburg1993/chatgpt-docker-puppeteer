@@ -197,6 +197,25 @@ export const TERMINAL_LIVE_STATUS_INTERVAL_MS = envInt('TERMINAL_LIVE_STATUS_INT
 export const TERMINAL_MAX_INJECT_HISTORY = envInt('TERMINAL_MAX_INJECT_HISTORY', 100);
 export const TERMINAL_MAX_LISTENERS = envInt('TERMINAL_MAX_LISTENERS', 25);
 export const TERMINAL_MAX_ATTACHMENTS = envInt('TERMINAL_MAX_ATTACHMENTS', 50);
+export const TERMINAL_MAX_INTERVENTION_MAILBOX = envInt('TERMINAL_MAX_INTERVENTION_MAILBOX', 64);
+export const TERMINAL_INTERVENTION_MAILBOX_COALESCE_WINDOW_MS = envInt(
+    'TERMINAL_INTERVENTION_MAILBOX_COALESCE_WINDOW_MS',
+    20_000,
+);
+export const TERMINAL_INTERVENTION_MAILBOX_MAX_MESSAGE_CHARS = envInt(
+    'TERMINAL_INTERVENTION_MAILBOX_MAX_MESSAGE_CHARS',
+    16_000,
+);
+export const TERMINAL_ZERO_PR_INTERVENTIONS = envBool('TERMINAL_ZERO_PR_INTERVENTIONS', true);
+export const TERMINAL_ZERO_PR_ALLOW_QUEUE_FALLBACK = envBool('TERMINAL_ZERO_PR_ALLOW_QUEUE_FALLBACK', true);
+export const TERMINAL_ZERO_PR_ALLOW_STEER = envBool('TERMINAL_ZERO_PR_ALLOW_STEER', false);
+export const TERMINAL_INTERVENTION_DEFAULT_MODE = envStr('TERMINAL_INTERVENTION_DEFAULT_MODE', 'zero-pr');
+export const TERMINAL_INTERVENTION_ALLOW_TEXT_DIRECTIVES = envBool('TERMINAL_INTERVENTION_ALLOW_TEXT_DIRECTIVES', true);
+export const INJECT_ZERO_PR_USER_DEFAULT = envBool('INJECT_ZERO_PR_USER_DEFAULT', true);
+export const INJECT_ZERO_PR_USER_ALLOW_QUEUE_FALLBACK = envBool('INJECT_ZERO_PR_USER_ALLOW_QUEUE_FALLBACK', false);
+export const INJECT_ZERO_PR_USER_ALLOW_STEER = envBool('INJECT_ZERO_PR_USER_ALLOW_STEER', false);
+export const INJECT_USER_DEFAULT_MODE = envStr('INJECT_USER_DEFAULT_MODE', 'intervene');
+export const INJECT_ALLOW_TEXT_MODE_DIRECTIVES = envBool('INJECT_ALLOW_TEXT_MODE_DIRECTIVES', true);
 
 // ── Queue / Internal Limits ──────────────────────────────────
 
@@ -255,6 +274,130 @@ export function getWebRateLimitPolicy() {
     const parsed = Number(process.env['WEB_RATE_LIMIT_PER_MINUTE'] ?? WEB_RATE_LIMIT_PER_MINUTE);
     const perMinute = Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : WEB_RATE_LIMIT_PER_MINUTE;
     return { enforced, perMinute };
+}
+
+/**
+ * Política dinâmica para intervenção humana no terminal.
+ *
+ * Por padrão, texto livre segue para a fila mailbox zero-PR quando o modelo está ocupado, preservando zero-PR. Quando o
+ * modelo está ocioso (sem turno ativo), `allowQueueFallback=true` (padrão) faz o fallback automático para turno normal
+ * — pois o mailbox nunca seria consumido sem `ask_user` disparado pelo modelo.
+ *
+ * @returns {{
+ *     enabled: boolean;
+ *     allowQueueFallback: boolean;
+ *     allowSteer: boolean;
+ *     defaultMode: 'queue' | 'zero-pr';
+ *     allowTextDirectives: boolean;
+ * }}
+ */
+export function getTerminalInterventionPolicy() {
+    const enabled =
+        process.env['TERMINAL_ZERO_PR_INTERVENTIONS'] === undefined
+            ? TERMINAL_ZERO_PR_INTERVENTIONS
+            : process.env['TERMINAL_ZERO_PR_INTERVENTIONS'] === 'true' ||
+              process.env['TERMINAL_ZERO_PR_INTERVENTIONS'] === '1';
+    const allowQueueFallback =
+        process.env['TERMINAL_ZERO_PR_ALLOW_QUEUE_FALLBACK'] === undefined
+            ? TERMINAL_ZERO_PR_ALLOW_QUEUE_FALLBACK
+            : process.env['TERMINAL_ZERO_PR_ALLOW_QUEUE_FALLBACK'] === 'true' ||
+              process.env['TERMINAL_ZERO_PR_ALLOW_QUEUE_FALLBACK'] === '1';
+    const allowSteer =
+        process.env['TERMINAL_ZERO_PR_ALLOW_STEER'] === undefined
+            ? TERMINAL_ZERO_PR_ALLOW_STEER
+            : process.env['TERMINAL_ZERO_PR_ALLOW_STEER'] === 'true' ||
+              process.env['TERMINAL_ZERO_PR_ALLOW_STEER'] === '1';
+    const defaultModeRaw = process.env['TERMINAL_INTERVENTION_DEFAULT_MODE'] ?? TERMINAL_INTERVENTION_DEFAULT_MODE;
+    const defaultMode = defaultModeRaw?.toLowerCase() === 'zero-pr' ? 'zero-pr' : 'queue';
+    const allowTextDirectives =
+        process.env['TERMINAL_INTERVENTION_ALLOW_TEXT_DIRECTIVES'] === undefined
+            ? TERMINAL_INTERVENTION_ALLOW_TEXT_DIRECTIVES
+            : process.env['TERMINAL_INTERVENTION_ALLOW_TEXT_DIRECTIVES'] === 'true' ||
+              process.env['TERMINAL_INTERVENTION_ALLOW_TEXT_DIRECTIVES'] === '1';
+    return {
+        enabled,
+        allowQueueFallback,
+        allowSteer,
+        defaultMode,
+        allowTextDirectives,
+    };
+}
+
+/**
+ * Política dinâmica do mailbox de intervenção zero-PR.
+ *
+ * - `maxEntries`: número máximo de mensagens pendentes por runtime.
+ * - `coalesceWindowMs`: janela para coalescer bursts consecutivos do mesmo emissor.
+ * - `maxMessageChars`: limite de chars de payload armazenado por entrada.
+ *
+ * @returns {{ maxEntries: number; coalesceWindowMs: number; maxMessageChars: number }}
+ */
+export function getTerminalInterventionMailboxPolicy() {
+    const maxEntriesRaw = Number(process.env['TERMINAL_MAX_INTERVENTION_MAILBOX'] ?? TERMINAL_MAX_INTERVENTION_MAILBOX);
+    const coalesceWindowRaw = Number(
+        process.env['TERMINAL_INTERVENTION_MAILBOX_COALESCE_WINDOW_MS'] ??
+            TERMINAL_INTERVENTION_MAILBOX_COALESCE_WINDOW_MS,
+    );
+    const maxMessageCharsRaw = Number(
+        process.env['TERMINAL_INTERVENTION_MAILBOX_MAX_MESSAGE_CHARS'] ??
+            TERMINAL_INTERVENTION_MAILBOX_MAX_MESSAGE_CHARS,
+    );
+    const maxEntries = Number.isFinite(maxEntriesRaw) && maxEntriesRaw > 0 ? Math.floor(maxEntriesRaw) : 64;
+    const coalesceWindowMs =
+        Number.isFinite(coalesceWindowRaw) && coalesceWindowRaw >= 0 ? Math.floor(coalesceWindowRaw) : 20_000;
+    const maxMessageChars =
+        Number.isFinite(maxMessageCharsRaw) && maxMessageCharsRaw > 0 ? Math.floor(maxMessageCharsRaw) : 16_000;
+    return {
+        maxEntries,
+        coalesceWindowMs,
+        maxMessageChars,
+    };
+}
+
+/**
+ * Política dinâmica para `/inject` com origem humana/operacional.
+ *
+ * O contrato canônico é zero-PR por padrão: inputs comuns e `mode=queue` de `user`/`llm-a` entram na fila mailbox.
+ * Abertura de turno/PR fica restrita a intenção explícita (`mode=turn`/`mode=dialog`).
+ *
+ * @returns {{
+ *     userDefaultSteer: boolean;
+ *     userDefaultMode: 'queue' | 'intervene';
+ *     allowQueueFallback: boolean;
+ *     allowSteer: boolean;
+ *     allowTextModeDirectives: boolean;
+ * }}
+ */
+export function getInjectInterventionPolicy() {
+    const userDefaultSteer =
+        process.env['INJECT_ZERO_PR_USER_DEFAULT'] === undefined
+            ? INJECT_ZERO_PR_USER_DEFAULT
+            : process.env['INJECT_ZERO_PR_USER_DEFAULT'] === 'true' ||
+              process.env['INJECT_ZERO_PR_USER_DEFAULT'] === '1';
+    const userDefaultModeRaw = process.env['INJECT_USER_DEFAULT_MODE'] ?? INJECT_USER_DEFAULT_MODE;
+    const userDefaultMode = userDefaultModeRaw?.toLowerCase() === 'intervene' ? 'intervene' : 'queue';
+    const allowQueueFallback =
+        process.env['INJECT_ZERO_PR_USER_ALLOW_QUEUE_FALLBACK'] === undefined
+            ? INJECT_ZERO_PR_USER_ALLOW_QUEUE_FALLBACK
+            : process.env['INJECT_ZERO_PR_USER_ALLOW_QUEUE_FALLBACK'] === 'true' ||
+              process.env['INJECT_ZERO_PR_USER_ALLOW_QUEUE_FALLBACK'] === '1';
+    const allowSteer =
+        process.env['INJECT_ZERO_PR_USER_ALLOW_STEER'] === undefined
+            ? INJECT_ZERO_PR_USER_ALLOW_STEER
+            : process.env['INJECT_ZERO_PR_USER_ALLOW_STEER'] === 'true' ||
+              process.env['INJECT_ZERO_PR_USER_ALLOW_STEER'] === '1';
+    const allowTextModeDirectives =
+        process.env['INJECT_ALLOW_TEXT_MODE_DIRECTIVES'] === undefined
+            ? INJECT_ALLOW_TEXT_MODE_DIRECTIVES
+            : process.env['INJECT_ALLOW_TEXT_MODE_DIRECTIVES'] === 'true' ||
+              process.env['INJECT_ALLOW_TEXT_MODE_DIRECTIVES'] === '1';
+    return {
+        userDefaultSteer,
+        userDefaultMode,
+        allowQueueFallback,
+        allowSteer,
+        allowTextModeDirectives,
+    };
 }
 
 // ─── IConfigProvider singleton (Faixa 3.2 — AC-5-06) ────────────────────────

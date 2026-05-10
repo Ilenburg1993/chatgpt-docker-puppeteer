@@ -17,20 +17,21 @@
  */
 
 import { log, wrapWithStats } from '#copilot/observability';
-import { buildCustomTools, registerTools } from '#copilot/sdk';
+import { buildCustomTools, getAllTools, registerTools } from '#copilot/sdk';
 import { codeTools } from './code-tools.js';
 import { experimentalRpcTools, setExperimentalSession } from './experimental-rpc-tools.js';
 import { fileReadTools, fileWriteTools, indexTools, scopeTools } from './file/index.js';
 import { gitTools } from './git/index.js';
 import { configureHookTools, hookTools } from './hook-tools.js';
 import { hubTools, setHub } from './hub-tools.js';
-import { introspectionTools, registerForIntrospection } from './introspection-tools.js';
+import { introspectionTools, registerForIntrospection, setToolContractReport } from './introspection-tools.js';
 import { permissionTools, setPermissionAgent } from './permission-tools.js';
 import { sessionRpcTools, setSessionRpc } from './session-rpc-tools.js';
 import { sessionTools } from './session-tools.js';
 import { shellTools } from './shell/index.js';
 import { taskTools } from './task-tools.js';
 import { todoReadTools, todoWriteTools } from './todo/index.js';
+import { verifyToolRegistryContracts } from './tool-contract-verifier.js';
 import { webTools } from './web-tools.js';
 
 /**
@@ -73,7 +74,7 @@ export function bootstrapTools(registry, mcpTools) {
         [scopeTools, { category: 'file-scope', tags: ['filesystem', 'io', 'scope'], readOnly: true }],
         [fileWriteTools, { category: 'file', tags: ['filesystem', 'io', 'write'] }],
         [shellTools, { category: 'shell', tags: ['exec', 'system', 'npm', 'node'] }],
-        [webTools, { category: 'web', tags: ['http', 'fetch', 'ssrf-protected'] }],
+        [webTools, { category: 'web', tags: ['http', 'fetch', 'ssrf-protected'], readOnly: true }],
         [todoReadTools, { category: 'todo', tags: ['tasks', 'todo', 'management', 'read'], readOnly: true }],
         [todoWriteTools, { category: 'todo', tags: ['tasks', 'todo', 'management', 'write'] }],
         [
@@ -116,13 +117,35 @@ export function bootstrapTools(registry, mcpTools) {
         }
     }
 
-    const allTools = [...TOOL_GROUPS.flatMap(([t]) => t), ...mcpTools, ...customTools];
+    // Ajustes finos de readOnly para tools de consulta sem efeito colateral, mantendo execução livre por padrão.
+    const forceReadOnlyTools = ['invoke_skill', 'hook_get_audit_tail'];
+    for (const toolName of forceReadOnlyTools) {
+        const entry = registry.entries.get(toolName);
+        if (!entry) continue;
+        registry.entries.set(toolName, {
+            ...entry,
+            readOnly: true,
+            tool: entry.tool.skipPermission === true ? entry.tool : { ...entry.tool, skipPermission: true },
+        });
+    }
+
+    const allTools = getAllTools(registry);
 
     // F7.3: instrumentar todas as tools com wrapWithStats para capturar latência e erros automaticamente
     const instrumentedTools = allTools.map(wrapWithStats);
 
     // Expõe registry para as ferramentas de introspecção (necessário antes de iniciar sessão)
     registerForIntrospection(instrumentedTools, registry);
+
+    const contractReport = verifyToolRegistryContracts(registry);
+    setToolContractReport(contractReport);
+    if (contractReport.errorCount > 0 || contractReport.warningCount > 0) {
+        log(
+            contractReport.errorCount > 0 ? 'WARN' : 'INFO',
+            `[tools-bootstrap] Tool Contract Verifier: total=${contractReport.totalTools} errors=${contractReport.errorCount} warnings=${contractReport.warningCount} ` +
+                `(desc=${contractReport.metadataCoverage.descriptionPct}% schema=${contractReport.metadataCoverage.parametersPct}% category=${contractReport.metadataCoverage.categoryPct}% tags=${contractReport.metadataCoverage.tagsPct}% instructions=${contractReport.metadataCoverage.instructionsPct}%)`,
+        );
+    }
 
     // Detecta colisões de nome entre tools. Cada tool com sobreposição potencial com built-ins do CLI
     // deve declarar `overridesBuiltInTool` explicitamente; não forçar globalmente para não mascarar conflitos.

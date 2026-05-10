@@ -45,18 +45,46 @@ export const CANONICAL_LOCAL_FS_TOOL_NAMES = Object.freeze([
 export const LEGACY_SDK_LOCAL_FS_TOOL_NAMES = Object.freeze(['view', 'glob', 'grep', 'create', 'edit']);
 
 /**
+ * Superfície canônica local para execução de comandos.
+ *
+ * @type {readonly string[]}
+ */
+export const CANONICAL_LOCAL_EXEC_TOOL_NAMES = Object.freeze(['exec_command']);
+
+/**
+ * Built-ins legadas de shell do SDK/CLI.
+ *
+ * @type {readonly string[]}
+ */
+export const LEGACY_SDK_SHELL_TOOL_NAMES = Object.freeze(['bash', 'write_bash', 'read_bash', 'stop_bash']);
+
+/**
  * Constrói a denylist de superfície de sessão para privilegiar FS local canônico sem remover handlers internos.
  *
  * @param {readonly string[]} toolNames
  * @param {readonly string[]} [baseExcluded=[]] Default is `[]`
  * @returns {string[]}
  */
-export function buildCanonicalLocalFsExcludedTools(toolNames, baseExcluded = []) {
+export function buildCanonicalLocalSurfaceExcludedTools(toolNames, baseExcluded = []) {
     const excluded = new Set(baseExcluded);
     if (hasCanonicalLocalFsTools(toolNames)) {
         for (const name of LEGACY_SDK_LOCAL_FS_TOOL_NAMES) excluded.add(name);
     }
+    if (hasCanonicalLocalExecTools(toolNames)) {
+        for (const name of LEGACY_SDK_SHELL_TOOL_NAMES) excluded.add(name);
+    }
     return [...excluded].sort();
+}
+
+/**
+ * Backward-compatible alias para chamadas legadas.
+ *
+ * @param {readonly string[]} toolNames
+ * @param {readonly string[]} [baseExcluded=[]] Default is `[]`
+ * @returns {string[]}
+ */
+export function buildCanonicalLocalFsExcludedTools(toolNames, baseExcluded = []) {
+    return buildCanonicalLocalSurfaceExcludedTools(toolNames, baseExcluded);
 }
 
 /**
@@ -67,6 +95,16 @@ export function buildCanonicalLocalFsExcludedTools(toolNames, baseExcluded = [])
  */
 export function hasCanonicalLocalFsTools(toolNames) {
     return CANONICAL_LOCAL_FS_TOOL_NAMES.every((name) => toolNames.includes(name));
+}
+
+/**
+ * Avalia se a superfície canônica de execução local está disponível.
+ *
+ * @param {readonly string[]} toolNames
+ * @returns {boolean}
+ */
+export function hasCanonicalLocalExecTools(toolNames) {
+    return CANONICAL_LOCAL_EXEC_TOOL_NAMES.every((name) => toolNames.includes(name));
 }
 
 /**

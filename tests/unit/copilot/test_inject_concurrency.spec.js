@@ -136,6 +136,7 @@ describe('F32.3 — injectToLlmB concurrência com múltiplos inject', () => {
         });
 
         assert.ok(result.ok, 'resultado deve ser ok=true');
+        assert.ok(typeof result.reply === 'string', 'reply deve ser string');
         assert.ok(result.reply.includes('watchdog only inject'));
     });
 

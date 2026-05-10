@@ -10,6 +10,7 @@ import { randomUUID } from 'node:crypto';
 import { CANONICAL_LOCAL_FS_TOOL_NAMES, decideSdkFsRouting, toError } from '#copilot/core';
 import { fileReadTools, fileWriteTools } from '#copilot/tools';
 import { isRuntimeElicitationSchema, normalizeElicitationContentWithSchema } from '../../core/elicitation-schema.js';
+import { readIntrospectionRegistrySnapshot } from '../../tools/introspection-tools.js';
 import { getPendingUserInputCount } from '../../tools/user-input-state.js';
 import {
     buildActivityAwareGuidance,
@@ -293,12 +294,15 @@ async function renderSdkDoctor({ println }, runtimeId) {
     const capabilities = callWithRuntimeTarget(getTerminalSdkSessionCapabilities, runtimeId);
     const caps = objectOrNull(capabilities) ?? {};
     const sdkTools = objectOrNull(caps['tools']) ?? {};
+    const sdkUi = objectOrNull(caps['ui']) ?? {};
     const sdkWorkspaceAvailable = sdkTools['workspace'] === true;
 
     const localFsToolNames = [...CANONICAL_LOCAL_FS_TOOL_NAMES];
     const localFsToolsReady = localFsToolNames.every(
         (name) => hasTool(fileReadTools, name) || hasTool(fileWriteTools, name),
     );
+    const registrySnapshot = readIntrospectionRegistrySnapshot();
+    const contract = registrySnapshot.toolContract;
 
     const promptProjection = await callWithRuntimeTarget(readTerminalSdkSystemPromptProjection, runtimeId);
     const instructionSourcesAvailable =
@@ -320,25 +324,36 @@ async function renderSdkDoctor({ println }, runtimeId) {
         },
     });
 
-    println('\n  \x1b[36mSDK Doctor — roteamento SDK x FS\x1b[0m');
+    println('\n  \x1b[36mSDK Doctor - roteamento SDK x FS\x1b[0m');
     println(
-        `  surfaces   \x1b[90msdk.workspace=${String(sdkWorkspaceAvailable)} · local.fs.canônico=${String(localFsToolsReady)} · instructionSources=${String(instructionSourcesAvailable)}\x1b[0m`,
+        `  surfaces   \x1b[90msdk.workspace=${String(sdkWorkspaceAvailable)} · local.fs.canonico=${String(localFsToolsReady)} · local.exec.canonico=${String(registrySnapshot.hasCanonicalLocalExecTools)} · legacy.shell.loaded=${String(registrySnapshot.hasLegacySdkShellToolsLoaded)} · instructionSources=${String(instructionSourcesAvailable)}\x1b[0m`,
+    );
+    println(
+        `  sdk caps   \x1b[90mtools.list=${String(sdkTools['list'] === true)} · tools.quota=${String(sdkTools['quota'] === true)} · ui.elicitation=${String(sdkUi['elicitation'] === true)}\x1b[0m`,
+    );
+    println(
+        `  contract   \x1b[90mok=${String(contract.ok)} · errors=${contract.errorCount} · warnings=${contract.warningCount} · coverage(desc=${contract.metadataCoverage.descriptionPct}% schema=${contract.metadataCoverage.parametersPct}% category=${contract.metadataCoverage.categoryPct}% tags=${contract.metadataCoverage.tagsPct}% instructions=${contract.metadataCoverage.instructionsPct}%)\x1b[0m`,
     );
     println(`  mode       \x1b[33m${routingMode}\x1b[0m`);
     if (routingMode === 'local-fs-primary') {
-        println('  decis�o    \x1b[32mFS local can�nico prim�rio (SDK workspace como auxiliar).\x1b[0m');
+        println('  decisao    \x1b[32mFS local canonico primario (SDK workspace como auxiliar).\x1b[0m');
     } else if (routingMode === 'sdk-workspace-only') {
-        println('  decis�o    \x1b[33mFallback em workspace SDK at� recuperar file-tools locais.\x1b[0m');
+        println('  decisao    \x1b[33mFallback em workspace SDK ate recuperar file-tools locais.\x1b[0m');
     } else {
-        println('  decis�o    \x1b[31mDegradado: restaurar boot/load antes de operar em arquivo.\x1b[0m');
+        println('  decisao    \x1b[31mDegradado: restaurar boot/load antes de operar em arquivo.\x1b[0m');
     }
-    println(`  dom�nio    \x1b[90m${guidance.domainHint}\x1b[0m`);
+    println(`  dominio    \x1b[90m${guidance.domainHint}\x1b[0m`);
     println(`  contexto   \x1b[90m${guidance.contextHint}\x1b[0m`);
     if (guidance.warnings.length > 0) {
-        println(`  aten��o    \x1b[33m${guidance.warnings.join(' | ')}\x1b[0m`);
+        println(`  atencao    \x1b[33m${guidance.warnings.join(' | ')}\x1b[0m`);
     }
-    println(`  razão      \x1b[90m${routing.reason}\x1b[0m`);
+    println(`  razao      \x1b[90m${routing.reason}\x1b[0m`);
     println(`  local fs   \x1b[90m${localFsToolNames.join(', ')}\x1b[0m`);
+    if (registrySnapshot.hasLegacySdkShellToolsLoaded && registrySnapshot.hasCanonicalLocalExecTools) {
+        println(
+            '  shell      \x1b[33mLegacy shell ainda carregada no registry; negar exposicao na sessao via excludedTools.\x1b[0m',
+        );
+    }
     println('');
 }
 
@@ -386,7 +401,7 @@ async function renderCommandFailureGuidance(println, runtimeId) {
  */
 function pretty(value, max = 1000) {
     const text = typeof value === 'string' ? value : JSON.stringify(value, null, 2);
-    return text.length > max ? `${text.slice(0, max)}\n… (${text.length - max} chars restantes)` : text;
+    return text.length > max ? `${text.slice(0, max)}\n... (${text.length - max} chars restantes)` : text;
 }
 
 /**
@@ -445,10 +460,10 @@ function defaultElicitationSchema() {
  */
 function parseElicitationResult(action, rest, schema) {
     if (action !== 'accept' && action !== 'decline' && action !== 'cancel') {
-        return { ok: false, error: 'Ação deve ser accept | decline | cancel.' };
+        return { ok: false, error: 'Acao deve ser accept | decline | cancel.' };
     }
     if (action !== 'accept' && rest.join(' ').trim()) {
-        return { ok: false, error: 'JSON content só é aceito para action=accept.' };
+        return { ok: false, error: 'JSON content so e aceito para action=accept.' };
     }
     if (action !== 'accept') {
         return { ok: true, result: { action } };
@@ -484,23 +499,23 @@ function renderSdkWaitsSummary({ println }, runtimeId) {
 
     println(`\n  \x1b[36mSDK Waits\x1b[0m`);
     println(
-        `  status   ${headlineColor}${totalPending > 0 ? `${totalPending} pendência(s)` : 'nenhuma pendência'}\x1b[0m`,
+        `  status   ${headlineColor}${totalPending > 0 ? `${totalPending} pendencia(s)` : 'nenhuma pendencia'}\x1b[0m`,
     );
     println(
         `  waits    \x1b[90melicitation=${pendingElicitations.pending}${pendingElicitations.latest?.mode ? ` (${pendingElicitations.latest.mode})` : ''} · permission=${permissionSummary.pending}${permissionSummary.latest ? ` (${permissionSummary.latest.permissionType})` : ''} · ask_user=${userInputSummary.pending}${userInputSummary.latest?.kind ? ` (${userInputSummary.latest.kind})` : ''} · request_user_input=${structuredInputPending}\x1b[0m`,
     );
 
     if (pendingElicitations.pending > 0) {
-        println('  ação     \x1b[90m/elicitation show latest · /elicitation list\x1b[0m');
+        println('  acao     \x1b[90m/elicitation show latest · /elicitation list\x1b[0m');
     }
     if (permissionSummary.pending > 0) {
-        println('  ação     \x1b[90m/permission show latest · /permission all\x1b[0m');
+        println('  acao     \x1b[90m/permission show latest · /permission all\x1b[0m');
     }
     if (userInputSummary.pending > 0) {
-        println('  ação     \x1b[90m/answer <texto> ou responda na conversa ativa\x1b[0m');
+        println('  acao     \x1b[90m/answer <texto> ou responda na conversa ativa\x1b[0m');
     }
     if (structuredInputPending > 0) {
-        println('  ação     \x1b[90mdigite a resposta normalmente; o REPL destrava request_user_input pendente\x1b[0m');
+        println('  acao     \x1b[90mdigite a resposta normalmente; o REPL destrava request_user_input pendente\x1b[0m');
     }
     if (totalPending === 0) {
         println('  \x1b[90mSem bloqueios de input humano do SDK no momento.\x1b[0m');
@@ -592,7 +607,7 @@ export async function cmdSdk({ println }, arg = '') {
             renderSdkWaitsSummary({ println }, runtimeId);
         } else if (sub === 'compact') {
             const result = await callWithRuntimeTarget(compactTerminalSdkSession, runtimeId);
-            println(`\n  \x1b[32m✓ SDK compaction solicitada.\x1b[0m\n  \x1b[90m${pretty(result, 700)}\x1b[0m\n`);
+            println(`\n  \x1b[32m[OK] SDK compaction solicitada.\x1b[0m\n  \x1b[90m${pretty(result, 700)}\x1b[0m\n`);
         } else {
             const state = readTerminalRuntimeState(runtimeId);
             const pendingElicitations = readTerminalElicitationSummary({ runtimeId: state.runtimeId });
@@ -612,7 +627,7 @@ export async function cmdSdk({ println }, arg = '') {
             );
         }
     } catch (e) {
-        println(`\n  \x1b[31m✗ SDK: ${toError(e).message}\x1b[0m\n`);
+        println(`\n  \x1b[31m[ERR] SDK: ${toError(e).message}\x1b[0m\n`);
     }
 }
 
@@ -631,7 +646,7 @@ async function renderSdkModels({ println }, runtimeId) {
         const effort = Array.isArray(m['supportedReasoningEfforts']) ? m['supportedReasoningEfforts'].join(',') : '';
         println(`  \x1b[33m${id}\x1b[0m${effort ? `  \x1b[90mreasoning: ${effort}\x1b[0m` : ''}`);
     }
-    if (models.length > 30) println(`  \x1b[90m… ${models.length - 30} modelos omitidos\x1b[0m`);
+    if (models.length > 30) println(`  \x1b[90m... ${models.length - 30} modelos omitidos\x1b[0m`);
     println('');
 }
 
@@ -644,16 +659,43 @@ async function renderSdkModels({ println }, runtimeId) {
 async function renderSdkTools({ println }, model, runtimeId) {
     const result = await callWithRuntimeTarget(listTerminalSdkTools, runtimeId, { model: model || undefined });
     const tools = arrayFromSdkList(result);
-    println(`\n  \x1b[36mTools SDK${model ? ` para ${model}` : ''} (${tools.length})\x1b[0m`);
+    const registrySnapshot = readIntrospectionRegistrySnapshot();
+    const contract = registrySnapshot.toolContract;
+    println(`\n  \x1b[36mTools SDK (built-in)${model ? ` para ${model}` : ''} (${tools.length})\x1b[0m`);
     for (const tool of tools.slice(0, 50)) {
         const t = objectOrNull(tool) ?? {};
-        const name = String(t['namespacedName'] ?? t['name'] ?? tool);
+        const rawName = String(t['name'] ?? tool);
+        const namespacedName = typeof t['namespacedName'] === 'string' ? t['namespacedName'] : null;
+        const name = String(namespacedName ?? rawName);
         const desc = String(t['description'] ?? '')
             .replace(/\s+/g, ' ')
             .slice(0, 90);
-        println(`  \x1b[33m${name}\x1b[0m${desc ? `  \x1b[90m${desc}\x1b[0m` : ''}`);
+        const hasParameters = Boolean(t['parameters'] && typeof t['parameters'] === 'object');
+        const hasInstructions = typeof t['instructions'] === 'string' && t['instructions'].trim().length > 0;
+        const badges = [hasParameters ? 'schema' : null, hasInstructions ? 'instructions' : null]
+            .filter(Boolean)
+            .join(' · ');
+        println(
+            `  \x1b[33m${name}\x1b[0m${badges ? `  \x1b[90m[${badges}]\x1b[0m` : ''}${desc ? `  \x1b[90m${desc}\x1b[0m` : ''}`,
+        );
+        if (namespacedName && rawName && namespacedName !== rawName) {
+            println(`    \x1b[90mraw=${rawName}\x1b[0m`);
+        }
+        if (hasInstructions) {
+            const instructions = String(t['instructions']).replace(/\s+/g, ' ').slice(0, 140);
+            println(`    \x1b[90minstructions: ${instructions}\x1b[0m`);
+        }
     }
-    if (tools.length > 50) println(`  \x1b[90m… ${tools.length - 50} tools omitidas\x1b[0m`);
+    if (tools.length > 50) println(`  \x1b[90m... ${tools.length - 50} tools omitidas\x1b[0m`);
+    println(
+        `\n  \x1b[36mRegistry local canonico\x1b[0m\n  total=\x1b[33m${registrySnapshot.total}\x1b[0m  fsCanonico=\x1b[33m${String(registrySnapshot.hasCanonicalLocalFsTools)}\x1b[0m  execCanonico=\x1b[33m${String(registrySnapshot.hasCanonicalLocalExecTools)}\x1b[0m  legacyShellLoaded=\x1b[33m${String(registrySnapshot.hasLegacySdkShellToolsLoaded)}\x1b[0m  disabled=\x1b[33m${registrySnapshot.disabled.length}\x1b[0m`,
+    );
+    if (registrySnapshot.disabled.length > 0) {
+        println(`  \x1b[90mdisabled: ${registrySnapshot.disabled.join(', ')}\x1b[0m`);
+    }
+    println(
+        `  \x1b[90mcontract: ok=${String(contract.ok)} · errors=${contract.errorCount} · warnings=${contract.warningCount} · desc=${contract.metadataCoverage.descriptionPct}% · schema=${contract.metadataCoverage.parametersPct}% · category=${contract.metadataCoverage.categoryPct}% · tags=${contract.metadataCoverage.tagsPct}% · instructions=${contract.metadataCoverage.instructionsPct}%\x1b[0m`,
+    );
     println('');
 }
 

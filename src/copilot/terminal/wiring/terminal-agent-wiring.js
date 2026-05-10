@@ -40,6 +40,7 @@ import {
 } from '../frontend/gateways/agent-runtime.js';
 import { stopTerminalDialogMode } from '../frontend/gateways/dialog.js';
 import { writeTerminalHubSystemTurn } from '../frontend/gateways/hub.js';
+import { drainMailboxToTurnIfIdle } from '../mailbox-drain.js';
 import { markTerminalActivityIdle, recordTerminalActivity } from '../state/activity-state.js';
 
 /** @type {boolean} */
@@ -180,6 +181,9 @@ export function registerAgentEventListeners(printBanner) {
     });
 
     // SSE: transmite respostas da LLM-B para clientes subscritos
+    let lastStreamingKbReported = -1;
+    let lastStreamingReportAt = 0;
+
     agentEvents.on(EMITTER_DIALOG_REPLY, (/** @type {{ reply: string }} */ evt) => {
         const { model, reasoningEffort } = readTerminalDialogStreamMeta();
         broadcastSse('dialog.reply', {
@@ -195,22 +199,40 @@ export function registerAgentEventListeners(printBanner) {
     });
     agentEvents.on(EMITTER_DIALOG_READY, () => {
         const { model, reasoningEffort } = readTerminalDialogStreamMeta();
+        lastStreamingKbReported = -1;
+        lastStreamingReportAt = 0;
         markTerminalActivityIdle('Aguardando próxima mensagem');
         broadcastSse('dialog.ready', {
             timestamp: Date.now(),
             model,
             reasoningEffort,
         });
+        // Drain do mailbox zero-PR: cobre abort pelo watchdog (que não dispara TURN_END).
+        drainMailboxToTurnIfIdle('dialog_ready');
     });
     agentEvents.on(EMITTER_ASSISTANT_STREAMING_DELTA, (/** @type {{ totalResponseSizeBytes?: number }} */ evt) => {
         const totalBytes = Number(evt?.totalResponseSizeBytes ?? 0);
         if (!Number.isFinite(totalBytes) || totalBytes <= 0) {
             return;
         }
-        recordTerminalActivity('streaming', 'Transmitindo resposta', {
-            detail: `${Math.round(totalBytes / 1024)} KB recebidos`,
-            source: 'sdk',
-            recordHistory: false,
+
+        const kb = Math.round(totalBytes / 1024);
+        const now = Date.now();
+        const sameBucket = kb === lastStreamingKbReported;
+        const tooSoon = now - lastStreamingReportAt < 900;
+        if (sameBucket && tooSoon) {
+            return;
+        }
+
+        lastStreamingKbReported = kb;
+        lastStreamingReportAt = now;
+        // F1.1: NÃO registrar activity aqui — turn-display.js é o único responsável
+        // por recordTerminalActivity('streaming', ...). Registrar aqui causava duplicação
+        // no histórico com source='sdk' vs source='dialog' (dois caminhos para o mesmo evento).
+        broadcastSse('streaming.progress', {
+            totalBytes,
+            kb,
+            timestamp: now,
         });
     });
 

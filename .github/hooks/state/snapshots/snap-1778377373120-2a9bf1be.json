@@ -1,41 +1,51 @@
 {
-    "snapshotId": "snap-1778202526342-71c85d77",
-    "createdAt": 1778202526342,
-    "sessionId": "cbd89734-c139-48d8-95a5-818715f43b1a",
+    "snapshotId": "snap-1778377373120-2a9bf1be",
+    "createdAt": 1778377373120,
+    "sessionId": "970995a1-0941-4f93-ab3e-30ebb72390aa",
     "model": "auto",
-    "status": "processing",
-    "sendCount": 3,
-    "dialogLoopActive": false,
+    "status": "waiting_for_input",
+    "sendCount": 1,
+    "dialogLoopActive": true,
     "dialogPaused": false,
-    "pendingQuestion": null,
-    "pendingQuestionMeta": null,
+    "pendingQuestion": "READY: aguardando próxima mensagem",
+    "pendingQuestionMeta": {
+        "kind": "ready",
+        "askedAt": 1778376387516,
+        "allowFreeform": true,
+        "protocolControlled": true
+    },
     "pendingQuestionShadow": null,
     "stateSnapshot": {
-        "sessionId": "cbd89734-c139-48d8-95a5-818715f43b1a",
-        "startedAt": 1778191258373,
-        "resumedAt": 1778202375382,
-        "resumeCount": 2,
-        "sendCount": 2,
+        "sessionId": "970995a1-0941-4f93-ab3e-30ebb72390aa",
+        "startedAt": 1778376122484,
+        "resumedAt": 1778376122484,
+        "resumeCount": 0,
+        "sendCount": 0,
         "model": "auto",
         "reasoningEffort": "xhigh",
-        "pendingQuestion": null,
-        "pendingQuestionMeta": null,
+        "pendingQuestion": "READY: aguardando próxima mensagem",
+        "pendingQuestionMeta": {
+            "kind": "ready",
+            "askedAt": 1778376387516,
+            "allowFreeform": true,
+            "protocolControlled": true
+        },
         "systemPromptBinding": {
-            "sessionId": "cbd89734-c139-48d8-95a5-818715f43b1a",
-            "digest": "891c012d7be840c0",
+            "sessionId": "970995a1-0941-4f93-ab3e-30ebb72390aa",
+            "digest": "2cdaa68b079b663c",
             "configuredMode": "append",
             "effectiveMode": "append",
             "effectiveLiveMode": "customize",
             "liveReloadEnabled": true,
             "liveReloadMechanism": "sdk-transform",
             "reloadStrategy": "sdk-transform",
-            "boundAt": 1778202375382
+            "boundAt": 1778376122484
         },
         "gracefulShutdown": false,
-        "dialogLoopActive": false,
+        "dialogLoopActive": true,
         "dialogPaused": false,
         "pendingTurnConsumedPR": true,
-        "lastPrConsumedAt": 1778202516168,
+        "lastPrConsumedAt": 1778376387512,
         "lastPrModel": "claude-sonnet-4.6",
         "lastPrCost": 1,
         "lastQuotaSnapshots": {
@@ -62,11 +72,11 @@
             "premium_interactions": {
                 "isUnlimitedEntitlement": false,
                 "entitlementRequests": 300,
-                "usedRequests": 73,
+                "usedRequests": 112,
                 "usageAllowedWithExhaustedQuota": true,
                 "overage": 0,
                 "overageAllowedWithExhaustedQuota": true,
-                "remainingPercentage": 75.7,
+                "remainingPercentage": 62.7,
                 "resetDate": "2026-06-01T00:00:00.000Z"
             },
             "session": {
@@ -76,8 +86,8 @@
                 "usageAllowedWithExhaustedQuota": false,
                 "overage": 0,
                 "overageAllowedWithExhaustedQuota": false,
-                "remainingPercentage": 78.7,
-                "resetDate": "2026-05-08T03:44:02.000Z"
+                "remainingPercentage": 45.9,
+                "resetDate": "2026-05-10T05:13:21.000Z"
             },
             "weekly": {
                 "isUnlimitedEntitlement": false,
@@ -90,24 +100,24 @@
                 "resetDate": "2026-05-11T00:00:00.000Z"
             }
         },
-        "lastAskUserAt": 1778202143974,
+        "lastAskUserAt": 1778376387516,
         "prMetrics": {
             "boots": 1,
             "resumesWithPR": 0,
             "resumesZeroPR": 0,
             "totalPR": 1
         },
-        "pendingTurnMessage": "Faça um auto diagnóstico de sua situação, após este boot. Tome todo o contexto necessário. Identifique bugs e gaps para sua operação. Seu código está em src\\copilot, onde devemos trabalhar continuamente.",
-        "pendingTurnTs": 1778191345387,
+        "pendingTurnMessage": "Faça uma auditoria rápida do package.json e do src/copilot/terminal/events, listando riscos. Use as tools de leitura/pesquisa necessárias.\n\n[+intervenção] /turn Faça uma auditoria rápida do package.json e do src/copilot/terminal/events, listando riscos. Use as tools de leitura/pesquisa necessárias.",
+        "pendingTurnTs": 1778376381800,
         "lastPrConfiguredModel": "auto",
         "lastPrModelMismatch": false,
         "lastPrEffectiveModel": "claude-sonnet-4.6"
     },
     "prMetrics": {
-        "boots": 0,
+        "boots": 1,
         "resumesWithPR": 0,
         "resumesZeroPR": 0,
-        "totalPR": 0
+        "totalPR": 1
     },
     "reason": "auto-shutdown"
 }

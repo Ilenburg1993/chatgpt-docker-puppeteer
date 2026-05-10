@@ -86,7 +86,7 @@ export function trySetLiveSessionModel(session, modelId, logLabel = 'AlwaysAlive
             /** @type {CopilotSession} */ (session),
             modelId,
             options?.reasoningEffort
-                ? { reasoningEffort: /** @type {'low' | 'medium' | 'high'} */ (options.reasoningEffort) }
+                ? { reasoningEffort: /** @type {'low' | 'medium' | 'high' | 'xhigh'} */ (options.reasoningEffort) }
                 : undefined,
         );
         if (isPromiseLike(maybeResult) === true) {

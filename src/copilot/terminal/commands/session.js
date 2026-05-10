@@ -177,6 +177,9 @@ export function cmdStatus({ hubSessionId, injectPort, println }, arg = '') {
                 : '\x1b[90m(n/d)\x1b[0m';
     const toolLoad = projection.toolLoad;
     const toolLoadColor = toolLoad.hasCanonicalLocalFsTools ? '\x1b[32m' : '\x1b[33m';
+    const toolContract = toolLoad.toolContract;
+    const toolContractColor =
+        toolContract.errorCount > 0 ? '\x1b[31m' : toolContract.warningCount > 0 ? '\x1b[33m' : '\x1b[32m';
     const instructionLoad = projection.instructionLoad;
     const instructionLoadColor =
         instructionLoad.sectionsMissingFileCount === 0 && instructionLoad.appendFileMissingCount === 0
@@ -229,7 +232,8 @@ export function cmdStatus({ hubSessionId, injectPort, println }, arg = '') {
     timeline         \x1b[90m${projection.timelineSource} · ${projection.timelineAuthority} · ${projection.timelineReconciliationStatus} · ${projection.timelineTurnCount} turns${timelineSyncLabel}\x1b[0m
     prompt digest    \x1b[90m${promptBindingDigest ?? '(sem binding)'}\x1b[0m
     prompt frescor   ${promptFreshnessLabel} \x1b[90m(${promptRecommendedAction})\x1b[0m
-    tools load       ${toolLoadColor}${toolLoad.total} registradas\x1b[0m \x1b[90m(fsCanônico=${toolLoad.hasCanonicalLocalFsTools} · sdkWorkspace=${toolLoad.hasSdkWorkspaceTooling} · disabled=${toolLoad.disabled.length})\x1b[0m
+    tools load       ${toolLoadColor}${toolLoad.total} registradas\x1b[0m \x1b[90m(fsCanônico=${toolLoad.hasCanonicalLocalFsTools} · execCanônico=${toolLoad.hasCanonicalLocalExecTools} · sdkWorkspace=${toolLoad.hasSdkWorkspaceTooling} · legacyShellLoaded=${toolLoad.hasLegacySdkShellToolsLoaded} · disabled=${toolLoad.disabled.length})\x1b[0m
+    tool contract   ${toolContractColor}${toolContract.ok ? 'ok' : 'attention'}\x1b[0m \x1b[90m(errors=${toolContract.errorCount} · warnings=${toolContract.warningCount} · desc=${toolContract.metadataCoverage.descriptionPct}% · schema=${toolContract.metadataCoverage.parametersPct}% · category=${toolContract.metadataCoverage.categoryPct}% · tags=${toolContract.metadataCoverage.tagsPct}% · instructions=${toolContract.metadataCoverage.instructionsPct}%)\x1b[0m
     instr. load      ${instructionLoadColor}${instructionLoad.liveReloadMechanism}\x1b[0m \x1b[90m(sections=${instructionLoad.sectionCount} · missingSectionFile=${instructionLoad.sectionsMissingFileCount} · missingAppendFile=${instructionLoad.appendFileMissingCount} · sourcesRpc=${instructionLoad.sdkSupportsInstructionSourcesRpc})\x1b[0m
     sdk↔fs route     ${sdkFsRoutingColor}${sdkFsRouting.mode}\x1b[0m \x1b[90m${sdkFsRouting.reason}\x1b[0m
     custom agents   \x1b[90mprofile=${COPILOT_OPERATIONAL_PROFILE} · ${customAgentsLine}\x1b[0m

@@ -10,6 +10,7 @@
 
 import { SESSION_EVENTS as SE } from '#copilot/events';
 import { onSessionEvent } from '../../sdk/session/events.js';
+import { normalizeToolsUpdatedEvent } from '../../sdk/session/session-events.js';
 import { log } from '../logger.js';
 
 /**
@@ -125,7 +126,14 @@ export function attachSessionHandlers(ctx) {
     unsubs.push(
         onSessionEvent(session, SE.SESSION_TOOLS_UPDATED, (event) => {
             if (persist) persistEvent({ type: event.type, sessionId, ts: event.timestamp, data: event.data });
-            log('DEBUG', `[event-collector] session.tools_updated session=${sessionId}`);
+            const normalized = normalizeToolsUpdatedEvent(event);
+            const namespaced = normalized.tools.filter((tool) => tool.namespacedName !== null).length;
+            const withSchema = normalized.tools.filter((tool) => tool.hasParameters === true).length;
+            const withInstructions = normalized.tools.filter((tool) => tool.hasInstructions === true).length;
+            log(
+                'DEBUG',
+                `[event-collector] session.tools_updated session=${sessionId} count=${normalized.count} namespaced=${namespaced} schema=${withSchema} instructions=${withInstructions}`,
+            );
         }),
     );
     unsubs.push(

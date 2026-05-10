@@ -10,6 +10,9 @@
 import { getFileCacheStats } from './runtime-file-context.js';
 import {
     clearInjectHistory,
+    clearRuntimeInterventionMailbox,
+    consumeRuntimeInterventionMailbox,
+    enqueueRuntimeInterventionMailbox,
     getBusy,
     getHubSessionId,
     getInjectHistory,
@@ -21,6 +24,8 @@ import {
     getSdkSessionMode,
     getThinkingHistory,
     getThinkingHistoryEntry,
+    peekRuntimeInterventionMailbox,
+    readRuntimeInterventionMailboxSummary,
     recordInjectHistory,
 } from './runtime-ui-state-store.js';
 
@@ -111,4 +116,44 @@ export function readRuntimeLatestThinkingHistoryEntry() {
 /** @returns {{ hits: number; misses: number; size: number }} */
 export function readRuntimeFileCacheStats() {
     return getFileCacheStats();
+}
+
+/**
+ * @param {Parameters<typeof enqueueRuntimeInterventionMailbox>[0]} input
+ * @returns {ReturnType<typeof enqueueRuntimeInterventionMailbox>}
+ */
+export function enqueueRuntimeIntervention(input) {
+    return enqueueRuntimeInterventionMailbox(input);
+}
+
+/**
+ * @param {string | null | undefined} runtimeId
+ * @returns {ReturnType<typeof readRuntimeInterventionMailboxSummary>}
+ */
+export function readRuntimeInterventionSummary(runtimeId) {
+    return readRuntimeInterventionMailboxSummary(runtimeId);
+}
+
+/**
+ * @param {string | null | undefined} runtimeId
+ * @returns {ReturnType<typeof peekRuntimeInterventionMailbox>}
+ */
+export function peekRuntimeIntervention(runtimeId) {
+    return peekRuntimeInterventionMailbox(runtimeId);
+}
+
+/**
+ * @param {string | null | undefined} runtimeId
+ * @returns {ReturnType<typeof consumeRuntimeInterventionMailbox>}
+ */
+export function consumeRuntimeIntervention(runtimeId) {
+    return consumeRuntimeInterventionMailbox(runtimeId);
+}
+
+/**
+ * @param {string | null | undefined} runtimeId
+ * @returns {number}
+ */
+export function clearRuntimeInterventions(runtimeId) {
+    return clearRuntimeInterventionMailbox(runtimeId);
 }

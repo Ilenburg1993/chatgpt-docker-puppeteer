@@ -57,6 +57,7 @@ import { sessionTools } from './session-tools.js';
 import { shellTools } from './shell/index.js';
 import { taskTools } from './task-tools.js';
 import { todoReadTools, todoTools, todoWriteTools } from './todo/index.js';
+import { createEmptyToolContractReport, verifyToolRegistryContracts } from './tool-contract-verifier.js';
 import { buildTool, withSkipPermission } from './tool-factory.js';
 import { webTools } from './web-tools.js';
 
@@ -125,6 +126,7 @@ export {
     buildTool,
     codeTools,
     configureHookTools,
+    createEmptyToolContractReport,
     experimentalRpcTools,
     fileReadTools,
     fileTools,
@@ -149,6 +151,7 @@ export {
     todoReadTools,
     todoTools,
     todoWriteTools,
+    verifyToolRegistryContracts,
     webTools,
     withSkipPermission,
 };

@@ -85,6 +85,23 @@ function tryZodV4ToJsonSchema(schema) {
     }
 }
 
+/**
+ * Valida se o JSON Schema gerado possui estrutura útil para parâmetros de tool.
+ *
+ * @param {unknown} schema
+ * @returns {schema is Record<string, unknown>}
+ */
+function isUsableToolParameterSchema(schema) {
+    if (!schema || typeof schema !== 'object' || Array.isArray(schema)) return false;
+    const data = /** @type {Record<string, unknown>} */ (schema);
+    if (typeof data['type'] === 'string') return true;
+    if (typeof data['$ref'] === 'string') return true;
+    if (data['properties'] && typeof data['properties'] === 'object') return true;
+    if (Array.isArray(data['anyOf']) || Array.isArray(data['oneOf']) || Array.isArray(data['allOf'])) return true;
+    if ('additionalProperties' in data) return true;
+    return false;
+}
+
 // Re-export do SDK para compat — consumers preferem usar createTool()
 export { defineTool };
 
@@ -117,26 +134,41 @@ function tryZodToJsonSchema(schema, toolName) {
     if (!isZod) return /** @type {Record<string, unknown>} */ (schema);
 
     const zodV4Schema = tryZodV4ToJsonSchema(schema);
-    if (zodV4Schema) return zodV4Schema;
+    if (isUsableToolParameterSchema(zodV4Schema)) return zodV4Schema;
 
     const converter = loadZodToJsonSchema();
     if (!converter) {
         const maybeJsonSchema = /** @type {{ toJSONSchema?: () => Record<string, unknown> }} */ (schema);
         if (typeof maybeJsonSchema.toJSONSchema === 'function') {
-            return maybeJsonSchema.toJSONSchema();
+            const manual = maybeJsonSchema.toJSONSchema();
+            if (isUsableToolParameterSchema(manual)) return manual;
+            log('WARN', `[sdk/tools] Schema inválido para '${toolName}' após toJSONSchema(); usando sem parâmetros.`);
+            return undefined;
         }
-        throw new Error(
+        log(
+            'WARN',
             `[sdk/tools] Tool '${toolName}' usa Zod schema mas 'zod-to-json-schema' não está disponível. ` +
-                'Instale a dependência ou forneça JSON Schema manual.',
+                'Tool será registrada sem parâmetros.',
         );
+        return undefined;
     }
 
     try {
-        return /** @type {Record<string, unknown>} */ (converter(/** @type {import('zod/v3').ZodTypeAny} */ (schema)));
+        const converted = /** @type {Record<string, unknown>} */ (
+            converter(/** @type {import('zod/v3').ZodTypeAny} */ (schema))
+        );
+        if (!isUsableToolParameterSchema(converted)) {
+            log(
+                'WARN',
+                `[sdk/tools] Schema convertido inválido para '${toolName}' (provável fallback raso); usando sem parâmetros.`,
+            );
+            return undefined;
+        }
+        return converted;
     } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         log('WARN', `[sdk/tools] Falha ao converter Zod schema da tool '${toolName}': ${message}`);
-        throw new Error(`[sdk/tools] Falha ao converter Zod schema da tool '${toolName}': ${message}`, { cause: err });
+        return undefined;
     }
 }
 

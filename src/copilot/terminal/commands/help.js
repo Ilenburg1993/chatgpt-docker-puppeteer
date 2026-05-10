@@ -36,9 +36,12 @@ export function cmdHelp({ injectPort, println }) {
   \x1b[33m/count\x1b[0m                               — estatísticas da sessão
   \x1b[33m/clear\x1b[0m                               — limpa histórico em memória
   \x1b[33m/clear-shadow\x1b[0m                        — limpa shadow persistida de ask_user restaurada do disco
-  \x1b[33m/steer <msg>\x1b[0m                         — intervenção SDK immediate no turno ativo, sem esperar a fila
-  \x1b[33m/interrupt <msg>\x1b[0m                     — aborta o turno ativo e enfileira a mensagem como substituta
+  \x1b[33m/queue <msg>\x1b[0m                         — enfileira intervenção no mailbox zero-PR
+  \x1b[33m/turn <msg>\x1b[0m                          — abre novo turno explicitamente (pode consumir PR)
+  \x1b[33m/steer <msg>\x1b[0m                         — SDK immediate explícito (bloqueado por padrão para preservar zero-PR)
+  \x1b[33m/interrupt <msg>\x1b[0m                     — aborta turno ativo; por padrão guarda substituição no mailbox zero-PR
   \x1b[33m/abort\x1b[0m                               — aborta apenas o turno SDK ativo
+  \x1b[33m/mailbox [status|consume|clear]\x1b[0m      — inspeciona/consome/limpa a fila mailbox zero-PR
   \x1b[33m/restart\x1b[0m                             — reinicia dialog loop
   \x1b[33m/emergency-reset\x1b[0m (\x1b[33m/ereset\x1b[0m)            — limpa rate limiters + reinicia loop
   \x1b[33m/quit\x1b[0m / \x1b[33m/exit\x1b[0m                         — encerra terminal
@@ -62,7 +65,7 @@ export function cmdHelp({ injectPort, println }) {
   \x1b[33m/thinking list [n]\x1b[0m                  — lista thinkings capturados (colapsados)
   \x1b[33m/thinking show <id>|latest\x1b[0m          — abre thinking completo capturado
   \x1b[33m/usage [on|off|now]\x1b[0m                  — toggle usage pós-turno ou snapshot instantâneo
-  \x1b[33m/tools\x1b[0m                               — lista ferramentas observadas com stats
+  \x1b[33m/tools [diag|all|raw]\x1b[0m                — stats de tools (canônico, diagnóstico e raw)
   \x1b[33m/sdk [status|models|tools|quota|prompt|capabilities|waits|compact]\x1b[0m — catálogo/quota/capabilities/ops SDK via Agent
   \x1b[33m/workspace [list|read|write|sync|mirror|promote]\x1b[0m — workspace SDK + convergência SDK↔FS auditável
   \x1b[33m/fs [list|read|search|create|write]\x1b[0m   — filesystem local canônico via file-tools
@@ -123,7 +126,8 @@ export function cmdHelp({ injectPort, println }) {
   \x1b[33mGET /gh/issues\x1b[0m  \x1b[33mGET /gh/prs\x1b[0m  \x1b[33mGET /gh/ci\x1b[0m
   \x1b[33mGET /git/status\x1b[0m  \x1b[33mGET /git/log\x1b[0m
 
-  \x1b[90mDigite qualquer coisa sem /  para enviar mensagem à LLM-B\x1b[0m
+  \x1b[90mTexto livre sem / entra no mailbox zero-PR por padrão e será aplicado na próxima ask_user.\x1b[0m
+  \x1b[90mUse /turn ou prefixo !!turn apenas quando quiser abrir novo turno que pode consumir PR.\x1b[0m
   \x1b[36m╚═══════════════════════════════════════════════════════════════════════╝\x1b[0m
 `);
 }

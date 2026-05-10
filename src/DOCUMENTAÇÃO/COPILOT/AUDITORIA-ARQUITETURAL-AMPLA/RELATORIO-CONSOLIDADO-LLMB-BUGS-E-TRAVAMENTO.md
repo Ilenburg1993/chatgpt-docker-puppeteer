@@ -362,6 +362,69 @@ Os seguintes módulos foram inspecionados e **não apresentaram novos bugs**:
 - `loop-manager.js`: `forceDeactivate()` emite `'stopped'` correto; `stop()` com `timedOut` guard evita dupla emissão; `#shouldSuppressWatchdogEscalation()` funcional.
 - `waitForRestartAndReply()`: `cleanup()` abrangente; `settled` guard; abort signal handled corretamente.
 
+## 8.7) Atualizações aplicadas — Onda E (Zero-PR 2.0 para intervenção humana)
+
+### ZERO-PR-01 — Política runtime explícita para intervenção humana ✅ CORRIGIDO
+
+**Arquivos:** `src/copilot/config/env.js`
+
+Adicionados toggles runtime (sem reinício):
+
+- `TERMINAL_ZERO_PR_INTERVENTIONS` (default `true`)
+- `TERMINAL_ZERO_PR_ALLOW_QUEUE_FALLBACK` (default `false`)
+- `INJECT_ZERO_PR_USER_DEFAULT` (default `true`)
+- `INJECT_ZERO_PR_USER_ALLOW_QUEUE_FALLBACK` (default `false`)
+
+Com getters dinâmicos:
+
+- `getTerminalInterventionPolicy()`
+- `getInjectInterventionPolicy()`
+
+**Efeito:** permite ajustar rigor da política em runtime, preservando fluidez operacional e evitando consumo acidental de PR por input humano.
+
+### ZERO-PR-02 — `/inject` com default zero-PR para `from=user` ✅ CORRIGIDO
+
+**Arquivos:** `src/copilot/presentation/agent-control.js`, `src/copilot/server/routes/agent.js`
+
+- Novo alias de modo `auto` no endpoint.
+- Se `from=user` e não há `mode` explícito, a resolução padrão passa a `steer` (zero-PR).
+- Em `mode=steer`, quando há `ask_user` pendente (`kind=question`), a mensagem é aplicada via
+  `answerAgentPendingQuestion()` (zero-PR) em vez de virar novo turno.
+- `mode=interrupt` para `from=user` é bloqueado (`409`) quando fallback de fila está desabilitado,
+  com código semântico `ZERO_PR_QUEUE_FALLBACK_DISABLED`.
+
+**Efeito:** intervenção humana por API respeita a política “não consumir PR por padrão”.
+
+### ZERO-PR-03 — Texto livre no REPL deixa de abrir turno implícito ✅ CORRIGIDO
+
+**Arquivo:** `src/copilot/terminal/repl/repl-lifecycle.js`
+
+Fluxo de input sem `/` agora:
+
+1. tenta resposta de `ask_user` pendente;
+2. sem pending, tenta `steer` (zero-PR);
+3. sem turno ativo:
+   - com fallback habilitado → enfileira turno;
+   - com fallback desabilitado (default) → não enfileira e orienta operador.
+
+Inclui logs estruturados para observability (`accepted`, `fallback`, `blocked`).
+
+### ZERO-PR-04 — Consumo de PR só por comando explícito ✅ CORRIGIDO
+
+**Arquivos:** `src/copilot/terminal/repl/repl-command-router.js`, `src/copilot/terminal/commands/help.js`
+
+- Novo comando `/turn <mensagem>` (alias `/queue`) para abertura deliberada de turno.
+- `/interrupt` passa a respeitar política zero-PR (por default aborta sem enfileirar substituição).
+- Help atualizado para diferenciar claramente intervenção operacional vs abertura de turno.
+
+### ZERO-PR-05 — Canal de injeção propaga modo auto para origem humana ✅ CORRIGIDO
+
+**Arquivo:** `src/copilot/channel/inject.js`
+
+- Quando `from=user` e `mode` não é fornecido, o client envia `mode='auto'`.
+
+**Efeito:** harmoniza semântica entre caller e borda do terminal, reduzindo drift entre clientes.
+
 ---
 
 ## 10) Conclusão objetiva

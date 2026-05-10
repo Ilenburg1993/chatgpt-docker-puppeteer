@@ -7,12 +7,14 @@
  *   interface operacional da LLM-B, mas removendo a dependência direta de `server/` em `terminal/handlers/agent.js`.
  */
 
+import { getInjectInterventionPolicy } from '#copilot/config';
 import { container, toError } from '#copilot/core';
 import { log, METRICS_STORE } from '#copilot/observability';
 import { projectAgentHttpError } from './agent-http-errors.js';
 import { resolveOptionalDialogTimeout } from './dialog-timeout-policy.js';
 import {
     abortAgentRuntimeCurrentMessage,
+    answerAgentPendingQuestion,
     getAgentHandoffManager,
     getAgentRuntimeControlsTarget,
     pauseAgentDialogLoop,
@@ -28,10 +30,14 @@ import {
     sendRuntimeDialogTurn,
     sendRuntimeDialogTurnWithDiagnostics,
 } from './runtime-dialog.js';
-import { readAgentRuntimeOverview } from './runtime-overview.js';
+import { readAgentRuntimeOverview, readAgentRuntimeOverviewProjection } from './runtime-overview.js';
 import { readAgentStatusSnapshot } from './runtime-status.js';
 import { readRuntimeIdFromParams } from './runtime-targeting.js';
-import { recordRuntimeInjectHistory } from './runtime-ui-state.js';
+import {
+    enqueueRuntimeIntervention,
+    readRuntimeInterventionSummary,
+    recordRuntimeInjectHistory,
+} from './runtime-ui-state.js';
 
 /**
  * @typedef {import('./types.js').HandlerResult} HandlerResult
@@ -44,34 +50,178 @@ import { recordRuntimeInjectHistory } from './runtime-ui-state.js';
  */
 const ALLOWED_FROM = new Set(['llm-a', 'user', 'system', 'llm_a']);
 
+/**
+ * `/inject` expõe nomes legados e nomes novos, mas eles são separados por risco de PR:
+ *
+ * - mailbox aliases: nunca chamam `session.send()`; aguardam `ask_user(kind=question)`;
+ * - turn aliases: chamam o dialog loop canônico e podem consumir PR;
+ * - sdk-immediate aliases: chamam `session.send({ mode: 'immediate' })` apenas quando a política permite.
+ *
+ * O modo interno `queue` abaixo é legado do handler e significa "turno do dialog loop". No contrato externo, `queue`
+ * significa mailbox zero-PR.
+ *
+ * @typedef {'queue' | 'intervene' | 'steer' | 'interrupt' | 'abort'} InjectInternalMode
+ * @typedef {'queue' | 'intervene' | 'steer'} InjectTextDirectiveMode
+ */
+
+/** @type {ReadonlySet<string>} */
+const ZERO_PR_MAILBOX_MODE_ALIASES = new Set(['queue', 'mailbox', 'defer', 'deferred']);
+
+/** @type {ReadonlySet<string>} */
+const EXPLICIT_TURN_MODE_ALIASES = new Set(['turn', 'dialog']);
+
+/** @type {ReadonlySet<string>} */
+const SDK_IMMEDIATE_MODE_ALIASES = new Set(['steer', 'immediate']);
+
+/** @type {ReadonlySet<string>} */
+const INTERRUPT_MODE_ALIASES = new Set(['interrupt', 'abort-and-queue', 'abort_and_queue']);
+
 /** @type {ReadonlySet<string>} */
 const INJECT_MODE_ALIASES = new Set([
-    'queue',
-    'turn',
-    'dialog',
-    'steer',
-    'immediate',
-    'interrupt',
-    'abort-and-queue',
-    'abort_and_queue',
+    ...ZERO_PR_MAILBOX_MODE_ALIASES,
+    ...EXPLICIT_TURN_MODE_ALIASES,
+    ...SDK_IMMEDIATE_MODE_ALIASES,
+    ...INTERRUPT_MODE_ALIASES,
+    'auto',
+    'intervene',
+    'abort',
 ]);
 
 /** @type {Map<string, Promise<void>>} */
 const _injectInterventionQueues = new Map();
 
 /**
- * @param {unknown} rawMode
- * @returns {'queue' | 'steer' | 'interrupt'}
+ * @param {string} message
+ * @returns {{ mode: InjectTextDirectiveMode | null; strippedMessage: string }}
  */
-function resolveInjectMode(rawMode) {
-    if (typeof rawMode !== 'string') return 'queue';
-    const normalized = rawMode.trim().toLowerCase();
-    if (!INJECT_MODE_ALIASES.has(normalized)) return 'queue';
-    if (normalized === 'steer' || normalized === 'immediate') return 'steer';
-    if (normalized === 'interrupt' || normalized === 'abort-and-queue' || normalized === 'abort_and_queue') {
-        return 'interrupt';
+function parseInjectTextModeDirective(message) {
+    const trimmed = message.trim();
+    const bangDirective = trimmed.match(/^!!([a-z_-]+)(?::|\s+)([\s\S]*)$/i);
+    if (bangDirective && typeof bangDirective[1] === 'string') {
+        const token = bangDirective[1].toLowerCase();
+        const mode =
+            token === 'immediate' || token === 'imediato' || token === 'steer'
+                ? 'steer'
+                : token === 'turn' || token === 'dialog'
+                  ? 'queue'
+                  : token === 'queue' || token === 'fila' || token === 'mailbox' || token === 'intervene'
+                    ? 'intervene'
+                    : null;
+        if (mode !== null) {
+            return {
+                mode,
+                strippedMessage: String(bangDirective[2] ?? '').trim(),
+            };
+        }
     }
-    return 'queue';
+    const bracket = trimmed.match(/^\[(queue|fila|mailbox|turn|dialog|immediate|imediato|intervene|steer)\](?::|\s*)/i);
+    if (bracket && typeof bracket[1] === 'string') {
+        const token = bracket[1].toLowerCase();
+        const mode =
+            token === 'turn' || token === 'dialog'
+                ? 'queue'
+                : token === 'immediate' || token === 'imediato' || token === 'steer'
+                  ? 'steer'
+                  : 'intervene';
+        return {
+            mode,
+            strippedMessage: trimmed.slice(bracket[0].length).trim(),
+        };
+    }
+    return { mode: null, strippedMessage: trimmed };
+}
+
+/**
+ * Preserva conteúdo quando um cliente já enviou `mode` explícito e o texto começa com uma diretiva conflitante.
+ *
+ * Ex.: `{ mode: 'turn', message: '!!queue literal' }` deve abrir turno com o texto literal, não apagar `!!queue`.
+ *
+ * @param {InjectInternalMode} internalMode
+ * @param {{ mode: InjectTextDirectiveMode | null; strippedMessage: string }} parsedText
+ * @param {string} originalMessage
+ * @returns {string}
+ */
+function resolveExplicitModeMessage(internalMode, parsedText, originalMessage) {
+    return parsedText.mode === internalMode ? parsedText.strippedMessage : originalMessage.trim();
+}
+
+/**
+ * @param {unknown} rawMode
+ * @param {string} message
+ * @returns {{ mode: InjectInternalMode; message: string }}
+ */
+function resolveInjectMode(rawMode, message) {
+    const policy = getInjectInterventionPolicy();
+    const parsedText = policy.allowTextModeDirectives
+        ? parseInjectTextModeDirective(message)
+        : { mode: null, strippedMessage: message.trim() };
+
+    /** @type {InjectTextDirectiveMode} */
+    const fallbackMode =
+        policy.userDefaultMode === 'intervene'
+            ? 'intervene'
+            : policy.userDefaultSteer && policy.allowSteer
+              ? 'steer'
+              : 'queue';
+
+    if (typeof rawMode !== 'string') {
+        return {
+            mode: parsedText.mode ?? fallbackMode,
+            message: parsedText.strippedMessage,
+        };
+    }
+
+    const normalized = rawMode.trim().toLowerCase();
+    if (!INJECT_MODE_ALIASES.has(normalized)) {
+        return {
+            mode: parsedText.mode ?? fallbackMode,
+            message: parsedText.strippedMessage,
+        };
+    }
+
+    if (normalized === 'auto') {
+        return {
+            mode: parsedText.mode ?? fallbackMode,
+            message: parsedText.strippedMessage,
+        };
+    }
+
+    if (ZERO_PR_MAILBOX_MODE_ALIASES.has(normalized)) {
+        return {
+            mode: 'intervene',
+            message: resolveExplicitModeMessage('intervene', parsedText, message),
+        };
+    }
+    if (EXPLICIT_TURN_MODE_ALIASES.has(normalized)) {
+        return { mode: 'queue', message: resolveExplicitModeMessage('queue', parsedText, message) };
+    }
+    if (normalized === 'intervene') {
+        return { mode: 'intervene', message: resolveExplicitModeMessage('intervene', parsedText, message) };
+    }
+    if (SDK_IMMEDIATE_MODE_ALIASES.has(normalized)) {
+        return { mode: 'steer', message: resolveExplicitModeMessage('steer', parsedText, message) };
+    }
+    if (INTERRUPT_MODE_ALIASES.has(normalized)) {
+        return { mode: 'interrupt', message: resolveExplicitModeMessage('interrupt', parsedText, message) };
+    }
+    if (normalized === 'abort') {
+        return { mode: 'abort', message: resolveExplicitModeMessage('abort', parsedText, message) };
+    }
+    return {
+        mode: fallbackMode,
+        message: parsedText.strippedMessage,
+    };
+}
+
+/**
+ * @param {string} from
+ * @returns {'llm-a' | 'user' | 'system' | 'inject'}
+ */
+function resolveMailboxSource(from) {
+    if (from === 'llm-a' || from === 'llm_a') return 'llm-a';
+    if (from === 'user') return 'user';
+    if (from === 'system') return 'system';
+    return 'inject';
 }
 
 /**
@@ -142,6 +292,29 @@ function resolveInjectTimeout(runtimeId, explicitTimeoutMs) {
         phase: 'inject',
         allowDisabled: true,
     });
+}
+
+/**
+ * Tenta aplicar intervenção imediatamente sem PR quando já existe `ask_user` pendente do tipo pergunta humana.
+ *
+ * @param {string | null | undefined} runtimeId
+ * @param {string} message
+ * @returns {{ applied: boolean; pendingQuestionKind: import('./types.js').RuntimePendingQuestionKind | null }}
+ */
+function tryApplyImmediateZeroPrIntervention(runtimeId, message) {
+    const interaction = readAgentRuntimeOverviewProjection(runtimeId);
+    const pendingQuestion = interaction.pendingQuestion;
+    const pendingQuestionKind = interaction.pendingQuestionKind;
+    const protocolControlled = Boolean(
+        pendingQuestion &&
+        (pendingQuestion.protocolControlled === true ||
+            (pendingQuestionKind !== null && pendingQuestionKind !== 'question')),
+    );
+    if (!pendingQuestion || protocolControlled) {
+        return { applied: false, pendingQuestionKind };
+    }
+    const applied = answerAgentPendingQuestion(message, runtimeId);
+    return { applied, pendingQuestionKind };
 }
 
 /**
@@ -313,7 +486,21 @@ export async function handlePipeline(params = {}) {
  *               message?: string;
  *               content?: string;
  *               from?: string;
- *               mode?: 'queue' | 'turn' | 'dialog' | 'steer' | 'immediate' | 'interrupt' | 'abort-and-queue' | 'abort_and_queue';
+ *               mode?:
+ *                   | 'queue'
+ *                   | 'mailbox'
+ *                   | 'defer'
+ *                   | 'deferred'
+ *                   | 'turn'
+ *                   | 'dialog'
+ *                   | 'auto'
+ *                   | 'steer'
+ *                   | 'immediate'
+ *                   | 'intervene'
+ *                   | 'interrupt'
+ *                   | 'abort'
+ *                   | 'abort-and-queue'
+ *                   | 'abort_and_queue';
  *               timeout?: number;
  *               context_files?: string[];
  *               attachments?: {
@@ -329,7 +516,21 @@ export async function handlePipeline(params = {}) {
  *           message?: string;
  *           content?: string;
  *           from?: string;
- *           mode?: 'queue' | 'turn' | 'dialog' | 'steer' | 'immediate' | 'interrupt' | 'abort-and-queue' | 'abort_and_queue';
+ *           mode?:
+ *               | 'queue'
+ *               | 'mailbox'
+ *               | 'defer'
+ *               | 'deferred'
+ *               | 'turn'
+ *               | 'dialog'
+ *               | 'auto'
+ *               | 'steer'
+ *               | 'immediate'
+ *               | 'intervene'
+ *               | 'interrupt'
+ *               | 'abort'
+ *               | 'abort-and-queue'
+ *               | 'abort_and_queue';
  *           timeout?: number;
  *           context_files?: string[];
  *           attachments?: {
@@ -350,20 +551,22 @@ export async function handleInject(params = {}) {
     const body = resolveAgentControlInput(params);
     const runtimeId = resolveRuntimeIdParam(params);
     const traceId = createInjectTraceId();
+    const rawFrom = body['from'] ?? 'llm-a';
+    const from = typeof rawFrom === 'string' && ALLOWED_FROM.has(rawFrom) ? rawFrom : 'llm-a';
+    const zeroPrInterventionSource = from === 'user' || from === 'llm-a' || from === 'llm_a' || from === 'system';
     const rawMessage =
         typeof body['message'] === 'string'
             ? body['message']
             : typeof body['content'] === 'string'
               ? body['content']
               : '';
-    const message = rawMessage.trim();
-    if (!message) {
+    const resolvedInject = resolveInjectMode(body['mode'] ?? body['delivery'] ?? body['strategy'], rawMessage);
+    const injectMode = resolvedInject.mode;
+    const message = resolvedInject.message;
+    if (!message && injectMode !== 'abort') {
         return { status: 400, body: { ok: false, error: '"message" é obrigatório' } };
     }
 
-    const rawFrom = body['from'] ?? 'llm-a';
-    const from = typeof rawFrom === 'string' && ALLOWED_FROM.has(rawFrom) ? rawFrom : 'llm-a';
-    const injectMode = resolveInjectMode(body['mode'] ?? body['delivery'] ?? body['strategy']);
     const explicitTimeoutMs =
         body['timeout'] === null
             ? 0
@@ -371,6 +574,7 @@ export async function handleInject(params = {}) {
               ? body['timeout']
               : undefined;
     const timeoutDecision = resolveInjectTimeout(runtimeId, explicitTimeoutMs);
+    const injectInterventionPolicy = getInjectInterventionPolicy();
     const timeout = timeoutDecision.timeoutMs;
     const agent = getAgent(runtimeId);
     const agentSnapshot = readAgentStatusSnapshot(agent);
@@ -393,7 +597,7 @@ export async function handleInject(params = {}) {
     let attachmentEmbeddingDurationMs = 0;
     let enrichedMessage = message;
     const contextFiles = Array.isArray(body['context_files']) ? body['context_files'] : [];
-    if (contextFiles.length > 0) {
+    if (injectMode !== 'abort' && contextFiles.length > 0) {
         try {
             const contextStartedAt = Date.now();
             const ctxs = await Promise.all(contextFiles.map(readRuntimeFileContext));
@@ -408,7 +612,7 @@ export async function handleInject(params = {}) {
     }
 
     const rawAttachments = Array.isArray(body['attachments']) ? body['attachments'] : [];
-    if (rawAttachments.length > 0) {
+    if (injectMode !== 'abort' && rawAttachments.length > 0) {
         let embedParts;
         try {
             const attachmentsStartedAt = Date.now();
@@ -440,68 +644,634 @@ export async function handleInject(params = {}) {
     const preflightDurationMs = t0 - preflightStartedAt;
     const metrics = resolveMetricsStoreSafe();
     try {
-        if (injectMode === 'steer') {
-            const messageId = await steerAgentRuntimeMessage(enrichedMessage, runtimeId);
-            const durationMs = Date.now() - t0;
-            const injectDiagnostics = {
-                preflightDurationMs,
-                contextEmbeddingDurationMs,
-                attachmentEmbeddingDurationMs,
-                dialogDurationMs: 0,
-                totalDurationMs: Date.now() - injectStartedAt,
-                mode: injectMode,
-                sdkMessageId: messageId,
-                runtimeDialog: null,
-            };
-            metrics?.recordInjectTurn?.(durationMs, true, 'completed');
-            recordRuntimeInjectHistory({
-                ts: t0,
-                traceId,
-                from,
-                message: message.slice(0, 200),
-                replySnippet: null,
-                durationMs,
-                timeoutMs: timeout,
-                timeoutStrategy: timeoutDecision.strategy,
-                timeoutReasons: timeoutDecision.reasons,
-                transportTimeoutMs: null,
-                runtimeId: runtimeId ?? 'default',
-                promptDigest: typeof promptBinding?.['digest'] === 'string' ? promptBinding['digest'] : null,
-                promptBindingDigest: typeof promptBinding?.['digest'] === 'string' ? promptBinding['digest'] : null,
-                promptIsStale: typeof promptFreshness?.['isStale'] === 'boolean' ? promptFreshness['isStale'] : null,
-                promptFreshnessReason: typeof promptFreshness?.['reason'] === 'string' ? promptFreshness['reason'] : null,
-                promptRecommendedAction:
-                    promptFreshness?.['recommendedAction'] === 'none' ||
-                    promptFreshness?.['recommendedAction'] === 'observe-live-reload' ||
-                    promptFreshness?.['recommendedAction'] === 'resume-session'
-                        ? promptFreshness['recommendedAction']
-                        : null,
-                diagnostics: injectDiagnostics,
-                outcome: 'steered',
-                ok: true,
-            });
-            log(
-                'INFO',
-                `[agent-control] /inject steered current turn (trace=${traceId}, duration=${durationMs}ms, messageId=${messageId || '-'})`,
-            );
-            return {
-                status: 202,
-                body: {
-                    ok: true,
-                    mode: injectMode,
-                    messageId,
-                    reply: null,
-                    durationMs,
-                    from,
+        if (injectMode === 'intervene') {
+            return await runInjectInterventionSequence(runtimeId, async () => {
+                const immediate = tryApplyImmediateZeroPrIntervention(runtimeId, enrichedMessage);
+                if (immediate.applied) {
+                    const durationMs = Date.now() - t0;
+                    const injectDiagnostics = {
+                        preflightDurationMs,
+                        contextEmbeddingDurationMs,
+                        attachmentEmbeddingDurationMs,
+                        dialogDurationMs: 0,
+                        totalDurationMs: Date.now() - injectStartedAt,
+                        mode: 'intervene_immediate',
+                        runtimeDialog: null,
+                    };
+                    metrics?.recordInjectTurn?.(durationMs, true, 'completed');
+                    metrics?.recordCounter?.('zero_pr.intervene.immediate_answer');
+                    recordRuntimeInjectHistory({
+                        ts: t0,
+                        traceId,
+                        from,
+                        message: message.slice(0, 200),
+                        replySnippet: null,
+                        durationMs,
+                        timeoutMs: timeout,
+                        timeoutStrategy: timeoutDecision.strategy,
+                        timeoutReasons: timeoutDecision.reasons,
+                        transportTimeoutMs: null,
+                        runtimeId: runtimeId ?? 'default',
+                        promptDigest: typeof promptBinding?.['digest'] === 'string' ? promptBinding['digest'] : null,
+                        promptBindingDigest:
+                            typeof promptBinding?.['digest'] === 'string' ? promptBinding['digest'] : null,
+                        promptIsStale:
+                            typeof promptFreshness?.['isStale'] === 'boolean' ? promptFreshness['isStale'] : null,
+                        promptFreshnessReason:
+                            typeof promptFreshness?.['reason'] === 'string' ? promptFreshness['reason'] : null,
+                        promptRecommendedAction:
+                            promptFreshness?.['recommendedAction'] === 'none' ||
+                            promptFreshness?.['recommendedAction'] === 'observe-live-reload' ||
+                            promptFreshness?.['recommendedAction'] === 'resume-session'
+                                ? promptFreshness['recommendedAction']
+                                : null,
+                        diagnostics: injectDiagnostics,
+                        outcome: 'completed',
+                        ok: true,
+                    });
+                    return {
+                        status: 202,
+                        body: {
+                            ok: true,
+                            code: 'ZERO_PR_ANSWER_IMMEDIATE',
+                            mode: 'answer',
+                            deferred: false,
+                            note: 'Intervenção imediata aplicada no ask_user pendente sem abrir novo PR.',
+                            reply: null,
+                            durationMs,
+                            from,
+                            traceId,
+                            timeoutMs: timeout,
+                            timeoutStrategy: timeoutDecision.strategy,
+                            timeoutReasons: timeoutDecision.reasons,
+                            promptDigest:
+                                typeof promptBinding?.['digest'] === 'string' ? promptBinding['digest'] : null,
+                            promptFreshness: promptFreshness,
+                            diagnostics: injectDiagnostics,
+                        },
+                    };
+                }
+
+                const deferred = enqueueRuntimeIntervention({
+                    runtimeId,
+                    source: resolveMailboxSource(from),
+                    modeHint: 'queue',
+                    message: enrichedMessage,
+                });
+                const mailbox = readRuntimeInterventionSummary(runtimeId);
+                const durationMs = Date.now() - t0;
+                const injectDiagnostics = {
+                    preflightDurationMs,
+                    contextEmbeddingDurationMs,
+                    attachmentEmbeddingDurationMs,
+                    dialogDurationMs: 0,
+                    totalDurationMs: Date.now() - injectStartedAt,
+                    mode: 'mailbox_queue',
+                    runtimeDialog: null,
+                };
+                metrics?.recordInjectTurn?.(durationMs, true, 'completed');
+                metrics?.recordCounter?.('zero_pr.intervene.deferred_mailbox');
+                recordRuntimeInjectHistory({
+                    ts: t0,
                     traceId,
+                    from,
+                    message: message.slice(0, 200),
+                    replySnippet: null,
+                    durationMs,
                     timeoutMs: timeout,
                     timeoutStrategy: timeoutDecision.strategy,
                     timeoutReasons: timeoutDecision.reasons,
+                    transportTimeoutMs: null,
+                    runtimeId: runtimeId ?? 'default',
                     promptDigest: typeof promptBinding?.['digest'] === 'string' ? promptBinding['digest'] : null,
-                    promptFreshness: promptFreshness,
+                    promptBindingDigest: typeof promptBinding?.['digest'] === 'string' ? promptBinding['digest'] : null,
+                    promptIsStale:
+                        typeof promptFreshness?.['isStale'] === 'boolean' ? promptFreshness['isStale'] : null,
+                    promptFreshnessReason:
+                        typeof promptFreshness?.['reason'] === 'string' ? promptFreshness['reason'] : null,
+                    promptRecommendedAction:
+                        promptFreshness?.['recommendedAction'] === 'none' ||
+                        promptFreshness?.['recommendedAction'] === 'observe-live-reload' ||
+                        promptFreshness?.['recommendedAction'] === 'resume-session'
+                            ? promptFreshness['recommendedAction']
+                            : null,
                     diagnostics: injectDiagnostics,
-                },
-            };
+                    outcome: 'completed',
+                    ok: true,
+                });
+                return {
+                    status: 202,
+                    body: {
+                        ok: true,
+                        code: 'ZERO_PR_MAILBOX_QUEUED',
+                        mode: 'mailbox_queue',
+                        deferred: true,
+                        mailbox: {
+                            queueSize: mailbox.queueSize,
+                            dropped: mailbox.dropped,
+                            merged: deferred.merged,
+                        },
+                        note: 'Mensagem registrada na fila mailbox zero-PR para aplicação na próxima ask_user.',
+                        reply: null,
+                        durationMs,
+                        from,
+                        traceId,
+                        timeoutMs: timeout,
+                        timeoutStrategy: timeoutDecision.strategy,
+                        timeoutReasons: timeoutDecision.reasons,
+                        promptDigest: typeof promptBinding?.['digest'] === 'string' ? promptBinding['digest'] : null,
+                        promptFreshness: promptFreshness,
+                        diagnostics: injectDiagnostics,
+                    },
+                };
+            });
+        }
+
+        if (injectMode === 'steer') {
+            return await runInjectInterventionSequence(runtimeId, async () => {
+                if (zeroPrInterventionSource && !injectInterventionPolicy.allowSteer) {
+                    const interaction = readAgentRuntimeOverviewProjection(runtimeId);
+                    const pendingQuestion = interaction.pendingQuestion;
+                    const pendingKind = interaction.pendingQuestionKind;
+                    let answerAttemptFailed = false;
+                    const protocolControlled = Boolean(
+                        pendingQuestion &&
+                            (pendingQuestion.protocolControlled === true ||
+                                (pendingKind !== null && pendingKind !== 'question')),
+                    );
+                    if (pendingQuestion && !protocolControlled) {
+                        const answered = answerAgentPendingQuestion(enrichedMessage, runtimeId);
+                        const durationMs = Date.now() - t0;
+                        const injectDiagnostics = {
+                            preflightDurationMs,
+                            contextEmbeddingDurationMs,
+                            attachmentEmbeddingDurationMs,
+                            dialogDurationMs: 0,
+                            totalDurationMs: Date.now() - injectStartedAt,
+                            mode: 'answer',
+                            sdkMessageId: null,
+                            runtimeDialog: null,
+                        };
+                        if (!answered) {
+                            answerAttemptFailed = true;
+                            metrics?.recordCounter?.('zero_pr.steer.answer_failed_requeued');
+                            log(
+                                'WARN',
+                                `[agent-control] /inject zero-pr answer failed; preserving in mailbox (trace=${traceId}, runtime=${runtimeId ?? 'default'})`,
+                            );
+                        } else {
+                            metrics?.recordInjectTurn?.(durationMs, true, 'completed');
+                            recordRuntimeInjectHistory({
+                                ts: t0,
+                                traceId,
+                                from,
+                                message: message.slice(0, 200),
+                                replySnippet: null,
+                                durationMs,
+                                timeoutMs: timeout,
+                                timeoutStrategy: timeoutDecision.strategy,
+                                timeoutReasons: timeoutDecision.reasons,
+                                transportTimeoutMs: null,
+                                runtimeId: runtimeId ?? 'default',
+                                promptDigest:
+                                    typeof promptBinding?.['digest'] === 'string' ? promptBinding['digest'] : null,
+                                promptBindingDigest:
+                                    typeof promptBinding?.['digest'] === 'string' ? promptBinding['digest'] : null,
+                                promptIsStale:
+                                    typeof promptFreshness?.['isStale'] === 'boolean' ? promptFreshness['isStale'] : null,
+                                promptFreshnessReason:
+                                    typeof promptFreshness?.['reason'] === 'string' ? promptFreshness['reason'] : null,
+                                promptRecommendedAction:
+                                    promptFreshness?.['recommendedAction'] === 'none' ||
+                                    promptFreshness?.['recommendedAction'] === 'observe-live-reload' ||
+                                    promptFreshness?.['recommendedAction'] === 'resume-session'
+                                        ? promptFreshness['recommendedAction']
+                                        : null,
+                                diagnostics: injectDiagnostics,
+                                outcome: 'completed',
+                                ok: true,
+                            });
+                            return {
+                                status: 202,
+                                body: {
+                                    ok: true,
+                                    mode: 'answer',
+                                    reply: null,
+                                    durationMs,
+                                    from,
+                                    traceId,
+                                    timeoutMs: timeout,
+                                    timeoutStrategy: timeoutDecision.strategy,
+                                    timeoutReasons: timeoutDecision.reasons,
+                                    promptDigest:
+                                        typeof promptBinding?.['digest'] === 'string' ? promptBinding['digest'] : null,
+                                    promptFreshness: promptFreshness,
+                                    diagnostics: injectDiagnostics,
+                                },
+                            };
+                        }
+                    }
+
+                    const immediate = answerAttemptFailed
+                        ? { applied: false, pendingQuestionKind: pendingKind }
+                        : tryApplyImmediateZeroPrIntervention(runtimeId, enrichedMessage);
+                    if (immediate.applied) {
+                        const durationMs = Date.now() - t0;
+                        const injectDiagnostics = {
+                            preflightDurationMs,
+                            contextEmbeddingDurationMs,
+                            attachmentEmbeddingDurationMs,
+                            dialogDurationMs: 0,
+                            totalDurationMs: Date.now() - injectStartedAt,
+                            mode: 'answer_immediate',
+                            sdkMessageId: null,
+                            runtimeDialog: null,
+                        };
+                        metrics?.recordInjectTurn?.(durationMs, true, 'completed');
+                        metrics?.recordCounter?.('zero_pr.steer.immediate_answer');
+                        recordRuntimeInjectHistory({
+                            ts: t0,
+                            traceId,
+                            from,
+                            message: message.slice(0, 200),
+                            replySnippet: null,
+                            durationMs,
+                            timeoutMs: timeout,
+                            timeoutStrategy: timeoutDecision.strategy,
+                            timeoutReasons: timeoutDecision.reasons,
+                            transportTimeoutMs: null,
+                            runtimeId: runtimeId ?? 'default',
+                            promptDigest:
+                                typeof promptBinding?.['digest'] === 'string' ? promptBinding['digest'] : null,
+                            promptBindingDigest:
+                                typeof promptBinding?.['digest'] === 'string' ? promptBinding['digest'] : null,
+                            promptIsStale:
+                                typeof promptFreshness?.['isStale'] === 'boolean' ? promptFreshness['isStale'] : null,
+                            promptFreshnessReason:
+                                typeof promptFreshness?.['reason'] === 'string' ? promptFreshness['reason'] : null,
+                            promptRecommendedAction:
+                                promptFreshness?.['recommendedAction'] === 'none' ||
+                                promptFreshness?.['recommendedAction'] === 'observe-live-reload' ||
+                                promptFreshness?.['recommendedAction'] === 'resume-session'
+                                    ? promptFreshness['recommendedAction']
+                                    : null,
+                            diagnostics: injectDiagnostics,
+                            outcome: 'completed',
+                            ok: true,
+                        });
+                        return {
+                            status: 202,
+                            body: {
+                                ok: true,
+                                code: 'ZERO_PR_ANSWER_IMMEDIATE',
+                                mode: 'answer',
+                                deferred: false,
+                                note: 'Steer bloqueado por política zero-PR; resposta aplicada imediatamente no ask_user pendente.',
+                                reply: null,
+                                durationMs,
+                                from,
+                                traceId,
+                                timeoutMs: timeout,
+                                timeoutStrategy: timeoutDecision.strategy,
+                                timeoutReasons: timeoutDecision.reasons,
+                                promptDigest:
+                                    typeof promptBinding?.['digest'] === 'string' ? promptBinding['digest'] : null,
+                                promptFreshness: promptFreshness,
+                                diagnostics: injectDiagnostics,
+                            },
+                        };
+                    }
+                    const durationMs = Date.now() - t0;
+                    const injectDiagnostics = {
+                        preflightDurationMs,
+                        contextEmbeddingDurationMs,
+                        attachmentEmbeddingDurationMs,
+                        dialogDurationMs: 0,
+                        totalDurationMs: Date.now() - injectStartedAt,
+                        mode: 'steer_blocked',
+                        sdkMessageId: null,
+                        runtimeDialog: null,
+                    };
+                    const deferred = enqueueRuntimeIntervention({
+                        runtimeId,
+                        source: resolveMailboxSource(from),
+                        modeHint: 'steer',
+                        message: enrichedMessage,
+                    });
+                    const mailbox = readRuntimeInterventionSummary(runtimeId);
+                    metrics?.recordInjectTurn?.(durationMs, true, 'completed');
+                    metrics?.recordCounter?.('zero_pr.steer.deferred_mailbox');
+                    recordRuntimeInjectHistory({
+                        ts: t0,
+                        traceId,
+                        from,
+                        message: message.slice(0, 200),
+                        replySnippet: null,
+                        durationMs,
+                        timeoutMs: timeout,
+                        timeoutStrategy: timeoutDecision.strategy,
+                        timeoutReasons: timeoutDecision.reasons,
+                        transportTimeoutMs: null,
+                        runtimeId: runtimeId ?? 'default',
+                        promptDigest: typeof promptBinding?.['digest'] === 'string' ? promptBinding['digest'] : null,
+                        promptBindingDigest:
+                            typeof promptBinding?.['digest'] === 'string' ? promptBinding['digest'] : null,
+                        promptIsStale:
+                            typeof promptFreshness?.['isStale'] === 'boolean' ? promptFreshness['isStale'] : null,
+                        promptFreshnessReason:
+                            typeof promptFreshness?.['reason'] === 'string' ? promptFreshness['reason'] : null,
+                        promptRecommendedAction:
+                            promptFreshness?.['recommendedAction'] === 'none' ||
+                            promptFreshness?.['recommendedAction'] === 'observe-live-reload' ||
+                            promptFreshness?.['recommendedAction'] === 'resume-session'
+                                ? promptFreshness['recommendedAction']
+                                : null,
+                        diagnostics: injectDiagnostics,
+                        outcome: 'completed',
+                        ok: true,
+                    });
+                    return {
+                        status: 202,
+                        body: {
+                            ok: true,
+                            code: 'ZERO_PR_DEFERRED_MAILBOX',
+                            mode: 'deferred_mailbox',
+                            deferred: true,
+                            mailbox: {
+                                queueSize: mailbox.queueSize,
+                                dropped: mailbox.dropped,
+                                merged: deferred.merged,
+                            },
+                            note: 'Steer bloqueado por política zero-PR; intervenção registrada para próxima ask_user.',
+                            reply: null,
+                            durationMs,
+                            from,
+                            traceId,
+                            timeoutMs: timeout,
+                            timeoutStrategy: timeoutDecision.strategy,
+                            timeoutReasons: timeoutDecision.reasons,
+                            promptDigest:
+                                typeof promptBinding?.['digest'] === 'string' ? promptBinding['digest'] : null,
+                            promptFreshness: promptFreshness,
+                            diagnostics: injectDiagnostics,
+                        },
+                    };
+                }
+
+                /** @type {string | undefined} */
+                let messageId;
+                try {
+                    messageId = await steerAgentRuntimeMessage(enrichedMessage, runtimeId);
+                } catch (e) {
+                    if (zeroPrInterventionSource && !injectInterventionPolicy.allowQueueFallback) {
+                        const immediate = tryApplyImmediateZeroPrIntervention(runtimeId, enrichedMessage);
+                        if (immediate.applied) {
+                            const durationMs = Date.now() - t0;
+                            const injectDiagnostics = {
+                                preflightDurationMs,
+                                contextEmbeddingDurationMs,
+                                attachmentEmbeddingDurationMs,
+                                dialogDurationMs: 0,
+                                totalDurationMs: Date.now() - injectStartedAt,
+                                mode: 'answer_immediate',
+                                sdkMessageId: null,
+                                runtimeDialog: null,
+                            };
+                            metrics?.recordInjectTurn?.(durationMs, true, 'completed');
+                            metrics?.recordCounter?.('zero_pr.no_active_turn.immediate_answer');
+                            return {
+                                status: 202,
+                                body: {
+                                    ok: true,
+                                    code: 'ZERO_PR_ANSWER_IMMEDIATE',
+                                    mode: 'answer',
+                                    deferred: false,
+                                    note: 'Sem turno ativo para steer; resposta aplicada imediatamente no ask_user pendente.',
+                                    reply: null,
+                                    durationMs,
+                                    from,
+                                    traceId,
+                                    timeoutMs: timeout,
+                                    timeoutStrategy: timeoutDecision.strategy,
+                                    timeoutReasons: timeoutDecision.reasons,
+                                    promptDigest:
+                                        typeof promptBinding?.['digest'] === 'string' ? promptBinding['digest'] : null,
+                                    promptFreshness: promptFreshness,
+                                    diagnostics: injectDiagnostics,
+                                },
+                            };
+                        }
+                        const durationMs = Date.now() - t0;
+                        const injectDiagnostics = {
+                            preflightDurationMs,
+                            contextEmbeddingDurationMs,
+                            attachmentEmbeddingDurationMs,
+                            dialogDurationMs: 0,
+                            totalDurationMs: Date.now() - injectStartedAt,
+                            mode: injectMode,
+                            sdkMessageId: null,
+                            runtimeDialog: null,
+                        };
+                        const deferred = enqueueRuntimeIntervention({
+                            runtimeId,
+                            source: resolveMailboxSource(from),
+                            modeHint: 'steer',
+                            message: enrichedMessage,
+                        });
+                        const mailbox = readRuntimeInterventionSummary(runtimeId);
+                        metrics?.recordInjectTurn?.(durationMs, true, 'completed');
+                        metrics?.recordCounter?.('zero_pr.no_active_turn.deferred_mailbox');
+                        recordRuntimeInjectHistory({
+                            ts: t0,
+                            traceId,
+                            from,
+                            message: message.slice(0, 200),
+                            replySnippet: null,
+                            durationMs,
+                            timeoutMs: timeout,
+                            timeoutStrategy: timeoutDecision.strategy,
+                            timeoutReasons: timeoutDecision.reasons,
+                            transportTimeoutMs: null,
+                            runtimeId: runtimeId ?? 'default',
+                            promptDigest:
+                                typeof promptBinding?.['digest'] === 'string' ? promptBinding['digest'] : null,
+                            promptBindingDigest:
+                                typeof promptBinding?.['digest'] === 'string' ? promptBinding['digest'] : null,
+                            promptIsStale:
+                                typeof promptFreshness?.['isStale'] === 'boolean' ? promptFreshness['isStale'] : null,
+                            promptFreshnessReason:
+                                typeof promptFreshness?.['reason'] === 'string' ? promptFreshness['reason'] : null,
+                            promptRecommendedAction:
+                                promptFreshness?.['recommendedAction'] === 'none' ||
+                                promptFreshness?.['recommendedAction'] === 'observe-live-reload' ||
+                                promptFreshness?.['recommendedAction'] === 'resume-session'
+                                    ? promptFreshness['recommendedAction']
+                                    : null,
+                            diagnostics: injectDiagnostics,
+                            outcome: 'completed',
+                            ok: true,
+                        });
+                        return {
+                            status: 202,
+                            body: {
+                                ok: true,
+                                code: 'ZERO_PR_DEFERRED_MAILBOX',
+                                mode: 'deferred_mailbox',
+                                deferred: true,
+                                mailbox: {
+                                    queueSize: mailbox.queueSize,
+                                    dropped: mailbox.dropped,
+                                    merged: deferred.merged,
+                                },
+                                note: 'Sem turno ativo para steer; intervenção registrada no mailbox para próxima ask_user.',
+                                reply: null,
+                                durationMs,
+                                from,
+                                traceId,
+                                timeoutMs: timeout,
+                                timeoutStrategy: timeoutDecision.strategy,
+                                timeoutReasons: timeoutDecision.reasons,
+                                promptDigest:
+                                    typeof promptBinding?.['digest'] === 'string' ? promptBinding['digest'] : null,
+                                promptFreshness: promptFreshness,
+                                diagnostics: injectDiagnostics,
+                            },
+                        };
+                    }
+                    throw e;
+                }
+                const durationMs = Date.now() - t0;
+                const injectDiagnostics = {
+                    preflightDurationMs,
+                    contextEmbeddingDurationMs,
+                    attachmentEmbeddingDurationMs,
+                    dialogDurationMs: 0,
+                    totalDurationMs: Date.now() - injectStartedAt,
+                    mode: injectMode,
+                    sdkMessageId: messageId,
+                    runtimeDialog: null,
+                };
+                metrics?.recordInjectTurn?.(durationMs, true, 'completed');
+                recordRuntimeInjectHistory({
+                    ts: t0,
+                    traceId,
+                    from,
+                    message: message.slice(0, 200),
+                    replySnippet: null,
+                    durationMs,
+                    timeoutMs: timeout,
+                    timeoutStrategy: timeoutDecision.strategy,
+                    timeoutReasons: timeoutDecision.reasons,
+                    transportTimeoutMs: null,
+                    runtimeId: runtimeId ?? 'default',
+                    promptDigest: typeof promptBinding?.['digest'] === 'string' ? promptBinding['digest'] : null,
+                    promptBindingDigest: typeof promptBinding?.['digest'] === 'string' ? promptBinding['digest'] : null,
+                    promptIsStale:
+                        typeof promptFreshness?.['isStale'] === 'boolean' ? promptFreshness['isStale'] : null,
+                    promptFreshnessReason:
+                        typeof promptFreshness?.['reason'] === 'string' ? promptFreshness['reason'] : null,
+                    promptRecommendedAction:
+                        promptFreshness?.['recommendedAction'] === 'none' ||
+                        promptFreshness?.['recommendedAction'] === 'observe-live-reload' ||
+                        promptFreshness?.['recommendedAction'] === 'resume-session'
+                            ? promptFreshness['recommendedAction']
+                            : null,
+                    diagnostics: injectDiagnostics,
+                    outcome: 'steered',
+                    ok: true,
+                });
+                log(
+                    'INFO',
+                    `[agent-control] /inject steered current turn (trace=${traceId}, duration=${durationMs}ms, messageId=${messageId || '-'})`,
+                );
+                return {
+                    status: 202,
+                    body: {
+                        ok: true,
+                        mode: injectMode,
+                        messageId,
+                        reply: null,
+                        durationMs,
+                        from,
+                        traceId,
+                        timeoutMs: timeout,
+                        timeoutStrategy: timeoutDecision.strategy,
+                        timeoutReasons: timeoutDecision.reasons,
+                        promptDigest: typeof promptBinding?.['digest'] === 'string' ? promptBinding['digest'] : null,
+                        promptFreshness: promptFreshness,
+                        diagnostics: injectDiagnostics,
+                    },
+                };
+            });
+        }
+
+        if (injectMode === 'abort') {
+            return await runInjectInterventionSequence(runtimeId, async () => {
+                const abortStartedAt = Date.now();
+                await abortAgentRuntimeCurrentMessage(runtimeId);
+                const abortDurationMs = Date.now() - abortStartedAt;
+                const durationMs = Date.now() - t0;
+                const injectDiagnostics = {
+                    preflightDurationMs,
+                    contextEmbeddingDurationMs,
+                    attachmentEmbeddingDurationMs,
+                    dialogDurationMs: 0,
+                    totalDurationMs: Date.now() - injectStartedAt,
+                    mode: injectMode,
+                    abortDurationMs,
+                    runtimeDialog: null,
+                };
+                metrics?.recordInjectTurn?.(durationMs, true, 'completed');
+                recordRuntimeInjectHistory({
+                    ts: t0,
+                    traceId,
+                    from,
+                    message: message.slice(0, 200),
+                    replySnippet: null,
+                    durationMs,
+                    timeoutMs: timeout,
+                    timeoutStrategy: timeoutDecision.strategy,
+                    timeoutReasons: timeoutDecision.reasons,
+                    transportTimeoutMs: null,
+                    runtimeId: runtimeId ?? 'default',
+                    promptDigest: typeof promptBinding?.['digest'] === 'string' ? promptBinding['digest'] : null,
+                    promptBindingDigest: typeof promptBinding?.['digest'] === 'string' ? promptBinding['digest'] : null,
+                    promptIsStale:
+                        typeof promptFreshness?.['isStale'] === 'boolean' ? promptFreshness['isStale'] : null,
+                    promptFreshnessReason:
+                        typeof promptFreshness?.['reason'] === 'string' ? promptFreshness['reason'] : null,
+                    promptRecommendedAction:
+                        promptFreshness?.['recommendedAction'] === 'none' ||
+                        promptFreshness?.['recommendedAction'] === 'observe-live-reload' ||
+                        promptFreshness?.['recommendedAction'] === 'resume-session'
+                            ? promptFreshness['recommendedAction']
+                            : null,
+                    diagnostics: injectDiagnostics,
+                    outcome: 'interrupted',
+                    ok: true,
+                });
+                log(
+                    'INFO',
+                    `[agent-control] /inject aborted current turn (trace=${traceId}, abort=${abortDurationMs}ms, duration=${durationMs}ms)`,
+                );
+                return {
+                    status: 202,
+                    body: {
+                        ok: true,
+                        mode: injectMode,
+                        reply: null,
+                        durationMs,
+                        from,
+                        traceId,
+                        timeoutMs: timeout,
+                        timeoutStrategy: timeoutDecision.strategy,
+                        timeoutReasons: timeoutDecision.reasons,
+                        promptDigest: typeof promptBinding?.['digest'] === 'string' ? promptBinding['digest'] : null,
+                        promptFreshness: promptFreshness,
+                        diagnostics: injectDiagnostics,
+                    },
+                };
+            });
         }
 
         /**
@@ -543,7 +1313,8 @@ export async function handleInject(params = {}) {
                 promptDigest: typeof promptBinding?.['digest'] === 'string' ? promptBinding['digest'] : null,
                 promptBindingDigest: typeof promptBinding?.['digest'] === 'string' ? promptBinding['digest'] : null,
                 promptIsStale: typeof promptFreshness?.['isStale'] === 'boolean' ? promptFreshness['isStale'] : null,
-                promptFreshnessReason: typeof promptFreshness?.['reason'] === 'string' ? promptFreshness['reason'] : null,
+                promptFreshnessReason:
+                    typeof promptFreshness?.['reason'] === 'string' ? promptFreshness['reason'] : null,
                 promptRecommendedAction:
                     promptFreshness?.['recommendedAction'] === 'none' ||
                     promptFreshness?.['recommendedAction'] === 'observe-live-reload' ||
@@ -578,6 +1349,125 @@ export async function handleInject(params = {}) {
         };
 
         if (injectMode === 'interrupt') {
+            if (zeroPrInterventionSource && !injectInterventionPolicy.allowQueueFallback) {
+                return await runInjectInterventionSequence(runtimeId, async () => {
+                    const immediate = tryApplyImmediateZeroPrIntervention(runtimeId, enrichedMessage);
+                    if (immediate.applied) {
+                        const durationMs = Date.now() - t0;
+                        const injectDiagnostics = {
+                            preflightDurationMs,
+                            contextEmbeddingDurationMs,
+                            attachmentEmbeddingDurationMs,
+                            dialogDurationMs: 0,
+                            totalDurationMs: Date.now() - injectStartedAt,
+                            mode: 'answer_immediate',
+                            abortDurationMs: 0,
+                            runtimeDialog: null,
+                        };
+                        metrics?.recordInjectTurn?.(durationMs, true, 'completed');
+                        metrics?.recordCounter?.('zero_pr.interrupt.immediate_answer');
+                        return {
+                            status: 202,
+                            body: {
+                                ok: true,
+                                code: 'ZERO_PR_ANSWER_IMMEDIATE',
+                                mode: 'answer',
+                                deferred: false,
+                                note: 'Intervenção aplicada imediatamente no ask_user pendente sem abort/queue.',
+                                reply: null,
+                                durationMs,
+                                from,
+                                traceId,
+                                timeoutMs: timeout,
+                                timeoutStrategy: timeoutDecision.strategy,
+                                timeoutReasons: timeoutDecision.reasons,
+                                promptDigest:
+                                    typeof promptBinding?.['digest'] === 'string' ? promptBinding['digest'] : null,
+                                promptFreshness: promptFreshness,
+                                diagnostics: injectDiagnostics,
+                            },
+                        };
+                    }
+                    const abortStartedAt = Date.now();
+                    await abortAgentRuntimeCurrentMessage(runtimeId);
+                    const abortDurationMs = Date.now() - abortStartedAt;
+                    const deferred = enqueueRuntimeIntervention({
+                        runtimeId,
+                        source: resolveMailboxSource(from),
+                        modeHint: 'interrupt',
+                        message: enrichedMessage,
+                    });
+                    const mailbox = readRuntimeInterventionSummary(runtimeId);
+                    const durationMs = Date.now() - t0;
+                    const injectDiagnostics = {
+                        preflightDurationMs,
+                        contextEmbeddingDurationMs,
+                        attachmentEmbeddingDurationMs,
+                        dialogDurationMs: 0,
+                        totalDurationMs: Date.now() - injectStartedAt,
+                        mode: 'interrupt_deferred_mailbox',
+                        abortDurationMs,
+                        runtimeDialog: null,
+                    };
+                    metrics?.recordInjectTurn?.(durationMs, true, 'completed');
+                    metrics?.recordCounter?.('zero_pr.interrupt.deferred_mailbox');
+                    recordRuntimeInjectHistory({
+                        ts: t0,
+                        traceId,
+                        from,
+                        message: message.slice(0, 200),
+                        replySnippet: null,
+                        durationMs,
+                        timeoutMs: timeout,
+                        timeoutStrategy: timeoutDecision.strategy,
+                        timeoutReasons: timeoutDecision.reasons,
+                        transportTimeoutMs: null,
+                        runtimeId: runtimeId ?? 'default',
+                        promptDigest: typeof promptBinding?.['digest'] === 'string' ? promptBinding['digest'] : null,
+                        promptBindingDigest:
+                            typeof promptBinding?.['digest'] === 'string' ? promptBinding['digest'] : null,
+                        promptIsStale:
+                            typeof promptFreshness?.['isStale'] === 'boolean' ? promptFreshness['isStale'] : null,
+                        promptFreshnessReason:
+                            typeof promptFreshness?.['reason'] === 'string' ? promptFreshness['reason'] : null,
+                        promptRecommendedAction:
+                            promptFreshness?.['recommendedAction'] === 'none' ||
+                            promptFreshness?.['recommendedAction'] === 'observe-live-reload' ||
+                            promptFreshness?.['recommendedAction'] === 'resume-session'
+                                ? promptFreshness['recommendedAction']
+                                : null,
+                        diagnostics: injectDiagnostics,
+                        outcome: 'interrupted',
+                        ok: true,
+                    });
+                    return {
+                        status: 202,
+                        body: {
+                            ok: true,
+                            code: 'ZERO_PR_DEFERRED_MAILBOX',
+                            mode: 'interrupt_deferred_mailbox',
+                            deferred: true,
+                            mailbox: {
+                                queueSize: mailbox.queueSize,
+                                dropped: mailbox.dropped,
+                                merged: deferred.merged,
+                            },
+                            note: 'Turno abortado; mensagem substituta foi registrada no mailbox para próxima ask_user.',
+                            reply: null,
+                            durationMs,
+                            from,
+                            traceId,
+                            timeoutMs: timeout,
+                            timeoutStrategy: timeoutDecision.strategy,
+                            timeoutReasons: timeoutDecision.reasons,
+                            promptDigest:
+                                typeof promptBinding?.['digest'] === 'string' ? promptBinding['digest'] : null,
+                            promptFreshness: promptFreshness,
+                            diagnostics: injectDiagnostics,
+                        },
+                    };
+                });
+            }
             return await runInjectInterventionSequence(runtimeId, async () => {
                 const abortStartedAt = Date.now();
                 await abortAgentRuntimeCurrentMessage(runtimeId);

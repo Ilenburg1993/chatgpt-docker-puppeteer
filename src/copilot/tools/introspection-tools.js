@@ -16,6 +16,7 @@ import { createRequire } from 'node:module';
 import { z } from 'zod';
 import { log } from './logger.js';
 import { getSummary as getMetricsSummary, getToolStats } from './metrics-proxy.js';
+import { createEmptyToolContractReport } from './tool-contract-verifier.js';
 import { withSkipPermission } from './tool-factory.js';
 
 // ─── Estado compartilhado via module-level registry ─────────────────────────
@@ -73,6 +74,9 @@ export function getDisabledTools() {
  * @type {Record<string, string[]>}
  */
 let _CATEGORY_TOOL_MAP_DYNAMIC = {};
+
+/** @type {import('./tool-contract-verifier.js').ToolContractReport} */
+let _toolContractReport = createEmptyToolContractReport();
 
 /**
  * Metadados por tool name. A fonte preferida é o ToolRegistry; `recordToolCategory()` preserva compatibilidade para
@@ -189,6 +193,25 @@ export function registerForIntrospection(tools, registry = null) {
 }
 
 /**
+ * Atualiza o último relatório de contrato de tools produzido no bootstrap.
+ *
+ * @param {import('./tool-contract-verifier.js').ToolContractReport} report
+ * @returns {void}
+ */
+export function setToolContractReport(report) {
+    _toolContractReport = report;
+}
+
+/**
+ * Retorna o último relatório de contrato de tools.
+ *
+ * @returns {import('./tool-contract-verifier.js').ToolContractReport}
+ */
+export function readToolContractReport() {
+    return _toolContractReport;
+}
+
+/**
  * Retorna snapshot canônico do estado de carga de tools observado pela introspecção.
  *
  * Útil para `/status`, `/diagnose` e validação de boot/load sem executar uma tool em loop.
@@ -199,7 +222,10 @@ export function registerForIntrospection(tools, registry = null) {
  *     categories: Record<string, number>;
  *     disabled: string[];
  *     hasCanonicalLocalFsTools: boolean;
+ *     hasCanonicalLocalExecTools: boolean;
  *     hasSdkWorkspaceTooling: boolean;
+ *     hasLegacySdkShellToolsLoaded: boolean;
+ *     toolContract: import('./tool-contract-verifier.js').ToolContractReport;
  * }}
  */
 export function readIntrospectionRegistrySnapshot() {
@@ -218,14 +244,21 @@ export function readIntrospectionRegistrySnapshot() {
         'patch_file',
     ];
     const hasCanonicalLocalFsTools = requiredLocalFs.every((name) => names.includes(name));
+    const hasCanonicalLocalExecTools = names.includes('exec_command');
     const hasSdkWorkspaceTooling = names.includes('workspace_read') || names.includes('workspace_write');
+    const hasLegacySdkShellToolsLoaded = ['bash', 'write_bash', 'read_bash', 'stop_bash'].some((name) =>
+        names.includes(name),
+    );
     return {
         total: names.length,
         names,
         categories,
         disabled: getDisabledTools(),
         hasCanonicalLocalFsTools,
+        hasCanonicalLocalExecTools,
         hasSdkWorkspaceTooling,
+        hasLegacySdkShellToolsLoaded,
+        toolContract: _toolContractReport,
     };
 }
 /**
@@ -238,6 +271,7 @@ export function resetIntrospectionStateForTests() {
     _disabledTools.clear();
     _toolNameToMetadataMap.clear();
     _CATEGORY_TOOL_MAP_DYNAMIC = {};
+    _toolContractReport = createEmptyToolContractReport();
 }
 
 // ─── Tools ───────────────────────────────────────────────────────────────────
@@ -562,6 +596,40 @@ const getToolHealthTool = createTool({
 });
 
 /**
+ * Tool: get_tool_contract_report — retorna o relatório completo do verificador de contrato de tools.
+ */
+const getToolContractReportTool = createTool({
+    name: 'get_tool_contract_report',
+    description:
+        'Retorna o relatório do Tool Contract Verifier com erros, warnings e cobertura de metadados das tools ' +
+        'registradas no runtime atual.',
+    parameters: /** @type {import('#copilot/sdk/types').ZodSchema<{ maxIssues?: number }>} */ (
+        /** @type {unknown} */ (
+            z.object({
+                maxIssues: z
+                    .number()
+                    .int()
+                    .min(1)
+                    .max(200)
+                    .optional()
+                    .default(50)
+                    .describe('Quantidade máxima de issues retornadas'),
+            })
+        )
+    ),
+    handler: async (/** @type {{ maxIssues?: number }} */ { maxIssues }) => {
+        const report = readToolContractReport();
+        const limit = typeof maxIssues === 'number' ? maxIssues : 50;
+        return {
+            ...report,
+            issues: report.issues.slice(0, limit),
+            totalIssues: report.issues.length,
+            issuesTruncated: report.issues.length > limit,
+        };
+    },
+});
+
+/**
  * @type {import('#copilot/sdk/types').Tool<any>[]}
  */
 export const introspectionTools = [
@@ -571,4 +639,5 @@ export const introspectionTools = [
     withSkipPermission(reportIntentTool),
     withSkipPermission(toggleToolTool),
     withSkipPermission(getToolHealthTool),
+    withSkipPermission(getToolContractReportTool),
 ];

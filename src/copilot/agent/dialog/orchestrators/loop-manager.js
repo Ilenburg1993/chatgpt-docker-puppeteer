@@ -418,7 +418,16 @@ export class DialogLoopManager extends EventEmitter {
             return false;
         }
         const pending = this.#host?.getPendingQuestionSnapshot?.();
-        return pending?.kind === 'question' && pending.protocolControlled !== true;
+        if (pending?.kind === 'question' && pending.protocolControlled !== true) {
+            return true;
+        }
+        const shadow = this.#host?.getPendingQuestionShadowSnapshot?.();
+        const shadowKind =
+            shadow && typeof shadow === 'object' && shadow.meta && typeof shadow.meta === 'object'
+                ? shadow.meta.kind
+                : null;
+        const shadowExpired = Boolean(this.#host?.isPendingQuestionShadowExpired?.());
+        return shadowKind === 'question' && !shadowExpired;
     }
 
     /**

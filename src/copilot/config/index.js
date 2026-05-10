@@ -80,12 +80,12 @@ export {
 } from './system-prompt/index.js';
 
 export {
+    MAESTRO_AGENT_NAME,
     buildCustomAgentsConfig,
     getCustomAgent,
     getEffectiveSdkAgentSelection,
     listAvailableSdkAgents,
     listCustomAgents,
-    MAESTRO_AGENT_NAME,
     registerCustomAgent,
     removeCustomAgent,
 } from './custom-agents.js';
@@ -96,7 +96,13 @@ export {
     resolveOperationalAgentSelection,
 } from './operational-profiles.js';
 
-export { TOOL_ALIASES, getAllToolNames, normalizeAgentToolList, resolveToolName } from './tool-aliases.js';
+export {
+    TOOL_ALIASES,
+    getAllToolNames,
+    normalizeAgentToolList,
+    normalizeObservedToolName,
+    resolveToolName,
+} from './tool-aliases.js';
 
 export {
     CONTEXT_UTIL_BLOCK_THRESHOLD,

@@ -40,7 +40,7 @@ export function buildTerminalStandaloneBannerView(opts, deps = {}) {
             ? '│  Modo: STANDALONE  (server 3008 não detectado)              │'
             : `│  Modo: CONECTADO   (MCP: ${String(mcp.toolCount).padEnd(2)} tools via :3008)              │`,
         `│  Inject server: ${opts.serverUrl.padEnd(40).slice(0, 40)} │`,
-        '│  Comandos: /help  /status  /skills  /ask                   │',
+        '│  Comandos: /help  /status  /queue  /turn  /mailbox         │',
         '└─────────────────────────────────────────────────────────────┘',
         '',
     ];

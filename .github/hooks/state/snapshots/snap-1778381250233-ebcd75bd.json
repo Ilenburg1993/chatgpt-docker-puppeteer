@@ -1,41 +1,41 @@
 {
-    "snapshotId": "snap-1778202733454-ed3283ec",
-    "createdAt": 1778202733454,
-    "sessionId": "cbd89734-c139-48d8-95a5-818715f43b1a",
+    "snapshotId": "snap-1778381250233-ebcd75bd",
+    "createdAt": 1778381250233,
+    "sessionId": "970995a1-0941-4f93-ab3e-30ebb72390aa",
     "model": "auto",
-    "status": "processing",
-    "sendCount": 4,
-    "dialogLoopActive": true,
+    "status": "idle",
+    "sendCount": 2,
+    "dialogLoopActive": false,
     "dialogPaused": false,
     "pendingQuestion": null,
     "pendingQuestionMeta": null,
     "pendingQuestionShadow": null,
     "stateSnapshot": {
-        "sessionId": "cbd89734-c139-48d8-95a5-818715f43b1a",
-        "startedAt": 1778191258373,
-        "resumedAt": 1778202653691,
-        "resumeCount": 3,
-        "sendCount": 3,
+        "sessionId": "970995a1-0941-4f93-ab3e-30ebb72390aa",
+        "startedAt": 1778376122484,
+        "resumedAt": 1778380867690,
+        "resumeCount": 2,
+        "sendCount": 1,
         "model": "auto",
         "reasoningEffort": "xhigh",
         "pendingQuestion": null,
         "pendingQuestionMeta": null,
         "systemPromptBinding": {
-            "sessionId": "cbd89734-c139-48d8-95a5-818715f43b1a",
-            "digest": "891c012d7be840c0",
+            "sessionId": "970995a1-0941-4f93-ab3e-30ebb72390aa",
+            "digest": "2cdaa68b079b663c",
             "configuredMode": "append",
             "effectiveMode": "append",
             "effectiveLiveMode": "customize",
             "liveReloadEnabled": true,
             "liveReloadMechanism": "sdk-transform",
             "reloadStrategy": "sdk-transform",
-            "boundAt": 1778202653691
+            "boundAt": 1778380867690
         },
         "gracefulShutdown": false,
-        "dialogLoopActive": true,
+        "dialogLoopActive": false,
         "dialogPaused": false,
         "pendingTurnConsumedPR": true,
-        "lastPrConsumedAt": 1778202667082,
+        "lastPrConsumedAt": 1778381060808,
         "lastPrModel": "claude-sonnet-4.6",
         "lastPrCost": 1,
         "lastQuotaSnapshots": {
@@ -62,11 +62,11 @@
             "premium_interactions": {
                 "isUnlimitedEntitlement": false,
                 "entitlementRequests": 300,
-                "usedRequests": 73,
+                "usedRequests": 114,
                 "usageAllowedWithExhaustedQuota": true,
                 "overage": 0,
                 "overageAllowedWithExhaustedQuota": true,
-                "remainingPercentage": 75.7,
+                "remainingPercentage": 62.1,
                 "resetDate": "2026-06-01T00:00:00.000Z"
             },
             "session": {
@@ -76,8 +76,8 @@
                 "usageAllowedWithExhaustedQuota": false,
                 "overage": 0,
                 "overageAllowedWithExhaustedQuota": false,
-                "remainingPercentage": 78.6,
-                "resetDate": "2026-05-08T03:44:02.000Z"
+                "remainingPercentage": 0.9,
+                "resetDate": "2026-05-10T05:13:21.000Z"
             },
             "weekly": {
                 "isUnlimitedEntitlement": false,
@@ -86,28 +86,28 @@
                 "usageAllowedWithExhaustedQuota": false,
                 "overage": 0,
                 "overageAllowedWithExhaustedQuota": false,
-                "remainingPercentage": 0.2,
+                "remainingPercentage": 0.5,
                 "resetDate": "2026-05-11T00:00:00.000Z"
             }
         },
-        "lastAskUserAt": 1778202143974,
+        "lastAskUserAt": 1778380903031,
         "prMetrics": {
             "boots": 1,
             "resumesWithPR": 0,
             "resumesZeroPR": 0,
             "totalPR": 1
         },
-        "pendingTurnMessage": "Faça um auto diagnóstico de sua situação, após este boot. Tome todo o contexto necessário. Identifique bugs e gaps para sua operação. Seu código está em src\\copilot, onde devemos trabalhar continuamente.",
-        "pendingTurnTs": 1778191345387,
+        "pendingTurnMessage": "faça um auto diagnóstico de você, sem utilizar sub agentes. Seu código está em src\\copilot, que é nosso foco de trabalho.",
+        "pendingTurnTs": 1778381037490,
         "lastPrConfiguredModel": "auto",
         "lastPrModelMismatch": false,
         "lastPrEffectiveModel": "claude-sonnet-4.6"
     },
     "prMetrics": {
-        "boots": 0,
+        "boots": 1,
         "resumesWithPR": 0,
         "resumesZeroPR": 0,
-        "totalPR": 0
+        "totalPR": 1
     },
     "reason": "auto-shutdown"
 }

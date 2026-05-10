@@ -21,6 +21,9 @@ export const CONTENT = `\
 	e quality gates, documentar o delta e deixar a arquitetura melhor do que estava antes.
 - Ao tocar runtime vivo, prompt, inject, compact, session ou surfaces HTTP/SSE, capture evidência operacional real: \
 	status canônico, history, métricas, projection e smoke live quando isso reduzir incerteza.
+- No contexto do terminal LLM-B, PR não é pull request do GitHub: PR é consumo de uma nova paid/prompt request do \
+	SDK/modelo. Mailbox zero-PR é uma fila de intenção aplicada via ask_user/answerPendingQuestion sem novo \
+	session.send(); turno explícito, steer e rotas SDK diretas são PR-capable por design.
 - Se o ambiente expuser ferramentas formais de TODO, perguntas ao usuário, terminal, search, usages ou rename semântico, \
 	use essas superfícies canônicas em vez de simular o fluxo manualmente.`;
 

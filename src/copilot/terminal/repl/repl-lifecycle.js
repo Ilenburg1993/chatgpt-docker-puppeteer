@@ -11,11 +11,18 @@
  * @see module:copilot/terminal/repl-command-router
  */
 
+import { getTerminalInterventionPolicy } from '#copilot/config';
 import { toError } from '#copilot/core';
 import { log } from '#copilot/observability';
 import readline from 'node:readline';
 import { extractAtReferences } from '../../presentation/runtime-file-context.js';
-import { addAttachment, getBusy, setRl } from '../../presentation/runtime-ui-state-store.js';
+import {
+    addAttachment,
+    enqueueRuntimeInterventionMailbox,
+    getBusy,
+    readRuntimeInterventionMailboxSummary,
+    setRl,
+} from '../../presentation/runtime-ui-state-store.js';
 import { buildTerminalOperationalGuidance } from '../auto-briefing.js';
 import {
     buildUserPrompt,
@@ -28,6 +35,7 @@ import {
 import { readTerminalStatusProjection } from '../frontend/index.js';
 import { readTerminalDisplayState, resolveTerminalBootDisplayPreset } from '../state/display-policy.js';
 import { tryAnswerTerminalPendingQuestionInput } from '../state/pending-question-answer.js';
+import { resolveFreeTextDelivery } from './free-text-delivery.js';
 import { setupTerminalLiveStatusLine } from './live-status-line.js';
 import { buildTerminalReplBanner } from './repl-banner.js';
 import { parseTerminalReplCommand } from './repl-command-parser.js';
@@ -187,6 +195,82 @@ export async function runReplLifecycle(injectServer, { injectPort, onReady }) {
     }
 
     /**
+     * @param {string} finalMessage
+     * @returns {Promise<void>}
+     */
+    async function handleImmediateIntervention(finalMessage) {
+        const pendingAnswer = tryAnswerTerminalPendingQuestionInput(finalMessage);
+        if (pendingAnswer.routed) {
+            printPendingAnswerResult(pendingAnswer);
+            refreshPrompt();
+            return;
+        }
+
+        // Se o modelo está ocioso (sem turno ativo ou na fila), o mailbox nunca será consumido:
+        // ask_user só dispara durante processamento ativo. Fallback para turno garante entrega.
+        const interventionPolicy = getTerminalInterventionPolicy();
+        const isModelIdle = !getBusy() && getTurnQueueDepth() === 0;
+        if (isModelIdle && interventionPolicy.allowQueueFallback) {
+            println(
+                '\x1b[90m  [intervene→turn] Modelo ocioso — mailbox não seria consumido. Encaminhando como turno.\x1b[0m',
+            );
+            queueUserTurn(finalMessage);
+            return;
+        }
+
+        const queued = enqueueRuntimeInterventionMailbox({
+            runtimeId: null,
+            source: 'terminal',
+            modeHint: 'interrupt',
+            message: finalMessage,
+        });
+        const summary = readRuntimeInterventionMailboxSummary(null);
+        log(
+            'INFO',
+            `[TerminalServer] immediate intervention mailbox enqueue runtime=${queued.runtimeId} merged=${queued.merged} queue=${queued.queueSize} dropped=${queued.dropped}`,
+        );
+        println(
+            `\x1b[36m  [immediate] intervenção registrada para aplicação prioritária na próxima ask_user (fila=${summary.queueSize}${summary.dropped > 0 ? ` · descartadas=${summary.dropped}` : ''}).\x1b[0m`,
+        );
+        println(
+            '\x1b[90m  Este caminho preserva zero-PR. Use /steer apenas quando quiser intervenção SDK immediate explícita.\x1b[0m',
+        );
+        if (isModelIdle) {
+            println(
+                '\x1b[33m  ⚠ Modelo ocioso e allowQueueFallback=false — entrada no mailbox pode não ser consumida até próximo turno ativo.\x1b[0m',
+            );
+        }
+        refreshPrompt();
+    }
+
+    /**
+     * @param {string} finalMessage
+     * @returns {Promise<void>}
+     */
+    async function routeFreeTextMessage(finalMessage) {
+        const resolved = resolveFreeTextDelivery(finalMessage);
+        if (!resolved.message) {
+            println('\x1b[33m  Mensagem vazia após diretiva; nada foi enviado.\x1b[0m');
+            refreshPrompt();
+            return;
+        }
+        if (resolved.mode === 'turn') {
+            queueUserTurn(resolved.message);
+            return;
+        }
+        if (resolved.mode === 'steer') {
+            const commandLine = `/steer ${resolved.message}`;
+            const command = parseTerminalReplCommand(commandLine, resolve);
+            if (command) {
+                await dispatchCmd(command.command, command.arg, command.rest, rl, injectServer, cleanup);
+                refreshPrompt();
+                return;
+            }
+        }
+        await handleImmediateIntervention(resolved.message);
+    }
+
+    /**
      * @param {string} line
      * @returns {Promise<void>}
      */
@@ -244,7 +328,7 @@ export async function runReplLifecycle(injectServer, { injectPort, onReady }) {
             return;
         }
 
-        queueUserTurn(finalMessage);
+        await routeFreeTextMessage(finalMessage);
     }
 
     rl.on('line', (line) => {

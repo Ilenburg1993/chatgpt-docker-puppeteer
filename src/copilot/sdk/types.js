@@ -134,9 +134,9 @@
  */
 
 /**
- * Tipo do resultado de tool. Valores: `"success"` | `"failure"` | `"rejected"` | `"denied"`.
+ * Tipo do resultado de tool. Valores: `"success"` | `"failure"` | `"rejected"` | `"denied"` | `"timeout"`.
  *
- * @typedef {'success' | 'failure' | 'rejected' | 'denied'} ToolResultType
+ * @typedef {'success' | 'failure' | 'rejected' | 'denied' | 'timeout'} ToolResultType
  */
 
 /**
@@ -850,8 +850,8 @@
 
 /**
  * Resposta de `client.getAuthStatus()` — verifica autenticação do usuário no GitHub Copilot. Campos: `isAuthenticated`
- * (bool), `authType?` (`"user"` | `"env"` | `"gh-cli"` | `"hmac"` | `"api-key"` | `"token"`), `host?`, `login?`,
- * `statusMessage?`.
+ * (bool), `authType?` (`"user"` | `"env"` | `"gh-cli"` | `"hmac"` | `"api-key"` | `"token"` | `"copilot-api-token"`),
+ * `host?`, `login?`, `statusMessage?`.
  *
  * @typedef {import('@github/copilot-sdk').GetAuthStatusResponse} GetAuthStatusResponse
  */

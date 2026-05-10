@@ -108,10 +108,14 @@ export {
     sanitizeIoTextOutput,
 } from './io-policy.js';
 export {
+    CANONICAL_LOCAL_EXEC_TOOL_NAMES,
     CANONICAL_LOCAL_FS_TOOL_NAMES,
     LEGACY_SDK_LOCAL_FS_TOOL_NAMES,
+    LEGACY_SDK_SHELL_TOOL_NAMES,
     buildCanonicalLocalFsExcludedTools,
+    buildCanonicalLocalSurfaceExcludedTools,
     decideSdkFsRouting,
+    hasCanonicalLocalExecTools,
     hasCanonicalLocalFsTools,
 } from './sdk-fs-routing.js';
 

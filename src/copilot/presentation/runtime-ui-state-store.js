@@ -8,8 +8,10 @@
  */
 
 import {
+    getTerminalInterventionMailboxPolicy,
     TERMINAL_MAX_ATTACHMENTS,
     TERMINAL_MAX_INJECT_HISTORY,
+    TERMINAL_MAX_INTERVENTION_MAILBOX,
     TERMINAL_MAX_LISTENERS,
     TERMINAL_SHOW_INTENT_ACTIVITY,
     TERMINAL_SHOW_STREAMING,
@@ -17,7 +19,7 @@ import {
     TERMINAL_SHOW_TOOL_ACTIVITY,
     TERMINAL_SHOW_USAGE,
 } from '#copilot/config';
-import { CopilotError, getHubSessionId as _getCoreHubSessionId, setSharedHubSessionId } from '#copilot/core';
+import { getHubSessionId as _getCoreHubSessionId, CopilotError, setSharedHubSessionId } from '#copilot/core';
 import { EventEmitter } from 'node:events';
 
 export const stateEmitter = new EventEmitter();
@@ -35,6 +37,7 @@ export const TERMINAL_EVENTS = /** @type {const} */ ({
     SHOW_TOOL_ACTIVITY_CHANGED: 'showToolActivity:changed',
     SHOW_INTENT_ACTIVITY_CHANGED: 'showIntentActivity:changed',
     SHOW_SESSION_ACTIVITY_CHANGED: 'showSessionActivity:changed',
+    INTERVENTION_MAILBOX_CHANGED: 'interventionMailbox:changed',
 });
 
 let _busy = false;
@@ -43,6 +46,76 @@ let _rl = null;
 /** @type {string[]} */
 let _attachmentQueue = [];
 const MAX_ATTACHMENT_QUEUE = TERMINAL_MAX_ATTACHMENTS;
+
+/**
+ * @typedef {object} RuntimeInterventionMailboxEntry
+ * @property {string} id
+ * @property {number} ts
+ * @property {string} runtimeId
+ * @property {'terminal' | 'inject' | 'llm-a' | 'user' | 'system'} source
+ * @property {'answer' | 'steer' | 'interrupt' | 'queue' | 'deferred'} modeHint Dica operacional preservada no mailbox
+ *   zero-PR. `queue` aqui NÃO significa fila de turno SDK; significa que a intenção veio de `/queue`, `mode=queue` ou
+ *   texto livre e deve ser aplicada somente via `ask_user`.
+ * @property {string} message
+ * @property {number} mergedCount
+ */
+
+/**
+ * @typedef {{
+ *     runtimeId: string;
+ *     entries: RuntimeInterventionMailboxEntry[];
+ *     dropped: number;
+ *     updatedAt: number;
+ * }} RuntimeInterventionMailboxState
+ */
+
+/** @type {Map<string, RuntimeInterventionMailboxState>} */
+const _runtimeInterventionMailbox = new Map();
+let _runtimeInterventionSeq = 0;
+
+/**
+ * @param {string | null | undefined} runtimeId
+ * @returns {string}
+ */
+function _normalizeInterventionRuntimeId(runtimeId) {
+    return typeof runtimeId === 'string' && runtimeId.trim().length > 0 ? runtimeId : 'default';
+}
+
+/**
+ * @returns {string}
+ */
+function _nextInterventionId() {
+    _runtimeInterventionSeq += 1;
+    return `iv-${Date.now().toString(36)}-${_runtimeInterventionSeq.toString(36)}`;
+}
+
+/**
+ * @param {string} value
+ * @param {number} maxChars
+ * @returns {string}
+ */
+function _truncateInterventionMessage(value, maxChars) {
+    if (value.length <= maxChars) return value;
+    return `${value.slice(0, Math.max(0, maxChars - 1))}…`;
+}
+
+/**
+ * @param {string | null | undefined} runtimeId
+ * @returns {RuntimeInterventionMailboxState}
+ */
+function _ensureRuntimeInterventionMailbox(runtimeId) {
+    const normalizedRuntimeId = _normalizeInterventionRuntimeId(runtimeId);
+    const current = _runtimeInterventionMailbox.get(normalizedRuntimeId);
+    if (current) return current;
+    const next = {
+        runtimeId: normalizedRuntimeId,
+        entries: [],
+        dropped: 0,
+        updatedAt: Date.now(),
+    };
+    _runtimeInterventionMailbox.set(normalizedRuntimeId, next);
+    return next;
+}
 /** @type {'interactive' | 'plan' | 'autopilot' | 'shell' | null} */
 let _sdkSessionMode = null;
 /** @type {'create' | 'update' | 'delete' | null} */
@@ -113,6 +186,171 @@ export function addAttachment(filePath) {
 /** @returns {void} */
 export function clearAttachments() {
     _attachmentQueue = [];
+}
+
+/**
+ * @param {{
+ *     runtimeId?: string | null;
+ *     source?: 'terminal' | 'inject' | 'llm-a' | 'user' | 'system';
+ *     modeHint?: 'answer' | 'steer' | 'interrupt' | 'queue' | 'deferred';
+ *     message: string;
+ * }} input
+ * @returns {{
+ *     enqueued: boolean;
+ *     merged: boolean;
+ *     runtimeId: string;
+ *     queueSize: number;
+ *     dropped: number;
+ *     entryId: string | null;
+ * }}
+ */
+export function enqueueRuntimeInterventionMailbox(input) {
+    const message = (input.message ?? '').trim();
+    if (!message) {
+        return {
+            enqueued: false,
+            merged: false,
+            runtimeId: _normalizeInterventionRuntimeId(input.runtimeId),
+            queueSize: 0,
+            dropped: 0,
+            entryId: null,
+        };
+    }
+
+    const policy = getTerminalInterventionMailboxPolicy();
+    const state = _ensureRuntimeInterventionMailbox(input.runtimeId);
+    const runtimeId = state.runtimeId;
+    const now = Date.now();
+    const source = input.source ?? 'terminal';
+    const modeHint = input.modeHint ?? 'deferred';
+    const boundedMessage = _truncateInterventionMessage(message, policy.maxMessageChars);
+
+    const tail = state.entries.length > 0 ? state.entries[state.entries.length - 1] : null;
+    if (tail && tail.source === source && now - tail.ts <= policy.coalesceWindowMs) {
+        const mergedRaw = `${tail.message}\n\n[+intervenção] ${boundedMessage}`;
+        tail.message = _truncateInterventionMessage(mergedRaw, policy.maxMessageChars);
+        tail.ts = now;
+        tail.modeHint = modeHint;
+        tail.mergedCount += 1;
+        state.updatedAt = now;
+        stateEmitter.emit(TERMINAL_EVENTS.INTERVENTION_MAILBOX_CHANGED, runtimeId, {
+            action: 'merged',
+            entryId: tail.id,
+            queueSize: state.entries.length,
+            dropped: state.dropped,
+        });
+        return {
+            enqueued: true,
+            merged: true,
+            runtimeId,
+            queueSize: state.entries.length,
+            dropped: state.dropped,
+            entryId: tail.id,
+        };
+    }
+
+    const entry = {
+        id: _nextInterventionId(),
+        ts: now,
+        runtimeId,
+        source,
+        modeHint,
+        message: boundedMessage,
+        mergedCount: 0,
+    };
+    state.entries.push(entry);
+    const effectiveMaxEntries = Math.max(1, Math.min(1024, policy.maxEntries || TERMINAL_MAX_INTERVENTION_MAILBOX));
+    while (state.entries.length > effectiveMaxEntries) {
+        state.entries.shift();
+        state.dropped += 1;
+    }
+    state.updatedAt = now;
+    stateEmitter.emit(TERMINAL_EVENTS.INTERVENTION_MAILBOX_CHANGED, runtimeId, {
+        action: 'enqueued',
+        entryId: entry.id,
+        queueSize: state.entries.length,
+        dropped: state.dropped,
+    });
+    return {
+        enqueued: true,
+        merged: false,
+        runtimeId,
+        queueSize: state.entries.length,
+        dropped: state.dropped,
+        entryId: entry.id,
+    };
+}
+
+/**
+ * @param {string | null | undefined} runtimeId
+ * @returns {{
+ *     runtimeId: string;
+ *     queueSize: number;
+ *     dropped: number;
+ *     updatedAt: number | null;
+ *     latest: RuntimeInterventionMailboxEntry | null;
+ * }}
+ */
+export function readRuntimeInterventionMailboxSummary(runtimeId) {
+    const normalizedRuntimeId = _normalizeInterventionRuntimeId(runtimeId);
+    const state = _runtimeInterventionMailbox.get(normalizedRuntimeId);
+    const latest = state && state.entries.length > 0 ? (state.entries.at(-1) ?? null) : null;
+    return {
+        runtimeId: normalizedRuntimeId,
+        queueSize: state?.entries.length ?? 0,
+        dropped: state?.dropped ?? 0,
+        updatedAt: state?.updatedAt ?? null,
+        latest,
+    };
+}
+
+/**
+ * @param {string | null | undefined} runtimeId
+ * @returns {RuntimeInterventionMailboxEntry | null}
+ */
+export function peekRuntimeInterventionMailbox(runtimeId) {
+    const normalizedRuntimeId = _normalizeInterventionRuntimeId(runtimeId);
+    const state = _runtimeInterventionMailbox.get(normalizedRuntimeId);
+    return state && state.entries.length > 0 ? (state.entries[0] ?? null) : null;
+}
+
+/**
+ * @param {string | null | undefined} runtimeId
+ * @returns {RuntimeInterventionMailboxEntry | null}
+ */
+export function consumeRuntimeInterventionMailbox(runtimeId) {
+    const normalizedRuntimeId = _normalizeInterventionRuntimeId(runtimeId);
+    const state = _runtimeInterventionMailbox.get(normalizedRuntimeId);
+    if (!state || state.entries.length === 0) return null;
+    const entry = state.entries.shift() ?? null;
+    state.updatedAt = Date.now();
+    stateEmitter.emit(TERMINAL_EVENTS.INTERVENTION_MAILBOX_CHANGED, normalizedRuntimeId, {
+        action: 'consumed',
+        entryId: entry?.id ?? null,
+        queueSize: state.entries.length,
+        dropped: state.dropped,
+    });
+    return entry;
+}
+
+/**
+ * @param {string | null | undefined} runtimeId
+ * @returns {number}
+ */
+export function clearRuntimeInterventionMailbox(runtimeId) {
+    const normalizedRuntimeId = _normalizeInterventionRuntimeId(runtimeId);
+    const state = _runtimeInterventionMailbox.get(normalizedRuntimeId);
+    if (!state) return 0;
+    const removed = state.entries.length;
+    state.entries.length = 0;
+    state.updatedAt = Date.now();
+    stateEmitter.emit(TERMINAL_EVENTS.INTERVENTION_MAILBOX_CHANGED, normalizedRuntimeId, {
+        action: 'cleared',
+        entryId: null,
+        queueSize: 0,
+        dropped: state.dropped,
+    });
+    return removed;
 }
 
 /** @returns {'interactive' | 'plan' | 'autopilot' | 'shell' | null} */

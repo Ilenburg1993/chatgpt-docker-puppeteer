@@ -248,6 +248,7 @@ const gitCurrentBranchTool = createTool({
     name: 'git_current_branch',
     description:
         'Retorna o nome do branch Git atual. Útil para confirmar em qual branch está antes de commitar ou pushar.',
+    parameters: z.object({}),
     handler: async () => {
         const r = await safeGitArgs(['rev-parse', '--abbrev-ref', 'HEAD']);
         return { branch: r.stdout.trim(), error: r.error };
@@ -261,6 +262,7 @@ const gitIsDirtyTool = createTool({
     name: 'git_is_dirty',
     description:
         'Verifica se o repositório tem mudanças não commitadas (working tree sujo). Retorna isDirty=true se há arquivos modificados, staged ou untracked.',
+    parameters: z.object({}),
     handler: async () => {
         const r = await safeGitArgs(['status', '--porcelain']);
         const isDirty = r.stdout.trim().length > 0;
