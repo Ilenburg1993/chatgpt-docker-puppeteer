@@ -35,7 +35,17 @@ Essas validações removem ruído de regressão local e permitem avaliar as clai
 
 ## 3. Leitura arquitetural do delta
 
-### 3.1 O que mudou de categoria
+### 3.1 Deep-dive — blind spot de denies confirmado
+
+A claim `OBS-BUG-03` / `SYS-GAP-04` foi revalidada com leitura cruzada de runtime:
+
+- `src/copilot/hooks/presets/production.js` registra decisões `deny` em `audit(...)`, que por sua vez escreve em `auditSink`/`defaultAuditLog`.
+- `src/copilot/hooks/tool-interceptor.js` também retorna `permissionDecision: 'deny'` após `log('WARN', ...)`, mas não registra métrica operacional local.
+- `src/copilot/observability/tool-stats.js` contabiliza chamadas apenas via `recordToolCall()`/`wrapWithStats()`, isto é, **após execução do handler** ou em bridges que registram explicitamente a chamada.
+
+Conclusão: o sistema atual **audita** bloqueios, mas não os promove automaticamente ao mesmo plano de **métricas agregadas de tools**. Portanto, o bug não é “falta total de rastreio”; é uma **assimetria entre audit log e observabilidade quantitativa**.
+
+### 3.2 O que mudou de categoria
 
 As claims externas mais úteis, após a estabilização do código, se repartem em três grupos:
 
@@ -53,7 +63,7 @@ As claims externas mais úteis, após a estabilização do código, se repartem 
    - `OBS-BUG-03` / `SYS-GAP-04`
    - `BUG-04` / `BUG-10`
 
-### 3.2 O que isso significa para o rebuild canônico
+### 3.3 O que isso significa para o rebuild canônico
 
 O centro de gravidade da auditoria saiu de “quebras imediatas da factory/bootstrap” e foi para **governança de observabilidade, limites operacionais e convergência de contratos**.
 
