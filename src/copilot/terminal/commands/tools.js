@@ -49,10 +49,14 @@ export function cmdTools({ println }, arg = '') {
     );
 
     for (const [name, data] of entries) {
-        const d =
-            /** @type {{ calls?: number; errors?: number; blocked?: number; avgLatencyMs?: number; aliases?: string[]; kind?: string }} */ (
-                data
-            );
+        const d = /** @type {{
+    calls?: number;
+    errors?: number;
+    blocked?: number;
+    avgLatencyMs?: number;
+    aliases?: string[];
+    kind?: string;
+}} */ (data);
         const calls = d.calls ?? 0;
         const errors = d.errors ?? 0;
         const blocked = d.blocked ?? 0;
@@ -79,10 +83,12 @@ export function cmdTools({ println }, arg = '') {
         });
         println('\n  \x1b[36mCategorias de telemetria\x1b[0m');
         for (const [cat, agg] of categoryEntries) {
-            const info =
-                /** @type {{ totalCalls?: number; totalErrors?: number; totalBlocked?: number; avgLatencyMs?: number }} */ (
-                    agg
-                );
+            const info = /** @type {{
+    totalCalls?: number;
+    totalErrors?: number;
+    totalBlocked?: number;
+    avgLatencyMs?: number;
+}} */ (agg);
             println(
                 `    \x1b[33m${cat}\x1b[0m  calls=\x1b[36m${info.totalCalls ?? 0}\x1b[0m  blocked=${info.totalBlocked ?? 0}  errors=${info.totalErrors ?? 0}  avg=${info.avgLatencyMs ?? 0}ms`,
             );

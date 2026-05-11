@@ -35,38 +35,47 @@ import { createHistogram } from './metrics-histogram.js';
  * @typedef {object} ToolTelemetryStore
  * @property {(name: string, durationMs: number, success?: boolean) => void} recordToolCall
  * @property {(name: string) => void} recordBlockedToolCall
- * @property {() => Record<string, {
- *     name: string;
- *     kind: string;
- *     canonicalName: string;
- *     scopePrefix: string | null;
- *     aliases: string[];
- *     calls: number;
- *     errors: number;
- *     blocked: number;
- *     avgLatencyMs: number;
- *     errorRate: number;
- *     latency: ReturnType<ReturnType<typeof createHistogram>['snapshot']>;
- *     lastCallIso: string | null;
- *     lastBlockedIso: string | null;
- *     lastOk: boolean;
- * }>} getToolStats
- * @property {() => Record<string, {
- *     totalCalls: number;
- *     successCount: number;
- *     errorCount: number;
- *     blockedCount: number;
- *     kind: string;
- *     aliases: string[];
- *     latency: ReturnType<ReturnType<typeof createHistogram>['snapshot']>;
- * }>} getToolMetricsSummary
- * @property {() => Record<string, {
- *     totalCalls: number;
- *     totalErrors: number;
- *     totalBlocked: number;
- *     avgLatencyMs: number;
- *     tools: string[];
- * }>} getStatsByCategory
+ * @property {() => Record<
+ *     string,
+ *     {
+ *         name: string;
+ *         kind: string;
+ *         canonicalName: string;
+ *         scopePrefix: string | null;
+ *         aliases: string[];
+ *         calls: number;
+ *         errors: number;
+ *         blocked: number;
+ *         avgLatencyMs: number;
+ *         errorRate: number;
+ *         latency: ReturnType<ReturnType<typeof createHistogram>['snapshot']>;
+ *         lastCallIso: string | null;
+ *         lastBlockedIso: string | null;
+ *         lastOk: boolean;
+ *     }
+ * >} getToolStats
+ * @property {() => Record<
+ *     string,
+ *     {
+ *         totalCalls: number;
+ *         successCount: number;
+ *         errorCount: number;
+ *         blockedCount: number;
+ *         kind: string;
+ *         aliases: string[];
+ *         latency: ReturnType<ReturnType<typeof createHistogram>['snapshot']>;
+ *     }
+ * >} getToolMetricsSummary
+ * @property {() => Record<
+ *     string,
+ *     {
+ *         totalCalls: number;
+ *         totalErrors: number;
+ *         totalBlocked: number;
+ *         avgLatencyMs: number;
+ *         tools: string[];
+ *     }
+ * >} getStatsByCategory
  * @property {(tool: import('#copilot/sdk/types').Tool<any>) => import('#copilot/sdk/types').Tool<any>} wrapWithStats
  * @property {() => void} reset
  */
@@ -183,8 +192,7 @@ export function createToolTelemetryStore() {
                 errors: current.errors,
                 blocked: current.blocked,
                 avgLatencyMs: current.calls > 0 ? Math.round(current.totalMs / current.calls) : 0,
-                errorRate:
-                    current.calls > 0 ? parseFloat(((current.errors / current.calls) * 100).toFixed(1)) : 0,
+                errorRate: current.calls > 0 ? parseFloat(((current.errors / current.calls) * 100).toFixed(1)) : 0,
                 latency: current.histogram.snapshot(),
                 lastCallIso: current.lastCallMs > 0 ? new Date(current.lastCallMs).toISOString() : null,
                 lastBlockedIso: current.lastBlockedMs > 0 ? new Date(current.lastBlockedMs).toISOString() : null,
@@ -214,7 +222,10 @@ export function createToolTelemetryStore() {
 
     /** @type {ToolTelemetryStore['getStatsByCategory']} */
     function getStatsByCategory() {
-        /** @type {Record<string, { totalCalls: number; totalErrors: number; totalBlocked: number; totalMs: number; tools: string[] }>} */
+        /** @type {Record<
+    string,
+    { totalCalls: number; totalErrors: number; totalBlocked: number; totalMs: number; tools: string[] }
+>} */
         const categories = {};
         for (const [name, current] of stats) {
             const category = current.kind || 'tool';

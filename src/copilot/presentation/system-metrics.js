@@ -284,9 +284,11 @@ export async function handleGetAudit({ summary: wantSummary = 0, limit = 50, ses
  */
 export function readToolStatsProjection() {
     const stats = getToolStats();
-    const tools = /** @type {Record<string, any>[]} */ (Object.entries(stats)
-        .map(([name, s]) => ({ ...s, name }))
-        .sort((a, b) => Number(b.calls ?? 0) - Number(a.calls ?? 0) || String(a.name).localeCompare(String(b.name))));
+    const tools = /** @type {Record<string, any>[]} */ (
+        Object.entries(stats)
+            .map(([name, s]) => ({ ...s, name }))
+            .sort((a, b) => Number(b.calls ?? 0) - Number(a.calls ?? 0) || String(a.name).localeCompare(String(b.name)))
+    );
     const entries = /** @type {[string, Record<string, any>][]} */ (tools.map((tool) => [String(tool['name']), tool]));
     const canonicalTools = tools;
 

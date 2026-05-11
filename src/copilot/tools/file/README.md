@@ -1,8 +1,8 @@
 # tools/file/
 
-**Propósito**: expor para a LLM-B as custom tools canônicas de arquivo, busca, índice e scope.  
-**Status documental**: Canônico ativo.  
-**Público**: mantenedores das tools SDK-first e das integrações de leitura/escrita da LLM-B.  
+**Propósito**: expor para a LLM-B as custom tools canônicas de arquivo, busca, índice e scope.
+**Status documental**: Canônico ativo.
+**Público**: mantenedores das tools SDK-first e das integrações de leitura/escrita da LLM-B.
 **Última atualização**: 7 de maio de 2026.
 
 ## O que esta pasta contém
@@ -63,12 +63,18 @@ Para automação shell, use `npm run copilot:index -- ...`.
 ## Entradas principais
 
 - `index.js`: barrel e composição final de `fileTools`.
-- `read-tools-io.js`: leitura e listagem via infra canônica.
-- `read-tools-search.js`: busca textual com seletor índice/rg.
+- `read-tools.js`: superfície canônica unificada de leitura (`read_file_content`, `list_directory`,
+  `search_in_files`, `diff_files`, `workspace_symbol_search`).
 - `write-tools.js`: mutações de arquivo com locks e atomicidade.
 - `index-tools.js`: ferramentas explícitas do índice L2.
 - `scope-tools.js`: ferramentas explícitas de scope LLM-B.
-- `symbol-search-tool.js`: busca simbólica compatível com fluxos existentes.
+
+### Nota de arquitetura
+
+Até maio/2026 havia uma divisão histórica entre `read-tools-io.js`, `read-tools-search.js` e
+`symbol-search-tool.js`. Essa fragmentação foi removida para evitar múltiplos “planos de leitura”
+paralelos. Agora existe **uma única superfície canônica de read tools** em `read-tools.js`, com
+helpers internos e metadados de I/O uniformes.
 
 ## Links relacionados
 

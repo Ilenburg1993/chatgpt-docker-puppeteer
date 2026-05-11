@@ -13,10 +13,13 @@ const MAX_RECURSION_DEPTH = 5;
 
 const FILE_KEYS = new Set([
     'path',
+    'path_a',
+    'path_b',
     'file',
     'filePath',
     'filepath',
     'filename',
+    'searchPath',
     'targetPath',
     'sourcePath',
     'destinationPath',
@@ -35,6 +38,8 @@ const START_LINE_KEYS = new Set(['startLine', 'start', 'fromLine']);
 const END_LINE_KEYS = new Set(['endLine', 'end', 'toLine']);
 
 const PATCH_KEYS = new Set(['patch', 'diff', 'content']);
+
+const RESULT_LINE_RANGE_KEYS = new Set(['returnedLines', 'lineRange']);
 
 /**
  * @typedef {{ start: number | null; end: number | null }} ToolLineRange
@@ -117,6 +122,109 @@ function addIfPresent(target, value) {
 }
 
 /**
+ * @param {ToolLineRange} target
+ * @param {ToolLineRange | null} candidate
+ * @returns {void}
+ */
+function mergeLineRange(target, candidate) {
+    if (!candidate) return;
+    if (candidate.start !== null) target.start = candidate.start;
+    if (candidate.end !== null) target.end = candidate.end;
+}
+
+/**
+ * @param {unknown} value
+ * @returns {ToolLineRange | null}
+ */
+function extractStructuredLineRange(value) {
+    if (!isObjectRecord(value)) return null;
+    const start = asFiniteNumber(value['start']);
+    const end = asFiniteNumber(value['end']);
+    if (start === null && end === null) return null;
+    return { start, end };
+}
+
+/**
+ * @param {string} keyName
+ * @param {unknown} raw
+ * @param {{
+ *     fileTargets: Set<string>;
+ *     urlTargets: Set<string>;
+ *     searchTerms: Set<string>;
+ *     patchFiles: Set<string>;
+ *     lineRange: ToolLineRange;
+ *     allowPatchKeys: boolean;
+ *     allowQueryKeys: boolean;
+ * }} state
+ * @returns {void}
+ */
+function processStructuredEntry(keyName, raw, state) {
+    const text = asCleanString(raw);
+
+    if (START_LINE_KEYS.has(keyName)) {
+        const num = asFiniteNumber(raw);
+        if (num !== null) state.lineRange.start = num;
+    }
+    if (END_LINE_KEYS.has(keyName)) {
+        const num = asFiniteNumber(raw);
+        if (num !== null) state.lineRange.end = num;
+    }
+    if (RESULT_LINE_RANGE_KEYS.has(keyName)) {
+        mergeLineRange(state.lineRange, extractStructuredLineRange(raw));
+    }
+
+    if (!text) return;
+
+    if (state.allowPatchKeys && PATCH_KEYS.has(keyName)) {
+        for (const file of extractPatchFileTargets(text)) {
+            addIfPresent(state.patchFiles, file);
+            if (isLikelyPathLike(file)) addIfPresent(state.fileTargets, file);
+        }
+    }
+
+    if (FILE_KEYS.has(keyName)) {
+        if (isLikelyUrl(text)) addIfPresent(state.urlTargets, text);
+        else addIfPresent(state.fileTargets, text);
+    }
+
+    if (URL_KEYS.has(keyName) && isLikelyUrl(text)) {
+        addIfPresent(state.urlTargets, text);
+    }
+
+    if (state.allowQueryKeys && QUERY_KEYS.has(keyName)) {
+        addIfPresent(state.searchTerms, text);
+    }
+}
+
+/**
+ * @param {unknown} value
+ * @param {{
+ *     fileTargets: Set<string>;
+ *     urlTargets: Set<string>;
+ *     searchTerms: Set<string>;
+ *     patchFiles: Set<string>;
+ *     lineRange: ToolLineRange;
+ *     allowPatchKeys: boolean;
+ *     allowQueryKeys: boolean;
+ * }} state
+ * @param {number} depth
+ * @returns {void}
+ */
+function visitStructuredMetadata(value, state, depth) {
+    if (depth > MAX_RECURSION_DEPTH) return;
+    if (Array.isArray(value)) {
+        for (const item of value) visitStructuredMetadata(item, state, depth + 1);
+        return;
+    }
+    if (!isObjectRecord(value)) return;
+
+    for (const [key, raw] of Object.entries(value)) {
+        processStructuredEntry(key.trim(), raw, state);
+        visitStructuredMetadata(raw, state, depth + 1);
+    }
+}
+
+/**
  * @param {unknown} value
  * @param {(text: string) => void} onText
  * @param {number} depth
@@ -181,59 +289,20 @@ export function introspectToolTargets({ args, result }) {
     /** @type {ToolLineRange} */
     const lineRange = { start: null, end: null };
 
-    /**
-     * @param {unknown} value
-     * @param {number} depth
-     * @returns {void}
-     */
-    function visit(value, depth) {
-        if (depth > MAX_RECURSION_DEPTH) return;
-        if (Array.isArray(value)) {
-            for (const item of value) visit(item, depth + 1);
-            return;
-        }
-        if (!isObjectRecord(value)) return;
+    const state = {
+        fileTargets,
+        urlTargets,
+        searchTerms,
+        patchFiles,
+        lineRange,
+        allowPatchKeys: true,
+        allowQueryKeys: true,
+    };
+    visitStructuredMetadata(args, state, 0);
 
-        for (const [key, raw] of Object.entries(value)) {
-            const keyName = key.trim();
-            const text = asCleanString(raw);
-
-            if (START_LINE_KEYS.has(keyName)) {
-                const num = asFiniteNumber(raw);
-                if (num !== null) lineRange.start = num;
-            }
-            if (END_LINE_KEYS.has(keyName)) {
-                const num = asFiniteNumber(raw);
-                if (num !== null) lineRange.end = num;
-            }
-
-            if (text) {
-                if (PATCH_KEYS.has(keyName)) {
-                    for (const file of extractPatchFileTargets(text)) {
-                        addIfPresent(patchFiles, file);
-                        if (isLikelyPathLike(file)) addIfPresent(fileTargets, file);
-                    }
-                }
-
-                if (FILE_KEYS.has(keyName)) {
-                    if (isLikelyUrl(text)) addIfPresent(urlTargets, text);
-                    else addIfPresent(fileTargets, text);
-                }
-
-                if (URL_KEYS.has(keyName) && isLikelyUrl(text)) {
-                    addIfPresent(urlTargets, text);
-                }
-
-                if (QUERY_KEYS.has(keyName)) {
-                    addIfPresent(searchTerms, text);
-                }
-            }
-
-            visit(raw, depth + 1);
-        }
-    }
-
-    visit(args, 0);
+    state.allowPatchKeys = false;
+    state.allowQueryKeys = false;
+    visitStructuredMetadata(result, state, 0);
 
     walkTextNodes(
         result,

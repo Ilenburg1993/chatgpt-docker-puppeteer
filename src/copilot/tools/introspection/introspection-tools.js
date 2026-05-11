@@ -146,7 +146,10 @@ function findTelemetryEntryByName(stats, toolName) {
     const normalizedWanted = toolName.toLowerCase();
     for (const [key, entry] of Object.entries(stats)) {
         const aliases = Array.isArray(entry['aliases']) ? /** @type {string[]} */ (entry['aliases']) : [];
-        if (key.toLowerCase() === normalizedWanted || aliases.some((alias) => alias.toLowerCase() === normalizedWanted)) {
+        if (
+            key.toLowerCase() === normalizedWanted ||
+            aliases.some((alias) => alias.toLowerCase() === normalizedWanted)
+        ) {
             return {
                 key,
                 entry,

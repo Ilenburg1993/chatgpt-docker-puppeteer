@@ -40,4 +40,21 @@ describe('terminal/tool-activity-presenter', () => {
         expect(presentation.startLine).toContain('Qual caminho seguir?');
         expect(presentation.completeLine(true, '1.0s')).toContain('aguardando decisão humana concluído');
     });
+
+    it('enriquece leitura com range efetivamente retornado no resultado', () => {
+        const presentation = buildTerminalToolActivityPresentation({
+            toolName: 'read_file_content',
+            args: { path: 'src/copilot/tools/file/read-tools.js', startLine: 10 },
+            result: {
+                success: true,
+                path: 'src/copilot/tools/file/read-tools.js',
+                returnedLines: { start: 10, end: 18 },
+            },
+        });
+
+        expect(presentation.operation).toBe('read');
+        expect(presentation.target).toContain('linhas 10-18');
+        expect(presentation.lineRange).toEqual({ start: 10, end: 18 });
+        expect(presentation.completeLine(true, '0.2s')).toContain('linhas 10-18');
+    });
 });
