@@ -30,6 +30,8 @@ Reconstruir `src/copilot/tools/` como um subsistema canônico, com:
 
 ## Resultado da validação inicial (auditoria externa x código real)
 
+> **Nota de evolução**: esta seção captura o snapshot inicial de 2026-05-10. Parte dos itens abaixo já mudou de estado após o hardening e a revalidação de 2026-05-11. Ver `2026-05-11-VALIDACAO-CLAIMS-EXTERNAS-DELTA.md` para o delta pós-estabilização.
+
 ### Confirmados na base atual
 
 - Dead code de timeout advisory em `session-rpc-tools` (parametrização ignorada).
@@ -150,4 +152,7 @@ Reconstruir `src/copilot/tools/` como um subsistema canônico, com:
 - ✅ Lote P1-2 concluído: `web_search` com tratamento explícito de payload JSON inválido no fallback DDG.
 - ✅ Lote P1-2 concluído: isolamento de estado reforçado em `sdk/tools/state` (clones defensivos).
 - ✅ Lote P1-2 concluído: boundary enforcement progressivo em `eslint.config.mjs` (modo `warn`) para `tools/`→`infra/db`.
-- 🔄 Próximo: consolidar contracts formais (ToolDefinition/Telemetry/Permission/UserInputBridge) e iniciar adapter de `ToolSessionContext`.
+- ✅ 2026-05-11: escopo `src/copilot` revalidado com `typecheck strict`, `eslint` e `npm run test:copilot` verdes.
+- ✅ 2026-05-11: branch `main` sincronizada com `origin/main` após push do lote estrutural.
+- ✅ 2026-05-11: claims externas revalidadas; parte do material original passou a estado **corrigido**, **obsoleto** ou **ainda ativo** com evidência objetiva (`2026-05-11-VALIDACAO-CLAIMS-EXTERNAS-DELTA.md`).
+- 🔄 Próximo: consolidar contracts formais (ToolDefinition/Telemetry/Permission/UserInputBridge), fechar blind spot de denies na observabilidade e decidir a política canônica para limites `Infinity` em file tools.
