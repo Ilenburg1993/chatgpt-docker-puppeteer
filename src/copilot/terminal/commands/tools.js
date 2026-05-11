@@ -10,7 +10,7 @@
  * @see EventBus
  */
 
-import { readIntrospectionRegistrySnapshot } from '../../tools/introspection-tools.js';
+import { readIntrospectionRegistrySnapshot } from '#copilot/tools';
 import { readTerminalStatusProjection, readTerminalToolStatsProjection } from '../frontend/index.js';
 
 /**

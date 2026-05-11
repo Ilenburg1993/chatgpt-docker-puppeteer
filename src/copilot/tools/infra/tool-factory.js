@@ -1,13 +1,14 @@
 // @ts-check
 /**
- * src/copilot/tools/tool-factory.js
+ * src/copilot/tools/infra/tool-factory.js
  *
  * AH.4 — Fábrica de Custom Tools para o Always-Alive Agent. Encapsula `defineTool` do SDK com convenções do projeto:
  *
  * - JSDoc/interfaces para parâmetros (sem Zod obrigatório)
- * - Suporte a Zod schemas via `zod-to-json-schema` quando disponível
+ * - Suporte a schemas Zod/Zod-like e JSON Schema via adaptador canônico do SDK
  * - `skipPermission: false` por padrão (requer aprovação explícita para todas as tools)
- * - Logging automático via `#core/logger` em cada invocação
+ * - Normalização canônica de parâmetros via SDK (`normalizeToolParametersSchema`)
+ * - Fallback local apenas para janela de bootstrap/TDZ em ciclos ESM
  *
  * ## AH.5 — Integração LSP / IDE
  *
@@ -51,44 +52,21 @@
  * });
  * ```
  *
- * @module copilot/tools/tool-factory
+ * @module copilot/tools/infra/tool-factory
  * @see EventBus
  * @see module:copilot/sdk/tools-registry
  * @see module:copilot/agent/tools-bootstrap
  *
  * ## Quando usar `buildTool` vs `defineTool`
  *
- * - **`buildTool`** (este módulo): para tools de produção. Adiciona logging automático de invocação,
- *   validação Zod transparente via `zod-to-json-schema`, e padroniza `skipPermission`. Use em todos os
+ * - **`buildTool`** (este módulo): para tools de produção. Reutiliza a normalização canônica do SDK,
+ *   aplica hardening local/fallback e padroniza `skipPermission`. Use em todos os
  *   arquivos de tools em `src/copilot/tools/`.
  * - **`defineTool`** (do `@github/copilot-sdk`): uso interno/SDK apenas. Evite chamar diretamente em
  *   código de produção — use `buildTool` que já encapsula o `defineTool`.
  */
 
-import { COPILOT_LOG_LEVEL } from '#copilot/config';
-import { createTool as sdkCreateTool } from '#copilot/sdk';
-import { createRequire } from 'node:module';
-
-/** @type {typeof import('zod-to-json-schema').zodToJsonSchema | null} */
-let _zodConverter = null;
-/** @type {boolean} */
-let _zodConverterAttempted = false;
-
-/**
- * @returns {typeof import('zod-to-json-schema').zodToJsonSchema | null}
- */
-function loadZodToJsonSchema() {
-    if (_zodConverter || _zodConverterAttempted) return _zodConverter;
-    _zodConverterAttempted = true;
-    try {
-        const requireFromHere = createRequire(import.meta.url);
-        const mod = requireFromHere('zod-to-json-schema');
-        _zodConverter = mod.zodToJsonSchema ?? mod.default ?? null;
-    } catch {
-        _zodConverter = null;
-    }
-    return _zodConverter;
-}
+import { normalizeToolParametersSchema, createTool as sdkCreateTool } from '#copilot/sdk';
 
 /**
  * Determina se o erro permite fallback para tool plain (ciclo/TDZ/export indisponível).
@@ -110,53 +88,6 @@ function isRecoverableToolFactoryError(err) {
     if (e instanceof ReferenceError) {
         return true;
     }
-    return false;
-}
-
-/**
- * Converte schemas Zod v4 usando a API nativa de JSON Schema do próprio pacote `zod`.
- *
- * `zod-to-json-schema` trabalha bem com Zod v3, mas pode retornar apenas `$schema` para schemas v4. Como a maior parte
- * das tools do projeto importa `zod` diretamente, este caminho precisa ser preferencial para `_zod`.
- *
- * @param {import('zod').ZodType | import('zod/v3').ZodTypeAny | Record<string, unknown>} parameters
- * @returns {Record<string, unknown> | undefined}
- */
-function tryZodV4ToJsonSchema(parameters) {
-    if (!('_zod' in parameters)) return undefined;
-    try {
-        const requireFromHere = createRequire(import.meta.url);
-        const mod = requireFromHere('zod');
-        const toJSONSchema =
-            typeof mod?.z?.toJSONSchema === 'function'
-                ? mod.z.toJSONSchema
-                : typeof mod?.toJSONSchema === 'function'
-                  ? mod.toJSONSchema
-                  : null;
-        if (!toJSONSchema) return undefined;
-        return /** @type {Record<string, unknown>} */ (toJSONSchema(parameters));
-    } catch {
-        return undefined;
-    }
-}
-
-/**
- * Valida se o JSON Schema produzido é útil para parâmetros de tool.
- *
- * Alguns conversores podem retornar apenas `{ $schema: ... }` em cenários de compatibilidade, o que deixa a tool com
- * contrato praticamente invisível para o modelo.
- *
- * @param {unknown} schema
- * @returns {schema is Record<string, unknown>}
- */
-function isUsableToolParameterSchema(schema) {
-    if (!schema || typeof schema !== 'object' || Array.isArray(schema)) return false;
-    const data = /** @type {Record<string, unknown>} */ (schema);
-    if (typeof data['type'] === 'string') return true;
-    if (typeof data['$ref'] === 'string') return true;
-    if (data['properties'] && typeof data['properties'] === 'object') return true;
-    if (Array.isArray(data['anyOf']) || Array.isArray(data['oneOf']) || Array.isArray(data['allOf'])) return true;
-    if ('additionalProperties' in data) return true;
     return false;
 }
 
@@ -185,22 +116,67 @@ function makePlainTool(options) {
 }
 
 /**
+ * Constrói opções seguras para fallback plain tool, materializando apenas campos opcionais definidos.
+ *
+ * @param {Parameters<typeof sdkCreateTool>[0]} options
+ * @returns {{
+ *     name: string;
+ *     description: string;
+ *     parameters?: Record<string, unknown>;
+ *     handler: import('#copilot/sdk/types').ToolHandler<any>;
+ *     skipPermission?: boolean;
+ *     overridesBuiltInTool?: boolean;
+ * }}
+ */
+function buildPlainToolOptions(options) {
+    const normalizedParameters =
+        options.parameters !== undefined ? normalizeParameters(options.parameters, options.name) : undefined;
+    return {
+        name: options.name,
+        description: options.description,
+        handler: /** @type {import('#copilot/sdk/types').ToolHandler<any>} */ (options.handler),
+        ...(normalizedParameters !== undefined ? { parameters: normalizedParameters } : {}),
+        ...(typeof options.skipPermission === 'boolean' ? { skipPermission: options.skipPermission } : {}),
+        ...(options.overridesBuiltInTool ? { overridesBuiltInTool: true } : {}),
+    };
+}
+
+/**
  * Factory SDK-first com fallback apenas para ciclos de inicialização.
  *
  * @param {Parameters<typeof sdkCreateTool>[0]} options
  * @returns {ReturnType<typeof sdkCreateTool>}
  */
 function createTool(options) {
+    const plainToolOptions = buildPlainToolOptions(options);
+    const plainTool = makePlainTool(plainToolOptions);
     try {
-        const tool = sdkCreateTool(options);
-        if (tool && typeof tool === 'object') {
-            return tool;
-        }
-        return /** @type {ReturnType<typeof sdkCreateTool>} */ (makePlainTool(options));
+        const tool = safeSdkCreateTool(options) || plainTool;
+        return validateBuiltTool(options.name, tool);
     } catch (err) {
         if (isRecoverableToolFactoryError(err)) {
-            return /** @type {ReturnType<typeof sdkCreateTool>} */ (makePlainTool(options));
+            logToolFactory(
+                'WARN',
+                `[tool-factory] Fallback plain-tool ativado para '${options.name}' após erro recuperável: ${err instanceof Error ? err.message : String(err)}`,
+            );
+            return validateBuiltTool(options.name, plainTool);
         }
+        throw err;
+    }
+}
+
+/**
+ * Invoca o builder do SDK de forma resiliente a mocks parciais/exports ausentes.
+ *
+ * @param {Parameters<typeof sdkCreateTool>[0]} options
+ * @returns {ReturnType<typeof sdkCreateTool> | null}
+ */
+function safeSdkCreateTool(options) {
+    try {
+        if (typeof sdkCreateTool !== 'function') return null;
+        return sdkCreateTool(options);
+    } catch (err) {
+        if (isRecoverableToolFactoryError(err)) return null;
         throw err;
     }
 }
@@ -212,16 +188,7 @@ function createTool(options) {
  * @param {string} message
  */
 function logToolFactory(level, message) {
-    const line = `[sdk] ${level}: ${message}`;
-    if (level === 'ERROR') {
-        console.error(line);
-    } else if (level === 'WARN') {
-        console.warn(line);
-    } else if (level === 'INFO') {
-        console.info(line);
-    } else if (COPILOT_LOG_LEVEL === 'DEBUG') {
-        console.debug(line);
-    }
+    process.stderr.write(`[sdk] ${String(level)}: ${String(message)}\n`);
 }
 
 /**
@@ -231,8 +198,10 @@ function logToolFactory(level, message) {
  * @typedef {object} BuildToolOptions
  * @property {string} name - Nome único da ferramenta (snake_case recomendado)
  * @property {string} description - Descrição legível para o modelo
- * @property {import('zod').ZodType | import('zod/v3').ZodTypeAny | Record<string, unknown>} [parameters] - Schema Zod
- *   (v3 ou v4) ou JSON Schema manual dos parâmetros
+ * @property {import('#copilot/sdk/tools/core.js').ToolParameterInput<any>} [parameters]
+ *
+ *   - Schema Zod (v3 ou v4, inclusive tipagem SDK) ou JSON Schema manual dos parâmetros
+ *
  * @property {import('#copilot/sdk/types').ToolHandler<TArgs>} handler - Callback executor da ferramenta
  * @property {boolean} [requiresApproval] - Se `true` (default), skipPermission=false
  * @property {boolean} [overridesBuiltInTool] - Se sobrescreve ferramenta nativa do SDK
@@ -242,44 +211,77 @@ function logToolFactory(level, message) {
  * Normaliza o schema de parâmetros para o formato aceito pelo SDK. Aceita instâncias Zod (convertidas automaticamente)
  * ou JSON Schema direto. Se falhar na conversão, loga aviso e retorna undefined (permitindo tool sem parâmetros).
  *
- * @param {import('zod').ZodType | import('zod/v3').ZodTypeAny | Record<string, unknown> | undefined} parameters
+ * @param {import('#copilot/sdk/tools/core.js').ToolParameterInput<any> | undefined} parameters
  * @param {string} [toolName='unknown'] Default is `'unknown'`
  * @returns {Record<string, unknown> | undefined}
  */
 function normalizeParameters(parameters, toolName = 'unknown') {
-    if (!parameters) return undefined;
-
-    // Detecta instância Zod v3 (`_def`) ou Zod v4 (`_zod`).
-    // Zod v4 mudou a arquitetura interna — a propriedade identificadora passou de `_def` para `_zod`.
-    // Ambas indicam um schema Zod que precisa ser convertido para JSON Schema antes de ser passado ao SDK.
-    // H1-FIX: Usar instanceof ZodType quando possível para melhor compatibilidade com versões futuras.
-    if ('_def' in parameters || '_zod' in parameters) {
-        try {
-            const zodV4Schema = tryZodV4ToJsonSchema(parameters);
-            if (isUsableToolParameterSchema(zodV4Schema)) return zodV4Schema;
-            const converter = loadZodToJsonSchema();
-            if (!converter) {
-                throw new Error('zod-to-json-schema indisponível');
+    try {
+        if (typeof normalizeToolParametersSchema !== 'function') {
+            if (parameters && typeof parameters === 'object' && !Array.isArray(parameters)) {
+                return /** @type {Record<string, unknown>} */ (parameters);
             }
-            const jsonSchema = /** @type {Record<string, unknown>} */ (
-                converter(/** @type {import('zod/v3').ZodTypeAny} */ (parameters))
-            );
-            if (!isUsableToolParameterSchema(jsonSchema)) {
-                throw new Error('JSON Schema inválido/incompleto após conversão Zod');
-            }
-            return jsonSchema;
-        } catch (err) {
-            const message = /** @type {Error} */ (err).message;
-            logToolFactory(
-                'WARN',
-                `[tool-factory] Falha ao converter Zod schema para '${toolName}': ${message}. Tool será registrada sem parâmetros.`,
-            );
-            // H1-FIX: Não relançar exceção — permitir tool sem parâmetros (fallback gracioso)
-            return undefined;
+            throw new TypeError('normalizeToolParametersSchema is not a function');
         }
+        return normalizeToolParametersSchema(
+            /** @type {import('#copilot/sdk/tools/core.js').ToolParameterInput<any> | undefined} */ (parameters),
+            toolName,
+        );
+    } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        logToolFactory(
+            'WARN',
+            `[tool-factory] Falha ao normalizar parâmetros de '${toolName}': ${message}. Tool será registrada sem parâmetros.`,
+        );
+        return undefined;
     }
+}
 
-    return isUsableToolParameterSchema(parameters) ? /** @type {Record<string, unknown>} */ (parameters) : undefined;
+/**
+ * Hardening local: garante que a tool produzida respeita o contrato canônico antes de sair da factory.
+ *
+ * @template T
+ * @param {string} toolName
+ * @param {import('#copilot/sdk/types').Tool<T>} tool
+ * @returns {import('#copilot/sdk/types').Tool<T>}
+ */
+function validateBuiltTool(toolName, tool) {
+    const validation = validateToolDefinitionContractLocal(tool);
+    if (!validation.ok) {
+        throw new TypeError(`[tool-factory] Tool '${toolName}' inválida: ${validation.reason}`);
+    }
+    return tool;
+}
+
+/**
+ * Contrato mínimo local para evitar ciclos/TDZ com facades de validação mais altas.
+ *
+ * @param {unknown} tool
+ * @returns {{ ok: true } | { ok: false; reason: string }}
+ */
+function validateToolDefinitionContractLocal(tool) {
+    if (!tool || typeof tool !== 'object') {
+        return { ok: false, reason: 'tool (object) obrigatório.' };
+    }
+    const candidate = /** @type {Record<string, unknown>} */ (tool);
+    if (typeof candidate['name'] !== 'string' || candidate['name'].trim() === '') {
+        return { ok: false, reason: 'name (string) obrigatório.' };
+    }
+    if (typeof candidate['description'] !== 'string' || candidate['description'].trim() === '') {
+        return { ok: false, reason: 'description (string) obrigatório.' };
+    }
+    if (typeof candidate['handler'] !== 'function') {
+        return { ok: false, reason: 'handler (function) obrigatório.' };
+    }
+    if (
+        candidate['parameters'] !== undefined &&
+        (typeof candidate['parameters'] !== 'object' ||
+            candidate['parameters'] === null ||
+            Array.isArray(candidate['parameters']))
+    ) {
+        return { ok: false, reason: 'parameters deve ser object quando definido.' };
+    }
+    return { ok: true };
 }
 
 /**
@@ -307,22 +309,12 @@ export function buildTool({
 }) {
     const jsonSchemaParams = normalizeParameters(parameters, name);
 
-    const wrappedHandler = /** @type {import('#copilot/sdk/types').ToolHandler<TArgs>} */ (
-        async (args, invocation) => {
-            logToolFactory(
-                'DEBUG',
-                `[tool-factory] Invocando tool '${name}' (sessionId=${invocation?.sessionId ?? 'n/a'})`,
-            );
-            return handler(args, invocation);
-        }
-    );
-
     return /** @type {import('#copilot/sdk/types').Tool<TArgs>} */ (
         createTool({
             name,
             description,
             ...(jsonSchemaParams !== undefined ? { parameters: jsonSchemaParams } : {}),
-            handler: /** @type {Parameters<typeof sdkCreateTool>[0]['handler']} */ (wrappedHandler),
+            handler: /** @type {Parameters<typeof sdkCreateTool>[0]['handler']} */ (handler),
             // Semântica explícita: requiresApproval=true => skipPermission=false; false => skipPermission=true.
             skipPermission: !requiresApproval,
             ...(overridesBuiltInTool ? { overridesBuiltInTool: true } : {}),

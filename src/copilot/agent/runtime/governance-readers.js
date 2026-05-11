@@ -13,6 +13,9 @@
  *     getPermissionCapabilitySnapshot?:
  *         | (() => ReturnType<import('../agent-context.js').AgentContext['getPermissionCapabilitySnapshot']>)
  *         | undefined;
+ *     getPermissionPolicySnapshot?:
+ *         | (() => ReturnType<import('../agent-context.js').AgentContext['getPermissionPolicySnapshot']>)
+ *         | undefined;
  *     getContextFactoryCapabilitiesSnapshot?:
  *         | (() => ReturnType<import('../agent-context.js').AgentContext['getContextFactoryCapabilitiesSnapshot']>)
  *         | undefined;
@@ -44,6 +47,16 @@ export function readRuntimePermissionCapability(runtime) {
             handlerAvailable: false,
         }
     );
+}
+
+/**
+ * Retorna snapshot detalhado da policy ativa (mode, allowTools, denyTools, denyShell, defaultDecision).
+ *
+ * @param {AgentRuntimeGovernanceTarget} runtime
+ * @returns {ReturnType<import('../agent-context.js').AgentContext['getPermissionPolicySnapshot']>}
+ */
+export function readRuntimePermissionPolicySnapshot(runtime) {
+    return runtime.getPermissionPolicySnapshot?.() ?? null;
 }
 
 /**

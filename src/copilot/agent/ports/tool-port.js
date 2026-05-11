@@ -20,16 +20,18 @@
  */
 
 import { createSessionRpcFacade } from '#copilot/sdk';
-import { isToolDisabled, readStore } from '#copilot/tools';
 import {
     bootstrapTools,
+    cancelAllUserInputRequests,
     configureHookTools,
+    isToolDisabled,
+    readStore,
+    resolveUserInput,
     setExperimentalSession,
     setHub,
     setPermissionAgent,
     setSessionRpc,
-} from '../../tools/bootstrap.js';
-import { resolveUserInput } from '../../tools/hook-tools.js';
+} from '#copilot/tools';
 
 /**
  * Registra tools do runtime e tools vindas do MCP no registry recebido.
@@ -82,6 +84,7 @@ export function resolveAgentUserInput(answer, requestId) {
  * @returns {void}
  */
 export function unbindAgentSessionTools() {
+    cancelAllUserInputRequests();
     setSessionRpc(null);
     try {
         if (typeof setExperimentalSession === 'function') {

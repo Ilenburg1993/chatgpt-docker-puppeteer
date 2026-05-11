@@ -8,9 +8,9 @@
  * @see EventBus
  */
 
-import { createTool } from '#copilot/sdk';
 import { z } from 'zod';
-import { log } from '../logger.js';
+import { log } from '../infra/logger.js';
+import { buildTool } from '../infra/tool-factory.js';
 import { VALID_TRANSITIONS, createTask, now, sanitize, withStore, zId, zPriority, zStatus } from './store.js';
 
 // ---------------------------------------------------------------------------
@@ -20,37 +20,27 @@ import { VALID_TRANSITIONS, createTask, now, sanitize, withStore, zId, zPriority
 /**
  * Tool: todo_create — cria uma nova tarefa com metadados ricos.
  */
-export const todoCreateTool = createTool({
+export const todoCreateTool = buildTool({
     name: 'todo_create',
     description:
         'Cria uma nova tarefa no sistema de gerenciamento profundo. ' +
         'Suporta título, descrição detalhada, prioridade (critical/high/medium/low/none), ' +
         'tags, data de vencimento, notas livres, e subtarefas via parentId. ' +
         'Retorna o objeto completo da tarefa criada com seu ID gerado.',
-    parameters: /** @type {import('#copilot/sdk/types').ZodSchema<any>} */ (
-        /** @type {unknown} */ (
-            z.object({
-                title: z.string().min(1).describe('Título da tarefa (obrigatório)'),
-                description: z.string().optional().describe('Descrição detalhada da tarefa'),
-                priority: zPriority
-                    .optional()
-                    .default('medium')
-                    .describe('Prioridade: critical | high | medium | low | none'),
-                tags: z.array(z.string()).optional().default([]).describe('Lista de tags/labels para categorização'),
-                due_date: z
-                    .string()
-                    .datetime({ offset: true })
-                    .optional()
-                    .describe('Data de vencimento ISO 8601 (ex: 2026-04-01T18:00:00Z)'),
-                parent_id: z.string().optional().describe('ID da tarefa pai para criar como subtarefa'),
-                notes: z.string().optional().describe('Notas livres associadas à tarefa'),
-                metadata: z
-                    .record(z.string(), z.unknown())
-                    .optional()
-                    .describe('Campos extras extensíveis (JSON livre)'),
-            })
-        )
-    ),
+    parameters: z.object({
+        title: z.string().min(1).describe('Título da tarefa (obrigatório)'),
+        description: z.string().optional().describe('Descrição detalhada da tarefa'),
+        priority: zPriority.optional().default('medium').describe('Prioridade: critical | high | medium | low | none'),
+        tags: z.array(z.string()).optional().default([]).describe('Lista de tags/labels para categorização'),
+        due_date: z
+            .string()
+            .datetime({ offset: true })
+            .optional()
+            .describe('Data de vencimento ISO 8601 (ex: 2026-04-01T18:00:00Z)'),
+        parent_id: z.string().optional().describe('ID da tarefa pai para criar como subtarefa'),
+        notes: z.string().optional().describe('Notas livres associadas à tarefa'),
+        metadata: z.record(z.string(), z.unknown()).optional().describe('Campos extras extensíveis (JSON livre)'),
+    }),
     handler: async (
         /**
          * @type {{
@@ -95,7 +85,7 @@ export const todoCreateTool = createTool({
 /**
  * Tool: todo_set_status — transiciona o status de uma tarefa com validação.
  */
-export const todoSetStatusTool = createTool({
+export const todoSetStatusTool = buildTool({
     name: 'todo_set_status',
     description:
         'Altera o status de uma tarefa seguindo a máquina de estados validada. ' +
@@ -103,21 +93,15 @@ export const todoSetStatusTool = createTool({
         'in_progress → todo | done | cancelled | blocked; ' +
         'done | cancelled → todo (reabrir); blocked → todo | in_progress. ' +
         'Use force: true para forçar transição fora do grafo (casos excepcionais).',
-    parameters: /** @type {import('#copilot/sdk/types').ZodSchema<any>} */ (
-        /** @type {unknown} */ (
-            z.object({
-                id: zId,
-                status: zStatus.describe('Novo status da tarefa'),
-                force: z.boolean().optional().describe('Forçar transição mesmo fora do grafo de estados'),
-                completed_by: z
-                    .string()
-                    .optional()
-                    .describe(
-                        'Identificador de quem concluiu (agente, usuário). Gravado em completedBy quando status=done.',
-                    ),
-            })
-        )
-    ),
+    parameters: z.object({
+        id: zId,
+        status: zStatus.describe('Novo status da tarefa'),
+        force: z.boolean().optional().describe('Forçar transição mesmo fora do grafo de estados'),
+        completed_by: z
+            .string()
+            .optional()
+            .describe('Identificador de quem concluiu (agente, usuário). Gravado em completedBy quando status=done.'),
+    }),
     handler: async (
         /** @type {{ id: string; status: import('./store.js').TodoStatus; force?: boolean; completed_by?: string }} */ args,
     ) =>
@@ -163,7 +147,7 @@ export const todoSetStatusTool = createTool({
 /**
  * Tool: todo_delete — exclui uma tarefa e desvincula do pai.
  */
-export const todoDeleteTool = createTool({
+export const todoDeleteTool = buildTool({
     name: 'todo_delete',
     description:
         'Exclui uma tarefa permanentemente. Por padrão, subtarefas são desvinculadas (tornam-se raiz). ' +

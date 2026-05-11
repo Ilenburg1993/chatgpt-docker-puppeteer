@@ -1,12 +1,12 @@
 // @ts-check
 /**
- * src/copilot/tools/tool-contract-verifier.js
+ * src/copilot/tools/introspection/tool-contract-verifier.js
  *
  * Verificador de contrato de tools registradas no runtime.
  *
  * Objetivo: detectar gaps de metadados/configuração de forma centralizada para rastreabilidade operacional.
  *
- * @module copilot/tools/tool-contract-verifier
+ * @module copilot/tools/introspection/tool-contract-verifier
  */
 
 /**

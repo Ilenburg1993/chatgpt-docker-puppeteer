@@ -11,9 +11,8 @@
  */
 
 import { buildHookContextAppendMessage } from '#copilot/config';
-import { approveAll, DEFAULT_DIAGNOSTIC_MODEL, DEFAULT_MODEL } from '#copilot/sdk';
+import { approveAll, createPermissionHandler, DEFAULT_DIAGNOSTIC_MODEL, DEFAULT_MODEL } from '#copilot/sdk';
 import { createHooks } from '../factory.js';
-import { createApproveAllPermission, createAuditOnlyPermission, createSafePermission } from '../permission-handler.js';
 
 /**
  * @typedef {import('#copilot/sdk/types').SessionConfig} SessionConfig
@@ -110,7 +109,7 @@ export function buildReadOnlyConfig(options = {}) {
         ...BASE_CONFIG,
         model,
         tools,
-        onPermissionRequest: createAuditOnlyPermission(),
+        onPermissionRequest: createPermissionHandler({ auditMode: true }),
     });
 }
 
@@ -136,7 +135,10 @@ export function buildFullAccessConfig(options = {}) {
         ...BASE_CONFIG,
         model,
         tools,
-        onPermissionRequest: createSafePermission(denyTools),
+        onPermissionRequest: createPermissionHandler({
+            denyKinds: ['shell'],
+            denyTools: ['run_shell_command', 'run_npm_script', 'run_node_script', ...denyTools],
+        }),
     });
 }
 
@@ -162,6 +164,6 @@ export function buildDiagnosticConfig(options = {}) {
         model,
         tools,
         streaming: false,
-        onPermissionRequest: createApproveAllPermission(),
+        onPermissionRequest: approveAll,
     });
 }

@@ -10,7 +10,7 @@
 
 import { createErrorHandler } from '../error-handler.js';
 import { log } from '../logger.js';
-import { createPermissionHandler } from '../permission-handler.js';
+import { createToolPermissionPolicy } from './permission-policy.js';
 
 /**
  * @typedef {import('../types.js').SessionHooks} SessionHooks
@@ -35,26 +35,19 @@ import { createPermissionHandler } from '../permission-handler.js';
  *     });
  *
  * @param {DenyAllPresetOptions} [opts]
- * @returns {{ hooks: SessionHooks; onPermissionRequest: import('../permission-handler.js').PermissionHandler }}
+ * @returns {{ hooks: SessionHooks; onPermissionRequest: import('@github/copilot-sdk').PermissionHandler }}
  */
 export function createDenyAllPreset(opts = {}) {
     const { exceptTools = [] } = opts;
     const allowed = new Set(exceptTools.map((t) => t.toLowerCase()));
 
-    // onPermissionRequest: usa allowTools para forçar deny para tudo que não está na lista.
-    // Quando exceptTools é vazio, allowTools recebe lista vazia — o que pelo contrato de
-    // createPermissionHandler (step 3: allowTools.length > 0) só ativa a whitelist se não-vazia.
-    // Por isso usamos onRequest para garantir deny incondicional quando nenhuma exceção existe,
-    // e whitelist estrita quando há exceções.
-    const onPermissionRequest =
-        exceptTools.length > 0
-            ? createPermissionHandler({ allowTools: exceptTools })
-            : createPermissionHandler({
-                  onRequest: (_) => {
-                      log('WARN', '[preset/deny-all] onPermissionRequest: tool NEGADA (deny-all)');
-                      return false; // false → makeDenied()
-                  },
-              });
+    const policy = createToolPermissionPolicy({
+        allowTools: [...allowed],
+        defaultDecision: 'deny',
+        label: 'preset/deny-all',
+        auditLog: true,
+    });
+    const onPermissionRequest = policy.onPermissionRequest;
 
     const onErrorOccurred = createErrorHandler({
         strategy: 'abort',
@@ -67,7 +60,8 @@ export function createDenyAllPreset(opts = {}) {
     const hooks = {
         async onPreToolUse(input, invocation) {
             const name = input.toolName.toLowerCase();
-            if (allowed.has(name)) {
+            const decision = policy.decide(name);
+            if (decision === 'allow') {
                 log('DEBUG', `[preset/deny-all] tool excetuada: ${input.toolName}`);
                 return { permissionDecision: 'allow' };
             }

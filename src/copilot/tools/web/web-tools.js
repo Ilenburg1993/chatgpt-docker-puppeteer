@@ -1,10 +1,10 @@
 // @ts-check
 /**
- * src/copilot/tools/web-tools.js
+ * src/copilot/tools/web/web-tools.js
  *
  * Custom Tools para acesso web. Inclui proteção SSRF (OWASP A10), telemetria de volume e validação de content-type.
  *
- * @module copilot/tools/web-tools
+ * @module copilot/tools/web/web-tools
  * @see EventBus
  * @see module:copilot/lib/http-request
  * @see module:copilot/lib/url-validator
@@ -21,9 +21,9 @@ import {
     withIoMeta,
 } from '#copilot/core';
 import { z } from 'zod';
-import { publishIoOperation } from '../infra/io-observability.js';
-import { log } from './logger.js';
-import { buildTool } from './tool-factory.js';
+import { publishIoOperation } from '../../infra/io-observability.js';
+import { log } from '../infra/logger.js';
+import { buildTool } from '../infra/tool-factory.js';
 
 // ─── SSRF Protection (via lib/url-validator.js) ──────────────────────────────
 
@@ -350,8 +350,22 @@ const webSearchTool = buildTool({
             });
 
             if (response.ok) {
-                /** @type {Record<string, unknown>} */
-                const data = await response.json();
+                /** @type {Record<string, unknown> | null} */
+                let data;
+                try {
+                    data = /** @type {Record<string, unknown>} */ (await response.json());
+                } catch (jsonErr) {
+                    const message = toError(jsonErr).message;
+                    log(
+                        'WARN',
+                        `[copilot/web_search] DDG JSON API retornou payload inválido: ${message} — usando HTML scraping`,
+                    );
+                    data = null;
+                }
+
+                if (!data || typeof data !== 'object') {
+                    throw new Error('DDG JSON API retornou payload não parseável.');
+                }
 
                 /** @type {{ title: string; url: string; snippet: string }[]} */
                 const results = [];

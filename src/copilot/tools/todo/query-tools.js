@@ -9,9 +9,8 @@
  * @see module:copilot/tools/todo/store
  */
 
-import { createTool } from '#copilot/sdk';
 import { z } from 'zod';
-import { withSkipPermission } from '../tool-factory.js';
+import { buildTool, withSkipPermission } from '../infra/tool-factory.js';
 import { PRIORITY_ORDER, isOverdue, readStore, sanitize, zPriority, zStatus } from './store.js';
 
 // ---------------------------------------------------------------------------
@@ -22,7 +21,7 @@ import { PRIORITY_ORDER, isOverdue, readStore, sanitize, zPriority, zStatus } fr
  * Tool: todo_list — lista tarefas com filtros compostos.
  */
 export const todoListTool = withSkipPermission(
-    createTool({
+    buildTool({
         name: 'todo_list',
         description:
             'Lista tarefas com filtros opcionais compostos. Pode filtrar por status, prioridade, ' +
@@ -131,7 +130,7 @@ export const todoListTool = withSkipPermission(
  * Tool: todo_search — busca full-text avançada em todos os campos de texto.
  */
 export const todoSearchTool = withSkipPermission(
-    createTool({
+    buildTool({
         name: 'todo_search',
         description:
             'Busca full-text avançada em todas as tarefas. Pesquisa simultânea em título, ' +
@@ -219,7 +218,7 @@ export const todoSearchTool = withSkipPermission(
  * Tool: todo_stats — estatísticas completas do sistema de tarefas.
  */
 export const todoStatsTool = withSkipPermission(
-    createTool({
+    buildTool({
         name: 'todo_stats',
         description:
             'Retorna estatísticas completas do sistema de tarefas: contagem por status e prioridade, ' +

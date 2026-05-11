@@ -30,6 +30,17 @@ const TOOLS_CONFIG_PATH = resolvePersistentConfigFile('tools-config.json');
 let _toolsConfig = { allowlist: null, denylist: [] };
 
 /**
+ * Reseta o estado em memória da configuração de tools para defaults.
+ *
+ * Útil para isolamento de testes e cenários de rebootstrap controlado.
+ *
+ * @returns {void}
+ */
+export function resetToolsConfigForTests() {
+    _toolsConfig = { allowlist: null, denylist: [] };
+}
+
+/**
  * F92: Versão async de loadToolsConfig — usa fs/promises.
  *
  * @returns {Promise<void>}
@@ -45,7 +56,10 @@ export async function loadToolsConfigAsync() {
         const jsonData = /** @type {unknown} */ (jsonResult.data);
         const result = ToolsConfigSchema.safeParse(jsonData);
         if (result.success && result.data) {
-            _toolsConfig = { allowlist: result.data.allowlist, denylist: result.data.denylist };
+            _toolsConfig = {
+                allowlist: Array.isArray(result.data.allowlist) ? [...result.data.allowlist] : null,
+                denylist: [...result.data.denylist],
+            };
             const { allowlist, denylist } = _toolsConfig;
             log(
                 'INFO',
@@ -102,7 +116,10 @@ export async function patchToolsConfig(updates) {
         };
     }
     if ('denylist' in updates) {
-        _toolsConfig = { ..._toolsConfig, denylist: updates.denylist ? [...updates.denylist] : [] };
+        _toolsConfig = {
+            ..._toolsConfig,
+            denylist: Array.isArray(updates.denylist) ? [...updates.denylist] : [],
+        };
     }
     await _persistToolsConfigAsync();
 }

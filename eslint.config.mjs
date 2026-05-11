@@ -466,4 +466,130 @@ export default tseslint.config(
             ],
         },
     },
+
+    // ── F22: Boundary progressivo tools → infra/db (modo warn) ─────────
+    {
+        files: ['src/copilot/tools/**/*.js'],
+        rules: {
+            'no-restricted-imports': [
+                'error',
+                {
+                    patterns: [
+                        {
+                            regex: '^#copilot/infra(?:$|/)',
+                            message:
+                                'Evite importar #copilot/infra diretamente em tools/. Prefira ports/capabilities intermediárias.',
+                        },
+                        {
+                            regex: '^#copilot/db(?:$|/)',
+                            message:
+                                'Evite importar #copilot/db diretamente em tools/. Prefira repository/domain adapters.',
+                        },
+                    ],
+                },
+            ],
+        },
+    },
+
+    // ── F23: Fábrica única de tools (buildTool) ─────────────────────────
+    {
+        files: ['src/copilot/tools/**/*.js'],
+        ignores: ['src/copilot/tools/infra/tool-factory.js'],
+        rules: {
+            'no-restricted-imports': [
+                'error',
+                {
+                    patterns: [
+                        {
+                            group: ['../../infra/*', '../infra/*', '#copilot/infra/*'],
+                            message:
+                                'Boundary target: evitar dependência direta tools → infra. Use portas/adapters no domínio tools.',
+                        },
+                        {
+                            group: ['../../db/*', '../db/*', '#copilot/db/*'],
+                            message:
+                                'Boundary target: evitar dependência direta tools → db. Passe por contratos/repository do domínio.',
+                        },
+                    ],
+                    paths: [
+                        {
+                            name: '#copilot/sdk',
+                            importNames: ['createTool', 'createToolSync'],
+                            message:
+                                'Em src/copilot/tools/** use buildTool (tool-factory) como fluxo único. ' +
+                                'Evite createTool/createToolSync direto para não criar arquiteturas paralelas.',
+                        },
+                    ],
+                },
+            ],
+        },
+    },
+
+    // ── F24: Hooks como camada final (somente hooks/** pode importar hooks/**) ─
+    // ── F25: index.js em tools/** deve ser barrel-only (re-exports) ───────────
+    {
+        files: ['src/copilot/tools/**/index.js'],
+        rules: {
+            'no-restricted-syntax': [
+                'error',
+                {
+                    selector: 'ImportDeclaration',
+                    message:
+                        'INDEX barrel-only: use apenas re-exports `export { ... } from ...` / `export * from ...`; evite imports diretos.',
+                },
+                {
+                    selector: 'ExportNamedDeclaration[declaration!=null]',
+                    message:
+                        'INDEX barrel-only: não declare símbolos em index.js; somente re-exporte símbolos de outros módulos.',
+                },
+            ],
+        },
+    },
+
+    // ── F24: Hooks como camada final (somente hooks/** pode importar hooks/**) ─
+    {
+        files: ['src/copilot/**/*.js'],
+        ignores: ['src/copilot/hooks/**'],
+        rules: {
+            'no-restricted-imports': [
+                'warn',
+                {
+                    patterns: [
+                        {
+                            regex: '^#copilot/hooks(?:$|/)',
+                            message:
+                                'Boundary target: hooks/ é camada final. Módulos fora de src/copilot/hooks/** não devem depender de #copilot/hooks.',
+                        },
+                        {
+                            regex: '^(?:\\.{1,2}/)+.*hooks(?:/|\\.js$)',
+                            message:
+                                'Boundary target: hooks/ é camada final. Evite import relativo para hooks/** fora da própria camada de hooks.',
+                        },
+                    ],
+                },
+            ],
+        },
+    },
+
+    // ── F26: Imports externos de tools DEVEM usar o barrel #copilot/tools ──────
+    // Módulos fora de src/copilot/tools/** não devem importar submodules internos
+    // de tools diretamente. O único ponto de contato externo é #copilot/tools.
+    {
+        files: ['src/copilot/**/*.js'],
+        ignores: ['src/copilot/tools/**'],
+        rules: {
+            'no-restricted-imports': [
+                'error',
+                {
+                    patterns: [
+                        {
+                            regex: '^(?:\\.\\./)+tools/',
+                            message:
+                                'F26: Importe de "#copilot/tools" (barrel canônico). Não use deep imports de submodulos de tools (tools/bootstrap, tools/infra/*, tools/**/index.js, etc.).',
+                        },
+                    ],
+                },
+            ],
+        },
+    },
 );

@@ -23,8 +23,8 @@ import { WORKSPACE_ROOT } from '#copilot/boot';
 import { isToolDisabled as defaultIsToolDisabled } from '#copilot/tools';
 import os from 'node:os';
 import { createCircuitBreakerHandler } from '../error-handler.js';
-import { createPermissionHandler } from '../permission-handler.js';
 import { createPromptTransformer } from '../prompt-transformer.js';
+import { createToolPermissionPolicy } from './permission-policy.js';
 
 const SENSITIVE_TOOL_NAMES = new Set([
     'run_shell_command',
@@ -128,7 +128,7 @@ function _matchPermanentDenyPattern(toolName, toolArgs) {
  *     });
  *
  * @param {ProductionPresetOptions} [opts]
- * @returns {{ hooks: SessionHooks; onPermissionRequest: import('../permission-handler.js').PermissionHandler }}
+ * @returns {{ hooks: SessionHooks; onPermissionRequest: import('@github/copilot-sdk').PermissionHandler }}
  */
 export function createProductionHooks(opts = {}) {
     const {
@@ -418,11 +418,17 @@ export function createProductionHooks(opts = {}) {
 
     // ── onPermissionRequest ───────────────────────────────────────────────────
 
-    /** @type {import('../permission-handler.js').PermissionHandlerConfig} */
-    const permConfig = { auditMode: true };
-    if (toolAllowList.length > 0) permConfig.allowTools = toolAllowList;
-    if (toolDenyList.length > 0) permConfig.denyTools = toolDenyList;
-    const onPermissionRequest = createPermissionHandler(permConfig);
+    // production usa createToolPermissionPolicy para consistência com onPreToolUse
+    // defaultDecision = 'ask' se toolAllowList presente (conservative), senão 'allow'
+    const _permPolicy = createToolPermissionPolicy({
+        allowTools: toolAllowList,
+        denyTools: toolDenyList,
+        defaultDecision: toolAllowList.length > 0 ? 'ask' : 'allow',
+        askFallbackInPermissionRequest: 'deny',
+        label: 'preset/production',
+        auditLog: true,
+    });
+    const onPermissionRequest = _permPolicy.onPermissionRequest;
 
     /** @type {SessionHooks} */
     const hooks = {

@@ -11,7 +11,7 @@ import {
     listScopes,
     refreshScope,
 } from '#copilot/infra/io-session-scope';
-import { buildTool } from '../tool-factory.js';
+import { buildTool } from '../infra/tool-factory.js';
 
 const ScopeDeclareParameters = z.object({
     sessionId: z.string().min(1).describe('ID da sessão/escopo para rastreamento da LLM-B.'),

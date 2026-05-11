@@ -93,6 +93,13 @@ import { bindAgentSessionTools, bootstrapAgentTools, isAgentToolDisabled } from 
  *     tools: import('#copilot/sdk/types').Tool[];
  *     busHooks: NonNullable<import('#copilot/sdk/types').SessionConfig['hooks']>;
  * }} PreparedSessionDeps
+ *
+ *
+ * @typedef {{
+ *     sessionId?: string;
+ *     agentName?: string;
+ *     agent?: { name?: string };
+ * }} HookInvocationContext
  */
 
 /**
@@ -273,12 +280,14 @@ export function buildSessionHooks(ctx, host) {
 }
 
 /**
- * @param {import('../../../hooks/types.js').PreToolUseHookInput | undefined} input
- * @param {import('../../../hooks/types.js').InvocationContext | undefined} invocation
+ * @param {import('#copilot/sdk/types').PreToolUseHookInput | undefined} input
+ * @param {HookInvocationContext | undefined} invocation
  * @returns {string | null}
  */
 function getHookAgentName(input, invocation) {
-    const inputAgent = typeof input?.agentName === 'string' && input.agentName ? input.agentName : null;
+    const inputRecord = input && typeof input === 'object' ? /** @type {Record<string, unknown>} */ (input) : null;
+    const rawInputAgent = inputRecord?.['agentName'];
+    const inputAgent = typeof rawInputAgent === 'string' && rawInputAgent ? rawInputAgent : null;
     const invocationAgent =
         typeof invocation?.agentName === 'string' && invocation.agentName ? invocation.agentName : null;
     const nestedAgent =

@@ -15,9 +15,8 @@
 
 import { AUDIT_LOGGER } from '#copilot/audit';
 import { DB_LOGGER, EVENT_BUS, SHUTDOWN_LOGGER } from '#copilot/core';
-import { HOOKS_LOGGER } from '#copilot/hooks';
-import { SDK_LOGGER, TOOLS_BUILDER } from '#copilot/sdk';
-import { TOOLS_LOGGER, TOOLS_METRICS } from '#copilot/tools';
+import { defaultHookBus, HOOKS_LOGGER, SDK_LOGGER, setHooksLogger, TOOLS_BUILDER } from '#copilot/sdk';
+import { setToolsLogger, setToolsMetrics, TOOLS_LOGGER, TOOLS_METRICS } from '#copilot/tools';
 import { channel } from 'node:diagnostics_channel';
 import { setAuditLogger } from '../audit/logger.js';
 import { container } from '../core/di-container.js';
@@ -27,19 +26,15 @@ import { SHUTDOWN_PRIORITY } from '../core/shutdown-priorities.js';
 import { registerShutdownHandler, setShutdownEventEmitter, setShutdownLogger } from '../core/shutdown.js';
 import { setDbLogger } from '../db/sqlite.js';
 import { registerBuiltinMiddleware } from '../events/middleware/index.js';
-import { defaultBus as hookBus } from '../hooks/bus.js';
-import { setHooksLogger } from '../hooks/logger.js';
 import { setSdkLogger } from '../sdk/logger.js';
 import { setSdkMetricEmitter } from '../sdk/telemetry/operation-metrics.js';
 import { setCustomToolsBuilder } from '../sdk/tools/custom.js';
-import { setToolsLogger } from '../tools/logger.js';
-import { setToolsMetrics } from '../tools/metrics-proxy.js';
 import { defaultConvergenceTraceStore, initConvergenceTracePersistence } from './convergence-trace-store.js';
 import { CONVERGENCE_TRACE_STORE, ERROR_TRACKER, EVENT_COLLECTOR, METRICS_STORE } from './di-tokens.js';
 import { defaultErrorTracker } from './error-tracker.js';
 import { attachObservabilityBusRuntime, detachObservabilityBusRuntime } from './event-bus-runtime.js';
 import { defaultEventCollector } from './event-collector.js';
-import { LOG_DIR, log } from './logger.js';
+import { log, LOG_DIR } from './logger.js';
 import { defaultMetrics } from './metrics.js';
 import { projectSdkOperationMetric } from './sdk-metric-bridge.js';
 import { getToolStats, recordToolCall } from './tool-stats.js';
@@ -148,7 +143,7 @@ export function bootstrapObservability() {
 
     // FAIXA-L1: bridge HookBus → EventBus (fix bug GAP-EVENTS-01)
     const bus = container.resolve(EVENT_BUS);
-    if (bus) hookBus.setEventBus(bus);
+    if (bus) defaultHookBus.setEventBus(bus);
 
     // FAIXA-L6: middleware pipeline (enricher → validator → rate-limiter)
     if (bus) registerBuiltinMiddleware(bus);

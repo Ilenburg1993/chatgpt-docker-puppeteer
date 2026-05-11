@@ -23,7 +23,7 @@ import { resolveHooksStateFile } from '#copilot/boot';
 import { logSwallowed } from '#copilot/core';
 import { getCopilotDb } from '#copilot/db';
 import * as fs from 'node:fs';
-import { log } from '../logger.js';
+import { log } from '../infra/logger.js';
 import { SCHEMA_VERSION } from './todo-schema.js';
 
 export { MAX_LIST, PRIORITY_ORDER, SCHEMA_VERSION, VALID_TRANSITIONS, zId, zPriority, zStatus } from './todo-schema.js';

@@ -34,3 +34,10 @@ export const SDK_CLIENT_MANAGER = createToken('SDK_CLIENT_MANAGER');
  * @type {import('../core/di.js').Token<import('./models/registry.js').ModelRuntime>}
  */
 export const SDK_MODEL_RUNTIME = createToken('SDK_MODEL_RUNTIME');
+
+/**
+ * Logger do runtime de hooks (superfície neutra SDK).
+ *
+ * @type {import('../core/di.js').Token<import('../core/di-tokens.js').CopilotLogger>}
+ */
+export const HOOKS_LOGGER = createToken('HOOKS_LOGGER');

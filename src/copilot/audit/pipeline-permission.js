@@ -10,7 +10,7 @@
  */
 
 import { logSwallowed, toError } from '#copilot/core';
-import { approveAll, PERMISSION_COMPLETED_KINDS, PERMISSION_RESULTS } from '#copilot/sdk';
+import { PERMISSION_COMPLETED_KINDS, PERMISSION_RESULTS } from '#copilot/sdk';
 import { appendFile, mkdir, rename, stat } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 import { getLogDir, log } from './logger.js';
@@ -162,14 +162,12 @@ export function buildAuditingPermissionHandler(baseHandler) {
                 try {
                     result = await baseHandler(request, invocation);
                 } catch (err) {
-                    log(
-                        'WARN',
-                        `[ToolAudit] baseHandler lançou exceção (fallback approveAll): ${toError(err).message}`,
-                    );
-                    result = await approveAll(request, invocation);
+                    log('WARN', `[ToolAudit] baseHandler lançou exceção (fallback deny): ${toError(err).message}`);
+                    result = { kind: PERMISSION_RESULTS.REJECT };
                 }
             } else {
-                result = await approveAll(request, invocation);
+                log('WARN', '[ToolAudit] baseHandler ausente (fallback deny).');
+                result = { kind: PERMISSION_RESULTS.REJECT };
             }
 
             const decision = isApprovedPermissionKind(result?.kind) ? 'approved' : 'denied';

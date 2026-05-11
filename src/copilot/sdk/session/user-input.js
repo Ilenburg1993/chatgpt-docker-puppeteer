@@ -12,6 +12,7 @@
  */
 
 import { createInterface } from 'node:readline';
+import { ToolSessionContext } from './tool-session-context.js';
 
 /**
  * @typedef {import('../types.js').UserInputHandler} UserInputHandler
@@ -22,6 +23,33 @@ import { createInterface } from 'node:readline';
  */
 
 /** @typedef {'question' | 'ready' | 'reply' | 'stopped'} UserInputQuestionKind */
+
+/**
+ * Resolver de input estruturado (`request_user_input`) — unificado ao núcleo canônico de user-input do SDK.
+ *
+ * @typedef {(answer: string) => void} StructuredUserInputResolver
+ */
+
+/**
+ * `ToolSessionContext` default — substitui os singletons globais anteriores. Pode ser sobrescrito via
+ * `configureDefaultUserInputContext()` no bootstrap para unificar o estado de input com o agente principal (LLM-B).
+ *
+ * @type {ToolSessionContext}
+ */
+let _defaultCtx = new ToolSessionContext({ sessionId: 'default' });
+
+/**
+ * Injeta um `ToolSessionContext` como context canônico default para este módulo. Deve ser chamado no bootstrap logo
+ * após o agente ser criado, antes de qualquer chamada a `request_user_input`.
+ *
+ * @param {ToolSessionContext} ctx
+ * @returns {void}
+ */
+export function configureDefaultUserInputContext(ctx) {
+    if (ctx instanceof ToolSessionContext) {
+        _defaultCtx = ctx;
+    }
+}
 
 /**
  * @typedef {object} InteractiveInputOptions
@@ -246,4 +274,76 @@ export function createStaticInputHandler(answers, defaultAnswer = '') {
         }
         return { answer: defaultAnswer, wasFreeform: true };
     };
+}
+
+/**
+ * Gera um ID canônico para requests de input estruturado.
+ *
+ * @returns {string}
+ */
+export function nextStructuredUserInputRequestId() {
+    return _defaultCtx.nextStructuredInputId();
+}
+
+/**
+ * Registra um resolver pendente para `request_user_input`.
+ *
+ * @param {string} requestId
+ * @param {StructuredUserInputResolver} resolve
+ * @returns {void}
+ */
+export function registerPendingStructuredUserInputResolver(requestId, resolve) {
+    _defaultCtx.registerPendingInput(requestId, resolve);
+}
+
+/**
+ * Remove um resolver pendente pelo ID.
+ *
+ * @param {string} requestId
+ * @returns {boolean}
+ */
+export function deletePendingStructuredUserInputResolver(requestId) {
+    return _defaultCtx.deletePendingInput(requestId);
+}
+
+/**
+ * Resolve um pending input estruturado específico, ou o mais antigo se `requestId` for omitido.
+ *
+ * @param {string} answer
+ * @param {string | undefined} [requestId]
+ * @returns {boolean}
+ */
+export function resolvePendingStructuredUserInput(answer, requestId) {
+    return _defaultCtx.resolveStructuredInput(answer, requestId);
+}
+
+/**
+ * @returns {string[]}
+ */
+export function getPendingStructuredUserInputIds() {
+    return _defaultCtx.getPendingInputIds();
+}
+
+/**
+ * @returns {number}
+ */
+export function getPendingStructuredUserInputCount() {
+    return _defaultCtx.getPendingInputCount();
+}
+
+/**
+ * @returns {boolean}
+ */
+export function hasPendingStructuredUserInputRequests() {
+    return _defaultCtx.hasPendingInputs();
+}
+
+/**
+ * Cancela (resolve) todos os requests pendentes com a mesma resposta padrão.
+ *
+ * @param {string} answer
+ * @returns {number}
+ */
+export function cancelAllPendingStructuredUserInput(answer) {
+    return _defaultCtx.cancelAllPendingInput(answer);
 }

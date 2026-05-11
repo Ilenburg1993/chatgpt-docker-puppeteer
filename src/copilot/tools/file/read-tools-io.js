@@ -16,9 +16,16 @@ import { sanitizeIoTextOutput } from '../../core/io-policy.js';
 import { readBytes, readText } from '../../infra/io-engine.js';
 import { warmReadThroughContext } from '../../infra/io-prefetch.js';
 import { scanDirectory } from '../../infra/io-scanner.js';
-import { log } from '../logger.js';
-import { buildTool } from '../tool-factory.js';
+import { log } from '../infra/logger.js';
+import { buildTool } from '../infra/tool-factory.js';
 import { WORKSPACE_ROOT, validatePath } from './shared.js';
+
+/**
+ * Tamanho mínimo em bytes para disparar warm read-through context em arquivos de texto.
+ *
+ * @type {number}
+ */
+const MIN_READ_THROUGH_BYTES = 1024;
 
 // ---------------------------------------------------------------------------
 // Tool: read_file_content
@@ -81,12 +88,15 @@ const readFileContentTool = buildTool({
             }
 
             const text = await readText(resolved, { startLine, endLine });
-            const readThrough = await warmReadThroughContext(resolved, {
-                workspaceRoot: WORKSPACE_ROOT,
-                relatedImports: true,
-                concurrency: 4,
-                silent: true,
-            });
+            const readThrough =
+                stats.size >= MIN_READ_THROUGH_BYTES
+                    ? await warmReadThroughContext(resolved, {
+                          workspaceRoot: WORKSPACE_ROOT,
+                          relatedImports: true,
+                          concurrency: 4,
+                          silent: true,
+                      })
+                    : null;
             const sanitized = sanitizeIoTextOutput({ text: text.content });
             const truncated = false;
 

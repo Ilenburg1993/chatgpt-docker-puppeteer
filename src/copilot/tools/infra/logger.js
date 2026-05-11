@@ -1,6 +1,6 @@
 // @ts-check
 /**
- * src/copilot/tools/logger.js
+ * src/copilot/tools/infra/logger.js
  *
  * Logger minimal para o módulo tools/.
  *
@@ -12,7 +12,7 @@
  * O logger real pode ser injetado via `setToolsLogger()` por uma camada superior (agent/, server/). Se não injetado,
  * usa `console.*` como fallback.
  *
- * @module copilot/tools/logger
+ * @module copilot/tools/infra/logger
  */
 
 /**

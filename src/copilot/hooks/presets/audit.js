@@ -15,14 +15,14 @@
 import { defaultAuditLog } from '#copilot/audit';
 import { createErrorHandler } from '../error-handler.js';
 import { log } from '../logger.js';
-import { createPermissionHandler } from '../permission-handler.js';
+import { createPermissionHandler } from '#copilot/sdk';
 
 /**
  * @typedef {import('../types.js').SessionHooks} SessionHooks
  *
  * @typedef {import('../types.js').OnPermissionRequestCallback} OnPermissionRequestCallback
  *
- * @typedef {import('../permission-handler.js').PermissionHandler} PermissionHandler
+ * @typedef {import('@github/copilot-sdk').PermissionHandler} PermissionHandler
  */
 
 /**
@@ -39,10 +39,10 @@ import { createPermissionHandler } from '../permission-handler.js';
  *     // Apenas em testes:
  *     const preset = createHooksAuditPreset({ allowAll: true });
  *
- * @param {{ allowAll?: boolean; permissionHandler?: import('../permission-handler.js').PermissionHandler }} [options]
+ * @param {{ allowAll?: boolean; permissionHandler?: import('@github/copilot-sdk').PermissionHandler }} [options]
  * @returns {{
  *     hooks: SessionHooks;
- *     onPermissionRequest: import('../permission-handler.js').PermissionHandler;
+ *     onPermissionRequest: import('@github/copilot-sdk').PermissionHandler;
  *     getAuditTrail: () => import('#copilot/audit/pipeline').AuditEntry[];
  *     clearAuditTrail: () => void;
  * }}

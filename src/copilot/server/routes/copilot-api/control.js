@@ -9,9 +9,10 @@
  * @module copilot/server/routes/copilot-api/control
  */
 
+import { globalAuditTrail } from '#copilot/audit';
 import { BRIDGE_ADMIN_TOKEN } from '#copilot/config';
-import { globalAuditTrail } from '#copilot/hooks';
 import { log } from '#copilot/observability';
+import { sanitizePermissionToolNames } from '#copilot/sdk';
 import { toError } from '../../../core/error-handlers.js';
 import { projectAgentHttpError } from '../../../presentation/agent-http-errors.js';
 import { buildAgentRuntimeCapabilitiesFromRoute } from '../../../presentation/runtime-capabilities.js';
@@ -220,7 +221,14 @@ async function _handleStop(res, deps) {
 function _handleGetPermissions(res, deps) {
     const { agent } = deps;
     const mode = typeof agent.getPermissionMode === 'function' ? agent.getPermissionMode() : 'approve_all';
-    res.json({ ok: true, ...buildRuntimeRouteMetaPayload(deps), mode });
+    const policySnapshot =
+        typeof agent.getPermissionPolicySnapshot === 'function' ? agent.getPermissionPolicySnapshot() : null;
+    res.json({
+        ok: true,
+        ...buildRuntimeRouteMetaPayload(deps),
+        mode,
+        ...(policySnapshot ? { policy: policySnapshot } : {}),
+    });
 }
 
 /**
@@ -233,32 +241,30 @@ function _handleSetPermissions(req, res, deps) {
     const runtimeMeta = buildRuntimeRouteMetaPayload(deps);
     const { mode, allowTools, denyTools, denyShell } = req.body ?? {};
     const validModes = ['approve_all', 'audit_only', 'selective'];
-    const toolNameRe = /^[a-zA-Z0-9_]+$/;
     /**
      * @param {unknown} names
      * @param {'allowTools' | 'denyTools'} label
      * @returns {{ ok: true; value: string[] } | { ok: false; error: string }}
      */
-    const sanitizeToolNames = (names, label) => {
+    const _sanitize = (names, label) => {
         if (names === undefined) return { ok: true, value: [] };
         if (!Array.isArray(names)) {
             return { ok: false, error: `Campo "${label}" deve ser array de strings.` };
         }
-        const unique = new Set();
+        // valida tipos antes de delegar ao SDK helper
         for (const raw of names) {
             if (typeof raw !== 'string') {
                 return { ok: false, error: `Campo "${label}" deve conter apenas strings.` };
             }
-            const normalized = raw.trim();
-            if (!normalized || !toolNameRe.test(normalized)) {
-                return {
-                    ok: false,
-                    error: `Campo "${label}" contém nome inválido: "${raw}". Use apenas [a-zA-Z0-9_].`,
-                };
-            }
-            unique.add(normalized);
         }
-        return { ok: true, value: [...unique] };
+        const value = sanitizePermissionToolNames(names);
+        if (
+            value.length !== new Set(names.map((n) => n.trim().toLowerCase())).size &&
+            names.some((n) => n.trim() === '' || !/^[a-zA-Z0-9_]+$/.test(n.trim()))
+        ) {
+            return { ok: false, error: `Campo "${label}" contém nomes inválidos. Use apenas [a-zA-Z0-9_].` };
+        }
+        return { ok: true, value };
     };
 
     if (!mode || !validModes.includes(mode)) {
@@ -271,11 +277,11 @@ function _handleSetPermissions(req, res, deps) {
     if (denyShell !== undefined && typeof denyShell !== 'boolean') {
         return void res.status(400).json({ ...runtimeMeta, ok: false, error: 'Campo "denyShell" deve ser boolean.' });
     }
-    const allowNames = sanitizeToolNames(allowTools, 'allowTools');
+    const allowNames = _sanitize(allowTools, 'allowTools');
     if (!allowNames.ok) {
         return void res.status(400).json({ ...runtimeMeta, ok: false, error: allowNames.error });
     }
-    const denyNames = sanitizeToolNames(denyTools, 'denyTools');
+    const denyNames = _sanitize(denyTools, 'denyTools');
     if (!denyNames.ok) {
         return void res.status(400).json({ ...runtimeMeta, ok: false, error: denyNames.error });
     }
@@ -305,9 +311,9 @@ function _handleSetPermissions(req, res, deps) {
 /**
  * GAP-SE-001b: Envia uma mensagem em modo steering (immediate) para redirecionar o agente mid-turn.
  *
- * Atenção arquitetural: esta rota é uma superfície direta do SDK (`agent.steerMessage()` →
- * `session.send({ mode: 'immediate' })`) e pode gerar `assistant.usage`/`pr.consumed`. Clientes que precisam preservar
- * zero-PR devem usar o contrato mediado por `/inject mode=queue|mailbox` ou pelo mailbox do terminal, que só drena em
+ * Atenção arquitetural: esta rota é uma superfície direta do SDK (`agent.steerMessage()` → `session.send({ mode:
+ * 'immediate' })`) e pode gerar `assistant.usage`/`pr.consumed`. Clientes que precisam preservar zero-PR devem usar o
+ * contrato mediado por `/inject mode=queue|mailbox` ou pelo mailbox do terminal, que só drena em
  * `ask_user(kind=question)`.
  *
  * @param {Req} req

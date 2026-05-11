@@ -15,8 +15,8 @@ import { sanitizeIoTextOutput } from '../../core/io-policy.js';
 import { diffText } from '../../infra/io-engine.js';
 import { getIoIndexStats, searchIoIndex } from '../../infra/io-index-registry.js';
 import { publishIoOperation } from '../../infra/io-observability.js';
-import { log } from '../logger.js';
-import { buildTool } from '../tool-factory.js';
+import { log } from '../infra/logger.js';
+import { buildTool } from '../infra/tool-factory.js';
 import { WORKSPACE_ROOT, execFileAsync, isRgAvailable, validatePath } from './shared.js';
 
 const RG_TIMEOUT_MS = undefined;

@@ -11,7 +11,7 @@
  * - `defineTool` — re-export do SDK (apenas para edge cases e compat)
  *
  * Para a registry de tools em runtime, ver `sdk/tools-registry.js`. Para a factory existente com convenções avançadas,
- * ver `tools/tool-factory.js`.
+ * ver `tools/infra/tool-factory.js`.
  *
  * @module copilot/sdk/tools
  * @see EventBus
@@ -21,6 +21,24 @@
 import { defineTool } from '@github/copilot-sdk';
 import { createRequire } from 'node:module';
 import { log } from '../logger.js';
+
+/**
+ * Entrada aceita para parâmetros de tool: schema Zod/Zod-like ou JSON Schema plano.
+ *
+ * @template [T=unknown] Default is `unknown`
+ * @typedef {import('zod').ZodType
+ *     | import('zod/v3').ZodTypeAny
+ *     | import('@github/copilot-sdk').ZodSchema<T>
+ *     | Record<string, unknown>} ToolParameterInput
+ */
+
+/**
+ * @param {unknown} value
+ * @returns {value is Record<string, unknown>}
+ */
+function isRecordObject(value) {
+    return !!value && typeof value === 'object' && !Array.isArray(value);
+}
 
 /**
  * Estado hoist-safe para ciclos ESM. `createTool()` pode ser chamado durante a avaliação circular de módulos de tools;
@@ -102,6 +120,40 @@ function isUsableToolParameterSchema(schema) {
     return false;
 }
 
+/**
+ * Heurística defensiva para detectar schemas Zod/Zod-like sem confundir objetos literais com `_def` arbitrário.
+ *
+ * @param {unknown} schema
+ * @returns {schema is ToolParameterInput}
+ */
+function isLikelyZodSchema(schema) {
+    if (!isRecordObject(schema)) return false;
+    return (
+        typeof schema['safeParse'] === 'function' ||
+        typeof schema['parse'] === 'function' ||
+        typeof schema['toJSONSchema'] === 'function' ||
+        (!!schema['_def'] && typeof schema['_def'] === 'object') ||
+        (!!schema['_zod'] && typeof schema['_zod'] === 'object')
+    );
+}
+
+/**
+ * Tenta usar a API direta `toJSONSchema()` quando disponível.
+ *
+ * @param {ToolParameterInput} schema
+ * @returns {Record<string, unknown> | undefined}
+ */
+function tryDirectToJsonSchema(schema) {
+    const schemaRecord = /** @type {Record<string, unknown>} */ (schema);
+    if (typeof schemaRecord['toJSONSchema'] !== 'function') return undefined;
+    try {
+        const jsonSchema = /** @type {() => unknown} */ (schemaRecord['toJSONSchema'])();
+        return isUsableToolParameterSchema(jsonSchema) ? jsonSchema : undefined;
+    } catch {
+        return undefined;
+    }
+}
+
 // Re-export do SDK para compat — consumers preferem usar createTool()
 export { defineTool };
 
@@ -110,7 +162,7 @@ export { defineTool };
  * @typedef {object} CreateToolOptions
  * @property {string} name - Nome único da ferramenta (snake_case)
  * @property {string} description - Descrição legível para o modelo
- * @property {any} [parameters] - Zod schema (ZodTypeAny/ZodSchema) ou JSON Schema plano (Record<string, unknown>)
+ * @property {ToolParameterInput<T>} [parameters] - Zod schema (ZodType/ZodSchema) ou JSON Schema plano
  * @property {import('@github/copilot-sdk').ToolHandler<T>
  *     | ((args: T, invocation?: unknown) => Promise<unknown> | unknown)} handler
  *   - Callback executor
@@ -122,26 +174,28 @@ export { defineTool };
 /**
  * Tenta converter um schema Zod para JSON Schema. Retorna `undefined` se a conversão falhar ou o input não for Zod.
  *
- * @param {import('zod/v3').ZodTypeAny | Record<string, unknown> | undefined} schema
+ * @param {ToolParameterInput | undefined} schema
  * @param {string} toolName
  * @returns {Record<string, unknown> | undefined}
  */
 function tryZodToJsonSchema(schema, toolName) {
     if (!schema) return undefined;
+    if (!isRecordObject(schema)) return undefined;
 
-    // Detecta Zod v3 (`_def`) ou v4 (`_zod`)
-    const isZod = '_def' in schema || '_zod' in schema;
-    if (!isZod) return /** @type {Record<string, unknown>} */ (schema);
+    if (!isLikelyZodSchema(schema)) {
+        return isUsableToolParameterSchema(schema) ? schema : undefined;
+    }
+
+    const directJsonSchema = tryDirectToJsonSchema(schema);
+    if (isUsableToolParameterSchema(directJsonSchema)) return directJsonSchema;
 
     const zodV4Schema = tryZodV4ToJsonSchema(schema);
     if (isUsableToolParameterSchema(zodV4Schema)) return zodV4Schema;
 
     const converter = loadZodToJsonSchema();
     if (!converter) {
-        const maybeJsonSchema = /** @type {{ toJSONSchema?: () => Record<string, unknown> }} */ (schema);
-        if (typeof maybeJsonSchema.toJSONSchema === 'function') {
-            const manual = maybeJsonSchema.toJSONSchema();
-            if (isUsableToolParameterSchema(manual)) return manual;
+        const schemaRecord = /** @type {Record<string, unknown>} */ (schema);
+        if (typeof schemaRecord['toJSONSchema'] === 'function') {
             log('WARN', `[sdk/tools] Schema inválido para '${toolName}' após toJSONSchema(); usando sem parâmetros.`);
             return undefined;
         }
@@ -155,7 +209,7 @@ function tryZodToJsonSchema(schema, toolName) {
 
     try {
         const converted = /** @type {Record<string, unknown>} */ (
-            converter(/** @type {import('zod/v3').ZodTypeAny} */ (schema))
+            converter(/** @type {import('zod/v3').ZodTypeAny} */ (/** @type {unknown} */ (schema)))
         );
         if (!isUsableToolParameterSchema(converted)) {
             log(
@@ -170,6 +224,20 @@ function tryZodToJsonSchema(schema, toolName) {
         log('WARN', `[sdk/tools] Falha ao converter Zod schema da tool '${toolName}': ${message}`);
         return undefined;
     }
+}
+
+/**
+ * Normaliza parâmetros de tool para JSON Schema utilizável pelo SDK.
+ *
+ * Fonte canônica para `src/copilot/sdk/tools/*` e `src/copilot/tools/infra/tool-factory.js`, evitando lógica paralela
+ * de detecção/conversão de schema.
+ *
+ * @param {ToolParameterInput | undefined} parameters
+ * @param {string} toolName
+ * @returns {Record<string, unknown> | undefined}
+ */
+export function normalizeToolParametersSchema(parameters, toolName) {
+    return tryZodToJsonSchema(parameters, toolName);
 }
 
 /**
@@ -251,7 +319,7 @@ export function createTool({
         throw new TypeError('[sdk/tools] createTool: handler (function) é obrigatório');
     }
 
-    const jsonSchema = tryZodToJsonSchema(parameters, name);
+    const jsonSchema = normalizeToolParametersSchema(/** @type {ToolParameterInput | undefined} */ (parameters), name);
 
     /** @type {import('@github/copilot-sdk').ToolHandler<T>} */
     const wrappedHandler = async (args, invocation) => {
@@ -272,7 +340,7 @@ export function createTool({
  * Cria uma tool síncrona (sem async no handler) — variante de conveniência.
  *
  * @template [T=unknown] Default is `unknown`
- * @param {Omit<CreateToolOptions<T>, 'parameters'> & { parameters?: Record<string, unknown> }} options
+ * @param {CreateToolOptions<T>} options
  * @returns {import('@github/copilot-sdk').Tool<T>}
  */
 export function createToolSync({
@@ -296,7 +364,7 @@ export function createToolSync({
         return handler(args, invocation);
     };
 
-    const jsonSchema = tryZodToJsonSchema(parameters, name);
+    const jsonSchema = normalizeToolParametersSchema(/** @type {ToolParameterInput | undefined} */ (parameters), name);
 
     return defineToolSafe(name, {
         description,

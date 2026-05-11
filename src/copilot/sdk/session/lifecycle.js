@@ -16,13 +16,14 @@
  * @see module:copilot/config/session-config
  */
 
-import { CopilotClient, approveAll } from '@github/copilot-sdk';
+import { CopilotClient } from '@github/copilot-sdk';
 import { toError } from '../../core/error-handlers.js';
 import { INFINITE_SESSION_DEFAULTS, REASONING_EFFORTS } from '../constants.js';
 import { getSdkRecoveryPolicy, toSdkOperationError } from '../errors.js';
 import { log } from '../logger.js';
 import { emitSdkOperationMetric } from '../telemetry/operation-metrics.js';
 import { resolveSessionAutoModel, setSessionAutoModelResolver } from './model-resolution-port.js';
+import { approveAll } from './permissions.js';
 
 export { setSessionAutoModelResolver };
 /**

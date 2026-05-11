@@ -11,13 +11,177 @@
  * @internal
  */
 
-import { attachBus, defaultBus } from '../../hooks/bus.js';
-import { composePreToolUseHandlers, createHooks } from '../../hooks/factory.js';
-import { createSessionHooks } from '../../hooks/session-hooks.js';
-import { createRuntimeDisableHook } from '../../hooks/tool-interceptor.js';
+import { defaultAuditLog } from '#copilot/audit';
+import { getCopilotFallbackModel } from '#copilot/config';
+import { attachBus, classifySdkRateLimitScope, defaultHookBus, modelSelector } from '#copilot/sdk';
 import { createQueuedElicitationHandler } from '../../sdk/session/elicitation.js';
+import { log } from './logging-port.js';
 
 export { createQueuedElicitationHandler };
+
+/**
+ * Contexto mínimo de invocação exposto pelos hooks do SDK e extensões de runtime.
+ *
+ * @typedef {{
+ *     sessionId?: string;
+ *     agentName?: string;
+ *     agent?: { name?: string };
+ * }} HookInvocationContext
+ */
+
+/**
+ * @param {unknown} raw
+ * @returns {string}
+ */
+function normalizeHookErrorMessage(raw) {
+    if (typeof raw === 'string') return raw;
+    if (raw && typeof raw === 'object') {
+        const rec = /** @type {Record<string, unknown>} */ (raw);
+        if (typeof rec['message'] === 'string' && rec['message']) return rec['message'];
+        const nestedError = rec['error'];
+        if (nestedError && typeof nestedError === 'object') {
+            const errRec = /** @type {Record<string, unknown>} */ (nestedError);
+            if (typeof errRec['message'] === 'string' && errRec['message']) return errRec['message'];
+        }
+        try {
+            return JSON.stringify(raw);
+        } catch {
+            return String(raw);
+        }
+    }
+    return String(raw);
+}
+
+/**
+ * @param {AgentSessionHookInput} input
+ * @returns {{
+ *     onSessionStart: import('#copilot/sdk/types').SessionStartHandler;
+ *     onSessionEnd: import('#copilot/sdk/types').SessionEndHandler;
+ *     onErrorOccurred: import('#copilot/sdk/types').ErrorOccurredHandler;
+ * }}
+ */
+function createAgentSessionLifecycleHooks(input) {
+    /**
+     * @param {import('#copilot/sdk/types').SessionStartHookInput} sessionInput
+     * @param {HookInvocationContext} invocation
+     */
+    const onSessionStart = async (sessionInput, invocation) => {
+        const sessionId = invocation?.sessionId ?? '';
+        input.metrics.recordSessionStart();
+        defaultAuditLog.record({ type: 'session.start', sessionId });
+        await input.emitWebhook('session.start', { sessionId });
+        const model = input.getModel();
+        return {
+            additionalContext: [
+                `sessionId: ${sessionId}`,
+                model ? `model: ${model}` : null,
+                `source: ${sessionInput.source ?? 'unknown'}`,
+                `node: ${process.version}`,
+            ]
+                .filter(Boolean)
+                .join(' | '),
+        };
+    };
+
+    /**
+     * @param {import('#copilot/sdk/types').SessionEndHookInput} _sessionInput
+     * @param {HookInvocationContext} invocation
+     */
+    const onSessionEnd = async (_sessionInput, invocation) => {
+        const sessionId = invocation?.sessionId ?? '';
+        input.metrics.recordSessionEnd();
+        defaultAuditLog.record({ type: 'session.end', sessionId });
+        await input.emitWebhook('session.end', { sessionId });
+    };
+
+    /**
+     * @param {import('#copilot/sdk/types').ErrorOccurredHookInput} errorInput
+     * @param {HookInvocationContext} invocation
+     */
+    const onErrorOccurred = async (errorInput, invocation) => {
+        const sessionId = invocation?.sessionId ?? '';
+        const errorContext = String(errorInput.errorContext ?? '');
+        const normalizedMessage = normalizeHookErrorMessage(errorInput.error);
+        log(
+            'WARN',
+            `[agent/hook-port] SDK errorOccurred [${errorContext}]: ${normalizedMessage} (recuperável: ${errorInput.recoverable})`,
+        );
+
+        defaultAuditLog.record({
+            type: 'session.error',
+            sessionId,
+            data: {
+                errorContext,
+                recoverable: errorInput.recoverable,
+            },
+        });
+
+        if (errorContext === 'rate_limit' || errorContext === 'quota') {
+            const rateLimitScope = classifySdkRateLimitScope(errorInput.error);
+            if (rateLimitScope !== 'session') {
+                const currentModel = input.getModel() ?? 'unknown';
+                const envFallback = getCopilotFallbackModel();
+                const fallbackModel =
+                    envFallback && envFallback !== currentModel
+                        ? envFallback
+                        : (modelSelector.suggestFallback(currentModel)?.id ?? null);
+                if (fallbackModel && fallbackModel !== currentModel) {
+                    input.scheduleFallback(fallbackModel);
+                }
+            }
+        }
+
+        input.emit('error', {
+            hookType: 'errorOccurred',
+            errorMessage: normalizedMessage,
+            errorContext,
+            recoverable: errorInput.recoverable,
+            sessionId,
+        });
+
+        /** @type {'retry' | 'abort'} */
+        const errorHandling = errorInput.recoverable ? 'retry' : 'abort';
+        return { errorHandling };
+    };
+
+    return {
+        onSessionStart,
+        onSessionEnd,
+        onErrorOccurred,
+    };
+}
+
+/**
+ * @param {import('#copilot/sdk/types').PreToolUseHandler[]} handlers
+ * @returns {import('#copilot/sdk/types').PreToolUseHandler}
+ */
+function composePreToolUseHandlers(...handlers) {
+    return async (input, invocation) => {
+        for (const handler of handlers) {
+            const result = await handler(input, invocation);
+            if (result?.permissionDecision) return result;
+        }
+        return undefined;
+    };
+}
+
+/**
+ * @param {(
+ *     name: string,
+ *     input?: import('#copilot/sdk/types').PreToolUseHookInput,
+ *     invocation?: HookInvocationContext,
+ * ) => boolean} isDisabledFn
+ * @returns {import('#copilot/sdk/types').PreToolUseHandler}
+ */
+function createRuntimeDisableHook(isDisabledFn) {
+    return async (input, invocation) => {
+        if (isDisabledFn(input.toolName, input, invocation)) {
+            log('WARN', `[agent/hook-port] tool desabilitada em runtime: ${input.toolName}`);
+            return { permissionDecision: 'deny' };
+        }
+        return {};
+    };
+}
 
 /**
  * Entradas mínimas exigidas pelos hooks de sessão do agent.
@@ -44,13 +208,12 @@ export { createQueuedElicitationHandler };
  * @returns {NonNullable<import('#copilot/sdk/types').SessionConfig['hooks']>}
  */
 export function buildAgentBusHooks(input) {
-    const lifecycleHooks = createSessionHooks(input);
-    const hooks = createHooks({
-        auditLog: true,
+    const lifecycleHooks = createAgentSessionLifecycleHooks(input);
+    const hooks = {
         onSessionStart: lifecycleHooks.onSessionStart,
         onSessionEnd: lifecycleHooks.onSessionEnd,
         onErrorOccurred: lifecycleHooks.onErrorOccurred,
-    });
+    };
 
     return attachBus(hooks);
 }
@@ -64,8 +227,8 @@ export function buildAgentBusHooks(input) {
  * @param {NonNullable<import('#copilot/sdk/types').SessionConfig['hooks']>} busHooks
  * @param {(
  *     toolName: string,
- *     input?: import('../../hooks/types.js').PreToolUseHookInput,
- *     invocation?: import('../../hooks/types.js').InvocationContext,
+ *     input?: import('#copilot/sdk/types').PreToolUseHookInput,
+ *     invocation?: HookInvocationContext,
  * ) => boolean} isToolDisabled
  * @returns {NonNullable<import('#copilot/sdk/types').SessionConfig['hooks']>}
  */
@@ -82,8 +245,8 @@ export function withAgentRuntimeToolPolicy(busHooks, isToolDisabled) {
 /**
  * Retorna o bus default dos hooks para diagnósticos e wiring legado.
  *
- * @returns {typeof defaultBus}
+ * @returns {typeof defaultHookBus}
  */
 export function getDefaultHookBus() {
-    return defaultBus;
+    return defaultHookBus;
 }

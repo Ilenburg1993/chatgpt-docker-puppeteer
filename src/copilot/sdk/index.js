@@ -179,28 +179,49 @@ export {
     normalizeElicitationPendingEvent,
     normalizeElicitationResult,
 } from './session/elicitation.js';
+export { attachBus, defaultBus as defaultHookBus, HookBus } from './session/hook-bus.js';
+export { clearHooksLogger, setHooksLogger } from './session/hook-logger.js';
+export { HookRegistry, SDK_HOOKS } from './session/hook-registry.js';
+export { PermissionController } from './session/permission-controller.js';
 export {
     classifyPermissionDecision,
     normalizePermissionCompletedEvent,
     normalizePermissionRequestedEvent,
 } from './session/permission-events.js';
+export {
+    DEFAULT_PERMISSION_MODE,
+    normalizePermissionMode,
+    PERMISSION_MODES,
+    TOOL_NAME_RE as PERMISSION_TOOL_NAME_RE,
+    sanitizeToolNames as sanitizePermissionToolNames,
+} from './session/permission-runtime.js';
 export { approveAll, createAllowlistPermissionHandler, createPermissionHandler } from './session/permissions.js';
-export { AgentToolPolicy } from './tools/agent-policy.js';
 export {
     normalizeModeChangedEvent,
     normalizeModelChangedEvent,
     normalizePlanChangedEvent,
     normalizeToolsUpdatedEvent,
 } from './session/session-events.js';
+export { createToolSessionContext, ToolSessionContext } from './session/tool-session-context.js';
 export {
+    cancelAllPendingStructuredUserInput,
     classifyUserInputQuestionKind,
+    configureDefaultUserInputContext,
     createQueuedInputHandler,
     createReadlineInputHandler,
     createStaticInputHandler,
+    deletePendingStructuredUserInputResolver,
+    getPendingStructuredUserInputCount,
+    getPendingStructuredUserInputIds,
+    hasPendingStructuredUserInputRequests,
+    nextStructuredUserInputRequestId,
     normalizeUserInputCompletedEvent,
     normalizeUserInputRequestedEvent,
+    registerPendingStructuredUserInputResolver,
+    resolvePendingStructuredUserInput,
 } from './session/user-input.js';
-export { defineTool } from './tools/core.js';
+export { AgentToolPolicy } from './tools/agent-policy.js';
+export { defineTool, normalizeToolParametersSchema } from './tools/core.js';
 
 /**
  * Hoist-safe facade para consumers que importam de `#copilot/sdk` durante ciclos ESM de tools.
@@ -217,9 +238,7 @@ export function createTool(options) {
  * Variante síncrona da factory de tools, exposta pelo barrel canônico.
  *
  * @template [T=unknown] Default is `unknown`
- * @param {Omit<import('./tools/core.js').CreateToolOptions<T>, 'parameters'> & {
- *     parameters?: Record<string, unknown>;
- * }} options
+ * @param {import('./tools/core.js').CreateToolOptions<T>} options
  * @returns {import('@github/copilot-sdk').Tool<T>}
  */
 export function createToolSync(options) {
@@ -471,4 +490,4 @@ export { emitSdkOperationMetric, setSdkMetricEmitter } from './telemetry/operati
 export { setCustomToolsBuilder } from './tools/custom.js';
 
 // ─── DI Tokens ────────────────────────────────────────────────────────────────
-export { SDK_CLIENT_MANAGER, SDK_LOGGER, SDK_MODEL_RUNTIME, TOOLS_BUILDER } from './di-tokens.js';
+export { HOOKS_LOGGER, SDK_CLIENT_MANAGER, SDK_LOGGER, SDK_MODEL_RUNTIME, TOOLS_BUILDER } from './di-tokens.js';

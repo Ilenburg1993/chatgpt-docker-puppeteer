@@ -154,7 +154,7 @@ function persistEvent(entry) {
 /**
  * @typedef {import('./metrics.js').MetricsStore} TelemetryStore
  *
- * @typedef {import('#copilot/hooks/bus').HookBus} HookBus
+ * @typedef {import('#copilot/sdk').HookBus} HookBus
  *
  * @typedef {import('./metrics.js').MetricsStore} MetricsStore
  *

@@ -1,6 +1,6 @@
 // @ts-check
 /**
- * src/copilot/tools/permission-tools.js
+ * src/copilot/tools/permission/permission-tools.js
  *
  * Tools para controle em runtime do modo de aprovação de tools do agente.
  *
@@ -15,7 +15,7 @@
  *
  * DL-PERM: o dialog loop não é uma tool e não é controlado por este subsistema.
  *
- * @module copilot/tools/permission-tools
+ * @module copilot/tools/permission/permission-tools
  * @see EventBus
  * @see module:copilot/lib/permissions
  * @see module:copilot/agent/permission-controller
@@ -24,8 +24,8 @@
 import { defaultAuditLog } from '#copilot/audit';
 import { ConfigError, toError } from '#copilot/core';
 import { z } from 'zod';
-import { log } from './logger.js';
-import { buildTool } from './tool-factory.js';
+import { log } from '../infra/logger.js';
+import { buildTool } from '../infra/tool-factory.js';
 
 // ─── Injeção de dependência do agent (ARCH-03: break circular dep) ────────────
 

@@ -1,6 +1,6 @@
 // @ts-check
 /**
- * src/copilot/tools/session-rpc-tools.js
+ * src/copilot/tools/session/session-rpc-tools.js
  *
  * Tools que expõem operações avançadas de RPC de sessão do SDK para a LLM-B. Permitem ao agente mudar de modo
  * (interactive/plan/autopilot), ler/atualizar o plan.md da sessão infinita, listar/selecionar sub-agentes e acionar
@@ -8,7 +8,7 @@
  *
  * Ativação: chamar setSessionRpc(createSessionRpcFacade(session)) após a sessão ser criada no always-alive.js.
  *
- * @module copilot/tools/session-rpc-tools
+ * @module copilot/tools/session/session-rpc-tools
  * @see EventBus
  * @see module:copilot/lib/session
  * @see module:copilot/always-alive
@@ -20,17 +20,16 @@
 
 import { COPILOT_RPC_TIMEOUT_MS, MAESTRO_AGENT_NAME } from '#copilot/config';
 import { toError } from '#copilot/core';
-import { createTool } from '#copilot/sdk';
 import { z } from 'zod';
-import { log } from './logger.js';
-import { withSkipPermission } from './tool-factory.js';
+import { log } from '../infra/logger.js';
+import { buildTool, withSkipPermission } from '../infra/tool-factory.js';
 
 // ─── RPC handle injetado externamente ────────────────────────────────────────
 
 /**
  * Handle RPC ativo da sessão corrente. Injetado via setSessionRpc() após inicialização.
  *
- * @type {ReturnType<typeof import('../sdk/rpc.js').createSessionRpcFacade> | null}
+ * @type {ReturnType<typeof import('../../sdk/rpc.js').createSessionRpcFacade> | null}
  */
 let _rpc = null;
 
@@ -42,7 +41,7 @@ let _rpc = null;
  * @returns {void}
  */
 export function setSessionRpc(rpc) {
-    _rpc = /** @type {ReturnType<typeof import('../sdk/rpc.js').createSessionRpcFacade> | null} */ (rpc);
+    _rpc = /** @type {ReturnType<typeof import('../../sdk/rpc.js').createSessionRpcFacade> | null} */ (rpc);
     log('DEBUG', `[session-rpc-tools] RPC ${rpc ? 'registrado' : 'removido'}.`);
 }
 
@@ -60,7 +59,7 @@ export function resetSessionRpcForTests() {
 /**
  * Verifica se o RPC está disponível ou retorna um erro padronizado.
  *
- * @returns {{ ok: true; rpc: ReturnType<typeof import('../sdk/rpc.js').createSessionRpcFacade> }
+ * @returns {{ ok: true; rpc: ReturnType<typeof import('../../sdk/rpc.js').createSessionRpcFacade> }
  *     | { ok: false; error: string }}
  */
 function getRpc() {
@@ -76,16 +75,20 @@ function getRpc() {
 const RPC_TIMEOUT_MS = COPILOT_RPC_TIMEOUT_MS;
 
 /**
- * Resolve timeout efetivo para uma chamada RPC.
+ * Resolve timeout advisory efetivo para logging de chamadas RPC.
  *
- * Retorna sempre `null`: timeouts de RPC da LLM-B são apenas informativos.
+ * Não impõe cancelamento de execução por tempo. O valor é utilizado apenas para telemetria e diagnósticos, preservando
+ * a liberdade operacional da LLM-B.
  *
  * @param {number | null | undefined} timeoutMs
  * @returns {number | null}
  */
 function resolveRpcTimeoutMs(timeoutMs) {
-    void timeoutMs;
-    return null;
+    if (timeoutMs === null) return null;
+    if (typeof timeoutMs === 'number' && Number.isFinite(timeoutMs) && timeoutMs > 0) {
+        return timeoutMs;
+    }
+    return RPC_TIMEOUT_MS;
 }
 
 /**
@@ -93,7 +96,7 @@ function resolveRpcTimeoutMs(timeoutMs) {
  *
  * @template T
  * @param {string} toolName - Nome do tool para logging
- * @param {(rpc: ReturnType<typeof import('../sdk/rpc.js').createSessionRpcFacade>) => Promise<T>} fn - Função que
+ * @param {(rpc: ReturnType<typeof import('../../sdk/rpc.js').createSessionRpcFacade>) => Promise<T>} fn - Função que
  *   recebe o handle RPC e executa a operação
  * @param {{ timeoutMs?: number | null }} [opts]
  * @returns {Promise<T | { error: string }>}
@@ -101,9 +104,10 @@ function resolveRpcTimeoutMs(timeoutMs) {
 async function wrapRpc(toolName, fn, opts = {}) {
     const r = getRpc();
     if (!r.ok) return { error: r.error };
-    resolveRpcTimeoutMs(opts.timeoutMs);
+    const advisoryTimeoutMs = resolveRpcTimeoutMs(opts.timeoutMs);
     try {
-        log('DEBUG', `[${toolName}] rpcTimeout=disabled advisory=${RPC_TIMEOUT_MS}ms`);
+        const advisoryLabel = advisoryTimeoutMs === null ? 'none' : `${advisoryTimeoutMs}ms`;
+        log('DEBUG', `[${toolName}] rpcTimeout=disabled advisory=${advisoryLabel}`);
         const result = await fn(r.rpc);
         return /** @type {T} */ (result);
     } catch (e) {
@@ -117,7 +121,7 @@ async function wrapRpc(toolName, fn, opts = {}) {
 /**
  * Tool: session_mode_get — retorna o modo atual da sessão SDK.
  */
-const sessionModeGetTool = createTool({
+const sessionModeGetTool = buildTool({
     name: 'session_mode_get',
     description:
         'Retorna o modo atual da sessão (interactive | plan | autopilot). ' +
@@ -139,7 +143,7 @@ const sessionModeGetTool = createTool({
 /**
  * Tool: session_mode_set — muda o modo da sessão SDK.
  */
-const sessionModeSetTool = createTool({
+const sessionModeSetTool = buildTool({
     name: 'session_mode_set',
     description:
         'Muda o modo da sessão: "interactive" (responde imediatamente), "plan" (cria plan.md antes de agir) ' +
@@ -167,7 +171,7 @@ const sessionModeSetTool = createTool({
 /**
  * Tool: session_plan_read — lê o plan.md da sessão infinita.
  */
-const sessionPlanReadTool = createTool({
+const sessionPlanReadTool = buildTool({
     name: 'session_plan_read',
     description:
         'Lê o conteúdo do plan.md da sessão infinita (infiniteSessions). Retorna null se o plano não existe ' +
@@ -188,7 +192,7 @@ const sessionPlanReadTool = createTool({
 /**
  * Tool: session_plan_update — atualiza/cria o plan.md da sessão infinita.
  */
-const sessionPlanUpdateTool = createTool({
+const sessionPlanUpdateTool = buildTool({
     name: 'session_plan_update',
     description:
         'Atualiza ou cria o plan.md da sessão infinita com o conteúdo fornecido (Markdown). ' +
@@ -214,7 +218,7 @@ const sessionPlanUpdateTool = createTool({
 /**
  * Tool: session_plan_delete — remove o plan.md da sessão infinita.
  */
-const sessionPlanDeleteTool = createTool({
+const sessionPlanDeleteTool = buildTool({
     name: 'session_plan_delete',
     description:
         'Remove o plan.md da sessão infinita. Use quando o plano foi concluído ou for reiniciado do zero. ' +
@@ -235,7 +239,7 @@ const sessionPlanDeleteTool = createTool({
 /**
  * Tool: session_agent_list — lista os agentes disponíveis na sessão.
  */
-const sessionAgentListTool = createTool({
+const sessionAgentListTool = buildTool({
     name: 'session_agent_list',
     description:
         'Lista todos os agentes customizados disponíveis na sessão atual (auditor, docs, reviewer, etc.). ' +
@@ -256,7 +260,7 @@ const sessionAgentListTool = createTool({
 /**
  * Tool: session_agent_current — retorna o agente ativo e reforça o maestro quando necessário.
  */
-const sessionAgentCurrentTool = createTool({
+const sessionAgentCurrentTool = buildTool({
     name: 'session_agent_current',
     description:
         'Retorna o agente customizado ativo na sessão. Se o SDK informar outro agente ou nenhum agente, reforça agent-full como maestro.',
@@ -280,7 +284,7 @@ const sessionAgentCurrentTool = createTool({
 /**
  * Tool: session_agent_select — seleciona um agente customizado para o turno atual.
  */
-const sessionAgentSelectTool = createTool({
+const sessionAgentSelectTool = buildTool({
     name: 'session_agent_select',
     description:
         'Reforça o agente maestro agent-full na sessão atual. Selecionar outro agente diretamente é bloqueado; especialistas devem ser usados por delegação do maestro.',
@@ -310,7 +314,7 @@ const sessionAgentSelectTool = createTool({
 /**
  * Tool: session_agent_reload — recarrega agentes SDK e reativa o maestro.
  */
-const sessionAgentReloadTool = createTool({
+const sessionAgentReloadTool = buildTool({
     name: 'session_agent_reload',
     description: 'Recarrega a lista de agentes customizados do SDK e reativa agent-full como maestro obrigatório.',
     parameters: /** @type {import('#copilot/sdk/types').ZodSchema<Record<string, never>>} */ (
@@ -330,7 +334,7 @@ const sessionAgentReloadTool = createTool({
 /**
  * Tool: session_compact — aciona compaction manual da sessão infinita.
  */
-const sessionCompactTool = createTool({
+const sessionCompactTool = buildTool({
     name: 'session_compact',
     description:
         'Aciona compaction manual da sessão infinita para liberar tokens de contexto. ' +

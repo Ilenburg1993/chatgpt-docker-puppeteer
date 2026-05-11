@@ -1,11 +1,11 @@
 // @ts-check
 /**
- * src/copilot/tools/code-tools.js
+ * src/copilot/tools/code/code-tools.js
  *
  * Custom Tools para verificação de qualidade de código. Permite ao agente executar lint, typecheck e testes sem sair do
  * loop de sessão.
  *
- * @module copilot/tools/code-tools
+ * @module copilot/tools/code/code-tools
  * @see EventBus
  * @see module:copilot/tools/tool-factory
  */
@@ -16,9 +16,9 @@ import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { promisify } from 'node:util';
 import { z } from 'zod';
-import { toExecError } from '../core/error-handlers.js';
-import { log } from './logger.js';
-import { buildTool, withSkipPermission } from './tool-factory.js';
+import { toExecError } from '../../core/error-handlers.js';
+import { log } from '../infra/logger.js';
+import { buildTool, withSkipPermission } from '../infra/tool-factory.js';
 
 const ROOT = WORKSPACE_ROOT;
 // BUG-MED-08 (fix): caminho absoluto para ESLint — evita falhas em ambientes

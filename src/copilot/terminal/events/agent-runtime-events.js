@@ -453,8 +453,9 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, regi
             return;
         }
         // Evita duplicidade visual: ferramentas externas já foram anunciadas em external_tool.completed
+        const suppressByInFlightName = entry ? false : _reg.isNameInFlight(name);
         if (
-            _reg.isNameInFlight(name) ||
+            suppressByInFlightName ||
             _reg.wasNameRecentlyCompleted(name, requestId) ||
             _reg.wasRecentlyCompleted(toolCallId, requestId)
         ) {

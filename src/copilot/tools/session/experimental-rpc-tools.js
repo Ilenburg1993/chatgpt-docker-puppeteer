@@ -1,6 +1,6 @@
 // @ts-check
 /**
- * src/copilot/tools/experimental-rpc-tools.js
+ * src/copilot/tools/session/experimental-rpc-tools.js
  *
  * Tools que expõem os subsistemas experimentais do SDK RPC para a LLM-B. Permitem ao agente gerenciar fleet, agents,
  * skills, MCP servers, plugins e extensions quando os respectivos feature flags estão habilitados.
@@ -8,17 +8,16 @@
  * Ativação: chamar `setExperimentalSession(session)` após a sessão ser criada. As tools verificam internamente se o
  * feature flag está habilitado antes de executar.
  *
- * @module copilot/tools/experimental-rpc-tools
+ * @module copilot/tools/session/experimental-rpc-tools
  * @see module:copilot/sdk/experimental-rpc
  * @see module:copilot/sdk/feature-flags
  */
 
 import { COPILOT_RPC_TIMEOUT_MS, MAESTRO_AGENT_NAME } from '#copilot/config';
 import { toError } from '#copilot/core';
-import { createTool } from '#copilot/sdk';
 import { z } from 'zod';
-import { log } from './logger.js';
-import { withSkipPermission } from './tool-factory.js';
+import { log } from '../infra/logger.js';
+import { buildTool, withSkipPermission } from '../infra/tool-factory.js';
 
 import {
     agentGetCurrent,
@@ -110,7 +109,7 @@ async function wrapExp(toolName, fn, opts = {}) {
 // Fleet tools
 // ═══════════════════════════════════════════════════════════════════════════════
 
-const expFleetStartTool = createTool({
+const expFleetStartTool = buildTool({
     name: 'exp_fleet_start',
     description: '[Experimental] Inicia um fleet de agentes paralelos. ' + 'Requer feature flag "fleet" habilitado.',
     parameters: /** @type {import('#copilot/sdk/types').ZodSchema<{ prompt?: string }>} */ (
@@ -129,7 +128,7 @@ const expFleetStartTool = createTool({
 // Agent tools
 // ═══════════════════════════════════════════════════════════════════════════════
 
-const expAgentListTool = createTool({
+const expAgentListTool = buildTool({
     name: 'exp_agent_list',
     description: '[Experimental] Lista agentes disponíveis na sessão. ' + 'Requer feature flag "agents" habilitado.',
     parameters: /** @type {import('#copilot/sdk/types').ZodSchema<Record<string, never>>} */ (
@@ -138,7 +137,7 @@ const expAgentListTool = createTool({
     handler: async () => wrapExp('exp_agent_list', (s) => agentList(s)),
 });
 
-const expAgentGetCurrentTool = createTool({
+const expAgentGetCurrentTool = buildTool({
     name: 'exp_agent_get_current',
     description: '[Experimental] Retorna o agente ativo atual. ' + 'Requer feature flag "agents" habilitado.',
     parameters: /** @type {import('#copilot/sdk/types').ZodSchema<Record<string, never>>} */ (
@@ -147,7 +146,7 @@ const expAgentGetCurrentTool = createTool({
     handler: async () => wrapExp('exp_agent_get_current', (s) => agentGetCurrent(s)),
 });
 
-const expAgentSelectTool = createTool({
+const expAgentSelectTool = buildTool({
     name: 'exp_agent_select',
     description:
         '[Experimental] Reforça o agente maestro obrigatório. Selecionar outro agente diretamente é bloqueado.',
@@ -169,7 +168,7 @@ const expAgentSelectTool = createTool({
     },
 });
 
-const expAgentDeselectTool = createTool({
+const expAgentDeselectTool = buildTool({
     name: 'exp_agent_deselect',
     description: '[Experimental] Bloqueia deseleção do maestro e reforça agent-full como agente ativo obrigatório.',
     parameters: /** @type {import('#copilot/sdk/types').ZodSchema<Record<string, never>>} */ (
@@ -178,7 +177,7 @@ const expAgentDeselectTool = createTool({
     handler: async () => wrapExp('exp_agent_deselect', (s) => agentSelect(s, MAESTRO_AGENT_NAME)),
 });
 
-const expAgentReloadTool = createTool({
+const expAgentReloadTool = buildTool({
     name: 'exp_agent_reload',
     description: '[Experimental] Recarrega a lista de agentes. ' + 'Requer feature flag "agents" habilitado.',
     parameters: /** @type {import('#copilot/sdk/types').ZodSchema<Record<string, never>>} */ (
@@ -191,7 +190,7 @@ const expAgentReloadTool = createTool({
 // Skills tools
 // ═══════════════════════════════════════════════════════════════════════════════
 
-const expSkillsListTool = createTool({
+const expSkillsListTool = buildTool({
     name: 'exp_skills_list',
     description: '[Experimental] Lista skills disponíveis. ' + 'Requer feature flag "skills" habilitado.',
     parameters: /** @type {import('#copilot/sdk/types').ZodSchema<Record<string, never>>} */ (
@@ -200,7 +199,7 @@ const expSkillsListTool = createTool({
     handler: async () => wrapExp('exp_skills_list', (s) => skillsList(s)),
 });
 
-const expSkillsEnableTool = createTool({
+const expSkillsEnableTool = buildTool({
     name: 'exp_skills_enable',
     description: '[Experimental] Habilita uma skill por nome. ' + 'Requer feature flag "skills" habilitado.',
     parameters: /** @type {import('#copilot/sdk/types').ZodSchema<{ name: string }>} */ (
@@ -214,7 +213,7 @@ const expSkillsEnableTool = createTool({
         wrapExp('exp_skills_enable', (s) => skillsEnable(s, name)),
 });
 
-const expSkillsDisableTool = createTool({
+const expSkillsDisableTool = buildTool({
     name: 'exp_skills_disable',
     description: '[Experimental] Desabilita uma skill por nome. ' + 'Requer feature flag "skills" habilitado.',
     parameters: /** @type {import('#copilot/sdk/types').ZodSchema<{ name: string }>} */ (
@@ -228,7 +227,7 @@ const expSkillsDisableTool = createTool({
         wrapExp('exp_skills_disable', (s) => skillsDisable(s, name)),
 });
 
-const expSkillsReloadTool = createTool({
+const expSkillsReloadTool = buildTool({
     name: 'exp_skills_reload',
     description: '[Experimental] Recarrega a lista de skills. ' + 'Requer feature flag "skills" habilitado.',
     parameters: /** @type {import('#copilot/sdk/types').ZodSchema<Record<string, never>>} */ (
@@ -241,7 +240,7 @@ const expSkillsReloadTool = createTool({
 // MCP tools
 // ═══════════════════════════════════════════════════════════════════════════════
 
-const expMcpListTool = createTool({
+const expMcpListTool = buildTool({
     name: 'exp_mcp_list',
     description: '[Experimental] Lista servidores MCP disponíveis. ' + 'Requer feature flag "mcp" habilitado.',
     parameters: /** @type {import('#copilot/sdk/types').ZodSchema<Record<string, never>>} */ (
@@ -250,7 +249,7 @@ const expMcpListTool = createTool({
     handler: async () => wrapExp('exp_mcp_list', (s) => mcpList(s)),
 });
 
-const expMcpEnableTool = createTool({
+const expMcpEnableTool = buildTool({
     name: 'exp_mcp_enable',
     description: '[Experimental] Habilita um servidor MCP por nome. ' + 'Requer feature flag "mcp" habilitado.',
     parameters: /** @type {import('#copilot/sdk/types').ZodSchema<{ serverName: string }>} */ (
@@ -264,7 +263,7 @@ const expMcpEnableTool = createTool({
         wrapExp('exp_mcp_enable', (s) => mcpEnable(s, serverName)),
 });
 
-const expMcpDisableTool = createTool({
+const expMcpDisableTool = buildTool({
     name: 'exp_mcp_disable',
     description: '[Experimental] Desabilita um servidor MCP por nome. ' + 'Requer feature flag "mcp" habilitado.',
     parameters: /** @type {import('#copilot/sdk/types').ZodSchema<{ serverName: string }>} */ (
@@ -278,7 +277,7 @@ const expMcpDisableTool = createTool({
         wrapExp('exp_mcp_disable', (s) => mcpDisable(s, serverName)),
 });
 
-const expMcpReloadTool = createTool({
+const expMcpReloadTool = buildTool({
     name: 'exp_mcp_reload',
     description: '[Experimental] Recarrega servidores MCP. ' + 'Requer feature flag "mcp" habilitado.',
     parameters: /** @type {import('#copilot/sdk/types').ZodSchema<Record<string, never>>} */ (
@@ -291,7 +290,7 @@ const expMcpReloadTool = createTool({
 // Plugins tools
 // ═══════════════════════════════════════════════════════════════════════════════
 
-const expPluginsListTool = createTool({
+const expPluginsListTool = buildTool({
     name: 'exp_plugins_list',
     description: '[Experimental] Lista plugins instalados. ' + 'Requer feature flag "plugins" habilitado.',
     parameters: /** @type {import('#copilot/sdk/types').ZodSchema<Record<string, never>>} */ (
@@ -304,7 +303,7 @@ const expPluginsListTool = createTool({
 // Extensions tools
 // ═══════════════════════════════════════════════════════════════════════════════
 
-const expExtensionsListTool = createTool({
+const expExtensionsListTool = buildTool({
     name: 'exp_extensions_list',
     description: '[Experimental] Lista extensões disponíveis. ' + 'Requer feature flag "extensions" habilitado.',
     parameters: /** @type {import('#copilot/sdk/types').ZodSchema<Record<string, never>>} */ (
@@ -313,7 +312,7 @@ const expExtensionsListTool = createTool({
     handler: async () => wrapExp('exp_extensions_list', (s) => extensionsList(s)),
 });
 
-const expExtensionsEnableTool = createTool({
+const expExtensionsEnableTool = buildTool({
     name: 'exp_extensions_enable',
     description: '[Experimental] Habilita uma extensão por ID. ' + 'Requer feature flag "extensions" habilitado.',
     parameters: /** @type {import('#copilot/sdk/types').ZodSchema<{ id: string }>} */ (
@@ -327,7 +326,7 @@ const expExtensionsEnableTool = createTool({
         wrapExp('exp_extensions_enable', (s) => extensionsEnable(s, id)),
 });
 
-const expExtensionsDisableTool = createTool({
+const expExtensionsDisableTool = buildTool({
     name: 'exp_extensions_disable',
     description: '[Experimental] Desabilita uma extensão por ID. ' + 'Requer feature flag "extensions" habilitado.',
     parameters: /** @type {import('#copilot/sdk/types').ZodSchema<{ id: string }>} */ (
@@ -341,7 +340,7 @@ const expExtensionsDisableTool = createTool({
         wrapExp('exp_extensions_disable', (s) => extensionsDisable(s, id)),
 });
 
-const expExtensionsReloadTool = createTool({
+const expExtensionsReloadTool = buildTool({
     name: 'exp_extensions_reload',
     description: '[Experimental] Recarrega extensões. ' + 'Requer feature flag "extensions" habilitado.',
     parameters: /** @type {import('#copilot/sdk/types').ZodSchema<Record<string, never>>} */ (

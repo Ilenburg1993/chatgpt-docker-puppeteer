@@ -1,30 +1,31 @@
 // @ts-check
 /**
- * src/copilot/tools/introspection-tools.js
+ * src/copilot/tools/introspection/introspection-tools.js
  *
  * Custom Tools de introspecção do agente. Permite ao agente listar as ferramentas disponíveis, consultar telemetria de
  * chamadas e obter informações sobre si mesmo.
  *
- * @module copilot/tools/introspection-tools
+ * @module copilot/tools/introspection/introspection-tools
  * @see EventBus
  * @see module:copilot/agent/status-snapshot
  */
 
 import { COPILOT_MCP_SERVERS, COPILOT_MODEL, COPILOT_SDK_ENABLED } from '#copilot/config';
-import { createTool } from '#copilot/sdk';
 import { createRequire } from 'node:module';
 import { z } from 'zod';
-import { log } from './logger.js';
-import { getSummary as getMetricsSummary, getToolStats } from './metrics-proxy.js';
+import { log } from '../infra/logger.js';
+import { getSummary as getMetricsSummary, getToolStats } from '../infra/metrics-proxy.js';
+import { buildTool, withSkipPermission } from '../infra/tool-factory.js';
 import { createEmptyToolContractReport } from './tool-contract-verifier.js';
-import { withSkipPermission } from './tool-factory.js';
 
-// ─── Estado compartilhado via module-level registry ─────────────────────────
+// ─── Estado compartilhado via registry canônico ─────────────────────────────
 
 /**
  * @typedef {import('#copilot/sdk/types').Tool} Tool
  *
  * @typedef {import('#copilot/sdk/tools-registry').ToolRegistry} ToolRegistry
+ *
+ * @typedef {import('#copilot/sdk/tools-registry').ToolEntry} ToolEntry
  *
  * @typedef {{
  *     category: string;
@@ -34,12 +35,12 @@ import { withSkipPermission } from './tool-factory.js';
  */
 
 /**
- * Registry interno de ferramentas acessível pelos introspection tools. Preenchido via registerForIntrospection() antes
- * do uso.
+ * Referência ao ToolRegistry canônico da sessão atual. A introspecção deriva nomes, categorias e metadados direto deste
+ * registry para evitar estado paralelo stale.
  *
- * @type {Tool[]}
+ * @type {ToolRegistry | null}
  */
-let _registeredTools = [];
+let _introspectionRegistry = null;
 
 /**
  * GAP-TOOLS-004: Set de tools desabilitadas em runtime. O agente pode desabilitar/habilitar tools durante a sessão via
@@ -68,90 +69,44 @@ export function getDisabledTools() {
     return [..._disabledTools];
 }
 
-/**
- * Mapa de categorias derivado do ToolRegistry canônico.
- *
- * @type {Record<string, string[]>}
- */
-let _CATEGORY_TOOL_MAP_DYNAMIC = {};
-
 /** @type {import('./tool-contract-verifier.js').ToolContractReport} */
 let _toolContractReport = createEmptyToolContractReport();
 
 /**
- * Metadados por tool name. A fonte preferida é o ToolRegistry; `recordToolCategory()` preserva compatibilidade para
- * testes e boots legados que ainda não passam o registry para `registerForIntrospection()`.
+ * Lista as entradas do ToolRegistry canônico atualmente conectado à introspecção.
  *
- * @type {Map<string, ToolIntrospectionMetadata>}
+ * @returns {ToolEntry[]}
  */
-export const _toolNameToMetadataMap = new Map();
-
-/**
- * Registra a associação compatível entre uma tool e sua categoria.
- *
- * @param {string} toolName
- * @param {string} category
- * @returns {void}
- */
-export function recordToolCategory(toolName, category) {
-    const normalized = toolName.toLowerCase();
-    const previous = _toolNameToMetadataMap.get(normalized);
-    _toolNameToMetadataMap.set(normalized, {
-        category,
-        tags: previous?.tags ?? [],
-        readOnly: previous?.readOnly ?? false,
-    });
+function listRegistryEntries() {
+    if (!_introspectionRegistry?.entries) return [];
+    return Array.from(_introspectionRegistry.entries.values());
 }
 
 /**
- * Captura os metadados canônicos do ToolRegistry para introspecção.
+ * Lista as tools atualmente registradas no ToolRegistry canônico.
  *
- * @param {ToolRegistry | null | undefined} registry
- * @returns {void}
+ * @returns {Tool[]}
  */
-function recordToolRegistryMetadata(registry) {
-    if (!registry?.entries) return;
-
-    for (const [name, entry] of registry.entries) {
-        _toolNameToMetadataMap.set(name.toLowerCase(), {
-            category: entry.category,
-            tags: Array.isArray(entry.tags) ? [...entry.tags] : [],
-            readOnly: entry.readOnly === true,
-        });
-    }
+function listRegisteredTools() {
+    return listRegistryEntries().map((entry) => entry.tool);
 }
 
 /**
- * Deriva as categorias das tools registradas a partir dos metadados canônicos capturados do registry.
- *
- * @returns {void}
- */
-function _deriveCategoriesFromTools() {
-    _CATEGORY_TOOL_MAP_DYNAMIC = {};
-
-    for (const tool of _registeredTools) {
-        const category = _toolNameToMetadataMap.get(tool.name.toLowerCase())?.category ?? 'unknown';
-
-        if (!_CATEGORY_TOOL_MAP_DYNAMIC[category]) {
-            _CATEGORY_TOOL_MAP_DYNAMIC[category] = [];
-        }
-
-        _CATEGORY_TOOL_MAP_DYNAMIC[category].push(tool.name);
-    }
-
-    log(
-        'DEBUG',
-        `[introspection] Categories derivadas dinamicamente: ${Object.keys(_CATEGORY_TOOL_MAP_DYNAMIC).join(', ')}`,
-    );
-}
-
-/**
- * Retorna o mapa de categorias derivado dinamicamente.
+ * Retorna o mapa de categorias derivado do ToolRegistry canônico.
  *
  * @returns {Record<string, string[]>}
  */
 function getCategoryToolMap() {
-    return _CATEGORY_TOOL_MAP_DYNAMIC;
+    /** @type {Record<string, string[]>} */
+    const categoryMap = {};
+    for (const entry of listRegistryEntries()) {
+        const category = entry.category ?? 'unknown';
+        if (!categoryMap[category]) {
+            categoryMap[category] = [];
+        }
+        categoryMap[category].push(entry.tool.name);
+    }
+    return categoryMap;
 }
 
 /**
@@ -159,37 +114,38 @@ function getCategoryToolMap() {
  * @returns {ToolIntrospectionMetadata}
  */
 function getToolMetadata(toolName) {
-    return _toolNameToMetadataMap.get(toolName.toLowerCase()) ?? { category: 'unknown', tags: [], readOnly: false };
+    const normalized = toolName.toLowerCase();
+    for (const [name, entry] of _introspectionRegistry?.entries ?? []) {
+        if (name.toLowerCase() === normalized) {
+            return {
+                category: entry.category,
+                tags: Array.isArray(entry.tags) ? [...entry.tags] : [],
+                readOnly: entry.readOnly === true,
+            };
+        }
+    }
+    return { category: 'unknown', tags: [], readOnly: false };
 }
 
 /**
- * Informa ao módulo quais ferramentas estão registradas na sessão atual. Deve ser chamado pelo AlwaysAliveAgent após
- * montar o array de tools.
+ * Informa ao módulo qual ToolRegistry canônico está ativo na sessão atual.
  *
- * @param {Tool[]} tools
- * @param {ToolRegistry | null} [registry]
+ * @param {ToolRegistry | null | undefined} registry
  * @returns {void}
  */
-export function registerForIntrospection(tools, registry = null) {
-    // M1-FIX: Validação de tipo + schema antes de atribuir
-    if (!Array.isArray(tools)) {
-        log(
-            'ERROR',
-            `[introspection] registerForIntrospection recebeu tipo inválido: ${typeof tools}. Esperado: Tool[].`,
-        );
-        _registeredTools = [];
+export function registerForIntrospection(registry) {
+    if (!registry?.entries) {
+        log('ERROR', `[introspection] registerForIntrospection recebeu registry inválido: ${typeof registry}.`);
+        _introspectionRegistry = null;
         return;
     }
 
-    if (tools.length === 0) {
-        log('WARN', '[introspection] registerForIntrospection chamado com array vazio.');
+    if (registry.entries.size === 0) {
+        log('WARN', '[introspection] registerForIntrospection chamado com registry vazio.');
     }
 
-    _registeredTools = tools;
-    recordToolRegistryMetadata(registry);
-    _deriveCategoriesFromTools();
-
-    log('DEBUG', `[introspection] ${tools.length} tools registradas para introspecção.`);
+    _introspectionRegistry = registry;
+    log('DEBUG', `[introspection] ${registry.entries.size} tools registradas para introspecção.`);
 }
 
 /**
@@ -229,11 +185,13 @@ export function readToolContractReport() {
  * }}
  */
 export function readIntrospectionRegistrySnapshot() {
-    const names = _registeredTools.map((tool) => tool.name).sort((a, b) => a.localeCompare(b));
+    const names = listRegisteredTools()
+        .map((tool) => tool.name)
+        .sort((a, b) => a.localeCompare(b));
     /** @type {Record<string, number>} */
     const categories = {};
-    for (const metadata of _toolNameToMetadataMap.values()) {
-        categories[metadata.category] = (categories[metadata.category] ?? 0) + 1;
+    for (const entry of listRegistryEntries()) {
+        categories[entry.category] = (categories[entry.category] ?? 0) + 1;
     }
     const requiredLocalFs = [
         'list_directory',
@@ -267,10 +225,8 @@ export function readIntrospectionRegistrySnapshot() {
  * @returns {void}
  */
 export function resetIntrospectionStateForTests() {
-    _registeredTools = [];
+    _introspectionRegistry = null;
     _disabledTools.clear();
-    _toolNameToMetadataMap.clear();
-    _CATEGORY_TOOL_MAP_DYNAMIC = {};
     _toolContractReport = createEmptyToolContractReport();
 }
 
@@ -279,7 +235,7 @@ export function resetIntrospectionStateForTests() {
 /**
  * Tool: list_tools — lista as ferramentas disponíveis na sessão.
  */
-const listToolsTool = createTool({
+const listToolsTool = buildTool({
     name: 'list_tools',
     description:
         'Lista todas as ferramentas (Custom Tools) disponíveis nesta sessão. ' +
@@ -298,7 +254,7 @@ const listToolsTool = createTool({
     handler: async (/** @type {{ category?: string; search?: string }} */ { category, search }) => {
         log('INFO', `[introspection/list_tools] category=${category ?? '*'} search=${search ?? '*'}`);
 
-        let tools = _registeredTools;
+        let tools = listRegisteredTools();
 
         // GAP-TOOLS-004: filtrar tools desabilitadas em runtime
         if (_disabledTools.size > 0) {
@@ -333,7 +289,7 @@ const listToolsTool = createTool({
 /**
  * Tool: get_agent_info — retorna informações sobre a sessão e o agente atual.
  */
-const getAgentInfoTool = createTool({
+const getAgentInfoTool = buildTool({
     name: 'get_agent_info',
     description:
         'Retorna informações sobre o agente atual: versão do SDK, modelo configurado, status da sessão, ' +
@@ -358,8 +314,8 @@ const getAgentInfoTool = createTool({
             model: COPILOT_MODEL ?? 'gpt-5-mini',
             pid: process.pid,
             uptime: Math.round(process.uptime()),
-            toolsRegistered: _registeredTools.length,
-            toolNames: _registeredTools.map((t) => t.name),
+            toolsRegistered: listRegistryEntries().length,
+            toolNames: listRegisteredTools().map((t) => t.name),
             categories: Object.fromEntries(
                 Object.entries(getCategoryToolMap()).map(([toolCategory, toolNames]) => [
                     toolCategory,
@@ -380,7 +336,7 @@ const getAgentInfoTool = createTool({
 /**
  * Tool: get_telemetry — retorna o sumário de telemetria de chamadas de ferramentas desta sessão.
  */
-const getTelemetryTool = createTool({
+const getTelemetryTool = buildTool({
     name: 'get_telemetry',
     description:
         'Retorna o sumário de telemetria da sessão: total de chamadas, taxa de sucesso, tools mais usadas, ' +
@@ -439,7 +395,7 @@ const getTelemetryTool = createTool({
  * A built-in do CLI (`report_intent`) deve prevalecer quando disponível. Este fallback local é mantido para runtimes
  * sem a built-in.
  */
-const reportIntentTool = createTool({
+const reportIntentTool = buildTool({
     name: 'report_intent_local',
     description:
         'Intent logging local. Prefira a built-in do CLI: "report_intent" quando disponível. ' +
@@ -481,7 +437,7 @@ const PROTECTED_TOOLS = new Set([
     'toggle_tool',
 ]);
 
-const toggleToolTool = createTool({
+const toggleToolTool = buildTool({
     name: 'toggle_tool',
     description:
         'Desabilita ou habilita uma tool em runtime. Tools desabilitadas são bloqueadas e não aparecem em list_tools. ' +
@@ -504,7 +460,7 @@ const toggleToolTool = createTool({
         }
 
         // Verificar se a tool existe
-        const exists = _registeredTools.some((t) => t.name.toLowerCase() === normalized);
+        const exists = listRegisteredTools().some((t) => t.name.toLowerCase() === normalized);
         if (!exists) {
             return { success: false, reason: 'tool não encontrada', toolName, enabled };
         }
@@ -531,7 +487,7 @@ const toggleToolTool = createTool({
  *
  * F7.3: introspecção por tool individual para diagnóstico de saúde.
  */
-const getToolHealthTool = createTool({
+const getToolHealthTool = buildTool({
     name: 'get_tool_health',
     description:
         'Retorna métricas de saúde por ferramenta: total de chamadas, taxa de erro, latência média e última execução. ' +
@@ -598,7 +554,7 @@ const getToolHealthTool = createTool({
 /**
  * Tool: get_tool_contract_report — retorna o relatório completo do verificador de contrato de tools.
  */
-const getToolContractReportTool = createTool({
+const getToolContractReportTool = buildTool({
     name: 'get_tool_contract_report',
     description:
         'Retorna o relatório do Tool Contract Verifier com erros, warnings e cobertura de metadados das tools ' +

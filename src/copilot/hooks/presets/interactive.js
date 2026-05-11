@@ -11,7 +11,7 @@
 
 import { createErrorHandler } from '../error-handler.js';
 import { log } from '../logger.js';
-import { createPermissionHandler } from '../permission-handler.js';
+import { createToolPermissionPolicy } from './permission-policy.js';
 
 /**
  * @typedef {import('../types.js').SessionHooks} SessionHooks
@@ -36,7 +36,7 @@ import { createPermissionHandler } from '../permission-handler.js';
  *     });
  *
  * @param {InteractivePresetOptions} [opts]
- * @returns {{ hooks: SessionHooks; onPermissionRequest: import('../permission-handler.js').PermissionHandler }}
+ * @returns {{ hooks: SessionHooks; onPermissionRequest: import('@github/copilot-sdk').PermissionHandler }}
  */
 export function createInteractivePreset(opts = {}) {
     const { autoAllowTools = [], autoDenyTools = [] } = opts;
@@ -52,22 +52,15 @@ export function createInteractivePreset(opts = {}) {
     ]);
     const autoDeny = new Set(autoDenyTools.map((t) => t.toLowerCase()));
 
-    // onPermissionRequest espelha a lógica do onPreToolUse:
-    // auto-deny → nega, auto-allow → aprova, demais → nega (conservative default para permissionRequest
-    // uma vez que o fluxo interativo de 'ask' não está disponível nesse contexto).
-    const onPermissionRequest = createPermissionHandler({
-        onRequest: (req) => {
-            const name =
-                /** @type {{ toolName?: string; tool?: string }} */ (req)?.toolName?.toLowerCase() ??
-                /** @type {{ toolName?: string; tool?: string }} */ (req)?.tool?.toLowerCase() ??
-                'unknown';
-            if (autoDeny.has(name)) return false;
-            if (autoAllow.has(name)) return true;
-            // 'ask' não é possível em onPermissionRequest → deny conservative
-            log('WARN', `[preset/interactive] onPermissionRequest: tool '${name}' NEGADA (ask não disponível aqui)`);
-            return false;
-        },
+    const policy = createToolPermissionPolicy({
+        allowTools: [...autoAllow],
+        denyTools: [...autoDeny],
+        defaultDecision: 'ask',
+        askFallbackInPermissionRequest: 'deny',
+        label: 'preset/interactive',
+        auditLog: true,
     });
+    const onPermissionRequest = policy.onPermissionRequest;
 
     const onErrorOccurred = createErrorHandler({
         maxRetries: 1,
@@ -82,12 +75,14 @@ export function createInteractivePreset(opts = {}) {
         async onPreToolUse(input, invocation) {
             const name = input.toolName.toLowerCase();
 
-            if (autoDeny.has(name)) {
+            const decision = policy.decide(name);
+
+            if (decision === 'deny') {
                 log('WARN', `[preset/interactive] tool NEGADA automaticamente: ${input.toolName}`);
                 return { permissionDecision: 'deny' };
             }
 
-            if (autoAllow.has(name)) {
+            if (decision === 'allow') {
                 log('DEBUG', `[preset/interactive] tool PERMITIDA automaticamente: ${input.toolName}`);
                 return { permissionDecision: 'allow' };
             }

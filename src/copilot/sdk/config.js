@@ -9,7 +9,7 @@
  * @see EventBus
  */
 
-import { approveAll } from '@github/copilot-sdk';
+import { approveAll } from './session/permissions.js';
 
 /**
  * @typedef {import('@github/copilot-sdk').SessionConfig} SessionConfig

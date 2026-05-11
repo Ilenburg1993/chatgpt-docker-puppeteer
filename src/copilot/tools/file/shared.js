@@ -14,7 +14,7 @@ import { isAscii, isUtf8 } from 'node:buffer';
 import { execFile } from 'node:child_process';
 import * as path from 'node:path';
 import { promisify } from 'node:util';
-import { log } from '../logger.js';
+import { log } from '../infra/logger.js';
 
 export const execFileAsync = promisify(execFile);
 
@@ -59,7 +59,9 @@ export async function isRgAvailable() {
  *
  * @type {RegExp[]}
  */
-export const BLOCKED_PATTERNS_SECRETS = [...DEFAULT_BLOCKED_READ_PATH_PATTERNS];
+export const BLOCKED_PATTERNS_SECRETS = [
+    ...(Array.isArray(DEFAULT_BLOCKED_READ_PATH_PATTERNS) ? DEFAULT_BLOCKED_READ_PATH_PATTERNS : []),
+];
 
 /**
  * Verifica se um caminho está dentro do workspace autorizado e não é um arquivo bloqueado.

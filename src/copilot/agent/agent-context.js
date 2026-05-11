@@ -16,6 +16,7 @@
  */
 
 import { EMITTER_PROCESS_QUEUE, EMITTER_STATUS } from '#copilot/events';
+import { createToolSessionContext } from '#copilot/sdk';
 import { COPILOT_MODEL, COPILOT_REASONING_EFFORT } from '../config/agent.js';
 import { createAgentContextFactories } from './context-factories.js';
 import {
@@ -148,6 +149,9 @@ export class AgentContext {
     /** @type {import('./ports/permission-port.js').AgentPermissionController} */
     permissions;
 
+    /** @type {import('#copilot/sdk').ToolSessionContext} */
+    toolSessionContext = createToolSessionContext();
+
     /** @type {import('#copilot/sdk/tools-registry').ToolRegistry} */
     toolsRegistry;
 
@@ -163,7 +167,7 @@ export class AgentContext {
     /** @type {import('./background-tasks.js').BackgroundTasks} */
     backgroundTasks;
 
-    /** @type {ReturnType<import('#copilot/hooks').createQueuedElicitationHandler>} */
+    /** @type {ReturnType<import('#copilot/sdk').createQueuedElicitationHandler>} */
     sdkElicitation;
 
     /**
@@ -232,6 +236,7 @@ export class AgentContext {
         this.webhooks = this.#factories.createWebhooks(this.#factoryHost);
         this.permissions = this.#factories.createPermissions(this.#factoryHost);
         this.toolsRegistry = this.#factories.createToolsRegistry(this.#factoryHost);
+        this.toolSessionContext = createToolSessionContext();
         this.keepalive = this.#factories.createKeepalive(this.#factoryHost);
         this.handoff = this.#factories.createHandoff(this.#factoryHost);
         this.messagesCache = this.#factories.createMessagesCache(this.#factoryHost);
@@ -1587,6 +1592,15 @@ export class AgentContext {
      */
     getPermissionHandlerSnapshot() {
         return this.permissions.handler;
+    }
+
+    /**
+     * Retorna snapshot detalhado da policy de permissões ativa (modo, allow/deny lists, denyShell, etc.).
+     *
+     * @returns {import('./ports/permission-port.js').PermissionPolicySnapshot | null}
+     */
+    getPermissionPolicySnapshot() {
+        return typeof this.permissions.getPolicySnapshot === 'function' ? this.permissions.getPolicySnapshot() : null;
     }
 
     /**

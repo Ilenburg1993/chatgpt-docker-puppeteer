@@ -7,7 +7,7 @@
  *   da tool diretamente.
  */
 
-import { readStore } from '../../tools/todo/store.js';
+import { readStore } from '#copilot/tools';
 
 /**
  * @typedef {{

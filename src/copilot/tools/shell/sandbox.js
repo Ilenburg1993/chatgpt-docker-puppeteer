@@ -142,6 +142,20 @@ export const ALLOWED_EXECUTABLES = (() => {
     return list.length > 0 ? new Set(list) : null;
 })();
 
+/**
+ * Cache privado de ambiente sanitizado para reduzir custo de reconstrução por chamada.
+ *
+ * @type {{ expiresAt: number; env: Record<string, string> } | null}
+ */
+let _safeEnvCache = null;
+
+/**
+ * TTL do cache de ambiente sanitizado (ms).
+ *
+ * @type {number}
+ */
+const SAFE_ENV_CACHE_TTL_MS = 5000;
+
 /** @type {Promise<string> | null} */
 let _rootRealPromise = null;
 
@@ -211,11 +225,9 @@ export function checkCommandBlocklist(command) {
  * @returns {Record<string, string>}
  */
 export function safeEnv() {
-    /** @type {{ expiresAt: number; env: Record<string, string> } | null} */
-    const cache = /** @type {any} */ (safeEnv)._cache ?? null;
     const now = Date.now();
-    if (cache && cache.expiresAt > now) {
-        return cache.env;
+    if (_safeEnvCache && _safeEnvCache.expiresAt > now) {
+        return _safeEnvCache.env;
     }
 
     const env = { ...process.env };
@@ -247,8 +259,8 @@ export function safeEnv() {
     }
 
     const sanitized = /** @type {Record<string, string>} */ (env);
-    /** @type {any} */ (safeEnv)._cache = {
-        expiresAt: now + 1000,
+    _safeEnvCache = {
+        expiresAt: now + SAFE_ENV_CACHE_TTL_MS,
         env: sanitized,
     };
     return sanitized;

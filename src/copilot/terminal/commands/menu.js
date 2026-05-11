@@ -8,7 +8,7 @@
  * @module copilot/terminal/commands/menu
  */
 
-import { getPendingUserInputCount } from '../../tools/user-input-state.js';
+import { getPendingStructuredUserInputCount } from '#copilot/sdk';
 import { readTerminalRuntimeControlState, readTerminalRuntimeState } from '../frontend/gateways/agent-runtime.js';
 import {
     readTerminalElicitationSummary,
@@ -36,7 +36,7 @@ export function buildTerminalSmartMenuEntries() {
     const elicitation = readTerminalElicitationSummary();
     const permission = readTerminalPermissionSummary();
     const userInput = readTerminalUserInputSummary();
-    const structuredUserInputPending = getPendingUserInputCount();
+    const structuredUserInputPending = getPendingStructuredUserInputCount();
     const entries = /** @type {TerminalSmartMenuEntry[]} */ ([]);
 
     entries.push(

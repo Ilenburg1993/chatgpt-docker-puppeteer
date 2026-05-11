@@ -197,6 +197,24 @@ export class AlwaysAliveAgent extends EventEmitter {
     }
 
     /**
+     * Retorna snapshot detalhado da policy de permissões ativa (modo, allow/deny lists, denyShell, defaultDecision).
+     *
+     * @returns {ReturnType<AgentContext['getPermissionPolicySnapshot']>}
+     */
+    getPermissionPolicySnapshot() {
+        return this.ctx.getPermissionPolicySnapshot?.() ?? null;
+    }
+
+    /**
+     * Retorna o `ToolSessionContext` desta sessão — encapsula estado por sessão (input pendente, broadcast SSE).
+     *
+     * @returns {import('#copilot/sdk').ToolSessionContext}
+     */
+    getToolSessionContext() {
+        return this.ctx.toolSessionContext;
+    }
+
+    /**
      * Retorna metadata do conjunto de factories que materializou managers/capabilities vivos do contexto.
      *
      * @returns {Record<string, Record<string, unknown>>}

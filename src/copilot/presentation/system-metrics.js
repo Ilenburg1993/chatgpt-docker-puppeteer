@@ -317,17 +317,17 @@ export function readToolStatsProjection() {
             lastCallIso: null,
             lastOk: true,
         };
-        const calls = Number(s.calls ?? 0);
-        const errors = Number(s.errors ?? 0);
-        const avgLatencyMs = Number(s.avgLatencyMs ?? 0);
+        const calls = Number(s['calls'] ?? 0);
+        const errors = Number(s['errors'] ?? 0);
+        const avgLatencyMs = Number(s['avgLatencyMs'] ?? 0);
         current.calls += calls;
         current.errors += errors;
         current.totalMsApprox += calls * avgLatencyMs;
         current.aliases.add(name);
-        if (typeof s.lastCallIso === 'string') {
-            if (!current.lastCallIso || s.lastCallIso > current.lastCallIso) current.lastCallIso = s.lastCallIso;
+        if (typeof s['lastCallIso'] === 'string') {
+            if (!current.lastCallIso || s['lastCallIso'] > current.lastCallIso) current.lastCallIso = s['lastCallIso'];
         }
-        if (s.lastOk === false) current.lastOk = false;
+        if (s['lastOk'] === false) current.lastOk = false;
         canonicalMap.set(key, current);
     }
 

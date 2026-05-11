@@ -18,7 +18,6 @@ import {
     SDK_API_TOKEN,
 } from '#copilot/config';
 import { container } from '#copilot/core';
-import { defaultBus, SDK_HOOKS } from '#copilot/hooks';
 import {
     DEFAULT_OTEL_FILE,
     defaultConvergenceTraceStore,
@@ -38,6 +37,7 @@ import {
     commandsHandlePending,
     compactionCompact,
     createClientSession,
+    defaultHookBus,
     disconnectClientSession,
     emitSdkOperationMetric,
     forceStopClient,
@@ -55,6 +55,7 @@ import {
     permissionsHandlePending,
     pickDefined,
     resumeClientSession,
+    SDK_HOOKS,
     sessionUiConfirm,
     sessionUiElicitation,
     sessionUiInput,
@@ -231,7 +232,7 @@ const sdkObservabilityOps = Object.freeze({
 });
 
 const sdkHookOps = Object.freeze({
-    bus: defaultBus,
+    bus: defaultHookBus,
     registry: SDK_HOOKS,
     log,
 });

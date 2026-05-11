@@ -10,7 +10,7 @@
 
 import { z } from 'zod/v3';
 import { buildIoIndexForDirectory, findIoIndexSymbol, getIoIndexStats, searchIoIndex } from '../../infra/index.js';
-import { buildTool } from '../tool-factory.js';
+import { buildTool } from '../infra/tool-factory.js';
 
 const IndexBuildParameters = z.object({
     directory: z.string().min(1).describe('Diretório local a indexar.'),

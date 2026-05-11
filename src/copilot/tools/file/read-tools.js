@@ -8,7 +8,7 @@
  * @see EventBus
  */
 
-import { withSkipPermission } from '../tool-factory.js';
+import { withSkipPermission } from '../infra/tool-factory.js';
 
 import { listDirectoryTool, readFileContentTool } from './read-tools-io.js';
 import { diffFilesTool, searchInFilesTool } from './read-tools-search.js';

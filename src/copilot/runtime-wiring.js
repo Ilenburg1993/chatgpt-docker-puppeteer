@@ -16,6 +16,8 @@ import {
 } from '#copilot/agent';
 import { BRIDGE_AGENT, FALLBACK_AGENT, NERV_BRIDGE_AGENT, PERMISSION_AGENT } from '#copilot/bridges';
 import { CONVERSATION_STORE, HUB } from '#copilot/conversation-hub';
+import { configureDefaultUserInputContext } from '#copilot/sdk';
+import { setHub, setPermissionAgent } from '#copilot/tools';
 import { setBridgeAgent } from './channel/client.js';
 import { conversationHub } from './conversation-hub/hub.js';
 import { setFallbackAgent } from './conversation-hub/orchestrator.js';
@@ -24,8 +26,6 @@ import { container } from './core/di-container.js';
 import { SHUTDOWN_PRIORITY } from './core/shutdown-priorities.js';
 import { registerShutdownHandler } from './core/shutdown.js';
 import { log } from './observability/logger.js';
-import { setHub } from './tools/hub-tools.js';
-import { setPermissionAgent } from './tools/permission-tools.js';
 
 /** @type {boolean} */
 let _runtimeDiWired = false;
@@ -39,7 +39,14 @@ let _runtimeDiWired = false;
 export function wireCopilotRuntimeDI({ broadcastSse }) {
     if (_runtimeDiWired) return;
 
-    configureHookTools({ broadcastSse });
+    // P2-2: unificar estado de user-input com o ToolSessionContext do agente principal.
+    // `alwaysAliveAgent` é um Proxy lazy — acessar getToolSessionContext() aqui cria
+    // a instância singleton do AlwaysAliveAgent se ainda não existe (comportamento intencional).
+    const toolSessionContext = alwaysAliveAgent.getToolSessionContext?.() ?? undefined;
+    configureHookTools({ broadcastSse, toolSessionContext });
+    if (toolSessionContext) {
+        configureDefaultUserInputContext(toolSessionContext);
+    }
 
     container.register(ALWAYS_ALIVE_AGENT, () => getAgent(), 'singleton');
     container.register(HUB, () => conversationHub, 'singleton');

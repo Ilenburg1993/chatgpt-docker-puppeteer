@@ -23,14 +23,15 @@ import { safeJsonParse } from '../../core/safe-json.js';
 import { CustomToolsFileSchema } from '../../core/schemas.js';
 import { log } from '../logger.js';
 import { resolvePersistentConfigFile } from '../persistent-paths.js';
-import { createToolSync } from './core.js';
 
 /**
  * @typedef {(opts: {
  *     name: string;
  *     description: string;
- *     parameters?: unknown;
+ *     parameters?: import('./core.js').ToolParameterInput<any>;
  *     handler: Function;
+ *     requiresApproval?: boolean;
+ *     overridesBuiltInTool?: boolean;
  * }) => import('@github/copilot-sdk').Tool} BuildToolFn
  */
 
@@ -50,6 +51,21 @@ let _loaded = false;
  */
 export function setCustomToolsBuilder(fn) {
     _buildTool = typeof fn === 'function' ? fn : null;
+}
+
+/**
+ * Resolve o builder canônico de custom tools.
+ *
+ * Arquitetura alvo: fluxo único via `buildTool` injetado do domínio `tools/`. Não usar fallback paralelo para
+ * `createToolSync`, evitando divergência de observabilidade/normalização.
+ *
+ * @returns {BuildToolFn}
+ */
+function requireCustomToolsBuilder() {
+    if (_buildTool) return _buildTool;
+    throw new Error(
+        'Custom tools builder não injetado. Chame setCustomToolsBuilder(buildTool) no bootstrap antes de buildCustomTools().',
+    );
 }
 
 /** Caminho canônico do arquivo de persistência. @type {string} */
@@ -348,7 +364,7 @@ export async function removeCustomTool(name) {
  */
 export function buildCustomTools() {
     ensureCustomToolsLoadedSync();
-    const buildTool = _buildTool ?? createToolSync;
+    const buildTool = requireCustomToolsBuilder();
     /** @type {import('@github/copilot-sdk').Tool[]} */
     const tools = [];
     for (const def of _registry.values()) {

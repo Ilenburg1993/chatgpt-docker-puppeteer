@@ -1,5 +1,7 @@
 // @ts-check
 import { ConfigError } from '#copilot/core';
+import { validateToolDefinitionContract } from '../../core/tool-contracts.js';
+import { log } from '../logger.js';
 /**
  * src/copilot/sdk/tools-registry.js
  *
@@ -68,12 +70,19 @@ export function createRegistry() {
  */
 export function registerTool(registry, tool, meta = {}) {
     if (!registry || !registry.entries) throw new ConfigError('[sdk/tools-registry] registry inválido.');
-    if (!tool || typeof tool.name !== 'string' || !tool.name)
-        throw new ConfigError('[sdk/tools-registry] registerTool: tool.name (string) é obrigatório.');
+    const validation = validateToolDefinitionContract(tool);
+    if (!validation.ok) {
+        throw new ConfigError(`[sdk/tools-registry] registerTool: ${validation.reason}`);
+    }
+    const safeTool = /** @type {Tool} */ (tool);
 
     const { category = 'uncategorized', tags = [], readOnly = false } = meta;
 
-    registry.entries.set(tool.name, { tool, category, tags, readOnly });
+    if (registry.entries.has(safeTool.name)) {
+        log('WARN', `[sdk/tools-registry] Sobrescrevendo tool já registrada: "${safeTool.name}".`);
+    }
+
+    registry.entries.set(safeTool.name, { tool: safeTool, category, tags, readOnly });
 }
 
 /**

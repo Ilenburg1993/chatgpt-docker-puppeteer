@@ -1,30 +1,29 @@
 // @ts-check
 /**
- * src/copilot/tools/task-tools.js
+ * src/copilot/tools/task/task-tools.js
  *
  * Custom Tools para gerenciamento de tarefas do sistema. Permite ao agente criar, consultar e atualizar tarefas via
  * infra SQLite existente.
  *
- * @module copilot/tools/task-tools
+ * @module copilot/tools/task/task-tools
  * @see EventBus
  * @see module:copilot/agent/task-executor
  */
 
 import { SERVER_PORT } from '#copilot/config';
-import { createTool } from '#copilot/sdk';
 import { access, readFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { z } from 'zod';
-import { toError } from '../core/error-handlers.js';
-import { httpRequest } from '../sdk/http-request.js';
-import { log } from './logger.js';
-import { withSkipPermission } from './tool-factory.js';
+import { toError } from '../../core/error-handlers.js';
+import { httpRequest } from '../../sdk/http-request.js';
+import { log } from '../infra/logger.js';
+import { buildTool, withSkipPermission } from '../infra/tool-factory.js';
 
 /**
  * Tool: get_tasks — lista tarefas recentes do sistema.
  */
-const getTasksTool = createTool({
+const getTasksTool = buildTool({
     name: 'get_tasks',
     description: 'Lista as tarefas mais recentes do sistema. Use para verificar estado atual da fila.',
     parameters: /** @type {import('#copilot/sdk/types').ZodSchema<any>} */ (
@@ -60,7 +59,7 @@ const getTasksTool = createTool({
 /**
  * Tool: add_task — enfileira uma nova tarefa no sistema.
  */
-const addTaskTool = createTool({
+const addTaskTool = buildTool({
     name: 'add_task',
     description: 'Cria e enfileira uma nova tarefa no sistema de missões. A tarefa será executada pelo kernel.',
     parameters: /** @type {import('#copilot/sdk/types').ZodSchema<any>} */ (
@@ -99,13 +98,13 @@ const addTaskTool = createTool({
 /**
  * Tool: get_session_state — lê o estado da sessão do hook system.
  */
-const getSessionStateTool = createTool({
+const getSessionStateTool = buildTool({
     name: 'get_session_state',
     description: 'Lê o estado da sessão atual do hook system (briefing, tarefas pendentes).',
     parameters: z.object({}),
     handler: async () => {
         try {
-            const ROOT = resolve(fileURLToPath(import.meta.url), '../../../../');
+            const ROOT = resolve(fileURLToPath(import.meta.url), '../../../../../');
             const stateDir = join(ROOT, '.github', 'hooks', 'state');
             const files = ['session-briefing.md', 'pending-tasks.md', 'session.json'];
             /** @type {Record<string, string>} */
@@ -129,7 +128,7 @@ const getSessionStateTool = createTool({
 /**
  * Tool: get_system_health — verifica saúde geral do sistema.
  */
-const getSystemHealthTool = createTool({
+const getSystemHealthTool = buildTool({
     name: 'get_system_health',
     description: 'Verifica a saúde dos serviços principais (API, Chrome, Queue).',
     parameters: z.object({}),

@@ -27,6 +27,14 @@ export {
     setAuditBus,
 } from './pipeline.js';
 
+export {
+    AuditTrail,
+    globalAuditTrail,
+    withErrorAudit,
+    withPostToolAudit,
+    withPreToolAudit,
+} from './hook-audit-trail.js';
+
 // Logger proxy (DI)
 export { setAuditLogger } from './logger.js';
 

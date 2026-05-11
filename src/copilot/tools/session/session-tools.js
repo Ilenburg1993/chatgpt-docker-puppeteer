@@ -1,10 +1,10 @@
 // @ts-check
 /**
- * src/copilot/tools/session-tools.js
+ * src/copilot/tools/session/session-tools.js
  *
  * Custom Tools para leitura e atualização do estado da sessão (hook system).
  *
- * @module copilot/tools/session-tools
+ * @module copilot/tools/session/session-tools
  * @see EventBus
  * @see module:copilot/lib/session
  * @see module:copilot/always-alive
@@ -12,20 +12,19 @@
 
 import { readBootSkillConfig, resolveHooksStateDir, resolveWorkspacePath } from '#copilot/boot';
 import { logSwallowed, toError } from '#copilot/core';
-import { createTool } from '#copilot/sdk';
 import { execFileSync } from 'node:child_process';
 import { mkdir, readdir, readFile, stat, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { z } from 'zod';
-import { log } from './logger.js';
-import { withSkipPermission } from './tool-factory.js';
+import { log } from '../infra/logger.js';
+import { buildTool, withSkipPermission } from '../infra/tool-factory.js';
 
 const HOOKS_STATE = resolveHooksStateDir();
 
 /**
  * Tool: read_briefing — lê o briefing da sessão Hook System.
  */
-const readBriefingTool = createTool({
+const readBriefingTool = buildTool({
     name: 'read_briefing',
     description:
         'Lê o briefing de sessão atual do Hook System (session-briefing.md). Contém estado, close_key e tarefas.',
@@ -44,7 +43,7 @@ const readBriefingTool = createTool({
 /**
  * Tool: write_pending_task — adiciona uma tarefa pendente ao pending-tasks.md.
  */
-const writePendingTaskTool = createTool({
+const writePendingTaskTool = buildTool({
     name: 'write_pending_task',
     description: 'Adiciona uma tarefa pendente ao arquivo pending-tasks.md do Hook System.',
     parameters: /** @type {import('#copilot/sdk/types').ZodSchema<any>} */ (
@@ -81,7 +80,7 @@ const writePendingTaskTool = createTool({
 /**
  * Tool: get_workspace_info — retorna informações contextuais do workspace.
  */
-const getWorkspaceInfoTool = createTool({
+const getWorkspaceInfoTool = buildTool({
     name: 'get_workspace_info',
     description:
         'Retorna informações do workspace atual: diretório de trabalho, branch git, Node version, status básico.',
@@ -136,7 +135,7 @@ const SESSION_CONTEXT_STORE = new Map();
 /**
  * Tool: set_session_context — armazena contexto em memória de sessão.
  */
-const setSessionContextTool = createTool({
+const setSessionContextTool = buildTool({
     name: 'set_session_context',
     description:
         'Armazena um valor de contexto em memória de sessão (chave/valor). Use para preservar informações entre turnos.',
@@ -159,7 +158,7 @@ const setSessionContextTool = createTool({
  * Tool: invoke_skill — carrega e retorna o conteúdo de uma skill pelo nome. Análogo ao built-in `skill` do GitHub
  * Copilot CLI. Permite ao agente injetar o conteúdo de uma skill como contexto adicional no turn atual.
  */
-const invokeSkillTool = createTool({
+const invokeSkillTool = buildTool({
     name: 'invoke_skill',
     description:
         'Carrega o conteúdo de uma skill pelo nome e retorna seu conteúdo completo como contexto. ' +

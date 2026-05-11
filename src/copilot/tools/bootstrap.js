@@ -12,27 +12,35 @@
  *   `stop()` + `start()`. Um futuro `unregisterTool(name)` no `ToolRegistry` poderia manter o registro em sincronia,
  *   mas a limitação real está no SDK.
  * @see EventBus
- * @see module:copilot/tools/tool-factory
+ * @see module:copilot/tools/infra/tool-factory
  * @see module:copilot/sdk/tools-registry
  */
 
 import { log, wrapWithStats } from '#copilot/observability';
-import { buildCustomTools, getAllTools, registerTools } from '#copilot/sdk';
-import { codeTools } from './code-tools.js';
-import { experimentalRpcTools, setExperimentalSession } from './experimental-rpc-tools.js';
+import { buildCustomTools, getAllTools as getRegistryTools, registerTools } from '#copilot/sdk';
+import { codeTools } from './code/index.js';
 import { fileReadTools, fileWriteTools, indexTools, scopeTools } from './file/index.js';
 import { gitTools } from './git/index.js';
-import { configureHookTools, hookTools } from './hook-tools.js';
-import { hubTools, setHub } from './hub-tools.js';
-import { introspectionTools, registerForIntrospection, setToolContractReport } from './introspection-tools.js';
-import { permissionTools, setPermissionAgent } from './permission-tools.js';
-import { sessionRpcTools, setSessionRpc } from './session-rpc-tools.js';
-import { sessionTools } from './session-tools.js';
+import { configureHookTools, hookTools } from './hook/index.js';
+import { hubTools, setHub } from './hub/index.js';
+import {
+    introspectionTools,
+    registerForIntrospection,
+    setToolContractReport,
+    verifyToolRegistryContracts,
+} from './introspection/index.js';
+import { permissionTools, setPermissionAgent } from './permission/index.js';
+import {
+    experimentalRpcTools,
+    sessionRpcTools,
+    sessionTools,
+    setExperimentalSession,
+    setSessionRpc,
+} from './session/index.js';
 import { shellTools } from './shell/index.js';
-import { taskTools } from './task-tools.js';
+import { taskTools } from './task/index.js';
 import { todoReadTools, todoWriteTools } from './todo/index.js';
-import { verifyToolRegistryContracts } from './tool-contract-verifier.js';
-import { webTools } from './web-tools.js';
+import { webTools } from './web/index.js';
 
 /**
  * @typedef {import('#copilot/sdk/tools-registry').ToolRegistry} ToolRegistry
@@ -43,6 +51,76 @@ import { webTools } from './web-tools.js';
 // R13: configureHookTools, setHub, setPermissionAgent, setSessionRpc, setExperimentalSession exportados diretamente de tools/index.js
 // O infra barrel (infra/index.js) re-exporta de tools-bootstrap.js; consumidores devem usar o barrel agent/.
 export { configureHookTools, setExperimentalSession, setHub, setPermissionAgent, setSessionRpc };
+
+// ─── getAllTools flat — array de todas as tools para consumers externos (ex.: server/routes/sdk/deps.js) ─────
+
+/** @type {import('#copilot/sdk/types').Tool[] | undefined} */
+let _allToolsCache;
+
+/**
+ * Retorna o array flat de todas as tools estáticas registráveis. Usa cache após primeira chamada (lazy singleton).
+ *
+ * Consumidores externos (ex.: `server/routes/sdk/deps.js`) que precisam enumerar as tools sem registry SDK devem usar
+ * esta função.
+ *
+ * @returns {import('#copilot/sdk/types').Tool[]}
+ */
+export function getAllStaticTools() {
+    if (!_allToolsCache) {
+        _allToolsCache = [
+            ...taskTools,
+            ...codeTools,
+            ...gitTools,
+            ...sessionTools,
+            ...sessionRpcTools,
+            ...hookTools,
+            ...hubTools,
+            ...introspectionTools,
+            ...(fileReadTools ?? []),
+            ...(indexTools ?? []),
+            ...(scopeTools ?? []),
+            ...(fileWriteTools ?? []),
+            ...shellTools,
+            ...webTools,
+            ...todoReadTools,
+            ...todoWriteTools,
+            ...permissionTools,
+            ...experimentalRpcTools,
+        ];
+    }
+    return _allToolsCache;
+}
+
+/**
+ * @deprecated Use `getAllStaticTools()` — mantido por compatibilidade para consumers existentes de `#copilot/tools`.
+ * @returns {import('#copilot/sdk/types').Tool[]}
+ */
+export function getAllTools() {
+    return getAllStaticTools();
+}
+
+/**
+ * @deprecated Use `getAllTools()` — proxy histórico mantido para compatibilidade.
+ * @type {import('#copilot/sdk/types').Tool[]}
+ */
+export const allTools = /** @type {any} */ (
+    new Proxy([], {
+        get(_, prop) {
+            const arr = getAllTools();
+            const val = Reflect.get(arr, prop);
+            return typeof val === 'function' ? val.bind(arr) : val;
+        },
+        has(_, prop) {
+            return Reflect.has(getAllTools(), prop);
+        },
+        ownKeys() {
+            return Reflect.ownKeys(getAllTools());
+        },
+        getOwnPropertyDescriptor(_, prop) {
+            return Object.getOwnPropertyDescriptor(getAllTools(), prop);
+        },
+    })
+);
 
 /**
  * Registra todas as tools estáticas do agente no registry por categoria/tags, e expõe o registry/telemetria para as
@@ -129,13 +207,13 @@ export function bootstrapTools(registry, mcpTools) {
         });
     }
 
-    const allTools = getAllTools(registry);
+    const allTools = getRegistryTools(registry);
 
     // F7.3: instrumentar todas as tools com wrapWithStats para capturar latência e erros automaticamente
     const instrumentedTools = allTools.map(wrapWithStats);
 
     // Expõe registry para as ferramentas de introspecção (necessário antes de iniciar sessão)
-    registerForIntrospection(instrumentedTools, registry);
+    registerForIntrospection(registry);
 
     const contractReport = verifyToolRegistryContracts(registry);
     setToolContractReport(contractReport);

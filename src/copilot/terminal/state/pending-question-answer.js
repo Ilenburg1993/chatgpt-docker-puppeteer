@@ -4,7 +4,7 @@
  * @file Policy local para rotear input humano quando há pergunta pendente do runtime.
  */
 
-import { hasPendingUserInputRequests } from '../../tools/user-input-state.js';
+import { hasPendingStructuredUserInputRequests } from '#copilot/sdk';
 import { answerTerminalPendingQuestion, readTerminalRuntimeState } from '../frontend/gateways/agent-runtime.js';
 
 /**
@@ -78,7 +78,7 @@ export function tryAnswerTerminalPendingQuestionInput(rawAnswer, runtimeId, opti
         return { ...resultBase, routed: false, ok: false, reason: 'empty' };
     }
     if (!pending) {
-        if (hasPendingUserInputRequests()) {
+        if (hasPendingStructuredUserInputRequests()) {
             const ok = answerTerminalPendingQuestion(answer, runtimeId);
             return { ...resultBase, routed: true, ok, reason: ok ? 'answered' : 'answer_failed' };
         }

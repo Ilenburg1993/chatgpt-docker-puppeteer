@@ -32,6 +32,8 @@
  * @see EventBus
  */
 
+import { approveAll, createPermissionHandler as createSdkPermissionHandler } from '#copilot/sdk';
+
 // ─── Tipos (sem lógica executável) ────────────────────────────────────────────
 export * from './types.js';
 
@@ -46,14 +48,43 @@ export {
     createSafeHooks,
 } from './factory.js';
 
-// ─── Permission handlers (migrado de lib/permissions.js) ──────────────────────
-export {
-    createApproveAllPermission,
-    createAuditOnlyPermission,
-    createPermissionHandler,
-    createRestrictedPermission,
-    createSafePermission,
-} from './permission-handler.js';
+// ─── Permission handlers (API pública em cima do núcleo canônico do SDK) ─────
+export { createAllowlistPermissionHandler, createPermissionHandler } from '#copilot/sdk';
+
+/**
+ * @returns {import('./types.js').PermissionHandler}
+ */
+export function createApproveAllPermission() {
+    return /** @type {import('./types.js').PermissionHandler} */ (approveAll);
+}
+
+/**
+ * @returns {import('./types.js').PermissionHandler}
+ */
+export function createAuditOnlyPermission() {
+    return /** @type {import('./types.js').PermissionHandler} */ (createSdkPermissionHandler({ auditMode: true }));
+}
+
+/**
+ * @param {string[]} allowedTools
+ * @returns {import('./types.js').PermissionHandler}
+ */
+export function createRestrictedPermission(allowedTools) {
+    return /** @type {import('./types.js').PermissionHandler} */ (createSdkPermissionHandler({ allowTools: allowedTools }));
+}
+
+/**
+ * @param {string[]} [additionalDenyTools]
+ * @returns {import('./types.js').PermissionHandler}
+ */
+export function createSafePermission(additionalDenyTools) {
+    return /** @type {import('./types.js').PermissionHandler} */ (
+        createSdkPermissionHandler({
+            denyKinds: ['shell'],
+            denyTools: ['run_shell_command', 'run_npm_script', 'run_node_script', ...(additionalDenyTools ?? [])],
+        })
+    );
+}
 
 // ─── Session lifecycle (migrado de agent/session-hooks.js) ────────────────────
 export { createCleanupHandler, createSessionHooks } from './session-hooks.js';

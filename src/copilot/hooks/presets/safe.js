@@ -11,7 +11,7 @@
 
 import { createErrorHandler } from '../error-handler.js';
 import { log } from '../logger.js';
-import { createPermissionHandler } from '../permission-handler.js';
+import { createToolPermissionPolicy } from './permission-policy.js';
 
 /**
  * @typedef {import('../types.js').SessionHooks} SessionHooks
@@ -36,7 +36,7 @@ import { createPermissionHandler } from '../permission-handler.js';
  *     });
  *
  * @param {SafePresetOptions} [opts]
- * @returns {{ hooks: SessionHooks; onPermissionRequest: import('../permission-handler.js').PermissionHandler }}
+ * @returns {{ hooks: SessionHooks; onPermissionRequest: import('@github/copilot-sdk').PermissionHandler }}
  */
 export function createSafePreset(opts = {}) {
     const { extraDenyTools = [], askOnTools = [], auditLog = true } = opts;
@@ -59,22 +59,15 @@ export function createSafePreset(opts = {}) {
 
     const DENY_TOOLS = new Set(['rm_rf', 'drop_table', 'wipe_data', ...extraDenyTools.map((t) => t.toLowerCase())]);
 
-    // onPermissionRequest espelha a lógica do onPreToolUse:
-    // DENY_TOOLS → nega, DEFAULT_ASK_TOOLS → nega (ask não disponível em permissionRequest), demais → aprova.
-    const onPermissionRequest = createPermissionHandler({
-        onRequest: (req) => {
-            const name =
-                /** @type {{ toolName?: string; tool?: string }} */ (req)?.toolName?.toLowerCase() ??
-                /** @type {{ toolName?: string; tool?: string }} */ (req)?.tool?.toLowerCase() ??
-                'unknown';
-            if (DENY_TOOLS.has(name) || DEFAULT_ASK_TOOLS.has(name)) {
-                if (auditLog) log('WARN', `[preset/safe] onPermissionRequest: tool '${name}' NEGADA`);
-                return false;
-            }
-            if (auditLog) log('DEBUG', `[preset/safe] onPermissionRequest: tool '${name}' APROVADA`);
-            return true;
-        },
+    const policy = createToolPermissionPolicy({
+        denyTools: [...DENY_TOOLS],
+        askTools: [...DEFAULT_ASK_TOOLS],
+        defaultDecision: 'allow',
+        askFallbackInPermissionRequest: 'deny',
+        label: 'preset/safe',
+        auditLog,
     });
+    const onPermissionRequest = policy.onPermissionRequest;
 
     const onErrorOccurred = createErrorHandler({
         maxRetries: 2,
@@ -89,12 +82,14 @@ export function createSafePreset(opts = {}) {
         async onPreToolUse(input, invocation) {
             const name = input.toolName.toLowerCase();
 
-            if (DENY_TOOLS.has(name)) {
+            const decision = policy.decide(name);
+
+            if (decision === 'deny') {
                 log('WARN', `[preset/safe] tool '${input.toolName}' NEGADA por política`);
                 return { permissionDecision: 'deny' };
             }
 
-            if (DEFAULT_ASK_TOOLS.has(name)) {
+            if (decision === 'ask') {
                 if (auditLog) {
                     log(
                         'INFO',
@@ -103,10 +98,7 @@ export function createSafePreset(opts = {}) {
                 }
                 return { permissionDecision: 'ask' };
             }
-
-            if (auditLog) {
-                log('DEBUG', `[preset/safe] tool '${input.toolName}' permitida`);
-            }
+            if (auditLog) log('DEBUG', `[preset/safe] tool '${input.toolName}' permitida`);
             return { permissionDecision: 'allow' };
         },
 

@@ -11,6 +11,8 @@
 
 O módulo `src/copilot/tools/` é o **registry central de Custom Tools** do Always-Alive Agent. Ele abriga 10 categorias funcionais de tools (tarefas, código, git, sessão, hooks, hub, introspecção, filesystem, shell, web), além de infraestrutura transversal (factory, DI tokens, logger, metrics proxy, verifier de contratos). A arquitetura atual demonstra **maturidade moderada-alta** com padrões consistentes de DI via injeção de módulos, mas apresenta **déficits estruturais** em encapsulamento de domínio, acoplamento funcional cruzado e ausência de limites de módulo (module boundaries) formalizados.
 
+> **📎 Documento complementar:** A análise foi expandida para os módulos Terminal, Events, Hooks, MCP Bridge, Presentation e Server Deps em [`2026-05-10-AUDITORIA-EXTENSAO-FASE2.md`](2026-05-10-AUDITORIA-EXTENSAO-FASE2.md) (seções 24–34). As novas seções incluem 20 novos bugs (BUG-18 a BUG-35), 6 gaps sistêmicos (SYS-GAP-11 a SYS-GAP-16), 1 inconsistência adicional (INC-06) e atualizações na priorização consolidada.
+
 ---
 
 ## 1. Mapa de Grafos — Relação `tools/` ↔ Resto de `src/copilot/`
@@ -26,6 +28,8 @@ src/copilot/
 ├── hooks/presets/production.js     → importa { isToolDisabled }
 ├── terminal/commands/sdk.js        → importa { fileReadTools, fileWriteTools }
 ├── terminal/commands/fs.js         → importa { fileReadTools, fileWriteTools }
+├── terminal/commands/tools.js      → importa { readIntrospectionRegistrySnapshot }
+├── terminal/commands/resume.js     → importa { fileReadTools }
 └── (tool-factory.js docstring)     → referência documental (não runtime)
 ```
 
@@ -312,7 +316,7 @@ O estado de pending inputs é mantido em module-level variables em vez de uma in
 
 ---
 
-## 5. Métricas Atuais do Módulo
+## 5. Métricas Atuais do Módulo (Tools Only)
 
 | Métrica | Valor |
 |---|---|
@@ -326,6 +330,19 @@ O estado de pending inputs é mantido em module-level variables em vez de uma in
 | **Uso de `buildTool` (com factory)** | 10 arquivos (~40 tools) |
 | **Linhas totais** | ~2.800 |
 | **Cobertura JSDoc** | ~85% (parcial em handlers) |
+
+### 5.1 Métricas Expandidas (Fase 2 — Total do Subsistema Tools)
+
+| Métrica | Valor |
+|---|---|
+| **Arquivos lidos (Fase 2)** | ~50+ (terminal, hooks, events, bridges, presentation, server, agent facades) |
+| **Total do módulo terminal** | 103 arquivos |
+| **Total hooks** | 15+ arquivos (incl. re-exports e presets) |
+| **Bugs tools (original)** | 17 |
+| **Bugs tools (Fase 2 novos)** | 18 (BUG-18 a BUG-35) |
+| **Bugs SDK** | 12 (inalterado) |
+| **Gaps sistêmicos** | 16 (original 10 + 6 novos) |
+| **Inconsistências** | 6 (original 5 + 1 novo) |
 
 ---
 
@@ -530,6 +547,8 @@ Esta seção documenta bugs concretos, gaps de segurança e problemas de engenha
 | **INC-02** | `todo/query-tools.js` | 14 | **LOW** | Importa `zPriority` e `zStatus` de `./store.js` para uso em schemas de filtro. Esses schemas são re-exportados pelo barrel mas o acoplamento direto ao store é desnecessário — poderiam estar no `todo-schema.js`. | Mover `zPriority` e `zStatus` para `todo-schema.js` e importar de lá. |
 | **INC-03** | `web-tools.js` | 156-159 | **LOW** | Parâmetros `maxBytes` e `timeoutMs` são descritos como "informativos" na docstring mas têm nomes que sugerem controle real. Outras ferramentas como `shell/index.js` usam nomes mais claros com prefixo `advisory`. | Renomear para `advisoryMaxBytes` e `advisoryTimeoutMs` para consistência com shell tools. |
 | **INC-04** | `todo/store.js` | 80-84 | **MEDIUM** | A migração `_migrateJsonLegacy()` roda sincronamente no top-level do módulo durante import. Se `todos.json` for muito grande (milhares de tarefas), o `fs.readFileSync` + `JSON.parse` + loop de inserts bloqueará o event loop durante o boot. | Tornar assíncrona ou usar batch com `setImmediate` para não bloquear. |
+| **INC-05** | `bootstrap.js` | 135 | **LOW** | `wrapWithStats` é aplicado a todas as tools após `getAllTools()` mas antes de qualquer registro de introspecção. Se uma tool falhar durante `wrapWithStats`, ela será silenciosamente removida do array instrumentado mas permanecerá registrada no registry. | Adicionar try/catch individual com logging por tool durante instrumentation. |
+| **INC-06** | `terminal/commands/sdk.js`, `terminal/commands/fs.js` | — | **MEDIUM** | Terminal commands importam `#copilot/tools` diretamente (fileReadTools, fileWriteTools) em vez de usar `agent/ports/tool-port.js`, bypassando a abstração do agent. | Rotejar acesso às tools via `tool-port.js` ou documentar a exceção de forma explícita. |
 | **INC-05** | `bootstrap.js` | 135 | **LOW** | `wrapWithStats` é aplicado a todas as tools após `getAllTools()` mas antes de qualquer registro de introspecção. Se uma tool falhar durante `wrapWithStats`, ela será silenciosamente removida do array instrumentado mas permanecerá registrada no registry. | Adicionar try/catch individual com logging por tool durante instrumentation. |
 
 ### 11.5 Gaps de Testabilidade
@@ -950,6 +969,29 @@ Adicionar `recordBlockedToolCall()` em `observability/tool-stats.js`. Fazer `too
 | 23 | 🟢 P3 | BUG-14 | `normalizeAgentToolList` não filtra null | Baixo | Entrada fantasma em Set |
 | 24 | 🟢 P3 | BUG-16 | Race condition em `answerNext()` | Baixo | Double-consume assíncrono |
 | 25 | 🟢 P3 | BUG-17 | `generateId()` usa `Math.random()` | Baixo | Colisão remota de IDs |
+| 26 | 🔴 P0 | **BUG-24** | MCP circuit breaker: state mutable module-level | Médio | Corrupção em concorrência |
+| 27 | 🟠 P1 | **BUG-33** | Audit preset registra "allow" para denied hooks | Médio | Auditoria enganosa |
+| 28 | 🟠 P1 | **SYS-GAP-11** | Terminal sem limites de módulo (nenhum ESLint rule) | Médio | Degradação arquitetural livre |
+| 29 | 🟠 P1 | **SYS-GAP-12** | Event adapter coverage sem validação build-time | Médio | Eventos silenciosamente ignorados |
+| 30 | 🟠 P1 | **SYS-GAP-14** | `active-tool-call-registry` singleton vs session-scoped | Médio | Vazamento cross-session |
+| 31 | 🟠 P1 | **BUG-25** | MCP tools sem `buildTool` wrapper (observabilidade degradada) | Médio | Dois níveis de tools |
+| 32 | 🟠 P1 | **BUG-19** | `active-tool-call-registry.js` module-level singleton | Médio | Subverte session-scoped design |
+| 33 | 🟡 P2 | **SYS-GAP-13** | Dois sistemas paralelos de eventos no terminal | Baixo | Duplicação de lógica |
+| 34 | 🟡 P2 | **SYS-GAP-15** | MCP bridge não usa `buildTool` | Médio | Dois níveis de tools |
+| 35 | 🟡 P2 | **SYS-GAP-16** | Event adapter coverage não testado em CI | Baixo | Cobertura não verificada |
+| 36 | 🟡 P2 | **INC-06** | Terminal bypassa agent facade para acessar tools | Médio | Acoplamento direto |
+| 37 | 🟡 P2 | **BUG-20** | `sdk-session-events.js` 1103 linhas — God Object | Médio | Manutenção prejudicada |
+| 38 | 🟡 P2 | **BUG-21** | `agent-runtime-events.js` 691 linhas — God Object | Médio | Manutenção prejudicada |
+| 39 | 🟢 P3 | **BUG-26** | AbortSignal + withRetry interação defeituosa | Baixo | Erro engolido em retry |
+| 40 | 🟢 P3 | **BUG-27** | `getAllTools()` sem cache em deps.js | Baixo | Recomputação por request |
+| 41 | 🟢 P3 | **BUG-28** | `defaultBus` singleton cross-session | Baixo | Event bleed |
+| 42 | 🟢 P3 | **BUG-29** | `composeHandlers` termina em `{}` | Baixo | Chain terminada prematuramente | **PARCIALMENTE CORRIGIDO** — check `result !== undefined && result !== null` previne early exit para `null`/`undefined`, mas `{}` ainda requer campos de decisão |
+| 43 | 🟢 P3 | **BUG-30** | `pipeline` swallow null signals | Baixo | Sinal perdido | **CORRIGIDO** — `if (result && typeof result === 'object')` filtra `null` |
+| 44 | 🟢 P3 | **BUG-31** | AuditTrail race condition read/write | Baixo | Dados corrompidos |
+| 45 | 🟢 P3 | **BUG-32** | `createRuntimeDisableHook` sem fallback null | Baixo | Crash se null |
+| 46 | 🟢 P3 | **BUG-34** | `hooks/index.js` JSDoc duplicado | Baixo | Documentação confusa |
+| 47 | 🟢 P3 | ~~**BUG-35**~~ | ~~Typo `tttlMs` → `ttlMs` em pending-question-replay~~ **NÃO REPRODUZIDO** — código uses `options.ttlMs` corretamente | — | — |
+| 48 | 🟢 P3 | **INC-07** | Tool presenters podem divergir | Baixo | Inconsistência de dados |
 
 ---
 
@@ -1051,6 +1093,7 @@ tools/todo/bulk-tools.js     → sdk, ../logger.js, ./store.js
 ```
 
 ### 22.5 Consumidores Externos de `#copilot/tools`
+
 ```
 src/copilot/
 ├── bootstrap.js                    → { TOOLS_LOGGER, TOOLS_METRICS }
@@ -1060,10 +1103,115 @@ src/copilot/
 ├── hooks/presets/production.js     → isToolDisabled
 ├── terminal/commands/sdk.js        → { fileReadTools, fileWriteTools }
 ├── terminal/commands/fs.js         → { fileReadTools, fileWriteTools }
+├── terminal/commands/tools.js      → readIntrospectionRegistrySnapshot
+├── terminal/commands/resume.js     → { fileReadTools }
 └── hooks/tool-interceptor.js       → (indiretamente via isToolDisabled)
 ```
 
+> **📎 Extensão Fase 2:** Veja [`2026-05-10-AUDITORIA-EXTENSAO-FASE2.md`](2026-05-10-AUDITORIA-EXTENSAO-FASE2.md) para análise completa do módulo Terminal, Events, Hooks, MCP Bridge, Presentation e Server Deps.
+
 ---
+
+## 22.6 Arquitetura de Observabilidade e Relações com Tools
+
+### 22.6.1 Pilha de Observabilidade
+
+```
+┌────────────────────────────────────────────────────────────────────────────┐
+│                         src/copilot/observability/                           │
+│                                                                              │
+│  bootstrap.js               ← Conecta core/ → observability/ via DI           │
+│      ├─ registra tokens: SHUTDOWN_LOGGER, DB_LOGGER, SDK_LOGGER,              │
+│      ├─ HOOKS_LOGGER, TOOLS_LOGGER, TOOLS_METRICS                            │
+│      ├─ EVENT_BUS (singleton global)                                          │
+│      └─ HookBus → EventBus bridge (FIX para SYS-GAP-14)                       │
+│                                                                              │
+│  index.js                   ← Barrel de exports públicos                       │
+│      ├─ tool-stats.js       ← wrapWithStats, recordToolCall, getToolStats    │
+│      ├─ metrics.js         ← defaultMetrics singleton (createMetricsStore)   │
+│      ├─ event-bus-runtime.js← attach/detach observability runtime            │
+│      ├─ event-collector.js ← SDK event collection (50+ event types)         │
+│      └─ error-tracker.js   ← ring buffer + global handlers                  │
+│                                                                              │
+│  core/event-bus.js         ← EventBus canônico (namespaces, wildcards, MW)   │
+│      ├─ usado por: terminal/events/, observability/, hooks/                  │
+│      └─ middleware: registerBuiltinMiddleware()                               │
+│                                                                              │
+│  sdk/session/hook-bus.js   ← HookBus estende EventEmitter                  │
+│      ├─ defaultBus singleton (BUG-28 cross-session bleed)                   │
+│      └─ emitHook() → EventBus bridge                                          │
+└────────────────────────────────────────────────────────────────────────────┘
+```
+
+### 22.6.2 Core Infrastructure Architecture
+
+```
+┌────────────────────────────────────────────────────────────────────────────┐
+│                         src/copilot/core/                                      │
+│                                                                              │
+│  di.js (275 lin)           ← Container DI formal                              │
+│      ├─ createToken()    ← tokens tipados                                   │
+│      ├─ createContainer()← singleton/transient/scoped lifecycle             │
+│      ├─ fork()           ← child containers                                 │
+│      └─ dispose()        ← cleanup ordem reversa                            │
+│                                                                              │
+│  di-container.js (20 lin) ← Singleton global exportado                       │
+│                                                                              │
+│  error-handlers.js (233 lin)                                                 │
+│      ├─ logSwallowed()   ← DEBUG + ErrorTracker entry                        │
+│      ├─ wrapAsync()      ← fire-and-forget wrapper                           │
+│      ├─ isFatalError()   ← SESSION_FATAL, CircuitOpenError, socket/IPC       │
+│      └─ isTransientError()← ECONNREFUSED, ETIMEDOUT, HTTP 429/502/503/504    │
+│                                                                              │
+│  mutex.js (151 lin)          ← Promise-chain serialization                     │
+│      ├─ createMutex()    ← mutex básico                                         │
+│      ├─ createMutexPool()← mutex por chave                                     │
+│      └─ withMutex()      ← helper para execução protegida                   │
+│                                                                              │
+│  circuit-breaker.js (164 lin)                                                  │
+│      ├─ CircuitOpenError ← erro customizado                                  │
+│      ├─ Estados: closed → open → half-open                                    │
+│      └─ execute()        ← wrapper protegido                                   │
+│                                                                              │
+│  event-bus.js (383 lin)      ← Bus canônico com namespaces/wildcards          │
+│      ├─ on/once/emit     ← subscrição básica                                   │
+│      ├─ use()            ← middleware pipeline                                 │
+│      ├─ count()/stats()  ← métricas observáveis                                │
+│      └─ bridgeEmitter()  ← bridge EventEmitter → EventBus                      │
+│                                                                              │
+│  shutdown.js (367 lin)                                                       │
+│      ├─ Priority-based handlers                                                 │
+│      ├─ Per-handler timeout (5s default)                                      │
+│      ├─ Lifecycle event emission via injected emitter                         │
+│      └─ Metrics tracking per handler                                            │
+│                                                                              │
+│  interfaces.js (321 lin)     ← 7 interfaces canônicas                         │
+│      ├─ IAgent, IEventBus, IStateStore, IToolRegistry                        │
+│      ├─ IHooksPipeline, IConfigProvider, IMetricsCollector                    │
+│      └─ Contratos JSDoc para DI / testes mock                                │
+└────────────────────────────────────────────────────────────────────────────┘
+```
+
+### 22.6.3 Relação Tools ↔ Observability
+
+| Camada | Arquivo | Função | Observabilidade |
+|---|---|---|---|
+| **Tools Factory** | `tools/tool-factory.js` | buildTool() | Usa `logToolFactory()` → **IGNORA** logger injetado (MITIGADO: fallback check) |
+| **Tools Stats** | `observability/tool-stats.js` | wrapWithStats() | **DOUBLE WRAPPING** com sdk/tools/core.js (SDK-BUG-01) |
+| **Tools Metrics** | `tools/metrics-proxy.js` | recordToolCall() | Proxy → `observability/metrics.js` → `defaultMetrics` |
+| **SDK Tools** | `sdk/tools/core.js` | createTool() | wrappedHandler() → **segundo layer de logs** |
+| **Hook Interceptor** | `hooks/tool-interceptor.js` | onPreToolUse/onPostToolUse | **Tools bloqueadas NÃO são contabilizadas** (SYS-GAP-04) |
+| **Tool Stats** | `tools/introspection-tools.js` | get_system_health | Usa getToolStats() + getStatsByCategory() |
+
+### 22.6.4 Problemas Identificados na Observabilidade
+
+| ID | Severidade | Descrição | Status |
+|---|---|---|---|
+| **OBS-BUG-01** | HIGH | `logToolFactory()` verifica `typeof log === 'function'` antes de usar logger injetado, mas cai para `console.*` se falhar | **MITIGADO** |
+| **OBS-BUG-02** | HIGH | `wrapWithStats()` dupla: tools/tool-stats.js + sdk/tools/core.js acumulam logs/metrics | Ativo |
+| **OBS-BUG-03** | MEDIUM | Hook interceptor (tool-interceptor.js) não chama `recordToolCall()` para denys | Ativo |
+| **OBS-GAP-01** | MEDIUM | EventBus não conectado a HookBus até bootstrap via `defaultHookBus.setEventBus(bus)` em bootstrap.js:146 | **MITIGADO** |
+| **OBS-GAP-02** | LOW | `defaultBus` singleton em sdk/session/hook-bus.js compartilhado cross-session | Ativo |
 
 ## 23. Recomendações Prioritárias Consolidadas
 
@@ -1087,15 +1235,23 @@ src/copilot/
 
 ## Notas Finais
 
-- **Total de arquivos analisados**: 32 (em `src/copilot/tools/`) + 20+ (em `src/copilot/sdk/`) + 6 (bridge layers: hooks, ports, observability, server)
-- **Total de bugs documentados**: 17 (BUG-01 a BUG-17)
+- **Total de arquivos analisados**: 32 (em `src/copilot/tools/`) + 20+ (em `src/copilot/sdk/`) + ~50+ (Fase 2: terminal, hooks, events, bridges, presentation, server, agent facades, observability) + ~2400 lin (core/ infrastructure)
+- **Core Infrastructure analisados**: 7 módulos (di.js, di-container.js, error-handlers.js, mutex.js, circuit-breaker.js, event-bus.js, shutdown.js, interfaces.js) totando ~2070 linhas
+- **Total de bugs tools documentados**: 34 (BUG-01 a BUG-34, incluindo BUG-18 a BUG-34 da Fase 2; BUG-35 **NÃO REPRODUZIDO**)
 - **Total de bugs SDK documentados**: 12 (SDK-BUG-01 a SDK-BUG-12)
-- **Total de gaps sistêmicos documentados**: 10 (SYS-GAP-01 a SYS-GAP-10)
-- **Total de itens na priorização final**: 38
-- **Linhas do arquivo**: 1068
+- **Total de bugs de observabilidade documentados**: 3 (OBS-BUG-01 a OBS-BUG-03)
+- **Total de gaps de observabilidade documentados**: 2 (OBS-GAP-01 a OBS-GAP-02)
+- **Total de gaps sistêmicos documentados**: 16 (SYS-GAP-01 a SYS-GAP-16, incluindo SYS-GAP-11 a SYS-GAP-16 da Fase 2)
+- **Total de inconsistências documentadas**: 6 (INC-01 a INC-06)
+- **Total de test gaps documentados**: 5 (TEST-01 a TEST-05)
+- **Total de itens na priorização final**: 47 (removido BUG-35 não reprodutível)
+- **Seções da auditoria (original + extensão)**: 35 (seções 1–23 originais + seção 22.6 observabilidade + seções 24–35 da extensão)
+- **Linhas do arquivo (original + extensão)**: ~1200 (original + observabilidade) + ~542 (extensão)
+
+> **📎 Documento de Extensão Fase 2:** [`2026-05-10-AUDITORIA-EXTENSAO-FASE2.md`](2026-05-10-AUDITORIA-EXTENSAO-FASE2.md) — cobre em profundidade os módulos Terminal, Events, Hooks, MCP Bridge, Presentation e Server Deps, incluindo análise de estado atual dos arquivos-fonte após modificações recentes.
 
 ---
 
 *Auditoria arquitetural completa gerada em 2026-05-10.*
-*Versão final consolidada — seções 1-23, incluindo análise sistêmica SDK↔Tools.*
+*Versão final consolidada — seções 1-23, incluindo análise sistêmica SDK↔Tools, core infrastructure, e extensão Fase 2.*
 *Autor: Kilo (automated) — repositório: chatgpt-docker-puppeteer*

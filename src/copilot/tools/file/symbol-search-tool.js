@@ -15,8 +15,8 @@ import { toError, toExecError } from '../../core/error-handlers.js';
 import { buildIoMeta, withIoMeta } from '../../core/io-contracts.js';
 import { sanitizeIoTextOutput } from '../../core/io-policy.js';
 import { publishIoOperation } from '../../infra/io-observability.js';
-import { log } from '../logger.js';
-import { buildTool } from '../tool-factory.js';
+import { log } from '../infra/logger.js';
+import { buildTool } from '../infra/tool-factory.js';
 import { WORKSPACE_ROOT, execFileAsync, isRgAvailable, validatePath } from './shared.js';
 
 const RG_TIMEOUT_MS = undefined;

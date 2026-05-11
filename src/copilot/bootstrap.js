@@ -24,9 +24,15 @@ import {
     runCopilotBootPlan,
 } from '#copilot/boot';
 import { EVENT_BUS, SHUTDOWN_LOGGER } from '#copilot/core';
-import { HOOKS_LOGGER } from '#copilot/hooks';
 import { ERROR_TRACKER } from '#copilot/observability';
-import { SDK_LOGGER, TOOLS_BUILDER, checkAuthStatus, createCopilotClient } from '#copilot/sdk';
+import {
+    HOOKS_LOGGER,
+    SDK_LOGGER,
+    TOOLS_BUILDER,
+    checkAuthStatus,
+    createCopilotClient,
+    defaultHookBus,
+} from '#copilot/sdk';
 import { TOOLS_LOGGER, TOOLS_METRICS } from '#copilot/tools';
 import { runCopilotSdkBootPreflight } from './agent/lifecycle/process-host/runtime-host.js';
 import { COPILOT_MODEL, PING_TIMEOUT_MS } from './config/agent.js';
@@ -118,11 +124,10 @@ export async function bootCopilot() {
                 const { buildTool } = await import('./tools/index.js');
                 bootstrapLateDeps({ buildTool });
 
-                const { defaultBus } = await import('./hooks/bus.js');
-                container.register(AUDIT_BUS, () => defaultBus, 'singleton');
+                container.register(AUDIT_BUS, () => defaultHookBus, 'singleton');
 
                 const { setAuditBus } = await import('./audit/pipeline-permission.js');
-                setAuditBus(defaultBus);
+                setAuditBus(defaultHookBus);
 
                 // ── Validation: verify all critical DI tokens are registered ────────
                 container.validateRequired([

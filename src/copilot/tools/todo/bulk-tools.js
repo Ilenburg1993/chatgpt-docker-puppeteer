@@ -9,9 +9,9 @@
  * @see module:copilot/tools/todo/store
  */
 
-import { createTool } from '#copilot/sdk';
 import { z } from 'zod';
-import { log } from '../logger.js';
+import { log } from '../infra/logger.js';
+import { buildTool } from '../infra/tool-factory.js';
 import { generateUniqueId, now, readStore, withStore, zId, zPriority, zStatus } from './store.js';
 
 // ---------------------------------------------------------------------------
@@ -21,26 +21,20 @@ import { generateUniqueId, now, readStore, withStore, zId, zPriority, zStatus } 
 /**
  * Tool: todo_bulk_update — atualiza status/prioridade/tags em múltiplas tarefas.
  */
-export const todoBulkUpdateTool = createTool({
+export const todoBulkUpdateTool = buildTool({
     name: 'todo_bulk_update',
     description:
         'Atualiza status, prioridade ou tags em múltiplas tarefas simultaneamente. ' +
         'Aplica a mesma mudança a todas as tarefas do array de IDs fornecido. ' +
         'Use para completar um sprint, repriorizar um conjunto ou etiquetar em lote.',
-    parameters: /** @type {import('#copilot/sdk/types').ZodSchema<any>} */ (
-        /** @type {unknown} */ (
-            z.object({
-                ids: z.array(zId).min(1).describe('Lista de IDs de tarefas a atualizar'),
-                status: zStatus
-                    .optional()
-                    .describe('Novo status a aplicar a todas (máquina de estados ignorada em bulk)'),
-                priority: zPriority.optional().describe('Nova prioridade a aplicar a todas'),
-                add_tags: z.array(z.string()).optional().describe('Tags a adicionar a todas'),
-                remove_tags: z.array(z.string()).optional().describe('Tags a remover de todas'),
-                completed_by: z.string().optional().describe('Identificador de quem concluiu (agente, usuário, etc.)'),
-            })
-        )
-    ),
+    parameters: z.object({
+        ids: z.array(zId).min(1).describe('Lista de IDs de tarefas a atualizar'),
+        status: zStatus.optional().describe('Novo status a aplicar a todas (máquina de estados ignorada em bulk)'),
+        priority: zPriority.optional().describe('Nova prioridade a aplicar a todas'),
+        add_tags: z.array(z.string()).optional().describe('Tags a adicionar a todas'),
+        remove_tags: z.array(z.string()).optional().describe('Tags a remover de todas'),
+        completed_by: z.string().optional().describe('Identificador de quem concluiu (agente, usuário, etc.)'),
+    }),
     handler: async (
         /**
          * @type {{
@@ -102,7 +96,7 @@ export const todoBulkUpdateTool = createTool({
 /**
  * Tool: todo_clear_completed — remove todas as tarefas concluídas ou canceladas.
  */
-export const todoClearCompletedTool = createTool({
+export const todoClearCompletedTool = buildTool({
     name: 'todo_clear_completed',
     description:
         'Remove todas as tarefas com status "done" ou "cancelled" (ou apenas um deles via status_filter). ' +
@@ -186,38 +180,34 @@ export const todoClearCompletedTool = createTool({
 /**
  * Tool: todo_import — importa tarefas de uma lista de objetos JSON.
  */
-export const todoImportTool = createTool({
+export const todoImportTool = buildTool({
     name: 'todo_import',
     description:
         'Importa múltiplas tarefas de uma vez a partir de um array de objetos. ' +
         'Cada objeto deve ter pelo menos "title". Campos opcionais: description, priority, status, ' +
         'tags, due_date, notes, metadata. IDs novos são gerados automaticamente. ' +
         'Use para migrar tarefas de outros sistemas ou criar um sprint inteiro de uma vez.',
-    parameters: /** @type {import('#copilot/sdk/types').ZodSchema<any>} */ (
-        /** @type {unknown} */ (
-            z.object({
-                tasks: z
-                    .array(
-                        z.object({
-                            title: z.string().min(1),
-                            description: z.string().optional(),
-                            status: zStatus.optional(),
-                            priority: zPriority.optional(),
-                            tags: z.array(z.string()).optional(),
-                            due_date: z.string().datetime({ offset: true }).optional(),
-                            notes: z.string().optional(),
-                            metadata: z.record(z.string(), z.unknown()).optional(),
-                        }),
-                    )
-                    .min(1)
-                    .describe('Array de tarefas a importar'),
-                default_priority: zPriority
-                    .optional()
-                    .default('medium')
-                    .describe('Prioridade padrão para tarefas sem priority'),
-            })
-        )
-    ),
+    parameters: z.object({
+        tasks: z
+            .array(
+                z.object({
+                    title: z.string().min(1),
+                    description: z.string().optional(),
+                    status: zStatus.optional(),
+                    priority: zPriority.optional(),
+                    tags: z.array(z.string()).optional(),
+                    due_date: z.string().datetime({ offset: true }).optional(),
+                    notes: z.string().optional(),
+                    metadata: z.record(z.string(), z.unknown()).optional(),
+                }),
+            )
+            .min(1)
+            .describe('Array de tarefas a importar'),
+        default_priority: zPriority
+            .optional()
+            .default('medium')
+            .describe('Prioridade padrão para tarefas sem priority'),
+    }),
     handler: async (
         /**
          * @type {{

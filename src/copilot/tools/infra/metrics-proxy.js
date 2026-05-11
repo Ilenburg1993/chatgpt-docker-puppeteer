@@ -1,6 +1,6 @@
 // @ts-check
 /**
- * src/copilot/tools/metrics-proxy.js
+ * src/copilot/tools/infra/metrics-proxy.js
  *
  * Proxy de métricas para o módulo tools/.
  *
@@ -9,10 +9,10 @@
  * Em vez de importar diretamente de observability/ (camada proibida para tools/), este módulo expõe funções de métricas
  * com implementações injetáveis via `setToolsMetrics()`. Se não injetado, retorna valores no-op / vazios.
  *
- * @module copilot/tools/metrics-proxy
+ * @module copilot/tools/infra/metrics-proxy
  */
 
-/** @typedef {import('../observability/metrics-histogram.js').MetricsSummary} MetricsSummary */
+/** @typedef {import('../../observability/metrics-histogram.js').MetricsSummary} MetricsSummary */
 
 /**
  * @typedef {object} ToolStatsEntry

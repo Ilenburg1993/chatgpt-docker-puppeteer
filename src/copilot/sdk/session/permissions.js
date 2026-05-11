@@ -15,6 +15,7 @@
 
 import { approveAll } from '@github/copilot-sdk';
 import { log } from '../logger.js';
+import { extractPermissionToolName } from './permission-runtime.js';
 
 // Re-export canônico do SDK
 export { approveAll };
@@ -36,6 +37,8 @@ export { approveAll };
  * @property {string[]} [denyTools] - Blacklist de nomes de tools negadas
  * @property {RegExp[]} [denyPatterns] - Regex patterns para negar tools por nome
  * @property {boolean} [auditMode=false] - Logar todas as decisões sem negar. Default is `false`
+ * @property {'allow' | 'deny'} [defaultDecision='allow'] - Decisão padrão quando nenhuma regra explícita (allow/deny).
+ *   Default is `'allow'`
  * @property {(
  *     request: PermissionRequest,
  *     invocation: { sessionId: string },
@@ -118,12 +121,7 @@ function extractPath(request) {
  * @returns {string}
  */
 function extractToolName(request) {
-    return (
-        /** @type {{ toolName?: string; tool?: string }} */ (request)?.toolName ??
-        /** @type {{ toolName?: string; tool?: string }} */ (request)?.tool ??
-        /** @type {{ name?: string }} */ (request)?.name ??
-        'unknown'
-    );
+    return extractPermissionToolName(request);
 }
 
 // ─── API pública ──────────────────────────────────────────────────────────────
@@ -151,6 +149,7 @@ export function createPermissionHandler(config) {
     const denyTools = cfg.denyTools ?? [];
     const denyPatterns = cfg.denyPatterns ?? [];
     const auditMode = cfg.auditMode ?? false;
+    const defaultDecision = cfg.defaultDecision === 'deny' ? 'deny' : 'allow';
     const onRequest = cfg.onRequest;
 
     assertOptionalStringArray(allowTools, 'allowTools');
@@ -253,13 +252,13 @@ export function createPermissionHandler(config) {
                 return result;
             }
 
-            // 6. Default: aprovar
+            // 6. Default: allow/deny configurável
             if (auditMode)
                 log(
                     'INFO',
-                    `[sdk/permissions] AUDIT: sessionId='${sessionId}' aprovando kind='${kind}' tool='${toolName}' (default)`,
+                    `[sdk/permissions] AUDIT: sessionId='${sessionId}' kind='${kind}' tool='${toolName}' (defaultDecision=${defaultDecision})`,
                 );
-            return approved();
+            return defaultDecision === 'deny' ? denied() : approved();
         }
     );
 }

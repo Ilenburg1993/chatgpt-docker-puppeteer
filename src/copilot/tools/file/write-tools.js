@@ -20,8 +20,8 @@ import {
     patchTextLocked,
     writeFileAtomic,
 } from '../../infra/io-engine.js';
-import { log } from '../logger.js';
-import { buildTool } from '../tool-factory.js';
+import { log } from '../infra/logger.js';
+import { buildTool } from '../infra/tool-factory.js';
 import { validatePath } from './shared.js';
 
 const ADVISORY_WRITE_CONTENT_BYTES = 2 * 1024 * 1024;

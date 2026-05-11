@@ -1,6 +1,6 @@
 // @ts-check
 /**
- * src/copilot/tools/hub-tools.js
+ * src/copilot/tools/hub/hub-tools.js
  *
  * Tools do AlwaysAliveAgent para o ConversationHub — ambiente permanente LLM-A ↔ LLM-B ↔ Usuário.
  *
@@ -11,29 +11,29 @@
  * - Verificar mensagens injetadas pelo usuário
  * - Consultar histórico de conversas
  *
- * @module copilot/tools/hub-tools
+ * @module copilot/tools/hub/hub-tools
  * @see EventBus
  * @see module:copilot/conversation-hub/orchestrator
  * @see module:copilot/channel/client
  */
 
 import { z } from 'zod';
-import { LLM_B_TURN_TIMEOUT_MS } from '../config/env.js';
-import { resolveHubTurnTimeout } from '../config/hub-timeout-policy.js';
-import { toError } from '../core/error-handlers.js';
-import { log } from './logger.js';
-import { buildTool } from './tool-factory.js';
+import { LLM_B_TURN_TIMEOUT_MS } from '../../config/env.js';
+import { resolveHubTurnTimeout } from '../../config/hub-timeout-policy.js';
+import { toError } from '../../core/error-handlers.js';
+import { log } from '../infra/logger.js';
+import { buildTool } from '../infra/tool-factory.js';
 
 // ─── Injeção de dependência do hub (ARCH-02) ─────────────────────────────────
 
-/** @type {import('../conversation-hub/hub.js').ConversationHub | null} */
+/** @type {import('../../conversation-hub/hub.js').ConversationHub | null} */
 let _injectedHub = null;
 
 /**
  * Injeta o ConversationHub para evitar import dinâmico implícito. Seguir o padrão de `setSessionRpc()` em
  * session-rpc-tools.js. Deve ser chamado em `bootstrapTools()` após o hub ser inicializado.
  *
- * @param {import('../conversation-hub/hub.js').ConversationHub} hub
+ * @param {import('../../conversation-hub/hub.js').ConversationHub} hub
  * @returns {void}
  */
 export function setHub(hub) {
@@ -52,7 +52,7 @@ export function resetHubForTests() {
 /**
  * Retorna o hub injetado via `setHub()`. Retorna null se não injetado ou não pronto.
  *
- * @returns {import('../conversation-hub/hub.js').ConversationHub | null}
+ * @returns {import('../../conversation-hub/hub.js').ConversationHub | null}
  */
 function requireHub() {
     if (_injectedHub === null) return null;

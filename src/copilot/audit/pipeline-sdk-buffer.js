@@ -22,7 +22,14 @@ const envInt = (key, def) => {
 const COPILOT_AUDIT_BUFFER_SIZE = envInt('COPILOT_AUDIT_BUFFER_SIZE', 500);
 
 /**
- * @typedef {import('#copilot/hooks/types').AuditEntry} SdkAuditEntry
+ * @typedef {{
+ *     toolName: string;
+ *     toolArgs: unknown;
+ *     toolResult: unknown;
+ *     sessionId: string;
+ *     ts: string;
+ *     durationMs?: number;
+ * }} SdkAuditEntry
  */
 
 /**

@@ -7,6 +7,7 @@
  */
 
 import { getMcpStatus } from '#copilot/bridges';
+import { readIntrospectionRegistrySnapshot } from '#copilot/tools';
 import { buildRuntimeSdkFsRoutingProjection } from '../../../presentation/runtime-file-routing.js';
 import { readRuntimeLifecycleSnapshot } from '../../../presentation/runtime-lifecycle.js';
 import { listActiveRuntimeTodosProjection } from '../../../presentation/runtime-todos.js';
@@ -16,7 +17,6 @@ import {
     getSdkSessionMode,
 } from '../../../presentation/runtime-ui-state-store.js';
 import { readToolStatsProjection } from '../../../presentation/system-metrics.js';
-import { readIntrospectionRegistrySnapshot } from '../../../tools/introspection-tools.js';
 import { readTerminalActivityHistory, readTerminalActivitySnapshot } from '../../state/activity-state.js';
 import { readTerminalDisplayState } from '../../state/display-policy.js';
 import { readTerminalTurnTraceProjection } from '../../state/turn-trace-state.js';

@@ -9,10 +9,9 @@
  * @see module:copilot/tools/todo/store
  */
 
-import { createTool } from '#copilot/sdk';
 import { z } from 'zod';
-import { log } from '../logger.js';
-import { withSkipPermission } from '../tool-factory.js';
+import { log } from '../infra/logger.js';
+import { buildTool, withSkipPermission } from '../infra/tool-factory.js';
 import { createTask, isOverdue, now, readStore, sanitize, withStore, zId, zPriority } from './store.js';
 
 // ---------------------------------------------------------------------------
@@ -23,7 +22,7 @@ import { createTask, isOverdue, now, readStore, sanitize, withStore, zId, zPrior
  * Tool: todo_get — obtém uma tarefa completa com sua árvore de subtarefas.
  */
 export const todoGetTool = withSkipPermission(
-    createTool({
+    buildTool({
         name: 'todo_get',
         description:
             'Obtém uma tarefa pelo ID com todos os seus metadados e subtarefas. ' +
@@ -72,7 +71,7 @@ export const todoGetTool = withSkipPermission(
 /**
  * Tool: todo_update — atualiza qualquer campo de uma tarefa existente.
  */
-export const todoUpdateTool = createTool({
+export const todoUpdateTool = buildTool({
     name: 'todo_update',
     description:
         'Atualiza campos arbitrários de uma tarefa existente. Apenas os campos fornecidos são ' +
@@ -166,7 +165,7 @@ export const todoUpdateTool = createTool({
 /**
  * Tool: todo_add_subtask — adiciona uma nova subtarefa a uma tarefa pai existente.
  */
-export const todoAddSubtaskTool = createTool({
+export const todoAddSubtaskTool = buildTool({
     name: 'todo_add_subtask',
     description:
         'Cria uma nova subtarefa vinculada a uma tarefa pai existente. ' +

@@ -1,6 +1,6 @@
 // @ts-check
 /**
- * src/copilot/tools/hook-tools.js
+ * src/copilot/tools/hook/hook-tools.js
  *
  * Custom Tools que expõem o hook system do projeto ao Always-Alive Agent (LLM-B).
  *
@@ -16,31 +16,34 @@
  * `POST /api/copilot/answer` (ou equivalente na interface ativa). A continuidade ordinária do terminal permanente
  * permanece no `ask_user`; esta tool só deve ser chamada quando uma decisão estruturada for realmente necessária.
  *
- * @module copilot/tools/hook-tools
+ * @module copilot/tools/hook/hook-tools
  * @see EventBus
  * @see module:copilot/lib/hooks
  * @see module:copilot/hooks/audit
  */
 
 import { getAuditTail } from '#copilot/audit';
+import {
+    cancelAllPendingStructuredUserInput,
+    deletePendingStructuredUserInputResolver,
+    getPendingStructuredUserInputCount,
+    getPendingStructuredUserInputIds,
+    hasPendingStructuredUserInputRequests as hasPendingStructuredUserInputRequestsState,
+    nextStructuredUserInputRequestId,
+    registerPendingStructuredUserInputResolver,
+    resolvePendingStructuredUserInput,
+    ToolSessionContext,
+} from '#copilot/sdk';
 import { execFile } from 'node:child_process';
 import { access, readFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 import { z } from 'zod';
-import { toError } from '../core/error-handlers.js';
-import { log } from './logger.js';
-import { buildTool, withSkipPermission } from './tool-factory.js';
-import {
-    deletePendingUserInputResolver,
-    getPendingUserInputCount,
-    getPendingUserInputIds,
-    hasPendingUserInputRequests as hasPendingUserInputRequestsState,
-    nextUserInputRequestId,
-    registerPendingUserInputResolver,
-    resolvePendingUserInput,
-} from './user-input-state.js';
+import { toError } from '../../core/error-handlers.js';
+import { normalizeUserInputBridgeContract } from '../../core/tool-contracts.js';
+import { log } from '../infra/logger.js';
+import { buildTool, withSkipPermission } from '../infra/tool-factory.js';
 const execFileAsync = promisify(execFile);
 
 /**
@@ -48,7 +51,7 @@ const execFileAsync = promisify(execFile);
  *
  * @type {string}
  */
-const ROOT = resolve(fileURLToPath(import.meta.url), '../../../../');
+const ROOT = resolve(fileURLToPath(import.meta.url), '../../../../../');
 
 /**
  * Diretório de estado do hook system.
@@ -67,14 +70,89 @@ const HOOK_STATE_DIR = join(ROOT, '.github', 'hooks', 'state');
 let _broadcastSse = () => {};
 
 /**
+ * `ToolSessionContext` injetado opcionalmente via `configureHookTools()`. Quando presente, o estado de input pendente é
+ * encapsulado por sessão (em vez de usar singletons globais).
+ *
+ * @type {ToolSessionContext | null}
+ */
+let _toolSessionContext = null;
+
+/**
  * Injeta a função `broadcastSse` para evitar import circular com a borda de diálogo do terminal. Deve ser chamado em
  * `startTerminalServer()` antes de iniciar o agente.
  *
- * @param {{ broadcastSse: (event: string, data: Record<string, unknown>) => void }} config
+ * @param {{
+ *     broadcastSse?: (event: string, data: Record<string, unknown>) => void;
+ *     toolSessionContext?: ToolSessionContext;
+ * }} config
  * @returns {void}
  */
-export function configureHookTools({ broadcastSse }) {
-    _broadcastSse = broadcastSse;
+export function configureHookTools({ broadcastSse, toolSessionContext } = {}) {
+    if (typeof broadcastSse === 'function') {
+        _broadcastSse = broadcastSse;
+    }
+    if (toolSessionContext instanceof ToolSessionContext) {
+        _toolSessionContext = toolSessionContext;
+        // Repassa broadcastSse para o context (caso seja configurado antes ou depois)
+        if (typeof broadcastSse === 'function') {
+            _toolSessionContext.configureBroadcastSse(broadcastSse);
+        }
+    }
+}
+
+// ─── Helpers internos com suporte a ToolSessionContext ───────────────────────
+
+/** @returns {number} */
+function _getPendingInputCount() {
+    return _toolSessionContext ? _toolSessionContext.getPendingInputCount() : getPendingStructuredUserInputCount();
+}
+
+/** @returns {string[]} */
+function _getPendingInputIds() {
+    return _toolSessionContext ? _toolSessionContext.getPendingInputIds() : getPendingStructuredUserInputIds();
+}
+
+/** @returns {string} */
+function _nextInputId() {
+    return _toolSessionContext ? _toolSessionContext.nextStructuredInputId() : nextStructuredUserInputRequestId();
+}
+
+/**
+ * @param {string} requestId
+ * @param {(answer: string) => void} resolve
+ */
+function _registerPendingInput(requestId, resolve) {
+    if (_toolSessionContext) {
+        _toolSessionContext.registerPendingInput(requestId, resolve);
+    } else {
+        registerPendingStructuredUserInputResolver(requestId, resolve);
+    }
+}
+
+/**
+ * @param {string} requestId
+ * @returns {boolean}
+ */
+function _deletePendingInput(requestId) {
+    return _toolSessionContext
+        ? _toolSessionContext.deletePendingInput(requestId)
+        : deletePendingStructuredUserInputResolver(requestId);
+}
+
+/**
+ * @param {string} event
+ * @param {Record<string, unknown>} data
+ */
+function _broadcast(event, data) {
+    if (_toolSessionContext) {
+        _toolSessionContext.broadcastSse(event, data);
+    } else {
+        try {
+            _broadcastSse(event, data);
+        } catch (_) {
+            /* ignora */
+        }
+    }
 }
 
 /**
@@ -86,7 +164,8 @@ export function configureHookTools({ broadcastSse }) {
  * @returns {boolean} true se havia uma Promise pendente resolvida, false se fila vazia
  */
 export function resolveUserInput(answer, requestId) {
-    return resolvePendingUserInput(answer, requestId);
+    if (_toolSessionContext) return _toolSessionContext.resolveStructuredInput(answer, requestId);
+    return resolvePendingStructuredUserInput(answer, requestId);
 }
 
 /**
@@ -95,7 +174,7 @@ export function resolveUserInput(answer, requestId) {
  * @returns {string[]}
  */
 export function getPendingInputIds() {
-    return getPendingUserInputIds();
+    return _getPendingInputIds();
 }
 
 /**
@@ -108,7 +187,22 @@ export function getPendingInputIds() {
  * @returns {boolean}
  */
 export function hasPendingUserInputRequests() {
-    return hasPendingUserInputRequestsState();
+    return _toolSessionContext ? _toolSessionContext.hasPendingInputs() : hasPendingStructuredUserInputRequestsState();
+}
+
+/**
+ * Cancela todas as solicitações estruturadas pendentes de input do usuário.
+ *
+ * Usado no teardown de sessão para evitar Promises órfãs quando o runtime encerra com `request_user_input` em
+ * andamento.
+ *
+ * @param {string} [answer='Sessão encerrada antes da resposta do usuário.'] Default is `'Sessão encerrada antes da
+ *   resposta do usuário.'`. Default is `'Sessão encerrada antes da resposta do usuário.'`
+ * @returns {number}
+ */
+export function cancelAllUserInputRequests(answer = 'Sessão encerrada antes da resposta do usuário.') {
+    if (_toolSessionContext) return _toolSessionContext.cancelAllPendingInput(answer);
+    return cancelAllPendingStructuredUserInput(answer);
 }
 
 // ─── Tool: hook_get_audit_tail ────────────────────────────────────────────────
@@ -242,24 +336,24 @@ const requestUserInputTool = buildTool({
 
         log('INFO', `[hook-tools/request_user_input] Pergunta: "${fullQuestion.slice(0, 100)}"`);
 
-        // RF-029: gerar ID único para este request de input
-        const requestId = nextUserInputRequestId();
-
         // ARCH-N01 (fix): suspensão real — a Promise só resolve quando resolveUserInput() for chamado,
         // o que ocorre via answerPendingQuestion() no agente (POST /api/copilot/answer).
         // Isso garante que o modelo não continua processamento até receber a resposta do usuário.
         return new Promise((resolve, reject) => {
             // RF-029: se já há muitos requests pendentes (>5), rejeitar para evitar acúmulo indefinido
-            if (getPendingUserInputCount() >= 5) {
+            if (_getPendingInputCount() >= 5) {
                 reject(
                     new Error(
                         `[hook-tools] Limite de requests de input simultâneos atingido (5). ` +
-                            `Requests pendentes: ${getPendingUserInputIds().join(', ')}`,
+                            `Requests pendentes: ${_getPendingInputIds().join(', ')}`,
                     ),
                 );
                 return;
             }
-            registerPendingUserInputResolver(requestId, (answer) => {
+
+            // RF-029: gerar ID único somente após validar capacidade disponível
+            const requestId = _nextInputId();
+            _registerPendingInput(requestId, (answer) => {
                 clearTimeout(autoCleanupTimer);
                 resolve({
                     requestId,
@@ -273,7 +367,7 @@ const requestUserInputTool = buildTool({
             });
             // BUG-P2-06: auto-cleanup após 10min para evitar memory leak se resolver nunca é chamado
             const autoCleanupTimer = setTimeout(() => {
-                if (deletePendingUserInputResolver(requestId)) {
+                if (_deletePendingInput(requestId)) {
                     resolve({
                         requestId,
                         question: fullQuestion,
@@ -287,12 +381,13 @@ const requestUserInputTool = buildTool({
             }, 600_000);
             autoCleanupTimer.unref();
             // ARCH-03 (fix): broadcastSse injetado via configureHookTools() — sem import dinâmico circular
-            _broadcastSse('waiting_for_input', {
+            const payload = normalizeUserInputBridgeContract({
                 requestId,
                 question: fullQuestion,
                 choices: choices ?? [],
                 allowFreeform,
             });
+            _broadcast('waiting_for_input', payload);
         });
     },
 });
