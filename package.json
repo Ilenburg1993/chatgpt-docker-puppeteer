@@ -503,7 +503,7 @@
     "chrome-devtools-mcp": "^0.20.3",
     "complexity-report": "^2.0.0-alpha",
     "cross-env": "^10.1.0",
-    "dependency-cruiser": "^16.10.4",
+    "dependency-cruiser": "^17.3.10",
     "esbuild": "^0.27.3",
     "eslint": "^10.3.0",
     "eslint-config-prettier": "^10.1.8",
