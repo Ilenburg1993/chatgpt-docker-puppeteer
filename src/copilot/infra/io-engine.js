@@ -9,12 +9,15 @@
  */
 
 import { isUtf8 } from 'node:buffer';
+import { execFile } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
 import { createReadStream } from 'node:fs';
 import * as fs from 'node:fs/promises';
 import { dirname } from 'node:path';
 import { createInterface } from 'node:readline';
+import { promisify } from 'node:util';
 import { buildIoMeta, createIoTraceId, withIoMeta } from '../core/io-contracts.js';
+import { sanitizeIoTextOutput } from '../core/io-policy.js';
 import { getIoL2Cache } from './io-cache-l2-registry.js';
 import {
     getIoL1Cache,
@@ -25,8 +28,15 @@ import {
     makeTextKey,
     normalizeIoCacheKey,
 } from './io-cache.js';
+import { findIoIndexSymbol, getIoIndexStats, searchIoIndex } from './io-index-registry.js';
 import { withIoResourceLock, withIoResourceLocks } from './io-locks.js';
 import { nowIoMs, publishIoOperation } from './io-observability.js';
+
+const execFileAsync = promisify(execFile);
+const RG_SEARCH_TIMEOUT_MS = undefined;
+
+/** @type {boolean | null} */
+let _rgAvailable = null;
 
 /** @param {string} filePath */
 function invalidateIoCacheTiers(filePath) {
@@ -92,6 +102,185 @@ function normalizeWritePayload(filePath, content, encoding) {
         payload: Buffer.isBuffer(content) ? content : String(content),
         bytes: buf.byteLength,
     };
+}
+
+/**
+ * @returns {Promise<boolean>}
+ */
+async function isRgAvailable() {
+    if (_rgAvailable !== null) return _rgAvailable;
+    try {
+        await execFileAsync('rg', ['--version'], { timeout: 3000 });
+        _rgAvailable = true;
+    } catch {
+        _rgAvailable = false;
+    }
+    return _rgAvailable;
+}
+
+/**
+ * @param {string} stdout
+ * @returns {{ text: string; sanitized: boolean; redactions: number; policyVersion: string }}
+ */
+function sanitizeSearchOutput(stdout) {
+    const sensitiveLineRe = /-----BEGIN [A-Z ]+-----|ey[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,}/;
+    const lineFiltered = stdout
+        .split('\n')
+        .filter((line) => !sensitiveLineRe.test(line))
+        .join('\n');
+    return sanitizeIoTextOutput({ text: lineFiltered });
+}
+
+/**
+ * @param {{
+ *     pattern: string;
+ *     isRegex?: boolean;
+ *     caseSensitive?: boolean;
+ *     includePattern?: string;
+ *     excludePattern?: string;
+ * }} opts
+ * @returns {boolean}
+ */
+function canUseIndexSearch(opts) {
+    return (
+        opts.pattern.trim().length > 0 &&
+        !opts.isRegex &&
+        !opts.caseSensitive &&
+        !opts.includePattern &&
+        !opts.excludePattern
+    );
+}
+
+/**
+ * @param {{ filePath: string; relativePath: string; snippet: string }[]} rows
+ * @returns {string}
+ */
+function formatIndexSearchRows(rows) {
+    return rows
+        .map((row) => {
+            const snippet = String(row.snippet ?? '')
+                .replaceAll('[', '')
+                .replaceAll(']', '')
+                .replace(/\s+/gu, ' ')
+                .trim();
+            return `${row.relativePath || row.filePath}: ${snippet}`;
+        })
+        .join('\n');
+}
+
+/**
+ * @param {{
+ *     pattern: string;
+ *     resolved: string;
+ *     isRegex?: boolean;
+ *     caseSensitive?: boolean;
+ *     includePattern?: string;
+ *     excludePattern?: string;
+ *     contextLines?: number;
+ * }} opts
+ * @returns {string[]}
+ */
+function buildGrepArgs(opts) {
+    return [
+        '-R',
+        '-n',
+        ...(opts.isRegex ? ['-E'] : ['-F']),
+        ...(opts.caseSensitive ? [] : ['-i']),
+        ...(opts.contextLines ? ['-C', String(opts.contextLines)] : []),
+        '--exclude-dir=.git',
+        '--exclude-dir=node_modules',
+        '--exclude-dir=dist',
+        ...(opts.includePattern ? [`--include=${opts.includePattern}`] : []),
+        ...(opts.excludePattern ? [`--exclude=${opts.excludePattern}`] : []),
+        opts.pattern,
+        opts.resolved,
+    ];
+}
+
+/**
+ * @param {string} name
+ * @returns {string}
+ */
+function escapeRegex(name) {
+    return name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/**
+ * @typedef {'function' | 'class' | 'variable' | 'export' | 'type' | 'all'} IoSymbolKind
+ */
+
+/**
+ * @param {string} symbolName
+ * @param {IoSymbolKind} kind
+ * @returns {string}
+ */
+function buildSymbolPattern(symbolName, kind) {
+    const n = escapeRegex(symbolName);
+
+    /** @type {Record<IoSymbolKind, string>} */
+    const patterns = {
+        function: [
+            `(?:async\\s+)?function\\s+${n}\\b`,
+            `${n}\\s*[:=]\\s*(?:async\\s+)?(?:\\([^)]*\\)|\\w+)\\s*=>`,
+            `${n}\\s*[:=]\\s*(?:async\\s+)?function`,
+            `def\\s+${n}\\b`,
+            `fn\\s+${n}\\b`,
+            `func\\s+${n}\\b`,
+        ].join('|'),
+        class: [`class\\s+${n}\\b`, `${n}\\s*=\\s*class\\b`].join('|'),
+        variable: [`(?:const|let|var)\\s+${n}\\b`, `${n}\\s*:?=\\s*(?!>)`].join('|'),
+        export: [
+            `export\\s+(?:default\\s+)?(?:(?:async\\s+)?function|class|const|let|var|type|interface)\\s+${n}\\b`,
+            `export\\s*\\{[^}]*\\b${n}\\b`,
+            `module\\.exports[\\[.].*\\b${n}\\b`,
+        ].join('|'),
+        type: [
+            `(?:interface|type)\\s+${n}\\b`,
+            `@typedef\\s+\\{[^}]+\\}\\s+${n}\\b`,
+            `${n}\\s*=\\s*(?:TypeVar|NewType)\\(`,
+        ].join('|'),
+        all: [
+            `(?:(?:async\\s+)?function|class|(?:const|let|var)|interface|type|def\\s|fn\\s|func\\s)\\s*${n}\\b`,
+            `${n}\\s*[:=]\\s*(?:async\\s+)?(?:\\([^)]*\\)|\\w+)\\s*=>`,
+        ].join('|'),
+    };
+
+    return patterns[kind] ?? patterns.all;
+}
+
+/**
+ * @param {IoSymbolKind} kind
+ * @returns {string[]}
+ */
+function kindToGlobs(kind) {
+    if (kind === 'type') return ['*.ts', '*.tsx', '*.d.ts'];
+    return ['*.js', '*.mjs', '*.cjs', '*.ts', '*.tsx', '*.py', '*.rs', '*.go'];
+}
+
+/**
+ * @param {{
+ *     relativePath?: string | null;
+ *     filePath: string;
+ *     symbolName: string;
+ *     symbolKind: string;
+ *     line: number;
+ *     exported?: number | boolean | null;
+ *     docComment?: string | null;
+ * }[]} rows
+ * @returns {string}
+ */
+function formatIndexSymbolRows(rows) {
+    return rows
+        .map((row) => {
+            const location = `${row.relativePath || row.filePath}:${row.line}`;
+            const exported = row.exported ? ' export' : '';
+            const doc = String(row.docComment ?? '')
+                .replace(/\s+/gu, ' ')
+                .trim();
+            const suffix = doc ? ` — ${doc}` : '';
+            return `${location}: ${row.symbolKind} ${row.symbolName}${exported}${suffix}`;
+        })
+        .join('\n');
 }
 
 /**
@@ -1290,6 +1479,374 @@ export async function diffText(pathA, pathB, options = {}) {
             false,
             error,
         );
+        throw error;
+    }
+}
+
+/**
+ * Busca texto/regex em arquivos já validados pelo adapter da tool.
+ *
+ * @param {string} targetPath
+ * @param {{
+ *     workspaceRoot?: string;
+ *     pattern: string;
+ *     isRegex?: boolean;
+ *     caseSensitive?: boolean;
+ *     includePattern?: string;
+ *     excludePattern?: string;
+ *     contextLines?: number;
+ *     maxResults?: number;
+ *     traceId?: string;
+ * }} options
+ * @returns {Promise<{
+ *     targetPath: string;
+ *     pattern: string;
+ *     output: string;
+ *     matchCount: number;
+ *     engine: string;
+ *     sanitized: boolean;
+ *     redactions: number;
+ *     io: import('../core/io-contracts.js').IoMeta;
+ * }>}
+ */
+export async function searchText(targetPath, options) {
+    const startedAt = nowIoMs();
+    const traceId = options.traceId ?? createIoTraceId();
+    const advisoryLimitsBase = {
+        requestedMaxResults: options.maxResults ?? null,
+        limitMode: 'informative',
+        patternLength: options.pattern.length,
+    };
+
+    /**
+     * @param {string} engine
+     * @param {number} bytesRead
+     * @param {Record<string, unknown>} [extra]
+     */
+    const buildSearchIo = (engine, bytesRead, extra = {}) =>
+        buildIoMeta({
+            operation: 'search',
+            target: targetPath,
+            targetKind: 'workspace',
+            bytesRead,
+            durationMs: elapsedMs(startedAt),
+            engine,
+            riskClass: 'low',
+            traceId,
+            advisoryLimits: { ...advisoryLimitsBase, ...extra },
+        });
+
+    try {
+        const indexStats = getIoIndexStats();
+        const indexSearchOptions = {
+            pattern: options.pattern,
+            ...(options.isRegex !== undefined ? { isRegex: options.isRegex } : {}),
+            ...(options.caseSensitive !== undefined ? { caseSensitive: options.caseSensitive } : {}),
+            ...(options.includePattern ? { includePattern: options.includePattern } : {}),
+            ...(options.excludePattern ? { excludePattern: options.excludePattern } : {}),
+        };
+        if (canUseIndexSearch(indexSearchOptions)) {
+            const freshFiles = 'freshFiles' in indexStats ? Number(indexStats.freshFiles ?? 0) : 0;
+            const indexRows =
+                Boolean(indexStats?.available) && freshFiles > 0
+                    ? searchIoIndex(options.pattern, { pathPrefix: targetPath })
+                    : [];
+            if (indexRows.length > 0) {
+                const filteredOutput = sanitizeSearchOutput(formatIndexSearchRows(indexRows));
+                const io = publishAndReturn(
+                    buildSearchIo('io-engine.index.search', Buffer.byteLength(filteredOutput.text, 'utf8'), {
+                        redactions: filteredOutput.redactions,
+                        fallback: 'rg-on-index-miss-or-complex-query',
+                    }),
+                    true,
+                );
+                return {
+                    targetPath,
+                    pattern: options.pattern,
+                    output: filteredOutput.text,
+                    matchCount: indexRows.length,
+                    engine: 'fts5-index',
+                    sanitized: filteredOutput.sanitized,
+                    redactions: filteredOutput.redactions,
+                    io: { ...io, policyVersion: filteredOutput.policyVersion },
+                };
+            }
+        }
+
+        if (await isRgAvailable()) {
+            try {
+                const { stdout } = await execFileAsync(
+                    'rg',
+                    [
+                        '--color=never',
+                        '--no-heading',
+                        ...(options.isRegex ? [] : ['--fixed-strings']),
+                        ...(options.caseSensitive ? [] : ['--ignore-case']),
+                        `--context=${options.contextLines ?? 2}`,
+                        ...(options.includePattern ? [`--glob=${options.includePattern}`] : []),
+                        ...(options.excludePattern ? [`--glob=!${options.excludePattern}`] : []),
+                        '--glob=!node_modules',
+                        '--glob=!.git',
+                        '--glob=!dist',
+                        '-e',
+                        options.pattern,
+                        targetPath,
+                    ],
+                    {
+                        cwd: options.workspaceRoot,
+                        timeout: RG_SEARCH_TIMEOUT_MS,
+                        maxBuffer: 1024 * 1024 * 1024,
+                    },
+                );
+                const filteredOutput = sanitizeSearchOutput(stdout);
+                const io = publishAndReturn(
+                    buildSearchIo('io-engine.rg.search', Buffer.byteLength(filteredOutput.text, 'utf8'), {
+                        redactions: filteredOutput.redactions,
+                    }),
+                    true,
+                );
+                return {
+                    targetPath,
+                    pattern: options.pattern,
+                    output: filteredOutput.text,
+                    matchCount: filteredOutput.text.split('\n').filter(Boolean).length,
+                    engine: 'rg',
+                    sanitized: filteredOutput.sanitized,
+                    redactions: filteredOutput.redactions,
+                    io: { ...io, policyVersion: filteredOutput.policyVersion },
+                };
+            } catch (error) {
+                const execError = /** @type {{ code?: unknown; status?: unknown; stderr?: unknown }} */ (error);
+                if ((execError.code === 1 || execError.status === 1) && !execError.stderr) {
+                    const io = publishAndReturn(buildSearchIo('io-engine.rg.search', 0), true);
+                    return {
+                        targetPath,
+                        pattern: options.pattern,
+                        output: '',
+                        matchCount: 0,
+                        engine: 'rg',
+                        sanitized: false,
+                        redactions: 0,
+                        io,
+                    };
+                }
+                throw error;
+            }
+        }
+
+        try {
+            const grepOptions = {
+                pattern: options.pattern,
+                resolved: targetPath,
+                ...(options.isRegex !== undefined ? { isRegex: options.isRegex } : {}),
+                ...(options.caseSensitive !== undefined ? { caseSensitive: options.caseSensitive } : {}),
+                ...(options.includePattern ? { includePattern: options.includePattern } : {}),
+                ...(options.excludePattern ? { excludePattern: options.excludePattern } : {}),
+                ...(options.contextLines !== undefined ? { contextLines: options.contextLines } : {}),
+            };
+            const { stdout } = await execFileAsync('grep', buildGrepArgs(grepOptions), {
+                cwd: options.workspaceRoot,
+                timeout: RG_SEARCH_TIMEOUT_MS,
+                maxBuffer: 1024 * 1024 * 1024,
+            });
+            const filteredOutput = sanitizeSearchOutput(stdout);
+            const io = publishAndReturn(
+                buildSearchIo('io-engine.grep.search', Buffer.byteLength(filteredOutput.text, 'utf8'), {
+                    redactions: filteredOutput.redactions,
+                }),
+                true,
+            );
+            return {
+                targetPath,
+                pattern: options.pattern,
+                output: filteredOutput.text,
+                matchCount: filteredOutput.text.split('\n').filter(Boolean).length,
+                engine: 'grep',
+                sanitized: filteredOutput.sanitized,
+                redactions: filteredOutput.redactions,
+                io: { ...io, policyVersion: filteredOutput.policyVersion },
+            };
+        } catch (error) {
+            const execError = /** @type {{ code?: unknown; status?: unknown; stderr?: unknown; message?: unknown }} */ (
+                error
+            );
+            if ((execError.code === 1 || execError.status === 1) && !execError.stderr) {
+                const io = publishAndReturn(buildSearchIo('io-engine.grep.search', 0), true);
+                return {
+                    targetPath,
+                    pattern: options.pattern,
+                    output: '',
+                    matchCount: 0,
+                    engine: 'grep',
+                    sanitized: false,
+                    redactions: 0,
+                    io,
+                };
+            }
+            if (execError.code === 'ENOENT' || String(execError.message ?? '').includes('ENOENT')) {
+                throw new Error('Nem ripgrep (rg) nem grep estão disponíveis neste ambiente para search_in_files.', {
+                    cause: error,
+                });
+            }
+            throw error;
+        }
+    } catch (error) {
+        publishAndReturn(buildSearchIo('io-engine.search', 0), false, error);
+        throw error;
+    }
+}
+
+/**
+ * Busca símbolos em arquivos já validados pelo adapter da tool.
+ *
+ * @param {string} targetPath
+ * @param {{
+ *     workspaceRoot?: string;
+ *     symbolName: string;
+ *     kind?: IoSymbolKind;
+ *     includePattern?: string;
+ *     caseSensitive?: boolean;
+ *     maxResults?: number;
+ *     traceId?: string;
+ * }} options
+ * @returns {Promise<{
+ *     targetPath: string;
+ *     symbol: string;
+ *     kind: IoSymbolKind;
+ *     output: string;
+ *     matchCount: number;
+ *     message?: string;
+ *     engine: string;
+ *     sanitized: boolean;
+ *     redactions: number;
+ *     io: import('../core/io-contracts.js').IoMeta;
+ * }>}
+ */
+export async function searchWorkspaceSymbols(targetPath, options) {
+    const startedAt = nowIoMs();
+    const traceId = options.traceId ?? createIoTraceId();
+    const resolvedKind = options.kind ?? 'all';
+    const advisoryLimitsBase = {
+        requestedMaxResults: options.maxResults ?? null,
+        limitMode: 'informative',
+        symbolLength: options.symbolName.length,
+    };
+    /**
+     * @param {string} engine
+     * @param {number} bytesRead
+     * @param {Record<string, unknown>} [extra]
+     */
+    const buildSymbolIo = (engine, bytesRead, extra = {}) =>
+        buildIoMeta({
+            operation: 'search',
+            target: targetPath,
+            targetKind: 'workspace',
+            bytesRead,
+            durationMs: elapsedMs(startedAt),
+            engine,
+            riskClass: 'low',
+            traceId,
+            advisoryLimits: { ...advisoryLimitsBase, ...extra },
+        });
+
+    try {
+        if (!options.includePattern && !options.caseSensitive) {
+            const rows = findIoIndexSymbol(options.symbolName).filter(
+                /**
+                 * @param {{ filePath: string; symbolKind: string }} row
+                 */
+                (row) => {
+                    const samePath = row.filePath === targetPath || row.filePath.startsWith(`${targetPath}/`);
+                    const sameKind = resolvedKind === 'all' ? true : row.symbolKind === resolvedKind;
+                    return samePath && sameKind;
+                },
+            );
+            if (rows.length > 0) {
+                const sanitized = sanitizeIoTextOutput({ text: formatIndexSymbolRows(rows) });
+                const io = publishAndReturn(
+                    buildSymbolIo('io-engine.index.symbol-search', Buffer.byteLength(sanitized.text, 'utf8'), {
+                        redactions: sanitized.redactions,
+                    }),
+                    true,
+                );
+                return {
+                    targetPath,
+                    symbol: options.symbolName,
+                    kind: resolvedKind,
+                    output: sanitized.text,
+                    matchCount: rows.length,
+                    engine: 'fts5-index',
+                    sanitized: sanitized.sanitized,
+                    redactions: sanitized.redactions,
+                    io: { ...io, policyVersion: sanitized.policyVersion },
+                };
+            }
+        }
+
+        if (!(await isRgAvailable())) {
+            throw new Error('ripgrep (rg) não está disponível neste ambiente. workspace_symbol_search requer rg.');
+        }
+
+        const { stdout } = await execFileAsync(
+            'rg',
+            [
+                '--color=never',
+                '--no-heading',
+                '--line-number',
+                '--with-filename',
+                '-e',
+                buildSymbolPattern(options.symbolName, resolvedKind),
+                ...(options.caseSensitive ? [] : ['--ignore-case']),
+                ...(options.includePattern
+                    ? ['--glob', options.includePattern]
+                    : kindToGlobs(resolvedKind).flatMap((glob) => ['--glob', glob])),
+                '--glob=!node_modules',
+                '--glob=!.git',
+                '--glob=!dist',
+                '--glob=!coverage',
+                '--glob=!*.min.js',
+                targetPath,
+            ],
+            {
+                cwd: options.workspaceRoot,
+                timeout: RG_SEARCH_TIMEOUT_MS,
+                maxBuffer: 1024 * 1024 * 1024,
+            },
+        ).catch((error) => {
+            const execError = /** @type {{ code?: unknown; status?: unknown; stderr?: unknown }} */ (error);
+            if ((execError.code === 1 || execError.status === 1) && !execError.stderr) {
+                return { stdout: '' };
+            }
+            throw error;
+        });
+
+        const sanitized = sanitizeIoTextOutput({ text: stdout });
+        const output = sanitized.text;
+        const lines = output.split('\n').filter(Boolean);
+        const io = publishAndReturn(
+            buildSymbolIo('io-engine.rg.symbol-search', Buffer.byteLength(output, 'utf8'), {
+                redactions: sanitized.redactions,
+            }),
+            true,
+        );
+        return {
+            targetPath,
+            symbol: options.symbolName,
+            kind: resolvedKind,
+            output,
+            matchCount: lines.length,
+            ...(lines.length === 0
+                ? {
+                      message: `Nenhuma declaração de "${options.symbolName}" (${resolvedKind}) encontrada em ${targetPath}`,
+                  }
+                : {}),
+            engine: 'rg',
+            sanitized: sanitized.sanitized,
+            redactions: sanitized.redactions,
+            io: { ...io, policyVersion: sanitized.policyVersion },
+        };
+    } catch (error) {
+        publishAndReturn(buildSymbolIo('io-engine.symbol-search', 0), false, error);
         throw error;
     }
 }

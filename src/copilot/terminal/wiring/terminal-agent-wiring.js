@@ -29,7 +29,6 @@ import {
     createTerminalHandledAgentEventsSet,
     createTerminalPassthroughAgentEventsSet,
 } from '../events/event-adapter-events.js';
-import { setupTerminalHeadlessEventAdapters } from '../events/event-adapters.js';
 import { setupTerminalTaskStreamListeners } from '../events/task-stream-events.js';
 import {
     abortTerminalCurrentMessage,
@@ -72,9 +71,6 @@ export function registerAgentEventListeners(printBanner) {
     if (_agentListenersRegistered) return;
     _agentListenersRegistered = true;
     const agentEvents = readTerminalAgentRuntimeEventHost();
-    if (!process.stdin.isTTY) {
-        setupTerminalHeadlessEventAdapters();
-    }
     agentEvents.on(EMITTER_DIALOG_STALLED, async (/** @type {{ stalledMs: number }} */ evt) => {
         const secs = Math.round(evt.stalledMs / 1000);
         const runtimeState = readTerminalRuntimeState();

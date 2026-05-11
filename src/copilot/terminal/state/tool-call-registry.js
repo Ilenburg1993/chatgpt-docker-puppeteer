@@ -40,6 +40,7 @@ const RECENTLY_COMPLETED_TTL_MS = 2 * 60_000;
  *     lastHeartbeatAt: number;
  *     lastProgress: number | null;
  *     lastProgressMessage: string | null;
+ *     rawArgs: Record<string, unknown>;
  *     presentation: import('../events/tool-activity-presenter.js').TerminalToolActivityPresentation | null;
  *     completedAt: number | null;
  *     success: boolean | null;
@@ -57,10 +58,22 @@ const RECENTLY_COMPLETED_TTL_MS = 2 * 60_000;
  *         opts?: {
  *             requestId?: string | null;
  *             canonicalName?: string | null;
+ *             rawArgs?: Record<string, unknown>;
  *             presentation?: import('../events/tool-activity-presenter.js').TerminalToolActivityPresentation | null;
  *         },
  *     ) => ToolCallEntry;
  *     getEntry: (toolCallId: string) => ToolCallEntry | null;
+ *     touch: (
+ *         toolCallId: string,
+ *         patch: {
+ *             rawArgs?: Record<string, unknown>;
+ *             presentation?: import('../events/tool-activity-presenter.js').TerminalToolActivityPresentation | null;
+ *             progress?: number | null;
+ *             progressMessage?: string | null;
+ *             lastHeartbeatAt?: number;
+ *             lastSignalAt?: number;
+ *         },
+ *     ) => ToolCallEntry | null;
  *     updatePresentation: (
  *         toolCallId: string,
  *         presentation: import('../events/tool-activity-presenter.js').TerminalToolActivityPresentation,
@@ -139,6 +152,7 @@ export function createToolCallRegistry() {
      * @param {{
      *     requestId?: string | null;
      *     canonicalName?: string | null;
+     *     rawArgs?: Record<string, unknown>;
      *     presentation?: import('../events/tool-activity-presenter.js').TerminalToolActivityPresentation | null;
      * }} [opts]
      * @returns {ToolCallEntry}
@@ -158,6 +172,7 @@ export function createToolCallRegistry() {
             lastHeartbeatAt: 0,
             lastProgress: null,
             lastProgressMessage: null,
+            rawArgs: opts.rawArgs ?? {},
             presentation: opts.presentation ?? null,
             completedAt: null,
             success: null,
@@ -180,15 +195,38 @@ export function createToolCallRegistry() {
 
     /**
      * @param {string} toolCallId
+     * @param {{
+     *     rawArgs?: Record<string, unknown>;
+     *     presentation?: import('../events/tool-activity-presenter.js').TerminalToolActivityPresentation | null;
+     *     progress?: number | null;
+     *     progressMessage?: string | null;
+     *     lastHeartbeatAt?: number;
+     *     lastSignalAt?: number;
+     * }} patch
+     * @returns {ToolCallEntry | null}
+     */
+    function touch(toolCallId, patch) {
+        const entry = _active.get(toolCallId);
+        if (!entry) return null;
+        if ('rawArgs' in patch && patch.rawArgs) entry.rawArgs = patch.rawArgs;
+        if ('presentation' in patch) entry.presentation = patch.presentation ?? null;
+        if ('progress' in patch) entry.lastProgress = patch.progress ?? null;
+        if ('progressMessage' in patch) entry.lastProgressMessage = patch.progressMessage ?? null;
+        if ('lastHeartbeatAt' in patch && typeof patch.lastHeartbeatAt === 'number') {
+            entry.lastHeartbeatAt = patch.lastHeartbeatAt;
+        }
+        entry.lastSignalAt =
+            'lastSignalAt' in patch && typeof patch.lastSignalAt === 'number' ? patch.lastSignalAt : Date.now();
+        return entry;
+    }
+
+    /**
+     * @param {string} toolCallId
      * @param {import('../events/tool-activity-presenter.js').TerminalToolActivityPresentation} presentation
      * @returns {void}
      */
     function updatePresentation(toolCallId, presentation) {
-        const entry = _active.get(toolCallId);
-        if (entry) {
-            entry.presentation = presentation;
-            entry.lastSignalAt = Date.now();
-        }
+        touch(toolCallId, { presentation });
     }
 
     /**
@@ -198,12 +236,7 @@ export function createToolCallRegistry() {
      * @returns {void}
      */
     function updateProgress(toolCallId, progress, message) {
-        const entry = _active.get(toolCallId);
-        if (entry) {
-            entry.lastProgress = progress;
-            entry.lastProgressMessage = message;
-            entry.lastSignalAt = Date.now();
-        }
+        touch(toolCallId, { progress, progressMessage: message });
     }
 
     /**
@@ -362,6 +395,7 @@ export function createToolCallRegistry() {
     return {
         register,
         getEntry,
+        touch,
         updatePresentation,
         updateProgress,
         complete,

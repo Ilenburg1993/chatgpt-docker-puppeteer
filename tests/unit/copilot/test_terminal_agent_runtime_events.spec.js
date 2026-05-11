@@ -120,6 +120,11 @@ describe('terminal/events/agent-runtime-events.js — contrato', () => {
         });
         listeners.get('tool.execution_complete')?.[0]?.({
             toolCallId: 'tool-1',
+            result: {
+                success: true,
+                path: 'src/copilot/terminal/repl/repl.js',
+                returnedLines: { start: 12, end: 19 },
+            },
             success: true,
         });
 
@@ -154,6 +159,8 @@ describe('terminal/events/agent-runtime-events.js — contrato', () => {
             'tool.complete',
             expect.objectContaining({
                 operation: 'read',
+                lineRange: { start: 12, end: 19 },
+                path: 'src/copilot/terminal/repl/repl.js',
                 success: true,
                 toolCallId: 'tool-1',
                 toolName: 'workspace.read_file',
@@ -202,6 +209,36 @@ describe('terminal/events/agent-runtime-events.js — contrato', () => {
         expect(println).toHaveBeenCalledWith(expect.stringContaining('PICK'));
         expect(writeInlineStatus).toHaveBeenCalledWith(expect.stringContaining('workspace.read_file'));
         expect(writeInlineStatus).toHaveBeenCalledWith(expect.stringContaining('abrindo arquivo grande'));
+    });
+
+    it('deduplica tool.execution_start repetido com o mesmo toolCallId', async () => {
+        const { setupTerminalAgentRuntimeEventListeners } =
+            await import('../../../src/copilot/terminal/events/agent-runtime-events.js');
+        /** @type {Map<string, Function[]>} */
+        const listeners = new Map();
+        const agent = {
+            on: vi.fn((event, handler) => {
+                const list = listeners.get(event) ?? [];
+                list.push(handler);
+                listeners.set(event, list);
+            }),
+            off: vi.fn(),
+        };
+
+        setupTerminalAgentRuntimeEventListeners({ agent: /** @type {any} */ (agent), rl: null });
+        listeners.get('tool.execution_start')?.[0]?.({
+            toolCallId: 'dup-1',
+            toolName: 'read_file_content',
+            args: { path: 'src/copilot/tools/file/read-tools.js', startLine: 1, endLine: 120 },
+        });
+        listeners.get('tool.execution_start')?.[0]?.({
+            toolCallId: 'dup-1',
+            toolName: 'read_file_content',
+            args: { path: 'src/copilot/tools/file/read-tools.js', startLine: 1, endLine: 120 },
+        });
+
+        expect(broadcastSse.mock.calls.filter(([event]) => event === 'tool.start')).toHaveLength(1);
+        expect(println.mock.calls.filter(([line]) => String(line).includes('read_file_content'))).toHaveLength(1);
     });
 
     it('funciona em modo headless sem readline e ainda emite SSE de tools', async () => {

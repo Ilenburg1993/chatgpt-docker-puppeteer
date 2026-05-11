@@ -181,6 +181,18 @@ export function compactTerminalToolText(text, max = 140) {
 }
 
 /**
+ * @param {TerminalToolOperation} operation
+ * @returns {'fileRead' | 'fileWrite' | 'fileEdit' | 'fileDelete' | 'tool'}
+ */
+export function mapTerminalToolOperationRole(operation) {
+    if (operation === 'read') return 'fileRead';
+    if (operation === 'write') return 'fileWrite';
+    if (operation === 'edit') return 'fileEdit';
+    if (operation === 'delete') return 'fileDelete';
+    return 'tool';
+}
+
+/**
  * @param {Record<string, unknown>} evt
  * @param {string} fallbackName
  * @returns {TerminalToolActivityPresentation}

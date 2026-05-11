@@ -22,6 +22,7 @@ const mocks = vi.hoisted(() => ({
     setLastSdkPlanOperation: vi.fn(),
     setSdkSessionMode: vi.fn(),
     getShowSessionActivity: vi.fn(() => false),
+    getShowToolActivity: vi.fn(() => true),
     consumeRuntimeInterventionMailbox: /** @type {any} */ (vi.fn(() => null)),
     enqueueRuntimeInterventionMailbox: vi.fn(),
     readRuntimeInterventionMailboxSummary: vi.fn(() => ({ queueSize: 0, dropped: 0, runtimeId: 'default' })),
@@ -50,6 +51,7 @@ vi.mock('../../../src/copilot/presentation/runtime-ui-state-store.js', () => ({
     setLastSdkPlanOperation: mocks.setLastSdkPlanOperation,
     setSdkSessionMode: mocks.setSdkSessionMode,
     getShowSessionActivity: mocks.getShowSessionActivity,
+    getShowToolActivity: mocks.getShowToolActivity,
     consumeRuntimeInterventionMailbox: mocks.consumeRuntimeInterventionMailbox,
     enqueueRuntimeInterventionMailbox: mocks.enqueueRuntimeInterventionMailbox,
     readRuntimeInterventionMailboxSummary: mocks.readRuntimeInterventionMailboxSummary,
@@ -143,6 +145,7 @@ describe('sdk-session-events.js — integração com ToolCallRegistry', () => {
         const entry = registry.resolveByRequestId('req-001');
         expect(entry?.toolName).toBe('browser_action');
         expect(entry?.kind).toBe('external');
+        expect(mocks.println).toHaveBeenCalledWith(expect.stringContaining('[TOOL]'));
     });
 
     it('onExternalToolCompleted completa no registry e emite SSE correto', async () => {

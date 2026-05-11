@@ -23,6 +23,7 @@ import { readCopilotBootConfig } from '#copilot/boot';
 import { toError } from '#copilot/core';
 import { log } from '#copilot/observability';
 import { ensureDialogLoop, println } from '../dialog/index.js';
+import { setupTerminalHeadlessEventAdapters } from '../events/event-adapters.js';
 import { recordTerminalActivity } from '../state/activity-state.js';
 import { runReplLifecycle } from './repl-lifecycle.js';
 export { setupAgentListeners } from './repl-listeners.js';
@@ -80,6 +81,7 @@ export function launchTerminalDialogLoopBootstrap(deps = {}) {
 export async function startRepl(injectServer) {
     if (!process.stdin.isTTY) {
         println('[boot] Modo headless detectado — REPL desativado. Use POST :' + INJECT_PORT + '/inject.');
+        setupTerminalHeadlessEventAdapters();
         void launchTerminalDialogLoopBootstrap();
         return;
     }

@@ -42,7 +42,11 @@ import {
 } from '../state/turn-trace-state.js';
 import { getTerminalDetailLevel } from '../state/ui-preferences.js';
 import { terminalActionChip, terminalThemeBadge, terminalThemeText } from '../state/ui-theme.js';
-import { buildTerminalToolActivityPresentation, compactTerminalToolText } from './tool-activity-presenter.js';
+import {
+    buildTerminalToolActivityPresentation,
+    compactTerminalToolText,
+    mapTerminalToolOperationRole,
+} from './tool-activity-presenter.js';
 import {
     buildToolLifecycleComplete,
     buildToolLifecyclePartialResult,
@@ -69,42 +73,31 @@ const TOOL_HEARTBEAT_INTERVAL_MS = 10_000;
 export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, registry = null }) {
     // Garante sempre um registry session-scoped — em produção é injetado pelo event-adapters.js
     const _reg = registry ?? createToolCallRegistry();
-    /**
-     * @type {Map<
-     *     string,
-     *     {
-     *         name: string;
-     *         t0: number;
-     *         presentation: import('./tool-activity-presenter.js').TerminalToolActivityPresentation;
-     *         lastProgress?: number | null;
-     *         lastProgressMessage?: string | null;
-     *         lastSignalAt: number;
-     *         lastHeartbeatAt: number;
-     *     }
-     * >}
-     */
-    const activeTools = new Map();
     const pendingQuestionReplay = createTerminalPendingQuestionReplayState();
     const toolHeartbeatTimer = setInterval(() => {
-        if (activeTools.size === 0) return;
+        const inFlight = _reg.getAllInFlight();
+        if (inFlight.length === 0) return;
         const now = Date.now();
         const compactDetail = getTerminalDetailLevel() === 'compact';
-        for (const [toolCallId, entry] of activeTools.entries()) {
+        for (const entry of inFlight) {
+            const toolCallId = entry.toolCallId;
             const elapsedMs = now - entry.t0;
             if (elapsedMs < TOOL_HEARTBEAT_INTERVAL_MS) continue;
             if (now - entry.lastHeartbeatAt < TOOL_HEARTBEAT_INTERVAL_MS) continue;
-            entry.lastHeartbeatAt = now;
+            _reg.touch(toolCallId, { lastHeartbeatAt: now, lastSignalAt: entry.lastSignalAt });
             const elapsed = (elapsedMs / 1000).toFixed(0);
             const sinceSignal = ((now - entry.lastSignalAt) / 1000).toFixed(0);
+            const detailBase = entry.presentation?.detail ?? entry.toolName;
+            const renderedName = entry.canonicalName ?? entry.toolName;
             recordTerminalActivity('tool', 'Tool em andamento', {
-                detail: `${entry.presentation.detail} · ${elapsed}s ativos · ${sinceSignal}s sem progresso`,
-                toolName: entry.name,
+                detail: `${detailBase} · ${elapsed}s ativos · ${sinceSignal}s sem progresso`,
+                toolName: renderedName,
                 source: 'sdk',
                 recordHistory: false,
             });
             if (getShowToolActivity()) {
                 const line =
-                    `  ${terminalThemeText('muted', '↳')} ${terminalThemeText('tool', compactDetail ? compactTerminalToolText(entry.name, 32) : entry.name)} ${terminalThemeText('muted', `ainda executando · ${elapsed}s · ${toolCallId || 'sem id'}`)}`.trimEnd();
+                    `  ${terminalThemeText('muted', '↳')} ${terminalThemeText('tool', compactDetail ? compactTerminalToolText(renderedName, 32) : renderedName)} ${terminalThemeText('muted', `ainda executando · ${elapsed}s · ${toolCallId || 'sem id'}`)}`.trimEnd();
                 if (compactDetail) writeInlineStatus(line);
                 else println(line);
             }
@@ -123,15 +116,13 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, regi
     }
 
     /**
-     * @param {import('./tool-activity-presenter.js').TerminalToolOperation} operation
-     * @returns {'fileRead' | 'fileWrite' | 'fileEdit' | 'fileDelete' | 'tool'}
+     * @param {unknown} value
+     * @returns {Record<string, unknown>}
      */
-    function mapOperationRole(operation) {
-        if (operation === 'read') return 'fileRead';
-        if (operation === 'write') return 'fileWrite';
-        if (operation === 'edit') return 'fileEdit';
-        if (operation === 'delete') return 'fileDelete';
-        return 'tool';
+    function objectArgsOrEmpty(value) {
+        return value && typeof value === 'object' && !Array.isArray(value)
+            ? /** @type {Record<string, unknown>} */ (value)
+            : {};
     }
 
     /**
@@ -218,30 +209,32 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, regi
     const onToolStart = (/** @type {Record<string, unknown>} */ evt) => {
         const toolCallId = /** @type {string} */ (evt?.['toolCallId'] ?? '');
         const name = /** @type {string} */ (evt?.['toolName'] ?? evt?.['name'] ?? 'tool');
+        const rawArgs = objectArgsOrEmpty(evt?.['args'] ?? evt?.['arguments'] ?? evt?.['input'] ?? null);
+        const presentation = buildTerminalToolActivityPresentation(evt, name);
+        const canonicalName = presentation.canonicalToolName ?? name;
         if (shouldSuppressToolNarration(name)) {
+            return;
+        }
+        if (toolCallId && _reg.isInFlight(toolCallId)) {
+            _reg.touch(toolCallId, {
+                rawArgs,
+                presentation,
+            });
             return;
         }
         // Evita duplicidade visual: ferramentas externas já foram anunciadas em external_tool.requested
         if (_reg.isNameInFlight(name)) {
             return;
         }
+        const compactDetail = getTerminalDetailLevel() === 'compact';
         // Registra tool nativa no ToolCallRegistry para correlação io_op → toolCallId
         if (toolCallId) {
-            _reg.register(toolCallId, name, 'native');
+            _reg.register(toolCallId, name, 'native', {
+                canonicalName,
+                rawArgs,
+                presentation,
+            });
         }
-        const compactDetail = getTerminalDetailLevel() === 'compact';
-        const presentation = buildTerminalToolActivityPresentation(evt, name);
-        const canonicalName = presentation.canonicalToolName ?? name;
-        const startedAt = Date.now();
-        activeTools.set(toolCallId, {
-            name: canonicalName,
-            t0: startedAt,
-            presentation,
-            lastProgress: null,
-            lastProgressMessage: null,
-            lastSignalAt: startedAt,
-            lastHeartbeatAt: 0,
-        });
         recordTerminalTurnToolActivity({
             toolName: canonicalName,
             operation: presentation.operation,
@@ -265,7 +258,7 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, regi
             source: 'sdk',
         });
         if (getShowToolActivity()) {
-            const operationRole = mapOperationRole(presentation.operation);
+            const operationRole = mapTerminalToolOperationRole(presentation.operation);
             const opLabel = presentation.operation.toUpperCase();
             println(
                 compactDetail
@@ -305,8 +298,11 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, regi
 
     const onToolProgress = (/** @type {Record<string, unknown>} */ evt) => {
         const toolCallId = /** @type {string} */ (evt?.['toolCallId'] ?? '');
-        const entry = activeTools.get(toolCallId);
-        const name = entry?.name ?? /** @type {string} */ (evt?.['toolName'] ?? evt?.['name'] ?? 'tool');
+        const entry = toolCallId ? _reg.getEntry(toolCallId) : null;
+        const name =
+            entry?.canonicalName ??
+            entry?.toolName ??
+            /** @type {string} */ (evt?.['toolName'] ?? evt?.['name'] ?? 'tool');
         if (shouldSuppressToolNarration(name)) {
             return;
         }
@@ -321,10 +317,12 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, regi
             ((progress !== null &&
                 (entry?.lastProgress == null || Math.abs(progress - entry.lastProgress) >= 5 || progress === 100)) ||
                 (progressMessage !== null && progressMessage !== entry?.lastProgressMessage));
-        if (entry) {
-            entry.lastProgress = progress;
-            entry.lastProgressMessage = progressMessage;
-            entry.lastSignalAt = Date.now();
+        if (toolCallId) {
+            _reg.touch(toolCallId, {
+                presentation,
+                progress,
+                progressMessage,
+            });
         }
         recordTerminalActivity('tool', 'Executando tool', {
             detail: effectiveDetail,
@@ -378,16 +376,16 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, regi
 
     const onToolPartialResult = (/** @type {{ toolCallId?: string; partialOutput?: string }} */ evt) => {
         const toolCallId = evt?.toolCallId ?? '';
-        const entry = activeTools.get(toolCallId);
-        const name = entry?.name ?? 'tool';
+        const entry = toolCallId ? _reg.getEntry(toolCallId) : null;
+        const name = entry?.canonicalName ?? entry?.toolName ?? 'tool';
         if (shouldSuppressToolNarration(name)) {
             return;
         }
         const presentation = entry?.presentation ?? buildTerminalToolActivityPresentation({}, name);
         const partialOutput = typeof evt?.partialOutput === 'string' ? evt.partialOutput : '';
         if (!partialOutput) return;
-        if (entry) {
-            entry.lastSignalAt = Date.now();
+        if (toolCallId) {
+            _reg.touch(toolCallId, { presentation });
         }
         const preview = compactTerminalToolText(partialOutput, 120);
         recordTerminalActivity('tool', 'Streaming de saída da tool', {
@@ -439,15 +437,14 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, regi
         const toolCallId = /** @type {string} */ (evt?.['toolCallId'] ?? '');
         const success = Boolean(evt?.['success']);
         const requestId = typeof evt?.['requestId'] === 'string' ? evt['requestId'] : null;
-        const entry = activeTools.get(toolCallId);
-        activeTools.delete(toolCallId);
+        const entry = toolCallId ? _reg.getEntry(toolCallId) : null;
         const eventName =
             typeof evt?.['toolName'] === 'string' && evt['toolName'].length > 0
                 ? evt['toolName']
                 : typeof evt?.['name'] === 'string' && evt['name'].length > 0
                   ? evt['name']
                   : null;
-        const name = entry?.name ?? eventName ?? 'tool';
+        const name = entry?.canonicalName ?? entry?.toolName ?? eventName ?? 'tool';
         if (shouldSuppressToolNarration(name)) {
             return;
         }
@@ -465,9 +462,17 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, regi
             _reg.complete(toolCallId, success);
         }
         const compactDetail = getTerminalDetailLevel() === 'compact';
-        const completionPresentation = buildTerminalToolActivityPresentation(evt, name);
+        const completionPresentation = buildTerminalToolActivityPresentation(
+            {
+                ...evt,
+                args: objectArgsOrEmpty(
+                    evt?.['args'] ?? evt?.['arguments'] ?? evt?.['input'] ?? entry?.rawArgs ?? null,
+                ),
+            },
+            name,
+        );
         const presentation =
-            completionPresentation.target || completionPresentation.path
+            completionPresentation.target || completionPresentation.path || completionPresentation.lineRange
                 ? completionPresentation
                 : (entry?.presentation ?? completionPresentation);
         const canonicalName = presentation.canonicalToolName ?? name;
@@ -478,7 +483,7 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, regi
               : 0;
         const dur = durationMs > 0 ? `${(durationMs / 1000).toFixed(1)}s` : 'n/d';
         const icon = success ? terminalThemeText('success', '✅') : terminalThemeText('error', '❌');
-        const operationRole = mapOperationRole(presentation.operation);
+        const operationRole = mapTerminalToolOperationRole(presentation.operation);
         if (compactDetail) {
             clearInlineStatus();
         }

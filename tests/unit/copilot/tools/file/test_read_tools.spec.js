@@ -21,6 +21,7 @@ import {
     listDirectoryTool,
     readFileContentTool,
     searchInFilesTool,
+    workspaceSymbolSearchTool,
 } from '../../../../../src/copilot/tools/file/read-tools.js';
 
 /**
@@ -42,13 +43,17 @@ let tmpDir;
 let fileA;
 /** @type {string} */
 let fileB;
+/** @type {string} */
+let fileSymbols;
 
 beforeEach(() => {
     tmpDir = fs.mkdtempSync(path.join(WORKSPACE, 'tmp', '.readtools-test-'));
     fileA = path.join(tmpDir, 'a.txt');
     fileB = path.join(tmpDir, 'b.txt');
+    fileSymbols = path.join(tmpDir, 'symbols.ts');
     fs.writeFileSync(fileA, 'line1\nline2\nline3\nline4\n');
     fs.writeFileSync(fileB, 'line1\nline2\nMODIFIED\nline4\n');
+    fs.writeFileSync(fileSymbols, 'export function helperTool() {}\nexport class WidgetTool {}\n');
     fs.mkdirSync(path.join(tmpDir, 'sub'));
     fs.writeFileSync(path.join(tmpDir, 'sub', 'nested.js'), 'console.log("hello");');
 });
@@ -289,5 +294,29 @@ describe('tools/file/diffFilesTool', () => {
             context_lines: 3,
         });
         expect(r.success).toBe(false);
+    });
+});
+
+// ─── workspaceSymbolSearchTool ─────────────────────────────────────────────
+
+describe('tools/file/workspaceSymbolSearchTool', () => {
+    it('exporta name workspace_symbol_search', () => {
+        expect(workspaceSymbolSearchTool.name).toBe('workspace_symbol_search');
+    });
+
+    it('busca declarações no workspace pela infraestrutura canônica', async () => {
+        const handler = /** @type {any} */ (getHandler(workspaceSymbolSearchTool));
+        const r = await handler({
+            name: 'helperTool',
+            kind: 'function',
+            path: tmpDir,
+            caseSensitive: false,
+            maxResults: 10,
+        });
+
+        expect(r.success).toBe(true);
+        expect(r.io?.operation).toBe('search');
+        expect(r.output).toContain('helperTool');
+        expect(r.searchPath).toBe(tmpDir);
     });
 });

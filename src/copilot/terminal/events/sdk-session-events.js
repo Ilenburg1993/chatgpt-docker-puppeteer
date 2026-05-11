@@ -58,6 +58,7 @@ import {
     consumeRuntimeInterventionMailbox,
     enqueueRuntimeInterventionMailbox,
     getShowSessionActivity,
+    getShowToolActivity,
     readRuntimeInterventionMailboxSummary,
     setLastSdkPlanOperation,
     setSdkSessionMode,
@@ -85,7 +86,11 @@ import {
 } from '../state/turn-trace-state.js';
 import { getTerminalDetailLevel } from '../state/ui-preferences.js';
 import { terminalThemeBadge, terminalThemeText } from '../state/ui-theme.js';
-import { buildTerminalToolActivityPresentation } from './tool-activity-presenter.js';
+import {
+    buildTerminalToolActivityPresentation,
+    compactTerminalToolText,
+    mapTerminalToolOperationRole,
+} from './tool-activity-presenter.js';
 import {
     buildToolLifecycleExternalCompleted,
     buildToolLifecycleExternalRequested,
@@ -798,7 +803,11 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
         const toolCallId = evt?.toolCallId ?? (requestId ? `ext:${requestId}` : `ext:${toolName}:${Date.now()}`);
         const presentation = buildTerminalToolActivityPresentation(evt ?? {}, toolName);
         const displayToolName = presentation.canonicalToolName ?? toolName;
-        _reg.register(toolCallId, displayToolName, 'external', { requestId });
+        _reg.register(toolCallId, displayToolName, 'external', {
+            requestId,
+            canonicalName: presentation.canonicalToolName,
+            presentation,
+        });
         recordTerminalTurnToolActivity({
             toolName: displayToolName,
             operation: presentation.operation,
@@ -820,7 +829,16 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
             toolName: displayToolName,
             source: 'sdk',
         });
-        if (shouldPrintSessionNarration('verbose')) {
+        if (getShowToolActivity()) {
+            const compactDetail = getTerminalDetailLevel() === 'compact';
+            const operationRole = mapTerminalToolOperationRole(presentation.operation);
+            const opLabel = presentation.operation.toUpperCase();
+            println(
+                compactDetail
+                    ? `  ${terminalThemeBadge('tool', 'TOOL')} ${terminalThemeBadge(operationRole, opLabel)} ${terminalThemeText('tool', compactTerminalToolText(displayToolName, 28))} ${terminalThemeText('muted', '·')} ${terminalThemeText(operationRole, compactTerminalToolText(presentation.startLine, 86))}`
+                    : `  ${terminalThemeBadge('tool', 'TOOL')} ${terminalThemeBadge(operationRole, opLabel)} ${terminalThemeText('tool', displayToolName)} ${terminalThemeText('muted', '·')} ${terminalThemeText(operationRole, presentation.startLine)}`,
+            );
+        } else if (shouldPrintSessionNarration('verbose')) {
             const targetLabel = presentation.target || presentation.path || requestId || '';
             println(`  \x1b[90m↗ external tool: ${displayToolName}${targetLabel ? ` · ${targetLabel}` : ''}\x1b[0m`);
         }
@@ -874,36 +892,51 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
         let toolName;
         /** @type {string | null} */
         let resolvedToolCallId = evtToolCallId;
+        const resolvedEntry = _reg.resolveByRequestId(requestId);
         {
-            const entry = _reg.resolveByRequestId(requestId);
-            const resolvedName = entry?.toolName ?? _reg.resolveNameByRequestId(requestId);
+            const resolvedName = resolvedEntry?.toolName ?? _reg.resolveNameByRequestId(requestId);
             toolName = originalToolName === 'external_tool' && resolvedName ? resolvedName : originalToolName;
-            if (entry) {
-                resolvedToolCallId = entry.toolCallId;
-                _reg.complete(entry.toolCallId, success);
+            if (resolvedEntry) {
+                resolvedToolCallId = resolvedEntry.toolCallId;
+                _reg.complete(resolvedEntry.toolCallId, success);
             } else {
                 toolName = originalToolName;
             }
         }
         const completionPresentation = buildTerminalToolActivityPresentation(evt ?? {}, toolName);
-        const displayToolName = completionPresentation.canonicalToolName ?? toolName;
+        const presentation =
+            completionPresentation.target || completionPresentation.path || completionPresentation.lineRange
+                ? completionPresentation
+                : (resolvedEntry?.presentation ?? completionPresentation);
+        const displayToolName = presentation.canonicalToolName ?? toolName;
         recordTerminalTurnToolActivity({
             toolName: displayToolName,
-            operation: completionPresentation.operation,
-            path: completionPresentation.path,
-            target: completionPresentation.target ?? requestId,
+            operation: presentation.operation,
+            path: presentation.path,
+            target: presentation.target ?? requestId,
             source: 'sdk',
             status: success ? 'completed' : 'failed',
             success,
             toolCallId: resolvedToolCallId,
         });
         recordTerminalActivity('tool', success ? 'External tool concluída' : 'External tool falhou', {
-            detail: completionPresentation.detail || `${displayToolName}${requestId ? ` · ${requestId}` : ''}`,
+            detail: presentation.detail || `${displayToolName}${requestId ? ` · ${requestId}` : ''}`,
             toolName: displayToolName,
             source: 'sdk',
             severity: success ? 'info' : 'error',
         });
-        if (shouldPrintSessionNarration('verbose')) {
+        if (getShowToolActivity()) {
+            const compactDetail = getTerminalDetailLevel() === 'compact';
+            const operationRole = mapTerminalToolOperationRole(presentation.operation);
+            const icon = success ? terminalThemeText('success', '✅') : terminalThemeText('error', '❌');
+            const statusBadge = success ? terminalThemeBadge('success', 'DONE') : terminalThemeBadge('error', 'FAIL');
+            const completionDetail = presentation.completeLine(success, 'n/d');
+            println(
+                compactDetail
+                    ? `  ${icon} ${statusBadge} ${terminalThemeText('tool', compactTerminalToolText(displayToolName, 28))} ${terminalThemeText('muted', '·')} ${terminalThemeText(operationRole, compactTerminalToolText(completionDetail, 88))}`
+                    : `  ${icon} ${statusBadge} ${terminalThemeText('tool', displayToolName)} ${terminalThemeText('muted', '·')} ${terminalThemeText(operationRole, completionDetail)}`,
+            );
+        } else if (shouldPrintSessionNarration('verbose')) {
             println(
                 `  ${success ? '\x1b[32m✓' : '\x1b[31m✗'} external tool:\x1b[0m ${displayToolName}${requestId ? ` \x1b[90m(${requestId})\x1b[0m` : ''}`,
             );
@@ -912,14 +945,14 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
             toolName: displayToolName,
             requestId,
             success,
-            operation: completionPresentation.operation,
-            path: completionPresentation.path,
-            target: completionPresentation.target,
-            fileTargets: completionPresentation.fileTargets,
-            urlTargets: completionPresentation.urlTargets,
-            searchTerms: completionPresentation.searchTerms,
-            lineRange: completionPresentation.lineRange,
-            patchFiles: completionPresentation.patchFiles,
+            operation: presentation.operation,
+            path: presentation.path,
+            target: presentation.target,
+            fileTargets: presentation.fileTargets,
+            urlTargets: presentation.urlTargets,
+            searchTerms: presentation.searchTerms,
+            lineRange: presentation.lineRange,
+            patchFiles: presentation.patchFiles,
             timestamp: Date.now(),
         });
         broadcastSse(
@@ -929,14 +962,14 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
                 requestId: requestId ?? '',
                 toolCallId: resolvedToolCallId,
                 success,
-                operation: completionPresentation.operation,
-                path: completionPresentation.path,
-                target: completionPresentation.target,
-                fileTargets: completionPresentation.fileTargets,
-                urlTargets: completionPresentation.urlTargets,
-                searchTerms: completionPresentation.searchTerms,
-                lineRange: completionPresentation.lineRange,
-                patchFiles: completionPresentation.patchFiles,
+                operation: presentation.operation,
+                path: presentation.path,
+                target: presentation.target,
+                fileTargets: presentation.fileTargets,
+                urlTargets: presentation.urlTargets,
+                searchTerms: presentation.searchTerms,
+                lineRange: presentation.lineRange,
+                patchFiles: presentation.patchFiles,
             }),
         );
     };
