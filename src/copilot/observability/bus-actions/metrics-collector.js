@@ -66,11 +66,6 @@ export function createMetricsCollector({ bus, metrics }) {
     });
 
     // Tool calls
-    on('hook:post_tool_use', (evt) => {
-        const input = evt?.input ?? {};
-        metrics.recordToolCall(input.toolName ?? 'unknown', input.durationMs ?? 0, input.result !== 'error');
-    });
-
     // Streaming chunks
     on('agent:dialog:streaming_started', () => {
         metrics.recordStreamingChunk(0);

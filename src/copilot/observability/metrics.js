@@ -20,6 +20,7 @@
 /** @typedef {import('./metrics-histogram.js').StreamingMetrics} StreamingMetrics */
 /** @typedef {import('./metrics-histogram.js').QuestionMetrics} QuestionMetrics */
 /** @typedef {import('./metrics-histogram.js').MetricsSummary} MetricsSummary */
+import { createToolTelemetryStore, defaultToolTelemetryStore } from './tool-stats.js';
 
 /**
  * @typedef {object} MetricsStore
@@ -65,17 +66,11 @@ import { createHistogram } from './metrics-histogram.js';
 /**
  * Cria um MetricsStore.
  *
+ * @param {{ toolTelemetry?: import('./tool-stats.js').ToolTelemetryStore }} [options]
  * @returns {MetricsStore}
  */
-export function createMetricsStore() {
-    /**
-     * @type {Record<
-     *     string,
-     *     { total: number; success: number; errors: number; histogram: ReturnType<typeof createHistogram> }
-     * >}
-     */
-    const _tools = {};
-
+export function createMetricsStore(options = {}) {
+    const toolTelemetry = options.toolTelemetry ?? createToolTelemetryStore();
     /** @type {TokenUsageMetrics} */
     const _tokens = { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0, byModel: {} };
 
@@ -169,14 +164,7 @@ export function createMetricsStore() {
      * @param {boolean} success
      */
     function recordToolCall(toolName, durationMs, success) {
-        if (!_tools[toolName]) {
-            _tools[toolName] = { total: 0, success: 0, errors: 0, histogram: createHistogram(500) };
-        }
-        const t = _tools[toolName];
-        t.total++;
-        if (success) t.success++;
-        else t.errors++;
-        t.histogram.record(durationMs);
+        toolTelemetry.recordToolCall(toolName, durationMs, success);
     }
 
     /**
@@ -416,15 +404,7 @@ export function createMetricsStore() {
      */
     function getSummary() {
         /** @type {Record<string, ToolMetrics>} */
-        const tools = {};
-        for (const [name, t] of Object.entries(_tools)) {
-            tools[name] = {
-                totalCalls: t.total,
-                successCount: t.success,
-                errorCount: t.errors,
-                latency: t.histogram.snapshot(),
-            };
-        }
+        const tools = /** @type {Record<string, ToolMetrics>} */ (toolTelemetry.getToolMetricsSummary());
         return {
             tools,
             tokens: { ..._tokens, byModel: { ..._tokens.byModel } },
@@ -479,7 +459,7 @@ export function createMetricsStore() {
     }
 
     function reset() {
-        Object.keys(_tools).forEach((k) => delete _tools[k]);
+        toolTelemetry.reset();
         _tokens.inputTokens = 0;
         _tokens.outputTokens = 0;
         _tokens.cacheReadTokens = 0;
@@ -561,4 +541,4 @@ export function createMetricsStore() {
  *
  * @type {MetricsStore}
  */
-export const defaultMetrics = createMetricsStore();
+export const defaultMetrics = createMetricsStore({ toolTelemetry: defaultToolTelemetryStore });

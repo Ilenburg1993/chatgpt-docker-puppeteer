@@ -18,9 +18,11 @@
  * @typedef {object} ToolStatsEntry
  * @property {number} calls
  * @property {number} errors
+ * @property {number} blocked
  * @property {number} avgLatencyMs
  * @property {number} errorRate
  * @property {string | null} lastCallIso
+ * @property {string | null} lastBlockedIso
  * @property {boolean} lastOk
  */
 
@@ -28,6 +30,7 @@
  * @typedef {object} MetricsProxyImpl
  * @property {() => MetricsSummary} getSummary
  * @property {() => Record<string, ToolStatsEntry>} getToolStats
+ * @property {(name: string) => void} [recordBlockedToolCall]
  * @property {(name: string, durationMs: number, success?: boolean) => void} recordToolCall
  */
 
@@ -87,4 +90,14 @@ export function getToolStats() {
  */
 export function recordToolCall(name, durationMs, success = true) {
     _impl?.recordToolCall(name, durationMs, success);
+}
+
+/**
+ * Registra tentativa bloqueada de tool. No-op se não injetado.
+ *
+ * @param {string} name
+ * @returns {void}
+ */
+export function recordBlockedToolCall(name) {
+    _impl?.recordBlockedToolCall?.(name);
 }

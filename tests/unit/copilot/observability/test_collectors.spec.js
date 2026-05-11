@@ -123,7 +123,7 @@ describe('F48 — attachToolHandlers', () => {
             success: true,
             result: { content: 'ok' },
         });
-        expect(ctx.metrics.recordToolCall).toHaveBeenCalledWith('bash', expect.any(Number), true);
+        expect(ctx.metrics.recordToolCall).not.toHaveBeenCalled();
         expect(globalAuditBuffer.push).toHaveBeenCalled();
         expect(ctx.pending.has('tc-3')).toBe(false);
     });

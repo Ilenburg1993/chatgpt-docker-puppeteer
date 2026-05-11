@@ -75,7 +75,6 @@ export function attachToolHandlers(ctx) {
                 result: event.data.result ?? null,
             });
 
-            metrics?.recordToolCall(toolName, durationMs, success);
             if (!success && errorTracker) {
                 errorTracker.trackError(new Error(`Tool failed: ${toolName}`), {
                     source: 'sdk:tool.execution_complete',

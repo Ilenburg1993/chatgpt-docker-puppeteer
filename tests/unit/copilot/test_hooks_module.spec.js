@@ -546,7 +546,8 @@ describe('hooks/registry › SDK_HOOKS', () => {
             canAbort: false,
         });
         const schema = reg.get('custom_hook');
-        assert.ok(schema?.description.includes('customizado'));
+        const description = schema && typeof schema.description === 'string' ? schema.description : '';
+        assert.ok(description.includes('customizado'));
     });
 });
 
@@ -1145,7 +1146,14 @@ describe('hooks/audit › createAuditPostToolHandler', () => {
 
     it('chama o logger externo com a entrada', async () => {
         const buf = new AuditRingBuffer({ capacity: 10 });
-        /** @type {import('../../../src/copilot/hooks/types.js').AuditEntry[]} */
+        /** @type {{
+    toolName: string;
+    toolArgs: unknown;
+    toolResult: unknown;
+    sessionId: string;
+    ts: string;
+    durationMs?: number;
+}[]} */
         const captured = [];
         const handler = createAuditPostToolHandler((e) => captured.push(e), buf);
         await handler(

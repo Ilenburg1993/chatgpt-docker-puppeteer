@@ -69,7 +69,13 @@ export { createAuditLog, defaultAuditLog } from '#copilot/audit';
 export { DEFAULT_OTEL_FILE, buildTelemetryConfig, isOtelEnabled, startSpan, startSpanImmediate } from './otel.js';
 
 // ─── Tool Stats ──────────────────────────────────────────────────────────────
-export { getStatsByCategory, getToolStats, recordToolCall, wrapWithStats } from './tool-stats.js';
+export {
+    getStatsByCategory,
+    getToolStats,
+    recordBlockedToolCall,
+    recordToolCall,
+    wrapWithStats,
+} from './tool-stats.js';
 
 // ─── Event Catalog + Dead-Letter ──────────────────────────────────────────────
 export { clearDeadLetters, getCatalog, getDeadLetters, recordDeadLetter } from './event-catalog.js';

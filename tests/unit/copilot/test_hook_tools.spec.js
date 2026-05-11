@@ -13,15 +13,15 @@
 
 import assert from 'node:assert/strict';
 import { afterEach, describe, it } from 'vitest';
+import { allTools } from '../../../src/copilot/tools/bootstrap.js';
 import {
     cancelAllUserInputRequests,
-    hookGetAuditTailTool,
-    hookTools,
-    hookGetPendingTasksTool,
     getPendingInputIds,
+    hookGetAuditTailTool,
+    hookGetPendingTasksTool,
+    hookTools,
     requestUserInputTool,
 } from '../../../src/copilot/tools/hook/hook-tools.js';
-import { allTools } from '../../../src/copilot/tools/bootstrap.js';
 
 afterEach(() => {
     cancelAllUserInputRequests('cleanup');

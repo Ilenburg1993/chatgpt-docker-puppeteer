@@ -128,6 +128,35 @@ function getToolMetadata(toolName) {
 }
 
 /**
+ * Resolve uma entrada de telemetria por nome canônico ou alias observado.
+ *
+ * @param {Record<string, Record<string, unknown>>} stats
+ * @param {string} toolName
+ * @returns {{ key: string; entry: Record<string, unknown> } | null}
+ */
+function findTelemetryEntryByName(stats, toolName) {
+    if (!toolName) return null;
+    if (toolName in stats) {
+        return {
+            key: toolName,
+            entry: stats[toolName] ?? {},
+        };
+    }
+
+    const normalizedWanted = toolName.toLowerCase();
+    for (const [key, entry] of Object.entries(stats)) {
+        const aliases = Array.isArray(entry['aliases']) ? /** @type {string[]} */ (entry['aliases']) : [];
+        if (key.toLowerCase() === normalizedWanted || aliases.some((alias) => alias.toLowerCase() === normalizedWanted)) {
+            return {
+                key,
+                entry,
+            };
+        }
+    }
+    return null;
+}
+
+/**
  * Informa ao módulo qual ToolRegistry canônico está ativo na sessão atual.
  *
  * @param {ToolRegistry | null | undefined} registry
@@ -357,21 +386,41 @@ const getTelemetryTool = buildTool({
     ),
     handler: async (/** @type {{ recent?: number; toolName?: string }} */ { toolName }) => {
         const summary = getMetricsSummary();
-        const toolsMap = summary.tools ?? {};
+        const toolsMap = /** @type {Record<string, Record<string, unknown>>} */ (summary.tools ?? {});
 
-        const toolValues = Object.values(toolsMap);
-        const totalCalls = toolValues.reduce((acc, t) => acc + (t.totalCalls ?? 0), 0);
-        const successCalls = toolValues.reduce((acc, t) => acc + (t.successCount ?? 0), 0);
-        const errorCalls = toolValues.reduce((acc, t) => acc + (t.errorCount ?? 0), 0);
+        const toolValues = /** @type {Record<string, unknown>[]} */ (Object.values(toolsMap));
+        const totalCalls = toolValues.reduce((acc, t) => acc + Number(t['totalCalls'] ?? 0), 0);
+        const successCalls = toolValues.reduce((acc, t) => acc + Number(t['successCount'] ?? 0), 0);
+        const errorCalls = toolValues.reduce((acc, t) => acc + Number(t['errorCount'] ?? 0), 0);
+        const blockedCalls = toolValues.reduce((acc, t) => acc + Number(t['blockedCount'] ?? 0), 0);
 
-        const topTools = toolName
-            ? toolsMap[toolName]
-                ? [{ name: toolName, count: toolsMap[toolName].totalCalls }]
-                : []
-            : Object.entries(toolsMap)
-                  .sort(([, a], [, b]) => (b.totalCalls ?? 0) - (a.totalCalls ?? 0))
-                  .slice(0, 10)
-                  .map(([name, t]) => ({ name, count: t.totalCalls ?? 0 }));
+        /** @type {{ name: string; count: number; blocked: number; aliases: string[] }[]} */
+        let topTools = [];
+        if (toolName) {
+            const match = findTelemetryEntryByName(toolsMap, toolName);
+            if (match) {
+                topTools = [
+                    {
+                        name: match.key,
+                        count: Number(match.entry['totalCalls'] ?? 0),
+                        blocked: Number(match.entry['blockedCount'] ?? 0),
+                        aliases: Array.isArray(match.entry['aliases'])
+                            ? /** @type {string[]} */ (match.entry['aliases'])
+                            : [],
+                    },
+                ];
+            }
+        } else {
+            topTools = Object.entries(toolsMap)
+                .sort(([, a], [, b]) => Number(b['totalCalls'] ?? 0) - Number(a['totalCalls'] ?? 0))
+                .slice(0, 10)
+                .map(([name, t]) => ({
+                    name,
+                    count: Number(t['totalCalls'] ?? 0),
+                    blocked: Number(t['blockedCount'] ?? 0),
+                    aliases: Array.isArray(t['aliases']) ? /** @type {string[]} */ (t['aliases']) : [],
+                }));
+        }
 
         return {
             available: true,
@@ -379,6 +428,7 @@ const getTelemetryTool = buildTool({
                 total: totalCalls,
                 success: successCalls,
                 errors: errorCalls,
+                blocked: blockedCalls,
                 successRate: totalCalls > 0 ? Math.round((successCalls / totalCalls) * 100) : 0,
             },
             topTools,
@@ -517,12 +567,12 @@ const getToolHealthTool = buildTool({
             limit,
         },
     ) => {
-        const stats = getToolStats();
+        const stats = /** @type {Record<string, Record<string, unknown>>} */ (getToolStats());
 
         if (tool_name) {
-            const s = stats[tool_name];
-            if (!s) return { found: false, tool: tool_name };
-            return { found: true, tool: tool_name, stats: s };
+            const match = findTelemetryEntryByName(stats, tool_name);
+            if (!match) return { found: false, tool: tool_name };
+            return { found: true, tool: match.key, requestedTool: tool_name, stats: match.entry };
         }
 
         /** @type {keyof ReturnType<typeof getToolStats>[string]} */
@@ -537,14 +587,16 @@ const getToolHealthTool = buildTool({
             .slice(0, typeof limit === 'number' ? limit : undefined)
             .map(([name, s]) => ({ name, ...s }));
 
-        const total = Object.values(stats).reduce((acc, s) => acc + s.calls, 0);
-        const totalErrors = Object.values(stats).reduce((acc, s) => acc + s.errors, 0);
+        const total = Object.values(stats).reduce((acc, s) => acc + Number(s['calls'] ?? 0), 0);
+        const totalErrors = Object.values(stats).reduce((acc, s) => acc + Number(s['errors'] ?? 0), 0);
+        const totalBlocked = Object.values(stats).reduce((acc, s) => acc + Number(s['blocked'] ?? 0), 0);
 
         log('DEBUG', `[get_tool_health] stats=${Object.keys(stats).length} tools tracked`);
         return {
             tracked: Object.keys(stats).length,
             totalCalls: total,
             totalErrors,
+            totalBlocked,
             overallErrorRate: total > 0 ? parseFloat(((totalErrors / total) * 100).toFixed(1)) : 0,
             topTools: entries,
         };

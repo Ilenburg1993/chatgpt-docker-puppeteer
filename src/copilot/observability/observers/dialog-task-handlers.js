@@ -367,10 +367,6 @@ export function attachDialogTaskHandlers(ctx) {
             if (callId) _toolStarts.delete(callId);
             const toolName = evt?.toolName ?? startInfo?.toolName ?? 'unknown';
             const durationMs = evt?.durationMs ?? (startInfo ? performance.now() - startInfo.ts : undefined);
-            const success = evt?.success !== false;
-            if (typeof durationMs === 'number') {
-                metrics.recordToolCall(toolName, durationMs, success);
-            }
             log(
                 'DEBUG',
                 `[agent-event-observer] tool.execution_complete tool=${toolName} duration=${durationMs ?? '?'}ms`,

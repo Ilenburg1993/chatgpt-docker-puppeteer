@@ -67,7 +67,7 @@ describe('FI-7 — observability barrel contract', () => {
 
     it('exports tool-stats functions (added in I-2)', async () => {
         const barrel = await import('#copilot/observability');
-        const expected = ['getToolStats', 'recordToolCall'];
+        const expected = ['getToolStats', 'recordToolCall', 'recordBlockedToolCall'];
         for (const name of expected) {
             expect(/** @type {Record<string, unknown>} */ (barrel)[name], `missing: ${name}`).toBeDefined();
         }

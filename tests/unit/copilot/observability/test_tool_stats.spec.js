@@ -12,6 +12,7 @@ import {
     _resetToolStats,
     getStatsByCategory,
     getToolStats,
+    recordBlockedToolCall,
     recordToolCall,
     wrapWithStats,
 } from '../../../../src/copilot/observability/tool-stats.js';
@@ -29,6 +30,7 @@ describe('tool-stats', () => {
             const stats = /** @type {any} */ (getToolStats());
             expect(stats.git_status.calls).toBe(1);
             expect(stats.git_status.errors).toBe(0);
+            expect(stats.git_status.blocked).toBe(0);
             expect(stats.git_status.lastOk).toBe(true);
         });
 
@@ -55,6 +57,15 @@ describe('tool-stats', () => {
             expect(stats.cmd.calls).toBe(3);
             expect(stats.cmd.errors).toBe(1);
         });
+
+        it('registra tentativa bloqueada sem contar como execução', () => {
+            recordBlockedToolCall('cmd');
+            const stats = /** @type {any} */ (getToolStats());
+            expect(stats.cmd.calls).toBe(0);
+            expect(stats.cmd.errors).toBe(0);
+            expect(stats.cmd.blocked).toBe(1);
+            expect(stats.cmd.lastBlockedIso).toBeTruthy();
+        });
     });
 
     // ── getToolStats ──────────────────────────────────────────────────────
@@ -62,6 +73,13 @@ describe('tool-stats', () => {
     describe('getToolStats', () => {
         it('retorna snapshot vazio sem chamadas', () => {
             expect(getToolStats()).toEqual({});
+        });
+
+        it('inclui metadados de bloqueio no snapshot', () => {
+            recordBlockedToolCall('test');
+            const stats = /** @type {any} */ (getToolStats());
+            expect(stats.test.blocked).toBe(1);
+            expect(stats.test.lastBlockedIso).toBeTruthy();
         });
 
         it('calcula avgLatencyMs corretamente', () => {
@@ -103,23 +121,23 @@ describe('tool-stats', () => {
             recordToolCall('git.status', 200, true);
 
             const cats = /** @type {any} */ (getStatsByCategory());
-            expect(cats.shell.totalCalls).toBe(2);
-            expect(cats.shell.tools).toEqual(['shell.exec_command', 'shell.read_file']);
+            expect(cats.tool.totalCalls).toBe(2);
+            expect(cats.tool.tools).toEqual(['exec_command', 'read_file']);
             expect(cats.git.totalCalls).toBe(1);
         });
 
-        it('categoriza tools sem ponto como "other"', () => {
+        it('categoriza tools sem namespace explícito como "tool"', () => {
             recordToolCall('standalone', 100, true);
             const cats = /** @type {any} */ (getStatsByCategory());
-            expect(cats.other).toBeDefined();
-            expect(cats.other.tools).toContain('standalone');
+            expect(cats.tool).toBeDefined();
+            expect(cats.tool.tools).toContain('standalone');
         });
 
         it('calcula avgLatencyMs por categoria', () => {
             recordToolCall('shell.a', 100, true);
             recordToolCall('shell.b', 300, true);
             const cats = /** @type {any} */ (getStatsByCategory());
-            expect(cats.shell.avgLatencyMs).toBe(200);
+            expect(cats.tool.avgLatencyMs).toBe(200);
         });
 
         it('acumula erros por categoria', () => {
@@ -127,6 +145,15 @@ describe('tool-stats', () => {
             recordToolCall('git.pull', 10, false);
             const cats = /** @type {any} */ (getStatsByCategory());
             expect(cats.git.totalErrors).toBe(2);
+        });
+
+        it('acumula bloqueios por categoria sem alterar avg por chamadas', () => {
+            recordToolCall('git.push', 100, true);
+            recordBlockedToolCall('git.push');
+            recordBlockedToolCall('git.pull');
+            const cats = /** @type {any} */ (getStatsByCategory());
+            expect(cats.git.totalBlocked).toBe(2);
+            expect(cats.git.avgLatencyMs).toBe(100);
         });
 
         it('retorna tools ordenadas', () => {

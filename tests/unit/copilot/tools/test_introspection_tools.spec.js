@@ -23,9 +23,16 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vite
 const mocks = vi.hoisted(() => ({
     log: vi.fn(),
     getToolStats: vi.fn(() => ({
-        web_fetch_local: { calls: 10, errors: 1, avgLatencyMs: 200, errorRate: 10, lastExecution: '2026-01-01' },
-        git_status: { calls: 5, errors: 0, avgLatencyMs: 50, errorRate: 0, lastExecution: '2026-01-01' },
-        shell_exec: { calls: 3, errors: 2, avgLatencyMs: 500, errorRate: 66, lastExecution: '2026-01-01' },
+        web_fetch_local: {
+            calls: 10,
+            errors: 1,
+            blocked: 2,
+            avgLatencyMs: 200,
+            errorRate: 10,
+            lastExecution: '2026-01-01',
+        },
+        git_status: { calls: 5, errors: 0, blocked: 0, avgLatencyMs: 50, errorRate: 0, lastExecution: '2026-01-01' },
+        shell_exec: { calls: 3, errors: 2, blocked: 1, avgLatencyMs: 500, errorRate: 66, lastExecution: '2026-01-01' },
     })),
     getSummary: vi.fn(() => ({
         tools: {
@@ -107,10 +114,7 @@ describe('introspection-tools', () => {
                         { tool: fakeTools[0], category: 'web', tags: ['http', 'read'], readOnly: true },
                     ],
                     ['git_status', { tool: fakeTools[1], category: 'git', tags: ['vcs'], readOnly: true }],
-                    [
-                        'list_tools',
-                        { tool: fakeTools[2], category: 'introspection', tags: ['meta'], readOnly: true },
-                    ],
+                    ['list_tools', { tool: fakeTools[2], category: 'introspection', tags: ['meta'], readOnly: true }],
                     [
                         'get_agent_info',
                         { tool: fakeTools[3], category: 'introspection', tags: ['meta'], readOnly: true },
@@ -377,6 +381,7 @@ describe('introspection-tools', () => {
             expect(result.tracked).toBe(3);
             expect(result.totalCalls).toBe(18); // 10+5+3
             expect(result.totalErrors).toBe(3); // 1+0+2
+            expect(result.totalBlocked).toBe(3); // 2+0+1
             expect(result.overallErrorRate).toBeGreaterThan(0);
             expect(result.topTools.length).toBe(3);
         });
@@ -387,6 +392,7 @@ describe('introspection-tools', () => {
             expect(result.found).toBe(true);
             expect(result.tool).toBe('web_fetch_local');
             expect(result.stats.calls).toBe(10);
+            expect(result.stats.blocked).toBe(2);
         });
 
         it('retorna found=false para tool inexistente', async () => {

@@ -25,7 +25,6 @@ import {
     EMITTER_TOOL_EXECUTION_PROGRESS,
     EMITTER_TOOL_EXECUTION_START,
 } from '#copilot/events';
-import { recordToolCall } from '#copilot/observability';
 import {
     getShowIntentActivity,
     getShowStreaming,
@@ -477,9 +476,6 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, regi
             : Number.isFinite(Number(evt?.['durationMs']))
               ? Number(evt?.['durationMs'])
               : 0;
-        if (entry || eventName) {
-            recordToolCall(`sdk.${canonicalName}`, durationMs, success);
-        }
         const dur = durationMs > 0 ? `${(durationMs / 1000).toFixed(1)}s` : 'n/d';
         const icon = success ? terminalThemeText('success', '✅') : terminalThemeText('error', '❌');
         const operationRole = mapOperationRole(presentation.operation);

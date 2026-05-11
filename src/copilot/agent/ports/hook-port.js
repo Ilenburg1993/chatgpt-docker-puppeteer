@@ -13,6 +13,7 @@
 
 import { defaultAuditLog } from '#copilot/audit';
 import { getCopilotFallbackModel } from '#copilot/config';
+import { recordBlockedToolCall } from '#copilot/observability';
 import { attachBus, classifySdkRateLimitScope, defaultHookBus, modelSelector } from '#copilot/sdk';
 import { createQueuedElicitationHandler } from '../../sdk/session/elicitation.js';
 import { log } from './logging-port.js';
@@ -234,11 +235,19 @@ export function buildAgentBusHooks(input) {
  */
 export function withAgentRuntimeToolPolicy(busHooks, isToolDisabled) {
     const runtimeDisableHook = createRuntimeDisableHook(isToolDisabled);
+    const preToolUse = busHooks.onPreToolUse
+        ? composePreToolUseHandlers(runtimeDisableHook, busHooks.onPreToolUse)
+        : runtimeDisableHook;
+
     return {
         ...busHooks,
-        onPreToolUse: busHooks.onPreToolUse
-            ? composePreToolUseHandlers(runtimeDisableHook, busHooks.onPreToolUse)
-            : runtimeDisableHook,
+        onPreToolUse: async (input, invocation) => {
+            const result = await preToolUse(input, invocation);
+            if (result?.permissionDecision === 'deny') {
+                recordBlockedToolCall(input.toolName);
+            }
+            return result;
+        },
     };
 }
 

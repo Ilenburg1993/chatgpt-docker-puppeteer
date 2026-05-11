@@ -8,6 +8,73 @@
 
 ---
 
+## Atualização de status — revalidação profunda em 2026-05-11
+
+> **Importante**: este documento nasceu como snapshot externo de 2026-05-10. As contagens agregadas e o texto das tabelas abaixo continuam úteis como **histórico de investigação**, mas **não são mais a fonte de verdade isolada** sobre o estado atual do código.
+>
+> A fonte operacional corrente passa a ser esta seção de revalidação + o roadmap canônico em `2026-05-10-ROADMAP-REBUILD-TOOLS-CANONICO.md`.
+
+### Síntese executiva do estado atual
+
+- O escopo `src/copilot` foi revalidado com:
+    - `npm run typecheck:strict:src.copilot` ✅
+    - `npm run typecheck:strict:tests.unit` ✅
+    - `npx eslint src/copilot tests/unit/copilot tests/integration/copilot` ✅
+    - `npm run test:copilot` ✅
+- Parte importante dos achados desta auditoria externa ficou **corrigida**, **obsoleta** ou **reescopada**.
+- Nesta rodada, o blind spot de observabilidade para denies no runtime canônico do agent foi fechado no plano principal de stats de tools.
+
+### Matriz objetiva de reclassificação
+
+| Item original                                                               | Estado em 2026-05-11                          | Evidência resumida                                                                                                                                                                                     | Leitura atual                                                                                                         |
+| --------------------------------------------------------------------------- | --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------- |
+| `BUG-01` — `getAllTools(registry)` ignorado                                 | **Obsoleta / falso positivo no estado atual** | a topologia de bootstrap atual em `src/copilot/tools/bootstrap.js` usa agregação estática compatível (`getAllStaticTools()` + compat `getAllTools()`)                                                  | a claim não descreve mais o fluxo real atual                                                                          |
+| `BUG-02` — timeout RPC morto/ignorado                                       | **Corrigida**                                 | `src/copilot/tools/session/session-rpc-tools.js` explicita semântica advisory sem dead code silencioso                                                                                                 | continua não-bloqueante por política, mas não é mais código morto                                                     |
+| `BUG-03` — fallback da factory perde schema                                 | **Corrigida**                                 | `src/copilot/tools/infra/tool-factory.js` normaliza parâmetros antes do fallback plain tool                                                                                                            | o caminho recoverable preserva contrato de schema                                                                     |
+| `BUG-06` — timer de input com race estrutural                               | **Corrigida / mitigada fortemente**           | `src/copilot/tools/hook/hook-tools.js` usa guarda por `_deletePendingInput(requestId)` + limpeza de timer no path bem-sucedido                                                                         | a race descrita não permanece no formato original                                                                     |
+| `BUG-07` — parse JSON DDG sem tratamento dedicado                           | **Corrigida**                                 | `src/copilot/tools/web/web-tools.js` recebeu tratamento explícito do fallback JSON inválido                                                                                                            | achado deixou de estar ativo                                                                                          |
+| `BUG-11` — pending input órfão no shutdown                                  | **Corrigida / mitigada fortemente**           | `src/copilot/agent/ports/tool-port.js` chama `cancelAllUserInputRequests()` no teardown; `hook-tools` integra cancelamento ao SDK                                                                      | o vazamento estrutural descrito foi fechado no runtime canônico                                                       |
+| `BUG-12` — stale import de `isToolDisabled`                                 | **Falso positivo / claim desatualizada**      | `src/copilot/hooks/presets/production.js` aceita `isToolDisabled` injetável e o binding default não caracteriza sozinho stale reference operacional                                                    | não há evidência atual de bug real no fluxo canônico                                                                  |
+| `SEC-01` — `safeEnv._cache` frágil                                          | **Corrigida**                                 | `src/copilot/tools/shell/sandbox.js` usa `_safeEnvCache` privado de módulo com TTL explícito                                                                                                           | a vulnerabilidade não existe mais no formato descrito                                                                 |
+| `SEC-03` — requestId antes da checagem de capacidade                        | **Corrigida**                                 | `src/copilot/tools/hook/hook-tools.js` valida capacidade antes de `_nextInputId()`                                                                                                                     | janela de inconsistência eliminada                                                                                    |
+| `SDK-BUG-01` / `OBS-BUG-02` — double wrapping factory↔SDK                   | **Reescopada e mitigada estruturalmente**     | `tool-factory` hoje usa `sdkCreateTool`; além disso, a telemetria de tools foi consolidada em `observability/tool-stats.js`, com `MetricsStore` delegando ao backend canônico e remoção de writers duplicados em terminal/collectors/shell | o risco residual deixou de ser dupla contagem generalizada e ficou concentrado no tier MCP fora da factory canônica |
+| `SDK-BUG-03` — overwrite silencioso no registry                             | **Corrigida**                                 | `src/copilot/sdk/tools/registry.js` registra warning em sobrescrita                                                                                                                                    | duplicatas não são mais silenciosas                                                                                   |
+| `SDK-BUG-04` — `_toolsConfig` sem reset                                     | **Corrigida**                                 | `src/copilot/sdk/tools/state.js` expõe `resetToolsConfigForTests()`                                                                                                                                    | isolamento de testes passou a existir                                                                                 |
+| `SDK-BUG-06` — dois sistemas paralelos de user-input                        | **Majoritariamente obsoleta**                 | o antigo `tools/user-input-state.js` deixou de ser a superfície canônica; `src/copilot/tools/hook/hook-tools.js` opera com `ToolSessionContext` e cancelamento integrado ao SDK                        | o problema foi largamente absorvido pela arquitetura atual                                                            |
+| `BUG-18` / `SYS-GAP-12` / `SYS-GAP-16` — cobertura de eventos sem validação | **Parcialmente mitigada**                     | existe cobertura dedicada em `tests/unit/copilot/test_terminal_event_adapter_events.spec.js`                                                                                                           | ainda pode evoluir, mas a ausência total de validação não é mais verdadeira                                           |
+| `OBS-BUG-03` / `SYS-GAP-04` — denies fora das métricas                      | **Corrigida no runtime canônico do agent**    | `src/copilot/agent/ports/hook-port.js` agora chama `recordBlockedToolCall()` em decisões `deny`; `src/copilot/observability/tool-stats.js` e `get_tool_health` passaram a expor `blocked/totalBlocked` | o Always-Alive runtime deixa de ter blind spot quantitativo para denies                                               |
+| `BUG-04` / `BUG-10` — limites `Infinity` nas file tools                     | **Ainda ativa**                               | `src/copilot/tools/file/shared.js` mantém limites operacionais não-bloqueantes por decisão policy-first                                                                                                | continua sendo trade-off aberto e precisa de decisão arquitetural formal                                              |
+| `BUG-24` — MCP bridge com state module-level mutável                        | **Ainda ativa**                               | `src/copilot/bridges/mcp-tool-bridge.js` mantém `_mcpHealth`, `_mcpCircuitOpen`, `_bootAttemptCount` etc. como estado de módulo                                                                        | segue como alvo estrutural prioritário                                                                                |
+| `BUG-25` / `SYS-GAP-15` — MCP bridge fora da factory canônica               | **Ainda ativa**                               | MCP bridge continua usando `createTool` direto                                                                                                                                                         | ainda há dois tiers de qualidade/observabilidade                                                                      |
+| `SYS-GAP-11` — terminal sem boundary enforcement suficiente                 | **Ainda ativa**                               | não há evidência de fechamento completo das regras de limite de módulo no terminal                                                                                                                     | backlog arquitetural permanece válido                                                                                 |
+
+### Novos recortes encontrados na investigação profunda
+
+1. **O problema de observabilidade mudou de forma**
+     - a claim antiga de “dupla métrica por duas factories” ficou desatualizada;
+    - o risco principal já não é mais a coexistência de planos paralelos para tools nativas: o runtime principal agora converge em `observability/tool-stats.js`, com `MetricsStore` atuando como facade do mesmo backend.
+    - o residual arquitetural ficou concentrado em duas frentes:
+        - MCP bridge ainda fora da factory canônica (`createTool` direto);
+        - warnings recoverable/TDZ-safe do `tool-factory` sob certos mocks SSR/Vitest.
+     - isso gera drift de ownership e naming (`exec_command` vs `shell.exec_command` vs `sdk.<tool>`), não necessariamente double-counting universal.
+
+2. **Persistem warnings TDZ-safe em certas árvores de import de teste**
+     - em execuções completas ainda aparecem warnings recoverable do `tool-factory` durante alguns grafos de import SSR/mocks;
+     - os testes passam porque o fallback atual é resiliente, mas o ruído evidencia oportunidade de endurecimento da normalização lazy de schema.
+
+### Conclusão desta revalidação
+
+O documento externo continua valioso como catálogo de hipóteses e de hotspots, mas o estado real em 2026-05-11 é:
+
+- **estabilização funcional concluída** para boa parte dos P0/P1 originais;
+- **blind spot de denies fechado** no runtime canônico do agent;
+- **backlog ativo deslocado** para três eixos principais:
+    1. política canônica para `Infinity` nas file tools;
+    2. encapsulamento/normalização do MCP bridge;
+    3. migração do MCP bridge para a surface canônica de factory/telemetria.
+
+---
+
 ## Sumário Executivo
 
 O módulo `src/copilot/tools/` é o **registry central de Custom Tools** do Always-Alive Agent, com 10 categorias funcionais (~55 tools), infraestrutura transversal (factory, DI tokens, logger, metrics proxy, contract verifier) e integrações profundas com `sdk/`, `terminal/`, `hooks/` e `observability/`. A arquitetura demonstra **maturidade moderada-alta** — padrões de DI por setter injection são consistentes, a factory é uniforme e a separação leitura/escrita é explícita — mas apresenta **déficits estruturais** mensuráveis: estado global mutável em 11+ variáveis module-level, duas fábricas paralelas com lógica duplicada, ausência de limites de módulo formalizados e cinco mecanismos de permissão não coordenados.

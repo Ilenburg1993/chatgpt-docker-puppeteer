@@ -37,7 +37,7 @@ import { defaultEventCollector } from './event-collector.js';
 import { log, LOG_DIR } from './logger.js';
 import { defaultMetrics } from './metrics.js';
 import { projectSdkOperationMetric } from './sdk-metric-bridge.js';
-import { getToolStats, recordToolCall } from './tool-stats.js';
+import { getToolStats, recordBlockedToolCall, recordToolCall } from './tool-stats.js';
 
 /** @type {boolean} */
 let _obsBooted = false;
@@ -196,6 +196,7 @@ export function bootstrapObservability() {
     setToolsMetrics({
         getSummary: () => defaultMetrics.getSummary(),
         getToolStats,
+        recordBlockedToolCall,
         recordToolCall,
     });
 }

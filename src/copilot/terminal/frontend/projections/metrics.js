@@ -38,6 +38,7 @@ import { readTerminalTimelineProjection, readTerminalTimelineSyncTelemetry } fro
  *     timelineSyncTelemetry: import('./timeline.js').TerminalTimelineSyncTelemetry;
  *     toolCallCount: number;
  *     toolErrorCount: number;
+ *     toolBlockedCount: number;
  *     errorStats: { total: number; buffered: number };
  *     activity: import('../../state/activity-state.js').TerminalActivitySnapshot;
  * }}
@@ -51,9 +52,11 @@ export function readTerminalMetricsProjection(runtimeId) {
     const toolStats = readToolStatsProjection().stats;
     let toolCallCount = 0;
     let toolErrorCount = 0;
+    let toolBlockedCount = 0;
     for (const stat of Object.values(toolStats)) {
         toolCallCount += Number(stat['calls'] ?? 0);
         toolErrorCount += Number(stat['errors'] ?? 0);
+        toolBlockedCount += Number(stat['blocked'] ?? 0);
     }
     const errorStats =
         typeof defaultErrorTracker?.getStats === 'function'
@@ -85,6 +88,7 @@ export function readTerminalMetricsProjection(runtimeId) {
         timelineSyncTelemetry: readTerminalTimelineSyncTelemetry(),
         toolCallCount,
         toolErrorCount,
+        toolBlockedCount,
         activity: readTerminalActivitySnapshot(),
         errorStats: {
             total: Number(errorStats.total ?? 0),

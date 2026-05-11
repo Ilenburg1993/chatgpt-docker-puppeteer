@@ -24,7 +24,6 @@ import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import { z } from 'zod';
 import { log } from '../infra/logger.js';
-import { recordToolCall } from '../infra/metrics-proxy.js';
 import { buildTool } from '../infra/tool-factory.js';
 import { ADVISORY_TIMEOUT_MS, runPipeline, runProcess, splitPipelineSegments, tokenizeShell } from './executor.js';
 import {
@@ -240,8 +239,6 @@ const execCommandTool = buildTool({
             timeoutMs: timeoutConfig.timeoutMs,
         });
 
-        // F6.4: registrar execução no audit de tools para observabilidade
-        recordToolCall('shell.exec_command', result.durationMs, result.exitCode === 0);
         // F14.5: audit JSONL para rastreabilidade de shell execution
         defaultAuditLog.recordToolComplete({
             toolCallId: _auditId,
@@ -329,8 +326,6 @@ const runNpmScriptTool = buildTool({
             timeoutMs: timeoutConfig.timeoutMs,
         });
 
-        // F6.4: audit log de execução npm
-        recordToolCall('shell.run_npm_script', result.durationMs, result.exitCode === 0);
         // F14.5: audit JSONL para rastreabilidade
         defaultAuditLog.recordToolComplete({
             toolCallId: _npmAuditId,
@@ -424,8 +419,6 @@ const runNodeFileTool = buildTool({
             timeoutMs: timeoutConfig.timeoutMs,
         });
 
-        // F6.4: audit log de execução node
-        recordToolCall('shell.run_node_file', result.durationMs, result.exitCode === 0);
         // F14.5: audit JSONL para rastreabilidade
         defaultAuditLog.recordToolComplete({
             toolCallId: _nodeAuditId,

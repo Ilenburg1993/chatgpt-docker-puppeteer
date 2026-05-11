@@ -4,7 +4,7 @@
  *
  * Comando `/tools` do REPL terminal LLM-B.
  *
- * Lista as tools observadas com estatísticas de uso (invocações, erros, latência).
+ * Lista a telemetria canônica das tools/superfícies observadas (invocações, bloqueios, erros, latência).
  *
  * @module copilot/terminal/commands/tools
  * @see EventBus
@@ -49,16 +49,24 @@ export function cmdTools({ println }, arg = '') {
     );
 
     for (const [name, data] of entries) {
-        const d = /** @type {{ calls?: number; errors?: number; avgLatencyMs?: number; aliases?: string[] }} */ (data);
+        const d =
+            /** @type {{ calls?: number; errors?: number; blocked?: number; avgLatencyMs?: number; aliases?: string[]; kind?: string }} */ (
+                data
+            );
         const calls = d.calls ?? 0;
         const errors = d.errors ?? 0;
+        const blocked = d.blocked ?? 0;
         const latency = typeof d.avgLatencyMs === 'number' ? `${d.avgLatencyMs.toFixed(0)}ms` : '?';
         const errorColor = errors > 0 ? '\x1b[31m' : '\x1b[32m';
+        const blockedColor = blocked > 0 ? '\x1b[33m' : '\x1b[90m';
         println(
-            `    \x1b[33m${name}\x1b[0m  calls=\x1b[36m${calls}\x1b[0m  errors=${errorColor}${errors}\x1b[0m  avg=${latency}`,
+            `    \x1b[33m${name}\x1b[0m  calls=\x1b[36m${calls}\x1b[0m  blocked=${blockedColor}${blocked}\x1b[0m  errors=${errorColor}${errors}\x1b[0m  avg=${latency}`,
         );
         if (!wantsRaw && wantsDiag && Array.isArray(d.aliases) && d.aliases.length > 1) {
             println(`      \x1b[90maliases: ${d.aliases.join(', ')}\x1b[0m`);
+        }
+        if (wantsDiag && typeof d.kind === 'string' && d.kind.length > 0) {
+            println(`      \x1b[90mkind: ${d.kind}\x1b[0m`);
         }
     }
 
@@ -69,11 +77,14 @@ export function cmdTools({ println }, arg = '') {
             const callsB = Number(/** @type {Record<string, unknown>} */ (b[1])['totalCalls'] ?? 0);
             return callsB - callsA;
         });
-        println('\n  \x1b[36mCategorias\x1b[0m');
+        println('\n  \x1b[36mCategorias de telemetria\x1b[0m');
         for (const [cat, agg] of categoryEntries) {
-            const info = /** @type {{ totalCalls?: number; totalErrors?: number; avgLatencyMs?: number }} */ (agg);
+            const info =
+                /** @type {{ totalCalls?: number; totalErrors?: number; totalBlocked?: number; avgLatencyMs?: number }} */ (
+                    agg
+                );
             println(
-                `    \x1b[33m${cat}\x1b[0m  calls=\x1b[36m${info.totalCalls ?? 0}\x1b[0m  errors=${info.totalErrors ?? 0}  avg=${info.avgLatencyMs ?? 0}ms`,
+                `    \x1b[33m${cat}\x1b[0m  calls=\x1b[36m${info.totalCalls ?? 0}\x1b[0m  blocked=${info.totalBlocked ?? 0}  errors=${info.totalErrors ?? 0}  avg=${info.avgLatencyMs ?? 0}ms`,
             );
         }
 

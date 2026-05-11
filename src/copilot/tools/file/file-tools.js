@@ -20,7 +20,7 @@ import { fileWriteTools } from './write-tools.js';
  * @returns {import('#copilot/sdk/types').Tool[]}
  */
 function asToolArray(value) {
-	return Array.isArray(value) ? value : [];
+    return Array.isArray(value) ? value : [];
 }
 
 /**
@@ -29,8 +29,8 @@ function asToolArray(value) {
  * @type {import('#copilot/sdk/types').Tool[]}
  */
 export const fileTools = [
-	...asToolArray(fileReadTools),
-	...asToolArray(indexTools),
-	...asToolArray(scopeTools),
-	...asToolArray(fileWriteTools),
+    ...asToolArray(fileReadTools),
+    ...asToolArray(indexTools),
+    ...asToolArray(scopeTools),
+    ...asToolArray(fileWriteTools),
 ];

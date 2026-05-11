@@ -141,7 +141,7 @@ describe('terminal/events/agent-runtime-events.js — contrato', () => {
             }),
         );
         expect(completeTerminalTurnToolCall).toHaveBeenCalledWith({ toolCallId: 'tool-1', success: true });
-        expect(recordToolCall).toHaveBeenCalledWith('sdk.workspace.read_file', expect.any(Number), true);
+        expect(recordToolCall).not.toHaveBeenCalled();
         expect(broadcastSse).toHaveBeenCalledWith(
             'tool.start',
             expect.objectContaining({

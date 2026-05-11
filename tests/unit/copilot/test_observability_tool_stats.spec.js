@@ -29,6 +29,17 @@ describe('tool-stats — estatísticas de ferramentas', () => {
         assert.equal(stats['my_tool'].avgLatencyMs, 50, 'avgLatencyMs deve ser 50');
     });
 
+    it('recordBlockedToolCall registra bloqueio sem contar execução', async () => {
+        const { recordBlockedToolCall, getToolStats } =
+            await import('../../../src/copilot/observability/tool-stats.js');
+        recordBlockedToolCall('my_tool');
+        const stats = getToolStats();
+        const myTool = stats['my_tool'];
+        assert.ok(myTool, 'stats deve conter my_tool após blocked record');
+        assert.equal(myTool.calls, 0, 'calls deve permanecer 0 para bloqueios');
+        assert.equal(myTool.blocked, 1, 'blocked deve ser 1');
+    });
+
     it('getStatsByCategory retorna objeto', async () => {
         const { getStatsByCategory } = await import('../../../src/copilot/observability/tool-stats.js');
         const byCat = getStatsByCategory();

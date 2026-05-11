@@ -32,6 +32,45 @@ Reconstruir `src/copilot/tools/` como um subsistema canônico, com:
 
 > **Nota de evolução**: esta seção captura o snapshot inicial de 2026-05-10. Parte dos itens abaixo já mudou de estado após o hardening e a revalidação de 2026-05-11. Ver `2026-05-11-VALIDACAO-CLAIMS-EXTERNAS-DELTA.md` para o delta pós-estabilização.
 
+### Revalidação profunda consolidada (estado atual em 2026-05-11)
+
+#### Já corrigidos / superados
+
+- `BUG-02` — timeout RPC morto/ignorado → corrigido com semântica advisory explícita.
+- `BUG-03` — fallback da factory sem schema → corrigido.
+- `BUG-06` — race estrutural de cleanup em `request_user_input` → corrigido/mitigado fortemente.
+- `BUG-07` — parse JSON inválido no fallback DDG → corrigido.
+- `BUG-11` — pending input órfão no teardown → corrigido/mitigado fortemente.
+- `SEC-01` — cache frágil de `safeEnv` → corrigido.
+- `SEC-03` — checagem de capacidade após geração de ID → corrigido.
+- `SDK-BUG-03` — overwrite silencioso no registry → corrigido.
+- `SDK-BUG-04` — falta de reset de `_toolsConfig` para testes → corrigido.
+- `OBS-BUG-03` / `SYS-GAP-04` — blind spot quantitativo de denies → **corrigido no runtime canônico do agent**.
+
+#### Obsoletos / falso positivo no estado atual
+
+- `BUG-01` — claim baseada numa topologia anterior do bootstrap de tools.
+- `BUG-12` — stale import de `isToolDisabled` não se sustenta como bug real no fluxo atual.
+- `SDK-BUG-06` — leitura antiga sobre dualidade de user-input ficou majoritariamente superada pela superfície atual baseada em `ToolSessionContext` + integração SDK.
+
+#### Reescopados (o problema real mudou)
+
+- `SDK-BUG-01` / `OBS-BUG-02`
+  - **não** são mais lidos como “duas factories gerando dupla métrica automática em todo caminho”;
+  - o gap real atual é **ownership fragmentado da telemetria de tools** e **drift de naming** entre planos (`tool-stats`, `defaultMetrics`, bridges e registros manuais).
+
+#### Ainda ativos e no backlog estrutural
+
+- `BUG-04` / `BUG-10` — política canônica para `Infinity` em file tools.
+- `BUG-24` — MCP bridge com state module-level mutável.
+- `BUG-25` / `SYS-GAP-15` — MCP bridge fora da factory canônica.
+- `SYS-GAP-11` — boundary enforcement do terminal ainda incompleto.
+
+#### Gaps adicionais encontrados na investigação
+
+- warnings recoverable do `tool-factory` ainda surgem em alguns grafos SSR/mocks de teste (`Cannot access '__vite_ssr_import_*__' before initialization`), sem quebrar execução mas produzindo ruído operacional;
+- o MCP bridge ainda permanece fora da factory canônica, embora já converse com o plano principal de métricas via `MetricsStore`.
+
 ### Confirmados na base atual
 
 - Dead code de timeout advisory em `session-rpc-tools` (parametrização ignorada).
@@ -91,6 +130,7 @@ Reconstruir `src/copilot/tools/` como um subsistema canônico, com:
 1. Definir **um único owner** de wrapping/logging/metrics (`sdk/tools/core` ou `tools/tool-factory`, não ambos).
 2. Extrair converter Zod→JSON Schema para módulo único compartilhado.
 3. Eliminar divergência de naming e padronizar metadados de tool.
+4. Normalizar também o plano de telemetria entre `tool-stats`, `defaultMetrics` e registros manuais de bridges/tools.
 
 ### Fase 2 — Estado por sessão e input bridge único
 
@@ -109,6 +149,35 @@ Reconstruir `src/copilot/tools/` como um subsistema canônico, com:
 1. Tool contract tests por categoria.
 2. Health-checks granulares por subsistema (`file`, `todo`, `shell`, `registry`, `user-input`).
 3. Dashboard de eventos bloqueados e tentativas negadas (observabilidade completa de permissão).
+
+---
+
+## Backlog ativo pós-revalidação + transformação desta rodada
+
+### A. Fechado nesta rodada
+
+1. **Blind spot de denies no runtime canônico**
+  - `withAgentRuntimeToolPolicy()` passou a registrar `recordBlockedToolCall(toolName)`;
+  - `tool-stats` agora expõe `blocked` / `lastBlockedIso` por tool;
+  - `get_tool_health` agora expõe `totalBlocked`.
+
+### B. Próximo lote de transformação ampla
+
+1. **Decisão arquitetural para limites `Infinity` em file tools**
+  - alternativas válidas:
+    - manter liberdade plena com risco explícito;
+    - limites configuráveis por ENV;
+    - negociação por domínio/streaming.
+
+2. **Encapsular estado do MCP bridge por instância/contexto**
+  - remover `_mcpHealth`, `_mcpCircuitOpen`, `_bootAttemptCount` de module scope;
+  - preparar a ponte para múltiplas sessões/runtime isolation.
+
+3. **Trazer MCP bridge para a superfície canônica de factory/telemetria**
+  - reduzir o tier paralelo de qualidade entre MCP tools e tools internas.
+
+4. **Reduzir warnings TDZ-safe na normalização de parâmetros sob SSR/mocks**
+  - não é bug funcional hoje, mas é ruído de arquitetura/testabilidade e merece hardening.
 
 ---
 
@@ -155,4 +224,7 @@ Reconstruir `src/copilot/tools/` como um subsistema canônico, com:
 - ✅ 2026-05-11: escopo `src/copilot` revalidado com `typecheck strict`, `eslint` e `npm run test:copilot` verdes.
 - ✅ 2026-05-11: branch `main` sincronizada com `origin/main` após push do lote estrutural.
 - ✅ 2026-05-11: claims externas revalidadas; parte do material original passou a estado **corrigido**, **obsoleto** ou **ainda ativo** com evidência objetiva (`2026-05-11-VALIDACAO-CLAIMS-EXTERNAS-DELTA.md`).
-- 🔄 Próximo: consolidar contracts formais (ToolDefinition/Telemetry/Permission/UserInputBridge), fechar blind spot de denies na observabilidade e decidir a política canônica para limites `Infinity` em file tools.
+- ✅ 2026-05-11: blind spot quantitativo de denies fechado no runtime canônico do agent (`hook-port` + `tool-stats` + `get_tool_health`).
+- ✅ 2026-05-11: `npm run typecheck:strict:tests.unit` voltou a verde após saneamento tipado das suítes de apoio no escopo Copilot.
+- ✅ 2026-05-11: owner único da telemetria de tools consolidado (`tool-stats` canônico + `MetricsStore` delegado + remoção de writers duplicados em terminal/collectors/shell + UX do `/tools` alinhada).
+- 🔄 Próximo: decidir a política canônica para limites `Infinity`, encapsular o state do MCP bridge e trazer o MCP bridge para a surface canônica de factory.

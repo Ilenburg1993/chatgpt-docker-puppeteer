@@ -5,7 +5,7 @@ import { setCustomToolsBuilder } from '#copilot/sdk';
 import { createRegistry } from '#copilot/sdk/tools-registry';
 import { bootstrapTools, buildTool } from '#copilot/tools';
 
-setCustomToolsBuilder(buildTool);
+setCustomToolsBuilder(/** @type {Parameters<typeof setCustomToolsBuilder>[0]} */ (buildTool));
 
 describe('tools bootstrap file capabilities', () => {
     it('carrega read/write/index/scope tools de filesystem no SDK runtime', () => {

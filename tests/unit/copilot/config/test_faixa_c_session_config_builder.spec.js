@@ -97,9 +97,7 @@ vi.mock('../../../../src/copilot/config/sdk-config-port.js', async () => {
             }
             return {
                 ...provider,
-                ...(typeof provider.baseUrl === 'string'
-                    ? { baseUrl: provider.baseUrl.replace(/\/+$/, '') }
-                    : {}),
+                ...(typeof provider.baseUrl === 'string' ? { baseUrl: provider.baseUrl.replace(/\/+$/, '') } : {}),
             };
         }),
         resolvePersistentConfigFile: vi.fn((name) => `/tmp/${name}`),

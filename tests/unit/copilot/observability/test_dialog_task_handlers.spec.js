@@ -266,7 +266,7 @@ describe('dialog-task-handlers', () => {
             });
             expect(metrics.recordCounter).toHaveBeenCalledWith('tool.execution.start');
             expect(metrics.recordCounter).toHaveBeenCalledWith('tool.execution.complete');
-            expect(metrics.recordToolCall).toHaveBeenCalledWith('read_file', 120, true);
+            expect(metrics.recordToolCall).not.toHaveBeenCalled();
         });
 
         it('registra tool.execution_progress', () => {

@@ -17,6 +17,7 @@ import {
     _resetToolStats,
     getStatsByCategory,
     getToolStats,
+    recordBlockedToolCall,
     recordToolCall,
     wrapWithStats,
 } from '#copilot/observability/tool-stats';
@@ -42,6 +43,7 @@ describe('F159 — recordToolCall acumula métricas por tool', () => {
         expect(entry).toBeDefined();
         expect(entry.calls).toBe(1);
         expect(entry.errors).toBe(0);
+        expect(entry.blocked).toBe(0);
         expect(entry.lastOk).toBe(true);
     });
 
@@ -58,7 +60,7 @@ describe('F159 — recordToolCall acumula métricas por tool', () => {
         recordToolCall('shell.exec', 200, true);
         recordToolCall('shell.exec', 150, false);
         const stats = getToolStats();
-        const entry = entryOf(stats, 'shell.exec');
+        const entry = entryOf(stats, 'exec');
         expect(entry.calls).toBe(3);
         expect(entry.errors).toBe(1);
     });
@@ -70,6 +72,16 @@ describe('F159 — recordToolCall acumula métricas por tool', () => {
         expect(entry.lastOk).toBe(true);
         expect(entry.errors).toBe(0);
     });
+
+    it('registra tentativa bloqueada em contador dedicado', () => {
+        recordBlockedToolCall('tool.test');
+        const stats = getToolStats();
+        const entry = entryOf(stats, 'tool.test');
+        expect(entry.calls).toBe(0);
+        expect(entry.errors).toBe(0);
+        expect(entry.blocked).toBe(1);
+        expect(entry.lastBlockedIso).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+    });
 });
 
 // ─── F160: getToolStats snapshot ───────────────────────────────────────────
@@ -79,15 +91,17 @@ describe('F160 — getToolStats retorna snapshot com campos corretos', () => {
         expect(getToolStats()).toEqual({});
     });
 
-    it('snapshot contém calls, errors, avgLatencyMs, errorRate, lastCallIso, lastOk', () => {
+    it('snapshot contém calls, errors, blocked, avgLatencyMs, errorRate, lastCallIso, lastBlockedIso, lastOk', () => {
         recordToolCall('code.lint', 120, true);
         const stats = getToolStats();
         const entry = entryOf(stats, 'code.lint');
         expect(entry).toHaveProperty('calls');
         expect(entry).toHaveProperty('errors');
+        expect(entry).toHaveProperty('blocked');
         expect(entry).toHaveProperty('avgLatencyMs');
         expect(entry).toHaveProperty('errorRate');
         expect(entry).toHaveProperty('lastCallIso');
+        expect(entry).toHaveProperty('lastBlockedIso');
         expect(entry).toHaveProperty('lastOk');
     });
 
@@ -213,7 +227,7 @@ describe('F163 — getStatsByCategory agrupa por prefixo', () => {
         recordToolCall('shell.list_dir', 50, true);
         recordToolCall('git.status', 80, false);
         const byCategory = getStatsByCategory();
-        const shell = entryOf(byCategory, 'shell');
+        const shell = entryOf(byCategory, 'tool');
         const git = entryOf(byCategory, 'git');
         expect(shell).toBeDefined();
         expect(git).toBeDefined();
@@ -221,10 +235,10 @@ describe('F163 — getStatsByCategory agrupa por prefixo', () => {
         expect(git.tools).toHaveLength(1);
     });
 
-    it('tools sem ponto ficam na categoria other', () => {
+    it('tools sem ponto ficam na categoria tool', () => {
         recordToolCall('standalonetool', 30, true);
         const byCategory = getStatsByCategory();
-        const other = entryOf(byCategory, 'other');
+        const other = entryOf(byCategory, 'tool');
         expect(other).toBeDefined();
         expect(other.tools).toContain('standalonetool');
     });
@@ -237,6 +251,14 @@ describe('F163 — getStatsByCategory agrupa por prefixo', () => {
         const code = entryOf(byCategory, 'code');
         expect(code.totalCalls).toBe(3);
         expect(code.totalErrors).toBe(1);
+    });
+
+    it('totalBlocked soma tentativas negadas da categoria', () => {
+        recordBlockedToolCall('code.lint');
+        recordBlockedToolCall('code.typecheck');
+        const byCategory = getStatsByCategory();
+        const code = entryOf(byCategory, 'code');
+        expect(code.totalBlocked).toBe(2);
     });
 });
 

@@ -115,7 +115,7 @@ describe('F13.4 terminal-standalone: tool-stats registros', () => {
         recordToolCall(toolName, 100, true);
 
         const stats = getToolStats();
-        const entry = stats[toolName];
+        const entry = stats['exec_command.test_standalone'];
         assert.ok(entry, 'deve ter entrada para shell tool');
         assert.strictEqual(entry.calls, 1, 'deve ter 1 chamada');
         assert.strictEqual(entry.errors, 0, 'deve ter 0 erros');

@@ -89,15 +89,13 @@ describe('registerTool', () => {
     });
 
     it('deve lançar se registry inválido', () => {
-        // @ts-expect-error — teste de runtime
-        assert.throws(() => registerTool(null, mkTool('t')), /registry inválido/);
+        assert.throws(() => registerTool(/** @type {any} */ (null), mkTool('t')), /registry inválido/);
     });
 
     it('deve lançar se tool.name ausente', () => {
         const reg = createRegistry();
-        // @ts-expect-error — teste de runtime
         assert.throws(
-            () => registerTool(reg, { description: 'sem nome', handler: () => ({}) }),
+            () => registerTool(reg, /** @type {any} */ ({ description: 'sem nome', handler: () => ({}) })),
             /name \(string\) obrigatório/,
         );
     });
