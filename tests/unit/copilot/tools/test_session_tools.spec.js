@@ -2,7 +2,7 @@
 /**
  * @file Faixa 36 — Session Tools Test Suite (F189-F196)
  *
- *   Testes para src/copilot/tools/session-tools.js:
+ *   Testes para src/copilot/tools/session/session-tools.js:
  *
  *   - read_briefing, write_pending_task, get_workspace_info, set_session_context, invoke_skill
  *   - export shape (sessionTools array)
@@ -16,10 +16,11 @@ const mocks = vi.hoisted(() => ({
     mockLog: vi.fn(),
     logSwallowed: vi.fn(),
     toError: vi.fn((error) => (error instanceof Error ? error : new Error(String(error)))),
+    buildTool: vi.fn((config) => config),
     withSkipPermission: vi.fn((tool) => Object.assign(tool, { skipPermission: true })),
 }));
 
-vi.mock('../../../../src/copilot/tools/logger.js', () => ({
+vi.mock('../../../../src/copilot/tools/infra/logger.js', () => ({
     log: mocks.mockLog,
 }));
 
@@ -62,13 +63,15 @@ vi.mock('#copilot/sdk', () => ({
 }));
 
 // withSkipPermission: passthrough
-vi.mock('#copilot/tools/tool-factory', () => ({
+vi.mock('../../../../src/copilot/tools/infra/tool-factory.js', () => ({
+    buildTool: mocks.buildTool,
     withSkipPermission: mocks.withSkipPermission,
 }));
 
 // ─── Import após mocks ──────────────────────────────────────────────────────
 
-const { sessionTools } = await import('#copilot/tools/session-tools');
+const sessionModuleUrl = new URL('../../../../src/copilot/tools/session/session-tools.js', import.meta.url);
+const { sessionTools } = await import(sessionModuleUrl.href);
 
 // Desestruturar tools do array exportado
 const [readBriefingTool, writePendingTaskTool, getWorkspaceInfoTool, setSessionContextTool, invokeSkillTool] =
@@ -320,9 +323,9 @@ describe('F36 — sessionTools export shape (F196)', () => {
     });
 
     it('tools com skipPermission são marcadas', () => {
-        const readBriefing = sessionTools.find((t) => t.name === 'read_briefing');
-        const getInfo = sessionTools.find((t) => t.name === 'get_workspace_info');
-        const skill = sessionTools.find((t) => t.name === 'invoke_skill');
+        const readBriefing = sessionTools.find((/** @type {any} */ t) => t.name === 'read_briefing');
+        const getInfo = sessionTools.find((/** @type {any} */ t) => t.name === 'get_workspace_info');
+        const skill = sessionTools.find((/** @type {any} */ t) => t.name === 'invoke_skill');
 
         expect(readBriefing?.skipPermission).toBe(true);
         expect(getInfo?.skipPermission).toBe(true);
@@ -330,7 +333,7 @@ describe('F36 — sessionTools export shape (F196)', () => {
     });
 
     it('nomes de tools corretos', () => {
-        const names = sessionTools.map((t) => t.name);
+        const names = sessionTools.map((/** @type {any} */ t) => t.name);
         expect(names).toContain('read_briefing');
         expect(names).toContain('write_pending_task');
         expect(names).toContain('get_workspace_info');

@@ -55,12 +55,15 @@ describe('copilot/hooks/presets/profiles.js — structural', () => {
         assert.ok(PROFILES_SRC.includes('approveAll'));
     });
 
-    it('ReadOnly deve usar createAuditOnlyPermission', () => {
-        assert.ok(PROFILES_SRC.includes('createAuditOnlyPermission'));
+    it('ReadOnly deve usar createPermissionHandler em modo audit', () => {
+        assert.ok(PROFILES_SRC.includes('createPermissionHandler'));
+        assert.ok(PROFILES_SRC.includes('auditMode: true'));
     });
 
-    it('FullAccess deve usar createSafePermission', () => {
-        assert.ok(PROFILES_SRC.includes('createSafePermission'));
+    it('FullAccess deve usar createPermissionHandler com denyKinds/denyTools', () => {
+        assert.ok(PROFILES_SRC.includes('createPermissionHandler'));
+        assert.ok(PROFILES_SRC.includes('denyKinds'));
+        assert.ok(PROFILES_SRC.includes('denyTools'));
     });
 
     it('deve ter JSDoc completo para cada builder', () => {

@@ -15,7 +15,7 @@ import { describe, expect, it, vi } from 'vitest';
 vi.mock('@github/copilot-sdk', () => ({
     SYSTEM_PROMPT_SECTIONS: Object.freeze({ identity: 'identity' }),
     CopilotClient: vi.fn(),
-    defineTool: vi.fn(() => ({ name: 'mock-tool', description: 'mock', schema: {} })),
+    defineTool: vi.fn(() => ({ name: 'mock-tool', description: 'mock', schema: {}, handler: async () => ({}) })),
     approveAll: vi.fn(),
 }));
 

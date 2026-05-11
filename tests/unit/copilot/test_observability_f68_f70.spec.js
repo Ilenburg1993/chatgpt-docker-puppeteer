@@ -49,6 +49,7 @@ vi.mock('#copilot/config/env', () => ({
     COPILOT_MCP_SERVERS: '',
     COPILOT_CUSTOM_AGENTS: '',
     COPILOT_DISABLED_AGENTS: '',
+    COPILOT_OPERATIONAL_PROFILE: 'production',
 }));
 
 vi.mock('#copilot/observability/logger', () => ({

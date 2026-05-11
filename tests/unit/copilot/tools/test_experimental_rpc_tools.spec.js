@@ -52,7 +52,7 @@ vi.mock('../../../../src/copilot/tools/logger.js', () => ({
     log: mocks.log,
 }));
 
-vi.mock('../../../../src/copilot/tools/tool-factory.js', () => ({
+vi.mock('../../../../src/copilot/tools/infra/tool-factory.js', () => ({
     withSkipPermission: mocks.withSkipPermission,
     buildTool: vi.fn((config) => config),
 }));
@@ -85,11 +85,11 @@ vi.mock('#copilot/sdk', () => ({
 }));
 
 describe('experimental-rpc-tools', () => {
-    /** @type {typeof import('../../../../src/copilot/tools/experimental-rpc-tools.js')} */
+    /** @type {typeof import('#copilot/tools')} */
     let mod;
 
     beforeAll(async () => {
-        mod = await import('../../../../src/copilot/tools/experimental-rpc-tools.js');
+        mod = await import('#copilot/tools');
     });
 
     beforeEach(() => {

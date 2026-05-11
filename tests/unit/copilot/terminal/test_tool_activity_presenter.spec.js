@@ -13,10 +13,10 @@ describe('terminal/tool-activity-presenter', () => {
 
         expect(presentation.toolName).toBe('view');
         expect(presentation.canonicalToolName).toBe('read_file_content');
-        expect(presentation.displayToolName).toBe('view -> read_file_content');
+        expect(presentation.displayToolName).toBe('read_file_content (alias: view)');
         expect(presentation.operation).toBe('read');
-        expect(presentation.detail).toContain('alias view -> read_file_content');
-        expect(presentation.progressLinePrefix).toContain('view -> read_file_content');
+        expect(presentation.detail).toContain('lendo arquivo');
+        expect(presentation.progressLinePrefix).toContain('read_file_content (alias: view)');
     });
 
     it('não adiciona ruído de alias para tool já canônica', () => {

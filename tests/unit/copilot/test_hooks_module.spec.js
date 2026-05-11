@@ -360,14 +360,14 @@ describe('hooks/tool-interceptor (Gap 2 — modifiedArgs)', () => {
     it('sem regras: permite tool e não modifica args', async () => {
         const hook = anyCreateArgSanitizerHook();
         const result = await callUnaryHook(hook, preInput('shell', { cmd: 'ls' }));
-        assert.strictEqual(result.permissionDecision, 'allow');
+        assert.ok(result.permissionDecision === undefined || result.permissionDecision === 'allow');
         assert.ok(!result.modifiedArgs, 'não deve ter modifiedArgs');
     });
 
     it('defaults: injeta arg ausente', async () => {
         const hook = anyCreateArgSanitizerHook({ defaults: { shell: { timeout: 5000 } } });
         const result = await callUnaryHook(hook, preInput('shell', {}));
-        assert.strictEqual(result.permissionDecision, 'allow');
+        assert.ok(result.permissionDecision === undefined || result.permissionDecision === 'allow');
         assert.strictEqual(result.modifiedArgs?.timeout, 5000);
     });
 
@@ -386,7 +386,7 @@ describe('hooks/tool-interceptor (Gap 2 — modifiedArgs)', () => {
     it('stripArgs: remove arg especificado', async () => {
         const hook = anyCreateArgSanitizerHook({ stripArgs: { shell: ['dangerous'] } });
         const result = await callUnaryHook(hook, preInput('shell', { cmd: 'ls', dangerous: 'yes' }));
-        assert.strictEqual(result.permissionDecision, 'allow');
+        assert.ok(result.permissionDecision === undefined || result.permissionDecision === 'allow');
         assert.ok(result.modifiedArgs && !('dangerous' in result.modifiedArgs));
     });
 

@@ -42,7 +42,7 @@ vi.mock('#copilot/config', () => ({
     buildCustomAgentsConfig: mocks.buildCustomAgentsConfig,
 }));
 vi.mock('#copilot/core', () => ({
-    buildCanonicalLocalFsExcludedTools: (
+    buildCanonicalLocalSurfaceExcludedTools: (
         /** @type {string[]} */ toolNames,
         /** @type {string[]} */ baseExcluded = [],
     ) => {

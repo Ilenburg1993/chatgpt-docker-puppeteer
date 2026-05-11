@@ -127,16 +127,16 @@ describe('F166 — Auditoria de zero-bypass SDK em src/copilot/', () => {
 
 describe('F167 — tools/ sem bypass direto de SDK', () => {
     const TOOLS_FILES = [
-        'src/copilot/tools/session-rpc-tools.js',
+        'src/copilot/tools/session/session-rpc-tools.js',
         'src/copilot/tools/git/index.js',
-        'src/copilot/tools/introspection-tools.js',
-        'src/copilot/tools/task-tools.js',
-        'src/copilot/tools/session-tools.js',
+        'src/copilot/tools/introspection/introspection-tools.js',
+        'src/copilot/tools/task/task-tools.js',
+        'src/copilot/tools/session/session-tools.js',
         'src/copilot/tools/todo/bulk-tools.js',
         'src/copilot/tools/todo/crud-tools.js',
         'src/copilot/tools/todo/query-tools.js',
         'src/copilot/tools/shell/index.js',
-        'src/copilot/tools/tool-factory.js',
+        'src/copilot/tools/infra/tool-factory.js',
         'src/copilot/bridges/mcp-tool-bridge.js',
     ];
 

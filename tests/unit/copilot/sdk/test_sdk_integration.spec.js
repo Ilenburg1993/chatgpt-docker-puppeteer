@@ -46,25 +46,22 @@ vi.mock('@github/copilot-sdk', () => {
         CopilotClient: vi.fn(),
         defineTool: vi.fn(),
         approveAll: vi.fn(),
+        ConfigError: class ConfigError extends Error {
+            /** @param {string} msg */
+            constructor(msg) {
+                super(msg);
+                this.name = 'ConfigError';
+            }
+        },
+        CopilotError: class CopilotError extends Error {
+            /** @param {string} msg */
+            constructor(msg) {
+                super(msg);
+                this.name = 'CopilotError';
+            }
+        },
     };
 });
-
-vi.mock('#copilot/core/errors', () => ({
-    ConfigError: class ConfigError extends Error {
-        /** @param {string} msg */
-        constructor(msg) {
-            super(msg);
-            this.name = 'ConfigError';
-        }
-    },
-    CopilotError: class CopilotError extends Error {
-        /** @param {string} msg */
-        constructor(msg) {
-            super(msg);
-            this.name = 'CopilotError';
-        }
-    },
-}));
 
 vi.mock('#copilot/sdk/client', () => ({
     getClient: vi.fn(),
@@ -77,8 +74,8 @@ vi.mock('#copilot/sdk/server-rpc', () => ({
 }));
 
 // Mock tools factory (used transitively by custom-tools.js)
-vi.mock('#copilot/tools/tool-factory', () => ({
-    buildTool: vi.fn(),
+vi.mock('../../../../src/copilot/tools/infra/tool-factory.js', () => ({
+    buildTool: vi.fn((config) => ({ ...config, type: 'function' })),
 }));
 
 // Mock core utilities (used transitively by custom-tools.js)

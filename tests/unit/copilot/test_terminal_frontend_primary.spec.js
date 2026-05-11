@@ -336,6 +336,7 @@ vi.mock('#copilot/observability', () => ({
 }));
 
 vi.mock('#copilot/sdk', () => ({
+    getPendingStructuredUserInputCount: vi.fn(() => 0),
     listModels: vi.fn(async () => [
         { id: 'gpt-5', capabilities: { supports: { reasoningEffort: true, vision: true } } },
     ]),

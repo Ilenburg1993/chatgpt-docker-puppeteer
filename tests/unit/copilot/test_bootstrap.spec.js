@@ -170,7 +170,9 @@ vi.mock('#copilot/observability', () => ({
 vi.mock('#copilot/sdk', () => ({
     CopilotClient: class MockCopilotClient {},
     SDK_LOGGER: Symbol.for('SDK_LOGGER'),
+    HOOKS_LOGGER: Symbol.for('HOOKS_LOGGER'),
     TOOLS_BUILDER: Symbol.for('TOOLS_BUILDER'),
+    defaultHookBus: mocks.defaultBus,
     checkAuthStatus: vi.fn(),
 }));
 

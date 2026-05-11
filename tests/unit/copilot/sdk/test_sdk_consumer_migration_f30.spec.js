@@ -25,17 +25,7 @@ const src = (relPath) => readFileSync(join(ROOT, 'src/copilot', relPath), 'utf8'
 // ─── F146: tools/ usa barrel para createTool ───────────────────────────────
 
 describe('F146 — tools/ usa #copilot/sdk para createTool', () => {
-    const toolFiles = [
-        'tools/session-rpc-tools.js',
-        'tools/git/index.js',
-        'tools/introspection-tools.js',
-        'tools/task-tools.js',
-        'tools/session-tools.js',
-        'tools/todo/bulk-tools.js',
-        'tools/todo/crud-tools.js',
-        'tools/shell/index.js',
-        'tools/tool-factory.js',
-    ];
+    const toolFiles = ['tools/infra/tool-factory.js'];
 
     for (const file of toolFiles) {
         it(`${file.split('/').pop()} não importa de '#copilot/sdk/tools'`, () => {
@@ -46,6 +36,13 @@ describe('F146 — tools/ usa #copilot/sdk para createTool', () => {
             expect(src(file)).toMatch(/import\s*\{[^}]*createTool[^}]*\}\s*from\s*'#copilot\/sdk'/);
         });
     }
+
+    it('sub-barrels de tools não importam createTool diretamente', () => {
+        const shellBarrel = src('tools/shell/index.js');
+        const gitBarrel = src('tools/git/index.js');
+        expect(shellBarrel).not.toMatch(/createTool/);
+        expect(gitBarrel).not.toMatch(/createTool/);
+    });
 });
 
 // ─── F147: bridges/ usa barrel ─────────────────────────────────────────────

@@ -41,6 +41,7 @@ const FACADE_OPERATION_MATRIX = {
             'sdk/tools.js',
             'sdk/ui-ops.js',
             'sdk/workspace-ops.js',
+            'sdk/agent-contract.js',
         ],
     },
     'agent-sdk-runtime.js': { role: 'infra', allowedFacadeImports: [] },

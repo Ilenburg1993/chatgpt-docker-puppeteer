@@ -122,8 +122,12 @@ describe('fileTools — exportações do módulo', () => {
     });
 
     it('allTools em index.js inclui todas as fileTools', () => {
+        const allToolNames = allTools.map((tool) => /** @type {any} */ (tool).name);
         for (const tool of fileTools) {
-            assert.ok(allTools.includes(tool), `allTools deveria incluir ${/** @type {any} */ (tool).name}`);
+            assert.ok(
+                allToolNames.includes(/** @type {any} */ (tool).name),
+                `allTools deveria incluir ${/** @type {any} */ (tool).name}`,
+            );
         }
     });
 

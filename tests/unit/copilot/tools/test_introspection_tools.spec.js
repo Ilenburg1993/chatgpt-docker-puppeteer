@@ -2,7 +2,7 @@
 /**
  * tests/unit/copilot/tools/test_introspection_tools.spec.js
  *
- * Testes unitários para src/copilot/tools/introspection-tools.js.
+ * Testes unitários para src/copilot/tools/introspection/introspection-tools.js.
  *
  * Valida:
  *
@@ -45,13 +45,14 @@ vi.mock('#copilot/config/env', () => ({
     COPILOT_SDK_ENABLED: true,
     COPILOT_CUSTOM_AGENTS: '',
     COPILOT_DISABLED_AGENTS: '',
+    COPILOT_OPERATIONAL_PROFILE: 'production',
 }));
 
-vi.mock('../../../../src/copilot/tools/logger.js', () => ({
+vi.mock('../../../../src/copilot/tools/infra/logger.js', () => ({
     log: mocks.log,
 }));
 
-vi.mock('../../../../src/copilot/tools/metrics-proxy.js', () => ({
+vi.mock('../../../../src/copilot/tools/infra/metrics-proxy.js', () => ({
     getSummary: mocks.getSummary,
     getToolStats: mocks.getToolStats,
 }));
@@ -72,7 +73,7 @@ vi.mock('#copilot/sdk', () => ({
     SYSTEM_PROMPT_SECTIONS: {},
 }));
 
-vi.mock('../../../../src/copilot/tools/tool-factory.js', () => ({
+vi.mock('../../../../src/copilot/tools/infra/tool-factory.js', () => ({
     buildTool: vi.fn((config) => config),
     withSkipPermission: mocks.withSkipPermission,
 }));
@@ -80,7 +81,7 @@ vi.mock('../../../../src/copilot/tools/tool-factory.js', () => ({
 // ─── Suite ────────────────────────────────────────────────────────────────────
 
 describe('introspection-tools', () => {
-    /** @type {typeof import('../../../../src/copilot/tools/introspection-tools.js')} */
+    /** @type {typeof import('../../../../src/copilot/tools/introspection/index.js')} */
     let mod;
 
     /** Fake tools para simular registro */
@@ -93,18 +94,31 @@ describe('introspection-tools', () => {
     ];
 
     beforeAll(async () => {
-        mod = await import('../../../../src/copilot/tools/introspection-tools.js');
+        mod = await import('../../../../src/copilot/tools/introspection/index.js');
     });
 
     beforeEach(() => {
         mod.resetIntrospectionStateForTests();
-        mod.recordToolCategory('web_fetch_local', 'web');
-        mod.recordToolCategory('git_status', 'git');
-        mod.recordToolCategory('list_tools', 'introspection');
-        mod.recordToolCategory('get_agent_info', 'introspection');
-        mod.recordToolCategory('shell_exec', 'shell');
-        // Registrar fake tools
-        mod.registerForIntrospection(/** @type {any} */ (fakeTools));
+        mod.registerForIntrospection(
+            /** @type {any} */ ({
+                entries: new Map([
+                    [
+                        'web_fetch_local',
+                        { tool: fakeTools[0], category: 'web', tags: ['http', 'read'], readOnly: true },
+                    ],
+                    ['git_status', { tool: fakeTools[1], category: 'git', tags: ['vcs'], readOnly: true }],
+                    [
+                        'list_tools',
+                        { tool: fakeTools[2], category: 'introspection', tags: ['meta'], readOnly: true },
+                    ],
+                    [
+                        'get_agent_info',
+                        { tool: fakeTools[3], category: 'introspection', tags: ['meta'], readOnly: true },
+                    ],
+                    ['shell_exec', { tool: fakeTools[4], category: 'shell', tags: ['exec'], readOnly: false }],
+                ]),
+            }),
+        );
     });
 
     afterEach(() => {
@@ -116,7 +130,7 @@ describe('introspection-tools', () => {
     describe('exports', () => {
         it('introspectionTools é array com 6 tools', () => {
             expect(Array.isArray(mod.introspectionTools)).toBe(true);
-            expect(mod.introspectionTools.length).toBe(6);
+            expect(mod.introspectionTools.length).toBe(7);
         });
 
         it('contém as tools esperadas', () => {
@@ -127,6 +141,7 @@ describe('introspection-tools', () => {
             expect(names).toContain('report_intent_local');
             expect(names).toContain('toggle_tool');
             expect(names).toContain('get_tool_health');
+            expect(names).toContain('get_tool_contract_report');
         });
     });
 
@@ -164,7 +179,7 @@ describe('introspection-tools', () => {
                 ]),
             };
 
-            mod.registerForIntrospection(/** @type {any} */ (fakeTools.slice(0, 2)), /** @type {any} */ (registry));
+            mod.registerForIntrospection(/** @type {any} */ (registry));
 
             const listTool = mod.introspectionTools.find((t) => t.name === 'list_tools');
             const result = await /** @type {any} */ (listTool).handler({ category: 'web' });

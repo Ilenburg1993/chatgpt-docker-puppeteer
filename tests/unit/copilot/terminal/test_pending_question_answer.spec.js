@@ -8,18 +8,18 @@ const runtimeMocks = vi.hoisted(() => ({
 }));
 
 const hookToolMocks = vi.hoisted(() => ({
-    hasPendingUserInputRequests: vi.fn(() => false),
+    hasPendingStructuredUserInputRequests: vi.fn(() => false),
 }));
 
 vi.mock('../../../../src/copilot/terminal/frontend/gateways/agent-runtime.js', () => runtimeMocks);
-vi.mock('../../../../src/copilot/tools/user-input-state.js', () => hookToolMocks);
+vi.mock('#copilot/sdk', () => hookToolMocks);
 
 import { tryAnswerTerminalPendingQuestionInput } from '../../../../src/copilot/terminal/state/pending-question-answer.js';
 
 describe('terminal/pending-question-answer', () => {
     beforeEach(() => {
         vi.clearAllMocks();
-        hookToolMocks.hasPendingUserInputRequests.mockReturnValue(false);
+        hookToolMocks.hasPendingStructuredUserInputRequests.mockReturnValue(false);
         runtimeMocks.readTerminalRuntimeState.mockReturnValue({
             runtimeId: 'default',
             pendingQuestionKind: 'question',
@@ -56,7 +56,7 @@ describe('terminal/pending-question-answer', () => {
             pendingQuestionShadowExpired: false,
             pendingQuestion: null,
         });
-        hookToolMocks.hasPendingUserInputRequests.mockReturnValue(true);
+        hookToolMocks.hasPendingStructuredUserInputRequests.mockReturnValue(true);
 
         const result = tryAnswerTerminalPendingQuestionInput('seguir com main', null);
 

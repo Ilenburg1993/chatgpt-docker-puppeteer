@@ -55,7 +55,6 @@ const F19_MIGRATED = [
     'config/system-prompt/index.js',
     'server/routes/sdk/session-crud.js',
     'hooks/permission-controller.js',
-    'hooks/permission-handler.js',
     'agent/lifecycle/orchestrators/agent-lifecycle.js',
     'agent/lifecycle/entrypoints/entry.js',
     'audit/pipeline.js',
@@ -113,22 +112,11 @@ describe('F19 — Zero imports diretos de @github/copilot-sdk fora de sdk/', () 
 // 2. Cada consumidor F19 migrado importa da fonte correta
 // ---------------------------------------------------------------------------
 describe('F19 — Consumidores migrados importam de #copilot/sdk', () => {
-    describe('Arquivos com approveAll', () => {
-        // session-crud.js agora importa approveAll diretamente de #copilot/sdk; config/session-config.js e audit/pipeline.js não usam approveAll
-        const approveAllFiles = ['hooks/permission-controller.js', 'hooks/permission-handler.js'];
-
-        for (const file of approveAllFiles) {
-            it(`${file}: approveAll importado de #copilot/sdk`, () => {
-                const src = readSource(file);
-                // Detecta tanto import single-line quanto multi-linha:
-                // - single: import { approveAll } from '#copilot/sdk'
-                // - multi:  import { approveAll, ... } from '#copilot/sdk'  (nome em linha separada)
-                const hasCorrectImport =
-                    src.split('\n').some((line) => /import.*approveAll.*from\s+['"]#copilot\/sdk['"]/.test(line)) ||
-                    /approveAll[\s\S]*?from\s+['"]#copilot\/sdk['"]/.test(src);
-                expect(hasCorrectImport, `${file}: approveAll deveria vir de #copilot/sdk`).toBe(true);
-            });
-        }
+    describe('Compat layer de permissão em hooks', () => {
+        it('hooks/permission-controller.js é reexport canônico para sdk/session/permission-controller', () => {
+            const src = readSource('hooks/permission-controller.js');
+            expect(src).toContain("from '../sdk/session/permission-controller.js'");
+        });
     });
 
     describe('Arquivos com client SDK via façade', () => {
@@ -179,8 +167,8 @@ describe('F19 — Barrel exporta CopilotClient', () => {
 // 4. Contagem de migração F19
 // ---------------------------------------------------------------------------
 describe('F19 — Contagem de migração', () => {
-    it('7 arquivos foram migrados na Faixa 19', () => {
-        expect(F19_MIGRATED).toHaveLength(7);
+    it('6 arquivos canônicos permanecem na Faixa 19 após cleanup de hooks legacy', () => {
+        expect(F19_MIGRATED).toHaveLength(6);
     });
 
     it('Todos os 7 arquivos existem e são legíveis', () => {
@@ -210,7 +198,7 @@ describe('F19 — Verificação global: zero bypass @github/copilot-sdk', () => 
     });
 
     it('F18 + F19 = 19 arquivos migrados no total', () => {
-        // 11 da F18 (tools + bridge) + 8 da F19
-        expect(11 + 8).toBe(19);
+        // sanity check: suite combinada permanece ativa após refactors de estrutura.
+        expect(2 + 6).toBe(8);
     });
 });

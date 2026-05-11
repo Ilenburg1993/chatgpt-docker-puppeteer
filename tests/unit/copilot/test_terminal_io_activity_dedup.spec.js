@@ -96,8 +96,8 @@ describe('io-activity-events.js — dedup window F1.2', () => {
         __test__.handleIoOperation(msg);
         __test__.handleIoOperation(msg); // duplicata imediata
 
-        // Apenas 1 broadcastSse deveria ter sido feito
-        expect(mocks.broadcastSse).toHaveBeenCalledTimes(1);
+        const ioEvents = mocks.broadcastSse.mock.calls.filter((args) => args[0] === 'io.operation');
+        expect(ioEvents).toHaveLength(1);
     });
 
     it('terceira operação idêntica (triple-firing) também é suprimida', async () => {
@@ -109,7 +109,8 @@ describe('io-activity-events.js — dedup window F1.2', () => {
         __test__.handleIoOperation(msg);
         __test__.handleIoOperation(msg);
 
-        expect(mocks.broadcastSse).toHaveBeenCalledTimes(1);
+        const ioEvents = mocks.broadcastSse.mock.calls.filter((args) => args[0] === 'io.operation');
+        expect(ioEvents).toHaveLength(1);
     });
 
     it('operações com mesma operação mas targets diferentes não se suprimem', async () => {
@@ -119,7 +120,8 @@ describe('io-activity-events.js — dedup window F1.2', () => {
         __test__.handleIoOperation(makeIoMessage('read', '/workspace/src/a.js'));
         __test__.handleIoOperation(makeIoMessage('read', '/workspace/src/b.js'));
 
-        expect(mocks.broadcastSse).toHaveBeenCalledTimes(2);
+        const ioEvents = mocks.broadcastSse.mock.calls.filter((args) => args[0] === 'io.operation');
+        expect(ioEvents).toHaveLength(2);
     });
 
     it('operações com mesmo target mas diferentes operações não se suprimem', async () => {
@@ -129,7 +131,8 @@ describe('io-activity-events.js — dedup window F1.2', () => {
         __test__.handleIoOperation(makeIoMessage('read', '/workspace/src/shared.js'));
         __test__.handleIoOperation(makeIoMessage('write', '/workspace/src/shared.js'));
 
-        expect(mocks.broadcastSse).toHaveBeenCalledTimes(2);
+        const ioEvents = mocks.broadcastSse.mock.calls.filter((args) => args[0] === 'io.operation');
+        expect(ioEvents).toHaveLength(2);
     });
 
     describe('isDuplicateIoOperation — lógica direta', () => {

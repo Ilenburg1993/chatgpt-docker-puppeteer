@@ -29,7 +29,8 @@ vi.mock('#copilot/observability/logger', () => ({
     getRecentLogs: vi.fn(() => []),
 }));
 
-vi.mock('../../../../src/copilot/tools/tool-factory.js', () => ({
+vi.mock('../../../../src/copilot/tools/infra/tool-factory.js', () => ({
+    buildTool: vi.fn((config) => config),
     withSkipPermission: vi.fn((tool) => tool),
 }));
 

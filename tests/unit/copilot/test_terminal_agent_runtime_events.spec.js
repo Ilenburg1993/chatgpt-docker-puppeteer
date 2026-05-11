@@ -154,8 +154,9 @@ describe('terminal/events/agent-runtime-events.js — contrato', () => {
             'tool.complete',
             expect.objectContaining({
                 operation: 'read',
-                path: 'src/copilot/terminal/repl/repl.js',
                 success: true,
+                toolCallId: 'tool-1',
+                toolName: 'workspace.read_file',
             }),
         );
     });
@@ -307,7 +308,7 @@ describe('terminal/events/agent-runtime-events.js — contrato', () => {
             'tool',
             'Tool em andamento',
             expect.objectContaining({
-                toolName: 'bash',
+                toolName: 'exec_command',
                 detail: expect.stringContaining('10s ativos'),
             }),
         );

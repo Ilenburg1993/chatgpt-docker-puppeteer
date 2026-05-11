@@ -27,7 +27,7 @@ vi.mock('#copilot/observability/logger', () => ({
     LOG_DIR: '/tmp/test-logs',
     getRecentLogs: vi.fn(() => []),
 }));
-vi.mock('#copilot/tools/tool-factory', () => ({ buildTool: mockBuildTool }));
+vi.mock('../../../../src/copilot/tools/infra/tool-factory.js', () => ({ buildTool: mockBuildTool }));
 vi.mock('#copilot/core/error-handlers', () => ({ logSwallowed: mockLogSwallowed }));
 vi.mock('#copilot/core/safe-json', () => ({
     safeJsonParse: vi.fn((raw) => {
@@ -287,12 +287,10 @@ describe('F39 — buildCustomTools', () => {
         expect(result).toBe('echo: world');
     });
 
-    it('constrói tools mesmo sem builder externo injetado', async () => {
+    it('exige builder externo injetado para construir tools', async () => {
         setCustomToolsBuilder(/** @type {any} */ (null));
         await registerCustomTool({ name: 'fallback_echo', description: 'Echo', handlerId: 'echo' });
-        const tools = buildCustomTools();
-        expect(tools).toHaveLength(1);
-        expect(tools[0]?.name).toBe('fallback_echo');
+        expect(() => buildCustomTools()).toThrow('Custom tools builder não injetado');
     });
 });
 

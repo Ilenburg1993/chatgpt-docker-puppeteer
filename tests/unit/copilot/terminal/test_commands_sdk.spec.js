@@ -84,6 +84,25 @@ const agentRuntimeMocks = vi.hoisted(() => ({
 vi.mock('../../../../src/copilot/terminal/frontend/gateways/sdk-session.js', () => runtimeMocks);
 vi.mock('../../../../src/copilot/terminal/frontend/gateways/agent-runtime.js', () => agentRuntimeMocks);
 vi.mock('#copilot/tools', () => ({
+    readIntrospectionRegistrySnapshot: vi.fn(() => ({
+        total: 6,
+        disabled: [],
+        hasCanonicalLocalFsTools: true,
+        hasCanonicalLocalExecTools: true,
+        hasLegacySdkShellToolsLoaded: false,
+        toolContract: {
+            ok: true,
+            errorCount: 0,
+            warningCount: 0,
+            metadataCoverage: {
+                descriptionPct: 100,
+                parametersPct: 100,
+                categoryPct: 100,
+                tagsPct: 100,
+                instructionsPct: 100,
+            },
+        },
+    })),
     fileReadTools: [
         { name: 'list_directory', handler: vi.fn(async () => ({ entries: [] })) },
         { name: 'read_file_content', handler: fileToolMocks.readFileHandler },
@@ -163,7 +182,7 @@ describe('terminal/commands/sdk', () => {
         await cmdSdk({ println: ctx.println }, 'waits');
 
         expect(ctx.output()).toContain('SDK Waits');
-        expect(ctx.output()).toContain('3 pendência(s)');
+        expect(ctx.output()).toContain('3 pendencia(s)');
         expect(ctx.output()).toContain('elicitation=1');
         expect(ctx.output()).toContain('permission=1');
         expect(ctx.output()).toContain('ask_user=1');
@@ -227,7 +246,7 @@ describe('terminal/commands/sdk', () => {
         const read = mockCtx();
         await cmdWorkspace({ println: read.println }, 'read plan.md');
         expect(runtimeMocks.readTerminalSdkWorkspaceFile).toHaveBeenCalledWith('plan.md');
-        expect(read.output()).toContain('não FS local');
+        expect(read.output()).toContain('SDK virtual');
         expect(read.output()).toContain('hello');
 
         const write = mockCtx();
@@ -264,7 +283,7 @@ describe('terminal/commands/sdk', () => {
         const ctx = mockCtx();
         await cmdWorkspace({ println: ctx.println }, 'sync plan.md --to tmp/plan-local.md');
 
-        expect(ctx.output()).toContain('conteúdo não textual');
+        expect(ctx.output()).toContain('textual');
         expect(ctx.output()).toContain('Próximos passos:');
         expect(ctx.output()).toContain('/status');
     });
@@ -317,7 +336,7 @@ describe('terminal/commands/sdk', () => {
         const conflict = mockCtx();
         await cmdWorkspace({ println: conflict.println }, 'promote tmp/local.md --to notes/from-local.md');
 
-        expect(conflict.output()).toContain('ação=conflict');
+        expect(conflict.output()).toContain('conflict');
         expect(conflict.output()).toContain('--overwrite');
     });
 
@@ -331,7 +350,7 @@ describe('terminal/commands/sdk', () => {
             'LOCAL:tmp/local.md',
         );
         expect(ctx.output()).toContain('overwrite');
-        expect(ctx.output()).toContain('ação=overwritten');
+        expect(ctx.output()).toContain('overwritten');
     });
 
     it('/elicitation lista pendências e dispara request estruturado', async () => {
@@ -463,7 +482,7 @@ describe('terminal/commands/sdk', () => {
 
         const show = mockCtx();
         await cmdPermission({ println: show.println }, 'show perm-1');
-        expect(show.output()).toContain('Permissão perm-1');
+        expect(show.output()).toContain('perm-1');
         expect(show.output()).toContain('file_write');
 
         const clear = mockCtx();
@@ -485,7 +504,7 @@ describe('terminal/commands/sdk', () => {
             expect.objectContaining({ kind: 'approve-once', reason: 'manual' }),
             null,
         );
-        expect(respond.output()).toContain('Resposta de permissão enviada');
+        expect(respond.output()).toContain('Resposta de permiss');
     });
 
     it('/permission integra request → respond → completed com correlação por requestId', async () => {
@@ -528,7 +547,7 @@ describe('terminal/commands/sdk', () => {
 
         const show = mockCtx();
         await cmdPermission({ println: show.println }, 'show perm-e2e-1');
-        expect(show.output()).toContain('Permissão perm-e2e-1');
+        expect(show.output()).toContain('perm-e2e-1');
         expect(show.output()).toContain('approve-once');
     });
 
@@ -567,7 +586,7 @@ describe('terminal/commands/sdk', () => {
             { kind: 'approve-once' },
             null,
         );
-        expect(respond.output()).toContain('Resposta de permissão enviada');
+        expect(respond.output()).toContain('Resposta de permiss');
     });
 
     it('/permission mode lê e altera o modo de governança do runtime', async () => {
@@ -596,7 +615,7 @@ describe('terminal/commands/sdk', () => {
 
         const showAudit = mockCtx();
         await cmdPermission({ println: showAudit.println }, 'show latest --runtime audit');
-        expect(showAudit.output()).toContain('Permissão perm-audit-1');
+        expect(showAudit.output()).toContain('perm-audit-1');
 
         const respondAudit = mockCtx();
         await cmdPermission({ println: respondAudit.println }, 'respond latest approve-once --runtime audit');

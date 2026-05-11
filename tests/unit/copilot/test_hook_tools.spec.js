@@ -2,8 +2,6 @@
 /**
  * tests/unit/copilot/test_hook_tools.spec.js
  *
- * Testes unitários para src/copilot/tools/hook-tools.js (Upgrade 6: hook-tools).
- *
  * Valida:
  *
  * - hookTools exporta array com 3 tools
@@ -14,15 +12,20 @@
  */
 
 import assert from 'node:assert/strict';
-import { describe, it } from 'vitest';
-
+import { afterEach, describe, it } from 'vitest';
 import {
+    cancelAllUserInputRequests,
     hookGetAuditTailTool,
-    hookGetPendingTasksTool,
     hookTools,
+    hookGetPendingTasksTool,
+    getPendingInputIds,
     requestUserInputTool,
-} from '../../../src/copilot/tools/hook-tools.js';
-import { allTools } from '../../../src/copilot/tools/index.js';
+} from '../../../src/copilot/tools/hook/hook-tools.js';
+import { allTools } from '../../../src/copilot/tools/bootstrap.js';
+
+afterEach(() => {
+    cancelAllUserInputRequests('cleanup');
+});
 
 // ─── Suite principal ──────────────────────────────────────────────────────────
 
@@ -36,15 +39,29 @@ describe('hookTools', () => {
         });
 
         it('hookTools inclui hookGetAuditTailTool, requestUserInputTool e hookGetPendingTasksTool', () => {
-            assert.ok(hookTools.includes(hookGetAuditTailTool));
-            assert.ok(hookTools.includes(requestUserInputTool));
-            assert.ok(hookTools.includes(hookGetPendingTasksTool));
+            const names = hookTools.map((tool) => tool.name);
+            assert.ok(names.includes(hookGetAuditTailTool.name));
+            assert.ok(names.includes(requestUserInputTool.name));
+            assert.ok(names.includes(hookGetPendingTasksTool.name));
         });
 
         it('allTools em index.js inclui todos os hookTools', () => {
             for (const tool of hookTools) {
                 assert.ok(allTools.includes(tool), `allTools deveria incluir ${JSON.stringify(tool)}`);
             }
+        });
+
+        it('getPendingInputIds() retorna cópia imutável do estado pendente', async () => {
+            const { resolveUserInput } = await import('../../../src/copilot/tools/hook/hook-tools.js');
+            const handler = /** @type {any} */ (requestUserInputTool).handler;
+            const promise = handler({ question: 'Qual o próximo passo?' });
+            const pending = getPendingInputIds();
+            assert.equal(Array.isArray(pending), true);
+            assert.equal(pending.length, 1);
+            pending.push('fake-id');
+            assert.equal(getPendingInputIds().includes('fake-id'), false);
+            queueMicrotask(() => resolveUserInput('seguir'));
+            await promise;
         });
     });
 
@@ -95,7 +112,7 @@ describe('hookTools', () => {
         // (ARCH-N01 suspensão real). Para testar, agendamos resolveUserInput() logo após invocar.
 
         it('handler retorna question e status=resolved após resolveUserInput', async () => {
-            const { resolveUserInput } = await import('../../../src/copilot/tools/hook-tools.js');
+            const { resolveUserInput } = await import('../../../src/copilot/tools/hook/hook-tools.js');
             const handler = /** @type {any} */ (requestUserInputTool).handler;
             const promise = handler({ question: 'Qual o próximo passo?', choices: ['A', 'B'] });
             // Agendar resolução no próximo tick
@@ -107,7 +124,7 @@ describe('hookTools', () => {
         });
 
         it('handler com context concatena ao question', async () => {
-            const { resolveUserInput } = await import('../../../src/copilot/tools/hook-tools.js');
+            const { resolveUserInput } = await import('../../../src/copilot/tools/hook/hook-tools.js');
             const handler = /** @type {any} */ (requestUserInputTool).handler;
             const promise = handler({ question: 'O que fazer?', context: 'Fiz X e Y.' });
             queueMicrotask(() => resolveUserInput('ok'));
@@ -117,7 +134,7 @@ describe('hookTools', () => {
         });
 
         it('handler com requires_selection=true define allowFreeform=false', async () => {
-            const { resolveUserInput } = await import('../../../src/copilot/tools/hook-tools.js');
+            const { resolveUserInput } = await import('../../../src/copilot/tools/hook/hook-tools.js');
             const handler = /** @type {any} */ (requestUserInputTool).handler;
             const promise = handler({ question: 'Escolha:', choices: ['A', 'B'], requires_selection: true });
             queueMicrotask(() => resolveUserInput('A'));
@@ -126,7 +143,7 @@ describe('hookTools', () => {
         });
 
         it('handler sem choices retorna choices=[]', async () => {
-            const { resolveUserInput } = await import('../../../src/copilot/tools/hook-tools.js');
+            const { resolveUserInput } = await import('../../../src/copilot/tools/hook/hook-tools.js');
             const handler = /** @type {any} */ (requestUserInputTool).handler;
             const promise = handler({ question: 'Qual a prioridade?' });
             queueMicrotask(() => resolveUserInput('alta'));
@@ -135,7 +152,7 @@ describe('hookTools', () => {
         });
 
         it('result.instruction é string não vazia', async () => {
-            const { resolveUserInput } = await import('../../../src/copilot/tools/hook-tools.js');
+            const { resolveUserInput } = await import('../../../src/copilot/tools/hook/hook-tools.js');
             const handler = /** @type {any} */ (requestUserInputTool).handler;
             const promise = handler({ question: 'Continua?' });
             queueMicrotask(() => resolveUserInput('sim'));

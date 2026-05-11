@@ -26,11 +26,10 @@ vi.mock('#copilot/sdk', () => ({
     commandsHandlePending: vi.fn(async (_session, requestId, options) => ({ requestId, ...options })),
     compactionCompact: vi.fn(async () => ({ success: true })),
     createTool: vi.fn((options) => ({
-        type: 'function',
         name: options?.name ?? 'mock_tool',
         description: options?.description ?? '',
-        schema: options?.inputSchema ?? { type: 'object', properties: {} },
-        run: options?.execute ?? (async () => ({})),
+        parameters: options?.inputSchema ?? { type: 'object', properties: {} },
+        handler: options?.execute ?? (async () => ({})),
     })),
     createQuotaMonitor: createQuotaMonitorMock,
     getSdkRecoveryPolicy: vi.fn((error, scope) => ({

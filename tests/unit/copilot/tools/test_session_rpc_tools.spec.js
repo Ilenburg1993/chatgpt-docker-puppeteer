@@ -2,7 +2,7 @@
 /**
  * tests/unit/copilot/tools/test_session_rpc_tools.spec.js
  *
- * Testes unitários para src/copilot/tools/session-rpc-tools.js.
+ * Testes unitários para src/copilot/tools/session/session-rpc-tools.js.
  *
  * Valida:
  *
@@ -54,7 +54,7 @@ vi.mock('#copilot/core', async (importOriginal) => {
     };
 });
 
-vi.mock('../../../../src/copilot/tools/logger.js', () => ({
+vi.mock('../../../../src/copilot/tools/infra/logger.js', () => ({
     log: mocks.log,
 }));
 
@@ -72,7 +72,7 @@ vi.mock('#copilot/sdk', () => ({
     SYSTEM_PROMPT_SECTIONS: {},
 }));
 
-vi.mock('../../../../src/copilot/tools/tool-factory.js', () => ({
+vi.mock('../../../../src/copilot/tools/infra/tool-factory.js', () => ({
     withSkipPermission: mocks.withSkipPermission,
     buildTool: mocks.buildTool,
 }));
@@ -115,17 +115,17 @@ function createFakeRpc() {
 // ─── Suite ────────────────────────────────────────────────────────────────────
 
 describe('session-rpc-tools', () => {
-    /** @type {typeof import('../../../../src/copilot/tools/session-rpc-tools.js')} */
+    /** @type {typeof import('../../../../src/copilot/tools/session/session-rpc-tools.js')} */
     let mod;
     /** @type {ReturnType<typeof createFakeRpc>} */
     let fakeRpc;
 
     beforeAll(async () => {
-        mod = await import('../../../../src/copilot/tools/session-rpc-tools.js');
+        mod = await import('../../../../src/copilot/tools/session/session-rpc-tools.js');
     });
 
     beforeEach(() => {
-        mod.resetSessionRpcForTests();
+        mod.setSessionRpc(null);
         fakeRpc = createFakeRpc();
         mod.setSessionRpc(fakeRpc);
     });

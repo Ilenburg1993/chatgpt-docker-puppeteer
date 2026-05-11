@@ -106,6 +106,8 @@ vi.mock('#copilot/observability', () => ({
 }));
 
 vi.mock('#copilot/sdk', () => ({
+    defaultHookBus: { on: vi.fn(), off: vi.fn(), emit: vi.fn() },
+    SDK_HOOKS: { list: vi.fn(() => []) },
     approveAll: vi.fn(),
     commandsHandlePending: vi.fn(),
     compactionCompact: vi.fn(),

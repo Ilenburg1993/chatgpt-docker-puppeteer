@@ -32,6 +32,7 @@ vi.mock(
                 COPILOT_MCP_SERVERS: '',
                 COPILOT_CUSTOM_AGENTS: '',
                 COPILOT_DISABLED_AGENTS: '',
+                COPILOT_OPERATIONAL_PROFILE: 'production',
                 COPILOT_MODEL: 'gpt-4o',
                 COPILOT_REASONING_EFFORT: '',
                 COPILOT_HUB_SOCKET_AUTH_REQUIRED: false,

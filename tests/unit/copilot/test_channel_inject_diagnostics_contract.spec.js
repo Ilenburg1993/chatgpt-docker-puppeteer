@@ -141,7 +141,7 @@ describe('channel/inject.js — diagnostics contract', () => {
         });
 
         assert.equal(result.ok, true);
-        assert.equal(result.reply, '');
+        assert.equal(result.reply, null);
         assert.equal(result.mode, 'steer');
         assert.equal(result.messageId, 'msg-123');
         assert.equal(receivedPayload?.['mode'], 'steer');

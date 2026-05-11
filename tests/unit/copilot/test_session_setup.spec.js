@@ -7,8 +7,9 @@ vi.mock('#copilot/observability/logger', () => ({
     LOG_DIR: '/tmp/test-logs',
     getRecentLogs: vi.fn(() => []),
 }));
-vi.mock('#copilot/sdk/index', () => ({
+vi.mock('#copilot/sdk', () => ({
     createSessionRpcFacade: vi.fn((session) => ({ session })),
+    attachBus: vi.fn((hooks) => hooks),
     REASONING_EFFORTS: {
         LOW: 'low',
         MEDIUM: 'medium',
@@ -48,19 +49,17 @@ vi.mock('#copilot/hooks/session-hooks', () => ({
     })),
 }));
 vi.mock('#copilot/tools', () => ({
-    readStore: vi.fn(async () => ({ tasks: {} })),
-    isToolDisabled: vi.fn(() => false),
-}));
-vi.mock('../../../src/copilot/tools/bootstrap.js', () => ({
     bootstrapTools: vi.fn((_registry, mcpTools) => ['tool1', 'tool2', ...mcpTools]),
     setSessionRpc: vi.fn(),
+    readStore: vi.fn(async () => ({ tasks: {} })),
+    isToolDisabled: vi.fn(() => false),
 }));
 vi.mock('../../../src/copilot/agent/dialog/wiring/user-input-handler.js', () => ({
     handleUserInputRequest: vi.fn(),
 }));
 
 import { createSessionRpcFacade } from '#copilot/sdk';
-import { isToolDisabled } from '#copilot/tools';
+import { isToolDisabled, setSessionRpc } from '#copilot/tools';
 import { handleUserInputRequest } from '../../../src/copilot/agent/dialog/wiring/user-input-handler.js';
 import { getAgentSdkToolsConfig } from '../../../src/copilot/agent/facades/agent-sdk-access.js';
 import {
@@ -70,7 +69,6 @@ import {
     finalizeSessionInit,
 } from '../../../src/copilot/agent/lifecycle/setup/session-setup.js';
 import { buildMcpTools } from '../../../src/copilot/bridges/mcp-tool-bridge.js';
-import { setSessionRpc } from '../../../src/copilot/tools/bootstrap.js';
 
 describe('session-setup (F63)', () => {
     /** @type {any} */

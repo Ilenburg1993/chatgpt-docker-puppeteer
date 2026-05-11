@@ -401,9 +401,13 @@ describe('hooks/presets/production', () => {
     });
 
     it('tool desabilitada por isToolDisabled é deny', async () => {
-        const { isToolDisabled } = await import('../../../../src/copilot/tools/introspection-tools.js');
-        vi.mocked(isToolDisabled).mockReturnValueOnce(true);
-        const { hooks } = /** @type {any} */ (createProductionHooks());
+        const { hooks } =
+            /** @type {any} */
+            (
+                createProductionHooks({
+                    isToolDisabled: () => true,
+                })
+            );
         const r = hooks.onPreToolUse(makeInput('disabled_tool'), makeInvocation());
         expect(r.permissionDecision).toBe('deny');
     });

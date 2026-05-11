@@ -2,12 +2,14 @@
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { readTerminalToolStatsProjection } = vi.hoisted(() => ({
+const { readTerminalToolStatsProjection, readTerminalStatusProjection } = vi.hoisted(() => ({
     readTerminalToolStatsProjection: vi.fn(),
+    readTerminalStatusProjection: vi.fn(() => ({ runtimeId: 'default', runtimeHealth: 'ok' })),
 }));
 
 vi.mock('../../../../src/copilot/terminal/frontend/index.js', () => ({
     readTerminalToolStatsProjection,
+    readTerminalStatusProjection,
 }));
 
 const { cmdTools } = await import('../../../../src/copilot/terminal/commands/tools.js');
@@ -27,6 +29,10 @@ describe('commands/tools', () => {
                 'tool.fast': { calls: 3, errors: 0, avgLatencyMs: 12 },
                 'tool.slow': { calls: 2, errors: 1, avgLatencyMs: 140 },
             },
+            canonicalEntries: /** @type {[string, Record<string, any>][]} */ ([
+                ['tool.fast', { calls: 3, errors: 0, avgLatencyMs: 12 }],
+                ['tool.slow', { calls: 2, errors: 1, avgLatencyMs: 140 }],
+            ]),
             entries: /** @type {[string, Record<string, any>][]} */ ([
                 ['tool.fast', { calls: 3, errors: 0, avgLatencyMs: 12 }],
                 ['tool.slow', { calls: 2, errors: 1, avgLatencyMs: 140 }],
@@ -53,6 +59,7 @@ describe('commands/tools', () => {
     it('renderiza estado vazio sem acessar observability diretamente', () => {
         readTerminalToolStatsProjection.mockReturnValueOnce({
             stats: {},
+            canonicalEntries: [],
             entries: [],
             tools: [],
             byCategory: {},

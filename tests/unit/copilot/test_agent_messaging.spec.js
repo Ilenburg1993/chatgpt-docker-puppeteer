@@ -16,7 +16,7 @@ import {
     sendMessage,
     sendMessageDialogBoot,
 } from '../../../src/copilot/agent/messaging/agent-messaging.js';
-import { requestUserInputTool } from '../../../src/copilot/tools/hook-tools.js';
+import { requestUserInputTool } from '../../../src/copilot/tools/hook/hook-tools.js';
 
 describe('agent-messaging › sendMessage', () => {
     /** @returns {{ ctx: AgentContext; host: EventEmitter & { emit: any } }} */

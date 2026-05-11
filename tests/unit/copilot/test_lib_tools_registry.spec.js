@@ -34,7 +34,11 @@ import {
  * @returns {import('@github/copilot-sdk').Tool}
  */
 function mkTool(name) {
-    return /** @type {any} */ ({ name, description: `Ferramenta ${name}` });
+    return /** @type {any} */ ({
+        name,
+        description: `Ferramenta ${name}`,
+        handler: () => ({}),
+    });
 }
 
 // ─── createRegistry ──────────────────────────────────────────────────────────
@@ -92,12 +96,15 @@ describe('registerTool', () => {
     it('deve lançar se tool.name ausente', () => {
         const reg = createRegistry();
         // @ts-expect-error — teste de runtime
-        assert.throws(() => registerTool(reg, { description: 'sem nome' }), /tool\.name/);
+        assert.throws(
+            () => registerTool(reg, { description: 'sem nome', handler: () => ({}) }),
+            /name \(string\) obrigatório/,
+        );
     });
 
     it('deve lançar se tool.name é string vazia', () => {
         const reg = createRegistry();
-        assert.throws(() => registerTool(reg, mkTool('')), /tool\.name/);
+        assert.throws(() => registerTool(reg, mkTool('')), /name \(string\) obrigatório/);
     });
 });
 

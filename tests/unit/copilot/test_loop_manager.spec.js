@@ -48,6 +48,7 @@ vi.mock('#copilot/config/env', () => ({
     COPILOT_MCP_SERVERS: '',
     COPILOT_CUSTOM_AGENTS: '',
     COPILOT_DISABLED_AGENTS: '',
+    COPILOT_OPERATIONAL_PROFILE: 'production',
 }));
 vi.mock('#copilot/core/errors', async () => {
     const actual = await vi.importActual('#copilot/core/errors');
@@ -254,7 +255,7 @@ describe('DialogLoopManager', () => {
 
             await expect(dlm.start('Hello 1')).rejects.toThrow('pipe closed');
             await expect(dlm.start('Hello 2')).rejects.toThrow('pipe closed');
-            await expect(dlm.start('Hello 3')).rejects.toThrow('pipe closed');
+            await expect(dlm.start('Hello 3')).rejects.toThrow(/Circuit breaker de boot aberto/);
 
             const callsBeforeCircuit = host.sendMessageDialogBoot.mock.calls.length;
             await expect(dlm.start('Hello 4')).rejects.toMatchObject({ code: 'DIALOG_BOOT_CIRCUIT_OPEN' });

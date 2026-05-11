@@ -2,7 +2,7 @@
 /**
  * tests/unit/copilot/tools/test_web_tools.spec.js
  *
- * Testes unitários para src/copilot/tools/web-tools.js.
+ * Testes unitários para src/copilot/tools/web/web-tools.js.
  *
  * Valida:
  *
@@ -52,20 +52,23 @@ vi.mock('#copilot/core', async (importOriginal) => {
 
 // Mock config/env
 vi.mock('#copilot/config/env', () => ({
+    getWebRateLimitPolicy: () => ({ perMinute: 60, enforced: false }),
+    WEB_FETCH_DISABLED: false,
     WEB_SEARCH_DISABLED: false,
 
     COPILOT_MCP_SERVERS: '',
     COPILOT_CUSTOM_AGENTS: '',
     COPILOT_DISABLED_AGENTS: '',
+    COPILOT_OPERATIONAL_PROFILE: 'production',
 }));
 
 // Mock logger
-vi.mock('../../../../src/copilot/tools/logger.js', () => ({
+vi.mock('../../../../src/copilot/tools/infra/logger.js', () => ({
     log: mocks.log,
 }));
 
 // Mock tool-factory
-vi.mock('../../../../src/copilot/tools/tool-factory.js', () => ({
+vi.mock('../../../../src/copilot/tools/infra/tool-factory.js', () => ({
     buildTool: mocks.buildTool,
     withSkipPermission: mocks.withSkipPermission,
 }));
@@ -101,6 +104,7 @@ function mockResponse(body, opts = {}) {
                     return { done: true, value: undefined };
                 },
                 cancel: vi.fn(),
+                releaseLock: vi.fn(),
             }),
         },
     };
@@ -109,13 +113,13 @@ function mockResponse(body, opts = {}) {
 // ─── Suite ────────────────────────────────────────────────────────────────────
 
 describe('web-tools', () => {
-    /** @type {typeof import('../../../../src/copilot/tools/web-tools.js')} */
+    /** @type {typeof import('../../../../src/copilot/tools/web/index.js')} */
     let mod;
     /** @type {any} */
     let fetchSpy;
 
     beforeAll(async () => {
-        mod = await import('../../../../src/copilot/tools/web-tools.js');
+        mod = await import('../../../../src/copilot/tools/web/index.js');
     });
 
     beforeEach(() => {

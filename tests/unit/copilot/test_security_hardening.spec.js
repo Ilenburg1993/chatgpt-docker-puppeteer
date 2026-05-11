@@ -12,7 +12,7 @@ import { describe, it } from 'vitest';
 describe('session-tools — execFileSync security (F131)', () => {
     it('get_workspace_info retorna git info sem shell injection', async () => {
         // Importar e invocar o tool handler via módulo
-        const { sessionTools } = await import('../../../src/copilot/tools/session-tools.js');
+        const { sessionTools } = await import('#copilot/tools');
         const getWorkspaceInfo = sessionTools.find((t) => t.name === 'get_workspace_info');
         assert.ok(getWorkspaceInfo, 'Tool get_workspace_info deve existir');
         const result = /** @type {any} */ (
@@ -32,7 +32,7 @@ describe('session-tools — execFileSync security (F131)', () => {
 
     it('session-tools não importa execSync', async () => {
         const source = await import('node:fs/promises').then((fs) =>
-            fs.readFile(new URL('../../../src/copilot/tools/session-tools.js', import.meta.url), 'utf8'),
+            fs.readFile(new URL('../../../src/copilot/tools/session/session-tools.js', import.meta.url), 'utf8'),
         );
         assert.ok(!source.includes('execSync'), 'Não deve importar execSync (usar execFileSync)');
         assert.ok(source.includes('execFileSync'), 'Deve usar execFileSync');

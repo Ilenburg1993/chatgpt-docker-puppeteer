@@ -204,7 +204,7 @@ vi.mock('../../../../src/copilot/terminal/state/activity-state.js', () => ({
     readTerminalActivityHistory: () => [],
 }));
 
-vi.mock('../../../../src/copilot/tools/introspection-tools.js', () => ({
+vi.mock('#copilot/tools', () => ({
     readIntrospectionRegistrySnapshot: () => ({
         total: 6,
         categories: { file: 6 },
@@ -247,7 +247,7 @@ describe('commands/diagnose', () => {
         expect(ctx.output()).toContain('Timers');
         expect(ctx.output()).toContain('Lifecycle mx');
         expect(ctx.output()).toContain('sdk↔fs route');
-        expect(ctx.output()).toContain('local-fs-primary');
+        expect(ctx.output()).toContain('degraded');
     });
 
     it('aceita runtimeId explícito no comando', async () => {

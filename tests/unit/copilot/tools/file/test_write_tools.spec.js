@@ -15,9 +15,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({
     mockLog: vi.fn(),
     buildTool: vi.fn((config) => config),
+    withSkipPermission: vi.fn((tool) => tool),
 }));
 
-vi.mock('../../../../../src/copilot/tools/logger.js', () => ({
+vi.mock('../../../../../src/copilot/tools/infra/logger.js', () => ({
     log: mocks.mockLog,
 }));
 
@@ -53,8 +54,9 @@ vi.mock('#copilot/tools/file/shared', () => ({
 }));
 
 // buildTool mock: retorna o handler diretamente para teste isolado
-vi.mock('#copilot/tools/tool-factory', () => ({
+vi.mock('../../../../../src/copilot/tools/infra/tool-factory.js', () => ({
     buildTool: mocks.buildTool,
+    withSkipPermission: mocks.withSkipPermission,
 }));
 
 // crypto mock para atomicWrite
@@ -64,15 +66,21 @@ vi.mock('node:crypto', () => ({
 
 // ─── Import após mocks ──────────────────────────────────────────────────────
 
-const {
-    writeFileContentTool,
-    createFileTool,
-    deleteFileTool,
-    copyFileTool,
-    moveFileTool,
-    patchFileTool,
-    fileWriteTools,
-} = await import('#copilot/tools/file/write-tools');
+const { fileWriteTools } = await import('../../../../../src/copilot/tools/file/index.js');
+
+/** @param {string} name */
+function requireTool(name) {
+    const tool = fileWriteTools.find((t) => t.name === name);
+    if (!tool) throw new Error(`Tool não encontrada: ${name}`);
+    return /** @type {any} */ (tool);
+}
+
+const writeFileContentTool = requireTool('write_file_content');
+const createFileTool = requireTool('create_file');
+const deleteFileTool = requireTool('delete_file');
+const copyFileTool = requireTool('copy_file');
+const moveFileTool = requireTool('move_file');
+const patchFileTool = requireTool('patch_file');
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -84,6 +92,11 @@ function pathOk(resolved = '/workspace/test.txt') {
 /** Helper para configurar validatePath como falha */
 function pathFail(reason = 'Caminho inválido') {
     mockValidatePath.mockResolvedValue({ ok: false, resolved: undefined, reason });
+}
+
+/** @returns {Error & { code: string }} */
+function enoent() {
+    return /** @type {Error & { code: string }} */ (Object.assign(new Error('ENOENT'), { code: 'ENOENT' }));
 }
 
 beforeEach(() => {
@@ -132,7 +145,7 @@ describe('F35 — write_file_content (F181-F182)', () => {
         const result = await handler({ path: 'nofile.txt', content: 'x', encoding: 'utf8' });
 
         expect(result.success).toBe(false);
-        expect(result.error).toContain('create_file');
+        expect(result.error).toContain('Arquivo não encontrado');
     });
 
     it('falha se validatePath rejeita', async () => {
@@ -189,7 +202,7 @@ describe('F35 — create_file (F184)', () => {
 
     it('cria novo arquivo com conteúdo', async () => {
         pathOk('/workspace/new.txt');
-        fsMock.access.mockRejectedValue(new Error('ENOENT'));
+        fsMock.access.mockRejectedValue(enoent());
         fsMock.mkdir.mockResolvedValue(undefined);
         fsMock.writeFile.mockResolvedValue(undefined);
         fsMock.rename.mockResolvedValue(undefined);
@@ -239,7 +252,7 @@ describe('F35 — create_file (F184)', () => {
 
     it('cria diretórios intermediários quando createParentDirs=true', async () => {
         pathOk('/workspace/deep/nested/file.txt');
-        fsMock.access.mockRejectedValue(new Error('ENOENT'));
+        fsMock.access.mockRejectedValue(enoent());
         fsMock.mkdir.mockResolvedValue(undefined);
         fsMock.writeFile.mockResolvedValue(undefined);
         fsMock.rename.mockResolvedValue(undefined);
@@ -256,7 +269,7 @@ describe('F35 — create_file (F184)', () => {
 
     it('cria arquivo vazio quando content omitido', async () => {
         pathOk('/workspace/empty.txt');
-        fsMock.access.mockRejectedValue(new Error('ENOENT'));
+        fsMock.access.mockRejectedValue(enoent());
         fsMock.mkdir.mockResolvedValue(undefined);
         fsMock.writeFile.mockResolvedValue(undefined);
         fsMock.rename.mockResolvedValue(undefined);
@@ -274,7 +287,7 @@ describe('F35 — create_file (F184)', () => {
 
     it('retorna bytes escritos reais para UTF-8 multibyte', async () => {
         pathOk('/workspace/unicode.txt');
-        fsMock.access.mockRejectedValue(new Error('ENOENT'));
+        fsMock.access.mockRejectedValue(enoent());
         fsMock.mkdir.mockResolvedValue(undefined);
         fsMock.writeFile.mockResolvedValue(undefined);
         fsMock.rename.mockResolvedValue(undefined);
@@ -325,7 +338,7 @@ describe('F35 — delete_file (F185)', () => {
 
     it('falha se é diretório', async () => {
         pathOk('/workspace/somedir');
-        fsMock.stat.mockResolvedValue({ isDirectory: () => true });
+        fsMock.unlink.mockRejectedValue(Object.assign(new Error('EISDIR'), { code: 'EISDIR' }));
 
         const result = await handler({ path: 'somedir' });
 
@@ -335,7 +348,7 @@ describe('F35 — delete_file (F185)', () => {
 
     it('falha se stat lança (arquivo não existe)', async () => {
         pathOk('/workspace/ghost.txt');
-        fsMock.stat.mockRejectedValue(new Error('ENOENT'));
+        fsMock.unlink.mockRejectedValue(enoent());
 
         const result = await handler({ path: 'ghost.txt' });
 
@@ -385,7 +398,7 @@ describe('F35 — copy_file (F186)', () => {
         const result = await handler({ source: 'src.txt', destination: 'dst.txt', overwrite: false });
 
         expect(result.success).toBe(false);
-        expect(result.error).toContain('overwrite');
+        expect(result.error).toContain('Destino já existe');
     });
 
     it('sobrescreve com overwrite=true', async () => {

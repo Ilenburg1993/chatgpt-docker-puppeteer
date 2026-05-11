@@ -133,6 +133,8 @@ describe('F23 — F109: experimental-rpc.js sem sobreposição com rpc.js', () =
         const rpcExports = extractExportedNames(rpcSrc);
 
         const allowedOverlap = new Set(['agentList', 'agentSelect', 'agentDeselect']);
+        allowedOverlap.add('agentGetCurrent');
+        allowedOverlap.add('agentReload');
         const overlap = expExports.filter((name) => rpcExports.includes(name) && !allowedOverlap.has(name));
         expect(overlap).toHaveLength(0);
     });

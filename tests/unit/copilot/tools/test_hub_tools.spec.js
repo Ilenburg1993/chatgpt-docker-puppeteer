@@ -2,7 +2,7 @@
 /**
  * tests/unit/copilot/tools/test_hub_tools.spec.js
  *
- * Testes unitários para src/copilot/tools/hub-tools.js.
+ * Testes unitários para src/copilot/tools/hub/hub-tools.js.
  *
  * Valida:
  *
@@ -26,7 +26,7 @@ vi.mock('#copilot/observability/logger', () => ({
     getRecentLogs: vi.fn(() => []),
 }));
 
-vi.mock('../../../../src/copilot/tools/tool-factory.js', () => ({
+vi.mock('../../../../src/copilot/tools/infra/tool-factory.js', () => ({
     buildTool: vi.fn((opts) => ({
         name: opts.name,
         description: opts.description,
@@ -84,13 +84,13 @@ function createFakeHub() {
 // ─── Suite ────────────────────────────────────────────────────────────────────
 
 describe('hub-tools', () => {
-    /** @type {typeof import('../../../../src/copilot/tools/hub-tools.js')} */
+    /** @type {typeof import('#copilot/tools')} */
     let mod;
     /** @type {ReturnType<typeof createFakeHub>} */
     let fakeHub;
 
     beforeAll(async () => {
-        mod = await import('../../../../src/copilot/tools/hub-tools.js');
+        mod = await import('#copilot/tools');
     });
 
     beforeEach(() => {

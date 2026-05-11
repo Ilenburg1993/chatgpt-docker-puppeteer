@@ -54,11 +54,11 @@ describe('F46 — rate-limiter-state DI bridge', () => {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 describe('F46 — permission-tools', () => {
-    /** @type {typeof import('#copilot/tools/permission-tools')} */
+    /** @type {typeof import('#copilot/tools')} */
     let mod;
 
     beforeAll(async () => {
-        mod = await import('#copilot/tools/permission-tools');
+        mod = await import('#copilot/tools');
     });
 
     it('permissionTools exporta array com 2 tools', () => {
@@ -125,11 +125,11 @@ describe('F46 — permission-tools', () => {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 describe('F46 — code-tools', () => {
-    /** @type {typeof import('#copilot/tools/code-tools')} */
+    /** @type {typeof import('#copilot/tools')} */
     let mod;
 
     beforeAll(async () => {
-        mod = await import('#copilot/tools/code-tools');
+        mod = await import('#copilot/tools');
     });
 
     it('codeTools exporta array com 3 tools', () => {

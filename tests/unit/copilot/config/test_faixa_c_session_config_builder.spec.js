@@ -19,6 +19,19 @@ vi.mock('#copilot/observability/logger', () => ({
     getRecentLogs: vi.fn(() => []),
 }));
 
+vi.mock('#copilot/boot', async (importOriginal) => {
+    const actual = /** @type {Record<string, unknown>} */ (await importOriginal());
+    return {
+        ...actual,
+        resolvePersistentConfigFile: vi.fn((name) => `/tmp/${name}`),
+        COPILOT_PACKAGE_ROOT: '/workspace',
+        WORKSPACE_ROOT: '/workspace',
+        resolveHooksStateDir: vi.fn(() => '/workspace/.github/hooks/state'),
+        resolveWorkspacePath: vi.fn((...parts) => ['/workspace', ...parts].join('/').replace(/\/+/g, '/')),
+        readBootSkillConfig: vi.fn(() => ({ enableSkillDiscovery: true })),
+    };
+});
+
 vi.mock(
     '#copilot/config/env',
     () =>
@@ -27,6 +40,7 @@ vi.mock(
                 COPILOT_MCP_SERVERS: '',
                 COPILOT_CUSTOM_AGENTS: '',
                 COPILOT_DISABLED_AGENTS: '',
+                COPILOT_OPERATIONAL_PROFILE: 'production',
                 COPILOT_MODEL: 'gpt-4o',
                 COPILOT_REASONING_EFFORT: '',
                 COPILOT_HUB_SOCKET_AUTH_REQUIRED: false,
@@ -51,6 +65,46 @@ vi.mock(
             },
         ),
 );
+
+vi.mock('../../../../src/copilot/config/sdk-config-port.js', async () => {
+    const clientOptions = /** @type {Record<string, unknown>} */ (
+        await import('../../../../src/copilot/sdk/session/client-options.js')
+    );
+    return {
+        BUILTIN_HANDLER_MAP: new Map(),
+        ClientOptionsBuilder: clientOptions.ClientOptionsBuilder,
+        buildCopilotClientOptionsFromEnv: clientOptions.buildCopilotClientOptionsFromEnv,
+        SYSTEM_PROMPT_SECTIONS: {},
+        INFINITE_SESSION_DEFAULTS: {
+            BACKGROUND_COMPACTION_THRESHOLD: 0.8,
+        },
+        REASONING_EFFORTS: {
+            LOW: 'low',
+            MEDIUM: 'medium',
+            HIGH: 'high',
+            XHIGH: 'xhigh',
+        },
+        approveAll: vi.fn(async () => ({ behavior: 'allow', updatedInput: undefined })),
+        getCustomToolDefinitions: vi.fn(() => []),
+        getToolsConfig: vi.fn(async () => ({ allowlist: null, denylist: [] })),
+        patchToolsConfig: vi.fn(async () => ({ success: true })),
+        registerCustomTool: vi.fn(async () => ({ success: true })),
+        removeCustomTool: vi.fn(async () => ({ success: true })),
+        validateProviderConfig: vi.fn((value) => {
+            const provider = /** @type {{ type?: string; baseUrl?: string }} */ (value);
+            if (provider.type === 'openai' && !provider.baseUrl) {
+                throw new Error('baseUrl is required');
+            }
+            return {
+                ...provider,
+                ...(typeof provider.baseUrl === 'string'
+                    ? { baseUrl: provider.baseUrl.replace(/\/+$/, '') }
+                    : {}),
+            };
+        }),
+        resolvePersistentConfigFile: vi.fn((name) => `/tmp/${name}`),
+    };
+});
 
 // ─── Imports ────────────────────────────────────────────────────────────────
 

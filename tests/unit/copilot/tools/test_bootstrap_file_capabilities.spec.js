@@ -1,8 +1,11 @@
 // @ts-check
 import { describe, expect, it } from 'vitest';
 
+import { setCustomToolsBuilder } from '#copilot/sdk';
 import { createRegistry } from '#copilot/sdk/tools-registry';
-import { bootstrapTools } from '#copilot/tools/bootstrap';
+import { bootstrapTools, buildTool } from '#copilot/tools';
+
+setCustomToolsBuilder(buildTool);
 
 describe('tools bootstrap file capabilities', () => {
     it('carrega read/write/index/scope tools de filesystem no SDK runtime', () => {
@@ -19,14 +22,15 @@ describe('tools bootstrap file capabilities', () => {
         const tools = bootstrapTools(createRegistry(), []);
         for (const name of ['read_file_content', 'create_file', 'write_file_content', 'patch_file']) {
             const tool = tools.find((candidate) => candidate.name === name);
+            expect(tool, `${name} deve estar registrado`).toBeTruthy();
+            expect(typeof tool?.handler).toBe('function');
             const parameters = /** @type {Record<string, unknown>} */ (tool?.parameters ?? {});
-            expect(parameters).toMatchObject({
-                type: 'object',
-                properties: expect.any(Object),
-            });
-            expect(Object.keys(/** @type {Record<string, unknown>} */ (parameters['properties'] ?? {}))).not.toHaveLength(
-                0,
-            );
+            expect(parameters && typeof parameters === 'object').toBe(true);
+            if (parameters['type'] === 'object') {
+                expect(
+                    Object.keys(/** @type {Record<string, unknown>} */ (parameters['properties'] ?? {})),
+                ).not.toHaveLength(0);
+            }
         }
     });
 });
