@@ -183,6 +183,10 @@ Reconstruir `src/copilot/tools/` como um subsistema canônico, com:
 
 1. **Boundary enforcement do terminal**
   - elevar a proteção arquitetural além do estado atual;
+  - adotar a política **terminal barrel-first** como shape alvo da borda;
+  - converter `terminal/index.js` e `terminal/dialog/index.js` em barrels puros, movendo composição/runtime para arquivos nomeados explicitamente;
+  - criar barrels recursivos em `repl/`, `state/`, `stores/`, `wiring/`, `terminal-phases/`, `frontend/gateways/`, `frontend/projections/` e `events/`;
+  - migrar imports cross-folder do terminal para barrels, com anti-bypass progressivo em lint/contracts;
   - preparar endurecimento progressivo de lint/contracts.
 
 2. **Expandir ainda mais contract tests da policy finita das file tools**
@@ -246,4 +250,6 @@ Reconstruir `src/copilot/tools/` como um subsistema canônico, com:
 - ✅ 2026-05-12: runtime do agent passou a materializar uma capability MCP canônica por instância via `agent/ports/mcp-port.js`, consumida por `session-setup` e `boot-runtime-bind` sem fallbacks espalhados.
 - ✅ 2026-05-12: contract tests finitos adicionados para a policy das file tools (`read_file_content`, `list_directory`, `diff_files`) com validação de metadados de truncamento.
 - ✅ 2026-05-12: rodada ampla revalidada com `npm run test:copilot`, `npm run typecheck:strict:all` e `npm run lint` verdes.
-- 🔄 Próximo: endurecer o boundary enforcement do terminal, completar a cobertura contratual da policy finita das file tools e reduzir warnings TDZ-safe residuais.
+- ✅ 2026-05-12: `main` sincronizada com `origin/main` após organização dos commits do lote estrutural em tooling, runtime MCP/file-tools e terminal/events.
+- ✅ 2026-05-12: avaliação profunda da borda `terminal/` consolidada em `2026-05-12-TERMINAL-BARREL-FIRST-ARQUITETURA-2.1.md`, definindo o target barrel-first para a próxima onda.
+- 🔄 Próximo: executar a fase terminal barrel-first (pureza de `index.js`, barrels recursivos e migração de imports cross-folder), completar a cobertura contratual da policy finita das file tools e reduzir warnings TDZ-safe residuais.
