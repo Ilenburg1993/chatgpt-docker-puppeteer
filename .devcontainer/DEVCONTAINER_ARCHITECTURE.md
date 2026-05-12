@@ -1,6 +1,6 @@
 # DevContainer Architecture — ChatGPT Docker Puppeteer
 
-**Versão**: 5.4.0 **Data**: 2026-03-08 **Status**: Canônico — fonte única da verdade para
+**Versão da imagem**: 1.0 **Data**: 2026-05-11 **Status**: Canônico — fonte única da verdade para
 arquitetura do DevContainer **Gerado por**: Auditoria completa pré-rebuild (Copilot)
 
 ---
@@ -50,17 +50,17 @@ DevContainers) com:
 
 ### Ferramentas Pinadas no Dockerfile
 
-| Ferramenta                 | Versão Pinada | ARG                        |
-| -------------------------- | ------------- | -------------------------- |
-| npm                        | 11.11.0       | `NPM_VERSION`              |
-| pnpm                       | 10.30.3       | `PNPM_VERSION`             |
-| @devcontainers/cli         | 0.83.3        | `DEVCONTAINER_CLI_VERSION` |
-| gh (GitHub CLI)            | 2.87.3        | `GH_VERSION`               |
-| actionlint                 | 1.7.11        | `ACTIONLINT_VERSION`       |
-| hadolint                   | 2.14.0        | `HADOLINT_VERSION`         |
-| typescript                 | 5.9.3         | (build-time, inline)       |
-| typescript-language-server | 5.1.3         | (build-time, inline)       |
-| jsonc-parser               | 3.3.1         | (build-time, inline)       |
+| Ferramenta                 | Versão Pinada | ARG                                  |
+| -------------------------- | ------------- | ------------------------------------ |
+| npm                        | 11.14.1       | `NPM_VERSION`                        |
+| pnpm                       | 11.1.0        | `PNPM_VERSION`                       |
+| @devcontainers/cli         | 0.86.1        | `DEVCONTAINER_CLI_VERSION`           |
+| gh (GitHub CLI)            | 2.92.0        | `GH_VERSION`                         |
+| actionlint                 | 1.7.12        | `ACTIONLINT_VERSION`                 |
+| hadolint                   | 2.14.0        | `HADOLINT_VERSION`                   |
+| typescript                 | 6.0.3         | `TYPESCRIPT_VERSION`                 |
+| typescript-language-server | 5.2.0         | `TYPESCRIPT_LANGUAGE_SERVER_VERSION` |
+| jsonc-parser               | 3.3.1         | (build-time, inline)                 |
 
 **Como atualizar**: editar os ARGs no topo do Dockerfile e fazer rebuild completo.
 
@@ -126,7 +126,7 @@ Isso reduz significativamente o tempo de rebuild incremental (quando apenas cama
 
 | ARG           | Valor                      | Propósito                    |
 | ------------- | -------------------------- | ---------------------------- |
-| `VERSION`     | `5.4.0`                    | Versão da suite DevContainer |
+| `VERSION`     | `1.0`                      | Versão do contrato da imagem |
 | `REMOTE_USER` | `node`                     | Usuário do container         |
 | `BUILD_ENV`   | `dev`                      | Ambiente de build            |
 | `IMAGE_NAME`  | `chatgpt-docker-puppeteer` | Nome da imagem               |
@@ -282,6 +282,7 @@ Docker.
 ### healthcheck.sh (v2.0)
 
 - Instalado em `/usr/local/bin/devcontainer-healthcheck.sh`
+- Declarado também como `HEALTHCHECK` nativo da imagem (Docker)
 - Checks: Node.js (CRÍTICO), VS Code Server (informativo), CDP proxy (informativo), Chromium local
   (informativo)
 - Exit 0 = healthy, Exit 1 = unhealthy (apenas se Node.js não disponível)
@@ -384,7 +385,7 @@ docker history <imagem>
 Com `# syntax=docker/dockerfile:1` no topo do Dockerfile, cada bloco `apt-get` usa:
 
 ```dockerfile
-RUN --mount=type=cache,id=apt-cache,target=/var/cache/apt,sharing=locked --mount=type=cache,id=apt-lib,target=/var/lib/apt,sharing=locked --mount=type=cache,id=apt-lib,target=/var/lib/apt,sharing=locked apt-get update && apt-get install -y --no-install-recommends ...
+RUN --mount=type=cache,id=apt-cache,target=/var/cache/apt,sharing=locked --mount=type=cache,id=apt-lib,target=/var/lib/apt,sharing=locked apt-get update && apt-get install -y --no-install-recommends ...
 ```
 
 O npm global também usa cache mount:

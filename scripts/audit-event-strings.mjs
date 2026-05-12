@@ -49,7 +49,10 @@ async function collectSSOTConstants(dir) {
         const content = await readFile(path.join(dir, file), 'utf-8');
         let match;
         while ((match = constRegex.exec(content)) !== null) {
-            values.add(match[1]);
+            const eventName = match[1];
+            if (eventName) {
+                values.add(eventName);
+            }
         }
     }
     return values;
@@ -251,7 +254,7 @@ async function scanFile(filePath, ssot) {
     const relative = path.relative(ROOT, filePath);
 
     for (let i = 0; i < lines.length; i++) {
-        const line = lines[i];
+        const line = lines[i] ?? '';
 
         // Skip imports, comments, JSDoc
         const trimmed = line.trim();
@@ -262,7 +265,7 @@ async function scanFile(filePath, ssot) {
             let match;
             while ((match = regex.exec(line)) !== null) {
                 const eventStr = match[1];
-                if (eventStr === '*') continue;
+                if (!eventStr || eventStr === '*') continue;
 
                 if (!ssot.has(eventStr)) {
                     const category = classifyEventString(eventStr);

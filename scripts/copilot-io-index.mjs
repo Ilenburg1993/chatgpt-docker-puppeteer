@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// @ts-check
 /**
  * CLI operacional para o índice L2 do Copilot.
  *
@@ -14,6 +15,23 @@ import {
     searchIoIndex,
 } from '../src/copilot/infra/index.js';
 
+/**
+ * @typedef {object} BuildCliArgs
+ * @property {boolean} recursive
+ * @property {boolean} respectGitignore
+ * @property {boolean | undefined} pruneMissing
+ * @property {string[]} include
+ * @property {string[]} exclude
+ * @property {string[]} extensions
+ * @property {number | undefined} concurrency
+ * @property {number | undefined} depth
+ * @property {string[]} rest
+ */
+
+/**
+ * @param {string | undefined} value
+ * @returns {number | undefined}
+ */
 function parsePositiveInt(value) {
     if (!value) return undefined;
     const parsed = Number(value);
@@ -21,17 +39,31 @@ function parsePositiveInt(value) {
     return Math.floor(parsed);
 }
 
+/**
+ * @param {string | undefined} ext
+ * @returns {string | undefined}
+ */
 function normalizeExtension(ext) {
     if (!ext) return ext;
     return ext.startsWith('.') ? ext.toLowerCase() : `.${ext.toLowerCase()}`;
 }
 
+/**
+ * @param {string} token
+ * @param {string} name
+ * @returns {string | null}
+ */
 function readInlineFlagValue(token, name) {
     const prefix = `${name}=`;
     return token.startsWith(prefix) ? token.slice(prefix.length) : null;
 }
 
+/**
+ * @param {string[]} parts
+ * @returns {BuildCliArgs}
+ */
 function parseBuildArgs(parts) {
+    /** @type {BuildCliArgs} */
     const parsed = {
         recursive: true,
         respectGitignore: true,
@@ -45,7 +77,7 @@ function parseBuildArgs(parts) {
     };
 
     for (let i = 0; i < parts.length; i++) {
-        const token = parts[i];
+        const token = parts[i] ?? '';
         const next = parts[i + 1];
         const includeInline = readInlineFlagValue(token, '--include');
         const excludeInline = readInlineFlagValue(token, '--exclude');
@@ -68,10 +100,17 @@ function parseBuildArgs(parts) {
             i += 1;
         } else if (excludeInline !== null) parsed.exclude.push(excludeInline);
         else if ((token === '--ext' || token === '-e') && next) {
-            parsed.extensions.push(normalizeExtension(next));
+            const normalizedExt = normalizeExtension(next);
+            if (normalizedExt) {
+                parsed.extensions.push(normalizedExt);
+            }
             i += 1;
-        } else if (extInline !== null) parsed.extensions.push(normalizeExtension(extInline));
-        else if (token === '--concurrency' && next) {
+        } else if (extInline !== null) {
+            const normalizedExt = normalizeExtension(extInline);
+            if (normalizedExt) {
+                parsed.extensions.push(normalizedExt);
+            }
+        } else if (token === '--concurrency' && next) {
             parsed.concurrency = parsePositiveInt(next);
             i += 1;
         } else if (concurrencyInline !== null) parsed.concurrency = parsePositiveInt(concurrencyInline);
@@ -85,6 +124,11 @@ function parseBuildArgs(parts) {
     return parsed;
 }
 
+/**
+ * @param {unknown} value
+ * @param {boolean} json
+ * @returns {void}
+ */
 function print(value, json) {
     if (json) {
         console.log(JSON.stringify(value, null, 2));
@@ -103,10 +147,14 @@ async function main() {
         const stats = getIoIndexStats();
         if (json) print(stats, true);
         else {
-            print(
-                `index: available=${stats.available} files=${stats.files ?? 0} fresh=${stats.freshFiles ?? 0} failed=${stats.failedFiles ?? 0} symbols=${stats.symbols ?? 0} imports=${stats.imports ?? 0} chunks=${stats.chunks ?? 0}`,
-                false,
-            );
+            if ('files' in stats) {
+                print(
+                    `index: available=${stats.available} files=${stats.files} fresh=${stats.freshFiles} failed=${stats.failedFiles} symbols=${stats.symbols} imports=${stats.imports} chunks=${stats.chunks}`,
+                    false,
+                );
+            } else {
+                print(`index: available=${stats.available} reason=${stats.reason} indexed=0 failed=0`, false);
+            }
         }
         return;
     }
@@ -114,6 +162,7 @@ async function main() {
     if (cmd === 'build' || cmd === 'rebuild' || cmd === 'update') {
         const parsed = parseBuildArgs(parts);
         const directory = parsed.rest.join(' ').trim() || 'src/copilot';
+        /** @type {NonNullable<Parameters<typeof buildIoIndexForDirectory>[1]>} */
         const options = {
             recursive: parsed.recursive,
             respectGitignore: parsed.respectGitignore,
@@ -128,10 +177,17 @@ async function main() {
         const result = await buildIoIndexForDirectory(directory, options);
         if (json) print(result, true);
         else {
-            print(
-                `build: dir=${directory} scanned=${result.scannedEntries ?? 0} candidates=${result.candidateFiles ?? 0} indexed=${result.indexed ?? 0} unchanged=${result.unchanged ?? 0} skipped=${result.skipped ?? 0} pruned=${result.pruned ?? 0} failed=${result.failed ?? 0} duration=${result.durationMs ?? 0}ms`,
-                false,
-            );
+            if ('scannedEntries' in result) {
+                print(
+                    `build: dir=${directory} scanned=${result.scannedEntries} candidates=${result.candidateFiles} indexed=${result.indexed} unchanged=${result.unchanged} skipped=${result.skipped} pruned=${result.pruned} failed=${result.failed} duration=${result.durationMs}ms`,
+                    false,
+                );
+            } else {
+                print(
+                    `build: dir=${directory} indexed=${result.indexed} skipped=${result.skipped} failed=${result.failed} duration=${result.durationMs}ms reason=${result.reason}`,
+                    false,
+                );
+            }
         }
         return;
     }

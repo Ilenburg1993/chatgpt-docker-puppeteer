@@ -41,25 +41,27 @@ FROM mcr.microsoft.com/devcontainers/javascript-node:24-bookworm
 # - Curated tools that are too stale in Debian should be pinned explicitly.
 # - Keep these values in sync with upstream stable releases when refreshing the image.
 # ---------------------------------------------------------------------------
-ARG NPM_VERSION=11.11.0
-ARG DEVCONTAINER_CLI_VERSION=0.83.3
-ARG PNPM_VERSION=10.30.3
-ARG GH_VERSION=2.87.3
-ARG ACTIONLINT_VERSION=1.7.11
+ARG NPM_VERSION=11.14.1
+ARG DEVCONTAINER_CLI_VERSION=0.86.1
+ARG PNPM_VERSION=11.1.0
+ARG GH_VERSION=2.92.0
+ARG ACTIONLINT_VERSION=1.7.12
 ARG HADOLINT_VERSION=2.14.0
+ARG TYPESCRIPT_VERSION=6.0.3
+ARG TYPESCRIPT_LANGUAGE_SERVER_VERSION=5.2.0
 
 # ---------------------------------------------------------------------------
 # Curated Rust/Go CLIs — pinned upstream releases (Section 6.8)
 # Update via: docker build --build-arg DELTA_VERSION=X.Y.Z ...
 # ---------------------------------------------------------------------------
-ARG DELTA_VERSION=0.17.0
-ARG ZOXIDE_VERSION=0.9.4
-ARG XH_VERSION=0.22.2
-ARG DUST_VERSION=1.0.0
-ARG SD_VERSION=1.0.0
-ARG BOTTOM_VERSION=0.9.6
-ARG GLOW_VERSION=1.5.1
-ARG PROCS_VERSION=0.14.5
+ARG DELTA_VERSION=0.19.2
+ARG ZOXIDE_VERSION=0.9.9
+ARG XH_VERSION=0.25.3
+ARG DUST_VERSION=1.2.4
+ARG SD_VERSION=1.1.0
+ARG BOTTOM_VERSION=0.12.3
+ARG GLOW_VERSION=2.1.2
+ARG PROCS_VERSION=0.14.11
 
 # ---------------------------------------------------------------------------
 # SHELL GLOBAL (PIPEFAIL)
@@ -210,6 +212,7 @@ RUN ln -sf /usr/bin/python3 /usr/bin/python
 ENV PATH="/usr/local/share/npm-global/bin:${HOME_DIR}/.npm-global/bin:${HOME_DIR}/.local/bin:${PATH}" \
     DEVCONTAINER_TOOLING_PREFIX="/usr/local/share/npm-global" \
     JSONC_PARSER_MODULE_PATH="/usr/local/share/npm-global/lib/node_modules/jsonc-parser" \
+    NODE_EXTRA_CA_CERTS="/etc/ssl/certs/ca-certificates.crt" \
     NPM_CONFIG_AUDIT=false \
     NPM_CONFIG_FUND=false \
     NPM_CONFIG_LOGLEVEL=warn \
@@ -231,15 +234,20 @@ RUN --mount=type=cache,id=npm-global-cache,target=/root/.npm,sharing=locked \
     pnpm@${PNPM_VERSION} \
     @devcontainers/cli@${DEVCONTAINER_CLI_VERSION} \
     jsonc-parser@3.3.1 \
-    typescript@5.9.3 \
-    typescript-language-server@5.1.3 \
+    typescript@${TYPESCRIPT_VERSION} \
+    typescript-language-server@${TYPESCRIPT_LANGUAGE_SERVER_VERSION} \
     && ln -sf /usr/local/share/npm-global/bin/npm /usr/local/bin/npm \
     && ln -sf /usr/local/share/npm-global/bin/npx /usr/local/bin/npx \
     && ln -sf /usr/local/share/npm-global/bin/pnpm /usr/local/bin/pnpm \
     && ln -sf /usr/local/share/npm-global/bin/devcontainer /usr/local/bin/devcontainer \
     && ln -sf /usr/local/share/npm-global/bin/tsc /usr/local/bin/tsc \
     && ln -sf /usr/local/share/npm-global/bin/tsserver /usr/local/bin/tsserver \
-    && ln -sf /usr/local/share/npm-global/bin/typescript-language-server /usr/local/bin/typescript-language-server
+    && ln -sf /usr/local/share/npm-global/bin/typescript-language-server /usr/local/bin/typescript-language-server \
+    && npm --version \
+    && pnpm --version \
+    && devcontainer --version \
+    && tsc --version \
+    && typescript-language-server --version
 
 
 # =============================================================================
@@ -422,19 +430,19 @@ RUN set -e; \
     *) echo "Unsupported architecture for curated CLIs: $arch" >&2; exit 1 ;; \
     esac; \
     gh_asset="gh_${GH_VERSION}_linux_${gh_arch}.tar.gz"; \
-    curl -fsSL "https://github.com/cli/cli/releases/download/v${GH_VERSION}/${gh_asset}" -o /tmp/gh.tgz; \
-    curl -fsSL "https://github.com/cli/cli/releases/download/v${GH_VERSION}/gh_${GH_VERSION}_checksums.txt" -o /tmp/gh_checksums.txt; \
+    curl -fsSL --retry 5 --retry-delay 2 --retry-connrefused --retry-all-errors "https://github.com/cli/cli/releases/download/v${GH_VERSION}/${gh_asset}" -o /tmp/gh.tgz; \
+    curl -fsSL --retry 5 --retry-delay 2 --retry-connrefused --retry-all-errors "https://github.com/cli/cli/releases/download/v${GH_VERSION}/gh_${GH_VERSION}_checksums.txt" -o /tmp/gh_checksums.txt; \
     grep "  ${gh_asset}\$" /tmp/gh_checksums.txt | sed 's#  .*#  /tmp/gh.tgz#' | sha256sum -c -; \
     tar -xzf /tmp/gh.tgz -C /tmp; \
     install -m 0755 "/tmp/gh_${GH_VERSION}_linux_${gh_arch}/bin/gh" /usr/local/bin/gh; \
     actionlint_asset="actionlint_${ACTIONLINT_VERSION}_linux_${actionlint_arch}.tar.gz"; \
-    curl -fsSL "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/${actionlint_asset}" -o /tmp/actionlint.tgz; \
-    curl -fsSL "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/actionlint_${ACTIONLINT_VERSION}_checksums.txt" -o /tmp/actionlint_checksums.txt; \
+    curl -fsSL --retry 5 --retry-delay 2 --retry-connrefused --retry-all-errors "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/${actionlint_asset}" -o /tmp/actionlint.tgz; \
+    curl -fsSL --retry 5 --retry-delay 2 --retry-connrefused --retry-all-errors "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/actionlint_${ACTIONLINT_VERSION}_checksums.txt" -o /tmp/actionlint_checksums.txt; \
     grep "  ${actionlint_asset}\$" /tmp/actionlint_checksums.txt | sed 's#  .*#  /tmp/actionlint.tgz#' | sha256sum -c -; \
     tar -xzf /tmp/actionlint.tgz -C /tmp; \
     install -m 0755 /tmp/actionlint /usr/local/bin/actionlint; \
-    curl -fsSL "https://github.com/hadolint/hadolint/releases/download/v${HADOLINT_VERSION}/hadolint-linux-${hadolint_arch}" -o /tmp/hadolint; \
-    curl -fsSL "https://github.com/hadolint/hadolint/releases/download/v${HADOLINT_VERSION}/hadolint-linux-${hadolint_arch}.sha256" -o /tmp/hadolint.sha256; \
+    curl -fsSL --retry 5 --retry-delay 2 --retry-connrefused --retry-all-errors "https://github.com/hadolint/hadolint/releases/download/v${HADOLINT_VERSION}/hadolint-linux-${hadolint_arch}" -o /tmp/hadolint; \
+    curl -fsSL --retry 5 --retry-delay 2 --retry-connrefused --retry-all-errors "https://github.com/hadolint/hadolint/releases/download/v${HADOLINT_VERSION}/hadolint-linux-${hadolint_arch}.sha256" -o /tmp/hadolint.sha256; \
     awk '{print $1 "  /tmp/hadolint"}' /tmp/hadolint.sha256 | sha256sum -c -; \
     install -m 0755 /tmp/hadolint /usr/local/bin/hadolint; \
     rm -rf /tmp/gh.tgz /tmp/gh_checksums.txt "/tmp/gh_${GH_VERSION}_linux_${gh_arch}" /tmp/actionlint.tgz /tmp/actionlint_checksums.txt /tmp/actionlint /tmp/hadolint /tmp/hadolint.sha256; \
@@ -483,55 +491,55 @@ RUN set -e; \
     mkdir -p /tmp/rust-cli; \
     # ─── delta (git-delta): rich, semantic diff viewer ───────────────────────
     # Tag format: VERSION (no v prefix). Binary inside subdirectory of tarball.
-    curl -fsSL "https://github.com/dandavison/delta/releases/download/${DELTA_VERSION}/delta-${DELTA_VERSION}-${DELTA_ARCH}.tar.gz" \
+    curl -fsSL --retry 5 --retry-delay 2 --retry-connrefused --retry-all-errors "https://github.com/dandavison/delta/releases/download/${DELTA_VERSION}/delta-${DELTA_VERSION}-${DELTA_ARCH}.tar.gz" \
     -o /tmp/rust-cli/delta.tgz; \
     tar -xzf /tmp/rust-cli/delta.tgz -C /tmp/rust-cli; \
     install -m 0755 "/tmp/rust-cli/delta-${DELTA_VERSION}-${DELTA_ARCH}/delta" /usr/local/bin/delta; \
     # ─── zoxide: smart cd with frecency ranking ───────────────────────────────
     # Tag format: vVERSION. Binary at tarball root.
-    curl -fsSL "https://github.com/ajeetdsouza/zoxide/releases/download/v${ZOXIDE_VERSION}/zoxide-${ZOXIDE_VERSION}-${ZOXIDE_ARCH}.tar.gz" \
+    curl -fsSL --retry 5 --retry-delay 2 --retry-connrefused --retry-all-errors "https://github.com/ajeetdsouza/zoxide/releases/download/v${ZOXIDE_VERSION}/zoxide-${ZOXIDE_VERSION}-${ZOXIDE_ARCH}.tar.gz" \
     -o /tmp/rust-cli/zoxide.tgz; \
     mkdir -p /tmp/rust-cli/zoxide-extract; \
     tar -xzf /tmp/rust-cli/zoxide.tgz -C /tmp/rust-cli/zoxide-extract; \
     install -m 0755 /tmp/rust-cli/zoxide-extract/zoxide /usr/local/bin/zoxide; \
     # ─── xh: friendly HTTP client (curl/httpie alternative) ──────────────────
     # Tag format: vVERSION. Binary inside subdirectory of tarball.
-    curl -fsSL "https://github.com/ducaale/xh/releases/download/v${XH_VERSION}/xh-v${XH_VERSION}-${XH_ARCH}.tar.gz" \
+    curl -fsSL --retry 5 --retry-delay 2 --retry-connrefused --retry-all-errors "https://github.com/ducaale/xh/releases/download/v${XH_VERSION}/xh-v${XH_VERSION}-${XH_ARCH}.tar.gz" \
     -o /tmp/rust-cli/xh.tgz; \
     mkdir -p /tmp/rust-cli/xh-extract; \
     tar -xzf /tmp/rust-cli/xh.tgz -C /tmp/rust-cli/xh-extract; \
     install -m 0755 "/tmp/rust-cli/xh-extract/xh-v${XH_VERSION}-${XH_ARCH}/xh" /usr/local/bin/xh; \
     # ─── dust: intuitive `du` replacement ────────────────────────────────────
     # Tag format: vVERSION. Binary inside subdirectory of tarball.
-    curl -fsSL "https://github.com/bootandy/dust/releases/download/v${DUST_VERSION}/dust-v${DUST_VERSION}-${DUST_ARCH}.tar.gz" \
+    curl -fsSL --retry 5 --retry-delay 2 --retry-connrefused --retry-all-errors "https://github.com/bootandy/dust/releases/download/v${DUST_VERSION}/dust-v${DUST_VERSION}-${DUST_ARCH}.tar.gz" \
     -o /tmp/rust-cli/dust.tgz; \
     mkdir -p /tmp/rust-cli/dust-extract; \
     tar -xzf /tmp/rust-cli/dust.tgz -C /tmp/rust-cli/dust-extract; \
     install -m 0755 "/tmp/rust-cli/dust-extract/dust-v${DUST_VERSION}-${DUST_ARCH}/dust" /usr/local/bin/dust; \
     # ─── sd: intuitive find & replace (sed alternative) ──────────────────────
     # Tag format: vVERSION. Static binary within tarball.
-    curl -fsSL "https://github.com/chmln/sd/releases/download/v${SD_VERSION}/sd-v${SD_VERSION}-${SD_ARCH}.tar.gz" \
+    curl -fsSL --retry 5 --retry-delay 2 --retry-connrefused --retry-all-errors "https://github.com/chmln/sd/releases/download/v${SD_VERSION}/sd-v${SD_VERSION}-${SD_ARCH}.tar.gz" \
     -o /tmp/rust-cli/sd.tgz; \
     mkdir -p /tmp/rust-cli/sd-extract; \
     tar -xzf /tmp/rust-cli/sd.tgz -C /tmp/rust-cli/sd-extract; \
     find /tmp/rust-cli/sd-extract -type f -name 'sd' -exec install -m 0755 {} /usr/local/bin/sd \;; \
     # ─── bottom (btm): graphical process/system monitor ──────────────────────
     # Tag format: VERSION (no v prefix). Asset name has NO version in filename.
-    curl -fsSL "https://github.com/ClementTsang/bottom/releases/download/${BOTTOM_VERSION}/bottom_${BOTTOM_ARCH}.tar.gz" \
+    curl -fsSL --retry 5 --retry-delay 2 --retry-connrefused --retry-all-errors "https://github.com/ClementTsang/bottom/releases/download/${BOTTOM_VERSION}/bottom_${BOTTOM_ARCH}.tar.gz" \
     -o /tmp/rust-cli/bottom.tgz; \
     mkdir -p /tmp/rust-cli/bottom-extract; \
     tar -xzf /tmp/rust-cli/bottom.tgz -C /tmp/rust-cli/bottom-extract; \
     install -m 0755 /tmp/rust-cli/bottom-extract/btm /usr/local/bin/btm; \
     # ─── glow: Markdown rendering in terminal ─────────────────────────────────
     # Tag format: vVERSION. Asset name has NO version in filename: glow_Linux_ARCH.
-    curl -fsSL "https://github.com/charmbracelet/glow/releases/download/v${GLOW_VERSION}/glow_Linux_${GLOW_ARCH}.tar.gz" \
+    curl -fsSL --retry 5 --retry-delay 2 --retry-connrefused --retry-all-errors "https://github.com/charmbracelet/glow/releases/download/v${GLOW_VERSION}/glow_${GLOW_VERSION}_Linux_${GLOW_ARCH}.tar.gz" \
     -o /tmp/rust-cli/glow.tgz; \
     mkdir -p /tmp/rust-cli/glow-extract; \
     tar -xzf /tmp/rust-cli/glow.tgz -C /tmp/rust-cli/glow-extract; \
     find /tmp/rust-cli/glow-extract -type f -name 'glow' -exec install -m 0755 {} /usr/local/bin/glow \;; \
     # ─── procs: modern ps replacement ────────────────────────────────────────
     # Tag format: vVERSION. Binary within zip.
-    curl -fsSL "https://github.com/dalance/procs/releases/download/v${PROCS_VERSION}/procs-v${PROCS_VERSION}-${PROCS_ARCH}.zip" \
+    curl -fsSL --retry 5 --retry-delay 2 --retry-connrefused --retry-all-errors "https://github.com/dalance/procs/releases/download/v${PROCS_VERSION}/procs-v${PROCS_VERSION}-${PROCS_ARCH}.zip" \
     -o /tmp/rust-cli/procs.zip; \
     mkdir -p /tmp/rust-cli/procs-extract; \
     unzip -q /tmp/rust-cli/procs.zip -d /tmp/rust-cli/procs-extract; \
@@ -567,7 +575,7 @@ RUN --mount=type=cache,id=apt-cache,target=/var/cache/apt,sharing=locked \
     curl \
     gnupg \
     && install -d -m 0755 /etc/apt/keyrings \
-    && curl -fsSL https://packages.microsoft.com/keys/microsoft.asc \
+    && curl -fsSL --retry 5 --retry-delay 2 --retry-connrefused --retry-all-errors https://packages.microsoft.com/keys/microsoft.asc \
     | gpg --dearmor > /etc/apt/keyrings/microsoft.gpg \
     && chmod 0644 /etc/apt/keyrings/microsoft.gpg \
     && echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/microsoft.gpg] https://packages.microsoft.com/debian/12/prod bookworm main" \
@@ -649,7 +657,7 @@ RUN --mount=type=cache,id=apt-cache,target=/var/cache/apt,sharing=locked \
     curl \
     gnupg \
     && install -m 0755 -d /etc/apt/keyrings \
-    && curl -fsSL https://download.docker.com/linux/debian/gpg \
+    && curl -fsSL --retry 5 --retry-delay 2 --retry-connrefused --retry-all-errors https://download.docker.com/linux/debian/gpg \
     | gpg --dearmor -o /etc/apt/keyrings/docker.gpg \
     && chmod a+r /etc/apt/keyrings/docker.gpg \
     && echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/debian bookworm stable" \
@@ -1038,13 +1046,16 @@ RUN chmod 0444 /etc/profile.d/10-gatekeeper-nss.sh
 # Wrapper de entrypoint (arquivo fornecido pelo projeto)
 # - Este script deve ser POSIX-safe e idempotente.
 # - Ele pode ativar o ambiente NSS wrapper antes de executar o comando final.
-COPY .devcontainer/nss-gatekeeper.sh /usr/local/bin/nss-gatekeeper
-RUN chmod 0755 /usr/local/bin/nss-gatekeeper
+COPY --chmod=0755 .devcontainer/nss-gatekeeper.sh /usr/local/bin/nss-gatekeeper
 
 # Healthcheck e utilitário de JSONC (image-level, independentes do workspace)
-COPY .devcontainer/scripts/healthcheck.sh /usr/local/bin/devcontainer-healthcheck.sh
-COPY .devcontainer/scripts/jsonc-validate.cjs /usr/local/bin/jsonc-validate
-RUN chmod 0755 /usr/local/bin/devcontainer-healthcheck.sh /usr/local/bin/jsonc-validate
+COPY --chmod=0755 .devcontainer/scripts/healthcheck.sh /usr/local/bin/devcontainer-healthcheck.sh
+COPY --chmod=0755 .devcontainer/scripts/jsonc-validate.cjs /usr/local/bin/jsonc-validate
+
+# Healthcheck nativo da imagem — advisory para runtime DevContainer.
+# Mantém start gracioso via start-period generoso e delega a lógica ao script canônico.
+HEALTHCHECK --interval=30s --timeout=10s --start-period=90s --retries=3 \
+    CMD /usr/local/bin/devcontainer-healthcheck.sh || exit 1
 
 # [D] UX BASELINE (GLOBAL, READ-ONLY, INTERACTIVE-ONLY, POSIX-SAFE)
 RUN cat > /etc/profile.d/20-devcontainer-ux.sh <<'EOF'

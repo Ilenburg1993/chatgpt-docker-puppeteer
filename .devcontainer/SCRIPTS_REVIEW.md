@@ -71,7 +71,7 @@ hooks. Esta seção consolida os contratos que devem estar sincronizados em todo
 ### Observações atuais
 
 - Bastante simples e não bloqueante. Executa `make info` para coletar informações e grava status em
-  `/tmp/devcontainer-health.status` (usado pelo healthcheck?).
+      `/tmp/devcontainer-health.status` (consumido pelo `healthcheck.sh` e pelo `post-attach.sh`).
 - Usa logs informativos/avisos mas sempre sai com `0`.
 
 ### Sugestões
@@ -79,9 +79,8 @@ hooks. Esta seção consolida os contratos que devem estar sincronizados em todo
 - [ ] **Possibilidade de `exit` com erro opcional**: em alguns workflows o devcontainer pode querer
       sinalizar falha (ex: se `make info` retorna código específico). Poderia haver uma variável
       `DEVCONTAINER_START_STRICT` que, quando definida, faz o script repassar o código de `make`.
-- [ ] **Link com healthcheck**: a variável `HEALTH_STATUS_FILE` poderia ser lida pelo healthcheck
-      final para evitar duplicação de lógica; atualmente o healthcheck não a consome. Se este
-      arquivo for usado, documentar essa ligação.
+- [x] **Link com healthcheck**: o `healthcheck.sh` já consome `/tmp/devcontainer-health.status`
+      para respeitar o estado observacional emitido pelo `post-start.sh`.
 - [ ] **Incrementar verificações**: além de `make info`, poderia checar a presença de artefatos
       criados pela `post-create` (ex.: `/tmp/devcontainer-nss/passwd`) para detectar inicialização
       parcial.
@@ -123,16 +122,16 @@ O validador de variáveis está bem estruturado. Melhorias possíveis:
 
 Excelente definição de filosofia (Node é crítico, resto é avisos). Pequenas áreas de afinamento:
 
-- [ ] **Consumir /tmp/devcontainer-health.status**: para manter o estado gerado por `post-start.sh`
-      e evitar repetir checks. Ex: se a última execução marcou `degraded`, healthcheck pode propagar
-      isso.
+- [x] **Consumir /tmp/devcontainer-health.status**: implementado. O healthcheck já respeita estados
+      `fatal` / `unhealthy` como falha e trata estados advisory como warnings.
 - [ ] **Verificação de `docker`**: incluir um teste de socket para fornecer aviso se a máquina host
       não está expondo o Docker, útil para workflows com CI (especialmente agora que o post-create
       injeta grupo based on socket).
 - [ ] **Timeouts configuráveis via ENV**: `NODE` timeout, `curl` timeouts já existem mas poderiam
       ser expostos para facilitar debugging em redes lentas.
-- [ ] **Documentar no README**: indicar no healthcheck que ele é usado pelo Docker e que
-      `HEALTHCHECK` na Dockerfile está sincronizado, evitando divergência.
+- [x] **Documentar no README/arquitetura**: a documentação canônica do DevContainer agora registra
+      explicitamente que a imagem declara `HEALTHCHECK` nativo sincronizado com
+      `/usr/local/bin/devcontainer-healthcheck.sh`.
 
 ---
 

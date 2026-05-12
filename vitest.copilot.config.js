@@ -49,11 +49,13 @@ export default defineConfig({
     test: {
         globals: true,
         environment: 'node',
+        setupFiles: ['tests/support/setup.js'],
         include: [
             'tests/unit/copilot/**/*.spec.js',
             'tests/integration/copilot/**/*.spec.js',
             'tests/regression/copilot/**/*.spec.js',
         ],
+        hookTimeout: 60000,
         testTimeout: 15000,
         pool: 'forks',
         maxWorkers: process.env.VITEST_MAX_WORKERS ?? '75%',

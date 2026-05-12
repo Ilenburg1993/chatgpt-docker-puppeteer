@@ -72,7 +72,7 @@
       "REMOTE_USER": "node",
       "VCS_REF": "${localEnv:GIT_COMMIT}",
       // --- METADATA & VERSIONING ---
-      "VERSION": "5.4.0"
+      "VERSION": "1.0"
     },
     "context": "..",
     "dockerfile": "Dockerfile"
@@ -1195,7 +1195,7 @@
     "--label",
     "role=devcontainer",
     "--label",
-    "version=5.5.0"
+    "version=1.0"
   ],
   // ============================================================
   // LIFECYCLE FINALIZATION

@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// @ts-check
 /**
  * src/copilot/llm-a-conversation.mjs
  *
@@ -15,8 +16,8 @@
  * @module copilot/llm-a-conversation
  */
 
-import { alwaysAliveAgent } from './agent/always-alive.js';
-import { LlmBridgeClient } from './channel/client.js';
+import { alwaysAliveAgent } from '../src/copilot/agent/always-alive.js';
+import { LlmBridgeClient } from '../src/copilot/channel/client.js';
 
 // ─── Helpers de display ────────────────────────────────────────────────────
 
@@ -142,7 +143,7 @@ async function main() {
 
         try {
             const result = await bridge.chat(msg, {
-                onDelta: (chunk) => process.stdout.write(chunk),
+                onDelta: (/** @type {string} */ chunk) => process.stdout.write(chunk),
                 timeoutMs: 120_000,
             });
 
@@ -159,17 +160,18 @@ async function main() {
     }
 
     section('📋 Histórico Completo da Conversa');
-    bridge.history.forEach((turn_item, idx) => {
+    for (const [idx, turn_item] of bridge.history.entries()) {
         const role = turn_item.role === 'user' ? '🤖 LLM-A' : '🔵 LLM-B';
         console.log(`\n[Turno ${idx + 1}] ${role} (${new Date(turn_item.timestamp).toISOString()}):`);
         console.log(turn_item.content.substring(0, 500) + (turn_item.content.length > 500 ? '...' : ''));
-    });
+    }
 
     await alwaysAliveAgent.stop();
     console.log('\n✅ Conversa encerrada. Agente parado.');
 }
 
-main().catch((e) => {
-    console.error('ERRO FATAL:', e.message);
+main().catch((/** @type {unknown} */ e) => {
+    const errorMessage = e instanceof Error ? e.message : String(e);
+    console.error('ERRO FATAL:', errorMessage);
     process.exit(1);
 });

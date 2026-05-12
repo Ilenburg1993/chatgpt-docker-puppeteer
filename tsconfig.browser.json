@@ -7,9 +7,8 @@
     "moduleResolution": "Bundler",
     "lib": ["ES2024", "DOM", "DOM.Iterable"],
     "types": ["node"],
-    "baseUrl": ".",
     "paths": {
-      "@/*": ["src/dashboard-ui/src/*"]
+      "@/*": ["./src/dashboard-ui/src/*"]
     }
   },
   "include": [

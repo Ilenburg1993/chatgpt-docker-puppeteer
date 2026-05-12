@@ -1,6 +1,6 @@
 # Auditoria & Plano — Tooling Dockerfile + TSServer
 
-**Data**: 2026-03-08 **Status**: Executado ✅ (revisado 2026-03-08 — ESLint + typescript-eslint
+**Data**: 2026-05-11 **Status**: Executado ✅ (revisado 2026-05-11 — ESLint + typescript-eslint
 integrado)
 
 ---
@@ -9,16 +9,16 @@ integrado)
 
 ### 1.1 Ferramentas solicitadas — status pré-execução
 
-| Ferramenta            | Função                                       | Estava no Dockerfile | Ação                        |
-| --------------------- | -------------------------------------------- | -------------------- | --------------------------- |
-| `git-delta` (`delta`) | Diffs coloridos e ricos para git             | ❌ Ausente           | ✅ Adicionada (Section 6.8) |
-| `zoxide`              | `cd` inteligente com histórico               | ❌ Ausente           | ✅ Adicionada               |
-| `xh`                  | HTTP client moderno (alternativa à `curl`)   | ❌ Ausente           | ✅ Adicionada               |
-| `dust`                | Alternativa a `du` — uso de disco interativo | ❌ Ausente           | ✅ Adicionada               |
-| `sd`                  | Substituto de `sed` com sintaxe regex clara  | ❌ Ausente           | ✅ Adicionada               |
-| `bottom` (cmd: `btm`) | Monitor de sistema moderno                   | ❌ Ausente           | ✅ Adicionada               |
-| `glow`                | Renderizador de Markdown no terminal         | ❌ Ausente           | ✅ Adicionada               |
-| `procs`               | Alternativa a `ps` com filtragem rica        | ❌ Ausente           | ✅ Adicionada               |
+| Ferramenta            | Função                                       | Estava no Dockerfile | Ação                       |
+| --------------------- | -------------------------------------------- | -------------------- | -------------------------- |
+| `git-delta` (`delta`) | Diffs coloridos e ricos para git             | ❌ Ausente            | ✅ Adicionada (Section 6.8) |
+| `zoxide`              | `cd` inteligente com histórico               | ❌ Ausente            | ✅ Adicionada               |
+| `xh`                  | HTTP client moderno (alternativa à `curl`)   | ❌ Ausente            | ✅ Adicionada               |
+| `dust`                | Alternativa a `du` — uso de disco interativo | ❌ Ausente            | ✅ Adicionada               |
+| `sd`                  | Substituto de `sed` com sintaxe regex clara  | ❌ Ausente            | ✅ Adicionada               |
+| `bottom` (cmd: `btm`) | Monitor de sistema moderno                   | ❌ Ausente            | ✅ Adicionada               |
+| `glow`                | Renderizador de Markdown no terminal         | ❌ Ausente            | ✅ Adicionada               |
+| `procs`               | Alternativa a `ps` com filtragem rica        | ❌ Ausente            | ✅ Adicionada               |
 
 **Ferramentas da sessão anterior** (validadas como presentes): nasm, libzstd-dev (toolchain), lz4,
 entr, pv, jo, p7zip-full, inotify-tools (Section 6), UV_THREADPOOL_SIZE=16 (Section 8.5).
@@ -99,8 +99,8 @@ MCP Client (Claude/Copilot via MCP tools)
 
 #### VS Code TSServer — Estado (`.vscode/settings.json`)
 
-| Configuração                            | Valor                         | Status                              |
-| --------------------------------------- | ----------------------------- | ----------------------------------- |
+| Configuração                            | Valor                         | Status                             |
+| --------------------------------------- | ----------------------------- | ---------------------------------- |
 | `useSyntaxServer`                       | `"auto"`                      | ✅ Correto (fix da sessão anterior) |
 | `maxTsServerMemory`                     | 6144 MB                       | ✅ Generoso                         |
 | `watchOptions.watchFile`                | `"useFsEvents"`               | ✅ inotify (ext4)                   |
@@ -146,16 +146,16 @@ SD_VERSION, BOTTOM_VERSION, GLOW_VERSION, PROCS_VERSION
 Instaladas via binary download de GitHub Releases com verificação de checksum. Todas com suporte
 `amd64` e `arm64`.
 
-| Comando  | Ferramenta | ARG                    |
-| -------- | ---------- | ---------------------- |
-| `delta`  | git-delta  | `DELTA_VERSION=0.17.0` |
-| `zoxide` | zoxide     | `ZOXIDE_VERSION=0.9.4` |
-| `xh`     | xh         | `XH_VERSION=0.22.2`    |
-| `dust`   | dust       | `DUST_VERSION=1.0.0`   |
-| `sd`     | sd         | `SD_VERSION=1.0.0`     |
-| `btm`    | bottom     | `BOTTOM_VERSION=0.9.6` |
-| `glow`   | glow       | `GLOW_VERSION=1.5.1`   |
-| `procs`  | procs      | `PROCS_VERSION=0.14.5` |
+| Comando  | Ferramenta | ARG                     |
+| -------- | ---------- | ----------------------- |
+| `delta`  | git-delta  | `DELTA_VERSION=0.19.2`  |
+| `zoxide` | zoxide     | `ZOXIDE_VERSION=0.9.9`  |
+| `xh`     | xh         | `XH_VERSION=0.25.3`     |
+| `dust`   | dust       | `DUST_VERSION=1.2.4`    |
+| `sd`     | sd         | `SD_VERSION=1.1.0`      |
+| `btm`    | bottom     | `BOTTOM_VERSION=0.12.3` |
+| `glow`   | glow       | `GLOW_VERSION=2.1.2`    |
+| `procs`  | procs      | `PROCS_VERSION=0.14.11` |
 
 > Para atualizar: sobreponha os ARGs no `docker build --build-arg` ou edite os defaults no topo do
 > Dockerfile.
@@ -250,8 +250,8 @@ gate captura qualquer divergência no próximo `docker build`.
 
 | Check                               | Resultado |
 | ----------------------------------- | --------- |
-| `hadolint .devcontainer/Dockerfile` | ✅ exit 0 |
-| `node --check tsserver-daemon.mjs`  | ✅ exit 0 |
+| `hadolint .devcontainer/Dockerfile` | ✅ exit 0  |
+| `node --check tsserver-daemon.mjs`  | ✅ exit 0  |
 
 ---
 
@@ -293,11 +293,11 @@ Sistema C: ESLint + typescript-eslint → regras com type-info em CI e pre-commi
 
 ### 5.2 Stack instalada
 
-| Pacote              | Versão  | Instalação                              |
-| ------------------- | ------- | --------------------------------------- |
-| `typescript-eslint` | 8.55.0  | `--legacy-peer-deps` (ESLint 10 compat) |
-| `eslint`            | ^10.0.0 | Já existente                            |
-| `typescript`        | ^5.9.3  | Já existente                            |
+| Pacote              | Versão  | Instalação                                |
+| ------------------- | ------- | ----------------------------------------- |
+| `typescript-eslint` | 8.55.0  | `--legacy-peer-deps` (ESLint 10 compat)   |
+| `eslint`            | ^10.0.0 | Já existente                              |
+| `typescript`        | ^6.0.3  | Alinhado com o workspace e o DevContainer |
 
 > **Nota de compatibilidade**: `typescript-eslint@8.55.0` declara peer
 > `eslint: "^8.57.0 || ^9.0.0"`. ESLint 10 não está listado mas é compatível — usa
@@ -305,13 +305,13 @@ Sistema C: ESLint + typescript-eslint → regras com type-info em CI e pre-commi
 
 ### 5.3 Arquitetura do `eslint.config.mjs` (8 zonas)
 
-| Zona | `files`                                       | Type-check                | Finalidade                              |
-| ---- | --------------------------------------------- | ------------------------- | --------------------------------------- |
-| 0    | global                                        | —                         | ignores globais                         |
+| Zona | `files`                                       | Type-check               | Finalidade                              |
+| ---- | --------------------------------------------- | ------------------------ | --------------------------------------- |
+| 0    | global                                        | —                        | ignores globais                         |
 | 1    | `**/*.{js,mjs,ts,mts}`                        | ❌ (sem projectService)   | base: parser TS + recommended           |
 | 2    | `src/**/*.{js,mjs}`                           | ✅ `projectService: true` | regras com type-info                    |
-| 3    | `src/{core,kernel,logic,nerv}/**`             | herda zona 2              | core estrito (só `_` como descarte)     |
-| 4    | `src/**` (exceto core)                        | herda zona 2              | backend (nomes arquiteturais tolerados) |
+| 3    | `src/{core,kernel,logic,nerv}/**`             | herda zona 2             | core estrito (só `_` como descarte)     |
+| 4    | `src/**` (exceto core)                        | herda zona 2             | backend (nomes arquiteturais tolerados) |
 | 5    | `src/driver/**`, `src/infra/browser_pool/**`… | ❌ `disableTypeChecked`   | browser context (globals.browser)       |
 | 6    | `tests/**`, `**/*.spec.*`                     | ❌ `disableTypeChecked`   | testes relaxados                        |
 | 7    | `scripts/**`, `*.config.*`                    | ❌ `disableTypeChecked`   | automação (warnings)                    |
@@ -346,8 +346,8 @@ Já estava: `eslint.validate: ["javascript", ..., "typescript", ...]`, `eslint.u
 
 ### 5.7 Verificações aplicadas
 
-| Check                                     | Resultado          |
-| ----------------------------------------- | ------------------ |
+| Check                                     | Resultado         |
+| ----------------------------------------- | ----------------- |
 | `hadolint .devcontainer/Dockerfile`       | ✅ exit 0          |
 | `node --check tsserver-daemon.mjs`        | ✅ exit 0          |
 | `node --check eslint.config.mjs`          | ✅ exit 0          |

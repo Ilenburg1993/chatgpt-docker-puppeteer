@@ -5,9 +5,8 @@
     "strict": true,
     "verbatimModuleSyntax": true,
     "allowImportingTsExtensions": true,
-    "baseUrl": ".",
     "paths": {
-      "@/*": ["src/*"]
+      "@/*": ["./src/*"]
     },
     "noEmit": true
   },

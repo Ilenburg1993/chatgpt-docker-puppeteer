@@ -15,7 +15,9 @@ import { io as socketClient } from 'socket.io-client';
 import { startCopilotServer } from '../src/copilot/server/index.js';
 
 const TEST_PORT = 13010;
+/** @type {Awaited<ReturnType<typeof startCopilotServer>> | undefined} */
 let server;
+/** @type {import('socket.io-client').Socket | undefined} */
 let socket;
 let exitCode = 0;
 
@@ -36,22 +38,23 @@ try {
         console.log('[socket-smoke] Todos os checks passaram ✅ (modo sem socket)');
     } else {
         await new Promise((resolve, reject) => {
-            socket = socketClient(`http://127.0.0.1:${TEST_PORT}/copilot`, {
+            const client = socketClient(`http://127.0.0.1:${TEST_PORT}/copilot`, {
                 timeout: 4000,
                 reconnection: false,
             });
+            socket = client;
 
-            socket.on('connect', () => {
+            client.on('connect', () => {
                 console.log('[socket-smoke] Socket /copilot conectado ✅');
-                socket.emit('sessions:list', { limit: 5 });
+                client.emit('sessions:list', { limit: 5 });
             });
 
-            socket.on('sessions:list:result', (/** @type {{ sessions: unknown[] }} */ data) => {
+            client.on('sessions:list:result', (/** @type {{ sessions: unknown[] }} */ data) => {
                 console.log('[socket-smoke] sessions:list OK —', data.sessions.length, 'sessões');
                 resolve(undefined);
             });
 
-            socket.on('connect_error', (/** @type {Error} */ err) => {
+            client.on('connect_error', (/** @type {Error} */ err) => {
                 reject(new Error(`Conexão socket falhou: ${err.message}`));
             });
 

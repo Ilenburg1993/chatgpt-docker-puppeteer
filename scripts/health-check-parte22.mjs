@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// @ts-check
 /**
  * scripts/health-check-parte22.mjs Verificação consolidada dos critérios PARTE-22 — critérios rigorosos Score máximo:
  * 100 pontos distribuídos em 12 critérios C1-C12
@@ -12,6 +13,16 @@ import { existsSync } from 'fs';
 const argv = process.argv.slice(2);
 const jsonOutput = argv.includes('--json');
 
+/**
+ * @typedef {object} HealthCheckResult
+ * @property {string} label
+ * @property {number} weight
+ * @property {number} score
+ * @property {string} detail
+ * @property {boolean} pass
+ */
+
+/** @type {Record<string, HealthCheckResult>} */
 const results = {};
 let totalScore = 0;
 const maxScore = 100;
@@ -31,7 +42,8 @@ function check(id, label, weight, fn) {
         results[id] = { label, weight, score: capped, detail, pass: capped >= weight };
         totalScore += capped;
     } catch (e) {
-        results[id] = { label, weight, score: 0, detail: `ERROR: ${e.message}`, pass: false };
+        const errorMessage = e instanceof Error ? e.message : String(e);
+        results[id] = { label, weight, score: 0, detail: `ERROR: ${errorMessage}`, pass: false };
     }
 }
 
@@ -42,7 +54,7 @@ function check(id, label, weight, fn) {
  * @returns {string}
  */
 function sh(cmd) {
-    return execSync(cmd, { encoding: 'utf8', shell: true, stdio: ['pipe', 'pipe', 'pipe'] }).trim();
+    return execSync(cmd, { encoding: 'utf8', stdio: 'pipe' }).trim();
 }
 
 // ─── C1: Zero god files >350 LoC ────────────────────────────────────────────

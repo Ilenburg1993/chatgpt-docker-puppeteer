@@ -65,7 +65,7 @@ function moduleName(filePath) {
     const rel = path.relative(SRC_DIR, filePath);
     const parts = rel.split(path.sep);
     // Use the first directory as the module group
-    return parts.length > 1 ? parts[0] : 'root';
+    return parts.length > 1 ? (parts[0] ?? 'root') : 'root';
 }
 
 const EMIT_RE = /\.emit\(\s*(?:['"]([^'"]+)['"]|\{\s*type:\s*['"]([^'"]+)['"])/g;
