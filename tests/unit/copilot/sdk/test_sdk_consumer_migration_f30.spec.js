@@ -47,13 +47,21 @@ describe('F146 — tools/ usa #copilot/sdk para createTool', () => {
 
 // ─── F147: bridges/ usa barrel ─────────────────────────────────────────────
 
-describe('F147 — bridges/ usa barrel para onSessionEvent e createTool', () => {
+describe('F147 — bridges/ converge para a factory canônica sem bypass de SDK', () => {
     it('mcp-tool-bridge.js não importa de #copilot/sdk/tools', () => {
         expect(src('bridges/mcp-tool-bridge.js')).not.toContain("from '#copilot/sdk/tools'");
     });
 
-    it('mcp-tool-bridge.js importa createTool de #copilot/sdk', () => {
-        expect(src('bridges/mcp-tool-bridge.js')).toMatch(/import\s*\{[^}]*createTool[^}]*\}\s*from\s*'#copilot\/sdk'/);
+    it('mcp-tool-bridge.js não importa createTool de #copilot/sdk', () => {
+        expect(src('bridges/mcp-tool-bridge.js')).not.toMatch(
+            /import\s*\{[^}]*createTool[^}]*\}\s*from\s*'#copilot\/sdk'/,
+        );
+    });
+
+    it('mcp-tool-bridge.js importa buildTool da factory canônica', () => {
+        expect(src('bridges/mcp-tool-bridge.js')).toMatch(
+            /import\s*\{[^}]*buildTool[^}]*\}\s*from\s*'#copilot\/tools'/,
+        );
     });
 
     // nerv-bridge.js removido em L36 — testes migrados

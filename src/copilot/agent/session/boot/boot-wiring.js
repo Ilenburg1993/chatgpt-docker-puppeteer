@@ -49,6 +49,8 @@ import {
  * @typedef {import('../lifecycle/keepalive.js').SessionKeepalive} SessionKeepalive
  *
  * @typedef {import('../../dialog/orchestrators/loop-manager.js').DialogLoopManager} DialogLoopManager
+ *
+ * @typedef {import('../../ports/mcp-port.js').AgentMcpCapability} AgentMcpCapability
  */
 
 /**
@@ -95,20 +97,8 @@ import {
  * @property {() => { boots: number; resumesWithPR: number; resumesZeroPR: number; totalPR: number } | null} getDialogPrMetrics
  * @property {(task: Promise<unknown>, meta?: { label?: string; description?: string }) => Promise<void>} trackBackgroundTask
  *   — Tracker central de tarefas em background do agente
- * @property {() => {
- *     startAutoReconnect: (
- *         onTools: (tools: import('#copilot/sdk/types').Tool[]) => void,
- *         intervalMs: number,
- *     ) => () => void;
- * } | null} [getMcpBridgeSnapshot]
- * @property {({
- *           startAutoReconnect: (
- *               onTools: (tools: import('#copilot/sdk/types').Tool[]) => void,
- *               intervalMs: number,
- *           ) => () => void;
- *       } | null)
- *     | undefined} mcpBridge
- *   — Ponte MCP injetável (F69)
+ * @property {() => AgentMcpCapability | null} [getMcpBridgeSnapshot]
+ * @property {AgentMcpCapability | null | undefined} mcpBridge — Ponte MCP injetável (F69)
  */
 
 /**

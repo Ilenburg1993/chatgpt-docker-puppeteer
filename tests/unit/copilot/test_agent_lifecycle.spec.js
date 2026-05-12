@@ -142,6 +142,11 @@ describe('agent-lifecycle › source contracts', () => {
         assert.ok(src.includes("'agent.start.rollback'"), 'start report deve medir rollback em falha parcial');
     });
 
+    it('agentStart resolve e fixa a capability MCP por runtime antes de iniciar a sessão', () => {
+        assert.ok(src.includes('resolveAgentMcpCapability('), 'agentStart deve resolver a capability MCP via porta');
+        assert.ok(src.includes('ctx.mcpBridge = resolveAgentMcpCapability('), 'runtime deve fixar bridge MCP própria');
+    });
+
     it('wireAgentSessionRuntime instala handles de cleanup antes de propagar erro do boot wiring', () => {
         const unsubsPos = src.indexOf('ctx.setSessionEventUnsubscribers(bootResult.unsubs)');
         const errorPos = src.indexOf('if (bootResult.error)');

@@ -2,7 +2,7 @@
 
 > **Data**: 2026-05-10
 > **Base externa analisada**: `2026-05-10-AUDITORIA-TOOLS.md` (tratada como evidência externa, não fonte de verdade)
-> **Status**: Plano mestre ativo (execução incremental)
+> **Status**: Plano mestre ativo (execução incremental; rodada ampla de 2026-05-12 consolidada)
 
 ---
 
@@ -32,7 +32,7 @@ Reconstruir `src/copilot/tools/` como um subsistema canônico, com:
 
 > **Nota de evolução**: esta seção captura o snapshot inicial de 2026-05-10. Parte dos itens abaixo já mudou de estado após o hardening e a revalidação de 2026-05-11. Ver `2026-05-11-VALIDACAO-CLAIMS-EXTERNAS-DELTA.md` para o delta pós-estabilização.
 
-### Revalidação profunda consolidada (estado atual em 2026-05-11)
+### Revalidação profunda consolidada (estado atual em 2026-05-12)
 
 #### Já corrigidos / superados
 
@@ -46,6 +46,9 @@ Reconstruir `src/copilot/tools/` como um subsistema canônico, com:
 - `SDK-BUG-03` — overwrite silencioso no registry → corrigido.
 - `SDK-BUG-04` — falta de reset de `_toolsConfig` para testes → corrigido.
 - `OBS-BUG-03` / `SYS-GAP-04` — blind spot quantitativo de denies → **corrigido no runtime canônico do agent**.
+- `BUG-24` — MCP bridge com state module-level mutável → **corrigido** com factory de instância (`createMcpToolBridge`) + singleton compatível.
+- `BUG-25` / `SYS-GAP-15` — MCP bridge fora da factory canônica → **corrigido no eixo de factory** com convergência para `buildTool`.
+- `BUG-04` / `BUG-10` — política canônica para `Infinity` em file tools → **formalizada** como policy por ENV com defaults unbounded e truncamento explícito apenas sob configuração finita.
 
 #### Obsoletos / falso positivo no estado atual
 
@@ -61,15 +64,14 @@ Reconstruir `src/copilot/tools/` como um subsistema canônico, com:
 
 #### Ainda ativos e no backlog estrutural
 
-- `BUG-04` / `BUG-10` — política canônica para `Infinity` em file tools.
-- `BUG-24` — MCP bridge com state module-level mutável.
-- `BUG-25` / `SYS-GAP-15` — MCP bridge fora da factory canônica.
 - `SYS-GAP-11` — boundary enforcement do terminal ainda incompleto.
+- convergência final do MCP bridge para uso **injetado por runtime/sessão**, em vez de depender principalmente do singleton default exposto pelo wrapper compatível.
+- contract tests e health-checks dedicados para a nova policy finita das file tools (content/search/list/diff) ainda merecem expansão.
 
 #### Gaps adicionais encontrados na investigação
 
-- warnings recoverable do `tool-factory` ainda surgem em alguns grafos SSR/mocks de teste (`Cannot access '__vite_ssr_import_*__' before initialization`), sem quebrar execução mas produzindo ruído operacional;
-- o MCP bridge ainda permanece fora da factory canônica, embora já converse com o plano principal de métricas via `MetricsStore`.
+- warnings recoverable do `tool-factory` ainda podem surgir em grafos SSR/mocks muito específicos, embora o caminho principal esteja hoje sem warnings na suíte Copilot consolidada;
+- o MCP bridge já convergiu para a factory canônica, mas a injeção contextual por runtime ainda não substituiu totalmente o wrapper singleton default.
 
 ### Confirmados na base atual
 
@@ -161,23 +163,34 @@ Reconstruir `src/copilot/tools/` como um subsistema canônico, com:
   - `tool-stats` agora expõe `blocked` / `lastBlockedIso` por tool;
   - `get_tool_health` agora expõe `totalBlocked`.
 
-### B. Próximo lote de transformação ampla
+### B. Fechado nesta rodada ampla (2026-05-12)
 
-1. **Decisão arquitetural para limites `Infinity` em file tools**
-  - alternativas válidas:
-    - manter liberdade plena com risco explícito;
-    - limites configuráveis por ENV;
-    - negociação por domínio/streaming.
+1. **Política canônica para `Infinity` em file tools formalizada**
+  - decisão adotada: **policy por ENV com defaults unbounded**;
+  - variáveis finitas ativam truncamento explícito e observável no boundary das tools;
+  - default preserva o princípio LLM-B first.
 
-2. **Encapsular estado do MCP bridge por instância/contexto**
-  - remover `_mcpHealth`, `_mcpCircuitOpen`, `_bootAttemptCount` de module scope;
-  - preparar a ponte para múltiplas sessões/runtime isolation.
+2. **Estado do MCP bridge encapsulado por instância/contexto**
+  - introduzida factory `createMcpToolBridge()`;
+  - wrapper singleton default preservado para backward compatibility;
+  - dependencies default ficaram lazy para reduzir acoplamento de import/mocks.
 
-3. **Trazer MCP bridge para a superfície canônica de factory/telemetria**
-  - reduzir o tier paralelo de qualidade entre MCP tools e tools internas.
+3. **MCP bridge trazido para a superfície canônica de factory**
+  - criação de tools MCP agora converge para `buildTool` via barrel canônico `#copilot/tools`;
+  - compatibilidade pública mantida (`buildMcpTools`, `listMcpTools`, `getMcpStatus`, `startMcpAutoReconnect`).
 
-4. **Reduzir warnings TDZ-safe na normalização de parâmetros sob SSR/mocks**
-  - não é bug funcional hoje, mas é ruído de arquitetura/testabilidade e merece hardening.
+### C. Próximo lote de transformação ampla
+
+1. **Boundary enforcement do terminal**
+  - elevar a proteção arquitetural além do estado atual;
+  - preparar endurecimento progressivo de lint/contracts.
+
+2. **Expandir ainda mais contract tests da policy finita das file tools**
+  - completar cobertura também para `search_in_files` e `workspace_symbol_search`;
+  - validar defaults unbounded explicitamente como contrato arquitetural.
+
+3. **Reduzir ainda mais warnings TDZ-safe residuais fora do caminho principal**
+  - não é bug funcional no fluxo validado, mas continua relevante para robustez de grafos SSR/mocks extremos.
 
 ---
 
@@ -227,4 +240,10 @@ Reconstruir `src/copilot/tools/` como um subsistema canônico, com:
 - ✅ 2026-05-11: blind spot quantitativo de denies fechado no runtime canônico do agent (`hook-port` + `tool-stats` + `get_tool_health`).
 - ✅ 2026-05-11: `npm run typecheck:strict:tests.unit` voltou a verde após saneamento tipado das suítes de apoio no escopo Copilot.
 - ✅ 2026-05-11: owner único da telemetria de tools consolidado (`tool-stats` canônico + `MetricsStore` delegado + remoção de writers duplicados em terminal/collectors/shell + UX do `/tools` alinhada).
-- 🔄 Próximo: decidir a política canônica para limites `Infinity`, encapsular o state do MCP bridge e trazer o MCP bridge para a surface canônica de factory.
+- ✅ 2026-05-12: política de saída das file tools formalizada como ENV policy-driven com defaults unbounded (`COPILOT_FILE_TOOLS_MAX_*`).
+- ✅ 2026-05-12: `src/copilot/bridges/mcp-tool-bridge.js` migrado para factory canônica (`buildTool`) e encapsulado por instância (`createMcpToolBridge`).
+- ✅ 2026-05-12: dependências default do MCP bridge tornadas lazy para reduzir acoplamento com mocks e grafos de importação.
+- ✅ 2026-05-12: runtime do agent passou a materializar uma capability MCP canônica por instância via `agent/ports/mcp-port.js`, consumida por `session-setup` e `boot-runtime-bind` sem fallbacks espalhados.
+- ✅ 2026-05-12: contract tests finitos adicionados para a policy das file tools (`read_file_content`, `list_directory`, `diff_files`) com validação de metadados de truncamento.
+- ✅ 2026-05-12: rodada ampla revalidada com `npm run test:copilot`, `npm run typecheck:strict:all` e `npm run lint` verdes.
+- 🔄 Próximo: endurecer o boundary enforcement do terminal, completar a cobertura contratual da policy finita das file tools e reduzir warnings TDZ-safe residuais.

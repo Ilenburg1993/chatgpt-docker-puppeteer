@@ -11,15 +11,18 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vite
 
 // ─── Mocks ────────────────────────────────────────────────────────────────────
 
-vi.mock('#copilot/config/env', () => ({
-    COPILOT_LOG_DIR: '/tmp/test-metrics',
-    COPILOT_METRICS_SNAPSHOT_INTERVAL: 0, // desabilita snapshot automático
-
-    COPILOT_MCP_SERVERS: '',
-    COPILOT_CUSTOM_AGENTS: '',
-    COPILOT_DISABLED_AGENTS: '',
-    COPILOT_OPERATIONAL_PROFILE: 'production',
-}));
+vi.mock('#copilot/config/env', async (importOriginal) => {
+    const actual = /** @type {Record<string, unknown>} */ (await importOriginal());
+    return {
+        ...actual,
+        COPILOT_LOG_DIR: '/tmp/test-metrics',
+        COPILOT_METRICS_SNAPSHOT_INTERVAL: 0, // desabilita snapshot automático
+        COPILOT_MCP_SERVERS: '',
+        COPILOT_CUSTOM_AGENTS: '',
+        COPILOT_DISABLED_AGENTS: '',
+        COPILOT_OPERATIONAL_PROFILE: 'production',
+    };
+});
 
 vi.mock('node:fs/promises', () => ({
     appendFile: vi.fn(async () => {}),

@@ -14,7 +14,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'vitest';
 
-import { buildMcpTools, listMcpTools } from '../../../src/copilot/bridges/mcp-tool-bridge.js';
+import { buildMcpTools, createMcpToolBridge, listMcpTools } from '../../../src/copilot/bridges/mcp-tool-bridge.js';
 
 // ---------------------------------------------------------------------------
 // listMcpTools — sem servidor (comportamento gracioso)
@@ -117,5 +117,39 @@ describe('mcp-tool-bridge › smoke tests', () => {
         const exports = Object.keys(mod);
         assert.ok(exports.includes('listMcpTools'), 'deve exportar listMcpTools');
         assert.ok(exports.includes('buildMcpTools'), 'deve exportar buildMcpTools');
+    });
+
+    it('createMcpToolBridge é exportada como factory de instância', async () => {
+        const mod = await import('../../../src/copilot/bridges/mcp-tool-bridge.js');
+        assert.equal(typeof mod.createMcpToolBridge, 'function');
+    });
+});
+
+describe('mcp-tool-bridge › instance isolation', () => {
+    it('mantém estado de health isolado por instância', async () => {
+        const bridgeA = createMcpToolBridge({
+            isPortOpenFn: async () => false,
+            logFn: () => {},
+            now: () => 1,
+        });
+        const bridgeB = createMcpToolBridge({
+            isPortOpenFn: async () => false,
+            logFn: () => {},
+            now: () => 2,
+        });
+
+        const initialB = bridgeB.getMcpStatus();
+        assert.equal(initialB.lastCheckMs, null);
+        assert.equal(initialB.circuitOpen, false);
+
+        await bridgeA.buildMcpTools();
+
+        const statusA = bridgeA.getMcpStatus();
+        const statusB = bridgeB.getMcpStatus();
+
+        assert.equal(statusA.circuitOpen, true, 'instância A deve abrir circuit quando a porta está fechada');
+        assert.equal(statusA.lastCheckMs, 1, 'instância A deve refletir seu relógio próprio');
+        assert.equal(statusB.lastCheckMs, null, 'instância B não deve herdar health da instância A');
+        assert.equal(statusB.circuitOpen, false, 'instância B deve permanecer intocada');
     });
 });

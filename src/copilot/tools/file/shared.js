@@ -21,17 +21,63 @@ export const execFileAsync = promisify(execFile);
 /** Raiz canonica do workspace definida pelo boot. */
 export const WORKSPACE_ROOT = BOOT_WORKSPACE_ROOT;
 
-/** Limite informativo histórico de bytes para read_file_content. Não bloqueia nem trunca operações da LLM-B. */
-export const MAX_CONTENT_BYTES = Number.POSITIVE_INFINITY;
+const FILE_TOOL_LIMIT_ENV_KEYS = /** @type {const} */ ({
+    maxContentBytes: 'COPILOT_FILE_TOOLS_MAX_CONTENT_BYTES',
+    maxSearchOutputBytes: 'COPILOT_FILE_TOOLS_MAX_SEARCH_OUTPUT_BYTES',
+    maxListEntries: 'COPILOT_FILE_TOOLS_MAX_LIST_ENTRIES',
+    maxDiffOutputBytes: 'COPILOT_FILE_TOOLS_MAX_DIFF_OUTPUT_BYTES',
+});
 
-/** Limite informativo histórico de bytes para search_in_files. Não bloqueia nem trunca operações da LLM-B. */
-export const MAX_SEARCH_OUTPUT = Number.POSITIVE_INFINITY;
+/**
+ * @param {string} envKey
+ * @returns {number}
+ */
+function readConfiguredLimitFromEnv(envKey) {
+    const raw = process.env[envKey];
+    if (raw === undefined || raw.trim() === '') return Number.POSITIVE_INFINITY;
+    const normalized = raw.trim().toLowerCase();
+    if (
+        normalized === 'infinity' ||
+        normalized === 'inf' ||
+        normalized === 'unbounded' ||
+        normalized === 'unlimited' ||
+        normalized === 'none'
+    ) {
+        return Number.POSITIVE_INFINITY;
+    }
+    const parsed = Number(raw);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : Number.POSITIVE_INFINITY;
+}
 
-/** Limite informativo histórico de entradas para list_directory. Não bloqueia operações da LLM-B. */
-export const MAX_LIST_ENTRIES = Number.POSITIVE_INFINITY;
+/**
+ * Política efetiva de saída das file tools.
+ *
+ * Defaults permanecem unbounded para manter o princípio LLM-B first; operadores podem ativar limites finitos via ENV
+ * quando desejarem uma política mais conservadora.
+ */
+export const FILE_TOOLS_OUTPUT_POLICY = Object.freeze({
+    maxContentBytes: readConfiguredLimitFromEnv(FILE_TOOL_LIMIT_ENV_KEYS.maxContentBytes),
+    maxSearchOutputBytes: readConfiguredLimitFromEnv(FILE_TOOL_LIMIT_ENV_KEYS.maxSearchOutputBytes),
+    maxListEntries: readConfiguredLimitFromEnv(FILE_TOOL_LIMIT_ENV_KEYS.maxListEntries),
+    maxDiffOutputBytes: readConfiguredLimitFromEnv(FILE_TOOL_LIMIT_ENV_KEYS.maxDiffOutputBytes),
+});
 
-/** Limite informativo histórico de bytes para diff_files. Não bloqueia nem trunca operações da LLM-B. */
-export const MAX_DIFF_OUTPUT = Number.POSITIVE_INFINITY;
+/**
+ * Limite efetivo de bytes para read_file_content.
+ *
+ * Default: `Infinity` (sem truncamento). Quando configurado via ENV para valor finito, a tool trunca a saída de forma
+ * explícita e observável.
+ */
+export const MAX_CONTENT_BYTES = FILE_TOOLS_OUTPUT_POLICY.maxContentBytes;
+
+/** Limite efetivo de bytes para search_in_files / workspace_symbol_search. Default: `Infinity`. */
+export const MAX_SEARCH_OUTPUT = FILE_TOOLS_OUTPUT_POLICY.maxSearchOutputBytes;
+
+/** Limite efetivo de entradas para list_directory. Default: `Infinity`. */
+export const MAX_LIST_ENTRIES = FILE_TOOLS_OUTPUT_POLICY.maxListEntries;
+
+/** Limite efetivo de bytes para diff_files. Default: `Infinity`. */
+export const MAX_DIFF_OUTPUT = FILE_TOOLS_OUTPUT_POLICY.maxDiffOutputBytes;
 
 // MELHORIA-10 (fix): verificação lazy da disponibilidade de ripgrep (cache single-check)
 /** @type {boolean | null} */
@@ -133,4 +179,62 @@ export function concatChunks(chunks) {
 export function truncateBuffer(buf, maxBytes) {
     if (buf.length <= maxBytes) return buf;
     return buf.subarray(0, maxBytes);
+}
+
+/**
+ * Trunca texto UTF-8 de forma segura quando uma política finita estiver ativa.
+ *
+ * @param {string} text
+ * @param {number} maxBytes
+ * @param {string} [notice]
+ * @returns {{ text: string; truncated: boolean; originalBytes: number; limitBytes: number | null }}
+ */
+export function truncateUtf8Text(text, maxBytes, notice) {
+    const normalized = String(text ?? '');
+    const originalBytes = Buffer.byteLength(normalized, 'utf8');
+    if (!Number.isFinite(maxBytes) || maxBytes <= 0 || originalBytes <= maxBytes) {
+        return {
+            text: normalized,
+            truncated: false,
+            originalBytes,
+            limitBytes: Number.isFinite(maxBytes) && maxBytes > 0 ? maxBytes : null,
+        };
+    }
+
+    const bytes = Buffer.from(normalized, 'utf8').subarray(0, maxBytes);
+    const safe = new TextDecoder('utf-8', { fatal: false }).decode(bytes).replace(/\uFFFD+$/, '');
+    const suffix = notice && notice.trim() ? notice : '\n\n⚠️ [output truncated by file-tools policy]';
+    return {
+        text: `${safe}${suffix}`,
+        truncated: true,
+        originalBytes,
+        limitBytes: maxBytes,
+    };
+}
+
+/**
+ * Aplica limite finito de entries de forma explícita.
+ *
+ * @template T
+ * @param {T[]} entries
+ * @param {number} maxEntries
+ * @returns {{ entries: T[]; truncated: boolean; totalEntries: number; limitEntries: number | null }}
+ */
+export function applyEntryLimit(entries, maxEntries) {
+    const safeEntries = Array.isArray(entries) ? entries : [];
+    const totalEntries = safeEntries.length;
+    if (!Number.isFinite(maxEntries) || maxEntries <= 0 || totalEntries <= maxEntries) {
+        return {
+            entries: safeEntries,
+            truncated: false,
+            totalEntries,
+            limitEntries: Number.isFinite(maxEntries) && maxEntries > 0 ? maxEntries : null,
+        };
+    }
+    return {
+        entries: safeEntries.slice(0, maxEntries),
+        truncated: true,
+        totalEntries,
+        limitEntries: maxEntries,
+    };
 }

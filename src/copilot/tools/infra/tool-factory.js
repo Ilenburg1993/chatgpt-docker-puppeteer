@@ -67,6 +67,7 @@
  */
 
 import { normalizeToolParametersSchema, createTool as sdkCreateTool } from '#copilot/sdk';
+import { log as toolsLog } from './logger.js';
 
 /**
  * Determina se o erro permite fallback para tool plain (ciclo/TDZ/export indisponível).
@@ -157,7 +158,7 @@ function createTool(options) {
         if (isRecoverableToolFactoryError(err)) {
             logToolFactory(
                 'WARN',
-                `[tool-factory] Fallback plain-tool ativado para '${options.name}' após erro recuperável: ${err instanceof Error ? err.message : String(err)}`,
+                `Fallback plain-tool ativado para '${options.name}' após erro recuperável: ${err instanceof Error ? err.message : String(err)}`,
             );
             return validateBuiltTool(options.name, plainTool);
         }
@@ -188,7 +189,15 @@ function safeSdkCreateTool(options) {
  * @param {string} message
  */
 function logToolFactory(level, message) {
-    process.stderr.write(`[sdk] ${String(level)}: ${String(message)}\n`);
+    try {
+        if (typeof toolsLog === 'function') {
+            toolsLog(level, `[tool-factory] ${String(message)}`);
+        }
+    } catch (error) {
+        if (!isRecoverableToolFactoryError(error)) {
+            throw error;
+        }
+    }
 }
 
 /**
@@ -217,6 +226,9 @@ function logToolFactory(level, message) {
  */
 function normalizeParameters(parameters, toolName = 'unknown') {
     try {
+        if (parameters === undefined) {
+            return undefined;
+        }
         if (typeof normalizeToolParametersSchema !== 'function') {
             if (parameters && typeof parameters === 'object' && !Array.isArray(parameters)) {
                 return /** @type {Record<string, unknown>} */ (parameters);
@@ -231,7 +243,7 @@ function normalizeParameters(parameters, toolName = 'unknown') {
         const message = err instanceof Error ? err.message : String(err);
         logToolFactory(
             'WARN',
-            `[tool-factory] Falha ao normalizar parâmetros de '${toolName}': ${message}. Tool será registrada sem parâmetros.`,
+            `Falha ao normalizar parâmetros de '${toolName}': ${message}. Tool será registrada sem parâmetros.`,
         );
         return undefined;
     }

@@ -15,6 +15,8 @@
  * @typedef {import('#copilot/sdk/types').CopilotSession} CopilotSession
  *
  * @typedef {import('#copilot/sdk/types').CopilotClient} CopilotClient
+ *
+ * @typedef {import('./ports/mcp-port.js').AgentMcpCapability} AgentMcpCapability
  */
 
 // ─── Agent Status ─────────────────────────────────────────────────────────────
@@ -92,11 +94,8 @@
  * @typedef {Object} AgentConfigState
  * @property {string} model - Modelo atual em uso.
  * @property {'low' | 'medium' | 'high' | 'xhigh' | undefined} reasoningEffort - Nível atual de reasoning.
- * @property {{
- *     buildTools: () => Promise<import('#copilot/sdk/types').Tool<any>[]>;
- *     buildConfig: () => Record<string, unknown>;
- *     startAutoReconnect: (onTools: (tools: import('#copilot/sdk/types').Tool<any>[]) => void) => () => void;
- * } | null} mcpBridge
+ * @property {AgentMcpCapability | null} mcpBridge
+ *
  *   - Dependências MCP injetáveis.
  */
 

@@ -26,7 +26,14 @@ import { warmReadThroughContext } from '../../infra/io-prefetch.js';
 import { scanDirectory } from '../../infra/io-scanner.js';
 import { log } from '../infra/logger.js';
 import { buildTool, withSkipPermission } from '../infra/tool-factory.js';
-import { WORKSPACE_ROOT, validatePath } from './shared.js';
+import {
+    applyEntryLimit,
+    FILE_TOOLS_OUTPUT_POLICY,
+    truncateBuffer,
+    truncateUtf8Text,
+    validatePath,
+    WORKSPACE_ROOT,
+} from './shared.js';
 
 /**
  * Tamanho mínimo em bytes para disparar warm read-through context em arquivos de texto.
@@ -78,14 +85,28 @@ export const readFileContentTool = buildTool({
 
             if (encoding === 'base64') {
                 const raw = await readBytes(resolved);
+                const limitedBuffer = truncateBuffer(raw.content, FILE_TOOLS_OUTPUT_POLICY.maxContentBytes);
+                const truncated = limitedBuffer.length < raw.content.length;
+                if (truncated) {
+                    log(
+                        'INFO',
+                        `[copilot/read_file_content] conteúdo binário truncado por política (${FILE_TOOLS_OUTPUT_POLICY.maxContentBytes} bytes) em ${resolved}`,
+                    );
+                }
                 return withIoMeta(
                     {
                         success: true,
                         path: resolved,
                         size: stats.size,
                         encoding: 'base64',
-                        content: raw.content.toString('base64'),
-                        truncated: false,
+                        content: limitedBuffer.toString('base64'),
+                        truncated,
+                        ...(truncated
+                            ? {
+                                  configuredLimitBytes: FILE_TOOLS_OUTPUT_POLICY.maxContentBytes,
+                                  originalContentBytes: raw.content.length,
+                              }
+                            : {}),
                     },
                     raw.io,
                 );
@@ -102,7 +123,20 @@ export const readFileContentTool = buildTool({
                       })
                     : null;
             const sanitized = sanitizeIoTextOutput({ text: text.content });
-            const truncated = false;
+            const contentOutput = truncateUtf8Text(
+                sanitized.text,
+                FILE_TOOLS_OUTPUT_POLICY.maxContentBytes,
+                Number.isFinite(FILE_TOOLS_OUTPUT_POLICY.maxContentBytes)
+                    ? `\n\n⚠️ [conteúdo truncado por política COPILOT_FILE_TOOLS_MAX_CONTENT_BYTES=${FILE_TOOLS_OUTPUT_POLICY.maxContentBytes}]`
+                    : undefined,
+            );
+            const truncated = contentOutput.truncated;
+            if (truncated) {
+                log(
+                    'INFO',
+                    `[copilot/read_file_content] conteúdo truncado por política (${FILE_TOOLS_OUTPUT_POLICY.maxContentBytes} bytes) em ${resolved}`,
+                );
+            }
 
             return withIoMeta(
                 {
@@ -111,11 +145,17 @@ export const readFileContentTool = buildTool({
                     size: stats.size,
                     totalLines: text.totalLines,
                     returnedLines: text.returnedLines,
-                    content: sanitized.text,
+                    content: contentOutput.text,
                     readThrough,
                     sanitized: sanitized.sanitized,
                     redactions: sanitized.redactions,
                     truncated,
+                    ...(truncated
+                        ? {
+                              configuredLimitBytes: FILE_TOOLS_OUTPUT_POLICY.maxContentBytes,
+                              originalContentBytes: contentOutput.originalBytes,
+                          }
+                        : {}),
                 },
                 { ...text.io, truncated, policyVersion: sanitized.policyVersion },
             );
@@ -187,16 +227,27 @@ export const listDirectoryTool = buildTool({
                 return legacy;
             };
             const entries = scan.entries.map(toLegacyEntry);
+            const limitedEntries = applyEntryLimit(entries, FILE_TOOLS_OUTPUT_POLICY.maxListEntries);
+            if (limitedEntries.truncated) {
+                log(
+                    'INFO',
+                    `[copilot/list_directory] saída truncada por política (${FILE_TOOLS_OUTPUT_POLICY.maxListEntries} entries) em ${resolved}`,
+                );
+            }
             return withIoMeta(
                 {
                     success: true,
                     path: resolved,
-                    count: entries.length,
-                    truncated: false,
+                    count: limitedEntries.entries.length,
+                    truncated: limitedEntries.truncated,
                     scannedBudget: scan.scannedEntries,
-                    entries,
+                    totalEntries: limitedEntries.totalEntries,
+                    ...(limitedEntries.truncated
+                        ? { configuredLimitEntries: FILE_TOOLS_OUTPUT_POLICY.maxListEntries }
+                        : {}),
+                    entries: limitedEntries.entries,
                 },
-                { ...scan.io, truncated: false },
+                { ...scan.io, truncated: limitedEntries.truncated },
             );
         } catch (err) {
             return { success: false, error: toError(err).message };
@@ -254,19 +305,38 @@ export const searchInFilesTool = buildTool({
                 contextLines,
                 maxResults,
             });
+            const output = truncateUtf8Text(
+                result.output,
+                FILE_TOOLS_OUTPUT_POLICY.maxSearchOutputBytes,
+                Number.isFinite(FILE_TOOLS_OUTPUT_POLICY.maxSearchOutputBytes)
+                    ? `\n\n⚠️ [resultado truncado por política COPILOT_FILE_TOOLS_MAX_SEARCH_OUTPUT_BYTES=${FILE_TOOLS_OUTPUT_POLICY.maxSearchOutputBytes}]`
+                    : undefined,
+            );
+            if (output.truncated) {
+                log(
+                    'INFO',
+                    `[copilot/search_in_files] saída truncada por política (${FILE_TOOLS_OUTPUT_POLICY.maxSearchOutputBytes} bytes) em ${resolved}`,
+                );
+            }
             return withIoMeta(
                 {
                     success: true,
                     pattern,
                     searchPath: resolved,
-                    output: result.output,
-                    truncated: false,
+                    output: output.text,
+                    truncated: output.truncated,
                     engine: result.engine,
                     matchCount: result.matchCount,
                     sanitized: result.sanitized,
                     redactions: result.redactions,
+                    ...(output.truncated
+                        ? {
+                              configuredLimitBytes: FILE_TOOLS_OUTPUT_POLICY.maxSearchOutputBytes,
+                              originalOutputBytes: output.originalBytes,
+                          }
+                        : {}),
                 },
-                result.io,
+                { ...result.io, truncated: output.truncated },
             );
         } catch (err) {
             return { success: false, error: toError(err).message };
@@ -301,16 +371,36 @@ export const diffFilesTool = buildTool({
 
         try {
             const diff = await diffText(va.resolved, vb.resolved, { contextLines: context_lines ?? 3 });
+            const diffOutput = truncateUtf8Text(
+                diff.diff,
+                FILE_TOOLS_OUTPUT_POLICY.maxDiffOutputBytes,
+                Number.isFinite(FILE_TOOLS_OUTPUT_POLICY.maxDiffOutputBytes)
+                    ? `\n\n⚠️ [diff truncado por política COPILOT_FILE_TOOLS_MAX_DIFF_OUTPUT_BYTES=${FILE_TOOLS_OUTPUT_POLICY.maxDiffOutputBytes}]`
+                    : undefined,
+            );
+            if (diffOutput.truncated) {
+                log(
+                    'INFO',
+                    `[copilot/diff_files] diff truncado por política (${FILE_TOOLS_OUTPUT_POLICY.maxDiffOutputBytes} bytes) entre ${va.resolved} e ${vb.resolved}`,
+                );
+            }
             return withIoMeta(
                 {
                     success: true,
                     path_a: va.resolved,
                     path_b: vb.resolved,
-                    diff: diff.diff,
+                    diff: diffOutput.text,
                     identical: diff.identical,
                     engine: diff.io.engine,
+                    truncated: diffOutput.truncated,
+                    ...(diffOutput.truncated
+                        ? {
+                              configuredLimitBytes: FILE_TOOLS_OUTPUT_POLICY.maxDiffOutputBytes,
+                              originalDiffBytes: diffOutput.originalBytes,
+                          }
+                        : {}),
                 },
-                diff.io,
+                { ...diff.io, truncated: diffOutput.truncated },
             );
         } catch (err) {
             return { success: false, error: toError(err).message };
@@ -364,6 +454,19 @@ export const workspaceSymbolSearchTool = buildTool({
                 caseSensitive,
                 maxResults,
             });
+            const output = truncateUtf8Text(
+                result.output,
+                FILE_TOOLS_OUTPUT_POLICY.maxSearchOutputBytes,
+                Number.isFinite(FILE_TOOLS_OUTPUT_POLICY.maxSearchOutputBytes)
+                    ? `\n\n⚠️ [resultado truncado por política COPILOT_FILE_TOOLS_MAX_SEARCH_OUTPUT_BYTES=${FILE_TOOLS_OUTPUT_POLICY.maxSearchOutputBytes}]`
+                    : undefined,
+            );
+            if (output.truncated) {
+                log(
+                    'INFO',
+                    `[copilot/workspace_symbol_search] saída truncada por política (${FILE_TOOLS_OUTPUT_POLICY.maxSearchOutputBytes} bytes) em ${resolved}`,
+                );
+            }
 
             return withIoMeta(
                 {
@@ -372,13 +475,19 @@ export const workspaceSymbolSearchTool = buildTool({
                     kind: resolvedKind,
                     searchPath: resolved,
                     matchCount: result.matchCount,
-                    output: result.output,
+                    output: output.text,
                     sanitized: result.sanitized,
                     redactions: result.redactions,
-                    truncated: false,
+                    truncated: output.truncated,
+                    ...(output.truncated
+                        ? {
+                              configuredLimitBytes: FILE_TOOLS_OUTPUT_POLICY.maxSearchOutputBytes,
+                              originalOutputBytes: output.originalBytes,
+                          }
+                        : {}),
                     ...(result.message ? { message: result.message } : {}),
                 },
-                result.io,
+                { ...result.io, truncated: output.truncated },
             );
         } catch (err) {
             return { success: false, error: toError(err).message };

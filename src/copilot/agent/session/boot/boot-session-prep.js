@@ -18,6 +18,8 @@ import { wireSessionEvents } from '../wiring/event-wirer.js';
  * @typedef {import('../../dialog/orchestrators/loop-manager.js').DialogLoopManager} DialogLoopManager
  *
  * @typedef {import('../lifecycle/keepalive.js').SessionKeepalive} SessionKeepalive
+ *
+ * @typedef {import('../../ports/mcp-port.js').AgentMcpCapability} AgentMcpCapability
  */
 
 /**
@@ -52,19 +54,8 @@ import { wireSessionEvents } from '../wiring/event-wirer.js';
  * }) => boolean} startKeepalive
  * @property {() => { boots: number; resumesWithPR: number; resumesZeroPR: number; totalPR: number } | null} getDialogPrMetrics
  * @property {(task: Promise<unknown>, meta?: { label?: string; description?: string }) => Promise<void>} trackBackgroundTask
- * @property {() => {
- *     startAutoReconnect: (
- *         onTools: (tools: import('#copilot/sdk/types').Tool[]) => void,
- *         intervalMs: number,
- *     ) => () => void;
- * } | null} [getMcpBridgeSnapshot]
- * @property {({
- *           startAutoReconnect: (
- *               onTools: (tools: import('#copilot/sdk/types').Tool[]) => void,
- *               intervalMs: number,
- *           ) => () => void;
- *       } | null)
- *     | undefined} mcpBridge
+ * @property {() => AgentMcpCapability | null} [getMcpBridgeSnapshot]
+ * @property {AgentMcpCapability | null | undefined} mcpBridge
  */
 
 /**

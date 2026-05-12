@@ -40,6 +40,24 @@ const envBool = (key, fallback) => {
     return v === 'true' || v === '1';
 };
 
+/** @param {string} key @param {number} fallback @returns {number} */
+const envPositiveOrInfinity = (key, fallback) => {
+    const v = process.env[key];
+    if (v === undefined || v.trim() === '') return fallback;
+    const normalized = v.trim().toLowerCase();
+    if (
+        normalized === 'infinity' ||
+        normalized === 'inf' ||
+        normalized === 'unbounded' ||
+        normalized === 'unlimited' ||
+        normalized === 'none'
+    ) {
+        return Number.POSITIVE_INFINITY;
+    }
+    const n = Number(v);
+    return Number.isFinite(n) && n > 0 ? n : fallback;
+};
+
 const DEFAULT_WORKSPACE_ROOT = resolve(import.meta.dirname, '../../..');
 
 // ── Agent ────────────────────────────────────────────────────
@@ -81,6 +99,22 @@ export const COPILOT_PINNED_CONTEXT_DIRS = envStr('COPILOT_PINNED_CONTEXT_DIRS',
 export const COPILOT_DISABLED_SKILLS = envStr('COPILOT_DISABLED_SKILLS', '');
 export const COPILOT_TOOL_PERMISSIONS_LOG = envOpt('COPILOT_TOOL_PERMISSIONS_LOG');
 export const COPILOT_WORKING_DIRECTORY = envStr('COPILOT_WORKING_DIRECTORY', DEFAULT_WORKSPACE_ROOT);
+export const COPILOT_FILE_TOOLS_MAX_CONTENT_BYTES = envPositiveOrInfinity(
+    'COPILOT_FILE_TOOLS_MAX_CONTENT_BYTES',
+    Number.POSITIVE_INFINITY,
+);
+export const COPILOT_FILE_TOOLS_MAX_SEARCH_OUTPUT_BYTES = envPositiveOrInfinity(
+    'COPILOT_FILE_TOOLS_MAX_SEARCH_OUTPUT_BYTES',
+    Number.POSITIVE_INFINITY,
+);
+export const COPILOT_FILE_TOOLS_MAX_LIST_ENTRIES = envPositiveOrInfinity(
+    'COPILOT_FILE_TOOLS_MAX_LIST_ENTRIES',
+    Number.POSITIVE_INFINITY,
+);
+export const COPILOT_FILE_TOOLS_MAX_DIFF_OUTPUT_BYTES = envPositiveOrInfinity(
+    'COPILOT_FILE_TOOLS_MAX_DIFF_OUTPUT_BYTES',
+    Number.POSITIVE_INFINITY,
+);
 export const LLM_B_BOOT_TIMEOUT_MS = envInt('LLM_B_BOOT_TIMEOUT_MS', 90_000);
 export const LLM_B_DIALOG_QUEUE_MAX = envInt('LLM_B_DIALOG_QUEUE_MAX', 10);
 export const LLM_B_WATCHDOG_MS = envInt('LLM_B_WATCHDOG_MS', 5 * 60 * 1_000);
@@ -158,6 +192,28 @@ export const COPILOT_OTEL_ENDPOINT = envOpt('COPILOT_OTEL_ENDPOINT');
 export const COPILOT_OTEL_EXPORTER_TYPE = envOpt('COPILOT_OTEL_EXPORTER_TYPE');
 export const COPILOT_OTEL_SOURCE_NAME = envStr('COPILOT_OTEL_SOURCE_NAME', COPILOT_CANONICAL_OTEL_SOURCE_NAME);
 export const COPILOT_OTEL_CAPTURE_CONTENT = envBool('COPILOT_OTEL_CAPTURE_CONTENT', false);
+
+/**
+ * Política efetiva de saída das file tools. Defaults preservam liberdade operacional da LLM-B.
+ *
+ * Quando um valor é finito via ENV, o truncamento correspondente passa a ser aplicado de forma explícita e observável
+ * na superfície das tools.
+ *
+ * @returns {{
+ *     maxContentBytes: number;
+ *     maxSearchOutputBytes: number;
+ *     maxListEntries: number;
+ *     maxDiffOutputBytes: number;
+ * }}
+ */
+export function getFileToolsOutputPolicy() {
+    return {
+        maxContentBytes: COPILOT_FILE_TOOLS_MAX_CONTENT_BYTES,
+        maxSearchOutputBytes: COPILOT_FILE_TOOLS_MAX_SEARCH_OUTPUT_BYTES,
+        maxListEntries: COPILOT_FILE_TOOLS_MAX_LIST_ENTRIES,
+        maxDiffOutputBytes: COPILOT_FILE_TOOLS_MAX_DIFF_OUTPUT_BYTES,
+    };
+}
 export const OTEL_EXPORTER_OTLP_ENDPOINT = envOpt('OTEL_EXPORTER_OTLP_ENDPOINT');
 
 // ── SSE ──────────────────────────────────────────────────────

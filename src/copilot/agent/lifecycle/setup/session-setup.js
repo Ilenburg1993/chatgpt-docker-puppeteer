@@ -39,7 +39,7 @@ import {
     readAgentSdkModelRegistryEntry,
 } from '../../facades/agent-sdk-access.js';
 import { buildAgentBusHooks, withAgentRuntimeToolPolicy } from '../../ports/hook-port.js';
-import { buildDefaultMcpConfig, buildDefaultMcpTools } from '../../ports/mcp-port.js';
+import { readAgentMcpCapabilitySnapshot } from '../../ports/mcp-port.js';
 import { bindAgentSessionTools, bootstrapAgentTools, isAgentToolDisabled } from '../../ports/tool-port.js';
 
 /**
@@ -54,10 +54,8 @@ import { bindAgentSessionTools, bootstrapAgentTools, isAgentToolDisabled } from 
  *   replay/estado obsoleto.
  * @property {() => import('#copilot/sdk/tools-registry').ToolRegistry} resetToolsRegistry - Recria o registry ativo de
  *   tools para o boot/resume atual.
- * @property {() => {
- *     buildTools: () => Promise<import('#copilot/sdk/types').Tool[]>;
- *     buildConfig: () => Record<string, unknown> | null | undefined;
- * } | null} [getMcpBridgeSnapshot]
+ * @property {() => import('../../ports/mcp-port.js').AgentMcpCapability | null} [getMcpBridgeSnapshot]
+ *
  *   - Snapshot opcional do bridge MCP injetado. Quando ausente, a porta MCP default é usada.
  *
  * @property {(event: string, payload: object) => Promise<void>} emitWebhook - Porta semântica de webhooks usada pelos
@@ -211,8 +209,8 @@ function handleDialogProtocolInput(ctx, input) {
  */
 export async function buildSessionTools(ctx) {
     invalidateMessagesCache(ctx);
-    const mcpBridge = typeof ctx.getMcpBridgeSnapshot === 'function' ? ctx.getMcpBridgeSnapshot() : null;
-    const mcpTools = mcpBridge ? await mcpBridge.buildTools() : await buildDefaultMcpTools();
+    const mcpBridge = readAgentMcpCapabilitySnapshot(ctx);
+    const mcpTools = await mcpBridge.buildTools();
     if (mcpTools.length > 0) {
         log('INFO', `[AlwaysAlive] ${mcpTools.length} MCP tools carregadas via bridge.`);
     }
@@ -304,10 +302,8 @@ function getHookAgentName(input, invocation) {
  * @returns {Record<string, unknown>}
  */
 export function buildSessionOptions(ctx, host, { tools, busHooks }) {
-    const mcpBridge = typeof ctx.getMcpBridgeSnapshot === 'function' ? ctx.getMcpBridgeSnapshot() : null;
-    const mcpConfig = /** @type {Record<string, MCPServerConfig> | null} */ (
-        mcpBridge ? mcpBridge.buildConfig() : buildDefaultMcpConfig()
-    );
+    const mcpBridge = readAgentMcpCapabilitySnapshot(ctx);
+    const mcpConfig = /** @type {Record<string, MCPServerConfig> | null} */ (mcpBridge.buildConfig());
     const bootConfig = readCopilotBootConfig();
     const builder = new SessionConfigBuilder()
         .model(ctx.getModelSnapshot())

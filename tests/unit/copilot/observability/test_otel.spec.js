@@ -14,31 +14,34 @@ import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 /** @type {Record<string, any>} */
 let envOverrides = {};
 
-vi.mock('#copilot/config/env', () => ({
-    get COPILOT_LOG_DIR() {
-        return envOverrides.COPILOT_LOG_DIR ?? '/tmp/test-logs';
-    },
-    get COPILOT_OTEL_DISABLED() {
-        return envOverrides.COPILOT_OTEL_DISABLED ?? false;
-    },
-    get COPILOT_OTEL_ENDPOINT() {
-        return envOverrides.COPILOT_OTEL_ENDPOINT ?? '';
-    },
-    get COPILOT_OTEL_EXPORTER_TYPE() {
-        return envOverrides.COPILOT_OTEL_EXPORTER_TYPE ?? undefined;
-    },
-    get COPILOT_OTEL_SOURCE_NAME() {
-        return envOverrides.COPILOT_OTEL_SOURCE_NAME ?? 'llm-b-terminal';
-    },
-    get COPILOT_OTEL_CAPTURE_CONTENT() {
-        return envOverrides.COPILOT_OTEL_CAPTURE_CONTENT ?? false;
-    },
-
-    COPILOT_MCP_SERVERS: '',
-    COPILOT_CUSTOM_AGENTS: '',
-    COPILOT_DISABLED_AGENTS: '',
-    COPILOT_OPERATIONAL_PROFILE: 'production',
-}));
+vi.mock('#copilot/config/env', async (importOriginal) => {
+    const actual = /** @type {Record<string, unknown>} */ (await importOriginal());
+    return {
+        ...actual,
+        get COPILOT_LOG_DIR() {
+            return envOverrides.COPILOT_LOG_DIR ?? '/tmp/test-logs';
+        },
+        get COPILOT_OTEL_DISABLED() {
+            return envOverrides.COPILOT_OTEL_DISABLED ?? false;
+        },
+        get COPILOT_OTEL_ENDPOINT() {
+            return envOverrides.COPILOT_OTEL_ENDPOINT ?? '';
+        },
+        get COPILOT_OTEL_EXPORTER_TYPE() {
+            return envOverrides.COPILOT_OTEL_EXPORTER_TYPE ?? undefined;
+        },
+        get COPILOT_OTEL_SOURCE_NAME() {
+            return envOverrides.COPILOT_OTEL_SOURCE_NAME ?? 'llm-b-terminal';
+        },
+        get COPILOT_OTEL_CAPTURE_CONTENT() {
+            return envOverrides.COPILOT_OTEL_CAPTURE_CONTENT ?? false;
+        },
+        COPILOT_MCP_SERVERS: '',
+        COPILOT_CUSTOM_AGENTS: '',
+        COPILOT_DISABLED_AGENTS: '',
+        COPILOT_OPERATIONAL_PROFILE: 'production',
+    };
+});
 
 describe('otel.js', () => {
     /** @type {typeof import('../../../../src/copilot/observability/otel.js')} */

@@ -16,7 +16,7 @@ import { getAgentSdkModelStatsTracker, isAgentSdkExperimentalEnabled } from '../
 import { defaultErrorTracker } from '../../ports/error-tracking-port.js';
 import { createAgentEventObserver } from '../../ports/event-observer-port.js';
 import { log } from '../../ports/logging-port.js';
-import { startDefaultMcpAutoReconnect } from '../../ports/mcp-port.js';
+import { readAgentMcpCapabilitySnapshot } from '../../ports/mcp-port.js';
 import { defaultMetrics } from '../../ports/metrics-port.js';
 import { resolveAgentUserInput } from '../../ports/tool-port.js';
 import { reapExpiredPendingQuestionShadow } from './boot-dialog-recovery.js';
@@ -73,11 +73,13 @@ export function stepStartMetricsTimer(ctx, state) {
  * @returns {void}
  */
 export function stepStartMcpReconnect(ctx, state) {
-    const mcpBridge = ctx.getMcpBridgeSnapshot?.() ?? ctx.mcpBridge ?? null;
-    const _mcpBridgeFn = mcpBridge?.startAutoReconnect ?? startDefaultMcpAutoReconnect;
-    state.mcpReconnectCancel = _mcpBridgeFn((/** @type {import('#copilot/sdk/types').Tool[]} */ tools) => {
-        ctx.emit(EMITTER_MCP_RECONNECTED, { toolCount: tools.length, ts: Date.now() });
-    }, MCP_RECONNECT_MS);
+    const mcpBridge = readAgentMcpCapabilitySnapshot(ctx);
+    state.mcpReconnectCancel = mcpBridge.startAutoReconnect(
+        (/** @type {import('#copilot/sdk/types').Tool[]} */ tools) => {
+            ctx.emit(EMITTER_MCP_RECONNECTED, { toolCount: tools.length, ts: Date.now() });
+        },
+        MCP_RECONNECT_MS,
+    );
 }
 
 /**

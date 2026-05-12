@@ -25,16 +25,17 @@ function readSource(relPath) {
 }
 
 // ---------------------------------------------------------------------------
-// Consumidores canônicos de createTool no estado atual
+// Consumidores canônicos no estado atual
 // ---------------------------------------------------------------------------
-const MIGRATED_FILES = ['tools/infra/tool-factory.js', 'bridges/mcp-tool-bridge.js'];
+const SDK_DIRECT_CONSUMERS = ['tools/infra/tool-factory.js'];
+const FACTORY_CONSUMERS = ['bridges/mcp-tool-bridge.js'];
 
 // ---------------------------------------------------------------------------
 // 1. Verificação estática de imports (sem execução de módulo)
 // ---------------------------------------------------------------------------
 describe('F18 — Migração defineTool → createTool (estática)', () => {
     describe('Nenhum consumidor importa defineTool de @github/copilot-sdk', () => {
-        for (const file of MIGRATED_FILES) {
+        for (const file of [...SDK_DIRECT_CONSUMERS, ...FACTORY_CONSUMERS]) {
             it(`${file} NÃO importa defineTool de @github/copilot-sdk`, () => {
                 const src = readSource(file);
                 // Aceita menções em comentários/JSDoc; proíbe import real
@@ -46,8 +47,8 @@ describe('F18 — Migração defineTool → createTool (estática)', () => {
         }
     });
 
-    describe('Todos os consumidores importam createTool de #copilot/sdk (barrel ou tools.js)', () => {
-        for (const file of MIGRATED_FILES) {
+    describe('Consumidores diretos do SDK importam createTool de #copilot/sdk', () => {
+        for (const file of SDK_DIRECT_CONSUMERS) {
             it(`${file} importa createTool de #copilot/sdk`, () => {
                 const src = readSource(file);
                 const hasCreateToolImport = src
@@ -58,8 +59,28 @@ describe('F18 — Migração defineTool → createTool (estática)', () => {
         }
     });
 
+    describe('Consumidores migrados para a factory canônica importam buildTool local', () => {
+        for (const file of FACTORY_CONSUMERS) {
+            it(`${file} importa buildTool da factory canônica`, () => {
+                const src = readSource(file);
+                const hasBuildToolImport = src
+                    .split('\n')
+                    .some((line) => /import\s.*buildTool/.test(line) && /#copilot\/tools/.test(line));
+                expect(hasBuildToolImport, `Import de buildTool não encontrado em ${file}`).toBe(true);
+            });
+
+            it(`${file} NÃO importa createTool diretamente de #copilot/sdk`, () => {
+                const src = readSource(file);
+                const hasCreateToolImport = src
+                    .split('\n')
+                    .some((line) => /import\s.*createTool/.test(line) && /#copilot\/sdk/.test(line));
+                expect(hasCreateToolImport, `Import direto de createTool encontrado em ${file}`).toBe(false);
+            });
+        }
+    });
+
     describe('Nenhum consumidor chama defineTool() no código', () => {
-        for (const file of MIGRATED_FILES) {
+        for (const file of [...SDK_DIRECT_CONSUMERS, ...FACTORY_CONSUMERS]) {
             it(`${file} NÃO contém chamada defineTool(`, () => {
                 const src = readSource(file);
                 // Remove linhas de comentário (// e * ) para não dar falso positivo
@@ -77,12 +98,20 @@ describe('F18 — Migração defineTool → createTool (estática)', () => {
         }
     });
 
-    describe('Todos os consumidores usam createTool() no código', () => {
-        for (const file of MIGRATED_FILES) {
+    describe('Consumidores diretos usam createTool() e consumidores migrados usam buildTool()', () => {
+        for (const file of SDK_DIRECT_CONSUMERS) {
             it(`${file} contém chamada createTool(`, () => {
                 const src = readSource(file);
                 const hasCreateToolCall = src.split('\n').some((line) => /createTool\s*\(/.test(line));
                 expect(hasCreateToolCall, `Chamada createTool() não encontrada em ${file}`).toBe(true);
+            });
+        }
+
+        for (const file of FACTORY_CONSUMERS) {
+            it(`${file} contém chamada buildTool(`, () => {
+                const src = readSource(file);
+                const hasBuildToolCall = src.split('\n').some((line) => /buildTool(Fn)?\s*\(/.test(line));
+                expect(hasBuildToolCall, `Chamada buildTool() não encontrada em ${file}`).toBe(true);
             });
         }
     });
@@ -120,22 +149,26 @@ describe('F18 — SDK tools/core.js permanece o wrapper canônico', () => {
 // 3. Contagem de migração (sanity check)
 // ---------------------------------------------------------------------------
 describe('F18 — Contagem de migração', () => {
-    it('Exatamente 2 consumidores canônicos usam createTool diretamente', () => {
-        expect(MIGRATED_FILES).toHaveLength(2);
+    it('Exatamente 1 consumidor canônico usa createTool diretamente', () => {
+        expect(SDK_DIRECT_CONSUMERS).toHaveLength(1);
     });
 
-    it('createTool é chamado ao menos 2 vezes nos consumidores canônicos', () => {
+    it('Exatamente 1 consumidor canônico usa a factory buildTool', () => {
+        expect(FACTORY_CONSUMERS).toHaveLength(1);
+    });
+
+    it('createTool é chamado ao menos 1 vez nos consumidores diretos', () => {
         let total = 0;
-        for (const file of MIGRATED_FILES) {
+        for (const file of SDK_DIRECT_CONSUMERS) {
             const src = readSource(file);
             const matches = src.match(/createTool\s*\(/g);
             total += matches ? matches.length : 0;
         }
-        expect(total).toBeGreaterThanOrEqual(2);
+        expect(total).toBeGreaterThanOrEqual(1);
     });
 
     it('createTool({ name: recebe string literal ou variável em cada chamada', () => {
-        for (const file of MIGRATED_FILES) {
+        for (const file of SDK_DIRECT_CONSUMERS) {
             const src = readSource(file);
             const calls = src.match(/createTool\s*\(\s*\{/g);
             if (!calls) continue;

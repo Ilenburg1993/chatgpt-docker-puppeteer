@@ -17,6 +17,8 @@ describe('observability/logger.js — console resilience', () => {
         });
 
         const { log } = await import('../../../../src/copilot/observability/logger.js');
+        log.setLevel('INFO');
+        log.setConsoleLevel('INFO');
 
         assert.doesNotThrow(() => {
             log('INFO', '[test] stdout should not crash runtime');
@@ -33,6 +35,8 @@ describe('observability/logger.js — console resilience', () => {
         });
 
         const { log } = await import('../../../../src/copilot/observability/logger.js');
+        log.setLevel('ERROR');
+        log.setConsoleLevel('ERROR');
 
         assert.doesNotThrow(() => {
             log('ERROR', '[test] stderr should not crash runtime');

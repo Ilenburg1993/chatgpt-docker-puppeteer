@@ -176,6 +176,7 @@ export class AgentContext {
      *     model?: string;
      *     reasoningEffort?: 'low' | 'medium' | 'high' | 'xhigh';
      *     factories?: Partial<import('./context-factories.js').AgentContextFactories>;
+     *     mcpBridge?: import('./ports/mcp-port.js').AgentMcpCapability | null;
      * }} [options]
      */
     constructor(emitter, options = {}) {
@@ -199,7 +200,7 @@ export class AgentContext {
             reasoningEffort:
                 /** @type {'low' | 'medium' | 'high' | 'xhigh' | undefined} */
                 (options.reasoningEffort ?? (COPILOT_REASONING_EFFORT || undefined)),
-            mcpBridge: null,
+            mcpBridge: options.mcpBridge ?? null,
         };
 
         this.metricsState = {
@@ -429,22 +430,14 @@ export class AgentContext {
     /**
      * F69: Injeção de dependências MCP — permite override em testes e desacoplamento de camadas.
      *
-     * @returns {{
-     *     buildTools: () => Promise<import('#copilot/sdk/types').Tool<any>[]>;
-     *     buildConfig: () => Record<string, unknown>;
-     *     startAutoReconnect: (onTools: (tools: import('#copilot/sdk/types').Tool<any>[]) => void) => () => void;
-     * } | null}
+     * @returns {import('./ports/mcp-port.js').AgentMcpCapability | null}
      */
     get mcpBridge() {
         return this.configState.mcpBridge;
     }
 
     /**
-     * @param {{
-     *     buildTools: () => Promise<import('#copilot/sdk/types').Tool<any>[]>;
-     *     buildConfig: () => Record<string, unknown>;
-     *     startAutoReconnect: (onTools: (tools: import('#copilot/sdk/types').Tool<any>[]) => void) => () => void;
-     * } | null} value
+     * @param {import('./ports/mcp-port.js').AgentMcpCapability | null} value
      */
     set mcpBridge(value) {
         this.configState.mcpBridge = value;
@@ -1201,11 +1194,7 @@ export class AgentContext {
     /**
      * Retorna a bridge MCP ativa sem expor diretamente o shape cru de `configState` aos consumidores quentes.
      *
-     * @returns {{
-     *     buildTools: () => Promise<import('#copilot/sdk/types').Tool<any>[]>;
-     *     buildConfig: () => Record<string, unknown>;
-     *     startAutoReconnect: (onTools: (tools: import('#copilot/sdk/types').Tool<any>[]) => void) => () => void;
-     * } | null}
+     * @returns {import('./ports/mcp-port.js').AgentMcpCapability | null}
      */
     getMcpBridgeSnapshot() {
         return this.configState.mcpBridge;

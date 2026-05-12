@@ -123,6 +123,18 @@ describe('session-setup (F63)', () => {
             const result = await buildSessionTools(ctx);
             expect(result.tools).toContainEqual(expect.objectContaining({ name: 'mcp-tool' }));
         });
+
+        it('usa capability MCP injetada no contexto quando disponível', async () => {
+            const buildTools = vi.fn(async () => [/** @type {any} */ ({ name: 'mcp-injected' })]);
+            const buildConfig = vi.fn(() => ({ injected: true }));
+            const startAutoReconnect = vi.fn(() => () => {});
+            ctx.getMcpBridgeSnapshot = vi.fn(() => ({ buildTools, buildConfig, startAutoReconnect }));
+
+            const result = await buildSessionTools(ctx);
+
+            expect(buildTools).toHaveBeenCalledTimes(1);
+            expect(result.tools).toContainEqual(expect.objectContaining({ name: 'mcp-injected' }));
+        });
     });
 
     describe('buildSessionHooks', () => {
@@ -200,6 +212,20 @@ describe('session-setup (F63)', () => {
 
             expect(options.reasoningEffort).toBeUndefined();
             expect(ctx.setReasoningEffort).toHaveBeenCalledWith(undefined);
+        });
+
+        it('usa buildConfig da capability MCP injetada ao montar a sessão', () => {
+            const tools = /** @type {any} */ (['t1']);
+            const busHooks = /** @type {any} */ ({ mock: true });
+            const buildTools = vi.fn(async () => []);
+            const buildConfig = vi.fn(() => ({ demo: { command: 'node', args: ['server.js'] } }));
+            const startAutoReconnect = vi.fn(() => () => {});
+            ctx.getMcpBridgeSnapshot = vi.fn(() => ({ buildTools, buildConfig, startAutoReconnect }));
+
+            const options = buildSessionOptions(ctx, host, { tools, busHooks });
+
+            expect(buildConfig).toHaveBeenCalledTimes(1);
+            expect(options.mcpServers).toEqual({ demo: { command: 'node', args: ['server.js'] } });
         });
 
         it('normaliza UserInputRequest do SDK preservando default allowFreeform=true', async () => {

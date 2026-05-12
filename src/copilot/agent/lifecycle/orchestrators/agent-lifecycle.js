@@ -50,6 +50,7 @@ import {
     raceAgentSdkEvents,
 } from '../../facades/agent-sdk-access.js';
 import { resolveConversationStore } from '../../ports/conversation-port.js';
+import { resolveAgentMcpCapability } from '../../ports/mcp-port.js';
 import { performBootWiring } from '../../session/boot/boot-wiring.js';
 import { syncSdkHistory } from '../../session/history/history-sync.js';
 import { initOrResumeSession } from '../../session/initializers/initializer.js';
@@ -342,6 +343,8 @@ export async function agentStart(ctx, host) {
         log('WARN', `[AlwaysAlive] start() ignorado: agente já está em estado '${ctx.getRuntimeStatus()}'.`);
         return;
     }
+
+    ctx.mcpBridge = resolveAgentMcpCapability(ctx.getMcpBridgeSnapshot?.() ?? ctx.mcpBridge ?? null);
 
     const startStartedAt = Date.now();
     /** @type {AgentStartPhaseResult[]} */

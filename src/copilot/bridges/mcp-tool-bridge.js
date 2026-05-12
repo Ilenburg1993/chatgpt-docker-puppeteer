@@ -7,7 +7,7 @@
  * Responsabilidades:
  *
  * - Consultar o Tool Registry via HTTP para listar as tools disponíveis.
- * - Gerar dinamicamente Custom Tools SDK (`defineTool`) para cada tool MCP.
+ * - Gerar dinamicamente Custom Tools SDK para cada tool MCP via factory canônica.
  * - Cada handler faz um POST /api/mcp com tools/call para executar a tool remotamente.
  *
  * Uso:
@@ -25,10 +25,157 @@
 
 import { MCP_PORT as _MCP_PORT, MCP_PORT_PROBE_TIMEOUT_MS } from '#copilot/config';
 import { BridgeError, container, toError, withRetry } from '#copilot/core';
-import { log, METRICS_STORE, startSpanImmediate } from '#copilot/observability';
-import { createTool } from '#copilot/sdk';
+import * as observability from '#copilot/observability';
+import { buildTool } from '#copilot/tools';
 import net from 'node:net';
 import { buildZodSchema } from './mcp-tool-schema.js';
+
+const CIRCUIT_RESET_MS = 60_000;
+const BOOT_BACKOFF_MS = [0, 200, 1000, 5_000];
+
+/**
+ * @typedef {object} BridgeMetricsStore
+ * @property {(name: string, durationMs: number, success?: boolean) => void} recordToolCall
+ * @property {(name: string, value?: number) => void} recordCounter
+ */
+
+/**
+ * @typedef {object} McpBridgeState
+ * @property {McpHealthStatus} health
+ * @property {boolean} circuitOpen
+ * @property {number} circuitOpenAt
+ * @property {number} bootAttemptCount
+ */
+
+/**
+ * @typedef {object} McpBridgeDeps
+ * @property {string} mcpPort
+ * @property {number} portProbeTimeoutMs
+ * @property {string} baseUrl
+ * @property {(level: 'DEBUG' | 'INFO' | 'WARN' | 'ERROR', message: string) => void} logFn
+ * @property {(
+ *     name: string,
+ *     attrs?: Record<string, string | number>,
+ * ) => import('#copilot/observability/otel').OtelSpan | null} startSpanImmediateFn
+ * @property {BridgeMetricsStore} metricsStore
+ * @property {(fn: () => Promise<unknown>, opts: Record<string, unknown>) => Promise<unknown>} withRetryFn
+ * @property {(input: string | URL | Request, init?: RequestInit) => Promise<Response>} fetchImpl
+ * @property {typeof net.connect} connectFn
+ * @property {() => number} now
+ * @property {(ms: number) => Promise<void>} delayFn
+ * @property {(inputSchema: object) => import('zod').ZodType<any>} schemaBuilder
+ * @property {typeof buildTool} buildToolFn
+ * @property {(() => Promise<boolean>) | undefined} [isPortOpenFn]
+ */
+
+function createInitialMcpHealth() {
+    return {
+        available: false,
+        lastCheckMs: null,
+        lastError: null,
+        toolCount: 0,
+        circuitOpen: false,
+        latencyMs: null,
+    };
+}
+
+/** @returns {McpBridgeState} */
+function createMcpBridgeState() {
+    return {
+        health: createInitialMcpHealth(),
+        circuitOpen: false,
+        circuitOpenAt: 0,
+        bootAttemptCount: 0,
+    };
+}
+
+/**
+ * @param {McpBridgeState} state
+ * @returns {void}
+ */
+function resetMcpBridgeState(state) {
+    state.circuitOpen = false;
+    state.circuitOpenAt = 0;
+    state.bootAttemptCount = 0;
+    state.health = createInitialMcpHealth();
+}
+
+/**
+ * @param {McpBridgeState} state
+ * @returns {McpHealthStatus}
+ */
+function getMcpStatusFromState(state) {
+    return { ...state.health };
+}
+
+function resolveBridgeMetricsStore() {
+    const metricsStoreToken = observability.METRICS_STORE;
+    if (!metricsStoreToken) {
+        return {
+            recordToolCall: () => {},
+            recordCounter: () => {},
+        };
+    }
+    try {
+        return /** @type {BridgeMetricsStore} */ (container.resolve(metricsStoreToken));
+    } catch {
+        return {
+            recordToolCall: () => {},
+            recordCounter: () => {},
+        };
+    }
+}
+
+/**
+ * @param {string} mcpPort
+ * @returns {string}
+ */
+function resolveMcpBaseUrl(mcpPort) {
+    return `http://127.0.0.1:${mcpPort}/api/mcp`;
+}
+
+/**
+ * @param {Partial<McpBridgeDeps>} [overrides]
+ * @returns {McpBridgeDeps}
+ */
+function resolveMcpBridgeDeps(overrides = {}) {
+    const mcpPort = overrides.mcpPort ?? _MCP_PORT;
+    return {
+        mcpPort,
+        portProbeTimeoutMs: overrides.portProbeTimeoutMs ?? MCP_PORT_PROBE_TIMEOUT_MS,
+        baseUrl: overrides.baseUrl ?? resolveMcpBaseUrl(mcpPort),
+        logFn: overrides.logFn ?? observability.log ?? (() => {}),
+        startSpanImmediateFn:
+            overrides.startSpanImmediateFn ??
+            /** @type {McpBridgeDeps['startSpanImmediateFn']} */ (
+                typeof observability.startSpanImmediate === 'function' ? observability.startSpanImmediate : () => null
+            ),
+        metricsStore: overrides.metricsStore ?? resolveBridgeMetricsStore(),
+        withRetryFn: overrides.withRetryFn ?? /** @type {McpBridgeDeps['withRetryFn']} */ (withRetry),
+        fetchImpl: overrides.fetchImpl ?? fetch,
+        connectFn: overrides.connectFn ?? net.connect,
+        now: overrides.now ?? (() => Date.now()),
+        delayFn: overrides.delayFn ?? ((ms) => new Promise((resolve) => setTimeout(resolve, ms))),
+        schemaBuilder: overrides.schemaBuilder ?? buildZodSchema,
+        buildToolFn: overrides.buildToolFn ?? buildTool,
+        ...(typeof overrides.isPortOpenFn === 'function' ? { isPortOpenFn: overrides.isPortOpenFn } : {}),
+    };
+}
+
+const _defaultMcpBridgeState = createMcpBridgeState();
+
+/** @type {McpBridgeDeps | null} */
+let _defaultMcpBridgeDeps = null;
+
+/**
+ * @returns {McpBridgeDeps}
+ */
+function getDefaultMcpBridgeDeps() {
+    if (_defaultMcpBridgeDeps === null) {
+        _defaultMcpBridgeDeps = resolveMcpBridgeDeps();
+    }
+    return _defaultMcpBridgeDeps;
+}
 
 /**
  * Estado de saúde do MCP bridge. Atualizado a cada chamada de `buildMcpTools()` e pelo health check periódico.
@@ -42,29 +189,6 @@ import { buildZodSchema } from './mcp-tool-schema.js';
  * @property {number | null} latencyMs - Latência da última chamada listMcpTools bem-sucedida (ms), ou null
  */
 
-/** @type {McpHealthStatus} */
-let _mcpHealth = {
-    available: false,
-    lastCheckMs: null,
-    lastError: null,
-    toolCount: 0,
-    circuitOpen: false,
-    latencyMs: null,
-};
-
-/**
- * Retorna uma snapshot imutável do estado de saúde do MCP bridge.
- *
- * @returns {McpHealthStatus}
- */
-export function getMcpStatus() {
-    return { ..._mcpHealth };
-}
-
-// FINDING-P4-2: usar MCP_PORT dedicado com fallback para PORT genérico e 3008
-const MCP_PORT = _MCP_PORT;
-const MCP_BASE = `http://127.0.0.1:${MCP_PORT}/api/mcp`;
-
 /**
  * F10.1: probe TCP rápido para verificar se a porta MCP está aberta sem bloquear o boot.
  *
@@ -72,10 +196,17 @@ const MCP_BASE = `http://127.0.0.1:${MCP_PORT}/api/mcp`;
  *
  * @returns {Promise<boolean>} true se a porta está acessível
  */
-function _isMcpPortOpen() {
-    const portProbeTimeoutMs = MCP_PORT_PROBE_TIMEOUT_MS;
+/**
+ * @param {McpBridgeDeps} deps
+ * @returns {Promise<boolean>}
+ */
+function _isMcpPortOpen(deps) {
+    if (typeof deps.isPortOpenFn === 'function') {
+        return deps.isPortOpenFn();
+    }
+    const portProbeTimeoutMs = deps.portProbeTimeoutMs;
     return new Promise((resolve) => {
-        const socket = net.connect({ host: '127.0.0.1', port: Number(MCP_PORT) }, () => {
+        const socket = deps.connectFn({ host: '127.0.0.1', port: Number(deps.mcpPort) }, () => {
             socket.destroy();
             resolve(true);
         });
@@ -87,17 +218,6 @@ function _isMcpPortOpen() {
         socket.on('error', () => resolve(false));
     });
 }
-
-// UPG-02: Circuit Breaker para chamadas ao MCP Tool Registry
-// Evita 40s de bloqueio quando o servidor MCP está offline (5 tentativas × 8s timeout)
-let _mcpCircuitOpen = false;
-let _mcpCircuitOpenAt = 0;
-const CIRCUIT_RESET_MS = 60_000;
-
-// BUG-MED-09 (fix): backoff exponencial para tentativas iniciais após restart do processo
-// Evita ~9 tentativas HTTP desnecessárias quando o servidor MCP está offline no boot
-const _BOOT_BACKOFF_MS = [0, 200, 1000, 5_000]; // tentativas 1–4: imediata, 200ms, 1s, 5s
-let _bootAttemptCount = 0;
 
 /**
  * @typedef {object} McpToolMeta
@@ -115,28 +235,29 @@ let _bootAttemptCount = 0;
  * 5xx). Tenta até 3 vezes com jitter.
  *
  * @param {string} method - Método JSON-RPC (ex: 'tools/list', 'tools/call')
+ * @param {McpBridgeDeps} deps
  * @param {unknown} [params] - Parâmetros do método
  * @returns {Promise<unknown>} Resultado do campo `result` ou lança Error em caso de falha
  * @throws {Error} Se o servidor MCP retornar erro HTTP, erro RPC ou conexão falhar após retries
  */
-async function rpcCall(method, params) {
+async function rpcCall(method, deps, params) {
     const body = JSON.stringify({
         jsonrpc: '2.0',
-        id: Date.now(),
+        id: deps.now(),
         method,
         params: params ?? {},
     });
 
-    const span = startSpanImmediate('copilot.bridge.mcp', {
+    const span = deps.startSpanImmediateFn('copilot.bridge.mcp', {
         bridge_type: 'mcp',
         method,
     });
-    const t0 = Date.now();
+    const t0 = deps.now();
 
     try {
-        const result = await withRetry(
+        const result = await deps.withRetryFn(
             async () => {
-                const response = await fetch(MCP_BASE, {
+                const response = await deps.fetchImpl(deps.baseUrl, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body,
@@ -162,7 +283,7 @@ async function rpcCall(method, params) {
             {
                 maxAttempts: 3,
                 baseDelayMs: 200,
-                shouldRetry: (e) => {
+                shouldRetry: (/** @type {unknown} */ e) => {
                     const err = toError(e);
                     const isNetworkError =
                         err?.code === 'ECONNRESET' || err?.code === 'ECONNREFUSED' || err?.name === 'TimeoutError';
@@ -170,8 +291,8 @@ async function rpcCall(method, params) {
                         e instanceof BridgeError && /** @type {BridgeError} */ (e).message.includes('HTTP 5');
                     return isNetworkError || isServerError;
                 },
-                onRetry: (e, attempt) => {
-                    log(
+                onRetry: (/** @type {unknown} */ e, /** @type {number} */ attempt) => {
+                    deps.logFn(
                         'WARN',
                         `[mcp-tool-bridge] rpcCall '${method}' falhou (tentativa ${attempt}/3): ${toError(e)?.message}`,
                     );
@@ -179,18 +300,18 @@ async function rpcCall(method, params) {
             },
         );
 
-        span?.setAttribute('duration_ms', Date.now() - t0);
+        span?.setAttribute('duration_ms', deps.now() - t0);
         span?.setAttribute('status_code', 0);
         span?.setStatus({ code: 1 });
-        container.resolve(METRICS_STORE).recordToolCall(`bridge.mcp.${method}`, Date.now() - t0, true);
+        deps.metricsStore.recordToolCall(`bridge.mcp.${method}`, deps.now() - t0, true);
         return result;
     } catch (err) {
-        span?.setAttribute('duration_ms', Date.now() - t0);
+        span?.setAttribute('duration_ms', deps.now() - t0);
         span?.setAttribute('status_code', 2);
         span?.setStatus({ code: 2, message: toError(err).message });
         span?.recordException(err);
-        container.resolve(METRICS_STORE).recordToolCall(`bridge.mcp.${method}`, Date.now() - t0, false);
-        container.resolve(METRICS_STORE).recordCounter('copilot.bridge.errors_total');
+        deps.metricsStore.recordToolCall(`bridge.mcp.${method}`, deps.now() - t0, false);
+        deps.metricsStore.recordCounter('copilot.bridge.errors_total');
         throw err;
     } finally {
         span?.end();
@@ -200,31 +321,45 @@ async function rpcCall(method, params) {
 /**
  * Lista as tools disponíveis no MCP Tool Registry local.
  *
+ * @param {McpBridgeDeps} deps
+ * @param {{ swallowErrors?: boolean }} [options]
  * @returns {Promise<McpToolMeta[]>} Array de metadados de tools
  */
-export async function listMcpTools() {
+async function listMcpToolsInternal(deps, options = {}) {
     try {
-        /** @type {{ tools?: McpToolMeta[] }} */
-        const result = /** @type {{ tools?: McpToolMeta[] }} */ (await rpcCall('tools/list', {}));
+        const result = /** @type {{ tools?: McpToolMeta[] }} */ (await rpcCall('tools/list', deps, {}));
         const tools = /** @type {McpToolMeta[]} */ (result?.tools ?? []);
         return tools.filter((t) => t && typeof t.name === 'string');
     } catch (e) {
-        log('WARN', `[mcp-tool-bridge] Falha ao listar tools MCP: ${toError(e).message}`);
-        return [];
+        deps.logFn('WARN', `[mcp-tool-bridge] Falha ao listar tools MCP: ${toError(e).message}`);
+        if (options.swallowErrors !== false) {
+            return [];
+        }
+        throw e;
     }
+}
+
+/**
+ * Lista as tools disponíveis no MCP Tool Registry local.
+ *
+ * @returns {Promise<McpToolMeta[]>} Array de metadados de tools
+ */
+export async function listMcpTools() {
+    return listMcpToolsInternal(getDefaultMcpBridgeDeps(), { swallowErrors: true });
 }
 
 /**
  * Cria um Custom Tool SDK que delega a execução para a tool MCP correspondente via HTTP.
  *
  * @param {McpToolMeta} mcpTool - Metadados da tool MCP
+ * @param {McpBridgeDeps} deps
  * @returns {import('#copilot/sdk/types').Tool<Record<string, unknown>>} Custom Tool pronta para uso no SDK
  */
-function createSdkToolFromMcp(mcpTool) {
-    const schema = buildZodSchema(mcpTool.inputSchema ?? {});
+function createSdkToolFromMcp(mcpTool, deps) {
+    const schema = deps.schemaBuilder(mcpTool.inputSchema ?? {});
     const toolName = `mcp_${mcpTool.name}`;
 
-    return createTool({
+    return deps.buildToolFn({
         name: toolName,
         description: `[MCP] ${mcpTool.description ?? mcpTool.name}`,
         parameters: schema,
@@ -232,7 +367,7 @@ function createSdkToolFromMcp(mcpTool) {
         // sobrescrever built-ins.
         handler: async (/** @type {Record<string, unknown>} */ params) => {
             try {
-                const result = await rpcCall('tools/call', {
+                const result = await rpcCall('tools/call', deps, {
                     name: mcpTool.name,
                     arguments: params,
                 });
@@ -250,7 +385,7 @@ function createSdkToolFromMcp(mcpTool) {
                 }
                 return JSON.stringify(result, null, 2);
             } catch (e) {
-                log('WARN', `[mcp-tool-bridge] Falha ao executar tool '${mcpTool.name}': ${toError(e).message}`);
+                deps.logFn('WARN', `[mcp-tool-bridge] Falha ao executar tool '${mcpTool.name}': ${toError(e).message}`);
                 return `Erro ao executar ${mcpTool.name}: ${toError(e).message}`;
             }
         },
@@ -263,73 +398,76 @@ function createSdkToolFromMcp(mcpTool) {
  * Consulta dinamicamente o endpoint MCP para descobrir as tools disponíveis e gera uma Custom Tool SDK para cada uma,
  * prefixada com `mcp_`.
  *
+ * @param {McpBridgeState} state
+ * @param {McpBridgeDeps} deps
  * @returns {Promise<import('#copilot/sdk/types').Tool<any>[]>} Array de Custom Tools prontas para registro no SDK
  */
-export async function buildMcpTools() {
+async function buildMcpToolsInternal(state, deps) {
     // UPG-02: circuit breaker — não tentar se o circuito está aberto
-    if (_mcpCircuitOpen && Date.now() - _mcpCircuitOpenAt < CIRCUIT_RESET_MS) {
-        log('DEBUG', '[mcp-tool-bridge] Circuit aberto — pulando consulta ao MCP Registry.');
-        _mcpHealth = { ..._mcpHealth, circuitOpen: true };
+    if (state.circuitOpen && deps.now() - state.circuitOpenAt < CIRCUIT_RESET_MS) {
+        deps.logFn('DEBUG', '[mcp-tool-bridge] Circuit aberto — pulando consulta ao MCP Registry.');
+        state.health = { ...state.health, circuitOpen: true };
         return [];
     }
 
     // F10.1: port probe rápido antes de qualquer HTTP — evita 24s de bloqueio quando servidor está offline
-    const portOpen = await _isMcpPortOpen();
+    const portOpen = await _isMcpPortOpen(deps);
     if (!portOpen) {
-        const closedPortReason = `ECONNREFUSED (port probe: ${MCP_PORT} fechada)`;
-        const repeatedStandalonePortClosed = _mcpHealth.lastError === closedPortReason && _mcpHealth.circuitOpen;
-        _mcpCircuitOpen = true;
-        _mcpCircuitOpenAt = Date.now();
-        _bootAttemptCount = 0;
-        _mcpHealth = {
+        const closedPortReason = `ECONNREFUSED (port probe: ${deps.mcpPort} fechada)`;
+        const repeatedStandalonePortClosed = state.health.lastError === closedPortReason && state.health.circuitOpen;
+        state.circuitOpen = true;
+        state.circuitOpenAt = deps.now();
+        state.bootAttemptCount = 0;
+        state.health = {
             available: false,
-            lastCheckMs: Date.now(),
+            lastCheckMs: deps.now(),
             lastError: closedPortReason,
             toolCount: 0,
             circuitOpen: true,
             latencyMs: null,
         };
-        log(
+        deps.logFn(
             repeatedStandalonePortClosed ? 'DEBUG' : 'INFO',
-            `[mcp-tool-bridge] Porta MCP ${MCP_PORT} fechada (standalone?) — circuit aberto imediatamente.`,
+            `[mcp-tool-bridge] Porta MCP ${deps.mcpPort} fechada (standalone?) — circuit aberto imediatamente.`,
         );
         return [];
     }
 
     // BUG-MED-09 (fix): aplicar backoff exponencial nas tentativas iniciais de boot
-    const bootDelay = _BOOT_BACKOFF_MS[Math.min(_bootAttemptCount, _BOOT_BACKOFF_MS.length - 1)] ?? 0;
-    _bootAttemptCount++;
+    const bootDelay = BOOT_BACKOFF_MS[Math.min(state.bootAttemptCount, BOOT_BACKOFF_MS.length - 1)] ?? 0;
+    state.bootAttemptCount++;
     if (bootDelay > 0) {
-        await new Promise((r) => setTimeout(r, bootDelay));
+        await deps.delayFn(bootDelay);
     }
 
     let mcpTools;
     try {
-        const _t0mcp = Date.now();
-        mcpTools = await listMcpTools();
-        _mcpCircuitOpen = false; // reset em caso de sucesso
-        _bootAttemptCount = 0; // BUG-MED-09: reset contador de boot após sucesso
-        _mcpHealth = {
+        const _t0mcp = deps.now();
+        mcpTools = await listMcpToolsInternal(deps, { swallowErrors: false });
+        state.circuitOpen = false; // reset em caso de sucesso
+        state.circuitOpenAt = 0;
+        state.bootAttemptCount = 0; // BUG-MED-09: reset contador de boot após sucesso
+        state.health = {
             available: true,
-            lastCheckMs: Date.now(),
+            lastCheckMs: deps.now(),
             lastError: null,
             toolCount: mcpTools.length,
             circuitOpen: false,
-            latencyMs: Date.now() - _t0mcp,
+            latencyMs: deps.now() - _t0mcp,
         };
     } catch (err) {
-        _mcpCircuitOpen = true;
-        _mcpCircuitOpenAt = Date.now();
-        _bootAttemptCount = 0; // F3.2 (BUG-MOD-02): resetar ao abrir circuit para evitar backoff acumulado
-        _mcpHealth = {
+        state.circuitOpen = true;
+        state.circuitOpenAt = deps.now();
+        state.bootAttemptCount = 0; // F3.2 (BUG-MOD-02): resetar ao abrir circuit para evitar backoff acumulado
+        state.health = {
             available: false,
-            lastCheckMs: Date.now(),
+            lastCheckMs: deps.now(),
             lastError: toError(err).message,
             toolCount: 0,
             circuitOpen: true,
             latencyMs: null,
         };
-        log(
+        deps.logFn(
             'WARN',
             `[mcp-tool-bridge] Falha ao consultar MCP Registry — circuit aberto por ${CIRCUIT_RESET_MS / 1000}s: ${toError(err).message}`,
         );
@@ -337,13 +475,31 @@ export async function buildMcpTools() {
     }
 
     if (mcpTools.length === 0) {
-        log('INFO', '[mcp-tool-bridge] Nenhuma tool MCP disponível (servidor offline ou MCP_ENABLED=false).');
+        deps.logFn('INFO', '[mcp-tool-bridge] Nenhuma tool MCP disponível (servidor offline ou MCP_ENABLED=false).');
         return [];
     }
 
-    log('INFO', `[mcp-tool-bridge] Construindo ${mcpTools.length} Custom Tools a partir do MCP Registry.`);
+    deps.logFn('INFO', `[mcp-tool-bridge] Construindo ${mcpTools.length} Custom Tools a partir do MCP Registry.`);
 
-    return mcpTools.map((tool) => createSdkToolFromMcp(tool));
+    return mcpTools.map((tool) => createSdkToolFromMcp(tool, deps));
+}
+
+/**
+ * Constrói Custom Tools SDK para todas as tools disponíveis no MCP Tool Registry local.
+ *
+ * @returns {Promise<import('#copilot/sdk/types').Tool<any>[]>}
+ */
+export async function buildMcpTools() {
+    return buildMcpToolsInternal(_defaultMcpBridgeState, getDefaultMcpBridgeDeps());
+}
+
+/**
+ * Retorna uma snapshot imutável do estado de saúde do MCP bridge default.
+ *
+ * @returns {McpHealthStatus}
+ */
+export function getMcpStatus() {
+    return getMcpStatusFromState(_defaultMcpBridgeState);
 }
 
 /**
@@ -353,16 +509,37 @@ export async function buildMcpTools() {
  * @internal
  */
 export function _resetMcpState() {
-    _mcpCircuitOpen = false;
-    _mcpCircuitOpenAt = 0;
-    _bootAttemptCount = 0;
-    _mcpHealth = {
-        available: false,
-        lastCheckMs: null,
-        lastError: null,
-        toolCount: 0,
-        circuitOpen: false,
-        latencyMs: null,
+    resetMcpBridgeState(_defaultMcpBridgeState);
+    _defaultMcpBridgeDeps = null;
+}
+
+/**
+ * Cria uma instância isolada do MCP bridge para testes/DI/múltiplos runtimes.
+ *
+ * A API pública do módulo continua expondo wrappers sobre um singleton default para preservar backward compatibility.
+ *
+ * @param {Partial<McpBridgeDeps>} [overrides]
+ * @returns {{
+ *     getMcpStatus: () => McpHealthStatus;
+ *     listMcpTools: () => Promise<McpToolMeta[]>;
+ *     buildMcpTools: () => Promise<import('#copilot/sdk/types').Tool<any>[]>;
+ *     startMcpAutoReconnect: (
+ *         onReconnect: (tools: import('#copilot/sdk/types').Tool[]) => void | Promise<void>,
+ *         baseIntervalMs?: number,
+ *     ) => () => void;
+ *     resetState: () => void;
+ * }}
+ */
+export function createMcpToolBridge(overrides = {}) {
+    const state = createMcpBridgeState();
+    const deps = resolveMcpBridgeDeps(overrides);
+    return {
+        getMcpStatus: () => getMcpStatusFromState(state),
+        listMcpTools: () => listMcpToolsInternal(deps, { swallowErrors: true }),
+        buildMcpTools: () => buildMcpToolsInternal(state, deps),
+        startMcpAutoReconnect: (onReconnect, baseIntervalMs) =>
+            startMcpAutoReconnectInternal(state, deps, onReconnect, baseIntervalMs),
+        resetState: () => resetMcpBridgeState(state),
     };
 }
 
@@ -378,7 +555,14 @@ export function _resetMcpState() {
  *   Default is `5 * 60_000`
  * @returns {() => void} Função de cancelamento — chame para parar o job
  */
-export function startMcpAutoReconnect(onReconnect, baseIntervalMs = 5 * 60_000) {
+/**
+ * @param {McpBridgeState} state
+ * @param {McpBridgeDeps} deps
+ * @param {(tools: import('#copilot/sdk/types').Tool[]) => void | Promise<void>} onReconnect
+ * @param {number} [baseIntervalMs]
+ * @returns {() => void}
+ */
+function startMcpAutoReconnectInternal(state, deps, onReconnect, baseIntervalMs = 5 * 60_000) {
     // F10.2: backoff crescente para evitar ruído permanente em modo standalone
     // Passos: 1×, 2×, 3×, 6× — ex: 5min, 10min, 15min, 30min (cap)
     const BACKOFF_MULTIPLIERS = [1, 2, 3, 6];
@@ -395,7 +579,7 @@ export function startMcpAutoReconnect(onReconnect, baseIntervalMs = 5 * 60_000) 
             if (_cancelled) return;
             _timer = null;
 
-            const status = getMcpStatus();
+            const status = getMcpStatusFromState(state);
             if (!status.circuitOpen && status.available && status.toolCount > 0) {
                 // MCP saudável — resetar backoff e reagendar no intervalo base
                 _stepIndex = 0;
@@ -403,11 +587,14 @@ export function startMcpAutoReconnect(onReconnect, baseIntervalMs = 5 * 60_000) 
                 return;
             }
 
-            log('DEBUG', `[mcp-auto-reconnect] Tentando reconectar (step ${_stepIndex}, delay ${delayMs / 1000}s)...`);
+            deps.logFn(
+                'DEBUG',
+                `[mcp-auto-reconnect] Tentando reconectar (step ${_stepIndex}, delay ${delayMs / 1000}s)...`,
+            );
             try {
-                const tools = await buildMcpTools();
+                const tools = await buildMcpToolsInternal(state, deps);
                 if (tools.length > 0) {
-                    log('INFO', `[mcp-auto-reconnect] MCP reconectado: ${tools.length} tools disponíveis`);
+                    deps.logFn('INFO', `[mcp-auto-reconnect] MCP reconectado: ${tools.length} tools disponíveis`);
                     _stepIndex = 0;
                     await onReconnect(tools);
                 } else {
@@ -416,7 +603,7 @@ export function startMcpAutoReconnect(onReconnect, baseIntervalMs = 5 * 60_000) 
                 }
             } catch (err) {
                 const msg = err instanceof Error ? toError(err).message : String(err);
-                log('DEBUG', `[mcp-auto-reconnect] Falha na tentativa de reconnect: ${msg}`);
+                deps.logFn('DEBUG', `[mcp-auto-reconnect] Falha na tentativa de reconnect: ${msg}`);
                 _stepIndex = Math.min(_stepIndex + 1, BACKOFF_MULTIPLIERS.length - 1);
             }
 
@@ -434,4 +621,20 @@ export function startMcpAutoReconnect(onReconnect, baseIntervalMs = 5 * 60_000) 
             _timer = null;
         }
     };
+}
+
+/**
+ * Wrapper público sobre o MCP bridge default.
+ *
+ * @param {(tools: import('#copilot/sdk/types').Tool[]) => void | Promise<void>} onReconnect
+ * @param {number} [baseIntervalMs]
+ * @returns {() => void}
+ */
+export function startMcpAutoReconnect(onReconnect, baseIntervalMs = 5 * 60_000) {
+    return startMcpAutoReconnectInternal(
+        _defaultMcpBridgeState,
+        getDefaultMcpBridgeDeps(),
+        onReconnect,
+        baseIntervalMs,
+    );
 }
