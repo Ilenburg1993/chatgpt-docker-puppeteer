@@ -51,16 +51,19 @@ vi.mock('#copilot/core', async (importOriginal) => {
 });
 
 // Mock config/env
-vi.mock('#copilot/config/env', () => ({
-    getWebRateLimitPolicy: () => ({ perMinute: 60, enforced: false }),
-    WEB_FETCH_DISABLED: false,
-    WEB_SEARCH_DISABLED: false,
-
-    COPILOT_MCP_SERVERS: '',
-    COPILOT_CUSTOM_AGENTS: '',
-    COPILOT_DISABLED_AGENTS: '',
-    COPILOT_OPERATIONAL_PROFILE: 'production',
-}));
+vi.mock('#copilot/config/env', async (importOriginal) => {
+    const actual = /** @type {Record<string, unknown>} */ (await importOriginal());
+    return {
+        ...actual,
+        getWebRateLimitPolicy: () => ({ perMinute: 60, enforced: false }),
+        WEB_FETCH_DISABLED: false,
+        WEB_SEARCH_DISABLED: false,
+        COPILOT_MCP_SERVERS: '',
+        COPILOT_CUSTOM_AGENTS: '',
+        COPILOT_DISABLED_AGENTS: '',
+        COPILOT_OPERATIONAL_PROFILE: 'production',
+    };
+});
 
 // Mock logger
 vi.mock('../../../../src/copilot/tools/infra/logger.js', () => ({

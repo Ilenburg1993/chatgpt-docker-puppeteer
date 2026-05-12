@@ -165,47 +165,6 @@ export function wireInteractionEvents(session, { emit }) {
             emit('subagent.deselected', { agentName, data, ts: evt?.timestamp ?? Date.now() });
         }),
 
-        // ── external_tool.requested / completed ────────────────────────
-        onSessionEvent(session, SESSION_EVENTS.EXTERNAL_TOOL_REQUESTED, (evt) => {
-            const raw = /** @type {Record<string, unknown>} */ (/** @type {unknown} */ (evt));
-            const data = /** @type {Record<string, unknown>} */ (raw['data'] ?? {});
-            const toolName = /** @type {string | undefined} */ (data['toolName'] ?? data['name']);
-            const requestId = /** @type {string | undefined} */ (data['requestId']);
-            const toolCallId = /** @type {string | undefined} */ (data['toolCallId']);
-            log(
-                'INFO',
-                `[interaction-events] external_tool.requested: ${toolName ?? '?'} requestId=${requestId ?? '?'} toolCallId=${toolCallId ?? '?'}`,
-            );
-            emit('external_tool.requested', {
-                toolName,
-                requestId,
-                toolCallId,
-                data,
-                ts: evt?.timestamp ?? Date.now(),
-            });
-        }),
-
-        onSessionEvent(session, SESSION_EVENTS.EXTERNAL_TOOL_COMPLETED, (evt) => {
-            const raw = /** @type {Record<string, unknown>} */ (/** @type {unknown} */ (evt));
-            const data = /** @type {Record<string, unknown>} */ (raw['data'] ?? {});
-            const toolName = /** @type {string | undefined} */ (data['toolName'] ?? data['name']);
-            const requestId = /** @type {string | undefined} */ (data['requestId']);
-            const success = /** @type {boolean | undefined} */ (data['success']);
-            const toolCallId = /** @type {string | undefined} */ (data['toolCallId']);
-            log(
-                'DEBUG',
-                `[interaction-events] external_tool.completed: ${toolName ?? '?'} requestId=${requestId ?? '?'}`,
-            );
-            emit('external_tool.completed', {
-                toolName,
-                requestId,
-                toolCallId,
-                success,
-                data,
-                ts: evt?.timestamp ?? Date.now(),
-            });
-        }),
-
         // ── pending_messages.modified ───────────────────────────────────
         onSessionEvent(session, SESSION_EVENTS.PENDING_MESSAGES_MODIFIED, (evt) => {
             const raw = /** @type {Record<string, unknown>} */ (/** @type {unknown} */ (evt));

@@ -26,13 +26,17 @@ const mocks = vi.hoisted(() => ({
     extensionsReload: vi.fn(async () => ({ reloaded: true })),
 }));
 
-vi.mock('#copilot/config/env', () => ({
-    COPILOT_RPC_TIMEOUT_MS: 5000,
-    COPILOT_MCP_SERVERS: '',
-    COPILOT_CUSTOM_AGENTS: '',
-    COPILOT_DISABLED_AGENTS: '',
-    COPILOT_OPERATIONAL_PROFILE: 'production',
-}));
+vi.mock('#copilot/config/env', async (importOriginal) => {
+    const actual = /** @type {Record<string, unknown>} */ (await importOriginal());
+    return {
+        ...actual,
+        COPILOT_RPC_TIMEOUT_MS: 5000,
+        COPILOT_MCP_SERVERS: '',
+        COPILOT_CUSTOM_AGENTS: '',
+        COPILOT_DISABLED_AGENTS: '',
+        COPILOT_OPERATIONAL_PROFILE: 'production',
+    };
+});
 
 vi.mock('#copilot/core', async (importOriginal) => {
     const actual = /** @type {Record<string, unknown>} */ (await importOriginal());

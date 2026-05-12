@@ -148,16 +148,18 @@ describe('terminal/events/agent-runtime-events.js — contrato', () => {
         expect(completeTerminalTurnToolCall).toHaveBeenCalledWith({ toolCallId: 'tool-1', success: true });
         expect(recordToolCall).not.toHaveBeenCalled();
         expect(broadcastSse).toHaveBeenCalledWith(
-            'tool.start',
+            'tool.lifecycle',
             expect.objectContaining({
+                type: 'start',
                 toolName: 'workspace.read_file',
                 operation: 'read',
                 path: 'src/copilot/terminal/repl/repl.js',
             }),
         );
         expect(broadcastSse).toHaveBeenCalledWith(
-            'tool.complete',
+            'tool.lifecycle',
             expect.objectContaining({
+                type: 'complete',
                 operation: 'read',
                 lineRange: { start: 12, end: 19 },
                 path: 'src/copilot/terminal/repl/repl.js',
@@ -237,7 +239,11 @@ describe('terminal/events/agent-runtime-events.js — contrato', () => {
             args: { path: 'src/copilot/tools/file/read-tools.js', startLine: 1, endLine: 120 },
         });
 
-        expect(broadcastSse.mock.calls.filter(([event]) => event === 'tool.start')).toHaveLength(1);
+        expect(
+            broadcastSse.mock.calls.filter(
+                ([event, payload]) => event === 'tool.lifecycle' && payload?.type === 'start',
+            ),
+        ).toHaveLength(1);
         expect(println.mock.calls.filter(([line]) => String(line).includes('read_file_content'))).toHaveLength(1);
     });
 
@@ -267,8 +273,13 @@ describe('terminal/events/agent-runtime-events.js — contrato', () => {
         });
 
         expect(broadcastSse).toHaveBeenCalledWith(
-            'tool.start',
-            expect.objectContaining({ toolCallId: 'tool-headless', operation: 'write', path: 'tmp/live.md' }),
+            'tool.lifecycle',
+            expect.objectContaining({
+                type: 'start',
+                toolCallId: 'tool-headless',
+                operation: 'write',
+                path: 'tmp/live.md',
+            }),
         );
         expect(println).toHaveBeenCalledWith(expect.stringContaining('LLM-B perguntou: "Confirmar operação?"'));
         expect(buildUserPrompt).not.toHaveBeenCalled();
@@ -307,7 +318,10 @@ describe('terminal/events/agent-runtime-events.js — contrato', () => {
         });
 
         expect(println).not.toHaveBeenCalledWith(expect.stringContaining('ask_user'));
-        expect(broadcastSse).not.toHaveBeenCalledWith('tool.start', expect.objectContaining({ toolCallId: 'ask-1' }));
+        expect(broadcastSse).not.toHaveBeenCalledWith(
+            'tool.lifecycle',
+            expect.objectContaining({ type: 'start', toolCallId: 'ask-1' }),
+        );
         expect(recordTerminalActivity).not.toHaveBeenCalledWith(
             'tool',
             'Executando tool',

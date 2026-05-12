@@ -13,7 +13,6 @@ import { log } from '#copilot/observability';
 import { PinnedFilesLoader } from '../../config/pinned-files.js';
 import { container } from '../../core/di-container.js';
 import { broadcastSse } from '../dialog/index.js';
-import { setupTerminalIoActivityEvents } from '../events/io-activity-events.js';
 import { recordTerminalActivity, terminalActivityEmitter } from '../state/activity-state.js';
 
 /**
@@ -63,7 +62,6 @@ export async function runTerminalPinnedContextPhase(ctx) {
         });
     };
     terminalActivityEmitter.on('activity:changed', ctx.activityChangedHandler);
-    ctx.disposeIoActivityEvents = setupTerminalIoActivityEvents();
 }
 
 /**
@@ -80,8 +78,6 @@ export async function rollbackTerminalPinnedContextPhase(ctx) {
         terminalActivityEmitter.off('activity:changed', ctx.activityChangedHandler);
         ctx.activityChangedHandler = null;
     }
-    ctx.disposeIoActivityEvents?.();
-    ctx.disposeIoActivityEvents = null;
     if (pinnedLoader && ctx.pinnedFilesChangedHandler) {
         if (typeof pinnedLoader.off === 'function') {
             pinnedLoader.off('changed', ctx.pinnedFilesChangedHandler);

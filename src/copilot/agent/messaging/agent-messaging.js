@@ -329,13 +329,6 @@ export async function executeTask(session, task, callbacks) {
         const toolName = /** @type {string} */ (payload?.['toolName'] ?? '');
         const toolSpan = startSpanImmediate('copilot.tool', { toolName, toolCallId, taskId: task.id });
         if (toolSpan && toolCallId) toolSpans.set(toolCallId, toolSpan);
-        emit('tool.execution_start', {
-            toolCallId,
-            toolName,
-            args: payload?.['arguments'] ?? {},
-            mcpServerName: /** @type {string | null} */ (payload?.['mcpServerName'] ?? null),
-            taskId: task.id,
-        });
     });
 
     const unsubToolComplete = onAgentSdkSessionEvent(session, 'tool.execution_complete', (event) => {
@@ -346,14 +339,6 @@ export async function executeTask(session, task, callbacks) {
             toolSpan.end();
             toolSpans.delete(toolCallId);
         }
-        emit('tool.execution_complete', {
-            toolCallId,
-            toolName: /** @type {string | null} */ (payload?.['toolName'] ?? null),
-            args: payload?.['arguments'] ?? payload?.['args'] ?? null,
-            result: payload?.['result'] ?? payload?.['output'] ?? null,
-            success: /** @type {boolean} */ (payload?.['success'] ?? false),
-            taskId: task.id,
-        });
     });
 
     const startTime = Date.now();

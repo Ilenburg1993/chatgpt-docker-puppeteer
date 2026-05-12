@@ -11,9 +11,9 @@
 import { getBusy } from '../../presentation/runtime-ui-state-store.js';
 import { buildUserPrompt } from '../dialog/index.js';
 import { readTerminalAgentRuntimeEventHost } from '../frontend/gateways/agent-runtime.js';
-import { clearActiveToolCallRegistry, setActiveToolCallRegistry } from '../state/active-tool-call-registry.js';
 import { createToolCallRegistry } from '../state/tool-call-registry.js';
 import { setupTerminalAgentRuntimeEventListeners } from './agent-runtime-events.js';
+import { setupTerminalIoActivityEvents } from './io-activity-events.js';
 import { setupTerminalSdkSessionEventListeners } from './sdk-session-events.js';
 
 /**
@@ -23,7 +23,6 @@ import { setupTerminalSdkSessionEventListeners } from './sdk-session-events.js';
 export function setupTerminalEventAdapters(rl = null) {
     const agent = readTerminalAgentRuntimeEventHost();
     const registry = createToolCallRegistry();
-    setActiveToolCallRegistry(registry);
     const refreshPromptIfIdle = () => {
         if (!rl || getBusy()) return;
         rl.setPrompt(buildUserPrompt());
@@ -35,11 +34,12 @@ export function setupTerminalEventAdapters(rl = null) {
         refreshPromptIfIdle,
         registry,
     });
+    const cleanupIoActivityEvents = setupTerminalIoActivityEvents({ registry });
 
     return () => {
         cleanupAgentRuntimeEvents();
         cleanupSdkSessionEvents();
-        clearActiveToolCallRegistry();
+        cleanupIoActivityEvents();
     };
 }
 

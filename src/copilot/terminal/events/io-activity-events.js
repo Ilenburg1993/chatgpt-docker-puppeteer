@@ -11,12 +11,11 @@
 import { channel } from 'node:diagnostics_channel';
 import { relative } from 'node:path';
 import { getShowToolActivity } from '../../presentation/runtime-ui-state-store.js';
-import { broadcastSse, println } from '../dialog/index.js';
-import { getActiveToolCallRegistry } from '../state/active-tool-call-registry.js';
+import { println } from '../dialog/index.js';
 import { recordTerminalActivity } from '../state/activity-state.js';
 import { recordTerminalTurnFileActivity } from '../state/turn-trace-state.js';
 import { terminalThemeBadge, terminalThemeText } from '../state/ui-theme.js';
-import { buildToolLifecycleIoOp } from './tool-lifecycle-event.js';
+import { handleTerminalIoToolLifecycle } from './tool-lifecycle-runtime.js';
 
 const ioOperationChannel = channel('copilot.io.operation');
 const MAX_RECENT_IO_OPERATIONS = 80;
@@ -181,9 +180,10 @@ function recordRecentIoOperation(entry) {
 
 /**
  * @param {TerminalIoOperationMessage} message
+ * @param {ReturnType<import('../state/tool-call-registry.js').createToolCallRegistry> | null} registry
  * @returns {void}
  */
-function handleIoOperation(message) {
+function handleIoOperation(message, registry = null) {
     const io = message.io;
     if (!io) return;
     const success = message.success !== false;
@@ -245,34 +245,24 @@ function handleIoOperation(message) {
         );
     }
 
-    broadcastSse('io.operation', {
-        ...entry,
-    });
-
-    // F3.2: correlate I/O operation with active tool call in registry
-    const _activeRegistry = getActiveToolCallRegistry();
-    const _inFlight = _activeRegistry ? _activeRegistry.getAllInFlight() : [];
-    const _correlated = _inFlight.length > 0 ? _inFlight[0] : null;
-    broadcastSse(
-        'tool.lifecycle',
-        buildToolLifecycleIoOp(entry, {
-            correlatedToolCallId: _correlated?.toolCallId ?? null,
-            correlatedToolName: _correlated?.toolName ?? null,
-        }),
-    );
+    handleTerminalIoToolLifecycle({ registry, entry });
 }
 
 /**
  * Conecta operações reais da engine de I/O ao terminal.
  *
+ * @param {{
+ *     registry?: ReturnType<import('../state/tool-call-registry.js').createToolCallRegistry> | null;
+ * }} [options]
  * @returns {() => void}
  */
-export function setupTerminalIoActivityEvents() {
+export function setupTerminalIoActivityEvents(options = {}) {
+    const registry = options.registry ?? null;
     /** @param {unknown} message */
     const subscriber = (message) => {
         const normalized = normalizeIoMessage(message);
         if (!normalized) return;
-        handleIoOperation(normalized);
+        handleIoOperation(normalized, registry);
     };
     ioOperationChannel.subscribe(subscriber);
     return () => {

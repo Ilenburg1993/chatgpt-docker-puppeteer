@@ -79,14 +79,15 @@ describe('terminal/io-activity-events', () => {
         );
         expect(println).toHaveBeenCalledWith(expect.stringContaining('[IO]'));
         expect(broadcastSse).toHaveBeenCalledWith(
-            'io.operation',
+            'tool.lifecycle',
             expect.objectContaining({
+                type: 'io_op',
                 timestamp: 123,
                 success: true,
                 operation: 'read',
                 target: 'src/copilot/terminal/events/io-activity-events.js',
-                bytesRead: 42,
-                engine: 'io-engine.fs.readFile.text',
+                ioBytesRead: 42,
+                ioEngine: 'io-engine.fs.readFile.text',
             }),
         );
         expect(readTerminalIoActivityProjection(1)).toEqual([

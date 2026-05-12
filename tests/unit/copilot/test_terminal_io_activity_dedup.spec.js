@@ -84,8 +84,10 @@ describe('io-activity-events.js — dedup window F1.2', () => {
 
         __test__.handleIoOperation(makeIoMessage('read', '/workspace/src/app.js'));
 
-        // broadcastSse deve ter sido chamado com io.operation
-        expect(mocks.broadcastSse).toHaveBeenCalledWith('io.operation', expect.objectContaining({ operation: 'read' }));
+        expect(mocks.broadcastSse).toHaveBeenCalledWith(
+            'tool.lifecycle',
+            expect.objectContaining({ type: 'io_op', operation: 'read' }),
+        );
     });
 
     it('segunda operação idêntica dentro de 60ms é suprimida', async () => {
@@ -96,7 +98,9 @@ describe('io-activity-events.js — dedup window F1.2', () => {
         __test__.handleIoOperation(msg);
         __test__.handleIoOperation(msg); // duplicata imediata
 
-        const ioEvents = mocks.broadcastSse.mock.calls.filter((args) => args[0] === 'io.operation');
+        const ioEvents = mocks.broadcastSse.mock.calls.filter(
+            (args) => args[0] === 'tool.lifecycle' && args[1]?.type === 'io_op',
+        );
         expect(ioEvents).toHaveLength(1);
     });
 
@@ -109,7 +113,9 @@ describe('io-activity-events.js — dedup window F1.2', () => {
         __test__.handleIoOperation(msg);
         __test__.handleIoOperation(msg);
 
-        const ioEvents = mocks.broadcastSse.mock.calls.filter((args) => args[0] === 'io.operation');
+        const ioEvents = mocks.broadcastSse.mock.calls.filter(
+            (args) => args[0] === 'tool.lifecycle' && args[1]?.type === 'io_op',
+        );
         expect(ioEvents).toHaveLength(1);
     });
 
@@ -120,7 +126,9 @@ describe('io-activity-events.js — dedup window F1.2', () => {
         __test__.handleIoOperation(makeIoMessage('read', '/workspace/src/a.js'));
         __test__.handleIoOperation(makeIoMessage('read', '/workspace/src/b.js'));
 
-        const ioEvents = mocks.broadcastSse.mock.calls.filter((args) => args[0] === 'io.operation');
+        const ioEvents = mocks.broadcastSse.mock.calls.filter(
+            (args) => args[0] === 'tool.lifecycle' && args[1]?.type === 'io_op',
+        );
         expect(ioEvents).toHaveLength(2);
     });
 
@@ -131,7 +139,9 @@ describe('io-activity-events.js — dedup window F1.2', () => {
         __test__.handleIoOperation(makeIoMessage('read', '/workspace/src/shared.js'));
         __test__.handleIoOperation(makeIoMessage('write', '/workspace/src/shared.js'));
 
-        const ioEvents = mocks.broadcastSse.mock.calls.filter((args) => args[0] === 'io.operation');
+        const ioEvents = mocks.broadcastSse.mock.calls.filter(
+            (args) => args[0] === 'tool.lifecycle' && args[1]?.type === 'io_op',
+        );
         expect(ioEvents).toHaveLength(2);
     });
 

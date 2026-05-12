@@ -25,34 +25,21 @@ import {
     EMITTER_TOOL_EXECUTION_PROGRESS,
     EMITTER_TOOL_EXECUTION_START,
 } from '#copilot/events';
-import {
-    getShowIntentActivity,
-    getShowStreaming,
-    getShowToolActivity,
-} from '../../presentation/runtime-ui-state-store.js';
-import { broadcastSse, buildUserPrompt, clearInlineStatus, println, writeInlineStatus } from '../dialog/index.js';
+import { getShowIntentActivity, getShowToolActivity } from '../../presentation/runtime-ui-state-store.js';
+import { broadcastSse, buildUserPrompt, println, writeInlineStatus } from '../dialog/index.js';
 import { readTerminalRuntimeState } from '../frontend/gateways/agent-runtime.js';
 import { recordTerminalActivity } from '../state/activity-state.js';
 import { createTerminalPendingQuestionReplayState } from '../state/pending-question-replay.js';
 import { createToolCallRegistry } from '../state/tool-call-registry.js';
-import {
-    completeTerminalTurnToolCall,
-    recordTerminalTurnFileActivity,
-    recordTerminalTurnToolActivity,
-} from '../state/turn-trace-state.js';
 import { getTerminalDetailLevel } from '../state/ui-preferences.js';
 import { terminalActionChip, terminalThemeBadge, terminalThemeText } from '../state/ui-theme.js';
+import { compactTerminalToolText } from './tool-activity-presenter.js';
 import {
-    buildTerminalToolActivityPresentation,
-    compactTerminalToolText,
-    mapTerminalToolOperationRole,
-} from './tool-activity-presenter.js';
-import {
-    buildToolLifecycleComplete,
-    buildToolLifecyclePartialResult,
-    buildToolLifecycleProgress,
-    buildToolLifecycleStart,
-} from './tool-lifecycle-event.js';
+    handleTerminalNativeToolComplete,
+    handleTerminalNativeToolPartialResult,
+    handleTerminalNativeToolProgress,
+    handleTerminalNativeToolStart,
+} from './tool-lifecycle-runtime.js';
 /**
  * @typedef {{
  *     on: (event: string, handler: (...args: any[]) => void) => void;
@@ -105,24 +92,6 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, regi
     }, TOOL_HEARTBEAT_INTERVAL_MS);
     if (typeof toolHeartbeatTimer.unref === 'function') {
         toolHeartbeatTimer.unref();
-    }
-
-    /**
-     * @param {string} toolName
-     * @returns {boolean}
-     */
-    function shouldSuppressToolNarration(toolName) {
-        return toolName === 'ask_user';
-    }
-
-    /**
-     * @param {unknown} value
-     * @returns {Record<string, unknown>}
-     */
-    function objectArgsOrEmpty(value) {
-        return value && typeof value === 'object' && !Array.isArray(value)
-            ? /** @type {Record<string, unknown>} */ (value)
-            : {};
     }
 
     /**
@@ -207,360 +176,19 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, regi
     };
 
     const onToolStart = (/** @type {Record<string, unknown>} */ evt) => {
-        const toolCallId = /** @type {string} */ (evt?.['toolCallId'] ?? '');
-        const name = /** @type {string} */ (evt?.['toolName'] ?? evt?.['name'] ?? 'tool');
-        const rawArgs = objectArgsOrEmpty(evt?.['args'] ?? evt?.['arguments'] ?? evt?.['input'] ?? null);
-        const presentation = buildTerminalToolActivityPresentation(evt, name);
-        const canonicalName = presentation.canonicalToolName ?? name;
-        if (shouldSuppressToolNarration(name)) {
-            return;
-        }
-        if (toolCallId && _reg.isInFlight(toolCallId)) {
-            _reg.touch(toolCallId, {
-                rawArgs,
-                presentation,
-            });
-            return;
-        }
-        // Evita duplicidade visual: ferramentas externas já foram anunciadas em external_tool.requested
-        if (_reg.isNameInFlight(name)) {
-            return;
-        }
-        const compactDetail = getTerminalDetailLevel() === 'compact';
-        // Registra tool nativa no ToolCallRegistry para correlação io_op → toolCallId
-        if (toolCallId) {
-            _reg.register(toolCallId, name, 'native', {
-                canonicalName,
-                rawArgs,
-                presentation,
-            });
-        }
-        recordTerminalTurnToolActivity({
-            toolName: canonicalName,
-            operation: presentation.operation,
-            path: presentation.path,
-            target: presentation.target,
-            source: 'sdk',
-            status: 'started',
-            toolCallId,
-        });
-        for (const fileTarget of presentation.fileTargets) {
-            if (!fileTarget || fileTarget === presentation.path) continue;
-            recordTerminalTurnFileActivity({
-                path: fileTarget,
-                operation: presentation.operation,
-                source: 'sdk',
-            });
-        }
-        recordTerminalActivity('tool', 'Executando tool', {
-            detail: presentation.detail,
-            toolName: canonicalName,
-            source: 'sdk',
-        });
-        if (getShowToolActivity()) {
-            const operationRole = mapTerminalToolOperationRole(presentation.operation);
-            const opLabel = presentation.operation.toUpperCase();
-            println(
-                compactDetail
-                    ? `  ${terminalThemeBadge('tool', 'TOOL')} ${terminalThemeBadge(operationRole, opLabel)} ${terminalThemeText('tool', compactTerminalToolText(presentation.displayToolName, 28))} ${terminalThemeText('muted', '·')} ${terminalThemeText(operationRole, compactTerminalToolText(presentation.startLine, 86))}`
-                    : `  ${terminalThemeBadge('tool', 'TOOL')} ${terminalThemeBadge(operationRole, opLabel)} ${terminalThemeText('tool', presentation.displayToolName)} ${terminalThemeText('muted', '·')} ${terminalThemeText(operationRole, presentation.startLine)}`,
-            );
-        }
-        broadcastSse('tool.start', {
-            toolCallId,
-            toolName: name,
-            operation: presentation.operation,
-            path: presentation.path,
-            target: presentation.target,
-            fileTargets: presentation.fileTargets,
-            urlTargets: presentation.urlTargets,
-            searchTerms: presentation.searchTerms,
-            lineRange: presentation.lineRange,
-            patchFiles: presentation.patchFiles,
-        });
-        broadcastSse(
-            'tool.lifecycle',
-            buildToolLifecycleStart({
-                toolCallId,
-                toolName: name,
-                canonicalName,
-                operation: presentation.operation,
-                path: presentation.path,
-                target: presentation.target,
-                fileTargets: presentation.fileTargets,
-                urlTargets: presentation.urlTargets,
-                searchTerms: presentation.searchTerms,
-                lineRange: presentation.lineRange,
-                patchFiles: presentation.patchFiles,
-            }),
-        );
+        handleTerminalNativeToolStart({ registry: _reg, evt });
     };
 
     const onToolProgress = (/** @type {Record<string, unknown>} */ evt) => {
-        const toolCallId = /** @type {string} */ (evt?.['toolCallId'] ?? '');
-        const entry = toolCallId ? _reg.getEntry(toolCallId) : null;
-        const name =
-            entry?.canonicalName ??
-            entry?.toolName ??
-            /** @type {string} */ (evt?.['toolName'] ?? evt?.['name'] ?? 'tool');
-        if (shouldSuppressToolNarration(name)) {
-            return;
-        }
-        const compactDetail = getTerminalDetailLevel() === 'compact';
-        const presentation = entry?.presentation ?? buildTerminalToolActivityPresentation(evt, name);
-        const progress = typeof evt?.['progress'] === 'number' ? Number(evt['progress']) : null;
-        const progressMessage = typeof evt?.['progressMessage'] === 'string' ? evt['progressMessage'] : null;
-        const effectiveDetail =
-            progressMessage ?? (progress !== null ? `${presentation.detail} · ${progress}%` : presentation.detail);
-        const shouldPrint =
-            getShowToolActivity() &&
-            ((progress !== null &&
-                (entry?.lastProgress == null || Math.abs(progress - entry.lastProgress) >= 5 || progress === 100)) ||
-                (progressMessage !== null && progressMessage !== entry?.lastProgressMessage));
-        if (toolCallId) {
-            _reg.touch(toolCallId, {
-                presentation,
-                progress,
-                progressMessage,
-            });
-        }
-        recordTerminalActivity('tool', 'Executando tool', {
-            detail: effectiveDetail,
-            toolName: name,
-            progress,
-            source: 'sdk',
-            recordHistory: false,
-        });
-        if (shouldPrint) {
-            const suffix = progressMessage ?? (progress !== null ? `${progress}%` : '');
-            const progressLine =
-                `  ${terminalThemeText('muted', '↳')} ${terminalThemeText('tool', compactDetail ? compactTerminalToolText(presentation.progressLinePrefix, 56) : presentation.progressLinePrefix)} ${terminalThemeText('muted', suffix)}`.trimEnd();
-            if (compactDetail) {
-                writeInlineStatus(progressLine);
-            } else {
-                println(progressLine);
-            }
-        }
-        broadcastSse('tool.progress', {
-            toolCallId,
-            toolName: name,
-            operation: presentation.operation,
-            path: presentation.path,
-            target: presentation.target,
-            fileTargets: presentation.fileTargets,
-            urlTargets: presentation.urlTargets,
-            searchTerms: presentation.searchTerms,
-            lineRange: presentation.lineRange,
-            patchFiles: presentation.patchFiles,
-            progress,
-            progressMessage,
-        });
-        broadcastSse(
-            'tool.lifecycle',
-            buildToolLifecycleProgress({
-                toolCallId,
-                toolName: name,
-                operation: presentation.operation,
-                path: presentation.path,
-                target: presentation.target,
-                fileTargets: presentation.fileTargets,
-                urlTargets: presentation.urlTargets,
-                searchTerms: presentation.searchTerms,
-                lineRange: presentation.lineRange,
-                patchFiles: presentation.patchFiles,
-                progress,
-                progressMessage,
-            }),
-        );
+        handleTerminalNativeToolProgress({ registry: _reg, evt });
     };
 
-    const onToolPartialResult = (/** @type {{ toolCallId?: string; partialOutput?: string }} */ evt) => {
-        const toolCallId = evt?.toolCallId ?? '';
-        const entry = toolCallId ? _reg.getEntry(toolCallId) : null;
-        const name = entry?.canonicalName ?? entry?.toolName ?? 'tool';
-        if (shouldSuppressToolNarration(name)) {
-            return;
-        }
-        const presentation = entry?.presentation ?? buildTerminalToolActivityPresentation({}, name);
-        const partialOutput = typeof evt?.partialOutput === 'string' ? evt.partialOutput : '';
-        if (!partialOutput) return;
-        if (toolCallId) {
-            _reg.touch(toolCallId, { presentation });
-        }
-        const preview = compactTerminalToolText(partialOutput, 120);
-        recordTerminalActivity('tool', 'Streaming de saída da tool', {
-            detail: preview ? `${presentation.detail} · ${preview}` : presentation.detail,
-            toolName: name,
-            source: 'sdk',
-            recordHistory: false,
-        });
-        if (getShowStreaming()) {
-            for (const line of partialOutput.split('\n')) {
-                if (!line) continue;
-                println(
-                    `  ${terminalThemeText('muted', '↳')} ${terminalThemeText('tool', presentation.progressLinePrefix)} ${terminalThemeText('muted', line)}`,
-                );
-            }
-        }
-        broadcastSse('tool.partial_result', {
-            toolCallId,
-            toolName: name,
-            operation: presentation.operation,
-            path: presentation.path,
-            target: presentation.target,
-            fileTargets: presentation.fileTargets,
-            urlTargets: presentation.urlTargets,
-            searchTerms: presentation.searchTerms,
-            lineRange: presentation.lineRange,
-            patchFiles: presentation.patchFiles,
-            partialOutput,
-        });
-        broadcastSse(
-            'tool.lifecycle',
-            buildToolLifecyclePartialResult({
-                toolCallId,
-                toolName: name,
-                operation: presentation.operation,
-                path: presentation.path,
-                target: presentation.target,
-                fileTargets: presentation.fileTargets,
-                urlTargets: presentation.urlTargets,
-                searchTerms: presentation.searchTerms,
-                lineRange: presentation.lineRange,
-                patchFiles: presentation.patchFiles,
-                partialOutput,
-            }),
-        );
+    const onToolPartialResult = (/** @type {Record<string, unknown>} */ evt) => {
+        handleTerminalNativeToolPartialResult({ registry: _reg, evt });
     };
 
     const onToolComplete = (/** @type {Record<string, unknown>} */ evt) => {
-        const toolCallId = /** @type {string} */ (evt?.['toolCallId'] ?? '');
-        const success = Boolean(evt?.['success']);
-        const requestId = typeof evt?.['requestId'] === 'string' ? evt['requestId'] : null;
-        const entry = toolCallId ? _reg.getEntry(toolCallId) : null;
-        const eventName =
-            typeof evt?.['toolName'] === 'string' && evt['toolName'].length > 0
-                ? evt['toolName']
-                : typeof evt?.['name'] === 'string' && evt['name'].length > 0
-                  ? evt['name']
-                  : null;
-        const name = entry?.canonicalName ?? entry?.toolName ?? eventName ?? 'tool';
-        if (shouldSuppressToolNarration(name)) {
-            return;
-        }
-        // Evita duplicidade visual: ferramentas externas já foram anunciadas em external_tool.completed
-        const suppressByInFlightName = entry ? false : _reg.isNameInFlight(name);
-        if (
-            suppressByInFlightName ||
-            _reg.wasNameRecentlyCompleted(name, requestId) ||
-            _reg.wasRecentlyCompleted(toolCallId, requestId)
-        ) {
-            return;
-        }
-        // Completa tool nativa no ToolCallRegistry (após guard; externals são completadas em onExternalToolCompleted)
-        if (toolCallId && _reg.getEntry(toolCallId)?.kind === 'native') {
-            _reg.complete(toolCallId, success);
-        }
-        const compactDetail = getTerminalDetailLevel() === 'compact';
-        const completionPresentation = buildTerminalToolActivityPresentation(
-            {
-                ...evt,
-                args: objectArgsOrEmpty(
-                    evt?.['args'] ?? evt?.['arguments'] ?? evt?.['input'] ?? entry?.rawArgs ?? null,
-                ),
-            },
-            name,
-        );
-        const presentation =
-            completionPresentation.target || completionPresentation.path || completionPresentation.lineRange
-                ? completionPresentation
-                : (entry?.presentation ?? completionPresentation);
-        const canonicalName = presentation.canonicalToolName ?? name;
-        const durationMs = entry
-            ? Date.now() - entry.t0
-            : Number.isFinite(Number(evt?.['durationMs']))
-              ? Number(evt?.['durationMs'])
-              : 0;
-        const dur = durationMs > 0 ? `${(durationMs / 1000).toFixed(1)}s` : 'n/d';
-        const icon = success ? terminalThemeText('success', '✅') : terminalThemeText('error', '❌');
-        const operationRole = mapTerminalToolOperationRole(presentation.operation);
-        if (compactDetail) {
-            clearInlineStatus();
-        }
-        if (toolCallId) {
-            completeTerminalTurnToolCall({ toolCallId, success });
-        }
-        const hasOnlyCallIdTarget =
-            typeof presentation.target === 'string' &&
-            presentation.target.length > 0 &&
-            presentation.target === toolCallId;
-        const lowFidelityGeneric =
-            canonicalName === 'tool' &&
-            presentation.operation === 'unknown' &&
-            presentation.fileTargets.length === 0 &&
-            presentation.urlTargets.length === 0 &&
-            presentation.searchTerms.length === 0 &&
-            (hasOnlyCallIdTarget || !presentation.target);
-        const lowFidelitySuffix =
-            lowFidelityGeneric && toolCallId ? ` · callId=${compactTerminalToolText(toolCallId, 28)}` : '';
-        const completionDetail = `${presentation.completeLine(success, dur)}${lowFidelitySuffix}`;
-
-        const activityLabel = lowFidelityGeneric
-            ? success
-                ? 'Tool concluída (metadados parciais)'
-                : 'Tool falhou (metadados parciais)'
-            : success
-              ? 'Tool concluída'
-              : 'Tool falhou';
-        recordTerminalActivity('tool', activityLabel, {
-            detail: completionDetail,
-            toolName: canonicalName,
-            progress: success ? 100 : null,
-            severity: success ? 'info' : 'error',
-            source: 'sdk',
-        });
-        if (getShowToolActivity()) {
-            const statusBadge = success ? terminalThemeBadge('success', 'DONE') : terminalThemeBadge('error', 'FAIL');
-            const renderedName =
-                lowFidelityGeneric && toolCallId ? `tool#${toolCallId.slice(-8)}` : presentation.displayToolName;
-            println(
-                compactDetail
-                    ? `  ${icon} ${statusBadge} ${terminalThemeText('tool', compactTerminalToolText(renderedName, 28))} ${terminalThemeText('muted', '·')} ${terminalThemeText(operationRole, compactTerminalToolText(completionDetail, 88))}`
-                    : `  ${icon} ${statusBadge} ${terminalThemeText('tool', renderedName)} ${terminalThemeText('muted', '·')} ${terminalThemeText(operationRole, completionDetail)}`,
-            );
-        }
-        broadcastSse('tool.complete', {
-            toolCallId,
-            toolName: name,
-            operation: presentation.operation,
-            path: presentation.path,
-            target: presentation.target,
-            fileTargets: presentation.fileTargets,
-            urlTargets: presentation.urlTargets,
-            searchTerms: presentation.searchTerms,
-            lineRange: presentation.lineRange,
-            patchFiles: presentation.patchFiles,
-            success,
-            durationMs: entry ? Date.now() - entry.t0 : 0,
-        });
-        broadcastSse(
-            'tool.lifecycle',
-            buildToolLifecycleComplete({
-                toolCallId,
-                toolName: name,
-                canonicalName,
-                operation: presentation.operation,
-                path: presentation.path,
-                target: presentation.target,
-                fileTargets: presentation.fileTargets,
-                urlTargets: presentation.urlTargets,
-                searchTerms: presentation.searchTerms,
-                lineRange: presentation.lineRange,
-                patchFiles: presentation.patchFiles,
-                success,
-                durationMs: durationMs > 0 ? durationMs : 0,
-            }),
-        );
+        handleTerminalNativeToolComplete({ registry: _reg, evt });
     };
 
     const onSessionError = (/** @type {Record<string, unknown>} */ evt) => {

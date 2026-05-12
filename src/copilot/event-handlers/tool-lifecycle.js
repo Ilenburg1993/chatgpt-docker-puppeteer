@@ -2,7 +2,7 @@
 /**
  * @module copilot/event-handlers/tool-lifecycle
  * @see EventBus
- * Faixa B3: Handlers dedicados para tool.execution_progress, tool.user_requested, tool.execution_start/complete.
+ * Faixa B3: Bridge canônico de todos os eventos de lifecycle de tools vindos da sessão SDK.
  */
 
 import { SESSION_EVENTS } from '#copilot/events';
@@ -16,6 +16,24 @@ import { onSessionEvent } from '../sdk/session/events.js';
  */
 export function wireToolLifecycleEvents(session, { emit }) {
     return [
+        // ── tool.execution_start ────────────────────────────────────────
+        onSessionEvent(session, SESSION_EVENTS.TOOL_EXECUTION_START, (evt) => {
+            const raw = /** @type {Record<string, unknown>} */ (/** @type {unknown} */ (evt));
+            const data = /** @type {Record<string, unknown>} */ (raw['data'] ?? {});
+            const toolCallId = /** @type {string | undefined} */ (data['toolCallId']);
+            const toolName = /** @type {string | undefined} */ (data['toolName']);
+            const mcpServerName = /** @type {string | undefined} */ (data['mcpServerName']);
+            log('INFO', `[tool-lifecycle] start: ${toolName ?? toolCallId ?? '?'} call=${toolCallId ?? '?'}`);
+            emit('tool.execution_start', {
+                toolCallId,
+                toolName,
+                args: data['arguments'] ?? data['args'] ?? {},
+                mcpServerName: mcpServerName ?? null,
+                requestId: /** @type {string | undefined} */ (data['requestId']) ?? null,
+                ts: evt?.timestamp ?? Date.now(),
+            });
+        }),
+
         // ── tool.execution_partial_result ───────────────────────────────
         onSessionEvent(session, SESSION_EVENTS.TOOL_EXECUTION_PARTIAL_RESULT, (evt) => {
             const raw = /** @type {Record<string, unknown>} */ (/** @type {unknown} */ (evt));
@@ -62,6 +80,65 @@ export function wireToolLifecycleEvents(session, { emit }) {
             const requestId = /** @type {string | undefined} */ (data['requestId']);
             log('INFO', `[tool-lifecycle] user_requested: ${toolName ?? '?'} requestId=${requestId ?? '?'}`);
             emit('tool.user_requested', { toolName, requestId, ts: evt?.timestamp ?? Date.now() });
+        }),
+
+        // ── tool.execution_complete ─────────────────────────────────────
+        onSessionEvent(session, SESSION_EVENTS.TOOL_EXECUTION_COMPLETE, (evt) => {
+            const raw = /** @type {Record<string, unknown>} */ (/** @type {unknown} */ (evt));
+            const data = /** @type {Record<string, unknown>} */ (raw['data'] ?? {});
+            const toolCallId = /** @type {string | undefined} */ (data['toolCallId']);
+            const toolName = /** @type {string | undefined} */ (data['toolName']);
+            const success = /** @type {boolean | undefined} */ (data['success']);
+            log('DEBUG', `[tool-lifecycle] complete: ${toolName ?? toolCallId ?? '?'} success=${success ?? '?'}`);
+            emit('tool.execution_complete', {
+                toolCallId,
+                toolName: toolName ?? null,
+                args: data['arguments'] ?? data['args'] ?? null,
+                result: data['result'] ?? data['output'] ?? null,
+                success: success ?? false,
+                requestId: /** @type {string | undefined} */ (data['requestId']) ?? null,
+                durationMs: /** @type {number | undefined} */ (data['durationMs']) ?? null,
+                ts: evt?.timestamp ?? Date.now(),
+            });
+        }),
+
+        // ── external_tool.requested ─────────────────────────────────────
+        onSessionEvent(session, SESSION_EVENTS.EXTERNAL_TOOL_REQUESTED, (evt) => {
+            const raw = /** @type {Record<string, unknown>} */ (/** @type {unknown} */ (evt));
+            const data = /** @type {Record<string, unknown>} */ (raw['data'] ?? {});
+            const toolName = /** @type {string | undefined} */ (data['toolName'] ?? data['name']);
+            const requestId = /** @type {string | undefined} */ (data['requestId']);
+            const toolCallId = /** @type {string | undefined} */ (data['toolCallId']);
+            log(
+                'INFO',
+                `[tool-lifecycle] external requested: ${toolName ?? '?'} requestId=${requestId ?? '?'} toolCallId=${toolCallId ?? '?'}`,
+            );
+            emit('external_tool.requested', {
+                toolName,
+                requestId,
+                toolCallId,
+                data,
+                ts: evt?.timestamp ?? Date.now(),
+            });
+        }),
+
+        // ── external_tool.completed ─────────────────────────────────────
+        onSessionEvent(session, SESSION_EVENTS.EXTERNAL_TOOL_COMPLETED, (evt) => {
+            const raw = /** @type {Record<string, unknown>} */ (/** @type {unknown} */ (evt));
+            const data = /** @type {Record<string, unknown>} */ (raw['data'] ?? {});
+            const toolName = /** @type {string | undefined} */ (data['toolName'] ?? data['name']);
+            const requestId = /** @type {string | undefined} */ (data['requestId']);
+            const success = /** @type {boolean | undefined} */ (data['success']);
+            const toolCallId = /** @type {string | undefined} */ (data['toolCallId']);
+            log('DEBUG', `[tool-lifecycle] external completed: ${toolName ?? '?'} requestId=${requestId ?? '?'}`);
+            emit('external_tool.completed', {
+                toolName,
+                requestId,
+                toolCallId,
+                success,
+                data,
+                ts: evt?.timestamp ?? Date.now(),
+            });
         }),
     ];
 }

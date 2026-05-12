@@ -46,14 +46,18 @@ const mocks = vi.hoisted(() => ({
     withSkipPermission: vi.fn((tool) => tool),
 }));
 
-vi.mock('#copilot/config/env', () => ({
-    COPILOT_MCP_SERVERS: 'test-server',
-    COPILOT_MODEL: 'gpt-4.1-test',
-    COPILOT_SDK_ENABLED: true,
-    COPILOT_CUSTOM_AGENTS: '',
-    COPILOT_DISABLED_AGENTS: '',
-    COPILOT_OPERATIONAL_PROFILE: 'production',
-}));
+vi.mock('#copilot/config/env', async (importOriginal) => {
+    const actual = /** @type {Record<string, unknown>} */ (await importOriginal());
+    return {
+        ...actual,
+        COPILOT_MCP_SERVERS: 'test-server',
+        COPILOT_MODEL: 'gpt-4.1-test',
+        COPILOT_SDK_ENABLED: true,
+        COPILOT_CUSTOM_AGENTS: '',
+        COPILOT_DISABLED_AGENTS: '',
+        COPILOT_OPERATIONAL_PROFILE: 'production',
+    };
+});
 
 vi.mock('../../../../src/copilot/tools/infra/logger.js', () => ({
     log: mocks.log,

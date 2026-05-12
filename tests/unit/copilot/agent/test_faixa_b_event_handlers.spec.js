@@ -281,13 +281,13 @@ describe('Faixa B2 — mcp-events handlers', () => {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 describe('Faixa B3 — tool-lifecycle handlers', () => {
-    it('wireToolLifecycleEvents retorna array de 3 unsubscribe functions', async () => {
+    it('wireToolLifecycleEvents retorna array de 7 unsubscribe functions', async () => {
         const { wireToolLifecycleEvents } = await import('#copilot/event-handlers/tool-lifecycle');
         const session = createMockSession();
         const emit = vi.fn();
         const unsubs = wireToolLifecycleEvents(/** @type {any} */ (session), { emit });
         expect(Array.isArray(unsubs)).toBe(true);
-        expect(unsubs.length).toBe(3);
+        expect(unsubs.length).toBe(7);
     });
 
     it('emite tool.execution_partial_result', async () => {
@@ -336,6 +336,25 @@ describe('Faixa B3 — tool-lifecycle handlers', () => {
         );
     });
 
+    it('emite external_tool.requested/completed no bridge canônico de tools', async () => {
+        const { wireToolLifecycleEvents } = await import('#copilot/event-handlers/tool-lifecycle');
+        const session = createMockSession();
+        const emit = vi.fn();
+        wireToolLifecycleEvents(/** @type {any} */ (session), { emit });
+
+        session._emit('external_tool.requested', { toolName: 'browser.open', requestId: 'ext-1' });
+        expect(emit).toHaveBeenCalledWith(
+            'external_tool.requested',
+            expect.objectContaining({ toolName: 'browser.open', requestId: 'ext-1' }),
+        );
+
+        session._emit('external_tool.completed', { toolName: 'browser.open', requestId: 'ext-1', success: true });
+        expect(emit).toHaveBeenCalledWith(
+            'external_tool.completed',
+            expect.objectContaining({ toolName: 'browser.open', requestId: 'ext-1', success: true }),
+        );
+    });
+
     it('mode-and-tools emite session.mode_changed e session.plan_changed', async () => {
         const { wireModeAndToolEvents } = await import('#copilot/event-handlers/mode-and-tools');
         const session = createMockSession();
@@ -357,13 +376,13 @@ describe('Faixa B3 — tool-lifecycle handlers', () => {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 describe('Faixa B4 — interaction-events handlers', () => {
-    it('wireInteractionEvents retorna array de 17 unsubscribe functions', async () => {
+    it('wireInteractionEvents retorna array de 15 unsubscribe functions', async () => {
         const { wireInteractionEvents } = await import('#copilot/event-handlers/interaction-events');
         const session = createMockSession();
         const emit = vi.fn();
         const unsubs = wireInteractionEvents(/** @type {any} */ (session), { emit });
         expect(Array.isArray(unsubs)).toBe(true);
-        expect(unsubs.length).toBe(17);
+        expect(unsubs.length).toBe(15);
     });
 
     it('emite skill.invoked', async () => {
@@ -474,23 +493,11 @@ describe('Faixa B4 — interaction-events handlers', () => {
         expect(emit).toHaveBeenCalledWith('subagent.deselected', expect.objectContaining({ agentName: 'code-agent' }));
     });
 
-    it('emite external_tool e pending_messages para UX/observabilidade', async () => {
+    it('emite pending_messages.modified para UX/observabilidade', async () => {
         const { wireInteractionEvents } = await import('#copilot/event-handlers/interaction-events');
         const session = createMockSession();
         const emit = vi.fn();
         wireInteractionEvents(/** @type {any} */ (session), { emit });
-
-        session._emit('external_tool.requested', { toolName: 'browser.open', requestId: 'ext-1' });
-        expect(emit).toHaveBeenCalledWith(
-            'external_tool.requested',
-            expect.objectContaining({ toolName: 'browser.open', requestId: 'ext-1' }),
-        );
-
-        session._emit('external_tool.completed', { toolName: 'browser.open', requestId: 'ext-1', success: true });
-        expect(emit).toHaveBeenCalledWith(
-            'external_tool.completed',
-            expect.objectContaining({ toolName: 'browser.open', requestId: 'ext-1', success: true }),
-        );
 
         session._emit('pending_messages.modified', { count: 2 });
         expect(emit).toHaveBeenCalledWith('pending_messages.modified', expect.objectContaining({ count: 2 }));

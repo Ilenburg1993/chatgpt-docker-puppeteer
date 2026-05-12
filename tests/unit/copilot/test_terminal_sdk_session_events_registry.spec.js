@@ -169,8 +169,10 @@ describe('sdk-session-events.js — integração com ToolCallRegistry', () => {
         expect(registry.isNameInFlight('github_api')).toBe(false);
         expect(registry.wasRecentlyCompleted(expect.any(String), 'req-002')).toBe(true);
 
-        // SSE emitido deve ter o nome real (github_api), não o genérico (external_tool)
-        const sseCall = mocks.broadcastSse.mock.calls.find(([event]) => event === 'external_tool.completed');
+        // O evento canônico deve ter o nome real (github_api), não o genérico (external_tool)
+        const sseCall = mocks.broadcastSse.mock.calls.find(
+            ([event, payload]) => event === 'tool.lifecycle' && payload?.type === 'external_completed',
+        );
         expect(sseCall).toBeDefined();
         expect(sseCall?.[1]?.toolName).toBe('github_api');
     });

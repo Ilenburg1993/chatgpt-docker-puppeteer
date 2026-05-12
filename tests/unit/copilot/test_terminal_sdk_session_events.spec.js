@@ -347,8 +347,12 @@ describe('terminal/events/sdk-session-events.js — contrato', () => {
             expect.objectContaining({ requestId: 'ui-1', answer: 'B', wasFreeform: false }),
         );
         expect(mocks.broadcastSse).toHaveBeenCalledWith(
-            'tool.user_requested',
-            expect.objectContaining({ toolName: 'workspace.write', requestId: 'tool-1' }),
+            'tool.lifecycle',
+            expect.objectContaining({
+                type: 'user_requested',
+                toolName: 'workspace.write',
+                requestId: 'tool-1',
+            }),
         );
         expect(mocks.broadcastSse).toHaveBeenCalledWith(
             'mcp.oauth.required',

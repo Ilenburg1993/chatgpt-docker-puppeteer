@@ -2,20 +2,18 @@
 /**
  * src/copilot/terminal/events/tool-lifecycle-event.js
  *
- * Schema canônico unificado do evento `tool.lifecycle` — emitido via SSE como suplemento aos eventos legados
- * (tool.start, tool.complete, external_tool.*, io.operation).
+ * Schema canônico unificado do evento `tool.lifecycle` — emitido via SSE como trilha única de tools no terminal.
  *
  * **Por que este arquivo existe?**
  *
- * O pipeline de eventos de tool cresceu de forma orgânica e acumulou 3 famílias de eventos paralelas no SSE do
- * terminal:
+ * O pipeline de eventos de tool cresceu de forma orgânica e acumulou 3 famílias paralelas de origem:
  *
  * - `tool.start / progress / partial_result / complete` (agent-runtime-events)
  * - `external_tool.requested / completed / tool.user_requested` (sdk-session-events)
  * - `io.operation` (io-activity-events)
  *
- * `tool.lifecycle` é o evento canônico unificado que normaliza todas as fases e fontes em um schema único e coerente,
- * sem remover os eventos existentes (backward-compat). Clientes novos podem ouvir apenas `tool.lifecycle`.
+ * `tool.lifecycle` é o evento canônico unificado que normaliza todas as fases e fontes em um schema único e coerente. O
+ * terminal emite apenas `tool.lifecycle`; adapters antigos permanecem apenas como referência histórica de origem.
  *
  * **F3.2 — Correlação io_op → toolCallId:** Quando `type = 'io_op'`, se houver tools em execução no ToolCallRegistry,
  * `correlatedToolCallId` / `correlatedToolName` identificam a tool mais provável responsável pela operação de I/O.
@@ -105,6 +103,7 @@
  * @property {{ name?: string; message?: string } | null} [ioError]
  * @property {string | null} [correlatedToolCallId]
  * @property {string | null} [correlatedToolName]
+ * @property {number | null} [timestamp]
  */
 
 /**
@@ -120,7 +119,7 @@ export function buildToolLifecycleEvent(type, source, fields) {
     return {
         type,
         source,
-        timestamp: Date.now(),
+        timestamp: fields.timestamp ?? Date.now(),
 
         toolCallId: fields.toolCallId ?? null,
         toolName: fields.toolName ?? 'tool',
@@ -386,6 +385,7 @@ export function buildToolLifecycleUserRequested(fields) {
  * Inclui campos de correlação F3.2 quando uma tool está em voo no ToolCallRegistry.
  *
  * @param {{
+ *     timestamp?: number | null;
  *     operation: string;
  *     target: string;
  *     targets: string[];
@@ -403,6 +403,7 @@ export function buildToolLifecycleUserRequested(fields) {
  */
 export function buildToolLifecycleIoOp(ioEntry, correlation) {
     return buildToolLifecycleEvent('io_op', 'io', {
+        timestamp: ioEntry.timestamp ?? null,
         toolName: `io.${ioEntry.operation}`,
         operation: ioEntry.operation,
         target: ioEntry.target,
