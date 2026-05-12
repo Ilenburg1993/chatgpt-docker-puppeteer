@@ -64,9 +64,9 @@ Reconstruir `src/copilot/tools/` como um subsistema canônico, com:
 
 #### Ainda ativos e no backlog estrutural
 
-- `SYS-GAP-11` — boundary enforcement do terminal ainda incompleto.
 - convergência final do MCP bridge para uso **injetado por runtime/sessão**, em vez de depender principalmente do singleton default exposto pelo wrapper compatível.
 - contract tests e health-checks dedicados para a nova policy finita das file tools (content/search/list/diff) ainda merecem expansão.
+- próxima onda ampla fora de `tools/`: reorganização barrel-first de `presentation/` como **shared edge layer**, sem repetir a topologia plana atual.
 
 #### Gaps adicionais encontrados na investigação
 
@@ -181,13 +181,13 @@ Reconstruir `src/copilot/tools/` como um subsistema canônico, com:
 
 ### C. Próximo lote de transformação ampla
 
-1. **Boundary enforcement do terminal**
-  - elevar a proteção arquitetural além do estado atual;
-  - adotar a política **terminal barrel-first** como shape alvo da borda;
-  - converter `terminal/index.js` e `terminal/dialog/index.js` em barrels puros, movendo composição/runtime para arquivos nomeados explicitamente;
-  - criar barrels recursivos em `repl/`, `state/`, `stores/`, `wiring/`, `terminal-phases/`, `frontend/gateways/`, `frontend/projections/` e `events/`;
-  - migrar imports cross-folder do terminal para barrels, com anti-bypass progressivo em lint/contracts;
-  - preparar endurecimento progressivo de lint/contracts.
+1. **Consolidação barrel-first de `presentation/`**
+  - tratar `presentation/` como **shared edge layer** e não como borda final;
+  - sair da topologia plana atual para subdomínios explícitos (`agent`, `routing`, `runtime`, `state`, `files`, `system`, `conversation`, `sdk`, `contracts`);
+  - introduzir sub-barrels puros e futura superfície pública explícita em `package.json`, evitando deep imports em arquivos concretos;
+  - migrar `server/`, `terminal/` e testes para consumir sub-superfícies canônicas de `presentation/`;
+  - decompor hotspots principais (`agent-control.js`, `runtime-ui-state-store.js`, `system-metrics.js`, `runtime-health.js`, `runtime-sdk-session.js`);
+  - endurecer governança para impedir `presentation/`→`terminal/server` e restringir consumers externos a barrels públicos.
 
 2. **Expandir ainda mais contract tests da policy finita das file tools**
   - completar cobertura também para `search_in_files` e `workspace_symbol_search`;
@@ -251,5 +251,7 @@ Reconstruir `src/copilot/tools/` como um subsistema canônico, com:
 - ✅ 2026-05-12: contract tests finitos adicionados para a policy das file tools (`read_file_content`, `list_directory`, `diff_files`) com validação de metadados de truncamento.
 - ✅ 2026-05-12: rodada ampla revalidada com `npm run test:copilot`, `npm run typecheck:strict:all` e `npm run lint` verdes.
 - ✅ 2026-05-12: `main` sincronizada com `origin/main` após organização dos commits do lote estrutural em tooling, runtime MCP/file-tools e terminal/events.
-- ✅ 2026-05-12: avaliação profunda da borda `terminal/` consolidada em `2026-05-12-TERMINAL-BARREL-FIRST-ARQUITETURA-2.1.md`, definindo o target barrel-first para a próxima onda.
-- 🔄 Próximo: executar a fase terminal barrel-first (pureza de `index.js`, barrels recursivos e migração de imports cross-folder), completar a cobertura contratual da policy finita das file tools e reduzir warnings TDZ-safe residuais.
+- ✅ 2026-05-12: avaliação profunda da borda `terminal/` consolidada em `2026-05-12-TERMINAL-BARREL-FIRST-ARQUITETURA-2.1.md`, seguida de execução ampla da fase barrel-first (root barrels puros, barrels recursivos, minimização de surface, anti-bypass e boundary inversion do boot).
+- ✅ 2026-05-12: provado por evidência que `src/copilot` fora de `terminal/` não depende mais do terminal; o boot canônico agora é `terminal/bootstrap.js -> boot/runtime-bootstrap.js` com host terminal injetado.
+- ✅ 2026-05-12: investigação profunda de `presentation/` consolidada em `2026-05-12-PRESENTATION-BARREL-FIRST-ARQUITETURA-2.1.md`, definindo a próxima onda barrel-first adaptada ao papel de shared edge layer.
+- 🔄 Próximo: executar a reorganização barrel-first de `presentation/`, completar a cobertura contratual da policy finita das file tools e reduzir warnings TDZ-safe residuais.
