@@ -78,12 +78,13 @@ export function startDefaultMcpAutoReconnect(onTools, intervalMs) {
  * @returns {value is AgentMcpCapability}
  */
 function isAgentMcpCapability(value) {
+    const candidate = /** @type {Record<string, unknown>} */ (value);
     return Boolean(
         value &&
         typeof value === 'object' &&
-        typeof (/** @type {Record<string, unknown>} */ (value).buildTools) === 'function' &&
-        typeof (/** @type {Record<string, unknown>} */ (value).buildConfig) === 'function' &&
-        typeof (/** @type {Record<string, unknown>} */ (value).startAutoReconnect) === 'function',
+        typeof candidate['buildTools'] === 'function' &&
+        typeof candidate['buildConfig'] === 'function' &&
+        typeof candidate['startAutoReconnect'] === 'function',
     );
 }
 
@@ -92,11 +93,12 @@ function isAgentMcpCapability(value) {
  * @returns {value is ReturnType<NonNullable<typeof mcpToolBridge.createMcpToolBridge>>}
  */
 function isNativeMcpBridgeInstance(value) {
+    const candidate = /** @type {Record<string, unknown>} */ (value);
     return Boolean(
         value &&
         typeof value === 'object' &&
-        typeof (/** @type {Record<string, unknown>} */ (value).buildMcpTools) === 'function' &&
-        typeof (/** @type {Record<string, unknown>} */ (value).startMcpAutoReconnect) === 'function',
+        typeof candidate['buildMcpTools'] === 'function' &&
+        typeof candidate['startMcpAutoReconnect'] === 'function',
     );
 }
 
