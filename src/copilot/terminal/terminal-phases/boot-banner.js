@@ -7,7 +7,7 @@
  *   evolução/testes sem reabrir o composition root do boot.
  */
 
-import { getMcpStatus } from '../../bridges/mcp-tool-bridge.js';
+import { getMcpStatus } from '#copilot/bridges';
 import { println } from '../dialog/index.js';
 
 /**

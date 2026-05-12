@@ -31,14 +31,18 @@ const mocks = vi.hoisted(() => ({
     writeInlineStatus: vi.fn(),
 }));
 
-vi.mock('#copilot/config', () => ({
-    TERMINAL_LIVE_STATUS_ENABLED: true,
-    TERMINAL_LIVE_STATUS_INTERVAL_MS: 1000,
-}));
+vi.mock('#copilot/config', async (importOriginal) => {
+    const actual = await importOriginal();
+    return {
+        ...actual,
+        TERMINAL_LIVE_STATUS_ENABLED: true,
+        TERMINAL_LIVE_STATUS_INTERVAL_MS: 1000,
+    };
+});
 vi.mock('../../../../src/copilot/terminal/state/activity-state.js', () => ({
     readTerminalActivitySnapshot: vi.fn(() => mocks.activity),
 }));
-vi.mock('../../../../src/copilot/terminal/dialog/output.js', () => ({
+vi.mock('../../../../src/copilot/terminal/dialog/index.js', () => ({
     clearInlineStatus: mocks.clearInlineStatus,
     writeInlineStatus: mocks.writeInlineStatus,
 }));

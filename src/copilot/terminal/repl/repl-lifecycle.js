@@ -23,7 +23,6 @@ import {
     readRuntimeInterventionMailboxSummary,
     setRl,
 } from '../../presentation/runtime-ui-state-store.js';
-import { buildTerminalOperationalGuidance } from '../auto-briefing.js';
 import {
     buildUserPrompt,
     buildWaitingPrompt,
@@ -33,8 +32,13 @@ import {
     sendTurn,
 } from '../dialog/index.js';
 import { readTerminalStatusProjection } from '../frontend/index.js';
-import { readTerminalDisplayState, resolveTerminalBootDisplayPreset } from '../state/display-policy.js';
-import { tryAnswerTerminalPendingQuestionInput } from '../state/pending-question-answer.js';
+import { buildTerminalOperationalGuidance } from '../frontend/operational-guidance/index.js';
+import {
+    readTerminalDisplayState,
+    resolveTerminalBootDisplayPreset,
+    tryAnswerTerminalPendingQuestionInput,
+} from '../state/repl-runtime/index.js';
+import { resolve } from '../stores/index.js';
 import { resolveFreeTextDelivery } from './free-text-delivery.js';
 import { setupTerminalLiveStatusLine } from './live-status-line.js';
 import { buildTerminalReplBanner } from './repl-banner.js';
@@ -47,8 +51,6 @@ import {
 } from './repl-input-routing.js';
 import { setupAgentListeners } from './repl-listeners.js';
 import { createTerminalMultilineInputState } from './repl-multiline.js';
-
-import { resolve } from '../stores/alias-store.js';
 
 /**
  * Executa o lifecycle completo do REPL readline para o terminal permanente.

@@ -8,7 +8,7 @@ import {
     normalizeAgentContextWindowProjection,
     readAgentRuntimeOverviewProjection,
 } from '../../../presentation/runtime-overview.js';
-import { readTerminalSessionBinding } from '../gateways/agent-runtime.js';
+import { readTerminalSessionBinding } from '../gateways/index.js';
 
 /**
  * @typedef {{ tokens: number; tokenLimit: number; utilization: number }} ContextWindowProjection

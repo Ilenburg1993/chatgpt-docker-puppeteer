@@ -10,8 +10,8 @@
 
 import { getBusy } from '../../presentation/runtime-ui-state-store.js';
 import { buildUserPrompt } from '../dialog/index.js';
-import { readTerminalAgentRuntimeEventHost } from '../frontend/gateways/agent-runtime.js';
-import { createToolCallRegistry } from '../state/tool-call-registry.js';
+import { readTerminalAgentRuntimeEventHost } from '../frontend/gateways/index.js';
+import { createToolCallRegistry } from '../state/events/index.js';
 import { setupTerminalAgentRuntimeEventListeners } from './agent-runtime-events.js';
 import { setupTerminalIoActivityEvents } from './io-activity-events.js';
 import { setupTerminalSdkSessionEventListeners } from './sdk-session-events.js';

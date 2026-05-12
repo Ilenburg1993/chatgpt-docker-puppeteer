@@ -84,10 +84,10 @@ import {
     readTerminalRuntimeState,
     resumeTerminalDialogLoop,
     steerTerminalMessage,
-} from '../frontend/gateways/agent-runtime.js';
-import { stopTerminalDialogMode } from '../frontend/gateways/dialog.js';
-import { deliverEntryAsTurnIfIdle } from '../mailbox-drain.js';
-import { clearRateLimiters } from '../state/rate-limiter-state.js';
+    stopTerminalDialogMode,
+} from '../frontend/gateways/index.js';
+import { clearRateLimiters } from '../state/repl-runtime/index.js';
+import { deliverEntryAsTurnIfIdle } from '../wiring/mailbox/index.js';
 import { parseTerminalReplCommand } from './repl-command-parser.js';
 
 /** @type {number} */

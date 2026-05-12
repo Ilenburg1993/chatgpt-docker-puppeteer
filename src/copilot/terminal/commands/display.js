@@ -12,28 +12,24 @@
 
 import {
     applyTerminalDisplayPreset,
+    getTerminalDetailLevel,
+    getTerminalThemeName,
+    isTerminalDetailLevel,
     isTerminalDisplayPresetName,
     isTerminalDisplayToggle,
+    isTerminalThemeName,
+    listTerminalDetailLevels,
     listTerminalDisplayPresets,
     listTerminalDisplayToggles,
+    listTerminalThemeProfiles,
     readTerminalDisplayState,
     readTerminalPromptDisplayPolicy,
+    setTerminalDetailLevel,
+    setTerminalThemeName,
     TERMINAL_DISPLAY_TOGGLE_KEYS,
     writeTerminalDisplayState,
     writeTerminalDisplayToggle,
-} from '../state/display-policy.js';
-import {
-    getTerminalDetailLevel,
-    isTerminalDetailLevel,
-    listTerminalDetailLevels,
-    setTerminalDetailLevel,
-} from '../state/ui-preferences.js';
-import {
-    getTerminalThemeName,
-    isTerminalThemeName,
-    listTerminalThemeProfiles,
-    setTerminalThemeName,
-} from '../state/ui-theme.js';
+} from '../state/ui/index.js';
 
 /**
  * @typedef {object} DisplayContext

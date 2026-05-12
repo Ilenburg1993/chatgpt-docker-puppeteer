@@ -10,11 +10,11 @@
 import { getSharedSdkSessionId, toError } from '#copilot/core';
 import { log } from '#copilot/observability';
 import { setHubSessionId } from '../../presentation/runtime-ui-state-store.js';
-import { createTerminalHubSession, initTerminalConversationHub } from '../frontend/gateways/hub.js';
-import { recordTerminalActivity } from '../state/activity-state.js';
+import { createTerminalHubSession, initTerminalConversationHub } from '../frontend/gateways/index.js';
+import { recordTerminalActivity } from '../state/boot/index.js';
 
 /**
- * @param {import('../index.js').TerminalBootContext} ctx
+ * @param {import('../runtime-root.js').TerminalBootContext} ctx
  * @returns {Promise<void>}
  */
 export async function runTerminalConversationHubPhase(ctx) {

@@ -11,7 +11,7 @@ import { rollbackTerminalPinnedContextPhase } from './boot-pinned.js';
 /**
  * Registra os shutdown handlers centrais do terminal.
  *
- * @param {import('../index.js').TerminalBootContext} ctx
+ * @param {import('../runtime-root.js').TerminalBootContext} ctx
  * @param {{
  *     rollbackRuntimeListenersPhase: () => Promise<void>;
  *     rollbackPinnedContextPhaseFn?: typeof rollbackTerminalPinnedContextPhase;

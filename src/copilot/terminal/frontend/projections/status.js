@@ -15,13 +15,13 @@ import {
     getLastSdkPlanOperation,
     getSdkSessionMode,
 } from '../../../presentation/runtime-ui-state-store.js';
-import { readTerminalActivitySnapshot } from '../../state/activity-state.js';
 import {
+    readTerminalActivitySnapshot,
     readTerminalElicitationSummary,
     readTerminalPermissionSummary,
     readTerminalUserInputSummary,
-} from '../../state/sdk-interactions.js';
-import { getTerminalSdkSessionCapabilities } from '../gateways/sdk-session.js';
+} from '../../state/projections/index.js';
+import { getTerminalSdkSessionCapabilities } from '../gateways/index.js';
 import {
     formatTerminalRuntimeTopology,
     normalizeTerminalModelBillingProjection,

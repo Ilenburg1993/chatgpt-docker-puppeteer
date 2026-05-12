@@ -366,14 +366,24 @@ describe('W114 — module layout governance: terminal root', () => {
             'events/',
             'frontend/',
             'frontend/gateways/',
+            'frontend/operational-guidance/',
             'frontend/projections/',
             'handlers/',
             'repl/',
             'state/',
+            'state/boot/',
+            'state/dialog/',
+            'state/events/',
+            'state/projections/',
+            'state/sdk/',
+            'state/repl/',
+            'state/repl-runtime/',
+            'state/ui/',
             'stores/',
             'terminal-phases/',
             'wiring/',
-        ];
+            'wiring/mailbox/',
+        ].sort();
         const declared = TERMINAL_MODULE_LAYOUT.filter((entry) => entry.kind === 'directory')
             .map((entry) => entry.path)
             .sort();
@@ -386,12 +396,18 @@ describe('W114 — module layout governance: terminal root', () => {
         );
     });
 
-    it('mantem entrypoint, orquestrador, REPL e adapters navegaveis', () => {
+    it('mantem barrel root, composition root, REPL e adapters navegaveis', () => {
         assert.equal(getTerminalModuleRole('bootstrap.js'), 'entrypoint');
-        assert.equal(getTerminalModuleRole('index.js'), 'orchestrator');
+        assert.equal(getTerminalModuleRole('index.js'), 'barrel');
+        assert.equal(getTerminalModuleRole('runtime-root.js'), 'orchestrator');
         assert.equal(getTerminalModuleRole('repl/repl.js'), 'repl');
         assert.equal(getTerminalModuleRole('events/agent-runtime-events.js'), 'event-adapter');
         assert.equal(getTerminalModuleRole('wiring/terminal-agent-wiring.js'), 'wiring');
+    });
+
+    it('nao preserva leafs legados na raiz apos mover owners para submodulos nomeados', () => {
+        assert.equal(getTerminalModuleRole('auto-briefing.js'), undefined);
+        assert.equal(getTerminalModuleRole('mailbox-drain.js'), undefined);
     });
 
     it('README local documenta os papeis arquiteturais declarados', () => {
@@ -447,7 +463,7 @@ describe('W114 — module layout governance: terminal root', () => {
         assert.equal(scorecard.byRisk['hotspot'], listTerminalModulesByRisk('hotspot').length);
         assert.deepEqual(scorecard.watch, [
             'events/tool-activity-presenter.js',
-            'mailbox-drain.js',
+            'runtime-root.js',
             'state/activity-state.js',
             'stores/',
             'stores/alias-store.js',
@@ -461,7 +477,6 @@ describe('W114 — module layout governance: terminal root', () => {
             'events/io-activity-events.js',
             'events/sdk-session-events.js',
             'frontend/',
-            'index.js',
             'repl/',
             'repl/repl-command-router.js',
             'repl/repl-lifecycle.js',

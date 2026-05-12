@@ -18,7 +18,7 @@ import {
     getRuntimeFallbackLog,
     getRuntimeFallbackStats,
 } from '#copilot/presentation/runtime-fallback-telemetry';
-import { readTerminalStatusProjection } from '#copilot/terminal/frontend/projections/status';
+import { readTerminalStatusProjection } from '#copilot/terminal/frontend';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 describe('Contract: Runtime Fallback Metadata Consistency (Onda E2)', () => {

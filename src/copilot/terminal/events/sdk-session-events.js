@@ -64,26 +64,25 @@ import {
 } from '../../presentation/runtime-ui-state-store.js';
 import { classifyPermissionDecision } from '../../sdk/session/permission-events.js';
 import { broadcastSse, println } from '../dialog/index.js';
-import { answerTerminalPendingQuestion } from '../frontend/gateways/agent-runtime.js';
-import { drainMailboxToTurnIfIdle } from '../mailbox-drain.js';
-import { recordTerminalActivity } from '../state/activity-state.js';
+import { answerTerminalPendingQuestion } from '../frontend/gateways/index.js';
 import {
+    beginTerminalTurnTrace,
+    completeTerminalTurnTrace,
+    createToolCallRegistry,
+    getTerminalDetailLevel,
+    recordTerminalActivity,
     recordTerminalElicitationCompleted,
     recordTerminalElicitationPending,
     recordTerminalPermissionCompleted,
     recordTerminalPermissionModeChanged,
     recordTerminalPermissionRequested,
+    recordTerminalTurnFileActivity,
     recordTerminalUserInputCompleted,
     recordTerminalUserInputRequested,
-} from '../state/sdk-interactions.js';
-import { createToolCallRegistry } from '../state/tool-call-registry.js';
-import {
-    beginTerminalTurnTrace,
-    completeTerminalTurnTrace,
-    recordTerminalTurnFileActivity,
-} from '../state/turn-trace-state.js';
-import { getTerminalDetailLevel } from '../state/ui-preferences.js';
-import { terminalThemeBadge, terminalThemeText } from '../state/ui-theme.js';
+    terminalThemeBadge,
+    terminalThemeText,
+} from '../state/events/index.js';
+import { drainMailboxToTurnIfIdle } from '../wiring/mailbox/index.js';
 import {
     handleTerminalExternalToolCompleted,
     handleTerminalExternalToolRequested,
@@ -169,7 +168,7 @@ function renderTurnTraceSummary(trace) {
  * @param {{
  *     agent: AgentEventHost;
  *     refreshPromptIfIdle: () => void;
- *     registry?: ReturnType<import('../state/tool-call-registry.js').createToolCallRegistry> | null;
+ *     registry?: ReturnType<import('../state/events/index.js').createToolCallRegistry> | null;
  * }} input
  * @returns {() => void}
  */

@@ -23,8 +23,8 @@ import { readCopilotBootConfig } from '#copilot/boot';
 import { toError } from '#copilot/core';
 import { log } from '#copilot/observability';
 import { ensureDialogLoop, println } from '../dialog/index.js';
-import { setupTerminalHeadlessEventAdapters } from '../events/event-adapters.js';
-import { recordTerminalActivity } from '../state/activity-state.js';
+import { setupTerminalHeadlessEventAdapters } from '../events/index.js';
+import { recordTerminalActivity } from '../state/repl-runtime/index.js';
 import { runReplLifecycle } from './repl-lifecycle.js';
 export { setupAgentListeners } from './repl-listeners.js';
 

@@ -6,11 +6,11 @@
  *   Sobe o servidor Copilot HTTP/Socket com as opções de hub quando disponível, e faz teardown no rollback.
  */
 
-import { isTerminalHubReady, readTerminalHubOrchestrator, readTerminalHubStore } from '../frontend/gateways/hub.js';
-import { recordTerminalActivity } from '../state/activity-state.js';
+import { isTerminalHubReady, readTerminalHubOrchestrator, readTerminalHubStore } from '../frontend/gateways/index.js';
+import { recordTerminalActivity } from '../state/boot/index.js';
 
 /**
- * @param {import('../index.js').TerminalBootContext} ctx
+ * @param {import('../runtime-root.js').TerminalBootContext} ctx
  * @returns {Promise<void>}
  */
 export async function runTerminalHttpServerPhase(ctx) {
@@ -32,7 +32,7 @@ export async function runTerminalHttpServerPhase(ctx) {
 /**
  * Fecha o servidor HTTP do terminal.
  *
- * @param {import('../index.js').TerminalBootContext} ctx
+ * @param {import('../runtime-root.js').TerminalBootContext} ctx
  * @returns {Promise<void>}
  */
 export async function rollbackTerminalHttpServerPhase(ctx) {

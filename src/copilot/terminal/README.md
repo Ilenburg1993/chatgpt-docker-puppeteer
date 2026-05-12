@@ -30,7 +30,13 @@ também declara `risk` e scorecard para orientar a ordem de decomposição.
 | Área                                     | Função                                                                     |
 | ---------------------------------------- | -------------------------------------------------------------------------- |
 | `module-map.js`                          | inventário executável da raiz do terminal                                  |
+| `index.js`                               | barrel público puro da borda terminal                                      |
+| `runtime-root.js`                        | composition root explícito do terminal                                     |
 | `frontend/`                              | consumer layer canônica do runtime para o terminal                         |
+| `frontend/operational-guidance/`         | guidance operacional para boot, /status, /sdk doctor, /fs e recuperação    |
+| `state/sdk/`                             | sub-surface estreita para elicitations, permissões e user input do SDK     |
+| `state/ui/`                              | sub-surface estreita para display policy, detalhe e tema visual            |
+| `state/repl-runtime/`                    | sub-surface estreita para controles runtime do REPL e rate-limiter reset   |
 | `dialog/`                                | prompt dinâmico, output helpers, waiting UX, engine de diálogo             |
 | `commands/`                              | comandos REPL finos, orientados a operações do runtime                     |
 | `state/display-policy.js`                | presets de densidade visual e impacto em prompt/waiting                    |
@@ -71,8 +77,9 @@ furam a fila local do REPL para evitar deadlocks em turnos longos ou degradados.
 | Papel              | Arquivos/diretórios                                                                            |
 | ------------------ | ---------------------------------------------------------------------------------------------- |
 | `entrypoint`       | `bootstrap.js`, `module-map.js`                                                                |
+| `barrel`           | `index.js`                                                                                     |
 | `boot`             | `bootstrap-lifecycle.js`, `terminal-phases/`                                                   |
-| `orchestrator`     | `index.js`                                                                                     |
+| `orchestrator`     | `runtime-root.js`                                                                              |
 | `repl`             | `repl/` e seus módulos de lifecycle, parsing, routing, banner, multiline e status vivo         |
 | `event-adapter`    | `events/` com adapters, presenters, passthrough e matriz de cobertura                          |
 | `wiring`           | `wiring/terminal-agent-wiring.js`, `wiring/`                                                   |
@@ -87,11 +94,11 @@ furam a fila local do REPL para evitar deadlocks em turnos longos ou degradados.
 
 ## Riscos da raiz
 
-| Risco     | Arquivos/diretórios                                                                                                                                                                                                                                                                                                               |
-| --------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `hotspot` | `index.js`, `repl/`, `repl/repl.js`, `repl/repl-command-router.js`, `events/`, `events/agent-runtime-events.js`, `events/sdk-session-events.js`, `state/`, `state/display-policy.js`, `state/sdk-interactions.js`, `state/turn-trace-state.js`, `wiring/`, `wiring/terminal-agent-wiring.js`, `commands/`, `dialog/`, `frontend/` |
-| `watch`   | `repl/repl-lifecycle.js`, `state/activity-state.js`, `events/io-activity-events.js`, `stores/`, `stores/alias-store.js`, `terminal-phases/`                                                                                                                                                                                       |
-| `stable`  | arquivos pequenos de boot, estado, passthrough, handlers, stores e adapters já finos                                                                                                                                                                                                                                              |
+| Risco     | Arquivos/diretórios                                                                                                                                                                                                                                                                                                   |
+| --------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `hotspot` | `repl/`, `repl/repl.js`, `repl/repl-command-router.js`, `events/`, `events/agent-runtime-events.js`, `events/sdk-session-events.js`, `state/`, `state/display-policy.js`, `state/sdk-interactions.js`, `state/turn-trace-state.js`, `wiring/`, `wiring/terminal-agent-wiring.js`, `commands/`, `dialog/`, `frontend/` |
+| `watch`   | `runtime-root.js`, `repl/repl-lifecycle.js`, `state/activity-state.js`, `events/io-activity-events.js`, `stores/`, `stores/alias-store.js`, `terminal-phases/`                                                                                                                                                        |
+| `stable`  | arquivos pequenos de boot, estado, passthrough, handlers, stores e adapters já finos                                                                                                                                                                                                                                  |
 
 Regra local: arquivos acima de 300 linhas precisam ser `hotspot`; arquivos acima de 220 linhas
 precisam ser ao menos `watch`. O scorecard exportado por `module-map.js` deve ser consultado antes
@@ -102,9 +109,10 @@ de novas features em UX.
 - O entrypoint executável continua sendo `terminal/bootstrap.js`.
 - O lifecycle fatal de boot fica em `terminal/bootstrap-lifecycle.js`, que registra sinais de
   processo e chama `runShutdown('boot_failure')` antes de encerrar em falha fatal.
-- `terminal/index.js` é owner de recursos de UX local: aliases, pinned files, activity listeners,
-  reflection loop, TODO cleanup e REPL.
-- O boot do terminal é dividido em fases exportadas por `terminal/index.js`, para que o
+- `terminal/index.js` é barrel puro e não concentra lógica operacional.
+- `terminal/runtime-root.js` é owner de recursos de UX local: aliases, pinned files, activity
+  listeners, reflection loop, TODO cleanup e REPL.
+- O boot do terminal é dividido em fases exportadas pela surface pública do terminal, para que o
   `BootLifecycleReport` diferencie aliases, runtime config, pinned context, ConversationHub, HTTP
   server, listeners e REPL.
 - Dentro de `terminal-phases/`, `boot-banner.js`, `boot-reflection-loop.js` e `boot-shutdown.js`
@@ -185,6 +193,27 @@ Deve sair do `terminal/` quando virar:
 
 - **Pode importar**: qualquer camada abaixo, porque é uma borda
 - **Não deve ser importado por**: `sdk/`, `core/`, `config/`, `agent/`
+
+## Política barrel-first local
+
+- todo `index.js` deve ser barrel puro;
+- composition roots devem ter nome explícito (`runtime-root.js`, `dialog-runtime.js`);
+- imports entre subpastas irmãs do terminal devem passar via barrels do respectivo submódulo;
+- imports same-folder privados podem permanecer diretos quando não cruzarem fronteiras de módulo.
+
+## Superfícies públicas autorizadas
+
+Superfícies públicas canônicas do terminal no `package.json`:
+
+- `#copilot/terminal`
+- `#copilot/terminal/commands`
+- `#copilot/terminal/dialog`
+- `#copilot/terminal/frontend`
+- `#copilot/terminal/handlers`
+- `#copilot/terminal/stores`
+- `#copilot/terminal/state/repl-runtime`
+
+Regra: não expor wildcard `#copilot/terminal/*`; novos acessos públicos exigem barrel explícito e contrato deliberado.
 
 ## Nota de clareza arquitetural
 

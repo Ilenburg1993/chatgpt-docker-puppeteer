@@ -8,7 +8,7 @@
  * @see EventBus
  */
 
-import { formatAliases, removeAlias, setAlias } from '../stores/alias-store.js';
+import { formatAliases, removeAlias, setAlias } from '../stores/index.js';
 
 /**
  * @typedef {object} SessionContext

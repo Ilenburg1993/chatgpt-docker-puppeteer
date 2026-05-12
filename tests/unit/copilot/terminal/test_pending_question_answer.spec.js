@@ -12,7 +12,13 @@ const hookToolMocks = vi.hoisted(() => ({
 }));
 
 vi.mock('../../../../src/copilot/terminal/frontend/gateways/agent-runtime.js', () => runtimeMocks);
-vi.mock('#copilot/sdk', () => hookToolMocks);
+vi.mock('#copilot/sdk', async (importOriginal) => {
+    const actual = /** @type {Record<string, unknown>} */ (await importOriginal());
+    return {
+        ...actual,
+        ...hookToolMocks,
+    };
+});
 
 import { tryAnswerTerminalPendingQuestionInput } from '../../../../src/copilot/terminal/state/pending-question-answer.js';
 

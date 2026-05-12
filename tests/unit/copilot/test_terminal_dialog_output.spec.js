@@ -7,10 +7,14 @@
 
 import { describe, expect, it, vi } from 'vitest';
 
-vi.mock('#copilot/config', () => ({
-    LLM_B_BOOT_PROMPT: undefined,
-    LLM_B_TURN_TIMEOUT_MS: 120_000,
-}));
+vi.mock('#copilot/config', async (importOriginal) => {
+    const actual = await importOriginal();
+    return {
+        ...actual,
+        LLM_B_BOOT_PROMPT: undefined,
+        LLM_B_TURN_TIMEOUT_MS: 120_000,
+    };
+});
 vi.mock('../../../src/copilot/presentation/runtime-ui-state-store.js', () => ({
     getBusy: vi.fn(() => false),
     getRl: vi.fn(() => null),

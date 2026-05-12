@@ -16,11 +16,11 @@ import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 // ═══════════════════════════════════════════════════════════════════════════════
 
 describe('F46 — rate-limiter-state DI bridge', () => {
-    /** @type {typeof import('#copilot/terminal/rate-limiter-state')} */
+    /** @type {typeof import('#copilot/terminal/state/repl-runtime')} */
     let rlMod;
 
     beforeAll(async () => {
-        rlMod = await import('#copilot/terminal/rate-limiter-state');
+        rlMod = await import('#copilot/terminal/state/repl-runtime');
     });
 
     beforeEach(() => {

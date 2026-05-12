@@ -34,7 +34,6 @@ export {
     listTerminalHandlerModulesByRisk,
     listTerminalHandlerModulesByRole,
 } from './module-map.js';
-export * from './shared.js';
 export {
     getInfiniteSessionConfig,
     getSseClientSets,

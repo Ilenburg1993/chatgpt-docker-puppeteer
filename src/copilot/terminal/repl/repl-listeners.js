@@ -9,7 +9,7 @@
  * @see EventBus
  */
 
-import { setupTerminalInteractiveEventAdapters } from '../events/event-adapters.js';
+import { setupTerminalInteractiveEventAdapters } from '../events/index.js';
 
 /**
  * Registra listeners de eventos do AlwaysAliveAgent para exibição no terminal.

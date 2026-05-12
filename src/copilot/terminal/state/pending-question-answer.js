@@ -5,7 +5,7 @@
  */
 
 import { hasPendingStructuredUserInputRequests } from '#copilot/sdk';
-import { answerTerminalPendingQuestion, readTerminalRuntimeState } from '../frontend/gateways/agent-runtime.js';
+import { answerTerminalPendingQuestion, readTerminalRuntimeState } from '../frontend/gateways/index.js';
 
 /**
  * @typedef {'answered' | 'answer_failed' | 'empty' | 'no_pending' | 'protocol_controlled' | 'invalid_choice'} TerminalPendingAnswerReason

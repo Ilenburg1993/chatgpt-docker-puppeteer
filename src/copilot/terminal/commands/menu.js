@@ -9,13 +9,13 @@
  */
 
 import { getPendingStructuredUserInputCount } from '#copilot/sdk';
-import { readTerminalRuntimeControlState, readTerminalRuntimeState } from '../frontend/gateways/agent-runtime.js';
+import { readTerminalRuntimeControlState, readTerminalRuntimeState } from '../frontend/gateways/index.js';
 import {
     readTerminalElicitationSummary,
     readTerminalPermissionSummary,
     readTerminalUserInputSummary,
-} from '../state/sdk-interactions.js';
-import { terminalActionChip, terminalThemeBadge, terminalThemeText } from '../state/ui-theme.js';
+} from '../state/sdk/index.js';
+import { terminalActionChip, terminalThemeBadge, terminalThemeText } from '../state/ui/index.js';
 
 /**
  * @typedef {{

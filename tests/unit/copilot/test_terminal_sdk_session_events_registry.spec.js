@@ -47,15 +47,19 @@ vi.mock('../../../src/copilot/terminal/dialog/index.js', () => ({
     broadcastSse: mocks.broadcastSse,
     println: mocks.println,
 }));
-vi.mock('../../../src/copilot/presentation/runtime-ui-state-store.js', () => ({
-    setLastSdkPlanOperation: mocks.setLastSdkPlanOperation,
-    setSdkSessionMode: mocks.setSdkSessionMode,
-    getShowSessionActivity: mocks.getShowSessionActivity,
-    getShowToolActivity: mocks.getShowToolActivity,
-    consumeRuntimeInterventionMailbox: mocks.consumeRuntimeInterventionMailbox,
-    enqueueRuntimeInterventionMailbox: mocks.enqueueRuntimeInterventionMailbox,
-    readRuntimeInterventionMailboxSummary: mocks.readRuntimeInterventionMailboxSummary,
-}));
+vi.mock('../../../src/copilot/presentation/runtime-ui-state-store.js', async (importOriginal) => {
+    const actual = await importOriginal();
+    return {
+        ...actual,
+        setLastSdkPlanOperation: mocks.setLastSdkPlanOperation,
+        setSdkSessionMode: mocks.setSdkSessionMode,
+        getShowSessionActivity: mocks.getShowSessionActivity,
+        getShowToolActivity: mocks.getShowToolActivity,
+        consumeRuntimeInterventionMailbox: mocks.consumeRuntimeInterventionMailbox,
+        enqueueRuntimeInterventionMailbox: mocks.enqueueRuntimeInterventionMailbox,
+        readRuntimeInterventionMailboxSummary: mocks.readRuntimeInterventionMailboxSummary,
+    };
+});
 vi.mock('../../../src/copilot/terminal/frontend/gateways/agent-runtime.js', () => ({
     answerTerminalPendingQuestion: mocks.answerTerminalPendingQuestion,
     drainMailboxToTurnIfIdle: vi.fn(),
@@ -99,7 +103,7 @@ vi.mock('../../../src/copilot/terminal/state/sdk-interactions.js', async () => {
 vi.mock('../../../src/copilot/terminal/sdk/session/permission-events.js', () => ({
     classifyPermissionDecision: vi.fn(() => 'granted'),
 }));
-vi.mock('../../../src/copilot/terminal/mailbox-drain.js', () => ({
+vi.mock('../../../src/copilot/terminal/wiring/mailbox/index.js', () => ({
     drainMailboxToTurnIfIdle: vi.fn(),
 }));
 vi.mock('../../../src/copilot/dialog/protocol.js', () => ({

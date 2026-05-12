@@ -12,9 +12,12 @@ import { channel } from 'node:diagnostics_channel';
 import { relative } from 'node:path';
 import { getShowToolActivity } from '../../presentation/runtime-ui-state-store.js';
 import { println } from '../dialog/index.js';
-import { recordTerminalActivity } from '../state/activity-state.js';
-import { recordTerminalTurnFileActivity } from '../state/turn-trace-state.js';
-import { terminalThemeBadge, terminalThemeText } from '../state/ui-theme.js';
+import {
+    recordTerminalActivity,
+    recordTerminalTurnFileActivity,
+    terminalThemeBadge,
+    terminalThemeText,
+} from '../state/events/index.js';
 import { handleTerminalIoToolLifecycle } from './tool-lifecycle-runtime.js';
 
 const ioOperationChannel = channel('copilot.io.operation');

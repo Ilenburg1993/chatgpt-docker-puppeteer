@@ -17,14 +17,15 @@
 
 import { getShowToolActivity } from '../../presentation/runtime-ui-state-store.js';
 import { broadcastSse, clearInlineStatus, println, writeInlineStatus } from '../dialog/index.js';
-import { recordTerminalActivity } from '../state/activity-state.js';
 import {
     completeTerminalTurnToolCall,
+    getTerminalDetailLevel,
+    recordTerminalActivity,
     recordTerminalTurnFileActivity,
     recordTerminalTurnToolActivity,
-} from '../state/turn-trace-state.js';
-import { getTerminalDetailLevel } from '../state/ui-preferences.js';
-import { terminalThemeBadge, terminalThemeText } from '../state/ui-theme.js';
+    terminalThemeBadge,
+    terminalThemeText,
+} from '../state/events/index.js';
 import {
     buildTerminalToolActivityPresentation,
     compactTerminalToolText,

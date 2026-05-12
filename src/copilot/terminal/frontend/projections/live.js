@@ -7,7 +7,7 @@
  */
 
 import { getSseClients, getSseCriticalClients, getTerminalReplayBuffer } from '../../../infra/sse/index.js';
-import { readTerminalIoActivityProjection } from '../../events/io-activity-events.js';
+import { readTerminalIoActivityProjection } from '../../events/index.js';
 import { readTerminalActivityProjection, readTerminalDisplayProjection } from './now.js';
 import { readTerminalStatusProjection } from './status.js';
 import { readTerminalTimelineProjection } from './timeline.js';

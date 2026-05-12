@@ -10,6 +10,7 @@
  * @typedef {'file' | 'directory'} TerminalModuleKind
  *
  * @typedef {'entrypoint'
+ *     | 'barrel'
  *     | 'boot'
  *     | 'orchestrator'
  *     | 'repl'
@@ -45,11 +46,20 @@ export const TERMINAL_MODULE_LAYOUT = Object.freeze([
     {
         path: 'index.js',
         kind: 'file',
+        role: 'barrel',
+        tier: 'primary',
+        risk: 'stable',
+        public: true,
+        summary: 'Barrel público puro da borda terminal: surface root, module-map e composition root nomeado.',
+    },
+    {
+        path: 'runtime-root.js',
+        kind: 'file',
         role: 'orchestrator',
         tier: 'primary',
-        risk: 'hotspot',
+        risk: 'watch',
         public: true,
-        summary: 'Composition root do terminal: fases de boot, recursos de UX local e REPL.',
+        summary: 'Composition root explícito do terminal: DI, fases de boot, listeners e start do REPL.',
     },
     {
         path: 'bootstrap.js',
@@ -68,24 +78,6 @@ export const TERMINAL_MODULE_LAYOUT = Object.freeze([
         risk: 'stable',
         public: false,
         summary: 'Lifecycle fatal de boot, sinais e shutdown por falha de bootstrap.',
-    },
-    {
-        path: 'auto-briefing.js',
-        kind: 'file',
-        role: 'frontend-surface',
-        tier: 'secondary',
-        risk: 'stable',
-        public: false,
-        summary: 'Briefing operacional canônico para boot, status, doctor e falhas de comando.',
-    },
-    {
-        path: 'mailbox-drain.js',
-        kind: 'file',
-        role: 'event-adapter',
-        tier: 'secondary',
-        risk: 'watch',
-        public: false,
-        summary: 'Drena mailbox da sessão para sincronizar resposta textual e estado de turnos no terminal.',
     },
     {
         path: 'module-map.js',
@@ -354,7 +346,7 @@ export const TERMINAL_MODULE_LAYOUT = Object.freeze([
         role: 'command-surface',
         tier: 'secondary',
         risk: 'hotspot',
-        public: false,
+        public: true,
         summary: 'Comandos REPL finos, orientados a operações do runtime.',
     },
     {
@@ -363,7 +355,7 @@ export const TERMINAL_MODULE_LAYOUT = Object.freeze([
         role: 'dialog-surface',
         tier: 'secondary',
         risk: 'hotspot',
-        public: false,
+        public: true,
         summary: 'Render, prompt, waiting UX, envio e exibição de turnos.',
     },
     {
@@ -381,7 +373,7 @@ export const TERMINAL_MODULE_LAYOUT = Object.freeze([
         role: 'frontend-surface',
         tier: 'secondary',
         risk: 'hotspot',
-        public: false,
+        public: true,
         summary: 'Consumer layer canônica do runtime para o terminal.',
     },
     {
@@ -403,12 +395,21 @@ export const TERMINAL_MODULE_LAYOUT = Object.freeze([
         summary: 'Gateways de runtime: agent-runtime, sdk-session, dialog, hub.',
     },
     {
+        path: 'frontend/operational-guidance/',
+        kind: 'directory',
+        role: 'frontend-surface',
+        tier: 'secondary',
+        risk: 'stable',
+        public: false,
+        summary: 'Guidance operacional do terminal para /status, /sdk doctor, /fs e recuperação de falhas.',
+    },
+    {
         path: 'handlers/',
         kind: 'directory',
         role: 'handler-surface',
         tier: 'secondary',
         risk: 'stable',
-        public: false,
+        public: true,
         summary: 'Handlers HTTP usados pelo servidor terminal/inject.',
     },
     {
@@ -430,12 +431,84 @@ export const TERMINAL_MODULE_LAYOUT = Object.freeze([
         summary: 'Estados locais do terminal: atividade, display, interação SDK, turn trace e limites.',
     },
     {
+        path: 'state/boot/',
+        kind: 'directory',
+        role: 'state',
+        tier: 'internal',
+        risk: 'stable',
+        public: false,
+        summary: 'Sub-surface focada do boot: atividade e display preset consumidos pelas fases de inicialização.',
+    },
+    {
+        path: 'state/dialog/',
+        kind: 'directory',
+        role: 'state',
+        tier: 'internal',
+        risk: 'stable',
+        public: false,
+        summary: 'Sub-surface focada do dialog: atividade, prompt policy e tema usados pelo runtime conversacional.',
+    },
+    {
+        path: 'state/events/',
+        kind: 'directory',
+        role: 'state',
+        tier: 'internal',
+        risk: 'stable',
+        public: false,
+        summary: 'Sub-surface focada para adapters de eventos, turn trace e SDK waits do terminal.',
+    },
+    {
+        path: 'state/sdk/',
+        kind: 'directory',
+        role: 'state',
+        tier: 'internal',
+        risk: 'stable',
+        public: false,
+        summary: 'Sub-surface focada das interações SDK do terminal: elicitations, permissões e user_input.',
+    },
+    {
+        path: 'state/projections/',
+        kind: 'directory',
+        role: 'state',
+        tier: 'internal',
+        risk: 'stable',
+        public: false,
+        summary: 'Sub-surface focada das projeções frontend: atividade, display e resumos de interações SDK.',
+    },
+    {
+        path: 'state/repl/',
+        kind: 'directory',
+        role: 'state',
+        tier: 'internal',
+        risk: 'stable',
+        public: false,
+        summary: 'Sub-surface focada do REPL: display state, answer policy, rate-limit reset e tema.',
+    },
+    {
+        path: 'state/repl-runtime/',
+        kind: 'directory',
+        role: 'state',
+        tier: 'internal',
+        risk: 'stable',
+        public: true,
+        summary: 'Sub-surface focada do runtime do REPL: input policy, display preset e resets operacionais.',
+    },
+    {
+        path: 'state/ui/',
+        kind: 'directory',
+        role: 'state',
+        tier: 'internal',
+        risk: 'stable',
+        public: false,
+        summary: 'Sub-surface focada da UX local: display policy, detalhe visual e tema do terminal.',
+    },
+    {
         path: 'stores/',
         kind: 'directory',
         role: 'store',
         tier: 'secondary',
         risk: 'watch',
-        public: false,
+        public: true,
         summary: 'Persistências locais pequenas usadas pela experiência interativa.',
     },
     {
@@ -455,6 +528,15 @@ export const TERMINAL_MODULE_LAYOUT = Object.freeze([
         risk: 'hotspot',
         public: false,
         summary: 'Wiring operacional entre agent, frontend terminal, watchdog e SSE.',
+    },
+    {
+        path: 'wiring/mailbox/',
+        kind: 'directory',
+        role: 'wiring',
+        tier: 'internal',
+        risk: 'stable',
+        public: false,
+        summary: 'Sub-surface focada da drenagem zero-PR do mailbox, consumida pelo REPL e pelos eventos SDK.',
     },
 ]);
 

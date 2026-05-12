@@ -6,9 +6,9 @@ import {
     buildActivityAwareGuidance,
     buildFailureRecoveryLines,
     buildTerminalOperationalGuidance,
-} from '../../../../src/copilot/terminal/auto-briefing.js';
+} from '../../../../src/copilot/terminal/frontend/operational-guidance/index.js';
 
-describe('terminal/auto-briefing', () => {
+describe('terminal/frontend/operational-guidance', () => {
     it('prioriza FS local no modo local-fs-primary', () => {
         const guidance = buildTerminalOperationalGuidance({
             sdkFsRouting: { mode: 'local-fs-primary', reason: 'ready' },

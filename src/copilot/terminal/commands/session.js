@@ -11,7 +11,6 @@
 
 import { COPILOT_OPERATIONAL_PROFILE, getEffectiveSdkAgentSelection } from '#copilot/config';
 import { toError } from '#copilot/core';
-import { buildTerminalOperationalGuidance } from '../auto-briefing.js';
 import {
     clearPendingTerminalQuestionShadow,
     clearTerminalHistory,
@@ -28,7 +27,8 @@ import {
     readTerminalTimelineProjection,
     saveTerminalSnapshotProjection,
 } from '../frontend/index.js';
-import { tryAnswerTerminalPendingQuestionInput } from '../state/pending-question-answer.js';
+import { buildTerminalOperationalGuidance } from '../frontend/operational-guidance/index.js';
+import { tryAnswerTerminalPendingQuestionInput } from '../state/repl-runtime/index.js';
 import { callWithRuntimeTarget, extractRuntimeTarget, withRuntimeTarget } from './runtime-target.js';
 
 /**

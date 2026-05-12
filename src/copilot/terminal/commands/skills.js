@@ -15,7 +15,7 @@
  * @see EventBus
  */
 
-import { handleGetSkills, handleSetSkills } from '../handlers/system-config.js';
+import { handleGetSkills, handleSetSkills } from '../handlers/index.js';
 
 /**
  * @typedef {Object} CmdContext

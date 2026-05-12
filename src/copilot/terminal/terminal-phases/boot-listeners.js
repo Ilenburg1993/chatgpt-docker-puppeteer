@@ -10,15 +10,14 @@
  *   - Emitir evento `terminal.started` via SSE
  */
 
+import { getMcpStatus } from '#copilot/bridges';
 import { log } from '#copilot/observability';
-import { getMcpStatus } from '../../bridges/mcp-tool-bridge.js';
 import { cancel as cancelTimer, registerTimer } from '../../core/timer-registry.js';
 import { getHubSessionId } from '../../presentation/runtime-ui-state-store.js';
 import { broadcastSse } from '../dialog/index.js';
-import { readTerminalRuntimeState } from '../frontend/gateways/agent-runtime.js';
-import { attachTerminalHubSocketIO, isTerminalHubReady } from '../frontend/gateways/hub.js';
-import { terminalActivityEmitter } from '../state/activity-state.js';
-import { registerAgentEventListeners } from '../wiring/terminal-agent-wiring.js';
+import { attachTerminalHubSocketIO, isTerminalHubReady, readTerminalRuntimeState } from '../frontend/gateways/index.js';
+import { terminalActivityEmitter } from '../state/boot/index.js';
+import { registerAgentEventListeners } from '../wiring/index.js';
 import { printStandaloneBanner } from './boot-banner.js';
 import { rollbackTerminalPinnedContextPhase } from './boot-pinned.js';
 import { startReflectionLoop, stopReflectionLoop } from './boot-reflection-loop.js';
@@ -37,7 +36,7 @@ let _sighupHandler = null;
 /**
  * Cancela o reflection timer e o SIGHUP handler do módulo.
  *
- * @param {import('../index.js').TerminalBootContext} ctx
+ * @param {import('../runtime-root.js').TerminalBootContext} ctx
  * @returns {Promise<void>}
  */
 export async function rollbackTerminalRuntimeListenersPhase(ctx) {
@@ -66,7 +65,7 @@ export async function rollbackTerminalRuntimeListenersPhase(ctx) {
 // ---------------------------------------------------------------------------
 
 /**
- * @param {import('../index.js').TerminalBootContext} ctx
+ * @param {import('../runtime-root.js').TerminalBootContext} ctx
  * @returns {Promise<void>}
  */
 export async function runTerminalRuntimeListenersPhase(ctx) {

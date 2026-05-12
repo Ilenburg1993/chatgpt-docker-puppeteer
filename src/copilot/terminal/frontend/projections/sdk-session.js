@@ -8,7 +8,7 @@ import {
     readTerminalSdkSessionProjection as readTerminalSdkSessionProjectionImpl,
     setTerminalSdkModeProjection as setTerminalSdkModeProjectionImpl,
     updateTerminalSdkPlanProjection as updateTerminalSdkPlanProjectionImpl,
-} from '../sdk-session-projection.js';
+} from './sdk-session-vanilla.js';
 
 /**
  * @param {string | null | undefined} [runtimeId]

@@ -11,7 +11,7 @@ import { beforeEach, describe, it } from 'vitest';
 
 // alias-store.js é um módulo singleton com estado interno.
 // Importamos uma única vez — cada describe usa resetAliases para limpar estado.
-import { formatAliases, getAliases, removeAlias, resetAliases, resolve, setAlias } from '#copilot/terminal/alias-store';
+import { formatAliases, getAliases, removeAlias, resetAliases, resolve, setAlias } from '#copilot/terminal/stores';
 
 describe('alias-store › resolve', () => {
     beforeEach(() => {

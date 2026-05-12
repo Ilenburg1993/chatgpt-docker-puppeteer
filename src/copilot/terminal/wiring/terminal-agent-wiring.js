@@ -24,23 +24,23 @@ import { log } from '#copilot/observability';
 import { logSwallowed } from '../../core/error-handlers.js';
 import { getHubSessionId } from '../../presentation/runtime-ui-state-store.js';
 import { broadcastSse, ensureDialogLoop, println } from '../dialog/index.js';
-import { registerTerminalAgentSsePassthrough } from '../events/agent-sse-passthrough.js';
 import {
     createTerminalHandledAgentEventsSet,
     createTerminalPassthroughAgentEventsSet,
-} from '../events/event-adapter-events.js';
-import { setupTerminalTaskStreamListeners } from '../events/task-stream-events.js';
+    registerTerminalAgentSsePassthrough,
+    setupTerminalTaskStreamListeners,
+} from '../events/index.js';
 import {
     abortTerminalCurrentMessage,
     pingTerminalDialogWatchdog,
     readTerminalAgentRuntimeEventHost,
     readTerminalDialogStreamMeta,
     readTerminalRuntimeState,
-} from '../frontend/gateways/agent-runtime.js';
-import { stopTerminalDialogMode } from '../frontend/gateways/dialog.js';
-import { writeTerminalHubSystemTurn } from '../frontend/gateways/hub.js';
-import { drainMailboxToTurnIfIdle } from '../mailbox-drain.js';
-import { markTerminalActivityIdle, recordTerminalActivity } from '../state/activity-state.js';
+    stopTerminalDialogMode,
+    writeTerminalHubSystemTurn,
+} from '../frontend/gateways/index.js';
+import { markTerminalActivityIdle, recordTerminalActivity } from '../state/dialog/index.js';
+import { drainMailboxToTurnIfIdle } from './mailbox-drain.js';
 
 /** @type {boolean} */
 let _agentListenersRegistered = false;

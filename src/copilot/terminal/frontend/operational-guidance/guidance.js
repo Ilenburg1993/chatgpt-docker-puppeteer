@@ -1,6 +1,6 @@
 // @ts-check
 /**
- * @module copilot/terminal/auto-briefing
+ * @module copilot/terminal/frontend/operational-guidance/guidance
  * @file Guia operacional canônico para reduzir ambiguidade entre SDK workspace virtual e FS local.
  *
  *   Corte A.9: expõe `severity` estruturado e `nextCommand` contextual para erros operacionais, permitindo que /fs e

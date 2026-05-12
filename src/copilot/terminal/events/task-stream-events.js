@@ -19,7 +19,7 @@ import {
     getShowThinking,
 } from '../../presentation/runtime-ui-state-store.js';
 import { println } from '../dialog/index.js';
-import { recordTerminalActivity } from '../state/activity-state.js';
+import { recordTerminalActivity } from '../state/events/index.js';
 
 /**
  * @typedef {{

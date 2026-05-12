@@ -1,6 +1,6 @@
 // @ts-check
 /**
- * @module copilot/terminal/mailbox-drain
+ * @module copilot/terminal/wiring/mailbox-drain
  * @file Lógica centralizada de drenagem do mailbox zero-PR do Terminal LLM-B.
  *
  *   O sistema zero-PR usa um mailbox (`_runtimeInterventionMailbox`) para receber mensagens do operador enquanto o modelo
@@ -34,8 +34,8 @@ import {
     consumeRuntimeInterventionMailbox,
     enqueueRuntimeInterventionMailbox,
     getBusy,
-} from '../presentation/runtime-ui-state-store.js';
-import { broadcastSse, getTurnQueueDepth, println, sendTurn } from './dialog/index.js';
+} from '../../presentation/runtime-ui-state-store.js';
+import { broadcastSse, getTurnQueueDepth, println, sendTurn } from '../dialog/index.js';
 
 /**
  * Resultado de uma operação de drenagem do mailbox.
@@ -49,7 +49,7 @@ import { broadcastSse, getTurnQueueDepth, println, sendTurn } from './dialog/ind
  * Se o modelo ainda estiver ocupado (turno em andamento ou fila não-vazia), recoloca a entrada no mailbox para ser
  * drenada na próxima oportunidade.
  *
- * @param {import('../presentation/runtime-ui-state-store.js').RuntimeInterventionMailboxEntry} entry Entrada
+ * @param {import('../../presentation/runtime-ui-state-store.js').RuntimeInterventionMailboxEntry} entry Entrada
  *   previamente consumida (via `consumeRuntimeInterventionMailbox`).
  * @param {string} trigger Identificador do contexto que originou a drenagem (ex: `'turn_end'`, `'dialog_ready'`,
  *   `'manual_consume'`).

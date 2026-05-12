@@ -13,10 +13,10 @@ import { log } from '#copilot/observability';
 import { PinnedFilesLoader } from '../../config/pinned-files.js';
 import { container } from '../../core/di-container.js';
 import { broadcastSse } from '../dialog/index.js';
-import { recordTerminalActivity, terminalActivityEmitter } from '../state/activity-state.js';
+import { recordTerminalActivity, terminalActivityEmitter } from '../state/boot/index.js';
 
 /**
- * @param {import('../index.js').TerminalBootContext} ctx
+ * @param {import('../runtime-root.js').TerminalBootContext} ctx
  * @returns {Promise<void>}
  */
 export async function runTerminalPinnedContextPhase(ctx) {
@@ -67,7 +67,7 @@ export async function runTerminalPinnedContextPhase(ctx) {
 /**
  * Rollback/cleanup do PinnedFilesLoader. Seguro para chamar em qualquer fase (shutdown ou falha de boot).
  *
- * @param {import('../index.js').TerminalBootContext} ctx
+ * @param {import('../runtime-root.js').TerminalBootContext} ctx
  * @returns {Promise<void>}
  */
 export async function rollbackTerminalPinnedContextPhase(ctx) {

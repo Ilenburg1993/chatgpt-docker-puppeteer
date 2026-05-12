@@ -27,11 +27,12 @@ import {
     readTerminalDialogStreamMeta,
     readTerminalRuntimeControlState,
     readTerminalRuntimeState,
+    runTerminalDialogTurn,
     startTerminalAgentRuntime,
-} from '../frontend/gateways/agent-runtime.js';
-import { runTerminalDialogTurn, startTerminalDialogMode } from '../frontend/gateways/dialog.js';
-import { normalizeTerminalModelBillingProjection } from '../frontend/projections/shared.js';
-import { markTerminalActivityIdle, recordTerminalActivity } from '../state/activity-state.js';
+    startTerminalDialogMode,
+} from '../frontend/gateways/index.js';
+import { normalizeTerminalModelBillingProjection } from '../frontend/projections/index.js';
+import { markTerminalActivityIdle, recordTerminalActivity } from '../state/dialog/index.js';
 import { drainPendingNotifications, getPersistenceFailureCount, persistTurnToHub } from './engine-persistence.js';
 import {
     BOOT_PROMPT,

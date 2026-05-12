@@ -10,10 +10,9 @@
 
 import { TERMINAL_LIVE_STATUS_ENABLED, TERMINAL_LIVE_STATUS_INTERVAL_MS } from '#copilot/config';
 import { getBusy } from '../../presentation/runtime-ui-state-store.js';
-import { clearInlineStatus, writeInlineStatus } from '../dialog/output.js';
-import { readTerminalDialogStreamMeta, readTerminalRuntimeState } from '../frontend/gateways/agent-runtime.js';
-import { readTerminalActivitySnapshot } from '../state/activity-state.js';
-import { terminalThemeText } from '../state/ui-theme.js';
+import { clearInlineStatus, writeInlineStatus } from '../dialog/index.js';
+import { readTerminalDialogStreamMeta, readTerminalRuntimeState } from '../frontend/gateways/index.js';
+import { readTerminalActivitySnapshot, terminalThemeText } from '../state/repl/index.js';
 
 const MIN_LIVE_STATUS_INTERVAL_MS = 250;
 const MAX_LIVE_DETAIL_CHARS = 96;

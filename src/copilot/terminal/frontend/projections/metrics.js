@@ -6,7 +6,7 @@
 import { defaultErrorTracker } from '#copilot/observability';
 import { readRuntimeLatestInjectHistoryEntryForRuntime } from '../../../presentation/runtime-ui-state.js';
 import { readToolStatsProjection } from '../../../presentation/system-metrics.js';
-import { readTerminalActivitySnapshot } from '../../state/activity-state.js';
+import { readTerminalActivitySnapshot } from '../../state/projections/index.js';
 import { normalizeTerminalModelBillingProjection, readTerminalRuntimeBase } from './shared.js';
 import { readTerminalTimelineProjection, readTerminalTimelineSyncTelemetry } from './timeline.js';
 

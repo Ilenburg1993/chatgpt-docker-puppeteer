@@ -17,30 +17,31 @@ import {
     getSdkSessionMode,
 } from '../../../presentation/runtime-ui-state-store.js';
 import { readToolStatsProjection } from '../../../presentation/system-metrics.js';
-import { readTerminalActivityHistory, readTerminalActivitySnapshot } from '../../state/activity-state.js';
-import { readTerminalDisplayState } from '../../state/display-policy.js';
-import { readTerminalTurnTraceProjection } from '../../state/turn-trace-state.js';
+import {
+    readTerminalActivityHistory,
+    readTerminalActivitySnapshot,
+    readTerminalDisplayState,
+    readTerminalTurnTraceProjection,
+} from '../../state/projections/index.js';
 import {
     answerTerminalPendingQuestion,
-    clearTerminalPendingQuestionShadow,
-    createTerminalSnapshot,
-    listTerminalSnapshots,
-    loadTerminalSnapshot,
-    readTerminalSessionBinding,
-    saveTerminalSnapshot,
-} from '../gateways/agent-runtime.js';
-import {
     canSearchTerminalHubTurns,
+    clearTerminalPendingQuestionShadow,
     countTerminalHubTurns,
+    createTerminalSnapshot,
     deleteTerminalHubMemory,
     isTerminalHubReady,
+    listTerminalSnapshots,
+    loadTerminalSnapshot,
     readTerminalHubMemories,
     readTerminalHubSession,
     readTerminalHubSessions,
     readTerminalHubTurns,
+    readTerminalSessionBinding,
+    saveTerminalSnapshot,
     searchTerminalHubTurns,
     storeTerminalHubMemory,
-} from '../gateways/hub.js';
+} from '../gateways/index.js';
 import { readTerminalRuntimeBase } from './shared.js';
 import { readTerminalTimelineProjection } from './timeline.js';
 

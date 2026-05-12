@@ -15,9 +15,11 @@ const SRC_TIMELINE = readFileSync(
 );
 
 test('frontend/index.js reexporta apenas famílias canônicas do frontend', () => {
-    // Barrel deve apontar apenas para projections/, gateways/ e sdk-session-projection
-    expect(SRC).toMatch(/from '\.\/projections\//);
-    expect(SRC).toMatch(/from '\.\/gateways\//);
+    // Barrel deve apontar apenas para os sub-barrels públicos do frontend.
+    expect(SRC).toMatch(/from '\.\/projections\/index\.js'/);
+    expect(SRC).toMatch(/from '\.\/gateways\/index\.js'/);
+    expect(SRC).not.toMatch(/from '\.\/projections\/(?!index\.js)/);
+    expect(SRC).not.toMatch(/from '\.\/gateways\/(?!index\.js)/);
     // Não deve conter nenhuma implementação direta (função export function)
     expect(SRC).not.toMatch(/^export\s+(async\s+)?function\s+/m);
     // Não deve importar de agentes/canais/hubs/core diretamente
@@ -31,12 +33,11 @@ test('frontend/index.js reexporta apenas famílias canônicas do frontend', () =
     expect(SRC).not.toMatch(/readTerminalTurnCount/);
 });
 
-test('projections/now.js e timeline.js usam gateways especializados em vez de shim agregado', () => {
-    expect(SRC_NOW).toMatch(/from '\.\.\/gateways\/agent-runtime\.js'/);
-    expect(SRC_NOW).toMatch(/from '\.\.\/gateways\/hub\.js'/);
-    expect(SRC_TIMELINE).toMatch(/from '\.\.\/gateways\/agent-runtime\.js'/);
-    expect(SRC_TIMELINE).toMatch(/from '\.\.\/gateways\/dialog\.js'/);
-    expect(SRC_TIMELINE).toMatch(/from '\.\.\/gateways\/hub\.js'/);
+test('projections/now.js e timeline.js cruzam fronteiras via barrels do frontend', () => {
+    expect(SRC_NOW).toMatch(/from '\.\.\/gateways\/index\.js'/);
+    expect(SRC_TIMELINE).toMatch(/from '\.\.\/gateways\/index\.js'/);
+    expect(SRC_NOW).not.toMatch(/from '\.\.\/gateways\/(?!index\.js)/);
+    expect(SRC_TIMELINE).not.toMatch(/from '\.\.\/gateways\/(?!index\.js)/);
     expect(SRC_NOW).not.toMatch(/from '#copilot\/agent'/);
     expect(SRC_NOW).not.toMatch(/from '#copilot\/channel'/);
     expect(SRC_NOW).not.toMatch(/from '#copilot\/conversation-hub'/);

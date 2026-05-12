@@ -2,7 +2,7 @@
 /**
  * tests/unit/copilot/test_terminal_frontend_sdk_session_projection.spec.js
  *
- * Contrato: terminal/frontend/sdk-session-projection.js
+ * Contrato: terminal/frontend/projections/sdk-session-vanilla.js
  */
 
 import { describe, expect, it, vi } from 'vitest';
@@ -30,14 +30,14 @@ vi.mock('../../../src/copilot/terminal/frontend/gateways/sdk-session.js', () => 
     updateTerminalSdkPlan: mocks.updateTerminalSdkPlan,
 }));
 
-describe('terminal/frontend/sdk-session-projection.js — contrato', () => {
+describe('terminal/frontend/projections/sdk-session-vanilla.js — contrato', () => {
     it('importa sem erros', async () => {
-        const mod = await import('../../../src/copilot/terminal/frontend/sdk-session-projection.js');
+        const mod = await import('../../../src/copilot/terminal/frontend/projections/sdk-session-vanilla.js');
         expect(mod).toBeTruthy();
     });
 
     it('exporta a superfície vanilla de mode/plan', async () => {
-        const mod = await import('../../../src/copilot/terminal/frontend/sdk-session-projection.js');
+        const mod = await import('../../../src/copilot/terminal/frontend/projections/sdk-session-vanilla.js');
         expect(typeof mod.readTerminalSdkSessionProjection).toBe('function');
         expect(typeof mod.setTerminalSdkModeProjection).toBe('function');
         expect(typeof mod.updateTerminalSdkPlanProjection).toBe('function');
@@ -45,7 +45,7 @@ describe('terminal/frontend/sdk-session-projection.js — contrato', () => {
     });
 
     it('readTerminalSdkSessionProjection monta projeção vanilla a partir de runtime + state', async () => {
-        const mod = await import('../../../src/copilot/terminal/frontend/sdk-session-projection.js');
+        const mod = await import('../../../src/copilot/terminal/frontend/projections/sdk-session-vanilla.js');
         const projection = await mod.readTerminalSdkSessionProjection();
 
         expect(projection).toEqual({
@@ -57,7 +57,7 @@ describe('terminal/frontend/sdk-session-projection.js — contrato', () => {
     });
 
     it('set/update/delete projections delegam ao runtime vanilla do SDK', async () => {
-        const mod = await import('../../../src/copilot/terminal/frontend/sdk-session-projection.js');
+        const mod = await import('../../../src/copilot/terminal/frontend/projections/sdk-session-vanilla.js');
 
         await expect(mod.setTerminalSdkModeProjection('plan')).resolves.toEqual({
             previousMode: 'interactive',

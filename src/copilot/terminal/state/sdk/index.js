@@ -1,0 +1,26 @@
+// @ts-check
+
+export {
+    classifyTerminalSdkQuota,
+    clearTerminalElicitation,
+    clearTerminalPermission,
+    clearTerminalPermissions,
+    clearTerminalUserInputs,
+    getTerminalElicitation,
+    getTerminalPermission,
+    listTerminalElicitations,
+    listTerminalPermissionModeHistory,
+    listTerminalPermissions,
+    listTerminalUserInputs,
+    pruneTerminalSdkInteractions,
+    readTerminalElicitationSummary,
+    readTerminalPermissionSummary,
+    readTerminalUserInputSummary,
+    recordTerminalElicitationCompleted,
+    recordTerminalElicitationPending,
+    recordTerminalPermissionCompleted,
+    recordTerminalPermissionModeChanged,
+    recordTerminalPermissionRequested,
+    recordTerminalUserInputCompleted,
+    recordTerminalUserInputRequested,
+} from '../sdk-interactions.js';

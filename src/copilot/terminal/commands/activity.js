@@ -1,6 +1,6 @@
 // @ts-check
 
-import { readTerminalIoActivityProjection } from '../events/io-activity-events.js';
+import { readTerminalIoActivityProjection } from '../events/index.js';
 import { readTerminalActivityProjection } from '../frontend/index.js';
 
 /**

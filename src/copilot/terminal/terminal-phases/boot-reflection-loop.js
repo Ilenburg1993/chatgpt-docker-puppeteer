@@ -8,7 +8,7 @@ import { LLM_B_REFLECTION_INTERVAL_MIN } from '#copilot/config';
 import { log } from '#copilot/observability';
 import { cancel as cancelTimer, registerTimer } from '../../core/timer-registry.js';
 import { sendTurn } from '../dialog/index.js';
-import { readTerminalRuntimeState } from '../frontend/gateways/agent-runtime.js';
+import { readTerminalRuntimeState } from '../frontend/gateways/index.js';
 
 /** @type {unknown | null} */
 let _reflectionTimer = null;

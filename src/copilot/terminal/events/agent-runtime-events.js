@@ -27,12 +27,16 @@ import {
 } from '#copilot/events';
 import { getShowIntentActivity, getShowToolActivity } from '../../presentation/runtime-ui-state-store.js';
 import { broadcastSse, buildUserPrompt, println, writeInlineStatus } from '../dialog/index.js';
-import { readTerminalRuntimeState } from '../frontend/gateways/agent-runtime.js';
-import { recordTerminalActivity } from '../state/activity-state.js';
-import { createTerminalPendingQuestionReplayState } from '../state/pending-question-replay.js';
-import { createToolCallRegistry } from '../state/tool-call-registry.js';
-import { getTerminalDetailLevel } from '../state/ui-preferences.js';
-import { terminalActionChip, terminalThemeBadge, terminalThemeText } from '../state/ui-theme.js';
+import { readTerminalRuntimeState } from '../frontend/gateways/index.js';
+import {
+    createTerminalPendingQuestionReplayState,
+    createToolCallRegistry,
+    getTerminalDetailLevel,
+    recordTerminalActivity,
+    terminalActionChip,
+    terminalThemeBadge,
+    terminalThemeText,
+} from '../state/events/index.js';
 import { compactTerminalToolText } from './tool-activity-presenter.js';
 import {
     handleTerminalNativeToolComplete,
@@ -53,7 +57,7 @@ const TOOL_HEARTBEAT_INTERVAL_MS = 10_000;
  * @param {{
  *     agent: AgentEventHost;
  *     rl?: import('readline').Interface | null;
- *     registry?: ReturnType<import('../state/tool-call-registry.js').createToolCallRegistry> | null;
+ *     registry?: ReturnType<import('../state/index.js').createToolCallRegistry> | null;
  * }} input
  * @returns {() => void}
  */

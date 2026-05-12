@@ -8,9 +8,15 @@
 
 import { getWorkspaceContext } from '#copilot/boot';
 import { sendRuntimeDialogTurnForRuntime } from '../../../presentation/runtime-dialog.js';
-import { readTerminalSessionBinding } from '../gateways/agent-runtime.js';
-import { clearTerminalHistoryFeed, readTerminalHistoryFeed, seedTerminalHistoryFeed } from '../gateways/dialog.js';
-import { countTerminalHubTurns, readTerminalHubTurns, writeTerminalHubTimelineTurn } from '../gateways/hub.js';
+import {
+    clearTerminalHistoryFeed,
+    countTerminalHubTurns,
+    readTerminalHistoryFeed,
+    readTerminalHubTurns,
+    readTerminalSessionBinding,
+    seedTerminalHistoryFeed,
+    writeTerminalHubTimelineTurn,
+} from '../gateways/index.js';
 import { readTerminalRuntimeBase } from './shared.js';
 
 /** @typedef {'hub' | 'bridge' | 'mixed' | 'empty'} TerminalTimelineSource */

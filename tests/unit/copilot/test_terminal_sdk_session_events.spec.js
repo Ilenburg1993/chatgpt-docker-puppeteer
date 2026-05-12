@@ -40,14 +40,18 @@ vi.mock('../../../src/copilot/terminal/dialog/index.js', () => ({
     println: mocks.println,
 }));
 
-vi.mock('../../../src/copilot/presentation/runtime-ui-state-store.js', () => ({
-    setLastSdkPlanOperation: mocks.setLastSdkPlanOperation,
-    setSdkSessionMode: mocks.setSdkSessionMode,
-    getShowSessionActivity: mocks.getShowSessionActivity,
-    consumeRuntimeInterventionMailbox: mocks.consumeRuntimeInterventionMailbox,
-    enqueueRuntimeInterventionMailbox: mocks.enqueueRuntimeInterventionMailbox,
-    readRuntimeInterventionMailboxSummary: mocks.readRuntimeInterventionMailboxSummary,
-}));
+vi.mock('../../../src/copilot/presentation/runtime-ui-state-store.js', async (importOriginal) => {
+    const actual = await importOriginal();
+    return {
+        ...actual,
+        setLastSdkPlanOperation: mocks.setLastSdkPlanOperation,
+        setSdkSessionMode: mocks.setSdkSessionMode,
+        getShowSessionActivity: mocks.getShowSessionActivity,
+        consumeRuntimeInterventionMailbox: mocks.consumeRuntimeInterventionMailbox,
+        enqueueRuntimeInterventionMailbox: mocks.enqueueRuntimeInterventionMailbox,
+        readRuntimeInterventionMailboxSummary: mocks.readRuntimeInterventionMailboxSummary,
+    };
+});
 
 vi.mock('../../../src/copilot/terminal/frontend/gateways/agent-runtime.js', () => ({
     answerTerminalPendingQuestion: mocks.answerTerminalPendingQuestion,

@@ -11,17 +11,7 @@ import { CANONICAL_LOCAL_FS_TOOL_NAMES, decideSdkFsRouting, toError } from '#cop
 import { getPendingStructuredUserInputCount } from '#copilot/sdk';
 import { fileReadTools, fileWriteTools, readIntrospectionRegistrySnapshot } from '#copilot/tools';
 import { isRuntimeElicitationSchema, normalizeElicitationContentWithSchema } from '../../core/elicitation-schema.js';
-import {
-    buildActivityAwareGuidance,
-    buildFailureRecoveryLines,
-    buildTerminalOperationalGuidance,
-} from '../auto-briefing.js';
-import { readTerminalIoActivityProjection } from '../events/io-activity-events.js';
-import {
-    readTerminalRuntimePermissionMode,
-    readTerminalRuntimeState,
-    setTerminalRuntimePermissionMode,
-} from '../frontend/gateways/agent-runtime.js';
+import { readTerminalIoActivityProjection } from '../events/index.js';
 import {
     compactTerminalSdkSession,
     confirmTerminalSdkSessionUi,
@@ -35,12 +25,20 @@ import {
     listTerminalSdkPendingPermissions,
     listTerminalSdkTools,
     listTerminalSdkWorkspaceFiles,
+    readTerminalRuntimePermissionMode,
+    readTerminalRuntimeState,
     readTerminalSdkSystemPromptProjection,
     readTerminalSdkWorkspaceFile,
     requestTerminalSdkElicitation,
     resolveTerminalSdkPendingElicitation,
     selectTerminalSdkSessionUi,
-} from '../frontend/gateways/sdk-session.js';
+    setTerminalRuntimePermissionMode,
+} from '../frontend/gateways/index.js';
+import {
+    buildActivityAwareGuidance,
+    buildFailureRecoveryLines,
+    buildTerminalOperationalGuidance,
+} from '../frontend/operational-guidance/index.js';
 import {
     classifyTerminalSdkQuota,
     clearTerminalElicitation,
@@ -55,7 +53,7 @@ import {
     readTerminalUserInputSummary,
     recordTerminalPermissionCompleted,
     recordTerminalPermissionRequested,
-} from '../state/sdk-interactions.js';
+} from '../state/sdk/index.js';
 import { callWithRuntimeTarget, extractRuntimeTarget } from './runtime-target.js';
 
 /**

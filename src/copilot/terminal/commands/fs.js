@@ -10,8 +10,8 @@
 
 import { fileReadTools, fileWriteTools } from '#copilot/tools';
 import { toError } from '../../core/error-handlers.js';
-import { buildActivityAwareGuidance, buildFailureRecoveryLines } from '../auto-briefing.js';
-import { readTerminalIoActivityProjection } from '../events/io-activity-events.js';
+import { buildActivityAwareGuidance, buildFailureRecoveryLines } from '../frontend/operational-guidance/index.js';
+import { readTerminalIoActivityProjection } from '../events/index.js';
 
 /**
  * @typedef {{ println: (text: string) => void }} CommandContext
