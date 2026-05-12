@@ -5,7 +5,7 @@
 Regras:
 
 - `terminal/bootstrap.js` é o único entrypoint executável canônico.
-- `agent.js` é compat operacional e apenas delega para `bootCopilot()`.
+- `terminal/bootstrap.js` injeta o host terminal em `boot/runtime-bootstrap.js`.
 - `boot/config.js` concentra workspace, host, porta, token, SDK CLI URL, diretórios de skills e
   diretórios pinados.
 - `boot/workspace.js` resolve `COPILOT_WORKING_DIRECTORY` e paths persistentes do workspace.
@@ -19,14 +19,14 @@ Regras:
 
 Fronteiras:
 
-- `boot/` não inicia servidor, terminal nem agent.
+- `boot/` não importa `terminal/`; ele apenas orquestra fases via host surface injetado pela borda terminal.
 - `server/` só hospeda HTTP/Socket.IO.
 - `terminal/` só hospeda UX e compõe o server recebido por injeção.
 - `agent/` só governa sessões e runtime SDK depois que o boot já definiu o ambiente.
 
 Lifecycle:
 
-- `bootCopilot()` monta o plano com `createCopilotBootPlan()` e executa via `runCopilotBootPlan()`.
+- `boot/runtime-bootstrap.js` monta o plano com `createCopilotBootPlan()` e executa via `runCopilotBootPlan()`.
 - as fases do terminal são executadas separadamente: `terminal-init`, `terminal-aliases`,
   `terminal-runtime-config`, `terminal-pinned-context`, `terminal-conversation-hub`,
   `copilot-http-server`, `terminal-runtime-listeners` e `repl`;

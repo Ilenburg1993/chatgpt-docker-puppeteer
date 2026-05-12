@@ -1,19 +1,11 @@
 // @ts-check
 /**
- * src/copilot/bootstrap.js — Entry point canônico do módulo copilot.
+ * src/copilot/boot/runtime-bootstrap.js — orquestrador canônico do boot Copilot.
  *
- * Modo único: **terminal-runtime** (ferramenta de desenvolvimento).
+ * O host terminal é injetado pela borda (`terminal/bootstrap.js`); nenhum módulo fora de `terminal/` importa a
+ * superfície do terminal diretamente.
  *
- * O copilot é a LLM-B — uma ferramenta de desenvolvimento equivalente ao DevTools. Não é um addon de produção. Sempre
- * boot via terminal com inject server (:3009).
- *
- * Boot sequence: Phase 0 — Kernel: container + L0 tokens (already at module load) Phase 1 — Observability: loggers,
- * error tracker, EventBus Phase 2 — Late deps: tools builder, audit bus Phase 3 — Runtime wiring Phase 4 — Terminal
- * host
- *
- * - Copilot HTTP server Phase 5 — REPL
- *
- * @module copilot/bootstrap
+ * @module copilot/boot/runtime-bootstrap
  */
 
 import { AUDIT_BUS } from '#copilot/audit';
@@ -34,19 +26,51 @@ import {
     defaultHookBus,
 } from '#copilot/sdk';
 import { TOOLS_LOGGER, TOOLS_METRICS } from '#copilot/tools';
-import { runCopilotSdkBootPreflight } from './agent/lifecycle/process-host/runtime-host.js';
-import { COPILOT_MODEL, PING_TIMEOUT_MS } from './config/agent.js';
-import { container } from './core/di-container.js';
+import { runCopilotSdkBootPreflight } from '../agent/lifecycle/process-host/runtime-host.js';
+import { COPILOT_MODEL, PING_TIMEOUT_MS } from '../config/agent.js';
+import { container } from '../core/di-container.js';
 import {
     bootstrapConvergencePersistence,
     bootstrapLateDeps,
     bootstrapObservability,
-} from './observability/bootstrap.js';
-import { log } from './observability/logger.js';
-import { startCopilotServer } from './server/index.js';
+} from '../observability/bootstrap.js';
+import { log } from '../observability/logger.js';
+import { startCopilotServer } from '../server/index.js';
 
 /** @type {boolean} */
 let _booted = false;
+
+/**
+ * @typedef {{
+ *     startCopilotServer: typeof import('../server/index.js').startCopilotServer;
+ *     wireRuntime: () => void;
+ *     startTodoCleanupJob: typeof import('../tools/todo/store.js').startTodoCleanupJob;
+ *     bootConfig: ReturnType<typeof readCopilotBootConfig>;
+ *     bootPreflight?: import('../agent/lifecycle/process-host/runtime-host.js').CopilotSdkBootPreflightReport | null;
+ * }} CopilotTerminalBootContextInput
+ *
+ *
+ * @typedef {{
+ *     createTerminalBootContext: (input: CopilotTerminalBootContextInput) => any;
+ *     runTerminalInitPhase: (ctx: any) => void | Promise<void>;
+ *     runTerminalAliasesPhase: (ctx: any) => void | Promise<void>;
+ *     runTerminalRuntimeConfigPhase: (ctx: any) => void | Promise<void>;
+ *     runTerminalPinnedContextPhase: (ctx: any) => void | Promise<void>;
+ *     runTerminalConversationHubPhase: (ctx: any) => void | Promise<void>;
+ *     runTerminalHttpServerPhase: (ctx: any) => void | Promise<void>;
+ *     runTerminalRuntimeListenersPhase: (ctx: any) => void | Promise<void>;
+ *     runTerminalReplPhase: (ctx: any) => void | Promise<void>;
+ *     rollbackTerminalPinnedContextPhase: (ctx: any) => void | Promise<void>;
+ *     rollbackTerminalHttpServerPhase: (ctx: any) => void | Promise<void>;
+ *     rollbackTerminalRuntimeListenersPhase: (ctx: any) => void | Promise<void>;
+ * }} CopilotTerminalHostSurface
+ *
+ *
+ * @typedef {{
+ *     terminal: CopilotTerminalHostSurface;
+ *     broadcastSse: (event: string, payload?: unknown) => void;
+ * }} CopilotRuntimeBootstrapOptions
+ */
 
 /**
  * Reseta a trava de boot para permitir nova tentativa em testes.
@@ -60,13 +84,15 @@ export function resetBootFlagForTests() {
 }
 
 /**
- * Inicializa o módulo copilot (modo terminal — único modo canônico).
+ * Inicializa o runtime Copilot usando um host terminal injetado pela borda.
  *
- * Idempotente — chamadas subsequentes são ignoradas com log de aviso.
- *
+ * @param {CopilotRuntimeBootstrapOptions} options
  * @returns {Promise<void>}
  */
-export async function bootCopilot() {
+export async function bootCopilot(options) {
+    if (!options?.terminal || typeof options.broadcastSse !== 'function') {
+        throw new TypeError('[boot/runtime-bootstrap] terminal host e broadcastSse são obrigatórios.');
+    }
     if (_booted) {
         log('WARN', '[bootstrap] bootCopilot já executado — ignorando chamada duplicada.');
         return;
@@ -74,24 +100,25 @@ export async function bootCopilot() {
     _booted = true;
 
     try {
+        const terminalSurface = options.terminal;
         const bootConfig = readCopilotBootConfig();
         const bootPlan = createCopilotBootPlan(bootConfig);
         /**
          * @type {{
          *     bootPreflight:
-         *         | import('./agent/lifecycle/process-host/runtime-host.js').CopilotSdkBootPreflightReport
+         *         | import('../agent/lifecycle/process-host/runtime-host.js').CopilotSdkBootPreflightReport
          *         | null;
-         *     startTodoCleanupJob: null | typeof import('./tools/todo/store.js').startTodoCleanupJob;
+         *     startTodoCleanupJob: null | typeof import('../tools/todo/store.js').startTodoCleanupJob;
          *     wireRuntime: null | (() => void);
-         *     terminal: null | typeof import('./terminal/index.js');
-         *     terminalContext: null | import('./terminal/index.js').TerminalBootContext;
+         *     terminal: CopilotTerminalHostSurface | null;
+         *     terminalContext: unknown;
          * }}
          */
         const bootState = {
             bootPreflight: null,
             startTodoCleanupJob: null,
             wireRuntime: null,
-            terminal: null,
+            terminal: terminalSurface,
             terminalContext: null,
         };
 
@@ -103,8 +130,8 @@ export async function bootCopilot() {
         /**
          * @type {Record<
          *     string,
-         *     | import('./boot/lifecycle-runner.js').BootPhaseHandler
-         *     | ((context: import('./boot/lifecycle-runner.js').BootPhaseRunContext) => void | Promise<void>)
+         *     | import('./lifecycle-runner.js').BootPhaseHandler
+         *     | ((context: import('./lifecycle-runner.js').BootPhaseRunContext) => void | Promise<void>)
          * >}
          */
         const phaseHandlers = {
@@ -112,24 +139,22 @@ export async function bootCopilot() {
                 bootstrapObservability();
                 container.resolve(ERROR_TRACKER).registerGlobalHandlers();
 
-                // A.15: persistência SQLite do trace-store de convergência — conecta L2 durável
                 try {
-                    const { getCopilotDb } = await import('./db/sqlite.js');
+                    const { getCopilotDb } = await import('../db/sqlite.js');
                     bootstrapConvergencePersistence(getCopilotDb());
                 } catch {
-                    // SQLite indisponível não deve bloquear o boot; ring-buffer in-memory continua
+                    // SQLite indisponível não deve bloquear o boot; ring-buffer in-memory continua.
                 }
             },
             'late-deps': async () => {
-                const { buildTool } = await import('./tools/index.js');
+                const { buildTool } = await import('../tools/index.js');
                 bootstrapLateDeps({ buildTool });
 
                 container.register(AUDIT_BUS, () => defaultHookBus, 'singleton');
 
-                const { setAuditBus } = await import('./audit/pipeline-permission.js');
+                const { setAuditBus } = await import('../audit/pipeline-permission.js');
                 setAuditBus(defaultHookBus);
 
-                // ── Validation: verify all critical DI tokens are registered ────────
                 container.validateRequired([
                     SHUTDOWN_LOGGER,
                     EVENT_BUS,
@@ -151,19 +176,21 @@ export async function bootCopilot() {
                 });
             },
             'runtime-wiring': async () => {
-                const [{ wireCopilotRuntimeDI }, terminal, { startTodoCleanupJob }] = await Promise.all([
-                    import('./runtime-wiring.js'),
-                    import('./terminal/index.js'),
-                    import('./tools/todo/store.js'),
+                const [{ wireCopilotRuntimeDI }, { startTodoCleanupJob }] = await Promise.all([
+                    import('../runtime-wiring.js'),
+                    import('../tools/todo/store.js'),
                 ]);
 
-                // GAP-BOOT-01: registrar/validar tokens do terminal ANTES do boot do servidor.
-                // wireCopilotRuntimeDI() é idempotente; startTerminalServer() recebe só a função de composição.
-                const wireRuntime = () => wireCopilotRuntimeDI({ broadcastSse: startTerminalServerBroadcast });
+                const wireRuntime = () =>
+                    wireCopilotRuntimeDI({
+                        broadcastSse: (event, payload) => {
+                            const data = payload && typeof payload === 'object' ? payload : { value: payload ?? null };
+                            options.broadcastSse(event, data);
+                        },
+                    });
                 bootState.wireRuntime = wireRuntime;
-                bootState.terminal = terminal;
                 bootState.startTodoCleanupJob = startTodoCleanupJob;
-                bootState.terminalContext = terminal.createTerminalBootContext({
+                bootState.terminalContext = terminalSurface.createTerminalBootContext({
                     startCopilotServer,
                     wireRuntime,
                     startTodoCleanupJob,
@@ -172,9 +199,6 @@ export async function bootCopilot() {
                 });
             },
             'boot-surface-validation': async () => {
-                if (!bootState.terminal) {
-                    throw new Error('[bootstrap] runtime-wiring não carregou a superfície terminal.');
-                }
                 const [coreSurface, sdkSurface, agentSurface] = await Promise.all([
                     import('#copilot/core'),
                     import('#copilot/sdk'),
@@ -184,7 +208,7 @@ export async function bootCopilot() {
                     core: coreSurface,
                     sdk: sdkSurface,
                     agent: agentSurface,
-                    terminal: bootState.terminal,
+                    terminal: terminalSurface,
                     plan: bootPlan,
                     phaseHandlers,
                 });
@@ -196,11 +220,9 @@ export async function bootCopilot() {
                 );
             },
             'terminal-init': async () => {
-                if (!bootState.terminal || !bootState.terminalContext) {
-                    throw new Error('[bootstrap] runtime-wiring não produziu dependências do terminal.');
-                }
+                const { terminal, ctx } = requireTerminalBootState(bootState);
                 log('DEBUG', `[bootstrap] Plano de boot: ${bootPlan.phases.map((phase) => phase.id).join(' -> ')}`);
-                await bootState.terminal.runTerminalInitPhase(bootState.terminalContext);
+                await terminal.runTerminalInitPhase(ctx);
             },
             'terminal-aliases': async () => {
                 const { terminal, ctx } = requireTerminalBootState(bootState);
@@ -211,7 +233,7 @@ export async function bootCopilot() {
                 await terminal.runTerminalRuntimeConfigPhase(ctx);
             },
             'terminal-pinned-context': async (
-                /** @type {import('./boot/lifecycle-runner.js').BootPhaseRunContext | undefined} */ bootPhase,
+                /** @type {import('./lifecycle-runner.js').BootPhaseRunContext | undefined} */ bootPhase,
             ) => {
                 const { terminal, ctx } = requireTerminalBootState(bootState);
                 await terminal.runTerminalPinnedContextPhase(ctx);
@@ -222,14 +244,14 @@ export async function bootCopilot() {
                 await terminal.runTerminalConversationHubPhase(ctx);
             },
             'copilot-http-server': async (
-                /** @type {import('./boot/lifecycle-runner.js').BootPhaseRunContext | undefined} */ bootPhase,
+                /** @type {import('./lifecycle-runner.js').BootPhaseRunContext | undefined} */ bootPhase,
             ) => {
                 const { terminal, ctx } = requireTerminalBootState(bootState);
                 await terminal.runTerminalHttpServerPhase(ctx);
                 bootPhase?.registerRollback('http-server', () => terminal.rollbackTerminalHttpServerPhase(ctx));
             },
             'terminal-runtime-listeners': async (
-                /** @type {import('./boot/lifecycle-runner.js').BootPhaseRunContext | undefined} */ bootPhase,
+                /** @type {import('./lifecycle-runner.js').BootPhaseRunContext | undefined} */ bootPhase,
             ) => {
                 const { terminal, ctx } = requireTerminalBootState(bootState);
                 await terminal.runTerminalRuntimeListenersPhase(ctx);
@@ -255,18 +277,6 @@ export async function bootCopilot() {
 }
 
 /**
- * Adapter tardio para evitar que `runtime-wiring` importe a borda terminal.
- *
- * @param {string} event
- * @param {unknown} [payload]
- * @returns {void}
- */
-function startTerminalServerBroadcast(event, payload) {
-    const data = payload && typeof payload === 'object' ? payload : { value: payload ?? null };
-    void import('./terminal/dialog/index.js').then(({ broadcastSse }) => broadcastSse(event, data));
-}
-
-/**
  * @param {{ type: string; timestamp: number; [key: string]: unknown }} event
  * @returns {void}
  */
@@ -277,14 +287,8 @@ function emitBootLifecycleEvent(event) {
 }
 
 /**
- * @param {{
- *     terminal: null | typeof import('./terminal/index.js');
- *     terminalContext: null | import('./terminal/index.js').TerminalBootContext;
- * }} bootState
- * @returns {{
- *     terminal: typeof import('./terminal/index.js');
- *     ctx: import('./terminal/index.js').TerminalBootContext;
- * }}
+ * @param {{ terminal: CopilotTerminalHostSurface | null; terminalContext: unknown }} bootState
+ * @returns {{ terminal: CopilotTerminalHostSurface; ctx: unknown }}
  */
 function requireTerminalBootState(bootState) {
     if (!bootState.terminal || !bootState.terminalContext) {

@@ -4,7 +4,7 @@
 
 Este diretório coordena start, stop, setup de sessão, reconexão, teardown e estado persistido do
 agent. Ele também contém um entrypoint compatível legado (`entry.js`), mas o boot canônico fica em
-`src/copilot/bootstrap.js` e `src/copilot/terminal/bootstrap.js`.
+`src/copilot/boot/runtime-bootstrap.js` e `src/copilot/terminal/bootstrap.js`.
 
 ## Como ler este diretório
 

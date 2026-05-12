@@ -7,8 +7,8 @@
  * Inicializa o AlwaysAliveAgent e mantém o processo ativo, aguardando mensagens via sinais ou via HTTP bridge (montado
  * no dashboard-web :3008).
  *
- * **Boot sequence**: `terminal/bootstrap.js` e `copilot/bootstrap.js` são o boot canônico. Este módulo não é entrypoint
- * operacional principal.
+ * **Boot sequence**: `terminal/bootstrap.js` injeta o host terminal em `boot/runtime-bootstrap.js`. Este módulo não é
+ * entrypoint operacional principal.
  *
  * O "host" citado pelos helpers deste arquivo é o host de processo compatível. Ele não se confunde com os
  * `DialogHost`/`DialogLoopHost` de `agent/types.js`.
@@ -57,7 +57,8 @@ import { drainStateWrites } from '../state/state-io.js';
 /**
  * Inicializa o agent lifecycle: plugin discovery, event wiring, retries, shutdown, IPC.
  *
- * Compat interno do lifecycle. O boot canônico chama `bootCopilot()` e compõe o runtime via `runtime-wiring.js`.
+ * Compat interno do lifecycle. O boot canônico chama `boot/runtime-bootstrap.js` e compõe o runtime via
+ * `runtime-wiring.js`.
  *
  * @returns {Promise<void>}
  */

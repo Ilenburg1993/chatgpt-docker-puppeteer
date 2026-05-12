@@ -58,8 +58,8 @@ export {
 /**
  * Cria e inicia o servidor copilot dedicado (Express + Socket.IO).
  *
- * Este módulo não inicia REPL, terminal UX nem runtime agent. Ele é composto pelo boot canônico em `terminal/index.js`,
- * que injeta `startCopilotServer()`.
+ * Este módulo não inicia REPL, terminal UX nem runtime agent. Ele é composto pelo boot canônico do terminal, que injeta
+ * `startCopilotServer()` no host local.
  *
  * @param {CopilotServerOptions} [opts]
  * @returns {Promise<CopilotServer>}

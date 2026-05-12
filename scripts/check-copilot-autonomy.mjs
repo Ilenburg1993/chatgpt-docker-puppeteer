@@ -9,17 +9,17 @@
  * 2. Os entry points de boot existem e exportam corretamente
  * 3. PM2 entry points resolvem para arquivos existentes
  * 4. Arquivos de wiring removidos permanecem removidos
- * 5. bootstrap.js implementa modo único (sem parâmetro mode/context)
+ * 5. runtime-bootstrap.js implementa boot genérico sem parâmetro mode/context
  *
- * Arquitetura Onda 2.7: copilot é ferramenta DEV-only. Boot canônico: terminal/bootstrap.js → bootCopilot() →
- * startTerminalServer()
+ * Arquitetura Onda 2.8+: copilot é ferramenta DEV-only. Boot canônico: terminal/bootstrap.js →
+ * boot/runtime-bootstrap.js → bootCopilot({ terminal, broadcastSse }) → startTerminalServer()
  *
  * Exit code 0 = tudo ok. Exit code 1 = problemas encontrados.
  *
  * Uso: node scripts/check-copilot-autonomy.mjs
  */
 
-import { execSync } from 'node:child_process';
+import { execFileSync, execSync } from 'node:child_process';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import {
@@ -59,10 +59,10 @@ if (output.trim()) {
 
 // ── Check 2: entry points existem ───────────────────────────────────────────
 
-// terminal/bootstrap.js = canônico (único modo real)
-// bootstrap.js = delegante (chama bootCopilot sem args)
+// terminal/bootstrap.js = entrypoint executável canônico
+// boot/runtime-bootstrap.js = orquestrador genérico com host terminal injetado
 const ENTRY_POINTS = [
-    { path: 'src/copilot/bootstrap.js', note: 'delegante (modo único)' },
+    { path: 'src/copilot/boot/runtime-bootstrap.js', note: 'orquestrador genérico com host terminal injetado' },
     { path: COPILOT_CANONICAL_BOOT_ENTRYPOINT, note: 'CANÔNICO — boot via terminal:llm-b' },
 ];
 
@@ -123,17 +123,30 @@ if (existsSync(resolve(SERVER_WIRING))) {
     console.log(`✅ Check 4: ${SERVER_WIRING} removido (Onda 3.9 aplicada).`);
 }
 
-// ── Check 5: bootstrap.js tem modo único (sem parâmetros mode/context) ──────
+// ── Check 5: runtime-bootstrap.js mantém boot genérico sem mode/context ─────
 
-const bootstrapSrc = readFileSync(resolve('src/copilot/bootstrap.js'), 'utf-8');
+const bootstrapSrc = readFileSync(resolve('src/copilot/boot/runtime-bootstrap.js'), 'utf-8');
 const hasModeProp =
     /\bmode\s*[=:]\s*['"]/.test(bootstrapSrc.replaceAll(COPILOT_BOOT_MODE, '')) || /CopilotBootMode/.test(bootstrapSrc);
 if (hasModeProp) {
-    console.error('❌ Check 5 FALHOU — bootstrap.js ainda contém referência a "mode" ou "CopilotBootMode".');
-    console.error('   Onda 2.7 exige modo único: bootCopilot() sem parâmetros.');
+    console.error(
+        '❌ Check 5 FALHOU — boot/runtime-bootstrap.js ainda contém referência a "mode" ou "CopilotBootMode".',
+    );
+    console.error('   O boot canônico deve ser host-driven, sem parâmetro de modo/contexto.');
     errors++;
 } else {
-    console.log('✅ Check 5: bootstrap.js implementa modo único (sem mode/CopilotBootMode).');
+    console.log('✅ Check 5: boot/runtime-bootstrap.js mantém boot genérico sem mode/CopilotBootMode.');
+}
+
+// ── Check 5b: src/copilot/bootstrap.js permanece removido ───────────────────
+
+if (existsSync(resolve('src/copilot/bootstrap.js'))) {
+    console.error(
+        '❌ Check 5b FALHOU — src/copilot/bootstrap.js reapareceu; o boot deve viver em boot/runtime-bootstrap.js.',
+    );
+    errors++;
+} else {
+    console.log('✅ Check 5b: src/copilot/bootstrap.js permanece removido.');
 }
 
 // ── Check 6: server/index.js existe e exporta startCopilotServer ────────────
@@ -298,8 +311,16 @@ if (missingBarrels.length > 0) {
 
 let removedRouteImports = '';
 try {
-    removedRouteImports = execSync(
-        `rg -n "^\\s*import .*src/copilot/api|^\\s*import .*#copilot/api|from ['"][^'"]*api/(express|sse)" src/copilot/server/routes/ --type js --no-heading`,
+    removedRouteImports = execFileSync(
+        'rg',
+        [
+            '-n',
+            String.raw`^\s*import .*src/copilot/api|^\s*import .*#copilot/api|from ['"][^'"]*api/(express|sse)`,
+            'src/copilot/server/routes/',
+            '--type',
+            'js',
+            '--no-heading',
+        ],
         {
             encoding: 'utf-8',
             stdio: ['pipe', 'pipe', 'pipe'],
@@ -429,8 +450,16 @@ if (missingSdkBaseline.length === 0) {
 
 // ── Check 18: SDK HTTP adapter expõe campos JSON-serializáveis do SDK ──────
 
-const sdkSessionMiddlewareSrc = readFileSync(resolve('src/copilot/server/routes/sdk/session-middleware.js'), 'utf-8');
-const sdkSessionMessagingSrc = readFileSync(resolve('src/copilot/server/routes/sdk/session-messaging.js'), 'utf-8');
+const SDK_ROUTE_FILES = [
+    'src/copilot/server/routes/sdk/session-middleware.js',
+    'src/copilot/server/routes/sdk/session-messaging.js',
+    'src/copilot/server/routes/sdk/session-crud.js',
+    'src/copilot/server/routes/sdk/session-schemas.js',
+    'src/copilot/server/routes/sdk/session-core-routes.js',
+];
+const sdkRouteSurface = SDK_ROUTE_FILES.filter((file) => existsSync(resolve(file)))
+    .map((file) => readFileSync(resolve(file), 'utf-8'))
+    .join('\n\n');
 const REQUIRED_SDK_ROUTE_FIELDS = [
     'configDir',
     'mcpServers',
@@ -442,11 +471,9 @@ const REQUIRED_SDK_ROUTE_FIELDS = [
     'reasoningEffort',
     'LogMessageBodySchema',
 ];
-const missingRouteFields = REQUIRED_SDK_ROUTE_FIELDS.filter(
-    (field) => !sdkSessionMiddlewareSrc.includes(field) && !sdkSessionMessagingSrc.includes(field),
-);
+const missingRouteFields = REQUIRED_SDK_ROUTE_FIELDS.filter((field) => !sdkRouteSurface.includes(field));
 
-if (missingRouteFields.length === 0 && sdkSessionMessagingSrc.includes("router.post('/sessions/:id/log'")) {
+if (missingRouteFields.length === 0 && sdkRouteSurface.includes("router.post('/sessions/:id/log'")) {
     console.log('✅ Check 18: /sdk/sessions cobre configuração SDK JSON e session.log().');
 } else {
     console.error(

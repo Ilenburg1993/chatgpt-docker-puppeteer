@@ -109,21 +109,6 @@ vi.mock('../../../src/copilot/agent/lifecycle/process-host/runtime-host.js', () 
     runCopilotSdkBootPreflight: mocks.runCopilotSdkBootPreflight,
 }));
 
-vi.mock('../../../src/copilot/terminal/index.js', () => ({
-    createTerminalBootContext: mocks.createTerminalBootContext,
-    runTerminalInitPhase: mocks.runTerminalInitPhase,
-    runTerminalAliasesPhase: mocks.runTerminalAliasesPhase,
-    runTerminalRuntimeConfigPhase: mocks.runTerminalRuntimeConfigPhase,
-    runTerminalPinnedContextPhase: mocks.runTerminalPinnedContextPhase,
-    runTerminalConversationHubPhase: mocks.runTerminalConversationHubPhase,
-    runTerminalHttpServerPhase: mocks.runTerminalHttpServerPhase,
-    runTerminalRuntimeListenersPhase: mocks.runTerminalRuntimeListenersPhase,
-    runTerminalReplPhase: mocks.runTerminalReplPhase,
-    rollbackTerminalPinnedContextPhase: mocks.rollbackTerminalPinnedContextPhase,
-    rollbackTerminalHttpServerPhase: mocks.rollbackTerminalHttpServerPhase,
-    rollbackTerminalRuntimeListenersPhase: mocks.rollbackTerminalRuntimeListenersPhase,
-}));
-
 vi.mock('../../../src/copilot/runtime-wiring.js', () => ({
     wireCopilotRuntimeDI: mocks.wireCopilotRuntimeDI,
 }));
@@ -192,11 +177,26 @@ vi.mock('../../../src/copilot/observability/logger.js', () => ({
 }));
 
 describe('copilot/bootstrap', () => {
-    /** @type {typeof import('../../../src/copilot/bootstrap.js')} */
+    /** @type {typeof import('../../../src/copilot/boot/runtime-bootstrap.js')} */
     let bootstrapMod;
 
+    const terminalSurface = {
+        createTerminalBootContext: mocks.createTerminalBootContext,
+        runTerminalInitPhase: mocks.runTerminalInitPhase,
+        runTerminalAliasesPhase: mocks.runTerminalAliasesPhase,
+        runTerminalRuntimeConfigPhase: mocks.runTerminalRuntimeConfigPhase,
+        runTerminalPinnedContextPhase: mocks.runTerminalPinnedContextPhase,
+        runTerminalConversationHubPhase: mocks.runTerminalConversationHubPhase,
+        runTerminalHttpServerPhase: mocks.runTerminalHttpServerPhase,
+        runTerminalRuntimeListenersPhase: mocks.runTerminalRuntimeListenersPhase,
+        runTerminalReplPhase: mocks.runTerminalReplPhase,
+        rollbackTerminalPinnedContextPhase: mocks.rollbackTerminalPinnedContextPhase,
+        rollbackTerminalHttpServerPhase: mocks.rollbackTerminalHttpServerPhase,
+        rollbackTerminalRuntimeListenersPhase: mocks.rollbackTerminalRuntimeListenersPhase,
+    };
+
     beforeAll(async () => {
-        bootstrapMod = await import('../../../src/copilot/bootstrap.js');
+        bootstrapMod = await import('../../../src/copilot/boot/runtime-bootstrap.js');
     });
 
     beforeEach(() => {
@@ -248,8 +248,8 @@ describe('copilot/bootstrap', () => {
 
         const { bootCopilot } = bootstrapMod;
 
-        await expect(bootCopilot()).rejects.toThrow('boot failed');
-        await expect(bootCopilot()).resolves.toBeUndefined();
+        await expect(bootCopilot({ terminal: terminalSurface, broadcastSse: vi.fn() })).rejects.toThrow('boot failed');
+        await expect(bootCopilot({ terminal: terminalSurface, broadcastSse: vi.fn() })).resolves.toBeUndefined();
 
         expect(mocks.runTerminalReplPhase).toHaveBeenCalledTimes(2);
         expect(mocks.bootstrapObservability).toHaveBeenCalledTimes(2);
@@ -258,7 +258,7 @@ describe('copilot/bootstrap', () => {
     });
 
     it('registra rollbacks transacionais para recursos terminal alocados por fase', async () => {
-        await bootstrapMod.bootCopilot();
+        await bootstrapMod.bootCopilot({ terminal: terminalSurface, broadcastSse: vi.fn() });
 
         expect(mocks.bootRollbacks.map((entry) => `${entry.phaseId}:${entry.id}`)).toEqual(
             expect.arrayContaining([
@@ -272,5 +272,9 @@ describe('copilot/bootstrap', () => {
         expect(mocks.rollbackTerminalPinnedContextPhase).toHaveBeenCalled();
         expect(mocks.rollbackTerminalHttpServerPhase).toHaveBeenCalled();
         expect(mocks.rollbackTerminalRuntimeListenersPhase).toHaveBeenCalled();
+    });
+
+    it('falha cedo quando o host terminal não é injetado', async () => {
+        await expect(bootstrapMod.bootCopilot(/** @type {any} */ ({}))).rejects.toThrow(/terminal host/i);
     });
 });

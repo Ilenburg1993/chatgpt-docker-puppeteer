@@ -7,9 +7,23 @@
  * @module copilot/terminal/bootstrap
  */
 
-import { bootCopilot } from '../bootstrap.js';
+import { bootCopilot } from '../boot/runtime-bootstrap.js';
 import { log } from '../observability/logger.js';
 import { handleTerminalBootFailure, registerTerminalShutdownSignals } from './bootstrap-lifecycle.js';
+import { broadcastSse } from './dialog/index.js';
+import * as terminal from './index.js';
+
+/**
+ * Adapta a surface SSE do terminal para o contrato genérico do boot.
+ *
+ * @param {string} event
+ * @param {unknown} [payload]
+ * @returns {void}
+ */
+function broadcastBootSse(event, payload) {
+    const data = payload && typeof payload === 'object' ? payload : { value: payload ?? null };
+    broadcastSse(event, data);
+}
 
 registerTerminalShutdownSignals();
 
@@ -22,4 +36,4 @@ if (typeof log.setConsoleLevel === 'function') {
     log.setConsoleLevel(/** @type {'DEBUG' | 'INFO' | 'WARN' | 'ERROR' | 'FATAL'} */ (consoleLevel));
 }
 
-bootCopilot().catch((err) => void handleTerminalBootFailure(err));
+bootCopilot({ terminal, broadcastSse: broadcastBootSse }).catch((err) => void handleTerminalBootFailure(err));

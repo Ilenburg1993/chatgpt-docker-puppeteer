@@ -12,7 +12,7 @@ Este diretório tem uma regra simples:
 ```text
 terminal:llm-b
   -> terminal/bootstrap.js
-    -> bootstrap.js
+    -> boot/runtime-bootstrap.js
       -> runtime-wiring.js
         -> terminal/index.js
           -> server/index.js
@@ -57,7 +57,8 @@ O boot local tem uma única autoridade executável:
 ```text
 npm run terminal:llm-b
   -> src/copilot/terminal/bootstrap.js
-    -> bootCopilot()
+    -> src/copilot/boot/runtime-bootstrap.js
+      -> bootCopilot({ terminal, broadcastSse })
       -> readCopilotBootConfig()
       -> startTerminalServer({ startCopilotServer, wireRuntime, startTodoCleanupJob, bootConfig })
         -> startCopilotServer()

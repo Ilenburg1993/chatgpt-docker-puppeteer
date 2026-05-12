@@ -4,7 +4,7 @@
  *
  * Contrato declarativo dos entrypoints operacionais do Copilot local.
  *
- * O boot real tem uma única trilha: terminal/bootstrap.js -> bootCopilot() -> startTerminalServer() ->
+ * O boot real tem uma única trilha: terminal/bootstrap.js -> boot/runtime-bootstrap.js -> startTerminalServer() ->
  * startCopilotServer(). Não existe entrypoint compatível paralelo.
  *
  * @module copilot/boot/contract
@@ -34,6 +34,7 @@ export const COPILOT_BOOT_RULES = Object.freeze({
     serverOwnership: 'server/index.js owns HTTP/Socket.IO only; it never starts terminal UX or the agent by itself.',
     terminalOwnership:
         'terminal/index.js owns REPL/SSE UX and composes the server through injected startCopilotServer.',
+    dependencyBoundary: 'No module in src/copilot outside terminal/ may import terminal surfaces directly.',
     pm2Ownership: 'PM2 must start only llm-b-terminal for the Copilot runtime.',
     bootConfigOwnership:
         'boot/config.js is the canonical place for workspace, skill directories, host, port and boot variable policy.',
