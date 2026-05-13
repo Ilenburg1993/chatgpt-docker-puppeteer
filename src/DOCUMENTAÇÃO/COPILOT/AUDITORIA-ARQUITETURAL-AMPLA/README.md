@@ -266,7 +266,7 @@ Na transição para o Bloco B, o pacote já passa a incluir também:
   de dialog boot recovery, agora delegado à façade semântica `agent-runtime-state.js`.
 - checkpoint complementar do Bloco B / aprofundamento do Bloco C (`48`), cobrindo a delegação de
   `AlwaysAliveAgent` para `agent-runtime-controls` no eixo de status/interação e o alinhamento da
-  cadeia de diálogo em `agent-dialog-runtime.js` / `presentation/runtime-dialog.js`.
+  cadeia de diálogo em `agent-dialog-runtime.js` / `presentation/runtime/dialog.js`.
 - checkpoint complementar do Bloco B / aprofundamento do Bloco C (`49`), cobrindo a delegação do
   eixo de governança/capabilities de `AlwaysAliveAgent` para `agent-runtime-controls` (permission
   mode, permission/context capabilities e tool registry snapshots), com guardrail estrutural

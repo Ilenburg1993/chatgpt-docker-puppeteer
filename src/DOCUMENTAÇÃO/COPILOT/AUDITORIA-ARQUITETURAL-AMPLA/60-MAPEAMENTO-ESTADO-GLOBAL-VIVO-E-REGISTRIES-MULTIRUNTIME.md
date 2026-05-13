@@ -101,7 +101,7 @@ cache ou rastreamento operacional de borda.
 - `observability/event-catalog.js` — `_deadLetters` (fila técnica de DLQ)
 - `observability/event-collector.js` — `_compactionHistory` (histórico operacional)
 - `observability/tool-stats.js` — `_stats` (registry técnico de métricas)
-- `presentation/runtime-file-context.js` — `_fileCache` (cache defensivo)
+- `presentation/files/context.js` — `_fileCache` (cache defensivo)
 
 **Classificação:** aceitáveis por ora, mas precisam continuar claramente marcados como
 terminal-local / cache / registry técnico e não como domínio implícito.
@@ -116,7 +116,7 @@ Estes não são necessariamente bugs, mas merecem revisão recorrente para evita
   - legítimo como rate limiting, mas precisa permanecer infra de borda.
 - `tools/session-tools.js` — `SESSION_CONTEXT_STORE`
   - precisa seguir técnico; não pode virar owner semântico de sessão viva.
-- `presentation/runtime-file-context.js` — `_fileCache`
+- `presentation/files/context.js` — `_fileCache`
   - precisa continuar cache defensivo e não store canônica de contexto.
 - `sdk/tools/custom.js` — `_registry`
   - legítimo como registry técnico; não deve crescer para composition root informal.

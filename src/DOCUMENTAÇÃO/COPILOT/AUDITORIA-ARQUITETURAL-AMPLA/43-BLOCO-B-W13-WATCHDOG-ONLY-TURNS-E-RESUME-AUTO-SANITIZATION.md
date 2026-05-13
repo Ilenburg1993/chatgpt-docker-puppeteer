@@ -83,7 +83,7 @@ Isso foi propagado em:
 - `src/copilot/agent/facades/agent-dialog-runtime.js`
 - `src/copilot/channel/client-dialog.js`
 - `src/copilot/channel/client.js`
-- `src/copilot/presentation/runtime-dialog.js`
+- `src/copilot/presentation/runtime/dialog.js`
 - `src/copilot/terminal/dialog/engine.js`
 
 Regra nova:

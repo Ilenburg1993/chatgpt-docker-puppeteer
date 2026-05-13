@@ -49,7 +49,7 @@ Critério de pronto:
 
 ### Progresso atual da E2
 
-- `presentation/runtime-models.js`, `runtime-sdk-session.js`, `runtime-tools.js` e
+- `presentation/runtime/models.js`, `runtime-sdk-session.js`, `runtime-tools.js` e
   `runtime-webhooks.js` já migraram para `requireAgentRuntimeSelection()`, abolindo fallback
   silencioso quando um `runtimeId` explícito não existe;
 - `server/routes/sdk/deps.js` passou a usar a mesma resolução estrita, fazendo o adapter `/sdk/*`
@@ -155,7 +155,7 @@ Critério de pronto:
 - `agent/runtime-registry.js` passou a aceitar metadata opcional `agentProfileId` por runtime, sem
   quebrar a API atual baseada em `runtimeId`;
 - o runtime default lazy agora se registra explicitamente com profile `always-alive`;
-- `presentation/runtime-overview.js`, `presentation/agent-runtime.js` e `/status` do terminal já
+- `presentation/runtime/overview.js`, `presentation/agent-runtime.js` e `/status` do terminal já
   propagam `agentProfileId`, preparando a UX e a topologia para múltiplos runtimes/perfis sem criar
   um segundo owner operacional.
 

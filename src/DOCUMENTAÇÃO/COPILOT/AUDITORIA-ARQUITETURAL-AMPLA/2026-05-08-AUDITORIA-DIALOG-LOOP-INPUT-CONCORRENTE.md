@@ -1,7 +1,7 @@
 # Auditoria — Dialog Loop e Input Humano Concorrente
 
 Data: 2026-05-08  
-Escopo: `src/copilot/terminal`, `src/copilot/presentation/runtime-dialog.js` e
+Escopo: `src/copilot/terminal`, `src/copilot/presentation/runtime/dialog.js` e
 `src/copilot/agent/dialog`.
 
 ## Objetivo

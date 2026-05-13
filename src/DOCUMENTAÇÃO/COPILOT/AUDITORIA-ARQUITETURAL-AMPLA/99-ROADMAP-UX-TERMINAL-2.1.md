@@ -226,7 +226,7 @@ Checkpoint recente:
   residual do terminal a uma allowlist explícita de eventos raw ainda sem adapter dedicado.
 - `/sdk prompt` agora expõe o status canônico do system prompt modular + instruction sources da
   sessão SDK ativa, sem abrir parser paralelo fora de `config/system-prompt/status.js` e
-  `presentation/runtime-sdk-session.js`.
+  `presentation/runtime/sdk-session.js`.
 - `/sdk prompt` agora também mostra `binding` e `freshness` do prompt persistido pela sessão SDK,
   transformando a diagnose de reload live/staleness em UX terminal canônica em vez de inspeção ad
   hoc em logs/estado bruto.
@@ -736,7 +736,7 @@ Situação ideal:
 
 Implementado nesta rodada:
 
-1. `presentation/runtime-controls.js` passou a expor leitura/mutação canônica de permission mode por
+1. `presentation/runtime/controls.js` passou a expor leitura/mutação canônica de permission mode por
    runtime;
 2. `frontend/gateways/agent-runtime.js` recebeu wrappers terminal para
    `read/setTerminalRuntimePermissionMode`;

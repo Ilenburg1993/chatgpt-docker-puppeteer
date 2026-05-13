@@ -1,12 +1,27 @@
 # 2026-05-12 — Avaliação arquitetural Presentation 2.1+: shared edge layer barrel-first
 
-**Data:** 2026-05-12  
-**Escopo:** `src/copilot/presentation/**`  
+**Data:** 2026-05-12
+**Escopo:** `src/copilot/presentation/**`
 **Motivação:** iniciar a próxima onda ampla de reorganização arquitetural após a consolidação barrel-first do `terminal/`, agora adaptando a estratégia para a natureza própria de `presentation/` como **shared edge layer**.
 
 ---
 
-## 1) Síntese executiva
+## 1) Sínese executiva
+
+> **Delta de execução — 2026-05-12 (rodada atual)**
+>
+> A implementação já avançou bastante além do diagnóstico-base desta nota:
+>
+> - `agent/`, `routing/`, `state/`, `system/`, `conversation/`, `contracts/`, `runtime/`, `files/` e `sdk/` já são
+>   subdomínios físicos reais;
+> - `server/` e `terminal/` já foram religados para consumir `presentation/` via sub-barrels nesses subdomínios;
+> - `package.json` já expõe superfícies públicas explícitas para `presentation` (`#copilot/presentation/*` sem
+>   curingas);
+> - um submódulo `agent/runtime/index.js` já foi introduzido para estreitar a surface de seleção/lookup de runtime e
+>   evitar ciclos com `agent/control.js`.
+>
+> Assim, esta nota passa a servir como **diagnóstico-base + target de governança**, e o próximo foco principal sai da
+> taxonomia física inicial para **surface minimization + decomposição de hotspots + enforcement automatizado**.
 
 `presentation/` **não é uma borda final** como `terminal/`. Ele é uma **camada transversal de projeções, payloads, accessors e handlers compartilhados** entre `server/`, `terminal/` e outras bordas/consumidores de runtime.
 
@@ -38,42 +53,22 @@ Conclusão: a próxima onda em `presentation/` deve ser tratada como **programa 
 
 ### 2.1 Topologia atual
 
-Hoje `src/copilot/presentation/` contém **35 arquivos no mesmo nível**, sem subpastas:
+Hoje `src/copilot/presentation/` já está organizado em subdomínios reais:
 
-- `agent-control.js`
-- `agent-http-errors.js`
-- `agent-runtime.js`
-- `conversation-hub.js`
-- `dialog-timeout-policy.js`
+- `agent/`
+- `routing/`
+- `runtime/`
+- `state/`
+- `files/`
+- `system/`
+- `conversation/`
+- `sdk/`
+- `contracts/`
+
+e mantém apenas poucos leaf files de raiz deliberados, como:
+
 - `index.js`
-- `realtime.js`
-- `runtime-capabilities.js`
-- `runtime-controls.js`
-- `runtime-dialog.js`
-- `runtime-fallback-telemetry.js`
-- `runtime-file-context.js`
-- `runtime-file-routing.js`
-- `runtime-health.js`
-- `runtime-lifecycle.js`
-- `runtime-meta.js`
-- `runtime-models.js`
-- `runtime-overview.js`
-- `runtime-ownership.js`
-- `runtime-request.js`
-- `runtime-route-deps.js`
-- `runtime-sdk-session.js`
-- `runtime-status.js`
-- `runtime-targeting.js`
-- `runtime-todos.js`
-- `runtime-tools.js`
-- `runtime-ui-state-store.js`
-- `runtime-ui-state.js`
-- `runtime-webhooks.js`
-- `sdk-recovery-policy.js`
-- `sdk-sessions.js`
-- `system-config.js`
-- `system-metrics.js`
-- `types.js`
+- `dialog-timeout-policy.js`
 - `README.md`
 
 ### 2.2 Volume / hotspots
@@ -149,13 +144,21 @@ Leitura arquitetural:
 
 ### 2.5 Superfície pública atual
 
-O barrel raiz `src/copilot/presentation/index.js` é puro no sentido de não conter lógica operacional, mas ele ainda é **amplo demais**:
+O barrel raiz `src/copilot/presentation/index.js` segue puro, e `package.json` já declara superfícies explícitas para:
 
-- usa muitos `export *`;
-- mistura namespaces (`export * as ...`) com reexports diretos;
-- expõe folhas concretas demais, sem intermediação por sub-barrels semânticos.
+- `#copilot/presentation`
+- `#copilot/presentation/agent`
+- `#copilot/presentation/contracts`
+- `#copilot/presentation/conversation`
+- `#copilot/presentation/files`
+- `#copilot/presentation/routing`
+- `#copilot/presentation/runtime`
+- `#copilot/presentation/sdk`
+- `#copilot/presentation/state`
+- `#copilot/presentation/system`
 
-Além disso, o `package.json` **não declara hoje superfícies explícitas `#copilot/presentation...`**, o que reforça uma cultura de imports por arquivo concreto.
+O gap remanescente deixou de ser “falta surface pública” e passou a ser **minimizar melhor a surface do root barrel e
+dos sub-barrels grandes**.
 
 ---
 
@@ -173,19 +176,19 @@ Isso já não escala para a densidade atual do módulo.
 
 ## 3.2 Problemas arquiteturais resultantes
 
-1. **superfície pública implícita**  
+1. **superfície pública implícita**
    consumidores dependem de leaf files porque não existem sub-superfícies canônicas;
 
-2. **mistura de domínios no mesmo nível**  
+2. **mistura de domínios no mesmo nível**
    `agent-control.js`, `runtime-request.js`, `runtime-ui-state-store.js` e `system-metrics.js` coexistem lado a lado embora pertençam a grupos semânticos distintos;
 
-3. **dificuldade de enforcement**  
+3. **dificuldade de enforcement**
    sem sub-barrels, não dá para distinguir facilmente o que é API pública do que é detalhe interno;
 
-4. **barrel raiz largo demais**  
+4. **barrel raiz largo demais**
    `index.js` vira hub por conveniência, não por governança deliberada;
 
-5. **risco de `presentation/` virar “segundo runtime”**  
+5. **risco de `presentation/` virar “segundo runtime”**
    conforme cresce, sem taxonomia clara, fica mais fácil deixar lógica de domínio/runtime vazar para a camada de projeção.
 
 ## 3.3 Risco específico desta pasta
@@ -386,6 +389,12 @@ Foco maior em:
 - `runtime/`
 - root `index.js`
 
+> **Status atual:** parcialmente iniciado.
+>
+> - `agent/runtime/index.js` já estreitou a fronteira entre `agent/` e `runtime/`;
+> - `server/` e `terminal/` já deixaram de fazer deep imports nos novos subdomínios barrelizados;
+> - ainda falta reduzir o peso deliberado do root `presentation/index.js` e tornar `runtime/index.js` mais explícito.
+
 ## Onda PBF-4 — Decomposição dos hotspots
 
 Prioridade absoluta:
@@ -404,6 +413,8 @@ Adicionar guardrails para:
 2. imports externos a `presentation/` só via superfícies públicas permitidas;
 3. `presentation/` não importa `terminal/` nem `server/`;
 4. arquivos acima de thresholds exigem decomposição planejada / ADR local.
+
+> **Status atual:** iniciado nesta rodada com contrato dedicado de governança barrel-first para `presentation/`.
 
 ---
 

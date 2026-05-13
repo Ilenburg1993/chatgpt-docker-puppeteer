@@ -38,7 +38,7 @@ ação adequada.
 
 Correções:
 
-- `presentation/sdk-recovery-policy.js` passou a classificar subescopos: `session`, `weekly_model` e
+- `presentation/sdk/recovery-policy.js` passou a classificar subescopos: `session`, `weekly_model` e
   `unknown`.
 - Mensagens de limite de sessão agora orientam aguardar o reset e deixam explícito que `/model auto`
   não contorna limite de sessão ativo.
@@ -128,7 +128,7 @@ Arquivos principais:
 
 - `src/copilot/sdk/models/auto-policy.js`;
 - `src/copilot/agent/facades/agent-model-config.js`;
-- `src/copilot/presentation/runtime-models.js`;
+- `src/copilot/presentation/runtime/models.js`;
 - `src/copilot/terminal/commands/config.js`;
 - `src/copilot/terminal/commands/session.js`;
 - `src/copilot/terminal/frontend/projections/config.js`.

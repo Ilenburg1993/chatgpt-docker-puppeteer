@@ -119,7 +119,7 @@ Criar um módulo canônico com fases:
 
 ### D3 — Exposição
 
-- [x] último boot report disponível via `presentation/runtime-lifecycle.js`;
+- [x] último boot report disponível via `presentation/runtime/lifecycle.js`;
 - [x] `/health` inclui snapshot de lifecycle;
 - [x] `/diagnose` renderiza boot/shutdown report de modo amigável;
 - [x] `/status` renderiza lifecycle/boot de modo amigável no REPL e expõe `lifecycleSummary` no

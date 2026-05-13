@@ -1102,7 +1102,7 @@ Transformações aplicadas:
   - métricas de convergência são emitidas por dependência de telemetry
     (`sdkTelemetry.emitOperationMetric`).
 - A decisão `sdk↔fs` foi exposta para presentation por um adapter dedicado
-  (`presentation/runtime-file-routing.js`), removendo acoplamento indevido de frontend terminal com
+  (`presentation/files/routing.js`), removendo acoplamento indevido de frontend terminal com
   `core`.
 - `session-setup.js` passou a aplicar policy dinâmica de tool em runtime mesmo quando denylist,
   allowlist e exclusões default estão vazias. Isso mantém a regra operacional: **nenhum

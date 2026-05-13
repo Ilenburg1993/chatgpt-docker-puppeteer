@@ -72,7 +72,7 @@ module maps.
   `user_input.*` manualmente e passaram a depender dos normalizers do SDK.
 - `sdk/rpc/ops.js` ganhou `permissionsListPending()` com detecção compatível de método no namespace
   `permissions` e envelope estável (`available/source/requests`).
-- `agent/facades/sdk/ui-ops.js`, `agent/always-alive.js`, `presentation/runtime-sdk-session.js` e
+- `agent/facades/sdk/ui-ops.js`, `agent/always-alive.js`, `presentation/runtime/sdk-session.js` e
   `terminal/frontend/gateways/sdk-session.js` passaram a expor a listagem ativa de permissões
   pendentes.
 - `terminal/commands/sdk.js` ganhou `/permission pending` com estratégia dual: listagem ativa via
@@ -122,7 +122,7 @@ module maps.
   isolamento runtime-aware de `elicitation` e `ask_user` no painel `/sdk waits`.
 - `config/system-prompt/projection.js` passou a definir envelope público único de projection
   (`status`, `sdkCompatibility`, `binding`, `freshness`, `session`, `instructionSources`,
-  `ownership`, `revision`) e `presentation/runtime-sdk-session.js` passou a retornar esse envelope
+  `ownership`, `revision`) e `presentation/runtime/sdk-session.js` passou a retornar esse envelope
   em `projection` sem quebrar campos legados.
 - `terminal/commands/sdk.js` passou a consumir preferencialmente `projection` com fallback para os
   campos legados (`systemPrompt`, `binding`, `freshness`, `instructionSources`).
@@ -302,7 +302,7 @@ Auditoria complementar solicitada sobre o comportamento observado no Copilot van
   e omite `reasoningEffort` nesse caso.
 - Gap corrigido: o terminal/recovery policy não deve sugerir `/model auto` como se fosse contorno
   universal para todo `429`.
-- `presentation/sdk-recovery-policy.js` e `sdk/errors.js` passaram a diferenciar `session`,
+- `presentation/sdk/recovery-policy.js` e `sdk/errors.js` passaram a diferenciar `session`,
   `weekly_model` e `unknown` como subescopos de rate limit.
 - `hooks/session-hooks.js` deixou de agendar fallback automático quando o SDK informa limite de
   sessão com reset temporal.

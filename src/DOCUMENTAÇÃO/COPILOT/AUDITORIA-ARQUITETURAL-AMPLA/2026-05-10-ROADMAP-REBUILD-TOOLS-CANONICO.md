@@ -182,12 +182,12 @@ Reconstruir `src/copilot/tools/` como um subsistema canônico, com:
 ### C. Próximo lote de transformação ampla
 
 1. **Consolidação barrel-first de `presentation/`**
-  - tratar `presentation/` como **shared edge layer** e não como borda final;
-  - sair da topologia plana atual para subdomínios explícitos (`agent`, `routing`, `runtime`, `state`, `files`, `system`, `conversation`, `sdk`, `contracts`);
-  - introduzir sub-barrels puros e futura superfície pública explícita em `package.json`, evitando deep imports em arquivos concretos;
-  - migrar `server/`, `terminal/` e testes para consumir sub-superfícies canônicas de `presentation/`;
-  - decompor hotspots principais (`agent-control.js`, `runtime-ui-state-store.js`, `system-metrics.js`, `runtime-health.js`, `runtime-sdk-session.js`);
-  - endurecer governança para impedir `presentation/`→`terminal/server` e restringir consumers externos a barrels públicos.
+  - ✅ topologia física inicial aplicada (`agent`, `routing`, `runtime`, `state`, `files`, `system`, `conversation`, `sdk`, `contracts`);
+  - ✅ superfícies públicas explícitas em `package.json` adicionadas para `presentation/*` sem curingas;
+  - ✅ `server/` e `terminal/` religados para consumir sub-barrels dos novos subdomínios;
+  - ✅ sub-surface `agent/runtime/index.js` introduzida para quebrar ciclos e estreitar lookup/seleção de runtime;
+  - 🔄 próximo: continuar PBF-3/PBF-4/PBF-5 com minimização do root barrel, explicitação adicional de `runtime/index.js` e decomposição dos hotspots principais (`agent/control.js`, `state/ui-store.js`, `system/metrics.js`, `runtime/health.js`, `runtime/sdk-session.js`);
+  - 🔄 próximo: endurecer ainda mais a governança para impedir regressão de deep imports e reforçar a regra `presentation/`→`!terminal/!server`.
 
 2. **Expandir ainda mais contract tests da policy finita das file tools**
   - completar cobertura também para `search_in_files` e `workspace_symbol_search`;

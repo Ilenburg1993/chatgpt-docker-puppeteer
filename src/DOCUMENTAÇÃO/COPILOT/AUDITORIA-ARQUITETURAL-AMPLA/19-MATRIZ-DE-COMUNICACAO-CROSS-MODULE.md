@@ -212,7 +212,7 @@ Isso é arquiteturalmente correto **desde que**:
 
 ### Sinal muito importante
 
-`presentation/runtime-sdk-session.js` consome `agent/` — isso confirma a promoção da fronteira
+`presentation/runtime/sdk-session.js` consome `agent/` — isso confirma a promoção da fronteira
 `agent ↔ sdk` via façade e reforça a tese de `presentation/` como consumer de alto nível.
 
 ---

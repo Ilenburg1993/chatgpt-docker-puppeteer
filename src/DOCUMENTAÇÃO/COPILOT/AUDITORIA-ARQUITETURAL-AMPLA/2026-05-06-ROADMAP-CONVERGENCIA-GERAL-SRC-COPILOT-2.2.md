@@ -109,7 +109,7 @@ Prioridade sugerida:
       bleed entre filas paralelas de runtimes diferentes.
 - [~] Provar isolamento de rate-limit por `runtimeId`. - 2026-05-06: subescopo de rate limit
   (`session` vs `weekly_model` vs `unknown`) agora é classificado em `sdk/errors.js` e
-  `presentation/sdk-recovery-policy.js`; ainda falta prova multi-runtime real.
+  `presentation/sdk/recovery-policy.js`; ainda falta prova multi-runtime real.
 - [~] Separar profile/capability snapshot por runtime/agent profile. - 2026-05-06: policy Auto,
   metadata de modelo observado e preferência local `gpt-5.4/high` passaram a ser projetadas por
   runtime; ainda falta exercitar múltiplos runtimes vivos em paralelo.

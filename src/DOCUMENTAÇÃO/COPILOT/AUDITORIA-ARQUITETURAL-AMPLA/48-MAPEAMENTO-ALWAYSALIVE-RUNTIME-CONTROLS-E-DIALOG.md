@@ -73,7 +73,7 @@ A subonda também alinhou os contratos de tipo entre:
 
 - `agent-dialog-runtime.js`;
 - `AgentContext.sendDialogTurn()`;
-- `presentation/runtime-dialog.js`.
+- `presentation/runtime/dialog.js`.
 
 Regras agora explícitas:
 

@@ -81,8 +81,8 @@ SDK SessionEvent
 | --------- | ----------------------------- | ---------------------------------------------------------------------------- | --------------- | ---------------------- |
 | F-PRES-01 | Seleção de runtime            | `presentation/runtime-targeting.js` + `presentation/agent-runtime.js`        | `presentation/` | **Canônico**           |
 | F-PRES-02 | Runtime request deps (HTTP)   | `presentation/runtime-request.js` + `runtime-route-deps.js`                  | `presentation/` | **Canônico**           |
-| F-PRES-03 | Health/status projections     | `presentation/runtime-health.js`, `runtime-status.js`, `runtime-overview.js` | `presentation/` | **Canônico**           |
-| F-PRES-04 | SDK session shared projection | `presentation/runtime-sdk-session.js`                                        | `presentation/` | **Canônico**           |
+| F-PRES-03 | Health/status projections     | `presentation/runtime/health.js`, `runtime-status.js`, `runtime-overview.js` | `presentation/` | **Canônico**           |
+| F-PRES-04 | SDK session shared projection | `presentation/runtime/sdk-session.js`                                        | `presentation/` | **Canônico**           |
 | F-PRES-05 | Agent control shared edge     | `presentation/agent-control.js`                                              | `presentation/` | **Canônico (hotspot)** |
 
 ## 3.5 Fluxos de borda server

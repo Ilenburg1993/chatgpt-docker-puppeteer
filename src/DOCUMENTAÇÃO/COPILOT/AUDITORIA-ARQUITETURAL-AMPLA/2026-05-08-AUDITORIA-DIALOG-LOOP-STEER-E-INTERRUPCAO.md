@@ -109,7 +109,7 @@ processa a mensagem substituta já sob a serialização canônica.
 - `src/copilot/agent/facades/agent-runtime-controls.js`
 - `src/copilot/agent/facades/index.js`
 - `src/copilot/agent/index.js`
-- `src/copilot/presentation/runtime-controls.js`
+- `src/copilot/presentation/runtime/controls.js`
 - `src/copilot/presentation/agent-control.js`
 - `src/copilot/channel/inject.js`
 - `src/copilot/server/routes/agent.js`

@@ -364,7 +364,7 @@ Critério de conclusão da migração:
 
 ### Transformações aplicadas
 
-- `channel/client.js`, `runtime-wiring.js`, `presentation/runtime-sdk-session.js`,
+- `channel/client.js`, `runtime-wiring.js`, `presentation/runtime/sdk-session.js`,
   `agent/facades/agent-runtime-capabilities.js` e `agent/lifecycle/runtime-host.js` deixaram de ler
   propriedades voláteis do agent diretamente (`status/sessionId/dialogLoopActive/dialogPaused`) e
   passaram a consumir snapshots/projections canônicas.
@@ -436,12 +436,12 @@ agent e SDK já está mais limpa; agora vale atacar a confiabilidade operacional
 
 ### Transformações aplicadas
 
-- `presentation/runtime-tools.js` ganhou `readAgentRuntimeToolsProjectionForRuntime(runtimeId)`.
-- `presentation/runtime-status.js` ganhou leituras `readAgentStatusSnapshotForRuntime()` e
+- `presentation/runtime/tools.js` ganhou `readAgentRuntimeToolsProjectionForRuntime(runtimeId)`.
+- `presentation/runtime/status.js` ganhou leituras `readAgentStatusSnapshotForRuntime()` e
   `readAgentStatusValueForRuntime()`.
-- `presentation/sdk-sessions.js` ganhou `resolveSdkRuntimeProjectionForRuntime()`, removendo a
+- `presentation/sdk/sessions.js` ganhou `resolveSdkRuntimeProjectionForRuntime()`, removendo a
   necessidade de passar o singleton vivo do agent para rotas de status/start/state.
-- `presentation/runtime-sdk-session.js` ganhou `resolveAgentSdkActiveSessionEntry()`, encapsulando o
+- `presentation/runtime/sdk-session.js` ganhou `resolveAgentSdkActiveSessionEntry()`, encapsulando o
   fallback da sessão permanente do AlwaysAlive quando ela ainda não está no registry SDK.
 - `agent/facades/agent-health-access.js` passou a ser exportado pelo barrel público do agent e a
   matriz mínima de facades críticas passou a ter contrato de export em `test_arch_contracts`.
@@ -515,13 +515,13 @@ agent e SDK já está mais limpa; agora vale atacar a confiabilidade operacional
 
 ### Transformações aplicadas
 
-- `presentation/runtime-health.js` ganhou `buildAgentHealthHttpResponse(runtimeId)`, encapsulando:
+- `presentation/runtime/health.js` ganhou `buildAgentHealthHttpResponse(runtimeId)`, encapsulando:
   - resolução de runtime alvo;
   - metadata de fallback;
   - status HTTP derivado do snapshot canônico de health.
 - `server/routes/health.js` deixou de montar payload de runtime/health manualmente e passou a
   consumir a projection HTTP de `presentation`.
-- `presentation/runtime-webhooks.js` ganhou projections HTTP canônicas:
+- `presentation/runtime/webhooks.js` ganhou projections HTTP canônicas:
   - `buildRuntimeWebhooksListHttpPayload(runtimeId)`;
   - `registerRuntimeWebhookHttp(url, runtimeId)`;
   - `unregisterRuntimeWebhookHttp(id, runtimeId)`.
@@ -650,11 +650,11 @@ agent e SDK já está mais limpa; agora vale atacar a confiabilidade operacional
 - O checkpoint anterior foi aplicado por fast-forward diretamente na `main`, enviado para
   `origin/main`, e a branch temporária do PR foi removida. O trabalho passa a seguir sempre na
   `main`, sem PR intermediário.
-- `presentation/runtime-health.js` passou a usar `readAgentRuntimeOverview()` para resolver seleção
+- `presentation/runtime/health.js` passou a usar `readAgentRuntimeOverview()` para resolver seleção
   de runtime e snapshot de health, alinhando health com a mesma leitura base usada por status,
   terminal e system config.
 - A montagem completa do `/copilot-api/health` saiu de `server/routes/copilot-api/control.js` e
-  passou para `buildCopilotApiHealthHttpResponseFromRoute()` em `presentation/runtime-health.js`. A
+  passou para `buildCopilotApiHealthHttpResponseFromRoute()` em `presentation/runtime/health.js`. A
   rota agora apenas resolve deps runtime-aware e serializa a projection.
 - `#copilot/agent` passou a exportar `readRuntimePermissionMode`, permitindo que projections leiam
   permission mode pelo seam público em vez de depender de métodos legados do singleton.

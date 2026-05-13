@@ -355,7 +355,7 @@ MCP tools são criadas via `createTool()` (SDK raw), **NÃO** via `buildTool()` 
 
 ### 30.1 Runtime Tools Projection
 
-`presentation/runtime-tools.js` (94 linhas) — Delega para `readAgentRuntimeTools()` do agent facade.
+`presentation/runtime/tools.js` (94 linhas) — Delega para `readAgentRuntimeTools()` do agent facade.
 
 ### 30.2 Runtime Meta Helpers
 

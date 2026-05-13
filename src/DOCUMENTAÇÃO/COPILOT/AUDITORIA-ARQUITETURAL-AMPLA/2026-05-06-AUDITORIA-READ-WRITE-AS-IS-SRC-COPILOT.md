@@ -23,7 +23,7 @@ Foram avaliadas estas superfícies:
 - shell/git/code/todo/session tools que leem, escrevem, executam busca ou persistem estado;
 - SDK workspace/session FS: `src/copilot/sdk/session/session-fs.js` e RPCs de workspace;
 - contexto de arquivos para terminal/apresentação:
-  `src/copilot/presentation/runtime-file-context.js`;
+  `src/copilot/presentation/files/context.js`;
 - persistência SQLite do Copilot: `src/copilot/db/**` e `src/copilot/conversation-hub/**`;
 - auditoria JSONL e buffers: `src/copilot/audit/**`, `src/copilot/observability/**`;
 - scanner/indexador RAG existente: `tools/rag/**`;
@@ -217,7 +217,7 @@ Lacunas:
 
 ## 9. Contexto de arquivo para terminal/apresentação
 
-Arquivo principal: `src/copilot/presentation/runtime-file-context.js`.
+Arquivo principal: `src/copilot/presentation/files/context.js`.
 
 Capacidades:
 
