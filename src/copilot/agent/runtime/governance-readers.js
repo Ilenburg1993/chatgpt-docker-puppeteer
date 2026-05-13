@@ -25,6 +25,8 @@
  *     getToolRegistryEntriesSnapshot?:
  *         | (() => ReturnType<import('../agent-context.js').AgentContext['getToolRegistryEntriesSnapshot']>)
  *         | undefined;
+ *     getToolSessionContext?: (() => import('#copilot/sdk').ToolSessionContext) | undefined;
+ *     toolSessionContext?: import('#copilot/sdk').ToolSessionContext | undefined;
  * }} AgentRuntimeGovernanceTarget
  */
 
@@ -57,6 +59,20 @@ export function readRuntimePermissionCapability(runtime) {
  */
 export function readRuntimePermissionPolicySnapshot(runtime) {
     return runtime.getPermissionPolicySnapshot?.() ?? null;
+}
+
+/**
+ * Retorna o ToolSessionContext vivo sem expor `AgentContext` como contrato público do runtime.
+ *
+ * @param {AgentRuntimeGovernanceTarget} runtime
+ * @returns {import('#copilot/sdk').ToolSessionContext}
+ */
+export function readRuntimeToolSessionContext(runtime) {
+    const context = runtime.getToolSessionContext?.() ?? runtime.toolSessionContext;
+    if (!context) {
+        throw new Error('AGENT_RUNTIME_TOOL_SESSION_CONTEXT_UNAVAILABLE');
+    }
+    return context;
 }
 
 /**

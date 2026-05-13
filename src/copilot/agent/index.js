@@ -33,7 +33,8 @@ export {
     HIGH_FREQUENCY_EVENTS,
     PR_CONSUMING_EVENTS,
 } from '../events/agent-events.js';
-export { AlwaysAliveAgent, alwaysAliveAgent, getAgent, resetAgent } from './always-alive.js';
+export { alwaysAliveAgent, getAgent, resetAgent } from './always-alive-singleton.js';
+export { AlwaysAliveAgent } from './always-alive.js';
 export { classifyAgentError } from './error-policy.js';
 export {
     DEFAULT_AGENT_RUNTIME_ID,
@@ -51,7 +52,28 @@ export {
 export {} from './types.js'; // re-exporta os typedefs: IAlwaysAliveAgent, AgentStatus, etc.
 
 // ── Subsistemas ──────────────────────────────────────────────
-export * from './dialog/index.js';
+export { AgentContext } from './context/index.js';
+export {
+    DIALOG_MODULE_LAYOUT,
+    DialogCompactionPolicy,
+    DialogLoopManager,
+    DialogLoopStateMachine,
+    DialogProtocol,
+    DialogWatchdog,
+    DialogWatchdogSupervisor,
+    WATCHDOG_THRESHOLDS,
+    buildTurnResolutionListeners,
+    dispatchTurnToHost,
+    emitTurnStart,
+    executeTurnImpl,
+    getDialogModuleDescriptor,
+    getDialogModuleRole,
+    handleUserInputRequest,
+    listDialogModulesByRole,
+    selectDialogResumeStrategy,
+    waitForRestartAndReply,
+    wireDialogLoopEvents,
+} from './dialog/index.js';
 export {
     abortRuntimeCurrentMessage,
     answerRuntimePendingQuestion,
@@ -118,12 +140,81 @@ export {
     unregisterAgentRuntimeWebhook,
     updateAgentSdkPlan,
 } from './facades/index.js';
-export * from './health-check.js';
-export * from './infra/index.js';
-export * from './lifecycle/index.js';
-export * from './messaging/index.js';
-export * from './session/index.js';
-export * from './state/index.js';
+export { getAgentHealthSnapshot } from './health-check.js';
+export {
+    HandoffManager,
+    MessageQueue,
+    PermissionController,
+    WebhookManager,
+    bootstrapTools,
+    buildAuditingPermissionHandler,
+    buildStatusSnapshot,
+    checkResolvedIp,
+    configureHookTools,
+    executeTask,
+    isHighRiskTool,
+    isPrivateIp,
+    logToolAudit,
+    setExperimentalSession,
+    setHub,
+    setPermissionAgent,
+    setSessionRpc,
+    validateWebhookUrl,
+} from './infra/index.js';
+export {
+    LIFECYCLE_MODULE_LAYOUT,
+    clearState,
+    clearStateAsync,
+    discoverRuntimePlugins,
+    drainStateWrites,
+    getLifecycleModuleDescriptor,
+    getLifecycleModuleRole,
+    listLifecycleModulesByRole,
+    persistState,
+    readState,
+    readStateAsync,
+    registerRuntimeAgentEventHost,
+    registerRuntimeIpcHost,
+    registerRuntimeProcessSignals,
+    registerRuntimeShutdownHost,
+    runCopilotSdkBootPreflight,
+    tryReconnect,
+    writeState,
+    writeStateAsync,
+} from './lifecycle/index.js';
+export {
+    answerPendingQuestion,
+    enqueueTask,
+    executeTask as executeAgentMessagingTask,
+    processQueue,
+    sendMessage,
+    sendMessageDialogBoot,
+    steerMessage,
+} from './messaging/index.js';
+export {
+    SESSION_MODULE_LAYOUT,
+    SessionKeepalive,
+    SessionMessagesCache,
+    buildHookSystemContext,
+    buildHookSystemContextSafe,
+    cleanupStaleSessions,
+    clearActiveSdkSessionOwnership,
+    createSnapshot,
+    getSessionModuleDescriptor,
+    getSessionModuleRole,
+    initOrResumeSession,
+    listSessionModulesByRole,
+    listSnapshotsAsync,
+    loadSnapshotAsync,
+    performBootWiring,
+    saveSnapshotAsync,
+    setBackgroundCompactionThreshold,
+    shouldRotateSession,
+    syncActiveSessionOwnership,
+    syncSdkHistory,
+    wireSessionEvents,
+} from './session/index.js';
+export { getStatusSnapshot, listenerDiagnostics } from './state/index.js';
 
 // ─── DI Tokens ────────────────────────────────────────────────────────────────
 export { ALWAYS_ALIVE_AGENT } from './di-tokens.js';

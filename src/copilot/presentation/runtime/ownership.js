@@ -7,7 +7,7 @@
  *   as bordas não importem helpers de ownership diretamente de `#copilot/agent` em vários pontos.
  */
 
-import { clearRuntimeSdkSessionOwnership, syncRuntimeSdkSessionOwnership } from '#copilot/agent';
+import { clearRuntimeSdkSessionOwnership, syncRuntimeSdkSessionOwnership } from '#copilot/agent/facades';
 
 /**
  * @param {string | null} sdkSessionId

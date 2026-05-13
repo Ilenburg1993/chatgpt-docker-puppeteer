@@ -39,7 +39,7 @@ import {
     HOOK_SESSION_END,
     HOOK_SESSION_START,
 } from '../../../events/index.js';
-import { getAgent } from '../../always-alive.js';
+import { getAgent } from '../../always-alive-singleton.js';
 import { checkAgentSdkAuthStatus, createAgentSdkClient } from '../../facades/agent-sdk-access.js';
 import { ERROR_TRACKER } from '../../ports/error-tracking-port.js';
 import { getDefaultHookBus } from '../../ports/hook-port.js';

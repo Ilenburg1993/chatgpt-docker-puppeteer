@@ -16,7 +16,7 @@ import {
     readSdkModelStats,
     setRuntimeModel,
     setRuntimeReasoningEffort,
-} from '#copilot/agent';
+} from '#copilot/agent/facades';
 import { requireAgentRuntimeSelection } from '../agent/runtime/index.js';
 
 /**

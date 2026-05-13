@@ -29,7 +29,7 @@ import {
     startRuntime,
     steerRuntimeMessage,
     stopAgentDialogLoopAuthorized,
-} from '#copilot/agent';
+} from '#copilot/agent/facades';
 import {
     getAgentRuntime,
     getDefaultAgentRuntime,

@@ -9,7 +9,7 @@
  * @see EventBus
  */
 
-import { sendAgentDialogTurn } from '#copilot/agent';
+import { sendAgentDialogTurn } from '#copilot/agent/facades';
 import { SessionError } from '#copilot/core';
 import { HUB_EVENTS } from '#copilot/events';
 import { log } from '#copilot/observability';

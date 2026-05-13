@@ -7,13 +7,10 @@
  *   recebem as dependências já compostas.
  */
 
-import {
-    ALWAYS_ALIVE_AGENT,
-    alwaysAliveAgent,
-    configureHookTools,
-    getAgent,
-    readRuntimeControlState,
-} from '#copilot/agent';
+import { alwaysAliveAgent, getAgent } from '#copilot/agent/always-alive';
+import { ALWAYS_ALIVE_AGENT } from '#copilot/agent/di-tokens';
+import { readRuntimeControlState } from '#copilot/agent/facades';
+import { configureHookTools } from '#copilot/agent/ports';
 import { BRIDGE_AGENT, FALLBACK_AGENT, NERV_BRIDGE_AGENT, PERMISSION_AGENT } from '#copilot/bridges';
 import { CONVERSATION_STORE, HUB } from '#copilot/conversation-hub';
 import { configureDefaultUserInputContext } from '#copilot/sdk';

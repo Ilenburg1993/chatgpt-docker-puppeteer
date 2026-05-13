@@ -13,10 +13,10 @@ import { gitLog, gitStatus, listIssues, listPrs, listRuns } from '#copilot/bridg
 import { container, toError } from '#copilot/core';
 import { ERROR_TRACKER, getStatsByCategory, getToolStats, METRICS_STORE } from '#copilot/observability';
 import { getSseClients } from '../../../infra/sse/state.js';
-import { clearRateLimiters } from '../../state/index.js';
-import { readAgentRuntimeOverview, readAgentRuntimeOverviewProjection } from '../../runtime/index.js';
 import { readRuntimeIdFromParams } from '../../routing/index.js';
+import { readAgentRuntimeOverview, readAgentRuntimeOverviewProjection } from '../../runtime/index.js';
 import {
+    clearRateLimiters,
     readRuntimeInjectHistory,
     readRuntimeLatestThinkingHistoryEntry,
     readRuntimeThinkingHistory,

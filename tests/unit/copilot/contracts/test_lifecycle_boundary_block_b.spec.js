@@ -185,15 +185,24 @@ describe('Block B — lifecycle ownership contracts', () => {
 
     it('always-alive delega subsistemas pela superfície runtime interna', () => {
         const alwaysAlive = readFileSync(srcPath('agent', 'always-alive.js'), 'utf8');
+        const singleton = readFileSync(srcPath('agent', 'always-alive-singleton.js'), 'utf8');
         const surface = readFileSync(srcPath('agent', 'agent-runtime-surface.js'), 'utf8');
+        const rootSurface = readFileSync(srcPath('agent', 'runtime', 'root-surface', 'index.js'), 'utf8');
 
-        assert.match(alwaysAlive, /from '\.\/agent-runtime-surface\.js'/);
+        assert.match(alwaysAlive, /from '\.\/runtime\/root-surface\/index\.js'/);
         assert.doesNotMatch(alwaysAlive, /from ['"]\.\/(?:dialog|facades|lifecycle|messaging|ports|state)\//);
         assert.doesNotMatch(alwaysAlive, /from ['"]\.\/(?:event-bridge-wiring|health-check|runtime-registry)\.js['"]/);
-        assert.match(surface, /from '\.\/lifecycle\/orchestrators\/agent-lifecycle\.js'/);
-        assert.match(surface, /from '\.\/messaging\/agent-messaging\.js'/);
-        assert.match(surface, /from '\.\/facades\/agent-sdk-access\.js'/);
-        assert.match(surface, /from '\.\/runtime-registry\.js'/);
+        assert.doesNotMatch(singleton, /from ['"]\.\/agent-runtime-surface\.js['"]/);
+        assert.match(singleton, /from '\.\/event-bridge-wiring\.js'/);
+        assert.match(singleton, /from '\.\/runtime-registry\.js'/);
+        assert.match(singleton, /ensureAgentEventBusBridge/);
+        assert.match(singleton, /registerAgentRuntime/);
+        assert.match(surface, /from '\.\/runtime\/root-surface\/index\.js'/);
+        assert.match(rootSurface, /from '\.\.\/\.\.\/lifecycle\/orchestrators\/agent-lifecycle\.js'/);
+        assert.match(rootSurface, /from '\.\.\/\.\.\/messaging\/agent-messaging\.js'/);
+        assert.match(rootSurface, /from '\.\.\/\.\.\/facades\/agent-sdk-access\.js'/);
+        assert.doesNotMatch(surface, /from '\.\/runtime-registry\.js'/);
+        assert.doesNotMatch(surface, /from '\.\/event-bridge-wiring\.js'/);
     });
 
     it('agent/dialog não importa state-io diretamente; usa runtime-state semanticamente', () => {

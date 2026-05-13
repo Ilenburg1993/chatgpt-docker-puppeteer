@@ -208,6 +208,76 @@ vi.mock('#copilot/agent', () => ({
     loadSnapshotAsync: vi.fn(async () => null),
 }));
 
+vi.mock('#copilot/agent/always-alive', () => ({
+    alwaysAliveAgent: defaultRuntime,
+    getAgent: () => defaultRuntime,
+}));
+
+vi.mock('#copilot/agent/runtime-registry', () => ({
+    getDefaultAgentRuntimeId: () => 'default',
+    getDefaultRegisteredAgentRuntime: () => defaultRuntime,
+    getRegisteredAgentRuntime: (runtimeId = 'default') =>
+        runtimeId === 'alt' ? altRuntime : runtimeId === 'default' ? defaultRuntime : null,
+    listAgentRuntimes: () => [
+        { runtimeId: 'default', runtime: defaultRuntime },
+        { runtimeId: 'alt', runtime: altRuntime },
+    ],
+}));
+
+vi.mock('#copilot/agent/facades', () => ({
+    readAgentRuntimeStatusSnapshot: (/** @type {typeof defaultRuntime} */ agent) => agent.getStatusSnapshot(),
+    readAgentRuntimeHealthSnapshot: (/** @type {typeof defaultRuntime} */ agent) => agent.getHealthSnapshot(),
+    readRuntimeControlState: readMockRuntimeControlState,
+    readRuntimeInteractionState: readMockRuntimeInteractionState,
+    readRuntimePrBudgetSnapshot: readMockRuntimePrBudgetSnapshot,
+    readRuntimePermissionMode: vi.fn(() => 'approve_all'),
+    readAgentRuntimeSdkResourceSnapshot: vi.fn(() => ({ client: false, session: false, quotaMonitor: false })),
+    readAgentRuntimeCapabilities: vi.fn(() => ({})),
+    readRuntimeAutoModelPolicy: (/** @type {typeof defaultRuntime} */ runtime) => ({
+        configuredModel: runtime.model,
+        observedModel: runtime.lastPrInfo?.effectiveModel ?? runtime.lastPrInfo?.model ?? null,
+        selectionAuthority: 'github-copilot',
+        canForcePreference: false,
+    }),
+    readSdkModelMetadata: () => null,
+    readAgentRuntimeTodoSummaries: vi.fn(async () => []),
+    answerRuntimePendingQuestion: (/** @type {typeof defaultRuntime} */ runtime, /** @type {string} */ answer) =>
+        runtime.answerPendingQuestion?.(answer) ?? false,
+    clearRuntimePendingQuestionShadow: (/** @type {typeof defaultRuntime} */ runtime) =>
+        runtime.clearPendingQuestionShadow?.() ?? false,
+    createRuntimeSnapshot: vi.fn((/** @type {Record<string, unknown>} */ data) => ({
+        snapshotId: 'snap-001',
+        createdAt: Date.now(),
+        ...data,
+    })),
+    saveRuntimeSnapshot: vi.fn(async () => '/tmp/snap-001.json'),
+    listRuntimeSnapshots: vi.fn(async () => [
+        { snapshotId: 'snap-001', createdAt: Date.now(), model: 'gpt-5-mini', reason: 'manual' },
+    ]),
+    loadRuntimeSnapshot: vi.fn(async (/** @type {string} */ id) =>
+        id === 'snap-001'
+            ? {
+                  snapshotId: 'snap-001',
+                  createdAt: Date.now(),
+                  sessionId: 'sess',
+                  model: 'gpt-5-mini',
+                  status: 'idle',
+                  sendCount: 5,
+                  dialogLoopActive: false,
+                  dialogPaused: false,
+                  pendingQuestion: null,
+                  pendingQuestionShadow: {
+                      question: 'READY: aguardando próxima mensagem',
+                      meta: { kind: 'ready' },
+                      restoredAt: 1,
+                      expiresAt: 2,
+                  },
+                  prMetrics: null,
+              }
+            : null,
+    ),
+}));
+
 vi.mock('#copilot/core', async () => {
     const actual = await vi.importActual('#copilot/core');
     return {

@@ -26,7 +26,7 @@
  *
  *     // Modo SDK client (standalone)
  *     import { LlmBridgeClient } from '#copilot/channel';
- *     import { getAgent } from '#copilot/agent';
+ *     import { getAgent } from '#copilot/agent/always-alive';
  *
  *     const agent = getAgent();
  *     await agent.start();

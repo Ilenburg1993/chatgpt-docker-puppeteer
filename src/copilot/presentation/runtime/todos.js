@@ -7,7 +7,7 @@
  *   módulo, sem abrir o store diretamente.
  */
 
-import { readAgentRuntimeTodoSummaries } from '#copilot/agent';
+import { readAgentRuntimeTodoSummaries } from '#copilot/agent/facades';
 
 /**
  * @typedef {{

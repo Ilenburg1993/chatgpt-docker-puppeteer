@@ -73,6 +73,54 @@ vi.mock('#copilot/agent', () => ({
     readAgentRuntimeTodoSummaries: vi.fn(async () => []),
     setRuntimeBackgroundCompactionThreshold: vi.fn(),
 }));
+
+vi.mock('#copilot/agent/always-alive', () => ({
+    alwaysAliveAgent: defaultRuntime,
+    getAgent: () => defaultRuntime,
+}));
+
+vi.mock('#copilot/agent/runtime-registry', () => ({
+    getDefaultAgentRuntimeId: () => 'default',
+    getDefaultRegisteredAgentRuntime: () => defaultRuntime,
+    getRegisteredAgentRuntime: (runtimeId = 'default') => (runtimeId === 'default' ? defaultRuntime : null),
+    listAgentRuntimes: () => [{ runtimeId: 'default', runtime: defaultRuntime }],
+}));
+
+vi.mock('#copilot/agent/facades', () => ({
+    readAgentRuntimeStatusSnapshot: (/** @type {any} */ runtime) => runtime.getStatusSnapshot(),
+    readAgentRuntimeHealthSnapshot: (/** @type {any} */ runtime) => runtime.getHealthSnapshot(),
+    readRuntimeControlState: (/** @type {any} */ runtime) => ({
+        status: runtime.status,
+        model: runtime.model,
+        reasoningEffort: runtime.reasoningEffort ?? 'off',
+        sessionId: runtime.sessionId ?? null,
+        dialogLoopActive: Boolean(runtime.dialogLoopActive),
+        dialogPaused: Boolean(runtime.dialogPaused),
+        queueSize: Number(runtime.queueSize ?? 0),
+    }),
+    readRuntimeInteractionState: () => ({
+        pendingQuestion: null,
+        pendingQuestionKind: null,
+        pendingQuestionShadow: null,
+        pendingQuestionShadowKind: null,
+        pendingQuestionShadowState: null,
+        pendingQuestionShadowExpired: false,
+        pendingQuestionShadowAgeMs: null,
+        pendingQuestionShadowExpiresAt: null,
+        pendingQuestionShadowRemainingMs: null,
+    }),
+    readRuntimePrBudgetSnapshot: () => ({
+        sendCount: 0,
+        dialogLoopActive: false,
+        sessionId: null,
+        prMetrics: { boots: 0, resumesWithPR: 0, resumesZeroPR: 0, totalPR: 0 },
+        lastPrInfo: null,
+    }),
+    readRuntimePermissionMode: vi.fn(() => 'approve_all'),
+    readAgentRuntimeSdkResourceSnapshot: vi.fn(() => ({ client: false, session: false, quotaMonitor: false })),
+    readAgentRuntimeTodoSummaries: vi.fn(async () => []),
+    setRuntimeBackgroundCompactionThreshold: vi.fn(),
+}));
 vi.mock('#copilot/bridges/mcp-tool-bridge', () => ({
     getMcpStatus: () => ({ available: false, toolCount: 0, circuitOpen: false }),
 }));

@@ -12,8 +12,10 @@ import {
     readRuntimeContextFactoryCapabilities,
     readRuntimePermissionCapability,
     readRuntimePermissionMode,
+    readRuntimePermissionPolicySnapshot,
     readRuntimeToolRegistry,
     readRuntimeToolRegistryEntries,
+    readRuntimeToolSessionContext,
 } from '../runtime/governance-readers.js';
 import { readAgentRuntimeHealthSnapshot, readAgentRuntimeStatusSnapshot } from '../runtime/status-readers.js';
 import { setBackgroundCompactionThreshold } from '../session/initializers/initializer.js';
@@ -268,8 +270,10 @@ export {
     readRuntimeContextFactoryCapabilities,
     readRuntimePermissionCapability,
     readRuntimePermissionMode,
+    readRuntimePermissionPolicySnapshot,
     readRuntimeToolRegistry,
     readRuntimeToolRegistryEntries,
+    readRuntimeToolSessionContext,
 };
 
 /**

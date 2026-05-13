@@ -7,7 +7,7 @@
  *   estático, filtros e paginação.
  */
 
-import { readAgentRuntimeTools } from '#copilot/agent';
+import { readAgentRuntimeTools } from '#copilot/agent/facades';
 import { requireAgentRuntimeSelection } from '../agent/runtime/index.js';
 import { buildRuntimeRouteMetaFromSelection } from '../routing/index.js';
 

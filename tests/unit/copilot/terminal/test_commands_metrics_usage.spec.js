@@ -132,6 +132,54 @@ vi.mock('#copilot/agent', () => ({
     loadRuntimeSnapshot: vi.fn(async () => null),
 }));
 
+vi.mock('#copilot/agent/always-alive', () => ({
+    alwaysAliveAgent: defaultRuntime,
+    getAgent: () => defaultRuntime,
+}));
+
+vi.mock('#copilot/agent/runtime-registry', () => ({
+    getDefaultAgentRuntimeId: () => 'default',
+    getDefaultRegisteredAgentRuntime: () => defaultRuntime,
+    getRegisteredAgentRuntime: (runtimeId = 'default') =>
+        runtimeId === 'alt' ? altRuntime : runtimeId === 'default' ? defaultRuntime : null,
+    listAgentRuntimes: () => [
+        { runtimeId: 'default', runtime: defaultRuntime },
+        { runtimeId: 'alt', runtime: altRuntime },
+    ],
+}));
+
+vi.mock('#copilot/agent/facades', () => ({
+    readAgentRuntimeStatusSnapshot: (/** @type {typeof defaultRuntime} */ agent) => agent.getStatusSnapshot(),
+    readAgentRuntimeHealthSnapshot: (/** @type {typeof defaultRuntime} */ agent) => agent.getHealthSnapshot(),
+    readRuntimeControlState: readMockRuntimeControlState,
+    readRuntimePrBudgetSnapshot: readMockRuntimePrBudgetSnapshot,
+    readRuntimeInteractionState: vi.fn(() => ({
+        pendingQuestion: null,
+        pendingQuestionKind: null,
+        pendingQuestionShadow: null,
+        pendingQuestionShadowKind: null,
+        pendingQuestionShadowState: null,
+        pendingQuestionShadowExpired: false,
+        pendingQuestionShadowAgeMs: null,
+        pendingQuestionShadowExpiresAt: null,
+        pendingQuestionShadowRemainingMs: null,
+    })),
+    readRuntimePermissionMode: vi.fn(() => 'approve_all'),
+    readAgentRuntimeSdkResourceSnapshot: vi.fn(() => ({ client: false, session: false, quotaMonitor: false })),
+    readRuntimeAutoModelPolicy: (/** @type {typeof defaultRuntime} */ runtime) => ({
+        configuredModel: runtime.model,
+        observedModel: runtime.lastPrInfo?.effectiveModel ?? runtime.lastPrInfo?.model ?? null,
+        selectionAuthority: 'github-copilot',
+        canForcePreference: false,
+    }),
+    readAgentRuntimeTodoSummaries: vi.fn(async () => []),
+    readSdkModelMetadata: () => null,
+    createRuntimeSnapshot: vi.fn(),
+    saveRuntimeSnapshot: vi.fn(),
+    listRuntimeSnapshots: vi.fn(async () => []),
+    loadRuntimeSnapshot: vi.fn(async () => null),
+}));
+
 vi.mock('#copilot/channel', () => ({
     llmBridgeClient: {
         turnCount: 11,

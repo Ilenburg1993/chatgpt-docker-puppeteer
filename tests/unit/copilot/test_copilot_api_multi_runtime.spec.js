@@ -5,7 +5,8 @@ import { EventEmitter } from 'node:events';
 import { createServer } from 'node:http';
 import { afterEach, beforeEach, describe, it } from 'vitest';
 
-import { alwaysAliveAgent, clearAgentRuntimeRegistry, registerAgentRuntime } from '#copilot/agent';
+import { alwaysAliveAgent } from '#copilot/agent/always-alive';
+import { clearAgentRuntimeRegistry, registerAgentRuntime } from '#copilot/agent/runtime-registry';
 import express from 'express';
 import supertest from 'supertest';
 

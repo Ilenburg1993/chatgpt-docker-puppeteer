@@ -8,7 +8,7 @@
  * @see module:copilot/channel/inject
  */
 
-import { readRuntimeControlState } from '#copilot/agent';
+import { readRuntimeControlState } from '#copilot/agent/facades';
 import { BridgeError } from '#copilot/core';
 import {
     EMITTER_QUESTION_PENDING,

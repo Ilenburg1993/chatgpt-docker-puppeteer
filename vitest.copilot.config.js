@@ -29,8 +29,9 @@ function buildAliasFromImports() {
             continue;
         }
 
+        const escapedPattern = pattern.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
         alias.push({
-            find: pattern,
+            find: new RegExp(`^${escapedPattern}$`),
             replacement: resolve(target.replace('./', '')),
         });
     }

@@ -13,7 +13,7 @@ import {
     readRuntimeControlState,
     readRuntimeInteractionState,
     readRuntimePrBudgetSnapshot,
-} from '#copilot/agent';
+} from '#copilot/agent/facades';
 import { listKnownAgentRuntimes, resolveAgentRuntimeSelection } from '../agent/runtime/index.js';
 import { recordRuntimeFallback } from './fallback-telemetry.js';
 

@@ -170,6 +170,7 @@ describe('contracts/facade-bypass-matrix â€” consumers permitidos por facade crÃ
             'agent/messaging/',
             'agent/state/',
             'agent/agent-runtime-surface.js',
+            'agent/runtime/root-surface/',
         ]);
         assert.deepEqual(violations, [], `Imports nÃ£o autorizados de agent-runtime-state:\n${violations.join('\n')}`);
     });
@@ -177,6 +178,7 @@ describe('contracts/facade-bypass-matrix â€” consumers permitidos por facade crÃ
     it('agent-runtime-controls sÃ³ Ã© consumida por runtime-surface (entrypoint compat)', () => {
         const violations = findFacadeImportViolations('facades/agent-runtime-controls.js', [
             'agent/agent-runtime-surface.js',
+            'agent/runtime/root-surface/',
         ]);
         assert.deepEqual(
             violations,
@@ -197,6 +199,7 @@ describe('contracts/facade-bypass-matrix â€” consumers permitidos por facade crÃ
             'agent/context-factories.js',
             'agent/error-policy.js',
             'agent/agent-runtime-surface.js',
+            'agent/runtime/root-surface/',
         ]);
 
         const sdkRuntimeViolations = findFacadeImportViolations('facades/agent-sdk-runtime.js', [
@@ -204,6 +207,7 @@ describe('contracts/facade-bypass-matrix â€” consumers permitidos por facade crÃ
             'agent/session/',
             'agent/messaging/',
             'agent/agent-runtime-surface.js',
+            'agent/runtime/root-surface/',
         ]);
 
         assert.deepEqual(

@@ -7,7 +7,7 @@
  *   de runtime e estabiliza o shape compartilhado por server, terminal e futuras bordas.
  */
 
-import { readAgentRuntimeCapabilities } from '#copilot/agent';
+import { readAgentRuntimeCapabilities } from '#copilot/agent/facades';
 import { buildRuntimeRouteMetaPayload } from '../routing/index.js';
 import { getAgentHealthSnapshotCompat } from './health.js';
 

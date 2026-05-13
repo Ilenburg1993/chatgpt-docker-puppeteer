@@ -9,7 +9,7 @@
  * @see EventBus
  */
 
-import { sendAgentDialogTurn, startAgentDialogLoop, stopAgentDialogLoopAuthorized } from '#copilot/agent';
+import { sendAgentDialogTurn, startAgentDialogLoop, stopAgentDialogLoopAuthorized } from '#copilot/agent/facades';
 import { LLM_B_TURN_TIMEOUT_MS } from '#copilot/config';
 import {
     EMITTER_DIALOG_READY,

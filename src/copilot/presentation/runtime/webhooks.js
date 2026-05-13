@@ -7,7 +7,11 @@
  *   uma superfície compartilhada adequada para `server/` e futuras bordas administrativas.
  */
 
-import { listAgentRuntimeWebhooks, registerAgentRuntimeWebhook, unregisterAgentRuntimeWebhook } from '#copilot/agent';
+import {
+    listAgentRuntimeWebhooks,
+    registerAgentRuntimeWebhook,
+    unregisterAgentRuntimeWebhook,
+} from '#copilot/agent/facades';
 import { requireAgentRuntimeSelection } from '../agent/runtime/index.js';
 import { buildRuntimeRouteMetaFromSelection, buildRuntimeRouteMetaPayload } from '../routing/index.js';
 

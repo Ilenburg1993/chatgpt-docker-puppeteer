@@ -3,7 +3,9 @@
 import assert from 'node:assert/strict';
 import { afterEach, beforeEach, describe, it } from 'vitest';
 
-import { ALWAYS_ALIVE_AGENT, alwaysAliveAgent, clearAgentRuntimeRegistry, registerAgentRuntime } from '#copilot/agent';
+import { alwaysAliveAgent } from '#copilot/agent/always-alive';
+import { ALWAYS_ALIVE_AGENT } from '#copilot/agent/di-tokens';
+import { clearAgentRuntimeRegistry, registerAgentRuntime } from '#copilot/agent/runtime-registry';
 import { CONVERSATION_STORE } from '#copilot/conversation-hub';
 import { container } from '#copilot/core';
 import express from 'express';

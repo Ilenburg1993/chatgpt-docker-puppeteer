@@ -8,14 +8,14 @@
  *   `agent/`.
  */
 
+import { getAgent } from '#copilot/agent/always-alive';
+import { readRuntimeControlState } from '#copilot/agent/facades';
 import {
-    getAgent,
     getDefaultRegisteredAgentRuntime,
     getRegisteredAgentRuntime,
     listAgentRuntimes,
     getDefaultAgentRuntimeId as readDefaultAgentRuntimeId,
-    readRuntimeControlState,
-} from '#copilot/agent';
+} from '#copilot/agent/runtime-registry';
 import { NotFoundError } from '#copilot/core';
 import { normalizeRuntimeId } from '../../routing/index.js';
 

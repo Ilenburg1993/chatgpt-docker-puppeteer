@@ -54,7 +54,7 @@ const RULES = [
     {
         filePrefix: `conversation-hub${path.sep}`,
         rule: 'conversation-hub-must-not-deep-import-agent',
-        regex: /\bimport\s+[^;]*\s+from\s+['"](?:#copilot\/agent\/.+|\.{1,2}\/.*agent\/.+)['"]/,
+        regex: /\bimport\s+[^;]*\s+from\s+['"](?:#copilot\/agent\/(?!facades['"]).+|\.{1,2}\/.*agent\/.+)['"]/,
     },
     {
         filePrefix: `presentation${path.sep}`,
@@ -132,7 +132,7 @@ const RULES = [
     {
         filePrefix: `agent${path.sep}always-alive.js`,
         rule: 'always-alive-must-not-touch-ctx-runtime-governance-directly',
-        regex: /\bthis\.ctx\.(?:getPermissionModeSnapshot|setPermissionMode|getPermissionCapabilitySnapshot|getContextFactoryCapabilitiesSnapshot|getToolRegistrySnapshot|getToolRegistryEntriesSnapshot)\b/,
+        regex: /\bthis\.ctx\.(?:getPermissionModeSnapshot|setPermissionMode|getPermissionCapabilitySnapshot|getPermissionPolicySnapshot|getContextFactoryCapabilitiesSnapshot|getToolRegistrySnapshot|getToolRegistryEntriesSnapshot|toolSessionContext)\b/,
     },
     {
         filePrefix: `agent${path.sep}session${path.sep}boot-steps.js`,

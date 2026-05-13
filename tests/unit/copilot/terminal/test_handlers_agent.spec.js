@@ -154,6 +154,70 @@ vi.mock('#copilot/agent', () => ({
     stopAgentDialogLoopAuthorized: mockStopAgentDialogLoopAuthorized,
 }));
 
+vi.mock('#copilot/agent/always-alive', () => ({
+    alwaysAliveAgent: defaultRuntime,
+    getAgent: () => defaultRuntime,
+}));
+
+vi.mock('#copilot/agent/runtime-registry', () => ({
+    getDefaultAgentRuntimeId: () => 'default',
+    getDefaultRegisteredAgentRuntime: () => defaultRuntime,
+    getRegisteredAgentRuntime: (runtimeId = 'default') => {
+        if (runtimeId === 'alt') return altRuntime;
+        return runtimeId === 'default' ? defaultRuntime : null;
+    },
+    listAgentRuntimes: () => [
+        { runtimeId: 'default', runtime: defaultRuntime },
+        { runtimeId: 'alt', runtime: altRuntime },
+    ],
+}));
+
+vi.mock('#copilot/agent/error-policy', () => ({
+    classifyAgentError: (/** @type {any} */ error) => {
+        if (error instanceof DOMException && error.name === 'AbortError') return 'ignore';
+        if (error?.code === 'AGENT_STOPPED') return 'fatal';
+        return 'retry';
+    },
+}));
+
+vi.mock('#copilot/agent/facades', () => ({
+    readAgentRuntimeStatusSnapshot: (/** @type {any} */ runtime) => runtime.getStatusSnapshot(),
+    readAgentRuntimeHealthSnapshot: (/** @type {any} */ runtime) => runtime.getHealthSnapshot(),
+    readRuntimeControlState: readMockRuntimeControlState,
+    readRuntimeInteractionState: (/** @type {any} */ runtime) => ({
+        pendingQuestion: runtime.pendingQuestion ?? null,
+        pendingQuestionKind: runtime.pendingQuestionKind ?? null,
+        pendingQuestionShadow: runtime.pendingQuestionShadow ?? null,
+        pendingQuestionShadowKind: runtime.pendingQuestionShadowKind ?? null,
+        pendingQuestionShadowState: runtime.pendingQuestionShadowState ?? null,
+        pendingQuestionShadowExpired: Boolean(runtime.pendingQuestionShadowExpired),
+        pendingQuestionShadowAgeMs: runtime.pendingQuestionShadowAgeMs ?? null,
+        pendingQuestionShadowExpiresAt: runtime.pendingQuestionShadowExpiresAt ?? null,
+        pendingQuestionShadowRemainingMs: runtime.pendingQuestionShadowRemainingMs ?? null,
+    }),
+    readRuntimePrBudgetSnapshot: () => ({ lastPrInfo: null, prMetrics: null }),
+    readRuntimePermissionMode: vi.fn(() => 'approve_all'),
+    readAgentRuntimeSdkResourceSnapshot: vi.fn(() => ({ client: false, session: false, quotaMonitor: false })),
+    abortRuntimeCurrentMessage: mockAbortRuntimeCurrentMessage,
+    steerRuntimeMessage: mockSteerRuntimeMessage,
+    answerRuntimePendingQuestion: mockAnswerRuntimePendingQuestion,
+    pauseRuntimeDialogLoop: vi.fn(async (/** @type {any} */ runtime) => runtime.pauseDialogLoop?.()),
+    resumeRuntimeDialogLoop: vi.fn(async (/** @type {any} */ runtime) => runtime.resumeDialogLoop?.()),
+    getRuntimeHandoffManager: (/** @type {any} */ runtime) => runtime.getHandoffManager(),
+    getRuntimeHandoffHistory: (/** @type {any} */ runtime) => runtime.getHandoffManager().getHistory(),
+    readAgentRuntimeTodoSummaries: vi.fn(async () => []),
+    startAgentDialogLoop: mockStartAgentDialogLoop,
+    sendAgentDialogTurn: mockSendAgentDialogTurn,
+    stopAgentDialogLoopAuthorized: mockStopAgentDialogLoopAuthorized,
+    recoverAgentDialogInputChannel: vi.fn(async () => ({
+        recovered: true,
+        reason: 'input_channel_missing',
+        strategy: 'mock',
+        prConsumed: false,
+        durationMs: 1,
+    })),
+}));
+
 const {
     handleGetContext,
     handlePipeline,
@@ -445,7 +509,10 @@ describe('handlers/agent — handleInject validação', () => {
     });
 
     it('modo interrupt aborta turno ativo e guarda substituição no mailbox zero-PR por padrão', async () => {
-        const result = await handleInject({ runtimeId: 'alt', body: { message: 'substitua o plano', mode: 'interrupt' } });
+        const result = await handleInject({
+            runtimeId: 'alt',
+            body: { message: 'substitua o plano', mode: 'interrupt' },
+        });
         const body = bodyOf(/** @type {{ body: any }} */ (result));
         expect(result.status).toBe(202);
         expect(body.ok).toBe(true);

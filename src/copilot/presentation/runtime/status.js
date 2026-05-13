@@ -15,7 +15,7 @@
  * @typedef {import('../../agent/types.js').IAlwaysAliveAgent} RuntimeStatusAgentLike
  */
 
-import { readAgentRuntimeStatusSnapshot, readAgentRuntimeStatusValue } from '#copilot/agent';
+import { readAgentRuntimeStatusSnapshot, readAgentRuntimeStatusValue } from '#copilot/agent/facades';
 import { resolveAgentRuntimeSelection } from '../agent/runtime/index.js';
 import { buildRuntimeRouteMetaFromSelection, buildRuntimeRouteMetaPayload } from '../routing/index.js';
 import { buildRuntimeLifecycleSummary, readRuntimeLifecycleSnapshot } from './lifecycle.js';

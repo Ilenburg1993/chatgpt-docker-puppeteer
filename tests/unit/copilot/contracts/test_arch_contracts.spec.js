@@ -255,33 +255,43 @@ describe('W4-9 — fronteira agent→sdk: barrel-only fora de facades/ports', ()
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// 3C. Fronteira externa→agent: consumidores usam o barrel público do agent
+// 3C. Fronteira externa→agent: consumidores usam seams explícitos do agent
 // ═══════════════════════════════════════════════════════════════════════════════
 
-describe('W4-9 — fronteira externa→agent: sem deep-import de facades internas', () => {
-    it('src/copilot fora de agent não importa agent/facades/* nem agent/error-policy.js', () => {
+describe('W4-9 — fronteira externa→agent: sem deep-import interno acidental', () => {
+    it('src/copilot fora de agent não importa arquivos internos de agent fora dos seams públicos 2.1', () => {
         const files = listJsFilesRecursive(COPILOT_ROOT);
         /** @type {string[]} */
         const violations = [];
+        const allowedAgentSubpaths = new Set([
+            'always-alive',
+            'di-tokens',
+            'error-policy',
+            'facades',
+            'ports',
+            'runtime-registry',
+            'session/wiring/event-wirer',
+        ]);
 
         for (const abs of files) {
             const rel = abs.replace(COPILOT_ROOT, '').replace(/\\/g, '/');
             if (rel.startsWith('agent/')) continue;
             const src = readFileSync(abs, 'utf-8');
-            if (
-                /(?:from\s+['"][^'"]*agent\/facades\/|import\(['"][^'"]*agent\/facades\/)/.test(src) ||
-                /(?:from\s+['"][^'"]*agent\/error-policy\.js['"]|import\(['"][^'"]*agent\/error-policy\.js['"])/.test(
-                    src,
-                )
-            ) {
-                violations.push(rel);
+            const matches = src.matchAll(
+                /(?:from\s+['"]#copilot\/agent\/([^'"]+)['"]|import\(['"]#copilot\/agent\/([^'"]+)['"]\))/g,
+            );
+            for (const match of matches) {
+                const subpath = String(match[1] ?? match[2] ?? '').replace(/\.js$/, '');
+                if (!allowedAgentSubpaths.has(subpath)) {
+                    violations.push(`${rel}: #copilot/agent/${subpath}`);
+                }
             }
         }
 
         assert.deepEqual(
             violations,
             [],
-            `Consumidores externos devem usar #copilot/agent, não facades internas:\n${violations.join('\n')}`,
+            `Consumidores externos devem usar apenas seams explícitos do agent:\n${violations.join('\n')}`,
         );
     });
 });
@@ -446,14 +456,15 @@ describe('W4-9 — terminal commands: sem bypass direto de observability em /too
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// 3G. runtime-wiring: consumir agent via barrel público
+// 3G. runtime-wiring: consumir agent via seams explícitos
 // ═══════════════════════════════════════════════════════════════════════════════
 
-describe('W4-9 — runtime-wiring consome agent via #copilot/agent', () => {
+describe('W4-9 — runtime-wiring consome agent via seams explícitos', () => {
     it('runtime-wiring.js não importa ./agent/index.js diretamente', () => {
         const src = readSrc('runtime-wiring.js');
 
-        assert.match(src, /from ['"]#copilot\/agent['"]/);
+        assert.match(src, /from ['"]#copilot\/agent\/(?:always-alive|di-tokens|facades|ports)['"]/);
+        assert.doesNotMatch(src, /from ['"]#copilot\/agent['"]/);
         assert.doesNotMatch(src, /from ['"]\.\/agent\/index\.js['"]/);
     });
 });

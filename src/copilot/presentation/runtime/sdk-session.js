@@ -21,7 +21,7 @@ import {
     readAgentSdkSessionMode,
     setAgentSdkSessionMode as setAgentSdkSessionModeOnAgent,
     updateAgentSdkPlan as updateAgentSdkPlanOnAgent,
-} from '#copilot/agent';
+} from '#copilot/agent/facades';
 import {
     buildSystemPromptPublicProjection,
     readSessionInstructionSources,

@@ -12,7 +12,7 @@ import {
     readAgentRuntimeSdkResourceSnapshot,
     readRuntimeControlState,
     readRuntimePermissionMode,
-} from '#copilot/agent';
+} from '#copilot/agent/facades';
 import { CHANNEL_VERSION } from '#copilot/channel';
 import { BRIDGE_EXPOSE_DIAGNOSTICS } from '#copilot/config';
 import { CONVERSATION_STORE } from '#copilot/conversation-hub';

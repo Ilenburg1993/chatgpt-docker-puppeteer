@@ -1,82 +1,54 @@
 // @ts-check
 /**
  * @module copilot/agent/agent-runtime-surface
- * @file Superficie interna usada pelo root `always-alive`.
+ * @file Barrel legado de compatibilidade para a root surface interna do agent.
  *
- *   O root do agent e a API publica compatível continuam em `always-alive.js`; este modulo concentra os adaptadores
- *   semanticos que esse root precisa para delegar lifecycle, dialog, messaging, status, SDK e registry sem importar
- *   cada subsistema diretamente.
+ *   Novos imports internos devem preferir `./runtime/root-surface/index.js`.
  */
 
 export {
-    ensureDialogLoopAttached as dialogEnsureAttached,
+    METRICS_STORE,
+    abortCurrentMessage,
+    agentStart,
+    agentStop,
+    agentTryReconnect,
+    clearAgentRuntimePendingQuestionShadow,
+    compactSdkSession,
+    confirmSdkSessionUi,
+    createSdkWorkspaceFile,
+    deleteSdkPlan,
+    deselectSdkAgent,
+    dialogEnsureAttached,
     dialogRecoverInputChannel,
     dialogResume,
     dialogStart,
     dialogStop,
-} from './dialog/controllers/agent-dialog-controller.js';
-export { ensureAgentEventBusBridge, resetAgentEventBusBridgeWiring } from './event-bridge-wiring.js';
-export { getAgentHealthSnapshot as healthSnapshot } from './health-check.js';
-export { agentStart, agentStop, agentTryReconnect } from './lifecycle/orchestrators/agent-lifecycle.js';
-export {
-    answerPendingQuestion as msgAnswer,
-    processQueue as msgProcessQueue,
-    sendMessage as msgSend,
-    sendMessageDialogBoot as msgSendBoot,
-    steerMessage as msgSteer,
-} from './messaging/agent-messaging.js';
-export { METRICS_STORE } from './ports/metrics-port.js';
-export { registerAgentRuntime, unregisterAgentRuntime } from './runtime-registry.js';
-export { listenerDiagnostics as stateDiagnostics, getStatusSnapshot as stateSnapshot } from './state/agent-state.js';
-
-export {
     dispatchAgentDialogTurn,
-    isAgentDialogLoopPaused,
-    pauseAgentDialogLoop,
-    readAgentDialogLastPrInfo,
-    readAgentDialogPrMetrics,
-} from './facades/agent-dialog-runtime.js';
-export {
-    getModel,
-    getReasoningEffort,
-    listAvailableModels,
-    setModel,
-    setReasoningEffort,
-} from './facades/agent-model-config.js';
-export {
-    getRuntimeHandoffManager,
-    readRuntimeContextFactoryCapabilities,
-    readRuntimeControlState,
-    readRuntimeInteractionState,
-    readRuntimePermissionCapability,
-    readRuntimePermissionMode,
-    readRuntimeToolRegistry,
-    readRuntimeToolRegistryEntries,
-    setRuntimePermissionMode,
-} from './facades/agent-runtime-controls.js';
-export { clearAgentRuntimePendingQuestionShadow, readAgentRuntimeSessionId } from './facades/agent-runtime-state.js';
-export {
-    compactSdkSession,
-    confirmSdkSessionUi,
-    createSdkWorkspaceFile,
-    deselectSdkAgent,
     execSdkShell,
     getCurrentSdkAgent,
     getForegroundSdkSessionId,
     getLastSdkSessionId,
+    getModel,
     getPendingSdkElicitation,
+    getReasoningEffort,
+    getRuntimeHandoffManager,
     getSdkAuthStatus,
     getSdkHandles,
     getSdkQuota,
     getSdkResourceSnapshot,
     getSdkSessionCapabilities,
+    getSdkSessionMode,
     getSdkStatus,
+    getSessionMessages,
     handleSdkPendingCommand,
     handleSdkPendingPermission,
     handleSdkPendingToolCall,
+    healthSnapshot,
     inputSdkSessionUi,
+    isAgentDialogLoopPaused,
     isSdkSessionUiElicitationAvailable,
     killSdkShell,
+    listAvailableModels,
     listPendingSdkElicitations,
     listPendingSdkPermissions,
     listSdkAgents,
@@ -84,26 +56,43 @@ export {
     listSdkModels,
     listSdkSessions,
     listSdkWorkspaceFiles,
+    listWebhooks,
+    msgAnswer,
+    msgProcessQueue,
+    msgSend,
+    msgSendBoot,
+    msgSteer,
+    pauseAgentDialogLoop,
+    pingDialogWatchdog,
     pingSdk,
+    readAgentDialogLastPrInfo,
+    readAgentDialogPrMetrics,
+    readAgentRuntimeSessionId,
+    readRuntimeContextFactoryCapabilities,
+    readRuntimeControlState,
+    readRuntimeInteractionState,
+    readRuntimePermissionCapability,
+    readRuntimePermissionMode,
+    readRuntimePermissionPolicySnapshot,
+    readRuntimeToolRegistry,
+    readRuntimeToolRegistryEntries,
+    readRuntimeToolSessionContext,
+    readSdkPlan,
     readSdkWorkspaceFile,
+    registerWebhook,
     reloadSdkAgents,
     requestSdkElicitation,
     resolvePendingSdkElicitation,
     selectSdkAgent,
     selectSdkSessionUi,
-    setForegroundSdkSessionId,
-} from './facades/agent-sdk-access.js';
-export {
-    deleteSdkPlan,
-    getSdkSessionMode,
-    readSdkPlan,
-    setSdkSessionMode,
-    updateSdkPlan,
-} from './facades/agent-sdk-session.js';
-export {
-    abortCurrentMessage,
-    getSessionMessages,
-    pingDialogWatchdog,
     sessionLog,
-} from './facades/agent-session-ops.js';
-export { listWebhooks, registerWebhook, unregisterWebhook } from './facades/agent-webhook-ops.js';
+    setForegroundSdkSessionId,
+    setModel,
+    setReasoningEffort,
+    setRuntimePermissionMode,
+    setSdkSessionMode,
+    stateDiagnostics,
+    stateSnapshot,
+    unregisterWebhook,
+    updateSdkPlan,
+} from './runtime/root-surface/index.js';

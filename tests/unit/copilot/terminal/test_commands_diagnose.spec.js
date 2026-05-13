@@ -152,6 +152,40 @@ vi.mock('#copilot/agent', () => ({
     readSdkModelMetadata: () => null,
 }));
 
+vi.mock('#copilot/agent/always-alive', () => ({
+    alwaysAliveAgent: defaultRuntime,
+    getAgent: () => defaultRuntime,
+}));
+
+vi.mock('#copilot/agent/runtime-registry', () => ({
+    getDefaultAgentRuntimeId: () => 'default',
+    getDefaultRegisteredAgentRuntime: () => defaultRuntime,
+    getRegisteredAgentRuntime: (runtimeId = 'default') =>
+        runtimeId === 'alt' ? altRuntime : runtimeId === 'default' ? defaultRuntime : null,
+    listAgentRuntimes: () => [
+        { runtimeId: 'default', runtime: defaultRuntime },
+        { runtimeId: 'alt', runtime: altRuntime },
+    ],
+}));
+
+vi.mock('#copilot/agent/facades', () => ({
+    readAgentRuntimeStatusSnapshot: (/** @type {typeof defaultRuntime} */ agent) => agent.getStatusSnapshot(),
+    readAgentRuntimeHealthSnapshot: (/** @type {typeof defaultRuntime} */ agent) => agent.getHealthSnapshot(),
+    readRuntimeControlState: readMockRuntimeControlState,
+    readRuntimeInteractionState: readMockRuntimeInteractionState,
+    readRuntimePrBudgetSnapshot: readMockRuntimePrBudgetSnapshot,
+    readRuntimePermissionMode: vi.fn(() => 'approve_all'),
+    readAgentRuntimeSdkResourceSnapshot: vi.fn(() => ({ client: false, session: false, quotaMonitor: false })),
+    readRuntimeAutoModelPolicy: (/** @type {typeof defaultRuntime} */ runtime) => ({
+        configuredModel: runtime.model,
+        observedModel: runtime.lastPrInfo?.effectiveModel ?? runtime.lastPrInfo?.model ?? null,
+        selectionAuthority: 'github-copilot',
+        canForcePreference: false,
+    }),
+    readAgentRuntimeTodoSummaries: vi.fn(async () => []),
+    readSdkModelMetadata: () => null,
+}));
+
 vi.mock('#copilot/bridges', () => ({
     getMcpStatus: () => ({ available: false, toolCount: 0, circuitOpen: false, latencyMs: null }),
 }));

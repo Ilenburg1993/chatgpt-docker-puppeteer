@@ -14,11 +14,17 @@ describe('always-alive.js › delegação para módulos extraídos', () => {
     let src;
     /** @type {string} */
     let surfaceSrc;
+    /** @type {string} */
+    let singletonSrc;
 
     beforeAll(async () => {
         src = await readFile(new URL('../../../src/copilot/agent/always-alive.js', import.meta.url), 'utf-8');
         surfaceSrc = await readFile(
-            new URL('../../../src/copilot/agent/agent-runtime-surface.js', import.meta.url),
+            new URL('../../../src/copilot/agent/runtime/root-surface/index.js', import.meta.url),
+            'utf-8',
+        );
+        singletonSrc = await readFile(
+            new URL('../../../src/copilot/agent/always-alive-singleton.js', import.meta.url),
             'utf-8',
         );
     });
@@ -36,8 +42,8 @@ describe('always-alive.js › delegação para módulos extraídos', () => {
     // ─── F36: AgentLifecycle ──────────────────────────────────────────────
 
     it('importa agentStart, agentStop, agentTryReconnect pela superfície runtime', () => {
-        assert.ok(src.includes("from './agent-runtime-surface.js'"));
-        assert.ok(surfaceSrc.includes("from './lifecycle/orchestrators/agent-lifecycle.js'"));
+        assert.ok(src.includes("from './runtime/root-surface/index.js'"));
+        assert.ok(surfaceSrc.includes("from '../../lifecycle/orchestrators/agent-lifecycle.js'"));
         assert.ok(src.includes('agentStart'));
         assert.ok(src.includes('agentStop'));
         assert.ok(src.includes('agentTryReconnect'));
@@ -54,8 +60,8 @@ describe('always-alive.js › delegação para módulos extraídos', () => {
     // ─── F37: AgentDialogController ───────────────────────────────────────
 
     it('importa dialogStart, dialogStop, dialogResume, ensureDialogLoopAttached', () => {
-        assert.ok(src.includes("from './agent-runtime-surface.js'"));
-        assert.ok(surfaceSrc.includes("from './dialog/controllers/agent-dialog-controller.js'"));
+        assert.ok(src.includes("from './runtime/root-surface/index.js'"));
+        assert.ok(surfaceSrc.includes("from '../../dialog/controllers/agent-dialog-controller.js'"));
         assert.ok(src.includes('dialogStart'));
         assert.ok(src.includes('dialogStop'));
         assert.ok(src.includes('dialogResume'));
@@ -65,8 +71,8 @@ describe('always-alive.js › delegação para módulos extraídos', () => {
     // ─── F38: AgentMessaging ──────────────────────────────────────────────
 
     it('importa sendMessage, sendMessageDialogBoot, steerMessage, answerPendingQuestion', () => {
-        assert.ok(src.includes("from './agent-runtime-surface.js'"));
-        assert.ok(surfaceSrc.includes("from './messaging/agent-messaging.js'"));
+        assert.ok(src.includes("from './runtime/root-surface/index.js'"));
+        assert.ok(surfaceSrc.includes("from '../../messaging/agent-messaging.js'"));
         assert.ok(src.includes('msgSend') || src.includes('sendMessage'));
         assert.ok(src.includes('msgSendBoot') || src.includes('sendMessageDialogBoot'));
         assert.ok(src.includes('msgSteer') || src.includes('steerMessage'));
@@ -80,22 +86,22 @@ describe('always-alive.js › delegação para módulos extraídos', () => {
     // ─── F39: AgentState ──────────────────────────────────────────────────
 
     it('importa getStatusSnapshot e listenerDiagnostics de agent-state.js', () => {
-        assert.ok(src.includes("from './agent-runtime-surface.js'"));
-        assert.ok(surfaceSrc.includes("from './state/agent-state.js'"));
+        assert.ok(src.includes("from './runtime/root-surface/index.js'"));
+        assert.ok(surfaceSrc.includes("from '../../state/agent-state.js'"));
         assert.ok(src.includes('stateSnapshot') || src.includes('getStatusSnapshot'));
         assert.ok(src.includes('stateDiagnostics') || src.includes('listenerDiagnostics'));
     });
 
     it('importa o helper de event bridge wiring dedicado', () => {
-        assert.ok(src.includes("from './agent-runtime-surface.js'"));
-        assert.ok(surfaceSrc.includes("from './event-bridge-wiring.js'"));
-        assert.ok(src.includes('ensureAgentEventBusBridge'));
-        assert.ok(src.includes('resetAgentEventBusBridgeWiring'));
+        assert.ok(!surfaceSrc.includes("from './event-bridge-wiring.js'"));
+        assert.ok(singletonSrc.includes("from './event-bridge-wiring.js'"));
+        assert.ok(singletonSrc.includes('ensureAgentEventBusBridge'));
+        assert.ok(singletonSrc.includes('resetAgentEventBusBridgeWiring'));
     });
 
     it('delegação de diálogo usa a façade agent-dialog-runtime para send/pause/PR snapshots', () => {
-        assert.ok(src.includes("from './agent-runtime-surface.js'"));
-        assert.ok(surfaceSrc.includes("from './facades/agent-dialog-runtime.js'"));
+        assert.ok(src.includes("from './runtime/root-surface/index.js'"));
+        assert.ok(surfaceSrc.includes("from '../../facades/agent-dialog-runtime.js'"));
         assert.ok(src.includes('dispatchAgentDialogTurn'));
         assert.ok(src.includes('pauseAgentDialogLoop'));
         assert.ok(src.includes('isAgentDialogLoopPaused'));
@@ -104,22 +110,24 @@ describe('always-alive.js › delegação para módulos extraídos', () => {
     });
 
     it('delegação de sessionId/shadow passa pela façade de runtime-state', () => {
-        assert.ok(src.includes("from './agent-runtime-surface.js'"));
-        assert.ok(surfaceSrc.includes("from './facades/agent-runtime-state.js'"));
+        assert.ok(src.includes("from './runtime/root-surface/index.js'"));
+        assert.ok(surfaceSrc.includes("from '../../facades/agent-runtime-state.js'"));
         assert.ok(src.includes('readAgentRuntimeSessionId'));
         assert.ok(src.includes('clearAgentRuntimePendingQuestionShadow'));
     });
 
     it('delegação de status/interação usa a façade agent-runtime-controls', () => {
-        assert.ok(src.includes("from './agent-runtime-surface.js'"));
-        assert.ok(surfaceSrc.includes("from './facades/agent-runtime-controls.js'"));
+        assert.ok(src.includes("from './runtime/root-surface/index.js'"));
+        assert.ok(surfaceSrc.includes("from '../../facades/agent-runtime-controls.js'"));
         assert.ok(src.includes('readRuntimeControlState'));
         assert.ok(src.includes('readRuntimeInteractionState'));
         assert.ok(src.includes('getRuntimeHandoffManager'));
         assert.ok(src.includes('readRuntimePermissionMode'));
+        assert.ok(src.includes('readRuntimePermissionPolicySnapshot'));
         assert.ok(src.includes('setRuntimePermissionMode'));
         assert.ok(src.includes('readRuntimePermissionCapability'));
         assert.ok(src.includes('readRuntimeContextFactoryCapabilities'));
+        assert.ok(src.includes('readRuntimeToolSessionContext'));
         assert.ok(src.includes('readRuntimeToolRegistry'));
         assert.ok(src.includes('readRuntimeToolRegistryEntries'));
     });
@@ -134,7 +142,9 @@ describe('always-alive.js › delegação para módulos extraídos', () => {
         assert.ok(!src.includes('this.ctx.getPermissionModeSnapshot()'));
         assert.ok(!src.includes('this.ctx.setPermissionMode('));
         assert.ok(!src.includes('this.ctx.getPermissionCapabilitySnapshot()'));
+        assert.ok(!src.includes('this.ctx.getPermissionPolicySnapshot()'));
         assert.ok(!src.includes('this.ctx.getContextFactoryCapabilitiesSnapshot()'));
+        assert.ok(!src.includes('this.ctx.toolSessionContext'));
         assert.ok(!src.includes('this.ctx.getToolRegistrySnapshot()'));
         assert.ok(!src.includes('this.ctx.getToolRegistryEntriesSnapshot()'));
         assert.ok(!src.includes('this.ctx.getRuntimeStatus()'));
