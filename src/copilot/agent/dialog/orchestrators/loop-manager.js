@@ -286,7 +286,6 @@ export class DialogLoopManager extends EventEmitter {
             this.#endLoopSpan(false);
             this.#watchdogSupervisor.clear();
             this.emit(EMITTER_LOOP_CHANGED, { active: false, ts: Date.now(), reason: 'boot_failed' });
-            this.#bootCircuit.recordFailure();
             throw err;
         }
     }
@@ -598,7 +597,7 @@ export class DialogLoopManager extends EventEmitter {
         this.#turnQueue.reset();
         this.#watchdogSupervisor.clear();
         // G2-BUG-11: emitir 'stopped' para que o host receba notificação do encerramento forçado
-        this.emit('stopped', { reason: 'force_deactivate', authorized: false });
+        this.emit('stopped', { reason: 'force_deactivate', authorized: true });
         this.emit(EMITTER_LOOP_CHANGED, { active: false, ts: Date.now(), reason: 'force_deactivate' });
     }
 

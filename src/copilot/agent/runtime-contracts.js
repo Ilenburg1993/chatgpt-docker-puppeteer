@@ -76,11 +76,6 @@ export function trySetLiveSessionModel(session, modelId, logLabel = 'AlwaysAlive
         return false;
     }
 
-    const maybeSetModel = Reflect.get(session, 'setModel');
-    if (typeof maybeSetModel !== 'function') {
-        return false;
-    }
-
     try {
         const maybeResult = setSessionModel(
             /** @type {CopilotSession} */ (session),

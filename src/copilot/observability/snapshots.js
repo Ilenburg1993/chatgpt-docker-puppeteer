@@ -18,9 +18,11 @@ import { STARVATION_THRESHOLD_MS } from '../config/agent.js';
  *
  * @typedef {import('../agent/types.js').AgentStatus} AgentStatus
  *
- * @typedef {import('../agent/types.js').AgentTask} AgentTask
- *
  * @typedef {import('../agent/types.js').PendingQuestion} PendingQuestion
+ */
+
+/**
+ * @typedef {{ id: string; enqueuedAt: number }} QueueOldestSnapshot
  */
 
 /**
@@ -32,7 +34,7 @@ import { STARVATION_THRESHOLD_MS } from '../config/agent.js';
  * @property {string} model - Modelo ativo
  * @property {'low' | 'medium' | 'high' | 'xhigh' | undefined} reasoningEffort - Nível de raciocínio
  * @property {number} queueSize - Tamanho da fila de tarefas
- * @property {AgentTask | undefined} queueOldest - Tarefa mais antiga na fila (undefined se vazia)
+ * @property {QueueOldestSnapshot | undefined} queueOldest - Snapshot da tarefa mais antiga na fila (undefined se vazia)
  * @property {PendingQuestion | null} pendingQuestion - Pergunta pendente do modelo
  * @property {boolean} isResumed - true se a sessão foi retomada
  * @property {number} resumeCount - Número de retomadas

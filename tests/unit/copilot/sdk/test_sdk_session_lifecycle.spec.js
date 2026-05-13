@@ -140,6 +140,21 @@ describe('sdk/session-lifecycle', () => {
             expect(s.setModel).toHaveBeenCalledWith('claude-sonnet-4-5', undefined);
         });
 
+        it('usa session.switchModel quando setModel não existe', async () => {
+            const switchModel = vi.fn().mockResolvedValue(undefined);
+            const s = fakeSession({
+                setModel: undefined,
+                switchModel,
+            });
+
+            await setSessionModel(s, 'gpt-5.4', { reasoningEffort: 'medium' });
+
+            expect(switchModel).toHaveBeenCalledWith('gpt-5.4', { reasoningEffort: 'medium' });
+            expect(metrics.map((metric) => `${metric.operation}:${metric.status}`)).toEqual(
+                expect.arrayContaining(['session.switchModel:started', 'session.switchModel:succeeded']),
+            );
+        });
+
         it('rejeita para model vazio', async () => {
             const s = fakeSession();
             await expect(setSessionModel(s, '')).rejects.toThrow('string não-vazia');

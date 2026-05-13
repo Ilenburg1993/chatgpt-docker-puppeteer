@@ -338,6 +338,9 @@ export function waitForRestartAndReply(emitter, host, message, timeout, stopReas
             onRetryPending = () => {
                 host.answerPendingQuestion(message);
                 onRetryStopped = (rawEvt) => {
+                    if (onRetryReply) {
+                        emitter.off(EMITTER_LOOP_REPLY, onRetryReply);
+                    }
                     const stoppedEvt = normalizeStopEvent(rawEvt);
                     settleReject(
                         new SessionError(

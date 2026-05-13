@@ -128,6 +128,39 @@ async function verifySessionModelSwitch(session, model, options) {
     return result;
 }
 
+/**
+ * Resolve a API nativa de troca de modelo exposta pela sessão SDK.
+ *
+ * SDKs recentes podem expor `switchModel()` no lugar do legado `setModel()`. Mantemos `setModel()` como primeira opção
+ * quando existir para preservar compatibilidade com a telemetria e comportamento atuais, mas não falhamos quando apenas
+ * `switchModel()` está disponível.
+ *
+ * @param {CopilotSession} session
+ * @returns {{
+ *     operation: 'session.setModel' | 'session.switchModel';
+ *     fn: (model: string, options?: { reasoningEffort?: ReasoningEffort }) => Promise<unknown> | unknown;
+ * } | null}
+ */
+function resolveNativeModelSwitcher(session) {
+    const maybeSetModel = Reflect.get(session, 'setModel');
+    if (typeof maybeSetModel === 'function') {
+        return {
+            operation: 'session.setModel',
+            fn: (model, options) => maybeSetModel.call(session, model, options),
+        };
+    }
+
+    const maybeSwitchModel = Reflect.get(session, 'switchModel');
+    if (typeof maybeSwitchModel === 'function') {
+        return {
+            operation: 'session.switchModel',
+            fn: (model, options) => maybeSwitchModel.call(session, model, options),
+        };
+    }
+
+    return null;
+}
+
 // ─── Wrappers públicos ────────────────────────────────────────────────────────
 
 /**
@@ -267,8 +300,10 @@ export async function setSessionModel(session, model, options) {
     }
     log('INFO', `[session-lifecycle] setModel: sessionId='${session.sessionId}', model='${model}'`);
     const startedAt = Date.now();
+    const nativeSwitcher = resolveNativeModelSwitcher(session);
+    const operation = nativeSwitcher?.operation ?? 'rpc.model.switchTo';
     emitSdkOperationMetric({
-        operation: 'session.setModel',
+        operation,
         status: 'started',
         sessionId: session.sessionId,
         attributes: { model },
@@ -278,11 +313,19 @@ export async function setSessionModel(session, model, options) {
         Reflect.set(session, '__copilotConfiguredReasoningEffort', options.reasoningEffort);
     }
     try {
-        await session.setModel(model, options);
+        if (nativeSwitcher) {
+            await nativeSwitcher.fn(model, options);
+        } else {
+            await modelSwitchTo(
+                session,
+                model,
+                options?.reasoningEffort ? { reasoningEffort: options.reasoningEffort } : undefined,
+            );
+        }
     } catch (error) {
-        const sdkError = toSdkOperationError('session.setModel', error);
+        const sdkError = toSdkOperationError(operation, error);
         emitSdkOperationMetric({
-            operation: 'session.setModel',
+            operation,
             status: 'failed',
             sessionId: session.sessionId,
             durationMs: Date.now() - startedAt,
@@ -291,12 +334,19 @@ export async function setSessionModel(session, model, options) {
         throw sdkError;
     }
     const verification = await verifySessionModelSwitch(session, model, options);
+    if (!nativeSwitcher) {
+        verification.usedRpcFallback = true;
+        if (!verification.effectiveModel) {
+            verification.effectiveModel = model;
+        }
+        verification.verifiedSwitch = verification.verifiedSwitch || verification.effectiveModel === model;
+    }
     if (verification.effectiveModel) {
         Reflect.set(session, '__copilotEffectiveModel', verification.effectiveModel);
     }
     Reflect.set(session, '__copilotModelVerified', verification.verifiedSwitch);
     emitSdkOperationMetric({
-        operation: 'session.setModel',
+        operation,
         status: 'succeeded',
         sessionId: session.sessionId,
         durationMs: Date.now() - startedAt,

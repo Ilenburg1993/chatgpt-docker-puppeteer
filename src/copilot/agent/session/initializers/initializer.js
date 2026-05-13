@@ -54,8 +54,33 @@ export { SessionJsonSchema, buildHookSystemContext, buildHookSystemContextSafe }
  * @typedef {import('#copilot/sdk/types').CopilotSession} CopilotSession
  */
 
-// F51: Carrega configuração persistida de ferramentas (assíncrono).
-await loadAgentSdkToolsConfigAsync();
+/** @type {Promise<void> | null} */
+let _toolsConfigLoadPromise = null;
+
+/** @type {boolean} */
+let _toolsConfigLoaded = false;
+
+/**
+ * Garante que a configuração persistida de ferramentas seja carregada apenas uma vez por processo.
+ *
+ * @returns {Promise<void>}
+ */
+async function ensureAgentSdkToolsConfigLoaded() {
+    if (_toolsConfigLoaded) {
+        return;
+    }
+    if (_toolsConfigLoadPromise !== null) {
+        await _toolsConfigLoadPromise;
+        return;
+    }
+    _toolsConfigLoadPromise = loadAgentSdkToolsConfigAsync();
+    try {
+        await _toolsConfigLoadPromise;
+        _toolsConfigLoaded = true;
+    } finally {
+        _toolsConfigLoadPromise = null;
+    }
+}
 
 /**
  * Limiar dinâmico de compactação — configurável em tempo de execução via PUT /config/infinite-session.
@@ -191,6 +216,8 @@ function _validateSessionForResume(sessionId, lastActivityMs) {
  * @throws {Error} Se a criação/retomada da sessão SDK falhar ou a escrita de estado falhar
  */
 export async function initOrResumeSession(client, sessionOptions) {
+    await ensureAgentSdkToolsConfigLoaded();
+
     const state = await readAgentRuntimePersistedStateAsync();
     const model = sessionOptions.model ?? AGENT_SDK_DEFAULT_MODEL;
     const injectContext = sessionOptions.injectHookContext !== false;

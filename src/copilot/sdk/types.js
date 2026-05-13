@@ -34,7 +34,8 @@
  */
 
 /**
- * Sessão ativa do SDK. Expõe: `sendAndWait()`, `on()`, `abort()`, `setModel()`, `rpc`, `sessionId`, `workingDirectory`.
+ * Sessão ativa do SDK. Expõe: `sendAndWait()`, `on()`, `abort()`, `setModel()` ou `switchModel()`, `rpc`, `sessionId`,
+ * `workingDirectory`.
  *
  * @typedef {import('@github/copilot-sdk').CopilotSession} CopilotSession
  */

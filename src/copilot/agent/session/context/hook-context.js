@@ -37,8 +37,9 @@ export const SESSION_JSON_FILE = resolveHooksStateFile('session.json');
  */
 export function sanitizeBriefingContent(raw) {
     const content = String(raw)
+        // Remove ANSI/VT100 (ESC simples, CSI, OSC).
         // eslint-disable-next-line no-control-regex
-        .replace(/\x1b\[[0-9;?]*[ -/]*[@-~]/g, '')
+        .replace(/\x1b(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~]|\][^\x07\x1b]*(?:\x07|\x1b\\))/g, '')
         // eslint-disable-next-line no-control-regex
         .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '')
         .replace(/<\/untrusted_session_briefing>/gi, '[redacted_close_tag]')
@@ -245,30 +246,45 @@ export async function buildHookSystemContext() {
 // SEC-02: previne injection de conteúdo grande via briefing
 const HOOK_CONTEXT_MAX_BYTES = _HOOK_CONTEXT_MAX_BYTES;
 
+/** @type {Promise<string> | null} */
+let _buildHookSystemContextSafePromise = null;
+
 /**
  * Constrói contexto do hook system com limite de tamanho aplicado.
  *
  * @returns {Promise<string>}
  */
 export async function buildHookSystemContextSafe() {
-    const raw = await buildHookSystemContext();
-    const optionalSkillsStart = raw.indexOf('\n\n## Skills Disponíveis');
-    if (Buffer.byteLength(raw, 'utf8') > HOOK_CONTEXT_MAX_BYTES && optionalSkillsStart !== -1) {
-        const optionalSkillsEnd = raw.indexOf('\n\n## Estado Runtime', optionalSkillsStart + 1);
-        const withoutSkills =
-            optionalSkillsEnd === -1
-                ? raw.slice(0, optionalSkillsStart)
-                : raw.slice(0, optionalSkillsStart) + raw.slice(optionalSkillsEnd);
-        if (Buffer.byteLength(withoutSkills, 'utf8') <= HOOK_CONTEXT_MAX_BYTES) {
-            return withoutSkills;
+    if (_buildHookSystemContextSafePromise !== null) {
+        return _buildHookSystemContextSafePromise;
+    }
+
+    _buildHookSystemContextSafePromise = (async () => {
+        const raw = await buildHookSystemContext();
+        const optionalSkillsStart = raw.indexOf('\n\n## Skills Disponíveis');
+        if (Buffer.byteLength(raw, 'utf8') > HOOK_CONTEXT_MAX_BYTES && optionalSkillsStart !== -1) {
+            const optionalSkillsEnd = raw.indexOf('\n\n## Estado Runtime', optionalSkillsStart + 1);
+            const withoutSkills =
+                optionalSkillsEnd === -1
+                    ? raw.slice(0, optionalSkillsStart)
+                    : raw.slice(0, optionalSkillsStart) + raw.slice(optionalSkillsEnd);
+            if (Buffer.byteLength(withoutSkills, 'utf8') <= HOOK_CONTEXT_MAX_BYTES) {
+                return withoutSkills;
+            }
         }
+        if (Buffer.byteLength(raw, 'utf8') > HOOK_CONTEXT_MAX_BYTES) {
+            // G1-BUG-08 (fix): usar TextDecoder com fatal=false para garantir que o truncamento em
+            // limite de bytes não corta caracteres UTF-8 multibyte no meio, gerando strings inválidas.
+            const bytes = Buffer.from(raw, 'utf8').subarray(0, HOOK_CONTEXT_MAX_BYTES);
+            const truncated = new TextDecoder('utf-8', { fatal: false }).decode(bytes).replace(/\uFFFD+$/, '');
+            return truncated + '\n\n⚠️ [contexto truncado por limite SEC-02: 8KB]';
+        }
+        return raw;
+    })();
+
+    try {
+        return await _buildHookSystemContextSafePromise;
+    } finally {
+        _buildHookSystemContextSafePromise = null;
     }
-    if (Buffer.byteLength(raw, 'utf8') > HOOK_CONTEXT_MAX_BYTES) {
-        // G1-BUG-08 (fix): usar TextDecoder com fatal=false para garantir que o truncamento em
-        // limite de bytes não corta caracteres UTF-8 multibyte no meio, gerando strings inválidas.
-        const bytes = Buffer.from(raw, 'utf8').subarray(0, HOOK_CONTEXT_MAX_BYTES);
-        const truncated = new TextDecoder('utf-8', { fatal: false }).decode(bytes).replace(/\uFFFD+$/, '');
-        return truncated + '\n\n⚠️ [contexto truncado por limite SEC-02: 8KB]';
-    }
-    return raw;
 }

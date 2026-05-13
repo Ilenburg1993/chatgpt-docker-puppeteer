@@ -194,11 +194,15 @@ export class MessageQueue {
         const tasks = this.#items.splice(0);
         if (tasks.length > 0) {
             this.#onChanged?.();
-            for (const task of tasks) {
+            for (let i = 0; i < tasks.length; i++) {
+                const task = tasks[i];
+                if (task === undefined) {
+                    continue;
+                }
                 // G2-BUG-12: criar cópia por task para que mutações de stack/cause por
                 // diferentes handlers não se propagam entre tasks.
                 let taskErr = err;
-                if (err instanceof Error && tasks.length > 1) {
+                if (err instanceof Error && i < tasks.length - 1) {
                     taskErr = Object.assign(
                         err.constructor === Error ? new Error(err.message) : Object.create(Object.getPrototypeOf(err)),
                         err,

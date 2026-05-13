@@ -52,7 +52,11 @@ import { log } from '../../ports/logging-port.js';
 export function isBootTimeoutError(error) {
     const candidate = /** @type {{ code?: unknown; message?: unknown }} */ (error);
     const message = typeof candidate?.message === 'string' ? candidate.message : String(error);
-    return candidate?.code === 'DIALOG_TIMEOUT' || message.includes('Boot timeout');
+    return (
+        candidate?.code === 'DIALOG_TIMEOUT' ||
+        candidate?.code === 'DIALOG_BOOT_TIMEOUT' ||
+        message.includes('Boot timeout')
+    );
 }
 
 /**

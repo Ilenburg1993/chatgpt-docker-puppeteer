@@ -260,7 +260,7 @@ export function createBootWiringSteps(client, session, isResumed, agentEmitter, 
             name: 'scheduleDialogRecovery',
             phase: 'dialog',
             required: false,
-            run: () => stepScheduleDialogRecovery(isResumed, ctx),
+            run: () => stepScheduleDialogRecovery(isResumed, ctx, state),
         },
         {
             name: 'startMetricsTimer',

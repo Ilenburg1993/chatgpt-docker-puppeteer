@@ -186,7 +186,13 @@ async function _doWriteState(updates) {
     // FIX state-io Bug 1: capturar geração antes do I/O — se clearState() for chamado durante o write, não restaurar cache stale.
     const genAtStart = _clearGen;
     const current = (await readStateAsync()) ?? _defaultState();
+    if (_clearGen !== genAtStart) {
+        return _defaultState();
+    }
     const next = /** @type {AliveAgentState} */ ({ ...current, ...updates });
+    if (_clearGen !== genAtStart) {
+        return _defaultState();
+    }
     await writeStateFileJson(next);
     if (_clearGen === genAtStart) {
         _stateCache = next;
@@ -206,7 +212,7 @@ export function clearState() {
     _stateCache = null;
     _readStatePromise = null;
     resetStateFileIoCache();
-    _clearGen++;  // FIX Bug 1: invalidar writes em voo
+    _clearGen++; // FIX Bug 1: invalidar writes em voo
     _writeQueue = Promise.resolve();
     clearStateAsync().catch((e) => logSwallowed(e, 'stateIo.clearState.asyncFallback'));
 }

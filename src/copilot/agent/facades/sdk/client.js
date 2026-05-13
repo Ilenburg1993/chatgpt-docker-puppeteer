@@ -208,7 +208,9 @@ export function getSdkResourceSnapshot(ctx) {
         userInputHandlerAvailable: true,
         hooksAvailable: true,
         toolRegistryAvailable: Boolean(toolRegistry),
-        modelSwitchAvailable: typeof handles.session?.setModel === 'function',
+        modelSwitchAvailable:
+            typeof handles.session?.setModel === 'function' ||
+            (handles.session ? typeof Reflect.get(handles.session, 'switchModel') === 'function' : false),
         abortAvailable: typeof handles.session?.abort === 'function',
         sessionLogAvailable: typeof handles.session?.log === 'function',
         historyAvailable: typeof handles.session?.getMessages === 'function',

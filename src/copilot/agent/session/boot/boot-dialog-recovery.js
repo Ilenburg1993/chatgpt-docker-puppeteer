@@ -18,11 +18,13 @@ import { log } from '../../ports/logging-port.js';
 
 /**
  * @typedef {import('./boot-session-prep.js').BootWiringContext} BootWiringContext
+ *
+ * @typedef {import('./boot-session-prep.js').BootWiringPipelineState} BootWiringPipelineState
  */
 
 /**
  * @param {BootWiringContext} ctx
- * @returns {void}
+ * @returns {() => void}
  */
 export function scheduleDialogBootRecovery(ctx) {
     log('DEBUG', '[AlwaysAlive] F53/F42.1: Recovery do dialog loop agendado após resume.');
@@ -38,6 +40,7 @@ export function scheduleDialogBootRecovery(ctx) {
     }, BOOT_RECOVERY_DELAY_MS);
     bootRecoveryTimer.unref?.();
     registerTimer('agent.dialogBootRecovery', 'timeout', bootRecoveryTimer);
+    return () => clearTimeout(bootRecoveryTimer);
 }
 
 /**
@@ -83,9 +86,10 @@ export async function runDialogBootRecovery(ctx) {
 /**
  * @param {boolean} isResumed
  * @param {BootWiringContext} ctx
+ * @param {BootWiringPipelineState} state
  * @returns {void}
  */
-export function stepScheduleDialogRecovery(isResumed, ctx) {
+export function stepScheduleDialogRecovery(isResumed, ctx, state) {
     if (!isResumed) {
         return;
     }
@@ -93,7 +97,8 @@ export function stepScheduleDialogRecovery(isResumed, ctx) {
     void ctx.trackBackgroundTask(
         shouldScheduleAgentRuntimeDialogBootRecovery().then((shouldSchedule) => {
             if (shouldSchedule) {
-                scheduleDialogBootRecovery(ctx);
+                const cancelBootRecovery = scheduleDialogBootRecovery(ctx);
+                state.unsubs.push(cancelBootRecovery);
             }
         }),
         {
