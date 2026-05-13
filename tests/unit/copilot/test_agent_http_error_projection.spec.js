@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'vitest';
 
-import { projectAgentHttpError } from '../../../src/copilot/presentation/agent-http-errors.js';
+import { projectAgentHttpError } from '../../../src/copilot/presentation/agent/index.js';
 
 describe('agent-http-errors', () => {
     it('mapeia AbortError para 504 / ignore', () => {

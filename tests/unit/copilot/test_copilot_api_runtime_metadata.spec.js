@@ -12,7 +12,7 @@ import { registerTaskRoutes } from '../../../src/copilot/server/routes/copilot-a
 
 /**
  * @param {(router: import('express').Router, binding: any) => void} register
- * @param {import('../../../src/copilot/presentation/runtime-route-deps.js').CopilotApiRouteDeps} deps
+ * @param {import('../../../src/copilot/presentation/routing/index.js').CopilotApiRouteDeps} deps
  */
 function createApp(register, deps) {
     const app = express();
@@ -26,7 +26,7 @@ function createApp(register, deps) {
 describe('copilot-api runtime metadata propagation', () => {
     it('control routes incluem runtime metadata em start/stop/permissions/steer/compliance', async () => {
         const deps =
-            /** @type {import('../../../src/copilot/presentation/runtime-route-deps.js').CopilotApiRouteDeps} */ ({
+            /** @type {import('../../../src/copilot/presentation/routing/index.js').CopilotApiRouteDeps} */ ({
                 runtimeId: 'default',
                 requestedRuntimeId: 'missing',
                 runtimeFound: false,
@@ -79,7 +79,7 @@ describe('copilot-api runtime metadata propagation', () => {
 
     it('task routes incluem runtime metadata em success e validações', async () => {
         const deps =
-            /** @type {import('../../../src/copilot/presentation/runtime-route-deps.js').CopilotApiRouteDeps} */ ({
+            /** @type {import('../../../src/copilot/presentation/routing/index.js').CopilotApiRouteDeps} */ ({
                 runtimeId: 'default',
                 requestedRuntimeId: 'missing',
                 runtimeFound: false,
@@ -117,10 +117,10 @@ describe('copilot-api runtime metadata propagation', () => {
     });
 
     it('task route /elicitation/:id/respond aplica validação/schema defaults antes de resolver', async () => {
-        /** @type {import('../../../src/copilot/presentation/types.js').RuntimeElicitationResult[]} */
+        /** @type {import('../../../src/copilot/presentation/contracts/index.js').RuntimeElicitationResult[]} */
         const resolved = [];
         const deps =
-            /** @type {import('../../../src/copilot/presentation/runtime-route-deps.js').CopilotApiRouteDeps} */ ({
+            /** @type {import('../../../src/copilot/presentation/routing/index.js').CopilotApiRouteDeps} */ ({
                 runtimeId: 'default',
                 requestedRuntimeId: 'missing',
                 runtimeFound: false,
@@ -147,7 +147,7 @@ describe('copilot-api runtime metadata propagation', () => {
                     }),
                     resolvePendingSdkElicitation: (
                         /** @type {string} */ _id,
-                        /** @type {import('../../../src/copilot/presentation/types.js').RuntimeElicitationResult} */ result,
+                        /** @type {import('../../../src/copilot/presentation/contracts/index.js').RuntimeElicitationResult} */ result,
                     ) => {
                         resolved.push(result);
                         return true;
@@ -176,7 +176,7 @@ describe('copilot-api runtime metadata propagation', () => {
 
     it('dialog routes incluem runtime metadata em start/turn/stop', async () => {
         const deps =
-            /** @type {import('../../../src/copilot/presentation/runtime-route-deps.js').CopilotApiRouteDeps} */ ({
+            /** @type {import('../../../src/copilot/presentation/routing/index.js').CopilotApiRouteDeps} */ ({
                 runtimeId: 'default',
                 requestedRuntimeId: 'missing',
                 runtimeFound: false,

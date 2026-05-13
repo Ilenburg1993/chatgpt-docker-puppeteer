@@ -33,7 +33,7 @@ vi.mock('../../../src/copilot/terminal/dialog/index.js', () => ({
     clearInlineStatus: mocks.clearInlineStatus,
 }));
 
-vi.mock('../../../src/copilot/presentation/runtime-ui-state-store.js', () => ({
+vi.mock('../../../src/copilot/presentation/state/index.js', () => ({
     getShowToolActivity: mocks.getShowToolActivity,
 }));
 

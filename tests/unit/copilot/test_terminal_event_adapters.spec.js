@@ -17,7 +17,7 @@ const mocks = vi.hoisted(() => ({
     readTerminalAgentRuntimeEventHost: vi.fn(() => ({ on: vi.fn(), off: vi.fn() })),
 }));
 
-vi.mock('../../../src/copilot/presentation/runtime-ui-state-store.js', () => ({
+vi.mock('../../../src/copilot/presentation/state/index.js', () => ({
     getBusy: mocks.getBusy,
 }));
 

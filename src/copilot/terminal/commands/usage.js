@@ -10,7 +10,7 @@
  * @see EventBus
  */
 
-import { getShowUsage, setShowUsage } from '../../presentation/runtime-ui-state-store.js';
+import { getShowUsage, setShowUsage } from '../../presentation/state/index.js';
 import { readTerminalConfigProjection, readTerminalUsageNowProjection } from '../frontend/index.js';
 import { callWithRuntimeTarget, extractRuntimeTarget } from './runtime-target.js';
 

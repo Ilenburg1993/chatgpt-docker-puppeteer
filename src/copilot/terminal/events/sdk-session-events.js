@@ -61,7 +61,7 @@ import {
     readRuntimeInterventionMailboxSummary,
     setLastSdkPlanOperation,
     setSdkSessionMode,
-} from '../../presentation/runtime-ui-state-store.js';
+} from '../../presentation/state/index.js';
 import { classifyPermissionDecision } from '../../sdk/session/permission-events.js';
 import { broadcastSse, println } from '../dialog/index.js';
 import { answerTerminalPendingQuestion } from '../frontend/gateways/index.js';

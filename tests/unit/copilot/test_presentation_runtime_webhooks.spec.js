@@ -24,7 +24,7 @@ vi.mock('#copilot/agent', () => ({
         mocks.unregisterWebhook(id),
 }));
 
-vi.mock('../../../src/copilot/presentation/agent-runtime.js', () => ({
+vi.mock('../../../src/copilot/presentation/agent/runtime/index.js', () => ({
     requireAgentRuntimeSelection: (/** @type {string | null | undefined} */ runtimeId) => {
         if (runtimeId === 'missing') {
             throw Object.assign(new Error("Runtime 'missing' não encontrado."), {
@@ -44,9 +44,9 @@ vi.mock('../../../src/copilot/presentation/agent-runtime.js', () => ({
     },
 }));
 
-describe('presentation/runtime-webhooks.js', () => {
+describe('presentation/runtime/webhooks.js', () => {
     it('encapsula list/register/unregister do runtime default', async () => {
-        const mod = await import('../../../src/copilot/presentation/runtime-webhooks.js');
+        const mod = await import('../../../src/copilot/presentation/runtime/webhooks.js');
 
         expect(mod.listRuntimeWebhooks()).toEqual([{ id: 'wh-1', url: 'https://example.test/hook' }]);
         expect(mod.registerRuntimeWebhook('https://hook.test')).toEqual({ id: 'wh-1', url: 'https://hook.test' });
@@ -58,7 +58,7 @@ describe('presentation/runtime-webhooks.js', () => {
     });
 
     it('aceita runtimeId explícito para seleção futura de runtime', async () => {
-        const mod = await import('../../../src/copilot/presentation/runtime-webhooks.js');
+        const mod = await import('../../../src/copilot/presentation/runtime/webhooks.js');
 
         mod.listRuntimeWebhooks('alt');
         mod.registerRuntimeWebhook('https://hook.alt', 'alt');
@@ -70,13 +70,13 @@ describe('presentation/runtime-webhooks.js', () => {
     });
 
     it('rejeita runtimeId explícito inexistente em vez de cair silenciosamente no default', async () => {
-        const mod = await import('../../../src/copilot/presentation/runtime-webhooks.js');
+        const mod = await import('../../../src/copilot/presentation/runtime/webhooks.js');
 
         expect(() => mod.resolveRuntimeWebhookSelection('missing')).toThrow("Runtime 'missing' não encontrado.");
     });
 
     it('projeta payload HTTP canônico para list/register/unregister quando o runtime existe', async () => {
-        const mod = await import('../../../src/copilot/presentation/runtime-webhooks.js');
+        const mod = await import('../../../src/copilot/presentation/runtime/webhooks.js');
 
         expect(mod.buildRuntimeWebhooksListHttpPayload('alt')).toEqual(
             expect.objectContaining({

@@ -19,7 +19,7 @@
  */
 
 import { Router } from 'express';
-import { resolveCopilotApiRouteDeps } from '../../../presentation/runtime-request.js';
+import { resolveCopilotApiRouteDeps } from '../../../presentation/routing/index.js';
 import { registerControlRoutes } from './control.js';
 import { registerDialogRoutes } from './dialog.js';
 import { registerStreamRoutes } from './stream.js';
@@ -33,10 +33,10 @@ import { registerTaskRoutes } from './tasks.js';
 export function createCopilotApiRouter() {
     const router = Router();
 
-    registerControlRoutes(router, (req) => resolveCopilotApiRouteDeps(req));
-    registerTaskRoutes(router, (req) => resolveCopilotApiRouteDeps(req));
-    registerStreamRoutes(router, (req) => resolveCopilotApiRouteDeps(req));
-    registerDialogRoutes(router, (req) => resolveCopilotApiRouteDeps(req));
+    registerControlRoutes(router, resolveCopilotApiRouteDeps);
+    registerTaskRoutes(router, resolveCopilotApiRouteDeps);
+    registerStreamRoutes(router, resolveCopilotApiRouteDeps);
+    registerDialogRoutes(router, resolveCopilotApiRouteDeps);
 
     return router;
 }

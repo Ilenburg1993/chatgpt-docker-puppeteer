@@ -47,7 +47,7 @@ import {
     setShowToolActivity,
     setShowUsage,
     stateEmitter,
-} from '../../../../src/copilot/presentation/runtime-ui-state-store.js';
+} from '../../../../src/copilot/presentation/state/index.js';
 
 describe('state getters/setters', () => {
     afterEach(() => {
@@ -212,7 +212,7 @@ describe('state inject history (circular buffer)', () => {
     beforeEach(() => clearInjectHistory());
     afterEach(() => clearInjectHistory());
 
-    /** @returns {import('../../../../src/copilot/presentation/runtime-ui-state-store.js').InjectHistoryEntry} */
+    /** @returns {import('../../../../src/copilot/presentation/state/index.js').InjectHistoryEntry} */
     const mkEntry = (from = 'test') => ({
         ts: Date.now(),
         from,

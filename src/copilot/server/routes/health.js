@@ -11,10 +11,10 @@
 
 import { Router } from 'express';
 import { toError } from '../../core/error-handlers.js';
-import { handleHubHealth } from '../../presentation/conversation-hub.js';
-import { buildAgentHealthHttpResponse } from '../../presentation/runtime-health.js';
-import { resolveRequestedRuntimeId } from '../../presentation/runtime-request.js';
-import { handleHealth } from '../../presentation/system-config.js';
+import { handleHubHealth } from '../../presentation/conversation/index.js';
+import { buildAgentHealthHttpResponse } from '../../presentation/runtime/index.js';
+import { resolveRequestedRuntimeId } from '../../presentation/routing/index.js';
+import { handleHealth } from '../../presentation/system/index.js';
 import { sanitizeHttpErrorMessage } from '../middleware/error-handler.js';
 import { getCopilotNamespace } from '../socket/hub-ns.js';
 import { callPresentationHandler } from './presentation-route.js';

@@ -13,7 +13,7 @@
 import { getMcpStatus } from '#copilot/bridges';
 import { log } from '#copilot/observability';
 import { cancel as cancelTimer, registerTimer } from '../../core/timer-registry.js';
-import { getHubSessionId } from '../../presentation/runtime-ui-state-store.js';
+import { getHubSessionId } from '../../presentation/state/index.js';
 import { broadcastSse } from '../dialog/index.js';
 import { attachTerminalHubSocketIO, isTerminalHubReady, readTerminalRuntimeState } from '../frontend/gateways/index.js';
 import { terminalActivityEmitter } from '../state/boot/index.js';

@@ -18,7 +18,7 @@ import {
     getThinkingHistory,
     getThinkingHistoryEntry,
     setShowThinking,
-} from '../../presentation/runtime-ui-state-store.js';
+} from '../../presentation/state/index.js';
 
 /**
  * @typedef {object} ThinkingContext

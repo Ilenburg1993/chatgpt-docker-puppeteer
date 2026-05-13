@@ -11,7 +11,7 @@ import { LLM_B_BOOT_TIMEOUT_MS } from '#copilot/config';
 import { container, toError } from '#copilot/core';
 import { log, METRICS_STORE } from '#copilot/observability';
 import { resolveOptionalDialogTimeout } from '../../presentation/dialog-timeout-policy.js';
-import { embedMultiple, readFileContext } from '../../presentation/runtime-file-context.js';
+import { embedMultiple, readFileContext } from '../../presentation/files/index.js';
 import {
     clearAttachments,
     getAttachmentQueue,
@@ -21,8 +21,8 @@ import {
     getShowThinking,
     getShowUsage,
     setBusy,
-} from '../../presentation/runtime-ui-state-store.js';
-import { describeSdkRecoveryPolicy, getSdkRecoveryPolicy } from '../../presentation/sdk-recovery-policy.js';
+} from '../../presentation/state/index.js';
+import { describeSdkRecoveryPolicy, getSdkRecoveryPolicy } from '../../presentation/sdk/index.js';
 import {
     readTerminalDialogStreamMeta,
     readTerminalRuntimeControlState,

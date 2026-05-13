@@ -8,9 +8,9 @@ import {
     embedMultiple,
     extractAtReferences,
     getFileCacheStats,
-} from '../../../src/copilot/presentation/runtime-file-context.js';
+} from '../../../src/copilot/presentation/files/context.js';
 
-describe('presentation/runtime-file-context.js', () => {
+describe('presentation/files/context.js', () => {
     it('expõe helpers compartilhadas de file-context', () => {
         expect(detectLang('foo.ts')).toBe('ts');
         expect(typeof getFileCacheStats).toBe('function');

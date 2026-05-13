@@ -13,16 +13,16 @@
 
 import { LLM_B_TURN_TIMEOUT_MS } from '#copilot/config';
 import { log } from '#copilot/observability';
-import { projectAgentHttpError } from '../../../presentation/agent-http-errors.js';
+import { projectAgentHttpError } from '../../../presentation/agent/index.js';
 import { resolveOptionalDialogTimeout } from '../../../presentation/dialog-timeout-policy.js';
-import { readAgentRuntimeControlStateFromRoute } from '../../../presentation/runtime-controls.js';
+import { readAgentRuntimeControlStateFromRoute } from '../../../presentation/runtime/index.js';
 import {
     sendRuntimeDialogTurnOnActiveLoop,
     startRuntimeDialogLoop,
     stopRuntimeDialogLoopAuthorized,
-} from '../../../presentation/runtime-dialog.js';
-import { buildRuntimeRouteMetaPayload } from '../../../presentation/runtime-meta.js';
-import { resolveCopilotApiRouteBinding } from '../../../presentation/runtime-request.js';
+} from '../../../presentation/runtime/index.js';
+import { buildRuntimeRouteMetaPayload } from '../../../presentation/routing/index.js';
+import { resolveCopilotApiRouteBinding } from '../../../presentation/routing/index.js';
 import {
     clearDialogTurnInFlight,
     hasDialogTurnInFlight,
@@ -36,9 +36,9 @@ import {
  *
  * @typedef {import('express').Router} BridgeRouter
  *
- * @typedef {import('../../../presentation/runtime-route-deps.js').CopilotApiRouteDeps} RuntimeRouteDeps
+ * @typedef {import('../../../presentation/routing/index.js').CopilotApiRouteDeps} RuntimeRouteDeps
  *
- * @typedef {import('../../../presentation/runtime-request.js').CopilotApiRouteBinding} RuntimeRouteBinding
+ * @typedef {import('../../../presentation/routing/index.js').CopilotApiRouteBinding} RuntimeRouteBinding
  */
 
 /**

@@ -154,7 +154,7 @@ function stateFromCheck(ok, available) {
  * Lê o mapa canônico de capabilities públicas do runtime atual.
  *
  * Esta função não deve produzir payload HTTP nem aplicar regras de roteamento/fallback de runtime. Esse embrulho fica
- * em `presentation/runtime-capabilities.js`.
+ * em `presentation/runtime/capabilities.js`.
  *
  * @param {CapabilityAgent} agent
  * @param {AgentRuntimeCapabilitiesOptions} [options]

@@ -3,7 +3,7 @@
  * @file Gateway: agent-runtime.
  *
  *   Wraps runtime state reads, lifecycle controls, pending questions, event subscriptions, handoff history, watchdog ping
- *   and snapshot I/O. Isolates `presentation/runtime-controls.js` and `presentation/runtime-overview.js`.
+ *   and snapshot I/O. Isolates `presentation/runtime/index.js` and `presentation/runtime/index.js`.
  */
 
 import { getSharedSessionBinding } from '#copilot/core';
@@ -28,8 +28,8 @@ import {
     startAgentRuntime,
     steerAgentRuntimeMessage,
     stopAgentRuntimeDialogLoopAuthorized,
-} from '../../../presentation/runtime-controls.js';
-import { readAgentRuntimeOverviewProjection } from '../../../presentation/runtime-overview.js';
+} from '../../../presentation/runtime/index.js';
+import { readAgentRuntimeOverviewProjection } from '../../../presentation/runtime/index.js';
 
 // ---------------------------------------------------------------------------
 // State reads
@@ -48,11 +48,11 @@ import { readAgentRuntimeOverviewProjection } from '../../../presentation/runtim
  *     dialogLoopActive: boolean;
  *     dialogPaused: boolean;
  *     queueSize: number;
- *     pendingQuestion: import('../../../presentation/types.js').RuntimePendingQuestion | null;
- *     pendingQuestionKind: import('../../../presentation/types.js').RuntimePendingQuestionKind | null;
- *     pendingQuestionShadow: import('../../../presentation/types.js').RuntimePendingQuestionShadow | null;
- *     pendingQuestionShadowKind: import('../../../presentation/types.js').RuntimePendingQuestionKind | null;
- *     pendingQuestionShadowState: import('../../../presentation/types.js').RuntimePendingQuestionShadowState | null;
+ *     pendingQuestion: import('../../../presentation/contracts/index.js').RuntimePendingQuestion | null;
+ *     pendingQuestionKind: import('../../../presentation/contracts/index.js').RuntimePendingQuestionKind | null;
+ *     pendingQuestionShadow: import('../../../presentation/contracts/index.js').RuntimePendingQuestionShadow | null;
+ *     pendingQuestionShadowKind: import('../../../presentation/contracts/index.js').RuntimePendingQuestionKind | null;
+ *     pendingQuestionShadowState: import('../../../presentation/contracts/index.js').RuntimePendingQuestionShadowState | null;
  *     pendingQuestionShadowExpired: boolean;
  *     pendingQuestionShadowAgeMs: number | null;
  *     pendingQuestionShadowExpiresAt: number | null;
@@ -284,7 +284,7 @@ export function readTerminalDialogStreamMeta(runtimeId) {
 
 /**
  * @param {string | null | undefined} [runtimeId]
- * @returns {import('../../../presentation/types.js').RuntimeHandoffRequest[]}
+ * @returns {import('../../../presentation/contracts/index.js').RuntimeHandoffRequest[]}
  */
 export function readTerminalHandoffHistory(runtimeId) {
     return readAgentHandoffHistory(runtimeId);

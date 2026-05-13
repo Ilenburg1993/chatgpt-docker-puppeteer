@@ -25,7 +25,7 @@ vi.mock('../../../src/copilot/terminal/dialog/index.js', () => ({
     println: mocks.println,
 }));
 
-vi.mock('../../../src/copilot/presentation/runtime-ui-state-store.js', () => ({
+vi.mock('../../../src/copilot/presentation/state/index.js', () => ({
     appendThinkingHistoryChunk: mocks.appendThinkingHistoryChunk,
     finalizeThinkingHistoryEntry: mocks.finalizeThinkingHistoryEntry,
     getShowStreaming: mocks.getShowStreaming,

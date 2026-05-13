@@ -15,8 +15,8 @@
  */
 
 import { access, stat } from 'node:fs/promises';
-import { MAX_EMBED_BYTES } from '../../presentation/runtime-file-context.js';
-import { addAttachment, clearAttachments, getAttachmentQueue } from '../../presentation/runtime-ui-state-store.js';
+import { MAX_EMBED_BYTES } from '../../presentation/files/index.js';
+import { addAttachment, clearAttachments, getAttachmentQueue } from '../../presentation/state/index.js';
 
 /**
  * Handler do comando `/attach`.

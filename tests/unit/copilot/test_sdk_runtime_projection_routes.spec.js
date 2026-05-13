@@ -5,12 +5,12 @@ import { clearSharedSessionBinding, setSharedHubSessionId, setSharedSdkSessionId
 import express from 'express';
 import request from 'supertest';
 
-import { buildRuntimeRouteMetaPayload } from '../../../src/copilot/presentation/runtime-meta.js';
+import { buildRuntimeRouteMetaPayload } from '../../../src/copilot/presentation/routing/index.js';
 import {
     paginateAgentRuntimeToolsProjection,
     readAgentRuntimeToolsProjection,
-} from '../../../src/copilot/presentation/runtime-tools.js';
-import { clearSdkRuntimeBinding, resolveSdkRuntimeProjection } from '../../../src/copilot/presentation/sdk-sessions.js';
+} from '../../../src/copilot/presentation/runtime/tools.js';
+import { clearSdkRuntimeBinding, resolveSdkRuntimeProjection } from '../../../src/copilot/presentation/sdk/sessions.js';
 import createAgentRouter from '../../../src/copilot/server/routes/sdk/agent.js';
 import createClientRouter from '../../../src/copilot/server/routes/sdk/client.js';
 import createObservabilityRouter from '../../../src/copilot/server/routes/sdk/observability.js';

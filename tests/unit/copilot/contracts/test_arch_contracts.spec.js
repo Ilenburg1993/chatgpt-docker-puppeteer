@@ -579,7 +579,7 @@ describe('W4-9 — bordas não leem propriedades voláteis do agent diretamente'
     });
 
     it('runtime-sdk-session.js resolve sessão ativa via status snapshot', () => {
-        const src = readSrc('presentation/runtime-sdk-session.js');
+        const src = readSrc('presentation/runtime/sdk-session.js');
 
         assert.match(src, /readAgentStatusSnapshot/);
         assert.doesNotMatch(src, /\bagent\.sessionId\b/);

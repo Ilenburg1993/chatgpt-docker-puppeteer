@@ -10,7 +10,7 @@
 import { CONVERSATION_STORE, HUB } from '#copilot/conversation-hub';
 import { bridgeEmitter, container } from '#copilot/core';
 import { getObservabilityBusDiagnostics } from '#copilot/observability';
-import { buildDefaultAgentModuleHealth } from '../../presentation/runtime-health.js';
+import { buildDefaultAgentModuleHealth } from '../../presentation/runtime/index.js';
 import { registerModuleHealth } from './health-modules.js';
 
 /**

@@ -12,7 +12,7 @@ import {
     clearThinkingHistory,
     finalizeThinkingHistoryEntry,
     recordInjectHistory,
-} from '../../../../src/copilot/presentation/runtime-ui-state-store.js';
+} from '../../../../src/copilot/presentation/state/index.js';
 import {
     handleGetHistory,
     handleGetThinkingEntry,

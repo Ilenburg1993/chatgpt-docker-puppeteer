@@ -23,7 +23,7 @@ import {
     handleGetHubSession,
     handleListSessions,
     handleListTurns,
-} from '../../presentation/conversation-hub.js';
+} from '../../presentation/conversation/index.js';
 import { validate } from '../middleware/validate.js';
 import { createPresentationRoute } from './presentation-route.js';
 

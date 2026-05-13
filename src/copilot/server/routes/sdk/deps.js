@@ -73,23 +73,23 @@ import {
     workspaceReadFile,
 } from '#copilot/sdk';
 import { getAllTools } from '#copilot/tools';
-import { requireAgentRuntimeSelection } from '../../../presentation/agent-runtime.js';
+import { requireAgentRuntimeSelection } from '../../../presentation/agent/index.js';
 import { resolveOptionalDialogTimeout } from '../../../presentation/dialog-timeout-policy.js';
-import { buildRuntimeRouteMetaPayload } from '../../../presentation/runtime-meta.js';
-import { setRuntimeModelProjection, setRuntimeReasoningProjection } from '../../../presentation/runtime-models.js';
-import { resolveRequestedRuntimeId } from '../../../presentation/runtime-request.js';
-import * as runtimeSdkSessionOps from '../../../presentation/runtime-sdk-session.js';
+import { buildRuntimeRouteMetaPayload } from '../../../presentation/routing/index.js';
+import { setRuntimeModelProjection, setRuntimeReasoningProjection } from '../../../presentation/runtime/index.js';
+import { resolveRequestedRuntimeId } from '../../../presentation/routing/index.js';
+import * as runtimeSdkSessionOps from '../../../presentation/runtime/index.js';
 import {
     readAgentStatusSnapshot,
     readAgentStatusSnapshotForRuntime,
     readAgentStatusValue,
     readAgentStatusValueForRuntime,
-} from '../../../presentation/runtime-status.js';
+} from '../../../presentation/runtime/index.js';
 import {
     paginateAgentRuntimeToolsProjection,
     readAgentRuntimeToolsProjection,
     readAgentRuntimeToolsProjectionForRuntime,
-} from '../../../presentation/runtime-tools.js';
+} from '../../../presentation/runtime/index.js';
 import {
     attachSdkSessionOwnership,
     clearSdkRuntimeBinding,
@@ -98,7 +98,7 @@ import {
     resolveSdkRuntimeProjection,
     resolveSdkRuntimeProjectionForRuntime,
     resolveSdkSessionRouteMeta,
-} from '../../../presentation/sdk-sessions.js';
+} from '../../../presentation/sdk/index.js';
 
 const sdkSessionOps = Object.freeze({
     approveAll,

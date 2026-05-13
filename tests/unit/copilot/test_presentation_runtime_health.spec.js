@@ -9,7 +9,7 @@ import {
     buildLegacyAgentHealth,
     getAgentHealthHttpStatus,
     getAgentHealthSnapshotCompat,
-} from '../../../src/copilot/presentation/runtime-health.js';
+} from '../../../src/copilot/presentation/runtime/health.js';
 
 describe('presentation/runtime-health', () => {
     it('usa getHealthSnapshot quando o runtime já expõe a projection canônica', () => {

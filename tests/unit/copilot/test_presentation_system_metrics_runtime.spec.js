@@ -47,12 +47,12 @@ const mocks = vi.hoisted(() => ({
     }),
 }));
 
-vi.mock('../../../src/copilot/presentation/runtime-overview.js', () => ({
+vi.mock('../../../src/copilot/presentation/runtime/overview.js', () => ({
     readAgentRuntimeOverview: mocks.readAgentRuntimeOverview,
     readAgentRuntimeOverviewProjection: mocks.readAgentRuntimeOverview,
 }));
 
-import { handleGetPrBudget, handleGetQuota } from '../../../src/copilot/presentation/system-metrics.js';
+import { handleGetPrBudget, handleGetQuota } from '../../../src/copilot/presentation/system/index.js';
 
 /** @template T @param {{ body: unknown }} result @returns {T} */
 const bodyOf = (result) => /** @type {T} */ (result.body);

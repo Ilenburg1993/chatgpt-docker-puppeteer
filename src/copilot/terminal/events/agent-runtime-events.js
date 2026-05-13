@@ -25,7 +25,7 @@ import {
     EMITTER_TOOL_EXECUTION_PROGRESS,
     EMITTER_TOOL_EXECUTION_START,
 } from '#copilot/events';
-import { getShowIntentActivity, getShowToolActivity } from '../../presentation/runtime-ui-state-store.js';
+import { getShowIntentActivity, getShowToolActivity } from '../../presentation/state/index.js';
 import { broadcastSse, buildUserPrompt, println, writeInlineStatus } from '../dialog/index.js';
 import { readTerminalRuntimeState } from '../frontend/gateways/index.js';
 import {

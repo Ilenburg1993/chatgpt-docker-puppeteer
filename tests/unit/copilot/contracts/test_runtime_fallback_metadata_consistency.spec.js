@@ -13,11 +13,7 @@
  *   - runtimeFallbackWarning (aviso canônico quando houve fallback)
  */
 
-import {
-    clearRuntimeFallbackLog,
-    getRuntimeFallbackLog,
-    getRuntimeFallbackStats,
-} from '#copilot/presentation/runtime-fallback-telemetry';
+import { clearRuntimeFallbackLog, getRuntimeFallbackLog, getRuntimeFallbackStats } from '#copilot/presentation/runtime';
 import { readTerminalStatusProjection } from '#copilot/terminal/frontend';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 

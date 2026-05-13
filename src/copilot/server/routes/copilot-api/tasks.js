@@ -14,11 +14,11 @@ import { log } from '#copilot/observability';
 import { normalizeElicitationResult } from '#copilot/sdk';
 import { randomUUID } from 'node:crypto';
 import { toError } from '../../../core/error-handlers.js';
-import { projectAgentHttpError } from '../../../presentation/agent-http-errors.js';
+import { projectAgentHttpError } from '../../../presentation/agent/index.js';
 import { resolveOptionalDialogTimeout } from '../../../presentation/dialog-timeout-policy.js';
-import { readAgentRuntimeControlStateFromRoute } from '../../../presentation/runtime-controls.js';
-import { buildRuntimeRouteMetaPayload } from '../../../presentation/runtime-meta.js';
-import { resolveCopilotApiRouteBinding } from '../../../presentation/runtime-request.js';
+import { readAgentRuntimeControlStateFromRoute } from '../../../presentation/runtime/index.js';
+import { buildRuntimeRouteMetaPayload } from '../../../presentation/routing/index.js';
+import { resolveCopilotApiRouteBinding } from '../../../presentation/routing/index.js';
 
 /**
  * @typedef {import('express').Request} Req
@@ -27,9 +27,9 @@ import { resolveCopilotApiRouteBinding } from '../../../presentation/runtime-req
  *
  * @typedef {import('express').Router} BridgeRouter
  *
- * @typedef {import('../../../presentation/runtime-route-deps.js').CopilotApiRouteDeps} RuntimeRouteDeps
+ * @typedef {import('../../../presentation/routing/index.js').CopilotApiRouteDeps} RuntimeRouteDeps
  *
- * @typedef {import('../../../presentation/runtime-request.js').CopilotApiRouteBinding} RuntimeRouteBinding
+ * @typedef {import('../../../presentation/routing/index.js').CopilotApiRouteBinding} RuntimeRouteBinding
  *
  * @typedef {Object} SendRequestBody
  * @property {string} message - Texto da mensagem a enviar ao agente

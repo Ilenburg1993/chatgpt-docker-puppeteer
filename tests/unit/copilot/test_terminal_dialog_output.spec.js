@@ -15,7 +15,7 @@ vi.mock('#copilot/config', async (importOriginal) => {
         LLM_B_TURN_TIMEOUT_MS: 120_000,
     };
 });
-vi.mock('../../../src/copilot/presentation/runtime-ui-state-store.js', () => ({
+vi.mock('../../../src/copilot/presentation/state/index.js', () => ({
     getBusy: vi.fn(() => false),
     getRl: vi.fn(() => null),
     getSdkSessionMode: vi.fn(() => 'interactive'),

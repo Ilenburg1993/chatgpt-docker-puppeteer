@@ -9,14 +9,14 @@ const mocks = vi.hoisted(() => ({
     })),
 }));
 
-vi.mock('../../../src/copilot/presentation/runtime-route-deps.js', () => ({
+vi.mock('../../../src/copilot/presentation/routing/route-deps.js', () => ({
     buildDefaultCopilotApiRouteDeps: mocks.buildDefaultCopilotApiRouteDeps,
 }));
 
 import {
     resolveCopilotApiRouteDeps,
     resolveRequestedRuntimeId,
-} from '../../../src/copilot/presentation/runtime-request.js';
+} from '../../../src/copilot/presentation/routing/request.js';
 
 describe('presentation/runtime-request.js', () => {
     it('resolveRequestedRuntimeId respeita a precedência canônica', () => {

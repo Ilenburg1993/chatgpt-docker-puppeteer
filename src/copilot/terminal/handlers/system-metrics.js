@@ -20,4 +20,4 @@ export {
     handleGitStatus,
     handleMetrics,
     handleSystemReset,
-} from '../../presentation/system-metrics.js';
+} from '../../presentation/system/index.js';

@@ -7,7 +7,7 @@
  * @module copilot/terminal/frontend/projections/sdk-session-vanilla
  */
 
-import { getLastSdkPlanChangedAt, getLastSdkPlanOperation } from '../../../presentation/runtime-ui-state-store.js';
+import { getLastSdkPlanChangedAt, getLastSdkPlanOperation } from '../../../presentation/state/index.js';
 import {
     deleteTerminalSdkPlan,
     getTerminalSdkSessionMode,
@@ -19,8 +19,8 @@ import {
 /**
  * @param {string | null | undefined} [runtimeId]
  * @returns {Promise<{
- *     currentMode: import('../../../presentation/types.js').RuntimeSdkMode | string;
- *     plan: import('../../../presentation/types.js').RuntimeSdkPlanReadResult;
+ *     currentMode: import('../../../presentation/contracts/index.js').RuntimeSdkMode | string;
+ *     plan: import('../../../presentation/contracts/index.js').RuntimeSdkPlanReadResult;
  *     lastObservedPlanOperation: 'create' | 'update' | 'delete' | null;
  *     lastObservedPlanChangedAt: number | null;
  * }>}
@@ -41,8 +41,8 @@ export async function readTerminalSdkSessionProjection(runtimeId) {
  * @param {'interactive' | 'plan' | 'autopilot'} mode
  * @param {string | null | undefined} [runtimeId]
  * @returns {Promise<{
- *     previousMode: import('../../../presentation/types.js').RuntimeSdkMode | string;
- *     currentMode: import('../../../presentation/types.js').RuntimeSdkMode | string;
+ *     previousMode: import('../../../presentation/contracts/index.js').RuntimeSdkMode | string;
+ *     currentMode: import('../../../presentation/contracts/index.js').RuntimeSdkMode | string;
  * }>}
  */
 export async function setTerminalSdkModeProjection(mode, runtimeId) {
@@ -61,7 +61,7 @@ export async function setTerminalSdkModeProjection(mode, runtimeId) {
 /**
  * @param {string} content
  * @param {string | null | undefined} [runtimeId]
- * @returns {Promise<import('../../../presentation/types.js').RuntimeSdkPlanReadResult>}
+ * @returns {Promise<import('../../../presentation/contracts/index.js').RuntimeSdkPlanReadResult>}
  */
 export async function updateTerminalSdkPlanProjection(content, runtimeId) {
     if (runtimeId !== undefined) {
@@ -74,7 +74,7 @@ export async function updateTerminalSdkPlanProjection(content, runtimeId) {
 
 /**
  * @param {string | null | undefined} [runtimeId]
- * @returns {Promise<import('../../../presentation/types.js').RuntimeSdkPlanReadResult>}
+ * @returns {Promise<import('../../../presentation/contracts/index.js').RuntimeSdkPlanReadResult>}
  */
 export async function deleteTerminalSdkPlanProjection(runtimeId) {
     if (runtimeId !== undefined) {

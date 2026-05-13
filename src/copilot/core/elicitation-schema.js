@@ -8,9 +8,9 @@
  */
 
 /**
- * @typedef {import('../presentation/types.js').RuntimeElicitationFieldValue} RuntimeElicitationFieldValue
+ * @typedef {import('../presentation/contracts/index.js').RuntimeElicitationFieldValue} RuntimeElicitationFieldValue
  *
- * @typedef {import('../presentation/types.js').RuntimeElicitationResult} RuntimeElicitationResult
+ * @typedef {import('../presentation/contracts/index.js').RuntimeElicitationResult} RuntimeElicitationResult
  */
 
 /**

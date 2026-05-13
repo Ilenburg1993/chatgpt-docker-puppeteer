@@ -35,7 +35,7 @@ Lifecycle:
 - fases sem handler ficam como `skipped` no relatório; isso é intencional apenas para fases
   documentais ou compat que sejam deliberadamente delegadas a outro host;
 - o último relatório fica disponível por `getLastBootLifecycleReport()` e é projetado por
-  `presentation/runtime-lifecycle.js`;
+  `presentation/runtime/lifecycle.js`;
 - novas fases que alocarem recursos devem declarar `timeoutMs` e, quando possível, handler
   `rollback`.
 

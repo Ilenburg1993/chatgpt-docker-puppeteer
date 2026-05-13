@@ -8,8 +8,8 @@
  */
 
 import { log } from '#copilot/observability';
-import { resolveRequestedRuntimeId } from '../../presentation/runtime-request.js';
-import { normalizeRuntimeId } from '../../presentation/runtime-targeting.js';
+import { resolveRequestedRuntimeId } from '../../presentation/routing/index.js';
+import { normalizeRuntimeId } from '../../presentation/routing/index.js';
 import { sanitizeHttpErrorMessage } from '../middleware/error-handler.js';
 
 /**

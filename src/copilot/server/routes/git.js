@@ -17,7 +17,7 @@ import {
     handleGhPrs,
     handleGitLog,
     handleGitStatus,
-} from '../../presentation/system-metrics.js';
+} from '../../presentation/system/index.js';
 import { createPresentationRoute } from './presentation-route.js';
 
 /**

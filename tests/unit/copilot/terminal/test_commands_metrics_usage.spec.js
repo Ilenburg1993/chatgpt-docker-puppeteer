@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 import {
     clearRuntimeInjectHistory,
     recordRuntimeInjectHistory,
-} from '../../../../src/copilot/presentation/runtime-ui-state.js';
+} from '../../../../src/copilot/presentation/state/index.js';
 
 const defaultRuntime = /** @type {any} */ ({
     sessionId: 'runtime-456',

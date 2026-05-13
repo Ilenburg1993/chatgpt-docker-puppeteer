@@ -452,7 +452,7 @@ function defaultElicitationSchema() {
  * @param {string | undefined} action
  * @param {string[]} rest
  * @param {unknown} [schema]
- * @returns {{ ok: true; result: import('../../presentation/types.js').RuntimeElicitationResult }
+ * @returns {{ ok: true; result: import('../../presentation/contracts/index.js').RuntimeElicitationResult }
  *     | { ok: false; error: string }}
  */
 function parseElicitationResult(action, rest, schema) {
@@ -998,7 +998,7 @@ export async function cmdElicitation({ println }, arg = '') {
                 inputTerminalSdkSessionUi,
                 runtimeId,
                 message,
-                /** @type {import('../../presentation/types.js').RuntimeInputOptions | undefined} */ (
+                /** @type {import('../../presentation/contracts/index.js').RuntimeInputOptions | undefined} */ (
                     parsed.json ?? undefined
                 ),
             );

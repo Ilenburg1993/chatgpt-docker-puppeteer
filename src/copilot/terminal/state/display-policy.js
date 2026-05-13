@@ -21,7 +21,7 @@ import {
     setShowThinking,
     setShowToolActivity,
     setShowUsage,
-} from '../../presentation/runtime-ui-state-store.js';
+} from '../../presentation/state/index.js';
 
 /**
  * @typedef {'thinking' | 'streaming' | 'usage' | 'tools' | 'intent' | 'session'} TerminalDisplayToggle

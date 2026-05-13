@@ -38,7 +38,7 @@ vi.mock('../../../src/copilot/terminal/state/activity-state.js', () => ({
     recordTerminalActivity,
 }));
 
-vi.mock('../../../src/copilot/presentation/runtime-ui-state-store.js', () => ({
+vi.mock('../../../src/copilot/presentation/state/index.js', () => ({
     getShowToolActivity,
     getShowStreaming,
     getShowIntentActivity,

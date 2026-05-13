@@ -50,7 +50,7 @@ vi.mock('../../../../src/copilot/terminal/frontend/gateways/agent-runtime.js', (
     readTerminalDialogStreamMeta: vi.fn(() => mocks.stream),
     readTerminalRuntimeState: vi.fn(() => mocks.runtime),
 }));
-vi.mock('../../../../src/copilot/presentation/runtime-ui-state-store.js', () => ({
+vi.mock('../../../../src/copilot/presentation/state/index.js', () => ({
     getBusy: vi.fn(() => mocks.busy),
 }));
 vi.mock('../../../../src/copilot/terminal/state/ui-theme.js', () => ({

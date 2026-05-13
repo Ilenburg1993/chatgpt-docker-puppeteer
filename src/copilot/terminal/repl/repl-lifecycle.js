@@ -15,14 +15,14 @@ import { getTerminalInterventionPolicy } from '#copilot/config';
 import { toError } from '#copilot/core';
 import { log } from '#copilot/observability';
 import readline from 'node:readline';
-import { extractAtReferences } from '../../presentation/runtime-file-context.js';
+import { extractAtReferences } from '../../presentation/files/index.js';
 import {
     addAttachment,
     enqueueRuntimeInterventionMailbox,
     getBusy,
     readRuntimeInterventionMailboxSummary,
     setRl,
-} from '../../presentation/runtime-ui-state-store.js';
+} from '../../presentation/state/index.js';
 import {
     buildUserPrompt,
     buildWaitingPrompt,

@@ -36,33 +36,100 @@ Em resumo:
 - `agent/` governa o runtime;
 - `presentation/` governa o acesso compartilhado das bordas ao runtime.
 
-## Arquivos
+## Topologia atual
 
-| Arquivo                     | Função                                                                      |
-| --------------------------- | --------------------------------------------------------------------------- |
-| `index.js`                  | barrel/hub canônico das superfícies compartilhadas                          |
-| `agent-runtime.js`          | accessor compartilhado do runtime default / runtimes registrados            |
-| `runtime-controls.js`       | mutações/controles compartilhados do runtime default e runtimes explícitos  |
-| `runtime-health.js`         | projection compartilhada de health do runtime                               |
-| `runtime-ownership.js`      | ownership compartilhado do vínculo SDK ↔ hub                                |
-| `runtime-overview.js`       | projection base compartilhada do runtime default (snap/health/runtimeId)    |
-| `runtime-status.js`         | payloads compartilhados de status/session/SSE para bordas HTTP e stream     |
-| `runtime-route-deps.js`     | composição compartilhada de dependências para routers de borda              |
-| `runtime-request.js`        | resolução canônica de `runtimeId` e deps por requisição HTTP                |
-| `runtime-targeting.js`      | normalização/seleção canônica de `runtimeId` entre HTTP, REPL e façades     |
-| `runtime-sdk-session.js`    | façade compartilhada de `mode/plan` vanilla da sessão SDK por runtime       |
-| `runtime-file-context.js`   | implementação compartilhada de contexto de arquivos/attachments             |
-| `runtime-ui-state-store.js` | store compartilhada do estado operacional/UI do terminal                    |
-| `runtime-ui-state.js`       | façade de leitura do estado operacional/UI compartilhado                    |
-| `runtime-dialog.js`         | façade compartilhada de turnos e embeddings de input                        |
-| `runtime-webhooks.js`       | façade compartilhada das operações de webhook do runtime                    |
-| `agent-control.js`          | controle compartilhado do agente (inject, pipeline, dialog, handoff)        |
-| `agent-http-errors.js`      | mapeamento canônico `Error -> HTTP` para o runtime do agente                |
-| `conversation-hub.js`       | handlers compartilhados de sessões, turns, memory e health do hub           |
-| `realtime.js`               | contratos compartilhados de realtime / SSE crítico / reset de rate limiters |
-| `sdk-sessions.js`           | ownership e projections compartilhadas da sessão SDK                        |
-| `system-config.js`          | health/config compartilhados para server e terminal                         |
-| `system-metrics.js`         | métricas, budget, git/gh e observabilidade compartilhada                    |
+> **Delta de execução — 2026-05-12**
+>
+> A primeira grande onda barrel-first de `presentation/` já foi aplicada:
+>
+> - `agent/`, `routing/`, `state/`, `system/`, `conversation/`, `contracts/`, `runtime/`, `files/` e `sdk/`
+>   já são subdomínios físicos reais;
+> - `agent/runtime/index.js` foi introduzido como surface estreita para seleção/lookup de runtime, evitando ciclos com
+>   `agent/control.js`;
+> - `server/` e `terminal/` já consomem `presentation/` via sub-barrels em vez de leaf files dos novos subdomínios;
+> - o próximo foco passa a ser minimizar ainda mais a surface pública e decompor hotspots internos.
+
+```text
+presentation/
+  index.js
+
+  agent/
+    index.js
+    control.js
+    http-errors.js
+    runtime/
+      index.js
+
+  routing/
+    index.js
+    meta.js
+    request.js
+    route-deps.js
+    targeting.js
+
+  state/
+    index.js
+    realtime.js
+    ui-state.js
+    ui-store.js
+
+  system/
+    index.js
+    config.js
+    metrics.js
+
+  conversation/
+    index.js
+    hub.js
+
+  contracts/
+    index.js
+    types.js
+
+  files/
+    index.js
+    context.js
+    routing.js
+
+  runtime/
+    index.js
+    capabilities.js
+    controls.js
+    dialog.js
+    fallback-telemetry.js
+    health.js
+    lifecycle.js
+    models.js
+    overview.js
+    ownership.js
+    sdk-session.js
+    status.js
+    todos.js
+    tools.js
+    webhooks.js
+
+  sdk/
+    index.js
+    recovery-policy.js
+    sessions.js
+
+  dialog-timeout-policy.js
+```
+
+## Superfícies principais
+
+| Superfície              | Função                                                                     |
+| ----------------------- | -------------------------------------------------------------------------- |
+| `index.js`              | barrel/hub canônico das superfícies compartilhadas                         |
+| `agent/index.js`        | controle do agente, projeção HTTP de erros e seleção compartilhada runtime |
+| `routing/index.js`      | targeting, route deps e metadata de runtime para bordas HTTP               |
+| `state/index.js`        | estado compartilhado de UI/realtime entre terminal e outras bordas         |
+| `system/index.js`       | config, health operacional e métricas compartilhadas                       |
+| `conversation/index.js` | handlers compartilhados de sessões, turns, memory e hub health             |
+| `contracts/index.js`    | tipos locais das projections e handlers compartilhados                     |
+| `runtime/index.js`      | façade barrelizada do runtime compartilhado                                |
+| `files/index.js`        | leitura/embedding/routing de arquivos compartilhados                       |
+| `sdk/index.js`          | ownership/recovery e projections compartilhadas da sessão SDK              |
 
 ## Heurística prática
 
@@ -74,7 +141,7 @@ Em resumo:
 
 ## Runtime compartilhado
 
-`agent-runtime.js` é o novo ponto canônico para bordas consumirem:
+`agent/runtime/index.js` é o novo ponto canônico para bordas consumirem:
 
 - runtime default atual do agent;
 - futuros runtimes nomeados vindos da `AgentRuntimeRegistry`;
@@ -86,7 +153,7 @@ Isso evita que `terminal/` e `server/` precisem conhecer diretamente a combinaç
 - registry explícita de runtimes;
 - política de seleção do runtime default.
 
-`runtime-overview.js` concentra a **leitura compartilhada** do runtime default:
+`runtime/overview.js` concentra a **leitura compartilhada** do runtime default:
 
 - `runtimeId`
 - `agentRuntimes`
@@ -95,13 +162,13 @@ Isso evita que `terminal/` e `server/` precisem conhecer diretamente a combinaç
 - `runtimeSessionId`
 - `contextWindow` normalizado
 
-`runtime-status.js` concentra os payloads menores e repetitivos de borda:
+`runtime/status.js` concentra os payloads menores e repetitivos de borda:
 
 - `/status`
 - `/session`
 - SSE `connected`
 
-`runtime-controls.js` concentra mutações/controles antes espalhados entre bordas:
+`runtime/controls.js` concentra mutações/controles antes espalhados entre bordas:
 
 - dialog pause/resume/stop/ping
 - handoff manager / history
@@ -111,13 +178,13 @@ Isso evita que `terminal/` e `server/` precisem conhecer diretamente a combinaç
 Além do caminho default, a façade já resolve também `runtimeId` explícito quando a borda precisa
 atuar sobre outro runtime registrado.
 
-`runtime-webhooks.js` concentra as operações administrativas de webhook do runtime default:
+`runtime/webhooks.js` concentra as operações administrativas de webhook do runtime default:
 
 - listagem
 - registro
 - remoção
 
-`runtime-route-deps.js` concentra a composição de dependências repetitivas de routers como:
+`routing/route-deps.js` concentra a composição de dependências repetitivas de routers como:
 
 - `copilot-api/index.js`
 - `sdk/index.js`
@@ -125,13 +192,13 @@ atuar sobre outro runtime registrado.
 assim `server/routes/*` deixa de remontar manualmente a combinação de runtime default, métricas, SDK
 client e tools.
 
-`runtime-request.js` transforma essa preparação em **caminho operacional por requisição**:
+`routing/request.js` transforma essa preparação em **caminho operacional por requisição**:
 
 - lê `runtimeId` por `query/header/body/params`;
 - resolve deps canônicas por request para `copilot-api` e `/sdk`;
 - evita que cada router reimplemente parsing de seleção de runtime.
 
-`runtime-targeting.js` agora centraliza a semântica base de `runtimeId` para todas as bordas:
+`routing/targeting.js` agora centraliza a semântica base de `runtimeId` para todas as bordas:
 
 - `normalizeRuntimeId()`
 - `hasRuntimeId()`
@@ -141,7 +208,7 @@ Com isso, tanto o parsing HTTP (`runtime-request.js`) quanto o parser do REPL
 (`terminal/commands/runtime-target.js`) e os accessors do runtime compartilham a mesma política de
 trim/empty/fallback.
 
-`agent-runtime.js` também já expõe `resolveAgentRuntimeSelection()` para distinguir com clareza:
+`agent/runtime/index.js` também já expõe `resolveAgentRuntimeSelection()` para distinguir com clareza:
 
 - `requestedRuntimeId`
 - `runtimeId` efetivamente resolvido
@@ -151,7 +218,7 @@ trim/empty/fallback.
 Isso permite que projections como `runtime-overview.js` e handlers de `system-config.js` informem
 explicitamente quando um runtime pedido não existe e a borda acabou operando sobre o default.
 
-`runtime-sdk-session.js` concentra as operações vanilla da sessão SDK por runtime:
+`runtime/sdk-session.js` concentra as operações vanilla da sessão SDK por runtime:
 
 - `getSdkSessionMode()`
 - `setSdkSessionMode()`
@@ -166,8 +233,8 @@ no runtime.
 `server/routes/presentation-route.js` já propaga esse `runtimeId` canônico também para os handlers
 compartilhados de:
 
-- `agent-control.js`
-- `system-metrics.js`
+- `agent/control.js`
+- `system/metrics.js`
 
 Então rotas históricas como `server/routes/agent.js` e `server/routes/observability.js` já conseguem
 participar do caminho multi-agent sem reinventar parsing local de `query/header/body/params`.
@@ -183,15 +250,15 @@ participar do caminho multi-agent sem reinventar parsing local de `query/header/
 - `sdkSessionId`
 - `hubSessionId`
 
-`runtime-file-context.js` e `runtime-ui-state-store.js` agora carregam a implementação compartilhada
+`runtime-file-context.js` e `state/ui-store.js` agora carregam a implementação compartilhada
 que antes vivia no terminal.
 
 Com isso:
 
-- `presentation/runtime-file-context.js` e `presentation/runtime-ui-state-store.js` são os owners
+- `presentation/files/context.js` e `presentation/state/ui-store/index.js` são os owners
   canônicos;
 - `presentation/` não importa mais `terminal/*` diretamente;
-- `runtime-ui-state.js` e `runtime-dialog.js` passaram a ser apenas fachadas sobre primitivas já
+- `state/ui-state.js` e `runtime-dialog.js` passaram a ser apenas fachadas sobre primitivas já
   centralizadas.
 
 ## Anti-drift
@@ -202,4 +269,4 @@ Com isso:
   fronteira está errada.
 - Se um módulo de `presentation/` voltar a importar `terminal/*` diretamente, isso tende a ser smell
   arquitetural e regressão de bypass — preferir usar `runtime-file-context.js`,
-  `runtime-ui-state-store.js`, `runtime-ui-state.js` ou `runtime-dialog.js`.
+  `state/ui-store.js`, `state/ui-state.js` ou `runtime-dialog.js`.

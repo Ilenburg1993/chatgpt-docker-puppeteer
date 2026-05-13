@@ -17,7 +17,7 @@ import {
     requireAgentRuntime,
     resolveAgentRuntimeId,
     resolveAgentRuntimeSelection,
-} from '../../../src/copilot/presentation/agent-runtime.js';
+} from '../../../src/copilot/presentation/agent/index.js';
 
 describe('presentation/agent-runtime', () => {
     afterEach(() => {

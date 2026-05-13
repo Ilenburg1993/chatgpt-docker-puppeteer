@@ -17,7 +17,7 @@ const stateStore = vi.hoisted(() => ({
     setShowSessionActivity: vi.fn(),
 }));
 
-vi.mock('../../../../src/copilot/presentation/runtime-ui-state-store.js', () => ({
+vi.mock('../../../../src/copilot/presentation/state/index.js', () => ({
     getShowThinking: stateStore.getShowThinking,
     getShowStreaming: stateStore.getShowStreaming,
     getShowUsage: stateStore.getShowUsage,

@@ -12,7 +12,7 @@ import {
     normalizeAgentContextWindowProjection,
     readAgentRuntimeOverview,
     readDefaultAgentRuntimeOverview,
-} from '../../../src/copilot/presentation/runtime-overview.js';
+} from '../../../src/copilot/presentation/runtime/overview.js';
 
 describe('presentation/runtime-overview', () => {
     afterEach(() => {

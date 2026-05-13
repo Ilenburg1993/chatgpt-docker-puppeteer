@@ -22,11 +22,11 @@ const mocks = vi.hoisted(() => {
     return { agent };
 });
 
-vi.mock('../../../src/copilot/presentation/runtime-controls.js', () => ({
+vi.mock('../../../src/copilot/presentation/runtime/controls.js', () => ({
     getDefaultAgentRuntimeControlsTarget: () => mocks.agent,
 }));
 
-describe('presentation/runtime-dialog.js', () => {
+describe('presentation/runtime/dialog.js', () => {
     beforeEach(() => {
         mocks.agent.dialogLoopActive = false;
         mocks.agent.dialogPaused = false;
@@ -39,7 +39,7 @@ describe('presentation/runtime-dialog.js', () => {
     });
 
     it('inicia o dialog loop quando inativo e não pausado', async () => {
-        const mod = await import('../../../src/copilot/presentation/runtime-dialog.js');
+        const mod = await import('../../../src/copilot/presentation/runtime/dialog.js');
         const reply = await mod.sendRuntimeDialogTurn('oi', 'user');
 
         expect(mocks.agent.startDialogLoop).toHaveBeenCalledTimes(1);
@@ -48,7 +48,7 @@ describe('presentation/runtime-dialog.js', () => {
     });
 
     it('propaga options para sendDialogTurn e permite start explícito', async () => {
-        const mod = await import('../../../src/copilot/presentation/runtime-dialog.js');
+        const mod = await import('../../../src/copilot/presentation/runtime/dialog.js');
 
         await mod.startRuntimeDialogLoop('boot');
         await mod.sendRuntimeDialogTurn('oi', 'user', { timeout: 2000 });
@@ -59,7 +59,7 @@ describe('presentation/runtime-dialog.js', () => {
 
     it('não inicia o loop quando o runtime está pausado', async () => {
         mocks.agent.dialogPaused = true;
-        const mod = await import('../../../src/copilot/presentation/runtime-dialog.js');
+        const mod = await import('../../../src/copilot/presentation/runtime/dialog.js');
         await mod.sendRuntimeDialogTurn('oi', 'llm-a');
 
         expect(mocks.agent.startDialogLoop).not.toHaveBeenCalled();
@@ -70,7 +70,7 @@ describe('presentation/runtime-dialog.js', () => {
         mocks.agent.dialogLoopActive = true;
         mocks.agent.status = 'idle';
         mocks.agent.pendingQuestion = null;
-        const mod = await import('../../../src/copilot/presentation/runtime-dialog.js');
+        const mod = await import('../../../src/copilot/presentation/runtime/dialog.js');
 
         await mod.sendRuntimeDialogTurn('oi', 'llm-a', { traceId: 't1' });
 
@@ -84,7 +84,7 @@ describe('presentation/runtime-dialog.js', () => {
     });
 
     it('expõe diagnósticos estruturados do turno quando auto-starta o loop', async () => {
-        const mod = await import('../../../src/copilot/presentation/runtime-dialog.js');
+        const mod = await import('../../../src/copilot/presentation/runtime/dialog.js');
 
         const result = await mod.sendRuntimeDialogTurnWithDiagnostics('oi', 'llm-a', {
             timeout: null,
@@ -107,7 +107,7 @@ describe('presentation/runtime-dialog.js', () => {
         mocks.agent.dialogLoopActive = true;
         mocks.agent.status = 'idle';
         mocks.agent.sendDialogTurn.mockRejectedValueOnce(new Error('boom'));
-        const mod = await import('../../../src/copilot/presentation/runtime-dialog.js');
+        const mod = await import('../../../src/copilot/presentation/runtime/dialog.js');
 
         await expect(
             mod.sendRuntimeDialogTurnWithDiagnostics('oi', 'system', {
@@ -124,7 +124,7 @@ describe('presentation/runtime-dialog.js', () => {
     });
 
     it('encerra o dialog loop com autorização explícita', async () => {
-        const mod = await import('../../../src/copilot/presentation/runtime-dialog.js');
+        const mod = await import('../../../src/copilot/presentation/runtime/dialog.js');
 
         await mod.stopRuntimeDialogLoopAuthorized();
 

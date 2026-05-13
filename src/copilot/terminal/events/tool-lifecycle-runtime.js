@@ -15,7 +15,7 @@
  * @module copilot/terminal/tool-lifecycle-runtime
  */
 
-import { getShowToolActivity } from '../../presentation/runtime-ui-state-store.js';
+import { getShowToolActivity } from '../../presentation/state/index.js';
 import { broadcastSse, clearInlineStatus, println, writeInlineStatus } from '../dialog/index.js';
 import {
     completeTerminalTurnToolCall,

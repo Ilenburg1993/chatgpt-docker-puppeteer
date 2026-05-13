@@ -6,7 +6,7 @@ import {
     buildRuntimeRouteMetaFromSelection,
     buildRuntimeRouteMetaPayload,
     normalizeRuntimeRouteMeta,
-} from '../../../src/copilot/presentation/runtime-meta.js';
+} from '../../../src/copilot/presentation/routing/index.js';
 
 describe('presentation/runtime-meta', () => {
     it('normaliza string legada para objeto com runtimeId', () => {

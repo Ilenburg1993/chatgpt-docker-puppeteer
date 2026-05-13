@@ -4,8 +4,8 @@
  */
 
 import { defaultErrorTracker } from '#copilot/observability';
-import { readRuntimeLatestInjectHistoryEntryForRuntime } from '../../../presentation/runtime-ui-state.js';
-import { readToolStatsProjection } from '../../../presentation/system-metrics.js';
+import { readRuntimeLatestInjectHistoryEntryForRuntime } from '../../../presentation/state/index.js';
+import { readToolStatsProjection } from '../../../presentation/system/index.js';
 import { readTerminalActivitySnapshot } from '../../state/projections/index.js';
 import { normalizeTerminalModelBillingProjection, readTerminalRuntimeBase } from './shared.js';
 import { readTerminalTimelineProjection, readTerminalTimelineSyncTelemetry } from './timeline.js';
@@ -27,7 +27,7 @@ import { readTerminalTimelineProjection, readTerminalTimelineSyncTelemetry } fro
  *     systemPromptFreshness: Record<string, unknown> | null;
  *     pr: Record<string, any> | null;
  *     modelBilling: import('./shared.js').TerminalModelBillingProjection;
- *     latestInject: import('../../../presentation/runtime-ui-state-store.js').InjectHistoryEntry | null;
+ *     latestInject: import('../../../presentation/state/index.js').InjectHistoryEntry | null;
  *     turnCount: number;
  *     bridgeTurnCount: number;
  *     timelineSource: import('./timeline.js').TerminalTimelineSource;

@@ -2,7 +2,7 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { buildRuntimeLifecycleSummary } from '../../../src/copilot/presentation/runtime-lifecycle.js';
+import { buildRuntimeLifecycleSummary } from '../../../src/copilot/presentation/runtime/lifecycle.js';
 
 describe('presentation/runtime-lifecycle', () => {
     it('projeta resumo amigável de boot e shutdown para status', () => {

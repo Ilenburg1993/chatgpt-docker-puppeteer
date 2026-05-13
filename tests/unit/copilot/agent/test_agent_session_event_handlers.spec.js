@@ -81,13 +81,9 @@ vi.mock(
             },
         ),
 );
-// Mock conversationStore e runtime-ui-state-store (deep deps from history-sync)
+// Mock conversationStore (deep deps from history-sync)
 vi.mock('#copilot/conversation-hub/store', () => ({
     conversationStore: mocks.conversationStore,
-}));
-vi.mock('#copilot/presentation/runtime-ui-state-store', () => ({
-    getHubSessionId: mocks.getHubSessionId,
-    default: {},
 }));
 
 // ═══════════════════════════════════════════════════════════════════════════════

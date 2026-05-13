@@ -10,7 +10,7 @@
 
 import { channel } from 'node:diagnostics_channel';
 import { relative } from 'node:path';
-import { getShowToolActivity } from '../../presentation/runtime-ui-state-store.js';
+import { getShowToolActivity } from '../../presentation/state/index.js';
 import { println } from '../dialog/index.js';
 import {
     recordTerminalActivity,

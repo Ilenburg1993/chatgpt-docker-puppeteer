@@ -3,11 +3,11 @@
  * Helpers compartilhados das projection families do terminal frontend.
  */
 
-import { buildRuntimeFallbackWarning } from '../../../presentation/runtime-meta.js';
+import { buildRuntimeFallbackWarning } from '../../../presentation/routing/index.js';
 import {
     normalizeAgentContextWindowProjection,
     readAgentRuntimeOverviewProjection,
-} from '../../../presentation/runtime-overview.js';
+} from '../../../presentation/runtime/index.js';
 import { readTerminalSessionBinding } from '../gateways/index.js';
 
 /**
@@ -51,11 +51,11 @@ import { readTerminalSessionBinding } from '../gateways/index.js';
  *     dialogLoopActive: boolean;
  *     dialogPaused: boolean;
  *     queueSize: number;
- *     pendingQuestion: import('../../../presentation/types.js').RuntimePendingQuestion | null;
- *     pendingQuestionKind: import('../../../presentation/types.js').RuntimePendingQuestionKind | null;
- *     pendingQuestionShadow: import('../../../presentation/types.js').RuntimePendingQuestionShadow | null;
- *     pendingQuestionShadowKind: import('../../../presentation/types.js').RuntimePendingQuestionKind | null;
- *     pendingQuestionShadowState: import('../../../presentation/types.js').RuntimePendingQuestionShadowState | null;
+ *     pendingQuestion: import('../../../presentation/contracts/index.js').RuntimePendingQuestion | null;
+ *     pendingQuestionKind: import('../../../presentation/contracts/index.js').RuntimePendingQuestionKind | null;
+ *     pendingQuestionShadow: import('../../../presentation/contracts/index.js').RuntimePendingQuestionShadow | null;
+ *     pendingQuestionShadowKind: import('../../../presentation/contracts/index.js').RuntimePendingQuestionKind | null;
+ *     pendingQuestionShadowState: import('../../../presentation/contracts/index.js').RuntimePendingQuestionShadowState | null;
  *     pendingQuestionShadowExpired: boolean;
  *     pendingQuestionShadowAgeMs: number | null;
  *     pendingQuestionShadowExpiresAt: number | null;

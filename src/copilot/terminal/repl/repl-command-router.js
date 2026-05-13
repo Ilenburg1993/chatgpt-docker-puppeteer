@@ -22,7 +22,7 @@ import {
     getHubSessionId,
     readRuntimeInterventionMailboxSummary,
     setRl,
-} from '../../presentation/runtime-ui-state-store.js';
+} from '../../presentation/state/index.js';
 import {
     cmdActivity as _cmdActivity,
     cmdAlias as _cmdAlias,

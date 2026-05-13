@@ -3,7 +3,7 @@
  * @file Gateway: sdk-session.
  *
  *   Wraps all SDK session operations (mode, plan, models, tools, quota, workspace files, compaction, elicitations and UI
- *   interactions). Isolates `presentation/runtime-sdk-session.js`.
+ *   interactions). Isolates `presentation/runtime/index.js`.
  */
 
 import {
@@ -31,7 +31,7 @@ import {
     selectAgentSdkSessionUi,
     setAgentSdkSessionMode,
     updateAgentSdkPlan,
-} from '../../../presentation/runtime-sdk-session.js';
+} from '../../../presentation/runtime/index.js';
 
 // ---------------------------------------------------------------------------
 // Mode
@@ -39,7 +39,7 @@ import {
 
 /**
  * @param {string | null | undefined} [runtimeId]
- * @returns {Promise<import('../../../presentation/types.js').RuntimeSdkModeResult>}
+ * @returns {Promise<import('../../../presentation/contracts/index.js').RuntimeSdkModeResult>}
  */
 export async function getTerminalSdkSessionMode(runtimeId) {
     return getAgentSdkSessionMode(runtimeId);
@@ -48,7 +48,7 @@ export async function getTerminalSdkSessionMode(runtimeId) {
 /**
  * @param {'interactive' | 'plan' | 'autopilot'} mode
  * @param {string | null | undefined} [runtimeId]
- * @returns {Promise<import('../../../presentation/types.js').RuntimeSdkModeResult>}
+ * @returns {Promise<import('../../../presentation/contracts/index.js').RuntimeSdkModeResult>}
  */
 export async function setTerminalSdkSessionMode(mode, runtimeId) {
     return setAgentSdkSessionMode(mode, runtimeId);
@@ -60,7 +60,7 @@ export async function setTerminalSdkSessionMode(mode, runtimeId) {
 
 /**
  * @param {string | null | undefined} [runtimeId]
- * @returns {Promise<import('../../../presentation/types.js').RuntimeSdkPlanReadResult>}
+ * @returns {Promise<import('../../../presentation/contracts/index.js').RuntimeSdkPlanReadResult>}
  */
 export async function readTerminalSdkPlan(runtimeId) {
     return readAgentSdkPlan(runtimeId);
@@ -175,7 +175,7 @@ export async function requestTerminalSdkElicitation(message, requestedSchema, ru
 
 /**
  * @param {string | null | undefined} [runtimeId]
- * @returns {import('../../../presentation/types.js').RuntimeSessionCapabilities}
+ * @returns {import('../../../presentation/contracts/index.js').RuntimeSessionCapabilities}
  */
 export function getTerminalSdkSessionCapabilities(runtimeId) {
     return getAgentSdkSessionCapabilities(runtimeId);
@@ -214,7 +214,7 @@ export async function selectTerminalSdkSessionUi(message, options, runtimeId) {
 
 /**
  * @param {string} message
- * @param {import('../../../presentation/types.js').RuntimeInputOptions | undefined} [options]
+ * @param {import('../../../presentation/contracts/index.js').RuntimeInputOptions | undefined} [options]
  * @param {string | null | undefined} [runtimeId]
  * @returns {Promise<string | null>}
  */
@@ -246,7 +246,7 @@ export function getTerminalSdkPendingElicitation(id, runtimeId) {
 
 /**
  * @param {string} id
- * @param {import('../../../presentation/types.js').RuntimeElicitationResult} result
+ * @param {import('../../../presentation/contracts/index.js').RuntimeElicitationResult} result
  * @param {string | null | undefined} [runtimeId]
  * @returns {boolean}
  */

@@ -10,12 +10,12 @@ import {
     readRuntimeModelStatsProjection,
     setRuntimeModelProjection,
     setRuntimeReasoningProjection,
-} from '../../../presentation/runtime-models.js';
+} from '../../../presentation/runtime/index.js';
 import {
     getLastSdkPlanChangedAt,
     getLastSdkPlanOperation,
     getSdkSessionMode,
-} from '../../../presentation/runtime-ui-state-store.js';
+} from '../../../presentation/state/index.js';
 import { readTerminalRuntimeBase } from './shared.js';
 
 /**
@@ -80,10 +80,10 @@ export function readTerminalConfigProjection(runtimeId) {
 
 /**
  * @param {string | null | undefined} [runtimeId]
- * @returns {Promise<{ currentModel: string; models: import('../../../presentation/types.js').RuntimeModelInfo[] }>}
+ * @returns {Promise<{ currentModel: string; models: import('../../../presentation/contracts/index.js').RuntimeModelInfo[] }>}
  */
 export async function listTerminalAvailableModelsProjection(runtimeId) {
-    return /** @type {Promise<{ currentModel: string; models: import('../../../presentation/types.js').RuntimeModelInfo[] }>} */ (
+    return /** @type {Promise<{ currentModel: string; models: import('../../../presentation/contracts/index.js').RuntimeModelInfo[] }>} */ (
         listRuntimeAvailableModelsProjection(runtimeId)
     );
 }

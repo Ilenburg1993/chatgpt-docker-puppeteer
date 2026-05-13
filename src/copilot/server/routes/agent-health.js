@@ -9,4 +9,4 @@ export {
     buildLegacyAgentHealth,
     getAgentHealthHttpStatus,
     getAgentHealthSnapshotCompat,
-} from '../../presentation/runtime-health.js';
+} from '../../presentation/runtime/index.js';

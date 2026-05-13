@@ -45,11 +45,11 @@ vi.mock('../../../src/copilot/presentation/dialog-timeout-policy.js', () => ({
         reasons: ['caller_disabled'],
     })),
 }));
-vi.mock('../../../src/copilot/presentation/runtime-file-context.js', () => ({
+vi.mock('../../../src/copilot/presentation/files/context.js', () => ({
     embedMultiple: vi.fn(async () => []),
     readFileContext: vi.fn(async () => null),
 }));
-vi.mock('../../../src/copilot/presentation/runtime-ui-state-store.js', () => ({
+vi.mock('../../../src/copilot/presentation/state/index.js', () => ({
     clearAttachments: vi.fn(),
     getAttachmentQueue: vi.fn(() => []),
     getHubSessionId: vi.fn(() => null),

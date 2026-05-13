@@ -19,7 +19,7 @@ const passRateMiddleware = (
     /** @type {import('express').NextFunction} */ next,
 ) => next();
 
-vi.mock('../../../src/copilot/presentation/agent-control.js', () => ({
+vi.mock('../../../src/copilot/presentation/agent/index.js', () => ({
     handleAcceptHandoff: vi.fn(() => ({ status: 200, body: { ok: true } })),
     handleDialogPause: vi.fn(() => ({ status: 200, body: { ok: true } })),
     handleDialogResume: vi.fn(() => ({ status: 200, body: { ok: true } })),
@@ -30,7 +30,7 @@ vi.mock('../../../src/copilot/presentation/agent-control.js', () => ({
     handleRejectHandoff: vi.fn(() => ({ status: 200, body: { ok: true } })),
 }));
 
-vi.mock('../../../src/copilot/presentation/system-metrics.js', () => ({
+vi.mock('../../../src/copilot/presentation/system/index.js', () => ({
     handleGetPrBudget: vi.fn(() => ({ status: 200, body: { ok: true } })),
     handleGetQuota: vi.fn(() => ({ status: 200, body: { ok: true } })),
 }));

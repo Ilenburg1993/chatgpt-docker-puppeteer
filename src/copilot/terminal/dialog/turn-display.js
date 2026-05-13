@@ -8,7 +8,7 @@
  * @see EventBus
  */
 
-import { appendThinkingHistoryChunk, finalizeThinkingHistoryEntry } from '../../presentation/runtime-ui-state-store.js';
+import { appendThinkingHistoryChunk, finalizeThinkingHistoryEntry } from '../../presentation/state/index.js';
 import { recordTerminalActivity, terminalThemeText } from '../state/dialog/index.js';
 import {
     beginTerminalRenderLock,

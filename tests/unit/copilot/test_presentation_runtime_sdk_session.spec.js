@@ -1,3 +1,13 @@
+vi.mock('#copilot/agent', () => ({
+    deleteAgentSdkPlan: vi.fn(async (runtime) => runtime.deleteSdkPlan()),
+    readAgentRuntimeStatusSnapshot: vi.fn((runtime) => runtime.getStatusSnapshot()),
+    readAgentRuntimeStatusValue: vi.fn((runtime) => runtime.getStatusSnapshot().status ?? 'idle'),
+    readAgentSdkPlan: vi.fn(async (runtime) => runtime.readSdkPlan()),
+    readAgentSdkSessionMode: vi.fn(async (runtime) => runtime.getSdkSessionMode()),
+    setAgentSdkSessionMode: vi.fn(async (runtime, mode) => runtime.setSdkSessionMode(mode)),
+    updateAgentSdkPlan: vi.fn(async (runtime, content) => runtime.updateSdkPlan(content)),
+}));
+
 // @ts-check
 
 import { describe, expect, it, vi } from 'vitest';
@@ -58,7 +68,7 @@ vi.mock('#copilot/config', async (importOriginal) => {
     };
 });
 
-vi.mock('../../../src/copilot/presentation/agent-runtime.js', () => ({
+vi.mock('../../../src/copilot/presentation/agent/runtime/index.js', () => ({
     requireAgentRuntimeSelection: (/** @type {string | null | undefined} */ runtimeId) => {
         if (runtimeId === 'missing') {
             throw Object.assign(new Error("Runtime 'missing' não encontrado."), {
@@ -78,7 +88,7 @@ vi.mock('../../../src/copilot/presentation/agent-runtime.js', () => ({
     },
 }));
 
-const runtimeSdkSession = await import('../../../src/copilot/presentation/runtime-sdk-session.js');
+const runtimeSdkSession = await import('../../../src/copilot/presentation/runtime/sdk-session.js');
 
 describe('presentation/runtime-sdk-session', () => {
     it('lê e altera mode/plan no runtime default', async () => {

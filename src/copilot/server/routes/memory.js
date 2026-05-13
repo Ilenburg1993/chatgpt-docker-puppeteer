@@ -12,7 +12,7 @@
 
 import { Router } from 'express';
 import { z } from 'zod';
-import { handleDeleteMemory, handleRecallMemories, handleStoreMemory } from '../../presentation/conversation-hub.js';
+import { handleDeleteMemory, handleRecallMemories, handleStoreMemory } from '../../presentation/conversation/index.js';
 import { writeRateMiddleware } from '../middleware/rate-limiter.js';
 import { validate } from '../middleware/validate.js';
 import { createPresentationRoute } from './presentation-route.js';

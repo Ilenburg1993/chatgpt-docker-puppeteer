@@ -22,8 +22,8 @@ import {
     handleInject,
     handlePipeline,
     handleRejectHandoff,
-} from '../../presentation/agent-control.js';
-import { handleGetPrBudget, handleGetQuota } from '../../presentation/system-metrics.js';
+} from '../../presentation/agent/index.js';
+import { handleGetPrBudget, handleGetQuota } from '../../presentation/system/index.js';
 import { validate } from '../middleware/validate.js';
 import { createPresentationRoute } from './presentation-route.js';
 

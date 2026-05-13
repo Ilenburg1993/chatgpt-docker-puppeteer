@@ -157,7 +157,7 @@ vi.mock('#copilot/tools', () => ({
     getAllTools: () => mocks.allTools,
 }));
 
-vi.mock('../../../src/copilot/presentation/agent-runtime.js', () => ({
+vi.mock('../../../src/copilot/presentation/agent/index.js', () => ({
     resolveAgentRuntimeSelection: (/** @type {string | null | undefined} */ runtimeId) => ({
         requestedRuntimeId: runtimeId ?? null,
         runtimeId: runtimeId === 'alt' ? 'default' : (runtimeId ?? 'default'),
@@ -185,11 +185,11 @@ vi.mock('../../../src/copilot/presentation/agent-runtime.js', () => ({
     },
 }));
 
-vi.mock('../../../src/copilot/presentation/runtime-sdk-session.js', () => ({
+vi.mock('../../../src/copilot/presentation/runtime/sdk-session.js', () => ({
     resolveAgentSdkActiveSessionEntry: vi.fn(() => null),
 }));
 
-vi.mock('../../../src/copilot/presentation/runtime-status.js', () => ({
+vi.mock('../../../src/copilot/presentation/runtime/status.js', () => ({
     readAgentStatusSnapshot: vi.fn(() => ({ status: 'idle' })),
     readAgentStatusSnapshotForRuntime: vi.fn(() => ({
         status: 'idle',
@@ -202,13 +202,13 @@ vi.mock('../../../src/copilot/presentation/runtime-status.js', () => ({
     readAgentStatusValueForRuntime: vi.fn(() => 'idle'),
 }));
 
-vi.mock('../../../src/copilot/presentation/runtime-tools.js', () => ({
+vi.mock('../../../src/copilot/presentation/runtime/tools.js', () => ({
     paginateAgentRuntimeToolsProjection: vi.fn((projection) => projection),
     readAgentRuntimeToolsProjection: vi.fn(() => ({ ok: true, tools: [] })),
     readAgentRuntimeToolsProjectionForRuntime: vi.fn(() => ({ ok: true, tools: [] })),
 }));
 
-vi.mock('../../../src/copilot/presentation/sdk-sessions.js', () => ({
+vi.mock('../../../src/copilot/presentation/sdk/sessions.js', () => ({
     attachSdkSessionOwnership: vi.fn((payload) => payload),
     clearSdkRuntimeBinding: vi.fn(() => ({ hubSessionId: null, sdkSessionId: null, isBound: false })),
     forgetSdkSessionOwnership: vi.fn(() => ({ hubSessionId: null, sdkSessionId: null, isBound: false })),
@@ -220,7 +220,7 @@ vi.mock('../../../src/copilot/presentation/sdk-sessions.js', () => ({
 
 describe('presentation/runtime-route-deps.js', () => {
     it('compõe deps do copilot-api a partir do runtime default', async () => {
-        const mod = await import('../../../src/copilot/presentation/runtime-route-deps.js');
+        const mod = await import('../../../src/copilot/presentation/routing/index.js');
         expect(mod.buildDefaultCopilotApiRouteDeps()).toEqual({
             agent: mocks.agent,
             runtimeId: 'default',
@@ -232,7 +232,7 @@ describe('presentation/runtime-route-deps.js', () => {
     });
 
     it('aceita runtimeId explícito para preparar multi-agent futuro', async () => {
-        const mod = await import('../../../src/copilot/presentation/runtime-route-deps.js');
+        const mod = await import('../../../src/copilot/presentation/routing/index.js');
         const deps = mod.buildDefaultCopilotApiRouteDeps('alt');
         expect(deps.requestedRuntimeId).toBe('alt');
         expect(deps.runtimeId).toBe('default');

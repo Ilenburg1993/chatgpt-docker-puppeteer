@@ -14,16 +14,16 @@ import { BRIDGE_ADMIN_TOKEN } from '#copilot/config';
 import { log } from '#copilot/observability';
 import { sanitizePermissionToolNames } from '#copilot/sdk';
 import { toError } from '../../../core/error-handlers.js';
-import { projectAgentHttpError } from '../../../presentation/agent-http-errors.js';
-import { buildAgentRuntimeCapabilitiesFromRoute } from '../../../presentation/runtime-capabilities.js';
-import { readAgentRuntimeControlStateFromRoute } from '../../../presentation/runtime-controls.js';
-import { buildCopilotApiHealthHttpResponseFromRoute } from '../../../presentation/runtime-health.js';
-import { buildRuntimeRouteMetaPayload } from '../../../presentation/runtime-meta.js';
-import { resolveCopilotApiRouteBinding } from '../../../presentation/runtime-request.js';
+import { projectAgentHttpError } from '../../../presentation/agent/index.js';
+import { buildAgentRuntimeCapabilitiesFromRoute } from '../../../presentation/runtime/index.js';
+import { readAgentRuntimeControlStateFromRoute } from '../../../presentation/runtime/index.js';
+import { buildCopilotApiHealthHttpResponseFromRoute } from '../../../presentation/runtime/index.js';
+import { buildRuntimeRouteMetaPayload } from '../../../presentation/routing/index.js';
+import { resolveCopilotApiRouteBinding } from '../../../presentation/routing/index.js';
 import {
     buildAgentSessionHttpPayloadFromRoute,
     buildAgentStatusHttpPayloadFromRoute,
-} from '../../../presentation/runtime-status.js';
+} from '../../../presentation/runtime/index.js';
 import { sanitizeHttpErrorMessage } from '../../middleware/error-handler.js';
 
 /**
@@ -33,9 +33,9 @@ import { sanitizeHttpErrorMessage } from '../../middleware/error-handler.js';
  *
  * @typedef {import('express').Router} BridgeRouter
  *
- * @typedef {import('../../../presentation/runtime-route-deps.js').CopilotApiRouteDeps} RuntimeRouteDeps
+ * @typedef {import('../../../presentation/routing/index.js').CopilotApiRouteDeps} RuntimeRouteDeps
  *
- * @typedef {import('../../../presentation/runtime-request.js').CopilotApiRouteBinding} RuntimeRouteBinding
+ * @typedef {import('../../../presentation/routing/index.js').CopilotApiRouteBinding} RuntimeRouteBinding
  */
 
 /**

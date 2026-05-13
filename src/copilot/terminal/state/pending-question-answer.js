@@ -17,7 +17,7 @@ import { answerTerminalPendingQuestion, readTerminalRuntimeState } from '../fron
  *     reason: TerminalPendingAnswerReason;
  *     runtimeId: string | null;
  *     answer: string;
- *     pendingQuestionKind: import('../../presentation/types.js').RuntimePendingQuestionKind | null;
+ *     pendingQuestionKind: import('../../presentation/contracts/index.js').RuntimePendingQuestionKind | null;
  *     pendingQuestionText: string | null;
  *     protocolControlled: boolean;
  *     shadowExpired: boolean;
@@ -26,7 +26,7 @@ import { answerTerminalPendingQuestion, readTerminalRuntimeState } from '../fron
 
 /**
  * @param {string} answer
- * @param {import('../../presentation/types.js').RuntimePendingQuestion} pending
+ * @param {import('../../presentation/contracts/index.js').RuntimePendingQuestion} pending
  * @returns {{ ok: true; answer: string } | { ok: false; reason: 'invalid_choice' }}
  */
 function normalizePendingQuestionAnswer(answer, pending) {

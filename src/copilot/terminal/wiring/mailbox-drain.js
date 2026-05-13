@@ -34,7 +34,7 @@ import {
     consumeRuntimeInterventionMailbox,
     enqueueRuntimeInterventionMailbox,
     getBusy,
-} from '../../presentation/runtime-ui-state-store.js';
+} from '../../presentation/state/index.js';
 import { broadcastSse, getTurnQueueDepth, println, sendTurn } from '../dialog/index.js';
 
 /**
@@ -49,7 +49,7 @@ import { broadcastSse, getTurnQueueDepth, println, sendTurn } from '../dialog/in
  * Se o modelo ainda estiver ocupado (turno em andamento ou fila não-vazia), recoloca a entrada no mailbox para ser
  * drenada na próxima oportunidade.
  *
- * @param {import('../../presentation/runtime-ui-state-store.js').RuntimeInterventionMailboxEntry} entry Entrada
+ * @param {import('../../presentation/state/index.js').RuntimeInterventionMailboxEntry} entry Entrada
  *   previamente consumida (via `consumeRuntimeInterventionMailbox`).
  * @param {string} trigger Identificador do contexto que originou a drenagem (ex: `'turn_end'`, `'dialog_ready'`,
  *   `'manual_consume'`).

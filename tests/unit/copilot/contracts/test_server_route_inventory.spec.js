@@ -119,7 +119,7 @@ describe('contracts/server-route-inventory — rotas agent-runtime vs hub/server
     it('sessions.js é adapter HTTP fino sobre presentation/conversation-hub', () => {
         const src = readRoute('sessions.js');
 
-        assert.match(src, /presentation\/conversation-hub\.js/);
+        assert.match(src, /presentation\/conversation\/index\.js/);
         assert.match(src, /createPresentationRoute\(handleGetHubSession/);
         assert.match(src, /createPresentationRoute\(handleCreateHubSession/);
         assert.match(src, /createPresentationRoute\(handleCloseHubSession/);

@@ -23,7 +23,7 @@ import {
     handleGetToolStats,
     handleMetrics,
     handleSystemReset,
-} from '../../presentation/system-metrics.js';
+} from '../../presentation/system/index.js';
 import { writeRateMiddleware } from '../middleware/rate-limiter.js';
 import { createPresentationRoute } from './presentation-route.js';
 

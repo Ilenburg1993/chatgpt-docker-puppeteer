@@ -17,7 +17,7 @@ import {
     appendThinkingHistoryChunk,
     finalizeThinkingHistoryEntry,
     getShowThinking,
-} from '../../presentation/runtime-ui-state-store.js';
+} from '../../presentation/state/index.js';
 import { println } from '../dialog/index.js';
 import { recordTerminalActivity } from '../state/events/index.js';
 

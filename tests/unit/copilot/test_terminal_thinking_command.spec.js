@@ -11,7 +11,7 @@ const mocks = vi.hoisted(() => ({
     clearThinkingHistory: vi.fn(),
 }));
 
-vi.mock('../../../src/copilot/presentation/runtime-ui-state-store.js', () => ({
+vi.mock('../../../src/copilot/presentation/state/index.js', () => ({
     clearThinkingHistory: mocks.clearThinkingHistory,
     getLatestThinkingHistoryEntry: mocks.getLatestThinkingHistoryEntry,
     getShowThinking: mocks.getShowThinking,

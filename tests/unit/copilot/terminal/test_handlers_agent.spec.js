@@ -164,7 +164,7 @@ const {
     handleAcceptHandoff,
     handleRejectHandoff,
 } = await import('../../../../src/copilot/terminal/handlers/agent.js');
-const { clearRuntimeInterventions } = await import('../../../../src/copilot/presentation/runtime-ui-state.js');
+const { clearRuntimeInterventions } = await import('../../../../src/copilot/presentation/state/index.js');
 
 /** @template T @param {{ body: unknown }} result @returns {T} */
 const bodyOf = (result) => /** @type {T} */ (result.body);

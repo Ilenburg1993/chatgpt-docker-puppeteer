@@ -6,7 +6,7 @@ import {
     classifyRuntimeSdkRateLimitScope,
     describeSdkRecoveryPolicy,
     getSdkRecoveryPolicy,
-} from '../../../src/copilot/presentation/sdk-recovery-policy.js';
+} from '../../../src/copilot/presentation/sdk/recovery-policy.js';
 
 describe('presentation/sdk-recovery-policy', () => {
     it('descreve rate_limit como bloqueio externo com ação operacional local', () => {

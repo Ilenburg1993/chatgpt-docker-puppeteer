@@ -10,7 +10,7 @@
 
 import { LLM_B_BOOT_PROMPT, LLM_B_TURN_TIMEOUT_MS } from '#copilot/config';
 import readline from 'node:readline';
-import { getBusy, getRl, getSdkSessionMode } from '../../presentation/runtime-ui-state-store.js';
+import { getBusy, getRl, getSdkSessionMode } from '../../presentation/state/index.js';
 import { readTerminalDialogStreamMeta, readTerminalRuntimeState } from '../frontend/gateways/index.js';
 import {
     getTerminalDetailLevel,

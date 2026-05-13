@@ -8,7 +8,7 @@
  * @module copilot/terminal/event-adapters
  */
 
-import { getBusy } from '../../presentation/runtime-ui-state-store.js';
+import { getBusy } from '../../presentation/state/index.js';
 import { buildUserPrompt } from '../dialog/index.js';
 import { readTerminalAgentRuntimeEventHost } from '../frontend/gateways/index.js';
 import { createToolCallRegistry } from '../state/events/index.js';

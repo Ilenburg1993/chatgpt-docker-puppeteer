@@ -17,14 +17,14 @@ import { validateUrlString } from '#copilot/core';
 import { Router } from 'express';
 import { z } from 'zod';
 
-import { projectAgentHttpError } from '../../presentation/agent-http-errors.js';
-import { buildMissingRuntimeRouteMeta } from '../../presentation/runtime-meta.js';
-import { resolveRequestedRuntimeId } from '../../presentation/runtime-request.js';
+import { projectAgentHttpError } from '../../presentation/agent/index.js';
+import { buildMissingRuntimeRouteMeta } from '../../presentation/routing/index.js';
+import { resolveRequestedRuntimeId } from '../../presentation/routing/index.js';
 import {
     buildRuntimeWebhooksListHttpPayload,
     registerRuntimeWebhookHttp,
     unregisterRuntimeWebhookHttp,
-} from '../../presentation/runtime-webhooks.js';
+} from '../../presentation/runtime/index.js';
 import { validate } from '../middleware/validate.js';
 
 /**

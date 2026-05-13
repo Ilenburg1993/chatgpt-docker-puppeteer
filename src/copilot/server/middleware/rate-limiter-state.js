@@ -10,4 +10,4 @@
  * @module copilot/server/middleware/rate-limiter-state
  */
 
-export { clearRateLimiters, registerClearRateLimiters } from '../../presentation/realtime.js';
+export { clearRateLimiters, registerClearRateLimiters } from '../../presentation/state/index.js';

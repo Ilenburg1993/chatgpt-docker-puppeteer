@@ -7,46 +7,36 @@
  *   reabrir a topologia interna do runtime do agent em cada ponto de consumo.
  */
 
-export * as agentControl from './agent-control.js';
-export * as agentHttpErrors from './agent-http-errors.js';
-export * from './agent-runtime.js';
-export * as conversationHubPresentation from './conversation-hub.js';
-export * as realtimePresentation from './realtime.js';
-export * from './runtime-capabilities.js';
-export * from './runtime-controls.js';
-export * from './runtime-dialog.js';
-export * from './runtime-file-context.js';
-export * from './runtime-file-routing.js';
+export * as agentHttpErrors from './agent/http-errors.js';
+export * as agentControl from './agent/index.js';
 export {
-    buildAgentHealthHttpResponse,
-    buildAgentModuleHealth,
-    buildCopilotApiHealthHttpResponseFromRoute,
-    buildLegacyAgentHealth,
-    getAgentHealthHttpStatus,
-    getAgentHealthSnapshotCompat,
-} from './runtime-health.js';
-export * from './runtime-lifecycle.js';
-export * from './runtime-meta.js';
-export * from './runtime-models.js';
-export * from './runtime-overview.js';
-export * from './runtime-ownership.js';
-export * from './runtime-route-deps.js';
-export * from './runtime-sdk-session.js';
-export {
-    buildAgentConnectedSsePayload,
-    buildAgentConnectedSsePayloadFromRoute,
-    buildAgentSessionHttpPayload,
-    buildAgentSessionHttpPayloadFromRoute,
-    buildAgentStatusHttpPayload,
-    buildAgentStatusHttpPayloadFromRoute,
-    readAgentStatusSnapshot,
-    readAgentStatusValue,
-} from './runtime-status.js';
-export * from './runtime-targeting.js';
-export * from './runtime-todos.js';
-export * from './runtime-tools.js';
-export * from './runtime-ui-state.js';
-export * from './runtime-webhooks.js';
-export * as sdkSessionsPresentation from './sdk-sessions.js';
-export * as systemConfigPresentation from './system-config.js';
-export * as systemMetricsPresentation from './system-metrics.js';
+    createAgentRuntimeNotFoundError,
+    getAgentRuntime,
+    getAgentRuntimeOrDefault,
+    getDefaultAgentRuntime,
+    getDefaultAgentRuntimeId,
+    isAgentRuntimeNotFoundError,
+    listKnownAgentRuntimes,
+    requireAgentRuntime,
+    requireAgentRuntimeSelection,
+    resolveAgentRuntimeId,
+    resolveAgentRuntimeSelection,
+} from './agent/runtime/index.js';
+export * as contractsPresentation from './contracts/index.js';
+export * as conversationHubPresentation from './conversation/index.js';
+export * from './files/index.js';
+export * as filesPresentation from './files/index.js';
+export * from './routing/index.js';
+export * as routingPresentation from './routing/index.js';
+export * from './runtime/index.js';
+export * as runtimePresentation from './runtime/index.js';
+export * from './sdk/index.js';
+export * as sdkPresentation from './sdk/index.js';
+export * as sdkSessionsPresentation from './sdk/sessions.js';
+export * from './state/index.js';
+export * as statePresentation from './state/index.js';
+export * as realtimePresentation from './state/realtime.js';
+export * as systemConfigPresentation from './system/config.js';
+export * from './system/index.js';
+export * as systemPresentation from './system/index.js';
+export * as systemMetricsPresentation from './system/metrics/index.js';

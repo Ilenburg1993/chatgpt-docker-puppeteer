@@ -8,7 +8,7 @@ describe('P4 — superfícies compartilhadas de realtime', () => {
     it('server/routes/sse.js não depende mais de terminal/dialog/sse.js', async () => {
         const src = await readFile(new URL('../../../src/copilot/server/routes/sse.js', import.meta.url), 'utf8');
 
-        assert.ok(src.includes('../../presentation/realtime.js'));
+        assert.ok(src.includes('../../presentation/state/index.js'));
         assert.ok(!src.includes('../../terminal/dialog/sse.js'));
     });
 
@@ -18,14 +18,14 @@ describe('P4 — superfícies compartilhadas de realtime', () => {
             'utf8',
         );
 
-        assert.ok(src.includes('../../presentation/realtime.js'));
+        assert.ok(src.includes('../../presentation/state/index.js'));
         assert.ok(!src.includes('../../terminal/rate-limiter-state.js'));
     });
 
     it('terminal/dialog/sse.js consome CRITICAL_EVENTS da camada shared', async () => {
         const src = await readFile(new URL('../../../src/copilot/terminal/dialog/sse.js', import.meta.url), 'utf8');
 
-        assert.ok(src.includes('../../presentation/realtime.js'));
+        assert.ok(src.includes('../../presentation/state/index.js'));
         assert.ok(!src.includes("new Set(['dialog.stalled', 'fatal', 'system'])"));
     });
 
@@ -35,7 +35,7 @@ describe('P4 — superfícies compartilhadas de realtime', () => {
             'utf8',
         );
 
-        assert.ok(src.includes('../presentation/realtime.js'));
+        assert.ok(src.includes('../../presentation/state/index.js'));
         assert.ok(!src.includes('let _clearFn'));
     });
 });

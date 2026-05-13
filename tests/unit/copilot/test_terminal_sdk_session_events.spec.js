@@ -40,7 +40,7 @@ vi.mock('../../../src/copilot/terminal/dialog/index.js', () => ({
     println: mocks.println,
 }));
 
-vi.mock('../../../src/copilot/presentation/runtime-ui-state-store.js', async (importOriginal) => {
+vi.mock('../../../src/copilot/presentation/state/index.js', async (importOriginal) => {
     const actual = await importOriginal();
     return {
         ...actual,

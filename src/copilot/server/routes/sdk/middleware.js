@@ -10,8 +10,8 @@
 
 import { CopilotError, toError } from '#copilot/core';
 import { log } from '#copilot/observability';
-import { buildMissingRuntimeRouteMeta } from '../../../presentation/runtime-meta.js';
-import { resolveRequestedRuntimeId } from '../../../presentation/runtime-request.js';
+import { buildMissingRuntimeRouteMeta } from '../../../presentation/routing/index.js';
+import { resolveRequestedRuntimeId } from '../../../presentation/routing/index.js';
 import { sanitizeHttpErrorMessage } from '../../middleware/error-handler.js';
 
 /**

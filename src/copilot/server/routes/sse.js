@@ -32,7 +32,7 @@ import {
     SseConnectionTracker,
     standardizeSsePayload,
 } from '../../infra/sse/utils.js';
-import { CRITICAL_EVENTS } from '../../presentation/realtime.js';
+import { CRITICAL_EVENTS } from '../../presentation/state/index.js';
 
 /**
  * @typedef {import('express').Request} Req

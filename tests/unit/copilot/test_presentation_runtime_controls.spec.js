@@ -92,7 +92,7 @@ vi.mock('#copilot/agent', () => ({
     stopAgentDialogLoopAuthorized,
 }));
 
-vi.mock('../../../src/copilot/presentation/agent-runtime.js', () => ({
+vi.mock('../../../src/copilot/presentation/agent/runtime/index.js', () => ({
     getDefaultAgentRuntime: () => defaultRuntime,
     getDefaultAgentRuntimeId: () => 'default',
     getAgentRuntime: (/** @type {string | null | undefined} */ runtimeId) =>
@@ -101,7 +101,7 @@ vi.mock('../../../src/copilot/presentation/agent-runtime.js', () => ({
         runtimeId === 'alt' ? altRuntime : defaultRuntime,
 }));
 
-const mod = await import('../../../src/copilot/presentation/runtime-controls.js');
+const mod = await import('../../../src/copilot/presentation/runtime/controls.js');
 
 describe('presentation/runtime-controls', () => {
     it('encapsula snapshots e threshold via façade compartilhada', async () => {

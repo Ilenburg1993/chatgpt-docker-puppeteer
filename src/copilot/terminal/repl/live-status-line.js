@@ -9,7 +9,7 @@
  */
 
 import { TERMINAL_LIVE_STATUS_ENABLED, TERMINAL_LIVE_STATUS_INTERVAL_MS } from '#copilot/config';
-import { getBusy } from '../../presentation/runtime-ui-state-store.js';
+import { getBusy } from '../../presentation/state/index.js';
 import { clearInlineStatus, writeInlineStatus } from '../dialog/index.js';
 import { readTerminalDialogStreamMeta, readTerminalRuntimeState } from '../frontend/gateways/index.js';
 import { readTerminalActivitySnapshot, terminalThemeText } from '../state/repl/index.js';

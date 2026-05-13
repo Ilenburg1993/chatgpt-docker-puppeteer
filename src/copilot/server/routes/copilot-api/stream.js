@@ -21,9 +21,9 @@ import {
     SseConnectionTracker,
     standardizeSsePayload,
 } from '../../../infra/sse/utils.js';
-import { buildRuntimeRouteMetaPayload } from '../../../presentation/runtime-meta.js';
-import { resolveCopilotApiRouteBinding } from '../../../presentation/runtime-request.js';
-import { buildAgentConnectedSsePayloadFromRoute } from '../../../presentation/runtime-status.js';
+import { buildRuntimeRouteMetaPayload } from '../../../presentation/routing/index.js';
+import { resolveCopilotApiRouteBinding } from '../../../presentation/routing/index.js';
+import { buildAgentConnectedSsePayloadFromRoute } from '../../../presentation/runtime/index.js';
 import {
     deleteCopilotApiStreamState,
     getCopilotApiStreamState,
@@ -37,9 +37,9 @@ import {
  *
  * @typedef {import('express').Router} BridgeRouter
  *
- * @typedef {import('../../../presentation/runtime-route-deps.js').CopilotApiRouteDeps} RuntimeRouteDeps
+ * @typedef {import('../../../presentation/routing/index.js').CopilotApiRouteDeps} RuntimeRouteDeps
  *
- * @typedef {import('../../../presentation/runtime-request.js').CopilotApiRouteBinding} RuntimeRouteBinding
+ * @typedef {import('../../../presentation/routing/index.js').CopilotApiRouteBinding} RuntimeRouteBinding
  *
  * @typedef {import('#copilot/core').AgentEventName} AgentEventName
  */

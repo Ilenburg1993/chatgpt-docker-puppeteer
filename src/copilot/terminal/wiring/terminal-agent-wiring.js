@@ -22,7 +22,7 @@ import {
 } from '#copilot/events';
 import { log } from '#copilot/observability';
 import { logSwallowed } from '../../core/error-handlers.js';
-import { getHubSessionId } from '../../presentation/runtime-ui-state-store.js';
+import { getHubSessionId } from '../../presentation/state/index.js';
 import { broadcastSse, ensureDialogLoop, println } from '../dialog/index.js';
 import {
     createTerminalHandledAgentEventsSet,

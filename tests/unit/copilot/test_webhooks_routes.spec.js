@@ -67,11 +67,15 @@ const mocks = vi.hoisted(() => ({
     })),
 }));
 
-vi.mock('../../../src/copilot/presentation/runtime-request.js', () => ({
-    resolveRequestedRuntimeId: mocks.resolveRequestedRuntimeId,
-}));
+vi.mock('../../../src/copilot/presentation/routing/index.js', async (importOriginal) => {
+    const actual = await importOriginal();
+    return {
+        ...actual,
+        resolveRequestedRuntimeId: mocks.resolveRequestedRuntimeId,
+    };
+});
 
-vi.mock('../../../src/copilot/presentation/runtime-webhooks.js', () => ({
+vi.mock('../../../src/copilot/presentation/runtime/webhooks.js', () => ({
     buildRuntimeWebhooksListHttpPayload: mocks.buildRuntimeWebhooksListHttpPayload,
     registerRuntimeWebhookHttp: mocks.registerRuntimeWebhookHttp,
     unregisterRuntimeWebhookHttp: mocks.unregisterRuntimeWebhookHttp,

@@ -10,7 +10,7 @@
  *   - `@runtime:alt`
  */
 
-import { hasRuntimeId, normalizeRuntimeId } from '../../presentation/runtime-targeting.js';
+import { hasRuntimeId, normalizeRuntimeId } from '../../presentation/routing/index.js';
 
 /**
  * @param {string | null | undefined} rawArg

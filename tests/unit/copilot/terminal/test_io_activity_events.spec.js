@@ -23,7 +23,7 @@ vi.mock('../../../../src/copilot/terminal/dialog/index.js', () => ({
     println,
 }));
 
-vi.mock('../../../../src/copilot/presentation/runtime-ui-state-store.js', () => ({
+vi.mock('../../../../src/copilot/presentation/state/index.js', () => ({
     getShowToolActivity,
 }));
 

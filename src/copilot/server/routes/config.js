@@ -23,7 +23,7 @@ import {
     handleSetInfiniteSessionConfig,
     handleSetSkills,
     handleSetToolsConfig,
-} from '../../presentation/system-config.js';
+} from '../../presentation/system/index.js';
 import { validate } from '../middleware/validate.js';
 import { createPresentationRoute } from './presentation-route.js';
 

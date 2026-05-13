@@ -13,4 +13,4 @@ export {
     handleInject,
     handlePipeline,
     handleRejectHandoff,
-} from '../../presentation/agent-control.js';
+} from '../../presentation/agent/index.js';

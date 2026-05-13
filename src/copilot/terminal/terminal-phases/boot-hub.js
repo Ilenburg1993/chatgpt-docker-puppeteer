@@ -9,7 +9,7 @@
 
 import { getSharedSdkSessionId, toError } from '#copilot/core';
 import { log } from '#copilot/observability';
-import { setHubSessionId } from '../../presentation/runtime-ui-state-store.js';
+import { setHubSessionId } from '../../presentation/state/index.js';
 import { createTerminalHubSession, initTerminalConversationHub } from '../frontend/gateways/index.js';
 import { recordTerminalActivity } from '../state/boot/index.js';
 

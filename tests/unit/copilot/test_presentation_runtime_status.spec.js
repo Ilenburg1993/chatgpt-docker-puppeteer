@@ -11,7 +11,7 @@ import {
     buildAgentStatusHttpPayloadFromRoute,
     readAgentStatusSnapshot,
     readAgentStatusValue,
-} from '../../../src/copilot/presentation/runtime-status.js';
+} from '../../../src/copilot/presentation/runtime/status.js';
 
 describe('presentation/runtime-status', () => {
     const agent = /** @type {any} */ ({

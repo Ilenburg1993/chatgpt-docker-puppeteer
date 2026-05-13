@@ -7,7 +7,7 @@ import {
     normalizeRuntimeId,
     pickRuntimeId,
     readRuntimeIdFromParams,
-} from '../../../src/copilot/presentation/runtime-targeting.js';
+} from '../../../src/copilot/presentation/routing/index.js';
 
 describe('presentation/runtime-targeting.js', () => {
     it('normalizeRuntimeId limpa whitespace e invalida vazios', () => {

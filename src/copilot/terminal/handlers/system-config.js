@@ -17,4 +17,4 @@ export {
     handleSetInfiniteSessionConfig,
     handleSetSkills,
     handleSetToolsConfig,
-} from '../../presentation/system-config.js';
+} from '../../presentation/system/index.js';

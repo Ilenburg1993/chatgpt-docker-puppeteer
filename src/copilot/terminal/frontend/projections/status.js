@@ -8,13 +8,13 @@ import { readSystemPromptStatusSync } from '#copilot/config';
 import { getPendingStructuredUserInputCount } from '#copilot/sdk';
 import { readIntrospectionRegistrySnapshot } from '#copilot/tools';
 import { readIoRuntimeHealthSnapshot } from '../../../infra/io-health.js';
-import { buildRuntimeSdkFsRoutingProjection } from '../../../presentation/runtime-file-routing.js';
-import { buildRuntimeLifecycleSummary, readRuntimeLifecycleSnapshot } from '../../../presentation/runtime-lifecycle.js';
+import { buildRuntimeSdkFsRoutingProjection } from '../../../presentation/files/index.js';
+import { buildRuntimeLifecycleSummary, readRuntimeLifecycleSnapshot } from '../../../presentation/runtime/index.js';
 import {
     getLastSdkPlanChangedAt,
     getLastSdkPlanOperation,
     getSdkSessionMode,
-} from '../../../presentation/runtime-ui-state-store.js';
+} from '../../../presentation/state/index.js';
 import {
     readTerminalActivitySnapshot,
     readTerminalElicitationSummary,
@@ -44,11 +44,11 @@ function objectOrNull(value) {
  *     health: Record<string, any> | null;
  *     dialogLoopActive: boolean;
  *     pendingQuestion: boolean;
- *     pendingQuestionKind: import('../../../presentation/types.js').RuntimePendingQuestionKind | null;
+ *     pendingQuestionKind: import('../../../presentation/contracts/index.js').RuntimePendingQuestionKind | null;
  *     pendingQuestionText: string | null;
  *     pendingQuestionShadow: boolean;
- *     pendingQuestionShadowKind: import('../../../presentation/types.js').RuntimePendingQuestionKind | null;
- *     pendingQuestionShadowState: import('../../../presentation/types.js').RuntimePendingQuestionShadowState | null;
+ *     pendingQuestionShadowKind: import('../../../presentation/contracts/index.js').RuntimePendingQuestionKind | null;
+ *     pendingQuestionShadowState: import('../../../presentation/contracts/index.js').RuntimePendingQuestionShadowState | null;
  *     pendingQuestionShadowText: string | null;
  *     pendingQuestionShadowExpired: boolean;
  *     pendingQuestionShadowAgeMs: number | null;
@@ -58,7 +58,7 @@ function objectOrNull(value) {
  *     systemPromptFreshness: Record<string, unknown> | null;
  *     lastPrInfo: Record<string, any> | null;
  *     modelBilling: import('./shared.js').TerminalModelBillingProjection;
- *     recommendedAction: import('../../../presentation/types.js').RuntimeRecommendedAction | null;
+ *     recommendedAction: import('../../../presentation/contracts/index.js').RuntimeRecommendedAction | null;
  *     sdkSessionMode: 'interactive' | 'plan' | 'autopilot' | 'shell' | null;
  *     sdkPlanOperation: 'create' | 'update' | 'delete' | null;
  *     sdkPlanChangedAt: number | null;
@@ -144,7 +144,7 @@ export function readTerminalStatusProjection({ hubSessionId = null, injectPort, 
     const base = readTerminalRuntimeBase(runtimeId);
     const pendingQuestion = base.pendingQuestion;
     const pendingQuestionShadow = base.pendingQuestionShadow;
-    const recommendedAction = /** @type {import('../../../presentation/types.js').RuntimeRecommendedAction | null} */ (
+    const recommendedAction = /** @type {import('../../../presentation/contracts/index.js').RuntimeRecommendedAction | null} */ (
         typeof base.health?.['recommendedAction'] === 'string' ? base.health['recommendedAction'] : null
     );
     const lifecycle = readRuntimeLifecycleSnapshot();

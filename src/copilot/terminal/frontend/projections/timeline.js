@@ -7,7 +7,7 @@
  */
 
 import { getWorkspaceContext } from '#copilot/boot';
-import { sendRuntimeDialogTurnForRuntime } from '../../../presentation/runtime-dialog.js';
+import { sendRuntimeDialogTurnForRuntime } from '../../../presentation/runtime/index.js';
 import {
     clearTerminalHistoryFeed,
     countTerminalHubTurns,
