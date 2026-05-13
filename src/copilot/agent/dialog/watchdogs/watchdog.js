@@ -9,8 +9,8 @@
  * @see module:copilot/agent/dialog/loop-manager
  */
 
-import { WATCHDOG_THRESHOLDS } from '../../../config/agent.js';
-import { log } from '../../ports/logging-port.js';
+import { WATCHDOG_THRESHOLDS } from '#copilot/config/agent';
+import { log } from '../../ports/index.js';
 
 /**
  * @typedef {Object} DialogWatchdogOptions

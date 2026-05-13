@@ -5,7 +5,7 @@
  */
 
 import { SessionError } from '#copilot/core';
-import { log } from '../../ports/logging-port.js';
+import { log } from '../../ports/index.js';
 
 const BOOT_FAILURE_CIRCUIT_WINDOW_MS = 120_000;
 const BOOT_FAILURE_CIRCUIT_COOLDOWN_MS = 60_000;

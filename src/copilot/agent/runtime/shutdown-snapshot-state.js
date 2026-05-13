@@ -4,8 +4,8 @@
  * @file Seams de governança de snapshot operacional e shutdown gracioso.
  */
 
-import { persistStateWithPolicy } from '../lifecycle/state/state-io.js';
-import { createSnapshot, saveSnapshotAsync } from '../session/state/snapshot.js';
+import { persistStateWithPolicy } from '../lifecycle/state/index.js';
+import { createSnapshot, saveSnapshotAsync } from '../session/state/index.js';
 
 /**
  * @typedef {import('../facades/agent-runtime-state.js').AgentRuntimeStateContext} AgentRuntimeStateContext
@@ -15,7 +15,7 @@ import { createSnapshot, saveSnapshotAsync } from '../session/state/snapshot.js'
  * Reseta a flag persistida de shutdown gracioso no começo do boot do runtime.
  *
  * @returns {Promise<
- *     import('../error-policy.js').AgentPolicyResult<import('../lifecycle/state/state-io.js').AliveAgentState>
+ *     import('../error/index.js').AgentPolicyResult<import('../lifecycle/state/index.js').AliveAgentState>
  * >}
  */
 export async function resetAgentRuntimeGracefulShutdownFlag() {
@@ -36,7 +36,7 @@ export async function resetAgentRuntimeGracefulShutdownFlag() {
  *     ts: number;
  * }} info
  * @returns {Promise<
- *     import('../error-policy.js').AgentPolicyResult<import('../lifecycle/state/state-io.js').AliveAgentState>
+ *     import('../error/index.js').AgentPolicyResult<import('../lifecycle/state/index.js').AliveAgentState>
  * >}
  */
 export async function persistAgentRuntimePrConsumptionSnapshot(info) {
@@ -99,7 +99,7 @@ export async function saveAgentRuntimeShutdownSnapshot(ctx, options) {
  * @param {AgentRuntimeStateContext} ctx
  * @param {{ dialogLoopActive: boolean }} options
  * @returns {Promise<
- *     import('../error-policy.js').AgentPolicyResult<import('../lifecycle/state/state-io.js').AliveAgentState>
+ *     import('../error/index.js').AgentPolicyResult<import('../lifecycle/state/index.js').AliveAgentState>
  * >}
  */
 export async function persistAgentRuntimeGracefulShutdownState(ctx, options) {

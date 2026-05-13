@@ -1,6 +1,6 @@
 // @ts-check
 /**
- * src/copilot/agent/ports/mcp-port.js
+ * src/copilot/agent/ports/index.js
  *
  * Porta compatível entre o runtime do agent e o bridge MCP.
  *
@@ -12,8 +12,8 @@
  * @internal
  */
 
-import * as mcpToolBridge from '../../bridges/mcp-tool-bridge.js';
-import { buildMcpConfig } from '../../config/mcp-servers.js';
+import * as mcpToolBridge from '#copilot/bridges';
+import { buildMcpConfig } from '#copilot/config';
 
 /**
  * @typedef {object} AgentMcpCapability

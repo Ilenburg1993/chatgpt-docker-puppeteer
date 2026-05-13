@@ -19,16 +19,12 @@ import { buildAuditingPermissionHandler } from '#copilot/audit';
 import { WORKSPACE_ROOT, readBootSkillConfig } from '#copilot/boot';
 import { MAESTRO_AGENT_NAME, buildCustomAgentsConfig } from '#copilot/config';
 import { buildCanonicalLocalSurfaceExcludedTools, toError } from '#copilot/core';
-import { SESSION_MAX_AGE_MS } from '../../../config/agent.js';
+import { SESSION_MAX_AGE_MS } from '#copilot/config/agent';
 import {
     buildLiveSystemMessage,
     buildSystemPromptBindingSnapshot,
     readSystemPromptStatus,
 } from '../../../config/system-prompt/index.js';
-import {
-    persistAgentRuntimeStatePartial,
-    readAgentRuntimePersistedStateAsync,
-} from '../../facades/agent-runtime-state.js';
 import {
     AGENT_SDK_DEFAULT_MODEL,
     canReadAgentSdkSessionMessages,
@@ -36,17 +32,18 @@ import {
     formatValidationResult,
     getAgentConfiguredSessionFsHandler,
     loadAgentSdkToolsConfigAsync,
+    persistAgentRuntimeStatePartial,
     pickDefinedAgentSdkOptions,
+    readAgentRuntimePersistedStateAsync,
     readAgentSdkSessionMessages,
     resumeOrCreateAgentSdkSession,
     validateAgentContracts,
-} from '../../facades/agent-sdk-access.js';
-import { log } from '../../ports/logging-port.js';
-import { defaultMetrics } from '../../ports/metrics-port.js';
-import { buildHookSystemContextSafe } from '../context/hook-context.js';
+} from '../../facades/index.js';
+import { defaultMetrics, log } from '../../ports/index.js';
+import { buildHookSystemContextSafe } from '../context/index.js';
 
 // Re-exports para backward compatibility
-export { SessionJsonSchema, buildHookSystemContext, buildHookSystemContextSafe } from '../context/hook-context.js';
+export { SessionJsonSchema, buildHookSystemContext, buildHookSystemContextSafe } from '../context/index.js';
 
 /**
  * @typedef {import('#copilot/sdk/types').CopilotClient} CopilotClient

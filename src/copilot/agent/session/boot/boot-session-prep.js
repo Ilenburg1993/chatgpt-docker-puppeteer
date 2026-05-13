@@ -5,10 +5,9 @@
  */
 
 import { EMITTER_SESSION_CLEANUP } from '#copilot/events';
-import { defaultEventCollector } from '../../ports/event-observer-port.js';
-import { defaultMetrics } from '../../ports/metrics-port.js';
-import { cleanupStaleSessionsWithPolicy } from '../lifecycle/cleanup.js';
-import { wireSessionEvents } from '../wiring/event-wirer.js';
+import { defaultEventCollector, defaultMetrics } from '../../ports/index.js';
+import { cleanupStaleSessionsWithPolicy } from '../lifecycle/index.js';
+import { wireSessionEvents } from '../wiring/index.js';
 
 /**
  * @typedef {import('#copilot/sdk/types').CopilotClient} CopilotClient
@@ -19,7 +18,7 @@ import { wireSessionEvents } from '../wiring/event-wirer.js';
  *
  * @typedef {import('../lifecycle/keepalive.js').SessionKeepalive} SessionKeepalive
  *
- * @typedef {import('../../ports/mcp-port.js').AgentMcpCapability} AgentMcpCapability
+ * @typedef {import('../../ports/index.js').AgentMcpCapability} AgentMcpCapability
  */
 
 /**

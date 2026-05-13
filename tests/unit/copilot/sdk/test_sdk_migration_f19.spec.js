@@ -130,7 +130,7 @@ describe('F19 — Consumidores migrados importam de #copilot/sdk', () => {
                 const src = readSource(file);
                 const hasFacadeImport = src
                     .split('\n')
-                    .some((line) => /from\s+['"].*agent-sdk-access\.js['"]/.test(line));
+                    .some((line) => /from\s+['"].*facades\/index\.js['"]/.test(line));
                 const hasClientCall = src.includes('createAgentSdkClient');
                 expect(hasFacadeImport && hasClientCall, `${file}: deveria usar createAgentSdkClient via façade`).toBe(
                     true,

@@ -12,14 +12,14 @@
  * @internal
  */
 
-import { normalizeToolRegistryEntry } from './agent-context-helpers.js';
+import { normalizeToolRegistryEntry } from './helpers/index.js';
 
 /**
  * Contrato mínimo do contexto para operações de tool registry e permissions.
  *
  * @typedef {{
  *     toolsRegistry: import('#copilot/sdk/tools-registry').ToolRegistry;
- *     permissions: import('../ports/permission-port.js').AgentPermissionController;
+ *     permissions: import('../ports/index.js').AgentPermissionController;
  *     toolSessionContext: import('#copilot/sdk').ToolSessionContext;
  *     invalidateStatusSnapshot: () => void;
  * }} ToolOpsCtx
@@ -96,7 +96,7 @@ export function getPermissionHandlerSnapshot(ctx) {
  * Retorna snapshot detalhado da policy de permissões ativa (modo, allow/deny lists, denyShell, etc.).
  *
  * @param {ToolOpsCtx} ctx
- * @returns {import('../ports/permission-port.js').PermissionPolicySnapshot | null}
+ * @returns {import('../ports/index.js').PermissionPolicySnapshot | null}
  */
 export function getPermissionPolicySnapshot(ctx) {
     return typeof ctx.permissions.getPolicySnapshot === 'function' ? ctx.permissions.getPolicySnapshot() : null;

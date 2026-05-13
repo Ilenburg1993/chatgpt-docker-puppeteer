@@ -20,7 +20,7 @@ import {
     toolsHandlePendingCall,
     uiElicitation,
 } from '#copilot/sdk';
-import { getSdkElicitationRef, requireSession } from './ctx-refs.js';
+import { getSdkElicitationRef, requireSession } from './core/index.js';
 
 /**
  * @param {unknown} ctx

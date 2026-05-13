@@ -26,8 +26,8 @@ import {
     DRAIN_WRITES_TIMEOUT_MS,
     PING_TIMEOUT_MS,
     RESTART_DELAY_MS,
-} from '../../../config/agent.js';
-import { logSwallowed } from '../../../core/error-handlers.js';
+} from '#copilot/config/agent';
+import { logSwallowed } from '#copilot/core';
 import {
     EMITTER_ERROR,
     EMITTER_SESSION_FATAL,
@@ -39,11 +39,9 @@ import {
     HOOK_SESSION_END,
     HOOK_SESSION_START,
 } from '../../../events/index.js';
-import { getAgent } from '../../always-alive-singleton.js';
-import { checkAgentSdkAuthStatus, createAgentSdkClient } from '../../facades/agent-sdk-access.js';
-import { ERROR_TRACKER } from '../../ports/error-tracking-port.js';
-import { getDefaultHookBus } from '../../ports/hook-port.js';
-import { log } from '../../ports/logging-port.js';
+import { getAgent } from '../../singleton/index.js';
+import { checkAgentSdkAuthStatus, createAgentSdkClient } from '../../facades/index.js';
+import { ERROR_TRACKER, getDefaultHookBus, log } from '../../ports/index.js';
 import {
     discoverRuntimePlugins,
     registerRuntimeAgentEventHost,
@@ -51,8 +49,8 @@ import {
     registerRuntimeProcessSignals,
     registerRuntimeShutdownHost,
     runCopilotSdkBootPreflight,
-} from '../process-host/runtime-host.js';
-import { drainStateWrites } from '../state/state-io.js';
+} from '../process-host/index.js';
+import { drainStateWrites } from '../state/index.js';
 
 /**
  * Inicializa o agent lifecycle: plugin discovery, event wiring, retries, shutdown, IPC.

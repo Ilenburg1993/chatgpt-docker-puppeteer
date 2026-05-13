@@ -20,18 +20,16 @@ import {
     EMITTER_TASK_QUEUED,
     EMITTER_TASK_STARTED,
 } from '#copilot/events';
-import { TASK_TIMEOUT_MS as ADVISORY_TASK_TIMEOUT_MS, MAX_TASK_RETRIES } from '../../config/agent.js';
-import { withAgentErrorPolicy } from '../error-policy.js';
-import { persistAgentRuntimeStatePartial } from '../facades/agent-runtime-state.js';
+import { TASK_TIMEOUT_MS as ADVISORY_TASK_TIMEOUT_MS, MAX_TASK_RETRIES } from '#copilot/config/agent';
+import { withAgentErrorPolicy } from '../error/index.js';
 import {
     onAgentSdkSessionEvent,
     onAllAgentSdkSessionEvents,
+    persistAgentRuntimeStatePartial,
     sendAgentSdkSession,
     sendAgentSdkSessionAndWait,
-} from '../facades/agent-sdk-runtime.js';
-import { log } from '../ports/logging-port.js';
-import { resolveAgentUserInput } from '../ports/tool-port.js';
-import { startSpan, startSpanImmediate } from '../ports/tracing-port.js';
+} from '../facades/index.js';
+import { log, resolveAgentUserInput, startSpan, startSpanImmediate } from '../ports/index.js';
 
 /**
  * @typedef {import('../agent-context.js').AgentContext} AgentContext

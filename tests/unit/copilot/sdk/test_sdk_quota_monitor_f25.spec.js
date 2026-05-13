@@ -286,7 +286,7 @@ describe('F118 — boot-wiring importa e usa quota monitor via façade', () => {
             'utf8',
         );
         expect(content).toContain('startAgentSdkBootQuotaBridge');
-        expect(content).toContain("from '../../facades/agent-sdk-access.js'");
+        expect(content).toContain("from '../../facades/index.js'");
         expect(content).not.toContain("from '#copilot/sdk'");
     });
 

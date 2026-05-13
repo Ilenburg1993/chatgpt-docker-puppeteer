@@ -21,26 +21,31 @@
 
 import { readCopilotBootConfig } from '#copilot/boot';
 import {
+    buildCustomAgentsConfig,
     DEFAULT_EXCLUDED_TOOLS,
     MAESTRO_AGENT_NAME,
     SessionConfigBuilder,
-    buildCustomAgentsConfig,
 } from '#copilot/config';
 import { buildCanonicalLocalSurfaceExcludedTools, container } from '#copilot/core';
 import { AgentToolPolicy } from '#copilot/sdk';
-import { log } from '../../ports/logging-port.js';
-import { METRICS_STORE } from '../../ports/metrics-port.js';
+import {
+    bindAgentSessionTools,
+    bootstrapAgentTools,
+    buildAgentBusHooks,
+    isAgentToolDisabled,
+    log,
+    METRICS_STORE,
+    readAgentMcpCapabilitySnapshot,
+    withAgentRuntimeToolPolicy,
+} from '../../ports/index.js';
 
-import { DialogProtocol } from '../../../dialog/protocol.js';
-import { handleUserInputRequest } from '../../dialog/wiring/user-input-handler.js';
+import { DialogProtocol } from '#copilot/dialog';
+import { handleUserInputRequest } from '../../dialog/wiring/index.js';
 import {
     createAgentSdkToolsRegistry,
     getAgentSdkToolsConfig,
     readAgentSdkModelRegistryEntry,
-} from '../../facades/agent-sdk-access.js';
-import { buildAgentBusHooks, withAgentRuntimeToolPolicy } from '../../ports/hook-port.js';
-import { readAgentMcpCapabilitySnapshot } from '../../ports/mcp-port.js';
-import { bindAgentSessionTools, bootstrapAgentTools, isAgentToolDisabled } from '../../ports/tool-port.js';
+} from '../../facades/index.js';
 
 /**
  * Contrato mínimo do `AgentContext` exigido pelo setup de sessão.
@@ -54,7 +59,7 @@ import { bindAgentSessionTools, bootstrapAgentTools, isAgentToolDisabled } from 
  *   replay/estado obsoleto.
  * @property {() => import('#copilot/sdk/tools-registry').ToolRegistry} resetToolsRegistry - Recria o registry ativo de
  *   tools para o boot/resume atual.
- * @property {() => import('../../ports/mcp-port.js').AgentMcpCapability | null} [getMcpBridgeSnapshot]
+ * @property {() => import('../../ports/index.js').AgentMcpCapability | null} [getMcpBridgeSnapshot]
  *
  *   - Snapshot opcional do bridge MCP injetado. Quando ausente, a porta MCP default é usada.
  *

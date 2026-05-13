@@ -8,7 +8,7 @@
  */
 
 /**
- * @typedef {import('./always-alive.js').AlwaysAliveAgent} AgentRuntime
+ * @typedef {import('./runtime/always-alive/index.js').AlwaysAliveAgent} AgentRuntime
  *
  * @typedef {{ agentProfileId?: string | null }} AgentRuntimeRegistrationOptions
  */

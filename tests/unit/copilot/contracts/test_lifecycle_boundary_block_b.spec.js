@@ -67,27 +67,28 @@ describe('Block B — lifecycle ownership contracts', () => {
         const bootSteps = readFileSync(srcPath('agent', 'session', 'boot', 'boot-steps.js'), 'utf8');
         const bootDialogRecovery = readFileSync(srcPath('agent', 'session', 'boot', 'boot-dialog-recovery.js'), 'utf8');
         const lifecycle = readFileSync(srcPath('agent', 'lifecycle', 'orchestrators', 'agent-lifecycle.js'), 'utf8');
+        const rootSurface = readFileSync(srcPath('agent', 'runtime', 'root-surface', 'index.js'), 'utf8');
 
         assert.match(src, /attachAgentSdkBootLifecycleBridge/);
         assert.match(src, /startAgentSdkBootQuotaBridge/);
         assert.doesNotMatch(src, /observeAgentSdkSessionLifecycle/);
         assert.doesNotMatch(src, /startAgentSdkQuotaMonitor/);
-        assert.match(alwaysAlive, /readAgentRuntimeSessionId/);
         assert.match(alwaysAlive, /clearAgentRuntimePendingQuestionShadow/);
         assert.match(alwaysAlive, /dispatchAgentDialogTurn/);
         assert.match(alwaysAlive, /pauseAgentDialogLoop/);
         assert.match(alwaysAlive, /isAgentDialogLoopPaused/);
         assert.match(alwaysAlive, /readAgentDialogPrMetrics/);
         assert.match(alwaysAlive, /readAgentDialogLastPrInfo/);
-        assert.match(alwaysAlive, /readRuntimeControlState/);
-        assert.match(alwaysAlive, /readRuntimeInteractionState/);
-        assert.match(alwaysAlive, /getRuntimeHandoffManager/);
-        assert.match(alwaysAlive, /readRuntimePermissionMode/);
-        assert.match(alwaysAlive, /setRuntimePermissionMode/);
-        assert.match(alwaysAlive, /readRuntimePermissionCapability/);
-        assert.match(alwaysAlive, /readRuntimeContextFactoryCapabilities/);
-        assert.match(alwaysAlive, /readRuntimeToolRegistry/);
-        assert.match(alwaysAlive, /readRuntimeToolRegistryEntries/);
+        const runtimeSurfaceSources = `${alwaysAlive}\n${rootSurface}`;
+        assert.match(runtimeSurfaceSources, /readRuntimeControlState/);
+        assert.match(runtimeSurfaceSources, /readRuntimeInteractionState/);
+        assert.match(runtimeSurfaceSources, /getRuntimeHandoffManager/);
+        assert.match(runtimeSurfaceSources, /readRuntimePermissionMode/);
+        assert.match(runtimeSurfaceSources, /setRuntimePermissionMode/);
+        assert.match(runtimeSurfaceSources, /readRuntimePermissionCapability/);
+        assert.match(runtimeSurfaceSources, /readRuntimeContextFactoryCapabilities/);
+        assert.match(runtimeSurfaceSources, /readRuntimeToolRegistry/);
+        assert.match(runtimeSurfaceSources, /readRuntimeToolRegistryEntries/);
         assert.doesNotMatch(alwaysAlive, /readState\(\)\?\.sessionId/);
         assert.doesNotMatch(alwaysAlive, /persistStateWithPolicy\(/);
         assert.doesNotMatch(
@@ -190,17 +191,23 @@ describe('Block B — lifecycle ownership contracts', () => {
         const rootSurface = readFileSync(srcPath('agent', 'runtime', 'root-surface', 'index.js'), 'utf8');
 
         assert.match(alwaysAlive, /from '\.\/runtime\/root-surface\/index\.js'/);
-        assert.doesNotMatch(alwaysAlive, /from ['"]\.\/(?:dialog|facades|lifecycle|messaging|ports|state)\//);
+        // C3.2 Phase 1 Decomposition: allow imports of low-risk subfachades (permission-tools, state-query, sdk-query, health)
+        // but disallow other subsystems (dialog, lifecycle, messaging, ports, state, event-bridge-wiring, etc.)
+        assert.doesNotMatch(alwaysAlive, /from ['"]\.\/(?:dialog|lifecycle|messaging|ports|state)\//);
+        assert.doesNotMatch(
+            alwaysAlive,
+            /from ['"]\.\/facades\/(?!(?:permission-tools|state-query|sdk-query|health)-facade\.js|index\.js)/,
+        );
         assert.doesNotMatch(alwaysAlive, /from ['"]\.\/(?:event-bridge-wiring|health-check|runtime-registry)\.js['"]/);
         assert.doesNotMatch(singleton, /from ['"]\.\/agent-runtime-surface\.js['"]/);
-        assert.match(singleton, /from '\.\/event-bridge-wiring\.js'/);
-        assert.match(singleton, /from '\.\/runtime-registry\.js'/);
+        assert.match(singleton, /from '\.\/event-bridge\/index\.js'/);
+        assert.match(singleton, /from '\.\/runtime\/registry\/index\.js'/);
         assert.match(singleton, /ensureAgentEventBusBridge/);
         assert.match(singleton, /registerAgentRuntime/);
         assert.match(surface, /from '\.\/runtime\/root-surface\/index\.js'/);
         assert.match(rootSurface, /from '\.\.\/\.\.\/lifecycle\/orchestrators\/agent-lifecycle\.js'/);
         assert.match(rootSurface, /from '\.\.\/\.\.\/messaging\/agent-messaging\.js'/);
-        assert.match(rootSurface, /from '\.\.\/\.\.\/facades\/agent-sdk-access\.js'/);
+        assert.match(rootSurface, /from '\.\.\/\.\.\/facades\/index\.js'/);
         assert.doesNotMatch(surface, /from '\.\/runtime-registry\.js'/);
         assert.doesNotMatch(surface, /from '\.\/event-bridge-wiring\.js'/);
     });

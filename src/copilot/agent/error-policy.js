@@ -9,7 +9,7 @@
  */
 
 import { isFatalError, toError } from '#copilot/core';
-import { getAgentSdkRecoveryPolicy } from './facades/agent-sdk-access.js';
+import { getAgentSdkRecoveryPolicy } from './facades/index.js';
 
 /**
  * @param {Error} error

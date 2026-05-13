@@ -16,7 +16,9 @@ const ALLOWED_FACADE_ROLES = new Set(['query', 'mutation', 'lifecycle', 'infra',
  * }} FacadeMatrixEntry
  */
 
-/** @type {Record<string, FacadeMatrixEntry>} */
+/**
+ * @type {Record<string, FacadeMatrixEntry>}
+ */
 const FACADE_OPERATION_MATRIX = {
     'agent-dialog-runtime.js': { role: 'lifecycle', allowedFacadeImports: [] },
     'agent-health-access.js': { role: 'query', allowedFacadeImports: [] },
@@ -30,6 +32,10 @@ const FACADE_OPERATION_MATRIX = {
     'agent-runtime-todos.js': { role: 'query', allowedFacadeImports: [] },
     'agent-runtime-tools.js': { role: 'query', allowedFacadeImports: [] },
     'agent-runtime-webhooks.js': { role: 'mutation', allowedFacadeImports: [] },
+    'health-facade.js': { role: 'query', allowedFacadeImports: [] },
+    'permission-tools-facade.js': { role: 'query', allowedFacadeImports: [] },
+    'sdk-query-facade.js': { role: 'query', allowedFacadeImports: [] },
+    'state-query-facade.js': { role: 'query', allowedFacadeImports: [] },
     'agent-sdk-access.js': {
         role: 'infra',
         allowedFacadeImports: [
@@ -42,6 +48,7 @@ const FACADE_OPERATION_MATRIX = {
             'sdk/ui-ops.js',
             'sdk/workspace-ops.js',
             'sdk/agent-contract.js',
+            'sdk/index.js',
         ],
     },
     'agent-sdk-runtime.js': { role: 'infra', allowedFacadeImports: [] },

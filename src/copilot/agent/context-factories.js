@@ -19,18 +19,14 @@ import {
     EMITTER_PERMISSION_MODE_CHANGED,
 } from '#copilot/events';
 import { normalizeElicitationCompletedEvent, normalizeElicitationPendingEvent } from '#copilot/sdk';
-import { MESSAGES_CACHE_TTL_MS } from '../config/agent.js';
-import { WebhookManager } from '../infra/webhooks.js';
-import { BackgroundTasks } from './background-tasks.js';
-import { DialogLoopManager } from './dialog/orchestrators/loop-manager.js';
-import { createAgentSdkToolsRegistry } from './facades/agent-sdk-access.js';
-import { HandoffManager } from './infra/handoff-manager.js';
-import { MessageQueue } from './infra/message-queue.js';
-import { createQueuedElicitationHandler } from './ports/hook-port.js';
-import { defaultMetrics } from './ports/metrics-port.js';
-import { createAgentPermissionController } from './ports/permission-port.js';
-import { SessionMessagesCache } from './session/history/history-sync.js';
-import { SessionKeepalive } from './session/lifecycle/keepalive.js';
+import { MESSAGES_CACHE_TTL_MS } from '#copilot/config/agent';
+import { BackgroundTasks } from './background/index.js';
+import { DialogLoopManager } from './dialog/orchestrators/index.js';
+import { createAgentSdkToolsRegistry } from './facades/index.js';
+import { HandoffManager, MessageQueue, WebhookManager } from './infra/index.js';
+import { createAgentPermissionController, createQueuedElicitationHandler, defaultMetrics } from './ports/index.js';
+import { SessionMessagesCache } from './session/history/index.js';
+import { SessionKeepalive } from './session/lifecycle/index.js';
 
 /**
  * @typedef {{
@@ -46,7 +42,7 @@ import { SessionKeepalive } from './session/lifecycle/keepalive.js';
  *     createWebhooks: (host: AgentContextFactoryHost) => WebhookManager;
  *     createPermissions: (
  *         host: AgentContextFactoryHost,
- *     ) => import('./ports/permission-port.js').AgentPermissionController;
+ *     ) => import('./ports/index.js').AgentPermissionController;
  *     createToolsRegistry: (host: AgentContextFactoryHost) => import('#copilot/sdk/tools-registry').ToolRegistry;
  *     createKeepalive: (host: AgentContextFactoryHost) => SessionKeepalive;
  *     createHandoff: (host: AgentContextFactoryHost) => HandoffManager;

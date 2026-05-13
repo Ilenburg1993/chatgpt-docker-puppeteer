@@ -23,10 +23,10 @@
 
 import { toError } from '#copilot/core';
 import { EMITTER_QUOTA_WARNING, EMITTER_SDK_LIFECYCLE } from '#copilot/events';
-import { withAgentErrorPolicy } from '../../error-policy.js';
-import { attachAgentSdkBootLifecycleBridge, startAgentSdkBootQuotaBridge } from '../../facades/agent-sdk-access.js';
-import { log } from '../../ports/logging-port.js';
-import { defaultMetrics } from '../../ports/metrics-port.js';
+import { withAgentErrorPolicy } from '../../error/index.js';
+import { attachAgentSdkBootLifecycleBridge, startAgentSdkBootQuotaBridge } from '../../facades/index.js';
+import { log } from '../../ports/index.js';
+import { defaultMetrics } from '../../ports/index.js';
 import {
     createBootWiringState,
     stepAttachAgentObserver,
@@ -39,7 +39,7 @@ import {
     stepWireHandoff,
     stepWireQuestionAnsweredRelay,
     stepWireSessionEvents,
-} from './boot-steps.js';
+} from './steps/index.js';
 
 /**
  * @typedef {import('#copilot/sdk/types').CopilotClient} CopilotClient
@@ -50,7 +50,7 @@ import {
  *
  * @typedef {import('../../dialog/orchestrators/loop-manager.js').DialogLoopManager} DialogLoopManager
  *
- * @typedef {import('../../ports/mcp-port.js').AgentMcpCapability} AgentMcpCapability
+ * @typedef {import('../../ports/index.js').AgentMcpCapability} AgentMcpCapability
  */
 
 /**

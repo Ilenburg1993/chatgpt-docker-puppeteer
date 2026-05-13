@@ -32,11 +32,32 @@ convergência arquitetural 2.0/2.1.
   - `lifecycle/orchestrators/agent-lifecycle.js` (664)
   - `messaging/agent-messaging.js` (545)
 
+- Arquivos JS ainda presentes no root de `src/copilot/agent`: **15**
+  - `agent-context.js`
+  - `agent-runtime-surface.js`
+  - `always-alive-singleton.js`
+  - `always-alive.js`
+  - `background-tasks.js`
+  - `context-factories.js`
+  - `di-tokens.js`
+  - `error-policy.js`
+  - `event-bridge-map.js`
+  - `event-bridge-wiring.js`
+  - `health-check.js`
+  - `index.js`
+  - `runtime-contracts.js`
+  - `runtime-registry.js`
+  - `types.js`
+
 Leitura: o módulo já está bastante modularizado por subdomínios físicos, porém mantém **superfície
 pública raiz larga**, hotspots de alta complexidade e alguns riscos de lifecycle/concorrência. Após
 a retomada C3.1/C3.2 de 2026-05-13, `agent-context.js` deixou de ser o maior hotspot e
 `always-alive.js` perdeu a responsabilidade de singleton/proxy, mas ainda concentra muitos métodos
 delegadores da fachada viva.
+
+Leitura ampliada desta rodada: o problema atual não é mais “ausência de arquitetura”, e sim
+**sobreposição de superfícies e de fluxos operacionais**. O boot está canônico; a operação do
+runtime ainda não.
 
 ---
 
@@ -216,6 +237,65 @@ Estado consolidado atual:
 - `tests`: imports `from '#copilot/agent'` = **0**;
 - `src/copilot`: imports `from '#copilot/agent/facades'` = **17**.
 
+### Atualização factual — investigação ampliada de arquitetura/fluxo (2026-05-13)
+
+A leitura cruzada entre `boot/`, `runtime-wiring.js`, `presentation/`, `server/`, `terminal/`,
+`channel/` e `conversation-hub/` confirmou o seguinte quadro:
+
+#### 1. Boot canônico: **confirmado e saudável**
+
+O contrato declarado em `src/copilot/boot/contract.js` corresponde ao runtime real:
+
+- `terminal/bootstrap.js`
+- `boot/runtime-bootstrap.js`
+- `runtime-wiring.js`
+- `terminal/runtime-root.js`
+- `server/index.js`
+
+Conclusão: **não há mais arquitetura paralela relevante no boot**.
+
+#### 2. Runtime access path: **quase canônico, mas ainda múltiplo na superfície**
+
+Hoje convivem, para o mesmo runtime, ao menos quatro superfícies importantes:
+
+- `agent/index.js` — root público ainda largo;
+- `agent/facades/index.js` — surface pública operacional moderna;
+- `agent/runtime/root-surface/index.js` — surface interna da classe viva;
+- `agent/agent-runtime-surface.js` — shim/barrel legado de compatibilidade.
+
+Conclusão: a convergência 2.1 avançou, porém **ainda não existe surface única plenamente nítida**.
+
+#### 3. Fluxos de interação: **paralelos por capability, não ainda unificados por policy**
+
+Foram confirmados múltiplos ingressos operacionais sobre o mesmo runtime:
+
+- `sendMessage()` (queue/simple chat)
+- `sendDialogTurn()` (dialog loop)
+- `handleInject()` (intervention / zero-PR / steer / abort / interrupt)
+- `conversation-hub/send-pipeline.js` (hub-send com múltiplas estratégias)
+- `channel/client.js` (bridge em-processo)
+
+Essas capabilities podem ser legítimas, mas a política de escolha/fallback entre elas ainda está
+dispersa.
+
+#### 4. Relação `agent` ↔ `presentation`: **boa direção, fronteira ainda vazando policy**
+
+`presentation/runtime/*` está bem alinhada ao papel de projection/access layer. Porém
+`presentation/agent/control/handlers.js` ainda concentra policy operacional demais, funcionando em
+vários cenários como quase-orquestrador, e não apenas como adaptador de borda.
+
+#### 5. Relação `agent` ↔ resto de `src/copilot`: **owner certo, gramática errada**
+
+O owner do runtime está corretamente em `agent/`. O problema é que `server/`, `terminal/`,
+`channel/` e `conversation-hub/` ainda chegam a esse owner por caminhos com gramáticas diferentes.
+
+Em resumo:
+
+- **boot único**: sim;
+- **runtime owner único**: quase;
+- **surface pública única**: ainda não;
+- **fluxo único de interação**: ainda não.
+
 ### Atualização factual pós-retomada C3.1 (2026-05-13)
 
 A retomada da subfase C3.1 confirmou que a execução anterior havia parado em estado intermediário:
@@ -294,18 +374,71 @@ Classificação atual dos achados externos reavaliados:
 - Gap de teste/infra C2 foi **corrigido** nesta rodada: mocks e contratos reconhecem subpaths
   explícitos como superfície pública deliberada.
 
+### Atualização factual pós-ONDA 2 barrel-first (2026-05-13)
+
+Retomada adicional da ONDA 2, antes de continuar a decomposição de `AlwaysAliveAgent`:
+
+- `typecheck:strict:src.copilot` foi executado primeiro e falhou por barrels auto-referenciais criados na migração
+  parcial anterior:
+  - `agent/error/index.js`;
+  - `agent/runtime/contracts/index.js`;
+  - `agent/event-bridge/index.js`.
+- Correção aplicada:
+  - `agent/error/index.js` reexporta `error-policy.js`;
+  - `agent/runtime/contracts/index.js` reexporta `runtime-contracts.js`;
+  - `agent/event-bridge/index.js` reexporta `event-bridge-wiring.js` e `event-bridge-map.js`.
+- Migração concluída de imports operacionais cross-folder em `agent` para barrels/superfícies públicas:
+  - `#copilot/config` e `#copilot/config/agent`;
+  - `#copilot/core`;
+  - `#copilot/dialog`;
+  - `#copilot/bridges`;
+  - `#copilot/event-handlers`;
+  - `#copilot/observability`;
+  - `#copilot/sdk`;
+  - sub-barrels internos `*/index.js`.
+- Superfícies corrigidas fora de `agent`:
+  - `#copilot/dialog` adicionado ao import map e ao `tsconfig.base.json`;
+  - `#copilot/bridges` exporta `createMcpToolBridge`;
+  - `#copilot/observability` exporta `buildStatusSnapshot`;
+  - `#copilot/config/agent` foi formalizado como sub-barrel público das constantes operacionais de `config/agent.js`,
+    preservando o root `#copilot/config` mais estreito.
+- Novo guardrail:
+  - `tests/unit/copilot/contracts/test_agent_barrel_governance.spec.js` valida que todo `index.js` de `agent` é barrel
+    puro e que imports internos cross-folder passam por barrels.
+
+Métrica pós-ONDA 2:
+
+- `crossFolderLeafNonIndex(agent)`: **0**;
+- `sameFolderLeafNonIndex(agent)`: **12**;
+- `indexBarrelLeafExports(agent)`: **173**.
+
+Gates:
+
+- `npm run typecheck:strict:src.copilot`: **verde**;
+- `npm run test:copilot:unit`: **2609/2609 verde**.
+
+Status reavaliado:
+
+- ONDA 2 barrel-first operacional: **concluída**;
+- Padrão `terminal`/`presentation` aplicado ao `agent` no escopo de imports cross-folder operacionais;
+- wildcard `#copilot/agent/*` permanece como compatibilidade white-box/testes, ainda rastreado como dívida de surface
+  pública futura, não como bloqueio da ONDA 2.
+
 ### Síntese objetiva
 
 - A auditoria externa está **majoritariamente correta** nos problemas críticos e de governança
   arquitetural.
 - Há **divergências pontuais** (itens já resolvidos/parcialmente mitigados), principalmente em
   eventos SDK e alguns itens de severidade.
-- Há base factual suficiente para uma auditoria própria completa com roadmap de execução em **faixas
-  → fases → subfases**, cobrindo:
-  1. correções de bugs,
-  2. hardening de concorrência/lifecycle,
-  3. convergência barrel-first 2.1 em `agent/`,
-  4. guardrails automáticos de regressão.
+- A investigação ampliada mostrou que o próximo salto de qualidade não é apenas continuar quebrando
+  hotspots: é **unificar superfície e fluxo** entre `agent`, `presentation`, `server`, `terminal`,
+  `channel` e `conversation-hub`.
+- Há base factual suficiente para um roadmap ampliado em **faixas → fases → subfases**, cobrindo:
+  1. correções de bugs e concorrência/lifecycle;
+  2. convergência barrel-first 2.1 em `agent/`;
+  3. limpeza do root e redução de superfícies concorrentes;
+  4. criação de taxonomia/owner únicos para os fluxos de interação;
+  5. guardrails automáticos contra regressão estrutural e regressão de fluxo.
 
 ---
 

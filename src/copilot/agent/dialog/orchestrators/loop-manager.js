@@ -23,19 +23,13 @@ import {
     EMITTER_LOOP_STALLED,
 } from '#copilot/events';
 import { EventEmitter } from 'node:events';
-import { logSwallowed } from '../../../core/error-handlers.js';
-import { DialogProtocol } from '../../../dialog/protocol.js';
-import {
-    persistAgentRuntimeDialogState,
-    readAgentRuntimeDialogPersistedState,
-} from '../../facades/agent-runtime-state.js';
-import { log } from '../../ports/logging-port.js';
-import { startSpanImmediate } from '../../ports/tracing-port.js';
-import { DialogBootCircuit } from '../boot/loop-boot-circuit.js';
-import { runDialogLoopBoot } from '../boot/loop-boot-runner.js';
-import { createDialogLoopRuntimeKit } from '../boot/loop-runtime-kit.js';
-import { executeTurnImpl } from '../executors/turn-executor.js';
-import { selectDialogResumeStrategy } from '../policies/resume-policy.js';
+import { logSwallowed } from '#copilot/core';
+import { DialogProtocol } from '#copilot/dialog';
+import { persistAgentRuntimeDialogState, readAgentRuntimeDialogPersistedState } from '../../facades/index.js';
+import { log, startSpanImmediate } from '../../ports/index.js';
+import { createDialogLoopRuntimeKit, DialogBootCircuit, runDialogLoopBoot } from '../boot/index.js';
+import { executeTurnImpl } from '../executors/index.js';
+import { selectDialogResumeStrategy } from '../policies/index.js';
 
 /**
  * @typedef {Object} DialogLoopManagerOptions
@@ -676,13 +670,19 @@ export class DialogLoopManager extends EventEmitter {
     #trackPersistedState(data, meta) {
         const label = meta.label ?? 'dialog.state.persist';
         return this.#trackBackgroundTask(
-            persistAgentRuntimeDialogState(data, label).then((result) => {
-                if (!result.ok) {
-                    const failure = /** @type {import('../../error-policy.js').AgentPolicyFailure} */ (result);
-                    throw failure.error;
-                }
-                return undefined;
-            }),
+            persistAgentRuntimeDialogState(data, label).then(
+                (
+                    /** @type {import('../../error/index.js').AgentPolicyResult<
+    import('../../lifecycle/state/index.js').AliveAgentState
+>} */ result,
+                ) => {
+                    if (!result.ok) {
+                        const failure = /** @type {import('../../error/index.js').AgentPolicyFailure} */ (result);
+                        throw failure.error;
+                    }
+                    return undefined;
+                },
+            ),
             meta,
         );
     }
@@ -715,5 +715,5 @@ export class DialogLoopManager extends EventEmitter {
     }
 }
 
-// F61: wireDialogLoopEvents extraído para event-wiring.js — re-exportado para compatibilidade
-export { wireDialogLoopEvents } from '../wiring/event-wiring.js';
+// F61: wireDialogLoopEvents extraído para wiring/index.js — re-exportado para compatibilidade
+export { wireDialogLoopEvents } from '../wiring/index.js';

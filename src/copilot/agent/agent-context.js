@@ -11,15 +11,10 @@
 
 import { EMITTER_PROCESS_QUEUE } from '#copilot/events';
 import { createToolSessionContext } from '#copilot/sdk';
-import { COPILOT_MODEL, COPILOT_REASONING_EFFORT } from '../config/agent.js';
-import { createAgentContextFactories } from './context-factories.js';
-import * as dialogOps from './context/agent-context-dialog-ops.js';
-import * as fsmOps from './context/agent-context-fsm.js';
-import * as metricsOps from './context/agent-context-metrics-ops.js';
-import * as runtimeOps from './context/agent-context-runtime-ops.js';
-import * as sessionOps from './context/agent-context-session-ops.js';
-import * as toolOps from './context/agent-context-tool-ops.js';
-import { performKeepaliveSdkTick } from './facades/agent-session-ops.js';
+import { COPILOT_MODEL, COPILOT_REASONING_EFFORT } from '#copilot/config/agent';
+import { createAgentContextFactories } from './context/factories/index.js';
+import { dialogOps, fsmOps, metricsOps, runtimeOps, sessionOps, toolOps } from './context/ops/index.js';
+import { performKeepaliveSdkTick } from './facades/index.js';
 
 /**
  * @typedef {import('#copilot/sdk/types').CopilotClient} CopilotClient
@@ -55,10 +50,10 @@ export class AgentContext {
     /** @type {Readonly<Record<AgentStatus, ReadonlySet<AgentStatus>>>} */
     static STATUS_TRANSITIONS = fsmOps.STATUS_TRANSITIONS;
 
-    /** @type {import('./context-factories.js').AgentContextFactories} */
+    /** @type {import('./context/factories/index.js').AgentContextFactories} */
     #factories;
 
-    /** @type {import('./context-factories.js').AgentContextFactoryHost} */
+    /** @type {import('./context/factories/index.js').AgentContextFactoryHost} */
     #factoryHost;
 
     /** @type {AgentSessionState} */
@@ -80,7 +75,7 @@ export class AgentContext {
     messageQueue;
     /** @type {import('../infra/webhooks.js').WebhookManager} */
     webhooks;
-    /** @type {import('./ports/permission-port.js').AgentPermissionController} */
+    /** @type {import('./ports/index.js').AgentPermissionController} */
     permissions;
     /** @type {import('#copilot/sdk').ToolSessionContext} */
     toolSessionContext;
@@ -94,7 +89,7 @@ export class AgentContext {
     messagesCache;
     /** @type {ReturnType<import('#copilot/sdk').createQueuedElicitationHandler>} */
     sdkElicitation;
-    /** @type {import('./background-tasks.js').BackgroundTasks} */
+    /** @type {import('./background/index.js').BackgroundTasks} */
     backgroundTasks;
 
     /**
@@ -102,8 +97,8 @@ export class AgentContext {
      * @param {{
      *     model?: string;
      *     reasoningEffort?: 'low' | 'medium' | 'high' | 'xhigh';
-     *     factories?: Partial<import('./context-factories.js').AgentContextFactories>;
-     *     mcpBridge?: import('./ports/mcp-port.js').AgentMcpCapability | null;
+     *     factories?: Partial<import('./context/factories/index.js').AgentContextFactories>;
+     *     mcpBridge?: import('./ports/index.js').AgentMcpCapability | null;
      * }} [options]
      */
     constructor(emitter, options = {}) {
@@ -276,7 +271,7 @@ export class AgentContext {
     get mcpBridge() {
         return this.configState.mcpBridge;
     }
-    /** @param {import('./ports/mcp-port.js').AgentMcpCapability | null} value */
+    /** @param {import('./ports/index.js').AgentMcpCapability | null} value */
     set mcpBridge(value) {
         this.configState.mcpBridge = value;
     }
@@ -298,9 +293,11 @@ export class AgentContext {
     get agentObserver() {
         return this.runtimeState.agentObserver;
     }
-    /** @param {{ attach: (agent: import('node:events').EventEmitter) => void; detach: () => void }
-    | null
-    | undefined} value */
+    /**
+     * @param {{ attach: (agent: import('node:events').EventEmitter) => void; detach: () => void }
+     *     | null
+     *     | undefined} value
+     */
     set agentObserver(value) {
         if (value == null) this.clearAgentObserver();
         else this.setAgentObserver(value);
@@ -450,16 +447,18 @@ export class AgentContext {
     getFreshStatusSnapshotCache(ttlMs) {
         return metricsOps.getFreshStatusSnapshotCache(this, ttlMs);
     }
-    /** @param {{
-    model?: string;
-    configuredModel?: string;
-    effectiveModel?: string;
-    modelMismatch?: boolean;
-    sessionId?: string | null;
-    cost?: number;
-    quotaSnapshots?: Record<string, unknown>;
-    ts: number;
-} | null} info */
+    /**
+     * @param {{
+     *     model?: string;
+     *     configuredModel?: string;
+     *     effectiveModel?: string;
+     *     modelMismatch?: boolean;
+     *     sessionId?: string | null;
+     *     cost?: number;
+     *     quotaSnapshots?: Record<string, unknown>;
+     *     ts: number;
+     * } | null} info
+     */
     setLastPrInfo(info) {
         metricsOps.setLastPrInfo(this, info);
     }
@@ -611,17 +610,37 @@ export class AgentContext {
         return dialogOps.clearPendingSdkElicitation(this, id);
     }
 
+    /**
+     * Retorna o snapshot do registry de tools registradas no runtime.
+     *
+     * @returns {import('#copilot/sdk/tools-registry').ToolRegistry}
+     */
     getToolRegistrySnapshot() {
         return toolOps.getToolRegistrySnapshot(this);
     }
+
+    /**
+     * Retorna uma projeção serializável das tools registradas no runtime.
+     *
+     * @returns {{
+     *     name: string;
+     *     description: string | null;
+     *     category: string;
+     *     tags: string[];
+     *     readOnly: boolean;
+     *     skipPermission: boolean;
+     * }[]}
+     */
     getToolRegistryEntriesSnapshot() {
         return toolOps.getToolRegistryEntriesSnapshot(this);
     }
     getPermissionModeSnapshot() {
         return toolOps.getPermissionModeSnapshot(this);
     }
-    /** @param {'approve_all' | 'audit_only' | 'selective'} mode @param {{ allowTools?: string[]; denyTools?: string[];
-  denyShell?: boolean }} [opts] */
+    /**
+     * @param {'approve_all' | 'audit_only' | 'selective'} mode @param {{ allowTools?: string[]; denyTools?: string[];
+     *   denyShell?: boolean }} [opts]
+     */
     setPermissionMode(mode, opts = {}) {
         toolOps.setPermissionMode(this, mode, opts);
     }
@@ -631,6 +650,11 @@ export class AgentContext {
     getPermissionPolicySnapshot() {
         return toolOps.getPermissionPolicySnapshot(this);
     }
+    /**
+     * Retorna readiness e metadata da capability de permissões governada pelo agent.
+     *
+     * @returns {{ mode: 'approve_all' | 'audit_only' | 'selective'; handlerAvailable: boolean }}
+     */
     getPermissionCapabilitySnapshot() {
         const factorySet = this.getContextFactoryCapabilitiesSnapshot();
         const metadata = {
@@ -714,11 +738,13 @@ export class AgentContext {
     sendDialogTurn(message, opts) {
         return this.dialogLoop.sendTurn(message, opts);
     }
-    /** @param {{
-    authorized?: boolean;
-    reason?: 'watchdog_restart' | 'authorized_stop' | 'recovery_restart';
-    shutdownTimeoutMs?: number;
-}} [opts] */
+    /**
+     * @param {{
+     *     authorized?: boolean;
+     *     reason?: 'watchdog_restart' | 'authorized_stop' | 'recovery_restart';
+     *     shutdownTimeoutMs?: number;
+     * }} [opts]
+     */
     stopDialogLoop(opts) {
         return this.dialogLoop.stop(opts);
     }
@@ -764,10 +790,12 @@ export class AgentContext {
     pingKeepalive() {
         this.keepalive.ping();
     }
-    /** @param {{
-    isIdle?: () => boolean;
-    onKeepalive?: (info: { ts: number; strategy: 'client.ping' | 'session.send' }) => void;
-}} [options] */
+    /**
+     * @param {{
+     *     isIdle?: () => boolean;
+     *     onKeepalive?: (info: { ts: number; strategy: 'client.ping' | 'session.send' }) => void;
+     * }} [options]
+     */
     startKeepalive(options = {}) {
         if (this.isStopped() || !this.hasActiveSession()) return false;
         this.keepalive.start({

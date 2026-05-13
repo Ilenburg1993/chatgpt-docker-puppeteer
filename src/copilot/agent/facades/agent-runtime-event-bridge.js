@@ -5,7 +5,7 @@
  */
 
 import { bridgeEmitter } from '#copilot/core';
-import { AGENT_EVENT_BRIDGE_MAP, DIALOG_LOOP_EVENT_BRIDGE_MAP, HANDOFF_EVENT_BRIDGE_MAP } from '../event-bridge-map.js';
+import { AGENT_EVENT_BRIDGE_MAP, DIALOG_LOOP_EVENT_BRIDGE_MAP, HANDOFF_EVENT_BRIDGE_MAP } from '../event-bridge/index.js';
 
 /**
  * @typedef {import('node:events').EventEmitter} EventEmitter

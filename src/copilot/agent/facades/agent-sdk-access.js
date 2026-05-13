@@ -40,7 +40,7 @@ export {
     pingSdk,
     raceAgentSdkEvents,
     stopAgentSdkClient,
-} from './sdk/client.js';
+} from './sdk/index.js';
 
 export {
     AGENT_SDK_DEFAULT_MODEL,
@@ -49,16 +49,16 @@ export {
     listAgentSdkCatalogModels,
     readAgentSdkModelRegistryEntry,
     readAgentSdkModelStats,
-} from './sdk/models.js';
+} from './sdk/index.js';
 
-export { formatValidationResult, validateAgentContracts } from './sdk/agent-contract.js';
+export { formatValidationResult, validateAgentContracts } from './sdk/index.js';
 
 export {
     createAgentSdkToolsRegistry,
     getAgentSdkToolsConfig,
     loadAgentSdkToolsConfigAsync,
     pickDefinedAgentSdkOptions,
-} from './sdk/tools.js';
+} from './sdk/index.js';
 
 export {
     createAgentSdkQuotaMonitor,
@@ -67,7 +67,7 @@ export {
     isAgentSdkQuotaOrRateLimitError,
     startAgentSdkBootQuotaBridge,
     startAgentSdkQuotaMonitor,
-} from './sdk/quota.js';
+} from './sdk/index.js';
 
 export {
     createAgentSdkSessionByClient,
@@ -80,7 +80,7 @@ export {
     listSdkSessions,
     resumeOrCreateAgentSdkSession,
     setForegroundSdkSessionId,
-} from './sdk/sessions.js';
+} from './sdk/index.js';
 
 export {
     compactSdkSession,
@@ -94,7 +94,7 @@ export {
     readSdkWorkspaceFile,
     reloadSdkAgents,
     selectSdkAgent,
-} from './sdk/workspace-ops.js';
+} from './sdk/index.js';
 
 export {
     confirmSdkSessionUi,
@@ -110,7 +110,7 @@ export {
     requestSdkElicitation,
     resolvePendingSdkElicitation,
     selectSdkSessionUi,
-} from './sdk/ui-ops.js';
+} from './sdk/index.js';
 
 // Funções de leitura de mensagens de sessão SDK — fonte canônica: agent-sdk-runtime.js
 // Mantidas aqui por compat; consumidores novos devem importar diretamente de agent-sdk-runtime.

@@ -14,17 +14,16 @@
 
 import { container, SessionError } from '#copilot/core';
 import { EMITTER_DIALOG_LOOP_CHANGED, EMITTER_DIALOG_RECOVERY, EMITTER_SESSION_KEEPALIVE } from '#copilot/events';
-import { CONTEXT_UTIL_BLOCK_THRESHOLD, CONTEXT_UTIL_WARN_THRESHOLD } from '../../../config/agent.js';
-import { withAgentErrorPolicy } from '../../error-policy.js';
-import { log } from '../../ports/logging-port.js';
-import { METRICS_STORE } from '../../ports/metrics-port.js';
+import { CONTEXT_UTIL_BLOCK_THRESHOLD, CONTEXT_UTIL_WARN_THRESHOLD } from '#copilot/config/agent';
+import { withAgentErrorPolicy } from '../../error/index.js';
+import { log, METRICS_STORE } from '../../ports/index.js';
 import {
     assertEmitterHost,
     normalizeCompactionComplete,
     normalizeTokenBudgetWarning,
     trySetLiveSessionModel,
-} from '../../runtime-contracts.js';
-import { wireDialogLoopEvents } from '../orchestrators/loop-manager.js';
+} from '../../runtime/contracts/index.js';
+import { wireDialogLoopEvents } from '../orchestrators/index.js';
 
 /**
  * @typedef {import('../../agent-context.js').AgentContext} AgentContext

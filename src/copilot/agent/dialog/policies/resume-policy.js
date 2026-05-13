@@ -8,8 +8,8 @@
  */
 
 import { EventEmitter } from 'node:events';
-import { RESUME_QUESTION_WAIT_MS } from '../../../config/agent.js';
-import { waitForAgentSdkEvent } from '../../facades/agent-sdk-runtime.js';
+import { RESUME_QUESTION_WAIT_MS } from '#copilot/config/agent';
+import { waitForAgentSdkEvent } from '../../facades/index.js';
 
 /**
  * @typedef {import('../../types.js').DialogLoopHost} AgentHost

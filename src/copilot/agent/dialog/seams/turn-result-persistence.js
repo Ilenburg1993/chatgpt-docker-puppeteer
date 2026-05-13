@@ -14,8 +14,8 @@ import {
     EMITTER_LOOP_STOPPED,
     EMITTER_QUESTION_PENDING,
 } from '#copilot/events';
-import { log } from '../../ports/logging-port.js';
-import { METRICS_STORE } from '../../ports/metrics-port.js';
+import { log } from '../../ports/index.js';
+import { METRICS_STORE } from '../../ports/index.js';
 
 /**
  * Constrói os event handlers principais de resolução/rejeição de um turno.
@@ -212,7 +212,9 @@ export function dispatchTurnToHostImpl(emitter, opts) {
                 'WARN',
                 `[DialogLoopManager] pending protocol shortcut (${traceLabel(traceId)}, kind=stopped, source=pending-question)`,
             );
-            onStopOuter({ authorized: false, reason: 'pending_protocol_stopped' });
+            // FIX P0-1: emitir authorized=true para 'pending_protocol_stopped' para evitar hang indefinido
+            // 'pending_protocol_stopped' é um encerramento deliberado do loop, não um erro/falha
+            onStopOuter({ authorized: true, reason: 'pending_protocol_stopped' });
             return;
         }
         log('INFO', `[DialogLoopManager] dispatching turn to pending question (${traceLabel(traceId)})`);
@@ -235,7 +237,8 @@ export function dispatchTurnToHostImpl(emitter, opts) {
                     'WARN',
                     `[DialogLoopManager] pending protocol shortcut after question.pending (${traceLabel(traceId)}, kind=stopped)`,
                 );
-                onStopOuter({ authorized: false, reason: 'pending_protocol_stopped' });
+                // FIX P0-1: emitir authorized=true para 'pending_protocol_stopped' para evitar hang indefinido
+                onStopOuter({ authorized: true, reason: 'pending_protocol_stopped' });
                 return;
             }
             if (clearTurnTimeout) {

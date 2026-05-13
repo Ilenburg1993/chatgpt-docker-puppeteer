@@ -27,7 +27,7 @@ export {
     sendMessageDialogBoot as msgSendBoot,
     steerMessage as msgSteer,
 } from '../../messaging/agent-messaging.js';
-export { METRICS_STORE } from '../../ports/metrics-port.js';
+export { METRICS_STORE } from '../../ports/index.js';
 export {
     listenerDiagnostics as stateDiagnostics,
     getStatusSnapshot as stateSnapshot,
@@ -101,7 +101,7 @@ export {
     selectSdkAgent,
     selectSdkSessionUi,
     setForegroundSdkSessionId,
-} from '../../facades/agent-sdk-access.js';
+} from '../../facades/index.js';
 export {
     deleteSdkPlan,
     getSdkSessionMode,

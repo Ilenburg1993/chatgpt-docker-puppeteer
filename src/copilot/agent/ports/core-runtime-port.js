@@ -15,5 +15,5 @@ export {
     setSharedSdkSessionId,
     toError,
 } from '#copilot/core';
-export { container } from '../../core/di-container.js';
-export { logSwallowed } from '../../core/error-handlers.js';
+export { container } from '#copilot/core';
+export { logSwallowed } from '#copilot/core';

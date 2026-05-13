@@ -4,4 +4,4 @@
  * @file Porta fina para snapshots observáveis do agent.
  */
 
-export { buildStatusSnapshot } from '../../observability/snapshots.js';
+export { buildStatusSnapshot } from '#copilot/observability';

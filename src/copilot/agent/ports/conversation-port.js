@@ -1,6 +1,6 @@
 // @ts-check
 /**
- * src/copilot/agent/ports/conversation-port.js
+ * src/copilot/agent/ports/index.js
  *
  * Porta compatível entre o runtime do agent e `conversation-hub/`.
  *

@@ -23,7 +23,14 @@ export {
     gitStashList,
     gitStatus,
 } from './git-bridge.js';
-export { _resetMcpState, buildMcpTools, getMcpStatus, listMcpTools, startMcpAutoReconnect } from './mcp-tool-bridge.js';
+export {
+    _resetMcpState,
+    buildMcpTools,
+    createMcpToolBridge,
+    getMcpStatus,
+    listMcpTools,
+    startMcpAutoReconnect,
+} from './mcp-tool-bridge.js';
 export { NervEventBusAdapter, emitNerv, nervEventBusAdapter } from './nerv-event-bus-adapter.js';
 
 // ─── GitHub CLI bridge ────────────────────────────────────────────────────────

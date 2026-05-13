@@ -1,6 +1,6 @@
 // @ts-check
 /**
- * src/copilot/agent/ports/hook-port.js
+ * src/copilot/agent/ports/index.js
  *
  * Porta compatível entre o runtime do agent e `hooks/`.
  *
@@ -15,8 +15,8 @@ import { defaultAuditLog } from '#copilot/audit';
 import { getCopilotFallbackModel } from '#copilot/config';
 import { recordBlockedToolCall } from '#copilot/observability';
 import { attachBus, classifySdkRateLimitScope, defaultHookBus, modelSelector } from '#copilot/sdk';
-import { createQueuedElicitationHandler } from '../../sdk/session/elicitation.js';
-import { log } from './logging-port.js';
+import { createQueuedElicitationHandler } from '#copilot/sdk';
+import { log } from './logging/index.js';
 
 export { createQueuedElicitationHandler };
 

@@ -12,10 +12,9 @@
  */
 
 import { toError } from '#copilot/core';
-import { withAgentErrorPolicy } from '../../error-policy.js';
-import { getAgentSdkRecoveryPolicy, pingAgentSdkClient, stopAgentSdkClient } from '../../facades/agent-sdk-access.js';
-import { log } from '../../ports/logging-port.js';
-import { startSpan } from '../../ports/tracing-port.js';
+import { withAgentErrorPolicy } from '../../error/index.js';
+import { getAgentSdkRecoveryPolicy, pingAgentSdkClient, stopAgentSdkClient } from '../../facades/index.js';
+import { log, startSpan } from '../../ports/index.js';
 
 /**
  * @typedef {Object} ReconnectCallbacks

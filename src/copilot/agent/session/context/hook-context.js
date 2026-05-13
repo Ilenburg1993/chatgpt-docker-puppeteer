@@ -18,11 +18,9 @@ import { readBootSkillConfig, resolveHooksStateFile } from '#copilot/boot';
 import { container, logSwallowed, toError } from '#copilot/core';
 import { access, open, readdir, readFile, stat } from 'node:fs/promises';
 import { z } from 'zod';
-import { HOOK_CONTEXT_MAX_BYTES as _HOOK_CONTEXT_MAX_BYTES } from '../../../config/agent.js';
-import { safeJsonParse } from '../../../core/safe-json.js';
-import { log } from '../../ports/logging-port.js';
-import { METRICS_STORE } from '../../ports/metrics-port.js';
-import { readAgentTodoStore } from '../../ports/tool-port.js';
+import { HOOK_CONTEXT_MAX_BYTES as _HOOK_CONTEXT_MAX_BYTES } from '#copilot/config/agent';
+import { safeJsonParse } from '#copilot/core';
+import { log, METRICS_STORE, readAgentTodoStore } from '../../ports/index.js';
 
 // ─── Paths ───────────────────────────────────────────────────────────────────
 

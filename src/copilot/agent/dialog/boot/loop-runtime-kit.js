@@ -8,14 +8,11 @@
  */
 
 import { getCopilotFallbackModel } from '#copilot/config';
-import { BOOT_TIMEOUT_MS, DIALOG_QUEUE_MAX, WATCHDOG_INTERVAL_MS, WATCHDOG_STALL_MS } from '../../../config/agent.js';
-import { readAgentRuntimeDialogBootstrapState } from '../../facades/agent-runtime-state.js';
-import { DialogCompactionPolicy } from '../policies/compaction-policy.js';
-import { ModelFallbackState } from '../policies/model-fallback.js';
-import { TurnQueue } from '../state/backpressure.js';
-import { DialogCostLedger } from '../state/cost-ledger.js';
-import { DialogLoopStateMachine } from '../state/state-machine.js';
-import { DialogWatchdogSupervisor } from '../watchdogs/watchdog-supervisor.js';
+import { BOOT_TIMEOUT_MS, DIALOG_QUEUE_MAX, WATCHDOG_INTERVAL_MS, WATCHDOG_STALL_MS } from '#copilot/config/agent';
+import { readAgentRuntimeDialogBootstrapState } from '../../facades/index.js';
+import { DialogCompactionPolicy, ModelFallbackState } from '../policies/index.js';
+import { DialogCostLedger, DialogLoopStateMachine, TurnQueue } from '../state/index.js';
+import { DialogWatchdogSupervisor } from '../watchdogs/index.js';
 
 /**
  * @typedef {{

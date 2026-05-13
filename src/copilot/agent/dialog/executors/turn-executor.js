@@ -15,27 +15,24 @@ import {
     EMITTER_QUESTION_PENDING,
     EMITTER_TURN_START,
 } from '#copilot/events';
-import { persistAgentRuntimePendingTurnState } from '../../facades/agent-runtime-state.js';
-import { log } from '../../ports/logging-port.js';
-import { METRICS_STORE } from '../../ports/metrics-port.js';
-import { startSpan } from '../../ports/tracing-port.js';
+import { persistAgentRuntimePendingTurnState } from '../../facades/index.js';
+import { log, METRICS_STORE, startSpan } from '../../ports/index.js';
 import {
+    buildTurnResolutionListenersImpl,
     castListener as castListenerImpl,
+    createAbortError as createAbortErrorImpl,
     createAssistantReplyFallback as createAssistantReplyFallbackImpl,
     createInactivityTimeout as createInactivityTimeoutImpl,
     detachAbortListener as detachAbortListenerImpl,
-    traceLabel as traceLabelImpl,
-} from '../seams/turn-execution-context.js';
-import {
-    createAbortError as createAbortErrorImpl,
+    dispatchTurnToHostImpl,
     finalizeTurnReply as finalizeTurnReplyImpl,
     normalizeAssistantMessageEvent as normalizeAssistantMessageEventImpl,
     normalizeAssistantReplyCandidate as normalizeAssistantReplyCandidateImpl,
     normalizeReplyEvent as normalizeReplyEventImpl,
     normalizeStopEvent as normalizeStopEventImpl,
     readPendingProtocolSnapshot as readPendingProtocolSnapshotImpl,
-} from '../seams/turn-input-validation.js';
-import { buildTurnResolutionListenersImpl, dispatchTurnToHostImpl } from '../seams/turn-result-persistence.js';
+    traceLabel as traceLabelImpl,
+} from '../seams/index.js';
 
 /**
  * Subconjunto do EventEmitter necessário para os executores de turno.
@@ -207,7 +204,7 @@ export function emitTurnStart(emitter, message, counter, host) {
     emitter.emit(EMITTER_TURN_START, { message: message.slice(0, 120), ts: turnStart });
     const persistPendingTurnTask = persistAgentRuntimePendingTurnState({ message, ts: turnStart }).then((result) => {
         if (!result.ok) {
-            const failure = /** @type {import('../../error-policy.js').AgentPolicyFailure} */ (result);
+            const failure = /** @type {import('../../error/index.js').AgentPolicyFailure} */ (result);
             throw failure.error;
         }
         return undefined;

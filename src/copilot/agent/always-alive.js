@@ -3,23 +3,20 @@
  * @module copilot/agent/always-alive
  * @file Agente always-alive: bootstrap, lifecycle e orquestração do loop de diálogo contínuo. Gerencia estado do
  *   agente, fila de mensagens e integração com o bus de eventos.
- *
- *   src/copilot/agent/always-alive.js
- * @see module:copilot/agent/dialog/loop-manager
- * @see module:copilot/agent/session/initializer
  * @see module:copilot/agent/lifecycle/state-io
  * @see module:copilot/agent/infra/message-queue
  */
 
-import { container, logSwallowed } from '#copilot/core';
+import { logSwallowed } from '#copilot/core';
 import { EMITTER_PROCESS_QUEUE } from '#copilot/events';
 import { EventEmitter } from 'node:events';
 
 // DialogProtocol agora é usado apenas pelo DialogLoopManager — removido daqui (E.1)
 
-import { MAX_LISTENERS } from '../config/agent.js';
+import { MAX_LISTENERS } from '#copilot/config/agent';
 // F35: AgentContext — contexto compartilhado entre módulos internos
-import { AgentContext } from './agent-context.js';
+import { AgentContext } from './context/index.js';
+import { HealthFacade, PermissionToolsFacade, SdkQueryFacade, StateQueryFacade } from './facades/index.js';
 import {
     abortCurrentMessage,
     agentStart,
@@ -39,24 +36,15 @@ import {
     dispatchAgentDialogTurn,
     execSdkShell,
     getCurrentSdkAgent,
-    getForegroundSdkSessionId,
-    getLastSdkSessionId,
     getModel,
     getPendingSdkElicitation,
     getReasoningEffort,
     getRuntimeHandoffManager,
-    getSdkAuthStatus,
-    getSdkHandles,
-    getSdkQuota,
-    getSdkResourceSnapshot,
     getSdkSessionCapabilities,
-    getSdkSessionMode,
-    getSdkStatus,
     getSessionMessages,
     handleSdkPendingCommand,
     handleSdkPendingPermission,
     handleSdkPendingToolCall,
-    healthSnapshot,
     inputSdkSessionUi,
     isAgentDialogLoopPaused,
     isSdkSessionUiElicitationAvailable,
@@ -65,12 +53,7 @@ import {
     listPendingSdkElicitations,
     listPendingSdkPermissions,
     listSdkAgents,
-    listSdkBuiltInTools,
-    listSdkModels,
-    listSdkSessions,
     listSdkWorkspaceFiles,
-    listWebhooks,
-    METRICS_STORE,
     msgAnswer,
     msgProcessQueue,
     msgSend,
@@ -78,36 +61,18 @@ import {
     msgSteer,
     pauseAgentDialogLoop,
     pingDialogWatchdog,
-    pingSdk,
     readAgentDialogLastPrInfo,
     readAgentDialogPrMetrics,
-    readAgentRuntimeSessionId,
-    readRuntimeContextFactoryCapabilities,
-    readRuntimeControlState,
-    readRuntimeInteractionState,
-    readRuntimePermissionCapability,
-    readRuntimePermissionMode,
-    readRuntimePermissionPolicySnapshot,
-    readRuntimeToolRegistry,
-    readRuntimeToolRegistryEntries,
-    readRuntimeToolSessionContext,
     readSdkPlan,
     readSdkWorkspaceFile,
-    registerWebhook,
     reloadSdkAgents,
     requestSdkElicitation,
     resolvePendingSdkElicitation,
     selectSdkAgent,
     selectSdkSessionUi,
     sessionLog,
-    setForegroundSdkSessionId,
     setModel,
     setReasoningEffort,
-    setRuntimePermissionMode,
-    setSdkSessionMode,
-    stateDiagnostics,
-    stateSnapshot,
-    unregisterWebhook,
     updateSdkPlan,
 } from './runtime/root-surface/index.js';
 
@@ -140,6 +105,28 @@ export class AlwaysAliveAgent extends EventEmitter {
     ctx;
 
     /**
+     * Subfachadas de domínio (Fase C3.2 — Decomposição Moderada).
+     *
+     * @type {PermissionToolsFacade}
+     */
+    #permissionToolsFacade;
+
+    /**
+     * @type {StateQueryFacade}
+     */
+    #stateQueryFacade;
+
+    /**
+     * @type {SdkQueryFacade}
+     */
+    #sdkQueryFacade;
+
+    /**
+     * @type {HealthFacade}
+     */
+    #healthFacade;
+
+    /**
      * @param {{ model?: string; reasoningEffort?: 'low' | 'medium' | 'high' | 'xhigh' }} [options]
      */
     constructor(options = {}) {
@@ -148,6 +135,12 @@ export class AlwaysAliveAgent extends EventEmitter {
         // O padrão de 10 é insuficiente; configurável via AGENT_MAX_LISTENERS (padrão 50).
         this.setMaxListeners(MAX_LISTENERS);
         this.ctx = new AgentContext(this, options);
+
+        // C3.2: Instanciar subfachadas
+        this.#permissionToolsFacade = new PermissionToolsFacade(this.ctx);
+        this.#stateQueryFacade = new StateQueryFacade(this.ctx);
+        this.#sdkQueryFacade = new SdkQueryFacade(this.ctx);
+        this.#healthFacade = new HealthFacade(this.ctx, this);
 
         // F35: MessageQueue emite EMITTER_PROCESS_QUEUE (Symbol interno) para disparar processamento.
         this.on(EMITTER_PROCESS_QUEUE, () => this.#processQueue());
@@ -165,7 +158,7 @@ export class AlwaysAliveAgent extends EventEmitter {
      * @returns {'approve_all' | 'audit_only' | 'selective'}
      */
     getPermissionMode() {
-        return readRuntimePermissionMode(this.ctx);
+        return this.#permissionToolsFacade.getPermissionMode();
     }
 
     /**
@@ -182,25 +175,25 @@ export class AlwaysAliveAgent extends EventEmitter {
      * @returns {void}
      */
     setPermissionMode(mode, opts = {}) {
-        setRuntimePermissionMode(this.ctx, mode, opts);
+        this.#permissionToolsFacade.setPermissionMode(mode, opts);
     }
 
     /**
      * Retorna readiness e metadata da capability de permissões governada pelo agent.
      *
-     * @returns {ReturnType<AgentContext['getPermissionCapabilitySnapshot']>}
+     * @returns {{ mode: 'approve_all' | 'audit_only' | 'selective'; handlerAvailable: boolean }}
      */
     getPermissionCapabilitySnapshot() {
-        return readRuntimePermissionCapability(this.ctx);
+        return this.#permissionToolsFacade.getPermissionCapabilitySnapshot();
     }
 
     /**
      * Retorna snapshot detalhado da policy de permissões ativa (modo, allow/deny lists, denyShell, defaultDecision).
      *
-     * @returns {ReturnType<AgentContext['getPermissionPolicySnapshot']>}
+     * @returns {unknown}
      */
     getPermissionPolicySnapshot() {
-        return readRuntimePermissionPolicySnapshot(this.ctx);
+        return this.#permissionToolsFacade.getPermissionPolicySnapshot();
     }
 
     /**
@@ -209,7 +202,7 @@ export class AlwaysAliveAgent extends EventEmitter {
      * @returns {import('#copilot/sdk').ToolSessionContext}
      */
     getToolSessionContext() {
-        return readRuntimeToolSessionContext(this.ctx);
+        return this.#permissionToolsFacade.getToolSessionContext();
     }
 
     /**
@@ -218,7 +211,7 @@ export class AlwaysAliveAgent extends EventEmitter {
      * @returns {Record<string, Record<string, unknown>>}
      */
     getContextFactoryCapabilitiesSnapshot() {
-        return readRuntimeContextFactoryCapabilities(this.ctx);
+        return this.#permissionToolsFacade.getContextFactoryCapabilitiesSnapshot();
     }
 
     /**
@@ -227,16 +220,23 @@ export class AlwaysAliveAgent extends EventEmitter {
      * @returns {import('#copilot/sdk/tools-registry').ToolRegistry}
      */
     getToolRegistrySnapshot() {
-        return readRuntimeToolRegistry(this.ctx);
+        return this.#permissionToolsFacade.getToolRegistrySnapshot();
     }
 
     /**
      * Retorna uma projeção serializável das tools registradas no runtime.
      *
-     * @returns {ReturnType<AgentContext['getToolRegistryEntriesSnapshot']>}
+     * @returns {{
+     *     name: string;
+     *     description: string | null;
+     *     category: string;
+     *     tags: string[];
+     *     readOnly: boolean;
+     *     skipPermission: boolean;
+     * }[]}
      */
     getToolRegistryEntriesSnapshot() {
-        return readRuntimeToolRegistryEntries(this.ctx);
+        return this.#permissionToolsFacade.getToolRegistryEntriesSnapshot();
     }
 
     /**
@@ -246,7 +246,7 @@ export class AlwaysAliveAgent extends EventEmitter {
      * @returns {{ id: string; url: string }} Identificador do webhook registrado
      */
     registerWebhook(url) {
-        return registerWebhook(this.ctx, url);
+        return this.#permissionToolsFacade.registerWebhook(url);
     }
 
     /**
@@ -256,7 +256,7 @@ export class AlwaysAliveAgent extends EventEmitter {
      * @returns {boolean} true se removido, false se não encontrado
      */
     unregisterWebhook(id) {
-        return unregisterWebhook(this.ctx, id);
+        return this.#permissionToolsFacade.unregisterWebhook(id);
     }
 
     /**
@@ -265,7 +265,7 @@ export class AlwaysAliveAgent extends EventEmitter {
      * @returns {{ id: string; url: string }[]}
      */
     listWebhooks() {
-        return listWebhooks(this.ctx);
+        return this.#permissionToolsFacade.listWebhooks();
     }
 
     /**
@@ -274,7 +274,7 @@ export class AlwaysAliveAgent extends EventEmitter {
      * @returns {AgentStatus}
      */
     get status() {
-        return /** @type {AgentStatus} */ (readRuntimeControlState(this.ctx).status);
+        return this.#stateQueryFacade.status;
     }
 
     /**
@@ -283,7 +283,7 @@ export class AlwaysAliveAgent extends EventEmitter {
      * @returns {boolean}
      */
     get dialogLoopActive() {
-        return readRuntimeControlState(this.ctx).dialogLoopActive;
+        return this.#stateQueryFacade.dialogLoopActive;
     }
 
     /**
@@ -301,7 +301,7 @@ export class AlwaysAliveAgent extends EventEmitter {
      * @returns {number}
      */
     get queueSize() {
-        return readRuntimeControlState(this.ctx).queueSize;
+        return this.#stateQueryFacade.queueSize;
     }
 
     /**
@@ -310,7 +310,7 @@ export class AlwaysAliveAgent extends EventEmitter {
      * @returns {PendingQuestion | null}
      */
     get pendingQuestion() {
-        return readRuntimeInteractionState(this.ctx).pendingQuestion;
+        return this.#stateQueryFacade.pendingQuestion;
     }
 
     /**
@@ -319,7 +319,7 @@ export class AlwaysAliveAgent extends EventEmitter {
      * @returns {import('./types.js').PendingQuestionKind | null}
      */
     get pendingQuestionKind() {
-        return readRuntimeInteractionState(this.ctx).pendingQuestionKind;
+        return this.#stateQueryFacade.pendingQuestionKind;
     }
 
     /**
@@ -328,7 +328,7 @@ export class AlwaysAliveAgent extends EventEmitter {
      * @returns {import('./types.js').PendingQuestionShadow | null}
      */
     get pendingQuestionShadow() {
-        return readRuntimeInteractionState(this.ctx).pendingQuestionShadow;
+        return this.#stateQueryFacade.pendingQuestionShadow;
     }
 
     /**
@@ -337,7 +337,7 @@ export class AlwaysAliveAgent extends EventEmitter {
      * @returns {import('./types.js').PendingQuestionKind | null}
      */
     get pendingQuestionShadowKind() {
-        return readRuntimeInteractionState(this.ctx).pendingQuestionShadowKind;
+        return this.#stateQueryFacade.pendingQuestionShadowKind;
     }
 
     /**
@@ -346,7 +346,7 @@ export class AlwaysAliveAgent extends EventEmitter {
      * @returns {import('./types.js').PendingQuestionShadowState | null}
      */
     get pendingQuestionShadowState() {
-        return readRuntimeInteractionState(this.ctx).pendingQuestionShadowState;
+        return this.#stateQueryFacade.pendingQuestionShadowState;
     }
 
     /**
@@ -355,7 +355,7 @@ export class AlwaysAliveAgent extends EventEmitter {
      * @returns {boolean}
      */
     get pendingQuestionShadowExpired() {
-        return readRuntimeInteractionState(this.ctx).pendingQuestionShadowExpired;
+        return this.#stateQueryFacade.pendingQuestionShadowExpired;
     }
 
     /**
@@ -364,7 +364,7 @@ export class AlwaysAliveAgent extends EventEmitter {
      * @returns {number | null}
      */
     get pendingQuestionShadowAgeMs() {
-        return readRuntimeInteractionState(this.ctx).pendingQuestionShadowAgeMs;
+        return this.#stateQueryFacade.pendingQuestionShadowAgeMs;
     }
 
     /**
@@ -373,7 +373,7 @@ export class AlwaysAliveAgent extends EventEmitter {
      * @returns {number | null}
      */
     get pendingQuestionShadowExpiresAt() {
-        return readRuntimeInteractionState(this.ctx).pendingQuestionShadowExpiresAt;
+        return this.#stateQueryFacade.pendingQuestionShadowExpiresAt;
     }
 
     /**
@@ -382,7 +382,7 @@ export class AlwaysAliveAgent extends EventEmitter {
      * @returns {number | null}
      */
     get pendingQuestionShadowRemainingMs() {
-        return readRuntimeInteractionState(this.ctx).pendingQuestionShadowRemainingMs;
+        return this.#stateQueryFacade.pendingQuestionShadowRemainingMs;
     }
 
     /**
@@ -403,7 +403,7 @@ export class AlwaysAliveAgent extends EventEmitter {
      * @returns {string | null}
      */
     get sessionId() {
-        return readAgentRuntimeSessionId(this.ctx);
+        return this.#stateQueryFacade.sessionId;
     }
 
     /**
@@ -413,7 +413,7 @@ export class AlwaysAliveAgent extends EventEmitter {
      * @returns {object}
      */
     get telemetry() {
-        return container.resolve(METRICS_STORE).getSummary();
+        return this.#stateQueryFacade.telemetry;
     }
 
     /**
@@ -422,7 +422,7 @@ export class AlwaysAliveAgent extends EventEmitter {
      * @returns {import('#copilot/sdk/tools-registry').ToolRegistry}
      */
     get toolsRegistry() {
-        return this.getToolRegistrySnapshot();
+        return this.#stateQueryFacade.toolsRegistry;
     }
 
     /**
@@ -560,7 +560,7 @@ export class AlwaysAliveAgent extends EventEmitter {
      * @returns {Promise<{ message: string; timestamp: number; protocolVersion?: number }>}
      */
     async pingSdk() {
-        return pingSdk(this.ctx);
+        return this.#sdkQueryFacade.pingSdk();
     }
 
     /**
@@ -569,7 +569,7 @@ export class AlwaysAliveAgent extends EventEmitter {
      * @returns {Promise<import('#copilot/sdk/types').GetStatusResponse>}
      */
     async getSdkStatus() {
-        return getSdkStatus(this.ctx);
+        return this.#sdkQueryFacade.getSdkStatus();
     }
 
     /**
@@ -578,7 +578,7 @@ export class AlwaysAliveAgent extends EventEmitter {
      * @returns {Promise<import('#copilot/sdk/types').GetAuthStatusResponse>}
      */
     async getSdkAuthStatus() {
-        return getSdkAuthStatus(this.ctx);
+        return this.#sdkQueryFacade.getSdkAuthStatus();
     }
 
     /**
@@ -587,7 +587,7 @@ export class AlwaysAliveAgent extends EventEmitter {
      * @returns {Promise<unknown>}
      */
     async listSdkModels() {
-        return listSdkModels(this.ctx);
+        return this.#sdkQueryFacade.listSdkModels();
     }
 
     /**
@@ -597,7 +597,7 @@ export class AlwaysAliveAgent extends EventEmitter {
      * @returns {Promise<unknown>}
      */
     async listSdkBuiltInTools(options) {
-        return listSdkBuiltInTools(this.ctx, options);
+        return this.#sdkQueryFacade.listSdkBuiltInTools(options);
     }
 
     /**
@@ -606,7 +606,7 @@ export class AlwaysAliveAgent extends EventEmitter {
      * @returns {Promise<unknown>}
      */
     async getSdkQuota() {
-        return getSdkQuota(this.ctx);
+        return this.#sdkQueryFacade.getSdkQuota();
     }
 
     /**
@@ -615,7 +615,7 @@ export class AlwaysAliveAgent extends EventEmitter {
      * @returns {Promise<string | undefined>}
      */
     async getLastSdkSessionId() {
-        return getLastSdkSessionId(this.ctx);
+        return this.#sdkQueryFacade.getLastSdkSessionId();
     }
 
     /**
@@ -624,7 +624,7 @@ export class AlwaysAliveAgent extends EventEmitter {
      * @returns {Promise<string | undefined>}
      */
     async getForegroundSdkSessionId() {
-        return getForegroundSdkSessionId(this.ctx);
+        return this.#sdkQueryFacade.getForegroundSdkSessionId();
     }
 
     /**
@@ -634,7 +634,7 @@ export class AlwaysAliveAgent extends EventEmitter {
      * @returns {Promise<void>}
      */
     async setForegroundSdkSessionId(sessionId) {
-        await setForegroundSdkSessionId(this.ctx, sessionId);
+        await this.#sdkQueryFacade.setForegroundSdkSessionId(sessionId);
     }
 
     /**
@@ -644,7 +644,7 @@ export class AlwaysAliveAgent extends EventEmitter {
      * @returns {Promise<import('#copilot/sdk/types').SessionMetadata[]>}
      */
     async listSdkSessions(filter) {
-        return listSdkSessions(this.ctx, filter);
+        return this.#sdkQueryFacade.listSdkSessions(filter);
     }
 
     /**
@@ -653,7 +653,7 @@ export class AlwaysAliveAgent extends EventEmitter {
      * @returns {Promise<import('#copilot/sdk/types').ModeResult>}
      */
     async getSdkSessionMode() {
-        return getSdkSessionMode(this.ctx);
+        return this.#sdkQueryFacade.getSdkSessionMode();
     }
 
     /**
@@ -663,7 +663,7 @@ export class AlwaysAliveAgent extends EventEmitter {
      * @returns {Promise<import('#copilot/sdk/types').ModeResult>}
      */
     async setSdkSessionMode(mode) {
-        return setSdkSessionMode(this.ctx, mode);
+        return this.#sdkQueryFacade.setSdkSessionMode(mode);
     }
 
     /**
@@ -967,7 +967,7 @@ export class AlwaysAliveAgent extends EventEmitter {
      * @returns {AgentStatusSnapshot}
      */
     getStatusSnapshot() {
-        return stateSnapshot(this.ctx, this);
+        return this.#healthFacade.getStatusSnapshot();
     }
 
     /**
@@ -978,7 +978,7 @@ export class AlwaysAliveAgent extends EventEmitter {
      * @returns {import('./types.js').AgentHealthSnapshot}
      */
     getHealthSnapshot() {
-        return healthSnapshot(this.ctx, this);
+        return this.#healthFacade.getHealthSnapshot();
     }
 
     /**
@@ -987,7 +987,7 @@ export class AlwaysAliveAgent extends EventEmitter {
      * @returns {import('./types.js').AgentSdkHandles}
      */
     getSdkHandles() {
-        return getSdkHandles(this.ctx);
+        return this.#healthFacade.getSdkHandles();
     }
 
     /**
@@ -996,7 +996,7 @@ export class AlwaysAliveAgent extends EventEmitter {
      * @returns {import('./types.js').AgentSdkAccessSnapshot}
      */
     getSdkResourceSnapshot() {
-        return getSdkResourceSnapshot(this.ctx);
+        return this.#healthFacade.getSdkResourceSnapshot();
     }
 
     /**
@@ -1005,7 +1005,7 @@ export class AlwaysAliveAgent extends EventEmitter {
      * @returns {{ [event: string]: number }}
      */
     listenerDiagnostics() {
-        return stateDiagnostics(this);
+        return this.#healthFacade.listenerDiagnostics();
     }
 
     /**

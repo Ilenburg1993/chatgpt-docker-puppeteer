@@ -653,7 +653,7 @@ describe('W86.4 — boot steps aggregate permanece fino por re-export', () => {
     it('boot-wiring.js continua consumindo surface estável via boot-steps aggregate', () => {
         const src = readSrc('agent/session/boot/boot-wiring.js');
 
-        assert.match(src, /from ['"]\.\/boot-steps\.js['"]/);
+        assert.match(src, /from ['"]\.\/steps\/index\.js['"]/);
         assert.doesNotMatch(src, /from ['"]\.\/boot-session-prep\.js['"]/);
         assert.doesNotMatch(src, /from ['"]\.\/boot-dialog-recovery\.js['"]/);
         assert.doesNotMatch(src, /from ['"]\.\/boot-runtime-bind\.js['"]/);
@@ -710,7 +710,7 @@ describe('W86.5.3 — state-file-io permanece seam infra isolado', () => {
             }
         }
 
-        assert.deepEqual(importers, ['agent/lifecycle/state/state-io.js']);
+        assert.deepEqual(importers, ['agent/lifecycle/state/file/index.js']);
     });
 });
 
@@ -718,7 +718,7 @@ describe('W86.6 — runtime pending-question seam extraído', () => {
     it('agent-runtime-state consome runtime/pending-question-state para operações de pending question', () => {
         const src = readSrc('agent/facades/agent-runtime-state.js');
 
-        assert.match(src, /from ['"]\.\.\/runtime\/pending-question-state\.js['"]/);
+        assert.match(src, /from ['"]\.\.\/runtime\/index\.js['"]/);
         assert.match(src, /shouldReapAgentRuntimePendingQuestionShadowImpl/);
         assert.match(src, /persistAgentRuntimePendingQuestionStateImpl/);
         assert.match(src, /clearAgentRuntimePendingQuestionShadowImpl/);
@@ -729,7 +729,7 @@ describe('W86.6.1 — runtime dialog-state seam extraído', () => {
     it('agent-runtime-state delega operações de dialog bootstrap/recovery para runtime/dialog-runtime-state', () => {
         const src = readSrc('agent/facades/agent-runtime-state.js');
 
-        assert.match(src, /from ['"]\.\.\/runtime\/dialog-runtime-state\.js['"]/);
+        assert.match(src, /from ['"]\.\.\/runtime\/index\.js['"]/);
         assert.match(src, /readAgentRuntimeDialogBootstrapStateImpl/);
         assert.match(src, /readAgentRuntimeDialogPersistedStateImpl/);
         assert.match(src, /persistAgentRuntimeDialogStateImpl/);
@@ -743,7 +743,7 @@ describe('W86.6.2 — runtime shutdown/snapshot seam extraído', () => {
     it('agent-runtime-state delega operações de snapshot/shutdown para runtime/shutdown-snapshot-state', () => {
         const src = readSrc('agent/facades/agent-runtime-state.js');
 
-        assert.match(src, /from ['"]\.\.\/runtime\/shutdown-snapshot-state\.js['"]/);
+        assert.match(src, /from ['"]\.\.\/runtime\/index\.js['"]/);
         assert.match(src, /resetAgentRuntimeGracefulShutdownFlagImpl/);
         assert.match(src, /persistAgentRuntimePrConsumptionSnapshotImpl/);
         assert.match(src, /saveAgentRuntimeShutdownSnapshotImpl/);
@@ -755,7 +755,7 @@ describe('W86.6.3 — runtime session-bootstrap seam extraído', () => {
     it('agent-runtime-state delega operações de session-id fallback e boot-state restore para runtime/session-bootstrap-state', () => {
         const src = readSrc('agent/facades/agent-runtime-state.js');
 
-        assert.match(src, /from ['"]\.\.\/runtime\/session-bootstrap-state\.js['"]/);
+        assert.match(src, /from ['"]\.\.\/runtime\/index\.js['"]/);
         assert.match(src, /readAgentRuntimeSessionIdImpl/);
         assert.match(src, /restoreAgentRuntimePersistentBootStateImpl/);
     });
@@ -765,7 +765,7 @@ describe('W86.7.1 — dialog turn-input-validation seam extraído', () => {
     it('turn-executor delega validações e normalizações para dialog/seams/turn-input-validation', () => {
         const src = readSrc('agent/dialog/executors/turn-executor.js');
 
-        assert.match(src, /from ['"]\.\.\/seams\/turn-input-validation\.js['"]/);
+        assert.match(src, /from ['"]\.\.\/seams\/index\.js['"]/);
         assert.match(src, /createAbortErrorImpl/);
         assert.match(src, /normalizeReplyEventImpl/);
         assert.match(src, /normalizeStopEventImpl/);
@@ -780,7 +780,7 @@ describe('W86.7.2 — dialog turn-execution-context seam extraído', () => {
     it('turn-executor delega contexto e lifecycle management para dialog/seams/turn-execution-context', () => {
         const src = readSrc('agent/dialog/executors/turn-executor.js');
 
-        assert.match(src, /from ['"]\.\.\/seams\/turn-execution-context\.js['"]/);
+        assert.match(src, /from ['"]\.\.\/seams\/index\.js['"]/);
         assert.match(src, /castListenerImpl/);
         assert.match(src, /createAssistantReplyFallbackImpl/);
         assert.match(src, /createInactivityTimeoutImpl/);
@@ -794,7 +794,7 @@ describe('W86.7.3 — dialog turn-result-persistence seam extraído', () => {
         const src = readSrc('agent/dialog/executors/turn-executor.js');
         const seam = readSrc('agent/dialog/seams/turn-result-persistence.js');
 
-        assert.match(src, /from ['"]\.\.\/seams\/turn-result-persistence\.js['"]/);
+        assert.match(src, /from ['"]\.\.\/seams\/index\.js['"]/);
         assert.match(src, /buildTurnResolutionListenersImpl/);
         assert.match(src, /dispatchTurnToHostImpl/);
         assert.match(seam, /export function buildTurnResolutionListenersImpl/);
@@ -809,8 +809,7 @@ describe('W86.8 — dialog loop boot lifecycle seam extraído', () => {
         const runner = readSrc('agent/dialog/boot/loop-boot-runner.js');
         const circuit = readSrc('agent/dialog/boot/loop-boot-circuit.js');
 
-        assert.match(manager, /from ['"]\.\.\/boot\/loop-boot-runner\.js['"]/);
-        assert.match(manager, /from ['"]\.\.\/boot\/loop-boot-circuit\.js['"]/);
+        assert.match(manager, /from ['"]\.\.\/boot\/index\.js['"]/);
         assert.match(manager, /runDialogLoopBoot\(/);
         assert.match(manager, /new DialogBootCircuit\(/);
 
@@ -839,10 +838,9 @@ describe('W87.1 — agent lifecycle consome core via porta local', () => {
         const lifecycle = readSrc('agent/lifecycle/orchestrators/agent-lifecycle.js');
         const port = readSrc('agent/ports/core-runtime-port.js');
 
-        assert.match(lifecycle, /from ['"]\.\.\/\.\.\/ports\/core-runtime-port\.js['"]/);
+        assert.match(lifecycle, /from ['"]\.\.\/\.\.\/ports\/index\.js['"]/);
         assert.match(port, /from ['"]#copilot\/core['"]/);
-        assert.match(port, /from ['"]\.\.\/\.\.\/core\/di-container\.js['"]/);
-        assert.match(port, /from ['"]\.\.\/\.\.\/core\/error-handlers\.js['"]/);
+        assert.doesNotMatch(port, /from ['"]\.\.\/\.\.\/core\/(?:di-container|error-handlers)\.js['"]/);
 
         assert.doesNotMatch(lifecycle, /from ['"]#copilot\/core['"]/);
         assert.doesNotMatch(lifecycle, /from ['"]\.\.\/\.\.\/core\/di-container\.js['"]/);
@@ -855,7 +853,7 @@ describe('W87.2 — session snapshot delega IO/schema para snapshot-store', () =
         const facade = readSrc('agent/session/state/snapshot.js');
         const store = readSrc('agent/session/state/snapshot-store.js');
 
-        assert.match(facade, /from ['"]\.\/snapshot-store\.js['"]/);
+        assert.match(facade, /from ['"]\.\/store\/index\.js['"]/);
         assert.match(facade, /saveSnapshotFileAsync/);
         assert.match(facade, /loadSnapshotFileAsync/);
         assert.match(facade, /normalizeSnapshotRecord/);

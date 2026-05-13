@@ -8,7 +8,7 @@
  */
 
 import { EMITTER_TURN_END } from '#copilot/events';
-import { DialogProtocol } from '../../../dialog/protocol.js';
+import { DialogProtocol } from '#copilot/dialog';
 
 /**
  * @param {string} message

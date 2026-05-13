@@ -47,6 +47,7 @@ export { bootstrapConvergencePersistence, bootstrapLateDeps, bootstrapObservabil
 
 // ─── Agent Event Observer ─────────────────────────────────────────────────────
 export { createAgentEventObserver } from './agent-event-observer.js';
+export { buildStatusSnapshot } from './snapshots.js';
 
 // ─── EventBus Runtime Canônico ───────────────────────────────────────────────
 export {

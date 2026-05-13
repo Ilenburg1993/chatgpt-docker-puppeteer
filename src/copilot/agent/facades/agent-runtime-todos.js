@@ -4,11 +4,11 @@
  * @file Façade agent-level para projections da capacidade TODO.
  */
 
-import { listActiveTodoSummaries } from '../ports/todo-port.js';
+import { listActiveTodoSummaries } from '../ports/index.js';
 
 /**
  * @param {{ limit?: number }} [input]
- * @returns {Promise<import('../ports/todo-port.js').AgentTodoSummary[]>}
+ * @returns {Promise<import('../ports/index.js').AgentTodoSummary[]>}
  */
 export function readAgentRuntimeTodoSummaries(input = {}) {
     return listActiveTodoSummaries(input);

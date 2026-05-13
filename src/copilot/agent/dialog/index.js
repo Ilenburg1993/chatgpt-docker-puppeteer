@@ -6,7 +6,7 @@
  * @see EventBus
  */
 
-export { DialogProtocol } from '../../dialog/protocol.js';
+export { DialogProtocol } from '#copilot/dialog';
 export {
     buildTurnResolutionListeners,
     dispatchTurnToHost,

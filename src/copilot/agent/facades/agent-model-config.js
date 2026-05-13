@@ -10,15 +10,15 @@
  */
 
 import { describeAutoModelPolicy, listModels, modelRegistry, modelStatsTracker } from '#copilot/sdk';
-import { toError } from '../../core/error-handlers.js';
-import { log } from '../ports/logging-port.js';
-import { trySetLiveSessionModel } from '../runtime-contracts.js';
-import { readAgentRuntimeStatusSnapshot } from '../runtime/status-readers.js';
+import { toError } from '#copilot/core';
+import { log } from '../ports/index.js';
+import { trySetLiveSessionModel } from '../runtime/contracts/index.js';
+import { readAgentRuntimeStatusSnapshot } from '../runtime/index.js';
 import { persistAgentRuntimeStatePartial } from './agent-runtime-state.js';
 
 /**
  * @param {import('../agent-context.js').AgentContext} ctx
- * @param {Partial<import('../lifecycle/state/state-io.js').AliveAgentState>} partial
+ * @param {Partial<import('../lifecycle/state/index.js').AliveAgentState>} partial
  * @param {{ label: string; description: string }} meta
  * @returns {void}
  */

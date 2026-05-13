@@ -23,7 +23,7 @@
 
 export { ERROR_TRACKER, defaultErrorTracker } from './error-tracking-port.js';
 export { createAgentEventObserver, defaultEventCollector, initEventCollector } from './event-observer-port.js';
-export { log } from './logging-port.js';
+export { log } from './logging/index.js';
 export { METRICS_STORE, defaultMetrics } from './metrics-port.js';
 export { buildStatusSnapshot } from './snapshot-port.js';
 export { buildTelemetryConfig, startSpan, startSpanImmediate } from './tracing-port.js';

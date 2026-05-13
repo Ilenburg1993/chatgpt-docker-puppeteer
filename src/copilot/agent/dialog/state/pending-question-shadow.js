@@ -12,7 +12,7 @@ import {
     PENDING_QUESTION_SHADOW_TTL_MS,
     PENDING_QUESTION_SHADOW_TTL_QUESTION_MS,
     PENDING_QUESTION_SHADOW_TTL_READY_MS,
-} from '../../../config/agent.js';
+} from '#copilot/config/agent';
 
 /**
  * @typedef {'fresh' | 'active' | 'expiring_soon' | 'expired'} PendingQuestionShadowState

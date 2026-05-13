@@ -16,4 +16,4 @@ export {
     readAgentRuntimeSdkResourceSnapshot,
     readAgentRuntimeStatusSnapshot,
     readAgentRuntimeStatusValue,
-} from '../runtime/status-readers.js';
+} from '../runtime/index.js';

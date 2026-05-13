@@ -5,11 +5,11 @@
  * @module copilot/agent/di-tokens
  */
 
-import { createToken } from '../core/di.js';
+import { createToken } from '#copilot/core';
 
 /**
  * Agente AlwaysAlive (singleton gerenciado por DI).
  *
- * @type {import('../core/di.js').Token<import('./always-alive.js').AlwaysAliveAgent>}
+ * @type {import('../core/di.js').Token<import('./runtime/always-alive/index.js').AlwaysAliveAgent>}
  */
 export const ALWAYS_ALIVE_AGENT = createToken('ALWAYS_ALIVE_AGENT');

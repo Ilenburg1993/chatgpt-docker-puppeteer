@@ -16,7 +16,7 @@
  *
  * @typedef {import('#copilot/sdk/types').CopilotClient} CopilotClient
  *
- * @typedef {import('./ports/mcp-port.js').AgentMcpCapability} AgentMcpCapability
+ * @typedef {import('./ports/index.js').AgentMcpCapability} AgentMcpCapability
  */
 
 // ─── Agent Status ─────────────────────────────────────────────────────────────
@@ -658,6 +658,11 @@
  *
  * @property {(() => 'approve_all' | 'audit_only' | 'selective') | undefined} getPermissionMode - Retorna o modo de
  *   permissão atual
+ * @property {(() => { mode: 'approve_all' | 'audit_only' | 'selective'; handlerAvailable: boolean }) | undefined} getPermissionCapabilitySnapshot
+ *   - Retorna readiness e metadata da capability de permissões governada pelo agent
+ *
+ * @property {(() => unknown) | undefined} getPermissionPolicySnapshot - Retorna snapshot detalhado da policy de
+ *   permissões ativa
  * @property {((
  *           mode: 'approve_all' | 'audit_only' | 'selective',
  *           opts?: { allowTools?: string[]; denyTools?: string[]; denyShell?: boolean },

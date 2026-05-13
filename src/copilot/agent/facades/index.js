@@ -70,9 +70,16 @@ export { clearRuntimeSdkSessionOwnership, syncRuntimeSdkSessionOwnership } from 
 export {
     clearAgentRuntimePendingQuestionShadow,
     markAgentRuntimeDialogPausedForRecovery,
+    persistAgentRuntimeDialogState,
     persistAgentRuntimeGracefulShutdownState,
     persistAgentRuntimePendingQuestionState,
+    persistAgentRuntimePendingTurnState,
     persistAgentRuntimePrConsumptionSnapshot,
+    persistAgentRuntimeStatePartial,
+    readAgentRuntimeDialogBootstrapState,
+    readAgentRuntimeDialogPersistedState,
+    readAgentRuntimePersistedStateAsync,
+    readAgentRuntimePersistedStateSync,
     readAgentRuntimeSessionId,
     resetAgentRuntimeGracefulShutdownFlag,
     restoreAgentRuntimePersistentBootState,
@@ -94,17 +101,24 @@ export {
     unregisterAgentRuntimeWebhook,
 } from './agent-runtime-webhooks.js';
 export {
+    AGENT_SDK_DEFAULT_MODEL,
     attachAgentSdkBootLifecycleBridge,
     checkAgentSdkAuthStatus,
     compactSdkSession,
     confirmSdkSessionUi,
     createAgentSdkClient,
+    createAgentSdkSessionByClient,
     createAgentSdkToolsRegistry,
     createSdkWorkspaceFile,
+    deleteAgentSdkSessionByClient,
     deselectSdkAgent,
     disconnectAgentSdkSession,
     ensureAgentSdkClientStarted,
     execSdkShell,
+    formatValidationResult,
+    getAgentConfiguredSessionFsHandler,
+    getAgentSdkModelStatsTracker,
+    getAgentSdkRecoveryPolicy,
     getAgentSdkToolsConfig,
     getCurrentSdkAgent,
     getForegroundSdkSessionId,
@@ -120,8 +134,11 @@ export {
     handleSdkPendingPermission,
     handleSdkPendingToolCall,
     inputSdkSessionUi,
+    isAgentSdkExperimentalEnabled,
     isSdkSessionUiElicitationAvailable,
     killSdkShell,
+    listAgentSdkProtectedSessionIdsByClient,
+    listAgentSdkSessionsByClient,
     listPendingSdkElicitations,
     listPendingSdkPermissions,
     listSdkAgents,
@@ -129,6 +146,8 @@ export {
     listSdkModels,
     listSdkSessions,
     listSdkWorkspaceFiles,
+    loadAgentSdkToolsConfigAsync,
+    pickDefinedAgentSdkOptions,
     pingAgentSdkClient,
     pingSdk,
     raceAgentSdkEvents,
@@ -137,11 +156,13 @@ export {
     reloadSdkAgents,
     requestSdkElicitation,
     resolvePendingSdkElicitation,
+    resumeOrCreateAgentSdkSession,
     selectSdkAgent,
     selectSdkSessionUi,
     setForegroundSdkSessionId,
     startAgentSdkBootQuotaBridge,
     stopAgentSdkClient,
+    validateAgentContracts,
 } from './agent-sdk-access.js';
 export {
     canReadAgentSdkSessionMessages,
@@ -164,5 +185,15 @@ export {
     updateAgentSdkPlan,
     updateSdkPlan,
 } from './agent-sdk-session.js';
-export { abortCurrentMessage, getSessionMessages, pingDialogWatchdog, sessionLog } from './agent-session-ops.js';
+export {
+    abortCurrentMessage,
+    getSessionMessages,
+    performKeepaliveSdkTick,
+    pingDialogWatchdog,
+    sessionLog,
+} from './agent-session-ops.js';
 export { listWebhooks, registerWebhook, unregisterWebhook } from './agent-webhook-ops.js';
+export { HealthFacade } from './health-facade.js';
+export { PermissionToolsFacade } from './permission-tools-facade.js';
+export { SdkQueryFacade } from './sdk-query-facade.js';
+export { StateQueryFacade } from './state-query-facade.js';

@@ -11,7 +11,7 @@
  */
 
 import { container, logSwallowed } from '#copilot/core';
-import { wireAgentRuntimeEventBusBridge } from './facades/agent-runtime-event-bridge.js';
+import { wireAgentRuntimeEventBusBridge } from './facades/index.js';
 
 /**
  * @typedef {import('node:events').EventEmitter & {

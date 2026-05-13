@@ -10,9 +10,9 @@
  * @see EventBus
  */
 
-import { withAgentErrorPolicy } from '../../error-policy.js';
-import { canReadAgentSdkSessionMessages, readAgentSdkSessionMessages } from '../../facades/agent-sdk-runtime.js';
-import { log } from '../../ports/logging-port.js';
+import { withAgentErrorPolicy } from '../../error/index.js';
+import { canReadAgentSdkSessionMessages, readAgentSdkSessionMessages } from '../../facades/index.js';
+import { log } from '../../ports/index.js';
 
 const DEFAULT_MESSAGES_CACHE_MAX_ITEMS = 1_000;
 
@@ -105,7 +105,7 @@ async function runSdkHistorySync(session, deps) {
  *     phase?: string;
  *     taskId?: string;
  * }} [policy]
- * @returns {Promise<import('../../error-policy.js').AgentPolicyResult<SessionHistorySyncResult>>}
+ * @returns {Promise<import('../../error/index.js').AgentPolicyResult<SessionHistorySyncResult>>}
  */
 export async function syncSdkHistory(session, emit, deps, policy = {}) {
     const label = policy.label ?? 'session.history.sync';

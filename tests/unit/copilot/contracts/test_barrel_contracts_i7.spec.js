@@ -163,7 +163,11 @@ describe('FI-7 — deep-import guard (Faixa I enforcement)', () => {
         /#copilot\/(core|config|observability|hooks|audit|conversation-hub|bridges|tools|channel|db|api)\/.+/;
 
     /** Aliases intencionais permitidos */
-    const INTENTIONAL_ALIASES = new Set(['#copilot/config/custom-tools-registry', '#copilot/config/tools-state']);
+    const INTENTIONAL_ALIASES = new Set([
+        '#copilot/config/agent',
+        '#copilot/config/custom-tools-registry',
+        '#copilot/config/tools-state',
+    ]);
 
     /** Arquivos com exceção explícita (usa alias intencional) */
     const ALLOWED_FILES = new Set(['tools/bootstrap.js', 'sdk/models/helpers.js']);

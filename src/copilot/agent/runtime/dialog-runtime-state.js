@@ -4,7 +4,7 @@
  * @file Seams de governança do estado persistido do dialog loop.
  */
 
-import { persistStateWithPolicy, readState, readStateAsync } from '../lifecycle/state/state-io.js';
+import { persistStateWithPolicy, readState, readStateAsync } from '../lifecycle/state/index.js';
 
 /**
  * Lê o bootstrap persistido do dialog loop para inicialização síncrona do runtime.
@@ -39,7 +39,7 @@ export async function readAgentRuntimeDialogPersistedState() {
  * @param {Record<string, unknown>} partial
  * @param {string} label
  * @returns {Promise<
- *     import('../error-policy.js').AgentPolicyResult<import('../lifecycle/state/state-io.js').AliveAgentState>
+ *     import('../error/index.js').AgentPolicyResult<import('../lifecycle/state/index.js').AliveAgentState>
  * >}
  */
 export async function persistAgentRuntimeDialogState(partial, label) {
@@ -51,7 +51,7 @@ export async function persistAgentRuntimeDialogState(partial, label) {
  *
  * @param {{ message: string; ts: number }} input
  * @returns {Promise<
- *     import('../error-policy.js').AgentPolicyResult<import('../lifecycle/state/state-io.js').AliveAgentState>
+ *     import('../error/index.js').AgentPolicyResult<import('../lifecycle/state/index.js').AliveAgentState>
  * >}
  */
 export async function persistAgentRuntimePendingTurnState(input) {
@@ -81,7 +81,7 @@ export async function shouldScheduleAgentRuntimeDialogBootRecovery() {
  * Persiste a intenção canônica de `dialogPaused=true` antes do boot recovery do dialog loop.
  *
  * @returns {Promise<
- *     import('../error-policy.js').AgentPolicyResult<import('../lifecycle/state/state-io.js').AliveAgentState>
+ *     import('../error/index.js').AgentPolicyResult<import('../lifecycle/state/index.js').AliveAgentState>
  * >}
  */
 export async function markAgentRuntimeDialogPausedForRecovery() {

@@ -7,7 +7,7 @@
  */
 
 import { logSwallowed, toError } from '#copilot/core';
-import { log } from './ports/logging-port.js';
+import { log } from './ports/index.js';
 
 const DEFAULT_MAX_PENDING_BACKGROUND_TASKS = 1000;
 

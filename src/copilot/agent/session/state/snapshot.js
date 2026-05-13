@@ -11,7 +11,7 @@
  * @see EventBus
  */
 
-import { readState } from '../../lifecycle/state/state-io.js';
+import { readState } from '../../lifecycle/state/index.js';
 import {
     listSnapshotFilesAsync,
     loadLatestSnapshotFileAsync,
@@ -19,7 +19,7 @@ import {
     normalizeSnapshotRecord,
     pruneSnapshotFilesAsync,
     saveSnapshotFileAsync,
-} from './snapshot-store.js';
+} from './store/index.js';
 
 /**
  * @typedef {Object} SessionSnapshotData

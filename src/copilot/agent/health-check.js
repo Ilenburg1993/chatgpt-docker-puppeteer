@@ -10,7 +10,7 @@
  * @typedef {import('./agent-context.js').AgentContext} AgentContext
  */
 
-import { readAgentHealthInputSnapshot } from './facades/agent-health-access.js';
+import { readAgentHealthInputSnapshot } from './facades/index.js';
 
 /**
  * @typedef {{

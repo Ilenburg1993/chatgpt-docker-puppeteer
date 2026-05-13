@@ -15,9 +15,13 @@
  */
 
 import { SHUTDOWN_PRIORITY, TimeoutError, registerShutdownHandler, runShutdown, toError } from '#copilot/core';
-import { listSdkCatalogModels } from '../../facades/agent-model-config.js';
-import { ensureAgentSdkClientStarted, pingAgentSdkClient, stopAgentSdkClient } from '../../facades/agent-sdk-access.js';
-import { readRuntimeControlState } from '../../facades/index.js';
+import {
+    ensureAgentSdkClientStarted,
+    listSdkCatalogModels,
+    pingAgentSdkClient,
+    readRuntimeControlState,
+    stopAgentSdkClient,
+} from '../../facades/index.js';
 
 /** @type {boolean} */
 let _processSignalHandlersRegistered = false;

@@ -16,9 +16,9 @@ import {
     ROTATION_MAX_COMPACTIONS,
     ROTATION_MAX_TURNS,
     ROTATION_MAX_UTIL,
-} from '../../../config/agent.js';
-import { log } from '../../ports/logging-port.js';
-import { startSpanImmediate } from '../../ports/tracing-port.js';
+} from '#copilot/config/agent';
+import { log } from '../../ports/index.js';
+import { startSpanImmediate } from '../../ports/index.js';
 
 /**
  * @typedef {Object} RotationDecision

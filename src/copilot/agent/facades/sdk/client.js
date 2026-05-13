@@ -26,7 +26,7 @@ import {
     getToolRegistryRef,
     hasRpcNamespace,
     requireClient,
-} from './ctx-refs.js';
+} from './core/index.js';
 
 /**
  * @typedef {import('#copilot/agent/types').AgentSdkHandles} AgentSdkHandles

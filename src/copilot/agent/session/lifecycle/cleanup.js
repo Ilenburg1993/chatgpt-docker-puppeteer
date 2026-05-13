@@ -12,16 +12,15 @@
  * @see EventBus
  */
 
-import { SESSION_MAX_AGE_MS } from '../../../config/agent.js';
-import { toError } from '../../../core/error-handlers.js';
-import { withAgentErrorPolicy } from '../../error-policy.js';
+import { SESSION_MAX_AGE_MS } from '#copilot/config/agent';
+import { toError } from '#copilot/core';
+import { withAgentErrorPolicy } from '../../error/index.js';
 import {
     deleteAgentSdkSessionByClient,
     listAgentSdkProtectedSessionIdsByClient,
     listAgentSdkSessionsByClient,
-} from '../../facades/agent-sdk-access.js';
-import { log } from '../../ports/logging-port.js';
-import { startSpan } from '../../ports/tracing-port.js';
+} from '../../facades/index.js';
+import { log, startSpan } from '../../ports/index.js';
 
 /**
  * @typedef {Object} SessionCleanupResult
@@ -161,7 +160,7 @@ export async function cleanupStaleSessions(client, options = {}) {
  *     taskId?: string;
  *     sessionId?: string;
  * }} [policy]
- * @returns {Promise<import('../../error-policy.js').AgentPolicyResult<SessionCleanupResult>>}
+ * @returns {Promise<import('../../error/index.js').AgentPolicyResult<SessionCleanupResult>>}
  */
 export async function cleanupStaleSessionsWithPolicy(client, options = {}, policy = {}) {
     const label = policy.label ?? 'session.cleanup.stale';
@@ -173,8 +172,8 @@ export async function cleanupStaleSessionsWithPolicy(client, options = {}, polic
      *     sessionId?: string;
      *     onError: (
      *         error: Error,
-     *         disposition: import('../../error-policy.js').AgentErrorDisposition,
-     *         context: import('../../error-policy.js').AgentErrorContext,
+     *         disposition: import('../../error/index.js').AgentErrorDisposition,
+     *         context: import('../../error/index.js').AgentErrorContext,
      *     ) => void;
      * }}
      */

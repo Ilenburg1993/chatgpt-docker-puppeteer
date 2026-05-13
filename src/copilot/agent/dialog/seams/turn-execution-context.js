@@ -15,7 +15,7 @@ import {
     EMITTER_TASK_REASONING,
     EMITTER_TOOL_EXECUTION_PROGRESS,
 } from '#copilot/events';
-import { log } from '../../ports/logging-port.js';
+import { log } from '../../ports/index.js';
 
 // Limite de fallback: máximo de caracteres aceitos do delta agregado para reply fallback.
 const MAX_DELTA_FALLBACK_CHARS = 50_000;

@@ -16,7 +16,7 @@
  */
 
 import { SessionError } from '#copilot/core';
-import { logSwallowed } from '../../../core/error-handlers.js';
+import { logSwallowed } from '#copilot/core';
 
 /**
  * Serializa execução de turnos com backpressure baseada em profundidade da fila.

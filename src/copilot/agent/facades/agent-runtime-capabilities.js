@@ -8,20 +8,18 @@
  */
 
 import {
+    readAgentRuntimeHealthSnapshot,
+    readAgentRuntimeStatusSnapshot,
     readRuntimeContextFactoryCapabilities,
     readRuntimePermissionCapability,
     readRuntimePermissionMode,
     readRuntimeToolRegistryEntries,
-} from '../runtime/governance-readers.js';
-import { readAgentRuntimeHealthSnapshot, readAgentRuntimeStatusSnapshot } from '../runtime/status-readers.js';
+} from '../runtime/index.js';
 
 /**
  * @typedef {import('../types.js').IAlwaysAliveAgent & {
  *     listWebhooks?: () => unknown[];
  *     getHandoffManager?: () => unknown;
- *     getPermissionCapabilitySnapshot?: () => Record<string, unknown>;
- *     getContextFactoryCapabilitiesSnapshot?: () => Record<string, Record<string, unknown>>;
- *     getToolRegistryEntriesSnapshot?: (() => unknown[]) | undefined;
  * }} CapabilityAgent
  */
 

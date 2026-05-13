@@ -9,6 +9,8 @@
  */
 
 import {
+    readAgentRuntimeHealthSnapshot,
+    readAgentRuntimeStatusSnapshot,
     readRuntimeContextFactoryCapabilities,
     readRuntimePermissionCapability,
     readRuntimePermissionMode,
@@ -16,10 +18,9 @@ import {
     readRuntimeToolRegistry,
     readRuntimeToolRegistryEntries,
     readRuntimeToolSessionContext,
-} from '../runtime/governance-readers.js';
-import { readAgentRuntimeHealthSnapshot, readAgentRuntimeStatusSnapshot } from '../runtime/status-readers.js';
-import { setBackgroundCompactionThreshold } from '../session/initializers/initializer.js';
-import { createSnapshot, listSnapshotsAsync, loadSnapshotAsync, saveSnapshotAsync } from '../session/state/snapshot.js';
+} from '../runtime/index.js';
+import { setBackgroundCompactionThreshold } from '../session/initializers/index.js';
+import { createSnapshot, listSnapshotsAsync, loadSnapshotAsync, saveSnapshotAsync } from '../session/state/index.js';
 
 /**
  * @typedef {{

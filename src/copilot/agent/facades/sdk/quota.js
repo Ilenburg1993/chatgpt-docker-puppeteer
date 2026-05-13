@@ -8,7 +8,7 @@
  */
 
 import { accountGetQuota, createQuotaMonitor, getSdkRecoveryPolicy, isSdkQuotaOrRateLimitError } from '#copilot/sdk';
-import { requireClient } from './ctx-refs.js';
+import { requireClient } from './core/index.js';
 
 /**
  * @param {import('#copilot/sdk/quota-monitor').QuotaMonitorOptions} options

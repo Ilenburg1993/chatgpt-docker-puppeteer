@@ -15,8 +15,8 @@ import {
     listSessions,
     resumeOrCreate,
 } from '#copilot/sdk';
-import { log } from '../../ports/logging-port.js';
-import { requireClient } from './ctx-refs.js';
+import { log } from '../../ports/index.js';
+import { requireClient } from './core/index.js';
 
 /**
  * @param {import('#copilot/sdk/types').CopilotClient} client

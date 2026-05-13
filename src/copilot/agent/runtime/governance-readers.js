@@ -11,19 +11,20 @@
  *     getPermissionModeSnapshot?: (() => 'approve_all' | 'audit_only' | 'selective') | undefined;
  *     getPermissionMode?: (() => 'approve_all' | 'audit_only' | 'selective') | undefined;
  *     getPermissionCapabilitySnapshot?:
- *         | (() => ReturnType<import('../agent-context.js').AgentContext['getPermissionCapabilitySnapshot']>)
+ *         | (() => { mode: 'approve_all' | 'audit_only' | 'selective'; handlerAvailable: boolean })
  *         | undefined;
- *     getPermissionPolicySnapshot?:
- *         | (() => ReturnType<import('../agent-context.js').AgentContext['getPermissionPolicySnapshot']>)
- *         | undefined;
- *     getContextFactoryCapabilitiesSnapshot?:
- *         | (() => ReturnType<import('../agent-context.js').AgentContext['getContextFactoryCapabilitiesSnapshot']>)
- *         | undefined;
- *     getToolRegistrySnapshot?:
- *         | (() => ReturnType<import('../agent-context.js').AgentContext['getToolRegistrySnapshot']>)
- *         | undefined;
+ *     getPermissionPolicySnapshot?: (() => unknown) | undefined;
+ *     getContextFactoryCapabilitiesSnapshot?: (() => Record<string, Record<string, unknown>>) | undefined;
+ *     getToolRegistrySnapshot?: (() => import('#copilot/sdk/tools-registry').ToolRegistry) | undefined;
  *     getToolRegistryEntriesSnapshot?:
- *         | (() => ReturnType<import('../agent-context.js').AgentContext['getToolRegistryEntriesSnapshot']>)
+ *         | (() => {
+ *               name: string;
+ *               description: string | null;
+ *               category: string;
+ *               tags: string[];
+ *               readOnly: boolean;
+ *               skipPermission: boolean;
+ *           }[])
  *         | undefined;
  *     getToolSessionContext?: (() => import('#copilot/sdk').ToolSessionContext) | undefined;
  *     toolSessionContext?: import('#copilot/sdk').ToolSessionContext | undefined;
@@ -55,7 +56,7 @@ export function readRuntimePermissionCapability(runtime) {
  * Retorna snapshot detalhado da policy ativa (mode, allowTools, denyTools, denyShell, defaultDecision).
  *
  * @param {AgentRuntimeGovernanceTarget} runtime
- * @returns {ReturnType<import('../agent-context.js').AgentContext['getPermissionPolicySnapshot']>}
+ * @returns {unknown}
  */
 export function readRuntimePermissionPolicySnapshot(runtime) {
     return runtime.getPermissionPolicySnapshot?.() ?? null;

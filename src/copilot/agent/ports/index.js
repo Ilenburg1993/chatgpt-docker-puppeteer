@@ -21,7 +21,7 @@ export * from './core-runtime-port.js';
 export * from './error-tracking-port.js';
 export * from './event-observer-port.js';
 export * from './hook-port.js';
-export * from './logging-port.js';
+export * from './logging/index.js';
 export * from './mcp-port.js';
 export * from './metrics-port.js';
 export * from './observability-port.js';

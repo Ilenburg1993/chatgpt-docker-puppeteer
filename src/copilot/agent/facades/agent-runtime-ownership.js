@@ -7,7 +7,7 @@
  *   diretamente do subsistema `session/state/ownership.js` através do barrel bruto do agent.
  */
 
-import { clearActiveSdkSessionOwnership, syncActiveSessionOwnership } from '../session/state/ownership.js';
+import { clearActiveSdkSessionOwnership, syncActiveSessionOwnership } from '../session/state/index.js';
 
 /**
  * @param {string | null} sdkSessionId

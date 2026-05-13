@@ -34,7 +34,7 @@ export {
     PR_CONSUMING_EVENTS,
 } from '../events/agent-events.js';
 export { alwaysAliveAgent, getAgent, resetAgent } from './always-alive-singleton.js';
-export { AlwaysAliveAgent } from './always-alive.js';
+export { AlwaysAliveAgent } from './runtime/always-alive/index.js';
 export { classifyAgentError } from './error-policy.js';
 export {
     DEFAULT_AGENT_RUNTIME_ID,
@@ -48,7 +48,7 @@ export {
     registerAgentRuntime,
     setDefaultAgentRuntimeId,
     unregisterAgentRuntime,
-} from './runtime-registry.js';
+} from './runtime/registry/index.js';
 export {} from './types.js'; // re-exporta os typedefs: IAlwaysAliveAgent, AgentStatus, etc.
 
 // ── Subsistemas ──────────────────────────────────────────────

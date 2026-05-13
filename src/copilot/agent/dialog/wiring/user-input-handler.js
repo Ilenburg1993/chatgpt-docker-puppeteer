@@ -11,9 +11,9 @@
  */
 
 import { EMITTER_QUESTION_PENDING } from '#copilot/events';
-import { DialogProtocol } from '../../../dialog/protocol.js';
-import { persistAgentRuntimePendingQuestionState } from '../../facades/agent-runtime-state.js';
-import { log } from '../../ports/logging-port.js';
+import { DialogProtocol } from '#copilot/dialog';
+import { persistAgentRuntimePendingQuestionState } from '../../facades/index.js';
+import { log } from '../../ports/index.js';
 
 const REPLY_PROTOCOL_CONTINUE =
     'CONTINUE_DIALOG_LOOP: resposta entregue ao usuario; chame ask_user("READY: aguardando próxima mensagem") agora.';

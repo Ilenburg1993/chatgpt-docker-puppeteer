@@ -15,7 +15,7 @@ import {
     getPendingQuestionShadowExpiresAt as shadowExpiresAt,
     getPendingQuestionShadowRemainingMs as shadowRemainingMs,
     getPendingQuestionShadowState as shadowState,
-} from '../dialog/state/pending-question-shadow.js';
+} from '../dialog/state/index.js';
 
 /**
  * @typedef {import('../types.js').AgentDialogState} AgentDialogState
@@ -300,7 +300,7 @@ export function getPendingQuestionShadowRemainingMs(ctx, now = Date.now()) {
  *
  * @param {DialogStateCtx} ctx
  * @param {number} [now]
- * @returns {import('../dialog/state/pending-question-shadow.js').PendingQuestionShadowState | null}
+ * @returns {import('../dialog/state/index.js').PendingQuestionShadowState | null}
  */
 export function getPendingQuestionShadowState(ctx, now = Date.now()) {
     return ctx.dialogState.pendingQuestionShadow ? shadowState(ctx.dialogState.pendingQuestionShadow, { now }) : null;

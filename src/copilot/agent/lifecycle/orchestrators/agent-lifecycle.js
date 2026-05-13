@@ -21,55 +21,45 @@ import {
     EMITTER_STOPPED,
 } from '#copilot/events';
 import {
+    buildTelemetryConfig,
     container,
+    defaultErrorTracker,
+    defaultMetrics,
     EVENT_BUS,
     getHubSessionId,
+    initEventCollector,
     isShuttingDown,
+    log,
     logSwallowed,
+    resolveAgentMcpCapability,
+    resolveConversationStore,
     SessionError,
     setSharedSdkSessionId,
+    startSpan,
     toError,
-} from '../../ports/core-runtime-port.js';
-import { defaultErrorTracker } from '../../ports/error-tracking-port.js';
-import { initEventCollector } from '../../ports/event-observer-port.js';
-import { log } from '../../ports/logging-port.js';
-import { defaultMetrics } from '../../ports/metrics-port.js';
-import { buildTelemetryConfig, startSpan } from '../../ports/tracing-port.js';
+} from '../../ports/index.js';
 
-import { SHUTDOWN_TIMEOUT_MS, STOP_BOOT_WAIT_MS } from '../../../config/agent.js';
-import {
-    persistAgentRuntimeGracefulShutdownState,
-    persistAgentRuntimePrConsumptionSnapshot,
-    resetAgentRuntimeGracefulShutdownFlag,
-    restoreAgentRuntimePersistentBootState,
-    saveAgentRuntimeShutdownSnapshot,
-} from '../../facades/agent-runtime-state.js';
+import { SHUTDOWN_TIMEOUT_MS, STOP_BOOT_WAIT_MS } from '#copilot/config/agent';
 import {
     createAgentSdkClient,
     ensureAgentSdkClientStarted,
+    persistAgentRuntimeGracefulShutdownState,
+    persistAgentRuntimePrConsumptionSnapshot,
     raceAgentSdkEvents,
-} from '../../facades/agent-sdk-access.js';
-import { resolveConversationStore } from '../../ports/conversation-port.js';
-import { resolveAgentMcpCapability } from '../../ports/mcp-port.js';
-import { performBootWiring } from '../../session/boot/boot-wiring.js';
-import { syncSdkHistory } from '../../session/history/history-sync.js';
-import { initOrResumeSession } from '../../session/initializers/initializer.js';
+    resetAgentRuntimeGracefulShutdownFlag,
+    restoreAgentRuntimePersistentBootState,
+    saveAgentRuntimeShutdownSnapshot,
+} from '../../facades/index.js';
+import { performBootWiring } from '../../session/boot/index.js';
+import { syncSdkHistory } from '../../session/history/index.js';
+import { initOrResumeSession } from '../../session/initializers/index.js';
 import {
     clearActiveSdkSessionOwnershipWithPolicy,
     syncActiveSessionOwnershipWithPolicy,
-} from '../../session/state/ownership.js';
-import { tryReconnect } from '../policies/reconnect-policy.js';
-import {
-    buildSessionHooks,
-    buildSessionOptions,
-    buildSessionTools,
-    finalizeSessionInit,
-} from '../setup/session-setup.js';
-import {
-    detachRuntimeObservers,
-    disconnectRuntimeSdkHandles,
-    teardownRuntimeSidecars,
-} from '../teardown/runtime-teardown.js';
+} from '../../session/state/index.js';
+import { tryReconnect } from '../policies/index.js';
+import { buildSessionHooks, buildSessionOptions, buildSessionTools, finalizeSessionInit } from '../setup/index.js';
+import { detachRuntimeObservers, disconnectRuntimeSdkHandles, teardownRuntimeSidecars } from '../teardown/index.js';
 
 /**
  * @typedef {import('../../agent-context.js').AgentContext} AgentContext

@@ -15,17 +15,17 @@
  */
 
 import { logSwallowed, toError } from '#copilot/core';
-import { DRAIN_WRITES_TIMEOUT_MS } from '../../../config/agent.js';
-import { safeJsonParse } from '../../../core/safe-json.js';
-import { AliveAgentStateSchema } from '../../../core/schemas.js';
-import { withAgentErrorPolicy } from '../../error-policy.js';
-import { log } from '../../ports/logging-port.js';
+import { DRAIN_WRITES_TIMEOUT_MS } from '#copilot/config/agent';
+import { safeJsonParse } from '#copilot/core';
+import { AliveAgentStateSchema } from '#copilot/core';
+import { withAgentErrorPolicy } from '../../error/index.js';
+import { log } from '../../ports/index.js';
 import {
     readStateFileIfExists,
     removeStateFileIfExists,
     resetStateFileIoCache,
     writeStateFileJson,
-} from './state-file-io.js';
+} from './file/index.js';
 
 // ─── Typedefs ────────────────────────────────────────────────────────────────
 
@@ -193,7 +193,14 @@ async function _doWriteState(updates) {
     if (_clearGen !== genAtStart) {
         return _defaultState();
     }
+    // FIX P0-4 (hardening): revalidar geração logo antes de escrever em disco para evitar persistência stale
+    // se clearState() foi chamado após o locking do mutex
+    if (_clearGen !== genAtStart) {
+        log('INFO', '[PersistentSession] Escrita de estado cancelada — clearState() foi chamado durante a operação.');
+        return _defaultState();
+    }
     await writeStateFileJson(next);
+    // Apenas restaurar cache se nenhuma limpeza ocorreu durante a escrita
     if (_clearGen === genAtStart) {
         _stateCache = next;
     }
@@ -321,7 +328,7 @@ export async function drainStateWrites(timeoutMs = DRAIN_WRITES_TIMEOUT_MS) {
  *
  * @param {Partial<AliveAgentState>} data - Dados parciais a persistir
  * @param {{ label?: string }} [opts]
- * @returns {Promise<import('../../error-policy.js').AgentPolicyResult<AliveAgentState>>}
+ * @returns {Promise<import('../../error/index.js').AgentPolicyResult<AliveAgentState>>}
  */
 export async function persistStateWithPolicy(data, opts = {}) {
     const label = opts.label ?? 'state.persist';

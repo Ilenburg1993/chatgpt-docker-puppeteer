@@ -7,12 +7,10 @@
 import { resolveHooksStateDir } from '#copilot/boot';
 import { access, mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
-import { SNAPSHOT_DIR as _SNAPSHOT_DIR_ENV, MAX_SNAPSHOTS } from '../../../config/agent.js';
-import { safeJsonParse } from '../../../core/safe-json.js';
-import { SessionSnapshotDataSchema, SnapshotListItemSchema } from '../../../core/schemas.js';
-import { logSwallowed } from '../../ports/core-runtime-port.js';
-import { log } from '../../ports/logging-port.js';
-import { startSpan } from '../../ports/tracing-port.js';
+import { SNAPSHOT_DIR as _SNAPSHOT_DIR_ENV, MAX_SNAPSHOTS } from '#copilot/config/agent';
+import { safeJsonParse } from '#copilot/core';
+import { SessionSnapshotDataSchema, SnapshotListItemSchema } from '#copilot/core';
+import { log, logSwallowed, startSpan } from '../../ports/index.js';
 
 const SNAPSHOT_DIR = _SNAPSHOT_DIR_ENV ? resolve(_SNAPSHOT_DIR_ENV) : resolve(resolveHooksStateDir(), 'snapshots');
 

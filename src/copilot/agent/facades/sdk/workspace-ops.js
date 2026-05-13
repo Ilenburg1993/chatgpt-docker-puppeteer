@@ -20,7 +20,7 @@ import {
     workspaceListFiles,
     workspaceReadFile,
 } from '#copilot/sdk';
-import { requireSession } from './ctx-refs.js';
+import { requireSession } from './core/index.js';
 
 /**
  * @param {unknown} ctx

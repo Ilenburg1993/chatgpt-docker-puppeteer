@@ -9,7 +9,7 @@
 import { resolveHooksStateDir, resolveHooksStateFile } from '#copilot/boot';
 import { mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
-import { STATE_FILE as _STATE_FILE_ENV } from '../../../config/agent.js';
+import { STATE_FILE as _STATE_FILE_ENV } from '#copilot/config/agent';
 
 /** @type {string} */
 export const STATE_DIR = resolveHooksStateDir();
