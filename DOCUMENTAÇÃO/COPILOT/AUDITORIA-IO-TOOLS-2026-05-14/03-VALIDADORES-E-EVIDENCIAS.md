@@ -83,7 +83,7 @@ Mesmo quando o ciclo não quebra hoje, ele reduz previsibilidade de ESM, testes 
 Estado após transformações em andamento:
 
 ```txt
-src/copilot/infra: files 94 cycles 0
+src/copilot/infra: files 95 cycles 0
 ```
 
 O ciclo foi removido extraindo leitura textual baixa para `src/copilot/infra/io/fs/read-text.js` e fazendo parser/index
@@ -168,6 +168,8 @@ Tools:
 - `policy/output-window` com cursor de linhas e items: coberto por `test_output_window_policy.spec.js`.
 - `policy/budgets` com budgets de search/subprocesso e facade pública: coberto por `test_policy_budgets.spec.js`,
   contrato de boundary, typecheck strict e lint.
+- `policy/path-resource` com resource keys, workspace candidates e byte nulo: coberto por
+  `test_policy_path_resource.spec.js`, `test_locks.spec.js`, contrato de boundary e typecheck strict.
 - `storage/` sem dependência de `io-engine`: coberto.
 - `parse/` sem dependências altas de IO/cache/session: coberto.
 - operation envelope em write tools: coberto.

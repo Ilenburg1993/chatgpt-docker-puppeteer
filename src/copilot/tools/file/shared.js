@@ -10,9 +10,9 @@
 
 import { WORKSPACE_ROOT as BOOT_WORKSPACE_ROOT } from '#copilot/boot';
 import { DEFAULT_BLOCKED_READ_PATH_PATTERNS, evaluateIoPathPolicyAsync } from '#copilot/core';
+import { hasNullByte, normalizeWorkspaceRoot } from '#copilot/infra/public/policy';
 import { isAscii, isUtf8 } from 'node:buffer';
 import { execFile } from 'node:child_process';
-import * as path from 'node:path';
 import { promisify } from 'node:util';
 import { log } from '../infra/logger.js';
 
@@ -120,12 +120,12 @@ export async function validatePath(filePath, opts) {
     if (typeof filePath !== 'string' || filePath.trim().length === 0) {
         return { ok: false, reason: 'Caminho inválido: path vazio.', resolved: '' };
     }
-    if (filePath.includes('\u0000')) {
+    if (hasNullByte(filePath)) {
         return { ok: false, reason: 'Caminho inválido: contém byte nulo.', resolved: '' };
     }
 
     const mode = opts?.mode ?? 'write';
-    const normalizedWorkspaceRoot = path.resolve(WORKSPACE_ROOT);
+    const normalizedWorkspaceRoot = normalizeWorkspaceRoot(WORKSPACE_ROOT);
     const policy = await evaluateIoPathPolicyAsync(filePath, {
         workspaceRoot: normalizedWorkspaceRoot,
         mode,

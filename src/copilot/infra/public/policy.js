@@ -12,8 +12,13 @@ export {
     DEFAULT_PROCESS_TIMEOUT_MS,
     MIN_BUFFER_BYTES,
     MIN_TIMEOUT_MS,
+    hasNullByte,
+    isPathInsideWorkspace,
+    normalizePathResourceKey,
     normalizePositiveIntegerBudget,
+    normalizeWorkspaceRoot,
     readEnvPositiveIntegerBudget,
     resolveIoSearchBudget,
+    resolveWorkspaceCandidate,
     resolveProcessExecutionBudget,
 } from '../policy/index.js';

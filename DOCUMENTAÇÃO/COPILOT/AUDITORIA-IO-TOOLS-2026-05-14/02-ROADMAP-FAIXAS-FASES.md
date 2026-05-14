@@ -42,6 +42,7 @@ locks e regressões principais.
 ### F0.5 — Locks básicos
 
 - Normalizar resource keys para locks intra-processo.
+- Centralizar normalização de path/resource em `policy/path-resource.js`.
 - Tornar lockfile atomico com `open('wx')`.
 - Verificar ownership no release.
 
@@ -99,6 +100,7 @@ Objetivo: liberdade alta com retorno controlado.
 - Status inicial: `policy/output-window.js` criado com `maxResults`/janela de linhas e aplicado em `io-engine` e
   índice SQLite.
 - `policy/budgets.js` criado para normalização defensiva de timeout e `maxBuffer` em search e subprocessos.
+- `policy/path-resource.js` criado para normalização de resource keys, raiz/candidato de workspace e byte nulo.
 - `list_directory` já aceita `maxEntries` + `cursor` e retorna `nextCursor`.
 - `search_in_files` e `workspace_symbol_search` aceitam `cursor` e retornam `nextCursor`, `cursorOffset` e
   `totalMatches`.

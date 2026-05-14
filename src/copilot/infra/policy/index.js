@@ -7,6 +7,13 @@
 
 export { limitTextLines, normalizeCursorOffset, normalizeMaxResults, windowItems, windowTextLines } from './output-window.js';
 export {
+    hasNullByte,
+    isPathInsideWorkspace,
+    normalizePathResourceKey,
+    normalizeWorkspaceRoot,
+    resolveWorkspaceCandidate,
+} from './path-resource.js';
+export {
     DEFAULT_IO_SEARCH_MAX_BUFFER_BYTES,
     DEFAULT_IO_SEARCH_TIMEOUT_MS,
     DEFAULT_PROCESS_MAX_BUFFER_BYTES,

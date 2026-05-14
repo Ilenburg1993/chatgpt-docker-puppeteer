@@ -8,7 +8,7 @@
  * @module copilot/infra/io-locks
  */
 
-import * as nodePath from 'node:path';
+import { normalizePathResourceKey } from './policy/path-resource.js';
 
 /** @type {Map<string, Promise<void>>} */
 const tails = new Map();
@@ -20,9 +20,7 @@ const tails = new Map();
  * @returns {string}
  */
 export function normalizeIoResourceKey(resourceKey) {
-    const raw = String(resourceKey || '<unknown>');
-    if (raw.startsWith('<') && raw.endsWith('>')) return raw;
-    return nodePath.normalize(nodePath.resolve(raw));
+    return normalizePathResourceKey(resourceKey);
 }
 
 /**
