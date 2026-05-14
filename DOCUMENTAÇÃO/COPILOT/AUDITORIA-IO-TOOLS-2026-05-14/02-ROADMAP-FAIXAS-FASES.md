@@ -181,6 +181,9 @@ Objetivo: transformar primitives em ações rastreáveis.
 - `patch_file` aceita `dryRun` e retorna operação com status `dry-run`, sem tocar no disco.
 - `patch_file` suporta `occurrence_index`, `replace_all`, `expected_occurrences`, `allowNoop` e `diffPreview`
   paginado/truncado para edição cirúrgica de arquivos com matches repetidos.
+- `patch_file` foi extraída para `tools/file/write/patch-file.js`; feedback específico foi isolado em
+  `write/patch-feedback.js` e helpers transacionais comuns em `write/mutation-helpers.js`, reduzindo `write-tools.js`
+  para facade de composição das mutações restantes.
 
 ### F3.2 — Transactions
 

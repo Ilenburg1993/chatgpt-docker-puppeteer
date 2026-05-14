@@ -321,6 +321,18 @@ Contrato ideal específico de `read_file_content`:
 - por ser tool central e complexa, a implementação de `read_file_content` deve viver em subdomínio dedicado
   (`tools/file/read/*`), enquanto `read-tools.js` permanece como facade de composição das read tools.
 
+Contrato ideal específico de `patch_file`:
+
+- deve viver em subdomínio dedicado (`tools/file/write/*`), separado de `write-tools.js`;
+- deve manter feedback próprio por código estável de erro, com `fix` específico para match ausente, match ambíguo,
+  conflito de modo, hash stale, no-op e ocorrência fora do intervalo;
+- deve retornar metadados de edição úteis para a LLM-B: ocorrências, ocorrência substituída, linhas do match, delta de
+  bytes/linhas, hashes, `dryRun`, `noop`, preview de diff e truncamento;
+- deve compartilhar helpers transacionais, rollback, auditoria e path feedback com as demais file write tools sem criar
+  acoplamento circular;
+- `write-tools.js` deve permanecer como facade pública/composição, não como depósito monolítico de toda lógica de
+  mutação.
+
 Subdomínios recomendados:
 
 - `file/`: leitura, escrita, search, index, scope.

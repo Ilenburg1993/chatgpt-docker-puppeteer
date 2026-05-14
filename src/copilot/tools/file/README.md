@@ -67,7 +67,9 @@ Para automação shell, use `npm run copilot:index -- ...`.
   `search_in_files`, `diff_files`, `workspace_symbol_search`).
 - `read/`: subdomínio interno barrel-first para implementação de tools de leitura grandes. Hoje contém a cadeia
   especializada de `read_file_content`, separando handler, janela/cursor e metadados canônicos.
-- `write-tools.js`: mutações de arquivo com locks e atomicidade.
+- `write-tools.js`: facade pública das mutações de arquivo com locks, rollback e atomicidade.
+- `write/`: subdomínio interno barrel-first para implementações e helpers grandes de mutação. Hoje contém
+  `patch_file`, feedback de patch e helpers transacionais compartilhados.
 - `index-tools.js`: ferramentas explícitas do índice L2.
 - `scope-tools.js`: ferramentas explícitas de scope LLM-B.
 
