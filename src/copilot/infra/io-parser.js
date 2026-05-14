@@ -30,6 +30,15 @@ import { LRUCache } from 'lru-cache';
 import * as nodePath from 'node:path';
 import { registerInvalidationHook } from './io-cache.js';
 import { readTextFileSnapshot } from './io/fs/read-text.js';
+import {
+    buildOutline,
+    extractJsonSchema,
+    extractMarkdownOutline,
+    extractMarkdownOutlineWithLines,
+    extractTopComments,
+} from './parse/index.js';
+
+export { buildOutline, extractJsonSchema, extractMarkdownOutline, extractTopComments };
 
 // ---------------------------------------------------------------------------
 // Config
@@ -425,175 +434,6 @@ export async function parseFileForContext(filePath, content) {
     const outline = buildOutline(symbols);
     const topComments = extractTopComments(content);
     return { symbols, outline, topComments };
-}
-
-// ---------------------------------------------------------------------------
-// JSON schema extraction
-// ---------------------------------------------------------------------------
-
-/**
- * Extrai top-level keys de um JSON (ou JSONL primeira linha).
- *
- * @param {string} content
- * @returns {{ symbols: SymbolEntry[]; parseError: string | null }}
- */
-export function extractJsonSchema(content) {
-    try {
-        const first = parseJsonOrJsonlSample(content);
-        const obj = Array.isArray(first) ? (first[0] ?? {}) : first;
-        const symbols = Object.keys(obj ?? {}).map((k, i) => ({
-            kind: /** @type {'variable'} */ ('variable'),
-            name: k,
-            exported: false,
-            line: i + 1,
-            docComment: null,
-        }));
-        return { symbols, parseError: null };
-    } catch (e) {
-        return { symbols: [], parseError: String(e) };
-    }
-}
-
-/**
- * @param {string} content
- * @returns {unknown}
- */
-function parseJsonOrJsonlSample(content) {
-    try {
-        return JSON.parse(content);
-    } catch (error) {
-        const firstLine = content
-            .split(/\r?\n/u)
-            .map((line) => line.trim())
-            .find((line) => line.length > 0);
-        if (!firstLine) throw error;
-        return JSON.parse(firstLine);
-    }
-}
-
-// ---------------------------------------------------------------------------
-// Markdown outline extraction
-// ---------------------------------------------------------------------------
-
-/**
- * Extrai headings H1-H4 de Markdown.
- *
- * @param {string} content
- * @returns {string[]}
- */
-export function extractMarkdownOutline(content) {
-    return extractMarkdownOutlineWithLines(content).map((entry) => entry.heading);
-}
-
-/**
- * Extrai headings H1-H4 de Markdown preservando linha real.
- *
- * @param {string} content
- * @returns {{ heading: string; line: number; depth: number }[]}
- */
-function extractMarkdownOutlineWithLines(content) {
-    /** @type {{ heading: string; line: number; depth: number }[]} */
-    const headings = [];
-    const lines = content.split('\n');
-    for (let index = 0; index < lines.length; index++) {
-        const line = lines[index] ?? '';
-        const m = /^(#{1,4})\s+(.+)$/.exec(line);
-        if (m) {
-            const marker = m[1] ?? '';
-            headings.push({
-                heading: `${marker} ${(m[2] ?? '').trim()}`,
-                line: index + 1,
-                depth: marker.length,
-            });
-        }
-    }
-    return headings;
-}
-
-// ---------------------------------------------------------------------------
-// Outline builder
-// ---------------------------------------------------------------------------
-
-/**
- * Constrói outline textual legível (para contexto LLM-B).
- *
- * @param {FileSymbols} symbols
- * @returns {string[]}
- */
-export function buildOutline(symbols) {
-    const lines = [];
-    const exported = symbols.symbols.filter((s) => s.exported);
-    const unexported = symbols.symbols.filter((s) => !s.exported);
-
-    if (exported.length) {
-        lines.push(`── Exports (${exported.length})`);
-        for (const s of exported) {
-            lines.push(`   [${s.kind}] ${s.name} (L${s.line})`);
-        }
-    }
-    if (unexported.length > 0 && unexported.length <= 20) {
-        lines.push(`── Internal (${unexported.length})`);
-        for (const s of unexported) {
-            lines.push(`   [${s.kind}] ${s.name} (L${s.line})`);
-        }
-    }
-    if (symbols.imports.length) {
-        lines.push(`── Imports (${symbols.imports.length})`);
-        for (const imp of symbols.imports) {
-            const specs = imp.specifiers.length
-                ? `{ ${imp.specifiers.slice(0, 4).join(', ')}${imp.specifiers.length > 4 ? ', ...' : ''} }`
-                : '*';
-            lines.push(`   ${specs} from '${imp.source}'`);
-        }
-    }
-    if (symbols.parseError) lines.push(`⚠️ Parse error: ${symbols.parseError}`);
-    return lines;
-}
-
-// ---------------------------------------------------------------------------
-// Top-level comment extractor
-// ---------------------------------------------------------------------------
-
-/**
- * Extrai os primeiros comentários de bloco (JSDoc/module docs) do arquivo.
- *
- * @param {string} content
- * @returns {string[]}
- */
-export function extractTopComments(content) {
-    /** @type {string[]} */
-    const comments = [];
-    const lines = content.split('\n');
-    let inBlock = false;
-    let blockLines = /** @type {string[]} */ ([]);
-
-    for (const line of lines.slice(0, 50)) {
-        const trimmed = line.trim();
-        if (!inBlock && trimmed.startsWith('/*')) {
-            inBlock = true;
-            blockLines = [line];
-            if (trimmed.endsWith('*/')) {
-                comments.push(blockLines.join('\n'));
-                inBlock = false;
-                blockLines = [];
-            }
-            continue;
-        }
-        if (inBlock) {
-            blockLines.push(line);
-            if (trimmed.endsWith('*/')) {
-                comments.push(blockLines.join('\n'));
-                inBlock = false;
-                blockLines = [];
-            }
-            continue;
-        }
-        if (trimmed.startsWith('//')) {
-            comments.push(line);
-        }
-    }
-
-    return comments.slice(0, 10);
 }
 
 /**

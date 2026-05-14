@@ -11,7 +11,8 @@
 - Engine canônica de I/O local em `io-engine.js`, ainda mantida como facade de compatibilidade durante a migração 2.0/2.1.
 - Cache L1 em memória, cache L2 SQLite, tiering, health e invalidação coordenada.
 - Scanner, parser, prefetch, scope de sessão e índice L2 pesquisável.
-- Subdomínios internos baixos em `shared/`, `policy/`, `scan/` e `io/fs/`.
+- Subdomínios internos baixos em `shared/`, `policy/`, `scan/`, `parse/`, `storage/`, `queue/`, `locks/`,
+  `runtime/` e `io/fs/`.
 - Locks, storage, queue, webhooks e infraestrutura SSE.
 
 ## O que não deve ficar aqui
@@ -47,7 +48,12 @@
 - `shared/`: helpers sem dependência de domínio, como leitura tipada de ambiente.
 - `policy/`: policies reutilizáveis, incluindo janela de saída para retornos grandes.
 - `scan/`: glob, gitignore, fingerprint e batching usados por scanner e prefetch.
+- `parse/`: parsers puros de JSON, Markdown, comentários e outline textual.
 - `io/fs/`: portas baixas de filesystem usadas para quebrar ciclos entre parser/index/engine.
+- `storage/`: JSON store baixo sem dependência de `io-engine.js`.
+- `queue/`: implementação modular da fila assíncrona.
+- `locks/`: barrels internos de locks em memória e lockfile.
+- `runtime/`: envelope rastreável de operação, base para transações e rollback.
 - `sse/`: fanout, replay buffer e estado SSE.
 
 ## Regras de manutenção
@@ -59,6 +65,8 @@
   diretamente em tools ou adapters.
 - Módulos baixos (`shared/`, `policy/`, `scan/`, `io/fs/`) não importam `public/`, `io-engine.js`, registry, tools ou
   sessão.
+- `parse/` permanece puro: sem `io/`, cache, índice, prefetch ou sessão.
+- `storage.js` é apenas facade de compatibilidade; implementação vive em `storage/`.
 - L1, L2 blob e L2 índice devem ser invalidados pelo mesmo evento de escrita.
 - Prefetch pode aquecer dados, mas não vira fonte de verdade; a verdade segue no filesystem via
   `io-engine`.

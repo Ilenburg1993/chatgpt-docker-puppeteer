@@ -50,7 +50,7 @@ Objetivo: iniciar arquitetura 2.0/2.1 sem quebrar consumidores.
 
 Status em 2026-05-14: facades públicas criadas, tools migradas para `#copilot/infra/public/*`, ciclo principal
 `index -> engine -> registry` removido, module-map de infra criado, contrato de boundary adicionado e subdomínios
-baixos `shared/`, `policy/`, `scan/` e `io/fs/` iniciados.
+baixos `shared/`, `policy/`, `scan/`, `parse/`, `storage/`, `queue/`, `locks/`, `runtime/` e `io/fs/` iniciados.
 
 ### F1.1 — Facades públicas
 
@@ -67,7 +67,7 @@ baixos `shared/`, `policy/`, `scan/` e `io/fs/` iniciados.
 
 ### F1.3 — Parser puro
 
-- Criar `parse/` puro.
+- Criar `parse/` puro (executado para JSON, Markdown, comentários e outline textual).
 - Mover cache/leitura para `session/symbol-cache.js` ou `prefetch/symbol-cache.js`.
 - Corrigir JSON array multi-linha, JSONL e Markdown com linha real.
 
@@ -94,6 +94,7 @@ Objetivo: liberdade alta com retorno controlado.
 - Uso em search, symbol search, list directory, index search, git diff, shell output.
 - Status inicial: `policy/output-window.js` criado com `maxResults`/janela de linhas e aplicado em `io-engine` e
   índice SQLite.
+- `list_directory` já aceita `maxEntries` + `cursor` e retorna `nextCursor`.
 
 ### F2.2 — `rg --json`
 
@@ -113,6 +114,7 @@ Objetivo: transformar primitives em ações rastreáveis.
 ### F3.1 — Operation envelope
 
 - `operationId`, `traceId`, capability, risk, preconditions, apply, result, evidence.
+- Status inicial: `runtime/operation.js` criado e file write tools retornam envelope `operation` em mutações.
 
 ### F3.2 — Transactions
 
@@ -188,3 +190,5 @@ npm run test:copilot:unit -- tests/unit/copilot/infra/**/*.spec.js tests/unit/co
 11. PR Low-level Subdomains: `shared/`, `policy/`, `scan/`, `io/fs/`.
 12. PR Output Window: cursor e truncamento estruturado.
 13. PR Runtime Agentic: operation/transaction/rollback.
+14. PR Parse Pure: mover parsers auxiliares para `parse/` sem dependências altas.
+15. PR Storage Queue Locks: iniciar domínios internos `storage/`, `queue/`, `locks/`.

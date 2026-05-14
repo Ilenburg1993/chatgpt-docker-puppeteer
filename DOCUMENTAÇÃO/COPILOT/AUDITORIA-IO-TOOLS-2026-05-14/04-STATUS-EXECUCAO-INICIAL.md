@@ -98,7 +98,13 @@ Transformações aplicadas:
 - `io-index-sqlite.search()` aplica `pathPrefix` no SQL/FTS em vez de filtrar em memória depois.
 - `io-scanner.js` ganhou `IO_SCAN_BATCH_SIZE`/`batchSize` para evitar fan-out massivo de promessas.
 - `shared/env.js`, `policy/output-window.js` e `scan/*` foram extraídos como subdomínios internos baixos.
+- `parse/*` passou a concentrar parsers puros de JSON, Markdown, comentários e outline.
+- `storage/*` passou a concentrar JSON store baixo; `storage.js` virou facade sem depender de `io-engine.js`.
+- `queue/*`, `locks/*` e `runtime/*` foram iniciados como domínios internos barrel-first.
 - `workspace_index_search` e `workspace_index_find_symbol` passaram a aceitar `maxResults`, aplicado no SQLite.
+- `list_directory` passou a aceitar `maxEntries` e `cursor`, retornando `nextCursor`.
+- Mutações de file tools passaram a retornar envelope `operation` com `operationId`, capability, risco, status, duração e
+  evidence.
 - `public/cache.js` e `public/testing.js` foram adicionados como facades públicas explícitas.
 - Tools de file/web consomem infra via `#copilot/infra/public/*`.
 - `src/copilot/infra/module-map.js` foi criado e exportado pelo barrel raiz para governança 2.0/2.1.
@@ -107,6 +113,6 @@ Transformações aplicadas:
 Evidência local:
 
 ```txt
-src/copilot/infra: files 45 cycles 0
+src/copilot/infra: files 61 cycles 0
 tools -> infra internals: 0 ocorrências
 ```

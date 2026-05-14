@@ -108,5 +108,6 @@ export * from './public/events.js';
 export * from './public/health.js';
 export * from './public/indexing.js';
 export * from './public/io.js';
+export * from './public/runtime.js';
 export * from './public/session.js';
 export * from './public/testing.js';

@@ -62,6 +62,7 @@ vi.mock('../../../../../src/copilot/tools/infra/tool-factory.js', () => ({
 // crypto mock para atomicWrite
 vi.mock('node:crypto', () => ({
     randomBytes: vi.fn(() => ({ toString: () => 'abcd1234' })),
+    randomUUID: vi.fn(() => 'op-test-id'),
 }));
 
 // ─── Import após mocks ──────────────────────────────────────────────────────
@@ -120,6 +121,7 @@ describe('F35 — write_file_content (F181-F182)', () => {
 
         expect(result).toMatchObject({ success: true, path: '/workspace/file.txt' });
         expect(result.io?.operation).toBe('write');
+        expect(result.operation).toMatchObject({ operationId: 'op-test-id', capability: 'file.write', status: 'applied' });
         expect(result.bytesWritten).toBe(5);
         expect(fsMock.writeFile).toHaveBeenCalledOnce();
         expect(fsMock.rename).toHaveBeenCalledOnce();
@@ -146,6 +148,7 @@ describe('F35 — write_file_content (F181-F182)', () => {
 
         expect(result.success).toBe(false);
         expect(result.error).toContain('Arquivo não encontrado');
+        expect(result.operation).toMatchObject({ capability: 'file.write', status: 'failed' });
     });
 
     it('falha se validatePath rejeita', async () => {
@@ -333,6 +336,7 @@ describe('F35 — delete_file (F185)', () => {
 
         expect(result).toMatchObject({ success: true, deleted: true });
         expect(result.io?.operation).toBe('delete');
+        expect(result.operation).toMatchObject({ capability: 'file.delete', status: 'applied' });
         expect(fsMock.unlink).toHaveBeenCalledWith('/workspace/doomed.txt');
     });
 
@@ -412,6 +416,7 @@ describe('F35 — copy_file (F186)', () => {
         const result = await handler({ source: 'a.txt', destination: 'b.txt', overwrite: true });
 
         expect(result.success).toBe(true);
+        expect(result.operation).toMatchObject({ capability: 'file.copy', status: 'applied' });
     });
 
     it('falha se source path inválido', async () => {
@@ -465,6 +470,7 @@ describe('F35 — move_file (F186)', () => {
         const result = await handler({ source: 'a.txt', destination: 'b.txt', overwrite: true });
 
         expect(result.success).toBe(true);
+        expect(result.operation).toMatchObject({ capability: 'file.move', status: 'applied' });
     });
 });
 
@@ -489,6 +495,7 @@ describe('F35 — patch_file (F187)', () => {
         });
 
         expect(result.success).toBe(true);
+        expect(result.operation).toMatchObject({ capability: 'file.patch', status: 'applied' });
     });
 
     it('falha se old_string não encontrada', async () => {

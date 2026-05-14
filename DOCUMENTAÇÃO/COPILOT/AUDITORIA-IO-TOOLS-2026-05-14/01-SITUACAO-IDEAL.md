@@ -112,6 +112,7 @@ src/copilot/infra/
     json-outline.js
     markdown-outline.js
     comments.js
+    outline-builder.js
     index.js
 
   index-store/

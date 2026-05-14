@@ -34,6 +34,7 @@ import { log } from '../infra/logger.js';
 import { buildTool, withSkipPermission } from '../infra/tool-factory.js';
 import {
     applyEntryLimit,
+    applyEntryWindow,
     FILE_TOOLS_OUTPUT_POLICY,
     truncateBuffer,
     truncateUtf8Text,
@@ -200,8 +201,10 @@ export const listDirectoryTool = buildTool({
             .describe('Profundidade máxima para listagem recursiva. Informativa e controlada pelo caller.'),
         showHidden: z.boolean().optional().default(false).describe('Incluir arquivos/diretórios ocultos (dotfiles)'),
         filter: z.string().optional().describe('Glob pattern para filtrar entradas (ex: *.js, *.md)'),
+        maxEntries: z.number().int().positive().optional().describe('Máximo de entradas de topo a retornar.'),
+        cursor: z.string().optional().describe('Cursor numérico retornado por chamada anterior.'),
     }),
-    handler: async ({ path: dirPath, recursive, depth, showHidden, filter }) => {
+    handler: async ({ path: dirPath, recursive, depth, showHidden, filter, maxEntries, cursor }) => {
         const { ok, reason, resolved } = await validatePath(dirPath, { mode: 'read' });
         if (!ok) return { success: false, error: reason };
 
@@ -242,11 +245,15 @@ export const listDirectoryTool = buildTool({
                 return legacy;
             };
             const entries = scan.entries.map(toLegacyEntry);
-            const limitedEntries = applyEntryLimit(entries, FILE_TOOLS_OUTPUT_POLICY.maxListEntries);
+            const configuredMaxEntries = maxEntries ?? FILE_TOOLS_OUTPUT_POLICY.maxListEntries;
+            const limitedEntries =
+                cursor !== undefined || maxEntries !== undefined
+                    ? applyEntryWindow(entries, { maxEntries: configuredMaxEntries, cursor })
+                    : applyEntryLimit(entries, configuredMaxEntries);
             if (limitedEntries.truncated) {
                 log(
                     'INFO',
-                    `[copilot/list_directory] saída truncada por política (${FILE_TOOLS_OUTPUT_POLICY.maxListEntries} entries) em ${resolved}`,
+                    `[copilot/list_directory] saída truncada por política (${configuredMaxEntries} entries) em ${resolved}`,
                 );
             }
             return withIoMeta(
@@ -255,10 +262,12 @@ export const listDirectoryTool = buildTool({
                     path: resolved,
                     count: limitedEntries.entries.length,
                     truncated: limitedEntries.truncated,
+                    nextCursor: 'nextCursor' in limitedEntries ? limitedEntries.nextCursor : null,
+                    cursorOffset: 'cursorOffset' in limitedEntries ? limitedEntries.cursorOffset : 0,
                     scannedBudget: scan.scannedEntries,
                     totalEntries: limitedEntries.totalEntries,
                     ...(limitedEntries.truncated
-                        ? { configuredLimitEntries: FILE_TOOLS_OUTPUT_POLICY.maxListEntries }
+                        ? { configuredLimitEntries: configuredMaxEntries }
                         : {}),
                     entries: limitedEntries.entries,
                 },

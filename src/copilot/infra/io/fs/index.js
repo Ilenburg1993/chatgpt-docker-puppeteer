@@ -6,3 +6,4 @@
  */
 
 export { readTextFileSnapshot } from './read-text.js';
+export { normalizeWritePayload, toWriteBuffer, writeAtomicFileUnlocked } from './write-atomic.js';

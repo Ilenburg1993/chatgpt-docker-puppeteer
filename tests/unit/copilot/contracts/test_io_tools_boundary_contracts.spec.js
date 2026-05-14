@@ -64,7 +64,16 @@ describe('IO/tools boundary contracts', () => {
     });
 
     it('facades públicas de IO existem como contratos nomeados', () => {
-        for (const facade of ['cache.js', 'events.js', 'health.js', 'indexing.js', 'io.js', 'session.js', 'testing.js']) {
+        for (const facade of [
+            'cache.js',
+            'events.js',
+            'health.js',
+            'indexing.js',
+            'io.js',
+            'runtime.js',
+            'session.js',
+            'testing.js',
+        ]) {
             expect(existsSync(join(COPILOT_INFRA_ROOT, 'public', facade)), facade).toBe(true);
         }
     });

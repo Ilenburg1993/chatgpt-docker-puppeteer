@@ -238,3 +238,46 @@ export function applyEntryLimit(entries, maxEntries) {
         limitEntries: maxEntries,
     };
 }
+
+/**
+ * Aplica janela de entries com cursor numérico estável.
+ *
+ * @template T
+ * @param {T[]} entries
+ * @param {{ maxEntries?: number; cursor?: string | number | null; fallbackMaxEntries?: number }} options
+ * @returns {{
+ *     entries: T[];
+ *     truncated: boolean;
+ *     totalEntries: number;
+ *     limitEntries: number | null;
+ *     cursorOffset: number;
+ *     nextCursor: string | null;
+ * }}
+ */
+export function applyEntryWindow(entries, options = {}) {
+    const safeEntries = Array.isArray(entries) ? entries : [];
+    const totalEntries = safeEntries.length;
+    const requestedLimit = Number(options.maxEntries ?? options.fallbackMaxEntries);
+    const limitEntries = Number.isFinite(requestedLimit) && requestedLimit > 0 ? Math.floor(requestedLimit) : null;
+    const requestedOffset = Number(options.cursor ?? 0);
+    const cursorOffset = Number.isFinite(requestedOffset) && requestedOffset > 0 ? Math.floor(requestedOffset) : 0;
+    if (limitEntries === null) {
+        return {
+            entries: safeEntries.slice(cursorOffset),
+            truncated: false,
+            totalEntries,
+            limitEntries,
+            cursorOffset,
+            nextCursor: null,
+        };
+    }
+    const endOffset = cursorOffset + limitEntries;
+    return {
+        entries: safeEntries.slice(cursorOffset, endOffset),
+        truncated: endOffset < totalEntries,
+        totalEntries,
+        limitEntries,
+        cursorOffset,
+        nextCursor: endOffset < totalEntries ? String(endOffset) : null,
+    };
+}

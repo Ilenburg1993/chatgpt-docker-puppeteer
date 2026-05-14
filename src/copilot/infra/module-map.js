@@ -18,6 +18,7 @@
  *     | 'shared-foundation'
  *     | 'policy-foundation'
  *     | 'scan-foundation'
+ *     | 'parse-foundation'
  *     | 'low-level-port'
  *     | 'io-engine'
  *     | 'io-cache'
@@ -28,6 +29,7 @@
  *     | 'observability'
  *     | 'sse-foundation'
  *     | 'storage'
+ *     | 'runtime-foundation'
  *     | 'webhook'
  *     | 'di'} InfraModuleRole
  *
@@ -112,6 +114,15 @@ export const INFRA_MODULE_LAYOUT = Object.freeze([
         summary: 'Primitivas modulares de scan: glob, gitignore, batching e fingerprint.',
     },
     {
+        path: 'parse/',
+        kind: 'directory',
+        role: 'parse-foundation',
+        tier: 'internal',
+        risk: 'watch',
+        public: false,
+        summary: 'Parsers puros sem dependência de IO/cache/session.',
+    },
+    {
         path: 'io/',
         kind: 'directory',
         role: 'low-level-port',
@@ -119,6 +130,42 @@ export const INFRA_MODULE_LAYOUT = Object.freeze([
         risk: 'watch',
         public: false,
         summary: 'Portas baixas de filesystem usadas por engines para evitar ciclos.',
+    },
+    {
+        path: 'locks/',
+        kind: 'directory',
+        role: 'concurrency-foundation',
+        tier: 'internal',
+        risk: 'watch',
+        public: false,
+        summary: 'Barrels internos de locks em memória e lockfile.',
+    },
+    {
+        path: 'queue/',
+        kind: 'directory',
+        role: 'concurrency-foundation',
+        tier: 'internal',
+        risk: 'stable',
+        public: false,
+        summary: 'Implementação modular da fila assíncrona.',
+    },
+    {
+        path: 'storage/',
+        kind: 'directory',
+        role: 'storage',
+        tier: 'internal',
+        risk: 'stable',
+        public: false,
+        summary: 'Implementações modulares de storage local.',
+    },
+    {
+        path: 'runtime/',
+        kind: 'directory',
+        role: 'runtime-foundation',
+        tier: 'internal',
+        risk: 'watch',
+        public: false,
+        summary: 'Operações rastreáveis, transações e rollback futuro.',
     },
     {
         path: 'io-engine.js',
@@ -262,7 +309,7 @@ export const INFRA_MODULE_LAYOUT = Object.freeze([
         tier: 'secondary',
         risk: 'stable',
         public: false,
-        summary: 'Fila assíncrona com limite de concorrência.',
+        summary: 'Facade de compatibilidade para queue/.',
     },
     {
         path: 'sse/',
@@ -280,7 +327,7 @@ export const INFRA_MODULE_LAYOUT = Object.freeze([
         tier: 'secondary',
         risk: 'stable',
         public: false,
-        summary: 'Helpers JSON/filesystem compartilhados.',
+        summary: 'Facade de compatibilidade para storage/.',
     },
     {
         path: 'webhooks.js',

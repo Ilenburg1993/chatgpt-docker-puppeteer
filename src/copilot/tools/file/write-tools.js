@@ -20,6 +20,11 @@ import {
     patchTextLocked,
     writeFileAtomic,
 } from '#copilot/infra/public/io';
+import {
+    completeIoOperationEnvelope,
+    createIoOperationEnvelope,
+    failIoOperationEnvelope,
+} from '#copilot/infra/public/runtime';
 import { log } from '../infra/logger.js';
 import { buildTool } from '../infra/tool-factory.js';
 import { validatePath } from './shared.js';
@@ -53,6 +58,12 @@ const writeFileContentTool = buildTool({
         if (!ok) return { success: false, error: reason };
 
         log('INFO', `[copilot/write_file_content] ${resolved}`);
+        const operation = createIoOperationEnvelope({
+            capability: 'file.write',
+            riskClass: 'high',
+            targets: [resolved],
+            evidence: { tool: 'write_file_content' },
+        });
 
         try {
             const buf = encoding === 'base64' ? Buffer.from(content, 'base64') : Buffer.from(content, 'utf8');
@@ -70,11 +81,15 @@ const writeFileContentTool = buildTool({
                     success: true,
                     path: resolved,
                     bytesWritten: buf.length,
+                    operation: completeIoOperationEnvelope(operation, {
+                        traceId: writeResult.io.traceId ?? null,
+                        evidence: { bytesWritten: buf.length },
+                    }),
                 },
                 writeResult.io,
             );
         } catch (err) {
-            return { success: false, error: toError(err).message };
+            return { success: false, error: toError(err).message, operation: failIoOperationEnvelope(operation, err) };
         }
     },
 });
@@ -110,6 +125,12 @@ const createFileTool = buildTool({
         if (!ok) return { success: false, error: reason };
 
         log('INFO', `[copilot/create_file] ${resolved}`);
+        const operation = createIoOperationEnvelope({
+            capability: overwrite ? 'file.create-or-overwrite' : 'file.create',
+            riskClass: overwrite ? 'high' : 'medium',
+            targets: [resolved],
+            evidence: { tool: 'create_file', overwrite },
+        });
 
         try {
             const contentBytes = Buffer.byteLength(content ?? '', 'utf8');
@@ -129,11 +150,15 @@ const createFileTool = buildTool({
                     success: true,
                     path: resolved,
                     bytesWritten: writeResult.bytesWritten,
+                    operation: completeIoOperationEnvelope(operation, {
+                        traceId: writeResult.io.traceId ?? null,
+                        evidence: { bytesWritten: writeResult.bytesWritten },
+                    }),
                 },
                 writeResult.io,
             );
         } catch (err) {
-            return { success: false, error: toError(err).message };
+            return { success: false, error: toError(err).message, operation: failIoOperationEnvelope(operation, err) };
         }
     },
 });
@@ -157,16 +182,33 @@ const deleteFileTool = buildTool({
         if (!ok) return { success: false, error: reason };
 
         log('INFO', `[copilot/delete_file] ${resolved}`);
+        const operation = createIoOperationEnvelope({
+            capability: 'file.delete',
+            riskClass: 'high',
+            targets: [resolved],
+            evidence: { tool: 'delete_file' },
+        });
 
         try {
             const deleted = await deleteFileLocked(resolved);
-            return { success: true, ...deleted };
+            return {
+                success: true,
+                ...deleted,
+                operation: completeIoOperationEnvelope(operation, {
+                    traceId: deleted.io?.traceId ?? null,
+                    evidence: { deleted: true },
+                }),
+            };
         } catch (err) {
             const e = /** @type {{ code?: unknown }} */ (err);
             if (e.code === 'EISDIR' || e.code === 'EPERM') {
-                return { success: false, error: 'É um diretório. delete_file só opera em arquivos.' };
+                return {
+                    success: false,
+                    error: 'É um diretório. delete_file só opera em arquivos.',
+                    operation: failIoOperationEnvelope(operation, err),
+                };
             }
-            return { success: false, error: toError(err).message };
+            return { success: false, error: toError(err).message, operation: failIoOperationEnvelope(operation, err) };
         }
     },
 });
@@ -194,6 +236,12 @@ const copyFileTool = buildTool({
         if (!dst.ok) return { success: false, error: dst.reason };
 
         log('INFO', `[copilot/copy_file] ${src.resolved} → ${dst.resolved}`);
+        const operation = createIoOperationEnvelope({
+            capability: 'file.copy',
+            riskClass: overwrite ? 'high' : 'medium',
+            targets: [src.resolved, dst.resolved],
+            evidence: { tool: 'copy_file', overwrite },
+        });
 
         try {
             const copyResult = await copyFileLocked(src.resolved, dst.resolved, { overwrite });
@@ -204,11 +252,15 @@ const copyFileTool = buildTool({
                     destination: dst.resolved,
                     bytesWritten: copyResult.bytesWritten,
                     lockWaitMs: copyResult.lockWaitMs,
+                    operation: completeIoOperationEnvelope(operation, {
+                        traceId: copyResult.io.traceId ?? null,
+                        evidence: { bytesWritten: copyResult.bytesWritten },
+                    }),
                 },
                 copyResult.io,
             );
         } catch (err) {
-            return { success: false, error: toError(err).message };
+            return { success: false, error: toError(err).message, operation: failIoOperationEnvelope(operation, err) };
         }
     },
 });
@@ -236,15 +288,30 @@ const moveFileTool = buildTool({
         if (!dst.ok) return { success: false, error: dst.reason };
 
         log('INFO', `[copilot/move_file] ${src.resolved} → ${dst.resolved}`);
+        const operation = createIoOperationEnvelope({
+            capability: 'file.move',
+            riskClass: overwrite ? 'high' : 'medium',
+            targets: [src.resolved, dst.resolved],
+            evidence: { tool: 'move_file', overwrite },
+        });
 
         try {
             const moveResult = await moveFileLocked(src.resolved, dst.resolved, { overwrite });
             return withIoMeta(
-                { success: true, source: src.resolved, destination: dst.resolved, lockWaitMs: moveResult.lockWaitMs },
+                {
+                    success: true,
+                    source: src.resolved,
+                    destination: dst.resolved,
+                    lockWaitMs: moveResult.lockWaitMs,
+                    operation: completeIoOperationEnvelope(operation, {
+                        traceId: moveResult.io.traceId ?? null,
+                        evidence: { moved: true },
+                    }),
+                },
                 moveResult.io,
             );
         } catch (err) {
-            return { success: false, error: toError(err).message };
+            return { success: false, error: toError(err).message, operation: failIoOperationEnvelope(operation, err) };
         }
     },
 });
@@ -281,6 +348,12 @@ const patchFileTool = buildTool({
     handler: async ({ path: filePath, old_string, new_string, replace_all, expected_occurrences }) => {
         const v = await validatePath(filePath, { mode: 'write' });
         if (!v.ok) return { success: false, error: v.reason };
+        const operation = createIoOperationEnvelope({
+            capability: 'file.patch',
+            riskClass: 'high',
+            targets: [v.resolved],
+            evidence: { tool: 'patch_file', replaceAll: replace_all },
+        });
 
         try {
             const patchResult = await patchTextLocked(v.resolved, {
@@ -297,11 +370,23 @@ const patchFileTool = buildTool({
             });
             log('INFO', `[copilot/patch_file] Patch aplicado: ${v.resolved}`);
             return withIoMeta(
-                { success: true, path: v.resolved, replacedOccurrences: patchResult.replacedOccurrences },
+                {
+                    success: true,
+                    path: v.resolved,
+                    replacedOccurrences: patchResult.replacedOccurrences,
+                    operation: completeIoOperationEnvelope(operation, {
+                        traceId: patchResult.io.traceId ?? null,
+                        evidence: { replacedOccurrences: patchResult.replacedOccurrences },
+                    }),
+                },
                 patchResult.io,
             );
         } catch (e) {
-            return { success: false, error: `Erro ao escrever arquivo: ${toError(e).message}` };
+            return {
+                success: false,
+                error: `Erro ao escrever arquivo: ${toError(e).message}`,
+                operation: failIoOperationEnvelope(operation, e),
+            };
         }
     },
 });

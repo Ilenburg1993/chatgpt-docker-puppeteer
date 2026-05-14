@@ -10,7 +10,6 @@
 
 import { isUtf8 } from 'node:buffer';
 import { execFile } from 'node:child_process';
-import { randomBytes } from 'node:crypto';
 import { createReadStream } from 'node:fs';
 import * as fs from 'node:fs/promises';
 import { dirname } from 'node:path';
@@ -30,6 +29,7 @@ import {
 } from './io-cache.js';
 import { findIoIndexSymbol, getIoIndexStats, searchIoIndex } from './io-index-registry.js';
 import { withIoResourceLock, withIoResourceLocks } from './io-locks.js';
+import { normalizeWritePayload, writeAtomicFileUnlocked } from './io/fs/write-atomic.js';
 import { nowIoMs, publishIoOperation } from './io-observability.js';
 import { limitTextLines, normalizeMaxResults } from './policy/output-window.js';
 import { readEnvPositiveInt } from './shared/env.js';
@@ -77,35 +77,11 @@ function invalidateIoCacheTierSubtrees(filePath) {
 }
 
 /**
- * @param {string | Buffer} content
- * @param {BufferEncoding} [encoding]
- * @returns {Buffer}
- */
-function toBuffer(content, encoding = 'utf8') {
-    return Buffer.isBuffer(content) ? content : Buffer.from(content, encoding);
-}
-
-/**
  * @param {number} startedAt
  * @returns {number}
  */
 function elapsedMs(startedAt) {
     return Math.max(0, Math.round(nowIoMs() - startedAt));
-}
-
-/**
- * @param {string} filePath
- * @param {string | Buffer} content
- * @param {BufferEncoding} encoding
- * @returns {{ payload: string | Buffer; bytes: number }}
- */
-function normalizeWritePayload(filePath, content, encoding) {
-    void filePath;
-    const buf = toBuffer(content, encoding);
-    return {
-        payload: Buffer.isBuffer(content) ? content : String(content),
-        bytes: buf.byteLength,
-    };
 }
 
 /**
@@ -285,29 +261,6 @@ function formatIndexSymbolRows(rows) {
             return `${location}: ${row.symbolKind} ${row.symbolName}${exported}${suffix}`;
         })
         .join('\n');
-}
-
-/**
- * Escrita atômica sem lock. O caller deve segurar o lock correto.
- *
- * @param {string} filePath
- * @param {string | Buffer} payload
- * @param {{ mode?: number }} [options]
- * @returns {Promise<void>}
- */
-async function writeAtomicUnlocked(filePath, payload, options = {}) {
-    const tmpPath = `${filePath}.${randomBytes(4).toString('hex')}.tmp`;
-    try {
-        await fs.writeFile(tmpPath, payload, options.mode === undefined ? undefined : { mode: options.mode });
-        await fs.rename(tmpPath, filePath);
-    } catch (error) {
-        try {
-            await fs.unlink(tmpPath);
-        } catch {
-            // best-effort cleanup
-        }
-        throw error;
-    }
 }
 
 /**
@@ -907,7 +860,11 @@ export async function writeFileAtomic(filePath, content, options = {}) {
                     }
                 }
 
-                await writeAtomicUnlocked(filePath, payload, options.mode === undefined ? {} : { mode: options.mode });
+                await writeAtomicFileUnlocked(
+                    filePath,
+                    payload,
+                    options.mode === undefined ? {} : { mode: options.mode },
+                );
                 return { path: filePath, bytesWritten: bytes };
             },
             {
@@ -1384,7 +1341,7 @@ export async function patchTextLocked(filePath, options) {
             const updated = options.replaceAll
                 ? content.split(options.oldString).join(options.newString)
                 : content.replace(options.oldString, () => options.newString);
-            await writeAtomicUnlocked(filePath, updated);
+            await writeAtomicFileUnlocked(filePath, updated);
             return {
                 replacedOccurrences: options.replaceAll ? occurrences : 1,
                 bytesWritten: Buffer.byteLength(updated, 'utf8'),

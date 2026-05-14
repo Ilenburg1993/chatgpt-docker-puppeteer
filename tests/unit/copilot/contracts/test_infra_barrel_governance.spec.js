@@ -1,6 +1,7 @@
 // @ts-check
 
 import { readdirSync } from 'node:fs';
+import { readFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
@@ -29,7 +30,16 @@ describe('infra barrel governance', () => {
 
         expect(publicFacades.map((entry) => entry.path)).toEqual(['public/']);
         expect(publicFacades.every((entry) => entry.public && entry.tier === 'primary')).toBe(true);
-        for (const facade of ['cache.js', 'events.js', 'health.js', 'indexing.js', 'io.js', 'session.js', 'testing.js']) {
+        for (const facade of [
+            'cache.js',
+            'events.js',
+            'health.js',
+            'indexing.js',
+            'io.js',
+            'runtime.js',
+            'session.js',
+            'testing.js',
+        ]) {
             expect(getInfraModuleDescriptor('public/')?.summary).toContain('Facades públicas');
             expect(readdirSync(join(INFRA_ROOT, 'public'))).toContain(facade);
         }
@@ -41,5 +51,25 @@ describe('infra barrel governance', () => {
         expect(scorecard.total).toBe(INFRA_MODULE_LAYOUT.length);
         expect(scorecard.hotspots).toEqual(expect.arrayContaining(['io-engine.js', 'io-index-sqlite.js', 'io-scanner.js']));
         expect(scorecard.byRole['public-facade']).toBe(1);
+    });
+
+    it('storage compat não depende da engine larga de IO', async () => {
+        const source = await readFile(join(INFRA_ROOT, 'storage.js'), 'utf8');
+
+        expect(source).not.toContain('./io-engine.js');
+        expect(source).toContain('./storage/index.js');
+    });
+
+    it('parse/ permanece puro sem dependências de IO/cache/session', async () => {
+        const parseFiles = readdirSync(join(INFRA_ROOT, 'parse')).filter((name) => name.endsWith('.js'));
+        const violations = [];
+        for (const file of parseFiles) {
+            const source = await readFile(join(INFRA_ROOT, 'parse', file), 'utf8');
+            if (/from ['"]\.\.\/(?:io|io-cache|io-index|io-session|io-prefetch)/.test(source)) {
+                violations.push(file);
+            }
+        }
+
+        expect(violations).toEqual([]);
     });
 });

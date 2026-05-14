@@ -177,6 +177,24 @@ describe('tools/file/listDirectoryTool', () => {
         const names2 = r2.entries.map((/** @type {{ name: string }} */ e) => e.name);
         expect(names2).toContain('.hidden');
     });
+
+    it('pagina entradas de topo com maxEntries e cursor', async () => {
+        fs.writeFileSync(path.join(tmpDir, 'c.txt'), 'c');
+        const handler = /** @type {any} */ (getHandler(listDirectoryTool));
+
+        const page1 = await handler({ path: tmpDir, recursive: false, maxEntries: 2 });
+        const page2 = await handler({ path: tmpDir, recursive: false, maxEntries: 2, cursor: page1.nextCursor });
+
+        expect(page1.success).toBe(true);
+        expect(page1.entries).toHaveLength(2);
+        expect(page1.truncated).toBe(true);
+        expect(page1.nextCursor).toBe('2');
+        expect(page2.cursorOffset).toBe(2);
+        expect(page2.entries.length).toBeGreaterThan(0);
+        expect(page2.entries.map((/** @type {{ name: string }} */ e) => e.name)).not.toEqual(
+            page1.entries.map((/** @type {{ name: string }} */ e) => e.name),
+        );
+    });
 });
 
 // ─── searchInFilesTool ──────────────────────────────────────────────────────
