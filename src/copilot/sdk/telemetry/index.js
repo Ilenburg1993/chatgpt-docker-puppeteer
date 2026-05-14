@@ -12,6 +12,8 @@ export { fullHealthCheck, getAuthStatus, getQuota, isServerReachable, pingCheck 
 
 export { emitSdkOperationMetric, setSdkMetricEmitter } from './operation-metrics.js';
 
+export { runCopilotSdkBootPreflight } from './preflight.js';
+
 export { createQuotaMonitor } from './quota-monitor.js';
 
 export {

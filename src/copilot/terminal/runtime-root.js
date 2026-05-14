@@ -12,12 +12,6 @@ import { log } from '#copilot/observability';
 import { startRepl } from './repl/index.js';
 import { applyTerminalBootDisplayPreset, recordTerminalActivity } from './state/boot/index.js';
 import { loadAliasesAsync } from './stores/index.js';
-import {
-    runTerminalConversationHubPhase,
-    runTerminalHttpServerPhase,
-    runTerminalPinnedContextPhase,
-    runTerminalRuntimeListenersPhase,
-} from './terminal-phases/index.js';
 
 /**
  * @typedef {import('../server/index.js').CopilotServerOptions} TerminalCopilotServerOptions
@@ -33,7 +27,7 @@ import {
  * @property {() => void | Promise<void>} [loadAliases]
  * @property {() => NodeJS.Timeout} [startTodoCleanupJob]
  * @property {ReturnType<import('#copilot/boot').readCopilotBootConfig>} [bootConfig]
- * @property {import('#copilot/agent/lifecycle').CopilotSdkBootPreflightReport | null} [bootPreflight]
+ * @property {import('#copilot/sdk/types').CopilotSdkBootPreflightReport | null} [bootPreflight]
  *
  *
  * @typedef {object} TerminalBootContext
@@ -42,7 +36,7 @@ import {
  * @property {() => void | Promise<void>} loadAliases
  * @property {() => NodeJS.Timeout} startTodoCleanupJob
  * @property {ReturnType<import('#copilot/boot').readCopilotBootConfig>} bootConfig
- * @property {import('#copilot/agent/lifecycle').CopilotSdkBootPreflightReport | null} bootPreflight
+ * @property {import('#copilot/sdk/types').CopilotSdkBootPreflightReport | null} bootPreflight
  * @property {import('../config/pinned-files.js').PinnedFilesLoader | null} pinnedLoader
  * @property {(() => void) | null} disposePinnedBridge
  * @property {((evt: { file: string; type: string }) => void) | null} pinnedFilesChangedHandler
@@ -147,20 +141,4 @@ export async function runTerminalReplPhase(ctx) {
         throw new Error('[TerminalServer] copilot-http-server phase has not completed.');
     }
     await startRepl(ctx.copilotServer.httpServer);
-}
-
-/**
- * @param {TerminalServerStartOptions} [options]
- * @returns {Promise<void>}
- */
-export async function startTerminalServer(options = {}) {
-    const ctx = createTerminalBootContext(options);
-    await runTerminalInitPhase(ctx);
-    await runTerminalAliasesPhase(ctx);
-    await runTerminalRuntimeConfigPhase(ctx);
-    await runTerminalPinnedContextPhase(ctx);
-    await runTerminalConversationHubPhase(ctx);
-    await runTerminalHttpServerPhase(ctx);
-    await runTerminalRuntimeListenersPhase(ctx);
-    await runTerminalReplPhase(ctx);
 }

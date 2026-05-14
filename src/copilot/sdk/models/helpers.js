@@ -12,6 +12,12 @@ import { getModelListClient } from './client-provider.js';
 import { modelSelector } from './registry.js';
 
 import { toError } from '#copilot/core/error-handlers';
+import {
+    clearPersistentModelCache,
+    evaluatePersistentCache,
+    readPersistentModelCache,
+    writePersistentModelCacheAsync,
+} from './persistent-cache.js';
 /**
  * @typedef {import('@github/copilot-sdk').ModelInfo} ModelInfo
  *
@@ -32,6 +38,9 @@ const MODELS_CACHE_TTL_MS = 5 * 60_000;
 /** @type {{ models: ModelInfo[]; expiresAt: number } | null} */
 let _modelsCache = null;
 
+/** @type {Promise<ModelInfo[]> | null} */
+let _inflightRequest = null;
+
 /**
  * Invalida o cache de modelos (útil em testes ou após mudança de conta).
  *
@@ -39,6 +48,9 @@ let _modelsCache = null;
  */
 export function clearModelsCache() {
     _modelsCache = null;
+    _inflightRequest = null;
+    // Limpar L2 cache persistente também (async, não-bloqueante)
+    void clearPersistentModelCache();
 }
 
 // ─── Listagem e filtragem ────────────────────────────────────────────────────
@@ -47,7 +59,7 @@ export function clearModelsCache() {
  * Lista todos os modelos disponíveis usando o cliente SDK ativo.
  *
  * AB.2: resultado cacheado por 5 minutos para evitar requisições repetidas. Equivale a `client.listModels()` mas usa o
- * cliente singleton gerenciado.
+ * cliente singleton gerenciado. Deduplica requisições concorrentes via `_inflightRequest`.
  *
  * @param {object} [clientOverrides={}] - Overrides opcionais para o cliente. Default is `{}`
  * @param {boolean} [forceRefresh=false] - Ignorar cache e buscar lista atualizada. Default is `false`
@@ -55,20 +67,62 @@ export function clearModelsCache() {
  */
 export async function listModels(clientOverrides = {}, forceRefresh = false) {
     const now = Date.now();
+    // L1: Check memória (5min TTL)
     if (!forceRefresh && _modelsCache && _modelsCache.expiresAt > now) {
         return _modelsCache.models;
     }
-    const client = await getModelListClient(clientOverrides);
-    let models;
-    try {
-        models = await client.listModels();
-    } catch (e) {
-        // RF-048: purge cache stale em caso de erro de rede, para forçar retry na próxima chamada
-        _modelsCache = null;
-        throw e;
+
+    // L2: Check disk persistent cache se L1 miss (24h TTL)
+    if (!forceRefresh && !_modelsCache) {
+        const persistedCache = await readPersistentModelCache();
+        if (persistedCache) {
+            const fallbackResult = evaluatePersistentCache(persistedCache);
+            if (!fallbackResult.isStale) {
+                // Cache no disk está fresco, usar
+                _modelsCache = {
+                    models: persistedCache.models,
+                    expiresAt: now + MODELS_CACHE_TTL_MS,
+                };
+                log('DEBUG', `[models] Cache disk usado (age: ${fallbackResult.ageMs}ms)`);
+                return _modelsCache.models;
+            }
+        }
     }
-    _modelsCache = { models, expiresAt: now + MODELS_CACHE_TTL_MS };
-    return models;
+
+    // Se há uma requisição em voo, reutilizar ao invés de disparar outra
+    if (_inflightRequest !== null) {
+        return _inflightRequest;
+    }
+
+    const client = await getModelListClient(clientOverrides);
+    // Guardar Promise em voo para deduplicação (L3: network fetch)
+    _inflightRequest = (async () => {
+        try {
+            const models = await client.listModels();
+            _modelsCache = { models, expiresAt: now + MODELS_CACHE_TTL_MS };
+            // Fase 3.3 Optimization #2: Salvar L2 persistente async (fire-and-forget)
+            writePersistentModelCacheAsync(models);
+            return models;
+        } catch (e) {
+            // Network falhou: try fallback L2 (mesmo que stale)
+            _modelsCache = null;
+            const persistedCache = await readPersistentModelCache();
+            if (persistedCache) {
+                log('WARN', `[models] Network falhou, usando cache stale do disk`);
+                const fallbackResult = evaluatePersistentCache(persistedCache);
+                _modelsCache = {
+                    models: persistedCache.models,
+                    expiresAt: now + (fallbackResult.isStale ? 60_000 : MODELS_CACHE_TTL_MS),
+                };
+                return persistedCache.models;
+            }
+            throw e;
+        } finally {
+            // Limpar referência de inflight após conclusão (sucesso ou erro)
+            _inflightRequest = null;
+        }
+    })();
+    return _inflightRequest;
 }
 
 /**

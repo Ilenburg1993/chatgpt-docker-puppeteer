@@ -16,6 +16,7 @@ Regras:
   executa rollbacks best-effort quando uma fase falha.
 - `boot/surface-validation.js` valida, antes de HTTP/REPL, se SDK, agent, terminal e handlers do
   plano foram carregados com as superfícies mínimas esperadas.
+- `sdk/telemetry/preflight.js` é o owner do preflight SDK/CLI; `agent/lifecycle` não participa dessa checagem.
 
 Fronteiras:
 

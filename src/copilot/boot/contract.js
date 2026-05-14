@@ -4,8 +4,8 @@
  *
  * Contrato declarativo dos entrypoints operacionais do Copilot local.
  *
- * O boot real tem uma única trilha: terminal/bootstrap.js -> boot/runtime-bootstrap.js -> startTerminalServer() ->
- * startCopilotServer(). Não existe entrypoint compatível paralelo.
+ * O boot real tem uma única trilha: terminal/bootstrap.js -> boot/runtime-bootstrap.js -> runCopilotBootPlan() ->
+ * fases explícitas do host terminal. Não existe entrypoint compatível paralelo.
  *
  * @module copilot/boot/contract
  */
@@ -23,9 +23,16 @@ export const COPILOT_TERMINAL_PM2_ENV_FLAG = 'COPILOT_TERMINAL_ENABLED';
 export const COPILOT_BOOT_PHASES = Object.freeze([
     'observability',
     'late-deps',
+    'sdk-preflight',
     'runtime-wiring',
-    'terminal-host',
+    'boot-surface-validation',
+    'terminal-init',
+    'terminal-aliases',
+    'terminal-runtime-config',
+    'terminal-pinned-context',
+    'terminal-conversation-hub',
     'copilot-http-server',
+    'terminal-runtime-listeners',
     'repl',
 ]);
 
@@ -33,7 +40,7 @@ export const COPILOT_BOOT_RULES = Object.freeze({
     singleRuntimeOwner: 'terminal/bootstrap.js is the only canonical executable boot owner.',
     serverOwnership: 'server/index.js owns HTTP/Socket.IO only; it never starts terminal UX or the agent by itself.',
     terminalOwnership:
-        'terminal/index.js owns REPL/SSE UX and composes the server through injected startCopilotServer.',
+        'terminal/index.js exposes only phase handlers consumed by boot/runtime-bootstrap.js.',
     dependencyBoundary: 'No module in src/copilot outside terminal/ may import terminal surfaces directly.',
     pm2Ownership: 'PM2 must start only llm-b-terminal for the Copilot runtime.',
     bootConfigOwnership:

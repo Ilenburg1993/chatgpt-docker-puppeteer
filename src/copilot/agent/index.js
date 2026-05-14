@@ -177,7 +177,6 @@ export {
     registerRuntimeIpcHost,
     registerRuntimeProcessSignals,
     registerRuntimeShutdownHost,
-    runCopilotSdkBootPreflight,
     tryReconnect,
     writeState,
     writeStateAsync,

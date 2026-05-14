@@ -37,15 +37,18 @@ describe('F22 — F124: feature-flags.js', () => {
         expect(existsSync(join(SRC_COPILOT, 'sdk/feature-flags.js'))).toBe(true);
     });
 
-    it('exporta EXPERIMENTAL_FEATURES com 5 features', () => {
+    it('exporta EXPERIMENTAL_FEATURES com 8 features', () => {
         const src = readSource('sdk/feature-flags.js');
         expect(src).toContain('export const EXPERIMENTAL_FEATURES');
-        // fleet, skills, mcp, plugins, extensions
+        // fleet, skills, mcp, plugins, extensions, sessions, history, usage
         expect(src).toContain("'fleet'");
         expect(src).toContain("'skills'");
         expect(src).toContain("'mcp'");
         expect(src).toContain("'plugins'");
         expect(src).toContain("'extensions'");
+        expect(src).toContain("'sessions'");
+        expect(src).toContain("'history'");
+        expect(src).toContain("'usage'");
     });
 
     it('exporta isExperimentalEnabled', () => {
@@ -125,8 +128,8 @@ describe('F22 — F124 runtime: feature-flags API', () => {
         expect(snapshot.mcp).toBe(true);
     });
 
-    it('EXPERIMENTAL_FEATURES tem exatamente 5 elementos', () => {
-        expect(featureFlags.EXPERIMENTAL_FEATURES).toHaveLength(5);
+    it('EXPERIMENTAL_FEATURES tem exatamente 8 elementos', () => {
+        expect(featureFlags.EXPERIMENTAL_FEATURES).toHaveLength(8);
     });
 });
 

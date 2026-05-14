@@ -327,8 +327,12 @@ export {
     modelGetCurrent,
     modelSwitchTo,
     modeSet,
+    nameGet,
+    nameSet,
     permissionsHandlePending,
     permissionsListPending,
+    permissionsResetSessionApprovals,
+    permissionsSetApproveAll,
     planDelete,
     planRead,
     planUpdate,
@@ -343,7 +347,23 @@ export {
 } from './rpc/index.js';
 
 // ─── Faixa 9: Server RPC + Health ──────────────────────────────────────────────
-export { accountGetQuota, createServerRpcFacade, modelsList, ping, toolsList } from './rpc/server.js';
+export {
+    accountGetQuota,
+    createServerRpcFacade,
+    mcpConfigAdd,
+    mcpConfigDisable,
+    mcpConfigEnable,
+    mcpConfigList,
+    mcpConfigRemove,
+    mcpConfigUpdate,
+    mcpDiscover,
+    modelsList,
+    ping,
+    sessionsFork,
+    skillsConfigSetDisabledSkills,
+    skillsDiscover,
+    toolsList,
+} from './rpc/server.js';
 
 export {
     getAuthStatus as checkAuthStatus,
@@ -352,6 +372,7 @@ export {
     isServerReachable,
     pingCheck,
 } from './telemetry/health.js';
+export { runCopilotSdkBootPreflight } from './telemetry/preflight.js';
 
 // ─── Faixa 21: Quota Monitor ──────────────────────────────────────────────────
 

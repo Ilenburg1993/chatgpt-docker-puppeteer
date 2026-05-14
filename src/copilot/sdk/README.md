@@ -36,7 +36,7 @@ Se uma capability já existe no SDK vanilla, ela deve nascer aqui antes de qualq
 ### Subsurface experimental controlada
 
 - `#copilot/sdk/rpc/experimental`
-  - escopo: `fleet`, `skills`, `mcp`, `plugins`, `extensions`
+  - escopo: `fleet`, `skills`, `mcp/oauth`, `plugins`, `extensions`, `history`, `usage`
   - **não** inclui `agent.*`
 
 ### Aliases removidos
@@ -107,7 +107,7 @@ Importações proibidas por design:
 | RPC experimental | `rpc/experimental.js`                                                                                     |
 | Tools            | `tools/index.js`, `tools/core.js`, `tools/registry.js`, `tools/state.js`, `tools/custom.js`               |
 | Models           | `models/index.js` e helpers de capabilities/model selection                                               |
-| Telemetry        | `telemetry/index.js`, `telemetry/health.js`, `telemetry/tracing.js`, `telemetry/quota-monitor.js`         |
+| Telemetry        | `telemetry/index.js`, `telemetry/health.js`, `telemetry/preflight.js`, `telemetry/tracing.js`, `quota`    |
 
 ## Consolidações aplicadas em 2026-05-14
 
@@ -120,6 +120,11 @@ Importações proibidas por design:
   foram migrados do root para `session`, `session-runtime`, `rpc`, `tools`, `telemetry`, `agents` e `models`.
 - No terminal, comandos, projeções, state e adapters deixaram de importar `#copilot/sdk/session` diretamente; o gateway
   `terminal/frontend/gateways/sdk-session.js` concentra a ponte vanilla da sessão SDK.
+- O preflight do boot foi movido para `sdk/telemetry/preflight.js`; `agent/lifecycle` deixou de ser owner dessa checagem
+  de CLI/auth/modelo.
+- A surface RPC local foi alinhada ao `@github/copilot-sdk@0.3.0` para `session.name`, permissões nativas
+  (`setApproveAll`, `resetSessionApprovals`), `mcp.config`, `skills.discover/config`, `sessions.fork`,
+  `mcp.oauth.login`, `history.truncate` e `usage.getMetrics`.
 - `sdk/session` deixou de abrir `copilot.sqlite` ao ser importado: `hook-bus` e `permission-controller` agora usam
   módulos folha (`#copilot/events/hook-events`, `#copilot/config/env`) em vez dos barrels largos.
 - `sdk/config.js` foi removido; configuração de sessão é responsabilidade de `#copilot/config`
@@ -151,6 +156,7 @@ ser atualizada ou isolada; o restante das flags rigorosas já é aplicado ao có
 - usar `#copilot/sdk` raiz quando subpath semântico já existe;
 - duplicar contracts do SDK em `agent/` ou `terminal/` sem necessidade;
 - misturar `agent.*` na superfície experimental;
+- manter wrappers de capacidade vanilla do SDK em `agent/` quando a operação pertence a `sdk/`;
 - transformar `sdk/` em camada de payload HTTP ou UX local.
 
 ## Governança executável

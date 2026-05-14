@@ -13,6 +13,7 @@
  * @see module:copilot/sdk/health
  */
 
+import { toError } from '#copilot/core/error-handlers';
 import { accountGetQuota } from '../rpc/server.js';
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
@@ -34,6 +35,7 @@ import { accountGetQuota } from '../rpc/server.js';
  * @property {(snapshots: Record<string, QuotaSnapshot>) => void} [onUpdate] - Chamado após cada poll bem-sucedido.
  * @property {(quotaId: string, snapshot: QuotaSnapshot) => void} [onWarning] - Chamado quando quota cai abaixo do
  *   threshold.
+ * @property {(error: Error) => void} [onError] - Chamado quando poll falha com erro.
  */
 
 /**
@@ -75,6 +77,7 @@ export function createQuotaMonitor(opts) {
         warningThreshold = DEFAULT_WARNING_THRESHOLD,
         onUpdate,
         onWarning,
+        onError,
     } = opts;
 
     if (!client || typeof client !== 'object') {
@@ -117,12 +120,16 @@ export function createQuotaMonitor(opts) {
         start() {
             if (_timer !== null) return;
             // Poll imediato ao iniciar
-            _fetch().catch(() => {
-                // silencioso: erro de poll não deve derrubar o monitor
+            _fetch().catch((err) => {
+                if (typeof onError === 'function') {
+                    onError(toError(err));
+                }
             });
             _timer = setInterval(() => {
-                _fetch().catch(() => {
-                    // silencioso: erro de poll periódico
+                _fetch().catch((err) => {
+                    if (typeof onError === 'function') {
+                        onError(toError(err));
+                    }
                 });
             }, intervalMs);
             // Não bloquear processo

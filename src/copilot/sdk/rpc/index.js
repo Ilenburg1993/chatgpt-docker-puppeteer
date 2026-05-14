@@ -21,13 +21,31 @@ export {
     compactionCompactTyped,
     permissionsHandlePending,
     permissionsListPending,
+    permissionsResetSessionApprovals,
+    permissionsSetApproveAll,
     shellExec,
     shellKill,
     toolsHandlePendingCall,
     uiElicitation,
 } from './ops.js';
 
-export { accountGetQuota, createServerRpcFacade, modelsList, ping, toolsList } from './server.js';
+export {
+    accountGetQuota,
+    createServerRpcFacade,
+    mcpConfigAdd,
+    mcpConfigDisable,
+    mcpConfigEnable,
+    mcpConfigList,
+    mcpConfigRemove,
+    mcpConfigUpdate,
+    mcpDiscover,
+    modelsList,
+    ping,
+    sessionsFork,
+    skillsConfigSetDisabledSkills,
+    skillsDiscover,
+    toolsList,
+} from './server.js';
 
 export { createSessionRpcFacade } from './session-facade.js';
 
@@ -37,6 +55,8 @@ export {
     modeSet,
     modelGetCurrent,
     modelSwitchTo,
+    nameGet,
+    nameSet,
     planDelete,
     planRead,
     planUpdate,

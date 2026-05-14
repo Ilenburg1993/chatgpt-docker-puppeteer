@@ -56,8 +56,8 @@ import { chatStructured as _chatStructured } from './client-structured.js';
 let _agent = null;
 
 /**
- * Injeta o AlwaysAliveAgent singleton para quebrar dependência circular. Chamado em `startTerminalServer()` durante o
- * boot.
+ * Injeta o AlwaysAliveAgent singleton para quebrar dependência circular. Chamado por `runtime-wiring.js` durante o boot
+ * canônico.
  *
  * @param {BridgeAgentLike} agent
  * @returns {void}

@@ -13,8 +13,9 @@ Este diretório tem uma regra simples:
 terminal:llm-b
   -> terminal/bootstrap.js
     -> boot/runtime-bootstrap.js
-      -> runtime-wiring.js
-        -> terminal/index.js
+      -> runCopilotBootPlan()
+        -> runtime-wiring.js
+        -> terminal phase handlers
           -> server/index.js
           -> repl.js
 
@@ -60,7 +61,9 @@ npm run terminal:llm-b
     -> src/copilot/boot/runtime-bootstrap.js
       -> bootCopilot({ terminal, broadcastSse })
       -> readCopilotBootConfig()
-      -> startTerminalServer({ startCopilotServer, wireRuntime, startTodoCleanupJob, bootConfig })
+      -> runCopilotBootPlan()
+        -> runtime-wiring.js
+        -> terminal phase handlers
         -> startCopilotServer()
         -> startRepl()
 ```
@@ -69,7 +72,7 @@ Regras:
 
 - `terminal/bootstrap.js` é o entrypoint canônico para execução local e PM2 `llm-b-terminal`;
 - `server/index.js` é dono apenas de HTTP/Socket.IO e nunca inicia REPL ou agent sozinho;
-- `terminal/index.js` é o host da UX local e compõe o server por injeção;
+- `terminal/index.js` é barrel de fases explícitas do host terminal; ele não executa o boot sozinho;
 - `boot/` registra o contrato vivo de boot, resolve workspace/skills/porta/token e guarda o baseline
   mínimo de capacidades vanilla do SDK que o projeto deve preservar.
 - `boot/config.js` é o arquivo canônico para variáveis operacionais de boot:
@@ -103,7 +106,8 @@ Em resumo:
 
 - comece em `sdk/`
 - se fizer sentido como API pública do runtime, exponha via `agent/facades/agent-sdk-access.js`
-- se a UX do terminal precisar de projeção pronta, use `terminal/frontend/sdk-session-projection.js`
+- se a UX do terminal precisar de projeção pronta, use `terminal/frontend/gateways/sdk-session.js` ou
+  `terminal/frontend/projections/*`
 
 ### “Quero reagir a um evento do SDK”
 

@@ -80,10 +80,10 @@ const LIFECYCLE_TYPE_SET = new Set(Object.values(LIFECYCLE_EVENTS));
  */
 function assertClient(client) {
     if (!client || typeof client !== 'object') {
-        throw new Error('[sdk/client-events] client is required');
+        throw new Error('[sdk/client-events] client não inicializado ou já finalizado (required)');
     }
     if (typeof (/** @type {Record<string, unknown>} */ (client)['on']) !== 'function') {
-        throw new Error('[sdk/client-events] client must have an .on() method');
+        throw new Error('[sdk/client-events] client deve ter método .on() (RPC indisponível)');
     }
 }
 

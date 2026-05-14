@@ -19,7 +19,10 @@ describe('terminal/index.js — contrato', () => {
         expect(mod).toBeTruthy();
     });
 
-    it('exporta startTerminalServer', () => {
-        expect(typeof mod.startTerminalServer).toBe('function');
+    it('exporta fases canônicas consumidas pelo boot runner', () => {
+        expect(typeof mod.createTerminalBootContext).toBe('function');
+        expect(typeof mod.runTerminalInitPhase).toBe('function');
+        expect(typeof mod.runTerminalReplPhase).toBe('function');
+        expect(mod).not.toHaveProperty('startTerminalServer');
     });
 });

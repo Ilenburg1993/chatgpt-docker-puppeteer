@@ -210,6 +210,14 @@
  *
  *   - Estatísticas do registry
  *
+ * @property {(other: IToolRegistry) => IToolRegistry} merge
+ *
+ *   - une este registry com outro (secundário sobrescreve primário), retornando novo registry
+ *
+ * @property {(names: string[]) => IToolRegistry} exclude
+ *
+ *   - retorna novo registry excluindo ferramentas com nomes específicos
+ *
  * @see module:copilot/sdk/tools-registry
  */
 

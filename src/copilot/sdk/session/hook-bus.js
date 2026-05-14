@@ -5,6 +5,7 @@
  * @module copilot/sdk/session/hook-bus
  */
 
+import { toError } from '#copilot/core/error-handlers';
 import {
     HOOK_ERROR_OCCURRED,
     HOOK_POST_TOOL_USE,
@@ -14,7 +15,6 @@ import {
     HOOK_SESSION_START,
 } from '#copilot/events/hook-events';
 import { EventEmitter } from 'node:events';
-import { toError } from '#copilot/core/error-handlers';
 import { log } from './hook-logger.js';
 
 /**
@@ -64,15 +64,24 @@ export class HookBus extends EventEmitter {
             input,
             output,
         };
+        // Separar try/catch por emissão para evitar que erros em um listener suprimam outros
         try {
             this.emit(hookName, event);
-            this.emit('*', event);
-            const busType = HOOK_NAME_TO_EVENTBUS[hookName];
-            if (busType && this.#eventBus) {
-                this.#eventBus.emit({ type: busType, hookName, sessionId, timestamp: event.timestamp, input, output });
-            }
         } catch (e) {
             log('WARN', `[sdk/hook-bus] listener erro em '${hookName}': ${toError(e).message}`);
+        }
+        try {
+            this.emit('*', event);
+        } catch (e) {
+            log('WARN', `[sdk/hook-bus] listener erro em wildcard '*': ${toError(e).message}`);
+        }
+        const busType = HOOK_NAME_TO_EVENTBUS[hookName];
+        if (busType && this.#eventBus) {
+            try {
+                this.#eventBus.emit({ type: busType, hookName, sessionId, timestamp: event.timestamp, input, output });
+            } catch (e) {
+                log('WARN', `[sdk/hook-bus] EventBus erro em '${busType}': ${toError(e).message}`);
+            }
         }
     }
 }

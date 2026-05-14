@@ -296,5 +296,23 @@ export function createToolRegistryAdapter(inner) {
             const info = inspectRegistry(reg);
             return { total: info.total, byCategory: info.categories };
         },
+        /**
+         * Une este registry com outro, retornando um novo adapter (secundário sobrescreve primário).
+         *
+         * @param {any} other - Outro adapter ou ToolRegistry
+         * @returns {import('#copilot/core/interfaces').IToolRegistry}
+         */
+        merge: (other) => {
+            const otherReg = other && typeof other === 'object' && other.entries ? other : createRegistry();
+            const merged = mergeRegistries(reg, otherReg);
+            return createToolRegistryAdapter(merged);
+        },
+        /**
+         * Exclui ferramentas com nomes específicos, retornando um novo adapter.
+         *
+         * @param {string[]} names - Nomes das ferramentas a excluir
+         * @returns {import('#copilot/core/interfaces').IToolRegistry}
+         */
+        exclude: (names) => createToolRegistryAdapter(excludeByNames(reg, names)),
     };
 }

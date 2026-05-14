@@ -61,11 +61,19 @@ function getCompactionMethod(session) {
      *     compaction?: { compact?: () => Promise<CompactionCompactResult> };
      * }}
      */ (session.rpc);
-    const fn = rpc.history?.compact ?? rpc.compaction?.compact;
-    if (typeof fn !== 'function') {
-        throw new TypeError('[sdk/rpc/compaction.compact] RPC de compaction indisponível (history/compaction).');
+    // Usar closure ao invés de bind para clareza de contexto e tipagem correta
+    // Guardar referência para validação strict
+    if (rpc.history && typeof rpc.history.compact === 'function') {
+        const method = rpc.history.compact;
+        const context = rpc.history;
+        return () => method.call(context);
     }
-    return fn.bind(rpc.history ?? rpc.compaction);
+    if (rpc.compaction && typeof rpc.compaction.compact === 'function') {
+        const method = rpc.compaction.compact;
+        const context = rpc.compaction;
+        return () => method.call(context);
+    }
+    throw new TypeError('[sdk/rpc/compaction.compact] RPC de compaction indisponível (history/compaction).');
 }
 
 /**
@@ -357,6 +365,54 @@ export async function permissionsListPending(session) {
     }
 }
 
+/**
+ * Ativa/desativa approve-all nativo da sessão quando o host expõe esse RPC.
+ *
+ * @param {CopilotSession} session
+ * @param {boolean} enabled
+ * @returns {Promise<HandleResult>}
+ */
+export async function permissionsSetApproveAll(session, enabled) {
+    assertRpcSession(session, 'permissions.setApproveAll');
+    if (typeof enabled !== 'boolean') {
+        throw new TypeError('[sdk/rpc/permissions.setApproveAll] enabled deve ser boolean.');
+    }
+    const permissions = /** @type {{ setApproveAll?: (params: { enabled: boolean }) => Promise<HandleResult> }} */ (
+        /** @type {unknown} */ (session.rpc.permissions)
+    );
+    if (typeof permissions.setApproveAll !== 'function') {
+        throw new TypeError('[sdk/rpc/permissions.setApproveAll] RPC indisponível nesta sessão SDK.');
+    }
+    appLog('INFO', `[sdk/rpc] permissions.setApproveAll: enabled=${enabled}, sessionId='${session.sessionId}'`);
+    try {
+        return /** @type {HandleResult} */ (await permissions.setApproveAll({ enabled }));
+    } catch (error) {
+        throw toSdkOperationError('permissions.setApproveAll', error);
+    }
+}
+
+/**
+ * Remove aprovações session-scoped quando o host expõe esse RPC.
+ *
+ * @param {CopilotSession} session
+ * @returns {Promise<HandleResult>}
+ */
+export async function permissionsResetSessionApprovals(session) {
+    assertRpcSession(session, 'permissions.resetSessionApprovals');
+    const permissions = /** @type {{ resetSessionApprovals?: () => Promise<HandleResult> }} */ (
+        /** @type {unknown} */ (session.rpc.permissions)
+    );
+    if (typeof permissions.resetSessionApprovals !== 'function') {
+        throw new TypeError('[sdk/rpc/permissions.resetSessionApprovals] RPC indisponível nesta sessão SDK.');
+    }
+    appLog('INFO', `[sdk/rpc] permissions.resetSessionApprovals: sessionId='${session.sessionId}'`);
+    try {
+        return /** @type {HandleResult} */ (await permissions.resetSessionApprovals());
+    } catch (error) {
+        throw toSdkOperationError('permissions.resetSessionApprovals', error);
+    }
+}
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // TOOLS subsystem
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -466,8 +522,9 @@ export async function agentDeselect(session) {
     assertRpcSession(session, 'agent.deselect');
     appLog('INFO', `[sdk/rpc] agent.deselect: sessionId='${session.sessionId}'`);
     try {
-        await session.rpc.agent.deselect();
-        return /** @type {AgentDeselectResult} */ ({});
+        const result = await session.rpc.agent.deselect();
+        // Não descartar resultado potencial do SDK; repassar com fallback
+        return /** @type {AgentDeselectResult} */ (result ?? {});
     } catch (error) {
         throw toSdkOperationError('agent.deselect', error);
     }

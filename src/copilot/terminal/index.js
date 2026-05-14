@@ -21,7 +21,6 @@ export {
     runTerminalInitPhase,
     runTerminalReplPhase,
     runTerminalRuntimeConfigPhase,
-    startTerminalServer,
 } from './runtime-root.js';
 export {
     buildTerminalStandaloneBannerView,

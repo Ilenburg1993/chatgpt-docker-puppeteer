@@ -1,0 +1,44 @@
+{
+    "snapshotId": "snap-1778653246219-fdc57f0d",
+    "createdAt": 1778653246219,
+    "sessionId": "963ce077-9136-45d7-adfa-6c4742541bcd",
+    "model": "auto",
+    "status": "idle",
+    "sendCount": 7,
+    "dialogLoopActive": false,
+    "dialogPaused": false,
+    "pendingQuestion": null,
+    "pendingQuestionMeta": null,
+    "pendingQuestionShadow": null,
+    "stateSnapshot": {
+        "sessionId": "963ce077-9136-45d7-adfa-6c4742541bcd",
+        "startedAt": 1778652041671,
+        "resumedAt": 1778652706592,
+        "resumeCount": 2,
+        "sendCount": 4,
+        "model": "auto",
+        "pendingQuestion": null,
+        "pendingQuestionMeta": null,
+        "systemPromptBinding": {
+            "sessionId": "963ce077-9136-45d7-adfa-6c4742541bcd",
+            "digest": "2cdaa68b079b663c",
+            "configuredMode": "append",
+            "effectiveMode": "append",
+            "effectiveLiveMode": "customize",
+            "liveReloadEnabled": true,
+            "liveReloadMechanism": "sdk-transform",
+            "reloadStrategy": "sdk-transform",
+            "boundAt": 1778652706592
+        },
+        "gracefulShutdown": false,
+        "dialogLoopActive": false,
+        "dialogPaused": false
+    },
+    "prMetrics": {
+        "boots": 0,
+        "resumesWithPR": 0,
+        "resumesZeroPR": 0,
+        "totalPR": 0
+    },
+    "reason": "auto-shutdown"
+}

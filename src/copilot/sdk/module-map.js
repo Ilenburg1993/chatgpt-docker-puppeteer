@@ -294,7 +294,7 @@ export const SDK_MODULE_LAYOUT = Object.freeze([
         tier: 'secondary',
         risk: 'watch',
         public: true,
-        summary: 'Surface experimental limitada a fleet, skills, mcp, plugins e extensions.',
+        summary: 'Surface experimental limitada e gated: fleet, skills, mcp/oauth, plugins, extensions, history e usage.',
     },
     {
         path: 'session/',
@@ -395,6 +395,16 @@ export const SDK_MODULE_LAYOUT = Object.freeze([
         risk: 'stable',
         public: true,
         summary: 'Monitor de quota e rate-limit da camada SDK.',
+    },
+    {
+        path: 'telemetry/preflight.js',
+        kind: 'file',
+        role: 'telemetry',
+        surface: 'telemetry',
+        tier: 'secondary',
+        risk: 'stable',
+        public: true,
+        summary: 'Preflight canônico do SDK/CLI usado pelo boot antes de expor HTTP/REPL.',
     },
     {
         path: 'tools/',

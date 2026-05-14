@@ -119,7 +119,7 @@ describe('F64 — onLifecycleEvent', () => {
 
     it('lança erro se client é null e getClient retorna null', () => {
         _resetClientState();
-        expect(() => onLifecycleEvent('session.created', vi.fn())).toThrow('client is required');
+        expect(() => onLifecycleEvent('session.created', vi.fn())).toThrow(/client.*required/);
     });
 
     it('lança erro se eventType é vazio', () => {

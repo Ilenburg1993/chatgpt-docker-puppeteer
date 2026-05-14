@@ -72,6 +72,14 @@ export const SECTION_ACTIONS = /** @type {const} */ ({
 
 // ─── Permission Request Results ───────────────────────────────────────────────
 
+/** Tipos de permissão solicitados pelo SDK. */
+export const PERMISSION_REQUEST_KINDS = /** @type {const} */ ({
+    SHELL: 'shell',
+    TASK_EXECUTION: 'task-execution',
+    WORKSPACE_TRUST: 'workspace-trust',
+    CONTENT_EXCLUSION_CHECK: 'content-exclusion-check',
+});
+
 /** Valores de resultado de permissão. */
 export const PERMISSION_RESULTS = /** @type {const} */ ({
     APPROVE_ONCE: 'approve-once',

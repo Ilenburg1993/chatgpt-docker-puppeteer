@@ -41,14 +41,13 @@ import {
 } from '../../../events/index.js';
 import { getAgent } from '../../singleton/index.js';
 import { checkAgentSdkAuthStatus, createAgentSdkClient } from '../../facades/index.js';
-import { ERROR_TRACKER, getDefaultHookBus, log } from '../../ports/index.js';
+import { ERROR_TRACKER, getDefaultHookBus, log, runCopilotSdkBootPreflight } from '../../ports/index.js';
 import {
     discoverRuntimePlugins,
     registerRuntimeAgentEventHost,
     registerRuntimeIpcHost,
     registerRuntimeProcessSignals,
     registerRuntimeShutdownHost,
-    runCopilotSdkBootPreflight,
 } from '../process-host/index.js';
 import { drainStateWrites } from '../state/index.js';
 

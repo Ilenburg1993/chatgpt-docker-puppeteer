@@ -14,7 +14,7 @@
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
 /**
- * @typedef {'fleet' | 'skills' | 'mcp' | 'plugins' | 'extensions'} ExperimentalFeature
+ * @typedef {'fleet' | 'skills' | 'mcp' | 'plugins' | 'extensions' | 'sessions' | 'history' | 'usage'} ExperimentalFeature
  */
 
 /**
@@ -25,7 +25,7 @@
 
 /** Nomes canônicos das features experimentais suportadas. */
 export const EXPERIMENTAL_FEATURES = /** @type {readonly ExperimentalFeature[]} */ (
-    Object.freeze(['fleet', 'skills', 'mcp', 'plugins', 'extensions'])
+    Object.freeze(['fleet', 'skills', 'mcp', 'plugins', 'extensions', 'sessions', 'history', 'usage'])
 );
 
 /** @type {ExperimentalFlags} */
@@ -35,6 +35,9 @@ const _flags = {
     mcp: false,
     plugins: false,
     extensions: false,
+    sessions: false,
+    history: false,
+    usage: false,
 };
 
 // Lê variáveis de ambiente na inicialização do módulo

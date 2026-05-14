@@ -105,7 +105,8 @@ vi.mock('#copilot/agent', () => ({
     startRuntime: vi.fn(),
 }));
 
-vi.mock('../../../src/copilot/agent/lifecycle/process-host/runtime-host.js', () => ({
+vi.mock('#copilot/sdk/telemetry', () => ({
+    getAuthStatus: vi.fn(),
     runCopilotSdkBootPreflight: mocks.runCopilotSdkBootPreflight,
 }));
 

@@ -79,7 +79,7 @@ let _toolSessionContext = null;
 
 /**
  * Injeta a função `broadcastSse` para evitar import circular com a borda de diálogo do terminal. Deve ser chamado em
- * `startTerminalServer()` antes de iniciar o agente.
+ * `runtime-wiring.js` durante o boot canônico antes de iniciar o agente.
  *
  * @param {{
  *     broadcastSse?: (event: string, data: Record<string, unknown>) => void;

@@ -105,9 +105,11 @@ Canônica apenas para os subsistemas experimentais ainda isolados:
 
 - `fleet`
 - `skills`
-- `mcp`
+- `mcp`/`mcp.oauth`
 - `plugins`
 - `extensions`
+- `history`
+- `usage`
 
 **Regra importante**: `agent.*` não pertence mais a esta surface. Agent virou domínio estável e deve ser consumido
 pela surface canônica de RPC estável.
@@ -220,6 +222,10 @@ semânticas e explícitas.
   foram deslocados do root para subpaths canônicos.
 - O terminal deixou de importar `#copilot/sdk/session` diretamente em comandos, status, state e adapters de eventos; a
   única ponte runtime para helpers vanilla da sessão SDK é `terminal/frontend/gateways/sdk-session.js`.
+- O preflight SDK/CLI do boot agora vive em `#copilot/sdk/telemetry`, removendo a dependência `boot -> agent/lifecycle`
+  para uma checagem que é de SDK vanilla.
+- A surface RPC local foi completada com capacidades do `@github/copilot-sdk@0.3.0`: `session.name`, aprovações nativas,
+  `mcp.config`, `skills.discover/config`, `sessions.fork`, `mcp.oauth.login`, `history.truncate` e `usage.getMetrics`.
 - `#copilot/config/tools-state`, `#copilot/config/custom-tools-registry`, `#copilot/config/tools` e
   `#copilot/config/tools/*` foram removidos de `package.json` porque apontavam para arquivos inexistentes.
 - Outros aliases históricos quebrados de `package.json` também foram removidos e agora há teste de regressão para

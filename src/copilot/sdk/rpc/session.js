@@ -20,6 +20,10 @@ import { assertRpcSession } from './guards.js';
  *
  * @typedef {{ modelId?: string }} ModelSwitchResult
  *
+ * @typedef {{ name?: string | null }} NameGetResult
+ *
+ * @typedef {{ name?: string | null; success: boolean }} NameSetResult
+ *
  * @typedef {{ mode: 'interactive' | 'plan' | 'autopilot' }} ModeGetResult
  *
  * @typedef {{ mode: 'interactive' | 'plan' | 'autopilot' }} ModeSetResult
@@ -57,6 +61,18 @@ function getWorkspaceRpc(session) {
 
     if (!candidate) {
         throw new TypeError('[sdk/rpc/workspace] namespace indisponível (expected workspaces/workspace).');
+    }
+
+    // Validar que os métodos obrigatórios existem (duck-typing defensivo)
+    const candidateObj = /** @type {Record<string, unknown>} */ (candidate);
+    if (typeof candidateObj['listFiles'] !== 'function') {
+        throw new TypeError('[sdk/rpc/workspace] namespace não expõe listFiles().');
+    }
+    if (typeof candidateObj['readFile'] !== 'function') {
+        throw new TypeError('[sdk/rpc/workspace] namespace não expõe readFile().');
+    }
+    if (typeof candidateObj['createFile'] !== 'function') {
+        throw new TypeError('[sdk/rpc/workspace] namespace não expõe createFile().');
     }
 
     const workspaceRpc = /**
@@ -142,6 +158,57 @@ export async function modelSwitchTo(session, modelId, options) {
             attributes: { modelId, errorKind: sdkError.kind },
         });
         throw sdkError;
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// NAME subsystem
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * Retorna o nome/título atual da sessão quando suportado pelo host.
+ *
+ * @param {CopilotSession} session
+ * @returns {Promise<NameGetResult>}
+ */
+export async function nameGet(session) {
+    assertRpcSession(session, 'name.get');
+    const rpc = /** @type {{ name?: { get?: () => Promise<NameGetResult> } }} */ (session.rpc);
+    if (typeof rpc.name?.get !== 'function') {
+        throw new TypeError('[sdk/rpc/name.get] RPC indisponível nesta sessão SDK.');
+    }
+    appLog('DEBUG', `[sdk/rpc] name.get: sessionId='${session.sessionId}'`);
+    try {
+        return /** @type {NameGetResult} */ (await rpc.name.get());
+    } catch (error) {
+        throw toSdkOperationError('name.get', error);
+    }
+}
+
+/**
+ * Define o nome/título da sessão quando suportado pelo host.
+ *
+ * @param {CopilotSession} session
+ * @param {string} name
+ * @returns {Promise<NameSetResult>}
+ */
+export async function nameSet(session, name) {
+    assertRpcSession(session, 'name.set');
+    if (typeof name !== 'string') {
+        throw new TypeError('[sdk/rpc/name.set] name deve ser string.');
+    }
+    const rpc = /** @type {{ name?: { set?: (params: { name: string }) => Promise<void | NameSetResult> } }} */ (
+        /** @type {unknown} */ (session.rpc)
+    );
+    if (typeof rpc.name?.set !== 'function') {
+        throw new TypeError('[sdk/rpc/name.set] RPC indisponível nesta sessão SDK.');
+    }
+    appLog('INFO', `[sdk/rpc] name.set: sessionId='${session.sessionId}'`);
+    try {
+        const result = await rpc.name.set({ name });
+        return result && typeof result === 'object' ? result : { name, success: true };
+    } catch (error) {
+        throw toSdkOperationError('name.set', error);
     }
 }
 

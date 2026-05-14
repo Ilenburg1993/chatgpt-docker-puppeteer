@@ -74,6 +74,9 @@ export class ToolSessionContext {
     /** @type {(event: string, data: Record<string, unknown>) => void} */
     #broadcastSse;
 
+    /** @type {boolean} - Rastreia se há callback ativo (evita comparação de referência) */
+    #hasActiveBroadcast;
+
     /**
      * @param {ToolSessionContextOptions} [opts]
      */
@@ -81,6 +84,7 @@ export class ToolSessionContext {
         this.#sessionId = typeof opts.sessionId === 'string' ? opts.sessionId : null;
         this.#pendingInputResolvers = new Map();
         this.#pendingInputSeq = 0;
+        this.#hasActiveBroadcast = typeof opts.broadcastSse === 'function';
         this.#broadcastSse = typeof opts.broadcastSse === 'function' ? opts.broadcastSse : () => {};
     }
 
@@ -106,6 +110,7 @@ export class ToolSessionContext {
      */
     configureBroadcastSse(fn) {
         if (typeof fn !== 'function') return;
+        this.#hasActiveBroadcast = true;
         this.#broadcastSse = fn;
     }
 
@@ -240,12 +245,9 @@ export class ToolSessionContext {
             sessionId: this.#sessionId,
             pendingInputCount: this.#pendingInputResolvers.size,
             pendingInputIds: [...this.#pendingInputResolvers.keys()],
-            hasBroadcastSse: this.#broadcastSse !== ToolSessionContext.#noopSse,
+            hasBroadcastSse: this.#hasActiveBroadcast,
         };
     }
-
-    /** @type {() => void} */
-    static #noopSse = () => {};
 }
 
 /**

@@ -16,11 +16,11 @@
  * @see EventBus
  */
 
-import { readFileSync } from 'node:fs';
-import { readFile, rename, writeFile } from 'node:fs/promises';
 import { logSwallowed, toError } from '#copilot/core/error-handlers';
 import { safeJsonParse } from '#copilot/core/safe-json';
 import { CustomToolsFileSchema } from '#copilot/core/schemas';
+import { readFileSync } from 'node:fs';
+import { readFile, rename, writeFile } from 'node:fs/promises';
 import { log } from '../logger.js';
 import { resolvePersistentConfigFile } from '../persistent-paths.js';
 
@@ -357,6 +357,15 @@ export async function removeCustomTool(name) {
 }
 
 /**
+ * Verifica se o custom tools builder foi injetado e está disponível.
+ *
+ * @returns {boolean}
+ */
+export function isCustomToolsBuilderReady() {
+    return _buildTool !== null;
+}
+
+/**
  * Constrói instâncias `Tool` SDK a partir das definições registradas. Cada tool com `handlerId` inválido é ignorada com
  * warning (proteção contra corrupção do arquivo de persistência).
  *
@@ -398,7 +407,7 @@ export function buildCustomTools() {
  * @internal
  */
 export function _resetRegistry() {
-    _registry = new Map();
-    _loadPromise = null;
-    _loaded = false;
+    _loaded = false; // primeiro: impede que Promise em voo marque como loaded
+    _loadPromise = null; // segundo: descarta referência da Promise em voo
+    _registry = new Map(); // terceiro: limpa dados
 }

@@ -110,7 +110,7 @@ export const LIFECYCLE_MODULE_LAYOUT = Object.freeze([
         role: 'process-host',
         tier: 'secondary',
         public: true,
-        summary: 'Borda de processo: sinais, IPC, shutdown host e preflight SDK.',
+        summary: 'Borda de processo compatível: sinais, IPC e shutdown host.',
     },
     {
         path: 'setup/session-setup.js',

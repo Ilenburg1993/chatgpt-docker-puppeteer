@@ -92,10 +92,11 @@ export class ModelSelector {
         const scored = candidates.map((model) => {
             let score = 0;
 
-            const costScore = 4 - COST_ORDER[model.costTier];
+            // Tratar tiers unknown com defaults: cost=medium(2), speed=medium(1)
+            const costScore = 4 - (COST_ORDER[model.costTier] ?? 2);
             if (criteria.preferLowCost) score += costScore * 3;
 
-            const speedScore = SPEED_ORDER[model.speedTier];
+            const speedScore = SPEED_ORDER[model.speedTier] ?? 1;
             if (criteria.preferFast) score += speedScore * 3;
 
             if (model.contextWindow >= 500_000) score += 2;

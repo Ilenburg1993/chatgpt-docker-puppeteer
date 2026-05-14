@@ -280,6 +280,31 @@ export async function mcpReload(session) {
     }
 }
 
+/**
+ * Inicia fluxo OAuth para um servidor MCP. SDK RPC: `session.rpc.mcp.oauth.login({ serverName })`
+ *
+ * @param {CopilotSession} session
+ * @param {string} serverName
+ * @returns {Promise<unknown>}
+ */
+export async function mcpOauthLogin(session, serverName) {
+    if (!isExperimentalEnabled('mcp')) throwNotEnabled('mcp', 'mcp.oauth.login');
+    assertRpcSession(session, 'mcp.oauth.login');
+    if (typeof serverName !== 'string' || serverName.length === 0) {
+        throw new TypeError('[sdk/experimental-rpc/mcp.oauth.login] serverName deve ser string não-vazia.');
+    }
+    const login = getRpc(session).mcp?.oauth?.login;
+    if (typeof login !== 'function') {
+        throw new TypeError('[sdk/experimental-rpc] método RPC indisponível: mcp.oauth.login()');
+    }
+    appLog('INFO', `[sdk/experimental-rpc] mcp.oauth.login: serverName='${serverName}', sessionId='${session.sessionId}'`);
+    try {
+        return await login({ serverName });
+    } catch (error) {
+        throw toSdkOperationError('experimental.mcp.oauth.login', error);
+    }
+}
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // plugins subsystem — SDK: plugins.list()
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -396,5 +421,44 @@ export async function extensionsReload(session) {
         return;
     } catch (error) {
         throw toSdkOperationError('experimental.extensions.reload', error);
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// history / usage subsystems
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * Trunca histórico da sessão em um boundary suportado pelo host. SDK RPC: `session.rpc.history.truncate(params)`
+ *
+ * @param {CopilotSession} session
+ * @param {Record<string, unknown>} params
+ * @returns {Promise<unknown>}
+ */
+export async function historyTruncate(session, params) {
+    if (!isExperimentalEnabled('history')) throwNotEnabled('history', 'history.truncate');
+    assertRpcSession(session, 'history.truncate');
+    appLog('INFO', `[sdk/experimental-rpc] history.truncate: sessionId='${session.sessionId}'`);
+    try {
+        return await requireRpcMethod(session, 'history', 'truncate')(params);
+    } catch (error) {
+        throw toSdkOperationError('experimental.history.truncate', error);
+    }
+}
+
+/**
+ * Lê métricas de uso da sessão. SDK RPC: `session.rpc.usage.getMetrics()`
+ *
+ * @param {CopilotSession} session
+ * @returns {Promise<unknown>}
+ */
+export async function usageGetMetrics(session) {
+    if (!isExperimentalEnabled('usage')) throwNotEnabled('usage', 'usage.getMetrics');
+    assertRpcSession(session, 'usage.getMetrics');
+    appLog('DEBUG', `[sdk/experimental-rpc] usage.getMetrics: sessionId='${session.sessionId}'`);
+    try {
+        return await requireRpcMethod(session, 'usage', 'getMetrics')();
+    } catch (error) {
+        throw toSdkOperationError('experimental.usage.getMetrics', error);
     }
 }

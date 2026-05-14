@@ -1017,6 +1017,19 @@
  * @typedef {{ eventId: string; [k: string]: unknown }} LogResult
  */
 
+/**
+ * Relatório canônico de preflight do SDK/CLI executado no boot.
+ *
+ * @typedef {object} CopilotSdkBootPreflightReport
+ * @property {boolean} ok
+ * @property {boolean} pingOk
+ * @property {boolean | null} authenticated
+ * @property {string | null} modelConfigured
+ * @property {boolean | null} modelValidated
+ * @property {string[]} warnings
+ * @property {string[]} errors
+ */
+
 // ─── Loose-typed SDK interfaces (projeto-local) ───────────────────────────────
 // Interfaces com assinaturas relaxadas para wrappers dinâmicos que precisam aceitar
 // strings arbitrárias em lugar de literal unions (necessário em event-wirer.js, etc.).
@@ -1055,11 +1068,14 @@
  * @property {(params?: Record<string, unknown>) => Promise<unknown>} [select]
  * @property {(params?: Record<string, unknown>) => Promise<unknown>} [deselect]
  * @property {(params?: Record<string, unknown>) => Promise<unknown>} [reload]
+ * @property {(params?: Record<string, unknown>) => Promise<unknown>} [truncate]
+ * @property {(params?: Record<string, unknown>) => Promise<unknown>} [getMetrics]
+ * @property {(params?: Record<string, unknown>) => Promise<unknown>} [login]
+ * @property {ExperimentalRpcNamespace} [oauth]
  */
 
 /**
- * Sessão com surface de RPC experimental. Campo `rpc` expõe os namespaces: `fleet`, `skills`, `mcp`, `plugins`,
- * `extensions`.
+ * Sessão com surface de RPC experimental. Campo `rpc` expõe namespaces experimentais do SDK.
  *
  * @typedef {object} ExperimentalSession
  * @property {{
@@ -1068,6 +1084,8 @@
  *     mcp: ExperimentalRpcNamespace;
  *     plugins: ExperimentalRpcNamespace;
  *     extensions: ExperimentalRpcNamespace;
+ *     history: ExperimentalRpcNamespace;
+ *     usage: ExperimentalRpcNamespace;
  * }} rpc
  */
 

@@ -19,6 +19,7 @@
  */
 
 import { toSdkOperationError } from '../errors.js';
+import { isExperimentalEnabled } from '../feature-flags.js';
 import { log as appLog } from '../logger.js';
 
 /**
@@ -64,6 +65,16 @@ import { log as appLog } from '../logger.js';
  *
  *
  * @typedef {{ quotaSnapshots: Record<string, QuotaSnapshot> }} AccountQuotaResult
+ *
+ * @typedef {{ servers?: Record<string, unknown>; [k: string]: unknown }} McpConfigListResult
+ *
+ * @typedef {{ success?: boolean; [k: string]: unknown }} ServerMutationResult
+ *
+ * @typedef {{ servers?: unknown[]; [k: string]: unknown }} McpDiscoverResult
+ *
+ * @typedef {{ skills?: unknown[]; [k: string]: unknown }} SkillsDiscoverResult
+ *
+ * @typedef {{ sessionId?: string; [k: string]: unknown }} SessionForkResult
  */
 
 // ─── Validação ─────────────────────────────────────────────────────────────────
@@ -174,6 +185,162 @@ export async function accountGetQuota(client) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// MCP CONFIG / DISCOVERY
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * @param {CopilotClient} client
+ * @returns {Promise<McpConfigListResult>}
+ */
+export async function mcpConfigList(client) {
+    assertClient(client, 'mcp.config.list');
+    try {
+        return /** @type {McpConfigListResult} */ (/** @type {unknown} */ (await client.rpc.mcp.config.list()));
+    } catch (error) {
+        throw toSdkOperationError('server.mcp.config.list', error);
+    }
+}
+
+/**
+ * @param {CopilotClient} client
+ * @param {Record<string, unknown>} params
+ * @returns {Promise<ServerMutationResult>}
+ */
+export async function mcpConfigAdd(client, params) {
+    assertClient(client, 'mcp.config.add');
+    try {
+        await client.rpc.mcp.config.add(/** @type {any} */ (params));
+        return { success: true };
+    } catch (error) {
+        throw toSdkOperationError('server.mcp.config.add', error);
+    }
+}
+
+/**
+ * @param {CopilotClient} client
+ * @param {Record<string, unknown>} params
+ * @returns {Promise<ServerMutationResult>}
+ */
+export async function mcpConfigUpdate(client, params) {
+    assertClient(client, 'mcp.config.update');
+    try {
+        await client.rpc.mcp.config.update(/** @type {any} */ (params));
+        return { success: true };
+    } catch (error) {
+        throw toSdkOperationError('server.mcp.config.update', error);
+    }
+}
+
+/**
+ * @param {CopilotClient} client
+ * @param {{ name: string }} params
+ * @returns {Promise<ServerMutationResult>}
+ */
+export async function mcpConfigRemove(client, params) {
+    assertClient(client, 'mcp.config.remove');
+    try {
+        await client.rpc.mcp.config.remove(params);
+        return { success: true };
+    } catch (error) {
+        throw toSdkOperationError('server.mcp.config.remove', error);
+    }
+}
+
+/**
+ * @param {CopilotClient} client
+ * @param {{ names: string[] }} params
+ * @returns {Promise<ServerMutationResult>}
+ */
+export async function mcpConfigEnable(client, params) {
+    assertClient(client, 'mcp.config.enable');
+    try {
+        await client.rpc.mcp.config.enable(params);
+        return { success: true };
+    } catch (error) {
+        throw toSdkOperationError('server.mcp.config.enable', error);
+    }
+}
+
+/**
+ * @param {CopilotClient} client
+ * @param {{ names: string[] }} params
+ * @returns {Promise<ServerMutationResult>}
+ */
+export async function mcpConfigDisable(client, params) {
+    assertClient(client, 'mcp.config.disable');
+    try {
+        await client.rpc.mcp.config.disable(params);
+        return { success: true };
+    } catch (error) {
+        throw toSdkOperationError('server.mcp.config.disable', error);
+    }
+}
+
+/**
+ * @param {CopilotClient} client
+ * @param {Record<string, unknown>} [params]
+ * @returns {Promise<McpDiscoverResult>}
+ */
+export async function mcpDiscover(client, params = {}) {
+    assertClient(client, 'mcp.discover');
+    try {
+        return /** @type {McpDiscoverResult} */ (await client.rpc.mcp.discover(/** @type {any} */ (params)));
+    } catch (error) {
+        throw toSdkOperationError('server.mcp.discover', error);
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SKILLS CONFIG / DISCOVERY
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * @param {CopilotClient} client
+ * @param {{ disabledSkills: string[] }} params
+ * @returns {Promise<ServerMutationResult>}
+ */
+export async function skillsConfigSetDisabledSkills(client, params) {
+    assertClient(client, 'skills.config.setDisabledSkills');
+    try {
+        await client.rpc.skills.config.setDisabledSkills(params);
+        return { success: true };
+    } catch (error) {
+        throw toSdkOperationError('server.skills.config.setDisabledSkills', error);
+    }
+}
+
+/**
+ * @param {CopilotClient} client
+ * @param {Record<string, unknown>} [params]
+ * @returns {Promise<SkillsDiscoverResult>}
+ */
+export async function skillsDiscover(client, params = {}) {
+    assertClient(client, 'skills.discover');
+    try {
+        return /** @type {SkillsDiscoverResult} */ (await client.rpc.skills.discover(/** @type {any} */ (params)));
+    } catch (error) {
+        throw toSdkOperationError('server.skills.discover', error);
+    }
+}
+
+/**
+ * @param {CopilotClient} client
+ * @param {Record<string, unknown>} params
+ * @returns {Promise<SessionForkResult>}
+ */
+export async function sessionsFork(client, params) {
+    if (!isExperimentalEnabled('sessions')) {
+        throw new Error("[sdk/server-rpc/sessions.fork] requer feature flag 'sessions' habilitada.");
+    }
+    assertClient(client, 'sessions.fork');
+    try {
+        return /** @type {SessionForkResult} */ (await client.rpc.sessions.fork(/** @type {any} */ (params)));
+    } catch (error) {
+        throw toSdkOperationError('server.sessions.fork', error);
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // FACADE
 // ═══════════════════════════════════════════════════════════════════════════════
 
@@ -186,6 +353,22 @@ export async function accountGetQuota(client) {
  *     models: { list: () => Promise<ModelsListResult> };
  *     tools: { list: (options?: { model?: string }) => Promise<ToolsListResult> };
  *     account: { getQuota: () => Promise<AccountQuotaResult> };
+ *     mcp: {
+ *         config: {
+ *             list: () => Promise<McpConfigListResult>;
+ *             add: (params: Record<string, unknown>) => Promise<ServerMutationResult>;
+ *             update: (params: Record<string, unknown>) => Promise<ServerMutationResult>;
+ *             remove: (params: { name: string }) => Promise<ServerMutationResult>;
+ *             enable: (params: { names: string[] }) => Promise<ServerMutationResult>;
+ *             disable: (params: { names: string[] }) => Promise<ServerMutationResult>;
+ *         };
+ *         discover: (params?: Record<string, unknown>) => Promise<McpDiscoverResult>;
+ *     };
+ *     skills: {
+ *         config: { setDisabledSkills: (params: { disabledSkills: string[] }) => Promise<ServerMutationResult> };
+ *         discover: (params?: Record<string, unknown>) => Promise<SkillsDiscoverResult>;
+ *     };
+ *     sessions: { fork: (params: Record<string, unknown>) => Promise<SessionForkResult> };
  * }}
  */
 export function createServerRpcFacade(client) {
@@ -195,5 +378,21 @@ export function createServerRpcFacade(client) {
         models: { list: () => modelsList(client) },
         tools: { list: (options) => toolsList(client, options) },
         account: { getQuota: () => accountGetQuota(client) },
+        mcp: {
+            config: {
+                list: () => mcpConfigList(client),
+                add: (params) => mcpConfigAdd(client, params),
+                update: (params) => mcpConfigUpdate(client, params),
+                remove: (params) => mcpConfigRemove(client, params),
+                enable: (params) => mcpConfigEnable(client, params),
+                disable: (params) => mcpConfigDisable(client, params),
+            },
+            discover: (params) => mcpDiscover(client, params),
+        },
+        skills: {
+            config: { setDisabledSkills: (params) => skillsConfigSetDisabledSkills(client, params) },
+            discover: (params) => skillsDiscover(client, params),
+        },
+        sessions: { fork: (params) => sessionsFork(client, params) },
     };
 }

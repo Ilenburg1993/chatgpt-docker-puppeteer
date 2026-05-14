@@ -15,6 +15,7 @@ import { log } from '../logger.js';
 import { modelGetCurrent, modelSwitchTo } from '../rpc/session.js';
 import { emitSdkOperationMetric } from '../telemetry/operation-metrics.js';
 
+import { verifyModelSwitchWithRetry } from './model-switch-verify-retry.js';
 /**
  * @typedef {import('@github/copilot-sdk').CopilotSession} CopilotSession
  *
@@ -50,12 +51,14 @@ function assertSession(session, caller) {
  * }>}
  */
 async function verifySessionModelSwitch(session, model, options) {
-    /** @type {{
-    requestedModel: string;
-    effectiveModel: string | null;
-    verifiedSwitch: boolean;
-    usedRpcFallback: boolean;
-}} */
+    /**
+     * @type {{
+     *     requestedModel: string;
+     *     effectiveModel: string | null;
+     *     verifiedSwitch: boolean;
+     *     usedRpcFallback: boolean;
+     * }}
+     */
     const result = {
         requestedModel: model,
         effectiveModel: null,
@@ -112,9 +115,24 @@ async function verifySessionModelSwitch(session, model, options) {
             options?.reasoningEffort ? { reasoningEffort: options.reasoningEffort } : undefined,
         );
         result.usedRpcFallback = true;
-        const current = await modelGetCurrent(session);
-        result.effectiveModel = current.modelId;
-        result.verifiedSwitch = current.modelId === model;
+
+        // Fase 3.2 Optimization #1: Retry com timeout cap
+        const verifyResult = await verifyModelSwitchWithRetry(
+            async () => {
+                const current = await modelGetCurrent(session);
+                result.effectiveModel = current.modelId;
+                return current.modelId === model;
+            },
+            { maxRetries: 3, pollDelayMs: 100, totalTimeoutMs: 500 },
+        );
+
+        result.verifiedSwitch = verifyResult.ok;
+        if (!result.verifiedSwitch) {
+            const detail = verifyResult.timedOut
+                ? `timeout após ${verifyResult.retries} retries`
+                : `não convergiu após ${verifyResult.retries} retries`;
+            log('WARN', `[session-runtime] Model switch verification falhou: ${detail}`);
+        }
     } catch (error) {
         log('WARN', `[session-runtime] rpc.model.switchTo fallback falhou: ${toError(error).message}`);
     }

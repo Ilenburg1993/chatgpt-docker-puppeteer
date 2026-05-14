@@ -80,7 +80,6 @@ export const COPILOT_BOOT_REQUIRED_SURFACES = Object.freeze({
         'rollbackTerminalPinnedContextPhase',
         'rollbackTerminalHttpServerPhase',
         'rollbackTerminalRuntimeListenersPhase',
-        'startTerminalServer',
     ]),
 });
 

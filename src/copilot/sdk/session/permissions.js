@@ -14,6 +14,7 @@
  */
 
 import { approveAll } from '@github/copilot-sdk';
+import { PERMISSION_REQUEST_KINDS } from '../constants.js';
 import { log } from '../logger.js';
 import { extractPermissionToolName } from './permission-runtime.js';
 
@@ -170,7 +171,7 @@ export function createPermissionHandler(config) {
             const sessionId = invocation?.sessionId ?? 'unknown';
 
             // Política canônica: content-exclusion-check nunca é auto-aprovado.
-            if (kind === 'content-exclusion-check') {
+            if (kind === PERMISSION_REQUEST_KINDS.CONTENT_EXCLUSION_CHECK) {
                 const path = extractPath(request);
                 log(
                     'WARN',
