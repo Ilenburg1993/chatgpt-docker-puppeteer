@@ -168,6 +168,8 @@ Status complementar:
 - `write_file_content` passou a rejeitar base64 malformado antes de mutar o filesystem, com `toolFeedback` acionável.
 - `io/search/subprocess.js` passou a concentrar execução de `rg`/`grep` e cache de disponibilidade de `rg`, removendo
   `child_process` direto da `io-engine` e preparando parsing incremental/telemetria de subprocessos em um único ponto.
+- Essa porta agora usa `spawn` com coleta controlada de stdout/stderr, timeout/sinal, erro compatível com status/stderr e
+  estouro explícito de `maxBuffer`, evitando a bufferização opaca de `execFile` em searches volumosas.
 
 ### F2.2 — `rg --json`
 
