@@ -9,8 +9,14 @@
  */
 
 import { z } from 'zod/v3';
-import { buildIoIndexForDirectory, findIoIndexSymbol, getIoIndexStats, searchIoIndex } from '../../infra/index.js';
+import {
+    buildIoIndexForDirectory,
+    findIoIndexSymbol,
+    getIoIndexStats,
+    searchIoIndex,
+} from '#copilot/infra/public/indexing';
 import { buildTool } from '../infra/tool-factory.js';
+import { validatePath } from './shared.js';
 
 const IndexBuildParameters = z.object({
     directory: z.string().min(1).describe('Diretório local a indexar.'),
@@ -29,10 +35,12 @@ const IndexBuildParameters = z.object({
 
 const IndexSearchParameters = z.object({
     query: z.string().min(1).describe('Consulta textual para FTS5.'),
+    maxResults: z.number().int().positive().max(500).optional().describe('Janela máxima de resultados. Default: 50.'),
 });
 
 const IndexSymbolParameters = z.object({
     symbol: z.string().min(1).describe('Nome ou substring do símbolo.'),
+    maxResults: z.number().int().positive().max(500).optional().describe('Janela máxima de resultados. Default: 50.'),
 });
 
 export const workspaceIndexBuildTool = buildTool({
@@ -51,6 +59,18 @@ export const workspaceIndexBuildTool = buildTool({
         concurrency,
         pruneMissing,
     }) => {
+        const pathCheck = await validatePath(directory, { mode: 'read' });
+        if (!pathCheck.ok) {
+            return {
+                available: false,
+                success: false,
+                indexed: 0,
+                skipped: 0,
+                failed: 0,
+                durationMs: 0,
+                error: pathCheck.reason,
+            };
+        }
         /** @type {Parameters<typeof buildIoIndexForDirectory>[1]} */
         const options = {};
         if (recursive !== undefined) options.recursive = recursive;
@@ -61,7 +81,7 @@ export const workspaceIndexBuildTool = buildTool({
         if (extensions !== undefined) options.extensions = extensions;
         if (concurrency !== undefined) options.concurrency = concurrency;
         if (pruneMissing !== undefined) options.pruneMissing = pruneMissing;
-        return buildIoIndexForDirectory(directory, options);
+        return buildIoIndexForDirectory(pathCheck.resolved, options);
     },
 });
 
@@ -76,11 +96,12 @@ export const workspaceIndexSearchTool = buildTool({
     name: 'workspace_index_search',
     description: 'Busca textual no índice FTS5 local quando ele está disponível.',
     parameters: IndexSearchParameters,
-    handler: async ({ query }) => {
+    handler: async ({ query, maxResults }) => {
         return {
             query,
+            maxResults: maxResults ?? 50,
             stats: getIoIndexStats(),
-            results: searchIoIndex(query),
+            results: searchIoIndex(query, { maxResults }),
         };
     },
 });
@@ -89,11 +110,12 @@ export const workspaceIndexFindSymbolTool = buildTool({
     name: 'workspace_index_find_symbol',
     description: 'Busca símbolos persistidos no índice L2 local.',
     parameters: IndexSymbolParameters,
-    handler: async ({ symbol }) => {
+    handler: async ({ symbol, maxResults }) => {
         return {
             symbol,
+            maxResults: maxResults ?? 50,
             stats: getIoIndexStats(),
-            results: findIoIndexSymbol(symbol),
+            results: findIoIndexSymbol(symbol, { maxResults }),
         };
     },
 });

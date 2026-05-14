@@ -28,16 +28,17 @@ const ADVISORY_GIT_PUSH_TIMEOUT_MS = 30_000;
  * usuário (ex: mensagem de commit, paths).
  *
  * @param {string[]} args - Argumentos para `git` (ex: ['commit', '-m', message])
- * @param {number} [advisoryTimeoutMs]
+ * @param {number} [timeoutMs]
  * @returns {Promise<{ stdout: string; exitCode: number; error?: string }>}
  */
-async function safeGitArgs(args, advisoryTimeoutMs = ADVISORY_GIT_CMD_TIMEOUT_MS) {
-    log('DEBUG', `[copilot/git] advisoryTimeout=${advisoryTimeoutMs}ms git ${args.join(' ')}`);
+async function safeGitArgs(args, timeoutMs = ADVISORY_GIT_CMD_TIMEOUT_MS) {
+    log('DEBUG', `[copilot/git] timeout=${timeoutMs}ms git ${args.join(' ')}`);
     try {
         const { stdout } = await execAsync('git', args, {
             cwd: ROOT,
             encoding: 'utf8',
-            maxBuffer: 1024 * 1024 * 1024,
+            timeout: timeoutMs,
+            maxBuffer: 10 * 1024 * 1024,
         });
         return { stdout, exitCode: 0 };
     } catch (e) {

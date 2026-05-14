@@ -10,8 +10,9 @@ import {
     getScopeStats,
     listScopes,
     refreshScope,
-} from '#copilot/infra/io-session-scope';
+} from '#copilot/infra/public/session';
 import { buildTool } from '../infra/tool-factory.js';
+import { validatePath } from './shared.js';
 
 const ScopeDeclareParameters = z.object({
     sessionId: z.string().min(1).describe('ID da sessão/escopo para rastreamento da LLM-B.'),
@@ -77,10 +78,22 @@ export const workspaceScopeDeclareTool = buildTool({
         awaitReady,
     }) => {
         const effectiveSessionId = scopeName?.trim() ? scopeName.trim() : sessionId;
+        let resolvedDirectory = directory;
+        if (directory) {
+            const pathCheck = await validatePath(directory, { mode: 'read' });
+            if (!pathCheck.ok) {
+                return {
+                    success: false,
+                    error: pathCheck.reason,
+                    sessionId: effectiveSessionId,
+                };
+            }
+            resolvedDirectory = pathCheck.resolved;
+        }
         const scope = await Promise.resolve(
             declareScope({
                 sessionId: effectiveSessionId,
-                directory,
+                directory: resolvedDirectory,
                 maxFiles,
                 parseSymbols,
                 indexMode,
@@ -122,7 +135,26 @@ export const workspaceScopeRefreshTool = buildTool({
     description: 'Atualiza o escopo de trabalho declarado para refletir alterações recentes de arquivos.',
     parameters: ScopeIdParameters,
     handler: async ({ sessionId, modifiedPaths }) => {
-        return refreshScope(sessionId, modifiedPaths);
+        if (!modifiedPaths || modifiedPaths.length === 0) {
+            return refreshScope(sessionId, modifiedPaths);
+        }
+
+        /** @type {string[]} */
+        const resolvedPaths = [];
+        for (const filePath of modifiedPaths) {
+            const pathCheck = await validatePath(filePath, { mode: 'read' });
+            if (!pathCheck.ok) {
+                return {
+                    success: false,
+                    error: pathCheck.reason,
+                    path: filePath,
+                    refreshed: 0,
+                    failed: 0,
+                };
+            }
+            resolvedPaths.push(pathCheck.resolved);
+        }
+        return refreshScope(sessionId, resolvedPaths);
     },
 });
 

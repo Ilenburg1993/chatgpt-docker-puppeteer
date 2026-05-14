@@ -12,7 +12,7 @@ const mocks = vi.hoisted(() => ({
     closeScope: vi.fn(),
 }));
 
-vi.mock('#copilot/infra/io-session-scope', () => ({
+vi.mock('#copilot/infra/public/session', () => ({
     closeScope: mocks.closeScope,
     declareScope: mocks.declareScope,
     refreshScope: mocks.refreshScope,
@@ -67,7 +67,7 @@ describe('tools/file/scope-tools', () => {
 
         expect(mocks.declareScope).toHaveBeenCalledWith({
             sessionId: 's1',
-            directory: 'src/copilot',
+            directory: expect.stringMatching(/src[/\\]copilot$/),
             maxFiles: 50,
             parseSymbols: undefined,
             indexMode: undefined,
@@ -92,7 +92,7 @@ describe('tools/file/scope-tools', () => {
         expect(mocks.declareScope).toHaveBeenCalledWith(
             expect.objectContaining({
                 sessionId: 'feature-a',
-                directory: 'src',
+                directory: expect.stringMatching(/src$/),
             }),
         );
         expect(out.sessionId).toBe('feature-a');
@@ -125,9 +125,25 @@ describe('tools/file/scope-tools', () => {
 
         expect(mocks.listScopes).toHaveBeenCalled();
         expect(mocks.getScopeStats).toHaveBeenCalledWith('abc');
-        expect(mocks.refreshScope).toHaveBeenCalledWith('abc', ['src/a.ts']);
+        expect(mocks.refreshScope).toHaveBeenCalledWith('abc', [expect.stringMatching(/src[/\\]a\.ts$/)]);
         expect(mocks.getScopeContext).toHaveBeenCalledWith('abc');
         expect(mocks.findSymbol).toHaveBeenCalledWith('abc', 'buildTool', { exactMatch: undefined });
         expect(mocks.closeScope).toHaveBeenCalledWith('abc');
+    });
+
+    it('rejects scope declare directory outside workspace before calling infra', async () => {
+        const handler = getHandler(workspaceScopeDeclareTool);
+
+        const out = await handler({ sessionId: 's-outside', directory: '/etc' });
+
+        expect(out.success).toBe(false);
+        expect(mocks.declareScope).not.toHaveBeenCalled();
+    });
+
+    it('rejects refresh modified path outside workspace before calling infra', async () => {
+        const out = await getHandler(workspaceScopeRefreshTool)({ sessionId: 'abc', modifiedPaths: ['/etc/passwd'] });
+
+        expect(out.success).toBe(false);
+        expect(mocks.refreshScope).not.toHaveBeenCalled();
     });
 });

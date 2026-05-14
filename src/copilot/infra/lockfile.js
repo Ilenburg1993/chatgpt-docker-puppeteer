@@ -7,8 +7,8 @@
  * @module copilot/infra/lockfile
  */
 
-import { existsSync, unlinkSync } from 'node:fs';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { existsSync, readFileSync, unlinkSync } from 'node:fs';
+import { mkdir, open, readFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
 
 /**
@@ -21,32 +21,44 @@ import { dirname } from 'node:path';
  * @returns {Promise<boolean>}
  */
 export async function acquireLock(lockPath) {
-    if (existsSync(lockPath)) {
-        try {
-            const raw = await readFile(lockPath, 'utf-8');
-            const pid = parseInt(raw.trim(), 10);
-            if (!isNaN(pid) && isProcessAlive(pid)) {
-                return false; // lock válido de outro processo
-            }
-            // stale lock — processo morreu
-            unlinkSync(lockPath);
-        } catch {
-            // arquivo corrompido — remove
-            try {
-                unlinkSync(lockPath);
-            } catch {
-                /* ignore */
-            }
-        }
-    }
-
     const dir = dirname(lockPath);
     if (!existsSync(dir)) {
         await mkdir(dir, { recursive: true });
     }
 
-    await writeFile(lockPath, String(process.pid), 'utf-8');
-    return true;
+    for (let attempt = 0; attempt < 2; attempt++) {
+        try {
+            const handle = await open(lockPath, 'wx');
+            try {
+                await handle.writeFile(JSON.stringify({ pid: process.pid, createdAt: Date.now() }), 'utf-8');
+            } finally {
+                await handle.close();
+            }
+            return true;
+        } catch (error) {
+            const code = /** @type {{ code?: unknown }} */ (error)?.code;
+            if (code !== 'EEXIST') throw error;
+
+            try {
+                const raw = await readFile(lockPath, 'utf-8');
+                const pid = readLockOwnerPid(raw);
+                if (pid !== null && isProcessAlive(pid)) {
+                    return false;
+                }
+            } catch {
+                // arquivo corrompido ou ilegível: tenta remover como stale
+            }
+
+            try {
+                unlinkSync(lockPath);
+            } catch (unlinkError) {
+                const unlinkCode = /** @type {{ code?: unknown }} */ (unlinkError)?.code;
+                if (unlinkCode !== 'ENOENT') return false;
+            }
+        }
+    }
+
+    return false;
 }
 
 /**
@@ -58,10 +70,30 @@ export async function acquireLock(lockPath) {
 export function releaseLock(lockPath) {
     try {
         if (existsSync(lockPath)) {
-            unlinkSync(lockPath);
+            const pid = readLockOwnerPid(readFileSync(lockPath, 'utf-8'));
+            if (pid === process.pid) {
+                unlinkSync(lockPath);
+            }
         }
     } catch {
         // best-effort
+    }
+}
+
+/**
+ * @param {string} raw
+ * @returns {number | null}
+ */
+function readLockOwnerPid(raw) {
+    const trimmed = raw.trim();
+    if (!trimmed) return null;
+    try {
+        const parsed = JSON.parse(trimmed);
+        const pid = Number(parsed?.pid);
+        return Number.isInteger(pid) && pid > 0 ? pid : null;
+    } catch {
+        const pid = Number.parseInt(trimmed, 10);
+        return Number.isInteger(pid) && pid > 0 ? pid : null;
     }
 }
 

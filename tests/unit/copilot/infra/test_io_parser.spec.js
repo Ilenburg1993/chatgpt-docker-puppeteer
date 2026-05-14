@@ -135,6 +135,14 @@ describe('extractJsonSchema', () => {
         const result = extractJsonSchema('{invalid json}');
         assert.ok(result.parseError !== null);
     });
+
+    it('extrai schema de array JSON multi-linha', () => {
+        const result = extractJsonSchema('[\n  { "id": 1, "name": "alpha" }\n]');
+        assert.equal(result.parseError, null);
+        const names = result.symbols.map((s) => s.name);
+        assert.ok(names.includes('id'));
+        assert.ok(names.includes('name'));
+    });
 });
 
 describe('extractMarkdownOutline', () => {
@@ -229,5 +237,12 @@ describe('parseFileForContext', () => {
         assert.ok(result !== null);
         assert.ok(Array.isArray(result.outline));
         assert.ok(result.outline.length > 0, `outline=${JSON.stringify(result.outline)}`);
+    });
+
+    it('preserva linha real dos headings markdown no parse simbólico', async () => {
+        const result = await parseFileSymbols(path.join(tmpDir, 'README.md'), MD_CONTENT);
+        const section = result.symbols.find((symbol) => symbol.name.includes('Seção 1'));
+        assert.ok(section);
+        assert.equal(section.line, 3);
     });
 });

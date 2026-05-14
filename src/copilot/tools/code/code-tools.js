@@ -40,17 +40,18 @@ const execFileAsync = promisify(execFile);
  * Executa um comando de shell via execFile de forma assíncrona (não bloqueia event loop).
  *
  * @param {string[]} argv — argv[0] é o executável, resto são args
- * @param {number} [advisoryTimeoutMs]
+ * @param {number} [timeoutMs]
  * @returns {Promise<{ stdout: string; exitCode: number; error?: string }>}
  */
-async function safeExec(argv, advisoryTimeoutMs = 60_000) {
+async function safeExec(argv, timeoutMs = 60_000) {
     const [cmd, ...args] = argv;
-    log('DEBUG', `[copilot/code-tools] advisoryTimeout=${advisoryTimeoutMs}ms argv=${argv.join(' ')}`);
+    log('DEBUG', `[copilot/code-tools] timeout=${timeoutMs}ms argv=${argv.join(' ')}`);
     try {
         const { stdout } = await execFileAsync(cmd ?? 'echo', args, {
             cwd: ROOT,
             encoding: 'utf8',
-            maxBuffer: 1024 * 1024 * 1024,
+            timeout: timeoutMs,
+            maxBuffer: 10 * 1024 * 1024,
         });
         return { stdout, exitCode: 0 };
     } catch (e) {
@@ -68,7 +69,7 @@ async function safeExec(argv, advisoryTimeoutMs = 60_000) {
  */
 const lintCheckTool = buildTool({
     name: 'lint_check',
-    description: 'Executa ESLint no projeto para detectar erros de estilo/qualidade. Retorna erros encontrados.',
+    description: 'Executa ESLint com cache no projeto para detectar erros de estilo/qualidade. Retorna erros encontrados.',
     parameters: z.object({
         fix: z.boolean().optional().default(false).describe('Se true, aplica correções automáticas (--fix)'),
         path: z.string().optional().describe('Caminho específico para lintar (ex: src/copilot)'),
@@ -76,7 +77,13 @@ const lintCheckTool = buildTool({
     handler: async (/** @type {{ fix?: boolean; path?: string }} */ { fix, path: filePath }) => {
         const target = filePath ?? '.';
         log('INFO', `[copilot/lint_check] Executando lint em '${target}'${fix ? ' com --fix' : ''}`);
-        const eslintArgs = [ESLINT_BIN, '--max-warnings=0'];
+        const eslintArgs = [
+            ESLINT_BIN,
+            '--max-warnings=0',
+            '--cache',
+            '--cache-location',
+            '/home/node/.cache/eslint/.eslintcache',
+        ];
         if (fix) eslintArgs.push('--fix');
         eslintArgs.push(target);
         const result = await safeExec(eslintArgs, 90_000);
@@ -93,7 +100,7 @@ const lintCheckTool = buildTool({
  */
 const runTestsTool = buildTool({
     name: 'run_tests',
-    description: 'Executa os testes unitários rápidos (test:fast). Retorna resultado.',
+    description: 'Executa as suítes Vitest canônicas do Copilot com cache. Retorna resultado.',
     parameters: z.object({
         suite: z
             .enum(['fast', 'unit', 'integration', 'all'])
@@ -104,12 +111,12 @@ const runTestsTool = buildTool({
     handler: async (/** @type {{ suite?: string }} */ { suite }) => {
         /** @type {Record<string, string>} */
         const scriptMap = {
-            integration: 'test:integration',
-            all: 'test:all',
-            unit: 'test:fast',
-            fast: 'test:fast',
+            integration: 'test:copilot:integration',
+            all: 'test:copilot',
+            unit: 'test:copilot:unit',
+            fast: 'test:copilot:unit',
         };
-        const script = scriptMap[suite ?? 'fast'] ?? 'test:fast';
+        const script = scriptMap[suite ?? 'fast'] ?? 'test:copilot:unit';
         log('INFO', `[copilot/run_tests] Executando npm run ${script}`);
         const npmResult = await safeExec(['npm', 'run', script], 120_000);
         return {
@@ -125,11 +132,11 @@ const runTestsTool = buildTool({
  */
 const typecheckTool = buildTool({
     name: 'typecheck',
-    description: 'Executa verificação de tipos TypeScript (typecheck:node). Retorna erros de tipo encontrados.',
+    description: 'Executa verificação TypeScript strict do escopo src/copilot. Retorna erros de tipo encontrados.',
     parameters: z.object({}),
     handler: async () => {
-        log('INFO', '[copilot/typecheck] Executando typecheck:node');
-        const result = await safeExec(['npm', 'run', 'typecheck:node'], 120_000);
+        log('INFO', '[copilot/typecheck] Executando typecheck:strict:src.copilot');
+        const result = await safeExec(['npm', 'run', 'typecheck:strict:src.copilot'], 120_000);
         return {
             success: result.exitCode === 0,
             output: result.stdout,

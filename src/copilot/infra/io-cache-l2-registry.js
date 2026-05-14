@@ -3,6 +3,7 @@
 import { getCopilotDb } from '#copilot/db';
 
 import { createIoL2SqliteCache } from './io-cache-l2-sqlite.js';
+import { readEnvPositiveInt } from './shared/env.js';
 
 /** @type {ReturnType<typeof createIoL2SqliteCache> | null} */
 let _ioL2Cache = null;
@@ -19,19 +20,6 @@ let _lastPruneErrorAtMs = null;
 
 function isEnabled() {
     return String(process.env['IO_L2_CACHE_ENABLED'] || '0').trim() === '1';
-}
-
-/**
- * @param {string} key
- * @param {number} fallback
- * @returns {number}
- */
-function readEnvPositiveInt(key, fallback) {
-    const raw = process.env[key];
-    if (raw === undefined || raw === null || String(raw).trim() === '') return fallback;
-    const parsed = Number(raw);
-    if (!Number.isFinite(parsed) || parsed <= 0) return fallback;
-    return Math.floor(parsed);
 }
 
 function startPruneTimer() {

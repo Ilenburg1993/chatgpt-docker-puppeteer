@@ -8,8 +8,22 @@
  * @module copilot/infra/io-locks
  */
 
+import * as nodePath from 'node:path';
+
 /** @type {Map<string, Promise<void>>} */
 const tails = new Map();
+
+/**
+ * Normaliza chaves de recursos de filesystem para reduzir bypass por path relativo/absoluto.
+ *
+ * @param {string} resourceKey
+ * @returns {string}
+ */
+export function normalizeIoResourceKey(resourceKey) {
+    const raw = String(resourceKey || '<unknown>');
+    if (raw.startsWith('<') && raw.endsWith('>')) return raw;
+    return nodePath.normalize(nodePath.resolve(raw));
+}
 
 /**
  * @param {'LockTimeout' | 'Abort'} kind
@@ -101,7 +115,7 @@ function waitForPrevious(previous, key, options) {
  * @returns {Promise<{ value: T; waitMs: number }>}
  */
 export async function withIoResourceLock(resourceKey, operation, options = {}) {
-    const key = resourceKey || '<unknown>';
+    const key = normalizeIoResourceKey(resourceKey);
     const startedWait = Date.now();
     const previous = tails.get(key) ?? Promise.resolve();
     /** @type {() => void} */
@@ -152,7 +166,9 @@ export async function withIoResourceLock(resourceKey, operation, options = {}) {
  * @returns {Promise<{ value: T; waitMs: number }>}
  */
 export async function withIoResourceLocks(resourceKeys, operation, options = {}) {
-    const keys = [...new Set(resourceKeys.map((key) => key || '<unknown>'))].sort((a, b) => a.localeCompare(b));
+    const keys = [...new Set(resourceKeys.map((key) => normalizeIoResourceKey(key)))].sort((a, b) =>
+        a.localeCompare(b),
+    );
     let totalWaitMs = 0;
 
     /**

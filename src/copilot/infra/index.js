@@ -52,6 +52,13 @@ export {
 } from './io-engine.js';
 export { readIoRuntimeHealthSnapshot } from './io-health.js';
 export { getIoLockStats, withIoResourceLocks } from './io-locks.js';
+export {
+    buildInfraModuleScorecard,
+    getInfraModuleDescriptor,
+    INFRA_MODULE_LAYOUT,
+    listInfraModulesByRisk,
+    listInfraModulesByRole,
+} from './module-map.js';
 export { nowIoMs, publishIoLifecycleEvent, publishIoOperation } from './io-observability.js';
 export {
     buildOutline,
@@ -96,3 +103,10 @@ export {
     getTerminalReplayBuffer,
 } from './sse/index.js';
 export { fileExists, readJson, writeJson } from './storage.js';
+export * from './public/cache.js';
+export * from './public/events.js';
+export * from './public/health.js';
+export * from './public/indexing.js';
+export * from './public/io.js';
+export * from './public/session.js';
+export * from './public/testing.js';

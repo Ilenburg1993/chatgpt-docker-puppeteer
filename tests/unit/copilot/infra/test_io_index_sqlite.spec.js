@@ -124,6 +124,37 @@ describe('createIoIndexSqlite', () => {
         expect(index.search('semantic index token')).toEqual([]);
     });
 
+    it('filtra busca FTS por pathPrefix no SQL', async () => {
+        expect(tmpDir).toBeTruthy();
+        const db = new Database(':memory:');
+        const index = createIoIndexSqlite({ db });
+        await writeFile(join(/** @type {string} */ (tmpDir), 'nested', 'notes-nested.md'), '# Nested\n\nsemantic index token\n', 'utf8');
+        await index.indexDirectory(/** @type {string} */ (tmpDir), { extensions: ['.md'], recursive: true });
+
+        const rootResults = index.search('semantic index token', { pathPrefix: /** @type {string} */ (tmpDir) });
+        const nestedResults = index.search('semantic index token', {
+            pathPrefix: join(/** @type {string} */ (tmpDir), 'nested'),
+        });
+
+        expect(rootResults.length).toBeGreaterThanOrEqual(2);
+        expect(nestedResults.length).toBe(1);
+        expect(nestedResults[0]?.relativePath).toContain('nested/notes-nested.md');
+    });
+
+    it('limita busca FTS e símbolos com janela explícita', async () => {
+        expect(tmpDir).toBeTruthy();
+        const db = new Database(':memory:');
+        const index = createIoIndexSqlite({ db });
+        await writeFile(join(/** @type {string} */ (tmpDir), 'one.md'), 'semantic index token\n', 'utf8');
+        await writeFile(join(/** @type {string} */ (tmpDir), 'two.md'), 'semantic index token\n', 'utf8');
+        await writeFile(join(/** @type {string} */ (tmpDir), 'gamma-a.js'), 'export const gammaAlpha = 1;\n', 'utf8');
+        await writeFile(join(/** @type {string} */ (tmpDir), 'gamma-b.js'), 'export const gammaBeta = 2;\n', 'utf8');
+        await index.indexDirectory(/** @type {string} */ (tmpDir), { extensions: ['.js', '.md'], recursive: true });
+
+        expect(index.search('semantic index token', { maxResults: 1 })).toHaveLength(1);
+        expect(index.findSymbol('gamma', { maxResults: 1 })).toHaveLength(1);
+    });
+
     it('não poda entradas fora de build parcial com include', async () => {
         expect(tmpDir).toBeTruthy();
         const db = new Database(':memory:');
@@ -139,5 +170,26 @@ describe('createIoIndexSqlite', () => {
         expect(second.pruned).toBe(0);
         expect(index.getStats().files).toBe(3);
         expect(index.search('semantic index token').length).toBeGreaterThanOrEqual(1);
+    });
+
+    it('persiste status failed quando parser retorna parseError no objeto', async () => {
+        expect(tmpDir).toBeTruthy();
+        const db = new Database(':memory:');
+        const index = createIoIndexSqlite({ db });
+
+        const result = await index.indexTextFile({
+            filePath: join(/** @type {string} */ (tmpDir), 'broken.js'),
+            workspaceRoot: /** @type {string} */ (tmpDir),
+            content: 'export function {',
+            sizeBytes: Buffer.byteLength('export function {', 'utf8'),
+            mtimeMs: Date.now(),
+            ctimeMs: null,
+        });
+
+        expect(result.parseError).toBeTruthy();
+        const stats = index.getStats();
+        expect(stats.files).toBe(1);
+        expect(stats.failedFiles).toBe(1);
+        expect(stats.freshFiles).toBe(0);
     });
 });

@@ -8,7 +8,7 @@ import * as fs from 'node:fs/promises';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { afterAll, beforeAll, describe, it } from 'vitest';
-import { resetIoL1CacheForTest } from '../../../../src/copilot/infra/io-cache.js';
+import { invalidateIoCacheSubtree, resetIoL1CacheForTest } from '../../../../src/copilot/infra/io-cache.js';
 import { writeFileAtomic } from '../../../../src/copilot/infra/io-engine.js';
 import {
     closeScope,
@@ -216,6 +216,28 @@ describe('refreshScope', () => {
         assert.ok(freshStats !== null);
         assert.strictEqual(freshStats.ready, true);
         assert.strictEqual(freshStats.invalidated, 0);
+
+        closeScope(sessionId);
+    });
+
+    it('invalidação recursiva remove símbolos de filhos no escopo', async () => {
+        const sessionId = 'test-scope-recursive-invalidation';
+        const nestedDir = path.join(tmpDir, 'nested-recursive');
+        const childPath = path.join(nestedDir, 'child.js');
+        await fs.mkdir(nestedDir, { recursive: true });
+        await fs.writeFile(childPath, "export function nestedChild() { return 'ok'; }\n", 'utf8');
+
+        const handle = declareScope({ sessionId, paths: [childPath], parseSymbols: true });
+        await handle.awaitReady();
+        assert.ok(findSymbol(sessionId, 'nestedChild', { exactMatch: true }).length >= 1);
+
+        invalidateIoCacheSubtree(nestedDir);
+
+        const stats = getScopeStats(sessionId);
+        assert.ok(stats !== null);
+        assert.strictEqual(stats.ready, false);
+        assert.strictEqual(stats.invalidated, 1);
+        assert.strictEqual(findSymbol(sessionId, 'nestedChild', { exactMatch: true }).length, 0);
 
         closeScope(sessionId);
     });

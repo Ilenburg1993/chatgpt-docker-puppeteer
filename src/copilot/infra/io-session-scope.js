@@ -114,31 +114,52 @@ function isSymbolParseTarget(filePath) {
 /**
  * @param {_InternalScope} scope
  * @param {string} filePath
+ * @param {{ recursive?: boolean }} [options]
  * @returns {boolean}
  */
-function scopeContainsPath(scope, filePath) {
+function scopeContainsPath(scope, filePath, options = {}) {
     const normalized = normalizeScopePath(filePath);
-    return scope.paths.some((candidate) => normalizeScopePath(candidate) === normalized);
+    return scope.paths.some((candidate) => {
+        const normalizedCandidate = normalizeScopePath(candidate);
+        return (
+            normalizedCandidate === normalized ||
+            (options.recursive === true && normalizedCandidate.startsWith(`${normalized}${nodePath.sep}`))
+        );
+    });
 }
 
 /**
  * @param {_InternalScope} scope
  * @param {string} filePath
+ * @param {{ recursive?: boolean }} [options]
  * @returns {void}
  */
-function markScopePathInvalidated(scope, filePath) {
-    if (!scopeContainsPath(scope, filePath)) return;
+function markScopePathInvalidated(scope, filePath, options = {}) {
+    if (!scopeContainsPath(scope, filePath, options)) return;
     const normalized = normalizeScopePath(filePath);
-    scope.symbolIndex.delete(filePath);
     for (const indexedPath of scope.symbolIndex.keys()) {
-        if (normalizeScopePath(indexedPath) === normalized) scope.symbolIndex.delete(indexedPath);
+        const normalizedIndexedPath = normalizeScopePath(indexedPath);
+        if (
+            normalizedIndexedPath === normalized ||
+            (options.recursive === true && normalizedIndexedPath.startsWith(`${normalized}${nodePath.sep}`))
+        ) {
+            scope.symbolIndex.delete(indexedPath);
+        }
     }
-    scope.invalidatedPaths.add(filePath);
+    for (const scopedPath of scope.paths) {
+        const normalizedScopedPath = normalizeScopePath(scopedPath);
+        if (
+            normalizedScopedPath === normalized ||
+            (options.recursive === true && normalizedScopedPath.startsWith(`${normalized}${nodePath.sep}`))
+        ) {
+            scope.invalidatedPaths.add(scopedPath);
+        }
+    }
     scope.ready = false;
 }
 
-registerInvalidationHook((filePath) => {
-    for (const scope of _registry.values()) markScopePathInvalidated(scope, filePath);
+registerInvalidationHook((filePath, event) => {
+    for (const scope of _registry.values()) markScopePathInvalidated(scope, filePath, event);
 });
 
 // ---------------------------------------------------------------------------

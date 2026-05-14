@@ -20,8 +20,8 @@ import {
     toError,
     withIoMeta,
 } from '#copilot/core';
+import { publishIoOperation } from '#copilot/infra/public/events';
 import { z } from 'zod';
-import { publishIoOperation } from '../../infra/io-observability.js';
 import { log } from '../infra/logger.js';
 import { buildTool } from '../infra/tool-factory.js';
 

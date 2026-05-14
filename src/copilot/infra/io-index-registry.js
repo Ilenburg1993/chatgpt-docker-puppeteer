@@ -79,9 +79,10 @@ export function searchIoIndex(query, options = {}) {
 
 /**
  * @param {string} name
+ * @param {Parameters<NonNullable<ReturnType<typeof getIoIndex>>['findSymbol']>[1]} [options]
  */
-export function findIoIndexSymbol(name) {
-    return getIoIndex()?.findSymbol(name) ?? [];
+export function findIoIndexSymbol(name, options = {}) {
+    return getIoIndex()?.findSymbol(name, options) ?? [];
 }
 
 /**

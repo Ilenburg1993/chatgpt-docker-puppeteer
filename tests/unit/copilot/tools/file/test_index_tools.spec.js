@@ -9,7 +9,7 @@ const mocks = vi.hoisted(() => ({
     findIoIndexSymbol: vi.fn(),
 }));
 
-vi.mock('../../../../../src/copilot/infra/index.js', () => ({
+vi.mock('#copilot/infra/public/indexing', () => ({
     buildIoIndexForDirectory: mocks.buildIoIndexForDirectory,
     getIoIndexStats: mocks.getIoIndexStats,
     searchIoIndex: mocks.searchIoIndex,
@@ -58,15 +58,27 @@ describe('tools/file/index-tools', () => {
             concurrency: 3,
         });
         const status = await getHandler(workspaceIndexStatusTool)({});
-        const search = await getHandler(workspaceIndexSearchTool)({ query: 'alpha' });
-        const symbol = await getHandler(workspaceIndexFindSymbolTool)({ symbol: 'alpha' });
+        const search = await getHandler(workspaceIndexSearchTool)({ query: 'alpha', maxResults: 7 });
+        const symbol = await getHandler(workspaceIndexFindSymbolTool)({ symbol: 'alpha', maxResults: 5 });
 
-        expect(mocks.buildIoIndexForDirectory).toHaveBeenCalledWith('src/copilot', {
+        expect(mocks.buildIoIndexForDirectory).toHaveBeenCalledWith(expect.stringMatching(/src[/\\]copilot$/), {
             include: ['*.js'],
             concurrency: 3,
         });
         expect(status).toEqual({ available: true, files: 2 });
-        expect(search.results).toEqual([{ relativePath: 'a.md' }]);
-        expect(symbol.results).toEqual([{ symbolName: 'alpha' }]);
+        expect(mocks.searchIoIndex).toHaveBeenCalledWith('alpha', { maxResults: 7 });
+        expect(mocks.findIoIndexSymbol).toHaveBeenCalledWith('alpha', { maxResults: 5 });
+        expect(search).toMatchObject({ maxResults: 7, results: [{ relativePath: 'a.md' }] });
+        expect(symbol).toMatchObject({ maxResults: 5, results: [{ symbolName: 'alpha' }] });
+    });
+
+    it('rejects index build directory outside workspace before calling infra', async () => {
+        const result = await getHandler(workspaceIndexBuildTool)({
+            directory: '/etc',
+        });
+
+        expect(result.success).toBe(false);
+        expect(result.available).toBe(false);
+        expect(mocks.buildIoIndexForDirectory).not.toHaveBeenCalled();
     });
 });

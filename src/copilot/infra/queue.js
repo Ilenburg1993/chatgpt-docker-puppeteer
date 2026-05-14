@@ -35,7 +35,8 @@ export class AsyncQueue {
      * @param {number} [opts.concurrency] - Máximo de tarefas simultâneas (default: 1).
      */
     constructor(opts) {
-        this.#concurrency = opts?.concurrency ?? 1;
+        const requested = Number(opts?.concurrency ?? 1);
+        this.#concurrency = Number.isFinite(requested) && requested > 0 ? Math.floor(requested) : 1;
     }
 
     /** Número de tarefas aguardando na fila. */
@@ -67,12 +68,18 @@ export class AsyncQueue {
         while (this.#running < this.#concurrency && this.#queue.length > 0) {
             const task = /** @type {QueueTask<unknown>} */ (this.#queue.shift());
             this.#running++;
-            task.fn()
-                .then(task.resolve, task.reject)
-                .finally(() => {
+            void (async () => {
+                try {
+                    const value = await task.fn();
                     this.#running--;
                     this.#drain();
-                });
+                    task.resolve(value);
+                } catch (error) {
+                    this.#running--;
+                    this.#drain();
+                    task.reject(error);
+                }
+            })();
         }
     }
 

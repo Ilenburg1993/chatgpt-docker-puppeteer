@@ -21,9 +21,15 @@ import { z } from 'zod';
 import { toError } from '../../core/error-handlers.js';
 import { withIoMeta } from '../../core/io-contracts.js';
 import { sanitizeIoTextOutput } from '../../core/io-policy.js';
-import { diffText, readBytes, readText, searchText, searchWorkspaceSymbols } from '../../infra/io-engine.js';
-import { warmReadThroughContext } from '../../infra/io-prefetch.js';
-import { scanDirectory } from '../../infra/io-scanner.js';
+import {
+    diffText,
+    readBytes,
+    readText,
+    scanDirectory,
+    searchText,
+    searchWorkspaceSymbols,
+    warmReadThroughContext,
+} from '#copilot/infra/public/io';
 import { log } from '../infra/logger.js';
 import { buildTool, withSkipPermission } from '../infra/tool-factory.js';
 import {
@@ -41,6 +47,15 @@ import {
  * @type {number}
  */
 const MIN_READ_THROUGH_BYTES = 1024;
+
+/**
+ * @typedef {object} IoScanEntry
+ * @property {string} name
+ * @property {'file' | 'directory' | 'symlink' | 'other'} type
+ * @property {string} path
+ * @property {number} [size]
+ * @property {IoScanEntry[]} [children]
+ */
 
 /**
  * Tool: read_file_content — lê o conteúdo de um arquivo.
@@ -213,7 +228,7 @@ export const listDirectoryTool = buildTool({
             });
 
             /**
-             * @param {import('../../infra/io-scanner.js').IoScanEntry} entry
+             * @param {IoScanEntry} entry
              * @returns {DirEntry}
              */
             const toLegacyEntry = (entry) => {

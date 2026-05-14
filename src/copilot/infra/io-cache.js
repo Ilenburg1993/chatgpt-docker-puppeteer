@@ -282,7 +282,7 @@ export function invalidateIoCachePath(filePath) {
     getIoL1Cache().invalidate(filePath);
     for (const hook of _invalidationHooks) {
         try {
-            hook(filePath);
+            hook(filePath, { recursive: false });
         } catch {
             /* hooks não devem crashar o caller */
         }
@@ -300,7 +300,7 @@ export function invalidateIoCacheSubtree(filePath) {
     getIoL1Cache().invalidate(filePath, { recursive: true });
     for (const hook of _invalidationHooks) {
         try {
-            hook(filePath);
+            hook(filePath, { recursive: true });
         } catch {
             /* hooks não devem crashar o caller */
         }
@@ -325,7 +325,7 @@ export function getVerifiedIoL1Entry(key, filePath) {
  * --------------------------------------------------------------------------- // Invalidation hooks — permite que
  * outros módulos (ex: io-parser) reajam a // invalidações sem criar dependência circular com io-engine. //
  *
- * /** @type {Array<(filePath: string) => void>}
+ * /** @type {Array<(filePath: string, event?: { recursive?: boolean }) => void>}
  */
 const _invalidationHooks = [];
 
@@ -333,7 +333,7 @@ const _invalidationHooks = [];
  * Registra um callback que será chamado toda vez que `invalidateIoCachePath` é invocado. Ideal para módulos externos
  * (ex: io-parser) invalidarem seus próprios caches sem acoplamento circular.
  *
- * @param {(filePath: string) => void} hook
+ * @param {(filePath: string, event?: { recursive?: boolean }) => void} hook
  * @returns {() => void} Função de unregister.
  */
 export function registerInvalidationHook(hook) {

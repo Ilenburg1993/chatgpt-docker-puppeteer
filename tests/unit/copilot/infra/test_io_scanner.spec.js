@@ -129,4 +129,24 @@ describe('infra/io-scanner', () => {
         expect(JSON.stringify(entries)).toContain('dir-11');
         expect(JSON.stringify(entries)).toContain('file.txt');
     });
+
+    it('processa scans em batches sem alterar ordenação ou recursão', async () => {
+        const dir = await createTempDir();
+        for (let i = 0; i < 5; i++) {
+            await mkdir(join(dir, `b-${i}`), { recursive: true });
+            await writeFile(join(dir, `b-${i}`, `${i}.txt`), `value ${i}`, 'utf8');
+        }
+
+        const result = await scanDirectory(dir, {
+            workspaceRoot: dir,
+            recursive: true,
+            depth: 2,
+            batchSize: 2,
+            concurrency: 2,
+        });
+
+        expect(result.entries.map((entry) => entry.name)).toEqual(['b-0', 'b-1', 'b-2', 'b-3', 'b-4']);
+        expect(result.entries.at(4)?.children?.map((entry) => entry.name)).toEqual(['4.txt']);
+        expect(result.io.advisoryLimits).toMatchObject({ batchSize: 2, concurrency: 2 });
+    });
 });

@@ -1,6 +1,7 @@
 // @ts-check
 
 import path from 'node:path';
+import { readEnvPositiveInt } from './shared/env.js';
 
 /**
  * @typedef {'bytes' | 'text' | 'json'} IoL2Kind
@@ -22,19 +23,6 @@ import path from 'node:path';
  * }} IoL2CacheRow
  */
 
-/**
- * @param {string} key
- * @param {number} fallback
- * @returns {number}
- */
-function readEnvPositiveInt(key, fallback) {
-    const raw = process.env[key];
-    if (raw === undefined || raw === null || String(raw).trim() === '') return fallback;
-    const parsed = Number(raw);
-    if (!Number.isFinite(parsed) || parsed <= 0) return fallback;
-    return Math.floor(parsed);
-}
-
 const DEFAULT_TTL_MS = readEnvPositiveInt('IO_L2_CACHE_TTL_MS', 5 * 60 * 1000);
 const DEFAULT_MAX_ENTRIES = readEnvPositiveInt('IO_L2_CACHE_MAX_ENTRIES', 100_000);
 
@@ -43,6 +31,15 @@ const DEFAULT_MAX_ENTRIES = readEnvPositiveInt('IO_L2_CACHE_MAX_ENTRIES', 100_00
  */
 function normalizeL2Path(filePath) {
     return path.resolve(filePath).replace(/\\/g, '/');
+}
+
+/**
+ * @param {unknown} value
+ * @returns {number | null}
+ */
+function normalizeTimestampMs(value) {
+    const numeric = Number(value);
+    return Number.isFinite(numeric) ? Math.round(numeric) : null;
 }
 
 /**
@@ -254,8 +251,8 @@ export function createIoL2SqliteCache(options) {
                     Number.isFinite(input.sizeBytes) ? input.sizeBytes : payload.byteLength,
                     nowMs,
                     expiresAtMs,
-                    Number.isFinite(input.mtimeMs) ? input.mtimeMs : null,
-                    Number.isFinite(input.ctimeMs) ? input.ctimeMs : null,
+                    normalizeTimestampMs(input.mtimeMs),
+                    normalizeTimestampMs(input.ctimeMs),
                     input.metaJson || null,
                     nowMs,
                 );

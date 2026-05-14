@@ -35,6 +35,7 @@ import { readBytes, readText } from './io-engine.js';
 import { getIoIndex } from './io-index-registry.js';
 import { parseAndCacheSymbols } from './io-parser.js';
 import { scanDirectory } from './io-scanner.js';
+import { matchesAnyPattern } from './scan/glob.js';
 
 // ---------------------------------------------------------------------------
 // Typedefs
@@ -77,52 +78,6 @@ import { scanDirectory } from './io-scanner.js';
 
 /** @type {Map<string, _SessionScope>} */
 const _scopes = new Map();
-
-/**
- * Converte um padrão glob simples em RegExp. Deliberadamente pequeno: cobre `*`, `**` e `?` para advisory
- * include/exclude sem introduzir uma engine paralela ao scanner canônico.
- *
- * @param {string} pattern
- * @returns {RegExp}
- */
-function simpleGlobToRegExp(pattern) {
-    const normalized = pattern.replace(/\\/g, '/');
-    let out = '^';
-    for (let i = 0; i < normalized.length; i++) {
-        const ch = normalized[i];
-        if (ch === '*') {
-            const next = normalized[i + 1];
-            if (next === '*') {
-                out += '.*';
-                i += 1;
-            } else {
-                out += '[^/]*';
-            }
-        } else if (ch === '?') {
-            out += '[^/]';
-        } else {
-            out += ch?.replace(/[|\\{}()[\]^$+?.]/g, '\\$&') ?? '';
-        }
-    }
-    out += '$';
-    return new RegExp(out, 'u');
-}
-
-/**
- * @param {string} filePath
- * @param {string} baseDir
- * @param {string[]} patterns
- */
-function matchesAnyPattern(filePath, baseDir, patterns) {
-    if (!patterns.length) return false;
-    const absolute = nodePath.resolve(filePath).replace(/\\/g, '/');
-    const relative = nodePath.relative(baseDir, filePath).replace(/\\/g, '/');
-    const basename = nodePath.basename(filePath);
-    return patterns.some((pattern) => {
-        const re = simpleGlobToRegExp(pattern);
-        return re.test(relative) || re.test(absolute) || re.test(basename);
-    });
-}
 
 // ---------------------------------------------------------------------------
 // Core: parallel warm-up

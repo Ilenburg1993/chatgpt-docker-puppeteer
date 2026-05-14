@@ -19,7 +19,7 @@ import {
     moveFileLocked,
     patchTextLocked,
     writeFileAtomic,
-} from '../../infra/io-engine.js';
+} from '#copilot/infra/public/io';
 import { log } from '../infra/logger.js';
 import { buildTool } from '../infra/tool-factory.js';
 import { validatePath } from './shared.js';

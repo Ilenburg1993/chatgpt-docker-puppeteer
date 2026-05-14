@@ -9,12 +9,19 @@
  */
 
 import ignore from 'ignore';
-import { lstat, readdir, readFile, realpath } from 'node:fs/promises';
+import { lstat, readdir } from 'node:fs/promises';
 import { basename, join, relative } from 'node:path';
 import pLimit from 'p-limit';
 import { buildIoMeta, createIoTraceId } from '../core/io-contracts.js';
 import { DEFAULT_BLOCKED_PATH_SEGMENTS } from '../core/io-policy.js';
 import { nowIoMs, publishIoLifecycleEvent, publishIoOperation } from './io-observability.js';
+import { buildFileFingerprint, classifyStats } from './scan/fingerprint.js';
+import { loadGitignoreMatcher } from './scan/gitignore.js';
+import { matchesAnyPattern, matchesFilter } from './scan/glob.js';
+import { mapInBatches, normalizeBatchSize } from './scan/batching.js';
+import { readEnvPositiveInt } from './shared/env.js';
+
+const DEFAULT_SCAN_BATCH_SIZE = readEnvPositiveInt('IO_SCAN_BATCH_SIZE', 512);
 
 /**
  * @typedef {object} IoScanEntry
@@ -26,86 +33,6 @@ import { nowIoMs, publishIoLifecycleEvent, publishIoOperation } from './io-obser
  * @property {{ realpath: string; mtimeMs: number; size: number }} [fingerprint]
  * @property {IoScanEntry[]} [children]
  */
-
-/**
- * @param {string} name
- * @param {string | undefined} filter
- * @returns {boolean}
- */
-function matchesFilter(name, filter) {
-    if (!filter) return true;
-    if (filter.startsWith('*.')) return name.endsWith(filter.slice(1));
-    return name === filter;
-}
-
-/**
- * @param {string} pattern
- * @returns {RegExp}
- */
-function simpleGlobToRegExp(pattern) {
-    const normalized = pattern.replace(/\\/g, '/');
-    let out = '^';
-    for (let i = 0; i < normalized.length; i++) {
-        const ch = normalized[i];
-        if (ch === '*') {
-            const next = normalized[i + 1];
-            if (next === '*') {
-                out += '.*';
-                i += 1;
-            } else {
-                out += '[^/]*';
-            }
-        } else if (ch === '?') {
-            out += '[^/]';
-        } else {
-            out += ch?.replace(/[|\\{}()[\]^$+?.]/g, '\\$&') ?? '';
-        }
-    }
-    out += '$';
-    return new RegExp(out, 'u');
-}
-
-/**
- * @param {string} absolutePath
- * @param {string} workspaceRoot
- * @param {readonly string[]} patterns
- * @returns {boolean}
- */
-function matchesAnyPattern(absolutePath, workspaceRoot, patterns) {
-    if (!patterns.length) return false;
-    const normalizedAbsolute = absolutePath.replace(/\\/g, '/');
-    const normalizedRelative = relative(workspaceRoot, absolutePath).replace(/\\/g, '/');
-    const name = basename(absolutePath);
-    return patterns.some((pattern) => {
-        const re = simpleGlobToRegExp(pattern);
-        return re.test(normalizedRelative) || re.test(normalizedAbsolute) || re.test(name);
-    });
-}
-
-/**
- * @param {import('node:fs').Stats} stats
- * @returns {'file' | 'directory' | 'symlink' | 'other'}
- */
-function classifyStats(stats) {
-    if (stats.isFile()) return 'file';
-    if (stats.isDirectory()) return 'directory';
-    if (stats.isSymbolicLink()) return 'symlink';
-    return 'other';
-}
-
-/**
- * @param {string} workspaceRoot
- */
-async function loadGitignoreMatcher(workspaceRoot) {
-    const matcher = ignore();
-    try {
-        const content = await readFile(join(workspaceRoot, '.gitignore'), 'utf8');
-        matcher.add(content);
-        return matcher;
-    } catch {
-        return matcher;
-    }
-}
 
 /**
  * Escaneia diretório com metadata canônica e limite de profundidade.
@@ -124,6 +51,7 @@ async function loadGitignoreMatcher(workspaceRoot) {
  *     include?: readonly string[];
  *     exclude?: readonly string[];
  *     concurrency?: number;
+ *     batchSize?: number;
  *     fingerprint?: boolean;
  * }} [options]
  * @returns {Promise<{
@@ -149,6 +77,7 @@ export async function scanDirectory(rootPath, options = {}) {
         Number.isFinite(options.concurrency) && Number(options.concurrency) > 0
             ? Math.floor(Number(options.concurrency))
             : 16;
+    const batchSize = normalizeBatchSize(Number(options.batchSize), DEFAULT_SCAN_BATCH_SIZE);
     const limit = pLimit(concurrency);
     const gitignore = respectGitignore ? await loadGitignoreMatcher(workspaceRoot) : ignore();
     const blockedSegments = new Set(
@@ -172,8 +101,10 @@ export async function scanDirectory(rootPath, options = {}) {
     async function scan(dir, currentDepth) {
         const names = await readdir(dir);
         names.sort((a, b) => a.localeCompare(b));
-        const entries = await Promise.all(
-            names.map(async (name) => {
+        const entries = await mapInBatches(
+            names,
+            batchSize,
+            async (name) => {
                 if (!showHidden && name.startsWith('.')) return null;
                 if (respectDenylist && blockedSegments.has(name.toLowerCase())) return null;
                 const absolutePath = join(dir, name);
@@ -201,12 +132,7 @@ export async function scanDirectory(rootPath, options = {}) {
                 });
                 if (type === 'file') entry.size = stats.size;
                 if (includeFingerprint && type === 'file') {
-                    const canonicalPath = await limit(() => realpath(absolutePath)).catch(() => absolutePath);
-                    entry.fingerprint = {
-                        realpath: canonicalPath,
-                        mtimeMs: stats.mtimeMs,
-                        size: stats.size,
-                    };
+                    entry.fingerprint = await buildFileFingerprint(absolutePath, stats, limit);
                 }
                 scannedEntries += 1;
                 if (scannedEntries % 500 === 0) {
@@ -218,15 +144,17 @@ export async function scanDirectory(rootPath, options = {}) {
                     });
                 }
                 return entry;
-            }),
+            },
         );
         const visibleEntries = entries.filter((entry) => entry !== null);
-        await Promise.all(
-            visibleEntries.map(async (entry) => {
+        await mapInBatches(
+            visibleEntries,
+            batchSize,
+            async (entry) => {
                 if (entry.type === 'directory' && recursive && currentDepth < maxDepth) {
                     entry.children = await scan(entry.absolutePath, currentDepth + 1);
                 }
-            }),
+            },
         );
         return visibleEntries;
     }
@@ -255,6 +183,7 @@ export async function scanDirectory(rootPath, options = {}) {
                 includePatternCount: includePatterns.length,
                 excludePatternCount: excludePatterns.length,
                 concurrency,
+                batchSize,
                 fingerprint: includeFingerprint,
             },
         });

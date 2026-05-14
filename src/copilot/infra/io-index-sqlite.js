@@ -13,10 +13,12 @@ import { createHash } from 'node:crypto';
 import { basename, extname, relative, resolve } from 'node:path';
 import pLimit from 'p-limit';
 import { createIoTraceId } from '../core/io-contracts.js';
-import { readText } from './io-engine.js';
+import { readTextFileSnapshot } from './io/fs/read-text.js';
 import { publishIoLifecycleEvent } from './io-observability.js';
-import { parseAndCacheSymbols } from './io-parser.js';
+import { parseFileSymbols } from './io-parser.js';
 import { scanDirectory } from './io-scanner.js';
+import { normalizeMaxResults } from './policy/output-window.js';
+import { readEnvPositiveInt } from './shared/env.js';
 
 const DEFAULT_INDEX_EXTENSIONS = Object.freeze([
     '.js',
@@ -40,6 +42,8 @@ const DEFAULT_INDEX_EXTENSIONS = Object.freeze([
 
 const SYMBOL_EXTENSIONS = new Set(['.js', '.mjs', '.cjs', '.jsx', '.ts', '.mts', '.cts', '.tsx']);
 const DEFAULT_CHUNK_LINES = 200;
+const DEFAULT_INDEX_SEARCH_MAX_RESULTS = readEnvPositiveInt('IO_INDEX_SEARCH_MAX_RESULTS', 50);
+const MAX_INDEX_SEARCH_RESULTS = readEnvPositiveInt('IO_INDEX_SEARCH_HARD_MAX_RESULTS', 500);
 
 /**
  * @typedef {'fresh' | 'stale' | 'failed' | 'skipped'} IoIndexFileStatus
@@ -89,6 +93,14 @@ function normalizeIndexPath(filePath) {
  */
 function normalizeRelativePath(workspaceRoot, filePath) {
     return relative(workspaceRoot, filePath).replace(/\\/g, '/');
+}
+
+/**
+ * @param {number | undefined} value
+ * @returns {number}
+ */
+function normalizeIndexMaxResults(value) {
+    return Math.min(normalizeMaxResults(value) ?? DEFAULT_INDEX_SEARCH_MAX_RESULTS, MAX_INDEX_SEARCH_RESULTS);
 }
 
 /**
@@ -352,6 +364,19 @@ export function createIoIndexSqlite(options) {
         FROM copilot_io_index_fts
         WHERE copilot_io_index_fts MATCH ?
         ORDER BY rank
+        LIMIT ?
+    `);
+    const stmtSearchScoped = db.prepare(`
+        SELECT
+            file_path as filePath,
+            relative_path as relativePath,
+            snippet(copilot_io_index_fts, 2, '[', ']', ' … ', 12) as snippet,
+            bm25(copilot_io_index_fts) as rank
+        FROM copilot_io_index_fts
+        WHERE copilot_io_index_fts MATCH ?
+            AND (file_path = ? OR file_path LIKE ?)
+        ORDER BY rank
+        LIMIT ?
     `);
     const stmtSymbolSearch = db.prepare(`
         SELECT
@@ -366,6 +391,7 @@ export function createIoIndexSqlite(options) {
         JOIN copilot_io_index_files f ON f.file_path = s.file_path
         WHERE s.symbol_name = ? OR s.symbol_name LIKE ?
         ORDER BY s.symbol_name ASC, f.relative_path ASC
+        LIMIT ?
     `);
 
     /**
@@ -452,8 +478,8 @@ export function createIoIndexSqlite(options) {
         let parseError = /** @type {string | null} */ (null);
         if (SYMBOL_EXTENSIONS.has(extension)) {
             try {
-                // parseAndCacheSymbols usa io-engine como fonte canônica de leitura e reaproveita parser cache.
-                symbols = await parseAndCacheSymbols(filePath);
+                symbols = await parseFileSymbols(filePath, input.content);
+                parseError = symbols.parseError;
             } catch (e) {
                 parseError = e instanceof Error ? e.message : String(e);
             }
@@ -640,20 +666,15 @@ export function createIoIndexSqlite(options) {
                                 unchanged += 1;
                                 return;
                             }
-                            const text = await readText(entry.absolutePath, {
-                                advisoryLimits: {
-                                    source: 'io-index',
-                                    limitMode: 'informative',
-                                },
-                            });
+                            const text = await readTextFileSnapshot(entry.absolutePath);
                             indexed.push(
                                 await indexTextFile({
                                     filePath: entry.absolutePath,
                                     workspaceRoot,
                                     content: text.content,
-                                    sizeBytes: entry.size ?? text.bytesRead,
-                                    mtimeMs: entry.fingerprint?.mtimeMs ?? 0,
-                                    ctimeMs: null,
+                                    sizeBytes: entry.size ?? text.sizeBytes,
+                                    mtimeMs: entry.fingerprint?.mtimeMs ?? text.mtimeMs,
+                                    ctimeMs: text.ctimeMs,
                                     metadata: {
                                         scanTraceId: scan.io.traceId,
                                         indexTraceId: traceId,
@@ -708,20 +729,27 @@ export function createIoIndexSqlite(options) {
 
         /**
          * @param {string} query
-         * @param {{ pathPrefix?: string }} [options]
+         * @param {{ pathPrefix?: string; maxResults?: number }} [options]
          */
         search(query, options = {}) {
             stats.searches += 1;
             const safe = sanitizeFtsQuery(query);
-            const rows = /** @type {IoIndexSearchResult[]} */ (stmtSearch.all(safe));
-            if (!options.pathPrefix) return rows;
+            const maxResults = normalizeIndexMaxResults(options.maxResults);
+            if (!options.pathPrefix) {
+                return /** @type {IoIndexSearchResult[]} */ (stmtSearch.all(safe, maxResults));
+            }
             const prefix = normalizeIndexPath(options.pathPrefix);
-            return rows.filter((row) => row.filePath === prefix || row.filePath.startsWith(`${prefix}/`));
+            return /** @type {IoIndexSearchResult[]} */ (
+                stmtSearchScoped.all(safe, prefix, `${prefix}/%`, maxResults)
+            );
         },
 
-        /** @param {string} name */
-        findSymbol(name) {
-            return stmtSymbolSearch.all(name, `%${name}%`);
+        /**
+         * @param {string} name
+         * @param {{ maxResults?: number }} [options]
+         */
+        findSymbol(name, options = {}) {
+            return stmtSymbolSearch.all(name, `%${name}%`, normalizeIndexMaxResults(options.maxResults));
         },
 
         getStats() {

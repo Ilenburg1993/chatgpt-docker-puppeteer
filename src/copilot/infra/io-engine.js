@@ -31,9 +31,13 @@ import {
 import { findIoIndexSymbol, getIoIndexStats, searchIoIndex } from './io-index-registry.js';
 import { withIoResourceLock, withIoResourceLocks } from './io-locks.js';
 import { nowIoMs, publishIoOperation } from './io-observability.js';
+import { limitTextLines, normalizeMaxResults } from './policy/output-window.js';
+import { readEnvPositiveInt } from './shared/env.js';
 
 const execFileAsync = promisify(execFile);
-const RG_SEARCH_TIMEOUT_MS = undefined;
+
+const RG_SEARCH_TIMEOUT_MS = readEnvPositiveInt('IO_SEARCH_TIMEOUT_MS', 15_000);
+const SEARCH_MAX_BUFFER_BYTES = readEnvPositiveInt('IO_SEARCH_MAX_BUFFER_BYTES', 16 * 1024 * 1024);
 
 /** @type {boolean | null} */
 let _rgAvailable = null;
@@ -384,10 +388,12 @@ export async function readBytes(filePath, options = {}) {
             const l2Entry = l2Cache.get(_cacheKey);
             if (l2Entry?.kind === 'bytes' && Buffer.isBuffer(l2Entry.payload)) {
                 const metadata = await fs.stat(filePath).catch(() => null);
+                const cachedMtimeMs = Number(l2Entry.mtimeMs);
+                const actualMtimeMs = Number(metadata?.mtimeMs);
                 const mtimeMatches =
-                    Number.isFinite(l2Entry.mtimeMs) &&
-                    Number.isFinite(metadata?.mtimeMs) &&
-                    Number(l2Entry.mtimeMs) === Number(metadata?.mtimeMs);
+                    Number.isFinite(cachedMtimeMs) &&
+                    Number.isFinite(actualMtimeMs) &&
+                    (cachedMtimeMs === actualMtimeMs || cachedMtimeMs === Math.round(actualMtimeMs));
                 const sizeMatches =
                     Number.isFinite(l2Entry.sizeBytes) &&
                     Number.isFinite(metadata?.size) &&
@@ -571,10 +577,12 @@ export async function readText(filePath, options = {}) {
             const l2Entry = l2Cache.get(_textKey);
             if (l2Entry?.kind === 'text' && Buffer.isBuffer(l2Entry.payload)) {
                 const metadata = await fs.stat(filePath).catch(() => null);
+                const cachedMtimeMs = Number(l2Entry.mtimeMs);
+                const actualMtimeMs = Number(metadata?.mtimeMs);
                 const mtimeMatches =
-                    Number.isFinite(l2Entry.mtimeMs) &&
-                    Number.isFinite(metadata?.mtimeMs) &&
-                    Number(l2Entry.mtimeMs) === Number(metadata?.mtimeMs);
+                    Number.isFinite(cachedMtimeMs) &&
+                    Number.isFinite(actualMtimeMs) &&
+                    (cachedMtimeMs === actualMtimeMs || cachedMtimeMs === Math.round(actualMtimeMs));
                 const sizeMatches =
                     Number.isFinite(l2Entry.sizeBytes) &&
                     Number.isFinite(metadata?.size) &&
@@ -1506,16 +1514,20 @@ export async function diffText(pathA, pathB, options = {}) {
  *     engine: string;
  *     sanitized: boolean;
  *     redactions: number;
+ *     truncated?: boolean;
  *     io: import('../core/io-contracts.js').IoMeta;
  * }>}
  */
 export async function searchText(targetPath, options) {
     const startedAt = nowIoMs();
     const traceId = options.traceId ?? createIoTraceId();
+    const maxResults = normalizeMaxResults(options.maxResults);
     const advisoryLimitsBase = {
-        requestedMaxResults: options.maxResults ?? null,
-        limitMode: 'informative',
+        requestedMaxResults: maxResults,
+        limitMode: 'enforced-output-window',
         patternLength: options.pattern.length,
+        timeoutMs: RG_SEARCH_TIMEOUT_MS,
+        maxBufferBytes: SEARCH_MAX_BUFFER_BYTES,
     };
 
     /**
@@ -1552,11 +1564,15 @@ export async function searchText(targetPath, options) {
                     ? searchIoIndex(options.pattern, { pathPrefix: targetPath })
                     : [];
             if (indexRows.length > 0) {
-                const filteredOutput = sanitizeSearchOutput(formatIndexSearchRows(indexRows));
+                const limitedRows = maxResults === null ? indexRows : indexRows.slice(0, maxResults);
+                const filteredOutput = sanitizeSearchOutput(formatIndexSearchRows(limitedRows));
+                const truncated = maxResults !== null && indexRows.length > maxResults;
                 const io = publishAndReturn(
                     buildSearchIo('io-engine.index.search', Buffer.byteLength(filteredOutput.text, 'utf8'), {
                         redactions: filteredOutput.redactions,
                         fallback: 'rg-on-index-miss-or-complex-query',
+                        truncated,
+                        originalResultCount: indexRows.length,
                     }),
                     true,
                 );
@@ -1564,11 +1580,12 @@ export async function searchText(targetPath, options) {
                     targetPath,
                     pattern: options.pattern,
                     output: filteredOutput.text,
-                    matchCount: indexRows.length,
+                    matchCount: limitedRows.length,
                     engine: 'fts5-index',
                     sanitized: filteredOutput.sanitized,
                     redactions: filteredOutput.redactions,
-                    io: { ...io, policyVersion: filteredOutput.policyVersion },
+                    truncated,
+                    io: { ...io, truncated, policyVersion: filteredOutput.policyVersion },
                 };
             }
         }
@@ -1583,6 +1600,7 @@ export async function searchText(targetPath, options) {
                         ...(options.isRegex ? [] : ['--fixed-strings']),
                         ...(options.caseSensitive ? [] : ['--ignore-case']),
                         `--context=${options.contextLines ?? 2}`,
+                        ...(maxResults === null ? [] : ['--max-count', String(maxResults)]),
                         ...(options.includePattern ? [`--glob=${options.includePattern}`] : []),
                         ...(options.excludePattern ? [`--glob=!${options.excludePattern}`] : []),
                         '--glob=!node_modules',
@@ -1595,13 +1613,16 @@ export async function searchText(targetPath, options) {
                     {
                         cwd: options.workspaceRoot,
                         timeout: RG_SEARCH_TIMEOUT_MS,
-                        maxBuffer: 1024 * 1024 * 1024,
+                        maxBuffer: SEARCH_MAX_BUFFER_BYTES,
                     },
                 );
-                const filteredOutput = sanitizeSearchOutput(stdout);
+                const limitedOutput = limitTextLines(stdout, maxResults);
+                const filteredOutput = sanitizeSearchOutput(limitedOutput.text);
                 const io = publishAndReturn(
                     buildSearchIo('io-engine.rg.search', Buffer.byteLength(filteredOutput.text, 'utf8'), {
                         redactions: filteredOutput.redactions,
+                        truncated: limitedOutput.truncated,
+                        originalLineCount: limitedOutput.originalLineCount,
                     }),
                     true,
                 );
@@ -1613,7 +1634,8 @@ export async function searchText(targetPath, options) {
                     engine: 'rg',
                     sanitized: filteredOutput.sanitized,
                     redactions: filteredOutput.redactions,
-                    io: { ...io, policyVersion: filteredOutput.policyVersion },
+                    truncated: limitedOutput.truncated,
+                    io: { ...io, truncated: limitedOutput.truncated, policyVersion: filteredOutput.policyVersion },
                 };
             } catch (error) {
                 const execError = /** @type {{ code?: unknown; status?: unknown; stderr?: unknown }} */ (error);
@@ -1647,12 +1669,15 @@ export async function searchText(targetPath, options) {
             const { stdout } = await execFileAsync('grep', buildGrepArgs(grepOptions), {
                 cwd: options.workspaceRoot,
                 timeout: RG_SEARCH_TIMEOUT_MS,
-                maxBuffer: 1024 * 1024 * 1024,
+                maxBuffer: SEARCH_MAX_BUFFER_BYTES,
             });
-            const filteredOutput = sanitizeSearchOutput(stdout);
+            const limitedOutput = limitTextLines(stdout, maxResults);
+            const filteredOutput = sanitizeSearchOutput(limitedOutput.text);
             const io = publishAndReturn(
                 buildSearchIo('io-engine.grep.search', Buffer.byteLength(filteredOutput.text, 'utf8'), {
                     redactions: filteredOutput.redactions,
+                    truncated: limitedOutput.truncated,
+                    originalLineCount: limitedOutput.originalLineCount,
                 }),
                 true,
             );
@@ -1664,7 +1689,8 @@ export async function searchText(targetPath, options) {
                 engine: 'grep',
                 sanitized: filteredOutput.sanitized,
                 redactions: filteredOutput.redactions,
-                io: { ...io, policyVersion: filteredOutput.policyVersion },
+                truncated: limitedOutput.truncated,
+                io: { ...io, truncated: limitedOutput.truncated, policyVersion: filteredOutput.policyVersion },
             };
         } catch (error) {
             const execError = /** @type {{ code?: unknown; status?: unknown; stderr?: unknown; message?: unknown }} */ (
@@ -1719,6 +1745,7 @@ export async function searchText(targetPath, options) {
  *     engine: string;
  *     sanitized: boolean;
  *     redactions: number;
+ *     truncated?: boolean;
  *     io: import('../core/io-contracts.js').IoMeta;
  * }>}
  */
@@ -1726,10 +1753,13 @@ export async function searchWorkspaceSymbols(targetPath, options) {
     const startedAt = nowIoMs();
     const traceId = options.traceId ?? createIoTraceId();
     const resolvedKind = options.kind ?? 'all';
+    const maxResults = normalizeMaxResults(options.maxResults);
     const advisoryLimitsBase = {
-        requestedMaxResults: options.maxResults ?? null,
-        limitMode: 'informative',
+        requestedMaxResults: maxResults,
+        limitMode: 'enforced-output-window',
         symbolLength: options.symbolName.length,
+        timeoutMs: RG_SEARCH_TIMEOUT_MS,
+        maxBufferBytes: SEARCH_MAX_BUFFER_BYTES,
     };
     /**
      * @param {string} engine
@@ -1762,10 +1792,14 @@ export async function searchWorkspaceSymbols(targetPath, options) {
                 },
             );
             if (rows.length > 0) {
-                const sanitized = sanitizeIoTextOutput({ text: formatIndexSymbolRows(rows) });
+                const limitedRows = maxResults === null ? rows : rows.slice(0, maxResults);
+                const truncated = maxResults !== null && rows.length > maxResults;
+                const sanitized = sanitizeIoTextOutput({ text: formatIndexSymbolRows(limitedRows) });
                 const io = publishAndReturn(
                     buildSymbolIo('io-engine.index.symbol-search', Buffer.byteLength(sanitized.text, 'utf8'), {
                         redactions: sanitized.redactions,
+                        truncated,
+                        originalResultCount: rows.length,
                     }),
                     true,
                 );
@@ -1774,11 +1808,12 @@ export async function searchWorkspaceSymbols(targetPath, options) {
                     symbol: options.symbolName,
                     kind: resolvedKind,
                     output: sanitized.text,
-                    matchCount: rows.length,
+                    matchCount: limitedRows.length,
                     engine: 'fts5-index',
                     sanitized: sanitized.sanitized,
                     redactions: sanitized.redactions,
-                    io: { ...io, policyVersion: sanitized.policyVersion },
+                    truncated,
+                    io: { ...io, truncated, policyVersion: sanitized.policyVersion },
                 };
             }
         }
@@ -1797,6 +1832,7 @@ export async function searchWorkspaceSymbols(targetPath, options) {
                 '-e',
                 buildSymbolPattern(options.symbolName, resolvedKind),
                 ...(options.caseSensitive ? [] : ['--ignore-case']),
+                ...(maxResults === null ? [] : ['--max-count', String(maxResults)]),
                 ...(options.includePattern
                     ? ['--glob', options.includePattern]
                     : kindToGlobs(resolvedKind).flatMap((glob) => ['--glob', glob])),
@@ -1810,7 +1846,7 @@ export async function searchWorkspaceSymbols(targetPath, options) {
             {
                 cwd: options.workspaceRoot,
                 timeout: RG_SEARCH_TIMEOUT_MS,
-                maxBuffer: 1024 * 1024 * 1024,
+                maxBuffer: SEARCH_MAX_BUFFER_BYTES,
             },
         ).catch((error) => {
             const execError = /** @type {{ code?: unknown; status?: unknown; stderr?: unknown }} */ (error);
@@ -1820,12 +1856,15 @@ export async function searchWorkspaceSymbols(targetPath, options) {
             throw error;
         });
 
-        const sanitized = sanitizeIoTextOutput({ text: stdout });
+        const limitedOutput = limitTextLines(stdout, maxResults);
+        const sanitized = sanitizeIoTextOutput({ text: limitedOutput.text });
         const output = sanitized.text;
         const lines = output.split('\n').filter(Boolean);
         const io = publishAndReturn(
             buildSymbolIo('io-engine.rg.symbol-search', Buffer.byteLength(output, 'utf8'), {
                 redactions: sanitized.redactions,
+                truncated: limitedOutput.truncated,
+                originalLineCount: limitedOutput.originalLineCount,
             }),
             true,
         );
@@ -1843,7 +1882,8 @@ export async function searchWorkspaceSymbols(targetPath, options) {
             engine: 'rg',
             sanitized: sanitized.sanitized,
             redactions: sanitized.redactions,
-            io: { ...io, policyVersion: sanitized.policyVersion },
+            truncated: limitedOutput.truncated,
+            io: { ...io, truncated: limitedOutput.truncated, policyVersion: sanitized.policyVersion },
         };
     } catch (error) {
         publishAndReturn(buildSymbolIo('io-engine.symbol-search', 0), false, error);

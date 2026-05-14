@@ -14,7 +14,7 @@
  * - `parseFileForContext(filePath, content)` — snapshot de contexto para LLM-B: symbols + outline + top-level comments.
  * - `extractJsonSchema(content)` — extrai shape (top-level keys) de JSON.
  * - `extractMarkdownOutline(content)` — extrai headings H1-H4 de Markdown.
- * - `parseAndCacheSymbols(filePath)` — lê do io-engine + parseia + cacheia resultado.
+ * - `parseAndCacheSymbols(filePath)` — lê por porta baixa acíclica + parseia + cacheia resultado.
  *
  * Design:
  *
@@ -29,7 +29,7 @@
 import { LRUCache } from 'lru-cache';
 import * as nodePath from 'node:path';
 import { registerInvalidationHook } from './io-cache.js';
-import { readText } from './io-engine.js';
+import { readTextFileSnapshot } from './io/fs/read-text.js';
 
 // ---------------------------------------------------------------------------
 // Config
@@ -48,8 +48,15 @@ const _symbolCache = new LRUCache(
 );
 
 // Registra auto-invalidação do parser cache quando io-cache invalida um path (ex: após escrita).
-registerInvalidationHook((filePath) => {
-    _symbolCache.delete(filePath);
+registerInvalidationHook((filePath, event) => {
+    const normalized = normalizeParserPath(filePath);
+    _symbolCache.delete(normalized);
+    if (event?.recursive === true) {
+        const prefix = `${normalized}${nodePath.sep}`;
+        for (const key of _symbolCache.keys()) {
+            if (String(key).startsWith(prefix)) _symbolCache.delete(key);
+        }
+    }
 });
 
 // ---------------------------------------------------------------------------
@@ -118,6 +125,14 @@ async function getBabelParse() {
 
 const JS_EXTENSIONS = new Set(['.js', '.mjs', '.cjs', '.jsx']);
 const TS_EXTENSIONS = new Set(['.ts', '.mts', '.cts', '.tsx']);
+
+/**
+ * @param {string} filePath
+ * @returns {string}
+ */
+function normalizeParserPath(filePath) {
+    return nodePath.normalize(nodePath.resolve(filePath));
+}
 
 /**
  * @param {string} ext
@@ -356,12 +371,12 @@ export async function parseFileSymbols(filePath, content) {
     }
 
     if (lang === 'markdown') {
-        const outline = extractMarkdownOutline(source);
-        base.symbols = outline.map((heading, i) => ({
+        const outline = extractMarkdownOutlineWithLines(source);
+        base.symbols = outline.map(({ heading, line }) => ({
             kind: /** @type {'variable'} */ ('variable'),
             name: heading,
             exported: false,
-            line: i + 1,
+            line,
             docComment: null,
         }));
         return base;
@@ -378,13 +393,13 @@ export async function parseFileSymbols(filePath, content) {
  * @returns {Promise<FileSymbols>}
  */
 export async function parseAndCacheSymbols(filePath) {
-    const cached = /** @type {FileSymbols | undefined} */ (_symbolCache.get(filePath));
+    const cacheKey = normalizeParserPath(filePath);
+    const cached = /** @type {FileSymbols | undefined} */ (_symbolCache.get(cacheKey));
     if (cached) return cached;
 
-    const result_text = await readText(filePath);
-    const content = typeof result_text === 'string' ? result_text : (result_text?.content ?? '');
-    const symbols = await parseFileSymbols(filePath, content);
-    _symbolCache.set(filePath, symbols);
+    const snapshot = await readTextFileSnapshot(filePath);
+    const symbols = await parseFileSymbols(filePath, snapshot.content);
+    _symbolCache.set(cacheKey, symbols);
     return symbols;
 }
 
@@ -395,7 +410,7 @@ export async function parseAndCacheSymbols(filePath) {
  * @returns {void}
  */
 export function invalidateParserCache(filePath) {
-    _symbolCache.delete(filePath);
+    _symbolCache.delete(normalizeParserPath(filePath));
 }
 
 /**
@@ -424,9 +439,7 @@ export async function parseFileForContext(filePath, content) {
  */
 export function extractJsonSchema(content) {
     try {
-        const first = content.trimStart().startsWith('[')
-            ? JSON.parse(content.split('\n')[0] ?? content)
-            : JSON.parse(content);
+        const first = parseJsonOrJsonlSample(content);
         const obj = Array.isArray(first) ? (first[0] ?? {}) : first;
         const symbols = Object.keys(obj ?? {}).map((k, i) => ({
             kind: /** @type {'variable'} */ ('variable'),
@@ -441,6 +454,23 @@ export function extractJsonSchema(content) {
     }
 }
 
+/**
+ * @param {string} content
+ * @returns {unknown}
+ */
+function parseJsonOrJsonlSample(content) {
+    try {
+        return JSON.parse(content);
+    } catch (error) {
+        const firstLine = content
+            .split(/\r?\n/u)
+            .map((line) => line.trim())
+            .find((line) => line.length > 0);
+        if (!firstLine) throw error;
+        return JSON.parse(firstLine);
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Markdown outline extraction
 // ---------------------------------------------------------------------------
@@ -452,11 +482,30 @@ export function extractJsonSchema(content) {
  * @returns {string[]}
  */
 export function extractMarkdownOutline(content) {
-    /** @type {string[]} */
+    return extractMarkdownOutlineWithLines(content).map((entry) => entry.heading);
+}
+
+/**
+ * Extrai headings H1-H4 de Markdown preservando linha real.
+ *
+ * @param {string} content
+ * @returns {{ heading: string; line: number; depth: number }[]}
+ */
+function extractMarkdownOutlineWithLines(content) {
+    /** @type {{ heading: string; line: number; depth: number }[]} */
     const headings = [];
-    for (const line of content.split('\n')) {
+    const lines = content.split('\n');
+    for (let index = 0; index < lines.length; index++) {
+        const line = lines[index] ?? '';
         const m = /^(#{1,4})\s+(.+)$/.exec(line);
-        if (m) headings.push(`${m[1] ?? ''} ${(m[2] ?? '').trim()}`);
+        if (m) {
+            const marker = m[1] ?? '';
+            headings.push({
+                heading: `${marker} ${(m[2] ?? '').trim()}`,
+                line: index + 1,
+                depth: marker.length,
+            });
+        }
     }
     return headings;
 }
