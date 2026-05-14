@@ -1193,6 +1193,7 @@ export async function moveFileLocked(source, destination, options = {}) {
  *     replaceAll?: boolean;
  *     expectedOccurrences?: number;
  *     expectedHash?: string;
+ *     dryRun?: boolean;
  *     advisoryLimits?: Record<string, unknown>;
  * }} options
  */
@@ -1205,10 +1206,19 @@ export async function patchTextLocked(filePath, options) {
             const previousHash = assertExpectedSha256(content, options.expectedHash);
             const { updated, replacedOccurrences, bytesWritten } = computeTextPatch(content, options);
             const contentHash = sha256(updated);
-            await writeAtomicFileUnlocked(filePath, updated);
-            return { replacedOccurrences, bytesWritten, previousHash, contentHash };
+            if (!options.dryRun) {
+                await writeAtomicFileUnlocked(filePath, updated);
+            }
+            return {
+                replacedOccurrences,
+                bytesWritten: options.dryRun ? 0 : bytesWritten,
+                projectedBytes: bytesWritten,
+                previousHash,
+                contentHash,
+                dryRun: Boolean(options.dryRun),
+            };
         });
-        invalidateIoCacheTiers(filePath);
+        if (!options.dryRun) invalidateIoCacheTiers(filePath);
         const io = publishAndReturn(
             buildIoMeta({
                 operation: 'patch',
@@ -1224,6 +1234,8 @@ export async function patchTextLocked(filePath, options) {
                     lockWaitMs: waitMs,
                     expectedHash: options.expectedHash ?? null,
                     contentHash: value.contentHash,
+                    dryRun: Boolean(options.dryRun),
+                    projectedBytes: value.projectedBytes,
                 },
             }),
             true,

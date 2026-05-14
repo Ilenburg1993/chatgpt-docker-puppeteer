@@ -504,6 +504,25 @@ describe('F35 — patch_file (F187)', () => {
         expect(result.operation).toMatchObject({ capability: 'file.patch', status: 'applied' });
     });
 
+    it('simula patch com dryRun sem escrever no disco', async () => {
+        pathOk('/workspace/target.js');
+        fsMock.access.mockResolvedValue(undefined);
+        fsMock.readFile.mockResolvedValue('const x = 1;\n');
+
+        const result = await handler({
+            path: 'target.js',
+            old_string: 'const x = 1;',
+            new_string: 'const x = 42;',
+            dryRun: true,
+        });
+
+        expect(result.success).toBe(true);
+        expect(result.dryRun).toBe(true);
+        expect(result.operation).toMatchObject({ capability: 'file.patch', status: 'dry-run' });
+        expect(fsMock.writeFile).not.toHaveBeenCalled();
+        expect(fsMock.rename).not.toHaveBeenCalled();
+    });
+
     it('falha se old_string não encontrada', async () => {
         pathOk('/workspace/file.txt');
         fsMock.access.mockResolvedValue(undefined);

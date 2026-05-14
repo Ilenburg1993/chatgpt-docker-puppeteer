@@ -360,15 +360,28 @@ const patchFileTool = buildTool({
             .string()
             .optional()
             .describe('SHA-256 esperado do conteúdo atual. Se o arquivo mudou, o patch falha sem aplicar.'),
+        dryRun: z
+            .boolean()
+            .optional()
+            .default(false)
+            .describe('Se true, valida e calcula o patch sem escrever no disco.'),
     }),
-    handler: async ({ path: filePath, old_string, new_string, replace_all, expected_occurrences, expectedHash }) => {
+    handler: async ({
+        path: filePath,
+        old_string,
+        new_string,
+        replace_all,
+        expected_occurrences,
+        expectedHash,
+        dryRun,
+    }) => {
         const v = await validatePath(filePath, { mode: 'write' });
         if (!v.ok) return { success: false, error: v.reason };
         const operation = createIoOperationEnvelope({
             capability: 'file.patch',
-            riskClass: 'high',
+            riskClass: dryRun ? 'low' : 'high',
             targets: [v.resolved],
-            evidence: { tool: 'patch_file', replaceAll: replace_all },
+            evidence: { tool: 'patch_file', replaceAll: replace_all, dryRun },
         });
 
         try {
@@ -378,26 +391,33 @@ const patchFileTool = buildTool({
                 replaceAll: replace_all,
                 expectedOccurrences: expected_occurrences,
                 ...(expectedHash ? { expectedHash } : {}),
+                dryRun,
                 advisoryLimits: {
                     advisoryPatchSegmentChars: ADVISORY_PATCH_SEGMENT_CHARS,
                     oldStringChars: old_string.length,
                     newStringChars: new_string.length,
                     expectedHash: expectedHash ?? null,
+                    dryRun,
                     limitMode: 'informative',
                 },
             });
-            log('INFO', `[copilot/patch_file] Patch aplicado: ${v.resolved}`);
+            log('INFO', `[copilot/patch_file] Patch ${dryRun ? 'simulado' : 'aplicado'}: ${v.resolved}`);
             return withIoMeta(
                 {
                     success: true,
                     path: v.resolved,
+                    dryRun: patchResult.dryRun,
                     replacedOccurrences: patchResult.replacedOccurrences,
+                    projectedBytes: patchResult.projectedBytes,
                     previousHash: patchResult.previousHash,
                     contentHash: patchResult.contentHash,
                     operation: completeIoOperationEnvelope(operation, {
+                        status: dryRun ? 'dry-run' : 'applied',
                         traceId: patchResult.io.traceId ?? null,
                         evidence: {
+                            dryRun,
                             replacedOccurrences: patchResult.replacedOccurrences,
+                            projectedBytes: patchResult.projectedBytes,
                             previousHash: patchResult.previousHash,
                             contentHash: patchResult.contentHash,
                         },

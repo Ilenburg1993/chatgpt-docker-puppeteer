@@ -117,12 +117,14 @@ Objetivo: transformar primitives em ações rastreáveis.
 - `operationId`, `traceId`, capability, risk, preconditions, apply, result, evidence.
 - Status inicial: `runtime/operation.js` criado e file write tools retornam envelope `operation` em mutações.
 - `write_file_content` e `patch_file` aceitam `expectedHash` SHA-256 e retornam `previousHash`/`contentHash`.
+- `patch_file` aceita `dryRun` e retorna operação com status `dry-run`, sem tocar no disco.
 
 ### F3.2 — Transactions
 
 - `beginChangeSet`.
 - snapshots/diffs antes de write/patch/move/delete.
-- Precondição otimista por hash iniciada em write/patch; rollback token e changeset continuam pendentes.
+- Precondição otimista por hash iniciada em write/patch; dry-run de patch executado; rollback token e changeset
+  continuam pendentes.
 - rollback token.
 
 ### F3.3 — Audit log

@@ -268,6 +268,25 @@ describe('infra/io-engine', () => {
         await expect(readFile(file, 'utf8')).resolves.toBe('alpha gamma');
     });
 
+    it('patchTextLocked dryRun calcula patch sem escrever no disco', async () => {
+        const dir = await createTempDir();
+        const file = join(dir, 'dry-run-patch.txt');
+        await writeFile(file, 'alpha beta', 'utf8');
+
+        const result = await patchTextLocked(file, {
+            oldString: 'beta',
+            newString: 'gamma',
+            expectedHash: sha256('alpha beta'),
+            dryRun: true,
+        });
+
+        expect(result.dryRun).toBe(true);
+        expect(result.bytesWritten).toBe(0);
+        expect(result.projectedBytes).toBe(Buffer.byteLength('alpha gamma', 'utf8'));
+        expect(result.contentHash).toBe(sha256('alpha gamma'));
+        await expect(readFile(file, 'utf8')).resolves.toBe('alpha beta');
+    });
+
     it('moveFileLocked aguarda lock ativo no source antes de mover', async () => {
         const dir = await createTempDir();
         const source = join(dir, 'write-vs-move.txt');
