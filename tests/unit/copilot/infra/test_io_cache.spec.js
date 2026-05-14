@@ -2,11 +2,13 @@
 import * as assert from 'node:assert/strict';
 import * as os from 'node:os';
 import * as nodePath from 'node:path';
+import { rm, stat, writeFile } from 'node:fs/promises';
 import { afterEach, describe, it } from 'vitest';
 
 import {
     getIoCacheStats,
     getIoL1Cache,
+    getVerifiedIoL1Entry,
     invalidateIoCachePath,
     invalidateIoCacheSubtree,
     makeBytesKey,
@@ -14,6 +16,7 @@ import {
     normalizeIoCacheKey,
     resetIoL1CacheForTest,
 } from '../../../../src/copilot/infra/io-cache.js';
+import { sha256 } from '../../../../src/copilot/infra/shared/hash.js';
 
 afterEach(() => {
     resetIoL1CacheForTest();
@@ -78,6 +81,35 @@ describe('infra/io-cache — get/set/hit/miss', () => {
         assert.ok(stats.hits >= 1);
         assert.ok(stats.misses >= 1);
         assert.ok(stats.bytesStored >= 1);
+    });
+
+    it('revalida por hash quando mtime diverge mas conteúdo segue idêntico', async () => {
+        const filePath = nodePath.join(os.tmpdir(), `io-cache-hash-${Date.now()}.txt`);
+        await writeFile(filePath, 'same-content', 'utf8');
+        const fileStat = await stat(filePath);
+        const cache = getIoL1Cache();
+        const key = makeBytesKey(normalizeIoCacheKey(filePath));
+        const content = Buffer.from('same-content', 'utf8');
+
+        cache.set(key, {
+            content,
+            bytes: content.byteLength,
+            cachedAt: 0,
+            lastValidatedAt: 0,
+            mtime: fileStat.mtimeMs - 10_000,
+            size: fileStat.size,
+            contentHash: sha256(content),
+        });
+
+        const result = await getVerifiedIoL1Entry(key, filePath);
+        const stats = cache.stats();
+
+        assert.ok(result !== null);
+        assert.equal(result?.fingerprintStrategy, 'mtime-size-hash');
+        assert.equal(stats.hashRevalidations, 1);
+        assert.equal(stats.hashRevalidationHits, 1);
+
+        await rm(filePath, { force: true });
     });
 });
 

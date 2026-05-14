@@ -28,6 +28,46 @@ describe('infra/io/patch', () => {
         ).toThrow('2 vezes');
     });
 
+    it('substitui ocorrência específica com occurrenceIndex', () => {
+        const patch = computeTextPatch('same middle same end', {
+            oldString: 'same',
+            newString: 'other',
+            occurrenceIndex: 2,
+        });
+
+        expect(patch.updated).toBe('same middle other end');
+        expect(patch.occurrences).toBe(2);
+        expect(patch.replacedOccurrences).toBe(1);
+        expect(patch.occurrenceIndex).toBe(2);
+    });
+
+    it('rejeita replaceAll junto com occurrenceIndex', () => {
+        expect(() =>
+            computeTextPatch('same same', {
+                oldString: 'same',
+                newString: 'other',
+                replaceAll: true,
+                occurrenceIndex: 1,
+            }),
+        ).toThrow('Use replace_all ou occurrence_index');
+    });
+
+    it('rejeita no-op salvo quando allowNoop=true', () => {
+        expect(() =>
+            computeTextPatch('same', {
+                oldString: 'same',
+                newString: 'same',
+            }),
+        ).toThrow('Patch sem efeito');
+
+        const patch = computeTextPatch('same', {
+            oldString: 'same',
+            newString: 'same',
+            allowNoop: true,
+        });
+        expect(patch.noop).toBe(true);
+    });
+
     it('gera diff simples com contexto', () => {
         const result = buildSimpleTextDiff('a\nb\nc', 'a\nB\nc', { contextLines: 1 });
 

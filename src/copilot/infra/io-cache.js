@@ -26,6 +26,7 @@ import * as nodePath from 'node:path';
 import { normalizeIoCacheKey } from './cache/l1/index.js';
 import { publishIoInvalidation, registerIoInvalidationHook } from './io/invalidation/bus.js';
 import { fingerprintMatches } from './shared/fingerprint-match.js';
+import { sha256 } from './shared/hash.js';
 
 // ---------------------------------------------------------------------------
 // Config
@@ -39,6 +40,9 @@ const DEFAULT_MAX_ENTRIES = Number(process.env['IO_L1_CACHE_MAX_ENTRIES'] ?? 2_0
 
 /** Limite de memória do cache L1 (bytes). Padrão: 128 MiB. */
 const DEFAULT_MAX_BYTES = Number(process.env['IO_L1_CACHE_MAX_BYTES'] ?? 128 * 1024 * 1024);
+
+/** Limite para revalidação por hash quando mtime diverge mas size segue igual. */
+const DEFAULT_HASH_REVALIDATE_MAX_BYTES = Number(process.env['IO_L1_HASH_REVALIDATE_MAX_BYTES'] ?? 1024 * 1024);
 
 /**
  * Intervalo mínimo entre validações de fingerprint (stat) para o mesmo arquivo. Padrão: 2000ms. Ajustável via
@@ -59,6 +63,8 @@ const STALE_PROBE_INTERVAL_MS = Number(process.env['IO_L1_STALE_PROBE_INTERVAL_M
  * @property {number} [size] - Tamanho do arquivo no momento do cache (bytes). Complemento do mtime.
  * @property {number} [lastValidatedAt] - Última vez que o fingerprint foi validado (ms).
  * @property {number} [accessCount] - Contagem de acessos para TTL adaptativo.
+ * @property {string} [contentHash] - SHA-256 do conteúdo completo cacheado, quando conhecido.
+ * @property {string} [fingerprintStrategy] - Estratégia usada na última validação relevante.
  */
 
 /**
@@ -68,10 +74,13 @@ const STALE_PROBE_INTERVAL_MS = Number(process.env['IO_L1_STALE_PROBE_INTERVAL_M
  * @property {number} evictions - Evicções (LRU ou TTL expirado).
  * @property {number} invalidations - Invalidações ativas por escrita/delete/move/patch.
  * @property {number} staleHits - Entradas invalidadas por fingerprint divergente (stale detection).
+ * @property {number} hashRevalidations - Revalidações por hash após divergência de fingerprint leve.
+ * @property {number} hashRevalidationHits - Entradas preservadas após revalidação por hash.
  * @property {number} size - Entradas atuais no cache.
  * @property {number} bytesStored - Total estimado de bytes armazenados no L1.
  * @property {number} ttlMs - TTL configurado.
  * @property {number} staleProbeIntervalMs - Intervalo de validação de fingerprint.
+ * @property {number} hashRevalidateMaxBytes - Maior arquivo elegível para revalidação por hash.
  */
 
 /**
@@ -106,6 +115,8 @@ export function getIoL1Cache() {
     let _evictions = 0;
     let _invalidations = 0;
     let _staleHits = 0;
+    let _hashRevalidations = 0;
+    let _hashRevalidationHits = 0;
 
     /** @type {import('lru-cache').LRUCache<string, IoCacheEntry>} */
     const _lru = new LRUCache(
@@ -176,6 +187,31 @@ export function getIoL1Cache() {
                 );
 
                 if (!isFresh) {
+                    const hashRevalidationEligible =
+                        typeof entry.contentHash === 'string' &&
+                        currentSize === entry.size &&
+                        currentSize <= DEFAULT_HASH_REVALIDATE_MAX_BYTES;
+                    if (hashRevalidationEligible) {
+                        _hashRevalidations++;
+                        try {
+                            const actual = await fsPromises.readFile(filePath);
+                            const actualHash = sha256(actual);
+                            if (actualHash === entry.contentHash) {
+                                entry.mtime = currentMtime;
+                                entry.size = currentSize;
+                                entry.lastValidatedAt = now;
+                                entry.fingerprintStrategy = 'mtime-size-hash';
+                                _hits++;
+                                _hashRevalidationHits++;
+                                if (entry.accessCount !== undefined) entry.accessCount++;
+                                else entry.accessCount = 1;
+                                return entry;
+                            }
+                        } catch {
+                            // Mantém o caminho de stale abaixo.
+                        }
+                    }
+
                     // Arquivo modificado externamente → invalida a entrada
                     _lru.delete(key);
                     _staleHits++;
@@ -185,6 +221,7 @@ export function getIoL1Cache() {
 
                 // Fingerprint válido: atualiza lastValidatedAt in-place (sem custo de set)
                 entry.lastValidatedAt = now;
+                entry.fingerprintStrategy = 'mtime-size';
                 _hits++;
                 if (entry.accessCount !== undefined) entry.accessCount++;
                 else entry.accessCount = 1;
@@ -221,10 +258,13 @@ export function getIoL1Cache() {
                 evictions: _evictions,
                 invalidations: _invalidations,
                 staleHits: _staleHits,
+                hashRevalidations: _hashRevalidations,
+                hashRevalidationHits: _hashRevalidationHits,
                 size: _lru.size,
                 bytesStored: _lru.calculatedSize ?? 0,
                 ttlMs: DEFAULT_TTL_MS,
                 staleProbeIntervalMs: STALE_PROBE_INTERVAL_MS,
+                hashRevalidateMaxBytes: DEFAULT_HASH_REVALIDATE_MAX_BYTES,
             };
         },
 
@@ -235,6 +275,8 @@ export function getIoL1Cache() {
             _evictions = 0;
             _invalidations = 0;
             _staleHits = 0;
+            _hashRevalidations = 0;
+            _hashRevalidationHits = 0;
         },
     };
 

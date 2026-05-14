@@ -52,6 +52,9 @@ const execFileAsync = promisify(execFile);
 /** @type {ReturnType<typeof resolveIoSearchBudget> | null} */
 let _ioSearchBudget = null;
 const ROLLBACK_SNAPSHOT_MAX_BYTES = 256 * 1024;
+const DEFAULT_PATCH_DIFF_CONTEXT_LINES = 3;
+const DEFAULT_PATCH_DIFF_MAX_LINES = 160;
+const DEFAULT_PATCH_DIFF_MAX_BYTES = 48 * 1024;
 
 /** @type {boolean | null} */
 let _rgAvailable = null;
@@ -69,6 +72,30 @@ function elapsedMs(startedAt) {
  */
 function getIoSearchBudget() {
     return (_ioSearchBudget ??= resolveIoSearchBudget());
+}
+
+/**
+ * @param {string} text
+ * @param {{ maxLines?: number; maxBytes?: number }} [options]
+ * @returns {{ text: string; truncated: boolean; lines: number; bytes: number }}
+ */
+function windowTextPreview(text, options = {}) {
+    const maxLines = Math.max(1, Math.trunc(options.maxLines ?? DEFAULT_PATCH_DIFF_MAX_LINES));
+    const maxBytes = Math.max(256, Math.trunc(options.maxBytes ?? DEFAULT_PATCH_DIFF_MAX_BYTES));
+    const lines = text.split('\n');
+    let truncated = lines.length > maxLines;
+    let preview = lines.slice(0, maxLines).join('\n');
+    let bytes = Buffer.byteLength(preview, 'utf8');
+    if (bytes > maxBytes) {
+        let end = preview.length;
+        while (end > 0 && Buffer.byteLength(preview.slice(0, end), 'utf8') > maxBytes) {
+            end = Math.max(0, end - 512);
+        }
+        preview = preview.slice(0, end);
+        bytes = Buffer.byteLength(preview, 'utf8');
+        truncated = true;
+    }
+    return { text: preview, truncated, lines: Math.min(lines.length, maxLines), bytes };
 }
 
 /**
@@ -121,6 +148,38 @@ function buildRollbackSnapshot(content) {
         return { snapshotBase64: content.toString('base64'), snapshotTruncated: false };
     }
     return { snapshotBase64: null, snapshotTruncated: true };
+}
+
+/**
+ * @param {unknown} metaJson
+ * @returns {Record<string, unknown>}
+ */
+function parseCacheMetaJson(metaJson) {
+    if (typeof metaJson !== 'string' || metaJson.trim() === '') return {};
+    try {
+        const parsed = JSON.parse(metaJson);
+        return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+            ? /** @type {Record<string, unknown>} */ (parsed)
+            : {};
+    } catch {
+        return {};
+    }
+}
+
+/**
+ * @param {Record<string, unknown>} meta
+ * @returns {string}
+ */
+function stringifyCacheMeta(meta) {
+    return JSON.stringify(meta);
+}
+
+/**
+ * @param {Record<string, unknown>} meta
+ * @returns {string | undefined}
+ */
+function readCacheContentHash(meta) {
+    return typeof meta['contentHash'] === 'string' ? meta['contentHash'] : undefined;
 }
 
 /**
@@ -202,6 +261,10 @@ function publishAndReturn(io, success, error) {
  *     path: string;
  *     content: Buffer;
  *     bytesRead: number;
+ *     sizeBytes: number;
+ *     mtimeMs: number | null;
+ *     contentHash: string;
+ *     cacheFingerprintStrategy: string | null;
  *     io: import('../core/io-contracts.js').IoMeta;
  * }>}
  */
@@ -218,6 +281,7 @@ export async function readBytes(filePath, options = {}) {
             const content = /** @type {Buffer} */ (
                 Buffer.isBuffer(_cached.content) ? _cached.content : Buffer.from(String(_cached.content))
             );
+            const contentHash = _cached.contentHash ?? sha256(content);
             const io = publishAndReturn(
                 buildIoMeta({
                     operation: 'read',
@@ -233,12 +297,23 @@ export async function readBytes(filePath, options = {}) {
                 }),
                 true,
             );
-            return { path: filePath, content, bytesRead: content.byteLength, io };
+            return {
+                path: filePath,
+                content,
+                bytesRead: content.byteLength,
+                sizeBytes: Number.isFinite(_cached.size) ? Number(_cached.size) : content.byteLength,
+                mtimeMs: Number.isFinite(_cached.mtime) ? Number(_cached.mtime) : null,
+                contentHash,
+                cacheFingerprintStrategy: _cached.fingerprintStrategy ?? null,
+                io,
+            };
         }
         const l2Cache = getIoL2Cache();
         if (l2Cache) {
             const l2Entry = l2Cache.get(_cacheKey);
             if (l2Entry?.kind === 'bytes' && Buffer.isBuffer(l2Entry.payload)) {
+                const l2Meta = parseCacheMetaJson(l2Entry.metaJson);
+                const contentHash = readCacheContentHash(l2Meta) ?? sha256(l2Entry.payload);
                 const metadata = await statPathSnapshot(filePath).catch(() => null);
                 const cachedMtimeMs = Number(l2Entry.mtimeMs);
                 const actualMtimeMs = Number(metadata?.mtimeMs);
@@ -261,6 +336,8 @@ export async function readBytes(filePath, options = {}) {
                         accessCount: 1,
                         mtime: Number(metadata?.mtimeMs),
                         size: Number(metadata?.size),
+                        contentHash,
+                        fingerprintStrategy: 'l2-mtime-size',
                     });
                     const io = publishAndReturn(
                         buildIoMeta({
@@ -281,6 +358,10 @@ export async function readBytes(filePath, options = {}) {
                         path: filePath,
                         content: l2Entry.payload,
                         bytesRead: l2Entry.payload.byteLength,
+                        sizeBytes: Number(metadata?.size ?? l2Entry.sizeBytes),
+                        mtimeMs: Number.isFinite(Number(metadata?.mtimeMs)) ? Number(metadata?.mtimeMs) : null,
+                        contentHash,
+                        cacheFingerprintStrategy: 'l2-mtime-size',
                         io,
                     };
                 }
@@ -290,6 +371,7 @@ export async function readBytes(filePath, options = {}) {
         }
         const snapshot = await readBytesFileSnapshot(filePath, options.signal ? { signal: options.signal } : {});
         const content = snapshot.content;
+        const contentHash = sha256(content);
         const _now = Date.now();
         /** @type {import('./io-cache.js').IoCacheEntry} */
         const _entry = {
@@ -300,6 +382,8 @@ export async function readBytes(filePath, options = {}) {
             accessCount: 1,
             mtime: snapshot.mtimeMs,
             size: snapshot.sizeBytes,
+            contentHash,
+            fingerprintStrategy: 'fs-read',
         };
         _l1.set(_cacheKey, _entry);
         if (l2Cache) {
@@ -310,6 +394,7 @@ export async function readBytes(filePath, options = {}) {
                 payload: content,
                 sizeBytes: content.byteLength,
                 mtimeMs: Number.isFinite(_entry.mtime) ? Number(_entry.mtime) : null,
+                metaJson: stringifyCacheMeta({ contentHash }),
             });
         }
         const io = publishAndReturn(
@@ -327,7 +412,16 @@ export async function readBytes(filePath, options = {}) {
             }),
             true,
         );
-        return { path: filePath, content, bytesRead: content.byteLength, io };
+        return {
+            path: filePath,
+            content,
+            bytesRead: content.byteLength,
+            sizeBytes: snapshot.sizeBytes,
+            mtimeMs: snapshot.mtimeMs,
+            contentHash,
+            cacheFingerprintStrategy: 'fs-read',
+            io,
+        };
     } catch (error) {
         publishAndReturn(
             buildIoMeta({
@@ -361,6 +455,11 @@ export async function readBytes(filePath, options = {}) {
  *     path: string;
  *     content: string;
  *     bytesRead: number;
+ *     sizeBytes: number;
+ *     mtimeMs: number | null;
+ *     contentHash: string;
+ *     returnedContentHash: string;
+ *     cacheFingerprintStrategy: string | null;
  *     totalLines: number;
  *     returnedLines: { start: number; end: number };
  *     io: import('../core/io-contracts.js').IoMeta;
@@ -396,6 +495,7 @@ export async function readText(filePath, options = {}) {
             // Cache hit: reconstituir resultado sem I/O
             _cacheState = 'l1-hit';
             const cachedContent = _cachedText.content;
+            const contentHash = _cachedText.contentHash ?? sha256(cachedContent);
             const cachedLines = cachedContent.split('\n');
             totalLines = cachedLines.length;
             const requestedStart = Math.max(1, options.startLine ?? 1);
@@ -425,6 +525,11 @@ export async function readText(filePath, options = {}) {
                 path: filePath,
                 content,
                 bytesRead: _cachedText.bytes,
+                sizeBytes: Number.isFinite(_cachedText.size) ? Number(_cachedText.size) : _cachedText.bytes,
+                mtimeMs: Number.isFinite(_cachedText.mtime) ? Number(_cachedText.mtime) : null,
+                contentHash,
+                returnedContentHash: sha256(content),
+                cacheFingerprintStrategy: _cachedText.fingerprintStrategy ?? null,
                 totalLines,
                 returnedLines: { start: sliceStart, end: sliceEnd },
                 io,
@@ -434,6 +539,8 @@ export async function readText(filePath, options = {}) {
         if (l2Cache) {
             const l2Entry = l2Cache.get(_textKey);
             if (l2Entry?.kind === 'text' && Buffer.isBuffer(l2Entry.payload)) {
+                const l2Meta = parseCacheMetaJson(l2Entry.metaJson);
+                const l2ContentHash = readCacheContentHash(l2Meta);
                 const metadata = await statPathSnapshot(filePath).catch(() => null);
                 const cachedMtimeMs = Number(l2Entry.mtimeMs);
                 const actualMtimeMs = Number(metadata?.mtimeMs);
@@ -448,6 +555,7 @@ export async function readText(filePath, options = {}) {
 
                 if (mtimeMatches && sizeMatches) {
                     const text = l2Entry.payload.toString('utf8');
+                    const contentHash = l2ContentHash ?? sha256(text);
                     const lines = text.split('\n');
                     const totalLines = lines.length;
                     const requestedStart = Math.max(1, options.startLine ?? 1);
@@ -465,6 +573,8 @@ export async function readText(filePath, options = {}) {
                         accessCount: 1,
                         mtime: Number(metadata?.mtimeMs),
                         size: Number(metadata?.size),
+                        contentHash,
+                        fingerprintStrategy: 'l2-mtime-size',
                     });
 
                     const io = publishAndReturn(
@@ -490,6 +600,11 @@ export async function readText(filePath, options = {}) {
                         path: filePath,
                         content,
                         bytesRead: l2Entry.payload.byteLength,
+                        sizeBytes: Number(metadata?.size ?? l2Entry.sizeBytes),
+                        mtimeMs: Number.isFinite(Number(metadata?.mtimeMs)) ? Number(metadata?.mtimeMs) : null,
+                        contentHash,
+                        returnedContentHash: sha256(content),
+                        cacheFingerprintStrategy: 'l2-mtime-size',
                         totalLines,
                         returnedLines: { start: sliceStart, end: sliceEnd },
                         io,
@@ -525,6 +640,7 @@ export async function readText(filePath, options = {}) {
             throw error;
         }
         text = raw.toString('utf8');
+        const contentHash = sha256(text);
         const lines = text.split('\n');
         totalLines = lines.length;
         const requestedStart = Math.max(1, options.startLine ?? 1);
@@ -542,6 +658,8 @@ export async function readText(filePath, options = {}) {
             accessCount: 1,
             mtime: textSnapshot.mtimeMs,
             size: textSnapshot.sizeBytes,
+            contentHash,
+            fingerprintStrategy: 'fs-read',
         };
         _l1.set(_textKey, _textEntry);
         if (l2Cache) {
@@ -552,6 +670,7 @@ export async function readText(filePath, options = {}) {
                 payload: text,
                 sizeBytes: raw.byteLength,
                 mtimeMs: Number.isFinite(_textEntry.mtime) ? Number(_textEntry.mtime) : null,
+                metaJson: stringifyCacheMeta({ contentHash, lineCount: totalLines, encoding: 'utf8' }),
             });
         }
         const io = publishAndReturn(buildIoMeta(baseMeta), true);
@@ -559,6 +678,11 @@ export async function readText(filePath, options = {}) {
             path: filePath,
             content,
             bytesRead: raw.byteLength,
+            sizeBytes: textSnapshot.sizeBytes,
+            mtimeMs: textSnapshot.mtimeMs,
+            contentHash,
+            returnedContentHash: sha256(content),
+            cacheFingerprintStrategy: 'fs-read',
             totalLines,
             returnedLines: { start: sliceStart, end: sliceEnd },
             io,
@@ -610,7 +734,11 @@ export async function readLines(filePath, options = {}) {
  *     path: string;
  *     chunks: { index: number; startLine: number; endLine: number; content: string; bytes: number }[];
  *     totalLines: number;
+ *     totalLinesKnown: boolean;
  *     bytesRead: number;
+ *     sizeBytes: number | null;
+ *     mtimeMs: number | null;
+ *     cacheFingerprintStrategy: string | null;
  *     io: import('../core/io-contracts.js').IoMeta;
  * }>}
  */
@@ -620,6 +748,7 @@ export async function readTextChunks(filePath, options = {}) {
     const startedAt = nowIoMs();
     try {
         const snapshot = await readTextLineChunks(filePath, options);
+        const stats = await statPathSnapshot(filePath).catch(() => null);
         const io = publishAndReturn(
             buildIoMeta({
                 operation: 'read',
@@ -645,7 +774,11 @@ export async function readTextChunks(filePath, options = {}) {
             path: filePath,
             chunks: snapshot.chunks,
             totalLines: snapshot.totalLines,
+            totalLinesKnown: snapshot.endLine === null,
             bytesRead: snapshot.bytesRead,
+            sizeBytes: stats ? stats.size : null,
+            mtimeMs: stats ? stats.mtimeMs : null,
+            cacheFingerprintStrategy: 'stream-bypass',
             io,
         };
     } catch (error) {
@@ -1293,8 +1426,13 @@ export async function moveFileLocked(source, destination, options = {}) {
  *     newString: string;
  *     replaceAll?: boolean;
  *     expectedOccurrences?: number;
+ *     occurrenceIndex?: number;
  *     expectedHash?: string;
  *     dryRun?: boolean;
+ *     allowNoop?: boolean;
+ *     diffContextLines?: number;
+ *     maxDiffLines?: number;
+ *     maxDiffBytes?: number;
  *     advisoryLimits?: Record<string, unknown>;
  * }} options
  */
@@ -1306,16 +1444,39 @@ export async function patchTextLocked(filePath, options) {
         const { value, waitMs } = await withIoResourceLock(filePath, async () => {
             const content = await fs.readFile(filePath, 'utf8');
             const previousHash = assertExpectedSha256(content, options.expectedHash);
-            const { updated, replacedOccurrences, bytesWritten } = computeTextPatch(content, options);
+            const patch = computeTextPatch(content, options);
+            const { updated, replacedOccurrences, bytesWritten } = patch;
             const contentHash = sha256(updated);
             const previousSnapshot = buildRollbackSnapshot(Buffer.from(content, 'utf8'));
+            const diff = buildSimpleTextDiff(content, updated, {
+                contextLines: options.diffContextLines ?? DEFAULT_PATCH_DIFF_CONTEXT_LINES,
+            });
+            const diffPreview = windowTextPreview(diff.diff, {
+                maxLines: options.maxDiffLines ?? DEFAULT_PATCH_DIFF_MAX_LINES,
+                maxBytes: options.maxDiffBytes ?? DEFAULT_PATCH_DIFF_MAX_BYTES,
+            });
             if (!options.dryRun) {
                 await writeAtomicFileUnlocked(filePath, updated);
             }
             return {
+                occurrences: patch.occurrences,
                 replacedOccurrences,
                 bytesWritten: options.dryRun ? 0 : bytesWritten,
                 projectedBytes: bytesWritten,
+                previousBytes: patch.previousBytes,
+                byteDelta: patch.byteDelta,
+                oldStringBytes: patch.oldStringBytes,
+                newStringBytes: patch.newStringBytes,
+                firstMatchLine: patch.firstMatchLine,
+                lastMatchLine: patch.lastMatchLine,
+                lineDelta: patch.lineDelta,
+                occurrenceIndex: patch.occurrenceIndex,
+                noop: patch.noop,
+                diffPreview: diffPreview.text,
+                diffPreviewTruncated: diffPreview.truncated,
+                diffPreviewLines: diffPreview.lines,
+                diffPreviewBytes: diffPreview.bytes,
+                diffContextLines: diff.contextLines,
                 previousHash,
                 contentHash,
                 dryRun: Boolean(options.dryRun),
@@ -1340,7 +1501,12 @@ export async function patchTextLocked(filePath, options) {
                     expectedHash: options.expectedHash ?? null,
                     contentHash: value.contentHash,
                     dryRun: Boolean(options.dryRun),
+                    occurrenceIndex: options.occurrenceIndex ?? null,
+                    replaceAll: Boolean(options.replaceAll),
+                    occurrences: value.occurrences,
+                    replacedOccurrences: value.replacedOccurrences,
                     projectedBytes: value.projectedBytes,
+                    byteDelta: value.byteDelta,
                 },
             }),
             true,

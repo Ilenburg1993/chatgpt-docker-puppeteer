@@ -26,6 +26,23 @@ describe('createIoL2SqliteCache', () => {
         expect(row?.payload.toString('utf8')).toBe('hello');
     });
 
+    it('preserva metaJson para fingerprints ricos', () => {
+        const db = createDb();
+        const cache = createIoL2SqliteCache({ db, ttlMs: 60_000 });
+
+        cache.set({
+            key: 'k-meta',
+            path: '/tmp/meta.txt',
+            kind: 'text',
+            payload: 'hello',
+            metaJson: JSON.stringify({ contentHash: 'abc123', lineCount: 1 }),
+        });
+
+        const row = cache.get('k-meta');
+
+        expect(row?.metaJson).toBe(JSON.stringify({ contentHash: 'abc123', lineCount: 1 }));
+    });
+
     it('expires entries by ttl', () => {
         const db = createDb();
         let nowMs = 1000;

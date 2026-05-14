@@ -41,10 +41,41 @@ import { toError } from '../../core/error-handlers.js';
 import { withIoMeta } from '../../core/io-contracts.js';
 import { log } from '../infra/logger.js';
 import { buildTool } from '../infra/tool-factory.js';
+import { createToolFailureResult } from '../infra/tool-feedback.js';
 import { validatePath } from './shared.js';
 
 const ADVISORY_WRITE_CONTENT_BYTES = 2 * 1024 * 1024;
 const ADVISORY_PATCH_SEGMENT_CHARS = 200_000;
+
+const PATCH_FEEDBACK_FIX = /** @type {const} */ ({
+    ERR_PATCH_INVALID_OLD_STRING:
+        'Envie old_string não vazio, copiado literalmente do conteúdo lido mais recentemente.',
+    ERR_PATCH_INVALID_NEW_STRING: 'Envie new_string como string; use string vazia apenas quando quiser deletar texto.',
+    ERR_PATCH_NOOP: 'Altere new_string para produzir diferença real, ou use allowNoop=true quando quiser registrar dry-run/no-op.',
+    ERR_PATCH_NOT_FOUND:
+        'Releia o arquivo com read_file_content, copie um trecho atual e inclua contexto suficiente em old_string.',
+    ERR_PATCH_EXPECTED_OCCURRENCES:
+        'Releia o arquivo e ajuste expected_occurrences, ou refine old_string para o número exato de matches desejado.',
+    ERR_PATCH_AMBIGUOUS_MATCH:
+        'Refine old_string com mais contexto, use occurrence_index para escolher a ocorrência, ou use replace_all com expected_occurrences.',
+    ERR_PATCH_CONFLICTING_MODE: 'Escolha apenas um modo: replace_all para todos os matches ou occurrence_index para um match específico.',
+    ERR_PATCH_INVALID_OCCURRENCE_INDEX: 'Use occurrence_index inteiro e baseado em 1.',
+    ERR_PATCH_OCCURRENCE_INDEX_OUT_OF_RANGE: 'Releia o arquivo e use occurrence_index dentro da contagem de matches atual.',
+    EEXPECTEDHASH: 'O arquivo mudou desde a leitura anterior. Releia o arquivo, atualize expectedHash e tente novamente.',
+});
+
+const PATCH_FEEDBACK_CATEGORY = /** @type {const} */ ({
+    ERR_PATCH_INVALID_OLD_STRING: 'invalid-parameters',
+    ERR_PATCH_INVALID_NEW_STRING: 'invalid-parameters',
+    ERR_PATCH_NOOP: 'invalid-parameters',
+    ERR_PATCH_NOT_FOUND: 'not-found',
+    ERR_PATCH_EXPECTED_OCCURRENCES: 'conflict',
+    ERR_PATCH_AMBIGUOUS_MATCH: 'invalid-parameters',
+    ERR_PATCH_CONFLICTING_MODE: 'invalid-parameters',
+    ERR_PATCH_INVALID_OCCURRENCE_INDEX: 'invalid-parameters',
+    ERR_PATCH_OCCURRENCE_INDEX_OUT_OF_RANGE: 'invalid-parameters',
+    EEXPECTEDHASH: 'conflict',
+});
 
 /**
  * @param {ReturnType<typeof createIoOperationEnvelope>} operation
@@ -188,6 +219,106 @@ function buildMutationChangeSet(input) {
     };
 }
 
+/**
+ * @param {unknown} error
+ * @returns {string | undefined}
+ */
+function readErrorCode(error) {
+    if (!error || typeof error !== 'object') return undefined;
+    const code = /** @type {Record<string, unknown>} */ (error)['code'];
+    return typeof code === 'string' ? code : undefined;
+}
+
+/**
+ * @param {unknown} error
+ * @returns {Record<string, unknown>}
+ */
+function readErrorDetails(error) {
+    if (!error || typeof error !== 'object') return {};
+    const details = /** @type {Record<string, unknown>} */ (error)['details'];
+    return details && typeof details === 'object' && !Array.isArray(details)
+        ? /** @type {Record<string, unknown>} */ (details)
+        : {};
+}
+
+/**
+ * @param {string} reason
+ * @returns {import('../infra/tool-feedback.js').ToolFailureCategory}
+ */
+function classifyPathFailure(reason) {
+    return /vazio|byte nulo|null byte|inválid|invalid|malformad/i.test(reason)
+        ? 'invalid-parameters'
+        : 'policy-denied';
+}
+
+/**
+ * @param {string} toolName
+ * @param {string} reason
+ * @param {Record<string, unknown>} receivedParameters
+ * @param {Record<string, unknown>} [details]
+ */
+function pathFailureResult(toolName, reason, receivedParameters, details = {}) {
+    return createToolFailureResult({
+        toolName,
+        message: reason,
+        category: classifyPathFailure(reason),
+        fix: 'Use um caminho válido dentro do workspace e tente novamente.',
+        receivedParameters,
+        details,
+    });
+}
+
+/**
+ * @param {unknown} error
+ * @returns {import('../infra/tool-feedback.js').ToolFailureCategory | undefined}
+ */
+function patchFailureCategory(error) {
+    const code = readErrorCode(error);
+    if (!code) return undefined;
+    return PATCH_FEEDBACK_CATEGORY[/** @type {keyof typeof PATCH_FEEDBACK_CATEGORY} */ (code)];
+}
+
+/**
+ * @param {unknown} error
+ * @returns {string | undefined}
+ */
+function patchFailureFix(error) {
+    const code = readErrorCode(error);
+    if (!code) return undefined;
+    return PATCH_FEEDBACK_FIX[/** @type {keyof typeof PATCH_FEEDBACK_FIX} */ (code)];
+}
+
+/**
+ * @param {string} toolName
+ * @param {unknown} error
+ * @param {Record<string, unknown>} receivedParameters
+ * @param {Record<string, unknown>} extraDetails
+ * @param {Record<string, unknown>} [extra]
+ */
+function mutationFailureResult(toolName, error, receivedParameters, extraDetails, extra = {}) {
+    const e = toError(error);
+    const code = readErrorCode(error);
+    const category = toolName === 'patch_file' ? patchFailureCategory(error) : undefined;
+    const fix = toolName === 'patch_file' ? patchFailureFix(error) : undefined;
+    return createToolFailureResult({
+        toolName,
+        error,
+        ...(category ? { category } : {}),
+        ...(fix ? { fix } : {}),
+        receivedParameters,
+        details: {
+            ...(code ? { code } : {}),
+            ...readErrorDetails(error),
+            ...extraDetails,
+        },
+        extra: {
+            ...extra,
+            ...(code ? { code } : {}),
+            error: toolName === 'patch_file' ? e.message : e.message,
+        },
+    });
+}
+
 // ---------------------------------------------------------------------------
 // Tool: write_file_content
 // ---------------------------------------------------------------------------
@@ -199,7 +330,7 @@ const writeFileContentTool = buildTool({
     name: 'write_file_content',
     description:
         'Escreve conteúdo em um arquivo existente no workspace. ' +
-        '⚠️ REQUER APROVAÇÃO — sobrescreve conteúdo existente. Use create_file para arquivos novos.',
+        'Sobrescreve o conteúdo completo; use create_file para arquivos novos e expectedHash para precondição otimista.',
     parameters: z.object({
         path: z.string().describe('Caminho do arquivo (deve existir)'),
         content: z.string().describe('Novo conteúdo completo do arquivo'),
@@ -215,7 +346,13 @@ const writeFileContentTool = buildTool({
     }),
     handler: async ({ path: filePath, content, encoding, expectedHash }) => {
         const { ok, reason, resolved } = await validatePath(filePath, { mode: 'write' });
-        if (!ok) return { success: false, error: reason };
+        if (!ok) {
+            return pathFailureResult('write_file_content', reason ?? 'Caminho inválido.', {
+                path: filePath,
+                encoding,
+                expectedHash,
+            });
+        }
 
         log('INFO', `[copilot/write_file_content] ${resolved}`);
         const operation = createIoOperationEnvelope({
@@ -276,11 +413,14 @@ const writeFileContentTool = buildTool({
                 writeResult.io,
             );
         } catch (err) {
-            return {
-                success: false,
-                error: toError(err).message,
-                operation: await failAndAuditMutation(operation, err, { tool: 'write_file_content' }),
-            };
+            const failedOperation = await failAndAuditMutation(operation, err, { tool: 'write_file_content' });
+            return mutationFailureResult(
+                'write_file_content',
+                err,
+                { path: filePath, encoding, expectedHash },
+                { path: resolved },
+                { operation: failedOperation },
+            );
         }
     },
 });
@@ -296,7 +436,7 @@ const createFileTool = buildTool({
     name: 'create_file',
     description:
         'Cria um novo arquivo no workspace com conteúdo opcional. ' +
-        '⚠️ REQUER APROVAÇÃO — o arquivo não deve existir previamente (use write_file_content para sobrescrever).',
+        'Por padrão falha se o arquivo já existe; use overwrite=true somente quando quiser substituir.',
     parameters: z.object({
         path: z.string().describe('Caminho do arquivo a criar'),
         content: z.string().optional().default('').describe('Conteúdo inicial do arquivo'),
@@ -313,7 +453,13 @@ const createFileTool = buildTool({
     }),
     handler: async ({ path: filePath, content, createParentDirs, overwrite }) => {
         const { ok, reason, resolved } = await validatePath(filePath, { mode: 'write' });
-        if (!ok) return { success: false, error: reason };
+        if (!ok) {
+            return pathFailureResult('create_file', reason ?? 'Caminho inválido.', {
+                path: filePath,
+                createParentDirs,
+                overwrite,
+            });
+        }
 
         log('INFO', `[copilot/create_file] ${resolved}`);
         const riskClass = riskForOverwrite(overwrite);
@@ -369,11 +515,14 @@ const createFileTool = buildTool({
                 writeResult.io,
             );
         } catch (err) {
-            return {
-                success: false,
-                error: toError(err).message,
-                operation: await failAndAuditMutation(operation, err, { tool: 'create_file' }),
-            };
+            const failedOperation = await failAndAuditMutation(operation, err, { tool: 'create_file' });
+            return mutationFailureResult(
+                'create_file',
+                err,
+                { path: filePath, createParentDirs, overwrite },
+                { path: resolved },
+                { operation: failedOperation },
+            );
         }
     },
 });
@@ -387,14 +536,15 @@ const createFileTool = buildTool({
  */
 const deleteFileTool = buildTool({
     name: 'delete_file',
-    description:
-        'Deleta um arquivo do workspace. ' + '⚠️ REQUER APROVAÇÃO — OPERAÇÃO IRREVERSÍVEL. Não deleta diretórios.',
+    description: 'Deleta um arquivo do workspace. Não opera sobre diretórios e retorna snapshot de rollback quando possível.',
     parameters: z.object({
         path: z.string().describe('Caminho do arquivo a deletar'),
     }),
     handler: async ({ path: filePath }) => {
         const { ok, reason, resolved } = await validatePath(filePath, { mode: 'write' });
-        if (!ok) return { success: false, error: reason };
+        if (!ok) {
+            return pathFailureResult('delete_file', reason ?? 'Caminho inválido.', { path: filePath });
+        }
 
         log('INFO', `[copilot/delete_file] ${resolved}`);
         const operation = createIoOperationEnvelope({
@@ -440,17 +590,25 @@ const deleteFileTool = buildTool({
         } catch (err) {
             const e = /** @type {{ code?: unknown }} */ (err);
             if (e.code === 'EISDIR' || e.code === 'EPERM') {
-                return {
-                    success: false,
-                    error: 'É um diretório. delete_file só opera em arquivos.',
-                    operation: await failAndAuditMutation(operation, err, { tool: 'delete_file' }),
-                };
+                const failedOperation = await failAndAuditMutation(operation, err, { tool: 'delete_file' });
+                return createToolFailureResult({
+                    toolName: 'delete_file',
+                    message: 'É um diretório. delete_file só opera em arquivos.',
+                    category: 'invalid-parameters',
+                    fix: 'Use uma tool de diretório apropriada ou informe o caminho de um arquivo regular.',
+                    receivedParameters: { path: filePath },
+                    details: { path: resolved, code: String(e.code) },
+                    extra: { operation: failedOperation },
+                });
             }
-            return {
-                success: false,
-                error: toError(err).message,
-                operation: await failAndAuditMutation(operation, err, { tool: 'delete_file' }),
-            };
+            const failedOperation = await failAndAuditMutation(operation, err, { tool: 'delete_file' });
+            return mutationFailureResult(
+                'delete_file',
+                err,
+                { path: filePath },
+                { path: resolved },
+                { operation: failedOperation },
+            );
         }
     },
 });
@@ -464,7 +622,7 @@ const deleteFileTool = buildTool({
  */
 const copyFileTool = buildTool({
     name: 'copy_file',
-    description: 'Copia um arquivo para outro caminho no workspace. ' + '⚠️ REQUER APROVAÇÃO se o destino já existe.',
+    description: 'Copia um arquivo para outro caminho no workspace, com overwrite explícito e rollback do destino quando possível.',
     parameters: z.object({
         source: z.string().describe('Caminho do arquivo de origem'),
         destination: z.string().describe('Caminho de destino'),
@@ -472,10 +630,24 @@ const copyFileTool = buildTool({
     }),
     handler: async ({ source, destination, overwrite }) => {
         const src = await validatePath(source, { mode: 'read' });
-        if (!src.ok) return { success: false, error: src.reason };
+        if (!src.ok) {
+            return pathFailureResult(
+                'copy_file',
+                src.reason ?? 'Caminho de origem inválido.',
+                { source, destination, overwrite },
+                { field: 'source' },
+            );
+        }
 
         const dst = await validatePath(destination, { mode: 'write' });
-        if (!dst.ok) return { success: false, error: dst.reason };
+        if (!dst.ok) {
+            return pathFailureResult(
+                'copy_file',
+                dst.reason ?? 'Caminho de destino inválido.',
+                { source, destination, overwrite },
+                { field: 'destination' },
+            );
+        }
 
         log('INFO', `[copilot/copy_file] ${src.resolved} → ${dst.resolved}`);
         const riskClass = riskForOverwrite(overwrite);
@@ -555,11 +727,14 @@ const copyFileTool = buildTool({
                 copyResult.io,
             );
         } catch (err) {
-            return {
-                success: false,
-                error: toError(err).message,
-                operation: await failAndAuditMutation(operation, err, { tool: 'copy_file' }),
-            };
+            const failedOperation = await failAndAuditMutation(operation, err, { tool: 'copy_file' });
+            return mutationFailureResult(
+                'copy_file',
+                err,
+                { source, destination, overwrite },
+                { source: src.resolved, destination: dst.resolved },
+                { operation: failedOperation },
+            );
         }
     },
 });
@@ -573,7 +748,7 @@ const copyFileTool = buildTool({
  */
 const moveFileTool = buildTool({
     name: 'move_file',
-    description: 'Move ou renomeia um arquivo no workspace. ' + '⚠️ REQUER APROVAÇÃO — remove o arquivo de origem.',
+    description: 'Move ou renomeia um arquivo no workspace, com overwrite explícito e metadados de rollback.',
     parameters: z.object({
         source: z.string().describe('Caminho do arquivo de origem'),
         destination: z.string().describe('Caminho de destino'),
@@ -581,10 +756,24 @@ const moveFileTool = buildTool({
     }),
     handler: async ({ source, destination, overwrite }) => {
         const src = await validatePath(source, { mode: 'read' });
-        if (!src.ok) return { success: false, error: src.reason };
+        if (!src.ok) {
+            return pathFailureResult(
+                'move_file',
+                src.reason ?? 'Caminho de origem inválido.',
+                { source, destination, overwrite },
+                { field: 'source' },
+            );
+        }
 
         const dst = await validatePath(destination, { mode: 'write' });
-        if (!dst.ok) return { success: false, error: dst.reason };
+        if (!dst.ok) {
+            return pathFailureResult(
+                'move_file',
+                dst.reason ?? 'Caminho de destino inválido.',
+                { source, destination, overwrite },
+                { field: 'destination' },
+            );
+        }
 
         log('INFO', `[copilot/move_file] ${src.resolved} → ${dst.resolved}`);
         const riskClass = riskForOverwrite(overwrite);
@@ -670,11 +859,14 @@ const moveFileTool = buildTool({
                 moveResult.io,
             );
         } catch (err) {
-            return {
-                success: false,
-                error: toError(err).message,
-                operation: await failAndAuditMutation(operation, err, { tool: 'move_file' }),
-            };
+            const failedOperation = await failAndAuditMutation(operation, err, { tool: 'move_file' });
+            return mutationFailureResult(
+                'move_file',
+                err,
+                { source, destination, overwrite },
+                { source: src.resolved, destination: dst.resolved },
+                { operation: failedOperation },
+            );
         }
     },
 });
@@ -690,8 +882,8 @@ const patchFileTool = buildTool({
     name: 'patch_file',
     description:
         'Aplica uma substituição cirúrgica num arquivo: substitui `old_string` por `new_string`. ' +
-        '`old_string` deve ocorrer EXATAMENTE UMA VEZ no arquivo (inclua ≥3 linhas de contexto). ' +
-        '⚠️ REQUER APROVAÇÃO — modifica o arquivo em disco.',
+        '`old_string` deve ser literal e, por padrão, ocorrer exatamente uma vez. ' +
+        'Para matches repetidos, use occurrence_index para uma ocorrência específica ou replace_all com expected_occurrences.',
     parameters: z.object({
         path: z.string().describe('Caminho do arquivo (relativo ao workspace ou absoluto)'),
         old_string: z.string().min(1).describe('Texto exato a substituir. Deve ocorrer exatamente 1 vez no arquivo.'),
@@ -707,6 +899,12 @@ const patchFileTool = buildTool({
             .min(1)
             .optional()
             .describe('Se definido, força contagem exata esperada de ocorrências antes de aplicar o patch.'),
+        occurrence_index: z
+            .number()
+            .int()
+            .min(1)
+            .optional()
+            .describe('Índice 1-based da ocorrência a substituir quando old_string aparece múltiplas vezes.'),
         expectedHash: z
             .string()
             .optional()
@@ -716,6 +914,27 @@ const patchFileTool = buildTool({
             .optional()
             .default(false)
             .describe('Se true, valida e calcula o patch sem escrever no disco.'),
+        allowNoop: z
+            .boolean()
+            .optional()
+            .default(false)
+            .describe('Se true, permite old_string e new_string iguais para validar match sem mudança.'),
+        diffContextLines: z
+            .number()
+            .int()
+            .min(0)
+            .max(20)
+            .optional()
+            .default(3)
+            .describe('Linhas de contexto no diffPreview retornado.'),
+        maxDiffLines: z
+            .number()
+            .int()
+            .min(1)
+            .max(500)
+            .optional()
+            .default(160)
+            .describe('Máximo de linhas no diffPreview retornado.'),
     }),
     handler: async ({
         path: filePath,
@@ -723,16 +942,57 @@ const patchFileTool = buildTool({
         new_string,
         replace_all,
         expected_occurrences,
+        occurrence_index,
         expectedHash,
         dryRun,
+        allowNoop,
+        diffContextLines,
+        maxDiffLines,
     }) => {
         const v = await validatePath(filePath, { mode: 'write' });
-        if (!v.ok) return { success: false, error: v.reason };
+        const receivedParameters = {
+            path: filePath,
+            old_string,
+            new_string,
+            replace_all,
+            expected_occurrences,
+            occurrence_index,
+            expectedHash,
+            dryRun,
+            allowNoop,
+            diffContextLines,
+            maxDiffLines,
+        };
+        if (!v.ok) {
+            return pathFailureResult('patch_file', v.reason ?? 'Caminho inválido.', receivedParameters);
+        }
+        if (typeof old_string !== 'string' || old_string.length === 0) {
+            return createToolFailureResult({
+                toolName: 'patch_file',
+                message: 'old_string deve ser uma string não vazia.',
+                category: 'invalid-parameters',
+                fix: PATCH_FEEDBACK_FIX.ERR_PATCH_INVALID_OLD_STRING,
+                receivedParameters,
+                details: { path: v.resolved, code: 'ERR_PATCH_INVALID_OLD_STRING' },
+                extra: { code: 'ERR_PATCH_INVALID_OLD_STRING' },
+            });
+        }
+        if (replace_all && occurrence_index !== undefined) {
+            return createToolFailureResult({
+                toolName: 'patch_file',
+                message: 'Use replace_all ou occurrence_index, não ambos na mesma chamada.',
+                category: 'invalid-parameters',
+                fix: PATCH_FEEDBACK_FIX.ERR_PATCH_CONFLICTING_MODE,
+                receivedParameters,
+                details: { path: v.resolved, code: 'ERR_PATCH_CONFLICTING_MODE' },
+                extra: { code: 'ERR_PATCH_CONFLICTING_MODE' },
+            });
+        }
         const operation = createIoOperationEnvelope({
             capability: IO_CAPABILITY.filePatch,
             riskClass: riskForDryRun(dryRun, IO_RISK.high),
             targets: [v.resolved],
-            evidence: { tool: 'patch_file', replaceAll: replace_all, dryRun },
+            evidence: { tool: 'patch_file', replaceAll: replace_all, occurrenceIndex: occurrence_index, dryRun },
         });
 
         try {
@@ -741,14 +1001,20 @@ const patchFileTool = buildTool({
                 newString: new_string,
                 replaceAll: replace_all,
                 expectedOccurrences: expected_occurrences,
+                occurrenceIndex: occurrence_index,
                 ...(expectedHash ? { expectedHash } : {}),
                 dryRun,
+                allowNoop,
+                diffContextLines,
+                maxDiffLines,
                 advisoryLimits: {
                     advisoryPatchSegmentChars: ADVISORY_PATCH_SEGMENT_CHARS,
                     oldStringChars: old_string.length,
                     newStringChars: new_string.length,
                     expectedHash: expectedHash ?? null,
                     dryRun,
+                    occurrenceIndex: occurrence_index ?? null,
+                    replaceAll: Boolean(replace_all),
                     limitMode: 'informative',
                 },
             });
@@ -758,8 +1024,21 @@ const patchFileTool = buildTool({
                     success: true,
                     path: v.resolved,
                     dryRun: patchResult.dryRun,
+                    occurrences: patchResult.occurrences,
                     replacedOccurrences: patchResult.replacedOccurrences,
                     projectedBytes: patchResult.projectedBytes,
+                    previousBytes: patchResult.previousBytes,
+                    byteDelta: patchResult.byteDelta,
+                    firstMatchLine: patchResult.firstMatchLine,
+                    lastMatchLine: patchResult.lastMatchLine,
+                    lineDelta: patchResult.lineDelta,
+                    occurrenceIndex: patchResult.occurrenceIndex,
+                    noop: patchResult.noop,
+                    diffPreview: patchResult.diffPreview,
+                    diffPreviewTruncated: patchResult.diffPreviewTruncated,
+                    diffPreviewLines: patchResult.diffPreviewLines,
+                    diffPreviewBytes: patchResult.diffPreviewBytes,
+                    diffContextLines: patchResult.diffContextLines,
                     previousHash: patchResult.previousHash,
                     contentHash: patchResult.contentHash,
                     operation: await completeAndAuditMutation(
@@ -769,8 +1048,12 @@ const patchFileTool = buildTool({
                             traceId: patchResult.io.traceId ?? null,
                             evidence: {
                                 dryRun,
+                                occurrences: patchResult.occurrences,
                                 replacedOccurrences: patchResult.replacedOccurrences,
                                 projectedBytes: patchResult.projectedBytes,
+                                byteDelta: patchResult.byteDelta,
+                                firstMatchLine: patchResult.firstMatchLine,
+                                lastMatchLine: patchResult.lastMatchLine,
                                 previousHash: patchResult.previousHash,
                                 contentHash: patchResult.contentHash,
                             },
@@ -792,17 +1075,25 @@ const patchFileTool = buildTool({
                             snapshotBase64: patchResult.previousSnapshotBase64,
                         },
                         dryRun,
-                        evidence: { tool: 'patch_file', dryRun },
+                        evidence: {
+                            tool: 'patch_file',
+                            dryRun,
+                            occurrenceIndex: patchResult.occurrenceIndex,
+                            replacedOccurrences: patchResult.replacedOccurrences,
+                        },
                     }),
                 },
                 patchResult.io,
             );
         } catch (e) {
-            return {
-                success: false,
-                error: `Erro ao escrever arquivo: ${toError(e).message}`,
-                operation: await failAndAuditMutation(operation, e, { tool: 'patch_file' }),
-            };
+            const failedOperation = await failAndAuditMutation(operation, e, { tool: 'patch_file' });
+            return mutationFailureResult(
+                'patch_file',
+                e,
+                receivedParameters,
+                { path: v.resolved },
+                { operation: failedOperation },
+            );
         }
     },
 });
@@ -814,7 +1105,7 @@ const patchFileTool = buildTool({
 export { copyFileTool, createFileTool, deleteFileTool, moveFileTool, patchFileTool, writeFileContentTool };
 
 /**
- * Tools de escrita do filesystem (requirePermission — aprovação obrigatória).
+ * Tools de escrita do filesystem.
  *
  * @type {import('#copilot/sdk/types').Tool[]}
  */

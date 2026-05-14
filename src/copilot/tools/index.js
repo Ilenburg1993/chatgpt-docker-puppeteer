@@ -35,6 +35,7 @@ export { buildTool, withSkipPermission } from './infra/tool-factory.js';
 export {
     classifyToolFailure,
     createToolFailureFeedback,
+    createToolFailureResult,
     createToolFailureResponse,
     enrichToolFailureResult,
     isToolFailureResult,

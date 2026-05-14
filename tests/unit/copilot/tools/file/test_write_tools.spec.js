@@ -544,8 +544,55 @@ describe('F35 — patch_file (F187)', () => {
         expect(result.dryRun).toBe(true);
         expect(result.operation).toMatchObject({ capability: 'file.patch', status: 'dry-run' });
         expect(result.changeSet?.status).toBe('aborted');
+        expect(result.diffPreview).toContain('-const x = 1;');
+        expect(result.diffPreview).toContain('+const x = 42;');
+        expect(result.diffPreviewTruncated).toBe(false);
         expect(fsMock.writeFile).not.toHaveBeenCalled();
         expect(fsMock.rename).not.toHaveBeenCalled();
+    });
+
+    it('aplica occurrence_index para old_string repetido', async () => {
+        pathOk('/workspace/repeated.txt');
+        fsMock.access.mockResolvedValue(undefined);
+        fsMock.readFile.mockResolvedValue('same\nmiddle\nsame\n');
+        fsMock.writeFile.mockResolvedValue(undefined);
+        fsMock.rename.mockResolvedValue(undefined);
+
+        const result = await handler({
+            path: 'repeated.txt',
+            old_string: 'same',
+            new_string: 'changed',
+            occurrence_index: 2,
+        });
+
+        expect(result.success).toBe(true);
+        expect(result.occurrences).toBe(2);
+        expect(result.replacedOccurrences).toBe(1);
+        expect(result.occurrenceIndex).toBe(2);
+        const writtenContent = /** @type {string} */ (fsMock.writeFile.mock.calls[0]?.[1]);
+        expect(writtenContent).toBe('same\nmiddle\nchanged\n');
+    });
+
+    it('falha com feedback claro quando replace_all e occurrence_index conflitam', async () => {
+        pathOk('/workspace/conflict.txt');
+
+        const result = await handler({
+            path: 'conflict.txt',
+            old_string: 'same',
+            new_string: 'changed',
+            replace_all: true,
+            occurrence_index: 1,
+        });
+
+        expect(result).toMatchObject({
+            success: false,
+            code: 'ERR_PATCH_CONFLICTING_MODE',
+            toolFeedback: {
+                category: 'invalid-parameters',
+            },
+        });
+        expect(result.toolFeedback.fix).toContain('Escolha apenas um modo');
+        expect(fsMock.readFile).not.toHaveBeenCalled();
     });
 
     it('falha se old_string não encontrada', async () => {
@@ -561,6 +608,14 @@ describe('F35 — patch_file (F187)', () => {
 
         expect(result.success).toBe(false);
         expect(result.error).toContain('não encontrado');
+        expect(result.toolFeedback).toMatchObject({
+            category: 'not-found',
+            details: {
+                code: 'ERR_PATCH_NOT_FOUND',
+                path: '/workspace/file.txt',
+            },
+        });
+        expect(result.toolFeedback.fix).toContain('Releia o arquivo');
     });
 
     it('falha se old_string encontrada múltiplas vezes', async () => {
@@ -576,6 +631,33 @@ describe('F35 — patch_file (F187)', () => {
 
         expect(result.success).toBe(false);
         expect(result.error).toContain('2 vezes');
+        expect(result.toolFeedback).toMatchObject({
+            category: 'invalid-parameters',
+            details: {
+                code: 'ERR_PATCH_AMBIGUOUS_MATCH',
+                occurrenceCount: 2,
+            },
+        });
+        expect(result.toolFeedback.fix).toContain('occurrence_index');
+    });
+
+    it('falha antes de ler quando old_string é vazia', async () => {
+        pathOk('/workspace/empty-old.txt');
+
+        const result = await handler({
+            path: 'empty-old.txt',
+            old_string: '',
+            new_string: 'x',
+        });
+
+        expect(result).toMatchObject({
+            success: false,
+            code: 'ERR_PATCH_INVALID_OLD_STRING',
+            toolFeedback: {
+                category: 'invalid-parameters',
+            },
+        });
+        expect(fsMock.readFile).not.toHaveBeenCalled();
     });
 
     it('falha se arquivo não existe', async () => {
@@ -685,5 +767,11 @@ describe('F35 — fileWriteTools export shape (F188)', () => {
         expect(copyFileTool.name).toBe('copy_file');
         expect(moveFileTool.name).toBe('move_file');
         expect(patchFileTool.name).toBe('patch_file');
+    });
+
+    it('descriptions não prometem aprovação manual', () => {
+        for (const tool of fileWriteTools) {
+            expect(tool.description).not.toMatch(/requer aprovação|approval|ask_user/i);
+        }
     });
 });

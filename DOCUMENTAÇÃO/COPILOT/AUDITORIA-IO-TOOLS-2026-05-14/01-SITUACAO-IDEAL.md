@@ -180,13 +180,13 @@ Proibições:
 
 ### Filesystem
 
-- `fs.read({ path, range, cursor, maxBytes })`
+- `fs.read({ path, range, cursor, maxBytes, maxLines, readStrategy, includeMetadata, includeHash })`
 - `fs.readChunks({ path, chunkLines, cursor })`
 - `fs.tree({ root, depth, include, exclude, cursor, maxItems })`
 - `fs.search({ query, mode, path, maxItems, maxBytes, cursor })`
 - `fs.symbols({ query, kind, pathPrefix, cursor })`
 - `fs.write({ path, content, expectedHash, snapshot })`
-- `fs.patch({ path, hunks, expectedHash, dryRun })`
+- `fs.patch({ path, oldString|hunks, newString, expectedHash, dryRun, occurrenceIndex, replaceAll, expectedOccurrences })`
 - `fs.move/copy/delete({ source, destination, dryRun, snapshot })`
 
 ### Code
@@ -286,6 +286,8 @@ Requisitos do feedback:
 - erros de policy/path devem deixar claro se o problema é forma do path, escopo fora do workspace ou capability
   proibida;
 - erros de concorrência/lock/hash devem orientar releitura do estado atual antes de nova mutação;
+- tools centrais devem enriquecer falhas específicas do domínio com códigos estáveis, `fix` próprio e detalhes úteis
+  para a próxima chamada, em vez de depender apenas de classificação textual genérica;
 - timeouts e falhas externas devem marcar `retryable:true` somente quando repetir fizer sentido;
 - nenhuma falha deve despejar conteúdo grande, tokens, secrets ou payloads integrais no feedback.
 
@@ -297,7 +299,27 @@ Requisitos do feedback:
 - tools chamam facades públicas de `infra`;
 - tools formatam output para LLM-B;
 - tools enriquecem falhas com `toolFeedback` canônico via factory/infra de tools;
-- tools não conhecem detalhes internos de cache, parser, scanner ou SQLite.
+- tools não conhecem detalhes internos de cache, parser, scanner ou SQLite;
+- tools grandes devem separar implementação em subdomínios internos com barrel próprio, preservando a superfície pública
+  estável do domínio.
+
+Contrato ideal específico de `read_file_content`:
+
+- modo básico continua sendo `path + encoding`, retornando `content`;
+- modo incremental deve aceitar `cursor`, `maxLines` e `maxBytes`;
+- cursor textual é linha 1-based; cursor binário/base64 é offset em bytes;
+- default textual deve ser `readStrategy='cached'`, formando/reusando cache full-file L1/L2 para ranges e páginas
+  subsequentes;
+- `readStrategy='stream'` deve existir para arquivos grandes quando a LLM quiser evitar hidratar cache full-file;
+- retornos devem expor `metadata` com stat, bytes, linhas, cache, cursor, truncamento, sanitização e hashes opcionais;
+- leituras repetidas por range/cursor devem aproveitar cache quando o fingerprint mtime+size continuar válido;
+- cache L1/L2 deve armazenar `contentHash` junto do payload quando conhecido;
+- se `mtime` divergir mas `size` continuar igual, L1 pode revalidar por hash para arquivos dentro de budget,
+  preservando a entrada quando o conteúdo real for idêntico;
+- metadata deve indicar a estratégia efetiva de fingerprint/cache (`fs-read`, `mtime-size`, `mtime-size-hash`,
+  `l2-mtime-size`, `stream-bypass`).
+- por ser tool central e complexa, a implementação de `read_file_content` deve viver em subdomínio dedicado
+  (`tools/file/read/*`), enquanto `read-tools.js` permanece como facade de composição das read tools.
 
 Subdomínios recomendados:
 

@@ -78,6 +78,11 @@ describe('infra/io-engine', () => {
                 path: file,
                 content: 'alpha',
                 bytesRead: expect.any(Number),
+                sizeBytes: Buffer.byteLength('alpha\nbeta', 'utf8'),
+                mtimeMs: expect.any(Number),
+                contentHash: sha256('alpha\nbeta'),
+                returnedContentHash: sha256('alpha'),
+                cacheFingerprintStrategy: 'fs-read',
                 totalLines: 2,
                 returnedLines: { start: 1, end: 1 },
                 io: expect.any(Object),
@@ -120,6 +125,9 @@ describe('infra/io-engine', () => {
 
         expect(full.content).toBe('one\ntwo\nthree');
         expect(range.content).toBe('two');
+        expect(range.contentHash).toBe(sha256('one\ntwo\nthree'));
+        expect(range.returnedContentHash).toBe(sha256('two'));
+        expect(range.cacheFingerprintStrategy).toBe('fs-read');
         expect(range.totalLines).toBe(3);
         expect(range.returnedLines).toEqual({ start: 2, end: 2 });
         expect(range.io.cache).toBe('l1-hit');
@@ -151,6 +159,8 @@ describe('infra/io-engine', () => {
         const first = await readBytes(file);
         expect(first.content.toString('utf8')).toBe('L2_PAYLOAD');
         expect(first.io.cache).toBe('l2-hit');
+        expect(first.contentHash).toBe(sha256(payload));
+        expect(first.cacheFingerprintStrategy).toBe('l2-mtime-size');
         expect(l2Mock.get).toHaveBeenCalledTimes(1);
 
         const second = await readBytes(file);
@@ -359,7 +369,29 @@ describe('infra/io-engine', () => {
         expect(result.bytesWritten).toBe(0);
         expect(result.projectedBytes).toBe(Buffer.byteLength('alpha gamma', 'utf8'));
         expect(result.contentHash).toBe(sha256('alpha gamma'));
+        expect(result.diffPreview).toContain('-alpha beta');
+        expect(result.diffPreview).toContain('+alpha gamma');
+        expect(result.diffPreviewTruncated).toBe(false);
         await expect(readFile(file, 'utf8')).resolves.toBe('alpha beta');
+    });
+
+    it('patchTextLocked aplica occurrenceIndex para conteúdo repetido', async () => {
+        const dir = await createTempDir();
+        const file = join(dir, 'occurrence-index-patch.txt');
+        await writeFile(file, 'value=1\nvalue=1\n', 'utf8');
+
+        const result = await patchTextLocked(file, {
+            oldString: 'value=1',
+            newString: 'value=2',
+            occurrenceIndex: 2,
+        });
+
+        expect(result.occurrences).toBe(2);
+        expect(result.replacedOccurrences).toBe(1);
+        expect(result.occurrenceIndex).toBe(2);
+        expect(result.firstMatchLine).toBe(1);
+        expect(result.lastMatchLine).toBe(2);
+        await expect(readFile(file, 'utf8')).resolves.toBe('value=1\nvalue=2\n');
     });
 
     it('moveFileLocked aguarda lock ativo no source antes de mover', async () => {

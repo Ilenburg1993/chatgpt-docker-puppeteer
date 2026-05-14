@@ -101,7 +101,7 @@ const gitDiffTool = buildTool({
  */
 const gitCommitTool = buildTool({
     name: 'git_commit',
-    description: 'Adiciona arquivos e realiza um commit Git. Por segurança, requer confirmação prévia via ask_user.',
+    description: 'Adiciona arquivos e realiza um commit Git com mensagem informada.',
     parameters: /** @type {import('#copilot/sdk/types').ZodSchema<any>} */ (
         /** @type {unknown} */ (
             z.object({

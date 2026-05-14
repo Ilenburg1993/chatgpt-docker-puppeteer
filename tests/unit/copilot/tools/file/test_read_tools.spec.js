@@ -77,6 +77,13 @@ describe('tools/file/readFileContentTool', () => {
         expect(r.io?.operation).toBe('read');
         expect(r.content).toContain('line1');
         expect(r.content).toContain('line4');
+        expect(r.metadata).toMatchObject({
+            path: fileA,
+            fileType: 'file',
+            encoding: 'utf8',
+            readStrategy: 'cached',
+            totalLinesKnown: true,
+        });
     });
 
     it('sanitiza segredos textuais na leitura canônica', async () => {
@@ -100,6 +107,53 @@ describe('tools/file/readFileContentTool', () => {
         expect(r.content).not.toContain('line1');
     });
 
+    it('pagina leitura textual por maxLines e cursor reutilizando cache full-file', async () => {
+        const handler = /** @type {any} */ (getHandler(readFileContentTool));
+        const page1 = await handler({ path: fileA, encoding: 'utf8', maxLines: 2, includeHash: true });
+        const page2 = await handler({ path: fileA, encoding: 'utf8', maxLines: 2, cursor: page1.nextCursor });
+
+        expect(page1.success).toBe(true);
+        expect(page1.content).toBe('line1\nline2');
+        expect(page1.nextCursor).toBe('3');
+        expect(page1.metadata.cache).toBe('l1-miss');
+        expect(page1.metadata.cacheFingerprintStrategy).toBe('fs-read');
+        expect(page1.metadata.contentHash).toMatch(/^[a-f0-9]{64}$/);
+        expect(page2.success).toBe(true);
+        expect(page2.content).toBe('line3\nline4');
+        expect(page2.cursor).toBe('3');
+        expect(page2.nextCursor).toBe('5');
+        expect(page2.metadata.cache).toBe('l1-hit');
+        expect(page2.metadata.cacheFingerprintStrategy).toBe('fs-read');
+    });
+
+    it('suporta leitura incremental por stream quando cache full-file deve ser evitado', async () => {
+        const handler = /** @type {any} */ (getHandler(readFileContentTool));
+        const r = await handler({ path: fileA, encoding: 'utf8', readStrategy: 'stream', maxLines: 2 });
+
+        expect(r.success).toBe(true);
+        expect(r.content).toBe('line1\nline2');
+        expect(r.readStrategy).toBe('stream');
+        expect(r.nextCursor).toBe('3');
+        expect(r.metadata.cache).toBe('stream-bypass');
+        expect(r.metadata.cacheFingerprintStrategy).toBe('stream-bypass');
+        expect(r.metadata.returnedLines).toEqual({ start: 1, end: 2 });
+    });
+
+    it('pode incluir stats do cache no metadata', async () => {
+        const handler = /** @type {any} */ (getHandler(readFileContentTool));
+        const r = await handler({ path: fileA, encoding: 'utf8', includeCacheStats: true });
+
+        expect(r.success).toBe(true);
+        expect(r.metadata.cacheStats).toEqual(
+            expect.objectContaining({
+                hits: expect.any(Number),
+                misses: expect.any(Number),
+                hashRevalidations: expect.any(Number),
+                hashRevalidationHits: expect.any(Number),
+            }),
+        );
+    });
+
     it('retorna conteúdo vazio quando startLine passa do fim do arquivo', async () => {
         const handler = /** @type {any} */ (getHandler(readFileContentTool));
         const r = await handler({ path: fileA, startLine: 99, encoding: 'utf8' });
@@ -117,17 +171,73 @@ describe('tools/file/readFileContentTool', () => {
         expect(decoded).toContain('line1');
     });
 
+    it('pagina leitura base64 por byte cursor e maxBytes', async () => {
+        const handler = /** @type {any} */ (getHandler(readFileContentTool));
+        const page1 = await handler({ path: fileA, encoding: 'base64', maxBytes: 5, includeHash: true });
+        const page2 = await handler({ path: fileA, encoding: 'base64', maxBytes: 5, cursor: page1.nextCursor });
+
+        expect(page1.success).toBe(true);
+        expect(Buffer.from(page1.content, 'base64').toString('utf8')).toBe('line1');
+        expect(page1.nextCursor).toBe('5');
+        expect(page1.metadata.rawReturnedBytes).toBe(5);
+        expect(page1.metadata.cacheFingerprintStrategy).toBe('fs-read');
+        expect(page1.metadata.contentHash).toMatch(/^[a-f0-9]{64}$/);
+        expect(page2.success).toBe(true);
+        expect(page2.cursor).toBe('5');
+        expect(Buffer.from(page2.content, 'base64').toString('utf8')).toBe('\nline');
+    });
+
     it('erro para diretório', async () => {
         const handler = /** @type {any} */ (getHandler(readFileContentTool));
         const r = await handler({ path: tmpDir, encoding: 'utf8' });
         expect(r.success).toBe(false);
         expect(r.error).toContain('diretório');
+        expect(r.toolFeedback).toMatchObject({
+            toolName: 'read_file_content',
+            reason: expect.stringContaining('diretório'),
+        });
     });
 
     it('erro para arquivo inexistente', async () => {
         const handler = /** @type {any} */ (getHandler(readFileContentTool));
         const r = await handler({ path: path.join(tmpDir, 'nope.txt'), encoding: 'utf8' });
         expect(r.success).toBe(false);
+        expect(r.toolFeedback).toMatchObject({
+            toolName: 'read_file_content',
+            category: 'not-found',
+            retryable: false,
+        });
+    });
+
+    it('retorna feedback acionável para cursor textual inválido', async () => {
+        const handler = /** @type {any} */ (getHandler(readFileContentTool));
+        const r = await handler({ path: fileA, encoding: 'utf8', cursor: 'abc' });
+
+        expect(r.success).toBe(false);
+        expect(r.error).toContain('Cursor de linha');
+        expect(r.toolFeedback).toMatchObject({
+            toolName: 'read_file_content',
+            category: 'invalid-parameters',
+            retryable: false,
+            receivedParameters: expect.objectContaining({ cursor: 'abc' }),
+        });
+        expect(r.toolFeedback.expectedParameters.properties).toHaveProperty('cursor');
+    });
+
+    it('retorna feedback acionável quando parâmetros de linha são usados com base64', async () => {
+        const handler = /** @type {any} */ (getHandler(readFileContentTool));
+        const r = await handler({ path: fileA, encoding: 'base64', startLine: 1 });
+
+        expect(r.success).toBe(false);
+        expect(r.error).toContain('encoding=utf8');
+        expect(r.toolFeedback).toMatchObject({
+            toolName: 'read_file_content',
+            category: 'invalid-parameters',
+            receivedParameters: expect.objectContaining({
+                encoding: 'base64',
+                startLine: 1,
+            }),
+        });
     });
 });
 

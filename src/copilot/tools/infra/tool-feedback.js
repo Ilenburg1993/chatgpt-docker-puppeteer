@@ -142,7 +142,7 @@ export function classifyToolFailure(error) {
     ) {
         return 'external-service';
     }
-    if (/\b(zod|schema|validation|invalid|inválid|invalido|inválido|parameter|parametro|parâmetro|argument|required|obrigatório|obrigatorio|expected|esperado|deve ser|tipo|enum|range)\b/.test(haystack)) {
+    if (/\b(zod|schema|validation|invalid|inválid|invalido|inválido|parameter|parameters|parametro|parametros|parâmetro|parâmetros|argument|argumento|argumentos|required|obrigatório|obrigatorio|expected|esperado|deve ser|tipo|enum|range|encoding)\b/.test(haystack)) {
         return 'invalid-parameters';
     }
     if (error instanceof Error) {
@@ -392,6 +392,33 @@ export function createToolFailureResponse(options) {
         success: false,
         ok: false,
         error: feedback.reason,
+        toolFeedback: feedback,
+    };
+}
+
+/**
+ * Cria um retorno de falha estruturado para handlers que validam domínio/policy antes de chamar a infra.
+ *
+ * @param {{
+ *     toolName: string;
+ *     error?: unknown;
+ *     message?: string;
+ *     category?: ToolFailureCategory;
+ *     retryable?: boolean;
+ *     fix?: string;
+ *     parameters?: unknown;
+ *     receivedParameters?: unknown;
+ *     details?: Record<string, unknown>;
+ *     extra?: Record<string, unknown>;
+ * }} options
+ * @returns {{ success: false; error: string; toolFeedback: ToolFailureFeedback } & Record<string, unknown>}
+ */
+export function createToolFailureResult(options) {
+    const feedback = createToolFailureFeedback(options);
+    return {
+        success: false,
+        error: feedback.reason,
+        ...(options.extra ?? {}),
         toolFeedback: feedback,
     };
 }

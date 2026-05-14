@@ -4,14 +4,14 @@
  *
  * Superfície canônica unificada das file read tools.
  *
- * Este arquivo concentra TODAS as tools de leitura/busca/símbolo do subdomínio `file`, evitando a fragmentação
- * histórica entre `read-tools-io.js`, `read-tools-search.js` e `symbol-search-tool.js`.
+ * Este arquivo concentra a composição pública das tools de leitura/busca/símbolo do subdomínio `file`, evitando a
+ * fragmentação histórica entre superfícies concorrentes.
  *
  * Princípios:
  *
- * - uma única superfície de leitura (`fileReadTools`);
+ * - uma única superfície pública de leitura (`fileReadTools`);
  * - todas as tools expõem metadados de I/O canônicos;
- * - a organização por responsabilidade fica intra-arquivo/helpers, não em múltiplos módulos paralelos.
+ * - implementações grandes podem viver em subdomínios internos com barrel próprio, mantendo este módulo como facade.
  *
  * @module copilot/tools/file/read-tools
  */
@@ -20,34 +20,20 @@ import { stat as fsStat } from 'node:fs/promises';
 import { z } from 'zod';
 import { toError } from '../../core/error-handlers.js';
 import { withIoMeta } from '../../core/io-contracts.js';
-import { sanitizeIoTextOutput } from '../../core/io-policy.js';
-import {
-    diffText,
-    readBytes,
-    readText,
-    scanDirectory,
-    searchText,
-    searchWorkspaceSymbols,
-    warmReadThroughContext,
-} from '#copilot/infra/public/io';
+import { diffText, scanDirectory, searchText, searchWorkspaceSymbols } from '#copilot/infra/public/io';
 import { log } from '../infra/logger.js';
 import { buildTool, withSkipPermission } from '../infra/tool-factory.js';
 import {
     applyEntryLimit,
     applyEntryWindow,
     FILE_TOOLS_OUTPUT_POLICY,
-    truncateBuffer,
     truncateUtf8Text,
     validatePath,
     WORKSPACE_ROOT,
 } from './shared.js';
+import { readFileContentTool } from './read/index.js';
 
-/**
- * Tamanho mínimo em bytes para disparar warm read-through context em arquivos de texto.
- *
- * @type {number}
- */
-const MIN_READ_THROUGH_BYTES = 1024;
+export { readFileContentTool } from './read/index.js';
 
 /**
  * @typedef {object} IoScanEntry
@@ -57,129 +43,6 @@ const MIN_READ_THROUGH_BYTES = 1024;
  * @property {number} [size]
  * @property {IoScanEntry[]} [children]
  */
-
-/**
- * Tool: read_file_content — lê o conteúdo de um arquivo.
- */
-export const readFileContentTool = buildTool({
-    name: 'read_file_content',
-    description:
-        'Lê o conteúdo de um arquivo no workspace. Arquivos de texto são retornados como string. ' +
-        'Arquivos binários retornam conteúdo em base64 quando essa codificação é solicitada.',
-    parameters: z.object({
-        path: z.string().describe('Caminho do arquivo (relativo ao workspace ou absoluto dentro de /workspaces/)'),
-        startLine: z
-            .number()
-            .int()
-            .min(1)
-            .optional()
-            .describe('Linha inicial (1-based). Se omitido, lê desde o início.'),
-        endLine: z
-            .number()
-            .int()
-            .min(1)
-            .optional()
-            .describe('Linha final (1-based, inclusivo). Se omitido, lê até o fim.'),
-        encoding: z
-            .enum(['utf8', 'base64'])
-            .optional()
-            .default('utf8')
-            .describe('Codificação de saída. Use base64 para arquivos binários.'),
-    }),
-    handler: async ({ path: filePath, startLine, endLine, encoding }) => {
-        const { ok, reason, resolved } = await validatePath(filePath, { mode: 'read' });
-        if (!ok) return { success: false, error: reason };
-        if (startLine !== undefined && endLine !== undefined && endLine < startLine) {
-            return { success: false, error: 'Intervalo inválido: endLine deve ser maior ou igual a startLine.' };
-        }
-
-        log('INFO', `[copilot/read_file_content] ${resolved}`);
-
-        try {
-            const stats = await fsStat(resolved);
-            if (stats.isDirectory()) return { success: false, error: 'É um diretório, use list_directory.' };
-
-            if (encoding === 'base64') {
-                const raw = await readBytes(resolved);
-                const limitedBuffer = truncateBuffer(raw.content, FILE_TOOLS_OUTPUT_POLICY.maxContentBytes);
-                const truncated = limitedBuffer.length < raw.content.length;
-                if (truncated) {
-                    log(
-                        'INFO',
-                        `[copilot/read_file_content] conteúdo binário truncado por política (${FILE_TOOLS_OUTPUT_POLICY.maxContentBytes} bytes) em ${resolved}`,
-                    );
-                }
-                return withIoMeta(
-                    {
-                        success: true,
-                        path: resolved,
-                        size: stats.size,
-                        encoding: 'base64',
-                        content: limitedBuffer.toString('base64'),
-                        truncated,
-                        ...(truncated
-                            ? {
-                                  configuredLimitBytes: FILE_TOOLS_OUTPUT_POLICY.maxContentBytes,
-                                  originalContentBytes: raw.content.length,
-                              }
-                            : {}),
-                    },
-                    raw.io,
-                );
-            }
-
-            const text = await readText(resolved, { startLine, endLine });
-            const readThrough =
-                stats.size >= MIN_READ_THROUGH_BYTES
-                    ? await warmReadThroughContext(resolved, {
-                          workspaceRoot: WORKSPACE_ROOT,
-                          relatedImports: true,
-                          concurrency: 4,
-                          silent: true,
-                      })
-                    : null;
-            const sanitized = sanitizeIoTextOutput({ text: text.content });
-            const contentOutput = truncateUtf8Text(
-                sanitized.text,
-                FILE_TOOLS_OUTPUT_POLICY.maxContentBytes,
-                Number.isFinite(FILE_TOOLS_OUTPUT_POLICY.maxContentBytes)
-                    ? `\n\n⚠️ [conteúdo truncado por política COPILOT_FILE_TOOLS_MAX_CONTENT_BYTES=${FILE_TOOLS_OUTPUT_POLICY.maxContentBytes}]`
-                    : undefined,
-            );
-            const truncated = contentOutput.truncated;
-            if (truncated) {
-                log(
-                    'INFO',
-                    `[copilot/read_file_content] conteúdo truncado por política (${FILE_TOOLS_OUTPUT_POLICY.maxContentBytes} bytes) em ${resolved}`,
-                );
-            }
-
-            return withIoMeta(
-                {
-                    success: true,
-                    path: resolved,
-                    size: stats.size,
-                    totalLines: text.totalLines,
-                    returnedLines: text.returnedLines,
-                    content: contentOutput.text,
-                    readThrough,
-                    sanitized: sanitized.sanitized,
-                    redactions: sanitized.redactions,
-                    truncated,
-                    ...(truncated
-                        ? {
-                              configuredLimitBytes: FILE_TOOLS_OUTPUT_POLICY.maxContentBytes,
-                              originalContentBytes: contentOutput.originalBytes,
-                          }
-                        : {}),
-                },
-                { ...text.io, truncated, policyVersion: sanitized.policyVersion },
-            );
-        } catch (err) {
-            return { success: false, error: toError(err).message };
-        }
-    },
-});
 
 /**
  * Tool: list_directory — lista o conteúdo de um diretório.

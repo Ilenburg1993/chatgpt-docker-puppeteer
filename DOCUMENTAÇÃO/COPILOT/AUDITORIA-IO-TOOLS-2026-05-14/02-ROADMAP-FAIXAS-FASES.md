@@ -62,6 +62,15 @@ Status em 2026-05-14: iniciado com `tool-feedback.js`, wrapper na `tool-factory`
 testes unitários dedicados. Pendência: expandir auditoria de contratos para exigir feedback nas tools registradas e
 adicionar fixtures por categoria em file/shell/web/git.
 
+Status complementar:
+
+- `createToolFailureResult` permite que handlers com validação de domínio retornem feedback estruturado antes de chamar
+  infra.
+- file write tools passaram a enriquecer falhas de path, policy e mutação com `toolFeedback` preservando
+  `success:false/error`.
+- `patch_file` ganhou códigos estáveis de falha, `fix` específico por caso e detalhes de ocorrência/hash/operação para
+  reduzir tentativas cegas da LLM.
+
 ## Faixa 1 — Infra barrel-first e acíclica por compatibilidade
 
 Objetivo: iniciar arquitetura 2.0/2.1 sem quebrar consumidores.
@@ -115,6 +124,8 @@ Objetivo: liberdade alta com retorno controlado.
 - Uso em search, symbol search, list directory, index search, git diff, shell output.
 - Falhas por janela/cursor devem retornar `toolFeedback.category='invalid-parameters'` ou `conflict`, explicando se a
   LLM deve reutilizar `nextCursor`, reiniciar a consulta, ou reduzir `maxBytes`/`maxItems`.
+- `read_file_content` deve expor cursor textual por linha, cursor base64 por byte, `maxLines`, `maxBytes`, metadados e
+  estratégia explícita `cached|stream`.
 - Status inicial: `policy/output-window.js` criado com `maxResults`/janela de linhas e aplicado em `io-engine` e
   índice SQLite.
 - `policy/budgets.js` criado para normalização defensiva de timeout e `maxBuffer` em search e subprocessos.
@@ -124,6 +135,20 @@ Objetivo: liberdade alta com retorno controlado.
   `totalMatches`.
 - `io/search/result-paginator.js` centraliza normalização de `cursor`/`maxResults`, lookahead de comando e paginação
   textual/de itens para search.
+
+Status complementar:
+
+- `read_file_content` ganhou leitura incremental por cursor, metadados ricos, hashes opcionais e `readStrategy`.
+- O default `readStrategy='cached'` preserva a policy de formar cache full-file quando a LLM lê arquivo; chamadas
+  posteriores com ranges/cursors reutilizam L1/L2 quando o fingerprint continua fresco.
+- `readStrategy='stream'` usa leitura incremental por linhas para arquivos grandes, explicitando `cache='stream-bypass'`
+  nos metadados.
+- A implementação de `read_file_content` foi extraída para `tools/file/read/` com barrel interno, separando handler,
+  janela/cursor e metadados canônicos, enquanto `read-tools.js` permanece como facade pública única de read tools.
+- L1 passou a armazenar `contentHash` e a revalidar por hash quando `mtime` diverge mas `size` segue igual dentro de
+  `IO_L1_HASH_REVALIDATE_MAX_BYTES`, evitando invalidação falsa.
+- L2 passou a persistir `contentHash` em `metaJson` para hidratar L1 e retornos de leitura sem recalcular hash quando o
+  payload já veio cacheado.
 
 ### F2.2 — `rg --json`
 
@@ -154,6 +179,8 @@ Objetivo: transformar primitives em ações rastreáveis.
 - Status inicial: `runtime/operation.js` criado e file write tools retornam envelope `operation` em mutações.
 - `write_file_content` e `patch_file` aceitam `expectedHash` SHA-256 e retornam `previousHash`/`contentHash`.
 - `patch_file` aceita `dryRun` e retorna operação com status `dry-run`, sem tocar no disco.
+- `patch_file` suporta `occurrence_index`, `replace_all`, `expected_occurrences`, `allowNoop` e `diffPreview`
+  paginado/truncado para edição cirúrgica de arquivos com matches repetidos.
 
 ### F3.2 — Transactions
 
