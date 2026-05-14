@@ -147,6 +147,7 @@ Tools:
 - `workspace_scope_refresh.modifiedPaths` fora do workspace: coberto.
 - `searchText` respeitando `maxResults`: coberto em engine.
 - `searchWorkspaceSymbols` respeitando `maxResults`: coberto em engine.
+- `search_in_files` e `workspace_symbol_search` com cursor: cobertos por `test_read_tools.spec.js`.
 - `lockfile` concorrente e release com ownership: coberto.
 - parser JSON array multi-linha: coberto.
 - parser markdown com linha real: coberto.
@@ -160,6 +161,7 @@ Tools:
 - índice FTS/symbol com `maxResults`: coberto.
 - subdomínios baixos `shared/`, `policy/`, `scan/`: cobertos por typecheck, testes focados e module-map.
 - `list_directory` com cursor: coberto.
+- `policy/output-window` com cursor de linhas e items: coberto por `test_output_window_policy.spec.js`.
 - `storage/` sem dependência de `io-engine`: coberto.
 - `parse/` sem dependências altas de IO/cache/session: coberto.
 - operation envelope em write tools: coberto.

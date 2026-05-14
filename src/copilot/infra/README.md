@@ -81,7 +81,8 @@
   roadmap/benchmark justificar.
 - Chunks persistidos pertencem ao índice L2; o cache L2 blob não deve virar catálogo semântico.
 - Limites de volume para a LLM-B devem ser explícitos e observáveis. Quando a operação for potencialmente grande,
-  use janela de saída (`maxResults`, `maxBytes`, cursor futuro) e retorne metadados de truncamento sempre que possível.
+  use janela de saída (`maxResults`, `maxBytes`, `cursor`) e retorne `nextCursor`, offset e metadados de truncamento
+  sempre que possível.
 
 ## Gates arquiteturais
 

@@ -302,6 +302,7 @@ export const searchInFilesTool = buildTool({
             .default(2)
             .describe('Linhas de contexto ao redor de cada match.'),
         maxResults: z.number().int().min(1).optional().describe('Número máximo sugerido de resultados.'),
+        cursor: z.string().optional().describe('Cursor numérico retornado por chamada anterior.'),
     }),
     handler: async ({
         pattern,
@@ -312,6 +313,7 @@ export const searchInFilesTool = buildTool({
         excludePattern,
         contextLines,
         maxResults,
+        cursor,
     }) => {
         const { ok, reason, resolved } = await validatePath(searchPath ?? '.', { mode: 'read' });
         if (!ok) return { success: false, error: reason };
@@ -328,6 +330,7 @@ export const searchInFilesTool = buildTool({
                 excludePattern,
                 contextLines,
                 maxResults,
+                cursor,
             });
             const output = truncateUtf8Text(
                 result.output,
@@ -348,7 +351,10 @@ export const searchInFilesTool = buildTool({
                     pattern,
                     searchPath: resolved,
                     output: output.text,
-                    truncated: output.truncated,
+                    truncated: output.truncated || Boolean(result.truncated),
+                    nextCursor: result.nextCursor ?? null,
+                    cursorOffset: result.cursorOffset ?? 0,
+                    totalMatches: result.totalMatches ?? result.matchCount,
                     engine: result.engine,
                     matchCount: result.matchCount,
                     sanitized: result.sanitized,
@@ -360,7 +366,7 @@ export const searchInFilesTool = buildTool({
                           }
                         : {}),
                 },
-                { ...result.io, truncated: output.truncated },
+                { ...result.io, truncated: output.truncated || Boolean(result.truncated) },
             );
         } catch (err) {
             return { success: false, error: toError(err).message };
@@ -458,8 +464,9 @@ export const workspaceSymbolSearchTool = buildTool({
         includePattern: z.string().optional().describe('Glob de arquivos a incluir (ex: "*.ts", "src/**/*.js")'),
         caseSensitive: z.boolean().optional().default(false).describe('Busca sensível a maiúsculas. Default: false'),
         maxResults: z.number().int().min(1).optional().describe('Número máximo sugerido de declarações a retornar.'),
+        cursor: z.string().optional().describe('Cursor numérico retornado por chamada anterior.'),
     }),
-    handler: async ({ name: symbolName, kind, path: searchPath, includePattern, caseSensitive, maxResults }) => {
+    handler: async ({ name: symbolName, kind, path: searchPath, includePattern, caseSensitive, maxResults, cursor }) => {
         const { ok, reason, resolved } = await validatePath(searchPath ?? '.', { mode: 'read' });
         if (!ok) return { success: false, error: reason };
 
@@ -477,6 +484,7 @@ export const workspaceSymbolSearchTool = buildTool({
                 includePattern,
                 caseSensitive,
                 maxResults,
+                cursor,
             });
             const output = truncateUtf8Text(
                 result.output,
@@ -502,7 +510,10 @@ export const workspaceSymbolSearchTool = buildTool({
                     output: output.text,
                     sanitized: result.sanitized,
                     redactions: result.redactions,
-                    truncated: output.truncated,
+                    truncated: output.truncated || Boolean(result.truncated),
+                    nextCursor: result.nextCursor ?? null,
+                    cursorOffset: result.cursorOffset ?? 0,
+                    totalMatches: result.totalMatches ?? result.matchCount,
                     ...(output.truncated
                         ? {
                               configuredLimitBytes: FILE_TOOLS_OUTPUT_POLICY.maxSearchOutputBytes,
@@ -511,7 +522,7 @@ export const workspaceSymbolSearchTool = buildTool({
                         : {}),
                     ...(result.message ? { message: result.message } : {}),
                 },
-                { ...result.io, truncated: output.truncated },
+                { ...result.io, truncated: output.truncated || Boolean(result.truncated) },
             );
         } catch (err) {
             return { success: false, error: toError(err).message };

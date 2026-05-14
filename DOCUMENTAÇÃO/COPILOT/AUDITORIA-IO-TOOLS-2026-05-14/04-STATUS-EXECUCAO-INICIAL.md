@@ -107,6 +107,8 @@ Transformações aplicadas:
 - `index-store/sqlite/*` foi criado com schema, normalização de paths, query FTS e chunks persistentes do índice L2.
 - `workspace_index_search` e `workspace_index_find_symbol` passaram a aceitar `maxResults`, aplicado no SQLite.
 - `list_directory` passou a aceitar `maxEntries` e `cursor`, retornando `nextCursor`.
+- `search_in_files` e `workspace_symbol_search` passaram a aceitar `cursor`, retornando `nextCursor`, `cursorOffset` e
+  `totalMatches`.
 - Mutações de file tools passaram a retornar envelope `operation` com `operationId`, capability, risco, status, duração e
   evidence.
 - `write_file_content` e `patch_file` passaram a aceitar `expectedHash` SHA-256 e retornam hashes de evidência.

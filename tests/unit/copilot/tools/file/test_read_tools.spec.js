@@ -279,6 +279,36 @@ describe('tools/file/searchInFilesTool', () => {
         expect(r.success).toBe(true);
         expect(r.matchCount === 0 || r.output === '').toBe(true);
     });
+
+    it('pagina resultados de busca com cursor', async () => {
+        fs.writeFileSync(path.join(tmpDir, 'many.txt'), 'needle one\nneedle two\nneedle three\n');
+        const handler = /** @type {any} */ (getHandler(searchInFilesTool));
+
+        const page1 = await handler({
+            pattern: 'needle',
+            path: tmpDir,
+            isRegex: false,
+            caseSensitive: false,
+            contextLines: 0,
+            maxResults: 2,
+        });
+        const page2 = await handler({
+            pattern: 'needle',
+            path: tmpDir,
+            isRegex: false,
+            caseSensitive: false,
+            contextLines: 0,
+            maxResults: 2,
+            cursor: page1.nextCursor,
+        });
+
+        expect(page1.success).toBe(true);
+        expect(page1.truncated).toBe(true);
+        expect(page1.nextCursor).toBe('2');
+        expect(page2.success).toBe(true);
+        expect(page2.cursorOffset).toBe(2);
+        expect(page2.output).toContain('needle three');
+    });
 });
 
 // ─── diffFilesTool ──────────────────────────────────────────────────────────
@@ -336,5 +366,35 @@ describe('tools/file/workspaceSymbolSearchTool', () => {
         expect(r.io?.operation).toBe('search');
         expect(r.output).toContain('helperTool');
         expect(r.searchPath).toBe(tmpDir);
+    });
+
+    it('pagina busca simbólica com cursor', async () => {
+        fs.writeFileSync(path.join(tmpDir, 'symbol-a.ts'), 'export function alphaPage() {}\n');
+        fs.writeFileSync(path.join(tmpDir, 'symbol-b.ts'), 'export function alphaPage() {}\n');
+        fs.writeFileSync(path.join(tmpDir, 'symbol-c.ts'), 'export function alphaPage() {}\n');
+        const handler = /** @type {any} */ (getHandler(workspaceSymbolSearchTool));
+
+        const page1 = await handler({
+            name: 'alphaPage',
+            kind: 'function',
+            path: tmpDir,
+            caseSensitive: false,
+            maxResults: 2,
+        });
+        const page2 = await handler({
+            name: 'alphaPage',
+            kind: 'function',
+            path: tmpDir,
+            caseSensitive: false,
+            maxResults: 2,
+            cursor: page1.nextCursor,
+        });
+
+        expect(page1.success).toBe(true);
+        expect(page1.truncated).toBe(true);
+        expect(page1.nextCursor).toBe('2');
+        expect(page2.success).toBe(true);
+        expect(page2.cursorOffset).toBe(2);
+        expect(page2.output).toContain('alphaPage');
     });
 });

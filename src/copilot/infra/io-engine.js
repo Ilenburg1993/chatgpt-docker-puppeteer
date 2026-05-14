@@ -47,7 +47,7 @@ import {
     kindToGlobs,
 } from './io/search/index.js';
 import { nowIoMs, publishIoOperation } from './io-observability.js';
-import { limitTextLines, normalizeMaxResults } from './policy/output-window.js';
+import { normalizeCursorOffset, normalizeMaxResults, windowItems, windowTextLines } from './policy/output-window.js';
 import { assertExpectedSha256 } from './policy/preconditions.js';
 import { readEnvPositiveInt } from './shared/env.js';
 import { sha256 } from './shared/hash.js';
@@ -1367,6 +1367,7 @@ export async function diffText(pathA, pathB, options = {}) {
  *     excludePattern?: string;
  *     contextLines?: number;
  *     maxResults?: number;
+ *     cursor?: string | number | null;
  *     traceId?: string;
  * }} options
  * @returns {Promise<{
@@ -1378,6 +1379,9 @@ export async function diffText(pathA, pathB, options = {}) {
  *     sanitized: boolean;
  *     redactions: number;
  *     truncated?: boolean;
+ *     nextCursor?: string | null;
+ *     cursorOffset?: number;
+ *     totalMatches?: number;
  *     io: import('../core/io-contracts.js').IoMeta;
  * }>}
  */
@@ -1385,8 +1389,11 @@ export async function searchText(targetPath, options) {
     const startedAt = nowIoMs();
     const traceId = options.traceId ?? createIoTraceId();
     const maxResults = normalizeMaxResults(options.maxResults);
+    const cursorOffset = normalizeCursorOffset(options.cursor);
+    const commandMaxCount = maxResults === null ? null : cursorOffset + maxResults + 1;
     const advisoryLimitsBase = {
         requestedMaxResults: maxResults,
+        cursorOffset,
         limitMode: 'enforced-output-window',
         patternLength: options.pattern.length,
         timeoutMs: RG_SEARCH_TIMEOUT_MS,
@@ -1424,18 +1431,24 @@ export async function searchText(targetPath, options) {
             const freshFiles = 'freshFiles' in indexStats ? Number(indexStats.freshFiles ?? 0) : 0;
             const indexRows =
                 Boolean(indexStats?.available) && freshFiles > 0
-                    ? searchIoIndex(options.pattern, { pathPrefix: targetPath })
+                    ? searchIoIndex(options.pattern, {
+                          pathPrefix: targetPath,
+                          ...(commandMaxCount === null ? {} : { maxResults: commandMaxCount }),
+                      })
                     : [];
             if (indexRows.length > 0) {
-                const limitedRows = maxResults === null ? indexRows : indexRows.slice(0, maxResults);
-                const filteredOutput = sanitizeSearchOutput(formatIndexSearchRows(limitedRows));
-                const truncated = maxResults !== null && indexRows.length > maxResults;
+                const windowed = windowItems(indexRows, {
+                    maxResults,
+                    ...(options.cursor === undefined ? {} : { cursor: options.cursor }),
+                });
+                const filteredOutput = sanitizeSearchOutput(formatIndexSearchRows(windowed.items));
                 const io = publishAndReturn(
                     buildSearchIo('io-engine.index.search', Buffer.byteLength(filteredOutput.text, 'utf8'), {
                         redactions: filteredOutput.redactions,
                         fallback: 'rg-on-index-miss-or-complex-query',
-                        truncated,
-                        originalResultCount: indexRows.length,
+                        truncated: windowed.truncated,
+                        originalResultCount: windowed.totalItems,
+                        nextCursor: windowed.nextCursor,
                     }),
                     true,
                 );
@@ -1443,12 +1456,15 @@ export async function searchText(targetPath, options) {
                     targetPath,
                     pattern: options.pattern,
                     output: filteredOutput.text,
-                    matchCount: limitedRows.length,
+                    matchCount: windowed.items.length,
                     engine: 'fts5-index',
                     sanitized: filteredOutput.sanitized,
                     redactions: filteredOutput.redactions,
-                    truncated,
-                    io: { ...io, truncated, policyVersion: filteredOutput.policyVersion },
+                    truncated: windowed.truncated,
+                    nextCursor: windowed.nextCursor,
+                    cursorOffset: windowed.cursorOffset,
+                    totalMatches: windowed.totalItems,
+                    io: { ...io, truncated: windowed.truncated, policyVersion: filteredOutput.policyVersion },
                 };
             }
         }
@@ -1463,7 +1479,7 @@ export async function searchText(targetPath, options) {
                         ...(options.isRegex ? [] : ['--fixed-strings']),
                         ...(options.caseSensitive ? [] : ['--ignore-case']),
                         `--context=${options.contextLines ?? 2}`,
-                        ...(maxResults === null ? [] : ['--max-count', String(maxResults)]),
+                        ...(commandMaxCount === null ? [] : ['--max-count', String(commandMaxCount)]),
                         ...(options.includePattern ? [`--glob=${options.includePattern}`] : []),
                         ...(options.excludePattern ? [`--glob=!${options.excludePattern}`] : []),
                         '--glob=!node_modules',
@@ -1479,13 +1495,17 @@ export async function searchText(targetPath, options) {
                         maxBuffer: SEARCH_MAX_BUFFER_BYTES,
                     },
                 );
-                const limitedOutput = limitTextLines(stdout, maxResults);
-                const filteredOutput = sanitizeSearchOutput(limitedOutput.text);
+                const windowedOutput = windowTextLines(stdout, {
+                    maxResults,
+                    ...(options.cursor === undefined ? {} : { cursor: options.cursor }),
+                });
+                const filteredOutput = sanitizeSearchOutput(windowedOutput.text);
                 const io = publishAndReturn(
                     buildSearchIo('io-engine.rg.search', Buffer.byteLength(filteredOutput.text, 'utf8'), {
                         redactions: filteredOutput.redactions,
-                        truncated: limitedOutput.truncated,
-                        originalLineCount: limitedOutput.originalLineCount,
+                        truncated: windowedOutput.truncated,
+                        originalLineCount: windowedOutput.originalLineCount,
+                        nextCursor: windowedOutput.nextCursor,
                     }),
                     true,
                 );
@@ -1497,8 +1517,11 @@ export async function searchText(targetPath, options) {
                     engine: 'rg',
                     sanitized: filteredOutput.sanitized,
                     redactions: filteredOutput.redactions,
-                    truncated: limitedOutput.truncated,
-                    io: { ...io, truncated: limitedOutput.truncated, policyVersion: filteredOutput.policyVersion },
+                    truncated: windowedOutput.truncated,
+                    nextCursor: windowedOutput.nextCursor,
+                    cursorOffset: windowedOutput.cursorOffset,
+                    totalMatches: windowedOutput.originalLineCount,
+                    io: { ...io, truncated: windowedOutput.truncated, policyVersion: filteredOutput.policyVersion },
                 };
             } catch (error) {
                 const execError = /** @type {{ code?: unknown; status?: unknown; stderr?: unknown }} */ (error);
@@ -1534,13 +1557,17 @@ export async function searchText(targetPath, options) {
                 timeout: RG_SEARCH_TIMEOUT_MS,
                 maxBuffer: SEARCH_MAX_BUFFER_BYTES,
             });
-            const limitedOutput = limitTextLines(stdout, maxResults);
-            const filteredOutput = sanitizeSearchOutput(limitedOutput.text);
+            const windowedOutput = windowTextLines(stdout, {
+                maxResults,
+                ...(options.cursor === undefined ? {} : { cursor: options.cursor }),
+            });
+            const filteredOutput = sanitizeSearchOutput(windowedOutput.text);
             const io = publishAndReturn(
                 buildSearchIo('io-engine.grep.search', Buffer.byteLength(filteredOutput.text, 'utf8'), {
                     redactions: filteredOutput.redactions,
-                    truncated: limitedOutput.truncated,
-                    originalLineCount: limitedOutput.originalLineCount,
+                    truncated: windowedOutput.truncated,
+                    originalLineCount: windowedOutput.originalLineCount,
+                    nextCursor: windowedOutput.nextCursor,
                 }),
                 true,
             );
@@ -1552,8 +1579,11 @@ export async function searchText(targetPath, options) {
                 engine: 'grep',
                 sanitized: filteredOutput.sanitized,
                 redactions: filteredOutput.redactions,
-                truncated: limitedOutput.truncated,
-                io: { ...io, truncated: limitedOutput.truncated, policyVersion: filteredOutput.policyVersion },
+                truncated: windowedOutput.truncated,
+                nextCursor: windowedOutput.nextCursor,
+                cursorOffset: windowedOutput.cursorOffset,
+                totalMatches: windowedOutput.originalLineCount,
+                io: { ...io, truncated: windowedOutput.truncated, policyVersion: filteredOutput.policyVersion },
             };
         } catch (error) {
             const execError = /** @type {{ code?: unknown; status?: unknown; stderr?: unknown; message?: unknown }} */ (
@@ -1596,6 +1626,7 @@ export async function searchText(targetPath, options) {
  *     includePattern?: string;
  *     caseSensitive?: boolean;
  *     maxResults?: number;
+ *     cursor?: string | number | null;
  *     traceId?: string;
  * }} options
  * @returns {Promise<{
@@ -1609,6 +1640,9 @@ export async function searchText(targetPath, options) {
  *     sanitized: boolean;
  *     redactions: number;
  *     truncated?: boolean;
+ *     nextCursor?: string | null;
+ *     cursorOffset?: number;
+ *     totalMatches?: number;
  *     io: import('../core/io-contracts.js').IoMeta;
  * }>}
  */
@@ -1617,8 +1651,11 @@ export async function searchWorkspaceSymbols(targetPath, options) {
     const traceId = options.traceId ?? createIoTraceId();
     const resolvedKind = options.kind ?? 'all';
     const maxResults = normalizeMaxResults(options.maxResults);
+    const cursorOffset = normalizeCursorOffset(options.cursor);
+    const commandMaxCount = maxResults === null ? null : cursorOffset + maxResults + 1;
     const advisoryLimitsBase = {
         requestedMaxResults: maxResults,
+        cursorOffset,
         limitMode: 'enforced-output-window',
         symbolLength: options.symbolName.length,
         timeoutMs: RG_SEARCH_TIMEOUT_MS,
@@ -1644,7 +1681,10 @@ export async function searchWorkspaceSymbols(targetPath, options) {
 
     try {
         if (!options.includePattern && !options.caseSensitive) {
-            const rows = findIoIndexSymbol(options.symbolName).filter(
+            const rows = findIoIndexSymbol(
+                options.symbolName,
+                commandMaxCount === null ? {} : { maxResults: commandMaxCount },
+            ).filter(
                 /**
                  * @param {{ filePath: string; symbolKind: string }} row
                  */
@@ -1655,14 +1695,17 @@ export async function searchWorkspaceSymbols(targetPath, options) {
                 },
             );
             if (rows.length > 0) {
-                const limitedRows = maxResults === null ? rows : rows.slice(0, maxResults);
-                const truncated = maxResults !== null && rows.length > maxResults;
-                const sanitized = sanitizeIoTextOutput({ text: formatIndexSymbolRows(limitedRows) });
+                const windowed = windowItems(rows, {
+                    maxResults,
+                    ...(options.cursor === undefined ? {} : { cursor: options.cursor }),
+                });
+                const sanitized = sanitizeIoTextOutput({ text: formatIndexSymbolRows(windowed.items) });
                 const io = publishAndReturn(
                     buildSymbolIo('io-engine.index.symbol-search', Buffer.byteLength(sanitized.text, 'utf8'), {
                         redactions: sanitized.redactions,
-                        truncated,
-                        originalResultCount: rows.length,
+                        truncated: windowed.truncated,
+                        originalResultCount: windowed.totalItems,
+                        nextCursor: windowed.nextCursor,
                     }),
                     true,
                 );
@@ -1671,12 +1714,15 @@ export async function searchWorkspaceSymbols(targetPath, options) {
                     symbol: options.symbolName,
                     kind: resolvedKind,
                     output: sanitized.text,
-                    matchCount: limitedRows.length,
+                    matchCount: windowed.items.length,
                     engine: 'fts5-index',
                     sanitized: sanitized.sanitized,
                     redactions: sanitized.redactions,
-                    truncated,
-                    io: { ...io, truncated, policyVersion: sanitized.policyVersion },
+                    truncated: windowed.truncated,
+                    nextCursor: windowed.nextCursor,
+                    cursorOffset: windowed.cursorOffset,
+                    totalMatches: windowed.totalItems,
+                    io: { ...io, truncated: windowed.truncated, policyVersion: sanitized.policyVersion },
                 };
             }
         }
@@ -1695,7 +1741,7 @@ export async function searchWorkspaceSymbols(targetPath, options) {
                 '-e',
                 buildSymbolPattern(options.symbolName, resolvedKind),
                 ...(options.caseSensitive ? [] : ['--ignore-case']),
-                ...(maxResults === null ? [] : ['--max-count', String(maxResults)]),
+                ...(commandMaxCount === null ? [] : ['--max-count', String(commandMaxCount)]),
                 ...(options.includePattern
                     ? ['--glob', options.includePattern]
                     : kindToGlobs(resolvedKind).flatMap((glob) => ['--glob', glob])),
@@ -1719,15 +1765,19 @@ export async function searchWorkspaceSymbols(targetPath, options) {
             throw error;
         });
 
-        const limitedOutput = limitTextLines(stdout, maxResults);
-        const sanitized = sanitizeIoTextOutput({ text: limitedOutput.text });
+        const windowedOutput = windowTextLines(stdout, {
+            maxResults,
+            ...(options.cursor === undefined ? {} : { cursor: options.cursor }),
+        });
+        const sanitized = sanitizeIoTextOutput({ text: windowedOutput.text });
         const output = sanitized.text;
         const lines = output.split('\n').filter(Boolean);
         const io = publishAndReturn(
             buildSymbolIo('io-engine.rg.symbol-search', Buffer.byteLength(output, 'utf8'), {
                 redactions: sanitized.redactions,
-                truncated: limitedOutput.truncated,
-                originalLineCount: limitedOutput.originalLineCount,
+                truncated: windowedOutput.truncated,
+                originalLineCount: windowedOutput.originalLineCount,
+                nextCursor: windowedOutput.nextCursor,
             }),
             true,
         );
@@ -1745,8 +1795,11 @@ export async function searchWorkspaceSymbols(targetPath, options) {
             engine: 'rg',
             sanitized: sanitized.sanitized,
             redactions: sanitized.redactions,
-            truncated: limitedOutput.truncated,
-            io: { ...io, truncated: limitedOutput.truncated, policyVersion: sanitized.policyVersion },
+            truncated: windowedOutput.truncated,
+            nextCursor: windowedOutput.nextCursor,
+            cursorOffset: windowedOutput.cursorOffset,
+            totalMatches: windowedOutput.originalLineCount,
+            io: { ...io, truncated: windowedOutput.truncated, policyVersion: sanitized.policyVersion },
         };
     } catch (error) {
         publishAndReturn(buildSymbolIo('io-engine.symbol-search', 0), false, error);

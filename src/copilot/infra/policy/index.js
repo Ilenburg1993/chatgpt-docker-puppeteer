@@ -5,5 +5,5 @@
  * @module copilot/infra/policy
  */
 
-export { limitTextLines, normalizeMaxResults } from './output-window.js';
+export { limitTextLines, normalizeCursorOffset, normalizeMaxResults, windowItems, windowTextLines } from './output-window.js';
 export { assertExpectedSha256 } from './preconditions.js';

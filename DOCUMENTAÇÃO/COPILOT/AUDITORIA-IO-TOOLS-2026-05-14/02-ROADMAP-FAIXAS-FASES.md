@@ -96,11 +96,14 @@ Objetivo: liberdade alta com retorno controlado.
 - Status inicial: `policy/output-window.js` criado com `maxResults`/janela de linhas e aplicado em `io-engine` e
   índice SQLite.
 - `list_directory` já aceita `maxEntries` + `cursor` e retorna `nextCursor`.
+- `search_in_files` e `workspace_symbol_search` aceitam `cursor` e retornam `nextCursor`, `cursorOffset` e
+  `totalMatches`.
 
 ### F2.2 — `rg --json`
 
 - Trocar stdout bruto por parsing incremental.
-- Suportar cursor por arquivo/linha.
+- Suportar cursor por arquivo/linha (iniciado com cursor por linha de saída em `rg`/`grep`; parsing incremental ainda
+  pendente).
 - Unificar fallback `grep` com mesma janela de output.
 
 ### F2.3 — Context packs
