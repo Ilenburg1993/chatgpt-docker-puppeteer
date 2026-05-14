@@ -10,8 +10,8 @@
 
 import { WORKSPACE_ROOT as BOOT_WORKSPACE_ROOT } from '#copilot/boot';
 import { DEFAULT_BLOCKED_READ_PATH_PATTERNS, evaluateIoPathPolicyAsync } from '#copilot/core';
+import { bufferIsAscii, bufferIsUtf8, truncateBufferView } from '#copilot/infra/public/buffer';
 import { hasNullByte, normalizeWorkspaceRoot } from '#copilot/infra/public/policy';
-import { isAscii, isUtf8 } from 'node:buffer';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { log } from '../infra/logger.js';
@@ -146,13 +146,12 @@ export async function validatePath(filePath, opts) {
 // ---------------------------------------------------------------------------
 
 /**
- * Reexportação de `isUtf8` do `node:buffer` para uso centralizado nas file-tools. Valida eficientemente se um
- * Buffer/Uint8Array é UTF-8 válido sem conversão. Disponível desde Node.js 19.4.0.
+ * Reexportação da facade pública de Buffer da infra para uso centralizado nas file-tools.
  *
  * @type {(input: Buffer | NodeJS.TypedArray | DataView) => boolean}
  * @see https://nodejs.org/docs/latest/api/buffer.html#bufferisutf8input
  */
-export { isAscii as bufferIsAscii, isUtf8 as bufferIsUtf8 };
+export { bufferIsAscii, bufferIsUtf8 };
 
 /**
  * Concatena um array de chunks (Buffers) com otimização: fornece `totalLength` ao `Buffer.concat` para evitar a segunda
@@ -177,8 +176,7 @@ export function concatChunks(chunks) {
  * @returns {Buffer} Subarray (view) do buffer original
  */
 export function truncateBuffer(buf, maxBytes) {
-    if (buf.length <= maxBytes) return buf;
-    return buf.subarray(0, maxBytes);
+    return truncateBufferView(buf, maxBytes);
 }
 
 /**
