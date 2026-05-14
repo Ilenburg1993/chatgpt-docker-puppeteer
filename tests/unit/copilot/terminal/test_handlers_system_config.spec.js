@@ -153,7 +153,8 @@ vi.mock('#copilot/observability/metrics', () => ({
 
 // Mock tools-state in-memory para não tocar no disco
 const _toolsState = { current: { allowlist: ['read_file', 'write_file'], denylist: ['run_shell_command'] } };
-vi.mock('#copilot/sdk/tools', () => ({
+vi.mock('#copilot/sdk/tools', async (importOriginal) => ({
+    ...(await importOriginal()),
     getToolsConfig: () => ({ ..._toolsState.current }),
     patchToolsConfig: async (/** @type {Record<string, unknown>} */ patch) => {
         Object.assign(_toolsState.current, patch);

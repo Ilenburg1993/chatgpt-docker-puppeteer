@@ -1,6 +1,7 @@
 // @ts-check
 import { describe, expect, it } from 'vitest';
 
+import { normalizeAgentToolList, resolveToolName } from '#copilot/config';
 import { AgentToolPolicy } from '../../../../src/copilot/sdk/tools/agent-policy.js';
 
 describe('AgentToolPolicy', () => {
@@ -12,6 +13,10 @@ describe('AgentToolPolicy', () => {
         ],
         { denylist: ['git_push'], allowlist: null },
         ['read_file_content', 'search_in_files', 'exec_command', 'git_push'],
+        {
+            normalizeAgentToolList,
+            resolveToolName,
+        },
     );
 
     it('permite acesso total ao agent-full, inclusive diante de denylist global', () => {
@@ -19,7 +24,7 @@ describe('AgentToolPolicy', () => {
         expect(policy.isToolAllowedForAgent('agent-full', 'git_push')).toBe(true);
     });
 
-    it('aplica allowlist por agente com aliases normalizados', () => {
+    it('aplica allowlist por agente com normalizers injetados pelo produto', () => {
         expect(policy.isToolAllowedForAgent('explore', 'view')).toBe(true);
         expect(policy.isToolAllowedForAgent('explore', 'search_in_files')).toBe(true);
         expect(policy.isToolAllowedForAgent('explore', 'exec_command')).toBe(false);

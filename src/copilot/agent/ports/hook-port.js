@@ -16,10 +16,20 @@ import { getCopilotFallbackModel } from '#copilot/config';
 import { recordBlockedToolCall } from '#copilot/observability';
 import { classifySdkRateLimitScope } from '#copilot/sdk/errors';
 import { modelSelector } from '#copilot/sdk/models';
-import { attachBus, createQueuedElicitationHandler, defaultBus as defaultHookBus } from '#copilot/sdk/session';
+import {
+    attachBus,
+    createQueuedElicitationHandler,
+    defaultBus as defaultHookBus,
+    normalizeElicitationCompletedEvent,
+    normalizeElicitationPendingEvent,
+} from '#copilot/sdk/session';
 import { log } from './logging/index.js';
 
-export { createQueuedElicitationHandler };
+export {
+    createQueuedElicitationHandler,
+    normalizeElicitationCompletedEvent,
+    normalizeElicitationPendingEvent,
+};
 
 /**
  * Contexto mínimo de invocação exposto pelos hooks do SDK e extensões de runtime.

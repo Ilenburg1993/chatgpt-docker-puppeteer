@@ -81,7 +81,10 @@ const agentRuntimeMocks = vi.hoisted(() => ({
     setTerminalRuntimePermissionMode: vi.fn((mode) => mode),
 }));
 
-vi.mock('../../../../src/copilot/terminal/frontend/gateways/sdk-session.js', () => runtimeMocks);
+vi.mock('../../../../src/copilot/terminal/frontend/gateways/sdk-session.js', async (importOriginal) => ({
+    ...(await importOriginal()),
+    ...runtimeMocks,
+}));
 vi.mock('../../../../src/copilot/terminal/frontend/gateways/agent-runtime.js', () => agentRuntimeMocks);
 vi.mock('#copilot/tools', () => ({
     readIntrospectionRegistrySnapshot: vi.fn(() => ({

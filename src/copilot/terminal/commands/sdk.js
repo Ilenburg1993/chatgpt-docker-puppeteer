@@ -8,7 +8,6 @@
 import { randomUUID } from 'node:crypto';
 
 import { CANONICAL_LOCAL_FS_TOOL_NAMES, decideSdkFsRouting, toError } from '#copilot/core';
-import { getPendingStructuredUserInputCount } from '#copilot/sdk/session';
 import { fileReadTools, fileWriteTools, readIntrospectionRegistrySnapshot } from '#copilot/tools';
 import { isRuntimeElicitationSchema, normalizeElicitationContentWithSchema } from '../../core/elicitation-schema.js';
 import { readTerminalIoActivityProjection } from '../events/index.js';
@@ -16,6 +15,7 @@ import {
     compactTerminalSdkSession,
     confirmTerminalSdkSessionUi,
     createTerminalSdkWorkspaceFile,
+    getTerminalPendingStructuredUserInputCount,
     getTerminalSdkQuota,
     getTerminalSdkSessionCapabilities,
     handleTerminalSdkPendingPermission,
@@ -489,7 +489,7 @@ function renderSdkWaitsSummary({ println }, runtimeId) {
     const pendingElicitations = readTerminalElicitationSummary({ runtimeId: scopedRuntimeId });
     const permissionSummary = readTerminalPermissionSummary({ runtimeId: scopedRuntimeId });
     const userInputSummary = readTerminalUserInputSummary({ runtimeId: scopedRuntimeId });
-    const structuredInputPending = getPendingStructuredUserInputCount();
+    const structuredInputPending = getTerminalPendingStructuredUserInputCount();
     const totalPending =
         pendingElicitations.pending + permissionSummary.pending + userInputSummary.pending + structuredInputPending;
     const headlineColor = totalPending > 0 ? '\x1b[33m' : '\x1b[32m';
@@ -610,7 +610,7 @@ export async function cmdSdk({ println }, arg = '') {
             const pendingElicitations = readTerminalElicitationSummary({ runtimeId: state.runtimeId });
             const permissionSummary = readTerminalPermissionSummary({ runtimeId: state.runtimeId });
             const userInputSummary = readTerminalUserInputSummary({ runtimeId: state.runtimeId });
-            const structuredInputPending = getPendingStructuredUserInputCount();
+            const structuredInputPending = getTerminalPendingStructuredUserInputCount();
             println('\n  \x1b[36mSDK Runtime\x1b[0m');
             println(`  runtime  \x1b[90m${state.runtimeId}\x1b[0m`);
             println(`  session  \x1b[90m${state.sessionId ?? '-'}\x1b[0m`);

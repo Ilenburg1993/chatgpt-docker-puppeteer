@@ -5,7 +5,6 @@
 
 import { getWorkspaceContext } from '#copilot/boot';
 import { readSystemPromptStatusSync } from '#copilot/config';
-import { getPendingStructuredUserInputCount } from '#copilot/sdk/session';
 import { readIntrospectionRegistrySnapshot } from '#copilot/tools';
 import { readIoRuntimeHealthSnapshot } from '../../../infra/io-health.js';
 import { buildRuntimeSdkFsRoutingProjection } from '../../../presentation/files/index.js';
@@ -21,7 +20,7 @@ import {
     readTerminalPermissionSummary,
     readTerminalUserInputSummary,
 } from '../../state/projections/index.js';
-import { getTerminalSdkSessionCapabilities } from '../gateways/index.js';
+import { getTerminalPendingStructuredUserInputCount, getTerminalSdkSessionCapabilities } from '../gateways/index.js';
 import {
     formatTerminalRuntimeTopology,
     normalizeTerminalModelBillingProjection,
@@ -256,7 +255,7 @@ export function readTerminalStatusProjection({ hubSessionId = null, injectPort, 
         pendingPermissions: permissionSummary.pending,
         latestPermissionType: permissionSummary.latest?.permissionType ?? null,
         pendingUserInputs: userInputSummary.pending,
-        pendingStructuredUserInputs: getPendingStructuredUserInputCount(),
+        pendingStructuredUserInputs: getTerminalPendingStructuredUserInputCount(),
         latestUserInputKind: userInputSummary.latest?.kind ?? null,
         permissionMode,
         sdkCapabilities,

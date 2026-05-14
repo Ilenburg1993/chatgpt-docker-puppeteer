@@ -69,6 +69,8 @@
     "#copilot/agent/dialog": "./src/copilot/agent/dialog/index.js",
     "#copilot/agent/lifecycle": "./src/copilot/agent/lifecycle/index.js",
     "#copilot/agent/session": "./src/copilot/agent/session/index.js",
+    "#copilot/agent/session/context": "./src/copilot/agent/session/context/index.js",
+    "#copilot/agent/session/wiring": "./src/copilot/agent/session/wiring/index.js",
     "#copilot/agent/messaging": "./src/copilot/agent/messaging/index.js",
     "#copilot/agent/facades": "./src/copilot/agent/facades/index.js",
     "#copilot/agent/ports": "./src/copilot/agent/ports/index.js",

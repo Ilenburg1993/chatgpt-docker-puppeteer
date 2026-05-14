@@ -17,7 +17,7 @@ Ele consome:
 
 - `agent/` para lifecycle e estado do agente;
 - `presentation/agent-runtime.js` como accessor compartilhado do runtime default;
-- `sdk/` como fonte canônica de contratos vanilla;
+- `sdk/` apenas por gateways terminal-owned quando precisar de contratos vanilla de sessão;
 - `frontend/` como camada de projeção/consumo do runtime;
 - `dialog/` como camada de render/prompt/espera/envio.
 
@@ -33,6 +33,7 @@ também declara `risk` e scorecard para orientar a ordem de decomposição.
 | `index.js`                               | barrel público puro da borda terminal                                      |
 | `runtime-root.js`                        | composition root explícito do terminal                                     |
 | `frontend/`                              | consumer layer canônica do runtime para o terminal                         |
+| `frontend/gateways/sdk-session.js`       | única ponte runtime do terminal para helpers vanilla de sessão SDK         |
 | `frontend/operational-guidance/`         | guidance operacional para boot, /status, /sdk doctor, /fs e recuperação    |
 | `state/sdk/`                             | sub-surface estreita para elicitations, permissões e user input do SDK     |
 | `state/ui/`                              | sub-surface estreita para display policy, detalhe e tema visual            |
@@ -172,6 +173,8 @@ Deve sair do `terminal/` quando virar:
 - `presentation/runtime-ui-state-store.js` não guarda mais um “plan mode local” paralelo — apenas a
   última projeção observada do SDK;
 - `events/sdk-session-events.js` reflete sinais vanilla da sessão SDK ao operador;
+- comandos, status, state e adapters consomem helpers vanilla da sessão SDK via
+  `frontend/gateways/sdk-session.js`, sem imports diretos de `#copilot/sdk/session`;
 - `events/agent-runtime-events.js` reflete sinais já normalizados pelo runtime/agent ao operador;
 - `events/event-adapters.js` é a via preferencial única para registrar adapters em modo REPL ou
   headless;
@@ -200,6 +203,7 @@ Deve sair do `terminal/` quando virar:
 - composition roots devem ter nome explícito (`runtime-root.js`, `dialog-runtime.js`);
 - imports entre subpastas irmãs do terminal devem passar via barrels do respectivo submódulo;
 - imports same-folder privados podem permanecer diretos quando não cruzarem fronteiras de módulo.
+- imports do terminal para `#copilot/sdk/session` ficam restritos ao gateway `frontend/gateways/sdk-session.js`.
 
 ## Superfícies públicas autorizadas
 

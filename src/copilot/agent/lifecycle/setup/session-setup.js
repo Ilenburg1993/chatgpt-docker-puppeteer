@@ -25,10 +25,12 @@ import {
     DEFAULT_EXCLUDED_TOOLS,
     MAESTRO_AGENT_NAME,
     SessionConfigBuilder,
+    normalizeAgentToolList,
+    resolveToolName,
 } from '#copilot/config';
 import { buildCanonicalLocalSurfaceExcludedTools, container } from '#copilot/core';
-import { AgentToolPolicy } from '#copilot/sdk/tools';
 import {
+    AgentToolPolicy,
     bindAgentSessionTools,
     bootstrapAgentTools,
     buildAgentBusHooks,
@@ -257,7 +259,10 @@ export function buildSessionHooks(ctx, host) {
     const toolsConfig = getAgentSdkToolsConfig();
     const defaultRuntimeDenylist = [...DEFAULT_EXCLUDED_TOOLS, ...toolsConfig.denylist];
     const customAgents = buildCustomAgentsConfig() ?? [];
-    const agentPolicy = new AgentToolPolicy(customAgents, toolsConfig);
+    const agentPolicy = new AgentToolPolicy(customAgents, toolsConfig, [], {
+        normalizeAgentToolList,
+        resolveToolName,
+    });
 
     return {
         busHooks: withAgentRuntimeToolPolicy(busHooks, (toolName, input, invocation) => {

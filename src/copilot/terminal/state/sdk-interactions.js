@@ -10,14 +10,14 @@
  */
 
 import {
-    classifyUserInputQuestionKind,
-    normalizeElicitationCompletedEvent,
-    normalizeElicitationPendingEvent,
-    normalizePermissionCompletedEvent,
-    normalizePermissionRequestedEvent,
-    normalizeUserInputCompletedEvent,
-    normalizeUserInputRequestedEvent,
-} from '#copilot/sdk/session';
+    classifyTerminalUserInputQuestionKind,
+    normalizeTerminalElicitationCompletedEvent,
+    normalizeTerminalElicitationPendingEvent,
+    normalizeTerminalPermissionCompletedEvent,
+    normalizeTerminalPermissionRequestedEvent,
+    normalizeTerminalUserInputCompletedEvent,
+    normalizeTerminalUserInputRequestedEvent,
+} from '../frontend/gateways/index.js';
 
 /** @typedef {'pending' | 'completed' | 'cleared'} SdkInteractionStatus */
 
@@ -176,7 +176,7 @@ export function pruneTerminalSdkInteractions(now = Date.now()) {
  * @returns {TerminalElicitationEntry}
  */
 export function recordTerminalElicitationPending(evt) {
-    const normalized = normalizeElicitationPendingEvent(evt);
+    const normalized = normalizeTerminalElicitationPendingEvent(evt);
     const requestId = normalized.requestId ?? '';
     const runtimeId = normalizeRuntimeId(normalized.runtimeId);
     const id = requestId || nextSyntheticInteractionId('elicitation');
@@ -210,7 +210,7 @@ export function recordTerminalElicitationPending(evt) {
  * @returns {TerminalElicitationEntry | null}
  */
 export function recordTerminalElicitationCompleted(evt) {
-    const normalized = normalizeElicitationCompletedEvent(evt);
+    const normalized = normalizeTerminalElicitationCompletedEvent(evt);
     const requestId = normalized.requestId ?? '';
     const runtimeId = normalizeRuntimeId(normalized.runtimeId);
     const entry =
@@ -302,7 +302,7 @@ export function clearTerminalElicitation(id) {
  * @returns {TerminalPermissionEntry}
  */
 export function recordTerminalPermissionRequested(evt) {
-    const normalized = normalizePermissionRequestedEvent(evt);
+    const normalized = normalizeTerminalPermissionRequestedEvent(evt);
     const requestId = normalized.requestId ?? '';
     const permissionType = normalized.permissionType;
     const runtimeId = normalizeRuntimeId(normalized.runtimeId);
@@ -330,7 +330,7 @@ export function recordTerminalPermissionRequested(evt) {
  * @returns {TerminalPermissionEntry | null}
  */
 export function recordTerminalPermissionCompleted(evt) {
-    const normalized = normalizePermissionCompletedEvent(evt);
+    const normalized = normalizeTerminalPermissionCompletedEvent(evt);
     const requestId = normalized.requestId ?? '';
     const permissionType = normalized.permissionType;
     const runtimeId = normalizeRuntimeId(normalized.runtimeId);
@@ -453,7 +453,7 @@ export function listTerminalPermissionModeHistory(opts = {}) {
  * @returns {TerminalSdkUserInputEntry}
  */
 export function recordTerminalUserInputRequested(evt) {
-    const normalized = normalizeUserInputRequestedEvent(evt);
+    const normalized = normalizeTerminalUserInputRequestedEvent(evt);
     const requestId = normalized.requestId ?? '';
     const question = normalized.question || '(sem pergunta)';
     const runtimeId = normalizeRuntimeId(normalized.runtimeId);
@@ -466,7 +466,7 @@ export function recordTerminalUserInputRequested(evt) {
         choices: normalized.choices,
         allowFreeform: normalized.allowFreeform,
         toolCallId: normalized.toolCallId,
-        kind: classifyUserInputQuestionKind(question),
+        kind: classifyTerminalUserInputQuestionKind(question),
         data: normalized.data,
         answer: null,
         wasFreeform: null,
@@ -485,7 +485,7 @@ export function recordTerminalUserInputRequested(evt) {
  * @returns {TerminalSdkUserInputEntry | null}
  */
 export function recordTerminalUserInputCompleted(evt) {
-    const normalized = normalizeUserInputCompletedEvent(evt);
+    const normalized = normalizeTerminalUserInputCompletedEvent(evt);
     const requestId = normalized.requestId ?? '';
     const runtimeId = normalizeRuntimeId(normalized.runtimeId);
     const entry =

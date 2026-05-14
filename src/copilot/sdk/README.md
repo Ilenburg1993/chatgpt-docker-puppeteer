@@ -77,7 +77,8 @@ As políticas executáveis vivem em `module-map.js` (`SDK_LAYER_ACCESS_POLICY`),
 - **event-handlers / hooks**: preferir `session`.
 - **observability**: `di`, `session` + `telemetry` (+ `tools` quando necessário).
 - **server**: preferir subpaths (`session/rpc/tools/telemetry`) em vez de root.
-- **terminal**: preferir `session` e `rpc`; sem recriar vanilla SDK localmente.
+- **terminal**: acessar `session` apenas por `terminal/frontend/gateways/sdk-session.js`; comandos, estado, status e
+  adapters devem consumir a semântica terminal-owned via barrels do terminal.
 - **tools**: `rpc`/`session`; `rpc/experimental` apenas com gating explícito.
 
 ## Mapeamento canônico de saída (SDK → outros domínios)
@@ -117,6 +118,8 @@ Importações proibidas por design:
 - `package.json#exports` agora publica apenas as surfaces SDK estáveis, sem depender de caminho físico interno.
 - Imports operacionais de `terminal`, `event-handlers`, `hooks`, `tools`, `agent/facades` e `server/routes/sdk/deps`
   foram migrados do root para `session`, `session-runtime`, `rpc`, `tools`, `telemetry`, `agents` e `models`.
+- No terminal, comandos, projeções, state e adapters deixaram de importar `#copilot/sdk/session` diretamente; o gateway
+  `terminal/frontend/gateways/sdk-session.js` concentra a ponte vanilla da sessão SDK.
 - `sdk/session` deixou de abrir `copilot.sqlite` ao ser importado: `hook-bus` e `permission-controller` agora usam
   módulos folha (`#copilot/events/hook-events`, `#copilot/config/env`) em vez dos barrels largos.
 - `sdk/config.js` foi removido; configuração de sessão é responsabilidade de `#copilot/config`

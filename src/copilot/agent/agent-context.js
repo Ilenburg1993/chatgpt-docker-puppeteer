@@ -10,11 +10,11 @@
  */
 
 import { EMITTER_PROCESS_QUEUE } from '#copilot/events';
-import { createToolSessionContext } from '#copilot/sdk/session';
 import { COPILOT_MODEL, COPILOT_REASONING_EFFORT } from '#copilot/config/agent';
 import { createAgentContextFactories } from './context/factories/index.js';
 import { dialogOps, fsmOps, metricsOps, runtimeOps, sessionOps, toolOps } from './context/ops/index.js';
 import { performKeepaliveSdkTick } from './facades/index.js';
+import { createToolSessionContext } from './ports/index.js';
 
 /**
  * @typedef {import('#copilot/sdk/types').CopilotClient} CopilotClient

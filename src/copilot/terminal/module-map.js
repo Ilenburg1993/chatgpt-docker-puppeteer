@@ -248,7 +248,7 @@ export const TERMINAL_MODULE_LAYOUT = Object.freeze([
         tier: 'secondary',
         risk: 'hotspot',
         public: false,
-        summary: 'Interações humanas com elicitation/permissões do SDK vanilla.',
+        summary: 'Estado local das interações humanas com elicitation/permissões; consome SDK via gateway terminal-owned.',
     },
     {
         path: 'events/tool-activity-presenter.js',
@@ -393,6 +393,15 @@ export const TERMINAL_MODULE_LAYOUT = Object.freeze([
         risk: 'stable',
         public: false,
         summary: 'Gateways de runtime: agent-runtime, sdk-session, dialog, hub.',
+    },
+    {
+        path: 'frontend/gateways/sdk-session.js',
+        kind: 'file',
+        role: 'sdk-adapter',
+        tier: 'secondary',
+        risk: 'hotspot',
+        public: false,
+        summary: 'Única ponte runtime do terminal para helpers vanilla da sessão SDK e operações expostas por presentation.',
     },
     {
         path: 'frontend/operational-guidance/',

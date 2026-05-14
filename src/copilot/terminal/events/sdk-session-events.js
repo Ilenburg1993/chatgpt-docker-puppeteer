@@ -53,7 +53,6 @@ import {
     EMITTER_USER_INPUT_COMPLETED,
     EMITTER_USER_INPUT_REQUESTED,
 } from '#copilot/events';
-import { classifyPermissionDecision } from '#copilot/sdk/session';
 import { DialogProtocol } from '../../dialog/protocol.js';
 import {
     consumeRuntimeInterventionMailbox,
@@ -64,7 +63,7 @@ import {
     setSdkSessionMode,
 } from '../../presentation/state/index.js';
 import { broadcastSse, println } from '../dialog/index.js';
-import { answerTerminalPendingQuestion } from '../frontend/gateways/index.js';
+import { answerTerminalPendingQuestion, classifyTerminalPermissionDecision } from '../frontend/gateways/index.js';
 import {
     beginTerminalTurnTrace,
     completeTerminalTurnTrace,
@@ -317,7 +316,7 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
         const entry = recordTerminalPermissionCompleted(evt);
         const data = eventObject(evt);
         const granted = data['granted'] ?? data['approved'] ?? entry?.granted;
-        const decision = classifyPermissionDecision(
+        const decision = classifyTerminalPermissionDecision(
             entry?.result ?? null,
             typeof granted === 'boolean' ? granted : null,
         );

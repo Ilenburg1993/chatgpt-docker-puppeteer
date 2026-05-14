@@ -20,6 +20,8 @@
  */
 
 import { createSessionRpcFacade } from '#copilot/sdk/rpc';
+import { createToolSessionContext } from '#copilot/sdk/session';
+import { AgentToolPolicy } from '#copilot/sdk/tools';
 import {
     bootstrapTools,
     cancelAllUserInputRequests,
@@ -115,3 +117,4 @@ export function isAgentToolDisabled(toolName) {
 }
 
 export { configureHookTools, setExperimentalSession, setHub, setPermissionAgent, setSessionRpc };
+export { AgentToolPolicy, createToolSessionContext };

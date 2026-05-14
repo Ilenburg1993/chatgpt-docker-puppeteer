@@ -32,6 +32,7 @@ describe('SessionConfigBuilder canônico', () => {
     });
 
     it('aplica overrides explicitamente sem passar pelo SDK root', () => {
+        /** @type {import('#copilot/sdk/types').PermissionHandler} */
         const handler = async () => ({ kind: 'approve-once' });
         const cfg = new SessionConfigBuilder()
             .sessionId('test-123')

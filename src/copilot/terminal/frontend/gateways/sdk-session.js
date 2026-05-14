@@ -7,6 +7,18 @@
  */
 
 import {
+    classifyPermissionDecision,
+    classifyUserInputQuestionKind,
+    getPendingStructuredUserInputCount,
+    hasPendingStructuredUserInputRequests,
+    normalizeElicitationCompletedEvent,
+    normalizeElicitationPendingEvent,
+    normalizePermissionCompletedEvent,
+    normalizePermissionRequestedEvent,
+    normalizeUserInputCompletedEvent,
+    normalizeUserInputRequestedEvent,
+} from '#copilot/sdk/session';
+import {
     compactAgentSdkSession,
     confirmAgentSdkSessionUi,
     createAgentSdkWorkspaceFile,
@@ -32,6 +44,89 @@ import {
     setAgentSdkSessionMode,
     updateAgentSdkPlan,
 } from '../../../presentation/runtime/index.js';
+
+// ---------------------------------------------------------------------------
+// Vanilla session helpers exposed as terminal-owned semantics
+// ---------------------------------------------------------------------------
+
+/**
+ * @returns {number}
+ */
+export function getTerminalPendingStructuredUserInputCount() {
+    return getPendingStructuredUserInputCount();
+}
+
+/**
+ * @returns {boolean}
+ */
+export function hasTerminalPendingStructuredUserInputRequests() {
+    return hasPendingStructuredUserInputRequests();
+}
+
+/**
+ * @param {string | null | undefined} kind
+ * @param {boolean | null | undefined} granted
+ * @returns {ReturnType<typeof classifyPermissionDecision>}
+ */
+export function classifyTerminalPermissionDecision(kind, granted) {
+    return classifyPermissionDecision(kind, granted);
+}
+
+/**
+ * @param {unknown} evt
+ * @returns {ReturnType<typeof normalizeElicitationPendingEvent>}
+ */
+export function normalizeTerminalElicitationPendingEvent(evt) {
+    return normalizeElicitationPendingEvent(evt);
+}
+
+/**
+ * @param {unknown} evt
+ * @returns {ReturnType<typeof normalizeElicitationCompletedEvent>}
+ */
+export function normalizeTerminalElicitationCompletedEvent(evt) {
+    return normalizeElicitationCompletedEvent(evt);
+}
+
+/**
+ * @param {unknown} evt
+ * @returns {ReturnType<typeof normalizePermissionRequestedEvent>}
+ */
+export function normalizeTerminalPermissionRequestedEvent(evt) {
+    return normalizePermissionRequestedEvent(evt);
+}
+
+/**
+ * @param {unknown} evt
+ * @returns {ReturnType<typeof normalizePermissionCompletedEvent>}
+ */
+export function normalizeTerminalPermissionCompletedEvent(evt) {
+    return normalizePermissionCompletedEvent(evt);
+}
+
+/**
+ * @param {unknown} evt
+ * @returns {ReturnType<typeof normalizeUserInputRequestedEvent>}
+ */
+export function normalizeTerminalUserInputRequestedEvent(evt) {
+    return normalizeUserInputRequestedEvent(evt);
+}
+
+/**
+ * @param {unknown} evt
+ * @returns {ReturnType<typeof normalizeUserInputCompletedEvent>}
+ */
+export function normalizeTerminalUserInputCompletedEvent(evt) {
+    return normalizeUserInputCompletedEvent(evt);
+}
+
+/**
+ * @param {string} question
+ * @returns {ReturnType<typeof classifyUserInputQuestionKind>}
+ */
+export function classifyTerminalUserInputQuestionKind(question) {
+    return classifyUserInputQuestionKind(question);
+}
 
 // ---------------------------------------------------------------------------
 // Mode

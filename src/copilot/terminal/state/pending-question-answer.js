@@ -4,8 +4,11 @@
  * @file Policy local para rotear input humano quando há pergunta pendente do runtime.
  */
 
-import { hasPendingStructuredUserInputRequests } from '#copilot/sdk/session';
-import { answerTerminalPendingQuestion, readTerminalRuntimeState } from '../frontend/gateways/index.js';
+import {
+    answerTerminalPendingQuestion,
+    hasTerminalPendingStructuredUserInputRequests,
+    readTerminalRuntimeState,
+} from '../frontend/gateways/index.js';
 
 /**
  * @typedef {'answered' | 'answer_failed' | 'empty' | 'no_pending' | 'protocol_controlled' | 'invalid_choice'} TerminalPendingAnswerReason
@@ -78,7 +81,7 @@ export function tryAnswerTerminalPendingQuestionInput(rawAnswer, runtimeId, opti
         return { ...resultBase, routed: false, ok: false, reason: 'empty' };
     }
     if (!pending) {
-        if (hasPendingStructuredUserInputRequests()) {
+        if (hasTerminalPendingStructuredUserInputRequests()) {
             const ok = answerTerminalPendingQuestion(answer, runtimeId);
             return { ...resultBase, routed: true, ok, reason: ok ? 'answered' : 'answer_failed' };
         }

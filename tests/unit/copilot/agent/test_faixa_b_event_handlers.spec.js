@@ -520,7 +520,7 @@ describe('Faixa B4 — interaction-events handlers', () => {
 
 describe('Faixa B — wireSessionEvents integração', () => {
     it('wireSessionEvents retorna mais unsubs que antes (inclui novos handlers)', async () => {
-        const { wireSessionEvents } = await import('#copilot/agent/session/wiring/event-wirer');
+        const { wireSessionEvents } = await import('#copilot/agent/session/wiring');
         const session = createMockSession();
         const callbacks = {
             emit: vi.fn(),
@@ -537,7 +537,7 @@ describe('Faixa B — wireSessionEvents integração', () => {
     });
 
     it('novos handlers propagam eventos via callbacks.emit', async () => {
-        const { wireSessionEvents } = await import('#copilot/agent/session/wiring/event-wirer');
+        const { wireSessionEvents } = await import('#copilot/agent/session/wiring');
         const session = createMockSession();
         const emit = vi.fn();
         const callbacks = {

@@ -17,3 +17,4 @@ export {
 } from '#copilot/core';
 export { container } from '#copilot/core';
 export { logSwallowed } from '#copilot/core';
+export { setSessionModel } from '#copilot/sdk/session-runtime';

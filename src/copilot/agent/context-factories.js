@@ -19,12 +19,17 @@ import {
     EMITTER_AGENT_BACKGROUND_IDLE,
     EMITTER_PERMISSION_MODE_CHANGED,
 } from '#copilot/events';
-import { normalizeElicitationCompletedEvent, normalizeElicitationPendingEvent } from '#copilot/sdk/session';
 import { BackgroundTasks } from './background/index.js';
 import { DialogLoopManager } from './dialog/orchestrators/index.js';
 import { createAgentSdkToolsRegistry } from './facades/index.js';
 import { HandoffManager, MessageQueue, WebhookManager } from './infra/index.js';
-import { createAgentPermissionController, createQueuedElicitationHandler, defaultMetrics } from './ports/index.js';
+import {
+    createAgentPermissionController,
+    createQueuedElicitationHandler,
+    defaultMetrics,
+    normalizeElicitationCompletedEvent,
+    normalizeElicitationPendingEvent,
+} from './ports/index.js';
 import { SessionMessagesCache } from './session/history/index.js';
 import { SessionKeepalive } from './session/lifecycle/index.js';
 

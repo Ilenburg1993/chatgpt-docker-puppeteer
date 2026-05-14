@@ -167,6 +167,7 @@ describe('FI-7 — deep-import guard (Faixa I enforcement)', () => {
         '#copilot/config/agent',
         '#copilot/config/custom-tools-registry',
         '#copilot/config/tools-state',
+        '#copilot/observability/logger',
     ]);
 
     /** Arquivos com exceção explícita (usa alias intencional) */

@@ -479,6 +479,7 @@ describe('W114 — module layout governance: terminal root', () => {
             'events/io-activity-events.js',
             'events/sdk-session-events.js',
             'frontend/',
+            'frontend/gateways/sdk-session.js',
             'repl/',
             'repl/repl-command-router.js',
             'repl/repl-lifecycle.js',

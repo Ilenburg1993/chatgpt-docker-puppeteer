@@ -154,7 +154,8 @@ barrel raiz apenas para constantes, tokens, classificação de erro ou helpers p
 
 - `src/copilot/hooks/*` → `#copilot/sdk/session`, `#copilot/sdk/models`, `#copilot/sdk/errors`
 - `src/copilot/observability/*` → `#copilot/sdk/di`, `#copilot/sdk/session`, `#copilot/sdk/telemetry`
-- `src/copilot/terminal/*` → `#copilot/sdk/session`, `#copilot/sdk/rpc`
+- `src/copilot/terminal/frontend/gateways/sdk-session.js` → `#copilot/sdk/session`; o restante do terminal consome
+  a surface terminal-owned via `terminal/frontend/gateways`
 - `src/copilot/server/routes/sdk/*` → `#copilot/sdk/session`, `#copilot/sdk/rpc`, `#copilot/sdk/tools`,
   `#copilot/sdk/telemetry`, `#copilot/sdk/utils`
 
@@ -217,6 +218,8 @@ semânticas e explícitas.
   usar módulos folha de `events` e `config`.
 - Consumers operacionais em `terminal`, `event-handlers`, `hooks`, `tools`, `agent/facades` e `server/routes/sdk/deps`
   foram deslocados do root para subpaths canônicos.
+- O terminal deixou de importar `#copilot/sdk/session` diretamente em comandos, status, state e adapters de eventos; a
+  única ponte runtime para helpers vanilla da sessão SDK é `terminal/frontend/gateways/sdk-session.js`.
 - `#copilot/config/tools-state`, `#copilot/config/custom-tools-registry`, `#copilot/config/tools` e
   `#copilot/config/tools/*` foram removidos de `package.json` porque apontavam para arquivos inexistentes.
 - Outros aliases históricos quebrados de `package.json` também foram removidos e agora há teste de regressão para
@@ -249,7 +252,7 @@ Snapshot em `src/copilot/**` (fora de `sdk/`) por camada consumidora:
 | `agent`             | `#copilot/sdk/session`          |    8 |
 | `agent`             | `#copilot/sdk/rpc`              |    6 |
 | `observability`     | `#copilot/sdk/session`          |    6 |
-| `terminal`          | `#copilot/sdk/session`          |    6 |
+| `terminal`          | `#copilot/sdk/session`          |    1 |
 | `config`            | `#copilot/sdk/session`          |    5 |
 | `server`            | `#copilot/sdk/session`          |    5 |
 | `tools`             | `#copilot/sdk/rpc`              |    4 |

@@ -439,14 +439,14 @@ describe('F43 — event-handlers/system-notifications', () => {
 
 describe('F43 — SessionMessagesCache', () => {
     it('retorna array vazio quando session é null', async () => {
-        const { SessionMessagesCache } = await import('#copilot/agent/session/history/history-sync');
+        const { SessionMessagesCache } = await import('#copilot/agent/session');
         const cache = new SessionMessagesCache(5000);
         const result = await cache.get(null);
         expect(result).toEqual([]);
     });
 
     it('retorna mensagens da sessão na primeira chamada', async () => {
-        const { SessionMessagesCache } = await import('#copilot/agent/session/history/history-sync');
+        const { SessionMessagesCache } = await import('#copilot/agent/session');
         const cache = new SessionMessagesCache(60000);
         const session = createMockSession();
         const result = await cache.get(/** @type {any} */ (session));
@@ -455,7 +455,7 @@ describe('F43 — SessionMessagesCache', () => {
     });
 
     it('retorna do cache na segunda chamada dentro do TTL', async () => {
-        const { SessionMessagesCache } = await import('#copilot/agent/session/history/history-sync');
+        const { SessionMessagesCache } = await import('#copilot/agent/session');
         const cache = new SessionMessagesCache(60000);
         const session = createMockSession();
         await cache.get(/** @type {any} */ (session));
@@ -466,7 +466,7 @@ describe('F43 — SessionMessagesCache', () => {
     });
 
     it('limita o cache de mensagens mantendo as entradas mais recentes', async () => {
-        const { SessionMessagesCache } = await import('#copilot/agent/session/history/history-sync');
+        const { SessionMessagesCache } = await import('#copilot/agent/session');
         const cache = new SessionMessagesCache(60000, { maxItems: 2 });
         const session = createMockSession();
         session.getMessages.mockResolvedValueOnce([
@@ -484,7 +484,7 @@ describe('F43 — SessionMessagesCache', () => {
     });
 
     it('invalidate() limpa o cache', async () => {
-        const { SessionMessagesCache } = await import('#copilot/agent/session/history/history-sync');
+        const { SessionMessagesCache } = await import('#copilot/agent/session');
         const cache = new SessionMessagesCache(60000);
         const session = createMockSession();
         await cache.get(/** @type {any} */ (session));
@@ -495,7 +495,7 @@ describe('F43 — SessionMessagesCache', () => {
     });
 
     it('retorna [] quando getMessages lança erro', async () => {
-        const { SessionMessagesCache } = await import('#copilot/agent/session/history/history-sync');
+        const { SessionMessagesCache } = await import('#copilot/agent/session');
         const cache = new SessionMessagesCache(60000);
         const session = createMockSession();
         session.getMessages.mockRejectedValueOnce(new Error('network'));
@@ -504,7 +504,7 @@ describe('F43 — SessionMessagesCache', () => {
     });
 
     it('syncSdkHistory emite sucesso quando sincroniza histórico do SDK', async () => {
-        const { syncSdkHistory } = await import('#copilot/agent/session/history/history-sync');
+        const { syncSdkHistory } = await import('#copilot/agent/session');
         const session = createMockSession();
         const emit = vi.fn();
         const syncFromSdkHistory = vi.fn(() => ({ synced: 2, skipped: 1 }));
@@ -525,7 +525,7 @@ describe('F43 — SessionMessagesCache', () => {
     });
 
     it('syncSdkHistory trata ausência de getMessages como capability indisponível, sem falha estrutural', async () => {
-        const { syncSdkHistory } = await import('#copilot/agent/session/history/history-sync');
+        const { syncSdkHistory } = await import('#copilot/agent/session');
         const emit = vi.fn();
 
         const result = await syncSdkHistory(
@@ -546,7 +546,7 @@ describe('F43 — SessionMessagesCache', () => {
     });
 
     it('syncSdkHistory emite falha estruturada quando getMessages explode', async () => {
-        const { syncSdkHistory } = await import('#copilot/agent/session/history/history-sync');
+        const { syncSdkHistory } = await import('#copilot/agent/session');
         const session = createMockSession();
         session.getMessages.mockRejectedValueOnce(new Error('history down'));
         const emit = vi.fn();
@@ -580,7 +580,7 @@ describe('F43 — SessionMessagesCache', () => {
 
 describe('F43 — event-wirer.js wireSessionEvents', () => {
     it('retorna array de unsubscribe functions', async () => {
-        const { wireSessionEvents } = await import('#copilot/agent/session/wiring/event-wirer');
+        const { wireSessionEvents } = await import('#copilot/agent/session/wiring');
         const session = createMockSession();
         const callbacks = {
             emit: vi.fn(),
@@ -598,7 +598,7 @@ describe('F43 — event-wirer.js wireSessionEvents', () => {
     });
 
     it('unsubscribe functions são chamáveis sem erro', async () => {
-        const { wireSessionEvents } = await import('#copilot/agent/session/wiring/event-wirer');
+        const { wireSessionEvents } = await import('#copilot/agent/session/wiring');
         const session = createMockSession();
         const callbacks = {
             emit: vi.fn(),

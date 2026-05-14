@@ -8,7 +8,6 @@
  * @module copilot/sdk/session/permission-controller
  */
 
-import { AGENT_DENY_SHELL_TOOLS } from '#copilot/config/env';
 import { log } from '../logger.js';
 import {
     DEFAULT_PERMISSION_MODE,
@@ -149,8 +148,9 @@ export class PermissionController {
                 break;
             case 'selective': {
                 const defaultShellTools = ['run_shell_command', 'run_npm_script', 'run_node_script'];
-                const shellTools = AGENT_DENY_SHELL_TOOLS
-                    ? AGENT_DENY_SHELL_TOOLS.split(',')
+                const configuredDenyShellTools = process.env['AGENT_DENY_SHELL_TOOLS'];
+                const shellTools = configuredDenyShellTools
+                    ? configuredDenyShellTools.split(',')
                           .map((t) => t.trim())
                           .filter((t) => Boolean(t) && TOOL_NAME_RE.test(t))
                     : defaultShellTools;
