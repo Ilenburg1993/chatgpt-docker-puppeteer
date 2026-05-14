@@ -3,13 +3,15 @@
 **Propósito**: concentrar primitivas técnicas compartilhadas do runtime Copilot local.  
 **Status documental**: Canônico de apoio.  
 **Público**: mantenedores de I/O, cache, indexação, storage, locks, SSE e adapters internos.  
-**Última atualização**: 7 de maio de 2026.
+**Última atualização**: 14 de maio de 2026.
 
 ## O que esta pasta contém
 
-- Engine canônica de I/O local em `io-engine.js`.
+- Facades públicas em `public/` para consumidores fora de `infra/`.
+- Engine canônica de I/O local em `io-engine.js`, ainda mantida como facade de compatibilidade durante a migração 2.0/2.1.
 - Cache L1 em memória, cache L2 SQLite, tiering, health e invalidação coordenada.
 - Scanner, parser, prefetch, scope de sessão e índice L2 pesquisável.
+- Subdomínios internos baixos em `shared/`, `policy/`, `scan/` e `io/fs/`.
 - Locks, storage, queue, webhooks e infraestrutura SSE.
 
 ## O que não deve ficar aqui
@@ -21,7 +23,13 @@
 
 ## Entradas principais de I/O
 
-- `io-engine.js`: única porta para leitura/escrita local com locks, metadados e invalidação.
+- `public/io.js`: facade pública para leitura, escrita, busca e scan.
+- `public/indexing.js`: facade pública para build/search/status do índice L2.
+- `public/session.js`: facade pública para escopos de sessão e contexto.
+- `public/events.js`: facade pública para telemetria de I/O.
+- `public/cache.js`: facade pública para inspeção/invalidação de cache.
+- `public/testing.js`: facade pública deliberada para resets em testes.
+- `io-engine.js`: engine de leitura/escrita local com locks, metadados e invalidação; ainda é compatibilidade interna larga.
 - `io-cache.js`: L1 quente do processo, TTL/fingerprint e invalidação ativa.
 - `io-cache-l2-sqlite.js`: L2 blob cache persistente para payloads de leitura.
 - `io-index-sqlite.js`: L2 índice persistente com arquivos, FTS, símbolos e imports.
@@ -32,11 +40,25 @@
 - `io-scanner.js`: enumeração canônica de diretórios com ignore/fingerprint.
 - `io-parser.js`: parsing JS/TS/JSON/Markdown e cache simbólico.
 - `io-health.js`: snapshot agregado de L1/L2/índice/scope para observability.
+- `module-map.js`: inventário executável da raiz de `infra/`, com papel, tier, risco e exposição pública.
+
+## Subdomínios internos
+
+- `shared/`: helpers sem dependência de domínio, como leitura tipada de ambiente.
+- `policy/`: policies reutilizáveis, incluindo janela de saída para retornos grandes.
+- `scan/`: glob, gitignore, fingerprint e batching usados por scanner e prefetch.
+- `io/fs/`: portas baixas de filesystem usadas para quebrar ciclos entre parser/index/engine.
+- `sse/`: fanout, replay buffer e estado SSE.
 
 ## Regras de manutenção
 
-- Toda leitura ou escrita nova deve partir de `io-engine.js`; não use `fs.readFile`/`fs.writeFile`
-  diretamente em tools ou bordas.
+- Consumidores fora de `src/copilot/infra/**` devem importar por `#copilot/infra/public/*` ou pelo barrel raiz de
+  compatibilidade quando a API ainda não tiver facade dedicada.
+- Tools não importam arquivos folha de `infra/`.
+- Toda leitura ou escrita nova em tools/bordas deve partir de uma facade pública; não use `fs.readFile`/`fs.writeFile`
+  diretamente em tools ou adapters.
+- Módulos baixos (`shared/`, `policy/`, `scan/`, `io/fs/`) não importam `public/`, `io-engine.js`, registry, tools ou
+  sessão.
 - L1, L2 blob e L2 índice devem ser invalidados pelo mesmo evento de escrita.
 - Prefetch pode aquecer dados, mas não vira fonte de verdade; a verdade segue no filesystem via
   `io-engine`.
@@ -45,8 +67,16 @@
 - Fingerprints de scan usam `realpath + mtimeMs + size`; hashes mais caros entram apenas quando o
   roadmap/benchmark justificar.
 - Chunks persistidos pertencem ao índice L2; o cache L2 blob não deve virar catálogo semântico.
-- Limites de volume para a LLM-B são informativos, não bloqueantes. Segurança fica nas policies de
-  path e permissões.
+- Limites de volume para a LLM-B devem ser explícitos e observáveis. Quando a operação for potencialmente grande,
+  use janela de saída (`maxResults`, `maxBytes`, cursor futuro) e retorne metadados de truncamento sempre que possível.
+
+## Gates arquiteturais
+
+- `tests/unit/copilot/contracts/test_infra_barrel_governance.spec.js`: garante que `module-map.js` cobre todas as
+  entradas raiz de `infra/` e que as facades públicas existem.
+- `tests/unit/copilot/contracts/test_io_tools_boundary_contracts.spec.js`: impede tools de importarem internals de
+  `infra/` fora de `#copilot/infra/public/*`.
+- A análise local de ciclos de `src/copilot/infra` deve permanecer em `cycles 0`.
 
 ## Operação do índice
 

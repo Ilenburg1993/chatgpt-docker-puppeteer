@@ -14,6 +14,8 @@ Este é o ponto único de navegação da documentação canônica do repositóri
   [RELATORIOS/STATUS_GERAL_DOCUMENTACAO.md](./RELATORIOS/STATUS_GERAL_DOCUMENTACAO.md)
 - Auditoria qualitativa das categorias vivas:
   [RELATORIOS/AUDITORIA_QUALITATIVA_CATEGORIAS_VIVAS.md](./RELATORIOS/AUDITORIA_QUALITATIVA_CATEGORIAS_VIVAS.md)
+- Auditoria IO/tools Copilot:
+  [COPILOT/AUDITORIA-IO-TOOLS-2026-05-14/README.md](./COPILOT/AUDITORIA-IO-TOOLS-2026-05-14/README.md)
 - Arquivo histórico: [ARQUIVO_MORTO/README.md](./ARQUIVO_MORTO/README.md)
 - Inventário resumido: [INDEX.md](./INDEX.md)
 
