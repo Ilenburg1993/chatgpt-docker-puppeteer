@@ -47,7 +47,8 @@
 ## Subdomínios internos
 
 - `shared/`: helpers sem dependência de domínio, como leitura tipada de ambiente.
-- `policy/`: policies reutilizáveis, incluindo janela de saída, budgets de buffer/timeout, path-resource e precondições.
+- `policy/`: policies reutilizáveis, incluindo capabilities, risco, janela de saída, budgets de buffer/timeout,
+  path-resource e precondições.
 - `scan/`: glob, gitignore, fingerprint e batching usados por scanner e prefetch.
 - `parse/`: parsers puros de JSON, Markdown, comentários e outline textual.
 - `index-store/`: schema, paths, queries e helpers persistentes do índice L2/SQLite.

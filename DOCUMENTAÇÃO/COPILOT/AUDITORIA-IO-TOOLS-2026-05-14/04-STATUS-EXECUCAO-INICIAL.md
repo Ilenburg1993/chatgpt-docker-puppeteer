@@ -103,6 +103,7 @@ Transformações aplicadas:
 - `shared/env.js`, `policy/output-window.js` e `scan/*` foram extraídos como subdomínios internos baixos.
 - `policy/budgets.js` foi criado para unificar budgets de timeout e `maxBuffer` de search/subprocessos.
 - `policy/path-resource.js` foi criado para unificar path/resource policy usada por locks e file tools.
+- `policy/capabilities.js` e `policy/risk.js` foram criados para padronizar envelopes agentic de mutação.
 - `parse/*` passou a concentrar parsers puros de JSON, Markdown, comentários e outline.
 - `storage/*` passou a concentrar JSON store baixo; `storage.js` virou facade sem depender de `io-engine.js`.
 - `queue/*`, `locks/*` e `runtime/*` foram iniciados como domínios internos barrel-first.
@@ -132,6 +133,6 @@ Transformações aplicadas:
 Evidência local:
 
 ```txt
-src/copilot/infra: files 95 cycles 0
+src/copilot/infra: files 97 cycles 0
 tools -> infra internals: 0 ocorrências
 ```

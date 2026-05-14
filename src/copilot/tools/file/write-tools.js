@@ -10,6 +10,7 @@
  */
 
 import { z } from 'zod';
+import { IO_CAPABILITY, IO_RISK, capabilityForCreate, riskForDryRun, riskForOverwrite } from '#copilot/infra/public/policy';
 import { toError } from '../../core/error-handlers.js';
 import { withIoMeta } from '../../core/io-contracts.js';
 import {
@@ -96,8 +97,8 @@ const writeFileContentTool = buildTool({
 
         log('INFO', `[copilot/write_file_content] ${resolved}`);
         const operation = createIoOperationEnvelope({
-            capability: 'file.write',
-            riskClass: 'high',
+            capability: IO_CAPABILITY.fileWrite,
+            riskClass: IO_RISK.high,
             targets: [resolved],
             evidence: { tool: 'write_file_content' },
         });
@@ -107,7 +108,7 @@ const writeFileContentTool = buildTool({
             const writeResult = await writeFileAtomic(resolved, buf, {
                 requireExists: true,
                 ...(expectedHash ? { expectedHash } : {}),
-                riskClass: 'high',
+                riskClass: IO_RISK.high,
                 advisoryLimits: {
                     advisoryWriteContentBytes: ADVISORY_WRITE_CONTENT_BYTES,
                     contentBytes: buf.byteLength,
@@ -178,9 +179,10 @@ const createFileTool = buildTool({
         if (!ok) return { success: false, error: reason };
 
         log('INFO', `[copilot/create_file] ${resolved}`);
+        const riskClass = riskForOverwrite(overwrite);
         const operation = createIoOperationEnvelope({
-            capability: overwrite ? 'file.create-or-overwrite' : 'file.create',
-            riskClass: overwrite ? 'high' : 'medium',
+            capability: capabilityForCreate(overwrite),
+            riskClass,
             targets: [resolved],
             evidence: { tool: 'create_file', overwrite },
         });
@@ -191,7 +193,7 @@ const createFileTool = buildTool({
                 encoding: 'utf8',
                 createParentDirs,
                 failIfExists: !overwrite,
-                riskClass: overwrite ? 'high' : 'medium',
+                riskClass,
                 advisoryLimits: {
                     advisoryWriteContentBytes: ADVISORY_WRITE_CONTENT_BYTES,
                     contentBytes,
@@ -244,8 +246,8 @@ const deleteFileTool = buildTool({
 
         log('INFO', `[copilot/delete_file] ${resolved}`);
         const operation = createIoOperationEnvelope({
-            capability: 'file.delete',
-            riskClass: 'high',
+            capability: IO_CAPABILITY.fileDelete,
+            riskClass: IO_RISK.high,
             targets: [resolved],
             evidence: { tool: 'delete_file' },
         });
@@ -309,9 +311,10 @@ const copyFileTool = buildTool({
         if (!dst.ok) return { success: false, error: dst.reason };
 
         log('INFO', `[copilot/copy_file] ${src.resolved} → ${dst.resolved}`);
+        const riskClass = riskForOverwrite(overwrite);
         const operation = createIoOperationEnvelope({
-            capability: 'file.copy',
-            riskClass: overwrite ? 'high' : 'medium',
+            capability: IO_CAPABILITY.fileCopy,
+            riskClass,
             targets: [src.resolved, dst.resolved],
             evidence: { tool: 'copy_file', overwrite },
         });
@@ -379,9 +382,10 @@ const moveFileTool = buildTool({
         if (!dst.ok) return { success: false, error: dst.reason };
 
         log('INFO', `[copilot/move_file] ${src.resolved} → ${dst.resolved}`);
+        const riskClass = riskForOverwrite(overwrite);
         const operation = createIoOperationEnvelope({
-            capability: 'file.move',
-            riskClass: overwrite ? 'high' : 'medium',
+            capability: IO_CAPABILITY.fileMove,
+            riskClass,
             targets: [src.resolved, dst.resolved],
             evidence: { tool: 'move_file', overwrite },
         });
@@ -475,8 +479,8 @@ const patchFileTool = buildTool({
         const v = await validatePath(filePath, { mode: 'write' });
         if (!v.ok) return { success: false, error: v.reason };
         const operation = createIoOperationEnvelope({
-            capability: 'file.patch',
-            riskClass: dryRun ? 'low' : 'high',
+            capability: IO_CAPABILITY.filePatch,
+            riskClass: riskForDryRun(dryRun, IO_RISK.high),
             targets: [v.resolved],
             evidence: { tool: 'patch_file', replaceAll: replace_all, dryRun },
         });

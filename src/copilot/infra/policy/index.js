@@ -14,6 +14,10 @@ export {
     resolveWorkspaceCandidate,
 } from './path-resource.js';
 export {
+    IO_CAPABILITY,
+    capabilityForCreate,
+} from './capabilities.js';
+export {
     DEFAULT_IO_SEARCH_MAX_BUFFER_BYTES,
     DEFAULT_IO_SEARCH_TIMEOUT_MS,
     DEFAULT_PROCESS_MAX_BUFFER_BYTES,
@@ -25,4 +29,5 @@ export {
     resolveIoSearchBudget,
     resolveProcessExecutionBudget,
 } from './budgets.js';
+export { IO_RISK, riskForDryRun, riskForOverwrite } from './risk.js';
 export { assertExpectedSha256 } from './preconditions.js';

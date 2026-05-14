@@ -126,6 +126,7 @@ Objetivo: transformar primitives em ações rastreáveis.
 ### F3.1 — Operation envelope
 
 - `operationId`, `traceId`, capability, risk, preconditions, apply, result, evidence.
+- `policy/capabilities.js` e `policy/risk.js` centralizam capabilities e risco de mutações.
 - Status inicial: `runtime/operation.js` criado e file write tools retornam envelope `operation` em mutações.
 - `write_file_content` e `patch_file` aceitam `expectedHash` SHA-256 e retornam `previousHash`/`contentHash`.
 - `patch_file` aceita `dryRun` e retorna operação com status `dry-run`, sem tocar no disco.
