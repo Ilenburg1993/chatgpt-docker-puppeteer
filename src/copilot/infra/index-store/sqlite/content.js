@@ -5,8 +5,8 @@
  * @module copilot/infra/index-store/sqlite/content
  */
 
-import { createHash } from 'node:crypto';
 import { extname } from 'node:path';
+import { sha256 as hashSha256 } from '../../shared/hash.js';
 
 export const DEFAULT_INDEX_EXTENSIONS = Object.freeze([
     '.js',
@@ -37,7 +37,7 @@ export const DEFAULT_CHUNK_LINES = 200;
  * @returns {string}
  */
 export function sha256(content) {
-    return createHash('sha256').update(content).digest('hex');
+    return hashSha256(content);
 }
 
 /**

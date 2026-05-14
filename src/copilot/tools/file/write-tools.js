@@ -52,8 +52,12 @@ const writeFileContentTool = buildTool({
             .optional()
             .default('utf8')
             .describe('Codificação do conteúdo (utf8 para texto, base64 para binário)'),
+        expectedHash: z
+            .string()
+            .optional()
+            .describe('SHA-256 esperado do conteúdo atual. Se o arquivo mudou, a escrita falha sem aplicar.'),
     }),
-    handler: async ({ path: filePath, content, encoding }) => {
+    handler: async ({ path: filePath, content, encoding, expectedHash }) => {
         const { ok, reason, resolved } = await validatePath(filePath, { mode: 'write' });
         if (!ok) return { success: false, error: reason };
 
@@ -69,10 +73,12 @@ const writeFileContentTool = buildTool({
             const buf = encoding === 'base64' ? Buffer.from(content, 'base64') : Buffer.from(content, 'utf8');
             const writeResult = await writeFileAtomic(resolved, buf, {
                 requireExists: true,
+                ...(expectedHash ? { expectedHash } : {}),
                 riskClass: 'high',
                 advisoryLimits: {
                     advisoryWriteContentBytes: ADVISORY_WRITE_CONTENT_BYTES,
                     contentBytes: buf.byteLength,
+                    expectedHash: expectedHash ?? null,
                     limitMode: 'informative',
                 },
             });
@@ -81,9 +87,15 @@ const writeFileContentTool = buildTool({
                     success: true,
                     path: resolved,
                     bytesWritten: buf.length,
+                    previousHash: writeResult.previousHash,
+                    contentHash: writeResult.contentHash,
                     operation: completeIoOperationEnvelope(operation, {
                         traceId: writeResult.io.traceId ?? null,
-                        evidence: { bytesWritten: buf.length },
+                        evidence: {
+                            bytesWritten: buf.length,
+                            previousHash: writeResult.previousHash,
+                            contentHash: writeResult.contentHash,
+                        },
                     }),
                 },
                 writeResult.io,
@@ -344,8 +356,12 @@ const patchFileTool = buildTool({
             .min(1)
             .optional()
             .describe('Se definido, força contagem exata esperada de ocorrências antes de aplicar o patch.'),
+        expectedHash: z
+            .string()
+            .optional()
+            .describe('SHA-256 esperado do conteúdo atual. Se o arquivo mudou, o patch falha sem aplicar.'),
     }),
-    handler: async ({ path: filePath, old_string, new_string, replace_all, expected_occurrences }) => {
+    handler: async ({ path: filePath, old_string, new_string, replace_all, expected_occurrences, expectedHash }) => {
         const v = await validatePath(filePath, { mode: 'write' });
         if (!v.ok) return { success: false, error: v.reason };
         const operation = createIoOperationEnvelope({
@@ -361,10 +377,12 @@ const patchFileTool = buildTool({
                 newString: new_string,
                 replaceAll: replace_all,
                 expectedOccurrences: expected_occurrences,
+                ...(expectedHash ? { expectedHash } : {}),
                 advisoryLimits: {
                     advisoryPatchSegmentChars: ADVISORY_PATCH_SEGMENT_CHARS,
                     oldStringChars: old_string.length,
                     newStringChars: new_string.length,
+                    expectedHash: expectedHash ?? null,
                     limitMode: 'informative',
                 },
             });
@@ -374,9 +392,15 @@ const patchFileTool = buildTool({
                     success: true,
                     path: v.resolved,
                     replacedOccurrences: patchResult.replacedOccurrences,
+                    previousHash: patchResult.previousHash,
+                    contentHash: patchResult.contentHash,
                     operation: completeIoOperationEnvelope(operation, {
                         traceId: patchResult.io.traceId ?? null,
-                        evidence: { replacedOccurrences: patchResult.replacedOccurrences },
+                        evidence: {
+                            replacedOccurrences: patchResult.replacedOccurrences,
+                            previousHash: patchResult.previousHash,
+                            contentHash: patchResult.contentHash,
+                        },
                     }),
                 },
                 patchResult.io,

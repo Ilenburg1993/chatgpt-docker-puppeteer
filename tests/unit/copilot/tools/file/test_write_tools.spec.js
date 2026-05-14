@@ -61,6 +61,12 @@ vi.mock('../../../../../src/copilot/tools/infra/tool-factory.js', () => ({
 
 // crypto mock para atomicWrite
 vi.mock('node:crypto', () => ({
+    createHash: vi.fn(() => ({
+        update: vi.fn(function update() {
+            return this;
+        }),
+        digest: vi.fn(() => 'mock-sha256'),
+    })),
     randomBytes: vi.fn(() => ({ toString: () => 'abcd1234' })),
     randomUUID: vi.fn(() => 'op-test-id'),
 }));

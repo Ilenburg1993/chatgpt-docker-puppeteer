@@ -103,8 +103,8 @@ Impacto: pressão de memória antes do throttle de I/O agir.
 
 ### P2 — diff e patch ainda são primitives pobres para LLM-B
 
-`diffText` compara linhas por posição, sem LCS/patience diff. `patchTextLocked` opera por string exata, sem `expectedHash`
-e sem rollback token.
+`diffText` compara linhas por posição, sem LCS/patience diff. `patchTextLocked` já recebeu `expectedHash` SHA-256, mas
+ainda opera por string exata e sem rollback token.
 
 Impacto: diffs grandes, contexto ruidoso e mutações pouco reversíveis.
 

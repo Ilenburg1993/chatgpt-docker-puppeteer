@@ -48,7 +48,9 @@ import {
 } from './io/search/index.js';
 import { nowIoMs, publishIoOperation } from './io-observability.js';
 import { limitTextLines, normalizeMaxResults } from './policy/output-window.js';
+import { assertExpectedSha256 } from './policy/preconditions.js';
 import { readEnvPositiveInt } from './shared/env.js';
+import { sha256 } from './shared/hash.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -687,6 +689,7 @@ export async function readTextChunks(filePath, options = {}) {
  *     mode?: number;
  *     requireExists?: boolean;
  *     failIfExists?: boolean;
+ *     expectedHash?: string;
  *     lockTimeoutMs?: number;
  *     signal?: AbortSignal;
  *     advisoryLimits?: Record<string, unknown>;
@@ -696,16 +699,21 @@ export async function readTextChunks(filePath, options = {}) {
  *     bytesWritten: number;
  *     io: import('../core/io-contracts.js').IoMeta;
  *     lockWaitMs: number;
+ *     previousHash: string | null;
+ *     contentHash: string;
  * }>}
  */
 export async function writeFileAtomic(filePath, content, options = {}) {
     const traceId = options.traceId ?? createIoTraceId();
     const startedAt = nowIoMs();
     const { payload, bytes } = normalizeWritePayload(filePath, content, options.encoding ?? 'utf8');
+    const contentHash = sha256(payload);
     try {
         const { value, waitMs } = await withIoResourceLock(
             filePath,
             async () => {
+                /** @type {string | null} */
+                let previousHash = null;
                 if (options.requireExists) {
                     try {
                         await fs.access(filePath);
@@ -730,12 +738,16 @@ export async function writeFileAtomic(filePath, content, options = {}) {
                     }
                 }
 
+                if (options.expectedHash) {
+                    previousHash = assertExpectedSha256(await fs.readFile(filePath), options.expectedHash);
+                }
+
                 await writeAtomicFileUnlocked(
                     filePath,
                     payload,
                     options.mode === undefined ? {} : { mode: options.mode },
                 );
-                return { path: filePath, bytesWritten: bytes };
+                return { path: filePath, bytesWritten: bytes, previousHash, contentHash };
             },
             {
                 ...(options.lockTimeoutMs === undefined ? {} : { timeoutMs: options.lockTimeoutMs }),
@@ -753,7 +765,12 @@ export async function writeFileAtomic(filePath, content, options = {}) {
                 engine: 'io-engine.atomic-write',
                 riskClass: options.riskClass ?? 'medium',
                 traceId,
-                advisoryLimits: { ...(options.advisoryLimits ?? {}), lockWaitMs: waitMs },
+                advisoryLimits: {
+                    ...(options.advisoryLimits ?? {}),
+                    lockWaitMs: waitMs,
+                    expectedHash: options.expectedHash ?? null,
+                    contentHash,
+                },
             }),
             true,
         );
@@ -1175,6 +1192,7 @@ export async function moveFileLocked(source, destination, options = {}) {
  *     newString: string;
  *     replaceAll?: boolean;
  *     expectedOccurrences?: number;
+ *     expectedHash?: string;
  *     advisoryLimits?: Record<string, unknown>;
  * }} options
  */
@@ -1184,9 +1202,11 @@ export async function patchTextLocked(filePath, options) {
     try {
         const { value, waitMs } = await withIoResourceLock(filePath, async () => {
             const content = await fs.readFile(filePath, 'utf8');
+            const previousHash = assertExpectedSha256(content, options.expectedHash);
             const { updated, replacedOccurrences, bytesWritten } = computeTextPatch(content, options);
+            const contentHash = sha256(updated);
             await writeAtomicFileUnlocked(filePath, updated);
-            return { replacedOccurrences, bytesWritten };
+            return { replacedOccurrences, bytesWritten, previousHash, contentHash };
         });
         invalidateIoCacheTiers(filePath);
         const io = publishAndReturn(
@@ -1199,7 +1219,12 @@ export async function patchTextLocked(filePath, options) {
                 engine: 'io-engine.patchTextLocked',
                 riskClass: 'high',
                 traceId,
-                advisoryLimits: { ...(options.advisoryLimits ?? {}), lockWaitMs: waitMs },
+                advisoryLimits: {
+                    ...(options.advisoryLimits ?? {}),
+                    lockWaitMs: waitMs,
+                    expectedHash: options.expectedHash ?? null,
+                    contentHash: value.contentHash,
+                },
             }),
             true,
         );

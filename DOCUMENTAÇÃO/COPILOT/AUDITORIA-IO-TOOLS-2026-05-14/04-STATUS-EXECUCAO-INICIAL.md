@@ -109,6 +109,7 @@ Transformações aplicadas:
 - `list_directory` passou a aceitar `maxEntries` e `cursor`, retornando `nextCursor`.
 - Mutações de file tools passaram a retornar envelope `operation` com `operationId`, capability, risco, status, duração e
   evidence.
+- `write_file_content` e `patch_file` passaram a aceitar `expectedHash` SHA-256 e retornam hashes de evidência.
 - `public/cache.js` e `public/testing.js` foram adicionados como facades públicas explícitas.
 - Tools de file/web consomem infra via `#copilot/infra/public/*`.
 - `src/copilot/infra/module-map.js` foi criado e exportado pelo barrel raiz para governança 2.0/2.1.
@@ -117,6 +118,6 @@ Transformações aplicadas:
 Evidência local:
 
 ```txt
-src/copilot/infra: files 82 cycles 0
+src/copilot/infra: files 84 cycles 0
 tools -> infra internals: 0 ocorrências
 ```

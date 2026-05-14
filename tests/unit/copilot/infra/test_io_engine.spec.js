@@ -13,12 +13,14 @@ import {
     deleteFileLocked,
     mkdirPathLocked,
     moveFileLocked,
+    patchTextLocked,
     readBytes,
     readText,
     readTextChunks,
     withIoResourceLock,
     writeFileAtomic,
 } from '../../../../src/copilot/infra/io-engine.js';
+import { sha256 } from '../../../../src/copilot/infra/shared/hash.js';
 import { scanDirectory } from '../../../../src/copilot/infra/io-scanner.js';
 
 /** @type {string[]} */
@@ -226,6 +228,44 @@ describe('infra/io-engine', () => {
         expect(written).toBe(true);
         expect(result.lockWaitMs).toBeGreaterThanOrEqual(1);
         await expect(readFile(file, 'utf8')).resolves.toBe('after');
+    });
+
+    it('writeFileAtomic respeita expectedHash antes de sobrescrever', async () => {
+        const dir = await createTempDir();
+        const file = join(dir, 'expected-hash-write.txt');
+        await writeFile(file, 'before', 'utf8');
+
+        const ok = await writeFileAtomic(file, 'after', { expectedHash: sha256('before') });
+
+        expect(ok.previousHash).toBe(sha256('before'));
+        expect(ok.contentHash).toBe(sha256('after'));
+        await expect(readFile(file, 'utf8')).resolves.toBe('after');
+
+        await expect(writeFileAtomic(file, 'nope', { expectedHash: sha256('stale') })).rejects.toMatchObject({
+            code: 'EEXPECTEDHASH',
+        });
+        await expect(readFile(file, 'utf8')).resolves.toBe('after');
+    });
+
+    it('patchTextLocked respeita expectedHash antes de aplicar patch', async () => {
+        const dir = await createTempDir();
+        const file = join(dir, 'expected-hash-patch.txt');
+        await writeFile(file, 'alpha beta', 'utf8');
+
+        const patched = await patchTextLocked(file, {
+            oldString: 'beta',
+            newString: 'gamma',
+            expectedHash: sha256('alpha beta'),
+        });
+
+        expect(patched.previousHash).toBe(sha256('alpha beta'));
+        expect(patched.contentHash).toBe(sha256('alpha gamma'));
+        await expect(readFile(file, 'utf8')).resolves.toBe('alpha gamma');
+
+        await expect(
+            patchTextLocked(file, { oldString: 'gamma', newString: 'delta', expectedHash: sha256('alpha beta') }),
+        ).rejects.toMatchObject({ code: 'EEXPECTEDHASH' });
+        await expect(readFile(file, 'utf8')).resolves.toBe('alpha gamma');
     });
 
     it('moveFileLocked aguarda lock ativo no source antes de mover', async () => {

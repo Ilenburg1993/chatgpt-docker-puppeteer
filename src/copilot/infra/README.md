@@ -71,6 +71,7 @@
 - `parse/` permanece puro: sem `io/`, cache, índice, prefetch ou sessão.
 - `storage.js` é apenas facade de compatibilidade; implementação vive em `storage/`.
 - L1, L2 blob e L2 índice devem ser invalidados pelo mesmo evento de escrita.
+- Mutações textuais devem aceitar precondição por `expectedHash` quando houver risco de snapshot obsoleto.
 - Prefetch pode aquecer dados, mas não vira fonte de verdade; a verdade segue no filesystem via
   `io-engine`.
 - Índice responde descoberta, busca e símbolos; quando estiver vazio ou inadequado, a tool deve cair

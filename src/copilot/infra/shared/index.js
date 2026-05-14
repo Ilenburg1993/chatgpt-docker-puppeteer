@@ -6,3 +6,4 @@
  */
 
 export { readEnvPositiveInt } from './env.js';
+export { sha256 } from './hash.js';

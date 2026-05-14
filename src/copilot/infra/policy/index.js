@@ -6,3 +6,4 @@
  */
 
 export { limitTextLines, normalizeMaxResults } from './output-window.js';
+export { assertExpectedSha256 } from './preconditions.js';
