@@ -11,8 +11,8 @@
 - Engine canônica de I/O local em `io-engine.js`, ainda mantida como facade de compatibilidade durante a migração 2.0/2.1.
 - Cache L1 em memória, cache L2 SQLite, tiering, health e invalidação coordenada.
 - Scanner, parser, prefetch, scope de sessão e índice L2 pesquisável.
-- Subdomínios internos baixos em `shared/`, `policy/`, `scan/`, `parse/`, `storage/`, `queue/`, `locks/`,
-  `runtime/`, `io/fs/`, `io/patch/` e `io/search/`.
+- Subdomínios internos baixos em `shared/`, `policy/`, `scan/`, `parse/`, `index-store/`, `storage/`, `queue/`,
+  `locks/`, `runtime/`, `io/fs/`, `io/patch/` e `io/search/`.
 - Locks, storage, queue, webhooks e infraestrutura SSE.
 
 ## O que não deve ficar aqui
@@ -49,6 +49,7 @@
 - `policy/`: policies reutilizáveis, incluindo janela de saída para retornos grandes.
 - `scan/`: glob, gitignore, fingerprint e batching usados por scanner e prefetch.
 - `parse/`: parsers puros de JSON, Markdown, comentários e outline textual.
+- `index-store/`: schema, paths, queries e helpers persistentes do índice L2/SQLite.
 - `io/fs/`: portas baixas de filesystem para bytes, texto, stat, mkdir, append, remove, copy, move e escrita atômica.
 - `io/patch/`: cálculo puro de patch e diff textual.
 - `io/search/`: adapters puros de busca textual, índice FTS, grep fallback e busca simbólica.

@@ -74,7 +74,7 @@ baixos `shared/`, `policy/`, `scan/`, `parse/`, `storage/`, `queue/`, `locks/`, 
 
 ### F1.4 — Index-store
 
-- Separar `index-store/sqlite`.
+- Separar `index-store/sqlite` (iniciado com schema, paths, query e helpers de conteúdo/chunks).
 - Indexador recebe `readText`/parser por injeção ou importa módulo baixo (iniciado com `readTextFileSnapshot`).
 - Busca FTS filtra `pathPrefix` no SQL (executado).
 

@@ -19,6 +19,7 @@
  *     | 'policy-foundation'
  *     | 'scan-foundation'
  *     | 'parse-foundation'
+ *     | 'index-store'
  *     | 'low-level-port'
  *     | 'io-engine'
  *     | 'io-cache'
@@ -121,6 +122,15 @@ export const INFRA_MODULE_LAYOUT = Object.freeze([
         risk: 'watch',
         public: false,
         summary: 'Parsers puros sem dependência de IO/cache/session.',
+    },
+    {
+        path: 'index-store/',
+        kind: 'directory',
+        role: 'index-store',
+        tier: 'internal',
+        risk: 'watch',
+        public: false,
+        summary: 'Stores persistentes do índice L2: schema, queries, paths e helpers SQLite.',
     },
     {
         path: 'io/',

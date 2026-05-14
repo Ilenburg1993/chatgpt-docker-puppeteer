@@ -104,6 +104,7 @@ Transformações aplicadas:
 - `io/fs/*` foi expandido com portas baixas para bytes, stat, mkdir, append, remove, copy e move.
 - `io/patch/*` foi criado com patch e diff textual puros.
 - `io/search/*` foi criado com helpers puros para índice FTS, grep fallback e busca simbólica.
+- `index-store/sqlite/*` foi criado com schema, normalização de paths, query FTS e chunks persistentes do índice L2.
 - `workspace_index_search` e `workspace_index_find_symbol` passaram a aceitar `maxResults`, aplicado no SQLite.
 - `list_directory` passou a aceitar `maxEntries` e `cursor`, retornando `nextCursor`.
 - Mutações de file tools passaram a retornar envelope `operation` com `operationId`, capability, risco, status, duração e
@@ -116,6 +117,6 @@ Transformações aplicadas:
 Evidência local:
 
 ```txt
-src/copilot/infra: files 76 cycles 0
+src/copilot/infra: files 82 cycles 0
 tools -> infra internals: 0 ocorrências
 ```

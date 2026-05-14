@@ -9,41 +9,29 @@
  * @module copilot/infra/io-index-sqlite
  */
 
-import { createHash } from 'node:crypto';
-import { basename, extname, relative, resolve } from 'node:path';
+import { basename, extname } from 'node:path';
 import pLimit from 'p-limit';
 import { createIoTraceId } from '../core/io-contracts.js';
+import {
+    classifyContentKind,
+    countLines,
+    DEFAULT_INDEX_EXTENSIONS,
+    ensureIoIndexSchema,
+    flattenScanEntries,
+    makeLineChunks,
+    normalizeIndexExtensions,
+    normalizeIndexMaxResults,
+    normalizeIndexPath,
+    normalizeRelativePath,
+    sanitizeFtsQuery,
+    sha256,
+    shouldIndexFile,
+    SYMBOL_EXTENSIONS,
+} from './index-store/index.js';
 import { readTextFileSnapshot } from './io/fs/read-text.js';
 import { publishIoLifecycleEvent } from './io-observability.js';
 import { parseFileSymbols } from './io-parser.js';
 import { scanDirectory } from './io-scanner.js';
-import { normalizeMaxResults } from './policy/output-window.js';
-import { readEnvPositiveInt } from './shared/env.js';
-
-const DEFAULT_INDEX_EXTENSIONS = Object.freeze([
-    '.js',
-    '.mjs',
-    '.cjs',
-    '.jsx',
-    '.ts',
-    '.mts',
-    '.cts',
-    '.tsx',
-    '.json',
-    '.jsonc',
-    '.md',
-    '.mdx',
-    '.txt',
-    '.yaml',
-    '.yml',
-    '.css',
-    '.html',
-]);
-
-const SYMBOL_EXTENSIONS = new Set(['.js', '.mjs', '.cjs', '.jsx', '.ts', '.mts', '.cts', '.tsx']);
-const DEFAULT_CHUNK_LINES = 200;
-const DEFAULT_INDEX_SEARCH_MAX_RESULTS = readEnvPositiveInt('IO_INDEX_SEARCH_MAX_RESULTS', 50);
-const MAX_INDEX_SEARCH_RESULTS = readEnvPositiveInt('IO_INDEX_SEARCH_HARD_MAX_RESULTS', 500);
 
 /**
  * @typedef {'fresh' | 'stale' | 'failed' | 'skipped'} IoIndexFileStatus
@@ -77,184 +65,6 @@ const MAX_INDEX_SEARCH_RESULTS = readEnvPositiveInt('IO_INDEX_SEARCH_HARD_MAX_RE
  *     rank: number;
  * }} IoIndexSearchResult
  */
-
-/**
- * @param {string} filePath
- * @returns {string}
- */
-function normalizeIndexPath(filePath) {
-    return resolve(filePath).replace(/\\/g, '/');
-}
-
-/**
- * @param {string} workspaceRoot
- * @param {string} filePath
- * @returns {string}
- */
-function normalizeRelativePath(workspaceRoot, filePath) {
-    return relative(workspaceRoot, filePath).replace(/\\/g, '/');
-}
-
-/**
- * @param {number | undefined} value
- * @returns {number}
- */
-function normalizeIndexMaxResults(value) {
-    return Math.min(normalizeMaxResults(value) ?? DEFAULT_INDEX_SEARCH_MAX_RESULTS, MAX_INDEX_SEARCH_RESULTS);
-}
-
-/**
- * @param {string} content
- * @returns {string}
- */
-function sha256(content) {
-    return createHash('sha256').update(content).digest('hex');
-}
-
-/**
- * @param {string} content
- * @returns {number}
- */
-function countLines(content) {
-    if (content.length === 0) return 0;
-    return content.split(/\r\n|\r|\n/u).length;
-}
-
-/**
- * @param {string} filePath
- * @returns {string}
- */
-function classifyContentKind(filePath) {
-    const ext = extname(filePath).toLowerCase();
-    if (SYMBOL_EXTENSIONS.has(ext)) return ext.endsWith('ts') || ext === '.tsx' ? 'typescript' : 'javascript';
-    if (ext === '.json' || ext === '.jsonc') return 'json';
-    if (ext === '.md' || ext === '.mdx') return 'markdown';
-    if (ext === '.yaml' || ext === '.yml') return 'yaml';
-    if (ext === '.html') return 'html';
-    if (ext === '.css') return 'css';
-    return 'text';
-}
-
-/**
- * @param {string} query
- * @returns {string}
- */
-function sanitizeFtsQuery(query) {
-    const tokens = query
-        .split(/\s+/u)
-        .map((part) => part.replace(/[^\p{L}\p{N}_./:-]+/gu, '').trim())
-        .filter(Boolean);
-    return tokens.length > 0 ? tokens.map((token) => `"${token.replace(/"/gu, '""')}"`).join(' ') : '""';
-}
-
-/**
- * @param {import('./io-scanner.js').IoScanEntry[]} entries
- * @returns {import('./io-scanner.js').IoScanEntry[]}
- */
-function flattenScanEntries(entries) {
-    /** @type {import('./io-scanner.js').IoScanEntry[]} */
-    const out = [];
-    for (const entry of entries) {
-        if (entry.type === 'file') out.push(entry);
-        if (Array.isArray(entry.children)) out.push(...flattenScanEntries(entry.children));
-    }
-    return out;
-}
-
-/**
- * @param {string} filePath
- * @param {readonly string[]} extensions
- * @returns {boolean}
- */
-function shouldIndexFile(filePath, extensions) {
-    if (extensions.length === 0) return true;
-    return extensions.includes(extname(filePath).toLowerCase());
-}
-
-/**
- * @param {{ exec: Function; prepare: Function }} db
- */
-function ensureIoIndexSchema(db) {
-    db.exec(`
-        CREATE TABLE IF NOT EXISTS copilot_io_index_files (
-            file_path       TEXT PRIMARY KEY,
-            workspace_root  TEXT NOT NULL,
-            relative_path   TEXT NOT NULL,
-            file_name       TEXT NOT NULL,
-            extension       TEXT NOT NULL,
-            content_kind    TEXT NOT NULL,
-            size_bytes      INTEGER NOT NULL,
-            mtime_ms        REAL NOT NULL,
-            ctime_ms        REAL,
-            content_hash    TEXT,
-            line_count      INTEGER NOT NULL DEFAULT 0,
-            symbol_count    INTEGER NOT NULL DEFAULT 0,
-            import_count    INTEGER NOT NULL DEFAULT 0,
-            status          TEXT NOT NULL,
-            parse_error     TEXT,
-            indexed_at_ms   INTEGER NOT NULL,
-            refreshed_at_ms INTEGER NOT NULL,
-            metadata_json   TEXT
-        ) STRICT;
-        CREATE INDEX IF NOT EXISTS idx_io_index_files_workspace
-            ON copilot_io_index_files(workspace_root, relative_path);
-        CREATE INDEX IF NOT EXISTS idx_io_index_files_status
-            ON copilot_io_index_files(status, indexed_at_ms DESC);
-        CREATE INDEX IF NOT EXISTS idx_io_index_files_ext
-            ON copilot_io_index_files(extension);
-
-        CREATE VIRTUAL TABLE IF NOT EXISTS copilot_io_index_fts USING fts5(
-            file_path UNINDEXED,
-            relative_path,
-            content,
-            tokenize='porter unicode61 remove_diacritics 1'
-        );
-
-        CREATE TABLE IF NOT EXISTS copilot_io_index_symbols (
-            id           INTEGER PRIMARY KEY AUTOINCREMENT,
-            file_path    TEXT NOT NULL,
-            symbol_name  TEXT NOT NULL,
-            symbol_kind  TEXT NOT NULL,
-            exported     INTEGER NOT NULL DEFAULT 0,
-            line         INTEGER NOT NULL DEFAULT 0,
-            doc_comment  TEXT,
-            FOREIGN KEY (file_path) REFERENCES copilot_io_index_files(file_path) ON DELETE CASCADE
-        ) STRICT;
-        CREATE INDEX IF NOT EXISTS idx_io_index_symbols_name
-            ON copilot_io_index_symbols(symbol_name);
-        CREATE INDEX IF NOT EXISTS idx_io_index_symbols_file
-            ON copilot_io_index_symbols(file_path);
-
-        CREATE TABLE IF NOT EXISTS copilot_io_index_imports (
-            id              INTEGER PRIMARY KEY AUTOINCREMENT,
-            file_path       TEXT NOT NULL,
-            source          TEXT NOT NULL,
-            specifiers_json TEXT NOT NULL,
-            is_dynamic      INTEGER NOT NULL DEFAULT 0,
-            line            INTEGER NOT NULL DEFAULT 0,
-            FOREIGN KEY (file_path) REFERENCES copilot_io_index_files(file_path) ON DELETE CASCADE
-        ) STRICT;
-        CREATE INDEX IF NOT EXISTS idx_io_index_imports_source
-            ON copilot_io_index_imports(source);
-        CREATE INDEX IF NOT EXISTS idx_io_index_imports_file
-            ON copilot_io_index_imports(file_path);
-
-        CREATE TABLE IF NOT EXISTS copilot_io_index_chunks (
-            id             INTEGER PRIMARY KEY AUTOINCREMENT,
-            file_path      TEXT NOT NULL,
-            chunk_index    INTEGER NOT NULL,
-            start_line     INTEGER NOT NULL,
-            end_line       INTEGER NOT NULL,
-            content        TEXT NOT NULL,
-            content_hash   TEXT NOT NULL,
-            created_at_ms  INTEGER NOT NULL,
-            FOREIGN KEY (file_path) REFERENCES copilot_io_index_files(file_path) ON DELETE CASCADE,
-            UNIQUE(file_path, chunk_index)
-        ) STRICT;
-        CREATE INDEX IF NOT EXISTS idx_io_index_chunks_file
-            ON copilot_io_index_chunks(file_path, chunk_index);
-    `);
-}
 
 /**
  * @param {{ db: { exec: Function; prepare: Function; transaction?: Function }; now?: () => number }} options
@@ -434,28 +244,6 @@ export function createIoIndexSqlite(options) {
     }
 
     /**
-     * @param {string} content
-     * @returns {{ index: number; startLine: number; endLine: number; content: string; hash: string }[]}
-     */
-    function makeLineChunks(content) {
-        if (content.length === 0) return [];
-        const lines = content.split(/\r\n|\r|\n/u);
-        const chunks = [];
-        for (let i = 0; i < lines.length; i += DEFAULT_CHUNK_LINES) {
-            const slice = lines.slice(i, i + DEFAULT_CHUNK_LINES);
-            const chunkContent = slice.join('\n');
-            chunks.push({
-                index: chunks.length,
-                startLine: i + 1,
-                endLine: i + slice.length,
-                content: chunkContent,
-                hash: sha256(chunkContent),
-            });
-        }
-        return chunks;
-    }
-
-    /**
      * @param {{
      *     filePath: string;
      *     workspaceRoot: string;
@@ -607,9 +395,7 @@ export function createIoIndexSqlite(options) {
             const startedAt = Date.now();
             const traceId = createIoTraceId();
             const workspaceRoot = normalizeIndexPath(options.workspaceRoot ?? rootPath);
-            const extensions = (options.extensions ?? DEFAULT_INDEX_EXTENSIONS).map((ext) =>
-                ext.startsWith('.') ? ext.toLowerCase() : `.${ext.toLowerCase()}`,
-            );
+            const extensions = normalizeIndexExtensions(options.extensions ?? DEFAULT_INDEX_EXTENSIONS);
             const concurrency =
                 Number.isFinite(options.concurrency) && Number(options.concurrency) > 0
                     ? Math.floor(Number(options.concurrency))
