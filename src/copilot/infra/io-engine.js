@@ -130,6 +130,15 @@ function sanitizeSearchOutput(stdout) {
 }
 
 /**
+ * @param {string} filePath
+ * @returns {Promise<{ contentHash: string; bytesRead: number }>}
+ */
+async function readMutationSnapshot(filePath) {
+    const content = await fs.readFile(filePath);
+    return { contentHash: sha256(content), bytesRead: content.byteLength };
+}
+
+/**
  * @typedef {'function' | 'class' | 'variable' | 'export' | 'type' | 'all'} IoSymbolKind
  */
 
@@ -985,28 +994,44 @@ export async function mkdirPathLocked(dirPath, options = {}) {
  *     deleted: true;
  *     io: import('../core/io-contracts.js').IoMeta;
  *     lockWaitMs: number;
+ *     previousHash: string;
+ *     previousBytes: number;
  * }>}
  */
 export async function deleteFileLocked(filePath) {
     const traceId = createIoTraceId();
     const startedAt = nowIoMs();
     try {
-        const { waitMs } = await withIoResourceLock(filePath, async () => deleteFileUnlocked(filePath));
+        const { value, waitMs } = await withIoResourceLock(filePath, async () => {
+            const snapshot = await readMutationSnapshot(filePath);
+            await deleteFileUnlocked(filePath);
+            return snapshot;
+        });
         invalidateIoCacheTiers(filePath);
         const io = publishAndReturn(
             buildIoMeta({
                 operation: 'delete',
                 target: filePath,
                 targetKind: 'file',
+                bytesRead: value.bytesRead,
                 durationMs: elapsedMs(startedAt),
                 engine: 'io-engine.fs.unlink',
                 riskClass: 'high',
                 traceId,
-                advisoryLimits: { lockWaitMs: waitMs },
+                advisoryLimits: { lockWaitMs: waitMs, previousHash: value.contentHash },
             }),
             true,
         );
-        return withIoMeta({ path: filePath, deleted: /** @type {const} */ (true), lockWaitMs: waitMs }, io);
+        return withIoMeta(
+            {
+                path: filePath,
+                deleted: /** @type {const} */ (true),
+                lockWaitMs: waitMs,
+                previousHash: value.contentHash,
+                previousBytes: value.bytesRead,
+            },
+            io,
+        );
     } catch (error) {
         publishAndReturn(
             buildIoMeta({
@@ -1094,10 +1119,15 @@ export async function copyFileLocked(source, destination, options = {}) {
     try {
         const { value, waitMs } = await withIoResourceLocks([source, destination], async () => {
             await assertDestinationWritable(destination, options.overwrite);
+            const sourceSnapshot = await readMutationSnapshot(source);
             await mkdirPathUnlocked(dirname(destination), { recursive: true });
             await copyFileUnlocked(source, destination);
             const stats = await statPathSnapshot(destination);
-            return { bytesWritten: stats.size };
+            return {
+                bytesWritten: stats.size,
+                sourceHash: sourceSnapshot.contentHash,
+                sourceBytes: sourceSnapshot.bytesRead,
+            };
         });
         invalidateIoCacheTiers(destination);
         const io = publishAndReturn(
@@ -1106,15 +1136,24 @@ export async function copyFileLocked(source, destination, options = {}) {
                 target: `${source} -> ${destination}`,
                 targetKind: 'file',
                 bytesWritten: value.bytesWritten,
+                bytesRead: value.sourceBytes,
                 durationMs: elapsedMs(startedAt),
                 engine: 'io-engine.fs.copyFile',
                 riskClass: options.overwrite ? 'high' : 'medium',
                 traceId,
-                advisoryLimits: { lockWaitMs: waitMs },
+                advisoryLimits: { lockWaitMs: waitMs, sourceHash: value.sourceHash },
             }),
             true,
         );
-        return { source, destination, bytesWritten: value.bytesWritten, lockWaitMs: waitMs, io };
+        return {
+            source,
+            destination,
+            bytesWritten: value.bytesWritten,
+            sourceBytes: value.sourceBytes,
+            sourceHash: value.sourceHash,
+            lockWaitMs: waitMs,
+            io,
+        };
     } catch (error) {
         publishAndReturn(
             buildIoMeta({
@@ -1144,10 +1183,12 @@ export async function moveFileLocked(source, destination, options = {}) {
     const traceId = options.traceId ?? createIoTraceId();
     const startedAt = nowIoMs();
     try {
-        const { waitMs } = await withIoResourceLocks([source, destination], async () => {
+        const { value, waitMs } = await withIoResourceLocks([source, destination], async () => {
             await assertDestinationWritable(destination, options.overwrite);
+            const sourceSnapshot = await readMutationSnapshot(source);
             await mkdirPathUnlocked(dirname(destination), { recursive: true });
             await moveFileUnlocked(source, destination);
+            return sourceSnapshot;
         });
         invalidateIoCacheTiers(source);
         invalidateIoCacheTiers(destination);
@@ -1156,15 +1197,23 @@ export async function moveFileLocked(source, destination, options = {}) {
                 operation: 'move',
                 target: `${source} -> ${destination}`,
                 targetKind: 'file',
+                bytesRead: value.bytesRead,
                 durationMs: elapsedMs(startedAt),
                 engine: 'io-engine.fs.rename',
                 riskClass: 'high',
                 traceId,
-                advisoryLimits: { lockWaitMs: waitMs },
+                advisoryLimits: { lockWaitMs: waitMs, sourceHash: value.contentHash },
             }),
             true,
         );
-        return { source, destination, lockWaitMs: waitMs, io };
+        return {
+            source,
+            destination,
+            sourceBytes: value.bytesRead,
+            sourceHash: value.contentHash,
+            lockWaitMs: waitMs,
+            io,
+        };
     } catch (error) {
         publishAndReturn(
             buildIoMeta({

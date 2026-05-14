@@ -169,3 +169,4 @@ Tools:
 - `io/search` com helpers de índice, grep fallback e busca simbólica: coberto por `test_io_search.spec.js`.
 - `index-store/sqlite` com schema, paths, query e chunks puros: coberto por `test_index_store_sqlite.spec.js`.
 - `expectedHash` SHA-256 em write/patch e `dryRun` em patch: cobertos por `test_io_engine.spec.js` e contrato de tools.
+- snapshots hash/bytes em delete/copy/move: cobertos por `test_io_engine.spec.js` e `test_write_tools.spec.js`.

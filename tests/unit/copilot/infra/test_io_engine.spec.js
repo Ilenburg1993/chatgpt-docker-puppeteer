@@ -194,6 +194,8 @@ describe('infra/io-engine', () => {
         const result = await copy;
         expect(copied).toBe(true);
         expect(result.lockWaitMs).toBeGreaterThanOrEqual(1);
+        expect(result.sourceHash).toBe(sha256('source'));
+        expect(result.sourceBytes).toBe(Buffer.byteLength('source', 'utf8'));
         await expect(readFile(destination, 'utf8')).resolves.toBe('source');
     });
 
@@ -318,6 +320,8 @@ describe('infra/io-engine', () => {
 
         expect(moved).toBe(true);
         expect(result.lockWaitMs).toBeGreaterThanOrEqual(1);
+        expect(result.sourceHash).toBe(sha256('source'));
+        expect(result.sourceBytes).toBe(Buffer.byteLength('source', 'utf8'));
         await expect(readFile(destination, 'utf8')).resolves.toBe('source');
         await expect(readFile(source, 'utf8')).rejects.toMatchObject({ code: 'ENOENT' });
     });
@@ -386,6 +390,8 @@ describe('infra/io-engine', () => {
 
         expect(deleted).toBe(true);
         expect(result.lockWaitMs).toBeGreaterThanOrEqual(1);
+        expect(result.previousHash).toBe(sha256('source'));
+        expect(result.previousBytes).toBe(Buffer.byteLength('source', 'utf8'));
         await expect(readFile(file, 'utf8')).rejects.toMatchObject({ code: 'ENOENT' });
     });
 

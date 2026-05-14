@@ -123,8 +123,8 @@ Objetivo: transformar primitives em ações rastreáveis.
 
 - `beginChangeSet`.
 - snapshots/diffs antes de write/patch/move/delete.
-- Precondição otimista por hash iniciada em write/patch; dry-run de patch executado; rollback token e changeset
-  continuam pendentes.
+- Precondição otimista por hash iniciada em write/patch; dry-run de patch executado; delete/copy/move retornam hashes
+  e bytes de snapshot para auditoria; rollback token e changeset continuam pendentes.
 - rollback token.
 
 ### F3.3 — Audit log

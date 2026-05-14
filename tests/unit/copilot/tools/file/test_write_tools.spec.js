@@ -336,12 +336,15 @@ describe('F35 — delete_file (F185)', () => {
     it('deleta arquivo existente', async () => {
         pathOk('/workspace/doomed.txt');
         fsMock.stat.mockResolvedValue({ isDirectory: () => false });
+        fsMock.readFile.mockResolvedValue(Buffer.from('doomed', 'utf8'));
         fsMock.unlink.mockResolvedValue(undefined);
 
         const result = await handler({ path: 'doomed.txt' });
 
         expect(result).toMatchObject({ success: true, deleted: true });
         expect(result.io?.operation).toBe('delete');
+        expect(result.previousHash).toBe('mock-sha256');
+        expect(result.previousBytes).toBe(6);
         expect(result.operation).toMatchObject({ capability: 'file.delete', status: 'applied' });
         expect(fsMock.unlink).toHaveBeenCalledWith('/workspace/doomed.txt');
     });
@@ -387,6 +390,7 @@ describe('F35 — copy_file (F186)', () => {
             .mockResolvedValueOnce({ ok: true, resolved: '/workspace/src.txt', reason: undefined })
             .mockResolvedValueOnce({ ok: true, resolved: '/workspace/dst.txt', reason: undefined });
         fsMock.access.mockRejectedValue(new Error('ENOENT'));
+        fsMock.readFile.mockResolvedValue(Buffer.from('source', 'utf8'));
         fsMock.mkdir.mockResolvedValue(undefined);
         fsMock.copyFile.mockResolvedValue(undefined);
         fsMock.stat.mockResolvedValue({ size: 42 });
@@ -394,6 +398,8 @@ describe('F35 — copy_file (F186)', () => {
         const result = await handler({ source: 'src.txt', destination: 'dst.txt', overwrite: false });
 
         expect(result).toMatchObject({ success: true, bytesWritten: 42 });
+        expect(result.sourceHash).toBe('mock-sha256');
+        expect(result.sourceBytes).toBe(6);
         expect(result.io?.operation).toBe('copy');
         expect(fsMock.copyFile).toHaveBeenCalledWith('/workspace/src.txt', '/workspace/dst.txt');
         expect(mockValidatePath.mock.calls[1]?.[1]).toEqual({ mode: 'write' });
@@ -416,12 +422,14 @@ describe('F35 — copy_file (F186)', () => {
             .mockResolvedValueOnce({ ok: true, resolved: '/workspace/a.txt', reason: undefined })
             .mockResolvedValueOnce({ ok: true, resolved: '/workspace/b.txt', reason: undefined });
         fsMock.mkdir.mockResolvedValue(undefined);
+        fsMock.readFile.mockResolvedValue(Buffer.from('copy', 'utf8'));
         fsMock.copyFile.mockResolvedValue(undefined);
         fsMock.stat.mockResolvedValue({ size: 10 });
 
         const result = await handler({ source: 'a.txt', destination: 'b.txt', overwrite: true });
 
         expect(result.success).toBe(true);
+        expect(result.sourceHash).toBe('mock-sha256');
         expect(result.operation).toMatchObject({ capability: 'file.copy', status: 'applied' });
     });
 
@@ -442,6 +450,7 @@ describe('F35 — move_file (F186)', () => {
             .mockResolvedValueOnce({ ok: true, resolved: '/workspace/old.txt', reason: undefined })
             .mockResolvedValueOnce({ ok: true, resolved: '/workspace/new.txt', reason: undefined });
         fsMock.access.mockRejectedValue(new Error('ENOENT'));
+        fsMock.readFile.mockResolvedValue(Buffer.from('move', 'utf8'));
         fsMock.mkdir.mockResolvedValue(undefined);
         fsMock.rename.mockResolvedValue(undefined);
 
@@ -451,6 +460,8 @@ describe('F35 — move_file (F186)', () => {
             success: true,
             source: '/workspace/old.txt',
             destination: '/workspace/new.txt',
+            sourceHash: 'mock-sha256',
+            sourceBytes: 4,
         });
         expect(mockValidatePath.mock.calls[1]?.[1]).toEqual({ mode: 'write' });
     });
@@ -471,11 +482,13 @@ describe('F35 — move_file (F186)', () => {
             .mockResolvedValueOnce({ ok: true, resolved: '/workspace/a.txt', reason: undefined })
             .mockResolvedValueOnce({ ok: true, resolved: '/workspace/b.txt', reason: undefined });
         fsMock.mkdir.mockResolvedValue(undefined);
+        fsMock.readFile.mockResolvedValue(Buffer.from('move', 'utf8'));
         fsMock.rename.mockResolvedValue(undefined);
 
         const result = await handler({ source: 'a.txt', destination: 'b.txt', overwrite: true });
 
         expect(result.success).toBe(true);
+        expect(result.sourceHash).toBe('mock-sha256');
         expect(result.operation).toMatchObject({ capability: 'file.move', status: 'applied' });
     });
 });

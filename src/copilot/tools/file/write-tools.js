@@ -208,7 +208,11 @@ const deleteFileTool = buildTool({
                 ...deleted,
                 operation: completeIoOperationEnvelope(operation, {
                     traceId: deleted.io?.traceId ?? null,
-                    evidence: { deleted: true },
+                    evidence: {
+                        deleted: true,
+                        previousHash: deleted.previousHash,
+                        previousBytes: deleted.previousBytes,
+                    },
                 }),
             };
         } catch (err) {
@@ -263,10 +267,16 @@ const copyFileTool = buildTool({
                     source: src.resolved,
                     destination: dst.resolved,
                     bytesWritten: copyResult.bytesWritten,
+                    sourceBytes: copyResult.sourceBytes,
+                    sourceHash: copyResult.sourceHash,
                     lockWaitMs: copyResult.lockWaitMs,
                     operation: completeIoOperationEnvelope(operation, {
                         traceId: copyResult.io.traceId ?? null,
-                        evidence: { bytesWritten: copyResult.bytesWritten },
+                        evidence: {
+                            bytesWritten: copyResult.bytesWritten,
+                            sourceBytes: copyResult.sourceBytes,
+                            sourceHash: copyResult.sourceHash,
+                        },
                     }),
                 },
                 copyResult.io,
@@ -314,10 +324,16 @@ const moveFileTool = buildTool({
                     success: true,
                     source: src.resolved,
                     destination: dst.resolved,
+                    sourceBytes: moveResult.sourceBytes,
+                    sourceHash: moveResult.sourceHash,
                     lockWaitMs: moveResult.lockWaitMs,
                     operation: completeIoOperationEnvelope(operation, {
                         traceId: moveResult.io.traceId ?? null,
-                        evidence: { moved: true },
+                        evidence: {
+                            moved: true,
+                            sourceBytes: moveResult.sourceBytes,
+                            sourceHash: moveResult.sourceHash,
+                        },
                     }),
                 },
                 moveResult.io,
