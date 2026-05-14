@@ -21,8 +21,12 @@ export class AsyncQueue {
     #concurrency;
     /** @type {number} */
     #running = 0;
-    /** @type {QueueTask<unknown>[]} */
-    #queue = [];
+    /** @type {Map<number, QueueTask<unknown>[]>} */
+    #queues = new Map([
+        [0, []], // alta
+        [5, []], // normal
+        [10, []], // baixa
+    ]);
 
     /**
      * @param {object} [opts]
@@ -35,7 +39,11 @@ export class AsyncQueue {
 
     /** Número de tarefas aguardando na fila. */
     get pending() {
-        return this.#queue.length;
+        let total = 0;
+        for (const queue of this.#queues.values()) {
+            total += queue.length;
+        }
+        return total;
     }
 
     /** Número de tarefas em execução. */
@@ -46,19 +54,35 @@ export class AsyncQueue {
     /**
      * @template T
      * @param {() => Promise<T>} fn
+     * @param {number} [priority=5] - Menor número = maior prioridade. Default is `5`
      * @returns {Promise<T>}
      */
-    add(fn) {
+    add(fn, priority = 5) {
+        const normalizedPriority = Number.isFinite(priority) ? Math.floor(priority) : 5;
+        const queue = this.#queues.get(normalizedPriority) ?? this.#queues.get(5);
         return new Promise((resolve, reject) => {
-            this.#queue.push({ fn, resolve: /** @type {(value: unknown) => void} */ (resolve), reject });
+            queue?.push({ fn, resolve: /** @type {(value: unknown) => void} */ (resolve), reject });
             this.#drain();
         });
     }
 
+    /**
+     * @returns {QueueTask<unknown> | undefined}
+     */
+    #nextTask() {
+        const orderedPriorities = [...this.#queues.keys()].sort((a, b) => a - b);
+        for (const key of orderedPriorities) {
+            const queue = this.#queues.get(key);
+            if (queue && queue.length > 0) return queue.shift();
+        }
+        return undefined;
+    }
+
     /** Processa a fila enquanto houver slots disponíveis. */
     #drain() {
-        while (this.#running < this.#concurrency && this.#queue.length > 0) {
-            const task = /** @type {QueueTask<unknown>} */ (this.#queue.shift());
+        while (this.#running < this.#concurrency && this.pending > 0) {
+            const task = this.#nextTask();
+            if (!task) break;
             this.#running++;
             void (async () => {
                 try {
@@ -77,9 +101,11 @@ export class AsyncQueue {
 
     /** Limpa tarefas pendentes (não cancela as em execução). */
     clear() {
-        for (const task of this.#queue) {
-            task.reject(new Error('Queue cleared'));
+        for (const queue of this.#queues.values()) {
+            for (const task of queue) {
+                task.reject(new Error('Queue cleared'));
+            }
+            queue.length = 0;
         }
-        this.#queue = [];
     }
 }

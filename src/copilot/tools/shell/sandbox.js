@@ -149,20 +149,6 @@ export const ALLOWED_EXECUTABLES = (() => {
     return list.length > 0 ? new Set(list) : null;
 })();
 
-/**
- * Cache privado de ambiente sanitizado para reduzir custo de reconstrução por chamada.
- *
- * @type {{ expiresAt: number; env: Record<string, string> } | null}
- */
-let _safeEnvCache = null;
-
-/**
- * TTL do cache de ambiente sanitizado (ms).
- *
- * @type {number}
- */
-const SAFE_ENV_CACHE_TTL_MS = 5000;
-
 /** @type {Promise<string> | null} */
 let _rootRealPromise = null;
 
@@ -215,12 +201,23 @@ export async function validateCwd(cwd) {
  * @returns {{ ok: boolean; reason?: string }}
  */
 export function checkCommandBlocklist(command) {
+    const normalized = normalizeCommandForValidation(command);
     for (const pattern of BLOCKED_COMMAND_PATTERNS) {
-        if (pattern.test(command)) {
+        if (pattern.test(normalized)) {
             return { ok: false, reason: `Comando bloqueado por política de segurança: ${pattern}` };
         }
     }
     return { ok: true };
+}
+
+/**
+ * Normaliza o comando para validação de segurança contra caracteres lookalike Unicode.
+ *
+ * @param {string} command
+ * @returns {string}
+ */
+export function normalizeCommandForValidation(command) {
+    return command.normalize('NFKC');
 }
 
 /**
@@ -232,11 +229,6 @@ export function checkCommandBlocklist(command) {
  * @returns {Record<string, string>}
  */
 export function safeEnv() {
-    const now = Date.now();
-    if (_safeEnvCache && _safeEnvCache.expiresAt > now) {
-        return _safeEnvCache.env;
-    }
-
     const env = { ...process.env };
     // Lista explícita de variáveis sensíveis conhecidas
     const sensitiveExact = new Set([
@@ -244,10 +236,18 @@ export function safeEnv() {
         'COPILOT_TOKEN',
         'NPM_TOKEN',
         'NPM_AUTH_TOKEN',
+        'NPM_CONFIG_AUTHTOKEN',
+        'NPM_CONFIG__AUTH',
         'AWS_SECRET_ACCESS_KEY',
+        'AWS_ACCESS_KEY_ID',
         'AWS_SESSION_TOKEN',
+        'KUBECONFIG',
+        'DOCKER_CONFIG',
+        'DOCKER_PASSWORD',
         'GOOGLE_APPLICATION_CREDENTIALS',
         'AZURE_CLIENT_SECRET',
+        'GITHUB_APP_ID',
+        'GITHUB_APP_PRIVATE_KEY',
         'DATABASE_URL',
         'DATABASE_PASSWORD',
         'REDIS_URL',
@@ -258,17 +258,13 @@ export function safeEnv() {
         'ANTHROPIC_API_KEY',
     ]);
     // Padrão genérico: remove qualquer var cujo nome contenha tokens sensíveis
-    const sensitivePattern = /TOKEN|SECRET|PASSWORD|API_KEY|CREDENTIAL|PRIVATE_KEY/i;
+    const sensitivePattern =
+        /TOKEN|SECRET|PASSWORD|API_KEY|CREDENTIAL|PRIVATE_KEY|KUBECONFIG|DOCKER_|AWS_ACCESS|GITHUB_APP_|NPM_CONFIG_/i;
     for (const key of Object.keys(env)) {
         if (sensitiveExact.has(key) || sensitivePattern.test(key)) {
             delete env[key];
         }
     }
 
-    const sanitized = /** @type {Record<string, string>} */ (env);
-    _safeEnvCache = {
-        expiresAt: now + SAFE_ENV_CACHE_TTL_MS,
-        env: sanitized,
-    };
-    return sanitized;
+    return /** @type {Record<string, string>} */ (env);
 }

@@ -25,6 +25,14 @@ async function createTempDir() {
 }
 
 describe('infra/io-scanner', () => {
+    it('rejeita rootPath/workspaceRoot inválidos com null-byte', async () => {
+        const dir = await createTempDir();
+        await expect(scanDirectory(`${dir}\u0000bad`)).rejects.toMatchObject({ code: 'ERR_INVALID_ARG_VALUE' });
+        await expect(scanDirectory(dir, { workspaceRoot: `${dir}\u0000bad` })).rejects.toMatchObject({
+            code: 'ERR_INVALID_ARG_VALUE',
+        });
+    });
+
     it('inclui realpath no fingerprint para freshness incremental', async () => {
         const dir = await createTempDir();
         const file = join(dir, 'target.txt');

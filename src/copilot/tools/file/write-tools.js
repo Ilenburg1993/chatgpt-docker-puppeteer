@@ -9,10 +9,6 @@
  * @see module:copilot/tools/file/shared
  */
 
-import { z } from 'zod';
-import { IO_CAPABILITY, IO_RISK, capabilityForCreate, riskForDryRun, riskForOverwrite } from '#copilot/infra/public/policy';
-import { toError } from '../../core/error-handlers.js';
-import { withIoMeta } from '../../core/io-contracts.js';
 import {
     copyFileLocked,
     createOrReplaceFileAtomic,
@@ -22,11 +18,27 @@ import {
     writeFileAtomic,
 } from '#copilot/infra/public/io';
 import {
+    IO_CAPABILITY,
+    IO_RISK,
+    capabilityForCreate,
+    riskForDryRun,
+    riskForOverwrite,
+} from '#copilot/infra/public/policy';
+import {
+    abortIoChangeSet,
+    appendIoChangeSetEntry,
+    applyIoChangeSet,
+    beginIoChangeSet,
     completeIoOperationEnvelope,
     createIoOperationEnvelope,
+    createIoRollbackToken,
     failIoOperationEnvelope,
     recordIoMutationAudit,
+    serializeIoRollbackToken,
 } from '#copilot/infra/public/runtime';
+import { z } from 'zod';
+import { toError } from '../../core/error-handlers.js';
+import { withIoMeta } from '../../core/io-contracts.js';
 import { log } from '../infra/logger.js';
 import { buildTool } from '../infra/tool-factory.js';
 import { validatePath } from './shared.js';
@@ -36,8 +48,16 @@ const ADVISORY_PATCH_SEGMENT_CHARS = 200_000;
 
 /**
  * @param {ReturnType<typeof createIoOperationEnvelope>} operation
- * @param {{ status?: 'planned' | 'applied' | 'failed' | 'dry-run'; traceId?: string | null; evidence?: Record<string, unknown> }} result
- * @param {{ tool: string; io?: import('../../core/io-contracts.js').IoMeta | null; result?: Record<string, unknown> }} auditContext
+ * @param {{
+ *     status?: 'planned' | 'applied' | 'failed' | 'dry-run';
+ *     traceId?: string | null;
+ *     evidence?: Record<string, unknown>;
+ * }} result
+ * @param {{
+ *     tool: string;
+ *     io?: import('../../core/io-contracts.js').IoMeta | null;
+ *     result?: Record<string, unknown>;
+ * }} auditContext
  */
 async function completeAndAuditMutation(operation, result, auditContext) {
     const completed = completeIoOperationEnvelope(operation, result);
@@ -53,7 +73,11 @@ async function completeAndAuditMutation(operation, result, auditContext) {
 /**
  * @param {ReturnType<typeof createIoOperationEnvelope>} operation
  * @param {unknown} error
- * @param {{ tool: string; io?: import('../../core/io-contracts.js').IoMeta | null; result?: Record<string, unknown> }} auditContext
+ * @param {{
+ *     tool: string;
+ *     io?: import('../../core/io-contracts.js').IoMeta | null;
+ *     result?: Record<string, unknown>;
+ * }} auditContext
  */
 async function failAndAuditMutation(operation, error, auditContext) {
     const failed = failIoOperationEnvelope(operation, error);
@@ -64,6 +88,104 @@ async function failAndAuditMutation(operation, error, auditContext) {
               evidence: { ...failed.evidence, auditLog: audit },
           }
         : failed;
+}
+
+/**
+ * @param {{
+ *     capability: string;
+ *     riskClass: import('../../core/io-contracts.js').IoRiskClass;
+ *     traceId?: string | null;
+ *     action?: 'write' | 'patch' | 'delete' | 'copy' | 'move';
+ *     targets?: string[];
+ *     rollback?: {
+ *         action: 'write' | 'patch' | 'delete' | 'copy' | 'move';
+ *         target: string;
+ *         previousHash?: string | null;
+ *         contentHash?: string | null;
+ *         bytes?: number | null;
+ *         snapshotBase64?: string | null;
+ *     } | null;
+ *     entries?: {
+ *         action: 'write' | 'patch' | 'delete' | 'copy' | 'move';
+ *         targets: string[];
+ *         rollback: {
+ *             action: 'write' | 'patch' | 'delete' | 'copy' | 'move';
+ *             target: string;
+ *             previousHash?: string | null;
+ *             contentHash?: string | null;
+ *             bytes?: number | null;
+ *             snapshotBase64?: string | null;
+ *         } | null;
+ *         evidence?: Record<string, unknown>;
+ *     }[];
+ *     dryRun?: boolean;
+ *     evidence?: Record<string, unknown>;
+ * }} input
+ */
+function buildMutationChangeSet(input) {
+    /**
+     * @type {{
+     *     action: 'write' | 'patch' | 'delete' | 'copy' | 'move';
+     *     targets: string[];
+     *     rollback: {
+     *         action: 'write' | 'patch' | 'delete' | 'copy' | 'move';
+     *         target: string;
+     *         previousHash?: string | null;
+     *         contentHash?: string | null;
+     *         bytes?: number | null;
+     *         snapshotBase64?: string | null;
+     *     } | null;
+     *     evidence?: Record<string, unknown>;
+     * }[]}
+     */
+    const entries = [];
+
+    if (Array.isArray(input.entries) && input.entries.length > 0) {
+        entries.push(...input.entries);
+    } else if (input.action && Array.isArray(input.targets) && input.targets.length > 0) {
+        entries.push({
+            action: input.action,
+            targets: input.targets,
+            rollback: input.rollback ?? null,
+            evidence: { ...(input.evidence ?? {}) },
+        });
+    }
+
+    let changeSet = beginIoChangeSet({
+        capability: input.capability,
+        riskClass: input.riskClass,
+        targets: entries.flatMap((entry) => entry.targets),
+        ...(input.traceId === undefined ? {} : { traceId: input.traceId }),
+        evidence: { ...(input.evidence ?? {}) },
+    });
+
+    for (const entry of entries) {
+        changeSet = appendIoChangeSetEntry(changeSet, {
+            action: entry.action,
+            targets: entry.targets,
+            rollback: entry.rollback ?? null,
+            evidence: { ...(entry.evidence ?? input.evidence ?? {}) },
+        });
+    }
+
+    changeSet = input.dryRun
+        ? abortIoChangeSet(changeSet, 'dry-run')
+        : applyIoChangeSet(changeSet, {
+              ...(input.traceId === undefined ? {} : { traceId: input.traceId }),
+              evidence: { ...(input.evidence ?? {}) },
+          });
+
+    const rollbackToken = createIoRollbackToken(changeSet);
+    return {
+        id: changeSet.changeSetId,
+        status: changeSet.status,
+        entryCount: changeSet.entries.length,
+        rollback: {
+            token: serializeIoRollbackToken(rollbackToken),
+            stepCount: rollbackToken.stepCount,
+            steps: rollbackToken.steps,
+        },
+    };
 }
 
 // ---------------------------------------------------------------------------
@@ -135,6 +257,21 @@ const writeFileContentTool = buildTool({
                         },
                         { tool: 'write_file_content', io: writeResult.io, result: { path: resolved } },
                     ),
+                    changeSet: buildMutationChangeSet({
+                        capability: IO_CAPABILITY.fileWrite,
+                        riskClass: IO_RISK.high,
+                        traceId: writeResult.io.traceId ?? null,
+                        action: 'write',
+                        targets: [resolved],
+                        rollback: {
+                            action: 'write',
+                            target: resolved,
+                            previousHash: writeResult.previousHash,
+                            contentHash: writeResult.contentHash,
+                            bytes: buf.length,
+                        },
+                        evidence: { tool: 'write_file_content' },
+                    }),
                 },
                 writeResult.io,
             );
@@ -213,6 +350,21 @@ const createFileTool = buildTool({
                         },
                         { tool: 'create_file', io: writeResult.io, result: { path: resolved } },
                     ),
+                    changeSet: buildMutationChangeSet({
+                        capability: capabilityForCreate(overwrite),
+                        riskClass,
+                        traceId: writeResult.io.traceId ?? null,
+                        action: 'write',
+                        targets: [resolved],
+                        rollback: {
+                            action: 'delete',
+                            target: resolved,
+                            previousHash: writeResult.previousHash,
+                            contentHash: writeResult.contentHash,
+                            bytes: writeResult.bytesWritten,
+                        },
+                        evidence: { tool: 'create_file', overwrite },
+                    }),
                 },
                 writeResult.io,
             );
@@ -269,6 +421,21 @@ const deleteFileTool = buildTool({
                     },
                     { tool: 'delete_file', io: deleted.io, result: { path: resolved } },
                 ),
+                changeSet: buildMutationChangeSet({
+                    capability: IO_CAPABILITY.fileDelete,
+                    riskClass: IO_RISK.high,
+                    traceId: deleted.io?.traceId ?? null,
+                    action: 'delete',
+                    targets: [resolved],
+                    rollback: {
+                        action: 'write',
+                        target: resolved,
+                        previousHash: deleted.previousHash,
+                        bytes: deleted.previousBytes,
+                        snapshotBase64: deleted.previousSnapshotBase64,
+                    },
+                    evidence: { tool: 'delete_file' },
+                }),
             };
         } catch (err) {
             const e = /** @type {{ code?: unknown }} */ (err);
@@ -329,6 +496,9 @@ const copyFileTool = buildTool({
                     bytesWritten: copyResult.bytesWritten,
                     sourceBytes: copyResult.sourceBytes,
                     sourceHash: copyResult.sourceHash,
+                    destinationPreviousHash: copyResult.destinationPreviousHash,
+                    destinationPreviousBytes: copyResult.destinationPreviousBytes,
+                    destinationPreviousSnapshotTruncated: copyResult.destinationPreviousSnapshotTruncated,
                     lockWaitMs: copyResult.lockWaitMs,
                     operation: await completeAndAuditMutation(
                         operation,
@@ -346,6 +516,41 @@ const copyFileTool = buildTool({
                             result: { source: src.resolved, destination: dst.resolved },
                         },
                     ),
+                    changeSet: buildMutationChangeSet({
+                        capability: IO_CAPABILITY.fileCopy,
+                        riskClass,
+                        traceId: copyResult.io.traceId ?? null,
+                        entries: [
+                            {
+                                action: 'copy',
+                                targets: [src.resolved, dst.resolved],
+                                rollback:
+                                    overwrite && copyResult.destinationPreviousSnapshotBase64
+                                        ? {
+                                              action: 'write',
+                                              target: dst.resolved,
+                                              previousHash: copyResult.destinationPreviousHash,
+                                              bytes: copyResult.destinationPreviousBytes,
+                                              snapshotBase64: copyResult.destinationPreviousSnapshotBase64,
+                                          }
+                                        : {
+                                              action: 'delete',
+                                              target: dst.resolved,
+                                              previousHash: copyResult.destinationPreviousHash ?? copyResult.sourceHash,
+                                              bytes: copyResult.bytesWritten,
+                                          },
+                                evidence: {
+                                    tool: 'copy_file',
+                                    overwrite,
+                                    destinationRestoreAvailable: Boolean(copyResult.destinationPreviousSnapshotBase64),
+                                    destinationRestoreTruncated: Boolean(
+                                        copyResult.destinationPreviousSnapshotTruncated,
+                                    ),
+                                },
+                            },
+                        ],
+                        evidence: { tool: 'copy_file', overwrite },
+                    }),
                 },
                 copyResult.io,
             );
@@ -399,6 +604,9 @@ const moveFileTool = buildTool({
                     destination: dst.resolved,
                     sourceBytes: moveResult.sourceBytes,
                     sourceHash: moveResult.sourceHash,
+                    destinationPreviousHash: moveResult.destinationPreviousHash,
+                    destinationPreviousBytes: moveResult.destinationPreviousBytes,
+                    destinationPreviousSnapshotTruncated: moveResult.destinationPreviousSnapshotTruncated,
                     lockWaitMs: moveResult.lockWaitMs,
                     operation: await completeAndAuditMutation(
                         operation,
@@ -416,6 +624,48 @@ const moveFileTool = buildTool({
                             result: { source: src.resolved, destination: dst.resolved },
                         },
                     ),
+                    changeSet: buildMutationChangeSet({
+                        capability: IO_CAPABILITY.fileMove,
+                        riskClass,
+                        traceId: moveResult.io.traceId ?? null,
+                        entries: [
+                            {
+                                action: 'move',
+                                targets: [src.resolved, dst.resolved],
+                                rollback: {
+                                    action: 'move',
+                                    target: src.resolved,
+                                    previousHash: moveResult.sourceHash,
+                                    bytes: moveResult.sourceBytes,
+                                },
+                                evidence: { tool: 'move_file', overwrite },
+                            },
+                            ...(overwrite && moveResult.destinationPreviousSnapshotBase64
+                                ? [
+                                      {
+                                          action: /** @type {'move'} */ ('move'),
+                                          targets: [src.resolved, dst.resolved],
+                                          rollback: {
+                                              action: /** @type {'write'} */ ('write'),
+                                              target: dst.resolved,
+                                              previousHash: moveResult.destinationPreviousHash,
+                                              bytes: moveResult.destinationPreviousBytes,
+                                              snapshotBase64: moveResult.destinationPreviousSnapshotBase64,
+                                          },
+                                          evidence: {
+                                              tool: 'move_file',
+                                              overwrite,
+                                              restoreDestination: true,
+                                              destinationRestoreTruncated: Boolean(
+                                                  moveResult.destinationPreviousSnapshotTruncated,
+                                              ),
+                                          },
+                                      },
+                                  ]
+                                : []),
+                        ],
+                        evidence: { tool: 'move_file', overwrite },
+                    }),
                 },
                 moveResult.io,
             );
@@ -527,6 +777,23 @@ const patchFileTool = buildTool({
                         },
                         { tool: 'patch_file', io: patchResult.io, result: { path: v.resolved, dryRun } },
                     ),
+                    changeSet: buildMutationChangeSet({
+                        capability: IO_CAPABILITY.filePatch,
+                        riskClass: riskForDryRun(dryRun, IO_RISK.high),
+                        traceId: patchResult.io.traceId ?? null,
+                        action: 'patch',
+                        targets: [v.resolved],
+                        rollback: {
+                            action: 'write',
+                            target: v.resolved,
+                            previousHash: patchResult.previousHash,
+                            contentHash: patchResult.contentHash,
+                            bytes: patchResult.projectedBytes,
+                            snapshotBase64: patchResult.previousSnapshotBase64,
+                        },
+                        dryRun,
+                        evidence: { tool: 'patch_file', dryRun },
+                    }),
                 },
                 patchResult.io,
             );

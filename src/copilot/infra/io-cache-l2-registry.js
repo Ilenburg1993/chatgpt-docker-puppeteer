@@ -17,6 +17,13 @@ let _lastInitErrorAtMs = null;
 let _lastPruneError = null;
 /** @type {number | null} */
 let _lastPruneErrorAtMs = null;
+/** @type {number} */
+let _initFailCount = 0;
+/** @type {number | null} */
+let _circuitOpenUntilMs = null;
+
+const MAX_INIT_FAILURES = 3;
+const CIRCUIT_BACKOFF_MS = [1000, 5000, 30000];
 
 function isEnabled() {
     return String(process.env['IO_L2_CACHE_ENABLED'] || '0').trim() === '1';
@@ -48,6 +55,9 @@ export function getIoL2Cache() {
     if (!isEnabled()) {
         return null;
     }
+    if (_circuitOpenUntilMs && Date.now() < _circuitOpenUntilMs) {
+        return null;
+    }
     if (_ioL2Cache) {
         return _ioL2Cache;
     }
@@ -59,11 +69,19 @@ export function getIoL2Cache() {
         });
         _lastInitError = null;
         _lastInitErrorAtMs = null;
+        _initFailCount = 0;
+        _circuitOpenUntilMs = null;
         startPruneTimer();
         return _ioL2Cache;
     } catch (err) {
+        _initFailCount += 1;
         _lastInitError = err instanceof Error ? err.message : String(err ?? 'unknown-init-error');
         _lastInitErrorAtMs = Date.now();
+        if (_initFailCount >= MAX_INIT_FAILURES) {
+            const idx = Math.min(_initFailCount - MAX_INIT_FAILURES, CIRCUIT_BACKOFF_MS.length - 1);
+            const backoffMs = CIRCUIT_BACKOFF_MS[idx] ?? CIRCUIT_BACKOFF_MS[CIRCUIT_BACKOFF_MS.length - 1] ?? 30_000;
+            _circuitOpenUntilMs = Date.now() + backoffMs;
+        }
         if (process.env['DEBUG_IO_L2'] === '1') {
             console.debug('[io-cache-l2] Failed to initialize L2 cache; operating in L1-only mode.');
         }
@@ -77,6 +95,8 @@ export function getIoL2CacheStats() {
         return {
             enabled: false,
             reason: health.reason,
+            ...(_initFailCount > 0 ? { initFailCount: _initFailCount } : {}),
+            ...(_circuitOpenUntilMs ? { circuitOpenUntilMs: _circuitOpenUntilMs } : {}),
             ...(_lastInitError ? { lastInitError: _lastInitError } : {}),
             ...(_lastInitErrorAtMs ? { lastInitErrorAtMs: _lastInitErrorAtMs } : {}),
         };
@@ -105,7 +125,9 @@ export function getIoL2CacheHealth() {
     if (!cache) {
         return {
             available: false,
-            reason: 'init-failed',
+            reason: _circuitOpenUntilMs && Date.now() < _circuitOpenUntilMs ? 'circuit-open' : 'init-failed',
+            ...(_initFailCount > 0 ? { initFailCount: _initFailCount } : {}),
+            ...(_circuitOpenUntilMs ? { circuitOpenUntilMs: _circuitOpenUntilMs } : {}),
             ...(_lastInitError ? { lastInitError: _lastInitError } : {}),
             ...(_lastInitErrorAtMs ? { lastInitErrorAtMs: _lastInitErrorAtMs } : {}),
         };
@@ -127,6 +149,8 @@ export function resetIoL2CacheForTest() {
     _lastInitErrorAtMs = null;
     _lastPruneError = null;
     _lastPruneErrorAtMs = null;
+    _initFailCount = 0;
+    _circuitOpenUntilMs = null;
     if (_pruneTimer) {
         clearInterval(_pruneTimer);
         _pruneTimer = null;

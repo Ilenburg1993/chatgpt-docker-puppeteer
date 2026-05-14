@@ -8,10 +8,40 @@
  * @module copilot/infra/io-locks
  */
 
+import { AsyncLocalStorage } from 'node:async_hooks';
 import { normalizePathResourceKey } from './policy/path-resource.js';
 
 /** @type {Map<string, Promise<void>>} */
 const tails = new Map();
+/** @type {AsyncLocalStorage<Set<string>>} */
+const heldLocksStorage = new AsyncLocalStorage();
+
+/**
+ * @param {string} key
+ * @returns {void}
+ */
+function scheduleTailCleanup(key) {
+    const tail = tails.get(key);
+    if (!tail) return;
+    void tail.finally(() => {
+        if (tails.get(key) === tail) {
+            tails.delete(key);
+        }
+    });
+}
+
+/**
+ * Sweep periódico para chaves órfãs em cenários extremos de alta rotação.
+ */
+setInterval(() => {
+    for (const [key, tail] of tails.entries()) {
+        void tail.finally(() => {
+            if (tails.get(key) === tail) {
+                tails.delete(key);
+            }
+        });
+    }
+}, 60_000).unref?.();
 
 /**
  * Normaliza chaves de recursos de filesystem para reduzir bypass por path relativo/absoluto.
@@ -114,6 +144,15 @@ function waitForPrevious(previous, key, options) {
  */
 export async function withIoResourceLock(resourceKey, operation, options = {}) {
     const key = normalizeIoResourceKey(resourceKey);
+    const heldLocks = heldLocksStorage.getStore();
+    if (heldLocks?.has(key)) {
+        if (options.signal?.aborted) {
+            throw createLockError('Abort', key);
+        }
+        const value = await operation();
+        return { value, waitMs: 0 };
+    }
+
     const startedWait = Date.now();
     const previous = tails.get(key) ?? Promise.resolve();
     /** @type {() => void} */
@@ -126,6 +165,7 @@ export async function withIoResourceLock(resourceKey, operation, options = {}) {
         .then(() => current)
         .catch(() => undefined);
     tails.set(key, tail);
+    scheduleTailCleanup(key);
 
     try {
         await waitForPrevious(previous, key, options);
@@ -141,7 +181,9 @@ export async function withIoResourceLock(resourceKey, operation, options = {}) {
         if (options.signal?.aborted) {
             throw createLockError('Abort', key);
         }
-        const value = await operation();
+        const nextHeldLocks = new Set(heldLocks ?? []);
+        nextHeldLocks.add(key);
+        const value = await heldLocksStorage.run(nextHeldLocks, () => operation());
         return { value, waitMs };
     } finally {
         release();

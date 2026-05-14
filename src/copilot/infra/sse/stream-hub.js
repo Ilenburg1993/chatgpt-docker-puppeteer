@@ -164,17 +164,30 @@ export class SseClientPool {
 
         let delivered = 0;
         let filteredOut = 0;
+        /** @type {SseClientEntry[]} */
+        const toRemove = [];
 
         for (const entry of this.#clients) {
             if (entry.filter && !entry.filter(filterEvent)) {
                 filteredOut++;
                 continue;
             }
-            entry.sse.send(event, payload, {
-                skipBuffer: true,
-                ...(eventId != null ? { eventId } : {}),
-            });
-            delivered++;
+            try {
+                entry.sse.send(event, payload, {
+                    skipBuffer: true,
+                    ...(eventId != null ? { eventId } : {}),
+                });
+                delivered++;
+            } catch {
+                toRemove.push(entry);
+                this.#count('send_error');
+            }
+        }
+
+        for (const entry of toRemove) {
+            if (this.removeClient(entry)) {
+                this.#count('client_removed_on_error');
+            }
         }
 
         this.#count('delivered', delivered);

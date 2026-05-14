@@ -7,9 +7,28 @@
  * @module copilot/infra/lockfile
  */
 
-import { existsSync, readFileSync, unlinkSync } from 'node:fs';
-import { mkdir, open, readFile } from 'node:fs/promises';
+import { existsSync, lstatSync, readFileSync, unlinkSync } from 'node:fs';
+import { lstat, mkdir, open, readFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
+
+/**
+ * @param {string} targetPath
+ * @returns {Promise<void>}
+ */
+async function assertPathIsNotSymlink(targetPath) {
+    try {
+        const stats = await lstat(targetPath);
+        if (stats.isSymbolicLink()) {
+            const error = new Error(`Lock path inválido (symlink detectado): ${targetPath}`);
+            /** @type {{ code?: string }} */ (error).code = 'ERR_LOCKFILE_SYMLINK';
+            throw error;
+        }
+    } catch (error) {
+        const code = /** @type {{ code?: unknown }} */ (error)?.code;
+        if (code === 'ENOENT') return;
+        throw error;
+    }
+}
 
 /**
  * Tenta adquirir um lockfile. Retorna `true` se adquirido, `false` se já existe um lock válido.
@@ -26,6 +45,8 @@ export async function acquireLock(lockPath) {
         await mkdir(dir, { recursive: true });
     }
 
+    await assertPathIsNotSymlink(lockPath);
+
     for (let attempt = 0; attempt < 2; attempt++) {
         try {
             const handle = await open(lockPath, 'wx');
@@ -38,6 +59,8 @@ export async function acquireLock(lockPath) {
         } catch (error) {
             const code = /** @type {{ code?: unknown }} */ (error)?.code;
             if (code !== 'EEXIST') throw error;
+
+            await assertPathIsNotSymlink(lockPath);
 
             try {
                 const raw = await readFile(lockPath, 'utf-8');
@@ -69,11 +92,12 @@ export async function acquireLock(lockPath) {
  */
 export function releaseLock(lockPath) {
     try {
-        if (existsSync(lockPath)) {
-            const pid = readLockOwnerPid(readFileSync(lockPath, 'utf-8'));
-            if (pid === process.pid) {
-                unlinkSync(lockPath);
-            }
+        if (!existsSync(lockPath)) return;
+        if (lstatSync(lockPath).isSymbolicLink()) return;
+        const pid = readLockOwnerPid(readFileSync(lockPath, 'utf-8'));
+        if (pid === process.pid) {
+            // best-effort: se lockPath virar symlink entre checks, unlink pode falhar e será ignorado
+            unlinkSync(lockPath);
         }
     } catch {
         // best-effort

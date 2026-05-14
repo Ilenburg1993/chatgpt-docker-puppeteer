@@ -61,12 +61,14 @@ vi.mock('../../../../../src/copilot/tools/infra/tool-factory.js', () => ({
 
 // crypto mock para atomicWrite
 vi.mock('node:crypto', () => ({
-    createHash: vi.fn(() => ({
-        update: vi.fn(function update() {
-            return this;
-        }),
-        digest: vi.fn(() => 'mock-sha256'),
-    })),
+    createHash: vi.fn(() => {
+        /** @type {{ update: import('vitest').Mock; digest: import('vitest').Mock }} */
+        const hash = {
+            update: vi.fn(() => hash),
+            digest: vi.fn(() => 'mock-sha256'),
+        };
+        return hash;
+    }),
     randomBytes: vi.fn(() => ({ toString: () => 'abcd1234' })),
     randomUUID: vi.fn(() => 'op-test-id'),
 }));
@@ -127,7 +129,11 @@ describe('F35 — write_file_content (F181-F182)', () => {
 
         expect(result).toMatchObject({ success: true, path: '/workspace/file.txt' });
         expect(result.io?.operation).toBe('write');
-        expect(result.operation).toMatchObject({ operationId: 'op-test-id', capability: 'file.write', status: 'applied' });
+        expect(result.operation).toMatchObject({
+            operationId: 'op-test-id',
+            capability: 'file.write',
+            status: 'applied',
+        });
         expect(result.bytesWritten).toBe(5);
         expect(fsMock.writeFile).toHaveBeenCalledOnce();
         expect(fsMock.rename).toHaveBeenCalledOnce();
@@ -346,6 +352,8 @@ describe('F35 — delete_file (F185)', () => {
         expect(result.previousHash).toBe('mock-sha256');
         expect(result.previousBytes).toBe(6);
         expect(result.operation).toMatchObject({ capability: 'file.delete', status: 'applied' });
+        expect(result.changeSet?.rollback?.stepCount).toBeGreaterThanOrEqual(1);
+        expect(result.changeSet?.rollback?.steps?.[0]?.snapshotBase64).toBeTypeOf('string');
         expect(fsMock.unlink).toHaveBeenCalledWith('/workspace/doomed.txt');
     });
 
@@ -431,6 +439,8 @@ describe('F35 — copy_file (F186)', () => {
         expect(result.success).toBe(true);
         expect(result.sourceHash).toBe('mock-sha256');
         expect(result.operation).toMatchObject({ capability: 'file.copy', status: 'applied' });
+        expect(result.changeSet?.rollback?.stepCount).toBeGreaterThanOrEqual(1);
+        expect(result.changeSet?.rollback?.steps?.[0]?.action).toBe('write');
     });
 
     it('falha se source path inválido', async () => {
@@ -490,6 +500,7 @@ describe('F35 — move_file (F186)', () => {
         expect(result.success).toBe(true);
         expect(result.sourceHash).toBe('mock-sha256');
         expect(result.operation).toMatchObject({ capability: 'file.move', status: 'applied' });
+        expect(result.changeSet?.rollback?.stepCount).toBe(2);
     });
 });
 
@@ -532,6 +543,7 @@ describe('F35 — patch_file (F187)', () => {
         expect(result.success).toBe(true);
         expect(result.dryRun).toBe(true);
         expect(result.operation).toMatchObject({ capability: 'file.patch', status: 'dry-run' });
+        expect(result.changeSet?.status).toBe('aborted');
         expect(fsMock.writeFile).not.toHaveBeenCalled();
         expect(fsMock.rename).not.toHaveBeenCalled();
     });

@@ -58,8 +58,10 @@ export class EventFanout {
     publish(channel, event, data) {
         /** @type {FanoutEvent} */
         const fanoutEvt = { channel, event, data, ts: Date.now(), origin: this.#processId };
-        this.#emitter.emit(channel, fanoutEvt);
-        this.#emitter.emit('*', fanoutEvt);
+        setImmediate(() => {
+            this.#emitter.emit(channel, fanoutEvt);
+            this.#emitter.emit('*', fanoutEvt);
+        });
     }
 
     /**

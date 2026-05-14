@@ -27,6 +27,6 @@ export function sanitizeFtsQuery(query) {
     const tokens = query
         .split(/\s+/u)
         .map((part) => part.replace(/[^\p{L}\p{N}_./:-]+/gu, '').trim())
-        .filter(Boolean);
+        .filter((token) => token.length >= 2);
     return tokens.length > 0 ? tokens.map((token) => `"${token.replace(/"/gu, '""')}"`).join(' ') : '""';
 }

@@ -28,10 +28,11 @@ import {
     shouldIndexFile,
     SYMBOL_EXTENSIONS,
 } from './index-store/index.js';
-import { readTextFileSnapshot } from './io/fs/read-text.js';
 import { publishIoLifecycleEvent } from './io-observability.js';
 import { parseFileSymbols } from './io-parser.js';
 import { scanDirectory } from './io-scanner.js';
+import { readTextFileSnapshot } from './io/fs/read-text.js';
+import { fingerprintMatches } from './shared/fingerprint-match.js';
 
 /**
  * @typedef {'fresh' | 'stale' | 'failed' | 'skipped'} IoIndexFileStatus
@@ -86,6 +87,22 @@ export function createIoIndexSqlite(options) {
         invalidations: 0,
         errors: 0,
     };
+
+    /**
+     * @param {Record<string, unknown> | undefined} metadata
+     * @param {number} [maxBytes=4096] Default is `4096`
+     * @returns {string}
+     */
+    function safeMetaJson(metadata, maxBytes = 4096) {
+        try {
+            const json = JSON.stringify(metadata ?? {});
+            if (typeof json !== 'string') return JSON.stringify({ _error: 'non-serializable' });
+            if (Buffer.byteLength(json, 'utf8') <= maxBytes) return json;
+            return JSON.stringify({ _truncated: true, _maxBytes: maxBytes });
+        } catch {
+            return JSON.stringify({ _error: 'non-serializable' });
+        }
+    }
 
     const stmtDeleteFile = db.prepare('DELETE FROM copilot_io_index_files WHERE file_path = ? OR file_path LIKE ?');
     const stmtDeleteFts = db.prepare('DELETE FROM copilot_io_index_fts WHERE file_path = ? OR file_path LIKE ?');
@@ -146,10 +163,11 @@ export function createIoIndexSqlite(options) {
         WHERE file_path = ?
         LIMIT 1
     `);
-    const stmtListIndexedUnderPath = db.prepare(`
+    const stmtListIndexedUnderPathFiltered = db.prepare(`
         SELECT file_path as filePath, extension
         FROM copilot_io_index_files
-        WHERE file_path = ? OR file_path LIKE ?
+        WHERE (file_path = ? OR file_path LIKE ?)
+            AND (? = '[]' OR extension IN (SELECT value FROM json_each(?)))
         ORDER BY file_path ASC
     `);
     const stmtCountFiles = db.prepare(`
@@ -230,12 +248,13 @@ export function createIoIndexSqlite(options) {
      */
     function pruneMissingRows(rootPath, currentFilePaths, extensions) {
         const normalizedRoot = normalizeIndexPath(rootPath);
+        const normalizedExtensions = extensions.map((ext) => String(ext).toLowerCase());
+        const extensionJson = JSON.stringify(normalizedExtensions);
         const rows = /** @type {{ filePath: string; extension: string }[]} */ (
-            stmtListIndexedUnderPath.all(normalizedRoot, `${normalizedRoot}/%`)
+            stmtListIndexedUnderPathFiltered.all(normalizedRoot, `${normalizedRoot}/%`, extensionJson, extensionJson)
         );
         let pruned = 0;
         for (const row of rows) {
-            if (extensions.length > 0 && !extensions.includes(String(row.extension).toLowerCase())) continue;
             if (currentFilePaths.has(row.filePath)) continue;
             clearFileRows(row.filePath);
             pruned += 1;
@@ -296,7 +315,7 @@ export function createIoIndexSqlite(options) {
                 parseError,
                 indexedAtMs,
                 refreshedAtMs: indexedAtMs,
-                metadataJson: JSON.stringify({
+                metadataJson: safeMetaJson({
                     ...(input.metadata ?? {}),
                     indexVersion: 1,
                     fingerprint: {
@@ -446,8 +465,16 @@ export function createIoIndexSqlite(options) {
                             if (
                                 existing?.status === 'fresh' &&
                                 entry.fingerprint &&
-                                Number(existing.sizeBytes) === Number(entry.fingerprint.size) &&
-                                Number(existing.mtimeMs) === Number(entry.fingerprint.mtimeMs)
+                                fingerprintMatches(
+                                    {
+                                        mtimeMs: Number(existing.mtimeMs),
+                                        sizeBytes: Number(existing.sizeBytes),
+                                    },
+                                    {
+                                        mtimeMs: Number(entry.fingerprint.mtimeMs),
+                                        sizeBytes: Number(entry.fingerprint.size),
+                                    },
+                                )
                             ) {
                                 unchanged += 1;
                                 return;
@@ -470,6 +497,17 @@ export function createIoIndexSqlite(options) {
                                     },
                                 }),
                             );
+                            if (indexed.length % 50 === 0) {
+                                publishIoLifecycleEvent('index', 'build.progress', {
+                                    traceId,
+                                    rootPath,
+                                    workspaceRoot,
+                                    indexed: indexed.length,
+                                    total: files.length,
+                                    pct: files.length > 0 ? Math.round((indexed.length / files.length) * 100) : 100,
+                                    currentFile: entry.absolutePath,
+                                });
+                            }
                         } catch {
                             failed += 1;
                         }
@@ -525,9 +563,7 @@ export function createIoIndexSqlite(options) {
                 return /** @type {IoIndexSearchResult[]} */ (stmtSearch.all(safe, maxResults));
             }
             const prefix = normalizeIndexPath(options.pathPrefix);
-            return /** @type {IoIndexSearchResult[]} */ (
-                stmtSearchScoped.all(safe, prefix, `${prefix}/%`, maxResults)
-            );
+            return /** @type {IoIndexSearchResult[]} */ (stmtSearchScoped.all(safe, prefix, `${prefix}/%`, maxResults));
         },
 
         /**

@@ -34,6 +34,7 @@
  *     | 'webhook'
  *     | 'di'} InfraModuleRole
  *
+ *
  * @typedef {'primary' | 'secondary' | 'internal'} InfraModuleTier
  *
  * @typedef {'stable' | 'watch' | 'hotspot'} InfraModuleRisk
@@ -355,7 +356,7 @@ export const INFRA_MODULE_LAYOUT = Object.freeze([
         tier: 'secondary',
         risk: 'watch',
         public: false,
-        summary: 'Infraestrutura de webhooks do runtime.',
+        summary: 'Infraestrutura de webhooks do runtime (integra com #copilot/config e #copilot/core).',
     },
     {
         path: 'di-tokens.js',

@@ -31,6 +31,7 @@ import { buildTool } from '../infra/tool-factory.js';
 
 /** @type {Map<number, number>} minute-bucket → request count */
 const RATE_WINDOW = new Map();
+const REDIRECT_BLOCKED_PORTS = new Set([22, 25, 3306, 5432, 6379, 8080, 8443, 9200, 27017]);
 
 /**
  * Reset util para testes — limpa buckets de rate-limit em memória.
@@ -85,6 +86,18 @@ function sanitizeWebSearchResults(results) {
     };
 }
 
+/**
+ * @param {string} urlText
+ * @returns {void}
+ */
+function assertRedirectPortAllowed(urlText) {
+    const parsed = new URL(urlText);
+    const explicitPort = parsed.port ? Number.parseInt(parsed.port, 10) : null;
+    if (explicitPort !== null && Number.isFinite(explicitPort) && REDIRECT_BLOCKED_PORTS.has(explicitPort)) {
+        throw new Error(`Redirect bloqueado para porta sensível: ${explicitPort} (${urlText})`);
+    }
+}
+
 // ─── Tool: web_fetch_local ───────────────────────────────────────────────────
 
 /**
@@ -125,7 +138,9 @@ async function fetchWithRedirectPolicy(startUrl, maxRedirects, opts = {}) {
             if (!check.ok || !check.url) {
                 throw new Error(`Redirect bloqueado por policy: ${check.reason} (→ ${resolvedUrl})`);
             }
-            currentUrl = check.url.toString();
+            const approvedUrl = check.url.toString();
+            assertRedirectPortAllowed(approvedUrl);
+            currentUrl = approvedUrl;
             redirectCount += 1;
             continue;
         }
@@ -136,7 +151,9 @@ async function fetchWithRedirectPolicy(startUrl, maxRedirects, opts = {}) {
             if (!check.ok || !check.url) {
                 throw new Error(`Redirect bloqueado por policy: ${check.reason} (→ ${responseUrl})`);
             }
-            currentUrl = check.url.toString();
+            const approvedUrl = check.url.toString();
+            assertRedirectPortAllowed(approvedUrl);
+            currentUrl = approvedUrl;
         }
 
         return { response, finalUrl: currentUrl, redirectCount };
@@ -317,6 +334,12 @@ const webSearchTool = buildTool({
         maxResults: z.number().int().min(1).optional().describe('Número sugerido de resultados a retornar.'),
     }),
     handler: async (/** @type {{ query: string; maxResults?: number }} */ { query, maxResults }) => {
+        const MAX_QUERY_CHARS = 500;
+        const safeQuery = typeof query === 'string' ? query.slice(0, MAX_QUERY_CHARS).trim() : '';
+        if (!safeQuery) {
+            return { success: false, error: 'Query inválida.' };
+        }
+
         const rate = checkRateLimit();
         if (!rate.ok) {
             return {
@@ -336,7 +359,7 @@ const webSearchTool = buildTool({
             typeof maxResults === 'number' && Number.isFinite(maxResults) ? maxResults : Number.POSITIVE_INFINITY;
 
         // F4.4 (UPG-09): tenta DDG Instant Answer JSON API primeiro (não requer JS, sem scraping frágil)
-        const jsonUrl = `https://api.duckduckgo.com/?q=${encodeURIComponent(query)}&format=json&no_html=1&skip_disambig=1`;
+        const jsonUrl = `https://api.duckduckgo.com/?q=${encodeURIComponent(safeQuery)}&format=json&no_html=1&skip_disambig=1`;
 
         try {
             // FIX WT-WEB-01: redirect: 'follow' bypassa SSRF policy — usar 'error' para que redirecionamentos inesperados lancem erro
@@ -373,7 +396,7 @@ const webSearchTool = buildTool({
                 // AbstractText (resposta direta para queries com resultado instantâneo)
                 if (data['AbstractText'] && data['AbstractURL']) {
                     results.push({
-                        title: /** @type {string} */ (data['Heading'] ?? query),
+                        title: /** @type {string} */ (data['Heading'] ?? safeQuery),
                         url: /** @type {string} */ (data['AbstractURL']),
                         snippet: /** @type {string} */ (data['AbstractText']),
                     });
@@ -431,12 +454,12 @@ const webSearchTool = buildTool({
                     publishIoOperation(io, { success: true });
                     log(
                         'INFO',
-                        `[copilot/web_search] DDG JSON API: query="${query}" → ${safeResults.length} resultados`,
+                        `[copilot/web_search] DDG JSON API: query="${safeQuery}" → ${safeResults.length} resultados`,
                     );
                     return withIoMeta(
                         {
                             success: true,
-                            query,
+                            query: safeQuery,
                             results: sanitizedResults.results,
                             advisoryMaxResults: maxResults ?? null,
                             sanitized: sanitizedResults.sanitized,
@@ -448,7 +471,7 @@ const webSearchTool = buildTool({
                 // Sem resultados JSON — cai para HTML scraping
                 log(
                     'WARN',
-                    `[copilot/web_search] DDG JSON API retornou 0 resultados para query="${query}" — usando HTML scraping`,
+                    `[copilot/web_search] DDG JSON API retornou 0 resultados para query="${safeQuery}" — usando HTML scraping`,
                 );
             }
         } catch (e) {
@@ -460,7 +483,7 @@ const webSearchTool = buildTool({
         }
 
         // Fallback: HTML scraping DDG Lite
-        const searchUrl = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`;
+        const searchUrl = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(safeQuery)}`;
 
         try {
             // FIX WT-WEB-01: redirect: 'follow' bypassa SSRF policy — usar 'error' para evitar SSRF por redirect
@@ -517,7 +540,7 @@ const webSearchTool = buildTool({
             if (results.length === 0) {
                 log(
                     'WARN',
-                    `[copilot/web_search] query="${query}" retornou 0 resultados — DDG pode estar bloqueando ou query sem correspondência.`,
+                    `[copilot/web_search] query="${safeQuery}" retornou 0 resultados — DDG pode estar bloqueando ou query sem correspondência.`,
                 );
             }
             // F6.4 (BUG-LEVE-04): filtrar URLs privadas/SSRF nos resultados DDG (HTML scraping)
@@ -542,11 +565,11 @@ const webSearchTool = buildTool({
                 },
             });
             publishIoOperation(io, { success: true });
-            log('INFO', `[copilot/web_search] query="${query}" → ${safeHtmlResults.length} resultados`);
+            log('INFO', `[copilot/web_search] query="${safeQuery}" → ${safeHtmlResults.length} resultados`);
             return withIoMeta(
                 {
                     success: true,
-                    query,
+                    query: safeQuery,
                     results: sanitizedResults.results,
                     advisoryMaxResults: maxResults ?? null,
                     sanitized: sanitizedResults.sanitized,

@@ -9,7 +9,7 @@
  */
 
 import { channel } from 'node:diagnostics_channel';
-import { performance } from 'node:perf_hooks';
+import { createHistogram, performance } from 'node:perf_hooks';
 import { logSwallowed } from '../core/error-handlers.js';
 
 const ioOperationChannel = channel('copilot.io.operation');
@@ -25,6 +25,22 @@ const lifecycleChannels = {
     scan: ioScanChannel,
 };
 
+/** @type {Map<string, ReturnType<typeof createHistogram>>} */
+const _latencyHistograms = new Map();
+
+/**
+ * @param {string} operation
+ * @returns {ReturnType<typeof createHistogram>}
+ */
+function getOrCreateHistogram(operation) {
+    let histogram = _latencyHistograms.get(operation);
+    if (!histogram) {
+        histogram = createHistogram();
+        _latencyHistograms.set(operation, histogram);
+    }
+    return histogram;
+}
+
 /**
  * @returns {number}
  */
@@ -39,6 +55,7 @@ export function nowIoMs() {
  */
 export function publishIoOperation(io, opts) {
     try {
+        recordIoLatency(io.operation, io.durationMs);
         ioOperationChannel.publish({
             ts: Date.now(),
             success: opts.success,
@@ -48,6 +65,35 @@ export function publishIoOperation(io, opts) {
     } catch (error) {
         logSwallowed(error, 'io-observability.diagnostics_channel');
     }
+}
+
+/**
+ * @param {string} operation
+ * @param {number | undefined} durationMs
+ * @returns {void}
+ */
+export function recordIoLatency(operation, durationMs) {
+    if (!Number.isFinite(durationMs) || Number(durationMs) <= 0) return;
+    const ms = Math.max(1, Math.round(Number(durationMs)));
+    getOrCreateHistogram(operation).record(ms);
+}
+
+/**
+ * @returns {Record<string, { mean: number; p50: number; p95: number; p99: number; count: number }>}
+ */
+export function getIoLatencyStats() {
+    /** @type {Record<string, { mean: number; p50: number; p95: number; p99: number; count: number }>} */
+    const stats = {};
+    for (const [operation, histogram] of _latencyHistograms) {
+        stats[operation] = {
+            mean: Math.round(histogram.mean),
+            p50: histogram.percentile(50),
+            p95: histogram.percentile(95),
+            p99: histogram.percentile(99),
+            count: histogram.count,
+        };
+    }
+    return stats;
 }
 
 /**

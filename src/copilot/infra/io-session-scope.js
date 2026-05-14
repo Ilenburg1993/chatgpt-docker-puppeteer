@@ -83,7 +83,6 @@ import { endSessionScope, startSessionScope, warmFromDirectory } from './io-pref
  * @property {number} warmDurationMs
  * @property {boolean} ready
  * @property {number} startedAt
- * @property {Promise<void>} _warmPromise
  */
 
 // ---------------------------------------------------------------------------
@@ -92,6 +91,8 @@ import { endSessionScope, startSessionScope, warmFromDirectory } from './io-pref
 
 /** @type {Map<string, _InternalScope>} */
 const _registry = new Map();
+/** @type {Map<string, Promise<void>>} */
+const _warmPromises = new Map();
 
 const SYMBOL_PARSE_EXTENSIONS = new Set(['.js', '.ts', '.mjs', '.cjs', '.jsx', '.tsx', '.mts', '.cts']);
 
@@ -168,7 +169,7 @@ registerInvalidationHook((filePath, event) => {
 
 /**
  * Declara um escopo de trabalho para a sessão LLM-B. Inicia prefetch + parse em background (não bloqueia). O chamador
- * pode fazer `await scope._warmPromise` se quiser aguardar.
+ * pode fazer `await awaitReady()` para aguardar warm-up.
  *
  * @param {ScopeDeclareOptions} opts
  * @returns {{ sessionId: string; ready: boolean; awaitReady: () => Promise<ScopeStats> }}
@@ -201,12 +202,11 @@ export function declareScope(opts) {
         warmDurationMs: 0,
         ready: false,
         startedAt: Date.now(),
-        _warmPromise: Promise.resolve(),
     };
     _registry.set(sessionId, scope);
 
     // Inicia background warm-up
-    scope._warmPromise = (async () => {
+    const warmPromise = (async () => {
         try {
             let resolvedPaths = [...(explicitPaths ?? [])];
 
@@ -284,12 +284,13 @@ export function declareScope(opts) {
             scope.ready = true; // marca ready mesmo em erro para não travar awaitReady
         }
     })();
+    _warmPromises.set(sessionId, warmPromise);
 
     return {
         sessionId,
         ready: false,
         awaitReady: async () => {
-            await scope._warmPromise;
+            await (_warmPromises.get(sessionId) ?? Promise.resolve());
             return (
                 getScopeStats(sessionId) ?? {
                     sessionId,
@@ -464,6 +465,7 @@ export async function refreshScope(sessionId, modifiedPaths) {
 export function closeScope(sessionId) {
     const stats = getScopeStats(sessionId);
     _registry.delete(sessionId);
+    _warmPromises.delete(sessionId);
     // Tenta encerrar escopo de prefetch também (best-effort)
     endSessionScope(sessionId);
     return stats;

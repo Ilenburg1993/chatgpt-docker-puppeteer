@@ -15,13 +15,29 @@ import pLimit from 'p-limit';
 import { buildIoMeta, createIoTraceId } from '../core/io-contracts.js';
 import { DEFAULT_BLOCKED_PATH_SEGMENTS } from '../core/io-policy.js';
 import { nowIoMs, publishIoLifecycleEvent, publishIoOperation } from './io-observability.js';
+import { hasNullByte } from './policy/path-resource.js';
+import { mapInBatches, normalizeBatchSize } from './scan/batching.js';
 import { buildFileFingerprint, classifyStats } from './scan/fingerprint.js';
 import { loadGitignoreMatcher } from './scan/gitignore.js';
 import { matchesAnyPattern, matchesFilter } from './scan/glob.js';
-import { mapInBatches, normalizeBatchSize } from './scan/batching.js';
 import { readEnvPositiveInt } from './shared/env.js';
 
 const DEFAULT_SCAN_BATCH_SIZE = readEnvPositiveInt('IO_SCAN_BATCH_SIZE', 512);
+
+/**
+ * @param {unknown} candidate
+ * @param {string} label
+ * @returns {asserts candidate is string}
+ */
+function assertValidScannerPath(candidate, label) {
+    if (typeof candidate !== 'string' || candidate.length === 0 || hasNullByte(candidate)) {
+        const error = /** @type {TypeError & { code?: string }} */ (
+            new TypeError(`${label} inválido: ${String(candidate)}`)
+        );
+        error.code = 'ERR_INVALID_ARG_VALUE';
+        throw error;
+    }
+}
 
 /**
  * @typedef {object} IoScanEntry
@@ -62,6 +78,7 @@ const DEFAULT_SCAN_BATCH_SIZE = readEnvPositiveInt('IO_SCAN_BATCH_SIZE', 512);
  * }>}
  */
 export async function scanDirectory(rootPath, options = {}) {
+    assertValidScannerPath(rootPath, 'rootPath');
     const traceId = options.traceId ?? createIoTraceId();
     const startedAt = nowIoMs();
     const recursive = Boolean(options.recursive);
@@ -70,8 +87,9 @@ export async function scanDirectory(rootPath, options = {}) {
     const respectDenylist = options.respectDenylist !== false;
     const respectGitignore = options.respectGitignore === true;
     const workspaceRoot = options.workspaceRoot ?? rootPath;
-    const includePatterns = options.include ?? [];
-    const excludePatterns = options.exclude ?? [];
+    assertValidScannerPath(workspaceRoot, 'workspaceRoot');
+    const includePatterns = (options.include ?? []).filter((pattern) => typeof pattern === 'string' && pattern);
+    const excludePatterns = (options.exclude ?? []).filter((pattern) => typeof pattern === 'string' && pattern);
     const includeFingerprint = options.fingerprint !== false;
     const concurrency =
         Number.isFinite(options.concurrency) && Number(options.concurrency) > 0
@@ -81,7 +99,9 @@ export async function scanDirectory(rootPath, options = {}) {
     const limit = pLimit(concurrency);
     const gitignore = respectGitignore ? await loadGitignoreMatcher(workspaceRoot) : ignore();
     const blockedSegments = new Set(
-        (options.blockedSegments ?? DEFAULT_BLOCKED_PATH_SEGMENTS).map((segment) => segment.toLowerCase()),
+        (options.blockedSegments ?? DEFAULT_BLOCKED_PATH_SEGMENTS)
+            .filter((segment) => typeof segment === 'string' && segment)
+            .map((segment) => segment.toLowerCase()),
     );
     let scannedEntries = 0;
     publishIoLifecycleEvent('scan', 'start', {
@@ -101,61 +121,56 @@ export async function scanDirectory(rootPath, options = {}) {
     async function scan(dir, currentDepth) {
         const names = await readdir(dir);
         names.sort((a, b) => a.localeCompare(b));
-        const entries = await mapInBatches(
-            names,
-            batchSize,
-            async (name) => {
-                if (!showHidden && name.startsWith('.')) return null;
-                if (respectDenylist && blockedSegments.has(name.toLowerCase())) return null;
-                const absolutePath = join(dir, name);
-                if (matchesAnyPattern(absolutePath, workspaceRoot, excludePatterns)) return null;
-                const relativePath = relative(workspaceRoot, absolutePath).replace(/\\/g, '/');
-                if (respectGitignore && relativePath && gitignore.ignores(relativePath)) return null;
-                let stats;
-                try {
-                    stats = await limit(() => lstat(absolutePath));
-                } catch {
-                    return null;
-                }
-                const type = classifyStats(stats);
-                const isDirectory = type === 'directory';
-                const includeByPattern =
-                    includePatterns.length === 0 || matchesAnyPattern(absolutePath, workspaceRoot, includePatterns);
-                const includeEntry = (matchesFilter(name, options.filter) && includeByPattern) || isDirectory;
-                if (!includeEntry) return null;
+        const entries = await mapInBatches(names, batchSize, async (name) => {
+            if (!showHidden && name.startsWith('.')) return null;
+            if (respectDenylist && blockedSegments.has(name.toLowerCase())) return null;
+            const absolutePath = join(dir, name);
+            if (matchesAnyPattern(absolutePath, workspaceRoot, excludePatterns)) return null;
+            const relativePath = relative(workspaceRoot, absolutePath).replace(/\\/g, '/');
+            if (respectGitignore && relativePath && gitignore.ignores(relativePath)) return null;
+            let stats;
+            try {
+                stats = await limit(() => lstat(absolutePath));
+            } catch {
+                return null;
+            }
+            const type = classifyStats(stats);
+            const isDirectory = type === 'directory';
+            const includeByPattern =
+                includePatterns.length === 0 || matchesAnyPattern(absolutePath, workspaceRoot, includePatterns);
+            const includeEntry = (matchesFilter(name, options.filter) && includeByPattern) || isDirectory;
+            if (!includeEntry) return null;
 
-                const entry = /** @type {IoScanEntry} */ ({
-                    name,
-                    type,
-                    path: options.workspaceRoot ? relative(options.workspaceRoot, absolutePath) : absolutePath,
-                    absolutePath,
+            const entry = /** @type {IoScanEntry} */ ({
+                name,
+                type,
+                path: options.workspaceRoot ? relative(options.workspaceRoot, absolutePath) : absolutePath,
+                absolutePath,
+            });
+            if (type === 'file') entry.size = stats.size;
+            if (includeFingerprint && type === 'file') {
+                entry.fingerprint = await buildFileFingerprint(absolutePath, stats, limit);
+            }
+            scannedEntries += 1;
+            if (scannedEntries % 500 === 0) {
+                publishIoLifecycleEvent('scan', 'progress', {
+                    traceId,
+                    rootPath,
+                    scannedEntries,
+                    currentPath: absolutePath,
                 });
-                if (type === 'file') entry.size = stats.size;
-                if (includeFingerprint && type === 'file') {
-                    entry.fingerprint = await buildFileFingerprint(absolutePath, stats, limit);
-                }
-                scannedEntries += 1;
-                if (scannedEntries % 500 === 0) {
-                    publishIoLifecycleEvent('scan', 'progress', {
-                        traceId,
-                        rootPath,
-                        scannedEntries,
-                        currentPath: absolutePath,
-                    });
-                }
-                return entry;
-            },
-        );
+            }
+            return entry;
+        });
         const visibleEntries = entries.filter((entry) => entry !== null);
-        await mapInBatches(
-            visibleEntries,
-            batchSize,
-            async (entry) => {
-                if (entry.type === 'directory' && recursive && currentDepth < maxDepth) {
+        if (recursive && currentDepth < maxDepth) {
+            const directoryEntries = visibleEntries.filter((entry) => entry.type === 'directory');
+            await Promise.all(
+                directoryEntries.map(async (entry) => {
                     entry.children = await scan(entry.absolutePath, currentDepth + 1);
-                }
-            },
-        );
+                }),
+            );
+        }
         return visibleEntries;
     }
 

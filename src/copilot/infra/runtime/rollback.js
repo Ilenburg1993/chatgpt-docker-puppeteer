@@ -1,0 +1,117 @@
+// @ts-check
+/**
+ * Planejamento e serialização de rollback para change sets de I/O.
+ *
+ * @module copilot/infra/runtime/rollback
+ */
+
+import { randomUUID } from 'node:crypto';
+import { sha256 } from '../shared/hash.js';
+
+/**
+ * @typedef {import('./transaction.js').IoChangeSet} IoChangeSet
+ *
+ * @typedef {import('./transaction.js').IoRollbackHint} IoRollbackHint
+ *
+ * @typedef {object} IoRollbackStep
+ * @property {number} order
+ * @property {string} entryId
+ * @property {IoRollbackHint['action']} action
+ * @property {string} target
+ * @property {string | null} previousHash
+ * @property {string | null} contentHash
+ * @property {number | null} bytes
+ * @property {string | null} snapshotBase64
+ *
+ * @typedef {object} IoRollbackToken
+ * @property {number} version
+ * @property {string} tokenId
+ * @property {string} changeSetId
+ * @property {number} createdAtMs
+ * @property {number} stepCount
+ * @property {IoRollbackStep[]} steps
+ * @property {string} digest
+ */
+
+const ROLLBACK_TOKEN_VERSION = 1;
+
+/**
+ * @param {IoRollbackStep[]} steps
+ * @param {string} changeSetId
+ * @returns {string}
+ */
+function buildDigest(steps, changeSetId) {
+    return sha256(JSON.stringify({ changeSetId, steps }));
+}
+
+/**
+ * @param {IoChangeSet} changeSet
+ * @returns {IoRollbackStep[]}
+ */
+export function buildIoRollbackPlan(changeSet) {
+    const rollbackEntries = [...changeSet.entries]
+        .reverse()
+        .filter((entry) => entry.rollback !== null)
+        .map((entry, index) => {
+            const rollback = /** @type {IoRollbackHint} */ (entry.rollback);
+            return {
+                order: index + 1,
+                entryId: entry.entryId,
+                action: rollback.action,
+                target: rollback.target,
+                previousHash: rollback.previousHash ?? null,
+                contentHash: rollback.contentHash ?? null,
+                bytes: rollback.bytes ?? null,
+                snapshotBase64: rollback.snapshotBase64 ?? null,
+            };
+        });
+    return rollbackEntries;
+}
+
+/**
+ * @param {IoChangeSet} changeSet
+ * @returns {IoRollbackToken}
+ */
+export function createIoRollbackToken(changeSet) {
+    const steps = buildIoRollbackPlan(changeSet);
+    return {
+        version: ROLLBACK_TOKEN_VERSION,
+        tokenId: randomUUID(),
+        changeSetId: changeSet.changeSetId,
+        createdAtMs: Date.now(),
+        stepCount: steps.length,
+        steps,
+        digest: buildDigest(steps, changeSet.changeSetId),
+    };
+}
+
+/**
+ * @param {IoRollbackToken} token
+ * @returns {boolean}
+ */
+export function verifyIoRollbackToken(token) {
+    if (token.version !== ROLLBACK_TOKEN_VERSION) return false;
+    const expected = buildDigest(token.steps, token.changeSetId);
+    return expected === token.digest;
+}
+
+/**
+ * @param {IoRollbackToken} token
+ * @returns {string}
+ */
+export function serializeIoRollbackToken(token) {
+    return Buffer.from(JSON.stringify(token), 'utf8').toString('base64url');
+}
+
+/**
+ * @param {string} serialized
+ * @returns {IoRollbackToken}
+ */
+export function parseIoRollbackToken(serialized) {
+    const raw = Buffer.from(serialized, 'base64url').toString('utf8');
+    const token = /** @type {IoRollbackToken} */ (JSON.parse(raw));
+    if (!verifyIoRollbackToken(token)) {
+        throw new Error('Rollback token inválido: digest mismatch ou versão incompatível.');
+    }
+    return token;
+}

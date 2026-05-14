@@ -56,17 +56,24 @@ const _symbolCache = new LRUCache(
     }),
 );
 
-// Registra auto-invalidação do parser cache quando io-cache invalida um path (ex: após escrita).
-registerInvalidationHook((filePath, event) => {
-    const normalized = normalizeParserPath(filePath);
-    _symbolCache.delete(normalized);
-    if (event?.recursive === true) {
-        const prefix = `${normalized}${nodePath.sep}`;
-        for (const key of _symbolCache.keys()) {
-            if (String(key).startsWith(prefix)) _symbolCache.delete(key);
+/** @type {(() => void) | null} */
+let _parserInvalidationUnregister = null;
+
+function ensureInvalidationHook() {
+    if (_parserInvalidationUnregister) return;
+    _parserInvalidationUnregister = registerInvalidationHook((filePath, event) => {
+        const normalized = normalizeParserPath(filePath);
+        _symbolCache.delete(normalized);
+        if (event?.recursive === true) {
+            const prefix = `${normalized}${nodePath.sep}`;
+            for (const key of _symbolCache.keys()) {
+                if (String(key).startsWith(prefix)) _symbolCache.delete(key);
+            }
         }
-    }
-});
+    });
+}
+
+ensureInvalidationHook();
 
 // ---------------------------------------------------------------------------
 // Typedefs
@@ -113,19 +120,20 @@ registerInvalidationHook((filePath, event) => {
 // Babel parser loader (lazy para não quebrar se não disponível)
 // ---------------------------------------------------------------------------
 
-/** @type {((code: string, opts: object) => any) | null} */
+/** @type {((code: string, opts: object) => any) | null | 'unavailable'} */
 let _babelParse = null;
 
 /** @returns {Promise<((code: string, opts: object) => any) | null>} */
 async function getBabelParse() {
-    if (_babelParse !== null) return _babelParse;
+    if (_babelParse !== null) return _babelParse === 'unavailable' ? null : _babelParse;
     try {
         const m = await import('@babel/parser');
         _babelParse = m.parse ?? m.default?.parse ?? null;
+        if (!_babelParse) _babelParse = 'unavailable';
     } catch {
-        _babelParse = null;
+        _babelParse = 'unavailable';
     }
-    return _babelParse;
+    return _babelParse === 'unavailable' ? null : _babelParse;
 }
 
 // ---------------------------------------------------------------------------
@@ -165,9 +173,10 @@ function classifyExtension(ext) {
  * @returns {any | null} AST ou null se falhou
  */
 function tryBabelParse(code, lang) {
-    if (!_babelParse) return null;
+    const parser = _babelParse;
+    if (!parser || parser === 'unavailable') return null;
     try {
-        return _babelParse(code, {
+        return parser(code, {
             sourceType: 'unambiguous',
             allowImportExportEverywhere: true,
             allowReturnOutsideFunction: true,
@@ -443,4 +452,15 @@ export async function parseFileForContext(filePath, content) {
  */
 export function getParserCacheStats() {
     return { size: _symbolCache.size, maxSize: 500 };
+}
+
+/**
+ * Limpa cache do parser e desmonta o hook de invalidação. Útil para isolamento em testes.
+ *
+ * @returns {void}
+ */
+export function resetParserCacheForTest() {
+    _symbolCache.clear();
+    _parserInvalidationUnregister?.();
+    _parserInvalidationUnregister = null;
 }

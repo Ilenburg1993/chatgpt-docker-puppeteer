@@ -25,6 +25,7 @@ import * as fsPromises from 'node:fs/promises';
 import * as nodePath from 'node:path';
 import { normalizeIoCacheKey } from './cache/l1/index.js';
 import { publishIoInvalidation, registerIoInvalidationHook } from './io/invalidation/bus.js';
+import { fingerprintMatches } from './shared/fingerprint-match.js';
 
 // ---------------------------------------------------------------------------
 // Config
@@ -169,7 +170,12 @@ export function getIoL1Cache() {
                 const currentMtime = stat.mtimeMs;
                 const currentSize = stat.size;
 
-                if (currentMtime !== entry.mtime || currentSize !== entry.size) {
+                const isFresh = fingerprintMatches(
+                    { mtimeMs: entry.mtime, sizeBytes: entry.size },
+                    { mtimeMs: currentMtime, sizeBytes: currentSize },
+                );
+
+                if (!isFresh) {
                     // Arquivo modificado externamente → invalida a entrada
                     _lru.delete(key);
                     _staleHits++;

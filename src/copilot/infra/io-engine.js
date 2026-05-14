@@ -16,25 +16,20 @@ import { promisify } from 'node:util';
 import { buildIoMeta, createIoTraceId, withIoMeta } from '../core/io-contracts.js';
 import { sanitizeIoTextOutput } from '../core/io-policy.js';
 import { getIoL2Cache } from './io-cache-l2-registry.js';
-import {
-    getIoL1Cache,
-    getVerifiedIoL1Entry,
-    makeBytesKey,
-    makeTextKey,
-    normalizeIoCacheKey,
-} from './io-cache.js';
+import { getIoL1Cache, getVerifiedIoL1Entry, makeBytesKey, makeTextKey, normalizeIoCacheKey } from './io-cache.js';
 import { findIoIndexSymbol, getIoIndexStats, searchIoIndex } from './io-index-registry.js';
 import { withIoResourceLock, withIoResourceLocks } from './io-locks.js';
+import { nowIoMs, publishIoOperation } from './io-observability.js';
 import { appendFileUnlocked } from './io/fs/append.js';
 import { copyFileUnlocked } from './io/fs/copy.js';
 import { mkdirPathUnlocked } from './io/fs/mkdir.js';
 import { moveFileUnlocked } from './io/fs/move.js';
 import { readBytesFileSnapshot } from './io/fs/read-bytes.js';
 import { readTextLineChunks } from './io/fs/read-chunks.js';
-import { invalidateIoCacheTiers, invalidateIoCacheTierSubtrees } from './io/invalidation/cache-tiers.js';
 import { deleteFileUnlocked, removePathUnlocked } from './io/fs/remove.js';
 import { statPathSnapshot } from './io/fs/stat.js';
 import { normalizeWritePayload, writeAtomicFileUnlocked } from './io/fs/write-atomic.js';
+import { invalidateIoCacheTiers, invalidateIoCacheTierSubtrees } from './io/invalidation/cache-tiers.js';
 import { buildSimpleTextDiff, computeTextPatch } from './io/patch/index.js';
 import {
     buildGrepArgs,
@@ -47,14 +42,16 @@ import {
     paginateSearchItems,
     paginateSearchText,
 } from './io/search/index.js';
-import { nowIoMs, publishIoOperation } from './io-observability.js';
 import { resolveIoSearchBudget } from './policy/budgets.js';
+import { hasNullByte } from './policy/path-resource.js';
 import { assertExpectedSha256 } from './policy/preconditions.js';
 import { sha256 } from './shared/hash.js';
 
 const execFileAsync = promisify(execFile);
 
-const IO_SEARCH_BUDGET = resolveIoSearchBudget();
+/** @type {ReturnType<typeof resolveIoSearchBudget> | null} */
+let _ioSearchBudget = null;
+const ROLLBACK_SNAPSHOT_MAX_BYTES = 256 * 1024;
 
 /** @type {boolean | null} */
 let _rgAvailable = null;
@@ -65,6 +62,27 @@ let _rgAvailable = null;
  */
 function elapsedMs(startedAt) {
     return Math.max(0, Math.round(nowIoMs() - startedAt));
+}
+
+/**
+ * @returns {ReturnType<typeof resolveIoSearchBudget>}
+ */
+function getIoSearchBudget() {
+    return (_ioSearchBudget ??= resolveIoSearchBudget());
+}
+
+/**
+ * @param {unknown} filePath
+ * @returns {asserts filePath is string}
+ */
+function assertValidIoFilePath(filePath) {
+    if (typeof filePath !== 'string' || hasNullByte(filePath)) {
+        const error = /** @type {TypeError & { code?: string }} */ (
+            new TypeError(`Path inválido: ${String(filePath)}`)
+        );
+        error.code = 'ERR_INVALID_ARG_VALUE';
+        throw error;
+    }
 }
 
 /**
@@ -95,12 +113,48 @@ function sanitizeSearchOutput(stdout) {
 }
 
 /**
+ * @param {Buffer} content
+ * @returns {{ snapshotBase64: string | null; snapshotTruncated: boolean }}
+ */
+function buildRollbackSnapshot(content) {
+    if (content.byteLength <= ROLLBACK_SNAPSHOT_MAX_BYTES) {
+        return { snapshotBase64: content.toString('base64'), snapshotTruncated: false };
+    }
+    return { snapshotBase64: null, snapshotTruncated: true };
+}
+
+/**
  * @param {string} filePath
- * @returns {Promise<{ contentHash: string; bytesRead: number }>}
+ * @returns {Promise<{
+ *     contentHash: string;
+ *     bytesRead: number;
+ *     snapshotBase64: string | null;
+ *     snapshotTruncated: boolean;
+ * }>}
  */
 async function readMutationSnapshot(filePath) {
     const content = await fs.readFile(filePath);
-    return { contentHash: sha256(content), bytesRead: content.byteLength };
+    const snapshot = buildRollbackSnapshot(content);
+    return { contentHash: sha256(content), bytesRead: content.byteLength, ...snapshot };
+}
+
+/**
+ * @param {string} filePath
+ * @returns {Promise<{
+ *     contentHash: string;
+ *     bytesRead: number;
+ *     snapshotBase64: string | null;
+ *     snapshotTruncated: boolean;
+ * } | null>}
+ */
+async function readOptionalMutationSnapshot(filePath) {
+    try {
+        return await readMutationSnapshot(filePath);
+    } catch (error) {
+        const code = /** @type {{ code?: unknown }} */ (error)?.code;
+        if (code === 'ENOENT' || code === 'ENOTDIR') return null;
+        throw error;
+    }
 }
 
 /**
@@ -143,7 +197,7 @@ function publishAndReturn(io, success, error) {
  * Lê bytes completos de um arquivo.
  *
  * @param {string} filePath
- * @param {{ traceId?: string; advisoryLimits?: Record<string, unknown> }} [options]
+ * @param {{ traceId?: string; advisoryLimits?: Record<string, unknown>; signal?: AbortSignal }} [options]
  * @returns {Promise<{
  *     path: string;
  *     content: Buffer;
@@ -152,6 +206,7 @@ function publishAndReturn(io, success, error) {
  * }>}
  */
 export async function readBytes(filePath, options = {}) {
+    assertValidIoFilePath(filePath);
     const traceId = options.traceId ?? createIoTraceId();
     const startedAt = nowIoMs();
     try {
@@ -233,7 +288,7 @@ export async function readBytes(filePath, options = {}) {
                 l2Cache.invalidatePath(filePath);
             }
         }
-        const snapshot = await readBytesFileSnapshot(filePath);
+        const snapshot = await readBytesFileSnapshot(filePath, options.signal ? { signal: options.signal } : {});
         const content = snapshot.content;
         const _now = Date.now();
         /** @type {import('./io-cache.js').IoCacheEntry} */
@@ -300,6 +355,7 @@ export async function readBytes(filePath, options = {}) {
  *     endLine?: number;
  *     traceId?: string;
  *     advisoryLimits?: Record<string, unknown>;
+ *     signal?: AbortSignal;
  * }} [options]
  * @returns {Promise<{
  *     path: string;
@@ -311,6 +367,7 @@ export async function readBytes(filePath, options = {}) {
  * }>}
  */
 export async function readText(filePath, options = {}) {
+    assertValidIoFilePath(filePath);
     const traceId = options.traceId ?? createIoTraceId();
     const startedAt = nowIoMs();
     let failurePublished = false;
@@ -443,7 +500,7 @@ export async function readText(filePath, options = {}) {
             }
         }
 
-        const textSnapshot = await readBytesFileSnapshot(filePath);
+        const textSnapshot = await readBytesFileSnapshot(filePath, options.signal ? { signal: options.signal } : {});
         raw = textSnapshot.content;
         const baseMeta = {
             operation: /** @type {const} */ ('read'),
@@ -558,6 +615,7 @@ export async function readLines(filePath, options = {}) {
  * }>}
  */
 export async function readTextChunks(filePath, options = {}) {
+    assertValidIoFilePath(filePath);
     const traceId = options.traceId ?? createIoTraceId();
     const startedAt = nowIoMs();
     try {
@@ -635,6 +693,7 @@ export async function readTextChunks(filePath, options = {}) {
  * }>}
  */
 export async function writeFileAtomic(filePath, content, options = {}) {
+    assertValidIoFilePath(filePath);
     const traceId = options.traceId ?? createIoTraceId();
     const startedAt = nowIoMs();
     const { payload, bytes } = normalizeWritePayload(filePath, content, options.encoding ?? 'utf8');
@@ -732,6 +791,7 @@ export async function writeFileAtomic(filePath, content, options = {}) {
  * @param {Parameters<typeof writeFileAtomic>[2] & { createParentDirs?: boolean }} [options]
  */
 export async function createOrReplaceFileAtomic(filePath, content, options = {}) {
+    assertValidIoFilePath(filePath);
     if (options.createParentDirs !== false) {
         await mkdirPathLocked(dirname(filePath), {
             recursive: true,
@@ -758,6 +818,7 @@ export async function createOrReplaceFileAtomic(filePath, content, options = {})
  * }} [options]
  */
 export async function appendTextLocked(filePath, content, options = {}) {
+    assertValidIoFilePath(filePath);
     const traceId = options.traceId ?? createIoTraceId();
     const startedAt = nowIoMs();
     const { payload, bytes } = normalizeWritePayload(filePath, content, options.encoding ?? 'utf8');
@@ -816,6 +877,7 @@ export async function appendTextLocked(filePath, content, options = {}) {
  * }>}
  */
 export async function statPath(filePath, options = {}) {
+    assertValidIoFilePath(filePath);
     const traceId = options.traceId ?? createIoTraceId();
     const startedAt = nowIoMs();
     try {
@@ -865,11 +927,15 @@ export async function statPath(filePath, options = {}) {
  * }>}
  */
 export async function mkdirPathLocked(dirPath, options = {}) {
+    assertValidIoFilePath(dirPath);
     const traceId = options.traceId ?? createIoTraceId();
     const startedAt = nowIoMs();
     try {
         const { waitMs } = await withIoResourceLock(dirPath, async () =>
-            mkdirPathUnlocked(dirPath, { recursive: Boolean(options.recursive), ...(options.mode === undefined ? {} : { mode: options.mode }) }),
+            mkdirPathUnlocked(dirPath, {
+                recursive: Boolean(options.recursive),
+                ...(options.mode === undefined ? {} : { mode: options.mode }),
+            }),
         );
         const io = publishAndReturn(
             buildIoMeta({
@@ -918,9 +984,12 @@ export async function mkdirPathLocked(dirPath, options = {}) {
  *     lockWaitMs: number;
  *     previousHash: string;
  *     previousBytes: number;
+ *     previousSnapshotBase64: string | null;
+ *     previousSnapshotTruncated: boolean;
  * }>}
  */
 export async function deleteFileLocked(filePath) {
+    assertValidIoFilePath(filePath);
     const traceId = createIoTraceId();
     const startedAt = nowIoMs();
     try {
@@ -951,6 +1020,8 @@ export async function deleteFileLocked(filePath) {
                 lockWaitMs: waitMs,
                 previousHash: value.contentHash,
                 previousBytes: value.bytesRead,
+                previousSnapshotBase64: value.snapshotBase64,
+                previousSnapshotTruncated: value.snapshotTruncated,
             },
             io,
         );
@@ -985,6 +1056,7 @@ export async function deleteFileLocked(filePath) {
  * }>}
  */
 export async function removePathLocked(filePath, options = {}) {
+    assertValidIoFilePath(filePath);
     const traceId = options.traceId ?? createIoTraceId();
     const startedAt = nowIoMs();
     try {
@@ -1036,11 +1108,26 @@ export async function removePathLocked(filePath, options = {}) {
  * @param {{ overwrite?: boolean; traceId?: string }} [options]
  */
 export async function copyFileLocked(source, destination, options = {}) {
+    assertValidIoFilePath(source);
+    assertValidIoFilePath(destination);
     const traceId = options.traceId ?? createIoTraceId();
     const startedAt = nowIoMs();
     try {
         const { value, waitMs } = await withIoResourceLocks([source, destination], async () => {
-            await assertDestinationWritable(destination, options.overwrite);
+            /**
+             * @type {{
+             *     contentHash: string;
+             *     bytesRead: number;
+             *     snapshotBase64: string | null;
+             *     snapshotTruncated: boolean;
+             * } | null}
+             */
+            let destinationSnapshot = null;
+            if (options.overwrite) {
+                destinationSnapshot = await readOptionalMutationSnapshot(destination);
+            } else {
+                await assertDestinationWritable(destination, options.overwrite);
+            }
             const sourceSnapshot = await readMutationSnapshot(source);
             await mkdirPathUnlocked(dirname(destination), { recursive: true });
             await copyFileUnlocked(source, destination);
@@ -1049,6 +1136,10 @@ export async function copyFileLocked(source, destination, options = {}) {
                 bytesWritten: stats.size,
                 sourceHash: sourceSnapshot.contentHash,
                 sourceBytes: sourceSnapshot.bytesRead,
+                destinationPreviousHash: destinationSnapshot?.contentHash ?? null,
+                destinationPreviousBytes: destinationSnapshot?.bytesRead ?? null,
+                destinationPreviousSnapshotBase64: destinationSnapshot?.snapshotBase64 ?? null,
+                destinationPreviousSnapshotTruncated: destinationSnapshot?.snapshotTruncated ?? false,
             };
         });
         invalidateIoCacheTiers(destination);
@@ -1063,7 +1154,12 @@ export async function copyFileLocked(source, destination, options = {}) {
                 engine: 'io-engine.fs.copyFile',
                 riskClass: options.overwrite ? 'high' : 'medium',
                 traceId,
-                advisoryLimits: { lockWaitMs: waitMs, sourceHash: value.sourceHash },
+                advisoryLimits: {
+                    lockWaitMs: waitMs,
+                    sourceHash: value.sourceHash,
+                    overwrite: Boolean(options.overwrite),
+                    destinationPreviousHash: value.destinationPreviousHash,
+                },
             }),
             true,
         );
@@ -1073,6 +1169,10 @@ export async function copyFileLocked(source, destination, options = {}) {
             bytesWritten: value.bytesWritten,
             sourceBytes: value.sourceBytes,
             sourceHash: value.sourceHash,
+            destinationPreviousHash: value.destinationPreviousHash,
+            destinationPreviousBytes: value.destinationPreviousBytes,
+            destinationPreviousSnapshotBase64: value.destinationPreviousSnapshotBase64,
+            destinationPreviousSnapshotTruncated: value.destinationPreviousSnapshotTruncated,
             lockWaitMs: waitMs,
             io,
         };
@@ -1102,15 +1202,36 @@ export async function copyFileLocked(source, destination, options = {}) {
  * @param {{ overwrite?: boolean; traceId?: string }} [options]
  */
 export async function moveFileLocked(source, destination, options = {}) {
+    assertValidIoFilePath(source);
+    assertValidIoFilePath(destination);
     const traceId = options.traceId ?? createIoTraceId();
     const startedAt = nowIoMs();
     try {
         const { value, waitMs } = await withIoResourceLocks([source, destination], async () => {
-            await assertDestinationWritable(destination, options.overwrite);
+            /**
+             * @type {{
+             *     contentHash: string;
+             *     bytesRead: number;
+             *     snapshotBase64: string | null;
+             *     snapshotTruncated: boolean;
+             * } | null}
+             */
+            let destinationSnapshot = null;
+            if (options.overwrite) {
+                destinationSnapshot = await readOptionalMutationSnapshot(destination);
+            } else {
+                await assertDestinationWritable(destination, options.overwrite);
+            }
             const sourceSnapshot = await readMutationSnapshot(source);
             await mkdirPathUnlocked(dirname(destination), { recursive: true });
             await moveFileUnlocked(source, destination);
-            return sourceSnapshot;
+            return {
+                ...sourceSnapshot,
+                destinationPreviousHash: destinationSnapshot?.contentHash ?? null,
+                destinationPreviousBytes: destinationSnapshot?.bytesRead ?? null,
+                destinationPreviousSnapshotBase64: destinationSnapshot?.snapshotBase64 ?? null,
+                destinationPreviousSnapshotTruncated: destinationSnapshot?.snapshotTruncated ?? false,
+            };
         });
         invalidateIoCacheTiers(source);
         invalidateIoCacheTiers(destination);
@@ -1124,7 +1245,12 @@ export async function moveFileLocked(source, destination, options = {}) {
                 engine: 'io-engine.fs.rename',
                 riskClass: 'high',
                 traceId,
-                advisoryLimits: { lockWaitMs: waitMs, sourceHash: value.contentHash },
+                advisoryLimits: {
+                    lockWaitMs: waitMs,
+                    sourceHash: value.contentHash,
+                    overwrite: Boolean(options.overwrite),
+                    destinationPreviousHash: value.destinationPreviousHash,
+                },
             }),
             true,
         );
@@ -1133,6 +1259,10 @@ export async function moveFileLocked(source, destination, options = {}) {
             destination,
             sourceBytes: value.bytesRead,
             sourceHash: value.contentHash,
+            destinationPreviousHash: value.destinationPreviousHash,
+            destinationPreviousBytes: value.destinationPreviousBytes,
+            destinationPreviousSnapshotBase64: value.destinationPreviousSnapshotBase64,
+            destinationPreviousSnapshotTruncated: value.destinationPreviousSnapshotTruncated,
             lockWaitMs: waitMs,
             io,
         };
@@ -1169,6 +1299,7 @@ export async function moveFileLocked(source, destination, options = {}) {
  * }} options
  */
 export async function patchTextLocked(filePath, options) {
+    assertValidIoFilePath(filePath);
     const traceId = createIoTraceId();
     const startedAt = nowIoMs();
     try {
@@ -1177,6 +1308,7 @@ export async function patchTextLocked(filePath, options) {
             const previousHash = assertExpectedSha256(content, options.expectedHash);
             const { updated, replacedOccurrences, bytesWritten } = computeTextPatch(content, options);
             const contentHash = sha256(updated);
+            const previousSnapshot = buildRollbackSnapshot(Buffer.from(content, 'utf8'));
             if (!options.dryRun) {
                 await writeAtomicFileUnlocked(filePath, updated);
             }
@@ -1187,6 +1319,8 @@ export async function patchTextLocked(filePath, options) {
                 previousHash,
                 contentHash,
                 dryRun: Boolean(options.dryRun),
+                previousSnapshotBase64: previousSnapshot.snapshotBase64,
+                previousSnapshotTruncated: previousSnapshot.snapshotTruncated,
             };
         });
         if (!options.dryRun) invalidateIoCacheTiers(filePath);
@@ -1238,6 +1372,8 @@ export async function patchTextLocked(filePath, options) {
  * @param {{ contextLines?: number }} [options]
  */
 export async function diffText(pathA, pathB, options = {}) {
+    assertValidIoFilePath(pathA);
+    assertValidIoFilePath(pathB);
     const startedAt = nowIoMs();
     const traceId = createIoTraceId();
     try {
@@ -1308,16 +1444,37 @@ export async function diffText(pathA, pathB, options = {}) {
  * }>}
  */
 export async function searchText(targetPath, options) {
+    assertValidIoFilePath(targetPath);
+    if (typeof options.pattern !== 'string' || options.pattern.trim().length === 0) {
+        const error = /** @type {TypeError & { code?: string }} */ (new TypeError('pattern inválido para searchText'));
+        error.code = 'ERR_INVALID_ARG_VALUE';
+        throw error;
+    }
+    if (options.includePattern !== undefined && hasNullByte(String(options.includePattern))) {
+        const error = /** @type {TypeError & { code?: string }} */ (
+            new TypeError('includePattern inválido para searchText')
+        );
+        error.code = 'ERR_INVALID_ARG_VALUE';
+        throw error;
+    }
+    if (options.excludePattern !== undefined && hasNullByte(String(options.excludePattern))) {
+        const error = /** @type {TypeError & { code?: string }} */ (
+            new TypeError('excludePattern inválido para searchText')
+        );
+        error.code = 'ERR_INVALID_ARG_VALUE';
+        throw error;
+    }
     const startedAt = nowIoMs();
     const traceId = options.traceId ?? createIoTraceId();
     const searchWindow = normalizeSearchWindow(options);
+    const ioSearchBudget = getIoSearchBudget();
     const advisoryLimitsBase = {
         requestedMaxResults: searchWindow.maxResults,
         cursorOffset: searchWindow.cursorOffset,
         limitMode: 'enforced-output-window',
         patternLength: options.pattern.length,
-        timeoutMs: IO_SEARCH_BUDGET.timeoutMs,
-        maxBufferBytes: IO_SEARCH_BUDGET.maxBufferBytes,
+        timeoutMs: ioSearchBudget.timeoutMs,
+        maxBufferBytes: ioSearchBudget.maxBufferBytes,
     };
 
     /**
@@ -1412,8 +1569,8 @@ export async function searchText(targetPath, options) {
                     ],
                     {
                         cwd: options.workspaceRoot,
-                        timeout: IO_SEARCH_BUDGET.timeoutMs,
-                        maxBuffer: IO_SEARCH_BUDGET.maxBufferBytes,
+                        timeout: ioSearchBudget.timeoutMs,
+                        maxBuffer: ioSearchBudget.maxBufferBytes,
                     },
                 );
                 const windowedOutput = paginateSearchText(stdout, searchWindow);
@@ -1472,8 +1629,8 @@ export async function searchText(targetPath, options) {
             };
             const { stdout } = await execFileAsync('grep', buildGrepArgs(grepOptions), {
                 cwd: options.workspaceRoot,
-                timeout: IO_SEARCH_BUDGET.timeoutMs,
-                maxBuffer: IO_SEARCH_BUDGET.maxBufferBytes,
+                timeout: ioSearchBudget.timeoutMs,
+                maxBuffer: ioSearchBudget.maxBufferBytes,
             });
             const windowedOutput = paginateSearchText(stdout, searchWindow);
             const filteredOutput = sanitizeSearchOutput(windowedOutput.text);
@@ -1562,17 +1719,33 @@ export async function searchText(targetPath, options) {
  * }>}
  */
 export async function searchWorkspaceSymbols(targetPath, options) {
+    assertValidIoFilePath(targetPath);
+    if (typeof options.symbolName !== 'string' || options.symbolName.trim().length === 0) {
+        const error = /** @type {TypeError & { code?: string }} */ (
+            new TypeError('symbolName inválido para searchWorkspaceSymbols')
+        );
+        error.code = 'ERR_INVALID_ARG_VALUE';
+        throw error;
+    }
+    if (options.includePattern !== undefined && hasNullByte(String(options.includePattern))) {
+        const error = /** @type {TypeError & { code?: string }} */ (
+            new TypeError('includePattern inválido para searchWorkspaceSymbols')
+        );
+        error.code = 'ERR_INVALID_ARG_VALUE';
+        throw error;
+    }
     const startedAt = nowIoMs();
     const traceId = options.traceId ?? createIoTraceId();
     const resolvedKind = options.kind ?? 'all';
     const searchWindow = normalizeSearchWindow(options);
+    const ioSearchBudget = getIoSearchBudget();
     const advisoryLimitsBase = {
         requestedMaxResults: searchWindow.maxResults,
         cursorOffset: searchWindow.cursorOffset,
         limitMode: 'enforced-output-window',
         symbolLength: options.symbolName.length,
-        timeoutMs: IO_SEARCH_BUDGET.timeoutMs,
-        maxBufferBytes: IO_SEARCH_BUDGET.maxBufferBytes,
+        timeoutMs: ioSearchBudget.timeoutMs,
+        maxBufferBytes: ioSearchBudget.maxBufferBytes,
     };
     /**
      * @param {string} engine
@@ -1651,9 +1824,7 @@ export async function searchWorkspaceSymbols(targetPath, options) {
                 '-e',
                 buildSymbolPattern(options.symbolName, resolvedKind),
                 ...(options.caseSensitive ? [] : ['--ignore-case']),
-                ...(searchWindow.commandMaxCount === null
-                    ? []
-                    : ['--max-count', String(searchWindow.commandMaxCount)]),
+                ...(searchWindow.commandMaxCount === null ? [] : ['--max-count', String(searchWindow.commandMaxCount)]),
                 ...(options.includePattern
                     ? ['--glob', options.includePattern]
                     : kindToGlobs(resolvedKind).flatMap((glob) => ['--glob', glob])),
@@ -1666,8 +1837,8 @@ export async function searchWorkspaceSymbols(targetPath, options) {
             ],
             {
                 cwd: options.workspaceRoot,
-                timeout: IO_SEARCH_BUDGET.timeoutMs,
-                maxBuffer: IO_SEARCH_BUDGET.maxBufferBytes,
+                timeout: ioSearchBudget.timeoutMs,
+                maxBuffer: ioSearchBudget.maxBufferBytes,
             },
         ).catch((error) => {
             const execError = /** @type {{ code?: unknown; status?: unknown; stderr?: unknown }} */ (error);

@@ -11,8 +11,29 @@ import { getIoL2CacheStats } from './io-cache-l2-registry.js';
 import { aggregateIoCacheTierStats, buildIoCacheTierPlan } from './io-cache-tiering.js';
 import { getIoCacheStats } from './io-cache.js';
 import { getIoIndexStats } from './io-index-registry.js';
+import { getIoLatencyStats } from './io-observability.js';
 import { getParserCacheStats } from './io-parser.js';
 import { getScopeStats, listScopes } from './io-session-scope.js';
+
+/**
+ * @template T
+ * @param {() => T} fn
+ * @param {T} fallback
+ * @returns {T}
+ */
+function safeCall(fn, fallback) {
+    try {
+        return fn();
+    } catch (error) {
+        if (fallback && typeof fallback === 'object') {
+            return /** @type {T} */ ({
+                .../** @type {Record<string, unknown>} */ (fallback),
+                error: error instanceof Error ? error.message : String(error),
+            });
+        }
+        return fallback;
+    }
+}
 
 /**
  * @returns {{
@@ -26,6 +47,7 @@ import { getScopeStats, listScopes } from './io-session-scope.js';
  *     };
  *     parser: ReturnType<typeof getParserCacheStats>;
  *     index: ReturnType<typeof getIoIndexStats>;
+ *     latency: ReturnType<typeof getIoLatencyStats>;
  *     scopes: {
  *         active: number;
  *         ids: string[];
@@ -34,7 +56,7 @@ import { getScopeStats, listScopes } from './io-session-scope.js';
  * }}
  */
 export function readIoRuntimeHealthSnapshot() {
-    const l1Stats = getIoCacheStats();
+    const l1Stats = safeCall(getIoCacheStats, null);
     const l1 = l1Stats
         ? { enabled: true, ...l1Stats }
         : {
@@ -42,16 +64,19 @@ export function readIoRuntimeHealthSnapshot() {
               initialized: false,
               reason: 'not-initialized',
           };
-    const l2 = getIoL2CacheStats();
+    const l2 = safeCall(getIoL2CacheStats, {
+        enabled: false,
+        reason: 'error',
+    });
     const l3 = {
         enabled: false,
         reason: 'reserved-for-multi-runtime-scale',
     };
     const aggregate = aggregateIoCacheTierStats({ l1, l2, l3 });
-    const ids = listScopes();
+    const ids = safeCall(listScopes, []);
     const recent = ids
         .slice(0, 10)
-        .map((id) => getScopeStats(id))
+        .map((id) => safeCall(() => getScopeStats(id), null))
         .filter((stats) => stats !== null);
 
     return {
@@ -68,8 +93,13 @@ export function readIoRuntimeHealthSnapshot() {
                 readHotsetRatio: aggregate.hitRatio,
             }),
         },
-        index: getIoIndexStats(),
-        parser: getParserCacheStats(),
+        index: safeCall(getIoIndexStats, {
+            enabled: false,
+            available: false,
+            reason: 'error',
+        }),
+        parser: safeCall(getParserCacheStats, { size: 0, maxSize: 500 }),
+        latency: safeCall(getIoLatencyStats, {}),
         scopes: {
             active: ids.length,
             ids,

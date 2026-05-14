@@ -46,6 +46,8 @@ import { webTools } from './web/index.js';
  * @typedef {import('#copilot/sdk/types').ToolRegistry} ToolRegistry
  *
  * @typedef {import('#copilot/sdk/types').Tool} Tool
+ *
+ * @typedef {{ tools: import('#copilot/sdk/types').Tool[]; category: string; tags: string[]; readOnly?: boolean }} ToolGroupConfig
  */
 
 // R13: configureHookTools, setHub, setPermissionAgent, setSessionRpc, setExperimentalSession exportados diretamente de tools/index.js
@@ -131,44 +133,43 @@ export const allTools = /** @type {any} */ (
  * @returns {Tool[]} Array consolidado `[...staticTools, ...mcpTools]` pronto para a sessão SDK
  */
 export function bootstrapTools(registry, mcpTools) {
-    /**
-     * G1-ARCH-07: Lista única de pares [tools, opts] usada tanto para registro quanto para buildAllTools. Declarada
-     * local à função para evitar TDZ com módulos que exportam via inicialização lazy. Adicionar um novo grupo aqui é
-     * suficiente — não há necessidade de duplicar no spread de `allTools`.
-     *
-     * @type {[import('#copilot/sdk/types').Tool[], Record<string, unknown>][]} }
-     */
+    /** @type {ToolGroupConfig[]} */
     const TOOL_GROUPS = [
-        [taskTools, { category: 'task', tags: ['queue', 'state'] }],
-        [codeTools, { category: 'code', tags: ['lint', 'test', 'typecheck'], readOnly: true }],
-        [gitTools, { category: 'git', tags: ['vcs', 'diff', 'commit'] }],
-        [sessionTools, { category: 'session', tags: ['hooks', 'briefing'] }],
-        [sessionRpcTools, { category: 'session-rpc', tags: ['rpc', 'mode', 'plan', 'agent', 'compaction'] }],
-        [hookTools, { category: 'hook', tags: ['audit', 'input', 'hooks'] }],
-        [hubTools, { category: 'hub', tags: ['conversation', 'llm-b', 'dialog', 'persistent'] }],
-        [introspectionTools, { category: 'introspection', tags: ['meta', 'telemetry'], readOnly: true }],
-        [fileReadTools, { category: 'file', tags: ['filesystem', 'io', 'read'], readOnly: true }],
-        [indexTools, { category: 'file-index', tags: ['filesystem', 'io', 'index'], readOnly: true }],
-        [scopeTools, { category: 'file-scope', tags: ['filesystem', 'io', 'scope'], readOnly: true }],
-        [fileWriteTools, { category: 'file', tags: ['filesystem', 'io', 'write'] }],
-        [shellTools, { category: 'shell', tags: ['exec', 'system', 'npm', 'node'] }],
-        [webTools, { category: 'web', tags: ['http', 'fetch', 'ssrf-protected'], readOnly: true }],
-        [todoReadTools, { category: 'todo', tags: ['tasks', 'todo', 'management', 'read'], readOnly: true }],
-        [todoWriteTools, { category: 'todo', tags: ['tasks', 'todo', 'management', 'write'] }],
-        [
-            experimentalRpcTools,
-            { category: 'experimental', tags: ['rpc', 'fleet', 'agent', 'skills', 'mcp', 'plugins', 'extensions'] },
-        ],
-        [permissionTools, { category: 'permission', tags: ['approval', 'security', 'runtime-control'] }],
+        { tools: taskTools, category: 'task', tags: ['queue', 'state'] },
+        { tools: codeTools, category: 'code', tags: ['lint', 'test', 'typecheck'], readOnly: true },
+        { tools: gitTools, category: 'git', tags: ['vcs', 'diff', 'commit'] },
+        { tools: sessionTools, category: 'session', tags: ['hooks', 'briefing'] },
+        { tools: sessionRpcTools, category: 'session-rpc', tags: ['rpc', 'mode', 'plan', 'agent', 'compaction'] },
+        { tools: hookTools, category: 'hook', tags: ['audit', 'input', 'hooks'] },
+        { tools: hubTools, category: 'hub', tags: ['conversation', 'llm-b', 'dialog', 'persistent'] },
+        { tools: introspectionTools, category: 'introspection', tags: ['meta', 'telemetry'], readOnly: true },
+        { tools: fileReadTools, category: 'file', tags: ['filesystem', 'io', 'read'], readOnly: true },
+        { tools: indexTools, category: 'file-index', tags: ['filesystem', 'io', 'index'], readOnly: true },
+        { tools: scopeTools, category: 'file-scope', tags: ['filesystem', 'io', 'scope'], readOnly: true },
+        { tools: fileWriteTools, category: 'file', tags: ['filesystem', 'io', 'write'] },
+        { tools: shellTools, category: 'shell', tags: ['exec', 'system', 'npm', 'node'] },
+        { tools: webTools, category: 'web', tags: ['http', 'fetch', 'ssrf-protected'], readOnly: true },
+        { tools: todoReadTools, category: 'todo', tags: ['tasks', 'todo', 'management', 'read'], readOnly: true },
+        { tools: todoWriteTools, category: 'todo', tags: ['tasks', 'todo', 'management', 'write'] },
+        {
+            tools: experimentalRpcTools,
+            category: 'experimental',
+            tags: ['rpc', 'fleet', 'agent', 'skills', 'mcp', 'plugins', 'extensions'],
+        },
+        { tools: permissionTools, category: 'permission', tags: ['approval', 'security', 'runtime-control'] },
     ];
 
     // G1-ARCH-07: itera sobre TOOL_GROUPS uma única vez — evita duplicação entre registerTools e allTools
     // C1-FIX: Granular error handling em cada categoria de tools (bootstrap robusto)
-    for (const [tools, opts] of TOOL_GROUPS) {
+    for (const group of TOOL_GROUPS) {
         try {
-            registerTools(registry, tools, opts);
+            registerTools(registry, group.tools, {
+                category: group.category,
+                tags: group.tags,
+                ...(group.readOnly !== undefined ? { readOnly: group.readOnly } : {}),
+            });
         } catch (err) {
-            const category = /** @type {Record<string, unknown>} */ (opts)['category'] ?? 'unknown';
+            const category = group.category;
             const error = /** @type {Error} */ (err);
             log('ERROR', `[tools-bootstrap] Erro ao registrar categoria '${category}': ${error.message}`);
             // Não relançar — permitir que outras categorias sejam registradas
@@ -240,9 +241,8 @@ export function bootstrapTools(registry, mcpTools) {
     // G2-DX-18: log de summary do bootstrap com count por categoria.
     /** @type {Map<string, number>} */
     const categoryCount = new Map();
-    for (const [tools, opts] of TOOL_GROUPS) {
-        const cat = /** @type {string} */ (/** @type {Record<string, unknown>} */ (opts)['category'] ?? 'unknown');
-        categoryCount.set(cat, (categoryCount.get(cat) ?? 0) + tools.length);
+    for (const group of TOOL_GROUPS) {
+        categoryCount.set(group.category, (categoryCount.get(group.category) ?? 0) + group.tools.length);
     }
     if (mcpTools.length > 0) categoryCount.set('mcp', mcpTools.length);
     if (customTools.length > 0) categoryCount.set('custom', customTools.length);

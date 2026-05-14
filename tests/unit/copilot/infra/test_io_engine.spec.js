@@ -17,11 +17,13 @@ import {
     readBytes,
     readText,
     readTextChunks,
+    searchText,
+    searchWorkspaceSymbols,
     withIoResourceLock,
     writeFileAtomic,
 } from '../../../../src/copilot/infra/io-engine.js';
-import { sha256 } from '../../../../src/copilot/infra/shared/hash.js';
 import { scanDirectory } from '../../../../src/copilot/infra/io-scanner.js';
+import { sha256 } from '../../../../src/copilot/infra/shared/hash.js';
 
 /** @type {string[]} */
 const TEMP_DIRS = [];
@@ -42,6 +44,59 @@ async function createTempDir() {
 }
 
 describe('infra/io-engine', () => {
+    it('rejeita parâmetros inválidos em searchText/searchWorkspaceSymbols', async () => {
+        await expect(searchText('/tmp/ok', { pattern: '' })).rejects.toMatchObject({ code: 'ERR_INVALID_ARG_VALUE' });
+        await expect(
+            searchText('/tmp/ok', { pattern: 'alpha', includePattern: '*.js\u0000bad' }),
+        ).rejects.toMatchObject({ code: 'ERR_INVALID_ARG_VALUE' });
+        await expect(searchWorkspaceSymbols('/tmp/ok', { symbolName: '   ' })).rejects.toMatchObject({
+            code: 'ERR_INVALID_ARG_VALUE',
+        });
+        await expect(
+            searchWorkspaceSymbols('/tmp/ok', { symbolName: 'foo', includePattern: '*.ts\u0000bad' }),
+        ).rejects.toMatchObject({ code: 'ERR_INVALID_ARG_VALUE' });
+    });
+
+    it('mantém contratos de retorno estáveis para readBytes/readText/writeFileAtomic', async () => {
+        const dir = await createTempDir();
+        const file = join(dir, 'contract-shapes.txt');
+        await writeFile(file, 'alpha\nbeta', 'utf8');
+
+        const bytesResult = await readBytes(file);
+        expect(bytesResult).toEqual(
+            expect.objectContaining({
+                path: file,
+                content: expect.any(Buffer),
+                bytesRead: expect.any(Number),
+                io: expect.any(Object),
+            }),
+        );
+
+        const textResult = await readText(file, { startLine: 1, endLine: 1 });
+        expect(textResult).toEqual(
+            expect.objectContaining({
+                path: file,
+                content: 'alpha',
+                bytesRead: expect.any(Number),
+                totalLines: 2,
+                returnedLines: { start: 1, end: 1 },
+                io: expect.any(Object),
+            }),
+        );
+
+        const writeResult = await writeFileAtomic(file, 'gamma');
+        expect(writeResult).toEqual(
+            expect.objectContaining({
+                path: file,
+                bytesWritten: Buffer.byteLength('gamma', 'utf8'),
+                lockWaitMs: expect.any(Number),
+                previousHash: null,
+                contentHash: expect.any(String),
+                io: expect.any(Object),
+            }),
+        );
+    });
+
     it('readText retorna range vazio consistente quando startLine passa do fim', async () => {
         const dir = await createTempDir();
         const file = join(dir, 'notes.txt');
@@ -162,6 +217,24 @@ describe('infra/io-engine', () => {
             code: 'EEXIST',
         });
         await expect(readFile(destination, 'utf8')).resolves.toBe('existing');
+    });
+
+    it('copyFileLocked com overwrite captura snapshot/hash do destino anterior para rollback', async () => {
+        const dir = await createTempDir();
+        const source = join(dir, 'copy-source.txt');
+        const destination = join(dir, 'copy-destination.txt');
+        await writeFile(source, 'source-content', 'utf8');
+        await writeFile(destination, 'old-destination', 'utf8');
+
+        const result = await copyFileLocked(source, destination, { overwrite: true });
+
+        expect(result.destinationPreviousHash).toBe(sha256('old-destination'));
+        expect(result.destinationPreviousBytes).toBe(Buffer.byteLength('old-destination', 'utf8'));
+        expect(result.destinationPreviousSnapshotBase64).toBe(
+            Buffer.from('old-destination', 'utf8').toString('base64'),
+        );
+        expect(result.destinationPreviousSnapshotTruncated).toBe(false);
+        await expect(readFile(destination, 'utf8')).resolves.toBe('source-content');
     });
 
     it('copyFileLocked aguarda lock ativo no source', async () => {
@@ -324,6 +397,40 @@ describe('infra/io-engine', () => {
         expect(result.sourceBytes).toBe(Buffer.byteLength('source', 'utf8'));
         await expect(readFile(destination, 'utf8')).resolves.toBe('source');
         await expect(readFile(source, 'utf8')).rejects.toMatchObject({ code: 'ENOENT' });
+    });
+
+    it('moveFileLocked com overwrite captura snapshot/hash do destino anterior para rollback', async () => {
+        const dir = await createTempDir();
+        const source = join(dir, 'move-source.txt');
+        const destination = join(dir, 'move-destination.txt');
+        await writeFile(source, 'incoming', 'utf8');
+        await writeFile(destination, 'existing-destination', 'utf8');
+
+        const result = await moveFileLocked(source, destination, { overwrite: true });
+
+        expect(result.destinationPreviousHash).toBe(sha256('existing-destination'));
+        expect(result.destinationPreviousBytes).toBe(Buffer.byteLength('existing-destination', 'utf8'));
+        expect(result.destinationPreviousSnapshotBase64).toBe(
+            Buffer.from('existing-destination', 'utf8').toString('base64'),
+        );
+        expect(result.destinationPreviousSnapshotTruncated).toBe(false);
+        await expect(readFile(destination, 'utf8')).resolves.toBe('incoming');
+        await expect(readFile(source, 'utf8')).rejects.toMatchObject({ code: 'ENOENT' });
+    });
+
+    it('patchTextLocked retorna snapshot base64 do conteúdo anterior para rollback', async () => {
+        const dir = await createTempDir();
+        const file = join(dir, 'patch-snapshot.txt');
+        await writeFile(file, 'before patch', 'utf8');
+
+        const result = await patchTextLocked(file, {
+            oldString: 'before',
+            newString: 'after',
+        });
+
+        expect(result.previousSnapshotBase64).toBe(Buffer.from('before patch', 'utf8').toString('base64'));
+        expect(result.previousSnapshotTruncated).toBe(false);
+        await expect(readFile(file, 'utf8')).resolves.toBe('after patch');
     });
 
     it('mkdirPathLocked aguarda lock ativo no diretório antes de criar', async () => {

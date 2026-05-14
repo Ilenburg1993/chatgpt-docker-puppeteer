@@ -12,6 +12,7 @@ import { SSE_REPLAY_BUFFER_SIZE } from '#copilot/config';
 
 /** Tamanho padrão do buffer circular (configurável via SSE_REPLAY_BUFFER_SIZE). */
 const DEFAULT_BUFFER_SIZE = SSE_REPLAY_BUFFER_SIZE;
+const DEFAULT_MAX_PAYLOAD_BYTES = Number(process.env['SSE_REPLAY_MAX_PAYLOAD_BYTES'] ?? 64 * 1024);
 
 /**
  * @typedef {{ id: number; event: string; data: unknown }} SseBufferedEvent
@@ -27,6 +28,8 @@ export class SseReplayBuffer {
     #maxSize;
     /** @type {number} */
     #nextId = 1;
+    /** @type {number} */
+    #maxPayloadBytes;
 
     /**
      * @param {number} [maxSize]
@@ -34,6 +37,33 @@ export class SseReplayBuffer {
     constructor(maxSize = DEFAULT_BUFFER_SIZE) {
         this.#maxSize = maxSize;
         this.#buffer = [];
+        this.#maxPayloadBytes =
+            Number.isFinite(DEFAULT_MAX_PAYLOAD_BYTES) && DEFAULT_MAX_PAYLOAD_BYTES > 0
+                ? Math.floor(DEFAULT_MAX_PAYLOAD_BYTES)
+                : 64 * 1024;
+    }
+
+    /**
+     * @param {unknown} data
+     * @returns {unknown}
+     */
+    #normalizePayload(data) {
+        try {
+            const serialized = JSON.stringify(data);
+            if (serialized === undefined) {
+                return { _serialized: false, _type: typeof data };
+            }
+            if (Buffer.byteLength(serialized, 'utf8') <= this.#maxPayloadBytes) {
+                return data;
+            }
+            return {
+                _truncated: true,
+                _originalSizeBytes: Buffer.byteLength(serialized, 'utf8'),
+                _maxPayloadBytes: this.#maxPayloadBytes,
+            };
+        } catch {
+            return { _serialized: false, _error: 'non-serializable-payload' };
+        }
     }
 
     /**
@@ -45,7 +75,7 @@ export class SseReplayBuffer {
      */
     push(event, data) {
         const id = this.#nextId++;
-        this.#buffer.push({ id, event, data });
+        this.#buffer.push({ id, event, data: this.#normalizePayload(data) });
         if (this.#buffer.length > this.#maxSize) {
             this.#buffer.shift();
         }

@@ -95,21 +95,19 @@ let _storeMutex = Promise.resolve();
  * @returns {Promise<T>}
  */
 export async function withStore(fn) {
-    /** @type {(v?: unknown) => void} */
-    let release;
-    const token = new Promise((r) => {
-        release = /** @type {(v?: unknown) => void} */ (r);
+    const acquire = _storeMutex.then(() => undefined);
+    /** @type {() => void} */
+    let release = () => {};
+    _storeMutex = new Promise((resolve) => {
+        release = () => resolve();
     });
-    const prev = _storeMutex;
-    _storeMutex = _storeMutex.then(() => token);
-    await prev;
+    await acquire;
     try {
         const store = await _readStoreRaw();
         const result = await fn(store);
         await _writeStoreRaw(store);
         return result;
     } finally {
-        // @ts-expect-error — release is always assigned before await prev resolves
         release();
     }
 }
@@ -132,6 +130,18 @@ async function _readStoreRaw() {
                 logSwallowed(e, 'todo.store.parseRow');
             }
         }
+
+        // Saneamento de integridade referencial (parent/subtasks) para tolerar DB legado/corrompido.
+        for (const task of Object.values(tasks)) {
+            if (!Array.isArray(task.subtaskIds)) {
+                task.subtaskIds = [];
+            }
+            task.subtaskIds = task.subtaskIds.filter((id) => typeof id === 'string' && id in tasks);
+            if (task.parentId && !(task.parentId in tasks)) {
+                task.parentId = null;
+            }
+        }
+
         return { version: SCHEMA_VERSION, tasks };
     } catch (e) {
         log('WARN', `[todo/store] _readStoreRaw falhou, retornando vazio: ${/** @type {Error} */ (e).message}`);

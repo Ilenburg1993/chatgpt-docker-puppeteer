@@ -211,6 +211,18 @@ export async function runPipeline(stages, { cwd, timeoutMs }) {
     return new Promise((resolve) => {
         let finished = false;
 
+        /** @param {'SIGTERM' | 'SIGKILL'} signal */
+        const stopAll = (signal) => {
+            for (const p of procs) {
+                p.stdout?.destroy();
+                p.stderr?.destroy();
+                p.stdin?.destroy();
+                if (p.exitCode === null && !p.killed) {
+                    p.kill(signal);
+                }
+            }
+        };
+
         /** @param {{ exitCode: number; stdout: string; stderr: string; durationMs: number }} result */
         const finalize = (result) => {
             if (finished) return;
@@ -254,6 +266,7 @@ export async function runPipeline(stages, { cwd, timeoutMs }) {
 
         for (const proc of procs) {
             proc.on('error', (error) => {
+                stopAll('SIGTERM');
                 finalize({
                     exitCode: 1,
                     stdout: truncateOutput(stdout),
@@ -266,13 +279,9 @@ export async function runPipeline(stages, { cwd, timeoutMs }) {
         const timer =
             typeof timeoutMs === 'number' && Number.isFinite(timeoutMs) && timeoutMs > 0
                 ? setTimeout(() => {
-                      for (const p of procs) p.kill('SIGTERM');
+                      stopAll('SIGTERM');
                       setTimeout(() => {
-                          for (const p of procs) {
-                              if (p.exitCode === null && !p.killed) {
-                                  p.kill('SIGKILL');
-                              }
-                          }
+                          stopAll('SIGKILL');
                       }, 750).unref();
                       finalize({
                           exitCode: 124,

@@ -187,11 +187,15 @@ export class WebhookManager {
             if (attempt > 0) {
                 // Exponential backoff: 500ms, 1000ms, 2000ms...
                 const delay = WEBHOOK_RETRY_BASE_MS * 2 ** (attempt - 1);
-                await new Promise((r) => setTimeout(r, delay));
+                await new Promise((r) => {
+                    const timer = setTimeout(r, delay);
+                    timer.unref?.();
+                });
             }
 
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), WEBHOOK_TIMEOUT_MS);
+            timeoutId.unref?.();
             try {
                 const resp = await fetch(url, {
                     method: 'POST',

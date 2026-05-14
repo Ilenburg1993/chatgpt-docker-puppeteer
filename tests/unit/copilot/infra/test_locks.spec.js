@@ -67,6 +67,21 @@ describe('infra locks', () => {
         expect(existsSync(lockPath)).toBe(false);
     });
 
+    it('withIoResourceLock permite reentrância no mesmo recurso dentro do mesmo contexto', async () => {
+        const dir = await createTempDir();
+        const filePath = join(dir, 'reentrant.txt');
+
+        const locked = await withIoResourceLock(filePath, async () => {
+            const nested = await withIoResourceLock(filePath, async () => 'nested-ok', {
+                timeoutMs: 25,
+            });
+            return nested;
+        });
+
+        expect(locked.value.value).toBe('nested-ok');
+        expect(locked.value.waitMs).toBe(0);
+    });
+
     it('releaseLock não remove lock de outro processo', async () => {
         const dir = await createTempDir();
         const lockPath = join(dir, 'foreign.lock');

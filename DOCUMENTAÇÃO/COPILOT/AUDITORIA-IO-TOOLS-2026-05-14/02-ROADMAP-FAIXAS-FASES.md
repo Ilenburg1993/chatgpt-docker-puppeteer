@@ -144,6 +144,20 @@ Objetivo: transformar primitives em ações rastreáveis.
   e bytes de snapshot para auditoria; rollback token e changeset continuam pendentes.
 - rollback token.
 
+Status em 2026-05-14 (execução complementar):
+
+- `runtime/transaction.js` criado com lifecycle de change set (`begin`, `append entry`, `apply`, `fail`, `abort`,
+  `rollback` lógico).
+- `runtime/rollback.js` criado com plano reverso, token serializável (`base64url`) e validação de integridade por
+  digest SHA-256.
+- `public/runtime.js` e `runtime/index.js` expõem APIs transacionais para uso progressivo pelas tools.
+- testes unitários adicionados em `tests/unit/copilot/infra/test_runtime_transaction_rollback.spec.js`.
+- `io-engine` agora expõe snapshot de pré-mutação (base64 quando <= 256 KiB) para `delete`, `copy(overwrite)`,
+  `move(overwrite)` e `patch`, com metadados de truncamento para rollback determinístico.
+- `write-tools` consomem snapshots para rollback enriquecido, incluindo restauração de destino em `copy/move`
+  com overwrite quando snapshot está disponível.
+- `patch_file` em `dryRun` passa a marcar `changeSet` como `aborted` (sem falso estado de aplicação).
+
 ### F3.3 — Audit log
 
 - JSONL append-only para mutações.

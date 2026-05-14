@@ -30,6 +30,7 @@
 
 import { stat as fsStat } from 'node:fs/promises';
 import * as nodePath from 'node:path';
+import pLimit from 'p-limit';
 import { getVerifiedIoL1Entry, makeBytesKey, makeTextKey, normalizeIoCacheKey } from './io-cache.js';
 import { readBytes, readText } from './io-engine.js';
 import { getIoIndex } from './io-index-registry.js';
@@ -99,10 +100,6 @@ export async function warmCacheForPaths(paths, opts = {}) {
     let failed = 0;
     let skipped = 0;
 
-    // Fila de paths a processar
-    let idx = 0;
-    const total = paths.length;
-
     /**
      * Processa um path: verifica se já está no cache, se não, lê do disco.
      *
@@ -125,14 +122,15 @@ export async function warmCacheForPaths(paths, opts = {}) {
 
         try {
             let warmed = false;
+            const signalOptions = signal ? { signal } : {};
 
             if (cachedBytes === null) {
-                await readBytes(filePath);
+                await readBytes(filePath, signalOptions);
                 warmed = true;
             }
 
             if (textMode && cachedText === null) {
-                await readText(filePath);
+                await readText(filePath, signalOptions);
                 warmed = true;
             }
 
@@ -143,17 +141,16 @@ export async function warmCacheForPaths(paths, opts = {}) {
         }
     }
 
-    // Worker pool de concorrência `concurrency`
-    async function worker() {
-        while (idx < total) {
-            if (signal?.aborted) break;
-            const path = paths[idx++];
-            if (path !== undefined) await processOne(path);
-        }
-    }
-
-    const workers = Array.from({ length: Math.min(concurrency, total || 1) }, () => worker());
-    await Promise.all(workers);
+    const normalizedConcurrency = Number.isFinite(concurrency) ? Math.max(1, Math.floor(concurrency)) : 8;
+    const limit = pLimit(normalizedConcurrency);
+    await Promise.all(
+        paths.map((filePath) =>
+            limit(async () => {
+                if (signal?.aborted) return;
+                await processOne(filePath);
+            }),
+        ),
+    );
 
     return { preloaded, failed, skipped, durationMs: Date.now() - t0 };
 }

@@ -24,6 +24,19 @@ async function createTempDir() {
 }
 
 describe('infra/io/fs read line ports', () => {
+    it('readTextLineChunks aborta quando signal já está cancelado', async () => {
+        const dir = await createTempDir();
+        const file = join(dir, 'abort.txt');
+        await writeFile(file, 'x\ny\nz', 'utf8');
+
+        const controller = new AbortController();
+        controller.abort();
+
+        await expect(readTextLineChunks(file, { signal: controller.signal })).rejects.toMatchObject({
+            name: 'AbortError',
+        });
+    });
+
     it('readTextLineChunks pagina snapshot textual por linhas', async () => {
         const dir = await createTempDir();
         const file = join(dir, 'chunks.txt');

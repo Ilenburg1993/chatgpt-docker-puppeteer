@@ -6,7 +6,7 @@
  */
 
 import { randomBytes } from 'node:crypto';
-import { writeFile, rename, unlink } from 'node:fs/promises';
+import { rename, unlink, writeFile } from 'node:fs/promises';
 
 /**
  * @param {string | Buffer} content
@@ -21,13 +21,13 @@ export function toWriteBuffer(content, encoding = 'utf8') {
  * @param {string} filePath
  * @param {string | Buffer} content
  * @param {BufferEncoding} encoding
- * @returns {{ payload: string | Buffer; bytes: number }}
+ * @returns {{ payload: Buffer; bytes: number }}
  */
 export function normalizeWritePayload(filePath, content, encoding) {
     void filePath;
     const buf = toWriteBuffer(content, encoding);
     return {
-        payload: Buffer.isBuffer(content) ? content : String(content),
+        payload: buf,
         bytes: buf.byteLength,
     };
 }

@@ -156,7 +156,7 @@ Se useStructured=true (padrão), usa o protocolo StructuredMessage para resposta
             if (!hub) return { success: false, error: 'ConversationHub não disponível neste modo de execução.' };
 
             // SEC-N04 (fix): truncar message para evitar payloads gigantes
-            const MAX_MSG_CHARS = 32_000;
+            const MAX_MSG_CHARS = Number(process.env['COPILOT_HUB_MAX_MSG_CHARS'] ?? 32_000);
             const safeMessage =
                 typeof message === 'string' && message.length > MAX_MSG_CHARS
                     ? message.slice(0, MAX_MSG_CHARS) + ' […truncado]'

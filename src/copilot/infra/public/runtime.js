@@ -6,10 +6,21 @@
  */
 
 export {
+    abortIoChangeSet,
+    appendIoChangeSetEntry,
+    applyIoChangeSet,
+    beginIoChangeSet,
     buildIoMutationAuditRecord,
+    buildIoRollbackPlan,
     completeIoOperationEnvelope,
     createIoOperationEnvelope,
+    createIoRollbackToken,
+    failIoChangeSet,
     failIoOperationEnvelope,
     getIoMutationAuditLogPath,
+    parseIoRollbackToken,
     recordIoMutationAudit,
+    rollbackIoChangeSet,
+    serializeIoRollbackToken,
+    verifyIoRollbackToken
 } from '../runtime/index.js';

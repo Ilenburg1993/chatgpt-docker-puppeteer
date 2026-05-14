@@ -331,7 +331,12 @@ const requestUserInputTool = buildTool({
             requires_selection,
         },
     ) => {
-        const fullQuestion = context ? `${question}\n\n**Contexto**: ${context}` : question;
+        const MAX_CONTEXT_CHARS = 2000;
+        const safeContext =
+            typeof context === 'string' && context.trim().length > 0
+                ? context.slice(0, MAX_CONTEXT_CHARS).replace(/\n{3,}/g, '\n\n')
+                : undefined;
+        const fullQuestion = safeContext ? `${question}\n\n**Contexto**: ${safeContext}` : question;
         const allowFreeform = !requires_selection;
 
         log('INFO', `[hook-tools/request_user_input] Pergunta: "${fullQuestion.slice(0, 100)}"`);
