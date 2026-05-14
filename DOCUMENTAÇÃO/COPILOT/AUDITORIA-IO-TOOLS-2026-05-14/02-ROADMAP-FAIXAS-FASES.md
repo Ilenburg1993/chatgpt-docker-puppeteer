@@ -143,12 +143,18 @@ Status complementar:
   posteriores com ranges/cursors reutilizam L1/L2 quando o fingerprint continua fresco.
 - `readStrategy='stream'` usa leitura incremental por linhas para arquivos grandes, explicitando `cache='stream-bypass'`
   nos metadados.
+- O modo stream de `read_file_content` aceita `streamHighWaterMark`, propagado para a porta baixa de leitura para
+  controle de throughput/backpressure.
 - A implementação de `read_file_content` foi extraída para `tools/file/read/` com barrel interno, separando handler,
   janela/cursor e metadados canônicos, enquanto `read-tools.js` permanece como facade pública única de read tools.
 - L1 passou a armazenar `contentHash` e a revalidar por hash quando `mtime` diverge mas `size` segue igual dentro de
   `IO_L1_HASH_REVALIDATE_MAX_BYTES`, evitando invalidação falsa.
 - L2 passou a persistir `contentHash` em `metaJson` para hidratar L1 e retornos de leitura sem recalcular hash quando o
   payload já veio cacheado.
+- `io/fs/read-chunks.js` passou a usar stream binário + `StringDecoder`, `addAbortSignal`, `highWaterMark` opcional e
+  contagem real de bytes lidos, separando bytes lidos de bytes retornados.
+- `io/fs/snapshot.js` introduziu snapshot binário streamado para mutações: SHA-256 incremental e snapshot base64 apenas
+  quando couber no budget de rollback.
 
 ### F2.2 — `rg --json`
 

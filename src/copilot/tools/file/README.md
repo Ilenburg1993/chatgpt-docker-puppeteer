@@ -66,7 +66,7 @@ Para automação shell, use `npm run copilot:index -- ...`.
 - `read-tools.js`: superfície canônica unificada de leitura (`read_file_content`, `list_directory`,
   `search_in_files`, `diff_files`, `workspace_symbol_search`).
 - `read/`: subdomínio interno barrel-first para implementação de tools de leitura grandes. Hoje contém a cadeia
-  especializada de `read_file_content`, separando handler, janela/cursor e metadados canônicos.
+  especializada de `read_file_content`, separando handler, janela/cursor, metadados canônicos e controle de stream.
 - `write-tools.js`: facade pública das mutações de arquivo com locks, rollback e atomicidade.
 - `write/`: subdomínio interno barrel-first para implementações e helpers grandes de mutação. Hoje contém
   `patch_file`, feedback de patch e helpers transacionais compartilhados.

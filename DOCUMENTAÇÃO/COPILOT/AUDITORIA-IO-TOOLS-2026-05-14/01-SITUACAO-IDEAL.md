@@ -180,7 +180,7 @@ Proibições:
 
 ### Filesystem
 
-- `fs.read({ path, range, cursor, maxBytes, maxLines, readStrategy, includeMetadata, includeHash })`
+- `fs.read({ path, range, cursor, maxBytes, maxLines, readStrategy, streamHighWaterMark, includeMetadata, includeHash })`
 - `fs.readChunks({ path, chunkLines, cursor })`
 - `fs.tree({ root, depth, include, exclude, cursor, maxItems })`
 - `fs.search({ query, mode, path, maxItems, maxBytes, cursor })`
@@ -311,6 +311,8 @@ Contrato ideal específico de `read_file_content`:
 - default textual deve ser `readStrategy='cached'`, formando/reusando cache full-file L1/L2 para ranges e páginas
   subsequentes;
 - `readStrategy='stream'` deve existir para arquivos grandes quando a LLM quiser evitar hidratar cache full-file;
+- quando `readStrategy='stream'`, a LLM pode ajustar `streamHighWaterMark` para balancear throughput, memória,
+  latência e backpressure em leituras grandes;
 - retornos devem expor `metadata` com stat, bytes, linhas, cache, cursor, truncamento, sanitização e hashes opcionais;
 - leituras repetidas por range/cursor devem aproveitar cache quando o fingerprint mtime+size continuar válido;
 - cache L1/L2 deve armazenar `contentHash` junto do payload quando conhecido;
@@ -332,6 +334,17 @@ Contrato ideal específico de `patch_file`:
   acoplamento circular;
 - `write-tools.js` deve permanecer como facade pública/composição, não como depósito monolítico de toda lógica de
   mutação.
+
+Contrato ideal de streams e snapshots de IO:
+
+- leituras incrementais devem usar streams com cancelamento real por `AbortSignal`;
+- decodificação textual streamada deve respeitar fronteiras multibyte e normalizar `CRLF`/`LF`/`CR` sem depender de
+  acumular o arquivo inteiro;
+- metadados de stream devem distinguir bytes lidos do filesystem e bytes retornados à LLM;
+- snapshots de rollback/hash para mutações devem ser streamados: hash incremental sempre, snapshot em memória apenas
+  até budget configurado;
+- APIs internas devem aceitar `highWaterMark` onde isso ajudar a controlar throughput/backpressure, sem expor
+  detalhes baixos para callers que não precisam.
 
 Subdomínios recomendados:
 

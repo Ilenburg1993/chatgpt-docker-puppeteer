@@ -6,7 +6,8 @@
  */
 
 import { createReadStream } from 'node:fs';
-import { createInterface } from 'node:readline';
+import { addAbortSignal } from 'node:stream';
+import { StringDecoder } from 'node:string_decoder';
 
 /**
  * @typedef {{ index: number; startLine: number; endLine: number; content: string; bytes: number }} TextLineChunk
@@ -24,7 +25,13 @@ function throwAbortError() {
 
 /**
  * @param {string} filePath
- * @param {{ chunkLines?: number; startLine?: number; endLine?: number; signal?: AbortSignal }} [options]
+ * @param {{
+ *     chunkLines?: number;
+ *     startLine?: number;
+ *     endLine?: number;
+ *     highWaterMark?: number;
+ *     signal?: AbortSignal;
+ * }} [options]
  * @returns {Promise<{
  *     path: string;
  *     chunks: TextLineChunk[];
@@ -45,6 +52,10 @@ export async function readTextLineChunks(filePath, options = {}) {
     const endLine = Number.isFinite(options.endLine)
         ? Math.max(startLine, Number(options.endLine))
         : Number.POSITIVE_INFINITY;
+    const highWaterMark =
+        Number.isFinite(options.highWaterMark) && Number(options.highWaterMark) > 0
+            ? Math.floor(Number(options.highWaterMark))
+            : undefined;
     /** @type {TextLineChunk[]} */
     const chunks = [];
     /** @type {string[]} */
@@ -52,47 +63,87 @@ export async function readTextLineChunks(filePath, options = {}) {
     let currentStartLine = startLine;
     let totalLines = 0;
     let bytesRead = 0;
+    let carry = '';
+    const decoder = new StringDecoder('utf8');
+    let stoppedAtRequestedWindow = false;
 
-    const stream = createReadStream(filePath, {
-        encoding: 'utf8',
-        ...(options.signal ? { signal: options.signal } : {}),
+    const baseStream = createReadStream(filePath, {
+        ...(highWaterMark !== undefined ? { highWaterMark } : {}),
     });
-    const rl = createInterface({ input: stream, crlfDelay: Infinity });
+    const stream = options.signal ? addAbortSignal(options.signal, baseStream) : baseStream;
+
+    /**
+     * @param {string} line
+     * @returns {boolean} true quando a leitura deve continuar.
+     */
+    const pushLine = (line) => {
+        totalLines += 1;
+        if (totalLines < startLine) return true;
+        if (totalLines > endLine) return false;
+        if (current.length === 0) currentStartLine = totalLines;
+        current.push(line);
+        if (current.length >= chunkLines) {
+            const content = current.join('\n');
+            chunks.push({
+                index: chunks.length,
+                startLine: currentStartLine,
+                endLine: totalLines,
+                content,
+                bytes: Buffer.byteLength(content, 'utf8'),
+            });
+            current = [];
+        }
+        return totalLines < endLine;
+    };
+
+    /**
+     * @param {string} decoded
+     * @param {boolean} final
+     * @returns {boolean} true quando a leitura deve continuar.
+     */
+    const processDecoded = (decoded, final) => {
+        let data = carry + decoded;
+        carry = '';
+        if (!final && data.endsWith('\r')) {
+            carry = '\r';
+            data = data.slice(0, -1);
+        }
+        if (data === '') return true;
+
+        const parts = data.split(/\r\n|\n|\r/);
+        if (!final) {
+            carry += parts.pop() ?? '';
+        } else if (/\r\n|\n|\r/.test(data.slice(-2))) {
+            while (parts.length > 0 && parts[parts.length - 1] === '') parts.pop();
+        }
+
+        for (const line of parts) {
+            if (!pushLine(line)) return false;
+        }
+        return true;
+    };
+
     try {
-        for await (const line of rl) {
-            totalLines += 1;
-            if (totalLines < startLine) continue;
-            if (totalLines > endLine) break;
-            if (current.length === 0) currentStartLine = totalLines;
-            current.push(line);
-            if (current.length >= chunkLines) {
-                const content = current.join('\n');
-                const bytes = Buffer.byteLength(content, 'utf8');
-                bytesRead += bytes;
-                chunks.push({
-                    index: chunks.length,
-                    startLine: currentStartLine,
-                    endLine: totalLines,
-                    content,
-                    bytes,
-                });
-                current = [];
+        for await (const chunk of stream) {
+            const buf = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+            bytesRead += buf.byteLength;
+            if (!processDecoded(decoder.write(buf), false)) {
+                stoppedAtRequestedWindow = true;
+                break;
             }
         }
+        if (!stoppedAtRequestedWindow) processDecoded(decoder.end(), true);
     } finally {
-        rl.close();
-        stream.destroy();
+        if (!stream.destroyed) stream.destroy();
     }
     if (current.length > 0) {
         const content = current.join('\n');
-        const bytes = Buffer.byteLength(content, 'utf8');
-        bytesRead += bytes;
         chunks.push({
             index: chunks.length,
             startLine: currentStartLine,
             endLine: currentStartLine + current.length - 1,
             content,
-            bytes,
+            bytes: Buffer.byteLength(content, 'utf8'),
         });
     }
 

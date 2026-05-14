@@ -13,6 +13,7 @@ export { readBytesFileSnapshot } from './read-bytes.js';
 export { readTextLineChunks } from './read-chunks.js';
 export { readTextLinesSnapshot } from './read-lines.js';
 export { readTextFileSnapshot } from './read-text.js';
+export { readBinaryMutationSnapshot } from './snapshot.js';
 export { deleteFileUnlocked, removePathUnlocked } from './remove.js';
 export { statPathSnapshot } from './stat.js';
 export { normalizeWritePayload, toWriteBuffer, writeAtomicFileUnlocked } from './write-atomic.js';

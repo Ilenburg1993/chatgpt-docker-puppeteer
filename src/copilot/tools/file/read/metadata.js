@@ -16,6 +16,7 @@
  *     nextCursor: string | null;
  *     maxBytes: number;
  *     maxLines?: number;
+ *     streamHighWaterMark?: number;
  *     bytesRead: number;
  *     bytesReturned: number;
  *     rawReturnedBytes?: number;
@@ -46,6 +47,7 @@ export function buildReadFileMetadata(stats, input) {
         rawReturnedBytes: input.rawReturnedBytes ?? input.bytesReturned,
         maxBytes: Number.isFinite(input.maxBytes) ? input.maxBytes : null,
         maxLines: input.maxLines ?? null,
+        streamHighWaterMark: input.streamHighWaterMark ?? null,
         totalLines: input.totalLines ?? null,
         totalLinesKnown: input.totalLinesKnown ?? input.totalLines !== undefined,
         returnedLines: input.returnedLines ?? null,

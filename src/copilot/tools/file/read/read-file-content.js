@@ -87,6 +87,13 @@ export const readFileContentTool = buildTool({
             .optional()
             .default('cached')
             .describe('cached forma/reusa cache full-file; stream pagina por readline sem hidratar cache full-file.'),
+        streamHighWaterMark: z
+            .number()
+            .int()
+            .min(1024)
+            .max(16 * 1024 * 1024)
+            .optional()
+            .describe('Buffer interno do read stream em bytes quando readStrategy=stream. Default: Node/fs padrão.'),
         includeMetadata: z
             .boolean()
             .optional()
@@ -117,6 +124,7 @@ export const readFileContentTool = buildTool({
         maxBytes,
         encoding,
         readStrategy,
+        streamHighWaterMark,
         includeMetadata,
         includeHash,
         includeReadThrough,
@@ -218,10 +226,12 @@ export const readFileContentTool = buildTool({
                           startLine: effectiveStartLine,
                           endLine: effectiveEndLine,
                           chunkLines: resolvedMaxLines ?? DEFAULT_STREAM_CHUNK_LINES,
+                          ...(streamHighWaterMark !== undefined ? { highWaterMark: streamHighWaterMark } : {}),
                           advisoryLimits: {
                               readStrategy: 'stream',
                               maxLines: resolvedMaxLines ?? null,
                               cursor: cursor ?? null,
+                              streamHighWaterMark: streamHighWaterMark ?? null,
                           },
                       })
                     : await readText(resolved, {
@@ -288,6 +298,9 @@ export const readFileContentTool = buildTool({
                 sanitized: sanitized.sanitized,
                 redactions: sanitized.redactions,
                 cacheFingerprintStrategy: text.cacheFingerprintStrategy,
+                ...(resolvedReadStrategy === 'stream' && streamHighWaterMark !== undefined
+                    ? { streamHighWaterMark }
+                    : {}),
                 ...(includeCacheStats ? { cacheStats: getIoCacheStats() } : {}),
                 ...(resolvedMaxLines !== undefined ? { maxLines: resolvedMaxLines } : {}),
                 ...(includeHash && 'contentHash' in text ? { contentHash: text.contentHash } : {}),

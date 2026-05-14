@@ -128,7 +128,13 @@ describe('tools/file/readFileContentTool', () => {
 
     it('suporta leitura incremental por stream quando cache full-file deve ser evitado', async () => {
         const handler = /** @type {any} */ (getHandler(readFileContentTool));
-        const r = await handler({ path: fileA, encoding: 'utf8', readStrategy: 'stream', maxLines: 2 });
+        const r = await handler({
+            path: fileA,
+            encoding: 'utf8',
+            readStrategy: 'stream',
+            maxLines: 2,
+            streamHighWaterMark: 1024,
+        });
 
         expect(r.success).toBe(true);
         expect(r.content).toBe('line1\nline2');
@@ -136,6 +142,7 @@ describe('tools/file/readFileContentTool', () => {
         expect(r.nextCursor).toBe('3');
         expect(r.metadata.cache).toBe('stream-bypass');
         expect(r.metadata.cacheFingerprintStrategy).toBe('stream-bypass');
+        expect(r.metadata.streamHighWaterMark).toBe(1024);
         expect(r.metadata.returnedLines).toEqual({ start: 1, end: 2 });
     });
 

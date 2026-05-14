@@ -26,6 +26,7 @@ import { mkdirPathUnlocked } from './io/fs/mkdir.js';
 import { moveFileUnlocked } from './io/fs/move.js';
 import { readBytesFileSnapshot } from './io/fs/read-bytes.js';
 import { readTextLineChunks } from './io/fs/read-chunks.js';
+import { readBinaryMutationSnapshot } from './io/fs/snapshot.js';
 import { deleteFileUnlocked, removePathUnlocked } from './io/fs/remove.js';
 import { statPathSnapshot } from './io/fs/stat.js';
 import { normalizeWritePayload, writeAtomicFileUnlocked } from './io/fs/write-atomic.js';
@@ -192,9 +193,7 @@ function readCacheContentHash(meta) {
  * }>}
  */
 async function readMutationSnapshot(filePath) {
-    const content = await fs.readFile(filePath);
-    const snapshot = buildRollbackSnapshot(content);
-    return { contentHash: sha256(content), bytesRead: content.byteLength, ...snapshot };
+    return readBinaryMutationSnapshot(filePath, { snapshotMaxBytes: ROLLBACK_SNAPSHOT_MAX_BYTES });
 }
 
 /**
@@ -728,6 +727,8 @@ export async function readLines(filePath, options = {}) {
  *     startLine?: number;
  *     endLine?: number;
  *     traceId?: string;
+ *     highWaterMark?: number;
+ *     signal?: AbortSignal;
  *     advisoryLimits?: Record<string, unknown>;
  * }} [options]
  * @returns {Promise<{
@@ -764,6 +765,7 @@ export async function readTextChunks(filePath, options = {}) {
                     chunkLines: snapshot.chunkLines,
                     startLine: snapshot.startLine,
                     endLine: snapshot.endLine,
+                    ...(options.highWaterMark !== undefined ? { highWaterMark: options.highWaterMark } : {}),
                     chunkCount: snapshot.chunks.length,
                     limitMode: 'informative',
                 },
