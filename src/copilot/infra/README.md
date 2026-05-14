@@ -53,7 +53,7 @@
 - `io/fs/`: portas baixas de filesystem para bytes, texto, linhas, chunks, stat, mkdir, append, remove, copy, move e
   escrita atômica.
 - `io/patch/`: cálculo puro de patch e diff textual.
-- `io/search/`: adapters puros de busca textual, índice FTS, grep fallback e busca simbólica.
+- `io/search/`: adapters puros de busca textual, índice FTS, grep fallback, busca simbólica e paginação de resultados.
 - `storage/`: JSON store baixo sem dependência de `io-engine.js`.
 - `queue/`: implementação modular da fila assíncrona.
 - `locks/`: barrels internos de locks em memória e lockfile.

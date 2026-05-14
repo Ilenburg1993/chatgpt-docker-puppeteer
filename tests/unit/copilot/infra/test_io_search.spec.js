@@ -9,6 +9,9 @@ import {
     formatIndexSearchRows,
     formatIndexSymbolRows,
     kindToGlobs,
+    normalizeSearchWindow,
+    paginateSearchItems,
+    paginateSearchText,
 } from '../../../../src/copilot/infra/io/search/index.js';
 
 describe('infra/io/search', () => {
@@ -44,5 +47,30 @@ describe('infra/io/search', () => {
                 docComment: 'Runs task',
             },
         ])).toContain('a.ts:3: function runTask export');
+    });
+
+    it('normaliza janela de busca e pagina itens com lookahead de comando', () => {
+        const window = normalizeSearchWindow({ maxResults: 2, cursor: '1' });
+
+        expect(window).toMatchObject({ maxResults: 2, cursorOffset: 1, commandMaxCount: 4 });
+        expect(paginateSearchItems(['a', 'b', 'c', 'd'], window)).toEqual({
+            items: ['b', 'c'],
+            truncated: true,
+            totalItems: 4,
+            cursorOffset: 1,
+            nextCursor: '3',
+        });
+    });
+
+    it('pagina saída textual de busca preservando total original', () => {
+        const window = normalizeSearchWindow({ maxResults: 1, cursor: 1 });
+
+        expect(paginateSearchText('a\nb\nc\n', window)).toEqual({
+            text: 'b',
+            truncated: true,
+            originalLineCount: 3,
+            cursorOffset: 1,
+            nextCursor: '2',
+        });
     });
 });

@@ -98,6 +98,8 @@ Objetivo: liberdade alta com retorno controlado.
 - `list_directory` já aceita `maxEntries` + `cursor` e retorna `nextCursor`.
 - `search_in_files` e `workspace_symbol_search` aceitam `cursor` e retornam `nextCursor`, `cursorOffset` e
   `totalMatches`.
+- `io/search/result-paginator.js` centraliza normalização de `cursor`/`maxResults`, lookahead de comando e paginação
+  textual/de itens para search.
 
 ### F2.2 — `rg --json`
 

@@ -44,9 +44,11 @@ import {
     formatIndexSearchRows,
     formatIndexSymbolRows,
     kindToGlobs,
+    normalizeSearchWindow,
+    paginateSearchItems,
+    paginateSearchText,
 } from './io/search/index.js';
 import { nowIoMs, publishIoOperation } from './io-observability.js';
-import { normalizeCursorOffset, normalizeMaxResults, windowItems, windowTextLines } from './policy/output-window.js';
 import { assertExpectedSha256 } from './policy/preconditions.js';
 import { readEnvPositiveInt } from './shared/env.js';
 import { sha256 } from './shared/hash.js';
@@ -1344,12 +1346,10 @@ export async function diffText(pathA, pathB, options = {}) {
 export async function searchText(targetPath, options) {
     const startedAt = nowIoMs();
     const traceId = options.traceId ?? createIoTraceId();
-    const maxResults = normalizeMaxResults(options.maxResults);
-    const cursorOffset = normalizeCursorOffset(options.cursor);
-    const commandMaxCount = maxResults === null ? null : cursorOffset + maxResults + 1;
+    const searchWindow = normalizeSearchWindow(options);
     const advisoryLimitsBase = {
-        requestedMaxResults: maxResults,
-        cursorOffset,
+        requestedMaxResults: searchWindow.maxResults,
+        cursorOffset: searchWindow.cursorOffset,
         limitMode: 'enforced-output-window',
         patternLength: options.pattern.length,
         timeoutMs: RG_SEARCH_TIMEOUT_MS,
@@ -1389,14 +1389,13 @@ export async function searchText(targetPath, options) {
                 Boolean(indexStats?.available) && freshFiles > 0
                     ? searchIoIndex(options.pattern, {
                           pathPrefix: targetPath,
-                          ...(commandMaxCount === null ? {} : { maxResults: commandMaxCount }),
+                          ...(searchWindow.commandMaxCount === null
+                              ? {}
+                              : { maxResults: searchWindow.commandMaxCount }),
                       })
                     : [];
             if (indexRows.length > 0) {
-                const windowed = windowItems(indexRows, {
-                    maxResults,
-                    ...(options.cursor === undefined ? {} : { cursor: options.cursor }),
-                });
+                const windowed = paginateSearchItems(indexRows, searchWindow);
                 const filteredOutput = sanitizeSearchOutput(formatIndexSearchRows(windowed.items));
                 const io = publishAndReturn(
                     buildSearchIo('io-engine.index.search', Buffer.byteLength(filteredOutput.text, 'utf8'), {
@@ -1435,7 +1434,9 @@ export async function searchText(targetPath, options) {
                         ...(options.isRegex ? [] : ['--fixed-strings']),
                         ...(options.caseSensitive ? [] : ['--ignore-case']),
                         `--context=${options.contextLines ?? 2}`,
-                        ...(commandMaxCount === null ? [] : ['--max-count', String(commandMaxCount)]),
+                        ...(searchWindow.commandMaxCount === null
+                            ? []
+                            : ['--max-count', String(searchWindow.commandMaxCount)]),
                         ...(options.includePattern ? [`--glob=${options.includePattern}`] : []),
                         ...(options.excludePattern ? [`--glob=!${options.excludePattern}`] : []),
                         '--glob=!node_modules',
@@ -1451,10 +1452,7 @@ export async function searchText(targetPath, options) {
                         maxBuffer: SEARCH_MAX_BUFFER_BYTES,
                     },
                 );
-                const windowedOutput = windowTextLines(stdout, {
-                    maxResults,
-                    ...(options.cursor === undefined ? {} : { cursor: options.cursor }),
-                });
+                const windowedOutput = paginateSearchText(stdout, searchWindow);
                 const filteredOutput = sanitizeSearchOutput(windowedOutput.text);
                 const io = publishAndReturn(
                     buildSearchIo('io-engine.rg.search', Buffer.byteLength(filteredOutput.text, 'utf8'), {
@@ -1513,10 +1511,7 @@ export async function searchText(targetPath, options) {
                 timeout: RG_SEARCH_TIMEOUT_MS,
                 maxBuffer: SEARCH_MAX_BUFFER_BYTES,
             });
-            const windowedOutput = windowTextLines(stdout, {
-                maxResults,
-                ...(options.cursor === undefined ? {} : { cursor: options.cursor }),
-            });
+            const windowedOutput = paginateSearchText(stdout, searchWindow);
             const filteredOutput = sanitizeSearchOutput(windowedOutput.text);
             const io = publishAndReturn(
                 buildSearchIo('io-engine.grep.search', Buffer.byteLength(filteredOutput.text, 'utf8'), {
@@ -1606,12 +1601,10 @@ export async function searchWorkspaceSymbols(targetPath, options) {
     const startedAt = nowIoMs();
     const traceId = options.traceId ?? createIoTraceId();
     const resolvedKind = options.kind ?? 'all';
-    const maxResults = normalizeMaxResults(options.maxResults);
-    const cursorOffset = normalizeCursorOffset(options.cursor);
-    const commandMaxCount = maxResults === null ? null : cursorOffset + maxResults + 1;
+    const searchWindow = normalizeSearchWindow(options);
     const advisoryLimitsBase = {
-        requestedMaxResults: maxResults,
-        cursorOffset,
+        requestedMaxResults: searchWindow.maxResults,
+        cursorOffset: searchWindow.cursorOffset,
         limitMode: 'enforced-output-window',
         symbolLength: options.symbolName.length,
         timeoutMs: RG_SEARCH_TIMEOUT_MS,
@@ -1639,7 +1632,7 @@ export async function searchWorkspaceSymbols(targetPath, options) {
         if (!options.includePattern && !options.caseSensitive) {
             const rows = findIoIndexSymbol(
                 options.symbolName,
-                commandMaxCount === null ? {} : { maxResults: commandMaxCount },
+                searchWindow.commandMaxCount === null ? {} : { maxResults: searchWindow.commandMaxCount },
             ).filter(
                 /**
                  * @param {{ filePath: string; symbolKind: string }} row
@@ -1651,10 +1644,7 @@ export async function searchWorkspaceSymbols(targetPath, options) {
                 },
             );
             if (rows.length > 0) {
-                const windowed = windowItems(rows, {
-                    maxResults,
-                    ...(options.cursor === undefined ? {} : { cursor: options.cursor }),
-                });
+                const windowed = paginateSearchItems(rows, searchWindow);
                 const sanitized = sanitizeIoTextOutput({ text: formatIndexSymbolRows(windowed.items) });
                 const io = publishAndReturn(
                     buildSymbolIo('io-engine.index.symbol-search', Buffer.byteLength(sanitized.text, 'utf8'), {
@@ -1697,7 +1687,9 @@ export async function searchWorkspaceSymbols(targetPath, options) {
                 '-e',
                 buildSymbolPattern(options.symbolName, resolvedKind),
                 ...(options.caseSensitive ? [] : ['--ignore-case']),
-                ...(commandMaxCount === null ? [] : ['--max-count', String(commandMaxCount)]),
+                ...(searchWindow.commandMaxCount === null
+                    ? []
+                    : ['--max-count', String(searchWindow.commandMaxCount)]),
                 ...(options.includePattern
                     ? ['--glob', options.includePattern]
                     : kindToGlobs(resolvedKind).flatMap((glob) => ['--glob', glob])),
@@ -1721,10 +1713,7 @@ export async function searchWorkspaceSymbols(targetPath, options) {
             throw error;
         });
 
-        const windowedOutput = windowTextLines(stdout, {
-            maxResults,
-            ...(options.cursor === undefined ? {} : { cursor: options.cursor }),
-        });
+        const windowedOutput = paginateSearchText(stdout, searchWindow);
         const sanitized = sanitizeIoTextOutput({ text: windowedOutput.text });
         const output = sanitized.text;
         const lines = output.split('\n').filter(Boolean);
