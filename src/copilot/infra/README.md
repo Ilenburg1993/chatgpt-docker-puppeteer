@@ -71,6 +71,8 @@
 - Tools não importam arquivos folha de `infra/`.
 - Toda leitura ou escrita nova em tools/bordas deve partir de uma facade pública; não use `fs.readFile`/`fs.writeFile`
   diretamente em tools ou adapters.
+- Conversões de bytes devem usar `shared/buffer.js` ou `public/buffer.js`: preserve `byteOffset`/`byteLength` de views,
+  copie payloads de escrita e valide base64/limites antes de chamar portas de IO.
 - Módulos baixos (`shared/`, `policy/`, `scan/`, `io/fs/`) não importam `public/`, `io-engine.js`, registry, tools ou
   sessão.
 - `parse/` permanece puro: sem `io/`, cache, índice, prefetch ou sessão.

@@ -104,6 +104,7 @@ export {
 } from './sse/index.js';
 export { fileExists, readJson, writeJson } from './storage.js';
 export * from './public/cache.js';
+export * from './public/buffer.js';
 export * from './public/events.js';
 export * from './public/health.js';
 export * from './public/indexing.js';

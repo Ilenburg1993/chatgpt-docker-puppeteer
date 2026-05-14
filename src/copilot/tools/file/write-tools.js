@@ -23,6 +23,7 @@ import {
     riskForOverwrite,
 } from '#copilot/infra/public/policy';
 import { createIoOperationEnvelope } from '#copilot/infra/public/runtime';
+import { decodeBase64ToOwnedBuffer, toOwnedBuffer } from '#copilot/infra/public/buffer';
 import { z } from 'zod';
 import { withIoMeta } from '../../core/io-contracts.js';
 import { log } from '../infra/logger.js';
@@ -83,7 +84,25 @@ const writeFileContentTool = buildTool({
         });
 
         try {
-            const buf = encoding === 'base64' ? Buffer.from(content, 'base64') : Buffer.from(content, 'utf8');
+            let buf;
+            try {
+                buf =
+                    encoding === 'base64'
+                        ? decodeBase64ToOwnedBuffer(content, 'write_file_content.content')
+                        : toOwnedBuffer(content, 'utf8');
+            } catch (error) {
+                return createToolFailureResult({
+                    toolName: 'write_file_content',
+                    error,
+                    category: 'invalid-parameters',
+                    fix: 'Envie content como texto UTF-8 ou como base64/base64url válido quando encoding=base64.',
+                    receivedParameters: { path: filePath, encoding, expectedHash },
+                    details: { path: resolved, encoding },
+                    extra: {
+                        operation: await failAndAuditMutation(operation, error, { tool: 'write_file_content' }),
+                    },
+                });
+            }
             const writeResult = await writeFileAtomic(resolved, buf, {
                 requireExists: true,
                 ...(expectedHash ? { expectedHash } : {}),

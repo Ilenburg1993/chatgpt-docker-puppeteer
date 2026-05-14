@@ -346,6 +346,17 @@ Contrato ideal de streams e snapshots de IO:
 - APIs internas devem aceitar `highWaterMark` onde isso ajudar a controlar throughput/backpressure, sem expor
   detalhes baixos para callers que não precisam.
 
+Contrato ideal de Buffer/bytes:
+
+- qualquer conversão `ArrayBuffer`/`TypedArray`/`DataView` para `Buffer` deve respeitar `byteOffset` e `byteLength`;
+- payloads destinados a escrita devem virar Buffer próprio, sem compartilhar memória mutável com o caller;
+- limites `Buffer.constants.MAX_LENGTH` e `Buffer.constants.MAX_STRING_LENGTH` devem ser validados em pontos de entrada
+  relevantes;
+- validação UTF-8/ASCII deve usar APIs modernas (`buffer.isUtf8`, `buffer.isAscii`) em vez de heurísticas textuais;
+- base64/base64url recebido de tools deve ser validado explicitamente antes de virar bytes, retornando
+  `toolFeedback.category='invalid-parameters'` quando malformado;
+- helpers de Buffer devem viver em `infra/shared/buffer.js` e ser expostos para tools apenas por facade pública.
+
 Subdomínios recomendados:
 
 - `file/`: leitura, escrita, search, index, scope.

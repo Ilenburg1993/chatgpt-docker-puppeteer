@@ -8,6 +8,7 @@
 import { createReadStream } from 'node:fs';
 import { addAbortSignal } from 'node:stream';
 import { StringDecoder } from 'node:string_decoder';
+import { toBufferView } from '../../shared/buffer.js';
 
 /**
  * @typedef {{ index: number; startLine: number; endLine: number; content: string; bytes: number }} TextLineChunk
@@ -125,7 +126,7 @@ export async function readTextLineChunks(filePath, options = {}) {
 
     try {
         for await (const chunk of stream) {
-            const buf = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+            const buf = toBufferView(/** @type {Buffer | Uint8Array} */ (chunk));
             bytesRead += buf.byteLength;
             if (!processDecoded(decoder.write(buf), false)) {
                 stoppedAtRequestedWindow = true;

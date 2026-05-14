@@ -8,6 +8,7 @@
 import { createHash } from 'node:crypto';
 import { createReadStream } from 'node:fs';
 import { addAbortSignal } from 'node:stream';
+import { toBufferView } from '../../shared/buffer.js';
 
 /**
  * @param {unknown} value
@@ -50,7 +51,7 @@ export async function readBinaryMutationSnapshot(filePath, options = {}) {
 
     try {
         for await (const chunk of stream) {
-            const buf = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+            const buf = toBufferView(/** @type {Buffer | Uint8Array} */ (chunk));
             bytesRead += buf.byteLength;
             hash.update(buf);
 

@@ -162,6 +162,10 @@ Status complementar:
   contagem real de bytes lidos, separando bytes lidos de bytes retornados.
 - `io/fs/snapshot.js` introduziu snapshot binário streamado para mutações: SHA-256 incremental e snapshot base64 apenas
   quando couber no budget de rollback.
+- `infra/shared/buffer.js` centraliza conversões seguras de `Buffer`/`ArrayBuffer`/`TypedArray`/`DataView`, valida
+  limites `Buffer.constants.*`, expõe `isUtf8/isAscii` modernos e valida base64/base64url para tools via
+  `infra/public/buffer.js`.
+- `write_file_content` passou a rejeitar base64 malformado antes de mutar o filesystem, com `toolFeedback` acionável.
 
 ### F2.2 — `rg --json`
 

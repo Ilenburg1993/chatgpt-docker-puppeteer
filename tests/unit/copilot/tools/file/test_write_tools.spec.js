@@ -16,7 +16,17 @@ const mocks = vi.hoisted(() => ({
     mockLog: vi.fn(),
     buildTool: vi.fn((config) => config),
     withSkipPermission: vi.fn((tool) => tool),
+    streamPayloads: new Map(),
 }));
+
+vi.mock('node:fs', async () => {
+    const { Readable } = await vi.importActual('node:stream');
+    return {
+        createReadStream: vi.fn((filePath) =>
+            Readable.from([mocks.streamPayloads.get(String(filePath)) ?? Buffer.alloc(0)]),
+        ),
+    };
+});
 
 vi.mock('../../../../../src/copilot/tools/infra/logger.js', () => ({
     log: mocks.mockLog,
@@ -110,7 +120,16 @@ function enoent() {
 
 beforeEach(() => {
     vi.clearAllMocks();
+    mocks.streamPayloads.clear();
 });
+
+/**
+ * @param {string} filePath
+ * @param {string | Buffer} content
+ */
+function streamPayload(filePath, content) {
+    mocks.streamPayloads.set(filePath, Buffer.isBuffer(content) ? content : Buffer.from(content, 'utf8'));
+}
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // F181-F182: write_file_content
@@ -150,6 +169,20 @@ describe('F35 — write_file_content (F181-F182)', () => {
 
         expect(result.success).toBe(true);
         expect(result.bytesWritten).toBe(14); // 'binary content'.length
+    });
+
+    it('rejeita base64 inválido antes de escrever', async () => {
+        pathOk('/workspace/binary.bin');
+
+        const result = await handler({ path: 'binary.bin', content: '%%%', encoding: 'base64' });
+
+        expect(result.success).toBe(false);
+        expect(result.toolFeedback).toMatchObject({
+            toolName: 'write_file_content',
+            category: 'invalid-parameters',
+            receivedParameters: expect.objectContaining({ encoding: 'base64' }),
+        });
+        expect(fsMock.writeFile).not.toHaveBeenCalled();
     });
 
     it('falha se arquivo não existe', async () => {
@@ -343,6 +376,7 @@ describe('F35 — delete_file (F185)', () => {
         pathOk('/workspace/doomed.txt');
         fsMock.stat.mockResolvedValue({ isDirectory: () => false });
         fsMock.readFile.mockResolvedValue(Buffer.from('doomed', 'utf8'));
+        streamPayload('/workspace/doomed.txt', 'doomed');
         fsMock.unlink.mockResolvedValue(undefined);
 
         const result = await handler({ path: 'doomed.txt' });
@@ -399,6 +433,7 @@ describe('F35 — copy_file (F186)', () => {
             .mockResolvedValueOnce({ ok: true, resolved: '/workspace/dst.txt', reason: undefined });
         fsMock.access.mockRejectedValue(new Error('ENOENT'));
         fsMock.readFile.mockResolvedValue(Buffer.from('source', 'utf8'));
+        streamPayload('/workspace/src.txt', 'source');
         fsMock.mkdir.mockResolvedValue(undefined);
         fsMock.copyFile.mockResolvedValue(undefined);
         fsMock.stat.mockResolvedValue({ size: 42 });
@@ -431,6 +466,8 @@ describe('F35 — copy_file (F186)', () => {
             .mockResolvedValueOnce({ ok: true, resolved: '/workspace/b.txt', reason: undefined });
         fsMock.mkdir.mockResolvedValue(undefined);
         fsMock.readFile.mockResolvedValue(Buffer.from('copy', 'utf8'));
+        streamPayload('/workspace/a.txt', 'copy');
+        streamPayload('/workspace/b.txt', 'copy');
         fsMock.copyFile.mockResolvedValue(undefined);
         fsMock.stat.mockResolvedValue({ size: 10 });
 
@@ -461,6 +498,7 @@ describe('F35 — move_file (F186)', () => {
             .mockResolvedValueOnce({ ok: true, resolved: '/workspace/new.txt', reason: undefined });
         fsMock.access.mockRejectedValue(new Error('ENOENT'));
         fsMock.readFile.mockResolvedValue(Buffer.from('move', 'utf8'));
+        streamPayload('/workspace/old.txt', 'move');
         fsMock.mkdir.mockResolvedValue(undefined);
         fsMock.rename.mockResolvedValue(undefined);
 
@@ -493,6 +531,8 @@ describe('F35 — move_file (F186)', () => {
             .mockResolvedValueOnce({ ok: true, resolved: '/workspace/b.txt', reason: undefined });
         fsMock.mkdir.mockResolvedValue(undefined);
         fsMock.readFile.mockResolvedValue(Buffer.from('move', 'utf8'));
+        streamPayload('/workspace/a.txt', 'move');
+        streamPayload('/workspace/b.txt', 'move');
         fsMock.rename.mockResolvedValue(undefined);
 
         const result = await handler({ source: 'a.txt', destination: 'b.txt', overwrite: true });
@@ -569,7 +609,7 @@ describe('F35 — patch_file (F187)', () => {
         expect(result.occurrences).toBe(2);
         expect(result.replacedOccurrences).toBe(1);
         expect(result.occurrenceIndex).toBe(2);
-        const writtenContent = /** @type {string} */ (fsMock.writeFile.mock.calls[0]?.[1]);
+        const writtenContent = String(fsMock.writeFile.mock.calls[0]?.[1]);
         expect(writtenContent).toBe('same\nmiddle\nchanged\n');
     });
 
@@ -700,7 +740,7 @@ describe('F35 — patch_file (F187)', () => {
         });
 
         // O conteúdo escrito deve conter $100 literalmente
-        const writtenContent = /** @type {string} */ (fsMock.writeFile.mock.calls[0]?.[1]);
+        const writtenContent = String(fsMock.writeFile.mock.calls[0]?.[1]);
         expect(writtenContent).toContain('$100');
     });
 
@@ -718,7 +758,7 @@ describe('F35 — patch_file (F187)', () => {
         });
 
         expect(result.success).toBe(true);
-        const writtenContent = /** @type {string} */ (fsMock.writeFile.mock.calls[0]?.[1]);
+        const writtenContent = String(fsMock.writeFile.mock.calls[0]?.[1]);
         expect(writtenContent).toBe('keep this keep that');
     });
 
