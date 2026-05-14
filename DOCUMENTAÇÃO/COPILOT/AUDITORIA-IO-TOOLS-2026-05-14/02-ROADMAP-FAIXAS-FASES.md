@@ -1,5 +1,12 @@
 # Roadmap — Faixas, Fases e Subfases
 
+## Orientação operacional persistida
+
+Esta frente deve prosseguir em ondas contínuas de investigação, transformação, validação, commit/push e nova
+investigação, sem tratar commits como ponto final. A prioridade corrente é IO e suas bordas associadas: streams,
+buffers, chunks, cache, snapshots, locks, search, patch, cursores, invalidação, backpressure e eficiência para LLM-B em
+Node 24+ ESM strict.
+
 ## Faixa 0 — Estabilização crítica
 
 Objetivo: remover riscos que podem vazar escopo, travar execução, inflar memória ou corromper frescor semântico.
