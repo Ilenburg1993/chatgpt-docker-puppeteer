@@ -10,6 +10,8 @@ export { copyFileUnlocked } from './copy.js';
 export { mkdirPathUnlocked } from './mkdir.js';
 export { moveFileUnlocked } from './move.js';
 export { readBytesFileSnapshot } from './read-bytes.js';
+export { readTextLineChunks } from './read-chunks.js';
+export { readTextLinesSnapshot } from './read-lines.js';
 export { readTextFileSnapshot } from './read-text.js';
 export { deleteFileUnlocked, removePathUnlocked } from './remove.js';
 export { statPathSnapshot } from './stat.js';

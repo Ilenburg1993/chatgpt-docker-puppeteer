@@ -50,7 +50,8 @@
 - `scan/`: glob, gitignore, fingerprint e batching usados por scanner e prefetch.
 - `parse/`: parsers puros de JSON, Markdown, comentários e outline textual.
 - `index-store/`: schema, paths, queries e helpers persistentes do índice L2/SQLite.
-- `io/fs/`: portas baixas de filesystem para bytes, texto, stat, mkdir, append, remove, copy, move e escrita atômica.
+- `io/fs/`: portas baixas de filesystem para bytes, texto, linhas, chunks, stat, mkdir, append, remove, copy, move e
+  escrita atômica.
 - `io/patch/`: cálculo puro de patch e diff textual.
 - `io/search/`: adapters puros de busca textual, índice FTS, grep fallback e busca simbólica.
 - `storage/`: JSON store baixo sem dependência de `io-engine.js`.

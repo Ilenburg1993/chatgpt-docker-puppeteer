@@ -10,10 +10,8 @@
 
 import { isUtf8 } from 'node:buffer';
 import { execFile } from 'node:child_process';
-import { createReadStream } from 'node:fs';
 import * as fs from 'node:fs/promises';
 import { dirname } from 'node:path';
-import { createInterface } from 'node:readline';
 import { promisify } from 'node:util';
 import { buildIoMeta, createIoTraceId, withIoMeta } from '../core/io-contracts.js';
 import { sanitizeIoTextOutput } from '../core/io-policy.js';
@@ -34,6 +32,7 @@ import { copyFileUnlocked } from './io/fs/copy.js';
 import { mkdirPathUnlocked } from './io/fs/mkdir.js';
 import { moveFileUnlocked } from './io/fs/move.js';
 import { readBytesFileSnapshot } from './io/fs/read-bytes.js';
+import { readTextLineChunks } from './io/fs/read-chunks.js';
 import { deleteFileUnlocked, removePathUnlocked } from './io/fs/remove.js';
 import { statPathSnapshot } from './io/fs/stat.js';
 import { normalizeWritePayload, writeAtomicFileUnlocked } from './io/fs/write-atomic.js';
@@ -595,79 +594,36 @@ export async function readLines(filePath, options = {}) {
 export async function readTextChunks(filePath, options = {}) {
     const traceId = options.traceId ?? createIoTraceId();
     const startedAt = nowIoMs();
-    const chunkLines =
-        Number.isFinite(options.chunkLines) && Number(options.chunkLines) > 0
-            ? Math.floor(Number(options.chunkLines))
-            : 200;
-    const startLine = Math.max(1, options.startLine ?? 1);
-    const endLine = Number.isFinite(options.endLine)
-        ? Math.max(startLine, Number(options.endLine))
-        : Number.POSITIVE_INFINITY;
-    /** @type {{ index: number; startLine: number; endLine: number; content: string; bytes: number }[]} */
-    const chunks = [];
-    /** @type {string[]} */
-    let current = [];
-    let currentStartLine = startLine;
-    let totalLines = 0;
-    let bytesRead = 0;
-
     try {
-        const stream = createReadStream(filePath, { encoding: 'utf8' });
-        const rl = createInterface({ input: stream, crlfDelay: Infinity });
-        for await (const line of rl) {
-            totalLines += 1;
-            if (totalLines < startLine) continue;
-            if (totalLines > endLine) break;
-            if (current.length === 0) currentStartLine = totalLines;
-            current.push(line);
-            if (current.length >= chunkLines) {
-                const content = current.join('\n');
-                const bytes = Buffer.byteLength(content, 'utf8');
-                bytesRead += bytes;
-                chunks.push({
-                    index: chunks.length,
-                    startLine: currentStartLine,
-                    endLine: totalLines,
-                    content,
-                    bytes,
-                });
-                current = [];
-            }
-        }
-        if (current.length > 0) {
-            const content = current.join('\n');
-            const bytes = Buffer.byteLength(content, 'utf8');
-            bytesRead += bytes;
-            chunks.push({
-                index: chunks.length,
-                startLine: currentStartLine,
-                endLine: currentStartLine + current.length - 1,
-                content,
-                bytes,
-            });
-        }
+        const snapshot = await readTextLineChunks(filePath, options);
         const io = publishAndReturn(
             buildIoMeta({
                 operation: 'read',
                 target: filePath,
                 targetKind: 'file',
-                bytesRead,
+                bytesRead: snapshot.bytesRead,
                 durationMs: elapsedMs(startedAt),
                 engine: 'io-engine.fs.createReadStream.textChunks',
                 riskClass: 'low',
                 traceId,
                 advisoryLimits: {
                     ...(options.advisoryLimits ?? {}),
-                    chunkLines,
-                    startLine,
-                    endLine: Number.isFinite(endLine) ? endLine : null,
-                    chunkCount: chunks.length,
+                    chunkLines: snapshot.chunkLines,
+                    startLine: snapshot.startLine,
+                    endLine: snapshot.endLine,
+                    chunkCount: snapshot.chunks.length,
                     limitMode: 'informative',
                 },
             }),
             true,
         );
-        return { path: filePath, chunks, totalLines, bytesRead, io };
+        return {
+            path: filePath,
+            chunks: snapshot.chunks,
+            totalLines: snapshot.totalLines,
+            bytesRead: snapshot.bytesRead,
+            io,
+        };
     } catch (error) {
         publishAndReturn(
             buildIoMeta({

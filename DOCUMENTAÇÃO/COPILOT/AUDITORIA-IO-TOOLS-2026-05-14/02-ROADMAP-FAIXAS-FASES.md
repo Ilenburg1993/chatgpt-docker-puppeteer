@@ -60,7 +60,7 @@ baixos `shared/`, `policy/`, `scan/`, `parse/`, `storage/`, `queue/`, `locks/`, 
 
 ### F1.2 — Quebra inicial do `io-engine.js`
 
-- Extrair leitura para `io/fs/read-*` (iniciado com `io/fs/read-text.js`).
+- Extrair leitura para `io/fs/read-*` (executado para texto, bytes, linhas e chunks de linhas).
 - Extrair escrita/mutação para `io/fs/write-*`, `copy`, `move`, `remove` (executado para portas baixas principais).
 - Extrair diff/patch para `io/patch` (executado para cálculo textual puro).
 - Extrair busca textual/simbólica para `io/search` (executado para índice FTS, grep fallback e padrões simbólicos).

@@ -92,7 +92,8 @@ io-index-registry.js -> io-index-sqlite.js -> io-engine.js -> io-index-registry.
 
 Transformações aplicadas:
 
-- `src/copilot/infra/io/fs/read-text.js` foi criado como porta baixa para leitura textual.
+- `src/copilot/infra/io/fs/read-text.js`, `read-lines.js` e `read-chunks.js` foram criados como portas baixas para leitura
+  textual, snapshots por linhas e paginação de chunks.
 - `io-parser.js` deixou de importar `io-engine.js` para leitura de símbolos.
 - `io-index-sqlite.js` deixou de importar `io-engine.js` durante indexação e passou a usar snapshot textual baixo.
 - `io-index-sqlite.search()` aplica `pathPrefix` no SQL/FTS em vez de filtrar em memória depois.
@@ -101,7 +102,7 @@ Transformações aplicadas:
 - `parse/*` passou a concentrar parsers puros de JSON, Markdown, comentários e outline.
 - `storage/*` passou a concentrar JSON store baixo; `storage.js` virou facade sem depender de `io-engine.js`.
 - `queue/*`, `locks/*` e `runtime/*` foram iniciados como domínios internos barrel-first.
-- `io/fs/*` foi expandido com portas baixas para bytes, stat, mkdir, append, remove, copy e move.
+- `io/fs/*` foi expandido com portas baixas para bytes, texto, linhas, chunks, stat, mkdir, append, remove, copy e move.
 - `io/patch/*` foi criado com patch e diff textual puros.
 - `io/search/*` foi criado com helpers puros para índice FTS, grep fallback e busca simbólica.
 - `index-store/sqlite/*` foi criado com schema, normalização de paths, query FTS e chunks persistentes do índice L2.
@@ -124,6 +125,6 @@ Transformações aplicadas:
 Evidência local:
 
 ```txt
-src/copilot/infra: files 85 cycles 0
+src/copilot/infra: files 87 cycles 0
 tools -> infra internals: 0 ocorrências
 ```
