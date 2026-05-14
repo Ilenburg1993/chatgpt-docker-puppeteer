@@ -9,7 +9,7 @@
  * @see EventBus
  */
 
-import { describeAutoModelPolicy, listModels, modelRegistry, modelStatsTracker } from '#copilot/sdk';
+import { describeAutoModelPolicy, listModels, modelRegistry, modelStatsTracker } from '#copilot/sdk/models';
 import { toError } from '#copilot/core';
 import { log } from '../ports/index.js';
 import { trySetLiveSessionModel } from '../runtime/contracts/index.js';

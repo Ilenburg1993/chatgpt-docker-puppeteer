@@ -8,18 +8,15 @@
  */
 
 import { MAESTRO_AGENT_NAME } from '#copilot/config';
+import { getCurrentAgent, listAgents, reloadAgents, selectAgent } from '#copilot/sdk/agents';
 import {
     compactionCompact,
-    getCurrentAgent,
-    listAgents,
-    reloadAgents,
-    selectAgent,
     shellExec,
     shellKill,
     workspaceCreateFile,
     workspaceListFiles,
     workspaceReadFile,
-} from '#copilot/sdk';
+} from '#copilot/sdk/rpc';
 import { requireSession } from './core/index.js';
 
 /**

@@ -27,7 +27,7 @@ import {
     SessionConfigBuilder,
 } from '#copilot/config';
 import { buildCanonicalLocalSurfaceExcludedTools, container } from '#copilot/core';
-import { AgentToolPolicy } from '#copilot/sdk';
+import { AgentToolPolicy } from '#copilot/sdk/tools';
 import {
     bindAgentSessionTools,
     bootstrapAgentTools,
@@ -57,7 +57,7 @@ import {
  * @typedef {object} SessionSetupContext
  * @property {() => void} invalidateMessagesCache - Invalida o cache de mensagens antes de rebuilar tools para evitar
  *   replay/estado obsoleto.
- * @property {() => import('#copilot/sdk/tools-registry').ToolRegistry} resetToolsRegistry - Recria o registry ativo de
+ * @property {() => import('#copilot/sdk/types').ToolRegistry} resetToolsRegistry - Recria o registry ativo de
  *   tools para o boot/resume atual.
  * @property {() => import('../../ports/index.js').AgentMcpCapability | null} [getMcpBridgeSnapshot]
  *
@@ -120,13 +120,13 @@ function invalidateMessagesCache(ctx) {
 
 /**
  * @param {SessionSetupContext} ctx
- * @returns {import('#copilot/sdk/tools-registry').ToolRegistry}
+ * @returns {import('#copilot/sdk/types').ToolRegistry}
  */
 function resetToolsRegistry(ctx) {
     if (typeof ctx.resetToolsRegistry === 'function') {
         return ctx.resetToolsRegistry();
     }
-    const compat = /** @type {{ toolsRegistry?: import('#copilot/sdk/tools-registry').ToolRegistry | null }} */ (ctx);
+    const compat = /** @type {{ toolsRegistry?: import('#copilot/sdk/types').ToolRegistry | null }} */ (ctx);
     compat.toolsRegistry = createAgentSdkToolsRegistry();
     return compat.toolsRegistry;
 }

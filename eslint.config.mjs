@@ -47,6 +47,7 @@ const GLOBAL_IGNORES = [
     'public/**',
     'src/dashboard-ui/**',
     'scripts/dist/**',
+    '.kilo/**',
     // Artefatos gerados (declarations TypeScript, tipos compilados)
     'tmp/**',
     // Vendor/skills externas ao projeto (codex, agentes vendors)
@@ -259,6 +260,10 @@ export default tseslint.config(
         files: ['tests/**/*.{js,mjs}', '**/*.spec.{js,mjs}', '**/*.test.{js,mjs}'],
         extends: [tseslint.configs.disableTypeChecked],
         languageOptions: {
+            parserOptions: {
+                projectService: false,
+                tsconfigRootDir: import.meta.dirname,
+            },
             globals: {
                 ...globals.node,
             },
@@ -286,6 +291,10 @@ export default tseslint.config(
         files: ['tests/legacy/**/*.{js,mjs}'],
         extends: [tseslint.configs.disableTypeChecked],
         languageOptions: {
+            parserOptions: {
+                projectService: false,
+                tsconfigRootDir: import.meta.dirname,
+            },
             globals: {
                 ...globals.node,
             },
@@ -404,7 +413,8 @@ export default tseslint.config(
                         {
                             name: '@github/copilot-sdk',
                             message:
-                                'Importe de "#copilot/sdk" (barrel) ou "#copilot/sdk/*.js" (módulo individual). ' +
+                                'Importe de uma surface local do SDK, como "#copilot/sdk/session", "#copilot/sdk/rpc", ' +
+                                '"#copilot/sdk/tools", "#copilot/sdk/telemetry" ou "#copilot/sdk/types". ' +
                                 'Apenas os wrappers em src/copilot/sdk/ podem importar diretamente de @github/copilot-sdk.',
                         },
                     ],
@@ -427,12 +437,18 @@ export default tseslint.config(
                     patterns: [
                         {
                             // Proíbe deep imports de #copilot/, EXCETO:
-                            //   - #copilot/sdk/types (typedef-only, sem runtime deps)
+                            //   - #copilot/sdk/* surfaces públicas governadas por sdk/module-map.js
                             //   - #copilot/observability/logger (allow-listed por DX/performance)
-                            regex: '^#copilot/(core|config|observability|hooks|audit|conversation-hub|bridges|tools|channel|db|api|sdk|agent|terminal)/(?!types$|logger$).+',
+                            regex: '^#copilot/(core|config|observability|hooks|audit|conversation-hub|bridges|tools|channel|db|api|agent|terminal)/(?!types$|logger$).+',
                             message:
                                 'Use o barrel do módulo (ex.: "#copilot/core") em vez do deep import. ' +
-                                'Exceções permitidas: #copilot/sdk/types e #copilot/observability/logger.',
+                                'Exceções permitidas: surfaces #copilot/sdk/* e #copilot/observability/logger.',
+                        },
+                        {
+                            regex: '^#copilot/sdk/(tools-registry|tools-state|custom-tools|server-rpc|rpc-session|rpc-ops|rpc-facade|health|tracing|quota-monitor|agent-contract|bridge-contract|channel-contract|client|client-facade|client-events|session-lifecycle|events|provider|permissions|system-message)$',
+                            message:
+                                'Alias SDK folha removido. Use a surface canônica: #copilot/sdk/session, ' +
+                                '#copilot/sdk/rpc, #copilot/sdk/tools, #copilot/sdk/telemetry ou #copilot/sdk/types.',
                         },
                     ],
                 },

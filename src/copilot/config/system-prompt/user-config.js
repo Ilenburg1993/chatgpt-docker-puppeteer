@@ -11,7 +11,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { readFile as readFileAsync } from 'node:fs/promises';
 import { isAbsolute, resolve } from 'node:path';
-import { resolvePersistentConfigFile } from '../sdk-config-port.js';
+import { resolvePersistentConfigFile } from '../persistent-paths.js';
 
 /**
  * @typedef {'append' | 'customize' | 'replace'} SystemPromptMode

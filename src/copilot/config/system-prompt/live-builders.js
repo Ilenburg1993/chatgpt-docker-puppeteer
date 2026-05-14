@@ -8,7 +8,7 @@
  * @module copilot/config/system-prompt/live-builders
  */
 
-import { customizeSystemMessage, sectionOverride } from '#copilot/sdk';
+import { customizeSystemMessage, sectionOverride } from '#copilot/sdk/session';
 import { applyDeclaredSystemPromptSection, buildSystemMessage } from './builders.js';
 import { loadLiveSystemPromptSections } from './live-loader.js';
 import { getMode } from './mode.js';

@@ -19,12 +19,10 @@
  * ctx.cancelAllPendingInput('[session encerrada]');
  * ```
  *
- * ## Compatibilidade
+ * ## Contexto default
  *
- * Os helpers globais em `user-input.js` (`nextStructuredUserInputRequestId`,
- * `registerPendingStructuredUserInputResolver`, etc.) continuam funcionais para o caso de sessão única
- * (backward-compat). A migração para `ToolSessionContext` é progressiva — por padrão os consumers existentes não
- * precisam ser alterados.
+ * `user-input.js` mantém helpers que operam sobre um `ToolSessionContext` default configurável no bootstrap. Consumers
+ * multi-sessão devem injetar a instância por sessão para preservar isolamento.
  *
  * @module copilot/sdk/session/tool-session-context
  */

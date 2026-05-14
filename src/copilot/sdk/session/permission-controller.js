@@ -8,7 +8,7 @@
  * @module copilot/sdk/session/permission-controller
  */
 
-import { AGENT_DENY_SHELL_TOOLS } from '#copilot/config';
+import { AGENT_DENY_SHELL_TOOLS } from '#copilot/config/env';
 import { log } from '../logger.js';
 import {
     DEFAULT_PERMISSION_MODE,

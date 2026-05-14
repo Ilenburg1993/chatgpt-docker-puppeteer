@@ -101,6 +101,13 @@
  */
 
 /**
+ * Entrada aceita pela factory canônica de tools para schemas de parâmetros.
+ *
+ * @template [T=unknown] Default is `unknown`
+ * @typedef {import('./tools/core.js').ToolParameterInput<T>} ToolParameterInput
+ */
+
+/**
  * Contexto de invocação de tool. Campos: `sessionId`, `toolCallId`, `toolName`, `arguments`, `traceparent?` (W3C trace
  * — do span execute_tool do CLI), `tracestate?` (W3C trace).
  *
@@ -163,6 +170,54 @@
  *
  * @template [T=unknown] Default is `unknown`
  * @typedef {import('@github/copilot-sdk').ZodSchema<T>} ZodSchema
+ */
+
+/**
+ * Registry canônico de tools local ao projeto.
+ *
+ * @typedef {import('./tools/registry.js').ToolRegistry} ToolRegistry
+ */
+
+/**
+ * Entrada do registry canônico de tools.
+ *
+ * @typedef {import('./tools/registry.js').ToolEntry} ToolEntry
+ */
+
+/**
+ * Contexto de tools isolado por sessão.
+ *
+ * @typedef {import('./session/tool-session-context.js').ToolSessionContext} ToolSessionContext
+ */
+
+/**
+ * Handler de elicitation enfileirada usado por runtime/agent.
+ *
+ * @typedef {ReturnType<typeof import('./session/elicitation.js').createQueuedElicitationHandler>} QueuedElicitationHandler
+ */
+
+/**
+ * Entrada pendente de elicitation enfileirada.
+ *
+ * @typedef {import('./session/elicitation.js').QueuedElicitationEntry} QueuedElicitationEntry
+ */
+
+/**
+ * Entrada concluída de elicitation enfileirada.
+ *
+ * @typedef {import('./session/elicitation.js').CompletedQueuedElicitationEntry} CompletedQueuedElicitationEntry
+ */
+
+/**
+ * Opções do handler de elicitation enfileirada.
+ *
+ * @typedef {import('./session/elicitation.js').QueuedElicitationHandlerOptions} QueuedElicitationHandlerOptions
+ */
+
+/**
+ * Bus de hooks do SDK local.
+ *
+ * @typedef {import('./session/hook-bus.js').HookBus} HookBus
  */
 
 // ─── Permissions ──────────────────────────────────────────────────────────────
@@ -840,6 +895,24 @@
  * @typedef {import('@github/copilot-sdk').TraceContextProvider} TraceContextProvider
  */
 
+/**
+ * Snapshot de quota normalizado pelo RPC server local.
+ *
+ * @typedef {import('./telemetry/quota-monitor.js').QuotaSnapshot} QuotaSnapshot
+ */
+
+/**
+ * Opções do monitor canônico de quota.
+ *
+ * @typedef {import('./telemetry/quota-monitor.js').QuotaMonitorOptions} QuotaMonitorOptions
+ */
+
+/**
+ * Monitor canônico de quota.
+ *
+ * @typedef {import('./telemetry/quota-monitor.js').QuotaMonitor} QuotaMonitor
+ */
+
 // ─── Status & Auth ────────────────────────────────────────────────────────────
 
 /**
@@ -967,8 +1040,8 @@
  */
 
 /**
- * Interface para namespace RPC experimental do SDK. Cobre namespaces `fleet`, `agent`, `skills`, `mcp`, `plugins`,
- * `extensions`. Alinhado com `createSessionRpc()` do SDK.
+ * Interface para namespace RPC experimental do SDK. Cobre namespaces `fleet`, `skills`, `mcp`, `plugins`, `extensions`.
+ * Alinhado com `createSessionRpc()` do SDK.
  *
  * Cada namespace usa apenas um subconjunto dos métodos. O typedef é uma union de todos os métodos possíveis para
  * simplificar o cast — cada função wrapper já valida feature flag e sessão antes de invocar.
@@ -985,13 +1058,12 @@
  */
 
 /**
- * Sessão com surface de RPC experimental. Campo `rpc` expõe os namespaces: `fleet`, `agent`, `skills`, `mcp`,
- * `plugins`, `extensions`.
+ * Sessão com surface de RPC experimental. Campo `rpc` expõe os namespaces: `fleet`, `skills`, `mcp`, `plugins`,
+ * `extensions`.
  *
  * @typedef {object} ExperimentalSession
  * @property {{
  *     fleet: ExperimentalRpcNamespace;
- *     agent: ExperimentalRpcNamespace;
  *     skills: ExperimentalRpcNamespace;
  *     mcp: ExperimentalRpcNamespace;
  *     plugins: ExperimentalRpcNamespace;

@@ -4,7 +4,7 @@
  * @file Policy local para rotear input humano quando há pergunta pendente do runtime.
  */
 
-import { hasPendingStructuredUserInputRequests } from '#copilot/sdk';
+import { hasPendingStructuredUserInputRequests } from '#copilot/sdk/session';
 import { answerTerminalPendingQuestion, readTerminalRuntimeState } from '../frontend/gateways/index.js';
 
 /**

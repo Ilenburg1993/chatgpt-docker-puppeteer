@@ -10,7 +10,7 @@
  */
 
 /**
- * @typedef {import('#copilot/sdk/tools-registry').ToolRegistry} ToolRegistry
+ * @typedef {import('#copilot/sdk/types').ToolRegistry} ToolRegistry
  */
 
 /**

@@ -17,7 +17,7 @@
  * @see EventBus
  */
 
-import { getClient } from './client.js';
+import { getClientSnapshot } from './client.js';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -112,11 +112,11 @@ export function isLifecycleEventType(eventType) {
  *
  * @param {string} eventType - tipo de lifecycle event (e.g. 'session.created')
  * @param {LifecycleHandler} handler - callback
- * @param {CopilotClient} [client] - client opcional; se omitido, usa getClient()
+ * @param {CopilotClient} [client] - client opcional; se omitido, usa o client já inicializado/injetado.
  * @returns {() => void} função unsubscribe
  */
 export function onLifecycleEvent(eventType, handler, client) {
-    const c = client ?? getClient();
+    const c = client ?? getClientSnapshot();
     assertClient(c);
     if (typeof eventType !== 'string' || eventType.length === 0) {
         throw new Error('[sdk/client-events] eventType must be a non-empty string');
@@ -141,11 +141,11 @@ export function onLifecycleEvent(eventType, handler, client) {
  *     ```
  *
  * @param {LifecycleHandler} handler - callback
- * @param {CopilotClient} [client] - client opcional; se omitido, usa getClient()
+ * @param {CopilotClient} [client] - client opcional; se omitido, usa o client já inicializado/injetado.
  * @returns {() => void} função unsubscribe
  */
 export function onAllLifecycleEvents(handler, client) {
-    const c = client ?? getClient();
+    const c = client ?? getClientSnapshot();
     assertClient(c);
     if (typeof handler !== 'function') {
         throw new Error('[sdk/client-events] handler must be a function');
@@ -165,11 +165,11 @@ export function onAllLifecycleEvents(handler, client) {
  *     ```;
  *
  * @param {Record<string, LifecycleHandler>} handlerMap - mapa de eventType → handler
- * @param {CopilotClient} [client] - client opcional; se omitido, usa getClient()
+ * @param {CopilotClient} [client] - client opcional; se omitido, usa o client já inicializado/injetado.
  * @returns {() => void} função que chama unsubscribe de todos
  */
 export function onLifecycleEvents(handlerMap, client) {
-    const c = client ?? getClient();
+    const c = client ?? getClientSnapshot();
     assertClient(c);
     if (!handlerMap || typeof handlerMap !== 'object') {
         throw new Error('[sdk/client-events] handlerMap must be a non-null object');

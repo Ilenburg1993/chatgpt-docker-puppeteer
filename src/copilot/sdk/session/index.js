@@ -67,6 +67,7 @@ export {
     getAuthStatus,
     getClient,
     getClientSession,
+    getClientSnapshot,
     getClientState,
     getClientStatus,
     getForegroundClientSessionId,
@@ -180,6 +181,7 @@ export {
     replaceSystemMessage,
     sectionOverride,
     supportsCustomizeMode,
+    SYSTEM_PROMPT_SECTIONS,
     transformSection,
 } from './system-message.js';
 export { ToolSessionContext, createToolSessionContext } from './tool-session-context.js';

@@ -8,14 +8,14 @@
  * Exports:
  *
  * - `createTool()` — factory padrão com logging, normalização Zod e defaults do projeto
- * - `defineTool` — re-export do SDK (apenas para edge cases e compat)
+ * - `defineTool` — primitive vanilla do SDK exposta para integrações que precisam controlar a factory diretamente
  *
- * Para a registry de tools em runtime, ver `sdk/tools-registry.js`. Para a factory existente com convenções avançadas,
- * ver `tools/infra/tool-factory.js`.
+ * Para a registry de tools em runtime, ver `sdk/tools/registry.js`. Para a factory de aplicação com convenções
+ * avançadas, ver `tools/infra/tool-factory.js`.
  *
  * @module copilot/sdk/tools
  * @see EventBus
- * @see module:copilot/sdk/tools-registry
+ * @see module:copilot/sdk/tools/registry
  */
 
 import { defineTool } from '@github/copilot-sdk';
@@ -154,7 +154,7 @@ function tryDirectToJsonSchema(schema) {
     }
 }
 
-// Re-export do SDK para compat — consumers preferem usar createTool()
+// Primitive vanilla para integrações de baixo nível; consumers comuns preferem createTool().
 export { defineTool };
 
 /**

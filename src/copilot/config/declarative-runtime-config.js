@@ -18,7 +18,7 @@ import {
     patchToolsConfig,
     registerCustomTool,
     removeCustomTool,
-} from './sdk-config-port.js';
+} from '#copilot/sdk/tools';
 
 const SKILLS_PATH = resolvePersistentConfigFile('skills.json');
 

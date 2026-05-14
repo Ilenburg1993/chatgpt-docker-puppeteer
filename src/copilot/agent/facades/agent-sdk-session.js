@@ -8,7 +8,7 @@
  */
 
 import { SessionError } from '#copilot/core';
-import { modeGet, modeSet, planDelete, planRead, planUpdate } from '#copilot/sdk';
+import { modeGet, modeSet, planDelete, planRead, planUpdate } from '#copilot/sdk/rpc';
 
 /**
  * @typedef {import('../agent-context.js').AgentContext} AgentContext

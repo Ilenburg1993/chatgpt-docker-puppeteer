@@ -125,7 +125,7 @@
  * @property {AgentStatus} status - Estado atual do agente.
  * @property {ReturnType<typeof setInterval> | null} metricsTimer - Timer de emissão periódica de métricas.
  * @property {(() => void) | null} mcpReconnectCancel - Cancel do auto-reconnect MCP.
- * @property {import('#copilot/sdk/quota-monitor').QuotaMonitor | null} quotaMonitor - Monitor periódico de quota.
+ * @property {import('#copilot/sdk/types').QuotaMonitor | null} quotaMonitor - Monitor periódico de quota.
  * @property {{ attach: (agent: import('node:events').EventEmitter) => void; detach: () => void } | null} agentObserver
  *   - Observer do agente para cleanup.
  *
@@ -726,11 +726,11 @@
  *     | undefined} inputSdkSessionUi
  *   - Solicita entrada textual via `session.ui.input()` ou fallback compatível
  *
- * @property {((options?: { sessionId?: string }) => import('#copilot/sdk/session/elicitation').QueuedElicitationEntry[])
+ * @property {((options?: { sessionId?: string }) => import('#copilot/sdk/types').QueuedElicitationEntry[])
  *     | undefined} listPendingSdkElicitations
  *   - Lista solicitações de elicitation pendentes do SDK
  *
- * @property {((id: string) => import('#copilot/sdk/session/elicitation').QueuedElicitationEntry | null) | undefined} getPendingSdkElicitation
+ * @property {((id: string) => import('#copilot/sdk/types').QueuedElicitationEntry | null) | undefined} getPendingSdkElicitation
  *   - Lê uma solicitação de elicitation pendente por id
  *
  * @property {((id: string, result: import('#copilot/sdk/types').ElicitationResult) => boolean) | undefined} resolvePendingSdkElicitation

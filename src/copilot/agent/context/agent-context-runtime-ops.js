@@ -32,7 +32,7 @@
  * Atualiza o quota monitor acoplado ao runtime.
  *
  * @param {RuntimeOpsCtx} ctx
- * @param {import('#copilot/sdk/quota-monitor').QuotaMonitor} quotaMonitor
+ * @param {import('#copilot/sdk/types').QuotaMonitor} quotaMonitor
  * @returns {void}
  */
 export function setQuotaMonitor(ctx, quotaMonitor) {
@@ -68,7 +68,7 @@ export function stopQuotaMonitor(ctx) {
  * Retorna o quota monitor ativo sem expor diretamente `runtimeState`.
  *
  * @param {RuntimeOpsCtx} ctx
- * @returns {import('#copilot/sdk/quota-monitor').QuotaMonitor | null}
+ * @returns {import('#copilot/sdk/types').QuotaMonitor | null}
  */
 export function getQuotaMonitorSnapshot(ctx) {
     return ctx.runtimeState.quotaMonitor;

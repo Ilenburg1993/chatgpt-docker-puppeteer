@@ -11,7 +11,7 @@
  */
 
 import { SessionError } from '#copilot/core';
-import { setSessionModel } from '#copilot/sdk';
+import { setSessionModel } from '#copilot/sdk/session-runtime';
 import { toError } from '#copilot/core';
 import { log } from './ports/index.js';
 

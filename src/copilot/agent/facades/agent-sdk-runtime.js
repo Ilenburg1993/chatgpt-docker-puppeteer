@@ -12,13 +12,17 @@
  */
 
 import {
-    getSessionMessages,
     onAllSessionEvents,
     onSessionEvent,
+} from '#copilot/sdk/session';
+import {
+    getSessionMessages,
     sendSession,
     sendSessionAndWait,
+} from '#copilot/sdk/session-runtime';
+import {
     waitForEvent,
-} from '#copilot/sdk';
+} from '#copilot/sdk/event-helpers';
 
 /**
  * @param {import('#copilot/sdk/types').CopilotSession} session

@@ -10,7 +10,7 @@
  */
 
 import { EMITTER_PROCESS_QUEUE } from '#copilot/events';
-import { createToolSessionContext } from '#copilot/sdk';
+import { createToolSessionContext } from '#copilot/sdk/session';
 import { COPILOT_MODEL, COPILOT_REASONING_EFFORT } from '#copilot/config/agent';
 import { createAgentContextFactories } from './context/factories/index.js';
 import { dialogOps, fsmOps, metricsOps, runtimeOps, sessionOps, toolOps } from './context/ops/index.js';
@@ -77,9 +77,9 @@ export class AgentContext {
     webhooks;
     /** @type {import('./ports/index.js').AgentPermissionController} */
     permissions;
-    /** @type {import('#copilot/sdk').ToolSessionContext} */
+    /** @type {import('#copilot/sdk/types').ToolSessionContext} */
     toolSessionContext;
-    /** @type {import('#copilot/sdk/tools-registry').ToolRegistry} */
+    /** @type {import('#copilot/sdk/types').ToolRegistry} */
     toolsRegistry;
     /** @type {import('./session/lifecycle/keepalive.js').SessionKeepalive} */
     keepalive;
@@ -87,7 +87,7 @@ export class AgentContext {
     handoff;
     /** @type {import('./session/history/history-sync.js').SessionMessagesCache} */
     messagesCache;
-    /** @type {ReturnType<import('#copilot/sdk').createQueuedElicitationHandler>} */
+    /** @type {import('#copilot/sdk/types').QueuedElicitationHandler} */
     sdkElicitation;
     /** @type {import('./background/index.js').BackgroundTasks} */
     backgroundTasks;
@@ -278,7 +278,7 @@ export class AgentContext {
     get quotaMonitor() {
         return this.runtimeState.quotaMonitor;
     }
-    /** @param {import('#copilot/sdk/quota-monitor').QuotaMonitor | null | undefined} value */
+    /** @param {import('#copilot/sdk/types').QuotaMonitor | null | undefined} value */
     set quotaMonitor(value) {
         if (value == null) this.clearQuotaMonitor();
         else this.setQuotaMonitor(value);
@@ -496,7 +496,7 @@ export class AgentContext {
     getAgentObserverSnapshot() {
         return runtimeOps.getAgentObserverSnapshot(this);
     }
-    /** @param {import('#copilot/sdk/quota-monitor').QuotaMonitor} quotaMonitor */
+    /** @param {import('#copilot/sdk/types').QuotaMonitor} quotaMonitor */
     setQuotaMonitor(quotaMonitor) {
         runtimeOps.setQuotaMonitor(this, quotaMonitor);
     }
@@ -613,7 +613,7 @@ export class AgentContext {
     /**
      * Retorna o snapshot do registry de tools registradas no runtime.
      *
-     * @returns {import('#copilot/sdk/tools-registry').ToolRegistry}
+     * @returns {import('#copilot/sdk/types').ToolRegistry}
      */
     getToolRegistrySnapshot() {
         return toolOps.getToolRegistrySnapshot(this);

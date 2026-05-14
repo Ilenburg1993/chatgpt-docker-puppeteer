@@ -117,9 +117,9 @@ import {
     startAgentSdkBootQuotaBridge,
     startAgentSdkQuotaMonitor,
     stopAgentSdkClient,
-} from '../../../src/copilot/agent/facades/agent-sdk-access.js';
+} from '../../../src/copilot/agent/facades/sdk-access.js';
 
-describe('agent-sdk-access facade', () => {
+describe('sdk-access facade', () => {
     /** @type {any} */
     let client;
     /** @type {any} */
@@ -455,7 +455,7 @@ describe('agent-sdk-access facade', () => {
 
     it('provider-side elicitation fica acessível pela facade do agent', async () => {
         const { getPendingSdkElicitation, listPendingSdkElicitations, resolvePendingSdkElicitation } =
-            await import('../../../src/copilot/agent/facades/agent-sdk-access.js');
+            await import('../../../src/copilot/agent/facades/sdk-access.js');
         expect(listPendingSdkElicitations(ctx)).toHaveLength(1);
         expect(getPendingSdkElicitation(ctx, 'elicitation-1')).toMatchObject({ message: 'Escolha o ambiente' });
         expect(resolvePendingSdkElicitation(ctx, 'elicitation-1', { action: 'accept' })).toBe(true);

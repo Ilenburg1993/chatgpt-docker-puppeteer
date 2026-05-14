@@ -101,6 +101,37 @@ export {
     unregisterAgentRuntimeWebhook,
 } from './agent-runtime-webhooks.js';
 export {
+    canReadAgentSdkSessionMessages,
+    onAgentSdkSessionEvent,
+    onAllAgentSdkSessionEvents,
+    readAgentSdkSessionMessages,
+    sendAgentSdkSession,
+    sendAgentSdkSessionAndWait,
+    waitForAgentSdkEvent,
+} from './agent-sdk-runtime.js';
+export {
+    deleteAgentSdkPlan,
+    deleteSdkPlan,
+    getSdkSessionMode,
+    readAgentSdkPlan,
+    readAgentSdkSessionMode,
+    readSdkPlan,
+    setAgentSdkSessionMode,
+    setSdkSessionMode,
+    updateAgentSdkPlan,
+    updateSdkPlan,
+} from './agent-sdk-session.js';
+export {
+    abortCurrentMessage,
+    getSessionMessages,
+    performKeepaliveSdkTick,
+    pingDialogWatchdog,
+    sessionLog,
+} from './agent-session-ops.js';
+export { listWebhooks, registerWebhook, unregisterWebhook } from './agent-webhook-ops.js';
+export { HealthFacade } from './health-facade.js';
+export { PermissionToolsFacade } from './permission-tools-facade.js';
+export {
     AGENT_SDK_DEFAULT_MODEL,
     attachAgentSdkBootLifecycleBridge,
     checkAgentSdkAuthStatus,
@@ -163,37 +194,6 @@ export {
     startAgentSdkBootQuotaBridge,
     stopAgentSdkClient,
     validateAgentContracts,
-} from './agent-sdk-access.js';
-export {
-    canReadAgentSdkSessionMessages,
-    onAgentSdkSessionEvent,
-    onAllAgentSdkSessionEvents,
-    readAgentSdkSessionMessages,
-    sendAgentSdkSession,
-    sendAgentSdkSessionAndWait,
-    waitForAgentSdkEvent,
-} from './agent-sdk-runtime.js';
-export {
-    deleteAgentSdkPlan,
-    deleteSdkPlan,
-    getSdkSessionMode,
-    readAgentSdkPlan,
-    readAgentSdkSessionMode,
-    readSdkPlan,
-    setAgentSdkSessionMode,
-    setSdkSessionMode,
-    updateAgentSdkPlan,
-    updateSdkPlan,
-} from './agent-sdk-session.js';
-export {
-    abortCurrentMessage,
-    getSessionMessages,
-    performKeepaliveSdkTick,
-    pingDialogWatchdog,
-    sessionLog,
-} from './agent-session-ops.js';
-export { listWebhooks, registerWebhook, unregisterWebhook } from './agent-webhook-ops.js';
-export { HealthFacade } from './health-facade.js';
-export { PermissionToolsFacade } from './permission-tools-facade.js';
+} from './sdk-access.js';
 export { SdkQueryFacade } from './sdk-query-facade.js';
 export { StateQueryFacade } from './state-query-facade.js';

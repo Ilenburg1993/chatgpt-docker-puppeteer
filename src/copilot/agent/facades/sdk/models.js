@@ -7,7 +7,8 @@
  * @module copilot/agent/facades/sdk/models
  */
 
-import { isExperimentalEnabled, listModels, modelRegistry, modelStatsTracker } from '#copilot/sdk';
+import { isExperimentalEnabled } from '#copilot/sdk/feature-flags';
+import { listModels, modelRegistry, modelStatsTracker } from '#copilot/sdk/models';
 
 /** @type {string} */
 export const AGENT_SDK_DEFAULT_MODEL = 'gpt-5-mini';

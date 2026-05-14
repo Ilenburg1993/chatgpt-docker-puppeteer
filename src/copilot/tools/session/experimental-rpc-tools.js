@@ -2,25 +2,23 @@
 /**
  * src/copilot/tools/session/experimental-rpc-tools.js
  *
- * Tools que expõem os subsistemas experimentais do SDK RPC para a LLM-B. Permitem ao agente gerenciar fleet, agents,
- * skills, MCP servers, plugins e extensions quando os respectivos feature flags estão habilitados.
+ * Tools que expõem os subsistemas experimentais do SDK RPC para a LLM-B. Permitem ao agente gerenciar fleet, skills,
+ * MCP servers, plugins e extensions quando os respectivos feature flags estão habilitados.
  *
  * Ativação: chamar `setExperimentalSession(session)` após a sessão ser criada. As tools verificam internamente se o
  * feature flag está habilitado antes de executar.
  *
  * @module copilot/tools/session/experimental-rpc-tools
- * @see module:copilot/sdk/experimental-rpc
+ * @see module:copilot/sdk/rpc/experimental
  * @see module:copilot/sdk/rpc
  * @see module:copilot/sdk/feature-flags
  */
 
-import { COPILOT_RPC_TIMEOUT_MS, MAESTRO_AGENT_NAME } from '#copilot/config';
+import { COPILOT_RPC_TIMEOUT_MS } from '#copilot/config';
 import { toError } from '#copilot/core';
 import { z } from 'zod';
 import { log } from '../infra/logger.js';
 import { buildTool, withSkipPermission } from '../infra/tool-factory.js';
-
-import { agentGetCurrent, agentList, agentReload, agentSelect } from '#copilot/sdk/rpc';
 
 import {
     extensionsDisable,
@@ -37,7 +35,7 @@ import {
     skillsEnable,
     skillsList,
     skillsReload,
-} from '#copilot/sdk/experimental-rpc';
+} from '#copilot/sdk/rpc/experimental';
 
 // ─── Session handle ──────────────────────────────────────────────────────────
 
@@ -121,68 +119,6 @@ const expFleetStartTool = buildTool({
     handler: async (/** @type {{ prompt?: string }} */ params) =>
         // Fleet bootstrap pode durar mais que RPCs curtas de controle; evitar timeout absoluto aqui.
         wrapExp('exp_fleet_start', (s) => fleetStart(s, params), { timeoutMs: null }),
-});
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// Agent tools
-// ═══════════════════════════════════════════════════════════════════════════════
-
-const expAgentListTool = buildTool({
-    name: 'exp_agent_list',
-    description: '[Experimental] Lista agentes disponíveis na sessão. ' + 'Requer feature flag "agents" habilitado.',
-    parameters: /** @type {import('#copilot/sdk/types').ZodSchema<Record<string, never>>} */ (
-        /** @type {unknown} */ (z.object({}))
-    ),
-    handler: async () => wrapExp('exp_agent_list', (s) => agentList(s)),
-});
-
-const expAgentGetCurrentTool = buildTool({
-    name: 'exp_agent_get_current',
-    description: '[Experimental] Retorna o agente ativo atual. ' + 'Requer feature flag "agents" habilitado.',
-    parameters: /** @type {import('#copilot/sdk/types').ZodSchema<Record<string, never>>} */ (
-        /** @type {unknown} */ (z.object({}))
-    ),
-    handler: async () => wrapExp('exp_agent_get_current', (s) => agentGetCurrent(s)),
-});
-
-const expAgentSelectTool = buildTool({
-    name: 'exp_agent_select',
-    description:
-        '[Experimental] Reforça o agente maestro obrigatório. Selecionar outro agente diretamente é bloqueado.',
-    parameters: /** @type {import('#copilot/sdk/types').ZodSchema<{ name: string }>} */ (
-        /** @type {unknown} */ (
-            z.object({
-                name: z.string().min(1).describe('Nome do agente a selecionar'),
-            })
-        )
-    ),
-    handler: async (/** @type {{ name: string }} */ { name }) => {
-        if (name !== MAESTRO_AGENT_NAME) {
-            return {
-                error: `Seleção direta de "${name}" bloqueada. O agente ativo obrigatório é "${MAESTRO_AGENT_NAME}".`,
-                enforcedAgent: MAESTRO_AGENT_NAME,
-            };
-        }
-        return wrapExp('exp_agent_select', (s) => agentSelect(s, MAESTRO_AGENT_NAME));
-    },
-});
-
-const expAgentDeselectTool = buildTool({
-    name: 'exp_agent_deselect',
-    description: '[Experimental] Bloqueia deseleção do maestro e reforça agent-full como agente ativo obrigatório.',
-    parameters: /** @type {import('#copilot/sdk/types').ZodSchema<Record<string, never>>} */ (
-        /** @type {unknown} */ (z.object({}))
-    ),
-    handler: async () => wrapExp('exp_agent_deselect', (s) => agentSelect(s, MAESTRO_AGENT_NAME)),
-});
-
-const expAgentReloadTool = buildTool({
-    name: 'exp_agent_reload',
-    description: '[Experimental] Recarrega a lista de agentes. ' + 'Requer feature flag "agents" habilitado.',
-    parameters: /** @type {import('#copilot/sdk/types').ZodSchema<Record<string, never>>} */ (
-        /** @type {unknown} */ (z.object({}))
-    ),
-    handler: async () => wrapExp('exp_agent_reload', (s) => agentReload(s)),
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -351,20 +287,14 @@ const expExtensionsReloadTool = buildTool({
 // ─── Export ───────────────────────────────────────────────────────────────────
 
 /**
- * Tools experimentais de RPC — fleet, agent, skills, mcp, plugins, extensions. Todas as tools read-only são envolvidas
- * com `withSkipPermission`.
+ * Tools experimentais de RPC — fleet, skills, mcp, plugins, extensions. Todas as tools read-only são envolvidas com
+ * `withSkipPermission`.
  *
  * @type {import('#copilot/sdk/types').Tool<any>[]}
  */
 export const experimentalRpcTools = [
     // Fleet
     expFleetStartTool,
-    // Agent
-    withSkipPermission(expAgentListTool),
-    withSkipPermission(expAgentGetCurrentTool),
-    expAgentSelectTool,
-    expAgentDeselectTool,
-    expAgentReloadTool,
     // Skills
     withSkipPermission(expSkillsListTool),
     expSkillsEnableTool,

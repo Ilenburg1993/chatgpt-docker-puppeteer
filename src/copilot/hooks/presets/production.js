@@ -128,7 +128,7 @@ function _matchPermanentDenyPattern(toolName, toolArgs) {
  *     });
  *
  * @param {ProductionPresetOptions} [opts]
- * @returns {{ hooks: SessionHooks; onPermissionRequest: import('@github/copilot-sdk').PermissionHandler }}
+ * @returns {{ hooks: SessionHooks; onPermissionRequest: import('#copilot/sdk/types').PermissionHandler }}
  */
 export function createProductionHooks(opts = {}) {
     const {

@@ -11,7 +11,7 @@
 
 import { LLM_B_TURN_TIMEOUT_MS } from '#copilot/config';
 import { log } from '#copilot/observability';
-import { normalizeElicitationResult } from '#copilot/sdk';
+import { normalizeElicitationResult } from '#copilot/sdk/session';
 import { randomUUID } from 'node:crypto';
 import { toError } from '../../../core/error-handlers.js';
 import { projectAgentHttpError } from '../../../presentation/agent/index.js';

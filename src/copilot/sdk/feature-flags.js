@@ -14,7 +14,7 @@
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
 /**
- * @typedef {'fleet' | 'agents' | 'skills' | 'mcp' | 'plugins' | 'extensions'} ExperimentalFeature
+ * @typedef {'fleet' | 'skills' | 'mcp' | 'plugins' | 'extensions'} ExperimentalFeature
  */
 
 /**
@@ -25,13 +25,12 @@
 
 /** Nomes canônicos das features experimentais suportadas. */
 export const EXPERIMENTAL_FEATURES = /** @type {readonly ExperimentalFeature[]} */ (
-    Object.freeze(['fleet', 'agents', 'skills', 'mcp', 'plugins', 'extensions'])
+    Object.freeze(['fleet', 'skills', 'mcp', 'plugins', 'extensions'])
 );
 
 /** @type {ExperimentalFlags} */
 const _flags = {
     fleet: false,
-    agents: false,
     skills: false,
     mcp: false,
     plugins: false,

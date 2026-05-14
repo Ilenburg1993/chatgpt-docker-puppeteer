@@ -73,7 +73,7 @@ const {
     loadCustomToolsAsync,
     setCustomToolsBuilder,
     _resetRegistry,
-} = await import('#copilot/sdk/custom-tools');
+} = await import('#copilot/sdk/tools');
 
 const { readFile } = await import('node:fs/promises');
 

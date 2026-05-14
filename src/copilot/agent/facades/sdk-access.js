@@ -1,8 +1,8 @@
 // @ts-check
 /**
- * src/copilot/agent/facades/agent-sdk-access.js
+ * src/copilot/agent/facades/sdk-access.js
  *
- * Compat shim — re-exporta de sub-facades em sdk/ por domínio.
+ * Barrel canônico de acesso ao SDK a partir das façades do agent.
  *
  * Decomposição realizada em W125 (2026-03-21): sdk/client.js — client, lifecycle events, handles, status ctx-wrapped
  * sdk/models.js — model registry, catálogo, stats, experimental sdk/tools.js — tools registry, configuração,
@@ -10,7 +10,7 @@
  * ctx-wrapped session ops sdk/workspace-ops.js — arquivos de workspace, shell, agentes customizados sdk/ui-ops.js — UI
  * elicitation, confirmações, inputs, permissões
  *
- * @module copilot/agent/facades/agent-sdk-access
+ * @module copilot/agent/facades/sdk-access
  * @see module:copilot/agent/facades/sdk/client
  * @see module:copilot/agent/facades/sdk/sessions
  * @see module:copilot/agent/facades/sdk/models
@@ -113,5 +113,4 @@ export {
 } from './sdk/index.js';
 
 // Funções de leitura de mensagens de sessão SDK — fonte canônica: agent-sdk-runtime.js
-// Mantidas aqui por compat; consumidores novos devem importar diretamente de agent-sdk-runtime.
 export { canReadAgentSdkSessionMessages, readAgentSdkSessionMessages } from './agent-sdk-runtime.js';

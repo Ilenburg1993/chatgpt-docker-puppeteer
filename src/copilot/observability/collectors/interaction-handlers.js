@@ -9,7 +9,7 @@
  */
 
 import { SESSION_EVENTS as SE } from '#copilot/events';
-import { normalizePermissionCompletedEvent, normalizePermissionRequestedEvent } from '#copilot/sdk';
+import { normalizePermissionCompletedEvent, normalizePermissionRequestedEvent } from '#copilot/sdk/session';
 import { onSessionEvent } from '#copilot/sdk/session';
 import { log } from '../logger.js';
 

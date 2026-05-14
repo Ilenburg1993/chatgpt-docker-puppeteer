@@ -11,7 +11,8 @@
  */
 
 import { buildHookContextAppendMessage } from '#copilot/config';
-import { approveAll, createPermissionHandler, DEFAULT_DIAGNOSTIC_MODEL, DEFAULT_MODEL } from '#copilot/sdk';
+import { DEFAULT_DIAGNOSTIC_MODEL, DEFAULT_MODEL } from '#copilot/sdk/constants';
+import { approveAll, createPermissionHandler } from '#copilot/sdk/session';
 import { createHooks } from '../factory.js';
 
 /**

@@ -6,7 +6,7 @@
  *
  * - prover factories de `onUserInputRequest` fora de `hooks/`;
  * - normalizar eventos `user_input.requested` / `user_input.completed` em contrato estável;
- * - manter `hooks/user-input.js` apenas como compat layer histórica.
+ * - manter a política de hooks fora do SDK, delegando para este núcleo quando precisar de user input.
  *
  * @module copilot/sdk/session/user-input
  */

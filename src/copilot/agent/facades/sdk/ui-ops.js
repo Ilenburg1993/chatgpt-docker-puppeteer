@@ -9,17 +9,19 @@
 
 import {
     commandsHandlePending,
-    getSessionCapabilities,
-    isSessionUiElicitationAvailable,
     permissionsHandlePending,
     permissionsListPending,
+    toolsHandlePendingCall,
+    uiElicitation,
+} from '#copilot/sdk/rpc';
+import {
+    getSessionCapabilities,
+    isSessionUiElicitationAvailable,
     sessionUiConfirm,
     sessionUiElicitation,
     sessionUiInput,
     sessionUiSelect,
-    toolsHandlePendingCall,
-    uiElicitation,
-} from '#copilot/sdk';
+} from '#copilot/sdk/session';
 import { getSdkElicitationRef, requireSession } from './core/index.js';
 
 /**

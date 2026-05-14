@@ -11,17 +11,16 @@
  * | 1     | Types & Constants         | constants.js           |
  * | 2     | Tools & Permissions       | tools.js, permissions  |
  * | 3     | SystemMessage Builder     | system-message.js      |
- * | 4     | Unified Config Builder    | config.js              |
- * | 5     | Client & Session Facade   | client-facade.js       |
- * | 6     | Session Runtime Lifecycle | session-runtime        |
- * | 7-8   | RPC Core & Advanced       | rpc/index + rpc-facade |
- * | 9     | Health & Auth             | health.js              |
- * | 10    | Event System              | events.js              |
- * | 11    | Lifecycle Events          | client-events.js       |
- * | 12    | Provider / BYOK           | provider.js            |
- * | 13    | Telemetry & Tracing       | telemetry.js           |
- * | 16    | Custom Tools Registry     | custom-tools.js        |
- * | 22    | Experimental Features     | feature-flags.js       |
+ * | 4     | Client & Session Facade   | client-facade.js       |
+ * | 5     | Session Runtime Lifecycle | session-runtime        |
+ * | 6-7   | RPC Core & Advanced       | rpc/index + rpc-facade |
+ * | 8     | Health & Auth             | health.js              |
+ * | 9     | Event System              | events.js              |
+ * | 10    | Lifecycle Events          | client-events.js       |
+ * | 11    | Provider / BYOK           | provider.js            |
+ * | 12    | Telemetry & Tracing       | telemetry.js           |
+ * | 15    | Custom Tools Registry     | custom-tools.js        |
+ * | 21    | Experimental Features     | feature-flags.js       |
  *
  * ### DI Setters (chamados por observability/bootstrap.js)
  *
@@ -159,6 +158,8 @@ export { pickDefined } from './utils.js';
 // types.js é puro JSDoc — não tem export runtime, consumers usam via import('./types.js')
 export {
     CONNECTION_STATES,
+    DEFAULT_DIAGNOSTIC_MODEL,
+    DEFAULT_MODEL,
     INFINITE_SESSION_DEFAULTS,
     PERMISSION_COMPLETED_KINDS,
     PERMISSION_RESULTS,
@@ -260,21 +261,10 @@ export {
     transformSection,
 } from './session/system-message.js';
 
-// ─── Faixa 4: Unified Config Builder (rev.4) ─────────────────────────────────
-// Nota: DEFAULT_EXCLUDED_TOOLS, buildAlwaysAliveConfig, buildDiagnosticConfig,
-// buildFullAccessConfig, buildReadOnlyConfig removidos — importar de '#copilot/config/session-config'.
-// Cf. PARTE-21C Faixa H: eliminação de violações L1→L2.
-export {
-    buildSessionConfig,
-    DEFAULT_DIAGNOSTIC_MODEL,
-    DEFAULT_INFINITE_SESSION,
-    DEFAULT_MODEL,
-    getProjectDefaults,
-    mergeExcludedTools,
-    mergeTools,
-} from './config.js';
+// Configuração de sessão é canônica em '#copilot/config' via SessionConfigBuilder.
+// O SDK root não reexporta builders de configuração para manter L1 livre de regras de produto L2.
 
-// ─── Faixa 5: Client & Session Facade (rev.4) ────────────────────────────────
+// ─── Faixa 4: Client & Session Facade (rev.4) ────────────────────────────────
 export {
     ensureClient,
     isClientReady,
@@ -296,10 +286,7 @@ export {
 } from './session/attachments.js';
 
 export { supportsElicitation, waitForElicitationCapability, watchCapabilities } from './session/capabilities.js';
-// Nota: buildConfig e getDefaults são aliases de buildSessionConfig e getProjectDefaults
-// já exportados acima (Faixa 4) — não re-exportar para evitar duplicadas.
-
-// ─── Faixa 6: Session Lifecycle Wrappers (rev.4) ─────────────────────────────
+// ─── Faixa 5: Session Lifecycle Wrappers (rev.4) ─────────────────────────────
 export {
     abortSession,
     disconnectSessionSafe,

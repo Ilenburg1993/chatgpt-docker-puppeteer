@@ -36,7 +36,7 @@ import { createToolPermissionPolicy } from './permission-policy.js';
  *     });
  *
  * @param {InteractivePresetOptions} [opts]
- * @returns {{ hooks: SessionHooks; onPermissionRequest: import('@github/copilot-sdk').PermissionHandler }}
+ * @returns {{ hooks: SessionHooks; onPermissionRequest: import('#copilot/sdk/types').PermissionHandler }}
  */
 export function createInteractivePreset(opts = {}) {
     const { autoAllowTools = [], autoDenyTools = [] } = opts;

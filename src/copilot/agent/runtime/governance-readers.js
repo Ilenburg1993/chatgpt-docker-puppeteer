@@ -15,7 +15,7 @@
  *         | undefined;
  *     getPermissionPolicySnapshot?: (() => unknown) | undefined;
  *     getContextFactoryCapabilitiesSnapshot?: (() => Record<string, Record<string, unknown>>) | undefined;
- *     getToolRegistrySnapshot?: (() => import('#copilot/sdk/tools-registry').ToolRegistry) | undefined;
+ *     getToolRegistrySnapshot?: (() => import('#copilot/sdk/types').ToolRegistry) | undefined;
  *     getToolRegistryEntriesSnapshot?:
  *         | (() => {
  *               name: string;
@@ -26,8 +26,8 @@
  *               skipPermission: boolean;
  *           }[])
  *         | undefined;
- *     getToolSessionContext?: (() => import('#copilot/sdk').ToolSessionContext) | undefined;
- *     toolSessionContext?: import('#copilot/sdk').ToolSessionContext | undefined;
+ *     getToolSessionContext?: (() => import('#copilot/sdk/types').ToolSessionContext) | undefined;
+ *     toolSessionContext?: import('#copilot/sdk/types').ToolSessionContext | undefined;
  * }} AgentRuntimeGovernanceTarget
  */
 
@@ -66,7 +66,7 @@ export function readRuntimePermissionPolicySnapshot(runtime) {
  * Retorna o ToolSessionContext vivo sem expor `AgentContext` como contrato público do runtime.
  *
  * @param {AgentRuntimeGovernanceTarget} runtime
- * @returns {import('#copilot/sdk').ToolSessionContext}
+ * @returns {import('#copilot/sdk/types').ToolSessionContext}
  */
 export function readRuntimeToolSessionContext(runtime) {
     const context = runtime.getToolSessionContext?.() ?? runtime.toolSessionContext;

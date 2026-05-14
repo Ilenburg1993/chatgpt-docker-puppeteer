@@ -109,10 +109,8 @@ describe('F131 — config/index.js exporta DEFAULT_EXCLUDED_TOOLS', () => {
         expect(Array.isArray(config.DEFAULT_EXCLUDED_TOOLS)).toBe(true);
     });
 
-    // sdk/config.js não exporta mais DEFAULT_EXCLUDED_TOOLS (removido intencionalmente)
-    it('sdk/config.js NÃO exporta DEFAULT_EXCLUDED_TOOLS (removido)', () => {
-        const content = readFileSync(join(SRC, 'sdk/config.js'), 'utf8');
-        expect(content).not.toContain('export const DEFAULT_EXCLUDED_TOOLS');
+    it('sdk/config.js não existe mais', () => {
+        expect(() => readFileSync(join(SRC, 'sdk/config.js'), 'utf8')).toThrow();
     });
 });
 

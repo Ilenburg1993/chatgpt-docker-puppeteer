@@ -66,7 +66,7 @@
  *   código de produção — use `buildTool` que já encapsula o `defineTool`.
  */
 
-import { normalizeToolParametersSchema, createTool as sdkCreateTool } from '#copilot/sdk';
+import { normalizeToolParametersSchema, createTool as sdkCreateTool } from '#copilot/sdk/tools';
 import { log as toolsLog } from './logger.js';
 
 /**
@@ -207,7 +207,7 @@ function logToolFactory(level, message) {
  * @typedef {object} BuildToolOptions
  * @property {string} name - Nome único da ferramenta (snake_case recomendado)
  * @property {string} description - Descrição legível para o modelo
- * @property {import('#copilot/sdk/tools/core.js').ToolParameterInput<any>} [parameters]
+ * @property {import('#copilot/sdk/types').ToolParameterInput<any>} [parameters]
  *
  *   - Schema Zod (v3 ou v4, inclusive tipagem SDK) ou JSON Schema manual dos parâmetros
  *
@@ -220,7 +220,7 @@ function logToolFactory(level, message) {
  * Normaliza o schema de parâmetros para o formato aceito pelo SDK. Aceita instâncias Zod (convertidas automaticamente)
  * ou JSON Schema direto. Se falhar na conversão, loga aviso e retorna undefined (permitindo tool sem parâmetros).
  *
- * @param {import('#copilot/sdk/tools/core.js').ToolParameterInput<any> | undefined} parameters
+ * @param {import('#copilot/sdk/types').ToolParameterInput<any> | undefined} parameters
  * @param {string} [toolName='unknown'] Default is `'unknown'`
  * @returns {Record<string, unknown> | undefined}
  */
@@ -236,7 +236,7 @@ function normalizeParameters(parameters, toolName = 'unknown') {
             throw new TypeError('normalizeToolParametersSchema is not a function');
         }
         return normalizeToolParametersSchema(
-            /** @type {import('#copilot/sdk/tools/core.js').ToolParameterInput<any> | undefined} */ (parameters),
+            /** @type {import('#copilot/sdk/types').ToolParameterInput<any> | undefined} */ (parameters),
             toolName,
         );
     } catch (err) {

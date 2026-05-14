@@ -36,7 +36,7 @@ const FACADE_OPERATION_MATRIX = {
     'permission-tools-facade.js': { role: 'query', allowedFacadeImports: [] },
     'sdk-query-facade.js': { role: 'query', allowedFacadeImports: [] },
     'state-query-facade.js': { role: 'query', allowedFacadeImports: [] },
-    'agent-sdk-access.js': {
+    'sdk-access.js': {
         role: 'infra',
         allowedFacadeImports: [
             'agent-sdk-runtime.js',
@@ -199,8 +199,8 @@ describe('contracts/facade-bypass-matrix — consumers permitidos por facade cr�
         assert.deepEqual(violations, [], `Imports não autorizados de agent-health-access:\n${violations.join('\n')}`);
     });
 
-    it('agent-sdk-access e agent-sdk-runtime só são consumidas por domínios runtime permitidos', () => {
-        const sdkAccessViolations = findFacadeImportViolations('facades/agent-sdk-access.js', [
+    it('sdk-access e agent-sdk-runtime só são consumidas por domínios runtime permitidos', () => {
+        const sdkAccessViolations = findFacadeImportViolations('facades/sdk-access.js', [
             'agent/lifecycle/',
             'agent/session/',
             'agent/context-factories.js',
@@ -220,7 +220,7 @@ describe('contracts/facade-bypass-matrix — consumers permitidos por facade cr�
         assert.deepEqual(
             sdkAccessViolations,
             [],
-            `Imports não autorizados de agent-sdk-access:\n${sdkAccessViolations.join('\n')}`,
+            `Imports não autorizados de sdk-access:\n${sdkAccessViolations.join('\n')}`,
         );
         assert.deepEqual(
             sdkRuntimeViolations,

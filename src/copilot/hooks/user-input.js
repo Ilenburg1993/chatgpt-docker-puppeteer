@@ -8,4 +8,4 @@
  * @module copilot/hooks/user-input
  */
 
-export { createQueuedInputHandler, createReadlineInputHandler, createStaticInputHandler } from '#copilot/sdk';
+export { createQueuedInputHandler, createReadlineInputHandler, createStaticInputHandler } from '#copilot/sdk/session';

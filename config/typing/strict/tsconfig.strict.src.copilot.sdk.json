@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "extends": "../../../tsconfig.node.json",
+  "compilerOptions": {
+    "tsBuildInfoFile": "/home/node/.cache/typescript/tsconfig.strict.src.copilot.sdk.tsbuildinfo",
+    "noEmit": true,
+
+    "target": "ES2024",
+    "lib": ["ES2024", "DOM", "DOM.Iterable"],
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+
+    "verbatimModuleSyntax": true,
+    "erasableSyntaxOnly": true,
+    "isolatedModules": true,
+
+    "strict": true,
+    "alwaysStrict": true,
+    "noImplicitAny": true,
+    "noImplicitThis": true,
+    "strictNullChecks": true,
+    "strictFunctionTypes": true,
+    "strictBindCallApply": true,
+    "strictBuiltinIteratorReturn": true,
+    "useUnknownInCatchVariables": true,
+
+    "exactOptionalPropertyTypes": true,
+    "noUncheckedIndexedAccess": true,
+    "noPropertyAccessFromIndexSignature": true,
+
+    "noImplicitOverride": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUncheckedSideEffectImports": true,
+
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+
+    "forceConsistentCasingInFileNames": true,
+
+    "skipLibCheck": true
+  },
+  "include": ["../../../src/copilot/sdk/**/*.js"]
+}

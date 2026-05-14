@@ -4,8 +4,9 @@
  *
  * Faixa 22 — Experimental RPC Features com feature flags.
  *
- * F118: fleet.start() com feature flag F119: agent.* gated F120: skills.* gated F121: mcp.* gated F122: plugins.list()
- * gated F123: extensions.* gated F124: feature-flags.js — config e API F125: feature flag on/off para cada subsistema
+ * F118: fleet.start() com feature flag F119: agent.* permanece em rpc estável (não experimental) F120: skills.* gated
+ * F121: mcp.* gated F122: plugins.list() gated F123: extensions.* gated F124: feature-flags.js — config e API F125:
+ * feature flag on/off por subsistema experimental
  */
 
 import { createRequire } from 'node:module';
@@ -36,12 +37,11 @@ describe('F22 — F124: feature-flags.js', () => {
         expect(existsSync(join(SRC_COPILOT, 'sdk/feature-flags.js'))).toBe(true);
     });
 
-    it('exporta EXPERIMENTAL_FEATURES com 6 features', () => {
+    it('exporta EXPERIMENTAL_FEATURES com 5 features', () => {
         const src = readSource('sdk/feature-flags.js');
         expect(src).toContain('export const EXPERIMENTAL_FEATURES');
-        // fleet, agents, skills, mcp, plugins, extensions
+        // fleet, skills, mcp, plugins, extensions
         expect(src).toContain("'fleet'");
-        expect(src).toContain("'agents'");
         expect(src).toContain("'skills'");
         expect(src).toContain("'mcp'");
         expect(src).toContain("'plugins'");
@@ -109,10 +109,10 @@ describe('F22 — F124 runtime: feature-flags API', () => {
     });
 
     it('resetExperimentalFlags desabilita tudo', () => {
-        featureFlags.setExperimentalFlag('agents', true);
+        featureFlags.setExperimentalFlag('fleet', true);
         featureFlags.setExperimentalFlag('skills', true);
         featureFlags.resetExperimentalFlags();
-        expect(featureFlags.isExperimentalEnabled('agents')).toBe(false);
+        expect(featureFlags.isExperimentalEnabled('fleet')).toBe(false);
         expect(featureFlags.isExperimentalEnabled('skills')).toBe(false);
     });
 
@@ -125,22 +125,26 @@ describe('F22 — F124 runtime: feature-flags API', () => {
         expect(snapshot.mcp).toBe(true);
     });
 
-    it('EXPERIMENTAL_FEATURES tem exatamente 6 elementos', () => {
-        expect(featureFlags.EXPERIMENTAL_FEATURES).toHaveLength(6);
+    it('EXPERIMENTAL_FEATURES tem exatamente 5 elementos', () => {
+        expect(featureFlags.EXPERIMENTAL_FEATURES).toHaveLength(5);
     });
 });
 
-// ─── F118-F123: experimental-rpc.js (source checks) ─────────────────────────
+// ─── F118-F123: rpc/experimental.js (source checks) ─────────────────────────
 
-describe('F22 — F118-F123: experimental-rpc.js exports', () => {
+describe('F22 — F118-F123: rpc/experimental.js exports', () => {
     it('experimental.js exporta fleetStart (F118)', () => {
         const src = readSource('sdk/rpc/experimental.js');
         expect(src).toContain('export async function fleetStart');
     });
 
-    it('experimental.js reexporta agentList, agentGetCurrent, agentSelect, agentDeselect, agentReload (F119)', () => {
+    it('experimental.js NÃO exporta agent.* (F119: agent é surface estável em #copilot/sdk/rpc)', () => {
         const src = readSource('sdk/rpc/experimental.js');
-        expect(src).toContain('export { agentDeselect, agentGetCurrent, agentList, agentReload, agentSelect }');
+        expect(src).not.toContain('agentList');
+        expect(src).not.toContain('agentGetCurrent');
+        expect(src).not.toContain('agentSelect');
+        expect(src).not.toContain('agentDeselect');
+        expect(src).not.toContain('agentReload');
     });
 
     it('experimental.js NÃO exporta funções fantasmas (agentGetStatus, agentStop, skillsGetStatus, mcpGetStatus)', () => {
@@ -211,11 +215,6 @@ describe('F22 — F125: feature flag on/off por subsistema', () => {
         await expect(expRpc.fleetStart(mockSession)).rejects.toThrow("'fleet'");
     });
 
-    it('agentList lança Error quando agents=false', async () => {
-        featureFlags.resetExperimentalFlags();
-        await expect(expRpc.agentList(mockSession)).rejects.toThrow('agent.list');
-    });
-
     it('skillsList lança Error quando skills=false', async () => {
         featureFlags.resetExperimentalFlags();
         await expect(expRpc.skillsList(mockSession)).rejects.toThrow("'skills'");
@@ -236,15 +235,6 @@ describe('F22 — F125: feature flag on/off por subsistema', () => {
         await expect(expRpc.extensionsList(mockSession)).rejects.toThrow("'extensions'");
     });
 
-    it('agentList com flag=true chama session.rpc.agent.list()', async () => {
-        featureFlags.setExperimentalFlag('agents', true);
-        const listMock = vi.fn().mockResolvedValue([]);
-        const sess = /** @type {any} */ ({ rpc: { agent: { list: listMock } } });
-        const result = await expRpc.agentList(sess);
-        expect(listMock).toHaveBeenCalledOnce();
-        expect(result).toEqual([]);
-    });
-
     it('fleetStart com flag=true chama session.rpc.fleet.start()', async () => {
         featureFlags.setExperimentalFlag('fleet', true);
         const startMock = vi.fn().mockResolvedValue({ started: true });
@@ -263,7 +253,7 @@ describe('F22 — F125: feature flag on/off por subsistema', () => {
         expect(result[0]?.name).toBe('Server A');
     });
 
-    it('sdk/experimental-rpc surface exporta funções experimentais alinhadas com SDK', () => {
+    it('sdk/rpc/experimental surface exporta funções experimentais alinhadas com SDK', () => {
         const src = readSource('sdk/index.js');
         expect(src).not.toContain('fleetStart');
         const expSrc = readSource('sdk/rpc/experimental.js');
@@ -275,23 +265,6 @@ describe('F22 — F125: feature flag on/off por subsistema', () => {
     });
 
     // ─── A3.2: Novos testes runtime para funções adicionadas ─────────────────
-
-    it('agentGetCurrent com flag=true chama session.rpc.agent.getCurrent()', async () => {
-        featureFlags.setExperimentalFlag('agents', true);
-        const getCurrentMock = vi.fn().mockResolvedValue({ id: 'a1', name: 'Agent 1' });
-        const sess = /** @type {any} */ ({ rpc: { agent: { getCurrent: getCurrentMock } } });
-        const result = await expRpc.agentGetCurrent(sess);
-        expect(getCurrentMock).toHaveBeenCalledOnce();
-        expect(result).toEqual({ id: 'a1', name: 'Agent 1' });
-    });
-
-    it('agentReload com flag=true chama session.rpc.agent.reload()', async () => {
-        featureFlags.setExperimentalFlag('agents', true);
-        const reloadMock = vi.fn().mockResolvedValue(undefined);
-        const sess = /** @type {any} */ ({ rpc: { agent: { reload: reloadMock } } });
-        await expRpc.agentReload(sess);
-        expect(reloadMock).toHaveBeenCalledOnce();
-    });
 
     it('skillsReload com flag=true chama session.rpc.skills.reload()', async () => {
         featureFlags.setExperimentalFlag('skills', true);
@@ -317,12 +290,6 @@ describe('F22 — F125: feature flag on/off por subsistema', () => {
         expect(reloadMock).toHaveBeenCalledOnce();
     });
 
-    it('agentSelect valida name não-vazio', async () => {
-        featureFlags.setExperimentalFlag('agents', true);
-        const sess = /** @type {any} */ ({ rpc: { agent: { select: vi.fn() } } });
-        await expect(expRpc.agentSelect(sess, '')).rejects.toThrow(TypeError);
-    });
-
     it('mcpEnable valida serverName não-vazio', async () => {
         featureFlags.setExperimentalFlag('mcp', true);
         const sess = /** @type {any} */ ({ rpc: { mcp: { enable: vi.fn() } } });
@@ -336,9 +303,9 @@ describe('F22 — F125: feature flag on/off por subsistema', () => {
     });
 
     it('assertSession lança TypeError para sessão inválida', async () => {
-        featureFlags.setExperimentalFlag('agents', true);
-        await expect(expRpc.agentList(/** @type {any} */ (null))).rejects.toThrow(TypeError);
-        await expect(expRpc.agentList(/** @type {any} */ ({}))).rejects.toThrow(TypeError);
+        featureFlags.setExperimentalFlag('skills', true);
+        await expect(expRpc.skillsList(/** @type {any} */ (null))).rejects.toThrow(TypeError);
+        await expect(expRpc.skillsList(/** @type {any} */ ({}))).rejects.toThrow(TypeError);
     });
 
     it('pluginsList com flag=true chama session.rpc.plugins.list()', async () => {
@@ -348,14 +315,6 @@ describe('F22 — F125: feature flag on/off por subsistema', () => {
         const result = await expRpc.pluginsList(sess);
         expect(listMock).toHaveBeenCalledOnce();
         expect(/** @type {{ id?: string }} */ (result[0])?.id).toBe('p1');
-    });
-
-    it('agentSelect com flag=true chama session.rpc.agent.select({ name })', async () => {
-        featureFlags.setExperimentalFlag('agents', true);
-        const selectMock = vi.fn().mockResolvedValue(undefined);
-        const sess = /** @type {any} */ ({ rpc: { agent: { select: selectMock } } });
-        await expRpc.agentSelect(sess, 'reviewer');
-        expect(selectMock).toHaveBeenCalledWith({ name: 'reviewer' });
     });
 
     it('extensionsEnable com flag=true chama session.rpc.extensions.enable({ id })', async () => {
@@ -382,14 +341,6 @@ describe('F22 — F125: feature flag on/off por subsistema', () => {
         expect(enableMock).toHaveBeenCalledWith({ name: 'skill-1' });
     });
 
-    it('agentDeselect com flag=true chama session.rpc.agent.deselect()', async () => {
-        featureFlags.setExperimentalFlag('agents', true);
-        const deselectMock = vi.fn().mockResolvedValue(undefined);
-        const sess = /** @type {any} */ ({ rpc: { agent: { deselect: deselectMock } } });
-        await expRpc.agentDeselect(sess);
-        expect(deselectMock).toHaveBeenCalledOnce();
-    });
-
     it('mcpDisable com flag=true chama session.rpc.mcp.disable({ serverName })', async () => {
         featureFlags.setExperimentalFlag('mcp', true);
         const disableMock = vi.fn().mockResolvedValue(undefined);
@@ -406,10 +357,10 @@ describe('F22 — F125: feature flag on/off por subsistema', () => {
         expect(enableMock).toHaveBeenCalledWith({ serverName: 'srv-1' });
     });
 
-    it('agentList converte falha de auth em SdkOperationError', async () => {
-        featureFlags.setExperimentalFlag('agents', true);
+    it('skillsList converte falha de auth em SdkOperationError', async () => {
+        featureFlags.setExperimentalFlag('skills', true);
         const listMock = vi.fn().mockRejectedValue(Object.assign(new Error('unauthorized'), { status: 401 }));
-        const sess = /** @type {any} */ ({ sessionId: 'sess-exp-1', rpc: { agent: { list: listMock } } });
-        await expect(expRpc.agentList(sess)).rejects.toBeInstanceOf(SdkOperationError);
+        const sess = /** @type {any} */ ({ sessionId: 'sess-exp-1', rpc: { skills: { list: listMock } } });
+        await expect(expRpc.skillsList(sess)).rejects.toBeInstanceOf(SdkOperationError);
     });
 });

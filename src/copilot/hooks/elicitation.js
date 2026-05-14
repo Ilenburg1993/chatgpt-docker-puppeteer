@@ -8,13 +8,13 @@
  * @module copilot/hooks/elicitation
  */
 
-export { createQueuedElicitationHandler, normalizeElicitationResult } from '#copilot/sdk';
+export { createQueuedElicitationHandler, normalizeElicitationResult } from '#copilot/sdk/session';
 
 /**
- * @typedef {import('#copilot/sdk/session/elicitation').QueuedElicitationEntry} QueuedElicitationEntry
+ * @typedef {import('#copilot/sdk/types').QueuedElicitationEntry} QueuedElicitationEntry
  *
- * @typedef {import('#copilot/sdk/session/elicitation').CompletedQueuedElicitationEntry} CompletedQueuedElicitationEntry
+ * @typedef {import('#copilot/sdk/types').CompletedQueuedElicitationEntry} CompletedQueuedElicitationEntry
  *
  *
- * @typedef {import('#copilot/sdk/session/elicitation').QueuedElicitationHandlerOptions} QueuedElicitationHandlerOptions
+ * @typedef {import('#copilot/sdk/types').QueuedElicitationHandlerOptions} QueuedElicitationHandlerOptions
  */

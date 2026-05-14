@@ -113,7 +113,7 @@ import {
  * } | null} agentObserver
  * @property {ReturnType<typeof setInterval> | null} metricsTimer
  * @property {(() => void) | null} mcpReconnectCancel
- * @property {import('#copilot/sdk/quota-monitor').QuotaMonitor | null} quotaMonitor — Monitor de quota (F118, Faixa 25)
+ * @property {import('#copilot/sdk/types').QuotaMonitor | null} quotaMonitor — Monitor de quota (F118, Faixa 25)
  * @property {import('../../types.js').AgentBootReport} bootReport - Relatório consolidado do pipeline de boot
  * @property {Error | null} [error] - Erro capturado durante a execução de alguma etapa
  */
@@ -130,7 +130,7 @@ import {
  * } | null} agentObserver
  * @property {ReturnType<typeof setInterval> | null} metricsTimer
  * @property {(() => void) | null} mcpReconnectCancel
- * @property {import('#copilot/sdk/quota-monitor').QuotaMonitor | null} quotaMonitor
+ * @property {import('#copilot/sdk/types').QuotaMonitor | null} quotaMonitor
  * @property {import('../../types.js').AgentBootStepResult[]} stepReports
  * @property {number} bootStartedAt
  */
@@ -179,8 +179,7 @@ function stepRegisterClientLifecycleHandlers(client, ctx, state) {
 // ── 10. Quota Monitor (F118 — Faixa 25) ──
 /**
  * Mantido em `boot-wiring.js` como ponto canônico visível do quota monitor para auditorias estruturais existentes.
- * Compatibilidade documental: referência histórica preservada ao caminho `#copilot/sdk/quota-monitor`, mas o import
- * canônico permanece via barrel `#copilot/sdk`.
+ * O import canônico permanece na façade de SDK do agent; não há alias folha para quota.
  *
  * @param {CopilotClient} client
  * @param {BootWiringContext} ctx

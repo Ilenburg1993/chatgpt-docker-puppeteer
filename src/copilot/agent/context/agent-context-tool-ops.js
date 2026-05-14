@@ -18,9 +18,9 @@ import { normalizeToolRegistryEntry } from './helpers/index.js';
  * Contrato mínimo do contexto para operações de tool registry e permissions.
  *
  * @typedef {{
- *     toolsRegistry: import('#copilot/sdk/tools-registry').ToolRegistry;
+ *     toolsRegistry: import('#copilot/sdk/types').ToolRegistry;
  *     permissions: import('../ports/index.js').AgentPermissionController;
- *     toolSessionContext: import('#copilot/sdk').ToolSessionContext;
+ *     toolSessionContext: import('#copilot/sdk/types').ToolSessionContext;
  *     invalidateStatusSnapshot: () => void;
  * }} ToolOpsCtx
  */
@@ -31,7 +31,7 @@ import { normalizeToolRegistryEntry } from './helpers/index.js';
  * Retorna o registry ativo de tools.
  *
  * @param {ToolOpsCtx} ctx
- * @returns {import('#copilot/sdk/tools-registry').ToolRegistry}
+ * @returns {import('#copilot/sdk/types').ToolRegistry}
  */
 export function getToolRegistrySnapshot(ctx) {
     return ctx.toolsRegistry;
@@ -104,7 +104,7 @@ export function getPermissionPolicySnapshot(ctx) {
 
 /**
  * @param {ToolOpsCtx} ctx
- * @returns {import('#copilot/sdk').ToolSessionContext}
+ * @returns {import('#copilot/sdk/types').ToolSessionContext}
  */
 export function getToolSessionContext(ctx) {
     return ctx.toolSessionContext;

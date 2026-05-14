@@ -132,10 +132,7 @@ describe('F23 — F109: experimental-rpc.js sem sobreposição com rpc core', ()
         const expExports = extractExportedNames(expSrc);
         const rpcExports = extractExportedNames(rpcSrc);
 
-        const allowedOverlap = new Set(['agentList', 'agentSelect', 'agentDeselect']);
-        allowedOverlap.add('agentGetCurrent');
-        allowedOverlap.add('agentReload');
-        const overlap = expExports.filter((name) => rpcExports.includes(name) && !allowedOverlap.has(name));
+        const overlap = expExports.filter((name) => rpcExports.includes(name));
         expect(overlap).toHaveLength(0);
     });
 
@@ -143,7 +140,6 @@ describe('F23 — F109: experimental-rpc.js sem sobreposição com rpc core', ()
         const src = readSdk('rpc/experimental.js');
         // Os subsistemas experimentais devem estar presentes
         expect(src).toContain('fleet');
-        expect(src).toContain('agent');
         expect(src).toContain('skills');
         expect(src).toContain('mcp');
         expect(src).toContain('plugins');
@@ -212,7 +208,6 @@ describe('F23 — F111: módulos obrigatórios acessíveis via barrel', () => {
         'telemetry/health.js',
         'types.js',
         'constants.js',
-        'config.js',
         'session/system-message.js',
         'tools/core.js',
         'session/permissions.js',
@@ -222,7 +217,7 @@ describe('F23 — F111: módulos obrigatórios acessíveis via barrel', () => {
         'session/client-events.js',
         'session/client-facade.js',
         'feature-flags.js',
-        // experimental-rpc é surface separada (#copilot/sdk/experimental-rpc)
+        // experimental-rpc é surface separada (#copilot/sdk/rpc/experimental)
         'telemetry/quota-monitor.js',
         'models/helpers.js',
         'models/registry.js',
@@ -274,9 +269,8 @@ describe('F23 — F112: barrel sem exports de símbolos inexistentes', () => {
         expect(src).toContain('export async function fleetStart');
     });
 
-    it('buildSessionConfig exportado existe em config.js', () => {
-        const src = readSdk('config.js');
-        expect(src).toContain('buildSessionConfig');
+    it('sdk/config.js foi removido da surface canônica', () => {
+        expect(() => readSdk('config.js')).toThrow();
     });
 
     it('fullHealthCheck exportado existe em health.js', () => {

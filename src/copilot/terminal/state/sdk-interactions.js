@@ -17,7 +17,7 @@ import {
     normalizePermissionRequestedEvent,
     normalizeUserInputCompletedEvent,
     normalizeUserInputRequestedEvent,
-} from '#copilot/sdk';
+} from '#copilot/sdk/session';
 
 /** @typedef {'pending' | 'completed' | 'cleared'} SdkInteractionStatus */
 

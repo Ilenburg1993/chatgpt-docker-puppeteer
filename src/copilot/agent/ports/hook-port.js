@@ -14,8 +14,9 @@
 import { defaultAuditLog } from '#copilot/audit';
 import { getCopilotFallbackModel } from '#copilot/config';
 import { recordBlockedToolCall } from '#copilot/observability';
-import { attachBus, classifySdkRateLimitScope, defaultHookBus, modelSelector } from '#copilot/sdk';
-import { createQueuedElicitationHandler } from '#copilot/sdk';
+import { classifySdkRateLimitScope } from '#copilot/sdk/errors';
+import { modelSelector } from '#copilot/sdk/models';
+import { attachBus, createQueuedElicitationHandler, defaultBus as defaultHookBus } from '#copilot/sdk/session';
 import { log } from './logging/index.js';
 
 export { createQueuedElicitationHandler };

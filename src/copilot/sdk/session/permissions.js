@@ -9,8 +9,8 @@
  *
  * @module copilot/sdk/permissions
  * @see EventBus
- * Este módulo é o núcleo canônico de policy de permissões na arquitetura 2.x.
- * Camadas legacy (ex.: hooks/permission-handler) devem delegar para cá.
+ * Este módulo é o núcleo canônico de policy de permissões na arquitetura 2.x. Camadas de hooks delegam para cá quando
+ * precisam compor permissões com policy de produto.
  */
 
 import { approveAll } from '@github/copilot-sdk';

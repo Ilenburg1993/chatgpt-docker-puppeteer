@@ -67,7 +67,7 @@ import { wireSessionEvents } from '../wiring/index.js';
  * } | null} agentObserver
  * @property {ReturnType<typeof setInterval> | null} metricsTimer
  * @property {(() => void) | null} mcpReconnectCancel
- * @property {import('#copilot/sdk/quota-monitor').QuotaMonitor | null} quotaMonitor
+ * @property {import('#copilot/sdk/types').QuotaMonitor | null} quotaMonitor
  * @property {import('../../types.js').AgentBootStepResult[]} stepReports
  * @property {number} bootStartedAt
  */

@@ -33,7 +33,7 @@ import {
 ## Quick Start — mínimo funcional
 
 ```js
-import { CopilotClient } from '@github/copilot-sdk';
+import { CopilotClient } from '#copilot/sdk';
 
 const client = new CopilotClient({ token: process.env.GITHUB_TOKEN });
 

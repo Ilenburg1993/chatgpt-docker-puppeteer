@@ -17,7 +17,7 @@
  */
 
 import { log, wrapWithStats } from '#copilot/observability';
-import { buildCustomTools, getAllTools as getRegistryTools, registerTools } from '#copilot/sdk';
+import { buildCustomTools, getAllTools as getRegistryTools, registerTools } from '#copilot/sdk/tools';
 import { codeTools } from './code/index.js';
 import { fileReadTools, fileWriteTools, indexTools, scopeTools } from './file/index.js';
 import { gitTools } from './git/index.js';
@@ -43,7 +43,7 @@ import { todoReadTools, todoWriteTools } from './todo/index.js';
 import { webTools } from './web/index.js';
 
 /**
- * @typedef {import('#copilot/sdk/tools-registry').ToolRegistry} ToolRegistry
+ * @typedef {import('#copilot/sdk/types').ToolRegistry} ToolRegistry
  *
  * @typedef {import('#copilot/sdk/types').Tool} Tool
  */

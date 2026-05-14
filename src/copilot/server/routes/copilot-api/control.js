@@ -12,7 +12,7 @@
 import { globalAuditTrail } from '#copilot/audit';
 import { BRIDGE_ADMIN_TOKEN } from '#copilot/config';
 import { log } from '#copilot/observability';
-import { sanitizePermissionToolNames } from '#copilot/sdk';
+import { sanitizeToolNames as sanitizePermissionToolNames } from '#copilot/sdk/session';
 import { toError } from '../../../core/error-handlers.js';
 import { projectAgentHttpError } from '../../../presentation/agent/index.js';
 import { buildAgentRuntimeCapabilitiesFromRoute } from '../../../presentation/runtime/index.js';

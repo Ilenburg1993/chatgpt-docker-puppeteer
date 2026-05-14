@@ -263,7 +263,7 @@ describe('F75 - Trace context propagation', () => {
 
 describe('Barrel - Faixa 13 exports', () => {
     it('barrel exporta todas as funcoes de telemetry', async () => {
-        const barrel = await import('#copilot/sdk/index');
+        const barrel = await import('#copilot/sdk');
         expect(typeof barrel.getTraceContext).toBe('function');
         expect(typeof barrel.createOtlpTelemetry).toBe('function');
         expect(typeof barrel.createFileTelemetry).toBe('function');

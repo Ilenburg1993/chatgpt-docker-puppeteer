@@ -94,7 +94,7 @@ export class PermissionToolsFacade {
     /**
      * Retorna o `ToolSessionContext` desta sessão — encapsula estado por sessão (input pendente, broadcast SSE).
      *
-     * @returns {import('#copilot/sdk').ToolSessionContext}
+     * @returns {import('#copilot/sdk/types').ToolSessionContext}
      */
     getToolSessionContext() {
         return readRuntimeToolSessionContext(this.ctx);
@@ -112,7 +112,7 @@ export class PermissionToolsFacade {
     /**
      * Retorna o registry ativo de tools sem expor o manager como contrato preferencial.
      *
-     * @returns {import('#copilot/sdk/tools-registry').ToolRegistry}
+     * @returns {import('#copilot/sdk/types').ToolRegistry}
      */
     getToolRegistrySnapshot() {
         return readRuntimeToolRegistry(this.ctx);

@@ -34,7 +34,7 @@ import {
     onAllSessionEvents,
     onSessionEvent,
     onSessionEvents,
-} from '#copilot/sdk/events';
+} from '#copilot/sdk/session';
 
 import { SESSION_EVENTS } from '#copilot/sdk/constants';
 
@@ -340,7 +340,7 @@ describe('F60b — createEventFilter', () => {
 
 describe('F62 — Barrel re-exports (sdk/index.js)', () => {
     it('re-exporta todas as 8 funções do events.js', async () => {
-        const barrel = await import('#copilot/sdk/index');
+        const barrel = await import('#copilot/sdk');
 
         expect(barrel.ALL_EVENT_TYPES).toBeDefined();
         expect(barrel.isKnownEventType).toBeTypeOf('function');

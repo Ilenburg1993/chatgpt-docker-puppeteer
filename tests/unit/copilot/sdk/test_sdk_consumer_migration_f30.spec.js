@@ -2,9 +2,9 @@
 /**
  * @file Faixa 30 — Consumer Migration Pass
  *
- *   Verifica que consumidores de submodules do SDK foram migrados para o barrel #copilot/sdk. Cobre:
+ *   Verifica que consumidores de submodules do SDK foram migrados para as surfaces canônicas. Cobre:
  *
- *   - F146: tools/ usa #copilot/sdk para createTool (não sdk/tools.js diretamente)
+ *   - F146: tools/ usa #copilot/sdk/tools para createTool
  *   - F147: bridges/ usa barrel (não sdk/events.js nem sdk/tools.js)
  *   - F148: agent/lifecycle/ usa barrel (não sdk/event-helpers)
  *   - F149: agent/session/ usa barrel (não sdk/session, sdk/tools-state, sdk/utils)
@@ -24,16 +24,12 @@ const src = (relPath) => readFileSync(join(ROOT, 'src/copilot', relPath), 'utf8'
 
 // ─── F146: tools/ usa barrel para createTool ───────────────────────────────
 
-describe('F146 — tools/ usa #copilot/sdk para createTool', () => {
+describe('F146 — tools/ usa #copilot/sdk/tools para createTool', () => {
     const toolFiles = ['tools/infra/tool-factory.js'];
 
     for (const file of toolFiles) {
-        it(`${file.split('/').pop()} não importa de '#copilot/sdk/tools'`, () => {
-            expect(src(file)).not.toContain("from '#copilot/sdk/tools'");
-        });
-
-        it(`${file.split('/').pop()} importa createTool de #copilot/sdk`, () => {
-            expect(src(file)).toMatch(/import\s*\{[^}]*createTool[^}]*\}\s*from\s*'#copilot\/sdk'/);
+        it(`${file.split('/').pop()} importa createTool da surface canônica de tools`, () => {
+            expect(src(file)).toMatch(/import\s*\{[^}]*createTool[^}]*\}\s*from\s*'#copilot\/sdk\/tools'/);
         });
     }
 
@@ -125,8 +121,8 @@ describe('F149 — agent/session/ converge para façades do agent', () => {
         expect(content).not.toContain("from '#copilot/sdk'");
     });
 
-    it('initializer.js não importa de #copilot/sdk/tools-state', () => {
-        expect(src('agent/session/initializers/initializer.js')).not.toContain("from '#copilot/sdk/tools-state'");
+    it('initializer.js não importa de #copilot/sdk/tools', () => {
+        expect(src('agent/session/initializers/initializer.js')).not.toContain("from '#copilot/sdk/tools'");
     });
 
     it('initializer.js não importa de #copilot/sdk/utils', () => {
@@ -142,21 +138,18 @@ describe('F149 — agent/session/ converge para façades do agent', () => {
     });
 });
 
-// ─── F150: observability/ usa barrel ───────────────────────────────────────
+// ─── F150: observability/ não reabre SDK diretamente ───────────────────────
 
-describe('F150 — observability/ usa barrel para onSessionEvent', () => {
-    it('event-collector.js não importa de #copilot/sdk/events', () => {
-        expect(src('observability/event-collector.js')).not.toContain("from '#copilot/sdk/events'");
-    });
-
-    it('event-collector.js importa de #copilot/sdk', () => {
+describe('F150 — observability/ usa events como porta semântica', () => {
+    it('event-collector.js não importa diretamente do SDK', () => {
         const content = src('observability/event-collector.js');
-        expect(content.includes("from '#copilot/sdk'") || content.includes("from '#copilot/events'")).toBe(true);
+        expect(content).not.toContain("from '#copilot/sdk");
+        expect(content).toContain("from '#copilot/events'");
     });
 
-    it('dialog-task-handlers.js não importa de #copilot/sdk/models/registry', () => {
+    it('dialog-task-handlers.js não importa de #copilot/sdk/models', () => {
         expect(src('observability/observers/dialog-task-handlers.js')).not.toContain(
-            "from '#copilot/sdk/models/registry'",
+            "from '#copilot/sdk/models'",
         );
     });
 
@@ -165,15 +158,16 @@ describe('F150 — observability/ usa barrel para onSessionEvent', () => {
     });
 });
 
-// ─── F151: terminal/ usa barrel ────────────────────────────────────────────
+// ─── F151: terminal/ usa projections compartilhadas ────────────────────────
 
-describe('F151 — terminal/ usa barrel para models e tools-state', () => {
-    it('commands/config.js não importa de #copilot/sdk/models/registry', () => {
-        expect(src('terminal/commands/config.js')).not.toContain("from '#copilot/sdk/models/registry'");
+describe('F151 — terminal/ não depende de SDK direto para config runtime', () => {
+    it('commands/config.js não importa de #copilot/sdk/models', () => {
+        expect(src('terminal/commands/config.js')).not.toContain("from '#copilot/sdk/models'");
     });
 
-    it('commands/config.js não importa de #copilot/sdk/models/helpers', () => {
-        expect(src('terminal/commands/config.js')).not.toContain("from '#copilot/sdk/models/helpers'");
+    it('commands/config.js não importa deep path de models/helpers', () => {
+        const forbidden = "from '#copilot/sdk/" + "models/helpers'";
+        expect(src('terminal/commands/config.js')).not.toContain(forbidden);
     });
 
     it('commands/config.js não reabre o sdk; usa frontend compartilhado', () => {
@@ -182,30 +176,35 @@ describe('F151 — terminal/ usa barrel para models e tools-state', () => {
         expect(content).toContain("from '../frontend/index.js'");
     });
 
-    it('handlers/system-config.js não importa de #copilot/sdk/custom-tools', () => {
-        expect(src('terminal/handlers/system-config.js')).not.toContain("from '#copilot/sdk/custom-tools'");
-    });
-
-    it('handlers/system-config.js não importa de #copilot/sdk/tools-state', () => {
-        expect(src('terminal/handlers/system-config.js')).not.toContain("from '#copilot/sdk/tools-state'");
+    it('handlers/system-config.js não importa do SDK', () => {
+        expect(src('terminal/handlers/system-config.js')).not.toContain("from '#copilot/sdk");
     });
 });
 
 // ─── F152: zero-bypass completo ────────────────────────────────────────────
 
 describe('F152 — zero-bypass: submodules críticos não importados fora de sdk/', () => {
-    const CRITICAL_SUBMODULES = [
-        '#copilot/sdk/event-helpers',
-        '#copilot/sdk/events',
-        '#copilot/sdk/models/registry',
-        '#copilot/sdk/models/helpers',
-        '#copilot/sdk/utils',
-        '#copilot/sdk/client',
-        '#copilot/sdk/tools-registry',
+    const REMOVED_ALIAS_SUFFIXES = [
+        'tools-registry',
+        'tools-state',
+        'custom-tools',
+        'server-rpc',
+        'rpc-session',
+        'rpc-ops',
+        'rpc-facade',
+        'health',
+        'tracing',
+        'quota-monitor',
+        'client',
+        'client-events',
+        'provider',
+        'permissions',
+        'system-message',
     ];
 
-    for (const mod of CRITICAL_SUBMODULES) {
-        it(`nenhum consumer usa "${mod}" fora de sdk/`, () => {
+    for (const suffix of REMOVED_ALIAS_SUFFIXES) {
+        const mod = `#copilot/sdk/${suffix}`;
+        it(`nenhum consumer usa alias SDK removido "${mod}"`, () => {
             const { execSync } = /** @type {typeof import('node:child_process')} */ (
                 // eslint-disable-next-line @typescript-eslint/no-require-imports
                 require('node:child_process')

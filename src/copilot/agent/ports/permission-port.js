@@ -11,7 +11,7 @@
  * @internal
  */
 
-import { PermissionController } from '#copilot/sdk';
+import { PermissionController } from '#copilot/sdk/session';
 
 /**
  * @typedef {'approve_all' | 'audit_only' | 'selective'} AgentPermissionMode

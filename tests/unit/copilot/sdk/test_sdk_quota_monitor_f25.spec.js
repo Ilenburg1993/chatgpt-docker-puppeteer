@@ -46,7 +46,7 @@ describe('F122 — barrel exporta createQuotaMonitor', () => {
     });
 
     it('módulo interno exporta createQuotaMonitor', async () => {
-        const mod = await import('#copilot/sdk/quota-monitor');
+        const mod = await import('#copilot/sdk/telemetry');
         expect(typeof mod.createQuotaMonitor).toBe('function');
     });
 });
@@ -55,24 +55,24 @@ describe('F122 — barrel exporta createQuotaMonitor', () => {
 
 describe('F120 — createQuotaMonitor contratos básicos', () => {
     it('lança TypeError quando client é null', async () => {
-        const { createQuotaMonitor } = await import('#copilot/sdk/quota-monitor');
+        const { createQuotaMonitor } = await import('#copilot/sdk/telemetry');
         expect(() => createQuotaMonitor({ client: /** @type {any} */ (null), intervalMs: 5000 })).toThrow(TypeError);
     });
 
     it('lança TypeError quando client não é objeto', async () => {
-        const { createQuotaMonitor } = await import('#copilot/sdk/quota-monitor');
+        const { createQuotaMonitor } = await import('#copilot/sdk/telemetry');
         expect(() => createQuotaMonitor({ client: /** @type {any} */ ('string'), intervalMs: 5000 })).toThrow(
             TypeError,
         );
     });
 
     it('lança RangeError quando intervalMs < 1000', async () => {
-        const { createQuotaMonitor } = await import('#copilot/sdk/quota-monitor');
+        const { createQuotaMonitor } = await import('#copilot/sdk/telemetry');
         expect(() => createQuotaMonitor({ client: /** @type {any} */ ({}), intervalMs: 500 })).toThrow(RangeError);
     });
 
     it('retorna objeto com start, stop, status, poll', async () => {
-        const { createQuotaMonitor } = await import('#copilot/sdk/quota-monitor');
+        const { createQuotaMonitor } = await import('#copilot/sdk/telemetry');
         const monitor = createQuotaMonitor({ client: /** @type {any} */ ({}), intervalMs: 60_000 });
         expect(typeof monitor.start).toBe('function');
         expect(typeof monitor.stop).toBe('function');
@@ -81,7 +81,7 @@ describe('F120 — createQuotaMonitor contratos básicos', () => {
     });
 
     it('status inicial: running=false, snapshots vazio, ts=0', async () => {
-        const { createQuotaMonitor } = await import('#copilot/sdk/quota-monitor');
+        const { createQuotaMonitor } = await import('#copilot/sdk/telemetry');
         const monitor = createQuotaMonitor({ client: /** @type {any} */ ({}), intervalMs: 60_000 });
         const status = monitor.status();
         expect(status.running).toBe(false);
@@ -90,7 +90,7 @@ describe('F120 — createQuotaMonitor contratos básicos', () => {
     });
 
     it('start() faz monitor passar para running=true', async () => {
-        const { createQuotaMonitor } = await import('#copilot/sdk/quota-monitor');
+        const { createQuotaMonitor } = await import('#copilot/sdk/telemetry');
         const monitor = createQuotaMonitor({ client: /** @type {any} */ ({}), intervalMs: 60_000 });
         monitor.start();
         expect(monitor.status().running).toBe(true);
@@ -98,7 +98,7 @@ describe('F120 — createQuotaMonitor contratos básicos', () => {
     });
 
     it('stop() faz monitor retornar a running=false', async () => {
-        const { createQuotaMonitor } = await import('#copilot/sdk/quota-monitor');
+        const { createQuotaMonitor } = await import('#copilot/sdk/telemetry');
         const monitor = createQuotaMonitor({ client: /** @type {any} */ ({}), intervalMs: 60_000 });
         monitor.start();
         monitor.stop();
@@ -106,7 +106,7 @@ describe('F120 — createQuotaMonitor contratos básicos', () => {
     });
 
     it('start() é idempotente (não cria múltiplos timers)', async () => {
-        const { createQuotaMonitor } = await import('#copilot/sdk/quota-monitor');
+        const { createQuotaMonitor } = await import('#copilot/sdk/telemetry');
         const monitor = createQuotaMonitor({ client: /** @type {any} */ ({}), intervalMs: 60_000 });
         monitor.start();
         monitor.start(); // segunda chamada não deve lançar
@@ -115,7 +115,7 @@ describe('F120 — createQuotaMonitor contratos básicos', () => {
     });
 
     it('stop() é idempotente (não lança em segunda chamada)', async () => {
-        const { createQuotaMonitor } = await import('#copilot/sdk/quota-monitor');
+        const { createQuotaMonitor } = await import('#copilot/sdk/telemetry');
         const monitor = createQuotaMonitor({ client: /** @type {any} */ ({}), intervalMs: 60_000 });
         monitor.start();
         monitor.stop();
@@ -127,7 +127,7 @@ describe('F120 — createQuotaMonitor contratos básicos', () => {
 
 describe('F121 — callbacks onWarning e onUpdate', () => {
     it('onUpdate é chamado após poll bem-sucedido', async () => {
-        const { createQuotaMonitor } = await import('#copilot/sdk/quota-monitor');
+        const { createQuotaMonitor } = await import('#copilot/sdk/telemetry');
         const onUpdate = vi.fn();
 
         // Mock do client com rpc.account.getQuota
@@ -155,7 +155,7 @@ describe('F121 — callbacks onWarning e onUpdate', () => {
     });
 
     it('onWarning é chamado quando remainingPercentage <= warningThreshold', async () => {
-        const { createQuotaMonitor } = await import('#copilot/sdk/quota-monitor');
+        const { createQuotaMonitor } = await import('#copilot/sdk/telemetry');
         const onWarning = vi.fn();
 
         const mockClient = {
@@ -183,7 +183,7 @@ describe('F121 — callbacks onWarning e onUpdate', () => {
     });
 
     it('onWarning NÃO é chamado quando quota está acima do threshold', async () => {
-        const { createQuotaMonitor } = await import('#copilot/sdk/quota-monitor');
+        const { createQuotaMonitor } = await import('#copilot/sdk/telemetry');
         const onWarning = vi.fn();
 
         const mockClient = {
@@ -210,7 +210,7 @@ describe('F121 — callbacks onWarning e onUpdate', () => {
     });
 
     it('poll() retorna snapshots atualizados', async () => {
-        const { createQuotaMonitor } = await import('#copilot/sdk/quota-monitor');
+        const { createQuotaMonitor } = await import('#copilot/sdk/telemetry');
 
         const snapshots = { premium: makeSnapshot(75), copilot: makeSnapshot(40) };
         const mockClient = {
@@ -231,7 +231,7 @@ describe('F121 — callbacks onWarning e onUpdate', () => {
     });
 
     it('poll() atualiza status().snapshots', async () => {
-        const { createQuotaMonitor } = await import('#copilot/sdk/quota-monitor');
+        const { createQuotaMonitor } = await import('#copilot/sdk/telemetry');
 
         const mockClient = {
             rpc: {
@@ -254,7 +254,7 @@ describe('F121 — callbacks onWarning e onUpdate', () => {
     });
 
     it('poll() atualiza status().ts para valor positivo', async () => {
-        const { createQuotaMonitor } = await import('#copilot/sdk/quota-monitor');
+        const { createQuotaMonitor } = await import('#copilot/sdk/telemetry');
 
         const mockClient = {
             rpc: {

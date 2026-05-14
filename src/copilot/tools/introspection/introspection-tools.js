@@ -23,9 +23,9 @@ import { createEmptyToolContractReport } from './tool-contract-verifier.js';
 /**
  * @typedef {import('#copilot/sdk/types').Tool} Tool
  *
- * @typedef {import('#copilot/sdk/tools-registry').ToolRegistry} ToolRegistry
+ * @typedef {import('#copilot/sdk/types').ToolRegistry} ToolRegistry
  *
- * @typedef {import('#copilot/sdk/tools-registry').ToolEntry} ToolEntry
+ * @typedef {import('#copilot/sdk/types').ToolEntry} ToolEntry
  *
  * @typedef {{
  *     category: string;

@@ -47,7 +47,7 @@ export function getAgentSdkSessionTarget(runtimeId) {
  * @param {string | null | undefined} runtimeId
  * @param {string} sessionId
  * @returns {{
- *     session: NonNullable<ReturnType<import('#copilot/sdk').getClientSession>>['session'];
+ *     session: import('#copilot/sdk/types').CopilotSession;
  *     model: string;
  *     createdAt: number;
  *     messagesCount: number;
@@ -59,7 +59,7 @@ export function resolveAgentSdkActiveSessionEntry(runtimeId, sessionId) {
     const agentSessionId = typeof snap['sessionId'] === 'string' ? snap['sessionId'] : null;
     const handles =
         typeof (/** @type {{ getSdkHandles?: unknown }} */ (agent).getSdkHandles) === 'function'
-            ? /** @type {{ session?: NonNullable<ReturnType<import('#copilot/sdk').getClientSession>>['session'] | null }} */ (
+            ? /** @type {{ session?: import('#copilot/sdk/types').CopilotSession | null }} */ (
                   /** @type {{ getSdkHandles: () => unknown }} */ (agent).getSdkHandles()
               )
             : null;

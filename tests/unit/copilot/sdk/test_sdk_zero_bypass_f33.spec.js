@@ -2,13 +2,13 @@
 /**
  * @file Faixa 33 — CI Zero-Bypass Regression Guard
  *
- *   Testes que garantem que nenhum arquivo fora de src/copilot/sdk/ importa diretamente submodules do SDK (bypass do
- *   barrel #copilot/sdk).
+ *   Testes que garantem que nenhum arquivo fora de src/copilot/sdk/ importa caminhos paralelos ou submodules não
+ *   canônicos do SDK. Subpaths explícitos e canônicos são permitidos quando representam a surface autorizada.
  *
  *   EXCEÇÕES intencionais documentadas:
  *
- *   - boot-wiring.js: '#copilot/sdk/quota-monitor' (importação precisa intencional)
- *   - config/index.js: '#copilot/sdk/tools-state' (re-export de compatibilidade)
+ *   - boot-wiring.js: '#copilot/sdk/telemetry' (importação precisa intencional)
+ *   - config/index.js: '#copilot/sdk/tools' (re-export de compatibilidade)
  *
  *   Faixas cobertas:
  *
@@ -27,6 +27,24 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 const ROOT = new URL('../../../../', import.meta.url).pathname.replace(/\/$/, '');
+
+const CANONICAL_SDK_SUBPATHS = new Set([
+    '#copilot/sdk/agents',
+    '#copilot/sdk/constants',
+    '#copilot/sdk/di',
+    '#copilot/sdk/errors',
+    '#copilot/sdk/event-helpers',
+    '#copilot/sdk/feature-flags',
+    '#copilot/sdk/models',
+    '#copilot/sdk/rpc',
+    '#copilot/sdk/rpc/experimental',
+    '#copilot/sdk/session',
+    '#copilot/sdk/session-runtime',
+    '#copilot/sdk/telemetry',
+    '#copilot/sdk/tools',
+    '#copilot/sdk/types',
+    '#copilot/sdk/utils',
+]);
 
 /**
  * Lê o conteúdo de um arquivo relativo ao root do projeto.
@@ -49,7 +67,7 @@ function findSdkBypasses(content) {
     const results = [];
     for (const match of content.matchAll(/from\s+'(#copilot\/sdk\/[^']+)'/g)) {
         const value = match[1];
-        if (value) results.push(value);
+        if (value && !CANONICAL_SDK_SUBPATHS.has(value)) results.push(value);
     }
     return results;
 }
@@ -57,14 +75,17 @@ function findSdkBypasses(content) {
 // ─── F166: Auditoria completa de bypasses ─────────────────────────────────
 
 describe('F166 — Auditoria de zero-bypass SDK em src/copilot/', () => {
-    // Zero bypasses intencionais restam (boot-wiring e config/index já migrados para barrel)
+    // Zero bypasses intencionais restam; os subpaths canônicos permitidos abaixo representam surfaces autorizadas.
     const KNOWN_INTENTIONAL_BYPASSES = new Map([
         ['src/copilot/observability/bootstrap.js', ['#copilot/sdk/telemetry', '#copilot/sdk/tools']],
         ['src/copilot/observability/collectors/assistant-handlers.js', ['#copilot/sdk/session']],
         ['src/copilot/observability/collectors/tool-handlers.js', ['#copilot/sdk/session']],
         ['src/copilot/observability/collectors/session-handlers.js', ['#copilot/sdk/session']],
         ['src/copilot/observability/collectors/interaction-handlers.js', ['#copilot/sdk/session']],
-        ['src/copilot/tools/session/experimental-rpc-tools.js', ['#copilot/sdk/rpc', '#copilot/sdk/experimental-rpc']],
+        ['src/copilot/tools/session/experimental-rpc-tools.js', ['#copilot/sdk/rpc', '#copilot/sdk/rpc/experimental']],
+        ['src/copilot/agent/ports/hook-port.js', ['#copilot/sdk/session']],
+        ['src/copilot/agent/ports/permission-port.js', ['#copilot/sdk/session']],
+        ['src/copilot/agent/ports/tool-port.js', ['#copilot/sdk/rpc']],
         ['src/copilot/hooks/registry.js', ['#copilot/sdk/session']],
         ['src/copilot/hooks/bus.js', ['#copilot/sdk/session']],
         ['src/copilot/hooks/logger.js', ['#copilot/sdk/session']],
@@ -130,20 +151,25 @@ describe('F166 — Auditoria de zero-bypass SDK em src/copilot/', () => {
         // Filtrar bypasses que não constam como intencionais
         const unexpected = allBypasses.filter(({ file, bypasses }) => {
             const allowedForFile = KNOWN_INTENTIONAL_BYPASSES.get(file) ?? [];
-            return bypasses.some((bp) => !allowedForFile.includes(bp) && !isAllowedDynamicBypass(file, bp));
+            return bypasses.some(
+                (bp) =>
+                    !CANONICAL_SDK_SUBPATHS.has(bp) &&
+                    !allowedForFile.includes(bp) &&
+                    !isAllowedDynamicBypass(file, bp),
+            );
         });
 
         if (unexpected.length > 0) {
             const msg = unexpected.map(({ file, bypasses }) => `  ${file}: ${bypasses.join(', ')}`).join('\n');
             throw new Error(
-                `Bypasses inesperados encontrados:\n${msg}\n\nUse o barrel '#copilot/sdk' em vez de importar submodules diretamente.`,
+                `Bypasses inesperados encontrados:\n${msg}\n\nUse a surface canônica adequada (root ou subpath autorizado) em vez de rotas paralelas.`,
             );
         }
 
         expect(unexpected).toHaveLength(0);
     });
 
-    it('boot-wiring.js usa fachada agent-sdk-access para quota monitor (sem bypass)', () => {
+    it('boot-wiring.js usa fachada sdk-access para quota monitor (sem bypass)', () => {
         const src = read('src/copilot/agent/session/boot/boot-wiring.js');
         expect(src).toContain("from '../../facades/index.js'");
         expect(src).toContain('startAgentSdkBootQuotaBridge');
@@ -262,6 +288,6 @@ describe('F172 — hooks/ e config/ sem bypass não-intencional de SDK', () => {
         const src = read('src/copilot/config/index.js');
         const bypasses = findSdkBypasses(src);
         // Apenas tools-state é permitido
-        expect(bypasses.every((bp) => bp === '#copilot/sdk/tools-state')).toBe(true);
+        expect(bypasses.every((bp) => bp === '#copilot/sdk/tools')).toBe(true);
     });
 });

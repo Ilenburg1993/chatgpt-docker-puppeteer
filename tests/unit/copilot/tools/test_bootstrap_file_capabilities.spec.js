@@ -2,7 +2,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { setCustomToolsBuilder } from '#copilot/sdk';
-import { createRegistry } from '#copilot/sdk/tools-registry';
+import { createRegistry } from '#copilot/sdk/tools';
 import { bootstrapTools, buildTool } from '#copilot/tools';
 
 setCustomToolsBuilder(/** @type {Parameters<typeof setCustomToolsBuilder>[0]} */ (buildTool));

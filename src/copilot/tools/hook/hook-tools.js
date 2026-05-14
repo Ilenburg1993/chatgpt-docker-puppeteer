@@ -33,7 +33,7 @@ import {
     registerPendingStructuredUserInputResolver,
     resolvePendingStructuredUserInput,
     ToolSessionContext,
-} from '#copilot/sdk';
+} from '#copilot/sdk/session';
 import { execFile } from 'node:child_process';
 import { access, readFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';

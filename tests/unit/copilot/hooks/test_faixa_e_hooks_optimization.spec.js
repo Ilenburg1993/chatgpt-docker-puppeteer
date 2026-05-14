@@ -59,7 +59,7 @@ vi.mock(
         ),
 );
 
-vi.mock('#copilot/sdk/model-selector', () => ({
+vi.mock('#copilot/sdk/models', () => ({
     modelSelector: {
         suggestFallback: vi.fn(() => null),
     },

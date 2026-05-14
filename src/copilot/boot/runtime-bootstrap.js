@@ -22,10 +22,9 @@ import {
     HOOKS_LOGGER,
     SDK_LOGGER,
     TOOLS_BUILDER,
-    checkAuthStatus,
-    createCopilotClient,
-    defaultHookBus,
-} from '#copilot/sdk';
+} from '#copilot/sdk/di';
+import { createCopilotClient, defaultBus as defaultHookBus } from '#copilot/sdk/session';
+import { getAuthStatus as checkAuthStatus } from '#copilot/sdk/telemetry';
 import { TOOLS_LOGGER, TOOLS_METRICS } from '#copilot/tools';
 import { COPILOT_MODEL, PING_TIMEOUT_MS } from '../config/agent.js';
 import { container } from '../core/di-container.js';

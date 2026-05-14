@@ -5,7 +5,7 @@
 
 import { getWorkspaceContext } from '#copilot/boot';
 import { readSystemPromptStatusSync } from '#copilot/config';
-import { getPendingStructuredUserInputCount } from '#copilot/sdk';
+import { getPendingStructuredUserInputCount } from '#copilot/sdk/session';
 import { readIntrospectionRegistrySnapshot } from '#copilot/tools';
 import { readIoRuntimeHealthSnapshot } from '../../../infra/io-health.js';
 import { buildRuntimeSdkFsRoutingProjection } from '../../../presentation/files/index.js';

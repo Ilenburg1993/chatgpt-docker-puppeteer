@@ -28,7 +28,7 @@ vi.mock('#copilot/core/errors', () => ({
     },
 }));
 
-vi.mock('#copilot/sdk/models/registry', () => ({
+vi.mock('#copilot/sdk/models', () => ({
     modelStatsTracker: { record: vi.fn() },
     SYSTEM_PROMPT_SECTIONS: {},
 }));

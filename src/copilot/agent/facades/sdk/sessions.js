@@ -14,7 +14,7 @@ import {
     getConfiguredSessionFsHandler,
     listSessions,
     resumeOrCreate,
-} from '#copilot/sdk';
+} from '#copilot/sdk/session';
 import { log } from '../../ports/index.js';
 import { requireClient } from './core/index.js';
 

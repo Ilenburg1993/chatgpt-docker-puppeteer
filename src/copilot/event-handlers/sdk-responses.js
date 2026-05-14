@@ -7,7 +7,7 @@
 
 import { SESSION_EVENTS } from '#copilot/events';
 import { log } from '#copilot/observability';
-import { normalizeElicitationCompletedEvent, normalizeElicitationPendingEvent } from '#copilot/sdk';
+import { normalizeElicitationCompletedEvent, normalizeElicitationPendingEvent } from '#copilot/sdk/session';
 import { onSessionEvents } from '#copilot/sdk/session';
 
 /**

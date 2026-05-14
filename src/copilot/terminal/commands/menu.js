@@ -8,7 +8,7 @@
  * @module copilot/terminal/commands/menu
  */
 
-import { getPendingStructuredUserInputCount } from '#copilot/sdk';
+import { getPendingStructuredUserInputCount } from '#copilot/sdk/session';
 import { readTerminalRuntimeControlState, readTerminalRuntimeState } from '../frontend/gateways/index.js';
 import {
     readTerminalElicitationSummary,

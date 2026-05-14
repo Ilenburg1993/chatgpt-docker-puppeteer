@@ -17,7 +17,7 @@ export { AUDIT_BUS, AUDIT_LOGGER } from '#copilot/audit';
 export { BRIDGE_AGENT, FALLBACK_AGENT, NERV_BRIDGE_AGENT, PERMISSION_AGENT } from '#copilot/bridges';
 export { HUB, SESSION_RPC } from '#copilot/conversation-hub';
 export { DB_LOGGER, EVENT_BUS, SHUTDOWN_LOGGER } from '#copilot/core';
-export { SDK_LOGGER, TOOLS_BUILDER } from '#copilot/sdk';
+export { SDK_LOGGER, TOOLS_BUILDER } from '#copilot/sdk/di';
 
 // ─── DI Container utilities ──────────────────────────────────────────────────
 export { container } from '../core/di-container.js';

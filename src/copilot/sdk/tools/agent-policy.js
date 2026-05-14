@@ -12,7 +12,7 @@
  * @module copilot/sdk/tools/agent-policy
  */
 
-import { normalizeAgentToolList, resolveToolName } from '#copilot/config';
+import { normalizeAgentToolList, resolveToolName } from '#copilot/config/tool-aliases';
 
 /**
  * @typedef {object} AgentToolPolicyDecision

@@ -10,7 +10,7 @@
 
 import { createErrorHandler } from '../error-handler.js';
 import { log } from '../logger.js';
-import { createPermissionHandler } from '#copilot/sdk';
+import { createPermissionHandler } from '#copilot/sdk/session';
 
 /**
  * @typedef {import('../types.js').SessionHooks} SessionHooks
@@ -28,7 +28,7 @@ import { createPermissionHandler } from '#copilot/sdk';
  *         hooks: createMinimalPreset().hooks,
  *     });
  *
- * @returns {{ hooks: SessionHooks; onPermissionRequest: import('@github/copilot-sdk').PermissionHandler }}
+ * @returns {{ hooks: SessionHooks; onPermissionRequest: import('#copilot/sdk/types').PermissionHandler }}
  */
 export function createMinimalPreset() {
     const onPermissionRequest = createPermissionHandler({ allowAll: true });

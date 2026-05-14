@@ -12,7 +12,7 @@ import {
     HOOK_PROMPT_SUBMITTED,
     HOOK_SESSION_END,
     HOOK_SESSION_START,
-} from '#copilot/events';
+} from '#copilot/events/hook-events';
 import { EventEmitter } from 'node:events';
 import { toError } from '#copilot/core/error-handlers';
 import { log } from './hook-logger.js';

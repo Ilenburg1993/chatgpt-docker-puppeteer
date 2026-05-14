@@ -30,7 +30,7 @@ export function setModelListClientProvider(nextProvider) {
  */
 export async function getModelListClient(overrides = {}) {
     if (provider === null) {
-        throw new Error('[sdk/models] Model list client provider não inicializado; carregue #copilot/sdk/client.');
+        throw new Error('[sdk/models] Model list client provider não inicializado; carregue #copilot/sdk/session.');
     }
     return provider(overrides);
 }

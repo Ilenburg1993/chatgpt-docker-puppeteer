@@ -184,14 +184,14 @@ describe('F45 — AuditRingBuffer', () => {
 
 describe('F45 — KNOWN_MODELS catalog', () => {
     it('KNOWN_MODELS é frozen array com >= 10 modelos', async () => {
-        const { KNOWN_MODELS } = await import('#copilot/sdk/models/known-models');
+        const { KNOWN_MODELS } = await import('#copilot/sdk/models');
         expect(Array.isArray(KNOWN_MODELS)).toBe(true);
         expect(KNOWN_MODELS.length).toBeGreaterThanOrEqual(10);
         expect(Object.isFrozen(KNOWN_MODELS)).toBe(true);
     });
 
     it('todos os modelos têm campos obrigatórios', async () => {
-        const { KNOWN_MODELS } = await import('#copilot/sdk/models/known-models');
+        const { KNOWN_MODELS } = await import('#copilot/sdk/models');
         for (const m of KNOWN_MODELS) {
             expect(m.id).toBeDefined();
             expect(m.costTier).toBeDefined();
@@ -204,13 +204,13 @@ describe('F45 — KNOWN_MODELS catalog', () => {
     });
 
     it('IDs são únicos', async () => {
-        const { KNOWN_MODELS } = await import('#copilot/sdk/models/known-models');
+        const { KNOWN_MODELS } = await import('#copilot/sdk/models');
         const ids = KNOWN_MODELS.map((m) => m.id);
         expect(new Set(ids).size).toBe(ids.length);
     });
 
     it('COST_ORDER possui todas as tiers', async () => {
-        const { COST_ORDER } = await import('#copilot/sdk/models/known-models');
+        const { COST_ORDER } = await import('#copilot/sdk/models');
         expect(COST_ORDER.free).toBeDefined();
         expect(COST_ORDER.low).toBeDefined();
         expect(COST_ORDER.medium).toBeDefined();
@@ -220,7 +220,7 @@ describe('F45 — KNOWN_MODELS catalog', () => {
     });
 
     it('SPEED_ORDER possui todas as tiers', async () => {
-        const { SPEED_ORDER } = await import('#copilot/sdk/models/known-models');
+        const { SPEED_ORDER } = await import('#copilot/sdk/models');
         expect(SPEED_ORDER.slow).toBeDefined();
         expect(SPEED_ORDER.medium).toBeDefined();
         expect(SPEED_ORDER.fast).toBeDefined();
@@ -228,7 +228,7 @@ describe('F45 — KNOWN_MODELS catalog', () => {
     });
 
     it('modelos com reasoning têm contextWindow >= 200_000', async () => {
-        const { KNOWN_MODELS } = await import('#copilot/sdk/models/known-models');
+        const { KNOWN_MODELS } = await import('#copilot/sdk/models');
         const reasoningModels = KNOWN_MODELS.filter((m) => m.supportsReasoning);
         expect(reasoningModels.length).toBeGreaterThan(0);
         for (const m of reasoningModels) {
@@ -243,13 +243,13 @@ describe('F45 — KNOWN_MODELS catalog', () => {
 
 describe('F45 — ModelStatsTracker', () => {
     it('getStats retorna null para modelo sem dados', async () => {
-        const { ModelStatsTracker } = await import('#copilot/sdk/models/stats-tracker');
+        const { ModelStatsTracker } = await import('#copilot/sdk/models');
         const tracker = new ModelStatsTracker();
         expect(tracker.getStats('gpt-4o')).toBeNull();
     });
 
     it('record + getStats retorna métricas corretas', async () => {
-        const { ModelStatsTracker } = await import('#copilot/sdk/models/stats-tracker');
+        const { ModelStatsTracker } = await import('#copilot/sdk/models');
         const tracker = new ModelStatsTracker();
         tracker.record('gpt-4o', { latencyMs: 100, success: true, inputTokens: 50, outputTokens: 100 });
         tracker.record('gpt-4o', { latencyMs: 200, success: true, inputTokens: 30, outputTokens: 70 });
@@ -263,7 +263,7 @@ describe('F45 — ModelStatsTracker', () => {
     });
 
     it('allStats retorna array de todos os modelos', async () => {
-        const { ModelStatsTracker } = await import('#copilot/sdk/models/stats-tracker');
+        const { ModelStatsTracker } = await import('#copilot/sdk/models');
         const tracker = new ModelStatsTracker();
         tracker.record('gpt-4o', { latencyMs: 100, success: true });
         tracker.record('o3', { latencyMs: 500, success: true, inputTokens: 100, outputTokens: 200 });
@@ -273,14 +273,14 @@ describe('F45 — ModelStatsTracker', () => {
     });
 
     it('allStats ignora modelos com 0 calls', async () => {
-        const { ModelStatsTracker } = await import('#copilot/sdk/models/stats-tracker');
+        const { ModelStatsTracker } = await import('#copilot/sdk/models');
         const tracker = new ModelStatsTracker();
         tracker._getOrCreate('gpt-4o'); // empty
         expect(tracker.allStats()).toHaveLength(0);
     });
 
     it('reset() limpa todas as estatísticas', async () => {
-        const { ModelStatsTracker } = await import('#copilot/sdk/models/stats-tracker');
+        const { ModelStatsTracker } = await import('#copilot/sdk/models');
         const tracker = new ModelStatsTracker();
         tracker.record('gpt-4o', { latencyMs: 100, success: true });
         tracker.reset();
@@ -289,7 +289,7 @@ describe('F45 — ModelStatsTracker', () => {
     });
 
     it('record acumula inputTokens e outputTokens default 0', async () => {
-        const { ModelStatsTracker } = await import('#copilot/sdk/models/stats-tracker');
+        const { ModelStatsTracker } = await import('#copilot/sdk/models');
         const tracker = new ModelStatsTracker();
         tracker.record('gpt-4o', { latencyMs: 50, success: true }); // no tokens
         const stats = tracker.getStats('gpt-4o');

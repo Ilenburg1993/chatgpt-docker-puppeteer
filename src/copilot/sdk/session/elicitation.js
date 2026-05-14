@@ -8,7 +8,7 @@
  * - normalizar eventos `elicitation.pending` / `elicitation.completed` em contrato estável;
  * - prover a fila assíncrona provider-side usada pelo agent/runtime.
  *
- * Camadas legacy (ex.: `hooks/elicitation.js`) devem delegar para este módulo.
+ * Camadas de hooks delegam para este módulo quando precisam compor elicitation com policy de produto.
  *
  * @module copilot/sdk/session/elicitation
  */

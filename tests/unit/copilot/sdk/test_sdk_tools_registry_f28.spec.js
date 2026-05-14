@@ -9,7 +9,7 @@
  *   - F135: contratos de createRegistry / registerTool / registerTools
  *   - F136: funções de consulta (getToolsByCategory, getToolsByTag, getReadOnlyTools, listToolNames)
  *   - F137: funções de composição (mergeRegistries, filterByNames, excludeByNames)
- *   - F138: zero-bypass audit — nenhum arquivo fora de sdk/ importa #copilot/sdk/tools-registry
+ *   - F138: zero-bypass audit — nenhum arquivo fora de sdk/ importa #copilot/sdk/tools
  */
 
 import {
@@ -76,17 +76,18 @@ function findFilesContaining(dir, needle) {
     return listJsFiles(dir).filter((file) => readFileSync(file, 'utf8').includes(needle));
 }
 
-// ─── F133: tools-bootstrap usa barrel ──────────────────────────────────────
+// ─── F133: tools-bootstrap usa surface canônica ────────────────────────────
 
 describe('F133 — tools-bootstrap não importa sdk/tools-registry diretamente', () => {
-    it('tools-bootstrap.js não contém import de #copilot/sdk/tools-registry', () => {
+    it('tools-bootstrap.js não contém import de alias folha removido', () => {
         const src = readFileSync(join(ROOT, 'src/copilot/tools/bootstrap.js'), 'utf8');
-        expect(src).not.toContain("from '#copilot/sdk/tools-registry'");
+        const removedAlias = "from '#copilot/sdk/" + "tools-registry'";
+        expect(src).not.toContain(removedAlias);
     });
 
-    it('tools-bootstrap.js contém import de registerTools vindo de #copilot/sdk', () => {
+    it('tools-bootstrap.js contém import de registerTools vindo de #copilot/sdk/tools', () => {
         const src = readFileSync(join(ROOT, 'src/copilot/tools/bootstrap.js'), 'utf8');
-        expect(src).toContain("registerTools } from '#copilot/sdk'");
+        expect(src).toContain("registerTools } from '#copilot/sdk/tools'");
     });
 });
 
@@ -271,13 +272,15 @@ describe('F137 — funções de composição', () => {
 // ─── F138: zero-bypass audit ────────────────────────────────────────────────
 
 describe('F138 — zero-bypass: nenhum consumidor direto de sdk/tools-registry fora de sdk/', () => {
-    it('agent/ não importa #copilot/sdk/tools-registry diretamente', () => {
-        expect(findFilesContaining(join(ROOT, 'src/copilot/agent'), "from '#copilot/sdk/tools-registry'")).toEqual([]);
+    it('agent/ não importa alias folha de registry', () => {
+        const removedAlias = "from '#copilot/sdk/" + "tools-registry'";
+        expect(findFilesContaining(join(ROOT, 'src/copilot/agent'), removedAlias)).toEqual([]);
     });
 
-    it('server/routes/sdk/ não importa #copilot/sdk/tools-registry diretamente', () => {
+    it('server/routes/sdk/ não importa alias folha de registry', () => {
+        const removedAlias = "from '#copilot/sdk/" + "tools-registry'";
         expect(
-            findFilesContaining(join(ROOT, 'src/copilot/server/routes/sdk'), "from '#copilot/sdk/tools-registry'"),
+            findFilesContaining(join(ROOT, 'src/copilot/server/routes/sdk'), removedAlias),
         ).toEqual([]);
     });
 });

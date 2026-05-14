@@ -23,7 +23,7 @@ import {
     mergeRegistries,
     registerTool,
     registerTools,
-} from '#copilot/sdk/tools-registry';
+} from '#copilot/sdk/tools';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 

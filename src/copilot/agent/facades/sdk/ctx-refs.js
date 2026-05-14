@@ -63,16 +63,16 @@ export function getPermissionHandlerRef(ctx) {
 
 /**
  * @param {unknown} ctx
- * @returns {import('#copilot/sdk/tools-registry').ToolRegistry | null}
+ * @returns {import('#copilot/sdk/types').ToolRegistry | null}
  */
 export function getToolRegistryRef(ctx) {
     const safeCtx = /** @type {any} */ (ctx);
     if (typeof safeCtx?.getToolRegistrySnapshot === 'function') {
-        return /** @type {import('#copilot/sdk/tools-registry').ToolRegistry | null} */ (
+        return /** @type {import('#copilot/sdk/types').ToolRegistry | null} */ (
             safeCtx.getToolRegistrySnapshot()
         );
     }
-    return /** @type {import('#copilot/sdk/tools-registry').ToolRegistry | null} */ (safeCtx?.toolsRegistry ?? null);
+    return /** @type {import('#copilot/sdk/types').ToolRegistry | null} */ (safeCtx?.toolsRegistry ?? null);
 }
 
 /**

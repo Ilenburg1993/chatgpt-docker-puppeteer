@@ -10,6 +10,14 @@
 
 // Funções puras de listagem, filtragem e seleção de modelos
 export {
+    COPILOT_AUTO_MODEL_EXCLUDED_CLASSES,
+    COPILOT_AUTO_MODEL_PUBLIC_CRITERIA,
+    DEFAULT_AUTO_MODEL_PREFERENCE,
+    describeAutoModelPolicy,
+    readAutoModelPreference,
+} from './auto-policy.js';
+
+export {
     buildReasoningConfig,
     clearModelsCache,
     filterEnabledModels,

@@ -67,33 +67,33 @@ describe('F117 — barrel exporta funções de health e auth', () => {
 
 describe('F116 — sdk/health.js contratos', () => {
     it('pingCheck: rejeita client inválido (null)', async () => {
-        const { pingCheck } = await import('#copilot/sdk/health');
+        const { pingCheck } = await import('#copilot/sdk/telemetry');
         await expect(pingCheck(/** @type {any} */ (null))).rejects.toThrow(/CopilotClient inválido/);
     });
 
     it('pingCheck: rejeita client sem rpc', async () => {
-        const { pingCheck } = await import('#copilot/sdk/health');
+        const { pingCheck } = await import('#copilot/sdk/telemetry');
         await expect(pingCheck(/** @type {any} */ ({}))).rejects.toThrow(/CopilotClient inválido/);
     });
 
     it('checkAuthStatus: rejeita client inválido (null)', async () => {
-        const { getAuthStatus } = await import('#copilot/sdk/health');
+        const { getAuthStatus } = await import('#copilot/sdk/telemetry');
         await expect(getAuthStatus(/** @type {any} */ (null))).rejects.toThrow(/CopilotClient inválido/);
     });
 
     it('checkAuthStatus: rejeita client sem rpc', async () => {
-        const { getAuthStatus } = await import('#copilot/sdk/health');
+        const { getAuthStatus } = await import('#copilot/sdk/telemetry');
         await expect(getAuthStatus(/** @type {any} */ ({}))).rejects.toThrow(/CopilotClient inválido/);
     });
 
     it('fullHealthCheck: rejeita client inválido', async () => {
-        const { fullHealthCheck } = await import('#copilot/sdk/health');
+        const { fullHealthCheck } = await import('#copilot/sdk/telemetry');
         await expect(fullHealthCheck(/** @type {any} */ (null))).rejects.toThrow(/CopilotClient inválido/);
     });
 
     it('AuthCheck: possui campos ok e authenticated', async () => {
         // Verifica forma do retorno quando auth falha por erro interno (sem conexão real)
-        const { getAuthStatus } = await import('#copilot/sdk/health');
+        const { getAuthStatus } = await import('#copilot/sdk/telemetry');
         // Client com rpc mas sem accountGetQuota real → vai rejeitar? Não: getAuthStatus
         // chama accountGetQuota internamente. Precisamos de um client com rpc que
         // falhe graciosamente.
@@ -110,7 +110,7 @@ describe('F116 — sdk/health.js contratos', () => {
     });
 
     it('QuotaCheck: possui campos ok e exhausted', async () => {
-        const { getQuota } = await import('#copilot/sdk/health');
+        const { getQuota } = await import('#copilot/sdk/telemetry');
         const clientWithRpc = { rpc: {} };
         const result = await getQuota(/** @type {any} */ (clientWithRpc));
         expect(result).toHaveProperty('ok');
@@ -122,7 +122,7 @@ describe('F116 — sdk/health.js contratos', () => {
 
 describe('F113 — boot verifica auth: lógica de checkAuthStatus', () => {
     it('checkAuthStatus retorna { ok: false, authenticated: false } quando quota falha', async () => {
-        const { getAuthStatus } = await import('#copilot/sdk/health');
+        const { getAuthStatus } = await import('#copilot/sdk/telemetry');
         // Simula client com rpc mas sem servidor: accountGetQuota vai rejeitar
         const result = await getAuthStatus(/** @type {any} */ ({ rpc: {} }));
         expect(result.ok).toBe(false);
@@ -152,7 +152,7 @@ describe('F113 — boot verifica auth: lógica de checkAuthStatus', () => {
 
 describe('F114 — mensagem clara quando não autenticado', () => {
     it('AuthCheck contém campo error quando não autenticado', async () => {
-        const { getAuthStatus } = await import('#copilot/sdk/health');
+        const { getAuthStatus } = await import('#copilot/sdk/telemetry');
         const result = await getAuthStatus(/** @type {any} */ ({ rpc: {} }));
         expect(result.ok).toBe(false);
         // Quando não autenticado, error deve ter mensagem descritiva
@@ -236,7 +236,7 @@ describe('health.js — tipos de retorno', () => {
         // Verifica forma do typedef sem conexão real
         const expectedFields = ['ok', 'latencyMs', 'protocolVersion', 'message'];
         // pingCheck retorna esses campos mesmo em falha
-        const { pingCheck } = await import('#copilot/sdk/health');
+        const { pingCheck } = await import('#copilot/sdk/telemetry');
         const result = await pingCheck(/** @type {any} */ ({ rpc: {} }));
         for (const field of expectedFields) {
             expect(result).toHaveProperty(field);
@@ -244,7 +244,7 @@ describe('health.js — tipos de retorno', () => {
     });
 
     it('PingCheck falha: ok=false com latencyMs numérico', async () => {
-        const { pingCheck } = await import('#copilot/sdk/health');
+        const { pingCheck } = await import('#copilot/sdk/telemetry');
         const result = await pingCheck(/** @type {any} */ ({ rpc: {} }));
         expect(result.ok).toBe(false);
         expect(typeof result.latencyMs).toBe('number');
@@ -252,7 +252,7 @@ describe('health.js — tipos de retorno', () => {
     });
 
     it('FullHealthResult: campos status, timestamp, checks', async () => {
-        const { fullHealthCheck } = await import('#copilot/sdk/health');
+        const { fullHealthCheck } = await import('#copilot/sdk/telemetry');
         const result = await fullHealthCheck(/** @type {any} */ ({ rpc: {} }));
         expect(result).toHaveProperty('status');
         expect(result).toHaveProperty('timestamp');
@@ -263,21 +263,21 @@ describe('health.js — tipos de retorno', () => {
     });
 
     it('FullHealthResult.status é unhealthy quando ping falha', async () => {
-        const { fullHealthCheck } = await import('#copilot/sdk/health');
+        const { fullHealthCheck } = await import('#copilot/sdk/telemetry');
         const result = await fullHealthCheck(/** @type {any} */ ({ rpc: {} }));
         // Sem conexão real, todos os checks falham
         expect(['unhealthy', 'degraded']).toContain(result.status);
     });
 
     it('FullHealthResult.timestamp é string ISO', async () => {
-        const { fullHealthCheck } = await import('#copilot/sdk/health');
+        const { fullHealthCheck } = await import('#copilot/sdk/telemetry');
         const result = await fullHealthCheck(/** @type {any} */ ({ rpc: {} }));
         expect(typeof result.timestamp).toBe('string');
         expect(() => new Date(result.timestamp)).not.toThrow();
     });
 
     it('isServerReachable retorna boolean', async () => {
-        const { isServerReachable } = await import('#copilot/sdk/health');
+        const { isServerReachable } = await import('#copilot/sdk/telemetry');
         const result = await isServerReachable(/** @type {any} */ ({ rpc: {} }));
         expect(typeof result).toBe('boolean');
     });

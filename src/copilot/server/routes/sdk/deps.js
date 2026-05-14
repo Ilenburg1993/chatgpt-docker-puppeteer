@@ -32,14 +32,25 @@ import {
     log,
     METRICS_STORE,
 } from '#copilot/observability';
+import { pickDefined } from '#copilot/sdk/utils';
 import {
-    approveAll,
     commandsHandlePending,
     compactionCompact,
+    permissionsHandlePending,
+    shellExec,
+    shellKill,
+    toolsHandlePendingCall,
+    toolsList,
+    uiElicitation,
+    workspaceCreateFile,
+    workspaceListFiles,
+    workspaceReadFile,
+} from '#copilot/sdk/rpc';
+import {
+    approveAll,
     createClientSession,
-    defaultHookBus,
+    defaultBus as defaultHookBus,
     disconnectClientSession,
-    emitSdkOperationMetric,
     forceStopClient,
     getClient,
     getClientSession,
@@ -52,8 +63,6 @@ import {
     listActiveClientSessions,
     listAllClientSessions,
     onAllSessionEvents,
-    permissionsHandlePending,
-    pickDefined,
     resumeClientSession,
     SDK_HOOKS,
     sessionUiConfirm,
@@ -61,17 +70,10 @@ import {
     sessionUiInput,
     sessionUiSelect,
     setForegroundClientSessionId,
-    shellExec,
-    shellKill,
     stopClient,
-    toolsHandlePendingCall,
-    toolsList,
-    uiElicitation,
     validateProviderConfig,
-    workspaceCreateFile,
-    workspaceListFiles,
-    workspaceReadFile,
-} from '#copilot/sdk';
+} from '#copilot/sdk/session';
+import { emitSdkOperationMetric } from '#copilot/sdk/telemetry';
 import { getAllTools } from '#copilot/tools';
 import { requireAgentRuntimeSelection } from '../../../presentation/agent/index.js';
 import { resolveOptionalDialogTimeout } from '../../../presentation/dialog-timeout-policy.js';

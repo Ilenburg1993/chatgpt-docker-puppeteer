@@ -25,7 +25,7 @@ vi.mock('@github/copilot-sdk', () => {
     return { SYSTEM_PROMPT_SECTIONS, CopilotClient: vi.fn(), defineTool: vi.fn(), approveAll: vi.fn() };
 });
 
-vi.mock('#copilot/sdk/client', () => ({
+vi.mock('#copilot/sdk/session', () => ({
     getClient: mockGetClient,
 }));
 
@@ -361,7 +361,7 @@ describe('F80 - filterModels', () => {
 
 describe('Barrel - Faixa 14 exports', () => {
     it('barrel exporta todas as funcoes novas da F14', async () => {
-        const barrel = /** @type {Record<string, unknown>} */ (await import('#copilot/sdk/index'));
+        const barrel = /** @type {Record<string, unknown>} */ (await import('#copilot/sdk'));
         const expected = [
             'filterModels',
             'getBillingMultiplier',
@@ -378,7 +378,7 @@ describe('Barrel - Faixa 14 exports', () => {
     });
 
     it('barrel mantém exports pre-existentes de models', async () => {
-        const barrel = /** @type {Record<string, unknown>} */ (await import('#copilot/sdk/index'));
+        const barrel = /** @type {Record<string, unknown>} */ (await import('#copilot/sdk'));
         const existing = [
             'buildReasoningConfig',
             'filterEnabledModels',

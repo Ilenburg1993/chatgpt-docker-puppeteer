@@ -56,13 +56,13 @@ describe('F86 - Barrel complete export coverage', () => {
     let barrel;
 
     it('barrel loads without error', async () => {
-        barrel = await import('#copilot/sdk/index');
+        barrel = await import('#copilot/sdk');
         expect(barrel).toBeDefined();
     });
 
     // ─── client.js ─────────────────────────────────────────────────────
     it('exports all client.js functions', async () => {
-        barrel = barrel ?? (await import('#copilot/sdk/index'));
+        barrel = barrel ?? (await import('#copilot/sdk'));
         const names = [
             'getClient',
             'buildClientOptions',
@@ -94,7 +94,7 @@ describe('F86 - Barrel complete export coverage', () => {
 
     // ─── session.js ────────────────────────────────────────────────────
     it('exports all session.js functions', async () => {
-        barrel = barrel ?? (await import('#copilot/sdk/index'));
+        barrel = barrel ?? (await import('#copilot/sdk'));
         const names = [
             'createClientFromCliUrl',
             'createSession',
@@ -111,7 +111,7 @@ describe('F86 - Barrel complete export coverage', () => {
 
     // ─── constants.js (F1) ─────────────────────────────────────────────
     it('exports all constants.js', async () => {
-        barrel = barrel ?? (await import('#copilot/sdk/index'));
+        barrel = barrel ?? (await import('#copilot/sdk'));
         const names = [
             'CONNECTION_STATES',
             'INFINITE_SESSION_DEFAULTS',
@@ -131,14 +131,14 @@ describe('F86 - Barrel complete export coverage', () => {
 
     // ─── tools.js + permissions.js (F2) ────────────────────────────────
     it('exports tools.js and permissions.js', async () => {
-        barrel = barrel ?? (await import('#copilot/sdk/index'));
+        barrel = barrel ?? (await import('#copilot/sdk'));
         const names = ['createTool', 'createToolSync', 'defineTool', 'approveAll', 'createAllowlistPermissionHandler'];
         for (const n of names) expect(barrel[n], `missing: ${n}`).toBeDefined();
     });
 
     // ─── system-message.js (F3) ────────────────────────────────────────
     it('exports system-message.js', async () => {
-        barrel = barrel ?? (await import('#copilot/sdk/index'));
+        barrel = barrel ?? (await import('#copilot/sdk'));
         const names = [
             'SYSTEM_PROMPT_SECTIONS',
             'appendSystemMessage',
@@ -155,26 +155,23 @@ describe('F86 - Barrel complete export coverage', () => {
         for (const n of names) expect(barrel[n], `missing: ${n}`).toBeDefined();
     });
 
-    // ─── config.js (F4) ───────────────────────────────────────────────
-    it('exports config.js', async () => {
-        barrel = barrel ?? (await import('#copilot/sdk/index'));
+    // ─── config canônico fora do SDK root ─────────────────────────────
+    it('não reexporta builders de config pelo SDK root', async () => {
+        barrel = barrel ?? (await import('#copilot/sdk'));
         const names = [
-            'DEFAULT_DIAGNOSTIC_MODEL',
-            // DEFAULT_EXCLUDED_TOOLS removido — importar de '#copilot/config/session-config'
-            'DEFAULT_INFINITE_SESSION',
-            'DEFAULT_MODEL',
-            // build*Config removidos — importar de '#copilot/hooks/presets/profiles'
             'buildSessionConfig',
             'getProjectDefaults',
             'mergeExcludedTools',
             'mergeTools',
         ];
-        for (const n of names) expect(barrel[n], `missing: ${n}`).toBeDefined();
+        for (const n of names) expect(barrel[n], `unexpected: ${n}`).toBeUndefined();
+        expect(barrel.DEFAULT_MODEL).toBeDefined();
+        expect(barrel.DEFAULT_DIAGNOSTIC_MODEL).toBeDefined();
     });
 
     // ─── client-facade.js (F5) ─────────────────────────────────────────
     it('exports client-facade.js', async () => {
-        barrel = barrel ?? (await import('#copilot/sdk/index'));
+        barrel = barrel ?? (await import('#copilot/sdk'));
         const names = [
             'ensureClient',
             'isClientReady',
@@ -188,7 +185,7 @@ describe('F86 - Barrel complete export coverage', () => {
     });
 
     it('exports attachment and capability helpers', async () => {
-        barrel = barrel ?? (await import('#copilot/sdk/index'));
+        barrel = barrel ?? (await import('#copilot/sdk'));
         const names = [
             'blobAttachment',
             'directoryAttachment',
@@ -205,7 +202,7 @@ describe('F86 - Barrel complete export coverage', () => {
 
     // ─── sdk-session-wrapper.js (F6) ─────────────────────────────────
     it('exports session lifecycle wrappers', async () => {
-        barrel = barrel ?? (await import('#copilot/sdk/index'));
+        barrel = barrel ?? (await import('#copilot/sdk'));
         const names = [
             'abortSession',
             'disposeSession',
@@ -219,7 +216,7 @@ describe('F86 - Barrel complete export coverage', () => {
 
     // ─── rpc.js (F7+F8) ───────────────────────────────────────────────
     it('exports rpc.js', async () => {
-        barrel = barrel ?? (await import('#copilot/sdk/index'));
+        barrel = barrel ?? (await import('#copilot/sdk'));
         const names = [
             'commandsHandlePending',
             'compactionCompact',
@@ -247,7 +244,7 @@ describe('F86 - Barrel complete export coverage', () => {
 
     // ─── server-rpc.js + health.js (F9) ───────────────────────────────
     it('exports server-rpc.js and health.js', async () => {
-        barrel = barrel ?? (await import('#copilot/sdk/index'));
+        barrel = barrel ?? (await import('#copilot/sdk'));
         const names = [
             'accountGetQuota',
             'createServerRpcFacade',
@@ -264,7 +261,7 @@ describe('F86 - Barrel complete export coverage', () => {
 
     // ─── events.js (F10) ──────────────────────────────────────────────
     it('exports events.js', async () => {
-        barrel = barrel ?? (await import('#copilot/sdk/index'));
+        barrel = barrel ?? (await import('#copilot/sdk'));
         const names = [
             'ALL_EVENT_TYPES',
             'createEventFilter',
@@ -280,7 +277,7 @@ describe('F86 - Barrel complete export coverage', () => {
 
     // ─── client-events.js (F11) ───────────────────────────────────────
     it('exports client-events.js', async () => {
-        barrel = barrel ?? (await import('#copilot/sdk/index'));
+        barrel = barrel ?? (await import('#copilot/sdk'));
         const names = [
             'LIFECYCLE_EVENTS',
             'isLifecycleEventType',
@@ -298,7 +295,7 @@ describe('F86 - Barrel complete export coverage', () => {
 
     // ─── provider.js (F12) ────────────────────────────────────────────
     it('exports provider.js', async () => {
-        barrel = barrel ?? (await import('#copilot/sdk/index'));
+        barrel = barrel ?? (await import('#copilot/sdk'));
         const names = [
             'anthropicProvider',
             'azureProvider',
@@ -311,7 +308,7 @@ describe('F86 - Barrel complete export coverage', () => {
 
     // ─── telemetry.js (F13) ───────────────────────────────────────────
     it('exports telemetry.js', async () => {
-        barrel = barrel ?? (await import('#copilot/sdk/index'));
+        barrel = barrel ?? (await import('#copilot/sdk'));
         const names = [
             'createFileTelemetry',
             'createOtlpTelemetry',
@@ -324,7 +321,7 @@ describe('F86 - Barrel complete export coverage', () => {
 
     // ─── models/* (F14) ───────────────────────────────────────────────
     it('exports models/helpers.js and models/registry.js', async () => {
-        barrel = barrel ?? (await import('#copilot/sdk/index'));
+        barrel = barrel ?? (await import('#copilot/sdk'));
         const names = [
             // helpers
             'buildReasoningConfig',
@@ -364,7 +361,7 @@ describe('F86 - Barrel complete export coverage', () => {
 
     // ─── agents.js (F15) ──────────────────────────────────────────────
     it('exports agents.js', async () => {
-        barrel = barrel ?? (await import('#copilot/sdk/index'));
+        barrel = barrel ?? (await import('#copilot/sdk'));
         const names = [
             'READ_ONLY_TOOLS',
             'buildAgentList',
@@ -390,18 +387,18 @@ describe('F86 - Barrel complete export coverage', () => {
 
 describe('F87 - Tree-shaking import validation', () => {
     it('import seletivo de createTool funciona', async () => {
-        const { createTool } = await import('#copilot/sdk/index');
+        const { createTool } = await import('#copilot/sdk');
         expect(typeof createTool).toBe('function');
     });
 
     it('import seletivo de constantes funciona', async () => {
-        const { SESSION_MODES, REASONING_EFFORTS } = await import('#copilot/sdk/index');
+        const { SESSION_MODES, REASONING_EFFORTS } = await import('#copilot/sdk');
         expect(SESSION_MODES).toBeDefined();
         expect(REASONING_EFFORTS).toBeDefined();
     });
 
     it('import seletivo de RPC funciona', async () => {
-        const { modelGetCurrent, modeSet } = await import('#copilot/sdk/index');
+        const { modelGetCurrent, modeSet } = await import('#copilot/sdk');
         expect(typeof modelGetCurrent).toBe('function');
         expect(typeof modeSet).toBe('function');
     });
@@ -413,12 +410,12 @@ describe('F87 - Tree-shaking import validation', () => {
 
 describe('F88 - tools-registry.js backward-compat', () => {
     it('createRegistry ainda acessivel via barrel', async () => {
-        const { createRegistry } = await import('#copilot/sdk/index');
+        const { createRegistry } = await import('#copilot/sdk');
         expect(typeof createRegistry).toBe('function');
     });
 
     it('registerTools ainda acessivel via barrel', async () => {
-        const { registerTools, getAllTools } = await import('#copilot/sdk/index');
+        const { registerTools, getAllTools } = await import('#copilot/sdk');
         expect(typeof registerTools).toBe('function');
         expect(typeof getAllTools).toBe('function');
     });
@@ -430,7 +427,7 @@ describe('F88 - tools-registry.js backward-compat', () => {
 
 describe('F16 - Newly added module exports', () => {
     it('exports custom-tools.js', async () => {
-        const barrel = await import('#copilot/sdk/index');
+        const barrel = await import('#copilot/sdk');
         const barrelMap = /** @type {Record<string, unknown>} */ (barrel);
         const names = [
             'BUILTIN_HANDLER_MAP',
@@ -445,7 +442,7 @@ describe('F16 - Newly added module exports', () => {
     });
 
     it('exports tools-state.js', async () => {
-        const barrel = await import('#copilot/sdk/index');
+        const barrel = await import('#copilot/sdk');
         const barrelMap = /** @type {Record<string, unknown>} */ (barrel);
         const names = ['getToolsConfig', 'loadToolsConfigAsync', 'patchToolsConfig'];
         for (const n of names) expect(barrelMap[n], `missing: ${n}`).toBeDefined();
@@ -458,24 +455,24 @@ describe('F16 - Newly added module exports', () => {
 
 describe('F89 - Utility and helper exports', () => {
     it('exports event-helpers.js', async () => {
-        const barrel = await import('#copilot/sdk/index');
+        const barrel = await import('#copilot/sdk');
         expect(typeof barrel.raceEvents).toBe('function');
         expect(typeof barrel.waitForEvent).toBe('function');
     });
 
     it('exports http-request.js', async () => {
-        const barrel = await import('#copilot/sdk/index');
+        const barrel = await import('#copilot/sdk');
         expect(typeof barrel.httpRequest).toBe('function');
     });
 
     it('não re-exporta url-validator.js (permanece em #copilot/core)', async () => {
-        const barrel = await import('#copilot/sdk/index');
+        const barrel = await import('#copilot/sdk');
         expect('validateUrl' in barrel).toBe(false);
         expect('validateUrlString' in barrel).toBe(false);
     });
 
     it('exports utils.js', async () => {
-        const barrel = await import('#copilot/sdk/index');
+        const barrel = await import('#copilot/sdk');
         expect(typeof barrel.pickDefined).toBe('function');
     });
 

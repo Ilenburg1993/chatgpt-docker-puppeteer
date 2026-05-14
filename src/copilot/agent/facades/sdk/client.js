@@ -8,16 +8,17 @@
  */
 
 import {
-    checkAuthStatus,
+    raceEvents,
+} from '#copilot/sdk/event-helpers';
+import { SESSION_LIFECYCLE_EVENTS } from '#copilot/sdk/constants';
+import { modelsList, toolsList } from '#copilot/sdk/rpc';
+import {
     createCopilotClient,
     disconnectSessionSafe,
     LIFECYCLE_EVENTS,
-    modelsList,
     onLifecycleEvents,
-    raceEvents,
-    SESSION_LIFECYCLE_EVENTS,
-    toolsList,
-} from '#copilot/sdk';
+} from '#copilot/sdk/session';
+import { getAuthStatus as checkAuthStatus } from '#copilot/sdk/telemetry';
 import {
     getClientRef,
     getPermissionHandlerRef,

@@ -8,7 +8,7 @@
 import { randomUUID } from 'node:crypto';
 
 import { CANONICAL_LOCAL_FS_TOOL_NAMES, decideSdkFsRouting, toError } from '#copilot/core';
-import { getPendingStructuredUserInputCount } from '#copilot/sdk';
+import { getPendingStructuredUserInputCount } from '#copilot/sdk/session';
 import { fileReadTools, fileWriteTools, readIntrospectionRegistrySnapshot } from '#copilot/tools';
 import { isRuntimeElicitationSchema, normalizeElicitationContentWithSchema } from '../../core/elicitation-schema.js';
 import { readTerminalIoActivityProjection } from '../events/index.js';

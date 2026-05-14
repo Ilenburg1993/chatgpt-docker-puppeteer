@@ -19,7 +19,7 @@
  * @internal
  */
 
-import { createSessionRpcFacade } from '#copilot/sdk';
+import { createSessionRpcFacade } from '#copilot/sdk/rpc';
 import {
     bootstrapTools,
     cancelAllUserInputRequests,
@@ -39,7 +39,7 @@ import {
  * O caller continua dono do lifecycle do registry; esta porta só executa o bootstrap concreto para que `session-setup`
  * não precise importar `tools/bootstrap.js`.
  *
- * @param {import('#copilot/sdk/tools-registry').ToolRegistry} registry
+ * @param {import('#copilot/sdk/types').ToolRegistry} registry
  * @param {import('#copilot/sdk/types').Tool[]} mcpTools
  * @returns {import('#copilot/sdk/types').Tool[]}
  */

@@ -9,8 +9,7 @@
  */
 
 import { SESSION_EVENTS as SE } from '#copilot/events';
-import { onSessionEvent } from '#copilot/sdk/session';
-import { normalizeToolsUpdatedEvent } from '#copilot/sdk/session';
+import { normalizeToolsUpdatedEvent, onSessionEvent } from '#copilot/sdk/session';
 import { log } from '../logger.js';
 
 /**
@@ -47,7 +46,7 @@ function normalizeSdkMessage(raw) {
  *
  * @type {((sessionId: string, entry: CompactionEntry) => void) | undefined}
  */
-var _recordCompaction;
+let _recordCompaction;
 
 /**
  * Injeta a função _recordCompaction (definida em event-collector.js).

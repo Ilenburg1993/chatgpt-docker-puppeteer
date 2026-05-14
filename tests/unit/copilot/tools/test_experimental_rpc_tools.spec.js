@@ -7,10 +7,7 @@ const mocks = vi.hoisted(() => ({
     withSkipPermission: vi.fn((tool) => tool),
     toError: vi.fn((error) => (error instanceof Error ? error : new Error(String(error)))),
     fleetStart: vi.fn(/** @returns {Promise<any>} */ async () => ({ ok: true })),
-    agentList: vi.fn(async () => ({ agents: [{ name: 'auditor' }] })),
-    agentGetCurrent: vi.fn(async () => ({ agent: { name: 'auditor' } })),
-    agentSelect: vi.fn(async (_session, name) => ({ agent: { name } })),
-    agentReload: vi.fn(async () => ({ reloaded: true })),
+
     skillsList: vi.fn(async () => ({ skills: [] })),
     skillsEnable: vi.fn(async () => ({ enabled: true })),
     skillsDisable: vi.fn(async () => ({ disabled: true })),
@@ -61,14 +58,7 @@ vi.mock('../../../../src/copilot/tools/infra/tool-factory.js', () => ({
     buildTool: vi.fn((config) => config),
 }));
 
-vi.mock('#copilot/sdk/rpc', () => ({
-    agentList: mocks.agentList,
-    agentGetCurrent: mocks.agentGetCurrent,
-    agentSelect: mocks.agentSelect,
-    agentReload: mocks.agentReload,
-}));
-
-vi.mock('#copilot/sdk/experimental-rpc', () => ({
+vi.mock('#copilot/sdk/rpc/experimental', () => ({
     fleetStart: mocks.fleetStart,
     skillsList: mocks.skillsList,
     skillsEnable: mocks.skillsEnable,
@@ -104,7 +94,6 @@ describe('experimental-rpc-tools', () => {
     it('exporta tools experimentais esperadas', () => {
         const names = mod.experimentalRpcTools.map((t) => t.name);
         expect(names).toContain('exp_fleet_start');
-        expect(names).toContain('exp_agent_list');
         expect(names).toContain('exp_skills_list');
         expect(names).toContain('exp_mcp_list');
         expect(names).toContain('exp_plugins_list');
@@ -113,19 +102,19 @@ describe('experimental-rpc-tools', () => {
 
     it('retorna erro quando sessão experimental não está disponível', async () => {
         mod.setExperimentalSession(null);
-        const tool = mod.experimentalRpcTools.find((t) => t.name === 'exp_agent_list');
+        const tool = mod.experimentalRpcTools.find((t) => t.name === 'exp_skills_list');
         const result = await /** @type {any} */ (tool).handler({});
         expect(result.error).toMatch(/não disponível|sessão/i);
     });
 
     it('limpa timer de timeout após sucesso rápido (sem timer pendurado)', async () => {
         vi.useFakeTimers();
-        mocks.agentList.mockResolvedValueOnce({ agents: [{ name: 'planner' }] });
+        mocks.skillsList.mockResolvedValueOnce(/** @type {any} */ ({ skills: [{ name: 'planner' }] }));
 
-        const tool = mod.experimentalRpcTools.find((t) => t.name === 'exp_agent_list');
+        const tool = mod.experimentalRpcTools.find((t) => t.name === 'exp_skills_list');
         const result = await /** @type {any} */ (tool).handler({});
 
-        expect(result.agents[0].name).toBe('planner');
+        expect(result.skills[0].name).toBe('planner');
         expect(vi.getTimerCount()).toBe(0);
         vi.useRealTimers();
     });
@@ -148,30 +137,5 @@ describe('experimental-rpc-tools', () => {
         expect(result.ok).toBe(true);
         expect(result.started).toBe(3);
         vi.useRealTimers();
-    });
-
-    it('bloqueia seleção direta de especialista e preserva o maestro', async () => {
-        const tool = mod.experimentalRpcTools.find((t) => t.name === 'exp_agent_select');
-        const result = await /** @type {any} */ (tool).handler({ name: 'auditor' });
-
-        expect(result.error).toMatch(/bloqueada/i);
-        expect(result.enforcedAgent).toBe('agent-full');
-        expect(mocks.agentSelect).not.toHaveBeenCalled();
-    });
-
-    it('seleciona agent-full quando seleção experimental pede o maestro', async () => {
-        const tool = mod.experimentalRpcTools.find((t) => t.name === 'exp_agent_select');
-        const result = await /** @type {any} */ (tool).handler({ name: 'agent-full' });
-
-        expect(result.agent.name).toBe('agent-full');
-        expect(mocks.agentSelect).toHaveBeenCalledWith(expect.anything(), 'agent-full');
-    });
-
-    it('exp_agent_deselect reforça agent-full em vez de deselecionar', async () => {
-        const tool = mod.experimentalRpcTools.find((t) => t.name === 'exp_agent_deselect');
-        const result = await /** @type {any} */ (tool).handler({});
-
-        expect(result.agent.name).toBe('agent-full');
-        expect(mocks.agentSelect).toHaveBeenCalledWith(expect.anything(), 'agent-full');
     });
 });

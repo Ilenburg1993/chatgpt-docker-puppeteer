@@ -35,7 +35,7 @@ import { createToolPermissionPolicy } from './permission-policy.js';
  *     });
  *
  * @param {DenyAllPresetOptions} [opts]
- * @returns {{ hooks: SessionHooks; onPermissionRequest: import('@github/copilot-sdk').PermissionHandler }}
+ * @returns {{ hooks: SessionHooks; onPermissionRequest: import('#copilot/sdk/types').PermissionHandler }}
  */
 export function createDenyAllPreset(opts = {}) {
     const { exceptTools = [] } = opts;

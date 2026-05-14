@@ -10,7 +10,7 @@
  */
 
 import { logSwallowed, toError } from '#copilot/core';
-import { sendSession } from '#copilot/sdk';
+import { sendSession } from '#copilot/sdk/session-runtime';
 import { log } from '../ports/index.js';
 
 /**

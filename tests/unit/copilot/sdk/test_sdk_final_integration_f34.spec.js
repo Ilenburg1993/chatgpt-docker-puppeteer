@@ -112,14 +112,12 @@ describe('F175 — Barrel exporta exports críticos de tools-registry', () => {
     });
 });
 
-// ─── F176: Exports críticos de config ─────────────────────────────────────
+// ─── F176: Exports críticos de tools/config runtime ───────────────────────
 
-describe('F176 — Barrel exporta exports críticos de config', () => {
+describe('F176 — Barrel exporta exports críticos de tools runtime', () => {
     const CONFIG_EXPORTS = [
         'getToolsConfig',
         'loadToolsConfigAsync',
-        'buildSessionConfig',
-        // buildFullAccessConfig e buildReadOnlyConfig movidos para #copilot/hooks/presets/profiles
     ];
 
     for (const name of CONFIG_EXPORTS) {
@@ -132,8 +130,8 @@ describe('F176 — Barrel exporta exports críticos de config', () => {
         expect(typeof SDK.getToolsConfig).toBe('function');
     });
 
-    it('buildSessionConfig é uma função', () => {
-        expect(typeof SDK.buildSessionConfig).toBe('function');
+    it('não reexporta builder de configuração de sessão pelo SDK root', () => {
+        expect(SDK).not.toHaveProperty('buildSessionConfig');
     });
 });
 
@@ -169,6 +167,24 @@ describe('F177 — Barrel exporta exports de events e event-helpers', () => {
 // ─── F178: Pipeline zero-bypass — auditoria dos módulos mais críticos ──────
 
 describe('F178 — Pipeline zero-bypass dos módulos mais críticos', () => {
+    const CANONICAL_SDK_SUBPATHS = new Set([
+        '#copilot/sdk/agents',
+        '#copilot/sdk/constants',
+        '#copilot/sdk/di',
+        '#copilot/sdk/errors',
+        '#copilot/sdk/event-helpers',
+        '#copilot/sdk/feature-flags',
+        '#copilot/sdk/models',
+        '#copilot/sdk/rpc',
+        '#copilot/sdk/rpc/experimental',
+        '#copilot/sdk/session',
+        '#copilot/sdk/session-runtime',
+        '#copilot/sdk/telemetry',
+        '#copilot/sdk/tools',
+        '#copilot/sdk/types',
+        '#copilot/sdk/utils',
+    ]);
+
     /**
      * @param {string} content
      * @returns {string[]}
@@ -178,7 +194,7 @@ describe('F178 — Pipeline zero-bypass dos módulos mais críticos', () => {
         const results = [];
         for (const match of content.matchAll(/from\s+'(#copilot\/sdk\/[^']+)'/g)) {
             const value = match[1];
-            if (value) results.push(value);
+            if (value && !CANONICAL_SDK_SUBPATHS.has(value)) results.push(value);
         }
         return results;
     }

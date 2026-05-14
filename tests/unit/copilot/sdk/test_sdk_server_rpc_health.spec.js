@@ -38,9 +38,9 @@ vi.mock('@github/copilot-sdk', () => ({
     },
 }));
 
-import { accountGetQuota, createServerRpcFacade, modelsList, ping, toolsList } from '#copilot/sdk/server-rpc';
+import { accountGetQuota, createServerRpcFacade, modelsList, ping, toolsList } from '#copilot/sdk/rpc';
 
-import { fullHealthCheck, getAuthStatus, getQuota, isServerReachable, pingCheck } from '#copilot/sdk/health';
+import { fullHealthCheck, getAuthStatus, getQuota, isServerReachable, pingCheck } from '#copilot/sdk/telemetry';
 
 // ─── Helper: fake CopilotClient ────────────────────────────────────────────
 

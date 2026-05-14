@@ -75,7 +75,7 @@ describe('F21 — F115: createQuotaMonitor', () => {
                 },
             },
         });
-        vi.doMock('#copilot/sdk/server-rpc', () => ({ accountGetQuota: mockAccountGetQuota }));
+        vi.doMock('#copilot/sdk/rpc', () => ({ accountGetQuota: mockAccountGetQuota }));
     });
 
     afterEach(() => {

@@ -199,7 +199,7 @@ export class AlwaysAliveAgent extends EventEmitter {
     /**
      * Retorna o `ToolSessionContext` desta sessão — encapsula estado por sessão (input pendente, broadcast SSE).
      *
-     * @returns {import('#copilot/sdk').ToolSessionContext}
+     * @returns {import('#copilot/sdk/types').ToolSessionContext}
      */
     getToolSessionContext() {
         return this.#permissionToolsFacade.getToolSessionContext();
@@ -217,7 +217,7 @@ export class AlwaysAliveAgent extends EventEmitter {
     /**
      * Retorna o registry ativo de tools sem expor o manager como contrato preferencial.
      *
-     * @returns {import('#copilot/sdk/tools-registry').ToolRegistry}
+     * @returns {import('#copilot/sdk/types').ToolRegistry}
      */
     getToolRegistrySnapshot() {
         return this.#permissionToolsFacade.getToolRegistrySnapshot();
@@ -419,7 +419,7 @@ export class AlwaysAliveAgent extends EventEmitter {
     /**
      * Retorna o registry de tools da sessão atual.
      *
-     * @returns {import('#copilot/sdk/tools-registry').ToolRegistry}
+     * @returns {import('#copilot/sdk/types').ToolRegistry}
      */
     get toolsRegistry() {
         return this.#stateQueryFacade.toolsRegistry;
@@ -798,7 +798,7 @@ export class AlwaysAliveAgent extends EventEmitter {
      * Lista solicitações de elicitation pendentes vindas do SDK para este runtime.
      *
      * @param {{ sessionId?: string }} [options]
-     * @returns {import('#copilot/sdk/session/elicitation').QueuedElicitationEntry[]}
+     * @returns {import('#copilot/sdk/types').QueuedElicitationEntry[]}
      */
     listPendingSdkElicitations(options = {}) {
         return listPendingSdkElicitations(this.ctx, options.sessionId);
@@ -808,7 +808,7 @@ export class AlwaysAliveAgent extends EventEmitter {
      * Retorna uma solicitação de elicitation pendente por id.
      *
      * @param {string} id
-     * @returns {import('#copilot/sdk/session/elicitation').QueuedElicitationEntry | null}
+     * @returns {import('#copilot/sdk/types').QueuedElicitationEntry | null}
      */
     getPendingSdkElicitation(id) {
         return getPendingSdkElicitation(this.ctx, id);

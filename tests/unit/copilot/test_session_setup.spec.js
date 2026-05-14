@@ -8,7 +8,6 @@ vi.mock('#copilot/observability/logger', () => ({
     getRecentLogs: vi.fn(() => []),
 }));
 vi.mock('#copilot/sdk', () => ({
-    createSessionRpcFacade: vi.fn((session) => ({ session })),
     attachBus: vi.fn((hooks) => hooks),
     REASONING_EFFORTS: {
         LOW: 'low',
@@ -27,7 +26,10 @@ vi.mock('#copilot/sdk', () => ({
         }
     },
 }));
-vi.mock('../../../src/copilot/agent/facades/agent-sdk-access.js', () => ({
+vi.mock('#copilot/sdk/rpc', () => ({
+    createSessionRpcFacade: vi.fn((session) => ({ session })),
+}));
+vi.mock('../../../src/copilot/agent/facades/sdk-access.js', () => ({
     createAgentSdkToolsRegistry: vi.fn(() => new Map()),
     getAgentSdkToolsConfig: vi.fn(() => ({ allowlist: null, denylist: [] })),
     readAgentSdkModelRegistryEntry: vi.fn((modelId) => {
@@ -58,10 +60,10 @@ vi.mock('../../../src/copilot/agent/dialog/wiring/user-input-handler.js', () => 
     handleUserInputRequest: vi.fn(),
 }));
 
-import { createSessionRpcFacade } from '#copilot/sdk';
+import { createSessionRpcFacade } from '#copilot/sdk/rpc';
 import { isToolDisabled, setSessionRpc } from '#copilot/tools';
 import { handleUserInputRequest } from '../../../src/copilot/agent/dialog/wiring/user-input-handler.js';
-import { getAgentSdkToolsConfig } from '../../../src/copilot/agent/facades/agent-sdk-access.js';
+import { getAgentSdkToolsConfig } from '../../../src/copilot/agent/facades/sdk-access.js';
 import {
     buildSessionHooks,
     buildSessionOptions,

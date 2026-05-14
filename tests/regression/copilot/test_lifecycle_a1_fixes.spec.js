@@ -19,15 +19,8 @@ const { mockLog, mockCreateSession, mockResumeSession, mockApproveAll } = vi.hoi
     mockApproveAll: vi.fn(() => 'approved'),
 }));
 
-// ─── Mock: logger (lifecycle.js importa de '../logger.js' → resolve para sdk/logger.js) ───
-vi.mock('#copilot/sdk/logger', async () => {
-    return {
-        log: mockLog,
-        setSdkLogger: vi.fn(),
-    };
-});
-// Fallback para o path relativo que vitest pode resolver
-vi.mock('../../../../src/copilot/sdk/logger.js', async () => {
+// lifecycle.js importa o logger por caminho relativo; o alias folha do SDK não existe mais.
+vi.mock('../../../src/copilot/sdk/logger.js', async () => {
     return {
         log: mockLog,
         setSdkLogger: vi.fn(),
@@ -35,7 +28,7 @@ vi.mock('../../../../src/copilot/sdk/logger.js', async () => {
 });
 
 // ─── Mock: error-handlers ──────────────────────────────────────────────────
-vi.mock('../../../../src/core/error-handlers.js', () => ({
+vi.mock('../../../src/core/error-handlers.js', () => ({
     toError: vi.fn((e) => (e instanceof Error ? e : new Error(String(e)))),
 }));
 
@@ -58,7 +51,7 @@ vi.mock('@github/copilot-sdk', () => ({
     },
 }));
 
-import { createSession, resumeSession } from '../../../../src/copilot/sdk/session/lifecycle.js';
+import { createSession, resumeSession } from '../../../src/copilot/sdk/session/lifecycle.js';
 
 // ─── Helper: fake client ───────────────────────────────────────────────────
 
@@ -321,14 +314,14 @@ describe('Fase A3 — boot-wiring lifecycle + SessionConfig fields', () => {
     // ─── A3.1: boot-wiring importa e usa client-events.js ──────────────
 
     describe('A3.1: boot-wiring usa façade de lifecycle/quota do SDK', () => {
-        it('boot-wiring.js usa helpers de lifecycle via agent-sdk-access', async () => {
+        it('boot-wiring.js usa helpers de lifecycle via sdk-access', async () => {
             const fs = await import('node:fs');
             const src = fs.readFileSync(
                 new URL('../../../src/copilot/agent/session/boot/boot-wiring.js', import.meta.url),
                 'utf-8',
             );
             expect(src).toContain('attachAgentSdkBootLifecycleBridge');
-            expect(src).toContain("from '../../facades/agent-sdk-access.js'");
+            expect(src).toContain("from '../../facades/index.js'");
             expect(src).not.toContain("from '#copilot/sdk'");
         });
 

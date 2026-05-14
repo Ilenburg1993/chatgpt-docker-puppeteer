@@ -19,11 +19,11 @@ Fachadas finas do `AlwaysAliveAgent`.
 | `agent-runtime-event-bridge.js` | infra           | wiring dos emitters internos para o EventBus                                                                                                           |
 | `agent-runtime-ownership.js`    | mutation        | vínculo entre sessão SDK ativa e hub session                                                                                                           |
 | `agent-runtime-state.js`        | mutation        | persistência semântica do estado vivo do runtime                                                                                                       |
-| `agent-runtime-status.js`       | query           | snapshots/status/health compatíveis do runtime                                                                                                         |
+| `agent-runtime-status.js`       | query           | snapshots/status/health do runtime                                                                                                                     |
 | `agent-runtime-todos.js`        | query           | projections da capacidade TODO                                                                                                                         |
 | `agent-runtime-tools.js`        | query           | tools disponíveis no runtime do agent                                                                                                                  |
 | `agent-runtime-webhooks.js`     | mutation        | operações de webhook do runtime                                                                                                                        |
-| `agent-sdk-access.js`           | infra           | façade pública compat que agrega `sdk/*.js` por domínio (client, models, tools, quota, sessions, workspace, UI) e preserva a borda canônica do runtime |
+| `sdk-access.js`                 | infra           | façade pública que agrega `sdk/*.js` por domínio (client, models, tools, quota, sessions, workspace, UI) e preserva a borda canônica do runtime        |
 | `agent-sdk-runtime.js`          | infra           | operações de sessão SDK ativa dentro do runtime                                                                                                        |
 | `agent-sdk-session.js`          | mutation        | operações vanilla de sessão SDK (`mode` e `plan`)                                                                                                      |
 | `agent-session-ops.js`          | lifecycle       | operações diretas de sessão (abort, log, watchdog, histórico)                                                                                          |
@@ -40,8 +40,8 @@ Fachadas finas do `AlwaysAliveAgent`.
 - `sdk/workspace-ops.js` — workspace files, shell e custom agents
 - `sdk/ui-ops.js` — elicitation, session.ui e pendências SDK
 
-`agent-sdk-access.js` permanece como **façade pública canônica** para callers do runtime; a pasta
-`sdk/` existe para evitar monólito interno, não para reabrir bypasss arbitrários.
+`sdk-access.js` permanece como **façade pública canônica** para callers do runtime; a pasta
+`sdk/` existe para evitar monólito interno, não para reabrir bypasses arbitrários.
 
 Os owners acima são protegidos por `tests/unit/copilot/contracts/test_facade_bypass_matrix.spec.js`.
 Qualquer import cruzado entre facades precisa estar declarado na matriz executável antes de ser

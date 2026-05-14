@@ -32,7 +32,7 @@
  * @see EventBus
  */
 
-import { approveAll, createPermissionHandler as createSdkPermissionHandler } from '#copilot/sdk';
+import { approveAll, createPermissionHandler as createSdkPermissionHandler } from '#copilot/sdk/session';
 
 // ─── Tipos (sem lógica executável) ────────────────────────────────────────────
 export * from './types.js';
@@ -49,7 +49,7 @@ export {
 } from './factory.js';
 
 // ─── Permission handlers (API pública em cima do núcleo canônico do SDK) ─────
-export { createAllowlistPermissionHandler, createPermissionHandler } from '#copilot/sdk';
+export { createAllowlistPermissionHandler, createPermissionHandler } from '#copilot/sdk/session';
 
 /**
  * @returns {import('./types.js').PermissionHandler}

@@ -15,7 +15,8 @@
 
 import { AUDIT_LOGGER } from '#copilot/audit';
 import { DB_LOGGER, EVENT_BUS, SHUTDOWN_LOGGER } from '#copilot/core';
-import { defaultHookBus, HOOKS_LOGGER, SDK_LOGGER, setHooksLogger, TOOLS_BUILDER } from '#copilot/sdk';
+import { HOOKS_LOGGER, SDK_LOGGER, TOOLS_BUILDER } from '#copilot/sdk/di';
+import { defaultBus as defaultHookBus, setHooksLogger } from '#copilot/sdk/session';
 import { setToolsLogger, setToolsMetrics, TOOLS_LOGGER, TOOLS_METRICS } from '#copilot/tools';
 import { channel } from 'node:diagnostics_channel';
 import { setAuditLogger } from '../audit/logger.js';

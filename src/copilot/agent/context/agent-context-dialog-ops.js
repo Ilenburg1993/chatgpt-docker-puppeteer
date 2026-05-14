@@ -33,7 +33,7 @@ import {
  * @typedef {{
  *     dialogState: AgentDialogState;
  *     sdkElicitation: import('../context-factories.js').AgentContextFactoryHost extends any
- *         ? ReturnType<import('#copilot/sdk').createQueuedElicitationHandler>
+ *         ? import('#copilot/sdk/types').QueuedElicitationHandler
  *         : never;
  *     invalidateStatusSnapshot: () => void;
  * }} DialogOpsCtx

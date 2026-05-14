@@ -12,7 +12,7 @@ vi.mock('#copilot/events', async (importOriginal) => {
     return {
         ...actual,
         SESSION_EVENTS: {
-            ...(/** @type {Record<string, string>} */ (actual['SESSION_EVENTS'] ?? {})),
+            .../** @type {Record<string, string>} */ (actual['SESSION_EVENTS'] ?? {}),
             ASSISTANT_USAGE: 'assistant.usage',
         },
     };

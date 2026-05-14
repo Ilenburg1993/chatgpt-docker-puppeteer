@@ -12,7 +12,7 @@ import {
     normalizePermissionRequestedEvent,
     normalizeUserInputCompletedEvent,
     normalizeUserInputRequestedEvent,
-} from '#copilot/sdk';
+} from '#copilot/sdk/session';
 import { DialogProtocol } from '../dialog/protocol.js';
 import { onSessionEvent } from '#copilot/sdk/session';
 

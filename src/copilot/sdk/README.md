@@ -1,66 +1,169 @@
 # sdk/
 
-## Responsabilidades
+## 🎯 Missão da camada
 
-Wrapper canônico sobre o **`@github/copilot-sdk`**.
+`src/copilot/sdk` é a **fronteira canônica** entre o runtime local e o `@github/copilot-sdk`.
 
-Esta pasta é a fonte de verdade local para:
+Aqui ficam as capacidades vanilla do SDK (session, rpc, tools, models, telemetry) com semântica estável,
+tipagem consistente e aliases explícitos.
 
-- tipos do SDK (`types.js`);
-- client lifecycle;
-- session lifecycle;
-- operações RPC vanilla (`mode`, `plan`, `agents`, `sessions`, etc.);
-- model registry/helpers;
-- telemetry e feature flags relacionadas ao SDK.
+Se uma capability já existe no SDK vanilla, ela deve nascer aqui antes de qualquer adaptação em `agent/`,
+`terminal/`, `server/` ou `presentation/`.
 
-## Princípio arquitetural
+## Arquitetura 2.0/2.1 — superfícies canônicas
 
-Nenhum módulo do runtime deve “recriar” uma capability do SDK sem passar por esta camada.
+### Root
 
-Se o SDK já oferece:
+- `#copilot/sdk` → barrel raiz estável
 
-- `mode.get/set`
-- `plan.read/update/delete`
-- `listSessions`
-- `foreground session`
-- `custom agents`
-- `streaming` / `usage` / hooks / user input
+### Subsurfaces estáveis
 
-então a implementação local deve começar aqui, e só depois ser ampliada em `agent/`, `terminal/` ou
-`presentation/`.
+- `#copilot/sdk/session`
+- `#copilot/sdk/session-runtime`
+- `#copilot/sdk/rpc`
+- `#copilot/sdk/telemetry`
+- `#copilot/sdk/tools`
+- `#copilot/sdk/agents`
+- `#copilot/sdk/models`
+- `#copilot/sdk/constants`
+- `#copilot/sdk/di`
+- `#copilot/sdk/errors`
+- `#copilot/sdk/event-helpers`
+- `#copilot/sdk/feature-flags`
+- `#copilot/sdk/utils`
+- `#copilot/sdk/types` (type-only/JSDoc)
+
+### Subsurface experimental controlada
+
+- `#copilot/sdk/rpc/experimental`
+  - escopo: `fleet`, `skills`, `mcp`, `plugins`, `extensions`
+  - **não** inclui `agent.*`
+
+### Aliases removidos
+
+Não há mais aliases folha de compatibilidade para o SDK em `package.json#imports`.
+
+Foram removidos `tools-registry`, `tools-state`, `custom-tools`, `tracing`, `quota-monitor`, `server-rpc`,
+`rpc-session`, `rpc-ops`, `rpc-facade`, `health`, `client`, `client-events`, `provider`, `permissions`,
+`system-message` e o wildcard `#copilot/sdk/*`.
+
+Regra: consumidores usam somente as surfaces estáveis listadas acima; tipos auxiliares locais ficam em
+`#copilot/sdk/types`.
+
+## Mapeamento aprofundado de acesso (entrada)
+
+Baseline observado em `src/copilot/**` (fora de `sdk/`) em 2026-05-14 após remoção dos shims:
+
+- `#copilot/sdk/types` → 420 referências JSDoc/type-only
+- `#copilot/sdk/session` → 75 referências
+- `#copilot/sdk/rpc` → 20 referências
+- `#copilot/sdk/rpc/experimental` → 15 referências, concentradas em tools experimentais e testes
+- `#copilot/sdk/tools` → 11 referências
+- `#copilot/sdk/telemetry` → 10 referências
+- `#copilot/sdk` → 8 referências, majoritariamente validação pública/contratos de barrel
+- micro-surfaces (`constants`, `di`, `errors`, `event-helpers`, `feature-flags`, `utils`) → 33 referências somadas
+
+Leitura arquitetural: o root deixou de carregar contratos internos residuais. Fluxos operacionais e tipos agora passam
+por portas semânticas explícitas.
+
+## Política canônica por camada
+
+As políticas executáveis vivem em `module-map.js` (`SDK_LAYER_ACCESS_POLICY`), mas o resumo operacional é:
+
+- **agent**: usar `session`, `session-runtime`, `rpc`, `tools`, `telemetry`, `models`, `errors`, `feature-flags`,
+  `utils` e `event-helpers`; sem root runtime.
+- **boot**: `di`, `session` e `telemetry`; root apenas para validação explícita da surface pública.
+- **config**: `constants`, `session` e `rpc`; evitar root e RPC operacional fora de introspecção.
+- **event-handlers / hooks**: preferir `session`.
+- **observability**: `di`, `session` + `telemetry` (+ `tools` quando necessário).
+- **server**: preferir subpaths (`session/rpc/tools/telemetry`) em vez de root.
+- **terminal**: preferir `session` e `rpc`; sem recriar vanilla SDK localmente.
+- **tools**: `rpc`/`session`; `rpc/experimental` apenas com gating explícito.
+
+## Mapeamento canônico de saída (SDK → outros domínios)
+
+Importações autorizadas dentro de `sdk/`:
+
+- `#copilot/core` e `#copilot/core/*`
+- `#copilot/boot` e `#copilot/boot/*`
+- `#copilot/infra` e `#copilot/infra/*`
+- `#copilot/events`
+- `#copilot/config`
+
+Importações proibidas por design:
+
+- `terminal/` como dependency direta da camada SDK
+- policy operacional de `presentation/` dentro do SDK
+- aliases folha ou wildcard físico como API pública
 
 ## Subdomínios reais
 
-| Área                 | Arquivos / pastas                                                                |
-| -------------------- | -------------------------------------------------------------------------------- |
-| Client lifecycle     | `session/client.js`, `session/lifecycle.js`                                      |
-| Session ops          | `session/plan.js`, `session/mode.js`, `session/agents.js`, `session/messages.js` |
-| RPC helpers          | `rpc/`, `rpc.js`                                                                 |
-| Model registry       | `models/`                                                                        |
-| Tools state/registry | `tools/`                                                                         |
-| Types & helpers      | `types.js`, `utils.js`, `event-helpers.js`, `constants.js`                       |
-| Telemetry            | `telemetry/`                                                                     |
+| Superfície       | Núcleo                                                                                                    |
+| ---------------- | --------------------------------------------------------------------------------------------------------- |
+| Root contracts   | `types.js`, `errors.js`, `constants.js`, `utils.js`, `event-helpers.js`, `logger.js`                      |
+| Session          | `session/client.js`, `session/lifecycle.js`, `session/runtime.js`, `session/events.js`, `session/ui.js`   |
+| RPC              | `rpc/index.js`, `rpc/session.js`, `rpc/ops.js`, `rpc/server.js`, `rpc/session-facade.js`, `rpc/guards.js` |
+| RPC experimental | `rpc/experimental.js`                                                                                     |
+| Tools            | `tools/index.js`, `tools/core.js`, `tools/registry.js`, `tools/state.js`, `tools/custom.js`               |
+| Models           | `models/index.js` e helpers de capabilities/model selection                                               |
+| Telemetry        | `telemetry/index.js`, `telemetry/health.js`, `telemetry/tracing.js`, `telemetry/quota-monitor.js`         |
 
-## Relação com outras camadas
+## Consolidações aplicadas em 2026-05-14
 
-- `event-handlers/` traduz `SessionEvent` do SDK para sinais internos.
-- `agent/facades/agent-sdk-access.js` expõe um subconjunto estratégico do SDK como API pública do
-  runtime.
-- `terminal/frontend/sdk-session-projection.js` monta UX vanilla de `mode/plan` em cima desta
-  camada.
+- `#copilot/sdk/models` e `#copilot/sdk/types` viraram aliases explícitos em `package.json`; antes dependiam do wildcard
+  implícito.
+- `constants`, `di`, `errors`, `event-helpers`, `feature-flags` e `utils` viraram micro-surfaces explícitas.
+- O wildcard `#copilot/sdk/*` e todos os aliases folha legados foram removidos de `package.json#imports`.
+- `package.json#exports` agora publica apenas as surfaces SDK estáveis, sem depender de caminho físico interno.
+- Imports operacionais de `terminal`, `event-handlers`, `hooks`, `tools`, `agent/facades` e `server/routes/sdk/deps`
+  foram migrados do root para `session`, `session-runtime`, `rpc`, `tools`, `telemetry`, `agents` e `models`.
+- `sdk/session` deixou de abrir `copilot.sqlite` ao ser importado: `hook-bus` e `permission-controller` agora usam
+  módulos folha (`#copilot/events/hook-events`, `#copilot/config/env`) em vez dos barrels largos.
+- `sdk/config.js` foi removido; configuração de sessão é responsabilidade de `#copilot/config`
+  (`SessionConfigBuilder`), não do SDK root.
+- Os aliases quebrados `#copilot/config/tools-state`, `#copilot/config/custom-tools-registry`, `#copilot/config/tools`
+  e `#copilot/config/tools/*`, que apontavam para arquivos inexistentes, foram removidos de `package.json`.
+- A mesma limpeza removeu aliases históricos sem arquivo correspondente (`#copilot/session-manager`,
+  `#copilot/hooks/permission`, `#copilot/hooks/audit`, `#copilot/observability/audit-log`,
+  `#copilot/observability/telemetry-store`, `#copilot/observability/error-registry`) e adicionou teste de regressão para
+  impedir novos aliases quebrados.
+- Foi criado `config/typing/strict/tsconfig.strict.src.copilot.sdk.json`, com TypeScript 6.0, NodeNext,
+  `strict`, `exactOptionalPropertyTypes`, `noUncheckedIndexedAccess`, `noPropertyAccessFromIndexSignature`,
+  `verbatimModuleSyntax`, `erasableSyntaxOnly`, `isolatedModules` e `noUncheckedSideEffectImports`.
 
-## Critério de fronteira com `agent/` e `presentation/`
+## Typecheck estrito do SDK
 
-- se a dúvida é “qual é a capacidade vanilla correta?”, a resposta nasce aqui;
-- se a dúvida é “como isso vira capability pública do runtime contínuo?”, a resposta sobe para
-  `agent/facades/`;
-- se a dúvida é “como isso aparece igual em `server/` e `terminal/`?”, a resposta sobe para
-  `presentation/`.
+O comando canônico é:
 
-`sdk/` não deve virar camada de payload HTTP nem de UX local.
+```bash
+npm run typecheck:strict:src.copilot.sdk
+```
 
-## Regras de importação
+Decisão de viabilidade: `skipLibCheck: false` foi avaliado, mas falha antes do código local por declarações de
+`vscode-jsonrpc` incompatíveis com iteradores do TS 6. A surface SDK fica com `skipLibCheck: true` até essa dependência
+ser atualizada ou isolada; o restante das flags rigorosas já é aplicado ao código local.
 
-- **Pode importar**: `core/`, `config/`, `observability/`, `node:*`, `@github/copilot-sdk`
-- **NÃO deve importar**: `terminal/`, `presentation/`
-- `agent/` pode consumir `sdk/`, mas não deve duplicar contratos que já existem aqui.
+## Anti-patterns que o módulo combate
+
+- usar `#copilot/sdk` raiz quando subpath semântico já existe;
+- duplicar contracts do SDK em `agent/` ou `terminal/` sem necessidade;
+- misturar `agent.*` na superfície experimental;
+- transformar `sdk/` em camada de payload HTTP ou UX local.
+
+## Governança executável
+
+Consulte `module-map.js` para:
+
+- inventário de módulos (`SDK_MODULE_LAYOUT`);
+- inventário de aliases (`SDK_ALIAS_LAYOUT`);
+- política por camada consumidora (`SDK_LAYER_ACCESS_POLICY`);
+- scorecard da borda (`buildSdkModuleScorecard()`).
+
+O README descreve intenção; o `module-map.js` descreve contrato verificável.
+
+## Próxima onda recomendada
+
+1. Converter gradualmente arquivos do SDK de JS+JSDoc para TS preservando `erasableSyntaxOnly`.
+2. Isolar ou atualizar dependências que impedem `skipLibCheck: false` com TS 6.
+3. Endurecer o ESLint type-aware do SDK para `no-unsafe-*` por subpasta, começando por `constants`, `errors`,
+   `utils`, `models` e `telemetry`.

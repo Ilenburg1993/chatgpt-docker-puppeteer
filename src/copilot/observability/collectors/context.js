@@ -11,7 +11,7 @@
 /**
  * @typedef {import('../metrics.js').MetricsStore} MetricsStore
  *
- * @typedef {import('#copilot/sdk').HookBus} HookBus
+ * @typedef {import('#copilot/sdk/types').HookBus} HookBus
  *
  * @typedef {import('../error-tracker.js').ErrorTracker} ErrorTracker
  *

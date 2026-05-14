@@ -10,7 +10,7 @@
  */
 
 import { logSwallowed, toError } from '#copilot/core';
-import { PERMISSION_COMPLETED_KINDS, PERMISSION_RESULTS } from '#copilot/sdk';
+import { PERMISSION_COMPLETED_KINDS, PERMISSION_RESULTS } from '#copilot/sdk/constants';
 import { appendFile, mkdir, rename, stat } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 import { getLogDir, log } from './logger.js';

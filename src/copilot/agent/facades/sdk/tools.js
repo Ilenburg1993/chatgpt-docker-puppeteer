@@ -7,10 +7,11 @@
  * @module copilot/agent/facades/sdk/tools
  */
 
-import { createRegistry, getToolsConfig, loadToolsConfigAsync, pickDefined } from '#copilot/sdk';
+import { pickDefined } from '#copilot/sdk/utils';
+import { createRegistry, getToolsConfig, loadToolsConfigAsync } from '#copilot/sdk/tools';
 
 /**
- * @returns {import('#copilot/sdk/tools-registry').ToolRegistry}
+ * @returns {import('#copilot/sdk/types').ToolRegistry}
  */
 export function createAgentSdkToolsRegistry() {
     return createRegistry();

@@ -7,7 +7,7 @@
  * @module copilot/hooks/presets/permission-policy
  */
 
-import { createPermissionHandler } from '#copilot/sdk';
+import { createPermissionHandler } from '#copilot/sdk/session';
 import { log } from '../logger.js';
 
 /** @typedef {'allow' | 'deny' | 'ask'} ToolDecision */

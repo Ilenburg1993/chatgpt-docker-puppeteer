@@ -84,7 +84,7 @@ export class StateQueryFacade {
     /**
      * Retorna o registry de tools da sessão atual.
      *
-     * @returns {import('#copilot/sdk/tools-registry').ToolRegistry}
+     * @returns {import('#copilot/sdk/types').ToolRegistry}
      */
     get toolsRegistry() {
         return readRuntimeToolRegistry(this.ctx);

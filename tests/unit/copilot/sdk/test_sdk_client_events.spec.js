@@ -3,9 +3,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // ─── Hoisted mocks ─────────────────────────────────────────────────────────
 
-const { mockClientOn, mockGetClient } = vi.hoisted(() => ({
+const { mockClientOn } = vi.hoisted(() => ({
     mockClientOn: vi.fn(),
-    mockGetClient: vi.fn(),
 }));
 
 // ─── SDK mock (padrão obrigatório) ─────────────────────────────────────────
@@ -26,14 +25,12 @@ vi.mock('@github/copilot-sdk', () => {
     return { SYSTEM_PROMPT_SECTIONS };
 });
 
-vi.mock('#copilot/sdk/client', () => ({
-    getClient: mockGetClient,
-}));
-
 // ─── Imports sob teste ─────────────────────────────────────────────────────
 
 import {
     LIFECYCLE_EVENTS,
+    _injectClientForTest,
+    _resetClientState,
     isLifecycleEventType,
     onAllLifecycleEvents,
     onLifecycleEvent,
@@ -43,7 +40,7 @@ import {
     onSessionDeleted,
     onSessionForeground,
     onSessionUpdated,
-} from '#copilot/sdk/client-events';
+} from '#copilot/sdk/session';
 
 // ─── Helper ────────────────────────────────────────────────────────────────
 
@@ -51,9 +48,14 @@ function setupMockClient() {
     const unsub = vi.fn();
     mockClientOn.mockReturnValue(unsub);
     const client = { on: mockClientOn };
-    mockGetClient.mockReturnValue(client);
+    _injectClientForTest(/** @type {any} */ (client));
     return { client, unsub };
 }
+
+beforeEach(() => {
+    _resetClientState();
+    mockClientOn.mockReset();
+});
 
 // ═════════════════════════════════════════════════════════════════════════════
 // F63 — LIFECYCLE_EVENTS constant & isLifecycleEventType
@@ -107,17 +109,16 @@ describe('F64 — onLifecycleEvent', () => {
         expect(result).toBe(unsub);
     });
 
-    it('usa getClient() quando client não é fornecido', () => {
+    it('usa client já injetado quando client não é fornecido', () => {
         setupMockClient();
         const handler = vi.fn();
 
         onLifecycleEvent('session.deleted', handler);
-        expect(mockGetClient).toHaveBeenCalled();
         expect(mockClientOn).toHaveBeenCalledWith('session.deleted', handler);
     });
 
     it('lança erro se client é null e getClient retorna null', () => {
-        mockGetClient.mockReturnValue(null);
+        _resetClientState();
         expect(() => onLifecycleEvent('session.created', vi.fn())).toThrow('client is required');
     });
 
@@ -175,7 +176,6 @@ describe('F64c — onLifecycleEvents', () => {
         const unsub2 = vi.fn();
         mockClientOn.mockReturnValueOnce(unsub1).mockReturnValueOnce(unsub2);
         const client = { on: mockClientOn };
-        mockGetClient.mockReturnValue(client);
 
         const h1 = vi.fn();
         const h2 = vi.fn();
@@ -257,7 +257,7 @@ describe('F65 — Typed convenience handlers', () => {
 
 describe('F66 — Barrel re-exports (sdk/index.js)', () => {
     it('re-exporta todas as 10 exports do client-events.js', async () => {
-        const barrel = await import('#copilot/sdk/index');
+        const barrel = await import('#copilot/sdk');
 
         expect(barrel.LIFECYCLE_EVENTS).toBeDefined();
         expect(barrel.isLifecycleEventType).toBeTypeOf('function');

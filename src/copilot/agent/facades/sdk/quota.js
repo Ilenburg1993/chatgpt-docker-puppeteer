@@ -7,12 +7,14 @@
  * @module copilot/agent/facades/sdk/quota
  */
 
-import { accountGetQuota, createQuotaMonitor, getSdkRecoveryPolicy, isSdkQuotaOrRateLimitError } from '#copilot/sdk';
+import { getSdkRecoveryPolicy, isSdkQuotaOrRateLimitError } from '#copilot/sdk/errors';
+import { accountGetQuota } from '#copilot/sdk/rpc';
+import { createQuotaMonitor } from '#copilot/sdk/telemetry';
 import { requireClient } from './core/index.js';
 
 /**
- * @param {import('#copilot/sdk/quota-monitor').QuotaMonitorOptions} options
- * @returns {import('#copilot/sdk/quota-monitor').QuotaMonitor}
+ * @param {import('#copilot/sdk/types').QuotaMonitorOptions} options
+ * @returns {import('#copilot/sdk/types').QuotaMonitor}
  */
 export function createAgentSdkQuotaMonitor(options) {
     return createQuotaMonitor(options);
@@ -23,10 +25,10 @@ export function createAgentSdkQuotaMonitor(options) {
  *     client: import('#copilot/sdk/types').CopilotClient;
  *     intervalMs: number;
  *     warningThreshold: number;
- *     onWarning?: (quotaId: string, snapshot: import('#copilot/sdk/quota-monitor').QuotaSnapshot) => void;
- *     onUpdate?: (snapshots: Record<string, import('#copilot/sdk/quota-monitor').QuotaSnapshot>) => void;
+ *     onWarning?: (quotaId: string, snapshot: import('#copilot/sdk/types').QuotaSnapshot) => void;
+ *     onUpdate?: (snapshots: Record<string, import('#copilot/sdk/types').QuotaSnapshot>) => void;
  * }} options
- * @returns {import('#copilot/sdk/quota-monitor').QuotaMonitor}
+ * @returns {import('#copilot/sdk/types').QuotaMonitor}
  */
 export function startAgentSdkQuotaMonitor(options) {
     const monitor = createQuotaMonitor(options);
@@ -39,10 +41,10 @@ export function startAgentSdkQuotaMonitor(options) {
  *     client: import('#copilot/sdk/types').CopilotClient;
  *     intervalMs: number;
  *     warningThreshold: number;
- *     onWarning?: (quotaId: string, snapshot: import('#copilot/sdk/quota-monitor').QuotaSnapshot) => void;
- *     onUpdate?: (snapshots: Record<string, import('#copilot/sdk/quota-monitor').QuotaSnapshot>) => void;
+ *     onWarning?: (quotaId: string, snapshot: import('#copilot/sdk/types').QuotaSnapshot) => void;
+ *     onUpdate?: (snapshots: Record<string, import('#copilot/sdk/types').QuotaSnapshot>) => void;
  * }} options
- * @returns {import('#copilot/sdk/quota-monitor').QuotaMonitor}
+ * @returns {import('#copilot/sdk/types').QuotaMonitor}
  */
 export function startAgentSdkBootQuotaBridge(options) {
     return startAgentSdkQuotaMonitor(options);

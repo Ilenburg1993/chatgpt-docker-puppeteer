@@ -1,30 +1,24 @@
 // @ts-check
 /**
- * Porta de configuração para contratos vindos do SDK.
+ * Porta leve de configuração para contratos vindos do SDK.
  *
- * `config/` ainda precisa conhecer alguns defaults e builders expostos pelo SDK vanilla. Concentrar esses imports aqui
- * evita que cada módulo de configuração reabra a mesma fronteira arquitetural.
+ * `system-prompt/` precisa conhecer seções vanilla do SDK sem abrir o barrel raiz. Este port permanece deliberadamente
+ * pequeno para não carregar tools, client ou runtime ao importar configuração de texto.
  *
  * @module copilot/config/sdk-config-port
  * @internal
  */
 
 export {
-    BUILTIN_HANDLER_MAP,
     INFINITE_SESSION_DEFAULTS,
     REASONING_EFFORTS,
-    SYSTEM_PROMPT_SECTIONS,
-    approveAll,
-    getCustomToolDefinitions,
-    getToolsConfig,
-    patchToolsConfig,
-    registerCustomTool,
-    removeCustomTool,
-    validateProviderConfig,
-} from '#copilot/sdk';
+} from '#copilot/sdk/constants';
 
-export { resolvePersistentConfigFile } from '../sdk/persistent-paths.js';
-export { ClientOptionsBuilder, buildCopilotClientOptionsFromEnv } from '#copilot/sdk/session';
+export {
+    approveAll,
+    SYSTEM_PROMPT_SECTIONS,
+    validateProviderConfig,
+} from '#copilot/sdk/session';
 
 /**
  * @typedef {import('#copilot/sdk/types').SessionConfig} SessionConfig

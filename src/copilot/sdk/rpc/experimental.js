@@ -2,13 +2,12 @@
 /**
  * src/copilot/sdk/rpc/experimental.js
  *
- * Wrappers tipados para os subsistemas experimentais do SDK RPC: `fleet`, `agent`, `skills`, `mcp`, `plugins`,
- * `extensions`.
+ * Wrappers tipados para os subsistemas experimentais do SDK RPC: `fleet`, `skills`, `mcp`, `plugins`, `extensions`.
  *
  * Cada função valida sessão e feature flag antes de chamar o RPC. Os métodos mapeiam 1:1 com
  * `session.rpc.<subsystem>.<method>()`.
  *
- * @module copilot/sdk/experimental-rpc
+ * @module copilot/sdk/rpc/experimental
  * @see EventBus
  * @see module:copilot/sdk/feature-flags
  * @see module:copilot/sdk/rpc
@@ -66,10 +65,6 @@ function requireRpcMethod(session, namespace, method) {
     }
     return /** @type {NonNullable<NonNullable<import('../types.js').ExperimentalSession['rpc'][N]>[M]>} */ (fn);
 }
-
-// Compatibilidade: agentes migraram para a surface estável `rpc/ops.js` e são reexportados aqui apenas para manter
-// consumidores legados e testes especializados funcionando sem duplicar implementação.
-export { agentDeselect, agentGetCurrent, agentList, agentReload, agentSelect } from './ops.js';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // fleet subsystem — SDK: fleet.start(params)

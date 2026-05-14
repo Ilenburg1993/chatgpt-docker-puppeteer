@@ -33,35 +33,21 @@
   "imports": {
     "#agent/*": "./src/agent/*.js",
     "#copilot/sdk": "./src/copilot/sdk/index.js",
-    "#copilot/sdk/tools-registry": "./src/copilot/sdk/tools/registry.js",
-    "#copilot/sdk/tools-state": "./src/copilot/sdk/tools/state.js",
-    "#copilot/sdk/custom-tools": "./src/copilot/sdk/tools/custom.js",
-    "#copilot/sdk/server-rpc": "./src/copilot/sdk/rpc/server.js",
-    "#copilot/sdk/rpc-session": "./src/copilot/sdk/rpc/session.js",
-    "#copilot/sdk/rpc-ops": "./src/copilot/sdk/rpc/ops.js",
-    "#copilot/sdk/rpc-facade": "./src/copilot/sdk/rpc/session-facade.js",
-    "#copilot/sdk/experimental-rpc": "./src/copilot/sdk/rpc/experimental.js",
-    "#copilot/sdk/health": "./src/copilot/sdk/telemetry/health.js",
+    "#copilot/sdk/constants": "./src/copilot/sdk/constants.js",
+    "#copilot/sdk/di": "./src/copilot/sdk/di-tokens.js",
+    "#copilot/sdk/errors": "./src/copilot/sdk/errors.js",
+    "#copilot/sdk/event-helpers": "./src/copilot/sdk/event-helpers.js",
+    "#copilot/sdk/feature-flags": "./src/copilot/sdk/feature-flags.js",
+    "#copilot/sdk/rpc/experimental": "./src/copilot/sdk/rpc/experimental.js",
     "#copilot/sdk/telemetry": "./src/copilot/sdk/telemetry/index.js",
-    "#copilot/sdk/tracing": "./src/copilot/sdk/telemetry/tracing.js",
-    "#copilot/sdk/quota-monitor": "./src/copilot/sdk/telemetry/quota-monitor.js",
+    "#copilot/sdk/utils": "./src/copilot/sdk/utils.js",
     "#copilot/sdk/agents": "./src/copilot/sdk/agent/index.js",
-    "#copilot/sdk/agent-contract": "./src/copilot/types/contracts/contract.js",
-    "#copilot/sdk/bridge-contract": "./src/copilot/types/contracts/bridge-contract.js",
-    "#copilot/sdk/channel-contract": "./src/copilot/types/contracts/channel-contract.js",
-    "#copilot/sdk/client": "./src/copilot/sdk/session/client.js",
-    "#copilot/sdk/client-facade": "./src/copilot/sdk/session/client-facade.js",
-    "#copilot/sdk/client-events": "./src/copilot/sdk/session/client-events.js",
+    "#copilot/sdk/models": "./src/copilot/sdk/models/index.js",
+    "#copilot/sdk/types": "./src/copilot/sdk/types.js",
     "#copilot/sdk/session": "./src/copilot/sdk/session/index.js",
-    "#copilot/sdk/session-lifecycle": "./src/copilot/sdk/session/lifecycle.js",
     "#copilot/sdk/session-runtime": "./src/copilot/sdk/session/runtime.js",
-    "#copilot/sdk/events": "./src/copilot/sdk/session/events.js",
-    "#copilot/sdk/provider": "./src/copilot/sdk/session/provider.js",
-    "#copilot/sdk/permissions": "./src/copilot/sdk/session/permissions.js",
-    "#copilot/sdk/system-message": "./src/copilot/sdk/session/system-message.js",
     "#copilot/sdk/tools": "./src/copilot/sdk/tools/index.js",
     "#copilot/sdk/rpc": "./src/copilot/sdk/rpc/index.js",
-    "#copilot/sdk/*": "./src/copilot/sdk/*.js",
     "#copilot/events": "./src/copilot/events/index.js",
     "#copilot/events/*": "./src/copilot/events/*.js",
     "#copilot/db": "./src/copilot/db/index.js",
@@ -124,25 +110,15 @@
     "#copilot/terminal/handlers": "./src/copilot/terminal/handlers/index.js",
     "#copilot/terminal/stores": "./src/copilot/terminal/stores/index.js",
     "#copilot/terminal/state/repl-runtime": "./src/copilot/terminal/state/repl-runtime/index.js",
-    "#copilot/session-manager": "./src/copilot/agent/session-initializer.js",
-    "#copilot/config/tools-state": "./src/copilot/sdk/tools-state.js",
-    "#copilot/config/custom-tools-registry": "./src/copilot/sdk/custom-tools.js",
-    "#copilot/config/tools": "./src/copilot/config/tools/index.js",
-    "#copilot/config/tools/*": "./src/copilot/config/tools/*.js",
     "#copilot/hooks": "./src/copilot/hooks/index.js",
     "#copilot/hooks/factory": "./src/copilot/hooks/factory.js",
-    "#copilot/hooks/permission": "./src/copilot/hooks/permission-handler.js",
     "#copilot/hooks/composer": "./src/copilot/hooks/composer.js",
     "#copilot/hooks/bus": "./src/copilot/hooks/bus.js",
     "#copilot/hooks/registry": "./src/copilot/hooks/registry.js",
     "#copilot/hooks/error": "./src/copilot/hooks/error-handler.js",
-    "#copilot/hooks/audit": "./src/copilot/hooks/audit.js",
     "#copilot/hooks/*": "./src/copilot/hooks/*.js",
     "#copilot/observability": "./src/copilot/observability/index.js",
     "#copilot/observability/logger": "./src/copilot/observability/logger.js",
-    "#copilot/observability/audit-log": "./src/copilot/observability/audit-log.js",
-    "#copilot/observability/telemetry-store": "./src/copilot/observability/telemetry-store.js",
-    "#copilot/observability/error-registry": "./src/copilot/observability/error-registry.js",
     "#copilot/observability/event-collector": "./src/copilot/observability/event-collector.js",
     "#copilot/observability/metrics": "./src/copilot/observability/metrics.js",
     "#copilot/observability/otel": "./src/copilot/observability/otel.js",
@@ -175,6 +151,54 @@
     ".": {
       "types": "./src/types/index.d.ts",
       "default": "./index.js"
+    },
+    "./copilot/sdk": {
+      "default": "./src/copilot/sdk/index.js"
+    },
+    "./copilot/sdk/agents": {
+      "default": "./src/copilot/sdk/agent/index.js"
+    },
+    "./copilot/sdk/constants": {
+      "default": "./src/copilot/sdk/constants.js"
+    },
+    "./copilot/sdk/di": {
+      "default": "./src/copilot/sdk/di-tokens.js"
+    },
+    "./copilot/sdk/errors": {
+      "default": "./src/copilot/sdk/errors.js"
+    },
+    "./copilot/sdk/event-helpers": {
+      "default": "./src/copilot/sdk/event-helpers.js"
+    },
+    "./copilot/sdk/feature-flags": {
+      "default": "./src/copilot/sdk/feature-flags.js"
+    },
+    "./copilot/sdk/models": {
+      "default": "./src/copilot/sdk/models/index.js"
+    },
+    "./copilot/sdk/rpc": {
+      "default": "./src/copilot/sdk/rpc/index.js"
+    },
+    "./copilot/sdk/rpc/experimental": {
+      "default": "./src/copilot/sdk/rpc/experimental.js"
+    },
+    "./copilot/sdk/session": {
+      "default": "./src/copilot/sdk/session/index.js"
+    },
+    "./copilot/sdk/session-runtime": {
+      "default": "./src/copilot/sdk/session/runtime.js"
+    },
+    "./copilot/sdk/telemetry": {
+      "default": "./src/copilot/sdk/telemetry/index.js"
+    },
+    "./copilot/sdk/tools": {
+      "default": "./src/copilot/sdk/tools/index.js"
+    },
+    "./copilot/sdk/types": {
+      "default": "./src/copilot/sdk/types.js"
+    },
+    "./copilot/sdk/utils": {
+      "default": "./src/copilot/sdk/utils.js"
     }
   },
   "main": "index.js",
@@ -411,7 +435,7 @@
     "typecheck:repo": "npm run typecheck:full && npm run typecheck:tests && npm run typecheck:dashboard && npm run typecheck:isolated",
     "typecheck:strict": "npm run typecheck:strict:all",
     "typecheck:strict:agents": "tsc -p config/typing/strict/tsconfig.strict.agents.json",
-    "typecheck:strict:all": "npm run typecheck:strict:public && npm run typecheck:strict:configs && npm run typecheck:strict:agents && npm run typecheck:strict:tools.workspace && npm run typecheck:strict:src.agent && npm run typecheck:strict:src.audit_agent && npm run typecheck:strict:src.core && npm run typecheck:strict:src.driver && npm run typecheck:strict:src.inference_gateway && npm run typecheck:strict:src.infra && npm run typecheck:strict:src.integration && npm run typecheck:strict:src.kernel && npm run typecheck:strict:src.logic && npm run typecheck:strict:src.missions && npm run typecheck:strict:src.nerv && npm run typecheck:strict:src.orchestrator && npm run typecheck:strict:src.server && npm run typecheck:strict:src.shared && npm run typecheck:strict:src.types && npm run typecheck:strict:src.validation && npm run typecheck:strict:src.root && npm run typecheck:strict:src.dashboard-ui && npm run typecheck:strict:scripts.analysis && npm run typecheck:strict:scripts.audit && npm run typecheck:strict:scripts.ci && npm run typecheck:strict:scripts.build && npm run typecheck:strict:scripts.env && npm run typecheck:strict:scripts.health && npm run typecheck:strict:scripts.ops && npm run typecheck:strict:scripts.setup && npm run typecheck:strict:scripts.legacy && npm run typecheck:strict:scripts.root && npm run typecheck:strict:tests.unit && npm run typecheck:strict:tests.integration && npm run typecheck:strict:tests.regression && npm run typecheck:strict:tests.e2e && npm run typecheck:strict:tests.helpers && npm run typecheck:strict:tests.fixtures && npm run typecheck:strict:tests.mocks && npm run typecheck:strict:tests.manual && npm run typecheck:strict:tests.legacy",
+    "typecheck:strict:all": "npm run typecheck:strict:public && npm run typecheck:strict:configs && npm run typecheck:strict:agents && npm run typecheck:strict:tools.workspace && npm run typecheck:strict:src.agent && npm run typecheck:strict:src.copilot.sdk && npm run typecheck:strict:src.audit_agent && npm run typecheck:strict:src.core && npm run typecheck:strict:src.driver && npm run typecheck:strict:src.inference_gateway && npm run typecheck:strict:src.infra && npm run typecheck:strict:src.integration && npm run typecheck:strict:src.kernel && npm run typecheck:strict:src.logic && npm run typecheck:strict:src.missions && npm run typecheck:strict:src.nerv && npm run typecheck:strict:src.orchestrator && npm run typecheck:strict:src.server && npm run typecheck:strict:src.shared && npm run typecheck:strict:src.types && npm run typecheck:strict:src.validation && npm run typecheck:strict:src.root && npm run typecheck:strict:src.dashboard-ui && npm run typecheck:strict:scripts.analysis && npm run typecheck:strict:scripts.audit && npm run typecheck:strict:scripts.ci && npm run typecheck:strict:scripts.build && npm run typecheck:strict:scripts.env && npm run typecheck:strict:scripts.health && npm run typecheck:strict:scripts.ops && npm run typecheck:strict:scripts.setup && npm run typecheck:strict:scripts.legacy && npm run typecheck:strict:scripts.root && npm run typecheck:strict:tests.unit && npm run typecheck:strict:tests.integration && npm run typecheck:strict:tests.regression && npm run typecheck:strict:tests.e2e && npm run typecheck:strict:tests.helpers && npm run typecheck:strict:tests.fixtures && npm run typecheck:strict:tests.mocks && npm run typecheck:strict:tests.manual && npm run typecheck:strict:tests.legacy",
     "typecheck:strict:audit": "npm run typecheck:strict:src.audit_agent",
     "typecheck:strict:configs": "tsc -p config/typing/strict/tsconfig.strict.configs.json",
     "typecheck:strict:core": "npm run typecheck:strict:src.core",
@@ -432,6 +456,7 @@
     "typecheck:strict:src.agent": "tsc -p config/typing/strict/tsconfig.strict.src.agent.json",
     "typecheck:strict:src.audit_agent": "tsc -p config/typing/strict/tsconfig.strict.src.audit_agent.json",
     "typecheck:strict:src.copilot": "tsc -p config/typing/strict/tsconfig.strict.src.copilot.json",
+    "typecheck:strict:src.copilot.sdk": "tsc -p config/typing/strict/tsconfig.strict.src.copilot.sdk.json",
     "typecheck:strict:src.core": "tsc -p config/typing/strict/tsconfig.strict.src.core.json",
     "typecheck:strict:src.dashboard-ui": "tsc -p config/typing/strict/tsconfig.strict.src.dashboard-ui.json",
     "typecheck:strict:src.driver": "tsc -p config/typing/strict/tsconfig.strict.src.driver.json",

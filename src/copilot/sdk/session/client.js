@@ -282,6 +282,16 @@ export class CopilotClientManager {
     }
 
     /**
+     * Retorna o client atual sem iniciar conexão. Útil para APIs síncronas que só podem operar sobre um client já
+     * criado/injetado.
+     *
+     * @returns {CopilotClient | null}
+     */
+    getClientSnapshot() {
+        return this.#client;
+    }
+
+    /**
      * @returns {Promise<{ message: string; timestamp: number; protocolVersion?: number }>}
      */
     async pingClient() {
@@ -518,6 +528,13 @@ export async function forceStopClient() {
 
 export function getClientState() {
     return defaultClientManager.getClientState();
+}
+
+/**
+ * @returns {CopilotClient | null}
+ */
+export function getClientSnapshot() {
+    return defaultClientManager.getClientSnapshot();
 }
 
 export async function pingClient() {

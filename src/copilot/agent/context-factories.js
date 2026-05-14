@@ -19,7 +19,7 @@ import {
     EMITTER_AGENT_BACKGROUND_IDLE,
     EMITTER_PERMISSION_MODE_CHANGED,
 } from '#copilot/events';
-import { normalizeElicitationCompletedEvent, normalizeElicitationPendingEvent } from '#copilot/sdk';
+import { normalizeElicitationCompletedEvent, normalizeElicitationPendingEvent } from '#copilot/sdk/session';
 import { BackgroundTasks } from './background/index.js';
 import { DialogLoopManager } from './dialog/orchestrators/index.js';
 import { createAgentSdkToolsRegistry } from './facades/index.js';
@@ -41,7 +41,7 @@ import { SessionKeepalive } from './session/lifecycle/index.js';
  *     createDialogLoop: (host: AgentContextFactoryHost) => DialogLoopManager;
  *     createWebhooks: (host: AgentContextFactoryHost) => WebhookManager;
  *     createPermissions: (host: AgentContextFactoryHost) => import('./ports/index.js').AgentPermissionController;
- *     createToolsRegistry: (host: AgentContextFactoryHost) => import('#copilot/sdk/tools-registry').ToolRegistry;
+ *     createToolsRegistry: (host: AgentContextFactoryHost) => import('#copilot/sdk/types').ToolRegistry;
  *     createKeepalive: (host: AgentContextFactoryHost) => SessionKeepalive;
  *     createHandoff: (host: AgentContextFactoryHost) => HandoffManager;
  *     createMessagesCache: (host: AgentContextFactoryHost) => SessionMessagesCache;
@@ -50,8 +50,8 @@ import { SessionKeepalive } from './session/lifecycle/index.js';
  *         resolvePending: (id: string, result: import('#copilot/sdk/types').ElicitationResult) => boolean;
  *         listPending: (opts?: {
  *             sessionId?: string;
- *         }) => import('#copilot/sdk/session/elicitation').QueuedElicitationEntry[];
- *         getPending: (id: string) => import('#copilot/sdk/session/elicitation').QueuedElicitationEntry | null;
+ *         }) => import('#copilot/sdk/types').QueuedElicitationEntry[];
+ *         getPending: (id: string) => import('#copilot/sdk/types').QueuedElicitationEntry | null;
  *         clearPending: (id: string, result?: import('#copilot/sdk/types').ElicitationResult) => boolean;
  *         pendingCount: () => number;
  *     };

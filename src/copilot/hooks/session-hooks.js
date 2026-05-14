@@ -18,7 +18,8 @@
 
 import { defaultAuditLog } from '#copilot/audit';
 import { getCopilotFallbackModel } from '#copilot/config';
-import { classifySdkRateLimitScope, modelSelector } from '#copilot/sdk';
+import { classifySdkRateLimitScope } from '#copilot/sdk/errors';
+import { modelSelector } from '#copilot/sdk/models';
 import { hostname } from 'node:os';
 import { createErrorHandler } from './error-handler.js';
 import { log } from './logger.js';
