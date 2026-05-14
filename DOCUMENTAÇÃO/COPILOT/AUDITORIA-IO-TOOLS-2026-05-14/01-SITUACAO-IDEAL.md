@@ -16,6 +16,8 @@ observáveis, reversíveis e fáceis de compor.
 6. Índice derivado: cache/parser/index nunca são fonte de verdade; filesystem + VCS + policy são.
 7. Trace por operação: toda ação importante tem `traceId`, duração, engine, risco e evidence.
 8. Validators first: tools de qualidade refletem os scripts oficiais do projeto.
+9. Feedback acionável: toda falha de tool retorna informação suficiente para a LLM corrigir parâmetros, escopo,
+   policy, cursor, timeout, lock ou dependência externa sem tentativa cega.
 
 ## Arquitetura alvo de `src/copilot/infra`
 
@@ -241,6 +243,52 @@ E retornar:
 Defaults podem ser generosos para LLM-B, mas não infinitos nos pontos que chamam subprocessos ou acumulam strings em
 memória. O default ideal é "alto e paginado", não "sem limite".
 
+## Política de falha e feedback para LLM-B
+
+Toda tool deve preservar compatibilidade com retornos legados (`success:false`, `ok:false`, `error`, `reason`), mas
+também acrescentar um bloco canônico `toolFeedback` quando falhar:
+
+```js
+{
+  success: false,
+  error: 'Mensagem humana curta',
+  toolFeedback: {
+    version: 1,
+    toolName,
+    category,
+    reason,
+    retryable,
+    fix,
+    expectedParameters,
+    receivedParameters,
+    details
+  }
+}
+```
+
+Categorias mínimas:
+
+- `invalid-parameters`: schema, tipo, enum, range, campo obrigatório, path vazio, cursor malformado.
+- `policy-denied`: operação fora do workspace, comando bloqueado, capability ausente, permissão negada.
+- `not-found`: arquivo, diretório, branch, sessão, cursor ou recurso inexistente.
+- `conflict`: hash esperado divergente, lock ocupado, destino existente, estado stale.
+- `timeout`: subprocesso, rede, parser, scan ou operação cancelada por `AbortSignal`.
+- `external-service`: HTTP, DNS, rate limit, fetch, webhook ou serviço indisponível.
+- `internal-error`: exceção interna capturada com código/nome suficientes para investigação.
+- `unknown`: fallback temporário que deve ser reduzido progressivamente.
+
+Requisitos do feedback:
+
+- erros de parâmetro devem indicar o schema esperado em forma resumida e os parâmetros recebidos com truncamento e
+  redaction de segredos;
+- erros de cursor/paginação devem explicar se a LLM deve reiniciar a busca, reaproveitar `nextCursor` ou reduzir
+  `maxBytes`/`maxItems`;
+- erros de policy/path devem deixar claro se o problema é forma do path, escopo fora do workspace ou capability
+  proibida;
+- erros de concorrência/lock/hash devem orientar releitura do estado atual antes de nova mutação;
+- timeouts e falhas externas devem marcar `retryable:true` somente quando repetir fizer sentido;
+- nenhuma falha deve despejar conteúdo grande, tokens, secrets ou payloads integrais no feedback.
+
 ## Situação ideal de `tools/`
 
 `tools/` deve continuar como camada de produto, não virar infra paralela. A regra:
@@ -248,6 +296,7 @@ memória. O default ideal é "alto e paginado", não "sem limite".
 - tools validam input e policy;
 - tools chamam facades públicas de `infra`;
 - tools formatam output para LLM-B;
+- tools enriquecem falhas com `toolFeedback` canônico via factory/infra de tools;
 - tools não conhecem detalhes internos de cache, parser, scanner ou SQLite.
 
 Subdomínios recomendados:
@@ -258,6 +307,13 @@ Subdomínios recomendados:
 - `git/`: VCS com output window.
 - `introspection/`: registry, contratos e capabilities.
 - `runtime/` futuro: operação, plano, rollback, evidence.
+
+Infra interna recomendada de `tools/`:
+
+- `infra/tool-factory.js`: único ponto de criação de tools de produção.
+- `infra/tool-feedback.js`: classificação, redaction, schema summary e envelope de falhas.
+- `introspection/tool-contract-verifier.js`: deve evoluir para auditar presença de schemas e compatibilidade do
+  feedback.
 
 ## End-state
 

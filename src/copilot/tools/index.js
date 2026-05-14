@@ -32,6 +32,16 @@ export {
 
 // ─── Factory e contratos ──────────────────────────────────────────────────────
 export { buildTool, withSkipPermission } from './infra/tool-factory.js';
+export {
+    classifyToolFailure,
+    createToolFailureFeedback,
+    createToolFailureResponse,
+    enrichToolFailureResult,
+    isToolFailureResult,
+    previewToolFeedbackValue,
+    summarizeToolParameterSchema,
+    withToolFailureFeedback,
+} from './infra/tool-feedback.js';
 
 // ─── Categorias de tools ──────────────────────────────────────────────────────
 export { codeTools } from './code/index.js';

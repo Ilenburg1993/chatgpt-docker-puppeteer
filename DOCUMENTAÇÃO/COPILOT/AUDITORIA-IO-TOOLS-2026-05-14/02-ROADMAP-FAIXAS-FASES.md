@@ -46,6 +46,22 @@ locks e regressões principais.
 - Tornar lockfile atomico com `open('wx')`.
 - Verificar ownership no release.
 
+### F0.6 — Feedback de falhas para LLM-B
+
+- Criar infra canônica de feedback de falhas em `tools/infra/tool-feedback.js`.
+- Enriquecer retornos legados `success:false`/`ok:false` com `toolFeedback` sem quebrar `error`/`reason`.
+- Capturar exceções de handlers na `tool-factory` e converter em resposta estruturada.
+- Classificar falhas em `invalid-parameters`, `policy-denied`, `not-found`, `conflict`, `timeout`,
+  `external-service`, `internal-error` e `unknown`.
+- Em erro de parâmetro, retornar schema esperado resumido, parâmetros recebidos truncados e segredos redigidos.
+- Em erro de cursor, path, lock, hash, timeout ou serviço externo, orientar a próxima ação da LLM com `fix` e
+  `retryable`.
+- Evoluir introspection/contract verifier para medir cobertura de schemas e aderência ao feedback canônico.
+
+Status em 2026-05-14: iniciado com `tool-feedback.js`, wrapper na `tool-factory`, export pelo barrel de `tools` e
+testes unitários dedicados. Pendência: expandir auditoria de contratos para exigir feedback nas tools registradas e
+adicionar fixtures por categoria em file/shell/web/git.
+
 ## Faixa 1 — Infra barrel-first e acíclica por compatibilidade
 
 Objetivo: iniciar arquitetura 2.0/2.1 sem quebrar consumidores.
@@ -97,6 +113,8 @@ Objetivo: liberdade alta com retorno controlado.
 
 - Helpers para `maxBytes`, `maxItems`, `cursor`.
 - Uso em search, symbol search, list directory, index search, git diff, shell output.
+- Falhas por janela/cursor devem retornar `toolFeedback.category='invalid-parameters'` ou `conflict`, explicando se a
+  LLM deve reutilizar `nextCursor`, reiniciar a consulta, ou reduzir `maxBytes`/`maxItems`.
 - Status inicial: `policy/output-window.js` criado com `maxResults`/janela de linhas e aplicado em `io-engine` e
   índice SQLite.
 - `policy/budgets.js` criado para normalização defensiva de timeout e `maxBuffer` em search e subprocessos.
@@ -131,6 +149,7 @@ Objetivo: transformar primitives em ações rastreáveis.
 ### F3.1 — Operation envelope
 
 - `operationId`, `traceId`, capability, risk, preconditions, apply, result, evidence.
+- Falhas do envelope devem propagar `traceId`/`operationId` em `toolFeedback.details` quando disponíveis.
 - `policy/capabilities.js` e `policy/risk.js` centralizam capabilities e risco de mutações.
 - Status inicial: `runtime/operation.js` criado e file write tools retornam envelope `operation` em mutações.
 - `write_file_content` e `patch_file` aceitam `expectedHash` SHA-256 e retornam `previousHash`/`contentHash`.
@@ -220,13 +239,14 @@ npm run test:copilot:unit -- tests/unit/copilot/infra/**/*.spec.js tests/unit/co
 3. PR Search Budget: timeout/maxBuffer/maxResults.
 4. PR Index Correctness: parseError e snapshot parse.
 5. PR Locks: resource key canonico + file lock atomico.
-6. PR Public Facades: `infra/public/*` e imports barrel-first.
-7. PR Parser Pure: remover dependência `parse -> io-engine`.
-8. PR Index-store: remover ciclo `index -> engine -> registry`.
-9. PR Scanner Budget: batching configurável para diretórios grandes.
-10. PR Infra Governance: module-map e contratos de boundary.
-11. PR Low-level Subdomains: `shared/`, `policy/`, `scan/`, `io/fs/`.
-12. PR Output Window: cursor e truncamento estruturado.
-13. PR Runtime Agentic: operation/transaction/rollback.
-14. PR Parse Pure: mover parsers auxiliares para `parse/` sem dependências altas.
-15. PR Storage Queue Locks: iniciar domínios internos `storage/`, `queue/`, `locks/`.
+6. PR Tool Failure Feedback: `toolFeedback`, classificação e testes por categoria.
+7. PR Public Facades: `infra/public/*` e imports barrel-first.
+8. PR Parser Pure: remover dependência `parse -> io-engine`.
+9. PR Index-store: remover ciclo `index -> engine -> registry`.
+10. PR Scanner Budget: batching configurável para diretórios grandes.
+11. PR Infra Governance: module-map e contratos de boundary.
+12. PR Low-level Subdomains: `shared/`, `policy/`, `scan/`, `io/fs/`.
+13. PR Output Window: cursor e truncamento estruturado.
+14. PR Runtime Agentic: operation/transaction/rollback.
+15. PR Parse Pure: mover parsers auxiliares para `parse/` sem dependências altas.
+16. PR Storage Queue Locks: iniciar domínios internos `storage/`, `queue/`, `locks/`.

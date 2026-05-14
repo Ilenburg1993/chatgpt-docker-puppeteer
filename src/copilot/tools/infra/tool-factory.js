@@ -68,6 +68,7 @@
 
 import { normalizeToolParametersSchema, createTool as sdkCreateTool } from '#copilot/sdk/tools';
 import { log as toolsLog } from './logger.js';
+import { withToolFailureFeedback } from './tool-feedback.js';
 
 /**
  * Determina se o erro permite fallback para tool plain (ciclo/TDZ/export indisponível).
@@ -320,13 +321,16 @@ export function buildTool({
     overridesBuiltInTool = false,
 }) {
     const jsonSchemaParams = normalizeParameters(parameters, name);
+    const failureAwareHandler = withToolFailureFeedback(name, handler, {
+        parameters: jsonSchemaParams,
+    });
 
     return /** @type {import('#copilot/sdk/types').Tool<TArgs>} */ (
         createTool({
             name,
             description,
             ...(jsonSchemaParams !== undefined ? { parameters: jsonSchemaParams } : {}),
-            handler: /** @type {Parameters<typeof sdkCreateTool>[0]['handler']} */ (handler),
+            handler: /** @type {Parameters<typeof sdkCreateTool>[0]['handler']} */ (failureAwareHandler),
             // Semântica explícita: requiresApproval=true => skipPermission=false; false => skipPermission=true.
             skipPermission: !requiresApproval,
             ...(overridesBuiltInTool ? { overridesBuiltInTool: true } : {}),
