@@ -83,7 +83,7 @@ Mesmo quando o ciclo não quebra hoje, ele reduz previsibilidade de ESM, testes 
 Estado após transformações em andamento:
 
 ```txt
-src/copilot/infra: files 88 cycles 0
+src/copilot/infra: files 92 cycles 0
 ```
 
 O ciclo foi removido extraindo leitura textual baixa para `src/copilot/infra/io/fs/read-text.js` e fazendo parser/index
@@ -171,6 +171,8 @@ Tools:
 - `io/patch` com patch/diff textual puro: coberto por `test_io_patch.spec.js`.
 - `io/search` com helpers de índice, grep fallback, busca simbólica e paginação de resultados: coberto por
   `test_io_search.spec.js`.
+- `io/invalidation` com bus, eventos normalizados e helper de tiers L1/L2: coberto por
+  `test_io_invalidation_bus.spec.js`, `test_io_engine.spec.js`, typecheck strict e `madge`.
 - `index-store/sqlite` com schema, paths, query e chunks puros: coberto por `test_index_store_sqlite.spec.js`.
 - `expectedHash` SHA-256 em write/patch e `dryRun` em patch: cobertos por `test_io_engine.spec.js` e contrato de tools.
 - snapshots hash/bytes em delete/copy/move: cobertos por `test_io_engine.spec.js` e `test_write_tools.spec.js`.

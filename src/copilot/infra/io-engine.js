@@ -19,8 +19,6 @@ import { getIoL2Cache } from './io-cache-l2-registry.js';
 import {
     getIoL1Cache,
     getVerifiedIoL1Entry,
-    invalidateIoCachePath,
-    invalidateIoCacheSubtree,
     makeBytesKey,
     makeTextKey,
     normalizeIoCacheKey,
@@ -33,6 +31,7 @@ import { mkdirPathUnlocked } from './io/fs/mkdir.js';
 import { moveFileUnlocked } from './io/fs/move.js';
 import { readBytesFileSnapshot } from './io/fs/read-bytes.js';
 import { readTextLineChunks } from './io/fs/read-chunks.js';
+import { invalidateIoCacheTiers, invalidateIoCacheTierSubtrees } from './io/invalidation/cache-tiers.js';
 import { deleteFileUnlocked, removePathUnlocked } from './io/fs/remove.js';
 import { statPathSnapshot } from './io/fs/stat.js';
 import { normalizeWritePayload, writeAtomicFileUnlocked } from './io/fs/write-atomic.js';
@@ -60,40 +59,6 @@ const SEARCH_MAX_BUFFER_BYTES = readEnvPositiveInt('IO_SEARCH_MAX_BUFFER_BYTES',
 
 /** @type {boolean | null} */
 let _rgAvailable = null;
-
-/** @param {string} filePath */
-function invalidateIoCacheTiers(filePath) {
-    try {
-        invalidateIoCachePath(filePath);
-    } catch {
-        // best-effort: falha em cache não pode interromper mutação canônica
-    }
-    const l2 = getIoL2Cache();
-    if (l2) {
-        try {
-            l2.invalidatePath(filePath);
-        } catch {
-            // best-effort: falha em L2 não pode interromper mutação canônica
-        }
-    }
-}
-
-/** @param {string} filePath */
-function invalidateIoCacheTierSubtrees(filePath) {
-    try {
-        invalidateIoCacheSubtree(filePath);
-    } catch {
-        // best-effort: falha em cache não pode interromper mutação canônica
-    }
-    const l2 = getIoL2Cache();
-    if (l2) {
-        try {
-            l2.invalidatePath(filePath);
-        } catch {
-            // best-effort: falha em L2 não pode interromper mutação canônica
-        }
-    }
-}
 
 /**
  * @param {number} startedAt

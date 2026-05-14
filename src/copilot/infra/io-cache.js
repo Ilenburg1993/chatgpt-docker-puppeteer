@@ -23,6 +23,7 @@
 import { LRUCache } from 'lru-cache';
 import * as fsPromises from 'node:fs/promises';
 import * as nodePath from 'node:path';
+import { publishIoInvalidation, registerIoInvalidationHook } from './io/invalidation/bus.js';
 
 // ---------------------------------------------------------------------------
 // Config
@@ -280,13 +281,7 @@ export function getIoL1Cache() {
  */
 export function invalidateIoCachePath(filePath) {
     getIoL1Cache().invalidate(filePath);
-    for (const hook of _invalidationHooks) {
-        try {
-            hook(filePath, { recursive: false });
-        } catch {
-            /* hooks não devem crashar o caller */
-        }
-    }
+    publishIoInvalidation(filePath, { recursive: false, source: 'l1-cache' });
 }
 
 /**
@@ -298,13 +293,7 @@ export function invalidateIoCachePath(filePath) {
  */
 export function invalidateIoCacheSubtree(filePath) {
     getIoL1Cache().invalidate(filePath, { recursive: true });
-    for (const hook of _invalidationHooks) {
-        try {
-            hook(filePath, { recursive: true });
-        } catch {
-            /* hooks não devem crashar o caller */
-        }
-    }
+    publishIoInvalidation(filePath, { recursive: true, source: 'l1-cache' });
 }
 
 /**
@@ -320,16 +309,6 @@ export function getVerifiedIoL1Entry(key, filePath) {
 }
 
 /**
- * ## Retorna estatísticas do cache L1, ou null se ainda não inicializado. //
- *
- * --------------------------------------------------------------------------- // Invalidation hooks — permite que
- * outros módulos (ex: io-parser) reajam a // invalidações sem criar dependência circular com io-engine. //
- *
- * /** @type {Array<(filePath: string, event?: { recursive?: boolean }) => void>}
- */
-const _invalidationHooks = [];
-
-/**
  * Registra um callback que será chamado toda vez que `invalidateIoCachePath` é invocado. Ideal para módulos externos
  * (ex: io-parser) invalidarem seus próprios caches sem acoplamento circular.
  *
@@ -337,11 +316,7 @@ const _invalidationHooks = [];
  * @returns {() => void} Função de unregister.
  */
 export function registerInvalidationHook(hook) {
-    _invalidationHooks.push(hook);
-    return () => {
-        const idx = _invalidationHooks.indexOf(hook);
-        if (idx !== -1) _invalidationHooks.splice(idx, 1);
-    };
+    return registerIoInvalidationHook(hook);
 }
 
 /**

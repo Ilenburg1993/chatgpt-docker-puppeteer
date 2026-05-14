@@ -50,7 +50,8 @@ Objetivo: iniciar arquitetura 2.0/2.1 sem quebrar consumidores.
 
 Status em 2026-05-14: facades públicas criadas, tools migradas para `#copilot/infra/public/*`, ciclo principal
 `index -> engine -> registry` removido, module-map de infra criado, contrato de boundary adicionado e subdomínios
-baixos `shared/`, `policy/`, `scan/`, `parse/`, `storage/`, `queue/`, `locks/`, `runtime/` e `io/fs/` iniciados.
+baixos `shared/`, `policy/`, `scan/`, `parse/`, `storage/`, `queue/`, `locks/`, `runtime`, `io/fs/`,
+`io/search` e `io/invalidation` iniciados.
 
 ### F1.1 — Facades públicas
 
@@ -64,6 +65,7 @@ baixos `shared/`, `policy/`, `scan/`, `parse/`, `storage/`, `queue/`, `locks/`, 
 - Extrair escrita/mutação para `io/fs/write-*`, `copy`, `move`, `remove` (executado para portas baixas principais).
 - Extrair diff/patch para `io/patch` (executado para cálculo textual puro).
 - Extrair busca textual/simbólica para `io/search` (executado para índice FTS, grep fallback e padrões simbólicos).
+- Extrair invalidação coordenada para `io/invalidation` (executado com bus, eventos e invalidação de tiers L1/L2).
 - Manter `io-engine.js` como facade temporária.
 
 ### F1.3 — Parser puro
