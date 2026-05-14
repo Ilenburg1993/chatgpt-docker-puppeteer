@@ -114,6 +114,8 @@ Transformações aplicadas:
 - `write_file_content` e `patch_file` passaram a aceitar `expectedHash` SHA-256 e retornam hashes de evidência.
 - `patch_file` passou a aceitar `dryRun`, retornando status `dry-run` e bytes/hash projetados sem escrita em disco.
 - `delete_file`, `copy_file` e `move_file` passaram a retornar hashes/bytes de snapshot pré-mutação.
+- `runtime/audit-log.js` passou a registrar JSONL append-only de mutações quando
+  `COPILOT_IO_MUTATION_AUDIT_LOG_PATH` está configurado.
 - `public/cache.js` e `public/testing.js` foram adicionados como facades públicas explícitas.
 - Tools de file/web consomem infra via `#copilot/infra/public/*`.
 - `src/copilot/infra/module-map.js` foi criado e exportado pelo barrel raiz para governança 2.0/2.1.
@@ -122,6 +124,6 @@ Transformações aplicadas:
 Evidência local:
 
 ```txt
-src/copilot/infra: files 84 cycles 0
+src/copilot/infra: files 85 cycles 0
 tools -> infra internals: 0 ocorrências
 ```

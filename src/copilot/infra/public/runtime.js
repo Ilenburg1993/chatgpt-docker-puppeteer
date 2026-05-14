@@ -5,4 +5,11 @@
  * @module copilot/infra/public/runtime
  */
 
-export { completeIoOperationEnvelope, createIoOperationEnvelope, failIoOperationEnvelope } from '../runtime/index.js';
+export {
+    buildIoMutationAuditRecord,
+    completeIoOperationEnvelope,
+    createIoOperationEnvelope,
+    failIoOperationEnvelope,
+    getIoMutationAuditLogPath,
+    recordIoMutationAudit,
+} from '../runtime/index.js';

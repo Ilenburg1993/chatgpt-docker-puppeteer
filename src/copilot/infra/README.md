@@ -56,7 +56,7 @@
 - `storage/`: JSON store baixo sem dependência de `io-engine.js`.
 - `queue/`: implementação modular da fila assíncrona.
 - `locks/`: barrels internos de locks em memória e lockfile.
-- `runtime/`: envelope rastreável de operação, base para transações e rollback.
+- `runtime/`: envelope rastreável de operação, audit log opt-in, base para transações e rollback.
 - `sse/`: fanout, replay buffer e estado SSE.
 
 ## Regras de manutenção

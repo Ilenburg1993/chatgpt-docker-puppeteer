@@ -6,3 +6,4 @@
  */
 
 export { completeIoOperationEnvelope, createIoOperationEnvelope, failIoOperationEnvelope } from './operation.js';
+export { buildIoMutationAuditRecord, getIoMutationAuditLogPath, recordIoMutationAudit } from './audit-log.js';

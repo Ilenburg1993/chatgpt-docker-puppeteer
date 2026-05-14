@@ -175,7 +175,7 @@ export const INFRA_MODULE_LAYOUT = Object.freeze([
         tier: 'internal',
         risk: 'watch',
         public: false,
-        summary: 'Operações rastreáveis, transações e rollback futuro.',
+        summary: 'Operações rastreáveis, audit log opt-in, transações e rollback futuro.',
     },
     {
         path: 'io-engine.js',

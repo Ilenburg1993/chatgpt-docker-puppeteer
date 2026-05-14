@@ -24,6 +24,7 @@ import {
     completeIoOperationEnvelope,
     createIoOperationEnvelope,
     failIoOperationEnvelope,
+    recordIoMutationAudit,
 } from '#copilot/infra/public/runtime';
 import { log } from '../infra/logger.js';
 import { buildTool } from '../infra/tool-factory.js';
@@ -31,6 +32,38 @@ import { validatePath } from './shared.js';
 
 const ADVISORY_WRITE_CONTENT_BYTES = 2 * 1024 * 1024;
 const ADVISORY_PATCH_SEGMENT_CHARS = 200_000;
+
+/**
+ * @param {ReturnType<typeof createIoOperationEnvelope>} operation
+ * @param {{ status?: 'planned' | 'applied' | 'failed' | 'dry-run'; traceId?: string | null; evidence?: Record<string, unknown> }} result
+ * @param {{ tool: string; io?: import('../../core/io-contracts.js').IoMeta | null; result?: Record<string, unknown> }} auditContext
+ */
+async function completeAndAuditMutation(operation, result, auditContext) {
+    const completed = completeIoOperationEnvelope(operation, result);
+    const audit = await recordIoMutationAudit(completed, auditContext);
+    return audit.enabled
+        ? {
+              ...completed,
+              evidence: { ...completed.evidence, auditLog: audit },
+          }
+        : completed;
+}
+
+/**
+ * @param {ReturnType<typeof createIoOperationEnvelope>} operation
+ * @param {unknown} error
+ * @param {{ tool: string; io?: import('../../core/io-contracts.js').IoMeta | null; result?: Record<string, unknown> }} auditContext
+ */
+async function failAndAuditMutation(operation, error, auditContext) {
+    const failed = failIoOperationEnvelope(operation, error);
+    const audit = await recordIoMutationAudit(failed, auditContext);
+    return audit.enabled
+        ? {
+              ...failed,
+              evidence: { ...failed.evidence, auditLog: audit },
+          }
+        : failed;
+}
 
 // ---------------------------------------------------------------------------
 // Tool: write_file_content
@@ -89,19 +122,27 @@ const writeFileContentTool = buildTool({
                     bytesWritten: buf.length,
                     previousHash: writeResult.previousHash,
                     contentHash: writeResult.contentHash,
-                    operation: completeIoOperationEnvelope(operation, {
-                        traceId: writeResult.io.traceId ?? null,
-                        evidence: {
-                            bytesWritten: buf.length,
-                            previousHash: writeResult.previousHash,
-                            contentHash: writeResult.contentHash,
+                    operation: await completeAndAuditMutation(
+                        operation,
+                        {
+                            traceId: writeResult.io.traceId ?? null,
+                            evidence: {
+                                bytesWritten: buf.length,
+                                previousHash: writeResult.previousHash,
+                                contentHash: writeResult.contentHash,
+                            },
                         },
-                    }),
+                        { tool: 'write_file_content', io: writeResult.io, result: { path: resolved } },
+                    ),
                 },
                 writeResult.io,
             );
         } catch (err) {
-            return { success: false, error: toError(err).message, operation: failIoOperationEnvelope(operation, err) };
+            return {
+                success: false,
+                error: toError(err).message,
+                operation: await failAndAuditMutation(operation, err, { tool: 'write_file_content' }),
+            };
         }
     },
 });
@@ -162,15 +203,23 @@ const createFileTool = buildTool({
                     success: true,
                     path: resolved,
                     bytesWritten: writeResult.bytesWritten,
-                    operation: completeIoOperationEnvelope(operation, {
-                        traceId: writeResult.io.traceId ?? null,
-                        evidence: { bytesWritten: writeResult.bytesWritten },
-                    }),
+                    operation: await completeAndAuditMutation(
+                        operation,
+                        {
+                            traceId: writeResult.io.traceId ?? null,
+                            evidence: { bytesWritten: writeResult.bytesWritten },
+                        },
+                        { tool: 'create_file', io: writeResult.io, result: { path: resolved } },
+                    ),
                 },
                 writeResult.io,
             );
         } catch (err) {
-            return { success: false, error: toError(err).message, operation: failIoOperationEnvelope(operation, err) };
+            return {
+                success: false,
+                error: toError(err).message,
+                operation: await failAndAuditMutation(operation, err, { tool: 'create_file' }),
+            };
         }
     },
 });
@@ -206,14 +255,18 @@ const deleteFileTool = buildTool({
             return {
                 success: true,
                 ...deleted,
-                operation: completeIoOperationEnvelope(operation, {
-                    traceId: deleted.io?.traceId ?? null,
-                    evidence: {
-                        deleted: true,
-                        previousHash: deleted.previousHash,
-                        previousBytes: deleted.previousBytes,
+                operation: await completeAndAuditMutation(
+                    operation,
+                    {
+                        traceId: deleted.io?.traceId ?? null,
+                        evidence: {
+                            deleted: true,
+                            previousHash: deleted.previousHash,
+                            previousBytes: deleted.previousBytes,
+                        },
                     },
-                }),
+                    { tool: 'delete_file', io: deleted.io, result: { path: resolved } },
+                ),
             };
         } catch (err) {
             const e = /** @type {{ code?: unknown }} */ (err);
@@ -221,10 +274,14 @@ const deleteFileTool = buildTool({
                 return {
                     success: false,
                     error: 'É um diretório. delete_file só opera em arquivos.',
-                    operation: failIoOperationEnvelope(operation, err),
+                    operation: await failAndAuditMutation(operation, err, { tool: 'delete_file' }),
                 };
             }
-            return { success: false, error: toError(err).message, operation: failIoOperationEnvelope(operation, err) };
+            return {
+                success: false,
+                error: toError(err).message,
+                operation: await failAndAuditMutation(operation, err, { tool: 'delete_file' }),
+            };
         }
     },
 });
@@ -270,19 +327,31 @@ const copyFileTool = buildTool({
                     sourceBytes: copyResult.sourceBytes,
                     sourceHash: copyResult.sourceHash,
                     lockWaitMs: copyResult.lockWaitMs,
-                    operation: completeIoOperationEnvelope(operation, {
-                        traceId: copyResult.io.traceId ?? null,
-                        evidence: {
-                            bytesWritten: copyResult.bytesWritten,
-                            sourceBytes: copyResult.sourceBytes,
-                            sourceHash: copyResult.sourceHash,
+                    operation: await completeAndAuditMutation(
+                        operation,
+                        {
+                            traceId: copyResult.io.traceId ?? null,
+                            evidence: {
+                                bytesWritten: copyResult.bytesWritten,
+                                sourceBytes: copyResult.sourceBytes,
+                                sourceHash: copyResult.sourceHash,
+                            },
                         },
-                    }),
+                        {
+                            tool: 'copy_file',
+                            io: copyResult.io,
+                            result: { source: src.resolved, destination: dst.resolved },
+                        },
+                    ),
                 },
                 copyResult.io,
             );
         } catch (err) {
-            return { success: false, error: toError(err).message, operation: failIoOperationEnvelope(operation, err) };
+            return {
+                success: false,
+                error: toError(err).message,
+                operation: await failAndAuditMutation(operation, err, { tool: 'copy_file' }),
+            };
         }
     },
 });
@@ -327,19 +396,31 @@ const moveFileTool = buildTool({
                     sourceBytes: moveResult.sourceBytes,
                     sourceHash: moveResult.sourceHash,
                     lockWaitMs: moveResult.lockWaitMs,
-                    operation: completeIoOperationEnvelope(operation, {
-                        traceId: moveResult.io.traceId ?? null,
-                        evidence: {
-                            moved: true,
-                            sourceBytes: moveResult.sourceBytes,
-                            sourceHash: moveResult.sourceHash,
+                    operation: await completeAndAuditMutation(
+                        operation,
+                        {
+                            traceId: moveResult.io.traceId ?? null,
+                            evidence: {
+                                moved: true,
+                                sourceBytes: moveResult.sourceBytes,
+                                sourceHash: moveResult.sourceHash,
+                            },
                         },
-                    }),
+                        {
+                            tool: 'move_file',
+                            io: moveResult.io,
+                            result: { source: src.resolved, destination: dst.resolved },
+                        },
+                    ),
                 },
                 moveResult.io,
             );
         } catch (err) {
-            return { success: false, error: toError(err).message, operation: failIoOperationEnvelope(operation, err) };
+            return {
+                success: false,
+                error: toError(err).message,
+                operation: await failAndAuditMutation(operation, err, { tool: 'move_file' }),
+            };
         }
     },
 });
@@ -427,17 +508,21 @@ const patchFileTool = buildTool({
                     projectedBytes: patchResult.projectedBytes,
                     previousHash: patchResult.previousHash,
                     contentHash: patchResult.contentHash,
-                    operation: completeIoOperationEnvelope(operation, {
-                        status: dryRun ? 'dry-run' : 'applied',
-                        traceId: patchResult.io.traceId ?? null,
-                        evidence: {
-                            dryRun,
-                            replacedOccurrences: patchResult.replacedOccurrences,
-                            projectedBytes: patchResult.projectedBytes,
-                            previousHash: patchResult.previousHash,
-                            contentHash: patchResult.contentHash,
+                    operation: await completeAndAuditMutation(
+                        operation,
+                        {
+                            status: dryRun ? 'dry-run' : 'applied',
+                            traceId: patchResult.io.traceId ?? null,
+                            evidence: {
+                                dryRun,
+                                replacedOccurrences: patchResult.replacedOccurrences,
+                                projectedBytes: patchResult.projectedBytes,
+                                previousHash: patchResult.previousHash,
+                                contentHash: patchResult.contentHash,
+                            },
                         },
-                    }),
+                        { tool: 'patch_file', io: patchResult.io, result: { path: v.resolved, dryRun } },
+                    ),
                 },
                 patchResult.io,
             );
@@ -445,7 +530,7 @@ const patchFileTool = buildTool({
             return {
                 success: false,
                 error: `Erro ao escrever arquivo: ${toError(e).message}`,
-                operation: failIoOperationEnvelope(operation, e),
+                operation: await failAndAuditMutation(operation, e, { tool: 'patch_file' }),
             };
         }
     },

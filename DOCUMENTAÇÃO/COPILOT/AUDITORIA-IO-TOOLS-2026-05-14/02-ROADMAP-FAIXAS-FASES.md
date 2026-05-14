@@ -134,6 +134,8 @@ Objetivo: transformar primitives em ações rastreáveis.
 
 - JSONL append-only para mutações.
 - Integração com `defaultAuditLog` onde fizer sentido.
+- Status inicial: `runtime/audit-log.js` criado com JSONL opt-in via `COPILOT_IO_MUTATION_AUDIT_LOG_PATH`; file write
+  tools registram envelopes concluídos/falhos quando habilitado.
 
 ## Faixa 4 — Eventos e bordas
 
