@@ -70,6 +70,7 @@ describe('IO/tools boundary contracts', () => {
             'health.js',
             'indexing.js',
             'io.js',
+            'policy.js',
             'runtime.js',
             'session.js',
             'testing.js',

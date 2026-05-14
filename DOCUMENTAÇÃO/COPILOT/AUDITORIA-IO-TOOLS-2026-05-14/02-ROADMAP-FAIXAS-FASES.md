@@ -31,6 +31,7 @@ locks e regressões principais.
 - Reduzir `maxBuffer`.
 - Aplicar `maxResults` na engine, mesmo antes de cursor completo.
 - Retornar `truncated`/`configuredLimit` no metadata.
+- Centralizar budgets de search/subprocesso em `policy/budgets.js` e expor `public/policy.js` para tools.
 
 ### F0.4 — Frescor do índice
 
@@ -97,6 +98,7 @@ Objetivo: liberdade alta com retorno controlado.
 - Uso em search, symbol search, list directory, index search, git diff, shell output.
 - Status inicial: `policy/output-window.js` criado com `maxResults`/janela de linhas e aplicado em `io-engine` e
   índice SQLite.
+- `policy/budgets.js` criado para normalização defensiva de timeout e `maxBuffer` em search e subprocessos.
 - `list_directory` já aceita `maxEntries` + `cursor` e retorna `nextCursor`.
 - `search_in_files` e `workspace_symbol_search` aceitam `cursor` e retornam `nextCursor`, `cursorOffset` e
   `totalMatches`.

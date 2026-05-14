@@ -10,6 +10,7 @@
  */
 
 import { getShellOutputPolicy } from '#copilot/config';
+import { resolveProcessExecutionBudget } from '#copilot/infra/public/policy';
 import { execFile, spawn } from 'node:child_process';
 import { promisify } from 'node:util';
 import { toExecError } from '../../core/error-handlers.js';
@@ -171,14 +172,12 @@ export function truncateOutput(text) {
  */
 export async function runProcess(file, args, { cwd, timeoutMs }) {
     const start = Date.now();
+    const budget = resolveProcessExecutionBudget(timeoutMs === undefined ? {} : { timeoutMs });
     try {
         const { stdout, stderr } = await execFileAsync(file, args, {
             cwd,
-            ...(typeof timeoutMs === 'number' && Number.isFinite(timeoutMs) && timeoutMs > 0
-                ? { timeout: timeoutMs }
-                : {}),
-            // FIX P0-4: reduzido de 1 GiB para 10 MiB — evita OOM/DoS por input malicioso.
-            maxBuffer: 10 * 1024 * 1024,
+            ...(budget.timeoutMs === null ? {} : { timeout: budget.timeoutMs }),
+            maxBuffer: budget.maxBufferBytes,
             env: safeEnv(),
             killSignal: 'SIGTERM',
         });

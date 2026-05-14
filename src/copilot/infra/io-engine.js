@@ -48,14 +48,13 @@ import {
     paginateSearchText,
 } from './io/search/index.js';
 import { nowIoMs, publishIoOperation } from './io-observability.js';
+import { resolveIoSearchBudget } from './policy/budgets.js';
 import { assertExpectedSha256 } from './policy/preconditions.js';
-import { readEnvPositiveInt } from './shared/env.js';
 import { sha256 } from './shared/hash.js';
 
 const execFileAsync = promisify(execFile);
 
-const RG_SEARCH_TIMEOUT_MS = readEnvPositiveInt('IO_SEARCH_TIMEOUT_MS', 15_000);
-const SEARCH_MAX_BUFFER_BYTES = readEnvPositiveInt('IO_SEARCH_MAX_BUFFER_BYTES', 16 * 1024 * 1024);
+const IO_SEARCH_BUDGET = resolveIoSearchBudget();
 
 /** @type {boolean | null} */
 let _rgAvailable = null;
@@ -1317,8 +1316,8 @@ export async function searchText(targetPath, options) {
         cursorOffset: searchWindow.cursorOffset,
         limitMode: 'enforced-output-window',
         patternLength: options.pattern.length,
-        timeoutMs: RG_SEARCH_TIMEOUT_MS,
-        maxBufferBytes: SEARCH_MAX_BUFFER_BYTES,
+        timeoutMs: IO_SEARCH_BUDGET.timeoutMs,
+        maxBufferBytes: IO_SEARCH_BUDGET.maxBufferBytes,
     };
 
     /**
@@ -1413,8 +1412,8 @@ export async function searchText(targetPath, options) {
                     ],
                     {
                         cwd: options.workspaceRoot,
-                        timeout: RG_SEARCH_TIMEOUT_MS,
-                        maxBuffer: SEARCH_MAX_BUFFER_BYTES,
+                        timeout: IO_SEARCH_BUDGET.timeoutMs,
+                        maxBuffer: IO_SEARCH_BUDGET.maxBufferBytes,
                     },
                 );
                 const windowedOutput = paginateSearchText(stdout, searchWindow);
@@ -1473,8 +1472,8 @@ export async function searchText(targetPath, options) {
             };
             const { stdout } = await execFileAsync('grep', buildGrepArgs(grepOptions), {
                 cwd: options.workspaceRoot,
-                timeout: RG_SEARCH_TIMEOUT_MS,
-                maxBuffer: SEARCH_MAX_BUFFER_BYTES,
+                timeout: IO_SEARCH_BUDGET.timeoutMs,
+                maxBuffer: IO_SEARCH_BUDGET.maxBufferBytes,
             });
             const windowedOutput = paginateSearchText(stdout, searchWindow);
             const filteredOutput = sanitizeSearchOutput(windowedOutput.text);
@@ -1572,8 +1571,8 @@ export async function searchWorkspaceSymbols(targetPath, options) {
         cursorOffset: searchWindow.cursorOffset,
         limitMode: 'enforced-output-window',
         symbolLength: options.symbolName.length,
-        timeoutMs: RG_SEARCH_TIMEOUT_MS,
-        maxBufferBytes: SEARCH_MAX_BUFFER_BYTES,
+        timeoutMs: IO_SEARCH_BUDGET.timeoutMs,
+        maxBufferBytes: IO_SEARCH_BUDGET.maxBufferBytes,
     };
     /**
      * @param {string} engine
@@ -1667,8 +1666,8 @@ export async function searchWorkspaceSymbols(targetPath, options) {
             ],
             {
                 cwd: options.workspaceRoot,
-                timeout: RG_SEARCH_TIMEOUT_MS,
-                maxBuffer: SEARCH_MAX_BUFFER_BYTES,
+                timeout: IO_SEARCH_BUDGET.timeoutMs,
+                maxBuffer: IO_SEARCH_BUDGET.maxBufferBytes,
             },
         ).catch((error) => {
             const execError = /** @type {{ code?: unknown; status?: unknown; stderr?: unknown }} */ (error);

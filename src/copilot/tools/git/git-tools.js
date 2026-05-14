@@ -10,6 +10,7 @@
  */
 
 import { WORKSPACE_ROOT } from '#copilot/boot';
+import { resolveProcessExecutionBudget } from '#copilot/infra/public/policy';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { z } from 'zod';
@@ -32,13 +33,14 @@ const ADVISORY_GIT_PUSH_TIMEOUT_MS = 30_000;
  * @returns {Promise<{ stdout: string; exitCode: number; error?: string }>}
  */
 async function safeGitArgs(args, timeoutMs = ADVISORY_GIT_CMD_TIMEOUT_MS) {
-    log('DEBUG', `[copilot/git] timeout=${timeoutMs}ms git ${args.join(' ')}`);
+    const budget = resolveProcessExecutionBudget({ timeoutMs });
+    log('DEBUG', `[copilot/git] timeout=${budget.timeoutMs}ms git ${args.join(' ')}`);
     try {
         const { stdout } = await execAsync('git', args, {
             cwd: ROOT,
             encoding: 'utf8',
-            timeout: timeoutMs,
-            maxBuffer: 10 * 1024 * 1024,
+            ...(budget.timeoutMs === null ? {} : { timeout: budget.timeoutMs }),
+            maxBuffer: budget.maxBufferBytes,
         });
         return { stdout, exitCode: 0 };
     } catch (e) {

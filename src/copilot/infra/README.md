@@ -29,6 +29,7 @@
 - `public/session.js`: facade pública para escopos de sessão e contexto.
 - `public/events.js`: facade pública para telemetria de I/O.
 - `public/cache.js`: facade pública para inspeção/invalidação de cache.
+- `public/policy.js`: facade pública para budgets compartilhados de subprocesso/search.
 - `public/testing.js`: facade pública deliberada para resets em testes.
 - `io-engine.js`: engine de leitura/escrita local com locks, metadados e invalidação; ainda é compatibilidade interna larga.
 - `io-cache.js`: L1 quente do processo, TTL/fingerprint e invalidação ativa.
@@ -46,7 +47,7 @@
 ## Subdomínios internos
 
 - `shared/`: helpers sem dependência de domínio, como leitura tipada de ambiente.
-- `policy/`: policies reutilizáveis, incluindo janela de saída para retornos grandes.
+- `policy/`: policies reutilizáveis, incluindo janela de saída, budgets de buffer/timeout e precondições.
 - `scan/`: glob, gitignore, fingerprint e batching usados por scanner e prefetch.
 - `parse/`: parsers puros de JSON, Markdown, comentários e outline textual.
 - `index-store/`: schema, paths, queries e helpers persistentes do índice L2/SQLite.

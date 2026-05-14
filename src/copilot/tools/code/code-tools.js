@@ -11,6 +11,7 @@
  */
 
 import { COPILOT_PACKAGE_ROOT, WORKSPACE_ROOT } from '#copilot/boot';
+import { resolveProcessExecutionBudget } from '#copilot/infra/public/policy';
 import { execFile, execFileSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -45,13 +46,14 @@ const execFileAsync = promisify(execFile);
  */
 async function safeExec(argv, timeoutMs = 60_000) {
     const [cmd, ...args] = argv;
-    log('DEBUG', `[copilot/code-tools] timeout=${timeoutMs}ms argv=${argv.join(' ')}`);
+    const budget = resolveProcessExecutionBudget({ timeoutMs });
+    log('DEBUG', `[copilot/code-tools] timeout=${budget.timeoutMs}ms argv=${argv.join(' ')}`);
     try {
         const { stdout } = await execFileAsync(cmd ?? 'echo', args, {
             cwd: ROOT,
             encoding: 'utf8',
-            timeout: timeoutMs,
-            maxBuffer: 10 * 1024 * 1024,
+            ...(budget.timeoutMs === null ? {} : { timeout: budget.timeoutMs }),
+            maxBuffer: budget.maxBufferBytes,
         });
         return { stdout, exitCode: 0 };
     } catch (e) {

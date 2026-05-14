@@ -1,11 +1,10 @@
 // @ts-check
 /**
- * Barrel de policies internas de infra.
+ * Facade pública de policies reutilizáveis por tools.
  *
- * @module copilot/infra/policy
+ * @module copilot/infra/public/policy
  */
 
-export { limitTextLines, normalizeCursorOffset, normalizeMaxResults, windowItems, windowTextLines } from './output-window.js';
 export {
     DEFAULT_IO_SEARCH_MAX_BUFFER_BYTES,
     DEFAULT_IO_SEARCH_TIMEOUT_MS,
@@ -17,5 +16,4 @@ export {
     readEnvPositiveIntegerBudget,
     resolveIoSearchBudget,
     resolveProcessExecutionBudget,
-} from './budgets.js';
-export { assertExpectedSha256 } from './preconditions.js';
+} from '../policy/index.js';

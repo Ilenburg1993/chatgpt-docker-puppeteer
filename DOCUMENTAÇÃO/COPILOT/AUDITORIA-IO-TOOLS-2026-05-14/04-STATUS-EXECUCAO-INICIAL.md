@@ -19,6 +19,7 @@ Foram criadas facades públicas:
 - `src/copilot/infra/public/indexing.js`
 - `src/copilot/infra/public/session.js`
 - `src/copilot/infra/public/events.js`
+- `src/copilot/infra/public/policy.js`
 - `src/copilot/infra/public/health.js`
 
 As file/web tools passaram a consumir essas facades em vez de módulos internos como `io-engine.js`,
@@ -99,6 +100,7 @@ Transformações aplicadas:
 - `io-index-sqlite.search()` aplica `pathPrefix` no SQL/FTS em vez de filtrar em memória depois.
 - `io-scanner.js` ganhou `IO_SCAN_BATCH_SIZE`/`batchSize` para evitar fan-out massivo de promessas.
 - `shared/env.js`, `policy/output-window.js` e `scan/*` foram extraídos como subdomínios internos baixos.
+- `policy/budgets.js` foi criado para unificar budgets de timeout e `maxBuffer` de search/subprocessos.
 - `parse/*` passou a concentrar parsers puros de JSON, Markdown, comentários e outline.
 - `storage/*` passou a concentrar JSON store baixo; `storage.js` virou facade sem depender de `io-engine.js`.
 - `queue/*`, `locks/*` e `runtime/*` foram iniciados como domínios internos barrel-first.
@@ -120,6 +122,7 @@ Transformações aplicadas:
 - `runtime/audit-log.js` passou a registrar JSONL append-only de mutações quando
   `COPILOT_IO_MUTATION_AUDIT_LOG_PATH` está configurado.
 - `public/cache.js` e `public/testing.js` foram adicionados como facades públicas explícitas.
+- `public/policy.js` foi adicionada para tools consumirem budgets sem importar internals de infra.
 - Tools de file/web consomem infra via `#copilot/infra/public/*`.
 - `src/copilot/infra/module-map.js` foi criado e exportado pelo barrel raiz para governança 2.0/2.1.
 - Contratos unitários passaram a impedir deep imports de tools para internals de infra.
@@ -127,6 +130,6 @@ Transformações aplicadas:
 Evidência local:
 
 ```txt
-src/copilot/infra: files 92 cycles 0
+src/copilot/infra: files 94 cycles 0
 tools -> infra internals: 0 ocorrências
 ```

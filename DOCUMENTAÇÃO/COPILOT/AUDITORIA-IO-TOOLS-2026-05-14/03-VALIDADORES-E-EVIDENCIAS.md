@@ -83,7 +83,7 @@ Mesmo quando o ciclo não quebra hoje, ele reduz previsibilidade de ESM, testes 
 Estado após transformações em andamento:
 
 ```txt
-src/copilot/infra: files 92 cycles 0
+src/copilot/infra: files 94 cycles 0
 ```
 
 O ciclo foi removido extraindo leitura textual baixa para `src/copilot/infra/io/fs/read-text.js` e fazendo parser/index
@@ -116,6 +116,9 @@ src/copilot/tools/file/read-tools.js -> #copilot/infra/public/io
 src/copilot/tools/file/write-tools.js -> #copilot/infra/public/io
 src/copilot/tools/file/index-tools.js -> #copilot/infra/public/indexing
 src/copilot/tools/file/scope-tools.js -> #copilot/infra/public/session
+src/copilot/tools/code/code-tools.js -> #copilot/infra/public/policy
+src/copilot/tools/git/git-tools.js -> #copilot/infra/public/policy
+src/copilot/tools/shell/executor.js -> #copilot/infra/public/policy
 ```
 
 Foi adicionado contrato unitário para impedir retorno de imports diretos para internals de infra.
@@ -163,6 +166,8 @@ Tools:
 - subdomínios baixos `shared/`, `policy/`, `scan/`: cobertos por typecheck, testes focados e module-map.
 - `list_directory` com cursor: coberto.
 - `policy/output-window` com cursor de linhas e items: coberto por `test_output_window_policy.spec.js`.
+- `policy/budgets` com budgets de search/subprocesso e facade pública: coberto por `test_policy_budgets.spec.js`,
+  contrato de boundary, typecheck strict e lint.
 - `storage/` sem dependência de `io-engine`: coberto.
 - `parse/` sem dependências altas de IO/cache/session: coberto.
 - operation envelope em write tools: coberto.
