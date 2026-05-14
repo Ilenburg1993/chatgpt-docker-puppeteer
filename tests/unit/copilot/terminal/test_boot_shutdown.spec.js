@@ -18,6 +18,7 @@ describe('terminal/terminal-phases/boot-shutdown', () => {
                     throw new Error('not used');
                 },
                 wireRuntime: () => undefined,
+                loadAliases: async () => undefined,
                 startTodoCleanupJob: () => /** @type {NodeJS.Timeout} */ ({ unref() {} }),
                 bootConfig: /** @type {never} */ ({}),
                 bootPreflight: null,

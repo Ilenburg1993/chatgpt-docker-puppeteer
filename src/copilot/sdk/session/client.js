@@ -5,8 +5,8 @@
  */
 
 import { CopilotClient } from '@github/copilot-sdk';
-import { CircuitBreaker } from '../../core/circuit-breaker.js';
-import { logSwallowed, toError } from '../../core/error-handlers.js';
+import { CircuitBreaker } from '#copilot/core/circuit-breaker';
+import { logSwallowed, toError } from '#copilot/core/error-handlers';
 import { getSdkRecoveryPolicy, toSdkOperationError } from '../errors.js';
 import { log } from '../logger.js';
 import { setModelListClientProvider } from '../models/client-provider.js';

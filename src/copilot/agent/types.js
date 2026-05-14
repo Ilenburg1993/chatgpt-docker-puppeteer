@@ -726,11 +726,11 @@
  *     | undefined} inputSdkSessionUi
  *   - Solicita entrada textual via `session.ui.input()` ou fallback compatível
  *
- * @property {((options?: { sessionId?: string }) => import('../sdk/session/elicitation.js').QueuedElicitationEntry[])
+ * @property {((options?: { sessionId?: string }) => import('#copilot/sdk/session/elicitation').QueuedElicitationEntry[])
  *     | undefined} listPendingSdkElicitations
  *   - Lista solicitações de elicitation pendentes do SDK
  *
- * @property {((id: string) => import('../sdk/session/elicitation.js').QueuedElicitationEntry | null) | undefined} getPendingSdkElicitation
+ * @property {((id: string) => import('#copilot/sdk/session/elicitation').QueuedElicitationEntry | null) | undefined} getPendingSdkElicitation
  *   - Lê uma solicitação de elicitation pendente por id
  *
  * @property {((id: string, result: import('#copilot/sdk/types').ElicitationResult) => boolean) | undefined} resolvePendingSdkElicitation

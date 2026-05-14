@@ -52,7 +52,7 @@ vi.mock('#copilot/core', async (importOriginal) => {
     };
 });
 
-vi.mock('../../../../src/copilot/tools/logger.js', () => ({
+vi.mock('../../../../src/copilot/tools/infra/logger.js', () => ({
     log: mocks.log,
 }));
 
@@ -61,17 +61,15 @@ vi.mock('../../../../src/copilot/tools/infra/tool-factory.js', () => ({
     buildTool: vi.fn((config) => config),
 }));
 
-vi.mock('#copilot/sdk', () => ({
-    createTool: vi.fn((config) => ({
-        name: config.name,
-        description: config.description,
-        handler: config.handler,
-    })),
-    fleetStart: mocks.fleetStart,
+vi.mock('#copilot/sdk/rpc', () => ({
     agentList: mocks.agentList,
     agentGetCurrent: mocks.agentGetCurrent,
     agentSelect: mocks.agentSelect,
     agentReload: mocks.agentReload,
+}));
+
+vi.mock('#copilot/sdk/experimental-rpc', () => ({
+    fleetStart: mocks.fleetStart,
     skillsList: mocks.skillsList,
     skillsEnable: mocks.skillsEnable,
     skillsDisable: mocks.skillsDisable,
@@ -85,7 +83,6 @@ vi.mock('#copilot/sdk', () => ({
     extensionsEnable: mocks.extensionsEnable,
     extensionsDisable: mocks.extensionsDisable,
     extensionsReload: mocks.extensionsReload,
-    SYSTEM_PROMPT_SECTIONS: {},
 }));
 
 describe('experimental-rpc-tools', () => {

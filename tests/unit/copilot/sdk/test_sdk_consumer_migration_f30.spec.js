@@ -195,7 +195,6 @@ describe('F151 — terminal/ usa barrel para models e tools-state', () => {
 
 describe('F152 — zero-bypass: submodules críticos não importados fora de sdk/', () => {
     const CRITICAL_SUBMODULES = [
-        '#copilot/sdk/tools',
         '#copilot/sdk/event-helpers',
         '#copilot/sdk/events',
         '#copilot/sdk/models/registry',

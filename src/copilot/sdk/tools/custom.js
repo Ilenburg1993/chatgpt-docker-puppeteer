@@ -18,9 +18,9 @@
 
 import { readFileSync } from 'node:fs';
 import { readFile, rename, writeFile } from 'node:fs/promises';
-import { logSwallowed, toError } from '../../core/error-handlers.js';
-import { safeJsonParse } from '../../core/safe-json.js';
-import { CustomToolsFileSchema } from '../../core/schemas.js';
+import { logSwallowed, toError } from '#copilot/core/error-handlers';
+import { safeJsonParse } from '#copilot/core/safe-json';
+import { CustomToolsFileSchema } from '#copilot/core/schemas';
 import { log } from '../logger.js';
 import { resolvePersistentConfigFile } from '../persistent-paths.js';
 

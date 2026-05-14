@@ -16,6 +16,7 @@ const PACKAGE_JSON_PATH = join(new URL('../../../../', import.meta.url).pathname
 const ALLOWED_PRESENTATION_PUBLIC_IMPORTS = new Set([
     '#copilot/presentation',
     '#copilot/presentation/agent',
+    '#copilot/presentation/agent/runtime',
     '#copilot/presentation/contracts',
     '#copilot/presentation/conversation',
     '#copilot/presentation/files',

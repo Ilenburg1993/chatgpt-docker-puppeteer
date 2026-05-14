@@ -7,4 +7,4 @@
  * @module copilot/hooks/logger
  */
 
-export { clearHooksLogger, log, setHooksLogger } from '../sdk/session/hook-logger.js';
+export { clearHooksLogger, log, setHooksLogger } from '#copilot/sdk/session';

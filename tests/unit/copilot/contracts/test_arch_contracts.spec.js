@@ -78,6 +78,7 @@ const EXPECTED_MODULES = [
     'observability',
     'presentation',
     'plugins',
+    'runtime',
     'sdk',
     'terminal',
     'tools',
@@ -150,6 +151,22 @@ describe('W4-9 — barrel exports: símbolos mínimos', () => {
 
         const missing = expectedFacadeExports.filter((name) => typeof agentExports[name] !== 'function');
         assert.deepEqual(missing, [], `Facades críticas ausentes do barrel #copilot/agent: ${missing.join(', ')}`);
+    });
+
+    it('runtime barrel exporta a surface canônica de acoplamento com o agent', async () => {
+        const mod = await import('#copilot/runtime');
+        const runtimeExports = /** @type {Record<string, unknown>} */ (mod);
+        const expectedRuntimeExports = [
+            'getDefaultAgentRuntime',
+            'resolveAgentRuntimeSelection',
+            'readAgentRuntimeControlState',
+            'getAgentRuntimeControlStateForTarget',
+            'sendRuntimeDialogTurnOnActiveLoop',
+            'readAgentRuntimeOverviewProjection',
+        ];
+
+        const missing = expectedRuntimeExports.filter((name) => !(name in runtimeExports));
+        assert.deepEqual(missing, [], `Surface crítica ausente do barrel #copilot/runtime: ${missing.join(', ')}`);
     });
 });
 
@@ -268,9 +285,12 @@ describe('W4-9 — fronteira externa→agent: sem deep-import interno acidental'
             'di-tokens',
             'error-policy',
             'facades',
+            'infra',
+            'lifecycle',
             'ports',
             'runtime-registry',
             'session/wiring/event-wirer',
+            'types',
         ]);
 
         for (const abs of files) {
@@ -577,7 +597,7 @@ describe('W4-9 — bordas não leem propriedades voláteis do agent diretamente'
     it('channel/client.js usa control-state facade pública para getAgentStatus()', () => {
         const src = readSrc('channel/client.js');
 
-        assert.match(src, /readRuntimeControlState/);
+        assert.match(src, /getAgentRuntimeControlStateForTarget|readRuntimeControlState/);
         assert.doesNotMatch(src, /presentation\/runtime-controls/);
         assert.doesNotMatch(src, /\bagent\.(?:status|sessionId|dialogLoopActive|dialogPaused)\b/);
     });
@@ -585,7 +605,7 @@ describe('W4-9 — bordas não leem propriedades voláteis do agent diretamente'
     it('runtime-wiring.js usa readRuntimeControlState antes de parar o agent', () => {
         const src = readSrc('runtime-wiring.js');
 
-        assert.match(src, /readRuntimeControlState/);
+        assert.match(src, /getAgentRuntimeControlStateForTarget|readRuntimeControlState/);
         assert.doesNotMatch(src, /\bagent\.status\b/);
     });
 

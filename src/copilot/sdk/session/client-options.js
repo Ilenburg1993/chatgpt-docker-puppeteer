@@ -9,7 +9,7 @@
  * @module copilot/sdk/session/client-options
  */
 
-import { COPILOT_CANONICAL_OTEL_SOURCE_NAME } from '../../boot/contract.js';
+import { COPILOT_CANONICAL_OTEL_SOURCE_NAME } from '#copilot/boot/contract';
 import { log } from '../logger.js';
 import { buildConfiguredClientSessionFsConfig, getConfiguredSessionIdleTimeoutSeconds } from './session-fs.js';
 

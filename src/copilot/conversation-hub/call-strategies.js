@@ -9,10 +9,10 @@
  * @see EventBus
  */
 
-import { sendAgentDialogTurn } from '#copilot/agent/facades';
 import { SessionError } from '#copilot/core';
 import { HUB_EVENTS } from '#copilot/events';
 import { log } from '#copilot/observability';
+import { sendRuntimeDialogTurnOnActiveLoop } from '#copilot/runtime';
 
 /**
  * @typedef {import('./orchestrator.js').AgentLike} AgentLike
@@ -42,7 +42,6 @@ export async function callViaDialogLoop(agent, message, messageContent, ctx) {
     if (!agent.sendDialogTurn) {
         throw new SessionError('[HubOrchestrator] agentInst não suporta sendDialogTurn', 'ORCH_NO_DIALOG_TURN');
     }
-    const dialogAgent = /** @type {Parameters<typeof sendAgentDialogTurn>[0]} */ (agent);
     const content = typeof message === 'string' ? message : messageContent;
     log('DEBUG', `[HubOrchestrator] Usando sendDialogTurn (modo eficiente) para turno #${ctx.turnNumber + 1}.`);
     // BUG-HIGH-03 (fix): capturar task.delta durante sendDialogTurn para emitir turn:delta em tempo real
@@ -53,10 +52,10 @@ export async function callViaDialogLoop(agent, message, messageContent, ctx) {
     };
     agent.on?.('task.delta', onDelta);
     try {
-        const reply = await sendAgentDialogTurn(
-            dialogAgent,
+        const reply = await sendRuntimeDialogTurnOnActiveLoop(
             content,
             ctx.timeoutMs !== null ? { timeout: ctx.timeoutMs } : undefined,
+            /** @type {Parameters<typeof sendRuntimeDialogTurnOnActiveLoop>[2]} */ (/** @type {unknown} */ (agent)),
         );
         if (reply === null) {
             throw new SessionError('[HubOrchestrator] sendDialogTurn retornou null', 'ORCH_DIALOG_NULL_REPLY');

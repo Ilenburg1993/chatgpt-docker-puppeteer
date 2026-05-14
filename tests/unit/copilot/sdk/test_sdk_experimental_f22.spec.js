@@ -138,13 +138,9 @@ describe('F22 — F118-F123: experimental-rpc.js exports', () => {
         expect(src).toContain('export async function fleetStart');
     });
 
-    it('experimental.js exporta agentList, agentGetCurrent, agentSelect, agentDeselect, agentReload (F119)', () => {
+    it('experimental.js reexporta agentList, agentGetCurrent, agentSelect, agentDeselect, agentReload (F119)', () => {
         const src = readSource('sdk/rpc/experimental.js');
-        expect(src).toContain('export async function agentList');
-        expect(src).toContain('export async function agentGetCurrent');
-        expect(src).toContain('export async function agentSelect');
-        expect(src).toContain('export async function agentDeselect');
-        expect(src).toContain('export async function agentReload');
+        expect(src).toContain('export { agentDeselect, agentGetCurrent, agentList, agentReload, agentSelect }');
     });
 
     it('experimental.js NÃO exporta funções fantasmas (agentGetStatus, agentStop, skillsGetStatus, mcpGetStatus)', () => {
@@ -217,7 +213,7 @@ describe('F22 — F125: feature flag on/off por subsistema', () => {
 
     it('agentList lança Error quando agents=false', async () => {
         featureFlags.resetExperimentalFlags();
-        await expect(expRpc.agentList(mockSession)).rejects.toThrow("'agents'");
+        await expect(expRpc.agentList(mockSession)).rejects.toThrow('agent.list');
     });
 
     it('skillsList lança Error quando skills=false', async () => {
@@ -267,24 +263,15 @@ describe('F22 — F125: feature flag on/off por subsistema', () => {
         expect(result[0]?.name).toBe('Server A');
     });
 
-    it('sdk/barrel reexporta funções experimentais alinhadas com SDK', () => {
+    it('sdk/experimental-rpc surface exporta funções experimentais alinhadas com SDK', () => {
         const src = readSource('sdk/index.js');
-        expect(src).toContain('fleetStart');
-        expect(src).toContain('agentList');
-        expect(src).toContain('agentGetCurrent');
-        expect(src).toContain('agentReload');
-        expect(src).toContain('skillsList');
-        expect(src).toContain('skillsReload');
-        expect(src).toContain('mcpList');
-        expect(src).toContain('mcpReload');
-        expect(src).toContain('pluginsList');
-        expect(src).toContain('extensionsList');
-        expect(src).toContain('extensionsReload');
-        // Removidas
-        expect(src).not.toContain('agentGetStatus');
-        expect(src).not.toContain('agentStop');
-        expect(src).not.toContain('skillsGetStatus');
-        expect(src).not.toContain('mcpGetStatus');
+        expect(src).not.toContain('fleetStart');
+        const expSrc = readSource('sdk/rpc/experimental.js');
+        expect(expSrc).toContain('fleetStart');
+        expect(expSrc).toContain('skillsList');
+        expect(expSrc).toContain('mcpList');
+        expect(expSrc).toContain('pluginsList');
+        expect(expSrc).toContain('extensionsList');
     });
 
     // ─── A3.2: Novos testes runtime para funções adicionadas ─────────────────

@@ -12,13 +12,13 @@ import {
     registerAgentRuntimeWebhook,
     unregisterAgentRuntimeWebhook,
 } from '#copilot/agent/facades';
-import { requireAgentRuntimeSelection } from '../agent/runtime/index.js';
+import { requireAgentRuntimeSelection } from '#copilot/presentation/agent/runtime';
 import { buildRuntimeRouteMetaFromSelection, buildRuntimeRouteMetaPayload } from '../routing/index.js';
 
 /**
  * @param {string | null | undefined} [runtimeId]
  * @returns {{
- *     agent: import('../../agent/always-alive.js').AlwaysAliveAgent;
+ *     agent: import('#copilot/agent/always-alive').AlwaysAliveAgent;
  *     runtimeId: string;
  *     requestedRuntimeId: string | null;
  *     runtimeFound: boolean;

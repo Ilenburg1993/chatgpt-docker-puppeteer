@@ -27,7 +27,7 @@ import {
     readSessionInstructionSources,
     readSystemPromptStatus,
 } from '#copilot/config';
-import { requireAgentRuntimeSelection } from '../agent/runtime/index.js';
+import { requireAgentRuntimeSelection } from '#copilot/presentation/agent/runtime';
 import { readAgentStatusSnapshot } from './status.js';
 
 /**

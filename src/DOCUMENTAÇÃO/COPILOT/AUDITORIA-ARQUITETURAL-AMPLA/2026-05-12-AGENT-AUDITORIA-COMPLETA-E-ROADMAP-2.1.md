@@ -878,3 +878,75 @@ camada compartilhada de borda.
 Esse é o caminho para cumprir, de fato, a arquitetura 2.0/2.1 pretendida: **um runtime owner, uma
 política de acesso, um fluxo único, um conjunto pequeno de superfícies explícitas e governança dura
 contra regressão**.
+
+---
+
+## 6.1) Atualização factual — seam canônico `#copilot/runtime` (2026-05-13)
+
+Depois da revisão completa do estado da ONDA 2/3 e da execução de `typecheck` estrito também para os
+testes de `src/copilot`, foi consolidado o ponto de acoplamento externo entre `agent` e o restante do
+copilot:
+
+- novo barrel `src/copilot/runtime/index.js`;
+- novo alias `#copilot/runtime`;
+- `agent` continua owner do runtime;
+- `presentation/runtime/*` permanece como projection/access layer;
+- consumidores externos mais quentes agora compartilham um seam operacional explícito.
+
+Consumidores migrados:
+
+- `src/copilot/channel/client-dialog.js`
+- `src/copilot/channel/client.js`
+- `src/copilot/conversation-hub/call-strategies.js`
+- `src/copilot/terminal/frontend/gateways/agent-runtime.js`
+- `src/copilot/runtime-wiring.js` (leitura de control-state antes de `stop`)
+
+Redução objetiva de acoplamento direto a `agent/*` fora de `agent/`:
+
+- **antes:** 50 arquivos
+- **agora:** 38 arquivos
+
+Buckets residuais:
+
+- `presentation`: 18
+- `server`: 9
+- `terminal`: 2
+- `channel`: 1
+- `boot`: 1
+- `runtime-wiring.js`: 1
+- `event-handlers`: 1
+- `sdk`: 1
+- `bridges`: 1
+- `runtime`: 1
+- `observability`: 1
+- `hooks`: 1
+
+Leitura arquitetural atualizada:
+
+- **ONDA 2**: concluída.
+- **ONDA 3 / C3.3**: ainda **não concluída**.
+- O acoplamento externo ficou canônico; a pluralidade de ingressos/gramática de fluxo ainda existe,
+  então a convergência completa continua pertencendo à ONDA 3.
+
+Bug/gap encontrado e corrigido durante a consolidação:
+
+- `presentation/agent/runtime/runtime-selection.js` importava o barrel amplo
+  `presentation/routing/index.js`;
+- isso reabria `presentation/agent/index.js` e, por side-effect, `presentation/state/ui-store`;
+- em testes com mocks estreitos de config, `TERMINAL_MAX_LISTENERS` chegava indefinido e quebrava
+  `setMaxListeners(...)`.
+
+Correção aplicada:
+
+- import estreitado para `presentation/routing/targeting.js`.
+
+Guardrails adicionados:
+
+- `tests/unit/copilot/contracts/test_runtime_coupling_governance.spec.js`
+- reforço em `tests/unit/copilot/contracts/test_arch_contracts.spec.js`
+
+Gates desta rodada:
+
+- `npm run typecheck:strict:src.copilot`: **verde**
+- `npm run typecheck:strict:tests.unit`: **verde**
+- `npm run test:copilot:unit`: **2614/2614** testes, **878/878** suites verdes

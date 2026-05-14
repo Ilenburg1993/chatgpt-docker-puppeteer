@@ -798,7 +798,7 @@ export class AlwaysAliveAgent extends EventEmitter {
      * Lista solicitações de elicitation pendentes vindas do SDK para este runtime.
      *
      * @param {{ sessionId?: string }} [options]
-     * @returns {import('../sdk/session/elicitation.js').QueuedElicitationEntry[]}
+     * @returns {import('#copilot/sdk/session/elicitation').QueuedElicitationEntry[]}
      */
     listPendingSdkElicitations(options = {}) {
         return listPendingSdkElicitations(this.ctx, options.sessionId);
@@ -808,7 +808,7 @@ export class AlwaysAliveAgent extends EventEmitter {
      * Retorna uma solicitação de elicitation pendente por id.
      *
      * @param {string} id
-     * @returns {import('../sdk/session/elicitation.js').QueuedElicitationEntry | null}
+     * @returns {import('#copilot/sdk/session/elicitation').QueuedElicitationEntry | null}
      */
     getPendingSdkElicitation(id) {
         return getPendingSdkElicitation(this.ctx, id);

@@ -13,7 +13,7 @@
  * @module copilot/sdk/session/elicitation
  */
 
-import { normalizeElicitationResultWithSchema } from '../../core/elicitation-schema.js';
+import { normalizeElicitationResultWithSchema } from '#copilot/core/elicitation-schema';
 
 /**
  * @typedef {import('../types.js').ElicitationContext} ElicitationContext

@@ -8,7 +8,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('#copilot/config', async (importOriginal) => {
-    const actual = await importOriginal();
+    const actual = /** @type {Record<string, unknown>} */ (await importOriginal());
     return {
         ...actual,
         LLM_B_BOOT_PROMPT: undefined,

@@ -11,7 +11,7 @@
 import { globalAuditBuffer } from '#copilot/audit';
 import { SESSION_EVENTS as SE } from '#copilot/events';
 import { introspectToolTargets } from '../../core/tool-target-introspection.js';
-import { onSessionEvent } from '../../sdk/session/events.js';
+import { onSessionEvent } from '#copilot/sdk/session';
 import { log } from '../logger.js';
 
 /** @typedef {import('./context.js').CollectorContext} CollectorContext */

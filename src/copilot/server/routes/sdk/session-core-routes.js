@@ -3,18 +3,18 @@
  * Rotas core de sessão SDK: send, stream, model, log, abort e messages.
  *
  * Atenção arquitetural: `/sessions/:id/send` é uma rota direta do SDK. Ela chama `sendSession*()` e pode emitir
- * `assistant.usage` / `pr.consumed`. Intervenções zero-PR de usuário/LLM-A devem passar pelo mailbox do runtime e
- * serem aplicadas apenas em `ask_user(kind=question)` via `answerPendingQuestion`.
+ * `assistant.usage` / `pr.consumed`. Intervenções zero-PR de usuário/LLM-A devem passar pelo mailbox do runtime e serem
+ * aplicadas apenas em `ask_user(kind=question)` via `answerPendingQuestion`.
  */
 
-import { createEventFilter, createSseWriter } from '../../../infra/sse/utils.js';
 import {
     abortSession,
     getSessionMessages,
     sendSession,
     sendSessionAndWait,
     setSessionModel,
-} from '../../../sdk/session/wrapper.js';
+} from '#copilot/sdk/session';
+import { createEventFilter, createSseWriter } from '../../../infra/sse/utils.js';
 import { resolveSdkRouteSharedDeps } from './deps.js';
 import { validateBody, validateModel, withErrorHandler } from './session-middleware.js';
 import { getActiveSessionEntryOrReply, withRuntimeMeta, withSessionRuntimeMeta } from './session-route-helpers.js';

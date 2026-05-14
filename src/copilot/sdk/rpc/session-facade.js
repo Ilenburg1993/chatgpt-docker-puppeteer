@@ -1,16 +1,14 @@
 // @ts-check
 /**
- * src/copilot/sdk/rpc.js
+ * src/copilot/sdk/rpc/session-facade.js
  *
- * Barrel de RPC — re-exporta rpc-session.js (model, mode, plan, workspace, log) e rpc-ops.js (compaction, shell,
- * elicitation, commands, permissions, tools). Expõe createSessionRpcFacade como API agregada principal.
+ * Façade agregada de RPC por sessão. Módulo canônico para o contrato de alto nível de RPC.
  *
- * @module copilot/sdk/rpc
- * @see EventBus
- * @see module:copilot/sdk/session-lifecycle
+ * @module copilot/sdk/rpc-session-facade
  */
 
-import { assertRpcSession } from './rpc/guards.js';
+import { assertRpcSession } from './guards.js';
+import { agentDeselect, agentGetCurrent, agentList, agentReload, agentSelect, compactionCompactTyped } from './ops.js';
 import {
     instructionSourcesGet,
     modeGet,
@@ -24,48 +22,7 @@ import {
     workspaceCreateFile,
     workspaceListFiles,
     workspaceReadFile,
-} from './rpc/session.js';
-
-export {
-    instructionSourcesGet,
-    modeGet,
-    modelGetCurrent,
-    modelSwitchTo,
-    modeSet,
-    planDelete,
-    planRead,
-    planUpdate,
-    sessionLog,
-    workspaceCreateFile,
-    workspaceListFiles,
-    workspaceReadFile,
-} from './rpc/session.js';
-
-export {
-    agentDeselect,
-    agentGetCurrent,
-    agentList,
-    agentReload,
-    agentSelect,
-    commandsHandlePending,
-    compactionCompact,
-    compactionCompactTyped,
-    permissionsHandlePending,
-    permissionsListPending,
-    shellExec,
-    shellKill,
-    toolsHandlePendingCall,
-    uiElicitation,
-} from './rpc/ops.js';
-
-import {
-    agentDeselect,
-    agentGetCurrent,
-    agentList,
-    agentReload,
-    agentSelect,
-    compactionCompactTyped,
-} from './rpc/ops.js';
+} from './session.js';
 
 /**
  * @typedef {import('@github/copilot-sdk').CopilotSession} CopilotSession
@@ -88,18 +45,6 @@ import {
  *
  * @typedef {{ success: boolean; tokensRemoved: number; messagesRemoved: number }} CompactionResult
  *
- * @typedef {{ processId: string }} ShellExecResult
- *
- * @typedef {{ killed: boolean }} ShellKillResult
- *
- * @typedef {{
- *     action: 'accept' | 'decline' | 'cancel';
- *     content?: Record<string, string | number | boolean | string[]>;
- * }} ElicitationResult
- *
- *
- * @typedef {{ success: boolean }} HandleResult
- *
  * @typedef {{ name: string; displayName: string; description: string }} AgentInfo
  *
  * @typedef {{ agents: AgentInfo[] }} AgentListResult
@@ -113,14 +58,7 @@ import {
  * @typedef {{ agents: AgentInfo[] }} AgentReloadResult
  */
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// Aggregate — createSessionRpcFacade
-// ═══════════════════════════════════════════════════════════════════════════════
-
 /**
- * Cria um objeto façade com todos os RPCs core agrupados por subsistema. Permite uso ergonômico: `const rpc =
- * createSessionRpcFacade(session); await rpc.model.getCurrent();`
- *
  * @param {CopilotSession} session
  * @returns {{
  *     model: {

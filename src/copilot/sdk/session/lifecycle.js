@@ -17,7 +17,7 @@
  */
 
 import { CopilotClient } from '@github/copilot-sdk';
-import { toError } from '../../core/error-handlers.js';
+import { toError } from '#copilot/core/error-handlers';
 import { INFINITE_SESSION_DEFAULTS, REASONING_EFFORTS } from '../constants.js';
 import { getSdkRecoveryPolicy, toSdkOperationError } from '../errors.js';
 import { log } from '../logger.js';

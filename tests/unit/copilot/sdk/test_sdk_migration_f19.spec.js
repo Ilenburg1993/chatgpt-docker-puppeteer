@@ -115,7 +115,7 @@ describe('F19 — Consumidores migrados importam de #copilot/sdk', () => {
     describe('Compat layer de permissão em hooks', () => {
         it('hooks/permission-controller.js é reexport canônico para sdk/session/permission-controller', () => {
             const src = readSource('hooks/permission-controller.js');
-            expect(src).toContain("from '../sdk/session/permission-controller.js'");
+            expect(src).toContain("from '#copilot/sdk/session'");
         });
     });
 

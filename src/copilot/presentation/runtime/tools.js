@@ -8,7 +8,7 @@
  */
 
 import { readAgentRuntimeTools } from '#copilot/agent/facades';
-import { requireAgentRuntimeSelection } from '../agent/runtime/index.js';
+import { requireAgentRuntimeSelection } from '#copilot/presentation/agent/runtime';
 import { buildRuntimeRouteMetaFromSelection } from '../routing/index.js';
 
 /** @typedef {ReturnType<typeof readAgentRuntimeTools>} AgentRuntimeToolsSnapshot */

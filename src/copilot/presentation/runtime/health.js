@@ -17,15 +17,15 @@ import { CHANNEL_VERSION } from '#copilot/channel';
 import { BRIDGE_EXPOSE_DIAGNOSTICS } from '#copilot/config';
 import { CONVERSATION_STORE } from '#copilot/conversation-hub';
 import { container } from '#copilot/core';
+import { resolveAgentRuntimeSelection } from '#copilot/presentation/agent/runtime';
 import { createRequire } from 'node:module';
-import { resolveAgentRuntimeSelection } from '../agent/runtime/index.js';
 import { buildRuntimeRouteMetaFromSelection, buildRuntimeRouteMetaPayload } from '../routing/index.js';
 import { readRuntimeLifecycleSnapshot } from './lifecycle.js';
 import { readAgentRuntimeOverview } from './overview.js';
 import { readAgentStatusSnapshot } from './status.js';
 
 /**
- * @typedef {import('../../agent/types.js').IAlwaysAliveAgent} RuntimeHealthAgentLike
+ * @typedef {import('#copilot/agent/types').IAlwaysAliveAgent} RuntimeHealthAgentLike
  */
 
 const _sdkVersion = (() => {
@@ -55,7 +55,7 @@ const _sdkVersion = (() => {
 
 /**
  * @param {unknown} value
- * @returns {import('../../agent/types.js').PendingQuestionKind | null}
+ * @returns {import('#copilot/agent/types').PendingQuestionKind | null}
  */
 function normalizePendingQuestionKind(value) {
     return value === 'ready' || value === 'reply' || value === 'stopped' || value === 'question' ? value : null;
@@ -81,7 +81,7 @@ function resolveRuntimeHealthTarget(runtimeId) {
 
 /**
  * @param {RuntimeHealthAgentLike} agent
- * @returns {import('../../agent/types.js').AgentHealthSnapshot}
+ * @returns {import('#copilot/agent/types').AgentHealthSnapshot}
  */
 export function getAgentHealthSnapshotCompat(agent) {
     return readAgentRuntimeHealthSnapshot(agent) ?? buildLegacyAgentHealth(agent);
@@ -89,7 +89,7 @@ export function getAgentHealthSnapshotCompat(agent) {
 
 /**
  * @param {string | null | undefined} [runtimeId]
- * @returns {import('../../agent/types.js').AgentHealthSnapshot}
+ * @returns {import('#copilot/agent/types').AgentHealthSnapshot}
  */
 export function getDefaultAgentHealthSnapshotCompat(runtimeId) {
     return getAgentHealthSnapshotCompat(resolveRuntimeHealthTarget(runtimeId).agent);
@@ -100,7 +100,7 @@ export function getDefaultAgentHealthSnapshotCompat(runtimeId) {
  *
  * @param {string | null | undefined} [runtimeId]
  * @returns {{
- *     health: import('../../agent/types.js').AgentHealthSnapshot;
+ *     health: import('#copilot/agent/types').AgentHealthSnapshot;
  *     runtimeId: string;
  *     requestedRuntimeId: string | null;
  *     runtimeFound: boolean;
@@ -110,7 +110,7 @@ export function getDefaultAgentHealthSnapshotCompat(runtimeId) {
 export function resolveAgentHealthSelection(runtimeId) {
     const target = readAgentRuntimeOverview(runtimeId);
     return {
-        health: /** @type {import('../../agent/types.js').AgentHealthSnapshot} */ (
+        health: /** @type {import('#copilot/agent/types').AgentHealthSnapshot} */ (
             target.health ?? getAgentHealthSnapshotCompat(target.agent)
         ),
         runtimeId: target.runtimeId,
@@ -126,7 +126,7 @@ export function resolveAgentHealthSelection(runtimeId) {
  * @param {string | null | undefined} [runtimeId]
  * @returns {{
  *     statusCode: number;
- *     body: import('../../agent/types.js').AgentHealthSnapshot & {
+ *     body: import('#copilot/agent/types').AgentHealthSnapshot & {
  *         runtimeId?: string;
  *         requestedRuntimeId?: string | null;
  *         runtimeFound?: boolean;
@@ -168,7 +168,7 @@ function readConversationStorePing() {
  * @param {import('../routing/index.js').CopilotApiRouteDeps} deps
  * @returns {{
  *     statusCode: number;
- *     body: import('../../agent/types.js').AgentHealthSnapshot & {
+ *     body: import('#copilot/agent/types').AgentHealthSnapshot & {
  *         permissionMode: string;
  *         channelVersion: string;
  *         sdkVersion: string;
@@ -205,7 +205,7 @@ export function buildCopilotApiHealthHttpResponseFromRoute(deps) {
 }
 
 /**
- * @param {import('../../agent/types.js').AgentHealthSnapshot} health
+ * @param {import('#copilot/agent/types').AgentHealthSnapshot} health
  * @returns {number}
  */
 export function getAgentHealthHttpStatus(health) {
@@ -269,7 +269,7 @@ export function buildDefaultAgentModuleHealth(runtimeId) {
 
 /**
  * @param {RuntimeHealthAgentLike} agent
- * @returns {import('../../agent/types.js').AgentHealthSnapshot}
+ * @returns {import('#copilot/agent/types').AgentHealthSnapshot}
  */
 export function buildLegacyAgentHealth(agent) {
     const snap = /** @type {LegacyAgentSnap} */ (readAgentStatusSnapshot(agent));
@@ -289,7 +289,7 @@ export function buildLegacyAgentHealth(agent) {
         ok: operational,
         healthy: operational,
         status: operational ? 'healthy' : 'unhealthy',
-        agentStatus: /** @type {import('../../agent/types.js').AgentStatus} */ (snap.status),
+        agentStatus: /** @type {import('#copilot/agent/types').AgentStatus} */ (snap.status),
         sessionId: snap.sessionId,
         model: snap.model,
         reasoningEffort: undefined,
@@ -321,7 +321,7 @@ export function buildLegacyAgentHealth(agent) {
         checks: {
             runtime: {
                 ok: operational,
-                status: /** @type {import('../../agent/types.js').AgentStatus} */ (snap.status),
+                status: /** @type {import('#copilot/agent/types').AgentStatus} */ (snap.status),
                 operational,
             },
             client: {

@@ -160,7 +160,7 @@ export async function resolveSdkRuntimeProjection(agent, client, connectionState
     const sharedBinding = getSdkSessionBindingProjection();
     const runtimeStatus =
         typeof (/** @type {{ getStatusSnapshot?: unknown }} */ (agent).getStatusSnapshot) === 'function'
-            ? readAgentStatusSnapshot(/** @type {import('../../agent/types.js').IAlwaysAliveAgent} */ (agent))
+            ? readAgentStatusSnapshot(/** @type {import('#copilot/agent/types').IAlwaysAliveAgent} */ (agent))
             : /** @type {Record<string, unknown>} */ (agent);
     const runtimeSessionId = typeof runtimeStatus['sessionId'] === 'string' ? runtimeStatus['sessionId'] : null;
     let foregroundSessionId = null;

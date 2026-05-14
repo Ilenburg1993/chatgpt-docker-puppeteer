@@ -105,7 +105,7 @@ describe('FG-3 — layer violation guard (bridges ↛ agent)', () => {
 
         for (const file of jsFiles) {
             const content = await readFile(join(bridgesDir, String(file)), 'utf-8');
-            const hasAgentImport = /#copilot\/agent/.test(content);
+            const hasAgentImport = /^\s*import\s+.+\s+from\s+['"]#copilot\/agent(?:\/[^'"]+)?['"]/m.test(content);
             expect(hasAgentImport, `${file} imports from #copilot/agent (layer violation L3→L4)`).toBe(false);
         }
     });

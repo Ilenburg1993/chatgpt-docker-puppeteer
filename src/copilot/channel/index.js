@@ -26,9 +26,9 @@
  *
  *     // Modo SDK client (standalone)
  *     import { LlmBridgeClient } from '#copilot/channel';
- *     import { getAgent } from '#copilot/agent/always-alive';
+ *     import { getDefaultAgentRuntime } from '#copilot/runtime';
  *
- *     const agent = getAgent();
+ *     const agent = getDefaultAgentRuntime();
  *     await agent.start();
  *     const bridge = new LlmBridgeClient();
  *     const result = await bridge.chat('Olá LLM-B!');

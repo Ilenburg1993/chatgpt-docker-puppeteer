@@ -12,4 +12,4 @@
  */
 
 export { SESSION_EVENTS } from '../sdk/constants.js';
-export { ALL_EVENT_TYPES, onSessionEvent, onSessionEvents } from '../sdk/session/events.js';
+export { ALL_EVENT_TYPES, onSessionEvent, onSessionEvents } from '#copilot/sdk/session';

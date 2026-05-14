@@ -12,11 +12,11 @@
 /**
  * Runtime compatível com as projections de status.
  *
- * @typedef {import('../../agent/types.js').IAlwaysAliveAgent} RuntimeStatusAgentLike
+ * @typedef {import('#copilot/agent/types').IAlwaysAliveAgent} RuntimeStatusAgentLike
  */
 
 import { readAgentRuntimeStatusSnapshot, readAgentRuntimeStatusValue } from '#copilot/agent/facades';
-import { resolveAgentRuntimeSelection } from '../agent/runtime/index.js';
+import { resolveAgentRuntimeSelection } from '#copilot/presentation/agent/runtime';
 import { buildRuntimeRouteMetaFromSelection, buildRuntimeRouteMetaPayload } from '../routing/index.js';
 import { buildRuntimeLifecycleSummary, readRuntimeLifecycleSnapshot } from './lifecycle.js';
 

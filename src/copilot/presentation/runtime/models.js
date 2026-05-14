@@ -17,7 +17,7 @@ import {
     setRuntimeModel,
     setRuntimeReasoningEffort,
 } from '#copilot/agent/facades';
-import { requireAgentRuntimeSelection } from '../agent/runtime/index.js';
+import { requireAgentRuntimeSelection } from '#copilot/presentation/agent/runtime';
 
 /**
  * @param {string} modelId

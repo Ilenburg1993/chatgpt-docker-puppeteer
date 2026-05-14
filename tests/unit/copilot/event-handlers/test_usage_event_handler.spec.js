@@ -7,11 +7,16 @@ const mocks = vi.hoisted(() => ({
     log: vi.fn(),
 }));
 
-vi.mock('#copilot/events', () => ({
-    SESSION_EVENTS: {
-        ASSISTANT_USAGE: 'assistant.usage',
-    },
-}));
+vi.mock('#copilot/events', async (importOriginal) => {
+    const actual = /** @type {Record<string, unknown>} */ (await importOriginal());
+    return {
+        ...actual,
+        SESSION_EVENTS: {
+            ...(/** @type {Record<string, string>} */ (actual['SESSION_EVENTS'] ?? {})),
+            ASSISTANT_USAGE: 'assistant.usage',
+        },
+    };
+});
 
 vi.mock('../../../../src/copilot/sdk/session/events.js', () => ({
     onSessionEvent: mocks.onSessionEvent,

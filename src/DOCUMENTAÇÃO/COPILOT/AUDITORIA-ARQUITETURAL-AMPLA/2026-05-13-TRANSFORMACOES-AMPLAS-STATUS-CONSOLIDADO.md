@@ -246,7 +246,8 @@ Conclusão: existem capacidades legítimas diferentes, porém ainda não há **u
 ## 7. Checklist de Qualidade
 
 - [x] Typecheck strict: PASSOU
-- [x] Testes unitários Copilot: 2609/2609 PASSOU
+- [x] Typecheck strict dos testes unitários: PASSOU
+- [x] Testes unitários Copilot: 2614/2614 PASSOU
 - [x] Sem regressão nos gates alvo: CONFIRMADO
 - [ ] Lint: resultado atual poluído por `.kilo/worktrees/*` (não é gate útil deste escopo)
 - [ ] Format check: PENDENTE
@@ -260,7 +261,7 @@ Conclusão: existem capacidades legítimas diferentes, porém ainda não há **u
 A sessão executou investigação profunda da arquitetura e aplicou **transformações críticas P0/P1** que estabilizam o runtime do agente. As correções foram validadas com sucesso através de:
 
 - ✅ Typecheck strict em verde
-- ✅ 2607 testes unitários passando
+- ✅ 2614 testes unitários passando
 - ✅ Sem regressões detectadas
 - ✅ Boot 2.1 confirmado operacional
 
@@ -277,7 +278,37 @@ O módulo `agent` está em ponto de maturidade elevado, mas a investigação amp
   públicas para remover deep imports/bypasses descobertos pelo strict e pelo contrato FI-7.
 - Gates desta retomada:
   - `npm run typecheck:strict:src.copilot`: **verde**;
-  - `npm run test:copilot:unit`: **2609/2609 verde**.
+  - `npm run typecheck:strict:tests.unit`: **verde**;
+  - `npm run test:copilot:unit`: **2614/2614 verde**.
+
+### Atualização adicional — seam canônico `#copilot/runtime`
+
+Depois da revisão completa do estado de ONDA 2/3, foi implementado um seam operacional explícito
+entre `agent` e o restante de `src/copilot`:
+
+- `src/copilot/runtime/index.js` + alias `#copilot/runtime`;
+- migração de `channel/client-dialog.js`, `channel/client.js`,
+  `conversation-hub/call-strategies.js`, `terminal/frontend/gateways/agent-runtime.js` e
+  `runtime-wiring.js` para esse seam;
+- criação de `src/copilot/event-handlers/contracts.js` para retirar os handlers do acoplamento tipado
+  com `agent/session/wiring/event-wirer.js`.
+
+Impacto:
+
+- referências externas diretas a `agent/*` caíram de **50** para **38** arquivos;
+- o residual ficou majoritariamente em `presentation/*`, `server/*`, composition roots e docs;
+- o problema dominante passa a ser menos “surface difusa” e mais “pluralidade de fluxo”.
+
+Estado real atualizado:
+
+- **ONDA 2**: concluída
+- **ONDA 3 / C3.3**: ainda não concluída
+
+Bug arquitetural encontrado e corrigido:
+
+- `presentation/agent/runtime/runtime-selection.js` importava `presentation/routing/index.js`,
+  reabria `presentation/agent/index.js` e puxava `presentation/state/ui-store` por side-effect;
+- o import foi estreitado para `presentation/routing/targeting.js`.
 
 
 ---

@@ -33,7 +33,7 @@ import {
  * @property {() => void | Promise<void>} [loadAliases]
  * @property {() => NodeJS.Timeout} [startTodoCleanupJob]
  * @property {ReturnType<import('#copilot/boot').readCopilotBootConfig>} [bootConfig]
- * @property {import('../agent/lifecycle/process-host/runtime-host.js').CopilotSdkBootPreflightReport | null} [bootPreflight]
+ * @property {import('#copilot/agent/lifecycle').CopilotSdkBootPreflightReport | null} [bootPreflight]
  *
  *
  * @typedef {object} TerminalBootContext
@@ -42,7 +42,7 @@ import {
  * @property {() => void | Promise<void>} loadAliases
  * @property {() => NodeJS.Timeout} startTodoCleanupJob
  * @property {ReturnType<import('#copilot/boot').readCopilotBootConfig>} bootConfig
- * @property {import('../agent/lifecycle/process-host/runtime-host.js').CopilotSdkBootPreflightReport | null} bootPreflight
+ * @property {import('#copilot/agent/lifecycle').CopilotSdkBootPreflightReport | null} bootPreflight
  * @property {import('../config/pinned-files.js').PinnedFilesLoader | null} pinnedLoader
  * @property {(() => void) | null} disposePinnedBridge
  * @property {((evt: { file: string; type: string }) => void) | null} pinnedFilesChangedHandler

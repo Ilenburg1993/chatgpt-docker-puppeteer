@@ -322,7 +322,7 @@ function tryApplyImmediateZeroPrIntervention(runtimeId, message) {
 
 /**
  * @param {string | null | undefined} [runtimeId]
- * @returns {import('../../../agent/always-alive.js').AlwaysAliveAgent}
+ * @returns {import('#copilot/agent/always-alive').AlwaysAliveAgent}
  */
 function getAgent(runtimeId = null) {
     return getAgentRuntimeControlsTarget(runtimeId);

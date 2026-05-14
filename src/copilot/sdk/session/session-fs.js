@@ -10,8 +10,8 @@
  */
 
 import { dirname, resolve } from 'node:path';
-import { readCopilotSessionFsBootConfig } from '../../boot/session-fs.js';
-import { evaluateIoPathPolicyAsync } from '../../core/io-policy.js';
+import { readCopilotSessionFsBootConfig } from '#copilot/boot/session-fs';
+import { evaluateIoPathPolicyAsync } from '#copilot/core/io-policy';
 import {
     appendTextLocked,
     createOrReplaceFileAtomic,
@@ -20,8 +20,8 @@ import {
     readText,
     removePathLocked,
     statPath,
-} from '../../infra/io-engine.js';
-import { scanDirectory } from '../../infra/io-scanner.js';
+} from '#copilot/infra/io-engine';
+import { scanDirectory } from '#copilot/infra/io-scanner';
 import { classifySdkError } from '../errors.js';
 import { log } from '../logger.js';
 import { emitSdkOperationMetric } from '../telemetry/operation-metrics.js';

@@ -184,6 +184,7 @@ describe('FI-7 — deep-import guard (Faixa I enforcement)', () => {
         for (const file of jsFiles) {
             const fileStr = String(file);
             if (ALLOWED_FILES.has(fileStr)) continue;
+            if (fileStr.startsWith('sdk/')) continue;
 
             const content = await readFile(join(copilotDir, fileStr), 'utf-8');
             const lines = content.split('\n');

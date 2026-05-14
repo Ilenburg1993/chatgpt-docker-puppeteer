@@ -28,36 +28,9 @@ import {
 // Re-exportar KNOWN_SDK_EVENTS para consumidores existentes
 export { KNOWN_SDK_EVENTS } from '#copilot/event-handlers';
 
-/**
- * Tipo mínimo de sessão SDK usado pelos handlers — compatível com CopilotSession.
- *
- * @typedef {import('#copilot/sdk/types').CopilotSession} CopilotSessionLike
- */
-
-/**
- * @typedef {import('#copilot/sdk/types').CopilotSession} CopilotSession
- */
-
-/**
- * Callbacks repassados pelo AlwaysAliveAgent para que o wirer possa notificá-lo sem acoplamento.
- *
- * @typedef {Object} SessionWirerCallbacks
- * @property {(event: string, payload?: unknown) => void} emit
- * @property {() => import('../../types.js').AgentStatusSnapshot} getStatusSnapshot
- * @property {(path: string) => void} onCheckpointPath
- * @property {(contextState: { tokens: number; tokenLimit: number; utilization: number } | null) => void} onContextState
- * @property {(prInfo: {
- *     model?: string;
- *     configuredModel?: string;
- *     modelMismatch?: boolean;
- *     sessionId?: string | null;
- *     cost?: number;
- *     quotaSnapshots?: Record<string, unknown>;
- *     ts: number;
- * }) => void} onPrInfo
- * @property {() => boolean} isProcessing
- * @property {() => boolean} dialogLoopActive
- */
+/** @typedef {import('#copilot/event-handlers/contracts').CopilotSessionLike} CopilotSessionLike */
+/** @typedef {import('#copilot/sdk/types').CopilotSession} CopilotSession */
+/** @typedef {import('#copilot/event-handlers/contracts').SessionWirerCallbacks} SessionWirerCallbacks */
 
 /**
  * Registra todos os listeners de eventos da sessão SDK.

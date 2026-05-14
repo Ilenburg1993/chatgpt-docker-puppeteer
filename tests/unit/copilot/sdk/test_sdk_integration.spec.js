@@ -206,7 +206,7 @@ describe('F90 - Health -> Auth -> Quota -> Session create', () => {
 
     it('apos health ok, session lifecycle funciona', async () => {
         const { isServerReachable } = await import('#copilot/sdk/health');
-        const { runSessionLifecycle } = await import('#copilot/sdk/sdk-session-wrapper');
+        const { runSessionLifecycle } = await import('#copilot/sdk/session-runtime');
 
         const client = createMockClient();
         const reachable = await isServerReachable(client);

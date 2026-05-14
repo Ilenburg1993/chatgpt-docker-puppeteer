@@ -2,6 +2,8 @@
 /**
  * Barrel público do subdomínio `presentation/runtime`.
  *
+ * Para acoplamento operacional genérico fora de `presentation/`, preferir `#copilot/runtime`.
+ *
  * @module copilot/presentation/runtime
  */
 

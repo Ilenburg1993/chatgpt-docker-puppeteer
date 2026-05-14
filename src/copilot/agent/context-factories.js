@@ -13,13 +13,13 @@
  * @internal
  */
 
+import { MESSAGES_CACHE_TTL_MS } from '#copilot/config/agent';
 import {
     EMITTER_AGENT_BACKGROUND_COMPLETED,
     EMITTER_AGENT_BACKGROUND_IDLE,
     EMITTER_PERMISSION_MODE_CHANGED,
 } from '#copilot/events';
 import { normalizeElicitationCompletedEvent, normalizeElicitationPendingEvent } from '#copilot/sdk';
-import { MESSAGES_CACHE_TTL_MS } from '#copilot/config/agent';
 import { BackgroundTasks } from './background/index.js';
 import { DialogLoopManager } from './dialog/orchestrators/index.js';
 import { createAgentSdkToolsRegistry } from './facades/index.js';
@@ -40,9 +40,7 @@ import { SessionKeepalive } from './session/lifecycle/index.js';
  *     createMessageQueue: (host: AgentContextFactoryHost) => MessageQueue;
  *     createDialogLoop: (host: AgentContextFactoryHost) => DialogLoopManager;
  *     createWebhooks: (host: AgentContextFactoryHost) => WebhookManager;
- *     createPermissions: (
- *         host: AgentContextFactoryHost,
- *     ) => import('./ports/index.js').AgentPermissionController;
+ *     createPermissions: (host: AgentContextFactoryHost) => import('./ports/index.js').AgentPermissionController;
  *     createToolsRegistry: (host: AgentContextFactoryHost) => import('#copilot/sdk/tools-registry').ToolRegistry;
  *     createKeepalive: (host: AgentContextFactoryHost) => SessionKeepalive;
  *     createHandoff: (host: AgentContextFactoryHost) => HandoffManager;
@@ -52,8 +50,8 @@ import { SessionKeepalive } from './session/lifecycle/index.js';
  *         resolvePending: (id: string, result: import('#copilot/sdk/types').ElicitationResult) => boolean;
  *         listPending: (opts?: {
  *             sessionId?: string;
- *         }) => import('../sdk/session/elicitation.js').QueuedElicitationEntry[];
- *         getPending: (id: string) => import('../sdk/session/elicitation.js').QueuedElicitationEntry | null;
+ *         }) => import('#copilot/sdk/session/elicitation').QueuedElicitationEntry[];
+ *         getPending: (id: string) => import('#copilot/sdk/session/elicitation').QueuedElicitationEntry | null;
  *         clearPending: (id: string, result?: import('#copilot/sdk/types').ElicitationResult) => boolean;
  *         pendingCount: () => number;
  *     };

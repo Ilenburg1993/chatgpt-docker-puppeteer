@@ -7,7 +7,7 @@
  * `ask_user(kind=question)`.
  */
 
-import { sendSession } from '../../../sdk/session/wrapper.js';
+import { sendSession } from '#copilot/sdk/session';
 
 /**
  * @typedef {ReturnType<import('./deps.js').resolveSdkRouteSharedDeps>} SdkRouteDeps

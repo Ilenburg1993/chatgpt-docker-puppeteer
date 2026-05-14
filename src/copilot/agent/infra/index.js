@@ -10,10 +10,10 @@ export { buildAuditingPermissionHandler, isHighRiskTool, logToolAudit } from '#c
 export { checkResolvedIp, isPrivateIp, validateWebhookUrl } from '#copilot/core';
 export { WebhookManager } from '../../infra/webhooks.js';
 export { executeTask } from '../messaging/agent-messaging.js';
-export { PermissionController } from '../ports/index.js';
-export { buildStatusSnapshot } from '../ports/index.js';
 export {
+    PermissionController,
     bootstrapAgentTools as bootstrapTools,
+    buildStatusSnapshot,
     configureHookTools,
     setExperimentalSession,
     setHub,
@@ -22,3 +22,8 @@ export {
 } from '../ports/index.js';
 export { HandoffManager } from './handoff-manager.js';
 export { MessageQueue } from './message-queue.js';
+/**
+ * @typedef {import('./handoff-manager.js').HandoffRequest} HandoffRequest
+ *
+ * @typedef {import('./handoff-manager.js').HandoffResult} HandoffResult
+ */

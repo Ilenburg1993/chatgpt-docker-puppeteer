@@ -41,7 +41,7 @@ vi.mock('../../../src/copilot/terminal/dialog/index.js', () => ({
 }));
 
 vi.mock('../../../src/copilot/presentation/state/index.js', async (importOriginal) => {
-    const actual = await importOriginal();
+    const actual = /** @type {Record<string, unknown>} */ (await importOriginal());
     return {
         ...actual,
         setLastSdkPlanOperation: mocks.setLastSdkPlanOperation,

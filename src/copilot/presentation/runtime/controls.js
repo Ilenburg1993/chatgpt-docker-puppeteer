@@ -35,11 +35,11 @@ import {
     getDefaultAgentRuntime,
     getDefaultAgentRuntimeId,
     requireAgentRuntime,
-} from '../agent/runtime/index.js';
+} from '#copilot/presentation/agent/runtime';
 
 /**
  * @param {string | null | undefined} [runtimeId]
- * @returns {import('../../agent/always-alive.js').AlwaysAliveAgent}
+ * @returns {import('#copilot/agent/always-alive').AlwaysAliveAgent}
  */
 export function getAgentRuntimeControlsTarget(runtimeId) {
     const resolvedRuntimeId = runtimeId ?? getDefaultAgentRuntimeId();
@@ -50,7 +50,7 @@ export function getAgentRuntimeControlsTarget(runtimeId) {
 }
 
 /**
- * @returns {import('../../agent/always-alive.js').AlwaysAliveAgent}
+ * @returns {import('#copilot/agent/always-alive').AlwaysAliveAgent}
  */
 export function getDefaultAgentRuntimeControlsTarget() {
     return getAgentRuntimeControlsTarget(getDefaultAgentRuntimeId());
@@ -99,16 +99,29 @@ export function setAgentRuntimePermissionMode(mode, runtimeId) {
 }
 
 /**
+ * Lê o estado de controle usando um runtime alvo já resolvido.
+ *
+ * Use em consumidores compartilhados que já recebem a instância viva do runtime e não devem tocar `agent/facades`
+ * diretamente.
+ *
+ * @param {import('#copilot/agent/always-alive').AlwaysAliveAgent} agent
+ * @returns {ReturnType<typeof readRuntimeControlState>}
+ */
+export function getAgentRuntimeControlStateForTarget(agent) {
+    return readRuntimeControlState(agent);
+}
+
+/**
  * Lê estado de controle usando o runtime já resolvido pela borda HTTP.
  *
  * Use em rotas que recebem `CopilotApiRouteDeps`; isso preserva bindings injetáveis e evita reabrir o registry por
  * `runtimeId` quando a rota já selecionou/fallbackou o runtime.
  *
- * @param {{ agent: import('../../agent/always-alive.js').AlwaysAliveAgent }} deps
+ * @param {{ agent: import('#copilot/agent/always-alive').AlwaysAliveAgent }} deps
  * @returns {ReturnType<typeof readRuntimeControlState>}
  */
 export function readAgentRuntimeControlStateFromRoute(deps) {
-    return readRuntimeControlState(deps.agent);
+    return getAgentRuntimeControlStateForTarget(deps.agent);
 }
 
 /**
@@ -231,14 +244,14 @@ export async function stopDefaultAgentDialogLoopAuthorized() {
 
 /**
  * @param {string | null | undefined} [runtimeId]
- * @returns {import('../../agent/infra/handoff-manager.js').HandoffManager | null}
+ * @returns {import('#copilot/agent/infra').HandoffManager | null}
  */
 export function getAgentHandoffManager(runtimeId) {
     return getRuntimeHandoffManager(getAgentRuntimeControlsTarget(runtimeId));
 }
 
 /**
- * @returns {import('../../agent/infra/handoff-manager.js').HandoffManager | null}
+ * @returns {import('#copilot/agent/infra').HandoffManager | null}
  */
 export function getDefaultAgentHandoffManager() {
     return getAgentHandoffManager(getDefaultAgentRuntimeId());
@@ -246,14 +259,14 @@ export function getDefaultAgentHandoffManager() {
 
 /**
  * @param {string | null | undefined} [runtimeId]
- * @returns {import('../../agent/infra/handoff-manager.js').HandoffRequest[]}
+ * @returns {import('#copilot/agent/infra').HandoffRequest[]}
  */
 export function readAgentHandoffHistory(runtimeId) {
     return getRuntimeHandoffHistory(getAgentRuntimeControlsTarget(runtimeId));
 }
 
 /**
- * @returns {import('../../agent/infra/handoff-manager.js').HandoffRequest[]}
+ * @returns {import('#copilot/agent/infra').HandoffRequest[]}
  */
 export function readDefaultAgentHandoffHistory() {
     return readAgentHandoffHistory(getDefaultAgentRuntimeId());

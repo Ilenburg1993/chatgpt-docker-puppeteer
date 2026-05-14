@@ -7,4 +7,4 @@
  * @module copilot/hooks/registry
  */
 
-export { HookRegistry, SDK_HOOKS } from '../sdk/session/hook-registry.js';
+export { HookRegistry, SDK_HOOKS } from '#copilot/sdk/session';

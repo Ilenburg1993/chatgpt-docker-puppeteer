@@ -11,7 +11,7 @@ import { log } from '../logger.js';
 import { getModelListClient } from './client-provider.js';
 import { modelSelector } from './registry.js';
 
-import { toError } from '../../core/error-handlers.js';
+import { toError } from '#copilot/core/error-handlers';
 /**
  * @typedef {import('@github/copilot-sdk').ModelInfo} ModelInfo
  *

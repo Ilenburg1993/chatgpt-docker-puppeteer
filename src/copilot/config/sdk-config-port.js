@@ -24,7 +24,7 @@ export {
 } from '#copilot/sdk';
 
 export { resolvePersistentConfigFile } from '../sdk/persistent-paths.js';
-export { ClientOptionsBuilder, buildCopilotClientOptionsFromEnv } from '../sdk/session/client-options.js';
+export { ClientOptionsBuilder, buildCopilotClientOptionsFromEnv } from '#copilot/sdk/session';
 
 /**
  * @typedef {import('#copilot/sdk/types').SessionConfig} SessionConfig

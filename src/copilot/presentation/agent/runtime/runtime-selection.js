@@ -17,10 +17,10 @@ import {
     getDefaultAgentRuntimeId as readDefaultAgentRuntimeId,
 } from '#copilot/agent/runtime-registry';
 import { NotFoundError } from '#copilot/core';
-import { normalizeRuntimeId } from '../../routing/index.js';
+import { normalizeRuntimeId } from '../../routing/targeting.js';
 
 /**
- * @typedef {import('../../../agent/always-alive.js').AlwaysAliveAgent} AgentRuntime
+ * @typedef {import('#copilot/agent/always-alive').AlwaysAliveAgent} AgentRuntime
  */
 
 /**

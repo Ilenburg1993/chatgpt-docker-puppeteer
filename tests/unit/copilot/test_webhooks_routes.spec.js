@@ -68,7 +68,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('../../../src/copilot/presentation/routing/index.js', async (importOriginal) => {
-    const actual = await importOriginal();
+    const actual = /** @type {Record<string, unknown>} */ (await importOriginal());
     return {
         ...actual,
         resolveRequestedRuntimeId: mocks.resolveRequestedRuntimeId,

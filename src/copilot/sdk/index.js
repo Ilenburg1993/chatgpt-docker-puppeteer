@@ -6,22 +6,22 @@
  *
  * ### Faixas de API
  *
- * | Faixa | Tema                       | Sub-módulo fonte      |
- * | ----- | -------------------------- | --------------------- |
- * | 1     | Types & Constants          | constants.js          |
- * | 2     | Tools & Permissions        | tools.js, permissions |
- * | 3     | SystemMessage Builder      | system-message.js     |
- * | 4     | Unified Config Builder     | config.js             |
- * | 5     | Client & Session Facade    | client-facade.js      |
- * | 6     | Session Lifecycle Wrappers | sdk-session-wrapper   |
- * | 7-8   | RPC Core & Advanced        | rpc.js, server-rpc    |
- * | 9     | Health & Auth              | health.js             |
- * | 10    | Event System               | events.js             |
- * | 11    | Lifecycle Events           | client-events.js      |
- * | 12    | Provider / BYOK            | provider.js           |
- * | 13    | Telemetry & Tracing        | telemetry.js          |
- * | 16    | Custom Tools Registry      | custom-tools.js       |
- * | 22    | Experimental Features      | feature-flags.js      |
+ * | Faixa | Tema                      | Sub-módulo fonte       |
+ * | ----- | ------------------------- | ---------------------- |
+ * | 1     | Types & Constants         | constants.js           |
+ * | 2     | Tools & Permissions       | tools.js, permissions  |
+ * | 3     | SystemMessage Builder     | system-message.js      |
+ * | 4     | Unified Config Builder    | config.js              |
+ * | 5     | Client & Session Facade   | client-facade.js       |
+ * | 6     | Session Runtime Lifecycle | session-runtime        |
+ * | 7-8   | RPC Core & Advanced       | rpc/index + rpc-facade |
+ * | 9     | Health & Auth             | health.js              |
+ * | 10    | Event System              | events.js              |
+ * | 11    | Lifecycle Events          | client-events.js       |
+ * | 12    | Provider / BYOK           | provider.js            |
+ * | 13    | Telemetry & Tracing       | telemetry.js           |
+ * | 16    | Custom Tools Registry     | custom-tools.js        |
+ * | 22    | Experimental Features     | feature-flags.js       |
  *
  * ### DI Setters (chamados por observability/bootstrap.js)
  *
@@ -310,7 +310,7 @@ export {
     sendSession,
     sendSessionAndWait,
     setSessionModel,
-} from './session/wrapper.js';
+} from './session/runtime.js';
 
 export {
     getSessionCapabilities,
@@ -353,7 +353,7 @@ export {
     workspaceCreateFile,
     workspaceListFiles,
     workspaceReadFile,
-} from './rpc.js';
+} from './rpc/index.js';
 
 // ─── Faixa 9: Server RPC + Health ──────────────────────────────────────────────
 export { accountGetQuota, createServerRpcFacade, modelsList, ping, toolsList } from './rpc/server.js';
@@ -453,7 +453,7 @@ export {
     registerTools,
 } from './tools/registry.js';
 
-// ─── Faixa 22: Experimental Features (gated) ─────────────────────────────────
+// ─── Faixa 22: Experimental Flags (gated) ────────────────────────────────────
 
 export {
     EXPERIMENTAL_FEATURES,
@@ -462,28 +462,6 @@ export {
     resetExperimentalFlags,
     setExperimentalFlag,
 } from './feature-flags.js';
-
-export {
-    agentDeselect,
-    agentGetCurrent,
-    agentList,
-    agentReload,
-    agentSelect,
-    extensionsDisable,
-    extensionsEnable,
-    extensionsList,
-    extensionsReload,
-    fleetStart,
-    mcpDisable,
-    mcpEnable,
-    mcpList,
-    mcpReload,
-    pluginsList,
-    skillsDisable,
-    skillsEnable,
-    skillsList,
-    skillsReload,
-} from './rpc/experimental.js';
 
 export { setSdkLogger } from './logger.js';
 export { emitSdkOperationMetric, setSdkMetricEmitter } from './telemetry/operation-metrics.js';

@@ -10,6 +10,7 @@
  *
  * @module copilot/tools/session/experimental-rpc-tools
  * @see module:copilot/sdk/experimental-rpc
+ * @see module:copilot/sdk/rpc
  * @see module:copilot/sdk/feature-flags
  */
 
@@ -19,11 +20,9 @@ import { z } from 'zod';
 import { log } from '../infra/logger.js';
 import { buildTool, withSkipPermission } from '../infra/tool-factory.js';
 
+import { agentGetCurrent, agentList, agentReload, agentSelect } from '#copilot/sdk/rpc';
+
 import {
-    agentGetCurrent,
-    agentList,
-    agentReload,
-    agentSelect,
     extensionsDisable,
     extensionsEnable,
     extensionsList,
@@ -38,7 +37,7 @@ import {
     skillsEnable,
     skillsList,
     skillsReload,
-} from '#copilot/sdk';
+} from '#copilot/sdk/experimental-rpc';
 
 // ─── Session handle ──────────────────────────────────────────────────────────
 

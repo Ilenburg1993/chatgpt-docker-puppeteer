@@ -1,0 +1,224 @@
+// @ts-check
+/**
+ * src/copilot/sdk/session/index.js — Barrel canônico de `sdk/session/`
+ *
+ * Política 2.1: superfície explícita (runtime-only), evitando `export *` em módulos que carregam typedefs homônimos no
+ * declaration emit (ex.: `CopilotSession`, `SessionConfig`).
+ *
+ * @module copilot/sdk/session
+ */
+
+export {
+    blobAttachment,
+    createBlobAttachment,
+    createFileAttachment,
+    directoryAttachment,
+    fileAttachment,
+    normalizeAttachments,
+    selectionAttachment,
+} from './attachments.js';
+
+export {
+    getSessionCapabilities,
+    supportsElicitation,
+    waitForElicitationCapability,
+    watchCapabilities,
+} from './capabilities.js';
+
+export {
+    LIFECYCLE_EVENTS,
+    isLifecycleEventType,
+    onAllLifecycleEvents,
+    onLifecycleEvent,
+    onLifecycleEvents,
+    onSessionBackground,
+    onSessionCreated,
+    onSessionDeleted,
+    onSessionForeground,
+    onSessionUpdated,
+} from './client-events.js';
+
+export {
+    ensureClient,
+    isClientReady,
+    quickDisconnect,
+    quickResume,
+    quickSession,
+    shutdownClient,
+    withSession,
+} from './client-facade.js';
+
+export { ClientOptionsBuilder, buildCopilotClientOptionsFromEnv } from './client-options.js';
+
+export {
+    CopilotClient,
+    CopilotClientManager,
+    _injectClientForTest,
+    _resetClientState,
+    buildClientOptions,
+    createClientSession,
+    createCopilotClient,
+    createCopilotClientManager,
+    defaultClientManager,
+    deleteClientSession,
+    disconnectClientSession,
+    forceStopClient,
+    getActiveSessionCount,
+    getAuthStatus,
+    getClient,
+    getClientSession,
+    getClientState,
+    getClientStatus,
+    getForegroundClientSessionId,
+    getLastClientSessionId,
+    getSdkConnectionCircuitBreaker,
+    getServerRpc,
+    incrementSessionMessageCount,
+    listActiveClientSessions,
+    listAllClientSessions,
+    listAvailableModels,
+    pingClient,
+    resumeClientSession,
+    sdkConnectionCircuitBreaker,
+    setForegroundClientSessionId,
+    stopClient,
+} from './client.js';
+
+export {
+    createQueuedElicitationHandler,
+    normalizeElicitationCompletedEvent,
+    normalizeElicitationPendingEvent,
+    normalizeElicitationResult,
+} from './elicitation.js';
+
+export {
+    ALL_EVENT_TYPES,
+    createEventFilter,
+    getEventPayload,
+    getEventType,
+    isKnownEventType,
+    onAllSessionEvents,
+    onSessionEvent,
+    onSessionEvents,
+} from './events.js';
+
+export { HookBus, attachBus, defaultBus } from './hook-bus.js';
+export { clearHooksLogger, log, setHooksLogger } from './hook-logger.js';
+export { HookRegistry, SDK_HOOKS } from './hook-registry.js';
+
+export {
+    createClientFromCliUrl,
+    createSession,
+    deleteSession,
+    disconnectSession,
+    listSessions,
+    resumeOrCreate,
+    resumeSession,
+    setSessionAutoModelResolver,
+} from './lifecycle.js';
+
+// model-resolution-port.js — excluído: lifecycle.js já re-exporta setSessionAutoModelResolver.
+
+export { PermissionController } from './permission-controller.js';
+export {
+    classifyPermissionDecision,
+    normalizePermissionCompletedEvent,
+    normalizePermissionRequestedEvent,
+} from './permission-events.js';
+export {
+    DEFAULT_PERMISSION_MODE,
+    PERMISSION_MODES,
+    TOOL_NAME_RE,
+    extractPermissionToolName,
+    normalizePermissionMode,
+    sanitizeToolNames,
+} from './permission-runtime.js';
+
+export { approveAll, createAllowlistPermissionHandler, createPermissionHandler } from './permissions.js';
+
+export {
+    anthropicProvider,
+    azureProvider,
+    isValidProviderType,
+    openaiProvider,
+    validateProviderConfig,
+} from './provider.js';
+export {
+    normalizeModeChangedEvent,
+    normalizeModelChangedEvent,
+    normalizePlanChangedEvent,
+    normalizeToolsUpdatedEvent,
+} from './session-events.js';
+
+export {
+    buildConfiguredClientSessionFsConfig,
+    createLocalSessionFsProvider,
+    createWorkspaceSessionFsHandler,
+    getConfiguredSessionFsHandler,
+    getConfiguredSessionIdleTimeoutSeconds,
+} from './session-fs.js';
+
+export {
+    clearActiveSdkSessions,
+    createSdkSessionRegistry,
+    defaultSdkSessionRegistry,
+    getActiveSdkSession,
+    getActiveSdkSessionCount,
+    incrementActiveSdkSessionMessageCount,
+    listActiveSdkSessions,
+    registerActiveSdkSession,
+    removeActiveSdkSession,
+} from './session-registry.js';
+
+export {
+    appendSystemMessage,
+    appendToGuidelines,
+    customizeSystemMessage,
+    getSectionDescription,
+    getSectionNames,
+    replaceIdentity,
+    replaceSystemMessage,
+    sectionOverride,
+    supportsCustomizeMode,
+    transformSection,
+} from './system-message.js';
+export { ToolSessionContext, createToolSessionContext } from './tool-session-context.js';
+
+// ui.js — exports explícitos: getSessionCapabilities já exportado por capabilities.js.
+export {
+    isSessionUiElicitationAvailable,
+    sessionUiConfirm,
+    sessionUiElicitation,
+    sessionUiInput,
+    sessionUiSelect,
+} from './ui.js';
+
+export {
+    cancelAllPendingStructuredUserInput,
+    classifyUserInputQuestionKind,
+    configureDefaultUserInputContext,
+    createQueuedInputHandler,
+    createReadlineInputHandler,
+    createStaticInputHandler,
+    deletePendingStructuredUserInputResolver,
+    getPendingStructuredUserInputCount,
+    getPendingStructuredUserInputIds,
+    hasPendingStructuredUserInputRequests,
+    nextStructuredUserInputRequestId,
+    normalizeUserInputCompletedEvent,
+    normalizeUserInputRequestedEvent,
+    registerPendingStructuredUserInputResolver,
+    resolvePendingStructuredUserInput,
+} from './user-input.js';
+
+export {
+    abortSession,
+    disconnectSessionSafe,
+    disposeSession,
+    getSessionMessages,
+    getSessionWorkspacePath,
+    runSessionLifecycle,
+    sendSession,
+    sendSessionAndWait,
+    setSessionModel,
+} from './runtime.js';

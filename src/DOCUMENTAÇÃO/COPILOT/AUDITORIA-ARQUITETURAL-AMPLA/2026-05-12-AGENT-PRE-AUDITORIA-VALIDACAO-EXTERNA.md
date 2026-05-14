@@ -451,3 +451,43 @@ O próximo documento consolida:
 - backlog completo sem gaps;
 - roadmap operacional com **faixas, fases e subfases**, com critérios de entrada/saída e
   dependências.
+
+---
+
+## Atualização factual adicional — acoplamento canônico externo (2026-05-13)
+
+Além do fechamento barrel-first da ONDA 2, foi executada uma rodada ampla de consolidação do
+acoplamento externo do runtime:
+
+- criado `src/copilot/runtime/index.js` com alias `#copilot/runtime`;
+- migrados para esse seam:
+  - `channel/client-dialog.js`
+  - `channel/client.js`
+  - `conversation-hub/call-strategies.js`
+  - `terminal/frontend/gateways/agent-runtime.js`
+  - `runtime-wiring.js` (para leitura de estado)
+- criado `src/copilot/event-handlers/contracts.js` para concentrar typedefs antes acoplados ao
+  módulo concreto `agent/session/wiring/event-wirer.js`.
+
+Métrica objetiva:
+
+- referências externas diretas a `agent/*` caíram de **50** para **38** arquivos.
+
+Leitura revisada:
+
+- **ONDA 2** está realmente concluída;
+- **ONDA 3 / C3.3** ainda não está concluída;
+- o que mudou nesta rodada foi a clareza da fronteira: o acoplamento operacional fora do owner
+  deixou de ser difuso e passou a ter seam nomeado e governado.
+
+Bug arquitetural encontrado e sanado:
+
+- `runtime-selection` importava `presentation/routing/index.js` e puxava `presentation/state/ui-store`
+  por side-effect;
+- a correção foi estreitar o import para `presentation/routing/targeting.js`.
+
+Gates desta rodada:
+
+- `npm run typecheck:strict:src.copilot`: **verde**
+- `npm run typecheck:strict:tests.unit`: **verde**
+- `npm run test:copilot:unit`: **2614/2614** verdes

@@ -8,6 +8,7 @@
  * @module copilot/boot/runtime-bootstrap
  */
 
+import { runCopilotSdkBootPreflight } from '#copilot/agent/lifecycle';
 import { AUDIT_BUS } from '#copilot/audit';
 import {
     assertCopilotBootSurfaces,
@@ -26,7 +27,6 @@ import {
     defaultHookBus,
 } from '#copilot/sdk';
 import { TOOLS_LOGGER, TOOLS_METRICS } from '#copilot/tools';
-import { runCopilotSdkBootPreflight } from '../agent/lifecycle/process-host/runtime-host.js';
 import { COPILOT_MODEL, PING_TIMEOUT_MS } from '../config/agent.js';
 import { container } from '../core/di-container.js';
 import {
@@ -46,7 +46,7 @@ let _booted = false;
  *     wireRuntime: () => void;
  *     startTodoCleanupJob: typeof import('../tools/todo/store.js').startTodoCleanupJob;
  *     bootConfig: ReturnType<typeof readCopilotBootConfig>;
- *     bootPreflight?: import('../agent/lifecycle/process-host/runtime-host.js').CopilotSdkBootPreflightReport | null;
+ *     bootPreflight?: import('#copilot/agent/lifecycle').CopilotSdkBootPreflightReport | null;
  * }} CopilotTerminalBootContextInput
  *
  *
@@ -105,9 +105,7 @@ export async function bootCopilot(options) {
         const bootPlan = createCopilotBootPlan(bootConfig);
         /**
          * @type {{
-         *     bootPreflight:
-         *         | import('../agent/lifecycle/process-host/runtime-host.js').CopilotSdkBootPreflightReport
-         *         | null;
+         *     bootPreflight: import('#copilot/agent/lifecycle').CopilotSdkBootPreflightReport | null;
          *     startTodoCleanupJob: null | typeof import('../tools/todo/store.js').startTodoCleanupJob;
          *     wireRuntime: null | (() => void);
          *     terminal: CopilotTerminalHostSurface | null;

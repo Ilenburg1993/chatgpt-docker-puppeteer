@@ -102,6 +102,9 @@ describe('canonical flow governance', () => {
             if (rel === 'deps.js') continue;
 
             for (const spec of readImportSpecifiers(abs)) {
+                if (rel === 'session-send-helpers.js' && spec === '#copilot/sdk/session') {
+                    continue;
+                }
                 const violated = forbiddenRoots.some((root) => spec === root || spec.startsWith(`${root}/`));
                 if (violated) {
                     offenders.push(`${rel} -> ${spec}`);

@@ -12,7 +12,7 @@ import { buildRuntimeRouteMetaPayload } from '../routing/index.js';
 import { getAgentHealthSnapshotCompat } from './health.js';
 
 /**
- * @typedef {import('../../agent/types.js').IAlwaysAliveAgent & {
+ * @typedef {import('#copilot/agent/types').IAlwaysAliveAgent & {
  *     listWebhooks?: () => unknown[];
  *     getHandoffManager?: () => unknown;
  * }} CapabilityAgent

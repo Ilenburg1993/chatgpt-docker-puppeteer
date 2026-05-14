@@ -14,7 +14,7 @@ import {
     readRuntimeInteractionState,
     readRuntimePrBudgetSnapshot,
 } from '#copilot/agent/facades';
-import { listKnownAgentRuntimes, resolveAgentRuntimeSelection } from '../agent/runtime/index.js';
+import { listKnownAgentRuntimes, resolveAgentRuntimeSelection } from '#copilot/presentation/agent/runtime';
 import { recordRuntimeFallback } from './fallback-telemetry.js';
 
 /**
@@ -44,7 +44,7 @@ export function normalizeAgentContextWindowProjection(raw) {
  *
  * @param {string | null | undefined} [runtimeId]
  * @returns {{
- *     agent: import('../../agent/always-alive.js').AlwaysAliveAgent;
+ *     agent: import('#copilot/agent/always-alive').AlwaysAliveAgent;
  *     agentProfileId: string | null;
  *     requestedRuntimeId: string | null;
  *     runtimeId: string;
@@ -113,11 +113,11 @@ export function readAgentRuntimeOverview(runtimeId) {
  *     dialogLoopActive: boolean;
  *     dialogPaused: boolean;
  *     queueSize: number;
- *     pendingQuestion: import('../../agent/types.js').PendingQuestion | null;
- *     pendingQuestionKind: import('../../agent/types.js').PendingQuestionKind | null;
- *     pendingQuestionShadow: import('../../agent/types.js').PendingQuestionShadow | null;
- *     pendingQuestionShadowKind: import('../../agent/types.js').PendingQuestionKind | null;
- *     pendingQuestionShadowState: import('../../agent/types.js').PendingQuestionShadowState | null;
+ *     pendingQuestion: import('#copilot/agent/types').PendingQuestion | null;
+ *     pendingQuestionKind: import('#copilot/agent/types').PendingQuestionKind | null;
+ *     pendingQuestionShadow: import('#copilot/agent/types').PendingQuestionShadow | null;
+ *     pendingQuestionShadowKind: import('#copilot/agent/types').PendingQuestionKind | null;
+ *     pendingQuestionShadowState: import('#copilot/agent/types').PendingQuestionShadowState | null;
  *     pendingQuestionShadowExpired: boolean;
  *     pendingQuestionShadowAgeMs: number | null;
  *     pendingQuestionShadowExpiresAt: number | null;

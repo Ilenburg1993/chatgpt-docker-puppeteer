@@ -1,6 +1,6 @@
 // @ts-check
 import { ConfigError } from '#copilot/core';
-import { validateToolDefinitionContract } from '../../core/tool-contracts.js';
+import { validateToolDefinitionContract } from '#copilot/core/tool-contracts';
 import { log } from '../logger.js';
 /**
  * src/copilot/sdk/tools-registry.js
@@ -278,10 +278,10 @@ export function inspectRegistry(registry) {
 
 /**
  * Cria um adapter OOP sobre o registry funcional, implementando a interface
- * {@link import('../../core/interfaces.js').IToolRegistry IToolRegistry}.
+ * {@link import('#copilot/core/interfaces').IToolRegistry IToolRegistry}.
  *
  * @param {ToolRegistry} [inner] - Registry interno. Se omitido, cria um novo vazio.
- * @returns {import('../../core/interfaces.js').IToolRegistry}
+ * @returns {import('#copilot/core/interfaces').IToolRegistry}
  */
 export function createToolRegistryAdapter(inner) {
     const reg = inner ?? createRegistry();

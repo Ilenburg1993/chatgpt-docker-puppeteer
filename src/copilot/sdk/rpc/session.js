@@ -93,7 +93,7 @@ export async function modelGetCurrent(session) {
 /**
  * Troca o modelo da sessão via RPC. Troca o modelo via RPC de baixo nível.
  *
- * **NOTA**: Prefira `session.setModel()` (via `sdk/session/wrapper.js`) para troca de modelo em código de negócio. Esta
+ * **NOTA**: Prefira `session.setModel()` (via `sdk/session/runtime.js`) para troca de modelo em código de negócio. Esta
  * função é uma alternativa de baixo nível que acessa `session.rpc.model.switchTo()` diretamente e pode não disparar
  * hooks/lifecycle internos do SDK.
  *

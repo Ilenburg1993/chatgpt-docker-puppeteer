@@ -22,6 +22,10 @@ import { getAgentRuntimeControlsTarget, getDefaultAgentRuntimeControlsTarget } f
 export { MAX_EMBED_BYTES };
 
 /**
+ * @typedef {'watchdog_restart' | 'authorized_stop' | 'recovery_restart'} RuntimeDialogStopReason
+ */
+
+/**
  * @typedef {{
  *     dialogLoopActive?: boolean | undefined;
  *     dialogPaused?: boolean | undefined;
@@ -247,10 +251,11 @@ export async function sendRuntimeDialogTurnForRuntime(message, from, options, ru
 
 /**
  * @param {RuntimeDialogTarget | null | undefined} [runtime]
+ * @param {RuntimeDialogStopReason} [reason='authorized_stop']
  * @returns {Promise<void>}
  */
-export async function stopRuntimeDialogLoopAuthorized(runtime) {
-    await stopAgentDialogLoopAuthorized(resolveRuntimeDialogTarget(runtime));
+export async function stopRuntimeDialogLoopAuthorized(runtime, reason = 'authorized_stop') {
+    await stopAgentDialogLoopAuthorized(resolveRuntimeDialogTarget(runtime), reason);
 }
 
 /**

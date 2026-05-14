@@ -29,7 +29,7 @@ import { buildTool, withSkipPermission } from '../infra/tool-factory.js';
 /**
  * Handle RPC ativo da sessão corrente. Injetado via setSessionRpc() após inicialização.
  *
- * @type {ReturnType<typeof import('../../sdk/rpc.js').createSessionRpcFacade> | null}
+ * @type {ReturnType<typeof import('#copilot/sdk/rpc-facade').createSessionRpcFacade> | null}
  */
 let _rpc = null;
 
@@ -41,7 +41,7 @@ let _rpc = null;
  * @returns {void}
  */
 export function setSessionRpc(rpc) {
-    _rpc = /** @type {ReturnType<typeof import('../../sdk/rpc.js').createSessionRpcFacade> | null} */ (rpc);
+    _rpc = /** @type {ReturnType<typeof import('#copilot/sdk/rpc-facade').createSessionRpcFacade> | null} */ (rpc);
     log('DEBUG', `[session-rpc-tools] RPC ${rpc ? 'registrado' : 'removido'}.`);
 }
 
@@ -59,7 +59,7 @@ export function resetSessionRpcForTests() {
 /**
  * Verifica se o RPC está disponível ou retorna um erro padronizado.
  *
- * @returns {{ ok: true; rpc: ReturnType<typeof import('../../sdk/rpc.js').createSessionRpcFacade> }
+ * @returns {{ ok: true; rpc: ReturnType<typeof import('#copilot/sdk/rpc-facade').createSessionRpcFacade> }
  *     | { ok: false; error: string }}
  */
 function getRpc() {
@@ -96,8 +96,8 @@ function resolveRpcTimeoutMs(timeoutMs) {
  *
  * @template T
  * @param {string} toolName - Nome do tool para logging
- * @param {(rpc: ReturnType<typeof import('../../sdk/rpc.js').createSessionRpcFacade>) => Promise<T>} fn - Função que
- *   recebe o handle RPC e executa a operação
+ * @param {(rpc: ReturnType<typeof import('#copilot/sdk/rpc-facade').createSessionRpcFacade>) => Promise<T>} fn - Função
+ *   que recebe o handle RPC e executa a operação
  * @param {{ timeoutMs?: number | null }} [opts]
  * @returns {Promise<T | { error: string }>}
  */

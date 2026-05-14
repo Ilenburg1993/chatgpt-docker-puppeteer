@@ -14,11 +14,11 @@
 import { STARVATION_THRESHOLD_MS } from '../config/agent.js';
 
 /**
- * @typedef {import('../agent/types.js').AgentStatusSnapshot} AgentStatusSnapshot
+ * @typedef {import('#copilot/agent/types').AgentStatusSnapshot} AgentStatusSnapshot
  *
- * @typedef {import('../agent/types.js').AgentStatus} AgentStatus
+ * @typedef {import('#copilot/agent/types').AgentStatus} AgentStatus
  *
- * @typedef {import('../agent/types.js').PendingQuestion} PendingQuestion
+ * @typedef {import('#copilot/agent/types').PendingQuestion} PendingQuestion
  */
 
 /**

@@ -119,15 +119,15 @@ describe('F23 — F108: index.js formato consistente', () => {
 
 // ─── F109: Sem sobreposição experimental-rpc.js vs rpc.js ────────────────────
 
-describe('F23 — F109: experimental-rpc.js sem sobreposição com rpc.js', () => {
-    it('experimental-rpc.js e rpc.js existem', () => {
+describe('F23 — F109: experimental-rpc.js sem sobreposição com rpc core', () => {
+    it('experimental-rpc.js e rpc/index.js existem', () => {
         expect(existsSync(join(SDK_DIR, 'rpc/experimental.js'))).toBe(true);
-        expect(existsSync(join(SDK_DIR, 'rpc.js'))).toBe(true);
+        expect(existsSync(join(SDK_DIR, 'rpc/index.js'))).toBe(true);
     });
 
-    it('experimental-rpc.js NÃO exporta funções já em rpc.js', () => {
+    it('experimental-rpc.js NÃO exporta funções já em rpc/index.js', () => {
         const expSrc = readSdk('rpc/experimental.js');
-        const rpcSrc = readSdk('rpc.js');
+        const rpcSrc = readSdk('rpc/index.js');
 
         const expExports = extractExportedNames(expSrc);
         const rpcExports = extractExportedNames(rpcSrc);
@@ -141,17 +141,17 @@ describe('F23 — F109: experimental-rpc.js sem sobreposição com rpc.js', () =
 
     it('experimental-rpc.js cobre subsistemas exclusivamente experimentais', () => {
         const src = readSdk('rpc/experimental.js');
-        // Os 6 subsistemas experimentais devem estar presentes
+        // Os subsistemas experimentais devem estar presentes
         expect(src).toContain('fleet');
-        expect(src).toContain('agents');
+        expect(src).toContain('agent');
         expect(src).toContain('skills');
         expect(src).toContain('mcp');
         expect(src).toContain('plugins');
         expect(src).toContain('extensions');
     });
 
-    it('rpc.js tem subsistemas core (model, mode, plan, shell, compaction)', () => {
-        const src = readSdk('rpc.js');
+    it('rpc/index.js tem subsistemas core (model, mode, plan, shell, compaction)', () => {
+        const src = readSdk('rpc/index.js');
         expect(src).toContain('modelGetCurrent');
         expect(src).toContain('modeGet');
         expect(src).toContain('planRead');
@@ -173,9 +173,9 @@ describe('F23 — F110: barrel tem seções organizadas', () => {
         expect(src).toContain("from './session/lifecycle.js'");
     });
 
-    it('barrel exporta de rpc.js', () => {
+    it('barrel exporta de rpc/index.js', () => {
         const src = readSdk('index.js');
-        expect(src).toContain("from './rpc.js'");
+        expect(src).toContain("from './rpc/index.js'");
     });
 
     it('barrel exporta de events.js', () => {
@@ -188,9 +188,9 @@ describe('F23 — F110: barrel tem seções organizadas', () => {
         expect(src).toContain("from './telemetry/health.js'");
     });
 
-    it('barrel exporta de experimental-rpc.js', () => {
+    it('barrel não reexporta experimental-rpc.js no root', () => {
         const src = readSdk('index.js');
-        expect(src).toContain("from './rpc/experimental.js'");
+        expect(src).not.toContain("from './rpc/experimental.js'");
     });
 
     it('barrel exporta de quota-monitor.js', () => {
@@ -205,7 +205,7 @@ describe('F23 — F111: módulos obrigatórios acessíveis via barrel', () => {
     const REQUIRED_MODULES = [
         'session/client.js',
         'session/lifecycle.js',
-        'rpc.js',
+        'rpc/index.js',
         'rpc/server.js',
         'session/events.js',
         'event-helpers.js',
@@ -222,7 +222,7 @@ describe('F23 — F111: módulos obrigatórios acessíveis via barrel', () => {
         'session/client-events.js',
         'session/client-facade.js',
         'feature-flags.js',
-        'rpc/experimental.js',
+        // experimental-rpc é surface separada (#copilot/sdk/experimental-rpc)
         'telemetry/quota-monitor.js',
         'models/helpers.js',
         'models/registry.js',
@@ -249,8 +249,8 @@ describe('F23 — F111: módulos obrigatórios acessíveis via barrel', () => {
 // ─── F112: Sem símbolos exportados que não existem ───────────────────────────
 
 describe('F23 — F112: barrel sem exports de símbolos inexistentes', () => {
-    it('createSessionRpcFacade exportado existe em rpc.js', () => {
-        const rpcSrc = readSdk('rpc.js');
+    it('createSessionRpcFacade exportado existe em rpc/session-facade.js', () => {
+        const rpcSrc = readSdk('rpc/session-facade.js');
         expect(rpcSrc).toContain('export function createSessionRpcFacade');
     });
 

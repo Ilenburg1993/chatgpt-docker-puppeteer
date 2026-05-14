@@ -28,6 +28,7 @@ vi.mock('../../../src/copilot/agent/facades/agent-sdk-access.js', () => ({
 }));
 
 import {
+    createBootWiringState,
     runDialogBootRecovery,
     scheduleDialogBootRecovery,
     stepScheduleDialogRecovery,
@@ -92,8 +93,9 @@ describe('boot-steps dialog boot recovery', () => {
     it('stepScheduleDialogRecovery consulta a decisão semântica de scheduling e agenda o timer quando aplicável', async () => {
         facadeMocks.shouldScheduleAgentRuntimeDialogBootRecovery.mockResolvedValue(true);
         const ctx = createCtx();
+        const state = createBootWiringState();
 
-        stepScheduleDialogRecovery(true, ctx);
+        stepScheduleDialogRecovery(true, ctx, state);
         await Promise.resolve();
 
         expect(facadeMocks.shouldScheduleAgentRuntimeDialogBootRecovery).toHaveBeenCalledTimes(1);
@@ -112,6 +114,7 @@ describe('boot-steps dialog boot recovery', () => {
             expect.any(Promise),
             expect.objectContaining({ label: 'dialog.boot_recovery.run' }),
         );
+        expect(state.unsubs).toHaveLength(1);
     });
 
     it('scheduleDialogBootRecovery não executa o recovery quando o agente já está stopped', async () => {

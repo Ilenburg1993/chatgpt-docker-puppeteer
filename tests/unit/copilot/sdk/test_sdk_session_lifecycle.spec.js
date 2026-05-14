@@ -54,7 +54,7 @@ import {
     runSessionLifecycle,
     sendSessionAndWait,
     setSessionModel,
-} from '#copilot/sdk/sdk-session-wrapper';
+} from '#copilot/sdk/session-runtime';
 import { setSdkMetricEmitter } from '../../../../src/copilot/sdk/telemetry/operation-metrics.js';
 
 // ─── Helper: fake session ──────────────────────────────────────────────────

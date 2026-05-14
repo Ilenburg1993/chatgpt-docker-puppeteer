@@ -8,7 +8,6 @@
  * @see module:copilot/channel/inject
  */
 
-import { readRuntimeControlState } from '#copilot/agent/facades';
 import { BridgeError } from '#copilot/core';
 import {
     EMITTER_QUESTION_PENDING,
@@ -19,6 +18,7 @@ import {
     EMITTER_TOOL_EXECUTION_PROGRESS,
 } from '#copilot/events';
 import { log } from '#copilot/observability';
+import { getAgentRuntimeControlStateForTarget } from '#copilot/runtime';
 import { logSwallowed } from '../core/error-handlers.js';
 import {
     dialogTurn as _dialogTurn,
@@ -592,7 +592,9 @@ export class LlmBridgeClient {
      */
     getAgentStatus() {
         const agent = requireAgent();
-        const controlState = readRuntimeControlState(/** @type {any} */ (agent));
+        const controlState = getAgentRuntimeControlStateForTarget(
+            /** @type {import('#copilot/agent').AlwaysAliveAgent} */ (/** @type {unknown} */ (agent)),
+        );
         return {
             status: controlState.status,
             sessionId: controlState.sessionId,

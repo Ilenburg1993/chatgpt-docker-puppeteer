@@ -28,8 +28,8 @@ import {
     startAgentRuntime,
     steerAgentRuntimeMessage,
     stopAgentRuntimeDialogLoopAuthorized,
-} from '../../../presentation/runtime/index.js';
-import { readAgentRuntimeOverviewProjection } from '../../../presentation/runtime/index.js';
+    readAgentRuntimeOverviewProjection,
+} from '#copilot/runtime';
 
 // ---------------------------------------------------------------------------
 // State reads

@@ -9,7 +9,6 @@
  * @see EventBus
  */
 
-import { sendAgentDialogTurn, startAgentDialogLoop, stopAgentDialogLoopAuthorized } from '#copilot/agent/facades';
 import { LLM_B_TURN_TIMEOUT_MS } from '#copilot/config';
 import {
     EMITTER_DIALOG_READY,
@@ -19,6 +18,7 @@ import {
     EMITTER_TASK_REASONING,
 } from '#copilot/events';
 import { log } from '#copilot/observability';
+import { sendRuntimeDialogTurnOnActiveLoop, startRuntimeDialogLoop, stopRuntimeDialogLoopAuthorized } from '#copilot/runtime';
 
 /**
  * Interface mínima do AlwaysAliveAgent usada pelas funções de dialog.
@@ -71,7 +71,7 @@ export async function startDialogMode(agent, bootPrompt, opts = {}) {
     const { cleanup } = registerDialogListeners(agent, opts);
 
     try {
-        await startAgentDialogLoop(agent, bootPrompt);
+        await startRuntimeDialogLoop(bootPrompt, agent);
         log('INFO', '[LlmBridgeClient] Modo diálogo ativo — LLM-B sinalizou READY.');
     } catch (err) {
         cleanup();
@@ -111,7 +111,7 @@ export async function dialogTurn(agent, message, opts = {}) {
     if (onReasoningTemp) agent.on(EMITTER_TASK_REASONING, onReasoningTemp);
 
     try {
-        const reply = await sendAgentDialogTurn(agent, message, { timeout });
+        const reply = await sendRuntimeDialogTurnOnActiveLoop(message, { timeout }, agent);
         if (reply === null) {
             throw new Error('[LlmBridgeClient] sendDialogTurn retornou null.');
         }
@@ -131,6 +131,6 @@ export async function dialogTurn(agent, message, opts = {}) {
  * @returns {Promise<void>}
  */
 export async function stopDialogMode(agent, reason = 'watchdog_restart') {
-    await stopAgentDialogLoopAuthorized(agent, reason);
+    await stopRuntimeDialogLoopAuthorized(agent, reason);
     log('INFO', `[LlmBridgeClient] Modo diálogo encerrado (reason=${reason}).`);
 }

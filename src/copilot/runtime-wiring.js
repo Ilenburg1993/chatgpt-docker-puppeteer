@@ -9,10 +9,10 @@
 
 import { alwaysAliveAgent, getAgent } from '#copilot/agent/always-alive';
 import { ALWAYS_ALIVE_AGENT } from '#copilot/agent/di-tokens';
-import { readRuntimeControlState } from '#copilot/agent/facades';
 import { configureHookTools } from '#copilot/agent/ports';
 import { BRIDGE_AGENT, FALLBACK_AGENT, NERV_BRIDGE_AGENT, PERMISSION_AGENT } from '#copilot/bridges';
 import { CONVERSATION_STORE, HUB } from '#copilot/conversation-hub';
+import { getAgentRuntimeControlStateForTarget } from '#copilot/runtime';
 import { configureDefaultUserInputContext } from '#copilot/sdk';
 import { setHub, setPermissionAgent } from '#copilot/tools';
 import { setBridgeAgent } from './channel/client.js';
@@ -72,7 +72,7 @@ export function wireCopilotRuntimeDI({ broadcastSse }) {
         'copilot.agent.stop',
         async () => {
             const agent = getAgent();
-            if (readRuntimeControlState(agent).status === 'stopped') return;
+            if (getAgentRuntimeControlStateForTarget(agent).status === 'stopped') return;
             await agent.stop({ preserveDialogLoopIntent: true });
             log('INFO', '[runtime-wiring] AlwaysAliveAgent parado com intenção de dialog loop preservada.');
         },

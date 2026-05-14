@@ -12,7 +12,7 @@ import { buildRuntimeRouteMetaFromSelection } from './meta.js';
 
 /**
  * @typedef {{
- *     agent: import('../../agent/always-alive.js').AlwaysAliveAgent;
+ *     agent: import('#copilot/agent/always-alive').AlwaysAliveAgent;
  *     runtimeId: string;
  *     requestedRuntimeId: string | null;
  *     runtimeFound: boolean;

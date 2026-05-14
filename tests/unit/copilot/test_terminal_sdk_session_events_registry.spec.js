@@ -48,7 +48,7 @@ vi.mock('../../../src/copilot/terminal/dialog/index.js', () => ({
     println: mocks.println,
 }));
 vi.mock('../../../src/copilot/presentation/state/index.js', async (importOriginal) => {
-    const actual = await importOriginal();
+    const actual = /** @type {Record<string, unknown>} */ (await importOriginal());
     return {
         ...actual,
         setLastSdkPlanOperation: mocks.setLastSdkPlanOperation,
@@ -78,7 +78,9 @@ vi.mock('../../../src/copilot/terminal/state/ui-theme.js', () => ({
     terminalThemeText: vi.fn((_, text) => text),
 }));
 vi.mock('../../../src/copilot/terminal/state/sdk-interactions.js', async () => {
-    const actual = await vi.importActual('../../../src/copilot/terminal/state/sdk-interactions.js');
+    const actual = /** @type {Record<string, unknown>} */ (
+        await vi.importActual('../../../src/copilot/terminal/state/sdk-interactions.js')
+    );
     return {
         ...actual,
         recordTerminalUserInputRequested: mocks.recordTerminalUserInputRequested,

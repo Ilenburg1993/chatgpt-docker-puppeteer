@@ -67,6 +67,10 @@ function requireRpcMethod(session, namespace, method) {
     return /** @type {NonNullable<NonNullable<import('../types.js').ExperimentalSession['rpc'][N]>[M]>} */ (fn);
 }
 
+// Compatibilidade: agentes migraram para a surface estável `rpc/ops.js` e são reexportados aqui apenas para manter
+// consumidores legados e testes especializados funcionando sem duplicar implementação.
+export { agentDeselect, agentGetCurrent, agentList, agentReload, agentSelect } from './ops.js';
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // fleet subsystem — SDK: fleet.start(params)
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -90,107 +94,6 @@ export async function fleetStart(session, options) {
         return /** @type {FleetStartResult} */ (await requireRpcMethod(session, 'fleet', 'start')(options ?? {}));
     } catch (error) {
         throw toSdkOperationError('experimental.fleet.start', error);
-    }
-}
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// agent subsystem — SDK: agent.list(), agent.getCurrent(), agent.select(params),
-//                   agent.deselect(), agent.reload()
-// ═══════════════════════════════════════════════════════════════════════════════
-
-/**
- * @typedef {{ name: string; displayName: string; description: string }} AgentInfo
- */
-
-/**
- * Lista agentes disponíveis na sessão (experimental). SDK RPC: `session.rpc.agent.list()`
- *
- * @param {CopilotSession} session
- * @returns {Promise<AgentInfo[]>}
- */
-export async function agentList(session) {
-    if (!isExperimentalEnabled('agents')) throwNotEnabled('agents', 'agent.list');
-    assertRpcSession(session, 'agent.list');
-    appLog('DEBUG', `[sdk/experimental-rpc] agent.list: sessionId='${session.sessionId}'`);
-    try {
-        return /** @type {AgentInfo[]} */ (await requireRpcMethod(session, 'agent', 'list')());
-    } catch (error) {
-        throw toSdkOperationError('experimental.agent.list', error);
-    }
-}
-
-/**
- * Retorna o agente ativo atual (experimental). SDK RPC: `session.rpc.agent.getCurrent()`
- *
- * @param {CopilotSession} session
- * @returns {Promise<AgentInfo | null>}
- */
-export async function agentGetCurrent(session) {
-    if (!isExperimentalEnabled('agents')) throwNotEnabled('agents', 'agent.getCurrent');
-    assertRpcSession(session, 'agent.getCurrent');
-    appLog('DEBUG', `[sdk/experimental-rpc] agent.getCurrent: sessionId='${session.sessionId}'`);
-    try {
-        return /** @type {AgentInfo | null} */ (await requireRpcMethod(session, 'agent', 'getCurrent')());
-    } catch (error) {
-        throw toSdkOperationError('experimental.agent.getCurrent', error);
-    }
-}
-
-/**
- * Seleciona um agente como ativo (experimental). SDK RPC: `session.rpc.agent.select({ name })`
- *
- * @param {CopilotSession} session
- * @param {string} name
- * @returns {Promise<void>}
- */
-export async function agentSelect(session, name) {
-    if (!isExperimentalEnabled('agents')) throwNotEnabled('agents', 'agent.select');
-    assertRpcSession(session, 'agent.select');
-    if (typeof name !== 'string' || name.length === 0) {
-        throw new TypeError('[sdk/experimental-rpc/agent.select] name deve ser string não-vazia.');
-    }
-    appLog('INFO', `[sdk/experimental-rpc] agent.select: name='${name}', sessionId='${session.sessionId}'`);
-    try {
-        await requireRpcMethod(session, 'agent', 'select')({ name });
-        return;
-    } catch (error) {
-        throw toSdkOperationError('experimental.agent.select', error);
-    }
-}
-
-/**
- * Deseleciona o agente ativo (experimental). SDK RPC: `session.rpc.agent.deselect()`
- *
- * @param {CopilotSession} session
- * @returns {Promise<void>}
- */
-export async function agentDeselect(session) {
-    if (!isExperimentalEnabled('agents')) throwNotEnabled('agents', 'agent.deselect');
-    assertRpcSession(session, 'agent.deselect');
-    appLog('INFO', `[sdk/experimental-rpc] agent.deselect: sessionId='${session.sessionId}'`);
-    try {
-        await requireRpcMethod(session, 'agent', 'deselect')();
-        return;
-    } catch (error) {
-        throw toSdkOperationError('experimental.agent.deselect', error);
-    }
-}
-
-/**
- * Recarrega a lista de agentes (experimental). SDK RPC: `session.rpc.agent.reload()`
- *
- * @param {CopilotSession} session
- * @returns {Promise<void>}
- */
-export async function agentReload(session) {
-    if (!isExperimentalEnabled('agents')) throwNotEnabled('agents', 'agent.reload');
-    assertRpcSession(session, 'agent.reload');
-    appLog('INFO', `[sdk/experimental-rpc] agent.reload: sessionId='${session.sessionId}'`);
-    try {
-        await requireRpcMethod(session, 'agent', 'reload')();
-        return;
-    } catch (error) {
-        throw toSdkOperationError('experimental.agent.reload', error);
     }
 }
 

@@ -21,6 +21,9 @@ export {
     registerRuntimeShutdownHost,
     runCopilotSdkBootPreflight,
 } from './process-host/runtime-host.js';
+/**
+ * @typedef {import('./process-host/runtime-host.js').CopilotSdkBootPreflightReport} CopilotSdkBootPreflightReport
+ */
 export {
     clearState,
     clearStateAsync,

@@ -30,6 +30,7 @@
       "#copilot/observability": ["./src/copilot/observability/index.js"],
       "#copilot/dialog": ["./src/copilot/dialog/index.js"],
       "#copilot/config/agent": ["./src/copilot/config/agent/index.js"],
+      "#copilot/runtime": ["./src/copilot/runtime/index.js"],
       "#copilot/types": ["./src/copilot/types/index.js"],
       "#copilot/types/*": ["./src/copilot/types/*"],
       "#copilot/observability/logger": ["./src/copilot/observability/logger.js"],

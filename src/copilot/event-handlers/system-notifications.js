@@ -7,11 +7,11 @@
 
 import { SESSION_EVENTS } from '#copilot/events';
 import { log } from '#copilot/observability';
-import { onSessionEvent } from '../sdk/session/events.js';
+import { onSessionEvent } from '#copilot/sdk/session';
 
 /**
- * @param {import('#copilot/agent/session/wiring/event-wirer').CopilotSessionLike} session
- * @param {Pick<import('#copilot/agent/session/wiring/event-wirer').SessionWirerCallbacks, 'emit'>} cb
+ * @param {import('./contracts.js').CopilotSessionLike} session
+ * @param {Pick<import('./contracts.js').SessionWirerCallbacks, 'emit'>} cb
  * @returns {(() => void)[]}
  */
 export function wireSystemNotificationEvents(session, { emit }) {

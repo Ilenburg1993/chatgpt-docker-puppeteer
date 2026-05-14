@@ -27,8 +27,8 @@ import { registerShutdownHandler, setShutdownEventEmitter, setShutdownLogger } f
 import { setDbLogger } from '../db/sqlite.js';
 import { registerBuiltinMiddleware } from '../events/middleware/index.js';
 import { setSdkLogger } from '../sdk/logger.js';
-import { setSdkMetricEmitter } from '../sdk/telemetry/operation-metrics.js';
-import { setCustomToolsBuilder } from '../sdk/tools/custom.js';
+import { setSdkMetricEmitter } from '#copilot/sdk/telemetry';
+import { setCustomToolsBuilder } from '#copilot/sdk/tools';
 import { defaultConvergenceTraceStore, initConvergenceTracePersistence } from './convergence-trace-store.js';
 import { CONVERGENCE_TRACE_STORE, ERROR_TRACKER, EVENT_COLLECTOR, METRICS_STORE } from './di-tokens.js';
 import { defaultErrorTracker } from './error-tracker.js';

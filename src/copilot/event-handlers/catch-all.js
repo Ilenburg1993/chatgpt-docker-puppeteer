@@ -6,7 +6,7 @@
  */
 
 import { log } from '#copilot/observability';
-import { onAllSessionEvents } from '../sdk/session/events.js';
+import { onAllSessionEvents } from '#copilot/sdk/session';
 
 /**
  * G2-PERF-02: Set de eventos SDK conhecidos como constante de módulo para evitar realocação.
@@ -90,7 +90,7 @@ export const KNOWN_SDK_EVENTS = new Set([
 ]);
 
 /**
- * @param {import('#copilot/agent/session/wiring/event-wirer').CopilotSessionLike} session
+ * @param {import('./contracts.js').CopilotSessionLike} session
  * @returns {() => void}
  */
 export function wireCatchAll(session) {

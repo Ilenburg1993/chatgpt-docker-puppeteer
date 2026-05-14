@@ -14,13 +14,13 @@ import {
     HOOK_SESSION_START,
 } from '#copilot/events';
 import { EventEmitter } from 'node:events';
-import { toError } from '../../core/error-handlers.js';
+import { toError } from '#copilot/core/error-handlers';
 import { log } from './hook-logger.js';
 
 /**
  * @typedef {import('../types.js').SessionHooks} SessionHooks
  *
- * @typedef {import('../../core/event-bus.js').EventBus} EventBus
+ * @typedef {import('#copilot/core/event-bus').EventBus} EventBus
  */
 
 /** @type {Record<string, string>} */

@@ -6,12 +6,12 @@
  */
 
 import { SESSION_EVENTS } from '#copilot/events';
-import { onSessionEvent } from '../sdk/session/events.js';
+import { onSessionEvent } from '#copilot/sdk/session';
 
 /**
- * @param {import('#copilot/agent/session/wiring/event-wirer').CopilotSessionLike} session
+ * @param {import('./contracts.js').CopilotSessionLike} session
  * @param {Pick<
- *     import('#copilot/agent/session/wiring/event-wirer').SessionWirerCallbacks,
+ *     import('./contracts.js').SessionWirerCallbacks,
  *     'emit' | 'isProcessing' | 'dialogLoopActive'
  * >} cb
  * @returns {(() => void)[]}
