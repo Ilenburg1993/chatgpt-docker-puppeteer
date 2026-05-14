@@ -37,6 +37,7 @@ import { readBytesFileSnapshot } from './io/fs/read-bytes.js';
 import { deleteFileUnlocked, removePathUnlocked } from './io/fs/remove.js';
 import { statPathSnapshot } from './io/fs/stat.js';
 import { normalizeWritePayload, writeAtomicFileUnlocked } from './io/fs/write-atomic.js';
+import { buildSimpleTextDiff, computeTextPatch } from './io/patch/index.js';
 import { nowIoMs, publishIoOperation } from './io-observability.js';
 import { limitTextLines, normalizeMaxResults } from './policy/output-window.js';
 import { readEnvPositiveInt } from './shared/env.js';
@@ -1323,25 +1324,9 @@ export async function patchTextLocked(filePath, options) {
     try {
         const { value, waitMs } = await withIoResourceLock(filePath, async () => {
             const content = await fs.readFile(filePath, 'utf8');
-            const occurrences = content.split(options.oldString).length - 1;
-            if (occurrences === 0) throw new Error('old_string não encontrado no arquivo.');
-            if (options.expectedOccurrences !== undefined && options.expectedOccurrences !== occurrences) {
-                throw new Error(`expected_occurrences=${options.expectedOccurrences}, mas encontrado=${occurrences}.`);
-            }
-            if (!options.replaceAll && options.expectedOccurrences === undefined && occurrences > 1) {
-                throw new Error(
-                    `old_string encontrado ${occurrences} vezes. Inclua mais contexto para identificar unicamente.`,
-                );
-            }
-
-            const updated = options.replaceAll
-                ? content.split(options.oldString).join(options.newString)
-                : content.replace(options.oldString, () => options.newString);
+            const { updated, replacedOccurrences, bytesWritten } = computeTextPatch(content, options);
             await writeAtomicFileUnlocked(filePath, updated);
-            return {
-                replacedOccurrences: options.replaceAll ? occurrences : 1,
-                bytesWritten: Buffer.byteLength(updated, 'utf8'),
-            };
+            return { replacedOccurrences, bytesWritten };
         });
         invalidateIoCacheTiers(filePath);
         const io = publishAndReturn(
@@ -1389,28 +1374,7 @@ export async function diffText(pathA, pathB, options = {}) {
     const traceId = createIoTraceId();
     try {
         const [a, b] = await Promise.all([readText(pathA), readText(pathB)]);
-        const aLines = a.content.split('\n');
-        const bLines = b.content.split('\n');
-        const max = Math.max(aLines.length, bLines.length);
-        const contextLines = Math.max(0, options.contextLines ?? 3);
-        /** @type {string[]} */
-        const out = [];
-        for (let i = 0; i < max; i++) {
-            if (aLines[i] === bLines[i]) continue;
-            const start = Math.max(0, i - contextLines);
-            const end = Math.min(max, i + contextLines + 1);
-            out.push(`@@ ${start + 1},${end - start} @@`);
-            for (let j = start; j < end; j++) {
-                if (aLines[j] === bLines[j]) {
-                    if (aLines[j] !== undefined) out.push(` ${aLines[j]}`);
-                } else {
-                    if (aLines[j] !== undefined) out.push(`-${aLines[j]}`);
-                    if (bLines[j] !== undefined) out.push(`+${bLines[j]}`);
-                }
-            }
-            i = end - 1;
-        }
-        const diff = out.join('\n');
+        const { diff, contextLines } = buildSimpleTextDiff(a.content, b.content, options);
         const io = publishAndReturn(
             buildIoMeta({
                 operation: 'diff',
