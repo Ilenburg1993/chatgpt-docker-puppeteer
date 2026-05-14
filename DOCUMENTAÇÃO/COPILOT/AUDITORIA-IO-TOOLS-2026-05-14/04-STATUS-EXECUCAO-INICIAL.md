@@ -101,6 +101,7 @@ Transformações aplicadas:
 - `parse/*` passou a concentrar parsers puros de JSON, Markdown, comentários e outline.
 - `storage/*` passou a concentrar JSON store baixo; `storage.js` virou facade sem depender de `io-engine.js`.
 - `queue/*`, `locks/*` e `runtime/*` foram iniciados como domínios internos barrel-first.
+- `io/fs/*` foi expandido com portas baixas para bytes, stat, mkdir, append, remove, copy e move.
 - `workspace_index_search` e `workspace_index_find_symbol` passaram a aceitar `maxResults`, aplicado no SQLite.
 - `list_directory` passou a aceitar `maxEntries` e `cursor`, retornando `nextCursor`.
 - Mutações de file tools passaram a retornar envelope `operation` com `operationId`, capability, risco, status, duração e
@@ -113,6 +114,6 @@ Transformações aplicadas:
 Evidência local:
 
 ```txt
-src/copilot/infra: files 61 cycles 0
+src/copilot/infra: files 68 cycles 0
 tools -> infra internals: 0 ocorrências
 ```

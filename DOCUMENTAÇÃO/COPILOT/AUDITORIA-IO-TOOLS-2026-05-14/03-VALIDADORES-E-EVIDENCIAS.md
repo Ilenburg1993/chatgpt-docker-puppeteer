@@ -83,7 +83,7 @@ Mesmo quando o ciclo não quebra hoje, ele reduz previsibilidade de ESM, testes 
 Estado após transformações iniciais:
 
 ```txt
-src/copilot/infra: files 61 cycles 0
+src/copilot/infra: files 68 cycles 0
 ```
 
 O ciclo foi removido extraindo leitura textual baixa para `src/copilot/infra/io/fs/read-text.js` e fazendo parser/index
@@ -163,3 +163,5 @@ Tools:
 - `storage/` sem dependência de `io-engine`: coberto.
 - `parse/` sem dependências altas de IO/cache/session: coberto.
 - operation envelope em write tools: coberto.
+- `io/fs` expandido para bytes/stat/mkdir/append/remove/copy/move: coberto por testes focados de engine/write/storage e
+  typecheck strict.

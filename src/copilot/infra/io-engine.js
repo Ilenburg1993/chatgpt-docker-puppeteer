@@ -29,6 +29,13 @@ import {
 } from './io-cache.js';
 import { findIoIndexSymbol, getIoIndexStats, searchIoIndex } from './io-index-registry.js';
 import { withIoResourceLock, withIoResourceLocks } from './io-locks.js';
+import { appendFileUnlocked } from './io/fs/append.js';
+import { copyFileUnlocked } from './io/fs/copy.js';
+import { mkdirPathUnlocked } from './io/fs/mkdir.js';
+import { moveFileUnlocked } from './io/fs/move.js';
+import { readBytesFileSnapshot } from './io/fs/read-bytes.js';
+import { deleteFileUnlocked, removePathUnlocked } from './io/fs/remove.js';
+import { statPathSnapshot } from './io/fs/stat.js';
 import { normalizeWritePayload, writeAtomicFileUnlocked } from './io/fs/write-atomic.js';
 import { nowIoMs, publishIoOperation } from './io-observability.js';
 import { limitTextLines, normalizeMaxResults } from './policy/output-window.js';
@@ -340,7 +347,7 @@ export async function readBytes(filePath, options = {}) {
         if (l2Cache) {
             const l2Entry = l2Cache.get(_cacheKey);
             if (l2Entry?.kind === 'bytes' && Buffer.isBuffer(l2Entry.payload)) {
-                const metadata = await fs.stat(filePath).catch(() => null);
+                const metadata = await statPathSnapshot(filePath).catch(() => null);
                 const cachedMtimeMs = Number(l2Entry.mtimeMs);
                 const actualMtimeMs = Number(metadata?.mtimeMs);
                 const mtimeMatches =
@@ -389,15 +396,19 @@ export async function readBytes(filePath, options = {}) {
                 l2Cache.invalidatePath(filePath);
             }
         }
-        const content = await fs.readFile(filePath);
-        const _stat = await fs.stat(filePath).catch(() => null);
+        const snapshot = await readBytesFileSnapshot(filePath);
+        const content = snapshot.content;
         const _now = Date.now();
         /** @type {import('./io-cache.js').IoCacheEntry} */
-        const _entry = { content, bytes: content.byteLength, cachedAt: _now, lastValidatedAt: _now, accessCount: 1 };
-        if (_stat !== null) {
-            _entry.mtime = _stat.mtimeMs;
-            _entry.size = _stat.size;
-        }
+        const _entry = {
+            content,
+            bytes: content.byteLength,
+            cachedAt: _now,
+            lastValidatedAt: _now,
+            accessCount: 1,
+            mtime: snapshot.mtimeMs,
+            size: snapshot.sizeBytes,
+        };
         _l1.set(_cacheKey, _entry);
         if (l2Cache) {
             l2Cache.set({
@@ -529,7 +540,7 @@ export async function readText(filePath, options = {}) {
         if (l2Cache) {
             const l2Entry = l2Cache.get(_textKey);
             if (l2Entry?.kind === 'text' && Buffer.isBuffer(l2Entry.payload)) {
-                const metadata = await fs.stat(filePath).catch(() => null);
+                const metadata = await statPathSnapshot(filePath).catch(() => null);
                 const cachedMtimeMs = Number(l2Entry.mtimeMs);
                 const actualMtimeMs = Number(metadata?.mtimeMs);
                 const mtimeMatches =
@@ -595,7 +606,8 @@ export async function readText(filePath, options = {}) {
             }
         }
 
-        raw = await fs.readFile(filePath);
+        const textSnapshot = await readBytesFileSnapshot(filePath);
+        raw = textSnapshot.content;
         const baseMeta = {
             operation: /** @type {const} */ ('read'),
             target: filePath,
@@ -626,7 +638,6 @@ export async function readText(filePath, options = {}) {
         sliceEnd = sliceStart > totalLines ? totalLines : Math.min(options.endLine ?? totalLines, totalLines);
         content = sliceStart > totalLines ? '' : lines.slice(sliceStart - 1, sliceEnd).join('\n');
         // Armazenar conteúdo completo para reutilização (texto é sempre o arquivo inteiro pré-slice)
-        const _textStat = await fs.stat(filePath).catch(() => null);
         const _textNow = Date.now();
         /** @type {import('./io-cache.js').IoCacheEntry} */
         const _textEntry = {
@@ -635,11 +646,9 @@ export async function readText(filePath, options = {}) {
             cachedAt: _textNow,
             lastValidatedAt: _textNow,
             accessCount: 1,
+            mtime: textSnapshot.mtimeMs,
+            size: textSnapshot.sizeBytes,
         };
-        if (_textStat !== null) {
-            _textEntry.mtime = _textStat.mtimeMs;
-            _textEntry.size = _textStat.size;
-        }
         _l1.set(_textKey, _textEntry);
         if (l2Cache) {
             l2Cache.set({
@@ -946,8 +955,7 @@ export async function appendTextLocked(filePath, content, options = {}) {
     try {
         const { waitMs } = await withIoResourceLock(
             filePath,
-            async () =>
-                fs.appendFile(filePath, payload, options.mode === undefined ? undefined : { mode: options.mode }),
+            async () => appendFileUnlocked(filePath, payload, options.mode === undefined ? {} : { mode: options.mode }),
             {
                 ...(options.lockTimeoutMs === undefined ? {} : { timeoutMs: options.lockTimeoutMs }),
                 ...(options.signal === undefined ? {} : { signal: options.signal }),
@@ -1002,7 +1010,7 @@ export async function statPath(filePath, options = {}) {
     const traceId = options.traceId ?? createIoTraceId();
     const startedAt = nowIoMs();
     try {
-        const stats = await fs.stat(filePath);
+        const stats = await statPathSnapshot(filePath);
         const io = publishAndReturn(
             buildIoMeta({
                 operation: 'stat',
@@ -1052,12 +1060,7 @@ export async function mkdirPathLocked(dirPath, options = {}) {
     const startedAt = nowIoMs();
     try {
         const { waitMs } = await withIoResourceLock(dirPath, async () =>
-            fs.mkdir(
-                dirPath,
-                options.mode === undefined
-                    ? { recursive: Boolean(options.recursive) }
-                    : { recursive: Boolean(options.recursive), mode: options.mode },
-            ),
+            mkdirPathUnlocked(dirPath, { recursive: Boolean(options.recursive), ...(options.mode === undefined ? {} : { mode: options.mode }) }),
         );
         const io = publishAndReturn(
             buildIoMeta({
@@ -1110,7 +1113,7 @@ export async function deleteFileLocked(filePath) {
     const traceId = createIoTraceId();
     const startedAt = nowIoMs();
     try {
-        const { waitMs } = await withIoResourceLock(filePath, async () => fs.unlink(filePath));
+        const { waitMs } = await withIoResourceLock(filePath, async () => deleteFileUnlocked(filePath));
         invalidateIoCacheTiers(filePath);
         const io = publishAndReturn(
             buildIoMeta({
@@ -1161,7 +1164,7 @@ export async function removePathLocked(filePath, options = {}) {
     const startedAt = nowIoMs();
     try {
         const { waitMs } = await withIoResourceLock(filePath, async () =>
-            fs.rm(filePath, { recursive: Boolean(options.recursive), force: Boolean(options.force) }),
+            removePathUnlocked(filePath, { recursive: Boolean(options.recursive), force: Boolean(options.force) }),
         );
         invalidateIoCacheTierSubtrees(filePath);
         const io = publishAndReturn(
@@ -1213,9 +1216,9 @@ export async function copyFileLocked(source, destination, options = {}) {
     try {
         const { value, waitMs } = await withIoResourceLocks([source, destination], async () => {
             await assertDestinationWritable(destination, options.overwrite);
-            await fs.mkdir(dirname(destination), { recursive: true });
-            await fs.copyFile(source, destination);
-            const stats = await fs.stat(destination);
+            await mkdirPathUnlocked(dirname(destination), { recursive: true });
+            await copyFileUnlocked(source, destination);
+            const stats = await statPathSnapshot(destination);
             return { bytesWritten: stats.size };
         });
         invalidateIoCacheTiers(destination);
@@ -1265,15 +1268,8 @@ export async function moveFileLocked(source, destination, options = {}) {
     try {
         const { waitMs } = await withIoResourceLocks([source, destination], async () => {
             await assertDestinationWritable(destination, options.overwrite);
-            await fs.mkdir(dirname(destination), { recursive: true });
-            try {
-                await fs.rename(source, destination);
-            } catch (error) {
-                const errCode = /** @type {{ code?: unknown }} */ (error)?.code;
-                if (errCode !== 'EXDEV') throw error;
-                await fs.copyFile(source, destination);
-                await fs.unlink(source);
-            }
+            await mkdirPathUnlocked(dirname(destination), { recursive: true });
+            await moveFileUnlocked(source, destination);
         });
         invalidateIoCacheTiers(source);
         invalidateIoCacheTiers(destination);

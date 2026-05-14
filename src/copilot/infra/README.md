@@ -49,7 +49,7 @@
 - `policy/`: policies reutilizáveis, incluindo janela de saída para retornos grandes.
 - `scan/`: glob, gitignore, fingerprint e batching usados por scanner e prefetch.
 - `parse/`: parsers puros de JSON, Markdown, comentários e outline textual.
-- `io/fs/`: portas baixas de filesystem usadas para quebrar ciclos entre parser/index/engine.
+- `io/fs/`: portas baixas de filesystem para bytes, texto, stat, mkdir, append, remove, copy, move e escrita atômica.
 - `storage/`: JSON store baixo sem dependência de `io-engine.js`.
 - `queue/`: implementação modular da fila assíncrona.
 - `locks/`: barrels internos de locks em memória e lockfile.
