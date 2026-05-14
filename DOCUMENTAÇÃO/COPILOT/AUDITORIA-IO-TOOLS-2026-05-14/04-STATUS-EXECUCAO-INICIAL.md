@@ -112,6 +112,7 @@ Transformações aplicadas:
 - `io/search/*` foi criado com helpers puros para índice FTS, grep fallback e busca simbólica.
 - `io/search/result-paginator.js` passou a centralizar cursor, limite e paginação textual/de itens de busca.
 - `io/invalidation/*` foi criado com bus best-effort, eventos normalizados e helper de invalidação de L1/L2.
+- `cache/l1/*` foi iniciado com chaves canônicas de L1, mantendo reexports legados em `io-cache.js`.
 - `index-store/sqlite/*` foi criado com schema, normalização de paths, query FTS e chunks persistentes do índice L2.
 - `workspace_index_search` e `workspace_index_find_symbol` passaram a aceitar `maxResults`, aplicado no SQLite.
 - `list_directory` passou a aceitar `maxEntries` e `cursor`, retornando `nextCursor`.
@@ -133,6 +134,6 @@ Transformações aplicadas:
 Evidência local:
 
 ```txt
-src/copilot/infra: files 97 cycles 0
+src/copilot/infra: files 99 cycles 0
 tools -> infra internals: 0 ocorrências
 ```

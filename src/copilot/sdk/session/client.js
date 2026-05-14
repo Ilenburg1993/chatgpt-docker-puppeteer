@@ -77,8 +77,8 @@ async function wait(ms) {
  */
 async function clearModelsCacheBestEffort() {
     try {
-        const { clearModelsCache } = await import('../models/helpers.js');
-        clearModelsCache();
+        const { clearModelsCacheAsync } = await import('../models/helpers.js');
+        await clearModelsCacheAsync();
     } catch (error) {
         logSwallowed(error, 'sdk.client.clearModelsCache');
     }

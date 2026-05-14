@@ -142,6 +142,15 @@ export const INFRA_MODULE_LAYOUT = Object.freeze([
         summary: 'Portas baixas de filesystem usadas por engines para evitar ciclos.',
     },
     {
+        path: 'cache/',
+        kind: 'directory',
+        role: 'io-cache',
+        tier: 'internal',
+        risk: 'watch',
+        public: false,
+        summary: 'Subdomínios modulares de cache L1/L2/tiering durante a migração 2.0/2.1.',
+    },
+    {
         path: 'locks/',
         kind: 'directory',
         role: 'concurrency-foundation',

@@ -12,7 +12,7 @@
 - Cache L1 em memória, cache L2 SQLite, tiering, health e invalidação coordenada.
 - Scanner, parser, prefetch, scope de sessão e índice L2 pesquisável.
 - Subdomínios internos baixos em `shared/`, `policy/`, `scan/`, `parse/`, `index-store/`, `storage/`, `queue/`,
-  `locks/`, `runtime/`, `io/fs/`, `io/patch/`, `io/search/` e `io/invalidation/`.
+  `locks/`, `runtime/`, `cache/`, `io/fs/`, `io/patch/`, `io/search/` e `io/invalidation/`.
 - Locks, storage, queue, webhooks e infraestrutura SSE.
 
 ## O que não deve ficar aqui
@@ -52,6 +52,7 @@
 - `scan/`: glob, gitignore, fingerprint e batching usados por scanner e prefetch.
 - `parse/`: parsers puros de JSON, Markdown, comentários e outline textual.
 - `index-store/`: schema, paths, queries e helpers persistentes do índice L2/SQLite.
+- `cache/l1/`: chaves canônicas de L1 e base para modularização futura do cache em memória.
 - `io/fs/`: portas baixas de filesystem para bytes, texto, linhas, chunks, stat, mkdir, append, remove, copy, move e
   escrita atômica.
 - `io/patch/`: cálculo puro de patch e diff textual.

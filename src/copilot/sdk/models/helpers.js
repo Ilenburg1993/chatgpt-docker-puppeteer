@@ -53,6 +53,17 @@ export function clearModelsCache() {
     void clearPersistentModelCache();
 }
 
+/**
+ * Invalida cache L1 e aguarda limpeza do cache persistente L2.
+ *
+ * @returns {Promise<void>}
+ */
+export async function clearModelsCacheAsync() {
+    _modelsCache = null;
+    _inflightRequest = null;
+    await clearPersistentModelCache();
+}
+
 // ─── Listagem e filtragem ────────────────────────────────────────────────────
 
 /**

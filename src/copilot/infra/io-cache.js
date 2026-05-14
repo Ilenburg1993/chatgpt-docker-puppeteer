@@ -23,6 +23,7 @@
 import { LRUCache } from 'lru-cache';
 import * as fsPromises from 'node:fs/promises';
 import * as nodePath from 'node:path';
+import { normalizeIoCacheKey } from './cache/l1/index.js';
 import { publishIoInvalidation, registerIoInvalidationHook } from './io/invalidation/bus.js';
 
 // ---------------------------------------------------------------------------
@@ -82,44 +83,7 @@ const STALE_PROBE_INTERVAL_MS = Number(process.env['IO_L1_STALE_PROBE_INTERVAL_M
  * @property {() => void} clear
  */
 
-// ---------------------------------------------------------------------------
-// Internal key helpers
-// ---------------------------------------------------------------------------
-
-/**
- * Normaliza um path para uso como chave de cache. NÃO faz I/O (não chama realpath). Usa resolve() + normalize().
- *
- * @param {string} filePath
- * @returns {string}
- */
-export function normalizeIoCacheKey(filePath) {
-    return nodePath.normalize(nodePath.resolve(filePath));
-}
-
-/**
- * Constrói a chave de cache para bytes.
- *
- * @param {string} normalizedPath
- * @returns {string}
- */
-export function makeBytesKey(normalizedPath) {
-    return `${normalizedPath}::read:bytes`;
-}
-
-/**
- * Constrói a chave de cache para texto (range ou completo).
- *
- * @param {string} normalizedPath
- * @param {number | undefined} startLine
- * @param {number | undefined} endLine
- * @returns {string}
- */
-export function makeTextKey(normalizedPath, startLine, endLine) {
-    const start = startLine ?? 0;
-    const end = endLine ?? 0;
-    if (start === 0 && end === 0) return `${normalizedPath}::read:text`;
-    return `${normalizedPath}::read:text:${start}:${end}`;
-}
+export { makeBytesKey, makeTextKey, normalizeIoCacheKey } from './cache/l1/index.js';
 
 // ---------------------------------------------------------------------------
 // Cache singleton — usa LRUCache (lru-cache) com TTL nativo e byte-accounting

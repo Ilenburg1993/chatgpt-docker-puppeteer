@@ -53,7 +53,7 @@ Objetivo: iniciar arquitetura 2.0/2.1 sem quebrar consumidores.
 Status em 2026-05-14: facades públicas criadas, tools migradas para `#copilot/infra/public/*`, ciclo principal
 `index -> engine -> registry` removido, module-map de infra criado, contrato de boundary adicionado e subdomínios
 baixos `shared/`, `policy/`, `scan/`, `parse/`, `storage/`, `queue/`, `locks/`, `runtime`, `io/fs/`,
-`io/search` e `io/invalidation` iniciados.
+`io/search`, `io/invalidation` e `cache/l1` iniciados.
 
 ### F1.1 — Facades públicas
 
@@ -118,6 +118,11 @@ Objetivo: liberdade alta com retorno controlado.
 
 - `scope.context({ budget: 'small'|'medium'|'deep' })`.
 - Ranking por path, imports, símbolos exportados e recência.
+
+### F2.4 — Cache modular
+
+- Extrair chaves L1 para `cache/l1` (executado).
+- Extrair implementação L1/L2/tiering para `cache/l1`, `cache/l2`, `cache/tiering` mantendo facades legadas.
 
 ## Faixa 3 — Operações agentic
 

@@ -20,6 +20,7 @@ export {
 export {
     buildReasoningConfig,
     clearModelsCache,
+    clearModelsCacheAsync,
     filterEnabledModels,
     filterModels,
     filterReasoningModels,

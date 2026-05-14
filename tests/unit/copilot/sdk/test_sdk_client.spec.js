@@ -112,7 +112,7 @@ vi.mock('@github/copilot-sdk', () => {
 });
 
 import { classifySdkRateLimitScope, getSdkRecoveryPolicy } from '../../../../src/copilot/sdk/errors.js';
-import { listModels } from '../../../../src/copilot/sdk/models/helpers.js';
+import { clearModelsCacheAsync, listModels } from '../../../../src/copilot/sdk/models/helpers.js';
 import {
     _injectClientForTest,
     _resetClientState,
@@ -142,8 +142,9 @@ import { setSdkMetricEmitter } from '../../../../src/copilot/sdk/telemetry/opera
 
 // ─── Setup ──────────────────────────────────────────────────────────────────
 
-beforeEach(() => {
+beforeEach(async () => {
     vi.restoreAllMocks();
+    await clearModelsCacheAsync();
     _resetClientState();
     setSdkMetricEmitter(null);
 });

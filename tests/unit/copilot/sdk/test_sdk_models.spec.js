@@ -50,7 +50,7 @@ vi.mock('#copilot/core/errors', () => ({
 
 import { setModelListClientProvider } from '../../../../src/copilot/sdk/models/client-provider.js';
 import {
-    clearModelsCache,
+    clearModelsCacheAsync,
     filterModels,
     getBillingMultiplier,
     getDefaultReasoningEffort,
@@ -114,8 +114,8 @@ describe('F76 - listModels / getModelById', () => {
     /** @type {any} */
     let mockClient;
 
-    beforeEach(() => {
-        clearModelsCache();
+    beforeEach(async () => {
+        await clearModelsCacheAsync();
         setModelListClientProvider(mockGetClient);
         mockClient = {
             listModels: vi.fn().mockResolvedValue([makeModel(), makeReasoningModel()]),
