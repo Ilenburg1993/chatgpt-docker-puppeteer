@@ -80,10 +80,10 @@ io-index-sqlite.js -> io-parser.js
 
 Mesmo quando o ciclo não quebra hoje, ele reduz previsibilidade de ESM, testes e refactors.
 
-Estado após transformações iniciais:
+Estado após transformações em andamento:
 
 ```txt
-src/copilot/infra: files 71 cycles 0
+src/copilot/infra: files 76 cycles 0
 ```
 
 O ciclo foi removido extraindo leitura textual baixa para `src/copilot/infra/io/fs/read-text.js` e fazendo parser/index
@@ -166,3 +166,4 @@ Tools:
 - `io/fs` expandido para bytes/stat/mkdir/append/remove/copy/move: coberto por testes focados de engine/write/storage e
   typecheck strict.
 - `io/patch` com patch/diff textual puro: coberto por `test_io_patch.spec.js`.
+- `io/search` com helpers de índice, grep fallback e busca simbólica: coberto por `test_io_search.spec.js`.

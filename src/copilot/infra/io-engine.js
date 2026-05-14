@@ -38,6 +38,14 @@ import { deleteFileUnlocked, removePathUnlocked } from './io/fs/remove.js';
 import { statPathSnapshot } from './io/fs/stat.js';
 import { normalizeWritePayload, writeAtomicFileUnlocked } from './io/fs/write-atomic.js';
 import { buildSimpleTextDiff, computeTextPatch } from './io/patch/index.js';
+import {
+    buildGrepArgs,
+    buildSymbolPattern,
+    canUseIndexSearch,
+    formatIndexSearchRows,
+    formatIndexSymbolRows,
+    kindToGlobs,
+} from './io/search/index.js';
 import { nowIoMs, publishIoOperation } from './io-observability.js';
 import { limitTextLines, normalizeMaxResults } from './policy/output-window.js';
 import { readEnvPositiveInt } from './shared/env.js';
@@ -120,156 +128,8 @@ function sanitizeSearchOutput(stdout) {
 }
 
 /**
- * @param {{
- *     pattern: string;
- *     isRegex?: boolean;
- *     caseSensitive?: boolean;
- *     includePattern?: string;
- *     excludePattern?: string;
- * }} opts
- * @returns {boolean}
- */
-function canUseIndexSearch(opts) {
-    return (
-        opts.pattern.trim().length > 0 &&
-        !opts.isRegex &&
-        !opts.caseSensitive &&
-        !opts.includePattern &&
-        !opts.excludePattern
-    );
-}
-
-/**
- * @param {{ filePath: string; relativePath: string; snippet: string }[]} rows
- * @returns {string}
- */
-function formatIndexSearchRows(rows) {
-    return rows
-        .map((row) => {
-            const snippet = String(row.snippet ?? '')
-                .replaceAll('[', '')
-                .replaceAll(']', '')
-                .replace(/\s+/gu, ' ')
-                .trim();
-            return `${row.relativePath || row.filePath}: ${snippet}`;
-        })
-        .join('\n');
-}
-
-/**
- * @param {{
- *     pattern: string;
- *     resolved: string;
- *     isRegex?: boolean;
- *     caseSensitive?: boolean;
- *     includePattern?: string;
- *     excludePattern?: string;
- *     contextLines?: number;
- * }} opts
- * @returns {string[]}
- */
-function buildGrepArgs(opts) {
-    return [
-        '-R',
-        '-n',
-        ...(opts.isRegex ? ['-E'] : ['-F']),
-        ...(opts.caseSensitive ? [] : ['-i']),
-        ...(opts.contextLines ? ['-C', String(opts.contextLines)] : []),
-        '--exclude-dir=.git',
-        '--exclude-dir=node_modules',
-        '--exclude-dir=dist',
-        ...(opts.includePattern ? [`--include=${opts.includePattern}`] : []),
-        ...(opts.excludePattern ? [`--exclude=${opts.excludePattern}`] : []),
-        opts.pattern,
-        opts.resolved,
-    ];
-}
-
-/**
- * @param {string} name
- * @returns {string}
- */
-function escapeRegex(name) {
-    return name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
-/**
  * @typedef {'function' | 'class' | 'variable' | 'export' | 'type' | 'all'} IoSymbolKind
  */
-
-/**
- * @param {string} symbolName
- * @param {IoSymbolKind} kind
- * @returns {string}
- */
-function buildSymbolPattern(symbolName, kind) {
-    const n = escapeRegex(symbolName);
-
-    /** @type {Record<IoSymbolKind, string>} */
-    const patterns = {
-        function: [
-            `(?:async\\s+)?function\\s+${n}\\b`,
-            `${n}\\s*[:=]\\s*(?:async\\s+)?(?:\\([^)]*\\)|\\w+)\\s*=>`,
-            `${n}\\s*[:=]\\s*(?:async\\s+)?function`,
-            `def\\s+${n}\\b`,
-            `fn\\s+${n}\\b`,
-            `func\\s+${n}\\b`,
-        ].join('|'),
-        class: [`class\\s+${n}\\b`, `${n}\\s*=\\s*class\\b`].join('|'),
-        variable: [`(?:const|let|var)\\s+${n}\\b`, `${n}\\s*:?=\\s*(?!>)`].join('|'),
-        export: [
-            `export\\s+(?:default\\s+)?(?:(?:async\\s+)?function|class|const|let|var|type|interface)\\s+${n}\\b`,
-            `export\\s*\\{[^}]*\\b${n}\\b`,
-            `module\\.exports[\\[.].*\\b${n}\\b`,
-        ].join('|'),
-        type: [
-            `(?:interface|type)\\s+${n}\\b`,
-            `@typedef\\s+\\{[^}]+\\}\\s+${n}\\b`,
-            `${n}\\s*=\\s*(?:TypeVar|NewType)\\(`,
-        ].join('|'),
-        all: [
-            `(?:(?:async\\s+)?function|class|(?:const|let|var)|interface|type|def\\s|fn\\s|func\\s)\\s*${n}\\b`,
-            `${n}\\s*[:=]\\s*(?:async\\s+)?(?:\\([^)]*\\)|\\w+)\\s*=>`,
-        ].join('|'),
-    };
-
-    return patterns[kind] ?? patterns.all;
-}
-
-/**
- * @param {IoSymbolKind} kind
- * @returns {string[]}
- */
-function kindToGlobs(kind) {
-    if (kind === 'type') return ['*.ts', '*.tsx', '*.d.ts'];
-    return ['*.js', '*.mjs', '*.cjs', '*.ts', '*.tsx', '*.py', '*.rs', '*.go'];
-}
-
-/**
- * @param {{
- *     relativePath?: string | null;
- *     filePath: string;
- *     symbolName: string;
- *     symbolKind: string;
- *     line: number;
- *     exported?: number | boolean | null;
- *     docComment?: string | null;
- * }[]} rows
- * @returns {string}
- */
-function formatIndexSymbolRows(rows) {
-    return rows
-        .map((row) => {
-            const location = `${row.relativePath || row.filePath}:${row.line}`;
-            const exported = row.exported ? ' export' : '';
-            const doc = String(row.docComment ?? '')
-                .replace(/\s+/gu, ' ')
-                .trim();
-            const suffix = doc ? ` — ${doc}` : '';
-            return `${location}: ${row.symbolKind} ${row.symbolName}${exported}${suffix}`;
-        })
-        .join('\n');
-}
 
 /**
  * Falha se o destino já existir quando a operação não autoriza overwrite.

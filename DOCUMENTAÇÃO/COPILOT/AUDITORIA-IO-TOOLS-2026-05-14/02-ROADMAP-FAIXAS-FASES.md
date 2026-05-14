@@ -63,6 +63,7 @@ baixos `shared/`, `policy/`, `scan/`, `parse/`, `storage/`, `queue/`, `locks/`, 
 - Extrair leitura para `io/fs/read-*` (iniciado com `io/fs/read-text.js`).
 - Extrair escrita/mutação para `io/fs/write-*`, `copy`, `move`, `remove` (executado para portas baixas principais).
 - Extrair diff/patch para `io/patch` (executado para cálculo textual puro).
+- Extrair busca textual/simbólica para `io/search` (executado para índice FTS, grep fallback e padrões simbólicos).
 - Manter `io-engine.js` como facade temporária.
 
 ### F1.3 — Parser puro

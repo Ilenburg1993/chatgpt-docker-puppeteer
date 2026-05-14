@@ -12,7 +12,7 @@
 - Cache L1 em memória, cache L2 SQLite, tiering, health e invalidação coordenada.
 - Scanner, parser, prefetch, scope de sessão e índice L2 pesquisável.
 - Subdomínios internos baixos em `shared/`, `policy/`, `scan/`, `parse/`, `storage/`, `queue/`, `locks/`,
-  `runtime/` e `io/fs/`.
+  `runtime/`, `io/fs/`, `io/patch/` e `io/search/`.
 - Locks, storage, queue, webhooks e infraestrutura SSE.
 
 ## O que não deve ficar aqui
@@ -51,6 +51,7 @@
 - `parse/`: parsers puros de JSON, Markdown, comentários e outline textual.
 - `io/fs/`: portas baixas de filesystem para bytes, texto, stat, mkdir, append, remove, copy, move e escrita atômica.
 - `io/patch/`: cálculo puro de patch e diff textual.
+- `io/search/`: adapters puros de busca textual, índice FTS, grep fallback e busca simbólica.
 - `storage/`: JSON store baixo sem dependência de `io-engine.js`.
 - `queue/`: implementação modular da fila assíncrona.
 - `locks/`: barrels internos de locks em memória e lockfile.
