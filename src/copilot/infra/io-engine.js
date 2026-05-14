@@ -9,10 +9,8 @@
  */
 
 import { isUtf8 } from 'node:buffer';
-import { execFile } from 'node:child_process';
 import * as fs from 'node:fs/promises';
 import { dirname } from 'node:path';
-import { promisify } from 'node:util';
 import { buildIoMeta, createIoTraceId, withIoMeta } from '../core/io-contracts.js';
 import { sanitizeIoTextOutput } from '../core/io-policy.js';
 import { getIoL2Cache } from './io-cache-l2-registry.js';
@@ -36,8 +34,10 @@ import {
     buildGrepArgs,
     buildSymbolPattern,
     canUseIndexSearch,
+    execSearchFile,
     formatIndexSearchRows,
     formatIndexSymbolRows,
+    isRipgrepAvailable,
     kindToGlobs,
     normalizeSearchWindow,
     paginateSearchItems,
@@ -48,17 +48,12 @@ import { hasNullByte } from './policy/path-resource.js';
 import { assertExpectedSha256 } from './policy/preconditions.js';
 import { sha256 } from './shared/hash.js';
 
-const execFileAsync = promisify(execFile);
-
 /** @type {ReturnType<typeof resolveIoSearchBudget> | null} */
 let _ioSearchBudget = null;
 const ROLLBACK_SNAPSHOT_MAX_BYTES = 256 * 1024;
 const DEFAULT_PATCH_DIFF_CONTEXT_LINES = 3;
 const DEFAULT_PATCH_DIFF_MAX_LINES = 160;
 const DEFAULT_PATCH_DIFF_MAX_BYTES = 48 * 1024;
-
-/** @type {boolean | null} */
-let _rgAvailable = null;
 
 /**
  * @param {number} startedAt
@@ -111,20 +106,6 @@ function assertValidIoFilePath(filePath) {
         error.code = 'ERR_INVALID_ARG_VALUE';
         throw error;
     }
-}
-
-/**
- * @returns {Promise<boolean>}
- */
-async function isRgAvailable() {
-    if (_rgAvailable !== null) return _rgAvailable;
-    try {
-        await execFileAsync('rg', ['--version'], { timeout: 3000 });
-        _rgAvailable = true;
-    } catch {
-        _rgAvailable = false;
-    }
-    return _rgAvailable;
 }
 
 /**
@@ -1713,9 +1694,9 @@ export async function searchText(targetPath, options) {
             }
         }
 
-        if (await isRgAvailable()) {
+        if (await isRipgrepAvailable()) {
             try {
-                const { stdout } = await execFileAsync(
+                const { stdout } = await execSearchFile(
                     'rg',
                     [
                         '--color=never',
@@ -1795,7 +1776,7 @@ export async function searchText(targetPath, options) {
                 ...(options.excludePattern ? { excludePattern: options.excludePattern } : {}),
                 ...(options.contextLines !== undefined ? { contextLines: options.contextLines } : {}),
             };
-            const { stdout } = await execFileAsync('grep', buildGrepArgs(grepOptions), {
+            const { stdout } = await execSearchFile('grep', buildGrepArgs(grepOptions), {
                 cwd: options.workspaceRoot,
                 timeout: ioSearchBudget.timeoutMs,
                 maxBuffer: ioSearchBudget.maxBufferBytes,
@@ -1978,11 +1959,11 @@ export async function searchWorkspaceSymbols(targetPath, options) {
             }
         }
 
-        if (!(await isRgAvailable())) {
+        if (!(await isRipgrepAvailable())) {
             throw new Error('ripgrep (rg) não está disponível neste ambiente. workspace_symbol_search requer rg.');
         }
 
-        const { stdout } = await execFileAsync(
+        const { stdout } = await execSearchFile(
             'rg',
             [
                 '--color=never',
