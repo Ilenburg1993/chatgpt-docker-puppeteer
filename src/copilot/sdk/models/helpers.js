@@ -202,11 +202,10 @@ export function pickModel(models, criteria = {}) {
  *
  * @param {ModelInfo[]} models - Lista de modelos disponíveis
  * @param {string} preferred - ID do modelo preferido
- * @param {string} [fallback='gpt-5-mini'] - Modelo de fallback se o preferido não estiver disponível. Default is
- *   `'gpt-5-mini'`
+ * @param {string} [fallback='auto'] - Modelo de fallback se o preferido não estiver disponível. Default is `'auto'`
  * @returns {string} ID do modelo a usar
  */
-export function resolveModelId(models, preferred, fallback = 'gpt-5-mini') {
+export function resolveModelId(models, preferred, fallback = 'auto') {
     const enabled = filterEnabledModels(models);
     const found = enabled.find((m) => m.id === preferred);
     return found ? found.id : fallback;
@@ -223,11 +222,11 @@ export function resolveModelId(models, preferred, fallback = 'gpt-5-mini') {
  *
  * @param {ModelInfo[]} models - Lista de modelos disponíveis
  * @param {string} [preferred='auto'] - ID do modelo preferido ou 'auto' para seleção automática. Default is `'auto'`
- * @param {string} [fallback='gpt-5-mini'] - Modelo de fallback se auto-selection falhar. Default is `'gpt-5-mini'`
+ * @param {string} [fallback='auto'] - Modelo de fallback se auto-selection falhar. Default is `'auto'`
  * @returns {Promise<string>} ID do modelo selecionado
  * @throws {Error} Se não houver modelos disponíveis
  */
-export async function resolveModelIdAuto(models, preferred = 'auto', fallback = 'gpt-5-mini') {
+export async function resolveModelIdAuto(models, preferred = 'auto', fallback = 'auto') {
     // Se preferred não é 'auto', usar resolveModelId original
     if (preferred !== 'auto') {
         return resolveModelId(models, preferred, fallback);

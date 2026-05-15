@@ -18,11 +18,11 @@
 
 import { CopilotClient } from '@github/copilot-sdk';
 import { toError } from '#copilot/core/error-handlers';
-import { INFINITE_SESSION_DEFAULTS, REASONING_EFFORTS } from '../constants.js';
+import { DEFAULT_MODEL, INFINITE_SESSION_DEFAULTS, REASONING_EFFORTS } from '../constants.js';
 import { getSdkRecoveryPolicy, toSdkOperationError } from '../errors.js';
 import { log } from '../logger.js';
 import { emitSdkOperationMetric } from '../telemetry/operation-metrics.js';
-import { resolveSessionAutoModel, setSessionAutoModelResolver } from './model-resolution-port.js';
+import { setSessionAutoModelResolver } from './model-resolution-port.js';
 import { approveAll } from './permissions.js';
 
 export { setSessionAutoModelResolver };
@@ -45,12 +45,13 @@ export { setSessionAutoModelResolver };
  * sessão preserva `model: "auto"` para que o próprio SDK possa aplicar a política nativa de roteamento/quota.
  *
  * @param {string} model
- * @param {string} [fallback='gpt-5-mini'] Default is `'gpt-5-mini'`
+ * @param {string} [fallback='auto'] Default is `'auto'`
  * @returns {Promise<string>}
  */
-export async function resolveSessionCreateModel(model, fallback = 'gpt-5-mini') {
+export async function resolveSessionCreateModel(model, fallback = DEFAULT_MODEL) {
+    void fallback;
     if (model !== 'auto') return model;
-    return resolveSessionAutoModel(fallback);
+    return 'auto';
 }
 
 /**
@@ -314,7 +315,7 @@ function buildInfiniteSessionConfig(opts) {
 }
 
 /**
- * Reasoning effort default aplicado ao fallback `gpt-5-mini`.
+ * Reasoning effort default aplicado quando `gpt-5-mini` for solicitado explicitamente.
  *
  * @returns {ReasoningEffortLevel}
  */
@@ -493,7 +494,7 @@ function normalizeResumeModelSelection(options) {
  * Cria uma nova sessao com o cliente SDK.
  *
  * @example
- *     const { session } = await createSession(client, { model: 'gpt-5-mini' });
+ *     const { session } = await createSession(client, { model: 'auto' });
  *
  * @param {import('@github/copilot-sdk').CopilotClient} client - CopilotClient instanciado
  * @param {SessionCreateOptions} [opts] - Opcoes de configuracao
@@ -503,7 +504,7 @@ function normalizeResumeModelSelection(options) {
 export async function createSession(client, opts) {
     assertClient(client, 'createSession');
     const options = opts ?? {};
-    const model = options.model ?? 'gpt-5-mini';
+    const model = options.model ?? DEFAULT_MODEL;
     let reasoningEffort = options.reasoningEffort;
 
     if (model === 'auto') {
@@ -514,7 +515,7 @@ export async function createSession(client, opts) {
         }
     }
 
-    // Regra canônica: fallback gpt-5-mini deve usar reasoning high por padrão, configurável por env.
+    // Compatibilidade: quando gpt-5-mini for solicitado explicitamente, aplica reasoning default configurável por env.
     if (!reasoningEffort && model === 'gpt-5-mini') {
         reasoningEffort = getDefaultGpt5MiniReasoningEffort();
     }

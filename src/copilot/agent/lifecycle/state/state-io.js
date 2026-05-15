@@ -53,8 +53,8 @@ import {
  * @property {boolean} [dialogLoopActive] - Se o dialog loop estava ativo no snapshot
  * @property {boolean} [dialogPaused] - `true` se pause explícito foi emitido via `pauseDialogLoop()`
  * @property {number} [pausedAt] - Timestamp do pause (ms)
- * @property {string} [pendingTurnMessage] - Última mensagem enviada sem resposta confirmada
- * @property {number} [pendingTurnTs] - Timestamp do envio pendente (ms)
+ * @property {string | null} [pendingTurnMessage] - Última mensagem enviada sem resposta confirmada
+ * @property {number | null} [pendingTurnTs] - Timestamp do envio pendente (ms)
  * @property {boolean} [pendingTurnConsumedPR] - Se `assistant.usage` já foi emitido para este turno
  * @property {number} [lastPrConsumedAt] - Timestamp do último PR consumido (ms)
  * @property {string} [lastPrModel] - Modelo que consumiu o último PR
@@ -367,7 +367,7 @@ function _defaultState() {
         resumedAt: Date.now(),
         resumeCount: 0,
         sendCount: 0,
-        model: 'gpt-5-mini',
+        model: 'auto',
         pendingQuestion: null,
         pendingQuestionMeta: null,
         systemPromptBinding: null,

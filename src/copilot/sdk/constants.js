@@ -12,7 +12,7 @@
 // ─── Session Modes ────────────────────────────────────────────────────────────
 
 /** Modelo default usado pelo SDK local quando nenhum modelo explícito foi escolhido. */
-export const DEFAULT_MODEL = 'gpt-5-mini';
+export const DEFAULT_MODEL = 'auto';
 
 /** Modelo leve para diagnósticos e testes. */
 export const DEFAULT_DIAGNOSTIC_MODEL = 'gpt-4.1-mini';

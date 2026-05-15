@@ -196,7 +196,7 @@ export const STOP_BOOT_WAIT_MS = 15_000;
 /** Timeout padrão para drain de writes (ms) */
 export const DRAIN_WRITES_TIMEOUT_MS = 3_000;
 /** Timeout de ping para health check (ms) */
-export const PING_TIMEOUT_MS = 5_000;
+export const PING_TIMEOUT_MS = 15_000;
 /** Timeout para aguardar question.pending em resume (ms) */
 export const RESUME_QUESTION_WAIT_MS = 5_000;
 /** TTL da shadow persistida de ask_user do tipo `ready` (ms) */

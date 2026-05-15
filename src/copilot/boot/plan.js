@@ -28,6 +28,7 @@ import { readCopilotBootConfig } from './config.js';
  * }}
  */
 export function createCopilotBootPlan(config = readCopilotBootConfig()) {
+    const sdkPreflightTimeoutMs = Math.max(45_000, config.terminal.bootTimeoutMs);
     return {
         mode: config.mode,
         workspaceRoot: config.workspace.root,
@@ -49,7 +50,7 @@ export function createCopilotBootPlan(config = readCopilotBootConfig()) {
                 id: 'sdk-preflight',
                 owner: 'bootstrap',
                 responsibility: 'validar conectividade CLI, auth e modelo configurado antes do uso do runtime',
-                timeoutMs: 15_000,
+                timeoutMs: sdkPreflightTimeoutMs,
             },
             {
                 id: 'runtime-wiring',

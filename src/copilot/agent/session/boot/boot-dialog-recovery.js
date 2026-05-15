@@ -6,11 +6,10 @@
 
 import { EMITTER_DIALOG_BOOT_RECOVERY } from '#copilot/events';
 import { BOOT_RECOVERY_DELAY_MS } from '#copilot/config/agent';
-import { logSwallowed, toError } from '#copilot/core';
+import { toError } from '#copilot/core';
 import { registerTimer } from '#copilot/core';
 import {
     clearAgentRuntimePendingQuestionShadow,
-    markAgentRuntimeDialogPausedForRecovery,
     shouldReapAgentRuntimePendingQuestionShadow,
     shouldScheduleAgentRuntimeDialogBootRecovery,
 } from '../../facades/index.js';
@@ -66,13 +65,9 @@ export async function runDialogBootRecovery(ctx) {
 
     try {
         ctx.ensureDialogLoopAttached();
-        const pausedPersist = await markAgentRuntimeDialogPausedForRecovery();
-        if (!pausedPersist.ok) {
-            logSwallowed(pausedPersist.error, 'agent.bootWiring.persistDialogPaused');
-        }
-        await ctx.resumeDialogLoop();
-        log('INFO', '[AlwaysAlive] F53: Dialog loop retomado após boot recovery.');
-        ctx.emit(EMITTER_DIALOG_BOOT_RECOVERY, { zeroPR: !ctx.dialogLoopActive(), ts: Date.now() });
+        await ctx.startDialogLoop(undefined, { resumeSessionAttach: true });
+        log('INFO', '[AlwaysAlive] F53: Dialog loop reanexado à sessão retomada sem boot prompt.');
+        ctx.emit(EMITTER_DIALOG_BOOT_RECOVERY, { zeroPR: true, ts: Date.now() });
     } catch (e) {
         log('WARN', `[AlwaysAlive] F53: Boot recovery falhou (${toError(e).message}) — fallback para startDialogLoop.`);
         try {

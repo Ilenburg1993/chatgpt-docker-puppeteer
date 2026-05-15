@@ -231,7 +231,7 @@ export function readCopilotBootConfig() {
         },
         terminal: {
             enabled: envBool('COPILOT_TERMINAL_ENABLED', false),
-            bootTimeoutMs: envInt('LLM_B_BOOT_TIMEOUT_MS', 30_000),
+            bootTimeoutMs: envInt('LLM_B_BOOT_TIMEOUT_MS', 90_000),
         },
         pm2: {
             canonicalProcess: contract.canonicalPm2Process,

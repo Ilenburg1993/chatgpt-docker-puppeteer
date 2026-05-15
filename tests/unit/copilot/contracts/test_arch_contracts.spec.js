@@ -636,7 +636,7 @@ describe('W4-9 — SDK model/session: helpers de modelo não importam client est
         assert.doesNotMatch(src, /from ['"]\.\.\/models\/index\.js['"]/);
         assert.doesNotMatch(src, /import\(['"]\.\.\/models\/index\.js['"]\)/);
         assert.match(src, /from ['"]\.\/model-resolution-port\.js['"]/);
-        assert.match(src, /resolveSessionAutoModel/);
+        assert.match(src, /resolveSessionCreateModel/);
         assert.match(src, /setSessionAutoModelResolver/);
     });
 

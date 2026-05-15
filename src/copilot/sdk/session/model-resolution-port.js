@@ -36,9 +36,9 @@ export function setSessionAutoModelResolver(resolver) {
 /**
  * Resolve `model="auto"` via resolver atualmente configurado.
  *
- * @param {string} [fallback='gpt-5-mini'] Default is `'gpt-5-mini'`
+ * @param {string} [fallback='auto'] Default is `'auto'`
  * @returns {Promise<string>}
  */
-export async function resolveSessionAutoModel(fallback = 'gpt-5-mini') {
+export async function resolveSessionAutoModel(fallback = 'auto') {
     return sessionAutoModelResolver(fallback);
 }

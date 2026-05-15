@@ -81,13 +81,19 @@ async function verifySessionModelSwitch(session, model, options) {
     try {
         const current = await modelGetCurrent(session);
         result.effectiveModel = current.modelId;
-        result.verifiedSwitch = current.modelId === model;
+        result.verifiedSwitch = model === 'auto' ? Boolean(current.modelId) : current.modelId === model;
     } catch (error) {
         log('WARN', `[session-runtime] model.getCurrent falhou após setModel: ${toError(error).message}`);
         return result;
     }
 
     if (result.verifiedSwitch) {
+        if (model === 'auto') {
+            log(
+                'INFO',
+                `[session-runtime] model='auto' aceito; SDK resolveu modelo efetivo '${result.effectiveModel ?? '?'}'.`,
+            );
+        }
         return result;
     }
 
@@ -121,9 +127,9 @@ async function verifySessionModelSwitch(session, model, options) {
             async () => {
                 const current = await modelGetCurrent(session);
                 result.effectiveModel = current.modelId;
-                return current.modelId === model;
+                return model === 'auto' ? Boolean(current.modelId) : current.modelId === model;
             },
-            { maxRetries: 3, pollDelayMs: 100, totalTimeoutMs: 500 },
+            { maxRetries: 8, pollDelayMs: 250, totalTimeoutMs: 5_000 },
         );
 
         result.verifiedSwitch = verifyResult.ok;

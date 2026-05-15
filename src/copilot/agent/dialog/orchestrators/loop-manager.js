@@ -94,6 +94,9 @@ export class DialogLoopManager extends EventEmitter {
     /** @type {DialogBootCircuit} W86.8: circuit breaker do boot extraído do manager */
     #bootCircuit = new DialogBootCircuit();
 
+    /** @type {boolean} Permite primeiro turno direto na mesma sessão retomada quando não há READY vivo. */
+    #directTurnDispatchEnabled = false;
+
     /**
      * @param {DialogLoopManagerOptions} [options]
      */
@@ -242,6 +245,7 @@ export class DialogLoopManager extends EventEmitter {
             );
         }
 
+        this.#directTurnDispatchEnabled = false;
         this.#state.activate();
         this.emit(EMITTER_LOOP_CHANGED, { active: true, ts: Date.now() });
         void this.#trackPersistedState(
@@ -282,6 +286,44 @@ export class DialogLoopManager extends EventEmitter {
             this.emit(EMITTER_LOOP_CHANGED, { active: false, ts: Date.now(), reason: 'boot_failed' });
             throw err;
         }
+    }
+
+    /**
+     * Reanexa o terminal a uma sessão SDK retomada sem enviar boot prompt para dentro da conversa antiga.
+     *
+     * Este caminho preserva continuidade: nenhum PR é gasto no startup, nenhum modelo recebe instrução fantasma, e o
+     * primeiro turno real pode ser despachado diretamente para a mesma sessão se o SDK não restaurar um READY vivo.
+     *
+     * @returns {Promise<void>}
+     */
+    async startResumedSession() {
+        if (!this.#host) {
+            throw new SessionError(
+                '[DialogLoopManager] Não vinculado a um host. Chame attach() primeiro.',
+                'NOT_ATTACHED',
+            );
+        }
+        if (this.#state.active) {
+            return;
+        }
+
+        this.#directTurnDispatchEnabled = true;
+        this.#state.activate();
+        this.#watchdogSupervisor.start();
+        this.#costLedger.recordZeroPrResume();
+        this.emit(EMITTER_LOOP_CHANGED, { active: true, ts: Date.now(), reason: 'resumed_session_attach' });
+        void this.#trackPersistedState(
+            { dialogLoopActive: true, dialogPaused: false },
+            {
+                label: 'dialog.state.resumed_session_attach',
+                description: 'Persist dialogLoopActive=true after zero-PR resumed session attach',
+            },
+        );
+        void this.#persistPrMetrics(
+            'dialog.prMetrics.resume_session_attach',
+            'Persist dialog loop PR metrics after zero-PR resumed session attach',
+        );
+        log('INFO', '[DialogLoopManager] Sessão retomada reanexada em modo zero-PR; boot prompt automático omitido.');
     }
 
     /**
@@ -637,7 +679,12 @@ export class DialogLoopManager extends EventEmitter {
         return executeTurnImpl(
             this,
             message,
-            { timeout, ...(signal !== undefined && { signal }), ...(traceId ? { traceId } : {}) },
+            {
+                timeout,
+                allowDirectDispatch: this.#directTurnDispatchEnabled,
+                ...(signal !== undefined && { signal }),
+                ...(traceId ? { traceId } : {}),
+            },
             {
                 host,
                 sendCountRef: this.#sendCountRef,

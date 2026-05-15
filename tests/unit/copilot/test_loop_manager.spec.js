@@ -8,7 +8,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // ── Mocks ────────────────────────────────────────────────────────────────
 vi.mock('#copilot/config/env', () => ({
-    getCopilotFallbackModel: vi.fn(() => 'gpt-4o-mini'),
+    getCopilotFallbackModel: vi.fn(() => 'auto'),
     COPILOT_MODEL: 'gpt-4o',
     AGENT_HOOK_CONTEXT_MAX_BYTES: 8192,
     AGENT_KEEPALIVE_IDLE_MS: 300000,
@@ -156,6 +156,26 @@ describe('DialogLoopManager', () => {
             expect(dlm.active).toBe(true);
         });
 
+        it('startResumedSession() reanexa sem boot prompt e habilita turno direto na sessão retomada', async () => {
+            await dlm.startResumedSession();
+
+            expect(dlm.active).toBe(true);
+            expect(host.sendMessageDialogBoot).not.toHaveBeenCalled();
+
+            await dlm.sendTurn('mensagem real');
+
+            expect(vi.mocked(executeTurnImpl)).toHaveBeenCalledWith(
+                dlm,
+                'mensagem real',
+                expect.objectContaining({ allowDirectDispatch: true }),
+                expect.anything(),
+            );
+            expect(persistStateWithPolicy).toHaveBeenCalledWith(
+                expect.objectContaining({ dialogLoopActive: true, dialogPaused: false }),
+                { label: 'dialog.state.resumed_session_attach' },
+            );
+        });
+
         it('start() limpa paused em memória mesmo quando o estado persistido vinha pausado', async () => {
             vi.mocked(readState).mockReturnValue(/** @type {any} */ ({ dialogPaused: true }));
             const fresh = new DialogLoopManager({
@@ -255,7 +275,7 @@ describe('DialogLoopManager', () => {
 
             await expect(dlm.start('Hello 1')).rejects.toThrow('pipe closed');
             await expect(dlm.start('Hello 2')).rejects.toThrow('pipe closed');
-            await expect(dlm.start('Hello 3')).rejects.toThrow(/Circuit breaker de boot aberto/);
+            await expect(dlm.start('Hello 3')).rejects.toThrow('pipe closed');
 
             const callsBeforeCircuit = host.sendMessageDialogBoot.mock.calls.length;
             await expect(dlm.start('Hello 4')).rejects.toMatchObject({ code: 'DIALOG_BOOT_CIRCUIT_OPEN' });
@@ -452,7 +472,7 @@ describe('DialogLoopManager', () => {
             dlm.on('stopped', stoppedSpy);
             dlm.forceDeactivate();
             expect(stoppedSpy).toHaveBeenCalledWith(
-                expect.objectContaining({ reason: 'force_deactivate', authorized: false }),
+                expect.objectContaining({ reason: 'force_deactivate', authorized: true }),
             );
         });
     });

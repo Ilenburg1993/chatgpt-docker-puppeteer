@@ -60,7 +60,7 @@ export function readTerminalTurnCount() {
  * Inicia o dialog mode do bridge.
  *
  * @param {string | undefined} bootPrompt
- * @param {{ onReady?: () => void }} [opts]
+ * @param {{ onReady?: () => void; resumeSessionAttach?: boolean }} [opts]
  * @returns {Promise<void>}
  */
 export async function startTerminalDialogMode(bootPrompt, opts = {}) {

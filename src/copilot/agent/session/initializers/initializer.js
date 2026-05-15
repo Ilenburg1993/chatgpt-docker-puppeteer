@@ -195,7 +195,7 @@ function _validateSessionForResume(sessionId, lastActivityMs) {
  *
  * @param {CopilotClient} client - Instância do CopilotClient
  * @param {object} sessionOptions - Opções para createSession/resumeSession
- * @param {string} [sessionOptions.model] - Modelo a usar (padrão: 'gpt-5-mini')
+ * @param {string} [sessionOptions.model] - Modelo a usar (padrão: 'auto')
  * @param {'low' | 'medium' | 'high' | 'xhigh'} [sessionOptions.reasoningEffort] - Esforço de raciocínio para o3/o4-mini
  * @param {import('#copilot/sdk/types').PermissionHandler} [sessionOptions.onPermissionRequest]
  * @param {Function} [sessionOptions.onUserInputRequest]
@@ -280,9 +280,12 @@ export async function initOrResumeSession(client, sessionOptions) {
         customAgents,
     };
 
-    // F43.2 (GAP-SD-03): verificar se a sessão deve ser rotacionada antes de tentar retomada
+    // F43.2 (GAP-SD-03): rotação automática deixou de ser default do terminal LLM-B.
+    // O princípio operacional atual é session-first: retomar a sessão anterior sempre que o SDK permitir.
+    // Rotação continua disponível para fluxos explícitos via sessionOptions.allowSessionRotation.
     let savedSessionId = _validateSessionForResume(state?.sessionId, state?.resumedAt ?? state?.startedAt);
-    if (savedSessionId) {
+    const allowSessionRotation = Reflect.get(sessionOptions, 'allowSessionRotation') === true;
+    if (savedSessionId && allowSessionRotation) {
         const { shouldRotateSession } = await import('../lifecycle/rotation.js');
         /** @type {import('../lifecycle/rotation.js').RotationContext} */
         const rotationCtx = {};
@@ -305,16 +308,15 @@ export async function initOrResumeSession(client, sessionOptions) {
     const requestedNativeAutoModel = model === 'auto';
     const persistedConcreteModel =
         !requestedNativeAutoModel && typeof state?.model === 'string' && state.model !== 'auto' ? state.model : null;
-    const effectiveModel =
-        typeof result.model === 'string'
-            ? result.model
-            : (persistedConcreteModel ?? (requestedNativeAutoModel ? 'auto' : model));
+    const effectiveModel = requestedNativeAutoModel
+        ? 'auto'
+        : (typeof result.model === 'string' ? result.model : (persistedConcreteModel ?? model));
     if (
         result.isResumed &&
         requestedNativeAutoModel &&
         state?.model &&
         state.model !== 'auto' &&
-        result.model === undefined
+        (result.model === undefined || result.model !== 'auto')
     ) {
         log(
             'INFO',
@@ -340,6 +342,10 @@ export async function initOrResumeSession(client, sessionOptions) {
                 model: effectiveModel,
                 systemPromptBinding: buildSystemPromptBindingSnapshot(systemPromptStatus, result.session.sessionId),
                 ...(effectiveReasoningEffort !== undefined ? { reasoningEffort: effectiveReasoningEffort } : {}),
+                dialogPaused: false,
+                pendingTurnMessage: null,
+                pendingTurnTs: null,
+                pendingTurnConsumedPR: false,
             },
             { label: 'session.initializer.resume' },
         );

@@ -29,6 +29,7 @@ import { createSnapshot, listSnapshotsAsync, loadSnapshotAsync, saveSnapshotAsyn
  *     getRuntimeStatus?: (() => string) | undefined;
  *     getModelSnapshot?: (() => string) | undefined;
  *     getReasoningEffortSnapshot?: (() => string | undefined) | undefined;
+ *     getIsResumedSnapshot?: (() => boolean) | undefined;
  *     getQueueSnapshot?: (() => { size: number }) | undefined;
  *     getPendingQuestionForStatusSnapshot?: (() => import('../types.js').PendingQuestion | null) | undefined;
  *     getPendingQuestionKind?: (() => import('../types.js').PendingQuestionKind | null) | undefined;
@@ -89,6 +90,7 @@ import { createSnapshot, listSnapshotsAsync, loadSnapshotAsync, saveSnapshotAsyn
  *     sessionId: string | null;
  *     dialogLoopActive: boolean;
  *     dialogPaused: boolean;
+ *     isResumed: boolean;
  *     queueSize: number;
  * }} AgentRuntimeControlState
  *
@@ -179,6 +181,7 @@ export function readRuntimeControlState(runtime) {
             health?.dialogLoopActive ?? runtime.isDialogLoopActive?.() ?? runtime.dialogLoopActive,
         ),
         dialogPaused: Boolean(dialogChecks?.paused ?? runtime.isDialogLoopPaused?.() ?? runtime.dialogPaused),
+        isResumed: Boolean(runtime.getIsResumedSnapshot?.() ?? snap['isResumed']),
         queueSize: Number(queueSnapshot?.size ?? snap['queueSize'] ?? 0),
     };
 }

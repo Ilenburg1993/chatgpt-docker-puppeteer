@@ -9,7 +9,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 // ── Mocks ────────────────────────────────────────────────────────────────────
 
 vi.mock('#copilot/config/env', () => ({
-    getCopilotFallbackModel: vi.fn(() => 'gpt-4o-mini'),
+    getCopilotFallbackModel: vi.fn(() => 'auto'),
     COPILOT_LOG_DIR: '',
     COPILOT_MODEL: 'gpt-4o',
     AGENT_HOOK_CONTEXT_MAX_BYTES: 4096,

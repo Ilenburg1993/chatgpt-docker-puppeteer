@@ -34,15 +34,19 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('#copilot/audit', () => ({ buildAuditingPermissionHandler: mocks.buildAuditingPermissionHandler }));
 vi.mock('#copilot/boot', () => ({
+    COPILOT_PACKAGE_ROOT: '/workspace',
     WORKSPACE_ROOT: '/workspace',
     readBootSkillConfig: vi.fn(() => ({ skillDirectories: ['/skills'] })),
+    resolvePersistentConfigFile: vi.fn((name) => `/tmp/copilot-test/${name}`),
 }));
 vi.mock('#copilot/config', () => ({
+    COPILOT_EVENTS_MAX_BYTES: 1024 * 1024,
+    COPILOT_LOG_DIR: '',
     MAESTRO_AGENT_NAME: 'agent-full',
     buildCustomAgentsConfig: mocks.buildCustomAgentsConfig,
 }));
-vi.mock('#copilot/core', async (importOriginal) => ({
-    ...(await importOriginal()),
+vi.mock('#copilot/core', () => ({
+    SHUTDOWN_PRIORITY: { BACKGROUND: 50 },
     buildCanonicalLocalSurfaceExcludedTools: (
         /** @type {string[]} */ toolNames,
         /** @type {string[]} */ baseExcluded = [],
@@ -61,6 +65,8 @@ vi.mock('#copilot/core', async (importOriginal) => ({
         }
         return [...excluded].sort();
     },
+    logSwallowed: vi.fn(),
+    registerShutdownHandler: vi.fn(),
     toError: (/** @type {unknown} */ error) => (error instanceof Error ? error : new Error(String(error))),
 }));
 vi.mock('../../../src/copilot/config/agent.js', () => ({
@@ -76,13 +82,27 @@ vi.mock('../../../src/copilot/config/system-prompt/index.js', () => ({
     readSystemPromptStatus: mocks.readSystemPromptStatus,
 }));
 vi.mock('../../../src/copilot/agent/facades/agent-sdk-access.js', () => ({
-    AGENT_SDK_DEFAULT_MODEL: 'gpt-5-mini',
+    AGENT_SDK_DEFAULT_MODEL: 'auto',
     canReadAgentSdkSessionMessages: mocks.canReadAgentSdkSessionMessages,
     createAgentSdkSessionByClient: mocks.createAgentSdkSessionByClient,
     formatValidationResult: mocks.formatValidationResult,
     getAgentConfiguredSessionFsHandler: mocks.getAgentConfiguredSessionFsHandler,
     loadAgentSdkToolsConfigAsync: mocks.loadAgentSdkToolsConfigAsync,
     pickDefinedAgentSdkOptions: mocks.pickDefinedAgentSdkOptions,
+    readAgentSdkSessionMessages: mocks.readAgentSdkSessionMessages,
+    resumeOrCreateAgentSdkSession: mocks.resumeOrCreateAgentSdkSession,
+    validateAgentContracts: mocks.validateAgentContracts,
+}));
+vi.mock('../../../src/copilot/agent/facades/index.js', () => ({
+    AGENT_SDK_DEFAULT_MODEL: 'auto',
+    canReadAgentSdkSessionMessages: mocks.canReadAgentSdkSessionMessages,
+    createAgentSdkSessionByClient: mocks.createAgentSdkSessionByClient,
+    formatValidationResult: mocks.formatValidationResult,
+    getAgentConfiguredSessionFsHandler: mocks.getAgentConfiguredSessionFsHandler,
+    loadAgentSdkToolsConfigAsync: mocks.loadAgentSdkToolsConfigAsync,
+    persistAgentRuntimeStatePartial: mocks.persistState,
+    pickDefinedAgentSdkOptions: mocks.pickDefinedAgentSdkOptions,
+    readAgentRuntimePersistedStateAsync: mocks.readState,
     readAgentSdkSessionMessages: mocks.readAgentSdkSessionMessages,
     resumeOrCreateAgentSdkSession: mocks.resumeOrCreateAgentSdkSession,
     validateAgentContracts: mocks.validateAgentContracts,
@@ -95,10 +115,20 @@ vi.mock('../../../src/copilot/agent/ports/logging-port.js', () => ({ log: vi.fn(
 vi.mock('../../../src/copilot/agent/ports/metrics-port.js', () => ({
     defaultMetrics: { recordSessionRotation: vi.fn() },
 }));
+vi.mock('../../../src/copilot/agent/ports/index.js', () => ({
+    defaultMetrics: { recordSessionRotation: vi.fn() },
+    log: vi.fn(),
+    startSpanImmediate: vi.fn(() => ({ end: vi.fn(), setAttribute: vi.fn() })),
+}));
 vi.mock('../../../src/copilot/agent/ports/tracing-port.js', () => ({
     startSpanImmediate: vi.fn(() => ({ end: vi.fn(), setAttribute: vi.fn() })),
 }));
 vi.mock('../../../src/copilot/agent/session/context/hook-context.js', () => ({
+    buildHookSystemContextSafe: mocks.buildHookSystemContextSafe,
+}));
+vi.mock('../../../src/copilot/agent/session/context/index.js', () => ({
+    SessionJsonSchema: {},
+    buildHookSystemContext: vi.fn(async () => 'hook ctx'),
     buildHookSystemContextSafe: mocks.buildHookSystemContextSafe,
 }));
 
@@ -164,7 +194,7 @@ describe('agent/session/initializer — sessionFs wiring', () => {
         expect(sessionOptions?.excludedTools).toEqual(['create', 'edit', 'glob', 'grep', 'view', 'web_fetch']);
     });
 
-    it('persiste o modelo efetivo resolvido em vez do placeholder auto', async () => {
+    it('preserva model=auto como configuração nativa mesmo quando o SDK observa modelo efetivo', async () => {
         const { initOrResumeSession } = await import('../../../src/copilot/agent/session/initializers/initializer.js');
         mocks.resumeOrCreateAgentSdkSession.mockResolvedValueOnce({
             session: { sessionId: 'resolved-sess' },
@@ -180,7 +210,7 @@ describe('agent/session/initializer — sessionFs wiring', () => {
 
         expect(mocks.persistState).toHaveBeenCalledWith(
             expect.objectContaining({
-                model: 'gpt-5-mini',
+                model: 'auto',
                 reasoningEffort: 'high',
                 systemPromptBinding: expect.objectContaining({ digest: 'prompt-digest', sessionId: 'resolved-sess' }),
             }),
@@ -188,7 +218,7 @@ describe('agent/session/initializer — sessionFs wiring', () => {
         );
         expect(result).toEqual(
             expect.objectContaining({
-                model: 'gpt-5-mini',
+                model: 'auto',
                 reasoningEffort: 'high',
             }),
         );

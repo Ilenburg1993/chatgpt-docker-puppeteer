@@ -29,7 +29,7 @@ export { MAX_EMBED_BYTES };
  * @typedef {{
  *     dialogLoopActive?: boolean | undefined;
  *     dialogPaused?: boolean | undefined;
- *     startDialogLoop: (bootPrompt?: string) => Promise<void>;
+ *     startDialogLoop: (bootPrompt?: string, opts?: { resumeSessionAttach?: boolean }) => Promise<void>;
  *     sendDialogTurn: (
  *         message: string,
  *         options?: { timeout?: number | null; signal?: AbortSignal; traceId?: string },
@@ -112,10 +112,11 @@ function readRuntimeDialogStateSnapshot(agent) {
 /**
  * @param {string | undefined} [bootPrompt]
  * @param {RuntimeDialogTarget | null | undefined} [runtime]
+ * @param {{ resumeSessionAttach?: boolean }} [opts]
  * @returns {Promise<void>}
  */
-export async function startRuntimeDialogLoop(bootPrompt, runtime) {
-    await startAgentDialogLoop(resolveRuntimeDialogTarget(runtime), bootPrompt ?? undefined);
+export async function startRuntimeDialogLoop(bootPrompt, runtime, opts = {}) {
+    await startAgentDialogLoop(resolveRuntimeDialogTarget(runtime), bootPrompt ?? undefined, opts);
 }
 
 /**

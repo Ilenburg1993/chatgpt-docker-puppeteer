@@ -3,7 +3,7 @@
  * src/copilot/channel/index.js
  *
  * Módulo canal LLM-A ↔ LLM-B — ponto de entrada canônico para toda comunicação entre LLM-A (GitHub Copilot — este
- * agente) e LLM-B (Copilot SDK / modelo configurado, default `gpt-5-mini`).
+ * agente) e LLM-B (Copilot SDK / modelo configurado, default `auto`).
  *
  * Consolida dois modos de comunicação:
  *

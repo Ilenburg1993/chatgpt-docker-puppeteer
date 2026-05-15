@@ -88,7 +88,8 @@ import {
  * }) => void} receiveHandoff
  * @property {() => void} ensureDialogLoopAttached — Garante DLM attached
  * @property {() => Promise<void>} resumeDialogLoop — Retoma dialog loop
- * @property {() => Promise<void>} startDialogLoop — Inicia dialog loop
+ * @property {(bootPrompt?: string, opts?: { resumeSessionAttach?: boolean }) => Promise<void>} startDialogLoop —
+ *   Inicia dialog loop
  * @property {(options?: {
  *     isIdle?: () => boolean;
  *     onKeepalive?: (info: { ts: number; strategy: 'client.ping' | 'session.send' }) => void;

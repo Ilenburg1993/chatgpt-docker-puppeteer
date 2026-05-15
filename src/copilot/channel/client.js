@@ -435,6 +435,7 @@ export class LlmBridgeClient {
      *     onReply?: (reply: string) => void;
      *     onStopped?: () => void;
      *     timeoutMs?: number;
+     *     resumeSessionAttach?: boolean;
      * }} [opts]
      * @returns {Promise<void>}
      */

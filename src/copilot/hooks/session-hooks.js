@@ -19,7 +19,6 @@
 import { defaultAuditLog } from '#copilot/audit';
 import { getCopilotFallbackModel } from '#copilot/config';
 import { classifySdkRateLimitScope } from '#copilot/sdk/errors';
-import { modelSelector } from '#copilot/sdk/models';
 import { hostname } from 'node:os';
 import { createErrorHandler } from './error-handler.js';
 import { log } from './logger.js';
@@ -107,19 +106,15 @@ export function createSessionHooks(ctx) {
                     );
                 } else {
                     const currentModel = getModel() ?? 'unknown';
-                    const envFallback = getCopilotFallbackModel();
-                    const fallbackModel =
-                        envFallback && envFallback !== currentModel
-                            ? envFallback
-                            : (modelSelector.suggestFallback(currentModel)?.id ?? null);
+                    const fallbackModel = getCopilotFallbackModel();
                     if (fallbackModel && fallbackModel !== currentModel) {
                         log(
                             'WARN',
-                            `[hooks/session-lifecycle] rate_limit/quota — próxima reconexão usará model fallback: ${fallbackModel}`,
+                            `[hooks/session-lifecycle] rate_limit/quota — próxima reconexão delegará seleção ao SDK via model fallback: ${fallbackModel}`,
                         );
                         scheduleFallback(fallbackModel);
                     } else {
-                        log('WARN', '[hooks/session-lifecycle] rate_limit/quota sem fallback disponível.');
+                        log('WARN', '[hooks/session-lifecycle] rate_limit/quota com model já em auto; aguardando reset do SDK.');
                     }
                 }
             }

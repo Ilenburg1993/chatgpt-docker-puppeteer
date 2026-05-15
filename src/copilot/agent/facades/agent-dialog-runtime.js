@@ -9,7 +9,7 @@
 
 /**
  * @typedef {{
- *     startDialogLoop: (bootPrompt?: string) => Promise<void>;
+ *     startDialogLoop: (bootPrompt?: string, opts?: { resumeSessionAttach?: boolean }) => Promise<void>;
  * }} AgentDialogStartTarget
  */
 
@@ -70,9 +70,14 @@
 /**
  * @param {AgentDialogStartTarget} runtime
  * @param {string | undefined} [bootPrompt]
+ * @param {{ resumeSessionAttach?: boolean }} [opts]
  * @returns {Promise<void>}
  */
-export async function startAgentDialogLoop(runtime, bootPrompt) {
+export async function startAgentDialogLoop(runtime, bootPrompt, opts = {}) {
+    if (opts.resumeSessionAttach === true) {
+        await runtime.startDialogLoop(bootPrompt ?? undefined, opts);
+        return;
+    }
     await runtime.startDialogLoop(bootPrompt ?? undefined);
 }
 

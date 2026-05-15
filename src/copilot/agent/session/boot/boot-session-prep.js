@@ -46,7 +46,7 @@ import { wireSessionEvents } from '../wiring/index.js';
  * }) => void} receiveHandoff
  * @property {() => void} ensureDialogLoopAttached
  * @property {() => Promise<void>} resumeDialogLoop
- * @property {() => Promise<void>} startDialogLoop
+ * @property {(bootPrompt?: string, opts?: { resumeSessionAttach?: boolean }) => Promise<void>} startDialogLoop
  * @property {(options?: {
  *     isIdle?: () => boolean;
  *     onKeepalive?: (info: { ts: number; strategy: 'client.ping' | 'session.send' }) => void;

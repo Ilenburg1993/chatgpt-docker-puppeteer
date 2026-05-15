@@ -368,14 +368,14 @@ export function waitForRestartAndReply(emitter, host, message, timeout, stopReas
  *
  * @param {TurnEmitter} emitter
  * @param {string} message
- * @param {{ timeout: number | null; signal?: AbortSignal; traceId?: string }} opts
+ * @param {{ timeout: number | null; signal?: AbortSignal; traceId?: string; allowDirectDispatch?: boolean }} opts
  * @param {{
  *     host: TurnHost;
  *     sendCountRef: { sendCount: number };
  * }} ctx
  * @returns {Promise<string>}
  */
-export function executeTurnImpl(emitter, message, { timeout, signal, traceId }, ctx) {
+export function executeTurnImpl(emitter, message, { timeout, signal, traceId, allowDirectDispatch = false }, ctx) {
     const { host, sendCountRef } = ctx;
 
     if (!host) {
@@ -474,6 +474,7 @@ export function executeTurnImpl(emitter, message, { timeout, signal, traceId }, 
                     resolve: settleResolve,
                     reject: settleReject,
                     waitForRestartAndReplyFn: waitFn,
+                    allowDirectDispatch,
                     onDispatch: () => replyFallback.markDispatched(),
                     ...(traceId ? { traceId } : {}),
                     tryUseReplyFallback: () =>

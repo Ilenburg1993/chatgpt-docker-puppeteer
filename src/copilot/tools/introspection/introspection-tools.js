@@ -376,7 +376,7 @@ const getAgentInfoTool = buildTool({
         return {
             sdkVersion,
             nodeVersion: process.version,
-            model: COPILOT_MODEL ?? 'gpt-5-mini',
+            model: COPILOT_MODEL ?? 'auto',
             liveModel,
             reasoningEffort: _agentInfoProvider?.getReasoningEffortSnapshot() ?? null,
             pid: process.pid,

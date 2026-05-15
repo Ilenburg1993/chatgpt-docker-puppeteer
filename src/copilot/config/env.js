@@ -284,13 +284,15 @@ export const INJECT_ALLOW_TEXT_MODE_DIRECTIVES = envBool('INJECT_ALLOW_TEXT_MODE
 export const MAX_QUEUE_SIZE = 100;
 
 /**
- * Retorna o modelo de fallback do Copilot para situações de rate_limit/quota. Lido em runtime (não import-time) para
- * permitir configuração dinâmica via `process.env`.
+ * Retorna o modelo de fallback do Copilot para situações de rate_limit/quota.
+ *
+ * Política canônica LLM-B: fallback de modelo é sempre `auto`, delegando a decisão ao SDK/GitHub Copilot. A variável
+ * legada `COPILOT_FALLBACK_MODEL` fica tolerada apenas por compatibilidade operacional, mas não altera mais o alvo.
  *
  * @returns {string | null}
  */
 export function getCopilotFallbackModel() {
-    return process.env['COPILOT_FALLBACK_MODEL'] ?? null;
+    return 'auto';
 }
 
 /**

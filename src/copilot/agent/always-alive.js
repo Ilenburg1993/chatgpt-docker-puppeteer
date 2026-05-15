@@ -1021,11 +1021,12 @@ export class AlwaysAliveAgent extends EventEmitter {
      * Inicia o "modo diálogo direto" com a LLM. Delega ao DialogLoopManager.
      *
      * @param {string} [bootPrompt] - Prompt de boot personalizado (opcional)
+     * @param {{ resumeSessionAttach?: boolean }} [opts]
      * @returns {Promise<void>}
      * @throws {Error} Se o agente não estiver no estado 'idle'
      */
-    async startDialogLoop(bootPrompt) {
-        await dialogStart(this.ctx, this, bootPrompt);
+    async startDialogLoop(bootPrompt, opts = {}) {
+        await dialogStart(this.ctx, this, bootPrompt, opts);
     }
 
     /**

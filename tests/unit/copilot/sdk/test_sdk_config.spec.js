@@ -10,8 +10,8 @@ import { DEFAULT_DIAGNOSTIC_MODEL, DEFAULT_MODEL, INFINITE_SESSION_DEFAULTS } fr
 import { SessionConfigBuilder } from '#copilot/config/session-config';
 
 describe('Config constants', () => {
-    it('DEFAULT_MODEL é gpt-5-mini', () => {
-        expect(DEFAULT_MODEL).toBe('gpt-5-mini');
+    it('DEFAULT_MODEL é auto', () => {
+        expect(DEFAULT_MODEL).toBe('auto');
     });
 
     it('DEFAULT_DIAGNOSTIC_MODEL é gpt-4.1-mini', () => {

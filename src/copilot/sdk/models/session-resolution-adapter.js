@@ -30,6 +30,9 @@ export function createSessionAutoModelResolver(deps = {}) {
     const listModelsFn = deps.listModelsFn ?? listModels;
     const resolveModelIdAutoFn = deps.resolveModelIdAutoFn ?? resolveModelIdAuto;
     return async (fallback) => {
+        if (fallback === 'auto') {
+            return 'auto';
+        }
         const availableModels = await listModelsFn();
         return resolveModelIdAutoFn(availableModels, 'auto', fallback);
     };

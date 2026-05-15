@@ -28,4 +28,14 @@ describe('sdk/models/session-resolution-adapter', () => {
         expect(listModelsFn).toHaveBeenCalledTimes(1);
         expect(resolveModelIdAutoFn).toHaveBeenCalledTimes(1);
     });
+
+    it('createSessionAutoModelResolver preserva fallback auto sem consultar catálogo', async () => {
+        const listModelsFn = vi.fn(async () => []);
+        const resolveModelIdAutoFn = vi.fn(async () => 'should-not-run');
+        const resolveAuto = createSessionAutoModelResolver({ listModelsFn, resolveModelIdAutoFn });
+
+        await expect(resolveAuto('auto')).resolves.toBe('auto');
+        expect(listModelsFn).not.toHaveBeenCalled();
+        expect(resolveModelIdAutoFn).not.toHaveBeenCalled();
+    });
 });

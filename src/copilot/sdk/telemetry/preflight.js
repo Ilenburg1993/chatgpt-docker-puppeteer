@@ -26,11 +26,12 @@ function errorMessage(err) {
 
 /**
  * @param {number} timeoutMs
+ * @param {string} [label='Operation'] Default is `'Operation'`
  * @returns {Promise<never>}
  */
-function timeoutAfter(timeoutMs) {
+function timeoutAfter(timeoutMs, label = 'Operation') {
     return new Promise((_, reject) => {
-        setTimeout(() => reject(new Error(`Ping timeout (${timeoutMs}ms)`)), timeoutMs);
+        setTimeout(() => reject(new Error(`${label} timeout (${timeoutMs}ms)`)), timeoutMs);
     });
 }
 
@@ -72,7 +73,7 @@ export async function runCopilotSdkBootPreflight({
             await client.start();
         }
 
-        await Promise.race([client.ping('boot-preflight'), timeoutAfter(pingTimeoutMs)]);
+        await Promise.race([client.ping('boot-preflight'), timeoutAfter(pingTimeoutMs, 'Ping')]);
         report.pingOk = true;
         log('INFO', '[copilot/sdk/preflight] CLI conectado — ping OK.');
 
@@ -92,13 +93,17 @@ export async function runCopilotSdkBootPreflight({
             log('DEBUG', `[copilot/sdk/preflight] ${warning}`);
         }
 
-        if (configuredModel && configuredModel !== 'gpt-5-mini') {
+        if (configuredModel) {
             if (configuredModel === 'auto') {
                 report.modelValidated = true;
-                log('INFO', '[copilot/sdk/preflight] Modelo "auto" será resolvido em runtime.');
+                log('INFO', '[copilot/sdk/preflight] Modelo "auto" será resolvido pelo SDK/GitHub Copilot.');
             } else {
                 try {
-                    const models = await client.listModels();
+                    const modelValidationTimeoutMs = Math.max(15_000, pingTimeoutMs);
+                    const models = await Promise.race([
+                        client.listModels(),
+                        timeoutAfter(modelValidationTimeoutMs, 'Model validation'),
+                    ]);
                     report.modelValidated = models.some((model) => model.id === configuredModel);
                     if (!report.modelValidated) {
                         const warning = `Modelo '${configuredModel}' não encontrado na lista de modelos disponíveis.`;

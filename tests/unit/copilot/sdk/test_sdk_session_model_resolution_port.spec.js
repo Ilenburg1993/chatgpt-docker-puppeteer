@@ -11,7 +11,7 @@ describe('sdk/session/model-resolution-port', () => {
     it('resolveSessionAutoModel usa resolver injetado', async () => {
         setSessionAutoModelResolver(async (fallback) => `resolved:${fallback}`);
 
-        await expect(resolveSessionAutoModel('gpt-5-mini')).resolves.toBe('resolved:gpt-5-mini');
+        await expect(resolveSessionAutoModel()).resolves.toBe('resolved:auto');
     });
 
     it('setSessionAutoModelResolver(null) restaura resolver default sem quebrar reinjeção', async () => {

@@ -140,6 +140,30 @@ describe('sdk/session-lifecycle', () => {
             expect(s.setModel).toHaveBeenCalledWith('claude-sonnet-4-5', undefined);
         });
 
+        it('aceita model auto quando SDK resolve modelo efetivo concreto', async () => {
+            const s = fakeSession({
+                rpc: {
+                    model: {
+                        getCurrent: vi.fn().mockResolvedValue({ modelId: 'gpt-5.4' }),
+                        switchTo: vi.fn(),
+                    },
+                },
+            });
+
+            const result = await setSessionModel(s, 'auto');
+
+            expect(s.setModel).toHaveBeenCalledWith('auto', undefined);
+            expect(s.rpc.model.switchTo).not.toHaveBeenCalled();
+            expect(result).toEqual({
+                requestedModel: 'auto',
+                effectiveModel: 'gpt-5.4',
+                verifiedSwitch: true,
+                usedRpcFallback: false,
+            });
+            expect(Reflect.get(s, '__copilotEffectiveModel')).toBe('gpt-5.4');
+            expect(Reflect.get(s, '__copilotModelVerified')).toBe(true);
+        });
+
         it('usa session.switchModel quando setModel não existe', async () => {
             const switchModel = vi.fn().mockResolvedValue(undefined);
             const s = fakeSession({

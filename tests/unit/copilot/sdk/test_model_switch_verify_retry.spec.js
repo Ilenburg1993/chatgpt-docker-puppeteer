@@ -103,12 +103,12 @@ describe('model-switch-verify-retry', () => {
             await expect(verifyModelSwitchWithRetry(invalidFn)).rejects.toThrow(TypeError);
         });
 
-        it('respeita config parcial com defaults', async () => {
+        it('respeita config parcial com defaults ampliados', async () => {
             const predicateFn = vi.fn().mockResolvedValue(true);
 
             const result = await verifyModelSwitchWithRetry(predicateFn, { maxRetries: 5 });
 
-            // Defaults: pollDelayMs=100, totalTimeoutMs=500
+            // Defaults atuais: pollDelayMs=250, totalTimeoutMs=5000.
             expect(result.ok).toBe(true);
             expect(predicateFn).toHaveBeenCalledTimes(1);
         });

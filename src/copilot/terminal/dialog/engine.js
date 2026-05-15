@@ -272,7 +272,11 @@ async function _tryStartDialogLoop() {
         source: 'dialog',
     });
     println('\x1b[90m  Conectando ao agente…\x1b[0m');
-    await startTerminalDialogMode(BOOT_PROMPT ?? undefined, {
+    const resumeSessionAttach = true;
+    log('INFO', '[dialog] reanexando terminal sem boot prompt automático.');
+    println('\x1b[90m  Reanexando sessão SDK sem boot prompt…\x1b[0m');
+    await startTerminalDialogMode(resumeSessionAttach ? undefined : (BOOT_PROMPT ?? undefined), {
+        resumeSessionAttach,
         onReady: () => println('\n  \x1b[32m●\x1b[0m  LLM-B pronta — pode começar\n'),
     });
 }

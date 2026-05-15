@@ -15,7 +15,6 @@ import { defaultAuditLog } from '#copilot/audit';
 import { getCopilotFallbackModel } from '#copilot/config';
 import { recordBlockedToolCall } from '#copilot/observability';
 import { classifySdkRateLimitScope } from '#copilot/sdk/errors';
-import { modelSelector } from '#copilot/sdk/models';
 import {
     attachBus,
     createQueuedElicitationHandler,
@@ -132,11 +131,7 @@ function createAgentSessionLifecycleHooks(input) {
             const rateLimitScope = classifySdkRateLimitScope(errorInput.error);
             if (rateLimitScope !== 'session') {
                 const currentModel = input.getModel() ?? 'unknown';
-                const envFallback = getCopilotFallbackModel();
-                const fallbackModel =
-                    envFallback && envFallback !== currentModel
-                        ? envFallback
-                        : (modelSelector.suggestFallback(currentModel)?.id ?? null);
+                const fallbackModel = getCopilotFallbackModel();
                 if (fallbackModel && fallbackModel !== currentModel) {
                     input.scheduleFallback(fallbackModel);
                 }

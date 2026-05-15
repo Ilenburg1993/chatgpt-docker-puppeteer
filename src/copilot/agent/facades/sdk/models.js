@@ -8,10 +8,11 @@
  */
 
 import { isExperimentalEnabled } from '#copilot/sdk/feature-flags';
+import { DEFAULT_MODEL } from '#copilot/sdk/constants';
 import { listModels, modelRegistry, modelStatsTracker } from '#copilot/sdk/models';
 
 /** @type {string} */
-export const AGENT_SDK_DEFAULT_MODEL = 'gpt-5-mini';
+export const AGENT_SDK_DEFAULT_MODEL = DEFAULT_MODEL;
 
 /**
  * @param {string} modelId

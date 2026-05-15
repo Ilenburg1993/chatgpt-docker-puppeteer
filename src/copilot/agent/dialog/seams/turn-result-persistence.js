@@ -157,6 +157,7 @@ export function buildTurnResolutionListenersImpl(emitter, opts) {
  *     resolve: (v: string) => void;
  *     reject: (e: Error) => void;
  *     waitForRestartAndReplyFn: (message: string, timeout: number | null, stopReason?: string) => Promise<string>;
+ *     allowDirectDispatch?: boolean;
  *     onDispatch?: () => void;
  *     tryUseReplyFallback?: () => boolean;
  *     traceId?: string;
@@ -185,6 +186,7 @@ export function dispatchTurnToHostImpl(emitter, opts) {
         resolve,
         reject,
         waitForRestartAndReplyFn,
+        allowDirectDispatch = false,
         onDispatch,
         tryUseReplyFallback,
         traceId,
@@ -220,6 +222,37 @@ export function dispatchTurnToHostImpl(emitter, opts) {
         log('INFO', `[DialogLoopManager] dispatching turn to pending question (${traceLabel(traceId)})`);
         onDispatch?.();
         host.answerPendingQuestion(message);
+    } else if (allowDirectDispatch && typeof host.sendMessageDialogBoot === 'function') {
+        log('INFO', `[DialogLoopManager] dispatching direct resumed turn (${traceLabel(traceId)})`);
+        onDispatch?.();
+        Promise.resolve(host.sendMessageDialogBoot(message, { timeoutMs: timeout })).then(
+            (reply) => {
+                if (typeof reply === 'string') {
+                    if (clearTurnTimeout) {
+                        clearTurnTimeout();
+                    } else {
+                        clearTimeout(timeoutHandle ?? undefined);
+                    }
+                    emitter.off(EMITTER_LOOP_REPLY, onReplyOuter);
+                    if (onReadyOuter) {
+                        emitter.off(EMITTER_LOOP_READY, onReadyOuter);
+                    }
+                    emitter.off(EMITTER_LOOP_STOPPED, onStopOuter);
+                    finalizeTurnReply?.(turnStart, reply, {
+                        emit: (/** @type {string} */ event, /** @type {object} */ payload) =>
+                            emitter.emit(event, payload),
+                        metrics: container.resolve(METRICS_STORE),
+                    });
+                    resolve(reply);
+                }
+            },
+            (error) => {
+                if (tryUseReplyFallback?.()) {
+                    return;
+                }
+                reject(error instanceof Error ? error : new Error(String(error)));
+            },
+        );
     } else {
         const onPending = () => {
             pendingListenerRef.current = null;

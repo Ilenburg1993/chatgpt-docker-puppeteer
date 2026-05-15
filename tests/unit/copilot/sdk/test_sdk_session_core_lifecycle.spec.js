@@ -130,7 +130,7 @@ describe('sdk/session/lifecycle core hardening', () => {
         process.env.COPILOT_GPT5_MINI_REASONING_EFFORT = 'medium';
         try {
             const client = fakeClient();
-            await createSession(client);
+            await createSession(client, { model: 'gpt-5-mini' });
             expect(client.createSession).toHaveBeenCalledWith(
                 expect.objectContaining({
                     model: 'gpt-5-mini',
@@ -167,6 +167,14 @@ describe('sdk/session/lifecycle core hardening', () => {
         setSessionAutoModelResolver(resolver);
 
         await expect(resolveSessionCreateModel('gpt-4.1')).resolves.toBe('gpt-4.1');
+        expect(resolver).not.toHaveBeenCalled();
+    });
+
+    it('resolveSessionCreateModel preserva auto para seleção nativa do SDK', async () => {
+        const resolver = vi.fn().mockResolvedValue('should-not-run');
+        setSessionAutoModelResolver(resolver);
+
+        await expect(resolveSessionCreateModel('auto')).resolves.toBe('auto');
         expect(resolver).not.toHaveBeenCalled();
     });
 

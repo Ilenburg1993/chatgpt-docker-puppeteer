@@ -768,7 +768,7 @@ describe('hooks/session-lifecycle › createSessionHooks', () => {
         );
     });
 
-    it('onErrorOccurred: agenda fallback quando rate_limit e FALLBACK configurado', () => {
+    it('onErrorOccurred: agenda fallback auto mesmo quando env legado configura modelo concreto', () => {
         process.env['COPILOT_FALLBACK_MODEL'] = 'gpt-3.5-turbo';
         let scheduled = null;
         const ctx = makeCtx({
@@ -778,7 +778,7 @@ describe('hooks/session-lifecycle › createSessionHooks', () => {
         });
         const { onErrorOccurred } = createSessionHooks(ctx);
         onErrorOccurred(errorInput({ error: 'Too many requests', errorContext: 'rate_limit' }), { sessionId: 'sess' });
-        assert.strictEqual(scheduled, 'gpt-3.5-turbo');
+        assert.strictEqual(scheduled, 'auto');
         delete process.env['COPILOT_FALLBACK_MODEL'];
     });
 

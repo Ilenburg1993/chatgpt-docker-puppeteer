@@ -44,7 +44,7 @@ const BASE_CONFIG = {
  * - context hook injetado no systemMessage
  *
  * @param {object} options
- * @param {string} [options.model='gpt-5-mini'] - Modelo a usar. Default is `'gpt-5-mini'`
+ * @param {string} [options.model='auto'] - Modelo a usar. Default is `'auto'`
  * @param {Tool[]} [options.tools=[]] - Custom tools a registrar. Default is `[]`
  * @param {PermissionHandler} [options.onPermissionRequest] - Override do handler de permissões (default: approveAll)
  * @param {Function} [options.onUserInputRequest] - Handler para perguntas do modelo
@@ -99,7 +99,7 @@ export function buildAlwaysAliveConfig(options = {}) {
  * - Adequado para análise/exploração sem side-effects
  *
  * @param {object} [options={}] Default is `{}`
- * @param {string} [options.model='gpt-5-mini'] - Modelo a usar. Default is `'gpt-5-mini'`
+ * @param {string} [options.model='auto'] - Modelo a usar. Default is `'auto'`
  * @param {Tool[]} [options.tools=[]] - Custom tools (readonly) a registrar. Default is `[]`
  * @returns {SessionConfig}
  */
@@ -123,7 +123,7 @@ export function buildReadOnlyConfig(options = {}) {
  * - Adequado para agentes que precisam de validação humana em modificações
  *
  * @param {object} [options={}] Default is `{}`
- * @param {string} [options.model='gpt-5-mini'] - Modelo a usar. Default is `'gpt-5-mini'`
+ * @param {string} [options.model='auto'] - Modelo a usar. Default is `'auto'`
  * @param {Tool[]} [options.tools=[]] - Custom tools a registrar. Default is `[]`
  * @param {string[]} [options.denyTools=[]] - Nomes de tools que devem ser bloqueadas (restante aprovado). Default is
  *   `[]`

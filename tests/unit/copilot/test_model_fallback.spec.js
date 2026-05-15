@@ -9,12 +9,12 @@ import { ModelFallbackState } from '../../../src/copilot/agent/dialog/policies/m
 
 describe('ModelFallbackState', () => {
     it('deve iniciar sem fallback pendente', () => {
-        const state = new ModelFallbackState({ defaultModel: 'gpt-4o' });
+        const state = new ModelFallbackState({ defaultModel: 'auto' });
         expect(state.pending).toBe(false);
     });
 
     it('setPending() deve marcar fallback como pendente', () => {
-        const state = new ModelFallbackState({ defaultModel: 'gpt-4o' });
+        const state = new ModelFallbackState({ defaultModel: 'auto' });
         state.setPending();
         expect(state.pending).toBe(true);
     });
@@ -26,7 +26,7 @@ describe('ModelFallbackState', () => {
     });
 
     it('applyIfPending() deve aplicar modelo no host e emitir evento', () => {
-        const state = new ModelFallbackState({ defaultModel: 'gpt-4o' });
+        const state = new ModelFallbackState({ defaultModel: 'auto' });
         state.setPending();
 
         const host = {
@@ -38,13 +38,13 @@ describe('ModelFallbackState', () => {
         const result = state.applyIfPending(host, emitFn);
         expect(result.applied).toBe(true);
         expect(result.previousModel).toBe('gpt-4o-mini');
-        expect(result.newModel).toBe('gpt-4o');
-        expect(host.setModel).toHaveBeenCalledWith('gpt-4o');
+        expect(result.newModel).toBe('auto');
+        expect(host.setModel).toHaveBeenCalledWith('auto');
         expect(emitFn).toHaveBeenCalledWith(
             'model.fallback',
             expect.objectContaining({
                 previousModel: 'gpt-4o-mini',
-                newModel: 'gpt-4o',
+                newModel: 'auto',
             }),
         );
         // Após aplicar, pending deve ser false
@@ -52,7 +52,7 @@ describe('ModelFallbackState', () => {
     });
 
     it('applyIfPending() sem pendência deve retornar applied=false', () => {
-        const state = new ModelFallbackState({ defaultModel: 'gpt-4o' });
+        const state = new ModelFallbackState({ defaultModel: 'auto' });
         const host = { getModel: () => 'gpt-4o-mini' };
         const emitFn = vi.fn();
 

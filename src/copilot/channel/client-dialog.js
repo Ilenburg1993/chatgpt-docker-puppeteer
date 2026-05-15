@@ -64,6 +64,7 @@ export function registerDialogListeners(agent, opts) {
  *     onReady?: () => void;
  *     onReply?: (reply: string) => void;
  *     onStopped?: () => void;
+ *     resumeSessionAttach?: boolean;
  * }} [opts]
  * @returns {Promise<void>}
  */
@@ -71,8 +72,14 @@ export async function startDialogMode(agent, bootPrompt, opts = {}) {
     const { cleanup } = registerDialogListeners(agent, opts);
 
     try {
-        await startRuntimeDialogLoop(bootPrompt, agent);
-        log('INFO', '[LlmBridgeClient] Modo diálogo ativo — LLM-B sinalizou READY.');
+        const resumeSessionAttach = opts.resumeSessionAttach === true;
+        await startRuntimeDialogLoop(bootPrompt, agent, { resumeSessionAttach });
+        log(
+            'INFO',
+            resumeSessionAttach
+                ? '[LlmBridgeClient] Modo diálogo reanexado à sessão retomada sem boot prompt.'
+                : '[LlmBridgeClient] Modo diálogo ativo — LLM-B sinalizou READY.',
+        );
     } catch (err) {
         cleanup();
         throw err;

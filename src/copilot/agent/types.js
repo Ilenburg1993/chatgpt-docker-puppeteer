@@ -475,6 +475,9 @@
  * @typedef {Object} DialogTurnHost
  * @property {() => boolean} hasPendingQuestion
  * @property {(message: string) => boolean} answerPendingQuestion
+ * @property {((message: string, opts?: { timeoutMs?: number | null }) => Promise<string>) | undefined}
+ *   [sendMessageDialogBoot]
+ *   Direct same-session dispatch used only by resumed terminal loops when no live READY ask_user exists.
  * @property {(() => {
  *           question: string;
  *           allowFreeform: boolean;
@@ -533,7 +536,7 @@
  * @property {string | null} sessionId
  * @property {() => AgentStatusSnapshot} getStatusSnapshot
  * @property {() => Promise<void>} resumeDialogLoop
- * @property {() => Promise<void>} startDialogLoop
+ * @property {(bootPrompt?: string, opts?: { resumeSessionAttach?: boolean }) => Promise<void>} startDialogLoop
  * @property {{ boots: number; resumesWithPR: number; resumesZeroPR: number; totalPR: number } | null} dialogPrMetrics
  * @property {() => void} ensureDialogLoopAttached
  * @property {(msg: string, opts?: object) => Promise<string>} sendMessage

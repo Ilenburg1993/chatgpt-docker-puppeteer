@@ -204,7 +204,7 @@ async function wireAgentSessionRuntime(ctx, host, client, session, isResumed, op
             receiveHandoff: (event) => ctx.receiveHandoff(event),
             ensureDialogLoopAttached: () => host.ensureDialogLoopAttached(),
             resumeDialogLoop: () => host.resumeDialogLoop(),
-            startDialogLoop: () => host.startDialogLoop(),
+            startDialogLoop: (bootPrompt, opts) => host.startDialogLoop(bootPrompt, opts),
             startKeepalive: (keepaliveOptions) => ctx.startKeepalive(keepaliveOptions),
             getDialogPrMetrics: () => host.dialogPrMetrics,
             trackBackgroundTask: (task, meta) => ctx.trackBackgroundTask(task, meta),

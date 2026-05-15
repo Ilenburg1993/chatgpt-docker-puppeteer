@@ -72,6 +72,7 @@ export function pingDefaultAgentDialogWatchdog() {
  *     sessionId: string | null;
  *     dialogLoopActive: boolean;
  *     dialogPaused: boolean;
+ *     isResumed: boolean;
  *     queueSize: number;
  * }}
  */

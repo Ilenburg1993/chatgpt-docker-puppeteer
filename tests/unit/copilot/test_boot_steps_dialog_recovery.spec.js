@@ -80,14 +80,15 @@ describe('boot-steps dialog boot recovery', () => {
         vi.useRealTimers();
     });
 
-    it('runDialogBootRecovery persiste dialogPaused pela façade semântica antes do resume', async () => {
+    it('runDialogBootRecovery reanexa sessão retomada sem boot prompt nem resume com PR', async () => {
         const ctx = createCtx();
 
         await runDialogBootRecovery(ctx);
 
-        expect(facadeMocks.markAgentRuntimeDialogPausedForRecovery).toHaveBeenCalledTimes(1);
+        expect(facadeMocks.markAgentRuntimeDialogPausedForRecovery).not.toHaveBeenCalled();
         expect(ctx.ensureDialogLoopAttached).toHaveBeenCalledTimes(1);
-        expect(ctx.resumeDialogLoop).toHaveBeenCalledTimes(1);
+        expect(ctx.resumeDialogLoop).not.toHaveBeenCalled();
+        expect(ctx.startDialogLoop).toHaveBeenCalledWith(undefined, { resumeSessionAttach: true });
     });
 
     it('stepScheduleDialogRecovery consulta a decisão semântica de scheduling e agenda o timer quando aplicável', async () => {

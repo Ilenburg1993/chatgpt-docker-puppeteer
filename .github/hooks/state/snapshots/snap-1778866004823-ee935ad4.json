@@ -1,51 +1,41 @@
 {
-    "snapshotId": "snap-1778203336321-c07bb321",
-    "createdAt": 1778203336321,
-    "sessionId": "c551ffa2-42a6-47c1-b1e6-34d143175c55",
+    "snapshotId": "snap-1778866004823-ee935ad4",
+    "createdAt": 1778866004823,
+    "sessionId": null,
     "model": "auto",
-    "status": "waiting_for_input",
-    "sendCount": 1,
+    "status": "idle",
+    "sendCount": 8,
     "dialogLoopActive": true,
     "dialogPaused": false,
-    "pendingQuestion": "READY: aguardando próxima mensagem",
-    "pendingQuestionMeta": {
-        "kind": "ready",
-        "askedAt": 1778203294283,
-        "allowFreeform": true,
-        "protocolControlled": true
-    },
+    "pendingQuestion": null,
+    "pendingQuestionMeta": null,
     "pendingQuestionShadow": null,
     "stateSnapshot": {
-        "sessionId": "c551ffa2-42a6-47c1-b1e6-34d143175c55",
-        "startedAt": 1778203287759,
-        "resumedAt": 1778203287759,
-        "resumeCount": 0,
-        "sendCount": 0,
+        "sessionId": "28e86601-153a-4482-a76f-73e947503bc7",
+        "startedAt": 1778850658746,
+        "resumedAt": 1778865987596,
+        "resumeCount": 11,
+        "sendCount": 8,
         "model": "auto",
-        "pendingQuestion": "READY: aguardando próxima mensagem",
-        "pendingQuestionMeta": {
-            "kind": "ready",
-            "askedAt": 1778203294283,
-            "allowFreeform": true,
-            "protocolControlled": true
-        },
+        "reasoningEffort": "high",
+        "pendingQuestion": null,
+        "pendingQuestionMeta": null,
         "systemPromptBinding": {
-            "sessionId": "c551ffa2-42a6-47c1-b1e6-34d143175c55",
-            "digest": "891c012d7be840c0",
+            "sessionId": "28e86601-153a-4482-a76f-73e947503bc7",
+            "digest": "2cdaa68b079b663c",
             "configuredMode": "append",
             "effectiveMode": "append",
             "effectiveLiveMode": "customize",
             "liveReloadEnabled": true,
             "liveReloadMechanism": "sdk-transform",
             "reloadStrategy": "sdk-transform",
-            "boundAt": 1778203287759
+            "boundAt": 1778865987596
         },
         "gracefulShutdown": false,
-        "reasoningEffort": "xhigh",
         "dialogLoopActive": true,
         "dialogPaused": false,
-        "pendingTurnConsumedPR": true,
-        "lastPrConsumedAt": 1778203294266,
+        "pendingTurnConsumedPR": false,
+        "lastPrConsumedAt": 1778865739936,
         "lastPrModel": "claude-sonnet-4.6",
         "lastPrConfiguredModel": "auto",
         "lastPrEffectiveModel": "claude-sonnet-4.6",
@@ -75,11 +65,11 @@
             "premium_interactions": {
                 "isUnlimitedEntitlement": false,
                 "entitlementRequests": 300,
-                "usedRequests": 75,
+                "usedRequests": 191,
                 "usageAllowedWithExhaustedQuota": true,
                 "overage": 0,
                 "overageAllowedWithExhaustedQuota": true,
-                "remainingPercentage": 75.1,
+                "remainingPercentage": 36.2,
                 "resetDate": "2026-06-01T00:00:00.000Z"
             },
             "session": {
@@ -89,8 +79,8 @@
                 "usageAllowedWithExhaustedQuota": false,
                 "overage": 0,
                 "overageAllowedWithExhaustedQuota": false,
-                "remainingPercentage": 77.5,
-                "resetDate": "2026-05-08T03:44:02.000Z"
+                "remainingPercentage": 12.9,
+                "resetDate": "2026-05-15T19:32:24.000Z"
             },
             "weekly": {
                 "isUnlimitedEntitlement": false,
@@ -99,23 +89,25 @@
                 "usageAllowedWithExhaustedQuota": false,
                 "overage": 0,
                 "overageAllowedWithExhaustedQuota": false,
-                "remainingPercentage": 0.2,
-                "resetDate": "2026-05-11T00:00:00.000Z"
+                "remainingPercentage": 0,
+                "resetDate": "2026-05-18T00:00:00.000Z"
             }
         },
-        "lastAskUserAt": 1778203294283,
+        "lastAskUserAt": 1778861372998,
         "prMetrics": {
-            "boots": 1,
+            "boots": 0,
             "resumesWithPR": 0,
-            "resumesZeroPR": 0,
-            "totalPR": 1
-        }
+            "resumesZeroPR": 1,
+            "totalPR": 0
+        },
+        "pendingTurnMessage": null,
+        "pendingTurnTs": null
     },
     "prMetrics": {
-        "boots": 1,
+        "boots": 0,
         "resumesWithPR": 0,
-        "resumesZeroPR": 0,
-        "totalPR": 1
+        "resumesZeroPR": 1,
+        "totalPR": 0
     },
     "reason": "auto-shutdown"
 }

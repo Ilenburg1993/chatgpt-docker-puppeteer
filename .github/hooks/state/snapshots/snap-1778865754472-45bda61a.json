@@ -1,41 +1,41 @@
 {
-    "snapshotId": "snap-1778204922636-5b464b5b",
-    "createdAt": 1778204922636,
-    "sessionId": "be9a4c66-e884-4f13-86ff-a13583ffb57d",
+    "snapshotId": "snap-1778865754472-45bda61a",
+    "createdAt": 1778865754472,
+    "sessionId": null,
     "model": "auto",
-    "status": "idle",
-    "sendCount": 1,
+    "status": "processing",
+    "sendCount": 6,
     "dialogLoopActive": true,
     "dialogPaused": false,
     "pendingQuestion": null,
     "pendingQuestionMeta": null,
     "pendingQuestionShadow": null,
     "stateSnapshot": {
-        "sessionId": "be9a4c66-e884-4f13-86ff-a13583ffb57d",
-        "startedAt": 1778204738602,
-        "resumedAt": 1778204738602,
-        "resumeCount": 0,
-        "sendCount": 0,
+        "sessionId": "28e86601-153a-4482-a76f-73e947503bc7",
+        "startedAt": 1778850658746,
+        "resumedAt": 1778865708797,
+        "resumeCount": 8,
+        "sendCount": 5,
         "model": "auto",
+        "reasoningEffort": "high",
         "pendingQuestion": null,
         "pendingQuestionMeta": null,
         "systemPromptBinding": {
-            "sessionId": "be9a4c66-e884-4f13-86ff-a13583ffb57d",
-            "digest": "96c3c7d50d6b867c",
+            "sessionId": "28e86601-153a-4482-a76f-73e947503bc7",
+            "digest": "2cdaa68b079b663c",
             "configuredMode": "append",
             "effectiveMode": "append",
             "effectiveLiveMode": "customize",
             "liveReloadEnabled": true,
             "liveReloadMechanism": "sdk-transform",
             "reloadStrategy": "sdk-transform",
-            "boundAt": 1778204738602
+            "boundAt": 1778865708797
         },
         "gracefulShutdown": false,
-        "reasoningEffort": "xhigh",
         "dialogLoopActive": true,
         "dialogPaused": false,
         "pendingTurnConsumedPR": true,
-        "lastPrConsumedAt": 1778204786916,
+        "lastPrConsumedAt": 1778865739936,
         "lastPrModel": "claude-sonnet-4.6",
         "lastPrConfiguredModel": "auto",
         "lastPrEffectiveModel": "claude-sonnet-4.6",
@@ -65,11 +65,11 @@
             "premium_interactions": {
                 "isUnlimitedEntitlement": false,
                 "entitlementRequests": 300,
-                "usedRequests": 79,
+                "usedRequests": 191,
                 "usageAllowedWithExhaustedQuota": true,
                 "overage": 0,
                 "overageAllowedWithExhaustedQuota": true,
-                "remainingPercentage": 73.6,
+                "remainingPercentage": 36.2,
                 "resetDate": "2026-06-01T00:00:00.000Z"
             },
             "session": {
@@ -79,8 +79,8 @@
                 "usageAllowedWithExhaustedQuota": false,
                 "overage": 0,
                 "overageAllowedWithExhaustedQuota": false,
-                "remainingPercentage": 73.3,
-                "resetDate": "2026-05-08T03:44:02.000Z"
+                "remainingPercentage": 12.9,
+                "resetDate": "2026-05-15T19:32:24.000Z"
             },
             "weekly": {
                 "isUnlimitedEntitlement": false,
@@ -89,25 +89,25 @@
                 "usageAllowedWithExhaustedQuota": false,
                 "overage": 0,
                 "overageAllowedWithExhaustedQuota": false,
-                "remainingPercentage": 0.1,
-                "resetDate": "2026-05-11T00:00:00.000Z"
+                "remainingPercentage": 0,
+                "resetDate": "2026-05-18T00:00:00.000Z"
             }
         },
-        "lastAskUserAt": 1778204745031,
+        "lastAskUserAt": 1778861372998,
         "prMetrics": {
             "boots": 1,
             "resumesWithPR": 0,
             "resumesZeroPR": 0,
             "totalPR": 1
         },
-        "pendingTurnMessage": "Teste obrigatório de tools canônicas locais. Use necessariamente e exatamente estas tools do SDK/local FS, nesta ordem, sem usar bash/shell/exec_command/npm/cat/sed/grep/view/glob/workspace/create/edit: 1) read_file_content para ler src/copilot/terminal/tool-activity-presenter.js; 2) create_file para criar tmp/llmb-canonical-live-20260507-2245.md com conteúdo \"alpha canonical fs\"; 3) write_file_content para sobrescrever o mesmo arquivo com \"beta canonical fs\"; 4) patch_file para trocar \"beta\" por \"gamma\"; 5) read_file_content para ler o arquivo final. Depois responda em PT-BR com uma tabela curta: tool usada, alvo, sucesso, e diga se alguma tool legada apareceu.",
-        "pendingTurnTs": 1778204758775
+        "pendingTurnMessage": null,
+        "pendingTurnTs": null
     },
     "prMetrics": {
-        "boots": 1,
+        "boots": 0,
         "resumesWithPR": 0,
         "resumesZeroPR": 0,
-        "totalPR": 1
+        "totalPR": 0
     },
     "reason": "auto-shutdown"
 }

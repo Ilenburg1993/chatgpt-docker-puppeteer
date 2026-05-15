@@ -730,8 +730,11 @@ export class AgentContext {
     attachDialogLoop(host) {
         this.dialogLoop.attach(host);
     }
-    /** @param {string} [bootPrompt] */
-    startDialogLoop(bootPrompt) {
+    /** @param {string} [bootPrompt] @param {{ resumeSessionAttach?: boolean }} [opts] */
+    startDialogLoop(bootPrompt, opts = {}) {
+        if (opts.resumeSessionAttach === true) {
+            return this.dialogLoop.startResumedSession();
+        }
         return this.dialogLoop.start(bootPrompt);
     }
     /** @param {string} message @param {{ timeout?: number | null; signal?: AbortSignal; traceId?: string }} [opts] */

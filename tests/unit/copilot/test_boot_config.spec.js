@@ -54,6 +54,7 @@ describe('copilot/boot — contrato central de boot', () => {
         expect(plan.phases.map((phase) => phase.id)).toContain('boot-surface-validation');
         expect(plan.phases.map((phase) => phase.id)).toContain('copilot-http-server');
         expect(plan.phases.map((phase) => phase.id)).toContain('repl');
+        expect(plan.phases.find((phase) => phase.id === 'sdk-preflight')?.timeoutMs).toBeGreaterThanOrEqual(90_000);
         expect(config.entrypoints).toEqual({ canonical: 'src/copilot/terminal/bootstrap.js' });
         expect(plan.phases.every((phase) => typeof phase.timeoutMs === 'number' && phase.timeoutMs > 0)).toBe(true);
     });

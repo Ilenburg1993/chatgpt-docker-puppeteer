@@ -70,7 +70,7 @@ describe('lib/session › createSession', () => {
         assert.ok(result.session);
     });
 
-    it('usa gpt-5-mini como model padrao', async () => {
+    it('usa auto como model padrao', async () => {
         const { createSession } = await import('#copilot/sdk/session');
         const capturedConfigs = /** @type {any[]} */ ([]);
         const client = {
@@ -82,8 +82,8 @@ describe('lib/session › createSession', () => {
         };
         await createSession(client);
         assert.ok(capturedConfigs.length > 0);
-        // model deve ser 'gpt-5-mini' (default)
-        assert.strictEqual(capturedConfigs[0].model, 'gpt-5-mini');
+        // model deve ser 'auto' (default) para o SDK escolher o modelo efetivo.
+        assert.strictEqual(capturedConfigs[0].model, 'auto');
     });
 
     it('inclui systemMessage quando systemMessageContent fornecido', async () => {

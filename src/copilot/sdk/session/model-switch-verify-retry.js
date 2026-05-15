@@ -4,8 +4,8 @@
  *
  * Helper para verificação de model switch com retry + timeout cap.
  *
- * **Fase 3.2 Optimization #1**: Implementa retry com exponential backoff e timeout cap de 500ms para evitar waits
- * indefinidos.
+ * **Fase 3.2 Optimization #1**: Implementa retry com exponential backoff e timeout cap configurável para evitar waits
+ * indefinidos sem falhar cedo demais durante a convergência do SDK.
  *
  * @module copilot/sdk/session/model-switch-verify-retry
  */
@@ -25,9 +25,9 @@
  */
 
 const DEFAULT_CONFIG = Object.freeze({
-    maxRetries: 3,
-    pollDelayMs: 100,
-    totalTimeoutMs: 500,
+    maxRetries: 8,
+    pollDelayMs: 250,
+    totalTimeoutMs: 5_000,
 });
 
 /**
@@ -43,7 +43,7 @@ async function waitMs(ms) {
 /**
  * Verifica model switch com retry + timeout cap.
  *
- * Executa predicado (função de verificação) até 3 vezes com backoff exponencial, respeitando timeout máximo de 500ms.
+ * Executa predicado com backoff incremental, respeitando timeout máximo default de 5s.
  * Retorna resultado com número de tentativas e status de timeout.
  *
  * @example

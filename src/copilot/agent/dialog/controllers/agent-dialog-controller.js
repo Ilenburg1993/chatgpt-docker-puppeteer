@@ -93,9 +93,10 @@ function startKeepaliveIfPossible(ctx, host) {
  * @param {AgentContext} ctx
  * @param {DialogHost} host
  * @param {string} [bootPrompt]
+ * @param {{ resumeSessionAttach?: boolean }} [opts]
  * @returns {Promise<void>}
  */
-export async function dialogStart(ctx, host, bootPrompt) {
+export async function dialogStart(ctx, host, bootPrompt, opts = {}) {
     if (ctx.isWaitingForInput() && ctx.getPendingQuestionKind() === 'ready' && ctx.isDialogLoopActive()) {
         log('WARN', '[AlwaysAlive] startDialogLoop() idempotente: READY pendente já mantém o loop ativo.');
         host.emit(EMITTER_DIALOG_LOOP_CHANGED, { active: true, ts: Date.now(), reason: 'ready_already_waiting' });
@@ -128,7 +129,8 @@ export async function dialogStart(ctx, host, bootPrompt) {
     // F42.2: pausar keepalive enquanto dialog loop está ativo
     ctx.stopKeepalive('dialog_loop_active');
     try {
-        await runDialogOperationWithPolicy('dialog.start', () => ctx.startDialogLoop(bootPrompt));
+        const operation = opts.resumeSessionAttach === true ? 'dialog.start.resumed_session_attach' : 'dialog.start';
+        await runDialogOperationWithPolicy(operation, () => ctx.startDialogLoop(bootPrompt, opts));
     } catch (error) {
         startKeepaliveIfPossible(ctx, host);
         throw error;

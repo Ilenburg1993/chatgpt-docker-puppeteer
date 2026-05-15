@@ -1,27 +1,26 @@
 {
-    "snapshotId": "snap-1778315836446-6c5a504b",
-    "createdAt": 1778315836447,
-    "sessionId": "c52579eb-0c95-41d6-97d9-0a0e48fcff6f",
-    "model": "auto",
+    "snapshotId": "snap-1778864495092-05367467",
+    "createdAt": 1778864495092,
+    "sessionId": null,
+    "model": "gpt-4.1",
     "status": "idle",
-    "sendCount": 1,
+    "sendCount": 3,
     "dialogLoopActive": false,
     "dialogPaused": false,
     "pendingQuestion": null,
     "pendingQuestionMeta": null,
     "pendingQuestionShadow": null,
     "stateSnapshot": {
-        "sessionId": "c52579eb-0c95-41d6-97d9-0a0e48fcff6f",
-        "startedAt": 1778297725237,
-        "resumedAt": 1778306452993,
+        "sessionId": "28e86601-153a-4482-a76f-73e947503bc7",
+        "startedAt": 1778850658746,
+        "resumedAt": 1778864391851,
         "resumeCount": 5,
-        "sendCount": 0,
-        "model": "auto",
-        "reasoningEffort": "xhigh",
+        "sendCount": 2,
+        "model": "gpt-4.1",
         "pendingQuestion": null,
         "pendingQuestionMeta": null,
         "systemPromptBinding": {
-            "sessionId": "c52579eb-0c95-41d6-97d9-0a0e48fcff6f",
+            "sessionId": "28e86601-153a-4482-a76f-73e947503bc7",
             "digest": "2cdaa68b079b663c",
             "configuredMode": "append",
             "effectiveMode": "append",
@@ -29,15 +28,18 @@
             "liveReloadEnabled": true,
             "liveReloadMechanism": "sdk-transform",
             "reloadStrategy": "sdk-transform",
-            "boundAt": 1778306452993
+            "boundAt": 1778864391851
         },
         "gracefulShutdown": false,
         "dialogLoopActive": false,
         "dialogPaused": false,
         "pendingTurnConsumedPR": true,
-        "lastPrConsumedAt": 1778304938447,
-        "lastPrModel": "claude-sonnet-4.6",
-        "lastPrCost": 1,
+        "lastPrConsumedAt": 1778862117198,
+        "lastPrModel": "gpt-4.1",
+        "lastPrConfiguredModel": "gpt-4.1",
+        "lastPrEffectiveModel": "gpt-4.1",
+        "lastPrModelMismatch": false,
+        "lastPrCost": 0,
         "lastQuotaSnapshots": {
             "chat": {
                 "isUnlimitedEntitlement": true,
@@ -62,11 +64,11 @@
             "premium_interactions": {
                 "isUnlimitedEntitlement": false,
                 "entitlementRequests": 300,
-                "usedRequests": 98,
+                "usedRequests": 190,
                 "usageAllowedWithExhaustedQuota": true,
                 "overage": 0,
                 "overageAllowedWithExhaustedQuota": true,
-                "remainingPercentage": 67.2,
+                "remainingPercentage": 36.8,
                 "resetDate": "2026-06-01T00:00:00.000Z"
             },
             "session": {
@@ -76,8 +78,8 @@
                 "usageAllowedWithExhaustedQuota": false,
                 "overage": 0,
                 "overageAllowedWithExhaustedQuota": false,
-                "remainingPercentage": 39.6,
-                "resetDate": "2026-05-09T08:35:28.000Z"
+                "remainingPercentage": 15.7,
+                "resetDate": "2026-05-15T19:32:24.000Z"
             },
             "weekly": {
                 "isUnlimitedEntitlement": false,
@@ -87,21 +89,18 @@
                 "overage": 0,
                 "overageAllowedWithExhaustedQuota": false,
                 "remainingPercentage": 0.2,
-                "resetDate": "2026-05-11T00:00:00.000Z"
+                "resetDate": "2026-05-18T00:00:00.000Z"
             }
         },
-        "lastAskUserAt": 1778304626704,
+        "lastAskUserAt": 1778861372998,
         "prMetrics": {
             "boots": 1,
             "resumesWithPR": 0,
             "resumesZeroPR": 0,
             "totalPR": 1
         },
-        "pendingTurnMessage": "faça um auto diagnóstico de você mesmo. seu código está em src\\copilot",
-        "pendingTurnTs": 1778304668623,
-        "lastPrConfiguredModel": "auto",
-        "lastPrModelMismatch": false,
-        "lastPrEffectiveModel": "claude-sonnet-4.6"
+        "pendingTurnMessage": "Você se lembra das alterações que fez nas tools de search? avalie isso.",
+        "pendingTurnTs": 1778861399537
     },
     "prMetrics": {
         "boots": 0,

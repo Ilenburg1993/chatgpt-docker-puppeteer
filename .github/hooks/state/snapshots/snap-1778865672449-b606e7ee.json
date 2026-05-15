@@ -1,27 +1,27 @@
 {
-    "snapshotId": "snap-1778371865787-b8189397",
-    "createdAt": 1778371865787,
-    "sessionId": "366c482e-57e9-4d5e-9561-387213da2bb8",
+    "snapshotId": "snap-1778865672449-b606e7ee",
+    "createdAt": 1778865672449,
+    "sessionId": null,
     "model": "auto",
-    "status": "idle",
-    "sendCount": 1,
-    "dialogLoopActive": false,
+    "status": "processing",
+    "sendCount": 5,
+    "dialogLoopActive": true,
     "dialogPaused": false,
     "pendingQuestion": null,
     "pendingQuestionMeta": null,
     "pendingQuestionShadow": null,
     "stateSnapshot": {
-        "sessionId": "366c482e-57e9-4d5e-9561-387213da2bb8",
-        "startedAt": 1778353919625,
-        "resumedAt": 1778359299297,
-        "resumeCount": 4,
-        "sendCount": 0,
+        "sessionId": "28e86601-153a-4482-a76f-73e947503bc7",
+        "startedAt": 1778850658746,
+        "resumedAt": 1778865596969,
+        "resumeCount": 7,
+        "sendCount": 4,
         "model": "auto",
-        "reasoningEffort": "xhigh",
+        "reasoningEffort": "high",
         "pendingQuestion": null,
         "pendingQuestionMeta": null,
         "systemPromptBinding": {
-            "sessionId": "366c482e-57e9-4d5e-9561-387213da2bb8",
+            "sessionId": "28e86601-153a-4482-a76f-73e947503bc7",
             "digest": "2cdaa68b079b663c",
             "configuredMode": "append",
             "effectiveMode": "append",
@@ -29,14 +29,17 @@
             "liveReloadEnabled": true,
             "liveReloadMechanism": "sdk-transform",
             "reloadStrategy": "sdk-transform",
-            "boundAt": 1778359299297
+            "boundAt": 1778865596969
         },
         "gracefulShutdown": false,
-        "dialogLoopActive": false,
+        "dialogLoopActive": true,
         "dialogPaused": false,
         "pendingTurnConsumedPR": true,
-        "lastPrConsumedAt": 1778355587687,
+        "lastPrConsumedAt": 1778865631753,
         "lastPrModel": "claude-sonnet-4.6",
+        "lastPrConfiguredModel": "auto",
+        "lastPrEffectiveModel": "claude-sonnet-4.6",
+        "lastPrModelMismatch": false,
         "lastPrCost": 1,
         "lastQuotaSnapshots": {
             "chat": {
@@ -62,11 +65,11 @@
             "premium_interactions": {
                 "isUnlimitedEntitlement": false,
                 "entitlementRequests": 300,
-                "usedRequests": 108,
+                "usedRequests": 191,
                 "usageAllowedWithExhaustedQuota": true,
                 "overage": 0,
                 "overageAllowedWithExhaustedQuota": true,
-                "remainingPercentage": 63.9,
+                "remainingPercentage": 36.5,
                 "resetDate": "2026-06-01T00:00:00.000Z"
             },
             "session": {
@@ -76,8 +79,8 @@
                 "usageAllowedWithExhaustedQuota": false,
                 "overage": 0,
                 "overageAllowedWithExhaustedQuota": false,
-                "remainingPercentage": 44.4,
-                "resetDate": "2026-05-10T00:06:56.000Z"
+                "remainingPercentage": 14,
+                "resetDate": "2026-05-15T19:32:24.000Z"
             },
             "weekly": {
                 "isUnlimitedEntitlement": false,
@@ -87,21 +90,18 @@
                 "overage": 0,
                 "overageAllowedWithExhaustedQuota": false,
                 "remainingPercentage": 0,
-                "resetDate": "2026-05-11T00:00:00.000Z"
+                "resetDate": "2026-05-18T00:00:00.000Z"
             }
         },
-        "lastAskUserAt": 1778355587690,
+        "lastAskUserAt": 1778861372998,
         "prMetrics": {
             "boots": 1,
             "resumesWithPR": 0,
             "resumesZeroPR": 0,
             "totalPR": 1
         },
-        "pendingTurnMessage": "Teste final 3: responda OK.",
-        "pendingTurnTs": 1778355578143,
-        "lastPrConfiguredModel": "auto",
-        "lastPrModelMismatch": false,
-        "lastPrEffectiveModel": "claude-sonnet-4.6"
+        "pendingTurnMessage": null,
+        "pendingTurnTs": null
     },
     "prMetrics": {
         "boots": 0,
