@@ -23,6 +23,7 @@
  *     | 'store'
  *     | 'passthrough'
  *     | 'sdk-adapter'
+ *     | 'dev-tooling'
  *     | 'wiring'} TerminalModuleRole
  *
  *
@@ -78,6 +79,15 @@ export const TERMINAL_MODULE_LAYOUT = Object.freeze([
         risk: 'stable',
         public: false,
         summary: 'Lifecycle fatal de boot, sinais e shutdown por falha de bootstrap.',
+    },
+    {
+        path: 'dev-watch.js',
+        kind: 'file',
+        role: 'dev-tooling',
+        tier: 'secondary',
+        risk: 'stable',
+        public: false,
+        summary: 'Watcher in-process de ficheiros src/copilot/** para hot-reload em modo dev. Activado por COPILOT_DEV_WATCH=true.',
     },
     {
         path: 'module-map.js',

@@ -32,6 +32,7 @@ import {
 import { permissionTools, setPermissionAgent } from './permission/index.js';
 import {
     experimentalRpcTools,
+    reloadAgentProcessTool,
     sessionRpcTools,
     sessionTools,
     setExperimentalSession,
@@ -75,6 +76,7 @@ export function getAllStaticTools() {
             ...gitTools,
             ...sessionTools,
             ...sessionRpcTools,
+            reloadAgentProcessTool,
             ...hookTools,
             ...hubTools,
             ...introspectionTools,
@@ -140,6 +142,7 @@ export function bootstrapTools(registry, mcpTools) {
         { tools: gitTools, category: 'git', tags: ['vcs', 'diff', 'commit'] },
         { tools: sessionTools, category: 'session', tags: ['hooks', 'briefing'] },
         { tools: sessionRpcTools, category: 'session-rpc', tags: ['rpc', 'mode', 'plan', 'agent', 'compaction'] },
+        { tools: [reloadAgentProcessTool], category: 'process', tags: ['reload', 'restart', 'process'] },
         { tools: hookTools, category: 'hook', tags: ['audit', 'input', 'hooks'] },
         { tools: hubTools, category: 'hub', tags: ['conversation', 'llm-b', 'dialog', 'persistent'] },
         { tools: introspectionTools, category: 'introspection', tags: ['meta', 'telemetry'], readOnly: true },

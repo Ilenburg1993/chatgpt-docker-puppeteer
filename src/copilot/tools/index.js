@@ -73,7 +73,7 @@ export {
     verifyToolRegistryContracts,
 } from './introspection/index.js';
 export { permissionTools } from './permission/index.js';
-export { experimentalRpcTools, sessionRpcTools, sessionTools } from './session/index.js';
+export { experimentalRpcTools, reloadAgentProcessTool, sessionRpcTools, sessionTools } from './session/index.js';
 export { shellTools } from './shell/index.js';
 export { taskTools } from './task/index.js';
 export { todoReadTools, todoTools, todoWriteTools } from './todo/index.js';

@@ -366,6 +366,7 @@ const sessionCompactTool = buildTool({
  * Fluxo: graceful shutdown via `runShutdown(reason)` → `process.exit(0)` → PM2 / VS Code / node --watch respawna.
  * O reload é a única forma confiável de ativar novas tools ou mudanças de módulos em um processo ESM vivo.
  */
+/** @type {import('#copilot/sdk/types').Tool<any>} */
 const reloadAgentProcessTool = buildTool({
     name: 'reload_agent_process',
     description:
@@ -417,7 +418,7 @@ const reloadAgentProcessTool = buildTool({
 // ─── Export ───────────────────────────────────────────────────────────────────
 
 /**
- * Tools de RPC de sessão SDK — mode, plan, agent, compaction, reload.
+ * Tools de RPC de sessão SDK — mode, plan, agent, compaction.
  *
  * @type {import('#copilot/sdk/types').Tool<any>[]}
  */
@@ -432,5 +433,6 @@ export const sessionRpcTools = [
     sessionAgentSelectTool,
     sessionAgentReloadTool,
     sessionCompactTool,
-    reloadAgentProcessTool,
 ];
+
+export { reloadAgentProcessTool };

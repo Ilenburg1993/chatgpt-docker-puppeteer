@@ -87,6 +87,7 @@ furam a fila local do REPL para evitar deadlocks em turnos longos ou degradados.
 | `wiring`           | `wiring/terminal-agent-wiring.js`, `wiring/`                                                   |
 | `passthrough`      | `events/agent-sse-passthrough.js`                                                              |
 | `sdk-adapter`      | `state/sdk-interactions.js`                                                                    |
+| `dev-tooling`      | `dev-watch.js` — watcher seletivo in-process para hot-reload em modo dev/supervisionado        |
 | `state`            | `state/` com activity, display, pending questions, rate limiter, SDK interactions e turn trace |
 | `store`            | `stores/alias-store.js`, `stores/`                                                             |
 | `command-surface`  | `commands/`                                                                                    |

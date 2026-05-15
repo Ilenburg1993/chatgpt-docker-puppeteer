@@ -8,5 +8,5 @@
  */
 
 export { experimentalRpcTools, setExperimentalSession } from './experimental-rpc-tools.js';
-export { sessionRpcTools, setSessionRpc } from './session-rpc-tools.js';
+export { reloadAgentProcessTool, sessionRpcTools, setSessionRpc } from './session-rpc-tools.js';
 export { sessionTools } from './session-tools.js';
