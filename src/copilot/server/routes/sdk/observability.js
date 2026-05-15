@@ -21,9 +21,9 @@
  */
 
 import { decideSdkFsRouting, hasCanonicalLocalFsTools } from '#copilot/core';
+import { readIoRuntimeHealthSnapshot } from '#copilot/infra/public/io';
 import { Router } from 'express';
 import { logSwallowed } from '../../../core/error-handlers.js';
-import { readIoRuntimeHealthSnapshot } from '../../../infra/io-health.js';
 import { withErrorHandler as _withErrorHandler } from './middleware.js';
 
 /**

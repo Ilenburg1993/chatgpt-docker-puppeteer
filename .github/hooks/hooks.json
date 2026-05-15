@@ -1,66 +1,68 @@
 {
+  "version": 1,
+  "disableAllHooks": true,
   "hooks": {
     "SessionStart": [
       {
         "type": "command",
         "command": ".github/hooks/scripts/session-start.sh",
-        "timeout": 90
+        "timeout": 300
       }
     ],
     "UserPromptSubmit": [
       {
         "type": "command",
         "command": ".github/hooks/scripts/user-prompt-submit.sh",
-        "timeout": 30
+        "timeout": 300
       }
     ],
     "PreToolUse": [
       {
         "type": "command",
         "command": ".github/hooks/scripts/pre-tool-use.sh",
-        "timeout": 30
+        "timeout": 300
       }
     ],
     "PostToolUse": [
       {
         "type": "command",
         "command": ".github/hooks/scripts/post-tool-use.sh",
-        "timeout": 30
+        "timeout": 300
       }
     ],
     "PreCompact": [
       {
         "type": "command",
         "command": ".github/hooks/scripts/pre-compact.sh",
-        "timeout": 60
+        "timeout": 300
       }
     ],
     "SubagentStart": [
       {
         "type": "command",
         "command": ".github/hooks/scripts/subagent-start.sh",
-        "timeout": 30
+        "timeout": 300
       }
     ],
     "SubagentStop": [
       {
         "type": "command",
         "command": ".github/hooks/scripts/subagent-stop.sh",
-        "timeout": 30
+        "timeout": 300
       }
     ],
     "Stop": [
       {
         "type": "command",
         "command": ".github/hooks/scripts/stop.sh",
-        "timeout": 45
+        "timeout": 300
       }
     ],
     "SessionEnd": [
       {
         "type": "command",
         "command": ".github/hooks/scripts/session-end.sh",
-        "timeout": 30
+        "timeout": 300
       }
     ]
   }

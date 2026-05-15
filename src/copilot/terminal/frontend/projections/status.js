@@ -5,7 +5,7 @@
 
 import { getWorkspaceContext } from '#copilot/boot';
 import { readSystemPromptStatusSync } from '#copilot/config';
-import { readIoRuntimeHealthSnapshot } from '../../../infra/io-health.js';
+import { readIoRuntimeHealthSnapshot } from '#copilot/infra/public/io';
 import { buildRuntimeSdkFsRoutingProjection } from '../../../presentation/files/index.js';
 import { buildRuntimeLifecycleSummary, readRuntimeLifecycleSnapshot } from '../../../presentation/runtime/index.js';
 import {
@@ -50,7 +50,9 @@ function objectOrNull(value) {
  *     pendingQuestionText: string | null;
  *     pendingQuestionShadow: boolean;
  *     pendingQuestionShadowKind: import('../../../presentation/contracts/index.js').RuntimePendingQuestionKind | null;
- *     pendingQuestionShadowState: import('../../../presentation/contracts/index.js').RuntimePendingQuestionShadowState | null;
+ *     pendingQuestionShadowState:
+ *         | import('../../../presentation/contracts/index.js').RuntimePendingQuestionShadowState
+ *         | null;
  *     pendingQuestionShadowText: string | null;
  *     pendingQuestionShadowExpired: boolean;
  *     pendingQuestionShadowAgeMs: number | null;
@@ -146,9 +148,10 @@ export function readTerminalStatusProjection({ hubSessionId = null, injectPort, 
     const base = readTerminalRuntimeBase(runtimeId);
     const pendingQuestion = base.pendingQuestion;
     const pendingQuestionShadow = base.pendingQuestionShadow;
-    const recommendedAction = /** @type {import('../../../presentation/contracts/index.js').RuntimeRecommendedAction | null} */ (
-        typeof base.health?.['recommendedAction'] === 'string' ? base.health['recommendedAction'] : null
-    );
+    const recommendedAction =
+        /** @type {import('../../../presentation/contracts/index.js').RuntimeRecommendedAction | null} */ (
+            typeof base.health?.['recommendedAction'] === 'string' ? base.health['recommendedAction'] : null
+        );
     const lifecycle = readRuntimeLifecycleSnapshot();
     const modelBilling = normalizeTerminalModelBillingProjection(base.lastPrInfo, String(base.snap['model'] ?? ''));
     const elicitationSummary = readTerminalElicitationSummary();

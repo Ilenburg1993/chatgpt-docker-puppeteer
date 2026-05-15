@@ -8,9 +8,6 @@
  * @module copilot/terminal/commands/scope
  */
 
-import { stat } from 'node:fs/promises';
-import { relative } from 'node:path';
-import { toError } from '../../core/error-handlers.js';
 import {
     closeScope,
     declareScope,
@@ -19,7 +16,10 @@ import {
     getScopeStats,
     listScopes,
     refreshScope,
-} from '../../infra/io-session-scope.js';
+} from '#copilot/infra/public/session';
+import { stat } from 'node:fs/promises';
+import { relative } from 'node:path';
+import { toError } from '../../core/error-handlers.js';
 
 /**
  * @typedef {{ println: (text: string) => void; hubSessionId?: string | null }} ScopeCommandContext

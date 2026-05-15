@@ -25,8 +25,11 @@ export {
     searchText,
     searchWorkspaceSymbols,
     statPath,
-    writeFileAtomic,
+    writeFileAtomic
 } from '../io-engine.js';
 
 export { warmReadThroughContext } from '../io-prefetch.js';
 export { scanDirectory } from '../io-scanner.js';
+
+// Observabilidade de IO em tempo de execução
+export { readIoRuntimeHealthSnapshot } from '../io-health.js';

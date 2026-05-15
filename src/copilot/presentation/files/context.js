@@ -10,8 +10,7 @@ import { extname, resolve as pathResolve } from 'node:path';
 import { logSwallowed, toError } from '../../core/error-handlers.js';
 import { evaluateIoPathPolicyAsync } from '../../core/io-policy.js';
 import { decodeBase64ToOwnedBuffer } from '../../infra/public/buffer.js';
-import { readText } from '../../infra/io-engine.js';
-import { scanDirectory } from '../../infra/io-scanner.js';
+import { readText, scanDirectory } from '../../infra/public/io.js';
 
 /** Limite informativo histórico. Não bloqueia embedding em operações da LLM-B. */
 export const MAX_EMBED_BYTES = Number.POSITIVE_INFINITY;

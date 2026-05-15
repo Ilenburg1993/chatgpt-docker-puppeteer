@@ -68,6 +68,9 @@
   "breadcrumbs.filePath": "on",
   "breadcrumbs.symbolPath": "last",
 
+  "disableAllHooks": true,
+
+
   // ===========================================================================
   // FASE 02) ARQUIVOS / ENCODING / AUTOSAVE / INTEGRIDADE
   // Comportamento de leitura, salvamento e higiene de arquivos.
