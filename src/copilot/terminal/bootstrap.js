@@ -11,6 +11,7 @@ import { bootCopilot } from '../boot/runtime-bootstrap.js';
 import { log } from '../observability/logger.js';
 import { handleTerminalBootFailure, registerTerminalShutdownSignals } from './bootstrap-lifecycle.js';
 import { broadcastSse } from './dialog/index.js';
+import { startDevWatch } from './dev-watch.js';
 import * as terminal from './index.js';
 
 /**
@@ -36,4 +37,6 @@ if (typeof log.setConsoleLevel === 'function') {
     log.setConsoleLevel(/** @type {'DEBUG' | 'INFO' | 'WARN' | 'ERROR' | 'FATAL'} */ (consoleLevel));
 }
 
-bootCopilot({ terminal, broadcastSse: broadcastBootSse }).catch((err) => void handleTerminalBootFailure(err));
+bootCopilot({ terminal, broadcastSse: broadcastBootSse })
+    .then(() => { startDevWatch(); })
+    .catch((err) => void handleTerminalBootFailure(err));
