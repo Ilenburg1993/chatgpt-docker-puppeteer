@@ -87,6 +87,85 @@ const UNUSED_VARS_STRICT = [
     },
 ];
 
+const NODE_BUILTIN_MODULE_PATTERN =
+    '^(?:assert|buffer|child_process|crypto|dgram|diagnostics_channel|dns|events|fs|http|http2|https|module|net|os|path|perf_hooks|process|readline|stream|string_decoder|timers|tls|url|util|worker_threads|zlib)(?:\\/|$)';
+
+const NODE24_ESM_SYNTAX_RESTRICTIONS = [
+    {
+        selector: `ImportDeclaration[source.value=/${NODE_BUILTIN_MODULE_PATTERN}/]`,
+        message:
+            'Node 24+ ESM: importe built-ins com prefixo "node:" (ex.: "node:fs/promises"). ' +
+            'Isso evita ambiguidade com pacotes npm e mantém compatibilidade com resolução NodeNext.',
+    },
+    {
+        selector: `ExportNamedDeclaration[source.value=/${NODE_BUILTIN_MODULE_PATTERN}/]`,
+        message: 'Node 24+ ESM: reexporte built-ins usando "node:" (ex.: "node:stream").',
+    },
+    {
+        selector: `ExportAllDeclaration[source.value=/${NODE_BUILTIN_MODULE_PATTERN}/]`,
+        message: 'Node 24+ ESM: reexporte built-ins usando "node:" (ex.: "node:stream").',
+    },
+    {
+        selector: `ImportExpression[source.value=/${NODE_BUILTIN_MODULE_PATTERN}/]`,
+        message:
+            'Node 24+ ESM: dynamic import de built-ins também deve usar "node:" (ex.: import("node:fs/promises")).',
+    },
+];
+
+const TOOLS_INDEX_BARREL_SYNTAX_RESTRICTIONS = [
+    {
+        selector: 'ImportDeclaration',
+        message:
+            'INDEX barrel-only: use apenas re-exports `export { ... } from ...` / `export * from ...`; evite imports diretos.',
+    },
+    {
+        selector: 'ExportNamedDeclaration[declaration!=null]',
+        message: 'INDEX barrel-only: não declare símbolos em index.js; somente re-exporte símbolos de outros módulos.',
+    },
+];
+
+const TOOLS_IO_SYNTAX_RESTRICTIONS = [
+    {
+        selector: 'ImportDeclaration[source.value=/^#copilot\\/infra\\/(?!public\\/)/]',
+        message:
+            'Boundary tools→infra: tools só podem consumir "#copilot/infra/public/*". ' +
+            'Crie/expanda uma facade pública em infra/public quando a capacidade ainda não existir.',
+    },
+    {
+        selector: 'ImportDeclaration[source.value=/^#copilot\\/db(?:$|\\/)/]',
+        message:
+            'Boundary tools→db: tools não devem acessar db diretamente. ' +
+            'Use repository/domain adapters ou uma facade pública explicitamente governada.',
+    },
+    {
+        selector: 'ImportDeclaration[source.value=/^(?:\\.\\.\\/){3,}(?:infra|db)(?:\\/|$)/]',
+        message:
+            'Boundary tools→infra/db: não use import relativo para escapar da camada tools. ' +
+            'Use "#copilot/infra/public/*" ou contratos locais de domínio.',
+    },
+    {
+        selector:
+            'ImportDeclaration[source.value="#copilot/sdk"] ImportSpecifier[imported.name=/^(createTool|createToolSync)$/]',
+        message:
+            'Tool factory: em src/copilot/tools/** use buildTool (tools/infra/tool-factory.js). ' +
+            'Evite createTool/createToolSync direto para manter schema, feedback e telemetria unificados.',
+    },
+    {
+        selector:
+            'ImportDeclaration[source.value="node:fs/promises"] ImportSpecifier[imported.name=/^(readFile|writeFile|appendFile|copyFile|cp|rename|rm|unlink|mkdir|open)$/]',
+        message:
+            'IO governance: tools não devem chamar fs/promises para leitura/escrita/mutação. ' +
+            'Use "#copilot/infra/public/io" para cache, locks, policy, metadata e invalidação coordenada.',
+    },
+    {
+        selector:
+            'ImportDeclaration[source.value="node:fs"] ImportSpecifier[imported.name=/^(readFile|readFileSync|writeFile|writeFileSync|appendFile|appendFileSync|copyFile|copyFileSync|cp|rename|rm|unlink|mkdir|open)$/]',
+        message:
+            'IO governance: tools não devem chamar node:fs diretamente para leitura/escrita/mutação. ' +
+            'Use "#copilot/infra/public/io" ou uma facade pública específica.',
+    },
+];
+
 export default tseslint.config(
     // ======================================================
     // 0. Global ignores (único ponto de verdade)
@@ -456,94 +535,6 @@ export default tseslint.config(
         },
     },
 
-    // ── F21A: Portas canônicas para composição cross-layer ───────────────────
-    {
-        files: ['src/copilot/config/**/*.js'],
-        ignores: ['src/copilot/config/sdk-config-port.js'],
-        rules: {
-            'no-restricted-syntax': [
-                'error',
-                {
-                    selector:
-                        'ImportDeclaration[source.value=/^#copilot\\/sdk(?:\\/|$)|^\\.\\.\\/sdk(?:\\/|$)/]',
-                    message:
-                        'Boundary config→sdk: use "../sdk-config-port.js". ' +
-                        'Apenas src/copilot/config/sdk-config-port.js pode compor diretamente surfaces do SDK.',
-                },
-                {
-                    selector:
-                        'ExportNamedDeclaration[source.value=/^#copilot\\/sdk(?:\\/|$)|^\\.\\.\\/sdk(?:\\/|$)/]',
-                    message:
-                        'Boundary config→sdk: reexporte via "../sdk-config-port.js"; não exponha SDK diretamente a partir de config/**.',
-                },
-                {
-                    selector:
-                        'ExportAllDeclaration[source.value=/^#copilot\\/sdk(?:\\/|$)|^\\.\\.\\/sdk(?:\\/|$)/]',
-                    message:
-                        'Boundary config→sdk: reexporte via "../sdk-config-port.js"; não exponha SDK diretamente a partir de config/**.',
-                },
-            ],
-        },
-    },
-
-    {
-        files: ['src/copilot/terminal/**/*.js'],
-        ignores: ['src/copilot/terminal/frontend/gateways/sdk-session.js', 'src/copilot/terminal/frontend/gateways/tools.js'],
-        rules: {
-            'no-restricted-syntax': [
-                'error',
-                {
-                    selector:
-                        'ImportDeclaration[source.value=/^#copilot\\/sdk(?:\\/|$)|^#copilot\\/tools(?:\\/|$)/]',
-                    message:
-                        'Boundary terminal→runtime: use gateways em terminal/frontend/gateways/*.js. ' +
-                        'SDK direto pertence a gateways/sdk-session.js; tools diretas pertencem a gateways/tools.js.',
-                },
-                {
-                    selector:
-                        'ExportNamedDeclaration[source.value=/^#copilot\\/sdk(?:\\/|$)|^#copilot\\/tools(?:\\/|$)/]',
-                    message:
-                        'Boundary terminal→runtime: reexporte capabilities através de terminal/frontend/gateways/*.js.',
-                },
-                {
-                    selector:
-                        'ExportAllDeclaration[source.value=/^#copilot\\/sdk(?:\\/|$)|^#copilot\\/tools(?:\\/|$)/]',
-                    message:
-                        'Boundary terminal→runtime: reexporte capabilities através de terminal/frontend/gateways/*.js.',
-                },
-            ],
-        },
-    },
-
-    {
-        files: ['src/copilot/server/routes/sdk/**/*.js'],
-        ignores: ['src/copilot/server/routes/sdk/deps.js'],
-        rules: {
-            'no-restricted-syntax': [
-                'error',
-                {
-                    selector:
-                        'ImportDeclaration[source.value=/^#copilot\\/sdk(?:\\/|$)|^#copilot\\/tools(?:\\/|$)|^#copilot\\/presentation(?:\\/|$)|^\\.\\.\\/\\.\\.\\/\\.\\.\\/presentation(?:\\/|$)/]',
-                    message:
-                        'Boundary server/routes/sdk: componha SDK, tools e presentation exclusivamente em deps.js. ' +
-                        'Handlers devem receber capabilities por routeDeps para preservar testabilidade e hierarquia.',
-                },
-                {
-                    selector:
-                        'ExportNamedDeclaration[source.value=/^#copilot\\/sdk(?:\\/|$)|^#copilot\\/tools(?:\\/|$)|^#copilot\\/presentation(?:\\/|$)|^\\.\\.\\/\\.\\.\\/\\.\\.\\/presentation(?:\\/|$)/]',
-                    message:
-                        'Boundary server/routes/sdk: reexports de SDK/tools/presentation pertencem a deps.js ou a uma facade local explícita.',
-                },
-                {
-                    selector:
-                        'ExportAllDeclaration[source.value=/^#copilot\\/sdk(?:\\/|$)|^#copilot\\/tools(?:\\/|$)|^#copilot\\/presentation(?:\\/|$)|^\\.\\.\\/\\.\\.\\/\\.\\.\\/presentation(?:\\/|$)/]',
-                    message:
-                        'Boundary server/routes/sdk: reexports de SDK/tools/presentation pertencem a deps.js ou a uma facade local explícita.',
-                },
-            ],
-        },
-    },
-
     // ── F21B: agent/** fora de facades/ports só pode usar #copilot/sdk barrel ─
     {
         files: ['src/copilot/agent/**/*.js'],
@@ -634,19 +625,7 @@ export default tseslint.config(
     {
         files: ['src/copilot/tools/**/index.js'],
         rules: {
-            'no-restricted-syntax': [
-                'error',
-                {
-                    selector: 'ImportDeclaration',
-                    message:
-                        'INDEX barrel-only: use apenas re-exports `export { ... } from ...` / `export * from ...`; evite imports diretos.',
-                },
-                {
-                    selector: 'ExportNamedDeclaration[declaration!=null]',
-                    message:
-                        'INDEX barrel-only: não declare símbolos em index.js; somente re-exporte símbolos de outros módulos.',
-                },
-            ],
+            'no-restricted-syntax': ['error', ...NODE24_ESM_SYNTAX_RESTRICTIONS, ...TOOLS_INDEX_BARREL_SYNTAX_RESTRICTIONS],
         },
     },
 
@@ -701,34 +680,7 @@ export default tseslint.config(
     {
         files: ['src/copilot/**/*.js'],
         rules: {
-            'no-restricted-syntax': [
-                'error',
-                {
-                    selector:
-                        'ImportDeclaration[source.value=/^(?:assert|buffer|child_process|crypto|dgram|diagnostics_channel|dns|events|fs|http|http2|https|module|net|os|path|perf_hooks|process|readline|stream|string_decoder|timers|tls|url|util|worker_threads|zlib)(?:\\/|$)/]',
-                    message:
-                        'Node 24+ ESM: importe built-ins com prefixo "node:" (ex.: "node:fs/promises"). ' +
-                        'Isso evita ambiguidade com pacotes npm e mantém compatibilidade com resolução NodeNext.',
-                },
-                {
-                    selector:
-                        'ExportNamedDeclaration[source.value=/^(?:assert|buffer|child_process|crypto|dgram|diagnostics_channel|dns|events|fs|http|http2|https|module|net|os|path|perf_hooks|process|readline|stream|string_decoder|timers|tls|url|util|worker_threads|zlib)(?:\\/|$)/]',
-                    message:
-                        'Node 24+ ESM: reexporte built-ins usando "node:" (ex.: "node:stream").',
-                },
-                {
-                    selector:
-                        'ExportAllDeclaration[source.value=/^(?:assert|buffer|child_process|crypto|dgram|diagnostics_channel|dns|events|fs|http|http2|https|module|net|os|path|perf_hooks|process|readline|stream|string_decoder|timers|tls|url|util|worker_threads|zlib)(?:\\/|$)/]',
-                    message:
-                        'Node 24+ ESM: reexporte built-ins usando "node:" (ex.: "node:stream").',
-                },
-                {
-                    selector:
-                        'ImportExpression[source.value=/^(?:assert|buffer|child_process|crypto|dgram|diagnostics_channel|dns|events|fs|http|http2|https|module|net|os|path|perf_hooks|process|readline|stream|string_decoder|timers|tls|url|util|worker_threads|zlib)(?:\\/|$)/]',
-                    message:
-                        'Node 24+ ESM: dynamic import de built-ins também deve usar "node:" (ex.: import("node:fs/promises")).',
-                },
-            ],
+            'no-restricted-syntax': ['error', ...NODE24_ESM_SYNTAX_RESTRICTIONS],
         },
     },
 
@@ -737,27 +689,82 @@ export default tseslint.config(
         files: ['src/copilot/tools/**/*.js'],
         ignores: ['src/copilot/tools/todo/store.js'],
         rules: {
+            'no-restricted-syntax': ['error', ...NODE24_ESM_SYNTAX_RESTRICTIONS, ...TOOLS_IO_SYNTAX_RESTRICTIONS],
+        },
+    },
+
+    {
+        files: ['src/copilot/tools/**/index.js'],
+        rules: {
             'no-restricted-syntax': [
                 'error',
+                ...NODE24_ESM_SYNTAX_RESTRICTIONS,
+                ...TOOLS_INDEX_BARREL_SYNTAX_RESTRICTIONS,
+                ...TOOLS_IO_SYNTAX_RESTRICTIONS,
+            ],
+        },
+    },
+
+    // ── F99: Fronteiras efetivas após merge do Flat Config ───────────────────
+    // Blocos finais de no-restricted-imports para zonas que precisam de uma
+    // mensagem executável específica. Mantê-los no fim evita sobrescrita por
+    // regras gerais de imports em blocos anteriores do Flat Config.
+    {
+        files: ['src/copilot/config/**/*.js'],
+        ignores: ['src/copilot/config/sdk-config-port.js'],
+        rules: {
+            'no-restricted-imports': [
+                'error',
                 {
-                    selector: 'ImportDeclaration[source.value=/^#copilot\\/infra\\/(?!public\\/)/]',
-                    message:
-                        'Boundary tools→infra: tools só podem consumir "#copilot/infra/public/*". ' +
-                        'Crie/expanda uma facade pública em infra/public quando a capacidade ainda não existir.',
+                    patterns: [
+                        {
+                            regex: '^(?:#copilot/sdk(?:/|$)|(?:\\.\\./)+sdk(?:/|$))',
+                            message:
+                                'Boundary config→sdk: use "../sdk-config-port.js". ' +
+                                'Apenas src/copilot/config/sdk-config-port.js pode compor diretamente surfaces do SDK.',
+                        },
+                    ],
                 },
+            ],
+        },
+    },
+
+    {
+        files: ['src/copilot/terminal/**/*.js'],
+        ignores: ['src/copilot/terminal/frontend/gateways/sdk-session.js', 'src/copilot/terminal/frontend/gateways/tools.js'],
+        rules: {
+            'no-restricted-imports': [
+                'error',
                 {
-                    selector:
-                        'ImportDeclaration[source.value="node:fs/promises"] ImportSpecifier[imported.name=/^(readFile|writeFile|appendFile|copyFile|cp|rename|rm|unlink|mkdir|open)$/]',
-                    message:
-                        'IO governance: tools não devem chamar fs/promises para leitura/escrita/mutação. ' +
-                        'Use "#copilot/infra/public/io" para cache, locks, policy, metadata e invalidação coordenada.',
+                    patterns: [
+                        {
+                            regex: '^(?:#copilot/(?:sdk|tools)(?:/|$)|(?:\\.\\./)+(?:sdk|tools)(?:/|$))',
+                            message:
+                                'Boundary terminal→runtime: use gateways em terminal/frontend/gateways/*.js. ' +
+                                'SDK direto pertence a gateways/sdk-session.js; tools diretas pertencem a gateways/tools.js.',
+                        },
+                    ],
                 },
+            ],
+        },
+    },
+
+    {
+        files: ['src/copilot/server/routes/sdk/**/*.js'],
+        ignores: ['src/copilot/server/routes/sdk/deps.js'],
+        rules: {
+            'no-restricted-imports': [
+                'error',
                 {
-                    selector:
-                        'ImportDeclaration[source.value="node:fs"] ImportSpecifier[imported.name=/^(readFile|readFileSync|writeFile|writeFileSync|appendFile|appendFileSync|copyFile|copyFileSync|cp|rename|rm|unlink|mkdir|open)$/]',
-                    message:
-                        'IO governance: tools não devem chamar node:fs diretamente para leitura/escrita/mutação. ' +
-                        'Use "#copilot/infra/public/io" ou uma facade pública específica.',
+                    patterns: [
+                        {
+                            regex:
+                                '^(?:#copilot/(?:sdk|tools|presentation)(?:/|$)|(?:\\.\\./)+presentation(?:/|$))',
+                            message:
+                                'Boundary server/routes/sdk: componha SDK, tools e presentation exclusivamente em deps.js. ' +
+                                'Handlers devem receber capabilities por routeDeps para preservar testabilidade e hierarquia.',
+                        },
+                    ],
                 },
             ],
         },
