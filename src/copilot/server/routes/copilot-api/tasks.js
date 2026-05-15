@@ -11,8 +11,8 @@
 
 import { LLM_B_TURN_TIMEOUT_MS } from '#copilot/config';
 import { log } from '#copilot/observability';
-import { normalizeElicitationResult } from '#copilot/sdk/session';
 import { randomUUID } from 'node:crypto';
+import { normalizeElicitationResultWithSchema } from '../../../core/elicitation-schema.js';
 import { toError } from '../../../core/error-handlers.js';
 import { projectAgentHttpError } from '../../../presentation/agent/index.js';
 import { resolveOptionalDialogTimeout } from '../../../presentation/dialog-timeout-policy.js';
@@ -289,7 +289,7 @@ export function registerTaskRoutes(bridge, binding) {
                     .json({ ...runtimeMeta, ok: false, error: 'Elicitation pendente não encontrada.' });
             }
             try {
-                const result = normalizeElicitationResult(
+                const result = normalizeElicitationResultWithSchema(
                     {
                         action,
                         ...(content !== undefined ? { content } : {}),

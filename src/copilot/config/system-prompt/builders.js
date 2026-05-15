@@ -8,8 +8,13 @@
  * @module copilot/config/system-prompt/builders
  */
 
-import { appendSystemMessage, customizeSystemMessage, replaceSystemMessage, sectionOverride } from '#copilot/sdk/session';
-import { SYSTEM_PROMPT_SECTIONS as SDK_SECTIONS } from '../sdk-config-port.js';
+import {
+    appendSystemMessage,
+    customizeSystemMessage,
+    replaceSystemMessage,
+    sectionOverride,
+    SYSTEM_PROMPT_SECTIONS as SDK_SECTIONS,
+} from '../sdk-config-port.js';
 import { getMode } from './mode.js';
 import { buildSystemPromptProfile, renderSystemPromptProfileBlock } from './profile.js';
 import {

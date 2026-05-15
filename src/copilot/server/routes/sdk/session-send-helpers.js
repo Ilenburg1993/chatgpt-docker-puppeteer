@@ -7,8 +7,6 @@
  * `ask_user(kind=question)`.
  */
 
-import { sendSession } from '#copilot/sdk/session';
-
 /**
  * @typedef {ReturnType<import('./deps.js').resolveSdkRouteSharedDeps>} SdkRouteDeps
  *
@@ -58,7 +56,7 @@ export async function sendAndWaitWithoutTimeout(routeDeps, session, messageOptio
     );
 
     try {
-        await sendSession(session, /** @type {never} */ (messageOptions));
+        await routeDeps.sdkSessionRuntime.sendSession(session, /** @type {never} */ (messageOptions));
         await idlePromise;
         return lastAssistantMessage;
     } finally {

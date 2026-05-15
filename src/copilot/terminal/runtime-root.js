@@ -27,7 +27,7 @@ import { loadAliasesAsync } from './stores/index.js';
  * @property {() => void | Promise<void>} [loadAliases]
  * @property {() => NodeJS.Timeout} [startTodoCleanupJob]
  * @property {ReturnType<import('#copilot/boot').readCopilotBootConfig>} [bootConfig]
- * @property {import('#copilot/sdk/types').CopilotSdkBootPreflightReport | null} [bootPreflight]
+ * @property {Record<string, unknown> | null} [bootPreflight]
  *
  *
  * @typedef {object} TerminalBootContext
@@ -36,7 +36,7 @@ import { loadAliasesAsync } from './stores/index.js';
  * @property {() => void | Promise<void>} loadAliases
  * @property {() => NodeJS.Timeout} startTodoCleanupJob
  * @property {ReturnType<import('#copilot/boot').readCopilotBootConfig>} bootConfig
- * @property {import('#copilot/sdk/types').CopilotSdkBootPreflightReport | null} bootPreflight
+ * @property {Record<string, unknown> | null} bootPreflight
  * @property {import('../config/pinned-files.js').PinnedFilesLoader | null} pinnedLoader
  * @property {(() => void) | null} disposePinnedBridge
  * @property {((evt: { file: string; type: string }) => void) | null} pinnedFilesChangedHandler
@@ -124,8 +124,8 @@ export async function runTerminalRuntimeConfigPhase(ctx) {
     ctx.wireRuntime();
     if (ctx.bootPreflight) {
         recordTerminalActivity('boot', 'Executando preflight SDK', {
-            detail: ctx.bootPreflight.pingOk ? 'CLI acessível' : 'CLI indisponível ou sem resposta',
-            severity: ctx.bootPreflight.ok ? 'info' : 'warn',
+            detail: ctx.bootPreflight['pingOk'] ? 'CLI acessível' : 'CLI indisponível ou sem resposta',
+            severity: ctx.bootPreflight['ok'] ? 'info' : 'warn',
             source: 'terminal',
             recordHistory: false,
         });

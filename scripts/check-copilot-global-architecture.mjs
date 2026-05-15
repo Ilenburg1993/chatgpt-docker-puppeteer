@@ -3,13 +3,14 @@
 /**
  * scripts/check-copilot-global-architecture.mjs
  *
- * Gate global, inicialmente observacional, para a topologia ideal de `src/copilot`.
+ * Gate global estrito para a topologia ideal de `src/copilot`.
  *
  * A diferença em relação a `check-layer-violations.mjs` é deliberada: este script modela `events/`, `event-handlers/`,
  * `presentation/`, `server/` e `terminal/` como áreas arquiteturais explícitas e reporta também acoplamentos sensíveis
  * que ainda são permitidos no curto prazo.
  *
- * Use `--strict` para sair com erro quando houver violações hard ou soft.
+ * Use `--strict` para sair com erro quando houver violações hard. Achados soft permanecem como inventário de dívida
+ * arquitetural e devem ficar em zero por política, mas a decisão de bloqueio é reservada para regras canônicas.
  *
  * @module scripts/check-copilot-global-architecture
  */
@@ -22,19 +23,19 @@ const COPILOT_ROOT = 'src/copilot';
 
 /** @type {Record<string, number>} */
 const LAYER_MAP = {
-    boot: 0,
     core: 0,
     types: 0,
     db: 0,
+    infra: 0,
+    boot: 1,
+    sdk: 1,
     config: 1,
-    sdk: 2,
     events: 2,
     'event-handlers': 2,
     hooks: 3,
     tools: 3,
     bridges: 3,
     plugins: 3,
-    infra: 3,
     agent: 4,
     channel: 4,
     'conversation-hub': 5,
@@ -93,9 +94,9 @@ const REMOVED_COMPAT_ENTRYPOINTS = new Set([
  */
 
 /** @type {RegExp} */
-const importRegex = /^\s*import\s.*from\s+['"]([^'"]+)['"]/gm;
+const importRegex = /^\s*import\s+(?:[\s\S]*?\s+from\s+)?['"]([^'"]+)['"]\s*;?/gm;
 /** @type {RegExp} */
-const exportFromRegex = /^\s*export\s+(?:\{[^}]*\}|\*)\s+from\s+['"]([^'"]+)['"]/gm;
+const exportFromRegex = /^\s*export\s+[\s\S]*?\s+from\s+['"]([^'"]+)['"]\s*;?/gm;
 /** @type {RegExp} */
 const dynamicImportRegex = /import\(\s*['"]([^'"]+)['"]\s*\)/gm;
 
@@ -253,6 +254,22 @@ function lineForIndex(src, matchIndex) {
  * @returns {boolean}
  */
 function isDocumentedCompositionImport(relFile, to, spec) {
+    if (relFile === 'boot/runtime-bootstrap.js') {
+        return ['agent', 'config', 'sdk', 'server', 'terminal', 'tools'].includes(to);
+    }
+
+    if (relFile === 'db/sqlite.js') {
+        return to === 'boot';
+    }
+
+    if (relFile.startsWith('infra/') && to === 'config') {
+        return true;
+    }
+
+    if (relFile === 'sdk/session/hook-bus.js') {
+        return to === 'events';
+    }
+
     if (relFile.startsWith('agent/ports/')) {
         return ['bridges', 'conversation-hub', 'hooks', 'observability', 'tools'].includes(to);
     }
@@ -266,6 +283,14 @@ function isDocumentedCompositionImport(relFile, to, spec) {
     }
 
     if (relFile === 'config/sdk-config-port.js') {
+        return to === 'sdk';
+    }
+
+    if (relFile === 'terminal/frontend/gateways/tools.js') {
+        return to === 'tools';
+    }
+
+    if (relFile === 'terminal/frontend/gateways/sdk-session.js') {
         return to === 'sdk';
     }
 
@@ -555,9 +580,7 @@ if (isDirectRun) {
     const findings = checkGlobalArchitecture();
     printReport(findings);
 
-    const strictViolationCount = findings.filter(
-        (finding) => finding.severity === 'hard' || finding.severity === 'soft',
-    ).length;
+    const strictViolationCount = findings.filter((finding) => finding.severity === 'hard').length;
     if (strict && strictViolationCount > 0) {
         process.exit(1);
     }

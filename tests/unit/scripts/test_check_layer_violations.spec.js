@@ -71,9 +71,19 @@ describe('check-layer-violations — LAYER_MAP', () => {
         assert.equal(LAYER_MAP['db'], 0);
     });
 
+    it('infra é fundação de I/O compartilhado', () => {
+        assert.equal(LAYER_MAP['infra'], 0);
+    });
+
     it('sdk e audit são L1', () => {
         assert.equal(LAYER_MAP['sdk'], 1);
         assert.equal(LAYER_MAP['audit'], 1);
+    });
+
+    it('config, events e observability são L2', () => {
+        assert.equal(LAYER_MAP['config'], 2);
+        assert.equal(LAYER_MAP['events'], 2);
+        assert.equal(LAYER_MAP['observability'], 2);
     });
 
     it('hooks é L3', () => {
@@ -81,8 +91,10 @@ describe('check-layer-violations — LAYER_MAP', () => {
         assert.equal(LAYER_MAP['plugins'], 3);
     });
 
-    it('terminal é L6', () => {
-        assert.equal(LAYER_MAP['terminal'], 6);
+    it('presentation é L6 e bordas HTTP/terminal são L7', () => {
+        assert.equal(LAYER_MAP['presentation'], 6);
+        assert.equal(LAYER_MAP['server'], 7);
+        assert.equal(LAYER_MAP['terminal'], 7);
     });
 
     it('services é L4', () => {
@@ -93,8 +105,9 @@ describe('check-layer-violations — LAYER_MAP', () => {
         assert.ok((LAYER_MAP['core'] ?? 0) < (LAYER_MAP['config'] ?? 0));
         assert.ok((LAYER_MAP['config'] ?? 0) < (LAYER_MAP['hooks'] ?? 0));
         assert.ok((LAYER_MAP['hooks'] ?? 0) < (LAYER_MAP['agent'] ?? 0));
-        assert.ok((LAYER_MAP['agent'] ?? 0) < (LAYER_MAP['api'] ?? 0));
-        assert.ok((LAYER_MAP['api'] ?? 0) < (LAYER_MAP['terminal'] ?? 0));
+        assert.ok((LAYER_MAP['agent'] ?? 0) < (LAYER_MAP['presentation'] ?? 0));
+        assert.ok((LAYER_MAP['presentation'] ?? 0) < (LAYER_MAP['server'] ?? 0));
+        assert.equal(LAYER_MAP['server'], LAYER_MAP['terminal']);
     });
 });
 
@@ -125,6 +138,13 @@ describe('check-layer-violations — regex patterns', () => {
         const m = dynamicImportRegex.exec("const mod = await import('#copilot/agent/loop');");
         assert.ok(m);
         assert.equal(m?.[1], '#copilot/agent/loop');
+    });
+
+    it('importRegex captura static import multi-linha', () => {
+        importRegex.lastIndex = 0;
+        const m = importRegex.exec("import {\n  foo,\n  bar,\n} from '#copilot/server';");
+        assert.ok(m);
+        assert.equal(m?.[1], '#copilot/server');
     });
 });
 

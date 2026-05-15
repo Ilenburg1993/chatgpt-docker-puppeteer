@@ -58,7 +58,9 @@ export function getActiveSessionEntryOrReply(routeDeps, id, res) {
         id,
     );
     if (runtimeEntry) {
-        return /** @type {NonNullable<ReturnType<SdkRouteDeps['sdkSession']['getClientSession']>>} */ (runtimeEntry);
+        return /** @type {NonNullable<ReturnType<SdkRouteDeps['sdkSession']['getClientSession']>>} */ (
+            /** @type {unknown} */ (runtimeEntry)
+        );
     }
 
     res.status(404).json({

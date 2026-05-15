@@ -10,6 +10,8 @@
  *
  * @typedef {import('../contracts/index.js').RuntimeSessionCapabilities} RuntimeSessionCapabilities
  *
+ * @typedef {import('../contracts/index.js').RuntimeCopilotSession} RuntimeCopilotSession
+ *
  * @typedef {import('../contracts/index.js').RuntimeInputOptions} RuntimeInputOptions
  *
  * @typedef {import('../contracts/index.js').RuntimeElicitationResult} RuntimeElicitationResult
@@ -47,7 +49,7 @@ export function getAgentSdkSessionTarget(runtimeId) {
  * @param {string | null | undefined} runtimeId
  * @param {string} sessionId
  * @returns {{
- *     session: import('#copilot/sdk/types').CopilotSession;
+ *     session: RuntimeCopilotSession;
  *     model: string;
  *     createdAt: number;
  *     messagesCount: number;
@@ -59,7 +61,7 @@ export function resolveAgentSdkActiveSessionEntry(runtimeId, sessionId) {
     const agentSessionId = typeof snap['sessionId'] === 'string' ? snap['sessionId'] : null;
     const handles =
         typeof (/** @type {{ getSdkHandles?: unknown }} */ (agent).getSdkHandles) === 'function'
-            ? /** @type {{ session?: import('#copilot/sdk/types').CopilotSession | null }} */ (
+            ? /** @type {{ session?: RuntimeCopilotSession | null }} */ (
                   /** @type {{ getSdkHandles: () => unknown }} */ (agent).getSdkHandles()
               )
             : null;
@@ -109,7 +111,7 @@ export async function readAgentSdkSystemPromptProjection(runtimeId) {
             : null;
     const handles =
         typeof (/** @type {{ getSdkHandles?: unknown }} */ (agent).getSdkHandles) === 'function'
-            ? /** @type {{ session?: import('#copilot/sdk/types').CopilotSession | null }} */ (
+            ? /** @type {{ session?: RuntimeCopilotSession | null }} */ (
                   /** @type {{ getSdkHandles: () => unknown }} */ (agent).getSdkHandles()
               )
             : null;
@@ -139,7 +141,9 @@ export async function readAgentSdkSystemPromptProjection(runtimeId) {
     }
 
     try {
-        const instructionSources = await readSessionInstructionSources(session);
+        const instructionSources = await readSessionInstructionSources(
+            /** @type {Parameters<typeof readSessionInstructionSources>[0]} */ (/** @type {unknown} */ (session)),
+        );
         const projection = buildSystemPromptPublicProjection({
             systemPrompt,
             binding,

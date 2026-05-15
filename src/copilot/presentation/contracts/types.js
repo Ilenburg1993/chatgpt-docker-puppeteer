@@ -22,6 +22,8 @@
  *
  * @typedef {object} RuntimeSessionCapabilities
  *
+ * @typedef {{ [key: string]: unknown }} RuntimeCopilotSession
+ *
  * @typedef {object} RuntimeInputOptions
  *
  * @typedef {string | number | boolean | string[]} RuntimeElicitationFieldValue

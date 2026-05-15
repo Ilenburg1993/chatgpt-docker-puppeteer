@@ -47,6 +47,7 @@ import {
     workspaceReadFile,
 } from '#copilot/sdk/rpc';
 import {
+    abortSession,
     approveAll,
     createClientSession,
     defaultBus as defaultHookBus,
@@ -57,6 +58,7 @@ import {
     getClientState,
     getForegroundClientSessionId,
     getLastClientSessionId,
+    getSessionMessages,
     getSessionCapabilities,
     incrementSessionMessageCount,
     isSessionUiElicitationAvailable,
@@ -65,11 +67,14 @@ import {
     onAllSessionEvents,
     resumeClientSession,
     SDK_HOOKS,
+    sendSession,
+    sendSessionAndWait,
     sessionUiConfirm,
     sessionUiElicitation,
     sessionUiInput,
     sessionUiSelect,
     setForegroundClientSessionId,
+    setSessionModel,
     stopClient,
     validateProviderConfig,
 } from '#copilot/sdk/session';
@@ -77,7 +82,7 @@ import { emitSdkOperationMetric } from '#copilot/sdk/telemetry';
 import { getAllTools } from '#copilot/tools';
 import { requireAgentRuntimeSelection } from '../../../presentation/agent/index.js';
 import { resolveOptionalDialogTimeout } from '../../../presentation/dialog-timeout-policy.js';
-import { buildRuntimeRouteMetaPayload } from '../../../presentation/routing/index.js';
+import { buildMissingRuntimeRouteMeta, buildRuntimeRouteMetaPayload } from '../../../presentation/routing/index.js';
 import { setRuntimeModelProjection, setRuntimeReasoningProjection } from '../../../presentation/runtime/index.js';
 import { resolveRequestedRuntimeId } from '../../../presentation/routing/index.js';
 import * as runtimeSdkSessionOps from '../../../presentation/runtime/index.js';
@@ -144,6 +149,14 @@ const sdkSessionUiOps = Object.freeze({
     sessionUiElicitation,
     sessionUiInput,
     sessionUiSelect,
+});
+
+const sdkSessionRuntimeOps = Object.freeze({
+    abortSession,
+    getSessionMessages,
+    sendSession,
+    sendSessionAndWait,
+    setSessionModel,
 });
 
 const runtimeSdkSessionNamespace = { ...runtimeSdkSessionOps };
@@ -279,6 +292,7 @@ function resolveMetricsStore() {
  *     sdkSessionRpc: typeof sdkSessionRpcOps;
  *     sdkSessionEvents: typeof sdkSessionEventOps;
  *     sdkSessionUi: typeof sdkSessionUiOps;
+ *     sdkSessionRuntime: typeof sdkSessionRuntimeOps;
  *     sdkRuntimeSession: typeof sdkRuntimeSessionOps;
  *     sdkSystemPrompt: typeof sdkSystemPromptOps;
  *     sdkSessionOwnership: typeof sdkSessionOwnershipOps;
@@ -309,6 +323,7 @@ export function buildDefaultSdkRouteSharedDeps(runtimeId) {
         sdkSessionRpc: sdkSessionRpcOps,
         sdkSessionEvents: sdkSessionEventOps,
         sdkSessionUi: sdkSessionUiOps,
+        sdkSessionRuntime: sdkSessionRuntimeOps,
         sdkRuntimeSession: sdkRuntimeSessionOps,
         sdkSystemPrompt: sdkSystemPromptOps,
         sdkSessionOwnership: sdkSessionOwnershipOps,
@@ -330,4 +345,20 @@ export function buildDefaultSdkRouteSharedDeps(runtimeId) {
  */
 export function resolveSdkRouteSharedDeps(req) {
     return buildDefaultSdkRouteSharedDeps(resolveRequestedRuntimeId(req));
+}
+
+/**
+ * @param {import('express').Request} req
+ * @returns {string | null}
+ */
+export function resolveSdkRequestedRuntimeId(req) {
+    return resolveRequestedRuntimeId(req);
+}
+
+/**
+ * @param {string | null | undefined} requestedRuntimeId
+ * @returns {ReturnType<typeof buildMissingRuntimeRouteMeta>}
+ */
+export function buildSdkMissingRuntimeRouteMeta(requestedRuntimeId) {
+    return buildMissingRuntimeRouteMeta(requestedRuntimeId);
 }

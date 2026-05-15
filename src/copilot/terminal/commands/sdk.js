@@ -9,7 +9,6 @@ import { randomUUID } from 'node:crypto';
 
 import { CANONICAL_LOCAL_FS_TOOL_NAMES, decideSdkFsRouting, toError } from '#copilot/core';
 import { utf8ByteLength } from '#copilot/infra/public/buffer';
-import { fileReadTools, fileWriteTools, readIntrospectionRegistrySnapshot } from '#copilot/tools';
 import { isRuntimeElicitationSchema, normalizeElicitationContentWithSchema } from '../../core/elicitation-schema.js';
 import { readTerminalIoActivityProjection } from '../events/index.js';
 import {
@@ -30,7 +29,11 @@ import {
     readTerminalRuntimeState,
     readTerminalSdkSystemPromptProjection,
     readTerminalSdkWorkspaceFile,
+    readTerminalToolRegistrySnapshot,
     requestTerminalSdkElicitation,
+    requireTerminalFileTool,
+    listTerminalFileReadTools,
+    listTerminalFileWriteTools,
     resolveTerminalSdkPendingElicitation,
     selectTerminalSdkSessionUi,
     setTerminalRuntimePermissionMode,
@@ -83,7 +86,7 @@ function arrayFromSdkList(value) {
 }
 
 /**
- * @param {{ handler?: Function }} tool
+ * @param {import('../frontend/gateways/tools.js').TerminalTool} tool
  * @returns {Function}
  */
 function getToolHandler(tool) {
@@ -91,20 +94,9 @@ function getToolHandler(tool) {
     throw new TypeError('[terminal/workspace] tool sem handler execut�vel.');
 }
 
-/**
- * @param {import('#copilot/sdk/types').Tool[]} tools
- * @param {string} name
- * @returns {import('#copilot/sdk/types').Tool}
- */
-function findTool(tools, name) {
-    const tool = tools.find((candidate) => candidate.name === name);
-    if (!tool) throw new TypeError(`[terminal/workspace] tool can�nica ausente: ${name}`);
-    return tool;
-}
-
-const createFileTool = findTool(fileWriteTools, 'create_file');
-const writeFileContentTool = findTool(fileWriteTools, 'write_file_content');
-const readFileContentTool = findTool(fileReadTools, 'read_file_content');
+const createFileTool = requireTerminalFileTool('write', 'create_file');
+const writeFileContentTool = requireTerminalFileTool('write', 'write_file_content');
+const readFileContentTool = requireTerminalFileTool('read', 'read_file_content');
 
 /**
  * @param {unknown} value
@@ -275,7 +267,7 @@ async function promoteLocalFileToWorkspace(ctx, payload) {
 }
 
 /**
- * @param {import('#copilot/sdk/types').Tool[]} tools
+ * @param {import('../frontend/gateways/tools.js').TerminalTool[]} tools
  * @param {string} name
  * @returns {boolean}
  */
@@ -296,10 +288,12 @@ async function renderSdkDoctor({ println }, runtimeId) {
     const sdkWorkspaceAvailable = sdkTools['workspace'] === true;
 
     const localFsToolNames = [...CANONICAL_LOCAL_FS_TOOL_NAMES];
+    const localReadTools = listTerminalFileReadTools();
+    const localWriteTools = listTerminalFileWriteTools();
     const localFsToolsReady = localFsToolNames.every(
-        (name) => hasTool(fileReadTools, name) || hasTool(fileWriteTools, name),
+        (name) => hasTool(localReadTools, name) || hasTool(localWriteTools, name),
     );
-    const registrySnapshot = readIntrospectionRegistrySnapshot();
+    const registrySnapshot = readTerminalToolRegistrySnapshot();
     const contract = registrySnapshot.toolContract;
 
     const promptProjection = await callWithRuntimeTarget(readTerminalSdkSystemPromptProjection, runtimeId);
@@ -365,8 +359,10 @@ async function renderCommandFailureGuidance(println, runtimeId) {
     const caps = objectOrNull(capabilities) ?? {};
     const sdkTools = objectOrNull(caps['tools']) ?? {};
     const sdkWorkspaceAvailable = sdkTools['workspace'] === true;
+    const localReadTools = listTerminalFileReadTools();
+    const localWriteTools = listTerminalFileWriteTools();
     const localFsToolsReady = [...CANONICAL_LOCAL_FS_TOOL_NAMES].every(
-        (name) => hasTool(fileReadTools, name) || hasTool(fileWriteTools, name),
+        (name) => hasTool(localReadTools, name) || hasTool(localWriteTools, name),
     );
     const routing = decideSdkFsRouting({
         canonicalFsReady: localFsToolsReady,
@@ -657,7 +653,7 @@ async function renderSdkModels({ println }, runtimeId) {
 async function renderSdkTools({ println }, model, runtimeId) {
     const result = await callWithRuntimeTarget(listTerminalSdkTools, runtimeId, { model: model || undefined });
     const tools = arrayFromSdkList(result);
-    const registrySnapshot = readIntrospectionRegistrySnapshot();
+    const registrySnapshot = readTerminalToolRegistrySnapshot();
     const contract = registrySnapshot.toolContract;
     println(`\n  \x1b[36mTools SDK (built-in)${model ? ` para ${model}` : ''} (${tools.length})\x1b[0m`);
     for (const tool of tools.slice(0, 50)) {

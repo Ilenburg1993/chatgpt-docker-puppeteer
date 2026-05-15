@@ -1,6 +1,6 @@
 # config/
 
-**Camada**: L1 — depende apenas de `core/`.
+**Camada**: L1 — configuração declarativa, com uma ponte SDK explícita.
 
 Configuração do agente: variáveis de ambiente, sessão, system prompt, custom agents, pinned files.
 
@@ -17,8 +17,11 @@ Configuração do agente: variáveis de ambiente, sessão, system prompt, custom
 
 ## Regras de importação
 
-- **Pode importar**: `core/`, `node:*`
-- **NÃO pode importar**: `agent/`, `sdk/`, `tools/`, `bridges/`, `terminal/`
+- **Pode importar**: `core/`, `observability/`, `node:*` e módulos internos de `config/`.
+- **Ponte SDK autorizada**: somente `sdk-config-port.js` pode importar `#copilot/sdk/*` ou submódulos físicos do SDK.
+- **Demais arquivos de `config/`**: quando precisarem de constantes, builders, tipos, paths persistentes ou helpers
+  vanilla do SDK, devem importar de `./sdk-config-port.js`.
+- **NÃO pode importar**: `agent/`, `tools/`, `bridges/`, `terminal/` ou SDK diretamente fora do port.
 
 ## Regra arquitetural 2.1
 

@@ -5,6 +5,6 @@
  * @module copilot/infra/io/patch
  */
 
-export { buildSimpleTextDiff } from './text-diff.js';
 export { diffText, diffTextWithReader } from './text-diff-service.js';
+export { buildSimpleTextDiff } from './text-diff.js';
 export { computeTextPatch } from './text-patch.js';

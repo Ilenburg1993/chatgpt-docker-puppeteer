@@ -9,7 +9,6 @@
  * @module copilot/sdk/session/session-fs
  */
 
-import { dirname, resolve } from 'node:path';
 import { readCopilotSessionFsBootConfig } from '#copilot/boot/session-fs';
 import { evaluateIoPathPolicyAsync } from '#copilot/core/io-policy';
 import {
@@ -22,6 +21,7 @@ import {
     scanDirectory,
     statPath,
 } from '#copilot/infra/public/io';
+import { dirname, resolve } from 'node:path';
 import { classifySdkError } from '../errors.js';
 import { log } from '../logger.js';
 import { emitSdkOperationMetric } from '../telemetry/operation-metrics.js';

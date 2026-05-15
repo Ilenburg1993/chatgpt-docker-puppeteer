@@ -34,6 +34,7 @@ também declara `risk` e scorecard para orientar a ordem de decomposição.
 | `runtime-root.js`                        | composition root explícito do terminal                                     |
 | `frontend/`                              | consumer layer canônica do runtime para o terminal                         |
 | `frontend/gateways/sdk-session.js`       | única ponte runtime do terminal para helpers vanilla de sessão SDK         |
+| `frontend/gateways/tools.js`             | única ponte terminal-owned para file tools e introspecção de tools         |
 | `frontend/operational-guidance/`         | guidance operacional para boot, /status, /sdk doctor, /fs e recuperação    |
 | `state/sdk/`                             | sub-surface estreita para elicitations, permissões e user input do SDK     |
 | `state/ui/`                              | sub-surface estreita para display policy, detalhe e tema visual            |
@@ -204,6 +205,8 @@ Deve sair do `terminal/` quando virar:
 - imports entre subpastas irmãs do terminal devem passar via barrels do respectivo submódulo;
 - imports same-folder privados podem permanecer diretos quando não cruzarem fronteiras de módulo.
 - imports do terminal para `#copilot/sdk/session` ficam restritos ao gateway `frontend/gateways/sdk-session.js`.
+- imports do terminal para `#copilot/tools` ficam restritos ao gateway `frontend/gateways/tools.js`; comandos e
+  projections devem consumir esse gateway.
 
 ## Superfícies públicas autorizadas
 

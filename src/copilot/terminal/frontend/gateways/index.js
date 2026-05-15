@@ -92,3 +92,9 @@ export {
     setTerminalSdkSessionMode,
     updateTerminalSdkPlan,
 } from './sdk-session.js';
+export {
+    listTerminalFileReadTools,
+    listTerminalFileWriteTools,
+    readTerminalToolRegistrySnapshot,
+    requireTerminalFileTool,
+} from './tools.js';

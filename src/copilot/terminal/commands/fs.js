@@ -8,9 +8,9 @@
  * @module copilot/terminal/commands/fs
  */
 
-import { fileReadTools, fileWriteTools } from '#copilot/tools';
 import { toError } from '../../core/error-handlers.js';
 import { buildActivityAwareGuidance, buildFailureRecoveryLines } from '../frontend/operational-guidance/index.js';
+import { requireTerminalFileTool } from '../frontend/gateways/index.js';
 import { readTerminalIoActivityProjection } from '../events/index.js';
 
 /**
@@ -18,7 +18,7 @@ import { readTerminalIoActivityProjection } from '../events/index.js';
  */
 
 /**
- * @param {{ handler?: Function }} tool
+ * @param {import('../frontend/gateways/tools.js').TerminalTool} tool
  * @returns {Function}
  */
 function getToolHandler(tool) {
@@ -26,22 +26,11 @@ function getToolHandler(tool) {
     throw new TypeError('[terminal/fs] tool sem handler executável.');
 }
 
-/**
- * @param {import('#copilot/sdk/types').Tool[]} tools
- * @param {string} name
- * @returns {import('#copilot/sdk/types').Tool}
- */
-function findTool(tools, name) {
-    const tool = tools.find((candidate) => candidate.name === name);
-    if (!tool) throw new TypeError(`[terminal/fs] tool canônica ausente: ${name}`);
-    return tool;
-}
-
-const listDirectoryTool = findTool(fileReadTools, 'list_directory');
-const readFileContentTool = findTool(fileReadTools, 'read_file_content');
-const searchInFilesTool = findTool(fileReadTools, 'search_in_files');
-const createFileTool = findTool(fileWriteTools, 'create_file');
-const writeFileContentTool = findTool(fileWriteTools, 'write_file_content');
+const listDirectoryTool = requireTerminalFileTool('read', 'list_directory');
+const readFileContentTool = requireTerminalFileTool('read', 'read_file_content');
+const searchInFilesTool = requireTerminalFileTool('read', 'search_in_files');
+const createFileTool = requireTerminalFileTool('write', 'create_file');
+const writeFileContentTool = requireTerminalFileTool('write', 'write_file_content');
 
 /**
  * Constrói guidance dinâmico de falha para o FS local, orientado pela última operação de I/O.
@@ -64,7 +53,7 @@ function buildFsDynamicGuidance() {
 }
 
 /**
- * @param {{ handler?: Function }} tool
+ * @param {import('../frontend/gateways/tools.js').TerminalTool} tool
  * @param {Record<string, unknown>} args
  * @returns {Promise<Record<string, unknown>>}
  */

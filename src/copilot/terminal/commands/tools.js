@@ -10,8 +10,8 @@
  * @see EventBus
  */
 
-import { readIntrospectionRegistrySnapshot } from '#copilot/tools';
 import { readTerminalStatusProjection, readTerminalToolStatsProjection } from '../frontend/index.js';
+import { readTerminalToolRegistrySnapshot } from '../frontend/gateways/index.js';
 
 /**
  * @typedef {object} ToolsContext
@@ -113,7 +113,7 @@ export function cmdTools({ println }, arg = '') {
         println(
             `    \x1b[90mcoverage: description=${contract.metadataCoverage.descriptionPct}% · schema=${contract.metadataCoverage.parametersPct}% · category=${contract.metadataCoverage.categoryPct}% · tags=${contract.metadataCoverage.tagsPct}% · instructions=${contract.metadataCoverage.instructionsPct}%\x1b[0m`,
         );
-        const detailedContract = readIntrospectionRegistrySnapshot().toolContract;
+        const detailedContract = readTerminalToolRegistrySnapshot().toolContract;
         if (detailedContract.issues.length > 0) {
             println('    \x1b[90mtop issues:\x1b[0m');
             for (const issue of detailedContract.issues.slice(0, 10)) {

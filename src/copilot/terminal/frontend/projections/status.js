@@ -5,7 +5,6 @@
 
 import { getWorkspaceContext } from '#copilot/boot';
 import { readSystemPromptStatusSync } from '#copilot/config';
-import { readIntrospectionRegistrySnapshot } from '#copilot/tools';
 import { readIoRuntimeHealthSnapshot } from '../../../infra/io-health.js';
 import { buildRuntimeSdkFsRoutingProjection } from '../../../presentation/files/index.js';
 import { buildRuntimeLifecycleSummary, readRuntimeLifecycleSnapshot } from '../../../presentation/runtime/index.js';
@@ -20,7 +19,11 @@ import {
     readTerminalPermissionSummary,
     readTerminalUserInputSummary,
 } from '../../state/projections/index.js';
-import { getTerminalPendingStructuredUserInputCount, getTerminalSdkSessionCapabilities } from '../gateways/index.js';
+import {
+    getTerminalPendingStructuredUserInputCount,
+    getTerminalSdkSessionCapabilities,
+    readTerminalToolRegistrySnapshot,
+} from '../gateways/index.js';
 import {
     formatTerminalRuntimeTopology,
     normalizeTerminalModelBillingProjection,
@@ -163,7 +166,7 @@ export function readTerminalStatusProjection({ hubSessionId = null, injectPort, 
             return null;
         }
     })();
-    const toolLoadSnapshot = readIntrospectionRegistrySnapshot();
+    const toolLoadSnapshot = readTerminalToolRegistrySnapshot();
     const promptStatus = readSystemPromptStatusSync();
     const toolLoad = {
         total: toolLoadSnapshot.total,

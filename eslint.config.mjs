@@ -456,6 +456,94 @@ export default tseslint.config(
         },
     },
 
+    // ── F21A: Portas canônicas para composição cross-layer ───────────────────
+    {
+        files: ['src/copilot/config/**/*.js'],
+        ignores: ['src/copilot/config/sdk-config-port.js'],
+        rules: {
+            'no-restricted-syntax': [
+                'error',
+                {
+                    selector:
+                        'ImportDeclaration[source.value=/^#copilot\\/sdk(?:\\/|$)|^\\.\\.\\/sdk(?:\\/|$)/]',
+                    message:
+                        'Boundary config→sdk: use "../sdk-config-port.js". ' +
+                        'Apenas src/copilot/config/sdk-config-port.js pode compor diretamente surfaces do SDK.',
+                },
+                {
+                    selector:
+                        'ExportNamedDeclaration[source.value=/^#copilot\\/sdk(?:\\/|$)|^\\.\\.\\/sdk(?:\\/|$)/]',
+                    message:
+                        'Boundary config→sdk: reexporte via "../sdk-config-port.js"; não exponha SDK diretamente a partir de config/**.',
+                },
+                {
+                    selector:
+                        'ExportAllDeclaration[source.value=/^#copilot\\/sdk(?:\\/|$)|^\\.\\.\\/sdk(?:\\/|$)/]',
+                    message:
+                        'Boundary config→sdk: reexporte via "../sdk-config-port.js"; não exponha SDK diretamente a partir de config/**.',
+                },
+            ],
+        },
+    },
+
+    {
+        files: ['src/copilot/terminal/**/*.js'],
+        ignores: ['src/copilot/terminal/frontend/gateways/sdk-session.js', 'src/copilot/terminal/frontend/gateways/tools.js'],
+        rules: {
+            'no-restricted-syntax': [
+                'error',
+                {
+                    selector:
+                        'ImportDeclaration[source.value=/^#copilot\\/sdk(?:\\/|$)|^#copilot\\/tools(?:\\/|$)/]',
+                    message:
+                        'Boundary terminal→runtime: use gateways em terminal/frontend/gateways/*.js. ' +
+                        'SDK direto pertence a gateways/sdk-session.js; tools diretas pertencem a gateways/tools.js.',
+                },
+                {
+                    selector:
+                        'ExportNamedDeclaration[source.value=/^#copilot\\/sdk(?:\\/|$)|^#copilot\\/tools(?:\\/|$)/]',
+                    message:
+                        'Boundary terminal→runtime: reexporte capabilities através de terminal/frontend/gateways/*.js.',
+                },
+                {
+                    selector:
+                        'ExportAllDeclaration[source.value=/^#copilot\\/sdk(?:\\/|$)|^#copilot\\/tools(?:\\/|$)/]',
+                    message:
+                        'Boundary terminal→runtime: reexporte capabilities através de terminal/frontend/gateways/*.js.',
+                },
+            ],
+        },
+    },
+
+    {
+        files: ['src/copilot/server/routes/sdk/**/*.js'],
+        ignores: ['src/copilot/server/routes/sdk/deps.js'],
+        rules: {
+            'no-restricted-syntax': [
+                'error',
+                {
+                    selector:
+                        'ImportDeclaration[source.value=/^#copilot\\/sdk(?:\\/|$)|^#copilot\\/tools(?:\\/|$)|^#copilot\\/presentation(?:\\/|$)|^\\.\\.\\/\\.\\.\\/\\.\\.\\/presentation(?:\\/|$)/]',
+                    message:
+                        'Boundary server/routes/sdk: componha SDK, tools e presentation exclusivamente em deps.js. ' +
+                        'Handlers devem receber capabilities por routeDeps para preservar testabilidade e hierarquia.',
+                },
+                {
+                    selector:
+                        'ExportNamedDeclaration[source.value=/^#copilot\\/sdk(?:\\/|$)|^#copilot\\/tools(?:\\/|$)|^#copilot\\/presentation(?:\\/|$)|^\\.\\.\\/\\.\\.\\/\\.\\.\\/presentation(?:\\/|$)/]',
+                    message:
+                        'Boundary server/routes/sdk: reexports de SDK/tools/presentation pertencem a deps.js ou a uma facade local explícita.',
+                },
+                {
+                    selector:
+                        'ExportAllDeclaration[source.value=/^#copilot\\/sdk(?:\\/|$)|^#copilot\\/tools(?:\\/|$)|^#copilot\\/presentation(?:\\/|$)|^\\.\\.\\/\\.\\.\\/\\.\\.\\/presentation(?:\\/|$)/]',
+                    message:
+                        'Boundary server/routes/sdk: reexports de SDK/tools/presentation pertencem a deps.js ou a uma facade local explícita.',
+                },
+            ],
+        },
+    },
+
     // ── F21B: agent/** fora de facades/ports só pode usar #copilot/sdk barrel ─
     {
         files: ['src/copilot/agent/**/*.js'],

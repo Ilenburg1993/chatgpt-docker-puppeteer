@@ -7,7 +7,6 @@
  */
 
 import { getMcpStatus } from '#copilot/bridges';
-import { readIntrospectionRegistrySnapshot } from '#copilot/tools';
 import { buildRuntimeSdkFsRoutingProjection } from '../../../presentation/files/index.js';
 import { readRuntimeLifecycleSnapshot } from '../../../presentation/runtime/index.js';
 import { listActiveRuntimeTodosProjection } from '../../../presentation/runtime/index.js';
@@ -38,6 +37,7 @@ import {
     readTerminalHubSessions,
     readTerminalHubTurns,
     readTerminalSessionBinding,
+    readTerminalToolRegistrySnapshot,
     saveTerminalSnapshot,
     searchTerminalHubTurns,
     storeTerminalHubMemory,
@@ -434,7 +434,7 @@ export async function readTerminalDiagnoseProjection({ hubSessionId = null, runt
     const topToolStats = readToolStatsProjection()
         .entries.sort(([, a], [, b]) => Number(b['avgLatencyMs'] ?? 0) - Number(a['avgLatencyMs'] ?? 0))
         .slice(0, 5);
-    const toolLoadSnapshot = readIntrospectionRegistrySnapshot();
+    const toolLoadSnapshot = readTerminalToolRegistrySnapshot();
     const sdkFsRouting = buildRuntimeSdkFsRoutingProjection({
         canonicalFsReady: toolLoadSnapshot.hasCanonicalLocalFsTools,
         sdkWorkspaceAvailable: toolLoadSnapshot.hasSdkWorkspaceTooling,

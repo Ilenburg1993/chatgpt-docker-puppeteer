@@ -15,13 +15,37 @@ export {
 } from '#copilot/sdk/constants';
 
 export {
+    ClientOptionsBuilder,
+    appendSystemMessage,
     approveAll,
+    buildCopilotClientOptionsFromEnv,
+    customizeSystemMessage,
+    getSectionDescription,
+    getSectionNames,
+    replaceSystemMessage,
+    sectionOverride,
     SYSTEM_PROMPT_SECTIONS,
+    supportsCustomizeMode,
     validateProviderConfig,
 } from '#copilot/sdk/session';
 
+export { resolvePersistentConfigFile } from '../sdk/persistent-paths.js';
+
+export { instructionSourcesGet } from '#copilot/sdk/rpc';
+
+export {
+    BUILTIN_HANDLER_MAP,
+    getCustomToolDefinitions,
+    getToolsConfig,
+    patchToolsConfig,
+    registerCustomTool,
+    removeCustomTool,
+} from '#copilot/sdk/tools';
+
 /**
  * @typedef {import('#copilot/sdk/types').SessionConfig} SessionConfig
+ *
+ * @typedef {import('#copilot/sdk/types').CopilotSession} CopilotSession
  *
  * @typedef {import('#copilot/sdk/types').ResumeSessionConfig} ResumeSessionConfig
  *
@@ -48,6 +72,8 @@ export {
  * @typedef {import('#copilot/sdk/types').SessionEventHandler} SessionEventHandler
  *
  * @typedef {import('#copilot/sdk/types').CreateSessionFsHandler} CreateSessionFsHandler
+ *
+ * @typedef {import('#copilot/sdk/types').ProviderConfig} ProviderConfig
  *
  * @typedef {import('#copilot/sdk/types').SectionOverrideAction} SectionOverrideAction
  */

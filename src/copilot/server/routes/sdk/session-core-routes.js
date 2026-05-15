@@ -7,13 +7,6 @@
  * aplicadas apenas em `ask_user(kind=question)` via `answerPendingQuestion`.
  */
 
-import {
-    abortSession,
-    getSessionMessages,
-    sendSession,
-    sendSessionAndWait,
-    setSessionModel,
-} from '#copilot/sdk/session';
 import { createEventFilter, createSseWriter } from '../../../infra/sse/utils.js';
 import { resolveSdkRouteSharedDeps } from './deps.js';
 import { validateBody, validateModel, withErrorHandler } from './session-middleware.js';
@@ -86,7 +79,7 @@ export function registerSessionCoreRoutes(router) {
             if (waitForResponse) {
                 const event =
                     timeoutDecision.timeoutMs !== null
-                        ? await sendSessionAndWait(
+                        ? await routeDeps.sdkSessionRuntime.sendSessionAndWait(
                               entry.session,
                               /** @type {never} */ (messageOptions),
                               timeoutDecision.timeoutMs,
@@ -117,7 +110,10 @@ export function registerSessionCoreRoutes(router) {
                     ),
                 );
             } else {
-                const messageId = await sendSession(entry.session, /** @type {never} */ (messageOptions));
+                const messageId = await routeDeps.sdkSessionRuntime.sendSession(
+                    entry.session,
+                    /** @type {never} */ (messageOptions),
+                );
                 res.json(withSessionRuntimeMeta(routeDeps, { ok: true, sessionId: id, messageId, enqueued: true }, id));
             }
         });
@@ -172,7 +168,7 @@ export function registerSessionCoreRoutes(router) {
             const safeModel = modelValidation.model;
             const entry = getActiveSessionEntryOrReply(routeDeps, id, res);
             if (!entry) return;
-            const verification = await setSessionModel(
+            const verification = await routeDeps.sdkSessionRuntime.setSessionModel(
                 entry.session,
                 safeModel,
                 routeDeps.sdkSession.pickDefined({ reasoningEffort }),
@@ -242,7 +238,7 @@ export function registerSessionCoreRoutes(router) {
             const { id } = req.params;
             const entry = getActiveSessionEntryOrReply(routeDeps, id, res);
             if (!entry) return;
-            await abortSession(entry.session);
+            await routeDeps.sdkSessionRuntime.abortSession(entry.session);
             routeDeps.sdkObservability.log('INFO', `[sdk-api] abort solicitado: sessão ${id}`);
             res.json(
                 withSessionRuntimeMeta(routeDeps, { ok: true, sessionId: id, message: 'Processamento abortado.' }, id),
@@ -256,7 +252,7 @@ export function registerSessionCoreRoutes(router) {
             const { id } = req.params;
             const entry = getActiveSessionEntryOrReply(routeDeps, id, res);
             if (!entry) return;
-            const messages = await getSessionMessages(entry.session);
+            const messages = await routeDeps.sdkSessionRuntime.getSessionMessages(entry.session);
             res.json(
                 withSessionRuntimeMeta(routeDeps, { ok: true, sessionId: id, count: messages.length, messages }, id),
             );

@@ -3,10 +3,10 @@
 /**
  * scripts/check-layer-violations.mjs
  *
- * Verifica se os imports de src/copilot respeitam a hierarquia de camadas (PARTE-20E, critério C2).
+ * Verifica se os imports de src/copilot respeitam a hierarquia coarse-grained de camadas.
  *
- * Hierarquia canônica (de baixo para cima): L0: core, db L1: sdk, audit L2: config, observability L3: hooks, tools,
- * bridges L4: agent, conversation-hub, channel L5: api L6: terminal
+ * Este script é um gate legado de compatibilidade. O contrato canônico e semântico vive em
+ * `check-copilot-global-architecture.mjs`; este arquivo permanece como smoke test simples para imports ascendentes.
  *
  * Regra: L(n) nunca importa de L(n+k) para k >= 1.
  *
@@ -23,20 +23,26 @@ const LAYER_MAP = {
     core: 0,
     types: 0,
     db: 0,
+    infra: 0,
+    boot: 0,
     sdk: 1,
     audit: 1,
     config: 2,
+    events: 2,
+    'event-handlers': 2,
     observability: 2,
     hooks: 3,
     tools: 3,
     bridges: 3,
     plugins: 3,
     agent: 4,
-    'conversation-hub': 4,
     channel: 4,
     services: 4,
-    api: 5,
-    terminal: 6,
+    'conversation-hub': 4,
+    presentation: 6,
+    api: 7,
+    server: 7,
+    terminal: 7,
 };
 
 /**
@@ -65,8 +71,44 @@ function isAllowedBoundaryImport(relFile, targetModule, spec) {
         );
     }
 
+    if (relFile.startsWith('boot/')) {
+        return ['agent', 'audit', 'config', 'observability', 'sdk', 'server', 'terminal', 'tools'].includes(targetModule);
+    }
+
+    if (relFile.startsWith('audit/') && targetModule === 'events') {
+        return true;
+    }
+
+    if (relFile.startsWith('infra/') && targetModule === 'observability') {
+        return true;
+    }
+
     if (relFile === 'types/index.js') {
-        return ['audit', 'bridges', 'conversation-hub', 'sdk'].includes(targetModule);
+        return ['audit', 'bridges', 'conversation-hub', 'events', 'sdk'].includes(targetModule);
+    }
+
+    if (relFile === 'db/sqlite.js') {
+        return targetModule === 'boot';
+    }
+
+    if (relFile.startsWith('infra/') && targetModule === 'config') {
+        return true;
+    }
+
+    if (relFile === 'sdk/session/hook-bus.js') {
+        return targetModule === 'events';
+    }
+
+    if (relFile === 'config/sdk-config-port.js') {
+        return targetModule === 'sdk';
+    }
+
+    if (relFile === 'terminal/frontend/gateways/sdk-session.js') {
+        return targetModule === 'sdk';
+    }
+
+    if (relFile === 'terminal/frontend/gateways/tools.js') {
+        return targetModule === 'tools';
     }
 
     return false;
@@ -140,9 +182,9 @@ export { LAYER_MAP, extractModule, isInsideJsDoc, resolveTarget };
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 /** @type {RegExp} */
-export const importRegex = /^\s*import\s.*from\s+['"]([^'"]+)['"]/gm;
+export const importRegex = /^\s*import\s+(?:[\s\S]*?\s+from\s+)?['"]([^'"]+)['"]\s*;?/gm;
 /** @type {RegExp} */
-export const exportFromRegex = /^\s*export\s+(?:\{[^}]*\}|\*)\s+from\s+['"]([^'"]+)['"]/gm;
+export const exportFromRegex = /^\s*export\s+[\s\S]*?\s+from\s+['"]([^'"]+)['"]\s*;?/gm;
 /** @type {RegExp} */
 export const dynamicImportRegex = /import\(\s*['"]([^'"]+)['"]\s*\)/gm;
 

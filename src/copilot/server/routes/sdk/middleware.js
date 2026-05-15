@@ -10,9 +10,8 @@
 
 import { CopilotError, toError } from '#copilot/core';
 import { log } from '#copilot/observability';
-import { buildMissingRuntimeRouteMeta } from '../../../presentation/routing/index.js';
-import { resolveRequestedRuntimeId } from '../../../presentation/routing/index.js';
 import { sanitizeHttpErrorMessage } from '../../middleware/error-handler.js';
+import { buildSdkMissingRuntimeRouteMeta, resolveSdkRequestedRuntimeId } from './deps.js';
 
 /**
  * F245.3: Mapa de CopilotError subclasses → HTTP status codes.
@@ -74,7 +73,7 @@ export function buildSdkRuntimeErrorMeta(req, err) {
     if (resolveErrorCode(err) !== 'AGENT_RUNTIME_NOT_FOUND') {
         return {};
     }
-    return buildMissingRuntimeRouteMeta(resolveRequestedRuntimeId(req));
+    return buildSdkMissingRuntimeRouteMeta(resolveSdkRequestedRuntimeId(req));
 }
 
 /**

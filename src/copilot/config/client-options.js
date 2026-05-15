@@ -7,4 +7,4 @@
  * @module copilot/config/client-options
  */
 
-export { ClientOptionsBuilder, buildCopilotClientOptionsFromEnv } from '#copilot/sdk/session';
+export { ClientOptionsBuilder, buildCopilotClientOptionsFromEnv } from './sdk-config-port.js';
