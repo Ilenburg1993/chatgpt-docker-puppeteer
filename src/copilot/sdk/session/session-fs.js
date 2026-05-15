@@ -19,9 +19,9 @@ import {
     moveFileLocked,
     readText,
     removePathLocked,
+    scanDirectory,
     statPath,
-} from '#copilot/infra/io-engine';
-import { scanDirectory } from '#copilot/infra/io-scanner';
+} from '#copilot/infra/public/io';
 import { classifySdkError } from '../errors.js';
 import { log } from '../logger.js';
 import { emitSdkOperationMetric } from '../telemetry/operation-metrics.js';

@@ -284,6 +284,15 @@
 - `lint -- src/copilot` ✅
 - `test:copilot:unit` ✅ (2723/2723)
 
+### 76) `src/copilot/sdk/session/session-fs.js`
+- Migração de boundary: remoção de imports diretos `#copilot/infra/io-engine` + `#copilot/infra/io-scanner`.
+- Adoção de `#copilot/infra/public/io` para operações de FS/scope, alinhando barrel-first fora de `infra/`.
+
+### 77) Gate oficial pós-migração de boundary SDK→infra/public
+- `typecheck:strict:src.copilot` ✅
+- `lint -- src/copilot` ✅
+- `test:copilot:unit` ✅ (2723/2723)
+
 ---
 
 ## Itens da Sprint 1 ainda pendentes

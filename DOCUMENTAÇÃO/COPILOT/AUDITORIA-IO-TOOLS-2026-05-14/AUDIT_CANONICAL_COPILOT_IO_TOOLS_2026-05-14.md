@@ -133,3 +133,4 @@ Classificadas como **direção válida** para roadmap evolutivo. Priorização r
 - Nova extração da F1.2 aplicada: bloco de leitura/metadata (`readBytes/readText/readLines/readTextChunks/statPath`) movido para `infra/io/fs/read-services.js`, com `io-engine` mantendo API estável por delegação.
 - Hardening de consistência aplicado: validação de path (`assertValidIoFilePath`) centralizada em `infra/policy/path-resource.js` e adotada nos módulos de facade/leitura/escrita/mutação.
 - Redução adicional da facade aplicada: `io-engine.diffText` passou para alias direto de `infra/io/patch/text-diff-service`, removendo wrapper residual no engine.
+- Boundary barrel-first ampliado: `sdk/session/session-fs.js` migrou imports diretos de `io-engine`/`io-scanner` para `#copilot/infra/public/io`.

@@ -109,6 +109,11 @@ Status em 2026-05-14: facades públicas criadas, tools migradas para `#copilot/i
 baixos `shared/`, `policy/`, `scan/`, `parse/`, `storage/`, `queue/`, `locks/`, `runtime`, `io/fs/`,
 `io/search`, `io/invalidation` e `cache/l1` iniciados.
 
+Status complementar (2026-05-15, continuidade):
+
+- `sdk/session/session-fs.js` deixou de importar `#copilot/infra/io-engine` e `#copilot/infra/io-scanner`
+  diretamente, passando a consumir `#copilot/infra/public/io` conforme boundary barrel-first.
+
 ### F1.1 — Facades públicas
 
 - Criar `infra/public/io.js`, `indexing.js`, `session.js`, `health.js`.
