@@ -608,4 +608,70 @@ export default tseslint.config(
             ],
         },
     },
+
+    // ── Node 24+ ESM / aliases — enforcement executável ─────────────────────
+    {
+        files: ['src/copilot/**/*.js'],
+        rules: {
+            'no-restricted-syntax': [
+                'error',
+                {
+                    selector:
+                        'ImportDeclaration[source.value=/^(?:assert|buffer|child_process|crypto|dgram|diagnostics_channel|dns|events|fs|http|http2|https|module|net|os|path|perf_hooks|process|readline|stream|string_decoder|timers|tls|url|util|worker_threads|zlib)(?:\\/|$)/]',
+                    message:
+                        'Node 24+ ESM: importe built-ins com prefixo "node:" (ex.: "node:fs/promises"). ' +
+                        'Isso evita ambiguidade com pacotes npm e mantém compatibilidade com resolução NodeNext.',
+                },
+                {
+                    selector:
+                        'ExportNamedDeclaration[source.value=/^(?:assert|buffer|child_process|crypto|dgram|diagnostics_channel|dns|events|fs|http|http2|https|module|net|os|path|perf_hooks|process|readline|stream|string_decoder|timers|tls|url|util|worker_threads|zlib)(?:\\/|$)/]',
+                    message:
+                        'Node 24+ ESM: reexporte built-ins usando "node:" (ex.: "node:stream").',
+                },
+                {
+                    selector:
+                        'ExportAllDeclaration[source.value=/^(?:assert|buffer|child_process|crypto|dgram|diagnostics_channel|dns|events|fs|http|http2|https|module|net|os|path|perf_hooks|process|readline|stream|string_decoder|timers|tls|url|util|worker_threads|zlib)(?:\\/|$)/]',
+                    message:
+                        'Node 24+ ESM: reexporte built-ins usando "node:" (ex.: "node:stream").',
+                },
+                {
+                    selector:
+                        'ImportExpression[source.value=/^(?:assert|buffer|child_process|crypto|dgram|diagnostics_channel|dns|events|fs|http|http2|https|module|net|os|path|perf_hooks|process|readline|stream|string_decoder|timers|tls|url|util|worker_threads|zlib)(?:\\/|$)/]',
+                    message:
+                        'Node 24+ ESM: dynamic import de built-ins também deve usar "node:" (ex.: import("node:fs/promises")).',
+                },
+            ],
+        },
+    },
+
+    // ── Tools → IO/infra — somente facades públicas e sem bypass de escrita/leitura ──
+    {
+        files: ['src/copilot/tools/**/*.js'],
+        ignores: ['src/copilot/tools/todo/store.js'],
+        rules: {
+            'no-restricted-syntax': [
+                'error',
+                {
+                    selector: 'ImportDeclaration[source.value=/^#copilot\\/infra\\/(?!public\\/)/]',
+                    message:
+                        'Boundary tools→infra: tools só podem consumir "#copilot/infra/public/*". ' +
+                        'Crie/expanda uma facade pública em infra/public quando a capacidade ainda não existir.',
+                },
+                {
+                    selector:
+                        'ImportDeclaration[source.value="node:fs/promises"] ImportSpecifier[imported.name=/^(readFile|writeFile|appendFile|copyFile|cp|rename|rm|unlink|mkdir|open)$/]',
+                    message:
+                        'IO governance: tools não devem chamar fs/promises para leitura/escrita/mutação. ' +
+                        'Use "#copilot/infra/public/io" para cache, locks, policy, metadata e invalidação coordenada.',
+                },
+                {
+                    selector:
+                        'ImportDeclaration[source.value="node:fs"] ImportSpecifier[imported.name=/^(readFile|readFileSync|writeFile|writeFileSync|appendFile|appendFileSync|copyFile|copyFileSync|cp|rename|rm|unlink|mkdir|open)$/]',
+                    message:
+                        'IO governance: tools não devem chamar node:fs diretamente para leitura/escrita/mutação. ' +
+                        'Use "#copilot/infra/public/io" ou uma facade pública específica.',
+                },
+            ],
+        },
+    },
 );
