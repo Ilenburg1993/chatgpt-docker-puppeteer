@@ -10,7 +10,14 @@
 
 import { WORKSPACE_ROOT as BOOT_WORKSPACE_ROOT } from '#copilot/boot';
 import { DEFAULT_BLOCKED_READ_PATH_PATTERNS, evaluateIoPathPolicyAsync } from '#copilot/core';
-import { bufferIsAscii, bufferIsUtf8, truncateBufferView } from '#copilot/infra/public/buffer';
+import {
+    bufferIsAscii,
+    bufferIsUtf8,
+    concatBufferViews,
+    toOwnedBuffer,
+    truncateBufferView,
+    utf8ByteLength,
+} from '#copilot/infra/public/buffer';
 import { hasNullByte, normalizeWorkspaceRoot } from '#copilot/infra/public/policy';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
@@ -182,7 +189,7 @@ export function concatChunks(chunks) {
     if (chunks.length === 0) return Buffer.alloc(0);
     if (chunks.length === 1) return chunks[0] ?? Buffer.alloc(0);
     const totalLength = chunks.reduce((sum, c) => sum + c.length, 0);
-    return Buffer.concat(chunks, totalLength);
+    return concatBufferViews(chunks, totalLength);
 }
 
 /**
@@ -207,7 +214,7 @@ export function truncateBuffer(buf, maxBytes) {
  */
 export function truncateUtf8Text(text, maxBytes, notice) {
     const normalized = String(text ?? '');
-    const originalBytes = Buffer.byteLength(normalized, 'utf8');
+    const originalBytes = utf8ByteLength(normalized, 'file tools text');
     if (!Number.isFinite(maxBytes) || maxBytes <= 0 || originalBytes <= maxBytes) {
         return {
             text: normalized,
@@ -217,7 +224,7 @@ export function truncateUtf8Text(text, maxBytes, notice) {
         };
     }
 
-    const bytes = Buffer.from(normalized, 'utf8').subarray(0, maxBytes);
+    const bytes = toOwnedBuffer(normalized).subarray(0, maxBytes);
     const safe = new TextDecoder('utf-8', { fatal: false }).decode(bytes).replace(/\uFFFD+$/, '');
     const suffix = notice && notice.trim() ? notice : '\n\n⚠️ [output truncated by file-tools policy]';
     return {

@@ -17,6 +17,7 @@ import { scanDirectory } from './io-scanner.js';
 import { readBytesFileSnapshot } from './io/fs/read-bytes.js';
 import { readTextFileSnapshot } from './io/fs/read-text.js';
 import { matchesAnyPattern } from './scan/glob.js';
+import { toOwnedBuffer, utf8ByteLength } from './shared/buffer.js';
 import { sha256 } from './shared/hash.js';
 
 /**
@@ -62,7 +63,7 @@ const _scopes = new Map();
 function primeIoL1Entry(key, content, meta) {
     const cache = getIoL1Cache();
     const now = Date.now();
-    const bytes = typeof content === 'string' ? Buffer.byteLength(content, 'utf8') : content.byteLength;
+    const bytes = typeof content === 'string' ? utf8ByteLength(content, 'prefetch content') : content.byteLength;
     cache.set(key, {
         content,
         bytes,
@@ -362,7 +363,7 @@ export async function warmReadThroughContext(filePath, opts = {}) {
             mtimeMs: text.mtimeMs,
             contentHash: textHash,
         });
-        primeIoL1Entry(makeBytesKey(normalized), Buffer.from(text.content, 'utf8'), {
+        primeIoL1Entry(makeBytesKey(normalized), toOwnedBuffer(text.content), {
             sizeBytes: text.sizeBytes,
             mtimeMs: text.mtimeMs,
             contentHash: textHash,

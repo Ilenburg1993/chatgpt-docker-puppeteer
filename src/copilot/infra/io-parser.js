@@ -37,6 +37,7 @@ import {
     extractMarkdownOutlineWithLines,
     extractTopComments,
 } from './parse/index.js';
+import { utf8ByteLength } from './shared/buffer.js';
 
 export { buildOutline, extractJsonSchema, extractMarkdownOutline, extractTopComments };
 
@@ -348,7 +349,7 @@ function _extractDeclSymbols(decl, exported, parentNode) {
 export async function parseFileSymbols(filePath, content) {
     const ext = nodePath.extname(filePath).toLowerCase();
     const lang = classifyExtension(ext);
-    const bytes = Buffer.byteLength(content, 'utf8');
+    const bytes = utf8ByteLength(content, 'parser content');
     const lines = content.split('\n').length;
     const truncated = bytes > MAX_PARSE_BYTES;
 

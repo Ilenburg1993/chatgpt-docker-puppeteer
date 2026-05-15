@@ -8,9 +8,8 @@
  * @module copilot/infra/io/search/subprocess
  */
 
-import { Buffer } from 'node:buffer';
 import { spawn } from 'node:child_process';
-import { toBufferView } from '../../shared/buffer.js';
+import { concatBufferViews, toBufferView, toOwnedBuffer } from '../../shared/buffer.js';
 
 const DEFAULT_SEARCH_SUBPROCESS_MAX_BUFFER_BYTES = 1024 * 1024;
 
@@ -167,8 +166,8 @@ export async function execSearchFile(file, args, options = {}) {
         };
         const child = spawn(executable, normalizedArgs, /** @type {import('node:child_process').SpawnOptions} */ (spawnOptions));
 
-        const decodeStdout = () => Buffer.concat(stdoutChunks, stdoutBytes).toString('utf8');
-        const decodeStderr = () => Buffer.concat(stderrChunks, stderrBytes).toString('utf8');
+        const decodeStdout = () => concatBufferViews(stdoutChunks, stdoutBytes).toString('utf8');
+        const decodeStderr = () => concatBufferViews(stderrChunks, stderrBytes).toString('utf8');
 
         /** @returns {void} */
         const cleanup = () => {
@@ -214,7 +213,7 @@ export async function execSearchFile(file, args, options = {}) {
             if (settled) return;
             const buffer =
                 typeof chunk === 'string'
-                    ? Buffer.from(chunk, 'utf8')
+                    ? toOwnedBuffer(chunk)
                     : toBufferView(
                           /** @type {Buffer | Uint8Array | ArrayBuffer | SharedArrayBuffer | DataView} */ (chunk),
                       );

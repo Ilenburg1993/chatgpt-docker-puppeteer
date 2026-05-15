@@ -8,7 +8,7 @@
 import { createReadStream } from 'node:fs';
 import { addAbortSignal } from 'node:stream';
 import { StringDecoder } from 'node:string_decoder';
-import { toBufferView } from '../../shared/buffer.js';
+import { toBufferView, utf8ByteLength } from '../../shared/buffer.js';
 
 /**
  * @typedef {{ index: number; startLine: number; endLine: number; content: string; bytes: number }} TextLineChunk
@@ -90,7 +90,7 @@ export async function readTextLineChunks(filePath, options = {}) {
                 startLine: currentStartLine,
                 endLine: totalLines,
                 content,
-                bytes: Buffer.byteLength(content, 'utf8'),
+                bytes: utf8ByteLength(content, 'read chunk'),
             });
             current = [];
         }
@@ -144,7 +144,7 @@ export async function readTextLineChunks(filePath, options = {}) {
             startLine: currentStartLine,
             endLine: currentStartLine + current.length - 1,
             content,
-            bytes: Buffer.byteLength(content, 'utf8'),
+            bytes: utf8ByteLength(content, 'read chunk'),
         });
     }
 

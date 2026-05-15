@@ -215,6 +215,9 @@ Status complementar:
 - `infra/shared/buffer.js` centraliza conversões seguras de `Buffer`/`ArrayBuffer`/`TypedArray`/`DataView`, valida
   limites `Buffer.constants.*`, expõe `isUtf8/isAscii` modernos e valida base64/base64url para tools via
   `infra/public/buffer.js`.
+- Consumidores centrais de IO/read/search/patch/prefetch/index/cache/tools passaram a usar helpers canônicos de
+  `utf8ByteLength`, `toOwnedBuffer`, `concatBufferViews`, `isBufferValue` e validação UTF-8, reduzindo medições e cópias
+  ad hoc com `Buffer.*`.
 - `write_file_content` passou a rejeitar base64 malformado antes de mutar o filesystem, com `toolFeedback` acionável.
 - `io/search/subprocess.js` passou a concentrar execução de `rg`/`grep` e cache de disponibilidade de `rg`, removendo
   `child_process` direto da `io-engine` e preparando parsing incremental/telemetria de subprocessos em um único ponto.

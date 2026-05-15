@@ -14,6 +14,7 @@ import { withIoResourceLock, withIoResourceLocks } from '../../io-locks.js';
 import { nowIoMs, publishIoOperation } from '../../io-observability.js';
 import { assertValidIoFilePath } from '../../policy/path-resource.js';
 import { assertExpectedSha256 } from '../../policy/preconditions.js';
+import { toOwnedBuffer, utf8ByteLength } from '../../shared/buffer.js';
 import { sha256 } from '../../shared/hash.js';
 import { invalidateIoCacheTiers, invalidateIoCacheTierSubtrees } from '../invalidation/cache-tiers.js';
 import { buildSimpleTextDiff, computeTextPatch } from '../patch/index.js';
@@ -60,14 +61,14 @@ function windowTextPreview(text, options = {}) {
     const lines = text.split('\n');
     let truncated = lines.length > maxLines;
     let preview = lines.slice(0, maxLines).join('\n');
-    let bytes = Buffer.byteLength(preview, 'utf8');
+    let bytes = utf8ByteLength(preview, 'diff preview');
     if (bytes > maxBytes) {
         let end = preview.length;
-        while (end > 0 && Buffer.byteLength(preview.slice(0, end), 'utf8') > maxBytes) {
+        while (end > 0 && utf8ByteLength(preview.slice(0, end), 'diff preview') > maxBytes) {
             end = Math.max(0, end - 512);
         }
         preview = preview.slice(0, end);
-        bytes = Buffer.byteLength(preview, 'utf8');
+        bytes = utf8ByteLength(preview, 'diff preview');
         truncated = true;
     }
     return { text: preview, truncated, lines: Math.min(lines.length, maxLines), bytes };
@@ -476,7 +477,7 @@ export async function patchTextLocked(filePath, options) {
             const patch = computeTextPatch(content, options);
             const { updated, replacedOccurrences, bytesWritten } = patch;
             const contentHash = sha256(updated);
-            const previousSnapshot = buildRollbackSnapshot(Buffer.from(content, 'utf8'));
+            const previousSnapshot = buildRollbackSnapshot(toOwnedBuffer(content));
             const diff = buildSimpleTextDiff(content, updated, {
                 contextLines: options.diffContextLines ?? DEFAULT_PATCH_DIFF_CONTEXT_LINES,
             });

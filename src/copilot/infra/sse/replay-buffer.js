@@ -9,6 +9,7 @@
  */
 
 import { SSE_REPLAY_BUFFER_SIZE } from '#copilot/config';
+import { utf8ByteLength } from '../shared/buffer.js';
 
 /** Tamanho padrão do buffer circular (configurável via SSE_REPLAY_BUFFER_SIZE). */
 const DEFAULT_BUFFER_SIZE = SSE_REPLAY_BUFFER_SIZE;
@@ -53,12 +54,13 @@ export class SseReplayBuffer {
             if (serialized === undefined) {
                 return { _serialized: false, _type: typeof data };
             }
-            if (Buffer.byteLength(serialized, 'utf8') <= this.#maxPayloadBytes) {
+            const serializedBytes = utf8ByteLength(serialized, 'sse replay payload');
+            if (serializedBytes <= this.#maxPayloadBytes) {
                 return data;
             }
             return {
                 _truncated: true,
-                _originalSizeBytes: Buffer.byteLength(serialized, 'utf8'),
+                _originalSizeBytes: serializedBytes,
                 _maxPayloadBytes: this.#maxPayloadBytes,
             };
         } catch {

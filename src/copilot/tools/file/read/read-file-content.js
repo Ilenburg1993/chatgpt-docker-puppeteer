@@ -9,6 +9,7 @@
 
 import { stat as fsStat } from 'node:fs/promises';
 import { z } from 'zod';
+import { utf8ByteLength } from '#copilot/infra/public/buffer';
 import { toError } from '../../../core/error-handlers.js';
 import { withIoMeta } from '../../../core/io-contracts.js';
 import { sanitizeIoTextOutput } from '../../../core/io-policy.js';
@@ -179,7 +180,7 @@ export const readFileContentTool = buildTool({
                     );
                 }
                 const content = limitedBuffer.toString('base64');
-                const bytesReturned = Buffer.byteLength(content, 'utf8');
+                const bytesReturned = utf8ByteLength(content, 'read_file_content bytes');
                 const metadata = buildReadFileMetadata(stats, {
                     resolved,
                     encoding: 'base64',
@@ -289,8 +290,8 @@ export const readFileContentTool = buildTool({
                 nextCursor,
                 maxBytes: outputMaxBytes,
                 bytesRead: text.bytesRead,
-                bytesReturned: Buffer.byteLength(contentOutput.text, 'utf8'),
-                rawReturnedBytes: Buffer.byteLength(sanitized.text, 'utf8'),
+                bytesReturned: utf8ByteLength(contentOutput.text, 'read_file_content returned bytes'),
+                rawReturnedBytes: utf8ByteLength(sanitized.text, 'read_file_content raw bytes'),
                 totalLines: text.totalLines,
                 totalLinesKnown,
                 returnedLines,

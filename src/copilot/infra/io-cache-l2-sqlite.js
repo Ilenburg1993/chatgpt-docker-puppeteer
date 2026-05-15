@@ -2,6 +2,7 @@
 
 import path from 'node:path';
 import { readEnvPositiveInt } from './shared/env.js';
+import { isBufferValue, toOwnedBuffer } from './shared/buffer.js';
 
 /**
  * @typedef {'bytes' | 'text' | 'json'} IoL2Kind
@@ -172,13 +173,13 @@ export function createIoL2SqliteCache(options) {
 
     /** @type {(value: unknown) => Buffer} */
     const toBuffer = (value) => {
-        if (Buffer.isBuffer(value)) {
+        if (isBufferValue(value)) {
             return value;
         }
         if (typeof value === 'string') {
-            return Buffer.from(value, 'utf8');
+            return toOwnedBuffer(value);
         }
-        return Buffer.from(JSON.stringify(value ?? null), 'utf8');
+        return toOwnedBuffer(JSON.stringify(value ?? null));
     };
 
     function capSizeIfNeeded() {
@@ -211,9 +212,13 @@ export function createIoL2SqliteCache(options) {
                 }
                 stmtTouch.run(nowMs, key);
                 stats.hits += 1;
+                const payload = /** @type {unknown} */ (row.payload);
                 return {
                     ...row,
-                    payload: Buffer.isBuffer(row.payload) ? row.payload : Buffer.from(row.payload || []),
+                    payload:
+                        isBufferValue(payload) || payload instanceof Uint8Array
+                            ? toOwnedBuffer(payload)
+                            : toOwnedBuffer(new Uint8Array()),
                 };
             } catch {
                 stats.errors += 1;

@@ -8,8 +8,8 @@
  * @module copilot/infra/io/fs/read-text
  */
 
-import { isUtf8 } from 'node:buffer';
 import * as fs from 'node:fs/promises';
+import { decodeUtf8Buffer } from '../../shared/buffer.js';
 
 /**
  * @typedef {object} TextFileSnapshot
@@ -29,14 +29,10 @@ import * as fs from 'node:fs/promises';
  */
 export async function readTextFileSnapshot(filePath) {
     const [content, stats] = await Promise.all([fs.readFile(filePath), fs.stat(filePath)]);
-    if (!isUtf8(content)) {
-        const error = new Error('Arquivo binário detectado (bytes inválidos para UTF-8).');
-        error.name = 'BinaryFileError';
-        throw error;
-    }
+    const text = decodeUtf8Buffer(content);
     return {
         path: filePath,
-        content: content.toString('utf8'),
+        content: text,
         bytesRead: content.byteLength,
         sizeBytes: stats.size,
         mtimeMs: stats.mtimeMs,

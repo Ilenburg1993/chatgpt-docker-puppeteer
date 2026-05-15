@@ -5,6 +5,8 @@
  * @module copilot/infra/io/patch/text-patch
  */
 
+import { utf8ByteLength } from '../../shared/buffer.js';
+
 /**
  * @typedef {{
  *     code?: string;
@@ -174,8 +176,8 @@ export function computeTextPatch(content, options) {
     const updated = options.replaceAll
         ? content.split(options.oldString).join(options.newString)
         : replaceOccurrenceAt(content, options.oldString, options.newString, occurrenceIndex ?? 1);
-    const previousBytes = Buffer.byteLength(content, 'utf8');
-    const bytesWritten = Buffer.byteLength(updated, 'utf8');
+    const previousBytes = utf8ByteLength(content, 'patch previous content');
+    const bytesWritten = utf8ByteLength(updated, 'patch updated content');
     return {
         updated,
         occurrences,
@@ -183,8 +185,8 @@ export function computeTextPatch(content, options) {
         bytesWritten,
         previousBytes,
         byteDelta: bytesWritten - previousBytes,
-        oldStringBytes: Buffer.byteLength(options.oldString, 'utf8'),
-        newStringBytes: Buffer.byteLength(options.newString, 'utf8'),
+        oldStringBytes: utf8ByteLength(options.oldString, 'patch old_string'),
+        newStringBytes: utf8ByteLength(options.newString, 'patch new_string'),
         firstMatchLine: lineNumberAt(content, offsets[0] ?? 0),
         lastMatchLine: lineNumberAt(content, offsets[offsets.length - 1] ?? 0),
         lineDelta: countLines(updated) - countLines(content),

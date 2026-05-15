@@ -13,6 +13,7 @@ import { findIoIndexSymbol, getIoIndexStats, searchIoIndex } from '../../io-inde
 import { nowIoMs, publishIoOperation } from '../../io-observability.js';
 import { resolveIoSearchBudget } from '../../policy/budgets.js';
 import { hasNullByte } from '../../policy/path-resource.js';
+import { utf8ByteLength } from '../../shared/buffer.js';
 import { buildGrepArgs } from './grep-adapter.js';
 import { canUseIndexSearch, formatIndexSearchRows } from './index-search.js';
 import { normalizeSearchWindow, paginateSearchItems, paginateSearchText } from './result-paginator.js';
@@ -184,7 +185,7 @@ export async function searchText(targetPath, options) {
                 const windowed = paginateSearchItems(indexRows, searchWindow);
                 const filteredOutput = sanitizeSearchOutput(formatIndexSearchRows(windowed.items));
                 const io = publishAndReturn(
-                    buildSearchIo('io-engine.index.search', Buffer.byteLength(filteredOutput.text, 'utf8'), {
+                    buildSearchIo('io-engine.index.search', utf8ByteLength(filteredOutput.text, 'search output'), {
                         redactions: filteredOutput.redactions,
                         fallback: 'rg-on-index-miss-or-complex-query',
                         truncated: windowed.truncated,
@@ -241,7 +242,7 @@ export async function searchText(targetPath, options) {
                 const windowedOutput = paginateSearchText(stdout, searchWindow);
                 const filteredOutput = sanitizeSearchOutput(windowedOutput.text);
                 const io = publishAndReturn(
-                    buildSearchIo('io-engine.rg.search', Buffer.byteLength(filteredOutput.text, 'utf8'), {
+                    buildSearchIo('io-engine.rg.search', utf8ByteLength(filteredOutput.text, 'search output'), {
                         redactions: filteredOutput.redactions,
                         truncated: windowedOutput.truncated,
                         originalLineCount: windowedOutput.originalLineCount,
@@ -300,7 +301,7 @@ export async function searchText(targetPath, options) {
             const windowedOutput = paginateSearchText(stdout, searchWindow);
             const filteredOutput = sanitizeSearchOutput(windowedOutput.text);
             const io = publishAndReturn(
-                buildSearchIo('io-engine.grep.search', Buffer.byteLength(filteredOutput.text, 'utf8'), {
+                buildSearchIo('io-engine.grep.search', utf8ByteLength(filteredOutput.text, 'search output'), {
                     redactions: filteredOutput.redactions,
                     truncated: windowedOutput.truncated,
                     originalLineCount: windowedOutput.originalLineCount,
@@ -450,7 +451,7 @@ export async function searchWorkspaceSymbols(targetPath, options) {
                 const windowed = paginateSearchItems(rows, searchWindow);
                 const sanitized = sanitizeIoTextOutput({ text: formatIndexSymbolRows(windowed.items) });
                 const io = publishAndReturn(
-                    buildSymbolIo('io-engine.index.symbol-search', Buffer.byteLength(sanitized.text, 'utf8'), {
+                    buildSymbolIo('io-engine.index.symbol-search', utf8ByteLength(sanitized.text, 'symbol output'), {
                         redactions: sanitized.redactions,
                         truncated: windowed.truncated,
                         originalResultCount: windowed.totalItems,
@@ -519,7 +520,7 @@ export async function searchWorkspaceSymbols(targetPath, options) {
         const output = sanitized.text;
         const lines = output.split('\n').filter(Boolean);
         const io = publishAndReturn(
-            buildSymbolIo('io-engine.rg.symbol-search', Buffer.byteLength(output, 'utf8'), {
+            buildSymbolIo('io-engine.rg.symbol-search', utf8ByteLength(output, 'symbol output'), {
                 redactions: sanitized.redactions,
                 truncated: windowedOutput.truncated,
                 originalLineCount: windowedOutput.originalLineCount,

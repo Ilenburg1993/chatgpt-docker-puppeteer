@@ -5,12 +5,12 @@
  * @module copilot/infra/io/fs/read-services
  */
 
-import { isUtf8 } from 'node:buffer';
 import { buildIoMeta, createIoTraceId } from '../../../core/io-contracts.js';
 import { getIoL2Cache } from '../../io-cache-l2-registry.js';
 import { getIoL1Cache, getVerifiedIoL1Entry, makeBytesKey, makeTextKey, normalizeIoCacheKey } from '../../io-cache.js';
 import { nowIoMs, publishIoOperation } from '../../io-observability.js';
 import { assertValidIoFilePath } from '../../policy/path-resource.js';
+import { bufferIsUtf8, isBufferValue, toOwnedBuffer } from '../../shared/buffer.js';
 import { sha256 } from '../../shared/hash.js';
 import { readBytesFileSnapshot } from './read-bytes.js';
 import { readTextLineChunks } from './read-chunks.js';
@@ -84,7 +84,7 @@ export async function readBytes(filePath, options = {}) {
         const _cached = await getVerifiedIoL1Entry(_cacheKey, filePath);
         if (_cached) {
             const content = /** @type {Buffer} */ (
-                Buffer.isBuffer(_cached.content) ? _cached.content : Buffer.from(String(_cached.content))
+                isBufferValue(_cached.content) ? _cached.content : toOwnedBuffer(String(_cached.content))
             );
             const contentHash = _cached.contentHash ?? sha256(content);
             const io = publishAndReturn(
@@ -116,7 +116,7 @@ export async function readBytes(filePath, options = {}) {
         const l2Cache = getIoL2Cache();
         if (l2Cache) {
             const l2Entry = l2Cache.get(_cacheKey);
-            if (l2Entry?.kind === 'bytes' && Buffer.isBuffer(l2Entry.payload)) {
+            if (l2Entry?.kind === 'bytes' && isBufferValue(l2Entry.payload)) {
                 const l2Meta = parseCacheMetaJson(l2Entry.metaJson);
                 const contentHash = readCacheContentHash(l2Meta) ?? sha256(l2Entry.payload);
                 const metadata = await statPathSnapshot(filePath).catch(() => null);
@@ -327,7 +327,7 @@ export async function readText(filePath, options = {}) {
 
         if (l2Cache) {
             const l2Entry = l2Cache.get(_textKey);
-            if (l2Entry?.kind === 'text' && Buffer.isBuffer(l2Entry.payload)) {
+            if (l2Entry?.kind === 'text' && isBufferValue(l2Entry.payload)) {
                 const l2Meta = parseCacheMetaJson(l2Entry.metaJson);
                 const l2ContentHash = readCacheContentHash(l2Meta);
                 const metadata = await statPathSnapshot(filePath).catch(() => null);
@@ -422,7 +422,7 @@ export async function readText(filePath, options = {}) {
                 ...(options.endLine !== undefined ? { endLine: options.endLine } : {}),
             },
         };
-        if (!isUtf8(raw)) {
+        if (!bufferIsUtf8(raw)) {
             const error = new Error('Arquivo binário detectado (bytes inválidos para UTF-8).');
             publishAndReturn(buildIoMeta(baseMeta), false, error);
             failurePublished = true;

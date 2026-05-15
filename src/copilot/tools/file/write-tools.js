@@ -23,7 +23,7 @@ import {
     riskForOverwrite,
 } from '#copilot/infra/public/policy';
 import { createIoOperationEnvelope } from '#copilot/infra/public/runtime';
-import { decodeBase64ToOwnedBuffer, toOwnedBuffer } from '#copilot/infra/public/buffer';
+import { decodeBase64ToOwnedBuffer, toOwnedBuffer, utf8ByteLength } from '#copilot/infra/public/buffer';
 import { z } from 'zod';
 import { withIoMeta } from '../../core/io-contracts.js';
 import { log } from '../infra/logger.js';
@@ -210,7 +210,7 @@ const createFileTool = buildTool({
         });
 
         try {
-            const contentBytes = Buffer.byteLength(content ?? '', 'utf8');
+            const contentBytes = utf8ByteLength(content ?? '', 'write_file_content content');
             const writeResult = await createOrReplaceFileAtomic(resolved, content ?? '', {
                 encoding: 'utf8',
                 createParentDirs,

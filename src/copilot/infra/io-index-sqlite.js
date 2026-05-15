@@ -33,6 +33,7 @@ import { parseFileSymbols } from './io-parser.js';
 import { scanDirectory } from './io-scanner.js';
 import { readTextFileSnapshot } from './io/fs/read-text.js';
 import { fingerprintMatches } from './shared/fingerprint-match.js';
+import { utf8ByteLength } from './shared/buffer.js';
 
 /**
  * @typedef {'fresh' | 'stale' | 'failed' | 'skipped'} IoIndexFileStatus
@@ -97,7 +98,7 @@ export function createIoIndexSqlite(options) {
         try {
             const json = JSON.stringify(metadata ?? {});
             if (typeof json !== 'string') return JSON.stringify({ _error: 'non-serializable' });
-            if (Buffer.byteLength(json, 'utf8') <= maxBytes) return json;
+            if (utf8ByteLength(json, 'index metadata') <= maxBytes) return json;
             return JSON.stringify({ _truncated: true, _maxBytes: maxBytes });
         } catch {
             return JSON.stringify({ _error: 'non-serializable' });

@@ -132,7 +132,8 @@ export function decodeUtf8Buffer(value, message) {
  */
 export function toOwnedBuffer(value, encoding = 'utf8') {
     if (typeof value === 'string') {
-        const bytes = encoding === 'utf8' ? utf8ByteLength(value, 'string write payload') : Buffer.byteLength(value, encoding);
+        const bytes =
+            encoding === 'utf8' ? utf8ByteLength(value, 'string write payload') : Buffer.byteLength(value, encoding);
         assertStringByteLengthWithinNodeLimit(bytes, 'string write payload');
         assertBufferByteLengthWithinNodeLimit(bytes, 'buffer write payload');
         return Buffer.from(value, encoding);

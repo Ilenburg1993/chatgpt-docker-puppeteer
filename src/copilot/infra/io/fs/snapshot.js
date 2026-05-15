@@ -8,7 +8,7 @@
 import { createHash } from 'node:crypto';
 import { createReadStream } from 'node:fs';
 import { addAbortSignal } from 'node:stream';
-import { toBufferView } from '../../shared/buffer.js';
+import { concatBufferViews, toBufferView } from '../../shared/buffer.js';
 
 /**
  * @param {unknown} value
@@ -71,7 +71,7 @@ export async function readBinaryMutationSnapshot(filePath, options = {}) {
     return {
         contentHash: hash.digest('hex'),
         bytesRead,
-        snapshotBase64: snapshotTruncated ? null : Buffer.concat(snapshotChunks, snapshotBytes).toString('base64'),
+        snapshotBase64: snapshotTruncated ? null : concatBufferViews(snapshotChunks, snapshotBytes).toString('base64'),
         snapshotTruncated,
     };
 }
