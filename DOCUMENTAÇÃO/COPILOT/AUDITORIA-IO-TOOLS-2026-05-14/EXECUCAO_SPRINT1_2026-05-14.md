@@ -158,6 +158,121 @@
 ### 48) `tests/unit/copilot/infra/test_io_fs_read_chunks.spec.js`
 - Novo teste para garantir rejeição com `AbortError` quando `readTextLineChunks` é chamado com signal já abortado.
 
+### 49) `src/copilot/tools/file/shared.js`
+- Política de output das file-tools migrou de default ilimitado para defaults altos e finitos (com override por ENV).
+
+### 50) `src/copilot/tools/session/session-tools.js`
+- `get_workspace_info` deixou de usar `maxBuffer` de 1 GiB em chamadas git; agora usa orçamento finito + timeout.
+
+### 51) `src/copilot/tools/web/web-tools.js`
+- `web_search` passou a aplicar limite default finito e clamp defensivo de `maxResults`.
+
+### 52) `DOCUMENTAÇÃO/.../02-ROADMAP-FAIXAS-FASES.md`
+- Roadmap alinhado à situação ideal com matriz de coerência Atual ↔ Ideal e status operacional atualizado por faixa.
+
+### 53) `src/copilot/infra/io-prefetch.js`
+- Transformação ampla de modularização: remoção da dependência direta de leitura em `io-engine`.
+- Prefetch passou a usar `io/fs/read-bytes` e `io/fs/read-text` com priming explícito de L1 (`bytes` + `text` + hash/fingerprint).
+
+### 54) Gate oficial pós-transformação ampla
+- `typecheck:strict:src.copilot` ✅
+- `lint -- src/copilot` ✅
+- `test:copilot:unit` ✅ (2720/2720)
+
+### 55) `src/copilot/infra/io/patch/text-diff.js`
+- Refatorado `buildSimpleTextDiff` para consolidar hunks sobrepostos/adjacentes em uma única janela.
+- Elimina cabeçalhos duplicados e contexto repetido em mudanças próximas (regressão do BUG-MED-01).
+
+### 56) `tests/unit/copilot/infra/test_io_patch.spec.js`
+- Adicionados testes de regressão para merge de hunks e não-duplicação de linhas de contexto.
+
+### 57) `tests/unit/copilot/terminal/test_commands_index.spec.js`
+- Estabilizado teste de status do índice para evitar flakiness por contagem global variável (`files>=2`),
+  mantendo validação funcional do fluxo `/index build/status/search/symbol`.
+
+### 58) `src/copilot/tools/web/web-tools.js`
+- `web_fetch_local` agora faz cleanup robusto de stream com `reader.cancel()` (best-effort) antes de `releaseLock()`
+    em `finally`, alinhando com a política de streams/snapshots da situação ideal.
+
+### 59) Gate oficial pós-hardening web stream
+- `typecheck:strict:src.copilot` ✅
+- `lint -- src/copilot` ✅
+- `test:copilot:unit` ✅ (2720/2720)
+
+### 60) `src/copilot/infra/io/search/text-search.js` + `src/copilot/infra/io-engine.js`
+- Extração da lógica de `searchText` e `searchWorkspaceSymbols` para módulo dedicado de busca textual/simbólica.
+- `io-engine` preserva API pública (mesmas exports) e passa a delegar para o subdomínio `io/search`.
+- Barrel `io/search/index.js` atualizado para expor as APIs extraídas.
+
+### 61) Gate oficial pós-extração de busca
+- `typecheck:strict:src.copilot` ✅
+- `lint -- src/copilot` ✅
+- `test:copilot:unit` ✅ (2720/2720)
+
+### 62) `src/copilot/infra/io/fs/locked-mutations.js` + `src/copilot/infra/io-engine.js`
+- Extração do bloco de mutações com lock para módulo dedicado de FS (`delete/remove/copy/move/patch`).
+- `io-engine` preserva as mesmas exports públicas e passa a delegar para o subdomínio `io/fs/locked-mutations`.
+- Barrel `src/copilot/infra/io/fs/index.js` atualizado para reexportar as mutações extraídas.
+
+### 63) Gate oficial pós-extração de mutações
+- `typecheck:strict:src.copilot` ✅
+- `lint -- src/copilot` ✅
+- `test:copilot:unit` ✅ (2720/2720)
+
+### 64) `src/copilot/infra/io/fs/locked-writes.js` + `src/copilot/infra/io-engine.js`
+- Extração do bloco de escritas lockadas para módulo dedicado de FS (`writeFileAtomic`, `createOrReplaceFileAtomic`,
+  `appendTextLocked`, `mkdirPathLocked`).
+- `io-engine` mantém o contrato público e passa a delegar essas operações ao subdomínio `io/fs/locked-writes`.
+- Barrel `src/copilot/infra/io/fs/index.js` atualizado para reexportar as APIs do novo módulo.
+
+### 65) Gate oficial pós-extração de writes
+- `typecheck:strict:src.copilot` ✅
+- `lint -- src/copilot` ✅
+- `test:copilot:unit` ✅ (2720/2720)
+
+### 66) `src/copilot/infra/io/patch/text-diff-service.js` + `src/copilot/infra/io-engine.js`
+- Extração da lógica de diff textual observável para serviço dedicado no subdomínio `io/patch`.
+- `io-engine.diffText` preserva o contrato público e delega para `diffTextWithReader`.
+- Barrel `src/copilot/infra/io/patch/index.js` atualizado para reexportar o novo serviço.
+
+### 67) Gate oficial pós-extração de diff
+- `typecheck:strict:src.copilot` ✅
+- `lint -- src/copilot` ✅
+- `test:copilot:unit` ✅ (2720/2720)
+
+### 68) `src/copilot/infra/io/fs/read-services.js` + `src/copilot/infra/io-engine.js`
+- Extração do bloco de leitura/metadata para serviço dedicado (`readBytes`, `readText`, `readLines`,
+  `readTextChunks`, `statPath`).
+- `io-engine` preserva o contrato público e delega as operações de leitura para `io/fs/read-services`.
+- Barrel `src/copilot/infra/io/fs/index.js` atualizado para reexportar `read-services`.
+
+### 69) Gate oficial pós-extração de read-services
+- `typecheck:strict:src.copilot` ✅
+- `lint -- src/copilot` ✅
+- `test:copilot:unit` ✅ (2720/2720)
+
+### 70) `src/copilot/infra/policy/path-resource.js` + adoção em módulos IO
+- Introduzido helper canônico `assertValidIoFilePath` em `policy/path-resource`.
+- Validação duplicada removida de `io-engine`, `io/fs/read-services`, `io/fs/locked-writes` e
+    `io/fs/locked-mutations`.
+- Resultado: menor drift entre módulos e comportamento de erro unificado (`ERR_INVALID_ARG_VALUE`).
+
+### 71) Gate oficial pós-centralização de assert path
+- `typecheck:strict:src.copilot` ✅
+- `lint -- src/copilot` ✅
+- `test:copilot:unit` ✅ (2720/2720)
+
+### 72) `tests/unit/copilot/infra/test_policy_path_resource.spec.js`
+- Cobertura ampliada para `assertValidIoFilePath`:
+    - aceita path válido;
+    - rejeita null-byte;
+    - rejeita path vazio.
+
+### 73) Gate oficial pós-cobertura de path policy
+- `typecheck:strict:src.copilot` ✅
+- `lint -- src/copilot` ✅
+- `test:copilot:unit` ✅ (2723/2723)
+
 ---
 
 ## Itens da Sprint 1 ainda pendentes
@@ -199,6 +314,8 @@
 - DEBT-10 (`tails cleanup`) — melhorado adicionalmente.
 - DEBT-03 (`fingerprint matching disperso`) — concluído.
 - DEBT-06 (`read-chunks` robustez abort/cancelamento) — melhorado.
+- Drift de output window ilimitada em file-tools — mitigado (defaults finitos).
+- Drift de orçamento excessivo (`session-tools` git info) — mitigado.
 
 ---
 

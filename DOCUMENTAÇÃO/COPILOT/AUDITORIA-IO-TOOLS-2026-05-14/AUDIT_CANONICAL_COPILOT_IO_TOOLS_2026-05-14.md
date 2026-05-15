@@ -33,7 +33,7 @@
 | BUG-HIGH-04 | **Confirmado (corrigido)**       | `pruneMissingRows` agora filtra extensões no SQL (`json_each`) antes da materialização em memória.            |
 | BUG-HIGH-05 | **Confirmado (corrigido)**       | `safeEnv` com cache TTL removido (recompute por chamada).                                                     |
 | BUG-HIGH-06 | **Confirmado (corrigido)**       | `runPipeline` ganhou cleanup defensivo de stdio/processos em erro/timeout.                                    |
-| BUG-MED-01  | **Parcial**                      | `buildSimpleTextDiff` continua simplista; risco de hunk subótimo permanece.                                   |
+| BUG-MED-01  | **Confirmado (corrigido)**       | `buildSimpleTextDiff` agora consolida hunks sobrepostos/adjacentes e evita duplicação de contexto/cabeçalho.  |
 | BUG-MED-02  | **Não confirmado**               | `last_accessed_ms` é atualizado por `stmtTouch`; hipótese externa superestimada.                              |
 | BUG-MED-03  | **Confirmado (corrigido)**       | `web_fetch_local` agora bloqueia redirects para portas sensíveis (22/25/3306/5432/6379/8080/8443/9200/27017). |
 | BUG-MED-04  | **Confirmado (corrigido)**       | `sanitizeFtsQuery` passou a descartar tokens com `< 2` chars.                                                 |
@@ -122,3 +122,13 @@ Classificadas como **direção válida** para roadmap evolutivo. Priorização r
 
 - Sprint 1 concluída com validação técnica em cache (typecheck/lint/test unit).
 - Sprint 2 avançada com novo lote concluído (segurança, observabilidade, fila/prioridade e resiliência operacional).
+- Coerência documental reforçada: roadmap atualizado com matriz explícita Atual ↔ Ideal para orientar a transformação ampla.
+- Drift de defaults ilimitados reduzido: file-tools e web-search agora operam com defaults altos/finitos e paginação por padrão.
+- Transformação ampla iniciada no eixo de modularização: `io-prefetch` foi desacoplado de leituras via `io-engine` e migrou para portas baixas `io/fs/*` com priming canônico de cache L1.
+- Qualidade de patch/diff elevada: `io/patch/text-diff` ganhou merge de hunks próximos com testes de regressão para evitar duplicação de contexto.
+- Modularização incremental de busca aplicada: `searchText` e `searchWorkspaceSymbols` foram extraídas de `io-engine` para `infra/io/search/text-search.js`, mantendo assinatura pública estável e gates verdes.
+- Nova extração da F1.2 aplicada: mutações com lock (`delete/remove/copy/move/patch`) migradas para `infra/io/fs/locked-mutations.js`, com `io-engine` atuando como facade de compatibilidade.
+- Nova extração da F1.2 aplicada: escritas lockadas (`write/create-or-replace/append/mkdir`) migradas para `infra/io/fs/locked-writes.js`, reduzindo o `io-engine` sem quebrar contratos públicos.
+- Nova extração da F1.2 aplicada: `diffText` movido para `infra/io/patch/text-diff-service.js`, mantendo assinatura pública do `io-engine` via delegação.
+- Nova extração da F1.2 aplicada: bloco de leitura/metadata (`readBytes/readText/readLines/readTextChunks/statPath`) movido para `infra/io/fs/read-services.js`, com `io-engine` mantendo API estável por delegação.
+- Hardening de consistência aplicado: validação de path (`assertValidIoFilePath`) centralizada em `infra/policy/path-resource.js` e adotada nos módulos de facade/leitura/escrita/mutação.

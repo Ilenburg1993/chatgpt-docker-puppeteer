@@ -41,6 +41,23 @@ export function assertStringByteLengthWithinNodeLimit(byteLength, label = 'strin
 }
 
 /**
+ * Mede bytes UTF-8 com validação explícita dos limites nativos do Node.
+ *
+ * @param {string} value
+ * @param {string} [label]
+ * @returns {number}
+ */
+export function utf8ByteLength(value, label = 'utf8 text') {
+    if (typeof value !== 'string') {
+        throw new TypeError(`${label}: esperado string.`);
+    }
+    const bytes = Buffer.byteLength(value, 'utf8');
+    assertStringByteLengthWithinNodeLimit(bytes, label);
+    assertBufferByteLengthWithinNodeLimit(bytes, label);
+    return bytes;
+}
+
+/**
  * @param {unknown} value
  * @returns {value is ArrayBuffer | SharedArrayBuffer}
  */
@@ -71,6 +88,42 @@ export function toBufferView(value) {
 }
 
 /**
+ * @param {unknown} value
+ * @returns {value is Buffer}
+ */
+export function isBufferValue(value) {
+    return Buffer.isBuffer(value);
+}
+
+/**
+ * Valida se uma entrada binária é UTF-8 bem-formado.
+ *
+ * @param {Buffer | Uint8Array | ArrayBuffer | SharedArrayBuffer | DataView} value
+ * @param {string} [message]
+ * @returns {Buffer}
+ */
+export function assertUtf8Buffer(value, message = 'Arquivo binário detectado (bytes inválidos para UTF-8).') {
+    const view = toBufferView(value);
+    if (!isUtf8(view)) {
+        const error = new Error(message);
+        error.name = 'BinaryFileError';
+        throw error;
+    }
+    return view;
+}
+
+/**
+ * Decodifica UTF-8 somente depois de validar bytes inválidos.
+ *
+ * @param {Buffer | Uint8Array | ArrayBuffer | SharedArrayBuffer | DataView} value
+ * @param {string} [message]
+ * @returns {string}
+ */
+export function decodeUtf8Buffer(value, message) {
+    return assertUtf8Buffer(value, message).toString('utf8');
+}
+
+/**
  * Converte para Buffer próprio, sem compartilhar memória com a entrada.
  *
  * @param {string | Buffer | Uint8Array | ArrayBuffer | SharedArrayBuffer | DataView} value
@@ -79,7 +132,7 @@ export function toBufferView(value) {
  */
 export function toOwnedBuffer(value, encoding = 'utf8') {
     if (typeof value === 'string') {
-        const bytes = Buffer.byteLength(value, encoding);
+        const bytes = encoding === 'utf8' ? utf8ByteLength(value, 'string write payload') : Buffer.byteLength(value, encoding);
         assertStringByteLengthWithinNodeLimit(bytes, 'string write payload');
         assertBufferByteLengthWithinNodeLimit(bytes, 'buffer write payload');
         return Buffer.from(value, encoding);
@@ -125,6 +178,23 @@ export function truncateBufferView(value, maxBytes) {
     const view = toBufferView(value);
     if (!Number.isFinite(maxBytes) || maxBytes < 0) return view;
     return view.byteLength <= maxBytes ? view : view.subarray(0, Math.trunc(maxBytes));
+}
+
+/**
+ * Concatena views binárias com orçamento explícito de bytes.
+ *
+ * @param {readonly (Buffer | Uint8Array | ArrayBuffer | SharedArrayBuffer | DataView)[]} chunks
+ * @param {number} [totalLength]
+ * @returns {Buffer}
+ */
+export function concatBufferViews(chunks, totalLength) {
+    if (chunks.length === 0) return Buffer.alloc(0);
+    const views = chunks.map((chunk) => toBufferView(chunk));
+    const resolvedLength =
+        totalLength === undefined ? views.reduce((sum, chunk) => sum + chunk.byteLength, 0) : Math.trunc(totalLength);
+    assertBufferByteLengthWithinNodeLimit(resolvedLength, 'buffer concat payload');
+    if (views.length === 1 && views[0]?.byteLength === resolvedLength) return views[0];
+    return Buffer.concat(views, resolvedLength);
 }
 
 export { isAscii as bufferIsAscii, isUtf8 as bufferIsUtf8 };

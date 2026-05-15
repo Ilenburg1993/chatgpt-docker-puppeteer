@@ -4,6 +4,7 @@ import { relative } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 import {
+    assertValidIoFilePath,
     hasNullByte,
     isPathInsideWorkspace,
     normalizePathResourceKey,
@@ -35,5 +36,18 @@ describe('infra/policy/path-resource', () => {
     it('detecta byte nulo para boundaries de path', () => {
         expect(hasNullByte('a\u0000b')).toBe(true);
         expect(hasNullByte('ab')).toBe(false);
+    });
+
+    it('valida path de IO válido sem lançar', () => {
+        expect(() => assertValidIoFilePath('/tmp/work/project/src/index.js')).not.toThrow();
+    });
+
+    it('rejeita path inválido com null-byte', () => {
+        expect(() => assertValidIoFilePath('src/evil\u0000file.js')).toThrowError(/inválido/i);
+        expect(() => assertValidIoFilePath('src/evil\u0000file.js')).toThrowError(/ERR_INVALID_ARG_VALUE|inválido/i);
+    });
+
+    it('rejeita path vazio', () => {
+        expect(() => assertValidIoFilePath('')).toThrowError(/inválido/i);
     });
 });

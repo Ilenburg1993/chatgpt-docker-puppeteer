@@ -4,61 +4,38 @@
  *
  * Sistema de prefetch inteligente do cache L1 para a LLM-B.
  *
- * Motivação: A LLM-B, ao iniciar uma sessão ou ao receber um escopo de trabalho, muitas vezes sabe de antemão quais
- * arquivos irá ler. Este módulo permite que ela pré-aqueça o cache L1 em background, de modo que as leituras
- * subsequentes sejam cache hits — sem latência de I/O.
- *
- * Capacidades:
- *
- * - `warmCacheForPaths(paths, opts)` — aquece L1 para uma lista de paths em paralelo controlado.
- * - `startSessionScope(sessionId, paths, opts)` — registra escopo nomeado (sessão LLM-B).
- * - `getSessionScopeStats(sessionId)` — hits/misses/preloaded do escopo.
- * - `endSessionScope(sessionId)` — deregistra escopo e retorna stats finais.
- * - `listSessionScopes()` — lista escopos ativos.
- * - `warmFromPattern(glob, opts)` — aquece por glob pattern (ex.: `src/copilot/**`).
- * - `warmFromRecentFiles(n, opts)` — aquece os N arquivos mais recentemente acessados no L1.
- *
- * Design:
- *
- * - Usa `readBytes` do io-engine para popular L1 via canal canônico (com policy, locks, trace).
- * - Concorrência controlada por `concurrency` (padrão: 8) para não saturar FS.
- * - Cada escopo tem `sessionId`, `paths`, contadores de hits/misses e `startedAt`.
- * - Erros de leitura são silenciosos por padrão (não quebram o loop LLM-B).
- *
  * @module copilot/infra/io-prefetch
  */
 
 import { stat as fsStat } from 'node:fs/promises';
 import * as nodePath from 'node:path';
 import pLimit from 'p-limit';
-import { getVerifiedIoL1Entry, makeBytesKey, makeTextKey, normalizeIoCacheKey } from './io-cache.js';
-import { readBytes, readText } from './io-engine.js';
+import { getIoL1Cache, getVerifiedIoL1Entry, makeBytesKey, makeTextKey, normalizeIoCacheKey } from './io-cache.js';
 import { getIoIndex } from './io-index-registry.js';
 import { parseAndCacheSymbols } from './io-parser.js';
 import { scanDirectory } from './io-scanner.js';
+import { readBytesFileSnapshot } from './io/fs/read-bytes.js';
+import { readTextFileSnapshot } from './io/fs/read-text.js';
 import { matchesAnyPattern } from './scan/glob.js';
-
-// ---------------------------------------------------------------------------
-// Typedefs
-// ---------------------------------------------------------------------------
+import { sha256 } from './shared/hash.js';
 
 /**
  * @typedef {object} PrefetchOptions
- * @property {number} [concurrency=8] - Máximo de leituras paralelas. Default is `8`
- * @property {boolean} [textMode=true] - Se true, popula chave de texto além de bytes. Default is `true`
- * @property {boolean} [silent=true] - Se true, erros de leitura são ignorados (não jogados). Default is `true`
- * @property {AbortSignal} [signal] - Sinal para abortar o prefetch em andamento.
+ * @property {number} [concurrency=8] Default is `8`
+ * @property {boolean} [textMode=true] Default is `true`
+ * @property {boolean} [silent=true] Default is `true`
+ * @property {AbortSignal} [signal]
  */
 
 /**
  * @typedef {object} SessionScopeStats
- * @property {string} sessionId - ID do escopo.
- * @property {number} preloaded - Arquivos efetivamente carregados no cache.
- * @property {number} failed - Arquivos que falharam durante prefetch.
- * @property {number} skipped - Arquivos pulados (já estavam no cache).
- * @property {number} durationMs - Duração total do warm-up em ms.
- * @property {number} pathCount - Total de paths registrados no escopo.
- * @property {boolean} active - Se o escopo ainda está ativo.
+ * @property {string} sessionId
+ * @property {number} preloaded
+ * @property {number} failed
+ * @property {number} skipped
+ * @property {number} durationMs
+ * @property {number} pathCount
+ * @property {boolean} active
  */
 
 /**
@@ -73,81 +50,123 @@ import { matchesAnyPattern } from './scan/glob.js';
  * @property {boolean} active
  */
 
-// ---------------------------------------------------------------------------
-// Session scope registry
-// ---------------------------------------------------------------------------
-
 /** @type {Map<string, _SessionScope>} */
 const _scopes = new Map();
 
-// ---------------------------------------------------------------------------
-// Core: parallel warm-up
-// ---------------------------------------------------------------------------
+/**
+ * @param {string} key
+ * @param {Buffer | string} content
+ * @param {{ sizeBytes: number; mtimeMs: number; contentHash?: string }} meta
+ * @returns {void}
+ */
+function primeIoL1Entry(key, content, meta) {
+    const cache = getIoL1Cache();
+    const now = Date.now();
+    const bytes = typeof content === 'string' ? Buffer.byteLength(content, 'utf8') : content.byteLength;
+    cache.set(key, {
+        content,
+        bytes,
+        cachedAt: now,
+        mtime: meta.mtimeMs,
+        size: meta.sizeBytes,
+        lastValidatedAt: now,
+        accessCount: 0,
+        ...(meta.contentHash ? { contentHash: meta.contentHash } : {}),
+        fingerprintStrategy: 'fs-read',
+    });
+}
 
 /**
- * Aquece o cache L1 para uma lista de paths, com concorrência controlada. Popula chave de bytes (e texto se
- * `textMode=true`).
- *
- * @param {string[]} paths - Lista de paths absolutos ou relativos.
+ * @param {string} filePath
+ * @param {boolean} textMode
+ * @param {{ content?: Buffer | string } | null} cachedBytes
+ * @param {{ content?: Buffer | string } | null} cachedText
+ * @param {{ signal?: AbortSignal }} signalOptions
+ * @returns {Promise<boolean>}
+ */
+async function warmSinglePath(filePath, textMode, cachedBytes, cachedText, signalOptions) {
+    const normalized = normalizeIoCacheKey(filePath);
+    const bytesKey = makeBytesKey(normalized);
+    const textKey = makeTextKey(normalized, undefined, undefined);
+    let warmed = false;
+
+    if (cachedBytes === null) {
+        const bytesSnapshot = await readBytesFileSnapshot(filePath, signalOptions);
+        const hash = sha256(bytesSnapshot.content);
+        primeIoL1Entry(bytesKey, bytesSnapshot.content, {
+            sizeBytes: bytesSnapshot.sizeBytes,
+            mtimeMs: bytesSnapshot.mtimeMs,
+            contentHash: hash,
+        });
+        warmed = true;
+
+        if (textMode && cachedText === null) {
+            const text = bytesSnapshot.content.toString('utf8');
+            primeIoL1Entry(textKey, text, {
+                sizeBytes: bytesSnapshot.sizeBytes,
+                mtimeMs: bytesSnapshot.mtimeMs,
+                contentHash: hash,
+            });
+            warmed = true;
+        }
+        return warmed;
+    }
+
+    if (textMode && cachedText === null) {
+        const textSnapshot = await readTextFileSnapshot(filePath);
+        primeIoL1Entry(textKey, textSnapshot.content, {
+            sizeBytes: textSnapshot.sizeBytes,
+            mtimeMs: textSnapshot.mtimeMs,
+            contentHash: sha256(textSnapshot.content),
+        });
+        warmed = true;
+    }
+
+    return warmed;
+}
+
+/**
+ * @param {string[]} paths
  * @param {PrefetchOptions} [opts]
  * @returns {Promise<{ preloaded: number; failed: number; skipped: number; durationMs: number }>}
  */
 export async function warmCacheForPaths(paths, opts = {}) {
     const { concurrency = 8, textMode = true, silent = true, signal } = opts;
     const t0 = Date.now();
-
     let preloaded = 0;
     let failed = 0;
     let skipped = 0;
 
-    /**
-     * Processa um path: verifica se já está no cache, se não, lê do disco.
-     *
-     * @param {string} filePath
-     * @returns {Promise<void>}
-     */
-    async function processOne(filePath) {
-        if (signal?.aborted) return;
-
-        const normalized = normalizeIoCacheKey(filePath);
-        const bytesKey = makeBytesKey(normalized);
-        const textKey = makeTextKey(normalized, undefined, undefined);
-
-        const cachedBytes = await getVerifiedIoL1Entry(bytesKey, filePath);
-        const cachedText = textMode ? await getVerifiedIoL1Entry(textKey, filePath) : null;
-        if (cachedBytes !== null && (!textMode || cachedText !== null)) {
-            skipped++;
-            return;
-        }
-
-        try {
-            let warmed = false;
-            const signalOptions = signal ? { signal } : {};
-
-            if (cachedBytes === null) {
-                await readBytes(filePath, signalOptions);
-                warmed = true;
-            }
-
-            if (textMode && cachedText === null) {
-                await readText(filePath, signalOptions);
-                warmed = true;
-            }
-
-            if (warmed) preloaded++;
-        } catch (err) {
-            if (!silent) throw err;
-            failed++;
-        }
-    }
-
     const normalizedConcurrency = Number.isFinite(concurrency) ? Math.max(1, Math.floor(concurrency)) : 8;
     const limit = pLimit(normalizedConcurrency);
+
     await Promise.all(
         paths.map((filePath) =>
             limit(async () => {
                 if (signal?.aborted) return;
-                await processOne(filePath);
+                const normalized = normalizeIoCacheKey(filePath);
+                const bytesKey = makeBytesKey(normalized);
+                const textKey = makeTextKey(normalized, undefined, undefined);
+                const cachedBytes = await getVerifiedIoL1Entry(bytesKey, filePath);
+                const cachedText = textMode ? await getVerifiedIoL1Entry(textKey, filePath) : null;
+                if (cachedBytes !== null && (!textMode || cachedText !== null)) {
+                    skipped++;
+                    return;
+                }
+
+                try {
+                    const warmed = await warmSinglePath(
+                        filePath,
+                        textMode,
+                        cachedBytes,
+                        cachedText,
+                        signal ? { signal } : {},
+                    );
+                    if (warmed) preloaded++;
+                } catch (err) {
+                    if (!silent) throw err;
+                    failed++;
+                }
             }),
         ),
     );
@@ -155,16 +174,9 @@ export async function warmCacheForPaths(paths, opts = {}) {
     return { preloaded, failed, skipped, durationMs: Date.now() - t0 };
 }
 
-// ---------------------------------------------------------------------------
-// Session scope API
-// ---------------------------------------------------------------------------
-
 /**
- * Registra e aquece um escopo de sessão LLM-B. Chamado no início de uma sessão quando a LLM-B conhece seu conjunto de
- * trabalho.
- *
- * @param {string} sessionId - Identificador único da sessão LLM-B.
- * @param {string[]} paths - Paths a pré-carregar.
+ * @param {string} sessionId
+ * @param {string[]} paths
  * @param {PrefetchOptions} [opts]
  * @returns {Promise<SessionScopeStats>}
  */
@@ -191,8 +203,6 @@ export async function startSessionScope(sessionId, paths, opts = {}) {
 }
 
 /**
- * Retorna estatísticas do escopo de sessão.
- *
  * @param {string} sessionId
  * @returns {SessionScopeStats | null}
  */
@@ -206,8 +216,6 @@ export function getSessionScopeStats(sessionId) {
 }
 
 /**
- * Encerra o escopo de sessão e retorna stats finais.
- *
  * @param {string} sessionId
  * @returns {SessionScopeStats | null}
  */
@@ -222,29 +230,21 @@ export function endSessionScope(sessionId) {
 }
 
 /**
- * Lista IDs dos escopos de sessão ativos.
- *
  * @returns {string[]}
  */
 export function listSessionScopes() {
     return [..._scopes.keys()];
 }
 
-// ---------------------------------------------------------------------------
-// Pattern-based warm-up
-// ---------------------------------------------------------------------------
-
 /**
- * Aquece o cache L1 varrendo um diretório e filtrando por extensões de arquivo.
- *
- * @param {string} directory - Diretório raiz a escanear.
+ * @param {string} directory
  * @param {object} [opts]
- * @param {string[]} [opts.extensions=['.js','.ts','.mjs','.json','.md']] - Extensões permitidas. Default is
+ * @param {string[]} [opts.extensions=['.js','.ts','.mjs','.json','.md']] Default is
  *   `['.js','.ts','.mjs','.json','.md']`
- * @param {number} [opts.maxFiles=500] - Quantidade sugerida para telemetry/advisory; não corta o scan. Default is `500`
- * @param {string[]} [opts.include] - Padrões glob simples para incluir arquivos.
- * @param {string[]} [opts.exclude] - Padrões glob simples para excluir arquivos.
- * @param {boolean} [opts.recursive=true] - Se false, escaneia apenas o diretório imediato. Default is `true`
+ * @param {number} [opts.maxFiles=500] Default is `500`
+ * @param {string[]} [opts.include]
+ * @param {string[]} [opts.exclude]
+ * @param {boolean} [opts.recursive=true] Default is `true`
  * @param {PrefetchOptions} [prefetchOpts]
  * @returns {Promise<{
  *     scanned: number;
@@ -268,7 +268,6 @@ export async function warmFromDirectory(directory, opts = {}, prefetchOpts = {})
     const t0 = Date.now();
     const baseDir = nodePath.resolve(directory);
 
-    // Escaneia diretório usando scanner canônico
     const scanResult = await scanDirectory(directory, {
         recursive,
         showHidden: false,
@@ -276,7 +275,6 @@ export async function warmFromDirectory(directory, opts = {}, prefetchOpts = {})
         respectGitignore: true,
     });
 
-    // Flatten recursivo das entradas aninhadas
     /** @param {import('./io-scanner.js').IoScanEntry[]} entries @returns {import('./io-scanner.js').IoScanEntry[]} */
     function flattenEntries(entries) {
         /** @type {import('./io-scanner.js').IoScanEntry[]} */
@@ -289,8 +287,6 @@ export async function warmFromDirectory(directory, opts = {}, prefetchOpts = {})
     }
 
     const allEntries = flattenEntries(scanResult.entries);
-
-    // Filtra por extensão e tipo arquivo
     const files = allEntries
         .filter((e) => e.type === 'file' && extensions.includes(nodePath.extname(e.name).toLowerCase()))
         .filter((e) => include.length === 0 || matchesAnyPattern(e.absolutePath, baseDir, include))
@@ -298,7 +294,6 @@ export async function warmFromDirectory(directory, opts = {}, prefetchOpts = {})
         .map((e) => e.absolutePath);
 
     const result = await warmCacheForPaths(files, prefetchOpts);
-
     return {
         scanned: scanResult.scannedEntries,
         ...result,
@@ -316,10 +311,7 @@ export async function warmFromDirectory(directory, opts = {}, prefetchOpts = {})
 }
 
 /**
- * Aquece os N arquivos mais recentemente acessados já presentes no L1 (renovação de TTL). Útil no início de um novo
- * turno para garantir que arquivos "quentes" do turno anterior não expirem durante o trabalho atual.
- *
- * @param {string[]} recentPaths - Lista de paths recentes (obtida de turn-trace-state ou activity).
+ * @param {string[]} recentPaths
  * @param {PrefetchOptions} [opts]
  * @returns {Promise<{ preloaded: number; failed: number; skipped: number; durationMs: number }>}
  */
@@ -328,10 +320,6 @@ export async function warmRecentPaths(recentPaths, opts = {}) {
 }
 
 /**
- * Aquece o contexto direto de uma leitura da LLM-B: garante L1 text/bytes do arquivo lido, materializa o índice L2 do
- * arquivo e, quando há imports relativos JS/TS, pré-aquece os alvos diretos. É read-through: parte da própria leitura
- * canônica e não cria uma base paralela.
- *
  * @param {string} filePath
  * @param {{
  *     workspaceRoot?: string;
@@ -366,7 +354,20 @@ export async function warmReadThroughContext(filePath, opts = {}) {
     let relatedFailed = 0;
 
     try {
-        const text = await readText(filePath);
+        const text = await readTextFileSnapshot(filePath);
+        const normalized = normalizeIoCacheKey(filePath);
+        const textHash = sha256(text.content);
+        primeIoL1Entry(makeTextKey(normalized, undefined, undefined), text.content, {
+            sizeBytes: text.sizeBytes,
+            mtimeMs: text.mtimeMs,
+            contentHash: textHash,
+        });
+        primeIoL1Entry(makeBytesKey(normalized), Buffer.from(text.content, 'utf8'), {
+            sizeBytes: text.sizeBytes,
+            mtimeMs: text.mtimeMs,
+            contentHash: textHash,
+        });
+
         if (index) {
             const stats = await fsStat(filePath).catch(() => null);
             const indexStore = getIoIndex();
@@ -378,10 +379,7 @@ export async function warmReadThroughContext(filePath, opts = {}) {
                     sizeBytes: stats.size,
                     mtimeMs: stats.mtimeMs,
                     ctimeMs: stats.ctimeMs,
-                    metadata: {
-                        source: 'read-through',
-                        limitMode: 'informative',
-                    },
+                    metadata: { source: 'read-through', limitMode: 'informative' },
                 });
                 indexed = true;
             }
@@ -409,10 +407,6 @@ export async function warmReadThroughContext(filePath, opts = {}) {
         durationMs: Date.now() - startedAt,
     };
 }
-
-// ---------------------------------------------------------------------------
-// Internal helpers
-// ---------------------------------------------------------------------------
 
 /**
  * @param {_SessionScope} scope

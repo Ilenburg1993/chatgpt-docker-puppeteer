@@ -7,6 +7,23 @@ investigação, sem tratar commits como ponto final. A prioridade corrente é IO
 buffers, chunks, cache, snapshots, locks, search, patch, cursores, invalidação, backpressure e eficiência para LLM-B em
 Node 24+ ESM strict.
 
+## Matriz de coerência (Situação Atual ↔ Situação Ideal)
+
+Esta matriz traduz a visão ideal em blocos executáveis e evita drift entre documentação e código:
+
+| Tema                      | Situação atual (resumo)                               | Situação ideal                                         | Gap residual | Faixa/Fase dona  |
+| ------------------------- | ----------------------------------------------------- | ------------------------------------------------------ | ------------ | ---------------- |
+| Barrel-first e boundaries | progresso alto em `public/*`, mas legado ainda existe | somente facades públicas aprovadas                     | médio        | F1.1 + F1.5 + F5 |
+| `io-engine` monolítico    | parcialmente extraído; facade ainda grande            | facade mínima com subdomínios baixos                   | alto         | F1.2 + F5        |
+| Parser puro               | avanços em `parse/*`; ainda há acoplamentos legados   | parser sem dependência de camadas altas                | médio        | F1.3             |
+| Output windows            | cursor/paginação já em pontos críticos                | defaults altos e finitos em todo retorno grande        | médio        | F2.1             |
+| Search subprocess         | orçamento e subprocesso evoluíram                     | parsing incremental + cursor estável por arquivo/linha | médio        | F2.2             |
+| Locks/snapshots/rollback  | forte evolução com operation/transaction              | reversibilidade completa e lock canônico uniforme      | médio        | F0.5 + F3.2      |
+| Feedback de falhas        | `toolFeedback` implantado em blocos-chave             | cobertura sistemática e verificável em todo toolset    | médio        | F0.6             |
+| Governança acíclica       | ciclo principal removido; dívida residual monitorada  | zero ciclos + gate CI anti-regressão                   | médio        | F1.5 + F5        |
+
+Regra prática: nenhuma transformação ampla começa sem antes atualizar esta matriz e o status da fase correspondente.
+
 ## Faixa 0 — Estabilização crítica
 
 Objetivo: remover riscos que podem vazar escopo, travar execução, inflar memória ou corromper frescor semântico.
@@ -31,6 +48,11 @@ locks e regressões principais.
   - `typecheck` -> `typecheck:strict:src.copilot`.
 - Atualizar `shell/sandbox.js` allowlist para os scripts copilot oficiais.
 - Reduzir `safeExec`/`safeGitArgs` de 1 GiB para limite seguro e timeout real.
+
+Status complementar (2026-05-14, onda contínua):
+
+- `session-tools.get_workspace_info` deixou de usar `maxBuffer` de 1 GiB e passou a usar orçamento finito + timeout.
+- validação de gates oficiais permanece: `typecheck:strict:src.copilot`, `test:copilot:unit`, `lint -- src/copilot`.
 
 ### F0.3 — Search budget
 
@@ -102,6 +124,27 @@ baixos `shared/`, `policy/`, `scan/`, `parse/`, `storage/`, `queue/`, `locks/`, 
 - Extrair invalidação coordenada para `io/invalidation` (executado com bus, eventos e invalidação de tiers L1/L2).
 - Manter `io-engine.js` como facade temporária.
 
+Status complementar (2026-05-14, onda contínua):
+
+- `io-prefetch` foi desacoplado de `io-engine` para leituras base, passando a usar portas baixas `io/fs/read-*` com
+  prime explícito de L1 e preservação de fingerprint/hash.
+- `io/patch/text-diff` passou a consolidar hunks sobrepostos/adjacentes, eliminando duplicações de contexto em
+  mudanças próximas e reduzindo ruído para a LLM-B durante revisão de diffs.
+- `searchText` e `searchWorkspaceSymbols` foram extraídas da facade `io-engine` para `io/search/text-search.js`,
+  preservando contrato público e reduzindo acoplamento direto da engine com adapters de busca.
+- Bloco de mutações com lock (`deleteFileLocked`, `removePathLocked`, `copyFileLocked`, `moveFileLocked`,
+  `patchTextLocked`) extraído para `io/fs/locked-mutations.js`, reduzindo escopo operacional da facade `io-engine`.
+- Bloco de escrita lockada (`writeFileAtomic`, `createOrReplaceFileAtomic`, `appendTextLocked`, `mkdirPathLocked`)
+  extraído para `io/fs/locked-writes.js`, mantendo a facade pública do `io-engine` por delegação.
+- `diffText` migrou para serviço dedicado (`io/patch/text-diff-service.js`) e o `io-engine` permaneceu como facade de
+  compatibilidade via delegação.
+- Bloco de leitura/metadata (`readBytes`, `readText`, `readLines`, `readTextChunks`, `statPath`) migrou para
+  `io/fs/read-services.js`, reduzindo acoplamento do `io-engine` e preservando a API pública via aliases de facade.
+- Validação de path foi centralizada em `policy/path-resource.assertValidIoFilePath`, removendo duplicação em
+  `io-engine`, `io/fs/read-services`, `io/fs/locked-writes` e `io/fs/locked-mutations`.
+- Cobertura unitária ampliada em `test_policy_path_resource.spec.js` para validar casos válidos e inválidos
+  (null-byte/path vazio) do helper canônico.
+
 ### F1.3 — Parser puro
 
 - Criar `parse/` puro (executado para JSON, Markdown, comentários e outline textual).
@@ -170,6 +213,11 @@ Status complementar:
   `child_process` direto da `io-engine` e preparando parsing incremental/telemetria de subprocessos em um único ponto.
 - Essa porta agora usa `spawn` com coleta controlada de stdout/stderr, timeout/sinal, erro compatível com status/stderr e
   estouro explícito de `maxBuffer`, evitando a bufferização opaca de `execFile` em searches volumosas.
+- file-tools (`shared.js`) passaram de default ilimitado para defaults altos e finitos de output window (com override por ENV,
+  inclusive suporte explícito a `Infinity` quando necessário para operações especiais).
+- `web_search` passou a usar limite default finito com clamp defensivo, evitando consultas ilimitadas por padrão.
+- `web_fetch_local` endureceu cleanup de stream com `reader.cancel()` + `releaseLock()` em `finally`, reduzindo
+  risco de retenção de recursos em truncamentos/erros.
 
 ### F2.2 — `rg --json`
 

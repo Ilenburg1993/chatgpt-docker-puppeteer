@@ -54,3 +54,20 @@ export function isPathInsideWorkspace(candidate, workspaceRoot) {
 export function hasNullByte(candidate) {
     return candidate.includes('\u0000');
 }
+
+/**
+ * Valida path de I/O local (string não vazia e sem null-byte).
+ *
+ * @param {unknown} candidate
+ * @param {string} [label]
+ * @returns {asserts candidate is string}
+ */
+export function assertValidIoFilePath(candidate, label = 'Path') {
+    if (typeof candidate !== 'string' || candidate.length === 0 || hasNullByte(candidate)) {
+        const error = /** @type {TypeError & { code?: string }} */ (
+            new TypeError(`${label} inválido: ${String(candidate)}`)
+        );
+        error.code = 'ERR_INVALID_ARG_VALUE';
+        throw error;
+    }
+}

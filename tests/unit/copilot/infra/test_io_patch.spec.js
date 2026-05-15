@@ -75,4 +75,29 @@ describe('infra/io/patch', () => {
         expect(result.diff).toContain('-b');
         expect(result.diff).toContain('+B');
     });
+
+    it('faz merge de hunks adjacentes com contexto e evita duplicação de cabeçalhos', () => {
+        const before = ['L1', 'A', 'L3', 'B', 'L5', 'L6'].join('\n');
+        const after = ['L1', 'A*', 'L3', 'B*', 'L5', 'L6'].join('\n');
+
+        const result = buildSimpleTextDiff(before, after, { contextLines: 1 });
+        const headerCount = (result.diff.match(/^@@/gm) ?? []).length;
+
+        expect(headerCount).toBe(1);
+        expect(result.diff).toContain('-A');
+        expect(result.diff).toContain('+A*');
+        expect(result.diff).toContain('-B');
+        expect(result.diff).toContain('+B*');
+    });
+
+    it('não duplica linhas de contexto quando mudanças estão próximas', () => {
+        const before = ['x0', 'x1', 'x2', 'x3', 'x4'].join('\n');
+        const after = ['x0', 'X1', 'x2', 'X3', 'x4'].join('\n');
+
+        const result = buildSimpleTextDiff(before, after, { contextLines: 1 });
+        const lines = result.diff.split('\n');
+        const contextX2Count = lines.filter((line) => line === ' x2').length;
+
+        expect(contextX2Count).toBe(1);
+    });
 });

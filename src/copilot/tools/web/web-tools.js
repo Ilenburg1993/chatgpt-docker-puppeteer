@@ -235,7 +235,7 @@ const webFetchTool = buildTool({
 
             let received = 0;
             const chunks = /** @type {Uint8Array[]} */ ([]);
-            // FIX WT-WEB-02: aplicar advisoryLimit no loop; FIX WT-WEB-03: releaseLock() em finally
+            // FIX WT-WEB-02: aplicar advisoryLimit no loop; cleanup robusto com cancel()+releaseLock().
             try {
                 while (true) {
                     const { done, value } = await reader.read();
@@ -248,6 +248,11 @@ const webFetchTool = buildTool({
                     }
                 }
             } finally {
+                try {
+                    await reader.cancel();
+                } catch {
+                    // no-op: best effort para liberar recursos do body stream
+                }
                 reader.releaseLock();
             }
 
@@ -355,8 +360,9 @@ const webSearchTool = buildTool({
             );
         }
 
-        const limit =
-            typeof maxResults === 'number' && Number.isFinite(maxResults) ? maxResults : Number.POSITIVE_INFINITY;
+        const requestedLimit =
+            typeof maxResults === 'number' && Number.isFinite(maxResults) ? Math.floor(maxResults) : 10;
+        const limit = Math.max(1, Math.min(50, requestedLimit));
 
         // F4.4 (UPG-09): tenta DDG Instant Answer JSON API primeiro (não requer JS, sem scraping frágil)
         const jsonUrl = `https://api.duckduckgo.com/?q=${encodeURIComponent(safeQuery)}&format=json&no_html=1&skip_disambig=1`;

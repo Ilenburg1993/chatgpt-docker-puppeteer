@@ -20,6 +20,8 @@ import { log } from '../infra/logger.js';
 import { buildTool, withSkipPermission } from '../infra/tool-factory.js';
 
 const HOOKS_STATE = resolveHooksStateDir();
+const GIT_INFO_TIMEOUT_MS = 8_000;
+const GIT_INFO_MAX_BUFFER = 8 * 1024 * 1024;
 
 /**
  * Tool: read_briefing — lê o briefing da sessão Hook System.
@@ -97,17 +99,20 @@ const getWorkspaceInfoTool = buildTool({
             gitBranch = execFileSync('git', ['rev-parse', '--abbrev-ref', 'HEAD'], {
                 cwd,
                 encoding: 'utf8',
-                maxBuffer: 1024 * 1024 * 1024,
+                maxBuffer: GIT_INFO_MAX_BUFFER,
+                timeout: GIT_INFO_TIMEOUT_MS,
             }).trim();
             gitRoot = execFileSync('git', ['rev-parse', '--show-toplevel'], {
                 cwd,
                 encoding: 'utf8',
-                maxBuffer: 1024 * 1024 * 1024,
+                maxBuffer: GIT_INFO_MAX_BUFFER,
+                timeout: GIT_INFO_TIMEOUT_MS,
             }).trim();
             gitCommit = execFileSync('git', ['rev-parse', '--short', 'HEAD'], {
                 cwd,
                 encoding: 'utf8',
-                maxBuffer: 1024 * 1024 * 1024,
+                maxBuffer: GIT_INFO_MAX_BUFFER,
+                timeout: GIT_INFO_TIMEOUT_MS,
             }).trim();
         } catch (e) {
             logSwallowed(e, 'session-tools.gitInfo');

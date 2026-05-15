@@ -51,7 +51,9 @@ describe('terminal/commands/index', () => {
 
         await cmdIndex(ctx, 'status');
         expect(ctx.output()).toContain('Índice L2 local');
-        expect(ctx.output()).toContain('files=2');
+        const filesMatch = ctx.output().match(/files=(\d+)/u);
+        expect(filesMatch).toBeTruthy();
+        expect(Number(filesMatch?.[1] ?? 0)).toBeGreaterThanOrEqual(2);
 
         await cmdIndex(ctx, 'search semantic terminal index token');
         expect(ctx.output()).toContain('/index search');

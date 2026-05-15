@@ -28,13 +28,21 @@ const FILE_TOOL_LIMIT_ENV_KEYS = /** @type {const} */ ({
     maxDiffOutputBytes: 'COPILOT_FILE_TOOLS_MAX_DIFF_OUTPUT_BYTES',
 });
 
+const FILE_TOOL_LIMIT_DEFAULTS = Object.freeze({
+    maxContentBytes: 2 * 1024 * 1024,
+    maxSearchOutputBytes: 2 * 1024 * 1024,
+    maxListEntries: 2000,
+    maxDiffOutputBytes: 2 * 1024 * 1024,
+});
+
 /**
  * @param {string} envKey
+ * @param {number} defaultValue
  * @returns {number}
  */
-function readConfiguredLimitFromEnv(envKey) {
+function readConfiguredLimitFromEnv(envKey, defaultValue) {
     const raw = process.env[envKey];
-    if (raw === undefined || raw.trim() === '') return Number.POSITIVE_INFINITY;
+    if (raw === undefined || raw.trim() === '') return defaultValue;
     const normalized = raw.trim().toLowerCase();
     if (
         normalized === 'infinity' ||
@@ -46,37 +54,47 @@ function readConfiguredLimitFromEnv(envKey) {
         return Number.POSITIVE_INFINITY;
     }
     const parsed = Number(raw);
-    return Number.isFinite(parsed) && parsed > 0 ? parsed : Number.POSITIVE_INFINITY;
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : defaultValue;
 }
 
 /**
  * Política efetiva de saída das file tools.
  *
- * Defaults permanecem unbounded para manter o princípio LLM-B first; operadores podem ativar limites finitos via ENV
- * quando desejarem uma política mais conservadora.
+ * Defaults são altos porém finitos (paginados por padrão); operadores podem ajustar via ENV.
  */
 export const FILE_TOOLS_OUTPUT_POLICY = Object.freeze({
-    maxContentBytes: readConfiguredLimitFromEnv(FILE_TOOL_LIMIT_ENV_KEYS.maxContentBytes),
-    maxSearchOutputBytes: readConfiguredLimitFromEnv(FILE_TOOL_LIMIT_ENV_KEYS.maxSearchOutputBytes),
-    maxListEntries: readConfiguredLimitFromEnv(FILE_TOOL_LIMIT_ENV_KEYS.maxListEntries),
-    maxDiffOutputBytes: readConfiguredLimitFromEnv(FILE_TOOL_LIMIT_ENV_KEYS.maxDiffOutputBytes),
+    maxContentBytes: readConfiguredLimitFromEnv(
+        FILE_TOOL_LIMIT_ENV_KEYS.maxContentBytes,
+        FILE_TOOL_LIMIT_DEFAULTS.maxContentBytes,
+    ),
+    maxSearchOutputBytes: readConfiguredLimitFromEnv(
+        FILE_TOOL_LIMIT_ENV_KEYS.maxSearchOutputBytes,
+        FILE_TOOL_LIMIT_DEFAULTS.maxSearchOutputBytes,
+    ),
+    maxListEntries: readConfiguredLimitFromEnv(
+        FILE_TOOL_LIMIT_ENV_KEYS.maxListEntries,
+        FILE_TOOL_LIMIT_DEFAULTS.maxListEntries,
+    ),
+    maxDiffOutputBytes: readConfiguredLimitFromEnv(
+        FILE_TOOL_LIMIT_ENV_KEYS.maxDiffOutputBytes,
+        FILE_TOOL_LIMIT_DEFAULTS.maxDiffOutputBytes,
+    ),
 });
 
 /**
  * Limite efetivo de bytes para read_file_content.
  *
- * Default: `Infinity` (sem truncamento). Quando configurado via ENV para valor finito, a tool trunca a saída de forma
- * explícita e observável.
+ * Default: alto e finito (paginado por padrão). Pode ser ajustado por ENV.
  */
 export const MAX_CONTENT_BYTES = FILE_TOOLS_OUTPUT_POLICY.maxContentBytes;
 
-/** Limite efetivo de bytes para search_in_files / workspace_symbol_search. Default: `Infinity`. */
+/** Limite efetivo de bytes para search_in_files / workspace_symbol_search. */
 export const MAX_SEARCH_OUTPUT = FILE_TOOLS_OUTPUT_POLICY.maxSearchOutputBytes;
 
-/** Limite efetivo de entradas para list_directory. Default: `Infinity`. */
+/** Limite efetivo de entradas para list_directory. */
 export const MAX_LIST_ENTRIES = FILE_TOOLS_OUTPUT_POLICY.maxListEntries;
 
-/** Limite efetivo de bytes para diff_files. Default: `Infinity`. */
+/** Limite efetivo de bytes para diff_files. */
 export const MAX_DIFF_OUTPUT = FILE_TOOLS_OUTPUT_POLICY.maxDiffOutputBytes;
 
 // MELHORIA-10 (fix): verificação lazy da disponibilidade de ripgrep (cache single-check)

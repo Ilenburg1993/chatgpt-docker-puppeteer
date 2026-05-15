@@ -932,10 +932,15 @@
   "github.copilot.editor.enableAutoCompletions": true,
   "github.copilot.enable": {
     "*": true,
+    "plaintext": false,
+    "markdown": true,
+    "scminput": false,
     "javascript": true,
     "json": true,
-    "markdown": true,
-    "plaintext": false
+    "typescript": true,
+    "jsonc": true,
+    "yaml": true,
+    "shellscript": true
   },
   "github.copilot.inlineSuggest.enable": true,
   "github.copilot.nextEditSuggestions.enabled": true,

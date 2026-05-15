@@ -5,10 +5,14 @@ import { describe, expect, it } from 'vitest';
 import {
     BUFFER_MAX_LENGTH,
     assertBufferByteLengthWithinNodeLimit,
+    concatBufferViews,
     decodeBase64ToOwnedBuffer,
+    decodeUtf8Buffer,
+    isBufferValue,
     toBufferView,
     toOwnedBuffer,
     truncateBufferView,
+    utf8ByteLength,
 } from '../../../../src/copilot/infra/shared/buffer.js';
 
 describe('infra/shared/buffer', () => {
@@ -48,5 +52,29 @@ describe('infra/shared/buffer', () => {
     it('decodeBase64ToOwnedBuffer aceita base64url e rejeita payload malformado', () => {
         expect(decodeBase64ToOwnedBuffer('YmluYXJ5LXBheWxvYWQ').toString('utf8')).toBe('binary-payload');
         expect(() => decodeBase64ToOwnedBuffer('%%%')).toThrow(/base64/);
+    });
+
+    it('utf8ByteLength mede texto e valida tipo', () => {
+        expect(utf8ByteLength('ação')).toBe(Buffer.byteLength('ação', 'utf8'));
+        expect(() => utf8ByteLength(/** @type {any} */ (123))).toThrow(/esperado string/);
+    });
+
+    it('decodeUtf8Buffer rejeita bytes UTF-8 inválidos com BinaryFileError', () => {
+        expect(decodeUtf8Buffer(Buffer.from('ok', 'utf8'))).toBe('ok');
+        expect(() => decodeUtf8Buffer(Buffer.from([0xff]))).toThrow(/UTF-8/);
+        try {
+            decodeUtf8Buffer(Buffer.from([0xff]));
+        } catch (error) {
+            expect(/** @type {Error} */ (error).name).toBe('BinaryFileError');
+        }
+    });
+
+    it('concatBufferViews concatena preservando views e isBufferValue identifica Buffer', () => {
+        const storage = new Uint8Array([0, 1, 2, 3, 4]);
+        const result = concatBufferViews([new Uint8Array(storage.buffer, 1, 2), Buffer.from([9])]);
+
+        expect([...result]).toEqual([1, 2, 9]);
+        expect(isBufferValue(result)).toBe(true);
+        expect(isBufferValue(storage)).toBe(false);
     });
 });
