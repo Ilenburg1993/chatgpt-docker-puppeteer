@@ -55,7 +55,7 @@ function assertOpen(changeSet) {
 /**
  * @param {{
  *     capability: string;
- *     riskClass?: import('../../core/io-contracts.js').IoRiskClass;
+ *     riskClass?: import('#copilot/core/io-contracts').IoRiskClass;
  *     targets?: readonly string[];
  *     traceId?: string | null;
  *     evidence?: Record<string, unknown>;

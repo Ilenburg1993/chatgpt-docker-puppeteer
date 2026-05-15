@@ -76,6 +76,6 @@ export { resetWebToolsRateLimitWindowForTests, webTools } from './web/index.js';
 
 // ─── Estado/infra compartilhada de tools ─────────────────────────────────────
 export { TOOLS_LOGGER, TOOLS_METRICS } from './infra/di-tokens.js';
-export { clearToolsLogger, setToolsLogger } from './infra/logger.js';
-export { clearToolsMetrics, setToolsMetrics } from './infra/metrics-proxy.js';
+export { clearToolsLogger, log, setToolsLogger } from './infra/logger.js';
+export { clearToolsMetrics, getSummary, getToolStats, setToolsMetrics } from './infra/metrics-proxy.js';
 export { readStore } from './todo/store.js';

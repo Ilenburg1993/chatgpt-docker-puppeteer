@@ -27,7 +27,7 @@ export function getIoMutationAuditLogPath() {
  * @param {import('./operation.js').IoOperationEnvelope} envelope
  * @param {{
  *     tool?: string;
- *     io?: import('../../core/io-contracts.js').IoMeta | null;
+ *     io?: import('#copilot/core/io-contracts').IoMeta | null;
  *     result?: Record<string, unknown>;
  * }} [context]
  * @returns {Record<string, unknown>}
@@ -66,7 +66,7 @@ export function buildIoMutationAuditRecord(envelope, context = {}) {
  * @param {import('./operation.js').IoOperationEnvelope} envelope
  * @param {{
  *     tool?: string;
- *     io?: import('../../core/io-contracts.js').IoMeta | null;
+ *     io?: import('#copilot/core/io-contracts').IoMeta | null;
  *     result?: Record<string, unknown>;
  * }} [context]
  * @returns {Promise<{ enabled: boolean; path: string | null; written: boolean; error?: string }>}

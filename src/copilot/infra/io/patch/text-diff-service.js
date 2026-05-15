@@ -5,7 +5,7 @@
  * @module copilot/infra/io/patch/text-diff-service
  */
 
-import { buildIoMeta, createIoTraceId } from '../../../core/io-contracts.js';
+import { buildIoMeta, createIoTraceId } from '#copilot/core';
 import { nowIoMs, publishIoOperation } from '../../io-observability.js';
 import { assertValidIoFilePath } from '../../policy/path-resource.js';
 import { readText } from '../fs/read-services.js';
@@ -20,10 +20,10 @@ function elapsedMs(startedAt) {
 }
 
 /**
- * @param {import('../../../core/io-contracts.js').IoMeta} io
+ * @param {import('#copilot/core/io-contracts').IoMeta} io
  * @param {boolean} success
  * @param {unknown} [error]
- * @returns {import('../../../core/io-contracts.js').IoMeta}
+ * @returns {import('#copilot/core/io-contracts').IoMeta}
  */
 function publishAndReturn(io, success, error) {
     publishIoOperation(io, { success, ...(error !== undefined ? { error } : {}) });
@@ -52,7 +52,7 @@ function publishAndReturn(io, success, error) {
  *     pathB: string;
  *     diff: string;
  *     identical: boolean;
- *     io: import('../../../core/io-contracts.js').IoMeta;
+ *     io: import('#copilot/core/io-contracts').IoMeta;
  * }>}
  */
 export async function diffTextWithReader(readTextLike, pathA, pathB, options = {}) {

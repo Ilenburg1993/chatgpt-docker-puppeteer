@@ -119,6 +119,8 @@ export {
     hasCanonicalLocalFsTools,
 } from './sdk-fs-routing.js';
 
+export { normalizeUserInputBridgeContract } from './tool-contracts.js';
+
 // ─── Timeouts ─────────────────────────────────────────────────────────────────
 export {
     computeAdaptiveDialogTimeout,

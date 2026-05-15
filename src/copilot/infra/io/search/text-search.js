@@ -7,8 +7,7 @@
  * @module copilot/infra/io/search/text-search
  */
 
-import { buildIoMeta, createIoTraceId } from '../../../core/io-contracts.js';
-import { sanitizeIoTextOutput } from '../../../core/io-policy.js';
+import { buildIoMeta, createIoTraceId, sanitizeIoTextOutput } from '#copilot/core';
 import { findIoIndexSymbol, getIoIndexStats, searchIoIndex } from '../../io-index-registry.js';
 import { nowIoMs, publishIoOperation } from '../../io-observability.js';
 import { resolveIoSearchBudget } from '../../policy/budgets.js';
@@ -66,10 +65,10 @@ function sanitizeSearchOutput(stdout) {
 }
 
 /**
- * @param {import('../../../core/io-contracts.js').IoMeta} io
+ * @param {import('#copilot/core/io-contracts').IoMeta} io
  * @param {boolean} success
  * @param {unknown} [error]
- * @returns {import('../../../core/io-contracts.js').IoMeta}
+ * @returns {import('#copilot/core/io-contracts').IoMeta}
  */
 function publishAndReturn(io, success, error) {
     publishIoOperation(io, { success, ...(error !== undefined ? { error } : {}) });
@@ -104,7 +103,7 @@ function publishAndReturn(io, success, error) {
  *     nextCursor?: string | null;
  *     cursorOffset?: number;
  *     totalMatches?: number;
- *     io: import('../../../core/io-contracts.js').IoMeta;
+ *     io: import('#copilot/core/io-contracts').IoMeta;
  * }>}
  */
 export async function searchText(targetPath, options) {
@@ -383,7 +382,7 @@ export async function searchText(targetPath, options) {
  *     nextCursor?: string | null;
  *     cursorOffset?: number;
  *     totalMatches?: number;
- *     io: import('../../../core/io-contracts.js').IoMeta;
+ *     io: import('#copilot/core/io-contracts').IoMeta;
  * }>}
  */
 export async function searchWorkspaceSymbols(targetPath, options) {

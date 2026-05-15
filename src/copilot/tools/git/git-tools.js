@@ -10,11 +10,11 @@
  */
 
 import { WORKSPACE_ROOT } from '#copilot/boot';
+import { toExecError } from '#copilot/core';
 import { resolveProcessExecutionBudget } from '#copilot/infra/public/policy';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { z } from 'zod';
-import { toExecError } from '../../core/error-handlers.js';
 import { log } from '../infra/logger.js';
 import { buildTool, withSkipPermission } from '../infra/tool-factory.js';
 

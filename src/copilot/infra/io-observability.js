@@ -10,7 +10,7 @@
 
 import { channel } from 'node:diagnostics_channel';
 import { createHistogram, performance } from 'node:perf_hooks';
-import { logSwallowed } from '../core/error-handlers.js';
+import { logSwallowed } from '#copilot/core';
 
 const ioOperationChannel = channel('copilot.io.operation');
 const ioCacheChannel = channel('copilot.io.cache');
@@ -49,7 +49,7 @@ export function nowIoMs() {
 }
 
 /**
- * @param {import('../core/io-contracts.js').IoMeta} io
+ * @param {import('#copilot/core/io-contracts').IoMeta} io
  * @param {{ success: boolean; error?: unknown }} opts
  * @returns {void}
  */

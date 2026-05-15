@@ -17,7 +17,7 @@ import { setupTerminalIoActivityEvents } from './io-activity-events.js';
 import { setupTerminalSdkSessionEventListeners } from './sdk-session-events.js';
 
 /**
- * @param {import('readline').Interface | null} rl
+ * @param {import('node:readline').Interface | null} rl
  * @returns {() => void}
  */
 export function setupTerminalEventAdapters(rl = null) {
@@ -44,7 +44,7 @@ export function setupTerminalEventAdapters(rl = null) {
 }
 
 /**
- * @param {import('readline').Interface} rl
+ * @param {import('node:readline').Interface} rl
  * @returns {() => void}
  */
 export function setupTerminalInteractiveEventAdapters(rl) {

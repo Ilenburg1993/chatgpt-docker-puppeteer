@@ -14,7 +14,7 @@ import { setupTerminalInteractiveEventAdapters } from '../events/index.js';
 /**
  * Registra listeners de eventos do AlwaysAliveAgent para exibição no terminal.
  *
- * @param {import('readline').Interface} rl - Interface readline ativa
+ * @param {import('node:readline').Interface} rl - Interface readline ativa
  * @returns {() => void} Função de cleanup
  */
 export function setupAgentListeners(rl) {

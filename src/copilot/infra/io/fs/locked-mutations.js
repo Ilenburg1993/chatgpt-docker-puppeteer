@@ -9,7 +9,7 @@
 
 import * as fs from 'node:fs/promises';
 import { dirname } from 'node:path';
-import { buildIoMeta, createIoTraceId, withIoMeta } from '../../../core/io-contracts.js';
+import { buildIoMeta, createIoTraceId, withIoMeta } from '#copilot/core';
 import { withIoResourceLock, withIoResourceLocks } from '../../io-locks.js';
 import { nowIoMs, publishIoOperation } from '../../io-observability.js';
 import { assertValidIoFilePath } from '../../policy/path-resource.js';
@@ -40,10 +40,10 @@ function elapsedMs(startedAt) {
 }
 
 /**
- * @param {import('../../../core/io-contracts.js').IoMeta} io
+ * @param {import('#copilot/core/io-contracts').IoMeta} io
  * @param {boolean} success
  * @param {unknown} [error]
- * @returns {import('../../../core/io-contracts.js').IoMeta}
+ * @returns {import('#copilot/core/io-contracts').IoMeta}
  */
 function publishAndReturn(io, success, error) {
     publishIoOperation(io, { success, ...(error !== undefined ? { error } : {}) });
@@ -143,7 +143,7 @@ function buildRollbackSnapshot(content) {
  * @returns {Promise<{
  *     path: string;
  *     deleted: true;
- *     io: import('../../../core/io-contracts.js').IoMeta;
+ *     io: import('#copilot/core/io-contracts').IoMeta;
  *     lockWaitMs: number;
  *     previousHash: string;
  *     previousBytes: number;
@@ -214,7 +214,7 @@ export async function deleteFileLocked(filePath) {
  * @returns {Promise<{
  *     path: string;
  *     deleted: true;
- *     io: import('../../../core/io-contracts.js').IoMeta;
+ *     io: import('#copilot/core/io-contracts').IoMeta;
  *     lockWaitMs: number;
  * }>}
  */

@@ -18,22 +18,21 @@
  */
 
 import { z } from 'zod';
-import { LLM_B_TURN_TIMEOUT_MS } from '../../config/env.js';
-import { resolveHubTurnTimeout } from '../../config/hub-timeout-policy.js';
-import { toError } from '../../core/error-handlers.js';
+import { LLM_B_TURN_TIMEOUT_MS, resolveHubTurnTimeout } from '#copilot/config';
+import { toError } from '#copilot/core';
 import { log } from '../infra/logger.js';
 import { buildTool } from '../infra/tool-factory.js';
 
 // ─── Injeção de dependência do hub (ARCH-02) ─────────────────────────────────
 
-/** @type {import('../../conversation-hub/hub.js').ConversationHub | null} */
+/** @type {import('#copilot/conversation-hub/hub').ConversationHub | null} */
 let _injectedHub = null;
 
 /**
  * Injeta o ConversationHub para evitar import dinâmico implícito. Seguir o padrão de `setSessionRpc()` em
  * session-rpc-tools.js. Deve ser chamado em `bootstrapTools()` após o hub ser inicializado.
  *
- * @param {import('../../conversation-hub/hub.js').ConversationHub} hub
+ * @param {import('#copilot/conversation-hub/hub').ConversationHub} hub
  * @returns {void}
  */
 export function setHub(hub) {
@@ -52,7 +51,7 @@ export function resetHubForTests() {
 /**
  * Retorna o hub injetado via `setHub()`. Retorna null se não injetado ou não pronto.
  *
- * @returns {import('../../conversation-hub/hub.js').ConversationHub | null}
+ * @returns {import('#copilot/conversation-hub/hub').ConversationHub | null}
  */
 function requireHub() {
     if (_injectedHub === null) return null;

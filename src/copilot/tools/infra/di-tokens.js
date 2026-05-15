@@ -5,19 +5,19 @@
  * @module copilot/tools/infra/di-tokens
  */
 
-import { createToken } from '../../core/di.js';
+import { createToken } from '#copilot/core';
 
 /**
  * Logger injetável para o módulo tools.
  *
- * @type {import('../../core/di.js').Token<import('../../core/di-tokens.js').CopilotLogger>}
+ * @type {import('#copilot/core/di').Token<import('#copilot/core/di-tokens').CopilotLogger>}
  */
 export const TOOLS_LOGGER = createToken('TOOLS_LOGGER');
 
 /**
  * Métricas proxy injetável para o módulo tools.
  *
- * @type {import('../../core/di.js').Token<{
+ * @type {import('#copilot/core/di').Token<{
  *     getSummary: () => object;
  *     getToolStats: () => object;
  *     recordToolCall: Function;

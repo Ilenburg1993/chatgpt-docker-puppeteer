@@ -9,7 +9,7 @@
 
 import * as fs from 'node:fs/promises';
 import { dirname } from 'node:path';
-import { buildIoMeta, createIoTraceId, withIoMeta } from '../../../core/io-contracts.js';
+import { buildIoMeta, createIoTraceId, withIoMeta } from '#copilot/core';
 import { withIoResourceLock } from '../../io-locks.js';
 import { nowIoMs, publishIoOperation } from '../../io-observability.js';
 import { assertValidIoFilePath } from '../../policy/path-resource.js';
@@ -29,10 +29,10 @@ function elapsedMs(startedAt) {
 }
 
 /**
- * @param {import('../../../core/io-contracts.js').IoMeta} io
+ * @param {import('#copilot/core/io-contracts').IoMeta} io
  * @param {boolean} success
  * @param {unknown} [error]
- * @returns {import('../../../core/io-contracts.js').IoMeta}
+ * @returns {import('#copilot/core/io-contracts').IoMeta}
  */
 function publishAndReturn(io, success, error) {
     publishIoOperation(io, { success, ...(error !== undefined ? { error } : {}) });
@@ -46,7 +46,7 @@ function publishAndReturn(io, success, error) {
  * @param {string | Buffer} content
  * @param {{
  *     encoding?: BufferEncoding;
- *     riskClass?: import('../../../core/io-contracts.js').IoRiskClass;
+ *     riskClass?: import('#copilot/core/io-contracts').IoRiskClass;
  *     traceId?: string;
  *     mode?: number;
  *     requireExists?: boolean;
@@ -59,7 +59,7 @@ function publishAndReturn(io, success, error) {
  * @returns {Promise<{
  *     path: string;
  *     bytesWritten: number;
- *     io: import('../../../core/io-contracts.js').IoMeta;
+ *     io: import('#copilot/core/io-contracts').IoMeta;
  *     lockWaitMs: number;
  *     previousHash: string | null;
  *     contentHash: string;
@@ -246,7 +246,7 @@ export async function appendTextLocked(filePath, content, options = {}) {
  * @returns {Promise<{
  *     path: string;
  *     created: true;
- *     io: import('../../../core/io-contracts.js').IoMeta;
+ *     io: import('#copilot/core/io-contracts').IoMeta;
  *     lockWaitMs: number;
  * }>}
  */

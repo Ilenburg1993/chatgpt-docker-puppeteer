@@ -11,7 +11,7 @@
 
 import { basename, extname } from 'node:path';
 import pLimit from 'p-limit';
-import { createIoTraceId } from '../core/io-contracts.js';
+import { createIoTraceId } from '#copilot/core';
 import {
     classifyContentKind,
     countLines,

@@ -12,8 +12,7 @@ import ignore from 'ignore';
 import { lstat, readdir } from 'node:fs/promises';
 import { basename, join, relative } from 'node:path';
 import pLimit from 'p-limit';
-import { buildIoMeta, createIoTraceId } from '../core/io-contracts.js';
-import { DEFAULT_BLOCKED_PATH_SEGMENTS } from '../core/io-policy.js';
+import { DEFAULT_BLOCKED_PATH_SEGMENTS, buildIoMeta, createIoTraceId } from '#copilot/core';
 import { nowIoMs, publishIoLifecycleEvent, publishIoOperation } from './io-observability.js';
 import { hasNullByte } from './policy/path-resource.js';
 import { mapInBatches, normalizeBatchSize } from './scan/batching.js';
@@ -74,7 +73,7 @@ function assertValidScannerPath(candidate, label) {
  *     path: string;
  *     entries: IoScanEntry[];
  *     scannedEntries: number;
- *     io: import('../core/io-contracts.js').IoMeta;
+ *     io: import('#copilot/core/io-contracts').IoMeta;
  * }>}
  */
 export async function scanDirectory(rootPath, options = {}) {

@@ -11,12 +11,12 @@
  */
 
 import { SERVER_PORT } from '#copilot/config';
+import { toError } from '#copilot/core';
+import { httpRequest } from '#copilot/sdk';
 import { access, readFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { z } from 'zod';
-import { toError } from '../../core/error-handlers.js';
-import { httpRequest } from '../../sdk/http-request.js';
 import { log } from '../infra/logger.js';
 import { buildTool, withSkipPermission } from '../infra/tool-factory.js';
 

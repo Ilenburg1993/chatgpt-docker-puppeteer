@@ -16,7 +16,7 @@ import {
     recordIoMutationAudit,
     serializeIoRollbackToken,
 } from '#copilot/infra/public/runtime';
-import { toError } from '../../../core/error-handlers.js';
+import { toError } from '#copilot/core';
 import { createToolFailureResult } from '../../infra/tool-feedback.js';
 import { patchFailureCategory, patchFailureFix, readErrorCode, readErrorDetails } from './patch-feedback.js';
 
@@ -32,7 +32,7 @@ export const ADVISORY_PATCH_SEGMENT_CHARS = 200_000;
  * }} result
  * @param {{
  *     tool: string;
- *     io?: import('../../../core/io-contracts.js').IoMeta | null;
+ *     io?: import('#copilot/core/io-contracts').IoMeta | null;
  *     result?: Record<string, unknown>;
  * }} auditContext
  */
@@ -52,7 +52,7 @@ export async function completeAndAuditMutation(operation, result, auditContext) 
  * @param {unknown} error
  * @param {{
  *     tool: string;
- *     io?: import('../../../core/io-contracts.js').IoMeta | null;
+ *     io?: import('#copilot/core/io-contracts').IoMeta | null;
  *     result?: Record<string, unknown>;
  * }} auditContext
  */
@@ -70,7 +70,7 @@ export async function failAndAuditMutation(operation, error, auditContext) {
 /**
  * @param {{
  *     capability: string;
- *     riskClass: import('../../../core/io-contracts.js').IoRiskClass;
+ *     riskClass: import('#copilot/core/io-contracts').IoRiskClass;
  *     traceId?: string | null;
  *     action?: 'write' | 'patch' | 'delete' | 'copy' | 'move';
  *     targets?: string[];

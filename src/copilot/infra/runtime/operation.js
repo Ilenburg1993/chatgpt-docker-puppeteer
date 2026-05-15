@@ -13,7 +13,7 @@ import { randomUUID } from 'node:crypto';
  * @typedef {object} IoOperationEnvelope
  * @property {string} operationId
  * @property {string} capability
- * @property {import('../../core/io-contracts.js').IoRiskClass} riskClass
+ * @property {import('#copilot/core/io-contracts').IoRiskClass} riskClass
  * @property {string[]} targets
  * @property {IoOperationStatus} status
  * @property {number} startedAtMs
@@ -27,7 +27,7 @@ import { randomUUID } from 'node:crypto';
 /**
  * @param {{
  *     capability: string;
- *     riskClass?: import('../../core/io-contracts.js').IoRiskClass;
+ *     riskClass?: import('#copilot/core/io-contracts').IoRiskClass;
  *     targets?: readonly string[];
  *     traceId?: string | null;
  *     evidence?: Record<string, unknown>;

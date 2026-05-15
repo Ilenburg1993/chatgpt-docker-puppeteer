@@ -12,7 +12,7 @@
  * @module copilot/tools/infra/metrics-proxy
  */
 
-/** @typedef {import('../../observability/metrics-histogram.js').MetricsSummary} MetricsSummary */
+/** @typedef {import('#copilot/observability/metrics-histogram').MetricsSummary} MetricsSummary */
 
 /**
  * @typedef {object} ToolStatsEntry

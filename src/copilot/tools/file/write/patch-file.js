@@ -9,7 +9,7 @@ import { patchTextLocked } from '#copilot/infra/public/io';
 import { IO_CAPABILITY, IO_RISK, riskForDryRun } from '#copilot/infra/public/policy';
 import { createIoOperationEnvelope } from '#copilot/infra/public/runtime';
 import { z } from 'zod';
-import { withIoMeta } from '../../../core/io-contracts.js';
+import { withIoMeta } from '#copilot/core';
 import { log } from '../../infra/logger.js';
 import { buildTool } from '../../infra/tool-factory.js';
 import { createToolFailureResult } from '../../infra/tool-feedback.js';

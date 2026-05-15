@@ -23,6 +23,7 @@ export const DEFAULT_EXCLUDED_TOOLS = /** @type {readonly string[]} */ (Object.f
 
 // ─── Env (variáveis de ambiente e constantes de configuração) ─────────────────
 export * from './env.js';
+export { resolveHubTurnTimeout } from './hub-timeout-policy.js';
 
 export { MCP_SERVERS, buildMcpConfig, listAvailableMcpServers } from './mcp-servers.js';
 

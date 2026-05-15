@@ -23,6 +23,7 @@
  */
 
 import { getAuditTail } from '#copilot/audit';
+import { normalizeUserInputBridgeContract, toError } from '#copilot/core';
 import {
     cancelAllPendingStructuredUserInput,
     deletePendingStructuredUserInputResolver,
@@ -40,8 +41,6 @@ import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 import { z } from 'zod';
-import { toError } from '../../core/error-handlers.js';
-import { normalizeUserInputBridgeContract } from '../../core/tool-contracts.js';
 import { log } from '../infra/logger.js';
 import { buildTool, withSkipPermission } from '../infra/tool-factory.js';
 const execFileAsync = promisify(execFile);

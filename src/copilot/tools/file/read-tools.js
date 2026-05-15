@@ -18,8 +18,7 @@
 
 import { stat as fsStat } from 'node:fs/promises';
 import { z } from 'zod';
-import { toError } from '../../core/error-handlers.js';
-import { withIoMeta } from '../../core/io-contracts.js';
+import { toError, withIoMeta } from '#copilot/core';
 import { diffText, scanDirectory, searchText, searchWorkspaceSymbols } from '#copilot/infra/public/io';
 import { log } from '../infra/logger.js';
 import { buildTool, withSkipPermission } from '../infra/tool-factory.js';

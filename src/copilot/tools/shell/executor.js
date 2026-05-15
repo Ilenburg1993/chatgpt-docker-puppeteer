@@ -10,10 +10,10 @@
  */
 
 import { getShellOutputPolicy } from '#copilot/config';
+import { toExecError } from '#copilot/core';
 import { resolveProcessExecutionBudget } from '#copilot/infra/public/policy';
 import { execFile, spawn } from 'node:child_process';
 import { promisify } from 'node:util';
-import { toExecError } from '../../core/error-handlers.js';
 import { safeEnv } from './sandbox.js';
 
 const execFileAsync = promisify(execFile);

@@ -57,7 +57,7 @@ export const appendTextLocked = appendTextLockedInFsWrites;
  * @returns {Promise<{
  *     path: string;
  *     stats: import('node:fs').Stats;
- *     io: import('../core/io-contracts.js').IoMeta;
+ *     io: import('#copilot/core/io-contracts').IoMeta;
  * }>}
  */
 export const statPath = statPathInReadServices;
@@ -70,7 +70,7 @@ export const statPath = statPathInReadServices;
  * @returns {Promise<{
  *     path: string;
  *     created: true;
- *     io: import('../core/io-contracts.js').IoMeta;
+ *     io: import('#copilot/core/io-contracts').IoMeta;
  *     lockWaitMs: number;
  * }>}
  */
@@ -118,7 +118,7 @@ export const diffText = diffTextInPatchService;
  *     nextCursor?: string | null;
  *     cursorOffset?: number;
  *     totalMatches?: number;
- *     io: import('../core/io-contracts.js').IoMeta;
+ *     io: import('#copilot/core/io-contracts').IoMeta;
  * }>}
  */
 export const searchText = searchTextInSearchModule;
@@ -151,7 +151,7 @@ export const searchText = searchTextInSearchModule;
  *     nextCursor?: string | null;
  *     cursorOffset?: number;
  *     totalMatches?: number;
- *     io: import('../core/io-contracts.js').IoMeta;
+ *     io: import('#copilot/core/io-contracts').IoMeta;
  * }>}
  */
 export const searchWorkspaceSymbols = searchWorkspaceSymbolsInSearchModule;

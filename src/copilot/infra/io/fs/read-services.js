@@ -5,7 +5,7 @@
  * @module copilot/infra/io/fs/read-services
  */
 
-import { buildIoMeta, createIoTraceId } from '../../../core/io-contracts.js';
+import { buildIoMeta, createIoTraceId } from '#copilot/core';
 import { getIoL2Cache } from '../../io-cache-l2-registry.js';
 import { getIoL1Cache, getVerifiedIoL1Entry, makeBytesKey, makeTextKey, normalizeIoCacheKey } from '../../io-cache.js';
 import { nowIoMs, publishIoOperation } from '../../io-observability.js';
@@ -57,10 +57,10 @@ function readCacheContentHash(meta) {
 }
 
 /**
- * @param {import('../../../core/io-contracts.js').IoMeta} io
+ * @param {import('#copilot/core/io-contracts').IoMeta} io
  * @param {boolean} success
  * @param {unknown} [error]
- * @returns {import('../../../core/io-contracts.js').IoMeta}
+ * @returns {import('#copilot/core/io-contracts').IoMeta}
  */
 function publishAndReturn(io, success, error) {
     publishIoOperation(io, { success, ...(error !== undefined ? { error } : {}) });

@@ -56,7 +56,7 @@ const TOOL_HEARTBEAT_INTERVAL_MS = 10_000;
 /**
  * @param {{
  *     agent: AgentEventHost;
- *     rl?: import('readline').Interface | null;
+ *     rl?: import('node:readline').Interface | null;
  *     registry?: ReturnType<import('../state/index.js').createToolCallRegistry> | null;
  * }} input
  * @returns {() => void}
