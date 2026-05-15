@@ -85,9 +85,9 @@ export const TERMINAL_MODULE_LAYOUT = Object.freeze([
         kind: 'file',
         role: 'dev-tooling',
         tier: 'secondary',
-        risk: 'stable',
+        risk: 'watch',
         public: false,
-        summary: 'Watcher in-process de ficheiros src/copilot/** para hot-reload em modo dev. Activado por COPILOT_DEV_WATCH=true.',
+        summary: 'Monitor passivo de mudanças em src/copilot/** (notify) ou auto-restart supervisionado (auto). Activado por COPILOT_DEV_WATCH. Expõe getDevWatchStatus() para introspection.',
     },
     {
         path: 'module-map.js',

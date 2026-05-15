@@ -408,7 +408,7 @@
     "start:container": "NODE_ENV=development NODE_OPTIONS='--strip-types --inspect=0.0.0.0:9229 --enable-source-maps --trace-warnings --trace-uncaught --unhandled-rejections=strict' node index.js",
     "summarize-code": "python3 agents/code_explainer/generate_summary.py",
     "terminal:llm-b": "COPILOT_LOG_LEVEL=INFO COPILOT_SDK_ENABLED=true COPILOT_OPERATIONAL_PROFILE=production COPILOT_REASONING_EFFORT=high TERMINAL_DISPLAY_PRESET=full node --disable-warning=ExperimentalWarning --strip-types src/copilot/terminal/bootstrap.js --model llm-b",
-    "terminal:llm-b:dev": "COPILOT_DEV_WATCH=true COPILOT_LOG_LEVEL=INFO COPILOT_SDK_ENABLED=true COPILOT_OPERATIONAL_PROFILE=production COPILOT_REASONING_EFFORT=high TERMINAL_DISPLAY_PRESET=full node --watch --disable-warning=ExperimentalWarning --strip-types src/copilot/terminal/bootstrap.js --model llm-b",
+    "terminal:llm-b:dev": "COPILOT_DEV_WATCH=auto COPILOT_LOG_LEVEL=INFO COPILOT_SDK_ENABLED=true COPILOT_OPERATIONAL_PROFILE=production COPILOT_REASONING_EFFORT=high TERMINAL_DISPLAY_PRESET=full node --watch --disable-warning=ExperimentalWarning --strip-types src/copilot/terminal/bootstrap.js --model llm-b",
     "test": "npm run test:unit && npm run test:integration && npm run test:regression",
     "test:check-schemas": "node scripts/check-schema-coverage.mjs",
     "test:copilot": "env -u NO_COLOR NODE_COMPILE_CACHE=${NODE_COMPILE_CACHE:-/home/node/.cache/node-compile} node scripts/ci/run-vitest-copilot.mjs",
