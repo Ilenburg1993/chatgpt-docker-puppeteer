@@ -24,6 +24,7 @@
 
 import { getAuditTail } from '#copilot/audit';
 import { normalizeUserInputBridgeContract, toError } from '#copilot/core';
+import { readText } from '#copilot/infra/public/io';
 import {
     cancelAllPendingStructuredUserInput,
     deletePendingStructuredUserInputResolver,
@@ -36,7 +37,7 @@ import {
     ToolSessionContext,
 } from '#copilot/sdk/session';
 import { execFile } from 'node:child_process';
-import { access, readFile } from 'node:fs/promises';
+import { access } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
@@ -422,7 +423,7 @@ const hookGetPendingTasksTool = buildTool({
             return { content: '', exists: false };
         }
         try {
-            const content = await readFile(pendingPath, 'utf8');
+            const content = (await readText(pendingPath)).content;
             log('INFO', `[hook-tools/get_pending_tasks] pending-tasks.md lido (${content.length} chars).`);
             return { content, exists: true };
         } catch (e) {

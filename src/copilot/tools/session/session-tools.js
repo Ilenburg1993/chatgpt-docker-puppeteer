@@ -12,8 +12,9 @@
 
 import { readBootSkillConfig, resolveHooksStateDir, resolveWorkspacePath } from '#copilot/boot';
 import { logSwallowed, toError } from '#copilot/core';
+import { createOrReplaceFileAtomic, mkdirPathLocked, readText } from '#copilot/infra/public/io';
 import { execFileSync } from 'node:child_process';
-import { mkdir, readdir, readFile, stat, writeFile } from 'node:fs/promises';
+import { readdir, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 import { z } from 'zod';
 import { log } from '../infra/logger.js';
@@ -34,8 +35,8 @@ const readBriefingTool = buildTool({
     handler: async () => {
         const p = join(HOOKS_STATE, 'session-briefing.md');
         try {
-            const content = await readFile(p, 'utf8');
-            return { content };
+            const result = await readText(p);
+            return { content: result.content, io: result.io };
         } catch {
             return { content: null, message: 'Briefing não encontrado.' };
         }
@@ -61,18 +62,18 @@ const writePendingTaskTool = buildTool({
         /** @type {{ title: string; description?: string; priority?: string }} */ { title, description, priority },
     ) => {
         try {
-            await mkdir(HOOKS_STATE, { recursive: true });
+            await mkdirPathLocked(HOOKS_STATE, { recursive: true });
             const p = join(HOOKS_STATE, 'pending-tasks.md');
             let existing = '# Tarefas Pendentes\n\n';
             try {
-                existing = await readFile(p, 'utf8');
+                existing = (await readText(p)).content;
             } catch (e) {
                 logSwallowed(e, 'session-tools.readPendingTasks');
             }
             const entry = `\n## [${(priority ?? 'medium').toUpperCase()}] ${title}\n${description ? `\n${description}\n` : ''}_Adicionado pelo SDK Agent em ${new Date().toISOString()}_\n`;
-            await writeFile(p, existing + entry, 'utf8');
+            const writeResult = await createOrReplaceFileAtomic(p, existing + entry);
             log('INFO', `[copilot/write_pending_task] Tarefa adicionada: ${title}`);
-            return { success: true, title };
+            return { success: true, title, io: writeResult.io };
         } catch (e) {
             return { success: false, error: toError(e).message };
         }
@@ -212,7 +213,7 @@ const invokeSkillTool = buildTool({
         const skillPath = join(skillsDir, name, 'SKILL.md');
         let content;
         try {
-            content = await readFile(skillPath, 'utf-8');
+            content = (await readText(skillPath)).content;
         } catch {
             return { error: `Skill '${name}' não encontrada.`, available };
         }

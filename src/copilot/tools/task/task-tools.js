@@ -12,8 +12,8 @@
 
 import { SERVER_PORT } from '#copilot/config';
 import { toError } from '#copilot/core';
+import { readText } from '#copilot/infra/public/io';
 import { httpRequest } from '#copilot/sdk';
-import { access, readFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { z } from 'zod';
@@ -112,8 +112,7 @@ const getSessionStateTool = buildTool({
             for (const file of files) {
                 const p = join(stateDir, file);
                 try {
-                    await access(p);
-                    result[file] = await readFile(p, 'utf8');
+                    result[file] = (await readText(p)).content;
                 } catch {
                     // file does not exist — skip
                 }
