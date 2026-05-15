@@ -472,8 +472,24 @@ export const findSymbolUsagesTool = buildTool({
             .default(true)
             .describe('Busca sensível a maiúsculas. Default: true para símbolos.'),
         maxResults: z.number().int().min(1).optional().describe('Máximo de matches a retornar.'),
+        cursor: z
+            .string()
+            .optional()
+            .describe(
+                'Cursor de paginação retornado em chamada anterior (campo nextCursor). ' +
+                    'Omitir para iniciar da primeira página.',
+            ),
     }),
-    handler: async ({ symbol, path: searchPath, includePattern, excludePattern, wholeWord, caseSensitive, maxResults }) => {
+    handler: async ({
+        symbol,
+        path: searchPath,
+        includePattern,
+        excludePattern,
+        wholeWord,
+        caseSensitive,
+        maxResults,
+        cursor,
+    }) => {
         const { ok, reason, resolved } = await validatePath(searchPath ?? '.', { mode: 'read' });
         if (!ok) return { success: false, error: reason };
 
@@ -488,10 +504,12 @@ export const findSymbolUsagesTool = buildTool({
                 pattern,
                 isRegex: true,
                 caseSensitive: caseSensitive !== false,
+                withLineNumbers: true,
                 contextLines: 0,
                 includePattern: includePattern ?? '*.{js,ts,mjs,cjs}',
                 ...(excludePattern ? { excludePattern } : {}),
                 ...(maxResults ? { maxResults } : {}),
+                ...(cursor ? { cursor } : {}),
             });
 
             const { matches, fileCount } = parseUsageOutput(result.output, WORKSPACE_ROOT);
@@ -505,6 +523,8 @@ export const findSymbolUsagesTool = buildTool({
                     matches,
                     engine: result.engine,
                     sanitized: result.sanitized,
+                    ...(result.truncated ? { truncated: result.truncated } : {}),
+                    ...(result.nextCursor ? { nextCursor: result.nextCursor } : {}),
                 },
                 result.io,
             );

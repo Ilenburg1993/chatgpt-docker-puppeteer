@@ -87,6 +87,7 @@ function publishAndReturn(io, success, error) {
  *     includePattern?: string;
  *     excludePattern?: string;
  *     contextLines?: number;
+ *     withLineNumbers?: boolean;
  *     maxResults?: number;
  *     cursor?: string | number | null;
  *     traceId?: string;
@@ -169,6 +170,18 @@ export async function searchText(targetPath, options) {
             ...(options.excludePattern ? { excludePattern: options.excludePattern } : {}),
         };
 
+        /**
+         * Conta apenas linhas de match real (formato `path:linenum:text`), excluindo linhas de
+         * contexto (`path-linenum-text`) e separadores (`--`). Funciona com saída de rg
+         * (--line-number sempre ativo) e grep (-n sempre ativo via buildGrepArgs).
+         *
+         * @param {string} text - Saída crua do rg/grep após sanitização
+         * @returns {number}
+         */
+        function countMatchLines(text) {
+            return text.split('\n').filter((line) => /^.+:\d+:/.test(line)).length;
+        }
+
         if (canUseIndexSearch(indexSearchOptions)) {
             const freshFiles = 'freshFiles' in indexStats ? Number(indexStats.freshFiles ?? 0) : 0;
             const indexRows =
@@ -217,6 +230,7 @@ export async function searchText(targetPath, options) {
                     [
                         '--color=never',
                         '--no-heading',
+                        '--line-number',
                         ...(options.isRegex ? [] : ['--fixed-strings']),
                         ...(options.caseSensitive ? [] : ['--ignore-case']),
                         `--context=${options.contextLines ?? 2}`,
@@ -253,7 +267,7 @@ export async function searchText(targetPath, options) {
                     targetPath,
                     pattern: options.pattern,
                     output: filteredOutput.text,
-                    matchCount: filteredOutput.text.split('\n').filter(Boolean).length,
+                    matchCount: countMatchLines(filteredOutput.text),
                     engine: 'rg',
                     sanitized: filteredOutput.sanitized,
                     redactions: filteredOutput.redactions,
@@ -312,7 +326,7 @@ export async function searchText(targetPath, options) {
                 targetPath,
                 pattern: options.pattern,
                 output: filteredOutput.text,
-                matchCount: filteredOutput.text.split('\n').filter(Boolean).length,
+                matchCount: countMatchLines(filteredOutput.text),
                 engine: 'grep',
                 sanitized: filteredOutput.sanitized,
                 redactions: filteredOutput.redactions,

@@ -48,7 +48,7 @@ export function buildSymbolPattern(symbolName, kind) {
             `${n}\\s*=\\s*(?:TypeVar|NewType)\\(`,
         ].join('|'),
         all: [
-            `(?:(?:async\\s+)?function|class|(?:const|let|var)|interface|type|def\\s|fn\\s|func\\s)\\s*${n}\\b`,
+            `(?:export\\s+(?:default\\s+)?)?(?:(?:async\\s+)?function|class|(?:const|let|var)|interface|type|def\\s|fn\\s|func\\s)\\s*${n}\\b`,
             `${n}\\s*[:=]\\s*(?:async\\s+)?(?:\\([^)]*\\)|\\w+)\\s*=>`,
         ].join('|'),
     };
