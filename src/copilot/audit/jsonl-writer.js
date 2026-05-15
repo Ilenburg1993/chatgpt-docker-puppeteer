@@ -9,6 +9,7 @@
  */
 
 import { logSwallowed } from '#copilot/core';
+import { utf8ByteLength } from '#copilot/infra/public/buffer';
 import { appendFile, mkdir, rename, stat } from 'node:fs/promises';
 import { dirname } from 'node:path';
 
@@ -52,7 +53,7 @@ export function createJsonlWriter(opts) {
                     }
                 }
                 const data = batch.join('');
-                const dataBytes = Buffer.byteLength(data, 'utf8');
+                const dataBytes = utf8ByteLength(data, 'jsonl audit batch');
                 if (_sizeBytes + dataBytes >= maxBytes) {
                     await rename(filePath, rotatedPath);
                     _sizeBytes = 0;

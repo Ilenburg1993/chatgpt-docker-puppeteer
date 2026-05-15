@@ -14,9 +14,8 @@ import {
     bufferIsAscii,
     bufferIsUtf8,
     concatBufferViews,
-    toOwnedBuffer,
     truncateBufferView,
-    utf8ByteLength,
+    truncateUtf8String,
 } from '#copilot/infra/public/buffer';
 import { hasNullByte, normalizeWorkspaceRoot } from '#copilot/infra/public/policy';
 import { execFile } from 'node:child_process';
@@ -214,24 +213,14 @@ export function truncateBuffer(buf, maxBytes) {
  */
 export function truncateUtf8Text(text, maxBytes, notice) {
     const normalized = String(text ?? '');
-    const originalBytes = utf8ByteLength(normalized, 'file tools text');
-    if (!Number.isFinite(maxBytes) || maxBytes <= 0 || originalBytes <= maxBytes) {
-        return {
-            text: normalized,
-            truncated: false,
-            originalBytes,
-            limitBytes: Number.isFinite(maxBytes) && maxBytes > 0 ? maxBytes : null,
-        };
-    }
-
-    const bytes = toOwnedBuffer(normalized).subarray(0, maxBytes);
-    const safe = new TextDecoder('utf-8', { fatal: false }).decode(bytes).replace(/\uFFFD+$/, '');
+    const truncated = truncateUtf8String(normalized, maxBytes);
+    if (!truncated.truncated) return truncated;
     const suffix = notice && notice.trim() ? notice : '\n\n⚠️ [output truncated by file-tools policy]';
     return {
-        text: `${safe}${suffix}`,
+        text: `${truncated.text}${suffix}`,
         truncated: true,
-        originalBytes,
-        limitBytes: maxBytes,
+        originalBytes: truncated.originalBytes,
+        limitBytes: truncated.limitBytes,
     };
 }
 

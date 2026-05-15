@@ -9,6 +9,7 @@
 
 import { getInjectInterventionPolicy } from '#copilot/config';
 import { container, toError } from '#copilot/core';
+import { utf8ByteLength } from '#copilot/infra/public/buffer';
 import { log, METRICS_STORE } from '#copilot/observability';
 import { resolveOptionalDialogTimeout } from '../../dialog-timeout-policy.js';
 import { readRuntimeIdFromParams } from '../../routing/index.js';
@@ -632,7 +633,7 @@ export async function handleInject(params = {}) {
             let totalBytes = 0;
             const limitedParts = [];
             for (const part of validParts) {
-                const partBytes = Buffer.byteLength(part, 'utf8');
+                const partBytes = utf8ByteLength(part, 'runtime embed part');
                 if (totalBytes + partBytes > MAX_EMBED_BYTES) break;
                 limitedParts.push(part);
                 totalBytes += partBytes;

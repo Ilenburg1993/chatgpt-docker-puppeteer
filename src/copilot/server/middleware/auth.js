@@ -10,6 +10,7 @@
 
 import { defaultAuditLog } from '#copilot/audit';
 import { readCopilotBootConfig } from '#copilot/boot';
+import { toOwnedBuffer } from '#copilot/infra/public/buffer';
 import { timingSafeEqual } from 'node:crypto';
 
 /**
@@ -36,8 +37,8 @@ export function createAuthMiddleware(opts) {
 
         // SEC-04: timingSafeEqual sem short-circuit para evitar timing leak
         const maxLen = Math.max(authHeader.length, expected.length);
-        const providedBuf = Buffer.from(authHeader.padEnd(maxLen));
-        const expectedBuf = Buffer.from(expected.padEnd(maxLen));
+        const providedBuf = toOwnedBuffer(authHeader.padEnd(maxLen));
+        const expectedBuf = toOwnedBuffer(expected.padEnd(maxLen));
         const lengthMatch = authHeader.length === expected.length;
         const tokenMatch = timingSafeEqual(providedBuf, expectedBuf) && lengthMatch;
 

@@ -8,6 +8,7 @@
 import { randomUUID } from 'node:crypto';
 
 import { CANONICAL_LOCAL_FS_TOOL_NAMES, decideSdkFsRouting, toError } from '#copilot/core';
+import { utf8ByteLength } from '#copilot/infra/public/buffer';
 import { fileReadTools, fileWriteTools, readIntrospectionRegistrySnapshot } from '#copilot/tools';
 import { isRuntimeElicitationSchema, normalizeElicitationContentWithSchema } from '../../core/elicitation-schema.js';
 import { readTerminalIoActivityProjection } from '../events/index.js';
@@ -268,7 +269,7 @@ async function promoteLocalFileToWorkspace(ctx, payload) {
         ok: true,
         traceId,
         result,
-        bytes: Buffer.byteLength(local.content, 'utf8'),
+        bytes: utf8ByteLength(local.content, 'terminal sdk local content'),
         action: payload.overwrite ? 'overwritten' : 'created',
     };
 }

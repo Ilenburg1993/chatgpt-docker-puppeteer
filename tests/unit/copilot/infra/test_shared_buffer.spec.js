@@ -12,6 +12,7 @@ import {
     toBufferView,
     toOwnedBuffer,
     truncateBufferView,
+    truncateUtf8String,
     utf8ByteLength,
 } from '../../../../src/copilot/infra/shared/buffer.js';
 
@@ -76,5 +77,14 @@ describe('infra/shared/buffer', () => {
         expect([...result]).toEqual([1, 2, 9]);
         expect(isBufferValue(result)).toBe(true);
         expect(isBufferValue(storage)).toBe(false);
+    });
+
+    it('truncateUtf8String trunca por bytes sem deixar replacement char final', () => {
+        const result = truncateUtf8String('ação', 2);
+
+        expect(result.text).toBe('a');
+        expect(result.truncated).toBe(true);
+        expect(result.limitBytes).toBe(2);
+        expect(result.originalBytes).toBe(Buffer.byteLength('ação', 'utf8'));
     });
 });

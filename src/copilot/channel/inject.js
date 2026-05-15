@@ -13,6 +13,7 @@
 import { readCopilotBootConfig } from '#copilot/boot';
 import { LLM_B_TURN_TIMEOUT_MS } from '#copilot/config';
 import { BridgeError, resolveOptionalDialogTimeout, resolveOptionalTransportTimeout, toError } from '#copilot/core';
+import { utf8ByteLength } from '#copilot/infra/public/buffer';
 import { log, recordToolCall } from '#copilot/observability';
 import http from 'node:http';
 import { HealthResponseSchema } from '../core/schemas.js';
@@ -168,7 +169,7 @@ function httpRequest(method, path, body, port, timeoutMs) {
         const headers = /** @type {Record<string, string>} */ ({
             'Content-Type': 'application/json',
         });
-        if (bodyStr) headers['Content-Length'] = String(Buffer.byteLength(bodyStr));
+        if (bodyStr) headers['Content-Length'] = String(utf8ByteLength(bodyStr, 'channel inject body'));
 
         const req = http.request(
             {

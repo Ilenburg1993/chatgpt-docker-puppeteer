@@ -9,6 +9,7 @@
 import { extname, resolve as pathResolve } from 'node:path';
 import { logSwallowed, toError } from '../../core/error-handlers.js';
 import { evaluateIoPathPolicyAsync } from '../../core/io-policy.js';
+import { decodeBase64ToOwnedBuffer } from '../../infra/public/buffer.js';
 import { readText } from '../../infra/io-engine.js';
 import { scanDirectory } from '../../infra/io-scanner.js';
 
@@ -313,7 +314,7 @@ export async function attachmentToEmbed(att) {
             decodedContent = `(dados binários, mimeType: ${mimeType})`;
         } else {
             try {
-                const text = Buffer.from(att.data, 'base64').toString('utf8');
+                const text = decodeBase64ToOwnedBuffer(att.data, 'attachment blob').toString('utf8');
                 decodedContent = text.includes('\0') ? `(dados binários, mimeType: ${mimeType})` : text;
             } catch {
                 decodedContent = `(dados binários, mimeType: ${mimeType})`;

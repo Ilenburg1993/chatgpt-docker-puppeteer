@@ -6,6 +6,7 @@
  */
 
 import { randomUUID } from 'node:crypto';
+import { decodeBase64ToOwnedBuffer, toOwnedBuffer } from '../shared/buffer.js';
 import { sha256 } from '../shared/hash.js';
 
 /**
@@ -100,7 +101,7 @@ export function verifyIoRollbackToken(token) {
  * @returns {string}
  */
 export function serializeIoRollbackToken(token) {
-    return Buffer.from(JSON.stringify(token), 'utf8').toString('base64url');
+    return toOwnedBuffer(JSON.stringify(token)).toString('base64url');
 }
 
 /**
@@ -108,7 +109,7 @@ export function serializeIoRollbackToken(token) {
  * @returns {IoRollbackToken}
  */
 export function parseIoRollbackToken(serialized) {
-    const raw = Buffer.from(serialized, 'base64url').toString('utf8');
+    const raw = decodeBase64ToOwnedBuffer(serialized, 'rollback token').toString('utf8');
     const token = /** @type {IoRollbackToken} */ (JSON.parse(raw));
     if (!verifyIoRollbackToken(token)) {
         throw new Error('Rollback token inválido: digest mismatch ou versão incompatível.');

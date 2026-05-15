@@ -21,6 +21,7 @@ import {
     withIoMeta,
 } from '#copilot/core';
 import { publishIoOperation } from '#copilot/infra/public/events';
+import { concatBufferViews, utf8ByteLength } from '#copilot/infra/public/buffer';
 import { z } from 'zod';
 import { log } from '../infra/logger.js';
 import { buildTool } from '../infra/tool-factory.js';
@@ -256,25 +257,14 @@ const webFetchTool = buildTool({
                 reader.releaseLock();
             }
 
-            const text = new TextDecoder().decode(
-                (() => {
-                    const total = chunks.reduce((s, c) => s + c.length, 0);
-                    const merged = new Uint8Array(total);
-                    let offset = 0;
-                    for (const c of chunks) {
-                        merged.set(c, offset);
-                        offset += c.length;
-                    }
-                    return merged;
-                })(),
-            );
+            const text = new TextDecoder().decode(concatBufferViews(chunks, received));
 
             const sanitized = sanitizeIoTextOutput({ text });
             const io = buildIoMeta({
                 operation: 'fetch',
                 target: finalUrl,
                 targetKind: 'url',
-                bytesRead: Buffer.byteLength(sanitized.text, 'utf8'),
+                bytesRead: utf8ByteLength(sanitized.text, 'web_fetch sanitized text'),
                 engine: 'fetch',
                 truncated: false,
                 advisoryLimits: {
@@ -449,7 +439,10 @@ const webSearchTool = buildTool({
                         operation: 'search',
                         target: jsonUrl,
                         targetKind: 'url',
-                        bytesRead: Buffer.byteLength(JSON.stringify(sanitizedResults.results), 'utf8'),
+                        bytesRead: utf8ByteLength(
+                            JSON.stringify(sanitizedResults.results),
+                            'web_search json results',
+                        ),
                         engine: 'duckduckgo.json',
                         advisoryLimits: {
                             requestedMaxResults: maxResults ?? null,
@@ -562,7 +555,7 @@ const webSearchTool = buildTool({
                 operation: 'search',
                 target: searchUrl,
                 targetKind: 'url',
-                bytesRead: Buffer.byteLength(JSON.stringify(sanitizedResults.results), 'utf8'),
+                bytesRead: utf8ByteLength(JSON.stringify(sanitizedResults.results), 'web_search html results'),
                 engine: 'duckduckgo.html',
                 advisoryLimits: {
                     requestedMaxResults: maxResults ?? null,

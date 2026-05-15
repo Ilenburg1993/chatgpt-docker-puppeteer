@@ -12,6 +12,7 @@
 
 import http from 'node:http';
 import https from 'node:https';
+import { utf8ByteLength } from '#copilot/infra/public/buffer';
 
 /**
  * Executa uma requisição HTTP(S) simples para URLs `http://` e `https://`.
@@ -49,7 +50,7 @@ export function httpRequest(method, urlStr, body = null, timeoutMs = 5000, maxRe
         };
         if (body) {
             options.headers['Content-Type'] = 'application/json';
-            options.headers['Content-Length'] = String(Buffer.byteLength(body));
+            options.headers['Content-Length'] = String(utf8ByteLength(body, 'http request body'));
         }
         const req = transport.request(options, (res) => {
             let data = '';

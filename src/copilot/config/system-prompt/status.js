@@ -12,6 +12,7 @@ import { createHash } from 'node:crypto';
 import { existsSync, readFileSync, statSync } from 'node:fs';
 import { readFile as readFileAsync, stat as statAsync } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
+import { utf8ByteLength } from '#copilot/infra/public/buffer';
 import { loadLiveSystemPromptSections } from './live-loader.js';
 import { readSystemPromptModeState } from './mode.js';
 import { buildSystemPromptProfile } from './profile.js';
@@ -294,7 +295,7 @@ function finalizeSystemPromptStatus({
         reloadBehavior: reloadPolicy.reloadBehavior,
         limitations: reloadPolicy.limitations,
         appendTextConfigured: Boolean(userConfig.appendText.trim()),
-        appendTextBytes: Buffer.byteLength(userConfig.appendText, 'utf8'),
+        appendTextBytes: utf8ByteLength(userConfig.appendText, 'system prompt append text'),
         appendFiles,
         userAppendContentBytes,
         profile: buildSystemPromptProfile(userConfig),
@@ -328,7 +329,7 @@ export function readSystemPromptStatusSync() {
             sectionId,
             file,
             action: section.ACTION,
-            contentBytes: Buffer.byteLength(section.CONTENT, 'utf8'),
+            contentBytes: utf8ByteLength(section.CONTENT, 'system prompt section'),
         };
     });
 
@@ -338,7 +339,7 @@ export function readSystemPromptStatusSync() {
         modeState,
         sdkCompatibility,
         appendFiles,
-        userAppendContentBytes: Buffer.byteLength(userAppendContent, 'utf8'),
+        userAppendContentBytes: utf8ByteLength(userAppendContent, 'system prompt user append content'),
         sectionStatuses,
     });
 }
@@ -362,7 +363,10 @@ export async function readSystemPromptStatus() {
                 sectionId,
                 file: await readTrackedFileStatus(resolveSectionFilePath(fileName)),
                 action: sections[sectionId]?.ACTION ?? section.ACTION,
-                contentBytes: Buffer.byteLength(sections[sectionId]?.CONTENT ?? section.CONTENT, 'utf8'),
+                contentBytes: utf8ByteLength(
+                    sections[sectionId]?.CONTENT ?? section.CONTENT,
+                    'system prompt live section',
+                ),
             };
         }),
     );
@@ -373,9 +377,9 @@ export async function readSystemPromptStatus() {
         modeState,
         sdkCompatibility,
         appendFiles,
-        userAppendContentBytes: Buffer.byteLength(
+        userAppendContentBytes: utf8ByteLength(
             [userAppendContent, userConfig.appendText].filter(Boolean).join('\n\n'),
-            'utf8',
+            'system prompt user append content',
         ),
         sectionStatuses,
     });

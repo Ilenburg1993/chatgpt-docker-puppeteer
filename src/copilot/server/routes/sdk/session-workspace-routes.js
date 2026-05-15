@@ -10,6 +10,7 @@ import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 
 import { IO_PATH_POLICY_VERSION, evaluateIoPathPolicyAsync } from '#copilot/core';
+import { utf8ByteLength } from '#copilot/infra/public/buffer';
 import { resolveSdkRouteSharedDeps } from './deps.js';
 import { validateBody, withErrorHandler } from './session-middleware.js';
 import { getActiveSessionEntryOrReply, withSessionRuntimeMeta } from './session-route-helpers.js';
@@ -407,7 +408,7 @@ export function registerSessionWorkspaceRoutes(router) {
                     sdkPath,
                     localPath: localPath.normalizedPath,
                     overwrite,
-                    bytes: Buffer.byteLength(sdkContent, 'utf8'),
+                    bytes: utf8ByteLength(sdkContent, 'sdk workspace content'),
                 },
             });
 
@@ -435,7 +436,7 @@ export function registerSessionWorkspaceRoutes(router) {
                     sdkPath,
                     localPath: localPath.normalizedPath,
                     overwrite,
-                    bytes: Buffer.byteLength(sdkContent, 'utf8'),
+                    bytes: utf8ByteLength(sdkContent, 'sdk workspace content'),
                 },
             });
 
@@ -592,7 +593,7 @@ export function registerSessionWorkspaceRoutes(router) {
                         sdkPath,
                         localPath: localPath.normalizedPath,
                         overwrite,
-                        bytes: Buffer.byteLength(sdkContent, 'utf8'),
+                        bytes: utf8ByteLength(sdkContent, 'sdk workspace content'),
                     },
                 });
                 emitConvergenceMetric(routeDeps, {
@@ -613,7 +614,7 @@ export function registerSessionWorkspaceRoutes(router) {
                         sdkPath,
                         localPath: localPath.normalizedPath,
                         overwrite,
-                        bytes: Buffer.byteLength(sdkContent, 'utf8'),
+                        bytes: utf8ByteLength(sdkContent, 'sdk workspace content'),
                     },
                 });
 
@@ -738,7 +739,7 @@ export function registerSessionWorkspaceRoutes(router) {
                 return;
             }
 
-            const bytes = Buffer.byteLength(localContent, 'utf8');
+            const bytes = utf8ByteLength(localContent, 'sdk workspace local content');
             emitConvergenceMetric(routeDeps, {
                 operation: 'workspace.promote',
                 phase: 'read_local',
@@ -766,7 +767,10 @@ export function registerSessionWorkspaceRoutes(router) {
                     audit = buildPromoteAudit('conflict', {
                         checked: true,
                         overwrite,
-                        existingBytes: existingContent === null ? null : Buffer.byteLength(existingContent, 'utf8'),
+                        existingBytes:
+                            existingContent === null
+                                ? null
+                                : utf8ByteLength(existingContent, 'sdk workspace existing content'),
                         reason: 'destination-exists',
                     });
                     emitConvergenceMetric(routeDeps, {

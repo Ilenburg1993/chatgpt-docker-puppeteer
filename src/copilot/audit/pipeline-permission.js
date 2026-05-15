@@ -10,6 +10,7 @@
  */
 
 import { logSwallowed, toError } from '#copilot/core';
+import { utf8ByteLength } from '#copilot/infra/public/buffer';
 import { PERMISSION_COMPLETED_KINDS, PERMISSION_RESULTS } from '#copilot/sdk/constants';
 import { appendFile, mkdir, rename, stat } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
@@ -97,7 +98,7 @@ export function isHighRiskTool(toolName) {
  */
 export function logToolAudit(entry) {
     const line = JSON.stringify({ type: 'tool.permission', ...entry, ts: new Date().toISOString() }) + '\n';
-    const lineBytes = Buffer.byteLength(line, 'utf8');
+    const lineBytes = utf8ByteLength(line, 'permission audit line');
 
     void (async () => {
         try {

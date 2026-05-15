@@ -16,6 +16,7 @@
 
 import { readBootSkillConfig, resolveHooksStateFile } from '#copilot/boot';
 import { container, logSwallowed, toError } from '#copilot/core';
+import { truncateUtf8String, utf8ByteLength } from '#copilot/infra/public/buffer';
 import { access, open, readdir, readFile, stat } from 'node:fs/promises';
 import { z } from 'zod';
 import { HOOK_CONTEXT_MAX_BYTES as _HOOK_CONTEXT_MAX_BYTES } from '#copilot/config/agent';
@@ -260,22 +261,19 @@ export async function buildHookSystemContextSafe() {
     _buildHookSystemContextSafePromise = (async () => {
         const raw = await buildHookSystemContext();
         const optionalSkillsStart = raw.indexOf('\n\n## Skills Disponíveis');
-        if (Buffer.byteLength(raw, 'utf8') > HOOK_CONTEXT_MAX_BYTES && optionalSkillsStart !== -1) {
+        if (utf8ByteLength(raw, 'hook context') > HOOK_CONTEXT_MAX_BYTES && optionalSkillsStart !== -1) {
             const optionalSkillsEnd = raw.indexOf('\n\n## Estado Runtime', optionalSkillsStart + 1);
             const withoutSkills =
                 optionalSkillsEnd === -1
                     ? raw.slice(0, optionalSkillsStart)
                     : raw.slice(0, optionalSkillsStart) + raw.slice(optionalSkillsEnd);
-            if (Buffer.byteLength(withoutSkills, 'utf8') <= HOOK_CONTEXT_MAX_BYTES) {
+            if (utf8ByteLength(withoutSkills, 'hook context without skills') <= HOOK_CONTEXT_MAX_BYTES) {
                 return withoutSkills;
             }
         }
-        if (Buffer.byteLength(raw, 'utf8') > HOOK_CONTEXT_MAX_BYTES) {
-            // G1-BUG-08 (fix): usar TextDecoder com fatal=false para garantir que o truncamento em
-            // limite de bytes não corta caracteres UTF-8 multibyte no meio, gerando strings inválidas.
-            const bytes = Buffer.from(raw, 'utf8').subarray(0, HOOK_CONTEXT_MAX_BYTES);
-            const truncated = new TextDecoder('utf-8', { fatal: false }).decode(bytes).replace(/\uFFFD+$/, '');
-            return truncated + '\n\n⚠️ [contexto truncado por limite SEC-02: 8KB]';
+        const truncated = truncateUtf8String(raw, HOOK_CONTEXT_MAX_BYTES);
+        if (truncated.truncated) {
+            return truncated.text + '\n\n⚠️ [contexto truncado por limite SEC-02: 8KB]';
         }
         return raw;
     })();

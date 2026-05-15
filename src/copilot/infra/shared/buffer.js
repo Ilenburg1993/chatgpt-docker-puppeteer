@@ -182,6 +182,37 @@ export function truncateBufferView(value, maxBytes) {
 }
 
 /**
+ * Trunca texto UTF-8 por bytes sem manter U+FFFD final de sequência multibyte cortada.
+ *
+ * @param {string} value
+ * @param {number} maxBytes
+ * @returns {{ text: string; truncated: boolean; originalBytes: number; limitBytes: number | null }}
+ */
+export function truncateUtf8String(value, maxBytes) {
+    if (typeof value !== 'string') {
+        throw new TypeError('utf8 text: esperado string.');
+    }
+    const originalBytes = utf8ByteLength(value, 'utf8 text');
+    if (!Number.isFinite(maxBytes) || maxBytes <= 0 || originalBytes <= maxBytes) {
+        return {
+            text: value,
+            truncated: false,
+            originalBytes,
+            limitBytes: Number.isFinite(maxBytes) && maxBytes > 0 ? Math.trunc(maxBytes) : null,
+        };
+    }
+
+    const limitBytes = Math.trunc(maxBytes);
+    const bytes = toOwnedBuffer(value).subarray(0, limitBytes);
+    return {
+        text: new TextDecoder('utf-8', { fatal: false }).decode(bytes).replace(/\uFFFD+$/, ''),
+        truncated: true,
+        originalBytes,
+        limitBytes,
+    };
+}
+
+/**
  * Concatena views binárias com orçamento explícito de bytes.
  *
  * @param {readonly (Buffer | Uint8Array | ArrayBuffer | SharedArrayBuffer | DataView)[]} chunks
