@@ -7,6 +7,8 @@
 
 import { buildIoMeta, createIoTraceId } from '../../../core/io-contracts.js';
 import { nowIoMs, publishIoOperation } from '../../io-observability.js';
+import { assertValidIoFilePath } from '../../policy/path-resource.js';
+import { readText } from '../fs/read-services.js';
 import { buildSimpleTextDiff } from './text-diff.js';
 
 /**
@@ -90,4 +92,28 @@ export async function diffTextWithReader(readTextLike, pathA, pathB, options = {
         );
         throw error;
     }
+}
+
+/**
+ * Diff textual simples entre arquivos locais, com validação de path e leitura via serviços canônicos.
+ *
+ * @param {string} pathA
+ * @param {string} pathB
+ * @param {{ contextLines?: number }} [options]
+ */
+export async function diffText(pathA, pathB, options = {}) {
+    assertValidIoFilePath(pathA);
+    assertValidIoFilePath(pathB);
+    return diffTextWithReader(
+        async (path) => {
+            const textResult = await readText(path);
+            return {
+                content: textResult.content,
+                bytesRead: textResult.bytesRead,
+            };
+        },
+        pathA,
+        pathB,
+        options,
+    );
 }

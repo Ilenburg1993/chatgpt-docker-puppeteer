@@ -144,6 +144,8 @@ Status complementar (2026-05-14, onda contínua):
   `io-engine`, `io/fs/read-services`, `io/fs/locked-writes` e `io/fs/locked-mutations`.
 - Cobertura unitária ampliada em `test_policy_path_resource.spec.js` para validar casos válidos e inválidos
   (null-byte/path vazio) do helper canônico.
+- `diffText` da facade `io-engine` foi reduzido para alias direto do serviço `io/patch/text-diff-service`, removendo
+  wrapper residual e consolidando validação/leitura no subdomínio de patch.
 
 ### F1.3 — Parser puro
 

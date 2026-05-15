@@ -273,6 +273,17 @@
 - `lint -- src/copilot` ✅
 - `test:copilot:unit` ✅ (2723/2723)
 
+### 74) `src/copilot/infra/io-engine.js` + `src/copilot/infra/io/patch/text-diff-service.js`
+- `diffText` na facade foi reduzido para alias direto de serviço de patch (`diffTextInPatchService`).
+- `text-diff-service` ganhou `diffText(...)` canônico (validação de path + leitura via `read-services`).
+- `io/patch/index.js` consolidado com exports sem duplicação (`buildSimpleTextDiff`, `computeTextPatch`,
+  `diffText`, `diffTextWithReader`).
+
+### 75) Gate oficial pós-redução residual do io-engine
+- `typecheck:strict:src.copilot` ✅
+- `lint -- src/copilot` ✅
+- `test:copilot:unit` ✅ (2723/2723)
+
 ---
 
 ## Itens da Sprint 1 ainda pendentes

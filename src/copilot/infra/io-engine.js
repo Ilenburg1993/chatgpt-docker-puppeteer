@@ -29,12 +29,11 @@ import {
     readText as readTextInReadServices,
     statPath as statPathInReadServices,
 } from './io/fs/read-services.js';
-import { diffTextWithReader } from './io/patch/index.js';
+import { diffText as diffTextInPatchService } from './io/patch/index.js';
 import {
     searchText as searchTextInSearchModule,
     searchWorkspaceSymbols as searchWorkspaceSymbolsInSearchModule,
 } from './io/search/text-search.js';
-import { assertValidIoFilePath } from './policy/path-resource.js';
 
 export const readBytes = readBytesInReadServices;
 
@@ -87,29 +86,7 @@ export const moveFileLocked = moveFileLockedInFsMutations;
 
 export const patchTextLocked = patchTextLockedInFsMutations;
 
-/**
- * Diff textual simples, sem invocar processo externo.
- *
- * @param {string} pathA
- * @param {string} pathB
- * @param {{ contextLines?: number }} [options]
- */
-export async function diffText(pathA, pathB, options = {}) {
-    assertValidIoFilePath(pathA);
-    assertValidIoFilePath(pathB);
-    return diffTextWithReader(
-        async (path) => {
-            const textResult = await readText(path);
-            return {
-                content: textResult.content,
-                bytesRead: textResult.bytesRead,
-            };
-        },
-        pathA,
-        pathB,
-        options,
-    );
-}
+export const diffText = diffTextInPatchService;
 
 /** @typedef {'function' | 'class' | 'variable' | 'export' | 'type' | 'all'} IoSymbolKind */
 
