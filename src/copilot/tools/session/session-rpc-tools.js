@@ -1,6 +1,6 @@
 // @ts-check
 import { COPILOT_RPC_TIMEOUT_MS, MAESTRO_AGENT_NAME } from '#copilot/config';
-import { toError } from '#copilot/core';
+import { runShutdown, toError } from '#copilot/core';
 import { z } from 'zod';
 import { log } from '../infra/logger.js';
 import { buildTool, withSkipPermission } from '../infra/tool-factory.js';
@@ -358,10 +358,66 @@ const sessionCompactTool = buildTool({
         ),
 });
 
+// ─── reload_agent_process ─────────────────────────────────────────────────────
+
+/**
+ * Tool: reload_agent_process — encerra o processo graciosamente para que o supervisor reinicie com ESM fresco.
+ *
+ * Fluxo: graceful shutdown via `runShutdown(reason)` → `process.exit(0)` → PM2 / VS Code / node --watch respawna.
+ * O reload é a única forma confiável de ativar novas tools ou mudanças de módulos em um processo ESM vivo.
+ */
+const reloadAgentProcessTool = buildTool({
+    name: 'reload_agent_process',
+    description:
+        'Encerra o processo atual de forma graciosa e sai com código 0, permitindo que o supervisor ' +
+        '(PM2, VS Code, node --watch) reinicie o processo com módulos ESM recarregados. ' +
+        'Use após instalar novas tools, alterar configurações ou após qualquer mudança que exija refresh do runtime. ' +
+        'Retorna o plano de shutdown antes de sair — a resposta é entregue antes do exit.',
+    parameters: /** @type {import('#copilot/sdk/types').ZodSchema<{ reason?: string; delay_ms?: number }>} */ (
+        /** @type {unknown} */ (
+            z.object({
+                reason: z
+                    .string()
+                    .optional()
+                    .describe('Motivo do reload, para logging (padrão: "agent_reload")'),
+                delay_ms: z
+                    .number()
+                    .int()
+                    .min(0)
+                    .max(5000)
+                    .optional()
+                    .describe('Delay em ms antes de process.exit(0) para garantir entrega da resposta (padrão: 500ms)'),
+            })
+        )
+    ),
+    handler: async (/** @type {{ reason?: string; delay_ms?: number }} */ { reason, delay_ms } = {}) => {
+        const delayMs = delay_ms ?? 500;
+        const reasonStr = reason ?? 'agent_reload';
+        const supervisor = process.env['pm_id']
+            ? 'pm2'
+            : (process.env['COPILOT_SUPERVISOR'] ?? 'bare-node');
+        log(
+            'INFO',
+            `[reload_agent_process] Graceful shutdown agendado. reason=${reasonStr} supervisor=${supervisor} delay=${delayMs}ms`,
+        );
+        setTimeout(() => {
+            runShutdown(reasonStr)
+                .catch(() => {})
+                .finally(() => process.exit(0));
+        }, delayMs);
+        return {
+            ok: true,
+            reason: reasonStr,
+            supervisor,
+            message: `Graceful shutdown em ${delayMs}ms. O supervisor (${supervisor}) reiniciará o processo com ESM fresco.`,
+        };
+    },
+});
+
 // ─── Export ───────────────────────────────────────────────────────────────────
 
 /**
- * Tools de RPC de sessão SDK — mode, plan, agent, compaction.
+ * Tools de RPC de sessão SDK — mode, plan, agent, compaction, reload.
  *
  * @type {import('#copilot/sdk/types').Tool<any>[]}
  */
@@ -376,4 +432,5 @@ export const sessionRpcTools = [
     sessionAgentSelectTool,
     sessionAgentReloadTool,
     sessionCompactTool,
+    reloadAgentProcessTool,
 ];
