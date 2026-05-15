@@ -51,6 +51,13 @@ const fsMock = {
 };
 vi.mock('node:fs/promises', () => fsMock);
 
+const ioMock = {
+    readText: vi.fn(),
+    mkdirPathLocked: vi.fn(),
+    createOrReplaceFileAtomic: vi.fn(),
+};
+vi.mock('#copilot/infra/public/io', () => ioMock);
+
 const mockExecFileSync = vi.fn();
 vi.mock('node:child_process', () => ({
     execFileSync: mockExecFileSync,
@@ -92,7 +99,10 @@ describe('F36 — read_briefing (F189-F190)', () => {
     const handler = /** @type {Function} */ (readBriefingTool.handler);
 
     it('retorna conteúdo do briefing quando existe', async () => {
-        fsMock.readFile.mockResolvedValue('# Session Briefing\nclose_key: abc123');
+        ioMock.readText.mockResolvedValue({
+            content: '# Session Briefing\nclose_key: abc123',
+            io: { operation: 'read' },
+        });
 
         const result = await callTool(handler, {});
 
@@ -100,7 +110,7 @@ describe('F36 — read_briefing (F189-F190)', () => {
     });
 
     it('retorna null quando briefing não existe', async () => {
-        fsMock.readFile.mockRejectedValue(new Error('ENOENT'));
+        ioMock.readText.mockRejectedValue(new Error('ENOENT'));
 
         const result = await callTool(handler, {});
 
@@ -121,48 +131,48 @@ describe('F36 — write_pending_task (F191-F192)', () => {
     const handler = /** @type {Function} */ (writePendingTaskTool.handler);
 
     it('adiciona tarefa ao pending-tasks.md', async () => {
-        fsMock.mkdir.mockResolvedValue(undefined);
-        fsMock.readFile.mockResolvedValue('# Tarefas Pendentes\n\n');
-        fsMock.writeFile.mockResolvedValue(undefined);
+        ioMock.mkdirPathLocked.mockResolvedValue({ io: { operation: 'mkdir' } });
+        ioMock.readText.mockResolvedValue({ content: '# Tarefas Pendentes\n\n', io: { operation: 'read' } });
+        ioMock.createOrReplaceFileAtomic.mockResolvedValue({ io: { operation: 'write' } });
 
         const result = await callTool(handler, { title: 'Fix bug', description: 'Corrigir bug X', priority: 'high' });
 
         expect(result.success).toBe(true);
         expect(result.title).toBe('Fix bug');
-        expect(fsMock.writeFile).toHaveBeenCalledOnce();
-        const written = fsMock.writeFile.mock.calls[0]?.[1];
+        expect(ioMock.createOrReplaceFileAtomic).toHaveBeenCalledOnce();
+        const written = ioMock.createOrReplaceFileAtomic.mock.calls[0]?.[1];
         expect(written).toBeDefined();
         expect(written).toContain('[HIGH] Fix bug');
         expect(written).toContain('Corrigir bug X');
     });
 
     it('cria arquivo quando não existe', async () => {
-        fsMock.mkdir.mockResolvedValue(undefined);
-        fsMock.readFile.mockRejectedValue(new Error('ENOENT'));
-        fsMock.writeFile.mockResolvedValue(undefined);
+        ioMock.mkdirPathLocked.mockResolvedValue({ io: { operation: 'mkdir' } });
+        ioMock.readText.mockRejectedValue(new Error('ENOENT'));
+        ioMock.createOrReplaceFileAtomic.mockResolvedValue({ io: { operation: 'write' } });
 
         const result = await callTool(handler, { title: 'Nova tarefa' });
 
         expect(result.success).toBe(true);
-        const written = fsMock.writeFile.mock.calls[0]?.[1];
+        const written = ioMock.createOrReplaceFileAtomic.mock.calls[0]?.[1];
         expect(written).toBeDefined();
         expect(written).toContain('# Tarefas Pendentes');
     });
 
     it('usa prioridade medium por default', async () => {
-        fsMock.mkdir.mockResolvedValue(undefined);
-        fsMock.readFile.mockResolvedValue('');
-        fsMock.writeFile.mockResolvedValue(undefined);
+        ioMock.mkdirPathLocked.mockResolvedValue({ io: { operation: 'mkdir' } });
+        ioMock.readText.mockResolvedValue({ content: '', io: { operation: 'read' } });
+        ioMock.createOrReplaceFileAtomic.mockResolvedValue({ io: { operation: 'write' } });
 
         await callTool(handler, { title: 'Default priority' });
 
-        const written = fsMock.writeFile.mock.calls[0]?.[1];
+        const written = ioMock.createOrReplaceFileAtomic.mock.calls[0]?.[1];
         expect(written).toBeDefined();
         expect(written).toContain('[MEDIUM]');
     });
 
     it('retorna erro em falha de escrita', async () => {
-        fsMock.mkdir.mockRejectedValue(new Error('EACCES'));
+        ioMock.mkdirPathLocked.mockRejectedValue(new Error('EACCES'));
 
         const result = await callTool(handler, { title: 'Will fail' });
 
@@ -171,9 +181,9 @@ describe('F36 — write_pending_task (F191-F192)', () => {
     });
 
     it('loga a adição de tarefa', async () => {
-        fsMock.mkdir.mockResolvedValue(undefined);
-        fsMock.readFile.mockResolvedValue('');
-        fsMock.writeFile.mockResolvedValue(undefined);
+        ioMock.mkdirPathLocked.mockResolvedValue({ io: { operation: 'mkdir' } });
+        ioMock.readText.mockResolvedValue({ content: '', io: { operation: 'read' } });
+        ioMock.createOrReplaceFileAtomic.mockResolvedValue({ io: { operation: 'write' } });
 
         await callTool(handler, { title: 'Logged task' });
 
@@ -274,7 +284,7 @@ describe('F36 — invoke_skill (F195)', () => {
     it('carrega conteúdo de uma skill existente', async () => {
         fsMock.stat.mockResolvedValue({});
         fsMock.readdir.mockResolvedValue([{ name: 'code-audit', isDirectory: () => true }]);
-        fsMock.readFile.mockResolvedValue('# Code Audit Skill\nInstruções...');
+        ioMock.readText.mockResolvedValue({ content: '# Code Audit Skill\nInstruções...', io: { operation: 'read' } });
 
         const result = await callTool(handler, { name: 'code-audit' });
 
@@ -285,7 +295,7 @@ describe('F36 — invoke_skill (F195)', () => {
     it('retorna erro se skill não encontrada', async () => {
         fsMock.stat.mockResolvedValue({});
         fsMock.readdir.mockResolvedValue([]);
-        fsMock.readFile.mockRejectedValue(new Error('ENOENT'));
+        ioMock.readText.mockRejectedValue(new Error('ENOENT'));
 
         const result = await callTool(handler, { name: 'nonexistent' });
 
