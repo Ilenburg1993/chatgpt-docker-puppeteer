@@ -15,7 +15,6 @@ import { getIoCacheStats } from '#copilot/infra/public/cache';
 import { readBytes, readText, readTextChunks, warmReadThroughContext } from '#copilot/infra/public/io';
 import { log } from '../../infra/logger.js';
 import { buildTool } from '../../infra/tool-factory.js';
-import { createToolFailureResult } from '../../infra/tool-feedback.js';
 import {
     FILE_TOOLS_OUTPUT_POLICY,
     truncateBuffer,
@@ -23,6 +22,7 @@ import {
     validatePath,
     WORKSPACE_ROOT,
 } from '../shared.js';
+import { createReadFileFailure } from './feedback.js';
 import { buildReadFileMetadata } from './metadata.js';
 import {
     nextLineCursor,
@@ -38,64 +38,6 @@ import {
  */
 const MIN_READ_THROUGH_BYTES = 1024;
 const DEFAULT_STREAM_CHUNK_LINES = 200;
-
-const READ_FILE_FEEDBACK_FIX = /** @type {const} */ ({
-    ERR_READ_PATH_INVALID:
-        'Use um path relativo ao workspace ou absoluto permitido em /workspaces, sem null byte e sem escapar da policy.',
-    ERR_READ_BINARY_LINE_WINDOW:
-        'Remova startLine/endLine/maxLines ou troque encoding para utf8 quando quiser janela por linha.',
-    ERR_READ_CURSOR_INVALID:
-        'Use o nextCursor retornado pela chamada anterior. Para utf8 ele é a próxima linha; para base64 é byte offset.',
-    ERR_READ_LINE_WINDOW_INVALID:
-        'Ajuste startLine/endLine para um intervalo crescente; endLine deve ser maior ou igual a startLine.',
-    ERR_READ_DIRECTORY:
-        'Use list_directory para diretórios, ou informe o path de um arquivo regular para read_file_content.',
-    ERR_READ_FAILED:
-        'Releia o path, reduza maxBytes/maxLines ou use readStrategy=stream para isolar arquivos grandes.',
-});
-
-const READ_FILE_CONTENT_FEEDBACK_PARAMETERS = /** @type {const} */ ({
-    type: 'object',
-    required: ['path'],
-    additionalProperties: false,
-    properties: {
-        path: { type: 'string', description: 'Caminho do arquivo.' },
-        startLine: { type: 'integer', description: 'Linha inicial 1-based para utf8.' },
-        endLine: { type: 'integer', description: 'Linha final 1-based inclusiva para utf8.' },
-        cursor: { type: 'string', description: 'Cursor retornado por chamada anterior.' },
-        maxLines: { type: 'integer', description: 'Máximo de linhas para utf8.' },
-        maxBytes: { type: 'integer', description: 'Máximo de bytes de saída.' },
-        encoding: { type: 'string', enum: ['utf8', 'base64'], description: 'Codificação de saída.' },
-        readStrategy: { type: 'string', enum: ['cached', 'stream'], description: 'Estratégia de leitura.' },
-        streamHighWaterMark: { type: 'integer', description: 'Buffer do read stream em bytes.' },
-        includeMetadata: { type: 'boolean', description: 'Inclui metadata.' },
-        includeHash: { type: 'boolean', description: 'Inclui hashes.' },
-        includeReadThrough: { type: 'boolean', description: 'Aquece contexto relacionado.' },
-        includeCacheStats: { type: 'boolean', description: 'Inclui stats do cache L1.' },
-    },
-});
-
-/**
- * @param {string} message
- * @param {keyof typeof READ_FILE_FEEDBACK_FIX} code
- * @param {Record<string, unknown>} receivedParameters
- * @param {Record<string, unknown>} [details]
- * @param {{ category?: import('../../infra/tool-feedback.js').ToolFailureCategory; error?: unknown; retryable?: boolean }} [options]
- */
-function readFileFailure(message, code, receivedParameters, details = {}, options = {}) {
-    return createToolFailureResult({
-        toolName: 'read_file_content',
-        message,
-        fix: READ_FILE_FEEDBACK_FIX[code],
-        parameters: READ_FILE_CONTENT_FEEDBACK_PARAMETERS,
-        receivedParameters,
-        details: { code, ...details },
-        extra: { code },
-        ...(options.error !== undefined ? { error: options.error } : {}),
-        ...(options.category !== undefined ? { category: options.category } : {}),
-        ...(options.retryable !== undefined ? { retryable: options.retryable } : {}),
-    });
-}
 
 /**
  * Tool: read_file_content — lê o conteúdo de um arquivo.
@@ -210,7 +152,7 @@ export const readFileContentTool = buildTool({
         const resolvedMaxLines = normalizePositiveInteger(maxLines);
         const { ok, reason, resolved } = await validatePath(filePath, { mode: 'read' });
         if (!ok) {
-            return readFileFailure(
+            return createReadFileFailure(
                 reason ?? 'Caminho inválido.',
                 'ERR_READ_PATH_INVALID',
                 receivedParameters,
@@ -219,7 +161,7 @@ export const readFileContentTool = buildTool({
             );
         }
         if (resolvedEncoding === 'base64' && (startLine !== undefined || endLine !== undefined || maxLines !== undefined)) {
-            return readFileFailure(
+            return createReadFileFailure(
                 'Parâmetros de linha (startLine/endLine/maxLines) são válidos apenas com encoding=utf8.',
                 'ERR_READ_BINARY_LINE_WINDOW',
                 receivedParameters,
@@ -231,7 +173,7 @@ export const readFileContentTool = buildTool({
         const textCursor =
             resolvedEncoding === 'utf8' ? parseReadCursor(cursor, { min: 1, label: 'Cursor de linha' }) : null;
         if (textCursor && !textCursor.ok) {
-            return readFileFailure(
+            return createReadFileFailure(
                 textCursor.reason,
                 'ERR_READ_CURSOR_INVALID',
                 receivedParameters,
@@ -246,7 +188,7 @@ export const readFileContentTool = buildTool({
         const byteCursor =
             resolvedEncoding === 'base64' ? parseReadCursor(cursor, { min: 0, label: 'Cursor de bytes' }) : null;
         if (byteCursor && !byteCursor.ok) {
-            return readFileFailure(
+            return createReadFileFailure(
                 byteCursor.reason,
                 'ERR_READ_CURSOR_INVALID',
                 receivedParameters,
@@ -263,7 +205,7 @@ export const readFileContentTool = buildTool({
         const effectiveEndLine =
             endLine ?? (resolvedMaxLines !== undefined ? effectiveStartLine + resolvedMaxLines - 1 : undefined);
         if (effectiveEndLine !== undefined && effectiveEndLine < effectiveStartLine) {
-            return readFileFailure(
+            return createReadFileFailure(
                 'Intervalo inválido: endLine deve ser maior ou igual a startLine.',
                 'ERR_READ_LINE_WINDOW_INVALID',
                 receivedParameters,
@@ -277,7 +219,7 @@ export const readFileContentTool = buildTool({
         try {
             const stats = await fsStat(resolved);
             if (stats.isDirectory()) {
-                return readFileFailure(
+                return createReadFileFailure(
                     'É um diretório, use list_directory.',
                     'ERR_READ_DIRECTORY',
                     receivedParameters,
@@ -459,7 +401,7 @@ export const readFileContentTool = buildTool({
             );
         } catch (err) {
             const error = toError(err);
-            return readFileFailure(
+            return createReadFileFailure(
                 error.message,
                 'ERR_READ_FAILED',
                 receivedParameters,

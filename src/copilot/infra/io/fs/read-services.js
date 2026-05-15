@@ -11,6 +11,7 @@ import { getIoL1Cache, getVerifiedIoL1Entry, makeBytesKey, makeTextKey, normaliz
 import { nowIoMs, publishIoOperation } from '../../io-observability.js';
 import { assertValidIoFilePath } from '../../policy/path-resource.js';
 import { bufferIsUtf8, isBufferValue, toOwnedBuffer } from '../../shared/buffer.js';
+import { fingerprintMatches } from '../../shared/fingerprint-match.js';
 import { sha256 } from '../../shared/hash.js';
 import { readBytesFileSnapshot } from './read-bytes.js';
 import { readTextLineChunks } from './read-chunks.js';
@@ -54,6 +55,25 @@ function stringifyCacheMeta(meta) {
  */
 function readCacheContentHash(meta) {
     return typeof meta['contentHash'] === 'string' ? meta['contentHash'] : undefined;
+}
+
+/**
+ * @param {{ mtimeMs?: number | null; sizeBytes: number }} l2Entry
+ * @param {{ mtimeMs?: number; size?: number } | null} metadata
+ * @returns {boolean}
+ */
+function l2EntryMatchesStat(l2Entry, metadata) {
+    if (!metadata) return false;
+    return fingerprintMatches(
+        {
+            mtimeMs: Number(l2Entry.mtimeMs),
+            sizeBytes: Number(l2Entry.sizeBytes),
+        },
+        {
+            mtimeMs: Number(metadata.mtimeMs),
+            sizeBytes: Number(metadata.size),
+        },
+    );
 }
 
 /**
@@ -120,18 +140,8 @@ export async function readBytes(filePath, options = {}) {
                 const l2Meta = parseCacheMetaJson(l2Entry.metaJson);
                 const contentHash = readCacheContentHash(l2Meta) ?? sha256(l2Entry.payload);
                 const metadata = await statPathSnapshot(filePath).catch(() => null);
-                const cachedMtimeMs = Number(l2Entry.mtimeMs);
-                const actualMtimeMs = Number(metadata?.mtimeMs);
-                const mtimeMatches =
-                    Number.isFinite(cachedMtimeMs) &&
-                    Number.isFinite(actualMtimeMs) &&
-                    (cachedMtimeMs === actualMtimeMs || cachedMtimeMs === Math.round(actualMtimeMs));
-                const sizeMatches =
-                    Number.isFinite(l2Entry.sizeBytes) &&
-                    Number.isFinite(metadata?.size) &&
-                    Number(l2Entry.sizeBytes) === Number(metadata?.size);
 
-                if (mtimeMatches && sizeMatches) {
+                if (l2EntryMatchesStat(l2Entry, metadata)) {
                     const _now = Date.now();
                     _l1.set(_cacheKey, {
                         content: l2Entry.payload,
@@ -331,18 +341,8 @@ export async function readText(filePath, options = {}) {
                 const l2Meta = parseCacheMetaJson(l2Entry.metaJson);
                 const l2ContentHash = readCacheContentHash(l2Meta);
                 const metadata = await statPathSnapshot(filePath).catch(() => null);
-                const cachedMtimeMs = Number(l2Entry.mtimeMs);
-                const actualMtimeMs = Number(metadata?.mtimeMs);
-                const mtimeMatches =
-                    Number.isFinite(cachedMtimeMs) &&
-                    Number.isFinite(actualMtimeMs) &&
-                    (cachedMtimeMs === actualMtimeMs || cachedMtimeMs === Math.round(actualMtimeMs));
-                const sizeMatches =
-                    Number.isFinite(l2Entry.sizeBytes) &&
-                    Number.isFinite(metadata?.size) &&
-                    Number(l2Entry.sizeBytes) === Number(metadata?.size);
 
-                if (mtimeMatches && sizeMatches) {
+                if (l2EntryMatchesStat(l2Entry, metadata)) {
                     const text = l2Entry.payload.toString('utf8');
                     const contentHash = l2ContentHash ?? sha256(text);
                     const lines = text.split('\n');
