@@ -13,7 +13,6 @@ export {
     copyFileLocked,
     createOrReplaceFileAtomic,
     deleteFileLocked,
-    diffText,
     mkdirPathLocked,
     moveFileLocked,
     patchTextLocked,
@@ -22,11 +21,12 @@ export {
     readText,
     readTextChunks,
     removePathLocked,
-    searchText,
-    searchWorkspaceSymbols,
     statPath,
     writeFileAtomic
-} from '../io-engine.js';
+} from '../io/fs/index.js';
+
+export { diffText } from '../io/patch/index.js';
+export { searchText, searchWorkspaceSymbols } from '../io/search/index.js';
 
 export { warmReadThroughContext } from '../io-prefetch.js';
 export { scanDirectory } from '../io-scanner.js';

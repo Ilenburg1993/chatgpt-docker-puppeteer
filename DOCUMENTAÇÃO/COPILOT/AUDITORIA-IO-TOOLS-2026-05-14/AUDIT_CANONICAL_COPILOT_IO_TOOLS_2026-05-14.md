@@ -134,3 +134,10 @@ Classificadas como **direção válida** para roadmap evolutivo. Priorização r
 - Hardening de consistência aplicado: validação de path (`assertValidIoFilePath`) centralizada em `infra/policy/path-resource.js` e adotada nos módulos de facade/leitura/escrita/mutação.
 - Redução adicional da facade aplicada: `io-engine.diffText` passou para alias direto de `infra/io/patch/text-diff-service`, removendo wrapper residual no engine.
 - Boundary barrel-first ampliado: `sdk/session/session-fs.js` migrou imports diretos de `io-engine`/`io-scanner` para `#copilot/infra/public/io`.
+- Facade pública de IO reduzida: `infra/public/io.js` agora reexporta leitura/escrita de `io/fs`, busca de
+	`io/search` e diff de `io/patch` diretamente, diminuindo dependência pública do legado em `io-engine`.
+- Boundary interno de `tools/` reforçado: autoimport cíclico do barrel raiz `#copilot/tools` foi identificado em
+	módulos internos, revertido para `tools/infra/*` e coberto por governança ESLint anti-regressão.
+- Avaliação de gates concluída: `test:copilot` já compartilha o mesmo runner/log compacto de `test:copilot:unit`, mas
+	ainda falha por suites ampliadas fora do corte imediato de IO/tools; `test:copilot:unit` permanece gate canônico de
+	mudança local até nova estabilização transversal.

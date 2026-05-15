@@ -1,4 +1,11 @@
 // @ts-check
+import { COPILOT_MCP_SERVERS, COPILOT_MODEL, COPILOT_SDK_ENABLED } from '#copilot/config';
+import { createRequire } from 'node:module';
+import { z } from 'zod';
+import { log } from '../infra/logger.js';
+import { getSummary as getMetricsSummary, getToolStats } from '../infra/metrics-proxy.js';
+import { buildTool, withSkipPermission } from '../infra/tool-factory.js';
+import { createEmptyToolContractReport } from './tool-contract-verifier.js';
 /**
  * src/copilot/tools/introspection/introspection-tools.js
  *
@@ -9,14 +16,6 @@
  * @see EventBus
  * @see module:copilot/agent/status-snapshot
  */
-
-import { COPILOT_MCP_SERVERS, COPILOT_MODEL, COPILOT_SDK_ENABLED } from '#copilot/config';
-import { createRequire } from 'node:module';
-import { z } from 'zod';
-import { log } from '../infra/logger.js';
-import { getSummary as getMetricsSummary, getToolStats } from '../infra/metrics-proxy.js';
-import { buildTool, withSkipPermission } from '../infra/tool-factory.js';
-import { createEmptyToolContractReport } from './tool-contract-verifier.js';
 
 // ─── Estado compartilhado via registry canônico ─────────────────────────────
 
@@ -71,6 +70,32 @@ export function getDisabledTools() {
 
 /** @type {import('./tool-contract-verifier.js').ToolContractReport} */
 let _toolContractReport = createEmptyToolContractReport();
+
+/**
+ * Provedor narrow do contexto de agente para enriquecer `get_agent_info` com estado live (modelo negociado e
+ * reasoning).
+ *
+ * @typedef {{
+ *     getModelSnapshot: () => string | undefined;
+ *     getReasoningEffortSnapshot: () => string | undefined;
+ *     getLastPrInfoSnapshot?: () => Record<string, unknown> | null;
+ * }} AgentInfoProvider
+ */
+
+/** @type {AgentInfoProvider | null} */
+let _agentInfoProvider = null;
+
+/**
+ * Injeta o provedor narrow do AgentContext para expor `liveModel` e `reasoningEffort` em `get_agent_info`.
+ *
+ * Deve ser chamado pelo wiring de sessão após `finalizeSessionInit` e limpo em `unbindAgentSessionTools`.
+ *
+ * @param {AgentInfoProvider | null} provider
+ * @returns {void}
+ */
+export function setAgentInfoProvider(provider) {
+    _agentInfoProvider = provider;
+}
 
 /**
  * Lista as entradas do ToolRegistry canônico atualmente conectado à introspecção.
@@ -260,6 +285,7 @@ export function resetIntrospectionStateForTests() {
     _introspectionRegistry = null;
     _disabledTools.clear();
     _toolContractReport = createEmptyToolContractReport();
+    _agentInfoProvider = null;
 }
 
 // ─── Tools ───────────────────────────────────────────────────────────────────
@@ -340,10 +366,19 @@ const getAgentInfoTool = buildTool({
             }
         })();
 
+        const _lastPrInfo = _agentInfoProvider?.getLastPrInfoSnapshot?.() ?? null;
+        const liveModel =
+            (typeof _lastPrInfo?.['effectiveModel'] === 'string' ? _lastPrInfo['effectiveModel'] : null) ??
+            (typeof _lastPrInfo?.['model'] === 'string' ? _lastPrInfo['model'] : null) ??
+            _agentInfoProvider?.getModelSnapshot() ??
+            null;
+
         return {
             sdkVersion,
             nodeVersion: process.version,
             model: COPILOT_MODEL ?? 'gpt-5-mini',
+            liveModel,
+            reasoningEffort: _agentInfoProvider?.getReasoningEffortSnapshot() ?? null,
             pid: process.pid,
             uptime: Math.round(process.uptime()),
             toolsRegistered: listRegistryEntries().length,

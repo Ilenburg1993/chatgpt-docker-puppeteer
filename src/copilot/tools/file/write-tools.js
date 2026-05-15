@@ -1,4 +1,12 @@
 // @ts-check
+import { withIoMeta } from '#copilot/core';
+import { decodeBase64ToOwnedBuffer, toOwnedBuffer, utf8ByteLength } from '#copilot/infra/public/buffer';
+import { createIoOperationEnvelope } from '#copilot/infra/public/runtime';
+import { z } from 'zod';
+import { log } from '../infra/logger.js';
+import { buildTool } from '../infra/tool-factory.js';
+import { createToolFailureResult } from '../infra/tool-feedback.js';
+import { validatePath } from './shared.js';
 /**
  * src/copilot/tools/file/write-tools.js
  *
@@ -16,20 +24,7 @@ import {
     moveFileLocked,
     writeFileAtomic,
 } from '#copilot/infra/public/io';
-import {
-    IO_CAPABILITY,
-    IO_RISK,
-    capabilityForCreate,
-    riskForOverwrite,
-} from '#copilot/infra/public/policy';
-import { createIoOperationEnvelope } from '#copilot/infra/public/runtime';
-import { decodeBase64ToOwnedBuffer, toOwnedBuffer, utf8ByteLength } from '#copilot/infra/public/buffer';
-import { z } from 'zod';
-import { withIoMeta } from '#copilot/core';
-import { log } from '../infra/logger.js';
-import { buildTool } from '../infra/tool-factory.js';
-import { createToolFailureResult } from '../infra/tool-feedback.js';
-import { validatePath } from './shared.js';
+import { IO_CAPABILITY, IO_RISK, capabilityForCreate, riskForOverwrite } from '#copilot/infra/public/policy';
 import {
     ADVISORY_WRITE_CONTENT_BYTES,
     buildMutationChangeSet,
@@ -275,7 +270,8 @@ const createFileTool = buildTool({
  */
 const deleteFileTool = buildTool({
     name: 'delete_file',
-    description: 'Deleta um arquivo do workspace. Não opera sobre diretórios e retorna snapshot de rollback quando possível.',
+    description:
+        'Deleta um arquivo do workspace. Não opera sobre diretórios e retorna snapshot de rollback quando possível.',
     parameters: z.object({
         path: z.string().describe('Caminho do arquivo a deletar'),
     }),
@@ -361,7 +357,8 @@ const deleteFileTool = buildTool({
  */
 const copyFileTool = buildTool({
     name: 'copy_file',
-    description: 'Copia um arquivo para outro caminho no workspace, com overwrite explícito e rollback do destino quando possível.',
+    description:
+        'Copia um arquivo para outro caminho no workspace, com overwrite explícito e rollback do destino quando possível.',
     parameters: z.object({
         source: z.string().describe('Caminho do arquivo de origem'),
         destination: z.string().describe('Caminho de destino'),

@@ -1,4 +1,7 @@
 // @ts-check
+import { z } from 'zod/v3';
+import { buildTool } from '../infra/tool-factory.js';
+import { validatePath } from './shared.js';
 /**
  * Tools canônicas para o índice L2 de arquivos.
  *
@@ -8,15 +11,13 @@
  * @module copilot/tools/file/index-tools
  */
 
-import { z } from 'zod/v3';
 import {
     buildIoIndexForDirectory,
     findIoIndexSymbol,
     getIoIndexStats,
+    invalidateIoIndexPath,
     searchIoIndex,
 } from '#copilot/infra/public/indexing';
-import { buildTool } from '../infra/tool-factory.js';
-import { validatePath } from './shared.js';
 
 const IndexBuildParameters = z.object({
     directory: z.string().min(1).describe('Diretório local a indexar.'),
@@ -120,9 +121,31 @@ export const workspaceIndexFindSymbolTool = buildTool({
     },
 });
 
+export const workspaceIndexInvalidateTool = buildTool({
+    name: 'workspace_index_invalidate',
+    description:
+        'Invalida arquivo ou diretório no índice L2. ' +
+        'Use após modificar arquivos para manter o índice fresco antes de buscas subsequentes.',
+    parameters: z.object({
+        path: z.string().min(1).describe('Caminho do arquivo ou diretório a invalidar no índice.'),
+    }),
+    handler: async ({ path }) => {
+        const pathCheck = await validatePath(path, { mode: 'read' });
+        if (!pathCheck.ok) return { success: false, error: pathCheck.reason };
+        const invalidated = invalidateIoIndexPath(pathCheck.resolved);
+        return {
+            success: true,
+            path: pathCheck.resolved,
+            invalidated,
+            stats: getIoIndexStats(),
+        };
+    },
+});
+
 export const indexTools = [
     workspaceIndexBuildTool,
     workspaceIndexStatusTool,
     workspaceIndexSearchTool,
     workspaceIndexFindSymbolTool,
+    workspaceIndexInvalidateTool,
 ];

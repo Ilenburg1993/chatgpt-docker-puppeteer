@@ -1,7 +1,7 @@
 # Análise Profunda da Situação Atual — 2026-05-15
 
-**Status**: Checkpoint de análise pré-transformações amplas.  
-**Commit de referência**: `53936143` (refactor: complete facade consolidation).  
+**Status**: Checkpoint de análise pré-transformações amplas.
+**Commit de referência**: `53936143` (refactor: complete facade consolidation).
 **Executado**: 2026-05-15 às 12:45 UTC.
 
 ---
@@ -49,15 +49,15 @@
 
 **Consumidores de `#copilot/infra/*`**:
 
-| Camada | Contagem | Exemplos |
-|--------|----------|----------|
-| **tools** | 15 módulos | file-tools, git-tools, shell-tools, session-tools, etc. |
-| **terminal** | 3 módulos | commands/scope, frontend/projections, handlers |
-| **server** | 3 módulos | routes/sdk/observability, middleware |
-| **sdk** | 2 módulos | session, tools |
-| **audit** | 2 módulos | internos |
-| **presentation** | 1 | files/context |
-| **config, channel, agent** | 1 cada | — |
+| Camada                     | Contagem   | Exemplos                                                |
+| -------------------------- | ---------- | ------------------------------------------------------- |
+| **tools**                  | 15 módulos | file-tools, git-tools, shell-tools, session-tools, etc. |
+| **terminal**               | 3 módulos  | commands/scope, frontend/projections, handlers          |
+| **server**                 | 3 módulos  | routes/sdk/observability, middleware                    |
+| **sdk**                    | 2 módulos  | session, tools                                          |
+| **audit**                  | 2 módulos  | internos                                                |
+| **presentation**           | 1          | files/context                                           |
+| **config, channel, agent** | 1 cada     | —                                                       |
 
 **Observação**: Tools é o maior consumidor (15 módulos). Merece análise especial para consolidação.
 
@@ -67,12 +67,12 @@
 
 ### 2.1 Cobertura Atual
 
-| Tipo | Arquivos | Script | Escopo |
-|------|----------|--------|--------|
-| **Unit** | 418 | `npm run test:copilot:unit` | `tests/unit/copilot/**/*.spec.js` |
-| **Integration** | 3 | (não isolado) | `tests/integration/copilot/**/*.spec.js` |
-| **Regression** | 1 | (não isolado) | `tests/regression/copilot/**/*.spec.js` |
-| **Full (ALL)** | 422 | `npm run test:copilot` | unit + integration + regression |
+| Tipo            | Arquivos | Script                      | Escopo                                   |
+| --------------- | -------- | --------------------------- | ---------------------------------------- |
+| **Unit**        | 418      | `npm run test:copilot:unit` | `tests/unit/copilot/**/*.spec.js`        |
+| **Integration** | 3        | (não isolado)               | `tests/integration/copilot/**/*.spec.js` |
+| **Regression**  | 1        | (não isolado)               | `tests/regression/copilot/**/*.spec.js`  |
+| **Full (ALL)**  | 422      | `npm run test:copilot`      | unit + integration + regression          |
 
 ### 2.2 Script Atual — `npm run test:copilot:unit`
 
@@ -121,7 +121,7 @@ REMOVER: "test:copilot:raw" ou renomear para "test:copilot:verbose"
 
 **Escopo**: `scripts/ci/run-vitest-copilot.mjs`
 
-**Achado**: 
+**Achado**:
 - O script já suporta múltiplos padrões de arquivo via passthrough args
 - `test:copilot` sem args roda tudo
 - `test:copilot:unit` com `tests/unit/copilot/**/*.spec.js` filtra
@@ -158,7 +158,7 @@ export { withIoResourceLock } from '../io-locks.js';
 export { readLockfileSync, writeLockfileSync } from '../lockfile.js';
 ```
 
-**Benefício**: 
+**Benefício**:
 - Reduce direct imports de módulos internos
 - Explícita a API de cache (importante para tools de file manipulation)
 - Facilita future refactoring de cache internamente
@@ -267,6 +267,6 @@ Antes de consolidar `test:copilot` como padrão:
 
 ---
 
-**Relatório finalizado em**: 2026-05-15 12:50 UTC  
-**Autor**: Análise automatizada pré-transformação  
+**Relatório finalizado em**: 2026-05-15 12:50 UTC
+**Autor**: Análise automatizada pré-transformação
 **Status**: Pronto para execução

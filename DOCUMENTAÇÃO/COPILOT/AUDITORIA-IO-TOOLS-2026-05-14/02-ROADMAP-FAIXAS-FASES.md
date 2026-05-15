@@ -151,6 +151,20 @@ Status complementar (2026-05-14, onda contínua):
   (null-byte/path vazio) do helper canônico.
 - `diffText` da facade `io-engine` foi reduzido para alias direto do serviço `io/patch/text-diff-service`, removendo
   wrapper residual e consolidando validação/leitura no subdomínio de patch.
+- `infra/public/io.js` deixou de reexportar leitura/escrita/busca/diff via `io-engine` e passou a apontar
+  diretamente para `io/fs`, `io/search` e `io/patch`, reduzindo o `io-engine` a uma janela de compatibilidade legada.
+- O subsistema `tools/` teve um drift detectado e corrigido: módulos internos chegaram a importar o barrel raiz
+  `#copilot/tools`, criando ciclo ESM sobre `buildTool/log`. O boundary correto voltou a ser `tools/infra/*` para
+  dependências internas, com regra ESLint específica anti-regressão.
+
+Status complementar (2026-05-15, avaliação de gates):
+
+- `test:copilot` e `test:copilot:unit` já usam o mesmo runner compacto (`scripts/ci/run-vitest-copilot.mjs`) e,
+  portanto, o mesmo perfil de log/artifacts.
+- A diferença atual está no escopo: `test:copilot` agrega suítes além de `tests/unit/copilot/**/*.spec.js` e ainda
+  falha por regressões fora do corte imediato de IO/tools (agent/runtime façade/delegation).
+- Conclusão operacional desta onda: manter `test:copilot:unit` como gate canônico rápido de mudança no escopo atual e
+  usar `test:copilot` como gate ampliado de estabilização até que o backlog transversal seja reduzido.
 
 ### F1.3 — Parser puro
 

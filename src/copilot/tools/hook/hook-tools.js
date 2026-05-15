@@ -1,4 +1,15 @@
 // @ts-check
+import { getAuditTail } from '#copilot/audit';
+import { normalizeUserInputBridgeContract, toError } from '#copilot/core';
+import { readText } from '#copilot/infra/public/io';
+import { execFile } from 'node:child_process';
+import { access } from 'node:fs/promises';
+import { join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { promisify } from 'node:util';
+import { z } from 'zod';
+import { log } from '../infra/logger.js';
+import { buildTool, withSkipPermission } from '../infra/tool-factory.js';
 /**
  * src/copilot/tools/hook/hook-tools.js
  *
@@ -22,9 +33,6 @@
  * @see module:copilot/hooks/audit
  */
 
-import { getAuditTail } from '#copilot/audit';
-import { normalizeUserInputBridgeContract, toError } from '#copilot/core';
-import { readText } from '#copilot/infra/public/io';
 import {
     cancelAllPendingStructuredUserInput,
     deletePendingStructuredUserInputResolver,
@@ -36,14 +44,6 @@ import {
     resolvePendingStructuredUserInput,
     ToolSessionContext,
 } from '#copilot/sdk/session';
-import { execFile } from 'node:child_process';
-import { access } from 'node:fs/promises';
-import { join, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { promisify } from 'node:util';
-import { z } from 'zod';
-import { log } from '../infra/logger.js';
-import { buildTool, withSkipPermission } from '../infra/tool-factory.js';
 const execFileAsync = promisify(execFile);
 
 /**

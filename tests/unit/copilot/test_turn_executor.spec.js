@@ -22,7 +22,7 @@ vi.mock('#copilot/core/errors', () => {
     return { SessionError, CopilotError };
 });
 
-vi.mock('#copilot/core', () => {
+vi.mock('#copilot/core', async (importOriginal) => {
     class SessionError extends Error {
         /** @param {string} msg @param {string} code */
         constructor(msg, code) {
@@ -32,6 +32,7 @@ vi.mock('#copilot/core', () => {
         }
     }
     return {
+        ...(await importOriginal()),
         SessionError,
         container: {
             resolve: vi.fn(() => ({ recordDialogTurn: vi.fn() })),

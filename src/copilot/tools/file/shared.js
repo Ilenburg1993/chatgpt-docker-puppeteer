@@ -1,4 +1,10 @@
 // @ts-check
+import { WORKSPACE_ROOT as BOOT_WORKSPACE_ROOT } from '#copilot/boot';
+import { DEFAULT_BLOCKED_READ_PATH_PATTERNS, evaluateIoPathPolicyAsync } from '#copilot/core';
+import { hasNullByte, normalizeWorkspaceRoot } from '#copilot/infra/public/policy';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
+import { log } from '../infra/logger.js';
 /**
  * src/copilot/tools/file/shared.js
  *
@@ -8,8 +14,6 @@
  * @see EventBus
  */
 
-import { WORKSPACE_ROOT as BOOT_WORKSPACE_ROOT } from '#copilot/boot';
-import { DEFAULT_BLOCKED_READ_PATH_PATTERNS, evaluateIoPathPolicyAsync } from '#copilot/core';
 import {
     bufferIsAscii,
     bufferIsUtf8,
@@ -17,10 +21,6 @@ import {
     truncateBufferView,
     truncateUtf8String,
 } from '#copilot/infra/public/buffer';
-import { hasNullByte, normalizeWorkspaceRoot } from '#copilot/infra/public/policy';
-import { execFile } from 'node:child_process';
-import { promisify } from 'node:util';
-import { log } from '../infra/logger.js';
 
 export const execFileAsync = promisify(execFile);
 

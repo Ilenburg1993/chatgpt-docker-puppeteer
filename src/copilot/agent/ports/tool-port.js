@@ -29,6 +29,7 @@ import {
     isToolDisabled,
     readStore,
     resolveUserInput,
+    setAgentInfoProvider,
     setExperimentalSession,
     setHub,
     setPermissionAgent,
@@ -88,6 +89,7 @@ export function resolveAgentUserInput(answer, requestId) {
 export function unbindAgentSessionTools() {
     cancelAllUserInputRequests();
     setSessionRpc(null);
+    setAgentInfoProvider(null);
     try {
         if (typeof setExperimentalSession === 'function') {
             setExperimentalSession(null);
@@ -114,6 +116,16 @@ export function readAgentTodoStore() {
  */
 export function isAgentToolDisabled(toolName) {
     return isToolDisabled(toolName);
+}
+
+/**
+ * Vincula o provedor de informações do agente ao subsistema de introspection.
+ *
+ * @param {import('#copilot/tools').AgentInfoProvider} ctx
+ * @returns {void}
+ */
+export function bindAgentInfoProvider(ctx) {
+    setAgentInfoProvider(ctx);
 }
 
 export { configureHookTools, setExperimentalSession, setHub, setPermissionAgent, setSessionRpc };

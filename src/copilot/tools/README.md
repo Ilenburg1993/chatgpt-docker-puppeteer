@@ -50,6 +50,7 @@
 
 1. **Hub externo único de `tools/`:** `#copilot/tools` (barrel raiz de `tools/index.js`).
 2. **Consumidores fora de `src/copilot/tools/**`:** devem importar apenas do barrel raiz.
+3. **Módulos internos de `src/copilot/tools/**`:** não podem importar `#copilot/tools`; devem usar `tools/infra/*` ou barrels internos do próprio domínio.
 3. **Sub-barrels de `tools/**`:** não podem se comunicar com módulos fora de `src/copilot/tools/**`; são internos ao subsistema.
 4. **`index.js` em `tools/**` é barrel-only:** sem lógica local, sem estado local, sem imports não-barrel.
 

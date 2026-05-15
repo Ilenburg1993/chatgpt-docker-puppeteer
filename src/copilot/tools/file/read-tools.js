@@ -1,4 +1,11 @@
 // @ts-check
+import { toError, withIoMeta } from '#copilot/core';
+import { diffText, scanDirectory, searchText, searchWorkspaceSymbols } from '#copilot/infra/public/io';
+import { stat as fsStat } from 'node:fs/promises';
+import { z } from 'zod';
+import { log } from '../infra/logger.js';
+import { buildTool, withSkipPermission } from '../infra/tool-factory.js';
+import { readFileContentTool } from './read/index.js';
 /**
  * src/copilot/tools/file/read-tools.js
  *
@@ -16,12 +23,6 @@
  * @module copilot/tools/file/read-tools
  */
 
-import { stat as fsStat } from 'node:fs/promises';
-import { z } from 'zod';
-import { toError, withIoMeta } from '#copilot/core';
-import { diffText, scanDirectory, searchText, searchWorkspaceSymbols } from '#copilot/infra/public/io';
-import { log } from '../infra/logger.js';
-import { buildTool, withSkipPermission } from '../infra/tool-factory.js';
 import {
     applyEntryLimit,
     applyEntryWindow,
@@ -30,7 +31,6 @@ import {
     validatePath,
     WORKSPACE_ROOT,
 } from './shared.js';
-import { readFileContentTool } from './read/index.js';
 
 export { readFileContentTool } from './read/index.js';
 
@@ -128,9 +128,7 @@ export const listDirectoryTool = buildTool({
                     cursorOffset: 'cursorOffset' in limitedEntries ? limitedEntries.cursorOffset : 0,
                     scannedBudget: scan.scannedEntries,
                     totalEntries: limitedEntries.totalEntries,
-                    ...(limitedEntries.truncated
-                        ? { configuredLimitEntries: configuredMaxEntries }
-                        : {}),
+                    ...(limitedEntries.truncated ? { configuredLimitEntries: configuredMaxEntries } : {}),
                     entries: limitedEntries.entries,
                 },
                 { ...scan.io, truncated: limitedEntries.truncated },
@@ -328,7 +326,15 @@ export const workspaceSymbolSearchTool = buildTool({
         maxResults: z.number().int().min(1).optional().describe('Número máximo sugerido de declarações a retornar.'),
         cursor: z.string().optional().describe('Cursor numérico retornado por chamada anterior.'),
     }),
-    handler: async ({ name: symbolName, kind, path: searchPath, includePattern, caseSensitive, maxResults, cursor }) => {
+    handler: async ({
+        name: symbolName,
+        kind,
+        path: searchPath,
+        includePattern,
+        caseSensitive,
+        maxResults,
+        cursor,
+    }) => {
         const { ok, reason, resolved } = await validatePath(searchPath ?? '.', { mode: 'read' });
         if (!ok) return { success: false, error: reason };
 
@@ -392,7 +398,123 @@ export const workspaceSymbolSearchTool = buildTool({
     },
 });
 
-export const symbolSearchTools = [workspaceSymbolSearchTool];
+/**
+ * Escapes a string for use as a literal in a regex pattern.
+ * @param {string} s
+ * @returns {string}
+ */
+function escapeForRegex(s) {
+    return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/**
+ * Parses raw ripgrep output (contextLines=0) into structured match objects.
+ * Each line is expected to be in the format `absolute/path:lineNum:text`.
+ * @param {string} output - Raw stdout from ripgrep
+ * @param {string} workspaceRoot - Absolute workspace root to strip from paths
+ * @returns {{ matches: Array<{file: string, line: number, text: string}>, fileCount: number }}
+ */
+function parseUsageOutput(output, workspaceRoot) {
+    /** @type {Array<{file: string, line: number, text: string}>} */
+    const matches = [];
+    const files = new Set();
+    const root = workspaceRoot.endsWith('/') ? workspaceRoot : `${workspaceRoot}/`;
+    for (const rawLine of output.split('\n')) {
+        if (!rawLine.trim() || rawLine === '--') continue;
+        // Non-greedy path group finds the first `:digit:` split → line number
+        const m = rawLine.match(/^(.+?):(\d+):(.*)$/);
+        if (!m) continue;
+        const filePath = m[1];
+        const lineStr = m[2];
+        if (!filePath || !lineStr) continue;
+        const lineNum = Number(lineStr);
+        const text = (m[3] ?? '').trimEnd();
+        const rel = filePath.startsWith(root) ? filePath.slice(root.length) : filePath;
+        files.add(rel);
+        matches.push({ file: rel, line: lineNum, text });
+    }
+    return { matches, fileCount: files.size };
+}
+
+/**
+ * Tool: find_symbol_usages — encontra todos os usos de um símbolo no workspace.
+ */
+export const findSymbolUsagesTool = buildTool({
+    name: 'find_symbol_usages',
+    description:
+        'Encontra todos os locais que referenciam ou importam um símbolo no workspace. ' +
+        'Retorna lista estruturada de matches: arquivo, linha e trecho. ' +
+        'Ideal para análise de impacto e rastreamento de dependências antes de refatorações.',
+    parameters: z.object({
+        symbol: z
+            .string()
+            .min(1)
+            .describe('Nome do símbolo a buscar (ex: "bindAgentInfoProvider", "AgentContext")'),
+        path: z
+            .string()
+            .optional()
+            .default('.')
+            .describe('Diretório de busca (relativo ao workspace). Default: raiz.'),
+        includePattern: z
+            .string()
+            .optional()
+            .default('*.{js,ts,mjs,cjs}')
+            .describe('Glob de arquivos a incluir. Default: arquivos JS/TS.'),
+        excludePattern: z.string().optional().describe('Glob de arquivos a excluir (ex: "node_modules,dist").'),
+        wholeWord: z
+            .boolean()
+            .optional()
+            .default(true)
+            .describe('Se true, busca somente o símbolo como palavra inteira (\\bsymbol\\b). Default: true.'),
+        caseSensitive: z
+            .boolean()
+            .optional()
+            .default(true)
+            .describe('Busca sensível a maiúsculas. Default: true para símbolos.'),
+        maxResults: z.number().int().min(1).optional().describe('Máximo de matches a retornar.'),
+    }),
+    handler: async ({ symbol, path: searchPath, includePattern, excludePattern, wholeWord, caseSensitive, maxResults }) => {
+        const { ok, reason, resolved } = await validatePath(searchPath ?? '.', { mode: 'read' });
+        if (!ok) return { success: false, error: reason };
+
+        const escaped = escapeForRegex(symbol);
+        const pattern = wholeWord !== false ? `\\b${escaped}\\b` : escaped;
+
+        log('INFO', `[copilot/find_symbol_usages] symbol="${symbol}" wholeWord=${wholeWord} in ${resolved}`);
+
+        try {
+            const result = await searchText(resolved, {
+                workspaceRoot: WORKSPACE_ROOT,
+                pattern,
+                isRegex: true,
+                caseSensitive: caseSensitive !== false,
+                contextLines: 0,
+                includePattern: includePattern ?? '*.{js,ts,mjs,cjs}',
+                ...(excludePattern ? { excludePattern } : {}),
+                ...(maxResults ? { maxResults } : {}),
+            });
+
+            const { matches, fileCount } = parseUsageOutput(result.output, WORKSPACE_ROOT);
+            return withIoMeta(
+                {
+                    success: true,
+                    symbol,
+                    searchPath: resolved,
+                    matchCount: matches.length,
+                    fileCount,
+                    matches,
+                    engine: result.engine,
+                    sanitized: result.sanitized,
+                },
+                result.io,
+            );
+        } catch (err) {
+            return { success: false, error: toError(err).message };
+        }
+    },
+});
+
+export const symbolSearchTools = [workspaceSymbolSearchTool, findSymbolUsagesTool];
 
 /**
  * @type {import('#copilot/sdk/types').Tool<any>[]}
@@ -403,4 +525,5 @@ export const fileReadTools = [
     searchInFilesTool,
     diffFilesTool,
     withSkipPermission(workspaceSymbolSearchTool),
+    withSkipPermission(findSymbolUsagesTool),
 ];

@@ -1,4 +1,7 @@
 // @ts-check
+import { z } from 'zod';
+import { buildTool, withSkipPermission } from '../infra/tool-factory.js';
+import { PRIORITY_ORDER, isOverdue, readStore, sanitize, zPriority, zStatus } from './store.js';
 /**
  * src/copilot/tools/todo/query-tools.js
  *
@@ -8,10 +11,6 @@
  * @see EventBus
  * @see module:copilot/tools/todo/store
  */
-
-import { z } from 'zod';
-import { buildTool, withSkipPermission } from '../infra/tool-factory.js';
-import { PRIORITY_ORDER, isOverdue, readStore, sanitize, zPriority, zStatus } from './store.js';
 
 // ---------------------------------------------------------------------------
 // Tool: todo_list

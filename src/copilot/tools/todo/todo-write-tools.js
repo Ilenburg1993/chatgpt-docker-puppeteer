@@ -1,4 +1,8 @@
 // @ts-check
+import { z } from 'zod';
+import { log } from '../infra/logger.js';
+import { buildTool } from '../infra/tool-factory.js';
+import { VALID_TRANSITIONS, createTask, now, sanitize, withStore, zId, zPriority, zStatus } from './store.js';
 /**
  * src/copilot/tools/todo/todo-write-tools.js
  *
@@ -7,11 +11,6 @@
  * @module copilot/tools/todo/todo-write-tools
  * @see EventBus
  */
-
-import { z } from 'zod';
-import { log } from '../infra/logger.js';
-import { buildTool } from '../infra/tool-factory.js';
-import { VALID_TRANSITIONS, createTask, now, sanitize, withStore, zId, zPriority, zStatus } from './store.js';
 
 // ---------------------------------------------------------------------------
 // Tool: todo_create

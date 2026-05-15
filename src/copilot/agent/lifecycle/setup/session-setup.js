@@ -31,6 +31,7 @@ import {
 import { buildCanonicalLocalSurfaceExcludedTools, container } from '#copilot/core';
 import {
     AgentToolPolicy,
+    bindAgentInfoProvider,
     bindAgentSessionTools,
     bootstrapAgentTools,
     buildAgentBusHooks,
@@ -414,4 +415,5 @@ export function finalizeSessionInit(ctx, session, isResumed) {
     ctx.setSession(session);
     ctx.setIsResumed(isResumed);
     bindAgentSessionTools(session);
+    bindAgentInfoProvider(ctx);
 }

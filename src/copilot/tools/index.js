@@ -9,6 +9,10 @@
  * @module copilot/tools
  */
 
+// ─── Typedef re-exports ───────────────────────────────────────────────────────
+
+/** @typedef {import('./introspection/introspection-tools.js').AgentInfoProvider} AgentInfoProvider */
+
 // ─── API de bootstrap/composição ──────────────────────────────────────────────
 export {
     allTools,
@@ -46,7 +50,7 @@ export {
 
 // ─── Categorias de tools ──────────────────────────────────────────────────────
 export { codeTools } from './code/index.js';
-export { fileReadTools, fileTools, fileWriteTools } from './file/index.js';
+export { fileReadTools, fileTools, fileWriteTools, findSymbolUsagesTool } from './file/index.js';
 export { gitTools } from './git/index.js';
 export {
     cancelAllUserInputRequests,
@@ -65,6 +69,7 @@ export {
     readToolContractReport,
     registerForIntrospection,
     resetIntrospectionStateForTests,
+    setAgentInfoProvider,
     verifyToolRegistryContracts,
 } from './introspection/index.js';
 export { permissionTools } from './permission/index.js';

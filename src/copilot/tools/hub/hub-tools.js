@@ -1,4 +1,9 @@
 // @ts-check
+import { LLM_B_TURN_TIMEOUT_MS, resolveHubTurnTimeout } from '#copilot/config';
+import { toError } from '#copilot/core';
+import { z } from 'zod';
+import { log } from '../infra/logger.js';
+import { buildTool } from '../infra/tool-factory.js';
 /**
  * src/copilot/tools/hub/hub-tools.js
  *
@@ -16,12 +21,6 @@
  * @see module:copilot/conversation-hub/orchestrator
  * @see module:copilot/channel/client
  */
-
-import { z } from 'zod';
-import { LLM_B_TURN_TIMEOUT_MS, resolveHubTurnTimeout } from '#copilot/config';
-import { toError } from '#copilot/core';
-import { log } from '../infra/logger.js';
-import { buildTool } from '../infra/tool-factory.js';
 
 // ─── Injeção de dependência do hub (ARCH-02) ─────────────────────────────────
 

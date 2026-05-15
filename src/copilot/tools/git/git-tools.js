@@ -1,4 +1,12 @@
 // @ts-check
+import { WORKSPACE_ROOT } from '#copilot/boot';
+import { toExecError } from '#copilot/core';
+import { resolveProcessExecutionBudget } from '#copilot/infra/public/policy';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
+import { z } from 'zod';
+import { log } from '../infra/logger.js';
+import { buildTool, withSkipPermission } from '../infra/tool-factory.js';
 /**
  * src/copilot/tools/git/git-tools.js
  *
@@ -8,15 +16,6 @@
  * @module copilot/tools/git/git-tools
  * @see EventBus
  */
-
-import { WORKSPACE_ROOT } from '#copilot/boot';
-import { toExecError } from '#copilot/core';
-import { resolveProcessExecutionBudget } from '#copilot/infra/public/policy';
-import { execFile } from 'node:child_process';
-import { promisify } from 'node:util';
-import { z } from 'zod';
-import { log } from '../infra/logger.js';
-import { buildTool, withSkipPermission } from '../infra/tool-factory.js';
 
 const execAsync = promisify(execFile);
 

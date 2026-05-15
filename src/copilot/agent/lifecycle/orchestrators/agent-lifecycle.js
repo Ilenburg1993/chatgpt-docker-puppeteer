@@ -94,7 +94,9 @@ export async function initSession(ctx, client, host) {
     const { session, isResumed, model, reasoningEffort } = await initOrResumeSession(client, options);
 
     ctx.setModel(model);
-    ctx.setReasoningEffort(reasoningEffort);
+    if (reasoningEffort !== undefined) {
+        ctx.setReasoningEffort(reasoningEffort);
+    }
 
     finalizeSessionInit(ctx, session, isResumed);
     return { session, isResumed };

@@ -1,4 +1,10 @@
 // @ts-check
+import { defaultAuditLog } from '#copilot/audit';
+import { getShellTimeoutPolicy } from '#copilot/config';
+import { z } from 'zod';
+import { log } from '../infra/logger.js';
+import { buildTool } from '../infra/tool-factory.js';
+import { ADVISORY_TIMEOUT_MS, runPipeline, runProcess, splitPipelineSegments, tokenizeShell } from './executor.js';
 /**
  * src/copilot/tools/shell/shell-tools.js
  *
@@ -18,14 +24,8 @@
  * @see EventBus
  */
 
-import { defaultAuditLog } from '#copilot/audit';
-import { getShellTimeoutPolicy } from '#copilot/config';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
-import { z } from 'zod';
-import { log } from '../infra/logger.js';
-import { buildTool } from '../infra/tool-factory.js';
-import { ADVISORY_TIMEOUT_MS, runPipeline, runProcess, splitPipelineSegments, tokenizeShell } from './executor.js';
 import {
     ALLOWED_EXECUTABLES,
     ALLOWED_NPM_SCRIPTS,

@@ -625,7 +625,11 @@ export default tseslint.config(
     {
         files: ['src/copilot/tools/**/index.js'],
         rules: {
-            'no-restricted-syntax': ['error', ...NODE24_ESM_SYNTAX_RESTRICTIONS, ...TOOLS_INDEX_BARREL_SYNTAX_RESTRICTIONS],
+            'no-restricted-syntax': [
+                'error',
+                ...NODE24_ESM_SYNTAX_RESTRICTIONS,
+                ...TOOLS_INDEX_BARREL_SYNTAX_RESTRICTIONS,
+            ],
         },
     },
 
@@ -694,6 +698,35 @@ export default tseslint.config(
     },
 
     {
+        files: ['src/copilot/tools/**/*.js'],
+        ignores: ['src/copilot/tools/index.js'],
+        rules: {
+            'no-restricted-imports': [
+                'error',
+                {
+                    paths: [
+                        {
+                            name: '#copilot/tools',
+                            message:
+                                'Boundary tools→tools: módulos internos de src/copilot/tools/** não devem importar o barrel raiz #copilot/tools. Use tool-factory/logger locais ou barrels internos do domínio.',
+                        },
+                        {
+                            name: '#copilot/tools/index',
+                            message:
+                                'Boundary tools→tools: módulos internos de src/copilot/tools/** não devem importar o barrel raiz #copilot/tools/index. Use dependências internas locais.',
+                        },
+                        {
+                            name: '#copilot/tools/index.js',
+                            message:
+                                'Boundary tools→tools: módulos internos de src/copilot/tools/** não devem importar o barrel raiz #copilot/tools/index.js. Use dependências internas locais.',
+                        },
+                    ],
+                },
+            ],
+        },
+    },
+
+    {
         files: ['src/copilot/tools/**/index.js'],
         rules: {
             'no-restricted-syntax': [
@@ -731,7 +764,10 @@ export default tseslint.config(
 
     {
         files: ['src/copilot/terminal/**/*.js'],
-        ignores: ['src/copilot/terminal/frontend/gateways/sdk-session.js', 'src/copilot/terminal/frontend/gateways/tools.js'],
+        ignores: [
+            'src/copilot/terminal/frontend/gateways/sdk-session.js',
+            'src/copilot/terminal/frontend/gateways/tools.js',
+        ],
         rules: {
             'no-restricted-imports': [
                 'error',
@@ -758,8 +794,7 @@ export default tseslint.config(
                 {
                     patterns: [
                         {
-                            regex:
-                                '^(?:#copilot/(?:sdk|tools|presentation)(?:/|$)|(?:\\.\\./)+presentation(?:/|$))',
+                            regex: '^(?:#copilot/(?:sdk|tools|presentation)(?:/|$)|(?:\\.\\./)+presentation(?:/|$))',
                             message:
                                 'Boundary server/routes/sdk: componha SDK, tools e presentation exclusivamente em deps.js. ' +
                                 'Handlers devem receber capabilities por routeDeps para preservar testabilidade e hierarquia.',

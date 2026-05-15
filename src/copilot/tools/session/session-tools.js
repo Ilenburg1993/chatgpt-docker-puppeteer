@@ -1,4 +1,13 @@
 // @ts-check
+import { readBootSkillConfig, resolveHooksStateDir, resolveWorkspacePath } from '#copilot/boot';
+import { logSwallowed, toError } from '#copilot/core';
+import { createOrReplaceFileAtomic, mkdirPathLocked, readText } from '#copilot/infra/public/io';
+import { execFileSync } from 'node:child_process';
+import { readdir, stat } from 'node:fs/promises';
+import { join } from 'node:path';
+import { z } from 'zod';
+import { log } from '../infra/logger.js';
+import { buildTool, withSkipPermission } from '../infra/tool-factory.js';
 /**
  * src/copilot/tools/session/session-tools.js
  *
@@ -9,16 +18,6 @@
  * @see module:copilot/lib/session
  * @see module:copilot/always-alive
  */
-
-import { readBootSkillConfig, resolveHooksStateDir, resolveWorkspacePath } from '#copilot/boot';
-import { logSwallowed, toError } from '#copilot/core';
-import { createOrReplaceFileAtomic, mkdirPathLocked, readText } from '#copilot/infra/public/io';
-import { execFileSync } from 'node:child_process';
-import { readdir, stat } from 'node:fs/promises';
-import { join } from 'node:path';
-import { z } from 'zod';
-import { log } from '../infra/logger.js';
-import { buildTool, withSkipPermission } from '../infra/tool-factory.js';
 
 const HOOKS_STATE = resolveHooksStateDir();
 const GIT_INFO_TIMEOUT_MS = 8_000;

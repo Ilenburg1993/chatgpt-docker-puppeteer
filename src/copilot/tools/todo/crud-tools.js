@@ -1,4 +1,8 @@
 // @ts-check
+import { z } from 'zod';
+import { log } from '../infra/logger.js';
+import { buildTool, withSkipPermission } from '../infra/tool-factory.js';
+import { createTask, isOverdue, now, readStore, sanitize, withStore, zId, zPriority } from './store.js';
 /**
  * src/copilot/tools/todo/crud-tools.js
  *
@@ -8,11 +12,6 @@
  * @see EventBus
  * @see module:copilot/tools/todo/store
  */
-
-import { z } from 'zod';
-import { log } from '../infra/logger.js';
-import { buildTool, withSkipPermission } from '../infra/tool-factory.js';
-import { createTask, isOverdue, now, readStore, sanitize, withStore, zId, zPriority } from './store.js';
 
 // ---------------------------------------------------------------------------
 // Tool: todo_get

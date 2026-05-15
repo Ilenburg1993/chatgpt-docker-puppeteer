@@ -1,4 +1,9 @@
 // @ts-check
+import { defaultAuditLog } from '#copilot/audit';
+import { ConfigError, toError } from '#copilot/core';
+import { z } from 'zod';
+import { log } from '../infra/logger.js';
+import { buildTool } from '../infra/tool-factory.js';
 /**
  * src/copilot/tools/permission/permission-tools.js
  *
@@ -20,12 +25,6 @@
  * @see module:copilot/lib/permissions
  * @see module:copilot/agent/permission-controller
  */
-
-import { defaultAuditLog } from '#copilot/audit';
-import { ConfigError, toError } from '#copilot/core';
-import { z } from 'zod';
-import { log } from '../infra/logger.js';
-import { buildTool } from '../infra/tool-factory.js';
 
 // ─── Injeção de dependência do agent (ARCH-03: break circular dep) ────────────
 

@@ -948,6 +948,15 @@ export class AlwaysAliveAgent extends EventEmitter {
     }
 
     /**
+     * Retorna snapshot do nível de raciocínio atual para leitores de controle runtime.
+     *
+     * @returns {'low' | 'medium' | 'high' | 'xhigh' | undefined}
+     */
+    getReasoningEffortSnapshot() {
+        return this.reasoningEffort;
+    }
+
+    /**
      * Troca o nível de raciocínio. A mudança é efetiva no próximo `sendMessage()`.
      *
      * @param {'low' | 'medium' | 'high' | 'xhigh' | undefined} effort - Nível de raciocínio

@@ -1,4 +1,9 @@
 // @ts-check
+import { COPILOT_RPC_TIMEOUT_MS, MAESTRO_AGENT_NAME } from '#copilot/config';
+import { toError } from '#copilot/core';
+import { z } from 'zod';
+import { log } from '../infra/logger.js';
+import { buildTool, withSkipPermission } from '../infra/tool-factory.js';
 /**
  * src/copilot/tools/session/session-rpc-tools.js
  *
@@ -17,12 +22,6 @@
  * Todas as chamadas são encapsuladas em `wrapRpc()` com try/catch e fallback gracioso (retorna `{ error }` em falha).
  * Em versões futuras do SDK, verificar se novos métodos públicos estão disponíveis como substitutos.
  */
-
-import { COPILOT_RPC_TIMEOUT_MS, MAESTRO_AGENT_NAME } from '#copilot/config';
-import { toError } from '#copilot/core';
-import { z } from 'zod';
-import { log } from '../infra/logger.js';
-import { buildTool, withSkipPermission } from '../infra/tool-factory.js';
 
 // ─── RPC handle injetado externamente ────────────────────────────────────────
 
@@ -96,8 +95,8 @@ function resolveRpcTimeoutMs(timeoutMs) {
  *
  * @template T
  * @param {string} toolName - Nome do tool para logging
- * @param {(rpc: ReturnType<typeof import('#copilot/sdk/rpc').createSessionRpcFacade>) => Promise<T>} fn - Função
- *   que recebe o handle RPC e executa a operação
+ * @param {(rpc: ReturnType<typeof import('#copilot/sdk/rpc').createSessionRpcFacade>) => Promise<T>} fn - Função que
+ *   recebe o handle RPC e executa a operação
  * @param {{ timeoutMs?: number | null }} [opts]
  * @returns {Promise<T | { error: string }>}
  */

@@ -11,6 +11,7 @@
 export {
     diffFilesTool,
     fileReadTools,
+    findSymbolUsagesTool,
     listDirectoryTool,
     readFileContentTool,
     searchInFilesTool,
@@ -22,6 +23,7 @@ export {
     indexTools,
     workspaceIndexBuildTool,
     workspaceIndexFindSymbolTool,
+    workspaceIndexInvalidateTool,
     workspaceIndexSearchTool,
     workspaceIndexStatusTool,
 } from './index-tools.js';

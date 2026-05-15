@@ -41,7 +41,8 @@ vi.mock('#copilot/config', () => ({
     MAESTRO_AGENT_NAME: 'agent-full',
     buildCustomAgentsConfig: mocks.buildCustomAgentsConfig,
 }));
-vi.mock('#copilot/core', () => ({
+vi.mock('#copilot/core', async (importOriginal) => ({
+    ...(await importOriginal()),
     buildCanonicalLocalSurfaceExcludedTools: (
         /** @type {string[]} */ toolNames,
         /** @type {string[]} */ baseExcluded = [],

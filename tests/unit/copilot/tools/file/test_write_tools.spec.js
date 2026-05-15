@@ -20,10 +20,14 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('node:fs', async () => {
-    const { Readable } = await vi.importActual('node:stream');
+    const actual = /** @type {Record<string, unknown>} */ (await vi.importActual('node:fs'));
+    const streamActual = /** @type {{ Readable: { from: (chunks: unknown[]) => unknown } }} */ (
+        await vi.importActual('node:stream')
+    );
     return {
+        ...actual,
         createReadStream: vi.fn((filePath) =>
-            Readable.from([mocks.streamPayloads.get(String(filePath)) ?? Buffer.alloc(0)]),
+            streamActual.Readable.from([mocks.streamPayloads.get(String(filePath)) ?? Buffer.alloc(0)]),
         ),
     };
 });

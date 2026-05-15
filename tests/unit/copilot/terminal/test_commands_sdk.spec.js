@@ -86,7 +86,8 @@ vi.mock('../../../../src/copilot/terminal/frontend/gateways/sdk-session.js', asy
     ...runtimeMocks,
 }));
 vi.mock('../../../../src/copilot/terminal/frontend/gateways/agent-runtime.js', () => agentRuntimeMocks);
-vi.mock('#copilot/tools', () => ({
+vi.mock('#copilot/tools', async (importOriginal) => ({
+    ...(await importOriginal()),
     readIntrospectionRegistrySnapshot: vi.fn(() => ({
         total: 6,
         disabled: [],

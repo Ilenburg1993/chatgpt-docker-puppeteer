@@ -153,7 +153,8 @@ vi.mock('#copilot/sdk', () => ({
     workspaceReadFile: vi.fn(),
 }));
 
-vi.mock('#copilot/tools', () => ({
+vi.mock('#copilot/tools', async (importOriginal) => ({
+    ...(await importOriginal()),
     getAllTools: () => mocks.allTools,
 }));
 

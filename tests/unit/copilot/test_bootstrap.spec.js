@@ -118,7 +118,8 @@ vi.mock('../../../src/copilot/tools/todo/store.js', () => ({
     startTodoCleanupJob: mocks.startTodoCleanupJob,
 }));
 
-vi.mock('../../../src/copilot/tools/index.js', () => ({
+vi.mock('../../../src/copilot/tools/index.js', async (importOriginal) => ({
+    ...(await importOriginal()),
     buildTool: mocks.buildTool,
     TOOLS_LOGGER: Symbol.for('TOOLS_LOGGER'),
     TOOLS_METRICS: Symbol.for('TOOLS_METRICS'),
@@ -140,7 +141,8 @@ vi.mock('#copilot/audit', () => ({
     AUDIT_BUS: Symbol.for('AUDIT_BUS'),
 }));
 
-vi.mock('#copilot/core', () => ({
+vi.mock('#copilot/core', async (importOriginal) => ({
+    ...(await importOriginal()),
     EVENT_BUS: Symbol.for('EVENT_BUS'),
     SHUTDOWN_LOGGER: Symbol.for('SHUTDOWN_LOGGER'),
 }));
@@ -162,7 +164,8 @@ vi.mock('#copilot/sdk', () => ({
     checkAuthStatus: vi.fn(),
 }));
 
-vi.mock('#copilot/tools', () => ({
+vi.mock('#copilot/tools', async (importOriginal) => ({
+    ...(await importOriginal()),
     buildTool: mocks.buildTool,
     TOOLS_LOGGER: Symbol.for('TOOLS_LOGGER'),
     TOOLS_METRICS: Symbol.for('TOOLS_METRICS'),

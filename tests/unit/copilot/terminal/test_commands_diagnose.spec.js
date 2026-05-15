@@ -238,7 +238,8 @@ vi.mock('../../../../src/copilot/terminal/state/activity-state.js', () => ({
     readTerminalActivityHistory: () => [],
 }));
 
-vi.mock('#copilot/tools', () => ({
+vi.mock('#copilot/tools', async (importOriginal) => ({
+    ...(await importOriginal()),
     readIntrospectionRegistrySnapshot: () => ({
         total: 6,
         categories: { file: 6 },

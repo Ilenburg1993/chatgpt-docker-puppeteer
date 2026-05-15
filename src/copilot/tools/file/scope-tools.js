@@ -1,6 +1,7 @@
 // @ts-check
-
 import { z } from 'zod/v3';
+import { buildTool } from '../infra/tool-factory.js';
+import { validatePath } from './shared.js';
 
 import {
     closeScope,
@@ -11,8 +12,6 @@ import {
     listScopes,
     refreshScope,
 } from '#copilot/infra/public/session';
-import { buildTool } from '../infra/tool-factory.js';
-import { validatePath } from './shared.js';
 
 const ScopeDeclareParameters = z.object({
     sessionId: z.string().min(1).describe('ID da sessão/escopo para rastreamento da LLM-B.'),

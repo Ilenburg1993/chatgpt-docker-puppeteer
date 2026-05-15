@@ -50,7 +50,8 @@ vi.mock('#copilot/hooks/session-hooks', () => ({
         onErrorOccurred: vi.fn(),
     })),
 }));
-vi.mock('#copilot/tools', () => ({
+vi.mock('#copilot/tools', async (importOriginal) => ({
+    ...(await importOriginal()),
     bootstrapTools: vi.fn((_registry, mcpTools) => ['tool1', 'tool2', ...mcpTools]),
     setSessionRpc: vi.fn(),
     readStore: vi.fn(async () => ({ tasks: {} })),

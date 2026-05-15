@@ -15,6 +15,7 @@ export {
     readToolContractReport,
     registerForIntrospection,
     resetIntrospectionStateForTests,
+    setAgentInfoProvider,
     setToolContractReport,
 } from './introspection-tools.js';
 

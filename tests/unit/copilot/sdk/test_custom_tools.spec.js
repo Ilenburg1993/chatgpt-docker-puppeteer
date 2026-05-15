@@ -27,7 +27,14 @@ vi.mock('#copilot/observability/logger', () => ({
     LOG_DIR: '/tmp/test-logs',
     getRecentLogs: vi.fn(() => []),
 }));
-vi.mock('../../../../src/copilot/tools/infra/tool-factory.js', () => ({ buildTool: mockBuildTool }));
+vi.mock('#copilot/tools', async (importOriginal) => {
+    const actual = /** @type {Record<string, unknown>} */ (await importOriginal());
+    return {
+        ...actual,
+        log: mockLog,
+        buildTool: mockBuildTool,
+    };
+});
 vi.mock('#copilot/core/error-handlers', () => ({ logSwallowed: mockLogSwallowed }));
 vi.mock('#copilot/core/safe-json', () => ({
     safeJsonParse: vi.fn((raw) => {

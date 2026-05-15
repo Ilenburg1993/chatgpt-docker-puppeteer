@@ -193,10 +193,6 @@ function stepStartQuotaMonitor(client, ctx, state) {
             intervalMs: 5 * 60 * 1000,
             warningThreshold: 20,
             onWarning: (quotaId, snapshot) => {
-                log(
-                    'WARN',
-                    `[boot-wiring] Quota baixa — id=${quotaId}, restante=${snapshot.remainingPercentage?.toFixed(1)}%`,
-                );
                 ctx.emit(EMITTER_QUOTA_WARNING, { quotaId, snapshot, ts: Date.now() });
             },
             onUpdate: (snapshots) => {

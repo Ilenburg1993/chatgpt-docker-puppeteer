@@ -28,7 +28,7 @@
  *
  * ```js
  * import { z } from 'zod/v3';
- * import { buildTool } from '#copilot/tools';
+ * import { buildTool } from '../infra/tool-factory.js';
  *
  * const readFileTool = buildTool({
  *     name: 'read_file',
@@ -61,7 +61,7 @@
  *
  * - **`buildTool`** (este módulo): para tools de produção. Reutiliza a normalização canônica do SDK,
  *   aplica hardening local/fallback e padroniza `skipPermission`. Use em todos os
- *   arquivos de tools em `src/copilot/tools/`.
+ *   arquivos internos de `src/copilot/tools/` via import local (`../infra/tool-factory.js`), evitando ciclo com o barrel raiz.
  * - **`defineTool`** (do `@github/copilot-sdk`): uso interno/SDK apenas. Evite chamar diretamente em
  *   código de produção — use `buildTool` que já encapsula o `defineTool`.
  */

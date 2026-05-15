@@ -24,6 +24,11 @@ vi.mock('../../../../src/copilot/tools/infra/logger.js', () => ({
     log: mocks.mockLog,
 }));
 
+vi.mock('../../../../src/copilot/tools/infra/tool-factory.js', () => ({
+    buildTool: mocks.buildTool,
+    withSkipPermission: mocks.withSkipPermission,
+}));
+
 vi.mock('#copilot/core', async (importOriginal) => {
     const actual = /** @type {Record<string, unknown>} */ (await importOriginal());
     return {
@@ -67,12 +72,6 @@ vi.mock('node:child_process', () => ({
 vi.mock('#copilot/sdk', () => ({
     createTool: vi.fn((config) => config),
     SYSTEM_PROMPT_SECTIONS: {},
-}));
-
-// withSkipPermission: passthrough
-vi.mock('../../../../src/copilot/tools/infra/tool-factory.js', () => ({
-    buildTool: mocks.buildTool,
-    withSkipPermission: mocks.withSkipPermission,
 }));
 
 // ─── Import após mocks ──────────────────────────────────────────────────────

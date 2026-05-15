@@ -1,4 +1,13 @@
 // @ts-check
+import { SERVER_PORT } from '#copilot/config';
+import { toError } from '#copilot/core';
+import { readText } from '#copilot/infra/public/io';
+import { httpRequest } from '#copilot/sdk';
+import { join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { z } from 'zod';
+import { log } from '../infra/logger.js';
+import { buildTool, withSkipPermission } from '../infra/tool-factory.js';
 /**
  * src/copilot/tools/task/task-tools.js
  *
@@ -9,16 +18,6 @@
  * @see EventBus
  * @see module:copilot/agent/task-executor
  */
-
-import { SERVER_PORT } from '#copilot/config';
-import { toError } from '#copilot/core';
-import { readText } from '#copilot/infra/public/io';
-import { httpRequest } from '#copilot/sdk';
-import { join, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { z } from 'zod';
-import { log } from '../infra/logger.js';
-import { buildTool, withSkipPermission } from '../infra/tool-factory.js';
 
 /**
  * Tool: get_tasks — lista tarefas recentes do sistema.

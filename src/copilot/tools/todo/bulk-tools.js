@@ -1,4 +1,8 @@
 // @ts-check
+import { z } from 'zod';
+import { log } from '../infra/logger.js';
+import { buildTool } from '../infra/tool-factory.js';
+import { generateUniqueId, now, readStore, withStore, zId, zPriority, zStatus } from './store.js';
 /**
  * src/copilot/tools/todo/bulk-tools.js
  *
@@ -8,11 +12,6 @@
  * @see EventBus
  * @see module:copilot/tools/todo/store
  */
-
-import { z } from 'zod';
-import { log } from '../infra/logger.js';
-import { buildTool } from '../infra/tool-factory.js';
-import { generateUniqueId, now, readStore, withStore, zId, zPriority, zStatus } from './store.js';
 
 // ---------------------------------------------------------------------------
 // Tool: todo_bulk_update

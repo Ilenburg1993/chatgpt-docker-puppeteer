@@ -1,4 +1,9 @@
 // @ts-check
+import { COPILOT_RPC_TIMEOUT_MS } from '#copilot/config';
+import { toError } from '#copilot/core';
+import { z } from 'zod';
+import { log } from '../infra/logger.js';
+import { buildTool, withSkipPermission } from '../infra/tool-factory.js';
 /**
  * src/copilot/tools/session/experimental-rpc-tools.js
  *
@@ -13,12 +18,6 @@
  * @see module:copilot/sdk/rpc
  * @see module:copilot/sdk/feature-flags
  */
-
-import { COPILOT_RPC_TIMEOUT_MS } from '#copilot/config';
-import { toError } from '#copilot/core';
-import { z } from 'zod';
-import { log } from '../infra/logger.js';
-import { buildTool, withSkipPermission } from '../infra/tool-factory.js';
 
 import {
     extensionsDisable,

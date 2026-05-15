@@ -65,12 +65,10 @@ vi.mock('#copilot/config/env', async (importOriginal) => {
     };
 });
 
-// Mock logger
 vi.mock('../../../../src/copilot/tools/infra/logger.js', () => ({
     log: mocks.log,
 }));
 
-// Mock tool-factory
 vi.mock('../../../../src/copilot/tools/infra/tool-factory.js', () => ({
     buildTool: mocks.buildTool,
     withSkipPermission: mocks.withSkipPermission,

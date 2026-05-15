@@ -1,4 +1,10 @@
 // @ts-check
+import { getWebRateLimitPolicy, WEB_FETCH_DISABLED, WEB_SEARCH_DISABLED } from '#copilot/config';
+import { concatBufferViews, utf8ByteLength } from '#copilot/infra/public/buffer';
+import { publishIoOperation } from '#copilot/infra/public/events';
+import { z } from 'zod';
+import { log } from '../infra/logger.js';
+import { buildTool } from '../infra/tool-factory.js';
 /**
  * src/copilot/tools/web/web-tools.js
  *
@@ -10,7 +16,6 @@
  * @see module:copilot/lib/url-validator
  */
 
-import { getWebRateLimitPolicy, WEB_FETCH_DISABLED, WEB_SEARCH_DISABLED } from '#copilot/config';
 import {
     buildIoMeta,
     evaluateIoUrlPolicy,
@@ -20,11 +25,6 @@ import {
     toError,
     withIoMeta,
 } from '#copilot/core';
-import { publishIoOperation } from '#copilot/infra/public/events';
-import { concatBufferViews, utf8ByteLength } from '#copilot/infra/public/buffer';
-import { z } from 'zod';
-import { log } from '../infra/logger.js';
-import { buildTool } from '../infra/tool-factory.js';
 
 // ─── SSRF Protection (via lib/url-validator.js) ──────────────────────────────
 
@@ -439,10 +439,7 @@ const webSearchTool = buildTool({
                         operation: 'search',
                         target: jsonUrl,
                         targetKind: 'url',
-                        bytesRead: utf8ByteLength(
-                            JSON.stringify(sanitizedResults.results),
-                            'web_search json results',
-                        ),
+                        bytesRead: utf8ByteLength(JSON.stringify(sanitizedResults.results), 'web_search json results'),
                         engine: 'duckduckgo.json',
                         advisoryLimits: {
                             requestedMaxResults: maxResults ?? null,

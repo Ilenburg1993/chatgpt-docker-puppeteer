@@ -273,6 +273,36 @@
 - `lint -- src/copilot` ✅
 - `test:copilot:unit` ✅ (2723/2723)
 
+### 72) `src/copilot/tools/**` + `eslint.config.mjs` + testes unitários de tools
+- Detectado e revertido drift arquitetural onde módulos internos de `tools/` importavam o barrel raiz `#copilot/tools`,
+    criando ciclo ESM em `buildTool`/`log`.
+- Dependências internas voltaram para `tools/infra/tool-factory.js` e `tools/infra/logger.js`.
+- Regra ESLint adicional passou a bloquear `#copilot/tools` dentro de `src/copilot/tools/**` (anti-regressão).
+- Testes ajustados para mockar logger/tool-factory locais quando o SUT usa imports internos.
+
+### 73) Avaliação consolidada de gates `test:copilot:unit` vs `test:copilot`
+- Confirmado que ambos usam o mesmo runner compacto (`scripts/ci/run-vitest-copilot.mjs`) e, portanto, o mesmo perfil
+    de log/artifacts.
+- `test:copilot:unit` voltou a verde total após a correção do ciclo (`2737/2737`).
+- `test:copilot` continua mais amplo e ainda falha por regressões fora do corte imediato de IO/tools (agent/runtime),
+    portanto não substitui ainda o gate canônico local desta frente.
+
+### 74) Gate oficial pós-correção de ciclo em `tools/`
+- `typecheck:strict:src.copilot` ✅
+- `lint -- src/copilot` ✅
+- `test:copilot:unit` ✅ (2737/2737)
+- `test:copilot` ❌ (falhas residuais fora do corte imediato de IO/tools; mesmo runner/log compacto)
+
+### 75) `src/copilot/infra/public/io.js`
+- A facade pública `public/io` deixou de depender de `io-engine` para leitura/escrita/busca/diff.
+- Reexports passaram a apontar diretamente para os subdomínios já extraídos: `io/fs`, `io/search` e `io/patch`.
+- Efeito arquitetural: `io-engine` fica mais próximo de uma janela de compatibilidade legada, reduzindo acoplamento do barrel público.
+
+### 76) Gate oficial pós-desacoplamento de `public/io`
+- `typecheck:strict:src.copilot` ✅
+- `lint -- src/copilot` ✅
+- `test:copilot:unit` ✅ (2737/2737)
+
 ### 74) `src/copilot/infra/io-engine.js` + `src/copilot/infra/io/patch/text-diff-service.js`
 - `diffText` na facade foi reduzido para alias direto de serviço de patch (`diffTextInPatchService`).
 - `text-diff-service` ganhou `diffText(...)` canônico (validação de path + leitura via `read-services`).

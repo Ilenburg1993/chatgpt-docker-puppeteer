@@ -1,15 +1,4 @@
 // @ts-check
-/**
- * src/copilot/tools/code/code-tools.js
- *
- * Custom Tools para verificação de qualidade de código. Permite ao agente executar lint, typecheck e testes sem sair do
- * loop de sessão.
- *
- * @module copilot/tools/code/code-tools
- * @see EventBus
- * @see module:copilot/tools/tool-factory
- */
-
 import { COPILOT_PACKAGE_ROOT, WORKSPACE_ROOT } from '#copilot/boot';
 import { toExecError } from '#copilot/core';
 import { resolveProcessExecutionBudget } from '#copilot/infra/public/policy';
@@ -20,6 +9,16 @@ import { promisify } from 'node:util';
 import { z } from 'zod';
 import { log } from '../infra/logger.js';
 import { buildTool, withSkipPermission } from '../infra/tool-factory.js';
+/**
+ * src/copilot/tools/code/code-tools.js
+ *
+ * Custom Tools para verificação de qualidade de código. Permite ao agente executar lint, typecheck e testes sem sair do
+ * loop de sessão.
+ *
+ * @module copilot/tools/code/code-tools
+ * @see EventBus
+ * @see module:copilot/tools/tool-factory
+ */
 
 const ROOT = WORKSPACE_ROOT;
 // BUG-MED-08 (fix): caminho absoluto para ESLint — evita falhas em ambientes
@@ -71,7 +70,8 @@ async function safeExec(argv, timeoutMs = 60_000) {
  */
 const lintCheckTool = buildTool({
     name: 'lint_check',
-    description: 'Executa ESLint com cache no projeto para detectar erros de estilo/qualidade. Retorna erros encontrados.',
+    description:
+        'Executa ESLint com cache no projeto para detectar erros de estilo/qualidade. Retorna erros encontrados.',
     parameters: z.object({
         fix: z.boolean().optional().default(false).describe('Se true, aplica correções automáticas (--fix)'),
         path: z.string().optional().describe('Caminho específico para lintar (ex: src/copilot)'),
