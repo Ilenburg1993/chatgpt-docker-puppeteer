@@ -19,6 +19,7 @@ export {
     recordTerminalUserInputCompleted,
     recordTerminalUserInputRequested,
 } from '../sdk-interactions.js';
+export { recordTerminalPromptHookSubmitted } from '../sdk-hook-events.js';
 export { createToolCallRegistry } from '../tool-call-registry.js';
 export {
     appendTerminalTranscriptTurn,

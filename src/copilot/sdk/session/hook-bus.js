@@ -120,10 +120,14 @@ export function attachBus(hooks, bus = defaultBus) {
         const orig = hooks.onUserPromptSubmitted;
         wrapped.onUserPromptSubmitted = async (input, invocation) => {
             const result = await orig(input, invocation);
+            const prompt = typeof input.prompt === 'string' ? input.prompt : '';
             bus.emitHook(
                 'prompt_submitted',
                 invocation?.sessionId ?? '',
-                { prompt: input.prompt?.slice(0, 80) },
+                {
+                    promptLength: prompt.length,
+                    promptPreview: prompt.replace(/\s+/g, ' ').trim().slice(0, 220),
+                },
                 result,
             );
             return result;

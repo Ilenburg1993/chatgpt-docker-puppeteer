@@ -20,6 +20,7 @@ import { log, wrapWithStats } from '#copilot/observability';
 import { buildCustomTools, getAllTools as getRegistryTools, registerTools } from '#copilot/sdk/tools';
 import { codeTools } from './code/index.js';
 import { fileReadTools, fileWriteTools, indexTools, scopeTools } from './file/index.js';
+import { searchTools } from './search/index.js';
 import { gitTools } from './git/index.js';
 import { configureHookTools, hookTools } from './hook/index.js';
 import { hubTools, setHub } from './hub/index.js';
@@ -84,6 +85,7 @@ export function getAllStaticTools() {
             ...(indexTools ?? []),
             ...(scopeTools ?? []),
             ...(fileWriteTools ?? []),
+            ...searchTools,
             ...shellTools,
             ...webTools,
             ...todoReadTools,
@@ -146,6 +148,7 @@ export function bootstrapTools(registry, mcpTools) {
         { tools: hookTools, category: 'hook', tags: ['audit', 'input', 'hooks'] },
         { tools: hubTools, category: 'hub', tags: ['conversation', 'llm-b', 'dialog', 'persistent'] },
         { tools: introspectionTools, category: 'introspection', tags: ['meta', 'telemetry'], readOnly: true },
+        { tools: searchTools, category: 'search', tags: ['filesystem', 'io', 'search'], readOnly: true },
         { tools: fileReadTools, category: 'file', tags: ['filesystem', 'io', 'read'], readOnly: true },
         { tools: indexTools, category: 'file-index', tags: ['filesystem', 'io', 'index'], readOnly: true },
         { tools: scopeTools, category: 'file-scope', tags: ['filesystem', 'io', 'scope'], readOnly: true },

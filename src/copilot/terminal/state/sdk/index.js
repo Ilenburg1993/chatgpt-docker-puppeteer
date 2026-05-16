@@ -24,3 +24,9 @@ export {
     recordTerminalUserInputCompleted,
     recordTerminalUserInputRequested,
 } from '../sdk-interactions.js';
+export {
+    clearTerminalPromptHookEvents,
+    listTerminalPromptHookEvents,
+    readTerminalPromptHookSummary,
+    recordTerminalPromptHookSubmitted,
+} from '../sdk-hook-events.js';

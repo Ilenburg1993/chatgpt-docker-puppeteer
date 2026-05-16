@@ -14,7 +14,7 @@ import { resolveIoSearchBudget } from '../../policy/budgets.js';
 import { hasNullByte } from '../../policy/path-resource.js';
 import { utf8ByteLength } from '../../shared/buffer.js';
 import { buildGrepArgs } from './grep-adapter.js';
-import { canUseIndexSearch, formatIndexSearchRows } from './index-search.js';
+import { canUseIndexSearch, filterIndexRowsByGlob, formatIndexSearchRows } from './index-search.js';
 import { normalizeSearchWindow, paginateSearchItems, paginateSearchText } from './result-paginator.js';
 import { execSearchFile, isRipgrepAvailable } from './subprocess.js';
 import { buildSymbolPattern, formatIndexSymbolRows, kindToGlobs } from './symbol-search.js';
@@ -193,8 +193,9 @@ export async function searchText(targetPath, options) {
                               : { maxResults: searchWindow.commandMaxCount }),
                       })
                     : [];
-            if (indexRows.length > 0) {
-                const windowed = paginateSearchItems(indexRows, searchWindow);
+            const filteredRows = filterIndexRowsByGlob(indexRows, options.includePattern, options.excludePattern);
+            if (filteredRows.length > 0) {
+                const windowed = paginateSearchItems(filteredRows, searchWindow);
                 const filteredOutput = sanitizeSearchOutput(formatIndexSearchRows(windowed.items));
                 const io = publishAndReturn(
                     buildSearchIo('io-engine.index.search', utf8ByteLength(filteredOutput.text, 'search output'), {

@@ -50,7 +50,14 @@ export {
 
 // ─── Categorias de tools ──────────────────────────────────────────────────────
 export { codeTools } from './code/index.js';
-export { fileReadTools, fileTools, fileWriteTools, findSymbolUsagesTool } from './file/index.js';
+export { fileReadTools, fileTools, fileWriteTools } from './file/index.js';
+export {
+    findSymbolUsagesTool,
+    searchInFilesTool,
+    searchTools,
+    symbolSearchTools,
+    workspaceSymbolSearchTool,
+} from './search/index.js';
 export { gitTools } from './git/index.js';
 export {
     cancelAllUserInputRequests,

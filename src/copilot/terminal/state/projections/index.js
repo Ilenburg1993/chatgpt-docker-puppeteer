@@ -7,4 +7,5 @@ export {
     readTerminalPermissionSummary,
     readTerminalUserInputSummary,
 } from '../sdk-interactions.js';
+export { readTerminalPromptHookSummary } from '../sdk-hook-events.js';
 export { readTerminalTurnTraceProjection } from '../turn-trace-state.js';

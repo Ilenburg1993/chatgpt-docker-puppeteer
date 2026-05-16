@@ -31,6 +31,7 @@ import {
     indexTools,
     scopeTools,
 } from '../../../src/copilot/tools/file/index.js';
+import { searchTools } from '../../../src/copilot/tools/search/index.js';
 import { allTools } from '../../../src/copilot/tools/index.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -85,9 +86,9 @@ afterEach(() => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe('fileTools — exportações do módulo', () => {
-    it('fileReadTools é um Array com pelo menos 4 elementos', () => {
+    it('fileReadTools é um Array com pelo menos 3 elementos', () => {
         assert.ok(Array.isArray(fileReadTools));
-        assert.ok(fileReadTools.length >= 4);
+        assert.ok(fileReadTools.length >= 3);
     });
 
     it('fileWriteTools é um Array com 6 elementos', () => {
@@ -103,12 +104,16 @@ describe('fileTools — exportações do módulo', () => {
         );
     });
 
-    it('fileReadTools inclui read_file_content, list_directory, search_in_files, diff_files', () => {
+    it('fileReadTools inclui read_file_content, list_directory, diff_files', () => {
         const names = fileReadTools.map((t) => /** @type {any} */ (t).name);
         assert.ok(names.includes('read_file_content'));
         assert.ok(names.includes('list_directory'));
-        assert.ok(names.includes('search_in_files'));
         assert.ok(names.includes('diff_files'));
+    });
+
+    it('searchTools inclui search_in_files', () => {
+        const names = searchTools.map((t) => /** @type {any} */ (t).name);
+        assert.ok(names.includes('search_in_files'));
     });
 
     it('fileWriteTools inclui write_file_content, create_file, delete_file, copy_file, move_file, patch_file', () => {
@@ -240,7 +245,7 @@ describe('list_directory', () => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe('search_in_files', () => {
-    const tool = findTool(fileReadTools, 'search_in_files');
+    const tool = findTool(searchTools, 'search_in_files');
 
     it('encontra texto em um arquivo', async () => {
         const result = await callTool(tool, { pattern: 'linha 2', path: tmpFile });

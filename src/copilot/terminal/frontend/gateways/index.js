@@ -98,6 +98,7 @@ export {
 export {
     listTerminalFileReadTools,
     listTerminalFileWriteTools,
+    listTerminalSearchTools,
     readTerminalToolRegistrySnapshot,
     requireTerminalFileTool,
 } from './tools.js';

@@ -8,7 +8,7 @@
  * @module copilot/terminal/frontend/gateways/tools
  */
 
-import { fileReadTools, fileWriteTools, readIntrospectionRegistrySnapshot } from '#copilot/tools';
+import { fileReadTools, fileWriteTools, readIntrospectionRegistrySnapshot, searchTools } from '#copilot/tools';
 
 /**
  * @typedef {{ name: string; handler?: Function; [key: string]: unknown }} TerminalTool
@@ -29,12 +29,24 @@ export function listTerminalFileWriteTools() {
 }
 
 /**
- * @param {'read' | 'write'} family
+ * @returns {TerminalTool[]}
+ */
+export function listTerminalSearchTools() {
+    return /** @type {TerminalTool[]} */ (/** @type {unknown} */ (searchTools));
+}
+
+/**
+ * @param {'read' | 'write' | 'search'} family
  * @param {string} name
  * @returns {TerminalTool}
  */
 export function requireTerminalFileTool(family, name) {
-    const tools = family === 'read' ? listTerminalFileReadTools() : listTerminalFileWriteTools();
+    const tools =
+        family === 'read'
+            ? listTerminalFileReadTools()
+            : family === 'write'
+              ? listTerminalFileWriteTools()
+              : listTerminalSearchTools();
     const tool = tools.find((candidate) => candidate.name === name);
     if (!tool) throw new TypeError(`[terminal/tools] tool canônica ausente: ${family}:${name}`);
     return tool;

@@ -28,7 +28,7 @@ function getToolHandler(tool) {
 
 const listDirectoryTool = requireTerminalFileTool('read', 'list_directory');
 const readFileContentTool = requireTerminalFileTool('read', 'read_file_content');
-const searchInFilesTool = requireTerminalFileTool('read', 'search_in_files');
+const searchInFilesTool = requireTerminalFileTool('search', 'search_in_files');
 const createFileTool = requireTerminalFileTool('write', 'create_file');
 const writeFileContentTool = requireTerminalFileTool('write', 'write_file_content');
 

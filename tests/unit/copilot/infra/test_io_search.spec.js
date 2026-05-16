@@ -18,7 +18,7 @@ describe('infra/io/search', () => {
     it('detecta quando a busca pode usar índice FTS', () => {
         expect(canUseIndexSearch({ pattern: 'alpha' })).toBe(true);
         expect(canUseIndexSearch({ pattern: 'alpha', isRegex: true })).toBe(false);
-        expect(canUseIndexSearch({ pattern: 'alpha', includePattern: '*.js' })).toBe(false);
+        expect(canUseIndexSearch({ pattern: 'alpha', includePattern: '*.js' })).toBe(true);
     });
 
     it('formata linhas do índice removendo marcação de snippet', () => {
