@@ -18,6 +18,7 @@ import {
     readTerminalPermissionSummary,
     readTerminalUserInputSummary,
 } from '../state/sdk/index.js';
+import { readTerminalIntentStats } from '../state/index.js';
 import { terminalActionChip, terminalThemeBadge, terminalThemeText } from '../state/ui/index.js';
 
 /**
@@ -39,6 +40,7 @@ export function buildTerminalSmartMenuEntries() {
     const elicitation = readTerminalElicitationSummary();
     const permission = readTerminalPermissionSummary();
     const userInput = readTerminalUserInputSummary();
+    const intentStats = readTerminalIntentStats();
     const structuredUserInputPending = getTerminalPendingStructuredUserInputCount();
     const entries = /** @type {TerminalSmartMenuEntry[]} */ ([]);
 
@@ -60,6 +62,15 @@ export function buildTerminalSmartMenuEntries() {
             label: 'Atividade recente',
             commandLine: '/activity 15',
             description: 'Últimos sinais úteis do loop/dialog/tools',
+        },
+        {
+            id: 'intent',
+            label: 'Intents da LLM-B',
+            commandLine: '/intent 20',
+            description:
+                intentStats.entries > 0
+                    ? `${intentStats.entries} intent(s) capturados de assistant.intent/report_intent`
+                    : 'Histórico de report_intent e assistant.intent',
         },
         {
             id: 'metrics',
