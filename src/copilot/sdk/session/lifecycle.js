@@ -19,7 +19,7 @@
 import { CopilotClient } from '@github/copilot-sdk';
 import { toError } from '#copilot/core/error-handlers';
 import { DEFAULT_MODEL, INFINITE_SESSION_DEFAULTS, REASONING_EFFORTS } from '../constants.js';
-import { getSdkRecoveryPolicy, toSdkOperationError } from '../errors.js';
+import { getSdkErrorFingerprint, getSdkRecoveryPolicy, toSdkOperationError } from '../errors.js';
 import { log } from '../logger.js';
 import { emitSdkOperationMetric } from '../telemetry/operation-metrics.js';
 import { setSessionAutoModelResolver } from './model-resolution-port.js';
@@ -192,8 +192,29 @@ async function reconnectClientBestEffort(client, operation) {
 }
 
 /**
+ * Padrões de mensagem SDK que indicam que a sessão simplesmente não existe mais no backend (expirou ou o CLI foi
+ * reiniciado), tornando a falha de resume um comportamento esperado. Cobrir variações de inglês e português usadas
+ * pelo SDK e CLI Copilot.
+ */
+const EXPECTED_RESUME_MISS_PATTERNS = [
+    'session not found',
+    'sessao nao encontrada',
+    'sessão não encontrada',
+    'session expired',
+    'session invalid',
+    'invalid session',
+    'unknown session',
+    'session does not exist',
+    'no session with id',
+    'no such session',
+    'session is not active',
+];
+
+/**
  * Sessões persistidas podem expirar no backend do SDK entre boots. Nesse caso `resumeOrCreate()` vai criar uma nova
  * sessão logo em seguida; a falha continua sendo métrica de lifecycle, mas não deve aparecer como erro fatal na UX.
+ *
+ * Cobre: mensagens explícitas de "não encontrado", HTTP 404/410 e variações de expiração/invalidação de sessão.
  *
  * @param {'session.create' | 'session.resume'} operation
  * @param {unknown} error
@@ -201,8 +222,11 @@ async function reconnectClientBestEffort(client, operation) {
  */
 function isExpectedResumeMiss(operation, error) {
     if (operation !== 'session.resume') return false;
-    const message = toError(error).message.toLowerCase();
-    return message.includes('session not found') || message.includes('sessao nao encontrada');
+    const fp = getSdkErrorFingerprint(error);
+    // HTTP 404 (not found) e 410 (gone) são sempre misses esperados em resume
+    if (fp.status === 404 || fp.status === 410) return true;
+    const haystack = `${fp.code} ${fp.errorType} ${fp.message}`.toLowerCase();
+    return EXPECTED_RESUME_MISS_PATTERNS.some((pattern) => haystack.includes(pattern));
 }
 
 /**
@@ -638,9 +662,10 @@ export async function resumeOrCreate(client, existingSessionId, opts) {
             const result = await resumeSession(client, existingSessionId, opts);
             return result;
         } catch (e) {
+            const isMiss = isExpectedResumeMiss('session.resume', e);
             log(
                 'WARN',
-                `[lib/session] Falha ao retomar '${existingSessionId}': ${toError(e).message}. Criando nova sessao.`,
+                `[lib/session] Falha ao retomar '${existingSessionId}': ${toError(e).message}. Criando nova sessao.${isMiss ? ' (miss esperado — CLI reiniciado ou sessao expirada)' : ''}`,
             );
         }
     }
@@ -721,3 +746,6 @@ export function createClientFromCliUrl(cliUrl) {
     log('INFO', `[lib/session] Conectando ao CLI externo: ${cliUrl}`);
     return new CopilotClient({ cliUrl });
 }
+
+/** @internal Expõe funções internas para testes unitários. */
+export const __test__ = { isExpectedResumeMiss, EXPECTED_RESUME_MISS_PATTERNS };

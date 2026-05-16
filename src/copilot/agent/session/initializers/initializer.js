@@ -372,7 +372,10 @@ export async function initOrResumeSession(client, sessionOptions) {
         if (!persistedNewSession.ok) {
             throw persistedNewSession.error;
         }
-        log('INFO', `[PersistentSession] Nova sessão criada: ${result.session.sessionId}`);
+        log(
+            'INFO',
+            `[PersistentSession] Nova sessão criada: ${result.session.sessionId}${savedSessionId ? ` (resume miss — sessão anterior '${savedSessionId}' não existe mais no SDK; comportamento esperado após reinício do CLI)` : ' (primeiro boot ou rotação explícita)'}`,
+        );
     }
 
     return {

@@ -65,6 +65,8 @@ function buildAutoBriefFingerprint(projection) {
         projection.runtimeId,
         projection.snap['model'],
         projection.snap['reasoningEffort'],
+        projection.snap['isResumed'],
+        projection.snap['resumeCount'],
         projection.toolLoad.total,
         projection.toolLoad.hasCanonicalLocalFsTools,
         projection.toolLoad.hasCanonicalLocalExecTools,
@@ -111,12 +113,15 @@ export function buildTerminalAutoBrief(input = {}) {
         contextWindow && typeof contextWindow === 'object'
             ? /** @type {{ utilization?: number }} */ (contextWindow).utilization
             : null;
+    const isResumed = Boolean(projection.snap['isResumed']);
+    const resumeCount = Number(projection.snap['resumeCount'] ?? 0);
+    const sessionTag = isResumed ? `retomada(#${resumeCount})` : 'nova';
     const ready = projection.toolLoad.total > 0 || projection.dialogLoopActive;
     const io = summarizeIoRuntime(projection.ioRuntime);
     /** @type {string[]} */
     const lines = [];
     lines.push(
-        `[auto-brief:${phase}] runtime=${projection.runtimeId} · modelo=${model}/${reasoning} · display=${displayPreset} · thinking=${displayState.thinking ? 'on' : 'off'} · streaming=${displayState.streaming ? 'on' : 'off'}`,
+        `[auto-brief:${phase}] runtime=${projection.runtimeId} · modelo=${model}/${reasoning} · sessão=${sessionTag} · display=${displayPreset} · thinking=${displayState.thinking ? 'on' : 'off'} · streaming=${displayState.streaming ? 'on' : 'off'}`,
     );
     lines.push(
         `[auto-brief:${phase}] tools=${projection.toolLoad.total} · fs=${yn(projection.toolLoad.hasCanonicalLocalFsTools)} · exec=${yn(projection.toolLoad.hasCanonicalLocalExecTools)} · sdkWorkspace=${yn(projection.toolLoad.hasSdkWorkspaceTooling)} · contrato=${projection.toolLoad.toolContract.ok ? 'ok' : `${projection.toolLoad.toolContract.errorCount} erro(s)`}`,
