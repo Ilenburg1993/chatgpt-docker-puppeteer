@@ -60,6 +60,7 @@ export const EMITTER_DIALOG_STALLED = 'dialog.stalled';
 export const EMITTER_DIALOG_STOPPED = 'dialog.stopped';
 export const EMITTER_DIALOG_BOOT_RECOVERY = 'dialog.boot_recovery';
 export const EMITTER_DIALOG_RECOVERY = 'dialog.recovery';
+export const EMITTER_DIALOG_PRE_STALL_WARNING = 'dialog.pre_stall_warning';
 
 // ── Dialog Loop Internal ─────────────────────────────────────
 export const EMITTER_LOOP_CHANGED = 'changed';

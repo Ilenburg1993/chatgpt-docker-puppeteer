@@ -117,8 +117,11 @@ export const COPILOT_FILE_TOOLS_MAX_DIFF_OUTPUT_BYTES = envPositiveOrInfinity(
 );
 export const LLM_B_BOOT_TIMEOUT_MS = envInt('LLM_B_BOOT_TIMEOUT_MS', 90_000);
 export const LLM_B_DIALOG_QUEUE_MAX = envInt('LLM_B_DIALOG_QUEUE_MAX', 10);
-export const LLM_B_WATCHDOG_MS = envInt('LLM_B_WATCHDOG_MS', 5 * 60 * 1_000);
 export const LLM_B_WATCHDOG_STALL_MS = envInt('LLM_B_WATCHDOG_STALL_MS', 15 * 60 * 1_000);
+// Intervalo derivado do stall threshold (10%) — garante que o tick pré-stall (80%) sempre seja capturado antes do stall (100%).
+// Exemplo: stall=15min → intervalo=90s. Janela pré-stall=180s >> 90s, portanto sempre detectado.
+export const LLM_B_WATCHDOG_MS = envInt('LLM_B_WATCHDOG_MS', Math.round(LLM_B_WATCHDOG_STALL_MS * 0.1));
+
 export const MAX_WEBHOOKS = envInt('MAX_WEBHOOKS', 50);
 export const WEB_FETCH_DISABLED = envBool('WEB_FETCH_DISABLED', false);
 export const WEB_SEARCH_DISABLED = envBool('WEB_SEARCH_DISABLED', false);

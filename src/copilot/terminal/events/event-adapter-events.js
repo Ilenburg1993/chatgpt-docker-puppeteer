@@ -17,6 +17,7 @@ export const TERMINAL_EXPLICIT_AGENT_EVENTS = new Set([
     'dialog.loop.changed',
     'dialog.ready',
     'dialog.stopped',
+    'dialog.pre_stall_warning',
     'session.usage',
     'session.compaction_complete',
     'elicitation.pending',
@@ -82,7 +83,6 @@ export const TERMINAL_EXPLICIT_AGENT_EVENTS = new Set([
 export const TERMINAL_AGENT_SSE_PASSTHROUGH_EVENTS = new Set([
     'dialog.boot_recovery',
     'dialog.paused',
-    'dialog.pre_stall_warning',
     'dialog.recovery',
     'dialog.resumed',
     'dialog.turn_end',

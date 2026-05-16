@@ -9,10 +9,11 @@
  * @see EventBus
  */
 
-import { LLM_B_TURN_TIMEOUT_MS } from '#copilot/config';
+import { LLM_B_TURN_TIMEOUT_MS, LLM_B_WATCHDOG_STALL_MS } from '#copilot/config';
 import {
     EMITTER_ASSISTANT_STREAMING_DELTA,
     EMITTER_DIALOG_LOOP_CHANGED,
+    EMITTER_DIALOG_PRE_STALL_WARNING,
     EMITTER_DIALOG_READY,
     EMITTER_DIALOG_REPLY,
     EMITTER_DIALOG_STALLED,
@@ -174,6 +175,46 @@ export function registerAgentEventListeners(printBanner) {
             );
         });
         broadcastSse('dialog.stalled', { stalledMs: evt.stalledMs, recoveredZeroPR: false });
+    });
+
+    // F41B.7: pré-stall warning — ação preemptiva quando loop está a 80% do limiar de stall.
+    // Se terminal ativo: ping watchdog silencioso (suprime stall iminente).
+    // Se genuinamente inativo: aviso visual + SSE para dashboard.
+    agentEvents.on(EMITTER_DIALOG_PRE_STALL_WARNING, (/** @type {{ stalledMs: number }} */ evt) => {
+        const secs = Math.round(evt.stalledMs / 1000);
+        const remainingSecs = Math.round((LLM_B_WATCHDOG_STALL_MS - evt.stalledMs) / 1000);
+        const runtimeState = readTerminalRuntimeState();
+        const isTerminalActive =
+            runtimeState.status !== 'idle' &&
+            runtimeState.status !== 'waiting_for_input' &&
+            runtimeState.dialogLoopActive;
+
+        if (isTerminalActive) {
+            // Terminal ativo mas sem turno SDK em andamento — ping preventivo para evitar stall falso
+            pingTerminalDialogWatchdog();
+            recordTerminalActivity('system', 'Pré-stall suprimido (terminal ativo)', {
+                detail: `${secs}s — status=${runtimeState.status}, ping preventivo emitido`,
+                source: 'watchdog',
+            });
+            log(
+                'INFO',
+                `[TerminalServer] Pré-stall (${secs}s) suprimido: terminal ativo (${runtimeState.status}).`,
+            );
+            broadcastSse('dialog.pre_stall_warning', { stalledMs: evt.stalledMs, suppressed: true });
+            return;
+        }
+
+        // Loop genuinamente inativo: aviso visual com tempo restante estimado
+        println(
+            `\n\x1b[33m[watchdog] ⚠️  Pré-stall: loop inativo há ${secs}s (~${remainingSecs}s para restart automático).\x1b[0m`,
+        );
+        log('WARN', `[TerminalServer] Pré-stall: loop inativo há ${secs}s (~${remainingSecs}s restantes).`);
+        recordTerminalActivity('system', 'Pré-stall watchdog', {
+            detail: `${secs}s inativo, restart em ~${remainingSecs}s`,
+            severity: 'warn',
+            source: 'watchdog',
+        });
+        broadcastSse('dialog.pre_stall_warning', { stalledMs: evt.stalledMs, suppressed: false, remainingSecs });
     });
 
     // SSE: transmite respostas da LLM-B para clientes subscritos
