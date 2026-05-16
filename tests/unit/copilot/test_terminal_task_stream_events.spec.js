@@ -11,6 +11,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({
     recordTerminalActivity: vi.fn(),
     println: vi.fn(),
+    renderTerminalAssistantTranscript: vi.fn(() => true),
+    getBusy: vi.fn(() => false),
     getShowStreaming: vi.fn(() => true),
     getShowThinking: vi.fn(() => true),
     appendThinkingHistoryChunk: vi.fn(),
@@ -28,14 +30,22 @@ vi.mock('../../../src/copilot/terminal/dialog/index.js', () => ({
 vi.mock('../../../src/copilot/presentation/state/index.js', () => ({
     appendThinkingHistoryChunk: mocks.appendThinkingHistoryChunk,
     finalizeThinkingHistoryEntry: mocks.finalizeThinkingHistoryEntry,
+    getBusy: mocks.getBusy,
     getShowStreaming: mocks.getShowStreaming,
     getShowThinking: mocks.getShowThinking,
+}));
+
+vi.mock('../../../src/copilot/terminal/events/assistant-transcript-renderer.js', () => ({
+    renderTerminalAssistantTranscript: mocks.renderTerminalAssistantTranscript,
 }));
 
 describe('terminal/task-stream-events.js — contrato', () => {
     beforeEach(() => {
         mocks.recordTerminalActivity.mockClear();
         mocks.println.mockClear();
+        mocks.renderTerminalAssistantTranscript.mockClear();
+        mocks.getBusy.mockReset();
+        mocks.getBusy.mockReturnValue(false);
         mocks.getShowStreaming.mockReset();
         mocks.getShowStreaming.mockReturnValue(true);
         mocks.getShowThinking.mockReset();
@@ -77,7 +87,7 @@ describe('terminal/task-stream-events.js — contrato', () => {
         stdoutSpy.mockRestore();
     });
 
-    it('registra task.delta sem imprimir streaming bruto no terminal', async () => {
+    it('registra task.delta sem imprimir streaming bruto e persiste transcript no fechamento', async () => {
         const stdoutSpy = vi.spyOn(process.stdout, 'write').mockReturnValue(true);
         const { setupTerminalTaskStreamListeners } =
             await import('../../../src/copilot/terminal/events/task-stream-events.js');
@@ -98,8 +108,28 @@ describe('terminal/task-stream-events.js — contrato', () => {
         );
         expect(mocks.println).not.toHaveBeenCalledWith(expect.stringContaining('task streaming'));
         expect(mocks.println).not.toHaveBeenCalledWith(expect.stringContaining('task complete'));
+        expect(mocks.renderTerminalAssistantTranscript).toHaveBeenCalledWith(
+            expect.objectContaining({
+                content: 'OK-LIVE-1',
+                source: 'agent/task.delta',
+                status: 'completed',
+            }),
+        );
         expect(stdoutSpy).not.toHaveBeenCalled();
         stdoutSpy.mockRestore();
+    });
+
+    it('não duplica transcript de task.delta quando o delta já pertence a turno ativo', async () => {
+        mocks.getBusy.mockReturnValue(true);
+        const { setupTerminalTaskStreamListeners } =
+            await import('../../../src/copilot/terminal/events/task-stream-events.js');
+        const agent = new EventEmitter();
+
+        setupTerminalTaskStreamListeners({ agent });
+        agent.emit('task.delta', { taskId: 'task-1', chunk: 'já renderizado pelo turno' });
+        agent.emit('task.completed', { taskId: 'task-1' });
+
+        expect(mocks.renderTerminalAssistantTranscript).not.toHaveBeenCalled();
     });
 
     it('não imprime reasoning cru de tarefa quando /thinking está desligado', async () => {

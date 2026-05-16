@@ -130,8 +130,9 @@ export async function runReplLifecycle(injectServer, { injectPort, onReady }) {
 
     if (onReady) void onReady();
 
+    // `println()` já redesenha o prompt ao final de cada linha do auto-brief. Reconfiguramos apenas o prompt efetivo
+    // aqui; redesenhar de novo nesta fase duplica `você› você›` quando o cursor já está na linha interativa.
     rl.setPrompt(buildUserPrompt());
-    rl.prompt();
 
     const PROMPT_CONTINUATION = '\x1b[90m  ...\x1b[0m ';
     const multilineInput = createTerminalMultilineInputState();

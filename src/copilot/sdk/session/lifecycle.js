@@ -192,6 +192,20 @@ async function reconnectClientBestEffort(client, operation) {
 }
 
 /**
+ * Sessões persistidas podem expirar no backend do SDK entre boots. Nesse caso `resumeOrCreate()` vai criar uma nova
+ * sessão logo em seguida; a falha continua sendo métrica de lifecycle, mas não deve aparecer como erro fatal na UX.
+ *
+ * @param {'session.create' | 'session.resume'} operation
+ * @param {unknown} error
+ * @returns {boolean}
+ */
+function isExpectedResumeMiss(operation, error) {
+    if (operation !== 'session.resume') return false;
+    const message = toError(error).message.toLowerCase();
+    return message.includes('session not found') || message.includes('sessao nao encontrada');
+}
+
+/**
  * @template T
  * @param {{
  *     client: import('@github/copilot-sdk').CopilotClient;
@@ -230,9 +244,10 @@ async function runSessionLifecycleOperation(params) {
             lastError = error;
             const policy = getSdkRecoveryPolicy(error, 'session');
             const shouldRetry = policy.retryable && attempt < maxAttempts;
+            const expectedResumeMiss = isExpectedResumeMiss(params.operation, error);
 
             log(
-                shouldRetry ? 'WARN' : 'ERROR',
+                shouldRetry || expectedResumeMiss ? 'WARN' : 'ERROR',
                 `[lib/session] ${params.operation} falhou (attempt=${attempt}/${maxAttempts}, kind=${policy.kind}, retryable=${policy.retryable}, reconnect=${policy.allowReconnect}): ${toError(error).message}`,
             );
 

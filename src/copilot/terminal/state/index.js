@@ -1,6 +1,7 @@
 // @ts-check
 
 /** @typedef {import('./activity-state.js').TerminalActivitySnapshot} TerminalActivitySnapshot */
+/** @typedef {import('./transcript-state.js').TerminalTranscriptTurn} TerminalTranscriptTurn */
 
 export {
     clearTerminalActivityHistory,
@@ -67,6 +68,12 @@ export {
     recordTerminalTurnFileActivity,
     recordTerminalTurnToolActivity,
 } from './turn-trace-state.js';
+export {
+    appendTerminalTranscriptTurn,
+    clearTerminalTranscriptTurns,
+    readTerminalTranscriptStats,
+    readTerminalTranscriptTurns,
+} from './transcript-state.js';
 export {
     TERMINAL_DETAIL_LEVELS,
     getTerminalDetailLevel,

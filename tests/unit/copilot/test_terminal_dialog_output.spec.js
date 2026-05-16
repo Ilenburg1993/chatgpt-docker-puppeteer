@@ -79,4 +79,9 @@ describe('terminal/dialog/output.js — contrato', () => {
         const mod = await import('../../../src/copilot/terminal/dialog/output.js');
         expect(mod.SEPARATOR).toBeDefined();
     });
+
+    it('expõe utilitário ANSI para cálculo seguro de largura visual', async () => {
+        const mod = await import('../../../src/copilot/terminal/dialog/output.js');
+        expect(mod.stripAnsiEscapes('\x1b[32mLLM-B\x1b[0m')).toBe('LLM-B');
+    });
 });

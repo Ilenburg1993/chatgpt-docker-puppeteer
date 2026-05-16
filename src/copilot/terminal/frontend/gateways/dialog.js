@@ -7,6 +7,7 @@
  */
 
 import { llmBridgeClient } from '#copilot/channel';
+import { clearTerminalTranscriptTurns, readTerminalTranscriptTurns } from '../../state/events/index.js';
 
 // ---------------------------------------------------------------------------
 // History feed
@@ -28,6 +29,24 @@ export function readTerminalHistoryFeed() {
  */
 export function clearTerminalHistoryFeed() {
     llmBridgeClient.clearHistory();
+}
+
+/**
+ * Histórico local de transcripts do terminal fora do bridge.
+ *
+ * @returns {import('../../state/transcript-state.js').TerminalTranscriptTurn[]}
+ */
+export function readTerminalTranscriptFeed() {
+    return readTerminalTranscriptTurns();
+}
+
+/**
+ * Limpa o histórico local de transcripts do terminal fora do bridge.
+ *
+ * @returns {void}
+ */
+export function clearTerminalTranscriptFeed() {
+    clearTerminalTranscriptTurns();
 }
 
 /**

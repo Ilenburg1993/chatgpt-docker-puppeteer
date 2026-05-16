@@ -10,16 +10,18 @@ import { getWorkspaceContext } from '#copilot/boot';
 import { sendRuntimeDialogTurnForRuntime } from '../../../presentation/runtime/index.js';
 import {
     clearTerminalHistoryFeed,
+    clearTerminalTranscriptFeed,
     countTerminalHubTurns,
     readTerminalHistoryFeed,
     readTerminalHubTurns,
     readTerminalSessionBinding,
+    readTerminalTranscriptFeed,
     seedTerminalHistoryFeed,
     writeTerminalHubTimelineTurn,
 } from '../gateways/index.js';
 import { readTerminalRuntimeBase } from './shared.js';
 
-/** @typedef {'hub' | 'bridge' | 'mixed' | 'empty'} TerminalTimelineSource */
+/** @typedef {'hub' | 'bridge' | 'terminal' | 'mixed' | 'empty'} TerminalTimelineSource */
 /** @typedef {'persistent' | 'transport' | 'reconciled' | 'none'} TerminalTimelineAuthority */
 /** @typedef {'persistent_only' | 'bridge_only' | 'aligned' | 'bridge_tail' | 'diverged' | 'empty'} TerminalTimelineReconciliation */
 /** @typedef {'none' | 'lazy'} TerminalTimelineSyncPolicy */
@@ -39,7 +41,7 @@ const TIMELINE_SYNC_FAILURE_RETRY_DELAYS_MS = [1_000, 5_000, 15_000];
  *     content: string;
  *     timestamp: number;
  *     persisted: boolean;
- *     origin: 'hub' | 'bridge';
+ *     origin: 'hub' | 'bridge' | 'terminal';
  *     turnId: number | null;
  *     sdkTurnId: string | null;
  * }} TerminalTimelineTurn
@@ -283,6 +285,42 @@ function mapBridgeTimelineTurn(turn, index) {
         turnId: null,
         sdkTurnId: null,
     };
+}
+
+/**
+ * @param {import('../../state/index.js').TerminalTranscriptTurn} turn
+ * @param {number} index
+ * @returns {TerminalTimelineTurn}
+ */
+function mapTerminalTranscriptTurn(turn, index) {
+    return {
+        role: normalizeTimelineRole(turn.role),
+        rawRole: turn.rawRole,
+        content: turn.content,
+        timestamp: normalizeTimestamp(turn.timestamp, Date.now() + index),
+        persisted: false,
+        origin: 'terminal',
+        turnId: null,
+        sdkTurnId: null,
+    };
+}
+
+/**
+ * @param {TerminalTimelineTurn[]} turns
+ * @returns {TerminalTimelineTurn[]}
+ */
+function dedupeTimelineTurns(turns) {
+    /** @type {Set<string>} */
+    const seen = new Set();
+    /** @type {TerminalTimelineTurn[]} */
+    const deduped = [];
+    for (const turn of turns) {
+        const signature = buildTimelineSignature(turn);
+        if (seen.has(signature)) continue;
+        seen.add(signature);
+        deduped.push(turn);
+    }
+    return deduped;
 }
 
 /**
@@ -656,6 +694,8 @@ export function readTerminalTimelineProjection({
     const policy = normalizeTimelineSyncPolicy(syncPolicy);
 
     const bridgeTurns = readTerminalHistoryFeed().slice(-limitTurns).map(mapBridgeTimelineTurn);
+    const terminalTurns = readTerminalTranscriptFeed().slice(-limitTurns).map(mapTerminalTranscriptTurn);
+    const liveTurns = dedupeTimelineTurns([...bridgeTurns, ...terminalTurns].sort((a, b) => a.timestamp - b.timestamp));
 
     /** @type {TerminalTimelineTurn[]} */
     let persistedTurns = [];
@@ -687,12 +727,12 @@ export function readTerminalTimelineProjection({
         timelineAuthority = 'persistent';
         reconciliationStatus = 'persistent_only';
 
-        if (bridgeTurns.length > 0) {
-            overlapCount = computeHubBridgeOverlap(persistedTurns, bridgeTurns);
-            if (overlapCount === bridgeTurns.length) {
+        if (liveTurns.length > 0) {
+            overlapCount = computeHubBridgeOverlap(persistedTurns, liveTurns);
+            if (overlapCount === liveTurns.length) {
                 reconciliationStatus = 'aligned';
             } else if (overlapCount > 0) {
-                liveBridgeTail = bridgeTurns.slice(overlapCount);
+                liveBridgeTail = liveTurns.slice(overlapCount);
                 if (liveBridgeTail.length > 0) {
                     turns = [...persistedTurns, ...liveBridgeTail];
                     timelineSource = 'mixed';
@@ -706,9 +746,14 @@ export function readTerminalTimelineProjection({
                 reconciliationStatus = 'diverged';
             }
         }
-    } else if (bridgeTurns.length > 0) {
-        turns = bridgeTurns;
-        timelineSource = 'bridge';
+    } else if (liveTurns.length > 0) {
+        turns = liveTurns;
+        timelineSource =
+            bridgeTurns.length > 0 && terminalTurns.length > 0
+                ? 'mixed'
+                : terminalTurns.length > 0
+                  ? 'terminal'
+                  : 'bridge';
         timelineAuthority = 'transport';
         reconciliationStatus = 'bridge_only';
     }
@@ -718,7 +763,7 @@ export function readTerminalTimelineProjection({
         hubSessionId,
         sdkSessionId: binding.sdkSessionId,
         reconciliationStatus,
-        bridgeTurns,
+        bridgeTurns: liveTurns,
         liveBridgeTail,
     });
 
@@ -872,6 +917,7 @@ export async function requestTerminalCompactionProjection(runtimeId) {
  */
 export function clearTerminalHistory() {
     clearTerminalHistoryFeed();
+    clearTerminalTranscriptFeed();
 }
 
 /**

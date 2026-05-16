@@ -15,7 +15,9 @@ import { readTerminalDialogStreamMeta, readTerminalRuntimeState } from '../front
 import { readTerminalActivitySnapshot, terminalThemeText } from '../state/repl/index.js';
 
 const MIN_LIVE_STATUS_INTERVAL_MS = 250;
-const MAX_LIVE_DETAIL_CHARS = 96;
+const MIN_LIVE_STATUS_HEARTBEAT_MS = 1_000;
+const DEFAULT_LIVE_STATUS_HEARTBEAT_MS = 5_000;
+const MAX_LIVE_DETAIL_CHARS = 240;
 
 /**
  * @param {string | null | undefined} value
@@ -114,7 +116,7 @@ export function shouldRenderTerminalLiveStatusLine(input = {}) {
 /**
  * Inicia o pulso permanente do terminal. Retorna cleanup idempotente.
  *
- * @param {{ intervalMs?: number; enabled?: boolean }} [options]
+ * @param {{ intervalMs?: number; heartbeatMs?: number; enabled?: boolean }} [options]
  * @returns {() => void}
  */
 export function setupTerminalLiveStatusLine(options = {}) {
@@ -124,9 +126,20 @@ export function setupTerminalLiveStatusLine(options = {}) {
         MIN_LIVE_STATUS_INTERVAL_MS,
         Math.floor(options.intervalMs ?? TERMINAL_LIVE_STATUS_INTERVAL_MS),
     );
+    const heartbeatMs = Math.max(
+        MIN_LIVE_STATUS_HEARTBEAT_MS,
+        Math.floor(options.heartbeatMs ?? DEFAULT_LIVE_STATUS_HEARTBEAT_MS),
+        intervalMs,
+    );
     /** @type {NodeJS.Timeout | null} */
     let timer = null;
     let rendered = false;
+    let lastRenderedLine = '';
+    let lastRenderedAt = 0;
+    const resetRenderCache = () => {
+        lastRenderedLine = '';
+        lastRenderedAt = 0;
+    };
     const render = () => {
         const activity = readTerminalActivitySnapshot();
         const runtime = readTerminalRuntimeState();
@@ -134,11 +147,17 @@ export function setupTerminalLiveStatusLine(options = {}) {
             if (rendered) {
                 clearInlineStatus();
                 rendered = false;
+                resetRenderCache();
             }
             return;
         }
-        writeInlineStatus(formatTerminalLiveStatusLine({ activity, runtime, now: Date.now() }));
+        const now = Date.now();
+        const line = formatTerminalLiveStatusLine({ activity, runtime, now });
+        if (rendered && line === lastRenderedLine && now - lastRenderedAt < heartbeatMs) return;
+        writeInlineStatus(line);
         rendered = true;
+        lastRenderedLine = line;
+        lastRenderedAt = now;
     };
     timer = setInterval(render, intervalMs);
     if (typeof timer.unref === 'function') timer.unref();
@@ -151,6 +170,7 @@ export function setupTerminalLiveStatusLine(options = {}) {
         if (rendered) {
             clearInlineStatus();
             rendered = false;
+            resetRenderCache();
         }
     };
 }

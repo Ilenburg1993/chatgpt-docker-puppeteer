@@ -13,6 +13,12 @@ export {
 } from '../sdk-interactions.js';
 export { createToolCallRegistry } from '../tool-call-registry.js';
 export {
+    appendTerminalTranscriptTurn,
+    clearTerminalTranscriptTurns,
+    readTerminalTranscriptStats,
+    readTerminalTranscriptTurns,
+} from '../transcript-state.js';
+export {
     beginTerminalTurnTrace,
     completeTerminalTurnToolCall,
     completeTerminalTurnTrace,

@@ -16,6 +16,7 @@
  */
 
 import {
+    EMITTER_ASSISTANT_MESSAGE,
     EMITTER_ASSISTANT_REASONING_COMPLETE,
     EMITTER_ASSISTANT_TURN_END,
     EMITTER_ASSISTANT_TURN_START,
@@ -57,6 +58,7 @@ import { DialogProtocol } from '../../dialog/protocol.js';
 import {
     consumeRuntimeInterventionMailbox,
     enqueueRuntimeInterventionMailbox,
+    getBusy,
     getShowSessionActivity,
     readRuntimeInterventionMailboxSummary,
     setLastSdkPlanOperation,
@@ -87,6 +89,7 @@ import {
     handleTerminalExternalToolRequested,
     handleTerminalToolUserRequested,
 } from './tool-lifecycle-runtime.js';
+import { renderTerminalAssistantTranscript } from './assistant-transcript-renderer.js';
 
 /**
  * @typedef {{
@@ -217,6 +220,39 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
         return getShowSessionActivity();
     }
 
+    /**
+     * @param {unknown} evt
+     * @returns {string}
+     */
+    function extractAssistantMessageContent(evt) {
+        const data = eventObject(evt);
+        const nested = eventObject(data['data']);
+        const content =
+            data['content'] ??
+            nested['content'] ??
+            data['message'] ??
+            nested['message'] ??
+            data['text'] ??
+            nested['text'];
+        return typeof content === 'string' ? content : '';
+    }
+
+    /**
+     * @param {string} content
+     * @returns {{ content: string; kind: ReturnType<typeof DialogProtocol.classify> } | null}
+     */
+    function normalizeAssistantTranscriptContent(content) {
+        const trimmed = content.trim();
+        if (!trimmed) return null;
+        const kind = DialogProtocol.classify(trimmed);
+        if (kind === 'ready' || kind === 'stopped') return null;
+        if (kind === 'reply') {
+            const reply = DialogProtocol.extractReply(trimmed);
+            return reply ? { content: reply, kind } : null;
+        }
+        return { content: trimmed, kind };
+    }
+
     const onAssistantTurnStart = (/** @type {{ turnId?: string | null }} */ evt) => {
         const turnId = evt?.turnId ?? null;
         beginTerminalTurnTrace({ turnId });
@@ -246,6 +282,30 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
             drainMailboxToTurnIfIdle('turn_end');
         });
         refreshPromptIfIdle();
+    };
+
+    const onAssistantMessage = (/** @type {unknown} */ evt) => {
+        const normalized = normalizeAssistantTranscriptContent(extractAssistantMessageContent(evt));
+        if (!normalized) return;
+        recordTerminalActivity('turn', 'Mensagem da LLM-B recebida', {
+            detail: `${normalized.kind}${normalized.content ? ` · ${normalized.content.slice(0, 160)}` : ''}`,
+            source: 'sdk',
+            recordHistory: false,
+        });
+        broadcastSse('assistant.message', {
+            content: normalized.content,
+            protocolKind: normalized.kind,
+            timestamp: Date.now(),
+        });
+        if (getBusy()) return;
+        const rendered = renderTerminalAssistantTranscript({
+            content: normalized.content,
+            title: normalized.kind === 'reply' ? 'Resposta fora do turno ativo' : 'Mensagem',
+            source: 'sdk/assistant.message',
+            status: 'message',
+            detail: normalized.kind,
+        });
+        if (rendered) refreshPromptIfIdle();
     };
 
     const onSessionInfo = (/** @type {{ infoType?: string; message?: string; url?: string }} */ evt) => {
@@ -880,6 +940,7 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
 
     agent.on(EMITTER_ASSISTANT_TURN_START, onAssistantTurnStart);
     agent.on(EMITTER_ASSISTANT_TURN_END, onAssistantTurnEnd);
+    agent.on(EMITTER_ASSISTANT_MESSAGE, onAssistantMessage);
     agent.on(EMITTER_SESSION_INFO, onSessionInfo);
     agent.on(EMITTER_SESSION_WARNING, onSessionWarning);
     agent.on(EMITTER_ELICITATION_PENDING, onElicitationPending);
@@ -918,6 +979,7 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
     return () => {
         agent.off(EMITTER_ASSISTANT_TURN_START, onAssistantTurnStart);
         agent.off(EMITTER_ASSISTANT_TURN_END, onAssistantTurnEnd);
+        agent.off(EMITTER_ASSISTANT_MESSAGE, onAssistantMessage);
         agent.off(EMITTER_SESSION_INFO, onSessionInfo);
         agent.off(EMITTER_SESSION_WARNING, onSessionWarning);
         agent.off(EMITTER_ELICITATION_PENDING, onElicitationPending);

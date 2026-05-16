@@ -28,7 +28,9 @@ export {
 } from './agent-runtime.js';
 export {
     clearTerminalHistoryFeed,
+    clearTerminalTranscriptFeed,
     readTerminalHistoryFeed,
+    readTerminalTranscriptFeed,
     readTerminalTurnCount,
     runTerminalDialogTurn,
     seedTerminalHistoryFeed,

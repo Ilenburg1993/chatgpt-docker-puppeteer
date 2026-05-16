@@ -119,6 +119,22 @@ describe('terminal/live-status-line', () => {
         cleanup();
     });
 
+    it('não redesenha frames idênticos antes do heartbeat', async () => {
+        const { setupTerminalLiveStatusLine } =
+            await import('../../../../src/copilot/terminal/repl/live-status-line.js');
+
+        const cleanup = setupTerminalLiveStatusLine({ intervalMs: 250, heartbeatMs: 1000 });
+        expect(mocks.writeInlineStatus).toHaveBeenCalledTimes(1);
+
+        await vi.advanceTimersByTimeAsync(750);
+        expect(mocks.writeInlineStatus).toHaveBeenCalledTimes(1);
+
+        await vi.advanceTimersByTimeAsync(250);
+        expect(mocks.writeInlineStatus).toHaveBeenCalledTimes(2);
+
+        cleanup();
+    });
+
     it('limpa a linha quando a atividade volta a idle', async () => {
         const { setupTerminalLiveStatusLine } =
             await import('../../../../src/copilot/terminal/repl/live-status-line.js');

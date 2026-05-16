@@ -59,6 +59,8 @@ também declara `risk` e scorecard para orientar a ordem de decomposição.
 | `events/tool-activity-presenter.js`      | narrativa operacional de tools, arquivos e comandos para o streaming live  |
 | `state/turn-trace-state.js`              | resumo canônico por turno de tools/arquivos tocados para `/activity`       |
 | `events/task-stream-events.js`           | render e SSE do streaming de tarefas internas (`task.*`)                   |
+| `events/task-transcript-accumulator.js`  | promoção bounded de deltas de tarefa para transcript persistente           |
+| `events/assistant-transcript-renderer.js` | renderer persistente de mensagens da LLM-B fora do turno ativo             |
 | `events/agent-sse-passthrough.js`        | passthrough SSE explícito e estreito para eventos sem adapter dedicado     |
 | `wiring/terminal-agent-wiring.js`        | SSE + wiring de alto nível entre terminal e agent                          |
 | `index.js` / `bootstrap.js`              | boot do terminal                                                           |

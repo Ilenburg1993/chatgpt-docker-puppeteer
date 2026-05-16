@@ -10,6 +10,7 @@ import { toError } from '#copilot/core';
 import { registerTimer } from '#copilot/core';
 import {
     clearAgentRuntimePendingQuestionShadow,
+    markAgentRuntimeDialogPausedForRecovery,
     shouldReapAgentRuntimePendingQuestionShadow,
     shouldScheduleAgentRuntimeDialogBootRecovery,
 } from '../../facades/index.js';
@@ -90,8 +91,15 @@ export function stepScheduleDialogRecovery(isResumed, ctx, state) {
     }
 
     void ctx.trackBackgroundTask(
-        shouldScheduleAgentRuntimeDialogBootRecovery().then((shouldSchedule) => {
+        shouldScheduleAgentRuntimeDialogBootRecovery().then(async (shouldSchedule) => {
             if (shouldSchedule) {
+                const pauseResult = await markAgentRuntimeDialogPausedForRecovery();
+                if (!pauseResult.ok) {
+                    log(
+                        'WARN',
+                        `[AlwaysAlive] F53: Falha ao marcar dialogPaused para boot recovery: ${toError(pauseResult.error).message}`,
+                    );
+                }
                 const cancelBootRecovery = scheduleDialogBootRecovery(ctx);
                 state.unsubs.push(cancelBootRecovery);
             }

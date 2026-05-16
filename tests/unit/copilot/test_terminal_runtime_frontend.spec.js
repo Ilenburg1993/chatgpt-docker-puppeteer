@@ -30,22 +30,21 @@ const readTurns = vi.fn(
         return persistedTurns.slice(offset, offset + limit);
     },
 );
-const writeTurn = vi.fn(
-    async (
-        /** @type {string} */ _hubSessionId,
-        /** @type {{ role?: string; content?: string; metadata?: object | null; sdkSessionId?: string | null }} */ opts = {},
-    ) => {
-        persistedTurns.push({
-            id: 40 + persistedTurns.length,
-            role: opts.role ?? 'user',
-            content: opts.content ?? '',
-            created_at: Date.now() + persistedTurns.length,
-            metadata: opts.metadata ? JSON.stringify(opts.metadata) : null,
-            sdk_session_id: opts.sdkSessionId ?? null,
-        });
-        return 42;
-    },
-);
+const writeTurnDefaultImpl = async (
+    /** @type {string} */ _hubSessionId,
+    /** @type {{ role?: string; content?: string; metadata?: object | null; sdkSessionId?: string | null }} */ opts = {},
+) => {
+    persistedTurns.push({
+        id: 40 + persistedTurns.length,
+        role: opts.role ?? 'user',
+        content: opts.content ?? '',
+        created_at: Date.now() + persistedTurns.length,
+        metadata: opts.metadata ? JSON.stringify(opts.metadata) : null,
+        sdk_session_id: opts.sdkSessionId ?? null,
+    });
+    return 42;
+};
+const writeTurn = vi.fn(writeTurnDefaultImpl);
 const defaultGetSdkSessionMode = vi.fn(async () => ({ mode: 'interactive' }));
 const defaultSetSdkSessionMode = vi.fn(async (/** @type {any} */ mode) => ({ mode }));
 const defaultGetSdkSessionCapabilities = vi.fn(() => ({ ui: { elicitation: true } }));
@@ -150,14 +149,52 @@ const altRuntime = /** @type {any} */ ({
         contextWindow: { tokens: 12000, tokenLimit: 64000, utilization: 0.18 },
     }),
 });
+
+/**
+ * @param {string | null | undefined} [runtimeId]
+ * @returns {any}
+ */
+function selectMockRuntime(runtimeId = 'default') {
+    if (runtimeId === 'alt') return altRuntime;
+    return runtimeId === 'default' || runtimeId == null ? defaultRuntime : null;
+}
+
+/**
+ * @param {string | null | undefined} [runtimeId]
+ * @returns {any}
+ */
+function readMockRuntimeOverviewProjection(runtimeId = 'default') {
+    const selected = selectMockRuntime(runtimeId) ?? defaultRuntime;
+    const status = selected.getStatusSnapshot();
+    const pendingQuestion = selected.pendingQuestion ?? null;
+    const pendingQuestionShadow = selected.pendingQuestionShadow ?? null;
+    return {
+        runtimeId: selected === altRuntime ? 'alt' : 'default',
+        model: selected.model,
+        reasoningEffort: selected.reasoningEffort ?? 'off',
+        status: selected.status,
+        sessionId: selected.sessionId ?? null,
+        dialogLoopActive: Boolean(selected.dialogLoopActive),
+        dialogPaused: Boolean(selected.dialogPaused),
+        queueSize: Number(selected.queueSize ?? 0),
+        pendingQuestion,
+        pendingQuestionKind: selected.pendingQuestionKind ?? pendingQuestion?.kind ?? null,
+        pendingQuestionShadow,
+        pendingQuestionShadowKind: selected.pendingQuestionShadowKind ?? pendingQuestionShadow?.meta?.kind ?? null,
+        pendingQuestionShadowState: selected.pendingQuestionShadowState ?? null,
+        pendingQuestionShadowExpired: Boolean(selected.pendingQuestionShadowExpired),
+        pendingQuestionShadowAgeMs: selected.pendingQuestionShadowAgeMs ?? null,
+        pendingQuestionShadowExpiresAt: selected.pendingQuestionShadowExpiresAt ?? null,
+        pendingQuestionShadowRemainingMs: selected.pendingQuestionShadowRemainingMs ?? null,
+        contextWindow: status.contextWindow ?? null,
+        lastPrInfo: selected.lastPrInfo ?? null,
+    };
+}
 vi.mock('#copilot/agent', () => ({
     getAgent: () => defaultRuntime,
     getDefaultAgentRuntimeId: () => 'default',
     getDefaultRegisteredAgentRuntime: () => defaultRuntime,
-    getRegisteredAgentRuntime: (/** @type {string | null | undefined} */ runtimeId = 'default') => {
-        if (runtimeId === 'alt') return altRuntime;
-        return runtimeId === 'default' ? defaultRuntime : null;
-    },
+    getRegisteredAgentRuntime: selectMockRuntime,
     listAgentRuntimes: () => [
         { runtimeId: 'default', runtime: defaultRuntime },
         { runtimeId: 'alt', runtime: altRuntime },
@@ -223,6 +260,83 @@ vi.mock('#copilot/agent', () => ({
     ),
 }));
 
+vi.mock('#copilot/runtime', () => ({
+    abortAgentRuntimeCurrentMessage: vi.fn(async () => {}),
+    answerAgentPendingQuestion: vi.fn(() => true),
+    clearAgentPendingQuestionShadow: vi.fn(() => true),
+    createAgentRuntimeSnapshot: vi.fn(() => ({ id: 'snapshot-1' })),
+    listAgentRuntimeSnapshots: vi.fn(() => []),
+    loadAgentRuntimeSnapshot: vi.fn(() => ({ ok: true })),
+    offAgentRuntimeEvent: vi.fn(),
+    onAgentRuntimeEvent: vi.fn(),
+    onceAgentRuntimeEvent: vi.fn(),
+    pauseAgentDialogLoop: () => defaultRuntime.pauseDialogLoop(),
+    pingDefaultAgentDialogWatchdog: () => defaultRuntime.pingDialogWatchdog(),
+    readAgentHandoffHistory: () => defaultRuntime.getHandoffManager().getHistory(),
+    readAgentRuntimeControlState: (/** @type {string | null | undefined} */ runtimeId) => {
+        const selected = selectMockRuntime(runtimeId) ?? defaultRuntime;
+        return {
+            status: selected.status,
+            model: selected.model,
+            reasoningEffort: selected.reasoningEffort ?? 'off',
+            sessionId: selected.sessionId ?? null,
+            dialogLoopActive: Boolean(selected.dialogLoopActive),
+            dialogPaused: Boolean(selected.dialogPaused),
+            queueSize: Number(selected.queueSize ?? 0),
+        };
+    },
+    readAgentRuntimeOverviewProjection: readMockRuntimeOverviewProjection,
+    readAgentRuntimePermissionMode: vi.fn(() => 'selective'),
+    resumeAgentDialogLoop: () => defaultRuntime.resumeDialogLoop(),
+    saveAgentRuntimeSnapshot: vi.fn(() => ({ ok: true })),
+    setAgentRuntimePermissionMode: vi.fn((mode) => mode),
+    startAgentRuntime: vi.fn(async () => {}),
+    steerAgentRuntimeMessage: vi.fn(async (prompt) => prompt),
+    stopAgentRuntimeDialogLoopAuthorized: async () =>
+        defaultRuntime.stopDialogLoop({ authorized: true, reason: 'authorized_stop' }),
+}));
+
+vi.mock('../../../src/copilot/presentation/runtime/index.js', () => ({
+    compactAgentSdkSession: vi.fn(async () => ({ ok: true })),
+    confirmAgentSdkSessionUi: (/** @type {string} */ message, /** @type {string | null | undefined} */ runtimeId) =>
+        (selectMockRuntime(runtimeId) ?? defaultRuntime).confirmSdkSessionUi(message),
+    createAgentSdkWorkspaceFile: vi.fn(async () => ({ ok: true })),
+    deleteAgentSdkPlan: (/** @type {string | null | undefined} */ runtimeId) =>
+        (selectMockRuntime(runtimeId) ?? defaultRuntime).deleteSdkPlan(),
+    getAgentSdkPendingElicitation: vi.fn(() => null),
+    getAgentSdkQuota: vi.fn(async () => ({ ok: true })),
+    getAgentSdkSessionCapabilities: (/** @type {string | null | undefined} */ runtimeId) =>
+        (selectMockRuntime(runtimeId) ?? defaultRuntime).getSdkSessionCapabilities(),
+    getAgentSdkSessionMode: (/** @type {string | null | undefined} */ runtimeId) =>
+        (selectMockRuntime(runtimeId) ?? defaultRuntime).getSdkSessionMode(),
+    handleAgentSdkPendingPermission: vi.fn(async () => null),
+    inputAgentSdkSessionUi: (/** @type {string} */ message, _options, /** @type {string | null | undefined} */ runtimeId) =>
+        (selectMockRuntime(runtimeId) ?? defaultRuntime).inputSdkSessionUi(message),
+    isAgentSdkSessionUiElicitationAvailable: (/** @type {string | null | undefined} */ runtimeId) =>
+        (selectMockRuntime(runtimeId) ?? defaultRuntime).isSdkSessionUiElicitationAvailable(),
+    listAgentSdkModels: vi.fn(async () => []),
+    listAgentSdkPendingElicitations: vi.fn(() => []),
+    listAgentSdkPendingPermissions: vi.fn(() => []),
+    listAgentSdkTools: vi.fn(async () => []),
+    listAgentSdkWorkspaceFiles: vi.fn(async () => []),
+    readAgentSdkPlan: (/** @type {string | null | undefined} */ runtimeId) =>
+        (selectMockRuntime(runtimeId) ?? defaultRuntime).readSdkPlan(),
+    readAgentRuntimeOverviewProjection: readMockRuntimeOverviewProjection,
+    readAgentSdkSystemPromptProjection: vi.fn(async () => ({ content: '' })),
+    readAgentSdkWorkspaceFile: vi.fn(async () => ({ content: '' })),
+    requestAgentSdkElicitation: vi.fn(async () => null),
+    resolveAgentSdkPendingElicitation: vi.fn(async () => null),
+    selectAgentSdkSessionUi: (
+        /** @type {string} */ message,
+        /** @type {string[]} */ options,
+        /** @type {string | null | undefined} */ runtimeId,
+    ) => (selectMockRuntime(runtimeId) ?? defaultRuntime).selectSdkSessionUi(message, options),
+    setAgentSdkSessionMode: (/** @type {any} */ mode, /** @type {string | null | undefined} */ runtimeId) =>
+        (selectMockRuntime(runtimeId) ?? defaultRuntime).setSdkSessionMode(mode),
+    updateAgentSdkPlan: (/** @type {string} */ content, /** @type {string | null | undefined} */ runtimeId) =>
+        (selectMockRuntime(runtimeId) ?? defaultRuntime).updateSdkPlan(content),
+}));
+
 vi.mock('#copilot/channel', () => ({
     llmBridgeClient: {
         turnCount: 12,
@@ -256,10 +370,13 @@ vi.mock('#copilot/conversation-hub', () => ({
 let runtime;
 /** @type {typeof import('../../../src/copilot/core/shared-state.js')} */
 let sharedState;
+/** @type {typeof import('../../../src/copilot/terminal/state/index.js')} */
+let transcriptState;
 
 beforeAll(async () => {
     runtime = await import('../../../src/copilot/terminal/frontend/index.js');
     sharedState = await import('../../../src/copilot/core/shared-state.js');
+    transcriptState = await import('../../../src/copilot/terminal/state/index.js');
 });
 
 beforeEach(() => {
@@ -268,8 +385,10 @@ beforeEach(() => {
     persistedTurns.length = 0;
     readTurns.mockClear();
     countTurns.mockClear();
-    writeTurn.mockClear();
+    writeTurn.mockReset();
+    writeTurn.mockImplementation(writeTurnDefaultImpl);
     clearHistory.mockClear();
+    transcriptState.clearTerminalTranscriptTurns();
     sharedState.clearSharedSessionBinding();
 });
 
@@ -368,6 +487,53 @@ describe('terminal/frontend/index', () => {
                     source: 'terminal.timeline_sync',
                     originalOrigin: 'bridge',
                     originalRole: 'assistant',
+                }),
+            }),
+        );
+    });
+
+    it('inclui transcript local da LLM-B na timeline e no sync lazy', async () => {
+        sharedState.setSharedHubSessionId('hub-transcript');
+        sharedState.setSharedSdkSessionId('sdk-transcript');
+        liveHistory.length = 0;
+        transcriptState.appendTerminalTranscriptTurn({
+            role: 'assistant',
+            rawRole: 'llm_b',
+            content: 'mensagem fora do turno ativo',
+            source: 'sdk/assistant.message',
+            timestamp: 1710000003000,
+        });
+        const transcriptStats = transcriptState.readTerminalTranscriptStats();
+
+        const timeline = runtime.readTerminalTimelineProjection({ limitPairs: 5 });
+        await new Promise((resolve) => setImmediate(resolve));
+
+        expect(transcriptStats).toEqual(
+            expect.objectContaining({
+                turns: 1,
+                bytes: Buffer.byteLength('mensagem fora do turno ativo', 'utf8'),
+                maxBytes: expect.any(Number),
+            }),
+        );
+        expect(timeline.timelineSource).toBe('terminal');
+        expect(timeline.turns).toEqual([
+            expect.objectContaining({
+                role: 'assistant',
+                rawRole: 'llm_b',
+                content: 'mensagem fora do turno ativo',
+                origin: 'terminal',
+            }),
+        ]);
+        expect(writeTurn).toHaveBeenCalledWith(
+            'hub-transcript',
+            expect.objectContaining({
+                role: 'llm_b',
+                content: 'mensagem fora do turno ativo',
+                sdkSessionId: 'sdk-transcript',
+                metadata: expect.objectContaining({
+                    source: 'terminal.timeline_sync',
+                    originalOrigin: 'terminal',
+                    originalRole: 'llm_b',
                 }),
             }),
         );

@@ -8,6 +8,7 @@
  */
 
 import {
+    EMITTER_ASSISTANT_TURN_END,
     EMITTER_TASK_COMPLETED,
     EMITTER_TASK_DELTA,
     EMITTER_TASK_ERROR,
@@ -20,6 +21,7 @@ import {
 } from '../../presentation/state/index.js';
 import { println } from '../dialog/index.js';
 import { recordTerminalActivity } from '../state/events/index.js';
+import { createTaskTranscriptAccumulator } from './task-transcript-accumulator.js';
 
 /**
  * @typedef {{
@@ -42,6 +44,7 @@ export function setupTerminalTaskStreamListeners({ agent }) {
     const taskDeltaStats = new Map();
     /** @type {Map<string, number>} */
     const taskLastDeltaActivityAt = new Map();
+    const taskTranscripts = createTaskTranscriptAccumulator();
 
     /**
      * @param {string | null | undefined} taskId
@@ -92,9 +95,9 @@ export function setupTerminalTaskStreamListeners({ agent }) {
     const getTaskKey = (taskId) => taskId ?? '__anonymous__';
 
     /**
-     * Task deltas representam saída incremental de uma tarefa interna do Agent. No terminal, eles não são renderizados
-     * como streaming bruto: isso evita duplicar a resposta final e preserva o prompt legível. O payload continua
-     * observável por histórico/SSE/telemetria quando esses canais estiverem habilitados.
+     * Task deltas são transitórios durante o streaming, mas não podem desaparecer. Enquanto há um turno explícito em
+     * andamento, `turn-display.js` já renderiza a resposta; fora desse caminho, acumulamos o conteúdo e imprimimos um
+     * transcript estável no fechamento da tarefa/turno.
      *
      * @param {string | null | undefined} taskId
      * @param {string} chunk
@@ -107,6 +110,7 @@ export function setupTerminalTaskStreamListeners({ agent }) {
             chunks: current.chunks + 1,
             chars: current.chars + chunk.length,
         });
+        taskTranscripts.record(taskId, chunk);
     };
 
     const onTaskDelta = (/** @type {{ taskId?: string | null; chunk?: string }} */ evt) => {
@@ -163,6 +167,7 @@ export function setupTerminalTaskStreamListeners({ agent }) {
             source: 'agent',
         });
         finalizeTaskThinkings(evt.taskId ?? undefined, 'completed');
+        taskTranscripts.flush(evt.taskId ?? undefined, 'completed', 'task.completed');
         taskDeltaStats.delete(taskKey);
         taskLastDeltaActivityAt.delete(taskKey);
     };
@@ -176,16 +181,26 @@ export function setupTerminalTaskStreamListeners({ agent }) {
             severity: 'error',
         });
         finalizeTaskThinkings(evt.taskId ?? undefined, 'error');
+        taskTranscripts.flush(evt.taskId ?? undefined, 'error', 'task.error');
         taskDeltaStats.delete(taskKey);
         taskLastDeltaActivityAt.delete(taskKey);
     };
 
+    const onAssistantTurnEnd = () => {
+        for (const taskKey of taskTranscripts.flushAll('completed', 'assistant.turn_end')) {
+            taskDeltaStats.delete(taskKey);
+            taskLastDeltaActivityAt.delete(taskKey);
+        }
+    };
+
+    agent.on(EMITTER_ASSISTANT_TURN_END, onAssistantTurnEnd);
     agent.on(EMITTER_TASK_DELTA, onTaskDelta);
     agent.on(EMITTER_TASK_REASONING, onTaskReasoning);
     agent.on(EMITTER_TASK_COMPLETED, onTaskCompleted);
     agent.on(EMITTER_TASK_ERROR, onTaskError);
 
     return () => {
+        agent.off(EMITTER_ASSISTANT_TURN_END, onAssistantTurnEnd);
         agent.off('task.delta', onTaskDelta);
         agent.off('task.reasoning', onTaskReasoning);
         agent.off('task.completed', onTaskCompleted);

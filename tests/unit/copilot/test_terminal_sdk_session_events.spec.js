@@ -13,6 +13,7 @@ const mocks = vi.hoisted(() => ({
     println: vi.fn(),
     setLastSdkPlanOperation: vi.fn(),
     setSdkSessionMode: vi.fn(),
+    getBusy: vi.fn(() => false),
     getShowSessionActivity: vi.fn(() => false),
     consumeRuntimeInterventionMailbox: /** @type {any} */ (vi.fn(() => null)),
     enqueueRuntimeInterventionMailbox: vi.fn(),
@@ -29,6 +30,7 @@ const mocks = vi.hoisted(() => ({
         kind: 'question',
     })),
     recordTerminalUserInputCompleted: vi.fn(() => null),
+    renderTerminalAssistantTranscript: vi.fn(() => true),
 }));
 
 vi.mock('../../../src/copilot/terminal/state/activity-state.js', () => ({
@@ -46,6 +48,7 @@ vi.mock('../../../src/copilot/presentation/state/index.js', async (importOrigina
         ...actual,
         setLastSdkPlanOperation: mocks.setLastSdkPlanOperation,
         setSdkSessionMode: mocks.setSdkSessionMode,
+        getBusy: mocks.getBusy,
         getShowSessionActivity: mocks.getShowSessionActivity,
         consumeRuntimeInterventionMailbox: mocks.consumeRuntimeInterventionMailbox,
         enqueueRuntimeInterventionMailbox: mocks.enqueueRuntimeInterventionMailbox,
@@ -77,6 +80,10 @@ vi.mock('../../../src/copilot/terminal/state/sdk-interactions.js', async () => {
     };
 });
 
+vi.mock('../../../src/copilot/terminal/events/assistant-transcript-renderer.js', () => ({
+    renderTerminalAssistantTranscript: mocks.renderTerminalAssistantTranscript,
+}));
+
 function createAgentHost() {
     /** @type {Map<string, Function[]>} */
     const listeners = new Map();
@@ -105,6 +112,7 @@ function createAgentHost() {
 describe('terminal/events/sdk-session-events.js — contrato', () => {
     beforeEach(() => {
         vi.clearAllMocks();
+        mocks.getBusy.mockReturnValue(false);
         mocks.getShowSessionActivity.mockReturnValue(false);
         mocks.getTerminalDetailLevel.mockReturnValue('detailed');
         mocks.completeTerminalTurnTrace.mockReturnValue(null);
@@ -152,6 +160,50 @@ describe('terminal/events/sdk-session-events.js — contrato', () => {
         );
         expect(mocks.println).not.toHaveBeenCalledWith(expect.stringContaining('Modo SDK: interactive → plan'));
         expect(refreshPromptIfIdle).toHaveBeenCalled();
+    });
+
+    it('persiste assistant.message fora de turno ativo e normaliza protocolo REPLY', async () => {
+        const { setupTerminalSdkSessionEventListeners } =
+            await import('../../../src/copilot/terminal/events/sdk-session-events.js');
+        const agent = createAgentHost();
+        const refreshPromptIfIdle = vi.fn();
+
+        setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfIdle });
+        agent.emit('assistant.message', { content: 'REPLY: resposta visível' });
+
+        expect(mocks.recordTerminalActivity).toHaveBeenCalledWith(
+            'turn',
+            'Mensagem da LLM-B recebida',
+            expect.objectContaining({ detail: expect.stringContaining('reply'), source: 'sdk' }),
+        );
+        expect(mocks.broadcastSse).toHaveBeenCalledWith(
+            'assistant.message',
+            expect.objectContaining({ content: 'resposta visível', protocolKind: 'reply' }),
+        );
+        expect(mocks.renderTerminalAssistantTranscript).toHaveBeenCalledWith(
+            expect.objectContaining({
+                content: 'resposta visível',
+                source: 'sdk/assistant.message',
+                detail: 'reply',
+            }),
+        );
+        expect(refreshPromptIfIdle).toHaveBeenCalled();
+    });
+
+    it('não duplica assistant.message enquanto um turno ativo já controla o render', async () => {
+        mocks.getBusy.mockReturnValue(true);
+        const { setupTerminalSdkSessionEventListeners } =
+            await import('../../../src/copilot/terminal/events/sdk-session-events.js');
+        const agent = createAgentHost();
+
+        setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfIdle: vi.fn() });
+        agent.emit('assistant.message', { content: 'mensagem do turno ativo' });
+
+        expect(mocks.broadcastSse).toHaveBeenCalledWith(
+            'assistant.message',
+            expect.objectContaining({ content: 'mensagem do turno ativo', protocolKind: 'question' }),
+        );
+        expect(mocks.renderTerminalAssistantTranscript).not.toHaveBeenCalled();
     });
 
     it('mantém session.model_changed silencioso por default e só narra em modo verbose', async () => {
