@@ -25,6 +25,7 @@ import { log } from '#copilot/observability';
 import { ensureDialogLoop, println } from '../dialog/index.js';
 import { setupTerminalHeadlessEventAdapters } from '../events/index.js';
 import { recordTerminalActivity } from '../state/repl-runtime/index.js';
+import { renderTerminalAutoBrief } from './auto-brief.js';
 import { runReplLifecycle } from './repl-lifecycle.js';
 export { setupAgentListeners } from './repl-listeners.js';
 
@@ -57,6 +58,14 @@ export function launchTerminalDialogLoopBootstrap(deps = {}) {
 
     return Promise.resolve()
         .then(() => ensureDialogLoopFn())
+        .then(() => {
+            renderTerminalAutoBrief({
+                injectPort: INJECT_PORT,
+                phase: 'ready',
+                force: true,
+                printlnFn,
+            });
+        })
         .catch((e) => {
             const error = toError(e);
             recordTerminalActivity('error', 'Falha no bootstrap do dialog loop', {

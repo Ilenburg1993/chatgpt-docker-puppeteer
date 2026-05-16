@@ -23,7 +23,18 @@ import {
 /**
  * @typedef {object} ThinkingContext
  * @property {(text: string) => void} println - Função de output do terminal
+ * @property {((lines: string[]) => void)=} printlnBlock - Escrita em bloco, quando disponível
  */
+
+/**
+ * @param {ThinkingContext} ctx
+ * @param {string[]} lines
+ * @returns {void}
+ */
+function printBlock(ctx, lines) {
+    if (ctx.printlnBlock) ctx.printlnBlock(lines);
+    else ctx.println(lines.join('\n'));
+}
 
 /**
  * Comando `/thinking [on|off|toggle]`.
@@ -39,7 +50,8 @@ import {
  * @param {string} [arg] - Argumento fornecido pelo usuário
  * @returns {void}
  */
-export function cmdThinking({ println }, arg) {
+export function cmdThinking(ctx, arg) {
+    const { println } = ctx;
     const trimmed = (arg ?? '').trim().toLowerCase();
     const [command = '', extra = ''] = trimmed.split(/\s+/, 2);
 
@@ -50,16 +62,18 @@ export function cmdThinking({ println }, arg) {
             println('\n  \x1b[90mNenhum thinking capturado ainda.\x1b[0m\n');
             return;
         }
-        println(`\n  \x1b[35mThinking capturado (${entries.length})\x1b[0m`);
+        /** @type {string[]} */
+        const lines = [`\n  \x1b[35mThinking capturado (${entries.length})\x1b[0m`];
         for (const entry of entries) {
             const shortId = entry.id.slice(-12);
             const preview = entry.content.replace(/\s+/g, ' ').trim().slice(0, 72);
-            println(
+            lines.push(
                 `  \x1b[33m${shortId}\x1b[0m  \x1b[90m${entry.source}\x1b[0m  \x1b[90m·\x1b[0m  ${entry.title}  \x1b[90m·\x1b[0m  ${entry.chars} chars`,
             );
-            if (preview) println(`    \x1b[90m${preview}${entry.content.length > preview.length ? '…' : ''}\x1b[0m`);
+            if (preview) lines.push(`    \x1b[90m${preview}${entry.content.length > preview.length ? '…' : ''}\x1b[0m`);
         }
-        println('\n  \x1b[90mUse /thinking show <id> ou /thinking latest para abrir.\x1b[0m\n');
+        lines.push('\n  \x1b[90mUse /thinking show <id> ou /thinking latest para abrir.\x1b[0m\n');
+        printBlock(ctx, lines);
         return;
     }
 
@@ -69,7 +83,7 @@ export function cmdThinking({ println }, arg) {
             rawId === 'latest'
                 ? getLatestThinkingHistoryEntry()
                 : (getThinkingHistoryEntry(rawId) ??
-                  getThinkingHistory(120)
+                  getThinkingHistory(Number.MAX_SAFE_INTEGER)
                       .slice()
                       .reverse()
                       .find((item) => item.id === rawId || item.id.endsWith(rawId)));
@@ -77,15 +91,17 @@ export function cmdThinking({ println }, arg) {
             println(`\n  \x1b[31mThinking não encontrado: ${rawId || '(vazio)'}\x1b[0m\n`);
             return;
         }
-        println(`\n  \x1b[35m╭─ thinking ${entry.id.slice(-12)}\x1b[0m  \x1b[90m${entry.title}\x1b[0m`);
-        println(
+        /** @type {string[]} */
+        const lines = [`\n  \x1b[35m╭─ thinking ${entry.id.slice(-12)}\x1b[0m  \x1b[90m${entry.title}\x1b[0m`];
+        lines.push(
             `  \x1b[35m│\x1b[0m  \x1b[90mfonte=${entry.source} · status=${entry.status} · chars=${entry.chars} · duração=${(Number(entry.durationMs ?? 0) / 1000).toFixed(1)}s\x1b[0m`,
         );
-        println('  \x1b[35m│\x1b[0m');
+        lines.push('  \x1b[35m│\x1b[0m');
         for (const line of entry.content.split('\n')) {
-            println(`  \x1b[35m│\x1b[0m  ${line}`);
+            lines.push(`  \x1b[35m│\x1b[0m  ${line}`);
         }
-        println('  \x1b[35m╰────────────────────────────────────────────────────────────\x1b[0m\n');
+        lines.push('  \x1b[35m╰────────────────────────────────────────────────────────────\x1b[0m\n');
+        printBlock(ctx, lines);
         return;
     }
 

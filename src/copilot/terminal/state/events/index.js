@@ -1,6 +1,14 @@
 // @ts-check
 
 export { markTerminalActivityIdle, recordTerminalActivity, terminalActivityEmitter } from '../activity-state.js';
+export {
+    appendTerminalIntent,
+    clearTerminalIntentHistory,
+    normalizeTerminalIntentRisk,
+    readLatestTerminalIntent,
+    readTerminalIntentHistory,
+    readTerminalIntentStats,
+} from '../intent-state.js';
 export { createTerminalPendingQuestionReplayState } from '../pending-question-replay.js';
 export {
     recordTerminalElicitationCompleted,

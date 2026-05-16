@@ -10,9 +10,17 @@
  */
 
 import { utf8ByteLength } from '#copilot/infra/public/buffer';
+import {
+    appendTerminalTranscriptArchive,
+    readTerminalTranscriptArchiveState,
+    resetTerminalTranscriptArchiveForTests,
+} from './transcript-archive.js';
 
-const MAX_TERMINAL_TRANSCRIPT_TURNS = 200;
-const MAX_TERMINAL_TRANSCRIPT_BYTES = 512 * 1024;
+const TERMINAL_TRANSCRIPT_SOFT_TURNS = 10_000;
+const TERMINAL_TRANSCRIPT_SOFT_BYTES = 32 * 1024 * 1024;
+const TERMINAL_TRANSCRIPT_CATASTROPHIC_TURNS = 100_000;
+const TERMINAL_TRANSCRIPT_CATASTROPHIC_BYTES = 128 * 1024 * 1024;
+const TERMINAL_TRANSCRIPT_HEAP_PRESSURE = 0.92;
 
 /**
  * @typedef {{
@@ -23,12 +31,56 @@ const MAX_TERMINAL_TRANSCRIPT_BYTES = 512 * 1024;
  *     byteLength: number;
  *     source: string;
  *     timestamp: number;
+ *     archived: boolean;
  * }} TerminalTranscriptTurn
  */
 
 /** @type {TerminalTranscriptTurn[]} */
 let _terminalTranscriptTurns = [];
 let _terminalTranscriptBytes = 0;
+let _terminalTranscriptArchivedTurns = 0;
+let _terminalTranscriptArchivedBytes = 0;
+let _terminalTranscriptMemoryEvictions = 0;
+
+/**
+ * @returns {number}
+ */
+function readHeapPressure() {
+    const usage = process.memoryUsage();
+    if (usage.heapTotal <= 0) return 0;
+    return usage.heapUsed / usage.heapTotal;
+}
+
+/**
+ * @returns {boolean}
+ */
+function shouldReduceTranscriptMemory() {
+    return (
+        _terminalTranscriptTurns.length > TERMINAL_TRANSCRIPT_CATASTROPHIC_TURNS ||
+        _terminalTranscriptBytes > TERMINAL_TRANSCRIPT_CATASTROPHIC_BYTES ||
+        readHeapPressure() >= TERMINAL_TRANSCRIPT_HEAP_PRESSURE
+    );
+}
+
+/**
+ * @returns {void}
+ */
+function reduceTranscriptMemoryIfNeeded() {
+    if (!shouldReduceTranscriptMemory()) return;
+    const targetTurns = Math.min(TERMINAL_TRANSCRIPT_SOFT_TURNS, TERMINAL_TRANSCRIPT_CATASTROPHIC_TURNS);
+    const targetBytes = Math.min(TERMINAL_TRANSCRIPT_SOFT_BYTES, TERMINAL_TRANSCRIPT_CATASTROPHIC_BYTES);
+    while (
+        _terminalTranscriptTurns.length > 0 &&
+        (_terminalTranscriptTurns.length > targetTurns ||
+            _terminalTranscriptBytes > targetBytes ||
+            readHeapPressure() >= TERMINAL_TRANSCRIPT_HEAP_PRESSURE)
+    ) {
+        const removed = _terminalTranscriptTurns.shift();
+        if (!removed) break;
+        _terminalTranscriptBytes = Math.max(0, _terminalTranscriptBytes - removed.byteLength);
+        _terminalTranscriptMemoryEvictions += 1;
+    }
+}
 
 /**
  * @param {string} content
@@ -75,17 +127,17 @@ export function appendTerminalTranscriptTurn(turn) {
         byteLength,
         source: turn.source ?? 'terminal.transcript',
         timestamp,
+        archived: false,
     };
+    const archive = appendTerminalTranscriptArchive(entry);
+    entry.archived = archive.archived;
+    if (archive.archived) {
+        _terminalTranscriptArchivedTurns += 1;
+        _terminalTranscriptArchivedBytes += entry.byteLength;
+    }
     _terminalTranscriptTurns.push(entry);
     _terminalTranscriptBytes += byteLength;
-    while (
-        _terminalTranscriptTurns.length > MAX_TERMINAL_TRANSCRIPT_TURNS ||
-        _terminalTranscriptBytes > MAX_TERMINAL_TRANSCRIPT_BYTES
-    ) {
-        const removed = _terminalTranscriptTurns.shift();
-        if (!removed) break;
-        _terminalTranscriptBytes = Math.max(0, _terminalTranscriptBytes - removed.byteLength);
-    }
+    reduceTranscriptMemoryIfNeeded();
     return entry;
 }
 
@@ -97,14 +149,40 @@ export function readTerminalTranscriptTurns() {
 }
 
 /**
- * @returns {{ bytes: number; turns: number; maxBytes: number; maxTurns: number }}
+ * @returns {{
+ *     bytes: number;
+ *     turns: number;
+ *     softBytes: number;
+ *     softTurns: number;
+ *     maxBytes: number;
+ *     maxTurns: number;
+ *     catastrophicBytes: number;
+ *     catastrophicTurns: number;
+ *     heapPressure: number;
+ *     archivedTurns: number;
+ *     archivedBytes: number;
+ *     memoryEvictions: number;
+ *     archivePath: string | null;
+ *     archiveError: string | null;
+ * }}
  */
 export function readTerminalTranscriptStats() {
+    const archive = readTerminalTranscriptArchiveState();
     return {
         bytes: _terminalTranscriptBytes,
         turns: _terminalTranscriptTurns.length,
-        maxBytes: MAX_TERMINAL_TRANSCRIPT_BYTES,
-        maxTurns: MAX_TERMINAL_TRANSCRIPT_TURNS,
+        softBytes: TERMINAL_TRANSCRIPT_SOFT_BYTES,
+        softTurns: TERMINAL_TRANSCRIPT_SOFT_TURNS,
+        maxBytes: TERMINAL_TRANSCRIPT_CATASTROPHIC_BYTES,
+        maxTurns: TERMINAL_TRANSCRIPT_CATASTROPHIC_TURNS,
+        catastrophicBytes: TERMINAL_TRANSCRIPT_CATASTROPHIC_BYTES,
+        catastrophicTurns: TERMINAL_TRANSCRIPT_CATASTROPHIC_TURNS,
+        heapPressure: readHeapPressure(),
+        archivedTurns: _terminalTranscriptArchivedTurns,
+        archivedBytes: _terminalTranscriptArchivedBytes,
+        memoryEvictions: _terminalTranscriptMemoryEvictions,
+        archivePath: archive.path,
+        archiveError: archive.error,
     };
 }
 
@@ -114,6 +192,10 @@ export function readTerminalTranscriptStats() {
 export function clearTerminalTranscriptTurns() {
     _terminalTranscriptTurns = [];
     _terminalTranscriptBytes = 0;
+    _terminalTranscriptArchivedTurns = 0;
+    _terminalTranscriptArchivedBytes = 0;
+    _terminalTranscriptMemoryEvictions = 0;
+    resetTerminalTranscriptArchiveForTests();
 }
 
 export const __test__ = {

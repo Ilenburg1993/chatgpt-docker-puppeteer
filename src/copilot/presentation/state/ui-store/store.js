@@ -547,7 +547,7 @@ export function getLatestInjectHistoryEntryForRuntime(runtimeId) {
     return null;
 }
 
-const MAX_THINKING_HISTORY = 120;
+const MAX_THINKING_HISTORY = 10_000;
 
 /**
  * @typedef {'dialog' | 'task'} ThinkingSource
@@ -650,7 +650,7 @@ export function finalizeThinkingHistoryEntry(id, opts = {}) {
  * @returns {ThinkingHistoryEntry[]}
  */
 export function getThinkingHistory(n = 20) {
-    const limit = Math.min(Math.max(1, n), MAX_THINKING_HISTORY);
+    const limit = Math.max(1, Math.floor(n));
     return _thinkingHistory.slice(-limit);
 }
 

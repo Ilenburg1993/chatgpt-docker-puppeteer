@@ -1,6 +1,6 @@
 // @ts-check
 /**
- * Acumulador bounded de deltas textuais de tarefas internas.
+ * Acumulador elástico de deltas textuais de tarefas internas.
  *
  * `task.delta` é um sinal de streaming; ele pode alimentar a linha viva, mas também precisa virar histórico persistente
  * quando representa fala visível da LLM-B fora de um turno explícito. Este módulo mantém esse estado isolado do wiring
@@ -12,7 +12,7 @@
 import { getBusy } from '../../presentation/state/index.js';
 import { renderTerminalAssistantTranscript } from './assistant-transcript-renderer.js';
 
-const DEFAULT_TASK_TRANSCRIPT_MAX_CHARS = 64_000;
+const DEFAULT_TASK_TRANSCRIPT_CATASTROPHIC_CHARS = 32 * 1024 * 1024;
 const ANONYMOUS_TASK_KEY = '__anonymous__';
 
 /**
@@ -54,7 +54,7 @@ function taskKeyToId(taskKey) {
  * }}
  */
 export function createTaskTranscriptAccumulator(options = {}) {
-    const maxChars = Math.max(1, Math.floor(options.maxChars ?? DEFAULT_TASK_TRANSCRIPT_MAX_CHARS));
+    const maxChars = Math.max(1, Math.floor(options.maxChars ?? DEFAULT_TASK_TRANSCRIPT_CATASTROPHIC_CHARS));
     const isBusy = options.isBusy ?? getBusy;
     const renderTranscript = options.renderTranscript ?? renderTerminalAssistantTranscript;
     /** @type {Map<string, TaskTranscriptEntry>} */

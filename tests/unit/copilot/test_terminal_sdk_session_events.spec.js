@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => ({
     recordTerminalActivity: vi.fn(),
     broadcastSse: vi.fn(),
     println: vi.fn(),
+    printlnBlock: vi.fn(),
     setLastSdkPlanOperation: vi.fn(),
     setSdkSessionMode: vi.fn(),
     getBusy: vi.fn(() => false),
@@ -38,8 +39,10 @@ vi.mock('../../../src/copilot/terminal/state/activity-state.js', () => ({
 }));
 
 vi.mock('../../../src/copilot/terminal/dialog/index.js', () => ({
+    SEPARATOR: '---',
     broadcastSse: mocks.broadcastSse,
     println: mocks.println,
+    printlnBlock: mocks.printlnBlock,
 }));
 
 vi.mock('../../../src/copilot/presentation/state/index.js', async (importOriginal) => {
@@ -112,6 +115,7 @@ function createAgentHost() {
 describe('terminal/events/sdk-session-events.js — contrato', () => {
     beforeEach(() => {
         vi.clearAllMocks();
+        mocks.printlnBlock.mockImplementation((/** @type {string[]} */ lines) => mocks.println(lines.join('\n')));
         mocks.getBusy.mockReturnValue(false);
         mocks.getShowSessionActivity.mockReturnValue(false);
         mocks.getTerminalDetailLevel.mockReturnValue('detailed');

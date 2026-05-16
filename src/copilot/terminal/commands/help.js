@@ -64,6 +64,7 @@ export function cmdHelp({ injectPort, println }) {
   \x1b[33m/thinking [on|off]\x1b[0m                   — toggle da expansão ao vivo do thinking/reasoning
   \x1b[33m/thinking list [n]\x1b[0m                  — lista thinkings capturados (colapsados)
   \x1b[33m/thinking show <id>|latest\x1b[0m          — abre thinking completo capturado
+  \x1b[33m/intent [n|clear]\x1b[0m                    — consulta intents persistidos de report_intent/assistant.intent
   \x1b[33m/usage [on|off|now]\x1b[0m                  — toggle usage pós-turno ou snapshot instantâneo
   \x1b[33m/tools [diag|all|raw]\x1b[0m                — stats de tools (canônico, diagnóstico e raw)
   \x1b[33m/sdk [status|models|tools|quota|prompt|capabilities|waits|compact]\x1b[0m — catálogo/quota/capabilities/ops SDK via Agent

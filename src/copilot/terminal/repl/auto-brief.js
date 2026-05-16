@@ -1,0 +1,175 @@
+// @ts-check
+/**
+ * Auto-brief progressivo do terminal LLM-B.
+ *
+ * O briefing inicial roda antes do registry de tools estar pronto; por isso ele precisa ser útil mesmo em boot parcial
+ * e deve poder rodar de novo após o dialog loop ficar pronto. Este módulo mantém a renderização em uma borda única,
+ * sem espalhar heurísticas de UX pelo lifecycle.
+ *
+ * @module copilot/terminal/repl/auto-brief
+ */
+
+import { toError } from '#copilot/core';
+import { log } from '#copilot/observability';
+import { printlnBlock } from '../dialog/index.js';
+import { readTerminalStatusProjection } from '../frontend/index.js';
+import { buildTerminalOperationalGuidance } from '../frontend/operational-guidance/index.js';
+import { readTerminalDisplayState, resolveTerminalBootDisplayPreset } from '../state/repl-runtime/index.js';
+
+/** @typedef {'boot' | 'ready' | 'manual'} TerminalAutoBriefPhase */
+
+/** @type {Map<string, string>} */
+const _lastAutoBriefFingerprintByPhase = new Map();
+
+/**
+ * @param {unknown} value
+ * @returns {string}
+ */
+function yn(value) {
+    return value ? 'sim' : 'não';
+}
+
+/**
+ * @param {number | null | undefined} value
+ * @returns {string}
+ */
+function pct(value) {
+    if (typeof value !== 'number' || !Number.isFinite(value)) return '-';
+    return `${Math.round(value * 100)}%`;
+}
+
+/**
+ * @param {ReturnType<typeof readTerminalStatusProjection>['ioRuntime']} ioRuntime
+ * @returns {{ io: string; cache: string; index: string }}
+ */
+function summarizeIoRuntime(ioRuntime) {
+    const hitRatio = ioRuntime.cache.aggregate.hitRatio;
+    const cache = `hit=${pct(hitRatio)} l2=${yn(Boolean(ioRuntime.cache.l2?.['enabled']))}`;
+    const indexRecord = /** @type {Record<string, unknown>} */ (ioRuntime.index ?? {});
+    const index = indexRecord['available']
+        ? `ok files=${String(indexRecord['files'] ?? indexRecord['fileCount'] ?? '-')}`
+        : `off:${String(indexRecord['reason'] ?? 'unavailable')}`;
+    return {
+        io: `scopes=${ioRuntime.scopes.active} parser=${String(ioRuntime.parser?.size ?? 0)}`,
+        cache,
+        index,
+    };
+}
+
+/**
+ * @param {ReturnType<typeof readTerminalStatusProjection>} projection
+ * @returns {string}
+ */
+function buildAutoBriefFingerprint(projection) {
+    return [
+        projection.runtimeId,
+        projection.snap['model'],
+        projection.snap['reasoningEffort'],
+        projection.toolLoad.total,
+        projection.toolLoad.hasCanonicalLocalFsTools,
+        projection.toolLoad.hasCanonicalLocalExecTools,
+        projection.instructionLoad.sectionCount,
+        projection.instructionLoad.sectionsMissingFileCount,
+        projection.sdkFsRouting.mode,
+        projection.timelineSource,
+        projection.timelineSyncStatus,
+        projection.ioRuntime.cache.aggregate.hitRatio,
+        projection.ioRuntime.scopes.active,
+    ].join('|');
+}
+
+/**
+ * @param {{
+ *     injectPort?: number;
+ *     phase?: TerminalAutoBriefPhase;
+ *     runtimeId?: string | null;
+ * }} [input]
+ * @returns {{
+ *     phase: TerminalAutoBriefPhase;
+ *     ready: boolean;
+ *     fingerprint: string;
+ *     lines: string[];
+ * }}
+ */
+export function buildTerminalAutoBrief(input = {}) {
+    const phase = input.phase ?? 'boot';
+    const projectionArgs = { runtimeId: input.runtimeId ?? null };
+    const projection = readTerminalStatusProjection(
+        typeof input.injectPort === 'number' ? { ...projectionArgs, injectPort: input.injectPort } : projectionArgs,
+    );
+    const displayState = readTerminalDisplayState();
+    const displayPreset = resolveTerminalBootDisplayPreset();
+    const guidance = buildTerminalOperationalGuidance({
+        sdkFsRouting: projection.sdkFsRouting,
+        toolLoad: projection.toolLoad,
+        instructionLoad: projection.instructionLoad,
+    });
+    const model = typeof projection.snap['model'] === 'string' ? projection.snap['model'] : '-';
+    const reasoning = typeof projection.snap['reasoningEffort'] === 'string' ? projection.snap['reasoningEffort'] : '-';
+    const contextWindow = projection.snap['contextWindow'];
+    const utilization =
+        contextWindow && typeof contextWindow === 'object'
+            ? /** @type {{ utilization?: number }} */ (contextWindow).utilization
+            : null;
+    const ready = projection.toolLoad.total > 0 || projection.dialogLoopActive;
+    const io = summarizeIoRuntime(projection.ioRuntime);
+    /** @type {string[]} */
+    const lines = [];
+    lines.push(
+        `[auto-brief:${phase}] runtime=${projection.runtimeId} · modelo=${model}/${reasoning} · display=${displayPreset} · thinking=${displayState.thinking ? 'on' : 'off'} · streaming=${displayState.streaming ? 'on' : 'off'}`,
+    );
+    lines.push(
+        `[auto-brief:${phase}] tools=${projection.toolLoad.total} · fs=${yn(projection.toolLoad.hasCanonicalLocalFsTools)} · exec=${yn(projection.toolLoad.hasCanonicalLocalExecTools)} · sdkWorkspace=${yn(projection.toolLoad.hasSdkWorkspaceTooling)} · contrato=${projection.toolLoad.toolContract.ok ? 'ok' : `${projection.toolLoad.toolContract.errorCount} erro(s)`}`,
+    );
+    lines.push(
+        `[auto-brief:${phase}] route=${guidance.mode} · ${guidance.summary} · próximo=${guidance.nextCommand ?? '-'}`,
+    );
+    lines.push(
+        `[auto-brief:${phase}] timeline=${projection.timelineSource}/${projection.timelineReconciliationStatus} · sync=${projection.timelineSyncStatus}${projection.timelineSyncReason ? `:${projection.timelineSyncReason}` : ''} · turnos=${projection.timelineTurnCount}/${projection.persistedTimelineTurnCount}`,
+    );
+    lines.push(
+        `[auto-brief:${phase}] io=${io.io} · cache=${io.cache} · index=${io.index} · ctx=${pct(utilization)}`,
+    );
+    if (!ready) {
+        lines.push(
+            `[auto-brief:${phase}] estado=parcial · registry/dialog ainda subindo; um brief pós-bootstrap será emitido quando houver dados reais.`,
+        );
+    }
+    if (guidance.warnings.length > 0) {
+        lines.push(`[auto-brief:${phase}] atenção=${guidance.warnings.join(' | ')}`);
+    }
+    return { phase, ready, fingerprint: buildAutoBriefFingerprint(projection), lines };
+}
+
+/**
+ * @param {{
+ *     injectPort?: number;
+ *     phase?: TerminalAutoBriefPhase;
+ *     runtimeId?: string | null;
+ *     force?: boolean;
+ *     printlnFn?: (line: string) => void;
+ *     printlnBlockFn?: (lines: string[]) => void;
+ * }} [input]
+ * @returns {ReturnType<typeof buildTerminalAutoBrief> | null}
+ */
+export function renderTerminalAutoBrief(input = {}) {
+    const printlnBlockFn =
+        input.printlnBlockFn ?? (input.printlnFn ? (lines) => input.printlnFn?.(lines.join('\n')) : printlnBlock);
+    try {
+        const brief = buildTerminalAutoBrief(input);
+        const dedupeKey = `${brief.phase}:${input.runtimeId ?? 'default'}`;
+        if (!input.force && _lastAutoBriefFingerprintByPhase.get(dedupeKey) === brief.fingerprint) {
+            return brief;
+        }
+        _lastAutoBriefFingerprintByPhase.set(dedupeKey, brief.fingerprint);
+        printlnBlockFn(brief.lines.map((line) => `\x1b[90m  ${line}\x1b[0m`));
+        return brief;
+    } catch (error) {
+        log('WARN', `[TerminalServer] Auto-briefing indisponível: ${toError(error).message}`);
+        return null;
+    }
+}
+
+export const __test__ = {
+    clear: () => _lastAutoBriefFingerprintByPhase.clear(),
+};

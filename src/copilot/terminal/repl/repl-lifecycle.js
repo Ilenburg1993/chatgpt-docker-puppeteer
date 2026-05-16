@@ -24,21 +24,20 @@ import {
     setRl,
 } from '../../presentation/state/index.js';
 import {
+    beginTerminalRenderLock,
     buildUserPrompt,
     buildWaitingPrompt,
+    endTerminalRenderLock,
     getTurnQueueDepth,
     println,
     resetStatusRowState,
     sendTurn,
 } from '../dialog/index.js';
-import { readTerminalStatusProjection } from '../frontend/index.js';
-import { buildTerminalOperationalGuidance } from '../frontend/operational-guidance/index.js';
 import {
-    readTerminalDisplayState,
-    resolveTerminalBootDisplayPreset,
     tryAnswerTerminalPendingQuestionInput,
 } from '../state/repl-runtime/index.js';
 import { resolve } from '../stores/index.js';
+import { renderTerminalAutoBrief } from './auto-brief.js';
 import { resolveFreeTextDelivery } from './free-text-delivery.js';
 import { setupTerminalLiveStatusLine } from './live-status-line.js';
 import { buildTerminalReplBanner } from './repl-banner.js';
@@ -92,41 +91,7 @@ export async function runReplLifecycle(injectServer, { injectPort, onReady }) {
 
     println(buildTerminalReplBanner(injectPort));
     println('\x1b[90m  Iniciando sessão com LLM-B…\x1b[0m');
-    try {
-        const projection = readTerminalStatusProjection({ injectPort });
-        const displayState = readTerminalDisplayState();
-        const displayPreset = resolveTerminalBootDisplayPreset();
-        println(
-            `\x1b[90m  [auto-brief] display=${displayPreset} · thinking=${displayState.thinking ? 'on' : 'off'} · streaming=${displayState.streaming ? 'on' : 'off'} · session=${displayState.session ? 'on' : 'off'}\x1b[0m`,
-        );
-        const projectedModel = typeof projection.snap['model'] === 'string' ? projection.snap['model'] : null;
-        const projectedReasoning =
-            typeof projection.snap['reasoningEffort'] === 'string' ? projection.snap['reasoningEffort'] : null;
-        if (projectedModel || projectedReasoning) {
-            println(
-                `\x1b[90m  [auto-brief] capacidade=${projectedModel ?? '-'} · reasoning=${projectedReasoning ?? '-'}\x1b[0m`,
-            );
-        }
-        if (Number(projection.toolLoad?.total ?? 0) <= 0) {
-            println(
-                '\x1b[90m  [auto-brief] route=booting · Aguardando bootstrap do registry local antes de avaliar FS canônico.\x1b[0m',
-            );
-        } else {
-            const guidance = buildTerminalOperationalGuidance({
-                sdkFsRouting: projection.sdkFsRouting,
-                toolLoad: projection.toolLoad,
-                instructionLoad: projection.instructionLoad,
-            });
-            println(`\x1b[90m  [auto-brief] route=${guidance.mode} · ${guidance.summary}\x1b[0m`);
-            println(`\x1b[90m  [auto-brief] ${guidance.domainHint}\x1b[0m`);
-            println(`\x1b[90m  [auto-brief] ${guidance.contextHint}\x1b[0m`);
-            if (guidance.warnings.length > 0) {
-                println(`\x1b[33m  [auto-brief] atenção: ${guidance.warnings.join(' | ')}\x1b[0m`);
-            }
-        }
-    } catch (e) {
-        log('WARN', `[TerminalServer] Auto-briefing indisponível no boot: ${toError(e).message}`);
-    }
+    renderTerminalAutoBrief({ injectPort, phase: 'boot', force: true });
 
     if (onReady) void onReady();
 
@@ -166,11 +131,13 @@ export async function runReplLifecycle(injectServer, { injectPort, onReady }) {
      */
     function dispatchImmediateCommand(command) {
         if (!command) return;
+        beginTerminalRenderLock();
         void dispatchCmd(command.command, command.arg, command.rest, rl, injectServer, cleanup)
             .catch((e) => {
                 log('ERROR', `[TerminalServer] Comando imediato falhou: ${toError(e).message}`);
             })
             .finally(() => {
+                endTerminalRenderLock();
                 refreshPrompt();
             });
     }
@@ -265,8 +232,13 @@ export async function runReplLifecycle(injectServer, { injectPort, onReady }) {
             const commandLine = `/steer ${resolved.message}`;
             const command = parseTerminalReplCommand(commandLine, resolve);
             if (command) {
-                await dispatchCmd(command.command, command.arg, command.rest, rl, injectServer, cleanup);
-                refreshPrompt();
+                beginTerminalRenderLock();
+                try {
+                    await dispatchCmd(command.command, command.arg, command.rest, rl, injectServer, cleanup);
+                } finally {
+                    endTerminalRenderLock();
+                    refreshPrompt();
+                }
                 return;
             }
         }
@@ -300,10 +272,15 @@ export async function runReplLifecycle(injectServer, { injectPort, onReady }) {
 
         const command = parseTerminalReplCommand(trimmed, resolve);
         if (command) {
-            await dispatchCmd(command.command, command.arg, command.rest, rl, injectServer, cleanup);
-            if (isReadlineOpen(rl)) {
-                rl.setPrompt(buildUserPrompt());
-                rl.prompt();
+            beginTerminalRenderLock();
+            try {
+                await dispatchCmd(command.command, command.arg, command.rest, rl, injectServer, cleanup);
+            } finally {
+                endTerminalRenderLock();
+                if (isReadlineOpen(rl)) {
+                    rl.setPrompt(buildUserPrompt());
+                    rl.prompt();
+                }
             }
             return;
         }

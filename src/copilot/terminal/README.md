@@ -50,6 +50,7 @@ também declara `risk` e scorecard para orientar a ordem de decomposição.
 | `repl/repl-input-routing.js`             | policy de comandos imediatos e fila durante input concorrente              |
 | `repl/repl-listeners.js`                 | tradução de eventos do agente/SDK para UX local                            |
 | `repl/repl-multiline.js`                 | estado de input multiline por continuação com barra invertida              |
+| `repl/auto-brief.js`                     | briefing progressivo de boot e pós-bootstrap com status real de tools/I/O  |
 | `repl/live-status-line.js`               | linha viva permanente com heartbeat, modelo, esforço e atividade atual     |
 | `terminal-phases/`                       | fases de boot do terminal e submódulos finos de banner/reflection/shutdown |
 | `events/event-adapters.js`               | composition root canônico dos adapters de eventos para REPL/headless       |
@@ -59,8 +60,10 @@ também declara `risk` e scorecard para orientar a ordem de decomposição.
 | `events/tool-activity-presenter.js`      | narrativa operacional de tools, arquivos e comandos para o streaming live  |
 | `state/turn-trace-state.js`              | resumo canônico por turno de tools/arquivos tocados para `/activity`       |
 | `events/task-stream-events.js`           | render e SSE do streaming de tarefas internas (`task.*`)                   |
-| `events/task-transcript-accumulator.js`  | promoção bounded de deltas de tarefa para transcript persistente           |
+| `events/task-transcript-accumulator.js`  | promoção elástica de deltas de tarefa para transcript persistente          |
 | `events/assistant-transcript-renderer.js` | renderer persistente de mensagens da LLM-B fora do turno ativo             |
+| `state/intent-state.js`                  | histórico elástico de intents explícitos para `/intent`, prompt e transcript |
+| `events/intent-renderer.js`              | renderer persistente de `assistant.intent`, `report_intent` e local fallback |
 | `events/agent-sse-passthrough.js`        | passthrough SSE explícito e estreito para eventos sem adapter dedicado     |
 | `wiring/terminal-agent-wiring.js`        | SSE + wiring de alto nível entre terminal e agent                          |
 | `index.js` / `bootstrap.js`              | boot do terminal                                                           |
@@ -191,6 +194,8 @@ Deve sair do `terminal/` quando virar:
 - `state/turn-trace-state.js` reconcilia `assistant.turn_*`, tools e alterações de workspace em um
   resumo por turno exibido por `/activity`;
 - `events/task-stream-events.js` concentra a narrativa do streaming de tarefas internas do runtime;
+- `events/intent-renderer.js` promove `assistant.intent`, `report_intent` e `report_intent_local`
+  para bloco visível, `/intent`, `/activity`, SSE e transcript persistente;
 - `events/agent-sse-passthrough.js` transmite apenas a janela residual de eventos do agent que ainda
   não ganharam adapter dedicado, eliminando o fallback genérico por default;
 - `repl/repl-listeners.js` agora orquestra essas duas fronteiras em vez de acumular toda a semântica

@@ -22,6 +22,7 @@ export { cmdFs } from './fs.js';
 export { cmdGh } from './gh.js';
 export { cmdGit } from './git.js';
 export { cmdHelp } from './help.js';
+export { cmdIntent } from './intent.js';
 export { cmdForget, cmdRecall, cmdRemember } from './memory.js';
 export { cmdMenu } from './menu.js';
 export { cmdMetrics } from './metrics.js';

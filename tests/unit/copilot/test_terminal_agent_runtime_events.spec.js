@@ -8,6 +8,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const println = vi.fn();
+const printlnBlock = vi.fn((/** @type {string[]} */ lines) => println(lines.join('\n')));
 const buildUserPrompt = vi.fn(() => 'prompt> ');
 const broadcastSse = vi.fn();
 const writeInlineStatus = vi.fn();
@@ -28,7 +29,9 @@ const getTerminalDetailLevel = vi.fn(() => 'detailed');
 const recordToolCall = vi.fn();
 
 vi.mock('../../../src/copilot/terminal/dialog/index.js', () => ({
+    SEPARATOR: '---',
     println,
+    printlnBlock,
     buildUserPrompt,
     broadcastSse,
     writeInlineStatus,
@@ -66,6 +69,7 @@ describe('terminal/events/agent-runtime-events.js — contrato', () => {
         vi.clearAllMocks();
         vi.useRealTimers();
         getTerminalDetailLevel.mockReturnValue('detailed');
+        printlnBlock.mockImplementation((/** @type {string[]} */ lines) => println(lines.join('\n')));
         readTerminalRuntimeState.mockReturnValue(
             /** @type {any} */ ({
                 pendingQuestion: null,
@@ -245,6 +249,55 @@ describe('terminal/events/agent-runtime-events.js — contrato', () => {
             ),
         ).toHaveLength(1);
         expect(println.mock.calls.filter(([line]) => String(line).includes('read_file_content'))).toHaveLength(1);
+    });
+
+    it('promove report_intent_local para intent persistente e visível no terminal', async () => {
+        const { setupTerminalAgentRuntimeEventListeners } =
+            await import('../../../src/copilot/terminal/events/agent-runtime-events.js');
+        /** @type {Map<string, Function[]>} */
+        const listeners = new Map();
+        const agent = {
+            on: vi.fn((event, handler) => {
+                const list = listeners.get(event) ?? [];
+                list.push(handler);
+                listeners.set(event, list);
+            }),
+            off: vi.fn(),
+        };
+
+        setupTerminalAgentRuntimeEventListeners({ agent: /** @type {any} */ (agent), rl: null });
+        listeners.get('tool.execution_start')?.[0]?.({
+            toolCallId: 'intent-tool-1',
+            toolName: 'report_intent_local',
+            args: {
+                intent: 'Vou editar read-tools com leitura incremental.',
+                tool: 'patch_file',
+                risk: 'high',
+            },
+        });
+
+        expect(printlnBlock).toHaveBeenCalledWith(expect.arrayContaining([expect.stringContaining('INTENT')]));
+        expect(println).toHaveBeenCalledWith(expect.stringContaining('Vou editar read-tools'));
+        expect(recordTerminalActivity).toHaveBeenCalledWith(
+            'turn',
+            'Intenção da LLM-B',
+            expect.objectContaining({
+                detail: expect.stringContaining('Vou editar read-tools'),
+                source: 'tool/report_intent_local',
+                severity: 'warn',
+                toolName: 'patch_file',
+            }),
+        );
+        expect(broadcastSse).toHaveBeenCalledWith(
+            'assistant.intent',
+            expect.objectContaining({
+                intent: 'Vou editar read-tools com leitura incremental.',
+                risk: 'high',
+                source: 'tool/report_intent_local',
+                tool: 'patch_file',
+                toolCallId: 'intent-tool-1',
+            }),
+        );
     });
 
     it('funciona em modo headless sem readline e ainda emite SSE de tools', async () => {

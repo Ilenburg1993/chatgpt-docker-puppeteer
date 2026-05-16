@@ -1,5 +1,6 @@
 // @ts-check
 
+export { buildTerminalAutoBrief, renderTerminalAutoBrief } from './auto-brief.js';
 export { resolveFreeTextDelivery } from './free-text-delivery.js';
 export {
     formatTerminalLiveStatusLine,

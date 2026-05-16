@@ -48,6 +48,7 @@ import {
     cmdHelp as _cmdHelp,
     cmdHistory as _cmdHistory,
     cmdIndex as _cmdIndex,
+    cmdIntent as _cmdIntent,
     cmdLive as _cmdLive,
     cmdMenu as _cmdMenu,
     cmdMetrics as _cmdMetrics,
@@ -72,7 +73,7 @@ import {
     cmdWho as _cmdWho,
     cmdWorkspace as _cmdWorkspace,
 } from '../commands/index.js';
-import { ensureDialogLoop, getTurnQueueDepth, println, sendTurn } from '../dialog/index.js';
+import { ensureDialogLoop, getTurnQueueDepth, println, printlnBlock, sendTurn } from '../dialog/index.js';
 import {
     abortTerminalCurrentMessage,
     answerTerminalPendingQuestion,
@@ -544,7 +545,8 @@ export const CMD_ROUTES = [
     [['turn'], (_, arg) => _cmdTurn(arg)],
     [['handoff'], () => _cmdHandoff()],
     [['skills'], (_, arg) => _cmdSkills({ println }, arg)],
-    [['thinking'], (_, arg) => _cmdThinking({ println }, arg)],
+    [['thinking'], (_, arg) => _cmdThinking({ println, printlnBlock }, arg)],
+    [['intent', 'intents'], (_, arg) => _cmdIntent({ println, printlnBlock }, arg)],
     [['tools'], (_, arg) => _cmdTools({ println }, arg)],
     [['sdk'], (_, arg) => _cmdSdk({ println }, arg)],
     [['workspace', 'ws'], (_, arg) => _cmdWorkspace({ println }, arg)],

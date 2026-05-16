@@ -1,6 +1,7 @@
 // @ts-check
 
 /** @typedef {import('./activity-state.js').TerminalActivitySnapshot} TerminalActivitySnapshot */
+/** @typedef {import('./intent-state.js').TerminalIntentEntry} TerminalIntentEntry */
 /** @typedef {import('./transcript-state.js').TerminalTranscriptTurn} TerminalTranscriptTurn */
 
 export {
@@ -29,6 +30,14 @@ export {
     writeTerminalDisplayToggle,
 } from './display-policy.js';
 export { tryAnswerTerminalPendingQuestionInput } from './pending-question-answer.js';
+export {
+    appendTerminalIntent,
+    clearTerminalIntentHistory,
+    normalizeTerminalIntentRisk,
+    readLatestTerminalIntent,
+    readTerminalIntentHistory,
+    readTerminalIntentStats,
+} from './intent-state.js';
 export {
     buildTerminalPendingQuestionReplayKey,
     createTerminalPendingQuestionReplayState,

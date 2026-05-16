@@ -9,11 +9,14 @@ export { drainPendingNotifications, getPersistenceFailureCount } from './engine-
 export { ensureDialogLoop, getTurnQueueDepth, sendTurn } from './dialog-runtime.js';
 export {
     BOOT_PROMPT,
+    beginTerminalRenderLock,
     buildUserPrompt,
     buildWaitingPrompt,
     clearInlineStatus,
+    endTerminalRenderLock,
     printExchange,
     println,
+    printlnBlock,
     PROMPT_USER,
     PROMPT_WAITING,
     resetStatusRowState,

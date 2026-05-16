@@ -17,7 +17,7 @@ import { readTerminalActivitySnapshot, terminalThemeText } from '../state/repl/i
 const MIN_LIVE_STATUS_INTERVAL_MS = 250;
 const MIN_LIVE_STATUS_HEARTBEAT_MS = 1_000;
 const DEFAULT_LIVE_STATUS_HEARTBEAT_MS = 5_000;
-const MAX_LIVE_DETAIL_CHARS = 240;
+const LIVE_DETAIL_CATASTROPHIC_CHARS = 2_000;
 
 /**
  * @param {string | null | undefined} value
@@ -78,7 +78,7 @@ export function formatTerminalLiveStatusLine(input = {}) {
     const model = stream?.model || runtime.model || '-';
     const effort = stream?.reasoningEffort || runtime.reasoningEffort || '-';
     const ageMs = Math.max(0, now - activity.startedAt);
-    const detail = compactLiveStatusText(activity.detail ?? activity.toolName ?? '', MAX_LIVE_DETAIL_CHARS);
+    const detail = compactLiveStatusText(activity.detail ?? activity.toolName ?? '', LIVE_DETAIL_CATASTROPHIC_CHARS);
     const progress = activity.progress !== null ? ` · ${activity.progress}%` : '';
     const loop = runtime.dialogLoopActive ? 'loop' : 'noloop';
     const queue = Number(runtime.queueSize ?? 0) > 0 ? ` · fila=${runtime.queueSize}` : '';

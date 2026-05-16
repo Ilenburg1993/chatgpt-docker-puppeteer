@@ -10,7 +10,7 @@
  */
 
 import { createHash } from 'node:crypto';
-import { SEPARATOR, println } from '../dialog/index.js';
+import { SEPARATOR, printlnBlock } from '../dialog/index.js';
 import { appendTerminalTranscriptTurn, terminalThemeBadge, terminalThemeText } from '../state/events/index.js';
 
 const RECENT_TRANSCRIPT_TTL_MS = 5 * 60_000;
@@ -80,19 +80,19 @@ export function renderTerminalAssistantTranscript(input) {
     const badgeRole = status === 'error' ? 'error' : status === 'completed' ? 'success' : 'info';
     const detail = input.detail ? ` ${terminalThemeText('muted', `· ${input.detail}`)}` : '';
 
-    println(SEPARATOR);
-    println(
+    const lines = [
+        SEPARATOR,
         `  ${terminalThemeBadge(badgeRole, 'LLM-B')} ${terminalThemeText('success', title)} ${terminalThemeText('muted', `· ${source}`)}${detail}`,
-    );
-    println('');
+        '',
+    ];
     for (const line of content.split('\n')) {
-        println(`  ${terminalThemeText('success', '│')}  ${line}`);
+        lines.push(`  ${terminalThemeText('success', '│')}  ${line}`);
     }
     if (input.truncated) {
-        println('');
-        println(`  ${terminalThemeText('warn', '… conteúdo truncado para preservar a sessão do terminal')}`);
+        lines.push('', `  ${terminalThemeText('warn', '… conteúdo preservado parcialmente em memória; veja o archive do transcript')}`);
     }
-    println('');
+    lines.push('');
+    printlnBlock(lines);
     appendTerminalTranscriptTurn({
         role: 'assistant',
         rawRole: 'llm_b',

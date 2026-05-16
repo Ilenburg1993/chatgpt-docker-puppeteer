@@ -41,6 +41,7 @@ import {
     buildToolLifecycleStart,
     buildToolLifecycleUserRequested,
 } from './tool-lifecycle-event.js';
+import { renderTerminalIntent } from './intent-renderer.js';
 
 /**
  * @param {string} toolName
@@ -58,6 +59,124 @@ export function objectArgsOrEmpty(value) {
     return value && typeof value === 'object' && !Array.isArray(value)
         ? /** @type {Record<string, unknown>} */ (value)
         : {};
+}
+
+/**
+ * @param {string} toolName
+ * @returns {boolean}
+ */
+function isReportIntentTool(toolName) {
+    const normalized = toolName.trim().toLowerCase();
+    return (
+        normalized === 'report_intent' ||
+        normalized === 'report_intent_local' ||
+        normalized.endsWith('.report_intent') ||
+        normalized.endsWith('.report_intent_local')
+    );
+}
+
+/**
+ * @param {unknown} value
+ * @returns {Record<string, unknown> | null}
+ */
+function objectOrParsedJson(value) {
+    if (value && typeof value === 'object' && !Array.isArray(value)) {
+        return /** @type {Record<string, unknown>} */ (value);
+    }
+    if (typeof value !== 'string') return null;
+    const text = value.trim();
+    if (!text.startsWith('{')) return null;
+    try {
+        const parsed = JSON.parse(text);
+        return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+            ? /** @type {Record<string, unknown>} */ (parsed)
+            : null;
+    } catch {
+        return null;
+    }
+}
+
+/**
+ * @param {Record<string, unknown>} record
+ * @param {string[]} keys
+ * @returns {string | null}
+ */
+function readFirstString(record, keys) {
+    for (const key of keys) {
+        const value = record[key];
+        if (typeof value === 'string' && value.trim()) return value.trim();
+    }
+    return null;
+}
+
+/**
+ * @param {Record<string, unknown>} evt
+ * @returns {Record<string, unknown>[]}
+ */
+function collectIntentPayloadCandidates(evt) {
+    const candidates = [
+        evt,
+        evt['data'],
+        evt['args'],
+        evt['arguments'],
+        evt['input'],
+        evt['result'],
+        evt['output'],
+        objectOrParsedJson(evt['result']),
+        objectOrParsedJson(evt['output']),
+        objectOrParsedJson(evt['data']),
+    ];
+    return candidates.flatMap((candidate) => {
+        const object = objectOrParsedJson(candidate);
+        if (!object) return [];
+        const nested = [object['data'], object['payload'], object['result'], object['output']]
+            .map(objectOrParsedJson)
+            .filter(Boolean);
+        return [object, .../** @type {Record<string, unknown>[]} */ (nested)];
+    });
+}
+
+/**
+ * @param {Record<string, unknown>} evt
+ * @param {string} fallbackToolName
+ * @returns {{ intent: string; tool: string | null; risk: unknown } | null}
+ */
+function extractReportIntentPayload(evt, fallbackToolName) {
+    for (const candidate of collectIntentPayloadCandidates(evt)) {
+        const intent = readFirstString(candidate, ['intent', 'message', 'summary', 'description']);
+        if (!intent) continue;
+        const tool =
+            readFirstString(candidate, ['tool', 'toolName', 'tool_name', 'targetTool', 'requestedTool', 'operation']) ??
+            fallbackToolName;
+        return {
+            intent,
+            tool,
+            risk: candidate['risk'] ?? candidate['riskLevel'] ?? candidate['severity'] ?? 'unknown',
+        };
+    }
+    return null;
+}
+
+/**
+ * @param {{
+ *     toolName: string;
+ *     evt: Record<string, unknown>;
+ *     source: string;
+ *     toolCallId?: string | null;
+ * }} input
+ * @returns {void}
+ */
+function renderReportIntentToolPayload(input) {
+    if (!isReportIntentTool(input.toolName)) return;
+    const payload = extractReportIntentPayload(input.evt, input.toolName);
+    if (!payload) return;
+    renderTerminalIntent({
+        intent: payload.intent,
+        tool: payload.tool,
+        risk: payload.risk,
+        source: input.source,
+        toolCallId: input.toolCallId ?? null,
+    });
 }
 
 /**
@@ -172,6 +291,7 @@ export function handleTerminalNativeToolStart({ registry, evt }) {
     const name = /** @type {string} */ (evt?.['toolName'] ?? evt?.['name'] ?? 'tool');
     if (shouldSuppressTerminalToolNarration(name)) return;
     const rawArgs = objectArgsOrEmpty(evt?.['args'] ?? evt?.['arguments'] ?? evt?.['input'] ?? null);
+    renderReportIntentToolPayload({ toolName: name, evt: { ...evt, args: rawArgs }, source: `tool/${name}`, toolCallId });
     const presentation = buildTerminalToolActivityPresentation(evt, name);
     const canonicalName = presentation.canonicalToolName ?? name;
     if (toolCallId && registry.isInFlight(toolCallId)) {
@@ -333,6 +453,12 @@ export function handleTerminalNativeToolComplete({ registry, evt }) {
               : null;
     const name = entry?.canonicalName ?? entry?.toolName ?? eventName ?? 'tool';
     if (shouldSuppressTerminalToolNarration(name)) return;
+    renderReportIntentToolPayload({
+        toolName: name,
+        evt: { ...evt, args: objectArgsOrEmpty(evt?.['args'] ?? evt?.['arguments'] ?? evt?.['input'] ?? entry?.rawArgs ?? null) },
+        source: `tool/${name}`,
+        toolCallId,
+    });
     const suppressByInFlightName = entry ? false : registry.isNameInFlight(name);
     if (
         suppressByInFlightName ||
@@ -431,6 +557,7 @@ export function handleTerminalExternalToolRequested({ registry, evt, verboseNarr
     const requestId = evt?.requestId ?? null;
     const toolCallId = evt?.toolCallId ?? (requestId ? `ext:${requestId}` : `ext:${toolName}:${Date.now()}`);
     const presentation = buildTerminalToolActivityPresentation(evt ?? {}, toolName);
+    renderReportIntentToolPayload({ toolName, evt: /** @type {Record<string, unknown>} */ (evt ?? {}), source: `sdk/external/${toolName}`, toolCallId });
     const displayToolName = presentation.canonicalToolName ?? toolName;
     registry.register(toolCallId, displayToolName, 'external', {
         requestId,
@@ -491,6 +618,12 @@ export function handleTerminalExternalToolCompleted({ registry, evt, verboseNarr
     const resolvedEntry = registry.resolveByRequestId(requestId);
     const resolvedName = resolvedEntry?.toolName ?? registry.resolveNameByRequestId(requestId);
     const toolName = originalToolName === 'external_tool' && resolvedName ? resolvedName : originalToolName;
+    renderReportIntentToolPayload({
+        toolName,
+        evt: /** @type {Record<string, unknown>} */ (evt ?? {}),
+        source: `sdk/external/${toolName}`,
+        toolCallId: resolvedToolCallId,
+    });
     if (resolvedEntry) {
         resolvedToolCallId = resolvedEntry.toolCallId;
         registry.complete(resolvedEntry.toolCallId, success);

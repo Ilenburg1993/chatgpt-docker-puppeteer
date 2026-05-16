@@ -25,7 +25,7 @@ import {
     EMITTER_TOOL_EXECUTION_PROGRESS,
     EMITTER_TOOL_EXECUTION_START,
 } from '#copilot/events';
-import { getShowIntentActivity, getShowToolActivity } from '../../presentation/state/index.js';
+import { getShowToolActivity } from '../../presentation/state/index.js';
 import { broadcastSse, buildUserPrompt, println, writeInlineStatus } from '../dialog/index.js';
 import { readTerminalRuntimeState } from '../frontend/gateways/index.js';
 import {
@@ -44,6 +44,7 @@ import {
     handleTerminalNativeToolProgress,
     handleTerminalNativeToolStart,
 } from './tool-lifecycle-runtime.js';
+import { renderTerminalIntent } from './intent-renderer.js';
 /**
  * @typedef {{
  *     on: (event: string, handler: (...args: any[]) => void) => void;
@@ -242,14 +243,12 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, regi
     const onIntent = (/** @type {Record<string, unknown>} */ evt) => {
         const intent = /** @type {string} */ (evt?.['intent'] ?? '');
         if (intent) {
-            recordTerminalActivity('turn', 'Intenção do assistente', {
-                detail: intent,
-                source: 'sdk',
-                recordHistory: false,
+            renderTerminalIntent({
+                intent,
+                source: 'sdk/assistant.intent',
+                tool: typeof evt?.['tool'] === 'string' ? evt['tool'] : null,
+                risk: evt?.['risk'] ?? evt?.['severity'] ?? 'unknown',
             });
-            if (getShowIntentActivity()) {
-                writeInlineStatus(`  \x1b[90m⏳ ${intent}\x1b[0m\x1b[K`);
-            }
         }
     };
 

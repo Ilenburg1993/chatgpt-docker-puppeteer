@@ -14,6 +14,7 @@ import { getBusy, getRl, getSdkSessionMode } from '../../presentation/state/inde
 import { readTerminalDialogStreamMeta, readTerminalRuntimeState } from '../frontend/gateways/index.js';
 import {
     getTerminalDetailLevel,
+    readLatestTerminalIntent,
     readTerminalActivitySnapshot,
     readTerminalPromptDisplayPolicy,
     terminalThemeText,
@@ -35,7 +36,9 @@ const ANSI_ESCAPE_PATTERN = new RegExp(`${ANSI_ESCAPE}\\[[0-?]*[ -/]*[@-~]`, 'g'
 const ANSI_CLEAR_TO_END_OF_LINE = '\x1b[K';
 const INLINE_STATUS_MIN_COLUMNS = 48;
 const INLINE_STATUS_FALLBACK_COLUMNS = 120;
-const INLINE_STATUS_MAX_ROWS = 6;
+const INLINE_STATUS_MIN_ROWS = 6;
+const INLINE_STATUS_FALLBACK_ROWS = 12;
+const INLINE_STATUS_HEIGHT_RATIO = 0.33;
 
 /**
  * Quantidade de linhas reservadas para status acima do prompt (layout: [status...][prompt]).
@@ -71,6 +74,15 @@ function resolveInlineStatusColumns() {
     const columns = Number(process.stdout.columns ?? INLINE_STATUS_FALLBACK_COLUMNS);
     if (!Number.isFinite(columns)) return INLINE_STATUS_FALLBACK_COLUMNS;
     return Math.max(INLINE_STATUS_MIN_COLUMNS, Math.floor(columns) - 1);
+}
+
+/**
+ * @returns {number}
+ */
+function resolveInlineStatusMaxRows() {
+    const rows = Number(process.stdout.rows ?? INLINE_STATUS_FALLBACK_ROWS);
+    if (!Number.isFinite(rows) || rows <= 0) return INLINE_STATUS_FALLBACK_ROWS;
+    return Math.max(INLINE_STATUS_MIN_ROWS, Math.floor(rows * INLINE_STATUS_HEIGHT_RATIO));
 }
 
 /**
@@ -136,10 +148,11 @@ function wrapPlainStatusLine(line, columns) {
  */
 function fitInlineStatusRows(text) {
     const columns = resolveInlineStatusColumns();
+    const maxRows = resolveInlineStatusMaxRows();
     const sanitized = String(text).replaceAll(ANSI_CLEAR_TO_END_OF_LINE, '').replace(/\r/g, '');
     const naturalRows = sanitized.split('\n');
     const alreadyFits =
-        naturalRows.length <= INLINE_STATUS_MAX_ROWS && naturalRows.every((line) => visibleTextLength(line) <= columns);
+        naturalRows.length <= maxRows && naturalRows.every((line) => visibleTextLength(line) <= columns);
     if (alreadyFits) {
         return naturalRows.map((line) => `${line}${ANSI_CLEAR_TO_END_OF_LINE}`);
     }
@@ -147,10 +160,10 @@ function fitInlineStatusRows(text) {
     const plainRows = stripAnsiEscapes(sanitized)
         .split('\n')
         .flatMap((line) => wrapPlainStatusLine(line, columns));
-    if (plainRows.length <= INLINE_STATUS_MAX_ROWS) {
+    if (plainRows.length <= maxRows) {
         return plainRows.map((line) => `${line}${ANSI_CLEAR_TO_END_OF_LINE}`);
     }
-    const rows = plainRows.slice(0, INLINE_STATUS_MAX_ROWS);
+    const rows = plainRows.slice(0, maxRows);
     const lastIndex = rows.length - 1;
     rows[lastIndex] = truncateVisibleEnd(rows[lastIndex] ?? '', columns);
     return rows.map((line) => `${line}${ANSI_CLEAR_TO_END_OF_LINE}`);
@@ -299,6 +312,16 @@ export function buildUserPrompt() {
             ),
         );
     }
+    const latestIntent = readLatestTerminalIntent();
+    if (latestIntent && Date.now() - latestIntent.timestamp < 5 * 60_000) {
+        const riskTag =
+            latestIntent.risk === 'high'
+                ? terminalThemeText('error', compactDetail ? '[I!]' : '[INTENT:HIGH]')
+                : latestIntent.risk === 'medium'
+                  ? terminalThemeText('warn', compactDetail ? '[I]' : '[INTENT]')
+                  : terminalThemeText('muted', compactDetail ? '[I]' : '[INTENT]');
+        tags.push(riskTag);
+    }
 
     return `${terminalThemeText('success', 'você')}${terminalThemeText('muted', '[')}${terminalThemeText('info', model)}${terminalThemeText('muted', '/')}${terminalThemeText('thinking', reasoningEffort)}${terminalThemeText('muted', ']')}${tags.join('')}${terminalThemeText('muted', '›')} `;
 }
@@ -432,13 +455,27 @@ export const BOOT_PROMPT = LLM_B_BOOT_PROMPT ?? DEFAULT_BOOT_PROMPT;
  * @returns {void}
  */
 export function println(text) {
+    printlnBlock([text]);
+}
+
+/**
+ * Escreve um bloco de linhas no stdout preservando o prompt com um único redraw.
+ *
+ * Use para blocos multi-linha semanticamente atômicos (auto-brief, transcript, cards). Isso evita que o prompt seja
+ * redesenhado entre cada linha, reduz writes ANSI e deixa o histórico visual muito mais limpo.
+ *
+ * @param {string | string[]} lines
+ * @returns {void}
+ */
+export function printlnBlock(lines) {
+    const text = Array.isArray(lines) ? lines.join('\n') : lines;
     if (getRl()) {
         if (_statusRowsReserved > 0) {
             clearReservedStatusRowsPreservingCursor();
             _statusRowsReserved = 0;
         }
         clearTerminalLine();
-        process.stdout.write(`${text}\n`);
+        process.stdout.write(`${text.endsWith('\n') ? text : `${text}\n`}`);
         // Re-reserva uma linha em branco acima do prompt para evitar salto visual no próximo pulso da linha viva.
         process.stdout.write('\n');
         _statusRowsReserved = 1;
