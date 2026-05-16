@@ -66,6 +66,25 @@ import { utf8ByteLength } from './shared/buffer.js';
  *     snippet: string;
  *     rank: number;
  * }} IoIndexSearchResult
+ *
+ * @typedef {{
+ *     filePath: string;
+ *     relativePath: string;
+ *     symbolName: string;
+ *     symbolKind: string;
+ *     exported: number;
+ *     line: number;
+ *     docComment: string | null;
+ * }} IoIndexSymbolResult
+ *
+ * @typedef {{
+ *     filePath: string;
+ *     relativePath: string;
+ *     source: string;
+ *     specifiersJson: string;
+ *     isDynamic: number;
+ *     line: number;
+ * }} IoIndexImportResult
  */
 
 /**
@@ -220,6 +239,20 @@ export function createIoIndexSqlite(options) {
         JOIN copilot_io_index_files f ON f.file_path = s.file_path
         WHERE s.symbol_name = ? OR s.symbol_name LIKE ?
         ORDER BY s.symbol_name ASC, f.relative_path ASC
+        LIMIT ?
+    `);
+    const stmtImportSearch = db.prepare(`
+        SELECT
+            i.file_path as filePath,
+            f.relative_path as relativePath,
+            i.source as source,
+            i.specifiers_json as specifiersJson,
+            i.is_dynamic as isDynamic,
+            i.line as line
+        FROM copilot_io_index_imports i
+        JOIN copilot_io_index_files f ON f.file_path = i.file_path
+        WHERE i.source = ? OR i.source LIKE ?
+        ORDER BY i.source ASC, f.relative_path ASC
         LIMIT ?
     `);
 
@@ -572,7 +605,22 @@ export function createIoIndexSqlite(options) {
          * @param {{ maxResults?: number }} [options]
          */
         findSymbol(name, options = {}) {
-            return stmtSymbolSearch.all(name, `%${name}%`, normalizeIndexMaxResults(options.maxResults));
+            return /** @type {IoIndexSymbolResult[]} */ (
+                stmtSymbolSearch.all(name, `%${name}%`, normalizeIndexMaxResults(options.maxResults))
+            );
+        },
+
+        /**
+         * @param {string} source
+         * @param {{ maxResults?: number }} [options]
+         */
+        findImports(source, options = {}) {
+            stats.searches += 1;
+            const safe = String(source ?? '').trim();
+            if (!safe) return /** @type {IoIndexImportResult[]} */ ([]);
+            return /** @type {IoIndexImportResult[]} */ (
+                stmtImportSearch.all(safe, `%${safe}%`, normalizeIndexMaxResults(options.maxResults))
+            );
         },
 
         getStats() {

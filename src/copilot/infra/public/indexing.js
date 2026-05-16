@@ -7,6 +7,7 @@
 
 export {
     buildIoIndexForDirectory,
+    findIoIndexImports,
     findIoIndexSymbol,
     getIoIndexStats,
     invalidateIoIndexPath,

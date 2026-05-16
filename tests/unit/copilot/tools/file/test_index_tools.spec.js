@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
     getIoIndexStats: vi.fn(),
     searchIoIndex: vi.fn(),
     findIoIndexSymbol: vi.fn(),
+    findIoIndexImports: vi.fn(),
 }));
 
 vi.mock('#copilot/infra/public/indexing', () => ({
@@ -14,11 +15,13 @@ vi.mock('#copilot/infra/public/indexing', () => ({
     getIoIndexStats: mocks.getIoIndexStats,
     searchIoIndex: mocks.searchIoIndex,
     findIoIndexSymbol: mocks.findIoIndexSymbol,
+    findIoIndexImports: mocks.findIoIndexImports,
 }));
 
 import {
     indexTools,
     workspaceIndexBuildTool,
+    workspaceIndexFindImportsTool,
     workspaceIndexFindSymbolTool,
     workspaceIndexSearchTool,
     workspaceIndexStatusTool,
@@ -35,6 +38,7 @@ describe('tools/file/index-tools', () => {
         mocks.getIoIndexStats.mockReset();
         mocks.searchIoIndex.mockReset();
         mocks.findIoIndexSymbol.mockReset();
+        mocks.findIoIndexImports.mockReset();
     });
 
     it('exports canonical index tool names', () => {
@@ -43,7 +47,19 @@ describe('tools/file/index-tools', () => {
             'workspace_index_status',
             'workspace_index_search',
             'workspace_index_find_symbol',
+            'workspace_index_invalidate',
+            'workspace_find_imports',
         ]);
+    });
+
+    it('delegates find-imports calls to io index registry', async () => {
+        mocks.getIoIndexStats.mockReturnValue({ available: true, files: 5 });
+        mocks.findIoIndexImports.mockReturnValue([{ source: 'react', relativePath: 'src/App.js', line: 1 }]);
+
+        const result = await getHandler(workspaceIndexFindImportsTool)({ source: 'react', maxResults: 10 });
+
+        expect(mocks.findIoIndexImports).toHaveBeenCalledWith('react', { maxResults: 10 });
+        expect(result).toMatchObject({ source: 'react', maxResults: 10, results: [{ source: 'react' }] });
     });
 
     it('delegates build/status/search/symbol calls to io index registry', async () => {

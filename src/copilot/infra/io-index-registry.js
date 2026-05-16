@@ -86,6 +86,14 @@ export function findIoIndexSymbol(name, options = {}) {
 }
 
 /**
+ * @param {string} source
+ * @param {Parameters<NonNullable<ReturnType<typeof getIoIndex>>['findImports']>[1]} [options]
+ */
+export function findIoIndexImports(source, options = {}) {
+    return getIoIndex()?.findImports(source, options) ?? [];
+}
+
+/**
  * @param {string} filePath
  */
 export function invalidateIoIndexPath(filePath) {

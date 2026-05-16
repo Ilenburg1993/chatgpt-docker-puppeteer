@@ -13,6 +13,7 @@ import { validatePath } from './shared.js';
 
 import {
     buildIoIndexForDirectory,
+    findIoIndexImports,
     findIoIndexSymbol,
     getIoIndexStats,
     invalidateIoIndexPath,
@@ -107,6 +108,14 @@ export const workspaceIndexSearchTool = buildTool({
     },
 });
 
+const IndexImportParameters = z.object({
+    source: z
+        .string()
+        .min(1)
+        .describe('Módulo importado a buscar (ex: "react", "#copilot/infra", "./utils"). Aceita substring.'),
+    maxResults: z.number().int().positive().max(500).optional().describe('Janela máxima de resultados. Default: 50.'),
+});
+
 export const workspaceIndexFindSymbolTool = buildTool({
     name: 'workspace_index_find_symbol',
     description: 'Busca símbolos persistidos no índice L2 local.',
@@ -142,10 +151,26 @@ export const workspaceIndexInvalidateTool = buildTool({
     },
 });
 
+export const workspaceIndexFindImportsTool = buildTool({
+    name: 'workspace_find_imports',
+    description:
+        'Encontra todos os locais que referenciam ou importam um símbolo no workspace. Retorna lista estruturada de matches: arquivo, linha e trecho. Ideal para análise de impacto e rastreamento de dependências antes de refatorações.',
+    parameters: IndexImportParameters,
+    handler: async ({ source, maxResults }) => {
+        return {
+            source,
+            maxResults: maxResults ?? 50,
+            stats: getIoIndexStats(),
+            results: findIoIndexImports(source, { maxResults }),
+        };
+    },
+});
+
 export const indexTools = [
     workspaceIndexBuildTool,
     workspaceIndexStatusTool,
     workspaceIndexSearchTool,
     workspaceIndexFindSymbolTool,
     workspaceIndexInvalidateTool,
+    workspaceIndexFindImportsTool,
 ];
