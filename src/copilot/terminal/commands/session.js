@@ -320,11 +320,31 @@ ${autoPolicyLine ? `${autoPolicyLine}\n` : ''}  ──────────�
         println(
             '  \x1b[33mAção: há ask_user pendente do SDK; responda via conversa normal ou use /answer <texto>.\x1b[0m',
         );
+        if (projection.latestUserInput) {
+            const latest = projection.latestUserInput;
+            const question =
+                typeof latest.question === 'string' ? latest.question.replace(/\s+/g, ' ').trim().slice(0, 180) : '';
+            const choices =
+                Array.isArray(latest.choices) && latest.choices.length > 0
+                    ? ` choices=${latest.choices.join(' | ')}`
+                    : '';
+            println(`  \x1b[90mUltimo ask_user: ${latest.id}${choices} - ${question}\x1b[0m`);
+        }
     }
     if (projection.pendingStructuredUserInputs > 0) {
         println(
             '  \x1b[33mAção: há request_user_input pendente; digite a resposta normalmente ou use /answer <texto>.\x1b[0m',
         );
+        if (projection.latestStructuredUserInput) {
+            const latest = projection.latestStructuredUserInput;
+            const question =
+                typeof latest.question === 'string' ? latest.question.replace(/\s+/g, ' ').trim().slice(0, 180) : '';
+            const choices =
+                Array.isArray(latest.choices) && latest.choices.length > 0
+                    ? ` choices=${latest.choices.join(' | ')}`
+                    : '';
+            println(`  \x1b[90mUltimo request_user_input: ${latest.requestId}${choices} - ${question}\x1b[0m`);
+        }
     }
     if (modelBilling.mismatch) {
         println(

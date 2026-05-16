@@ -55,6 +55,7 @@ export { gitTools } from './git/index.js';
 export {
     cancelAllUserInputRequests,
     getPendingInputIds,
+    getPendingInputRequests,
     hasPendingUserInputRequests,
     hookTools,
     resolveUserInput,

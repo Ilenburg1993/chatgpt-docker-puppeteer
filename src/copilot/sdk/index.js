@@ -214,6 +214,7 @@ export {
     deletePendingStructuredUserInputResolver,
     getPendingStructuredUserInputCount,
     getPendingStructuredUserInputIds,
+    getPendingStructuredUserInputRequests,
     hasPendingStructuredUserInputRequests,
     nextStructuredUserInputRequestId,
     normalizeUserInputCompletedEvent,

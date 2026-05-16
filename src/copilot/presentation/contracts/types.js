@@ -25,8 +25,79 @@
  * @typedef {{ [key: string]: unknown }} RuntimeCopilotSession
  *
  * @typedef {object} RuntimeInputOptions
+ * @property {string} [title]
+ * @property {string} [description]
+ * @property {number} [minLength]
+ * @property {number} [maxLength]
+ * @property {'email' | 'uri' | 'date' | 'date-time'} [format]
+ * @property {string} [default]
  *
  * @typedef {string | number | boolean | string[]} RuntimeElicitationFieldValue
+ *
+ * @typedef {{
+ *     type: 'string';
+ *     enum?: string[];
+ *     enumNames?: string[];
+ *     oneOf?: { const: string; title: string }[];
+ *     minLength?: number;
+ *     maxLength?: number;
+ *     format?: 'email' | 'uri' | 'date' | 'date-time';
+ *     default?: string;
+ *     title?: string;
+ *     description?: string;
+ * }} RuntimeElicitationStringField
+ *
+ * @typedef {{
+ *     type: 'array';
+ *     minItems?: number;
+ *     maxItems?: number;
+ *     items?: { type?: 'string'; enum?: string[]; anyOf?: { const: string; title: string }[] };
+ *     default?: string[];
+ *     title?: string;
+ *     description?: string;
+ * }} RuntimeElicitationArrayField
+ *
+ * @typedef {{
+ *     type: 'boolean';
+ *     default?: boolean;
+ *     title?: string;
+ *     description?: string;
+ * }} RuntimeElicitationBooleanField
+ *
+ * @typedef {{
+ *     type: 'number' | 'integer';
+ *     minimum?: number;
+ *     maximum?: number;
+ *     default?: number;
+ *     title?: string;
+ *     description?: string;
+ * }} RuntimeElicitationNumberField
+ *
+ * @typedef {RuntimeElicitationStringField | RuntimeElicitationArrayField | RuntimeElicitationBooleanField |
+ * RuntimeElicitationNumberField} RuntimeElicitationSchemaField
+ *
+ * @typedef {{
+ *     type: 'object';
+ *     properties: Record<string, RuntimeElicitationSchemaField | Record<string, unknown>>;
+ *     required?: string[];
+ *     title?: string;
+ *     description?: string;
+ * }} RuntimeElicitationSchema
+ *
+ * @typedef {{
+ *     message: string;
+ *     requestedSchema: RuntimeElicitationSchema;
+ * }} RuntimeElicitationParams
+ *
+ * @typedef {{
+ *     sessionId: string;
+ *     message: string;
+ *     requestedSchema?: RuntimeElicitationSchema;
+ *     mode?: 'form' | 'url';
+ *     elicitationSource?: string;
+ *     url?: string;
+ *     [key: string]: unknown;
+ * }} RuntimeElicitationContext
  *
  * @typedef {{
  *     action: 'accept' | 'decline' | 'cancel';

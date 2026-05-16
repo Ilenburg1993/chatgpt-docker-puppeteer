@@ -15,7 +15,7 @@
  *
  * // Em hook-tools.js, ao invés de usar funções globais de user-input:
  * const requestId = ctx.nextStructuredInputId();
- * ctx.registerPendingInput(requestId, resolve);
+ * ctx.registerPendingInput(requestId, resolve, { question: 'Continuar?', choices: ['sim', 'nao'] });
  * ctx.cancelAllPendingInput('[session encerrada]');
  * ```
  *
@@ -31,6 +31,20 @@
  * Resolver de input estruturado (`request_user_input`).
  *
  * @typedef {(answer: string) => void} StructuredInputResolver
+ *
+ * @typedef {object} StructuredInputRequestSnapshot
+ * @property {string} requestId
+ * @property {string} question
+ * @property {string[]} choices
+ * @property {boolean} allowFreeform
+ * @property {number} createdAt
+ * @property {string | null} sessionId
+ * @property {string | null} toolCallId
+ * @property {Record<string, unknown>} data
+ *
+ * @typedef {object} StructuredInputPendingEntry
+ * @property {StructuredInputResolver} resolve
+ * @property {StructuredInputRequestSnapshot} request
  */
 
 /**
@@ -49,6 +63,7 @@
  * @property {string | null} sessionId
  * @property {number} pendingInputCount
  * @property {string[]} pendingInputIds
+ * @property {StructuredInputRequestSnapshot[]} pendingInputRequests
  * @property {boolean} hasBroadcastSse
  */
 
@@ -65,8 +80,8 @@ export class ToolSessionContext {
     /** @type {string | null} */
     #sessionId;
 
-    /** @type {Map<string, StructuredInputResolver>} */
-    #pendingInputResolvers;
+    /** @type {Map<string, StructuredInputPendingEntry>} */
+    #pendingInputEntries;
 
     /** @type {number} */
     #pendingInputSeq;
@@ -82,7 +97,7 @@ export class ToolSessionContext {
      */
     constructor(opts = {}) {
         this.#sessionId = typeof opts.sessionId === 'string' ? opts.sessionId : null;
-        this.#pendingInputResolvers = new Map();
+        this.#pendingInputEntries = new Map();
         this.#pendingInputSeq = 0;
         this.#hasActiveBroadcast = typeof opts.broadcastSse === 'function';
         this.#broadcastSse = typeof opts.broadcastSse === 'function' ? opts.broadcastSse : () => {};
@@ -146,10 +161,32 @@ export class ToolSessionContext {
      *
      * @param {string} requestId
      * @param {StructuredInputResolver} resolve
+     * @param {Partial<Omit<StructuredInputRequestSnapshot, 'requestId' | 'sessionId'>>} [request]
      * @returns {void}
      */
-    registerPendingInput(requestId, resolve) {
-        this.#pendingInputResolvers.set(requestId, resolve);
+    registerPendingInput(requestId, resolve, request = {}) {
+        const choices = Array.isArray(request.choices)
+            ? request.choices.filter((choice) => typeof choice === 'string' && choice.trim().length > 0)
+            : [];
+        this.#pendingInputEntries.set(requestId, {
+            resolve,
+            request: {
+                requestId,
+                question:
+                    typeof request.question === 'string' && request.question.trim().length > 0
+                        ? request.question
+                        : '(pergunta sem texto)',
+                choices,
+                allowFreeform: request.allowFreeform !== false,
+                createdAt:
+                    typeof request.createdAt === 'number' && Number.isFinite(request.createdAt)
+                        ? request.createdAt
+                        : Date.now(),
+                sessionId: this.#sessionId,
+                toolCallId: typeof request.toolCallId === 'string' && request.toolCallId.trim().length > 0 ? request.toolCallId : null,
+                data: request.data && typeof request.data === 'object' ? { ...request.data } : {},
+            },
+        });
     }
 
     /**
@@ -159,7 +196,7 @@ export class ToolSessionContext {
      * @returns {boolean}
      */
     deletePendingInput(requestId) {
-        return this.#pendingInputResolvers.delete(requestId);
+        return this.#pendingInputEntries.delete(requestId);
     }
 
     /**
@@ -170,22 +207,22 @@ export class ToolSessionContext {
      * @returns {boolean}
      */
     resolveStructuredInput(answer, requestId) {
-        if (this.#pendingInputResolvers.size === 0) return false;
+        if (this.#pendingInputEntries.size === 0) return false;
 
         if (requestId) {
-            const resolve = this.#pendingInputResolvers.get(requestId);
-            if (!resolve) return false;
-            this.#pendingInputResolvers.delete(requestId);
-            resolve(answer);
+            const entry = this.#pendingInputEntries.get(requestId);
+            if (!entry) return false;
+            this.#pendingInputEntries.delete(requestId);
+            entry.resolve(answer);
             return true;
         }
 
         // Resolve o mais antigo
-        const oldest = this.#pendingInputResolvers.entries().next();
+        const oldest = this.#pendingInputEntries.entries().next();
         if (oldest.done) return false;
-        const [oldestId, resolve] = oldest.value;
-        this.#pendingInputResolvers.delete(oldestId);
-        resolve(answer);
+        const [oldestId, entry] = oldest.value;
+        this.#pendingInputEntries.delete(oldestId);
+        entry.resolve(answer);
         return true;
     }
 
@@ -195,7 +232,20 @@ export class ToolSessionContext {
      * @returns {string[]}
      */
     getPendingInputIds() {
-        return [...this.#pendingInputResolvers.keys()];
+        return [...this.#pendingInputEntries.keys()];
+    }
+
+    /**
+     * Snapshot dos requests estruturados pendentes, em ordem FIFO.
+     *
+     * @returns {StructuredInputRequestSnapshot[]}
+     */
+    getPendingInputRequests() {
+        return [...this.#pendingInputEntries.values()].map((entry) => ({
+            ...entry.request,
+            choices: [...entry.request.choices],
+            data: { ...entry.request.data },
+        }));
     }
 
     /**
@@ -204,7 +254,7 @@ export class ToolSessionContext {
      * @returns {number}
      */
     getPendingInputCount() {
-        return this.#pendingInputResolvers.size;
+        return this.#pendingInputEntries.size;
     }
 
     /**
@@ -213,7 +263,7 @@ export class ToolSessionContext {
      * @returns {boolean}
      */
     hasPendingInputs() {
-        return this.#pendingInputResolvers.size > 0;
+        return this.#pendingInputEntries.size > 0;
     }
 
     /**
@@ -224,13 +274,13 @@ export class ToolSessionContext {
      * @returns {number} Número de resolvers cancelados.
      */
     cancelAllPendingInput(answer) {
-        if (this.#pendingInputResolvers.size === 0) return 0;
-        const resolvers = [...this.#pendingInputResolvers.values()];
-        this.#pendingInputResolvers.clear();
-        for (const resolve of resolvers) {
-            resolve(answer);
+        if (this.#pendingInputEntries.size === 0) return 0;
+        const entries = [...this.#pendingInputEntries.values()];
+        this.#pendingInputEntries.clear();
+        for (const entry of entries) {
+            entry.resolve(answer);
         }
-        return resolvers.length;
+        return entries.length;
     }
 
     // ─── Observabilidade ──────────────────────────────────────────────────────
@@ -243,8 +293,9 @@ export class ToolSessionContext {
     snapshot() {
         return {
             sessionId: this.#sessionId,
-            pendingInputCount: this.#pendingInputResolvers.size,
-            pendingInputIds: [...this.#pendingInputResolvers.keys()],
+            pendingInputCount: this.#pendingInputEntries.size,
+            pendingInputIds: [...this.#pendingInputEntries.keys()],
+            pendingInputRequests: this.getPendingInputRequests(),
             hasBroadcastSse: this.#hasActiveBroadcast,
         };
     }

@@ -74,6 +74,7 @@ export {
     handleTerminalSdkPendingPermission,
     inputTerminalSdkSessionUi,
     isTerminalSdkSessionUiElicitationAvailable,
+    listTerminalPendingStructuredUserInputs,
     listTerminalSdkModels,
     listTerminalSdkPendingElicitations,
     listTerminalSdkPendingPermissions,

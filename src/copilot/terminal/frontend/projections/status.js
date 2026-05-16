@@ -22,6 +22,7 @@ import {
 import {
     getTerminalPendingStructuredUserInputCount,
     getTerminalSdkSessionCapabilities,
+    listTerminalPendingStructuredUserInputs,
     readTerminalToolRegistrySnapshot,
 } from '../gateways/index.js';
 import {
@@ -90,6 +91,8 @@ function objectOrNull(value) {
  *     latestPermissionType: string | null;
  *     pendingUserInputs: number;
  *     pendingStructuredUserInputs: number;
+ *     latestUserInput: ReturnType<typeof readTerminalUserInputSummary>['latest'];
+ *     latestStructuredUserInput: ReturnType<typeof listTerminalPendingStructuredUserInputs>[number] | null;
  *     latestUserInputKind: 'question' | 'ready' | 'reply' | 'stopped' | null;
  *     permissionMode: 'approve_all' | 'audit_only' | 'selective';
  *     sdkCapabilities: Record<string, unknown> | null;
@@ -262,6 +265,8 @@ export function readTerminalStatusProjection({ hubSessionId = null, injectPort, 
         latestPermissionType: permissionSummary.latest?.permissionType ?? null,
         pendingUserInputs: userInputSummary.pending,
         pendingStructuredUserInputs: getTerminalPendingStructuredUserInputCount(),
+        latestUserInput: userInputSummary.latest ?? null,
+        latestStructuredUserInput: listTerminalPendingStructuredUserInputs().at(-1) ?? null,
         latestUserInputKind: userInputSummary.latest?.kind ?? null,
         permissionMode,
         sdkCapabilities,

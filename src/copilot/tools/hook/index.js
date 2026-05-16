@@ -10,6 +10,7 @@ export {
     cancelAllUserInputRequests,
     configureHookTools,
     getPendingInputIds,
+    getPendingInputRequests,
     hasPendingUserInputRequests,
     hookGetAuditTailTool,
     hookGetPendingTasksTool,

@@ -10,6 +10,7 @@ import {
     classifyPermissionDecision,
     classifyUserInputQuestionKind,
     getPendingStructuredUserInputCount,
+    getPendingStructuredUserInputRequests,
     hasPendingStructuredUserInputRequests,
     normalizeElicitationCompletedEvent,
     normalizeElicitationPendingEvent,
@@ -54,6 +55,13 @@ import {
  */
 export function getTerminalPendingStructuredUserInputCount() {
     return getPendingStructuredUserInputCount();
+}
+
+/**
+ * @returns {ReturnType<typeof getPendingStructuredUserInputRequests>}
+ */
+export function listTerminalPendingStructuredUserInputs() {
+    return getPendingStructuredUserInputRequests();
 }
 
 /**

@@ -21,6 +21,7 @@ import {
     handleTerminalSdkPendingPermission,
     inputTerminalSdkSessionUi,
     isTerminalSdkSessionUiElicitationAvailable,
+    listTerminalPendingStructuredUserInputs,
     listTerminalSdkModels,
     listTerminalSdkPendingPermissions,
     listTerminalSdkTools,
@@ -399,6 +400,30 @@ function pretty(value, max = 1000) {
 }
 
 /**
+ * @param {number} ts
+ * @returns {string}
+ */
+function formatAge(ts) {
+    if (!Number.isFinite(ts)) return 'idade n/d';
+    const seconds = Math.max(0, Math.round((Date.now() - ts) / 1000));
+    if (seconds < 60) return `${seconds}s`;
+    const minutes = Math.floor(seconds / 60);
+    if (minutes < 60) return `${minutes}m${seconds % 60 ? `${seconds % 60}s` : ''}`;
+    const hours = Math.floor(minutes / 60);
+    return `${hours}h${minutes % 60 ? `${minutes % 60}m` : ''}`;
+}
+
+/**
+ * @param {string} text
+ * @param {number} [max=180]
+ * @returns {string}
+ */
+function compactText(text, max = 180) {
+    const normalized = text.replace(/\s+/g, ' ').trim();
+    return normalized.length > max ? `${normalized.slice(0, max - 3)}...` : normalized;
+}
+
+/**
  * @param {string[]} rest
  * @returns {{ json: Record<string, unknown> | null; error: string | null }}
  */
@@ -486,7 +511,8 @@ function renderSdkWaitsSummary({ println }, runtimeId) {
     const pendingElicitations = readTerminalElicitationSummary({ runtimeId: scopedRuntimeId });
     const permissionSummary = readTerminalPermissionSummary({ runtimeId: scopedRuntimeId });
     const userInputSummary = readTerminalUserInputSummary({ runtimeId: scopedRuntimeId });
-    const structuredInputPending = getTerminalPendingStructuredUserInputCount();
+    const structuredInputs = listTerminalPendingStructuredUserInputs();
+    const structuredInputPending = structuredInputs.length || getTerminalPendingStructuredUserInputCount();
     const totalPending =
         pendingElicitations.pending + permissionSummary.pending + userInputSummary.pending + structuredInputPending;
     const headlineColor = totalPending > 0 ? '\x1b[33m' : '\x1b[32m';
@@ -507,9 +533,27 @@ function renderSdkWaitsSummary({ println }, runtimeId) {
     }
     if (userInputSummary.pending > 0) {
         println('  acao     \x1b[90m/answer <texto> ou responda na conversa ativa\x1b[0m');
+        const latest = userInputSummary.latest;
+        if (latest) {
+            const choices = latest.choices.length > 0 ? ` choices=${latest.choices.join(' | ')}` : '';
+            const freeform = latest.allowFreeform ? 'livre' : 'selecao obrigatoria';
+            println(`  ask      \x1b[90m${latest.id} - ${formatAge(latest.createdAt)} - ${latest.kind} - ${freeform}${choices}\x1b[0m`);
+            println(`           ${compactText(latest.question, 220)}`);
+        }
     }
     if (structuredInputPending > 0) {
         println('  acao     \x1b[90mdigite a resposta normalmente; o REPL destrava request_user_input pendente\x1b[0m');
+        for (const entry of structuredInputs.slice(0, 3)) {
+            const choices = entry.choices.length > 0 ? ` choices=${entry.choices.join(' | ')}` : '';
+            const freeform = entry.allowFreeform ? 'livre' : 'selecao obrigatoria';
+            println(
+                `  input    \x1b[90m${entry.requestId} - ${formatAge(entry.createdAt)} - ${freeform}${choices}\x1b[0m`,
+            );
+            println(`           ${compactText(entry.question, 220)}`);
+        }
+        if (structuredInputs.length > 3) {
+            println(`  input    \x1b[90m+${structuredInputs.length - 3} request_user_input pendente(s)\x1b[0m`);
+        }
     }
     if (totalPending === 0) {
         println('  \x1b[90mSem bloqueios de input humano do SDK no momento.\x1b[0m');

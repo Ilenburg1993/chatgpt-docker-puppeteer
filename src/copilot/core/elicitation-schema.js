@@ -81,12 +81,57 @@ function matchesVariant(value, variants) {
 }
 
 /**
+ * @param {unknown} value
+ * @returns {number | null}
+ */
+function finiteNumberOrNull(value) {
+    return typeof value === 'number' && Number.isFinite(value) ? value : null;
+}
+
+/**
+ * @param {string} value
+ * @param {unknown} format
+ * @returns {boolean}
+ */
+function matchesStringFormat(value, format) {
+    if (format === 'email') {
+        return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+    }
+    if (format === 'uri') {
+        try {
+            new URL(value);
+            return true;
+        } catch {
+            return false;
+        }
+    }
+    if (format === 'date') {
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+        const parsed = Date.parse(`${value}T00:00:00.000Z`);
+        return Number.isFinite(parsed);
+    }
+    if (format === 'date-time') {
+        return Number.isFinite(Date.parse(value));
+    }
+    return true;
+}
+
+/**
  * @param {string} key
  * @param {string[]} value
  * @param {Record<string, unknown>} fieldObj
  * @returns {{ ok: true } | { ok: false; error: string }}
  */
 function validateArrayField(key, value, fieldObj) {
+    const minItems = finiteNumberOrNull(fieldObj['minItems']);
+    if (minItems !== null && value.length < minItems) {
+        return { ok: false, error: `Campo "${key}" deve ter ao menos ${minItems} item(ns).` };
+    }
+    const maxItems = finiteNumberOrNull(fieldObj['maxItems']);
+    if (maxItems !== null && value.length > maxItems) {
+        return { ok: false, error: `Campo "${key}" deve ter no maximo ${maxItems} item(ns).` };
+    }
+
     const items = objectOrNull(fieldObj['items']);
     if (!items) return { ok: true };
 
@@ -174,6 +219,31 @@ function validateFieldAgainstSchema(key, value, fieldObj) {
 
     if (Array.isArray(value)) {
         return validateArrayField(key, value, fieldObj);
+    }
+
+    if (typeof value === 'string') {
+        const minLength = finiteNumberOrNull(fieldObj['minLength']);
+        if (minLength !== null && value.length < minLength) {
+            return { ok: false, error: `Campo "${key}" deve ter ao menos ${minLength} caractere(s).` };
+        }
+        const maxLength = finiteNumberOrNull(fieldObj['maxLength']);
+        if (maxLength !== null && value.length > maxLength) {
+            return { ok: false, error: `Campo "${key}" deve ter no maximo ${maxLength} caractere(s).` };
+        }
+        if (!matchesStringFormat(value, fieldObj['format'])) {
+            return { ok: false, error: `Campo "${key}" deve respeitar o formato ${String(fieldObj['format'])}.` };
+        }
+    }
+
+    if (typeof value === 'number') {
+        const minimum = finiteNumberOrNull(fieldObj['minimum']);
+        if (minimum !== null && value < minimum) {
+            return { ok: false, error: `Campo "${key}" deve ser maior ou igual a ${minimum}.` };
+        }
+        const maximum = finiteNumberOrNull(fieldObj['maximum']);
+        if (maximum !== null && value > maximum) {
+            return { ok: false, error: `Campo "${key}" deve ser menor ou igual a ${maximum}.` };
+        }
     }
 
     return { ok: true };

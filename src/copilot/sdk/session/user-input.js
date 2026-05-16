@@ -20,6 +20,16 @@ import { ToolSessionContext } from './tool-session-context.js';
  * @typedef {import('../types.js').UserInputRequest} UserInputRequest
  *
  * @typedef {import('../types.js').UserInputResponse} UserInputResponse
+ *
+ * @typedef {object} StructuredInputRequestSnapshot
+ * @property {string} requestId
+ * @property {string} question
+ * @property {string[]} choices
+ * @property {boolean} allowFreeform
+ * @property {number} createdAt
+ * @property {string | null} sessionId
+ * @property {string | null} toolCallId
+ * @property {Record<string, unknown>} data
  */
 
 /** @typedef {'question' | 'ready' | 'reply' | 'stopped'} UserInputQuestionKind */
@@ -290,10 +300,11 @@ export function nextStructuredUserInputRequestId() {
  *
  * @param {string} requestId
  * @param {StructuredUserInputResolver} resolve
+ * @param {Partial<Omit<StructuredInputRequestSnapshot, 'requestId' | 'sessionId'>>} [request]
  * @returns {void}
  */
-export function registerPendingStructuredUserInputResolver(requestId, resolve) {
-    _defaultCtx.registerPendingInput(requestId, resolve);
+export function registerPendingStructuredUserInputResolver(requestId, resolve, request = {}) {
+    _defaultCtx.registerPendingInput(requestId, resolve, request);
 }
 
 /**
@@ -322,6 +333,13 @@ export function resolvePendingStructuredUserInput(answer, requestId) {
  */
 export function getPendingStructuredUserInputIds() {
     return _defaultCtx.getPendingInputIds();
+}
+
+/**
+ * @returns {StructuredInputRequestSnapshot[]}
+ */
+export function getPendingStructuredUserInputRequests() {
+    return _defaultCtx.getPendingInputRequests();
 }
 
 /**

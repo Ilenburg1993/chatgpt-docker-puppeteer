@@ -38,6 +38,7 @@ import {
     deletePendingStructuredUserInputResolver,
     getPendingStructuredUserInputCount,
     getPendingStructuredUserInputIds,
+    getPendingStructuredUserInputRequests,
     hasPendingStructuredUserInputRequests as hasPendingStructuredUserInputRequestsState,
     nextStructuredUserInputRequestId,
     registerPendingStructuredUserInputResolver,
@@ -45,6 +46,18 @@ import {
     ToolSessionContext,
 } from '#copilot/sdk/session';
 const execFileAsync = promisify(execFile);
+
+/**
+ * @typedef {object} StructuredInputRequestSnapshot
+ * @property {string} requestId
+ * @property {string} question
+ * @property {string[]} choices
+ * @property {boolean} allowFreeform
+ * @property {number} createdAt
+ * @property {string | null} sessionId
+ * @property {string | null} toolCallId
+ * @property {Record<string, unknown>} data
+ */
 
 /**
  * Raiz do repositório — calculada em relação a este arquivo (src/copilot/tools/).
@@ -112,6 +125,11 @@ function _getPendingInputIds() {
     return _toolSessionContext ? _toolSessionContext.getPendingInputIds() : getPendingStructuredUserInputIds();
 }
 
+/** @returns {StructuredInputRequestSnapshot[]} */
+function _getPendingInputRequests() {
+    return _toolSessionContext ? _toolSessionContext.getPendingInputRequests() : getPendingStructuredUserInputRequests();
+}
+
 /** @returns {string} */
 function _nextInputId() {
     return _toolSessionContext ? _toolSessionContext.nextStructuredInputId() : nextStructuredUserInputRequestId();
@@ -120,12 +138,13 @@ function _nextInputId() {
 /**
  * @param {string} requestId
  * @param {(answer: string) => void} resolve
+ * @param {Partial<Omit<StructuredInputRequestSnapshot, 'requestId' | 'sessionId'>>} [request]
  */
-function _registerPendingInput(requestId, resolve) {
+function _registerPendingInput(requestId, resolve, request = {}) {
     if (_toolSessionContext) {
-        _toolSessionContext.registerPendingInput(requestId, resolve);
+        _toolSessionContext.registerPendingInput(requestId, resolve, request);
     } else {
-        registerPendingStructuredUserInputResolver(requestId, resolve);
+        registerPendingStructuredUserInputResolver(requestId, resolve, request);
     }
 }
 
@@ -175,6 +194,15 @@ export function resolveUserInput(answer, requestId) {
  */
 export function getPendingInputIds() {
     return _getPendingInputIds();
+}
+
+/**
+ * Retorna snapshots completos dos requests estruturados pendentes.
+ *
+ * @returns {StructuredInputRequestSnapshot[]}
+ */
+export function getPendingInputRequests() {
+    return _getPendingInputRequests();
 }
 
 /**
@@ -344,19 +372,14 @@ const requestUserInputTool = buildTool({
         // ARCH-N01 (fix): suspensão real — a Promise só resolve quando resolveUserInput() for chamado,
         // o que ocorre via answerPendingQuestion() no agente (POST /api/copilot/answer).
         // Isso garante que o modelo não continua processamento até receber a resposta do usuário.
-        return new Promise((resolve, reject) => {
-            // RF-029: se já há muitos requests pendentes (>5), rejeitar para evitar acúmulo indefinido
-            if (_getPendingInputCount() >= 5) {
-                reject(
-                    new Error(
-                        `[hook-tools] Limite de requests de input simultâneos atingido (5). ` +
-                            `Requests pendentes: ${_getPendingInputIds().join(', ')}`,
-                    ),
+        return new Promise((resolve) => {
+            if (_getPendingInputCount() >= 12) {
+                log(
+                    'WARN',
+                    `[hook-tools/request_user_input] ${_getPendingInputCount()} inputs estruturados pendentes; mantendo fila viva e auditável.`,
                 );
-                return;
             }
 
-            // RF-029: gerar ID único somente após validar capacidade disponível
             const requestId = _nextInputId();
             _registerPendingInput(requestId, (answer) => {
                 clearTimeout(autoCleanupTimer);
@@ -369,6 +392,12 @@ const requestUserInputTool = buildTool({
                     answer,
                     instruction: 'Resposta recebida. Processar e continuar o fluxo.',
                 });
+            }, {
+                question: fullQuestion,
+                choices: choices ?? [],
+                allowFreeform,
+                createdAt: Date.now(),
+                data: { source: 'request_user_input', requires_selection: requires_selection === true },
             });
             // BUG-P2-06: auto-cleanup após 10min para evitar memory leak se resolver nunca é chamado
             const autoCleanupTimer = setTimeout(() => {

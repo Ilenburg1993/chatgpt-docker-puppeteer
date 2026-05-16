@@ -2,52 +2,61 @@
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const runtimeMocks = vi.hoisted(() => ({
-    compactTerminalSdkSession: vi.fn(async () => ({ success: true })),
-    confirmTerminalSdkSessionUi: vi.fn(async () => true),
-    createTerminalSdkWorkspaceFile: vi.fn(async (path, content) => ({ path, content })),
-    getTerminalSdkQuota: vi.fn(async () => ({
-        quotaSnapshots: { chat: { remainingPercentage: 0.91, resetDate: '2026-05-01' } },
-    })),
-    inputTerminalSdkSessionUi: vi.fn(async (message) => `${message}:typed`),
-    isTerminalSdkSessionUiElicitationAvailable: vi.fn(() => true),
-    listTerminalSdkModels: vi.fn(async () => ({ models: [{ id: 'gpt-5-mini', supportedReasoningEfforts: ['high'] }] })),
-    listTerminalSdkPendingPermissions: vi.fn(async () => ({
-        available: true,
-        source: 'permissions.listPendingPermissionRequests',
-        requests: [{ requestId: 'perm-rpc-1', permissionType: 'file_write' }],
-    })),
-    listTerminalSdkTools: vi.fn(async () => ({ tools: [{ name: 'read_file', description: 'Read files' }] })),
-    listTerminalSdkWorkspaceFiles: vi.fn(async () => ({ files: [{ path: 'plan.md' }] })),
-    readTerminalSdkSystemPromptProjection: vi.fn(async () => ({
-        sessionId: 'sdk-1',
-        sessionAvailable: true,
-        instructionSources: { sources: [{ type: 'system', origin: 'sdk' }] },
-        instructionSourcesError: null,
-        systemPrompt: {
-            effectiveMode: 'append',
-            effectiveLiveMode: 'customize',
-            liveReloadMechanism: 'sdk-transform',
-            configPath: '/tmp/system-prompt.json',
-            autoReload: true,
-            sections: Array.from({ length: 10 }, (_, idx) => ({ sectionId: `s${idx + 1}` })),
-            appendFiles: [{ path: '/tmp/user.md', exists: true }],
-            limitations: ['mode=replace exige resume total apenas quando usado explicitamente.'],
-            sdkCompatibility: { supportsCustomizeMode: true, supportsInstructionSourcesRpc: true },
-            revision: { digest: 'abcd1234efgh5678' },
-        },
-    })),
-    readTerminalSdkWorkspaceFile: vi.fn(async (path) => ({ path, content: 'hello' })),
-    getTerminalSdkSessionCapabilities: vi.fn(() => ({
-        ui: { elicitation: true, confirm: true, select: true, input: true },
-        tools: { workspace: true, list: true, quota: true },
-        plan: { read: true, write: true, delete: true },
-    })),
-    handleTerminalSdkPendingPermission: vi.fn(async (requestId, result) => ({ requestId, result, ok: true })),
-    requestTerminalSdkElicitation: vi.fn(async () => ({ action: 'accept', content: { answer: 'ok' } })),
-    resolveTerminalSdkPendingElicitation: vi.fn(() => true),
-    selectTerminalSdkSessionUi: vi.fn(async (_message, options) => options[0] ?? null),
-}));
+const runtimeMocks = vi.hoisted(() => {
+    /** @type {Array<Record<string, unknown>>} */
+    const pendingStructuredInputs = [];
+    return {
+        pendingStructuredInputs,
+        compactTerminalSdkSession: vi.fn(async () => ({ success: true })),
+        confirmTerminalSdkSessionUi: vi.fn(async () => true),
+        createTerminalSdkWorkspaceFile: vi.fn(async (path, content) => ({ path, content })),
+        getTerminalPendingStructuredUserInputCount: vi.fn(() => pendingStructuredInputs.length),
+        getTerminalSdkQuota: vi.fn(async () => ({
+            quotaSnapshots: { chat: { remainingPercentage: 0.91, resetDate: '2026-05-01' } },
+        })),
+        inputTerminalSdkSessionUi: vi.fn(async (message) => `${message}:typed`),
+        isTerminalSdkSessionUiElicitationAvailable: vi.fn(() => true),
+        listTerminalPendingStructuredUserInputs: vi.fn(() => pendingStructuredInputs),
+        listTerminalSdkModels: vi.fn(async () => ({
+            models: [{ id: 'gpt-5-mini', supportedReasoningEfforts: ['high'] }],
+        })),
+        listTerminalSdkPendingPermissions: vi.fn(async () => ({
+            available: true,
+            source: 'permissions.listPendingPermissionRequests',
+            requests: [{ requestId: 'perm-rpc-1', permissionType: 'file_write' }],
+        })),
+        listTerminalSdkTools: vi.fn(async () => ({ tools: [{ name: 'read_file', description: 'Read files' }] })),
+        listTerminalSdkWorkspaceFiles: vi.fn(async () => ({ files: [{ path: 'plan.md' }] })),
+        readTerminalSdkSystemPromptProjection: vi.fn(async () => ({
+            sessionId: 'sdk-1',
+            sessionAvailable: true,
+            instructionSources: { sources: [{ type: 'system', origin: 'sdk' }] },
+            instructionSourcesError: null,
+            systemPrompt: {
+                effectiveMode: 'append',
+                effectiveLiveMode: 'customize',
+                liveReloadMechanism: 'sdk-transform',
+                configPath: '/tmp/system-prompt.json',
+                autoReload: true,
+                sections: Array.from({ length: 10 }, (_, idx) => ({ sectionId: `s${idx + 1}` })),
+                appendFiles: [{ path: '/tmp/user.md', exists: true }],
+                limitations: ['mode=replace exige resume total apenas quando usado explicitamente.'],
+                sdkCompatibility: { supportsCustomizeMode: true, supportsInstructionSourcesRpc: true },
+                revision: { digest: 'abcd1234efgh5678' },
+            },
+        })),
+        readTerminalSdkWorkspaceFile: vi.fn(async (path) => ({ path, content: 'hello' })),
+        getTerminalSdkSessionCapabilities: vi.fn(() => ({
+            ui: { elicitation: true, confirm: true, select: true, input: true },
+            tools: { workspace: true, list: true, quota: true },
+            plan: { read: true, write: true, delete: true },
+        })),
+        handleTerminalSdkPendingPermission: vi.fn(async (requestId, result) => ({ requestId, result, ok: true })),
+        requestTerminalSdkElicitation: vi.fn(async () => ({ action: 'accept', content: { answer: 'ok' } })),
+        resolveTerminalSdkPendingElicitation: vi.fn(() => true),
+        selectTerminalSdkSessionUi: vi.fn(async (_message, options) => options[0] ?? null),
+    };
+});
 
 const fileToolMocks = vi.hoisted(() => ({
     readFileHandler: vi.fn(async ({ path }) => ({
@@ -146,6 +155,7 @@ describe('terminal/commands/sdk', () => {
         clearTerminalElicitation('all');
         clearTerminalPermissions();
         clearTerminalUserInputs();
+        runtimeMocks.pendingStructuredInputs.splice(0);
         vi.clearAllMocks();
     });
 
@@ -218,6 +228,27 @@ describe('terminal/commands/sdk', () => {
         expect(ctx.output()).toContain('elicitation=1');
         expect(ctx.output()).toContain('permission=1');
         expect(ctx.output()).toContain('ask_user=1');
+    });
+
+    it('/sdk waits detalha request_user_input pendente', async () => {
+        runtimeMocks.pendingStructuredInputs.push({
+            requestId: 'request-user-input-test-1',
+            question: 'Escolha a estrategia de continuidade com contexto longo',
+            choices: ['seguir', 'pausar'],
+            allowFreeform: false,
+            createdAt: Date.now() - 2_000,
+            sessionId: 'sdk-1',
+            toolCallId: null,
+            data: {},
+        });
+
+        const ctx = mockCtx();
+        await cmdSdk({ println: ctx.println }, 'waits');
+
+        expect(ctx.output()).toContain('request_user_input=1');
+        expect(ctx.output()).toContain('request-user-input-test-1');
+        expect(ctx.output()).toContain('choices=seguir | pausar');
+        expect(ctx.output()).toContain('Escolha a estrategia');
     });
 
     it('/sdk prompt exibe status canônico do system prompt e instruction sources', async () => {
@@ -463,6 +494,52 @@ describe('terminal/commands/sdk', () => {
         expect(runtimeMocks.resolveTerminalSdkPendingElicitation).toHaveBeenCalledWith('el-defaults', {
             action: 'accept',
             content: { env: 'dev', tags: ['fast', 'safe'] },
+        });
+    });
+
+    it('/elicitation valida restrições escalares e limites de array do schema SDK', async () => {
+        recordTerminalElicitationPending({
+            requestId: 'el-limits',
+            message: 'Informe dados',
+            mode: 'form',
+            requestedSchema: {
+                type: 'object',
+                properties: {
+                    email: { type: 'string', format: 'email', minLength: 6, maxLength: 80 },
+                    count: { type: 'integer', minimum: 1, maximum: 3 },
+                    tags: { type: 'array', minItems: 1, maxItems: 2, items: { type: 'string', enum: ['a', 'b'] } },
+                },
+                required: ['email', 'count', 'tags'],
+            },
+        });
+
+        const invalidEmail = mockCtx();
+        await cmdElicitation({ println: invalidEmail.println }, 'respond el-limits accept {"email":"x","count":2,"tags":["a"]}');
+        expect(invalidEmail.output()).toContain('email');
+        expect(runtimeMocks.resolveTerminalSdkPendingElicitation).not.toHaveBeenCalled();
+
+        const invalidNumber = mockCtx();
+        await cmdElicitation(
+            { println: invalidNumber.println },
+            'respond el-limits accept {"email":"a@b.com","count":4,"tags":["a"]}',
+        );
+        expect(invalidNumber.output()).toContain('menor ou igual');
+
+        const invalidArray = mockCtx();
+        await cmdElicitation(
+            { println: invalidArray.println },
+            'respond el-limits accept {"email":"a@b.com","count":2,"tags":["a","b","a"]}',
+        );
+        expect(invalidArray.output()).toContain('maximo 2');
+
+        const valid = mockCtx();
+        await cmdElicitation(
+            { println: valid.println },
+            'respond el-limits accept {"email":"a@b.com","count":2,"tags":["a","b"]}',
+        );
+        expect(runtimeMocks.resolveTerminalSdkPendingElicitation).toHaveBeenCalledWith('el-limits', {
+            action: 'accept',
+            content: { email: 'a@b.com', count: 2, tags: ['a', 'b'] },
         });
     });
 

@@ -17,6 +17,7 @@ import { allTools } from '../../../src/copilot/tools/bootstrap.js';
 import {
     cancelAllUserInputRequests,
     getPendingInputIds,
+    getPendingInputRequests,
     hookGetAuditTailTool,
     hookGetPendingTasksTool,
     hookTools,
@@ -61,6 +62,25 @@ describe('hookTools', () => {
             pending.push('fake-id');
             assert.equal(getPendingInputIds().includes('fake-id'), false);
             queueMicrotask(() => resolveUserInput('seguir'));
+            await promise;
+        });
+
+        it('getPendingInputRequests() expõe metadata completa e imutável do request_user_input', async () => {
+            const { resolveUserInput } = await import('../../../src/copilot/tools/hook/hook-tools.js');
+            const handler = /** @type {any} */ (requestUserInputTool).handler;
+            const promise = handler({
+                question: 'Escolha o caminho',
+                choices: ['A', 'B'],
+                requires_selection: true,
+            });
+            const pending = getPendingInputRequests();
+            assert.equal(pending.length, 1);
+            assert.equal(pending[0]?.question, 'Escolha o caminho');
+            assert.deepEqual(pending[0]?.choices, ['A', 'B']);
+            assert.equal(pending[0]?.allowFreeform, false);
+            pending[0]?.choices.push('fake');
+            assert.deepEqual(getPendingInputRequests()[0]?.choices, ['A', 'B']);
+            queueMicrotask(() => resolveUserInput('A'));
             await promise;
         });
     });
