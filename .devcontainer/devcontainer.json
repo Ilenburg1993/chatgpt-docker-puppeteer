@@ -1,5 +1,5 @@
 // ============================================================================
-// DevContainer — Ambiente de Desenvolvimento Controlado - v5.3
+// DevContainer — Ambiente de Desenvolvimento Controlado - v5.4.0
 // Projeto: chatgpt-docker-puppeteer
 //
 // Propósito:
@@ -24,9 +24,22 @@
 //   • Estabilidade e previsibilidade > conveniência automática
 //
 // Nota Arquitetural Importante:
-//   Portas de controle (ex.: Chrome DevTools / Proxy) são deliberadamente
-//   BLOQUEADAS no DevContainer. O acesso a essas superfícies é decidido
-//   exclusivamente pelo runtime da aplicação.
+//   Portas de controle (ex.: Chrome Proxy / Debug) não são auto-expostas por
+//   inferência. Quando declaradas, são forwardadas explicitamente e com política
+//   de UX silenciosa/ignore. O acesso operacional continua decidido pelo runtime.
+//
+// CHANGELOG v5.4.0 (2026-05-15):
+// 🔧 DOCKERFILE/NSS SYNC (CANONICAL ALIGNMENT)
+// ✅ ALINHADO: Dockerfile.canonical.v1.3
+// ✅ ALINHADO: nss-gatekeeper canonical v2.0.0
+// ✅ ALINHADO: post-start v2.5.0
+// ✅ ALINHADO: post-attach v5.4.0
+// ✅ CORRIGIDO: build.args.VERSION 1.0 → 1.3
+// ✅ CORRIGIDO: LD_PRELOAD absoluto/canônico em containerEnv + remoteEnv
+// ✅ CORRIGIDO: portsAttributes wildcard → otherPortsAttributes oficial
+// ✅ ADICIONADO: GitHub.copilot explicitamente junto de GitHub.copilot-chat
+// ✅ ADICIONADO: overrideCommand=false para honrar CMD/ENTRYPOINT da imagem
+// ✅ ADICIONADO: labels runtime devcontainer.version e image.version
 //
 // CHANGELOG v5.3 (2026-02-03):
 // 🔧 SSH FORWARDING MIGRATION (BREAKING CHANGE - FIX CRÍTICO)
@@ -53,7 +66,7 @@
 // ============================================================================
 {
   // ============================================================
-  // BUILD CONFIGURATION (v3.4 - Simbiose Ativada)
+  // BUILD CONFIGURATION (v5.4.0 — Dockerfile v1.3 sync)
   // ============================================================
   "build": {
     "args": {
@@ -72,13 +85,13 @@
       "REMOTE_USER": "node",
       "VCS_REF": "${localEnv:GIT_COMMIT}",
       // --- METADATA & VERSIONING ---
-      "VERSION": "1.0"
+      "VERSION": "1.3.2"
     },
     "context": "..",
     "dockerfile": "Dockerfile"
   },
   // ============================================================
-  // CONTAINER ENVIRONMENT VARIABLES (Simbiose v3.4)
+  // CONTAINER ENVIRONMENT VARIABLES (v5.4.0 — NSS/Dockerfile sync)
   // ============================================================
   "containerEnv": {
     // canonical shell contract mirrored from /etc/profile.d/00-runtime.sh
@@ -104,10 +117,28 @@
     // Canonical NSS artifact directory.
     // Used by profile.d + nss-gatekeeper; safe as plain metadata in containerEnv.
     "DEVCONTAINER_NSS_DIR": "/tmp/devcontainer-nss",
+    // =========================================================
+    // NETWORK RESILIENCE — GitHub/Copilot route manager
+    // ---------------------------------------------------------
+    // Smart route selector for api.github.com, delegated by
+    // post-start.sh to .devcontainer/scripts/network/github-api-route-fix.sh.
+    // It repairs ISP/DNS edge failures without changing Windows/host network.
+    // =========================================================
+    "DEVCONTAINER_ENABLE_GITHUB_API_ROUTE_FIX": "true",
+    "DEVCONTAINER_GITHUB_API_HOST": "api.github.com",
+    "DEVCONTAINER_GITHUB_API_ROUTE_PROXY_MODE": "auto",
+    "DEVCONTAINER_GITHUB_API_MIN_SCORE": "85",
+    "DEVCONTAINER_GITHUB_API_MAX_CANDIDATES": "16",
+    "DEVCONTAINER_GITHUB_API_PARALLEL_PROBES": "true",
+    "DEVCONTAINER_GITHUB_API_ROUTE_CACHE_ENABLED": "true",
+    "DEVCONTAINER_GITHUB_API_ENABLE_IPV6": "false",
+    "DEVCONTAINER_GITHUB_API_OPENSSL_PREFLIGHT": "false",
+    "DEVCONTAINER_SKIP_GITHUB_API_PROBES_AFTER_ROUTE_FIX": "true",
     // Safe to globalize as long as NSS_WRAPPER_* points at files that always exist.
     // This keeps base container processes (including VS Code bootstrap paths)
     // on a safe, always-readable NSS baseline before profile hooks refine it.
-    "LD_PRELOAD": "libnss_wrapper.so",
+    "DEVCONTAINER_NSS_WRAPPER_LIB": "/usr/local/lib/devcontainer/libnss_wrapper.so",
+    "LD_PRELOAD": "/usr/local/lib/devcontainer/libnss_wrapper.so",
     // Bootstrap fallback must point to stable files. /tmp artifacts are runtime
     // only and may not exist yet when VS Code issues early exec/user commands.
     // The gatekeeper/profile path can still override these to /tmp later.
@@ -181,7 +212,9 @@
     // Puppeteer NUNCA deve baixar Chromium automaticamente
     // • Chrome externo é primário
     // • Chromium local é fallback técnico (imagem-level)
+    "PUPPETEER_SKIP_DOWNLOAD": "true",
     "PUPPETEER_SKIP_CHROMIUM_DOWNLOAD": "true",
+    "PUPPETEER_EXECUTABLE_PATH": "/usr/bin/chromium",
     // ------------------------------------------------------------
     // PUPPETEER — ENDPOINT CANÔNICO (CONTRATO DE FRONTEIRA)
     // ------------------------------------------------------------
@@ -329,7 +362,6 @@
         "ms-vscode.remote-server",
         "GitHub.remotehub",
         "ms-vscode.remote-repositories",
-        "Gruntfuggly.todo-tree",
         "jasonnutter.search-node-modules",
         "Vue.volar",
         "ms-vscode-remote.remote-wsl"
@@ -397,8 +429,8 @@
           "**/.git/objects/**": true,
           "**/.git/refs/**": true,
           "**/.git/logs/**": true,
-          "**/backups/**": true, // v5.5: exclui backups do watcher
-          "**/artifacts/**": true, // v5.5: arquivos gerados
+          "**/backups/**": true, // v5.4.0: exclui backups do watcher
+          "**/artifacts/**": true, // v5.4.0: arquivos gerados
           "**/monitoring/**": true,
           "**/dist/**": true,
           "**/logs/**": true,
@@ -409,14 +441,14 @@
           "**/tmp/**": true
         },
         // ========================================================
-        // EXTENSION HOST — ESTABILIDADE DE MEMÓRIA (v5.5)
+        // EXTENSION HOST — ESTABILIDADE DE MEMÓRIA (v5.4.0)
         // O extension host com 55+ extensões pode consumir 1.7+ GB.
         // Reduzir auto-save frequency e desabilitar código desnecessário
         // alivia o GC do extension host e reduz chances de crash/restart.
         // ========================================================
         // Reduz frequência de auto-fetch Git (causa wake-ups do extension host)
-        "git.autofetch": false, // v5.5: desativado (era true) — causa I/O periódico
-        "git.autofetchPeriod": 1800, // v5.5: se reativado, 30 min mínimo
+        "git.autofetch": false, // v5.4.0: desativado (era true) — causa I/O periódico
+        "git.autofetchPeriod": 1800, // v5.4.0: se reativado, 30 min mínimo
         "git.confirmSync": false,
         "git.decorations.enabled": true,
         "git.enableSmartCommit": true,
@@ -502,8 +534,8 @@
             //   • 10-gatekeeper-nss.sh → LD_PRELOAD com caminho absoluto
             //     (evita erros de linker em spawns intensivos de subprocesso)
             //   • 00-restore-env.sh → PATH correto com nvm/npm-global
-            // Sem -l, containerEnv só passa libnss_wrapper.so (sem path), que
-            // o linker às vezes não consegue resolver em sessões de alta carga.
+            // Sem -l, profile.d não recanonicaliza/refina NSS_WRAPPER_* nem
+            // reforça o LD_PRELOAD canônico para shells interativos.
             "args": ["-l"],
             "icon": "terminal-bash",
             "path": "/bin/bash"
@@ -690,7 +722,9 @@
   // Fluxo de Dados LLM Automation:
   //    Puppeteer → localhost:9224 (proxy) → host.docker.internal:9225 (Chrome)
   //
-  // O sistema DEVE funcionar mesmo sem Chrome externo (fallback para Chromium local)
+  // O sistema possui Chromium local como fallback técnico de imagem, mas o fluxo
+  // normal de automação LLM exige Chrome externo via Chrome Proxy. O fallback local
+  // só deve ser ativado por decisão explícita do runtime.
   //
   // ===========================================================
   // ============================================================================
@@ -875,6 +909,11 @@
     "source=/var/run/docker.sock,target=/var/run/docker.sock,type=bind"
   ],
   "name": "ChatGPT Docker Puppeteer - Dev Container",
+  // Default oficial para portas não declaradas explicitamente.
+  // Use otherPortsAttributes em vez de wildcard "*" dentro de portsAttributes.
+  "otherPortsAttributes": {
+    "onAutoForward": "ignore"
+  },
   "portsAttributes": {
     // ----------------------------------------------------------
     // Política global: DENY-BY-DEFAULT
@@ -882,9 +921,6 @@
     // • Qualquer porta NÃO declarada explicitamente é ignorada
     // • Nenhuma inferência automática é permitida
     // ----------------------------------------------------------
-    "*": {
-      "onAutoForward": "ignore"
-    },
     // ================== UI HUMANA ==============================
     "3008": {
       "label": "Dashboard Principal — Mission Control (HTTP + Socket.io + API)",
@@ -938,17 +974,31 @@
       // ⚠️  Só funciona se processo rodar com: --inspect=0.0.0.0:9230
     }
   },
-  // Roda quando você "entra" no terminal (Feedback visual humano)
-  "postAttachCommand": "bash ${containerWorkspaceFolder}/.devcontainer/scripts/post-attach.sh",
   // ============================================================
   // LIFECYCLE HOOKS - Sincronia de Inicialização
   // ============================================================
-  // O postCreateCommand agora assume a responsabilidade de linkar o
-  // histórico imortal e preparar o Claude/Puppeteer.
-  "postCreateCommand": "bash ${containerWorkspaceFolder}/.devcontainer/scripts/post-create.sh",
+  // Chamamos bash explicitamente dentro do login shell.
+  // Motivo:
+  //   bash -lc '<script>' exige que o arquivo tenha bit executável.
+  //   bash -lc 'bash <script>' executa o arquivo como input do bash e evita
+  //   falha por chmod ausente no workspace montado.
+  //
+  // Ainda assim, os scripts devem permanecer versionados como 100755.
+  "postCreateCommand": "bash -lc 'bash ${containerWorkspaceFolder}/.devcontainer/scripts/post-create.sh'",
+
   // Roda toda vez que o container sobe (não-bloqueante por contrato)
-  "postStartCommand": "bash ${containerWorkspaceFolder}/.devcontainer/scripts/post-start.sh",
+  "postStartCommand": "bash -lc 'bash ${containerWorkspaceFolder}/.devcontainer/scripts/post-start.sh'",
+
+  // Roda a cada attach do VS Code ao container
+  "postAttachCommand": "bash -lc 'bash ${containerWorkspaceFolder}/.devcontainer/scripts/post-attach.sh'",
+  //
   "privileged": false,
+  // Honra o contrato ENTRYPOINT/CMD da imagem:
+  //   ENTRYPOINT ["dumb-init", "--", "/usr/local/bin/nss-gatekeeper"]
+  //   CMD ["sleep", "infinity"]
+  // O default do Dev Containers para Dockerfile é overrideCommand=true; aqui
+  // desabilitamos para manter o handoff canônico da imagem.
+  "overrideCommand": false,
   // ===========================================================
   // RUNTIME ENVIRONMENT VARIABLES
   // ===========================================================
@@ -993,12 +1043,15 @@
     "CHROME_HOST": "${localEnv:CHROME_HOST:host.docker.internal}",
     "CHROME_PORT": "${localEnv:CHROME_PORT:9225}",
     "CHROME_PROXY_BIND": "${localEnv:CHROME_PROXY_BIND:0.0.0.0}",
-    // NSS wrapper baseline for VS Code remote server + subprocesses.
-    // Official Dev Container guidance: remoteEnv reaches VS Code and related
-    // subprocesses, which is exactly the gap not covered by profile-only hooks.
-    // Keep this on stable system files; shell/profile hooks may override to the
-    // dynamic /tmp artifacts after they are materialized.
+    // Canonical NSS wrapper bootstrap.
+    // LD_PRELOAD must be absolute. A relative "libnss_wrapper.so" can be visible
+    // to non-login VS Code/bootstrap subprocesses before /etc/profile.d runs,
+    // producing ld.so preload warnings.
+    // NSS_WRAPPER_PASSWD/GROUP intentionally start on stable system files;
+    // entrypoint/profile hooks may refine them to /tmp/devcontainer-nss artifacts
+    // after those files are materialized.
     "DEVCONTAINER_NSS_DIR": "${containerEnv:DEVCONTAINER_NSS_DIR}",
+    "DEVCONTAINER_NSS_WRAPPER_LIB": "${containerEnv:DEVCONTAINER_NSS_WRAPPER_LIB}",
     "LD_PRELOAD": "${containerEnv:LD_PRELOAD}",
     "NSS_WRAPPER_PASSWD": "${containerEnv:NSS_WRAPPER_PASSWD}",
     "NSS_WRAPPER_GROUP": "${containerEnv:NSS_WRAPPER_GROUP}",
@@ -1107,9 +1160,10 @@
     //   servidores abaixo. O arquivo em si não é modificado pelos --dns flags.
     //
     // Camada 2 — post-start.sh:
-    //   fix_dns() sobrescreve /etc/resolv.conf diretamente a cada container
-    //   start, garantindo acesso direto a 1.1.1.1 e 8.8.8.8 independente do
-    //   comportamento do Docker Desktop.
+    //   fix_dns() reescreve o conteúdo de /etc/resolv.conf via tee a cada
+    //   container start, preservando o inode quando o arquivo é gerenciado
+    //   pelo Docker. Isso garante acesso direto a 1.1.1.1 e 8.8.8.8
+    //   independente do comportamento do Docker Desktop.
     //
     // Referência: https://docs.docker.com/reference/cli/docker/container/run/#dns
     "--dns=1.1.1.1",
@@ -1160,7 +1214,7 @@
     // ============================================================================
     "--group-add=docker",
     // ====================================================================
-    // TCP KEEPALIVE — DETECÇÃO RÁPIDA DE CONEXÕES MORTAS (v5.5)
+    // TCP KEEPALIVE — DETECÇÃO RÁPIDA DE CONEXÕES MORTAS (v5.4.0)
     // ====================================================================
     // Por padrão o kernel Linux usa tcp_keepalive_time=7200 (2 horas).
     // Isso significa que conexões idle não são sondadas por 2 HORAS antes
@@ -1173,7 +1227,8 @@
     // • tcp_keepalive_probes=3: 3 falhas → conexão declarada morta
     // Efeito total: conexão morta detectada em ~2min45s (vs 2h15min atual)
     //
-    // ⚠️ REQUER REBUILD DO CONTAINER para entrar em vigor.
+    // ⚠️ REQUER RECRIAÇÃO DO CONTAINER para entrar em vigor
+    //    (Rebuild/Reopen Container; alteração de runArgs não se aplica a container já vivo).
     // Sysctls net.ipv4.tcp_* são namespace-específicos no Linux 5.15+
     // (WSL2 6.6 suporta). Testado: `sysctl -w` dentro sem --privileged
     // retorna EPERM; via --sysctl no docker run funciona sem privilégios.
@@ -1189,13 +1244,17 @@
     "--sysctl",
     "net.ipv4.tcp_fin_timeout=30",
     "--network=bridge",
-    // METADATA: Sincronizado com a Section 0 do Dockerfile
+    // METADATA: sincronizado com Dockerfile.canonical.v1.3 e devcontainer v5.4.0
     "--label",
     "project=chatgpt-docker-puppeteer",
     "--label",
     "role=devcontainer",
     "--label",
-    "version=1.0"
+    "version=1.3.2",
+    "--label",
+    "image.version=1.3.2",
+    "--label",
+    "devcontainer.version=5.4.0"
   ],
   // ============================================================
   // LIFECYCLE FINALIZATION

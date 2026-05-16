@@ -1,161 +1,295 @@
 # =============================================================================
-# .gitattributes — Normalização de Quebras de Linha (Line Endings)
-# Version: 2.4 (Node + Puppeteer + DevContainer + CI + VS)
-# Objetivo: garantir consistência LF para desenvolvimento em WSL/Containers/CI,
-#           compatibilidade com VS Code, e segurança para artefatos binários.
-# Nota: O Git normaliza EOL; BOM não é controlado por .gitattributes.
-#       Para BOM (PowerShell) use hook / editor config / CI.
+# .gitattributes — Canonical Git attributes for WSL2 / DevContainer / Windows
+# Version: 2.5
+#
+# Goal:
+#   Keep executable/devcontainer-critical files LF-only across Windows, WSL2,
+#   Linux containers and CI, while protecting real binary artifacts from Git EOL
+#   normalization and diff heuristics.
+#
+# Notes:
+#   - Git attributes are repository policy and override contributor-local
+#     core.autocrlf behavior for matching paths.
+#   - `eol=lf` controls line endings, not text encoding or BOM.
+#   - BOM/encoding policy should be enforced by editorconfig, hooks or CI.
+#   - After changing this file, run:
+#       git add --renormalize .
 # =============================================================================
 
-# Regra global: detectar texto automaticamente e forçar LF no repositório
+# -----------------------------------------------------------------------------
+# Baseline
+# -----------------------------------------------------------------------------
+# Let Git classify files, normalize text to LF in the index, and leave binary
+# content untouched. More specific rules below make critical paths explicit.
 * text=auto eol=lf
 
-# -----------------------------
-# Scripts e executáveis (sensitive to EOL)
-# -----------------------------
-# Shell scripts — MUST be LF (BOM forbidden)
-*.sh        text eol=lf
-*.bash      text eol=lf
-*.zsh       text eol=lf
+# -----------------------------------------------------------------------------
+# DevContainer / Docker / runtime-critical files
+# -----------------------------------------------------------------------------
+Dockerfile text eol=lf
+Dockerfile.* text eol=lf
+*.Dockerfile text eol=lf
+.dockerignore text eol=lf
+docker-compose*.yml text eol=lf
+docker-compose*.yaml text eol=lf
+compose*.yml text eol=lf
+compose*.yaml text eol=lf
 
-# PowerShell — treat as text with LF in repo/worktree; BOM must be enforced by editor/hook.
-# (We keep eol=lf: PowerShell on Windows tolerates LF; BOM policy handled separately.)
-*.ps1       text eol=lf
-*.psm1      text eol=lf
-*.psd1      text eol=lf
+.devcontainer/*.sh text eol=lf
+.devcontainer/**/*.sh text eol=lf
+.devcontainer/nss-gatekeeper.sh text eol=lf
+.devcontainer/scripts/*.sh text eol=lf
+.devcontainer/scripts/**/*.sh text eol=lf
+.devcontainer/*.json text eol=lf
+.devcontainer/*.jsonc text eol=lf
+.devcontainer/** text eol=lf
 
-# Code
-*.js        text eol=lf
-*.cjs       text eol=lf
-*.mjs       text eol=lf
-*.ts        text eol=lf
-*.tsx       text eol=lf
-*.jsx       text eol=lf
-*.py        text eol=lf
-*.pl        text eol=lf
-*.rb        text eol=lf
+# -----------------------------------------------------------------------------
+# Shells / executable scripts — LF mandatory
+# -----------------------------------------------------------------------------
+*.sh text eol=lf
+*.bash text eol=lf
+*.zsh text eol=lf
+*.fish text eol=lf
+*.ksh text eol=lf
+*.awk text eol=lf
+*.sed text eol=lf
+*.envrc text eol=lf
 
-# -----------------------------
-# Node / package managers
-# -----------------------------
-package.json            text eol=lf
-package-lock.json       text eol=lf
-yarn.lock               text eol=lf
-pnpm-lock.yaml          text eol=lf
-.npmrc                  text eol=lf
-.yarnrc                 text eol=lf
-.editorconfig           text eol=lf
+# PowerShell.
+# Canonical project shell is bash, but PowerShell is instrumental in this repo.
+# PowerShell 7+ handles UTF-8/LF well; BOM policy is intentionally not expressed
+# here because .gitattributes line-ending policy does not control BOM.
+*.ps1 text eol=lf
+*.psm1 text eol=lf
+*.psd1 text eol=lf
 
-# -----------------------------
-# Puppeteer / Chromium local artifacts (if accidentally versioned)
-# Mark as binary to avoid normalization attempts
-# -----------------------------
-.local-chromium/**      binary
-chrome-linux/**         binary
-chrome-win/**           binary
-chrome-mac/**           binary
+# -----------------------------------------------------------------------------
+# Windows command scripts — CRLF mandatory
+# -----------------------------------------------------------------------------
+*.bat text eol=crlf
+*.cmd text eol=crlf
 
-# -----------------------------
-# Docker / DevContainer / CI configs
-# -----------------------------
-Dockerfile*             text eol=lf
-docker-compose*.yml     text eol=lf
-docker-compose*.yaml    text eol=lf
-.dockerignore           text eol=lf
-.devcontainer/**        text eol=lf
-.github/workflows/**    text eol=lf
+# -----------------------------------------------------------------------------
+# Source code
+# -----------------------------------------------------------------------------
+*.js text eol=lf
+*.cjs text eol=lf
+*.mjs text eol=lf
+*.jsx text eol=lf
+*.ts text eol=lf
+*.tsx text eol=lf
+*.vue text eol=lf
+*.svelte text eol=lf
 
-# -----------------------------
-# VS Code / IDE
-# -----------------------------
-.vscode/**              text eol=lf
+*.py text eol=lf
+*.pyi text eol=lf
+*.rb text eol=lf
+*.pl text eol=lf
+*.pm text eol=lf
+*.php text eol=lf
+*.go text eol=lf
+*.rs text eol=lf
+*.java text eol=lf
+*.kt text eol=lf
+*.kts text eol=lf
+*.c text eol=lf
+*.h text eol=lf
+*.cc text eol=lf
+*.cpp text eol=lf
+*.cxx text eol=lf
+*.hpp text eol=lf
+*.cs text eol=lf
+*.swift text eol=lf
+*.lua text eol=lf
+*.r text eol=lf
+*.R text eol=lf
 
-# -----------------------------
-# Metadados, documentação e dados legíveis
-# -----------------------------
-.gitattributes          text eol=lf
-.gitignore              text eol=lf
-README*                 text eol=lf
-LICENSE*                text eol=lf
-*.md                    text eol=lf
-*.json                  text eol=lf
-*.jsonc                 text eol=lf
-*.xml                   text eol=lf
-*.yaml                  text eol=lf
-*.yml                   text eol=lf
-*.toml                  text eol=lf
-*.ini                   text eol=lf
-*.env                   text eol=lf
-*.env.*                 text eol=lf
-.eslintrc               text eol=lf
-.prettierrc             text eol=lf
+# -----------------------------------------------------------------------------
+# Web / styles / templates
+# -----------------------------------------------------------------------------
+*.html text eol=lf
+*.htm text eol=lf
+*.css text eol=lf
+*.scss text eol=lf
+*.sass text eol=lf
+*.less text eol=lf
+*.svg text eol=lf
+*.xml text eol=lf
 
-# -----------------------------
-# Exceções Windows (CRLF necessárias)
-# -----------------------------
-*.bat                    text eol=crlf
-*.cmd                    text eol=crlf
+# -----------------------------------------------------------------------------
+# Data / config / documentation
+# -----------------------------------------------------------------------------
+.gitattributes text eol=lf
+.gitignore text eol=lf
+.editorconfig text eol=lf
 
-# -----------------------------
-# Imagens e mídia (binários)
-# -----------------------------
-*.png                    binary
-*.jpg                    binary
-*.jpeg                   binary
-*.gif                    binary
-*.ico                    binary
-*.webp                   binary
+README* text eol=lf
+LICENSE* text eol=lf
+CHANGELOG* text eol=lf
+CONTRIBUTING* text eol=lf
+*.md text eol=lf
+*.mdx text eol=lf
+*.txt text eol=lf
 
-# SVG é texto (XML) — mantemos como texto para diffs/otimização
-*.svg                    text eol=lf
+*.json text eol=lf
+*.jsonc text eol=lf
+*.yaml text eol=lf
+*.yml text eol=lf
+*.toml text eol=lf
+*.ini text eol=lf
+*.conf text eol=lf
+*.cfg text eol=lf
+*.properties text eol=lf
+*.csv text eol=lf
+*.tsv text eol=lf
+*.sql text eol=lf
+*.graphql text eol=lf
+*.gql text eol=lf
 
-# -----------------------------
-# Fontes (binários)
-# -----------------------------
-*.ttf                    binary
-*.eot                    binary
-*.otf                    binary
-*.woff                   binary
-*.woff2                  binary
+*.env text eol=lf
+*.env.* text eol=lf
+.env text eol=lf
+.env.* text eol=lf
+.npmrc text eol=lf
+.yarnrc text eol=lf
+.yarnrc.yml text eol=lf
 
-# -----------------------------
-# Arquivos compactados e artefatos intensivos
-# -----------------------------
-*.zip                    binary
-*.tar                    binary
-*.tar.gz                 binary
-*.tgz                    binary
-*.gz                     binary
-*.rar                    binary
-*.7z                     binary
+*.patch text eol=lf
+*.diff text eol=lf
 
-# -----------------------------
-# Documentos binários
-# -----------------------------
-*.pdf                    binary
-*.doc                    binary
-*.docx                   binary
-*.xls                    binary
-*.xlsx                   binary
-*.ppt                    binary
-*.pptx                   binary
+# -----------------------------------------------------------------------------
+# Node / package managers / lockfiles
+# -----------------------------------------------------------------------------
+package.json text eol=lf
+package-lock.json text eol=lf
+npm-shrinkwrap.json text eol=lf
+yarn.lock text eol=lf
+pnpm-lock.yaml text eol=lf
+pnpm-workspace.yaml text eol=lf
 
-# -----------------------------
-# Segurança / chaves / certificados (não normalizar)
-# -----------------------------
-*.key                    binary
-*.pem                    binary
-*.p12                    binary
-*.crt                    binary
+# -----------------------------------------------------------------------------
+# GitHub / CI / editor metadata
+# -----------------------------------------------------------------------------
+.github/** text eol=lf
+.github/workflows/** text eol=lf
+.vscode/** text eol=lf
 
-# -----------------------------
-# Outros: arquivos de build e caches (tipicamente não versionados)
-# -----------------------------
-dist/**                  binary
-build/**                 binary
-coverage/**              binary
-.cache/**                binary
+# -----------------------------------------------------------------------------
+# Visual Studio / Windows project files
+# -----------------------------------------------------------------------------
+# Keep Windows-native project/solution files CRLF if they ever appear.
+*.sln text eol=crlf
+*.vcxproj text eol=crlf
+*.vcxproj.filters text eol=crlf
+*.csproj text eol=crlf
+*.props text eol=crlf
+*.targets text eol=crlf
 
-# `node_modules` is intentionally ignored in `.gitignore` and should not be
-# tracked or marked here; keeping it in .gitattributes may cause confusion.
+# -----------------------------------------------------------------------------
+# Images / media — binary
+# -----------------------------------------------------------------------------
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.webp binary
+*.avif binary
+*.bmp binary
+*.tif binary
+*.tiff binary
+
+*.mp3 binary
+*.wav binary
+*.ogg binary
+*.flac binary
+*.mp4 binary
+*.mov binary
+*.webm binary
+*.mkv binary
+
+# -----------------------------------------------------------------------------
+# Fonts — binary
+# -----------------------------------------------------------------------------
+*.ttf binary
+*.eot binary
+*.otf binary
+*.woff binary
+*.woff2 binary
+
+# -----------------------------------------------------------------------------
+# Archives / compressed artifacts — binary
+# -----------------------------------------------------------------------------
+*.zip binary
+*.tar binary
+*.tar.gz binary
+*.tgz binary
+*.gz binary
+*.bz2 binary
+*.xz binary
+*.zst binary
+*.br binary
+*.rar binary
+*.7z binary
+
+# -----------------------------------------------------------------------------
+# Documents / office binaries
+# -----------------------------------------------------------------------------
+*.pdf binary
+*.doc binary
+*.docx binary
+*.xls binary
+*.xlsx binary
+*.ppt binary
+*.pptx binary
+
+# -----------------------------------------------------------------------------
+# Databases / binary runtime artifacts
+# -----------------------------------------------------------------------------
+*.db binary
+*.sqlite binary
+*.sqlite3 binary
+*.mdb binary
+*.accdb binary
+*.wasm binary
+*.node binary
+*.so binary
+*.dll binary
+*.dylib binary
+*.exe binary
+
+# -----------------------------------------------------------------------------
+# Security material — never normalize
+# -----------------------------------------------------------------------------
+*.key binary
+*.pem binary
+*.p12 binary
+*.pfx binary
+*.crt binary
+*.cer binary
+*.der binary
+*.pub text eol=lf
+
+# -----------------------------------------------------------------------------
+# Browser / Puppeteer / Chromium artifacts if accidentally versioned
+# -----------------------------------------------------------------------------
+.local-chromium/** binary
+chrome-linux/** binary
+chrome-win/** binary
+chrome-mac/** binary
+
+# -----------------------------------------------------------------------------
+# Build outputs / caches if accidentally versioned
+# -----------------------------------------------------------------------------
+dist/** binary
+build/** binary
+coverage/** binary
+.cache/** binary
+tmp/** binary
+temp/** binary
+logs/** text eol=lf
+
+# `node_modules` is intentionally ignored in .gitignore and should not be
+# tracked or marked here. Keeping it in .gitattributes can cause confusion.
 # EOF

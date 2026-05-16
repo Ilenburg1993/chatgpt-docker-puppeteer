@@ -456,7 +456,7 @@ o Act: Se um robô estiver em silêncio (Zumbi), o Reconciliador dispara uma manob
 
 4. Remediation Engine: A Farmacopeia
 O remediation.js é o repositório de sabedoria tática do sistema. Ele traduz Sintomas em Ações:
-Sintoma (Triage)Ação Prescrita (Remediation)ImpactoBROWSER_FROZENBROWSER_REBOOTAlta SeveridadeCAPTCHA_CHALLENGEENGINE_PAUSE + NotificaçãoCríticoLOGICAL_LOOPCACHE_CLEAR + TASK_RETRYMédia SeveridadeLIMIT_REACHEDENGINE_PAUSE (Cooldown 1h)Média Severidade
+Sintoma (Triage)Ação Prescrita (Remediation)ImpactoBROWSER_FROZENBROWSER_REBOOTAlta SeveridadeCAPTCHA_CHALLENGEENGINE_PAUSE + NotificaçãoCríticoLOGICAL_LOOPCACHE_CLEAR + TASK_RETRYMédia SeveridadeLIMIT_REACHEDENGINE_PAUSE (Cooldown 1h)Média Severidade
 5. Telemetria de Realtime
 O servidor provê fluxos contínuos de dados para o Dashboard:
 * Hardware Pulse: Amostragem de CPU e RAM a cada 5s via hardware.js.

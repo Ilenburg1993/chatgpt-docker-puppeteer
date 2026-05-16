@@ -1,56 +1,121 @@
-# Dependencies
+# =============================================================================
+# .gitignore — ChatGPT Docker Puppeteer
+# Version: 2.5
+#
+# Objetivo:
+#   Ignorar estado local, caches, logs, snapshots, artefatos sensíveis e outputs
+#   gerados em runtime/build/test, preservando apenas contratos, fontes,
+#   documentação, templates e arquivos .gitkeep deliberados.
+#
+# Princípios:
+#   1. Nunca versionar estado transitório de hooks, sessões, filas, respostas,
+#      browsers, caches, logs ou credenciais.
+#   2. Nunca ignorar código-fonte, scripts estruturais ou contratos canônicos.
+#   3. Diretórios runtime podem manter .gitkeep quando a existência da pasta
+#      fizer parte do contrato do projeto.
+# =============================================================================
+
+
+# =============================================================================
+# Dependencies / package managers
+# =============================================================================
 node_modules/
+**/node_modules/
+
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-package-lock.json.tmp
-src/dashboard-ui/node_modules/
-src/dashboard-ui/node_modules/**
+pnpm-debug.log*
 
-# Environment variables
+package-lock.json.tmp
+
+# npm/yarn/pnpm local caches
+.npm/
+.yarn/cache/
+.yarn/unplugged/
+.yarn/build-state.yml
+.pnpm-store/
+
+
+# =============================================================================
+# Environment variables / local secrets
+# =============================================================================
 .env
 .env.local
 .env.development
+.env.test.local
+.env.production.local
 .env.*.local
+.envrc
 
-# Local Python virtual environments
+# DevContainer-local env override
+.devcontainer/.env
+
+
+# =============================================================================
+# Python local environments / caches
+# =============================================================================
 .venv/
 venv/
 remote-kernel/
+
 __pycache__/
-*.pyc
+*.py[cod]
 *.pyo
 *.pyd
+
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
 .coverage
 .coverage.*
 
-# Codex local state (skills, sessions, etc.)
+
+# =============================================================================
+# Codex / local assistant state
+# =============================================================================
 .codex/*
 !.codex/config.toml
 !.codex/README.md
 
-# Local assistant notes/config (keep an example committed)
+# Local assistant notes/config
 /assistant/perf-notes.toml
 
-# Legacy local assistant config (deprecated; kept ignored to avoid accidental commits)
+# Legacy local assistant config
 /config.toml
 
+
+# =============================================================================
 # Logs
+# =============================================================================
 logs/
+*.log
+logs/**/*.log
+audit.log
+
 var/*
 !var/logs/
 var/logs/*
 !var/logs/copilot/
 var/logs/copilot/*
 !var/logs/copilot/.gitkeep
-*.log
-logs/**/*.log
 
-# Copilot Hooks — auditoria local (nunca commitar logs brutos nem estado transitório)
+crash_reports/
+
+
+# =============================================================================
+# Copilot Hooks — runtime state, logs, snapshots, checkpoints
+#
+# Scripts/configs under .github/hooks may be versioned.
+# Runtime data under logs/state/checkpoints must not.
+# =============================================================================
 .github/hooks/logs/
+.github/hooks/checkpoints/
+
+.github/hooks/state/*
+!.github/hooks/state/.gitkeep
+
+# Explicit guardrails for generated hook state
 .github/hooks/state/session-context.json
 .github/hooks/state/session-context-*.json
 .github/hooks/state/session-briefing.md
@@ -59,157 +124,209 @@ logs/**/*.log
 .github/hooks/state/AUTHORIZED_CLOSE.flag
 .github/hooks/state/SESSION_CLOSE_NO_KEY.flag
 .github/hooks/state/section-summaries/
+.github/hooks/state/snapshots/
 .github/hooks/state/audit.jsonl
 .github/hooks/state/*.lock
 .github/hooks/state/.mismatch_track.json
 .github/hooks/state/sdk-always-alive.json
-.github/hooks/checkpoints/
-audit.log
-crash_reports/
-# Stray file-descriptor redirect artifacts (e.g. devcontainer post-create log captured to fd number)
+
+
+# =============================================================================
+# Stray file-descriptor redirect artifacts
+# Ex.: devcontainer post-create log captured to fd number.
+# =============================================================================
 /[0-9]
 /[0-9][0-9]
 /[0-9][0-9][0-9]
 
-# Runtime data
+
+# =============================================================================
+# Runtime data / process state
+# =============================================================================
+pids/
 pids
 *.pid
 *.seed
 *.pid.lock
+
 data/
 *.sqlite
 *.sqlite-wal
 *.sqlite-shm
+*.db
+*.db-wal
+*.db-shm
 
-# Task queue and results (sensitive data)
-fila/
+
+# =============================================================================
+# Task queue and generated results
+# =============================================================================
+fila/*
 !fila/.gitkeep
-respostas/
+
+respostas/*
 !respostas/.gitkeep
-artifacts/
+
+artifacts/*
 !artifacts/.gitkeep
 
-# Browser profiles (may contain sessions)
+
+# =============================================================================
+# Browser profiles / local login state
+# =============================================================================
 profile/
 local-login/
 local-login/profile/
 
+
+# =============================================================================
 # Temporary files
+# =============================================================================
 *.tmp
 *.tmp.*
+*.bak
+*.backup
+*~
+
 .cache/
+tmp/
+tests/tmp/
+
 .tmp.driveupload/
 .tmp.drivedownload/
 .tmp.driveupdate/
-tests/tmp/
-tmp/
 
+
+# =============================================================================
 # Build outputs
+# =============================================================================
 dist/
 build/
-*.tgz
-
-# Old dashboard (deprecated, use src/dashboard-ui/)
+out/
 public/
 
-# IDE and editors
-# .vscode/ (permitido para versionamento dos arquivos de configuração)
-#!.vscode/extensions.json
-#!.vscode/settings.json
-#!.vscode/tasks.json
-#!.vscode/launch.json
-#!.vscode/*.code-snippets
-#!.vscode/keybindings.json
-# VS Code auto-generated logs (Makefile Tools extension)
-#.vscode/*.log
-#.vscode/configurationCache.log
-#.idea/
+*.tgz
+
+
+# =============================================================================
+# IDE / editors
+#
+# .vscode is intentionally allowed for committed project settings.
+# Ignore only generated/editor-local noise.
+# =============================================================================
+.vscode/*.log
+.vscode/configurationCache.log
+.vscode-server/
+
+.idea/
 *.swp
 *.swo
-*~
+
 .DS_Store
 
-# Dev container
-.vscode-server/
-.devcontainer/.env
 
-# OS specific
-Thumbs.db
-ehthumbs.db
-Desktop.ini
+# =============================================================================
+# DevContainer ephemeral state
+# =============================================================================
+.devcontainer/.first-attach
+.devcontainer/.initialized
+.devcontainer/state/
+.devcontainer/tmp/
+.devcontainer/logs/
 
-# Backups
-*.bak
-*.backup
-*-Copia*.js
-backups/
-old/
 
-# Analysis and scans (may contain sensitive data)
+# =============================================================================
+# Mission runtime state
+# =============================================================================
+missions/*
+!missions/.gitkeep
+
+missions-test-boot/*
+!missions-test-boot/.gitkeep
+
+missions/**/state.json
+missions/**/checkpoints/
+missions-test-boot/**/state.json
+missions-test-boot/**/checkpoints/
+
+
+# =============================================================================
+# Local / personal tool state
+# =============================================================================
+.claude/
+.pm2/
+
+.npm/_update-notifier-last-checked
+
+# This literal appeared in old ignore rules; keep ignored defensively if created.
+${containerUserHome}/
+
+
+# =============================================================================
+# Local TLS / certificates / credentials
+# =============================================================================
+ssl/
+
+*.key
+*.pem
+*.p12
+*.pfx
+
+
+# =============================================================================
+# Archives / large local artifacts
+# =============================================================================
+*.rar
+*.zip
+*.tar
+*.tar.gz
+*.7z
+
+src.rar
+kernel.rar
+driver.rar.old
+
+
+# =============================================================================
+# Analysis and scans
+# =============================================================================
 analysis/outputs/
 analysis/scans/
 analysis/**/*.json
 !analysis/.gitkeep
 
-# Archives
-*.rar
-*.zip
-*.tar.gz
-src.rar
-kernel.rar
-driver.rar.old
+.secrets.baseline
+trufflehog_output.json
 
-# PM2
-.pm2/
 
-# Deprecated config files (use config.json instead)
-chrome-config.json
-pids/
-
-# Coverage reports
+# =============================================================================
+# Coverage / test artifacts
+# =============================================================================
 coverage/
 .nyc_output/
 .c8/
 *.lcov
 lcov.info
 
-# Test artifacts
-tests/tmp/
 tests/**/*.log
 
-# Security scan outputs
-.secrets.baseline
-trufflehog_output.json
-src/dashboard-ui/node_modules/
 
-# Devcontainer ephemeral state
-.devcontainer/.first-attach
-.devcontainer/.initialized
-.devcontainer/state/
+# =============================================================================
+# OS-specific files
+# =============================================================================
+Thumbs.db
+ehthumbs.db
+Desktop.ini
 
-# Mission runtime state
-missions/
-!missions/.gitkeep
-missions-test-boot/
-!missions-test-boot/.gitkeep
-missions/**/state.json
-missions-test-boot/**/checkpoints/
-missions-test-boot/**/state.json
 
-# Local / personal
-.claude/
-.npm/_update-notifier-last-checked
-${containerUserHome}/
+# =============================================================================
+# Deprecated config files
+# =============================================================================
+chrome-config.json
 
-# Local TLS material
-ssl/
 
-# DevContainer runtime logs (numeric filenames produced by post-create.sh)
+# =============================================================================
+# DevContainer runtime numeric logs
+# =============================================================================
 /60
 60
-
-# ESLint cache (movido para volume Docker: /home/node/.cache/eslint/)
-# .eslintcache — não commitado; reside em XDG_CACHE_HOME no container
-
-# Prettier cache (em volume Docker: /home/node/.cache/prettier/)
-# Ambos são cobertos pelo volume devcontainer-cache e não existem no workspace

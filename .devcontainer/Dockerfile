@@ -1,10 +1,10 @@
 # syntax=docker/dockerfile:1
 # =============================================================================
-# Dockerfile v1.0 — ChatGPT Docker Puppeteer DevContainer (CANÔNICO / DEFINITIVO)
+# Dockerfile v1.3.2 — ChatGPT Docker Puppeteer DevContainer (CANÔNICO / DEFINITIVO)
 # Base: Node.js 24 + Debian Bookworm (Microsoft DevContainers)
 # hadolint global ignore=DL3008,DL3059,DL3009
 #
-# OBJETIVO MACRO (v1.0)
+# OBJETIVO MACRO (v1.3.2)
 #   Este Dockerfile define uma imagem DEV (apenas desenvolvimento) com foco em:
 #   - Estabilidade máxima do VS Code Server (Remote - Containers / Dev Containers)
 #   - Compatibilidade alta com GitHub Copilot / Copilot Chat e fluxos de agente
@@ -26,15 +26,16 @@
 #   altos no host (na prática, root-equivalent). Isso é deliberado para DEV.
 #
 # VERSÃO
-#   - Todas as versões/contratos internos nesta imagem usam "1.0".
-#   - ARG VERSION default é 1.0 e é propagado para contratos e labels OCI.
+#   - Todas as versões/contratos internos nesta imagem usam "1.3.2".
+#   - ARG VERSION default é 1.3.2 e é propagado para contratos e labels OCI.
 # =============================================================================
 
 
 # =============================================================================
 # SECTION 0 — BASE IMAGE, SHELL GLOBAL & BUILD METADATA (OCI)
 # =============================================================================
-FROM mcr.microsoft.com/devcontainers/javascript-node:24-bookworm
+ARG BASE_IMAGE=mcr.microsoft.com/devcontainers/javascript-node:24-bookworm
+FROM ${BASE_IMAGE}
 
 # ---------------------------------------------------------------------------
 # Toolchain pins (upstream stable)
@@ -43,12 +44,14 @@ FROM mcr.microsoft.com/devcontainers/javascript-node:24-bookworm
 # ---------------------------------------------------------------------------
 ARG NPM_VERSION=11.14.1
 ARG DEVCONTAINER_CLI_VERSION=0.86.1
-ARG PNPM_VERSION=11.1.0
+ARG PNPM_VERSION=11.1.2
 ARG GH_VERSION=2.92.0
 ARG ACTIONLINT_VERSION=1.7.12
 ARG HADOLINT_VERSION=2.14.0
+ARG YQ_VERSION=4.53.2
 ARG TYPESCRIPT_VERSION=6.0.3
-ARG TYPESCRIPT_LANGUAGE_SERVER_VERSION=5.2.0
+ARG TYPESCRIPT_LANGUAGE_SERVER_VERSION=5.1.3
+ARG JSONC_PARSER_VERSION=3.3.1
 
 # ---------------------------------------------------------------------------
 # Curated Rust/Go CLIs — pinned upstream releases (Section 6.8)
@@ -72,9 +75,9 @@ SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
 # ---------------------------------------------------------------------------
 # Build-time metadata (OCI)
-# - VERSION deve ser "1.0" para o release canônico (pode ser override via build-arg).
+# - VERSION deve ser "1.3.2" para o release canônico (pode ser override via build-arg).
 # ---------------------------------------------------------------------------
-ARG VERSION=1.0
+ARG VERSION=1.3.2
 ARG BUILD_DATE=unknown
 ARG VCS_REF=unknown
 ARG IMAGE_NAME=chatgpt-docker-puppeteer
@@ -87,7 +90,7 @@ LABEL org.opencontainers.image.title="${IMAGE_NAME}" \
     org.opencontainers.image.created="${BUILD_DATE}" \
     org.opencontainers.image.revision="${VCS_REF}" \
     org.opencontainers.image.environment="${BUILD_ENV}" \
-    org.opencontainers.image.description="DevContainer for ChatGPT Puppeteer Agent (DEV) — Canonical v1.0"
+    org.opencontainers.image.description="DevContainer for ChatGPT Puppeteer Agent (DEV) — Canonical v1.3.2"
 
 # ---------------------------------------------------------------------------
 # Build-time feedback (logs)
@@ -130,7 +133,10 @@ ENV XDG_CONFIG_HOME="${HOME_DIR}/.config" \
     XDG_CACHE_HOME="${HOME_DIR}/.cache" \
     XDG_DATA_HOME="${HOME_DIR}/.local/share" \
     XDG_STATE_HOME="${HOME_DIR}/.local/state" \
-    PUPPETEER_CACHE_DIR="${HOME_DIR}/.cache/puppeteer"
+    PUPPETEER_CACHE_DIR="${HOME_DIR}/.cache/puppeteer" \
+    PUPPETEER_SKIP_DOWNLOAD=true \
+    PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true \
+    PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
 
 # Hardening mínimo:
 # - Garante diretório de workspace
@@ -147,9 +153,17 @@ RUN mkdir -p "${APP_DIR}" \
 #   • libnss-wrapper requerido para Gatekeeper NSS (runtime)
 #   • openssh-client para compatibilidade com operações git/ssh (sem agent auto-start)
 # =============================================================================
-ENV DEBIAN_FRONTEND=noninteractive \
-    TZ=America/Sao_Paulo \
+ARG DEBIAN_FRONTEND=noninteractive
+ENV TZ=America/Sao_Paulo \
     LANGUAGE=pt_BR:pt:en
+
+# BuildKit apt-cache enablement. Docker's own cache-mount example removes
+# docker-clean and keeps downloaded packages, while the cache mount keeps them
+# outside the final layer. This must appear before the first apt install to be
+# effective for all apt-backed sections.
+RUN rm -f /etc/apt/apt.conf.d/docker-clean \
+    && printf '%s\n' 'Binary::apt::APT::Keep-Downloaded-Packages "true";' \
+    > /etc/apt/apt.conf.d/keep-cache
 
 RUN --mount=type=cache,id=apt-cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,id=apt-lib,target=/var/lib/apt,sharing=locked \
@@ -167,6 +181,34 @@ RUN --mount=type=cache,id=apt-cache,target=/var/cache/apt,sharing=locked \
 
 ENV LANG=pt_BR.UTF-8 \
     LC_MESSAGES=pt_BR.UTF-8
+
+# Canonical absolute NSS wrapper path.
+# Why:
+# - DevContainer/VS Code processes may inherit LD_PRELOAD before login shells
+#   load /etc/profile.d.
+# - A relative "libnss_wrapper.so" in LD_PRELOAD can produce ld.so preload
+#   warnings in non-login subprocesses.
+# - This symlink gives containerEnv/remoteEnv a stable, architecture-neutral path.
+RUN set -e; \
+    install -d -m 0755 /usr/local/lib/devcontainer; \
+    nss_lib=""; \
+    arch="$(uname -m 2>/dev/null || echo x86_64)"; \
+    if [ -f "/usr/lib/${arch}-linux-gnu/libnss_wrapper.so" ]; then \
+    nss_lib="/usr/lib/${arch}-linux-gnu/libnss_wrapper.so"; \
+    elif [ -f "/usr/lib/x86_64-linux-gnu/libnss_wrapper.so" ]; then \
+    nss_lib="/usr/lib/x86_64-linux-gnu/libnss_wrapper.so"; \
+    elif [ -f "/usr/lib/aarch64-linux-gnu/libnss_wrapper.so" ]; then \
+    nss_lib="/usr/lib/aarch64-linux-gnu/libnss_wrapper.so"; \
+    else \
+    nss_lib="$(ldconfig -p 2>/dev/null | awk '/libnss_wrapper\.so/{print $NF; exit}')"; \
+    fi; \
+    test -n "${nss_lib}"; \
+    test -f "${nss_lib}"; \
+    ln -sf "${nss_lib}" /usr/local/lib/devcontainer/libnss_wrapper.so; \
+    test -r /usr/local/lib/devcontainer/libnss_wrapper.so \
+    && printf '%s\n' "NSS wrapper canonical lib: $(readlink -f /usr/local/lib/devcontainer/libnss_wrapper.so 2>/dev/null || printf /usr/local/lib/devcontainer/libnss_wrapper.so)"
+
+ENV DEVCONTAINER_NSS_WRAPPER_LIB="/usr/local/lib/devcontainer/libnss_wrapper.so"
 
 
 # =============================================================================
@@ -216,6 +258,7 @@ ENV PATH="/usr/local/share/npm-global/bin:${HOME_DIR}/.npm-global/bin:${HOME_DIR
     NPM_CONFIG_AUDIT=false \
     NPM_CONFIG_FUND=false \
     NPM_CONFIG_LOGLEVEL=warn \
+    NPM_CONFIG_UPDATE_NOTIFIER=false \
     NPM_CONFIG_PREFIX="${HOME_DIR}/.npm-global"
 
 # Toolchain global canônico (CLI de container + parsing JSONC + TS/LSP)
@@ -233,7 +276,7 @@ RUN --mount=type=cache,id=npm-global-cache,target=/root/.npm,sharing=locked \
     npm@${NPM_VERSION} \
     pnpm@${PNPM_VERSION} \
     @devcontainers/cli@${DEVCONTAINER_CLI_VERSION} \
-    jsonc-parser@3.3.1 \
+    jsonc-parser@${JSONC_PARSER_VERSION} \
     typescript@${TYPESCRIPT_VERSION} \
     typescript-language-server@${TYPESCRIPT_LANGUAGE_SERVER_VERSION} \
     && ln -sf /usr/local/share/npm-global/bin/npm /usr/local/bin/npm \
@@ -322,6 +365,7 @@ RUN --mount=type=cache,id=apt-cache,target=/var/cache/apt,sharing=locked \
     fonts-liberation \
     fonts-noto-core \
     fonts-noto-ui-core \
+    fonts-noto-cjk \
     fonts-noto-color-emoji \
     fonts-jetbrains-mono \
     fonts-ipafont-gothic \
@@ -357,6 +401,7 @@ RUN --mount=type=cache,id=apt-cache,target=/var/cache/apt,sharing=locked \
     lsof \
     procps \
     psmisc \
+    util-linux \
     sysstat \
     curl \
     wget \
@@ -389,7 +434,6 @@ RUN --mount=type=cache,id=apt-cache,target=/var/cache/apt,sharing=locked \
     pass \
     age \
     graphviz \
-    yq \
     moreutils \
     watchman \
     hyperfine \
@@ -445,10 +489,21 @@ RUN set -e; \
     curl -fsSL --retry 5 --retry-delay 2 --retry-connrefused --retry-all-errors "https://github.com/hadolint/hadolint/releases/download/v${HADOLINT_VERSION}/hadolint-linux-${hadolint_arch}.sha256" -o /tmp/hadolint.sha256; \
     awk '{print $1 "  /tmp/hadolint"}' /tmp/hadolint.sha256 | sha256sum -c -; \
     install -m 0755 /tmp/hadolint /usr/local/bin/hadolint; \
-    rm -rf /tmp/gh.tgz /tmp/gh_checksums.txt "/tmp/gh_${GH_VERSION}_linux_${gh_arch}" /tmp/actionlint.tgz /tmp/actionlint_checksums.txt /tmp/actionlint /tmp/hadolint /tmp/hadolint.sha256; \
+    case "$arch" in amd64) yq_arch='amd64' ;; arm64) yq_arch='arm64' ;; *) echo "Unsupported architecture for yq: $arch" >&2; exit 1 ;; esac; \
+    yq_asset="yq_linux_${yq_arch}"; \
+    curl -fsSL --retry 5 --retry-delay 2 --retry-connrefused --retry-all-errors "https://github.com/mikefarah/yq/releases/download/v${YQ_VERSION}/${yq_asset}" -o /tmp/yq; \
+    curl -fsSL --retry 5 --retry-delay 2 --retry-connrefused --retry-all-errors "https://github.com/mikefarah/yq/releases/download/v${YQ_VERSION}/checksums" -o /tmp/yq_checksums.txt; \
+    curl -fsSL --retry 5 --retry-delay 2 --retry-connrefused --retry-all-errors "https://github.com/mikefarah/yq/releases/download/v${YQ_VERSION}/checksums_hashes_order" -o /tmp/yq_checksums_hashes_order.txt; \
+    yq_sha256_line="$(awk '{v=toupper($0); if(v=="SHA-256" || v=="SHA256"){print NR; exit}}' /tmp/yq_checksums_hashes_order.txt)"; \
+    test -n "${yq_sha256_line}"; \
+    yq_sha256_col="$((yq_sha256_line + 1))"; \
+    awk -v a="${yq_asset}" -v col="${yq_sha256_col}" 'BEGIN{found=0} ($1==a || $1=="./"a || $1 ~ "/"a"$"){if(col > NF || $col !~ /^[0-9a-fA-F]+$/) exit 2; print $col "  /tmp/yq"; found=1; exit} END{if(!found) exit 1}' /tmp/yq_checksums.txt | sha256sum -c -; \
+    install -m 0755 /tmp/yq /usr/local/bin/yq; \
+    rm -rf /tmp/gh.tgz /tmp/gh_checksums.txt "/tmp/gh_${GH_VERSION}_linux_${gh_arch}" /tmp/actionlint.tgz /tmp/actionlint_checksums.txt /tmp/actionlint /tmp/hadolint /tmp/hadolint.sha256 /tmp/yq /tmp/yq_checksums.txt /tmp/yq_checksums_hashes_order.txt; \
     gh --version | head -n 1; \
     actionlint -version; \
-    hadolint --version
+    hadolint --version; \
+    yq --version
 
 
 # =============================================================================
@@ -457,8 +512,10 @@ RUN set -e; \
 # Ferramentas modernas do ecossistema Rust/Go que não estão disponíveis nos
 # repositórios Debian Bookworm, ou estão em versões muito desatualizadas.
 #
-# Cada ferramenta é baixada do GitHub Releases com verificação de integridade
-# via HTTPS. Suporte a amd64 e arm64.
+# Cada ferramenta é baixada do GitHub Releases com pin explícito de versão
+# e smoke test. Alguns upstreams não publicam checksums padronizados para
+# todos os assets; quando não houver checksum oficial, a limitação é explícita
+# e deve ser compensada por revisão periódica/pinning em CI. Suporte a amd64 e arm64.
 #
 # Para atualizar: ajuste os ARGs DELTA_VERSION, ZOXIDE_VERSION, etc. no topo.
 # =============================================================================
@@ -590,14 +647,14 @@ RUN mkdir -p /etc/powershell \
 RUN cat > /etc/powershell/PowerShell.Contract.ps1 <<'EOF'
 # =============================================================================
 # PowerShell Contract — DevContainer
-# Version: 1.0
+# Version: 1.3.2
 #
 # Authority Model:
 #   • PowerShell  → Instrumental (subordinado)
 #   • Bash        → Canonical (autoridade)
 # =============================================================================
 
-$env:POWERSHELL_CONTRACT_VERSION = "1.0"
+$env:POWERSHELL_CONTRACT_VERSION = "1.3.2"
 $env:POWERSHELL_CONTRACT_LOADED  = "true"
 $env:POWERSHELL_ROLE             = "instrumental"
 $env:POWERSHELL_AUTHORITY        = "subordinate"
@@ -670,18 +727,24 @@ RUN --mount=type=cache,id=apt-cache,target=/var/cache/apt,sharing=locked \
 
 # Grupo docker — alinhamento defensivo com host (best-effort)
 RUN set -e; \
+    groupadd -f docker 2>/dev/null || true; \
     if [ -n "${DOCKER_GID:-}" ]; then \
     echo "→ DOCKER_GID fornecido: ${DOCKER_GID}"; \
-    if getent group docker >/dev/null 2>&1; then \
+    existing_group="$(getent group "${DOCKER_GID}" | cut -d: -f1 || true)"; \
+    if [ -n "${existing_group}" ]; then \
+    echo "→ GID ${DOCKER_GID} já pertence ao grupo ${existing_group}; adicionando usuário a esse grupo"; \
+    usermod -aG "${existing_group}" "${USER_NAME}" 2>/dev/null || true; \
+    elif getent group docker >/dev/null 2>&1; then \
     groupmod -g "${DOCKER_GID}" docker 2>/dev/null || true; \
+    usermod -aG docker "${USER_NAME}" 2>/dev/null || true; \
     else \
     groupadd -g "${DOCKER_GID}" docker 2>/dev/null || true; \
+    usermod -aG docker "${USER_NAME}" 2>/dev/null || true; \
     fi; \
     else \
     echo "→ DOCKER_GID não fornecido — garantindo grupo docker local"; \
-    groupadd -f docker 2>/dev/null || true; \
-    fi; \
     usermod -aG docker "${USER_NAME}" 2>/dev/null || true; \
+    fi; \
     true
 
 
@@ -695,7 +758,7 @@ RUN set -e; \
 RUN set -e; \
     echo ""; \
     echo "═══════════════════════════════════════════════════"; \
-    echo " Tool Validation Gate — DevContainer v1.0"; \
+    echo " Tool Validation Gate — DevContainer v1.3.2"; \
     echo "═══════════════════════════════════════════════════"; \
     _ok=0; _fail=0; _warn=0; \
     _check() { \
@@ -728,10 +791,12 @@ RUN set -e; \
     _check tree; _check ncdu; _check jo; _check entr; \
     echo "── Process & System ────────────────────────────────"; \
     _check htop; _check lsof; _check strace; _check dstat; \
-    _check inotifywait; _check ps; _check watch; \
+    _check inotifywait; _check ps; _check watch; _check flock; \
     echo "── Network & Debug ─────────────────────────────────"; \
     _check nc; _check nmap; _check tcpdump; _check mtr; \
-    _check socat; _check traceroute; _check dig; _check ip; \
+    _check socat; _check traceroute; _check dig; _check ip; _check certutil; \
+    echo "── Browser & Rendering ─────────────────────────────"; \
+    _check chromium; _check fc-match; \
     echo "── Code Quality ────────────────────────────────────"; \
     _check shellcheck; _check yamllint; _check cloc; \
     _check ccache; _check hyperfine; _check watchman; \
@@ -788,6 +853,7 @@ RUN mkdir -p \
     "${HOME_DIR}/.local/share/rag-index" \
     "${HOME_DIR}/.local/state" \
     "${HOME_DIR}/.local/bin" \
+    "${CODEX_HOME}" \
     "${HOME_DIR}/.npm" \
     "${HOME_DIR}/.npm-global" \
     "${HOME_DIR}/.pm2" \
@@ -814,12 +880,13 @@ RUN mkdir -p \
     "${HOME_DIR}/.ssh" \
     "${HOME_DIR}/.gnupg" \
     "${HOME_DIR}/.claude" \
+    "${CODEX_HOME}" \
     "/home/${USER_NAME}-history" \
     && touch "/home/${USER_NAME}-history/.bash_history" \
     && chown "${USER_NAME}:${USER_NAME}" "/home/${USER_NAME}-history/.bash_history" \
-    # .hushlogin: suprime MOTD em shells login+interativos (ex.: userEnvProbe loginInteractiveShell)
-    # Elimina: 50-motd-news (rede), 50-landscape-sysinfo (CPU/disco), 91-contract-ua-esm-status (rede)
-    # Mantém intactos todos os scripts de /etc/profile.d/ (runtime.sh, gatekeeper-nss.sh, etc.)
+    && : ".hushlogin: suprime MOTD em shells login+interativos (ex.: userEnvProbe loginInteractiveShell)" \
+    && : "Elimina MOTD de rede/CPU/disco sem tocar em /etc/profile.d" \
+    && : "Mantém intactos runtime.sh, gatekeeper-nss.sh e demais profile.d" \
     && touch "${HOME_DIR}/.hushlogin" \
     && chown "${USER_NAME}:${USER_NAME}" "${HOME_DIR}/.hushlogin" \
     && chmod 0644 "${HOME_DIR}/.hushlogin" \
@@ -828,15 +895,16 @@ RUN mkdir -p \
     && touch "${HOME_DIR}/.ssh/config" \
     && chmod 0600 "${HOME_DIR}/.ssh/config" \
     && chown "${USER_NAME}:${USER_NAME}" "${HOME_DIR}/.ssh/config" \
-    # Endurecimento adicional (sensíveis mas não secretos por si só)
+    && : "Endurecimento adicional: diretórios sensíveis mas não secretos por si só" \
     && chmod 0700 \
     "${HOME_DIR}/.copilot" \
     "${HOME_DIR}/.config/gh" \
     "${HOME_DIR}/.config/github-copilot" \
+    "${HOME_DIR}/.config/GitHub Copilot" \
     "${HOME_DIR}/.config/opencode" \
     "${HOME_DIR}/.claude" \
     "/home/${USER_NAME}-history" \
-    # Permissões relaxadas apenas em bits do usuário (não altera group/other)
+    && : "Permissões relaxadas apenas em bits do usuário; não altera group/other" \
     && chmod -R u+rwX \
     "${HOME_DIR}/.vscode-server" \
     "${HOME_DIR}/.cache" \
@@ -850,7 +918,7 @@ RUN mkdir -p \
 
 
 # =============================================================================
-# SECTION 8.5 — ENV DEFAULTS (DOCUMENTAÇÃO / SAFE DEFAULTS DEV) — v1.0
+# SECTION 8.5 — ENV DEFAULTS (DOCUMENTAÇÃO / SAFE DEFAULTS DEV) — v1.3.2
 #
 # Hierarquia prática (maior prioridade -> menor):
 #   1) devcontainer.json: remoteEnv (processos geridos pelo VS Code)
@@ -908,7 +976,7 @@ ENV PUPPETEER_LOCAL_LAUNCH_DISABLED=true \
     MOCK_CHROME=0 \
     ENABLE_STATE_FILE=true
 
-# CHROME PROXY SERVICE (v1.0)
+# CHROME PROXY SERVICE (v1.3.2)
 ENV WS_IDLE_TIMEOUT_MS=300000 \
     ALLOWED_ORIGINS="http://localhost:3008,http://127.0.0.1:3008"
 
@@ -920,7 +988,7 @@ ENV UV_THREADPOOL_SIZE=16
 
 
 # =============================================================================
-# SECTION 9 — SHELL CONTRACT + GATEKEEPER NSS + UX BASELINE + HANDOFF (v1.0)
+# SECTION 9 — SHELL CONTRACT + GATEKEEPER NSS + UX BASELINE + HANDOFF (v1.3.2)
 #
 # Objetivos:
 #   [A] Infra: bash-completion + dumb-init (entrypoint)
@@ -932,6 +1000,24 @@ ENV UV_THREADPOOL_SIZE=16
 # NOTA SOBRE /etc/profile.d:
 #   Scripts aqui precisam ser POSIX-safe sempre que possível, pois podem ser
 #   “sourceados” em diferentes shells via /etc/profile.
+#
+# REGRA CANÔNICA NSS:
+#   LD_PRELOAD nunca deve conter "libnss_wrapper.so" relativo.
+#   O valor canônico é definido em SECTION 2:
+#     /usr/local/lib/devcontainer/libnss_wrapper.so
+#
+#   Motivo:
+#   - VS Code/DevContainer pode executar processos não-login antes de profile.d.
+#   - LD_PRELOAD relativo gera avisos ld.so e comportamento instável:
+#       ERROR: ld.so: object 'libnss_wrapper.so' ... cannot be preloaded
+#   - O caminho canônico é estável e independe do multiarch real da distro.
+#
+# Camadas de defesa:
+#   1. SECTION 2 cria DEVCONTAINER_NSS_WRAPPER_LIB e symlink canônico.
+#   2. devcontainer.json deve exportar LD_PRELOAD com esse caminho absoluto.
+#   3. nss-gatekeeper canonicaliza no ENTRYPOINT antes do comando real.
+#   4. profile.d canonicaliza novamente em shells login/interativos.
+#   5. post-start/post-attach auditam o estado em runtime.
 # =============================================================================
 
 # [A] PRÉ-REQUISITOS
@@ -942,11 +1028,13 @@ RUN --mount=type=cache,id=apt-cache,target=/var/cache/apt,sharing=locked \
     bash-completion \
     dumb-init
 
+RUN command -v dumb-init >/dev/null 2>&1
+
 # [B] CONTRATO CANÔNICO RUNTIME (GLOBAL, READ-ONLY)
 RUN mkdir -p /etc/profile.d \
     && printf '%s\n' \
     '# Canonical Runtime Shell Contract' \
-    '# Version: 1.0' \
+    '# Version: 1.3.2' \
     '# Declarative only — no logic, no side effects' \
     '# AI-AWARE CONTRACT (Semantic Hints Only)' \
     '' \
@@ -978,79 +1066,454 @@ RUN mkdir -p /etc/profile.d \
     && chmod 0444 /etc/profile.d/00-runtime.sh
 
 # [C] GATEKEEPER NSS (GLOBAL, FAIL-SAFE, POSIX-SAFE)
+#
+# Responsabilidades:
+#   - Resolver libnss_wrapper.so para caminho absoluto canônico.
+#   - Canonicalizar LD_PRELOAD mesmo quando artefatos runtime ainda não existem.
+#   - Ativar NSS wrapper com artefatos runtime quando existirem.
+#   - Usar /etc/passwd e /etc/group como fallback estável quando os artefatos
+#     ainda não foram criados/refinados.
+#   - Remover tokens antigos/relativos de LD_PRELOAD.
+#   - Preservar outros tokens LD_PRELOAD legítimos.
+#
+# POSIX-sh compatible:
+#   - Não usa arrays.
+#   - Não usa [[ ]].
+#   - Deve poder ser sourceado por /etc/profile.
 RUN cat > /etc/profile.d/10-gatekeeper-nss.sh <<'EOF'
 # DevContainer Gatekeeper — NSS Wrapper
-# Version: 1.0
+# Version: 1.3.2
 # Scope: Universal (all shells)
 # Mutability: READ-ONLY (Image-level)
-# Behavior: Fail-safe; activates only if artifacts exist and library is present.
+# Behavior: Fail-safe; canonicalizes LD_PRELOAD and binds NSS to valid files.
 #
 # POSIX-sh compatible (no [[ ]], no arrays).
 
-# Bypass explícito
+# Bypass explícito.
 if [ -n "${DEVCONTAINER_SKIP_NSS:-}" ]; then
   return 0 2>/dev/null || exit 0
 fi
 
-# Opcional: restringir a interativo
-# case "$-" in *i*) ;; *) return 0 2>/dev/null || exit 0 ;; esac
-
-# Artefatos canônicos (seed fallback no entrypoint; post-create pode refinar)
 NSS_BASE_DIR="${DEVCONTAINER_NSS_DIR:-/tmp/devcontainer-nss}"
 PASSWD_FILE="${NSS_BASE_DIR}/passwd"
 GROUP_FILE="${NSS_BASE_DIR}/group"
 
-# Diretório best-effort (nunca fatal)
+# Diretório best-effort; nunca fatal.
 mkdir -p "${NSS_BASE_DIR}" 2>/dev/null || true
 chmod 700 "${NSS_BASE_DIR}" 2>/dev/null || true
 
-# Só ativa se artefatos existirem e não estiverem vazios
-if [ ! -s "${PASSWD_FILE}" ] || [ ! -s "${GROUP_FILE}" ]; then
-  return 0 2>/dev/null || exit 0
-fi
-
-ARCH="$(uname -m 2>/dev/null || echo x86_64)"
+# Resolve canonical absolute NSS wrapper path.
 NSS_LIB=""
 
-# Paths conhecidos (Debian/Ubuntu multiarch)
-if [ -f "/usr/lib/${ARCH}-linux-gnu/libnss_wrapper.so" ]; then
-  NSS_LIB="/usr/lib/${ARCH}-linux-gnu/libnss_wrapper.so"
-elif [ -f "/usr/lib/x86_64-linux-gnu/libnss_wrapper.so" ]; then
-  NSS_LIB="/usr/lib/x86_64-linux-gnu/libnss_wrapper.so"
-elif command -v ldconfig >/dev/null 2>&1 && ldconfig -p 2>/dev/null | grep -q "libnss_wrapper\.so"; then
-  NSS_LIB="libnss_wrapper.so"
+if [ -n "${DEVCONTAINER_NSS_WRAPPER_LIB:-}" ] && [ -r "${DEVCONTAINER_NSS_WRAPPER_LIB}" ]; then
+  NSS_LIB="${DEVCONTAINER_NSS_WRAPPER_LIB}"
+elif [ -r "/usr/local/lib/devcontainer/libnss_wrapper.so" ]; then
+  NSS_LIB="/usr/local/lib/devcontainer/libnss_wrapper.so"
 else
+  ARCH="$(uname -m 2>/dev/null || echo x86_64)"
+
+  if [ -r "/usr/lib/${ARCH}-linux-gnu/libnss_wrapper.so" ]; then
+    NSS_LIB="/usr/lib/${ARCH}-linux-gnu/libnss_wrapper.so"
+  elif [ -r "/usr/lib/x86_64-linux-gnu/libnss_wrapper.so" ]; then
+    NSS_LIB="/usr/lib/x86_64-linux-gnu/libnss_wrapper.so"
+  elif [ -r "/usr/lib/aarch64-linux-gnu/libnss_wrapper.so" ]; then
+    NSS_LIB="/usr/lib/aarch64-linux-gnu/libnss_wrapper.so"
+  elif command -v ldconfig >/dev/null 2>&1; then
+    NSS_LIB="$(ldconfig -p 2>/dev/null | awk '/libnss_wrapper\.so/{print $NF; exit}')"
+  fi
+fi
+
+if [ -z "${NSS_LIB}" ] || [ ! -r "${NSS_LIB}" ]; then
   return 0 2>/dev/null || exit 0
 fi
 
-export NSS_WRAPPER_PASSWD="${PASSWD_FILE}"
-export NSS_WRAPPER_GROUP="${GROUP_FILE}"
+export DEVCONTAINER_NSS_WRAPPER_LIB="${NSS_LIB}"
+export DEVCONTAINER_NSS_DIR="${NSS_BASE_DIR}"
 
-# Evitar duplicação em LD_PRELOAD
-case ":${LD_PRELOAD:-}:" in
-  *":${NSS_LIB}:"*|*":libnss_wrapper.so:"*) : ;;
-  *) export LD_PRELOAD="${NSS_LIB}${LD_PRELOAD:+:$LD_PRELOAD}" ;;
-esac
+# Bind NSS wrapper to valid files.
+# Prefer runtime artifacts; otherwise use stable system files.
+if [ -s "${PASSWD_FILE}" ] && [ -s "${GROUP_FILE}" ]; then
+  export NSS_WRAPPER_PASSWD="${PASSWD_FILE}"
+  export NSS_WRAPPER_GROUP="${GROUP_FILE}"
+elif [ -s "${NSS_WRAPPER_PASSWD:-}" ] && [ -s "${NSS_WRAPPER_GROUP:-}" ]; then
+  : # inherited bindings are valid; keep them
+elif [ -s /etc/passwd ] && [ -s /etc/group ]; then
+  export NSS_WRAPPER_PASSWD="/etc/passwd"
+  export NSS_WRAPPER_GROUP="/etc/group"
+else
+  unset NSS_WRAPPER_PASSWD 2>/dev/null || true
+  unset NSS_WRAPPER_GROUP 2>/dev/null || true
+fi
 
-# Debug opt-in (stderr)
+# Canonicalize LD_PRELOAD:
+#   - remove qualquer token libnss_wrapper.so antigo, relativo ou absoluto;
+#   - preserva outros tokens legítimos;
+#   - prepende o caminho absoluto canônico.
+__dc_old_preload="${LD_PRELOAD:-}"
+__dc_new_preload=""
+
+__dc_ifs_save="${IFS}"
+IFS=":"
+for __dc_token in ${__dc_old_preload}; do
+  [ -z "${__dc_token}" ] && continue
+
+  case "${__dc_token}" in
+    libnss_wrapper.so|*/libnss_wrapper.so)
+      continue
+      ;;
+  esac
+
+  if [ -z "${__dc_new_preload}" ]; then
+    __dc_new_preload="${__dc_token}"
+  else
+    __dc_new_preload="${__dc_new_preload}:${__dc_token}"
+  fi
+done
+IFS="${__dc_ifs_save}"
+
+if [ -n "${__dc_new_preload}" ]; then
+  export LD_PRELOAD="${NSS_LIB}:${__dc_new_preload}"
+else
+  export LD_PRELOAD="${NSS_LIB}"
+fi
+
+unset __dc_old_preload __dc_new_preload __dc_token __dc_ifs_save
+
+# Debug opt-in (stderr).
 if [ -n "${DEVCONTAINER_NSS_DEBUG:-}" ]; then
   CURRENT_UID="$(id -u 2>/dev/null || echo unknown)"
-  echo "[gatekeeper] NSS active (UID=${CURRENT_UID}, preload=${NSS_LIB})" >&2
+  echo "[gatekeeper] NSS env canonicalized (UID=${CURRENT_UID}, preload=${NSS_LIB}, passwd=${NSS_WRAPPER_PASSWD:-<unset>}, group=${NSS_WRAPPER_GROUP:-<unset>})" >&2
 fi
 
 return 0 2>/dev/null || exit 0
 EOF
 
-RUN chmod 0444 /etc/profile.d/10-gatekeeper-nss.sh
+RUN chmod 0444 /etc/profile.d/10-gatekeeper-nss.sh \
+    && bash -n /etc/profile.d/10-gatekeeper-nss.sh
 
-# Wrapper de entrypoint (arquivo fornecido pelo projeto)
-# - Este script deve ser POSIX-safe e idempotente.
-# - Ele pode ativar o ambiente NSS wrapper antes de executar o comando final.
+# Wrapper de entrypoint canônico fornecido pelo projeto.
+# - Mantém .devcontainer/nss-gatekeeper.sh como fonte auditável no repositório.
+# - O script deve ser a versão canônica v2.x: idempotente, fail-safe e capaz de
+#   remover tokens LD_PRELOAD relativos antes do comando real.
+# - O profile.d acima segue como segunda camada para shells login/interativos.
 COPY --chmod=0755 .devcontainer/nss-gatekeeper.sh /usr/local/bin/nss-gatekeeper
 
-# Healthcheck e utilitário de JSONC (image-level, independentes do workspace)
-COPY --chmod=0755 .devcontainer/scripts/healthcheck.sh /usr/local/bin/devcontainer-healthcheck.sh
-COPY --chmod=0755 .devcontainer/scripts/jsonc-validate.cjs /usr/local/bin/jsonc-validate
+# Normalize repository-controlled shell script copied from possibly Windows-touched
+# worktrees. This makes the image resilient even if Git checkout/autocrlf regresses.
+RUN sed -i 's/\r$//' /usr/local/bin/nss-gatekeeper \
+    && chmod 0755 /usr/local/bin/nss-gatekeeper \
+    && bash -n /usr/local/bin/nss-gatekeeper
+
+# Healthcheck e utilitário de JSONC (image-level, independentes do workspace).
+RUN cat > /usr/local/bin/devcontainer-healthcheck.sh <<'EOF'
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+command -v node >/dev/null 2>&1
+command -v npm >/dev/null 2>&1
+command -v bash >/dev/null 2>&1
+command -v dumb-init >/dev/null 2>&1
+
+node --version >/dev/null
+npm --version >/dev/null
+
+uid="$(id -u)"
+getent passwd "${uid}" >/dev/null 2>&1 || getent passwd "$(id -un 2>/dev/null || true)" >/dev/null 2>&1
+
+if [ -n "${LD_PRELOAD:-}" ]; then
+  old_ifs="${IFS}"
+  IFS=":"
+  for token in ${LD_PRELOAD}; do
+    [ -z "${token}" ] && continue
+    case "${token}" in
+      libnss_wrapper.so)
+        exit 1
+        ;;
+      */libnss_wrapper.so)
+        [ -r "${token}" ] || exit 1
+        ;;
+      */*)
+        # Other absolute/path-like preloads must be readable.
+        [ -r "${token}" ] || exit 1
+        ;;
+      *)
+        # Non-NSS bare library names may be valid via the dynamic loader path.
+        :
+        ;;
+    esac
+  done
+  IFS="${old_ifs}"
+fi
+
+[ -d "${HOME:-/home/node}" ]
+exit 0
+EOF
+
+RUN cat > /usr/local/bin/jsonc-validate <<'EOF'
+#!/usr/bin/env node
+'use strict';
+
+/**
+ * jsonc-validate — DevContainer JSONC validation utility.
+ *
+ * Canonical version: 1.3.2
+ *
+ * Purpose:
+ *   Validate JSON and JSON-with-comments files during local development,
+ *   post-create diagnostics, and CI-like checks inside this DevContainer image.
+ *
+ * Design constraints:
+ *   - No network access.
+ *   - No project-local dependency resolution requirement.
+ *   - Prefer the image-level `jsonc-parser` installed in the canonical npm prefix.
+ *   - Return machine-friendly exit codes while keeping human-readable output.
+ *
+ * Exit codes:
+ *   0 — all files parsed successfully.
+ *   1 — one or more files exist but contain JSONC syntax errors.
+ *   2 — invocation, dependency, or read error.
+ *
+ * @file DevContainer JSONC validator.
+ * @license Internal-DevContainer-Contract
+ */
+
+const fs = require('node:fs');
+const path = require('node:path');
+
+const VERSION = '1.3.2';
+
+/**
+ * Converts an unknown thrown value into a readable string.
+ *
+ * @param {unknown} error - Any thrown JavaScript value.
+ * @returns {string} Human-readable error message.
+ */
+function formatUnknownError(error) {
+  if (error && typeof error === 'object' && 'message' in error) {
+    return String(error.message);
+  }
+  return String(error);
+}
+
+/**
+ * Loads jsonc-parser from deterministic locations.
+ *
+ * Resolution order:
+ *   1. JSONC_PARSER_MODULE_PATH, when supplied by Dockerfile/devcontainer.json.
+ *   2. Canonical image npm prefix.
+ *   3. Node's normal module resolution, as a final fallback.
+ *
+ * @returns {{parse: Function, printParseErrorCode?: Function, getLocation?: Function}}
+ *   The loaded jsonc-parser module subset used by this utility.
+ */
+function loadJsoncParser() {
+  const candidates = [
+    process.env.JSONC_PARSER_MODULE_PATH,
+    '/usr/local/share/npm-global/lib/node_modules/jsonc-parser',
+    'jsonc-parser',
+  ].filter(Boolean);
+
+  const errors = [];
+  for (const candidate of candidates) {
+    try {
+      return require(candidate);
+    } catch (error) {
+      errors.push(`${candidate}: ${formatUnknownError(error)}`);
+    }
+  }
+
+  console.error('jsonc-validate: não foi possível carregar jsonc-parser.');
+  for (const error of errors) console.error(`  - ${error}`);
+  process.exit(2);
+}
+
+/**
+ * Prints command usage.
+ *
+ * @returns {void}
+ */
+function printUsage() {
+  console.error('Uso: jsonc-validate <arquivo.jsonc|arquivo.json> [...]');
+  console.error('     jsonc-validate --help');
+  console.error('     jsonc-validate --version');
+}
+
+/**
+ * Resolves a user-supplied file argument against the current working directory.
+ *
+ * @param {string} file - CLI file argument.
+ * @returns {string} Absolute path used for reading.
+ */
+function resolveInputPath(file) {
+  return path.resolve(process.cwd(), file);
+}
+
+/**
+ * Formats a parse error location.
+ *
+ * jsonc-parser offsets are byte/UTF-16 positions into the source text. When
+ * available, `getLocation()` provides zero-based line/column coordinates. This
+ * helper converts those coordinates to one-based values for human diagnostics.
+ *
+ * @param {string} text - Full file text.
+ * @param {number} offset - Parser error offset.
+ * @param {Function|undefined} getLocation - Optional jsonc-parser getLocation.
+ * @returns {string} `line:column` when possible, otherwise `offset:<n>`.
+ */
+function formatLocation(text, offset, getLocation) {
+  if (typeof getLocation === 'function') {
+    try {
+      const location = getLocation(text, offset);
+      if (location && Number.isInteger(location.line) && Number.isInteger(location.column)) {
+        return `${location.line + 1}:${location.column + 1}`;
+      }
+    } catch (_) {
+      // Fall through to offset fallback.
+    }
+  }
+  return `offset:${offset}`;
+}
+
+/**
+ * Validates one JSON/JSONC file.
+ *
+ * @param {string} file - Original CLI file argument, preserved for output.
+ * @param {{parse: Function, printParseErrorCode?: Function, getLocation?: Function}} parser
+ *   Loaded jsonc-parser module subset.
+ * @returns {0|1|2} Validation status for the single file.
+ */
+function validateFile(file, parser) {
+  const absolute = resolveInputPath(file);
+  const errors = [];
+  let text;
+
+  try {
+    text = fs.readFileSync(absolute, 'utf8');
+  } catch (error) {
+    console.error(`${file}: erro de leitura: ${formatUnknownError(error)}`);
+    return 2;
+  }
+
+  parser.parse(text, errors, {
+    allowTrailingComma: true,
+    disallowComments: false,
+  });
+
+  if (errors.length === 0) {
+    console.log(`${file}: OK`);
+    return 0;
+  }
+
+  for (const error of errors) {
+    const code = typeof parser.printParseErrorCode === 'function'
+      ? parser.printParseErrorCode(error.error)
+      : String(error.error);
+    const location = formatLocation(text, error.offset, parser.getLocation);
+    console.error(`${file}:${location}: ${code}`);
+  }
+
+  return 1;
+}
+
+/**
+ * Main CLI entry point.
+ *
+ * @param {string[]} argv - CLI arguments excluding node and script path.
+ * @returns {number} Process exit code.
+ */
+function main(argv) {
+  if (argv.includes('--version')) {
+    console.log(`jsonc-validate ${VERSION}`);
+    return 0;
+  }
+
+  if (argv.includes('--help') || argv.length === 0) {
+    printUsage();
+    return argv.length === 0 ? 2 : 0;
+  }
+
+  const files = argv.filter((arg) => !arg.startsWith('--'));
+  if (files.length !== argv.length) {
+    console.error('jsonc-validate: opção desconhecida.');
+    printUsage();
+    return 2;
+  }
+
+  const parser = loadJsoncParser();
+  let finalStatus = 0;
+
+  for (const file of files) {
+    const status = validateFile(file, parser);
+    if (status === 2) finalStatus = 2;
+    else if (status === 1 && finalStatus === 0) finalStatus = 1;
+  }
+
+  return finalStatus;
+}
+
+process.exit(main(process.argv.slice(2)));
+EOF
+
+RUN chmod 0755 /usr/local/bin/nss-gatekeeper \
+    /usr/local/bin/devcontainer-healthcheck.sh \
+    /usr/local/bin/jsonc-validate \
+    \
+    && echo "→ Cleaning any stale build-time NSS artifacts before validation..." \
+    && rm -rf /tmp/devcontainer-nss /tmp/devcontainer-nss-buildcheck \
+    \
+    && echo "→ Validating nss-gatekeeper syntax..." \
+    && bash -n /usr/local/bin/nss-gatekeeper \
+    \
+    && echo "→ Validating generated healthcheck syntax..." \
+    && bash -n /usr/local/bin/devcontainer-healthcheck.sh \
+    \
+    && echo "→ Validating jsonc-validate syntax/runtime..." \
+    && node --check /usr/local/bin/jsonc-validate \
+    && /usr/local/bin/jsonc-validate --version \
+    \
+    && echo "→ Validating executable bits..." \
+    && test -x /usr/local/bin/nss-gatekeeper \
+    && test -x /usr/local/bin/devcontainer-healthcheck.sh \
+    && test -x /usr/local/bin/jsonc-validate \
+    \
+    && echo "→ Validating canonical NSS wrapper library..." \
+    && test -n "${DEVCONTAINER_NSS_WRAPPER_LIB}" \
+    && test -r "${DEVCONTAINER_NSS_WRAPPER_LIB}" \
+    && test -r /usr/local/lib/devcontainer/libnss_wrapper.so \
+    \
+    && echo "→ Validating nss-gatekeeper semantic markers..." \
+    && grep -q 'DEVCONTAINER_NSS_WRAPPER_LIB' /usr/local/bin/nss-gatekeeper \
+    && grep -q 'LD_PRELOAD' /usr/local/bin/nss-gatekeeper \
+    && grep -q 'NSS_WRAPPER_PASSWD' /usr/local/bin/nss-gatekeeper \
+    && grep -q 'NSS_WRAPPER_GROUP' /usr/local/bin/nss-gatekeeper \
+    \
+    && echo "→ Validating profile.d NSS canonicalization behavior..." \
+    && env \
+    DEVCONTAINER_NSS_WRAPPER_LIB="${DEVCONTAINER_NSS_WRAPPER_LIB}" \
+    DEVCONTAINER_NSS_DIR=/tmp/devcontainer-nss-buildcheck \
+    NSS_WRAPPER_PASSWD=/etc/passwd \
+    NSS_WRAPPER_GROUP=/etc/group \
+    bash -lc 'export LD_PRELOAD="libnss_wrapper.so"; \
+    . /etc/profile.d/10-gatekeeper-nss.sh; \
+    test "${DEVCONTAINER_NSS_WRAPPER_LIB}" = "/usr/local/lib/devcontainer/libnss_wrapper.so"; \
+    test "${LD_PRELOAD}" = "/usr/local/lib/devcontainer/libnss_wrapper.so"; \
+    test "${NSS_WRAPPER_PASSWD}" = "/etc/passwd"; \
+    test "${NSS_WRAPPER_GROUP}" = "/etc/group"' \
+    \
+    && echo "→ Validating nss-gatekeeper execution smoke test in isolated NSS dir..." \
+    && env \
+    DEVCONTAINER_NSS_DIR=/tmp/devcontainer-nss-buildcheck \
+    DEVCONTAINER_NSS_WRAPPER_LIB="${DEVCONTAINER_NSS_WRAPPER_LIB}" \
+    LD_PRELOAD="${DEVCONTAINER_NSS_WRAPPER_LIB}" \
+    NSS_WRAPPER_PASSWD=/etc/passwd \
+    NSS_WRAPPER_GROUP=/etc/group \
+    /usr/local/bin/nss-gatekeeper true \
+    \
+    && echo "→ Verifying default runtime NSS dir was not created during build checks..." \
+    && test ! -e /tmp/devcontainer-nss \
+    \
+    && echo "→ Removing build-time NSS artifacts from final image..." \
+    && rm -rf /tmp/devcontainer-nss /tmp/devcontainer-nss-buildcheck
 
 # Healthcheck nativo da imagem — advisory para runtime DevContainer.
 # Mantém start gracioso via start-period generoso e delega a lógica ao script canônico.
@@ -1060,12 +1523,12 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=90s --retries=3 \
 # [D] UX BASELINE (GLOBAL, READ-ONLY, INTERACTIVE-ONLY, POSIX-SAFE)
 RUN cat > /etc/profile.d/20-devcontainer-ux.sh <<'EOF'
 # DevContainer UX Contract
-# Version: 1.0
+# Version: 1.3.2
 # Scope: Interactive shells only
 # Mutability: READ-ONLY (Image-level)
 
 # Nunca afeta shells não-interativos
-case "$-" in *i*) ;; *) return 0 ;; esac
+case "$-" in *i*) ;; *) return 0 2>/dev/null || exit 0 ;; esac
 
 __dc_parse_git_branch() {
   command -v git >/dev/null 2>&1 || return 0
@@ -1073,7 +1536,12 @@ __dc_parse_git_branch() {
   git branch 2>/dev/null | sed -n 's/^\* \(.*\)$/ (\1)/p'
 }
 
-# Prompt informativo (compatível com bash; em sh apenas “degrada” visualmente)
+# Prompt informativo.
+# Observação:
+#   A sintaxe \[...\] é específica do bash. Como o contrato canônico do
+#   DevContainer é bash, isso é intencional para terminais bash. Em shells
+#   POSIX genéricos, o script só é carregado se interativo e tende a degradar
+#   visualmente sem afetar automação.
 export PS1="\n\[\033[01;30m\][\t]\[\033[00m\] \
 \[\033[01;32m\]➜ \[\033[00m\]\
 \[\033[01;34m\]\w\[\033[00m\]\
@@ -1088,7 +1556,7 @@ export HISTSIZE=10000
 export HISTFILESIZE=20000
 export HISTTIMEFORMAT="%F %T "
 
-# Autocomplete (se disponível)
+# Autocomplete — apenas se disponível.
 if [ -f /usr/share/bash-completion/bash_completion ]; then
   . /usr/share/bash-completion/bash_completion
 fi
@@ -1096,9 +1564,8 @@ EOF
 
 RUN chmod 0444 /etc/profile.d/20-devcontainer-ux.sh
 
-
 # =============================================================================
-# SECTION 9.6 — BASH HARDENING (.bashrc persistent overrides) — v1.0
+# SECTION 9.6 — BASH HARDENING (.bashrc persistent overrides) — v1.3.2
 #
 # Problema: ~/.bashrc vem da base image (node) e define HISTSIZE=1000.
 # Em login shells (ordem: profile.d → .profile → .bashrc), o .bashrc do
@@ -1116,7 +1583,7 @@ RUN chmod 0444 /etc/profile.d/20-devcontainer-ux.sh
 # =============================================================================
 RUN cat >> "${HOME_DIR}/.bashrc" <<'BASH_HARDENING'
 
-# === DevContainer bash hardening (v1.0 — appended by Dockerfile) ===
+# === DevContainer bash hardening (v1.3.2 — appended by Dockerfile) ===
 # Applied last in .bashrc → these always win over profile.d (20-devcontainer-ux.sh)
 # and the base-image defaults. Do NOT remove — needed for DevContainer stability.
 HISTSIZE=10000
@@ -1143,7 +1610,7 @@ ENTRYPOINT ["dumb-init", "--", "/usr/local/bin/nss-gatekeeper"]
 CMD ["sleep", "infinity"]
 
 # =============================================================================
-# FINAL NOTES (v1.0)
+# FINAL NOTES (v1.3.2)
 #   - dockerd NÃO é instalado
 #   - Docker CLI opera via socket do host (bind mount)
 #   - NSS wrapper é ativado em runtime pelo entrypoint/profile e refinado pelos hooks

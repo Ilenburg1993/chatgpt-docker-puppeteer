@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # =============================================================================
-# post-start.sh — DevContainer Start Hook (Fail-Safe + Smart GitHub API Route)
-# Version: v2.2.0
+# post-start.sh — DevContainer Start Hook (Fail-Safe Orchestrator)
+# Version: v2.5.0
 #
 # Contract:
 # - Never blocks DevContainer start/attach indefinitely.
@@ -9,15 +9,16 @@
 # - Always exits 0.
 # - No destructive structural mutations: no recursive chown, no mount rewrites.
 # - Only bounded, reversible runtime-network mutations are allowed:
-#     * /etc/resolv.conf rewrite, when enabled.
-#     * managed /etc/hosts block for api.github.com, when a validated route exists.
+#     * /etc/resolv.conf content rewrite, when enabled, preserving file inode.
+#     * delegated managed /etc/hosts block for api.github.com via:
+#       .devcontainer/scripts/network/github-api-route-fix.sh
 #
 # Purpose:
-# - Preserve the lightweight diagnostics from v1.1.
-# - Repair a specific route/DNS failure mode where api.github.com resolves to an
-#   unreachable edge IP from the current ISP/route.
-# - Select an API IP by semantic validation, not merely by TCP reachability.
+# - Keep post-start.sh as a small fail-safe orchestrator.
+# - Preserve lightweight diagnostics from v1.1/v2.2.
+# - Delegate Smart GitHub API Route selection to a dedicated subscript.
 # - Keep Copilot/VS Code diagnostics readable and actionable.
+# - Canonicalize NSS/LD_PRELOAD for hook subprocesses even when inherited env is stale.
 # =============================================================================
 
 # Maximum fail-safe posture. This script must tolerate strict parent shells,
@@ -31,7 +32,8 @@ trap - ERR EXIT INT TERM 2> /dev/null || true
 # Constants / config
 # -----------------------------------------------------------------------------
 readonly SCRIPT_NAME="post-start.sh"
-readonly SCRIPT_VERSION="2.2.0"
+readonly SCRIPT_VERSION="2.5.0"
+
 if SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2> /dev/null && pwd -P 2> /dev/null)"; then
     :
 else
@@ -41,11 +43,17 @@ readonly SCRIPT_DIR
 
 readonly HEALTH_STATUS_FILE="${DEVCONTAINER_HEALTH_STATUS_FILE:-/tmp/devcontainer-health.status}"
 readonly NETWORK_STATUS_FILE="${DEVCONTAINER_NETWORK_STATUS_FILE:-/tmp/devcontainer-network.status}"
+readonly HEALTH_ERROR_LOG="${DEVCONTAINER_HEALTH_ERROR_LOG:-${HEALTH_STATUS_FILE}.error.log}"
 readonly GITHUB_ROUTE_REPORT_FILE="${DEVCONTAINER_GITHUB_ROUTE_REPORT_FILE:-/tmp/devcontainer-github-api-route.report}"
+readonly DIAGNOSTICS_STATUS_FILE="${DEVCONTAINER_DIAGNOSTICS_STATUS_FILE:-/tmp/devcontainer-diagnostics.status}"
 
 readonly MAKE_INFO_TIMEOUT_SECONDS="${DEVCONTAINER_MAKE_TIMEOUT:-10}"
 readonly ENABLE_SSHD_CHECK="${DEVCONTAINER_ENABLE_SSHD_CHECK:-false}"
+readonly SSH_AUDIT_MODE="${DEVCONTAINER_SSH_AUDIT_MODE:-auto}"
 readonly NSS_BASE_DIR="${DEVCONTAINER_NSS_DIR:-/tmp/devcontainer-nss}"
+readonly NSS_TARGET_USER_OVERRIDE="${DEVCONTAINER_NSS_TARGET_USER:-}"
+readonly NSS_TARGET_HOME_OVERRIDE="${DEVCONTAINER_NSS_TARGET_HOME:-}"
+readonly NSS_WRAPPER_LIB_CANONICAL="${DEVCONTAINER_NSS_WRAPPER_LIB:-/usr/local/lib/devcontainer/libnss_wrapper.so}"
 
 readonly ENABLE_DNS_FIX="${DEVCONTAINER_ENABLE_DNS_FIX:-true}"
 readonly DNS_FIX_SERVERS="${DEVCONTAINER_DNS_FIX_SERVERS:-1.1.1.1 8.8.8.8}"
@@ -53,53 +61,29 @@ readonly DNS_FIX_OPTIONS="${DEVCONTAINER_DNS_FIX_OPTIONS:-timeout:1 attempts:2 r
 
 readonly ENABLE_GITHUB_API_ROUTE_FIX="${DEVCONTAINER_ENABLE_GITHUB_API_ROUTE_FIX:-true}"
 readonly GITHUB_API_HOST="${DEVCONTAINER_GITHUB_API_HOST:-api.github.com}"
-readonly GITHUB_API_ROUTE_CONNECT_TIMEOUT="${DEVCONTAINER_GITHUB_API_ROUTE_CONNECT_TIMEOUT:-3}"
-readonly GITHUB_API_ROUTE_MAX_TIME="${DEVCONTAINER_GITHUB_API_ROUTE_MAX_TIME:-7}"
-readonly GITHUB_API_MIN_SCORE="${DEVCONTAINER_GITHUB_API_MIN_SCORE:-85}"
-readonly GITHUB_API_MAX_CANDIDATES="${DEVCONTAINER_GITHUB_API_MAX_CANDIDATES:-16}"
+readonly GITHUB_API_ROUTE_SCRIPT="${DEVCONTAINER_GITHUB_API_ROUTE_SCRIPT:-${SCRIPT_DIR}/network/github-api-route-fix.sh}"
 
-# Resolvers used only for candidate discovery. They do not replace /etc/resolv.conf.
-# 185.228.* returned valid 140.82.* candidates in the observed environment.
-readonly GITHUB_API_RESOLVERS="${DEVCONTAINER_GITHUB_API_RESOLVERS:-185.228.168.9 185.228.169.9 1.1.1.1 1.0.0.1 8.8.8.8 8.8.4.4 9.9.9.9 149.112.112.112 208.67.222.222 208.67.220.220 76.76.2.0 76.76.10.0 94.140.14.14 94.140.15.15}"
-
-# Seed candidates are not trusted. They are only probed. Keep small.
-readonly GITHUB_API_SEED_CANDIDATES="${DEVCONTAINER_GITHUB_API_SEED_CANDIDATES:-140.82.112.6 140.82.113.6 140.82.114.6 140.82.121.6}"
-
-# Optional authenticated probes. Disabled by default because start hooks should
-# not depend on auth state and must never leak credentials.
-readonly ENABLE_GITHUB_API_AUTH_PROBE="${DEVCONTAINER_ENABLE_GITHUB_API_AUTH_PROBE:-false}"
-readonly ENABLE_COPILOT_INTERNAL_AUTH_PROBE="${DEVCONTAINER_ENABLE_COPILOT_INTERNAL_AUTH_PROBE:-false}"
+# When the delegated route fixer succeeds, it has already semantically validated
+# the GitHub API endpoints. Skipping them in the later smoke probe avoids double
+# probing during boot while still probing the remaining Copilot/telemetry hosts.
+readonly SKIP_GITHUB_API_PROBES_AFTER_ROUTE_FIX="${DEVCONTAINER_SKIP_GITHUB_API_PROBES_AFTER_ROUTE_FIX:-true}"
 
 # Network smoke probes. These are not auth checks. 4xx can be acceptable for
 # service roots; 000/TLS failure is the primary red flag.
 readonly COPILOT_PROBE_ENDPOINTS="${DEVCONTAINER_COPILOT_PROBE_ENDPOINTS:-https://copilot-proxy.githubusercontent.com https://api.github.com https://api.github.com/rate_limit https://api.github.com/user https://default.exp-tas.com https://api.githubcopilot.com https://api.individual.githubcopilot.com https://proxy.individual.githubcopilot.com}"
 
 # -----------------------------------------------------------------------------
-# Logging / report helpers
+# Logging helpers
 # -----------------------------------------------------------------------------
-ts() { date '+%Y-%m-%dT%H:%M:%S%z' 2> /dev/null || date; }
 log_info() { printf '%s\n' "ℹ️  [${SCRIPT_NAME}] $*"; }
 log_warn() { printf '%s\n' "⚠️  [${SCRIPT_NAME}] $*"; }
 log_ok() { printf '%s\n' "✅ [${SCRIPT_NAME}] $*"; }
-log_debug() {
-    if [[ "${DEVCONTAINER_VERBOSE_NETWORK:-false}" == "true" ]]; then
-        printf '%s\n' "🔎 [${SCRIPT_NAME}] $*"
-    fi
-}
 
-write_report_header() {
+log_error_detail() {
     {
-        printf 'script=%s\n' "${SCRIPT_NAME}"
-        printf 'version=%s\n' "${SCRIPT_VERSION}"
-        printf 'timestamp=%s\n' "$(ts)"
-        printf 'host=%s\n' "${GITHUB_API_HOST}"
-        printf 'connect_timeout=%s\n' "${GITHUB_API_ROUTE_CONNECT_TIMEOUT}"
-        printf 'max_time=%s\n' "${GITHUB_API_ROUTE_MAX_TIME}"
-        printf 'min_score=%s\n' "${GITHUB_API_MIN_SCORE}"
-        printf '\n'
-    } > "${GITHUB_ROUTE_REPORT_FILE}" 2> /dev/null || true
+        printf '[%s] %s\n' "$(date '+%Y-%m-%dT%H:%M:%S%z' 2> /dev/null || date)" "$*"
+    } >> "${HEALTH_ERROR_LOG}" 2> /dev/null || true
 }
-append_report() { printf '%s\n' "$*" >> "${GITHUB_ROUTE_REPORT_FILE}" 2> /dev/null || true; }
 
 # -----------------------------------------------------------------------------
 # Utility helpers
@@ -123,106 +107,380 @@ safe_sudo() {
         "$@"
         return $?
     fi
+
     if has_cmd sudo; then
         sudo -n "$@"
         return $?
     fi
+
     return 127
 }
 
 extract_field() {
     local key="$1"
     local line="$2"
-    printf '%s' "${line}" | tr '|' '\n' | awk -F= -v k="${key}" '$1 == k {sub($1"=", ""); print; exit}'
+
+    printf '%s' "${line}" | tr '|' '\n' | awk -F= -v k="${key}" '
+        $1 == k {
+            sub($1"=", "")
+            print
+            exit
+        }
+    '
 }
 
-float_ms() {
-    awk -v s="$1" 'BEGIN { if (s == "") s=0; printf "%d", s*1000 }' 2> /dev/null
+resolve_target_user() {
+    local current_uid current_user
+
+    if [[ -n "${NSS_TARGET_USER_OVERRIDE}" ]]; then
+        printf '%s\n' "${NSS_TARGET_USER_OVERRIDE}"
+        return 0
+    fi
+
+    current_uid="$(id -u 2> /dev/null || echo unknown)"
+    current_user="$(id -un 2> /dev/null || echo unknown)"
+
+    if [[ "${current_uid}" != "0" && "${current_uid}" != "unknown" && -n "${current_user}" && "${current_user}" != "unknown" ]]; then
+        printf '%s\n' "${current_user}"
+        return 0
+    fi
+
+    if [[ -n "${SUDO_USER:-}" && "${SUDO_USER:-}" != "root" ]]; then
+        printf '%s\n' "${SUDO_USER}"
+        return 0
+    fi
+
+    if has_cmd getent && getent passwd node > /dev/null 2>&1; then
+        printf '%s\n' "node"
+        return 0
+    fi
+
+    printf '%s\n' "${current_user:-root}"
 }
 
-trim_candidate_list() {
-    local max="${1:-${GITHUB_API_MAX_CANDIDATES}}"
-    awk -v max="${max}" 'NF && !seen[$0]++ { print; count++; if (count >= max) exit }'
+resolve_user_uid() {
+    local user="$1"
+    id -u "${user}" 2> /dev/null || awk -F: -v u="${user}" '$1 == u {print $3; exit}' /etc/passwd 2> /dev/null || true
+}
+
+resolve_user_gid() {
+    local user="$1"
+    id -g "${user}" 2> /dev/null || awk -F: -v u="${user}" '$1 == u {print $4; exit}' /etc/passwd 2> /dev/null || true
+}
+
+resolve_user_home() {
+    local user="$1"
+
+    if [[ -n "${NSS_TARGET_HOME_OVERRIDE}" ]]; then
+        printf '%s\n' "${NSS_TARGET_HOME_OVERRIDE}"
+        return 0
+    fi
+
+    if has_cmd getent; then
+        getent passwd "${user}" 2> /dev/null | awk -F: 'NF >= 6 {print $6; exit}'
+        return 0
+    fi
+
+    awk -F: -v u="${user}" '$1 == u {print $6; exit}' /etc/passwd 2> /dev/null || true
+}
+
+passwd_has_user_uid() {
+    local passwd_file="$1"
+    local user="$2"
+    local uid="$3"
+
+    awk -F: -v u="${user}" -v id="${uid}" '$1 == u && $3 == id {found=1} END {exit found ? 0 : 1}' "${passwd_file}" 2> /dev/null
 }
 
 # -----------------------------------------------------------------------------
-# Diagnostic: LD_PRELOAD and NSS wrapper surface
+# Diagnostic / canonicalization: LD_PRELOAD and NSS wrapper surface
 # -----------------------------------------------------------------------------
-check_ld_preload() {
-    local val="${LD_PRELOAD:-}"
-    if [[ -z "${val}" ]]; then
-        log_warn "LD_PRELOAD is empty; NSS wrapper may not be active (can be normal before profile load)."
-        return 1
-    fi
-    if [[ "${val}" == ":"* || "${val}" == *":" || "${val}" == *"::"* ]]; then
-        log_warn "LD_PRELOAD contém token vazio (p.ex. '::' ou ':' nas pontas): '${val}'"
-    fi
-    if ((${#val} > 4096)); then
-        log_warn "LD_PRELOAD length=${#val} exceeds kernel limit; truncation may occur."
-    fi
-    if [[ "${val}" == *"libnss_wrapper.so"* && "${val}" != */* ]]; then
-        if has_cmd ldconfig && ! ldconfig -p 2> /dev/null | grep -q 'libnss_wrapper\.so'; then
-            log_warn "LD_PRELOAD usa libnss_wrapper.so relativo, mas ldconfig não o localizou; pode gerar aviso ld.so."
+resolve_nss_wrapper_lib() {
+    local arch
+    local candidate
+
+    for candidate in "${NSS_WRAPPER_LIB_CANONICAL}" "/usr/local/lib/devcontainer/libnss_wrapper.so"; do
+        if [[ -n "${candidate}" && -r "${candidate}" ]]; then
+            printf '%s\n' "${candidate}"
+            return 0
+        fi
+    done
+
+    arch="$(uname -m 2> /dev/null || echo x86_64)"
+
+    for candidate in "/usr/lib/${arch}-linux-gnu/libnss_wrapper.so" "/usr/lib/x86_64-linux-gnu/libnss_wrapper.so" "/usr/lib/aarch64-linux-gnu/libnss_wrapper.so"; do
+        if [[ -r "${candidate}" ]]; then
+            printf '%s\n' "${candidate}"
+            return 0
+        fi
+    done
+
+    if has_cmd ldconfig; then
+        candidate="$(ldconfig -p 2> /dev/null | awk '/libnss_wrapper\.so/{print $NF; exit}')"
+        if [[ -n "${candidate}" && -r "${candidate}" ]]; then
+            printf '%s\n' "${candidate}"
+            return 0
         fi
     fi
+
+    return 1
+}
+
+canonicalize_ld_preload() {
+    # Canonicalizes LD_PRELOAD for this hook and all future child processes.
+    #
+    # Rules:
+    # - remove any existing NSS wrapper token, relative or absolute;
+    # - preserve unrelated LD_PRELOAD tokens;
+    # - prepend the canonical absolute NSS wrapper path;
+    # - never hang, never fail the whole hook.
+    if [[ -n "${DEVCONTAINER_SKIP_NSS:-}" ]]; then
+        log_info "NSS preload canonicalization skipped via DEVCONTAINER_SKIP_NSS."
+        return 0
+    fi
+
+    local nss_lib
+    nss_lib="$(resolve_nss_wrapper_lib 2> /dev/null || true)"
+
+    if [[ -z "${nss_lib}" || ! -r "${nss_lib}" ]]; then
+        log_warn "NSS wrapper lib não encontrada; LD_PRELOAD não será canonicalizado."
+        return 1
+    fi
+
+    local old_preload="${LD_PRELOAD:-}"
+    local new_preload=""
+    local token
+    local old_ifs="${IFS}"
+
+    IFS=':'
+    for token in ${old_preload}; do
+        [[ -z "${token}" ]] && continue
+
+        case "${token}" in
+            libnss_wrapper.so | */libnss_wrapper.so)
+                continue
+                ;;
+        esac
+
+        if [[ -z "${new_preload}" ]]; then
+            new_preload="${token}"
+        else
+            new_preload="${new_preload}:${token}"
+        fi
+    done
+    IFS="${old_ifs}"
+
+    if [[ -n "${new_preload}" ]]; then
+        export LD_PRELOAD="${nss_lib}:${new_preload}"
+    else
+        export LD_PRELOAD="${nss_lib}"
+    fi
+
+    export DEVCONTAINER_NSS_WRAPPER_LIB="${nss_lib}"
+
+    log_info "LD_PRELOAD canonicalizado para NSS wrapper absoluto: ${nss_lib}"
     return 0
 }
 
+normalize_nss_wrapper_paths() {
+    # Ensures NSS_WRAPPER_PASSWD/GROUP always point to readable, non-empty files.
+    # Prefer runtime artifacts when present; otherwise use immutable /etc fallback.
+    if [[ -n "${DEVCONTAINER_SKIP_NSS:-}" ]]; then
+        log_info "NSS wrapper path normalization skipped via DEVCONTAINER_SKIP_NSS."
+        return 0
+    fi
+
+    local passwd_file="${NSS_BASE_DIR}/passwd"
+    local group_file="${NSS_BASE_DIR}/group"
+
+    export DEVCONTAINER_NSS_DIR="${NSS_BASE_DIR}"
+
+    if [[ -s "${passwd_file}" && -s "${group_file}" ]]; then
+        export NSS_WRAPPER_PASSWD="${passwd_file}"
+        export NSS_WRAPPER_GROUP="${group_file}"
+        log_info "NSS wrapper paths apontam para artefatos runtime: ${NSS_BASE_DIR}"
+        return 0
+    fi
+
+    if [[ -s /etc/passwd && -s /etc/group ]]; then
+        export NSS_WRAPPER_PASSWD="/etc/passwd"
+        export NSS_WRAPPER_GROUP="/etc/group"
+        log_info "NSS wrapper paths normalizados para fallback seguro: /etc/passwd, /etc/group"
+        return 0
+    fi
+
+    unset NSS_WRAPPER_PASSWD 2> /dev/null || true
+    unset NSS_WRAPPER_GROUP 2> /dev/null || true
+    log_warn "NSS wrapper paths não puderam ser normalizados; bindings foram removidos."
+    return 1
+}
+
+normalize_nss_runtime_env() {
+    local rc=0
+
+    normalize_nss_wrapper_paths || rc=1
+    canonicalize_ld_preload || rc=1
+
+    return "${rc}"
+}
+
+check_ld_preload() {
+    local val="${LD_PRELOAD:-}"
+    local degraded=0
+    local token
+    local found_nss=0
+    local old_ifs="${IFS}"
+
+    if [[ -z "${val}" ]]; then
+        log_warn "LD_PRELOAD vazio; NSS wrapper pode não estar ativo."
+        return 1
+    fi
+
+    if [[ "${val}" == ":"* || "${val}" == *":" || "${val}" == *"::"* ]]; then
+        log_warn "LD_PRELOAD contém token vazio (p.ex. '::' ou ':' nas pontas): '${val}'"
+        degraded=1
+    fi
+
+    if ((${#val} > 4096)); then
+        log_warn "LD_PRELOAD length=${#val} exceeds kernel limit; truncation may occur."
+        degraded=1
+    fi
+
+    IFS=':'
+    for token in ${val}; do
+        [[ -z "${token}" ]] && continue
+
+        case "${token}" in
+            libnss_wrapper.so)
+                log_warn "LD_PRELOAD contém libnss_wrapper.so relativo; esperado caminho absoluto canônico."
+                degraded=1
+                found_nss=1
+                ;;
+            */libnss_wrapper.so)
+                found_nss=1
+                if [[ ! -r "${token}" ]]; then
+                    log_warn "LD_PRELOAD aponta para NSS wrapper ilegível/inexistente: ${token}"
+                    degraded=1
+                else
+                    log_info "LD_PRELOAD NSS wrapper OK: ${token}"
+                fi
+                ;;
+        esac
+    done
+    IFS="${old_ifs}"
+
+    if [[ "${found_nss}" -eq 0 ]]; then
+        log_warn "LD_PRELOAD não contém libnss_wrapper.so; NSS wrapper pode não estar ativo."
+        degraded=1
+    fi
+
+    if [[ -n "${DEVCONTAINER_NSS_WRAPPER_LIB:-}" && ! -r "${DEVCONTAINER_NSS_WRAPPER_LIB}" ]]; then
+        log_warn "DEVCONTAINER_NSS_WRAPPER_LIB aponta para arquivo ilegível/inexistente: ${DEVCONTAINER_NSS_WRAPPER_LIB}"
+        degraded=1
+    fi
+
+    if [[ -n "${NSS_WRAPPER_PASSWD:-}" && ! -s "${NSS_WRAPPER_PASSWD}" ]]; then
+        log_warn "NSS_WRAPPER_PASSWD inválido ou vazio: ${NSS_WRAPPER_PASSWD}"
+        degraded=1
+    fi
+
+    if [[ -n "${NSS_WRAPPER_GROUP:-}" && ! -s "${NSS_WRAPPER_GROUP}" ]]; then
+        log_warn "NSS_WRAPPER_GROUP inválido ou vazio: ${NSS_WRAPPER_GROUP}"
+        degraded=1
+    fi
+
+    return "${degraded}"
+}
+
 repair_nss_artifacts() {
-    local current_uid current_gid current_user passwd_file group_file passwd_tmp group_tmp
-    current_uid="$(id -u 2> /dev/null || echo unknown)"
-    if [[ "${current_uid}" == "0" || "${current_uid}" == "unknown" ]]; then return 1; fi
-    current_gid="$(id -g 2> /dev/null || echo unknown)"
-    current_user="$(id -un 2> /dev/null || echo node)"
-    [[ -z "${current_user}" || "${current_user}" == "unknown" ]] && current_user="node"
+    local target_user target_uid target_gid target_home
+    local passwd_file group_file passwd_tmp group_tmp
+
+    target_user="$(resolve_target_user)"
+    target_uid="$(resolve_user_uid "${target_user}")"
+    target_gid="$(resolve_user_gid "${target_user}")"
+    target_home="$(resolve_user_home "${target_user}")"
+
+    [[ -z "${target_user}" || "${target_user}" == "unknown" ]] && target_user="node"
+    [[ -z "${target_uid}" ]] && target_uid="$(id -u 2> /dev/null || echo 1000)"
+    [[ -z "${target_gid}" ]] && target_gid="$(id -g 2> /dev/null || echo 1000)"
+    [[ -z "${target_home}" ]] && target_home="/home/${target_user}"
 
     passwd_file="${NSS_BASE_DIR}/passwd"
     group_file="${NSS_BASE_DIR}/group"
     passwd_tmp="${passwd_file}.tmp"
     group_tmp="${group_file}.tmp"
 
-    mkdir -p "${NSS_BASE_DIR}" 2> /dev/null || return 1
-    [[ -r /etc/passwd ]] && cat /etc/passwd > "${passwd_tmp}" 2> /dev/null || true
-    [[ -r /etc/group ]] && cat /etc/group > "${group_tmp}" 2> /dev/null || true
+    mkdir -p "${NSS_BASE_DIR}" 2>> "${HEALTH_ERROR_LOG}" || return 1
+
+    if [[ -r /etc/passwd ]]; then
+        cat /etc/passwd > "${passwd_tmp}" 2>> "${HEALTH_ERROR_LOG}" || true
+    fi
+    if [[ -r /etc/group ]]; then
+        cat /etc/group > "${group_tmp}" 2>> "${HEALTH_ERROR_LOG}" || true
+    fi
 
     if [[ ! -s "${passwd_tmp}" ]]; then
         printf '%s:x:%s:%s:%s user:%s:/bin/bash\n' \
-            "${current_user}" "${current_uid}" "${current_gid}" "${current_user}" "${HOME:-/home/node}" > "${passwd_tmp}" 2> /dev/null || return 1
-    fi
-    if [[ ! -s "${group_tmp}" ]]; then
-        printf '%s:x:%s:\n' "${current_user}" "${current_gid}" > "${group_tmp}" 2> /dev/null || return 1
+            "${target_user}" "${target_uid}" "${target_gid}" "${target_user}" "${target_home}" > "${passwd_tmp}" 2>> "${HEALTH_ERROR_LOG}" || return 1
     fi
 
-    mv -f "${passwd_tmp}" "${passwd_file}" 2> /dev/null || return 1
-    mv -f "${group_tmp}" "${group_file}" 2> /dev/null || return 1
-    chmod 600 "${passwd_file}" "${group_file}" 2> /dev/null || true
-    log_info "NSS artifacts repaired in post-start: ${NSS_BASE_DIR}"
+    if ! passwd_has_user_uid "${passwd_tmp}" "${target_user}" "${target_uid}"; then
+        printf '%s:x:%s:%s:%s user:%s:/bin/bash\n' \
+            "${target_user}" "${target_uid}" "${target_gid}" "${target_user}" "${target_home}" >> "${passwd_tmp}" 2>> "${HEALTH_ERROR_LOG}" || return 1
+    fi
+
+    if [[ ! -s "${group_tmp}" ]]; then
+        printf '%s:x:%s:\n' "${target_user}" "${target_gid}" > "${group_tmp}" 2>> "${HEALTH_ERROR_LOG}" || return 1
+    fi
+
+    mv -f "${passwd_tmp}" "${passwd_file}" 2>> "${HEALTH_ERROR_LOG}" || return 1
+    mv -f "${group_tmp}" "${group_file}" 2>> "${HEALTH_ERROR_LOG}" || return 1
+
+    chmod 600 "${passwd_file}" "${group_file}" 2>> "${HEALTH_ERROR_LOG}" || true
+    log_info "NSS artifacts repaired in post-start: ${NSS_BASE_DIR} (target=${target_user}, uid=${target_uid})"
     return 0
 }
 
 audit_nss_artifacts() {
-    local degraded=0 passwd_file="${NSS_BASE_DIR}/passwd" group_file="${NSS_BASE_DIR}/group"
+    local degraded=0
+    local passwd_file="${NSS_BASE_DIR}/passwd"
+    local group_file="${NSS_BASE_DIR}/group"
+
     export DEVCONTAINER_NSS_DIR="${NSS_BASE_DIR}"
 
-    if [[ ! -s "${passwd_file}" || ! -s "${group_file}" ]]; then repair_nss_artifacts || true; fi
+    if [[ ! -s "${passwd_file}" || ! -s "${group_file}" ]]; then
+        repair_nss_artifacts || true
+    fi
 
-    if [[ -s "${passwd_file}" ]]; then log_info "NSS artifact OK: ${passwd_file}"; else
+    # After artifacts are repaired/confirmed, point future child processes to them
+    # and canonicalize LD_PRELOAD again. This affects this hook and all subprocesses
+    # spawned after this point.
+    normalize_nss_runtime_env || degraded=1
+
+    if [[ -s "${passwd_file}" ]]; then
+        log_info "NSS artifact OK: ${passwd_file}"
+    else
         log_warn "NSS artifact ausente/vazio: ${passwd_file}"
         degraded=1
     fi
-    if [[ -s "${group_file}" ]]; then log_info "NSS artifact OK: ${group_file}"; else
+
+    if [[ -s "${group_file}" ]]; then
+        log_info "NSS artifact OK: ${group_file}"
+    else
         log_warn "NSS artifact ausente/vazio: ${group_file}"
         degraded=1
     fi
 
-    local current_user current_uid
-    current_user="$(id -un 2> /dev/null || echo unknown)"
-    current_uid="$(id -u 2> /dev/null || echo unknown)"
-    if [[ -s "${passwd_file}" && "${current_user}" != "unknown" && "${current_uid}" != "unknown" ]]; then
-        if grep -qE "^${current_user}:x:${current_uid}:" "${passwd_file}" 2> /dev/null; then
-            log_info "NSS passwd coerente com usuário atual: ${current_user} (uid=${current_uid})"
+    local target_user target_uid
+    target_user="$(resolve_target_user)"
+    target_uid="$(resolve_user_uid "${target_user}")"
+
+    if [[ -s "${passwd_file}" && -n "${target_user}" && -n "${target_uid}" ]]; then
+        if passwd_has_user_uid "${passwd_file}" "${target_user}" "${target_uid}"; then
+            log_info "NSS passwd coerente com usuário alvo: ${target_user} (uid=${target_uid})"
         else
-            log_warn "NSS passwd NÃO contém linha esperada para ${current_user} (uid=${current_uid}) — possível mismatch."
+            log_warn "NSS passwd NÃO contém linha esperada para ${target_user} (uid=${target_uid}) — possível mismatch."
             degraded=1
         fi
     fi
@@ -232,7 +490,7 @@ audit_nss_artifacts() {
 }
 
 # -----------------------------------------------------------------------------
-# DNS fix — configurable and bounded
+# DNS fix — configurable, bounded, inode-preserving
 # -----------------------------------------------------------------------------
 fix_dns() {
     if [[ "${ENABLE_DNS_FIX}" != "true" ]]; then
@@ -242,7 +500,7 @@ fix_dns() {
 
     local tmp ns count=0
     tmp="$(mktemp 2> /dev/null || echo "/tmp/resolv.conf.$$")"
-    : > "${tmp}" 2> /dev/null || return 1
+    : > "${tmp}" 2>> "${HEALTH_ERROR_LOG}" || return 1
 
     for ns in ${DNS_FIX_SERVERS}; do
         if is_ipv4 "${ns}"; then
@@ -252,6 +510,7 @@ fix_dns() {
             log_warn "DNS fix: ignorando nameserver inválido: ${ns}"
         fi
     done
+
     printf 'options %s\n' "${DNS_FIX_OPTIONS}" >> "${tmp}"
 
     if [[ "${count}" -eq 0 ]]; then
@@ -260,11 +519,14 @@ fix_dns() {
         return 1
     fi
 
-    safe_sudo cp "${tmp}" /etc/resolv.conf > /dev/null 2>&1 || {
-        log_warn "DNS fix: falha ao sobrescrever /etc/resolv.conf (sem sudo -n/root ou read-only?)."
+    # Docker often bind-mounts /etc/resolv.conf. Preserve inode: write content via tee.
+    safe_sudo tee /etc/resolv.conf < "${tmp}" > /dev/null 2>> "${HEALTH_ERROR_LOG}" || {
+        log_warn "DNS fix: falha ao sobrescrever conteúdo de /etc/resolv.conf (sem sudo -n/root ou read-only?)."
+        log_error_detail "DNS fix failed while tee-ing /etc/resolv.conf from ${tmp}"
         rm -f "${tmp}" 2> /dev/null || true
         return 1
     }
+
     rm -f "${tmp}" 2> /dev/null || true
 
     local configured
@@ -274,407 +536,96 @@ fix_dns() {
 }
 
 # -----------------------------------------------------------------------------
-# Smart GitHub API route selector
+# Delegated Smart GitHub API route selector
 # -----------------------------------------------------------------------------
-probe_github_api_current_route() {
-    local host="${GITHUB_API_HOST}" tmp meta body http ctype tls remote time_total root_ms
-    tmp="$(mktemp 2> /dev/null || echo "/tmp/github-api-current.$$")"
-    meta="$(curl -4 --noproxy '*' -sS \
-        --connect-timeout "${GITHUB_API_ROUTE_CONNECT_TIMEOUT}" \
-        --max-time "${GITHUB_API_ROUTE_MAX_TIME}" \
-        -o "${tmp}" \
-        -w 'http_code=%{http_code}|content_type=%{content_type}|time_total=%{time_total}|remote_ip=%{remote_ip}|ssl_verify_result=%{ssl_verify_result}' \
-        "https://${host}/" 2> /dev/null || true)"
-    body="$(cat "${tmp}" 2> /dev/null || true)"
-    rm -f "${tmp}" 2> /dev/null || true
-
-    http="$(extract_field http_code "${meta}")"
-    ctype="$(extract_field content_type "${meta}")"
-    tls="$(extract_field ssl_verify_result "${meta}")"
-    remote="$(extract_field remote_ip "${meta}")"
-    time_total="$(extract_field time_total "${meta}")"
-    root_ms="$(float_ms "${time_total}")"
-
-    if [[ "${http}" == "200" && "${ctype}" == *"application/json"* && "${tls}" == "0" ]] \
-        && printf '%s' "${body}" | grep -q 'current_user_url' \
-        && printf '%s' "${body}" | grep -q 'https://api.github.com/user' \
-        && printf '%s' "${body}" | grep -q 'rate_limit_url'; then
-        printf 'ok|%s|%s|%s\n' "${remote:-unknown}" "${root_ms:-0}" "${meta}"
-        return 0
-    fi
-
-    printf 'fail|%s|%s|%s\n' "${remote:-unknown}" "${root_ms:-0}" "${meta}"
-    return 1
-}
-
-collect_github_api_candidates() {
-    local host="${GITHUB_API_HOST}" resolver
-    {
-        # Existing hosts entry is a candidate, not trusted.
-        awk -v h="${host}" '$0 !~ /^#/ { for (i=2; i<=NF; i++) if ($i == h) print $1 }' /etc/hosts 2> /dev/null || true
-
-        # System resolver candidate. May be bad; scorer rejects it if unreachable.
-        if has_cmd getent; then getent ahostsv4 "${host}" 2> /dev/null | awk '{print $1}' || true; fi
-
-        # Explicit resolvers bypass resolv.conf.
-        if has_cmd dig; then
-            for resolver in ${GITHUB_API_RESOLVERS}; do
-                dig +time=1 +tries=1 @"${resolver}" "${host}" +short A 2> /dev/null || true
-            done
-        else
-            log_warn "GitHub API route: dig não encontrado; usando getent + seed candidates."
-        fi
-
-        # Seed candidates. Must pass semantic validation.
-        local seed
-        for seed in ${GITHUB_API_SEED_CANDIDATES}; do
-            printf '%s\n' "${seed}"
-        done
-    } | while IFS= read -r ip; do
-        is_ipv4 "${ip}" && printf '%s\n' "${ip}"
-    done | sort -u | trim_candidate_list "${GITHUB_API_MAX_CANDIDATES}"
-}
-
-probe_github_api_candidate() {
-    # Prints: ip|score|root_http|rate_http|user_http|latency_ms|remote_ip|reason
-    local ip="$1" host="${GITHUB_API_HOST}"
-    local tmp_root tmp_rate tmp_user root_meta rate_meta user_meta root_body rate_body user_body
-    local score=0 reason=""
-
-    tmp_root="$(mktemp 2> /dev/null || echo "/tmp/github-api-root.$$")"
-
-    root_meta="$(curl -4 --noproxy '*' -sS \
-        --connect-timeout "${GITHUB_API_ROUTE_CONNECT_TIMEOUT}" \
-        --max-time "${GITHUB_API_ROUTE_MAX_TIME}" \
-        --resolve "${host}:443:${ip}" \
-        -o "${tmp_root}" \
-        -w 'http_code=%{http_code}|content_type=%{content_type}|time_connect=%{time_connect}|time_total=%{time_total}|remote_ip=%{remote_ip}|ssl_verify_result=%{ssl_verify_result}' \
-        "https://${host}/" 2> /dev/null || true)"
-    log_debug "GitHub API candidate ${ip}: root_meta=${root_meta}"
-
-    local root_http root_ctype root_time root_remote root_tls root_ms
-    root_http="$(extract_field http_code "${root_meta}")"
-    root_ctype="$(extract_field content_type "${root_meta}")"
-    root_time="$(extract_field time_total "${root_meta}")"
-    root_remote="$(extract_field remote_ip "${root_meta}")"
-    root_tls="$(extract_field ssl_verify_result "${root_meta}")"
-    root_ms="$(float_ms "${root_time}")"
-    root_body="$(cat "${tmp_root}" 2> /dev/null || true)"
-    rm -f "${tmp_root}" 2> /dev/null || true
-
-    if [[ "${root_http}" == "200" && "${root_ctype}" == *"application/json"* && "${root_tls}" == "0" ]] \
-        && printf '%s' "${root_body}" | grep -q 'current_user_url' \
-        && printf '%s' "${root_body}" | grep -q 'https://api.github.com/user' \
-        && printf '%s' "${root_body}" | grep -q 'rate_limit_url'; then
-        score=$((score + 55))
-        reason="${reason}root-api-ok;"
-    else
-        reason="${reason}root-api-fail(http=${root_http:-000},ctype=${root_ctype:-none},tls=${root_tls:-?});"
-        printf '%s|%s|%s|%s|%s|%s|%s|%s\n' "${ip}" "0" "${root_http:-000}" "000" "000" "${root_ms:-0}" "${root_remote:-}" "${reason}"
-        return 0
-    fi
-
-    tmp_rate="$(mktemp 2> /dev/null || echo "/tmp/github-api-rate.$$")"
-    rate_meta="$(curl -4 --noproxy '*' -sS \
-        --connect-timeout "${GITHUB_API_ROUTE_CONNECT_TIMEOUT}" \
-        --max-time "${GITHUB_API_ROUTE_MAX_TIME}" \
-        --resolve "${host}:443:${ip}" \
-        -o "${tmp_rate}" \
-        -w 'http_code=%{http_code}|content_type=%{content_type}|time_total=%{time_total}|remote_ip=%{remote_ip}|ssl_verify_result=%{ssl_verify_result}' \
-        "https://${host}/rate_limit" 2> /dev/null || true)"
-    local rate_http rate_ctype rate_tls
-    rate_http="$(extract_field http_code "${rate_meta}")"
-    rate_ctype="$(extract_field content_type "${rate_meta}")"
-    rate_tls="$(extract_field ssl_verify_result "${rate_meta}")"
-    rate_body="$(cat "${tmp_rate}" 2> /dev/null || true)"
-    rm -f "${tmp_rate}" 2> /dev/null || true
-
-    if [[ "${rate_http}" == "200" && "${rate_ctype}" == *"application/json"* && "${rate_tls}" == "0" ]] \
-        && printf '%s' "${rate_body}" | grep -q 'resources' \
-        && printf '%s' "${rate_body}" | grep -q 'rate'; then
-        score=$((score + 25))
-        reason="${reason}rate-limit-ok;"
-    else
-        reason="${reason}rate-limit-fail(http=${rate_http:-000},ctype=${rate_ctype:-none},tls=${rate_tls:-?});"
-    fi
-
-    tmp_user="$(mktemp 2> /dev/null || echo "/tmp/github-api-user.$$")"
-    user_meta="$(curl -4 --noproxy '*' -sS \
-        --connect-timeout "${GITHUB_API_ROUTE_CONNECT_TIMEOUT}" \
-        --max-time "${GITHUB_API_ROUTE_MAX_TIME}" \
-        --resolve "${host}:443:${ip}" \
-        -o "${tmp_user}" \
-        -w 'http_code=%{http_code}|content_type=%{content_type}|time_total=%{time_total}|remote_ip=%{remote_ip}|ssl_verify_result=%{ssl_verify_result}' \
-        "https://${host}/user" 2> /dev/null || true)"
-    local user_http user_ctype user_tls
-    user_http="$(extract_field http_code "${user_meta}")"
-    user_ctype="$(extract_field content_type "${user_meta}")"
-    user_tls="$(extract_field ssl_verify_result "${user_meta}")"
-    user_body="$(cat "${tmp_user}" 2> /dev/null || true)"
-    rm -f "${tmp_user}" 2> /dev/null || true
-
-    # Without auth, /user normally returns 401 JSON. With auth/proxy state, 200
-    # is fine. 403 is acceptable as a shaped API proof. Redirects/plaintext are not.
-    if [[ ("${user_http}" == "200" || "${user_http}" == "401" || "${user_http}" == "403") && "${user_ctype}" == *"application/json"* && "${user_tls}" == "0" ]] \
-        && { printf '%s' "${user_body}" | grep -q 'message\|login\|documentation_url' || [[ "${user_http}" == "403" ]]; }; then
-        score=$((score + 15))
-        reason="${reason}user-endpoint-shaped-ok;"
-    else
-        reason="${reason}user-endpoint-fail(http=${user_http:-000},ctype=${user_ctype:-none},tls=${user_tls:-?});"
-    fi
-
-    if [[ -n "${root_ms}" ]]; then
-        if ((root_ms > 0 && root_ms <= 500)); then
-            score=$((score + 5))
-            reason="${reason}latency<=500ms;"
-        elif ((root_ms > 500 && root_ms <= 1500)); then
-            score=$((score + 2))
-            reason="${reason}latency<=1500ms;"
-        else
-            reason="${reason}latency-slow-or-missing;"
-        fi
-    fi
-
-    printf '%s|%s|%s|%s|%s|%s|%s|%s\n' \
-        "${ip}" "${score}" "${root_http:-000}" "${rate_http:-000}" "${user_http:-000}" "${root_ms:-0}" "${root_remote:-}" "${reason}"
-}
-
-get_github_token_best_effort() {
-    if [[ -n "${GH_TOKEN:-}" ]]; then
-        printf '%s' "${GH_TOKEN}"
-        return 0
-    fi
-    if [[ -n "${GITHUB_TOKEN:-}" ]]; then
-        printf '%s' "${GITHUB_TOKEN}"
-        return 0
-    fi
-    if has_cmd gh; then gh auth token 2> /dev/null || true; fi
-}
-
-probe_github_api_auth_optional() {
-    local ip="$1" host="${GITHUB_API_HOST}"
-    if [[ "${ENABLE_GITHUB_API_AUTH_PROBE}" != "true" && "${ENABLE_COPILOT_INTERNAL_AUTH_PROBE}" != "true" ]]; then return 0; fi
-
-    local token
-    token="$(get_github_token_best_effort)"
-    if [[ -z "${token}" ]]; then
-        log_warn "GitHub API auth probe: token indisponível; probes autenticados ignorados."
-        return 0
-    fi
-
-    if [[ "${ENABLE_GITHUB_API_AUTH_PROBE}" == "true" ]]; then
-        local user_meta user_http user_tls
-        user_meta="$(curl -4 --noproxy '*' -sS \
-            --connect-timeout "${GITHUB_API_ROUTE_CONNECT_TIMEOUT}" --max-time "${GITHUB_API_ROUTE_MAX_TIME}" \
-            --resolve "${host}:443:${ip}" \
-            -H "Authorization: Bearer ${token}" -H 'Accept: application/vnd.github+json' \
-            -o /dev/null \
-            -w 'http_code=%{http_code}|ssl_verify_result=%{ssl_verify_result}' \
-            "https://${host}/user" 2> /dev/null || true)"
-        user_http="$(extract_field http_code "${user_meta}")"
-        user_tls="$(extract_field ssl_verify_result "${user_meta}")"
-        if [[ "${user_http}" == "200" && "${user_tls}" == "0" ]]; then
-            log_ok "GitHub API auth probe OK: /user autenticado via ${ip} → HTTP 200."
-        else
-            log_warn "GitHub API auth probe não OK: /user autenticado via ${ip} → HTTP ${user_http:-000}, tls=${user_tls:-?}."
-        fi
-    fi
-
-    if [[ "${ENABLE_COPILOT_INTERNAL_AUTH_PROBE}" == "true" ]]; then
-        local cop_meta cop_http cop_tls
-        cop_meta="$(curl -4 --noproxy '*' -sS \
-            --connect-timeout "${GITHUB_API_ROUTE_CONNECT_TIMEOUT}" --max-time "${GITHUB_API_ROUTE_MAX_TIME}" \
-            --resolve "${host}:443:${ip}" \
-            -H "Authorization: Bearer ${token}" -H 'Accept: application/json' \
-            -o /dev/null \
-            -w 'http_code=%{http_code}|ssl_verify_result=%{ssl_verify_result}' \
-            "https://${host}/copilot_internal/v2/token" 2> /dev/null || true)"
-        cop_http="$(extract_field http_code "${cop_meta}")"
-        cop_tls="$(extract_field ssl_verify_result "${cop_meta}")"
-        if [[ "${cop_tls}" == "0" && ("${cop_http}" == "200" || "${cop_http}" == "401" || "${cop_http}" == "403") ]]; then
-            log_ok "Copilot internal auth-shaped probe OK: /copilot_internal/v2/token via ${ip} → HTTP ${cop_http}."
-        else
-            log_warn "Copilot internal auth-shaped probe não OK: HTTP ${cop_http:-000}, tls=${cop_tls:-?}."
-        fi
-    fi
-}
-
-apply_github_api_hosts_override() {
-    local best_ip="$1" host="${GITHUB_API_HOST}" tmp_hosts backup_file
-    tmp_hosts="$(mktemp 2> /dev/null || echo "/tmp/hosts.github-api.$$")"
-    backup_file="/tmp/hosts.pre-github-api-route-fix.$(date +%s 2> /dev/null || echo $$)"
-    cp /etc/hosts "${backup_file}" 2> /dev/null || true
-
-    awk -v h="${host}" '
-        BEGIN { skip=0 }
-        $0 ~ /^# >>> devcontainer-github-api-route-fix/ { skip=1; next }
-        $0 ~ /^# <<< devcontainer-github-api-route-fix/ { skip=0; next }
-        skip == 1 { next }
-        {
-          found=0
-          for (i=2; i<=NF; i++) if ($i == h) found=1
-          if (found == 0) print $0
-        }
-    ' /etc/hosts > "${tmp_hosts}" 2> /dev/null || {
-        log_warn "GitHub API route: falha ao preparar novo /etc/hosts."
-        rm -f "${tmp_hosts}" 2> /dev/null || true
-        return 1
-    }
-
-    {
-        printf '\n# >>> devcontainer-github-api-route-fix managed by %s v%s\n' "${SCRIPT_NAME}" "${SCRIPT_VERSION}"
-        printf '# reason: validated semantic GitHub API route; default ISP/DNS route may be broken\n'
-        printf '# generated_at: %s\n' "$(ts)"
-        printf '%s %s\n' "${best_ip}" "${host}"
-        printf '# <<< devcontainer-github-api-route-fix\n'
-    } >> "${tmp_hosts}"
-
-    safe_sudo cp "${tmp_hosts}" /etc/hosts > /dev/null 2>&1 || {
-        log_warn "GitHub API route: falha ao aplicar /etc/hosts (sem sudo -n/root ou read-only?)."
-        rm -f "${tmp_hosts}" 2> /dev/null || true
-        return 1
-    }
-
-    rm -f "${tmp_hosts}" 2> /dev/null || true
-    log_info "GitHub API route: backup best-effort de /etc/hosts em ${backup_file}."
-    log_ok "GitHub API route aplicado: ${host} → ${best_ip}"
-    return 0
-}
-
-verify_github_api_hosts_override() {
-    local expected_ip="$1" host="${GITHUB_API_HOST}" resolved
-    resolved="$(getent ahostsv4 "${host}" 2> /dev/null | awk 'NR==1{print $1}' || true)"
-    log_info "GitHub API route verify: getent ${host} → ${resolved:-<none>}"
-
-    local result state remote latency meta
-    result="$(probe_github_api_current_route)"
-    IFS='|' read -r state remote latency meta <<< "${result}"
-    if [[ "${state}" == "ok" ]]; then
-        log_ok "GitHub API route verify OK: ${host} → IP ${remote:-unknown} | latency=${latency:-0}ms"
-        [[ -n "${expected_ip}" && "${remote}" != "${expected_ip}" ]] && log_warn "GitHub API route verify: remote_ip=${remote}, esperado=${expected_ip}; pode haver cache/proxy."
-        return 0
-    fi
-
-    log_warn "GitHub API route verify FALHOU: ${host} → IP ${remote:-unknown}; meta=${meta:-none}"
-    return 1
-}
-
-fix_github_api_route() {
+run_github_api_route_fix() {
     if [[ "${ENABLE_GITHUB_API_ROUTE_FIX}" != "true" ]]; then
         log_info "GitHub API route fix desabilitado por DEVCONTAINER_ENABLE_GITHUB_API_ROUTE_FIX=${ENABLE_GITHUB_API_ROUTE_FIX}."
         return 0
     fi
-    if ! has_cmd curl; then
-        log_warn "GitHub API route: curl não encontrado — ignorado."
+
+    if [[ ! -f "${GITHUB_API_ROUTE_SCRIPT}" ]]; then
+        log_warn "GitHub API route: subscript ausente: ${GITHUB_API_ROUTE_SCRIPT}"
         return 1
     fi
 
-    write_report_header
-    log_info "GitHub API route: avaliando rota atual para ${GITHUB_API_HOST}."
+    # Use bash explicitly; do not depend on executable bit preservation across
+    # Windows/Git filesystems. The subscript owns DEVCONTAINER_GITHUB_* defaults;
+    # any exported user-provided overrides remain visible to it naturally.
+    DEVCONTAINER_GITHUB_ROUTE_REPORT_FILE="${GITHUB_ROUTE_REPORT_FILE}" \
+        DEVCONTAINER_GITHUB_API_HOST="${GITHUB_API_HOST}" \
+        DEVCONTAINER_VERBOSE_NETWORK="${DEVCONTAINER_VERBOSE_NETWORK:-false}" \
+        bash "${GITHUB_API_ROUTE_SCRIPT}"
 
-    local current_result current_state current_remote current_latency current_meta
-    current_result="$(probe_github_api_current_route)"
-    IFS='|' read -r current_state current_remote current_latency current_meta <<< "${current_result}"
-    append_report "current_route_state=${current_state} current_remote=${current_remote} current_latency_ms=${current_latency} current_meta=${current_meta}"
-
-    if [[ "${current_state}" == "ok" ]]; then
-        log_ok "GitHub API route: rota atual já é funcional (${GITHUB_API_HOST} → ${current_remote}, ${current_latency}ms)."
-        return 0
-    fi
-    log_warn "GitHub API route: rota atual NÃO funcional (${GITHUB_API_HOST} → ${current_remote:-unknown}); buscando alternativa validada."
-
-    local candidates
-    candidates="$(collect_github_api_candidates)"
-    if [[ -z "${candidates}" ]]; then
-        log_warn "GitHub API route: nenhum candidato coletado."
-        append_report "result=no-candidates"
-        return 1
-    fi
-
-    log_info "GitHub API route: candidatos coletados: $(printf '%s' "${candidates}" | tr '\n' ' ')"
-    append_report "candidates=$(printf '%s' "${candidates}" | tr '\n' ' ')"
-
-    local best_ip="" best_score=-1 best_latency=999999 best_record=""
-    local record ip score root_http rate_http user_http latency_ms remote reason
-
-    while IFS= read -r ip; do
-        [[ -z "${ip}" ]] && continue
-        record="$(probe_github_api_candidate "${ip}")"
-        IFS='|' read -r ip score root_http rate_http user_http latency_ms remote reason <<< "${record}"
-
-        log_info "GitHub API candidate ${ip}: score=${score}; root=${root_http}; rate=${rate_http}; user=${user_http}; latency=${latency_ms}ms; remote=${remote:-?}; ${reason}"
-        append_report "candidate=${ip} score=${score} root=${root_http} rate=${rate_http} user=${user_http} latency_ms=${latency_ms} remote=${remote} reason=${reason}"
-
-        if [[ "${score}" =~ ^[0-9]+$ ]]; then
-            if ((score > best_score)) || { ((score == best_score)) && ((latency_ms > 0 && latency_ms < best_latency)); }; then
-                best_score="${score}"
-                best_latency="${latency_ms:-999999}"
-                best_ip="${ip}"
-                best_record="${record}"
-            fi
-        fi
-    done <<< "${candidates}"
-
-    if [[ -z "${best_ip}" || "${best_score}" -lt "${GITHUB_API_MIN_SCORE}" ]]; then
-        log_warn "GitHub API route: nenhum candidato atingiu score mínimo ${GITHUB_API_MIN_SCORE}; melhor=${best_ip:-none}, score=${best_score}."
-        append_report "result=no-valid-candidate best_ip=${best_ip:-none} best_score=${best_score}"
-        return 1
-    fi
-
-    log_ok "GitHub API route: escolhido ${best_ip} com score=${best_score}, latency=${best_latency}ms."
-    append_report "selected=${best_ip} selected_score=${best_score} selected_record=${best_record}"
-
-    apply_github_api_hosts_override "${best_ip}" || {
-        append_report "result=apply-failed selected=${best_ip}"
-        return 1
-    }
-    verify_github_api_hosts_override "${best_ip}" || {
-        append_report "result=verify-failed selected=${best_ip}"
-        return 1
-    }
-    probe_github_api_auth_optional "${best_ip}" || true
-
-    append_report "result=ok selected=${best_ip} score=${best_score}"
-    return 0
+    return $?
 }
 
 # -----------------------------------------------------------------------------
 # NSS DB — initialize VS Code/Chromium trust store on Linux
 # -----------------------------------------------------------------------------
 init_nss_db() {
-    local nssdb="${HOME}/.pki/nssdb"
+    local target_user target_gid target_home nssdb current_user
+
     if ! has_cmd certutil; then
         log_warn "NSS DB: certutil não encontrado (libnss3-tools não instalado); ignorado."
         return 1
     fi
 
-    if [[ -d "${nssdb}" ]]; then
-        if certutil -L -d "sql:${nssdb}" > /dev/null 2>&1; then
-            log_info "NSS DB OK: ${nssdb}"
-            return 0
-        fi
-        log_warn "NSS DB corrompido: ${nssdb} — removendo e recriando."
-        rm -rf "${nssdb}" 2> /dev/null || true
-    fi
+    target_user="$(resolve_target_user)"
+    target_gid="$(resolve_user_gid "${target_user}")"
+    target_home="$(resolve_user_home "${target_user}")"
+    current_user="$(id -un 2> /dev/null || echo unknown)"
 
-    mkdir -p "${nssdb}" 2> /dev/null || {
+    [[ -z "${target_home}" ]] && target_home="${HOME:-/home/${target_user}}"
+    [[ -z "${target_gid}" ]] && target_gid="$(id -g 2> /dev/null || echo 1000)"
+
+    nssdb="${target_home}/.pki/nssdb"
+
+    mkdir -p "${nssdb}" 2>> "${HEALTH_ERROR_LOG}" || {
         log_warn "NSS DB: falha ao criar ${nssdb}."
         return 1
     }
-    certutil -d "sql:${nssdb}" -N -f /dev/null 2> /dev/null || {
-        log_warn "NSS DB: certutil -N falhou (rc=$?)."
+
+    if [[ "${current_user}" == "root" && "${target_user}" != "root" ]]; then
+        safe_sudo chown "${target_user}:${target_gid}" "${target_home}/.pki" "${nssdb}" 2>> "${HEALTH_ERROR_LOG}" || true
+    fi
+
+    if [[ -d "${nssdb}" ]]; then
+        if certutil -L -d "sql:${nssdb}" > /dev/null 2>> "${HEALTH_ERROR_LOG}"; then
+            log_info "NSS DB OK: ${nssdb} (target=${target_user})"
+            return 0
+        fi
+
+        log_warn "NSS DB corrompido: ${nssdb} — removendo e recriando. Veja ${HEALTH_ERROR_LOG}."
+        rm -rf "${nssdb}" 2>> "${HEALTH_ERROR_LOG}" || true
+        mkdir -p "${nssdb}" 2>> "${HEALTH_ERROR_LOG}" || return 1
+        if [[ "${current_user}" == "root" && "${target_user}" != "root" ]]; then
+            safe_sudo chown "${target_user}:${target_gid}" "${nssdb}" 2>> "${HEALTH_ERROR_LOG}" || true
+        fi
+    fi
+
+    certutil -d "sql:${nssdb}" -N -f /dev/null > /dev/null 2>> "${HEALTH_ERROR_LOG}" || {
+        log_warn "NSS DB: certutil -N falhou. Veja ${HEALTH_ERROR_LOG}."
         return 1
     }
-    log_info "NSS DB criado: ${nssdb}"
 
-    local custom_dir="/usr/local/share/ca-certificates" imported=0 crt_file ca_name
+    log_info "NSS DB criado: ${nssdb} (target=${target_user})"
+
+    local custom_dir="/usr/local/share/ca-certificates"
+    local imported=0
+    local crt_file ca_name
+
     if [[ -d "${custom_dir}" ]]; then
         while IFS= read -r -d '' crt_file; do
             ca_name="$(basename "${crt_file}" .crt)"
-            if certutil -A -d "sql:${nssdb}" -n "custom-${ca_name}" -t "CT,," -i "${crt_file}" 2> /dev/null; then imported=$((imported + 1)); fi
+            if certutil -A -d "sql:${nssdb}" -n "custom-${ca_name}" -t "CT,," -i "${crt_file}" > /dev/null 2>> "${HEALTH_ERROR_LOG}"; then
+                imported=$((imported + 1))
+            fi
         done < <(find "${custom_dir}" -maxdepth 2 -name '*.crt' -print0 2> /dev/null)
+
         [[ "${imported}" -gt 0 ]] && log_info "NSS DB: ${imported} CA(s) customizado(s) importado(s)"
     fi
+
     return 0
 }
 
@@ -682,7 +633,9 @@ init_nss_db() {
 # Connectivity probes
 # -----------------------------------------------------------------------------
 expected_status_ok_for_url() {
-    local url="$1" code="$2"
+    local url="$1"
+    local code="$2"
+
     case "${url}" in
         https://api.github.com/user*)
             [[ "${code}" == "200" || "${code}" == "401" || "${code}" == "403" ]]
@@ -703,18 +656,44 @@ expected_status_ok_for_url() {
     esac
 }
 
+should_skip_probe_url() {
+    local url="$1"
+    local route_fix_ok="$2"
+
+    [[ "${SKIP_GITHUB_API_PROBES_AFTER_ROUTE_FIX}" == "true" ]] || return 1
+    [[ "${route_fix_ok}" == "true" ]] || return 1
+
+    case "${url}" in
+        https://api.github.com | https://api.github.com/*)
+            return 0
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+}
+
 probe_copilot_connectivity() {
+    local route_fix_ok="${1:-false}"
     local failed=0
+
     if ! has_cmd curl; then
         log_warn "Copilot probe: curl não encontrado — ignorado."
         return 1
     fi
 
     local url result http_code time_connect time_total tls_ok remote_ip ctype
+
     for url in ${COPILOT_PROBE_ENDPOINTS}; do
-        result="$(curl -4 -so /dev/null --connect-timeout 5 --max-time 10 \
+        if should_skip_probe_url "${url}" "${route_fix_ok}"; then
+            log_info "Copilot probe skip: ${url} já validado pelo GitHub API route fix."
+            continue
+        fi
+
+        result="$(LC_ALL=C curl -4 -so /dev/null --connect-timeout 5 --max-time 10 \
             -w 'http_code=%{http_code}|content_type=%{content_type}|time_connect=%{time_connect}|time_total=%{time_total}|remote_ip=%{remote_ip}|ssl_verify_result=%{ssl_verify_result}' \
-            "${url}" 2> /dev/null || true)"
+            "${url}" 2>> "${HEALTH_ERROR_LOG}" || true)"
+
         http_code="$(extract_field http_code "${result}")"
         ctype="$(extract_field content_type "${result}")"
         time_connect="$(extract_field time_connect "${result}")"
@@ -735,6 +714,7 @@ probe_copilot_connectivity() {
             log_ok "Copilot probe OK: ${url} → HTTP ${http_code} | IP ${remote_ip:-unknown} | TCP ${time_connect:-0}s | total ${time_total:-0}s | TLS OK"
         fi
     done
+
     return "${failed}"
 }
 
@@ -746,6 +726,7 @@ audit_initialized_marker() {
         log_info "Marker encontrado: .devcontainer/.initialized"
         return 0
     fi
+
     log_warn "Marker ausente: .devcontainer/.initialized (post-create pode ter falhado ou não rodou)."
     return 0
 }
@@ -755,16 +736,37 @@ run_make_info() {
         log_warn "make não encontrado no PATH."
         return 1
     fi
+
     if has_cmd timeout; then
-        timeout "${MAKE_INFO_TIMEOUT_SECONDS}" make info > /dev/null 2>&1
+        timeout "${MAKE_INFO_TIMEOUT_SECONDS}" make info > /dev/null 2>> "${HEALTH_ERROR_LOG}"
         return $?
     fi
-    make info > /dev/null 2>&1
+
+    make info > /dev/null 2>> "${HEALTH_ERROR_LOG}"
     return $?
 }
 
 audit_ssh() {
-    local ssh_key_found=false key
+    case "${SSH_AUDIT_MODE}" in
+        false | off | disabled | none)
+            log_info "SSH audit desabilitado por DEVCONTAINER_SSH_AUDIT_MODE=${SSH_AUDIT_MODE}."
+            return 0
+            ;;
+        attach-only)
+            log_info "SSH audit adiado para postAttach por DEVCONTAINER_SSH_AUDIT_MODE=attach-only."
+            return 0
+            ;;
+        auto | true | on | enabled)
+            :
+            ;;
+        *)
+            log_warn "SSH audit mode desconhecido (${SSH_AUDIT_MODE}); usando modo auto."
+            ;;
+    esac
+
+    local ssh_key_found=false
+    local key
+
     for key in id_rsa id_dsa id_ecdsa id_ed25519; do
         if [[ -s "${HOME:-/home/node}/.ssh/${key}" ]]; then
             ssh_key_found=true
@@ -772,16 +774,28 @@ audit_ssh() {
             break
         fi
     done
+
     if [[ "${ssh_key_found}" == "false" ]]; then
-        if has_cmd ssh-add && ssh-add -L > /dev/null 2>&1; then
-            log_info "Nenhuma chave em ~/.ssh, mas agente SSH encaminhado detectado."
-            ssh_key_found=true
-        else log_warn "Nenhuma chave SSH privada detectada e nenhum agente aparente; git/ssh pode falhar (WARN only)."; fi
+        if [[ -n "${SSH_AUTH_SOCK:-}" ]] && has_cmd ssh-add; then
+            if ssh-add -L > /dev/null 2>> "${HEALTH_ERROR_LOG}"; then
+                log_info "Nenhuma chave em ~/.ssh, mas agente SSH encaminhado detectado."
+                ssh_key_found=true
+            else
+                log_info "SSH_AUTH_SOCK presente, mas ssh-add -L ainda não retornou chaves; estado comum antes do postAttach."
+            fi
+        else
+            log_info "Nenhuma chave SSH privada/agente detectado no postStart; normal antes do postAttach em alguns fluxos VS Code."
+        fi
     fi
+
     if [[ "${ENABLE_SSHD_CHECK}" != "true" ]]; then
         log_info "SSHD check skipped via DEVCONTAINER_ENABLE_SSHD_CHECK."
     else
-        if has_cmd sshd; then log_info "sshd está instalado."; else log_info "sshd não encontrado; acesso inbound via SSH permanece desabilitado (estado esperado)."; fi
+        if has_cmd sshd; then
+            log_info "sshd está instalado."
+        else
+            log_info "sshd não encontrado; acesso inbound via SSH permanece desabilitado (estado esperado)."
+        fi
     fi
 }
 
@@ -793,11 +807,27 @@ log_info "Versão: v${SCRIPT_VERSION}"
 log_info "PWD: ${PWD:-unknown}"
 log_info "User: $(id -un 2> /dev/null || echo unknown) (uid=$(id -u 2> /dev/null || echo unknown), gid=$(id -g 2> /dev/null || echo unknown))"
 log_info "NSS_BASE_DIR: ${NSS_BASE_DIR}"
-log_info "LD_PRELOAD: ${LD_PRELOAD:-<unset>}"
+log_info "NSS target user: $(resolve_target_user)"
+log_info "LD_PRELOAD inicial: ${LD_PRELOAD:-<unset>}"
+log_info "GitHub API route script: ${GITHUB_API_ROUTE_SCRIPT}"
 log_info "Route report: ${GITHUB_ROUTE_REPORT_FILE}"
+log_info "Health error log: ${HEALTH_ERROR_LOG}"
+
+log_info "Normalizando ambiente NSS/LD_PRELOAD para subprocessos do hook..."
+normalize_nss_runtime_env
+nss_env_rc=$?
+if [[ "${nss_env_rc}" -ne 0 ]]; then
+    log_warn "Normalização inicial de NSS/LD_PRELOAD degradada; audit_nss_artifacts tentará reparar artefatos depois."
+fi
+log_info "LD_PRELOAD após normalização: ${LD_PRELOAD:-<unset>}"
+log_info "DEVCONTAINER_NSS_WRAPPER_LIB: ${DEVCONTAINER_NSS_WRAPPER_LIB:-<unset>}"
+log_info "NSS_WRAPPER_PASSWD: ${NSS_WRAPPER_PASSWD:-<unset>}"
+log_info "NSS_WRAPPER_GROUP: ${NSS_WRAPPER_GROUP:-<unset>}"
 
 status="ok"
 network_status="ok"
+diagnostics_status="ok"
+github_api_route_fix_ok="false"
 
 log_info "Aplicando fix de DNS..."
 fix_dns
@@ -809,19 +839,21 @@ if [[ "${dns_rc}" -ne 0 ]]; then
 fi
 
 log_info "Aplicando fix inteligente de rota para ${GITHUB_API_HOST}..."
-fix_github_api_route
+run_github_api_route_fix
 github_api_route_rc=$?
 if [[ "${github_api_route_rc}" -ne 0 ]]; then
     status="degraded"
     network_status="degraded"
     log_warn "Fix inteligente de rota para ${GITHUB_API_HOST} não aplicado — Copilot pode falhar se a rota DNS padrão estiver ruim."
+else
+    github_api_route_fix_ok="true"
 fi
 
 run_make_info
 make_rc=$?
 if [[ "${make_rc}" -ne 0 ]]; then
-    status="degraded"
-    log_warn "make info falhou (rc=${make_rc}, timeout=${MAKE_INFO_TIMEOUT_SECONDS}s)."
+    diagnostics_status="degraded"
+    log_warn "make info falhou (rc=${make_rc}, timeout=${MAKE_INFO_TIMEOUT_SECONDS}s) — diagnóstico degradado, sem degradar health estrutural."
 else
     log_info "make info executado com sucesso."
 fi
@@ -838,11 +870,11 @@ audit_initialized_marker || true
 init_nss_db || true
 
 log_info "Verificando conectividade com endpoints GitHub/Copilot/VS Code relevantes..."
-probe_copilot_connectivity
+probe_copilot_connectivity "${github_api_route_fix_ok}"
 probe_rc=$?
 if [[ "${probe_rc}" -ne 0 ]]; then
     network_status="degraded"
-    log_warn "Um ou mais endpoints relevantes não responderam como esperado. Veja ${GITHUB_ROUTE_REPORT_FILE} e logs acima."
+    log_warn "Um ou mais endpoints relevantes não responderam como esperado. Veja ${GITHUB_ROUTE_REPORT_FILE}, ${HEALTH_ERROR_LOG} e logs acima."
 else
     log_ok "Todos os probes de rede relevantes responderam."
 fi
@@ -855,7 +887,10 @@ fi
 
 printf '%s\n' "${status}" > "${HEALTH_STATUS_FILE}" 2> /dev/null || true
 printf '%s\n' "${network_status}" > "${NETWORK_STATUS_FILE}" 2> /dev/null || true
+printf '%s\n' "${diagnostics_status}" > "${DIAGNOSTICS_STATUS_FILE}" 2> /dev/null || true
+
 log_info "health.status=${status} (${HEALTH_STATUS_FILE})"
 log_info "network.status=${network_status} (${NETWORK_STATUS_FILE})"
+log_info "diagnostics.status=${diagnostics_status} (${DIAGNOSTICS_STATUS_FILE})"
 
 exit 0

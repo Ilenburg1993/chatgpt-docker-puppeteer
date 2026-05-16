@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # =============================================================================
 # PHASE 0 — GUARDA DE EXECUÇÃO (FAIL-SAFE ABSOLUTO)
-# CANONICAL v5.3.1
+# CANONICAL v5.4.1
 #
 # Contrato:
 # - post-attach NUNCA pode falhar
@@ -16,14 +16,14 @@
 # Desarma heranças perigosas
 set +e
 set +u
-set +o pipefail 2>/dev/null || true
+set +o pipefail 2> /dev/null || true
 
 # Neutraliza traps herdados (defensivo absoluto)
-trap - ERR EXIT INT TERM 2>/dev/null || true
+trap - ERR EXIT INT TERM 2> /dev/null || true
 
 # Versão canônica do hook (fonte única da verdade)
 readonly SCRIPT_NAME="post-attach"
-readonly SCRIPT_VERSION="5.3.1"
+readonly SCRIPT_VERSION="5.4.1"
 
 # ---------------------------------------------------------------------------
 # CLI options parser
@@ -36,7 +36,7 @@ while [[ $# -gt 0 ]]; do
             shift
             ;;
         --help)
-            cat <<'EOF'
+            cat << 'EOF'
 post-attach.sh [--brief] [--help] [--version]
 
 --brief    suppress detailed environment diagnostics
@@ -57,7 +57,7 @@ done
 
 # =============================================================================
 # PHASE 1 — UX HELPERS (API SEMÂNTICA DE OUTPUT)
-# CANONICAL v5.3.1
+# CANONICAL v5.4.1
 #
 # Finalidade:
 #   • Prover API mínima e estável de mensagens humanas
@@ -75,7 +75,7 @@ done
 # ---------------------------------------------------------------------------
 COLOR_ENABLED=false
 
-if [[ -t 1 ]] && command -v tput >/dev/null 2>&1; then
+if [[ -t 1 ]] && command -v tput > /dev/null 2>&1; then
     COLOR_ENABLED=true
 fi
 
@@ -105,7 +105,7 @@ fi
 #   • Apenas: info / ok / warn
 # ---------------------------------------------------------------------------
 info() { printf "%b\n" "${CYAN}ℹ️  $*${NC}"; }
-ok()   { printf "%b\n" "${GREEN}✅ $*${NC}"; }
+ok() { printf "%b\n" "${GREEN}✅ $*${NC}"; }
 warn() { printf "%b\n" "${YELLOW}⚠️  $*${NC}"; }
 
 # ---------------------------------------------------------------------------
@@ -126,15 +126,15 @@ dir_size_snapshot() {
         return 0
     fi
 
-    if command -v timeout >/dev/null 2>&1; then
-        size="$(timeout 2 du -sh "${target_dir}" 2>/dev/null | awk 'NR==1 {print $1}')"
+    if command -v timeout > /dev/null 2>&1; then
+        size="$(timeout 2 du -sh "${target_dir}" 2> /dev/null | awk 'NR==1 {print $1}')"
         rc=$?
 
         case "${rc}" in
             0)
                 printf '%s\n' "${size:-?}"
                 ;;
-            124|137)
+            124 | 137)
                 printf '%s\n' "~(lento)"
                 ;;
             *)
@@ -151,14 +151,104 @@ dir_size_snapshot() {
         return 0
     fi
 
-    size="$(du -sh "${target_dir}" 2>/dev/null | awk 'NR==1 {print $1}')"
+    size="$(du -sh "${target_dir}" 2> /dev/null | awk 'NR==1 {print $1}')"
     printf '%s\n' "${size:-?}"
+    return 0
+}
+
+# ---------------------------------------------------------------------------
+# Helpers passivos adicionais
+# ---------------------------------------------------------------------------
+is_uint() {
+    [[ "${1:-}" =~ ^[0-9]+$ ]]
+}
+
+read_status_snapshot() {
+    # $1=file, $2=label
+    local status_file="$1"
+    local status_label="$2"
+    local status_value=""
+
+    if [[ -r "${status_file}" ]]; then
+        status_value="$(head -n 1 "${status_file}" 2> /dev/null || echo unknown)"
+        case "${status_value}" in
+            ok)
+                ok "${status_label}: OK"
+                ;;
+            degraded | fail | failed | error)
+                warn "${status_label}: ${status_value}"
+                ;;
+            *)
+                info "${status_label}: ${status_value:-unknown}"
+                ;;
+        esac
+    else
+        warn "${status_label}: sem snapshot registrado"
+    fi
+}
+
+detect_pm2_version_passive() {
+    # Avoids invoking pm2 itself because some pm2 commands may daemonize.
+    local pm2_bin="$1"
+    local pm2_real=""
+    local dir=""
+    local pkg=""
+    local depth=0
+
+    if [[ -z "${pm2_bin}" ]]; then
+        printf '%s\n' "desconhecida"
+        return 0
+    fi
+
+    if command -v readlink > /dev/null 2>&1; then
+        pm2_real="$(readlink -f "${pm2_bin}" 2> /dev/null || printf '%s' "${pm2_bin}")"
+    else
+        pm2_real="${pm2_bin}"
+    fi
+
+    dir="$(dirname "${pm2_real}" 2> /dev/null || printf '.')"
+
+    while [[ "${depth}" -lt 8 && -n "${dir}" && "${dir}" != "/" ]]; do
+        pkg="${dir}/package.json"
+        if [[ -r "${pkg}" ]] && grep -q '"name"[[:space:]]*:[[:space:]]*"pm2"' "${pkg}" 2> /dev/null; then
+            if command -v node > /dev/null 2>&1; then
+                node -e 'try { const p = require(process.argv[1]); console.log(p.version || "desconhecida"); } catch { console.log("desconhecida"); }' "${pkg}" 2> /dev/null
+                return 0
+            fi
+            if command -v jq > /dev/null 2>&1; then
+                jq -r '.version // "desconhecida"' "${pkg}" 2> /dev/null || printf '%s\n' "desconhecida"
+                return 0
+            fi
+        fi
+        dir="$(dirname "${dir}" 2> /dev/null || printf '/')"
+        depth=$((depth + 1))
+    done
+
+    printf '%s\n' "desconhecida"
+}
+
+pm2_dump_process_count_passive() {
+    # Reads PM2 dump only. Does not invoke pm2 and therefore does not start its daemon.
+    local pm2_home="${PM2_HOME:-${USER_HOME}/.pm2}"
+    local dump_file="${pm2_home}/dump.pm2"
+
+    if [[ ! -r "${dump_file}" ]]; then
+        printf '%s\n' "absent"
+        return 0
+    fi
+
+    if command -v jq > /dev/null 2>&1; then
+        jq '. | length' "${dump_file}" 2> /dev/null || printf '%s\n' "unknown"
+        return 0
+    fi
+
+    grep -c '"name"' "${dump_file}" 2> /dev/null || printf '%s\n' "unknown"
     return 0
 }
 
 # =============================================================================
 # PHASE 2 — BANNER DE ATTACH (IDENTIDADE HUMANA — INICIAL)
-# CANONICAL v5.3.1
+# CANONICAL v5.4.1
 #
 # Finalidade:
 #   • Sinalizar visualmente o evento de attach
@@ -228,7 +318,7 @@ UX_STATE_WRITABLE=true
 # ---------------------------------------------------------------------------
 # Preparação defensiva do namespace
 # ---------------------------------------------------------------------------
-if ! mkdir -p "${UX_STATE_DIR}" 2>/dev/null; then
+if ! mkdir -p "${UX_STATE_DIR}" 2> /dev/null; then
     UX_STATE_WRITABLE=false
 fi
 
@@ -239,7 +329,7 @@ IS_FIRST_ATTACH=false
 
 if [[ "${UX_STATE_WRITABLE}" == "true" && ! -f "${FIRST_ATTACH_MARKER}" ]]; then
     IS_FIRST_ATTACH=true
-    touch "${FIRST_ATTACH_MARKER}" 2>/dev/null || true
+    touch "${FIRST_ATTACH_MARKER}" 2> /dev/null || true
 fi
 
 # ---------------------------------------------------------------------------
@@ -256,41 +346,45 @@ ATTACH_OFFSET_FILE="${ATTACH_COUNT_FILE}-offset"
 
 if [[ "${UX_STATE_WRITABLE}" == "true" ]]; then
     # garantimos que o diretório existe antes de mexer nos arquivos
-    mkdir -p "${UX_STATE_DIR}" 2>/dev/null || true
+    mkdir -p "${UX_STATE_DIR}" 2> /dev/null || true
 
     if [[ ! -f "${ATTACH_COUNT_FILE}" ]]; then
         # primeiro attach: criamos o arquivo base com 1 e limpamos qualquer offset
-        if printf '%s\n' 1 > "${ATTACH_COUNT_FILE}.tmp" 2>/dev/null; then
-            mv "${ATTACH_COUNT_FILE}.tmp" "${ATTACH_COUNT_FILE}" 2>/dev/null || true
+        if printf '%s\n' 1 > "${ATTACH_COUNT_FILE}.tmp" 2> /dev/null; then
+            mv "${ATTACH_COUNT_FILE}.tmp" "${ATTACH_COUNT_FILE}" 2> /dev/null || true
         fi
-        rm -f "${ATTACH_OFFSET_FILE}" 2>/dev/null || true
+        rm -f "${ATTACH_OFFSET_FILE}" 2> /dev/null || true
     else
-        base=$(cat "${ATTACH_COUNT_FILE}" 2>/dev/null || echo 0)
+        base="$(cat "${ATTACH_COUNT_FILE}" 2> /dev/null || echo 0)"
         offset=0
         if [[ -f "${ATTACH_OFFSET_FILE}" ]]; then
-            offset=$(cat "${ATTACH_OFFSET_FILE}" 2>/dev/null || echo 0)
+            offset="$(cat "${ATTACH_OFFSET_FILE}" 2> /dev/null || echo 0)"
         fi
+
+        is_uint "${base}" || base=0
+        is_uint "${offset}" || offset=0
+
         offset=$((offset + 1))
         total=$((base + offset))
 
-        if (( total % 10 == 0 )); then
-            if printf '%s\n' "${total}" > "${ATTACH_COUNT_FILE}.tmp" 2>/dev/null; then
-                mv "${ATTACH_COUNT_FILE}.tmp" "${ATTACH_COUNT_FILE}" 2>/dev/null || true
+        if ((total % 10 == 0)); then
+            if printf '%s\n' "${total}" > "${ATTACH_COUNT_FILE}.tmp" 2> /dev/null; then
+                mv "${ATTACH_COUNT_FILE}.tmp" "${ATTACH_COUNT_FILE}" 2> /dev/null || true
             fi
-            rm -f "${ATTACH_OFFSET_FILE}" 2>/dev/null || true
+            rm -f "${ATTACH_OFFSET_FILE}" 2> /dev/null || true
         else
             # atualizamos apenas o offset, mantendo o base intacto
-            if printf '%s\n' "${offset}" > "${ATTACH_OFFSET_FILE}.tmp" 2>/dev/null; then
-                mv "${ATTACH_OFFSET_FILE}.tmp" "${ATTACH_OFFSET_FILE}" 2>/dev/null || true
+            if printf '%s\n' "${offset}" > "${ATTACH_OFFSET_FILE}.tmp" 2> /dev/null; then
+                mv "${ATTACH_OFFSET_FILE}.tmp" "${ATTACH_OFFSET_FILE}" 2> /dev/null || true
             fi
         fi
     fi
 
-    if date -Is > "${LAST_ATTACH_AT_FILE}.tmp" 2>/dev/null; then
-        mv "${LAST_ATTACH_AT_FILE}.tmp" "${LAST_ATTACH_AT_FILE}" 2>/dev/null || true
+    if date -Is > "${LAST_ATTACH_AT_FILE}.tmp" 2> /dev/null; then
+        mv "${LAST_ATTACH_AT_FILE}.tmp" "${LAST_ATTACH_AT_FILE}" 2> /dev/null || true
     fi
 
-    touch "${LAST_ATTACH_MARKER}" 2>/dev/null || true
+    touch "${LAST_ATTACH_MARKER}" 2> /dev/null || true
 fi
 
 # =============================================================================
@@ -316,7 +410,7 @@ fi
 # ---------------------------------------------------------------------------
 # Identidade de execução (defensiva)
 # ---------------------------------------------------------------------------
-CURRENT_USER="$(whoami 2>/dev/null || echo 'desconhecido')"
+CURRENT_USER="$(whoami 2> /dev/null || echo 'desconhecido')"
 WORKSPACE_DIR="${PWD:-indefinido}"
 
 # Âncora canônica de HOME (não normativa)
@@ -352,12 +446,9 @@ if [[ -n "${WORKSPACE_DIR}" ]]; then
     if [[ -f "${WORKSPACE_DIR}/Makefile" || -d "${WORKSPACE_DIR}/.git" ]]; then
         PROJECT_ROOT="${WORKSPACE_DIR}"
     else
-        PARENT_DIR=""
-        if cd "${WORKSPACE_DIR}/.." 2>/dev/null; then
-            PARENT_DIR=$(pwd || true)
-        fi
+        PARENT_DIR="$(cd "${WORKSPACE_DIR}/.." 2> /dev/null && pwd -P 2> /dev/null || true)"
         if [[ -n "${PARENT_DIR}" ]] \
-           && { [[ -f "${PARENT_DIR}/Makefile" ]] || [[ -d "${PARENT_DIR}/.git" ]]; }; then
+            && { [[ -f "${PARENT_DIR}/Makefile" ]] || [[ -d "${PARENT_DIR}/.git" ]]; }; then
             PROJECT_ROOT="${PARENT_DIR}"
         fi
     fi
@@ -369,41 +460,164 @@ fi
 # Observação:
 #   • Ausência de Node NÃO é erro
 # ---------------------------------------------------------------------------
-NODE_VERSION="$(node --version 2>/dev/null || echo 'não disponível')"
-NPM_VERSION="$(npm --version 2>/dev/null || echo 'não disponível')"
-NODE_PATH="$(command -v node 2>/dev/null || echo 'não encontrado')"
-NPM_PATH="$(command -v npm 2>/dev/null || echo 'não encontrado')"
+NODE_VERSION="$(node --version 2> /dev/null || echo 'não disponível')"
+NPM_VERSION="$(npm --version 2> /dev/null || echo 'não disponível')"
+NODE_PATH="$(command -v node 2> /dev/null || echo 'não encontrado')"
+NPM_PATH="$(command -v npm 2> /dev/null || echo 'não encontrado')"
 
 # ---------------------------------------------------------------------------
 # Output humano estruturado
 # ---------------------------------------------------------------------------
-printf "  • %-22s %s\n" "Usuário:"             "${CURRENT_USER}"
-printf "  • %-22s %s\n" "Contexto execução:"   "${EXECUTION_CONTEXT}"
-printf "  • %-22s %s\n" "Workspace (PWD):"     "${WORKSPACE_DIR}"
-printf "  • %-22s %s\n" "Projeto (root):"      "${PROJECT_ROOT}"
-printf "  • %-22s %s\n" "LD_PRELOAD:"           "${LD_PRELOAD:-<unset>}"
+printf "  • %-22s %s\n" "Usuário:" "${CURRENT_USER}"
+printf "  • %-22s %s\n" "Contexto execução:" "${EXECUTION_CONTEXT}"
+printf "  • %-22s %s\n" "Workspace (PWD):" "${WORKSPACE_DIR}"
+printf "  • %-22s %s\n" "Projeto (root):" "${PROJECT_ROOT}"
+printf "  • %-22s %s\n" "Node.js:" "${NODE_VERSION}"
+printf "  • %-22s %s\n" "npm:" "${NPM_VERSION}"
+printf "  • %-22s %s\n" "Node path:" "${NODE_PATH}"
+printf "  • %-22s %s\n" "npm path:" "${NPM_PATH}"
+
 if [[ "${NODE_PATH}" =~ ^/mnt/[A-Za-z]/ ]]; then
     warn "Node.js resolve para um binário do Windows (${NODE_PATH}); prefira o Node Linux no WSL/container"
 fi
 if [[ "${NPM_PATH}" =~ ^/mnt/[A-Za-z]/ ]]; then
     warn "npm resolve para um binário do Windows (${NPM_PATH}); isso pode quebrar Codex, npm scripts e paths UNC"
 fi
-if [[ -z "${LD_PRELOAD:-}" || ! "${LD_PRELOAD}" =~ libnss_wrapper\.so ]]; then
-    warn "LD_PRELOAD does not contain libnss_wrapper.so; identity wrapper may be inactive"
+
+echo ""
+
+# ---------------------------------------------------------------------------
+# NSS / LD_PRELOAD — diagnóstico passivo canônico
+#
+# Contrato:
+#   • post-attach NÃO repara NSS; apenas observa e explica.
+#   • Correção estrutural pertence a:
+#       - Dockerfile: cria /usr/local/lib/devcontainer/libnss_wrapper.so
+#       - devcontainer.json: exporta LD_PRELOAD absoluto
+#       - nss-gatekeeper: canonicaliza antes do comando real
+#       - post-start: audita/recanonicaliza subprocessos do hook
+# ---------------------------------------------------------------------------
+info "NSS / LD_PRELOAD (diagnóstico passivo):"
+
+NSS_BASE_DIR="${DEVCONTAINER_NSS_DIR:-/tmp/devcontainer-nss}"
+NSS_CANONICAL_LIB="${DEVCONTAINER_NSS_WRAPPER_LIB:-/usr/local/lib/devcontainer/libnss_wrapper.so}"
+NSS_PASSWD_FILE="${NSS_BASE_DIR}/passwd"
+NSS_GROUP_FILE="${NSS_BASE_DIR}/group"
+
+LD_PRELOAD_VALUE="${LD_PRELOAD:-}"
+NSS_WRAPPER_PASSWD_VALUE="${NSS_WRAPPER_PASSWD:-}"
+NSS_WRAPPER_GROUP_VALUE="${NSS_WRAPPER_GROUP:-}"
+
+NSS_PRELOAD_FOUND=false
+NSS_PRELOAD_RELATIVE=false
+NSS_PRELOAD_UNREADABLE=false
+NSS_PRELOAD_CANONICAL=false
+NSS_PRELOAD_ABSOLUTE_NONCANONICAL=false
+NSS_PRELOAD_COUNT=0
+
+if [[ -n "${LD_PRELOAD_VALUE}" ]]; then
+    OLD_IFS="${IFS}"
+    IFS=':'
+    for preload_token in ${LD_PRELOAD_VALUE}; do
+        [[ -z "${preload_token}" ]] && continue
+
+        case "${preload_token}" in
+            libnss_wrapper.so)
+                NSS_PRELOAD_FOUND=true
+                NSS_PRELOAD_RELATIVE=true
+                NSS_PRELOAD_COUNT=$((NSS_PRELOAD_COUNT + 1))
+                ;;
+            */libnss_wrapper.so)
+                NSS_PRELOAD_FOUND=true
+                NSS_PRELOAD_COUNT=$((NSS_PRELOAD_COUNT + 1))
+
+                if [[ "${preload_token}" == "${NSS_CANONICAL_LIB}" ]]; then
+                    NSS_PRELOAD_CANONICAL=true
+                else
+                    NSS_PRELOAD_ABSOLUTE_NONCANONICAL=true
+                fi
+
+                if [[ ! -r "${preload_token}" ]]; then
+                    NSS_PRELOAD_UNREADABLE=true
+                fi
+                ;;
+        esac
+    done
+    IFS="${OLD_IFS}"
+    unset OLD_IFS preload_token
 fi
-# always expose NSS base dir when configured, regardless of LD_PRELOAD state
-if [[ -n "${DEVCONTAINER_NSS_DIR:-}" ]]; then
-    # print runtime info when LD_PRELOAD is set but missing wrapper, else keep simple
-    if [[ -n "${LD_PRELOAD:-}" && ! "${LD_PRELOAD}" =~ libnss_wrapper\.so ]]; then
-        printf "  • %-22s %s\n" "Node.js:"             "${NODE_VERSION}"
-        printf "  • %-22s %s\n" "npm:"                 "${NPM_VERSION}"
-        printf "  • %-22s %s\n" "Node path:"           "${NODE_PATH}"
+
+printf "  • %-22s %s\n" "LD_PRELOAD:" "${LD_PRELOAD_VALUE:-<unset>}"
+printf "  • %-22s %s\n" "NSS lib canônica:" "${NSS_CANONICAL_LIB}"
+printf "  • %-22s %s\n" "NSS base dir:" "${NSS_BASE_DIR}"
+printf "  • %-22s %s\n" "NSS passwd:" "${NSS_WRAPPER_PASSWD_VALUE:-<unset>}"
+printf "  • %-22s %s\n" "NSS group:" "${NSS_WRAPPER_GROUP_VALUE:-<unset>}"
+
+if [[ -r "${NSS_CANONICAL_LIB}" ]]; then
+    ok "NSS wrapper canônico legível"
+else
+    warn "NSS wrapper canônico não encontrado/ilegível: ${NSS_CANONICAL_LIB}"
+fi
+
+if [[ "${NSS_PRELOAD_FOUND}" == "false" ]]; then
+    warn "LD_PRELOAD não contém libnss_wrapper.so; identity wrapper pode estar inativo"
+fi
+
+if [[ "${NSS_PRELOAD_RELATIVE}" == "true" ]]; then
+    warn "LD_PRELOAD contém libnss_wrapper.so relativo; esperado caminho absoluto canônico"
+fi
+
+if [[ "${NSS_PRELOAD_UNREADABLE}" == "true" ]]; then
+    warn "LD_PRELOAD contém caminho de libnss_wrapper.so ilegível/inexistente"
+fi
+
+if [[ "${NSS_PRELOAD_COUNT}" -gt 1 ]]; then
+    warn "LD_PRELOAD contém múltiplos tokens de libnss_wrapper.so; esperado apenas o canônico"
+fi
+
+if [[ "${NSS_PRELOAD_CANONICAL}" == "true" ]]; then
+    ok "LD_PRELOAD contém NSS wrapper canônico"
+elif [[ "${NSS_PRELOAD_ABSOLUTE_NONCANONICAL}" == "true" ]]; then
+    warn "LD_PRELOAD contém NSS wrapper absoluto, mas diferente do caminho canônico esperado"
+fi
+
+if [[ -n "${LD_PRELOAD_VALUE}" ]]; then
+    if [[ "${LD_PRELOAD_VALUE}" == ":"* || "${LD_PRELOAD_VALUE}" == *":" || "${LD_PRELOAD_VALUE}" == *"::"* ]]; then
+        warn "LD_PRELOAD contém token vazio (: nas pontas ou :: no meio)"
     fi
-    printf "  • %-22s %s\n" "NSS base dir:"        "${DEVCONTAINER_NSS_DIR:-/tmp/devcontainer-nss}"
-    echo ""
+
+    if ((${#LD_PRELOAD_VALUE} > 4096)); then
+        warn "LD_PRELOAD tem ${#LD_PRELOAD_VALUE} caracteres; pode exceder limite seguro do kernel"
+    fi
 fi
 
+if [[ -n "${NSS_WRAPPER_PASSWD_VALUE}" ]]; then
+    if [[ -r "${NSS_WRAPPER_PASSWD_VALUE}" && -s "${NSS_WRAPPER_PASSWD_VALUE}" ]]; then
+        ok "NSS_WRAPPER_PASSWD válido e legível"
+    else
+        warn "NSS_WRAPPER_PASSWD aponta para arquivo ausente, vazio ou ilegível: ${NSS_WRAPPER_PASSWD_VALUE}"
+    fi
+else
+    warn "NSS_WRAPPER_PASSWD não está definido"
+fi
 
+if [[ -n "${NSS_WRAPPER_GROUP_VALUE}" ]]; then
+    if [[ -r "${NSS_WRAPPER_GROUP_VALUE}" && -s "${NSS_WRAPPER_GROUP_VALUE}" ]]; then
+        ok "NSS_WRAPPER_GROUP válido e legível"
+    else
+        warn "NSS_WRAPPER_GROUP aponta para arquivo ausente, vazio ou ilegível: ${NSS_WRAPPER_GROUP_VALUE}"
+    fi
+else
+    warn "NSS_WRAPPER_GROUP não está definido"
+fi
+
+if [[ -r "${NSS_PASSWD_FILE}" && -s "${NSS_PASSWD_FILE}" && -r "${NSS_GROUP_FILE}" && -s "${NSS_GROUP_FILE}" ]]; then
+    ok "Artefatos NSS runtime presentes e legíveis em ${NSS_BASE_DIR}"
+else
+    warn "Artefatos NSS runtime ausentes/incompletos/ilegíveis em ${NSS_BASE_DIR}; fallback /etc pode estar em uso"
+fi
+
+echo ""
 
 # =============================================================================
 # PHASE 5 — ESTADO ESTRUTURAL
@@ -455,7 +669,7 @@ info "Estado estrutural do DevContainer:"
 __dc_read_manifest_key() {
     # $1 = arquivo
     # $2 = chave
-    grep -E "^${2}=" "$1" 2>/dev/null | head -n1 | cut -d= -f2 || true
+    grep -E "^${2}=" "$1" 2> /dev/null | head -n1 | cut -d= -f2 || true
 }
 
 # ---------------------------------------------------------------------------
@@ -469,33 +683,33 @@ if [[ "${SKIP_STATE_FILE}" == "false" && -r "${STATE_MANIFEST}" ]]; then
     MANIFEST_STATUS="$(__dc_read_manifest_key "${STATE_MANIFEST}" "status")"
     MANIFEST_INTEGRITY="$(__dc_read_manifest_key "${STATE_MANIFEST}" "integrity")"
 
-    [[ -n "${MANIFEST_INIT_AT}" ]] && \
-        info "→ Último post-create em: ${MANIFEST_INIT_AT}"
+    [[ -n "${MANIFEST_INIT_AT}" ]] \
+        && info "→ Último post-create em: ${MANIFEST_INIT_AT}"
 
-    [[ -n "${MANIFEST_SCRIPT_VERSION}" ]] && \
-        info "→ post-create versão: ${MANIFEST_SCRIPT_VERSION}"
+    [[ -n "${MANIFEST_SCRIPT_VERSION}" ]] \
+        && info "→ post-create versão: ${MANIFEST_SCRIPT_VERSION}"
 
-    [[ -n "${MANIFEST_STATUS}" ]] && \
-        info "→ Status estrutural: ${MANIFEST_STATUS}"
+    [[ -n "${MANIFEST_STATUS}" ]] \
+        && info "→ Status estrutural: ${MANIFEST_STATUS}"
 
-    [[ -n "${MANIFEST_INTEGRITY}" ]] && \
-        info "→ Integridade: ${MANIFEST_INTEGRITY}"
+    [[ -n "${MANIFEST_INTEGRITY}" ]] \
+        && info "→ Integridade: ${MANIFEST_INTEGRITY}"
 
 # ---------------------------------------------------------------------------
 # 2. Fallback LEGADO (compatibilidade histórica)
 # ---------------------------------------------------------------------------
 elif [[ -r "${STATE_MANIFEST}" ]]; then
     warn "Manifesto canônico indisponível — usando marcador legado"
-    ok   "DevContainer inicializado (post-create confirmado)"
+    ok "DevContainer inicializado (post-create confirmado)"
 
     LEGACY_INIT_AT="$(__dc_read_manifest_key "${STATE_MANIFEST}" "initialized_at")"
     LEGACY_VERSION="$(__dc_read_manifest_key "${STATE_MANIFEST}" "script_version")"
 
-    [[ -n "${LEGACY_INIT_AT}" ]] && \
-        info "→ Inicializado em: ${LEGACY_INIT_AT}"
+    [[ -n "${LEGACY_INIT_AT}" ]] \
+        && info "→ Inicializado em: ${LEGACY_INIT_AT}"
 
-    [[ -n "${LEGACY_VERSION}" ]] && \
-        info "→ post-create versão: ${LEGACY_VERSION}"
+    [[ -n "${LEGACY_VERSION}" ]] \
+        && info "→ post-create versão: ${LEGACY_VERSION}"
 
 # ---------------------------------------------------------------------------
 # 3. Estado estrutural ausente / desconhecido
@@ -524,30 +738,28 @@ echo ""
 #   • Expor capacidades críticas observáveis (runtime)
 # =============================================================================
 
-
 # ---------------------------------------------------------------------------
-# 6.1 — Healthcheck (snapshot passivo)
+# 6.1 — Health / Network / Diagnostics snapshots (passivo)
 # ---------------------------------------------------------------------------
-HEALTH_STATUS_FILE="/tmp/devcontainer-health.status"
+HEALTH_STATUS_FILE="${DEVCONTAINER_HEALTH_STATUS_FILE:-/tmp/devcontainer-health.status}"
+NETWORK_STATUS_FILE="${DEVCONTAINER_NETWORK_STATUS_FILE:-/tmp/devcontainer-network.status}"
+DIAGNOSTICS_STATUS_FILE="${DEVCONTAINER_DIAGNOSTICS_STATUS_FILE:-/tmp/devcontainer-diagnostics.status}"
+GITHUB_ROUTE_REPORT_FILE="${DEVCONTAINER_GITHUB_ROUTE_REPORT_FILE:-/tmp/devcontainer-github-api-route.report}"
 
 info "Estado conhecido do sistema:"
 
-if [[ -r "${HEALTH_STATUS_FILE}" ]]; then
-    HEALTH_STATUS="$(cat "${HEALTH_STATUS_FILE}" 2>/dev/null || echo unknown)"
+read_status_snapshot "${HEALTH_STATUS_FILE}" "Último healthcheck registrado"
+read_status_snapshot "${NETWORK_STATUS_FILE}" "Último network check registrado"
+read_status_snapshot "${DIAGNOSTICS_STATUS_FILE}" "Último diagnostics check registrado"
 
-    if [[ "${HEALTH_STATUS}" == "ok" ]]; then
-        ok "Último healthcheck registrado: OK"
-    else
-        warn "Último healthcheck registrado: NÃO OK"
-        warn "→ Healthcheck pode ser executado manualmente (make health)"
-    fi
+if [[ -r "${GITHUB_ROUTE_REPORT_FILE}" ]]; then
+    ok "Relatório de rota GitHub API detectado"
+    info "→ ${GITHUB_ROUTE_REPORT_FILE}"
 else
-    warn "Nenhum healthcheck registrado ainda"
-    info "→ Healthcheck ainda não foi executado neste ambiente"
+    info "→ Relatório de rota GitHub API ainda não registrado"
 fi
 
 echo ""
-
 
 # ---------------------------------------------------------------------------
 # 6.2 — SSH (Capacidade Crítica | Observação Passiva)
@@ -573,7 +785,6 @@ else
 fi
 
 echo ""
-
 
 # ---------------------------------------------------------------------------
 # 6.3 — ENV (Resumo Passivo - Arquitetura remoteEnv)
@@ -612,6 +823,14 @@ fi
 
 echo ""
 
+if [[ "${BRIEF}" == "true" ]]; then
+    printf "%b\n" "${BLUE}──────────────────────────────────────────────────────────────${NC}"
+    ok "Ambiente pronto para uso."
+    info "Attach concluído em modo breve."
+    printf "%b\n" "${BLUE}──────────────────────────────────────────────────────────────${NC}"
+    echo ""
+    exit 0
+fi
 
 # =============================================================================
 # PHASE 7 — QUICK START GUIDE (FIRST ATTACH ONLY)
@@ -682,61 +901,56 @@ if [ "${IS_FIRST_ATTACH}" = true ]; then
 fi
 
 # =============================================================================
-# PHASE 8 — PM2 (OBSERVAÇÃO PASSIVA)
-# CANONICAL v5.2.1
+# PHASE 8 — PM2 (OBSERVAÇÃO PASSIVA SEM DAEMONIZAÇÃO)
+# CANONICAL v5.4.1
 #
 # CONTRATO:
-#   • Observação estritamente PASSIVA
-#   • Nunca inicia, reinicia ou modifica processos
-#   • Nunca presume que PM2 deva estar ativo
-#   • Nunca bloqueia o attach
+#   • Observação estritamente PASSIVA.
+#   • Nunca chama `pm2 jlist`, `pm2 list`, `pm2 status` ou qualquer comando que
+#     possa inicializar o daemon interno do PM2.
+#   • Nunca inicia, reinicia ou modifica processos.
+#   • Nunca presume que PM2 deva estar ativo.
 #
 # OBJETIVO:
-#   • Informar se o PM2 está disponível no ambiente
-#   • Indicar se há processos registrados
+#   • Informar se o binário PM2 está disponível.
+#   • Ler, se existir, o dump persistente ~/.pm2/dump.pm2 de forma passiva.
 # =============================================================================
 
-info "PM2 (observação passiva):"
+info "PM2 (observação passiva sem daemonização):"
 
 PM2_CMD=""
 
 # ---------------------------------------------------------------------------
 # Detecção do binário PM2 (ordem semântica)
 # ---------------------------------------------------------------------------
-if command -v pm2 >/dev/null 2>&1; then
-    PM2_CMD="pm2"
-elif [ -x "node_modules/.bin/pm2" ]; then
+if command -v pm2 > /dev/null 2>&1; then
+    PM2_CMD="$(command -v pm2 2> /dev/null || echo pm2)"
+elif [[ -x "node_modules/.bin/pm2" ]]; then
     PM2_CMD="node_modules/.bin/pm2"
 fi
 
-# ---------------------------------------------------------------------------
-# Diagnóstico observacional
-# ---------------------------------------------------------------------------
-if [ -n "${PM2_CMD}" ]; then
-    PM2_VERSION="$(${PM2_CMD} --version 2>/dev/null || echo 'desconhecida')"
-    ok "PM2 disponível — versão ${PM2_VERSION}"
+if [[ -n "${PM2_CMD}" ]]; then
+    PM2_VERSION="$(detect_pm2_version_passive "${PM2_CMD}")"
+    ok "PM2 disponível — binário: ${PM2_CMD}"
+    info "→ Versão detectada passivamente: ${PM2_VERSION}"
 
-    # Consulta passiva de processos (sem detalhamento)
-    if command -v timeout >/dev/null 2>&1; then
-        PM2_JLIST="$(
-            timeout 3 "${PM2_CMD}" jlist 2>/dev/null || echo '[]'
-        )"
-    else
-        PM2_JLIST="$("${PM2_CMD}" jlist 2>/dev/null || echo '[]')"
-    fi
+    PM2_HOME_EFFECTIVE="${PM2_HOME:-${USER_HOME}/.pm2}"
+    PM2_DUMP_FILE="${PM2_HOME_EFFECTIVE}/dump.pm2"
+    PM2_DUMP_COUNT="$(pm2_dump_process_count_passive)"
 
-    if command -v jq >/dev/null 2>&1; then
-        PROC_COUNT="$(echo "${PM2_JLIST}" | jq '. | length' 2>/dev/null || echo 0)"
+    if [[ "${PM2_DUMP_COUNT}" == "absent" ]]; then
+        warn "Nenhum dump.pm2 encontrado em ${PM2_HOME_EFFECTIVE}"
+        info "→ Normal antes de iniciar ou salvar processos PM2"
+    elif [[ "${PM2_DUMP_COUNT}" == "unknown" ]]; then
+        warn "dump.pm2 encontrado, mas não pôde ser interpretado passivamente"
+        info "→ Arquivo: ${PM2_DUMP_FILE}"
+    elif is_uint "${PM2_DUMP_COUNT}" && [[ "${PM2_DUMP_COUNT}" -gt 0 ]]; then
+        ok "dump.pm2 indica ${PM2_DUMP_COUNT} processo(s) salvo(s)"
+        info "→ Isto não confirma processo ativo; é apenas snapshot persistente"
+        info "→ Use 'pm2 status' ou 'make pm2-status' manualmente para estado real"
     else
-        PROC_COUNT="$(echo "${PM2_JLIST}" | grep -c '"name"' 2>/dev/null || echo 0)"
-    fi
-
-    if [ "${PROC_COUNT}" -gt 0 ]; then
-        ok "PM2 respondeu — ${PROC_COUNT} processo(s) registrado(s)"
-        info "→ Use 'pm2 status' ou 'make pm2-status' para detalhes"
-    else
-        warn "PM2 disponível, mas nenhum processo registrado"
-        info "→ Normal antes de iniciar o sistema"
+        warn "dump.pm2 presente, mas sem processos salvos"
+        info "→ Normal antes de iniciar/salvar o sistema"
     fi
 else
     warn "PM2 não detectado no ambiente"
@@ -744,8 +958,6 @@ else
 fi
 
 echo ""
-
-
 
 # =============================================================================
 # PHASE 9 — CHROME EXTERNO (CDP | DIAGNÓSTICO PASSIVO)
@@ -815,22 +1027,23 @@ fi
 CHROME_CDP_PATH="/json/version"
 CHROME_CDP_TIMEOUT_SECONDS=2
 
-if command -v curl >/dev/null 2>&1; then
+if command -v curl > /dev/null 2>&1; then
     CDP_RESPONSE="$(
-        curl \
+        LC_ALL=C curl \
+            --noproxy '*' \
             --silent \
             --fail \
             --max-time "${CHROME_CDP_TIMEOUT_SECONDS}" \
             --connect-timeout "${CHROME_CDP_TIMEOUT_SECONDS}" \
             "${CHROME_PROXY_ENDPOINT}${CHROME_CDP_PATH}" \
-            2>/dev/null || echo ""
+            2> /dev/null || echo ""
     )"
 
     if [ -n "${CDP_RESPONSE}" ]; then
         # Proxy respondeu — SEM inferir estado do Chrome Windows
         CHROME_VERSION="$(
             echo "${CDP_RESPONSE}" \
-            | sed -n 's/.*"Browser"[[:space:]]*:[[:space:]]*"\([^\"]*\)".*/\1/p'
+                | sed -n 's/.*"Browser"[[:space:]]*:[[:space:]]*"\([^\"]*\)".*/\1/p'
         )"
 
         ok "Chrome Proxy (container:9224): respondendo"
@@ -847,7 +1060,6 @@ else
 fi
 
 echo ""
-
 
 # =============================================================================
 # PHASE 10 — VOLUMES & CACHE (OBSERVAÇÃO PASSIVA)
@@ -911,22 +1123,21 @@ echo ""
 info "Espaço em disco (snapshot):"
 
 # Usa última linha para evitar variações de locale/header
-DISK_USAGE="$(df -h / 2>/dev/null | awk 'END {print $5}' || echo '?%')"
-DISK_AVAIL="$(df -h / 2>/dev/null | awk 'END {print $4}' || echo '?')"
+DISK_USAGE="$(df -h / 2> /dev/null | awk 'END {print $5}' || echo '?%')"
+DISK_AVAIL="$(df -h / 2> /dev/null | awk 'END {print $4}' || echo '?')"
 
 DISK_USAGE_NUM="${DISK_USAGE%\%}"
 
-if [ "${DISK_USAGE_NUM}" -gt 90 ] 2>/dev/null; then
+if [ "${DISK_USAGE_NUM}" -gt 90 ] 2> /dev/null; then
     warn "Uso de disco: ${DISK_USAGE} (${DISK_AVAIL} disponível) — CRÍTICO"
     warn "→ Ação manual sugerida: make clean (logs/cache)"
-elif [ "${DISK_USAGE_NUM}" -gt 80 ] 2>/dev/null; then
+elif [ "${DISK_USAGE_NUM}" -gt 80 ] 2> /dev/null; then
     warn "Uso de disco: ${DISK_USAGE} (${DISK_AVAIL} disponível) — ALTO"
 else
     ok "Uso de disco: ${DISK_USAGE} (${DISK_AVAIL} disponível)"
 fi
 
 echo ""
-
 
 # =============================================================================
 # PHASE 11 — DOCUMENTAÇÃO VIVA (MAPA DE PORTAS & FRONTEIRAS)
@@ -1016,17 +1227,17 @@ if [ "${IS_FIRST_ATTACH}" = true ]; then
     echo ""
 
     info "Natureza deste ambiente:"
-    printf "  • %-20s %s\n" "Tipo:"        "Ambiente de desenvolvimento (DevContainer)"
-    printf "  • %-20s %s\n" "Automação:"   "Nenhuma ação automática no attach"
-    printf "  • %-20s %s\n" "Segurança:"   "Nenhuma modificação estrutural foi realizada"
-    printf "  • %-20s %s\n" "Controle:"    "Toda ação depende de decisão explícita sua"
+    printf "  • %-20s %s\n" "Tipo:" "Ambiente de desenvolvimento (DevContainer)"
+    printf "  • %-20s %s\n" "Automação:" "Nenhuma ação automática no attach"
+    printf "  • %-20s %s\n" "Segurança:" "Nenhuma modificação estrutural foi realizada"
+    printf "  • %-20s %s\n" "Controle:" "Toda ação depende de decisão explícita sua"
     echo ""
 
     info "Próximos passos sugeridos (opcionais, execução manual):"
-    printf "  • %-14s → %s\n" "make help"   "listar comandos disponíveis no projeto"
-    printf "  • %-14s → %s\n" "make info"   "exibir informações detalhadas do ambiente"
+    printf "  • %-14s → %s\n" "make help" "listar comandos disponíveis no projeto"
+    printf "  • %-14s → %s\n" "make info" "exibir informações detalhadas do ambiente"
     printf "  • %-14s → %s\n" "make health" "executar verificações de saúde"
-    printf "  • %-14s → %s\n" "make start"  "iniciar o sistema quando fizer sentido"
+    printf "  • %-14s → %s\n" "make start" "iniciar o sistema quando fizer sentido"
     echo ""
 
     info "Documentação:"
@@ -1065,11 +1276,11 @@ echo ""
 
 # =============================================================================
 # ENCERRAMENTO SEMÂNTICO — ATTACH COMPLETO
-# CANONICAL v5.2.1
+# CANONICAL v5.4.1
 # =============================================================================
 
 printf "%b\n" "${BLUE}──────────────────────────────────────────────────────────────${NC}"
-ok   "Ambiente pronto para uso."
+ok "Ambiente pronto para uso."
 info "Attach concluído com sucesso."
 info "Nenhuma ação automática, destrutiva ou estrutural foi executada."
 printf "%b\n" "${BLUE}──────────────────────────────────────────────────────────────${NC}"
