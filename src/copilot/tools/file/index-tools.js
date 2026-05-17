@@ -23,6 +23,7 @@ import {
     invalidateIoIndexPath,
     normalizeSearchWindow,
     paginateSearchItems,
+    parseFileForContext,
     searchIoIndex,
 } from '#copilot/infra/public/indexing';
 
@@ -43,6 +44,7 @@ const IndexBuildParameters = z.object({
 
 const IndexSearchParameters = z.object({
     query: z.string().min(1).describe('Consulta textual para FTS5.'),
+    path: z.string().optional().describe('Diretório ou arquivo para restringir a busca (relativo ao workspace). Default: workspace inteiro.'),
     maxResults: z.number().int().positive().max(500).optional().describe('Janela máxima de resultados. Default: 50.'),
     cursor: z.string().optional().describe('Cursor numérico retornado por chamada anterior.'),
     includePattern: z.string().optional().describe('Filtro glob de arquivos a incluir (ex: *.ts, src/**/*.js).'),
@@ -123,13 +125,22 @@ export const workspaceIndexSearchTool = buildTool({
         'Busca textual no índice FTS5 local quando ele está disponível. ' +
         'Retorna `output` string formatada com highlights (**match**), `matchCount`, `totalMatches` e `nextCursor` para paginação.',
     parameters: IndexSearchParameters,
-    handler: async ({ query, maxResults, cursor, includePattern, excludePattern }) => {
+    handler: async ({ query, path: searchPath, maxResults, cursor, includePattern, excludePattern }) => {
         const stats = getIoIndexStats();
         if (!stats.available) {
             return { query, output: '', matchCount: 0, totalMatches: 0, truncated: false, nextCursor: null, engine: 'fts5-index', available: false, stats };
         }
+        let pathPrefix = undefined;
+        if (searchPath) {
+            const pathCheck = await validatePath(searchPath, { mode: 'read' });
+            if (!pathCheck.ok) return { query, output: '', matchCount: 0, error: pathCheck.reason, available: false };
+            pathPrefix = pathCheck.resolved;
+        }
         const window = normalizeSearchWindow({ maxResults, cursor });
-        const rows = searchIoIndex(query, window.commandMaxCount != null ? { maxResults: window.commandMaxCount } : {});
+        const rows = searchIoIndex(query, {
+            ...(window.commandMaxCount != null ? { maxResults: window.commandMaxCount } : {}),
+            ...(pathPrefix != null ? { pathPrefix } : {}),
+        });
         const filtered = filterIndexRowsByGlob(rows, includePattern, excludePattern);
         const paged = paginateSearchItems(filtered, window);
         return {
@@ -224,6 +235,63 @@ export const workspaceIndexFindImportsTool = buildTool({
     },
 });
 
+const ParseFileParameters = z.object({
+    path: z.string().min(1).describe('Caminho do arquivo a analisar (relativo ao workspace ou absoluto dentro de /workspaces/).'),
+    includeImports: z.boolean().optional().describe('Se true, inclui lista de imports no resultado. Default: true.'),
+    includeExports: z.boolean().optional().describe('Se true, inclui lista de exports no resultado. Default: true.'),
+    includeOutline: z.boolean().optional().describe('Se true, inclui outline textual dos símbolos. Default: true.'),
+    includeTopComments: z.boolean().optional().describe('Se true, inclui comentários de topo do arquivo (file-level JSDoc/header). Default: false.'),
+});
+
+/**
+ * Tool `workspace_parse_file` — análise Babel profunda de um arquivo.
+ *
+ * Retorna símbolos, imports, exports, outline estrutural e comentários de cabeçalho.
+ * Usa o parser Babel interno do índice L2 com cache LRU (500 itens, TTL 5min).
+ */
+export const workspaceParseFileTool = buildTool({
+    name: 'workspace_parse_file',
+    description:
+        'Analisa um arquivo com o parser Babel interno e retorna símbolos declarados, imports, exports, outline estrutural e ' +
+        'comentários de cabeçalho. Suporta JS, TS, JSX, TSX, JSON e Markdown. ' +
+        'Usa cache LRU — leituras repetidas do mesmo arquivo são baratas.',
+    parameters: ParseFileParameters,
+    handler: async ({
+        path: filePath,
+        includeImports = true,
+        includeExports = true,
+        includeOutline = true,
+        includeTopComments = false,
+    }) => {
+        const pathCheck = await validatePath(filePath, { mode: 'read' });
+        if (!pathCheck.ok) return { path: filePath, error: pathCheck.reason, success: false };
+
+        let content;
+        try {
+            const { readText } = await import('#copilot/infra/public/io');
+            const snapshot = await readText(pathCheck.resolved);
+            content = snapshot.content;
+        } catch (err) {
+            return { path: filePath, error: err instanceof Error ? err.message : String(err), success: false };
+        }
+
+        const parsed = await parseFileForContext(pathCheck.resolved, content);
+
+        /** @type {Record<string, unknown>} */
+        const result = {
+            path: pathCheck.resolved,
+            success: true,
+            symbols: parsed.symbols.symbols,
+            parseError: parsed.symbols.parseError ?? null,
+        };
+        if (includeImports) result.imports = parsed.symbols.imports;
+        if (includeExports) result.exports = parsed.symbols.exports;
+        if (includeOutline) result.outline = parsed.outline;
+        if (includeTopComments) result.topComments = parsed.topComments;
+        return result;
+    },
+});
+
 export const indexTools = [
     workspaceIndexBuildTool,
     workspaceIndexStatusTool,
@@ -231,4 +299,5 @@ export const indexTools = [
     workspaceIndexFindSymbolTool,
     workspaceIndexInvalidateTool,
     workspaceIndexFindImportsTool,
+    workspaceParseFileTool,
 ];

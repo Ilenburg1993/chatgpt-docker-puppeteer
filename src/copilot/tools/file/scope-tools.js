@@ -76,7 +76,9 @@ export const workspaceScopeDeclareTool = buildTool({
         recursive,
         awaitReady,
     }) => {
-        const effectiveSessionId = scopeName?.trim() ? scopeName.trim() : sessionId;
+        // sessionId é o identificador canônico do escopo. scopeName é apenas um label display opcional.
+        const effectiveSessionId = sessionId;
+        const displayName = scopeName?.trim() || sessionId;
         let resolvedDirectory = directory;
         if (directory) {
             const pathCheck = await validatePath(directory, { mode: 'read' });
@@ -115,6 +117,7 @@ export const workspaceScopeDeclareTool = buildTool({
             const stats = await scope.awaitReady();
             return {
                 sessionId: effectiveSessionId,
+                scopeName: displayName,
                 scope,
                 stats,
                 advisoryLimits,
@@ -123,6 +126,7 @@ export const workspaceScopeDeclareTool = buildTool({
 
         return {
             sessionId: effectiveSessionId,
+            scopeName: displayName,
             scope,
             advisoryLimits,
         };

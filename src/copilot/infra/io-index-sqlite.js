@@ -605,6 +605,7 @@ export function createIoIndexSqlite(options) {
          * @param {{ maxResults?: number }} [options]
          */
         findSymbol(name, options = {}) {
+            stats.searches += 1;
             return /** @type {IoIndexSymbolResult[]} */ (
                 stmtSymbolSearch.all(name, `%${name}%`, normalizeIndexMaxResults(options.maxResults))
             );

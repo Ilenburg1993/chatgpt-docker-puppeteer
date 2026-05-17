@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # =============================================================================
 # local-dns-cache.sh — DevContainer Local DNS Cache Manager
-# Version: v1.5.0
+# Version: v1.5.1
 #
 # Purpose:
 #   Optional runtime-only DNS cache layer for DevContainers. Intended to be
@@ -27,6 +27,16 @@
 #     WRITE_RESOLV_CONF=true requires DNS_BIND_PORT=53.
 #   - This script intentionally does not manage api.github.com routing. That is
 #     delegated to github-api-route-fix.sh via /etc/hosts.
+#
+# v1.5.1 focus:
+#   - ShellCheck SC2329 cleanup for ranking helpers invoked through lock wrappers.
+#   - Ranking lock made explicit and direct-call based, avoiding dynamic function
+#     invocation that static analyzers cannot prove.
+#   - Stronger hostname/resolv option sanitization and ranking-file corruption
+#     tolerance.
+#   - Status action no longer writes transient `running` before passive status
+#     collection.
+#   - Additional compatibility aliases for DEVCONTAINER_LOCAL_DNS_* action/mode.
 # =============================================================================
 
 set +e
@@ -64,17 +74,52 @@ cfg_uint() {
     printf '%s' "${value}"
 }
 
+is_nonnegative_int() {
+    [[ "${1:-}" =~ ^[0-9]+$ ]]
+}
+
+uint_or_zero() {
+    local value
+    value="${1:-0}"
+    if is_nonnegative_int "${value}"; then
+        printf '%s' "${value}"
+    else
+        printf '0'
+    fi
+}
+
 sanitize_resolv_options() {
     # /etc/resolv.conf options are whitespace-separated tokens. Keep only a
     # conservative subset to prevent env-driven newline/config injection while
-    # preserving the intended performance knobs: timeout, attempts and rotate.
-    local raw token output
+    # preserving the intended performance knobs: timeout, attempts, ndots and
+    # rotate. Numeric values are bounded to glibc-safe operational ranges.
+    local raw token output key value
     raw="${1:-}"
     output=""
 
     for token in ${raw}; do
+        key=""
+        value=""
         case "${token}" in
-            timeout:[0-9]* | attempts:[0-9]* | ndots:[0-9]* | rotate | edns0 | trust-ad | single-request | single-request-reopen) ;;
+            timeout:[0-9]*)
+                key="timeout"
+                value="${token#timeout:}"
+                value="$(cfg_uint "${value}" 1 1 30)"
+                token="${key}:${value}"
+                ;;
+            attempts:[0-9]*)
+                key="attempts"
+                value="${token#attempts:}"
+                value="$(cfg_uint "${value}" 2 1 5)"
+                token="${key}:${value}"
+                ;;
+            ndots:[0-9]*)
+                key="ndots"
+                value="${token#ndots:}"
+                value="$(cfg_uint "${value}" 1 0 15)"
+                token="${key}:${value}"
+                ;;
+            rotate | edns0 | trust-ad | single-request | single-request-reopen) ;;
             *)
                 continue
                 ;;
@@ -99,17 +144,17 @@ sanitize_resolv_options() {
 # -----------------------------------------------------------------------------
 SCRIPT_NAME="local-dns-cache.sh"
 readonly SCRIPT_NAME
-SCRIPT_VERSION="1.5.0"
+SCRIPT_VERSION="1.5.1"
 readonly SCRIPT_VERSION
 
-ACTION="${DEVCONTAINER_LOCAL_DNS_CACHE_ACTION:-start}"
+ACTION="${DEVCONTAINER_LOCAL_DNS_ACTION:-${DEVCONTAINER_LOCAL_DNS_CACHE_ACTION:-start}}"
 case "${ACTION}" in
     start | status | stop | restart | probe | benchmark | doctor | health) : ;;
     *) ACTION="start" ;;
 esac
 readonly ACTION
 
-DNS_MODE="${DEVCONTAINER_LOCAL_DNS_CACHE_MODE:-local}"
+DNS_MODE="${DEVCONTAINER_LOCAL_DNS_MODE:-${DEVCONTAINER_LOCAL_DNS_CACHE_MODE:-local}}"
 case "${DNS_MODE}" in
     off | disabled | false) DNS_MODE="off" ;;
     auto) DNS_MODE="auto" ;;
@@ -235,6 +280,8 @@ RANKING_STATE_FILE="${DEVCONTAINER_LOCAL_DNS_RANKING_STATE_FILE:-${RUNTIME_DIR}/
 readonly RANKING_STATE_FILE
 RANKING_LOCK_FILE="${DEVCONTAINER_LOCAL_DNS_RANKING_LOCK_FILE:-${RANKING_FILE}.lock}"
 readonly RANKING_LOCK_FILE
+RANKING_LOCK_WAIT_SECONDS="$(cfg_uint "${DEVCONTAINER_LOCAL_DNS_RANKING_LOCK_WAIT_SECONDS:-${LOCK_WAIT_SECONDS}}" "${LOCK_WAIT_SECONDS}" 0 300)"
+readonly RANKING_LOCK_WAIT_SECONDS
 RANKING_MAX_AGE_SECONDS="$(cfg_uint "${DEVCONTAINER_LOCAL_DNS_RANKING_MAX_AGE_SECONDS:-86400}" 86400 60 2592000)"
 readonly RANKING_MAX_AGE_SECONDS
 RANKING_REBENCHMARK_MIN_SECONDS="$(cfg_uint "${DEVCONTAINER_LOCAL_DNS_REBENCHMARK_MIN_SECONDS:-900}" 900 0 86400)"
@@ -398,6 +445,7 @@ write_report_header() {
         printf 'prefer_unprivileged_dnsmasq=%s\n' "${PREFER_UNPRIVILEGED_DNSMASQ}"
         printf 'repair_on_probe_failure=%s\n' "${REPAIR_ON_PROBE_FAILURE}"
         printf 'ranking_file=%s\n' "${RANKING_FILE}"
+        printf 'ranking_lock_wait_seconds=%s\n' "${RANKING_LOCK_WAIT_SECONDS}"
         printf 'ranking_max_age_seconds=%s\n' "${RANKING_MAX_AGE_SECONDS}"
         printf 'ranking_rebenchmark_min_seconds=%s\n' "${RANKING_REBENCHMARK_MIN_SECONDS}"
         printf 'ranking_hysteresis_score_margin=%s\n' "${RANKING_HYSTERESIS_SCORE_MARGIN}"
@@ -649,12 +697,26 @@ is_valid_nameserver() {
 }
 
 is_safe_hostname() {
-    local h
+    local h label old_ifs
     h="${1:-}"
     [[ ${#h} -ge 1 && ${#h} -le 253 ]] || return 1
     [[ "${h}" =~ ^[A-Za-z0-9][A-Za-z0-9.-]*[A-Za-z0-9]$ ]] || return 1
     [[ "${h}" != *..* ]] || return 1
     [[ "${h}" == *.* ]] || return 1
+
+    old_ifs="${IFS}"
+    IFS='.'
+    for label in ${h}; do
+        [[ ${#label} -ge 1 && ${#label} -le 63 ]] || {
+            IFS="${old_ifs}"
+            return 1
+        }
+        [[ "${label}" =~ ^[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?$ ]] || {
+            IFS="${old_ifs}"
+            return 1
+        }
+    done
+    IFS="${old_ifs}"
     return 0
 }
 
@@ -737,21 +799,6 @@ ensure_ranking_file_unlocked() {
         chmod 0600 "${RANKING_FILE}" 2> /dev/null || true
     fi
     return 0
-}
-
-with_ranking_lock() {
-    local fn
-    fn="${1:-}"
-    shift || true
-    ensure_parent_dir "${RANKING_LOCK_FILE}"
-    if has_cmd flock; then
-        (
-            flock -x -w "${LOCK_WAIT_SECONDS}" 9 || exit 98
-            "${fn}" "$@"
-        ) 9> "${RANKING_LOCK_FILE}"
-        return $?
-    fi
-    "${fn}" "$@"
 }
 
 write_ranking_state() {
@@ -899,36 +946,82 @@ ranking_score_for_upstream() {
 }
 
 save_ranking_from_live_unlocked() {
-    local live_lines selected_order tmp now upstream score avg min_ms p95 ok fail selected_count selected_epoch previous_selected previous_last_selected previous_success previous_failure
+    local live_lines selected_order tmp now upstream score avg min_ms p95 ok fail
+    local selected_count selected_epoch previous_selected previous_last_selected previous_success previous_failure
+    local ranking_dir fail_epoch
+
     live_lines="${1:-}"
     selected_order="${2:-}"
     ensure_ranking_file_unlocked || return 0
-    tmp="$(make_temp_file dns-ranking "$(dirname "${RANKING_FILE}" 2> /dev/null || printf /tmp)")"
+
+    ranking_dir="$(dirname "${RANKING_FILE}" 2> /dev/null || printf /tmp)"
+    tmp="$(make_temp_file dns-ranking "${ranking_dir}")"
     [[ -n "${tmp}" ]] || return 0
     now="$(now_epoch)"
-    printf '%s\n' 'upstream	success_count	failure_count	last_success_epoch	last_failure_epoch	avg_ms	min_ms	p95_ms	rank_score	selected_count	last_selected_epoch' > "${tmp}" 2> /dev/null || return 0
-    while IFS=$'\t' read -r score avg min_ms p95 ok fail upstream; do
+
+    if ! printf '%s\n' 'upstream	success_count	failure_count	last_success_epoch	last_failure_epoch	avg_ms	min_ms	p95_ms	rank_score	selected_count	last_selected_epoch' > "${tmp}" 2> /dev/null; then
+        rm -f "${tmp}" 2> /dev/null || true
+        return 0
+    fi
+
+    while IFS=$'	' read -r score avg min_ms p95 ok fail upstream; do
         [[ -n "${upstream}" ]] || continue
-        previous_selected="$(awk -F'\t' -v u="${upstream}" 'NR > 1 && $1 == u {print $10+0; exit}' "${RANKING_FILE}" 2> /dev/null || printf '0')"
-        previous_last_selected="$(awk -F'\t' -v u="${upstream}" 'NR > 1 && $1 == u {print $11+0; exit}' "${RANKING_FILE}" 2> /dev/null || printf '0')"
-        previous_success="$(awk -F'\t' -v u="${upstream}" 'NR > 1 && $1 == u {print $2+0; exit}' "${RANKING_FILE}" 2> /dev/null || printf '0')"
-        previous_failure="$(awk -F'\t' -v u="${upstream}" 'NR > 1 && $1 == u {print $3+0; exit}' "${RANKING_FILE}" 2> /dev/null || printf '0')"
-        selected_count="${previous_selected:-0}"
-        selected_epoch="${previous_last_selected:-0}"
-        if printf '%s\n' "${selected_order}" | awk -v u="${upstream}" 'NR == 1 && $0 == u {found=1} END {exit found ? 0 : 1}'; then
+
+        score="$(uint_or_zero "${score}")"
+        avg="$(uint_or_zero "${avg}")"
+        min_ms="$(uint_or_zero "${min_ms}")"
+        p95="$(uint_or_zero "${p95}")"
+        ok="$(uint_or_zero "${ok}")"
+        fail="$(uint_or_zero "${fail}")"
+
+        previous_selected="$(awk -F'	' -v u="${upstream}" 'NR > 1 && $1 == u {print $10+0; exit}' "${RANKING_FILE}" 2> /dev/null || printf '0')"
+        previous_last_selected="$(awk -F'	' -v u="${upstream}" 'NR > 1 && $1 == u {print $11+0; exit}' "${RANKING_FILE}" 2> /dev/null || printf '0')"
+        previous_success="$(awk -F'	' -v u="${upstream}" 'NR > 1 && $1 == u {print $2+0; exit}' "${RANKING_FILE}" 2> /dev/null || printf '0')"
+        previous_failure="$(awk -F'	' -v u="${upstream}" 'NR > 1 && $1 == u {print $3+0; exit}' "${RANKING_FILE}" 2> /dev/null || printf '0')"
+
+        previous_selected="$(uint_or_zero "${previous_selected}")"
+        previous_last_selected="$(uint_or_zero "${previous_last_selected}")"
+        previous_success="$(uint_or_zero "${previous_success}")"
+        previous_failure="$(uint_or_zero "${previous_failure}")"
+
+        selected_count="${previous_selected}"
+        selected_epoch="${previous_last_selected}"
+        if printf '%s\n' "${selected_order}" | awk -v u="${upstream}" '$0 == u {found=1} END {exit found ? 0 : 1}'; then
             selected_count=$((selected_count + 1))
             selected_epoch="${now}"
         fi
+
+        fail_epoch="0"
+        if ((fail > 0)); then
+            fail_epoch="${now}"
+        fi
+
         printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
-            "${upstream}" "$((previous_success + ok))" "$((previous_failure + fail))" "${now}" "$([[ "${fail}" -gt 0 ]] && printf '%s' "${now}" || printf '0')" \
+            "${upstream}" "$((previous_success + ok))" "$((previous_failure + fail))" "${now}" "${fail_epoch}" \
             "${avg}" "${min_ms}" "${p95}" "${score}" "${selected_count}" "${selected_epoch}" >> "${tmp}" 2> /dev/null || true
     done <<< "${live_lines}"
-    mv -f "${tmp}" "${RANKING_FILE}" 2> /dev/null || rm -f "${tmp}" 2> /dev/null || true
-    chmod 0600 "${RANKING_FILE}" 2> /dev/null || true
+
+    if mv -f "${tmp}" "${RANKING_FILE}" 2> /dev/null; then
+        chmod 0600 "${RANKING_FILE}" 2> /dev/null || true
+    else
+        rm -f "${tmp}" 2> /dev/null || true
+    fi
 }
 
 save_ranking_from_live() {
-    with_ranking_lock save_ranking_from_live_unlocked "$@"
+    ensure_parent_dir "${RANKING_LOCK_FILE}"
+    if has_cmd flock; then
+        (
+            if [[ "${RANKING_LOCK_WAIT_SECONDS}" -gt 0 ]]; then
+                flock -x -w "${RANKING_LOCK_WAIT_SECONDS}" 9 || exit 98
+            else
+                flock -x 9 || exit 98
+            fi
+            save_ranking_from_live_unlocked "$@"
+        ) 9> "${RANKING_LOCK_FILE}"
+        return $?
+    fi
+    save_ranking_from_live_unlocked "$@"
 }
 
 choose_ranked_upstreams() {
@@ -1527,7 +1620,7 @@ repair_after_local_probe_failure() {
 
 start_dnsmasq() {
     if [[ "${DNS_MODE}" == "off" ]]; then
-        log_info "DNS cache local desligado por DEVCONTAINER_LOCAL_DNS_CACHE_MODE=off."
+        log_info "DNS cache local desligado por modo=off."
         write_status "off"
         append_report "result=off"
         write_summary "off" "mode-off"
@@ -1808,6 +1901,7 @@ benchmark_action() {
         log_warn "benchmark não encontrou upstream funcional."
         SELECTED_UPSTREAMS=""
         UPSTREAM_COUNT="0"
+        write_status "degraded"
         write_summary "degraded" "benchmark-no-functional-upstream"
         return 1
     fi
@@ -1815,6 +1909,7 @@ benchmark_action() {
     UPSTREAM_COUNT="$(printf '%s\n' "${selected}" | awk 'NF{c++} END{print c+0}')"
     append_report "benchmark_ranked_upstreams=${SELECTED_UPSTREAMS} source=${RANKING_SOURCE} reason=${RANKING_REASON}"
     log_ok "benchmark upstreams: ${SELECTED_UPSTREAMS}"
+    write_status "ok"
     write_summary "ok" "benchmark-ok"
     return 0
 }
@@ -1858,8 +1953,10 @@ doctor_action() {
         fi
     fi
     if [[ "${rc}" -eq 0 ]]; then
+        write_status "ok"
         write_summary "ok" "doctor"
     else
+        write_status "degraded"
         write_summary "degraded" "doctor"
     fi
     return "${rc}"
@@ -1935,9 +2032,15 @@ start_flow() {
 
 main_unlocked() {
     local probe_rc
-    write_report_header
-    write_metrics_header
-    write_status "running"
+    if [[ "${ACTION}" == "status" ]]; then
+        ensure_parent_dir "${REPORT_FILE}"
+        ensure_parent_dir "${METRICS_FILE}"
+        append_report "status_action_invoked timestamp=$(ts)"
+    else
+        write_report_header
+        write_metrics_header
+        write_status "running"
+    fi
     log_info "Local DNS cache manager iniciado (v${SCRIPT_VERSION}); action=${ACTION}; mode=${DNS_MODE}."
     log_debug "PATH=${PATH:-<unset>}"
     log_debug "DNS_BIND_ADDRESS=${DNS_BIND_ADDRESS}; DNS_BIND_PORT=${DNS_BIND_PORT}; WRITE_RESOLV_CONF=${WRITE_RESOLV_CONF}"
@@ -1981,8 +2084,10 @@ main_unlocked() {
             probe_local_dns
             probe_rc=$?
             if [[ "${probe_rc}" -eq 0 ]]; then
+                write_status "ok"
                 write_summary "ok" "probe"
             else
+                write_status "degraded"
                 write_summary "degraded" "probe"
             fi
             return "${probe_rc}"

@@ -18,3 +18,6 @@ export {
 export { filterIndexRowsByGlob, formatIndexImportRows, formatIndexSearchRows } from '../io/search/index-search.js';
 export { formatIndexSymbolRows } from '../io/search/symbol-search.js';
 export { normalizeSearchWindow, paginateSearchItems } from '../io/search/result-paginator.js';
+
+// Parser Babel — contexto profundo de arquivo (símbolos, imports, exports, outline, topComments)
+export { parseFileForContext } from '../io-parser.js';
