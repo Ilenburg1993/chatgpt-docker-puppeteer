@@ -1,10 +1,10 @@
 # syntax=docker/dockerfile:1
 # =============================================================================
-# Dockerfile v1.3.2 — ChatGPT Docker Puppeteer DevContainer (CANÔNICO / DEFINITIVO)
+# Dockerfile v1.4.0 — ChatGPT Docker Puppeteer DevContainer (CANÔNICO / DEFINITIVO)
 # Base: Node.js 24 + Debian Bookworm (Microsoft DevContainers)
 # hadolint global ignore=DL3008,DL3059,DL3009
 #
-# OBJETIVO MACRO (v1.3.2)
+# OBJETIVO MACRO (v1.4.0)
 #   Este Dockerfile define uma imagem DEV (apenas desenvolvimento) com foco em:
 #   - Estabilidade máxima do VS Code Server (Remote - Containers / Dev Containers)
 #   - Compatibilidade alta com GitHub Copilot / Copilot Chat e fluxos de agente
@@ -26,8 +26,8 @@
 #   altos no host (na prática, root-equivalent). Isso é deliberado para DEV.
 #
 # VERSÃO
-#   - Todas as versões/contratos internos nesta imagem usam "1.3.2".
-#   - ARG VERSION default é 1.3.2 e é propagado para contratos e labels OCI.
+#   - Todas as versões/contratos internos nesta imagem usam "1.4.0".
+#   - ARG VERSION default é 1.4.0 e é propagado para contratos e labels OCI.
 # =============================================================================
 
 
@@ -75,9 +75,9 @@ SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
 # ---------------------------------------------------------------------------
 # Build-time metadata (OCI)
-# - VERSION deve ser "1.3.2" para o release canônico (pode ser override via build-arg).
+# - VERSION deve ser "1.4.0" para o release canônico (pode ser override via build-arg).
 # ---------------------------------------------------------------------------
-ARG VERSION=1.3.2
+ARG VERSION=1.4.0
 ARG BUILD_DATE=unknown
 ARG VCS_REF=unknown
 ARG IMAGE_NAME=chatgpt-docker-puppeteer
@@ -90,7 +90,7 @@ LABEL org.opencontainers.image.title="${IMAGE_NAME}" \
     org.opencontainers.image.created="${BUILD_DATE}" \
     org.opencontainers.image.revision="${VCS_REF}" \
     org.opencontainers.image.environment="${BUILD_ENV}" \
-    org.opencontainers.image.description="DevContainer for ChatGPT Puppeteer Agent (DEV) — Canonical v1.3.2"
+    org.opencontainers.image.description="DevContainer for ChatGPT Puppeteer Agent (DEV) — Canonical v1.4.0"
 
 # ---------------------------------------------------------------------------
 # Build-time feedback (logs)
@@ -406,7 +406,12 @@ RUN --mount=type=cache,id=apt-cache,target=/var/cache/apt,sharing=locked \
     curl \
     wget \
     netcat-openbsd \
+    dnsmasq-base \
+    tinyproxy-bin \
     dnsutils \
+    bind9-host \
+    ldnsutils \
+    libcap2-bin \
     libnss3-tools \
     iproute2 \
     iputils-ping \
@@ -461,6 +466,30 @@ RUN if command -v batcat >/dev/null 2>&1 && ! command -v bat >/dev/null 2>&1; th
     && if command -v fdfind >/dev/null 2>&1 && ! command -v fd >/dev/null 2>&1; then \
     ln -sf /usr/bin/fdfind /usr/local/bin/fd; \
     fi
+
+# Network helper binaries for the modular Copilot/GitHub network architecture.
+# Debian packaging notes:
+# - dnsmasq-base provides /usr/sbin/dnsmasq without system-daemon infrastructure.
+# - tinyproxy-bin provides the tinyproxy executable without installing the full
+#   service/logrotate wrapper package.
+# - /usr/sbin is not guaranteed to be present in every non-root runtime PATH,
+#   so expose stable /usr/local/bin shims used by post-start network scripts.
+RUN set -e; \
+    if [ -x /usr/sbin/dnsmasq ]; then \
+    ln -sf /usr/sbin/dnsmasq /usr/local/bin/dnsmasq; \
+    fi; \
+    if [ -x /usr/sbin/tinyproxy ]; then \
+    ln -sf /usr/sbin/tinyproxy /usr/local/bin/tinyproxy; \
+    elif [ -x /usr/bin/tinyproxy ]; then \
+    ln -sf /usr/bin/tinyproxy /usr/local/bin/tinyproxy; \
+    fi; \
+    if [ -x /usr/sbin/dnsmasq ] && command -v setcap >/dev/null 2>&1; then \
+    setcap cap_net_bind_service=+ep /usr/sbin/dnsmasq 2>/dev/null || true; \
+    fi; \
+    command -v dnsmasq >/dev/null 2>&1; \
+    command -v tinyproxy >/dev/null 2>&1; \
+    dnsmasq --version | head -n 1; \
+    tinyproxy -h >/dev/null 2>&1 || true
 
 # Curated upstream CLI binaries
 # - `gh` from Debian bookworm lags significantly behind upstream; use the official release artifact.
@@ -647,14 +676,14 @@ RUN mkdir -p /etc/powershell \
 RUN cat > /etc/powershell/PowerShell.Contract.ps1 <<'EOF'
 # =============================================================================
 # PowerShell Contract — DevContainer
-# Version: 1.3.2
+# Version: 1.4.0
 #
 # Authority Model:
 #   • PowerShell  → Instrumental (subordinado)
 #   • Bash        → Canonical (autoridade)
 # =============================================================================
 
-$env:POWERSHELL_CONTRACT_VERSION = "1.3.2"
+$env:POWERSHELL_CONTRACT_VERSION = "1.4.0"
 $env:POWERSHELL_CONTRACT_LOADED  = "true"
 $env:POWERSHELL_ROLE             = "instrumental"
 $env:POWERSHELL_AUTHORITY        = "subordinate"
@@ -758,7 +787,7 @@ RUN set -e; \
 RUN set -e; \
     echo ""; \
     echo "═══════════════════════════════════════════════════"; \
-    echo " Tool Validation Gate — DevContainer v1.3.2"; \
+    echo " Tool Validation Gate — DevContainer v1.4.0"; \
     echo "═══════════════════════════════════════════════════"; \
     _ok=0; _fail=0; _warn=0; \
     _check() { \
@@ -791,10 +820,11 @@ RUN set -e; \
     _check tree; _check ncdu; _check jo; _check entr; \
     echo "── Process & System ────────────────────────────────"; \
     _check htop; _check lsof; _check strace; _check dstat; \
-    _check inotifywait; _check ps; _check watch; _check flock; \
+    _check inotifywait; _check ps; _check watch; _check flock; _check timeout; \
     echo "── Network & Debug ─────────────────────────────────"; \
     _check nc; _check nmap; _check tcpdump; _check mtr; \
-    _check socat; _check traceroute; _check dig; _check ip; _check certutil; \
+    _check socat; _check traceroute; _check dig; _check host; _check drill; \
+    _check ip; _check ss; _check certutil; _check dnsmasq; _check tinyproxy; \
     echo "── Browser & Rendering ─────────────────────────────"; \
     _check chromium; _check fc-match; \
     echo "── Code Quality ────────────────────────────────────"; \
@@ -852,6 +882,8 @@ RUN mkdir -p \
     "${HOME_DIR}/.local/share/rag-db" \
     "${HOME_DIR}/.local/share/rag-index" \
     "${HOME_DIR}/.local/state" \
+    "${HOME_DIR}/.local/state/devcontainer" \
+    "${HOME_DIR}/.local/state/devcontainer/network" \
     "${HOME_DIR}/.local/bin" \
     "${CODEX_HOME}" \
     "${HOME_DIR}/.npm" \
@@ -918,7 +950,7 @@ RUN mkdir -p \
 
 
 # =============================================================================
-# SECTION 8.5 — ENV DEFAULTS (DOCUMENTAÇÃO / SAFE DEFAULTS DEV) — v1.3.2
+# SECTION 8.5 — ENV DEFAULTS (DOCUMENTAÇÃO / SAFE DEFAULTS DEV) — v1.4.0
 #
 # Hierarquia prática (maior prioridade -> menor):
 #   1) devcontainer.json: remoteEnv (processos geridos pelo VS Code)
@@ -976,7 +1008,7 @@ ENV PUPPETEER_LOCAL_LAUNCH_DISABLED=true \
     MOCK_CHROME=0 \
     ENABLE_STATE_FILE=true
 
-# CHROME PROXY SERVICE (v1.3.2)
+# CHROME PROXY SERVICE (v1.4.0)
 ENV WS_IDLE_TIMEOUT_MS=300000 \
     ALLOWED_ORIGINS="http://localhost:3008,http://127.0.0.1:3008"
 
@@ -986,9 +1018,27 @@ ENV WS_IDLE_TIMEOUT_MS=300000 \
 # 16 = bom compromisso para ambientes multi-core sem desperdício de memória.
 ENV UV_THREADPOOL_SIZE=16
 
+# GitHub/Copilot network architecture defaults (runtime-only).
+# These are intentionally conservative: tools are installed in the image, but
+# the higher-level lifecycle behavior is controlled by devcontainer.json.
+ENV DEVCONTAINER_ENABLE_LOCAL_DNS_CACHE=false \
+    DEVCONTAINER_LOCAL_DNS_CACHE_MODE=auto \
+    DEVCONTAINER_LOCAL_DNS_BIND_ADDRESS=127.0.0.1 \
+    DEVCONTAINER_LOCAL_DNS_BIND_PORT=53 \
+    DEVCONTAINER_LOCAL_DNS_WRITE_RESOLV_CONF=true \
+    DEVCONTAINER_ENABLE_LOCAL_COPILOT_PROXY=false \
+    DEVCONTAINER_COPILOT_PROXY_MODE=off \
+    DEVCONTAINER_LOCAL_COPILOT_PROXY_HOST=127.0.0.1 \
+    DEVCONTAINER_LOCAL_COPILOT_PROXY_PORT=3128 \
+    DEVCONTAINER_ENABLE_COPILOT_NETWORK_MANAGER=false \
+    DEVCONTAINER_COPILOT_NETWORK_MANAGER_MODE=active \
+    DEVCONTAINER_COPILOT_PROBE_IP_FAMILY=4 \
+    DEVCONTAINER_GITHUB_API_ENABLE_IPV6=false \
+    DEVCONTAINER_COPILOT_MANAGER_RUN_API_ROUTE_FIX=true
+
 
 # =============================================================================
-# SECTION 9 — SHELL CONTRACT + GATEKEEPER NSS + UX BASELINE + HANDOFF (v1.3.2)
+# SECTION 9 — SHELL CONTRACT + GATEKEEPER NSS + UX BASELINE + HANDOFF (v1.4.0)
 #
 # Objetivos:
 #   [A] Infra: bash-completion + dumb-init (entrypoint)
@@ -1034,7 +1084,7 @@ RUN command -v dumb-init >/dev/null 2>&1
 RUN mkdir -p /etc/profile.d \
     && printf '%s\n' \
     '# Canonical Runtime Shell Contract' \
-    '# Version: 1.3.2' \
+    '# Version: 1.4.0' \
     '# Declarative only — no logic, no side effects' \
     '# AI-AWARE CONTRACT (Semantic Hints Only)' \
     '' \
@@ -1082,7 +1132,7 @@ RUN mkdir -p /etc/profile.d \
 #   - Deve poder ser sourceado por /etc/profile.
 RUN cat > /etc/profile.d/10-gatekeeper-nss.sh <<'EOF'
 # DevContainer Gatekeeper — NSS Wrapper
-# Version: 1.3.2
+# Version: 1.4.0
 # Scope: Universal (all shells)
 # Mutability: READ-ONLY (Image-level)
 # Behavior: Fail-safe; canonicalizes LD_PRELOAD and binds NSS to valid files.
@@ -1256,7 +1306,7 @@ RUN cat > /usr/local/bin/jsonc-validate <<'EOF'
 /**
  * jsonc-validate — DevContainer JSONC validation utility.
  *
- * Canonical version: 1.3.2
+ * Canonical version: 1.4.0
  *
  * Purpose:
  *   Validate JSON and JSON-with-comments files during local development,
@@ -1280,7 +1330,7 @@ RUN cat > /usr/local/bin/jsonc-validate <<'EOF'
 const fs = require('node:fs');
 const path = require('node:path');
 
-const VERSION = '1.3.2';
+const VERSION = '1.4.0';
 
 /**
  * Converts an unknown thrown value into a readable string.
@@ -1523,7 +1573,7 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=90s --retries=3 \
 # [D] UX BASELINE (GLOBAL, READ-ONLY, INTERACTIVE-ONLY, POSIX-SAFE)
 RUN cat > /etc/profile.d/20-devcontainer-ux.sh <<'EOF'
 # DevContainer UX Contract
-# Version: 1.3.2
+# Version: 1.4.0
 # Scope: Interactive shells only
 # Mutability: READ-ONLY (Image-level)
 
@@ -1565,7 +1615,7 @@ EOF
 RUN chmod 0444 /etc/profile.d/20-devcontainer-ux.sh
 
 # =============================================================================
-# SECTION 9.6 — BASH HARDENING (.bashrc persistent overrides) — v1.3.2
+# SECTION 9.6 — BASH HARDENING (.bashrc persistent overrides) — v1.4.0
 #
 # Problema: ~/.bashrc vem da base image (node) e define HISTSIZE=1000.
 # Em login shells (ordem: profile.d → .profile → .bashrc), o .bashrc do
@@ -1583,7 +1633,7 @@ RUN chmod 0444 /etc/profile.d/20-devcontainer-ux.sh
 # =============================================================================
 RUN cat >> "${HOME_DIR}/.bashrc" <<'BASH_HARDENING'
 
-# === DevContainer bash hardening (v1.3.2 — appended by Dockerfile) ===
+# === DevContainer bash hardening (v1.4.0 — appended by Dockerfile) ===
 # Applied last in .bashrc → these always win over profile.d (20-devcontainer-ux.sh)
 # and the base-image defaults. Do NOT remove — needed for DevContainer stability.
 HISTSIZE=10000
@@ -1610,7 +1660,8 @@ ENTRYPOINT ["dumb-init", "--", "/usr/local/bin/nss-gatekeeper"]
 CMD ["sleep", "infinity"]
 
 # =============================================================================
-# FINAL NOTES (v1.3.2)
+# FINAL NOTES (v1.4.0)
+#   - dnsmasq-base/tinyproxy-bin são instalados como binários, sem auto-start
 #   - dockerd NÃO é instalado
 #   - Docker CLI opera via socket do host (bind mount)
 #   - NSS wrapper é ativado em runtime pelo entrypoint/profile e refinado pelos hooks

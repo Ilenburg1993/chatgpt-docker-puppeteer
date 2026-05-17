@@ -1,29 +1,42 @@
 #!/usr/bin/env bash
 # =============================================================================
 # github-api-route-fix.sh — Smart GitHub API Route Selector
-# Version: v1.3.0
+# Version: v1.8.0
+#
+# Purpose:
+#   Runtime-only network resilience helper for DevContainers. Intended to be
+#   invoked by .devcontainer/scripts/post-start.sh.
 #
 # Contract:
-# - Intended to be called by .devcontainer/scripts/post-start.sh v2.3.x.
-# - Does not start services.
-# - Does not mutate Docker/DevContainer structure.
-# - Performs only bounded, reversible runtime-network mutation:
-#     * managed /etc/hosts block for api.github.com, after semantic validation.
-# - Exits 0 only when the current route is valid, a proxy route is valid, or a
-#   validated direct route was applied.
-# - Exits non-zero when it cannot prove a functional GitHub API route.
+#   - Does not start services.
+#   - Does not mutate Docker/DevContainer structure.
+#   - Performs only bounded, reversible runtime-network mutation:
+#       * a managed /etc/hosts block for api.github.com, after semantic HTTPS
+#         validation of the chosen route.
+#   - Preserves Docker-managed /etc/hosts inode by writing through tee; never
+#     replaces /etc/hosts with mv/cp.
+#   - Exits 0 only when it can prove a functional route by one of these paths:
+#       * current direct route is valid and kept;
+#       * proxy-aware route is valid and proxy mode allows it;
+#       * validated direct candidate was applied and verified.
+#   - Exits non-zero when it cannot prove a functional GitHub API route.
 #
 # Design:
-# - Treat DNS answers, cache entries, /etc/hosts entries and seed IPs as
-#   untrusted candidates.
-# - Validate candidates by HTTPS/SNI/TLS plus semantic API checks.
-# - Prefer stable current route; switch only when current is broken or materially
-#   worse according to score/latency hysteresis.
-# - Preserve Docker-managed /etc/hosts inode by writing content through tee,
-#   never by replacing the file with cp/mv.
-# - Force LC_ALL=C for curl write-out parsing stability.
-# - Use flock where available for cache and hosts writes.
-# - Probe candidates in parallel by default, bounded by curl timeouts.
+#   - DNS answers, cache entries, /etc/hosts entries and seed IPs are untrusted.
+#   - Candidates are validated via HTTPS + SNI + TLS verification + semantic
+#     REST API response checks.
+#   - Prefer stability: keep current route unless a candidate is materially
+#     better or current route is broken.
+#   - Use flock when available for cache and hosts writes.
+#   - Use mktemp-only temp files; no predictable write fallbacks.
+#   - IPv6 is opt-in and rejects IPv4-mapped IPv6 (::ffff:x.y.z.w) so a broken
+#     IPv4 route cannot masquerade as an IPv6 candidate.
+#   - Persistent candidate cache is treated as signal, not authority.
+#     v1.8.0 adds bounded recent-failure penalties, per-IP cooldown,
+#     gradual recovery and p95 historical latency scoring.
+#   - Emits report, status, summary and candidate metrics files for post-start and
+#     post-attach diagnostics, including structured decision reasons.
+#   - Fail-safe shell posture: no inherited traps, no set -e/u/pipefail.
 # =============================================================================
 
 set +e
@@ -32,56 +45,145 @@ set +o pipefail 2> /dev/null || true
 trap - ERR EXIT INT TERM 2> /dev/null || true
 
 # -----------------------------------------------------------------------------
-# Constants / config
+# Constants / sanitized config
 # -----------------------------------------------------------------------------
 readonly SCRIPT_NAME="github-api-route-fix.sh"
-readonly SCRIPT_VERSION="1.3.0"
+readonly SCRIPT_VERSION="1.8.0"
+
+cfg_bool() {
+    case "${1:-}" in
+        true | TRUE | 1 | yes | YES | on | ON) printf 'true' ;;
+        false | FALSE | 0 | no | NO | off | OFF) printf 'false' ;;
+        *) printf '%s' "${2:-false}" ;;
+    esac
+}
+
+cfg_uint() {
+    local value fallback min max
+    value="${1:-}"
+    fallback="${2:-0}"
+    min="${3:-0}"
+    max="${4:-}"
+    if [[ ! "${value}" =~ ^[0-9]+$ ]]; then
+        value="${fallback}"
+    fi
+    if ((value < min)); then
+        value="${fallback}"
+    fi
+    if [[ -n "${max}" && "${max}" =~ ^[0-9]+$ && "${value}" =~ ^[0-9]+$ && value -gt max ]]; then
+        value="${max}"
+    fi
+    printf '%s' "${value}"
+}
 
 readonly GITHUB_API_HOST="${DEVCONTAINER_GITHUB_API_HOST:-api.github.com}"
-readonly GITHUB_ROUTE_REPORT_FILE="${DEVCONTAINER_GITHUB_ROUTE_REPORT_FILE:-/tmp/devcontainer-github-api-route.report}"
+ALLOW_CUSTOM_HOST="$(cfg_bool "${DEVCONTAINER_GITHUB_API_ALLOW_CUSTOM_HOST:-false}" false)"
+readonly ALLOW_CUSTOM_HOST
 
-readonly CONNECT_TIMEOUT="${DEVCONTAINER_GITHUB_API_ROUTE_CONNECT_TIMEOUT:-3}"
-readonly MAX_TIME="${DEVCONTAINER_GITHUB_API_ROUTE_MAX_TIME:-7}"
-readonly MIN_SCORE="${DEVCONTAINER_GITHUB_API_MIN_SCORE:-85}"
-readonly MAX_CANDIDATES="${DEVCONTAINER_GITHUB_API_MAX_CANDIDATES:-16}"
+ACTION="${DEVCONTAINER_GITHUB_API_ROUTE_ACTION:-start}"
+case "${ACTION}" in
+    start | probe | status | clear-cache) : ;;
+    *) ACTION="start" ;;
+esac
+readonly ACTION
+
+readonly GITHUB_ROUTE_REPORT_FILE="${DEVCONTAINER_GITHUB_ROUTE_REPORT_FILE:-/tmp/devcontainer-github-api-route.report}"
+readonly GITHUB_ROUTE_STATUS_FILE="${DEVCONTAINER_GITHUB_ROUTE_STATUS_FILE:-/tmp/devcontainer-github-api-route.status}"
+readonly GITHUB_ROUTE_SUMMARY_FILE="${DEVCONTAINER_GITHUB_ROUTE_SUMMARY_FILE:-/tmp/devcontainer-github-api-route.summary}"
+readonly GITHUB_ROUTE_METRICS_FILE="${DEVCONTAINER_GITHUB_ROUTE_METRICS_FILE:-/tmp/devcontainer-github-api-route.metrics.tsv}"
+
+CONNECT_TIMEOUT="$(cfg_uint "${DEVCONTAINER_GITHUB_API_ROUTE_CONNECT_TIMEOUT:-3}" 3 1 30)"
+readonly CONNECT_TIMEOUT
+MAX_TIME="$(cfg_uint "${DEVCONTAINER_GITHUB_API_ROUTE_MAX_TIME:-7}" 7 2 120)"
+readonly MAX_TIME
+MIN_SCORE="$(cfg_uint "${DEVCONTAINER_GITHUB_API_MIN_SCORE:-85}" 85 1 150)"
+readonly MIN_SCORE
+MAX_CANDIDATES="$(cfg_uint "${DEVCONTAINER_GITHUB_API_MAX_CANDIDATES:-16}" 16 1 64)"
+readonly MAX_CANDIDATES
 
 readonly RESOLVERS="${DEVCONTAINER_GITHUB_API_RESOLVERS:-185.228.168.9 185.228.169.9 1.1.1.1 1.0.0.1 8.8.8.8 8.8.4.4 9.9.9.9 149.112.112.112 208.67.222.222 208.67.220.220 76.76.2.0 76.76.10.0 94.140.14.14 94.140.15.15}"
-readonly SEED_CANDIDATES="${DEVCONTAINER_GITHUB_API_SEED_CANDIDATES:-140.82.112.6 140.82.113.6 140.82.114.6 140.82.121.6}"
+readonly SEED_CANDIDATES="${DEVCONTAINER_GITHUB_API_SEED_CANDIDATES:-140.82.112.5 140.82.112.6 140.82.113.5 140.82.113.6 140.82.114.5 140.82.114.6 140.82.121.5 140.82.121.6}"
 
-readonly ENABLE_AUTH_PROBE="${DEVCONTAINER_ENABLE_GITHUB_API_AUTH_PROBE:-false}"
-readonly ENABLE_COPILOT_INTERNAL_AUTH_PROBE="${DEVCONTAINER_ENABLE_COPILOT_INTERNAL_AUTH_PROBE:-false}"
+ENABLE_AUTH_PROBE="$(cfg_bool "${DEVCONTAINER_ENABLE_GITHUB_API_AUTH_PROBE:-false}" false)"
+readonly ENABLE_AUTH_PROBE
+ENABLE_COPILOT_INTERNAL_AUTH_PROBE="$(cfg_bool "${DEVCONTAINER_ENABLE_COPILOT_INTERNAL_AUTH_PROBE:-false}" false)"
+readonly ENABLE_COPILOT_INTERNAL_AUTH_PROBE
 
-readonly CACHE_ENABLED="${DEVCONTAINER_GITHUB_API_ROUTE_CACHE_ENABLED:-true}"
+CACHE_ENABLED="$(cfg_bool "${DEVCONTAINER_GITHUB_API_ROUTE_CACHE_ENABLED:-true}" true)"
+readonly CACHE_ENABLED
 readonly CACHE_FILE="${DEVCONTAINER_GITHUB_API_ROUTE_CACHE_FILE:-${XDG_CACHE_HOME:-${HOME:-/tmp}/.cache}/devcontainer/network/github-api-route.cache.tsv}"
-readonly CACHE_MAX_AGE_SECONDS="${DEVCONTAINER_GITHUB_API_ROUTE_CACHE_MAX_AGE_SECONDS:-604800}"
+CACHE_MAX_AGE_SECONDS="$(cfg_uint "${DEVCONTAINER_GITHUB_API_ROUTE_CACHE_MAX_AGE_SECONDS:-604800}" 604800 60 31536000)"
+readonly CACHE_MAX_AGE_SECONDS
+CACHE_MAX_ENTRIES="$(cfg_uint "${DEVCONTAINER_GITHUB_API_ROUTE_CACHE_MAX_ENTRIES:-128}" 128 8 2048)"
+readonly CACHE_MAX_ENTRIES
+RECENT_FAILURE_HARD_BLOCK_SECONDS="$(cfg_uint "${DEVCONTAINER_GITHUB_API_RECENT_FAILURE_HARD_BLOCK_SECONDS:-0}" 0 0 86400)"
+readonly RECENT_FAILURE_HARD_BLOCK_SECONDS
+
+# v1.8.0 — historical stability policy.
+# The cache remains advisory, but now carries enough bounded state for:
+# - recent failure penalty;
+# - per-IP cooldown;
+# - gradual recovery after a bad period;
+# - p95 latency scoring instead of relying only on the last probe.
+RECENT_FAILURE_WINDOW_SECONDS="$(cfg_uint "${DEVCONTAINER_GITHUB_API_RECENT_FAILURE_WINDOW_SECONDS:-1800}" 1800 60 86400)"
+readonly RECENT_FAILURE_WINDOW_SECONDS
+RECENT_FAILURE_PENALTY_PER_FAILURE="$(cfg_uint "${DEVCONTAINER_GITHUB_API_RECENT_FAILURE_PENALTY_PER_FAILURE:-10}" 10 0 100)"
+readonly RECENT_FAILURE_PENALTY_PER_FAILURE
+RECENT_FAILURE_PENALTY_MAX="$(cfg_uint "${DEVCONTAINER_GITHUB_API_RECENT_FAILURE_PENALTY_MAX:-35}" 35 0 100)"
+readonly RECENT_FAILURE_PENALTY_MAX
+COOLDOWN_FAILURE_THRESHOLD="$(cfg_uint "${DEVCONTAINER_GITHUB_API_COOLDOWN_FAILURE_THRESHOLD:-2}" 2 1 20)"
+readonly COOLDOWN_FAILURE_THRESHOLD
+COOLDOWN_SECONDS="$(cfg_uint "${DEVCONTAINER_GITHUB_API_COOLDOWN_SECONDS:-600}" 600 0 86400)"
+readonly COOLDOWN_SECONDS
+RECOVERY_SECONDS="$(cfg_uint "${DEVCONTAINER_GITHUB_API_RECOVERY_SECONDS:-1800}" 1800 0 86400)"
+readonly RECOVERY_SECONDS
+P95_SAMPLE_LIMIT="$(cfg_uint "${DEVCONTAINER_GITHUB_API_P95_SAMPLE_LIMIT:-20}" 20 3 200)"
+readonly P95_SAMPLE_LIMIT
+P95_GOOD_MS="$(cfg_uint "${DEVCONTAINER_GITHUB_API_P95_GOOD_MS:-500}" 500 1 120000)"
+readonly P95_GOOD_MS
+P95_ACCEPTABLE_MS="$(cfg_uint "${DEVCONTAINER_GITHUB_API_P95_ACCEPTABLE_MS:-1000}" 1000 1 120000)"
+readonly P95_ACCEPTABLE_MS
+P95_SLOW_MS="$(cfg_uint "${DEVCONTAINER_GITHUB_API_P95_SLOW_MS:-1500}" 1500 1 120000)"
+readonly P95_SLOW_MS
+
 readonly CACHE_LOCK_FILE="${DEVCONTAINER_GITHUB_API_ROUTE_CACHE_LOCK_FILE:-${CACHE_FILE}.lock}"
 
-readonly HYSTERESIS_SCORE_MARGIN="${DEVCONTAINER_GITHUB_API_HYSTERESIS_SCORE_MARGIN:-8}"
-readonly HYSTERESIS_LATENCY_RATIO_PERCENT="${DEVCONTAINER_GITHUB_API_HYSTERESIS_LATENCY_RATIO_PERCENT:-75}"
-readonly OPTIMIZE_WHEN_CURRENT_OK="${DEVCONTAINER_GITHUB_API_OPTIMIZE_WHEN_CURRENT_OK:-true}"
-readonly FORCE_RESELECT="${DEVCONTAINER_GITHUB_API_FORCE_RESELECT:-false}"
+HYSTERESIS_SCORE_MARGIN="$(cfg_uint "${DEVCONTAINER_GITHUB_API_HYSTERESIS_SCORE_MARGIN:-8}" 8 0 100)"
+readonly HYSTERESIS_SCORE_MARGIN
+HYSTERESIS_LATENCY_RATIO_PERCENT="$(cfg_uint "${DEVCONTAINER_GITHUB_API_HYSTERESIS_LATENCY_RATIO_PERCENT:-75}" 75 1 100)"
+readonly HYSTERESIS_LATENCY_RATIO_PERCENT
+OPTIMIZE_WHEN_CURRENT_OK="$(cfg_bool "${DEVCONTAINER_GITHUB_API_OPTIMIZE_WHEN_CURRENT_OK:-true}" true)"
+readonly OPTIMIZE_WHEN_CURRENT_OK
+FORCE_RESELECT="$(cfg_bool "${DEVCONTAINER_GITHUB_API_FORCE_RESELECT:-false}" false)"
+readonly FORCE_RESELECT
 
-# auto: if a proxy is configured and works for api.github.com, do not touch hosts.
-# direct: ignore proxies and run direct route selection.
-# respect: if proxy exists, only test proxy-aware route and never apply hosts.
-readonly PROXY_MODE="${DEVCONTAINER_GITHUB_API_ROUTE_PROXY_MODE:-auto}"
+case "${DEVCONTAINER_GITHUB_API_ROUTE_PROXY_MODE:-auto}" in
+    auto | direct | respect) readonly PROXY_MODE="${DEVCONTAINER_GITHUB_API_ROUTE_PROXY_MODE:-auto}" ;;
+    *) readonly PROXY_MODE="auto" ;;
+esac
 
-# IPv6 is opt-in for now. The current observed incident is IPv4-specific and the
-# caller already runs IPv4 probes. If enabled, AAAA/getent IPv6 candidates are
-# also considered and written to /etc/hosts when they win.
-readonly ENABLE_IPV6="${DEVCONTAINER_GITHUB_API_ENABLE_IPV6:-false}"
-
-# Candidate probing is parallel by default. With small MAX_CANDIDATES this keeps
-# start hooks responsive under dropped-packet timeouts.
-readonly PARALLEL_PROBES="${DEVCONTAINER_GITHUB_API_PARALLEL_PROBES:-true}"
+ENABLE_IPV6="$(cfg_bool "${DEVCONTAINER_GITHUB_API_ENABLE_IPV6:-false}" false)"
+readonly ENABLE_IPV6
+PARALLEL_PROBES="$(cfg_bool "${DEVCONTAINER_GITHUB_API_PARALLEL_PROBES:-true}" true)"
+readonly PARALLEL_PROBES
 readonly PROBE_TMP_DIR="${DEVCONTAINER_GITHUB_API_PROBE_TMP_DIR:-/tmp}"
 
-# Optional TLS preflight. Curl already validates TLS; keep this off by default
-# to avoid false negatives in minimal images or unusual OpenSSL behavior.
-readonly OPENSSL_PREFLIGHT="${DEVCONTAINER_GITHUB_API_OPENSSL_PREFLIGHT:-false}"
-readonly OPENSSL_PREFLIGHT_TIMEOUT="${DEVCONTAINER_GITHUB_API_OPENSSL_PREFLIGHT_TIMEOUT:-2}"
+OPENSSL_PREFLIGHT="$(cfg_bool "${DEVCONTAINER_GITHUB_API_OPENSSL_PREFLIGHT:-false}" false)"
+readonly OPENSSL_PREFLIGHT
+OPENSSL_PREFLIGHT_TIMEOUT="$(cfg_uint "${DEVCONTAINER_GITHUB_API_OPENSSL_PREFLIGHT_TIMEOUT:-2}" 2 1 20)"
+readonly OPENSSL_PREFLIGHT_TIMEOUT
 
 readonly HOSTS_LOCK_FILE="${DEVCONTAINER_GITHUB_API_HOSTS_LOCK_FILE:-/tmp/devcontainer-github-api-route.hosts.lock}"
+CACHE_LOCK_WAIT_SECONDS="$(cfg_uint "${DEVCONTAINER_GITHUB_API_CACHE_LOCK_WAIT_SECONDS:-10}" 10 1 120)"
+readonly CACHE_LOCK_WAIT_SECONDS
+HOSTS_LOCK_WAIT_SECONDS="$(cfg_uint "${DEVCONTAINER_GITHUB_API_HOSTS_LOCK_WAIT_SECONDS:-15}" 15 1 120)"
+readonly HOSTS_LOCK_WAIT_SECONDS
+STRICT_VERIFY_EXPECTED_IP="$(cfg_bool "${DEVCONTAINER_GITHUB_API_STRICT_VERIFY_EXPECTED_IP:-true}" true)"
+readonly STRICT_VERIFY_EXPECTED_IP
+ROLLBACK_ON_VERIFY_FAILURE="$(cfg_bool "${DEVCONTAINER_GITHUB_API_ROLLBACK_ON_VERIFY_FAILURE:-true}" true)"
+readonly ROLLBACK_ON_VERIFY_FAILURE
+DRY_RUN="$(cfg_bool "${DEVCONTAINER_GITHUB_API_ROUTE_DRY_RUN:-false}" false)"
+readonly DRY_RUN
 
 # -----------------------------------------------------------------------------
 # Logging / reporting
@@ -98,34 +200,190 @@ log_debug() {
     fi
 }
 
+ensure_parent_dir() {
+    local path="$1" dir
+    dir="$(dirname "${path}" 2> /dev/null || printf '/tmp')"
+    mkdir -p "${dir}" 2> /dev/null || true
+}
+
+write_atomic_file() {
+    local target content mode dir tmp
+    target="${1:-}"
+    content="${2:-}"
+    mode="${3:-0644}"
+    [[ -n "${target}" ]] || return 1
+    ensure_parent_dir "${target}"
+    dir="$(dirname "${target}" 2> /dev/null || printf '/tmp')"
+    tmp="$(mktemp "${dir%/}/.${SCRIPT_NAME}.XXXXXX" 2> /dev/null || true)"
+    [[ -n "${tmp}" ]] || return 1
+    printf '%s' "${content}" > "${tmp}" 2> /dev/null || {
+        rm -f "${tmp}" 2> /dev/null || true
+        return 1
+    }
+    chmod "${mode}" "${tmp}" 2> /dev/null || true
+    mv -f "${tmp}" "${target}" 2> /dev/null || {
+        rm -f "${tmp}" 2> /dev/null || true
+        return 1
+    }
+    return 0
+}
+
 write_report_header() {
+    ensure_parent_dir "${GITHUB_ROUTE_REPORT_FILE}"
     {
         printf 'script=%s\n' "${SCRIPT_NAME}"
         printf 'version=%s\n' "${SCRIPT_VERSION}"
         printf 'timestamp=%s\n' "$(ts)"
         printf 'host=%s\n' "${GITHUB_API_HOST}"
+        printf 'action=%s\n' "${ACTION}"
+        printf 'allow_custom_host=%s\n' "${ALLOW_CUSTOM_HOST}"
         printf 'connect_timeout=%s\n' "${CONNECT_TIMEOUT}"
         printf 'max_time=%s\n' "${MAX_TIME}"
         printf 'min_score=%s\n' "${MIN_SCORE}"
         printf 'max_candidates=%s\n' "${MAX_CANDIDATES}"
         printf 'cache_enabled=%s\n' "${CACHE_ENABLED}"
         printf 'cache_file=%s\n' "${CACHE_FILE}"
+        printf 'status_file=%s\n' "${GITHUB_ROUTE_STATUS_FILE}"
+        printf 'summary_file=%s\n' "${GITHUB_ROUTE_SUMMARY_FILE}"
+        printf 'metrics_file=%s\n' "${GITHUB_ROUTE_METRICS_FILE}"
         printf 'parallel_probes=%s\n' "${PARALLEL_PROBES}"
         printf 'proxy_mode=%s\n' "${PROXY_MODE}"
         printf 'enable_ipv6=%s\n' "${ENABLE_IPV6}"
         printf 'optimize_when_current_ok=%s\n' "${OPTIMIZE_WHEN_CURRENT_OK}"
+        printf 'cache_lock_wait_seconds=%s\n' "${CACHE_LOCK_WAIT_SECONDS}"
+        printf 'hosts_lock_wait_seconds=%s\n' "${HOSTS_LOCK_WAIT_SECONDS}"
+        printf 'strict_verify_expected_ip=%s\n' "${STRICT_VERIFY_EXPECTED_IP}"
+        printf 'rollback_on_verify_failure=%s\n' "${ROLLBACK_ON_VERIFY_FAILURE}"
+        printf 'dry_run=%s\n' "${DRY_RUN}"
+        printf 'recent_failure_window_seconds=%s\n' "${RECENT_FAILURE_WINDOW_SECONDS}"
+        printf 'recent_failure_penalty_per_failure=%s\n' "${RECENT_FAILURE_PENALTY_PER_FAILURE}"
+        printf 'recent_failure_penalty_max=%s\n' "${RECENT_FAILURE_PENALTY_MAX}"
+        printf 'cooldown_failure_threshold=%s\n' "${COOLDOWN_FAILURE_THRESHOLD}"
+        printf 'cooldown_seconds=%s\n' "${COOLDOWN_SECONDS}"
+        printf 'recovery_seconds=%s\n' "${RECOVERY_SECONDS}"
+        printf 'p95_sample_limit=%s\n' "${P95_SAMPLE_LIMIT}"
+        printf 'p95_good_ms=%s\n' "${P95_GOOD_MS}"
+        printf 'p95_acceptable_ms=%s\n' "${P95_ACCEPTABLE_MS}"
+        printf 'p95_slow_ms=%s\n' "${P95_SLOW_MS}"
         printf '\n'
     } > "${GITHUB_ROUTE_REPORT_FILE}" 2> /dev/null || true
 }
 
-append_report() { printf '%s\n' "$*" >> "${GITHUB_ROUTE_REPORT_FILE}" 2> /dev/null || true; }
+append_report() {
+    ensure_parent_dir "${GITHUB_ROUTE_REPORT_FILE}"
+    printf '%s\n' "$*" >> "${GITHUB_ROUTE_REPORT_FILE}" 2> /dev/null || true
+}
+
+write_status() {
+    local value
+    value="${1:-unknown}"
+    write_atomic_file "${GITHUB_ROUTE_STATUS_FILE}" "$(printf '%s\n' "${value}")" 2> /dev/null || {
+        ensure_parent_dir "${GITHUB_ROUTE_STATUS_FILE}"
+        printf '%s\n' "${value}" > "${GITHUB_ROUTE_STATUS_FILE}" 2> /dev/null || true
+    }
+}
+
+write_summary() {
+    local status selected_ip selected_score selected_latency current_ip current_score current_latency reason
+    local decision selected_p95 current_p95 cooldown_remaining recovery_remaining content
+    status="${1:-unknown}"
+    selected_ip="${2:-}"
+    selected_score="${3:-}"
+    selected_latency="${4:-}"
+    current_ip="${5:-}"
+    current_score="${6:-}"
+    current_latency="${7:-}"
+    reason="${8:-}"
+    decision="${9:-${reason:-unknown}}"
+    selected_p95="${10:-unknown}"
+    current_p95="${11:-unknown}"
+    cooldown_remaining="${12:-0}"
+    recovery_remaining="${13:-0}"
+    content="$(
+        printf 'status=%s\n' "${status}"
+        printf 'selected_ip=%s\n' "${selected_ip:-none}"
+        printf 'selected_score=%s\n' "${selected_score:-unknown}"
+        printf 'selected_latency_ms=%s\n' "${selected_latency:-unknown}"
+        printf 'selected_p95_latency_ms=%s\n' "${selected_p95:-unknown}"
+        printf 'current_ip=%s\n' "${current_ip:-unknown}"
+        printf 'current_score=%s\n' "${current_score:-unknown}"
+        printf 'current_latency_ms=%s\n' "${current_latency:-unknown}"
+        printf 'current_p95_latency_ms=%s\n' "${current_p95:-unknown}"
+        printf 'cooldown_remaining_seconds=%s\n' "${cooldown_remaining:-0}"
+        printf 'recovery_remaining_seconds=%s\n' "${recovery_remaining:-0}"
+        printf 'reason=%s\n' "${reason:-none}"
+        printf 'decision_reason=%s\n' "${decision:-none}"
+        printf 'report=%s\n' "${GITHUB_ROUTE_REPORT_FILE}"
+        printf 'metrics=%s\n' "${GITHUB_ROUTE_METRICS_FILE}"
+        printf 'cache=%s\n' "${CACHE_FILE}"
+        printf 'completed_at=%s\n' "$(ts)"
+    )"
+    write_atomic_file "${GITHUB_ROUTE_SUMMARY_FILE}" "$(printf '%s\n' "${content}")" 0644 || {
+        ensure_parent_dir "${GITHUB_ROUTE_SUMMARY_FILE}"
+        printf '%s\n' "${content}" > "${GITHUB_ROUTE_SUMMARY_FILE}" 2> /dev/null || true
+    }
+}
+
+write_metrics_header() {
+    ensure_parent_dir "${GITHUB_ROUTE_METRICS_FILE}"
+    printf 'timestamp\tip\tscore\troot_http\trate_http\tuser_http\tlatency_ms\tp95_latency_ms\trecent_failures\tcooldown_remaining_seconds\trecovery_remaining_seconds\tremote_ip\tselected\tstatus\treason\n' > "${GITHUB_ROUTE_METRICS_FILE}" 2> /dev/null || true
+}
+
+append_candidate_metric() {
+    local ip score root_http rate_http user_http latency_ms remote reason selected status p95_latency recent_failures cooldown_remaining recovery_remaining
+    ip="${1:-}"
+    score="${2:-0}"
+    root_http="${3:-000}"
+    rate_http="${4:-000}"
+    user_http="${5:-000}"
+    latency_ms="${6:-0}"
+    remote="${7:-}"
+    reason="${8:-}"
+    selected="${9:-false}"
+    p95_latency="${10:-unknown}"
+    recent_failures="${11:-0}"
+    cooldown_remaining="${12:-0}"
+    recovery_remaining="${13:-0}"
+    status="fail"
+    if is_nonnegative_int "${score}" && ((score >= MIN_SCORE)) && { ! is_nonnegative_int "${cooldown_remaining}" || ((cooldown_remaining == 0)); }; then
+        status="ok"
+    fi
+    printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
+        "$(ts)" "${ip}" "${score}" "${root_http}" "${rate_http}" "${user_http}" "${latency_ms}" \
+        "${p95_latency:-unknown}" "${recent_failures:-0}" "${cooldown_remaining:-0}" "${recovery_remaining:-0}" \
+        "${remote:-unknown}" "${selected}" "${status}" "${reason}" \
+        >> "${GITHUB_ROUTE_METRICS_FILE}" 2> /dev/null || true
+}
 
 # -----------------------------------------------------------------------------
 # Generic helpers
 # -----------------------------------------------------------------------------
 has_cmd() { command -v "$1" > /dev/null 2>&1; }
+is_nonnegative_int() { [[ "${1:-}" =~ ^[0-9]+$ ]]; }
 
-is_nonnegative_int() { [[ "$1" =~ ^[0-9]+$ ]]; }
+is_safe_hostname() {
+    local h label old_ifs
+    h="${1:-}"
+    [[ ${#h} -ge 1 && ${#h} -le 253 ]] || return 1
+    [[ "${h}" =~ ^[A-Za-z0-9][A-Za-z0-9.-]*[A-Za-z0-9]$ ]] || return 1
+    [[ "${h}" != *..* ]] || return 1
+    [[ "${h}" == *.* ]] || return 1
+
+    old_ifs="${IFS}"
+    IFS='.'
+    for label in ${h}; do
+        [[ ${#label} -ge 1 && ${#label} -le 63 ]] || {
+            IFS="${old_ifs}"
+            return 1
+        }
+        [[ "${label}" =~ ^[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?$ ]] || {
+            IFS="${old_ifs}"
+            return 1
+        }
+    done
+    IFS="${old_ifs}"
+    return 0
+}
 
 is_ipv4() {
     awk -v ip="$1" 'BEGIN {
@@ -144,19 +402,65 @@ is_ipv6() {
         python3 - "$1" << 'PY' > /dev/null 2>&1
 import ipaddress, sys
 try:
-    ipaddress.IPv6Address(sys.argv[1])
+    ip = ipaddress.IPv6Address(sys.argv[1])
 except Exception:
     sys.exit(1)
+
+# Reject IPv4-mapped IPv6 (::ffff:x.y.z.w). It is not a native IPv6 route and,
+# in this project, it can represent the same broken IPv4 edge that triggered the
+# route fix in the first place.
+if ip.ipv4_mapped is not None:
+    sys.exit(1)
+
+# Reject addresses that cannot be valid public HTTPS candidates for GitHub API.
+if ip.is_unspecified or ip.is_loopback or ip.is_multicast or ip.is_link_local:
+    sys.exit(1)
+
+sys.exit(0)
 PY
         return $?
     fi
-    # Conservative fallback: only accept common IPv6 character set with colon.
-    [[ "$1" =~ ^[0-9A-Fa-f:]+$ ]]
+    [[ "$1" =~ ^[0-9A-Fa-f:]+$ ]] || return 1
+    [[ "$1" != ::ffff:* && "$1" != fe80:* && "$1" != ::1 && "$1" != ff* ]]
+}
+
+is_public_ipv4_candidate() {
+    is_ipv4 "$1" || return 1
+    awk -v ip="$1" 'BEGIN {
+        split(ip,a,".");
+        a1=a[1]+0; a2=a[2]+0; a3=a[3]+0; a4=a[4]+0;
+
+        # Reject non-routable, local, documentation, benchmarking,
+        # multicast, reserved and broadcast ranges. Candidate IPs for
+        # public GitHub API routing must be globally routable IPv4 addresses.
+        if (a1 == 0) exit 1;
+        if (a1 == 10) exit 1;
+        if (a1 == 100 && a2 >= 64 && a2 <= 127) exit 1;
+        if (a1 == 127) exit 1;
+        if (a1 == 169 && a2 == 254) exit 1;
+        if (a1 == 172 && a2 >= 16 && a2 <= 31) exit 1;
+        if (a1 == 192 && a2 == 0 && a3 == 0) exit 1;
+        if (a1 == 192 && a2 == 0 && a3 == 2) exit 1;
+        if (a1 == 192 && a2 == 168) exit 1;
+        if (a1 == 198 && (a2 == 18 || a2 == 19)) exit 1;
+        if (a1 == 198 && a2 == 51 && a3 == 100) exit 1;
+        if (a1 == 203 && a2 == 0 && a3 == 113) exit 1;
+        if (a1 >= 224) exit 1;
+        if (a1 == 255 && a2 == 255 && a3 == 255 && a4 == 255) exit 1;
+        exit 0;
+    }' 2> /dev/null
 }
 
 is_ip_candidate() {
-    if is_ipv4 "$1"; then return 0; fi
+    if is_public_ipv4_candidate "$1"; then return 0; fi
     [[ "${ENABLE_IPV6}" == "true" ]] && is_ipv6 "$1"
+}
+
+is_resolver_ip() {
+    # Resolver addresses may legitimately be local/private in custom setups.
+    if is_ipv4 "$1"; then return 0; fi
+    [[ "$1" == *:* ]] && return 0
+    return 1
 }
 
 ip_family() {
@@ -205,8 +509,15 @@ extract_field() {
     printf '%s' "${line}" | tr '|' '\n' | awk -F= -v k="${key}" '$1 == k {sub($1"=", ""); print; exit}'
 }
 
+extract_reason_field() {
+    local key reason
+    key="${1:-}"
+    reason="${2:-}"
+    [[ -n "${key}" ]] || return 0
+    printf '%s' "${reason}" | tr ';' '\n' | awk -F= -v k="${key}" '$1 == k {sub($1"=", ""); print; exit}'
+}
+
 float_ms() {
-    # curl write-out can be locale-sensitive in some builds. Normalize defensively.
     local value="$1"
     value="${value/,/.}"
     LC_ALL=C awk -v s="${value}" 'BEGIN { if (s == "") s=0; printf "%d", s*1000 }' 2> /dev/null
@@ -230,12 +541,33 @@ has_proxy_env() {
     [[ -n "${HTTPS_PROXY:-}${https_proxy:-}${HTTP_PROXY:-}${http_proxy:-}${ALL_PROXY:-}${all_proxy:-}" ]]
 }
 
+make_temp_file() {
+    local prefix="${1:-tmp}" dir="${2:-/tmp}" tmp=""
+    mkdir -p "${dir}" 2> /dev/null || dir="/tmp"
+    tmp="$(mktemp "${dir%/}/${prefix}.XXXXXX" 2> /dev/null || true)"
+    if [[ -n "${tmp}" ]]; then
+        printf '%s\n' "${tmp}"
+        return 0
+    fi
+    tmp="$(mktemp "/tmp/${prefix}.XXXXXX" 2> /dev/null || true)"
+    [[ -n "${tmp}" ]] && printf '%s\n' "${tmp}"
+}
+
+make_temp_dir() {
+    local prefix="${1:-tmp}" dir="${2:-/tmp}" tmp=""
+    mkdir -p "${dir}" 2> /dev/null || dir="/tmp"
+    tmp="$(mktemp -d "${dir%/}/${prefix}.XXXXXX" 2> /dev/null || true)"
+    if [[ -n "${tmp}" ]]; then
+        printf '%s\n' "${tmp}"
+        return 0
+    fi
+    mktemp -d "/tmp/${prefix}.XXXXXX" 2> /dev/null || true
+}
+
 # -----------------------------------------------------------------------------
 # Curl helpers
 # -----------------------------------------------------------------------------
 curl_current_route() {
-    # args: output_file url mode family_hint
-    # mode: direct|proxy-aware
     local output_file="$1" url="$2" mode="$3" family_hint="${4:-4}"
     local -a args=()
     if [[ "${family_hint}" == "4" ]]; then args+=("-4"); fi
@@ -251,7 +583,6 @@ curl_current_route() {
 }
 
 curl_candidate_route() {
-    # args: output_file path ip
     local output_file="$1" path="$2" ip="$3"
     local flag resolve_value
     local -a args=()
@@ -273,23 +604,33 @@ curl_candidate_route() {
 
 # -----------------------------------------------------------------------------
 # Cache helpers
-# TSV columns:
-# ip success_count failure_count last_success_epoch last_failure_epoch
-# last_score last_latency_ms selected_count last_selected_epoch
+# TSV columns, backward compatible with v1.7.0:
+#  1 ip
+#  2 success_count
+#  3 failure_count
+#  4 last_success_epoch
+#  5 last_failure_epoch
+#  6 last_score
+#  7 last_latency_ms
+#  8 selected_count
+#  9 last_selected_epoch
+# 10 cooldown_until_epoch          [v1.8.0]
+# 11 recovery_until_epoch          [v1.8.0]
+# 12 latency_samples_csv           [v1.8.0]
+# 13 failure_epochs_csv            [v1.8.0]
 # -----------------------------------------------------------------------------
-ensure_cache_file_locked_body() {
+ensure_cache_file_unlocked() {
     [[ "${CACHE_ENABLED}" == "true" ]] || return 1
     local dir
     dir="$(dirname "${CACHE_FILE}" 2> /dev/null || printf '/tmp')"
     mkdir -p "${dir}" 2> /dev/null || return 1
     [[ -f "${CACHE_FILE}" ]] || : > "${CACHE_FILE}" 2> /dev/null || return 1
+    chmod 0600 "${CACHE_FILE}" 2> /dev/null || true
     return 0
 }
 
 ensure_cache_file() {
-    if [[ "${CACHE_ENABLED}" != "true" ]]; then
-        return 1
-    fi
+    [[ "${CACHE_ENABLED}" == "true" ]] || return 1
 
     local lock_dir
     lock_dir="$(dirname "${CACHE_LOCK_FILE}" 2> /dev/null || printf '/tmp')"
@@ -297,13 +638,79 @@ ensure_cache_file() {
 
     if has_cmd flock; then
         (
-            flock -x 9 || exit 98
-            ensure_cache_file_locked_body
+            flock -x -w "${CACHE_LOCK_WAIT_SECONDS}" 9 || exit 98
+            ensure_cache_file_unlocked
         ) 9> "${CACHE_LOCK_FILE}"
         return $?
     fi
 
-    ensure_cache_file_locked_body
+    ensure_cache_file_unlocked
+}
+
+prune_cache_locked_body() {
+    [[ "${CACHE_ENABLED}" == "true" ]] || return 0
+    ensure_cache_file_unlocked || return 0
+
+    local tmp cache_dir now max_age
+    cache_dir="$(dirname "${CACHE_FILE}" 2> /dev/null || printf '/tmp')"
+    tmp="$(make_temp_file github-api-cache-prune "${cache_dir}")"
+    [[ -n "${tmp}" ]] || return 0
+    now="$(now_epoch)"
+    max_age="${CACHE_MAX_AGE_SECONDS}"
+
+    awk -v now="${now}" -v max_age="${max_age}" '
+        BEGIN { FS=OFS="\t" }
+        NF >= 9 {
+            ip=$1; last_success=$4+0; last_failure=$5+0;
+            last_seen=(last_success > last_failure ? last_success : last_failure);
+            if (last_seen <= 0) next;
+            if ((now - last_seen) > max_age) next;
+            print last_seen, $0;
+        }' "${CACHE_FILE}" 2> /dev/null \
+        | sort -rn -k1,1 2> /dev/null \
+        | head -n "${CACHE_MAX_ENTRIES}" 2> /dev/null \
+        | cut -f2- > "${tmp}" 2> /dev/null
+
+    if [[ -s "${tmp}" || -f "${CACHE_FILE}" ]]; then
+        mv -f "${tmp}" "${CACHE_FILE}" 2> /dev/null || rm -f "${tmp}" 2> /dev/null || true
+        chmod 0600 "${CACHE_FILE}" 2> /dev/null || true
+    else
+        rm -f "${tmp}" 2> /dev/null || true
+    fi
+}
+
+prune_cache() {
+    [[ "${CACHE_ENABLED}" == "true" ]] || return 0
+    local lock_dir
+    lock_dir="$(dirname "${CACHE_LOCK_FILE}" 2> /dev/null || printf '/tmp')"
+    mkdir -p "${lock_dir}" 2> /dev/null || true
+    if has_cmd flock; then
+        (
+            flock -x -w "${CACHE_LOCK_WAIT_SECONDS}" 9 || exit 0
+            prune_cache_locked_body
+        ) 9> "${CACHE_LOCK_FILE}"
+        return $?
+    fi
+    prune_cache_locked_body
+}
+
+clear_cache() {
+    [[ "${CACHE_ENABLED}" == "true" ]] || return 0
+    local lock_dir
+    lock_dir="$(dirname "${CACHE_LOCK_FILE}" 2> /dev/null || printf '/tmp')"
+    mkdir -p "${lock_dir}" 2> /dev/null || true
+    if has_cmd flock; then
+        (
+            flock -x -w "${CACHE_LOCK_WAIT_SECONDS}" 9 || exit 0
+            ensure_parent_dir "${CACHE_FILE}"
+            : > "${CACHE_FILE}" 2> /dev/null || true
+            chmod 0600 "${CACHE_FILE}" 2> /dev/null || true
+        ) 9> "${CACHE_LOCK_FILE}"
+    else
+        ensure_parent_dir "${CACHE_FILE}"
+        : > "${CACHE_FILE}" 2> /dev/null || true
+        chmod 0600 "${CACHE_FILE}" 2> /dev/null || true
+    fi
 }
 
 cache_candidates() {
@@ -316,13 +723,14 @@ cache_candidates() {
 
     if has_cmd flock; then
         (
-            flock -s 9 || exit 0
+            flock -s -w "${CACHE_LOCK_WAIT_SECONDS}" 9 || exit 0
             awk -v now="${now}" -v max_age="${max_age}" -v enable_ipv6="${ENABLE_IPV6}" '
                 BEGIN { FS="\t" }
                 {
-                    ip=$1; last_success=$4+0;
+                    ip=$1; last_success=$4+0; cooldown_until=$10+0;
                     ipv4=(ip ~ /^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$/);
                     ipv6=(ip ~ /:/);
+                    if (cooldown_until > now) next;
                     if ((ipv4 || (enable_ipv6 == "true" && ipv6)) && last_success > 0 && (now - last_success) <= max_age) print ip;
                 }' "${CACHE_FILE}" 2> /dev/null
         ) 9> "${CACHE_LOCK_FILE}"
@@ -330,89 +738,260 @@ cache_candidates() {
         awk -v now="${now}" -v max_age="${max_age}" -v enable_ipv6="${ENABLE_IPV6}" '
             BEGIN { FS="\t" }
             {
-                ip=$1; last_success=$4+0;
+                ip=$1; last_success=$4+0; cooldown_until=$10+0;
                 ipv4=(ip ~ /^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$/);
                 ipv6=(ip ~ /:/);
+                if (cooldown_until > now) next;
                 if ((ipv4 || (enable_ipv6 == "true" && ipv6)) && last_success > 0 && (now - last_success) <= max_age) print ip;
             }' "${CACHE_FILE}" 2> /dev/null
     fi
 }
 
-cache_history_bonus() {
-    local ip="$1"
+cache_candidate_state() {
+    local ip now
+    ip="${1:-}"
     [[ "${CACHE_ENABLED}" == "true" ]] || {
-        printf '0'
+        printf '0|0|0|0|0|cache-disabled;'
         return 0
     }
     ensure_cache_file || {
-        printf '0'
+        printf '0|0|0|0|0|cache-unavailable;'
         return 0
     }
-
-    local now
     now="$(now_epoch)"
 
-    awk -v ip="${ip}" -v now="${now}" '
-        BEGIN { FS="\t"; bonus=0 }
-        $1 == ip {
-            success=$2+0; failure=$3+0; last_success=$4+0; last_failure=$5+0; selected=$8+0;
-            age_success=(last_success > 0 ? now-last_success : 999999999);
-            age_failure=(last_failure > 0 ? now-last_failure : 999999999);
-
-            if (success >= 5) bonus += 5;
-            else if (success >= 3) bonus += 3;
-            else if (success >= 1) bonus += 1;
-
-            if (selected >= 3) bonus += 3;
-            else if (selected >= 1) bonus += 1;
-
-            if (age_success < 3600) bonus += 4;
-            else if (age_success < 86400) bonus += 2;
-            else if (age_success < 604800) bonus += 1;
-
-            if (age_failure < 300) bonus -= 25;
-            else if (age_failure < 3600) bonus -= 15;
-            else if (age_failure < 21600) bonus -= 10;
-            else if (age_failure < 86400) bonus -= 5;
-            else if (age_failure < 604800) bonus -= 2;
-
-            if (failure > success && failure >= 2) bonus -= 8;
-            print bonus;
-            found=1;
-            exit;
+    awk -v ip="${ip}" \
+        -v now="${now}" \
+        -v failure_window="${RECENT_FAILURE_WINDOW_SECONDS}" \
+        -v p95_good="${P95_GOOD_MS}" \
+        -v p95_acceptable="${P95_ACCEPTABLE_MS}" \
+        -v p95_slow="${P95_SLOW_MS}" \
+        -v penalty_per_failure="${RECENT_FAILURE_PENALTY_PER_FAILURE}" \
+        -v penalty_max="${RECENT_FAILURE_PENALTY_MAX}" '
+        BEGIN { FS="\t"; found=0 }
+        function sortn(a, n,    i,j,tmp) {
+            for (i=1; i<=n; i++) for (j=i+1; j<=n; j++) if (a[j] < a[i]) { tmp=a[i]; a[i]=a[j]; a[j]=tmp }
         }
-        END { if (!found) print 0 }' "${CACHE_FILE}" 2> /dev/null
+        function p95_from_csv(csv,    n,parts,i,v,pidx,count) {
+            n=split(csv, parts, ",")
+            count=0
+            delete vals
+            for (i=1; i<=n; i++) {
+                v=parts[i]+0
+                if (v > 0) vals[++count]=v
+            }
+            if (count <= 0) return 0
+            sortn(vals, count)
+            pidx=int(count*0.95)
+            if (pidx < 1) pidx=1
+            if (pidx < count && (count*0.95) > pidx) pidx++
+            if (pidx > count) pidx=count
+            return vals[pidx]+0
+        }
+        function recent_failures_from_csv(csv,    n,parts,i,t,c) {
+            n=split(csv, parts, ",")
+            c=0
+            for (i=1; i<=n; i++) {
+                t=parts[i]+0
+                if (t > 0 && (now - t) >= 0 && (now - t) <= failure_window) c++
+            }
+            return c
+        }
+        $1 == ip {
+            found=1
+            success=$2+0; failure=$3+0; last_success=$4+0; last_failure=$5+0
+            selected=$8+0; cooldown_until=$10+0; recovery_until=$11+0
+            p95=p95_from_csv($12)
+            recent_fail=recent_failures_from_csv($13)
+            cooldown_remaining=(cooldown_until > now ? cooldown_until-now : 0)
+            recovery_remaining=(recovery_until > now ? recovery_until-now : 0)
+            delta=0
+            reason=""
+
+            age_success=(last_success > 0 ? now-last_success : 999999999)
+            age_failure=(last_failure > 0 ? now-last_failure : 999999999)
+
+            if (success >= 5) { delta += 5; reason=reason "success>=5:+5;" }
+            else if (success >= 3) { delta += 3; reason=reason "success>=3:+3;" }
+            else if (success >= 1) { delta += 1; reason=reason "success>=1:+1;" }
+
+            if (selected >= 3) { delta += 3; reason=reason "selected>=3:+3;" }
+            else if (selected >= 1) { delta += 1; reason=reason "selected>=1:+1;" }
+
+            if (age_success < 3600) { delta += 4; reason=reason "recent-success<1h:+4;" }
+            else if (age_success < 86400) { delta += 2; reason=reason "recent-success<1d:+2;" }
+            else if (age_success < 604800) { delta += 1; reason=reason "recent-success<7d:+1;" }
+
+            if (age_failure < 300) { delta -= 25; reason=reason "last-failure<5m:-25;" }
+            else if (age_failure < 3600) { delta -= 15; reason=reason "last-failure<1h:-15;" }
+            else if (age_failure < 21600) { delta -= 10; reason=reason "last-failure<6h:-10;" }
+            else if (age_failure < 86400) { delta -= 5; reason=reason "last-failure<1d:-5;" }
+            else if (age_failure < 604800) { delta -= 2; reason=reason "last-failure<7d:-2;" }
+
+            if (recent_fail > 0) {
+                fp=recent_fail * penalty_per_failure
+                if (fp > penalty_max) fp=penalty_max
+                delta -= fp
+                reason=reason "recent_failures_penalty=-" fp ";"
+            }
+
+            if (failure > success && failure >= 2) { delta -= 8; reason=reason "failures>success:-8;" }
+
+            if (p95 > 0) {
+                if (p95 <= p95_good) { delta += 5; reason=reason "p95<=" p95_good ":+5;" }
+                else if (p95 <= p95_acceptable) { delta += 2; reason=reason "p95<=" p95_acceptable ":+2;" }
+                else if (p95 > p95_slow) { delta -= 15; reason=reason "p95>" p95_slow ":-15;" }
+                else { delta -= 5; reason=reason "p95-between-acceptable-and-slow:-5;" }
+            } else {
+                reason=reason "p95=unknown;"
+            }
+
+            if (recovery_remaining > 0) {
+                delta -= 5
+                reason=reason "gradual-recovery-active=-5;"
+            }
+
+            if (cooldown_remaining > 0) reason=reason "cooldown-active=" cooldown_remaining ";"
+            print delta "|" p95 "|" recent_fail "|" cooldown_remaining "|" recovery_remaining "|" reason
+            exit
+        }
+        END {
+            if (!found) print "0|0|0|0|0|no-history;"
+        }' "${CACHE_FILE}" 2> /dev/null
+}
+
+cache_recent_failure_blocked() {
+    local ip state _delta _p95 _recent cooldown_remaining _recovery _reason now last_failure age
+    ip="${1:-}"
+    state="$(cache_candidate_state "${ip}")"
+    IFS='|' read -r _delta _p95 _recent cooldown_remaining _recovery _reason <<< "${state}"
+    if [[ "${cooldown_remaining}" =~ ^[0-9]+$ && "${cooldown_remaining}" -gt 0 ]]; then
+        return 0
+    fi
+
+    [[ "${CACHE_ENABLED}" == "true" ]] || return 1
+    [[ "${RECENT_FAILURE_HARD_BLOCK_SECONDS}" -gt 0 ]] || return 1
+    ensure_cache_file || return 1
+    now="$(now_epoch)"
+    last_failure="$(awk -v ip="${ip}" 'BEGIN{FS="\t"} $1==ip{print $5+0; exit}' "${CACHE_FILE}" 2> /dev/null || printf '0')"
+    [[ "${last_failure}" =~ ^[0-9]+$ && "${last_failure}" -gt 0 ]] || return 1
+    age=$((now - last_failure))
+    ((age >= 0 && age < RECENT_FAILURE_HARD_BLOCK_SECONDS))
 }
 
 cache_update_locked_body() {
     local ip="$1" ok="$2" score="$3" latency="$4" selected="$5"
     ensure_cache_file_unlocked || return 0
 
-    local now tmp
+    local now tmp cache_dir
     now="$(now_epoch)"
-    tmp="$(mktemp 2> /dev/null || echo "/tmp/github-api-cache.$$.$RANDOM")"
+    cache_dir="$(dirname "${CACHE_FILE}" 2> /dev/null || printf '/tmp')"
+    tmp="$(make_temp_file github-api-cache "${cache_dir}")"
+    [[ -n "${tmp}" ]] || return 0
 
-    if awk -v ip="${ip}" -v ok="${ok}" -v score="${score}" -v latency="${latency}" -v selected="${selected}" -v now="${now}" '
+    if awk -v ip="${ip}" \
+        -v ok="${ok}" \
+        -v score="${score}" \
+        -v latency="${latency}" \
+        -v selected="${selected}" \
+        -v now="${now}" \
+        -v sample_limit="${P95_SAMPLE_LIMIT}" \
+        -v failure_window="${RECENT_FAILURE_WINDOW_SECONDS}" \
+        -v cooldown_threshold="${COOLDOWN_FAILURE_THRESHOLD}" \
+        -v cooldown_seconds="${COOLDOWN_SECONDS}" \
+        -v recovery_seconds="${RECOVERY_SECONDS}" '
         BEGIN { FS=OFS="\t"; found=0 }
+        function append_limited_csv(csv, value, limit,    n,parts,i,start,out) {
+            if (value == "" || value == "0") return csv
+            n=split(csv, parts, ",")
+            parts[++n]=value
+            start=n-limit+1
+            if (start < 1) start=1
+            out=""
+            for (i=start; i<=n; i++) {
+                if (parts[i] == "") continue
+                out=(out == "" ? parts[i] : out "," parts[i])
+            }
+            return out
+        }
+        function prune_failure_csv(csv,    n,parts,i,t,out) {
+            n=split(csv, parts, ",")
+            out=""
+            for (i=1; i<=n; i++) {
+                t=parts[i]+0
+                if (t > 0 && (now - t) >= 0 && (now - t) <= failure_window) {
+                    out=(out == "" ? t : out "," t)
+                }
+            }
+            return out
+        }
+        function count_csv(csv,    n,parts,i,c) {
+            n=split(csv, parts, ",")
+            c=0
+            for (i=1; i<=n; i++) if (parts[i] != "") c++
+            return c
+        }
+        function emit_record(ip, success, failure, last_success, last_failure, score, latency, selected_count, last_selected, cooldown_until, recovery_until, latency_samples, failure_epochs) {
+            print ip, success, failure, last_success, last_failure, score, latency, selected_count, last_selected, cooldown_until, recovery_until, latency_samples, failure_epochs
+        }
         $1 == ip {
-            found=1;
-            success=$2+0; failure=$3+0; last_success=$4+0; last_failure=$5+0;
-            selected_count=$8+0; last_selected=$9+0;
-            if (ok == "true") { success++; last_success=now } else { failure++; last_failure=now }
-            if (selected == "true") { selected_count++; last_selected=now }
-            print ip, success, failure, last_success, last_failure, score, latency, selected_count, last_selected;
-            next;
+            found=1
+            success=$2+0; failure=$3+0; last_success=$4+0; last_failure=$5+0
+            selected_count=$8+0; last_selected=$9+0
+            cooldown_until=$10+0; recovery_until=$11+0
+            latency_samples=$12; failure_epochs=$13
+            failure_epochs=prune_failure_csv(failure_epochs)
+
+            if (ok == "true") {
+                success++
+                last_success=now
+                if (latency+0 > 0) latency_samples=append_limited_csv(latency_samples, latency+0, sample_limit)
+                if (last_failure > 0 && (now - last_failure) <= 86400 && recovery_seconds > 0) recovery_until=now+recovery_seconds
+                if (cooldown_until < now) cooldown_until=0
+            } else {
+                failure++
+                last_failure=now
+                failure_epochs=append_limited_csv(failure_epochs, now, sample_limit)
+                recent=count_csv(prune_failure_csv(failure_epochs))
+                if (cooldown_seconds > 0 && recent >= cooldown_threshold) {
+                    cooldown_until=now+cooldown_seconds
+                    if (recovery_seconds > 0) recovery_until=cooldown_until+recovery_seconds
+                }
+            }
+            if (selected == "true") {
+                selected_count++
+                last_selected=now
+            }
+            emit_record(ip, success, failure, last_success, last_failure, score, latency, selected_count, last_selected, cooldown_until, recovery_until, latency_samples, failure_epochs)
+            next
         }
         { print }
         END {
             if (!found) {
-                success=0; failure=0; last_success=0; last_failure=0; selected_count=0; last_selected=0;
-                if (ok == "true") { success=1; last_success=now } else { failure=1; last_failure=now }
-                if (selected == "true") { selected_count=1; last_selected=now }
-                print ip, success, failure, last_success, last_failure, score, latency, selected_count, last_selected;
+                success=0; failure=0; last_success=0; last_failure=0; selected_count=0; last_selected=0
+                cooldown_until=0; recovery_until=0; latency_samples=""; failure_epochs=""
+                if (ok == "true") {
+                    success=1
+                    last_success=now
+                    if (latency+0 > 0) latency_samples=append_limited_csv("", latency+0, sample_limit)
+                } else {
+                    failure=1
+                    last_failure=now
+                    failure_epochs=append_limited_csv("", now, sample_limit)
+                    if (cooldown_seconds > 0 && cooldown_threshold <= 1) {
+                        cooldown_until=now+cooldown_seconds
+                        if (recovery_seconds > 0) recovery_until=cooldown_until+recovery_seconds
+                    }
+                }
+                if (selected == "true") {
+                    selected_count=1
+                    last_selected=now
+                }
+                emit_record(ip, success, failure, last_success, last_failure, score, latency, selected_count, last_selected, cooldown_until, recovery_until, latency_samples, failure_epochs)
             }
         }' "${CACHE_FILE}" > "${tmp}" 2> /dev/null; then
         mv -f "${tmp}" "${CACHE_FILE}" 2> /dev/null || rm -f "${tmp}" 2> /dev/null || true
+        chmod 0600 "${CACHE_FILE}" 2> /dev/null || true
     else
         rm -f "${tmp}" 2> /dev/null || true
     fi
@@ -427,7 +1006,7 @@ cache_update() {
 
     if has_cmd flock; then
         (
-            flock -x 9 || exit 0
+            flock -x -w "${CACHE_LOCK_WAIT_SECONDS}" 9 || exit 0
             cache_update_locked_body "$@"
         ) 9> "${CACHE_LOCK_FILE}"
         return $?
@@ -439,12 +1018,17 @@ cache_update() {
 # -----------------------------------------------------------------------------
 # Proxy-aware short-circuit
 # -----------------------------------------------------------------------------
+PROXY_ROUTE_REMOTE=""
+PROXY_ROUTE_LATENCY_MS=""
+
 probe_proxy_route_if_configured() {
     has_proxy_env || return 1
     [[ "${PROXY_MODE}" == "auto" || "${PROXY_MODE}" == "respect" ]] || return 1
 
     local tmp meta body http ctype tls remote time_total latency_ms
-    tmp="$(mktemp 2> /dev/null || echo "/tmp/github-api-proxy.$$")"
+    tmp="$(make_temp_file github-api-proxy /tmp)"
+    [[ -n "${tmp}" ]] || return 1
+
     meta="$(curl_current_route "${tmp}" "https://${GITHUB_API_HOST}/" "proxy-aware" "auto")"
     body="$(cat "${tmp}" 2> /dev/null || true)"
     rm -f "${tmp}" 2> /dev/null || true
@@ -462,6 +1046,8 @@ probe_proxy_route_if_configured() {
         && printf '%s' "${body}" | grep -q 'current_user_url' \
         && printf '%s' "${body}" | grep -q 'https://api.github.com/user' \
         && printf '%s' "${body}" | grep -q 'rate_limit_url'; then
+        PROXY_ROUTE_REMOTE="${remote:-unknown}"
+        PROXY_ROUTE_LATENCY_MS="${latency_ms:-0}"
         log_ok "proxy-aware route funcional para ${GITHUB_API_HOST} → remote=${remote:-unknown}, latency=${latency_ms}ms; não alterando /etc/hosts."
         append_report "result=proxy-route-ok remote=${remote:-unknown} latency_ms=${latency_ms}"
         return 0
@@ -481,9 +1067,12 @@ probe_proxy_route_if_configured() {
 # GitHub API semantic probes
 # -----------------------------------------------------------------------------
 probe_github_api_current_route() {
-    # Prints: state|remote_ip|latency_ms|score|meta
     local tmp meta body http ctype tls remote time_total latency_ms score=0
-    tmp="$(mktemp 2> /dev/null || echo "/tmp/github-api-current.$$")"
+    tmp="$(make_temp_file github-api-current /tmp)"
+    [[ -n "${tmp}" ]] || {
+        printf 'fail|unknown|0|0|no-temp-file\n'
+        return 1
+    }
 
     local family_hint="4"
     [[ "${ENABLE_IPV6}" == "true" ]] && family_hint="auto"
@@ -529,22 +1118,47 @@ openssl_preflight_ok() {
 }
 
 probe_github_api_candidate() {
-    # Prints: ip|score|root_http|rate_http|user_http|latency_ms|remote_ip|reason
-    local ip="$1"
+    local ip
     local tmp_root tmp_rate tmp_user root_meta rate_meta user_meta root_body rate_body user_body
-    local score=0 reason=""
+    local score reason state hist_delta hist_p95 hist_recent_failures hist_cooldown_remaining hist_recovery_remaining hist_reason
+    ip="${1:-}"
+    score=0
+    reason=""
+
+    if ! is_ip_candidate "${ip}"; then
+        printf '%s|0|000|000|000|0||decision=candidate-rejected;invalid-ip;\n' "${ip}"
+        return 0
+    fi
+
+    state="$(cache_candidate_state "${ip}")"
+    IFS='|' read -r hist_delta hist_p95 hist_recent_failures hist_cooldown_remaining hist_recovery_remaining hist_reason <<< "${state}"
+    if [[ "${hist_cooldown_remaining}" =~ ^[0-9]+$ && "${hist_cooldown_remaining}" -gt 0 ]]; then
+        printf '%s|0|000|000|000|0||decision=candidate-suppressed;cooldown-active=%s;p95_latency_ms=%s;recent_failures=%s;recovery_remaining_seconds=%s;%s\n' \
+            "${ip}" "${hist_cooldown_remaining}" "${hist_p95:-0}" "${hist_recent_failures:-0}" "${hist_recovery_remaining:-0}" "${hist_reason:-}"
+        return 0
+    fi
+
+    if cache_recent_failure_blocked "${ip}"; then
+        printf '%s|0|000|000|000|0||decision=candidate-suppressed;recent-failure-hard-block;p95_latency_ms=%s;recent_failures=%s;recovery_remaining_seconds=%s;%s\n' \
+            "${ip}" "${hist_p95:-0}" "${hist_recent_failures:-0}" "${hist_recovery_remaining:-0}" "${hist_reason:-}"
+        return 0
+    fi
 
     if ! openssl_preflight_ok "${ip}"; then
-        reason="${reason}openssl-preflight-fail;"
+        reason="${reason}decision=candidate-rejected;openssl-preflight-fail;"
         printf '%s|%s|%s|%s|%s|%s|%s|%s\n' "${ip}" "0" "000" "000" "000" "0" "" "${reason}"
         return 0
     fi
 
-    tmp_root="$(mktemp 2> /dev/null || echo "/tmp/github-api-root.$$.$RANDOM")"
+    tmp_root="$(make_temp_file github-api-root /tmp)"
+    [[ -n "${tmp_root}" ]] || {
+        printf '%s|0|000|000|000|0||decision=candidate-rejected;no-temp-file;\n' "${ip}"
+        return 0
+    }
     root_meta="$(curl_candidate_route "${tmp_root}" "/" "${ip}")"
     log_debug "candidate=${ip} root_meta=${root_meta}"
 
-    local root_http root_ctype root_time root_remote root_tls root_ms history_bonus
+    local root_http root_ctype root_time root_remote root_tls root_ms
     root_http="$(extract_field http_code "${root_meta}")"
     root_ctype="$(extract_field content_type "${root_meta}")"
     root_time="$(extract_field time_total "${root_meta}")"
@@ -559,69 +1173,82 @@ probe_github_api_candidate() {
         && printf '%s' "${root_body}" | grep -q 'https://api.github.com/user' \
         && printf '%s' "${root_body}" | grep -q 'rate_limit_url'; then
         score=$((score + 55))
-        reason="${reason}root-api-ok;"
+        reason="${reason}root-api-ok;+55;"
     else
-        reason="${reason}root-api-fail(http=${root_http:-000},ctype=${root_ctype:-none},tls=${root_tls:-?});"
+        reason="${reason}decision=candidate-rejected;root-api-fail(http=${root_http:-000},ctype=${root_ctype:-none},tls=${root_tls:-?});"
         printf '%s|%s|%s|%s|%s|%s|%s|%s\n' "${ip}" "0" "${root_http:-000}" "000" "000" "${root_ms:-0}" "${root_remote:-}" "${reason}"
         return 0
     fi
 
-    tmp_rate="$(mktemp 2> /dev/null || echo "/tmp/github-api-rate.$$.$RANDOM")"
-    rate_meta="$(curl_candidate_route "${tmp_rate}" "/rate_limit" "${ip}")"
-
     local rate_http rate_ctype rate_tls
-    rate_http="$(extract_field http_code "${rate_meta}")"
-    rate_ctype="$(extract_field content_type "${rate_meta}")"
-    rate_tls="$(extract_field ssl_verify_result "${rate_meta}")"
-    rate_body="$(cat "${tmp_rate}" 2> /dev/null || true)"
-    rm -f "${tmp_rate}" 2> /dev/null || true
+    rate_http="000"
+    tmp_rate="$(make_temp_file github-api-rate /tmp)"
+    if [[ -n "${tmp_rate}" ]]; then
+        rate_meta="$(curl_candidate_route "${tmp_rate}" "/rate_limit" "${ip}")"
+        rate_http="$(extract_field http_code "${rate_meta}")"
+        rate_ctype="$(extract_field content_type "${rate_meta}")"
+        rate_tls="$(extract_field ssl_verify_result "${rate_meta}")"
+        rate_body="$(cat "${tmp_rate}" 2> /dev/null || true)"
+        rm -f "${tmp_rate}" 2> /dev/null || true
 
-    if [[ "${rate_http}" == "200" && "${rate_ctype}" == *"application/json"* && "${rate_tls}" == "0" ]] \
-        && printf '%s' "${rate_body}" | grep -q 'resources' \
-        && printf '%s' "${rate_body}" | grep -q 'rate'; then
-        score=$((score + 25))
-        reason="${reason}rate-limit-ok;"
+        if [[ "${rate_http}" == "200" && "${rate_ctype}" == *"application/json"* && "${rate_tls}" == "0" ]] \
+            && printf '%s' "${rate_body}" | grep -q 'resources' \
+            && printf '%s' "${rate_body}" | grep -q 'rate'; then
+            score=$((score + 25))
+            reason="${reason}rate-limit-ok;+25;"
+        else
+            reason="${reason}rate-limit-fail(http=${rate_http:-000},ctype=${rate_ctype:-none},tls=${rate_tls:-?});"
+        fi
     else
-        reason="${reason}rate-limit-fail(http=${rate_http:-000},ctype=${rate_ctype:-none},tls=${rate_tls:-?});"
+        reason="${reason}rate-limit-fail(no-temp-file);"
     fi
 
-    tmp_user="$(mktemp 2> /dev/null || echo "/tmp/github-api-user.$$.$RANDOM")"
-    user_meta="$(curl_candidate_route "${tmp_user}" "/user" "${ip}")"
-
     local user_http user_ctype user_tls
-    user_http="$(extract_field http_code "${user_meta}")"
-    user_ctype="$(extract_field content_type "${user_meta}")"
-    user_tls="$(extract_field ssl_verify_result "${user_meta}")"
-    user_body="$(cat "${tmp_user}" 2> /dev/null || true)"
-    rm -f "${tmp_user}" 2> /dev/null || true
+    user_http="000"
+    tmp_user="$(make_temp_file github-api-user /tmp)"
+    if [[ -n "${tmp_user}" ]]; then
+        user_meta="$(curl_candidate_route "${tmp_user}" "/user" "${ip}")"
+        user_http="$(extract_field http_code "${user_meta}")"
+        user_ctype="$(extract_field content_type "${user_meta}")"
+        user_tls="$(extract_field ssl_verify_result "${user_meta}")"
+        user_body="$(cat "${tmp_user}" 2> /dev/null || true)"
+        rm -f "${tmp_user}" 2> /dev/null || true
 
-    if [[ ("${user_http}" == "200" || "${user_http}" == "401" || "${user_http}" == "403") && "${user_ctype}" == *"application/json"* && "${user_tls}" == "0" ]] \
-        && { printf '%s' "${user_body}" | grep -q 'message\|login\|documentation_url' || [[ "${user_http}" == "403" ]]; }; then
-        score=$((score + 15))
-        reason="${reason}user-endpoint-shaped-ok;"
+        if [[ ("${user_http}" == "200" || "${user_http}" == "401" || "${user_http}" == "403") && "${user_ctype}" == *"application/json"* && "${user_tls}" == "0" ]] \
+            && { printf '%s' "${user_body}" | grep -q 'message\|login\|documentation_url' || [[ "${user_http}" == "403" ]]; }; then
+            score=$((score + 15))
+            reason="${reason}user-endpoint-shaped-ok;+15;"
+        else
+            reason="${reason}user-endpoint-fail(http=${user_http:-000},ctype=${user_ctype:-none},tls=${user_tls:-?});"
+        fi
     else
-        reason="${reason}user-endpoint-fail(http=${user_http:-000},ctype=${user_ctype:-none},tls=${user_tls:-?});"
+        reason="${reason}user-endpoint-fail(no-temp-file);"
     fi
 
     if [[ -n "${root_ms}" ]]; then
         if ((root_ms > 0 && root_ms <= 500)); then
             score=$((score + 5))
-            reason="${reason}latency<=500ms;"
+            reason="${reason}current-latency<=500ms;+5;"
         elif ((root_ms > 500 && root_ms <= 1500)); then
             score=$((score + 2))
-            reason="${reason}latency<=1500ms;"
+            reason="${reason}current-latency<=1500ms;+2;"
         else
-            reason="${reason}latency-slow-or-missing;"
+            reason="${reason}current-latency-slow-or-missing;"
         fi
     fi
 
-    history_bonus="$(cache_history_bonus "${ip}")"
-    if [[ "${history_bonus}" =~ ^-?[0-9]+$ && "${history_bonus}" != "0" ]]; then
-        score=$((score + history_bonus))
-        reason="${reason}history=${history_bonus};"
+    if [[ "${hist_delta}" =~ ^-?[0-9]+$ && "${hist_delta}" != "0" ]]; then
+        score=$((score + hist_delta))
     fi
+    reason="${reason}history-delta=${hist_delta:-0};p95_latency_ms=${hist_p95:-0};recent_failures=${hist_recent_failures:-0};recovery_remaining_seconds=${hist_recovery_remaining:-0};${hist_reason:-}"
 
     if ((score < 0)); then score=0; fi
+
+    if ((score >= MIN_SCORE)); then
+        reason="${reason}decision=candidate-valid;"
+    else
+        reason="${reason}decision=candidate-below-min-score;"
+    fi
 
     printf '%s|%s|%s|%s|%s|%s|%s|%s\n' \
         "${ip}" "${score}" "${root_http:-000}" "${rate_http:-000}" "${user_http:-000}" "${root_ms:-0}" "${root_remote:-}" "${reason}"
@@ -650,7 +1277,7 @@ collect_github_api_candidates() {
 
         if has_cmd dig; then
             for resolver in "${resolvers[@]}"; do
-                is_ip_candidate "${resolver}" || continue
+                is_resolver_ip "${resolver}" || continue
                 dig +time=1 +tries=1 @"${resolver}" "${host}" +short A 2> /dev/null || true
                 if [[ "${ENABLE_IPV6}" == "true" ]]; then
                     dig +time=1 +tries=1 @"${resolver}" "${host}" +short AAAA 2> /dev/null || true
@@ -683,7 +1310,6 @@ get_github_token_best_effort() {
 
 probe_github_api_auth_optional() {
     local ip="$1" host="${GITHUB_API_HOST}"
-
     if [[ "${ENABLE_AUTH_PROBE}" != "true" && "${ENABLE_COPILOT_INTERNAL_AUTH_PROBE}" != "true" ]]; then return 0; fi
 
     local token resolve_value flag
@@ -744,15 +1370,10 @@ probe_github_api_auth_optional() {
 }
 
 # -----------------------------------------------------------------------------
-# /etc/hosts apply / verify
+# /etc/hosts apply / restore / verify
 # -----------------------------------------------------------------------------
-apply_hosts_locked_body() {
-    local best_ip="$1" host="${GITHUB_API_HOST}"
-    local tmp_hosts backup_file
-    tmp_hosts="$(mktemp 2> /dev/null || echo "/tmp/hosts.github-api.$$.$RANDOM")"
-    backup_file="/tmp/hosts.pre-github-api-route-fix.$(date +%s 2> /dev/null || echo $$)"
-    cp /etc/hosts "${backup_file}" 2> /dev/null || true
-
+strip_managed_hosts_block() {
+    local host="${GITHUB_API_HOST}"
     awk -v h="${host}" '
         BEGIN { skip=0 }
         $0 ~ /^# >>> devcontainer-github-api-route-fix/ { skip=1; next }
@@ -763,7 +1384,39 @@ apply_hosts_locked_body() {
           for (i=2; i<=NF; i++) if ($i == h) found=1
           if (found == 0) print $0
         }
-    ' /etc/hosts > "${tmp_hosts}" 2> /dev/null || {
+    ' /etc/hosts 2> /dev/null
+}
+
+restore_hosts_from_backup() {
+    local backup_file="$1"
+    [[ -r "${backup_file}" ]] || return 1
+    if safe_sudo tee /etc/hosts < "${backup_file}" > /dev/null 2>&1; then
+        log_info "rollback de /etc/hosts aplicado a partir de ${backup_file}."
+        append_report "rollback=ok backup=${backup_file}"
+        return 0
+    fi
+    log_warn "rollback de /etc/hosts falhou; backup disponível em ${backup_file}."
+    append_report "rollback=failed backup=${backup_file}"
+    return 1
+}
+
+apply_hosts_locked_body() {
+    local best_ip="$1" backup_file="${2:-}" host="${GITHUB_API_HOST}"
+    local tmp_hosts backup_dir
+    tmp_hosts="$(make_temp_file hosts.github-api /tmp)"
+    [[ -n "${tmp_hosts}" ]] || {
+        log_warn "falha ao criar arquivo temporário para /etc/hosts."
+        return 1
+    }
+
+    backup_dir="${DEVCONTAINER_GITHUB_API_HOSTS_BACKUP_DIR:-/tmp}"
+    mkdir -p "${backup_dir}" 2> /dev/null || backup_dir="/tmp"
+    if [[ -z "${backup_file}" ]]; then
+        backup_file="$(mktemp "${backup_dir%/}/hosts.pre-github-api-route-fix.XXXXXX" 2> /dev/null || printf "${backup_dir%/}/hosts.pre-github-api-route-fix.%s" "$(date +%s 2> /dev/null || echo $$)")"
+    fi
+    cp /etc/hosts "${backup_file}" 2> /dev/null || true
+
+    strip_managed_hosts_block > "${tmp_hosts}" 2> /dev/null || {
         log_warn "falha ao preparar novo conteúdo de /etc/hosts."
         rm -f "${tmp_hosts}" 2> /dev/null || true
         return 1
@@ -777,9 +1430,6 @@ apply_hosts_locked_body() {
         printf '# <<< devcontainer-github-api-route-fix\n'
     } >> "${tmp_hosts}"
 
-    # Important for Docker/DevContainers: /etc/hosts is usually a Docker-managed
-    # mounted file. Replacing it with cp/mv may fail with EBUSY or break inode
-    # semantics. tee rewrites the content while preserving the mounted file.
     if ! safe_sudo tee /etc/hosts < "${tmp_hosts}" > /dev/null 2>&1; then
         log_warn "falha ao aplicar /etc/hosts via tee (sem sudo -n/root ou read-only?)."
         rm -f "${tmp_hosts}" 2> /dev/null || true
@@ -788,25 +1438,26 @@ apply_hosts_locked_body() {
 
     rm -f "${tmp_hosts}" 2> /dev/null || true
     log_info "backup best-effort de /etc/hosts em ${backup_file}."
+    append_report "hosts_backup=${backup_file}"
     log_ok "override aplicado: ${host} → ${best_ip}"
     return 0
 }
 
 apply_github_api_hosts_override() {
-    local best_ip="$1"
+    local best_ip="$1" backup_file="${2:-}"
     local lock_dir
     lock_dir="$(dirname "${HOSTS_LOCK_FILE}" 2> /dev/null || printf '/tmp')"
     mkdir -p "${lock_dir}" 2> /dev/null || true
 
     if has_cmd flock; then
         (
-            flock -x 9 || exit 98
-            apply_hosts_locked_body "${best_ip}"
+            flock -x -w "${HOSTS_LOCK_WAIT_SECONDS}" 9 || exit 98
+            apply_hosts_locked_body "${best_ip}" "${backup_file}"
         ) 9> "${HOSTS_LOCK_FILE}"
         return $?
     fi
 
-    apply_hosts_locked_body "${best_ip}"
+    apply_hosts_locked_body "${best_ip}" "${backup_file}"
 }
 
 verify_github_api_hosts_override() {
@@ -825,6 +1476,10 @@ verify_github_api_hosts_override() {
         log_ok "verify OK: ${host} → IP ${remote:-unknown} | latency=${latency:-0}ms | score=${score:-0}"
         if [[ -n "${expected_ip}" && "${remote}" != "${expected_ip}" ]]; then
             log_warn "verify: remote_ip=${remote}, esperado=${expected_ip}; pode haver cache/proxy."
+            if [[ "${STRICT_VERIFY_EXPECTED_IP}" == "true" ]]; then
+                append_report "verify=strict-mismatch expected=${expected_ip} remote=${remote:-unknown}"
+                return 1
+            fi
         fi
         return 0
     fi
@@ -852,7 +1507,8 @@ should_switch_from_current() {
     if ((best_score >= current_score + HYSTERESIS_SCORE_MARGIN)); then return 0; fi
 
     if ((best_score >= current_score && current_latency > 0 && best_latency > 0)); then
-        local threshold=$((current_latency * HYSTERESIS_LATENCY_RATIO_PERCENT / 100))
+        local threshold
+        threshold=$((current_latency * HYSTERESIS_LATENCY_RATIO_PERCENT / 100))
         if ((best_latency < threshold)); then return 0; fi
     fi
 
@@ -861,17 +1517,17 @@ should_switch_from_current() {
 
 probe_candidates_parallel() {
     local candidates="$1"
-    local tmp_dir pid ip tmp_file
+    local tmp_dir pid ip tmp_file count
     local -a pids=() files=() ips=()
+    count=0
 
-    tmp_dir="$(mktemp -d "${PROBE_TMP_DIR%/}/github-api-probes.XXXXXX" 2> /dev/null || mktemp -d 2> /dev/null)"
-    if [[ -z "${tmp_dir}" || ! -d "${tmp_dir}" ]]; then
-        return 1
-    fi
+    tmp_dir="$(make_temp_dir github-api-probes "${PROBE_TMP_DIR}")"
+    if [[ -z "${tmp_dir}" || ! -d "${tmp_dir}" ]]; then return 1; fi
 
     while IFS= read -r ip; do
         [[ -z "${ip}" ]] && continue
-        tmp_file="${tmp_dir}/probe.$(printf '%s' "${ip}" | tr ':.' '__').out"
+        count=$((count + 1))
+        tmp_file="${tmp_dir}/probe.${count}.$(printf '%s' "${ip}" | tr -c 'A-Za-z0-9_' '_').out"
         probe_github_api_candidate "${ip}" > "${tmp_file}" 2> "${tmp_file}.err" &
         pid=$!
         pids+=("${pid}")
@@ -879,9 +1535,7 @@ probe_candidates_parallel() {
         ips+=("${ip}")
     done <<< "${candidates}"
 
-    for pid in "${pids[@]}"; do
-        wait "${pid}" 2> /dev/null || true
-    done
+    for pid in "${pids[@]}"; do wait "${pid}" 2> /dev/null || true; done
 
     local index=0
     while ((index < ${#files[@]})); do
@@ -915,12 +1569,37 @@ update_cache_from_record() {
     cache_update "${ip}" "${ok}" "${score:-0}" "${latency_ms:-0}" "${selected}"
 }
 
+update_cache_from_records() {
+    local records="$1" selected_ip="${2:-}" record
+    while IFS= read -r record; do
+        [[ -n "${record}" ]] && update_cache_from_record "${record}" "${selected_ip}"
+    done <<< "${records}"
+}
+
 select_and_apply_route() {
     write_report_header
+    write_metrics_header
+    write_status "running"
+    prune_cache || true
+
+    if ! is_safe_hostname "${GITHUB_API_HOST}"; then
+        log_warn "host inválido/não seguro: ${GITHUB_API_HOST}"
+        append_report "result=invalid-host host=${GITHUB_API_HOST}"
+        write_summary "failed" "" "" "" "" "" "" "decision=fail;cause=invalid-host"
+        return 1
+    fi
+
+    if [[ "${GITHUB_API_HOST}" != "api.github.com" && "${ALLOW_CUSTOM_HOST}" != "true" ]]; then
+        log_warn "host customizado bloqueado por segurança: ${GITHUB_API_HOST}; defina DEVCONTAINER_GITHUB_API_ALLOW_CUSTOM_HOST=true para permitir."
+        append_report "result=custom-host-not-allowed host=${GITHUB_API_HOST}"
+        write_summary "failed" "" "" "" "" "" "" "decision=fail;cause=custom-host-not-allowed"
+        return 1
+    fi
 
     if ! has_cmd curl; then
         log_warn "curl não encontrado; não é possível validar rota."
         append_report "result=no-curl"
+        write_summary "failed" "" "" "" "" "" "" "decision=fail;cause=no-curl"
         return 1
     fi
 
@@ -928,9 +1607,11 @@ select_and_apply_route() {
 
     if has_proxy_env && [[ "${PROXY_MODE}" != "direct" ]]; then
         if probe_proxy_route_if_configured; then
+            write_summary "ok" "${PROXY_ROUTE_REMOTE:-proxy}" "" "${PROXY_ROUTE_LATENCY_MS:-}" "${PROXY_ROUTE_REMOTE:-proxy}" "" "${PROXY_ROUTE_LATENCY_MS:-}" "decision=keep;cause=proxy-route-ok"
             return 0
         fi
         if [[ "${PROXY_MODE}" == "respect" ]]; then
+            write_summary "failed" "" "" "" "" "" "" "decision=fail;cause=proxy-route-failed-respect-mode"
             return 1
         fi
     fi
@@ -944,6 +1625,7 @@ select_and_apply_route() {
     if [[ "${current_state}" == "ok" && "${OPTIMIZE_WHEN_CURRENT_OK}" != "true" ]]; then
         log_ok "rota atual já é funcional (${GITHUB_API_HOST} → ${current_remote}, ${current_latency}ms); otimização desabilitada."
         append_report "result=current-ok-no-optimization selected=${current_remote} score=${current_score}"
+        write_summary "ok" "${current_remote}" "${current_score}" "${current_latency}" "${current_remote}" "${current_score}" "${current_latency}" "decision=keep-current;cause=current-ok-no-optimization"
         return 0
     fi
 
@@ -956,19 +1638,20 @@ select_and_apply_route() {
     local candidates
     candidates="$(collect_github_api_candidates)"
     if [[ -z "${candidates}" ]]; then
+        if [[ "${current_state}" == "ok" ]]; then
+            log_ok "nenhum candidato coletado, mas rota atual está funcional; mantendo ${current_remote}."
+            append_report "result=current-kept-no-candidates current=${current_remote} current_score=${current_score}"
+            write_summary "ok" "${current_remote}" "${current_score}" "${current_latency}" "${current_remote}" "${current_score}" "${current_latency}" "decision=keep-current;cause=no-candidates;current-valid=true"
+            return 0
+        fi
         log_warn "nenhum candidato coletado."
         append_report "result=no-candidates"
+        write_summary "failed" "" "" "" "${current_remote}" "${current_score}" "${current_latency}" "decision=fail;cause=no-candidates;current-valid=false"
         return 1
     fi
 
     log_info "candidatos coletados: $(printf '%s' "${candidates}" | tr '\n' ' ')"
     append_report "candidates=$(printf '%s' "${candidates}" | tr '\n' ' ')"
-
-    local effective_min_score="${MIN_SCORE}"
-    if ! is_nonnegative_int "${effective_min_score}"; then
-        log_warn "MIN_SCORE inválido (${MIN_SCORE}); usando 85."
-        effective_min_score=85
-    fi
 
     local all_records=""
     if [[ "${PARALLEL_PROBES}" == "true" ]]; then
@@ -983,7 +1666,7 @@ select_and_apply_route() {
 
     local best_ip="" best_score=-1 best_latency=999999 best_record=""
     local current_full_score="" current_full_latency=""
-    local record ip score root_http rate_http user_http latency_ms remote reason
+    local record ip score root_http rate_http user_http latency_ms remote reason record_p95 record_recent_failures record_cooldown_remaining record_recovery_remaining
 
     while IFS= read -r record; do
         [[ -z "${record}" ]] && continue
@@ -991,6 +1674,11 @@ select_and_apply_route() {
 
         log_info "candidate ${ip}: score=${score}; root=${root_http}; rate=${rate_http}; user=${user_http}; latency=${latency_ms}ms; remote=${remote:-?}; ${reason}"
         append_report "candidate=${ip} score=${score} root=${root_http} rate=${rate_http} user=${user_http} latency_ms=${latency_ms} remote=${remote} reason=${reason}"
+        record_p95="$(extract_reason_field p95_latency_ms "${reason}")"
+        record_recent_failures="$(extract_reason_field recent_failures "${reason}")"
+        record_cooldown_remaining="$(extract_reason_field cooldown-active "${reason}")"
+        record_recovery_remaining="$(extract_reason_field recovery_remaining_seconds "${reason}")"
+        append_candidate_metric "${ip}" "${score}" "${root_http}" "${rate_http}" "${user_http}" "${latency_ms}" "${remote}" "${reason}" "false" "${record_p95:-unknown}" "${record_recent_failures:-0}" "${record_cooldown_remaining:-0}" "${record_recovery_remaining:-0}"
 
         if [[ "${current_state}" == "ok" && "${ip}" == "${current_remote}" ]]; then
             current_full_score="${score}"
@@ -998,6 +1686,7 @@ select_and_apply_route() {
         fi
 
         if is_nonnegative_int "${score}"; then
+            is_nonnegative_int "${latency_ms}" || latency_ms=999999
             if ((score > best_score)) || { ((score == best_score)) && ((latency_ms > 0 && latency_ms < best_latency)); }; then
                 best_score="${score}"
                 best_latency="${latency_ms:-999999}"
@@ -1007,12 +1696,18 @@ select_and_apply_route() {
         fi
     done <<< "${all_records}"
 
-    if [[ -z "${best_ip}" || "${best_score}" -lt "${effective_min_score}" ]]; then
-        log_warn "nenhum candidato atingiu score mínimo ${effective_min_score}; melhor=${best_ip:-none}, score=${best_score}."
-        append_report "result=no-valid-candidate best_ip=${best_ip:-none} best_score=${best_score} min_score=${effective_min_score}"
-        while IFS= read -r record; do
-            [[ -n "${record}" ]] && update_cache_from_record "${record}" ""
-        done <<< "${all_records}"
+    if [[ -z "${best_ip}" || "${best_score}" -lt "${MIN_SCORE}" ]]; then
+        if [[ "${current_state}" == "ok" ]]; then
+            log_ok "nenhum candidato superou o score mínimo, mas rota atual está funcional; mantendo ${current_remote}."
+            append_report "result=current-kept-no-valid-candidate current=${current_remote} current_score=${current_score} best_ip=${best_ip:-none} best_score=${best_score} min_score=${MIN_SCORE}"
+            update_cache_from_records "${all_records}" "${current_remote}"
+            write_summary "ok" "${current_remote}" "${current_score}" "${current_latency}" "${current_remote}" "${current_score}" "${current_latency}" "decision=keep-current;cause=no-valid-candidate;current-valid=true"
+            return 0
+        fi
+        log_warn "nenhum candidato atingiu score mínimo ${MIN_SCORE}; melhor=${best_ip:-none}, score=${best_score}."
+        append_report "result=no-valid-candidate best_ip=${best_ip:-none} best_score=${best_score} min_score=${MIN_SCORE}"
+        update_cache_from_records "${all_records}" ""
+        write_summary "failed" "${best_ip:-}" "${best_score}" "${best_latency}" "${current_remote}" "${current_score}" "${current_latency}" "decision=fail;cause=no-valid-candidate"
         return 1
     fi
 
@@ -1025,38 +1720,70 @@ select_and_apply_route() {
         else
             log_ok "mantendo rota atual por estabilidade: atual=${current_remote}/${current_score}/${current_latency}ms; melhor=${best_ip}/${best_score}/${best_latency}ms."
             append_report "result=current-kept current=${current_remote} current_score=${current_score} best_ip=${best_ip} best_score=${best_score}"
-            while IFS= read -r record; do
-                [[ -n "${record}" ]] && update_cache_from_record "${record}" "${current_remote}"
-            done <<< "${all_records}"
+            update_cache_from_records "${all_records}" "${current_remote}"
+            write_summary "ok" "${current_remote}" "${current_score}" "${current_latency}" "${current_remote}" "${current_score}" "${current_latency}" "decision=keep-current;cause=hysteresis"
             return 0
         fi
     fi
 
     log_ok "escolhido ${best_ip} com score=${best_score}, latency=${best_latency}ms."
     append_report "selected=${best_ip} selected_score=${best_score} selected_record=${best_record}"
+    IFS='|' read -r ip score root_http rate_http user_http latency_ms remote reason <<< "${best_record}"
+    record_p95="$(extract_reason_field p95_latency_ms "${reason}")"
+    record_recent_failures="$(extract_reason_field recent_failures "${reason}")"
+    record_cooldown_remaining="$(extract_reason_field cooldown-active "${reason}")"
+    record_recovery_remaining="$(extract_reason_field recovery_remaining_seconds "${reason}")"
+    append_candidate_metric "${ip}" "${score}" "${root_http}" "${rate_http}" "${user_http}" "${latency_ms}" "${remote}" "${reason}" "true" "${record_p95:-unknown}" "${record_recent_failures:-0}" "${record_cooldown_remaining:-0}" "${record_recovery_remaining:-0}"
 
-    apply_github_api_hosts_override "${best_ip}" || {
+    if [[ "${DRY_RUN}" == "true" || "${ACTION}" == "probe" ]]; then
+        log_ok "dry-run ativo: candidato validado, mas /etc/hosts não será alterado."
+        append_report "result=dry-run selected=${best_ip} score=${best_score}"
+        update_cache_from_records "${all_records}" ""
+        write_summary "ok" "${best_ip}" "${best_score}" "${best_latency}" "${current_remote}" "${current_score}" "${current_latency}" "decision=probe-only;cause=validated-candidate"
+        return 0
+    fi
+
+    local backup_file backup_dir
+    backup_dir="${DEVCONTAINER_GITHUB_API_HOSTS_BACKUP_DIR:-/tmp}"
+    mkdir -p "${backup_dir}" 2> /dev/null || backup_dir="/tmp"
+    backup_file="$(mktemp "${backup_dir%/}/hosts.pre-github-api-route-fix.XXXXXX" 2> /dev/null || printf "${backup_dir%/}/hosts.pre-github-api-route-fix.%s" "$(date +%s 2> /dev/null || echo $$)")"
+
+    apply_github_api_hosts_override "${best_ip}" "${backup_file}"
+    local apply_rc=$?
+    if [[ "${apply_rc}" -ne 0 ]]; then
         append_report "result=apply-failed selected=${best_ip}"
-        while IFS= read -r record; do
-            [[ -n "${record}" ]] && update_cache_from_record "${record}" ""
-        done <<< "${all_records}"
+        update_cache_from_records "${all_records}" ""
+        write_summary "failed" "${best_ip}" "${best_score}" "${best_latency}" "${current_remote}" "${current_score}" "${current_latency}" "decision=fail;cause=hosts-apply-failed"
         return 1
-    }
+    fi
 
-    verify_github_api_hosts_override "${best_ip}" || {
+    if ! verify_github_api_hosts_override "${best_ip}"; then
         append_report "result=verify-failed selected=${best_ip}"
-        while IFS= read -r record; do
-            [[ -n "${record}" ]] && update_cache_from_record "${record}" ""
-        done <<< "${all_records}"
+        if [[ "${ROLLBACK_ON_VERIFY_FAILURE}" == "true" && -n "${backup_file}" ]]; then
+            restore_hosts_from_backup "${backup_file}" || true
+        fi
+        update_cache_from_records "${all_records}" ""
+        write_summary "failed" "${best_ip}" "${best_score}" "${best_latency}" "${current_remote}" "${current_score}" "${current_latency}" "decision=fail;cause=post-apply-verify-failed"
         return 1
-    }
+    fi
 
-    while IFS= read -r record; do
-        [[ -n "${record}" ]] && update_cache_from_record "${record}" "${best_ip}"
-    done <<< "${all_records}"
-
+    update_cache_from_records "${all_records}" "${best_ip}"
     probe_github_api_auth_optional "${best_ip}" || true
     append_report "result=ok selected=${best_ip} score=${best_score}"
+    write_summary "ok" "${best_ip}" "${best_score}" "${best_latency}" "${current_remote}" "${current_score}" "${current_latency}" "decision=apply;cause=validated-candidate"
+    return 0
+}
+
+# -----------------------------------------------------------------------------
+# Actions
+# -----------------------------------------------------------------------------
+status_action() {
+    local status
+    status="$(cat "${GITHUB_ROUTE_STATUS_FILE}" 2> /dev/null || printf 'unknown')"
+    log_info "status=${status}; report=${GITHUB_ROUTE_REPORT_FILE}; summary=${GITHUB_ROUTE_SUMMARY_FILE}; metrics=${GITHUB_ROUTE_METRICS_FILE}; cache=${CACHE_FILE}"
+    if [[ -r "${GITHUB_ROUTE_SUMMARY_FILE}" ]]; then
+        cat "${GITHUB_ROUTE_SUMMARY_FILE}" 2> /dev/null || true
+    fi
     return 0
 }
 
@@ -1065,14 +1792,37 @@ select_and_apply_route() {
 # -----------------------------------------------------------------------------
 main() {
     log_info "Smart GitHub API route fix iniciado (v${SCRIPT_VERSION})."
-    log_info "host=${GITHUB_API_HOST}; report=${GITHUB_ROUTE_REPORT_FILE}; cache=${CACHE_FILE}; proxy_mode=${PROXY_MODE}; ipv6=${ENABLE_IPV6}; parallel=${PARALLEL_PROBES}"
+    log_info "action=${ACTION}; host=${GITHUB_API_HOST}; report=${GITHUB_ROUTE_REPORT_FILE}; cache=${CACHE_FILE}; proxy_mode=${PROXY_MODE}; ipv6=${ENABLE_IPV6}; parallel=${PARALLEL_PROBES}; dry_run=${DRY_RUN}"
+
+    case "${ACTION}" in
+        status)
+            status_action
+            return 0
+            ;;
+        clear-cache)
+            write_report_header
+            clear_cache
+            write_status "cache-cleared"
+            write_summary "cache-cleared" "" "" "" "" "" "" "decision=cache;cause=clear-cache"
+            log_ok "cache de rota GitHub API limpo: ${CACHE_FILE}"
+            return 0
+            ;;
+        probe)
+            :
+            ;;
+        *)
+            :
+            ;;
+    esac
 
     select_and_apply_route
     local rc=$?
 
     if [[ "${rc}" -eq 0 ]]; then
+        write_status "ok"
         log_ok "Smart GitHub API route fix concluído com sucesso."
     else
+        write_status "failed"
         log_warn "Smart GitHub API route fix não conseguiu provar/aplicar rota funcional (rc=${rc})."
     fi
 

@@ -21,9 +21,9 @@ describe('infra/io/search', () => {
         expect(canUseIndexSearch({ pattern: 'alpha', includePattern: '*.js' })).toBe(true);
     });
 
-    it('formata linhas do índice removendo marcação de snippet', () => {
+    it('formata linhas do índice com highlight markdown', () => {
         expect(formatIndexSearchRows([{ filePath: '/x/a.md', relativePath: 'a.md', snippet: '[alpha] token' }])).toBe(
-            'a.md: alpha token',
+            'a.md: **alpha** token',
         );
     });
 

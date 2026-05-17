@@ -12,13 +12,7 @@ import { minimatch } from 'minimatch';
  * `includePattern`/`excludePattern` são permitidos — o post-filter {@link filterIndexRowsByGlob}
  * é responsável por aplicar o filtro sobre os resultados do índice.
  *
- * @param {{
- *     pattern: string;
- *     isRegex?: boolean;
- *     caseSensitive?: boolean;
- *     includePattern?: string;
- *     excludePattern?: string;
- * }} opts
+ * @param {{ pattern: string; isRegex?: boolean; caseSensitive?: boolean; includePattern?: string; excludePattern?: string }} opts
  * @returns {boolean}
  */
 export function canUseIndexSearch(opts) {
@@ -31,10 +25,11 @@ export function canUseIndexSearch(opts) {
  * Padrões sem barra (`/`) usam `matchBase: true` para corresponder apenas ao nome do arquivo.
  * Padrões com barra são testados contra o `relativePath` completo.
  *
- * @param {{ filePath: string; relativePath: string; snippet: string }[]} rows
+ * @template {{ filePath: string; relativePath: string }} T
+ * @param {T[]} rows
  * @param {string | undefined} includePattern - Glob de inclusão (ex: "*.ts", "src/**\/*.js")
  * @param {string | undefined} excludePattern - Glob de exclusão (ex: "node_modules")
- * @returns {{ filePath: string; relativePath: string; snippet: string }[]}
+ * @returns {T[]}
  */
 export function filterIndexRowsByGlob(rows, includePattern, excludePattern) {
     if (!includePattern && !excludePattern) return rows;
@@ -58,6 +53,7 @@ export function filterIndexRowsByGlob(rows, includePattern, excludePattern) {
 
 /**
  * Formata linhas do índice FTS5 para string de saída legível.
+ * Highlights FTS5 `[match]` são convertidos para `**match**` (markdown bold).
  *
  * @param {{ filePath: string; relativePath: string; snippet: string }[]} rows
  * @returns {string}
@@ -66,11 +62,35 @@ export function formatIndexSearchRows(rows) {
     return rows
         .map((row) => {
             const snippet = String(row.snippet ?? '')
-                .replaceAll('[', '')
-                .replaceAll(']', '')
+                .replace(/\[([^\]]*)\]/gu, '**$1**')
                 .replace(/\s+/gu, ' ')
                 .trim();
             return `${row.relativePath || row.filePath}: ${snippet}`;
+        })
+        .join('\n');
+}
+
+/**
+ * Formata linhas do índice de imports para string de saída legível.
+ *
+ * @param {{ filePath: string; relativePath: string; source: string; specifiersJson: string; isDynamic: number | boolean; line: number }[]} rows
+ * @returns {string}
+ */
+export function formatIndexImportRows(rows) {
+    return rows
+        .map((row) => {
+            const location = `${row.relativePath || row.filePath}:${row.line}`;
+            let specifiers = '';
+            try {
+                const parsed = JSON.parse(String(row.specifiersJson ?? '[]'));
+                if (Array.isArray(parsed) && parsed.length > 0) {
+                    specifiers = ` { ${parsed.join(', ')} }`;
+                }
+            } catch {
+                // ignore malformed JSON — specifiers omitted
+            }
+            const dynamic = row.isDynamic ? ' (dynamic)' : '';
+            return `${location}: import${specifiers}${dynamic} from '${row.source}'`;
         })
         .join('\n');
 }

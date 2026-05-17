@@ -13,10 +13,16 @@ import { validatePath } from './shared.js';
 
 import {
     buildIoIndexForDirectory,
+    filterIndexRowsByGlob,
     findIoIndexImports,
     findIoIndexSymbol,
+    formatIndexImportRows,
+    formatIndexSearchRows,
+    formatIndexSymbolRows,
     getIoIndexStats,
     invalidateIoIndexPath,
+    normalizeSearchWindow,
+    paginateSearchItems,
     searchIoIndex,
 } from '#copilot/infra/public/indexing';
 
@@ -38,11 +44,28 @@ const IndexBuildParameters = z.object({
 const IndexSearchParameters = z.object({
     query: z.string().min(1).describe('Consulta textual para FTS5.'),
     maxResults: z.number().int().positive().max(500).optional().describe('Janela máxima de resultados. Default: 50.'),
+    cursor: z.string().optional().describe('Cursor numérico retornado por chamada anterior.'),
+    includePattern: z.string().optional().describe('Filtro glob de arquivos a incluir (ex: *.ts, src/**/*.js).'),
+    excludePattern: z.string().optional().describe('Filtro glob de arquivos a excluir (ex: node_modules, dist).'),
 });
 
 const IndexSymbolParameters = z.object({
     symbol: z.string().min(1).describe('Nome ou substring do símbolo.'),
     maxResults: z.number().int().positive().max(500).optional().describe('Janela máxima de resultados. Default: 50.'),
+    cursor: z.string().optional().describe('Cursor numérico retornado por chamada anterior.'),
+    exactMatch: z
+        .boolean()
+        .optional()
+        .describe('Se true, busca correspondência exata ao invés de substring. Default: false.'),
+});
+
+const IndexImportParameters = z.object({
+    source: z
+        .string()
+        .min(1)
+        .describe('Módulo importado a buscar (ex: "react", "#copilot/infra", "./utils"). Aceita substring.'),
+    maxResults: z.number().int().positive().max(500).optional().describe('Janela máxima de resultados. Default: 50.'),
+    cursor: z.string().optional().describe('Cursor numérico retornado por chamada anterior.'),
 });
 
 export const workspaceIndexBuildTool = buildTool({
@@ -96,36 +119,58 @@ export const workspaceIndexStatusTool = buildTool({
 
 export const workspaceIndexSearchTool = buildTool({
     name: 'workspace_index_search',
-    description: 'Busca textual no índice FTS5 local quando ele está disponível.',
+    description:
+        'Busca textual no índice FTS5 local quando ele está disponível. ' +
+        'Retorna `output` string formatada com highlights (**match**), `matchCount`, `totalMatches` e `nextCursor` para paginação.',
     parameters: IndexSearchParameters,
-    handler: async ({ query, maxResults }) => {
+    handler: async ({ query, maxResults, cursor, includePattern, excludePattern }) => {
+        const stats = getIoIndexStats();
+        if (!stats.available) {
+            return { query, output: '', matchCount: 0, totalMatches: 0, truncated: false, nextCursor: null, engine: 'fts5-index', available: false, stats };
+        }
+        const window = normalizeSearchWindow({ maxResults, cursor });
+        const rows = searchIoIndex(query, window.commandMaxCount != null ? { maxResults: window.commandMaxCount } : {});
+        const filtered = filterIndexRowsByGlob(rows, includePattern, excludePattern);
+        const paged = paginateSearchItems(filtered, window);
         return {
             query,
-            maxResults: maxResults ?? 50,
-            stats: getIoIndexStats(),
-            results: searchIoIndex(query, { maxResults }),
+            output: formatIndexSearchRows(paged.items),
+            matchCount: paged.items.length,
+            totalMatches: paged.totalItems,
+            truncated: paged.truncated,
+            nextCursor: paged.nextCursor,
+            cursorOffset: paged.cursorOffset,
+            engine: 'fts5-index',
+            stats,
         };
     },
 });
 
-const IndexImportParameters = z.object({
-    source: z
-        .string()
-        .min(1)
-        .describe('Módulo importado a buscar (ex: "react", "#copilot/infra", "./utils"). Aceita substring.'),
-    maxResults: z.number().int().positive().max(500).optional().describe('Janela máxima de resultados. Default: 50.'),
-});
-
 export const workspaceIndexFindSymbolTool = buildTool({
     name: 'workspace_index_find_symbol',
-    description: 'Busca símbolos persistidos no índice L2 local.',
+    description:
+        'Busca símbolos persistidos no índice L2 local. ' +
+        'Retorna `output` string formatada com arquivo:linha e tipo de símbolo, `matchCount` e `nextCursor` para paginação.',
     parameters: IndexSymbolParameters,
-    handler: async ({ symbol, maxResults }) => {
+    handler: async ({ symbol, maxResults, cursor, exactMatch }) => {
+        const stats = getIoIndexStats();
+        if (!stats.available) {
+            return { symbol, output: '', matchCount: 0, totalMatches: 0, truncated: false, nextCursor: null, engine: 'fts5-index', available: false, stats };
+        }
+        const window = normalizeSearchWindow({ maxResults, cursor });
+        const rows = findIoIndexSymbol(symbol, window.commandMaxCount != null ? { maxResults: window.commandMaxCount } : {});
+        const filtered = exactMatch ? rows.filter((r) => r.symbolName === symbol) : rows;
+        const paged = paginateSearchItems(filtered, window);
         return {
             symbol,
-            maxResults: maxResults ?? 50,
-            stats: getIoIndexStats(),
-            results: findIoIndexSymbol(symbol, { maxResults }),
+            output: formatIndexSymbolRows(paged.items),
+            matchCount: paged.items.length,
+            totalMatches: paged.totalItems,
+            truncated: paged.truncated,
+            nextCursor: paged.nextCursor,
+            cursorOffset: paged.cursorOffset,
+            engine: 'fts5-index',
+            stats,
         };
     },
 });
@@ -154,14 +199,27 @@ export const workspaceIndexInvalidateTool = buildTool({
 export const workspaceIndexFindImportsTool = buildTool({
     name: 'workspace_find_imports',
     description:
-        'Encontra todos os locais que referenciam ou importam um símbolo no workspace. Retorna lista estruturada de matches: arquivo, linha e trecho. Ideal para análise de impacto e rastreamento de dependências antes de refatorações.',
+        'Encontra todos os locais que referenciam ou importam um símbolo no workspace. ' +
+        'Retorna `output` string formatada com arquivo:linha, especificadores e módulo do import, `matchCount` e `nextCursor`.',
     parameters: IndexImportParameters,
-    handler: async ({ source, maxResults }) => {
+    handler: async ({ source, maxResults, cursor }) => {
+        const stats = getIoIndexStats();
+        if (!stats.available) {
+            return { source, output: '', matchCount: 0, totalMatches: 0, truncated: false, nextCursor: null, engine: 'fts5-index', available: false, stats };
+        }
+        const window = normalizeSearchWindow({ maxResults, cursor });
+        const rows = findIoIndexImports(source, window.commandMaxCount != null ? { maxResults: window.commandMaxCount } : {});
+        const paged = paginateSearchItems(rows, window);
         return {
             source,
-            maxResults: maxResults ?? 50,
-            stats: getIoIndexStats(),
-            results: findIoIndexImports(source, { maxResults }),
+            output: formatIndexImportRows(paged.items),
+            matchCount: paged.items.length,
+            totalMatches: paged.totalItems,
+            truncated: paged.truncated,
+            nextCursor: paged.nextCursor,
+            cursorOffset: paged.cursorOffset,
+            engine: 'fts5-index',
+            stats,
         };
     },
 });

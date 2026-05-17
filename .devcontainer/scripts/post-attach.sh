@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # =============================================================================
 # PHASE 0 — GUARDA DE EXECUÇÃO (FAIL-SAFE ABSOLUTO)
-# CANONICAL v5.4.1
+# CANONICAL v5.6.0
 #
 # Contrato:
 # - post-attach NUNCA pode falhar
@@ -11,6 +11,14 @@
 # Política explícita:
 # - UX resiliente > rigor de shell
 # - Variáveis opcionais são aceitáveis
+# CHANGELOG v5.6.0 (2026-05-16):
+# - Alinhado ao devcontainer v5.6.0 e à nova arquitetura de rede.
+# - Adiciona snapshot passivo do DNS cache local v1.4.0.
+# - Adiciona snapshot passivo do GitHub/Copilot Network Manager v1.3.1.
+# - Adiciona leitura estruturada de summaries key=value em /tmp.
+# - Mantém contrato de attach: read-only, não destrutivo, não bloqueante.
+# - Atualiza mapa de portas para documentar DNS cache interno não-forwarded.
+#
 # =============================================================================
 
 # Desarma heranças perigosas
@@ -23,7 +31,7 @@ trap - ERR EXIT INT TERM 2> /dev/null || true
 
 # Versão canônica do hook (fonte única da verdade)
 readonly SCRIPT_NAME="post-attach"
-readonly SCRIPT_VERSION="5.4.1"
+readonly SCRIPT_VERSION="5.6.0"
 
 # ---------------------------------------------------------------------------
 # CLI options parser
@@ -57,7 +65,7 @@ done
 
 # =============================================================================
 # PHASE 1 — UX HELPERS (API SEMÂNTICA DE OUTPUT)
-# CANONICAL v5.4.1
+# CANONICAL v5.6.0
 #
 # Finalidade:
 #   • Prover API mínima e estável de mensagens humanas
@@ -246,9 +254,76 @@ pm2_dump_process_count_passive() {
     return 0
 }
 
+# ---------------------------------------------------------------------------
+# Key/value summary readers (passive, bounded, redaction-safe)
+# ---------------------------------------------------------------------------
+sanitize_oneline() {
+    # Keep diagnostics single-line and terminal-safe.
+    tr -d '
+' 2> /dev/null | head -n 1 | sed 's/[[:cntrl:]]//g' 2> /dev/null
+}
+
+read_first_line() {
+    local file
+    file="${1:-}"
+    [[ -r "${file}" ]] || return 1
+    head -n 1 "${file}" 2> /dev/null | sanitize_oneline
+}
+
+kv_get() {
+    # Reads first key=value occurrence without evaluating content.
+    # $1=file, $2=key
+    local file key value
+    file="${1:-}"
+    key="${2:-}"
+    [[ -r "${file}" && -n "${key}" ]] || return 1
+
+    value="$(awk -v k="${key}" '
+        index($0, k "=") == 1 {
+            sub(/^[^=]*=/, "", $0);
+            print;
+            exit;
+        }
+    ' "${file}" 2> /dev/null | tr -d '
+')"
+
+    [[ -n "${value}" ]] || return 1
+    printf '%s
+' "${value}" | sanitize_oneline
+}
+
+kv_or() {
+    # $1=file, $2=key, $3=fallback
+    local value
+    value="$(kv_get "${1:-}" "${2:-}" 2> /dev/null || true)"
+    printf '%s
+' "${value:-${3:-unknown}}"
+}
+
+print_bullet() {
+    # $1=label, $2=value
+    printf "  • %-26s %s
+" "${1:-Item:}" "${2:-unknown}"
+}
+
+status_to_human() {
+    local status
+    status="${1:-unknown}"
+    case "${status}" in
+        ok) printf '%s
+' 'OK' ;;
+        off | disabled) printf '%s
+' 'off' ;;
+        degraded | fail | failed | error) printf '%s
+' "${status}" ;;
+        *) printf '%s
+' "${status:-unknown}" ;;
+    esac
+}
+
 # =============================================================================
 # PHASE 2 — BANNER DE ATTACH (IDENTIDADE HUMANA — INICIAL)
-# CANONICAL v5.4.1
+# CANONICAL v5.6.0
 #
 # Finalidade:
 #   • Sinalizar visualmente o evento de attach
@@ -282,7 +357,7 @@ printf "%b\n" "${BLUE}═══════════════════�
 echo ""
 # =============================================================================
 # PHASE 3 — NAMESPACE CANÔNICO DE ESTADO (UX / ATTACH)
-# CANONICAL v5.3.1
+# CANONICAL v5.6.0
 #
 # CONTRATO (NORMATIVO):
 #   • Este namespace armazena APENAS estado HUMANO / UX
@@ -390,7 +465,7 @@ fi
 # =============================================================================
 # PHASE 4 — CONTEXTO BÁSICO DO AMBIENTE (DIAGNÓSTICO HUMANO)
 # additional environment diagnostics including LD_PRELOAD
-# CANONICAL v5.3.1
+# CANONICAL v5.6.0
 #
 # CONTRATO:
 #   • Diagnóstico exclusivamente informativo
@@ -435,21 +510,41 @@ fi
 # ---------------------------------------------------------------------------
 # Raiz lógica do projeto (HEURÍSTICA DECLARADA)
 #
+# Ordem de resolução:
+#   1. git rev-parse --show-toplevel, quando disponível
+#   2. WORKSPACE_DIR se contiver Makefile ou .git
+#   3. Diretório pai se contiver Makefile ou .git
+#
 # Limitações conhecidas:
-#   • Monorepos profundos
-#   • Workspaces multi-root
-#   • Execução fora do root lógico
+#   • Monorepos profundos podem escolher o root Git, não o pacote lógico
+#   • Workspaces multi-root continuam dependendo do WORKSPACE_DIR atual
+#   • Execução fora do workspace pode cair no valor heurístico indefinido
 # ---------------------------------------------------------------------------
 PROJECT_ROOT="indefinido (heurístico)"
+PARENT_DIR=""
+GIT_TOPLEVEL=""
 
-if [[ -n "${WORKSPACE_DIR}" ]]; then
-    if [[ -f "${WORKSPACE_DIR}/Makefile" || -d "${WORKSPACE_DIR}/.git" ]]; then
-        PROJECT_ROOT="${WORKSPACE_DIR}"
-    else
-        PARENT_DIR="$(cd "${WORKSPACE_DIR}/.." 2> /dev/null && pwd -P 2> /dev/null || true)"
-        if [[ -n "${PARENT_DIR}" ]] \
-            && { [[ -f "${PARENT_DIR}/Makefile" ]] || [[ -d "${PARENT_DIR}/.git" ]]; }; then
-            PROJECT_ROOT="${PARENT_DIR}"
+if [[ -n "${WORKSPACE_DIR:-}" ]]; then
+    if command -v git > /dev/null 2>&1; then
+        if GIT_TOPLEVEL="$(git -C "${WORKSPACE_DIR}" rev-parse --show-toplevel 2> /dev/null)"; then
+            if [[ -n "${GIT_TOPLEVEL}" && -d "${GIT_TOPLEVEL}" ]]; then
+                PROJECT_ROOT="${GIT_TOPLEVEL}"
+            fi
+        fi
+    fi
+
+    if [[ "${PROJECT_ROOT}" == "indefinido (heurístico)" ]]; then
+        if [[ -f "${WORKSPACE_DIR}/Makefile" || -e "${WORKSPACE_DIR}/.git" ]]; then
+            PROJECT_ROOT="${WORKSPACE_DIR}"
+        else
+            if PARENT_DIR="$(cd "${WORKSPACE_DIR}/.." 2> /dev/null && pwd -P 2> /dev/null)"; then
+                if [[ -n "${PARENT_DIR}" ]] \
+                    && { [[ -f "${PARENT_DIR}/Makefile" ]] || [[ -e "${PARENT_DIR}/.git" ]]; }; then
+                    PROJECT_ROOT="${PARENT_DIR}"
+                fi
+            else
+                PARENT_DIR=""
+            fi
         fi
     fi
 fi
@@ -622,7 +717,7 @@ echo ""
 # =============================================================================
 # PHASE 5 — ESTADO ESTRUTURAL
 # (STATE MANIFESTO | DIAGNÓSTICO PASSIVO)
-# CANONICAL v5.2.1
+# CANONICAL v5.6.0
 #
 # CONTRATO (INVIOLÁVEL):
 #   • Leitura ESTRITAMENTE PASSIVA
@@ -724,7 +819,7 @@ echo ""
 
 # =============================================================================
 # PHASE 6 — ESTADO DE SAÚDE & CAPACIDADES CRÍTICAS (PASSIVO)
-# CANONICAL v5.2.1
+# CANONICAL v5.6.0
 #
 # CONTRATO (INVIOLÁVEL):
 #   • Diagnóstico estritamente PASSIVO
@@ -757,6 +852,108 @@ if [[ -r "${GITHUB_ROUTE_REPORT_FILE}" ]]; then
     info "→ ${GITHUB_ROUTE_REPORT_FILE}"
 else
     info "→ Relatório de rota GitHub API ainda não registrado"
+fi
+
+echo ""
+
+# ---------------------------------------------------------------------------
+# 6.1.1 — Rede GitHub/Copilot & DNS cache local (snapshot passivo)
+# ---------------------------------------------------------------------------
+# Contrato:
+#   • Apenas lê snapshots já produzidos pelo post-start e pelos scripts de rede.
+#   • Nunca inicia dnsmasq, proxy, curl probes ou route-fix.
+#   • Nunca reescreve /etc/resolv.conf.
+#   • Nunca imprime tokens/ambiente bruto.
+# ---------------------------------------------------------------------------
+LOCAL_DNS_STATUS_FILE="${DEVCONTAINER_LOCAL_DNS_STATUS_FILE:-/tmp/devcontainer-local-dns-cache.status}"
+LOCAL_DNS_SUMMARY_FILE="${DEVCONTAINER_LOCAL_DNS_SUMMARY_FILE:-/tmp/devcontainer-local-dns-cache.summary}"
+COPILOT_NETWORK_STATUS_FILE="${DEVCONTAINER_COPILOT_NETWORK_STATUS_FILE:-/tmp/devcontainer-copilot-network.status}"
+COPILOT_NETWORK_SUMMARY_FILE="${DEVCONTAINER_COPILOT_NETWORK_SUMMARY_FILE:-/tmp/devcontainer-copilot-network.summary}"
+GITHUB_ROUTE_SUMMARY_FILE="${DEVCONTAINER_GITHUB_ROUTE_SUMMARY_FILE:-/tmp/devcontainer-github-api-route.summary}"
+LOCAL_PROXY_SUMMARY_FILE="${DEVCONTAINER_LOCAL_COPILOT_PROXY_SUMMARY_FILE:-/tmp/devcontainer-local-copilot-proxy.summary}"
+
+info "Rede GitHub/Copilot e DNS local (snapshot passivo):"
+
+# DNS cache local
+DNS_CACHE_ENABLED="${DEVCONTAINER_ENABLE_LOCAL_DNS_CACHE:-false}"
+DNS_STATUS="$(read_first_line "${LOCAL_DNS_STATUS_FILE}" 2> /dev/null || printf 'unknown')"
+
+if [[ -r "${LOCAL_DNS_SUMMARY_FILE}" ]]; then
+    DNS_STATUS="$(kv_or "${LOCAL_DNS_SUMMARY_FILE}" status "${DNS_STATUS}")"
+    case "${DNS_STATUS}" in
+        ok) ok "DNS cache local: OK" ;;
+        off | disabled) info "DNS cache local: off" ;;
+        *) warn "DNS cache local: $(status_to_human "${DNS_STATUS}")" ;;
+    esac
+    print_bullet "habilitado:" "${DNS_CACHE_ENABLED}"
+    print_bullet "modo/action:" "$(kv_or "${LOCAL_DNS_SUMMARY_FILE}" mode unknown)/$(kv_or "${LOCAL_DNS_SUMMARY_FILE}" action unknown)"
+    print_bullet "resolv.conf:" "$(kv_or "${LOCAL_DNS_SUMMARY_FILE}" resolv_conf_status unknown)"
+    print_bullet "upstreams:" "$(kv_or "${LOCAL_DNS_SUMMARY_FILE}" selected_upstreams unknown)"
+    print_bullet "concluído em:" "$(kv_or "${LOCAL_DNS_SUMMARY_FILE}" completed_at unknown)"
+else
+    if [[ "${DNS_CACHE_ENABLED}" == "true" ]]; then
+        warn "DNS cache local habilitado, mas summary ainda não foi registrado"
+    else
+        info "DNS cache local: desabilitado por configuração"
+    fi
+fi
+
+if [[ -r /etc/resolv.conf ]]; then
+    RESOLV_FIRST_NS="$(awk '$1 == "nameserver" {print $2; exit}' /etc/resolv.conf 2> /dev/null | sanitize_oneline)"
+    print_bullet "nameserver efetivo:" "${RESOLV_FIRST_NS:-unknown}"
+    if [[ "${DNS_CACHE_ENABLED}" == "true" ]]; then
+        if [[ "${RESOLV_FIRST_NS}" == "127.0.0.1" || "${RESOLV_FIRST_NS}" == "::1" ]]; then
+            ok "/etc/resolv.conf aponta para o cache local"
+        else
+            warn "DNS cache habilitado, mas /etc/resolv.conf não aponta para loopback"
+        fi
+    fi
+fi
+
+# GitHub API route summary
+if [[ -r "${GITHUB_ROUTE_SUMMARY_FILE}" ]]; then
+    ROUTE_STATUS="$(kv_or "${GITHUB_ROUTE_SUMMARY_FILE}" status unknown)"
+    case "${ROUTE_STATUS}" in
+        ok) ok "GitHub API route-fix: OK" ;;
+        *) warn "GitHub API route-fix: $(status_to_human "${ROUTE_STATUS}")" ;;
+    esac
+    print_bullet "api.github.com IP:" "$(kv_or "${GITHUB_ROUTE_SUMMARY_FILE}" selected_ip "$(kv_or "${GITHUB_ROUTE_SUMMARY_FILE}" current_ip unknown)")"
+    print_bullet "latência rota:" "$(kv_or "${GITHUB_ROUTE_SUMMARY_FILE}" selected_latency_ms unknown)ms"
+    print_bullet "razão:" "$(kv_or "${GITHUB_ROUTE_SUMMARY_FILE}" reason unknown)"
+else
+    info "GitHub API route summary ainda não registrado"
+fi
+
+# Copilot network manager summary
+COPILOT_STATUS="$(read_first_line "${COPILOT_NETWORK_STATUS_FILE}" 2> /dev/null || printf 'unknown')"
+if [[ -r "${COPILOT_NETWORK_SUMMARY_FILE}" ]]; then
+    COPILOT_STATUS="$(kv_or "${COPILOT_NETWORK_SUMMARY_FILE}" status "${COPILOT_STATUS}")"
+    case "${COPILOT_STATUS}" in
+        ok) ok "Copilot Network Manager: OK" ;;
+        *) warn "Copilot Network Manager: $(status_to_human "${COPILOT_STATUS}")" ;;
+    esac
+    print_bullet "histórico:" "$(kv_or "${COPILOT_NETWORK_SUMMARY_FILE}" history_status unknown)"
+    print_bullet "endpoints:" "$(kv_or "${COPILOT_NETWORK_SUMMARY_FILE}" endpoints_ok 0)/$(kv_or "${COPILOT_NETWORK_SUMMARY_FILE}" endpoints_total 0) ok; failed=$(kv_or "${COPILOT_NETWORK_SUMMARY_FILE}" endpoints_failed 0); slow=$(kv_or "${COPILOT_NETWORK_SUMMARY_FILE}" endpoints_slow 0)"
+    print_bullet "pior host histórico:" "$(kv_or "${COPILOT_NETWORK_SUMMARY_FILE}" history_worst_host unknown)"
+    print_bullet "p95 pior host:" "$(kv_or "${COPILOT_NETWORK_SUMMARY_FILE}" history_worst_p95_ms unknown)ms"
+    print_bullet "concluído em:" "$(kv_or "${COPILOT_NETWORK_SUMMARY_FILE}" completed_at unknown)"
+else
+    info "Copilot Network Manager summary ainda não registrado"
+fi
+
+# Proxy local permanece opt-in; apenas documenta se houver snapshot.
+if [[ "${DEVCONTAINER_ENABLE_LOCAL_COPILOT_PROXY:-false}" == "true" || -r "${LOCAL_PROXY_SUMMARY_FILE}" ]]; then
+    if [[ -r "${LOCAL_PROXY_SUMMARY_FILE}" ]]; then
+        PROXY_STATUS="$(kv_or "${LOCAL_PROXY_SUMMARY_FILE}" status unknown)"
+        case "${PROXY_STATUS}" in
+            ok) ok "Proxy local Copilot: OK" ;;
+            off | disabled) info "Proxy local Copilot: off" ;;
+            *) warn "Proxy local Copilot: $(status_to_human "${PROXY_STATUS}")" ;;
+        esac
+        print_bullet "proxy mode:" "$(kv_or "${LOCAL_PROXY_SUMMARY_FILE}" mode unknown)"
+    else
+        info "Proxy local Copilot habilitado, mas sem snapshot registrado"
+    fi
 fi
 
 echo ""
@@ -834,7 +1031,7 @@ fi
 
 # =============================================================================
 # PHASE 7 — QUICK START GUIDE (FIRST ATTACH ONLY)
-# CANONICAL v5.2.1
+# CANONICAL v5.6.0
 #
 # CONTRATO:
 #   • Exibido APENAS no primeiro attach
@@ -902,7 +1099,7 @@ fi
 
 # =============================================================================
 # PHASE 8 — PM2 (OBSERVAÇÃO PASSIVA SEM DAEMONIZAÇÃO)
-# CANONICAL v5.4.1
+# CANONICAL v5.6.0
 #
 # CONTRATO:
 #   • Observação estritamente PASSIVA.
@@ -961,7 +1158,7 @@ echo ""
 
 # =============================================================================
 # PHASE 9 — CHROME EXTERNO (CDP | DIAGNÓSTICO PASSIVO)
-# CANONICAL v5.2.1
+# CANONICAL v5.6.0
 #
 # MODELO FÍSICO (NÃO NEGOCIÁVEL):
 #
@@ -1063,7 +1260,7 @@ echo ""
 
 # =============================================================================
 # PHASE 10 — VOLUMES & CACHE (OBSERVAÇÃO PASSIVA)
-# CANONICAL v5.2.1
+# CANONICAL v5.6.0
 #
 # CONTRATO (INVIOLÁVEL):
 #   • Display estritamente PASSIVO
@@ -1112,7 +1309,7 @@ echo ""
 
 # =============================================================================
 # PHASE 10.1 — DISK USAGE (SNAPSHOT PASSIVO)
-# CANONICAL v5.2.1
+# CANONICAL v5.6.0
 #
 # CONTRATO:
 #   • Apenas leitura
@@ -1141,7 +1338,7 @@ echo ""
 
 # =============================================================================
 # PHASE 11 — DOCUMENTAÇÃO VIVA (MAPA DE PORTAS & FRONTEIRAS)
-# CANONICAL v5.2.1
+# CANONICAL v5.6.0
 #
 # CONTRATO (INVIOLÁVEL):
 #   • Documentação PURA (read-only)
@@ -1196,6 +1393,15 @@ echo "    9230  → Node.js Debug (dashboard-web --inspect)"
 echo ""
 
 # ---------------------------------------------------------------------------
+# Rede interna não-forwarded
+# ---------------------------------------------------------------------------
+echo "  Rede interna do container (não-forwarded):"
+echo "    53    → dnsmasq local em 127.0.0.1:53 quando habilitado"
+echo "             └─ Gerenciado por local-dns-cache.sh"
+echo "    3128  → Proxy HTTP CONNECT local para Copilot, opt-in/desligado por padrão"
+echo ""
+
+# ---------------------------------------------------------------------------
 # Fonte de Verdade
 # ---------------------------------------------------------------------------
 echo "  Fonte de verdade:"
@@ -1204,7 +1410,7 @@ echo ""
 
 # =============================================================================
 # PHASE 12 — QUICK TIPS (ALWAYS)
-# CANONICAL v5.2.1
+# CANONICAL v5.6.0
 #
 # CONTRATO (INVIOLÁVEL):
 #   • Quick Start Guide COMPLETO apenas no PRIMEIRO attach (PHASE 7)
@@ -1259,7 +1465,7 @@ fi
 
 # =============================================================================
 # FINAL BANNER
-# CANONICAL v5.2.1
+# CANONICAL v5.6.0
 # =============================================================================
 
 echo ""
@@ -1276,7 +1482,7 @@ echo ""
 
 # =============================================================================
 # ENCERRAMENTO SEMÂNTICO — ATTACH COMPLETO
-# CANONICAL v5.4.1
+# CANONICAL v5.6.0
 # =============================================================================
 
 printf "%b\n" "${BLUE}──────────────────────────────────────────────────────────────${NC}"
@@ -1290,3 +1496,5 @@ echo ""
 # =============================================================================
 # FIM DO post-attach.sh
 # =============================================================================
+
+exit 0

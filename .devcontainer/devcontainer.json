@@ -1,5 +1,5 @@
 // ============================================================================
-// DevContainer — Ambiente de Desenvolvimento Controlado - v5.4.0
+// DevContainer — Ambiente de Desenvolvimento Controlado - v5.6.0
 // Projeto: chatgpt-docker-puppeteer
 //
 // Propósito:
@@ -27,6 +27,35 @@
 //   Portas de controle (ex.: Chrome Proxy / Debug) não são auto-expostas por
 //   inferência. Quando declaradas, são forwardadas explicitamente e com política
 //   de UX silenciosa/ignore. O acesso operacional continua decidido pelo runtime.
+//
+// CHANGELOG v5.6.0 (2026-05-16):
+// 🌐 DNS CACHE PROMOTION + NETWORK HARDENING
+// ✅ ALINHADO: Dockerfile.canonical.v1.4.0
+// ✅ ALINHADO: post-start v2.7.0
+// ✅ ALINHADO: github-api-route-fix v1.7.0
+// ✅ ALINHADO: local-dns-cache v1.4.0
+// ✅ ALINHADO: local-copilot-proxy v1.1.0
+// ✅ ALINHADO: github-copilot-network-manager v1.3.1
+// ✅ PROMOVIDO: DNS cache local habilitado por padrão em modo auto/ranked
+// ✅ ADICIONADO: hardening de dnsmasq start/repair/ownership/port-check
+// ✅ ADICIONADO: thresholds e locks explícitos para GitHub/Copilot manager
+// ✅ ADICIONADO: verificação estrita de IP aplicado no route-fix
+// ✅ MANTIDO: proxy local desligado por padrão até teste controlado posterior
+// ✅ CORRIGIDO: DEVCONTAINER_MAKE_TIMEOUT=30, validado após PM2 warmup
+//
+// CHANGELOG v5.5.0 (2026-05-16):
+// 🌐 NETWORK ARCHITECTURE SYNC (GITHUB/COPILOT)
+// ✅ ALINHADO: Dockerfile.canonical.v1.4.0
+// ✅ ALINHADO: post-start v2.7.0
+// ✅ ALINHADO: github-api-route-fix v1.5.1
+// ✅ ALINHADO: local-dns-cache v1.2.0
+// ✅ ALINHADO: local-copilot-proxy v1.1.0
+// ✅ ALINHADO: github-copilot-network-manager v1.1.0
+// ✅ ADICIONADO: Copilot Network Manager habilitado por padrão
+// ✅ ADICIONADO: DNS cache local e proxy local como infraestrutura opt-in
+// ✅ CORRIGIDO: CODEX_HOME aponta para ${containerWorkspaceFolder}/.codex
+// ✅ CORRIGIDO: lifecycle hooks quotados e chamados por bash explicitamente
+// ✅ CORRIGIDO: build.args.VERSION e labels para 1.4.0 / devcontainer 5.5.0
 //
 // CHANGELOG v5.4.0 (2026-05-15):
 // 🔧 DOCKERFILE/NSS SYNC (CANONICAL ALIGNMENT)
@@ -66,7 +95,7 @@
 // ============================================================================
 {
   // ============================================================
-  // BUILD CONFIGURATION (v5.4.0 — Dockerfile v1.3 sync)
+  // BUILD CONFIGURATION (v5.6.0 — Dockerfile v1.4.0 sync)
   // ============================================================
   "build": {
     "args": {
@@ -85,13 +114,13 @@
       "REMOTE_USER": "node",
       "VCS_REF": "${localEnv:GIT_COMMIT}",
       // --- METADATA & VERSIONING ---
-      "VERSION": "1.3.2"
+      "VERSION": "1.4.0"
     },
     "context": "..",
     "dockerfile": "Dockerfile"
   },
   // ============================================================
-  // CONTAINER ENVIRONMENT VARIABLES (v5.4.0 — NSS/Dockerfile sync)
+  // CONTAINER ENVIRONMENT VARIABLES (v5.6.0 — NSS/Dockerfile/network sync)
   // ============================================================
   "containerEnv": {
     // canonical shell contract mirrored from /etc/profile.d/00-runtime.sh
@@ -100,6 +129,7 @@
     "SHELL_CANONICAL": "bash",
     "CANONICAL_SHELL": "bash",
     "INSTRUMENTAL_SHELLS": "pwsh",
+    "DEVCONTAINER_MAKE_TIMEOUT": "30",
 
     "APP_ENV": "dev",
     "APP_NAME": "chatgpt-docker-puppeteer",
@@ -133,7 +163,85 @@
     "DEVCONTAINER_GITHUB_API_ROUTE_CACHE_ENABLED": "true",
     "DEVCONTAINER_GITHUB_API_ENABLE_IPV6": "false",
     "DEVCONTAINER_GITHUB_API_OPENSSL_PREFLIGHT": "false",
+    "DEVCONTAINER_GITHUB_API_STRICT_VERIFY_EXPECTED_IP": "true",
+    "DEVCONTAINER_GITHUB_API_CACHE_LOCK_WAIT_SECONDS": "10",
+    "DEVCONTAINER_GITHUB_API_HOSTS_LOCK_WAIT_SECONDS": "15",
+    "DEVCONTAINER_GITHUB_API_ROUTE_CACHE_MAX_ENTRIES": "128",
+    "DEVCONTAINER_GITHUB_API_RECENT_FAILURE_HARD_BLOCK_SECONDS": "0",
     "DEVCONTAINER_SKIP_GITHUB_API_PROBES_AFTER_ROUTE_FIX": "true",
+
+    // =========================================================
+    // NETWORK RESILIENCE — Modular GitHub/Copilot layer (v5.5.0)
+    // ---------------------------------------------------------
+    // Camada 1: github-api-route-fix.sh corrige ativamente apenas api.github.com.
+    // Camada 2: github-copilot-network-manager.sh agrega route-fix + probes.
+    // Camada 3: local-dns-cache.sh e local-copilot-proxy.sh existem como
+    //            infraestrutura opt-in, não ativada automaticamente.
+    //
+    // Política:
+    // • ativo por padrão: manager + route-fix de api.github.com;
+    // • opt-in: cache DNS local e proxy HTTP CONNECT local;
+    // • IPv6 para api.github.com permanece off até haver AAAA real funcional.
+    // =========================================================
+    "DEVCONTAINER_ENABLE_COPILOT_NETWORK_MANAGER": "true",
+    "DEVCONTAINER_COPILOT_NETWORK_MANAGER_MODE": "active",
+    "DEVCONTAINER_COPILOT_MANAGER_RUN_API_ROUTE_FIX": "true",
+    "DEVCONTAINER_COPILOT_MANAGER_FAIL_ON_DEGRADED": "false",
+    "DEVCONTAINER_COPILOT_MANAGER_SUBSCRIPT_TIMEOUT_SECONDS": "90",
+    "DEVCONTAINER_COPILOT_WARN_TOTAL_MS": "1500",
+    "DEVCONTAINER_COPILOT_PROBE_CONNECT_TIMEOUT": "4",
+    "DEVCONTAINER_COPILOT_PROBE_MAX_TIME": "12",
+    "DEVCONTAINER_COPILOT_PROBE_IP_FAMILY": "4",
+    "DEVCONTAINER_COPILOT_PROBE_PROXY_MODE": "direct",
+    "DEVCONTAINER_COPILOT_PROBE_PARALLEL": "false",
+    "DEVCONTAINER_COPILOT_NETWORK_LOCK_WAIT_SECONDS": "30",
+    "DEVCONTAINER_COPILOT_NETWORK_HISTORY_LOCK_WAIT_SECONDS": "10",
+    "DEVCONTAINER_COPILOT_MANAGER_ALLOW_CUSTOM_ENDPOINTS": "false",
+    "DEVCONTAINER_COPILOT_MANAGER_ALLOW_CUSTOM_GITHUB_API_HOST": "false",
+    "DEVCONTAINER_COPILOT_PROBE_ENDPOINTS": "https://api.github.com https://api.github.com/rate_limit https://api.github.com/user https://api.github.com/copilot_internal/v2/token https://copilot-proxy.githubusercontent.com https://default.exp-tas.com https://api.githubcopilot.com https://api.individual.githubcopilot.com https://proxy.individual.githubcopilot.com",
+
+    // DNS cache local: habilitado em modo auto/ranked após validação manual
+    // com local-dns-cache v1.4.0. O script só escreve /etc/resolv.conf
+    // depois de provar dnsmasq em 127.0.0.1:53 e restaura fallback em falha.
+    "DEVCONTAINER_ENABLE_LOCAL_DNS_CACHE": "true",
+    "DEVCONTAINER_LOCAL_DNS_CACHE_MODE": "auto",
+    "DEVCONTAINER_LOCAL_DNS_BIND_ADDRESS": "127.0.0.1",
+    "DEVCONTAINER_LOCAL_DNS_BIND_PORT": "53",
+    "DEVCONTAINER_LOCAL_DNS_UPSTREAM_SELECTION": "ranked",
+    "DEVCONTAINER_LOCAL_DNS_UPSTREAMS": "1.1.1.1 1.0.0.1 8.8.8.8 8.8.4.4 9.9.9.9 149.112.112.112",
+    "DEVCONTAINER_LOCAL_DNS_BENCHMARK_HOSTS": "api.github.com github.com copilot-proxy.githubusercontent.com api.githubcopilot.com",
+    "DEVCONTAINER_LOCAL_DNS_START_MODE": "auto",
+    "DEVCONTAINER_LOCAL_DNS_WRITE_RESOLV_CONF": "true",
+    "DEVCONTAINER_LOCAL_DNS_REPAIR_ON_PROBE_FAILURE": "true",
+    "DEVCONTAINER_LOCAL_DNS_VALIDATE_CONFIG": "true",
+    "DEVCONTAINER_LOCAL_DNS_STRICT_PORT_CHECK": "true",
+    "DEVCONTAINER_LOCAL_DNS_TAKEOVER_STALE_DNSMASQ": "true",
+    "DEVCONTAINER_LOCAL_DNS_STOP_BY_SOCKET_OWNER": "true",
+    "DEVCONTAINER_LOCAL_DNS_STOP_WAIT_MS": "2000",
+    "DEVCONTAINER_LOCAL_DNS_FORWARD_MAX": "150",
+    "DEVCONTAINER_LOCAL_DNS_CACHE_SIZE": "10000",
+    "DEVCONTAINER_LOCAL_DNS_MIN_CACHE_TTL": "0",
+    "DEVCONTAINER_LOCAL_DNS_MAX_CACHE_TTL": "300",
+    "DEVCONTAINER_LOCAL_DNS_NEG_TTL": "30",
+    "DEVCONTAINER_LOCAL_DNS_RESOLV_OPTIONS": "timeout:1 attempts:2 rotate",
+    "DEVCONTAINER_LOCAL_DNS_READ_ETC_HOSTS": "false",
+    "DEVCONTAINER_LOCAL_DNS_LOG_QUERIES": "false",
+    "DEVCONTAINER_LOCAL_DNS_ENABLE_IPV6_UPSTREAMS": "false",
+    "DEVCONTAINER_LOCAL_DNS_ALL_SERVERS": "false",
+    "DEVCONTAINER_LOCAL_DNS_STRICT_ORDER": "false",
+    "DEVCONTAINER_LOCAL_DNS_USE_STALE_CACHE": "false",
+
+    // Proxy HTTP CONNECT local: disponível na imagem v1.4.0, mas desligado por padrão.
+    // Para habilitar de forma explícita: DEVCONTAINER_ENABLE_LOCAL_COPILOT_PROXY=true
+    // e DEVCONTAINER_COPILOT_PROXY_MODE=local.
+    "DEVCONTAINER_ENABLE_LOCAL_COPILOT_PROXY": "false",
+    "DEVCONTAINER_COPILOT_PROXY_MODE": "off",
+    "DEVCONTAINER_LOCAL_COPILOT_PROXY_HOST": "127.0.0.1",
+    "DEVCONTAINER_LOCAL_COPILOT_PROXY_PORT": "3128",
+    "DEVCONTAINER_LOCAL_COPILOT_PROXY_APPLY_PROFILE": "false",
+
+    // Evita duplicar probes quando o manager v1.1+ já rodou com sucesso.
+    "DEVCONTAINER_POST_START_LEGACY_PROBES_AFTER_MANAGER": "false",
     // Safe to globalize as long as NSS_WRAPPER_* points at files that always exist.
     // This keeps base container processes (including VS Code bootstrap paths)
     // on a safe, always-readable NSS baseline before profile hooks refine it.
@@ -299,6 +407,7 @@
   "customizations": {
     "vscode": {
       "extensions": [
+        "GitHub.copilot",
         "GitHub.copilot-chat",
         "dbaeumer.vscode-eslint",
         "esbenp.prettier-vscode",
@@ -984,13 +1093,13 @@
   //   falha por chmod ausente no workspace montado.
   //
   // Ainda assim, os scripts devem permanecer versionados como 100755.
-  "postCreateCommand": "bash -lc 'bash ${containerWorkspaceFolder}/.devcontainer/scripts/post-create.sh'",
+  "postCreateCommand": "bash -lc 'bash \"${containerWorkspaceFolder}/.devcontainer/scripts/post-create.sh\"'",
 
   // Roda toda vez que o container sobe (não-bloqueante por contrato)
-  "postStartCommand": "bash -lc 'bash ${containerWorkspaceFolder}/.devcontainer/scripts/post-start.sh'",
+  "postStartCommand": "bash -lc 'bash \"${containerWorkspaceFolder}/.devcontainer/scripts/post-start.sh\"'",
 
   // Roda a cada attach do VS Code ao container
-  "postAttachCommand": "bash -lc 'bash ${containerWorkspaceFolder}/.devcontainer/scripts/post-attach.sh'",
+  "postAttachCommand": "bash -lc 'bash \"${containerWorkspaceFolder}/.devcontainer/scripts/post-attach.sh\"'",
   //
   "privileged": false,
   // Honra o contrato ENTRYPOINT/CMD da imagem:
@@ -1064,7 +1173,7 @@
     // Keep Codex state consistent across terminal + extension processes in-container.
     // Contract: this overrides the Dockerfile fallback and must match
     // .vscode/settings.json terminal.integrated.env.linux.CODEX_HOME.
-    "CODEX_HOME": "${containerEnv:CODEX_HOME}",
+    "CODEX_HOME": "${containerWorkspaceFolder}/.codex",
     "COPILOT_GITHUB_TOKEN": "${localEnv:COPILOT_GITHUB_TOKEN}",
     "DEEPSEEK_API_KEY": "${localEnv:DEEPSEEK_API_KEY}",
     // PORT deprecated v6.0: Use apenas SERVER_PORT
@@ -1244,17 +1353,17 @@
     "--sysctl",
     "net.ipv4.tcp_fin_timeout=30",
     "--network=bridge",
-    // METADATA: sincronizado com Dockerfile.canonical.v1.3 e devcontainer v5.4.0
+    // METADATA: sincronizado com Dockerfile.canonical.v1.4.0 e devcontainer v5.6.0
     "--label",
     "project=chatgpt-docker-puppeteer",
     "--label",
     "role=devcontainer",
     "--label",
-    "version=1.3.2",
+    "version=1.4.0",
     "--label",
-    "image.version=1.3.2",
+    "image.version=1.4.0",
     "--label",
-    "devcontainer.version=5.4.0"
+    "devcontainer.version=5.6.0"
   ],
   // ============================================================
   // LIFECYCLE FINALIZATION
