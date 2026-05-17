@@ -613,15 +613,16 @@ export function createIoIndexSqlite(options) {
 
         /**
          * @param {string} source
-         * @param {{ maxResults?: number }} [options]
+         * @param {{ maxResults?: number; exactSource?: boolean }} [options]
          */
         findImports(source, options = {}) {
             stats.searches += 1;
             const safe = String(source ?? '').trim();
             if (!safe) return /** @type {IoIndexImportResult[]} */ ([]);
-            return /** @type {IoIndexImportResult[]} */ (
+            const rows = /** @type {IoIndexImportResult[]} */ (
                 stmtImportSearch.all(safe, `%${safe}%`, normalizeIndexMaxResults(options.maxResults))
             );
+            return options.exactSource ? rows.filter((r) => r.source === source) : rows;
         },
 
         getStats() {

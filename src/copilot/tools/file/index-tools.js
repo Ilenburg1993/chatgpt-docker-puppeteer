@@ -68,6 +68,10 @@ const IndexImportParameters = z.object({
         .describe('Módulo importado a buscar (ex: "react", "#copilot/infra", "./utils"). Aceita substring.'),
     maxResults: z.number().int().positive().max(500).optional().describe('Janela máxima de resultados. Default: 50.'),
     cursor: z.string().optional().describe('Cursor numérico retornado por chamada anterior.'),
+    exactSource: z
+        .boolean()
+        .optional()
+        .describe('Se true, filtra apenas imports com source exatamente igual ao valor fornecido. Default: false.'),
 });
 
 export const workspaceIndexBuildTool = buildTool({
@@ -213,13 +217,16 @@ export const workspaceIndexFindImportsTool = buildTool({
         'Encontra todos os locais que referenciam ou importam um símbolo no workspace. ' +
         'Retorna `output` string formatada com arquivo:linha, especificadores e módulo do import, `matchCount` e `nextCursor`.',
     parameters: IndexImportParameters,
-    handler: async ({ source, maxResults, cursor }) => {
+    handler: async ({ source, maxResults, cursor, exactSource }) => {
         const stats = getIoIndexStats();
         if (!stats.available) {
             return { source, output: '', matchCount: 0, totalMatches: 0, truncated: false, nextCursor: null, engine: 'fts5-index', available: false, stats };
         }
         const window = normalizeSearchWindow({ maxResults, cursor });
-        const rows = findIoIndexImports(source, window.commandMaxCount != null ? { maxResults: window.commandMaxCount } : {});
+        const rows = findIoIndexImports(source, {
+            ...(window.commandMaxCount != null ? { maxResults: window.commandMaxCount } : {}),
+            ...(exactSource ? { exactSource: true } : {}),
+        });
         const paged = paginateSearchItems(rows, window);
         return {
             source,

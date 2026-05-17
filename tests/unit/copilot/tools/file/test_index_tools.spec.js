@@ -56,6 +56,7 @@ describe('tools/file/index-tools', () => {
             'workspace_index_find_symbol',
             'workspace_index_invalidate',
             'workspace_find_imports',
+            'workspace_parse_file',
         ]);
     });
 
@@ -293,5 +294,47 @@ describe('tools/file/index-tools', () => {
 
         // commandMaxCount = 0 + 10 + 1 = 11
         expect(mocks.searchIoIndex).toHaveBeenCalledWith('foo', { maxResults: 11 });
+    });
+
+    // --- exactSource filter for workspace_find_imports ---
+
+    it('applies exactSource filter for imports lookup', async () => {
+        mocks.getIoIndexStats.mockReturnValue({ available: true, files: 10 });
+        // Mock simulates io-index-sqlite filtering behavior
+        mocks.findIoIndexImports.mockImplementation((source, options) => {
+            const rows = [
+                { filePath: '/ws/a.js', relativePath: 'a.js', source: 'react', specifiersJson: '["useState"]', isDynamic: 0, line: 1 },
+                { filePath: '/ws/b.js', relativePath: 'b.js', source: 'react-dom', specifiersJson: '["render"]', isDynamic: 0, line: 2 },
+            ];
+            return options?.exactSource ? rows.filter((r) => r.source === source) : rows;
+        });
+
+        const result = await getHandler(workspaceIndexFindImportsTool)({ source: 'react', exactSource: true });
+
+        expect(mocks.findIoIndexImports).toHaveBeenCalledWith('react', expect.objectContaining({ exactSource: true }));
+        expect(result.matchCount).toBe(1);
+        expect(result.output).toContain("from 'react'");
+        expect(result.output).not.toContain('react-dom');
+    });
+
+    it('includes all results when exactSource is false (default)', async () => {
+        mocks.getIoIndexStats.mockReturnValue({ available: true, files: 10 });
+        mocks.findIoIndexImports.mockReturnValue([
+            { filePath: '/ws/a.js', relativePath: 'a.js', source: 'react', specifiersJson: '[]', isDynamic: 0, line: 1 },
+            { filePath: '/ws/b.js', relativePath: 'b.js', source: 'react-dom', specifiersJson: '[]', isDynamic: 0, line: 2 },
+        ]);
+
+        const result = await getHandler(workspaceIndexFindImportsTool)({ source: 'react' });
+
+        expect(result.matchCount).toBe(2);
+    });
+
+    it('does not pass exactSource to findIoIndexImports when undefined', async () => {
+        mocks.getIoIndexStats.mockReturnValue({ available: true, files: 5 });
+        mocks.findIoIndexImports.mockReturnValue([]);
+
+        await getHandler(workspaceIndexFindImportsTool)({ source: 'zod' });
+
+        expect(mocks.findIoIndexImports).toHaveBeenCalledWith('zod', {});
     });
 });
