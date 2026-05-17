@@ -152,6 +152,30 @@ describe('workspaceSymbolSearchTool (workspace_symbol_search)', () => {
         });
         expect(result.success).toBe(false);
     });
+
+    it('exactMatch: true — aceita parâmetro sem crashar', async () => {
+        const result = await /** @type {any} */ (workspaceSymbolSearchTool).handler({
+            name: 'hello',
+            kind: 'function',
+            path: tmpDir,
+            caseSensitive: false,
+            exactMatch: true,
+        });
+        expect(typeof result.success).toBe('boolean');
+    });
+
+    it('exactMatch: true — não retorna símbolo com nome diferente', async () => {
+        const result = await /** @type {any} */ (workspaceSymbolSearchTool).handler({
+            name: 'helloXYZ_nao_existe_99',
+            kind: 'function',
+            path: tmpDir,
+            caseSensitive: false,
+            exactMatch: true,
+        });
+        // Símbolo inexistente → matchCount 0 ou success false
+        const count = result.matchCount ?? 0;
+        expect(count).toBe(0);
+    });
 });
 
 // ─── findSymbolUsagesTool ─────────────────────────────────────────────────────
