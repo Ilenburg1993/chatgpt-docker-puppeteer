@@ -377,6 +377,7 @@ export async function searchText(targetPath, options) {
  *     workspaceRoot?: string;
  *     symbolName: string;
  *     kind?: IoSymbolKind;
+ *     exactMatch?: boolean;
  *     includePattern?: string;
  *     caseSensitive?: boolean;
  *     maxResults?: number;
@@ -454,11 +455,12 @@ export async function searchWorkspaceSymbols(targetPath, options) {
                 options.symbolName,
                 searchWindow.commandMaxCount === null ? {} : { maxResults: searchWindow.commandMaxCount },
             ).filter(
-                /** @param {{ filePath: string; symbolKind: string }} row */
+                /** @param {{ filePath: string; symbolKind: string; symbolName: string }} row */
                 (row) => {
                     const samePath = row.filePath === targetPath || row.filePath.startsWith(`${targetPath}/`);
                     const sameKind = resolvedKind === 'all' ? true : row.symbolKind === resolvedKind;
-                    return samePath && sameKind;
+                    const exactOk = options.exactMatch ? row.symbolName === options.symbolName : true;
+                    return samePath && sameKind && exactOk;
                 },
             );
             if (rows.length > 0) {

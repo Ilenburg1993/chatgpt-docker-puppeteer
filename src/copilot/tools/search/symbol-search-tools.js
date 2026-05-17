@@ -42,6 +42,7 @@ export const workspaceSymbolSearchTool = buildTool({
         caseSensitive: z.boolean().optional().default(false).describe('Busca sensível a maiúsculas. Default: false'),
         maxResults: z.number().int().min(1).optional().describe('Número máximo sugerido de declarações a retornar.'),
         cursor: z.string().optional().describe('Cursor numérico retornado por chamada anterior.'),
+        exactMatch: z.boolean().optional().default(false).describe('Se true, busca apenas símbolos com nome exato (sem substring match). Default: false.'),
     }),
     handler: async ({
         name: symbolName,
@@ -51,6 +52,7 @@ export const workspaceSymbolSearchTool = buildTool({
         caseSensitive,
         maxResults,
         cursor,
+        exactMatch,
     }) => {
         const { ok, reason, resolved } = await validatePath(searchPath ?? '.', { mode: 'read' });
         if (!ok) return { success: false, error: reason };
@@ -66,6 +68,7 @@ export const workspaceSymbolSearchTool = buildTool({
                 workspaceRoot: WORKSPACE_ROOT,
                 symbolName,
                 kind: resolvedKind,
+                exactMatch,
                 includePattern,
                 caseSensitive,
                 maxResults,

@@ -9,6 +9,7 @@
  * @param {{
  *     symbols: Array<{ kind: string; name: string; exported: boolean; line: number }>;
  *     imports: Array<{ source: string; specifiers: string[] }>;
+ *     exports?: string[];
  *     parseError: string | null;
  * }} symbols
  * @returns {string[]}
@@ -24,6 +25,15 @@ export function buildOutline(symbols) {
             lines.push(`   [${s.kind}] ${s.name} (L${s.line})`);
         }
     }
+
+    const reExports = (symbols.exports ?? []).filter((e) => e.startsWith('* from '));
+    if (reExports.length) {
+        lines.push(`── Re-exports (${reExports.length})`);
+        for (const re of reExports) {
+            lines.push(`   export ${re}`);
+        }
+    }
+
     if (unexported.length > 0 && unexported.length <= 20) {
         lines.push(`── Internal (${unexported.length})`);
         for (const s of unexported) {
