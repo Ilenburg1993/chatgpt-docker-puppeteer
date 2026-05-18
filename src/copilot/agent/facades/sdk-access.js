@@ -64,6 +64,7 @@ export {
     createAgentSdkQuotaMonitor,
     getAgentSdkRecoveryPolicy,
     getSdkQuota,
+    getSdkUsageMetrics,
     isAgentSdkQuotaOrRateLimitError,
     startAgentSdkBootQuotaBridge,
     startAgentSdkQuotaMonitor,
@@ -105,10 +106,12 @@ export {
     handleSdkPendingToolCall,
     inputSdkSessionUi,
     isSdkSessionUiElicitationAvailable,
+    loginSdkMcpOauth,
     listPendingSdkElicitations,
     listPendingSdkPermissions,
     requestSdkElicitation,
     resolvePendingSdkElicitation,
+    resetSdkSessionApprovals,
     selectSdkSessionUi,
 } from './sdk/index.js';
 

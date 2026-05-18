@@ -34,11 +34,13 @@ const _ioDedupWindow = new Map();
 
 /**
  * @param {string} operation
- * @param {string} primaryTarget
+ * @param {string[]} targets
+ * @param {string} fallbackTarget
  * @returns {boolean} true se deve suprimir (é duplicata dentro da janela)
  */
-function isDuplicateIoOperation(operation, primaryTarget) {
-    const key = `${operation}::${primaryTarget}`;
+function isDuplicateIoOperation(operation, targets, fallbackTarget) {
+    const keyTarget = targets.length > 0 ? targets.join(' -> ') : fallbackTarget;
+    const key = `${operation}::${keyTarget}`;
     const now = Date.now();
     const lastTs = _ioDedupWindow.get(key);
     if (lastTs !== undefined && now - lastTs <= IO_DEDUP_WINDOW_MS) {
@@ -196,7 +198,7 @@ function handleIoOperation(message, registry = null) {
     const primaryTarget =
         touchedTargets[0] ?? (typeof io.target === 'string' ? compactTargetPath(io.target) : 'unknown');
     // F1.2: absorver triple-firing de camadas de cache de I/O
-    if (isDuplicateIoOperation(io.operation, primaryTarget)) {
+    if (isDuplicateIoOperation(io.operation, touchedTargets, primaryTarget)) {
         return;
     }
     const byteLabel = formatBytes(io.bytesRead ?? io.bytesWritten);

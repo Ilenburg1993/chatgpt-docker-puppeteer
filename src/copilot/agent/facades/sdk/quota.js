@@ -9,8 +9,9 @@
 
 import { getSdkRecoveryPolicy, isSdkQuotaOrRateLimitError } from '#copilot/sdk/errors';
 import { accountGetQuota } from '#copilot/sdk/rpc';
+import { usageGetMetrics } from '#copilot/sdk/rpc/experimental';
 import { createQuotaMonitor } from '#copilot/sdk/telemetry';
-import { requireClient } from './core/index.js';
+import { requireClient, requireSession } from './core/index.js';
 
 /**
  * @param {import('#copilot/sdk/types').QuotaMonitorOptions} options
@@ -73,4 +74,12 @@ export function getAgentSdkRecoveryPolicy(error, scope) {
  */
 export async function getSdkQuota(ctx) {
     return accountGetQuota(requireClient(ctx, 'getSdkQuota'));
+}
+
+/**
+ * @param {unknown} ctx
+ * @returns {Promise<Awaited<ReturnType<typeof usageGetMetrics>>>}
+ */
+export async function getSdkUsageMetrics(ctx) {
+    return usageGetMetrics(requireSession(ctx, 'getSdkUsageMetrics'));
 }

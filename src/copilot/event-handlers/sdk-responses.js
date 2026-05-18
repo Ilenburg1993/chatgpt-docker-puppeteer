@@ -7,8 +7,11 @@
 
 import { SESSION_EVENTS } from '#copilot/events';
 import { log } from '#copilot/observability';
-import { normalizeElicitationCompletedEvent, normalizeElicitationPendingEvent } from '#copilot/sdk/session';
-import { onSessionEvents } from '#copilot/sdk/session';
+import {
+    normalizeElicitationCompletedEvent,
+    normalizeElicitationPendingEvent,
+    onSessionEvents,
+} from '#copilot/sdk/session';
 
 /**
  * @param {unknown} raw
@@ -50,8 +53,10 @@ export function wireSdkResponseEvents(session, { emit }) {
                 const data = /** @type {Record<string, unknown>} */ (evt?.data ?? {});
                 const messageId = /** @type {string | undefined} */ (data['messageId']);
                 const content = /** @type {string | undefined} */ (data['content']);
+                const agentId = /** @type {string | undefined} */ (data['agentId']);
                 emit('assistant.message', {
                     messageId: messageId ?? null,
+                    agentId: agentId ?? null,
                     content: content ?? '',
                     ts: Date.now(),
                 });
@@ -59,10 +64,12 @@ export function wireSdkResponseEvents(session, { emit }) {
             [SESSION_EVENTS.ASSISTANT_REASONING]: (evt) => {
                 const data = /** @type {Record<string, unknown>} */ (evt?.data ?? {});
                 const reasoningId = /** @type {string | undefined} */ (data['reasoningId']);
+                const agentId = /** @type {string | undefined} */ (data['agentId']);
                 const content = data['content'];
                 const len = typeof content === 'string' ? content.length : 0;
                 emit('assistant.reasoning_complete', {
                     reasoningId: reasoningId ?? null,
+                    agentId: agentId ?? null,
                     contentLength: len,
                     ts: Date.now(),
                 });

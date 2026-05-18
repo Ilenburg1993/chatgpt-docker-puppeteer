@@ -26,6 +26,7 @@ import {
     terminalThemeBadge,
     terminalThemeText,
 } from '../state/events/index.js';
+import { renderTerminalIntent } from './intent-renderer.js';
 import {
     buildTerminalToolActivityPresentation,
     compactTerminalToolText,
@@ -41,7 +42,6 @@ import {
     buildToolLifecycleStart,
     buildToolLifecycleUserRequested,
 } from './tool-lifecycle-event.js';
-import { renderTerminalIntent } from './intent-renderer.js';
 
 /**
  * @param {string} toolName
@@ -291,7 +291,12 @@ export function handleTerminalNativeToolStart({ registry, evt }) {
     const name = /** @type {string} */ (evt?.['toolName'] ?? evt?.['name'] ?? 'tool');
     if (shouldSuppressTerminalToolNarration(name)) return;
     const rawArgs = objectArgsOrEmpty(evt?.['args'] ?? evt?.['arguments'] ?? evt?.['input'] ?? null);
-    renderReportIntentToolPayload({ toolName: name, evt: { ...evt, args: rawArgs }, source: `tool/${name}`, toolCallId });
+    renderReportIntentToolPayload({
+        toolName: name,
+        evt: { ...evt, args: rawArgs },
+        source: `tool/${name}`,
+        toolCallId,
+    });
     const presentation = buildTerminalToolActivityPresentation(evt, name);
     const canonicalName = presentation.canonicalToolName ?? name;
     if (toolCallId && registry.isInFlight(toolCallId)) {
@@ -453,12 +458,6 @@ export function handleTerminalNativeToolComplete({ registry, evt }) {
               : null;
     const name = entry?.canonicalName ?? entry?.toolName ?? eventName ?? 'tool';
     if (shouldSuppressTerminalToolNarration(name)) return;
-    renderReportIntentToolPayload({
-        toolName: name,
-        evt: { ...evt, args: objectArgsOrEmpty(evt?.['args'] ?? evt?.['arguments'] ?? evt?.['input'] ?? entry?.rawArgs ?? null) },
-        source: `tool/${name}`,
-        toolCallId,
-    });
     const suppressByInFlightName = entry ? false : registry.isNameInFlight(name);
     if (
         suppressByInFlightName ||
@@ -467,6 +466,15 @@ export function handleTerminalNativeToolComplete({ registry, evt }) {
     ) {
         return;
     }
+    renderReportIntentToolPayload({
+        toolName: name,
+        evt: {
+            ...evt,
+            args: objectArgsOrEmpty(evt?.['args'] ?? evt?.['arguments'] ?? evt?.['input'] ?? entry?.rawArgs ?? null),
+        },
+        source: `tool/${name}`,
+        toolCallId,
+    });
     if (toolCallId && registry.getEntry(toolCallId)?.kind === 'native') {
         registry.complete(toolCallId, success);
     }
@@ -557,7 +565,12 @@ export function handleTerminalExternalToolRequested({ registry, evt, verboseNarr
     const requestId = evt?.requestId ?? null;
     const toolCallId = evt?.toolCallId ?? (requestId ? `ext:${requestId}` : `ext:${toolName}:${Date.now()}`);
     const presentation = buildTerminalToolActivityPresentation(evt ?? {}, toolName);
-    renderReportIntentToolPayload({ toolName, evt: /** @type {Record<string, unknown>} */ (evt ?? {}), source: `sdk/external/${toolName}`, toolCallId });
+    renderReportIntentToolPayload({
+        toolName,
+        evt: /** @type {Record<string, unknown>} */ (evt ?? {}),
+        source: `sdk/external/${toolName}`,
+        toolCallId,
+    });
     const displayToolName = presentation.canonicalToolName ?? toolName;
     registry.register(toolCallId, displayToolName, 'external', {
         requestId,

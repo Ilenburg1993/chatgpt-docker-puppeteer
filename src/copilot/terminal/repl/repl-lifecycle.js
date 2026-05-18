@@ -33,9 +33,7 @@ import {
     resetStatusRowState,
     sendTurn,
 } from '../dialog/index.js';
-import {
-    tryAnswerTerminalPendingQuestionInput,
-} from '../state/repl-runtime/index.js';
+import { tryAnswerTerminalPendingQuestionInput } from '../state/repl-runtime/index.js';
 import { resolve } from '../stores/index.js';
 import { renderTerminalAutoBrief } from './auto-brief.js';
 import { resolveFreeTextDelivery } from './free-text-delivery.js';
@@ -323,14 +321,6 @@ export async function runReplLifecycle(injectServer, { injectPort, onReady }) {
             }
             if (escapeCmd && isTerminalImmediateCommand(escapeCmd.command)) {
                 dispatchImmediateCommand(escapeCmd);
-                return;
-            }
-        }
-        if (!multilineInput.hasPending() && trimmedForEscape && !trimmedForEscape.startsWith('/')) {
-            const pendingAnswer = tryAnswerTerminalPendingQuestionInput(trimmedForEscape);
-            if (pendingAnswer.routed) {
-                printPendingAnswerResult(pendingAnswer);
-                refreshPrompt();
                 return;
             }
         }

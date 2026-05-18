@@ -59,7 +59,18 @@ const MAX_TURN_QUEUE_SIZE = 10;
 /** @type {number} */
 let _turnQueueDepth = 0;
 
-const IDLE_TRANSITION_TIMEOUT_MS = Math.max(15_000, Math.min(120_000, Math.round(LLM_B_BOOT_TIMEOUT_MS * 0.5)));
+/**
+ * @param {unknown} value
+ * @param {number} fallbackMs
+ * @returns {number}
+ */
+function resolveBoundedTimeoutMs(value, fallbackMs) {
+    const numeric = Number(value);
+    const base = Number.isFinite(numeric) && numeric > 0 ? numeric : fallbackMs;
+    return Math.max(15_000, Math.min(120_000, Math.round(base * 0.5)));
+}
+
+const IDLE_TRANSITION_TIMEOUT_MS = resolveBoundedTimeoutMs(LLM_B_BOOT_TIMEOUT_MS, 60_000);
 
 /**
  * Retorna a profundidade atual da fila de turnos.

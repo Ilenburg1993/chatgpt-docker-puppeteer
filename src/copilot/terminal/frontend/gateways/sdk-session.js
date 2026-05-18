@@ -28,9 +28,11 @@ import {
     getAgentSdkQuota,
     getAgentSdkSessionCapabilities,
     getAgentSdkSessionMode,
+    getAgentSdkUsageMetrics,
     handleAgentSdkPendingPermission,
     inputAgentSdkSessionUi,
     isAgentSdkSessionUiElicitationAvailable,
+    loginAgentSdkMcpOauth,
     listAgentSdkModels,
     listAgentSdkPendingElicitations,
     listAgentSdkPendingPermissions,
@@ -40,6 +42,7 @@ import {
     readAgentSdkSystemPromptProjection,
     readAgentSdkWorkspaceFile,
     requestAgentSdkElicitation,
+    resetAgentSdkSessionApprovals,
     resolveAgentSdkPendingElicitation,
     selectAgentSdkSessionUi,
     setAgentSdkSessionMode,
@@ -217,6 +220,14 @@ export async function getTerminalSdkQuota(runtimeId) {
 
 /**
  * @param {string | null | undefined} [runtimeId]
+ * @returns {Promise<unknown>}
+ */
+export async function getTerminalSdkUsageMetrics(runtimeId) {
+    return getAgentSdkUsageMetrics(runtimeId);
+}
+
+/**
+ * @param {string | null | undefined} [runtimeId]
  * @returns {Promise<Awaited<ReturnType<typeof readAgentSdkSystemPromptProjection>>>}
  */
 export async function readTerminalSdkSystemPromptProjection(runtimeId) {
@@ -375,4 +386,21 @@ export async function handleTerminalSdkPendingPermission(requestId, result, runt
  */
 export async function listTerminalSdkPendingPermissions(runtimeId) {
     return listAgentSdkPendingPermissions(runtimeId);
+}
+
+/**
+ * @param {string | null | undefined} [runtimeId]
+ * @returns {Promise<unknown>}
+ */
+export async function resetTerminalSdkSessionApprovals(runtimeId) {
+    return resetAgentSdkSessionApprovals(runtimeId);
+}
+
+/**
+ * @param {string} serverName
+ * @param {string | null | undefined} [runtimeId]
+ * @returns {Promise<unknown>}
+ */
+export async function loginTerminalSdkMcpOauth(serverName, runtimeId) {
+    return loginAgentSdkMcpOauth(serverName, runtimeId);
 }

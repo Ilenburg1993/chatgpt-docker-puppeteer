@@ -91,10 +91,21 @@ import { clearRateLimiters } from '../state/repl-runtime/index.js';
 import { deliverEntryAsTurnIfIdle } from '../wiring/mailbox/index.js';
 import { parseTerminalReplCommand } from './repl-command-parser.js';
 
+/**
+ * @param {unknown} value
+ * @param {number} fallbackMs
+ * @returns {number}
+ */
+function resolveBoundedTimeoutMs(value, fallbackMs) {
+    const numeric = Number(value);
+    const base = Number.isFinite(numeric) && numeric > 0 ? numeric : fallbackMs;
+    return Math.max(15_000, Math.min(120_000, Math.round(base * 0.5)));
+}
+
 /** @type {number} */
 const INJECT_PORT = readCopilotBootConfig().server.port;
 
-const RESTART_WAIT_TIMEOUT_MS = Math.max(15_000, Math.min(120_000, Math.round(LLM_B_BOOT_TIMEOUT_MS * 0.5)));
+const RESTART_WAIT_TIMEOUT_MS = resolveBoundedTimeoutMs(LLM_B_BOOT_TIMEOUT_MS, 60_000);
 /** @type {Promise<void>} */
 let _terminalInterventionQueue = Promise.resolve();
 
@@ -125,33 +136,37 @@ async function _cmdEmergencyReset() {
 async function _cmdRestart() {
     println('\x1b[90m  Reiniciando dialog loop…\x1b[0m');
     try {
-        // FINDING-P4-1 (T-05 fix): registrar 'dialog.ready' ANTES de stopDialogMode()
-        // para evitar race condition (o evento pode disparar antes do .once ser registrado)
-        /** @type {(v?: unknown) => void} */
-        let resolveReady = () => {};
-        /** @type {(e: Error) => void} */
-        let rejectReady = () => {};
-        const readyPromise = new Promise((resolve, reject) => {
-            resolveReady = resolve;
-            rejectReady = reject;
-        });
-        const timeout = setTimeout(
+        // Registrar 'dialog.ready' ANTES de stopDialogMode() para evitar race condition.
+        const { promise: readyPromise, resolve: resolveReady, reject: rejectReady } = Promise.withResolvers();
+        /** @type {ReturnType<typeof setTimeout> | null} */
+        let timeout = setTimeout(
             () => rejectReady(new Error(`Timeout aguardando restart (${RESTART_WAIT_TIMEOUT_MS}ms)`)),
             RESTART_WAIT_TIMEOUT_MS,
         );
-        /** @type {() => void} */
+        let settled = false;
+        /** @returns {void} */
+        const cleanupReadyWait = () => {
+            if (timeout !== null) {
+                clearTimeout(timeout);
+                timeout = null;
+            }
+            offTerminalAgentRuntimeEvent(EMITTER_DIALOG_READY, onReady);
+        };
+        /** @returns {void} */
         const onReady = () => {
-            clearTimeout(timeout);
-            resolveReady();
+            if (settled) return;
+            settled = true;
+            cleanupReadyWait();
+            resolveReady(undefined);
         };
         onceTerminalAgentRuntimeEvent(EMITTER_DIALOG_READY, onReady);
         await stopTerminalDialogMode();
         if (!readTerminalRuntimeControlState().dialogLoopActive) {
             await readyPromise;
         } else {
-            // dialog loop já está ativo — não precisamos aguardar, limpar listener e timeout
-            clearTimeout(timeout);
-            offTerminalAgentRuntimeEvent(EMITTER_DIALOG_READY, onReady);
+            // dialog loop já está ativo — não precisamos aguardar, limpar listener e timeout.
+            settled = true;
+            cleanupReadyWait();
         }
     } catch (e) {
         println(`\x1b[31m  Falha no restart: ${toError(e).message}\x1b[0m`);

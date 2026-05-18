@@ -689,6 +689,8 @@
  *   builtin/MCP pelo RPC server-scoped do SDK
  * @property {(() => Promise<unknown>) | undefined} getSdkQuota - Retorna snapshot de quota pelo RPC server-scoped do
  *   SDK
+ * @property {(() => Promise<unknown>) | undefined} getSdkUsageMetrics - Retorna métricas de uso session-scoped pela
+ *   RPC experimental `usage.getMetrics()`
  * @property {(() => Promise<string | undefined>) | undefined} getLastSdkSessionId - Retorna a última sessão conhecida
  *   pelo SDK atual
  * @property {(() => Promise<string | undefined>) | undefined} getForegroundSdkSessionId - Retorna a sessão em
@@ -745,6 +747,10 @@
  *
  * @property {(() => Promise<{ available: boolean; source: string | null; requests: unknown[] }>) | undefined} listPendingSdkPermissions
  *   - Lista permissões pendentes via surface RPC do SDK quando disponível
+ * @property {((serverName: string) => Promise<unknown>) | undefined} loginSdkMcpOauth - Inicia fluxo OAuth MCP via
+ *   RPC experimental da sessão SDK
+ * @property {(() => Promise<unknown>) | undefined} resetSdkSessionApprovals - Limpa aprovações session-scoped
+ *   acumuladas na sessão SDK atual
  *
  * @property {((
  *           requestId: string,

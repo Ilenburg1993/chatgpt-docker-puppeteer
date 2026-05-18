@@ -275,6 +275,18 @@ export async function getAgentSdkQuota(runtimeId) {
  * @param {string | null | undefined} [runtimeId]
  * @returns {Promise<unknown>}
  */
+export async function getAgentSdkUsageMetrics(runtimeId) {
+    const target = getAgentSdkSessionTarget(runtimeId);
+    if (typeof target.getSdkUsageMetrics !== 'function') {
+        throw new TypeError('AGENT_SDK_USAGE_METRICS_UNAVAILABLE');
+    }
+    return target.getSdkUsageMetrics();
+}
+
+/**
+ * @param {string | null | undefined} [runtimeId]
+ * @returns {Promise<unknown>}
+ */
 export async function listAgentSdkWorkspaceFiles(runtimeId) {
     return getAgentSdkSessionTarget(runtimeId).listSdkWorkspaceFiles();
 }
@@ -395,4 +407,29 @@ export async function listAgentSdkPendingPermissions(runtimeId) {
         return { available: false, source: null, requests: [] };
     }
     return target.listPendingSdkPermissions();
+}
+
+/**
+ * @param {string | null | undefined} [runtimeId]
+ * @returns {Promise<unknown>}
+ */
+export async function resetAgentSdkSessionApprovals(runtimeId) {
+    const target = getAgentSdkSessionTarget(runtimeId);
+    if (typeof target.resetSdkSessionApprovals !== 'function') {
+        throw new TypeError('AGENT_SDK_RESET_SESSION_APPROVALS_UNAVAILABLE');
+    }
+    return target.resetSdkSessionApprovals();
+}
+
+/**
+ * @param {string} serverName
+ * @param {string | null | undefined} [runtimeId]
+ * @returns {Promise<unknown>}
+ */
+export async function loginAgentSdkMcpOauth(serverName, runtimeId) {
+    const target = getAgentSdkSessionTarget(runtimeId);
+    if (typeof target.loginSdkMcpOauth !== 'function') {
+        throw new TypeError('AGENT_SDK_MCP_OAUTH_LOGIN_UNAVAILABLE');
+    }
+    return target.loginSdkMcpOauth(serverName);
 }

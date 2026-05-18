@@ -93,3 +93,10 @@ export async function handleTerminalBootFailure(error, deps = {}) {
 export function resetTerminalBootstrapLifecycleForTests() {
     terminalShutdownSignalsRegistered = false;
 }
+
+/**
+ * @returns {boolean}
+ */
+export function isTerminalShutdownSignalsRegistered() {
+    return terminalShutdownSignalsRegistered;
+}

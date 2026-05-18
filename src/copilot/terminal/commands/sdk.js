@@ -18,6 +18,7 @@ import {
     getTerminalPendingStructuredUserInputCount,
     getTerminalSdkQuota,
     getTerminalSdkSessionCapabilities,
+    getTerminalSdkUsageMetrics,
     handleTerminalSdkPendingPermission,
     inputTerminalSdkSessionUi,
     isTerminalSdkSessionUiElicitationAvailable,
@@ -35,6 +36,7 @@ import {
     readTerminalToolRegistrySnapshot,
     requestTerminalSdkElicitation,
     requireTerminalFileTool,
+    resetTerminalSdkSessionApprovals,
     resolveTerminalSdkPendingElicitation,
     selectTerminalSdkSessionUi,
     setTerminalRuntimePermissionMode,
@@ -92,7 +94,7 @@ function arrayFromSdkList(value) {
  */
 function getToolHandler(tool) {
     if (typeof tool?.handler === 'function') return tool.handler;
-    throw new TypeError('[terminal/workspace] tool sem handler execut�vel.');
+    throw new TypeError('[terminal/workspace] tool sem handler executável.');
 }
 
 const createFileTool = requireTerminalFileTool('write', 'create_file');
@@ -150,7 +152,7 @@ function ioSummary(result) {
     const operation = typeof io['operation'] === 'string' ? io['operation'] : null;
     const engine = typeof io['engine'] === 'string' ? io['engine'] : null;
     if (!operation && !engine) return '';
-    return `io=${operation ?? '-'} � engine=${engine ?? '-'}`;
+    return `io=${operation ?? '-'} · engine=${engine ?? '-'}`;
 }
 
 /**
@@ -194,7 +196,7 @@ async function materializeWorkspaceFile(ctx, payload) {
               createParentDirs: true,
           };
     const result = await getToolHandler(tool)(args);
-    return objectOrNull(result) ?? { success: false, error: 'materializa��o retornou payload inv�lido.' };
+    return objectOrNull(result) ?? { success: false, error: 'materialização retornou payload inválido.' };
 }
 
 /**
@@ -235,7 +237,7 @@ async function promoteLocalFileToWorkspace(ctx, payload) {
     const traceId = randomUUID();
     const local = await readLocalFileForWorkspace(payload.sourcePath);
     if (!local) {
-        return { ok: false, traceId, reason: 'arquivo local n�o textual/indispon�vel para promo��o' };
+        return { ok: false, traceId, reason: 'arquivo local não textual/indisponível para promoção' };
     }
 
     if (!payload.overwrite) {
@@ -244,7 +246,7 @@ async function promoteLocalFileToWorkspace(ctx, payload) {
             return {
                 ok: false,
                 traceId,
-                reason: 'destino j� existe no workspace SDK; use --overwrite para substituir',
+                reason: 'destino já existe no workspace SDK; use --overwrite para substituir',
                 conflict: true,
             };
         } catch (error) {
@@ -319,13 +321,13 @@ async function renderSdkDoctor({ println }, runtimeId) {
 
     println('\n  \x1b[36mSDK Doctor - roteamento SDK x FS\x1b[0m');
     println(
-        `  surfaces   \x1b[90msdk.workspace=${String(sdkWorkspaceAvailable)} � local.fs.canonico=${String(localFsToolsReady)} � local.exec.canonico=${String(registrySnapshot.hasCanonicalLocalExecTools)} � legacy.shell.loaded=${String(registrySnapshot.hasLegacySdkShellToolsLoaded)} � instructionSources=${String(instructionSourcesAvailable)}\x1b[0m`,
+        `  surfaces   \x1b[90msdk.workspace=${String(sdkWorkspaceAvailable)} · local.fs.canonico=${String(localFsToolsReady)} · local.exec.canonico=${String(registrySnapshot.hasCanonicalLocalExecTools)} · legacy.shell.loaded=${String(registrySnapshot.hasLegacySdkShellToolsLoaded)} · instructionSources=${String(instructionSourcesAvailable)}\x1b[0m`,
     );
     println(
-        `  sdk caps   \x1b[90mtools.list=${String(sdkTools['list'] === true)} � tools.quota=${String(sdkTools['quota'] === true)} � ui.elicitation=${String(sdkUi['elicitation'] === true)}\x1b[0m`,
+        `  sdk caps   \x1b[90mtools.list=${String(sdkTools['list'] === true)} · tools.quota=${String(sdkTools['quota'] === true)} · ui.elicitation=${String(sdkUi['elicitation'] === true)}\x1b[0m`,
     );
     println(
-        `  contract   \x1b[90mok=${String(contract.ok)} � errors=${contract.errorCount} � warnings=${contract.warningCount} � coverage(desc=${contract.metadataCoverage.descriptionPct}% schema=${contract.metadataCoverage.parametersPct}% category=${contract.metadataCoverage.categoryPct}% tags=${contract.metadataCoverage.tagsPct}% instructions=${contract.metadataCoverage.instructionsPct}%)\x1b[0m`,
+        `  contract   \x1b[90mok=${String(contract.ok)} · errors=${contract.errorCount} · warnings=${contract.warningCount} · coverage(desc=${contract.metadataCoverage.descriptionPct}% schema=${contract.metadataCoverage.parametersPct}% category=${contract.metadataCoverage.categoryPct}% tags=${contract.metadataCoverage.tagsPct}% instructions=${contract.metadataCoverage.instructionsPct}%)\x1b[0m`,
     );
     println(`  mode       \x1b[33m${routingMode}\x1b[0m`);
     if (routingMode === 'local-fs-primary') {
@@ -522,14 +524,14 @@ function renderSdkWaitsSummary({ println }, runtimeId) {
         `  status   ${headlineColor}${totalPending > 0 ? `${totalPending} pendencia(s)` : 'nenhuma pendencia'}\x1b[0m`,
     );
     println(
-        `  waits    \x1b[90melicitation=${pendingElicitations.pending}${pendingElicitations.latest?.mode ? ` (${pendingElicitations.latest.mode})` : ''} � permission=${permissionSummary.pending}${permissionSummary.latest ? ` (${permissionSummary.latest.permissionType})` : ''} � ask_user=${userInputSummary.pending}${userInputSummary.latest?.kind ? ` (${userInputSummary.latest.kind})` : ''} � request_user_input=${structuredInputPending}\x1b[0m`,
+        `  waits    \x1b[90melicitation=${pendingElicitations.pending}${pendingElicitations.latest?.mode ? ` (${pendingElicitations.latest.mode})` : ''} · permission=${permissionSummary.pending}${permissionSummary.latest ? ` (${permissionSummary.latest.permissionType})` : ''} · ask_user=${userInputSummary.pending}${userInputSummary.latest?.kind ? ` (${userInputSummary.latest.kind})` : ''} · request_user_input=${structuredInputPending}\x1b[0m`,
     );
 
     if (pendingElicitations.pending > 0) {
-        println('  acao     \x1b[90m/elicitation show latest � /elicitation list\x1b[0m');
+        println('  acao     \x1b[90m/elicitation show latest · /elicitation list\x1b[0m');
     }
     if (permissionSummary.pending > 0) {
-        println('  acao     \x1b[90m/permission show latest � /permission all\x1b[0m');
+        println('  acao     \x1b[90m/permission show latest · /permission all\x1b[0m');
     }
     if (userInputSummary.pending > 0) {
         println('  acao     \x1b[90m/answer <texto> ou responda na conversa ativa\x1b[0m');
@@ -577,13 +579,13 @@ function renderSdkCapabilitiesSummary({ println }, runtimeId) {
 
     println('\n  \x1b[36mSDK Capabilities\x1b[0m');
     println(
-        `  ui       \x1b[90melicitation=${String(ui['elicitation'] ?? false)} � confirm=${String(ui['confirm'] ?? false)} � select=${String(ui['select'] ?? false)} � input=${String(ui['input'] ?? false)}\x1b[0m`,
+        `  ui       \x1b[90melicitation=${String(ui['elicitation'] ?? false)} · confirm=${String(ui['confirm'] ?? false)} · select=${String(ui['select'] ?? false)} · input=${String(ui['input'] ?? false)}\x1b[0m`,
     );
     println(
-        `  tools    \x1b[90mworkspace=${String(tools['workspace'] ?? false)} � list=${String(tools['list'] ?? false)} � quota=${String(tools['quota'] ?? false)}\x1b[0m`,
+        `  tools    \x1b[90mworkspace=${String(tools['workspace'] ?? false)} · list=${String(tools['list'] ?? false)} · quota=${String(tools['quota'] ?? false)}\x1b[0m`,
     );
     println(
-        `  plan     \x1b[90mread=${String(plan['read'] ?? false)} � write=${String(plan['write'] ?? false)} � delete=${String(plan['delete'] ?? false)}\x1b[0m`,
+        `  plan     \x1b[90mread=${String(plan['read'] ?? false)} · write=${String(plan['write'] ?? false)} · delete=${String(plan['delete'] ?? false)}\x1b[0m`,
     );
     println(`  raw      \x1b[90m${pretty(capabilities, 1200)}\x1b[0m\n`);
 }
@@ -659,7 +661,7 @@ export async function cmdSdk({ println }, arg = '') {
             println(`  session  \x1b[90m${state.sessionId ?? '-'}\x1b[0m`);
             println(`  model    \x1b[33m${state.model}\x1b[0m  reasoning=\x1b[33m${state.reasoningEffort}\x1b[0m`);
             println(
-                `  waits    \x1b[90melicitation=${pendingElicitations.pending}${pendingElicitations.latest?.mode ? ` (${pendingElicitations.latest.mode})` : ''} � permission=${permissionSummary.pending}${permissionSummary.latest ? ` (${permissionSummary.latest.permissionType})` : ''} � ask_user=${userInputSummary.pending}${userInputSummary.latest?.kind ? ` (${userInputSummary.latest.kind})` : ''} � request_user_input=${structuredInputPending}\x1b[0m`,
+                `  waits    \x1b[90melicitation=${pendingElicitations.pending}${pendingElicitations.latest?.mode ? ` (${pendingElicitations.latest.mode})` : ''} · permission=${permissionSummary.pending}${permissionSummary.latest ? ` (${permissionSummary.latest.permissionType})` : ''} · ask_user=${userInputSummary.pending}${userInputSummary.latest?.kind ? ` (${userInputSummary.latest.kind})` : ''} · request_user_input=${structuredInputPending}\x1b[0m`,
             );
             await renderSdkQuota({ println }, runtimeId, { compact: true });
             println(
@@ -714,7 +716,7 @@ async function renderSdkTools({ println }, model, runtimeId) {
         const hasInstructions = typeof t['instructions'] === 'string' && t['instructions'].trim().length > 0;
         const badges = [hasParameters ? 'schema' : null, hasInstructions ? 'instructions' : null]
             .filter(Boolean)
-            .join(' � ');
+                .join(' · ');
         println(
             `  \x1b[33m${name}\x1b[0m${badges ? `  \x1b[90m[${badges}]\x1b[0m` : ''}${desc ? `  \x1b[90m${desc}\x1b[0m` : ''}`,
         );
@@ -734,7 +736,7 @@ async function renderSdkTools({ println }, model, runtimeId) {
         println(`  \x1b[90mdisabled: ${registrySnapshot.disabled.join(', ')}\x1b[0m`);
     }
     println(
-        `  \x1b[90mcontract: ok=${String(contract.ok)} � errors=${contract.errorCount} � warnings=${contract.warningCount} � desc=${contract.metadataCoverage.descriptionPct}% � schema=${contract.metadataCoverage.parametersPct}% � category=${contract.metadataCoverage.categoryPct}% � tags=${contract.metadataCoverage.tagsPct}% � instructions=${contract.metadataCoverage.instructionsPct}%\x1b[0m`,
+        `  \x1b[90mcontract: ok=${String(contract.ok)} · errors=${contract.errorCount} · warnings=${contract.warningCount} · desc=${contract.metadataCoverage.descriptionPct}% · schema=${contract.metadataCoverage.parametersPct}% · category=${contract.metadataCoverage.categoryPct}% · tags=${contract.metadataCoverage.tagsPct}% · instructions=${contract.metadataCoverage.instructionsPct}%\x1b[0m`,
     );
     println('');
 }
@@ -747,6 +749,13 @@ async function renderSdkTools({ println }, model, runtimeId) {
  */
 async function renderSdkQuota({ println }, runtimeId, opts = {}) {
     const result = await callWithRuntimeTarget(getTerminalSdkQuota, runtimeId);
+    let usageMetrics = null;
+    let usageMetricsError = null;
+    try {
+        usageMetrics = await callWithRuntimeTarget(getTerminalSdkUsageMetrics, runtimeId);
+    } catch (error) {
+        usageMetricsError = toError(error).message;
+    }
     const data = objectOrNull(result) ?? {};
     const snapshots = objectOrNull(data['quotaSnapshots']) ?? {};
     const state = classifyTerminalSdkQuota(result);
@@ -761,6 +770,14 @@ async function renderSdkQuota({ println }, runtimeId, opts = {}) {
         );
     }
     if (Object.keys(snapshots).length === 0) println('  \x1b[90mSem snapshots de quota no retorno SDK.\x1b[0m');
+    if (!opts.compact) {
+        if (usageMetrics) {
+            const summary = pretty(usageMetrics, 700).replace(/\n+/g, ' ');
+            println(`  usage rpc  \x1b[90m${summary}\x1b[0m`);
+        } else if (usageMetricsError) {
+            println(`  usage rpc  \x1b[90mindisponível: ${usageMetricsError}\x1b[0m`);
+        }
+    }
     if (!opts.compact) println('');
 }
 
@@ -797,7 +814,7 @@ async function renderSdkSystemPrompt({ println }, runtimeId) {
         `  config   \x1b[90m${String(status['configPath'] ?? '-')}\x1b[0m  autoReload=\x1b[33m${String(status['autoReload'] ?? false)}\x1b[0m`,
     );
     println(
-        `  sdk      \x1b[90mcustomize=${String(sdkCompatibility['supportsCustomizeMode'] ?? false)} � sourcesRpc=${String(sdkCompatibility['supportsInstructionSourcesRpc'] ?? false)}\x1b[0m`,
+        `  sdk      \x1b[90mcustomize=${String(sdkCompatibility['supportsCustomizeMode'] ?? false)} · sourcesRpc=${String(sdkCompatibility['supportsInstructionSourcesRpc'] ?? false)}\x1b[0m`,
     );
     println(
         `  digest   \x1b[90m${String(revision['digest'] ?? '-')}\x1b[0m  sections=\x1b[33m${sections.length}\x1b[0m  appendFiles=\x1b[33m${appendFiles.length}\x1b[0m`,
@@ -814,16 +831,16 @@ async function renderSdkSystemPrompt({ println }, runtimeId) {
     }
 
     if (limitations.length > 0) {
-        println('  \x1b[36mLimita��es\x1b[0m');
+        println('  \x1b[36mLimitações\x1b[0m');
         for (const limitation of limitations.slice(0, 4)) {
-            println(`  \x1b[90m� ${String(limitation)}\x1b[0m`);
+            println(`  \x1b[90m• ${String(limitation)}\x1b[0m`);
         }
     }
 
     if (instructionSources) {
         println(`  \x1b[36mInstruction sources\x1b[0m\n  \x1b[90m${pretty(instructionSources, 1200)}\x1b[0m`);
     } else if (instructionSourcesError) {
-        println(`  \x1b[33mInstruction sources indispon�veis:\x1b[0m ${String(instructionSourcesError)}`);
+        println(`  \x1b[33mInstruction sources indisponíveis:\x1b[0m ${String(instructionSourcesError)}`);
     }
 
     println('');
@@ -846,7 +863,7 @@ export async function cmdWorkspace({ println }, arg = '') {
             }
             const result = await callWithRuntimeTarget(readTerminalSdkWorkspaceFile, runtimeId, path);
             println(
-                `\n  \x1b[36m${path}\x1b[0m  \x1b[90m(SDK virtual; n�o FS local)\x1b[0m\n${pretty(result, 4000)}\n`,
+                `\n  \x1b[36m${path}\x1b[0m  \x1b[90m(SDK virtual; não FS local)\x1b[0m\n${pretty(result, 4000)}\n`,
             );
         } else if (sub === 'write') {
             const path = rest.shift();
@@ -869,7 +886,7 @@ export async function cmdWorkspace({ println }, arg = '') {
             const readResult = await callWithRuntimeTarget(readTerminalSdkWorkspaceFile, runtimeId, sourcePath);
             const content = workspaceReadContent(readResult);
             if (content === null) {
-                println('\n  \x1b[31m? Workspace SDK: conte�do n�o textual/indispon�vel para materializa��o.\x1b[0m');
+                println('\n  \x1b[31m✗ Workspace SDK: conteúdo não textual/indisponível para materialização.\x1b[0m');
                 println(`  \x1b[90m${pretty(readResult, 900)}\x1b[0m\n`);
                 await renderCommandFailureGuidance(println, runtimeId);
                 return;
@@ -885,17 +902,17 @@ export async function cmdWorkspace({ println }, arg = '') {
             );
             if (writeResult['success'] !== true) {
                 println(
-                    `\n  \x1b[31m? Materializa��o SDK?FS falhou:\x1b[0m ${String(writeResult['error'] ?? 'erro desconhecido')}`,
+                    `\n  \x1b[31m✗ Materialização SDK→FS falhou:\x1b[0m ${String(writeResult['error'] ?? 'erro desconhecido')}`,
                 );
                 println(
-                    '  \x1b[90mUse --overwrite para substituir arquivo local j� existente quando apropriado.\x1b[0m\n',
+                    '  \x1b[90mUse --overwrite para substituir arquivo local já existente quando apropriado.\x1b[0m\n',
                 );
                 await renderCommandFailureGuidance(println, runtimeId);
                 return;
             }
 
             println(
-                `\n  \x1b[32m? SDK?FS materializado:\x1b[0m \x1b[33m${sourcePath}\x1b[0m ? \x1b[33m${destinationPath}\x1b[0m`,
+                `\n  \x1b[32m✓ SDK→FS materializado:\x1b[0m \x1b[33m${sourcePath}\x1b[0m → \x1b[33m${destinationPath}\x1b[0m`,
             );
             const io = ioSummary(writeResult);
             if (io) println(`  \x1b[90m${io}\x1b[0m`);
@@ -906,7 +923,7 @@ export async function cmdWorkspace({ println }, arg = '') {
             const listResult = await callWithRuntimeTarget(listTerminalSdkWorkspaceFiles, runtimeId);
             const files = workspaceListPaths(listResult);
             if (files.length === 0) {
-                println('\n  \x1b[33mWorkspace SDK virtual vazio ou sem paths materializ�veis.\x1b[0m');
+                println('\n  \x1b[33mWorkspace SDK virtual vazio ou sem paths materializáveis.\x1b[0m');
                 println(`  \x1b[90m${pretty(listResult, 900)}\x1b[0m\n`);
                 return;
             }
@@ -918,7 +935,7 @@ export async function cmdWorkspace({ println }, arg = '') {
                 const content = workspaceReadContent(readResult);
                 if (content === null) {
                     fail += 1;
-                    println(`  \x1b[31m? skip\x1b[0m ${sourcePath} (conte�do n�o textual)`);
+                    println(`  \x1b[31m✗ skip\x1b[0m ${sourcePath} (conteúdo não textual)`);
                     continue;
                 }
                 const destinationPath = `${targetRoot.replace(/\/$/u, '')}/${sourcePath}`;
@@ -928,15 +945,15 @@ export async function cmdWorkspace({ println }, arg = '') {
                 );
                 if (writeResult['success'] === true) {
                     ok += 1;
-                    println(`  \x1b[32m?\x1b[0m ${sourcePath} ? ${destinationPath}`);
+                    println(`  \x1b[32m✓\x1b[0m ${sourcePath} → ${destinationPath}`);
                 } else {
                     fail += 1;
-                    println(`  \x1b[31m?\x1b[0m ${sourcePath} (${String(writeResult['error'] ?? 'erro')})`);
+                    println(`  \x1b[31m✗\x1b[0m ${sourcePath} (${String(writeResult['error'] ?? 'erro')})`);
                 }
             }
 
             println(
-                `\n  \x1b[36mMirror SDK?FS conclu�do\x1b[0m  \x1b[90mok=${ok} � fail=${fail} � root=${targetRoot}\x1b[0m\n`,
+                `\n  \x1b[36mMirror SDK→FS concluído\x1b[0m  \x1b[90mok=${ok} · fail=${fail} · root=${targetRoot}\x1b[0m\n`,
             );
         } else if (sub === 'promote' || sub === 'push' || sub === 'import') {
             const sourcePath = rest[0] ?? '';
@@ -956,10 +973,10 @@ export async function cmdWorkspace({ println }, arg = '') {
                 },
             );
             if (!result.ok) {
-                println(`\n  \x1b[31m? Promo��o FS?SDK falhou:\x1b[0m ${result.reason}`);
+                println(`\n  \x1b[31m✗ Promoção FS→SDK falhou:\x1b[0m ${result.reason}`);
                 if (result.conflict) {
                     println(
-                        '  \x1b[90mpol�tica=fail-if-exists � a��o=conflict � use --overwrite com inten��o expl�cita\x1b[0m',
+                        '  \x1b[90mpolítica=fail-if-exists · ação=conflict · use --overwrite com intenção explícita\x1b[0m',
                     );
                 }
                 println(`  \x1b[90mtraceId=${result.traceId}\x1b[0m\n`);
@@ -968,10 +985,10 @@ export async function cmdWorkspace({ println }, arg = '') {
             }
 
             println(
-                `\n  \x1b[32m? FS?SDK promovido:\x1b[0m \x1b[33m${sourcePath}\x1b[0m ? \x1b[33m${destinationPath}\x1b[0m`,
+                `\n  \x1b[32m✓ FS→SDK promovido:\x1b[0m \x1b[33m${sourcePath}\x1b[0m → \x1b[33m${destinationPath}\x1b[0m`,
             );
             println(
-                `  \x1b[90mpol�tica=${flags.overwrite ? 'overwrite' : 'fail-if-exists'} � a��o=${result.action} � bytes=${result.bytes} � traceId=${result.traceId}\x1b[0m\n`,
+                `  \x1b[90mpolítica=${flags.overwrite ? 'overwrite' : 'fail-if-exists'} · ação=${result.action} · bytes=${result.bytes} · traceId=${result.traceId}\x1b[0m\n`,
             );
         } else {
             const result = await callWithRuntimeTarget(listTerminalSdkWorkspaceFiles, runtimeId);
@@ -982,17 +999,17 @@ export async function cmdWorkspace({ println }, arg = '') {
                     const f = objectOrNull(file) ?? {};
                     println(`  \x1b[33m${String(f['path'] ?? f['name'] ?? file)}\x1b[0m`);
                 }
-                if (files.length > 80) println(`  \x1b[90m� ${files.length - 80} arquivos omitidos\x1b[0m`);
+                if (files.length > 80) println(`  \x1b[90m• ${files.length - 80} arquivos omitidos\x1b[0m`);
             } else {
                 println(`  \x1b[90m${pretty(result, 1500)}\x1b[0m`);
             }
             println('  \x1b[90mUso: /workspace list | read <path> | write <path> <content>\x1b[0m');
             println(
-                '  \x1b[90m     /workspace sync <sdkPath> [--to <localPath>] [--overwrite] � /workspace mirror [--to <localDir>] [--overwrite]\x1b[0m',
+                '  \x1b[90m     /workspace sync <sdkPath> [--to <localPath>] [--overwrite] · /workspace mirror [--to <localDir>] [--overwrite]\x1b[0m',
             );
             println('  \x1b[90m     /workspace promote <localPath> [--to <sdkPath>] [--overwrite]\x1b[0m');
             println(
-                '  \x1b[90mObs: list/read/write operam no workspace SDK virtual; sync/mirror materializam no FS local can�nico; promote faz FS?SDK com auditoria.\x1b[0m\n',
+                '  \x1b[90mObs: list/read/write operam no workspace SDK virtual; sync/mirror materializam no FS local canônico; promote faz FS→SDK com auditoria.\x1b[0m\n',
             );
         }
     } catch (e) {
@@ -1014,10 +1031,10 @@ export async function cmdElicitation({ println }, arg = '') {
         if (sub === 'confirm') {
             const message = rest.join(' ').trim() || 'Confirma?';
             const result = await callWithRuntimeTarget(confirmTerminalSdkSessionUi, runtimeId, message);
-            println(`\n  \x1b[32m? session.ui.confirm conclu�do.\x1b[0m\n  \x1b[90m${String(result)}\x1b[0m\n`);
+            println(`\n  \x1b[32m✓ session.ui.confirm concluído.\x1b[0m\n  \x1b[90m${String(result)}\x1b[0m\n`);
         } else if (sub === 'select') {
             const { left, right } = splitAtDoubleDash(rest);
-            const message = left.join(' ').trim() || 'Selecione uma op��o';
+            const message = left.join(' ').trim() || 'Selecione uma opção';
             const options = right
                 .join(' ')
                 .split('|')
@@ -1028,13 +1045,13 @@ export async function cmdElicitation({ println }, arg = '') {
                 return;
             }
             const result = await callWithRuntimeTarget(selectTerminalSdkSessionUi, runtimeId, message, options);
-            println(`\n  \x1b[32m? session.ui.select conclu�do.\x1b[0m\n  \x1b[90m${String(result)}\x1b[0m\n`);
+            println(`\n  \x1b[32m✓ session.ui.select concluído.\x1b[0m\n  \x1b[90m${String(result)}\x1b[0m\n`);
         } else if (sub === 'input') {
             const { left, right } = splitAtDoubleDash(rest);
             const message = left.join(' ').trim() || 'Informe um valor';
             const parsed = parseJsonObject(right);
             if (parsed.error) {
-                println(`\x1b[31m  JSON inv�lido: ${parsed.error}\x1b[0m`);
+                println(`\x1b[31m  JSON inválido: ${parsed.error}\x1b[0m`);
                 return;
             }
             const result = await callWithRuntimeTarget(
@@ -1045,7 +1062,7 @@ export async function cmdElicitation({ println }, arg = '') {
                     parsed.json ?? undefined
                 ),
             );
-            println(`\n  \x1b[32m? session.ui.input conclu�do.\x1b[0m\n  \x1b[90m${String(result)}\x1b[0m\n`);
+            println(`\n  \x1b[32m✓ session.ui.input concluído.\x1b[0m\n  \x1b[90m${String(result)}\x1b[0m\n`);
         } else if (sub === 'capabilities') {
             const available = callWithRuntimeTarget(isTerminalSdkSessionUiElicitationAvailable, runtimeId);
             const ok = available;
@@ -1059,18 +1076,18 @@ export async function cmdElicitation({ println }, arg = '') {
             println(
                 ok
                     ? '\x1b[32m  Elicitation removida da UX local.\x1b[0m'
-                    : '\x1b[33m  Elicitation n�o encontrada.\x1b[0m',
+                    : '\x1b[33m  Elicitation não encontrada.\x1b[0m',
             );
         } else if (sub === 'respond') {
             const [id = 'latest', action, ...jsonRest] = rest;
             const entry = getTerminalElicitation(id, { runtimeId });
             if (!entry) {
-                println('\x1b[33m  Elicitation n�o encontrada.\x1b[0m');
+                println('\x1b[33m  Elicitation não encontrada.\x1b[0m');
                 return;
             }
             const parsedResult = parseElicitationResult(action, jsonRest, entry.requestedSchema);
             if (!parsedResult.ok) {
-                println(`\x1b[31m  Resposta inv�lida: ${parsedResult.error}\x1b[0m`);
+                println(`\x1b[31m  Resposta inválida: ${parsedResult.error}\x1b[0m`);
                 return;
             }
             const resolved = callWithRuntimeTarget(
@@ -1082,8 +1099,8 @@ export async function cmdElicitation({ println }, arg = '') {
             const ok = resolved;
             println(
                 ok
-                    ? `\n  \x1b[32m? Elicitation respondida.\x1b[0m \x1b[90m${entry.id}\x1b[0m\n`
-                    : `\n  \x1b[33mElicitation n�o est� mais pendente.\x1b[0m \x1b[90m${entry.id}\x1b[0m\n`,
+                    ? `\n  \x1b[32m✓ Elicitation respondida.\x1b[0m \x1b[90m${entry.id}\x1b[0m\n`
+                    : `\n  \x1b[33mElicitation não está mais pendente.\x1b[0m \x1b[90m${entry.id}\x1b[0m\n`,
             );
         } else if (sub === 'request') {
             const message = rest.join(' ').trim() || 'Informe os dados solicitados.';
@@ -1093,22 +1110,22 @@ export async function cmdElicitation({ println }, arg = '') {
                 message,
                 defaultElicitationSchema(),
             );
-            println(`\n  \x1b[32m? Elicitation SDK conclu�da.\x1b[0m\n  \x1b[90m${pretty(result, 1500)}\x1b[0m\n`);
+            println(`\n  \x1b[32m✓ Elicitation SDK concluída.\x1b[0m\n  \x1b[90m${pretty(result, 1500)}\x1b[0m\n`);
         } else if (sub === 'request-json') {
             const { left, right } = splitAtDoubleDash(rest);
             const message =
                 (right.length > 0 ? left.join(' ').trim() : rest.shift()) ?? 'Informe os dados solicitados.';
             const parsed = parseJsonObject(right.length > 0 ? right : rest);
             if (parsed.error || !parsed.json) {
-                println(`\x1b[31m  JSON inv�lido: ${parsed.error ?? 'schema ausente'}\x1b[0m`);
+                println(`\x1b[31m  JSON inválido: ${parsed.error ?? 'schema ausente'}\x1b[0m`);
                 return;
             }
             if (!isRuntimeElicitationSchema(parsed.json)) {
-                println('\x1b[31m  Schema inv�lido: esperado { "type": "object", "properties": { ... } }.\x1b[0m');
+                println('\x1b[31m  Schema inválido: esperado { "type": "object", "properties": { ... } }.\x1b[0m');
                 return;
             }
             const result = await callWithRuntimeTarget(requestTerminalSdkElicitation, runtimeId, message, parsed.json);
-            println(`\n  \x1b[32m? Elicitation SDK conclu�da.\x1b[0m\n  \x1b[90m${pretty(result, 1500)}\x1b[0m\n`);
+            println(`\n  \x1b[32m✓ Elicitation SDK concluída.\x1b[0m\n  \x1b[90m${pretty(result, 1500)}\x1b[0m\n`);
         } else {
             const entries = listTerminalElicitations({ includeCompleted: sub === 'all', runtimeId });
             if (entries.length === 0) {
@@ -1126,7 +1143,7 @@ export async function cmdElicitation({ println }, arg = '') {
                 '  \x1b[90mUso: /elicitation [list|all|capabilities|confirm <msg>|select <msg> -- a|b|c|input <msg> -- {json}|show latest|clear <id>|request <msg>|request-json <msg> -- <schemaJson>|respond <id> <accept|decline|cancel> [json]]\x1b[0m',
             );
             println(
-                '  \x1b[90mask_user = conversa READY/REPLY; elicitation = formul�rio/URL estruturado do SDK; confirm/select/input = conveni�ncias de session.ui.*.\x1b[0m\n',
+                '  \x1b[90mask_user = conversa READY/REPLY; elicitation = formulário/URL estruturado do SDK; confirm/select/input = conveniências de session.ui.*.\x1b[0m\n',
             );
         }
     } catch (e) {
@@ -1168,7 +1185,7 @@ export async function cmdPermission({ println }, arg = '') {
         const payloadArg = rest.slice(2).join(' ').trim();
         const entry = getTerminalPermission(idArg || 'latest', { runtimeId });
         if (!entry || !entry.requestId) {
-            println('  \x1b[33mPermiss�o n�o encontrada ou sem requestId can�nico para responder.\x1b[0m');
+            println('  \x1b[33mPermissão não encontrada ou sem requestId canônico para responder.\x1b[0m');
             return;
         }
         const decision = parsePermissionDecision(actionArg);
@@ -1189,7 +1206,7 @@ export async function cmdPermission({ println }, arg = '') {
                 }
                 payload = /** @type {Record<string, unknown>} */ (parsed);
             } catch (error) {
-                println(`  \x1b[31mJSON inv�lido:\x1b[0m ${toError(error).message}`);
+                println(`  \x1b[31mJSON inválido:\x1b[0m ${toError(error).message}`);
                 return;
             }
         }
@@ -1211,7 +1228,7 @@ export async function cmdPermission({ println }, arg = '') {
             ts: Date.now(),
         });
         println(
-            `\n  \x1b[32m? Resposta de permiss�o enviada:\x1b[0m \x1b[90m${entry.requestId}\x1b[0m � ${decision.kind}`,
+            `\n  \x1b[32m✓ Resposta de permissão enviada:\x1b[0m \x1b[90m${entry.requestId}\x1b[0m · ${decision.kind}`,
         );
         println(`  \x1b[90m${pretty(result, 700)}\x1b[0m\n`);
         return;
@@ -1220,14 +1237,14 @@ export async function cmdPermission({ println }, arg = '') {
         const remote = await callWithRuntimeTarget(listTerminalSdkPendingPermissions, runtimeId);
         const resolvedRuntimeId = readTerminalRuntimeState(runtimeId).runtimeId;
         if (!remote.available) {
-            println('\n  \x1b[33mListagem ativa de permiss�es pendentes indispon�vel no SDK atual.\x1b[0m');
+            println('\n  \x1b[33mListagem ativa de permissões pendentes indisponível no SDK atual.\x1b[0m');
             println('  \x1b[90mFallback operacional: usando estado observado local (/permission list).\x1b[0m\n');
         } else {
             const requests = Array.isArray(remote.requests) ? remote.requests : [];
-            println(`\n  \x1b[36mPermiss�es pendentes via RPC (${requests.length})\x1b[0m`);
+            println(`\n  \x1b[36mPermissões pendentes via RPC (${requests.length})\x1b[0m`);
             println(`  \x1b[90msource: ${remote.source ?? 'unknown'}\x1b[0m`);
             if (requests.length === 0) {
-                println('  \x1b[32mNenhuma permiss�o pendente reportada pela sess�o SDK.\x1b[0m\n');
+                println('  \x1b[32mNenhuma permissão pendente reportada pela sessão SDK.\x1b[0m\n');
                 return;
             }
             for (const item of requests) {
@@ -1257,34 +1274,40 @@ export async function cmdPermission({ println }, arg = '') {
             return;
         }
     }
+    if (sub === 'reset-approvals') {
+        const result = await callWithRuntimeTarget(resetTerminalSdkSessionApprovals, runtimeId);
+        println(`\n  \x1b[32m✓ Aprovações da sessão resetadas.\x1b[0m`);
+        println(`  \x1b[90m${pretty(result, 700)}\x1b[0m\n`);
+        return;
+    }
     if (sub === 'cockpit' || sub === 'panel') {
         renderPermissionCockpit({ println }, runtimeId);
         return;
     }
     if (sub === 'clear') {
         const ok = clearTerminalPermission(rest[0] || 'latest');
-        println(ok ? '\x1b[32m  Permiss�o removida da UX local.\x1b[0m' : '\x1b[33m  Permiss�o n�o encontrada.\x1b[0m');
+        println(ok ? '\x1b[32m  Permissão removida da UX local.\x1b[0m' : '\x1b[33m  Permissão não encontrada.\x1b[0m');
         return;
     }
 
     const entries = listTerminalPermissions({ includeCompleted: sub === 'all', runtimeId });
     if (entries.length === 0) {
-        println('\n  \x1b[90mNenhuma permiss�o SDK pendente na UX local.\x1b[0m');
+        println('\n  \x1b[90mNenhuma permissão SDK pendente na UX local.\x1b[0m');
     } else {
-        println(`\n  \x1b[36mPermiss�es SDK (${entries.length})\x1b[0m`);
+        println(`\n  \x1b[36mPermissões SDK (${entries.length})\x1b[0m`);
         for (const entry of entries) {
             const statusColor =
                 entry.status === 'pending' ? '\x1b[33m' : entry.granted === false ? '\x1b[31m' : '\x1b[90m';
             const result = entry.granted == null ? entry.result : entry.granted ? 'approved' : 'not-approved';
             println(
-                `  ${statusColor}${entry.id}\x1b[0m  ${entry.permissionType}  \x1b[90m${entry.status}${result ? ` � ${result}` : ''}\x1b[0m`,
+                `  ${statusColor}${entry.id}\x1b[0m  ${entry.permissionType}  \x1b[90m${entry.status}${result ? ` · ${result}` : ''}\x1b[0m`,
             );
         }
     }
     println(
-        '  \x1b[90mUso: /permission [list|pending|cockpit|all|show latest|clear <id>|clear all|mode [approve_all|audit_only|selective]|respond <id> <decision> [json]]\x1b[0m',
+        '  \x1b[90mUso: /permission [list|pending|reset-approvals|cockpit|all|show latest|clear <id>|clear all|mode [approve_all|audit_only|selective]|respond <id> <decision> [json]]\x1b[0m',
     );
-    println('  \x1b[90mPermiss�es s�o decididas pelo SDK/hook; este comando � observabilidade operacional.\x1b[0m\n');
+    println('  \x1b[90mPermissões são decididas pelo SDK/hook; este comando é observabilidade operacional.\x1b[0m\n');
 }
 
 /**
@@ -1294,7 +1317,7 @@ export async function cmdPermission({ println }, arg = '') {
  */
 function renderElicitationEntry({ println }, entry) {
     if (!entry) {
-        println('\x1b[33m  Elicitation n�o encontrada.\x1b[0m');
+        println('\x1b[33m  Elicitation não encontrada.\x1b[0m');
         return;
     }
     println(`\n  \x1b[36mElicitation ${entry.id}\x1b[0m`);
@@ -1304,7 +1327,7 @@ function renderElicitationEntry({ println }, entry) {
     if (entry.url) println(`  url     \x1b[36m${entry.url}\x1b[0m`);
     if (entry.source) println(`  source  \x1b[90m${entry.source}\x1b[0m`);
     if (entry.toolCallId) println(`  tool    \x1b[90m${entry.toolCallId}\x1b[0m`);
-    if (entry.actionable) println('  action  \x1b[32mrespond�vel pelo runtime\x1b[0m');
+    if (entry.actionable) println('  action  \x1b[32mrespondível pelo runtime\x1b[0m');
     if (entry.resultAction) println(`  result  \x1b[33m${entry.resultAction}\x1b[0m`);
     if (entry.resultContent) println(`\n  result content:\n${pretty(entry.resultContent, 2500)}`);
     if (entry.requestedSchema) println(`\n  schema:\n${pretty(entry.requestedSchema, 2500)}`);
@@ -1322,10 +1345,10 @@ function renderElicitationEntry({ println }, entry) {
  */
 function renderPermissionEntry({ println }, entry) {
     if (!entry) {
-        println('\x1b[33m  Permiss�o n�o encontrada.\x1b[0m');
+        println('\x1b[33m  Permissão não encontrada.\x1b[0m');
         return;
     }
-    println(`\n  \x1b[36mPermiss�o ${entry.id}\x1b[0m`);
+    println(`\n  \x1b[36mPermissão ${entry.id}\x1b[0m`);
     println(`  status  \x1b[33m${entry.status}\x1b[0m`);
     println(`  type    \x1b[33m${entry.permissionType}\x1b[0m`);
     if (entry.requestId) println(`  request \x1b[90m${entry.requestId}\x1b[0m`);
@@ -1335,7 +1358,7 @@ function renderPermissionEntry({ println }, entry) {
     if (entry.completedAt) println(`  done    \x1b[90m${new Date(entry.completedAt).toISOString()}\x1b[0m`);
     if (entry.status === 'pending' && entry.requestId) {
         println(
-            '  \x1b[90mA��o: /permission respond <id> <approve-once|approve-for-session|approve-for-location|reject|user-not-available>\x1b[0m',
+            '  \x1b[90mAção: /permission respond <id> <approve-once|approve-for-session|approve-for-location|reject|user-not-available>\x1b[0m',
         );
     }
     println(`\n  data:\n${pretty(entry.data, 2500)}\n`);
@@ -1362,16 +1385,16 @@ function renderPermissionCockpit({ println }, runtimeId) {
     println(`  pendentes  \x1b[33m${pending.length}\x1b[0m`);
     if (latest) {
         println(
-            `  latest     \x1b[90m${latest.id}\x1b[0m ${latest.permissionType}${latest.requestId ? ` � requestId=${latest.requestId}` : ''}`,
+            `  latest     \x1b[90m${latest.id}\x1b[0m ${latest.permissionType}${latest.requestId ? ` · requestId=${latest.requestId}` : ''}`,
         );
     } else {
-        println('  latest     \x1b[90m(nenhuma permiss�o observada)\x1b[0m');
+        println('  latest     \x1b[90m(nenhuma permissão observada)\x1b[0m');
     }
 
     if (typeRows.length > 0) {
-        println('  por tipo   \x1b[90m' + typeRows.map(([type, count]) => `${type}=${count}`).join(' � ') + '\x1b[0m');
+        println('  por tipo   \x1b[90m' + typeRows.map(([type, count]) => `${type}=${count}`).join(' · ') + '\x1b[0m');
     } else {
-        println('  por tipo   \x1b[90m(nenhuma pend�ncia)\x1b[0m');
+        println('  por tipo   \x1b[90m(nenhuma pendência)\x1b[0m');
     }
 
     if (modeChanges.length > 0) {
@@ -1380,10 +1403,10 @@ function renderPermissionCockpit({ println }, runtimeId) {
             println(`    \x1b[90m${new Date(item.ts).toLocaleTimeString('pt-BR')}\x1b[0m  ${item.mode}`);
         }
     } else {
-        println('  mode log   \x1b[90m(sem mudan�as recentes no runtime local)\x1b[0m');
+        println('  mode log   \x1b[90m(sem mudanças recentes no runtime local)\x1b[0m');
     }
 
-    println('  quick      \x1b[90m/permission pending � /permission show latest � /permission mode selective\x1b[0m');
+    println('  quick      \x1b[90m/permission pending · /permission show latest · /permission mode selective\x1b[0m');
     if (latest?.requestId && latest.status === 'pending') {
         println(`  quick      \x1b[90m/permission respond ${latest.id} approve-once\x1b[0m`);
     }

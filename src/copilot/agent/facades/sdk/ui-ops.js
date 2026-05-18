@@ -11,9 +11,11 @@ import {
     commandsHandlePending,
     permissionsHandlePending,
     permissionsListPending,
+    permissionsResetSessionApprovals,
     toolsHandlePendingCall,
     uiElicitation,
 } from '#copilot/sdk/rpc';
+import { mcpOauthLogin } from '#copilot/sdk/rpc/experimental';
 import {
     getSessionCapabilities,
     isSessionUiElicitationAvailable,
@@ -134,6 +136,23 @@ export async function handleSdkPendingPermission(ctx, requestId, result) {
  */
 export async function listPendingSdkPermissions(ctx) {
     return permissionsListPending(requireSession(ctx, 'listPendingSdkPermissions'));
+}
+
+/**
+ * @param {unknown} ctx
+ * @returns {Promise<Awaited<ReturnType<typeof permissionsResetSessionApprovals>>>}
+ */
+export async function resetSdkSessionApprovals(ctx) {
+    return permissionsResetSessionApprovals(requireSession(ctx, 'resetSdkSessionApprovals'));
+}
+
+/**
+ * @param {unknown} ctx
+ * @param {string} serverName
+ * @returns {Promise<Awaited<ReturnType<typeof mcpOauthLogin>>>}
+ */
+export async function loginSdkMcpOauth(ctx, serverName) {
+    return mcpOauthLogin(requireSession(ctx, 'loginSdkMcpOauth'), serverName);
 }
 
 /**

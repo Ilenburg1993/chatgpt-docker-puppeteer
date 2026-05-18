@@ -470,6 +470,7 @@ export function println(text) {
 export function printlnBlock(lines) {
     const text = Array.isArray(lines) ? lines.join('\n') : lines;
     if (getRl()) {
+        const hadReservedStatusRows = _statusRowsReserved > 0;
         if (_statusRowsReserved > 0) {
             clearReservedStatusRowsPreservingCursor();
             _statusRowsReserved = 0;
@@ -477,7 +478,10 @@ export function printlnBlock(lines) {
         clearTerminalLine();
         process.stdout.write(`${text.endsWith('\n') ? text : `${text}\n`}`);
         // Re-reserva uma linha em branco acima do prompt para evitar salto visual no próximo pulso da linha viva.
-        process.stdout.write('\n');
+        // Se a linha já existia, mantê-la é suficiente; emitir outro \n acumulava espaços verticais.
+        if (!hadReservedStatusRows) {
+            process.stdout.write('\n');
+        }
         _statusRowsReserved = 1;
         redrawPromptIfInteractive();
         return;

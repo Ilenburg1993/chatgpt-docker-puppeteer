@@ -65,7 +65,11 @@ import {
     setSdkSessionMode,
 } from '../../presentation/state/index.js';
 import { broadcastSse, println } from '../dialog/index.js';
-import { answerTerminalPendingQuestion, classifyTerminalPermissionDecision } from '../frontend/gateways/index.js';
+import {
+    answerTerminalPendingQuestion,
+    classifyTerminalPermissionDecision,
+    loginTerminalSdkMcpOauth,
+} from '../frontend/gateways/index.js';
 import {
     beginTerminalTurnTrace,
     completeTerminalTurnTrace,
@@ -84,12 +88,12 @@ import {
     terminalThemeText,
 } from '../state/events/index.js';
 import { drainMailboxToTurnIfIdle } from '../wiring/mailbox/index.js';
+import { renderTerminalAssistantTranscript } from './assistant-transcript-renderer.js';
 import {
     handleTerminalExternalToolCompleted,
     handleTerminalExternalToolRequested,
     handleTerminalToolUserRequested,
 } from './tool-lifecycle-runtime.js';
-import { renderTerminalAssistantTranscript } from './assistant-transcript-renderer.js';
 
 /**
  * @typedef {{
@@ -285,6 +289,10 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
     };
 
     const onAssistantMessage = (/** @type {unknown} */ evt) => {
+        const data = eventObject(evt);
+        if (typeof data['agentId'] === 'string' && data['agentId'].trim().length > 0) {
+            return;
+        }
         const normalized = normalizeAssistantTranscriptContent(extractAssistantMessageContent(evt));
         if (!normalized) return;
         recordTerminalActivity('turn', 'Mensagem da LLM-B recebida', {
@@ -882,6 +890,57 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
             `\n  \x1b[33m🔑 OAuth MCP necessário:\x1b[0m ${serverName}${requestId ? ` \x1b[90m(${requestId})\x1b[0m` : ''}`,
         );
         broadcastSse('mcp.oauth.required', { serverName, requestId, timestamp: Date.now() });
+        if (serverName !== 'unknown') {
+            void (async () => {
+                try {
+                    const result = await loginTerminalSdkMcpOauth(serverName);
+                    const payload = eventObject(result);
+                    const loginUrl =
+                        (typeof payload['url'] === 'string' && payload['url']) ||
+                        (typeof payload['verificationUri'] === 'string' && payload['verificationUri']) ||
+                        (typeof payload['verification_uri'] === 'string' && payload['verification_uri']) ||
+                        null;
+                    recordTerminalActivity('system', 'Fluxo OAuth MCP iniciado', {
+                        detail: `${serverName}${loginUrl ? ` · ${loginUrl}` : ''}`,
+                        source: 'sdk',
+                        severity: 'info',
+                        recordHistory: false,
+                    });
+                    println(
+                        `  ${terminalThemeBadge('info', 'MCP')} ${terminalThemeText('info', `oauth.login iniciado via RPC para ${serverName}`)}`,
+                    );
+                    if (loginUrl) {
+                        println(`  \x1b[36m${loginUrl}\x1b[0m`);
+                    }
+                    broadcastSse('mcp.oauth.login_started', {
+                        serverName,
+                        requestId,
+                        loginUrl,
+                        payload,
+                        timestamp: Date.now(),
+                    });
+                    refreshPromptIfIdle();
+                } catch (error) {
+                    const message = error instanceof Error ? error.message : String(error ?? 'erro desconhecido');
+                    recordTerminalActivity('system', 'Falha ao iniciar OAuth MCP via RPC', {
+                        detail: `${serverName} · ${message}`,
+                        source: 'sdk',
+                        severity: 'warn',
+                        recordHistory: false,
+                    });
+                    println(
+                        `  ${terminalThemeBadge('warn', 'MCP')} ${terminalThemeText('warn', `oauth.login indisponível para ${serverName}: ${message}`)}`,
+                    );
+                    broadcastSse('mcp.oauth.login_failed', {
+                        serverName,
+                        requestId,
+                        error: message,
+                        timestamp: Date.now(),
+                    });
+                    refreshPromptIfIdle();
+                }
+            })();
+        }
         refreshPromptIfIdle();
     };
 

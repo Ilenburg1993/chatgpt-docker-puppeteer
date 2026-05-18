@@ -136,9 +136,19 @@ function nextSyntheticInteractionId(prefix) {
  * @returns {string | null}
  */
 function pruneCompletedInteractionMap(map, latestId, now = Date.now()) {
-    const completed = [...map.values()]
-        .filter((entry) => entry.status !== 'pending')
-        .sort((a, b) => (b.completedAt ?? b.createdAt) - (a.completedAt ?? a.createdAt));
+    /** @type {{ id: string; status: SdkInteractionStatus; createdAt: number; completedAt: number | null }[]} */
+    const completed = [];
+    /** @type {{ id: string; status: SdkInteractionStatus; createdAt: number; completedAt: number | null } | null} */
+    let latestRemaining = null;
+    for (const entry of map.values()) {
+        if (!latestRemaining || entry.createdAt > latestRemaining.createdAt) {
+            latestRemaining = entry;
+        }
+        if (entry.status !== 'pending') {
+            completed.push(entry);
+        }
+    }
+    completed.sort((a, b) => (b.completedAt ?? b.createdAt) - (a.completedAt ?? a.createdAt));
     const toDelete = new Set();
     for (const entry of completed) {
         const completedAt = entry.completedAt ?? entry.createdAt;
@@ -153,7 +163,16 @@ function pruneCompletedInteractionMap(map, latestId, now = Date.now()) {
         map.delete(id);
     }
     if (latestId && map.has(latestId)) return latestId;
-    return [...map.values()].sort((a, b) => b.createdAt - a.createdAt)[0]?.id ?? null;
+    if (latestRemaining && !toDelete.has(latestRemaining.id)) {
+        return latestRemaining.id;
+    }
+    let nextLatest = null;
+    for (const entry of map.values()) {
+        if (!nextLatest || entry.createdAt > nextLatest.createdAt) {
+            nextLatest = entry;
+        }
+    }
+    return nextLatest?.id ?? null;
 }
 
 /**

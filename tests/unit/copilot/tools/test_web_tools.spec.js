@@ -44,9 +44,71 @@ vi.mock('#copilot/core', async (importOriginal) => {
     const actual = /** @type {Record<string, unknown>} */ (await importOriginal());
     return {
         ...actual,
+        IO_URL_MAX_REDIRECTS: 5,
+        buildIoMeta: vi.fn((/** @type {Record<string, unknown>} */ input) => ({
+            cache: 'none',
+            riskClass: 'low',
+            policyVersion: 'test',
+            ...input,
+        })),
+        evaluateIoUrlPolicy: vi.fn((/** @type {{ input?: string; maxRedirects?: number }} */ options = {}) => {
+            const input = typeof options.input === 'string' ? options.input.trim() : '';
+            if (!input) {
+                return {
+                    ok: false,
+                    reason: 'URL inválida',
+                    code: 'URL_REQUIRED',
+                    policyVersion: 'test',
+                };
+            }
+            let parsed;
+            try {
+                parsed = new URL(input);
+            } catch {
+                return {
+                    ok: false,
+                    reason: 'URL inválida',
+                    code: 'URL_BLOCKED',
+                    policyVersion: 'test',
+                };
+            }
+            const validation = mocks.validateUrl(parsed);
+            if (!validation?.safe) {
+                return {
+                    ok: false,
+                    reason: validation?.reason || 'private IP',
+                    code: 'URL_BLOCKED',
+                    policyVersion: 'test',
+                };
+            }
+            return {
+                ok: true,
+                url: parsed,
+                maxRedirects: typeof options.maxRedirects === 'number' ? options.maxRedirects : 5,
+                policyVersion: 'test',
+            };
+        }),
         logSwallowed: mocks.logSwallowed,
+        sanitizeIoTextOutput: vi.fn((/** @type {{ text?: string }} */ options = {}) => {
+            const source = typeof options.text === 'string' ? options.text : '';
+            let redactions = 0;
+            const text = source.replace(/\bBearer\s+[A-Za-z0-9._~+/=-]{8,}\b/giu, () => {
+                redactions += 1;
+                return 'Bearer [redacted]';
+            });
+            return {
+                text,
+                sanitized: redactions > 0,
+                redactions,
+                policyVersion: 'test',
+            };
+        }),
         toError: mocks.toError,
         validateUrl: mocks.validateUrl,
+        withIoMeta: vi.fn((/** @type {Record<string, unknown>} */ payload, /** @type {unknown} */ io) => ({
+            ...payload,
+            io,
+        })),
     };
 });
 

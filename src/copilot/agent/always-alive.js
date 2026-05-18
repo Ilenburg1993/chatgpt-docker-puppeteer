@@ -41,6 +41,7 @@ import {
     getReasoningEffort,
     getRuntimeHandoffManager,
     getSdkSessionCapabilities,
+    getSdkUsageMetrics,
     getSessionMessages,
     handleSdkPendingCommand,
     handleSdkPendingPermission,
@@ -49,6 +50,7 @@ import {
     isAgentDialogLoopPaused,
     isSdkSessionUiElicitationAvailable,
     killSdkShell,
+    loginSdkMcpOauth,
     listAvailableModels,
     listPendingSdkElicitations,
     listPendingSdkPermissions,
@@ -67,6 +69,7 @@ import {
     readSdkWorkspaceFile,
     reloadSdkAgents,
     requestSdkElicitation,
+    resetSdkSessionApprovals,
     resolvePendingSdkElicitation,
     selectSdkAgent,
     selectSdkSessionUi,
@@ -843,6 +846,34 @@ export class AlwaysAliveAgent extends EventEmitter {
      */
     async listPendingSdkPermissions() {
         return listPendingSdkPermissions(this.ctx);
+    }
+
+    /**
+     * Reseta aprovações acumuladas da sessão SDK atual.
+     *
+     * @returns {Promise<unknown>}
+     */
+    async resetSdkSessionApprovals() {
+        return resetSdkSessionApprovals(this.ctx);
+    }
+
+    /**
+     * Inicia o fluxo OAuth de um servidor MCP via RPC experimental do SDK.
+     *
+     * @param {string} serverName
+     * @returns {Promise<unknown>}
+     */
+    async loginSdkMcpOauth(serverName) {
+        return loginSdkMcpOauth(this.ctx, serverName);
+    }
+
+    /**
+     * Lê métricas de uso session-scoped expostas pela RPC experimental `usage.getMetrics()`.
+     *
+     * @returns {Promise<unknown>}
+     */
+    async getSdkUsageMetrics() {
+        return getSdkUsageMetrics(this.ctx);
     }
 
     /**
