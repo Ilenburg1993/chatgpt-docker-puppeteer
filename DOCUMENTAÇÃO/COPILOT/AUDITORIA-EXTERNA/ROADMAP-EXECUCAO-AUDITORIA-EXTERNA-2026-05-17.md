@@ -160,7 +160,7 @@ O roadmap só pode ser encerrado quando **todas** as condições abaixo estivere
 
 ## Rastreamento de status (fonte de verdade)
 
-- Matriz técnica detalhada: `VALIDACAO-FORENSE-AUDITORIA-EXTERNA-2026-05-17.mds`
+- Matriz técnica detalhada: `VALIDACAO-FORENSE-AUDITORIA-EXTERNA-2026-05-17.md`
 - Documento-base externo: `# Auditoria Técnica — Copilot SDK 0.3 - CLAUDE SONNET - externa.md`
 +
 ---

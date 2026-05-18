@@ -286,4 +286,84 @@ Ainda assim, a auditoria foi útil e séria. A linha correta agora é:
 
 O roadmap operacional desta validação está no arquivo complementar:
 
-- `DOCUMENTAÇÃO/COPILOT/AUDITORIA-EXTERNA/ROADMAP-TERMINAL-LLM-B-AUDIT_EXTERNA-2026-05-18.mds`
+- `DOCUMENTAÇÃO/COPILOT/AUDITORIA-EXTERNA/ROADMAP-TERMINAL-LLM-B-AUDIT_EXTERNA-2026-05-18.md`
+
+O aprofundamento temático desta rodada está no anexo:
+
+- `DOCUMENTAÇÃO/COPILOT/AUDITORIA-EXTERNA/SESSION-EVENTS-TERMINAL-HARDENING-2026-05-18.md`
+
+## 10. Addendum — validação focada em `session-events.d.ts` (linhas 946–1828)
+
+### 10.1. Veredito geral desta rodada adicional
+
+O recorte `946–1828` de `node_modules/@github/copilot-sdk/dist/generated/session-events.d.ts` confirma um ponto arquitetural importante:
+
+- o SDK 0.3.0 diferencia claramente eventos finais/persistíveis, eventos efêmeros de streaming/progresso e eventos de coordenação/UI;
+- a cadeia local já absorve boa parte disso corretamente;
+- mas o terminal ainda não tratava todos esses sinais com a mesma qualidade de UX e de rastreabilidade.
+
+Minha conclusão adicional é:
+
+1. a cadeia `session → event-handlers → agent → terminal` está conceitualmente correta;
+2. o principal gap remanescente não era mais de wiring bruto, e sim de **surface/UX canônica**;
+3. o problema dos “flashs” reportado pelo operador era real e coerente com o desenho atual do terminal em modo `compact`.
+
+### 10.2. Diagnóstico técnico do problema de UX reportado pelo operador
+
+O comportamento descrito pelo usuário — mensagens operacionais aparecerem por segundos e sumirem quando o terminal atualiza o próximo status — foi confirmado como consequência de duas escolhas atuais:
+
+1. `tool.execution_progress` em `compact` usava `writeInlineStatus(...)` como canal principal;
+2. heartbeats de tools longas em `compact` também usavam apenas linha inline, sem snapshot textual durável.
+
+Isso não era uma quebra de lógica do agent, mas um **bug de UX operacional**: a informação existia, porém o operador não conseguia reconstruir com clareza a narrativa do que a LLM-B fez ao longo do tempo.
+
+### 10.3. Achados adicionais desta rodada
+
+#### ACHADO-D — `system.notification` estava normalizado, mas subexposto no terminal
+
+Os eventos `system.notification` já eram convertidos em:
+
+- `agent.background.completed`
+- `agent.background.idle`
+- `agent.shell.completed`
+- `agent.shell.detached_completed`
+
+Porém o terminal não os promovia a UX explícita. Isso criava uma discrepância entre a cadeia canônica de eventos e a visibilidade operacional real.
+
+**Decisão:** tratar como gap de surface do terminal, não do SDK.
+
+#### ACHADO-E — há mais famílias ainda não promovidas à UX terminal explícita
+
+Continuam merecendo tratamento dedicado ou decisão formal:
+
+- `hook.start` / `hook.end`
+- `sampling.requested` / `sampling.completed`
+- `commands.changed`
+- `capabilities.changed`
+- `auto_mode_switch.requested` / `auto_mode_switch.completed`
+- `exit_plan_mode.requested`
+- `assistant.usage` como narrativa visível por evento/turno
+- attachments `blob` no caminho terminal
+
+### 10.4. Reclassificação operacional
+
+#### Subir para P1
+
+- durabilidade de UX para progresso e heartbeat de tools em `compact`
+- surface terminal para `system.notification` já normalizada em `agent.background.*` e `agent.shell.*`
+
+#### Permanecem P2/P3
+
+- `hook.*`, `sampling.*`, `commands.changed`, `capabilities.changed`, `auto_mode_switch.*`
+- narrativa explícita para `assistant.usage`
+- suporte terminal para attachments `blob`
+
+### 10.5. Palavra final desta rodada adicional
+
+O tema desta rodada não é “embelezar” o terminal.
+
+É consolidar a ideia de que:
+
+- informação operacional relevante não pode existir apenas como inline transient UI;
+- eventos efêmeros do SDK podem continuar efêmeros no wire, mas a superfície terminal precisa promover snapshots duráveis quando isso for importante para a operação humana;
+- o terminal da LLM-B é uma console operacional, então clareza narrativa e persistência visual fazem parte do contrato funcional.

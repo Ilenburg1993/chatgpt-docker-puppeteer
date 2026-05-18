@@ -716,7 +716,7 @@ async function renderSdkTools({ println }, model, runtimeId) {
         const hasInstructions = typeof t['instructions'] === 'string' && t['instructions'].trim().length > 0;
         const badges = [hasParameters ? 'schema' : null, hasInstructions ? 'instructions' : null]
             .filter(Boolean)
-                .join(' · ');
+            .join(' · ');
         println(
             `  \x1b[33m${name}\x1b[0m${badges ? `  \x1b[90m[${badges}]\x1b[0m` : ''}${desc ? `  \x1b[90m${desc}\x1b[0m` : ''}`,
         );

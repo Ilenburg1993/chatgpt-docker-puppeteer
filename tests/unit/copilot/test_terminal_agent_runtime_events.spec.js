@@ -213,8 +213,44 @@ describe('terminal/events/agent-runtime-events.js — contrato', () => {
 
         expect(println).toHaveBeenCalledWith(expect.stringContaining('ASK'));
         expect(println).toHaveBeenCalledWith(expect.stringContaining('PICK'));
+        expect(println).toHaveBeenCalledWith(expect.stringContaining('abrindo arquivo grande'));
         expect(writeInlineStatus).toHaveBeenCalledWith(expect.stringContaining('workspace.read_file'));
         expect(writeInlineStatus).toHaveBeenCalledWith(expect.stringContaining('abrindo arquivo grande'));
+    });
+
+    it('mantém heartbeat de tool longa visível no histórico mesmo em modo compact', async () => {
+        vi.useFakeTimers();
+        vi.setSystemTime(new Date('2026-05-18T10:00:00.000Z'));
+        getTerminalDetailLevel.mockReturnValue('compact');
+        const { setupTerminalAgentRuntimeEventListeners } =
+            await import('../../../src/copilot/terminal/events/agent-runtime-events.js');
+        /** @type {Map<string, Function[]>} */
+        const listeners = new Map();
+        const agent = {
+            on: vi.fn((event, handler) => {
+                const list = listeners.get(event) ?? [];
+                list.push(handler);
+                listeners.set(event, list);
+            }),
+            off: vi.fn(),
+        };
+
+        const cleanup = setupTerminalAgentRuntimeEventListeners({ agent: /** @type {any} */ (agent), rl: null });
+        listeners.get('tool.execution_start')?.[0]?.({
+            toolCallId: 'tool-long-compact',
+            toolName: 'exec_command',
+        });
+        println.mockClear();
+        writeInlineStatus.mockClear();
+
+        await vi.advanceTimersByTimeAsync(10_000);
+
+        expect(println).toHaveBeenCalledWith(expect.stringContaining('ainda executando · 10s · tool-long-compact'));
+        expect(writeInlineStatus).toHaveBeenCalledWith(
+            expect.stringContaining('ainda executando · 10s · tool-long-compact'),
+        );
+
+        cleanup();
     });
 
     it('deduplica tool.execution_start repetido com o mesmo toolCallId', async () => {
@@ -419,6 +455,55 @@ describe('terminal/events/agent-runtime-events.js — contrato', () => {
         expect(println).toHaveBeenCalledWith(expect.stringContaining('ainda executando · 10s · bash-long'));
 
         cleanup();
+    });
+
+    it('expõe notificações operacionais de background agent e shell no terminal', async () => {
+        const { setupTerminalAgentRuntimeEventListeners } =
+            await import('../../../src/copilot/terminal/events/agent-runtime-events.js');
+        /** @type {Map<string, Function[]>} */
+        const listeners = new Map();
+        const agent = {
+            on: vi.fn((event, handler) => {
+                const list = listeners.get(event) ?? [];
+                list.push(handler);
+                listeners.set(event, list);
+            }),
+            off: vi.fn(),
+        };
+
+        setupTerminalAgentRuntimeEventListeners({ agent: /** @type {any} */ (agent), rl: null });
+        listeners.get('agent.background.completed')?.[0]?.({
+            agentId: 'bg-1',
+            agentType: 'explore',
+            status: 'completed',
+            description: 'investigar sessão SDK',
+        });
+        listeners.get('agent.shell.completed')?.[0]?.({
+            shellId: 'shell-1',
+            exitCode: 0,
+            description: 'npm run lint:copilot',
+        });
+
+        expect(recordTerminalActivity).toHaveBeenCalledWith(
+            'task',
+            'Agente em background concluído',
+            expect.objectContaining({ detail: 'investigar sessão SDK · status=completed', source: 'agent' }),
+        );
+        expect(recordTerminalActivity).toHaveBeenCalledWith(
+            'task',
+            'Shell concluído',
+            expect.objectContaining({ detail: 'npm run lint:copilot · exit=0', source: 'agent' }),
+        );
+        expect(println).toHaveBeenCalledWith(expect.stringContaining('Background agent concluído: investigar sessão SDK'));
+        expect(println).toHaveBeenCalledWith(expect.stringContaining('Shell concluído: npm run lint:copilot · exit=0'));
+        expect(broadcastSse).toHaveBeenCalledWith(
+            'agent.background.completed',
+            expect.objectContaining({ agentId: 'bg-1', status: 'completed' }),
+        );
+        expect(broadcastSse).toHaveBeenCalledWith(
+            'agent.shell.completed',
+            expect.objectContaining({ shellId: 'shell-1', exitCode: 0 }),
+        );
     });
 
     it('reanuncia pergunta pendente viva ao registrar listeners do terminal', async () => {

@@ -2,7 +2,9 @@
 
 > Documento-base: `DOCUMENTAÇÃO/COPILOT/AUDITORIA-EXTERNA/Terminal LLM-B - Análise: Bugs, Gaps e Oportunidades de Upgrade - AUDIT_EXTERNA.md`
 >
-> Documento complementar de validação: `DOCUMENTAÇÃO/COPILOT/AUDITORIA-EXTERNA/VALIDACAO-TERMINAL-LLM-B-AUDIT_EXTERNA-2026-05-18.mds`
+> Documento complementar de validação: `DOCUMENTAÇÃO/COPILOT/AUDITORIA-EXTERNA/VALIDACAO-TERMINAL-LLM-B-AUDIT_EXTERNA-2026-05-18.md`
+>
+> Anexo temático desta rodada: `DOCUMENTAÇÃO/COPILOT/AUDITORIA-EXTERNA/SESSION-EVENTS-TERMINAL-HARDENING-2026-05-18.md`
 >
 > Data: `2026-05-18`
 >
@@ -397,8 +399,9 @@ Esta fase existe para garantir que nada fique “sumido”.
 
 ### Documentação criada nesta sessão
 
-- `VALIDACAO-TERMINAL-LLM-B-AUDIT_EXTERNA-2026-05-18.mds`
-- `ROADMAP-TERMINAL-LLM-B-AUDIT_EXTERNA-2026-05-18.mds`
+- `VALIDACAO-TERMINAL-LLM-B-AUDIT_EXTERNA-2026-05-18.md`
+- `ROADMAP-TERMINAL-LLM-B-AUDIT_EXTERNA-2026-05-18.md`
+- `SESSION-EVENTS-TERMINAL-HARDENING-2026-05-18.md`
 
 ---
 
@@ -445,3 +448,23 @@ Ele organiza a execução em ondas curtas e verificáveis, mas mantém a exigên
 - **todos os itens validados serão tratados**;
 - **nenhum será deixado sem decisão**;
 - **o foco imediato permanece em `src/copilot/terminal` e nas integrações que o sustentam**.
+
+### Addendum desta rodada — foco em `session-events.d.ts` (linhas 946–1828)
+
+Esta rodada acrescenta uma trilha específica para a cadeia:
+
+`session event vanilla → event-handlers → agent event normalizado → terminal explicit handler / passthrough / ignorado`.
+
+Os achados centrais foram:
+
+1. a cadeia session → agent → terminal já está conceitualmente boa;
+2. o principal gap remanescente era de **surface canônica e UX durável**, não de wiring bruto;
+3. o problema reportado pelo operador — mensagens operacionais que aparecem e somem — era real, sobretudo em `compact`, porque parte do progresso e do heartbeat existia apenas como inline status.
+
+Isso implica a seguinte extensão prática da próxima onda obrigatória:
+
+1. validar a leva de hardenings agora aplicada;
+2. revisar `assistant.*` efêmero vs final;
+3. revisar `system.notification` e sua promoção a `agent.background.*` / `agent.shell.*`;
+4. revisar `hook.*`, `sampling.*`, `commands.changed`, `capabilities.changed`, `auto_mode_switch.*`, `exit_plan_mode.requested`;
+5. garantir que nenhum evento relevante para operação contínua permaneça apenas como “flash” inline.

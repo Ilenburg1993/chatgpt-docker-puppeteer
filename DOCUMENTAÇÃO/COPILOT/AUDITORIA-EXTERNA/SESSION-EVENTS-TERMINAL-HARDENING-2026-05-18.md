@@ -1,0 +1,252 @@
+# Hardening focado em `session-events.d.ts` — Terminal, sessão e agent
+
+> Documento-foco: `node_modules/@github/copilot-sdk/dist/generated/session-events.d.ts`
+>
+> Recorte prioritário: linhas `946–1828`
+>
+> Referências complementares:
+>
+> - `DOCUMENTAÇÃO/COPILOT/AUDITORIA-EXTERNA/VALIDACAO-TERMINAL-LLM-B-AUDIT_EXTERNA-2026-05-18.md`
+> - `DOCUMENTAÇÃO/COPILOT/AUDITORIA-EXTERNA/ROADMAP-TERMINAL-LLM-B-AUDIT_EXTERNA-2026-05-18.md`
+> - `https://github.com/github/copilot-sdk/blob/main/nodejs/README.md`
+
+---
+
+## 1. Objetivo deste anexo
+
+Este anexo responde a uma pergunta mais específica do que a auditoria anterior respondeu:
+
+**a cadeia de eventos de sessão/agent está implementada de ponta a ponta, de forma canônica, com UX terminal clara e sem arquiteturas paralelas desnecessárias?**
+
+O foco está nas famílias do intervalo `946–1828`, incluindo:
+
+- `assistant.*`
+- `tool.execution_*`
+- `system.message`
+- `system.notification`
+- `permission.*`
+- `user_input.*`
+- `elicitation.*`
+- `sampling.*`
+- `mcp.oauth.*`
+- `external_tool.*`
+- `command.*`
+- `auto_mode_switch.*`
+- `commands.changed`
+- `capabilities.changed`
+- `exit_plan_mode.*`
+- `session.tools_updated`
+- `session.background_tasks_changed`
+- `session.skills_loaded`
+
+---
+
+## 2. Princípio canônico confirmado pelo SDK 0.3.0
+
+O README oficial do SDK e o arquivo tipado confirmam uma separação correta entre três classes de sinal:
+
+1. **eventos finais/persistíveis**
+   - ex.: `assistant.message`, `assistant.reasoning`, `tool.execution_complete`, `permission.completed`
+2. **eventos efêmeros de streaming/progresso**
+   - ex.: `assistant.message_delta`, `assistant.reasoning_delta`, `tool.execution_progress`
+3. **eventos de coordenação/UI/runtime**
+   - ex.: `capabilities.changed`, `commands.changed`, `system.notification`, `exit_plan_mode.requested`
+
+O problema não está nessa modelagem. O problema aparece quando a superfície terminal trata sinais semanticamente importantes **apenas como transientes**, sem promoção para narrativa durável.
+
+---
+
+## 3. Cadeia ponta-a-ponta observada no projeto
+
+### 3.1. Fluxo dominante atual
+
+O fluxo dominante identificado no repositório é:
+
+`SDK session event vanilla`  
+→ `src/copilot/event-handlers/**`  
+→ `agent event normalizado`  
+→ `src/copilot/terminal/events/**`  
+→ `stdout local + SSE + activity-state + transcript/turn-trace`
+
+Esse desenho é correto e preferível a consumir diretamente o SDK em múltiplas camadas de UI.
+
+### 3.2. Onde o fluxo já está canônico
+
+Está razoavelmente canônico para:
+
+- `assistant.message`
+- `assistant.turn_start` / `assistant.turn_end`
+- `assistant.intent`
+- `tool.execution_start`
+- `tool.execution_complete`
+- `permission.requested` / `permission.completed`
+- `user_input.requested` / `user_input.completed`
+- `elicitation.requested` / `elicitation.completed`
+- `mcp.oauth_required` / `mcp.oauth_completed`
+- `external_tool.requested` / `external_tool.completed`
+
+### 3.3. Onde o fluxo ainda estava parcial
+
+Estava parcial, latente ou subexposto para:
+
+- `tool.execution_progress`
+- heartbeat visual de tool longa
+- `system.notification` → `agent.background.*` / `agent.shell.*`
+- `assistant.usage`
+- `hook.start` / `hook.end`
+- `sampling.requested` / `sampling.completed`
+- `commands.changed`
+- `capabilities.changed`
+- `auto_mode_switch.*`
+- `exit_plan_mode.requested`
+- attachments `blob` no terminal
+
+---
+
+## 4. Matriz de cobertura do recorte 946–1828
+
+| Família | Estado atual | Veredito | Observação |
+| --- | --- | --- | --- |
+| `assistant.message` | coberto | bom | render final e transcript fora do turno ativo |
+| `assistant.message_delta` | parcial | aceitável, mas exige vigilância | bom no wire; UX depende do render/live loop e do final event |
+| `assistant.reasoning` / `assistant.reasoning_delta` | parcial | aceitável | thinking/history existe, mas ainda é uma UX especializada |
+| `assistant.usage` | parcial | gap de surface | coleta/estado existem; narrativa terminal ainda é fraca |
+| `tool.execution_start` | coberto | bom | narrativa e SSE canônicos |
+| `tool.execution_progress` | antes parcial, agora endurecido | melhorar continuamente | `compact` precisava snapshot durável |
+| `tool.execution_partial_result` | coberto | bom | já tratado com narrativa e SSE |
+| `tool.execution_complete` | coberto | bom | narrativa, turn-trace e SSE |
+| `system.notification` | antes parcial, agora endurecido em parte | ainda incompleto | background/shell agora mais visíveis; restante continua a revisar |
+| `permission.*` | coberto | bom | cadeia relativamente madura |
+| `user_input.*` | coberto | bom | integração com mailbox e protocolo local |
+| `elicitation.*` | coberto | bom | UX local existe |
+| `sampling.*` | ausente no terminal | gap real | precisa decisão de UX/surface |
+| `mcp.oauth.*` | coberto em boa parte | bom com ressalvas | fluxo RPC já iniciado; UX ainda pode melhorar |
+| `external_tool.*` | coberto | bom | fluxo canônico dedicado |
+| `command.*` | parcial | gap de surface | observabilidade existe mais do que UX terminal |
+| `auto_mode_switch.*` | ausente no terminal | gap real | precisa surface explícita |
+| `commands.changed` | ausente no terminal | gap real | falta narrativa/estado terminal |
+| `capabilities.changed` | ausente no terminal | gap real | falta espelhamento de capacidade na superfície local |
+| `exit_plan_mode.requested` | ausente no terminal | gap real | `completed` existe; `requested` ainda não |
+| `session.tools_updated` | parcial | aceitável | há narrativa resumida, mas não surface rica |
+| `session.background_tasks_changed` | parcial | aceitável | visível, porém ainda minimalista |
+| `session.skills_loaded` | parcial | aceitável | visível, porém ainda minimalista |
+
+---
+
+## 5. Diagnóstico do problema de “flash” no terminal
+
+### 5.1. Causa imediata confirmada
+
+O problema relatado pelo operador foi confirmado principalmente no modo `compact`:
+
+- `tool.execution_progress` usava `writeInlineStatus(...)` como canal principal;
+- heartbeat de tool longa também era reescrito em linha inline;
+- o próximo update sobrescrevia a linha anterior;
+- o operador perdia a narrativa do que a LLM-B fez em sequência.
+
+### 5.2. Por que isso é grave
+
+Isso é grave porque, na prática, transforma uma LLM operacional em uma UI de status volátil.
+
+Em operação contínua, o terminal precisa responder a perguntas como:
+
+- o que ela começou a fazer?
+- o que mudou no meio do caminho?
+- quando ficou parada numa tool longa?
+- quando uma shell assíncrona concluiu?
+
+Se a resposta depender de lembrar um “flash” que sumiu, a UX está funcionalmente incompleta.
+
+---
+
+## 6. Situação atual x situação ideal
+
+### Situação atual
+
+- os eventos chegam ao sistema de forma razoavelmente organizada;
+- a distinção entre eventos efêmeros e finais existe;
+- o terminal cobre boa parte das famílias importantes;
+- mas ainda havia assimetria entre **evento emitido** e **evento operacionalmente visível**.
+
+### Situação ideal
+
+1. **cada família de evento tem um owner terminal claro**;
+2. **eventos efêmeros continuam efêmeros no wire, mas snapshots operacionais relevantes são promovidos a histórico visível**;
+3. **não há caminhos paralelos competindo para narrar o mesmo fato**;
+4. **nenhum evento relevante para operação contínua depende apenas de inline status**;
+5. **o terminal deixa claro o que é turn do assistente, o que é progresso de tool, o que é background agent, o que é shell, o que é prompt/permission/UI**.
+
+---
+
+## 7. Roadmap complementar por fases e subfases
+
+## Fase A — Consolidar narrativa operacional visível
+
+### Subfase A.1 — remover flashes como portador único de informação
+
+- promover snapshots duráveis de `tool.execution_progress` em `compact`
+- promover snapshots duráveis de heartbeat de tool longa em `compact`
+- revisar outros usos de `writeInlineStatus(...)` para garantir que sejam auxiliares, não exclusivos
+
+### Subfase A.2 — fechar a família `system.notification`
+
+- manter normalização em `event-handlers/system-notifications.js`
+- expor no terminal:
+  - `agent.background.completed`
+  - `agent.background.idle`
+  - `agent.shell.completed`
+  - `agent.shell.detached_completed`
+- decidir se todos terão histórico durável ou se parte ficará só em activity/SSE
+
+## Fase B — Cobertura explícita das famílias ainda ausentes
+
+### Subfase B.1 — coordenação e capacidades
+
+- `commands.changed`
+- `capabilities.changed`
+- `auto_mode_switch.requested`
+- `auto_mode_switch.completed`
+- `exit_plan_mode.requested`
+
+### Subfase B.2 — eventos de integração/hook
+
+- `hook.start`
+- `hook.end`
+- `sampling.requested`
+- `sampling.completed`
+
+## Fase C — Surface terminal de recursos novos do SDK
+
+### Subfase C.1 — uso e billing por evento
+
+- superfície mais clara para `assistant.usage`
+- correlação com `/sdk quota`, PR e diagnósticos locais
+
+### Subfase C.2 — attachments e capacidades de UI
+
+- suporte terminal a `blob` attachments
+- uso explícito de `session.capabilities.ui` para ajustar UX local
+
+---
+
+## 8. O que foi executado nesta rodada
+
+Nesta rodada adicional, foram iniciados hardenings concretos alinhados a este anexo:
+
+1. snapshots duráveis de progresso de tool em `compact`;
+2. heartbeat de tool longa tornando-se visível também no histórico textual do terminal;
+3. promoção terminal de `agent.background.completed`, `agent.background.idle`, `agent.shell.completed` e `agent.shell.detached_completed`.
+
+Isso não encerra a trilha, mas corrige imediatamente o tipo de UX que o operador relatou como problemática.
+
+---
+
+## 9. Palavra final
+
+O recorte `946–1828` não revelou uma arquitetura quebrada. Revelou algo mais sutil:
+
+**o sistema estava mais maduro no transporte e normalização dos eventos do que na promoção deles para uma UX terminal verdadeiramente operacional.**
+
+Esse é exatamente o tipo de detalhe que, para a LLM-B, não é detalhe.
+
+É contrato de operação contínua.

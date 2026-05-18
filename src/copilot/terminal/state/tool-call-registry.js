@@ -40,6 +40,8 @@ const RECENTLY_COMPLETED_TTL_MS = 2 * 60_000;
  *     lastHeartbeatAt: number;
  *     lastProgress: number | null;
  *     lastProgressMessage: string | null;
+ *     lastDurableProgressAt: number;
+ *     lastDurableProgressMessage: string | null;
  *     rawArgs: Record<string, unknown>;
  *     presentation: import('../events/tool-activity-presenter.js').TerminalToolActivityPresentation | null;
  *     completedAt: number | null;
@@ -70,6 +72,8 @@ const RECENTLY_COMPLETED_TTL_MS = 2 * 60_000;
  *             presentation?: import('../events/tool-activity-presenter.js').TerminalToolActivityPresentation | null;
  *             progress?: number | null;
  *             progressMessage?: string | null;
+ *             lastDurableProgressAt?: number;
+ *             lastDurableProgressMessage?: string | null;
  *             lastHeartbeatAt?: number;
  *             lastSignalAt?: number;
  *         },
@@ -172,6 +176,8 @@ export function createToolCallRegistry() {
             lastHeartbeatAt: 0,
             lastProgress: null,
             lastProgressMessage: null,
+            lastDurableProgressAt: 0,
+            lastDurableProgressMessage: null,
             rawArgs: opts.rawArgs ?? {},
             presentation: opts.presentation ?? null,
             completedAt: null,
@@ -200,6 +206,8 @@ export function createToolCallRegistry() {
      *     presentation?: import('../events/tool-activity-presenter.js').TerminalToolActivityPresentation | null;
      *     progress?: number | null;
      *     progressMessage?: string | null;
+    *     lastDurableProgressAt?: number;
+    *     lastDurableProgressMessage?: string | null;
      *     lastHeartbeatAt?: number;
      *     lastSignalAt?: number;
      * }} patch
@@ -212,6 +220,12 @@ export function createToolCallRegistry() {
         if ('presentation' in patch) entry.presentation = patch.presentation ?? null;
         if ('progress' in patch) entry.lastProgress = patch.progress ?? null;
         if ('progressMessage' in patch) entry.lastProgressMessage = patch.progressMessage ?? null;
+        if ('lastDurableProgressAt' in patch && typeof patch.lastDurableProgressAt === 'number') {
+            entry.lastDurableProgressAt = patch.lastDurableProgressAt;
+        }
+        if ('lastDurableProgressMessage' in patch) {
+            entry.lastDurableProgressMessage = patch.lastDurableProgressMessage ?? null;
+        }
         if ('lastHeartbeatAt' in patch && typeof patch.lastHeartbeatAt === 'number') {
             entry.lastHeartbeatAt = patch.lastHeartbeatAt;
         }

@@ -11,6 +11,8 @@
  */
 
 import {
+    EMITTER_AGENT_BACKGROUND_COMPLETED,
+    EMITTER_AGENT_BACKGROUND_IDLE,
     EMITTER_ASSISTANT_INTENT,
     EMITTER_QUESTION_PENDING,
     EMITTER_SESSION_COMPACTION_COMPLETE,
@@ -46,6 +48,9 @@ import {
     handleTerminalNativeToolStart,
 } from './tool-lifecycle-runtime.js';
 import { renderTerminalIntent } from './intent-renderer.js';
+
+const AGENT_SHELL_COMPLETED_EVENT = 'agent.shell.completed';
+const AGENT_SHELL_DETACHED_COMPLETED_EVENT = 'agent.shell.detached_completed';
 /**
  * @typedef {{
  *     on: (event: string, handler: (...args: any[]) => void) => void;
@@ -94,8 +99,10 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, regi
             if (getShowToolActivity()) {
                 const line =
                     `  ${terminalThemeText('muted', '↳')} ${terminalThemeText('tool', compactDetail ? compactTerminalToolText(renderedName, 32) : renderedName)} ${terminalThemeText('muted', `ainda executando · ${elapsed}s · ${toolCallId || 'sem id'}`)}`.trimEnd();
-                if (compactDetail) writeInlineStatus(line);
-                else println(line);
+                if (compactDetail) {
+                    println(line);
+                    writeInlineStatus(line);
+                } else println(line);
             }
         }
         }, TOOL_HEARTBEAT_INTERVAL_MS,
@@ -286,6 +293,73 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, regi
         println(`  \x1b[31m🤖 Sub-agente falhou: ${name} — ${error}\x1b[0m`);
     };
 
+    const onBackgroundCompleted = (/** @type {Record<string, unknown>} */ evt) => {
+        const description = /** @type {string} */ (evt?.['description'] ?? evt?.['agentType'] ?? evt?.['agentId'] ?? 'agent');
+        const status = /** @type {'completed' | 'failed'} */ (evt?.['status'] ?? 'completed');
+        const failed = status === 'failed';
+        recordTerminalActivity('task', failed ? 'Agente em background falhou' : 'Agente em background concluído', {
+            detail: `${description} · status=${status}`,
+            severity: failed ? 'error' : 'info',
+            source: 'agent',
+        });
+        println(
+            failed
+                ? `  \x1b[31m🤖 Background agent falhou: ${description}\x1b[0m`
+                : `  \x1b[32m🤖 Background agent concluído: ${description}\x1b[0m`,
+        );
+        broadcastSse('agent.background.completed', {
+            ...evt,
+            timestamp: Date.now(),
+        });
+    };
+
+    const onBackgroundIdle = (/** @type {Record<string, unknown>} */ evt) => {
+        const description = /** @type {string} */ (evt?.['description'] ?? evt?.['agentType'] ?? evt?.['agentId'] ?? 'agent');
+        recordTerminalActivity('task', 'Agente em background ocioso', {
+            detail: description,
+            source: 'agent',
+            recordHistory: false,
+        });
+        println(`  \x1b[90m🤖 Background agent ocioso: ${description}\x1b[0m`);
+        broadcastSse('agent.background.idle', {
+            ...evt,
+            timestamp: Date.now(),
+        });
+    };
+
+    const onShellCompleted = (/** @type {Record<string, unknown>} */ evt) => {
+        const description = /** @type {string} */ (evt?.['description'] ?? evt?.['shellId'] ?? 'shell');
+        const exitCode = typeof evt?.['exitCode'] === 'number' ? evt['exitCode'] : null;
+        const failed = exitCode !== null && exitCode !== 0;
+        recordTerminalActivity('task', failed ? 'Shell concluído com erro' : 'Shell concluído', {
+            detail: `${description}${exitCode !== null ? ` · exit=${exitCode}` : ''}`,
+            severity: failed ? 'error' : 'info',
+            source: 'agent',
+        });
+        println(
+            failed
+                ? `  \x1b[31m💻 Shell concluído com erro: ${description}${exitCode !== null ? ` · exit=${exitCode}` : ''}\x1b[0m`
+                : `  \x1b[32m💻 Shell concluído: ${description}${exitCode !== null ? ` · exit=${exitCode}` : ''}\x1b[0m`,
+        );
+        broadcastSse('agent.shell.completed', {
+            ...evt,
+            timestamp: Date.now(),
+        });
+    };
+
+    const onShellDetachedCompleted = (/** @type {Record<string, unknown>} */ evt) => {
+        const description = /** @type {string} */ (evt?.['description'] ?? evt?.['shellId'] ?? 'shell');
+        recordTerminalActivity('task', 'Shell destacada concluída', {
+            detail: description,
+            source: 'agent',
+        });
+        println(`  \x1b[32m💻 Shell destacada concluída: ${description}\x1b[0m`);
+        broadcastSse('agent.shell.detached_completed', {
+            ...evt,
+            timestamp: Date.now(),
+        });
+    };
+
     agent.on(EMITTER_QUESTION_PENDING, onQuestion);
     agent.on(EMITTER_STOPPED, onStopped);
     agent.on(EMITTER_TOOL_EXECUTION_START, onToolStart);
@@ -299,6 +373,10 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, regi
     agent.on(EMITTER_SUBAGENT_STARTED, onSubagentStarted);
     agent.on(EMITTER_SUBAGENT_COMPLETED, onSubagentCompleted);
     agent.on(EMITTER_SUBAGENT_FAILED, onSubagentFailed);
+    agent.on(EMITTER_AGENT_BACKGROUND_COMPLETED, onBackgroundCompleted);
+    agent.on(EMITTER_AGENT_BACKGROUND_IDLE, onBackgroundIdle);
+    agent.on(AGENT_SHELL_COMPLETED_EVENT, onShellCompleted);
+    agent.on(AGENT_SHELL_DETACHED_COMPLETED_EVENT, onShellDetachedCompleted);
 
     const runtimeState = readTerminalRuntimeState();
     if (runtimeState.pendingQuestion && runtimeState.pendingQuestionKind !== 'ready') {
@@ -324,5 +402,9 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, regi
         agent.off(EMITTER_SUBAGENT_STARTED, onSubagentStarted);
         agent.off(EMITTER_SUBAGENT_COMPLETED, onSubagentCompleted);
         agent.off(EMITTER_SUBAGENT_FAILED, onSubagentFailed);
+        agent.off(EMITTER_AGENT_BACKGROUND_COMPLETED, onBackgroundCompleted);
+        agent.off(EMITTER_AGENT_BACKGROUND_IDLE, onBackgroundIdle);
+        agent.off(AGENT_SHELL_COMPLETED_EVENT, onShellCompleted);
+        agent.off(AGENT_SHELL_DETACHED_COMPLETED_EVENT, onShellDetachedCompleted);
     };
 }

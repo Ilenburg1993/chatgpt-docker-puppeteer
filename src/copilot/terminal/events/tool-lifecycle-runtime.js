@@ -43,6 +43,9 @@ import {
     buildToolLifecycleUserRequested,
 } from './tool-lifecycle-event.js';
 
+const DURABLE_TOOL_PROGRESS_INTERVAL_MS = 4_000;
+const DURABLE_TOOL_PROGRESS_PERCENT_STEP = 25;
+
 /**
  * @param {string} toolName
  * @returns {boolean}
@@ -224,19 +227,48 @@ function printToolStart(presentation) {
 }
 
 /**
+ * @param {import('../state/tool-call-registry.js').ToolCallEntry | null} entry
+ * @param {number | null} progress
+ * @param {string | null} progressMessage
+ * @returns {boolean}
+ */
+function shouldPersistToolProgressMilestone(entry, progress, progressMessage) {
+    if (getTerminalDetailLevel() !== 'compact') return false;
+    if (progress === null && !progressMessage) return false;
+    const now = Date.now();
+    const lastDurableAt = entry?.lastDurableProgressAt ?? 0;
+    const intervalElapsed = lastDurableAt <= 0 || now - lastDurableAt >= DURABLE_TOOL_PROGRESS_INTERVAL_MS;
+    const messageChanged = Boolean(progressMessage) && progressMessage !== entry?.lastDurableProgressMessage;
+    const progressJumpedEnough =
+        progress !== null &&
+        (entry?.lastProgress == null || Math.abs(progress - entry.lastProgress) >= DURABLE_TOOL_PROGRESS_PERCENT_STEP);
+    if (progress === 100) return true;
+    if (!entry) return true;
+    if (progressMessage && entry.lastDurableProgressAt <= 0) return true;
+    if (messageChanged && intervalElapsed) return true;
+    if (progressJumpedEnough && intervalElapsed) return true;
+    return false;
+}
+
+/**
  * @param {import('./tool-activity-presenter.js').TerminalToolActivityPresentation} presentation
  * @param {number | null} progress
  * @param {string | null} progressMessage
+ * @param {{ persistInHistory?: boolean }} [options]
  * @returns {void}
  */
-function printToolProgress(presentation, progress, progressMessage) {
+function printToolProgress(presentation, progress, progressMessage, options = {}) {
     if (!getShowToolActivity()) return;
     const compactDetail = getTerminalDetailLevel() === 'compact';
     const suffix = progressMessage ?? (progress !== null ? `${progress}%` : '');
     const progressLine =
         `  ${terminalThemeText('muted', '↳')} ${terminalThemeText('tool', compactDetail ? compactTerminalToolText(presentation.progressLinePrefix, 56) : presentation.progressLinePrefix)} ${terminalThemeText('muted', suffix)}`.trimEnd();
-    if (compactDetail) writeInlineStatus(progressLine);
-    else println(progressLine);
+    if (compactDetail) {
+        if (options.persistInHistory) println(progressLine);
+        writeInlineStatus(progressLine);
+        return;
+    }
+    println(progressLine);
 }
 
 /**
@@ -357,24 +389,32 @@ export function handleTerminalNativeToolProgress({ registry, evt }) {
         ((progress !== null &&
             (entry?.lastProgress == null || Math.abs(progress - entry.lastProgress) >= 5 || progress === 100)) ||
             (progressMessage !== null && progressMessage !== entry?.lastProgressMessage));
+    const persistMilestone = shouldPrint && shouldPersistToolProgressMilestone(entry, progress, progressMessage);
+    const now = persistMilestone ? Date.now() : 0;
     if (toolCallId) {
         registry.touch(toolCallId, {
             presentation,
             progress,
             progressMessage,
+            ...(persistMilestone
+                ? {
+                      lastDurableProgressAt: now,
+                      lastDurableProgressMessage: progressMessage ?? entry?.lastDurableProgressMessage ?? null,
+                  }
+                : {}),
         });
     }
     const effectiveDetail =
         progressMessage ?? (progress !== null ? `${presentation.detail} · ${progress}%` : presentation.detail);
-    recordTerminalActivity('tool', 'Executando tool', {
+    recordTerminalActivity('tool', persistMilestone ? 'Progresso de tool' : 'Executando tool', {
         detail: effectiveDetail,
         toolName: name,
         progress,
         source: 'sdk',
-        recordHistory: false,
+        recordHistory: persistMilestone,
     });
     if (shouldPrint) {
-        printToolProgress(presentation, progress, progressMessage);
+        printToolProgress(presentation, progress, progressMessage, { persistInHistory: persistMilestone });
     }
     broadcastSse(
         'tool.lifecycle',

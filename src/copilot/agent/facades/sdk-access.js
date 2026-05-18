@@ -106,12 +106,12 @@ export {
     handleSdkPendingToolCall,
     inputSdkSessionUi,
     isSdkSessionUiElicitationAvailable,
-    loginSdkMcpOauth,
     listPendingSdkElicitations,
     listPendingSdkPermissions,
+    loginSdkMcpOauth,
     requestSdkElicitation,
-    resolvePendingSdkElicitation,
     resetSdkSessionApprovals,
+    resolvePendingSdkElicitation,
     selectSdkSessionUi,
 } from './sdk/index.js';
 
