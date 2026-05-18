@@ -40,6 +40,8 @@ export {
     pingAgentSdkClient,
     pingSdk,
     raceAgentSdkEvents,
+    readSdkSkillsGovernance,
+    setSdkDisabledSkills,
     stopAgentSdkClient,
 } from './sdk/index.js';
 

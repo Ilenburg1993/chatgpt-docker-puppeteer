@@ -616,6 +616,26 @@ export class AlwaysAliveAgent extends EventEmitter {
     }
 
     /**
+     * Lê projeção canônica de governança de skills do runtime SDK/CLI atual.
+     *
+     * @param {{ projectPaths?: string[]; skillDirectories?: string[] }} [options]
+     * @returns {Promise<unknown>}
+     */
+    async readSdkSkillsGovernance(options) {
+        return this.#sdkQueryFacade.readSdkSkillsGovernance(options);
+    }
+
+    /**
+     * Atualiza a lista server-scoped de `disabledSkills` do runtime SDK/CLI atual.
+     *
+     * @param {string[]} disabledSkills
+     * @returns {Promise<unknown>}
+     */
+    async setSdkDisabledSkills(disabledSkills) {
+        return this.#sdkQueryFacade.setSdkDisabledSkills(disabledSkills);
+    }
+
+    /**
      * Retorna snapshot de quota via RPC server-scoped do SDK.
      *
      * @returns {Promise<unknown>}

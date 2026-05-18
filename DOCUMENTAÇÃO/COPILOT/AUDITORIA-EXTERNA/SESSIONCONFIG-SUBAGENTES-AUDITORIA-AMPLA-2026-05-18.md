@@ -29,7 +29,12 @@ Esta auditoria verifica três superfícies intimamente relacionadas do SDK insta
 
 1. `SessionConfig`
 2. `ResumeSessionConfig`
-3. `CustomAgentConfig` / subagentes
+3. `CustomAgentConfig` e sua manifestação runtime via `subagent.*`
+
+Nota semântica importante desta auditoria:
+
+- `custom agent` = definição declarativa anexada à sessão em `SessionConfig.customAgents`;
+- `sub-agent` = manifestação runtime de um custom agent quando o SDK o seleciona/invoca e emite eventos `subagent.*`.
 
 O critério aqui não é “há algo vagamente parecido no runtime”.
 
@@ -325,12 +330,13 @@ Na camada de contrato/configuração/factory:
 - `skills` está **full**
 - `mcpServers` por agente está **full**
 - governança mínima de skills por subagente está **entregue**
+- a superfície terminal agora expõe projeção rica e mutação básica via `/sdk skills config`, `/sdk skills agents`, `/sdk skills disable ...` e `/sdk skills enable ...`
 
 O backlog residual aqui já não é de contrato, e sim de produto/UX mais rica:
 
-- projeções mais visíveis de skills por subagente
+- projeções ainda mais visíveis/correlacionadas de skills por subagente em streaming
 - diffs de config mais ricos em eventos
-- mutações/config administrativas adicionais
+- mutações/config administrativas adicionais (ex.: alinhamento entre estado server-scoped e persistência declarativa do processo)
 
 ---
 

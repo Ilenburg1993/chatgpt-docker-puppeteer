@@ -685,6 +685,12 @@
  * @property {(() => Promise<import('#copilot/sdk/types').GetAuthStatusResponse>) | undefined} getSdkAuthStatus -
  *   Retorna status de autenticação do SDK/CLI atual
  * @property {(() => Promise<unknown>) | undefined} listSdkModels - Lista modelos pelo RPC server-scoped do SDK
+ * @property {((options?: { projectPaths?: string[]; skillDirectories?: string[] }) => Promise<unknown>) | undefined} listSdkSkills
+ *   - Descobre skills pelo RPC server-scoped do SDK
+ * @property {((options?: { projectPaths?: string[]; skillDirectories?: string[] }) => Promise<unknown>) | undefined} readSdkSkillsGovernance
+ *   - Retorna projeção de governança de skills, separando descoberta runtime, config de sessão/boot e custom agents
+ * @property {((disabledSkills: string[]) => Promise<unknown>) | undefined} setSdkDisabledSkills
+ *   - Atualiza a lista server-scoped de `disabledSkills` do runtime SDK atual
  * @property {((options?: { model?: string }) => Promise<unknown>) | undefined} listSdkBuiltInTools - Lista tools
  *   builtin/MCP pelo RPC server-scoped do SDK
  * @property {(() => Promise<unknown>) | undefined} getSdkQuota - Retorna snapshot de quota pelo RPC server-scoped do

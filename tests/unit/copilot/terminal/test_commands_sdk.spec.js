@@ -33,6 +33,54 @@ const runtimeMocks = vi.hoisted(() => {
                 },
             ],
         })),
+        readTerminalSdkSkillsGovernance: vi.fn(async () => ({
+            discovery: {
+                skills: [
+                    {
+                        name: 'skill-pdf',
+                        description: 'Resume e extrai conteúdo de PDFs grandes.',
+                        source: 'project',
+                        enabled: true,
+                        userInvocable: true,
+                        path: '/repo/.github/skills/pdf/SKILL.md',
+                        projectPath: '/repo',
+                    },
+                    {
+                        name: 'security-scan',
+                        description: 'Varredura de segurança.',
+                        source: 'project',
+                        enabled: false,
+                        userInvocable: false,
+                        path: '/repo/.github/skills/security/SKILL.md',
+                        projectPath: '/repo',
+                    },
+                ],
+            },
+            bootSkills: {
+                skillDirectories: ['/repo/.github/skills'],
+                disabledSkills: ['security-scan'],
+            },
+            customAgents: [
+                {
+                    name: 'security-auditor',
+                    displayName: 'Security Auditor',
+                    infer: true,
+                    tools: ['grep', 'view'],
+                    preloadSkills: ['security-scan', 'skill-pdf'],
+                    preloadEnabledSkills: ['skill-pdf'],
+                    preloadDisabledSkills: ['security-scan'],
+                },
+            ],
+            semantics: {
+                customAgentDefinition:
+                    'Custom agents são definições declarativas anexadas em SessionConfig.customAgents (prompt, tools, MCP, skills).',
+                subagentRuntime:
+                    'Sub-agent é a manifestação runtime de um custom agent quando o SDK o seleciona/invoca e emite eventos subagent.*.',
+                disabledSkillsMutationScope:
+                    'Mutação de disabledSkills via SDK é server-scoped no runtime/CLI atual; não reescreve automaticamente COPILOT_DISABLED_SKILLS do processo.',
+            },
+        })),
+        setTerminalSdkDisabledSkills: vi.fn(async (disabledSkills) => ({ success: true, disabledSkills })),
         listTerminalSdkPendingPermissions: vi.fn(async () => ({
             available: true,
             source: 'permissions.listPendingPermissionRequests',
@@ -305,6 +353,43 @@ describe('terminal/commands/sdk', () => {
         expect(ctx.output()).toContain('slash');
         expect(ctx.output()).toContain('filtros: project=/repo');
         expect(ctx.output()).toContain('dir=/extra-skills');
+        expect(ctx.output()).toContain('custom agent = definicao declarativa');
+    });
+
+    it('/sdk skills config separa config de sessão, runtime disabled e semântica custom agent/subagent', async () => {
+        const ctx = mockCtx();
+        await cmdSdk({ println: ctx.println }, 'skills config');
+
+        expect(runtimeMocks.readTerminalSdkSkillsGovernance).toHaveBeenCalled();
+        expect(ctx.output()).toContain('Skills SDK Config');
+        expect(ctx.output()).toContain('skillDirectories=1');
+        expect(ctx.output()).toContain('security-scan');
+        expect(ctx.output()).toContain('SessionConfig.customAgents');
+        expect(ctx.output()).toContain('subagent.*');
+    });
+
+    it('/sdk skills agents projeta preload por custom agent sem confundir com subagent runtime', async () => {
+        const ctx = mockCtx();
+        await cmdSdk({ println: ctx.println }, 'skills agents');
+
+        expect(ctx.output()).toContain('Custom Agents x Skills');
+        expect(ctx.output()).toContain('security-auditor');
+        expect(ctx.output()).toContain('preload=security-scan, skill-pdf');
+        expect(ctx.output()).toContain('disabled=security-scan');
+        expect(ctx.output()).toContain('subagent.*');
+    });
+
+    it('/sdk skills disable e enable atualizam disabledSkills via SDK server-scoped', async () => {
+        const disableCtx = mockCtx();
+        await cmdSdk({ println: disableCtx.println }, 'skills disable docs-helper');
+        expect(runtimeMocks.setTerminalSdkDisabledSkills).toHaveBeenCalledWith(['docs-helper', 'security-scan']);
+        expect(disableCtx.output()).toContain('disabledSkills runtime atualizadas');
+        expect(disableCtx.output()).toContain('server RPC');
+
+        const enableCtx = mockCtx();
+        await cmdSdk({ println: enableCtx.println }, 'skills enable security-scan');
+        expect(runtimeMocks.setTerminalSdkDisabledSkills).toHaveBeenCalledWith([]);
+        expect(enableCtx.output()).toContain('disabledSkills runtime atualizadas');
     });
 
     it('/sdk headers configura, exibe e limpa headers one-shot do próximo turno', async () => {

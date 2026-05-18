@@ -18,6 +18,8 @@ import {
     listSdkSessions,
     listSdkSkills,
     pingSdk,
+    readSdkSkillsGovernance,
+    setSdkDisabledSkills,
     setForegroundSdkSessionId,
     setSdkSessionMode,
 } from '../runtime/root-surface/index.js';
@@ -99,6 +101,26 @@ export class SdkQueryFacade {
      */
     async listSdkSkills(options) {
         return listSdkSkills(this.ctx, options);
+    }
+
+    /**
+     * Lê projeção canônica de governança de skills do runtime SDK/CLI atual.
+     *
+     * @param {{ projectPaths?: string[]; skillDirectories?: string[] }} [options]
+     * @returns {Promise<unknown>}
+     */
+    async readSdkSkillsGovernance(options) {
+        return readSdkSkillsGovernance(this.ctx, options);
+    }
+
+    /**
+     * Atualiza a lista server-scoped de `disabledSkills` do runtime SDK/CLI atual.
+     *
+     * @param {string[]} disabledSkills
+     * @returns {Promise<unknown>}
+     */
+    async setSdkDisabledSkills(disabledSkills) {
+        return setSdkDisabledSkills(this.ctx, disabledSkills);
     }
 
     /**

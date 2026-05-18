@@ -118,7 +118,7 @@ A situação ideal ao final deste roadmap é:
 
 - **GAP-009** — adotar `convertMcpCallToolResult()` onde fizer sentido
 - **GAP-012** — avaliar `session.rpc.instructions.getSources()` como fonte prioritária
-- **GAP-013** — governança/mutação e projeção rica de skills por subagente (contrato/config já endurecidos nesta rodada)
+- **GAP-013** — governança/mutação e projeção rica de skills por subagente/custom agent (contrato/config já endurecidos; superfície terminal avançou nesta rodada)
 
 #### Latentes / mitigados, mas merecem hardening
 
@@ -507,13 +507,13 @@ A situação ideal ao final deste roadmap é:
 
 - **Faixa 0**: consolidada; este arquivo passa a ser o plano único limpo e sem duplicações narrativas.
 - **Faixa 1**: além do hardening de progresso/heartbeat, a superfície terminal agora cobre explicitamente `assistant.usage` (via `pr.consumed`), `hook.*`, `sampling.*`, `commands.changed`, `capabilities.changed`, `auto_mode_switch.*` e `exit_plan_mode.requested`.
-- **Faixa 2**: reset approvals, quota metrics e OAuth MCP já entregues; `skills` já têm surface mínima por `/sdk skills`, `instructions` já aparecem em `/sdk prompt`, blobs já têm surface mínima por `/attach blob`, `requestHeaders` por turno foram entregues via `/sdk headers` + dispatch SDK direto com reanexo controlado, e a paridade estrutural de `CopilotClient` + `SessionConfig`/`ResumeSessionConfig`/subagentes foi auditada e endurecida.
+- **Faixa 2**: reset approvals, quota metrics e OAuth MCP já entregues; `skills` agora têm surface mais rica por `/sdk skills`, `/sdk skills config`, `/sdk skills agents` e mutação básica de `disabledSkills` via `/sdk skills disable|enable`; `instructions` já aparecem em `/sdk prompt`, blobs já têm surface mínima por `/attach blob`, `requestHeaders` por turno foram entregues via `/sdk headers` + dispatch SDK direto com reanexo controlado, e a paridade estrutural de `CopilotClient` + `SessionConfig`/`ResumeSessionConfig`/subagentes foi auditada e endurecida.
 - **Faixa 3**: concluída nesta rodada — runner corrigido, warnings zerados, `typecheck` estrito verde e convergência entre `test:unit` e `test:copilot:unit` comprovada.
 - **Faixa 4+**: permanecem como continuação natural agora que a baseline de validação está realmente verde e sem warnings.
 
 ## 6. Próxima sequência obrigatória de execução
 
-1. aprofundar `skills.*` para governança/mutação e projeção por subagente (**GAP-013**);
+1. consolidar `skills.*` com persistência/config declarativa alinhada ao estado server-scoped e correlação mais rica com eventos `subagent.*` (**GAP-013**);
 2. enriquecer `command.*`, `commands.changed` e `capabilities.changed` com diffs/estado operacional mais ricos;
 3. só depois voltar à **Faixa 4** para persistência longa, re-registro defensivo residual e upgrades arquiteturais controlados.
 

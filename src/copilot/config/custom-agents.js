@@ -171,10 +171,16 @@ export function removeCustomAgent(name) {
  */
 
 /**
- * Sub-agentes no formato aceito pelo SDK (SessionConfig.customAgents).
+ * Definições de custom agents no formato aceito pelo SDK (`SessionConfig.customAgents`).
  *
- * Esses agentes são invocados pela LLM-B via delegação automática. Diferem dos agentes internos (`BUILTIN_AGENTS`) que
- * são usados via REPL/terminal — estes são nativos ao SDK Copilot.
+ * Importante: `customAgents` são definições declarativas de sessão. Em tempo de execução, quando o runtime seleciona
+ * ou delega para um desses agentes, ele passa a aparecer na telemetria/eventos como `subagent.*`.
+ *
+ * Em outras palavras:
+ * - `custom agent` = configuração anexada à sessão;
+ * - `sub-agent` = manifestação runtime de um custom agent selecionado/invocado pelo orchestrator.
+ *
+ * Eles diferem dos agentes internos (`BUILTIN_AGENTS`) usados pelo REPL/terminal local.
  *
  * @type {SdkCustomAgentConfig[]}
  */
@@ -439,7 +445,9 @@ const DEFAULT_AGENT_SELECTION = resolveOperationalAgentSelection({
 
 const DEFAULT_SDK_AGENTS = enforceMaestroFirst(DEFAULT_AGENT_SELECTION.enabled);
 
-// GAP-Q03 fix: COPILOT_DISABLED_AGENTS permite desabilitar sub-agentes sem remover de COPILOT_CUSTOM_AGENTS
+// GAP-Q03 fix: COPILOT_DISABLED_AGENTS permite desabilitar custom agents da sessão sem removê-los de
+// COPILOT_CUSTOM_AGENTS. Se um agente desabilitado não entrar em `customAgents`, ele também não poderá aparecer como
+// `subagent.*` em tempo de execução.
 const DISABLED_AGENTS = new Set(DEFAULT_AGENT_SELECTION.disabled.filter((name) => name !== MAESTRO_AGENT_NAME));
 
 /**

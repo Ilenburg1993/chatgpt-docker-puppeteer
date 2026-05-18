@@ -61,7 +61,7 @@ import { SdkCustomAgentConfigSchema } from '#copilot/core';
  * @param {Set<string> | undefined} [availableTools] - Set de nomes de ferramentas disponíveis (validação mais rígida).
  *   Opcional.
  * @param {{ skillDirectories?: string[]; disabledSkills?: string[] }} [options] - Contexto opcional da sessão para
- *   validar preload de skills por subagente.
+ *   validar preload de skills por custom agent (que pode vir a executar como `subagent.*` em runtime).
  * @returns {{ errors: string[]; warnings: string[]; contractLog: Record<string, any> }}
  */
 export function validateAgentContracts(customAgents, availableTools = undefined, options = {}) {
@@ -121,7 +121,7 @@ export function validateAgentContracts(customAgents, availableTools = undefined,
 
         if ((!agent.description || !agent.description.trim()) && agent.infer !== false) {
             warnings.push(
-                `Agente "${agentName}" não declarou description. O SDK aceita isso, mas a seleção automática de subagentes fica menos precisa sem uma descrição específica.`,
+                `Agente "${agentName}" não declarou description. O SDK aceita isso, mas a seleção automática de custom agents/subagentes fica menos precisa sem uma descrição específica.`,
             );
             contractLog[agentName].warnings.push('Description ausente para agente inferível');
         }

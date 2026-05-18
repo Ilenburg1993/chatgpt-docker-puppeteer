@@ -40,12 +40,14 @@ import {
     listAgentSdkWorkspaceFiles,
     loginAgentSdkMcpOauth,
     readAgentSdkPlan,
+    readAgentSdkSkillsGovernance,
     readAgentSdkSystemPromptProjection,
     readAgentSdkWorkspaceFile,
     requestAgentSdkElicitation,
     resetAgentSdkSessionApprovals,
     resolveAgentSdkPendingElicitation,
     selectAgentSdkSessionUi,
+    setAgentSdkDisabledSkills,
     setAgentSdkSessionMode,
     updateAgentSdkPlan,
 } from '../../../presentation/runtime/index.js';
@@ -209,6 +211,24 @@ export async function listTerminalSdkModels(runtimeId) {
  */
 export async function listTerminalSdkSkills(options, runtimeId) {
     return listAgentSdkSkills(options, runtimeId);
+}
+
+/**
+ * @param {{ projectPaths?: string[]; skillDirectories?: string[] }} [options]
+ * @param {string | null | undefined} [runtimeId]
+ * @returns {Promise<unknown>}
+ */
+export async function readTerminalSdkSkillsGovernance(options, runtimeId) {
+    return readAgentSdkSkillsGovernance(options, runtimeId);
+}
+
+/**
+ * @param {string[]} disabledSkills
+ * @param {string | null | undefined} [runtimeId]
+ * @returns {Promise<unknown>}
+ */
+export async function setTerminalSdkDisabledSkills(disabledSkills, runtimeId) {
+    return setAgentSdkDisabledSkills(disabledSkills, runtimeId);
 }
 
 /**

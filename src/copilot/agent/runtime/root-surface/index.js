@@ -111,6 +111,7 @@ export {
     listSdkWorkspaceFiles,
     loginSdkMcpOauth,
     pingSdk,
+    readSdkSkillsGovernance,
     readSdkWorkspaceFile,
     reloadSdkAgents,
     requestSdkElicitation,
@@ -118,5 +119,6 @@ export {
     resolvePendingSdkElicitation,
     selectSdkAgent,
     selectSdkSessionUi,
+    setSdkDisabledSkills,
     setForegroundSdkSessionId,
 } from '../../facades/index.js';

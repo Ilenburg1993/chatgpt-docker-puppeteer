@@ -37,6 +37,7 @@ import {
     listTerminalSdkWorkspaceFiles,
     readTerminalRuntimePermissionMode,
     readTerminalRuntimeState,
+    readTerminalSdkSkillsGovernance,
     readTerminalSdkSystemPromptProjection,
     readTerminalSdkWorkspaceFile,
     readTerminalToolRegistrySnapshot,
@@ -45,6 +46,7 @@ import {
     resetTerminalSdkSessionApprovals,
     resolveTerminalSdkPendingElicitation,
     selectTerminalSdkSessionUi,
+    setTerminalSdkDisabledSkills,
     setTerminalRuntimePermissionMode,
 } from '../frontend/gateways/index.js';
 import {
@@ -121,6 +123,14 @@ function parseSdkSkillsArgs(rest) {
         ...(projectPaths.length > 0 ? { projectPaths } : {}),
         ...(skillDirectories.length > 0 ? { skillDirectories } : {}),
     };
+}
+
+/**
+ * @param {string[]} names
+ * @returns {string[]}
+ */
+function normalizeSkillNames(names) {
+    return [...new Set(names.map((name) => name.trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'pt-BR'));
 }
 
 /**
@@ -800,6 +810,24 @@ async function renderSdkModels({ println }, runtimeId) {
  * @returns {Promise<void>}
  */
 async function renderSdkSkills({ println }, rest, runtimeId) {
+    const [action = '', ...tail] = rest;
+    if (action === 'config') {
+        await renderSdkSkillsConfig({ println }, runtimeId);
+        return;
+    }
+    if (action === 'agents') {
+        await renderSdkSkillsAgents({ println }, runtimeId);
+        return;
+    }
+    if (action === 'disable') {
+        await updateSdkDisabledSkills({ println }, 'disable', tail, runtimeId);
+        return;
+    }
+    if (action === 'enable') {
+        await updateSdkDisabledSkills({ println }, 'enable', tail, runtimeId);
+        return;
+    }
+
     const options = parseSdkSkillsArgs(rest);
     const result = await callWithRuntimeTarget(listTerminalSdkSkills, runtimeId, options);
     const skills = arrayFromSdkList(result);
@@ -850,7 +878,139 @@ async function renderSdkSkills({ println }, rest, runtimeId) {
         if (path && path !== projectPath) println(`    \x1b[90mpath=${path}\x1b[0m`);
     }
     if (skills.length > 40) println(`  \x1b[90m... ${skills.length - 40} skills omitidas\x1b[0m`);
+    println(
+        '  \x1b[90mcustom agent = definicao declarativa em SessionConfig.customAgents; subagent = uso runtime desse custom agent via eventos subagent.*\x1b[0m',
+    );
     println('');
+}
+
+/**
+ * @param {CommandContext} ctx
+ * @param {string | null | undefined} runtimeId
+ * @returns {Promise<void>}
+ */
+async function renderSdkSkillsConfig({ println }, runtimeId) {
+    const governance = /** @type {Record<string, unknown>} */ (
+        (await callWithRuntimeTarget(readTerminalSdkSkillsGovernance, runtimeId)) ?? {}
+    );
+    const bootSkills = objectOrNull(governance['bootSkills']) ?? {};
+    const discovery = objectOrNull(governance['discovery']) ?? {};
+    const semantics = objectOrNull(governance['semantics']) ?? {};
+    const discoveredSkills = arrayFromSdkList(discovery);
+    const discoveredDisabled = discoveredSkills
+        .filter((skill) => objectOrNull(skill)?.['enabled'] === false)
+        .map((skill) => String(objectOrNull(skill)?.['name'] ?? ''))
+        .filter(Boolean)
+        .sort((a, b) => a.localeCompare(b, 'pt-BR'));
+    const skillDirectories = Array.isArray(bootSkills['skillDirectories']) ? bootSkills['skillDirectories'] : [];
+    const disabledSkills = Array.isArray(bootSkills['disabledSkills']) ? bootSkills['disabledSkills'] : [];
+
+    println('\n  \x1b[36mSkills SDK Config\x1b[0m');
+    println(`  \x1b[90mskillDirectories=${skillDirectories.length} | disabledSkills(boot)=${disabledSkills.length} | disabledSkills(runtime)=${discoveredDisabled.length}\x1b[0m`);
+    println(`  session dirs      \x1b[90m${skillDirectories.length > 0 ? skillDirectories.join(', ') : '-'}\x1b[0m`);
+    println(`  boot disabled     \x1b[90m${disabledSkills.length > 0 ? disabledSkills.join(', ') : '-'}\x1b[0m`);
+    println(`  runtime disabled  \x1b[90m${discoveredDisabled.length > 0 ? discoveredDisabled.join(', ') : '-'}\x1b[0m`);
+    println(`  semantic          \x1b[90m${String(semantics['customAgentDefinition'] ?? '-') }\x1b[0m`);
+    println(`  runtime           \x1b[90m${String(semantics['subagentRuntime'] ?? '-') }\x1b[0m`);
+    println(`  mutation          \x1b[90m${String(semantics['disabledSkillsMutationScope'] ?? '-') }\x1b[0m`);
+    println(
+        '  \x1b[90mUso: /sdk skills agents | /sdk skills disable <skill...> | /sdk skills enable <skill...> | /sdk skills [--project <path>] [--dir <path>]\x1b[0m\n',
+    );
+}
+
+/**
+ * @param {CommandContext} ctx
+ * @param {string | null | undefined} runtimeId
+ * @returns {Promise<void>}
+ */
+async function renderSdkSkillsAgents({ println }, runtimeId) {
+    const governance = /** @type {Record<string, unknown>} */ (
+        (await callWithRuntimeTarget(readTerminalSdkSkillsGovernance, runtimeId)) ?? {}
+    );
+    const customAgents = Array.isArray(governance['customAgents']) ? governance['customAgents'] : [];
+    const agentsWithSkills = customAgents.filter((agent) => {
+        const entry = objectOrNull(agent);
+        return Array.isArray(entry?.['preloadSkills']) && entry['preloadSkills'].length > 0;
+    });
+
+    println(`\n  \x1b[36mCustom Agents x Skills (${customAgents.length})\x1b[0m`);
+    println(
+        `  \x1b[90magentsWithPreload=${agentsWithSkills.length} | inferable=${customAgents.filter((agent) => objectOrNull(agent)?.['infer'] !== false).length}\x1b[0m`,
+    );
+    println(
+        '  \x1b[90mcustom agent = definicao de sessao; subagent = quando o runtime seleciona/invoca esse custom agent e emite subagent.*\x1b[0m',
+    );
+
+    for (const agent of customAgents) {
+        const entry = objectOrNull(agent) ?? {};
+        const name = String(entry['name'] ?? 'unknown');
+        const displayName = typeof entry['displayName'] === 'string' ? entry['displayName'] : name;
+        const preloadSkills = Array.isArray(entry['preloadSkills']) ? entry['preloadSkills'].map(String) : [];
+        const preloadEnabledSkills = Array.isArray(entry['preloadEnabledSkills'])
+            ? entry['preloadEnabledSkills'].map(String)
+            : [];
+        const preloadDisabledSkills = Array.isArray(entry['preloadDisabledSkills'])
+            ? entry['preloadDisabledSkills'].map(String)
+            : [];
+        const infer = entry['infer'] !== false;
+        const tools = Array.isArray(entry['tools']) ? entry['tools'].map(String) : null;
+
+        println(`  \x1b[33m${name}\x1b[0m  \x1b[90m(${displayName}) | infer=${String(infer)} | tools=${tools ? tools.join(', ') || '[]' : 'all'}\x1b[0m`);
+        if (preloadSkills.length === 0) {
+            println('    \x1b[90mpreload skills: -\x1b[0m');
+            continue;
+        }
+        println(`    \x1b[90mpreload=${preloadSkills.join(', ')}\x1b[0m`);
+        if (preloadEnabledSkills.length > 0) println(`    \x1b[32menabled=${preloadEnabledSkills.join(', ')}\x1b[0m`);
+        if (preloadDisabledSkills.length > 0) println(`    \x1b[31mdisabled=${preloadDisabledSkills.join(', ')}\x1b[0m`);
+    }
+
+    if (customAgents.length === 0) {
+        println('  \x1b[90mNenhum custom agent configurado nesta sessao.\x1b[0m');
+    }
+    println('');
+}
+
+/**
+ * @param {CommandContext} ctx
+ * @param {'enable' | 'disable'} action
+ * @param {string[]} names
+ * @param {string | null | undefined} runtimeId
+ * @returns {Promise<void>}
+ */
+async function updateSdkDisabledSkills({ println }, action, names, runtimeId) {
+    const requested = normalizeSkillNames(names);
+    if (requested.length === 0) {
+        println(`\n  \x1b[31m[ERR] Use /sdk skills ${action} <skill...>\x1b[0m\n`);
+        return;
+    }
+
+    const governance = /** @type {Record<string, unknown>} */ (
+        (await callWithRuntimeTarget(readTerminalSdkSkillsGovernance, runtimeId)) ?? {}
+    );
+    const discovery = objectOrNull(governance['discovery']) ?? {};
+    const currentDisabled = new Set(
+        arrayFromSdkList(discovery)
+            .filter((skill) => objectOrNull(skill)?.['enabled'] === false)
+            .map((skill) => String(objectOrNull(skill)?.['name'] ?? ''))
+            .filter(Boolean),
+    );
+
+    if (action === 'disable') {
+        for (const name of requested) currentDisabled.add(name);
+    } else {
+        for (const name of requested) currentDisabled.delete(name);
+    }
+
+    const disabledSkills = [...currentDisabled].sort((a, b) => a.localeCompare(b, 'pt-BR'));
+    await callWithRuntimeTarget(setTerminalSdkDisabledSkills, runtimeId, disabledSkills);
+
+    println(`\n  \x1b[32m[OK] disabledSkills runtime atualizadas via SDK (${action}).\x1b[0m`);
+    println(`  \x1b[90mrequested=${requested.join(', ')}\x1b[0m`);
+    println(`  \x1b[90mruntime disabled=${disabledSkills.length > 0 ? disabledSkills.join(', ') : '-'}\x1b[0m`);
+    println(
+        '  \x1b[90mEscopo: altera o runtime/CLI atual via server RPC; n�o reescreve automaticamente COPILOT_DISABLED_SKILLS do processo.\x1b[0m\n',
+    );
 }
 
 /**

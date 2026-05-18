@@ -20,7 +20,9 @@
 import {
     deleteAgentSdkPlan as deleteAgentSdkPlanOnAgent,
     readAgentSdkPlan as readAgentSdkPlanFromAgent,
+    readSdkSkillsGovernance as readSdkSkillsGovernanceOnAgent,
     readAgentSdkSessionMode,
+    setSdkDisabledSkills as setSdkDisabledSkillsOnAgent,
     setAgentSdkSessionMode as setAgentSdkSessionModeOnAgent,
     updateAgentSdkPlan as updateAgentSdkPlanOnAgent,
 } from '#copilot/agent/facades';
@@ -186,6 +188,28 @@ export async function readAgentSdkSystemPromptProjection(runtimeId) {
             projection,
         };
     }
+}
+
+/**
+ * Lê projeção canônica de governança de skills do runtime alvo.
+ *
+ * @param {{ projectPaths?: string[]; skillDirectories?: string[] }} [options]
+ * @param {string | null | undefined} [runtimeId]
+ * @returns {Promise<unknown>}
+ */
+export async function readAgentSdkSkillsGovernance(options, runtimeId) {
+    return readSdkSkillsGovernanceOnAgent(getAgentSdkSessionTarget(runtimeId), options);
+}
+
+/**
+ * Atualiza a lista server-scoped de `disabledSkills` do runtime alvo.
+ *
+ * @param {string[]} disabledSkills
+ * @param {string | null | undefined} [runtimeId]
+ * @returns {Promise<unknown>}
+ */
+export async function setAgentSdkDisabledSkills(disabledSkills, runtimeId) {
+    return setSdkDisabledSkillsOnAgent(getAgentSdkSessionTarget(runtimeId), disabledSkills);
 }
 
 /**

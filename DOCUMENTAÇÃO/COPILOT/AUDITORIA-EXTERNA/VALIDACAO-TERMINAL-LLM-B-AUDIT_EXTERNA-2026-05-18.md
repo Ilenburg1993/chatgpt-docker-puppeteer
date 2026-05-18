@@ -131,7 +131,7 @@ A auditoria descrevia um `setInterval` clássico. O código atual usa `registerI
 | GAP-010 | **Confirmado**           | Expor no terminal               | `/sdk quota` ainda não usa `session.rpc.usage.getMetrics()`                                                                                 |
 | GAP-011 | **Parcial / latente**    | Hardening recomendado           | ausência de `agentId` no terminal só importa se subagent streaming voltar a ser habilitado                                                  |
 | GAP-012 | **Parcial / latente**    | Oportunidade válida             | a projeção atual é suficiente, mas não usa a RPC mais nova                                                                                  |
-| GAP-013 | **Parcial / endurecido** | Governança básica entregue      | contrato/config/factory de skills por subagente agora estão alinhados; continuam pendentes mutações e projeções de produto mais ricas       |
+| GAP-013 | **Parcial / avançado**   | Surface terminal e mutação básica entregues | contrato/config/factory de skills por custom agent/subagente estão alinhados; `/sdk skills config|agents|disable|enable` já existe; permanecem pendentes persistência declarativa alinhada e correlação ainda mais rica com runtime |
 | GAP-014 | **Refutado**             | Já implementado                 | `enableConfigDiscovery` já é configurado                                                                                                    |
 | GAP-015 | **Corrigido nesta onda** | Superfície canônica entregue    | `/sdk headers` + store one-shot + `runTerminalDialogTurn` agora usam dispatch SDK direto com reanexo do dialog loop para turnos com headers |
 | GAP-016 | **Parcial / endurecido** | Superfície mínima entregue      | `/attach blob <mime> <base64>` agora suporta blob inline no terminal; o caminho segue zero-PR via embed textual, não binário nativo         |
@@ -394,12 +394,14 @@ Após a estabilização da baseline de testes, esta retomada executou uma nova o
 - `assistant.usage` deixou de ser apenas coleta/estado implícito e ganhou owner terminal explícito via `pr.consumed` e `pr.fallback_model` em `agent-runtime-events.js`;
 - `hook.*`, `sampling.*`, `commands.changed`, `capabilities.changed`, `auto_mode_switch.*` e `exit_plan_mode.requested` passaram a ter wiring canônico até a UX terminal;
 - `skills.discover` agora está exposto no terminal por `/sdk skills`, atravessando a cadeia canônica `agent → presentation → gateway → command`;
+- a distinção canônica entre `custom agent` (definição em `SessionConfig.customAgents`) e `sub-agent` (manifestação runtime via `subagent.*`) foi formalizada em código e documentação;
+- o terminal agora expõe governança mais rica de skills por `/sdk skills config`, `/sdk skills agents`, `/sdk skills disable <skill...>` e `/sdk skills enable <skill...>`, usando mutação server-scoped honesta para `disabledSkills`;
 - o terminal passou a aceitar `blob` inline por `/attach blob <mime> <base64> [--name ...]`, com fila estruturada e embedding zero-PR via helper unificado de runtime.
 - `requestHeaders` por turno agora estão expostos por `/sdk headers`, com store one-shot e dispatch SDK direto com reanexo do dialog loop no gateway quando necessário.
 
 Com isso, o backlog remanescente ficou mais estreito e mais claramente concentrado em:
 
-- governança/mutação avançada de skills (incluindo subagentes);
+- governança/mutação avançada de skills (incluindo alinhamento entre estado server-scoped e persistência declarativa);
 - aprofundamento de superfícies ricas para `command.*` e capacidades dinâmicas;
 - eventual caminho binário nativo futuro além do embed textual do terminal.
 
