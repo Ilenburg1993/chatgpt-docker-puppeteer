@@ -39,9 +39,10 @@ without inventing local semantics:
 - session inventory: `listSessions`, `getLastSessionId`, `deleteSession`, foreground get/set;
 - session lifecycle: create, resume, disconnect, abort, messages and SSE event stream;
 - messaging: `send`, `sendAndWait`, delivery `mode`, file/directory/selection/blob attachments;
-- configuration: `systemMessage`, `infiniteSessions`, `provider`, `reasoningEffort`, `configDir`,
-  `mcpServers`, `customAgents`, selected `agent`, `skillDirectories`, `disabledSkills`,
-  `availableTools`, `excludedTools`;
+- configuration: `systemMessage`, `infiniteSessions`, `provider`, `reasoningEffort`, `modelCapabilities`,
+  `configDir`, `enableConfigDiscovery`, `includeSubAgentStreamingEvents`, `mcpServers`, `customAgents`,
+  `defaultAgent`, selected `agent`, `skillDirectories`, `disabledSkills`, `gitHubToken`, `availableTools`,
+  `excludedTools`;
 - session methods: `setModel(model, { reasoningEffort })` and `session.log()`.
 
 Function-valued SDK capabilities (`tools[].handler`, `onPermissionRequest`, `onUserInputRequest`,

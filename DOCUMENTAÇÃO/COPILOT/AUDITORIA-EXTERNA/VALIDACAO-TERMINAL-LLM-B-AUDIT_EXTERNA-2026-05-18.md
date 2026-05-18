@@ -117,25 +117,25 @@ A auditoria descrevia um `setInterval` clássico. O código atual usa `registerI
 
 ## 4. Gaps SDK 0.3.0 — veredito item a item
 
-| ID      | Veredito                 | Decisão final                   | Evidência resumida                                                                                                                         |
-| ------- | ------------------------ | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| GAP-001 | **Refutado**             | Já implementado                 | `src/copilot/agent/session/initializers/initializer.js` passa `onPermissionRequest`                                                        |
-| GAP-002 | **Parcial / latente**    | Hardening recomendado           | o terminal atual não sofre isso no fluxo padrão porque `includeSubAgentStreamingEvents: false`, mas a ponte local não preservava `agentId` |
-| GAP-003 | **Refutado**             | Já implementado                 | `excludedTools` já entra na configuração de sessão                                                                                         |
-| GAP-004 | **Refutado**             | Já suportado                    | `sessionIdleTimeoutSeconds` já existe na configuração client-side                                                                          |
-| GAP-005 | **Parcial / endurecido** | Superfície mínima entregue      | o terminal agora expõe discovery via `/sdk skills`; mutações/config de skills ainda merecem desenho dedicado                               |
-| GAP-006 | **Confirmado**           | Implementar superfície terminal | o handler atual de OAuth MCP só narra; não aciona `session.rpc.mcp.oauthLogin()`                                                           |
-| GAP-007 | **Refutado**             | Já migrado                      | o repositório já usa `createSessionFsHandler` e provider idiomático                                                                        |
-| GAP-008 | **Refutado**             | Já migrado                      | o código usa `gitHubToken` corretamente                                                                                                    |
-| GAP-009 | **Confirmado**           | Oportunidade de simplificação   | `convertMcpCallToolResult()` ainda não está incorporado                                                                                    |
-| GAP-010 | **Confirmado**           | Expor no terminal               | `/sdk quota` ainda não usa `session.rpc.usage.getMetrics()`                                                                                |
-| GAP-011 | **Parcial / latente**    | Hardening recomendado           | ausência de `agentId` no terminal só importa se subagent streaming voltar a ser habilitado                                                 |
-| GAP-012 | **Parcial / latente**    | Oportunidade válida             | a projeção atual é suficiente, mas não usa a RPC mais nova                                                                                 |
-| GAP-013 | **Confirmado**           | Planejar                        | skills por subagente ainda não estão mapeadas como recurso de produto                                                                      |
-| GAP-014 | **Refutado**             | Já implementado                 | `enableConfigDiscovery` já é configurado                                                                                                   |
+| ID      | Veredito                 | Decisão final                   | Evidência resumida                                                                                                                          |
+| ------- | ------------------------ | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| GAP-001 | **Refutado**             | Já implementado                 | `src/copilot/agent/session/initializers/initializer.js` passa `onPermissionRequest`                                                         |
+| GAP-002 | **Parcial / latente**    | Hardening recomendado           | o terminal atual não sofre isso no fluxo padrão porque `includeSubAgentStreamingEvents: false`, mas a ponte local não preservava `agentId`  |
+| GAP-003 | **Refutado**             | Já implementado                 | `excludedTools` já entra na configuração de sessão                                                                                          |
+| GAP-004 | **Refutado**             | Já suportado                    | `sessionIdleTimeoutSeconds` já existe na configuração client-side                                                                           |
+| GAP-005 | **Parcial / endurecido** | Superfície mínima entregue      | o terminal agora expõe discovery via `/sdk skills`; mutações/config de skills ainda merecem desenho dedicado                                |
+| GAP-006 | **Confirmado**           | Implementar superfície terminal | o handler atual de OAuth MCP só narra; não aciona `session.rpc.mcp.oauthLogin()`                                                            |
+| GAP-007 | **Refutado**             | Já migrado                      | o repositório já usa `createSessionFsHandler` e provider idiomático                                                                         |
+| GAP-008 | **Refutado**             | Já migrado                      | o código usa `gitHubToken` corretamente                                                                                                     |
+| GAP-009 | **Confirmado**           | Oportunidade de simplificação   | `convertMcpCallToolResult()` ainda não está incorporado                                                                                     |
+| GAP-010 | **Confirmado**           | Expor no terminal               | `/sdk quota` ainda não usa `session.rpc.usage.getMetrics()`                                                                                 |
+| GAP-011 | **Parcial / latente**    | Hardening recomendado           | ausência de `agentId` no terminal só importa se subagent streaming voltar a ser habilitado                                                  |
+| GAP-012 | **Parcial / latente**    | Oportunidade válida             | a projeção atual é suficiente, mas não usa a RPC mais nova                                                                                  |
+| GAP-013 | **Parcial / endurecido** | Governança básica entregue      | contrato/config/factory de skills por subagente agora estão alinhados; continuam pendentes mutações e projeções de produto mais ricas       |
+| GAP-014 | **Refutado**             | Já implementado                 | `enableConfigDiscovery` já é configurado                                                                                                    |
 | GAP-015 | **Corrigido nesta onda** | Superfície canônica entregue    | `/sdk headers` + store one-shot + `runTerminalDialogTurn` agora usam dispatch SDK direto com reanexo do dialog loop para turnos com headers |
-| GAP-016 | **Parcial / endurecido** | Superfície mínima entregue      | `/attach blob <mime> <base64>` agora suporta blob inline no terminal; o caminho segue zero-PR via embed textual, não binário nativo        |
-| GAP-017 | **Confirmado**           | Corrigir imediatamente          | o SDK já expõe `resetSessionApprovals` e o terminal não expunha a ação                                                                     |
+| GAP-016 | **Parcial / endurecido** | Superfície mínima entregue      | `/attach blob <mime> <base64>` agora suporta blob inline no terminal; o caminho segue zero-PR via embed textual, não binário nativo         |
+| GAP-017 | **Confirmado**           | Corrigir imediatamente          | o SDK já expõe `resetSessionApprovals` e o terminal não expunha a ação                                                                      |
 
 ### Decisão importante sobre GAP-002 / GAP-011
 
@@ -212,6 +212,19 @@ O problema foi confirmado em duas camadas diferentes:
 2. havia também **warnings reais de workers do Vitest**, agravados pelo uso de `pool: 'forks'` e por concorrência alta demais para a carga do lote Copilot.
 
 **Decisão:** tratar como trilha operacional obrigatória desta mesma rodada, não como dívida paralela.
+
+### ACHADO-E — `SessionConfig`, `ResumeSessionConfig` e subagentes não estavam totalmente full
+
+Uma auditoria dedicada a `node_modules/@github/copilot-sdk/dist/types.d.ts` confirmou quatro desvios estruturais relevantes:
+
+1. `ResumeSessionConfig` ainda não tinha módulo dedicado no lugar correto;
+2. `SessionConfigBuilder.buildForResume()` podia vazar `sessionId` para payloads de resume;
+3. `SessionConfigBuilder.build()` podia vazar `disableResume` para payloads de create;
+4. a camada local de subagentes ainda tinha drift em relação ao SDK oficial (`description?`, `skills?`, `mcpServers?`, `tools=[]`).
+
+Além disso, a superfície HTTP de sessões ainda não expunha toda a parte serializável restante de `SessionConfig`/`ResumeSessionConfig` (`modelCapabilities`, `enableConfigDiscovery`, `includeSubAgentStreamingEvents`, `defaultAgent`, `gitHubToken`).
+
+**Decisão:** tratar como trilha estrutural obrigatória e corrigir na mesma onda. O detalhamento completo está em `SESSIONCONFIG-SUBAGENTES-AUDITORIA-AMPLA-2026-05-18.md`.
 
 ---
 
@@ -299,6 +312,14 @@ O roadmap operacional desta validação está no arquivo complementar:
 O aprofundamento temático desta rodada está no anexo:
 
 - `DOCUMENTAÇÃO/COPILOT/AUDITORIA-EXTERNA/SESSION-EVENTS-TERMINAL-HARDENING-2026-05-18.md`
+
+E a auditoria complementar dedicada à superfície `CopilotClient` está em:
+
+- `DOCUMENTAÇÃO/COPILOT/AUDITORIA-EXTERNA/COPILOTCLIENT-AUDITORIA-AMPLA-2026-05-18.md`
+
+E a auditoria complementar dedicada a `SessionConfig`, `ResumeSessionConfig` e subagentes está em:
+
+- `DOCUMENTAÇÃO/COPILOT/AUDITORIA-EXTERNA/SESSIONCONFIG-SUBAGENTES-AUDITORIA-AMPLA-2026-05-18.md`
 
 ## 10. Addendum — validação focada em `session-events.d.ts` (linhas 946–1828)
 
@@ -465,3 +486,48 @@ A resposta final para a dúvida do usuário é:
 - **sim**, havia um problema real de orquestração/configuração do runner híbrido;
 - **sim**, havia também falhas reais em testes stale fora do recorte inicial;
 - **agora**, a trilha de validação está convergente, warning-zero e pronta para a retomada contínua e profunda do roadmap funcional.
+
+## 12. Addendum — auditoria ampla de `CopilotClient`
+
+### 12.1. Escopo e fonte de verdade
+
+Nesta rodada foi feita leitura integral de `node_modules/@github/copilot-sdk/dist/client.d.ts` e confronto com:
+
+- `node_modules/@github/copilot-sdk/dist/types.d.ts`
+- README oficial do SDK
+- implementação local em `src/copilot/sdk/session/**`, `src/copilot/server/routes/sdk/**` e `src/copilot/boot/**`
+
+A regra adotada foi: **o pacote tipado instalado vale mais do que o README quando houver drift**.
+
+### 12.2. Principais achados
+
+1. a cobertura local já era forte para quase todo o contrato do client;
+2. faltava uma fachada explícita para `getSessionMetadata(sessionId)`;
+3. o `ClientOptionsBuilder` ainda não cobria explicitamente `cwd`, `isChildProcess` e `autoRestart`;
+4. havia drift documental local em torno de `provider` e do escopo real de `CopilotClientOptions`.
+
+### 12.3. Correções aplicadas nesta rodada
+
+- `src/copilot/sdk/session/client.js`
+	- `startClient()` explícito como alias semântico de start/getClient
+	- `getClientSessionMetadata()` com fallback compatível
+- `src/copilot/server/routes/sdk/session-crud.js`
+	- `GET /sessions/:id` passou a usar metadata dedicada do SDK
+- `src/copilot/sdk/session/client-options.js`
+	- builder fluente para `cwd`, `isChildProcess`, `autoRestart`
+	- parsing de env correspondente
+- `src/copilot/sdk/types.js`
+	- SSOT documental atualizado
+- `src/copilot/sdk/session/provider.js`
+	- correção do comentário sobre `provider`
+- `src/copilot/boot/contract.js` e `src/copilot/boot/surface-validation.js`
+	- baseline declarativo ampliado para a paridade do client
+
+### 12.4. Veredito final desta frente
+
+Após essa leva, a avaliação final é:
+
+- **métodos do `client.d.ts`: full**
+- **options do `client.d.ts`: full**
+- **surface lifecycle: full via helper layer já existente**
+- **README drift (`copilotHome`)**: documentado como fora do contrato do pacote instalado localmente

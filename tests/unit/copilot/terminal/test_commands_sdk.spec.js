@@ -141,11 +141,11 @@ vi.mock('#copilot/tools', async (importOriginal) => ({
     ],
 }));
 
-import { cmdElicitation, cmdPermission, cmdSdk, cmdWorkspace } from '../../../../src/copilot/terminal/commands/sdk.js';
 import {
     clearNextTurnRequestHeaders,
     getNextTurnRequestHeaders,
 } from '../../../../src/copilot/presentation/state/index.js';
+import { cmdElicitation, cmdPermission, cmdSdk, cmdWorkspace } from '../../../../src/copilot/terminal/commands/sdk.js';
 import {
     clearTerminalElicitation,
     clearTerminalPermissions,

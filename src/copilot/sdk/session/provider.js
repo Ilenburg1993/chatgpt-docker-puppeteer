@@ -5,7 +5,7 @@
  * Faixa 12 - Provider/BYOK Support. Builders para configuração de providers customizados (OpenAI-compat, Azure,
  * Anthropic).
  *
- * O SDK aceita um campo `provider?: ProviderConfig` em `CopilotClientOptions` para modo BYOK.
+ * O SDK aceita um campo `provider?: ProviderConfig` em `SessionConfig`/`ResumeSessionConfig` para modo BYOK.
  *
  * @module copilot/sdk/provider
  * @see EventBus

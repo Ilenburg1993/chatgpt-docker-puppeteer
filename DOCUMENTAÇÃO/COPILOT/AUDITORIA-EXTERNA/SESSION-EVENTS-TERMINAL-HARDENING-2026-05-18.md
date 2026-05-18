@@ -8,6 +8,8 @@
 >
 > - `DOCUMENTAÇÃO/COPILOT/AUDITORIA-EXTERNA/VALIDACAO-TERMINAL-LLM-B-AUDIT_EXTERNA-2026-05-18.md`
 > - `DOCUMENTAÇÃO/COPILOT/AUDITORIA-EXTERNA/ROADMAP-TERMINAL-LLM-B-AUDIT_EXTERNA-2026-05-18.md`
+> - `DOCUMENTAÇÃO/COPILOT/AUDITORIA-EXTERNA/COPILOTCLIENT-AUDITORIA-AMPLA-2026-05-18.md`
+> - `DOCUMENTAÇÃO/COPILOT/AUDITORIA-EXTERNA/SESSIONCONFIG-SUBAGENTES-AUDITORIA-AMPLA-2026-05-18.md`
 > - `https://github.com/github/copilot-sdk/blob/main/nodejs/README.md`
 
 ---
@@ -104,6 +106,10 @@ Estava parcial, latente ou subexposto para:
 Após a retomada contínua sobre baseline verde, os itens acima deixaram de ser apenas backlog conceitual: todos ganharam tratamento material, restando sobretudo aprofundamento de UX/diffs e não mais ausência total de surface.
 
 Um complemento importante desta rodada é que `requestHeaders` por turno deixaram de ser gap abstrato do roadmap e viraram contrato implementado. A solução adotada foi deliberadamente canônica: em vez de fingir que o caminho `ask_user` do dialog loop aceita headers por turno, o terminal faz bounce controlado para `llmBridgeClient.chat(...)` quando há headers one-shot, e reanexa o dialog loop ao fim.
+
+Outro complemento importante é que a camada local de `CopilotClient` também foi auditada e endurecida em paralelo: metadata dedicada de sessão, builder/options full e baseline declarativo do boot agora estão alinhados com o `client.d.ts` realmente instalado, evitando que a cadeia terminal/session opere sobre uma fachada parcialmente incompleta.
+
+Um terceiro complemento importante desta rodada é que `SessionConfig`, `ResumeSessionConfig` e `CustomAgentConfig` também foram auditados em profundidade: agora existe builder dedicado de resume, sanitização estrutural explícita e a camada local de subagentes deixou de divergir do SDK em `description?`, `skills?`, `mcpServers?` e `tools=[]`. Isso reduz o risco de a cadeia terminal/session operar sobre contratos locais mais restritivos do que o SDK oficial.
 
 ---
 

@@ -14,7 +14,10 @@ export const CreateSessionBodySchema = z.object({
     sessionId: z.string().optional(),
     clientName: z.string().optional(),
     reasoningEffort: z.enum(['low', 'medium', 'high', 'xhigh']).optional(),
+    modelCapabilities: z.record(z.string(), z.unknown()).optional(),
     configDir: z.string().optional(),
+    enableConfigDiscovery: z.boolean().optional(),
+    includeSubAgentStreamingEvents: z.boolean().optional(),
     systemMessage: z.unknown().optional(),
     availableTools: z.array(z.string()).optional(),
     excludedTools: z.array(z.string()).optional(),
@@ -23,10 +26,12 @@ export const CreateSessionBodySchema = z.object({
     streaming: z.boolean().optional(),
     mcpServers: z.record(z.string(), z.unknown()).optional(),
     customAgents: z.array(z.unknown()).optional(),
+    defaultAgent: z.record(z.string(), z.unknown()).optional(),
     agent: z.string().optional(),
     skillDirectories: z.array(z.string()).optional(),
     disabledSkills: z.array(z.string()).optional(),
     infiniteSessions: z.unknown().optional(),
+    gitHubToken: z.string().optional(),
 });
 
 /** Schema para POST /sessions/:id/send body */
@@ -50,7 +55,10 @@ export const ResumeSessionBodySchema = z
         clientName: z.string().optional(),
         model: z.string().optional(),
         reasoningEffort: z.enum(['low', 'medium', 'high', 'xhigh']).optional(),
+        modelCapabilities: z.record(z.string(), z.unknown()).optional(),
         configDir: z.string().optional(),
+        enableConfigDiscovery: z.boolean().optional(),
+        includeSubAgentStreamingEvents: z.boolean().optional(),
         systemMessage: z.unknown().optional(),
         availableTools: z.array(z.string()).optional(),
         excludedTools: z.array(z.string()).optional(),
@@ -59,10 +67,12 @@ export const ResumeSessionBodySchema = z
         streaming: z.boolean().optional(),
         mcpServers: z.record(z.string(), z.unknown()).optional(),
         customAgents: z.array(z.unknown()).optional(),
+        defaultAgent: z.record(z.string(), z.unknown()).optional(),
         agent: z.string().optional(),
         skillDirectories: z.array(z.string()).optional(),
         disabledSkills: z.array(z.string()).optional(),
         infiniteSessions: z.unknown().optional(),
+        gitHubToken: z.string().optional(),
         disableResume: z.boolean().optional(),
     })
     .optional();

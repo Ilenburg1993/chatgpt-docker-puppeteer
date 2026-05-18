@@ -49,6 +49,7 @@ function mockClient() {
         getLastSessionId: vi.fn().mockResolvedValue('last-session-id'),
         getForegroundSessionId: vi.fn().mockResolvedValue('foreground-session-id'),
         setForegroundSessionId: vi.fn().mockResolvedValue(undefined),
+        getSessionMetadata: vi.fn().mockResolvedValue(undefined),
         listModels: vi.fn().mockResolvedValue([{ id: 'gpt-4.1' }]),
         createSession: vi.fn((_cfg) => Promise.resolve(mockSession())),
         resumeSession: vi.fn((id, _cfg) => Promise.resolve(mockSession(id))),
@@ -104,6 +105,10 @@ vi.mock('@github/copilot-sdk', () => {
         async setForegroundSessionId() {
             return undefined;
         }
+
+        async getSessionMetadata() {
+            return undefined;
+        }
     }
     return {
         CopilotClient: MockCopilotClient,
@@ -125,6 +130,7 @@ import {
     getActiveSessionCount,
     getClient,
     getClientSession,
+    getClientSessionMetadata,
     getClientState,
     getForegroundClientSessionId,
     getLastClientSessionId,
@@ -135,6 +141,7 @@ import {
     resumeClientSession,
     sdkConnectionCircuitBreaker,
     setForegroundClientSessionId,
+    startClient,
     stopClient,
 } from '../../../../src/copilot/sdk/session/client.js';
 import { createSdkSessionRegistry } from '../../../../src/copilot/sdk/session/session-registry.js';
@@ -167,6 +174,12 @@ describe('sdk/client › buildClientOptions', () => {
 // ─── getClient ──────────────────────────────────────────────────────────────
 
 describe('sdk/client › getClient', () => {
+    it('startClient é alias explícito de start/getClient', async () => {
+        const client = await startClient();
+        expect(client).toBeDefined();
+        expect(client.getState()).toBe('connected');
+    });
+
     it('cria e retorna client conectado', async () => {
         const client = await getClient();
         expect(client).toBeDefined();
@@ -387,6 +400,26 @@ describe('sdk/client › surface extras', () => {
         _injectClientForTest(/** @type {any} */ (mc));
 
         await expect(getServerRpc()).resolves.toBe(mc.rpc);
+    });
+
+    it('expõe getClientSessionMetadata via método dedicado do SDK', async () => {
+        const mc = mockClient();
+        mc.getSessionMetadata.mockResolvedValue({ sessionId: 'sess-meta', summary: 'hello' });
+        _injectClientForTest(/** @type {any} */ (mc));
+
+        await expect(getClientSessionMetadata('sess-meta')).resolves.toMatchObject({ sessionId: 'sess-meta' });
+        expect(mc.getSessionMetadata).toHaveBeenCalledWith('sess-meta');
+        expect(mc.listSessions).not.toHaveBeenCalled();
+    });
+
+    it('faz fallback para listSessions quando getSessionMetadata não existe', async () => {
+        const mc = mockClient();
+        delete mc.getSessionMetadata;
+        mc.listSessions.mockResolvedValue([{ sessionId: 'sess-meta', summary: 'from-list' }]);
+        _injectClientForTest(/** @type {any} */ (mc));
+
+        await expect(getClientSessionMetadata('sess-meta')).resolves.toMatchObject({ sessionId: 'sess-meta' });
+        expect(mc.listSessions).toHaveBeenCalledOnce();
     });
 });
 

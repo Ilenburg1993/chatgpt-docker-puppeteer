@@ -6,6 +6,11 @@
 >
 > Anexo temático desta rodada: `DOCUMENTAÇÃO/COPILOT/AUDITORIA-EXTERNA/SESSION-EVENTS-TERMINAL-HARDENING-2026-05-18.md`
 >
+> Auditorias complementares desta rodada:
+>
+> - `DOCUMENTAÇÃO/COPILOT/AUDITORIA-EXTERNA/COPILOTCLIENT-AUDITORIA-AMPLA-2026-05-18.md`
+> - `DOCUMENTAÇÃO/COPILOT/AUDITORIA-EXTERNA/SESSIONCONFIG-SUBAGENTES-AUDITORIA-AMPLA-2026-05-18.md`
+>
 > Data: `2026-05-18`
 >
 > Escopo operacional: `src/copilot/terminal/**` e integrações imediatas em `src/copilot/agent/**`, `src/copilot/presentation/**`, `src/copilot/sdk/**`, `src/copilot/event-handlers/**`
@@ -113,8 +118,7 @@ A situação ideal ao final deste roadmap é:
 
 - **GAP-009** — adotar `convertMcpCallToolResult()` onde fizer sentido
 - **GAP-012** — avaliar `session.rpc.instructions.getSources()` como fonte prioritária
-- **GAP-013** — mapear skills por subagente
-- **GAP-015** — suportar `requestHeaders` por turno
+- **GAP-013** — governança/mutação e projeção rica de skills por subagente (contrato/config já endurecidos nesta rodada)
 
 #### Latentes / mitigados, mas merecem hardening
 
@@ -157,6 +161,8 @@ A situação ideal ao final deste roadmap é:
 - **ACHADO-A** — a ponte de eventos descartava `agentId`; já corrigido nesta onda
 - **ACHADO-B** — `requestHeaders` por turno exigia um desvio arquitetural honesto; agora foi entregue via dispatch SDK direto com bounce controlado do dialog loop
 - **ACHADO-C** — divergência de runner e warnings de teardown do Vitest foram confirmados, diagnosticados e corrigidos nesta rodada
+- **ACHADO-D** — a fachada local do `CopilotClient` não estava em paridade full com o `client.d.ts` instalado; auditoria dedicada criada e correções desta rodada entregam `startClient`, `getClientSessionMetadata` e builder/options completos
+- **ACHADO-E** — `SessionConfig`/`ResumeSessionConfig` e `CustomAgentConfig` não estavam totalmente parificados com o `types.d.ts` instalado; auditoria dedicada criada e correções desta rodada entregam builder dedicado de resume, sanitização estrutural, surface HTTP serializável full e hardening de subagentes (`skills`, `mcpServers`, `description?`, `tools=[]`)
 
 ---
 
@@ -299,6 +305,43 @@ A situação ideal ao final deste roadmap é:
 - evitar bypass lateral via camadas paralelas.
 
 **Status:** concluída nesta rodada — a surface terminal foi entregue por `/sdk headers`, com armazenamento one-shot local, consumo no próximo turno do usuário e dispatch SDK direto com reanexo do dialog loop porque o caminho zero-PR de `ask_user` não carrega `requestHeaders` honestamente.
+
+### Fase 2.3 — Paridade full de `CopilotClient`
+
+#### Subfase 2.3.1 — Métodos do `client.d.ts`
+
+- fechar lookup dedicado de metadata por sessão;
+- validar a cobertura real de `start/stop/forceStop/create/resume/list/delete/foreground/lifecycle`;
+- garantir que a superfície local use os métodos dedicados do SDK quando existirem.
+
+**Status:** majoritariamente concluída nesta rodada (`startClient` explícito, `getClientSessionMetadata`, rota `/sessions/:id` endurecida).
+
+#### Subfase 2.3.2 — Opções de `CopilotClientOptions`
+
+- garantir builder fluente e suporte de env para todas as opções relevantes do pacote instalado;
+- documentar explicitamente drift entre README e typings instalados (ex.: `copilotHome` fora do pacote local);
+- manter `autoRestart` apenas como pass-through deprecated/no-op, sem fingir semântica inexistente.
+
+**Status:** concluída nesta rodada para `cwd`, `isChildProcess`, `autoRestart`, `sessionFs` e `sessionIdleTimeoutSeconds`.
+
+### Fase 2.4 — Paridade full de `SessionConfig`, `ResumeSessionConfig` e subagentes
+
+#### Subfase 2.4.1 — `SessionConfig` / `ResumeSessionConfig`
+
+- garantir builder dedicado para `ResumeSessionConfig` no lugar correto;
+- impedir vazamento de campos exclusivos de create (`sessionId`) para resume;
+- impedir vazamento de `disableResume` em `SessionConfig` normal;
+- expor na rota HTTP toda a parte serializável restante de `SessionConfig`/`ResumeSessionConfig` (`modelCapabilities`, `enableConfigDiscovery`, `includeSubAgentStreamingEvents`, `defaultAgent`, `gitHubToken`).
+
+**Status:** concluída nesta rodada.
+
+#### Subfase 2.4.2 — `CustomAgentConfig` / subagentes
+
+- alinhar typedefs/schemas/factories ao contrato oficial (`description?`, `mcpServers?`, `skills?`);
+- parar de tratar `tools=[]` como erro estrutural quando o SDK aceita o contrato;
+- validar preload de skills por subagente contra `skillDirectories` e `disabledSkills` reais da sessão.
+
+**Status:** concluída nesta rodada na camada de contrato/config/factory; follow-up permanece apenas para UX/projeções mais ricas.
 
 #### Subfase 2.2.2 — Blob attachments
 
@@ -464,13 +507,13 @@ A situação ideal ao final deste roadmap é:
 
 - **Faixa 0**: consolidada; este arquivo passa a ser o plano único limpo e sem duplicações narrativas.
 - **Faixa 1**: além do hardening de progresso/heartbeat, a superfície terminal agora cobre explicitamente `assistant.usage` (via `pr.consumed`), `hook.*`, `sampling.*`, `commands.changed`, `capabilities.changed`, `auto_mode_switch.*` e `exit_plan_mode.requested`.
-- **Faixa 2**: reset approvals, quota metrics e OAuth MCP já entregues; `skills` já têm surface mínima por `/sdk skills`, `instructions` já aparecem em `/sdk prompt`, blobs já têm surface mínima por `/attach blob`, e `requestHeaders` por turno foram entregues via `/sdk headers` + dispatch SDK direto com reanexo controlado.
+- **Faixa 2**: reset approvals, quota metrics e OAuth MCP já entregues; `skills` já têm surface mínima por `/sdk skills`, `instructions` já aparecem em `/sdk prompt`, blobs já têm surface mínima por `/attach blob`, `requestHeaders` por turno foram entregues via `/sdk headers` + dispatch SDK direto com reanexo controlado, e a paridade estrutural de `CopilotClient` + `SessionConfig`/`ResumeSessionConfig`/subagentes foi auditada e endurecida.
 - **Faixa 3**: concluída nesta rodada — runner corrigido, warnings zerados, `typecheck` estrito verde e convergência entre `test:unit` e `test:copilot:unit` comprovada.
 - **Faixa 4+**: permanecem como continuação natural agora que a baseline de validação está realmente verde e sem warnings.
 
 ## 6. Próxima sequência obrigatória de execução
 
-1. aprofundar `skills.*` para governança/mutação e mapeamento por subagente (**GAP-013**);
+1. aprofundar `skills.*` para governança/mutação e projeção por subagente (**GAP-013**);
 2. enriquecer `command.*`, `commands.changed` e `capabilities.changed` com diffs/estado operacional mais ricos;
 3. só depois voltar à **Faixa 4** para persistência longa, re-registro defensivo residual e upgrades arquiteturais controlados.
 
@@ -589,6 +632,8 @@ Esta fase existe para garantir que nada fique “sumido”.
 - `VALIDACAO-TERMINAL-LLM-B-AUDIT_EXTERNA-2026-05-18.md`
 - `ROADMAP-TERMINAL-LLM-B-AUDIT_EXTERNA-2026-05-18.md`
 - `SESSION-EVENTS-TERMINAL-HARDENING-2026-05-18.md`
+- `COPILOTCLIENT-AUDITORIA-AMPLA-2026-05-18.md`
+- `SESSIONCONFIG-SUBAGENTES-AUDITORIA-AMPLA-2026-05-18.md`
 
 ---
 
@@ -605,9 +650,10 @@ A próxima execução contínua deve seguir esta ordem:
    - sem adiar regressão introduzida nesta onda;
    - sem empurrar problema para “fase futura” se ele nasceu agora.
 
-3. **se a validação ficar verde, avançar para Fase 2 / Subfase 2.2**
-   - timeline/backoff/persistência de falhas de sync;
-   - e então seguir para Subfase 3.1 (`skills`/`instructionSources`).
+3. **se a validação ficar verde, avançar para a continuação da Faixa 2**
+   - governança/mutação de `skills.*` e projeção por subagente;
+   - depois `instructions.getSources()` / `convertMcpCallToolResult()`;
+   - e só então retomar timeline/backoff/persistência de falhas de sync.
 
 ---
 

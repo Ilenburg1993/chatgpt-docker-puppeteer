@@ -176,6 +176,16 @@ export class CopilotClientManager {
     }
 
     /**
+     * Alias explícito para a semântica de `CopilotClient.start()`, preservando a convenção de fachada local.
+     *
+     * @param {Partial<CopilotClientOptions>} [overrides]
+     * @returns {Promise<CopilotClient>}
+     */
+    async startClient(overrides = {}) {
+        return this.getClient(overrides);
+    }
+
+    /**
      * @param {Partial<CopilotClientOptions>} overrides
      * @returns {Promise<CopilotClient>}
      */
@@ -460,6 +470,24 @@ export class CopilotClientManager {
     }
 
     /**
+     * Lookup O(1) de metadata de sessão quando suportado pelo SDK. Faz fallback para `listSessions()` quando a
+     * implementação/mocks ainda não expõem `getSessionMetadata()`.
+     *
+     * @param {string} sessionId
+     * @returns {Promise<SessionMetadata | undefined>}
+     */
+    async getClientSessionMetadata(sessionId) {
+        const client = await this.getClient();
+        /** @type {{ getSessionMetadata?: (sessionId: string) => Promise<SessionMetadata | undefined> }} */
+        const metadataClient = client;
+        if (typeof metadataClient.getSessionMetadata === 'function') {
+            return metadataClient.getSessionMetadata(sessionId);
+        }
+        const sessions = await client.listSessions();
+        return sessions.find((session) => session.sessionId === sessionId);
+    }
+
+    /**
      * @param {string} sessionId
      * @returns {number}
      */
@@ -514,6 +542,10 @@ export const defaultClientManager = new CopilotClientManager({
 
 export function getSdkConnectionCircuitBreaker() {
     return defaultClientManager.getCircuitBreaker();
+}
+
+export async function startClient(overrides = {}) {
+    return defaultClientManager.startClient(overrides);
 }
 
 export async function getClient(overrides = {}) {
@@ -628,6 +660,14 @@ export function listActiveClientSessions() {
  */
 export async function listAllClientSessions(filter) {
     return defaultClientManager.listAllClientSessions(filter);
+}
+
+/**
+ * @param {string} sessionId
+ * @returns {Promise<SessionMetadata | undefined>}
+ */
+export async function getClientSessionMetadata(sessionId) {
+    return defaultClientManager.getClientSessionMetadata(sessionId);
 }
 
 /**

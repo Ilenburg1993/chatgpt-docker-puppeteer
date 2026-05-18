@@ -160,11 +160,13 @@ export function removeCustomAgent(name) {
  * @typedef {object} SdkCustomAgentConfig
  * @property {string} name
  * @property {string} [displayName]
- * @property {string} description
+ * @property {string} [description]
  * @property {string[] | null | undefined} [tools]
  * @property {{ must?: string[]; should?: string[]; optional?: string[] }} [toolTiers]
  * @property {string} prompt
+ * @property {Record<string, import('./sdk-config-port.js').MCPServerConfig>} [mcpServers]
  * @property {boolean} [infer]
+ * @property {string[]} [skills]
  * @property {'maestro'} [priority]
  */
 

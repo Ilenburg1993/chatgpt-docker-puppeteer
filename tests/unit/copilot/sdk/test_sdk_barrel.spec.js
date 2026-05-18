@@ -65,6 +65,7 @@ describe('F86 - Barrel complete export coverage', () => {
         barrel = barrel ?? (await import('#copilot/sdk'));
         const names = [
             'getClient',
+            'startClient',
             'buildClientOptions',
             'createClientSession',
             'deleteClientSession',
@@ -73,6 +74,7 @@ describe('F86 - Barrel complete export coverage', () => {
             'getActiveSessionCount',
             'getAuthStatus',
             'getClientSession',
+            'getClientSessionMetadata',
             'getClientState',
             'getClientStatus',
             'getSdkConnectionCircuitBreaker',
@@ -158,12 +160,7 @@ describe('F86 - Barrel complete export coverage', () => {
     // ─── config canônico fora do SDK root ─────────────────────────────
     it('não reexporta builders de config pelo SDK root', async () => {
         barrel = barrel ?? (await import('#copilot/sdk'));
-        const names = [
-            'buildSessionConfig',
-            'getProjectDefaults',
-            'mergeExcludedTools',
-            'mergeTools',
-        ];
+        const names = ['buildSessionConfig', 'getProjectDefaults', 'mergeExcludedTools', 'mergeTools'];
         for (const n of names) expect(barrel[n], `unexpected: ${n}`).toBeUndefined();
         expect(barrel.DEFAULT_MODEL).toBeDefined();
         expect(barrel.DEFAULT_DIAGNOSTIC_MODEL).toBeDefined();

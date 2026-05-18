@@ -39,7 +39,7 @@ describe('FI-7 — config barrel contract', () => {
     it('exports env constants', async () => {
         const barrel = await import('#copilot/config');
         // Spot-check: alguns dos ~97 exports de env.js
-        const expected = ['DEFAULT_EXCLUDED_TOOLS'];
+        const expected = ['DEFAULT_EXCLUDED_TOOLS', 'ResumeSessionConfigBuilder', 'sanitizeResumeSessionConfig'];
         for (const name of expected) {
             expect(/** @type {Record<string, unknown>} */ (barrel)[name], `missing: ${name}`).toBeDefined();
         }

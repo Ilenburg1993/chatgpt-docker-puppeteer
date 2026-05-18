@@ -18,17 +18,20 @@
 // ─── Core Client & Session ────────────────────────────────────────────────────
 
 /**
- * Classe principal do SDK. Gerencia conexão com o CLI, autenticação, criação/resumo de sessões e lifecycle events.
- * Métodos: `start()`, `stop()`, `session.create()`, `session.resume()`, `listModels()`, `getStatus()`,
- * `getAuthStatus()`, `on()` (lifecycle).
+ * Classe principal do SDK. Gerencia conexão com o CLI, autenticação, criação/resumo de sessões, metadata e lifecycle
+ * events. Métodos principais: `start()`, `stop()`, `forceStop()`, `createSession()`, `resumeSession()`, `ping()`,
+ * `getState()`, `getStatus()`, `getAuthStatus()`, `listModels()`, `getLastSessionId()`, `listSessions()`,
+ * `getSessionMetadata()`, `deleteSession()`, `getForegroundSessionId()`, `setForegroundSessionId()` e `on()`
+ * (lifecycle).
  *
  * @typedef {import('@github/copilot-sdk').CopilotClient} CopilotClient
  */
 
 /**
  * Opções de criação do CopilotClient. Permite configurar: `cliPath`, `cliArgs`, `cwd`, `port`, `useStdio`,
- * `isChildProcess`, `cliUrl`, `logLevel`, `autoStart`, `env`, `gitHubToken`, `useLoggedInUser`, `onListModels`,
- * `telemetry`, `onGetTraceContext`.
+ * `isChildProcess`, `cliUrl`, `logLevel`, `autoStart`, `autoRestart` (deprecated/no-op no SDK atual), `env`,
+ * `gitHubToken`, `useLoggedInUser`, `onListModels`, `telemetry`, `onGetTraceContext`, `sessionFs` e
+ * `sessionIdleTimeoutSeconds`.
  *
  * @typedef {import('@github/copilot-sdk').CopilotClientOptions} CopilotClientOptions
  */
@@ -42,16 +45,22 @@
 
 /**
  * Configuração completa para criação de sessão. Campos principais: `sessionId?`, `clientName?`, `model?`,
- * `reasoningEffort?`, `configDir?`, `tools?`, `systemMessage?`, `availableTools?`, `excludedTools?`, `provider?`,
- * `onPermissionRequest`, `onUserInputRequest?`, `hooks?`, `workingDirectory?`, `streaming?`, `mcpServers?`,
- * `customAgents?`, `agent?`, `skillDirectories?`, `disabledSkills?`, `infiniteSessions?`, `onEvent?`.
+ * `reasoningEffort?`, `modelCapabilities?`, `configDir?`, `enableConfigDiscovery?`, `tools?`, `commands?`,
+ * `systemMessage?`, `availableTools?`, `excludedTools?`, `provider?`, `onPermissionRequest`, `onUserInputRequest?`,
+ * `onElicitationRequest?`, `hooks?`, `workingDirectory?`, `streaming?`, `includeSubAgentStreamingEvents?`,
+ * `mcpServers?`, `customAgents?`, `defaultAgent?`, `agent?`, `skillDirectories?`, `disabledSkills?`,
+ * `infiniteSessions?`, `gitHubToken?`, `onEvent?` e `createSessionFsHandler?`.
  *
  * @typedef {import('@github/copilot-sdk').SessionConfig} SessionConfig
  */
 
 /**
- * Configuração para retomar sessão existente. Subconjunto de `SessionConfig` que exclui `sessionId`. Adicionalmente
- * aceita `disableResume?: boolean` para reconectar sem emitir `session.resume`.
+ * Configuração para retomar sessão existente. Subconjunto de `SessionConfig` que exclui `sessionId`, mas preserva os
+ * principais knobs operacionais: `clientName?`, `model?`, `reasoningEffort?`, `modelCapabilities?`, `tools?`,
+ * `commands?`, `systemMessage?`, `availableTools?`, `excludedTools?`, `provider?`, `workingDirectory?`, `streaming?`,
+ * `includeSubAgentStreamingEvents?`, `mcpServers?`, `customAgents?`, `defaultAgent?`, `agent?`, `skillDirectories?`,
+ * `disabledSkills?`, `infiniteSessions?`, `gitHubToken?`, `onEvent?` e `createSessionFsHandler?`. Adicionalmente aceita
+ * `disableResume?: boolean` para reconectar sem emitir `session.resume`.
  *
  * @typedef {import('@github/copilot-sdk').ResumeSessionConfig} ResumeSessionConfig
  */
@@ -796,8 +805,9 @@
 
 /**
  * Configuração de agente customizado. Campos: `name` (único), `displayName?`, `description?`, `tools?` (string[] | null
- * — null = todas as tools disponíveis), `prompt` (conteúdo do agente), `mcpServers?` (`Record<string,
- * MCPServerConfig>`), `infer?` (bool, default `true`).
+ * — null/omitido = todas as tools disponíveis), `prompt` (conteúdo do agente), `mcpServers?` (`Record<string,
+ * MCPServerConfig>`), `infer?` (bool, default `true`) e `skills?` (`string[]` — preload explícito resolvido contra
+ * `skillDirectories` da sessão).
  *
  * @typedef {import('@github/copilot-sdk').CustomAgentConfig} CustomAgentConfig
  */

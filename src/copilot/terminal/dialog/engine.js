@@ -10,7 +10,6 @@ import { emitNerv } from '#copilot/bridges';
 import { LLM_B_BOOT_TIMEOUT_MS } from '#copilot/config';
 import { cancelTimer, container, registerInterval, sleepMs, toError } from '#copilot/core';
 import { utf8ByteLength } from '#copilot/infra/public/buffer';
-import { clearNextTurnRequestHeaders, getNextTurnRequestHeaders } from '../../presentation/state/index.js';
 import { log, METRICS_STORE } from '#copilot/observability';
 import { resolveOptionalDialogTimeout } from '../../presentation/dialog-timeout-policy.js';
 import { MAX_EMBED_BYTES } from '../../presentation/files/index.js';
@@ -18,8 +17,10 @@ import { attachmentToRuntimeEmbed } from '../../presentation/runtime/index.js';
 import { describeSdkRecoveryPolicy, getSdkRecoveryPolicy } from '../../presentation/sdk/index.js';
 import {
     clearAttachments,
+    clearNextTurnRequestHeaders,
     getAttachmentQueue,
     getHubSessionId,
+    getNextTurnRequestHeaders,
     getRl,
     getShowStreaming,
     getShowThinking,

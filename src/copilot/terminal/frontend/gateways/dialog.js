@@ -110,7 +110,8 @@ export async function stopTerminalDialogMode() {
 export async function runTerminalDialogTurn(enrichedMessage, opts) {
     const requestHeaders = opts.requestHeaders || {};
     if (Object.keys(requestHeaders).length > 0) {
-        const agentStatus = typeof llmBridgeClient.getAgentStatus === 'function' ? llmBridgeClient.getAgentStatus() : null;
+        const agentStatus =
+            typeof llmBridgeClient.getAgentStatus === 'function' ? llmBridgeClient.getAgentStatus() : null;
         const hadDialogLoop = Boolean(agentStatus?.dialogLoopActive || agentStatus?.dialogPaused);
         if (hadDialogLoop) {
             await llmBridgeClient.stopDialogMode('authorized_stop');

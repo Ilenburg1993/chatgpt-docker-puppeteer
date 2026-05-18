@@ -68,13 +68,15 @@ export const READ_ONLY_TOOLS = [
  * @param {string} [cfg.displayName] - Nome de exibição para UI
  * @param {string} [cfg.description] - Descrição do que o agente faz
  * @param {string[] | null} [cfg.tools] - Lista de nomes de ferramentas. null = todas. undefined = todas.
- * @param {Record<string, object>} [cfg.mcpServers] - MCP servers específicos deste agente
+ * @param {Record<string, import('@github/copilot-sdk').MCPServerConfig>} [cfg.mcpServers] - MCP servers específicos
+ *   deste agente
  * @param {boolean} [cfg.infer=true] - Se disponível para inferência de modelo. Default is `true`
+ * @param {string[]} [cfg.skills] - Skills a pré-carregar no contexto do agente
  * @returns {CustomAgentConfig}
  * @throws {ConfigError} Se name ou prompt forem string vazia ou não-string
  * @see createReadOnlyAgent
  */
-export function createAgent({ name, prompt, displayName, description, tools, mcpServers, infer }) {
+export function createAgent({ name, prompt, displayName, description, tools, mcpServers, infer, skills }) {
     if (!name || typeof name !== 'string')
         throw new ConfigError('[lib/agents] createAgent: "name" (string) é obrigatório.');
     if (!prompt || typeof prompt !== 'string')
@@ -89,6 +91,7 @@ export function createAgent({ name, prompt, displayName, description, tools, mcp
     if (mcpServers !== undefined)
         config.mcpServers = /** @type {Record<string, import('@github/copilot-sdk').MCPServerConfig>} */ (mcpServers);
     if (infer !== undefined) config.infer = infer;
+    if (skills !== undefined) config.skills = skills;
 
     return config;
 }

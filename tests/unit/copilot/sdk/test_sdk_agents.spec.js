@@ -113,6 +113,32 @@ describe('agents.js - Factory helpers', () => {
         expect(agent.prompt).toBe('Do stuff');
     });
 
+    it('createAgent preserva mcpServers e skills quando informados', () => {
+        const agent = createAgent({
+            name: 'db-analyst',
+            prompt: 'Analise banco',
+            mcpServers: {
+                postgres: {
+                    type: 'local',
+                    command: 'npx',
+                    args: ['-y', '@modelcontextprotocol/server-postgres'],
+                    tools: ['*'],
+                },
+            },
+            skills: ['db-review'],
+        });
+
+        expect(agent.mcpServers).toEqual({
+            postgres: {
+                type: 'local',
+                command: 'npx',
+                args: ['-y', '@modelcontextprotocol/server-postgres'],
+                tools: ['*'],
+            },
+        });
+        expect(agent.skills).toEqual(['db-review']);
+    });
+
     it('createAgent lanca ConfigError para name vazio', () => {
         expect(() => createAgent({ name: '', prompt: 'x' })).toThrow();
     });

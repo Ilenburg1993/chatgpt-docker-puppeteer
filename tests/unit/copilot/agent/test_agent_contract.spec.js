@@ -45,4 +45,46 @@ describe('agent contract validation', () => {
         expect(result.errors).toEqual([]);
         expect(result.warnings.join('\n')).toMatch(/workspace_index_search/);
     });
+
+    it('aceita agente sem description e registra warning quando inferível', () => {
+        const result = validateAgentContracts(
+            [{ name: 'researcher', prompt: 'Pesquise', tools: ['read_file_content'] }],
+            new Set(['read_file_content']),
+        );
+
+        expect(result.errors).toEqual([]);
+        expect(result.warnings.join('\n')).toMatch(/description/);
+    });
+
+    it('aceita tools=[] como válido e emite warning em vez de erro', () => {
+        const result = validateAgentContracts([{ name: 'planner', prompt: 'Planeje', tools: [] }], new Set());
+
+        expect(result.errors).toEqual([]);
+        expect(result.warnings.join('\n')).toMatch(/tools=\[\]/);
+    });
+
+    it('avisa quando subagente declara skills sem skillDirectories na sessão', () => {
+        const result = validateAgentContracts(
+            [{ name: 'security', prompt: 'Audite', skills: ['security-scan'] }],
+            new Set(),
+            { skillDirectories: [], disabledSkills: [] },
+        );
+
+        expect(result.errors).toEqual([]);
+        expect(result.warnings.join('\n')).toMatch(/skillDirectories/);
+    });
+
+    it('avisa quando skills do subagente estão desabilitadas na sessão', () => {
+        const result = validateAgentContracts(
+            [{ name: 'security', prompt: 'Audite', skills: ['security-scan', 'dependency-check'] }],
+            new Set(),
+            {
+                skillDirectories: ['/workspace/.github/skills'],
+                disabledSkills: ['security-scan'],
+            },
+        );
+
+        expect(result.errors).toEqual([]);
+        expect(result.warnings.join('\n')).toMatch(/security-scan/);
+    });
 });

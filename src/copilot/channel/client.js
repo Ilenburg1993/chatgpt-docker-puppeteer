@@ -145,8 +145,8 @@ function createInactivityGuard(timeoutMs, onTimeout) {
  *
  * @typedef {Object} ChatOptions
  * @property {(chunk: string, taskId: string) => void} [onDelta] - Callback por chunk de streaming
- * @property {(chunk: string, reasoningId: string | null, taskId: string) => void} [onReasoning] - Callback por chunk
- *   de reasoning
+ * @property {(chunk: string, reasoningId: string | null, taskId: string) => void} [onReasoning] - Callback por chunk de
+ *   reasoning
  * @property {(question: object) => void} [onQuestion] - Callback quando modelo faz pergunta
  * @property {number | null} [timeoutMs] - Timeout em ms. `null` = sem timeout por inatividade. Este é o default para
  *   não impor limite bloqueante à LLM-B.
@@ -250,7 +250,7 @@ export class LlmBridgeClient {
      * @returns {Promise<ChatResult>}
      */
     async #chatOnce(message, opts = {}) {
-           const { onDelta, onReasoning, onQuestion, timeoutMs = null, attachments, requestHeaders } = opts;
+        const { onDelta, onReasoning, onQuestion, timeoutMs = null, attachments, requestHeaders } = opts;
         const startedAt = Date.now();
 
         if (requireAgent().status === 'stopped') {
@@ -292,7 +292,9 @@ export class LlmBridgeClient {
             }
         };
 
-        const onReasoningEvt = (/** @type {{ taskId?: string; chunk?: string; reasoningId?: string | null }} */ evt) => {
+        const onReasoningEvt = (
+            /** @type {{ taskId?: string; chunk?: string; reasoningId?: string | null }} */ evt,
+        ) => {
             if (activeTaskId && evt.taskId === activeTaskId && onReasoning) {
                 try {
                     onReasoning(evt.chunk ?? '', evt.reasoningId ?? null, evt.taskId);

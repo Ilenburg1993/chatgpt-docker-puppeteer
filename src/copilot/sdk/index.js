@@ -50,6 +50,7 @@ export {
     getAuthStatus,
     getClient,
     getClientSession,
+    getClientSessionMetadata,
     getClientState,
     getClientStatus,
     getForegroundClientSessionId,
@@ -63,6 +64,7 @@ export {
     pingClient,
     resumeClientSession,
     setForegroundClientSessionId,
+    startClient,
     stopClient,
 } from './session/client.js';
 

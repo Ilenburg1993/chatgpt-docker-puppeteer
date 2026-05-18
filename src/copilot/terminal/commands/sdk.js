@@ -9,12 +9,12 @@ import { randomUUID } from 'node:crypto';
 
 import { CANONICAL_LOCAL_FS_TOOL_NAMES, decideSdkFsRouting, toError } from '#copilot/core';
 import { utf8ByteLength } from '#copilot/infra/public/buffer';
+import { isRuntimeElicitationSchema, normalizeElicitationContentWithSchema } from '../../core/elicitation-schema.js';
 import {
     clearNextTurnRequestHeaders,
     getNextTurnRequestHeaders,
     setNextTurnRequestHeaders,
 } from '../../presentation/state/index.js';
-import { isRuntimeElicitationSchema, normalizeElicitationContentWithSchema } from '../../core/elicitation-schema.js';
 import { readTerminalIoActivityProjection } from '../events/index.js';
 import {
     compactTerminalSdkSession,

@@ -45,6 +45,72 @@ import { approveAll, INFINITE_SESSION_DEFAULTS, REASONING_EFFORTS, validateProvi
  */
 
 /**
+ * Chaves serializáveis aceitas pelo contrato oficial de `ResumeSessionConfig`.
+ *
+ * @type {readonly (keyof ResumeSessionConfig)[]}
+ */
+export const RESUME_SESSION_CONFIG_KEYS = Object.freeze([
+    'clientName',
+    'model',
+    'tools',
+    'commands',
+    'systemMessage',
+    'availableTools',
+    'excludedTools',
+    'provider',
+    'modelCapabilities',
+    'streaming',
+    'includeSubAgentStreamingEvents',
+    'reasoningEffort',
+    'onPermissionRequest',
+    'onUserInputRequest',
+    'onElicitationRequest',
+    'hooks',
+    'workingDirectory',
+    'configDir',
+    'enableConfigDiscovery',
+    'mcpServers',
+    'customAgents',
+    'defaultAgent',
+    'agent',
+    'skillDirectories',
+    'disabledSkills',
+    'infiniteSessions',
+    'gitHubToken',
+    'onEvent',
+    'createSessionFsHandler',
+]);
+
+/**
+ * @param {Partial<SessionConfig> & { disableResume?: boolean }} config
+ * @returns {ResumeSessionConfig & { disableResume?: boolean }}
+ */
+export function sanitizeResumeSessionConfig(config) {
+    /** @type {Partial<ResumeSessionConfig> & { disableResume?: boolean }} */
+    const resume = {};
+    const resumeRecord = /** @type {Record<string, unknown>} */ (resume);
+    const configRecord = /** @type {Record<string, unknown>} */ (config);
+
+    for (const key of RESUME_SESSION_CONFIG_KEYS) {
+        if (Object.prototype.hasOwnProperty.call(config, key) && config[key] !== undefined) {
+            resumeRecord[key] = configRecord[key];
+        }
+    }
+
+    if (resume.onPermissionRequest === undefined) {
+        resume.onPermissionRequest = approveAll;
+    }
+    if (resume.streaming === undefined) {
+        resume.streaming = true;
+    }
+    if (config.disableResume !== undefined) {
+        resume.disableResume = config.disableResume;
+    }
+
+    return /** @type {ResumeSessionConfig & { disableResume?: boolean }} */ (/** @type {unknown} */ (resume));
+}
+
+/**
  * Builder fluent para `SessionConfig`. Permite construir a configuração de sessão de forma tipada e encadeada.
  *
  * @example
@@ -409,7 +475,9 @@ export class SessionConfigBuilder {
         if (this.#config.streaming === undefined) {
             this.#config.streaming = true;
         }
-        return /** @type {SessionConfig} */ (/** @type {unknown} */ ({ ...this.#config }));
+        const { disableResume: _ignoredDisableResume, ...sessionConfig } = this.#config;
+        void _ignoredDisableResume;
+        return /** @type {SessionConfig} */ (/** @type {unknown} */ ({ ...sessionConfig }));
     }
 
     /**
@@ -419,10 +487,9 @@ export class SessionConfigBuilder {
      */
     buildForResume() {
         const full = this.build();
-        const resume = /** @type {ResumeSessionConfig & { disableResume?: boolean }} */ (/** @type {unknown} */ (full));
-        if (this.#config.disableResume !== undefined) {
-            resume.disableResume = this.#config.disableResume;
-        }
-        return resume;
+        return sanitizeResumeSessionConfig({
+            ...full,
+            ...(this.#config.disableResume !== undefined ? { disableResume: this.#config.disableResume } : {}),
+        });
     }
 }

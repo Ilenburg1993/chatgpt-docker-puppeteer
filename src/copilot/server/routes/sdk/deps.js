@@ -32,7 +32,6 @@ import {
     log,
     METRICS_STORE,
 } from '#copilot/observability';
-import { pickDefined } from '#copilot/sdk/utils';
 import {
     commandsHandlePending,
     compactionCompact,
@@ -55,11 +54,12 @@ import {
     forceStopClient,
     getClient,
     getClientSession,
+    getClientSessionMetadata,
     getClientState,
     getForegroundClientSessionId,
     getLastClientSessionId,
-    getSessionMessages,
     getSessionCapabilities,
+    getSessionMessages,
     incrementSessionMessageCount,
     isSessionUiElicitationAvailable,
     listActiveClientSessions,
@@ -79,23 +79,26 @@ import {
     validateProviderConfig,
 } from '#copilot/sdk/session';
 import { emitSdkOperationMetric } from '#copilot/sdk/telemetry';
+import { pickDefined } from '#copilot/sdk/utils';
 import { getAllTools } from '#copilot/tools';
 import { requireAgentRuntimeSelection } from '../../../presentation/agent/index.js';
 import { resolveOptionalDialogTimeout } from '../../../presentation/dialog-timeout-policy.js';
-import { buildMissingRuntimeRouteMeta, buildRuntimeRouteMetaPayload } from '../../../presentation/routing/index.js';
-import { setRuntimeModelProjection, setRuntimeReasoningProjection } from '../../../presentation/runtime/index.js';
-import { resolveRequestedRuntimeId } from '../../../presentation/routing/index.js';
-import * as runtimeSdkSessionOps from '../../../presentation/runtime/index.js';
 import {
-    readAgentStatusSnapshot,
-    readAgentStatusSnapshotForRuntime,
-    readAgentStatusValue,
-    readAgentStatusValueForRuntime,
-} from '../../../presentation/runtime/index.js';
+    buildMissingRuntimeRouteMeta,
+    buildRuntimeRouteMetaPayload,
+    resolveRequestedRuntimeId,
+} from '../../../presentation/routing/index.js';
+import * as runtimeSdkSessionOps from '../../../presentation/runtime/index.js';
 import {
     paginateAgentRuntimeToolsProjection,
     readAgentRuntimeToolsProjection,
     readAgentRuntimeToolsProjectionForRuntime,
+    readAgentStatusSnapshot,
+    readAgentStatusSnapshotForRuntime,
+    readAgentStatusValue,
+    readAgentStatusValueForRuntime,
+    setRuntimeModelProjection,
+    setRuntimeReasoningProjection,
 } from '../../../presentation/runtime/index.js';
 import {
     attachSdkSessionOwnership,
@@ -113,6 +116,7 @@ const sdkSessionOps = Object.freeze({
     disconnectClientSession,
     getClient,
     getClientSession,
+    getClientSessionMetadata,
     getForegroundClientSessionId,
     getLastClientSessionId,
     incrementSessionMessageCount,

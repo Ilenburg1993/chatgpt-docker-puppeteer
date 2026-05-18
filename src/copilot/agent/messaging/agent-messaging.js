@@ -12,6 +12,7 @@
  * @see EventBus
  */
 
+import { TASK_TIMEOUT_MS as ADVISORY_TASK_TIMEOUT_MS, MAX_TASK_RETRIES } from '#copilot/config/agent';
 import { SessionError } from '#copilot/core';
 import {
     EMITTER_QUESTION_ANSWERED,
@@ -20,7 +21,6 @@ import {
     EMITTER_TASK_QUEUED,
     EMITTER_TASK_STARTED,
 } from '#copilot/events';
-import { TASK_TIMEOUT_MS as ADVISORY_TASK_TIMEOUT_MS, MAX_TASK_RETRIES } from '#copilot/config/agent';
 import { withAgentErrorPolicy } from '../error/index.js';
 import {
     onAgentSdkSessionEvent,

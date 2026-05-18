@@ -48,9 +48,11 @@ import { SdkCustomAgentConfigSchema } from '#copilot/core';
  *     name: string;
  *     tools?: string[] | null | undefined;
  *     displayName?: string;
- *     description?: string;
+ *     description?: string | undefined;
  *     prompt?: string;
+ *     mcpServers?: Record<string, import('@github/copilot-sdk').MCPServerConfig>;
  *     infer?: boolean;
+ *     skills?: string[];
  *     priority?: 'maestro';
  *     toolTiers?: { must?: string[]; should?: string[]; optional?: string[] };
  * }[]} customAgents
@@ -58,15 +60,25 @@ import { SdkCustomAgentConfigSchema } from '#copilot/core';
  *
  * @param {Set<string> | undefined} [availableTools] - Set de nomes de ferramentas disponíveis (validação mais rígida).
  *   Opcional.
+ * @param {{ skillDirectories?: string[]; disabledSkills?: string[] }} [options] - Contexto opcional da sessão para
+ *   validar preload de skills por subagente.
  * @returns {{ errors: string[]; warnings: string[]; contractLog: Record<string, any> }}
  */
-export function validateAgentContracts(customAgents, availableTools = undefined) {
+export function validateAgentContracts(customAgents, availableTools = undefined, options = {}) {
     /** @type {string[]} */
     const errors = [];
     /** @type {string[]} */
     const warnings = [];
     /** @type {Record<string, any>} */
     const contractLog = {};
+    const sessionSkillDirectories = Array.isArray(options.skillDirectories)
+        ? options.skillDirectories.filter((dir) => typeof dir === 'string' && dir.length > 0)
+        : [];
+    const disabledSkills = new Set(
+        Array.isArray(options.disabledSkills)
+            ? options.disabledSkills.filter((skill) => typeof skill === 'string' && skill.length > 0)
+            : [],
+    );
 
     if (!customAgents || customAgents.length === 0) {
         return { errors, warnings, contractLog };
@@ -76,7 +88,7 @@ export function validateAgentContracts(customAgents, availableTools = undefined)
         const structural = SdkCustomAgentConfigSchema.safeParse(agent);
         if (!structural.success) {
             const agentName = typeof agent?.name === 'string' && agent.name ? agent.name : '(unknown)';
-            const structuralError = /** @type {{ issues: Array<{ path: Array<string | number>; message: string }> }} */ (
+            const structuralError = /** @type {{ issues: { path: (string | number)[]; message: string }[] }} */ (
                 structural.error
             );
             errors.push(
@@ -100,11 +112,44 @@ export function validateAgentContracts(customAgents, availableTools = undefined)
             toolsRequested: Array.isArray(agent.tools) ? agent.tools : ['*'],
             toolsResolved: [],
             unresolvedTools: [],
+            skillsRequested: Array.isArray(agent.skills) ? agent.skills : [],
             wildcard: !Array.isArray(agent.tools) || agent.tools.includes('*'),
             status: 'unknown',
             errors: [],
             warnings: [],
         };
+
+        if ((!agent.description || !agent.description.trim()) && agent.infer !== false) {
+            warnings.push(
+                `Agente "${agentName}" não declarou description. O SDK aceita isso, mas a seleção automática de subagentes fica menos precisa sem uma descrição específica.`,
+            );
+            contractLog[agentName].warnings.push('Description ausente para agente inferível');
+        }
+
+        if (Array.isArray(agent.skills)) {
+            if (agent.skills.length === 0) {
+                warnings.push(`Agente "${agentName}" declarou skills=[]. Nenhum preload será aplicado.`);
+                contractLog[agentName].warnings.push('Lista de skills vazia');
+            } else {
+                if (sessionSkillDirectories.length === 0) {
+                    warnings.push(
+                        `Agente "${agentName}" declara preload de skills (${agent.skills.join(', ')}), mas a sessão não configurou skillDirectories.`,
+                    );
+                    contractLog[agentName].warnings.push('Skills declaradas sem skillDirectories de sessão');
+                }
+                const disabledRequested = agent.skills.filter((skill) => disabledSkills.has(skill));
+                if (disabledRequested.length > 0) {
+                    warnings.push(
+                        disabledRequested.length === agent.skills.length
+                            ? `Agente "${agentName}" tem todas as skills pré-carregadas desabilitadas: ${disabledRequested.join(', ')}.`
+                            : `Agente "${agentName}" tem skills pré-carregadas desabilitadas: ${disabledRequested.join(', ')}.`,
+                    );
+                    contractLog[agentName].warnings.push(
+                        `Skills desabilitadas na sessão: ${disabledRequested.join(', ')}`,
+                    );
+                }
+            }
+        }
 
         // Valida array de ferramentas do agente
         if (agent.tools === null || agent.tools === undefined) {
@@ -124,10 +169,10 @@ export function validateAgentContracts(customAgents, availableTools = undefined)
         }
 
         if (agent.tools.length === 0) {
-            errors.push(`Agente "${agentName}" não declarou ferramentas. Ao menos uma ferramenta é obrigatória.`);
-            contractLog[agentName].status = 'error';
-            contractLog[agentName].errors.push('Array de ferramentas vazio');
-            continue;
+            warnings.push(
+                `Agente "${agentName}" declarou tools=[]. O SDK aceita isso, mas o agente operará sem ferramentas.`,
+            );
+            contractLog[agentName].warnings.push('Array de ferramentas vazio');
         }
 
         // Normaliza nomes de ferramentas (canônico + legado → canônico). `*` é uma declaração simbólica resolvida contra

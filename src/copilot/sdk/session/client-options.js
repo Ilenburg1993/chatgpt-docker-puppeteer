@@ -137,6 +137,12 @@ export class ClientOptionsBuilder {
         return this;
     }
 
+    /** @param {string} path @returns {this} */
+    cwd(path) {
+        this.#opts.cwd = path;
+        return this;
+    }
+
     /** @param {string} url @returns {this} */
     cliUrl(url) {
         this.#opts.cliUrl = url;
@@ -146,6 +152,12 @@ export class ClientOptionsBuilder {
     /** @param {boolean} use @returns {this} */
     useStdio(use) {
         this.#opts.useStdio = use;
+        return this;
+    }
+
+    /** @param {boolean} value @returns {this} */
+    isChildProcess(value) {
+        this.#opts.isChildProcess = value;
         return this;
     }
 
@@ -263,14 +275,23 @@ export class ClientOptionsBuilder {
         return this;
     }
 
+    /** @param {boolean} value @returns {this} */
+    autoRestart(value) {
+        this.#opts.autoRestart = value;
+        return this;
+    }
+
     /** @returns {this} */
     fromEnv() {
         const cliPath = process.env['COPILOT_CLI_PATH'];
         const cliUrl = process.env['COPILOT_CLI_URL'];
         const cliArgs = parseCliArgsEnv(process.env['COPILOT_CLI_ARGS']);
+        const cwd = process.env['COPILOT_CLI_CWD'] || process.env['COPILOT_WORKING_DIRECTORY'];
         const port = parseIntegerEnv(process.env['COPILOT_CLI_PORT']);
         const useStdio = parseBooleanEnv(process.env['COPILOT_USE_STDIO']);
+        const isChildProcess = parseBooleanEnv(process.env['COPILOT_CLI_IS_CHILD_PROCESS']);
         const autoStart = parseBooleanEnv(process.env['COPILOT_AUTO_START']);
+        const autoRestart = parseBooleanEnv(process.env['COPILOT_AUTO_RESTART']);
         const useLoggedInUser = parseBooleanEnv(process.env['COPILOT_USE_LOGGED_IN_USER']);
         const githubToken = process.env['COPILOT_GITHUB_TOKEN'] || process.env['GITHUB_TOKEN'];
         const logLevel =
@@ -281,9 +302,12 @@ export class ClientOptionsBuilder {
         if (cliPath) this.#opts.cliPath = cliPath;
         if (cliUrl) this.#opts.cliUrl = cliUrl;
         if (cliArgs) this.#opts.cliArgs = cliArgs;
+        if (cwd) this.#opts.cwd = cwd;
         if (port !== undefined) this.#opts.port = port;
         if (useStdio !== undefined) this.#opts.useStdio = useStdio;
+        if (isChildProcess !== undefined) this.#opts.isChildProcess = isChildProcess;
         if (autoStart !== undefined) this.#opts.autoStart = autoStart;
+        if (autoRestart !== undefined) this.#opts.autoRestart = autoRestart;
         if (useLoggedInUser !== undefined) this.#opts.useLoggedInUser = useLoggedInUser;
         if (githubToken) this.#opts.gitHubToken = githubToken;
         if (logLevel) this.#opts.logLevel = logLevel;
@@ -328,12 +352,14 @@ export function buildCopilotClientOptionsFromEnv(overrides = {}) {
         const cwd = process.env['COPILOT_CLI_CWD'] || process.env['COPILOT_WORKING_DIRECTORY'];
         const port = parseIntegerEnv(process.env['COPILOT_CLI_PORT']);
         const useStdio = parseBooleanEnv(process.env['COPILOT_USE_STDIO']);
+        const isChildProcess = parseBooleanEnv(process.env['COPILOT_CLI_IS_CHILD_PROCESS']);
 
         if (cliPath) builder.cliPath(cliPath);
         if (cliArgs) builder.cliArgs(cliArgs);
-        if (cwd) builder.merge({ cwd });
+        if (cwd) builder.cwd(cwd);
         if (port !== undefined) builder.port(port);
         if (useStdio !== undefined) builder.useStdio(useStdio);
+        if (isChildProcess !== undefined) builder.isChildProcess(isChildProcess);
         builder.envPassthrough(['PATH', 'HOME', 'SHELL', 'USER', 'USERNAME', 'TMPDIR']);
     }
 
@@ -341,6 +367,9 @@ export function buildCopilotClientOptionsFromEnv(overrides = {}) {
 
     const autoStart = parseBooleanEnv(process.env['COPILOT_AUTO_START']);
     if (autoStart !== undefined) builder.autoStart(autoStart);
+
+    const autoRestart = parseBooleanEnv(process.env['COPILOT_AUTO_RESTART']);
+    if (autoRestart !== undefined) builder.autoRestart(autoRestart);
 
     if (githubToken) {
         builder.githubToken(githubToken);

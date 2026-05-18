@@ -237,7 +237,10 @@ export async function initOrResumeSession(client, sessionOptions) {
         availableToolNameList,
         Array.isArray(sessionOptions.excludedTools) ? sessionOptions.excludedTools : [],
     );
-    const agentContractValidation = validateAgentContracts(customAgents ?? [], availableToolNames);
+    const agentContractValidation = validateAgentContracts(customAgents ?? [], availableToolNames, {
+        skillDirectories: bootSkills.skillDirectories,
+        disabledSkills: bootSkills.disabledSkills,
+    });
     _lastAgentContractValidation = agentContractValidation;
     const validationSummary = formatValidationResult(agentContractValidation);
     if (agentContractValidation.errors.length > 0) {

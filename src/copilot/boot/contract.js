@@ -4,8 +4,8 @@
  *
  * Contrato declarativo dos entrypoints operacionais do Copilot local.
  *
- * O boot real tem uma única trilha: terminal/bootstrap.js -> boot/runtime-bootstrap.js -> runCopilotBootPlan() ->
- * fases explícitas do host terminal. Não existe entrypoint compatível paralelo.
+ * O boot real tem uma única trilha: terminal/bootstrap.js -> boot/runtime-bootstrap.js -> runCopilotBootPlan() -> fases
+ * explícitas do host terminal. Não existe entrypoint compatível paralelo.
  *
  * @module copilot/boot/contract
  */
@@ -39,8 +39,7 @@ export const COPILOT_BOOT_PHASES = Object.freeze([
 export const COPILOT_BOOT_RULES = Object.freeze({
     singleRuntimeOwner: 'terminal/bootstrap.js is the only canonical executable boot owner.',
     serverOwnership: 'server/index.js owns HTTP/Socket.IO only; it never starts terminal UX or the agent by itself.',
-    terminalOwnership:
-        'terminal/index.js exposes only phase handlers consumed by boot/runtime-bootstrap.js.',
+    terminalOwnership: 'terminal/index.js exposes only phase handlers consumed by boot/runtime-bootstrap.js.',
     dependencyBoundary: 'No module in src/copilot outside terminal/ may import terminal surfaces directly.',
     pm2Ownership: 'PM2 must start only llm-b-terminal for the Copilot runtime.',
     bootConfigOwnership:
@@ -57,6 +56,7 @@ export const SDK_VANILLA_CAPABILITY_BASELINE = Object.freeze([
     'client.getAuthStatus',
     'client.listModels',
     'client.listSessions',
+    'client.getSessionMetadata',
     'client.getLastSessionId',
     'client.deleteSession',
     'client.getForegroundSessionId',
@@ -89,7 +89,16 @@ export const SDK_VANILLA_CAPABILITY_BASELINE = Object.freeze([
     'session.customProvider',
     'session.mcpServers',
     'session.customAgents',
+    'session.customAgents.mcpServers',
+    'session.customAgents.skills',
+    'session.defaultAgent',
     'session.skills',
+    'session.enableConfigDiscovery',
+    'session.includeSubAgentStreamingEvents',
+    'session.modelCapabilities',
+    'session.sessionFsHandler',
+    'session.gitHubToken',
+    'session.resume.disableResume',
     'telemetry.otel',
     'telemetry.traceContext',
 ]);

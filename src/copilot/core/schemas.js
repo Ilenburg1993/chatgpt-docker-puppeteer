@@ -170,8 +170,8 @@ export const HealthResponseSchema = z.object({
 export const SdkCustomAgentConfigSchema = z.object({
     name: z.string().min(1),
     displayName: z.string().optional(),
-    description: z.string().min(1),
-    tools: z.array(z.string()).min(1).nullable().optional(),
+    description: z.string().min(1).optional(),
+    tools: z.array(z.string()).nullable().optional(),
     toolTiers: z
         .object({
             must: z.array(z.string()).optional(),
@@ -180,7 +180,9 @@ export const SdkCustomAgentConfigSchema = z.object({
         })
         .optional(),
     prompt: z.string().min(1),
+    mcpServers: z.record(z.string(), z.unknown()).optional(),
     infer: z.boolean().optional(),
+    skills: z.array(z.string().min(1)).optional(),
     priority: z.enum(['maestro']).optional(),
 });
 

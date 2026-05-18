@@ -110,6 +110,7 @@ import {
     ClientOptionsBuilder,
     buildCopilotClientOptionsFromEnv,
 } from '../../../../src/copilot/config/client-options.js';
+import { ResumeSessionConfigBuilder } from '../../../../src/copilot/config/resume-session-config.js';
 import { SessionConfigBuilder } from '../../../../src/copilot/config/session-config.js';
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -305,6 +306,22 @@ describe('SessionConfigBuilder', () => {
         expect(config.disableResume).toBe(true);
     });
 
+    it('build() não vaza disableResume em SessionConfig', () => {
+        const config = new SessionConfigBuilder().model('gpt-4.1').disableResume(true).build();
+        expect('disableResume' in config).toBe(false);
+    });
+
+    it('buildForResume() remove sessionId do payload de retomada', () => {
+        const config = new SessionConfigBuilder()
+            .sessionId('should-not-leak')
+            .model('gpt-4.1')
+            .disableResume(true)
+            .buildForResume();
+        expect('sessionId' in config).toBe(false);
+        expect(config.model).toBe('gpt-4.1');
+        expect(config.disableResume).toBe(true);
+    });
+
     it('provider() define BYOK config', () => {
         const provider = { type: 'openai', baseUrl: 'http://localhost:11434/v1/' };
         const config = new SessionConfigBuilder().provider(/** @type {any} */ (provider)).build();
@@ -348,6 +365,11 @@ describe('ClientOptionsBuilder', () => {
     it('cliPath() define executável CLI', () => {
         const opts = new ClientOptionsBuilder().cliPath('/usr/bin/copilot').build();
         expect(opts.cliPath).toBe('/usr/bin/copilot');
+    });
+
+    it('cwd() define diretório de trabalho do processo CLI', () => {
+        const opts = new ClientOptionsBuilder().cwd('/workspace/project').build();
+        expect(opts.cwd).toBe('/workspace/project');
     });
 
     it('logLevel() define nível de log', () => {
@@ -515,6 +537,17 @@ describe('ClientOptionsBuilder', () => {
         expect(opts.useStdio).toBe(false);
     });
 
+    it('isChildProcess() propaga a flag de conexão por stdio ao parent', () => {
+        const opts = new ClientOptionsBuilder().useStdio(true).isChildProcess(true).build();
+        expect(opts.useStdio).toBe(true);
+        expect(opts.isChildProcess).toBe(true);
+    });
+
+    it('autoRestart() preserva a flag legada/deprecated como pass-through', () => {
+        const opts = new ClientOptionsBuilder().autoRestart(false).build();
+        expect(opts.autoRestart).toBe(false);
+    });
+
     it('encadeamento fluent funciona', () => {
         const opts = new ClientOptionsBuilder().cliUrl('localhost:9000').logLevel('info').autoStart(true).build();
         expect(opts.cliUrl).toBe('localhost:9000');
@@ -547,8 +580,11 @@ describe('ClientOptionsBuilder', () => {
             delete process.env.COPILOT_CLI_URL;
             process.env.COPILOT_CLI_PATH = '/opt/copilot';
             process.env.COPILOT_CLI_ARGS = '["--stdio"]';
+            process.env.COPILOT_CLI_CWD = '/workspace/copilot';
             process.env.COPILOT_USE_STDIO = 'true';
+            process.env.COPILOT_CLI_IS_CHILD_PROCESS = 'false';
             process.env.COPILOT_AUTO_START = 'false';
+            process.env.COPILOT_AUTO_RESTART = 'false';
             process.env.COPILOT_GITHUB_TOKEN = 'ghp_env';
             process.env.OTEL_EXPORTER_OTLP_ENDPOINT = 'http://localhost:4318';
             process.env.OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT = 'true';
@@ -557,8 +593,11 @@ describe('ClientOptionsBuilder', () => {
             const opts = buildCopilotClientOptionsFromEnv();
             expect(opts.cliPath).toBe('/opt/copilot');
             expect(opts.cliArgs).toEqual(['--stdio']);
+            expect(opts.cwd).toBe('/workspace/copilot');
             expect(opts.useStdio).toBe(true);
+            expect(opts.isChildProcess).toBe(false);
             expect(opts.autoStart).toBe(false);
+            expect(opts.autoRestart).toBe(false);
             expect(opts.gitHubToken).toBe('ghp_env');
             expect(opts.useLoggedInUser).toBe(false);
             expect(opts.env?.NO_COLOR).toBeUndefined();
@@ -571,5 +610,45 @@ describe('ClientOptionsBuilder', () => {
         } finally {
             process.env = original;
         }
+    });
+});
+
+describe('ResumeSessionConfigBuilder', () => {
+    it('expõe apenas a superfície de resume e preserva disableResume', () => {
+        const handler = vi.fn();
+        const config = new ResumeSessionConfigBuilder()
+            .clientName('resume-client')
+            .model('gpt-4.1')
+            .workingDirectory('/tmp/resume')
+            .onPermissionRequest(handler)
+            .disableResume(true)
+            .build();
+
+        expect(config.clientName).toBe('resume-client');
+        expect(config.model).toBe('gpt-4.1');
+        expect(config.workingDirectory).toBe('/tmp/resume');
+        expect(config.onPermissionRequest).toBe(handler);
+        expect(config.disableResume).toBe(true);
+        expect('sessionId' in config).toBe(false);
+    });
+
+    it('merge() sanitiza campos exclusivos de criação', () => {
+        const config = new ResumeSessionConfigBuilder()
+            .merge(
+                /** @type {any} */ ({
+                    sessionId: 'create-only',
+                    clientName: 'resume-client',
+                    disableResume: true,
+                }),
+            )
+            .build();
+
+        expect(config.clientName).toBe('resume-client');
+        expect(config.disableResume).toBe(true);
+        expect('sessionId' in config).toBe(false);
+    });
+
+    it('não expõe sessionId() como API do builder dedicado', () => {
+        expect('sessionId' in new ResumeSessionConfigBuilder()).toBe(false);
     });
 });

@@ -483,15 +483,15 @@ export class AlwaysAliveAgent extends EventEmitter {
      * @param {{
      *     timeoutMs?: number | null;
      *     attachments?: import('#copilot/sdk/types').MessageOptions['attachments'];
-    *     requestHeaders?: Record<string, string>;
+     *     requestHeaders?: Record<string, string>;
      *     signal?: AbortSignal;
      * }} [opts]
      *   - `timeoutMs` sobrescreve o timeout padrão de 60 s do SDK para `sendAndWait`. Use um valor grande (ex.: `24 * 60 *
      *       60 * 1000`) para tarefas de longa duração como o dialog loop, que nunca emitem `session.idle`
      *       organicamente.
      *   - `attachments` permite enviar arquivos, imagens ou referências de contexto junto com a mensagem.
-    *   - `signal` permite cancelar a tarefa via `AbortSignal` antes ou durante o processamento.
-    *   - `requestHeaders` injeta headers HTTP no próximo `session.send()` consumindo PR, útil para BYOK por turno.
+     *   - `signal` permite cancelar a tarefa via `AbortSignal` antes ou durante o processamento.
+     *   - `requestHeaders` injeta headers HTTP no próximo `session.send()` consumindo PR, útil para BYOK por turno.
      *
      * @returns {Promise<string>} Resposta completa do modelo
      */

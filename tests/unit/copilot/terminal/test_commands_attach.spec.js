@@ -36,12 +36,12 @@ describe('terminal/commands/attach', () => {
     it('/attach blob adiciona attachment inline sem roundtrip por disco', async () => {
         stateMocks.getAttachmentQueue.mockReturnValue(
             /** @type {(string | Record<string, unknown>)[]} */ ([
-            {
-                type: 'blob',
-                data: 'Y29udGV1ZG8=',
-                mimeType: 'text/plain',
-                displayName: 'memo.txt',
-            },
+                {
+                    type: 'blob',
+                    data: 'Y29udGV1ZG8=',
+                    mimeType: 'text/plain',
+                    displayName: 'memo.txt',
+                },
             ]),
         );
         const ctx = mockCtx();

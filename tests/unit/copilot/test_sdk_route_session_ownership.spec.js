@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { afterEach, beforeEach, describe, it } from 'vitest';
+import { afterEach, beforeEach, describe, it, vi } from 'vitest';
 
 import { CONVERSATION_STORE } from '#copilot/conversation-hub';
 import {
@@ -80,6 +80,12 @@ describe('sdk routes session ownership SSOT', () => {
     /** @type {string | null} */
     let lastSessionId = null;
 
+    /** @type {ReturnType<typeof vi.fn>} */
+    let listSessionsSpy;
+
+    /** @type {ReturnType<typeof vi.fn>} */
+    let getSessionMetadataSpy;
+
     /** @type {any[]} */
     let persistedBindings;
     /** @type {any[]} */
@@ -92,6 +98,8 @@ describe('sdk routes session ownership SSOT', () => {
         previousConversationStore = hadConversationStore ? container.resolve(CONVERSATION_STORE) : undefined;
         foregroundSessionId = null;
         lastSessionId = null;
+        listSessionsSpy = vi.fn(async () => []);
+        getSessionMetadataSpy = vi.fn(async () => undefined);
         persistedBindings = [];
         createdConfigs = [];
         resumedConfigs = [];
@@ -121,7 +129,8 @@ describe('sdk routes session ownership SSOT', () => {
                     foregroundSessionId = id;
                     lastSessionId = id;
                 },
-                listSessions: async () => [],
+                getSessionMetadata: getSessionMetadataSpy,
+                listSessions: listSessionsSpy,
                 createSession: async (/** @type {{ sessionId?: string }} */ config) => {
                     createdConfigs.push(config);
                     const session = makeSession(config.sessionId ?? 'sdk-created');
@@ -192,7 +201,10 @@ describe('sdk routes session ownership SSOT', () => {
             model: 'gpt-4.1',
             clientName: 'test-client',
             reasoningEffort: 'high',
+            modelCapabilities: { supports: { reasoningEffort: true } },
             configDir: '/tmp/copilot-config',
+            enableConfigDiscovery: true,
+            includeSubAgentStreamingEvents: false,
             systemMessage: { mode: 'customize', content: 'contexto' },
             availableTools: ['read_file'],
             excludedTools: ['shell'],
@@ -201,10 +213,12 @@ describe('sdk routes session ownership SSOT', () => {
             streaming: true,
             mcpServers: { local: { type: 'stdio', command: 'node', args: ['server.js'], tools: ['*'] } },
             customAgents: [{ name: 'reviewer', prompt: 'revise' }],
+            defaultAgent: { excludedTools: ['heavy_tool'] },
             agent: 'reviewer',
             skillDirectories: ['.github/skills'],
             disabledSkills: ['old-skill'],
             infiniteSessions: { enabled: true, backgroundCompactionThreshold: 0.8 },
+            gitHubToken: 'ghs_session_token',
         };
 
         const res = await request(createApp()).post('/sessions').send(body).expect(201);
@@ -240,6 +254,18 @@ describe('sdk routes session ownership SSOT', () => {
         assert.deepEqual(persistedBindings, [{ hubSessionId: 'hub-2', sdkSessionId: 'sdk-foreground' }]);
     });
 
+    it('GET /sessions/:id usa getSessionMetadata dedicado sem varrer listSessions', async () => {
+        getSessionMetadataSpy.mockResolvedValue({ sessionId: 'sdk-meta', summary: 'metadata-dedicated' });
+
+        const res = await request(createApp()).get('/sessions/sdk-meta').expect(200);
+
+        assert.equal(res.body.sessionId, 'sdk-meta');
+        assert.equal(res.body.metadata.sessionId, 'sdk-meta');
+        assert.equal(res.body.metadata.summary, 'metadata-dedicated');
+        assert.equal(getSessionMetadataSpy.mock.calls.length, 1);
+        assert.equal(listSessionsSpy.mock.calls.length, 0);
+    });
+
     it('POST /sessions/:id/resume sincroniza a sessão retomada na SSOT compartilhada', async () => {
         setSharedHubSessionId('hub-3');
 
@@ -256,7 +282,10 @@ describe('sdk routes session ownership SSOT', () => {
             clientName: 'resume-client',
             model: 'gpt-4.1',
             reasoningEffort: 'medium',
+            modelCapabilities: { supports: { reasoningEffort: true } },
             configDir: '/tmp/copilot-resume',
+            enableConfigDiscovery: true,
+            includeSubAgentStreamingEvents: false,
             systemMessage: { mode: 'append', content: 'resume' },
             availableTools: ['read_file'],
             excludedTools: ['shell'],
@@ -265,10 +294,12 @@ describe('sdk routes session ownership SSOT', () => {
             streaming: false,
             mcpServers: { local: { type: 'stdio', command: 'node', args: ['server.js'], tools: ['*'] } },
             customAgents: [{ name: 'reviewer', prompt: 'revise' }],
+            defaultAgent: { excludedTools: ['heavy_tool'] },
             agent: 'reviewer',
             skillDirectories: ['.github/skills'],
             disabledSkills: ['old-skill'],
             infiniteSessions: { enabled: false },
+            gitHubToken: 'ghs_session_token',
             disableResume: true,
         };
 

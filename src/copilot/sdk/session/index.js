@@ -67,6 +67,7 @@ export {
     getAuthStatus,
     getClient,
     getClientSession,
+    getClientSessionMetadata,
     getClientSnapshot,
     getClientState,
     getClientStatus,
@@ -82,6 +83,7 @@ export {
     resumeClientSession,
     sdkConnectionCircuitBreaker,
     setForegroundClientSessionId,
+    startClient,
     stopClient,
 } from './client.js';
 
@@ -172,6 +174,7 @@ export {
 } from './session-registry.js';
 
 export {
+    SYSTEM_PROMPT_SECTIONS,
     appendSystemMessage,
     appendToGuidelines,
     customizeSystemMessage,
@@ -181,7 +184,6 @@ export {
     replaceSystemMessage,
     sectionOverride,
     supportsCustomizeMode,
-    SYSTEM_PROMPT_SECTIONS,
     transformSection,
 } from './system-message.js';
 export { ToolSessionContext, createToolSessionContext } from './tool-session-context.js';
