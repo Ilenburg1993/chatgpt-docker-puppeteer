@@ -17,6 +17,7 @@ import {
     appendThinkingHistoryChunk,
     clearAttachments,
     clearInjectHistory,
+    clearNextTurnRequestHeaders,
     clearThinkingHistory,
     finalizeThinkingHistoryEntry,
     getAttachmentQueue,
@@ -26,6 +27,7 @@ import {
     getInjectHistoryForRuntime,
     getLastSdkPlanChangedAt,
     getLastSdkPlanOperation,
+    getNextTurnRequestHeaders,
     getLatestInjectHistoryEntryForRuntime,
     getLatestThinkingHistoryEntry,
     getSdkSessionMode,
@@ -40,6 +42,7 @@ import {
     setBusy,
     setHubSessionId,
     setLastSdkPlanOperation,
+    setNextTurnRequestHeaders,
     setSdkSessionMode,
     setShowIntentActivity,
     setShowStreaming,
@@ -246,6 +249,32 @@ describe('state attachment queue', () => {
         } catch (/** @type {any} */ e) {
             expect(e.message).toContain('cheia');
         }
+    });
+});
+
+describe('state next-turn request headers', () => {
+    beforeEach(() => clearNextTurnRequestHeaders());
+    afterEach(() => clearNextTurnRequestHeaders());
+
+    it('set/get round-trip com cópia defensiva', () => {
+        setNextTurnRequestHeaders({ Authorization: 'Bearer test', 'X-Mode': 'byok' });
+
+        const headers = getNextTurnRequestHeaders();
+        expect(headers).toEqual({ Authorization: 'Bearer test', 'X-Mode': 'byok' });
+
+        if (headers) headers.Authorization = 'mutado';
+        expect(getNextTurnRequestHeaders()).toEqual({ Authorization: 'Bearer test', 'X-Mode': 'byok' });
+    });
+
+    it('normaliza headers vazios para null', () => {
+        setNextTurnRequestHeaders({ Authorization: '   ', 'X-Mode': '' });
+        expect(getNextTurnRequestHeaders()).toBeNull();
+    });
+
+    it('clear limpa o estado one-shot', () => {
+        setNextTurnRequestHeaders({ Authorization: 'Bearer test' });
+        clearNextTurnRequestHeaders();
+        expect(getNextTurnRequestHeaders()).toBeNull();
     });
 });
 

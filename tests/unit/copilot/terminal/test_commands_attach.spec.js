@@ -10,7 +10,7 @@ const fsMocks = vi.hoisted(() => ({
 const stateMocks = vi.hoisted(() => ({
     addAttachment: vi.fn(),
     clearAttachments: vi.fn(),
-    getAttachmentQueue: vi.fn(() => []),
+    getAttachmentQueue: vi.fn(() => /** @type {(string | Record<string, unknown>)[]} */ ([])),
 }));
 
 vi.mock('node:fs/promises', () => fsMocks);
@@ -34,14 +34,16 @@ describe('terminal/commands/attach', () => {
     });
 
     it('/attach blob adiciona attachment inline sem roundtrip por disco', async () => {
-        stateMocks.getAttachmentQueue.mockReturnValue([
+        stateMocks.getAttachmentQueue.mockReturnValue(
+            /** @type {(string | Record<string, unknown>)[]} */ ([
             {
                 type: 'blob',
                 data: 'Y29udGV1ZG8=',
                 mimeType: 'text/plain',
                 displayName: 'memo.txt',
             },
-        ]);
+            ]),
+        );
         const ctx = mockCtx();
 
         await cmdAttach({ println: ctx.println }, 'blob text/plain Y29udGV1ZG8= --name memo.txt');
@@ -61,15 +63,17 @@ describe('terminal/commands/attach', () => {
     });
 
     it('/attach lista fila com entries tipadas', async () => {
-        stateMocks.getAttachmentQueue.mockReturnValue([
-            '/tmp/a.js',
-            {
-                type: 'blob',
-                data: 'Y29udGV1ZG8=',
-                mimeType: 'image/png',
-                displayName: 'screenshot.png',
-            },
-        ]);
+        stateMocks.getAttachmentQueue.mockReturnValue(
+            /** @type {(string | Record<string, unknown>)[]} */ ([
+                '/tmp/a.js',
+                {
+                    type: 'blob',
+                    data: 'Y29udGV1ZG8=',
+                    mimeType: 'image/png',
+                    displayName: 'screenshot.png',
+                },
+            ]),
+        );
         const ctx = mockCtx();
 
         await cmdAttach({ println: ctx.println }, '');

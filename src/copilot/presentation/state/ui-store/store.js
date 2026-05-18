@@ -61,6 +61,8 @@ let _rl = null;
 
 /** @type {TerminalAttachmentQueueEntry[]} */
 let _attachmentQueue = [];
+/** @type {Record<string, string> | null} */
+let _nextTurnRequestHeaders = null;
 const MAX_ATTACHMENT_QUEUE = TERMINAL_MAX_ATTACHMENTS;
 
 /**
@@ -233,6 +235,36 @@ export function addAttachment(attachment) {
 /** @returns {void} */
 export function clearAttachments() {
     _attachmentQueue = [];
+}
+
+/** @returns {Record<string, string> | null} */
+export function getNextTurnRequestHeaders() {
+    return _nextTurnRequestHeaders ? { ..._nextTurnRequestHeaders } : null;
+}
+
+/**
+ * @param {Record<string, string> | null | undefined} headers
+ * @returns {void}
+ */
+export function setNextTurnRequestHeaders(headers) {
+    if (!headers || Object.keys(headers).length === 0) {
+        _nextTurnRequestHeaders = null;
+        return;
+    }
+    /** @type {Record<string, string>} */
+    const normalized = {};
+    for (const [key, value] of Object.entries(headers)) {
+        const headerName = String(key).trim();
+        const headerValue = String(value).trim();
+        if (!headerName || !headerValue) continue;
+        normalized[headerName] = headerValue;
+    }
+    _nextTurnRequestHeaders = Object.keys(normalized).length > 0 ? normalized : null;
+}
+
+/** @returns {void} */
+export function clearNextTurnRequestHeaders() {
+    _nextTurnRequestHeaders = null;
 }
 
 /**

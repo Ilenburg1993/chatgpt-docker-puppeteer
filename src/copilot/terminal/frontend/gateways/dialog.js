@@ -103,9 +103,45 @@ export async function stopTerminalDialogMode() {
  *     timeout: number | null;
  *     onDelta: (chunk: string) => void;
  *     onReasoning?: (chunk: string, reasoningId: string | null) => void;
+ *     requestHeaders?: Record<string, string>;
  * }} opts
  * @returns {Promise<string>}
  */
 export async function runTerminalDialogTurn(enrichedMessage, opts) {
+    const requestHeaders = opts.requestHeaders || {};
+    if (Object.keys(requestHeaders).length > 0) {
+        const agentStatus = typeof llmBridgeClient.getAgentStatus === 'function' ? llmBridgeClient.getAgentStatus() : null;
+        const hadDialogLoop = Boolean(agentStatus?.dialogLoopActive || agentStatus?.dialogPaused);
+        if (hadDialogLoop) {
+            await llmBridgeClient.stopDialogMode('authorized_stop');
+        }
+        try {
+            const onReasoningCb = opts.onReasoning;
+            const onDelta = opts.onDelta
+                ? /** @type {(chunk: string, taskId: string) => void} */ ((chunk) => opts.onDelta(chunk))
+                : undefined;
+            const onReasoning = onReasoningCb
+                ? /** @type {(chunk: string, reasoningId: string | null, taskId: string) => void} */ (
+                      (chunk, reasoningId) => onReasoningCb(chunk, reasoningId)
+                  )
+                : undefined;
+            const chatOpts = {
+                timeoutMs: opts.timeout,
+                ...(onDelta ? { onDelta } : {}),
+                ...(onReasoning ? { onReasoning } : {}),
+                requestHeaders,
+            };
+            const result = await llmBridgeClient.chat(enrichedMessage, chatOpts);
+            return result.response;
+        } finally {
+            if (hadDialogLoop) {
+                try {
+                    await llmBridgeClient.startDialogMode(undefined, { resumeSessionAttach: true });
+                } catch {
+                    // A reanexação é best-effort aqui; o watchdog/controle local podem recuperar a seguir.
+                }
+            }
+        }
+    }
     return llmBridgeClient.dialogTurn(enrichedMessage, opts);
 }

@@ -199,6 +199,48 @@ describe('LlmBridgeClient › coleta de streaming via AlwaysAliveAgent', () => {
         }
     });
 
+    it('onReasoning recebe chunks do turno atual e requestHeaders são repassados ao agente', async () => {
+        const { LlmBridgeClient: LBC } = await import('../../../src/copilot/channel/client.js');
+        const client = new LBC();
+
+        /** @type {string[]} */
+        const reasoningChunks = [];
+        /** @type {{ requestHeaders?: Record<string, string> } | null} */
+        let capturedOpts = null;
+        const sendMessageOrig = alwaysAliveAgent.sendMessage.bind(alwaysAliveAgent);
+        const taskId = `task-request-headers-${Date.now()}`;
+
+        alwaysAliveAgent.sendMessage = async function (_msg, opts) {
+            capturedOpts = opts ?? null;
+            alwaysAliveAgent.emit('task.queued', { taskId, message: _msg });
+            alwaysAliveAgent.emit('task.reasoning', { taskId, chunk: 'pensando...', reasoningId: 'r1' });
+            return Promise.resolve('Resposta com headers');
+        };
+        Object.defineProperty(alwaysAliveAgent, 'status', { get: () => 'idle', configurable: true });
+
+        try {
+            const result = await client.chat('Mensagem com headers', {
+                onReasoning: (chunk) => reasoningChunks.push(chunk),
+                requestHeaders: { Authorization: 'Bearer test', 'X-Mode': 'byok' },
+            });
+
+            const captured = /** @type {{ requestHeaders?: Record<string, string> } | null} */ (capturedOpts);
+            const forwardedHeaders = captured ? captured.requestHeaders : undefined;
+
+            assert.deepStrictEqual(forwardedHeaders, {
+                Authorization: 'Bearer test',
+                'X-Mode': 'byok',
+            });
+            assert.deepStrictEqual(reasoningChunks, ['pensando...']);
+            assert.strictEqual(result.response, 'Resposta com headers');
+        } finally {
+            alwaysAliveAgent.sendMessage = sendMessageOrig;
+            // @ts-expect-error — propriedade de teste definida dinamicamente
+            delete alwaysAliveAgent.status;
+            client.clearHistory();
+        }
+    });
+
     it('chat() adiciona turno user e assistant no histórico', async () => {
         const { LlmBridgeClient: LBC } = await import('../../../src/copilot/channel/client.js');
         const client = new LBC();

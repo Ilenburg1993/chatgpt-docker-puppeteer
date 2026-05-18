@@ -9,6 +9,11 @@ import { randomUUID } from 'node:crypto';
 
 import { CANONICAL_LOCAL_FS_TOOL_NAMES, decideSdkFsRouting, toError } from '#copilot/core';
 import { utf8ByteLength } from '#copilot/infra/public/buffer';
+import {
+    clearNextTurnRequestHeaders,
+    getNextTurnRequestHeaders,
+    setNextTurnRequestHeaders,
+} from '../../presentation/state/index.js';
 import { isRuntimeElicitationSchema, normalizeElicitationContentWithSchema } from '../../core/elicitation-schema.js';
 import { readTerminalIoActivityProjection } from '../events/index.js';
 import {
@@ -207,6 +212,24 @@ function parseWorkspaceMaterializeFlags(rest) {
         }
     }
     return { overwrite, to };
+}
+
+/**
+ * @param {string[]} tokens
+ * @returns {Record<string, string>}
+ */
+function parseSdkRequestHeaders(tokens) {
+    /** @type {Record<string, string>} */
+    const headers = {};
+    for (const token of tokens) {
+        const idx = token.indexOf('=');
+        if (idx <= 0) continue;
+        const key = token.slice(0, idx).trim();
+        const value = token.slice(idx + 1).trim();
+        if (!key || !value) continue;
+        headers[key] = value;
+    }
+    return headers;
 }
 
 /**
@@ -677,6 +700,8 @@ export async function cmdSdk({ println }, arg = '') {
             await renderSdkDoctor({ println }, runtimeId);
         } else if (sub === 'capabilities' || sub === 'caps') {
             renderSdkCapabilitiesSummary({ println }, runtimeId);
+        } else if (sub === 'headers') {
+            renderSdkRequestHeadersSummary({ println }, rest);
         } else if (sub === 'waits') {
             renderSdkWaitsSummary({ println }, runtimeId);
         } else if (sub === 'compact') {
@@ -697,12 +722,56 @@ export async function cmdSdk({ println }, arg = '') {
             );
             await renderSdkQuota({ println }, runtimeId, { compact: true });
             println(
-                '  \x1b[90mUso: /sdk models | /sdk skills [--project <path>] [--dir <path>] | /sdk tools [model] | /sdk quota | /sdk prompt | /sdk capabilities | /sdk waits | /sdk doctor | /sdk compact\x1b[0m\n',
+                '  \x1b[90mUso: /sdk models | /sdk skills [--project <path>] [--dir <path>] | /sdk tools [model] | /sdk quota | /sdk prompt | /sdk capabilities | /sdk headers [k=v ...|clear] | /sdk waits | /sdk doctor | /sdk compact\x1b[0m\n',
             );
         }
     } catch (e) {
         println(`\n  \x1b[31m[ERR] SDK: ${toError(e).message}\x1b[0m\n`);
     }
+}
+
+/**
+ * @param {CommandContext} ctx
+ * @param {string[]} rest
+ * @returns {void}
+ */
+function renderSdkRequestHeadersSummary({ println }, rest) {
+    const [first = '', ...tail] = rest;
+    if (!first) {
+        const headers = getNextTurnRequestHeaders();
+        println('\n  \x1b[36mRequest Headers do próximo turno\x1b[0m');
+        if (!headers) {
+            println('  \x1b[90mNenhum header one-shot configurado. Use /sdk headers chave=valor ...\x1b[0m');
+        } else {
+            for (const [key, value] of Object.entries(headers)) {
+                println(`  \x1b[33m${key}\x1b[0m=\x1b[90m${value}\x1b[0m`);
+            }
+        }
+        println(
+            '  \x1b[90mObservação: turnos com requestHeaders usam dispatch SDK direto e reanexam o dialog loop depois da resposta.\x1b[0m\n',
+        );
+        return;
+    }
+
+    if (first === 'clear') {
+        clearNextTurnRequestHeaders();
+        println('\n  \x1b[90mHeaders one-shot limpos.\x1b[0m\n');
+        return;
+    }
+
+    const headers = parseSdkRequestHeaders([first, ...tail]);
+    if (Object.keys(headers).length === 0) {
+        println('\n  \x1b[31m[ERR] Use /sdk headers chave=valor [outra=coisa] ou /sdk headers clear\x1b[0m\n');
+        return;
+    }
+    setNextTurnRequestHeaders(headers);
+    println('\n  \x1b[32m[OK] Headers one-shot configurados para o próximo turno do usuário.\x1b[0m');
+    for (const [key, value] of Object.entries(headers)) {
+        println(`  \x1b[33m${key}\x1b[0m=\x1b[90m${value}\x1b[0m`);
+    }
+    println(
+        '  \x1b[90mEsse próximo turno usará dispatch SDK direto (consome PR) e depois reanexará o dialog loop.\x1b[0m\n',
+    );
 }
 
 /**

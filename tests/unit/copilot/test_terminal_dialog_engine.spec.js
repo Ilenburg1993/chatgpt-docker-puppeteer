@@ -45,13 +45,15 @@ vi.mock('../../../src/copilot/presentation/dialog-timeout-policy.js', () => ({
         reasons: ['caller_disabled'],
     })),
 }));
-vi.mock('../../../src/copilot/presentation/runtime/dialog.js', () => ({
+vi.mock('../../../src/copilot/presentation/runtime/index.js', () => ({
     attachmentToRuntimeEmbed: vi.fn(async () => null),
 }));
 vi.mock('../../../src/copilot/presentation/state/index.js', () => ({
     clearAttachments: vi.fn(),
+    clearNextTurnRequestHeaders: vi.fn(),
     getAttachmentQueue: vi.fn(() => []),
     getHubSessionId: vi.fn(() => null),
+    getNextTurnRequestHeaders: vi.fn(() => null),
     getRl: vi.fn(() => null),
     getShowStreaming: vi.fn(() => false),
     getShowThinking: vi.fn(() => false),
@@ -151,7 +153,7 @@ describe('terminal/dialog/engine.js — contrato', () => {
 
     it('embute blob attachment estruturado no próximo turno do usuário', async () => {
         const state = await import('../../../src/copilot/presentation/state/index.js');
-        const runtimeDialog = await import('../../../src/copilot/presentation/runtime/dialog.js');
+        const runtimeDialog = await import('../../../src/copilot/presentation/runtime/index.js');
         const dialogGateway = await import('../../../src/copilot/terminal/frontend/gateways/dialog.js');
 
         vi.mocked(state.getAttachmentQueue).mockReturnValue([
@@ -183,6 +185,23 @@ describe('terminal/dialog/engine.js — contrato', () => {
         expect(vi.mocked(dialogGateway.runTerminalDialogTurn)).toHaveBeenCalledWith(
             expect.stringContaining('Explique este artefato.'),
             expect.any(Object),
+        );
+    });
+
+    it('consome requestHeaders one-shot do próximo turno e encaminha ao gateway de diálogo', async () => {
+        const state = await import('../../../src/copilot/presentation/state/index.js');
+        const dialogGateway = await import('../../../src/copilot/terminal/frontend/gateways/dialog.js');
+
+        vi.mocked(state.getNextTurnRequestHeaders).mockReturnValue({ Authorization: 'Bearer test', 'X-Mode': 'byok' });
+
+        await mod.sendTurn('Mensagem com byok', 'user');
+
+        expect(vi.mocked(state.clearNextTurnRequestHeaders)).toHaveBeenCalled();
+        expect(vi.mocked(dialogGateway.runTerminalDialogTurn)).toHaveBeenCalledWith(
+            'Mensagem com byok',
+            expect.objectContaining({
+                requestHeaders: { Authorization: 'Bearer test', 'X-Mode': 'byok' },
+            }),
         );
     });
 

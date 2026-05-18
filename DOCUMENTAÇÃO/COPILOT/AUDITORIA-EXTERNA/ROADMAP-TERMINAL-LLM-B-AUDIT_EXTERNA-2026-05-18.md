@@ -106,6 +106,7 @@ A situação ideal ao final deste roadmap é:
 - **GAP-006** — fluxo terminal agora tenta iniciar `mcp.oauth.login()` via RPC quando o evento `mcp.oauth.required` ocorre
 - **GAP-010** — `/sdk quota` agora consulta `usage.getMetrics()` em best-effort
 - **GAP-005** — `/sdk skills` agora expõe discovery de skills na superfície terminal via cadeia canônica do runtime
+- **GAP-015** — `/sdk headers` + one-shot `requestHeaders` por turno já percorrem terminal → gateway → bridge → agent, com dispatch SDK direto e reanexo controlado do dialog loop
 - **GAP-016** — `/attach blob <mime> <base64> [--name ...]` habilita blobs inline sem roundtrip obrigatório por disco
 
 #### Confirmados e ainda pendentes
@@ -154,7 +155,7 @@ A situação ideal ao final deste roadmap é:
 ### 3.4 Achados adicionais desta validação
 
 - **ACHADO-A** — a ponte de eventos descartava `agentId`; já corrigido nesta onda
-- **ACHADO-B** — `requestHeaders` por turno é um gap real de integração, ainda pendente
+- **ACHADO-B** — `requestHeaders` por turno exigia um desvio arquitetural honesto; agora foi entregue via dispatch SDK direto com bounce controlado do dialog loop
 - **ACHADO-C** — divergência de runner e warnings de teardown do Vitest foram confirmados, diagnosticados e corrigidos nesta rodada
 
 ---
@@ -297,7 +298,7 @@ A situação ideal ao final deste roadmap é:
 - expor contrato ponta-a-ponta no terminal/gateway/presentation/agent;
 - evitar bypass lateral via camadas paralelas.
 
-**Status:** pendente.
+**Status:** concluída nesta rodada — a surface terminal foi entregue por `/sdk headers`, com armazenamento one-shot local, consumo no próximo turno do usuário e dispatch SDK direto com reanexo do dialog loop porque o caminho zero-PR de `ask_user` não carrega `requestHeaders` honestamente.
 
 #### Subfase 2.2.2 — Blob attachments
 
@@ -463,16 +464,15 @@ A situação ideal ao final deste roadmap é:
 
 - **Faixa 0**: consolidada; este arquivo passa a ser o plano único limpo e sem duplicações narrativas.
 - **Faixa 1**: além do hardening de progresso/heartbeat, a superfície terminal agora cobre explicitamente `assistant.usage` (via `pr.consumed`), `hook.*`, `sampling.*`, `commands.changed`, `capabilities.changed`, `auto_mode_switch.*` e `exit_plan_mode.requested`.
-- **Faixa 2**: reset approvals, quota metrics e OAuth MCP já entregues; `skills` já têm surface mínima por `/sdk skills`, `instructions` já aparecem em `/sdk prompt`, blobs já têm surface mínima por `/attach blob`, e o grande gap remanescente passa a ser `requestHeaders` por turno.
+- **Faixa 2**: reset approvals, quota metrics e OAuth MCP já entregues; `skills` já têm surface mínima por `/sdk skills`, `instructions` já aparecem em `/sdk prompt`, blobs já têm surface mínima por `/attach blob`, e `requestHeaders` por turno foram entregues via `/sdk headers` + dispatch SDK direto com reanexo controlado.
 - **Faixa 3**: concluída nesta rodada — runner corrigido, warnings zerados, `typecheck` estrito verde e convergência entre `test:unit` e `test:copilot:unit` comprovada.
 - **Faixa 4+**: permanecem como continuação natural agora que a baseline de validação está realmente verde e sem warnings.
 
 ## 6. Próxima sequência obrigatória de execução
 
-1. atacar a **Faixa 2.2.1** com `requestHeaders` por turno, que agora é o gap funcional mais estrutural;
-2. aprofundar `skills.*` para governança/mutação e mapeamento por subagente (**GAP-013**);
-3. enriquecer `command.*`, `commands.changed` e `capabilities.changed` com diffs/estado operacional mais ricos;
-4. só depois voltar à **Faixa 4** para persistência longa, re-registro defensivo residual e upgrades arquiteturais controlados.
+1. aprofundar `skills.*` para governança/mutação e mapeamento por subagente (**GAP-013**);
+2. enriquecer `command.*`, `commands.changed` e `capabilities.changed` com diffs/estado operacional mais ricos;
+3. só depois voltar à **Faixa 4** para persistência longa, re-registro defensivo residual e upgrades arquiteturais controlados.
 
 ## 7. Observação de governança
 
@@ -498,10 +498,9 @@ Expor capacidades avançadas por mensagem/turno no terminal.
 
 #### Itens
 
-- GAP-015 — `requestHeaders`
 - GAP-016 — blob attachments
 
-**Status:** pendente.
+**Status:** parcialmente concluída — `requestHeaders` já foram entregues com surface terminal e blobs já têm superfície mínima; o residual é eventual caminho binário nativo futuro além do embed textual zero-PR.
 
 ---
 

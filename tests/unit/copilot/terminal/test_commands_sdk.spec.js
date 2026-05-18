@@ -143,6 +143,10 @@ vi.mock('#copilot/tools', async (importOriginal) => ({
 
 import { cmdElicitation, cmdPermission, cmdSdk, cmdWorkspace } from '../../../../src/copilot/terminal/commands/sdk.js';
 import {
+    clearNextTurnRequestHeaders,
+    getNextTurnRequestHeaders,
+} from '../../../../src/copilot/presentation/state/index.js';
+import {
     clearTerminalElicitation,
     clearTerminalPermissions,
     clearTerminalUserInputs,
@@ -168,6 +172,7 @@ describe('terminal/commands/sdk', () => {
         clearTerminalElicitation('all');
         clearTerminalPermissions();
         clearTerminalUserInputs();
+        clearNextTurnRequestHeaders();
         runtimeMocks.pendingStructuredInputs.splice(0);
         vi.clearAllMocks();
     });
@@ -300,6 +305,26 @@ describe('terminal/commands/sdk', () => {
         expect(ctx.output()).toContain('slash');
         expect(ctx.output()).toContain('filtros: project=/repo');
         expect(ctx.output()).toContain('dir=/extra-skills');
+    });
+
+    it('/sdk headers configura, exibe e limpa headers one-shot do próximo turno', async () => {
+        const setCtx = mockCtx();
+        await cmdSdk({ println: setCtx.println }, 'headers Authorization=Bearer-test X-Mode=byok');
+
+        expect(getNextTurnRequestHeaders()).toEqual({ Authorization: 'Bearer-test', 'X-Mode': 'byok' });
+        expect(setCtx.output()).toContain('Headers one-shot configurados');
+        expect(setCtx.output()).toContain('dispatch SDK direto');
+
+        const showCtx = mockCtx();
+        await cmdSdk({ println: showCtx.println }, 'headers');
+        expect(showCtx.output()).toContain('Request Headers do próximo turno');
+        expect(showCtx.output()).toContain('Authorization');
+        expect(showCtx.output()).toContain('X-Mode');
+
+        const clearCtx = mockCtx();
+        await cmdSdk({ println: clearCtx.println }, 'headers clear');
+        expect(getNextTurnRequestHeaders()).toBeNull();
+        expect(clearCtx.output()).toContain('Headers one-shot limpos');
     });
 
     it('/workspace lista, lê e escreve no workspace virtual SDK, deixando claro que não é FS local', async () => {

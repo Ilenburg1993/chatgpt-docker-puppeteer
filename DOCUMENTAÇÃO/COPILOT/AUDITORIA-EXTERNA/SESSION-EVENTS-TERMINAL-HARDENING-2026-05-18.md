@@ -103,6 +103,8 @@ Estava parcial, latente ou subexposto para:
 
 Após a retomada contínua sobre baseline verde, os itens acima deixaram de ser apenas backlog conceitual: todos ganharam tratamento material, restando sobretudo aprofundamento de UX/diffs e não mais ausência total de surface.
 
+Um complemento importante desta rodada é que `requestHeaders` por turno deixaram de ser gap abstrato do roadmap e viraram contrato implementado. A solução adotada foi deliberadamente canônica: em vez de fingir que o caminho `ask_user` do dialog loop aceita headers por turno, o terminal faz bounce controlado para `llmBridgeClient.chat(...)` quando há headers one-shot, e reanexa o dialog loop ao fim.
+
 ---
 
 ## 4. Matriz de cobertura do recorte 946–1828
@@ -228,6 +230,12 @@ Se a resposta depender de lembrar um “flash” que sumiu, a UX está funcional
 
 - suporte terminal a `blob` attachments já entregue em superfície mínima por `/attach blob`
 - uso explícito de `session.capabilities.ui` para ajustar UX local
+
+### Subfase C.3 — inputs avançados por turno
+
+- `requestHeaders` por turno já entregues por `/sdk headers` com store one-shot local
+- gateway de diálogo faz dispatch SDK direto com reanexo do dialog loop quando necessário
+- residual futuro: avaliar se existe no SDK um caminho zero-PR nativo que carregue headers sem bounce explícito
 
 ---
 

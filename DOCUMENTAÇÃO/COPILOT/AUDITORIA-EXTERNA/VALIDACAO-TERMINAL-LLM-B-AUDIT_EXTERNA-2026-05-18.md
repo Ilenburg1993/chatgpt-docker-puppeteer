@@ -133,7 +133,7 @@ A auditoria descrevia um `setInterval` clássico. O código atual usa `registerI
 | GAP-012 | **Parcial / latente**    | Oportunidade válida             | a projeção atual é suficiente, mas não usa a RPC mais nova                                                                                 |
 | GAP-013 | **Confirmado**           | Planejar                        | skills por subagente ainda não estão mapeadas como recurso de produto                                                                      |
 | GAP-014 | **Refutado**             | Já implementado                 | `enableConfigDiscovery` já é configurado                                                                                                   |
-| GAP-015 | **Confirmado**           | Planejar/refatorar              | `runTerminalDialogTurn` e a pilha abaixo não expõem `requestHeaders` por turno                                                             |
+| GAP-015 | **Corrigido nesta onda** | Superfície canônica entregue    | `/sdk headers` + store one-shot + `runTerminalDialogTurn` agora usam dispatch SDK direto com reanexo do dialog loop para turnos com headers |
 | GAP-016 | **Parcial / endurecido** | Superfície mínima entregue      | `/attach blob <mime> <base64>` agora suporta blob inline no terminal; o caminho segue zero-PR via embed textual, não binário nativo        |
 | GAP-017 | **Confirmado**           | Corrigir imediatamente          | o SDK já expõe `resetSessionApprovals` e o terminal não expunha a ação                                                                     |
 
@@ -183,18 +183,26 @@ Mesmo com a mitigação de sessão (`includeSubAgentStreamingEvents: false`), a 
 
 **Decisão:** tratar como hardening necessário entre terminal e resto de `src/copilot`.
 
-### ACHADO-B — `requestHeaders` por turno continua sem superfície
+### ACHADO-B — `requestHeaders` por turno exigia um desvio honesto do zero-PR
 
 A trilha atual é:
 
 - `terminal/frontend/gateways/dialog.js`
 - `channel/client-dialog.js`
-- `presentation/runtime/dialog.js`
-- `sendAgentDialogTurn(...)`
+- `channel/client.js`
+- `agent/messaging/agent-messaging.js`
 
-Nenhuma dessas camadas expõe `requestHeaders` por mensagem/turno na superfície do terminal.
+O achado real desta retomada foi mais sutil do que “falta passar um parâmetro”.
 
-**Decisão:** confirmar como gap real de integração, mas não forçar patch apressado sem desenhar contrato de ponta a ponta.
+O caminho canônico zero-PR do dialog loop responde `ask_user` pendente; ele **não** carrega `requestHeaders` por turno de forma honesta. Portanto, para suportar BYOK/headers dinâmicos sem mentir sobre o contrato, foi necessário introduzir uma estratégia explícita:
+
+1. armazenar headers one-shot no estado de apresentação;
+2. consumi-los apenas no próximo turno do usuário;
+3. no gateway de diálogo, fazer bounce controlado do dialog loop;
+4. despachar o turno por `llmBridgeClient.chat(...)`, que já cai no caminho `sendMessage()`/SDK direto com `requestHeaders`;
+5. reanexar o dialog loop com `resumeSessionAttach: true` ao final.
+
+**Decisão:** gap confirmado e corrigido nesta rodada sem abrir arquitetura paralela nem fingir suporte dentro do caminho `ask_user`.
 
 ### ACHADO-C — divergência de runner e warnings de teardown do Vitest
 
@@ -256,7 +264,6 @@ O terminal ideal deve:
 - GAP-002
 - GAP-006
 - GAP-010
-- GAP-015
 
 ### P2 — consolidar e endurecer
 
@@ -357,7 +364,7 @@ Continuam merecendo tratamento dedicado ou aprofundamento, mas já houve endurec
 
 - aprofundamento de `command.*` e diffs mais ricos para `commands.changed` / `capabilities.changed`
 - governança de skills por subagente e mutações/config dedicadas
-- `requestHeaders` por turno e, no futuro, eventual caminho binário nativo além do embed textual zero-PR
+- eventual caminho binário nativo futuro além do embed textual zero-PR
 
 ### 10.6. Addendum desta retomada contínua
 
@@ -367,10 +374,10 @@ Após a estabilização da baseline de testes, esta retomada executou uma nova o
 - `hook.*`, `sampling.*`, `commands.changed`, `capabilities.changed`, `auto_mode_switch.*` e `exit_plan_mode.requested` passaram a ter wiring canônico até a UX terminal;
 - `skills.discover` agora está exposto no terminal por `/sdk skills`, atravessando a cadeia canônica `agent → presentation → gateway → command`;
 - o terminal passou a aceitar `blob` inline por `/attach blob <mime> <base64> [--name ...]`, com fila estruturada e embedding zero-PR via helper unificado de runtime.
+- `requestHeaders` por turno agora estão expostos por `/sdk headers`, com store one-shot e dispatch SDK direto com reanexo do dialog loop no gateway quando necessário.
 
 Com isso, o backlog remanescente ficou mais estreito e mais claramente concentrado em:
 
-- `requestHeaders` por turno;
 - governança/mutação avançada de skills (incluindo subagentes);
 - aprofundamento de superfícies ricas para `command.*` e capacidades dinâmicas;
 - eventual caminho binário nativo futuro além do embed textual do terminal.

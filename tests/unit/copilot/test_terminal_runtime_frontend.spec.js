@@ -5,6 +5,8 @@ import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 const stopDialogMode = vi.fn(async () => {});
 const startDialogMode = vi.fn(async () => {});
 const dialogTurn = vi.fn(async () => 'ok');
+const chat = vi.fn(async () => ({ response: 'chat-ok' }));
+const getAgentStatus = vi.fn(() => ({ dialogLoopActive: true, dialogPaused: false }));
 /** @type {{ role: string; content: string; timestamp?: number }[]} */
 const liveHistory = [{ role: 'user', content: 'oi' }];
 const clearHistory = vi.fn(() => {
@@ -348,6 +350,8 @@ vi.mock('#copilot/channel', () => ({
         stopDialogMode,
         startDialogMode,
         dialogTurn,
+        chat,
+        getAgentStatus,
     },
 }));
 
@@ -386,10 +390,15 @@ beforeEach(() => {
     liveHistory.length = 0;
     liveHistory.push({ role: 'user', content: 'oi' });
     persistedTurns.length = 0;
+    startDialogMode.mockClear();
+    stopDialogMode.mockClear();
+    dialogTurn.mockClear();
     readTurns.mockClear();
     countTurns.mockClear();
     writeTurn.mockReset();
     writeTurn.mockImplementation(writeTurnDefaultImpl);
+    chat.mockClear();
+    getAgentStatus.mockClear();
     clearHistory.mockClear();
     transcriptState.clearTerminalTranscriptTurns();
     sharedState.clearSharedSessionBinding();
@@ -443,6 +452,31 @@ describe('terminal/frontend/index', () => {
         expect(timelineBeforeClear.turns).toHaveLength(1);
         expect(timelineAfterClear.timelineSource).toBe('empty');
         expect(timelineAfterClear.turns).toHaveLength(0);
+    });
+
+    it('usa dispatch SDK direto com bounce controlado do dialog loop quando há requestHeaders', async () => {
+        const onDelta = vi.fn();
+        const onReasoning = vi.fn();
+
+        const reply = await runtime.runTerminalDialogTurn('mensagem com byok', {
+            timeout: 1000,
+            onDelta,
+            onReasoning,
+            requestHeaders: { Authorization: 'Bearer test' },
+        });
+
+        expect(reply).toBe('chat-ok');
+        expect(getAgentStatus).toHaveBeenCalled();
+        expect(stopDialogMode).toHaveBeenCalledWith('authorized_stop');
+        expect(chat).toHaveBeenCalledWith(
+            'mensagem com byok',
+            expect.objectContaining({
+                timeoutMs: 1000,
+                requestHeaders: { Authorization: 'Bearer test' },
+            }),
+        );
+        expect(startDialogMode).toHaveBeenCalledWith(undefined, { resumeSessionAttach: true });
+        expect(dialogTurn).not.toHaveBeenCalled();
     });
 
     it('sincroniza lazy timeline bridge_only para o Hub sem criar pending user espúrio', async () => {

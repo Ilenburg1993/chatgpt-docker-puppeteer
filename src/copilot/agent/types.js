@@ -164,6 +164,7 @@
  * @property {number | null} [timeoutMs] - Timeout informativo; null desabilita bloqueio local.
  * @property {import('#copilot/sdk/types').MessageOptions['attachments']} [attachments] - Anexos (arquivos, imagens,
  *   seleções) a enviar junto com a mensagem.
+ * @property {Record<string, string>} [requestHeaders] - Headers HTTP customizados a aplicar no turno direto do SDK.
  */
 
 // ─── AgentStatusSnapshot ──────────────────────────────────────────────────────

@@ -200,6 +200,7 @@ async function sendAndWaitWithInactivityTimeout(session, sendOpts, timeoutMs) {
  * @property {string} message
  * @property {number | null} [timeoutMs]
  * @property {import('#copilot/sdk/types').MessageOptions['attachments']} [attachments]
+ * @property {Record<string, string>} [requestHeaders]
  * @property {number} enqueuedAt
  * @property {number} [attempts] - Número de tentativas realizadas (para limitar reintentos após reconexão)
  * @property {(text: string) => void} resolve
@@ -215,12 +216,13 @@ async function sendAndWaitWithInactivityTimeout(session, sendOpts, timeoutMs) {
  * @param {{
  *     timeoutMs?: number | null;
  *     attachments?: import('#copilot/sdk/types').MessageOptions['attachments'];
+ *     requestHeaders?: Record<string, string>;
  *     signal?: AbortSignal;
  *     resolve: (v: string | PromiseLike<string>) => void;
  *     reject: (r: unknown) => void;
  * }} opts
  */
-export function enqueueTask(ctx, host, message, { timeoutMs, attachments, signal, resolve, reject }) {
+export function enqueueTask(ctx, host, message, { timeoutMs, attachments, requestHeaders, signal, resolve, reject }) {
     const safeTimeoutMs = normalizeTimeoutMs(timeoutMs);
     const task = /** @type {AgentTask} */ ({
         id: `task-${Date.now()}-${globalThis.crypto.randomUUID().slice(-8)}`,
@@ -230,6 +232,7 @@ export function enqueueTask(ctx, host, message, { timeoutMs, attachments, signal
         enqueuedAt: Date.now(),
         timeoutMs: safeTimeoutMs,
         ...(attachments !== undefined ? { attachments } : {}),
+        ...(requestHeaders !== undefined ? { requestHeaders } : {}),
     });
     try {
         ctx.enqueueMessageTask(task, ...(signal ? [{ signal }] : []));
@@ -252,11 +255,12 @@ export function enqueueTask(ctx, host, message, { timeoutMs, attachments, signal
  * @param {{
  *     timeoutMs?: number | null;
  *     attachments?: import('#copilot/sdk/types').MessageOptions['attachments'];
+ *     requestHeaders?: Record<string, string>;
  *     signal?: AbortSignal;
  * }} [opts]
  * @returns {Promise<string>}
  */
-export function sendMessage(ctx, host, message, { timeoutMs, attachments, signal } = {}) {
+export function sendMessage(ctx, host, message, { timeoutMs, attachments, requestHeaders, signal } = {}) {
     return new Promise((resolve, reject) => {
         if (signal?.aborted) {
             reject(new DOMException('AbortError: sendMessage cancelado antes de enfileirar.', 'AbortError'));
@@ -276,6 +280,7 @@ export function sendMessage(ctx, host, message, { timeoutMs, attachments, signal
             reject,
             ...(timeoutMs !== undefined ? { timeoutMs } : {}),
             ...(attachments !== undefined ? { attachments } : {}),
+            ...(requestHeaders !== undefined ? { requestHeaders } : {}),
             ...(signal !== undefined ? { signal } : {}),
         });
     });
@@ -287,7 +292,7 @@ export function sendMessage(ctx, host, message, { timeoutMs, attachments, signal
  * @param {AgentContext} ctx
  * @param {MessagingHost} host
  * @param {string} message
- * @param {{ timeoutMs?: number | null }} [opts]
+ * @param {{ timeoutMs?: number | null; requestHeaders?: Record<string, string> }} [opts]
  * @returns {Promise<string>}
  */
 export function sendMessageDialogBoot(ctx, host, message, opts = {}) {
@@ -350,6 +355,7 @@ export async function executeTask(session, task, callbacks) {
         const sendOpts = /** @type {import('#copilot/sdk/types').MessageOptions} */ ({
             prompt: task.message,
             ...(task.attachments !== undefined ? { attachments: task.attachments } : {}),
+            ...(task.requestHeaders !== undefined ? { requestHeaders: task.requestHeaders } : {}),
         });
         const effectiveTimeoutMs = task.timeoutMs ?? null;
         log(

@@ -145,11 +145,14 @@ function createInactivityGuard(timeoutMs, onTimeout) {
  *
  * @typedef {Object} ChatOptions
  * @property {(chunk: string, taskId: string) => void} [onDelta] - Callback por chunk de streaming
+ * @property {(chunk: string, reasoningId: string | null, taskId: string) => void} [onReasoning] - Callback por chunk
+ *   de reasoning
  * @property {(question: object) => void} [onQuestion] - Callback quando modelo faz pergunta
  * @property {number | null} [timeoutMs] - Timeout em ms. `null` = sem timeout por inatividade. Este é o default para
  *   não impor limite bloqueante à LLM-B.
  * @property {import('#copilot/sdk/types').MessageOptions['attachments']} [attachments] - Anexos (arquivos, imagens) a
  *   enviar junto com a mensagem
+ * @property {Record<string, string>} [requestHeaders] - Headers HTTP por turno no caminho direto `sendMessage()`
  * @property {number} [retries] - F11.4: número máximo de tentativas em caso de timeout/erro transiente (default: 0)
  * @property {number} [retryDelayMs] - F11.4: delay base entre tentativas em ms (default: 1500; cresce 2× a cada retry)
  *   Cliente de alto nível para conversa contínua com LLM-B via AlwaysAliveAgent.
@@ -194,12 +197,28 @@ export class LlmBridgeClient {
      * @throws {Error} Se o agente não estiver ativo ou a tarefa falhar
      */
     async chat(message, opts = {}) {
-        const { onDelta, onQuestion, timeoutMs = null, attachments, retries = 0, retryDelayMs = 1_500 } = opts;
+        const {
+            onDelta,
+            onReasoning,
+            onQuestion,
+            timeoutMs = null,
+            attachments,
+            requestHeaders,
+            retries = 0,
+            retryDelayMs = 1_500,
+        } = opts;
 
         // F11.4: wrapper de retry — tenta no máximo `retries+1` vezes em erros de timeout ou busy
         for (let attempt = 0; attempt <= retries; attempt++) {
             try {
-                return await this.#chatOnce(message, { onDelta, onQuestion, timeoutMs, attachments });
+                return await this.#chatOnce(message, {
+                    onDelta,
+                    onReasoning,
+                    onQuestion,
+                    timeoutMs,
+                    attachments,
+                    requestHeaders,
+                });
             } catch (err) {
                 const msg = toError(err).message;
                 const isRetryable = msg.includes('Timeout') || msg.includes('busy') || msg.includes('ECONNRESET');
@@ -222,14 +241,16 @@ export class LlmBridgeClient {
      * @param {string} message
      * @param {{
      *     onDelta?: ChatOptions['onDelta'];
+     *     onReasoning?: ChatOptions['onReasoning'];
      *     onQuestion?: ChatOptions['onQuestion'];
      *     timeoutMs?: number | null;
      *     attachments?: ChatOptions['attachments'];
+     *     requestHeaders?: ChatOptions['requestHeaders'];
      * }} opts
      * @returns {Promise<ChatResult>}
      */
     async #chatOnce(message, opts = {}) {
-        const { onDelta, onQuestion, timeoutMs = null, attachments } = opts;
+           const { onDelta, onReasoning, onQuestion, timeoutMs = null, attachments, requestHeaders } = opts;
         const startedAt = Date.now();
 
         if (requireAgent().status === 'stopped') {
@@ -271,6 +292,16 @@ export class LlmBridgeClient {
             }
         };
 
+        const onReasoningEvt = (/** @type {{ taskId?: string; chunk?: string; reasoningId?: string | null }} */ evt) => {
+            if (activeTaskId && evt.taskId === activeTaskId && onReasoning) {
+                try {
+                    onReasoning(evt.chunk ?? '', evt.reasoningId ?? null, evt.taskId);
+                } catch (e) {
+                    logSwallowed(e, 'channel.client.onReasoning');
+                }
+            }
+        };
+
         const onQuestionEvt = (/** @type {Record<string, unknown>} */ evt) => {
             if (onQuestion) {
                 try {
@@ -285,6 +316,9 @@ export class LlmBridgeClient {
         // e remover listener imediatamente após capturar o taskId deste turno
         requireAgent().once(EMITTER_TASK_QUEUED, onTaskQueued);
         requireAgent().on(EMITTER_TASK_DELTA, onDeltaEvt);
+        if (onReasoning) {
+            requireAgent().on(EMITTER_TASK_REASONING, onReasoningEvt);
+        }
 
         if (onQuestion) {
             requireAgent().once(EMITTER_QUESTION_PENDING, onQuestionEvt);
@@ -319,7 +353,13 @@ export class LlmBridgeClient {
             requireAgent().on(EMITTER_TASK_DELTA, onProgress);
             requireAgent().on(EMITTER_QUESTION_PENDING, onProgress);
 
-            const response = await Promise.race([requireAgent().sendMessage(message, { attachments }), timeoutPromise]);
+            const response = await Promise.race([
+                requireAgent().sendMessage(message, {
+                    ...(attachments !== undefined ? { attachments } : {}),
+                    ...(requestHeaders !== undefined ? { requestHeaders } : {}),
+                }),
+                timeoutPromise,
+            ]);
 
             const responseStr = /** @type {string} */ (response);
             const durationMs = Date.now() - startedAt;
@@ -347,14 +387,18 @@ export class LlmBridgeClient {
             };
         } finally {
             inactivityGuard.clear();
-            requireAgent().off('task.queued', onTaskQueued);
-            requireAgent().off('task.delta', onDeltaEvt);
+            requireAgent().off(EMITTER_TASK_QUEUED, onTaskQueued);
+            requireAgent().off(EMITTER_TASK_DELTA, onDeltaEvt);
+            if (onReasoning) {
+                requireAgent().off(EMITTER_TASK_REASONING, onReasoningEvt);
+            }
             requireAgent().off(EMITTER_TASK_STARTED, onProgress);
             requireAgent().off(EMITTER_TASK_REASONING, onProgress);
             requireAgent().off(EMITTER_TOOL_EXECUTION_PROGRESS, onProgress);
+            requireAgent().off(EMITTER_TASK_DELTA, onProgress);
             requireAgent().off(EMITTER_QUESTION_PENDING, onProgress);
             if (onQuestion) {
-                requireAgent().off('question.pending', onQuestionEvt);
+                requireAgent().off(EMITTER_QUESTION_PENDING, onQuestionEvt);
             }
         }
     }

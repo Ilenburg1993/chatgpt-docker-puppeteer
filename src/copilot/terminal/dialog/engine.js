@@ -10,6 +10,7 @@ import { emitNerv } from '#copilot/bridges';
 import { LLM_B_BOOT_TIMEOUT_MS } from '#copilot/config';
 import { cancelTimer, container, registerInterval, sleepMs, toError } from '#copilot/core';
 import { utf8ByteLength } from '#copilot/infra/public/buffer';
+import { clearNextTurnRequestHeaders, getNextTurnRequestHeaders } from '../../presentation/state/index.js';
 import { log, METRICS_STORE } from '#copilot/observability';
 import { resolveOptionalDialogTimeout } from '../../presentation/dialog-timeout-policy.js';
 import { MAX_EMBED_BYTES } from '../../presentation/files/index.js';
@@ -358,12 +359,16 @@ export function sendTurn(message, actor = 'user') {
     }
 
     const attachments = actor === 'user' ? getAttachmentQueue() : [];
+    const requestHeaders = actor === 'user' ? getNextTurnRequestHeaders() : null;
     if (attachments.length > 0) {
         clearAttachments();
     }
+    if (requestHeaders) {
+        clearNextTurnRequestHeaders();
+    }
 
     _turnQueueDepth++;
-    const next = _sendTurnMutex.then(() => _executeTurn(message, actor, attachments)).catch(() => null);
+    const next = _sendTurnMutex.then(() => _executeTurn(message, actor, attachments, requestHeaders)).catch(() => null);
     _sendTurnMutex = next.then(
         () => null,
         () => null,
@@ -383,9 +388,10 @@ export function sendTurn(message, actor = 'user') {
  * @param {string} message
  * @param {string} actor
  * @param {TerminalQueuedAttachment[]} attachments
+ * @param {Record<string, string> | null} [requestHeaders]
  * @returns {Promise<string | null>}
  */
-async function _executeTurn(message, actor, attachments = []) {
+async function _executeTurn(message, actor, attachments = [], requestHeaders = null) {
     const t0 = Date.now();
     const runtimeState = readTerminalRuntimeState();
     const ctxState = runtimeState.contextWindow;
@@ -425,6 +431,16 @@ async function _executeTurn(message, actor, attachments = []) {
         detail: message.slice(0, 120),
         source: 'dialog',
     });
+    if (requestHeaders && Object.keys(requestHeaders).length > 0) {
+        recordTerminalActivity('system', 'Turno com requestHeaders', {
+            detail: Object.keys(requestHeaders).join(', '),
+            source: 'dialog',
+            severity: 'warn',
+        });
+        println(
+            `\x1b[90m  ↳ requestHeaders por turno detectados (${Object.keys(requestHeaders).join(', ')}); usando dispatch SDK direto com reanexo do dialog loop.\x1b[0m`,
+        );
+    }
     broadcastSse('busy', { busy: true, actor });
     const rl = getRl();
     /** @type {NodeJS.Timeout | null} */
@@ -555,6 +571,7 @@ async function _executeTurn(message, actor, attachments = []) {
             timeout: timeoutDecision.timeoutMs,
             onDelta,
             onReasoning,
+            ...(requestHeaders ? { requestHeaders } : {}),
         });
         const durationMs = Date.now() - t0;
 
