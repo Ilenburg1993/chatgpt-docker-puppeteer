@@ -20,6 +20,7 @@ export {
     readLines,
     readText,
     readTextChunks,
+    readTextChunksStream,
     removePathLocked,
     statPath,
     writeFileAtomic

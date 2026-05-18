@@ -59,7 +59,11 @@ export class AsyncQueue {
      */
     add(fn, priority = 5) {
         const normalizedPriority = Number.isFinite(priority) ? Math.floor(priority) : 5;
-        const queue = this.#queues.get(normalizedPriority) ?? this.#queues.get(5);
+        let queue = this.#queues.get(normalizedPriority);
+        if (!queue) {
+            queue = [];
+            this.#queues.set(normalizedPriority, queue);
+        }
         return new Promise((resolve, reject) => {
             queue?.push({ fn, resolve: /** @type {(value: unknown) => void} */ (resolve), reject });
             this.#drain();

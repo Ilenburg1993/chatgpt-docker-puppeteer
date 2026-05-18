@@ -9,11 +9,15 @@
  */
 
 import { getCopilotDb } from '#copilot/db';
+import { resolve } from 'node:path';
 import { registerInvalidationHook } from './io-cache.js';
 import { createIoIndexSqlite } from './io-index-sqlite.js';
 
 /** @type {ReturnType<typeof createIoIndexSqlite> | null} */
 let _ioIndex = null;
+
+/** @type {Map<string, Promise<unknown>>} */
+const _inflightIndexBuilds = new Map();
 
 registerInvalidationHook((filePath) => {
     try {
@@ -66,7 +70,33 @@ export async function buildIoIndexForDirectory(directory, options = {}) {
             reason: 'index-unavailable',
         };
     }
-    return index.indexDirectory(directory, options);
+
+    const normalizedDirectory = resolve(directory);
+    const key = JSON.stringify([
+        normalizedDirectory,
+        options.workspaceRoot ? resolve(options.workspaceRoot) : null,
+        options.recursive ?? null,
+        options.depth ?? null,
+        options.respectGitignore ?? null,
+        options.concurrency ?? null,
+        options.maxFiles ?? null,
+        options.pruneMissing ?? null,
+        options.extensions ? [...options.extensions].map((ext) => String(ext).toLowerCase()).sort() : null,
+        options.include ? [...options.include].map(String).sort() : null,
+        options.exclude ? [...options.exclude].map(String).sort() : null,
+    ]);
+
+    const inflight = _inflightIndexBuilds.get(key);
+    if (inflight) {
+        return /** @type {Awaited<ReturnType<typeof index.indexDirectory>>} */ (await inflight);
+    }
+
+    const buildPromise = index.indexDirectory(directory, options).finally(() => {
+        _inflightIndexBuilds.delete(key);
+    });
+
+    _inflightIndexBuilds.set(key, buildPromise);
+    return await buildPromise;
 }
 
 /**
@@ -102,4 +132,5 @@ export function invalidateIoIndexPath(filePath) {
 
 export function resetIoIndexForTest() {
     _ioIndex = null;
+    _inflightIndexBuilds.clear();
 }

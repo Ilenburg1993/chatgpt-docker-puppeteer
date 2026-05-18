@@ -2,6 +2,7 @@
 
 import { spawn } from 'node:child_process';
 import { createWriteStream, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { glob as fsGlob } from 'node:fs/promises';
 import path from 'node:path';
 
 const cwd = process.cwd();

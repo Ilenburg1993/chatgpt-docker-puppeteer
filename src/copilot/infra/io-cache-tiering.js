@@ -56,7 +56,7 @@ export function buildIoCacheTierPlan(input = {}) {
         recommendations.push('Consider enabling L2: workspace file count is high.');
     }
     if (!l2Enabled && readHotsetRatio < 0.1) {
-        recommendations.push('Keep L2 disabled until hotset/read patterns stabilize.');
+        recommendations.push('Read hotset ratio is low: evaluate enabling L2 and reviewing cache sizing/workload.');
     }
     if (l2Enabled && !l3Enabled && workspaceFiles > 20000) {
         recommendations.push('Prepare L3 design for multi-runtime sharing and cold-start reduction.');

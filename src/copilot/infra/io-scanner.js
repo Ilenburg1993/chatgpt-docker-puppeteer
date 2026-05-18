@@ -8,11 +8,11 @@
  * @module copilot/infra/io-scanner
  */
 
+import { DEFAULT_BLOCKED_PATH_SEGMENTS, buildIoMeta, createIoTraceId, toError } from '#copilot/core';
 import ignore from 'ignore';
 import { lstat, readdir } from 'node:fs/promises';
 import { basename, join, relative } from 'node:path';
 import pLimit from 'p-limit';
-import { DEFAULT_BLOCKED_PATH_SEGMENTS, buildIoMeta, createIoTraceId } from '#copilot/core';
 import { nowIoMs, publishIoLifecycleEvent, publishIoOperation } from './io-observability.js';
 import { hasNullByte } from './policy/path-resource.js';
 import { mapInBatches, normalizeBatchSize } from './scan/batching.js';
@@ -22,6 +22,7 @@ import { matchesAnyPattern, matchesFilter } from './scan/glob.js';
 import { readEnvPositiveInt } from './shared/env.js';
 
 const DEFAULT_SCAN_BATCH_SIZE = readEnvPositiveInt('IO_SCAN_BATCH_SIZE', 512);
+const DEFAULT_SCAN_HARD_MAX_ENTRIES = readEnvPositiveInt('IO_SCAN_HARD_MAX_ENTRIES', 20_000);
 
 /**
  * @param {unknown} candidate
@@ -95,6 +96,7 @@ export async function scanDirectory(rootPath, options = {}) {
             ? Math.floor(Number(options.concurrency))
             : 16;
     const batchSize = normalizeBatchSize(Number(options.batchSize), DEFAULT_SCAN_BATCH_SIZE);
+    const hardMaxEntries = DEFAULT_SCAN_HARD_MAX_ENTRIES;
     const limit = pLimit(concurrency);
     const gitignore = respectGitignore ? await loadGitignoreMatcher(workspaceRoot) : ignore();
     const blockedSegments = new Set(
@@ -103,6 +105,7 @@ export async function scanDirectory(rootPath, options = {}) {
             .map((segment) => segment.toLowerCase()),
     );
     let scannedEntries = 0;
+    let hardLimitReached = false;
     publishIoLifecycleEvent('scan', 'start', {
         traceId,
         rootPath,
@@ -121,6 +124,10 @@ export async function scanDirectory(rootPath, options = {}) {
         const names = await readdir(dir);
         names.sort((a, b) => a.localeCompare(b));
         const entries = await mapInBatches(names, batchSize, async (name) => {
+            if (hardLimitReached || scannedEntries >= hardMaxEntries) {
+                hardLimitReached = true;
+                return null;
+            }
             if (!showHidden && name.startsWith('.')) return null;
             if (respectDenylist && blockedSegments.has(name.toLowerCase())) return null;
             const absolutePath = join(dir, name);
@@ -151,6 +158,9 @@ export async function scanDirectory(rootPath, options = {}) {
                 entry.fingerprint = await buildFileFingerprint(absolutePath, stats, limit);
             }
             scannedEntries += 1;
+            if (scannedEntries >= hardMaxEntries) {
+                hardLimitReached = true;
+            }
             if (scannedEntries % 500 === 0) {
                 publishIoLifecycleEvent('scan', 'progress', {
                     traceId,
@@ -192,6 +202,8 @@ export async function scanDirectory(rootPath, options = {}) {
                 showHidden,
                 scannedEntries,
                 limitMode: 'informative',
+                hardLimitReached,
+                hardMaxEntries,
                 denylist: respectDenylist ? 'enabled' : 'disabled',
                 gitignore: respectGitignore ? 'enabled' : 'disabled',
                 includePatternCount: includePatterns.length,
@@ -223,7 +235,7 @@ export async function scanDirectory(rootPath, options = {}) {
             traceId,
             rootPath,
             durationMs: io.durationMs ?? 0,
-            error: error instanceof Error ? error.message : String(error),
+            error: toError(error).message,
         });
         throw error;
     }

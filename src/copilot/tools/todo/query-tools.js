@@ -1,7 +1,16 @@
 // @ts-check
 import { z } from 'zod';
 import { buildTool, withSkipPermission } from '../infra/tool-factory.js';
-import { PRIORITY_ORDER, isOverdue, readStore, sanitize, zPriority, zStatus } from './store.js';
+import {
+    PRIORITY_ORDER,
+    isOverdue,
+    readStore,
+    readTasksPage,
+    sanitize,
+    searchTasksPage,
+    zPriority,
+    zStatus,
+} from './store.js';
 /**
  * src/copilot/tools/todo/query-tools.js
  *
@@ -49,6 +58,12 @@ export const todoListTool = withSkipPermission(
                         .min(1)
                         .optional()
                         .describe('Quantidade sugerida de resultados; omitido retorna todos.'),
+                    offset: z
+                        .number()
+                        .int()
+                        .min(0)
+                        .optional()
+                        .describe('Offset de paginação para avançar na lista de resultados.'),
                 })
             )
         ),
@@ -62,60 +77,33 @@ export const todoListTool = withSkipPermission(
              *     text?: string;
              *     overdue_only?: boolean;
              *     limit?: number;
+             *     offset?: number;
              * }}
              */ args,
         ) => {
-            const store = await readStore();
-            const allTasks = Object.values(store.tasks);
+            /** @type {Parameters<typeof readTasksPage>[0]} */
+            const pageRequest = {};
+            if (args.status !== undefined) pageRequest.status = args.status;
+            if (args.priority !== undefined) pageRequest.priority = args.priority;
+            if (args.tag !== undefined) pageRequest.tag = args.tag;
+            if (args.parent_id !== undefined) pageRequest.parentId = args.parent_id;
+            if (args.text !== undefined) pageRequest.text = args.text;
+            if (args.overdue_only !== undefined) pageRequest.overdueOnly = args.overdue_only;
+            if (args.limit !== undefined) pageRequest.limit = args.limit;
+            if (args.offset !== undefined) pageRequest.offset = args.offset;
 
-            /** @type {(import('./store.js').TodoItem & { overdue: boolean })[]} */
-            let filtered = allTasks.map((t) => ({ ...t, overdue: isOverdue(t) }));
-
-            if (args.status) filtered = filtered.filter((t) => t.status === args.status);
-            if (args.priority) filtered = filtered.filter((t) => t.priority === args.priority);
-            if (args.tag) {
-                const tag = args.tag;
-                filtered = filtered.filter((t) => t.tags.includes(tag));
-            }
-            if (args.overdue_only) filtered = filtered.filter((t) => t.overdue);
-
-            // parent_id: null = apenas raiz, string = filhos do pai, undefined = todos
-            if (args.parent_id === null) {
-                filtered = filtered.filter((t) => t.parentId === null);
-            } else if (typeof args.parent_id === 'string') {
-                filtered = filtered.filter((t) => t.parentId === args.parent_id);
-            }
-
-            if (args.text) {
-                const q = args.text.toLowerCase();
-                filtered = filtered.filter(
-                    (t) =>
-                        t.title.toLowerCase().includes(q) ||
-                        t.description.toLowerCase().includes(q) ||
-                        t.notes.toLowerCase().includes(q) ||
-                        t.tags.some((tag) => tag.toLowerCase().includes(q)),
-                );
-            }
-
-            // Ordenação: overdue primeiro → prioridade → mais recente
-            filtered.sort((a, b) => {
-                if (a.overdue !== b.overdue) return a.overdue ? -1 : 1;
-                const pa = PRIORITY_ORDER[a.priority] ?? 99;
-                const pb = PRIORITY_ORDER[b.priority] ?? 99;
-                if (pa !== pb) return pa - pb;
-                return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-            });
-
-            const total = filtered.length;
-            const returnedTasks = typeof args.limit === 'number' ? filtered.slice(0, args.limit) : filtered;
+            const page = await readTasksPage(pageRequest);
+            const returnedTasks = page.tasks.map((task) => ({ ...task, overdue: isOverdue(task) }));
 
             return {
                 success: true,
                 tasks: returnedTasks,
-                total,
-                returned: returnedTasks.length,
-                has_more: returnedTasks.length < total,
-                advisoryLimit: args.limit ?? null,
+                total: page.total,
+                returned: page.returned,
+                has_more: page.hasMore,
+                advisoryLimit: page.limit,
+                offset: page.offset,
+                nextOffset: page.hasMore ? page.offset + page.returned : null,
             };
         },
     }),
@@ -150,6 +138,7 @@ export const todoSearchTool = withSkipPermission(
                         .min(1)
                         .optional()
                         .describe('Quantidade sugerida de resultados; omitido retorna todos.'),
+                    offset: z.number().int().min(0).optional().describe('Offset de paginação para avançar na busca.'),
                 })
             )
         ),
@@ -160,50 +149,46 @@ export const todoSearchTool = withSkipPermission(
              *     status?: import('./store.js').TodoStatus;
              *     priority?: import('./store.js').TodoPriority;
              *     limit?: number;
+             *     offset?: number;
              * }}
              */ args,
         ) => {
-            const store = await readStore();
             const terms = args.query
                 .toLowerCase()
                 .split(/\s+/)
                 .filter((t) => t.length > 0);
+            /** @type {Parameters<typeof searchTasksPage>[0]} */
+            const pageRequest = { terms };
+            if (args.status !== undefined) pageRequest.status = args.status;
+            if (args.priority !== undefined) pageRequest.priority = args.priority;
+            if (args.limit !== undefined) pageRequest.limit = args.limit;
+            if (args.offset !== undefined) pageRequest.offset = args.offset;
 
-            /** @type {{ task: import('./store.js').TodoItem & { overdue: boolean }; score: number }[]} */
-            const scored = [];
-
-            for (const task of Object.values(store.tasks)) {
-                if (args.status && task.status !== args.status) continue;
-                if (args.priority && task.priority !== args.priority) continue;
-
+            const page = await searchTasksPage(pageRequest);
+            const results = page.tasks.map((task) => {
                 const haystack = [task.title, task.description, task.notes, ...task.tags].join(' ').toLowerCase();
-
-                const matchCount = terms.filter((t) => haystack.includes(t)).length;
-                if (matchCount === terms.length) {
-                    scored.push({ task: { ...task, overdue: isOverdue(task) }, score: matchCount });
-                }
-            }
-
-            // Ordenar por: score desc → priority → createdAt desc
-            scored.sort((a, b) => {
-                if (b.score !== a.score) return b.score - a.score;
-                const pa = PRIORITY_ORDER[a.task.priority] ?? 99;
-                const pb = PRIORITY_ORDER[b.task.priority] ?? 99;
-                if (pa !== pb) return pa - pb;
-                return new Date(b.task.createdAt).getTime() - new Date(a.task.createdAt).getTime();
+                const score = terms.filter((t) => haystack.includes(t)).length;
+                return { ...task, overdue: isOverdue(task), _score: score };
             });
 
-            const total = scored.length;
-            const limited = typeof args.limit === 'number' ? scored.slice(0, args.limit) : scored;
-            const results = limited.map(({ task, score }) => ({ ...task, _score: score }));
+            // Ordenar por score apenas dentro da janela paginada
+            results.sort((a, b) => {
+                if ((b._score ?? 0) !== (a._score ?? 0)) return (b._score ?? 0) - (a._score ?? 0);
+                const pa = PRIORITY_ORDER[a.priority] ?? 99;
+                const pb = PRIORITY_ORDER[b.priority] ?? 99;
+                if (pa !== pb) return pa - pb;
+                return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+            });
 
             return {
                 success: true,
                 query: args.query,
                 results,
-                total,
-                returned: results.length,
-                advisoryLimit: args.limit ?? null,
+                total: page.total,
+                returned: page.returned,
+                advisoryLimit: page.limit,
+                offset: page.offset,
+                nextOffset: page.hasMore ? page.offset + page.returned : null,
             };
         },
     }),

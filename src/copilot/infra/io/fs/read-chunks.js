@@ -33,18 +33,15 @@ function throwAbortError() {
  *     highWaterMark?: number;
  *     signal?: AbortSignal;
  * }} [options]
- * @returns {Promise<{
- *     path: string;
- *     chunks: TextLineChunk[];
- *     totalLines: number;
- *     bytesRead: number;
- *     chunkLines: number;
- *     startLine: number;
- *     endLine: number | null;
- * }>}
+ * @param {{ totalLines: number; bytesRead: number; stoppedAtRequestedWindow: boolean }} [state={ totalLines: 0, bytesRead: 0, stoppedAtRequestedWindow: false }]
+ *   Default is `{ totalLines: 0, bytesRead: 0, stoppedAtRequestedWindow: false }`
+ * @returns {AsyncGenerator<TextLineChunk, void, void>}
  */
-export async function readTextLineChunks(filePath, options = {}) {
-    if (options.signal?.aborted) throwAbortError();
+async function* iterateTextLineChunks(
+    filePath,
+    options = {},
+    state = { totalLines: 0, bytesRead: 0, stoppedAtRequestedWindow: false },
+) {
     const chunkLines =
         Number.isFinite(options.chunkLines) && Number(options.chunkLines) > 0
             ? Math.floor(Number(options.chunkLines))
@@ -57,16 +54,12 @@ export async function readTextLineChunks(filePath, options = {}) {
         Number.isFinite(options.highWaterMark) && Number(options.highWaterMark) > 0
             ? Math.floor(Number(options.highWaterMark))
             : undefined;
-    /** @type {TextLineChunk[]} */
-    const chunks = [];
     /** @type {string[]} */
     let current = [];
     let currentStartLine = startLine;
-    let totalLines = 0;
-    let bytesRead = 0;
     let carry = '';
+    let chunkIndex = 0;
     const decoder = new StringDecoder('utf8');
-    let stoppedAtRequestedWindow = false;
 
     const baseStream = createReadStream(filePath, {
         ...(highWaterMark !== undefined ? { highWaterMark } : {}),
@@ -74,42 +67,56 @@ export async function readTextLineChunks(filePath, options = {}) {
     const stream = options.signal ? addAbortSignal(options.signal, baseStream) : baseStream;
 
     /**
-     * @param {string} line
-     * @returns {boolean} true quando a leitura deve continuar.
+     * @param {string} content
+     * @returns {TextLineChunk}
      */
-    const pushLine = (line) => {
-        totalLines += 1;
-        if (totalLines < startLine) return true;
-        if (totalLines > endLine) return false;
-        if (current.length === 0) currentStartLine = totalLines;
+    function emitChunk(content) {
+        const chunk = {
+            index: chunkIndex,
+            startLine: currentStartLine,
+            endLine: state.totalLines,
+            content,
+            bytes: utf8ByteLength(content, 'read chunk'),
+        };
+        chunkIndex += 1;
+        current = [];
+        return chunk;
+    }
+
+    /**
+     * @param {string} line
+     * @returns {TextLineChunk | null}
+     */
+    function pushLine(line) {
+        state.totalLines += 1;
+        if (state.totalLines < startLine) return null;
+        if (state.totalLines > endLine) {
+            state.stoppedAtRequestedWindow = true;
+            return null;
+        }
+        if (current.length === 0) currentStartLine = state.totalLines;
         current.push(line);
         if (current.length >= chunkLines) {
-            const content = current.join('\n');
-            chunks.push({
-                index: chunks.length,
-                startLine: currentStartLine,
-                endLine: totalLines,
-                content,
-                bytes: utf8ByteLength(content, 'read chunk'),
-            });
-            current = [];
+            return emitChunk(current.join('\n'));
         }
-        return totalLines < endLine;
-    };
+        return null;
+    }
 
     /**
      * @param {string} decoded
      * @param {boolean} final
-     * @returns {boolean} true quando a leitura deve continuar.
+     * @returns {TextLineChunk[]}
      */
-    const processDecoded = (decoded, final) => {
+    function processDecoded(decoded, final) {
+        /** @type {TextLineChunk[]} */
+        const emitted = [];
         let data = carry + decoded;
         carry = '';
         if (!final && data.endsWith('\r')) {
             carry = '\r';
             data = data.slice(0, -1);
         }
-        if (data === '') return true;
+        if (data === '') return emitted;
 
         const parts = data.split(/\r\n|\n|\r/);
         if (!final) {
@@ -119,42 +126,106 @@ export async function readTextLineChunks(filePath, options = {}) {
         }
 
         for (const line of parts) {
-            if (!pushLine(line)) return false;
+            const chunk = pushLine(line);
+            if (chunk) emitted.push(chunk);
+            if (state.stoppedAtRequestedWindow) break;
         }
-        return true;
-    };
+        return emitted;
+    }
 
     try {
         for await (const chunk of stream) {
             const buf = toBufferView(/** @type {Buffer | Uint8Array} */ (chunk));
-            bytesRead += buf.byteLength;
-            if (!processDecoded(decoder.write(buf), false)) {
-                stoppedAtRequestedWindow = true;
-                break;
+            state.bytesRead += buf.byteLength;
+            for (const emitted of processDecoded(decoder.write(buf), false)) {
+                yield emitted;
+            }
+            if (state.stoppedAtRequestedWindow) break;
+        }
+        if (!state.stoppedAtRequestedWindow) {
+            for (const emitted of processDecoded(decoder.end(), true)) {
+                yield emitted;
             }
         }
-        if (!stoppedAtRequestedWindow) processDecoded(decoder.end(), true);
     } finally {
         if (!stream.destroyed) stream.destroy();
     }
+
     if (current.length > 0) {
-        const content = current.join('\n');
-        chunks.push({
-            index: chunks.length,
-            startLine: currentStartLine,
-            endLine: currentStartLine + current.length - 1,
-            content,
-            bytes: utf8ByteLength(content, 'read chunk'),
-        });
+        yield emitChunk(current.join('\n'));
     }
+}
+
+/**
+ * @param {string} filePath
+ * @param {{
+ *     chunkLines?: number;
+ *     startLine?: number;
+ *     endLine?: number;
+ *     highWaterMark?: number;
+ *     signal?: AbortSignal;
+ * }} [options]
+ * @returns {Promise<{
+ *     path: string;
+ *     chunks: TextLineChunk[];
+ *     totalLines: number;
+ *     bytesRead: number;
+ *     chunkLines: number;
+ *     startLine: number;
+ *     endLine: number | null;
+ * }>}
+ */
+export async function readTextLineChunks(filePath, options = {}) {
+    if (options.signal?.aborted) throwAbortError();
+    const state = { totalLines: 0, bytesRead: 0, stoppedAtRequestedWindow: false };
+    const arrayCtor = /** @type {any} */ (Array);
+    const chunks = await arrayCtor.fromAsync(iterateTextLineChunks(filePath, options, state));
 
     return {
         path: filePath,
         chunks,
-        totalLines,
-        bytesRead,
-        chunkLines,
-        startLine,
-        endLine: Number.isFinite(endLine) ? endLine : null,
+        totalLines: state.totalLines,
+        bytesRead: state.bytesRead,
+        chunkLines:
+            Number.isFinite(options.chunkLines) && Number(options.chunkLines) > 0
+                ? Math.floor(Number(options.chunkLines))
+                : 200,
+        startLine: Math.max(1, options.startLine ?? 1),
+        endLine: Number.isFinite(options.endLine)
+            ? Math.max(Math.max(1, options.startLine ?? 1), Number(options.endLine))
+            : null,
     };
+}
+
+/**
+ * Exponibiliza o mesmo particionamento textual como `ReadableStream`.
+ *
+ * @param {string} filePath
+ * @param {{
+ *     chunkLines?: number;
+ *     startLine?: number;
+ *     endLine?: number;
+ *     highWaterMark?: number;
+ *     signal?: AbortSignal;
+ * }} [options]
+ * @returns {ReadableStream<TextLineChunk>}
+ */
+export function readTextLineChunksStream(filePath, options = {}) {
+    const state = { totalLines: 0, bytesRead: 0, stoppedAtRequestedWindow: false };
+    const iterable = iterateTextLineChunks(filePath, options, state);
+    const readableStreamCtor = /** @type {any} */ (globalThis.ReadableStream);
+    if (typeof readableStreamCtor?.from === 'function') {
+        return readableStreamCtor.from(iterable);
+    }
+
+    return new ReadableStream({
+        async start(controller) {
+            try {
+                for await (const chunk of iterable) controller.enqueue(chunk);
+                controller.close();
+            } catch (error) {
+                controller.error(error);
+            }
+        },
+    });
 }

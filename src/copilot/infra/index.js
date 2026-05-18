@@ -51,14 +51,7 @@ export {
     writeFileAtomic,
 } from './io-engine.js';
 export { readIoRuntimeHealthSnapshot } from './io-health.js';
-export { getIoLockStats, withIoResourceLocks } from './io-locks.js';
-export {
-    buildInfraModuleScorecard,
-    getInfraModuleDescriptor,
-    INFRA_MODULE_LAYOUT,
-    listInfraModulesByRisk,
-    listInfraModulesByRole,
-} from './module-map.js';
+export { acquireIoResourceLock, acquireIoResourceLocks, getIoLockStats, withIoResourceLocks } from './io-locks.js';
 export { nowIoMs, publishIoLifecycleEvent, publishIoOperation } from './io-observability.js';
 export {
     buildOutline,
@@ -92,7 +85,23 @@ export {
     listScopes,
     refreshScope,
 } from './io-session-scope.js';
-export { acquireLock, releaseLock } from './lockfile.js';
+export { acquireLock, releaseLock, releaseLockAsync } from './lockfile.js';
+export {
+    INFRA_MODULE_LAYOUT,
+    buildInfraModuleScorecard,
+    getInfraModuleDescriptor,
+    listInfraModulesByRisk,
+    listInfraModulesByRole,
+} from './module-map.js';
+export * from './public/buffer.js';
+export * from './public/cache.js';
+export * from './public/events.js';
+export * from './public/health.js';
+export * from './public/indexing.js';
+export * from './public/io.js';
+export * from './public/runtime.js';
+export * from './public/session.js';
+export * from './public/testing.js';
 export { AsyncQueue } from './queue.js';
 export {
     EventFanout,
@@ -103,12 +112,3 @@ export {
     getTerminalReplayBuffer,
 } from './sse/index.js';
 export { fileExists, readJson, writeJson } from './storage.js';
-export * from './public/cache.js';
-export * from './public/buffer.js';
-export * from './public/events.js';
-export * from './public/health.js';
-export * from './public/indexing.js';
-export * from './public/io.js';
-export * from './public/runtime.js';
-export * from './public/session.js';
-export * from './public/testing.js';

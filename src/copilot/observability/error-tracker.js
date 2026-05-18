@@ -15,6 +15,7 @@
  * @see EventBus
  */
 
+import { toError } from '#copilot/core';
 import { log } from './logger.js';
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
@@ -86,8 +87,9 @@ function nextId() {
  * @returns {{ message: string; stack: string | undefined; errorType: string }}
  */
 function extractErrorInfo(err) {
+    const e = toError(err);
     if (err instanceof Error) {
-        return { message: err.message, stack: err.stack, errorType: err.constructor.name };
+        return { message: e.message, stack: e.stack, errorType: e.constructor.name };
     }
     if (typeof err === 'string') {
         return { message: err, stack: undefined, errorType: 'string' };

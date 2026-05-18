@@ -1,7 +1,7 @@
 // @ts-check
+import { ESLint } from 'eslint';
 import assert from 'node:assert/strict';
 import { join } from 'node:path';
-import { ESLint } from 'eslint';
 import { describe, it } from 'vitest';
 
 const ROOT = process.cwd();
@@ -66,5 +66,26 @@ describe('ESLint effective Copilot architecture rules', () => {
         const importsRule = config.rules?.['no-restricted-imports'];
 
         assert.match(ruleText(importsRule), /Boundary server\/routes\/sdk/);
+    });
+
+    it('bloqueia setInterval cru nos módulos recorrentes canonizados', async () => {
+        const config = await configFor('src/copilot/sdk/telemetry/quota-monitor.js');
+        const syntaxRule = config.rules?.['no-restricted-syntax'];
+
+        assert.match(ruleText(syntaxRule), /Use registerInterval from #copilot\/core/);
+    });
+
+    it('bloqueia setInterval cru no todo store canonizado', async () => {
+        const config = await configFor('src/copilot/tools/todo/store.js');
+        const syntaxRule = config.rules?.['no-restricted-syntax'];
+
+        assert.match(ruleText(syntaxRule), /Use registerInterval from #copilot\/core/);
+    });
+
+    it('bloqueia await-setTimeout manual no handler de controle do agente', async () => {
+        const config = await configFor('src/copilot/presentation/agent/control/handlers.js');
+        const syntaxRule = config.rules?.['no-restricted-syntax'];
+
+        assert.match(ruleText(syntaxRule), /Use sleepMs from #copilot\/core/);
     });
 });

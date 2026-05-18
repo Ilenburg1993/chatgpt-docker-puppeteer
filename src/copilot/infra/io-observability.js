@@ -8,9 +8,9 @@
  * @module copilot/infra/io-observability
  */
 
+import { logSwallowed, toError } from '#copilot/core';
 import { channel } from 'node:diagnostics_channel';
 import { createHistogram, performance } from 'node:perf_hooks';
-import { logSwallowed } from '#copilot/core';
 
 const ioOperationChannel = channel('copilot.io.operation');
 const ioCacheChannel = channel('copilot.io.cache');
@@ -60,7 +60,12 @@ export function publishIoOperation(io, opts) {
             ts: Date.now(),
             success: opts.success,
             io,
-            ...(opts.error instanceof Error ? { error: { name: opts.error.name, message: opts.error.message } } : {}),
+            ...(opts.error != null
+                ? (() => {
+                      const normalized = toError(opts.error);
+                      return { error: { name: normalized.name, message: normalized.message } };
+                  })()
+                : {}),
         });
     } catch (error) {
         logSwallowed(error, 'io-observability.diagnostics_channel');

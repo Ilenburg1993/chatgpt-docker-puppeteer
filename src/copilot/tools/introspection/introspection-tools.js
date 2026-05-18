@@ -1,5 +1,6 @@
 // @ts-check
 import { COPILOT_MCP_SERVERS, COPILOT_MODEL, COPILOT_SDK_ENABLED } from '#copilot/config';
+import { readIoRuntimeHealthSnapshot } from '#copilot/infra/public/io';
 import { createRequire } from 'node:module';
 import { z } from 'zod';
 import { log } from '../infra/logger.js';
@@ -50,13 +51,40 @@ let _introspectionRegistry = null;
 const _disabledTools = new Set();
 
 /**
+ * Tools excluídas estaticamente na configuração da sessão SDK (`excludedTools`).
+ *
+ * Essas tools devem permanecer indisponíveis para o modelo mesmo quando `toggle_tool` tenta habilitá-las.
+ *
+ * @type {Set<string>}
+ */
+const _sessionExcludedTools = new Set();
+
+/**
+ * Atualiza o snapshot de tools excluídas estaticamente na sessão atual.
+ *
+ * @param {string[] | null | undefined} toolNames
+ * @returns {void}
+ */
+export function setSessionExcludedTools(toolNames) {
+    _sessionExcludedTools.clear();
+    if (!Array.isArray(toolNames)) return;
+    for (const toolName of toolNames) {
+        if (typeof toolName !== 'string') continue;
+        const normalized = toolName.trim().toLowerCase();
+        if (!normalized) continue;
+        _sessionExcludedTools.add(normalized);
+    }
+}
+
+/**
  * Verifica se uma tool está desabilitada em runtime.
  *
  * @param {string} name - Nome da tool
  * @returns {boolean}
  */
 export function isToolDisabled(name) {
-    return _disabledTools.has(name.toLowerCase());
+    const normalized = name.toLowerCase();
+    return _disabledTools.has(normalized) || _sessionExcludedTools.has(normalized);
 }
 
 /**
@@ -65,7 +93,25 @@ export function isToolDisabled(name) {
  * @returns {string[]}
  */
 export function getDisabledTools() {
+    return [...new Set([..._sessionExcludedTools, ..._disabledTools])];
+}
+
+/**
+ * Retorna somente as tools desabilitadas dinamicamente em runtime (via `toggle_tool`).
+ *
+ * @returns {string[]}
+ */
+function getRuntimeDisabledTools() {
     return [..._disabledTools];
+}
+
+/**
+ * Retorna somente as tools excluídas estaticamente pela configuração da sessão SDK.
+ *
+ * @returns {string[]}
+ */
+function getSessionExcludedTools() {
+    return [..._sessionExcludedTools];
 }
 
 /** @type {import('./tool-contract-verifier.js').ToolContractReport} */
@@ -234,6 +280,8 @@ export function readToolContractReport() {
  *     names: string[];
  *     categories: Record<string, number>;
  *     disabled: string[];
+ *     runtimeDisabled: string[];
+ *     sessionExcluded: string[];
  *     hasCanonicalLocalFsTools: boolean;
  *     hasCanonicalLocalExecTools: boolean;
  *     hasSdkWorkspaceTooling: boolean;
@@ -274,6 +322,8 @@ export function readIntrospectionRegistrySnapshot() {
         hasSdkWorkspaceTooling,
         hasLegacySdkShellToolsLoaded,
         toolContract: _toolContractReport,
+        runtimeDisabled: getRuntimeDisabledTools(),
+        sessionExcluded: getSessionExcludedTools(),
     };
 }
 /**
@@ -284,6 +334,7 @@ export function readIntrospectionRegistrySnapshot() {
 export function resetIntrospectionStateForTests() {
     _introspectionRegistry = null;
     _disabledTools.clear();
+    _sessionExcludedTools.clear();
     _toolContractReport = createEmptyToolContractReport();
     _agentInfoProvider = null;
 }
@@ -315,8 +366,8 @@ const listToolsTool = buildTool({
         let tools = listRegisteredTools();
 
         // GAP-TOOLS-004: filtrar tools desabilitadas em runtime
-        if (_disabledTools.size > 0) {
-            tools = tools.filter((t) => !_disabledTools.has(t.name.toLowerCase()));
+        if (_disabledTools.size > 0 || _sessionExcludedTools.size > 0) {
+            tools = tools.filter((t) => !isToolDisabled(t.name));
         }
 
         if (search) {
@@ -338,7 +389,7 @@ const listToolsTool = buildTool({
                 ...getToolMetadata(t.name),
                 name: t.name,
                 description: t.description ?? null,
-                disabled: _disabledTools.has(t.name.toLowerCase()),
+                disabled: isToolDisabled(t.name),
             })),
         };
     },
@@ -373,6 +424,8 @@ const getAgentInfoTool = buildTool({
             _agentInfoProvider?.getModelSnapshot() ??
             null;
 
+        const ioHealth = readIoRuntimeHealthSnapshot();
+
         return {
             sdkVersion,
             nodeVersion: process.version,
@@ -390,7 +443,29 @@ const getAgentInfoTool = buildTool({
                 ]),
             ),
             disabledTools: getDisabledTools(),
+            runtimeDisabledTools: getRuntimeDisabledTools(),
+            sessionExcludedTools: getSessionExcludedTools(),
             hasTelemetry: true,
+            io: {
+                generatedAt: ioHealth.generatedAt,
+                cache: {
+                    hitRatio: ioHealth.cache.aggregate.hitRatio,
+                    hits: ioHealth.cache.aggregate.hits,
+                    misses: ioHealth.cache.aggregate.misses,
+                    l2Enabled: Boolean(ioHealth.cache.l2?.['enabled']),
+                },
+                index: {
+                    available: Boolean(ioHealth.index?.available),
+                    freshFiles:
+                        ioHealth.index && typeof ioHealth.index === 'object' && 'freshFiles' in ioHealth.index
+                            ? Number(/** @type {{ freshFiles?: number }} */ (ioHealth.index).freshFiles ?? 0)
+                            : 0,
+                },
+                scopes: {
+                    active: ioHealth.scopes.active,
+                },
+                latency: ioHealth.latency,
+            },
             env: {
                 COPILOT_MCP_SERVERS: COPILOT_MCP_SERVERS,
                 NODE_ENV: process.env['NODE_ENV'] ?? '',
@@ -554,6 +629,15 @@ const toggleToolTool = buildTool({
         }
 
         if (enabled) {
+            if (_sessionExcludedTools.has(normalized)) {
+                return {
+                    success: false,
+                    reason: 'tool excluída pela configuração da sessão (excludedTools)',
+                    toolName,
+                    enabled: false,
+                    sessionExcludedTools: getSessionExcludedTools(),
+                };
+            }
             _disabledTools.delete(normalized);
             log('INFO', `[introspection/toggle_tool] tool habilitada: ${toolName}`);
         } else {
@@ -565,7 +649,9 @@ const toggleToolTool = buildTool({
             success: true,
             toolName,
             enabled,
-            disabledTools: [..._disabledTools],
+            disabledTools: getDisabledTools(),
+            runtimeDisabledTools: getRuntimeDisabledTools(),
+            sessionExcludedTools: getSessionExcludedTools(),
         };
     },
 });

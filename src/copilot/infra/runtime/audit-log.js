@@ -8,6 +8,7 @@
  * @module copilot/infra/runtime/audit-log
  */
 
+import { toError } from '#copilot/core';
 import { dirname } from 'node:path';
 import { appendFileUnlocked } from '../io/fs/append.js';
 import { mkdirPathUnlocked } from '../io/fs/mkdir.js';
@@ -84,7 +85,7 @@ export async function recordIoMutationAudit(envelope, context = {}) {
             enabled: true,
             path: filePath,
             written: false,
-            error: error instanceof Error ? error.message : String(error),
+            error: toError(error).message,
         };
     }
 }

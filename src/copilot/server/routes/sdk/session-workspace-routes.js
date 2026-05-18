@@ -9,7 +9,7 @@
 import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 
-import { IO_PATH_POLICY_VERSION, evaluateIoPathPolicyAsync } from '#copilot/core';
+import { IO_PATH_POLICY_VERSION, evaluateIoPathPolicyAsync, toError } from '#copilot/core';
 import { utf8ByteLength } from '#copilot/infra/public/buffer';
 import { resolveSdkRouteSharedDeps } from './deps.js';
 import { validateBody, withErrorHandler } from './session-middleware.js';
@@ -220,7 +220,7 @@ function extractLocalReadContent(value) {
  * @returns {boolean}
  */
 function isSdkWorkspaceMissingError(error) {
-    const message = String(error instanceof Error ? error.message : error).toLowerCase();
+    const message = toError(error).message.toLowerCase();
     return (
         message.includes('enoent') ||
         message.includes('not found') ||
@@ -355,13 +355,7 @@ export function registerSessionWorkspaceRoutes(router) {
             try {
                 localPath = await resolveLocalPathOrThrow(desiredLocalPath, workspaceRoot, 'write');
             } catch (error) {
-                sendError(
-                    res,
-                    routeDeps,
-                    400,
-                    'INVALID_LOCAL_PATH',
-                    String(error instanceof Error ? error.message : error),
-                );
+                sendError(res, routeDeps, 400, 'INVALID_LOCAL_PATH', toError(error).message);
                 return;
             }
 
@@ -482,13 +476,7 @@ export function registerSessionWorkspaceRoutes(router) {
                     'write',
                 );
             } catch (error) {
-                sendError(
-                    res,
-                    routeDeps,
-                    400,
-                    'INVALID_LOCAL_PATH',
-                    String(error instanceof Error ? error.message : error),
-                );
+                sendError(res, routeDeps, 400, 'INVALID_LOCAL_PATH', toError(error).message);
                 return;
             }
 
@@ -545,7 +533,7 @@ export function registerSessionWorkspaceRoutes(router) {
                         localPath: localCandidate,
                         status: 'failed',
                         traceId,
-                        reason: String(error instanceof Error ? error.message : error),
+                        reason: toError(error).message,
                     });
                     continue;
                 }
@@ -684,13 +672,7 @@ export function registerSessionWorkspaceRoutes(router) {
             try {
                 localPath = await resolveLocalPathOrThrow(String(req.body?.sourcePath ?? ''), workspaceRoot, 'read');
             } catch (error) {
-                sendError(
-                    res,
-                    routeDeps,
-                    400,
-                    'INVALID_LOCAL_PATH',
-                    String(error instanceof Error ? error.message : error),
-                );
+                sendError(res, routeDeps, 400, 'INVALID_LOCAL_PATH', toError(error).message);
                 return;
             }
 
@@ -819,7 +801,7 @@ export function registerSessionWorkspaceRoutes(router) {
                                 localPath: localPath.normalizedPath,
                                 sdkPath,
                                 overwrite,
-                                reason: String(error instanceof Error ? error.message : error),
+                                reason: toError(error).message,
                             },
                         });
                         throw error;

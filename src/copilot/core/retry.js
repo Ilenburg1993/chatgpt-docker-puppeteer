@@ -10,6 +10,31 @@
 
 import { TimeoutError } from './errors.js';
 
+const errorCtor = /** @type {{ isError?: (value: unknown) => boolean }} */ (Error);
+const isError =
+    typeof errorCtor.isError === 'function'
+        ? /** @type {(value: unknown) => boolean} */ (errorCtor.isError.bind(Error))
+        : /** @type {(value: unknown) => boolean} */ ((value) => value instanceof Error);
+
+/**
+ * @param {number} timeoutMs
+ * @returns {{ signal: AbortSignal; cleanup: () => void }}
+ */
+function createTimeoutSignal(timeoutMs) {
+    const abortSignalCtor = /** @type {{ timeout?: (ms: number) => AbortSignal }} */ (AbortSignal);
+    if (typeof abortSignalCtor.timeout === 'function') {
+        return { signal: abortSignalCtor.timeout(Math.max(0, timeoutMs)), cleanup: () => {} };
+    }
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), Math.max(0, timeoutMs));
+    timeoutId.unref?.();
+    return {
+        signal: controller.signal,
+        cleanup: () => clearTimeout(timeoutId),
+    };
+}
+
 /**
  * @typedef {object} RetryOptions
  * @property {number} [maxAttempts=3] - Número máximo de tentativas. Default is `3`
@@ -69,10 +94,9 @@ export async function withRetry(fn, opts = {}) {
                         'abort',
                         () => {
                             clearTimeout(timer);
-                            const reason =
-                                signal.reason instanceof Error
-                                    ? signal.reason
-                                    : new Error(String(signal.reason ?? 'Retry aborted'));
+                            const reason = isError(signal.reason)
+                                ? /** @type {Error} */ (signal.reason)
+                                : new Error(String(signal.reason ?? 'Retry aborted'));
                             reject(reason);
                         },
                         { once: true },
@@ -97,23 +121,28 @@ export async function withRetry(fn, opts = {}) {
  * @returns {Promise<T>}
  */
 export async function withTimeout(fn, timeoutMs, label = 'operation') {
-    const controller = new AbortController();
-
-    /** @type {ReturnType<typeof setTimeout> | undefined} */
-    let timer;
+    const timeoutHandle = createTimeoutSignal(timeoutMs);
+    /** @type {() => void} */
+    let detachAbortListener = () => {};
 
     try {
         const result = await Promise.race([
-            fn(controller.signal),
+            fn(timeoutHandle.signal),
             new Promise((_, reject) => {
-                timer = setTimeout(() => {
-                    controller.abort();
+                const onAbort = () => {
                     reject(new TimeoutError(`${label} timed out after ${timeoutMs}ms`));
-                }, timeoutMs);
+                };
+                if (timeoutHandle.signal.aborted) {
+                    onAbort();
+                    return;
+                }
+                timeoutHandle.signal.addEventListener('abort', onAbort, { once: true });
+                detachAbortListener = () => timeoutHandle.signal.removeEventListener('abort', onAbort);
             }),
         ]);
         return /** @type {T} */ (result);
     } finally {
-        clearTimeout(timer);
+        detachAbortListener();
+        timeoutHandle.cleanup();
     }
 }

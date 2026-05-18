@@ -10,6 +10,7 @@
 
 import { appendFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
+import { toError } from '../../core/error-handlers.js';
 
 const TERMINAL_TRANSCRIPT_ARCHIVE_DIR = join(process.cwd(), 'data', 'copilot-terminal', 'transcripts');
 
@@ -40,7 +41,7 @@ export function appendTerminalTranscriptArchive(entry) {
         _terminalTranscriptArchiveError = null;
         return { archived: true, path, error: null };
     } catch (error) {
-        _terminalTranscriptArchiveError = error instanceof Error ? error.message : String(error);
+        _terminalTranscriptArchiveError = toError(error).message;
         return { archived: false, path: _terminalTranscriptArchivePath, error: _terminalTranscriptArchiveError };
     }
 }

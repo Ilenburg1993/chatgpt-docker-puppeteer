@@ -82,6 +82,9 @@ const BLOCKED_COMMAND_PATTERNS = [
     /\benv\b\s*$/, // 'env' sem args lista todas as variáveis
     /\benv\b\s+(-0|--null)\b/i, // env -0 / env --null
     /\bset\b\s*$/, // shell builtin 'set' sem args lista todas as variáveis
+    /\bhistory\b\s*$/i, // histórico de comandos pode conter segredos em argumentos antigos
+    /\bdeclare\b\s+-p\b/i, // dump de variáveis shell
+    /\btypeset\b(\s+-p)?\b/i, // equivalente em alguns shells
 ];
 
 /**

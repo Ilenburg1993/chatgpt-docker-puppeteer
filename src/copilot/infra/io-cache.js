@@ -243,11 +243,16 @@ export function getIoL1Cache() {
             const normalized = normalizeIoCacheKey(filePath);
             const prefix = `${normalized}::`;
             const subtreePrefix = `${normalized}${nodePath.sep}`;
+            /** @type {string[]} */
+            const keysToDelete = [];
             for (const k of _lru.keys()) {
                 if (k.startsWith(prefix) || (options.recursive === true && k.startsWith(subtreePrefix))) {
-                    _lru.delete(k);
-                    _invalidations++;
+                    keysToDelete.push(k);
                 }
+            }
+            for (const k of keysToDelete) {
+                _lru.delete(k);
+                _invalidations++;
             }
         },
 

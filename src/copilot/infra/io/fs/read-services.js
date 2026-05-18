@@ -14,7 +14,7 @@ import { bufferIsUtf8, isBufferValue, toOwnedBuffer } from '../../shared/buffer.
 import { fingerprintMatches } from '../../shared/fingerprint-match.js';
 import { sha256 } from '../../shared/hash.js';
 import { readBytesFileSnapshot } from './read-bytes.js';
-import { readTextLineChunks } from './read-chunks.js';
+import { readTextLineChunks, readTextLineChunksStream } from './read-chunks.js';
 import { statPathSnapshot } from './stat.js';
 
 /**
@@ -577,6 +577,25 @@ export async function readTextChunks(filePath, options = {}) {
         );
         throw error;
     }
+}
+
+/**
+ * Exponibiliza `readTextChunks` em forma de `ReadableStream` para consumidores que preferem streaming web nativo.
+ *
+ * @param {string} filePath
+ * @param {{
+ *     chunkLines?: number;
+ *     startLine?: number;
+ *     endLine?: number;
+ *     traceId?: string;
+ *     highWaterMark?: number;
+ *     signal?: AbortSignal;
+ *     advisoryLimits?: Record<string, unknown>;
+ * }} [options]
+ * @returns {ReadableStream<import('./read-chunks.js').TextLineChunk>}
+ */
+export function readTextChunksStream(filePath, options = {}) {
+    return readTextLineChunksStream(filePath, options);
 }
 
 /**

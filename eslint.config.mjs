@@ -804,4 +804,42 @@ export default tseslint.config(
             ],
         },
     },
+
+    // ── Timers recorrentes canônicos — use registerInterval do core ─────────
+    {
+        files: [
+            'src/copilot/sdk/telemetry/quota-monitor.js',
+            'src/copilot/agent/session/lifecycle/keepalive.js',
+            'src/copilot/terminal/events/agent-runtime-events.js',
+            'src/copilot/conversation-hub/store.js',
+            'src/copilot/observability/metrics.js',
+            'src/copilot/observability/error-alerting.js',
+            'src/copilot/terminal/repl/live-status-line.js',
+            'src/copilot/infra/io-cache-l2-registry.js',
+            'src/copilot/terminal/dialog/engine.js',
+            'src/copilot/terminal/wiring/terminal-agent-wiring.js',
+            'src/copilot/infra/sse/utils.js',
+            'src/copilot/agent/session/boot/boot-runtime-bind.js',
+            'src/copilot/agent/dialog/watchdogs/watchdog.js',
+            'src/copilot/tools/todo/store.js',
+            'src/copilot/presentation/agent/control/handlers.js',
+        ],
+        rules: {
+            'no-restricted-syntax': [
+                'error',
+                {
+                    selector: "CallExpression[callee.name='setInterval']",
+                    message:
+                        'Use registerInterval from #copilot/core for recurring timers. ' +
+                        'Ele registra o timer no shutdown registry e evita reaparição de polling cru.',
+                },
+                {
+                    selector: "AwaitExpression CallExpression[callee.name='setTimeout']",
+                    message:
+                        'Use sleepMs from #copilot/core para esperas assíncronas canônicas. ' +
+                        'Evite await-setTimeout manual para manter governança de timers e shutdown.',
+                },
+            ],
+        },
+    },
 );

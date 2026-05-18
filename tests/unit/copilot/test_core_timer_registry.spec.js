@@ -15,6 +15,7 @@ import {
     cancelAll,
     listActiveTimers,
     registerTimer,
+    sleepMs,
 } from '../../../src/copilot/core/timer-registry.js';
 
 import { _resetForTesting as resetShutdown } from '../../../src/copilot/core/shutdown.js';
@@ -124,5 +125,16 @@ describe('core/timer-registry.js › listActiveTimers', () => {
         assert.equal(snapshot[0]?.id, 'newer');
         assert.equal(Object.hasOwn(snapshot[0] ?? {}, 'handle'), false);
         assert.equal(typeof snapshot[0]?.ageMs, 'number');
+    });
+});
+
+describe('core/timer-registry.js › sleepMs', () => {
+    it('permite waits concorrentes com mesmo label sem cancelamento cruzado', async () => {
+        await Promise.all([
+            sleepMs(5, { id: 'same-label', unref: false }),
+            sleepMs(5, { id: 'same-label', unref: false }),
+        ]);
+
+        assert.equal(activeCount(), 0);
     });
 });

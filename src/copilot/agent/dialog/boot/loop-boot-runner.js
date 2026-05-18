@@ -4,9 +4,10 @@
  * @file Execução do boot do dialog loop: boot prompt, READY tardio e persistência operacional.
  */
 
-import { EMITTER_LOOP_CHANGED, EMITTER_LOOP_READY, EMITTER_LOOP_TURN_TIMEOUT } from '#copilot/events';
 import { BOOT_LATE_PROTOCOL_GRACE_MS, LONG_TASK_TIMEOUT_MS } from '#copilot/config/agent';
+import { toError } from '#copilot/core';
 import { DialogProtocol } from '#copilot/dialog';
+import { EMITTER_LOOP_CHANGED, EMITTER_LOOP_READY, EMITTER_LOOP_TURN_TIMEOUT } from '#copilot/events';
 import { waitForAgentSdkEvent } from '../../facades/index.js';
 import { log } from '../../ports/index.js';
 
@@ -87,10 +88,7 @@ async function waitForLateBootReady(input) {
         });
         return true;
     } catch (lateErr) {
-        log(
-            'WARN',
-            `[DialogLoopManager] READY tardio ausente: ${lateErr instanceof Error ? lateErr.message : lateErr}`,
-        );
+        log('WARN', `[DialogLoopManager] READY tardio ausente: ${toError(lateErr).message}`);
         return false;
     }
 }
@@ -102,7 +100,7 @@ async function waitForLateBootReady(input) {
  */
 function markBootFailed(input, bootErr) {
     input.bootCircuit.recordFailure();
-    const reason = bootErr instanceof Error ? bootErr.message : String(bootErr);
+    const reason = toError(bootErr).message;
     input.state.deactivate();
     input.watchdogSupervisor.clear();
     input.endLoopSpan(false);

@@ -4,9 +4,10 @@
  * @file Wrapper do CopilotClient com circuit breaker para operações de conexão.
  */
 
-import { CopilotClient } from '@github/copilot-sdk';
+import { sleepMs } from '#copilot/core';
 import { CircuitBreaker } from '#copilot/core/circuit-breaker';
 import { logSwallowed, toError } from '#copilot/core/error-handlers';
+import { CopilotClient } from '@github/copilot-sdk';
 import { getSdkRecoveryPolicy, toSdkOperationError } from '../errors.js';
 import { log } from '../logger.js';
 import { setModelListClientProvider } from '../models/client-provider.js';
@@ -69,7 +70,10 @@ export const sdkConnectionCircuitBreaker = new CircuitBreaker('sdk-connection', 
  * @returns {Promise<void>}
  */
 async function wait(ms) {
-    await new Promise((resolve) => setTimeout(resolve, ms));
+    await sleepMs(ms, {
+        id: `sdk.session.client.wait:${Date.now()}:${Math.random().toString(36).slice(2)}`,
+        unref: true,
+    });
 }
 
 /**

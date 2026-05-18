@@ -7,7 +7,7 @@
  *   src/copilot/agent/dialog/executors/turn-executor.js
  */
 
-import { container, SessionError } from '#copilot/core';
+import { container, SessionError, toError } from '#copilot/core';
 import {
     EMITTER_LOOP_READY,
     EMITTER_LOOP_REPLY,
@@ -216,10 +216,7 @@ export function emitTurnStart(emitter, message, counter, host) {
         });
     } else {
         void persistPendingTurnTask.catch((error) => {
-            log(
-                'WARN',
-                `[DialogLoopManager] pending turn persist falhou: ${error instanceof Error ? error.message : String(error)}`,
-            );
+            log('WARN', `[DialogLoopManager] pending turn persist falhou: ${toError(error).message}`);
         });
     }
     return { turnStart };
@@ -310,7 +307,7 @@ export function waitForRestartAndReply(emitter, host, message, timeout, stopReas
             if (settled) return;
             settled = true;
             cleanup();
-            reject(error instanceof Error ? error : new Error(String(error)));
+            reject(toError(error));
         };
 
         // F41B.5: abort handler — limpa todos os listeners pendentes

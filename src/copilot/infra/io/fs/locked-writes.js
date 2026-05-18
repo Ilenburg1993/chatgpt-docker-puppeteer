@@ -7,10 +7,10 @@
  * @module copilot/infra/io/fs/locked-writes
  */
 
+import { buildIoMeta, createIoTraceId, withIoMeta } from '#copilot/core';
 import * as fs from 'node:fs/promises';
 import { dirname } from 'node:path';
-import { buildIoMeta, createIoTraceId, withIoMeta } from '#copilot/core';
-import { withIoResourceLock } from '../../io-locks.js';
+import { acquireIoResourceLock, withIoResourceLock } from '../../io-locks.js';
 import { nowIoMs, publishIoOperation } from '../../io-observability.js';
 import { assertValidIoFilePath } from '../../policy/path-resource.js';
 import { assertExpectedSha256 } from '../../policy/preconditions.js';
@@ -72,51 +72,55 @@ export async function writeFileAtomic(filePath, content, options = {}) {
     const { payload, bytes } = normalizeWritePayload(filePath, content, options.encoding ?? 'utf8');
     const contentHash = sha256(payload);
     try {
-        const { value, waitMs } = await withIoResourceLock(
-            filePath,
-            async () => {
-                /** @type {string | null} */
-                let previousHash = null;
-                if (options.requireExists) {
-                    try {
-                        await fs.access(filePath);
-                    } catch {
-                        const err = new Error(`Arquivo não encontrado: ${filePath}`);
-                        /** @type {{ code?: string }} */ (err).code = 'ENOENT';
-                        throw err;
-                    }
-                }
-
-                if (options.failIfExists) {
-                    try {
-                        await fs.access(filePath);
-                        const err = new Error(`Destino já existe: ${filePath}`);
-                        /** @type {{ code?: string }} */ (err).code = 'EEXIST';
-                        throw err;
-                    } catch (accessError) {
-                        const code = /** @type {{ code?: unknown }} */ (accessError)?.code;
-                        if (code !== 'ENOENT') {
-                            throw accessError;
+        const lease = await acquireIoResourceLock(filePath, {
+            ...(options.lockTimeoutMs === undefined ? {} : { timeoutMs: options.lockTimeoutMs }),
+            ...(options.signal === undefined ? {} : { signal: options.signal }),
+        });
+        const value = await (async () => {
+            try {
+                return await lease.run(async () => {
+                    /** @type {string | null} */
+                    let previousHash = null;
+                    if (options.requireExists) {
+                        try {
+                            await fs.access(filePath);
+                        } catch {
+                            const err = new Error(`Arquivo não encontrado: ${filePath}`);
+                            /** @type {{ code?: string }} */ (err).code = 'ENOENT';
+                            throw err;
                         }
                     }
-                }
 
-                if (options.expectedHash) {
-                    previousHash = assertExpectedSha256(await fs.readFile(filePath), options.expectedHash);
-                }
+                    if (options.failIfExists) {
+                        try {
+                            await fs.access(filePath);
+                            const err = new Error(`Destino já existe: ${filePath}`);
+                            /** @type {{ code?: string }} */ (err).code = 'EEXIST';
+                            throw err;
+                        } catch (accessError) {
+                            const code = /** @type {{ code?: unknown }} */ (accessError)?.code;
+                            if (code !== 'ENOENT') {
+                                throw accessError;
+                            }
+                        }
+                    }
 
-                await writeAtomicFileUnlocked(
-                    filePath,
-                    payload,
-                    options.mode === undefined ? {} : { mode: options.mode },
-                );
-                return { path: filePath, bytesWritten: bytes, previousHash, contentHash };
-            },
-            {
-                ...(options.lockTimeoutMs === undefined ? {} : { timeoutMs: options.lockTimeoutMs }),
-                ...(options.signal === undefined ? {} : { signal: options.signal }),
-            },
-        );
+                    if (options.expectedHash) {
+                        previousHash = assertExpectedSha256(await fs.readFile(filePath), options.expectedHash);
+                    }
+
+                    await writeAtomicFileUnlocked(
+                        filePath,
+                        payload,
+                        options.mode === undefined ? {} : { mode: options.mode },
+                    );
+                    return { path: filePath, bytesWritten: bytes, previousHash, contentHash };
+                });
+            } finally {
+                lease.release();
+            }
+        })();
+        const waitMs = lease.waitMs;
         invalidateIoCacheTiers(filePath);
         const io = publishAndReturn(
             buildIoMeta({
@@ -196,14 +200,18 @@ export async function appendTextLocked(filePath, content, options = {}) {
     const startedAt = nowIoMs();
     const { payload, bytes } = normalizeWritePayload(filePath, content, options.encoding ?? 'utf8');
     try {
-        const { waitMs } = await withIoResourceLock(
-            filePath,
-            async () => appendFileUnlocked(filePath, payload, options.mode === undefined ? {} : { mode: options.mode }),
-            {
-                ...(options.lockTimeoutMs === undefined ? {} : { timeoutMs: options.lockTimeoutMs }),
-                ...(options.signal === undefined ? {} : { signal: options.signal }),
-            },
-        );
+        const lease = await acquireIoResourceLock(filePath, {
+            ...(options.lockTimeoutMs === undefined ? {} : { timeoutMs: options.lockTimeoutMs }),
+            ...(options.signal === undefined ? {} : { signal: options.signal }),
+        });
+        try {
+            await lease.run(async () =>
+                appendFileUnlocked(filePath, payload, options.mode === undefined ? {} : { mode: options.mode }),
+            );
+        } finally {
+            lease.release();
+        }
+        const waitMs = lease.waitMs;
         invalidateIoCacheTiers(filePath);
         const io = publishAndReturn(
             buildIoMeta({

@@ -21,6 +21,8 @@ import {
     handleTerminalSdkPendingPermission,
     inputTerminalSdkSessionUi,
     isTerminalSdkSessionUiElicitationAvailable,
+    listTerminalFileReadTools,
+    listTerminalFileWriteTools,
     listTerminalPendingStructuredUserInputs,
     listTerminalSdkModels,
     listTerminalSdkPendingPermissions,
@@ -33,8 +35,6 @@ import {
     readTerminalToolRegistrySnapshot,
     requestTerminalSdkElicitation,
     requireTerminalFileTool,
-    listTerminalFileReadTools,
-    listTerminalFileWriteTools,
     resolveTerminalSdkPendingElicitation,
     selectTerminalSdkSessionUi,
     setTerminalRuntimePermissionMode,
@@ -415,7 +415,7 @@ function formatAge(ts) {
 
 /**
  * @param {string} text
- * @param {number} [max=180]
+ * @param {number} [max=180] Default is `180`
  * @returns {string}
  */
 function compactText(text, max = 180) {
@@ -537,7 +537,9 @@ function renderSdkWaitsSummary({ println }, runtimeId) {
         if (latest) {
             const choices = latest.choices.length > 0 ? ` choices=${latest.choices.join(' | ')}` : '';
             const freeform = latest.allowFreeform ? 'livre' : 'selecao obrigatoria';
-            println(`  ask      \x1b[90m${latest.id} - ${formatAge(latest.createdAt)} - ${latest.kind} - ${freeform}${choices}\x1b[0m`);
+            println(
+                `  ask      \x1b[90m${latest.id} - ${formatAge(latest.createdAt)} - ${latest.kind} - ${freeform}${choices}\x1b[0m`,
+            );
             println(`           ${compactText(latest.question, 220)}`);
         }
     }
@@ -1187,7 +1189,7 @@ export async function cmdPermission({ println }, arg = '') {
                 }
                 payload = /** @type {Record<string, unknown>} */ (parsed);
             } catch (error) {
-                println(`  \x1b[31mJSON inv�lido:\x1b[0m ${error instanceof Error ? error.message : String(error)}`);
+                println(`  \x1b[31mJSON inv�lido:\x1b[0m ${toError(error).message}`);
                 return;
             }
         }

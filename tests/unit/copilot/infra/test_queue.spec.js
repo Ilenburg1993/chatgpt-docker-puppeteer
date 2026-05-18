@@ -41,4 +41,35 @@ describe('infra/queue AsyncQueue', () => {
         await expect(running).resolves.toBe('done');
         await expect(pending).rejects.toThrow('Queue cleared');
     });
+
+    it('respeita prioridades arbitrárias sem fallback silencioso para 5', async () => {
+        const queue = new AsyncQueue({ concurrency: 1 });
+        /** @type {string[]} */
+        const order = [];
+
+        /** @type {() => void} */
+        let release = () => {};
+        const blocker = queue.add(
+            () =>
+                new Promise((resolve) => {
+                    release = () => resolve(undefined);
+                }),
+            5,
+        );
+
+        const p1 = queue.add(async () => {
+            order.push('p5');
+            return 'p5';
+        }, 5);
+
+        const p2 = queue.add(async () => {
+            order.push('p3');
+            return 'p3';
+        }, 3);
+
+        release();
+        await blocker;
+        await Promise.all([p1, p2]);
+        expect(order).toEqual(['p3', 'p5']);
+    });
 });

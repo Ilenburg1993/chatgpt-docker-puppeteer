@@ -13,6 +13,8 @@ import { AGENT_EMITTER_ERROR, AGENT_SESSION_FATAL } from '#copilot/events';
 import { log } from '../logger.js';
 import { startSpanImmediate } from '../otel.js';
 
+import { toError } from '#copilot/core';
+
 /**
  * @param {unknown} raw
  * @returns {string}
@@ -65,7 +67,7 @@ export function attachSessionAgentHandlers(ctx) {
             metrics.recordCounter('session.fatal');
             metrics.recordSessionError();
             if (errorTracker && evt?.error) {
-                const err = evt.error instanceof Error ? evt.error : new Error(String(evt.error));
+                const err = toError(evt.error);
                 errorTracker.trackError(err, {
                     source: AGENT_SESSION_FATAL,
                     metadata: { sessionId: evt?.sessionId },
@@ -274,7 +276,7 @@ export function attachSessionAgentHandlers(ctx) {
         safe((/** @type {unknown} */ err) => {
             metrics.recordCounter('agent.emitter.error');
             if (errorTracker) {
-                const e = err instanceof Error ? err : new Error(normalizeUnknownErrorMessage(err));
+                const e = toError(err);
                 errorTracker.trackError(e, { source: AGENT_EMITTER_ERROR });
             }
             log('WARN', `[agent-event-observer] agent error: ${normalizeUnknownErrorMessage(err)}`);

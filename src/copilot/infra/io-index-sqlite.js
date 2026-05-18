@@ -9,9 +9,9 @@
  * @module copilot/infra/io-index-sqlite
  */
 
+import { createIoTraceId, toError } from '#copilot/core';
 import { basename, extname } from 'node:path';
 import pLimit from 'p-limit';
-import { createIoTraceId } from '#copilot/core';
 import {
     classifyContentKind,
     countLines,
@@ -28,12 +28,16 @@ import {
     shouldIndexFile,
     SYMBOL_EXTENSIONS,
 } from './index-store/index.js';
+import { acquireIoResourceLock } from './io-locks.js';
 import { publishIoLifecycleEvent } from './io-observability.js';
 import { parseFileSymbols } from './io-parser.js';
 import { scanDirectory } from './io-scanner.js';
 import { readTextFileSnapshot } from './io/fs/read-text.js';
-import { fingerprintMatches } from './shared/fingerprint-match.js';
 import { utf8ByteLength } from './shared/buffer.js';
+import { readEnvPositiveInt } from './shared/env.js';
+import { fingerprintMatches } from './shared/fingerprint-match.js';
+
+const DEFAULT_INDEX_BUILD_MAX_FILES = readEnvPositiveInt('IO_INDEX_BUILD_MAX_FILES', 10_000);
 
 /**
  * @typedef {'fresh' | 'stale' | 'failed' | 'skipped'} IoIndexFileStatus
@@ -46,7 +50,6 @@ import { utf8ByteLength } from './shared/buffer.js';
  *     extension: string;
  *     contentKind: string;
  *     sizeBytes: number;
- *     mtimeMs: number;
  *     ctimeMs: number | null;
  *     contentHash: string | null;
  *     lineCount: number;
@@ -67,6 +70,7 @@ import { utf8ByteLength } from './shared/buffer.js';
  *     rank: number;
  * }} IoIndexSearchResult
  *
+ *
  * @typedef {{
  *     filePath: string;
  *     relativePath: string;
@@ -76,6 +80,7 @@ import { utf8ByteLength } from './shared/buffer.js';
  *     line: number;
  *     docComment: string | null;
  * }} IoIndexSymbolResult
+ *
  *
  * @typedef {{
  *     filePath: string;
@@ -322,7 +327,7 @@ export function createIoIndexSqlite(options) {
                 symbols = await parseFileSymbols(filePath, input.content);
                 parseError = symbols.parseError;
             } catch (e) {
-                parseError = e instanceof Error ? e.message : String(e);
+                parseError = toError(e).message;
             }
         }
 
@@ -441,148 +446,176 @@ export function createIoIndexSqlite(options) {
          *     exclude?: readonly string[];
          *     extensions?: readonly string[];
          *     concurrency?: number;
+         *     maxFiles?: number;
          *     pruneMissing?: boolean;
          * }} [options]
          */
         async indexDirectory(rootPath, options = {}) {
-            const startedAt = Date.now();
-            const traceId = createIoTraceId();
-            const workspaceRoot = normalizeIndexPath(options.workspaceRoot ?? rootPath);
-            const extensions = normalizeIndexExtensions(options.extensions ?? DEFAULT_INDEX_EXTENSIONS);
-            const concurrency =
-                Number.isFinite(options.concurrency) && Number(options.concurrency) > 0
-                    ? Math.floor(Number(options.concurrency))
-                    : 8;
-            const limit = pLimit(concurrency);
-            publishIoLifecycleEvent('index', 'build.start', {
-                traceId,
-                rootPath,
-                workspaceRoot,
-                recursive: options.recursive ?? true,
-                concurrency,
-            });
-            /** @type {Parameters<typeof scanDirectory>[1]} */
-            const scanOptions = {
-                workspaceRoot,
-                recursive: options.recursive ?? true,
-                depth: options.depth ?? 20,
-                respectGitignore: options.respectGitignore ?? true,
-                concurrency,
-                fingerprint: true,
-            };
-            if (options.include !== undefined) scanOptions.include = options.include;
-            if (options.exclude !== undefined) scanOptions.exclude = options.exclude;
-            const scan = await scanDirectory(rootPath, scanOptions);
-            const files = flattenScanEntries(scan.entries).filter((entry) =>
-                shouldIndexFile(entry.absolutePath, extensions),
-            );
-            const currentFilePaths = new Set(files.map((entry) => normalizeIndexPath(entry.absolutePath)));
-            const maySafelyPrune =
-                (options.include?.length ?? 0) === 0 &&
-                (options.exclude?.length ?? 0) === 0 &&
-                options.pruneMissing !== false;
-            const pruned = maySafelyPrune ? pruneMissingRows(rootPath, currentFilePaths, extensions) : 0;
+            const normalizedRoot = normalizeIndexPath(options.workspaceRoot ?? rootPath);
+            const lockKey = `io-index-build:${normalizedRoot}`;
+            const lease = await acquireIoResourceLock(lockKey);
+            try {
+                const value = await lease.run(async () => {
+                    const startedAt = Date.now();
+                    const traceId = createIoTraceId();
+                    const workspaceRoot = normalizeIndexPath(options.workspaceRoot ?? rootPath);
+                    const extensions = normalizeIndexExtensions(options.extensions ?? DEFAULT_INDEX_EXTENSIONS);
+                    const concurrency =
+                        Number.isFinite(options.concurrency) && Number(options.concurrency) > 0
+                            ? Math.floor(Number(options.concurrency))
+                            : 8;
+                    const limit = pLimit(concurrency);
+                    const effectiveMaxFiles =
+                        Number.isFinite(options.maxFiles) && Number(options.maxFiles) > 0
+                            ? Math.floor(Number(options.maxFiles))
+                            : DEFAULT_INDEX_BUILD_MAX_FILES;
 
-            let failed = 0;
-            let unchanged = 0;
-            const indexed = [];
+                    publishIoLifecycleEvent('index', 'build.start', {
+                        traceId,
+                        rootPath,
+                        workspaceRoot,
+                        recursive: options.recursive ?? true,
+                        concurrency,
+                        effectiveMaxFiles,
+                    });
+                    /** @type {Parameters<typeof scanDirectory>[1]} */
+                    const scanOptions = {
+                        workspaceRoot,
+                        recursive: options.recursive ?? true,
+                        depth: options.depth ?? 20,
+                        respectGitignore: options.respectGitignore ?? true,
+                        concurrency,
+                        fingerprint: true,
+                    };
+                    if (options.include !== undefined) scanOptions.include = options.include;
+                    if (options.exclude !== undefined) scanOptions.exclude = options.exclude;
+                    const scan = await scanDirectory(rootPath, scanOptions);
+                    const allCandidates = flattenScanEntries(scan.entries).filter((entry) =>
+                        shouldIndexFile(entry.absolutePath, extensions),
+                    );
+                    const files = allCandidates.slice(0, effectiveMaxFiles);
+                    const hardLimitReached = allCandidates.length > files.length;
 
-            await Promise.all(
-                files.map((entry) =>
-                    limit(async () => {
-                        try {
-                            const normalizedFilePath = normalizeIndexPath(entry.absolutePath);
-                            const existing =
-                                /** @type {{ sizeBytes?: number; mtimeMs?: number; status?: string } | undefined} */ (
-                                    stmtGetFingerprint.get(normalizedFilePath)
-                                );
-                            if (
-                                existing?.status === 'fresh' &&
-                                entry.fingerprint &&
-                                fingerprintMatches(
-                                    {
-                                        mtimeMs: Number(existing.mtimeMs),
-                                        sizeBytes: Number(existing.sizeBytes),
-                                    },
-                                    {
-                                        mtimeMs: Number(entry.fingerprint.mtimeMs),
-                                        sizeBytes: Number(entry.fingerprint.size),
-                                    },
-                                )
-                            ) {
-                                unchanged += 1;
-                                return;
-                            }
-                            const text = await readTextFileSnapshot(entry.absolutePath);
-                            indexed.push(
-                                await indexTextFile({
-                                    filePath: entry.absolutePath,
-                                    workspaceRoot,
-                                    content: text.content,
-                                    sizeBytes: entry.size ?? text.sizeBytes,
-                                    mtimeMs: entry.fingerprint?.mtimeMs ?? text.mtimeMs,
-                                    ctimeMs: text.ctimeMs,
-                                    metadata: {
-                                        scanTraceId: scan.io.traceId,
-                                        indexTraceId: traceId,
-                                        scannerEngine: scan.io.engine,
-                                        source: 'indexDirectory',
-                                        realpath: entry.fingerprint?.realpath ?? null,
-                                    },
-                                }),
-                            );
-                            if (indexed.length % 50 === 0) {
-                                publishIoLifecycleEvent('index', 'build.progress', {
-                                    traceId,
-                                    rootPath,
-                                    workspaceRoot,
-                                    indexed: indexed.length,
-                                    total: files.length,
-                                    pct: files.length > 0 ? Math.round((indexed.length / files.length) * 100) : 100,
-                                    currentFile: entry.absolutePath,
-                                });
-                            }
-                        } catch {
-                            failed += 1;
-                        }
-                    }),
-                ),
-            );
+                    const currentFilePaths = new Set(files.map((entry) => normalizeIndexPath(entry.absolutePath)));
+                    const hasFilterSlice = (options.include?.length ?? 0) > 0 || (options.exclude?.length ?? 0) > 0;
+                    const maySafelyPrune =
+                        options.pruneMissing === true || (!hasFilterSlice && options.pruneMissing !== false);
+                    const pruned = maySafelyPrune ? pruneMissingRows(rootPath, currentFilePaths, extensions) : 0;
 
-            const skipped = Math.max(0, flattenScanEntries(scan.entries).length - files.length);
-            stats.builds += 1;
-            stats.skipped += skipped + unchanged;
-            stats.failed += failed;
-            stats.pruned += pruned;
-            publishIoLifecycleEvent('index', 'build.complete', {
-                traceId,
-                rootPath,
-                workspaceRoot,
-                scannedEntries: scan.scannedEntries,
-                candidateFiles: files.length,
-                indexed: indexed.length,
-                unchanged,
-                skipped,
-                failed,
-                pruned,
-                durationMs: Math.max(0, Date.now() - startedAt),
-            });
+                    let failed = 0;
+                    let unchanged = 0;
+                    const indexed = [];
 
-            return {
-                available: true,
-                traceId,
-                workspaceRoot,
-                scannedEntries: scan.scannedEntries,
-                candidateFiles: files.length,
-                indexed: indexed.length,
-                skipped: skipped + unchanged,
-                unchanged,
-                failed,
-                pruned,
-                pruneMissing: maySafelyPrune,
-                durationMs: Math.max(0, Date.now() - startedAt),
-                limitMode: 'informative',
-            };
+                    await Promise.all(
+                        files.map((entry) =>
+                            limit(async () => {
+                                try {
+                                    const normalizedFilePath = normalizeIndexPath(entry.absolutePath);
+                                    const existing = /**
+                                     * @type {{ sizeBytes?: number; mtimeMs?: number; status?: string } | undefined}
+                                     */ (stmtGetFingerprint.get(normalizedFilePath));
+                                    if (
+                                        existing?.status === 'fresh' &&
+                                        entry.fingerprint &&
+                                        fingerprintMatches(
+                                            {
+                                                mtimeMs: Number(existing.mtimeMs),
+                                                sizeBytes: Number(existing.sizeBytes),
+                                            },
+                                            {
+                                                mtimeMs: Number(entry.fingerprint.mtimeMs),
+                                                sizeBytes: Number(entry.fingerprint.size),
+                                            },
+                                        )
+                                    ) {
+                                        unchanged += 1;
+                                        return;
+                                    }
+                                    const text = await readTextFileSnapshot(entry.absolutePath);
+                                    indexed.push(
+                                        await indexTextFile({
+                                            filePath: entry.absolutePath,
+                                            workspaceRoot,
+                                            content: text.content,
+                                            sizeBytes: entry.size ?? text.sizeBytes,
+                                            mtimeMs: entry.fingerprint?.mtimeMs ?? text.mtimeMs,
+                                            ctimeMs: text.ctimeMs,
+                                            metadata: {
+                                                scanTraceId: scan.io.traceId,
+                                                indexTraceId: traceId,
+                                                scannerEngine: scan.io.engine,
+                                                source: 'indexDirectory',
+                                                realpath: entry.fingerprint?.realpath ?? null,
+                                            },
+                                        }),
+                                    );
+                                    if (indexed.length % 50 === 0) {
+                                        publishIoLifecycleEvent('index', 'build.progress', {
+                                            traceId,
+                                            rootPath,
+                                            workspaceRoot,
+                                            indexed: indexed.length,
+                                            total: files.length,
+                                            pct:
+                                                files.length > 0
+                                                    ? Math.round((indexed.length / files.length) * 100)
+                                                    : 100,
+                                            currentFile: entry.absolutePath,
+                                        });
+                                    }
+                                } catch {
+                                    failed += 1;
+                                }
+                            }),
+                        ),
+                    );
+
+                    const skipped = Math.max(0, flattenScanEntries(scan.entries).length - files.length);
+                    stats.builds += 1;
+                    stats.skipped += skipped + unchanged;
+                    stats.failed += failed;
+                    stats.pruned += pruned;
+                    publishIoLifecycleEvent('index', 'build.complete', {
+                        traceId,
+                        rootPath,
+                        workspaceRoot,
+                        scannedEntries: scan.scannedEntries,
+                        candidateFiles: files.length,
+                        totalCandidates: allCandidates.length,
+                        indexed: indexed.length,
+                        unchanged,
+                        skipped,
+                        failed,
+                        pruned,
+                        hardLimitReached,
+                        effectiveMaxFiles,
+                        durationMs: Math.max(0, Date.now() - startedAt),
+                    });
+
+                    return {
+                        available: true,
+                        traceId,
+                        workspaceRoot,
+                        scannedEntries: scan.scannedEntries,
+                        candidateFiles: files.length,
+                        totalCandidates: allCandidates.length,
+                        effectiveMaxFiles,
+                        hardLimitReached,
+                        indexed: indexed.length,
+                        skipped: skipped + unchanged,
+                        unchanged,
+                        failed,
+                        pruned,
+                        pruneMissing: maySafelyPrune,
+                        durationMs: Math.max(0, Date.now() - startedAt),
+                        limitMode: 'enforced-max-files',
+                    };
+                });
+
+                return value;
+            } finally {
+                lease.release();
+            }
         },
 
         /**

@@ -288,11 +288,14 @@ export async function warmFromDirectory(directory, opts = {}, prefetchOpts = {})
     }
 
     const allEntries = flattenEntries(scanResult.entries);
-    const files = allEntries
+    const allCandidateFiles = allEntries
         .filter((e) => e.type === 'file' && extensions.includes(nodePath.extname(e.name).toLowerCase()))
         .filter((e) => include.length === 0 || matchesAnyPattern(e.absolutePath, baseDir, include))
         .filter((e) => exclude.length === 0 || !matchesAnyPattern(e.absolutePath, baseDir, exclude))
         .map((e) => e.absolutePath);
+
+    const effectiveMaxFiles = Number.isFinite(maxFiles) && maxFiles > 0 ? Math.floor(maxFiles) : 500;
+    const files = allCandidateFiles.slice(0, effectiveMaxFiles);
 
     const result = await warmCacheForPaths(files, prefetchOpts);
     return {
@@ -302,11 +305,14 @@ export async function warmFromDirectory(directory, opts = {}, prefetchOpts = {})
         paths: files,
         advisoryLimits: {
             requestedMaxFiles: maxFiles,
+            effectiveMaxFiles,
+            hardLimitReached: allCandidateFiles.length > files.length,
             selectedFiles: files.length,
+            candidateFiles: allCandidateFiles.length,
             recursive,
             includePatternCount: include.length,
             excludePatternCount: exclude.length,
-            limitMode: 'informative',
+            limitMode: 'enforced-max-files',
         },
     };
 }
@@ -370,16 +376,27 @@ export async function warmReadThroughContext(filePath, opts = {}) {
         });
 
         if (index) {
-            const stats = await fsStat(filePath).catch(() => null);
-            const indexStore = getIoIndex();
-            if (indexStore && stats) {
+            const indexStore = /**
+             * @type {{
+             *     indexTextFile?: (input: {
+             *         filePath: string;
+             *         workspaceRoot: string;
+             *         content: string;
+             *         sizeBytes: number;
+             *         mtimeMs: number;
+             *         ctimeMs: number | null;
+             *         metadata?: Record<string, unknown>;
+             *     }) => Promise<unknown>;
+             * } | null}
+             */ (getIoIndex());
+            if (typeof indexStore?.indexTextFile === 'function') {
                 await indexStore.indexTextFile({
                     filePath,
                     workspaceRoot,
                     content: text.content,
-                    sizeBytes: stats.size,
-                    mtimeMs: stats.mtimeMs,
-                    ctimeMs: stats.ctimeMs,
+                    sizeBytes: text.sizeBytes,
+                    mtimeMs: text.mtimeMs,
+                    ctimeMs: text.ctimeMs,
                     metadata: { source: 'read-through', limitMode: 'informative' },
                 });
                 indexed = true;
@@ -437,19 +454,34 @@ async function resolveRelativeImportTargets(sourceFile, imports) {
     const baseDir = nodePath.dirname(sourceFile);
     /** @type {string[]} */
     const out = [];
+    /** @type {Map<string, Promise<import('node:fs').Stats | null>>} */
+    const statCache = new Map();
+
+    /**
+     * @param {string} candidate
+     * @returns {Promise<import('node:fs').Stats | null>}
+     */
+    function statCandidate(candidate) {
+        const cached = statCache.get(candidate);
+        if (cached) return cached;
+        const pending = fsStat(candidate).catch(() => null);
+        statCache.set(candidate, pending);
+        return pending;
+    }
+
     for (const entry of imports) {
         if (!entry.source.startsWith('.')) continue;
         const raw = nodePath.resolve(baseDir, entry.source);
-        const candidates = IMPORT_EXTENSIONS.flatMap((ext) => [
-            `${raw}${ext}`,
-            nodePath.join(raw, `index${ext || '.js'}`),
-        ]);
-        for (const candidate of candidates) {
-            const stat = await fsStat(candidate).catch(() => null);
-            if (stat?.isFile()) {
-                out.push(candidate);
-                break;
-            }
+        const candidates = [
+            ...new Set(
+                IMPORT_EXTENSIONS.flatMap((ext) => [`${raw}${ext}`, nodePath.join(raw, `index${ext || '.js'}`)]),
+            ),
+        ];
+        const stats = await Promise.all(candidates.map((candidate) => statCandidate(candidate)));
+        const foundIndex = stats.findIndex((stat) => stat?.isFile());
+        if (foundIndex >= 0) {
+            const foundCandidate = candidates[foundIndex];
+            if (foundCandidate) out.push(foundCandidate);
         }
     }
     return [...new Set(out)];

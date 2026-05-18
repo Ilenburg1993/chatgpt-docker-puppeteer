@@ -41,6 +41,11 @@ export function sha256(content) {
 }
 
 /**
+ * Conta linhas físicas indexáveis para persistência no index-store.
+ *
+ * Contrato: string vazia retorna 0 (arquivo vazio não possui linhas materializadas no índice). Para deltas de patch com
+ * baseline mínima de 1 linha, usar utilitário específico do domínio de patch.
+ *
  * @param {string} content
  * @returns {number}
  */

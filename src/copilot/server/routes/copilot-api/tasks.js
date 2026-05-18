@@ -16,9 +16,27 @@ import { normalizeElicitationResultWithSchema } from '../../../core/elicitation-
 import { toError } from '../../../core/error-handlers.js';
 import { projectAgentHttpError } from '../../../presentation/agent/index.js';
 import { resolveOptionalDialogTimeout } from '../../../presentation/dialog-timeout-policy.js';
+import { buildRuntimeRouteMetaPayload, resolveCopilotApiRouteBinding } from '../../../presentation/routing/index.js';
 import { readAgentRuntimeControlStateFromRoute } from '../../../presentation/runtime/index.js';
-import { buildRuntimeRouteMetaPayload } from '../../../presentation/routing/index.js';
-import { resolveCopilotApiRouteBinding } from '../../../presentation/routing/index.js';
+
+/**
+ * @param {number} timeoutMs
+ * @returns {{ signal: AbortSignal; cleanup: () => void }}
+ */
+function createTimeoutSignal(timeoutMs) {
+    const abortSignalCtor = /** @type {{ timeout?: (ms: number) => AbortSignal }} */ (AbortSignal);
+    if (typeof abortSignalCtor.timeout === 'function') {
+        return { signal: abortSignalCtor.timeout(Math.max(0, timeoutMs)), cleanup: () => {} };
+    }
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), Math.max(0, timeoutMs));
+    timeoutId.unref?.();
+    return {
+        signal: controller.signal,
+        cleanup: () => clearTimeout(timeoutId),
+    };
+}
 
 /**
  * @typedef {import('express').Request} Req
@@ -97,17 +115,16 @@ export function registerTaskRoutes(bridge, binding) {
             if (waitForResponse) {
                 // Para turnos longos, o caller pode desabilitar o timeout explícito (timeoutMs=0).
                 // Caso contrário, usamos timeout adaptativo alinhado ao runtime do dialog loop.
-                const controller = timeoutDecision.timeoutMs !== null ? new AbortController() : null;
                 const timeoutHandle =
-                    controller !== null && typeof timeoutDecision.timeoutMs === 'number'
-                        ? setTimeout(() => controller.abort(), timeoutDecision.timeoutMs)
+                    typeof timeoutDecision.timeoutMs === 'number'
+                        ? createTimeoutSignal(timeoutDecision.timeoutMs)
                         : null;
                 try {
                     const raceResult = await agent.sendMessage(message, {
                         ...(attachments !== undefined ? { attachments } : {}),
-                        ...(controller !== null ? { signal: controller.signal } : {}),
+                        ...(timeoutHandle !== null ? { signal: timeoutHandle.signal } : {}),
                     });
-                    if (timeoutHandle) clearTimeout(timeoutHandle);
+                    timeoutHandle?.cleanup();
                     log(
                         'INFO',
                         `[copilot-api/tasks/send] waitForResponse timeout=${timeoutDecision.timeoutMs ?? 'disabled'} strategy=${timeoutDecision.strategy} reasons=${timeoutDecision.reasons.join('+')}`,
@@ -123,7 +140,7 @@ export function registerTaskRoutes(bridge, binding) {
                         },
                     });
                 } catch (e) {
-                    if (timeoutHandle) clearTimeout(timeoutHandle);
+                    timeoutHandle?.cleanup();
                     const projection = projectAgentHttpError(e, {
                         fallbackStatus: 500,
                         timeoutStatus: 504,

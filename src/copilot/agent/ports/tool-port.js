@@ -33,6 +33,7 @@ import {
     setExperimentalSession,
     setHub,
     setPermissionAgent,
+    setSessionExcludedTools,
     setSessionRpc,
 } from '#copilot/tools';
 
@@ -90,6 +91,7 @@ export function unbindAgentSessionTools() {
     cancelAllUserInputRequests();
     setSessionRpc(null);
     setAgentInfoProvider(null);
+    setSessionExcludedTools([]);
     try {
         if (typeof setExperimentalSession === 'function') {
             setExperimentalSession(null);
@@ -128,5 +130,22 @@ export function bindAgentInfoProvider(ctx) {
     setAgentInfoProvider(ctx);
 }
 
-export { configureHookTools, setExperimentalSession, setHub, setPermissionAgent, setSessionRpc };
-export { AgentToolPolicy, createToolSessionContext };
+/**
+ * Atualiza a baseline de tools excluídas estaticamente (`excludedTools`) para a sessão ativa.
+ *
+ * @param {string[] | null | undefined} toolNames
+ * @returns {void}
+ */
+export function bindAgentSessionExcludedTools(toolNames) {
+    setSessionExcludedTools(Array.isArray(toolNames) ? toolNames : []);
+}
+
+export {
+    AgentToolPolicy,
+    configureHookTools,
+    createToolSessionContext,
+    setExperimentalSession,
+    setHub,
+    setPermissionAgent,
+    setSessionRpc,
+};

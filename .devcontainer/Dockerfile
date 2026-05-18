@@ -1,10 +1,10 @@
 # syntax=docker/dockerfile:1
 # =============================================================================
-# Dockerfile v1.4.0 — ChatGPT Docker Puppeteer DevContainer (CANÔNICO / DEFINITIVO)
+# Dockerfile v1.4.2 — ChatGPT Docker Puppeteer DevContainer (CANÔNICO / DEFINITIVO)
 # Base: Node.js 24 + Debian Bookworm (Microsoft DevContainers)
 # hadolint global ignore=DL3008,DL3059,DL3009
 #
-# OBJETIVO MACRO (v1.4.0)
+# OBJETIVO MACRO (v1.4.2)
 #   Este Dockerfile define uma imagem DEV (apenas desenvolvimento) com foco em:
 #   - Estabilidade máxima do VS Code Server (Remote - Containers / Dev Containers)
 #   - Compatibilidade alta com GitHub Copilot / Copilot Chat e fluxos de agente
@@ -26,8 +26,21 @@
 #   altos no host (na prática, root-equivalent). Isso é deliberado para DEV.
 #
 # VERSÃO
-#   - Todas as versões/contratos internos nesta imagem usam "1.4.0".
-#   - ARG VERSION default é 1.4.0 e é propagado para contratos e labels OCI.
+#   - Todas as versões/contratos internos nesta imagem usam "1.4.2".
+#   - ARG VERSION default é 1.4.2 e é propagado para contratos e labels OCI.
+#
+# CHANGELOG v1.4.2:
+#   - Faz auditoria conservadora de gaps de tooling básico recomendado para DEV:
+#     adiciona rsync, sudo, gawk, acl, uuid-runtime, net-tools, ethtool e
+#     pinentry-curses sem introduzir daemons nem serviços.
+#   - Remove a instalação canônica de pnpm do prefixo global da imagem para
+#     alinhar com package.json v1.1.0, que padroniza npm como único package manager.
+#   - Amplia o Tool Validation Gate com checks dos novos utilitários e retira pnpm
+#     da lista obrigatória.
+#   - Mantém rejeição explícita de Docker daemon/containerd, resolvconf/systemd,
+#     iptables/nftables e benchmarks auto-start durante build/boot.
+#   - Preserva build conservadora: nenhuma daemonização, nenhum benchmark em build,
+#     nenhum proxy/DNS ativado por padrão.
 # =============================================================================
 
 
@@ -44,14 +57,16 @@ FROM ${BASE_IMAGE}
 # ---------------------------------------------------------------------------
 ARG NPM_VERSION=11.14.1
 ARG DEVCONTAINER_CLI_VERSION=0.86.1
-ARG PNPM_VERSION=11.1.2
 ARG GH_VERSION=2.92.0
 ARG ACTIONLINT_VERSION=1.7.12
 ARG HADOLINT_VERSION=2.14.0
 ARG YQ_VERSION=4.53.2
 ARG TYPESCRIPT_VERSION=6.0.3
-ARG TYPESCRIPT_LANGUAGE_SERVER_VERSION=5.1.3
+ARG TYPESCRIPT_LANGUAGE_SERVER_VERSION=5.2.0
 ARG JSONC_PARSER_VERSION=3.3.1
+ARG NETWORK_BENCHMARK_DURATION_SECONDS=600
+ARG NETWORK_BENCHMARK_INTERVAL_SECONDS=10
+ARG NETWORK_RECOMMENDATION_TTL_SECONDS=86400
 
 # ---------------------------------------------------------------------------
 # Curated Rust/Go CLIs — pinned upstream releases (Section 6.8)
@@ -75,9 +90,9 @@ SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
 # ---------------------------------------------------------------------------
 # Build-time metadata (OCI)
-# - VERSION deve ser "1.4.0" para o release canônico (pode ser override via build-arg).
+# - VERSION deve ser "1.4.2" para o release canônico (pode ser override via build-arg).
 # ---------------------------------------------------------------------------
-ARG VERSION=1.4.0
+ARG VERSION=1.4.2
 ARG BUILD_DATE=unknown
 ARG VCS_REF=unknown
 ARG IMAGE_NAME=chatgpt-docker-puppeteer
@@ -90,7 +105,7 @@ LABEL org.opencontainers.image.title="${IMAGE_NAME}" \
     org.opencontainers.image.created="${BUILD_DATE}" \
     org.opencontainers.image.revision="${VCS_REF}" \
     org.opencontainers.image.environment="${BUILD_ENV}" \
-    org.opencontainers.image.description="DevContainer for ChatGPT Puppeteer Agent (DEV) — Canonical v1.4.0"
+    org.opencontainers.image.description="DevContainer for ChatGPT Puppeteer Agent (DEV) — Canonical v1.4.2"
 
 # ---------------------------------------------------------------------------
 # Build-time feedback (logs)
@@ -265,7 +280,7 @@ ENV PATH="/usr/local/share/npm-global/bin:${HOME_DIR}/.npm-global/bin:${HOME_DIR
 # - Alinha npm com o contrato do repo (volta/package.json)
 # - Expõe `devcontainer` para build/read-configuration dentro do próprio container
 # - Expõe `jsonc-parser` para validação real de `devcontainer.json`, `settings.json` e templates .jsonc
-# - Fixa `pnpm` explicitamente no prefixo canônico para evitar depender do estado da imagem-base
+# - Não instala pnpm/yarn como tooling canônico: o repositório padroniza npm.
 #
 # NOTA:
 # - Instalar em /usr/local/share/npm-global evita que o volume /home/node/.npm-global
@@ -274,20 +289,17 @@ RUN --mount=type=cache,id=npm-global-cache,target=/root/.npm,sharing=locked \
     mkdir -p "${HOME_DIR}/.npm-global" /usr/local/share/npm-global \
     && env NPM_CONFIG_PREFIX=/usr/local/share/npm-global npm install -g \
     npm@${NPM_VERSION} \
-    pnpm@${PNPM_VERSION} \
     @devcontainers/cli@${DEVCONTAINER_CLI_VERSION} \
     jsonc-parser@${JSONC_PARSER_VERSION} \
     typescript@${TYPESCRIPT_VERSION} \
     typescript-language-server@${TYPESCRIPT_LANGUAGE_SERVER_VERSION} \
     && ln -sf /usr/local/share/npm-global/bin/npm /usr/local/bin/npm \
     && ln -sf /usr/local/share/npm-global/bin/npx /usr/local/bin/npx \
-    && ln -sf /usr/local/share/npm-global/bin/pnpm /usr/local/bin/pnpm \
     && ln -sf /usr/local/share/npm-global/bin/devcontainer /usr/local/bin/devcontainer \
     && ln -sf /usr/local/share/npm-global/bin/tsc /usr/local/bin/tsc \
     && ln -sf /usr/local/share/npm-global/bin/tsserver /usr/local/bin/tsserver \
     && ln -sf /usr/local/share/npm-global/bin/typescript-language-server /usr/local/bin/typescript-language-server \
     && npm --version \
-    && pnpm --version \
     && devcontainer --version \
     && tsc --version \
     && typescript-language-server --version
@@ -381,12 +393,22 @@ RUN --mount=type=cache,id=apt-cache,target=/var/cache/apt,sharing=locked \
 # Princípios:
 #   • Ferramentas de linha de comando apenas (sem serviços)
 #   • Úteis para: rede/TLS, inspeção de processos, encoding, análise de código, etc.
+#   • v1.4.2 aceita apenas complementos passivos e básicos:
+#       - sudo/rsync/gawk/acl/uuid-runtime/net-tools/ethtool/pinentry-curses
+#   • v1.4.2 rejeita dependências que criem daemons, policy global ou mutação de rede:
+#       - docker-ce/containerd/dockerd, resolvconf/systemd-resolved, iptables/nftables,
+#         openssh-server, iperf3 daemonizado e keyring/DBus persistente.
 # =============================================================================
 RUN --mount=type=cache,id=apt-cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,id=apt-lib,target=/var/lib/apt,sharing=locked \
     apt-get update \
     && apt-get install -y --no-install-recommends \
     git \
+    sudo \
+    rsync \
+    gawk \
+    acl \
+    uuid-runtime \
     less \
     vim \
     nano \
@@ -414,6 +436,8 @@ RUN --mount=type=cache,id=apt-cache,target=/var/cache/apt,sharing=locked \
     libcap2-bin \
     libnss3-tools \
     iproute2 \
+    net-tools \
+    ethtool \
     iputils-ping \
     traceroute \
     nmap \
@@ -436,6 +460,7 @@ RUN --mount=type=cache,id=apt-cache,target=/var/cache/apt,sharing=locked \
     shellcheck \
     yamllint \
     gnupg \
+    pinentry-curses \
     pass \
     age \
     graphviz \
@@ -454,7 +479,9 @@ RUN --mount=type=cache,id=apt-cache,target=/var/cache/apt,sharing=locked \
     pv \
     jo \
     p7zip-full \
-    inotify-tools
+    inotify-tools \
+    ipcalc \
+    whois
 
 # Debian packaging note:
 # - `bat` package exposes `batcat`
@@ -676,14 +703,14 @@ RUN mkdir -p /etc/powershell \
 RUN cat > /etc/powershell/PowerShell.Contract.ps1 <<'EOF'
 # =============================================================================
 # PowerShell Contract — DevContainer
-# Version: 1.4.0
+# Version: 1.4.2
 #
 # Authority Model:
 #   • PowerShell  → Instrumental (subordinado)
 #   • Bash        → Canonical (autoridade)
 # =============================================================================
 
-$env:POWERSHELL_CONTRACT_VERSION = "1.4.0"
+$env:POWERSHELL_CONTRACT_VERSION = "1.4.2"
 $env:POWERSHELL_CONTRACT_LOADED  = "true"
 $env:POWERSHELL_ROLE             = "instrumental"
 $env:POWERSHELL_AUTHORITY        = "subordinate"
@@ -787,7 +814,7 @@ RUN set -e; \
 RUN set -e; \
     echo ""; \
     echo "═══════════════════════════════════════════════════"; \
-    echo " Tool Validation Gate — DevContainer v1.4.0"; \
+    echo " Tool Validation Gate — DevContainer v1.4.2"; \
     echo "═══════════════════════════════════════════════════"; \
     _ok=0; _fail=0; _warn=0; \
     _check() { \
@@ -809,9 +836,9 @@ RUN set -e; \
     fi; \
     }; \
     echo "── System & Build ──────────────────────────────────"; \
-    _check git; _check curl; _check wget; _check openssl; \
-    _check gpg; _check nasm; _check cmake; _check cc; \
-    _check python3; _check node; _check npm; _check pnpm; \
+    _check git; _check sudo; _check rsync; _check curl; _check wget; _check openssl; \
+    _check gpg; _check gawk; _check awk; _check nasm; _check cmake; _check cc; _check make; \
+    _check python3; _check python; _check node; _check npm; \
     echo "── Editors & Navigation ────────────────────────────"; \
     _check vim; _check nano; _check less; _check fzf; \
     echo "── File & Archive ──────────────────────────────────"; \
@@ -821,10 +848,12 @@ RUN set -e; \
     echo "── Process & System ────────────────────────────────"; \
     _check htop; _check lsof; _check strace; _check dstat; \
     _check inotifywait; _check ps; _check watch; _check flock; _check timeout; \
+    _check setfacl; _check getfacl; _check uuidgen; \
     echo "── Network & Debug ─────────────────────────────────"; \
     _check nc; _check nmap; _check tcpdump; _check mtr; \
-    _check socat; _check traceroute; _check dig; _check host; _check drill; \
-    _check ip; _check ss; _check certutil; _check dnsmasq; _check tinyproxy; \
+    _check socat; _check traceroute; _check dig; _check host; _check drill; _check ipcalc; _check whois; \
+    _check ip; _check ss; _check ifconfig; _check netstat; _check route; _check ethtool; \
+    _check getent; _check certutil; _check dnsmasq; _check tinyproxy; \
     echo "── Browser & Rendering ─────────────────────────────"; \
     _check chromium; _check fc-match; \
     echo "── Code Quality ────────────────────────────────────"; \
@@ -832,19 +861,19 @@ RUN set -e; \
     _check ccache; _check hyperfine; _check watchman; \
     echo "── Data & DB ───────────────────────────────────────"; \
     _check sqlite3; _check redis-cli; _check psql; \
-    _check jq; _check yq; _check protoc; \
+    _check jq; _check yq; _check jo; _check protoc; \
     echo "── TypeScript & LSP ────────────────────────────────"; \
     _check tsc; _check tsserver; _check typescript-language-server; \
     echo "── DevOps CLIs (upstream) ──────────────────────────"; \
-    _check gh; _check actionlint; _check hadolint; _check git-lfs; \
-    _check age; _check pass; \
+    _check gh; _check actionlint; _check hadolint; _check devcontainer; _check git-lfs; \
+    _check age; _check pass; _check pinentry-curses; \
     echo "── DevOps CLIs (runtime-socket / opcional) ─────────"; \
     _check_optional docker; \
     echo "── Rust/Go CLIs (Section 6.8) ──────────────────────"; \
     _check delta; _check zoxide; _check xh; _check dust; \
     _check sd; _check btm; _check glow; _check procs; \
-    echo "── Instrumental Shell (opcional) ───────────────────"; \
-    _check_optional pwsh; \
+    echo "── Instrumental Shell ──────────────────────────────"; \
+    _check pwsh; \
     echo "───────────────────────────────────────────────────"; \
     echo " Result: ${_ok} OK  |  ${_fail} MISSING  |  ${_warn} optional absent"; \
     echo "═══════════════════════════════════════════════════"; \
@@ -884,6 +913,9 @@ RUN mkdir -p \
     "${HOME_DIR}/.local/state" \
     "${HOME_DIR}/.local/state/devcontainer" \
     "${HOME_DIR}/.local/state/devcontainer/network" \
+    "${HOME_DIR}/.local/state/devcontainer/network/benchmarks" \
+    "${HOME_DIR}/.local/state/devcontainer/network/recommendations" \
+    "${HOME_DIR}/.local/state/devcontainer/network/artifacts" \
     "${HOME_DIR}/.local/bin" \
     "${CODEX_HOME}" \
     "${HOME_DIR}/.npm" \
@@ -950,7 +982,7 @@ RUN mkdir -p \
 
 
 # =============================================================================
-# SECTION 8.5 — ENV DEFAULTS (DOCUMENTAÇÃO / SAFE DEFAULTS DEV) — v1.4.0
+# SECTION 8.5 — ENV DEFAULTS (DOCUMENTAÇÃO / SAFE DEFAULTS DEV) — v1.4.2
 #
 # Hierarquia prática (maior prioridade -> menor):
 #   1) devcontainer.json: remoteEnv (processos geridos pelo VS Code)
@@ -1008,7 +1040,7 @@ ENV PUPPETEER_LOCAL_LAUNCH_DISABLED=true \
     MOCK_CHROME=0 \
     ENABLE_STATE_FILE=true
 
-# CHROME PROXY SERVICE (v1.4.0)
+# CHROME PROXY SERVICE (v1.4.2)
 ENV WS_IDLE_TIMEOUT_MS=300000 \
     ALLOWED_ORIGINS="http://localhost:3008,http://127.0.0.1:3008"
 
@@ -1019,8 +1051,12 @@ ENV WS_IDLE_TIMEOUT_MS=300000 \
 ENV UV_THREADPOOL_SIZE=16
 
 # GitHub/Copilot network architecture defaults (runtime-only).
-# These are intentionally conservative: tools are installed in the image, but
-# the higher-level lifecycle behavior is controlled by devcontainer.json.
+# These are intentionally conservative:
+#   - tools are installed in the image;
+#   - benchmark/compare never run during build;
+#   - post-start observes recommendations by default and never applies proxy transport
+#     unless explicitly allowed by DEVCONTAINER_POST_START_APPLY_TRANSPORT_RECOMMENDATION.
+# The lifecycle behavior remains controlled by devcontainer.json/Makefile.
 ENV DEVCONTAINER_ENABLE_LOCAL_DNS_CACHE=false \
     DEVCONTAINER_LOCAL_DNS_CACHE_MODE=auto \
     DEVCONTAINER_LOCAL_DNS_BIND_ADDRESS=127.0.0.1 \
@@ -1028,17 +1064,30 @@ ENV DEVCONTAINER_ENABLE_LOCAL_DNS_CACHE=false \
     DEVCONTAINER_LOCAL_DNS_WRITE_RESOLV_CONF=true \
     DEVCONTAINER_ENABLE_LOCAL_COPILOT_PROXY=false \
     DEVCONTAINER_COPILOT_PROXY_MODE=off \
+    DEVCONTAINER_LOCAL_COPILOT_PROXY_MODE=off \
     DEVCONTAINER_LOCAL_COPILOT_PROXY_HOST=127.0.0.1 \
     DEVCONTAINER_LOCAL_COPILOT_PROXY_PORT=3128 \
     DEVCONTAINER_ENABLE_COPILOT_NETWORK_MANAGER=false \
     DEVCONTAINER_COPILOT_NETWORK_MANAGER_MODE=active \
+    DEVCONTAINER_COPILOT_NETWORK_MANAGER_POST_START_ACTION=recommend \
+    DEVCONTAINER_COPILOT_TRANSPORT_PROFILE=auto \
+    DEVCONTAINER_POST_START_APPLY_TRANSPORT_RECOMMENDATION=false \
     DEVCONTAINER_COPILOT_PROBE_IP_FAMILY=4 \
     DEVCONTAINER_GITHUB_API_ENABLE_IPV6=false \
+    DEVCONTAINER_GITHUB_API_FUNCTIONALITY_PROFILE=copilot \
+    DEVCONTAINER_GITHUB_API_BENCHMARK_DURATION_SECONDS=${NETWORK_BENCHMARK_DURATION_SECONDS} \
+    DEVCONTAINER_GITHUB_API_BENCHMARK_INTERVAL_SECONDS=${NETWORK_BENCHMARK_INTERVAL_SECONDS} \
+    DEVCONTAINER_LOCAL_COPILOT_PROXY_BENCHMARK_DURATION_SECONDS=${NETWORK_BENCHMARK_DURATION_SECONDS} \
+    DEVCONTAINER_LOCAL_COPILOT_PROXY_BENCHMARK_INTERVAL_SECONDS=${NETWORK_BENCHMARK_INTERVAL_SECONDS} \
+    DEVCONTAINER_COPILOT_NETWORK_BENCHMARK_DURATION_SECONDS=${NETWORK_BENCHMARK_DURATION_SECONDS} \
+    DEVCONTAINER_COPILOT_NETWORK_BENCHMARK_INTERVAL_SECONDS=${NETWORK_BENCHMARK_INTERVAL_SECONDS} \
+    DEVCONTAINER_COPILOT_NETWORK_RECOMMENDATION_TTL_SECONDS=${NETWORK_RECOMMENDATION_TTL_SECONDS} \
+    DEVCONTAINER_COPILOT_ENDPOINT_REGISTRY=${APP_DIR}/.devcontainer/network/endpoints.github-copilot.tsv \
     DEVCONTAINER_COPILOT_MANAGER_RUN_API_ROUTE_FIX=true
 
 
 # =============================================================================
-# SECTION 9 — SHELL CONTRACT + GATEKEEPER NSS + UX BASELINE + HANDOFF (v1.4.0)
+# SECTION 9 — SHELL CONTRACT + GATEKEEPER NSS + UX BASELINE + HANDOFF (v1.4.2)
 #
 # Objetivos:
 #   [A] Infra: bash-completion + dumb-init (entrypoint)
@@ -1084,7 +1133,7 @@ RUN command -v dumb-init >/dev/null 2>&1
 RUN mkdir -p /etc/profile.d \
     && printf '%s\n' \
     '# Canonical Runtime Shell Contract' \
-    '# Version: 1.4.0' \
+    '# Version: 1.4.2' \
     '# Declarative only — no logic, no side effects' \
     '# AI-AWARE CONTRACT (Semantic Hints Only)' \
     '' \
@@ -1132,7 +1181,7 @@ RUN mkdir -p /etc/profile.d \
 #   - Deve poder ser sourceado por /etc/profile.
 RUN cat > /etc/profile.d/10-gatekeeper-nss.sh <<'EOF'
 # DevContainer Gatekeeper — NSS Wrapper
-# Version: 1.4.0
+# Version: 1.4.2
 # Scope: Universal (all shells)
 # Mutability: READ-ONLY (Image-level)
 # Behavior: Fail-safe; canonicalizes LD_PRELOAD and binds NSS to valid files.
@@ -1306,7 +1355,7 @@ RUN cat > /usr/local/bin/jsonc-validate <<'EOF'
 /**
  * jsonc-validate — DevContainer JSONC validation utility.
  *
- * Canonical version: 1.4.0
+ * Canonical version: 1.4.2
  *
  * Purpose:
  *   Validate JSON and JSON-with-comments files during local development,
@@ -1330,7 +1379,7 @@ RUN cat > /usr/local/bin/jsonc-validate <<'EOF'
 const fs = require('node:fs');
 const path = require('node:path');
 
-const VERSION = '1.4.0';
+const VERSION = '1.4.2';
 
 /**
  * Converts an unknown thrown value into a readable string.
@@ -1573,7 +1622,7 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=90s --retries=3 \
 # [D] UX BASELINE (GLOBAL, READ-ONLY, INTERACTIVE-ONLY, POSIX-SAFE)
 RUN cat > /etc/profile.d/20-devcontainer-ux.sh <<'EOF'
 # DevContainer UX Contract
-# Version: 1.4.0
+# Version: 1.4.2
 # Scope: Interactive shells only
 # Mutability: READ-ONLY (Image-level)
 
@@ -1615,7 +1664,7 @@ EOF
 RUN chmod 0444 /etc/profile.d/20-devcontainer-ux.sh
 
 # =============================================================================
-# SECTION 9.6 — BASH HARDENING (.bashrc persistent overrides) — v1.4.0
+# SECTION 9.6 — BASH HARDENING (.bashrc persistent overrides) — v1.4.2
 #
 # Problema: ~/.bashrc vem da base image (node) e define HISTSIZE=1000.
 # Em login shells (ordem: profile.d → .profile → .bashrc), o .bashrc do
@@ -1633,7 +1682,7 @@ RUN chmod 0444 /etc/profile.d/20-devcontainer-ux.sh
 # =============================================================================
 RUN cat >> "${HOME_DIR}/.bashrc" <<'BASH_HARDENING'
 
-# === DevContainer bash hardening (v1.4.0 — appended by Dockerfile) ===
+# === DevContainer bash hardening (v1.4.2 — appended by Dockerfile) ===
 # Applied last in .bashrc → these always win over profile.d (20-devcontainer-ux.sh)
 # and the base-image defaults. Do NOT remove — needed for DevContainer stability.
 HISTSIZE=10000
@@ -1660,8 +1709,9 @@ ENTRYPOINT ["dumb-init", "--", "/usr/local/bin/nss-gatekeeper"]
 CMD ["sleep", "infinity"]
 
 # =============================================================================
-# FINAL NOTES (v1.4.0)
+# FINAL NOTES (v1.4.2)
 #   - dnsmasq-base/tinyproxy-bin são instalados como binários, sem auto-start
+#   - utilitários passivos adicionais em v1.4.2: rsync/gawk/acl/uuidgen/net-tools/ethtool
 #   - dockerd NÃO é instalado
 #   - Docker CLI opera via socket do host (bind mount)
 #   - NSS wrapper é ativado em runtime pelo entrypoint/profile e refinado pelos hooks

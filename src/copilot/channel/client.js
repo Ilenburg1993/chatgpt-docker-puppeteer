@@ -8,7 +8,7 @@
  * @see module:copilot/channel/inject
  */
 
-import { BridgeError } from '#copilot/core';
+import { BridgeError, sleepMs } from '#copilot/core';
 import {
     EMITTER_QUESTION_PENDING,
     EMITTER_TASK_DELTA,
@@ -19,7 +19,7 @@ import {
 } from '#copilot/events';
 import { log } from '#copilot/observability';
 import { getAgentRuntimeControlStateForTarget } from '#copilot/runtime';
-import { logSwallowed } from '../core/error-handlers.js';
+import { logSwallowed, toError } from '../core/error-handlers.js';
 import {
     dialogTurn as _dialogTurn,
     startDialogMode as _startDialogMode,
@@ -201,12 +201,12 @@ export class LlmBridgeClient {
             try {
                 return await this.#chatOnce(message, { onDelta, onQuestion, timeoutMs, attachments });
             } catch (err) {
-                const msg = err instanceof Error ? err.message : String(err);
+                const msg = toError(err).message;
                 const isRetryable = msg.includes('Timeout') || msg.includes('busy') || msg.includes('ECONNRESET');
                 if (isRetryable && attempt < retries) {
                     const waitMs = retryDelayMs * Math.pow(2, attempt);
                     log('DEBUG', `[LlmBridgeClient] chat() retry ${attempt + 1}/${retries} após ${waitMs}ms: ${msg}`);
-                    await new Promise((r) => setTimeout(r, waitMs));
+                    await sleepMs(waitMs, { id: `channel.client.chat-retry:${attempt + 1}`, unref: true });
                     continue;
                 }
                 throw err;

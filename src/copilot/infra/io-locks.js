@@ -11,6 +11,12 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { normalizePathResourceKey } from './policy/path-resource.js';
 
+const errorCtor = /** @type {{ isError?: (value: unknown) => boolean }} */ (Error);
+const isError =
+    typeof errorCtor.isError === 'function'
+        ? /** @type {(value: unknown) => boolean} */ (errorCtor.isError.bind(Error))
+        : /** @type {(value: unknown) => boolean} */ ((value) => value instanceof Error);
+
 /** @type {Map<string, Promise<void>>} */
 const tails = new Map();
 /** @type {AsyncLocalStorage<Set<string>>} */
@@ -29,19 +35,6 @@ function scheduleTailCleanup(key) {
         }
     });
 }
-
-/**
- * Sweep periódico para chaves órfãs em cenários extremos de alta rotação.
- */
-setInterval(() => {
-    for (const [key, tail] of tails.entries()) {
-        void tail.finally(() => {
-            if (tails.get(key) === tail) {
-                tails.delete(key);
-            }
-        });
-    }
-}, 60_000).unref?.();
 
 /**
  * Normaliza chaves de recursos de filesystem para reduzir bypass por path relativo/absoluto.
@@ -76,7 +69,7 @@ function createLockError(kind, resourceKey) {
  * @returns {Error}
  */
 function asError(error) {
-    return error instanceof Error ? error : new Error(String(error));
+    return isError(error) ? /** @type {Error} */ (error) : new Error(String(error));
 }
 
 /**
@@ -134,32 +127,49 @@ function waitForPrevious(previous, key, options) {
 }
 
 /**
- * Executa uma operação em lock exclusivo por recurso.
- *
- * @template T
- * @param {string} resourceKey
- * @param {() => Promise<T>} operation
- * @param {{ timeoutMs?: number; signal?: AbortSignal }} [options]
- * @returns {Promise<{ value: T; waitMs: number }>}
+ * @typedef {object} IoResourceLockLease
+ * @property {string} key
+ * @property {number} waitMs
+ * @property {<T>(operation: () => Promise<T>) => Promise<T>} run
+ * @property {() => void} release
  */
-export async function withIoResourceLock(resourceKey, operation, options = {}) {
+
+/**
+ * @typedef {object} IoResourceLocksLease
+ * @property {string[]} keys
+ * @property {number} waitMs
+ * @property {<T>(operation: () => Promise<T>) => Promise<T>} run
+ * @property {() => void} release
+ */
+
+/**
+ * Adquire lock exclusivo por recurso e retorna lease explicitamente liberável.
+ *
+ * Compatível com `await using` via `Symbol.asyncDispose`.
+ *
+ * @param {string} resourceKey
+ * @param {{ timeoutMs?: number; signal?: AbortSignal }} [options]
+ * @returns {Promise<IoResourceLockLease>}
+ */
+export async function acquireIoResourceLock(resourceKey, options = {}) {
     const key = normalizeIoResourceKey(resourceKey);
     const heldLocks = heldLocksStorage.getStore();
     if (heldLocks?.has(key)) {
         if (options.signal?.aborted) {
             throw createLockError('Abort', key);
         }
-        const value = await operation();
-        return { value, waitMs: 0 };
+        return /** @type {IoResourceLockLease & { [Symbol.asyncDispose]: () => Promise<void> }} */ ({
+            key,
+            waitMs: 0,
+            run: (operation) => operation(),
+            release: () => {},
+            [Symbol.asyncDispose]: async () => {},
+        });
     }
 
     const startedWait = Date.now();
     const previous = tails.get(key) ?? Promise.resolve();
-    /** @type {() => void} */
-    let release = () => {};
-    const current = new Promise((resolve) => {
-        release = () => resolve(undefined);
-    });
+    const { promise: current, resolve: releaseCurrent } = Promise.withResolvers();
     const tail = previous
         .catch(() => undefined)
         .then(() => current)
@@ -170,26 +180,122 @@ export async function withIoResourceLock(resourceKey, operation, options = {}) {
     try {
         await waitForPrevious(previous, key, options);
     } catch (error) {
-        release();
+        releaseCurrent(undefined);
         if (tails.get(key) === tail) {
             tails.delete(key);
         }
         throw error;
     }
-    const waitMs = Date.now() - startedWait;
-    try {
-        if (options.signal?.aborted) {
-            throw createLockError('Abort', key);
-        }
-        const nextHeldLocks = new Set(heldLocks ?? []);
-        nextHeldLocks.add(key);
-        const value = await heldLocksStorage.run(nextHeldLocks, () => operation());
-        return { value, waitMs };
-    } finally {
-        release();
+
+    if (options.signal?.aborted) {
+        releaseCurrent(undefined);
         if (tails.get(key) === tail) {
             tails.delete(key);
         }
+        throw createLockError('Abort', key);
+    }
+
+    const nextHeldLocks = new Set(heldLocks ?? []);
+    nextHeldLocks.add(key);
+
+    let released = false;
+    const release = () => {
+        if (released) return;
+        released = true;
+        releaseCurrent(undefined);
+        if (tails.get(key) === tail) {
+            tails.delete(key);
+        }
+    };
+
+    return /** @type {IoResourceLockLease & { [Symbol.asyncDispose]: () => Promise<void> }} */ ({
+        key,
+        waitMs: Date.now() - startedWait,
+        run: (operation) => heldLocksStorage.run(nextHeldLocks, () => operation()),
+        release,
+        [Symbol.asyncDispose]: async () => {
+            release();
+        },
+    });
+}
+
+/**
+ * Adquire locks exclusivos para múltiplos recursos em ordem estável e retorna lease liberável.
+ *
+ * Compatível com `await using` via `Symbol.asyncDispose`.
+ *
+ * @param {string[]} resourceKeys
+ * @param {{ timeoutMs?: number; signal?: AbortSignal }} [options]
+ * @returns {Promise<IoResourceLocksLease>}
+ */
+export async function acquireIoResourceLocks(resourceKeys, options = {}) {
+    const keys = [...new Set(resourceKeys.map((key) => normalizeIoResourceKey(key)))].sort((a, b) =>
+        a.localeCompare(b),
+    );
+    const heldLocks = heldLocksStorage.getStore();
+    if (keys.length === 0) {
+        return /** @type {IoResourceLocksLease & { [Symbol.asyncDispose]: () => Promise<void> }} */ ({
+            keys: [],
+            waitMs: 0,
+            run: (operation) => operation(),
+            release: () => {},
+            [Symbol.asyncDispose]: async () => {},
+        });
+    }
+
+    /** @type {IoResourceLockLease[]} */
+    const leases = [];
+    let totalWaitMs = 0;
+
+    try {
+        for (const key of keys) {
+            const lease = await acquireIoResourceLock(key, options);
+            leases.push(lease);
+            totalWaitMs += lease.waitMs;
+        }
+    } catch (error) {
+        for (const lease of leases.reverse()) {
+            lease.release();
+        }
+        throw error;
+    }
+
+    let released = false;
+    const release = () => {
+        if (released) return;
+        released = true;
+        for (const lease of [...leases].reverse()) {
+            lease.release();
+        }
+    };
+
+    return /** @type {IoResourceLocksLease & { [Symbol.asyncDispose]: () => Promise<void> }} */ ({
+        keys,
+        waitMs: totalWaitMs,
+        run: (operation) => heldLocksStorage.run(new Set([...(heldLocks ?? []), ...keys]), () => operation()),
+        release,
+        [Symbol.asyncDispose]: async () => {
+            release();
+        },
+    });
+}
+
+/**
+ * Executa uma operação em lock exclusivo por recurso.
+ *
+ * @template T
+ * @param {string} resourceKey
+ * @param {() => Promise<T>} operation
+ * @param {{ timeoutMs?: number; signal?: AbortSignal }} [options]
+ * @returns {Promise<{ value: T; waitMs: number }>}
+ */
+export async function withIoResourceLock(resourceKey, operation, options = {}) {
+    const lease = await acquireIoResourceLock(resourceKey, options);
+    try {
+        const value = await lease.run(operation);
+        return { value, waitMs: lease.waitMs };
+    } finally {
+        lease.release();
     }
 }
 
@@ -206,25 +312,13 @@ export async function withIoResourceLock(resourceKey, operation, options = {}) {
  * @returns {Promise<{ value: T; waitMs: number }>}
  */
 export async function withIoResourceLocks(resourceKeys, operation, options = {}) {
-    const keys = [...new Set(resourceKeys.map((key) => normalizeIoResourceKey(key)))].sort((a, b) =>
-        a.localeCompare(b),
-    );
-    let totalWaitMs = 0;
-
-    /**
-     * @param {number} index
-     * @returns {Promise<T>}
-     */
-    async function acquire(index) {
-        const key = keys[index];
-        if (!key) return operation();
-        const locked = await withIoResourceLock(key, () => acquire(index + 1), options);
-        totalWaitMs += locked.waitMs;
-        return locked.value;
+    const lease = await acquireIoResourceLocks(resourceKeys, options);
+    try {
+        const value = await lease.run(operation);
+        return { value, waitMs: lease.waitMs };
+    } finally {
+        lease.release();
     }
-
-    const value = await acquire(0);
-    return { value, waitMs: totalWaitMs };
 }
 
 /**

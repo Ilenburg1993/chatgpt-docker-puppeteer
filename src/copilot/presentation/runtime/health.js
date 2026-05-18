@@ -16,7 +16,7 @@ import {
 import { CHANNEL_VERSION } from '#copilot/channel';
 import { BRIDGE_EXPOSE_DIAGNOSTICS } from '#copilot/config';
 import { CONVERSATION_STORE } from '#copilot/conversation-hub';
-import { container } from '#copilot/core';
+import { container, toError } from '#copilot/core';
 import { resolveAgentRuntimeSelection } from '#copilot/presentation/agent/runtime';
 import { createRequire } from 'node:module';
 import { buildRuntimeRouteMetaFromSelection, buildRuntimeRouteMetaPayload } from '../routing/index.js';
@@ -155,7 +155,7 @@ function readConversationStorePing() {
         store.db.prepare('SELECT 1').get();
         return { ok: true };
     } catch (error) {
-        return { ok: false, error: error instanceof Error ? error.message : String(error) };
+        return { ok: false, error: toError(error).message };
     }
 }
 

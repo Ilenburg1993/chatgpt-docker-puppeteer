@@ -8,6 +8,7 @@
  * @see EventBus
  */
 
+import { toError } from '#copilot/core';
 import { fmtDate, repoArgs, runGh, runGhJson } from './shared.js';
 
 // Re-export domínios
@@ -52,7 +53,7 @@ export async function getStatus() {
         const out = await runGh(['status'], { lenient: true });
         return out || null;
     } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
+        const msg = toError(err).message;
         if (msg.includes('403') || msg.includes('Unauthorized') || msg.includes('scope')) {
             return 'NOTIF_403';
         }

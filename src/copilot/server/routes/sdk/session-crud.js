@@ -6,6 +6,7 @@
  * @see EventBus
  */
 
+import { toError } from '#copilot/core';
 import { Router } from 'express';
 import { resolveSdkRouteSharedDeps } from './deps.js';
 import { rateLimitMiddleware, validateBody, validateModel, withErrorHandler } from './session-middleware.js';
@@ -89,7 +90,7 @@ function normalizeRouteProvider(routeDeps, provider, res) {
  * @returns {string}
  */
 function toProviderValidationMessage(error) {
-    return error instanceof Error ? error.message : String(error);
+    return toError(error).message;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

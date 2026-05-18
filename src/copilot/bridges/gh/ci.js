@@ -8,6 +8,7 @@
  * @see EventBus
  */
 
+import { sleepMs } from '#copilot/core';
 import { calcFetchLimit, fmtDate, repoArgs, runGh, runGhJson, runIcon, slicePage } from './shared.js';
 
 /**
@@ -93,7 +94,7 @@ export async function watchRun(runId, onUpdate, opts = {}) {
         if (!run) return null;
         onUpdate(run);
         if (run.status === 'completed') return run;
-        await new Promise((r) => setTimeout(r, intervalMs));
+        await sleepMs(intervalMs, { id: `bridges.gh.ci.watch:${runId}:${attempt + 1}`, unref: true });
     }
     return null;
 }

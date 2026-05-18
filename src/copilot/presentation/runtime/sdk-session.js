@@ -29,6 +29,7 @@ import {
     readSessionInstructionSources,
     readSystemPromptStatus,
 } from '#copilot/config';
+import { toError } from '#copilot/core';
 import { requireAgentRuntimeSelection } from '#copilot/presentation/agent/runtime';
 import { readAgentStatusSnapshot } from './status.js';
 
@@ -164,7 +165,7 @@ export async function readAgentSdkSystemPromptProjection(runtimeId) {
             projection,
         };
     } catch (error) {
-        const instructionSourcesError = error instanceof Error ? error.message : String(error);
+        const instructionSourcesError = toError(error).message;
         const projection = buildSystemPromptPublicProjection({
             systemPrompt,
             binding,

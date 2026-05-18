@@ -20,6 +20,7 @@
 /** @typedef {import('./metrics-histogram.js').StreamingMetrics} StreamingMetrics */
 /** @typedef {import('./metrics-histogram.js').QuestionMetrics} QuestionMetrics */
 /** @typedef {import('./metrics-histogram.js').MetricsSummary} MetricsSummary */
+import { cancelTimer, registerInterval } from '#copilot/core';
 import { createToolTelemetryStore, defaultToolTelemetryStore } from './tool-stats.js';
 
 /**
@@ -60,7 +61,6 @@ import { COPILOT_LOG_DIR, COPILOT_METRICS_SNAPSHOT_INTERVAL } from '#copilot/con
 import { appendFile as _appendFile, mkdir as _mkdir } from 'node:fs/promises';
 import { join as _join } from 'node:path';
 import { logSwallowed } from '../core/error-handlers.js';
-import { cancel as cancelTimer, registerTimer } from '../core/timer-registry.js';
 import { createHistogram } from './metrics-histogram.js';
 
 /**
@@ -355,6 +355,8 @@ export function createMetricsStore(options = {}) {
 
     /** @type {ReturnType<typeof setInterval> | null} */
     let _snapshotTimer = null;
+    /** @type {string | null} */
+    let _snapshotTimerId = null;
 
     /**
      * Inicia snapshot periódico de métricas em arquivo.
@@ -368,7 +370,8 @@ export function createMetricsStore(options = {}) {
         const ms = intervalMs ?? COPILOT_METRICS_SNAPSHOT_INTERVAL;
         if (ms <= 0) return;
         const resolvedDir = logDir ?? (COPILOT_LOG_DIR || './var/logs/copilot');
-        _snapshotTimer = setInterval(() => {
+        _snapshotTimerId = `metrics.snapshot:${Date.now()}:${Math.random().toString(36).slice(2)}`;
+        _snapshotTimer = registerInterval(_snapshotTimerId, () => {
             void (async () => {
                 try {
                     // FINDING-P5-3: usar imports estáticos em vez de dynamic import a cada tick
@@ -381,8 +384,6 @@ export function createMetricsStore(options = {}) {
             })();
         }, ms);
         if (_snapshotTimer.unref) _snapshotTimer.unref();
-        // F155: registrar no timer-registry para cleanup automático via shutdown
-        registerTimer('metrics.snapshot', 'interval', _snapshotTimer);
     }
 
     /**
@@ -392,10 +393,9 @@ export function createMetricsStore(options = {}) {
      */
     function stopPeriodicSnapshot() {
         if (_snapshotTimer) {
-            clearInterval(_snapshotTimer);
+            if (_snapshotTimerId) cancelTimer(_snapshotTimerId);
             _snapshotTimer = null;
-            // F155: cancelar também no registry (idempotente)
-            cancelTimer('metrics.snapshot');
+            _snapshotTimerId = null;
         }
     }
 

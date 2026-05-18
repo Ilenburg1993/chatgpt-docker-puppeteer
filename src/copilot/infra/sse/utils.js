@@ -9,6 +9,7 @@
  */
 
 import { MAX_SSE_CLIENTS } from '#copilot/config';
+import { cancelTimer, registerInterval } from '#copilot/core';
 import { defaultMetrics } from '#copilot/observability';
 import { createGzip } from 'node:zlib';
 
@@ -163,10 +164,16 @@ export function createSseWriter(req, res, opts = {}) {
     }
 
     // --- Heartbeat ---
-    /** @type {ReturnType<typeof setInterval> | null} */
-    let heartbeatTimer = null;
+    /** @type {string | null} */
+    let heartbeatTimerId = null;
     if (heartbeatMs > 0) {
-        heartbeatTimer = setInterval(() => send('heartbeat', { ts: Date.now() }, { skipBuffer: true }), heartbeatMs);
+        heartbeatTimerId = `sse.heartbeat:${Date.now()}:${Math.random().toString(36).slice(2)}`;
+        const _heartbeatTimer = registerInterval(
+            heartbeatTimerId,
+            () => send('heartbeat', { ts: Date.now() }, { skipBuffer: true }),
+            heartbeatMs,
+        );
+        _heartbeatTimer.unref?.();
     }
 
     // --- Max lifetime ---
@@ -191,7 +198,7 @@ export function createSseWriter(req, res, opts = {}) {
     const cleanup = () => {
         if (_cleaned) return;
         _cleaned = true;
-        if (heartbeatTimer) clearInterval(heartbeatTimer);
+        if (heartbeatTimerId) cancelTimer(heartbeatTimerId);
         if (lifetimeTimer) clearTimeout(lifetimeTimer);
         tracker?.decrement();
         for (const cb of cleanupCallbacks) cb();

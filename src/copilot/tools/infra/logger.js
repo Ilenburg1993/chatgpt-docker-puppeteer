@@ -14,7 +14,7 @@
  *
  * @module copilot/tools/infra/logger
  */
-
+import { toError } from '#copilot/core';
 /**
  * @callback LogFn
  * @param {'DEBUG' | 'INFO' | 'WARN' | 'ERROR'} level
@@ -55,7 +55,7 @@ export function log(level, msg, meta) {
         _injectedLogger(level, msg, meta);
         return;
     }
-    const text = msg instanceof Error ? msg.message : typeof msg === 'object' ? JSON.stringify(msg) : msg;
+    const text = msg instanceof Error ? toError(msg).message : typeof msg === 'object' ? JSON.stringify(msg) : msg;
     switch (level.toUpperCase()) {
         case 'ERROR':
             console.error(text);

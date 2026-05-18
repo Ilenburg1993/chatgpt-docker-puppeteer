@@ -7,10 +7,10 @@
  * @module copilot/infra/io/fs/locked-mutations
  */
 
+import { buildIoMeta, createIoTraceId, withIoMeta } from '#copilot/core';
 import * as fs from 'node:fs/promises';
 import { dirname } from 'node:path';
-import { buildIoMeta, createIoTraceId, withIoMeta } from '#copilot/core';
-import { withIoResourceLock, withIoResourceLocks } from '../../io-locks.js';
+import { acquireIoResourceLock, acquireIoResourceLocks } from '../../io-locks.js';
 import { nowIoMs, publishIoOperation } from '../../io-observability.js';
 import { assertValidIoFilePath } from '../../policy/path-resource.js';
 import { assertExpectedSha256 } from '../../policy/preconditions.js';
@@ -156,11 +156,19 @@ export async function deleteFileLocked(filePath) {
     const traceId = createIoTraceId();
     const startedAt = nowIoMs();
     try {
-        const { value, waitMs } = await withIoResourceLock(filePath, async () => {
-            const snapshot = await readMutationSnapshot(filePath);
-            await deleteFileUnlocked(filePath);
-            return snapshot;
-        });
+        const lease = await acquireIoResourceLock(filePath);
+        const value = await (async () => {
+            try {
+                return await lease.run(async () => {
+                    const snapshot = await readMutationSnapshot(filePath);
+                    await deleteFileUnlocked(filePath);
+                    return snapshot;
+                });
+            } finally {
+                lease.release();
+            }
+        })();
+        const waitMs = lease.waitMs;
         invalidateIoCacheTiers(filePath);
         const io = publishAndReturn(
             buildIoMeta({
@@ -223,9 +231,15 @@ export async function removePathLocked(filePath, options = {}) {
     const traceId = options.traceId ?? createIoTraceId();
     const startedAt = nowIoMs();
     try {
-        const { waitMs } = await withIoResourceLock(filePath, async () =>
-            removePathUnlocked(filePath, { recursive: Boolean(options.recursive), force: Boolean(options.force) }),
-        );
+        const lease = await acquireIoResourceLock(filePath);
+        try {
+            await lease.run(async () =>
+                removePathUnlocked(filePath, { recursive: Boolean(options.recursive), force: Boolean(options.force) }),
+            );
+        } finally {
+            lease.release();
+        }
+        const waitMs = lease.waitMs;
         invalidateIoCacheTierSubtrees(filePath);
         const io = publishAndReturn(
             buildIoMeta({
@@ -276,35 +290,43 @@ export async function copyFileLocked(source, destination, options = {}) {
     const traceId = options.traceId ?? createIoTraceId();
     const startedAt = nowIoMs();
     try {
-        const { value, waitMs } = await withIoResourceLocks([source, destination], async () => {
-            /**
-             * @type {{
-             *     contentHash: string;
-             *     bytesRead: number;
-             *     snapshotBase64: string | null;
-             *     snapshotTruncated: boolean;
-             * } | null}
-             */
-            let destinationSnapshot = null;
-            if (options.overwrite) {
-                destinationSnapshot = await readOptionalMutationSnapshot(destination);
-            } else {
-                await assertDestinationWritable(destination, options.overwrite);
+        const lease = await acquireIoResourceLocks([source, destination]);
+        const value = await (async () => {
+            try {
+                return await lease.run(async () => {
+                    /**
+                     * @type {{
+                     *     contentHash: string;
+                     *     bytesRead: number;
+                     *     snapshotBase64: string | null;
+                     *     snapshotTruncated: boolean;
+                     * } | null}
+                     */
+                    let destinationSnapshot = null;
+                    if (options.overwrite) {
+                        destinationSnapshot = await readOptionalMutationSnapshot(destination);
+                    } else {
+                        await assertDestinationWritable(destination, options.overwrite);
+                    }
+                    const sourceSnapshot = await readMutationSnapshot(source);
+                    await mkdirPathUnlocked(dirname(destination), { recursive: true });
+                    await copyFileUnlocked(source, destination);
+                    const stats = await statPathSnapshot(destination);
+                    return {
+                        bytesWritten: stats.size,
+                        sourceHash: sourceSnapshot.contentHash,
+                        sourceBytes: sourceSnapshot.bytesRead,
+                        destinationPreviousHash: destinationSnapshot?.contentHash ?? null,
+                        destinationPreviousBytes: destinationSnapshot?.bytesRead ?? null,
+                        destinationPreviousSnapshotBase64: destinationSnapshot?.snapshotBase64 ?? null,
+                        destinationPreviousSnapshotTruncated: destinationSnapshot?.snapshotTruncated ?? false,
+                    };
+                });
+            } finally {
+                lease.release();
             }
-            const sourceSnapshot = await readMutationSnapshot(source);
-            await mkdirPathUnlocked(dirname(destination), { recursive: true });
-            await copyFileUnlocked(source, destination);
-            const stats = await statPathSnapshot(destination);
-            return {
-                bytesWritten: stats.size,
-                sourceHash: sourceSnapshot.contentHash,
-                sourceBytes: sourceSnapshot.bytesRead,
-                destinationPreviousHash: destinationSnapshot?.contentHash ?? null,
-                destinationPreviousBytes: destinationSnapshot?.bytesRead ?? null,
-                destinationPreviousSnapshotBase64: destinationSnapshot?.snapshotBase64 ?? null,
-                destinationPreviousSnapshotTruncated: destinationSnapshot?.snapshotTruncated ?? false,
-            };
-        });
+        })();
+        const waitMs = lease.waitMs;
         invalidateIoCacheTiers(destination);
         const io = publishAndReturn(
             buildIoMeta({
@@ -370,32 +392,40 @@ export async function moveFileLocked(source, destination, options = {}) {
     const traceId = options.traceId ?? createIoTraceId();
     const startedAt = nowIoMs();
     try {
-        const { value, waitMs } = await withIoResourceLocks([source, destination], async () => {
-            /**
-             * @type {{
-             *     contentHash: string;
-             *     bytesRead: number;
-             *     snapshotBase64: string | null;
-             *     snapshotTruncated: boolean;
-             * } | null}
-             */
-            let destinationSnapshot = null;
-            if (options.overwrite) {
-                destinationSnapshot = await readOptionalMutationSnapshot(destination);
-            } else {
-                await assertDestinationWritable(destination, options.overwrite);
+        const lease = await acquireIoResourceLocks([source, destination]);
+        const value = await (async () => {
+            try {
+                return await lease.run(async () => {
+                    /**
+                     * @type {{
+                     *     contentHash: string;
+                     *     bytesRead: number;
+                     *     snapshotBase64: string | null;
+                     *     snapshotTruncated: boolean;
+                     * } | null}
+                     */
+                    let destinationSnapshot = null;
+                    if (options.overwrite) {
+                        destinationSnapshot = await readOptionalMutationSnapshot(destination);
+                    } else {
+                        await assertDestinationWritable(destination, options.overwrite);
+                    }
+                    const sourceSnapshot = await readMutationSnapshot(source);
+                    await mkdirPathUnlocked(dirname(destination), { recursive: true });
+                    await moveFileUnlocked(source, destination);
+                    return {
+                        ...sourceSnapshot,
+                        destinationPreviousHash: destinationSnapshot?.contentHash ?? null,
+                        destinationPreviousBytes: destinationSnapshot?.bytesRead ?? null,
+                        destinationPreviousSnapshotBase64: destinationSnapshot?.snapshotBase64 ?? null,
+                        destinationPreviousSnapshotTruncated: destinationSnapshot?.snapshotTruncated ?? false,
+                    };
+                });
+            } finally {
+                lease.release();
             }
-            const sourceSnapshot = await readMutationSnapshot(source);
-            await mkdirPathUnlocked(dirname(destination), { recursive: true });
-            await moveFileUnlocked(source, destination);
-            return {
-                ...sourceSnapshot,
-                destinationPreviousHash: destinationSnapshot?.contentHash ?? null,
-                destinationPreviousBytes: destinationSnapshot?.bytesRead ?? null,
-                destinationPreviousSnapshotBase64: destinationSnapshot?.snapshotBase64 ?? null,
-                destinationPreviousSnapshotTruncated: destinationSnapshot?.snapshotTruncated ?? false,
-            };
-        });
+        })();
+        const waitMs = lease.waitMs;
         invalidateIoCacheTiers(source);
         invalidateIoCacheTiers(destination);
         const io = publishAndReturn(
@@ -471,49 +501,57 @@ export async function patchTextLocked(filePath, options) {
     const traceId = createIoTraceId();
     const startedAt = nowIoMs();
     try {
-        const { value, waitMs } = await withIoResourceLock(filePath, async () => {
-            const content = await fs.readFile(filePath, 'utf8');
-            const previousHash = assertExpectedSha256(content, options.expectedHash);
-            const patch = computeTextPatch(content, options);
-            const { updated, replacedOccurrences, bytesWritten } = patch;
-            const contentHash = sha256(updated);
-            const previousSnapshot = buildRollbackSnapshot(toOwnedBuffer(content));
-            const diff = buildSimpleTextDiff(content, updated, {
-                contextLines: options.diffContextLines ?? DEFAULT_PATCH_DIFF_CONTEXT_LINES,
-            });
-            const diffPreview = windowTextPreview(diff.diff, {
-                maxLines: options.maxDiffLines ?? DEFAULT_PATCH_DIFF_MAX_LINES,
-                maxBytes: options.maxDiffBytes ?? DEFAULT_PATCH_DIFF_MAX_BYTES,
-            });
-            if (!options.dryRun) {
-                await writeAtomicFileUnlocked(filePath, updated);
+        const lease = await acquireIoResourceLock(filePath);
+        const value = await (async () => {
+            try {
+                return await lease.run(async () => {
+                    const content = await fs.readFile(filePath, 'utf8');
+                    const previousHash = assertExpectedSha256(content, options.expectedHash);
+                    const patch = computeTextPatch(content, options);
+                    const { updated, replacedOccurrences, bytesWritten } = patch;
+                    const contentHash = sha256(updated);
+                    const previousSnapshot = buildRollbackSnapshot(toOwnedBuffer(content));
+                    const diff = buildSimpleTextDiff(content, updated, {
+                        contextLines: options.diffContextLines ?? DEFAULT_PATCH_DIFF_CONTEXT_LINES,
+                    });
+                    const diffPreview = windowTextPreview(diff.diff, {
+                        maxLines: options.maxDiffLines ?? DEFAULT_PATCH_DIFF_MAX_LINES,
+                        maxBytes: options.maxDiffBytes ?? DEFAULT_PATCH_DIFF_MAX_BYTES,
+                    });
+                    if (!options.dryRun) {
+                        await writeAtomicFileUnlocked(filePath, updated);
+                    }
+                    return {
+                        occurrences: patch.occurrences,
+                        replacedOccurrences,
+                        bytesWritten: options.dryRun ? 0 : bytesWritten,
+                        projectedBytes: bytesWritten,
+                        previousBytes: patch.previousBytes,
+                        byteDelta: patch.byteDelta,
+                        oldStringBytes: patch.oldStringBytes,
+                        newStringBytes: patch.newStringBytes,
+                        firstMatchLine: patch.firstMatchLine,
+                        lastMatchLine: patch.lastMatchLine,
+                        lineDelta: patch.lineDelta,
+                        occurrenceIndex: patch.occurrenceIndex,
+                        noop: patch.noop,
+                        diffPreview: diffPreview.text,
+                        diffPreviewTruncated: diffPreview.truncated,
+                        diffPreviewLines: diffPreview.lines,
+                        diffPreviewBytes: diffPreview.bytes,
+                        diffContextLines: diff.contextLines,
+                        previousHash,
+                        contentHash,
+                        dryRun: Boolean(options.dryRun),
+                        previousSnapshotBase64: previousSnapshot.snapshotBase64,
+                        previousSnapshotTruncated: previousSnapshot.snapshotTruncated,
+                    };
+                });
+            } finally {
+                lease.release();
             }
-            return {
-                occurrences: patch.occurrences,
-                replacedOccurrences,
-                bytesWritten: options.dryRun ? 0 : bytesWritten,
-                projectedBytes: bytesWritten,
-                previousBytes: patch.previousBytes,
-                byteDelta: patch.byteDelta,
-                oldStringBytes: patch.oldStringBytes,
-                newStringBytes: patch.newStringBytes,
-                firstMatchLine: patch.firstMatchLine,
-                lastMatchLine: patch.lastMatchLine,
-                lineDelta: patch.lineDelta,
-                occurrenceIndex: patch.occurrenceIndex,
-                noop: patch.noop,
-                diffPreview: diffPreview.text,
-                diffPreviewTruncated: diffPreview.truncated,
-                diffPreviewLines: diffPreview.lines,
-                diffPreviewBytes: diffPreview.bytes,
-                diffContextLines: diff.contextLines,
-                previousHash,
-                contentHash,
-                dryRun: Boolean(options.dryRun),
-                previousSnapshotBase64: previousSnapshot.snapshotBase64,
-                previousSnapshotTruncated: previousSnapshot.snapshotTruncated,
-            };
-        });
+        })();
+        const waitMs = lease.waitMs;
         if (!options.dryRun) invalidateIoCacheTiers(filePath);
         const io = publishAndReturn(
             buildIoMeta({

@@ -16,8 +16,9 @@
  * @see module:copilot/config/session-config
  */
 
-import { CopilotClient } from '@github/copilot-sdk';
+import { sleepMs } from '#copilot/core';
 import { toError } from '#copilot/core/error-handlers';
+import { CopilotClient } from '@github/copilot-sdk';
 import { DEFAULT_MODEL, INFINITE_SESSION_DEFAULTS, REASONING_EFFORTS } from '../constants.js';
 import { getSdkErrorFingerprint, getSdkRecoveryPolicy, toSdkOperationError } from '../errors.js';
 import { log } from '../logger.js';
@@ -173,7 +174,10 @@ function assertSession(session, caller) {
  * @returns {Promise<void>}
  */
 async function wait(ms) {
-    await new Promise((resolve) => setTimeout(resolve, ms));
+    await sleepMs(ms, {
+        id: `sdk.session.lifecycle.wait:${Date.now()}:${Math.random().toString(36).slice(2)}`,
+        unref: true,
+    });
 }
 
 /**
@@ -193,8 +197,8 @@ async function reconnectClientBestEffort(client, operation) {
 
 /**
  * Padrões de mensagem SDK que indicam que a sessão simplesmente não existe mais no backend (expirou ou o CLI foi
- * reiniciado), tornando a falha de resume um comportamento esperado. Cobrir variações de inglês e português usadas
- * pelo SDK e CLI Copilot.
+ * reiniciado), tornando a falha de resume um comportamento esperado. Cobrir variações de inglês e português usadas pelo
+ * SDK e CLI Copilot.
  */
 const EXPECTED_RESUME_MISS_PATTERNS = [
     'session not found',

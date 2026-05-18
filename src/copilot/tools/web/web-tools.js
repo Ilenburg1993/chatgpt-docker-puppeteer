@@ -33,6 +33,7 @@ import {
 /** @type {Map<number, number>} minute-bucket → request count */
 const RATE_WINDOW = new Map();
 const REDIRECT_BLOCKED_PORTS = new Set([22, 25, 3306, 5432, 6379, 8080, 8443, 9200, 27017]);
+const MAX_WEB_FETCH_BODY_BYTES = 64 * 1024;
 
 /**
  * Reset util para testes — limpa buckets de rate-limit em memória.
@@ -99,6 +100,27 @@ function assertRedirectPortAllowed(urlText) {
     }
 }
 
+/**
+ * @param {Record<string, string> | undefined} headers
+ * @returns {Record<string, string>}
+ */
+function sanitizeRequestHeaders(headers) {
+    if (!headers || typeof headers !== 'object') return {};
+    const blocked = new Set(['host', 'content-length', 'connection', 'transfer-encoding']);
+    /** @type {Record<string, string>} */
+    const out = {};
+    for (const [rawName, rawValue] of Object.entries(headers)) {
+        const name = String(rawName).trim();
+        if (!/^[A-Za-z0-9-]+$/u.test(name)) continue;
+        const lowered = name.toLowerCase();
+        if (blocked.has(lowered)) continue;
+        const value = String(rawValue ?? '').trim();
+        if (value.length === 0) continue;
+        out[name] = value;
+    }
+    return out;
+}
+
 // ─── Tool: web_fetch_local ───────────────────────────────────────────────────
 
 /**
@@ -107,20 +129,26 @@ function assertRedirectPortAllowed(urlText) {
  *
  * @param {string} startUrl
  * @param {number} maxRedirects
+ * @param {{ method: 'GET' | 'POST' | 'PUT' | 'PATCH'; headers: Record<string, string>; body?: string }} request
  * @param {{ signal?: AbortSignal }} [opts]
  * @returns {Promise<{ response: Response; finalUrl: string; redirectCount: number }>}
  * @throws {Error} Se o número de redirects exceder o limite ou uma URL intermediária for bloqueada.
  */
-async function fetchWithRedirectPolicy(startUrl, maxRedirects, opts = {}) {
-    const AGENT_HEADERS = { 'User-Agent': 'github-copilot-agent/1.0' };
+async function fetchWithRedirectPolicy(startUrl, maxRedirects, request, opts = {}) {
+    const baseHeaders = { 'User-Agent': 'github-copilot-agent/1.0', ...request.headers };
     let currentUrl = startUrl;
     let redirectCount = 0;
 
     for (;;) {
+        if (redirectCount > 0 && request.method !== 'GET') {
+            throw new Error('Redirect para métodos não-GET não é suportado por política de segurança.');
+        }
+
         const response = await fetch(currentUrl, {
-            method: 'GET',
+            method: request.method,
             redirect: 'manual',
-            headers: AGENT_HEADERS,
+            headers: baseHeaders,
+            ...(request.body !== undefined ? { body: request.body } : {}),
             ...(opts.signal ? { signal: opts.signal } : {}),
         });
 
@@ -174,11 +202,27 @@ const webFetchTool = buildTool({
         'Volume/timeout são informativos e não bloqueiam a operação.',
     parameters: z.object({
         url: z.string().url().describe('URL completa da página a buscar (https:// recomendado)'),
+        method: z.enum(['GET', 'POST', 'PUT', 'PATCH']).optional().describe('Método HTTP. Default: GET.'),
+        headers: z.record(z.string(), z.string()).optional().describe('Headers HTTP opcionais (sanitizados).'),
+        body: z.string().optional().describe('Body textual opcional para métodos não-GET.'),
         maxBytes: z.number().int().min(1).optional().describe('Tamanho informativo da resposta em bytes.'),
-        timeoutMs: z.number().int().min(0).optional().describe('Timeout informativo em ms; não aborta a operação.'),
+        timeoutMs: z
+            .number()
+            .int()
+            .min(0)
+            .optional()
+            .describe('Timeout efetivo em ms (aborta a operação quando excedido).'),
     }),
     handler: async (
-        /** @type {{ url: string; maxBytes?: number; timeoutMs?: number }} */ { url, maxBytes, timeoutMs },
+        /** @type {{
+    url: string;
+    method?: 'GET' | 'POST' | 'PUT' | 'PATCH';
+    headers?: Record<string, string>;
+    body?: string;
+    maxBytes?: number;
+    timeoutMs?: number;
+}} */
+        { url, method, headers, body, maxBytes, timeoutMs },
     ) => {
         const rate = checkRateLimit();
         if (!rate.ok) {
@@ -206,17 +250,29 @@ const webFetchTool = buildTool({
         const maxRedirects = inputUrlDecision.maxRedirects ?? IO_URL_MAX_REDIRECTS;
         const timeoutBudgetMs =
             typeof timeoutMs === 'number' && Number.isFinite(timeoutMs) && timeoutMs > 0 ? timeoutMs : null;
-        const controller = timeoutBudgetMs !== null ? new AbortController() : null;
-        const timeoutHandle =
-            controller && timeoutBudgetMs !== null
-                ? setTimeout(() => controller.abort(new Error('Timeout')), timeoutBudgetMs)
-                : null;
+        const safeMethod = method ?? 'GET';
+        const safeHeaders = sanitizeRequestHeaders(headers);
+        const safeBody = typeof body === 'string' ? body : undefined;
+        const bodySizeBytes = safeBody ? utf8ByteLength(safeBody, 'web_fetch request body') : 0;
+
+        if (safeMethod === 'GET' && safeBody !== undefined) {
+            return { success: false, error: 'Body não é suportado para método GET.' };
+        }
+        if (safeBody && bodySizeBytes > MAX_WEB_FETCH_BODY_BYTES) {
+            return {
+                success: false,
+                error: `Body excede limite de ${MAX_WEB_FETCH_BODY_BYTES} bytes (${bodySizeBytes} bytes).`,
+            };
+        }
+
+        const signal = timeoutBudgetMs !== null ? AbortSignal.timeout(timeoutBudgetMs) : undefined;
 
         try {
             const { response, finalUrl, redirectCount } = await fetchWithRedirectPolicy(
                 parsed.toString(),
                 maxRedirects,
-                controller ? { signal: controller.signal } : {},
+                { method: safeMethod, headers: safeHeaders, ...(safeBody !== undefined ? { body: safeBody } : {}) },
+                signal ? { signal } : {},
             );
 
             if (redirectCount > 0) {
@@ -270,6 +326,8 @@ const webFetchTool = buildTool({
                 advisoryLimits: {
                     requestedMaxBytes: advisoryLimit,
                     advisoryTimeoutMs: timeoutMs ?? null,
+                    method: safeMethod,
+                    requestBodyBytes: bodySizeBytes,
                     redactions: sanitized.redactions,
                     policyDecision: inputUrlDecision.ok ? 'allow' : 'deny',
                     policyVersion: inputUrlDecision.policyVersion,
@@ -287,6 +345,7 @@ const webFetchTool = buildTool({
                     success: true,
                     url: finalUrl,
                     status: response.status,
+                    method: safeMethod,
                     contentType,
                     truncated: false,
                     advisoryMaxBytes: advisoryLimit,
@@ -305,8 +364,6 @@ const webFetchTool = buildTool({
             const msg = toError(e).message ?? String(e);
             log('WARN', `[copilot/web_fetch] Erro: ${msg}`);
             return { success: false, error: msg };
-        } finally {
-            if (timeoutHandle) clearTimeout(timeoutHandle);
         }
     },
 });

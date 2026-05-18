@@ -8,6 +8,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import {
     readBinaryMutationSnapshot,
     readTextLineChunks,
+    readTextLineChunksStream,
     readTextLinesSnapshot,
 } from '../../../../src/copilot/infra/io/fs/index.js';
 import { sha256 } from '../../../../src/copilot/infra/shared/hash.js';
@@ -76,6 +77,27 @@ describe('infra/io/fs read line ports', () => {
         ]);
         expect(result.bytesRead).toBeGreaterThan(Buffer.byteLength('beta\ngamma', 'utf8'));
         expect(result.bytesRead).toBeLessThanOrEqual(Buffer.byteLength(content, 'utf8'));
+    });
+
+    it('readTextLineChunksStream expõe chunks via ReadableStream.from', async () => {
+        const dir = await createTempDir();
+        const file = join(dir, 'stream.txt');
+        await writeFile(file, 'l1\nl2\nl3\nl4', 'utf8');
+
+        const stream = readTextLineChunksStream(file, { chunkLines: 2 });
+        const reader = stream.getReader();
+        /** @type {Array<Awaited<ReturnType<typeof reader.read>>['value']>} */
+        const chunks = [];
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            chunks.push(value);
+        }
+
+        expect(chunks).toEqual([
+            { index: 0, startLine: 1, endLine: 2, content: 'l1\nl2', bytes: 5 },
+            { index: 1, startLine: 3, endLine: 4, content: 'l3\nl4', bytes: 5 },
+        ]);
     });
 
     it('readTextLinesSnapshot retorna linhas de snapshot UTF-8 normalizando quebras', async () => {

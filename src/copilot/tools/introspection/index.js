@@ -16,6 +16,7 @@ export {
     registerForIntrospection,
     resetIntrospectionStateForTests,
     setAgentInfoProvider,
+    setSessionExcludedTools,
     setToolContractReport,
 } from './introspection-tools.js';
 

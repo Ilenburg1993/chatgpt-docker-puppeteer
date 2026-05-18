@@ -4,14 +4,14 @@
  * @file Seams de binding operacional do runtime (observer, métricas, MCP, keepalive e relays).
  */
 
+import { MCP_RECONNECT_MS, METRICS_INTERVAL_MS } from '#copilot/config/agent';
+import { registerInterval } from '#copilot/core';
 import {
     EMITTER_AGENT_METRICS,
     EMITTER_MCP_RECONNECTED,
     EMITTER_QUESTION_ANSWERED,
     EMITTER_SESSION_KEEPALIVE,
 } from '#copilot/events';
-import { MCP_RECONNECT_MS, METRICS_INTERVAL_MS } from '#copilot/config/agent';
-import { registerTimer } from '#copilot/core';
 import { getAgentSdkModelStatsTracker, isAgentSdkExperimentalEnabled } from '../../facades/index.js';
 import {
     createAgentEventObserver,
@@ -60,12 +60,15 @@ export function stepStartMetricsTimer(ctx, state) {
         return;
     }
 
-    const metricsTimer = setInterval(() => {
-        reapExpiredPendingQuestionShadow(ctx);
-        ctx.emit(EMITTER_AGENT_METRICS, ctx.getStatusSnapshot());
-    }, METRICS_INTERVAL_MS);
+    const metricsTimer = registerInterval(
+        'agent.metricsEmit',
+        () => {
+            reapExpiredPendingQuestionShadow(ctx);
+            ctx.emit(EMITTER_AGENT_METRICS, ctx.getStatusSnapshot());
+        },
+        METRICS_INTERVAL_MS,
+    );
     metricsTimer.unref();
-    registerTimer('agent.metricsEmit', 'interval', metricsTimer);
     state.metricsTimer = metricsTimer;
 }
 

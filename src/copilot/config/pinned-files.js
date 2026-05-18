@@ -14,7 +14,7 @@ import { EventEmitter } from 'node:events';
 import { watch } from 'node:fs';
 import { access, readdir, readFile, stat } from 'node:fs/promises';
 import { join } from 'node:path';
-import { logSwallowed } from '../core/error-handlers.js';
+import { logSwallowed, toError } from '../core/error-handlers.js';
 
 const DEBOUNCE_MS = 500;
 const SUPPORTED_EXTENSIONS = ['.md', '.txt', '.js', '.ts', '.json', '.yaml', '.yml'];
@@ -84,7 +84,7 @@ export class PinnedFilesLoader extends EventEmitter {
         try {
             await this.#startWatchers();
         } catch (err) {
-            const msg = err instanceof Error ? err.message : String(err);
+            const msg = toError(err).message;
             log('WARN', `[PinnedFilesLoader] Watchers não iniciados (continuando sem hot-reload): ${msg}`);
         }
         log(

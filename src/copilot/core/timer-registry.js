@@ -36,6 +36,9 @@ const timers = new Map();
 /** @type {boolean} */
 let shutdownRegistered = false;
 
+/** @type {number} */
+let sleepSequence = 0;
+
 /**
  * Registra um timer no registry. Se já existir um timer com o mesmo `id`, o anterior é cancelado automaticamente antes
  * do novo ser registrado.
@@ -50,6 +53,62 @@ export function registerTimer(id, type, handle) {
     cancel(id);
     timers.set(id, { id, type, handle, registeredAt: Date.now() });
     return handle;
+}
+
+/**
+ * Cria e registra um intervalo canônico no timer-registry.
+ *
+ * @param {string} id
+ * @param {Parameters<typeof setInterval>[0]} callback
+ * @param {Parameters<typeof setInterval>[1]} delay
+ * @param {...any[]} args
+ * @returns {ReturnType<typeof setInterval>}
+ */
+export function registerInterval(id, callback, delay, ...args) {
+    return /** @type {ReturnType<typeof setInterval>} */ (
+        registerTimer(id, 'interval', setInterval(callback, delay, ...args))
+    );
+}
+
+/**
+ * Cria e registra um timeout canônico no timer-registry.
+ *
+ * @param {string} id
+ * @param {Parameters<typeof setTimeout>[0]} callback
+ * @param {Parameters<typeof setTimeout>[1]} delay
+ * @param {...any[]} args
+ * @returns {ReturnType<typeof setTimeout>}
+ */
+export function registerTimeout(id, callback, delay, ...args) {
+    return /** @type {ReturnType<typeof setTimeout>} */ (
+        registerTimer(id, 'timeout', setTimeout(callback, delay, ...args))
+    );
+}
+
+/**
+ * Aguarda um atraso em ms usando timeout registrado no timer-registry.
+ *
+ * @param {number} delayMs
+ * @param {{ id?: string; unref?: boolean }} [options]
+ * @returns {Promise<void>}
+ */
+export async function sleepMs(delayMs, options = {}) {
+    const delay = Math.max(0, Number.isFinite(delayMs) ? Math.floor(delayMs) : 0);
+    if (delay === 0) return;
+    const baseId = options.id ?? 'core.sleep';
+    // IDs de sleep precisam ser sempre únicos para evitar cancelamento cruzado entre waits concorrentes.
+    const id = `${baseId}:${Date.now()}:${++sleepSequence}`;
+    await new Promise((resolve) => {
+        const handle = registerTimeout(
+            id,
+            () => {
+                cancel(id);
+                resolve(undefined);
+            },
+            delay,
+        );
+        if (options.unref !== false) handle.unref?.();
+    });
 }
 
 /**
@@ -120,6 +179,7 @@ export function listActiveTimers(now = Date.now()) {
 export function _resetForTesting() {
     cancelAll();
     shutdownRegistered = false;
+    sleepSequence = 0;
 }
 
 /**

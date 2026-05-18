@@ -19,6 +19,12 @@
 /** @type {HookLogFn | null} */
 let _injectedLogger = null;
 
+const errorCtor = /** @type {{ isError?: (value: unknown) => boolean }} */ (Error);
+const isError =
+    typeof errorCtor.isError === 'function'
+        ? /** @type {(value: unknown) => boolean} */ (errorCtor.isError.bind(Error))
+        : /** @type {(value: unknown) => boolean} */ ((value) => value instanceof Error);
+
 /**
  * @param {HookLogFn} logFn
  * @returns {void}
@@ -42,7 +48,11 @@ export function log(level, msg, meta) {
         _injectedLogger(level, msg, meta);
         return;
     }
-    const text = msg instanceof Error ? msg.message : typeof msg === 'object' ? JSON.stringify(msg) : msg;
+    const text = isError(msg)
+        ? /** @type {Error} */ (msg).message
+        : typeof msg === 'object'
+          ? JSON.stringify(msg)
+          : msg;
     switch (level.toUpperCase()) {
         case 'ERROR':
             console.error(text);

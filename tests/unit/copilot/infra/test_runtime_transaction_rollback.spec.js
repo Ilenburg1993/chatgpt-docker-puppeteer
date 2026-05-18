@@ -110,4 +110,27 @@ describe('infra/runtime/transaction + rollback', () => {
         expect(parsed.changeSetId).toBe(token.changeSetId);
         expect(parsed.digest).toBe(token.digest);
     });
+
+    it('isola evidence/rollback de mutações externas após append', () => {
+        const started = beginIoChangeSet({ capability: 'file.write' });
+        const evidence = { nested: { source: 'write_file_content' } };
+        const rollback = {
+            action: /** @type {'write'} */ ('write'),
+            target: '/tmp/a.txt',
+            previousHash: 'old',
+        };
+
+        const withEntry = appendIoChangeSetEntry(started, {
+            action: 'write',
+            targets: ['/tmp/a.txt'],
+            evidence,
+            rollback,
+        });
+
+        evidence.nested.source = 'mutated';
+        rollback.previousHash = 'changed';
+
+        expect(withEntry.entries[0]?.evidence).toEqual({ nested: { source: 'write_file_content' } });
+        expect(withEntry.entries[0]?.rollback?.previousHash).toBe('old');
+    });
 });

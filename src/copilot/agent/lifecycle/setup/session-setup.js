@@ -24,14 +24,15 @@ import {
     buildCustomAgentsConfig,
     DEFAULT_EXCLUDED_TOOLS,
     MAESTRO_AGENT_NAME,
-    SessionConfigBuilder,
     normalizeAgentToolList,
     resolveToolName,
+    SessionConfigBuilder,
 } from '#copilot/config';
 import { buildCanonicalLocalSurfaceExcludedTools, container } from '#copilot/core';
 import {
     AgentToolPolicy,
     bindAgentInfoProvider,
+    bindAgentSessionExcludedTools,
     bindAgentSessionTools,
     bootstrapAgentTools,
     buildAgentBusHooks,
@@ -60,8 +61,8 @@ import {
  * @typedef {object} SessionSetupContext
  * @property {() => void} invalidateMessagesCache - Invalida o cache de mensagens antes de rebuilar tools para evitar
  *   replay/estado obsoleto.
- * @property {() => import('#copilot/sdk/types').ToolRegistry} resetToolsRegistry - Recria o registry ativo de
- *   tools para o boot/resume atual.
+ * @property {() => import('#copilot/sdk/types').ToolRegistry} resetToolsRegistry - Recria o registry ativo de tools
+ *   para o boot/resume atual.
  * @property {() => import('../../ports/index.js').AgentMcpCapability | null} [getMcpBridgeSnapshot]
  *
  *   - Snapshot opcional do bridge MCP injetado. Quando ausente, a porta MCP default é usada.
@@ -316,6 +317,12 @@ export function buildSessionOptions(ctx, host, { tools, busHooks }) {
     const mcpBridge = readAgentMcpCapabilitySnapshot(ctx);
     const mcpConfig = /** @type {Record<string, MCPServerConfig> | null} */ (mcpBridge.buildConfig());
     const bootConfig = readCopilotBootConfig();
+    const excludedTools = buildCanonicalLocalSurfaceExcludedTools(
+        tools.map((tool) => tool.name),
+        DEFAULT_EXCLUDED_TOOLS,
+    );
+    bindAgentSessionExcludedTools(excludedTools);
+
     const builder = new SessionConfigBuilder()
         .model(ctx.getModelSnapshot())
         .clientName('chatgpt-docker-puppeteer')
@@ -323,12 +330,7 @@ export function buildSessionOptions(ctx, host, { tools, busHooks }) {
         .skillDirectories(bootConfig.skills.skillDirectories)
         .onPermissionRequest(getPermissionHandler(ctx))
         .tools(tools)
-        .excludedTools(
-            buildCanonicalLocalSurfaceExcludedTools(
-                tools.map((tool) => tool.name),
-                DEFAULT_EXCLUDED_TOOLS,
-            ),
-        );
+        .excludedTools(excludedTools);
 
     builder.hooks(busHooks);
     if (mcpConfig) {

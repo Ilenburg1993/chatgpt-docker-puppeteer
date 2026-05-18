@@ -2,8 +2,8 @@
 /**
  * tests/unit/copilot/infra/test_outline_builder.spec.js
  *
- * Testes unitários para src/copilot/infra/parse/outline-builder.js
- * Cobre: buildOutline — seções exports, re-exports, internal, imports e parseError.
+ * Testes unitários para src/copilot/infra/parse/outline-builder.js Cobre: buildOutline — seções exports, re-exports,
+ * internal, imports e parseError.
  */
 
 import { describe, expect, it } from 'vitest';
@@ -53,7 +53,9 @@ describe('buildOutline — seção Exports', () => {
     });
 
     it('não exibe seção Exports quando vazia', () => {
-        const lines = buildOutline(makeInput({ symbols: [{ kind: 'function', name: 'local', exported: false, line: 1 }] }));
+        const lines = buildOutline(
+            makeInput({ symbols: [{ kind: 'function', name: 'local', exported: false, line: 1 }] }),
+        );
         expect(lines.some((l) => l.includes('── Exports'))).toBe(false);
     });
 });
@@ -79,8 +81,8 @@ describe('buildOutline — seção Re-exports (GAP-4)', () => {
 
     it('funciona corretamente quando exports é undefined', () => {
         const input = makeInput();
-        // @ts-ignore — testando omissão intencional
-        delete input.exports;
+        const mutableInput = /** @type {{ exports?: unknown }} */ (input);
+        delete mutableInput.exports;
         expect(() => buildOutline(input)).not.toThrow();
         expect(buildOutline(input).some((l) => l.includes('── Re-exports'))).toBe(false);
     });

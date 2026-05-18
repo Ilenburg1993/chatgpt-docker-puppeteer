@@ -8,7 +8,7 @@
  * @see EventBus
  */
 
-import { TimeoutError } from '#copilot/core';
+import { TimeoutError, toError } from '#copilot/core';
 import { AGENT_DIALOG_TURN_TIMEOUT, AGENT_TASK_ERROR } from '#copilot/events';
 import { log } from '../logger.js';
 import { startSpanImmediate } from '../otel.js';
@@ -274,7 +274,7 @@ export function attachDialogTaskHandlers(ctx) {
                 }
             }
             if (errorTracker) {
-                const err = evt?.error instanceof Error ? evt.error : new Error(String(evt?.error ?? 'task.error'));
+                const err = toError(evt?.error);
                 errorTracker.trackError(err, { source: AGENT_TASK_ERROR, metadata: { taskId } });
             }
             log('WARN', `[agent-event-observer] task.error taskId=${taskId}`);

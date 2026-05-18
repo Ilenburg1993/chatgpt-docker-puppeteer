@@ -5,5 +5,10 @@
  * @module copilot/infra/locks
  */
 
-export { getIoLockStats, normalizeIoResourceKey, withIoResourceLock, withIoResourceLocks } from './async-resource-lock.js';
-export { acquireLock, releaseLock } from './file-lock.js';
+export {
+    getIoLockStats,
+    normalizeIoResourceKey,
+    withIoResourceLock,
+    withIoResourceLocks,
+} from './async-resource-lock.js';
+export { acquireLock, releaseLock, releaseLockAsync } from './file-lock.js';

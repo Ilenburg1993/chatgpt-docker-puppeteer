@@ -17,9 +17,9 @@
 
 import { buildAuditingPermissionHandler } from '#copilot/audit';
 import { WORKSPACE_ROOT, readBootSkillConfig } from '#copilot/boot';
-import { MAESTRO_AGENT_NAME, buildCustomAgentsConfig } from '#copilot/config';
-import { buildCanonicalLocalSurfaceExcludedTools, toError } from '#copilot/core';
+import { COPILOT_ENABLE_CONFIG_DISCOVERY, MAESTRO_AGENT_NAME, buildCustomAgentsConfig } from '#copilot/config';
 import { SESSION_MAX_AGE_MS } from '#copilot/config/agent';
+import { buildCanonicalLocalSurfaceExcludedTools, toError } from '#copilot/core';
 import {
     buildLiveSystemMessage,
     buildSystemPromptBindingSnapshot,
@@ -264,7 +264,8 @@ export async function initOrResumeSession(client, sessionOptions) {
             reasoningEffort: sessionOptions.reasoningEffort,
             onUserInputRequest: sessionOptions.onUserInputRequest,
             createSessionFsHandler,
-            includeSubAgentStreamingEvents: true,
+            enableConfigDiscovery: COPILOT_ENABLE_CONFIG_DISCOVERY,
+            includeSubAgentStreamingEvents: false,
             hooks: sessionOptions.hooks,
             tools: sessionOptions.tools,
             mcpServers: sessionOptions.mcpServers,
@@ -310,7 +311,9 @@ export async function initOrResumeSession(client, sessionOptions) {
         !requestedNativeAutoModel && typeof state?.model === 'string' && state.model !== 'auto' ? state.model : null;
     const effectiveModel = requestedNativeAutoModel
         ? 'auto'
-        : (typeof result.model === 'string' ? result.model : (persistedConcreteModel ?? model));
+        : typeof result.model === 'string'
+          ? result.model
+          : (persistedConcreteModel ?? model);
     if (
         result.isResumed &&
         requestedNativeAutoModel &&

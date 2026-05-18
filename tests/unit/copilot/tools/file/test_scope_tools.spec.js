@@ -79,7 +79,7 @@ describe('tools/file/scope-tools', () => {
         expect(out.sessionId).toBe('s1');
     });
 
-    it('workspace_scope_declare usa scopeName como sessionId efetivo quando fornecido', async () => {
+    it('workspace_scope_declare usa sessionId como efetivo, scopeName é apenas label', async () => {
         const handler = getHandler(workspaceScopeDeclareTool);
         mocks.declareScope.mockResolvedValue({ scopeId: 'scope-feature-a', files: [], symbols: new Map() });
 
@@ -89,13 +89,16 @@ describe('tools/file/scope-tools', () => {
             directory: 'src',
         });
 
+        // effectiveSessionId = sessionId (não scopeName)
         expect(mocks.declareScope).toHaveBeenCalledWith(
             expect.objectContaining({
-                sessionId: 'feature-a',
+                sessionId: 'session-default',
                 directory: expect.stringMatching(/src$/),
             }),
         );
-        expect(out.sessionId).toBe('feature-a');
+        expect(out.sessionId).toBe('session-default');
+        // displayName = scopeName
+        expect(out.scopeName).toBe('feature-a');
     });
 
     it('workspace_scope_declare aguarda awaitReady quando solicitado', async () => {

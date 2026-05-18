@@ -4,10 +4,9 @@
  * @file Seams de recuperação do dialog loop durante boot/resume.
  */
 
-import { EMITTER_DIALOG_BOOT_RECOVERY } from '#copilot/events';
 import { BOOT_RECOVERY_DELAY_MS } from '#copilot/config/agent';
-import { toError } from '#copilot/core';
-import { registerTimer } from '#copilot/core';
+import { cancelTimer, registerTimeout, toError } from '#copilot/core';
+import { EMITTER_DIALOG_BOOT_RECOVERY } from '#copilot/events';
 import {
     clearAgentRuntimePendingQuestionShadow,
     markAgentRuntimeDialogPausedForRecovery,
@@ -28,19 +27,26 @@ import { log } from '../../ports/index.js';
  */
 export function scheduleDialogBootRecovery(ctx) {
     log('DEBUG', '[AlwaysAlive] F53/F42.1: Recovery do dialog loop agendado após resume.');
-    const bootRecoveryTimer = setTimeout(() => {
-        if (ctx.getStatus() === 'stopped') {
-            return;
-        }
+    const timerId = 'agent.dialogBootRecovery';
+    const bootRecoveryTimer = registerTimeout(
+        timerId,
+        () => {
+            cancelTimer(timerId);
+            if (ctx.getStatus() === 'stopped') {
+                return;
+            }
 
-        void ctx.trackBackgroundTask(runDialogBootRecovery(ctx), {
-            label: 'dialog.boot_recovery.run',
-            description: 'Retry dialog loop recovery after resumed session boot',
-        });
-    }, BOOT_RECOVERY_DELAY_MS);
+            void ctx.trackBackgroundTask(runDialogBootRecovery(ctx), {
+                label: 'dialog.boot_recovery.run',
+                description: 'Retry dialog loop recovery after resumed session boot',
+            });
+        },
+        BOOT_RECOVERY_DELAY_MS,
+    );
     bootRecoveryTimer.unref?.();
-    registerTimer('agent.dialogBootRecovery', 'timeout', bootRecoveryTimer);
-    return () => clearTimeout(bootRecoveryTimer);
+    return () => {
+        cancelTimer(timerId);
+    };
 }
 
 /**

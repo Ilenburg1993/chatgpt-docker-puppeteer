@@ -7,15 +7,14 @@
  * @internal K86.7.3
  */
 
-import { SessionError, container } from '#copilot/core';
+import { SessionError, container, toError } from '#copilot/core';
 import {
     EMITTER_LOOP_READY,
     EMITTER_LOOP_REPLY,
     EMITTER_LOOP_STOPPED,
     EMITTER_QUESTION_PENDING,
 } from '#copilot/events';
-import { log } from '../../ports/index.js';
-import { METRICS_STORE } from '../../ports/index.js';
+import { METRICS_STORE, log } from '../../ports/index.js';
 
 /**
  * Constrói os event handlers principais de resolução/rejeição de um turno.
@@ -250,7 +249,7 @@ export function dispatchTurnToHostImpl(emitter, opts) {
                 if (tryUseReplyFallback?.()) {
                     return;
                 }
-                reject(error instanceof Error ? error : new Error(String(error)));
+                reject(toError(error));
             },
         );
     } else {

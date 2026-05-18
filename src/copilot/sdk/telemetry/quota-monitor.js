@@ -13,7 +13,7 @@
  * @see module:copilot/sdk/health
  */
 
-import { toError } from '#copilot/core/error-handlers';
+import { cancelTimer, registerInterval, toError } from '#copilot/core';
 import { accountGetQuota } from '../rpc/server.js';
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
@@ -92,6 +92,7 @@ export function createQuotaMonitor(opts) {
     let _ts = 0;
     /** @type {ReturnType<typeof setInterval> | null} */
     let _timer = null;
+    const _timerId = `sdk.quota-monitor:${Math.random().toString(36).slice(2)}`;
 
     /**
      * @returns {Promise<Record<string, QuotaSnapshot>>}
@@ -125,7 +126,7 @@ export function createQuotaMonitor(opts) {
                     onError(toError(err));
                 }
             });
-            _timer = setInterval(() => {
+            _timer = registerInterval(_timerId, () => {
                 _fetch().catch((err) => {
                     if (typeof onError === 'function') {
                         onError(toError(err));
@@ -144,7 +145,7 @@ export function createQuotaMonitor(opts) {
 
         stop() {
             if (_timer !== null) {
-                clearInterval(_timer);
+                cancelTimer(_timerId);
                 _timer = null;
             }
         },

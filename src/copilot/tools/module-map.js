@@ -209,6 +209,30 @@ function increment(bucket, key) {
 }
 
 /**
+ * Conta entradas por chave usando `Object.groupBy` quando disponível (Node 24+), com fallback seguro.
+ *
+ * @template T
+ * @param {readonly T[]} entries
+ * @param {(entry: T) => string} selector
+ * @returns {Record<string, number>}
+ */
+function countBy(entries, selector) {
+    const objectCtor =
+        /** @type {{ groupBy?: (items: readonly T[], fn: (item: T) => string) => Record<string, T[]> }} */ (Object);
+    if (typeof objectCtor.groupBy === 'function') {
+        const grouped = objectCtor.groupBy(entries, selector);
+        return Object.fromEntries(Object.entries(grouped).map(([key, values]) => [key, values.length]));
+    }
+
+    /** @type {Record<string, number>} */
+    const fallback = {};
+    for (const entry of entries) {
+        increment(fallback, selector(entry));
+    }
+    return fallback;
+}
+
+/**
  * @param {ToolsModuleRole} role
  * @returns {ToolsModuleDescriptor[]}
  */
@@ -254,27 +278,12 @@ export function getToolsModuleRole(path) {
  * }}
  */
 export function buildToolsModuleScorecard() {
-    /** @type {Record<string, number>} */
-    const byKind = {};
-    /** @type {Record<string, number>} */
-    const byRole = {};
-    /** @type {Record<string, number>} */
-    const byTier = {};
-    /** @type {Record<string, number>} */
-    const byRisk = {};
-    /** @type {string[]} */
-    const publicEntries = [];
-    /** @type {string[]} */
-    const hotspots = [];
-
-    for (const entry of TOOLS_MODULE_LAYOUT) {
-        increment(byKind, entry.kind);
-        increment(byRole, entry.role);
-        increment(byTier, entry.tier);
-        increment(byRisk, entry.risk);
-        if (entry.public) publicEntries.push(entry.path);
-        if (entry.risk === 'hotspot') hotspots.push(entry.path);
-    }
+    const byKind = countBy(TOOLS_MODULE_LAYOUT, (entry) => entry.kind);
+    const byRole = countBy(TOOLS_MODULE_LAYOUT, (entry) => entry.role);
+    const byTier = countBy(TOOLS_MODULE_LAYOUT, (entry) => entry.tier);
+    const byRisk = countBy(TOOLS_MODULE_LAYOUT, (entry) => entry.risk);
+    const publicEntries = TOOLS_MODULE_LAYOUT.filter((entry) => entry.public).map((entry) => entry.path);
+    const hotspots = TOOLS_MODULE_LAYOUT.filter((entry) => entry.risk === 'hotspot').map((entry) => entry.path);
 
     return {
         total: TOOLS_MODULE_LAYOUT.length,

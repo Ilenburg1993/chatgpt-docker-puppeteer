@@ -8,7 +8,7 @@
  */
 
 import { getInjectInterventionPolicy } from '#copilot/config';
-import { container, toError } from '#copilot/core';
+import { container, sleepMs, toError } from '#copilot/core';
 import { utf8ByteLength } from '#copilot/infra/public/buffer';
 import { log, METRICS_STORE } from '#copilot/observability';
 import { resolveOptionalDialogTimeout } from '../../dialog-timeout-policy.js';
@@ -438,7 +438,10 @@ export async function handlePipeline(params = {}) {
         const timeoutDecision = resolveInjectTimeout(runtimeId, explicitTimeoutMs);
 
         if (waitMs > 0) {
-            await new Promise((r) => setTimeout(r, waitMs));
+            await sleepMs(waitMs, {
+                id: `presentation.agent.control.pipeline:${runtimeId}:${i + 1}`,
+                unref: true,
+            });
         }
 
         const t0 = Date.now();

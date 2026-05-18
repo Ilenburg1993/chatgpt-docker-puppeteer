@@ -18,8 +18,6 @@
  */
 
 import { readCopilotBootConfig } from '#copilot/boot';
-import { EVENT_BUS, bridgeEmitter, container, toError, withRetry } from '#copilot/core';
-import { PluginRegistry, discoverPlugins } from '#copilot/plugins';
 import {
     BOOT_MAX_RETRIES,
     COPILOT_MODEL,
@@ -27,7 +25,8 @@ import {
     PING_TIMEOUT_MS,
     RESTART_DELAY_MS,
 } from '#copilot/config/agent';
-import { logSwallowed } from '#copilot/core';
+import { EVENT_BUS, bridgeEmitter, container, logSwallowed, toError, withRetry } from '#copilot/core';
+import { PluginRegistry, discoverPlugins } from '#copilot/plugins';
 import {
     EMITTER_ERROR,
     EMITTER_SESSION_FATAL,
@@ -39,9 +38,9 @@ import {
     HOOK_SESSION_END,
     HOOK_SESSION_START,
 } from '../../../events/index.js';
-import { getAgent } from '../../singleton/index.js';
 import { checkAgentSdkAuthStatus, createAgentSdkClient } from '../../facades/index.js';
 import { ERROR_TRACKER, getDefaultHookBus, log, runCopilotSdkBootPreflight } from '../../ports/index.js';
+import { getAgent } from '../../singleton/index.js';
 import {
     discoverRuntimePlugins,
     registerRuntimeAgentEventHost,
@@ -103,7 +102,7 @@ export async function startAgentLoop() {
                     maxDelayMs: RESTART_DELAY_MS * 4,
                     jitter: true,
                     onRetry: (err, attempt) => {
-                        const msg = err instanceof Error ? err.message : String(err);
+                        const msg = toError(err).message;
                         log('ERROR', `[copilot/agent] Falha ao iniciar (tentativa ${attempt}): ${msg}`);
                         log('INFO', `[copilot/agent] Tentando novamente em ~${RESTART_DELAY_MS}ms...`);
                     },

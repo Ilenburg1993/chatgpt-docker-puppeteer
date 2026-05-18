@@ -18,6 +18,7 @@
 
 import { defaultAuditLog } from '#copilot/audit';
 import { getCopilotFallbackModel } from '#copilot/config';
+import { toError } from '#copilot/core';
 import { classifySdkRateLimitScope } from '#copilot/sdk/errors';
 import { hostname } from 'node:os';
 import { createErrorHandler } from './error-handler.js';
@@ -114,7 +115,10 @@ export function createSessionHooks(ctx) {
                         );
                         scheduleFallback(fallbackModel);
                     } else {
-                        log('WARN', '[hooks/session-lifecycle] rate_limit/quota com model já em auto; aguardando reset do SDK.');
+                        log(
+                            'WARN',
+                            '[hooks/session-lifecycle] rate_limit/quota com model já em auto; aguardando reset do SDK.',
+                        );
                     }
                 }
             }
@@ -206,7 +210,7 @@ export function createCleanupHandler(cleanupFns, opts) {
             try {
                 await fn(sessionId, reason);
             } catch (e) {
-                const msg = e instanceof Error ? e.message : String(e);
+                const msg = toError(e).message;
                 log('WARN', `[hooks/session-lifecycle] ${label} erro (continuando): ${msg}`);
             }
         }

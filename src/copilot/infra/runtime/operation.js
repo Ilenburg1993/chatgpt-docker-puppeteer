@@ -5,6 +5,7 @@
  * @module copilot/infra/runtime/operation
  */
 
+import { toError } from '#copilot/core';
 import { randomUUID } from 'node:crypto';
 
 /**
@@ -83,6 +84,6 @@ export function failIoOperationEnvelope(envelope, error, result = {}) {
         durationMs: Math.max(0, completedAtMs - envelope.startedAtMs),
         traceId: result.traceId ?? envelope.traceId,
         evidence: { ...envelope.evidence, ...(result.evidence ?? {}) },
-        error: error instanceof Error ? error.message : String(error ?? 'unknown-error'),
+        error: toError(error ?? 'unknown-error').message,
     };
 }

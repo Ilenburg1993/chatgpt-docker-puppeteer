@@ -154,7 +154,7 @@ describe('agent/session/initializer — sessionFs wiring', () => {
         );
     });
 
-    it('injeta maestro e streaming de subagentes sem poluir defaultAgent com tools locais', async () => {
+    it('injeta maestro com streaming de subagentes desabilitado por default sem poluir defaultAgent com tools locais', async () => {
         const { initOrResumeSession } = await import('../../../src/copilot/agent/session/initializers/initializer.js');
         const toolA = { name: 'read_file_content' };
         const toolB = { name: 'exec_command' };
@@ -167,7 +167,7 @@ describe('agent/session/initializer — sessionFs wiring', () => {
             null,
             expect.objectContaining({
                 agent: 'agent-full',
-                includeSubAgentStreamingEvents: true,
+                includeSubAgentStreamingEvents: false,
             }),
         );
         expect(sessionOptions ? Reflect.get(sessionOptions, 'defaultAgent') : undefined).toBeUndefined();

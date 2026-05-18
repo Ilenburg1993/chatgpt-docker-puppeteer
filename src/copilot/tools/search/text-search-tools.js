@@ -2,8 +2,8 @@
 /**
  * Search tools de texto: `search_in_files` e `find_symbol_usages`.
  *
- * Owner canônico das tools de busca textual do workspace. Extraído de `file/read-tools.js`
- * para separar a superfície de search da superfície de file-read com clareza arquitetural.
+ * Owner canônico das tools de busca textual do workspace. Extraído de `file/read-tools.js` para separar a superfície de
+ * search da superfície de file-read com clareza arquitetural.
  *
  * @module copilot/tools/search/text-search-tools
  */
@@ -11,12 +11,13 @@
 import { toError, withIoMeta } from '#copilot/core';
 import { searchText } from '#copilot/infra/public/io';
 import { z } from 'zod';
+import { FILE_TOOLS_OUTPUT_POLICY, truncateUtf8Text, validatePath, WORKSPACE_ROOT } from '../file/shared.js';
 import { log } from '../infra/logger.js';
 import { buildTool } from '../infra/tool-factory.js';
-import { FILE_TOOLS_OUTPUT_POLICY, truncateUtf8Text, validatePath, WORKSPACE_ROOT } from '../file/shared.js';
 
 /**
  * Escapes a string for use as a literal in a regex pattern.
+ *
  * @param {string} s
  * @returns {string}
  */
@@ -25,14 +26,15 @@ export function escapeForRegex(s) {
 }
 
 /**
- * Parses raw ripgrep output (contextLines=0) into structured match objects.
- * Each line is expected to be in the format `absolute/path:lineNum:text`.
+ * Parses raw ripgrep output (contextLines=0) into structured match objects. Each line is expected to be in the format
+ * `absolute/path:lineNum:text`.
+ *
  * @param {string} output - Raw stdout from ripgrep
  * @param {string} workspaceRoot - Absolute workspace root to strip from paths
- * @returns {{ matches: Array<{file: string, line: number, text: string}>, fileCount: number }}
+ * @returns {{ matches: { file: string; line: number; text: string }[]; fileCount: number }}
  */
 export function parseUsageOutput(output, workspaceRoot) {
-    /** @type {Array<{file: string, line: number, text: string}>} */
+    /** @type {{ file: string; line: number; text: string }[]} */
     const matches = [];
     const files = new Set();
     const root = workspaceRoot.endsWith('/') ? workspaceRoot : `${workspaceRoot}/`;
@@ -129,6 +131,8 @@ export const searchInFilesTool = buildTool({
                     cursorOffset: result.cursorOffset ?? 0,
                     totalMatches: result.totalMatches ?? result.matchCount,
                     engine: result.engine,
+                    indexFallback: result.indexFallback ?? false,
+                    indexFallbackReason: result.indexFallbackReason ?? null,
                     matchCount: result.matchCount,
                     sanitized: result.sanitized,
                     redactions: result.redactions,
@@ -157,15 +161,8 @@ export const findSymbolUsagesTool = buildTool({
         'Retorna lista estruturada de matches: arquivo, linha e trecho. ' +
         'Ideal para análise de impacto e rastreamento de dependências antes de refatorações.',
     parameters: z.object({
-        symbol: z
-            .string()
-            .min(1)
-            .describe('Nome do símbolo a buscar (ex: "bindAgentInfoProvider", "AgentContext")'),
-        path: z
-            .string()
-            .optional()
-            .default('.')
-            .describe('Diretório de busca (relativo ao workspace). Default: raiz.'),
+        symbol: z.string().min(1).describe('Nome do símbolo a buscar (ex: "bindAgentInfoProvider", "AgentContext")'),
+        path: z.string().optional().default('.').describe('Diretório de busca (relativo ao workspace). Default: raiz.'),
         includePattern: z
             .string()
             .optional()

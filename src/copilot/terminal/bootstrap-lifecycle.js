@@ -9,6 +9,7 @@
  * @internal
  */
 
+import { toError } from '#copilot/core';
 import { runShutdown } from '../core/shutdown.js';
 import { log } from '../observability/logger.js';
 
@@ -79,9 +80,7 @@ export async function handleTerminalBootFailure(error, deps = {}) {
     } catch (shutdownError) {
         logFn(
             'WARN',
-            `[terminal/bootstrap] Shutdown central falhou após boot failure: ${
-                shutdownError instanceof Error ? shutdownError.message : String(shutdownError)
-            }`,
+            `[terminal/bootstrap] Shutdown central falhou após boot failure: ${toError(shutdownError).message}`,
         );
     }
     exitFn(1);

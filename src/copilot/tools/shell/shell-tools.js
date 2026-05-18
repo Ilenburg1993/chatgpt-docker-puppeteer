@@ -36,6 +36,14 @@ import {
 } from './sandbox.js';
 
 /**
+ * @param {string[]} tokens
+ * @returns {boolean}
+ */
+function hasSubshellLikeToken(tokens) {
+    return tokens.some((token) => token.includes('$(') || token.includes('`'));
+}
+
+/**
  * Resolve o timeout de execução considerando policy runtime e override por chamada.
  *
  * @param {number | undefined} timeoutSeconds
@@ -182,6 +190,16 @@ const execCommandTool = buildTool({
                     return { success: false, error: `Constructs shell complexos no segmento: "${seg}"` };
                 }
             }
+            for (const seg of pipeSegments) {
+                const parts = tokenizeShell(seg.trim());
+                if (hasSubshellLikeToken(parts)) {
+                    return {
+                        success: false,
+                        error: `Sintaxe de substituição de comando detectada no segmento "${seg}".`,
+                    };
+                }
+            }
+
             const stages = pipeSegments.map((/** @type {string} */ seg) => {
                 const parts = tokenizeShell(seg.trim());
                 const [file, ...args] = parts;
@@ -211,6 +229,12 @@ const execCommandTool = buildTool({
         }
         // BUG-H01 (fix): tokenizar respeitando aspas simples e duplas, em vez de split(/\s+/)
         const parts = tokenizeShell(command.trim());
+        if (hasSubshellLikeToken(parts)) {
+            return {
+                success: false,
+                error: 'Sintaxe de substituição de comando ($(...) ou crases) não é suportada por política de shell.',
+            };
+        }
         const [executable, ...execArgs] = parts;
         if (!executable) {
             return { success: false, error: 'Comando vazio.' };

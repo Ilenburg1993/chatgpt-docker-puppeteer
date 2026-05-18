@@ -8,10 +8,11 @@
 
 import { emitNerv } from '#copilot/bridges';
 import { LLM_B_BOOT_TIMEOUT_MS } from '#copilot/config';
-import { container, toError } from '#copilot/core';
+import { cancelTimer, container, registerInterval, sleepMs, toError } from '#copilot/core';
 import { log, METRICS_STORE } from '#copilot/observability';
 import { resolveOptionalDialogTimeout } from '../../presentation/dialog-timeout-policy.js';
 import { embedMultiple, readFileContext } from '../../presentation/files/index.js';
+import { describeSdkRecoveryPolicy, getSdkRecoveryPolicy } from '../../presentation/sdk/index.js';
 import {
     clearAttachments,
     getAttachmentQueue,
@@ -22,7 +23,6 @@ import {
     getShowUsage,
     setBusy,
 } from '../../presentation/state/index.js';
-import { describeSdkRecoveryPolicy, getSdkRecoveryPolicy } from '../../presentation/sdk/index.js';
 import {
     readTerminalDialogStreamMeta,
     readTerminalRuntimeControlState,
@@ -198,7 +198,7 @@ async function _doEnsureDialogLoop() {
                 'WARN',
                 `[dialog] ensureDialogLoop falhou (tentativa ${attempt}/${MAX_RETRIES}) — retry em ${delay}ms: ${toError(err).message}`,
             );
-            await new Promise((r) => setTimeout(r, delay));
+            await sleepMs(delay, { id: `terminal.dialog.ensure-retry:${attempt}`, unref: true });
         }
     }
 }
@@ -209,7 +209,25 @@ async function _doEnsureDialogLoop() {
  * @returns {Promise<void>}
  */
 async function _tryStartDialogLoop() {
-    const status = readTerminalRuntimeControlState().status;
+    let status = readTerminalRuntimeControlState().status;
+    if (status === 'starting') {
+        recordTerminalActivity('boot', 'Aguardando boot do agente', {
+            detail: 'Status=starting antes de iniciar dialog loop',
+            source: 'dialog',
+        });
+        println('\x1b[90m  Aguardando boot do agente concluir…\x1b[0m');
+        const deadline = Date.now() + IDLE_TRANSITION_TIMEOUT_MS;
+        while (Date.now() < deadline) {
+            status = readTerminalRuntimeControlState().status;
+            if (status !== 'starting') break;
+            await sleepMs(500, { id: 'terminal.dialog.wait-starting-transition', unref: true });
+        }
+        status = readTerminalRuntimeControlState().status;
+        if (status === 'starting') {
+            throw new Error(`Timeout aguardando transição de status 'starting' (${IDLE_TRANSITION_TIMEOUT_MS}ms)`);
+        }
+    }
+
     if (status === 'stopped') {
         recordTerminalActivity('boot', 'Iniciando agente', {
             detail: 'AlwaysAliveAgent start()',
@@ -217,21 +235,14 @@ async function _tryStartDialogLoop() {
         });
         println('\x1b[90m  Iniciando AlwaysAliveAgent…\x1b[0m');
         await startTerminalAgentRuntime();
-        await new Promise((resolve, reject) => {
-            const timeout = setTimeout(
-                () => reject(new Error(`Timeout aguardando idle (${IDLE_TRANSITION_TIMEOUT_MS}ms)`)),
-                IDLE_TRANSITION_TIMEOUT_MS,
-            );
-            const check = () => {
-                if (readTerminalRuntimeControlState().status === 'idle') {
-                    clearTimeout(timeout);
-                    resolve(undefined);
-                } else {
-                    setTimeout(check, 500);
-                }
-            };
-            check();
-        });
+        const deadline = Date.now() + IDLE_TRANSITION_TIMEOUT_MS;
+        while (Date.now() < deadline) {
+            if (readTerminalRuntimeControlState().status === 'idle') break;
+            await sleepMs(500, { id: 'terminal.dialog.wait-idle.after-start', unref: true });
+        }
+        if (readTerminalRuntimeControlState().status !== 'idle') {
+            throw new Error(`Timeout aguardando idle (${IDLE_TRANSITION_TIMEOUT_MS}ms)`);
+        }
     }
 
     if (readTerminalRuntimeControlState().status === 'processing') {
@@ -240,25 +251,18 @@ async function _tryStartDialogLoop() {
             source: 'dialog',
         });
         println('\x1b[90m  Aguardando agente concluir tarefa em andamento…\x1b[0m');
-        await new Promise((resolve, reject) => {
-            const timeout = setTimeout(
-                () => reject(new Error(`Timeout aguardando idle após processing (${IDLE_TRANSITION_TIMEOUT_MS}ms)`)),
-                IDLE_TRANSITION_TIMEOUT_MS,
-            );
-            const check = () => {
-                const s = readTerminalRuntimeControlState().status;
-                if (s === 'idle') {
-                    clearTimeout(timeout);
-                    resolve(undefined);
-                } else if (s === 'stopped') {
-                    clearTimeout(timeout);
-                    reject(new Error(`Agente parado inesperadamente antes de dialog loop`));
-                } else {
-                    setTimeout(check, 500);
-                }
-            };
-            check();
-        });
+        const deadline = Date.now() + IDLE_TRANSITION_TIMEOUT_MS;
+        while (Date.now() < deadline) {
+            const s = readTerminalRuntimeControlState().status;
+            if (s === 'idle') break;
+            if (s === 'stopped') {
+                throw new Error(`Agente parado inesperadamente antes de dialog loop`);
+            }
+            await sleepMs(500, { id: 'terminal.dialog.wait-idle.after-processing', unref: true });
+        }
+        if (readTerminalRuntimeControlState().status !== 'idle') {
+            throw new Error(`Timeout aguardando idle após processing (${IDLE_TRANSITION_TIMEOUT_MS}ms)`);
+        }
     }
 
     if (hasReadyProtocolQuestion()) {
@@ -369,6 +373,8 @@ async function _executeTurn(message, actor, attachments = []) {
     const rl = getRl();
     /** @type {NodeJS.Timeout | null} */
     let waitingTicker = null;
+    /** @type {string | null} */
+    let waitingTickerId = null;
     /** @type {{ firstOutputAt: number; lastNarrationAt: number; model: string; effort: string }} */
     const liveTurnSignal = { firstOutputAt: 0, lastNarrationAt: 0, model: '-', effort: '-' };
     if (rl) {
@@ -403,10 +409,15 @@ async function _executeTurn(message, actor, attachments = []) {
         };
         renderWaitingStatus();
         rl.setPrompt(buildWaitingPrompt());
-        waitingTicker = setInterval(() => {
-            renderWaitingStatus();
-            narrateWaitingStatus();
-        }, 1000);
+        waitingTickerId = `terminal.dialog.waiting:${Date.now()}:${Math.random().toString(36).slice(2)}`;
+        waitingTicker = registerInterval(
+            waitingTickerId,
+            () => {
+                renderWaitingStatus();
+                narrateWaitingStatus();
+            },
+            1000,
+        );
         if (typeof waitingTicker.unref === 'function') waitingTicker.unref();
     }
 
@@ -543,16 +554,17 @@ async function _executeTurn(message, actor, attachments = []) {
         log('ERROR', `[TerminalServer] Erro no turno ${actor}: ${toError(e).message}`);
         if (!readTerminalRuntimeControlState().dialogLoopActive) {
             log('WARN', '[TerminalServer] Dialog loop inativo após erro — reagendando ensureDialogLoop');
-            setTimeout(() => {
+            void (async () => {
+                await sleepMs(2_000, { id: 'terminal.dialog.restart-after-turn-error', unref: true });
                 ensureDialogLoop().catch((restartErr) => {
                     log('ERROR', `[TerminalServer] Falha ao reiniciar dialog loop: ${restartErr.message}`);
                 });
-            }, 2_000);
+            })();
         }
         return null;
     } finally {
         if (waitingTicker !== null) {
-            clearInterval(waitingTicker);
+            if (waitingTickerId) cancelTimer(waitingTickerId);
         }
         setBusy(false);
         if (readTerminalRuntimeControlState().dialogLoopActive) {

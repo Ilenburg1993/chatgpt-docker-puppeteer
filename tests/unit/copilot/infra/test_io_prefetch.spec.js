@@ -164,11 +164,12 @@ describe('warmFromDirectory', () => {
         assert.ok(result.durationMs >= 0);
     });
 
-    it('mantém maxFiles como advisory sem cortar o escopo', async () => {
+    it('enforce maxFiles como hard cap no scan de aquecimento', async () => {
         resetIoL1CacheForTest();
         const result = await warmFromDirectory(tmpDir, { maxFiles: 1 });
-        assert.ok(result.preloaded + result.skipped >= 2, `preloaded=${result.preloaded}`);
+        assert.ok(result.preloaded + result.skipped <= 1, `preloaded=${result.preloaded}`);
         assert.strictEqual(result.advisoryLimits.requestedMaxFiles, 1);
-        assert.strictEqual(result.advisoryLimits.limitMode, 'informative');
+        assert.strictEqual(result.advisoryLimits.limitMode, 'enforced-max-files');
+        assert.strictEqual(result.advisoryLimits.hardLimitReached, true);
     });
 });

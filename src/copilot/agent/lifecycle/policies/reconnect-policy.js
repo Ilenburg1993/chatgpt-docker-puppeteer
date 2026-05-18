@@ -11,7 +11,7 @@
  * @see EventBus
  */
 
-import { toError } from '#copilot/core';
+import { sleepMs, toError } from '#copilot/core';
 import { withAgentErrorPolicy } from '../../error/index.js';
 import { getAgentSdkRecoveryPolicy, pingAgentSdkClient, stopAgentSdkClient } from '../../facades/index.js';
 import { log, startSpan } from '../../ports/index.js';
@@ -103,7 +103,10 @@ export async function tryReconnect(originalError, client, currentStatus, callbac
                 log('INFO', `[AlwaysAlive] Reconexão tentativa ${attempt}/${maxAttempts} em ${Math.round(delay)}ms...`);
                 emit('status', `reconnecting:${attempt}/${maxAttempts}`);
 
-                await new Promise((r) => setTimeout(r, delay));
+                await sleepMs(delay, {
+                    id: `agent.lifecycle.reconnect:${attempt}`,
+                    unref: true,
+                });
                 if (shouldAbort?.()) {
                     log('INFO', '[AlwaysAlive] Reconexão abortada após backoff: host em shutdown.');
                     return false;

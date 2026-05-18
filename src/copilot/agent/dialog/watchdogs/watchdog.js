@@ -10,6 +10,7 @@
  */
 
 import { WATCHDOG_THRESHOLDS } from '#copilot/config/agent';
+import { cancelTimer, registerInterval } from '#copilot/core';
 import { log } from '../../ports/index.js';
 
 /**
@@ -65,6 +66,9 @@ export class DialogWatchdog {
     /** @type {ReturnType<typeof setInterval> | null} */
     #timer = null;
 
+    /** @type {string | null} */
+    #timerId = null;
+
     /** @type {number} */
     #lastActivity = 0;
 
@@ -92,27 +96,32 @@ export class DialogWatchdog {
         this.#lastActivity = Date.now();
         this.#preStallEmitted = false;
         this.#stallEmitted = false;
-        this.#timer = setInterval(() => {
-            const stalledMs = Date.now() - this.#lastActivity;
-            // F41B.7: aviso pré-stall a 80% do threshold
-            if (!this.#preStallEmitted && this.#onPreStallWarning && stalledMs > this.#stallThresholdMs * 0.8) {
-                this.#preStallEmitted = true;
-                log(
-                    'WARN',
-                    `[DialogWatchdog] Pré-stall: loop inativo há ${Math.round(stalledMs / 1000)}s (80% do threshold)`,
-                );
-                this.#onPreStallWarning(stalledMs);
-            }
-            if (stalledMs > this.#stallThresholdMs) {
-                log('WARN', `[DialogWatchdog] Dialog loop inativo há ${Math.round(stalledMs / 1000)}s`);
-                // FIX: guard one-shot — evita onStall ser chamado a cada tick enquanto o loop permanece travado.
-                // Com intervalMs=5min e loop travado por horas, sem guard: 24+ chamadas de onStall.
-                if (!this.#stallEmitted) {
-                    this.#stallEmitted = true;
-                    this.#onStall(stalledMs);
+        this.#timerId = `agent.dialog.watchdog:${Date.now()}:${Math.random().toString(36).slice(2)}`;
+        this.#timer = registerInterval(
+            this.#timerId,
+            () => {
+                const stalledMs = Date.now() - this.#lastActivity;
+                // F41B.7: aviso pré-stall a 80% do threshold
+                if (!this.#preStallEmitted && this.#onPreStallWarning && stalledMs > this.#stallThresholdMs * 0.8) {
+                    this.#preStallEmitted = true;
+                    log(
+                        'WARN',
+                        `[DialogWatchdog] Pré-stall: loop inativo há ${Math.round(stalledMs / 1000)}s (80% do threshold)`,
+                    );
+                    this.#onPreStallWarning(stalledMs);
                 }
-            }
-        }, this.#intervalMs);
+                if (stalledMs > this.#stallThresholdMs) {
+                    log('WARN', `[DialogWatchdog] Dialog loop inativo há ${Math.round(stalledMs / 1000)}s`);
+                    // FIX: guard one-shot — evita onStall ser chamado a cada tick enquanto o loop permanece travado.
+                    // Com intervalMs=5min e loop travado por horas, sem guard: 24+ chamadas de onStall.
+                    if (!this.#stallEmitted) {
+                        this.#stallEmitted = true;
+                        this.#onStall(stalledMs);
+                    }
+                }
+            },
+            this.#intervalMs,
+        );
     }
 
     /**
@@ -133,8 +142,9 @@ export class DialogWatchdog {
      */
     stop() {
         if (this.#timer !== null) {
-            clearInterval(this.#timer);
+            if (this.#timerId) cancelTimer(this.#timerId);
             this.#timer = null;
+            this.#timerId = null;
         }
     }
 

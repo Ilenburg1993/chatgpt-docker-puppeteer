@@ -29,6 +29,7 @@ import { invalidateIoCachePath, registerInvalidationHook } from './io-cache.js';
 import { buildIoIndexForDirectory } from './io-index-registry.js';
 import { invalidateParserCache, parseAndCacheSymbols } from './io-parser.js';
 import { endSessionScope, startSessionScope, warmFromDirectory } from './io-prefetch.js';
+import { readEnvPositiveInt } from './shared/env.js';
 
 // ---------------------------------------------------------------------------
 // Typedefs
@@ -63,6 +64,7 @@ import { endSessionScope, startSessionScope, warmFromDirectory } from './io-pref
  * @property {number} warmDurationMs - Duração do warm-up em ms.
  * @property {boolean} ready - Se o escopo está pronto (prefetch completo).
  * @property {number} startedAt - Timestamp de início.
+ * @property {number} maxActiveScopes - Capacidade máxima configurada para escopos ativos simultâneos.
  */
 
 /**
@@ -83,6 +85,7 @@ import { endSessionScope, startSessionScope, warmFromDirectory } from './io-pref
  * @property {number} warmDurationMs
  * @property {boolean} ready
  * @property {number} startedAt
+ * @property {number} lastAccessAt
  */
 
 // ---------------------------------------------------------------------------
@@ -93,6 +96,10 @@ import { endSessionScope, startSessionScope, warmFromDirectory } from './io-pref
 const _registry = new Map();
 /** @type {Map<string, Promise<void>>} */
 const _warmPromises = new Map();
+/** @type {Map<string, AbortController>} */
+const _warmControllers = new Map();
+
+const MAX_ACTIVE_SCOPES = readEnvPositiveInt('IO_MAX_ACTIVE_SCOPES', 10);
 
 const SYMBOL_PARSE_EXTENSIONS = new Set(['.js', '.ts', '.mjs', '.cjs', '.jsx', '.tsx', '.mts', '.cts']);
 
@@ -159,6 +166,46 @@ function markScopePathInvalidated(scope, filePath, options = {}) {
     scope.ready = false;
 }
 
+/**
+ * @param {_InternalScope} scope
+ * @returns {void}
+ */
+function touchScope(scope) {
+    scope.lastAccessAt = Date.now();
+}
+
+/**
+ * @param {string} sessionId
+ * @returns {void}
+ */
+function abortWarmForSession(sessionId) {
+    const controller = _warmControllers.get(sessionId);
+    if (controller && !controller.signal.aborted) {
+        controller.abort();
+    }
+    _warmControllers.delete(sessionId);
+}
+
+/**
+ * @param {string} incomingSessionId
+ * @returns {void}
+ */
+function enforceScopeLimit(incomingSessionId) {
+    if (_registry.has(incomingSessionId)) return;
+    while (_registry.size >= MAX_ACTIVE_SCOPES) {
+        let oldestSessionId = null;
+        let oldestAccess = Number.POSITIVE_INFINITY;
+        for (const [sessionId, scope] of _registry.entries()) {
+            if (scope.lastAccessAt < oldestAccess) {
+                oldestAccess = scope.lastAccessAt;
+                oldestSessionId = sessionId;
+            }
+        }
+        if (!oldestSessionId) break;
+        closeScope(oldestSessionId);
+    }
+}
+
 registerInvalidationHook((filePath, event) => {
     for (const scope of _registry.values()) markScopePathInvalidated(scope, filePath, event);
 });
@@ -190,6 +237,12 @@ export function declareScope(opts) {
         silent = true,
     } = opts;
 
+    const previousWarmPromise = _warmPromises.get(sessionId) ?? null;
+    const warmController = new AbortController();
+
+    enforceScopeLimit(sessionId);
+    abortWarmForSession(sessionId);
+
     /** @type {_InternalScope} */
     const scope = {
         sessionId,
@@ -202,12 +255,18 @@ export function declareScope(opts) {
         warmDurationMs: 0,
         ready: false,
         startedAt: Date.now(),
+        lastAccessAt: Date.now(),
     };
     _registry.set(sessionId, scope);
+    _warmControllers.set(sessionId, warmController);
 
     // Inicia background warm-up
     const warmPromise = (async () => {
         try {
+            if (previousWarmPromise) {
+                await previousWarmPromise.catch(() => undefined);
+            }
+
             let resolvedPaths = [...(explicitPaths ?? [])];
 
             // Se um diretório foi fornecido, escaneia e combina
@@ -215,8 +274,9 @@ export function declareScope(opts) {
                 const scanResult = await warmFromDirectory(
                     directory,
                     { extensions, maxFiles, include, exclude, recursive },
-                    { concurrency, silent, textMode: true },
+                    { concurrency, silent, textMode: true, signal: warmController.signal },
                 );
+                if (warmController.signal.aborted) return;
                 scope.preloaded += scanResult.preloaded;
                 scope.failed += scanResult.failed;
                 scope.warmDurationMs += scanResult.durationMs;
@@ -224,7 +284,12 @@ export function declareScope(opts) {
                 resolvedPaths = [...new Set([...resolvedPaths, ...scanResult.paths])];
             } else if (explicitPaths && explicitPaths.length > 0) {
                 // Prefetch direto dos paths explícitos
-                const warm = await startSessionScope(sessionId, explicitPaths, { concurrency, silent });
+                const warm = await startSessionScope(sessionId, explicitPaths, {
+                    concurrency,
+                    silent,
+                    signal: warmController.signal,
+                });
+                if (warmController.signal.aborted) return;
                 scope.preloaded += warm.preloaded;
                 scope.failed += warm.failed;
                 scope.warmDurationMs += warm.durationMs;
@@ -242,6 +307,7 @@ export function declareScope(opts) {
 
                 const parseWorker = async () => {
                     while (idx < parseTargets.length) {
+                        if (warmController.signal.aborted) return;
                         const p = parseTargets[idx++];
                         if (!p) continue;
                         try {
@@ -262,6 +328,7 @@ export function declareScope(opts) {
             }
 
             if (directory && indexMode !== 'off') {
+                if (warmController.signal.aborted) return;
                 /** @type {Parameters<typeof buildIoIndexForDirectory>[1]} */
                 const indexOptions = {
                     recursive,
@@ -279,9 +346,12 @@ export function declareScope(opts) {
                 };
             }
 
+            if (warmController.signal.aborted) return;
             scope.ready = true;
         } catch {
             scope.ready = true; // marca ready mesmo em erro para não travar awaitReady
+        } finally {
+            _warmControllers.delete(sessionId);
         }
     })();
     _warmPromises.set(sessionId, warmPromise);
@@ -303,6 +373,7 @@ export function declareScope(opts) {
                     warmDurationMs: 0,
                     ready: true,
                     startedAt: scope.startedAt,
+                    maxActiveScopes: MAX_ACTIVE_SCOPES,
                 }
             );
         },
@@ -318,6 +389,7 @@ export function declareScope(opts) {
 export function getScopeStats(sessionId) {
     const scope = _registry.get(sessionId);
     if (!scope) return null;
+    touchScope(scope);
     return {
         sessionId,
         pathCount: scope.paths.length,
@@ -329,6 +401,7 @@ export function getScopeStats(sessionId) {
         warmDurationMs: scope.warmDurationMs,
         ready: scope.ready,
         startedAt: scope.startedAt,
+        maxActiveScopes: MAX_ACTIVE_SCOPES,
     };
 }
 
@@ -339,7 +412,10 @@ export function getScopeStats(sessionId) {
  * @returns {Map<string, import('./io-parser.js').FileSymbols> | null}
  */
 export function getScopeSymbolIndex(sessionId) {
-    return _registry.get(sessionId)?.symbolIndex ?? null;
+    const scope = _registry.get(sessionId);
+    if (!scope) return null;
+    touchScope(scope);
+    return scope.symbolIndex;
 }
 
 /**
@@ -352,6 +428,7 @@ export function getScopeSymbolIndex(sessionId) {
 export function getScopeContext(sessionId) {
     const scope = _registry.get(sessionId);
     if (!scope) return null;
+    touchScope(scope);
 
     let totalSymbols = 0;
     const allExports = /** @type {string[]} */ ([]);
@@ -383,6 +460,7 @@ export function getScopeContext(sessionId) {
 export function findSymbol(sessionId, name, opts = {}) {
     const scope = _registry.get(sessionId);
     if (!scope) return [];
+    touchScope(scope);
 
     const { exactMatch = false } = opts;
     /** @type {SymbolSearchResult[]} */
@@ -428,6 +506,7 @@ export function invalidateScopePath(sessionId, filePath) {
 export async function refreshScope(sessionId, modifiedPaths) {
     const scope = _registry.get(sessionId);
     if (!scope) return { refreshed: 0, failed: 0 };
+    touchScope(scope);
 
     const invalidatedTargets = [...scope.invalidatedPaths];
     const targets =
@@ -464,6 +543,7 @@ export async function refreshScope(sessionId, modifiedPaths) {
  */
 export function closeScope(sessionId) {
     const stats = getScopeStats(sessionId);
+    abortWarmForSession(sessionId);
     _registry.delete(sessionId);
     _warmPromises.delete(sessionId);
     // Tenta encerrar escopo de prefetch também (best-effort)

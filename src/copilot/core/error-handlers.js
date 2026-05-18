@@ -16,6 +16,12 @@
 import { CircuitOpenError } from './circuit-breaker.js';
 import { BridgeError, CopilotError } from './errors.js';
 
+const errorCtor = /** @type {{ isError?: (value: unknown) => boolean }} */ (Error);
+const isError =
+    typeof errorCtor.isError === 'function'
+        ? /** @type {(value: unknown) => boolean} */ (errorCtor.isError.bind(Error))
+        : /** @type {(value: unknown) => boolean} */ ((value) => value instanceof Error);
+
 // ─── Handlers injetáveis (bootstrap via observability/bootstrap.js) ───────────
 
 /**
@@ -66,7 +72,7 @@ export function getErrorHandlerDeps() {
  * @returns {NormalizedError} Instância de Error garantida (com `.code` quando presente).
  */
 export function toError(value) {
-    if (value instanceof Error) {
+    if (isError(value)) {
         return /** @type {NormalizedError} */ (value);
     }
     if (typeof value === 'string') return /** @type {NormalizedError} */ (new Error(value));
@@ -103,15 +109,16 @@ export function toError(value) {
  * @returns {ExecError}
  */
 export function toExecError(value) {
-    if (value instanceof Error) {
+    if (isError(value)) {
+        const asErr = /** @type {Error} */ (value);
         const v = /** @type {Record<string, unknown>} */ (/** @type {unknown} */ (value));
         return {
-            message: value.message,
+            message: asErr.message,
             stdout: typeof v['stdout'] === 'string' ? v['stdout'] : undefined,
             stderr: typeof v['stderr'] === 'string' ? v['stderr'] : undefined,
             code: typeof v['code'] === 'number' || typeof v['code'] === 'string' ? v['code'] : undefined,
             status: typeof v['status'] === 'number' ? v['status'] : undefined,
-            stack: value.stack,
+            stack: asErr.stack,
         };
     }
     if (typeof value === 'object' && value !== null) {
@@ -139,7 +146,7 @@ export function toExecError(value) {
  * @returns {void}
  */
 export function logSwallowed(err, context) {
-    const message = err instanceof Error ? err.message : String(err);
+    const message = isError(err) ? /** @type {Error} */ (err).message : String(err);
     _deps.log('DEBUG', `[swallowed:${context}] ${message}`);
     _deps.tracker.trackError(err, { source: `swallowed:${context}` });
 }
@@ -184,7 +191,7 @@ const FATAL_CODES = new Set(['SESSION_FATAL', 'ERR_SOCKET_CLOSED', 'ERR_IPC_CHAN
 export function isFatalError(err) {
     if (err instanceof CircuitOpenError) return true;
     if (err instanceof CopilotError && typeof err.code === 'string' && FATAL_CODES.has(err.code)) return true;
-    if (err instanceof Error) {
+    if (isError(err)) {
         const code = /** @type {Error & { code?: string }} */ (err).code;
         if (typeof code === 'string' && FATAL_CODES.has(code)) return true;
     }
@@ -221,7 +228,7 @@ const TRANSIENT_HTTP_CODES = new Set([429, 502, 503, 504]);
  */
 export function isTransientError(err) {
     if (err instanceof BridgeError) return true;
-    if (err instanceof Error) {
+    if (isError(err)) {
         const code = /** @type {Error & { code?: string }} */ (err).code;
         if (typeof code === 'string' && TRANSIENT_CODES.has(code)) return true;
         const status =

@@ -1,3 +1,5 @@
+import { sleepMs } from '#copilot/core';
+
 // @ts-check
 /**
  * src/copilot/sdk/session/model-switch-verify-retry.js
@@ -37,14 +39,17 @@ const DEFAULT_CONFIG = Object.freeze({
  * @returns {Promise<void>}
  */
 async function waitMs(ms) {
-    await new Promise((resolve) => setTimeout(resolve, ms));
+    await sleepMs(ms, {
+        id: `sdk.model-switch.verify:${Date.now()}:${Math.random().toString(36).slice(2)}`,
+        unref: true,
+    });
 }
 
 /**
  * Verifica model switch com retry + timeout cap.
  *
- * Executa predicado com backoff incremental, respeitando timeout máximo default de 5s.
- * Retorna resultado com número de tentativas e status de timeout.
+ * Executa predicado com backoff incremental, respeitando timeout máximo default de 5s. Retorna resultado com número de
+ * tentativas e status de timeout.
  *
  * @example
  *     const result = await verifyModelSwitchWithRetry(

@@ -10,8 +10,9 @@
  * @see EventBus
  */
 
-import { EMITTER_QUESTION_PENDING } from '#copilot/events';
+import { toError } from '#copilot/core';
 import { DialogProtocol } from '#copilot/dialog';
+import { EMITTER_QUESTION_PENDING } from '#copilot/events';
 import { persistAgentRuntimePendingQuestionState } from '../../facades/index.js';
 import { log } from '../../ports/index.js';
 
@@ -52,10 +53,7 @@ function trackBackgroundTask(ctx, task, meta) {
         return;
     }
     void task.catch((error) =>
-        log(
-            'WARN',
-            `[AlwaysAlive] Background task ${meta.label ?? 'unknown'} falhou: ${error instanceof Error ? error.message : String(error)}`,
-        ),
+        log('WARN', `[AlwaysAlive] Background task ${meta.label ?? 'unknown'} falhou: ${toError(error).message}`),
     );
 }
 

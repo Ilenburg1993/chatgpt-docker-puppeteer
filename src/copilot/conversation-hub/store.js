@@ -16,7 +16,7 @@
  * @see module:copilot/db/sqlite
  */
 
-import { SessionError, logSwallowed, toError } from '#copilot/core';
+import { SessionError, cancelTimer, logSwallowed, registerInterval, toError } from '#copilot/core';
 import { getCopilotDb } from '#copilot/db';
 import { log } from '#copilot/observability';
 import { v4 as uuidv4 } from 'uuid';
@@ -61,6 +61,9 @@ export class ConversationStore {
     /** @type {ReturnType<typeof setInterval> | null} */
     #checkpointTimer = null;
 
+    /** @type {string | null} */
+    #checkpointTimerId = null;
+
     /**
      * Serializa escritas de turns por hub_session no nível do processo JS, reduzindo interleavings entre `sendToLlmB()`
      * e `injectUserMessage()` antes mesmo de chegar ao SQLite.
@@ -92,7 +95,9 @@ export class ConversationStore {
             // MELHORIA-09 (fix): agendar WAL checkpoint periódico para evitar acúmulo do WAL file
             // em sessões de longa duração. O checkpoint passivo (PASSIVE) não bloqueia readers.
             let _checkpointErrors = 0;
-            const checkpointTimer = setInterval(
+            this.#checkpointTimerId = `conversation-hub.store.checkpoint:${Date.now()}:${Math.random().toString(36).slice(2)}`;
+            const checkpointTimer = registerInterval(
+                this.#checkpointTimerId,
                 () => {
                     try {
                         db.pragma('wal_checkpoint(PASSIVE)');
@@ -142,8 +147,9 @@ export class ConversationStore {
      */
     close() {
         if (this.#checkpointTimer !== null) {
-            clearInterval(this.#checkpointTimer);
+            if (this.#checkpointTimerId) cancelTimer(this.#checkpointTimerId);
             this.#checkpointTimer = null;
+            this.#checkpointTimerId = null;
         }
         this.#writeTailsBySession.clear();
         this.#initialized = false;

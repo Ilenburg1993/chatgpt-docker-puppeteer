@@ -66,6 +66,7 @@
  *   código de produção — use `buildTool` que já encapsula o `defineTool`.
  */
 
+import { toError } from '#copilot/core';
 import { normalizeToolParametersSchema, createTool as sdkCreateTool } from '#copilot/sdk/tools';
 import { log as toolsLog } from './logger.js';
 import { withToolFailureFeedback } from './tool-feedback.js';
@@ -159,7 +160,7 @@ function createTool(options) {
         if (isRecoverableToolFactoryError(err)) {
             logToolFactory(
                 'WARN',
-                `Fallback plain-tool ativado para '${options.name}' após erro recuperável: ${err instanceof Error ? err.message : String(err)}`,
+                `Fallback plain-tool ativado para '${options.name}' após erro recuperável: ${toError(err).message}`,
             );
             return validateBuiltTool(options.name, plainTool);
         }
@@ -241,7 +242,7 @@ function normalizeParameters(parameters, toolName = 'unknown') {
             toolName,
         );
     } catch (err) {
-        const message = err instanceof Error ? err.message : String(err);
+        const message = toError(err).message;
         logToolFactory(
             'WARN',
             `Falha ao normalizar parâmetros de '${toolName}': ${message}. Tool será registrada sem parâmetros.`,

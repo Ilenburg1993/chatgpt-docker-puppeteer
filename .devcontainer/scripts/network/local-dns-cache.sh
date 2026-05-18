@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # =============================================================================
 # local-dns-cache.sh — DevContainer Local DNS Cache Manager
-# Version: v1.5.1
+# Version: v1.5.3
 #
 # Purpose:
 #   Optional runtime-only DNS cache layer for DevContainers. Intended to be
@@ -28,21 +28,58 @@
 #   - This script intentionally does not manage api.github.com routing. That is
 #     delegated to github-api-route-fix.sh via /etc/hosts.
 #
-# v1.5.1 focus:
-#   - ShellCheck SC2329 cleanup for ranking helpers invoked through lock wrappers.
-#   - Ranking lock made explicit and direct-call based, avoiding dynamic function
-#     invocation that static analyzers cannot prove.
-#   - Stronger hostname/resolv option sanitization and ranking-file corruption
-#     tolerance.
-#   - Status action no longer writes transient `running` before passive status
-#     collection.
-#   - Additional compatibility aliases for DEVCONTAINER_LOCAL_DNS_* action/mode.
+# v1.5.3 focus:
+#   - Fixes the undefined read_first_line regression seen during start.
+#   - Makes benchmark summaries non-stale when dnsmasq is intentionally not
+#     running, separating benchmark-only state from runtime-active state.
+#   - Strengthens runtime health detection when a stale pidfile exists but a
+#     managed dnsmasq process is actually alive.
+#   - Fails closed before writing /etc/resolv.conf unless the local dnsmasq
+#     process and local DNS probe are both proven healthy.
+#   - Restores /etc/resolv.conf automatically after post-write resolver probe
+#     failures, preventing 127.0.0.1 from being left behind without a working
+#     cache.
+#   - Adds process/port diagnostics and stop handling for managed dnsmasq
+#     processes discovered by command line even when the pidfile is stale.
 # =============================================================================
 
 set +e
 set +u
 set +o pipefail 2> /dev/null || true
 trap - ERR EXIT INT TERM 2> /dev/null || true
+
+# -----------------------------------------------------------------------------
+# CLI read-only helpers
+# -----------------------------------------------------------------------------
+case "${1:-}" in
+    --version)
+        printf '%s v%s\n' 'local-dns-cache.sh' '1.5.3'
+        exit 0
+        ;;
+    --help)
+        cat << 'USAGE'
+local-dns-cache.sh [--help] [--version] [action]
+
+Environment-driven actions:
+  DEVCONTAINER_LOCAL_DNS_ACTION=start|status|stop|restart|probe|benchmark|doctor|health
+  DEVCONTAINER_LOCAL_DNS_CACHE_ACTION is kept as a compatibility alias.
+
+Positional action alias:
+  bash local-dns-cache.sh status
+  bash local-dns-cache.sh health
+  bash local-dns-cache.sh benchmark
+
+Key knobs:
+  DEVCONTAINER_LOCAL_DNS_MODE=off|auto|local|required
+  DEVCONTAINER_LOCAL_DNS_WRITE_RESOLV_CONF=true|false
+  DEVCONTAINER_LOCAL_DNS_UPSTREAM_SELECTION=static|ranked
+
+This script is runtime-only. It may start a bounded loopback dnsmasq helper and
+may rewrite /etc/resolv.conf when explicitly enabled by configuration.
+USAGE
+        exit 0
+        ;;
+esac
 
 # -----------------------------------------------------------------------------
 # Configuration helpers
@@ -144,10 +181,18 @@ sanitize_resolv_options() {
 # -----------------------------------------------------------------------------
 SCRIPT_NAME="local-dns-cache.sh"
 readonly SCRIPT_NAME
-SCRIPT_VERSION="1.5.1"
+SCRIPT_VERSION="1.5.3"
 readonly SCRIPT_VERSION
 
-ACTION="${DEVCONTAINER_LOCAL_DNS_ACTION:-${DEVCONTAINER_LOCAL_DNS_CACHE_ACTION:-start}}"
+POSITIONAL_ACTION=""
+case "${1:-}" in
+    start | status | stop | restart | probe | benchmark | doctor | health)
+        POSITIONAL_ACTION="${1}"
+        ;;
+esac
+readonly POSITIONAL_ACTION
+
+ACTION="${DEVCONTAINER_LOCAL_DNS_ACTION:-${DEVCONTAINER_LOCAL_DNS_CACHE_ACTION:-${POSITIONAL_ACTION:-start}}}"
 case "${ACTION}" in
     start | status | stop | restart | probe | benchmark | doctor | health) : ;;
     *) ACTION="start" ;;
@@ -226,6 +271,8 @@ WRITE_RESOLV_CONF="$(cfg_bool "${DEVCONTAINER_LOCAL_DNS_WRITE_RESOLV_CONF:-true}
 readonly WRITE_RESOLV_CONF
 RESTORE_RESOLV_CONF_ON_STOP="$(cfg_bool "${DEVCONTAINER_LOCAL_DNS_RESTORE_RESOLV_CONF_ON_STOP:-true}" true)"
 readonly RESTORE_RESOLV_CONF_ON_STOP
+RESTORE_RESOLV_CONF_ON_FAILURE="$(cfg_bool "${DEVCONTAINER_LOCAL_DNS_RESTORE_RESOLV_CONF_ON_FAILURE:-true}" true)"
+readonly RESTORE_RESOLV_CONF_ON_FAILURE
 ENABLE_IPV6_UPSTREAMS="$(cfg_bool "${DEVCONTAINER_LOCAL_DNS_ENABLE_IPV6_UPSTREAMS:-false}" false)"
 readonly ENABLE_IPV6_UPSTREAMS
 ALLOW_NON_LOOPBACK_BIND="$(cfg_bool "${DEVCONTAINER_LOCAL_DNS_ALLOW_NON_LOOPBACK_BIND:-false}" false)"
@@ -240,6 +287,8 @@ STRICT_PORT_CHECK="$(cfg_bool "${DEVCONTAINER_LOCAL_DNS_STRICT_PORT_CHECK:-true}
 readonly STRICT_PORT_CHECK
 STOP_DNS_REBIND="$(cfg_bool "${DEVCONTAINER_LOCAL_DNS_STOP_DNS_REBIND:-true}" true)"
 readonly STOP_DNS_REBIND
+DNS_LOOP_DETECT="$(cfg_bool "${DEVCONTAINER_LOCAL_DNS_LOOP_DETECT:-true}" true)"
+readonly DNS_LOOP_DETECT
 DNS_ALL_SERVERS="$(cfg_bool "${DEVCONTAINER_LOCAL_DNS_ALL_SERVERS:-false}" false)"
 readonly DNS_ALL_SERVERS
 DNS_STRICT_ORDER="$(cfg_bool "${DEVCONTAINER_LOCAL_DNS_STRICT_ORDER:-false}" false)"
@@ -344,6 +393,27 @@ summary_value_from_file() {
     awk -F= -v k="${key}" '$1 == k {sub($1"=", ""); print; exit}' "${file}" 2> /dev/null
 }
 
+read_first_line() {
+    local file fallback line
+    file="${1:-}"
+    fallback="${2:-}"
+    if [[ -r "${file}" ]]; then
+        IFS= read -r line < "${file}" 2> /dev/null || line=""
+        if [[ -n "${line}" ]]; then
+            printf '%s' "${line}"
+            return 0
+        fi
+    fi
+    printf '%s' "${fallback}"
+}
+
+runtime_action_requires_dnsmasq() {
+    case "${ACTION}" in
+        start | restart | health | probe | status) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
 ensure_parent_dir() {
     local path dir
     path="${1:-/tmp/unknown}"
@@ -433,6 +503,7 @@ write_report_header() {
         printf 'max_cache_ttl=%s\n' "${DNS_MAX_CACHE_TTL}"
         printf 'neg_ttl=%s\n' "${DNS_NEG_TTL}"
         printf 'dns_forward_max=%s\n' "${DNS_FORWARD_MAX}"
+        printf 'dns_loop_detect=%s\n' "${DNS_LOOP_DETECT}"
         printf 'probe_host=%s\n' "${PROBE_HOST}"
         printf 'write_resolv_conf=%s\n' "${WRITE_RESOLV_CONF}"
         printf 'read_etc_hosts=%s\n' "${READ_ETC_HOSTS}"
@@ -441,6 +512,7 @@ write_report_header() {
         printf 'strict_order=%s\n' "${DNS_STRICT_ORDER}"
         printf 'use_stale_cache=%s\n' "${DNS_USE_STALE_CACHE}"
         printf 'takeover_stale_dnsmasq=%s\n' "${TAKEOVER_STALE_DNSMASQ}"
+        printf 'restore_resolv_conf_on_failure=%s\n' "${RESTORE_RESOLV_CONF_ON_FAILURE}"
         printf 'dnsmasq_start_mode=%s\n' "${DNSMASQ_START_MODE}"
         printf 'prefer_unprivileged_dnsmasq=%s\n' "${PREFER_UNPRIVILEGED_DNSMASQ}"
         printf 'repair_on_probe_failure=%s\n' "${REPAIR_ON_PROBE_FAILURE}"
@@ -474,9 +546,10 @@ append_metric() {
 }
 
 collect_runtime_health() {
-    local pid nameservers summary_status summary_fp current_fp status_mtime age now pid_cmdline
+    local pid nameservers summary_status summary_fp current_fp status_mtime age now pid_cmdline discovered_pid
     pid="$(read_dnsmasq_pid)"
-    DNSMASQ_PID_EFFECTIVE="${pid:-none}"
+    discovered_pid="$(first_managed_dnsmasq_pid_by_cmdline)"
+    DNSMASQ_PID_EFFECTIVE="${pid:-${discovered_pid:-none}}"
     DNSMASQ_PROCESS_STATUS="stopped"
 
     if [[ -n "${pid}" ]]; then
@@ -489,9 +562,15 @@ collect_runtime_health() {
                 DNSMASQ_PROCESS_STATUS="pidfile-non-dnsmasq"
             fi
         else
-            DNSMASQ_PROCESS_STATUS="stale-pidfile-dead"
+            if [[ -n "${discovered_pid}" ]]; then
+                DNSMASQ_PID_EFFECTIVE="${discovered_pid}"
+                DNSMASQ_PROCESS_STATUS="running-managed-stale-pidfile"
+            else
+                DNSMASQ_PROCESS_STATUS="stale-pidfile-dead"
+            fi
         fi
-    elif dnsmasq_is_running; then
+    elif [[ -n "${discovered_pid}" ]]; then
+        DNSMASQ_PID_EFFECTIVE="${discovered_pid}"
         DNSMASQ_PROCESS_STATUS="running-managed-no-pidfile"
     fi
 
@@ -534,7 +613,7 @@ collect_runtime_health() {
     STATUS_STALE="false"
     STATUS_STALE_REASON="fresh-or-unavailable"
 
-    if [[ "${summary_status}" == "ok" ]]; then
+    if [[ "${summary_status}" == "ok" ]] && runtime_action_requires_dnsmasq; then
         if [[ "${WRITE_RESOLV_CONF}" == "true" && "${RESOLV_CONF_HEALTH}" != *"points-to-cache"* ]]; then
             STATUS_STALE="true"
             STATUS_STALE_REASON="summary-ok-but-resolv-conf-not-pointing-to-cache"
@@ -573,7 +652,10 @@ write_summary() {
     status="${1:-unknown}"
     reason="${2:-none}"
     collect_runtime_health
-    if [[ "${status}" != "ok" && "${status}" != "stale" ]]; then
+    if [[ "${status}" == "ok" ]] && ! runtime_action_requires_dnsmasq; then
+        STATUS_STALE="false"
+        STATUS_STALE_REASON="not-runtime-action-${ACTION}"
+    elif [[ "${status}" != "ok" && "${status}" != "stale" ]]; then
         STATUS_STALE="false"
         STATUS_STALE_REASON="not-applicable-for-${status}"
     fi
@@ -642,6 +724,16 @@ is_ipv4() {
     }' 2> /dev/null
 }
 
+is_ipv4_unusable_nameserver() {
+    local ip first
+    ip="${1:-}"
+    is_ipv4 "${ip}" || return 1
+    first="${ip%%.*}"
+    [[ "${ip}" == "0.0.0.0" || "${ip}" == "255.255.255.255" ]] && return 0
+    [[ "${first}" =~ ^[0-9]+$ ]] || return 1
+    ((first >= 224))
+}
+
 is_ipv6_literal() {
     [[ "${1:-}" == *:* ]] || return 1
     if has_cmd python3; then
@@ -682,6 +774,9 @@ is_valid_bind_address() {
 
 is_valid_nameserver() {
     if is_ipv4 "$1"; then
+        if is_ipv4_unusable_nameserver "$1"; then
+            return 1
+        fi
         if is_ipv4_loopback "$1" && [[ "${ALLOW_LOOPBACK_UPSTREAMS}" != "true" ]]; then
             return 1
         fi
@@ -765,15 +860,28 @@ managed_dnsmasq_pid_is_alive() {
     process_cmdline_contains "${pid}" "${DNSMASQ_CONF}" || return 1
 }
 
+managed_dnsmasq_pids_by_cmdline() {
+    local proc pid cmdline
+    for proc in /proc/[0-9]*; do
+        [[ -d "${proc}" ]] || continue
+        pid="${proc##*/}"
+        [[ "${pid}" =~ ^[0-9]+$ ]] || continue
+        [[ -r "${proc}/cmdline" ]] || continue
+        cmdline="$(tr '\0' ' ' < "${proc}/cmdline" 2> /dev/null || true)"
+        [[ "${cmdline}" == *"dnsmasq"* && "${cmdline}" == *"${DNSMASQ_CONF}"* ]] || continue
+        printf '%s\n' "${pid}"
+    done
+}
+
+first_managed_dnsmasq_pid_by_cmdline() {
+    managed_dnsmasq_pids_by_cmdline | awk 'NF {print; exit}'
+}
+
 dnsmasq_is_running() {
-    if managed_dnsmasq_pid_is_alive; then
-        return 0
-    fi
-    if has_cmd pgrep; then
-        pgrep -f "dnsmasq.*${DNSMASQ_CONF}" > /dev/null 2>&1
-        return $?
-    fi
-    return 1
+    local pid
+    managed_dnsmasq_pid_is_alive && return 0
+    pid="$(first_managed_dnsmasq_pid_by_cmdline)"
+    [[ -n "${pid}" ]]
 }
 
 port_in_use() {
@@ -1196,6 +1304,9 @@ write_dnsmasq_config() {
         if [[ "${STOP_DNS_REBIND}" == "true" ]]; then
             printf 'stop-dns-rebind\n'
         fi
+        if [[ "${DNS_LOOP_DETECT}" == "true" ]]; then
+            printf 'dns-loop-detect\n'
+        fi
         printf 'bind-interfaces\n'
         printf 'listen-address=%s\n' "${DNS_BIND_ADDRESS}"
         printf 'port=%s\n' "${DNS_BIND_PORT}"
@@ -1400,7 +1511,7 @@ process_is_dnsmasq() {
     pid="${1:-}"
     [[ "${pid}" =~ ^[0-9]+$ ]] || return 1
     [[ -d "/proc/${pid}" ]] || return 1
-    comm="$(cat "/proc/${pid}/comm" 2> /dev/null || true)"
+    comm="$(awk 'NR == 1 {print; exit}' "/proc/${pid}/comm" 2> /dev/null || true)"
     [[ "${comm}" == "dnsmasq" ]] && return 0
     [[ -r "/proc/${pid}/cmdline" ]] || return 1
     cmdline="$(tr '\0' ' ' < "/proc/${pid}/cmdline" 2> /dev/null || true)"
@@ -1507,7 +1618,11 @@ prepare_dnsmasq_runtime_for_start() {
     # Stale pid/log files may be root-owned from a previous privileged dnsmasq.
     # Remove them with sudo best-effort before starting a new controlled instance.
     if [[ -e "${DNSMASQ_PID_FILE}" ]]; then
-        remove_file_privileged "${DNSMASQ_PID_FILE}" || true
+        local existing_pid
+        existing_pid="$(read_dnsmasq_pid)"
+        if [[ -z "${existing_pid}" || ! "${existing_pid}" =~ ^[0-9]+$ || ! -d "/proc/${existing_pid}" ]]; then
+            remove_file_privileged "${DNSMASQ_PID_FILE}" || true
+        fi
     fi
 
     if [[ -e "${DNSMASQ_LOG_FILE}" && ! -w "${DNSMASQ_LOG_FILE}" ]]; then
@@ -1520,11 +1635,13 @@ prepare_dnsmasq_runtime_for_start() {
 }
 
 start_dnsmasq_process_as_user() {
-    dnsmasq --conf-file="${DNSMASQ_CONF}" > /dev/null 2> /dev/null
+    # Close FD 9 so daemonized dnsmasq never inherits the manager flock.
+    dnsmasq --conf-file="${DNSMASQ_CONF}" 9>&- > /dev/null 2> /dev/null
 }
 
 start_dnsmasq_process_as_root() {
-    safe_sudo dnsmasq --conf-file="${DNSMASQ_CONF}" > /dev/null 2> /dev/null
+    # Close FD 9 so daemonized dnsmasq never inherits the manager flock.
+    safe_sudo dnsmasq --conf-file="${DNSMASQ_CONF}" 9>&- > /dev/null 2> /dev/null
 }
 
 start_dnsmasq_process() {
@@ -1656,6 +1773,15 @@ start_dnsmasq() {
         return 1
     fi
 
+    if [[ -s "${DNSMASQ_PID_FILE}" ]]; then
+        local existing_pid
+        existing_pid="$(read_dnsmasq_pid)"
+        if [[ -n "${existing_pid}" && ! -d "/proc/${existing_pid}" ]]; then
+            append_report "stale_pidfile_removed_before_start pid=${existing_pid}"
+            remove_file_privileged "${DNSMASQ_PID_FILE}" || true
+        fi
+    fi
+
     if dnsmasq_is_running; then
         log_info "dnsmasq já está em execução para ${DNSMASQ_CONF}; validando antes de reutilizar."
         if [[ -r "${DNSMASQ_CONF}" ]]; then
@@ -1663,7 +1789,8 @@ start_dnsmasq() {
             UPSTREAM_COUNT="$(awk -F= '$1=="server" {c++} END{print c+0}' "${DNSMASQ_CONF}" 2> /dev/null || printf '0')"
         fi
         if probe_local_dns; then
-            append_report "dnsmasq=reused-running probe=ok"
+            collect_runtime_health
+            append_report "dnsmasq=reused-running probe=ok process_status=${DNSMASQ_PROCESS_STATUS}"
             return 0
         fi
         append_report "dnsmasq=reused-running probe=failed; attempting-restart"
@@ -1759,6 +1886,16 @@ restore_or_fallback_resolv_conf() {
     return 1
 }
 
+restore_resolv_conf_after_failure() {
+    local why
+    why="${1:-runtime-failure}"
+    [[ "${RESTORE_RESOLV_CONF_ON_FAILURE}" == "true" ]] || return 0
+    if resolv_conf_is_managed; then
+        append_report "resolv_conf=restore-after-failure reason=${why}"
+        restore_or_fallback_resolv_conf || true
+    fi
+}
+
 stop_dnsmasq() {
     local pid stop_rc
     stop_rc=0
@@ -1771,6 +1908,11 @@ stop_dnsmasq() {
             stop_rc=1
         fi
     fi
+
+    while IFS= read -r pid; do
+        [[ -n "${pid}" ]] || continue
+        terminate_dnsmasq_pid "${pid}" "managed-cmdline" || stop_rc=1
+    done < <(managed_dnsmasq_pids_by_cmdline)
 
     if port_in_use "${DNS_BIND_ADDRESS}" "${DNS_BIND_PORT}"; then
         stop_dnsmasq_on_socket || stop_rc=1
@@ -1789,7 +1931,7 @@ stop_dnsmasq() {
 }
 
 resolv_conf_is_managed() {
-    grep -q "${RESOLV_MANAGED_MARKER}" /etc/resolv.conf 2> /dev/null
+    grep -F -q "${RESOLV_MANAGED_MARKER}" /etc/resolv.conf 2> /dev/null
 }
 
 backup_resolv_conf_once() {
@@ -1800,7 +1942,7 @@ backup_resolv_conf_once() {
         return 0
     fi
 
-    if [[ -s "${RESOLV_BACKUP_FILE}" ]] && ! grep -q "${RESOLV_MANAGED_MARKER}" "${RESOLV_BACKUP_FILE}" 2> /dev/null; then
+    if [[ -s "${RESOLV_BACKUP_FILE}" ]] && ! grep -F -q "${RESOLV_MANAGED_MARKER}" "${RESOLV_BACKUP_FILE}" 2> /dev/null; then
         append_report "resolv_conf_backup=preserved existing=${RESOLV_BACKUP_FILE}"
         return 0
     fi
@@ -1965,6 +2107,12 @@ doctor_action() {
 health_action() {
     local rc
     rc=0
+    if [[ "${DNS_MODE}" == "off" ]]; then
+        write_status "off"
+        write_summary "off" "mode-off"
+        log_info "health: DNS cache mode off."
+        return 0
+    fi
     collect_runtime_health
     if [[ "${DNSMASQ_PROCESS_STATUS}" != running-* ]]; then
         rc=1
@@ -1991,17 +2139,31 @@ health_action() {
 start_flow() {
     local current_status
     start_dnsmasq || return 1
-    current_status="$(cat "${STATUS_FILE}" 2> /dev/null || printf '')"
+    current_status="$(read_first_line "${STATUS_FILE}" "")"
     if [[ "${DNS_MODE}" == "off" || "${current_status}" == "off" ]]; then return 0; fi
+
+    collect_runtime_health
+    if [[ "${DNSMASQ_PROCESS_STATUS}" != running-* ]]; then
+        write_status "degraded"
+        append_report "result=dnsmasq-not-running-before-resolv-conf process_status=${DNSMASQ_PROCESS_STATUS}"
+        restore_resolv_conf_after_failure "dnsmasq-not-running-before-resolv-conf"
+        write_summary "degraded" "dnsmasq-not-running-before-resolv-conf"
+        return 1
+    fi
 
     if ! probe_local_dns; then
         if repair_after_local_probe_failure; then
             append_report "probe_local_after_repair=ok"
-        else
-            if resolv_conf_is_managed; then
-                append_report "resolv_conf=managed-but-local-probe-failed; restoring fallback"
-                restore_or_fallback_resolv_conf || true
+            collect_runtime_health
+            if [[ "${DNSMASQ_PROCESS_STATUS}" != running-* ]]; then
+                write_status "degraded"
+                append_report "result=repair-did-not-leave-dnsmasq-running process_status=${DNSMASQ_PROCESS_STATUS}"
+                restore_resolv_conf_after_failure "repair-did-not-leave-dnsmasq-running"
+                write_summary "degraded" "repair-did-not-leave-dnsmasq-running"
+                return 1
             fi
+        else
+            restore_resolv_conf_after_failure "local-probe-failed"
             write_status "degraded"
             append_report "result=probe-local-failed"
             write_summary "degraded" "probe-local-failed"
@@ -2012,6 +2174,7 @@ start_flow() {
     write_resolv_conf || {
         write_status "degraded"
         append_report "result=resolv-conf-failed"
+        restore_resolv_conf_after_failure "resolv-conf-failed"
         write_summary "degraded" "resolv-conf-failed"
         return 1
     }
@@ -2019,6 +2182,7 @@ start_flow() {
     probe_system_resolver || {
         write_status "degraded"
         append_report "result=system-resolver-probe-failed"
+        restore_resolv_conf_after_failure "system-resolver-probe-failed"
         write_summary "degraded" "system-resolver-probe-failed"
         return 1
     }
@@ -2031,7 +2195,7 @@ start_flow() {
 }
 
 main_unlocked() {
-    local probe_rc
+    local probe_rc stop_rc
     if [[ "${ACTION}" == "status" ]]; then
         ensure_parent_dir "${REPORT_FILE}"
         ensure_parent_dir "${METRICS_FILE}"
@@ -2057,9 +2221,17 @@ main_unlocked() {
     case "${ACTION}" in
         stop)
             stop_dnsmasq
-            write_status "stopped"
-            append_report "result=stopped"
-            return 0
+            stop_rc=$?
+            if [[ "${stop_rc}" -eq 0 ]]; then
+                write_status "stopped"
+                append_report "result=stopped"
+                write_summary "stopped" "stop"
+            else
+                write_status "degraded"
+                append_report "result=stop-degraded rc=${stop_rc}"
+                write_summary "degraded" "stop-degraded"
+            fi
+            return "${stop_rc}"
             ;;
         status)
             status_dnsmasq
@@ -2098,9 +2270,61 @@ main_unlocked() {
     return $?
 }
 
+lock_diagnostics() {
+    local lock_file out
+    lock_file="${1:-${LOCK_FILE}}"
+    out=""
+    if has_cmd lsof; then
+        out="$(lsof "${lock_file}" 2> /dev/null | sed -n '1,20p' 2> /dev/null || true)"
+    fi
+    if [[ -z "${out}" ]] && has_cmd fuser; then
+        out="$(fuser -v "${lock_file}" 2>&1 | sed -n '1,20p' 2> /dev/null || true)"
+    fi
+    [[ -n "${out}" ]] || out="no-holder-detected-or-diagnostic-tool-missing"
+    printf '%s' "${out}" | tr '\r\n\t' '   ' | awk '{gsub(/[[:cntrl:]]/, ""); print; exit}'
+}
+
+effective_lock_file() {
+    local configured dir uid fallback
+    configured="${LOCK_FILE}"
+    ensure_parent_dir "${configured}"
+    if { : >> "${configured}"; } 2> /dev/null; then
+        printf '%s' "${configured}"
+        return 0
+    fi
+    uid="$(id -u 2> /dev/null || printf 'unknown')"
+    fallback="/tmp/local-dns-cache.${uid}.lock"
+    dir="$(dirname "${fallback}" 2> /dev/null || printf '/tmp')"
+    mkdir -p "${dir}" 2> /dev/null || true
+    printf '%s' "${fallback}"
+}
+
+write_lock_failure_artifacts() {
+    local lock_file diagnostics
+    lock_file="${1:-${LOCK_FILE}}"
+    diagnostics="$(lock_diagnostics "${lock_file}")"
+    write_status "lock-failed"
+    append_report "lock=failed lock_file=${lock_file} wait_seconds=${LOCK_WAIT_SECONDS} diagnostics=${diagnostics}"
+    {
+        printf 'status=lock-failed\n'
+        printf 'reason=lock-timeout\n'
+        printf 'script=%s\n' "${SCRIPT_NAME}"
+        printf 'script_version=%s\n' "${SCRIPT_VERSION}"
+        printf 'action=%s\n' "${ACTION}"
+        printf 'mode=%s\n' "${DNS_MODE}"
+        printf 'lock_file=%s\n' "${lock_file}"
+        printf 'configured_lock_file=%s\n' "${LOCK_FILE}"
+        printf 'lock_wait_seconds=%s\n' "${LOCK_WAIT_SECONDS}"
+        printf 'lock_diagnostics=%s\n' "${diagnostics}"
+        printf 'completed_at=%s\n' "$(ts)"
+    } | safe_write_file "${SUMMARY_FILE}" 0644 || true
+}
+
 main() {
+    local rc lock_file
     mkdir -p "${RUNTIME_DIR}" 2> /dev/null || true
     if has_cmd flock; then
+        lock_file="$(effective_lock_file)"
         (
             if [[ "${LOCK_WAIT_SECONDS}" -gt 0 ]]; then
                 flock -w "${LOCK_WAIT_SECONDS}" -x 9 || exit 98
@@ -2108,8 +2332,12 @@ main() {
                 flock -x 9 || exit 98
             fi
             main_unlocked
-        ) 9> "${LOCK_FILE}"
-        return $?
+        ) 9> "${lock_file}"
+        rc=$?
+        if [[ "${rc}" -eq 98 ]]; then
+            write_lock_failure_artifacts "${lock_file}"
+        fi
+        return "${rc}"
     fi
     main_unlocked
 }

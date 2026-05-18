@@ -1,8 +1,8 @@
 // @ts-check
 
 import path from 'node:path';
-import { readEnvPositiveInt } from './shared/env.js';
 import { isBufferValue, toOwnedBuffer } from './shared/buffer.js';
+import { readEnvPositiveInt } from './shared/env.js';
 
 /**
  * @typedef {'bytes' | 'text' | 'json'} IoL2Kind
@@ -26,6 +26,7 @@ import { isBufferValue, toOwnedBuffer } from './shared/buffer.js';
 
 const DEFAULT_TTL_MS = readEnvPositiveInt('IO_L2_CACHE_TTL_MS', 5 * 60 * 1000);
 const DEFAULT_MAX_ENTRIES = readEnvPositiveInt('IO_L2_CACHE_MAX_ENTRIES', 100_000);
+const CAP_CHECK_INTERVAL = 100;
 
 /**
  * @param {string} filePath
@@ -262,7 +263,9 @@ export function createIoL2SqliteCache(options) {
                     nowMs,
                 );
                 stats.sets += 1;
-                capSizeIfNeeded();
+                if (maxEntries <= CAP_CHECK_INTERVAL || stats.sets % CAP_CHECK_INTERVAL === 0) {
+                    capSizeIfNeeded();
+                }
                 return true;
             } catch {
                 stats.errors += 1;
@@ -290,6 +293,7 @@ export function createIoL2SqliteCache(options) {
                 if (removed > 0) {
                     stats.evictions += removed;
                 }
+                capSizeIfNeeded();
                 return removed;
             } catch {
                 stats.errors += 1;

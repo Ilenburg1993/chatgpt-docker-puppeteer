@@ -9,8 +9,25 @@
 # • Compatível com Docker / DevContainer do zero
 # • Alinhado com package.json scripts (95% coverage)
 #
-# Versão: 4.1.1
-# Data:   2026-03-01
+# Versão: 4.2.2
+# Data:   2026-05-17
+# Changelog v4.2.2:
+#   - Alinha comandos DNS ao local-dns-cache v1.5.3.
+#   - Adiciona network-dns-* para status, doctor, benchmark, start, health, stop, summary e lock.
+#   - Corrige quick targets para não herdarem duração longa do ambiente.
+#   - Separa summaries atuais de snapshots de boot/lifecycle para evitar leitura de artefatos stale.
+#   - Expande artifacts/status/doctor para incluir DNS cache local.
+# Changelog v4.2.1:
+#   - Corrige network-doctor para usar DEVCONTAINER_COPILOT_NETWORK_MANAGER_ACTION=doctor.
+#   - Corrige comandos explícitos de proxy para forçar mode=local, mesmo quando containerEnv define off.
+#   - Corrige manager benchmark/compare para permitir A/B direct vs proxy-local de verdade.
+#   - Adiciona targets rápidos/diagnósticos para proxy compare, lock e summaries.
+# Changelog v4.2.0:
+#   - Adiciona superfície oficial de comandos para benchmark prolongado GitHub/Copilot.
+#   - Adiciona targets para route-fix v1.8.4, proxy v1.2.2 e manager v1.5.0.
+#   - Separa validação rápida/shellcheck de benchmarks longos para não contaminar boot.
+#   - Adiciona summary/artifacts/recommendation readers para consumo humano.
+#   - Mantém proxy local opt-in e benchmark A/B manual/controlado.
 # Changelog v4.1.1:
 #   - Consolidação de validações de DevContainer, Dockerfile e GitHub/Actions
 #   - Novos targets validate-devcontainer, validate-dockerfile, validate-github e validate-platform
@@ -46,6 +63,31 @@ NODE := node
 NPM  := npm
 PM2  := npx pm2
 CURL := curl
+
+# =============================================================================
+# GITHUB/COPILOT NETWORK CONTROL PLANE
+# =============================================================================
+
+POST_CREATE_SCRIPT ?= .devcontainer/scripts/post-create.sh
+POST_START_SCRIPT ?= .devcontainer/scripts/post-start.sh
+POST_ATTACH_SCRIPT ?= .devcontainer/scripts/post-attach.sh
+NETWORK_LOCAL_DNS_SCRIPT ?= .devcontainer/scripts/network/local-dns-cache.sh
+NETWORK_ROUTE_SCRIPT ?= .devcontainer/scripts/network/github-api-route-fix.sh
+NETWORK_MANAGER_SCRIPT ?= .devcontainer/scripts/network/github-copilot-network-manager.sh
+NETWORK_PROXY_SCRIPT ?= .devcontainer/scripts/network/local-copilot-proxy.sh
+NETWORK_ADVISOR_SCRIPT ?= .devcontainer/scripts/network/copilot-route-advisor.sh
+
+NETWORK_BENCHMARK_SECONDS ?= 600
+NETWORK_BENCHMARK_INTERVAL ?= 10
+NETWORK_BENCHMARK_MAX_SAMPLES ?= 0
+NETWORK_FUNCTIONALITY_PROFILE ?= full
+NETWORK_PROXY_MODE ?= local
+NETWORK_TRANSPORT_PROFILE ?= auto
+NETWORK_ENABLE_LOCAL_PROXY ?= true
+NETWORK_DNS_MODE ?= local
+NETWORK_DNS_UPSTREAM_SELECTION ?= ranked
+NETWORK_DNS_FORCE_REBENCHMARK ?= true
+NETWORK_DNS_WRITE_RESOLV_CONF ?= true
 
 # =============================================================================
 # RAG SCOPE CONFIG (aditivo, compatível com defaults atuais)
@@ -94,7 +136,7 @@ endif
 help:
 	@echo ""
 	@echo "$(CYAN)╔════════════════════════════════════════════════════════════╗$(NC)"
-	@echo "$(CYAN)║  ChatGPT Docker Puppeteer — Makefile v4.1 (DEV)            ║$(NC)"
+	@echo "$(CYAN)║  ChatGPT Docker Puppeteer — Makefile v4.2 (DEV)            ║$(NC)"
 	@echo "$(CYAN)║  PM2-First • Bootstrap-Ready • Production-Ready             ║$(NC)"
 	@echo "$(CYAN)╚════════════════════════════════════════════════════════════╝$(NC)"
 	@echo ""
@@ -135,6 +177,16 @@ help:
 	@echo "  $(CYAN)make mcp-diagnose$(NC)      Diagnóstico MCP (RAG/LSP/Ollama)"
 	@echo "  $(CYAN)make lsp-health$(NC)        Diagnóstico funcional LSP via MCP"
 	@echo "  $(CYAN)make semantic-preflight$(NC) Preflight PM2+MCP+RAG+LSP"
+	@echo ""
+	@echo "$(CYAN)$(BOLD)🌐 GitHub/Copilot Network:$(NC)"
+	@echo "  $(CYAN)make network-status$(NC)       Snapshots passivos de rota/manager/proxy"
+	@echo "  $(CYAN)make network-summary$(NC)      Exibir summaries/recommendations atuais"
+	@echo "  $(CYAN)make network-validate$(NC)     bash -n + ShellCheck + doctor"
+	@echo "  $(CYAN)make network-route-probe$(NC)  Probe dry-run api.github.com"
+	@echo "  $(CYAN)make network-route-benchmark$(NC) Benchmark prolongado api.github.com"
+	@echo "  $(CYAN)make network-proxy-compare$(NC) A/B direct vs proxy-local"
+	@echo "  $(CYAN)make network-manager-recommend$(NC) Policy recommendation consolidada"
+	@echo "  $(CYAN)make network-manager-benchmark$(NC) Benchmark coordenado manager"
 	@echo ""
 	@echo "$(BLUE)$(BOLD)📊 Análise & Code Quality:$(NC)"
 	@echo "  $(CYAN)make analyze-deps$(NC)      Dependências circulares"
@@ -232,7 +284,7 @@ info:
 	@echo "  npm:  $(GREEN)$$($(NPM) --version 2>/dev/null || echo 'não instalado')$(NC)"
 	@echo "  PM2:  $(GREEN)$$($(PM2) --version 2>/dev/null || echo 'não disponível')$(NC)"
 	@echo "  Diretório: $(BOLD)$$(pwd)$(NC)"
-	@echo "  Makefile: $(BOLD)v4.1.1$(NC)"
+	@echo "  Makefile: $(BOLD)v4.2.0$(NC)"
 	@echo ""
 	@echo "$(YELLOW)Pacotes base instalados no projeto:$(NC)"
 	@echo "  • $(GREEN)chalk$(NC) (^5.6.2) - Terminal colors"
@@ -241,9 +293,9 @@ info:
 	@echo ""
 
 version:
-	@echo "Makefile v4.1.1 — DEV / Bootstrap-Ready / Production-Ready"
-	@echo "Data: 2026-03-01"
-	@echo "Targets: 80+ | Aliases: 13 | Coverage: 97%"
+	@echo "Makefile v4.2.2 — DEV / Bootstrap-Ready / Network-Benchmark-Ready"
+	@echo "Data: 2026-05-17"
+	@echo "Targets: 110+ | Aliases: 13 | Coverage: 98%"
 
 # =============================================================================
 # 1️⃣ DESCOBERTA DE AMBIENTE (somente leitura)
@@ -468,6 +520,310 @@ validate-platform:
 	@echo "$(CYAN)🔍 Validação consolidada de plataforma/CI$(NC)"
 	@$(NPM) run check:platform
 	@echo "$(GREEN)✅ Plataforma/CI validada$(NC)"
+
+
+# =============================================================================
+# 5️⃣.5 GITHUB/COPILOT NETWORK CONTROL PLANE
+# =============================================================================
+
+.PHONY: network-help network-status network-summary network-summary-current network-summary-boot network-summary-all network-artifacts network-syntax network-shellcheck network-validate network-validate-soft network-doctor
+.PHONY: network-dns-status network-dns-doctor network-dns-benchmark network-dns-start network-dns-health network-dns-stop network-dns-summary network-dns-lock-diagnose
+.PHONY: network-route-status network-route-probe network-route-benchmark
+.PHONY: network-proxy-status network-proxy-doctor network-proxy-start network-proxy-stop network-proxy-benchmark network-proxy-compare network-proxy-compare-quick network-proxy-summary network-proxy-lock-diagnose
+.PHONY: network-manager-status network-manager-recommend network-manager-benchmark network-manager-benchmark-quick network-manager-compare network-manager-compare-quick
+
+network-help:
+	@echo ""
+	@echo "$(CYAN)$(BOLD)🌐 GitHub/Copilot Network Control Plane$(NC)"
+	@echo "  $(CYAN)make network-status$(NC)                    Lê status passivo de DNS/manager/route/proxy"
+	@echo "  $(CYAN)make network-summary$(NC)                   Mostra snapshot atual, sem misturar post-start antigo"
+	@echo "  $(CYAN)make network-summary-boot$(NC)              Mostra snapshots de lifecycle/boot"
+	@echo "  $(CYAN)make network-summary-all$(NC)               Mostra snapshots atuais + boot"
+	@echo "  $(CYAN)make network-validate$(NC)                  bash -n + ShellCheck + doctor"
+	@echo "  $(CYAN)make network-dns-benchmark$(NC)             Ranking/benchmark de upstreams DNS"
+	@echo "  $(CYAN)make network-dns-start$(NC)                 Inicia DNS cache local com prova antes de resolv.conf"
+	@echo "  $(CYAN)make network-dns-health$(NC)                Health do DNS cache local"
+	@echo "  $(CYAN)make network-route-probe$(NC)               Probe dry-run api.github.com"
+	@echo "  $(CYAN)make network-route-benchmark$(NC)           Benchmark api.github.com por $(NETWORK_BENCHMARK_SECONDS)s"
+	@echo "  $(CYAN)make network-proxy-compare$(NC)             A/B direct vs proxy-local"
+	@echo "  $(CYAN)make network-proxy-compare-quick$(NC)       A/B curto de 120s, sem herdar duração longa"
+	@echo "  $(CYAN)make network-manager-recommend$(NC)         Gera policy recommendation"
+	@echo "  $(CYAN)make network-manager-benchmark$(NC)         Orquestra benchmark coordenado"
+	@echo ""
+	@echo "$(YELLOW)Variáveis úteis$(NC): NETWORK_BENCHMARK_SECONDS=600 NETWORK_BENCHMARK_INTERVAL=10 NETWORK_FUNCTIONALITY_PROFILE=full NETWORK_PROXY_MODE=local NETWORK_ENABLE_LOCAL_PROXY=true"
+	@echo "$(YELLOW)DNS úteis$(NC): NETWORK_DNS_MODE=local NETWORK_DNS_UPSTREAM_SELECTION=ranked NETWORK_DNS_WRITE_RESOLV_CONF=true"
+	@echo ""
+
+network-status:
+	@echo "$(CYAN)🌐 Network status snapshots$(NC)"
+	@DEVCONTAINER_LOCAL_DNS_ACTION=status bash "$(NETWORK_LOCAL_DNS_SCRIPT)" || true
+	@DEVCONTAINER_COPILOT_NETWORK_MANAGER_ACTION=status bash "$(NETWORK_MANAGER_SCRIPT)" || true
+	@DEVCONTAINER_GITHUB_API_ROUTE_ACTION=status bash "$(NETWORK_ROUTE_SCRIPT)" || true
+	@DEVCONTAINER_LOCAL_COPILOT_PROXY_ACTION=status bash "$(NETWORK_PROXY_SCRIPT)" || true
+
+network-summary: network-summary-current
+
+network-summary-current:
+	@echo "$(CYAN)📄 Current network summaries/recommendations$(NC)"
+	@for f in \
+		/tmp/devcontainer-local-dns-cache.status \
+		/tmp/devcontainer-local-dns-cache.summary \
+		/tmp/devcontainer-local-dns-cache.metrics.tsv \
+		/tmp/devcontainer-github-api-route.summary \
+		/tmp/devcontainer-github-api-route.benchmark.summary \
+		/tmp/devcontainer-github-api-route.recommendation \
+		/tmp/devcontainer-copilot-network.summary \
+		/tmp/devcontainer-copilot-network.recommendation \
+		/tmp/devcontainer-copilot-network.recommendation.json \
+		/tmp/devcontainer-copilot-proxy.status \
+		/tmp/devcontainer-copilot-proxy.summary \
+		/tmp/devcontainer-copilot-proxy.benchmark.summary \
+		/tmp/devcontainer-copilot-proxy.comparison.tsv \
+		/tmp/devcontainer-copilot-proxy.recommendation; do \
+		if [ -r "$$f" ]; then \
+			echo ""; echo "===== $$f ====="; cat "$$f"; \
+		fi; \
+	done
+
+network-summary-boot:
+	@echo "$(CYAN)📄 Lifecycle/boot snapshots$(NC)"
+	@for f in \
+		/tmp/devcontainer-post-create.summary \
+		/tmp/devcontainer-post-start.summary \
+		/tmp/devcontainer-post-start.report \
+		/tmp/devcontainer-post-attach.summary; do \
+		if [ -r "$$f" ]; then \
+			echo ""; echo "===== $$f ====="; cat "$$f"; \
+		fi; \
+	done
+
+network-summary-all:
+	@$(MAKE) -f "$(firstword $(MAKEFILE_LIST))" network-summary-boot
+	@$(MAKE) -f "$(firstword $(MAKEFILE_LIST))" network-summary-current
+
+network-artifacts:
+	@echo "$(CYAN)📦 Network artifacts em /tmp$(NC)"
+	@ls -lh /tmp/devcontainer-local-dns-cache.* /tmp/devcontainer-github-api-route.* /tmp/devcontainer-copilot-network.* /tmp/devcontainer-copilot-proxy.* 2>/dev/null || true
+
+network-syntax:
+	@echo "$(CYAN)🔎 bash -n hooks/scripts de rede$(NC)"
+	@bash -n "$(POST_CREATE_SCRIPT)"
+	@bash -n "$(POST_START_SCRIPT)"
+	@bash -n "$(POST_ATTACH_SCRIPT)"
+	@bash -n "$(NETWORK_LOCAL_DNS_SCRIPT)"
+	@bash -n "$(NETWORK_ROUTE_SCRIPT)"
+	@bash -n "$(NETWORK_MANAGER_SCRIPT)"
+	@bash -n "$(NETWORK_PROXY_SCRIPT)"
+	@bash -n "$(NETWORK_ADVISOR_SCRIPT)"
+	@echo "$(GREEN)✅ Sintaxe shell OK$(NC)"
+
+network-shellcheck:
+	@echo "$(CYAN)🔎 ShellCheck hooks/scripts de rede$(NC)"
+	@command -v shellcheck >/dev/null 2>&1 || { echo "$(RED)❌ shellcheck não instalado$(NC)"; exit 127; }
+	@shellcheck "$(POST_CREATE_SCRIPT)" "$(POST_START_SCRIPT)" "$(POST_ATTACH_SCRIPT)" \
+		"$(NETWORK_LOCAL_DNS_SCRIPT)" "$(NETWORK_ROUTE_SCRIPT)" "$(NETWORK_MANAGER_SCRIPT)" \
+		"$(NETWORK_PROXY_SCRIPT)" "$(NETWORK_ADVISOR_SCRIPT)"
+	@echo "$(GREEN)✅ ShellCheck OK$(NC)"
+
+network-validate: network-syntax network-shellcheck network-doctor
+	@echo "$(GREEN)✅ Network control plane validado$(NC)"
+
+network-validate-soft: network-syntax
+	@$(MAKE) network-shellcheck || true
+	@$(MAKE) network-doctor || true
+
+network-doctor:
+	@echo "$(CYAN)🩺 Network doctor$(NC)"
+	@DEVCONTAINER_LOCAL_DNS_ACTION=doctor bash "$(NETWORK_LOCAL_DNS_SCRIPT)" || true
+	@DEVCONTAINER_LOCAL_COPILOT_PROXY_ACTION=doctor bash "$(NETWORK_PROXY_SCRIPT)" || true
+	@DEVCONTAINER_COPILOT_NETWORK_MANAGER_ACTION=doctor bash "$(NETWORK_MANAGER_SCRIPT)" || true
+	@DEVCONTAINER_GITHUB_API_ROUTE_ACTION=status bash "$(NETWORK_ROUTE_SCRIPT)" || true
+
+network-dns-status:
+	@DEVCONTAINER_LOCAL_DNS_ACTION=status bash "$(NETWORK_LOCAL_DNS_SCRIPT)"
+
+network-dns-doctor:
+	@DEVCONTAINER_LOCAL_DNS_ACTION=doctor bash "$(NETWORK_LOCAL_DNS_SCRIPT)"
+
+network-dns-benchmark:
+	@echo "$(CYAN)📈 Benchmark/ranking de upstreams DNS$(NC)"
+	@DEVCONTAINER_LOCAL_DNS_ACTION=benchmark \
+		DEVCONTAINER_LOCAL_DNS_MODE="$(NETWORK_DNS_MODE)" \
+		DEVCONTAINER_LOCAL_DNS_UPSTREAM_SELECTION="$(NETWORK_DNS_UPSTREAM_SELECTION)" \
+		DEVCONTAINER_LOCAL_DNS_FORCE_REBENCHMARK="$(NETWORK_DNS_FORCE_REBENCHMARK)" \
+		bash "$(NETWORK_LOCAL_DNS_SCRIPT)"
+
+network-dns-start:
+	@echo "$(CYAN)🌐 Start DNS cache local controlado$(NC)"
+	@DEVCONTAINER_LOCAL_DNS_ACTION=start \
+		DEVCONTAINER_LOCAL_DNS_MODE="$(NETWORK_DNS_MODE)" \
+		DEVCONTAINER_LOCAL_DNS_UPSTREAM_SELECTION="$(NETWORK_DNS_UPSTREAM_SELECTION)" \
+		DEVCONTAINER_LOCAL_DNS_WRITE_RESOLV_CONF="$(NETWORK_DNS_WRITE_RESOLV_CONF)" \
+		bash "$(NETWORK_LOCAL_DNS_SCRIPT)"
+
+network-dns-health:
+	@DEVCONTAINER_LOCAL_DNS_ACTION=health \
+		DEVCONTAINER_LOCAL_DNS_MODE="$(NETWORK_DNS_MODE)" \
+		bash "$(NETWORK_LOCAL_DNS_SCRIPT)"
+
+network-dns-stop:
+	@DEVCONTAINER_LOCAL_DNS_ACTION=stop \
+		DEVCONTAINER_LOCAL_DNS_MODE="$(NETWORK_DNS_MODE)" \
+		bash "$(NETWORK_LOCAL_DNS_SCRIPT)"
+
+network-dns-summary:
+	@echo "$(CYAN)📄 DNS cache summaries/metrics$(NC)"
+	@for f in \
+		/tmp/devcontainer-local-dns-cache.status \
+		/tmp/devcontainer-local-dns-cache.summary \
+		/tmp/devcontainer-local-dns-cache.metrics.tsv \
+		/tmp/devcontainer-local-dns-cache.report; do \
+		if [ -r "$$f" ]; then \
+			echo ""; echo "===== $$f ====="; cat "$$f"; \
+		fi; \
+	done
+
+network-dns-lock-diagnose:
+	@echo "$(CYAN)🔐 DNS lock/process diagnostics$(NC)"
+	@echo "===== LOCK ====="; ls -l /tmp/devcontainer-network/local-dns-cache.lock 2>/dev/null || true
+	@echo ""; echo "===== LSOF ====="; lsof /tmp/devcontainer-network/local-dns-cache.lock 2>/dev/null || true
+	@echo ""; echo "===== FUSER ====="; fuser -v /tmp/devcontainer-network/local-dns-cache.lock 2>/dev/null || true
+	@echo ""; echo "===== PROCESSES ====="; ps -ef | grep -E 'local-dns-cache|dnsmasq' | grep -v grep || true
+	@echo ""; echo "===== RESOLV.CONF ====="; cat /etc/resolv.conf 2>/dev/null || true
+
+network-route-status:
+	@DEVCONTAINER_GITHUB_API_ROUTE_ACTION=status bash "$(NETWORK_ROUTE_SCRIPT)"
+
+network-route-probe:
+	@DEVCONTAINER_GITHUB_API_ROUTE_ACTION=probe \
+		DEVCONTAINER_GITHUB_API_ROUTE_DRY_RUN=true \
+		DEVCONTAINER_GITHUB_API_FUNCTIONALITY_PROFILE="$${DEVCONTAINER_GITHUB_API_FUNCTIONALITY_PROFILE:-copilot}" \
+		bash "$(NETWORK_ROUTE_SCRIPT)"
+
+network-route-benchmark:
+	@echo "$(CYAN)📈 Benchmark prolongado api.github.com$(NC)"
+	@DEVCONTAINER_GITHUB_API_ROUTE_ACTION=benchmark \
+		DEVCONTAINER_GITHUB_API_FUNCTIONALITY_PROFILE="$(NETWORK_FUNCTIONALITY_PROFILE)" \
+		DEVCONTAINER_GITHUB_API_BENCHMARK_DURATION_SECONDS="$(NETWORK_BENCHMARK_SECONDS)" \
+		DEVCONTAINER_GITHUB_API_BENCHMARK_INTERVAL_SECONDS="$(NETWORK_BENCHMARK_INTERVAL)" \
+		DEVCONTAINER_GITHUB_API_BENCHMARK_MAX_SAMPLES="$(NETWORK_BENCHMARK_MAX_SAMPLES)" \
+		bash "$(NETWORK_ROUTE_SCRIPT)"
+
+network-proxy-status:
+	@DEVCONTAINER_LOCAL_COPILOT_PROXY_ACTION=status bash "$(NETWORK_PROXY_SCRIPT)"
+
+network-proxy-doctor:
+	@DEVCONTAINER_LOCAL_COPILOT_PROXY_ACTION=doctor bash "$(NETWORK_PROXY_SCRIPT)"
+
+network-proxy-start:
+	@DEVCONTAINER_ENABLE_LOCAL_COPILOT_PROXY="$(NETWORK_ENABLE_LOCAL_PROXY)" \
+		DEVCONTAINER_LOCAL_COPILOT_PROXY_ACTION=start \
+		DEVCONTAINER_LOCAL_COPILOT_PROXY_MODE="$(NETWORK_PROXY_MODE)" \
+		bash "$(NETWORK_PROXY_SCRIPT)"
+
+network-proxy-stop:
+	@DEVCONTAINER_LOCAL_COPILOT_PROXY_ACTION=stop bash "$(NETWORK_PROXY_SCRIPT)"
+
+network-proxy-benchmark:
+	@echo "$(CYAN)📈 Benchmark proxy-local$(NC)"
+	@DEVCONTAINER_ENABLE_LOCAL_COPILOT_PROXY="$(NETWORK_ENABLE_LOCAL_PROXY)" \
+		DEVCONTAINER_LOCAL_COPILOT_PROXY_ACTION=benchmark \
+		DEVCONTAINER_LOCAL_COPILOT_PROXY_MODE="$(NETWORK_PROXY_MODE)" \
+		DEVCONTAINER_LOCAL_COPILOT_PROXY_BENCHMARK_DURATION_SECONDS="$(NETWORK_BENCHMARK_SECONDS)" \
+		DEVCONTAINER_LOCAL_COPILOT_PROXY_BENCHMARK_INTERVAL_SECONDS="$(NETWORK_BENCHMARK_INTERVAL)" \
+		DEVCONTAINER_LOCAL_COPILOT_PROXY_BENCHMARK_MAX_SAMPLES="$(NETWORK_BENCHMARK_MAX_SAMPLES)" \
+		bash "$(NETWORK_PROXY_SCRIPT)"
+
+network-proxy-compare:
+	@echo "$(CYAN)⚖️  A/B direct vs proxy-local$(NC)"
+	@DEVCONTAINER_ENABLE_LOCAL_COPILOT_PROXY="$(NETWORK_ENABLE_LOCAL_PROXY)" \
+		DEVCONTAINER_LOCAL_COPILOT_PROXY_ACTION=compare \
+		DEVCONTAINER_LOCAL_COPILOT_PROXY_MODE="$(NETWORK_PROXY_MODE)" \
+		DEVCONTAINER_LOCAL_COPILOT_PROXY_BENCHMARK_DURATION_SECONDS="$(NETWORK_BENCHMARK_SECONDS)" \
+		DEVCONTAINER_LOCAL_COPILOT_PROXY_BENCHMARK_INTERVAL_SECONDS="$(NETWORK_BENCHMARK_INTERVAL)" \
+		DEVCONTAINER_LOCAL_COPILOT_PROXY_BENCHMARK_MAX_SAMPLES="$(NETWORK_BENCHMARK_MAX_SAMPLES)" \
+		bash "$(NETWORK_PROXY_SCRIPT)"
+
+network-proxy-compare-quick:
+	@echo "$(CYAN)⚖️  A/B curto direct vs proxy-local — 120s fixos$(NC)"
+	@DEVCONTAINER_ENABLE_LOCAL_COPILOT_PROXY="$(NETWORK_ENABLE_LOCAL_PROXY)" \
+		DEVCONTAINER_LOCAL_COPILOT_PROXY_ACTION=compare \
+		DEVCONTAINER_LOCAL_COPILOT_PROXY_MODE="$(NETWORK_PROXY_MODE)" \
+		DEVCONTAINER_LOCAL_COPILOT_PROXY_BENCHMARK_DURATION_SECONDS="120" \
+		DEVCONTAINER_LOCAL_COPILOT_PROXY_BENCHMARK_INTERVAL_SECONDS="10" \
+		DEVCONTAINER_LOCAL_COPILOT_PROXY_BENCHMARK_MAX_SAMPLES="$(NETWORK_BENCHMARK_MAX_SAMPLES)" \
+		bash "$(NETWORK_PROXY_SCRIPT)"
+
+network-proxy-summary:
+	@echo "$(CYAN)📄 Proxy summaries/comparison$(NC)"
+	@for f in \
+		/tmp/devcontainer-copilot-proxy.status \
+		/tmp/devcontainer-copilot-proxy.summary \
+		/tmp/devcontainer-copilot-proxy.benchmark.summary \
+		/tmp/devcontainer-copilot-proxy.comparison.tsv \
+		/tmp/devcontainer-copilot-proxy.recommendation; do \
+		if [ -r "$$f" ]; then \
+			echo ""; echo "===== $$f ====="; cat "$$f"; \
+		fi; \
+	done
+
+network-proxy-lock-diagnose:
+	@echo "$(CYAN)🔐 Proxy lock/process diagnostics$(NC)"
+	@echo "===== LOCK ====="; ls -l /tmp/devcontainer-network/tinyproxy-copilot.lock 2>/dev/null || true
+	@echo ""; echo "===== LSOF ====="; lsof /tmp/devcontainer-network/tinyproxy-copilot.lock 2>/dev/null || true
+	@echo ""; echo "===== FUSER ====="; fuser -v /tmp/devcontainer-network/tinyproxy-copilot.lock 2>/dev/null || true
+	@echo ""; echo "===== PROCESSES ====="; ps -ef | grep -E 'local-copilot-proxy|tinyproxy' | grep -v grep || true
+
+network-manager-status:
+	@DEVCONTAINER_COPILOT_NETWORK_MANAGER_ACTION=status bash "$(NETWORK_MANAGER_SCRIPT)"
+
+network-manager-recommend:
+	@DEVCONTAINER_COPILOT_NETWORK_MANAGER_ACTION=recommend \
+		DEVCONTAINER_COPILOT_TRANSPORT_PROFILE="$(NETWORK_TRANSPORT_PROFILE)" \
+		bash "$(NETWORK_MANAGER_SCRIPT)"
+	@$(MAKE) -f "$(firstword $(MAKEFILE_LIST))" network-summary-current
+
+network-manager-benchmark:
+	@echo "$(CYAN)📈 Benchmark coordenado manager$(NC)"
+	@DEVCONTAINER_ENABLE_LOCAL_COPILOT_PROXY="$(NETWORK_ENABLE_LOCAL_PROXY)" \
+		DEVCONTAINER_LOCAL_COPILOT_PROXY_MODE="$(NETWORK_PROXY_MODE)" \
+		DEVCONTAINER_COPILOT_NETWORK_MANAGER_ACTION=benchmark \
+		DEVCONTAINER_COPILOT_TRANSPORT_PROFILE="$(NETWORK_TRANSPORT_PROFILE)" \
+		DEVCONTAINER_COPILOT_NETWORK_BENCHMARK_DURATION_SECONDS="$(NETWORK_BENCHMARK_SECONDS)" \
+		DEVCONTAINER_COPILOT_NETWORK_BENCHMARK_INTERVAL_SECONDS="$(NETWORK_BENCHMARK_INTERVAL)" \
+		DEVCONTAINER_COPILOT_NETWORK_BENCHMARK_MAX_SAMPLES="$(NETWORK_BENCHMARK_MAX_SAMPLES)" \
+		bash "$(NETWORK_MANAGER_SCRIPT)"
+
+network-manager-benchmark-quick:
+	@echo "$(CYAN)📈 Benchmark coordenado manager — 180s fixos$(NC)"
+	@DEVCONTAINER_ENABLE_LOCAL_COPILOT_PROXY="$(NETWORK_ENABLE_LOCAL_PROXY)" \
+		DEVCONTAINER_LOCAL_COPILOT_PROXY_MODE="$(NETWORK_PROXY_MODE)" \
+		DEVCONTAINER_COPILOT_NETWORK_MANAGER_ACTION=benchmark \
+		DEVCONTAINER_COPILOT_TRANSPORT_PROFILE="$(NETWORK_TRANSPORT_PROFILE)" \
+		DEVCONTAINER_COPILOT_NETWORK_BENCHMARK_DURATION_SECONDS="180" \
+		DEVCONTAINER_COPILOT_NETWORK_BENCHMARK_INTERVAL_SECONDS="10" \
+		DEVCONTAINER_COPILOT_NETWORK_BENCHMARK_MAX_SAMPLES="0" \
+		bash "$(NETWORK_MANAGER_SCRIPT)"
+
+network-manager-compare:
+	@echo "$(CYAN)⚖️  Manager compare-transports$(NC)"
+	@DEVCONTAINER_ENABLE_LOCAL_COPILOT_PROXY="$(NETWORK_ENABLE_LOCAL_PROXY)" \
+		DEVCONTAINER_LOCAL_COPILOT_PROXY_MODE="$(NETWORK_PROXY_MODE)" \
+		DEVCONTAINER_COPILOT_NETWORK_MANAGER_ACTION=compare-transports \
+		DEVCONTAINER_COPILOT_NETWORK_BENCHMARK_DURATION_SECONDS="$(NETWORK_BENCHMARK_SECONDS)" \
+		DEVCONTAINER_COPILOT_NETWORK_BENCHMARK_INTERVAL_SECONDS="$(NETWORK_BENCHMARK_INTERVAL)" \
+		DEVCONTAINER_COPILOT_NETWORK_BENCHMARK_MAX_SAMPLES="$(NETWORK_BENCHMARK_MAX_SAMPLES)" \
+		bash "$(NETWORK_MANAGER_SCRIPT)"
+
+network-manager-compare-quick:
+	@echo "$(CYAN)⚖️  Manager compare-transports — 120s fixos$(NC)"
+	@DEVCONTAINER_ENABLE_LOCAL_COPILOT_PROXY="$(NETWORK_ENABLE_LOCAL_PROXY)" \
+		DEVCONTAINER_LOCAL_COPILOT_PROXY_MODE="$(NETWORK_PROXY_MODE)" \
+		DEVCONTAINER_COPILOT_NETWORK_MANAGER_ACTION=compare-transports \
+		DEVCONTAINER_COPILOT_NETWORK_BENCHMARK_DURATION_SECONDS="120" \
+		DEVCONTAINER_COPILOT_NETWORK_BENCHMARK_INTERVAL_SECONDS="10" \
+		DEVCONTAINER_COPILOT_NETWORK_BENCHMARK_MAX_SAMPLES="0" \
+		bash "$(NETWORK_MANAGER_SCRIPT)"
 
 # =============================================================================
 # 6️⃣ ANÁLISE & CODE QUALITY

@@ -234,6 +234,18 @@ describe('web-tools', () => {
             expect(result.error).toMatch(/abort/i);
         });
 
+        it('retorna erro explícito para incompatibilidade de AbortSignal (undici v7/cross-realm)', async () => {
+            fetchSpy.mockRejectedValueOnce(
+                new TypeError('RequestInit: Expected signal ("AbortSignal {}") to be an instance of AbortSignal.'),
+            );
+
+            const tool = findFetch();
+            const result = await tool.handler({ url: 'https://slow.example.com', timeoutMs: 1000 });
+
+            expect(result.success).toBe(false);
+            expect(result.error).toMatch(/Expected signal|AbortSignal/i);
+        });
+
         it('retorna erro em falha de rede', async () => {
             fetchSpy.mockRejectedValueOnce(new Error('ECONNREFUSED'));
 

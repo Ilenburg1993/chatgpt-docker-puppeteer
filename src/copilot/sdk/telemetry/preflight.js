@@ -4,6 +4,8 @@
  * @file Preflight canônico do SDK/CLI usado pelo boot antes de expor HTTP/REPL.
  */
 
+import { toError } from '#copilot/core';
+
 /**
  * @typedef {{
  *     ok: boolean;
@@ -21,7 +23,7 @@
  * @returns {string}
  */
 function errorMessage(err) {
-    return err instanceof Error ? err.message : String(err);
+    return toError(err).message;
 }
 
 /**

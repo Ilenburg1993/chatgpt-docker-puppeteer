@@ -28,10 +28,15 @@ function createPatchError(message, code, details = {}) {
 }
 
 /**
+ * Contagem de linhas orientada a delta de patch.
+ *
+ * Contrato: string vazia conta como 1 linha-base para evitar deltas negativos artificiais ao comparar estados vazios em
+ * operações de patch textual.
+ *
  * @param {string} content
  * @returns {number}
  */
-function countLines(content) {
+function countPatchLines(content) {
     return content.length === 0 ? 1 : content.split('\n').length;
 }
 
@@ -189,7 +194,7 @@ export function computeTextPatch(content, options) {
         newStringBytes: utf8ByteLength(options.newString, 'patch new_string'),
         firstMatchLine: lineNumberAt(content, offsets[0] ?? 0),
         lastMatchLine: lineNumberAt(content, offsets[offsets.length - 1] ?? 0),
-        lineDelta: countLines(updated) - countLines(content),
+        lineDelta: countPatchLines(updated) - countPatchLines(content),
         occurrenceIndex,
         noop: updated === content,
     };

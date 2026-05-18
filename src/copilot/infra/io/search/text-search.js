@@ -104,6 +104,8 @@ function publishAndReturn(io, success, error) {
  *     nextCursor?: string | null;
  *     cursorOffset?: number;
  *     totalMatches?: number;
+ *     indexFallback?: boolean;
+ *     indexFallbackReason?: string | null;
  *     io: import('#copilot/core/io-contracts').IoMeta;
  * }>}
  */
@@ -160,6 +162,11 @@ export async function searchText(targetPath, options) {
             advisoryLimits: { ...advisoryLimitsBase, ...extra },
         });
 
+    /** @type {boolean} */
+    let indexFallback;
+    /** @type {string | null} */
+    let indexFallbackReason;
+
     try {
         const indexStats = getIoIndexStats();
         const indexSearchOptions = {
@@ -171,9 +178,9 @@ export async function searchText(targetPath, options) {
         };
 
         /**
-         * Conta apenas linhas de match real (formato `path:linenum:text`), excluindo linhas de
-         * contexto (`path-linenum-text`) e separadores (`--`). Funciona com saída de rg
-         * (--line-number sempre ativo) e grep (-n sempre ativo via buildGrepArgs).
+         * Conta apenas linhas de match real (formato `path:linenum:text`), excluindo linhas de contexto
+         * (`path-linenum-text`) e separadores (`--`). Funciona com saída de rg (--line-number sempre ativo) e grep (-n
+         * sempre ativo via buildGrepArgs).
          *
          * @param {string} text - Saída crua do rg/grep após sanitização
          * @returns {number}
@@ -219,9 +226,21 @@ export async function searchText(targetPath, options) {
                     nextCursor: windowed.nextCursor,
                     cursorOffset: windowed.cursorOffset,
                     totalMatches: windowed.totalItems,
+                    indexFallback: false,
+                    indexFallbackReason: null,
                     io: { ...io, truncated: windowed.truncated, policyVersion: filteredOutput.policyVersion },
                 };
             }
+            indexFallback = true;
+            indexFallbackReason =
+                indexRows.length === 0
+                    ? Boolean(indexStats?.available) && freshFiles > 0
+                        ? 'index-no-matches'
+                        : 'index-unavailable-or-stale'
+                    : 'index-filtered-out-by-glob';
+        } else {
+            indexFallback = true;
+            indexFallbackReason = 'query-not-index-compatible';
         }
 
         if (await isRipgrepAvailable()) {
@@ -276,6 +295,8 @@ export async function searchText(targetPath, options) {
                     nextCursor: windowedOutput.nextCursor,
                     cursorOffset: windowedOutput.cursorOffset,
                     totalMatches: windowedOutput.originalLineCount,
+                    indexFallback,
+                    indexFallbackReason,
                     io: { ...io, truncated: windowedOutput.truncated, policyVersion: filteredOutput.policyVersion },
                 };
             } catch (error) {
@@ -290,6 +311,8 @@ export async function searchText(targetPath, options) {
                         engine: 'rg',
                         sanitized: false,
                         redactions: 0,
+                        indexFallback,
+                        indexFallbackReason,
                         io,
                     };
                 }
@@ -335,6 +358,8 @@ export async function searchText(targetPath, options) {
                 nextCursor: windowedOutput.nextCursor,
                 cursorOffset: windowedOutput.cursorOffset,
                 totalMatches: windowedOutput.originalLineCount,
+                indexFallback,
+                indexFallbackReason,
                 io: { ...io, truncated: windowedOutput.truncated, policyVersion: filteredOutput.policyVersion },
             };
         } catch (error) {
@@ -351,13 +376,18 @@ export async function searchText(targetPath, options) {
                     engine: 'grep',
                     sanitized: false,
                     redactions: 0,
+                    indexFallback,
+                    indexFallbackReason,
                     io,
                 };
             }
             if (execError.code === 'ENOENT' || String(execError.message ?? '').includes('ENOENT')) {
-                throw new Error('Nem ripgrep (rg) nem grep estão disponíveis neste ambiente para search_in_files.', {
-                    cause: error,
-                });
+                throw new Error(
+                    'Nem ripgrep (rg) nem grep estão disponíveis para search_in_files. Instale `ripgrep` (recomendado) ou `grep` no ambiente.',
+                    {
+                        cause: error,
+                    },
+                );
             }
             throw error;
         }

@@ -7,6 +7,7 @@
  */
 
 import { getWorkspaceContext } from '#copilot/boot';
+import { sleepMs, toError } from '#copilot/core';
 import { sendRuntimeDialogTurnForRuntime } from '../../../presentation/runtime/index.js';
 import {
     clearTerminalHistoryFeed,
@@ -170,8 +171,10 @@ function refreshTimelineSyncGauges() {
  * @returns {Promise<void>}
  */
 function sleep(ms) {
-    if (ms <= 0) return Promise.resolve();
-    return new Promise((resolve) => setTimeout(resolve, ms));
+    return sleepMs(ms, {
+        id: 'terminal.timeline.projection.sleep',
+        unref: true,
+    });
 }
 
 /**
@@ -396,7 +399,7 @@ async function persistBridgeTailToHub(hubSessionId, turns, sdkSessionId) {
             }
         }
         if (lastError) {
-            throw lastError instanceof Error ? lastError : new Error(String(lastError));
+            throw toError(lastError);
         }
         syncedCount += 1;
     }

@@ -93,7 +93,7 @@ export async function readPersistentModelCache() {
     } catch (error) {
         // ENOENT (file not found) é normal, não logar
         const err = /** @type {NodeJS.ErrnoException} */ (error);
-        if (err instanceof Error && err.code === 'ENOENT') {
+        if (err && typeof err === 'object' && err.code === 'ENOENT') {
             return null;
         }
 
@@ -166,7 +166,7 @@ export async function clearPersistentModelCache() {
     } catch (error) {
         // ENOENT = file already gone, ok
         const err = /** @type {NodeJS.ErrnoException} */ (error);
-        if (!(err instanceof Error && err.code === 'ENOENT')) {
+        if (!(err && typeof err === 'object' && err.code === 'ENOENT')) {
             const errMsg = toError(error);
             log('DEBUG', `[model-cache] Clear persistência: ${errMsg.message}`);
         }

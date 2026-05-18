@@ -12,6 +12,7 @@
  */
 
 import { KEEPALIVE_IDLE_THRESHOLD_MS, KEEPALIVE_INTERVAL_MS } from '#copilot/config/agent';
+import { cancelTimer, registerInterval } from '#copilot/core';
 import { withAgentErrorPolicy } from '../../error/index.js';
 import { log } from '../../ports/index.js';
 
@@ -43,6 +44,9 @@ export class SessionKeepalive {
     /** @type {boolean} */
     #running = false;
 
+    /** @type {string | null} */
+    #timerId = null;
+
     /**
      * @param {SessionKeepaliveOptions} [options]
      */
@@ -65,8 +69,9 @@ export class SessionKeepalive {
         if (this.#running) return;
         this.#running = true;
         this.#lastActivityAt = Date.now();
+        this.#timerId = `agent.session.keepalive:${Date.now()}:${Math.random().toString(36).slice(2)}`;
 
-        this.#timer = setInterval(() => {
+        this.#timer = registerInterval(this.#timerId, () => {
             void this.#tick(callbacks);
         }, this.#intervalMs);
         this.#timer.unref();
@@ -85,8 +90,9 @@ export class SessionKeepalive {
         this.#running = false;
         this.#tickInFlight = false;
         if (this.#timer) {
-            clearInterval(this.#timer);
+            if (this.#timerId) cancelTimer(this.#timerId);
             this.#timer = null;
+            this.#timerId = null;
         }
         log('INFO', `[SessionKeepalive] Parado (${reason}).`);
     }

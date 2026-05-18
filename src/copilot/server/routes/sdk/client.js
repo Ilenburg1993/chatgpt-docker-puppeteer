@@ -21,6 +21,7 @@
  * @see EventBus
  */
 
+import { toError } from '#copilot/core';
 import { Router } from 'express';
 import { withErrorHandler as _withErrorHandler } from './middleware.js';
 
@@ -301,7 +302,7 @@ export default function createClientRouter(deps) {
                 } catch (error) {
                     sdkObservability.log(
                         'WARN',
-                        `[sdk-api/tools] Falha ao consultar built-ins via RPC: ${error instanceof Error ? error.message : String(error)}`,
+                        `[sdk-api/tools] Falha ao consultar built-ins via RPC: ${toError(error).message}`,
                     );
                 }
             }

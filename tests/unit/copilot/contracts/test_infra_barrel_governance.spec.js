@@ -49,8 +49,13 @@ describe('infra barrel governance', () => {
         const scorecard = buildInfraModuleScorecard();
 
         expect(scorecard.total).toBe(INFRA_MODULE_LAYOUT.length);
-        expect(scorecard.hotspots).toEqual(expect.arrayContaining(['io-engine.js', 'io-index-sqlite.js', 'io-scanner.js']));
+        expect(scorecard.hotspots).toEqual(
+            expect.arrayContaining(['io-engine.js', 'io-index-sqlite.js', 'io-scanner.js']),
+        );
         expect(scorecard.byRole['public-facade']).toBe(1);
+        expect(scorecard.drift.available).toBe(true);
+        expect(scorecard.drift.missingInLayout).toEqual([]);
+        expect(scorecard.drift.staleInLayout).toEqual([]);
     });
 
     it('storage compat não depende da engine larga de IO', async () => {

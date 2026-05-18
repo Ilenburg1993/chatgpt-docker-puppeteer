@@ -76,13 +76,17 @@ function assertClient(client, caller) {
  * @returns {string}
  */
 function getErrorMessage(err) {
-    if (err instanceof Error) {
+    if (err && typeof err === 'object') {
         const raw = /** @type {Record<string, unknown>} */ (/** @type {unknown} */ (err));
         const cause = raw['cause'];
-        if (cause instanceof Error && typeof cause.message === 'string' && cause.message.length > 0) {
-            return cause.message;
+        if (cause && typeof cause === 'object') {
+            const causeMessage = /** @type {{ message?: unknown }} */ (cause).message;
+            if (typeof causeMessage === 'string' && causeMessage.length > 0) {
+                return causeMessage;
+            }
         }
-        return err.message;
+        const message = raw['message'];
+        if (typeof message === 'string' && message.length > 0) return message;
     }
     return String(err);
 }

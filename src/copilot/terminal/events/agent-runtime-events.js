@@ -37,6 +37,7 @@ import {
     terminalThemeBadge,
     terminalThemeText,
 } from '../state/events/index.js';
+import { cancelTimer, registerInterval } from '#copilot/core';
 import { compactTerminalToolText } from './tool-activity-presenter.js';
 import {
     handleTerminalNativeToolComplete,
@@ -66,7 +67,10 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, regi
     // Garante sempre um registry session-scoped — em produção é injetado pelo event-adapters.js
     const _reg = registry ?? createToolCallRegistry();
     const pendingQuestionReplay = createTerminalPendingQuestionReplayState();
-    const toolHeartbeatTimer = setInterval(() => {
+    const toolHeartbeatTimerId = `terminal.agent-runtime-events.tool-heartbeat:${Date.now()}:${Math.random().toString(36).slice(2)}`;
+    const toolHeartbeatTimer = registerInterval(
+        toolHeartbeatTimerId,
+        () => {
         const inFlight = _reg.getAllInFlight();
         if (inFlight.length === 0) return;
         const now = Date.now();
@@ -94,7 +98,8 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, regi
                 else println(line);
             }
         }
-    }, TOOL_HEARTBEAT_INTERVAL_MS);
+        }, TOOL_HEARTBEAT_INTERVAL_MS,
+    );
     if (typeof toolHeartbeatTimer.unref === 'function') {
         toolHeartbeatTimer.unref();
     }
@@ -305,7 +310,7 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, regi
     }
 
     return () => {
-        clearInterval(toolHeartbeatTimer);
+        cancelTimer(toolHeartbeatTimerId);
         agent.off(EMITTER_QUESTION_PENDING, onQuestion);
         agent.off(EMITTER_STOPPED, onStopped);
         agent.off(EMITTER_TOOL_EXECUTION_START, onToolStart);

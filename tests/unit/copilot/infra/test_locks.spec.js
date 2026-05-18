@@ -6,8 +6,12 @@ import { tmpdir } from 'node:os';
 import { join, relative } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { withIoResourceLock } from '../../../../src/copilot/infra/io-locks.js';
-import { acquireLock, releaseLock } from '../../../../src/copilot/infra/lockfile.js';
+import {
+    acquireIoResourceLock,
+    acquireIoResourceLocks,
+    withIoResourceLock,
+} from '../../../../src/copilot/infra/io-locks.js';
+import { acquireLock, releaseLock, releaseLockAsync } from '../../../../src/copilot/infra/lockfile.js';
 
 /** @type {string[]} */
 const TEMP_DIRS = [];
@@ -90,5 +94,59 @@ describe('infra locks', () => {
         releaseLock(lockPath);
 
         expect(existsSync(lockPath)).toBe(true);
+    });
+
+    it('releaseLockAsync remove lock do processo atual', async () => {
+        const dir = await createTempDir();
+        const lockPath = join(dir, 'async.lock');
+
+        const acquired = await acquireLock(lockPath);
+        expect(acquired).toBe(true);
+        expect(existsSync(lockPath)).toBe(true);
+
+        await releaseLockAsync(lockPath);
+        expect(existsSync(lockPath)).toBe(false);
+    });
+
+    it('acquireIoResourceLock expõe lease com run e liberação por asyncDispose', async () => {
+        const dir = await createTempDir();
+        const filePath = join(dir, 'disposable.txt');
+
+        const lease = await acquireIoResourceLock(filePath);
+        const nested = await lease.run(() => withIoResourceLock(filePath, async () => 'nested', { timeoutMs: 25 }));
+
+        expect(nested.value).toBe('nested');
+        expect(nested.waitMs).toBe(0);
+
+        await /** @type {{ [Symbol.asyncDispose]: () => Promise<void> }} */ (/** @type {unknown} */ (lease))[
+            Symbol.asyncDispose
+        ]();
+
+        const reacquired = await withIoResourceLock(filePath, async () => 'ok', { timeoutMs: 100 });
+        expect(reacquired.value).toBe('ok');
+    });
+
+    it('acquireIoResourceLocks expõe lease multi-recurso com run e liberação por asyncDispose', async () => {
+        const dir = await createTempDir();
+        const source = join(dir, 'source.txt');
+        const destination = join(dir, 'destination.txt');
+
+        const lease = await acquireIoResourceLocks([source, destination]);
+        const nested = await lease.run(async () => {
+            const sourceLock = await withIoResourceLock(source, async () => 'source-ok', { timeoutMs: 25 });
+            const destinationLock = await withIoResourceLock(destination, async () => 'destination-ok', {
+                timeoutMs: 25,
+            });
+            return [sourceLock.value, destinationLock.value];
+        });
+
+        expect(nested).toEqual(['source-ok', 'destination-ok']);
+
+        await /** @type {{ [Symbol.asyncDispose]: () => Promise<void> }} */ (/** @type {unknown} */ (lease))[
+            Symbol.asyncDispose
+        ]();
+
+        const reacquired = await withIoResourceLock(source, async () => 'ok', { timeoutMs: 100 });
+        expect(reacquired.value).toBe('ok');
     });
 });

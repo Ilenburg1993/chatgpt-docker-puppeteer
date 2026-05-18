@@ -10,6 +10,7 @@
  */
 
 import { LLM_B_TURN_TIMEOUT_MS, LLM_B_WATCHDOG_STALL_MS } from '#copilot/config';
+import { sleepMs } from '#copilot/core';
 import {
     EMITTER_ASSISTANT_STREAMING_DELTA,
     EMITTER_DIALOG_LOOP_CHANGED,
@@ -114,31 +115,15 @@ export function registerAgentEventListeners(printBanner) {
         }
 
         // 2. Aguardar janela adaptativa para o ask_user reaparecer (0 PR se reaparecer)
-        const recovered = await new Promise((resolve) => {
-            let settled = false;
-            const settle = (/** @type {boolean} */ value) => {
-                if (settled) return;
-                settled = true;
-                resolve(value);
-            };
-            const timeout = setTimeout(() => settle(false), WATCHDOG_RECOVERY_WAIT_MS);
-            const check = () => {
-                if (readTerminalRuntimeState().pendingQuestionKind === 'ready') {
-                    clearTimeout(timeout);
-                    settle(true);
-                }
-            };
-            // BUG-WDOG-02: check() imediato pode resolver a Promise antes do setInterval ser
-            // criado, deixando interval e timeout cleanup pendentes por WATCHDOG_RECOVERY_WAIT_MS.
-            // Solução: verificar `settled` antes de criar o interval.
-            check();
-            if (settled) return;
-            const interval = setInterval(() => {
-                check();
-                if (settled) clearInterval(interval);
-            }, 500);
-            setTimeout(() => clearInterval(interval), WATCHDOG_RECOVERY_WAIT_MS + 100);
-        });
+        let recovered = false;
+        const recoveryDeadline = Date.now() + WATCHDOG_RECOVERY_WAIT_MS;
+        while (Date.now() < recoveryDeadline) {
+            if (readTerminalRuntimeState().pendingQuestionKind === 'ready') {
+                recovered = true;
+                break;
+            }
+            await sleepMs(500, { id: 'terminal.watchdog.recovery.wait', unref: true });
+        }
 
         if (recovered) {
             // F52.3: ask_user reapareceu — dialog loop continua sem custo de PR
@@ -196,10 +181,7 @@ export function registerAgentEventListeners(printBanner) {
                 detail: `${secs}s — status=${runtimeState.status}, ping preventivo emitido`,
                 source: 'watchdog',
             });
-            log(
-                'INFO',
-                `[TerminalServer] Pré-stall (${secs}s) suprimido: terminal ativo (${runtimeState.status}).`,
-            );
+            log('INFO', `[TerminalServer] Pré-stall (${secs}s) suprimido: terminal ativo (${runtimeState.status}).`);
             broadcastSse('dialog.pre_stall_warning', { stalledMs: evt.stalledMs, suppressed: true });
             return;
         }

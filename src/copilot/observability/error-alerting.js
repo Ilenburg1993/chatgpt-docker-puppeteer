@@ -17,9 +17,8 @@
  * @see EventBus
  */
 
+import { cancelTimer, registerInterval } from '#copilot/core';
 import { log } from './logger.js';
-
-import { cancel as cancelTimer, registerTimer } from '../core/timer-registry.js';
 
 const WEBHOOK_TIMEOUT_MS = 5_000;
 
@@ -222,21 +221,20 @@ export function createErrorAlerter(tracker, config = {}) {
 
     function destroy() {
         if (_interval) {
-            clearInterval(_interval);
+            if (_intervalId) cancelTimer(_intervalId);
             _interval = null;
-            // F156: cancelar também no registry (idempotente)
-            cancelTimer('observability.errorAlerting');
+            _intervalId = null;
         }
         reset();
     }
 
     // F39.5: Check periódico automático (a cada 30s)
-    _interval = setInterval(check, 30_000);
+    /** @type {string | null} */
+    let _intervalId = `observability.errorAlerting:${Date.now()}:${Math.random().toString(36).slice(2)}`;
+    _interval = registerInterval(_intervalId, check, 30_000);
     if (typeof _interval === 'object' && 'unref' in _interval) {
         _interval.unref();
     }
-    // F156: registrar no timer-registry para cleanup automático via shutdown
-    registerTimer('observability.errorAlerting', 'interval', _interval);
 
     return { check, getLastAlert, getAlertStats, reset, destroy };
 }

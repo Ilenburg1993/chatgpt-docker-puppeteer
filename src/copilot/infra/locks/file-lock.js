@@ -5,4 +5,4 @@
  * @module copilot/infra/locks/file-lock
  */
 
-export { acquireLock, releaseLock } from '../lockfile.js';
+export { acquireLock, releaseLock, releaseLockAsync } from '../lockfile.js';

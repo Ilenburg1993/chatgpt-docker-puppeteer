@@ -5,5 +5,10 @@
  * @module copilot/infra/io/invalidation
  */
 
-export { publishIoInvalidation, registerIoInvalidationHook } from './bus.js';
+export {
+    flushIoInvalidationQueue,
+    publishIoInvalidation,
+    registerIoInvalidationHook,
+    resetIoInvalidationBusForTest,
+} from './bus.js';
 export { normalizeIoInvalidationEvent } from './events.js';

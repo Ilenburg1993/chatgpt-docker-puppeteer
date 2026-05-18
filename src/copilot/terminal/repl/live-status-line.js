@@ -9,6 +9,7 @@
  */
 
 import { TERMINAL_LIVE_STATUS_ENABLED, TERMINAL_LIVE_STATUS_INTERVAL_MS } from '#copilot/config';
+import { cancelTimer, registerInterval } from '#copilot/core';
 import { getBusy } from '../../presentation/state/index.js';
 import { clearInlineStatus, writeInlineStatus } from '../dialog/index.js';
 import { readTerminalDialogStreamMeta, readTerminalRuntimeState } from '../frontend/gateways/index.js';
@@ -133,6 +134,8 @@ export function setupTerminalLiveStatusLine(options = {}) {
     );
     /** @type {NodeJS.Timeout | null} */
     let timer = null;
+    /** @type {string | null} */
+    let timerId = null;
     let rendered = false;
     let lastRenderedLine = '';
     let lastRenderedAt = 0;
@@ -159,13 +162,15 @@ export function setupTerminalLiveStatusLine(options = {}) {
         lastRenderedLine = line;
         lastRenderedAt = now;
     };
-    timer = setInterval(render, intervalMs);
+    timerId = `terminal.live-status-line:${Date.now()}:${Math.random().toString(36).slice(2)}`;
+    timer = registerInterval(timerId, render, intervalMs);
     if (typeof timer.unref === 'function') timer.unref();
     render();
     return () => {
         if (timer) {
-            clearInterval(timer);
+            if (timerId) cancelTimer(timerId);
             timer = null;
+            timerId = null;
         }
         if (rendered) {
             clearInlineStatus();

@@ -258,7 +258,8 @@ function log(level, msg, metaOrTaskId = '-') {
 
     let content = msg;
     if (msg instanceof Error) {
-        content = `${msg.message}\n${msg.stack}`;
+        const e = toError(msg);
+        content = `${e.message}\n${e.stack}`;
     } else if (typeof msg === 'object') {
         try {
             content = JSON.stringify(msg);

@@ -2,14 +2,14 @@
 /**
  * Porta baixa para subprocessos de busca local.
  *
- * Mantém a engine canônica afastada dos detalhes de `child_process` e concentra
- * caches de disponibilidade/execução usados por adapters como rg e grep.
+ * Mantém a engine canônica afastada dos detalhes de `child_process` e concentra caches de disponibilidade/execução
+ * usados por adapters como rg e grep.
  *
  * @module copilot/infra/io/search/subprocess
  */
 
 import { spawn } from 'node:child_process';
-import { concatBufferViews, toBufferView, toOwnedBuffer } from '../../shared/buffer.js';
+import { concatBufferViews, toOwnedBuffer } from '../../shared/buffer.js';
 
 const DEFAULT_SEARCH_SUBPROCESS_MAX_BUFFER_BYTES = 1024 * 1024;
 
@@ -92,14 +92,26 @@ function normalizeTimeout(timeout) {
  * @param {NodeJS.Signals | null} signal
  * @param {string} stdout
  * @param {string} stderr
- * @returns {Error & { code?: number | string; status?: number; signal?: NodeJS.Signals; stdout?: string; stderr?: string; killed?: boolean }}
+ * @returns {Error & {
+ *     code?: number | string;
+ *     status?: number;
+ *     signal?: NodeJS.Signals;
+ *     stdout?: string;
+ *     stderr?: string;
+ *     killed?: boolean;
+ * }}
  */
 function makeSearchExitError(file, args, status, signal, stdout, stderr) {
     const descriptor = [file, ...args].join(' ');
     const reason = signal ? `signal ${signal}` : `exit code ${String(status)}`;
-    const error = /** @type {Error & { code?: number | string; status?: number; signal?: NodeJS.Signals; stdout?: string; stderr?: string; killed?: boolean }} */ (
-        new Error(`Comando de busca falhou (${reason}): ${descriptor}`)
-    );
+    const error = /** @type {Error & {
+    code?: number | string;
+    status?: number;
+    signal?: NodeJS.Signals;
+    stdout?: string;
+    stderr?: string;
+    killed?: boolean;
+}} */ (new Error(`Comando de busca falhou (${reason}): ${descriptor}`));
     if (status !== null) {
         error.code = status;
         error.status = status;
@@ -134,8 +146,8 @@ function makeSearchRuntimeError(message, stdout, stderr, code) {
 /**
  * Executa um binário de busca com argumentos já normalizados pelo adapter chamador.
  *
- * Usa `spawn` e coleta stdout/stderr com limite explícito para evitar que um
- * `execFile` bufferize grandes resultados antes de a IO conseguir reagir.
+ * Usa `spawn` e coleta stdout/stderr com limite explícito para evitar que um `execFile` bufferize grandes resultados
+ * antes de a IO conseguir reagir.
  *
  * @param {string} file
  * @param {readonly string[]} args
@@ -164,7 +176,11 @@ export async function execSearchFile(file, args, options = {}) {
             stdio: ['ignore', 'pipe', 'pipe'],
             ...(options.cwd !== undefined ? { cwd: options.cwd } : {}),
         };
-        const child = spawn(executable, normalizedArgs, /** @type {import('node:child_process').SpawnOptions} */ (spawnOptions));
+        const child = spawn(
+            executable,
+            normalizedArgs,
+            /** @type {import('node:child_process').SpawnOptions} */ (spawnOptions),
+        );
 
         const decodeStdout = () => concatBufferViews(stdoutChunks, stdoutBytes).toString('utf8');
         const decodeStderr = () => concatBufferViews(stderrChunks, stderrBytes).toString('utf8');
@@ -211,12 +227,11 @@ export async function execSearchFile(file, args, options = {}) {
          */
         const collect = (target, chunk) => {
             if (settled) return;
-            const buffer =
+            const buffer = toOwnedBuffer(
                 typeof chunk === 'string'
-                    ? toOwnedBuffer(chunk)
-                    : toBufferView(
-                          /** @type {Buffer | Uint8Array | ArrayBuffer | SharedArrayBuffer | DataView} */ (chunk),
-                      );
+                    ? chunk
+                    : /** @type {Buffer | Uint8Array | ArrayBuffer | SharedArrayBuffer | DataView} */ (chunk),
+            );
             if (target === 'stdout') {
                 stdoutBytes += buffer.byteLength;
                 if (stdoutBytes > maxBuffer) {

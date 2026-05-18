@@ -4,21 +4,21 @@
  *
  * Monitor passivo de mudanças em `src/copilot/**` para uso em sessões de longa duração.
  *
- * **Modo padrão: `notify`** — detecta e acumula mudanças, loga, mas NÃO reinicia o processo.
- * O reinício automático destruiria a sessão de chat ativa. O utilizador controla o momento
- * certo via ferramenta `reload_agent_process`.
+ * **Modo padrão: `notify`** — detecta e acumula mudanças, loga, mas NÃO reinicia o processo. O reinício automático
+ * destruiria a sessão de chat ativa. O utilizador controla o momento certo via ferramenta `reload_agent_process`.
  *
- * **Modo `auto`** — reinicia automaticamente. Só é seguro com supervisor externo (PM2, node --watch)
- * em contextos onde a sessão de chat é descartável (pipelines, testes isolados). Activado por
- * `COPILOT_DEV_WATCH=auto`.
+ * **Modo `auto`** — reinicia automaticamente. Só é seguro com supervisor externo (PM2, node --watch) em contextos onde
+ * a sessão de chat é descartável (pipelines, testes isolados). Activado por `COPILOT_DEV_WATCH=auto`.
  *
  * Activação:
- *   - `COPILOT_DEV_WATCH=true` ou `COPILOT_DEV_WATCH=notify` → modo notify
- *   - `COPILOT_DEV_WATCH=auto`  → modo auto-restart (⚠️  quebra chat activo)
+ *
+ * - `COPILOT_DEV_WATCH=true` ou `COPILOT_DEV_WATCH=notify` → modo notify
+ * - `COPILOT_DEV_WATCH=auto` → modo auto-restart (⚠️ quebra chat activo)
  *
  * @module copilot/terminal/dev-watch
  */
 
+import { toError } from '#copilot/core';
 import { watch as fsWatch } from 'node:fs';
 import { dirname, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -74,8 +74,8 @@ export function getDevWatchStatus() {
 /**
  * Inicia o monitor de ficheiros para `src/copilot/`.
  *
- * No-op quando `COPILOT_DEV_WATCH` não está definido e `opts.mode` não é fornecido.
- * Regista handler de cleanup no shutdown para fechar o watcher sem file descriptors pendentes.
+ * No-op quando `COPILOT_DEV_WATCH` não está definido e `opts.mode` não é fornecido. Regista handler de cleanup no
+ * shutdown para fechar o watcher sem file descriptors pendentes.
  *
  * @param {DevWatchOptions} [opts]
  * @returns {void}
@@ -128,7 +128,7 @@ function _startNotifyWatcher(watchPath, debounceMs) {
     });
 
     watcher.on('error', (/** @type {Error} */ err) => {
-        log('WARN', `[dev-watch] Watcher erro: ${err instanceof Error ? err.message : String(err)}`);
+        log('WARN', `[dev-watch] Watcher erro: ${toError(err).message}`);
     });
 
     _registerCleanup(() => {
@@ -138,7 +138,7 @@ function _startNotifyWatcher(watchPath, debounceMs) {
 }
 
 /**
- * Modo `auto`: reinicia o processo após detecção (⚠️  quebra sessão de chat activa).
+ * Modo `auto`: reinicia o processo após detecção (⚠️ quebra sessão de chat activa).
  *
  * @param {string} watchPath
  * @param {number} debounceMs
@@ -165,7 +165,7 @@ function _startAutoWatcher(watchPath, debounceMs) {
     });
 
     watcher.on('error', (/** @type {Error} */ err) => {
-        log('WARN', `[dev-watch] Watcher erro: ${err instanceof Error ? err.message : String(err)}`);
+        log('WARN', `[dev-watch] Watcher erro: ${toError(err).message}`);
     });
 
     _registerCleanup(() => {

@@ -1,6 +1,6 @@
 // @ts-check
 import { resolveHooksStateFile } from '#copilot/boot';
-import { logSwallowed } from '#copilot/core';
+import { logSwallowed, registerInterval, toError } from '#copilot/core';
 import { getCopilotDb } from '#copilot/db';
 import { log } from '../infra/logger.js';
 import { SCHEMA_VERSION } from './todo-schema.js';
@@ -113,6 +113,20 @@ export async function withStore(fn) {
 }
 
 /**
+ * Serializa uma operação somente-leitura no store, reutilizando o mesmo mutex de escrita para consistência.
+ *
+ * @template T
+ * @param {(store: TodoStore) => Promise<T> | T} fn
+ * @returns {Promise<T>}
+ */
+export async function withStoreRead(fn) {
+    const acquire = _storeMutex.then(() => undefined);
+    await acquire;
+    const store = await _readStoreRaw();
+    return fn(store);
+}
+
+/**
  * @returns {Promise<TodoStore>}
  */
 async function _readStoreRaw() {
@@ -173,7 +187,211 @@ async function _writeStoreRaw(store) {
  * @returns {Promise<TodoStore>}
  */
 export async function readStore() {
-    return _readStoreRaw();
+    return withStoreRead((store) => store);
+}
+
+/**
+ * @param {{ id: string; data: string }[]} rows
+ * @returns {TodoItem[]}
+ */
+function deserializeTaskRows(rows) {
+    /** @type {TodoItem[]} */
+    const tasks = [];
+    for (const row of rows) {
+        try {
+            const task = /** @type {TodoItem} */ (JSON.parse(row.data));
+            tasks.push(task);
+        } catch (e) {
+            logSwallowed(e, 'todo.store.deserializeTaskRows');
+        }
+    }
+    return tasks;
+}
+
+/**
+ * Lê tarefas paginadas via SQL, com filtros aplicados no banco para evitar full-load em memória.
+ *
+ * @param {{
+ *     status?: TodoStatus;
+ *     priority?: TodoPriority;
+ *     tag?: string;
+ *     parentId?: string | null;
+ *     text?: string;
+ *     overdueOnly?: boolean;
+ *     limit?: number;
+ *     offset?: number;
+ * }} [opts]
+ * @returns {Promise<{
+ *     tasks: TodoItem[];
+ *     total: number;
+ *     returned: number;
+ *     limit: number;
+ *     offset: number;
+ *     hasMore: boolean;
+ * }>}
+ */
+export async function readTasksPage(opts = {}) {
+    const { status, priority, tag, parentId, text, overdueOnly, limit = 100, offset = 0 } = opts;
+
+    const safeLimit = Number.isFinite(limit) ? Math.max(1, Math.floor(limit)) : 100;
+    const safeOffset = Number.isFinite(offset) ? Math.max(0, Math.floor(offset)) : 0;
+
+    const acquire = _storeMutex.then(() => undefined);
+    await acquire;
+
+    const db = getCopilotDb();
+    /** @type {string[]} */
+    const where = [];
+    /** @type {unknown[]} */
+    const params = [];
+
+    if (status) {
+        where.push("json_extract(data, '$.status') = ?");
+        params.push(status);
+    }
+    if (priority) {
+        where.push("json_extract(data, '$.priority') = ?");
+        params.push(priority);
+    }
+    if (typeof parentId === 'string') {
+        where.push("json_extract(data, '$.parentId') = ?");
+        params.push(parentId);
+    } else if (parentId === null) {
+        where.push("json_extract(data, '$.parentId') IS NULL");
+    }
+    if (typeof tag === 'string' && tag.trim().length > 0) {
+        where.push("EXISTS (SELECT 1 FROM json_each(data, '$.tags') jt WHERE jt.value = ?)");
+        params.push(tag.trim());
+    }
+    if (typeof text === 'string' && text.trim().length > 0) {
+        where.push(
+            "(LOWER(COALESCE(json_extract(data, '$.title'), '')) LIKE ? " +
+                "OR LOWER(COALESCE(json_extract(data, '$.description'), '')) LIKE ? " +
+                "OR LOWER(COALESCE(json_extract(data, '$.notes'), '')) LIKE ?)",
+        );
+        const like = `%${text.trim().toLowerCase()}%`;
+        params.push(like, like, like);
+    }
+    if (overdueOnly) {
+        where.push(
+            "json_extract(data, '$.dueDate') IS NOT NULL " +
+                "AND json_extract(data, '$.status') NOT IN ('done', 'cancelled') " +
+                "AND json_extract(data, '$.dueDate') < ?",
+        );
+        params.push(new Date().toISOString());
+    }
+
+    const whereClause = where.length > 0 ? `WHERE ${where.join(' AND ')}` : '';
+    const countSql = `SELECT COUNT(*) AS n FROM copilot_todo_tasks ${whereClause}`;
+    const countRow = /** @type {{ n: number }} */ (db.prepare(countSql).get(...params));
+    const total = Number(countRow?.n ?? 0);
+
+    const listSql =
+        `SELECT id, data FROM copilot_todo_tasks ${whereClause} ` +
+        `ORDER BY ` +
+        `CASE ` +
+        `WHEN json_extract(data, '$.dueDate') IS NOT NULL ` +
+        `AND json_extract(data, '$.status') NOT IN ('done', 'cancelled') ` +
+        `AND json_extract(data, '$.dueDate') < ? THEN 0 ELSE 1 END ASC, ` +
+        `CASE json_extract(data, '$.priority') ` +
+        `WHEN 'critical' THEN 0 WHEN 'high' THEN 1 WHEN 'medium' THEN 2 WHEN 'low' THEN 3 ELSE 4 END ASC, ` +
+        `json_extract(data, '$.createdAt') DESC ` +
+        `LIMIT ? OFFSET ?`;
+
+    const rows = /** @type {{ id: string; data: string }[]} */ (
+        db.prepare(listSql).all(...params, new Date().toISOString(), safeLimit, safeOffset)
+    );
+
+    const tasks = deserializeTaskRows(rows);
+    return {
+        tasks,
+        total,
+        returned: tasks.length,
+        limit: safeLimit,
+        offset: safeOffset,
+        hasMore: safeOffset + tasks.length < total,
+    };
+}
+
+/**
+ * Busca paginada SQL com todos os termos (AND) aplicados em título/descrição/notas/tags.
+ *
+ * @param {{
+ *     terms: string[];
+ *     status?: TodoStatus;
+ *     priority?: TodoPriority;
+ *     limit?: number;
+ *     offset?: number;
+ * }} opts
+ * @returns {Promise<{
+ *     tasks: TodoItem[];
+ *     total: number;
+ *     returned: number;
+ *     limit: number;
+ *     offset: number;
+ *     hasMore: boolean;
+ * }>}
+ */
+export async function searchTasksPage(opts) {
+    const { terms, status, priority, limit = 100, offset = 0 } = opts;
+    const safeTerms = terms.map((t) => t.trim().toLowerCase()).filter((t) => t.length > 0);
+    const safeLimit = Number.isFinite(limit) ? Math.max(1, Math.floor(limit)) : 100;
+    const safeOffset = Number.isFinite(offset) ? Math.max(0, Math.floor(offset)) : 0;
+
+    const acquire = _storeMutex.then(() => undefined);
+    await acquire;
+
+    const db = getCopilotDb();
+    /** @type {string[]} */
+    const where = [];
+    /** @type {unknown[]} */
+    const params = [];
+
+    if (status) {
+        where.push("json_extract(data, '$.status') = ?");
+        params.push(status);
+    }
+    if (priority) {
+        where.push("json_extract(data, '$.priority') = ?");
+        params.push(priority);
+    }
+
+    for (const term of safeTerms) {
+        where.push(
+            "(LOWER(COALESCE(json_extract(data, '$.title'), '')) LIKE ? " +
+                "OR LOWER(COALESCE(json_extract(data, '$.description'), '')) LIKE ? " +
+                "OR LOWER(COALESCE(json_extract(data, '$.notes'), '')) LIKE ? " +
+                "OR EXISTS (SELECT 1 FROM json_each(data, '$.tags') jt WHERE LOWER(COALESCE(jt.value, '')) LIKE ?))",
+        );
+        const like = `%${term}%`;
+        params.push(like, like, like, like);
+    }
+
+    const whereClause = where.length > 0 ? `WHERE ${where.join(' AND ')}` : '';
+    const countSql = `SELECT COUNT(*) AS n FROM copilot_todo_tasks ${whereClause}`;
+    const countRow = /** @type {{ n: number }} */ (db.prepare(countSql).get(...params));
+    const total = Number(countRow?.n ?? 0);
+
+    const listSql =
+        `SELECT id, data FROM copilot_todo_tasks ${whereClause} ` +
+        `ORDER BY ` +
+        `CASE json_extract(data, '$.priority') ` +
+        `WHEN 'critical' THEN 0 WHEN 'high' THEN 1 WHEN 'medium' THEN 2 WHEN 'low' THEN 3 ELSE 4 END ASC, ` +
+        `json_extract(data, '$.createdAt') DESC ` +
+        `LIMIT ? OFFSET ?`;
+
+    const rows = /** @type {{ id: string; data: string }[]} */ (
+        db.prepare(listSql).all(...params, safeLimit, safeOffset)
+    );
+    const tasks = deserializeTaskRows(rows);
+    return {
+        tasks,
+        total,
+        returned: tasks.length,
+        limit: safeLimit,
+        offset: safeOffset,
+        hasMore: safeOffset + tasks.length < total,
+    };
 }
 
 // ---------------------------------------------------------------------------
@@ -343,13 +561,20 @@ export function startTodoCleanupJob(opts = {}) {
     const { intervalMs = 24 * 60 * 60 * 1000, maxAgeDays = TODO_MAX_AGE_DAYS } = opts;
 
     // Executa imediatamente (assíncrono, sem bloquear)
-    cleanupExpiredTasks(maxAgeDays).catch((/** @type {Error} */ e) =>
-        log('WARN', `[todo/store] cleanup inicial falhou: ${e.message}`),
+    cleanupExpiredTasks(maxAgeDays).catch((e) =>
+        log('WARN', `[todo/store] cleanup inicial falhou: ${toError(e).message}`),
     );
 
-    return setInterval(() => {
-        cleanupExpiredTasks(maxAgeDays).catch((/** @type {Error} */ e) =>
-            log('WARN', `[todo/store] cleanup periódico falhou: ${e.message}`),
-        );
-    }, intervalMs);
+    const timerId = `todo.store.cleanup:${Date.now()}:${Math.random().toString(36).slice(2)}`;
+    const timer = registerInterval(
+        timerId,
+        () => {
+            cleanupExpiredTasks(maxAgeDays).catch((e) =>
+                log('WARN', `[todo/store] cleanup periódico falhou: ${toError(e).message}`),
+            );
+        },
+        intervalMs,
+    );
+
+    return timer;
 }

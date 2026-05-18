@@ -9,9 +9,28 @@
  */
 
 import { WEBHOOK_ALLOW_PRIVATE_HOSTS } from '#copilot/config';
+import { MAX_WEBHOOKS, WEBHOOK_MAX_RETRIES, WEBHOOK_RETRY_BASE_MS, WEBHOOK_TIMEOUT_MS } from '#copilot/config/agent';
 import { ConfigError, checkResolvedIp, toError, validateWebhookUrl } from '#copilot/core';
 import { log } from '#copilot/observability';
-import { MAX_WEBHOOKS, WEBHOOK_MAX_RETRIES, WEBHOOK_RETRY_BASE_MS, WEBHOOK_TIMEOUT_MS } from '#copilot/config/agent';
+
+/**
+ * @param {number} timeoutMs
+ * @returns {{ signal: AbortSignal; cleanup: () => void }}
+ */
+function createTimeoutSignal(timeoutMs) {
+    const abortSignalCtor = /** @type {{ timeout?: (ms: number) => AbortSignal }} */ (AbortSignal);
+    if (typeof abortSignalCtor.timeout === 'function') {
+        return { signal: abortSignalCtor.timeout(Math.max(0, timeoutMs)), cleanup: () => {} };
+    }
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), Math.max(0, timeoutMs));
+    timeoutId.unref?.();
+    return {
+        signal: controller.signal,
+        cleanup: () => clearTimeout(timeoutId),
+    };
+}
 
 /**
  * @typedef {{ id: string; url: string }} WebhookEntry
@@ -193,15 +212,13 @@ export class WebhookManager {
                 });
             }
 
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), WEBHOOK_TIMEOUT_MS);
-            timeoutId.unref?.();
+            const timeoutHandle = createTimeoutSignal(WEBHOOK_TIMEOUT_MS);
             try {
                 const resp = await fetch(url, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body,
-                    signal: controller.signal,
+                    signal: timeoutHandle.signal,
                 });
                 if (resp.ok) return; // sucesso
 
@@ -230,7 +247,7 @@ export class WebhookManager {
                     );
                 }
             } finally {
-                clearTimeout(timeoutId);
+                timeoutHandle.cleanup();
             }
         }
     }

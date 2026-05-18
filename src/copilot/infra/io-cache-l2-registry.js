@@ -1,6 +1,8 @@
 // @ts-check
 
+import { cancelTimer, registerInterval, toError } from '#copilot/core';
 import { getCopilotDb } from '#copilot/db';
+import { publishIoLifecycleEvent } from './io-observability.js';
 
 import { createIoL2SqliteCache } from './io-cache-l2-sqlite.js';
 import { readEnvPositiveInt } from './shared/env.js';
@@ -9,6 +11,8 @@ import { readEnvPositiveInt } from './shared/env.js';
 let _ioL2Cache = null;
 /** @type {NodeJS.Timeout | null} */
 let _pruneTimer = null;
+/** @type {string | null} */
+let _pruneTimerId = null;
 /** @type {string | null} */
 let _lastInitError = null;
 /** @type {number | null} */
@@ -32,7 +36,8 @@ function isEnabled() {
 function startPruneTimer() {
     if (_pruneTimer) return;
     const pruneCycleMs = readEnvPositiveInt('IO_L2_CACHE_PRUNE_MS', 5 * 60 * 1000);
-    _pruneTimer = setInterval(() => {
+    _pruneTimerId = `io-cache-l2.prune:${Date.now()}:${Math.random().toString(36).slice(2)}`;
+    _pruneTimer = registerInterval(_pruneTimerId, () => {
         try {
             const cache = _ioL2Cache;
             if (!cache) return;
@@ -41,7 +46,7 @@ function startPruneTimer() {
                 console.debug(`[io-cache-l2] Pruned ${removed} expired entries.`);
             }
         } catch (err) {
-            _lastPruneError = err instanceof Error ? err.message : String(err ?? 'unknown-prune-error');
+            _lastPruneError = toError(err ?? 'unknown-prune-error').message;
             _lastPruneErrorAtMs = Date.now();
             if (process.env['DEBUG_IO_L2'] === '1') {
                 console.error('[io-cache-l2] Prune error:', err);
@@ -69,18 +74,30 @@ export function getIoL2Cache() {
         });
         _lastInitError = null;
         _lastInitErrorAtMs = null;
+        const hadCircuitOpen = _circuitOpenUntilMs !== null;
         _initFailCount = 0;
         _circuitOpenUntilMs = null;
+        if (hadCircuitOpen) {
+            publishIoLifecycleEvent('cache', 'l2.circuit-closed', {
+                reason: 'init-succeeded',
+            });
+        }
         startPruneTimer();
         return _ioL2Cache;
     } catch (err) {
         _initFailCount += 1;
-        _lastInitError = err instanceof Error ? err.message : String(err ?? 'unknown-init-error');
+        _lastInitError = toError(err ?? 'unknown-init-error').message;
         _lastInitErrorAtMs = Date.now();
         if (_initFailCount >= MAX_INIT_FAILURES) {
             const idx = Math.min(_initFailCount - MAX_INIT_FAILURES, CIRCUIT_BACKOFF_MS.length - 1);
             const backoffMs = CIRCUIT_BACKOFF_MS[idx] ?? CIRCUIT_BACKOFF_MS[CIRCUIT_BACKOFF_MS.length - 1] ?? 30_000;
             _circuitOpenUntilMs = Date.now() + backoffMs;
+            publishIoLifecycleEvent('cache', 'l2.circuit-open', {
+                initFailCount: _initFailCount,
+                backoffMs,
+                circuitOpenUntilMs: _circuitOpenUntilMs,
+                lastInitError: _lastInitError,
+            });
         }
         if (process.env['DEBUG_IO_L2'] === '1') {
             console.debug('[io-cache-l2] Failed to initialize L2 cache; operating in L1-only mode.');
@@ -152,7 +169,8 @@ export function resetIoL2CacheForTest() {
     _initFailCount = 0;
     _circuitOpenUntilMs = null;
     if (_pruneTimer) {
-        clearInterval(_pruneTimer);
+        if (_pruneTimerId) cancelTimer(_pruneTimerId);
         _pruneTimer = null;
+        _pruneTimerId = null;
     }
 }

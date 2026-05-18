@@ -12,7 +12,15 @@
 
 import { readCopilotBootConfig } from '#copilot/boot';
 import { LLM_B_TURN_TIMEOUT_MS } from '#copilot/config';
-import { BridgeError, resolveOptionalDialogTimeout, resolveOptionalTransportTimeout, toError } from '#copilot/core';
+import {
+    BridgeError,
+    cancelTimer,
+    registerInterval,
+    resolveOptionalDialogTimeout,
+    resolveOptionalTransportTimeout,
+    sleepMs,
+    toError,
+} from '#copilot/core';
 import { utf8ByteLength } from '#copilot/infra/public/buffer';
 import { log, recordToolCall } from '#copilot/observability';
 import http from 'node:http';
@@ -110,9 +118,9 @@ function _checkClientRateLimit() {
  *     | 'abort'
  *     | 'abort-and-queue'
  *     | 'abort_and_queue'} [mode]
- *   - modo de entrega: `queue`/`mailbox` enfileira no mailbox zero-PR para a próxima ask_user; `turn`/`dialog` abre
- *       turno canônico e pode consumir PR; `steer`/`immediate` usa SDK immediate quando política permitir; `interrupt`
- *       aborta o turno ativo e, por padrão, guarda substituição no mailbox; `abort` apenas aborta o turno ativo.
+ *   - modo de entrega: `queue`/`mailbox` enfileira no mailbox zero-PR para a próxima ask_user; `turn`/`dialog` abre turno
+ *       canônico e pode consumir PR; `steer`/`immediate` usa SDK immediate quando política permitir; `interrupt` aborta
+ *       o turno ativo e, por padrão, guarda substituição no mailbox; `abort` apenas aborta o turno ativo.
  *
  * @property {number | null} [timeoutMs] - timeout semântico do turno em ms (padrão adaptativo). Use 0/null para
  *   watchdog-only (sem timeout absoluto)
@@ -129,7 +137,9 @@ function _checkClientRateLimit() {
  * @typedef {Object} InjectResult
  * @property {boolean} ok - true se a resposta foi obtida com sucesso
  * @property {string | null} reply - Resposta de LLM-B; null em modos zero-PR assíncronos/mailbox
- * @property {'queue' | 'mailbox_queue' | 'deferred_mailbox' | 'steer' | 'interrupt' | 'abort' | string | undefined} [mode] - modo efetivo retornado pela borda
+ * @property {'queue' | 'mailbox_queue' | 'deferred_mailbox' | 'steer' | 'interrupt' | 'abort' | string | undefined} [mode]
+ *   - modo efetivo retornado pela borda
+ *
  * @property {string | undefined} [messageId] - id SDK retornado por modo `steer`
  * @property {number} durationMs - Duração da chamada em ms
  * @property {string} from - Ator remetente
@@ -261,7 +271,7 @@ export async function injectToLlmB(message, opts = {}) {
                     'INFO',
                     `[inject-llmb] Tentativa ${attempt + 1}/${maxRetries} (${isBusy ? 'BUSY' : 'BOOTING'}) — aguardando ${waitMs}ms...`,
                 );
-                await new Promise((r) => setTimeout(r, waitMs));
+                await sleepMs(waitMs, { id: `channel.inject.retry:${attempt + 1}`, unref: true });
                 continue;
             }
             throw err;
@@ -450,13 +460,57 @@ export async function waitForLlmBReady(opts = {}) {
     const port = opts.port ?? DEFAULT_PORT;
     const deadline = maxWaitMs === null ? Number.POSITIVE_INFINITY : Date.now() + maxWaitMs;
 
-    while (Date.now() < deadline) {
-        const h = await checkLlmBHealth({ port });
-        if (h.ready) return;
-        await new Promise((r) => setTimeout(r, pollIntervalMs));
-    }
+    return await new Promise((resolve, reject) => {
+        let settled = false;
+        let running = false;
+        const timerId = `channel.inject.waitForReady:${Date.now()}:${Math.random().toString(36).slice(2)}`;
 
-    throw new BridgeError(`[inject-llmb] Terminal LLM-B não ficou pronto em ${maxWaitMs}ms.`, 'LLM_B_NOT_READY');
+        /** @param {unknown} [error] */
+        const settle = (error) => {
+            if (settled) return;
+            settled = true;
+            cancelTimer(timerId);
+            if (error !== undefined) {
+                reject(toError(error));
+            } else {
+                resolve();
+            }
+        };
+
+        const tick = async () => {
+            if (settled || running) return;
+            running = true;
+            try {
+                const h = await checkLlmBHealth({ port });
+                if (h.ready) {
+                    settle();
+                    return;
+                }
+                if (Date.now() >= deadline) {
+                    settle(
+                        new BridgeError(
+                            `[inject-llmb] Terminal LLM-B não ficou pronto em ${maxWaitMs}ms.`,
+                            'LLM_B_NOT_READY',
+                        ),
+                    );
+                }
+            } catch (error) {
+                settle(error);
+            } finally {
+                running = false;
+            }
+        };
+
+        void tick();
+        const timer = registerInterval(
+            timerId,
+            () => {
+                void tick();
+            },
+            pollIntervalMs,
+        );
+        timer.unref?.();
+    });
 }
 
 /** @typedef {import('./sse-client.js').SseEvent} SseEvent */

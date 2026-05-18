@@ -59,11 +59,7 @@ export function detachRuntimeObservers(ctx) {
         try {
             unsub();
         } catch (e) {
-            log(
-                'WARN',
-                '[runtime-teardown] unsub falhou (continuando limpeza): ' +
-                    (e instanceof Error ? e.message : String(e)),
-            );
+            log('WARN', '[runtime-teardown] unsub falhou (continuando limpeza): ' + toError(e).message);
         }
     }
     ctx.clearSessionEventUnsubscribers();

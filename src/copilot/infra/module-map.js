@@ -8,6 +8,10 @@
  * @module copilot/infra/module-map
  */
 
+import { readdirSync } from 'node:fs';
+import { dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
 /**
  * @typedef {'file' | 'directory'} InfraModuleKind
  *
@@ -278,6 +282,15 @@ export const INFRA_MODULE_LAYOUT = Object.freeze([
         summary: 'Parser de símbolos, outline, comentários e schema para contexto.',
     },
     {
+        path: 'io-parser-worker.js',
+        kind: 'file',
+        role: 'io-parser',
+        tier: 'secondary',
+        risk: 'watch',
+        public: false,
+        summary: 'Worker thread dedicado ao parse JS/TS off-main-thread com retorno de símbolos/imports/exports.',
+    },
+    {
         path: 'io-session-scope.js',
         kind: 'file',
         role: 'io-scope',
@@ -379,6 +392,30 @@ function increment(bucket, key) {
 }
 
 /**
+ * Conta entradas por chave usando `Object.groupBy` quando disponível (Node 24+), com fallback seguro.
+ *
+ * @template T
+ * @param {readonly T[]} entries
+ * @param {(entry: T) => string} selector
+ * @returns {Record<string, number>}
+ */
+function countBy(entries, selector) {
+    const objectCtor =
+        /** @type {{ groupBy?: (items: readonly T[], fn: (item: T) => string) => Record<string, T[]> }} */ (Object);
+    if (typeof objectCtor.groupBy === 'function') {
+        const grouped = objectCtor.groupBy(entries, selector);
+        return Object.fromEntries(Object.entries(grouped).map(([key, values]) => [key, values.length]));
+    }
+
+    /** @type {Record<string, number>} */
+    const fallback = {};
+    for (const entry of entries) {
+        increment(fallback, selector(entry));
+    }
+    return fallback;
+}
+
+/**
  * @param {InfraModuleRole} role
  * @returns {InfraModuleDescriptor[]}
  */
@@ -413,29 +450,45 @@ export function getInfraModuleDescriptor(path) {
  *     byRisk: Record<string, number>;
  *     publicEntries: string[];
  *     hotspots: string[];
+ *     drift: {
+ *         available: boolean;
+ *         missingInLayout: string[];
+ *         staleInLayout: string[];
+ *     };
  * }}
  */
 export function buildInfraModuleScorecard() {
-    /** @type {Record<string, number>} */
-    const byKind = {};
-    /** @type {Record<string, number>} */
-    const byRole = {};
-    /** @type {Record<string, number>} */
-    const byTier = {};
-    /** @type {Record<string, number>} */
-    const byRisk = {};
-    /** @type {string[]} */
-    const publicEntries = [];
-    /** @type {string[]} */
-    const hotspots = [];
+    const byKind = countBy(INFRA_MODULE_LAYOUT, (entry) => entry.kind);
+    const byRole = countBy(INFRA_MODULE_LAYOUT, (entry) => entry.role);
+    const byTier = countBy(INFRA_MODULE_LAYOUT, (entry) => entry.tier);
+    const byRisk = countBy(INFRA_MODULE_LAYOUT, (entry) => entry.risk);
+    const publicEntries = INFRA_MODULE_LAYOUT.filter((entry) => entry.public).map((entry) => entry.path);
+    const hotspots = INFRA_MODULE_LAYOUT.filter((entry) => entry.risk === 'hotspot').map((entry) => entry.path);
 
-    for (const entry of INFRA_MODULE_LAYOUT) {
-        increment(byKind, entry.kind);
-        increment(byRole, entry.role);
-        increment(byTier, entry.tier);
-        increment(byRisk, entry.risk);
-        if (entry.public) publicEntries.push(entry.path);
-        if (entry.risk === 'hotspot') hotspots.push(entry.path);
+    /** @type {{ available: boolean; missingInLayout: string[]; staleInLayout: string[] }} */
+    const drift = {
+        available: false,
+        missingInLayout: [],
+        staleInLayout: [],
+    };
+
+    try {
+        const modulePath = fileURLToPath(import.meta.url);
+        const infraRoot = dirname(modulePath);
+        const actualEntries = readdirSync(infraRoot, { withFileTypes: true })
+            .filter((entry) => entry.name === 'README.md' || entry.name.endsWith('.js') || entry.isDirectory())
+            .map((entry) => (entry.isDirectory() ? `${entry.name}/` : entry.name))
+            .sort();
+        const mappedEntries = INFRA_MODULE_LAYOUT.map((entry) => entry.path).sort();
+
+        const mappedSet = new Set(mappedEntries);
+        const actualSet = new Set(actualEntries);
+
+        drift.available = true;
+        drift.missingInLayout = actualEntries.filter((path) => !mappedSet.has(path));
+        drift.staleInLayout = mappedEntries.filter((path) => !actualSet.has(path));
+    } catch {
+        // best effort: scorecard não deve falhar por limitações de filesystem/runtime.
     }
 
     return {
@@ -446,5 +499,6 @@ export function buildInfraModuleScorecard() {
         byRisk,
         publicEntries: publicEntries.sort(),
         hotspots: hotspots.sort(),
+        drift,
     };
 }

@@ -12,6 +12,12 @@
 /** @typedef {'connection' | 'session'} RuntimeSdkRecoveryScope */
 /** @typedef {'session' | 'weekly_model' | 'unknown'} RuntimeSdkRateLimitScope */
 
+const errorCtor = /** @type {{ isError?: (value: unknown) => boolean }} */ (Error);
+const isError =
+    typeof errorCtor.isError === 'function'
+        ? /** @type {(value: unknown) => boolean} */ (errorCtor.isError.bind(Error))
+        : /** @type {(value: unknown) => boolean} */ ((value) => value instanceof Error);
+
 /**
  * @typedef {{
  *     kind: RuntimeSdkErrorKind;
@@ -46,12 +52,13 @@ function lower(value) {
  * @returns {{ code: string; errorType: string; message: string; status: number | null }}
  */
 function getRuntimeSdkErrorFingerprint(error) {
-    if (error instanceof Error) {
-        const raw = /** @type {Record<string, unknown>} */ (/** @type {unknown} */ (error));
+    if (isError(error)) {
+        const err = /** @type {Error} */ (error);
+        const raw = /** @type {Record<string, unknown>} */ (/** @type {unknown} */ (err));
         return {
             code: lower(raw['code']),
             errorType: lower(raw['errorType'] ?? raw['type']),
-            message: lower(error.message),
+            message: lower(err.message),
             status: typeof raw['status'] === 'number' ? raw['status'] : null,
         };
     }
@@ -244,12 +251,11 @@ export function getSdkRecoveryPolicy(error, scope = 'connection') {
  * @returns {RuntimeSdkRecoveryMessage}
  */
 export function describeSdkRecoveryPolicy(policy, error) {
-    const message =
-        error instanceof Error
-            ? error.message
-            : typeof error === 'object' && error !== null
-              ? String(/** @type {Record<string, unknown>} */ (error)['message'] ?? error)
-              : String(error);
+    const message = isError(error)
+        ? /** @type {Error} */ (error).message
+        : typeof error === 'object' && error !== null
+          ? String(/** @type {Record<string, unknown>} */ (error)['message'] ?? error)
+          : String(error);
     switch (policy.kind) {
         case 'auth':
             return {

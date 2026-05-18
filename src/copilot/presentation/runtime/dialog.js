@@ -15,6 +15,7 @@ import {
     startAgentDialogLoop,
     stopAgentDialogLoopAuthorized,
 } from '#copilot/agent/facades';
+import { toError } from '#copilot/core';
 import { log } from '#copilot/observability';
 import { attachmentToEmbed, embedMultiple, MAX_EMBED_BYTES, readFileContext } from '../files/index.js';
 import { getAgentRuntimeControlsTarget, getDefaultAgentRuntimeControlsTarget } from './controls.js';
@@ -140,7 +141,7 @@ export async function sendRuntimeDialogTurnOnActiveLoop(message, options, runtim
         );
         return reply;
     } catch (error) {
-        const reason = error instanceof Error ? `${error.name}:${error.message}` : String(error);
+        const reason = toError(error).name + ':' + toError(error).message;
         log(
             'WARN',
             `[runtime-dialog] turn failed (${traceLabel(traceId)}, duration=${Date.now() - startedAt}ms, error=${reason})`,
@@ -220,7 +221,7 @@ export async function sendRuntimeDialogTurnWithDiagnostics(message, from, option
             },
         };
     } catch (error) {
-        const normalized = error instanceof Error ? error : new Error(String(error));
+        const normalized = toError(error);
         Object.assign(normalized, {
             injectDiagnostics: {
                 traceId: traceId ?? null,
@@ -252,7 +253,7 @@ export async function sendRuntimeDialogTurnForRuntime(message, from, options, ru
 
 /**
  * @param {RuntimeDialogTarget | null | undefined} [runtime]
- * @param {RuntimeDialogStopReason} [reason='authorized_stop']
+ * @param {RuntimeDialogStopReason} [reason='authorized_stop'] Default is `'authorized_stop'`
  * @returns {Promise<void>}
  */
 export async function stopRuntimeDialogLoopAuthorized(runtime, reason = 'authorized_stop') {

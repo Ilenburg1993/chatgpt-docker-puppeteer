@@ -8,7 +8,7 @@
  */
 
 import { existsSync, lstatSync, readFileSync, unlinkSync } from 'node:fs';
-import { lstat, mkdir, open, readFile } from 'node:fs/promises';
+import { lstat, mkdir, open, readFile, unlink } from 'node:fs/promises';
 import { dirname } from 'node:path';
 
 /**
@@ -73,7 +73,7 @@ export async function acquireLock(lockPath) {
             }
 
             try {
-                unlinkSync(lockPath);
+                await unlink(lockPath);
             } catch (unlinkError) {
                 const unlinkCode = /** @type {{ code?: unknown }} */ (unlinkError)?.code;
                 if (unlinkCode !== 'ENOENT') return false;
@@ -96,8 +96,34 @@ export function releaseLock(lockPath) {
         if (lstatSync(lockPath).isSymbolicLink()) return;
         const pid = readLockOwnerPid(readFileSync(lockPath, 'utf-8'));
         if (pid === process.pid) {
-            // best-effort: se lockPath virar symlink entre checks, unlink pode falhar e será ignorado
             unlinkSync(lockPath);
+        }
+    } catch {
+        // best-effort
+    }
+}
+
+/**
+ * Libera lockfile de forma assíncrona (preferível em caminhos quentes de runtime).
+ *
+ * @param {string} lockPath - Caminho absoluto do lockfile.
+ * @returns {Promise<void>}
+ */
+export async function releaseLockAsync(lockPath) {
+    try {
+        const stats = await lstat(lockPath).catch((error) => {
+            const code = /** @type {{ code?: unknown }} */ (error)?.code;
+            if (code === 'ENOENT') return null;
+            throw error;
+        });
+        if (!stats || stats.isSymbolicLink()) return;
+        const pid = readLockOwnerPid(await readFile(lockPath, 'utf-8'));
+        if (pid === process.pid) {
+            await unlink(lockPath).catch((error) => {
+                const code = /** @type {{ code?: unknown }} */ (error)?.code;
+                if (code === 'ENOENT') return;
+                throw error;
+            });
         }
     } catch {
         // best-effort

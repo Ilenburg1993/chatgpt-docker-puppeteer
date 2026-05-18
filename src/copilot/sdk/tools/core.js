@@ -18,6 +18,7 @@
  * @see module:copilot/sdk/tools/registry
  */
 
+import { toError } from '#copilot/core';
 import { defineTool } from '@github/copilot-sdk';
 import { createRequire } from 'node:module';
 import { log } from '../logger.js';
@@ -220,7 +221,7 @@ function tryZodToJsonSchema(schema, toolName) {
         }
         return converted;
     } catch (err) {
-        const message = err instanceof Error ? err.message : String(err);
+        const message = toError(err).message;
         log('WARN', `[sdk/tools] Falha ao converter Zod schema da tool '${toolName}': ${message}`);
         return undefined;
     }
@@ -277,10 +278,11 @@ function defineToolSafe(name, config) {
         const tool = defineTool(name, config);
         return tool && typeof tool === 'object' ? tool : makePlainSdkTool(name, config);
     } catch (err) {
-        if (err instanceof Error && /defineTool.*export|No "defineTool" export/i.test(err.message)) {
+        const normalized = toError(err);
+        if (/defineTool.*export|No "defineTool" export/i.test(normalized.message)) {
             return makePlainSdkTool(name, config);
         }
-        throw err;
+        throw normalized;
     }
 }
 

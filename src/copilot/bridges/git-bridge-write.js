@@ -137,7 +137,7 @@ export async function gitPull() {
     try {
         return await runGit(['pull', '--ff-only'], { timeoutMs: GIT_LONG_TIMEOUT_MS });
     } catch (err) {
-        return err instanceof Error ? err.message : String(err);
+        return toError(err).message;
     }
 }
 
@@ -156,7 +156,7 @@ export async function gitPush(opts = {}) {
     try {
         return await runGit(args, { timeoutMs: GIT_LONG_TIMEOUT_MS });
     } catch (err) {
-        return err instanceof Error ? err.message : String(err);
+        return toError(err).message;
     }
 }
 
@@ -192,7 +192,7 @@ export async function gitCommit(message) {
         const match = out.match(/\b([0-9a-f]{7,})\b/);
         return match?.[1] ?? out.split('\n')[0] ?? out;
     } catch (err) {
-        return err instanceof Error ? err.message : String(err);
+        return toError(err).message;
     }
 }
 
@@ -212,7 +212,7 @@ export async function gitStash(opts = {}) {
         if (message) args.push('-m', message);
         return await runGit(args);
     } catch (err) {
-        return err instanceof Error ? err.message : String(err);
+        return toError(err).message;
     }
 }
 

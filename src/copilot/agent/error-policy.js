@@ -61,8 +61,7 @@ function unwrapSdkOperationCause(error) {
  * @returns {Error}
  */
 function normalizeAgentError(error) {
-    if (typeof toError === 'function') return toError(error);
-    return error instanceof Error ? error : new Error(String(error));
+    return toError(error);
 }
 
 /**

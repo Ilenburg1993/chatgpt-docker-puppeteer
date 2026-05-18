@@ -13,16 +13,16 @@
 
 import { LLM_B_TURN_TIMEOUT_MS } from '#copilot/config';
 import { log } from '#copilot/observability';
+import { toError } from '../../../core/error-handlers.js';
 import { projectAgentHttpError } from '../../../presentation/agent/index.js';
 import { resolveOptionalDialogTimeout } from '../../../presentation/dialog-timeout-policy.js';
-import { readAgentRuntimeControlStateFromRoute } from '../../../presentation/runtime/index.js';
+import { buildRuntimeRouteMetaPayload, resolveCopilotApiRouteBinding } from '../../../presentation/routing/index.js';
 import {
+    readAgentRuntimeControlStateFromRoute,
     sendRuntimeDialogTurnOnActiveLoop,
     startRuntimeDialogLoop,
     stopRuntimeDialogLoopAuthorized,
 } from '../../../presentation/runtime/index.js';
-import { buildRuntimeRouteMetaPayload } from '../../../presentation/routing/index.js';
-import { resolveCopilotApiRouteBinding } from '../../../presentation/routing/index.js';
 import {
     clearDialogTurnInFlight,
     hasDialogTurnInFlight,
@@ -83,7 +83,7 @@ export function registerDialogRoutes(bridge, binding) {
                 message: 'Modo diálogo ativo. Use POST /dialog/turn para interagir.',
             });
         } catch (err) {
-            const msg = err instanceof Error ? err.message : String(err);
+            const msg = toError(err).message;
             log('ERROR', `[copilot-api/dialog/start] falhou: ${msg}`);
             const projection = projectAgentHttpError(err);
             return res.status(projection.status).json({ ...runtimeMeta, ...projection.body });
@@ -162,7 +162,7 @@ export function registerDialogRoutes(bridge, binding) {
                 },
             });
         } catch (err) {
-            const msg = err instanceof Error ? err.message : String(err);
+            const msg = toError(err).message;
             const projection = projectAgentHttpError(err, { timeoutStatus: 504 });
             log('WARN', `[copilot-api/dialog/turn] falhou (${projection.status}): ${msg}`);
             return res.status(projection.status).json({

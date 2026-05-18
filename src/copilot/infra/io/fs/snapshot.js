@@ -50,8 +50,13 @@ export async function readBinaryMutationSnapshot(filePath, options = {}) {
     const stream = options.signal ? addAbortSignal(options.signal, baseStream) : baseStream;
 
     try {
-        for await (const chunk of stream) {
-            const buf = toBufferView(/** @type {Buffer | Uint8Array} */ (chunk));
+        const arrayCtor = /** @type {any} */ (Array);
+        /** @type {Buffer[]} */
+        const bufferViews = await arrayCtor.fromAsync(
+            stream,
+            /** @param {Buffer | Uint8Array} chunk */ (chunk) => toBufferView(chunk),
+        );
+        for (const buf of bufferViews) {
             bytesRead += buf.byteLength;
             hash.update(buf);
 

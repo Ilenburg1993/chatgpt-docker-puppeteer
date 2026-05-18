@@ -6,6 +6,8 @@
  * um bloco canônico que ajude a LLM a corrigir a próxima chamada sem adivinhar.
  */
 
+import { toError } from '#copilot/core';
+
 const MAX_STRING_PREVIEW = 240;
 const MAX_ARRAY_PREVIEW = 20;
 const MAX_OBJECT_KEYS_PREVIEW = 40;
@@ -49,7 +51,14 @@ const CATEGORY_DEFAULTS = /** @type {const} */ ({
 });
 
 /**
- * @typedef {'invalid-parameters' | 'policy-denied' | 'not-found' | 'conflict' | 'timeout' | 'external-service' | 'internal-error' | 'unknown'} ToolFailureCategory
+ * @typedef {'invalid-parameters'
+ *     | 'policy-denied'
+ *     | 'not-found'
+ *     | 'conflict'
+ *     | 'timeout'
+ *     | 'external-service'
+ *     | 'internal-error'
+ *     | 'unknown'} ToolFailureCategory
  */
 
 /**
@@ -88,7 +97,10 @@ function getErrorCode(error) {
  * @returns {string}
  */
 function messageFrom(value) {
-    if (value instanceof Error) return value.message || value.name;
+    if (value instanceof Error) {
+        const err = toError(value);
+        return err.message || err.name;
+    }
     if (typeof value === 'string') return value;
     if (isRecord(value)) {
         for (const key of ['error', 'reason', 'message']) {
@@ -104,7 +116,8 @@ function messageFrom(value) {
  * @returns {string | undefined}
  */
 function errorNameFrom(error) {
-    return error instanceof Error && error.name ? error.name : undefined;
+    const err = error instanceof Error ? toError(error) : null;
+    return err?.name;
 }
 
 /**
@@ -122,10 +135,18 @@ export function classifyToolFailure(error) {
     if (/\b(etimedout|timeout|timed out|aborterror|aborted|cancelled|cancelado)\b/.test(haystack)) {
         return 'timeout';
     }
-    if (/\b(enoent|not found|no such file|não encontrado|não encontrada|nao encontrado|nao encontrada|não existe|nao existe)\b/.test(haystack)) {
+    if (
+        /\b(enoent|not found|no such file|não encontrado|não encontrada|nao encontrado|nao encontrada|não existe|nao existe)\b/.test(
+            haystack,
+        )
+    ) {
         return 'not-found';
     }
-    if (/\b(eacces|eperm|permission|denied|blocked|bloquead|policy|política|politica|protegida|protegido|fora do workspace|não permitido|nao permitido)\b/.test(haystack)) {
+    if (
+        /\b(eacces|eperm|permission|denied|blocked|bloquead|policy|política|politica|protegida|protegido|fora do workspace|não permitido|nao permitido)\b/.test(
+            haystack,
+        )
+    ) {
         return 'policy-denied';
     }
     if (
@@ -142,10 +163,14 @@ export function classifyToolFailure(error) {
     ) {
         return 'external-service';
     }
-    if (/\b(zod|schema|validation|invalid|inválid|invalido|inválido|parameter|parameters|parametro|parametros|parâmetro|parâmetros|argument|argumento|argumentos|required|obrigatório|obrigatorio|expected|esperado|deve ser|tipo|enum|range|encoding)\b/.test(haystack)) {
+    if (
+        /\b(zod|schema|validation|invalid|inválid|invalido|inválido|parameter|parameters|parametro|parametros|parâmetro|parâmetros|argument|argumento|argumentos|required|obrigatório|obrigatorio|expected|esperado|deve ser|tipo|enum|range|encoding)\b/.test(
+            haystack,
+        )
+    ) {
         return 'invalid-parameters';
     }
-    if (error instanceof Error) {
+    if (error instanceof Error || toError(error)) {
         return 'internal-error';
     }
     return 'unknown';
@@ -257,7 +282,10 @@ export function createToolFailureFeedback(options) {
         retryable: options.retryable ?? defaults.retryable,
         fix: options.fix ?? defaults.fix,
         ...(options.parameters !== undefined
-            ? { expectedParameters: summarizeToolParameterSchema(options.parameters) ?? previewToolFeedbackValue(options.parameters) }
+            ? {
+                  expectedParameters:
+                      summarizeToolParameterSchema(options.parameters) ?? previewToolFeedbackValue(options.parameters),
+              }
             : {}),
         ...(options.receivedParameters !== undefined
             ? { receivedParameters: previewToolFeedbackValue(options.receivedParameters) }

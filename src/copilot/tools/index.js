@@ -39,8 +39,8 @@ export { buildTool, withSkipPermission } from './infra/tool-factory.js';
 export {
     classifyToolFailure,
     createToolFailureFeedback,
-    createToolFailureResult,
     createToolFailureResponse,
+    createToolFailureResult,
     enrichToolFailureResult,
     isToolFailureResult,
     previewToolFeedbackValue,
@@ -51,13 +51,6 @@ export {
 // ─── Categorias de tools ──────────────────────────────────────────────────────
 export { codeTools } from './code/index.js';
 export { fileReadTools, fileTools, fileWriteTools } from './file/index.js';
-export {
-    findSymbolUsagesTool,
-    searchInFilesTool,
-    searchTools,
-    symbolSearchTools,
-    workspaceSymbolSearchTool,
-} from './search/index.js';
 export { gitTools } from './git/index.js';
 export {
     cancelAllUserInputRequests,
@@ -78,9 +71,17 @@ export {
     registerForIntrospection,
     resetIntrospectionStateForTests,
     setAgentInfoProvider,
+    setSessionExcludedTools,
     verifyToolRegistryContracts,
 } from './introspection/index.js';
 export { permissionTools } from './permission/index.js';
+export {
+    findSymbolUsagesTool,
+    searchInFilesTool,
+    searchTools,
+    symbolSearchTools,
+    workspaceSymbolSearchTool,
+} from './search/index.js';
 export { experimentalRpcTools, reloadAgentProcessTool, sessionRpcTools, sessionTools } from './session/index.js';
 export { shellTools } from './shell/index.js';
 export { taskTools } from './task/index.js';
