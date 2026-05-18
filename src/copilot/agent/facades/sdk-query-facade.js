@@ -16,6 +16,7 @@ import {
     listSdkBuiltInTools,
     listSdkModels,
     listSdkSessions,
+    listSdkSkills,
     pingSdk,
     setForegroundSdkSessionId,
     setSdkSessionMode,
@@ -88,6 +89,16 @@ export class SdkQueryFacade {
      */
     async listSdkBuiltInTools(options) {
         return listSdkBuiltInTools(this.ctx, options);
+    }
+
+    /**
+     * Descobre skills visíveis ao runtime SDK/CLI, com filtros opcionais de projeto/diretório.
+     *
+     * @param {{ projectPaths?: string[]; skillDirectories?: string[] }} [options]
+     * @returns {Promise<unknown>}
+     */
+    async listSdkSkills(options) {
+        return listSdkSkills(this.ctx, options);
     }
 
     /**

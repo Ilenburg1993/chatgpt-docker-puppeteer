@@ -177,6 +177,7 @@ export {
     listSdkBuiltInTools,
     listSdkModels,
     listSdkSessions,
+    listSdkSkills,
     listSdkWorkspaceFiles,
     loadAgentSdkToolsConfigAsync,
     loginSdkMcpOauth,

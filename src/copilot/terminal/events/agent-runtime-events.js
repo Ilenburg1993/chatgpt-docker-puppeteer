@@ -28,7 +28,7 @@ import {
     EMITTER_TOOL_EXECUTION_PROGRESS,
     EMITTER_TOOL_EXECUTION_START,
 } from '#copilot/events';
-import { getShowToolActivity } from '../../presentation/state/index.js';
+import { getShowToolActivity, getShowUsage } from '../../presentation/state/index.js';
 import { broadcastSse, buildUserPrompt, println, writeInlineStatus } from '../dialog/index.js';
 import { readTerminalRuntimeState } from '../frontend/gateways/index.js';
 import {
@@ -51,6 +51,8 @@ import {
 
 const AGENT_SHELL_COMPLETED_EVENT = 'agent.shell.completed';
 const AGENT_SHELL_DETACHED_COMPLETED_EVENT = 'agent.shell.detached_completed';
+const AGENT_PR_CONSUMED_EVENT = 'pr.consumed';
+const AGENT_PR_FALLBACK_MODEL_EVENT = 'pr.fallback_model';
 /**
  * @typedef {{
  *     on: (event: string, handler: (...args: any[]) => void) => void;
@@ -59,6 +61,54 @@ const AGENT_SHELL_DETACHED_COMPLETED_EVENT = 'agent.shell.detached_completed';
  */
 
 const TOOL_HEARTBEAT_INTERVAL_MS = 10_000;
+
+/**
+ * @param {Record<string, unknown>} evt
+ * @returns {{
+ *     billedModel: string | null;
+ *     configuredModel: string | null;
+ *     effectiveModel: string | null;
+ *     displayModel: string | null;
+ *     mismatch: boolean;
+ *     cost: number | null;
+ * }}
+ */
+function normalizeUsageBilling(evt) {
+    const billedModel = typeof evt?.['model'] === 'string' ? evt['model'] : null;
+    const configuredModel = typeof evt?.['configuredModel'] === 'string' ? evt['configuredModel'] : null;
+    const effectiveModel = typeof evt?.['effectiveModel'] === 'string' ? evt['effectiveModel'] : null;
+    const mismatch =
+        Boolean(evt?.['modelMismatch']) ||
+        Boolean(billedModel && configuredModel && billedModel !== configuredModel) ||
+        Boolean(effectiveModel && configuredModel && effectiveModel !== configuredModel);
+    return {
+        billedModel,
+        configuredModel,
+        effectiveModel,
+        displayModel: effectiveModel ?? billedModel ?? configuredModel,
+        mismatch,
+        cost: typeof evt?.['cost'] === 'number' ? evt['cost'] : null,
+    };
+}
+
+/**
+ * @param {ReturnType<typeof normalizeUsageBilling>} billing
+ * @returns {string}
+ */
+function formatUsageDetail(billing) {
+    const parts = [];
+    if (billing.mismatch) {
+        if (billing.configuredModel) parts.push(`modeloCfg=${billing.configuredModel}`);
+        if (billing.effectiveModel) parts.push(`modeloEfetivo=${billing.effectiveModel}`);
+        if (billing.billedModel) parts.push(`modeloCobrado=${billing.billedModel}`);
+    } else if (billing.displayModel) {
+        parts.push(`modelo=${billing.displayModel}`);
+    }
+    if (billing.cost !== null) {
+        parts.push(`custo=${billing.cost.toFixed(4)}`);
+    }
+    return parts.join(' · ') || 'sem metadados de billing';
+}
 
 /**
  * @param {{
@@ -365,6 +415,47 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, regi
         });
     };
 
+    const onPrConsumed = (/** @type {Record<string, unknown>} */ evt) => {
+        const billing = normalizeUsageBilling(evt);
+        const detail = formatUsageDetail(billing);
+        const showUsage = getShowUsage();
+        const shouldPersist = showUsage || billing.mismatch;
+        const label = billing.mismatch ? 'Uso contabilizado com divergência de modelo' : 'Uso do turno contabilizado';
+        recordTerminalActivity('system', label, {
+            detail,
+            source: 'agent',
+            severity: billing.mismatch ? 'warn' : 'info',
+            recordHistory: shouldPersist,
+        });
+        if (showUsage || billing.mismatch) {
+            println(
+                `  ${terminalThemeBadge(billing.mismatch ? 'warn' : 'info', 'USAGE')} ${terminalThemeText(billing.mismatch ? 'warn' : 'muted', detail)}`,
+            );
+        }
+        broadcastSse(AGENT_PR_CONSUMED_EVENT, {
+            ...evt,
+            timestamp: Date.now(),
+        });
+    };
+
+    const onPrFallbackModel = (/** @type {Record<string, unknown>} */ evt) => {
+        const from = typeof evt?.['from'] === 'string' ? evt['from'] : '?';
+        const to = typeof evt?.['to'] === 'string' ? evt['to'] : '?';
+        const detail = `${from} → ${to}`;
+        recordTerminalActivity('system', 'Fallback de modelo aplicado', {
+            detail,
+            source: 'agent',
+            severity: 'warn',
+        });
+        println(
+            `  ${terminalThemeBadge('warn', 'MODEL')} ${terminalThemeText('warn', `Fallback de modelo: ${detail}`)}`,
+        );
+        broadcastSse(AGENT_PR_FALLBACK_MODEL_EVENT, {
+            ...evt,
+            timestamp: Date.now(),
+        });
+    };
+
     agent.on(EMITTER_QUESTION_PENDING, onQuestion);
     agent.on(EMITTER_STOPPED, onStopped);
     agent.on(EMITTER_TOOL_EXECUTION_START, onToolStart);
@@ -382,6 +473,8 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, regi
     agent.on(EMITTER_AGENT_BACKGROUND_IDLE, onBackgroundIdle);
     agent.on(AGENT_SHELL_COMPLETED_EVENT, onShellCompleted);
     agent.on(AGENT_SHELL_DETACHED_COMPLETED_EVENT, onShellDetachedCompleted);
+    agent.on(AGENT_PR_CONSUMED_EVENT, onPrConsumed);
+    agent.on(AGENT_PR_FALLBACK_MODEL_EVENT, onPrFallbackModel);
 
     const runtimeState = readTerminalRuntimeState();
     if (runtimeState.pendingQuestion && runtimeState.pendingQuestionKind !== 'ready') {
@@ -411,5 +504,7 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, regi
         agent.off(EMITTER_AGENT_BACKGROUND_IDLE, onBackgroundIdle);
         agent.off(AGENT_SHELL_COMPLETED_EVENT, onShellCompleted);
         agent.off(AGENT_SHELL_DETACHED_COMPLETED_EVENT, onShellDetachedCompleted);
+        agent.off(AGENT_PR_CONSUMED_EVENT, onPrConsumed);
+        agent.off(AGENT_PR_FALLBACK_MODEL_EVENT, onPrFallbackModel);
     };
 }

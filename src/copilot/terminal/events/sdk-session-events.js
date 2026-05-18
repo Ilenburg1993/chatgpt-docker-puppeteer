@@ -20,11 +20,18 @@ import {
     EMITTER_ASSISTANT_REASONING_COMPLETE,
     EMITTER_ASSISTANT_TURN_END,
     EMITTER_ASSISTANT_TURN_START,
+    EMITTER_AUTO_MODE_SWITCH_COMPLETED,
+    EMITTER_AUTO_MODE_SWITCH_REQUESTED,
+    EMITTER_CAPABILITIES_CHANGED,
+    EMITTER_COMMANDS_CHANGED,
     EMITTER_ELICITATION_COMPLETED,
     EMITTER_ELICITATION_PENDING,
     EMITTER_EXIT_PLAN_MODE_COMPLETED,
+    EMITTER_EXIT_PLAN_MODE_REQUESTED,
     EMITTER_EXTERNAL_TOOL_COMPLETED,
     EMITTER_EXTERNAL_TOOL_REQUESTED,
+    EMITTER_HOOK_END,
+    EMITTER_HOOK_START,
     EMITTER_MCP_OAUTH_COMPLETED,
     EMITTER_MCP_OAUTH_REQUIRED,
     EMITTER_MCP_SERVER_STATUS_CHANGED,
@@ -32,6 +39,8 @@ import {
     EMITTER_PERMISSION_COMPLETED,
     EMITTER_PERMISSION_MODE_CHANGED,
     EMITTER_PERMISSION_REQUESTED,
+    EMITTER_SAMPLING_COMPLETED,
+    EMITTER_SAMPLING_REQUESTED,
     EMITTER_SESSION_BACKGROUND_TASKS_CHANGED,
     EMITTER_SESSION_CONTEXT_CHANGED,
     EMITTER_SESSION_EXTENSIONS_LOADED,
@@ -967,6 +976,229 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
         broadcastSse('pending_messages.modified', { count, timestamp: Date.now() });
     };
 
+    const onHookStart = (
+        /** @type {{ hookInvocationId?: string; hookType?: string; input?: Record<string, unknown> }} */ evt,
+    ) => {
+        const hookType = evt?.hookType ?? 'unknown';
+        const hookInvocationId = evt?.hookInvocationId ?? null;
+        recordTerminalActivity('system', 'Hook SDK iniciado', {
+            detail: `${hookType}${hookInvocationId ? ` · ${hookInvocationId}` : ''}`,
+            source: 'sdk',
+            recordHistory: false,
+        });
+        if (shouldPrintSessionNarration('verbose')) {
+            println(`  ${terminalThemeBadge('info', 'HOOK')} ${terminalThemeText('muted', `${hookType} iniciado`)}`);
+        }
+        broadcastSse('hook.start', {
+            hookType,
+            hookInvocationId,
+            input: evt?.input ?? null,
+            timestamp: Date.now(),
+        });
+    };
+
+    const onHookEnd = (
+        /** @type {{
+    hookInvocationId?: string;
+    hookType?: string;
+    success?: boolean;
+    error?: { message?: string };
+}} */ evt,
+    ) => {
+        const hookType = evt?.hookType ?? 'unknown';
+        const hookInvocationId = evt?.hookInvocationId ?? null;
+        const success = evt?.success === true;
+        const errorMessage = evt?.error?.message ?? null;
+        recordTerminalActivity('system', success ? 'Hook SDK concluído' : 'Hook SDK falhou', {
+            detail: `${hookType}${hookInvocationId ? ` · ${hookInvocationId}` : ''}${errorMessage ? ` · ${errorMessage}` : ''}`,
+            source: 'sdk',
+            severity: success ? 'info' : 'warn',
+            recordHistory: !success,
+        });
+        if (!success || shouldPrintSessionNarration('verbose')) {
+            println(
+                `  ${terminalThemeBadge(success ? 'info' : 'warn', 'HOOK')} ${terminalThemeText(success ? 'muted' : 'warn', `${hookType} ${success ? 'concluído' : 'falhou'}${errorMessage ? ` · ${errorMessage}` : ''}`)}`,
+            );
+        }
+        broadcastSse('hook.end', {
+            hookType,
+            hookInvocationId,
+            success,
+            error: errorMessage,
+            timestamp: Date.now(),
+        });
+    };
+
+    const onSamplingRequested = (
+        /** @type {{ requestId?: string; serverName?: string; mcpRequestId?: string | number }} */ evt,
+    ) => {
+        const requestId = evt?.requestId ?? null;
+        const serverName = evt?.serverName ?? 'unknown';
+        const mcpRequestId = evt?.mcpRequestId ?? null;
+        recordTerminalActivity('question', 'Sampling MCP solicitado', {
+            detail: `${serverName}${requestId ? ` · ${requestId}` : ''}`,
+            source: 'sdk',
+            severity: 'warn',
+        });
+        if (shouldPrintSessionNarration('important')) {
+            println(
+                `  ${terminalThemeBadge('warn', 'SAMPLE')} ${terminalThemeText('warn', `${serverName} solicitou sampling${requestId ? ` (${requestId})` : ''}`)}`,
+            );
+        }
+        broadcastSse('sampling.requested', {
+            requestId,
+            serverName,
+            mcpRequestId,
+            timestamp: Date.now(),
+        });
+        refreshPromptIfIdle();
+    };
+
+    const onSamplingCompleted = (/** @type {{ requestId?: string }} */ evt) => {
+        const requestId = evt?.requestId ?? null;
+        recordTerminalActivity('system', 'Sampling MCP concluído', {
+            detail: requestId ? `requestId=${requestId}` : 'sampling concluído',
+            source: 'sdk',
+            recordHistory: false,
+        });
+        broadcastSse('sampling.completed', {
+            requestId,
+            timestamp: Date.now(),
+        });
+        refreshPromptIfIdle();
+    };
+
+    const onCommandsChanged = (
+        /** @type {{ commands?: { name?: string; description?: string }[]; count?: number }} */ evt,
+    ) => {
+        const commands = Array.isArray(evt?.commands) ? evt.commands : [];
+        const count = Number(evt?.count ?? commands.length ?? 0);
+        const preview = commands
+            .slice(0, 3)
+            .map((command) => command?.name ?? 'unknown')
+            .join(', ');
+        recordTerminalActivity('system', 'Comandos SDK atualizados', {
+            detail: `${count} comando(s)${preview ? ` · ${preview}` : ''}`,
+            source: 'sdk',
+            recordHistory: false,
+        });
+        if (shouldPrintSessionNarration('verbose')) {
+            println(
+                `  ${terminalThemeBadge('info', 'CMDS')} ${terminalThemeText('muted', `${count} comando(s)${preview ? ` · ${preview}` : ''}`)}`,
+            );
+        }
+        broadcastSse('commands.changed', {
+            count,
+            commands,
+            timestamp: Date.now(),
+        });
+        refreshPromptIfIdle();
+    };
+
+    const onCapabilitiesChanged = (
+        /** @type {{
+    capabilities?: { ui?: { elicitation?: boolean } };
+    changes?: { ui?: { elicitation?: boolean } };
+}} */ evt,
+    ) => {
+        const uiChanges = evt?.changes?.ui ?? {};
+        const uiCapabilities = evt?.capabilities?.ui ?? {};
+        const elicitationEnabled = uiCapabilities.elicitation === true;
+        const changeBits = [
+            uiChanges.elicitation !== undefined ? `ui.elicitation=${String(uiChanges.elicitation)}` : null,
+            `snapshot.ui.elicitation=${String(elicitationEnabled)}`,
+        ]
+            .filter(Boolean)
+            .join(' · ');
+        recordTerminalActivity('system', 'Capabilities SDK alteradas', {
+            detail: changeBits || 'capabilities alteradas',
+            source: 'sdk',
+            recordHistory: false,
+        });
+        if (shouldPrintSessionNarration('verbose')) {
+            println(
+                `  ${terminalThemeBadge('info', 'CAPS')} ${terminalThemeText('muted', changeBits || 'capabilities alteradas')}`,
+            );
+        }
+        broadcastSse('capabilities.changed', {
+            capabilities: evt?.capabilities ?? null,
+            changes: evt?.changes ?? null,
+            timestamp: Date.now(),
+        });
+        refreshPromptIfIdle();
+    };
+
+    const onAutoModeSwitchRequested = (/** @type {{ requestId?: string; errorCode?: string }} */ evt) => {
+        const requestId = evt?.requestId ?? null;
+        const errorCode = evt?.errorCode ?? null;
+        recordTerminalActivity('system', 'Troca automática de modo solicitada', {
+            detail: `${requestId ?? 'sem requestId'}${errorCode ? ` · ${errorCode}` : ''}`,
+            source: 'sdk',
+            severity: 'warn',
+        });
+        if (shouldPrintSessionNarration('important')) {
+            println(
+                `  ${terminalThemeBadge('warn', 'AUTO')} ${terminalThemeText('warn', `SDK solicitou auto mode switch${errorCode ? ` · ${errorCode}` : ''}`)}`,
+            );
+        }
+        broadcastSse('auto_mode_switch.requested', {
+            requestId,
+            errorCode,
+            timestamp: Date.now(),
+        });
+        refreshPromptIfIdle();
+    };
+
+    const onAutoModeSwitchCompleted = (/** @type {{ requestId?: string; response?: string }} */ evt) => {
+        const requestId = evt?.requestId ?? null;
+        const response = evt?.response ?? null;
+        recordTerminalActivity('system', 'Troca automática de modo concluída', {
+            detail: `${requestId ?? 'sem requestId'}${response ? ` · ${response}` : ''}`,
+            source: 'sdk',
+            recordHistory: false,
+        });
+        broadcastSse('auto_mode_switch.completed', {
+            requestId,
+            response,
+            timestamp: Date.now(),
+        });
+        refreshPromptIfIdle();
+    };
+
+    const onExitPlanModeRequested = (
+        /** @type {{ requestId?: string; recommendedAction?: string; actions?: string[]; planContent?: string }} */ evt,
+    ) => {
+        const requestId = evt?.requestId ?? null;
+        const recommendedAction = evt?.recommendedAction ?? null;
+        const actions = Array.isArray(evt?.actions) ? evt.actions : [];
+        const preview =
+            typeof evt?.planContent === 'string' ? compactSummaryText(evt.planContent.replace(/\s+/gu, ' '), 96) : null;
+        recordTerminalActivity('system', 'Saída do plan mode solicitada', {
+            detail: `${recommendedAction ?? 'sem recomendação'} · ${actions.length} ação(ões)${preview ? ` · ${preview}` : ''}`,
+            source: 'sdk',
+            severity: 'warn',
+        });
+        if (shouldPrintSessionNarration('important')) {
+            println(
+                `  ${terminalThemeBadge('warn', 'PLAN')} ${terminalThemeText('warn', `exit_plan_mode solicitado${recommendedAction ? ` · recomendar=${recommendedAction}` : ''}`)}`,
+            );
+            if (actions.length > 0) {
+                println(`  ${terminalThemeText('muted', `ações: ${actions.join(', ')}`)}`);
+            }
+            if (preview) {
+                println(`  ${terminalThemeText('muted', preview)}`);
+            }
+        }
+        broadcastSse('exit_plan_mode.requested', {
+            requestId,
+            recommendedAction,
+            actions,
+            planPreview: preview,
+            timestamp: Date.now(),
+        });
+        refreshPromptIfIdle();
+    };
+
     const onExitPlanModeCompleted = (/** @type {{ requestId?: string }} */ evt) => {
         recordTerminalActivity('system', 'Saída de plan mode concluída', {
             detail: evt?.requestId ? `requestId=${evt.requestId}` : 'SDK saiu do plan mode',
@@ -1032,6 +1264,15 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
     agent.on(EMITTER_MCP_OAUTH_REQUIRED, onMcpOauthRequired);
     agent.on(EMITTER_MCP_OAUTH_COMPLETED, onMcpOauthCompleted);
     agent.on(EMITTER_PENDING_MESSAGES_MODIFIED, onPendingMessagesModified);
+    agent.on(EMITTER_HOOK_START, onHookStart);
+    agent.on(EMITTER_HOOK_END, onHookEnd);
+    agent.on(EMITTER_SAMPLING_REQUESTED, onSamplingRequested);
+    agent.on(EMITTER_SAMPLING_COMPLETED, onSamplingCompleted);
+    agent.on(EMITTER_COMMANDS_CHANGED, onCommandsChanged);
+    agent.on(EMITTER_CAPABILITIES_CHANGED, onCapabilitiesChanged);
+    agent.on(EMITTER_AUTO_MODE_SWITCH_REQUESTED, onAutoModeSwitchRequested);
+    agent.on(EMITTER_AUTO_MODE_SWITCH_COMPLETED, onAutoModeSwitchCompleted);
+    agent.on(EMITTER_EXIT_PLAN_MODE_REQUESTED, onExitPlanModeRequested);
     agent.on(EMITTER_EXIT_PLAN_MODE_COMPLETED, onExitPlanModeCompleted);
     agent.on(EMITTER_ASSISTANT_REASONING_COMPLETE, onAssistantReasoningComplete);
 
@@ -1071,6 +1312,15 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
         agent.off(EMITTER_MCP_OAUTH_REQUIRED, onMcpOauthRequired);
         agent.off(EMITTER_MCP_OAUTH_COMPLETED, onMcpOauthCompleted);
         agent.off(EMITTER_PENDING_MESSAGES_MODIFIED, onPendingMessagesModified);
+        agent.off(EMITTER_HOOK_START, onHookStart);
+        agent.off(EMITTER_HOOK_END, onHookEnd);
+        agent.off(EMITTER_SAMPLING_REQUESTED, onSamplingRequested);
+        agent.off(EMITTER_SAMPLING_COMPLETED, onSamplingCompleted);
+        agent.off(EMITTER_COMMANDS_CHANGED, onCommandsChanged);
+        agent.off(EMITTER_CAPABILITIES_CHANGED, onCapabilitiesChanged);
+        agent.off(EMITTER_AUTO_MODE_SWITCH_REQUESTED, onAutoModeSwitchRequested);
+        agent.off(EMITTER_AUTO_MODE_SWITCH_COMPLETED, onAutoModeSwitchCompleted);
+        agent.off(EMITTER_EXIT_PLAN_MODE_REQUESTED, onExitPlanModeRequested);
         agent.off(EMITTER_EXIT_PLAN_MODE_COMPLETED, onExitPlanModeCompleted);
         agent.off(EMITTER_ASSISTANT_REASONING_COMPLETE, onAssistantReasoningComplete);
     };

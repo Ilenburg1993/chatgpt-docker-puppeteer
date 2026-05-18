@@ -180,6 +180,13 @@ describe('SESSION_EVENTS', () => {
         expect(SESSION_EVENTS.CAPABILITIES_CHANGED).toBe('capabilities.changed');
     });
 
+    it('inclui sampling e auto_mode_switch do SDK', () => {
+        expect(SESSION_EVENTS.SAMPLING_REQUESTED).toBe('sampling.requested');
+        expect(SESSION_EVENTS.SAMPLING_COMPLETED).toBe('sampling.completed');
+        expect(SESSION_EVENTS.AUTO_MODE_SWITCH_REQUESTED).toBe('auto_mode_switch.requested');
+        expect(SESSION_EVENTS.AUTO_MODE_SWITCH_COMPLETED).toBe('auto_mode_switch.completed');
+    });
+
     it('categorias de evento assistant.* presentes', () => {
         const assistantEvents = Object.values(SESSION_EVENTS).filter((v) => v.startsWith('assistant.'));
         expect(assistantEvents.length).toBeGreaterThanOrEqual(8);

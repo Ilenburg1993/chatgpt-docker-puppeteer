@@ -604,6 +604,16 @@ export class AlwaysAliveAgent extends EventEmitter {
     }
 
     /**
+     * Descobre skills expostas pelo runtime SDK/CLI, opcionalmente limitando o scan a projetos/diretórios.
+     *
+     * @param {{ projectPaths?: string[]; skillDirectories?: string[] }} [options]
+     * @returns {Promise<unknown>}
+     */
+    async listSdkSkills(options) {
+        return this.#sdkQueryFacade.listSdkSkills(options);
+    }
+
+    /**
      * Retorna snapshot de quota via RPC server-scoped do SDK.
      *
      * @returns {Promise<unknown>}

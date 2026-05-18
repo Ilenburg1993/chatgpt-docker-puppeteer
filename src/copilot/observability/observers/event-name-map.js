@@ -12,9 +12,13 @@
  */
 
 import {
+    AGENT_AUTO_MODE_SWITCH_COMPLETED,
+    AGENT_AUTO_MODE_SWITCH_REQUESTED,
     AGENT_BACKGROUND_COMPLETED,
     AGENT_BACKGROUND_IDLE,
     AGENT_BEFORE_STOP,
+    AGENT_CAPABILITIES_CHANGED,
+    AGENT_COMMANDS_CHANGED,
     AGENT_CONTEXT_COMPACTED,
     AGENT_DIALOG_LOOP_CHANGED,
     AGENT_DIALOG_PAUSED,
@@ -30,7 +34,10 @@ import {
     AGENT_EMITTER_ERROR,
     AGENT_ERROR,
     AGENT_EXIT_PLAN_MODE_COMPLETED,
+    AGENT_EXIT_PLAN_MODE_REQUESTED,
     AGENT_EXTERNAL_TOOL_COMPLETED,
+    AGENT_HOOK_END,
+    AGENT_HOOK_START,
     AGENT_METRICS,
     AGENT_PENDING_MESSAGES_MODIFIED,
     AGENT_PERMISSION_MODE_CHANGED,
@@ -39,6 +46,8 @@ import {
     AGENT_QUESTION_ANSWERED,
     AGENT_QUESTION_PENDING,
     AGENT_READY,
+    AGENT_SAMPLING_COMPLETED,
+    AGENT_SAMPLING_REQUESTED,
     AGENT_SESSION_COMPACTION_COMPLETE,
     AGENT_SESSION_COMPACTION_START,
     AGENT_SESSION_FATAL,
@@ -139,6 +148,12 @@ export const EMITTER_TO_BUS_TYPE = {
     // ── Agent misc ────────────────────────────────────────────────────────────
     'agent.metrics': AGENT_METRICS,
     'system.message': AGENT_SYSTEM_MESSAGE,
+    'hook.start': AGENT_HOOK_START,
+    'hook.end': AGENT_HOOK_END,
+    'sampling.requested': AGENT_SAMPLING_REQUESTED,
+    'sampling.completed': AGENT_SAMPLING_COMPLETED,
+    'commands.changed': AGENT_COMMANDS_CHANGED,
+    'capabilities.changed': AGENT_CAPABILITIES_CHANGED,
     'agent.background.completed': AGENT_BACKGROUND_COMPLETED,
     'agent.background.idle': AGENT_BACKGROUND_IDLE,
     'agent.shell.completed': AGENT_SHELL_COMPLETED,
@@ -146,6 +161,9 @@ export const EMITTER_TO_BUS_TYPE = {
 
     // ── FAIXA-L14 additions ───────────────────────────────────────────────────
     'pending_messages.modified': AGENT_PENDING_MESSAGES_MODIFIED,
+    'exit_plan_mode.requested': AGENT_EXIT_PLAN_MODE_REQUESTED,
     'exit_plan_mode.completed': AGENT_EXIT_PLAN_MODE_COMPLETED,
+    'auto_mode_switch.requested': AGENT_AUTO_MODE_SWITCH_REQUESTED,
+    'auto_mode_switch.completed': AGENT_AUTO_MODE_SWITCH_COMPLETED,
     'external_tool.completed': AGENT_EXTERNAL_TOOL_COMPLETED,
 };

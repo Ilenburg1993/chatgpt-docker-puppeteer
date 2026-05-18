@@ -188,6 +188,47 @@ describe('state attachment queue', () => {
         expect(getAttachmentQueue()).toHaveLength(1);
     });
 
+    it('aceita blob attachment estruturado com cópia defensiva', () => {
+        addAttachment({
+            type: 'blob',
+            data: 'Y29udGV1ZG8=',
+            mimeType: 'text/plain',
+            displayName: 'memo.txt',
+        });
+
+        const queue = getAttachmentQueue();
+        expect(queue).toEqual([
+            {
+                type: 'blob',
+                data: 'Y29udGV1ZG8=',
+                mimeType: 'text/plain',
+                displayName: 'memo.txt',
+            },
+        ]);
+
+        /** @type {any} */ (queue[0]).displayName = 'mutado.txt';
+        expect(getAttachmentQueue()).toEqual([
+            {
+                type: 'blob',
+                data: 'Y29udGV1ZG8=',
+                mimeType: 'text/plain',
+                displayName: 'memo.txt',
+            },
+        ]);
+    });
+
+    it('deduplica blob attachment idêntico', () => {
+        const blob = {
+            type: 'blob',
+            data: 'Y29udGV1ZG8=',
+            mimeType: 'text/plain',
+            displayName: 'memo.txt',
+        };
+        addAttachment(blob);
+        addAttachment(blob);
+        expect(getAttachmentQueue()).toHaveLength(1);
+    });
+
     it('clearAttachments limpa a fila', () => {
         addAttachment('/tmp/c.js');
         clearAttachments();

@@ -376,13 +376,13 @@ describe('Faixa B3 — tool-lifecycle handlers', () => {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 describe('Faixa B4 — interaction-events handlers', () => {
-    it('wireInteractionEvents retorna array de 15 unsubscribe functions', async () => {
+    it('wireInteractionEvents retorna array com cobertura ampliada dos eventos de interação', async () => {
         const { wireInteractionEvents } = await import('#copilot/event-handlers/interaction-events');
         const session = createMockSession();
         const emit = vi.fn();
         const unsubs = wireInteractionEvents(/** @type {any} */ (session), { emit });
         expect(Array.isArray(unsubs)).toBe(true);
-        expect(unsubs.length).toBe(15);
+        expect(unsubs.length).toBeGreaterThanOrEqual(24);
     });
 
     it('emite skill.invoked', async () => {
@@ -412,6 +412,99 @@ describe('Faixa B4 — interaction-events handlers', () => {
         expect(emit).toHaveBeenCalledWith('command.queued', expect.objectContaining({ requestId: 'cmd-1' }));
         session._emit('command.completed', { requestId: 'cmd-1' });
         expect(emit).toHaveBeenCalledWith('command.completed', expect.objectContaining({ requestId: 'cmd-1' }));
+    });
+
+    it('emite hooks, commands.changed e capabilities.changed com payload normalizado', async () => {
+        const { wireInteractionEvents } = await import('#copilot/event-handlers/interaction-events');
+        const session = createMockSession();
+        const emit = vi.fn();
+        /** @type {any} */ (session).capabilities = { ui: { elicitation: true } };
+
+        wireInteractionEvents(/** @type {any} */ (session), { emit });
+
+        session._emit('hook.start', { hookInvocationId: 'hk-1', hookType: 'preToolUse', input: { tool: 'grep' } });
+        expect(emit).toHaveBeenCalledWith(
+            'hook.start',
+            expect.objectContaining({ hookInvocationId: 'hk-1', hookType: 'preToolUse' }),
+        );
+
+        session._emit('hook.end', {
+            hookInvocationId: 'hk-1',
+            hookType: 'preToolUse',
+            success: false,
+            error: { message: 'boom' },
+        });
+        expect(emit).toHaveBeenCalledWith(
+            'hook.end',
+            expect.objectContaining({ hookInvocationId: 'hk-1', hookType: 'preToolUse', success: false }),
+        );
+
+        session._emit('commands.changed', {
+            commands: [
+                { name: '/plan', description: 'Open plan mode' },
+                { name: '/auto', description: 'Switch to auto mode' },
+            ],
+        });
+        expect(emit).toHaveBeenCalledWith(
+            'commands.changed',
+            expect.objectContaining({
+                count: 2,
+                commands: expect.arrayContaining([expect.objectContaining({ name: '/plan' })]),
+            }),
+        );
+
+        session._emit('capabilities.changed', { ui: { elicitation: true } });
+        expect(emit).toHaveBeenCalledWith(
+            'capabilities.changed',
+            expect.objectContaining({
+                capabilities: expect.objectContaining({ ui: expect.objectContaining({ elicitation: true }) }),
+                changes: expect.objectContaining({ ui: expect.objectContaining({ elicitation: true }) }),
+            }),
+        );
+    });
+
+    it('emite sampling, auto_mode_switch e exit_plan_mode.requested', async () => {
+        const { wireInteractionEvents } = await import('#copilot/event-handlers/interaction-events');
+        const session = createMockSession();
+        const emit = vi.fn();
+
+        wireInteractionEvents(/** @type {any} */ (session), { emit });
+
+        session._emit('sampling.requested', { requestId: 'sample-1', serverName: 'browser', mcpRequestId: 7 });
+        expect(emit).toHaveBeenCalledWith(
+            'sampling.requested',
+            expect.objectContaining({ requestId: 'sample-1', serverName: 'browser', mcpRequestId: 7 }),
+        );
+
+        session._emit('sampling.completed', { requestId: 'sample-1' });
+        expect(emit).toHaveBeenCalledWith('sampling.completed', expect.objectContaining({ requestId: 'sample-1' }));
+
+        session._emit('auto_mode_switch.requested', { requestId: 'auto-1', errorCode: 'rate_limit' });
+        expect(emit).toHaveBeenCalledWith(
+            'auto_mode_switch.requested',
+            expect.objectContaining({ requestId: 'auto-1', errorCode: 'rate_limit' }),
+        );
+
+        session._emit('auto_mode_switch.completed', { requestId: 'auto-1', response: 'yes_always' });
+        expect(emit).toHaveBeenCalledWith(
+            'auto_mode_switch.completed',
+            expect.objectContaining({ requestId: 'auto-1', response: 'yes_always' }),
+        );
+
+        session._emit('exit_plan_mode.requested', {
+            requestId: 'plan-2',
+            recommendedAction: 'approve',
+            actions: ['approve', 'edit', 'reject'],
+            planContent: '# Plano\n\nFazer rollout',
+        });
+        expect(emit).toHaveBeenCalledWith(
+            'exit_plan_mode.requested',
+            expect.objectContaining({
+                requestId: 'plan-2',
+                recommendedAction: 'approve',
+                actions: ['approve', 'edit', 'reject'],
+            }),
+        );
     });
 
     it('emite exit_plan_mode.completed', async () => {

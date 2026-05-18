@@ -135,11 +135,22 @@ export const EMITTER_AGENT_BACKGROUND_COMPLETED = 'agent.background.completed';
 export const EMITTER_AGENT_BACKGROUND_IDLE = 'agent.background.idle';
 
 // ── Plan Mode / External Tools ──────────────────────────────
+export const EMITTER_EXIT_PLAN_MODE_REQUESTED = 'exit_plan_mode.requested';
 export const EMITTER_EXIT_PLAN_MODE_COMPLETED = 'exit_plan_mode.completed';
 export const EMITTER_EXTERNAL_TOOL_REQUESTED = 'external_tool.requested';
 export const EMITTER_EXTERNAL_TOOL_COMPLETED = 'external_tool.completed';
 export const EMITTER_TOOL_USER_REQUESTED = 'tool.user_requested';
 export const EMITTER_PENDING_MESSAGES_MODIFIED = 'pending_messages.modified';
+
+// ── Hook / Sampling / Commands / Capabilities ───────────────
+export const EMITTER_HOOK_START = 'hook.start';
+export const EMITTER_HOOK_END = 'hook.end';
+export const EMITTER_SAMPLING_REQUESTED = 'sampling.requested';
+export const EMITTER_SAMPLING_COMPLETED = 'sampling.completed';
+export const EMITTER_COMMANDS_CHANGED = 'commands.changed';
+export const EMITTER_CAPABILITIES_CHANGED = 'capabilities.changed';
+export const EMITTER_AUTO_MODE_SWITCH_REQUESTED = 'auto_mode_switch.requested';
+export const EMITTER_AUTO_MODE_SWITCH_COMPLETED = 'auto_mode_switch.completed';
 
 // ── Elicitation ──────────────────────────────────────────────
 export const EMITTER_ELICITATION_PENDING = 'elicitation.pending';

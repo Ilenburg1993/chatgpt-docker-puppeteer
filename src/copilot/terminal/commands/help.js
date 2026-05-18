@@ -54,8 +54,9 @@ export function cmdHelp({ injectPort, println }) {
   \x1b[33m/reasoning low|medium|high|xhigh|off\x1b[0m — altera reasoning effort
 
   \x1b[1mContexto e Arquivos\x1b[0m
-  \x1b[33m/attach\x1b[0m                              — lista fila de arquivos agendados para embed
+  \x1b[33m/attach\x1b[0m                              — lista fila de attachments agendados para embed
   \x1b[33m/attach <caminho>\x1b[0m                    — adiciona arquivo à fila (embed no próximo turno)
+  \x1b[33m/attach blob <mime> <base64> [--name n]\x1b[0m — adiciona blob inline sem roundtrip por disco
   \x1b[33m/attach clear\x1b[0m                        — limpa fila de attachments
   \x1b[33m@<caminho>\x1b[0m (inline)                  — embed automático: @src/foo.js no texto da mensagem
   \x1b[33m/context\x1b[0m                             — estima uso atual de tokens da sessão

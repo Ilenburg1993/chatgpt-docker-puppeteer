@@ -14,6 +14,7 @@ const broadcastSse = vi.fn();
 const writeInlineStatus = vi.fn();
 const recordTerminalActivity = vi.fn();
 const getShowToolActivity = vi.fn(() => true);
+const getShowUsage = vi.fn(() => true);
 const getShowStreaming = vi.fn(() => true);
 const getShowIntentActivity = vi.fn(() => true);
 const readTerminalRuntimeState = vi.fn(
@@ -43,6 +44,7 @@ vi.mock('../../../src/copilot/terminal/state/activity-state.js', () => ({
 
 vi.mock('../../../src/copilot/presentation/state/index.js', () => ({
     getShowToolActivity,
+    getShowUsage,
     getShowStreaming,
     getShowIntentActivity,
 }));
@@ -69,6 +71,7 @@ describe('terminal/events/agent-runtime-events.js — contrato', () => {
         vi.clearAllMocks();
         vi.useRealTimers();
         getTerminalDetailLevel.mockReturnValue('detailed');
+        getShowUsage.mockReturnValue(true);
         printlnBlock.mockImplementation((/** @type {string[]} */ lines) => println(lines.join('\n')));
         readTerminalRuntimeState.mockReturnValue(
             /** @type {any} */ ({
@@ -505,6 +508,84 @@ describe('terminal/events/agent-runtime-events.js — contrato', () => {
         expect(broadcastSse).toHaveBeenCalledWith(
             'agent.shell.completed',
             expect.objectContaining({ shellId: 'shell-1', exitCode: 0 }),
+        );
+    });
+
+    it('promove pr.consumed para narrativa explícita de uso com SSE dedicada', async () => {
+        const { setupTerminalAgentRuntimeEventListeners } =
+            await import('../../../src/copilot/terminal/events/agent-runtime-events.js');
+        /** @type {Map<string, Function[]>} */
+        const listeners = new Map();
+        const agent = {
+            on: vi.fn((event, handler) => {
+                const list = listeners.get(event) ?? [];
+                list.push(handler);
+                listeners.set(event, list);
+            }),
+            off: vi.fn(),
+        };
+
+        setupTerminalAgentRuntimeEventListeners({ agent: /** @type {any} */ (agent), rl: null });
+        listeners.get('pr.consumed')?.[0]?.({
+            model: 'gpt-5-mini',
+            configuredModel: 'gpt-5',
+            effectiveModel: 'gpt-5-mini',
+            cost: 0.0123,
+            modelMismatch: true,
+        });
+
+        expect(recordTerminalActivity).toHaveBeenCalledWith(
+            'system',
+            'Uso contabilizado com divergência de modelo',
+            expect.objectContaining({
+                detail: 'modeloCfg=gpt-5 · modeloEfetivo=gpt-5-mini · modeloCobrado=gpt-5-mini · custo=0.0123',
+                severity: 'warn',
+                source: 'agent',
+                recordHistory: true,
+            }),
+        );
+        expect(println).toHaveBeenCalledWith(expect.stringContaining('USAGE'));
+        expect(println).toHaveBeenCalledWith(expect.stringContaining('modeloCobrado=gpt-5-mini'));
+        expect(broadcastSse).toHaveBeenCalledWith(
+            'pr.consumed',
+            expect.objectContaining({
+                model: 'gpt-5-mini',
+                configuredModel: 'gpt-5',
+                cost: 0.0123,
+            }),
+        );
+    });
+
+    it('promove pr.fallback_model para aviso operacional explícito', async () => {
+        const { setupTerminalAgentRuntimeEventListeners } =
+            await import('../../../src/copilot/terminal/events/agent-runtime-events.js');
+        /** @type {Map<string, Function[]>} */
+        const listeners = new Map();
+        const agent = {
+            on: vi.fn((event, handler) => {
+                const list = listeners.get(event) ?? [];
+                list.push(handler);
+                listeners.set(event, list);
+            }),
+            off: vi.fn(),
+        };
+
+        setupTerminalAgentRuntimeEventListeners({ agent: /** @type {any} */ (agent), rl: null });
+        listeners.get('pr.fallback_model')?.[0]?.({ from: 'gpt-5', to: 'gpt-5-mini' });
+
+        expect(recordTerminalActivity).toHaveBeenCalledWith(
+            'system',
+            'Fallback de modelo aplicado',
+            expect.objectContaining({
+                detail: 'gpt-5 → gpt-5-mini',
+                severity: 'warn',
+                source: 'agent',
+            }),
+        );
+        expect(println).toHaveBeenCalledWith(expect.stringContaining('Fallback de modelo: gpt-5 → gpt-5-mini'));
+        expect(broadcastSse).toHaveBeenCalledWith(
+            'pr.fallback_model',
+            expect.objectContaining({ from: 'gpt-5', to: 'gpt-5-mini' }),
         );
     });
 

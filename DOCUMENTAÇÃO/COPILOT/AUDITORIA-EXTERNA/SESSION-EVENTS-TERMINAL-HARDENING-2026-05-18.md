@@ -101,6 +101,8 @@ Estava parcial, latente ou subexposto para:
 - `exit_plan_mode.requested`
 - attachments `blob` no terminal
 
+Após a retomada contínua sobre baseline verde, os itens acima deixaram de ser apenas backlog conceitual: todos ganharam tratamento material, restando sobretudo aprofundamento de UX/diffs e não mais ausência total de surface.
+
 ---
 
 ## 4. Matriz de cobertura do recorte 946–1828
@@ -110,7 +112,7 @@ Estava parcial, latente ou subexposto para:
 | `assistant.message`                                 | coberto                                  | bom                             | render final e transcript fora do turno ativo                     |
 | `assistant.message_delta`                           | parcial                                  | aceitável, mas exige vigilância | bom no wire; UX depende do render/live loop e do final event      |
 | `assistant.reasoning` / `assistant.reasoning_delta` | parcial                                  | aceitável                       | thinking/history existe, mas ainda é uma UX especializada         |
-| `assistant.usage`                                   | parcial                                  | gap de surface                  | coleta/estado existem; narrativa terminal ainda é fraca           |
+| `assistant.usage`                                   | endurecido                               | bom com follow-up               | owner explícito via `pr.consumed` / `pr.fallback_model`           |
 | `tool.execution_start`                              | coberto                                  | bom                             | narrativa e SSE canônicos                                         |
 | `tool.execution_progress`                           | antes parcial, agora endurecido          | melhorar continuamente          | `compact` precisava snapshot durável                              |
 | `tool.execution_partial_result`                     | coberto                                  | bom                             | já tratado com narrativa e SSE                                    |
@@ -119,17 +121,17 @@ Estava parcial, latente ou subexposto para:
 | `permission.*`                                      | coberto                                  | bom                             | cadeia relativamente madura                                       |
 | `user_input.*`                                      | coberto                                  | bom                             | integração com mailbox e protocolo local                          |
 | `elicitation.*`                                     | coberto                                  | bom                             | UX local existe                                                   |
-| `sampling.*`                                        | ausente no terminal                      | gap real                        | precisa decisão de UX/surface                                     |
+| `sampling.*`                                        | coberto                                  | bom com follow-up               | já ganhou wiring e narrativa básica                               |
 | `mcp.oauth.*`                                       | coberto em boa parte                     | bom com ressalvas               | fluxo RPC já iniciado; UX ainda pode melhorar                     |
 | `external_tool.*`                                   | coberto                                  | bom                             | fluxo canônico dedicado                                           |
 | `command.*`                                         | parcial                                  | gap de surface                  | observabilidade existe mais do que UX terminal                    |
-| `auto_mode_switch.*`                                | ausente no terminal                      | gap real                        | precisa surface explícita                                         |
-| `commands.changed`                                  | ausente no terminal                      | gap real                        | falta narrativa/estado terminal                                   |
-| `capabilities.changed`                              | ausente no terminal                      | gap real                        | falta espelhamento de capacidade na superfície local              |
-| `exit_plan_mode.requested`                          | ausente no terminal                      | gap real                        | `completed` existe; `requested` ainda não                         |
+| `auto_mode_switch.*`                                | coberto                                  | bom com follow-up               | já ganhou surface explícita                                       |
+| `commands.changed`                                  | coberto                                  | bom com follow-up               | narrativa básica entregue; ainda cabe diff mais rico              |
+| `capabilities.changed`                              | coberto                                  | bom com follow-up               | já há espelhamento básico no terminal                             |
+| `exit_plan_mode.requested`                          | coberto                                  | bom com follow-up               | `requested` passou a ter owner explícito                          |
 | `session.tools_updated`                             | parcial                                  | aceitável                       | há narrativa resumida, mas não surface rica                       |
 | `session.background_tasks_changed`                  | parcial                                  | aceitável                       | visível, porém ainda minimalista                                  |
-| `session.skills_loaded`                             | parcial                                  | aceitável                       | visível, porém ainda minimalista                                  |
+| `session.skills_loaded`                             | parcial                                  | aceitável                       | evento segue minimalista, mas `/sdk skills` reduziu o gap prático |
 
 ---
 
@@ -219,12 +221,12 @@ Se a resposta depender de lembrar um “flash” que sumiu, a UX está funcional
 
 ### Subfase C.1 — uso e billing por evento
 
-- superfície mais clara para `assistant.usage`
-- correlação com `/sdk quota`, PR e diagnósticos locais
+- superfície explícita para `assistant.usage` já entregue via `pr.consumed`
+- aprofundar correlação com `/sdk quota`, PR e diagnósticos locais
 
 ### Subfase C.2 — attachments e capacidades de UI
 
-- suporte terminal a `blob` attachments
+- suporte terminal a `blob` attachments já entregue em superfície mínima por `/attach blob`
 - uso explícito de `session.capabilities.ui` para ajustar UX local
 
 ---

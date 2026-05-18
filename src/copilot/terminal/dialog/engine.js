@@ -9,9 +9,11 @@
 import { emitNerv } from '#copilot/bridges';
 import { LLM_B_BOOT_TIMEOUT_MS } from '#copilot/config';
 import { cancelTimer, container, registerInterval, sleepMs, toError } from '#copilot/core';
+import { utf8ByteLength } from '#copilot/infra/public/buffer';
 import { log, METRICS_STORE } from '#copilot/observability';
 import { resolveOptionalDialogTimeout } from '../../presentation/dialog-timeout-policy.js';
-import { embedMultiple, readFileContext } from '../../presentation/files/index.js';
+import { MAX_EMBED_BYTES } from '../../presentation/files/index.js';
+import { attachmentToRuntimeEmbed } from '../../presentation/runtime/index.js';
 import { describeSdkRecoveryPolicy, getSdkRecoveryPolicy } from '../../presentation/sdk/index.js';
 import {
     clearAttachments,
@@ -55,9 +57,52 @@ import {
 
 export { drainPendingNotifications, getPersistenceFailureCount };
 
+/**
+ * @typedef {string
+ *     | {
+ *           type?: string;
+ *           path?: string;
+ *           filePath?: string;
+ *           displayName?: string;
+ *           content?: string;
+ *           text?: string;
+ *           data?: string;
+ *           mimeType?: string;
+ *           selection?: Record<string, unknown>;
+ *       }} TerminalQueuedAttachment
+ */
+
 const MAX_TURN_QUEUE_SIZE = 10;
 /** @type {number} */
 let _turnQueueDepth = 0;
+
+/**
+ * @param {TerminalQueuedAttachment} attachment
+ * @returns {Parameters<typeof attachmentToRuntimeEmbed>[0]}
+ */
+function normalizeQueuedAttachment(attachment) {
+    return typeof attachment === 'string' ? { type: 'file', path: attachment } : attachment;
+}
+
+/**
+ * @param {TerminalQueuedAttachment} attachment
+ * @returns {string}
+ */
+function describeQueuedAttachment(attachment) {
+    if (typeof attachment === 'string') return attachment;
+    const type = typeof attachment?.type === 'string' ? attachment.type : 'file';
+    if ((type === 'file' || type === 'directory') && typeof attachment?.path === 'string') return attachment.path;
+    if (type === 'selection' && typeof attachment?.filePath === 'string') {
+        return `${attachment.filePath} [selection]`;
+    }
+    if (type === 'blob') {
+        const displayName = typeof attachment?.displayName === 'string' ? attachment.displayName : 'blob';
+        const mimeType = typeof attachment?.mimeType === 'string' ? attachment.mimeType : 'application/octet-stream';
+        return `${displayName} [blob:${mimeType}]`;
+    }
+    if (typeof attachment?.displayName === 'string') return attachment.displayName;
+    return 'attachment';
+}
 
 /**
  * @param {unknown} value
@@ -337,7 +382,7 @@ export function sendTurn(message, actor = 'user') {
  *
  * @param {string} message
  * @param {string} actor
- * @param {string[]} attachments
+ * @param {TerminalQueuedAttachment[]} attachments
  * @returns {Promise<string | null>}
  */
 async function _executeTurn(message, actor, attachments = []) {
@@ -436,9 +481,26 @@ async function _executeTurn(message, actor, attachments = []) {
 
     if (attachments.length > 0) {
         try {
-            const ctxs = await Promise.all(attachments.map(readFileContext));
-            enrichedMessage = embedMultiple(ctxs, enrichedMessage);
-            println(`\x1b[90m  📎 ${ctxs.length} arquivo(s) embutido(s): ${ctxs.map((c) => c.path).join(', ')}\x1b[0m`);
+            const embedParts = await Promise.all(
+                attachments.map((attachment) => attachmentToRuntimeEmbed(normalizeQueuedAttachment(attachment))),
+            );
+            const validParts = embedParts.filter(/** @type {(s: string | null) => s is string} */ (s) => s !== null);
+            if (validParts.length > 0) {
+                let totalBytes = 0;
+                const limitedParts = [];
+                for (const part of validParts) {
+                    const partBytes = utf8ByteLength(part, 'terminal dialog attachment embed');
+                    if (totalBytes + partBytes > MAX_EMBED_BYTES) break;
+                    limitedParts.push(part);
+                    totalBytes += partBytes;
+                }
+                if (limitedParts.length > 0) {
+                    enrichedMessage = limitedParts.join('\n\n') + '\n\n' + enrichedMessage;
+                    println(
+                        `\x1b[90m  📎 ${limitedParts.length} attachment(s) embutido(s): ${attachments.map(describeQueuedAttachment).join(', ')}\x1b[0m`,
+                    );
+                }
+            }
         } catch (embedErr) {
             println(`\x1b[33m  ⚠️  Falha ao embutir arquivo(s): ${toError(embedErr).message}\x1b[0m`);
         }

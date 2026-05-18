@@ -107,6 +107,7 @@ export {
     listSdkBuiltInTools,
     listSdkModels,
     listSdkSessions,
+    listSdkSkills,
     listSdkWorkspaceFiles,
     loginSdkMcpOauth,
     pingSdk,

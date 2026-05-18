@@ -45,9 +45,8 @@ vi.mock('../../../src/copilot/presentation/dialog-timeout-policy.js', () => ({
         reasons: ['caller_disabled'],
     })),
 }));
-vi.mock('../../../src/copilot/presentation/files/context.js', () => ({
-    embedMultiple: vi.fn(async () => []),
-    readFileContext: vi.fn(async () => null),
+vi.mock('../../../src/copilot/presentation/runtime/dialog.js', () => ({
+    attachmentToRuntimeEmbed: vi.fn(async () => null),
 }));
 vi.mock('../../../src/copilot/presentation/state/index.js', () => ({
     clearAttachments: vi.fn(),
@@ -148,6 +147,43 @@ describe('terminal/dialog/engine.js — contrato', () => {
 
     it('exporta getTurnQueueDepth', async () => {
         expect(typeof mod.getTurnQueueDepth).toBe('function');
+    });
+
+    it('embute blob attachment estruturado no próximo turno do usuário', async () => {
+        const state = await import('../../../src/copilot/presentation/state/index.js');
+        const runtimeDialog = await import('../../../src/copilot/presentation/runtime/dialog.js');
+        const dialogGateway = await import('../../../src/copilot/terminal/frontend/gateways/dialog.js');
+
+        vi.mocked(state.getAttachmentQueue).mockReturnValue([
+            {
+                type: 'blob',
+                data: 'Y29udGV1ZG8=',
+                mimeType: 'text/plain',
+                displayName: 'memo.txt',
+            },
+        ]);
+        vi.mocked(runtimeDialog.attachmentToRuntimeEmbed).mockResolvedValueOnce(
+            'Blob `memo.txt` (text/plain)\n```\nconteúdo\n```',
+        );
+
+        await mod.sendTurn('Explique este artefato.', 'user');
+
+        expect(vi.mocked(state.clearAttachments)).toHaveBeenCalled();
+        expect(vi.mocked(runtimeDialog.attachmentToRuntimeEmbed)).toHaveBeenCalledWith(
+            expect.objectContaining({
+                type: 'blob',
+                mimeType: 'text/plain',
+                displayName: 'memo.txt',
+            }),
+        );
+        expect(vi.mocked(dialogGateway.runTerminalDialogTurn)).toHaveBeenCalledWith(
+            expect.stringContaining('Blob `memo.txt` (text/plain)'),
+            expect.any(Object),
+        );
+        expect(vi.mocked(dialogGateway.runTerminalDialogTurn)).toHaveBeenCalledWith(
+            expect.stringContaining('Explique este artefato.'),
+            expect.any(Object),
+        );
     });
 
     it('pausa o boot do dialog loop quando a policy SDK bloqueia reconnect por auth', async () => {

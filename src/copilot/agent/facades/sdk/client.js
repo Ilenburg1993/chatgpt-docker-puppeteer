@@ -7,17 +7,10 @@
  * @module copilot/agent/facades/sdk/client
  */
 
-import {
-    raceEvents,
-} from '#copilot/sdk/event-helpers';
 import { SESSION_LIFECYCLE_EVENTS } from '#copilot/sdk/constants';
-import { modelsList, toolsList } from '#copilot/sdk/rpc';
-import {
-    createCopilotClient,
-    disconnectSessionSafe,
-    LIFECYCLE_EVENTS,
-    onLifecycleEvents,
-} from '#copilot/sdk/session';
+import { raceEvents } from '#copilot/sdk/event-helpers';
+import { modelsList, skillsDiscover, toolsList } from '#copilot/sdk/rpc';
+import { createCopilotClient, disconnectSessionSafe, LIFECYCLE_EVENTS, onLifecycleEvents } from '#copilot/sdk/session';
 import { getAuthStatus as checkAuthStatus } from '#copilot/sdk/telemetry';
 import {
     getClientRef,
@@ -310,4 +303,13 @@ export async function listSdkModels(ctx) {
  */
 export async function listSdkBuiltInTools(ctx, options) {
     return toolsList(requireClient(ctx, 'listSdkBuiltInTools'), options);
+}
+
+/**
+ * @param {unknown} ctx
+ * @param {{ projectPaths?: string[]; skillDirectories?: string[] }} [options]
+ * @returns {Promise<Awaited<ReturnType<typeof skillsDiscover>>>}
+ */
+export async function listSdkSkills(ctx, options) {
+    return skillsDiscover(requireClient(ctx, 'listSdkSkills'), options);
 }

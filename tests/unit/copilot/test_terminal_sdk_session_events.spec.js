@@ -575,6 +575,124 @@ describe('terminal/events/sdk-session-events.js — contrato', () => {
         expect(mocks.println).toHaveBeenCalledWith(expect.stringContaining('Tools dinâmicas SDK atualizadas: 92'));
     });
 
+    it('surfa hooks, sampling, commands/capabilities, auto-mode e exit_plan_mode.requested', async () => {
+        mocks.getShowSessionActivity.mockReturnValue(true);
+        const { setupTerminalSdkSessionEventListeners } =
+            await import('../../../src/copilot/terminal/events/sdk-session-events.js');
+        const agent = createAgentHost();
+        const refreshPromptIfIdle = vi.fn();
+
+        setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfIdle });
+
+        agent.emit('hook.start', {
+            hookInvocationId: 'hk-1',
+            hookType: 'preToolUse',
+            input: { tool: 'grep' },
+        });
+        agent.emit('hook.end', {
+            hookInvocationId: 'hk-1',
+            hookType: 'preToolUse',
+            success: false,
+            error: { message: 'boom' },
+        });
+        agent.emit('sampling.requested', {
+            requestId: 'sample-1',
+            serverName: 'browser',
+            mcpRequestId: 7,
+        });
+        agent.emit('sampling.completed', { requestId: 'sample-1' });
+        agent.emit('commands.changed', {
+            count: 2,
+            commands: [{ name: '/plan' }, { name: '/auto' }],
+        });
+        agent.emit('capabilities.changed', {
+            capabilities: { ui: { elicitation: true } },
+            changes: { ui: { elicitation: true } },
+        });
+        agent.emit('auto_mode_switch.requested', {
+            requestId: 'auto-1',
+            errorCode: 'rate_limit',
+        });
+        agent.emit('auto_mode_switch.completed', {
+            requestId: 'auto-1',
+            response: 'yes_always',
+        });
+        agent.emit('exit_plan_mode.requested', {
+            requestId: 'plan-1',
+            recommendedAction: 'approve',
+            actions: ['approve', 'edit', 'reject'],
+            planContent: '# Plano\n\nAplicar rollout gradual',
+        });
+
+        expect(mocks.recordTerminalActivity).toHaveBeenCalledWith(
+            'system',
+            'Hook SDK iniciado',
+            expect.objectContaining({ detail: 'preToolUse · hk-1', recordHistory: false }),
+        );
+        expect(mocks.recordTerminalActivity).toHaveBeenCalledWith(
+            'system',
+            'Hook SDK falhou',
+            expect.objectContaining({ severity: 'warn', source: 'sdk' }),
+        );
+        expect(mocks.recordTerminalActivity).toHaveBeenCalledWith(
+            'question',
+            'Sampling MCP solicitado',
+            expect.objectContaining({ detail: 'browser · sample-1', severity: 'warn' }),
+        );
+        expect(mocks.recordTerminalActivity).toHaveBeenCalledWith(
+            'system',
+            'Comandos SDK atualizados',
+            expect.objectContaining({ detail: expect.stringContaining('2 comando(s) · /plan, /auto') }),
+        );
+        expect(mocks.recordTerminalActivity).toHaveBeenCalledWith(
+            'system',
+            'Capabilities SDK alteradas',
+            expect.objectContaining({ detail: expect.stringContaining('ui.elicitation=true') }),
+        );
+        expect(mocks.recordTerminalActivity).toHaveBeenCalledWith(
+            'system',
+            'Troca automática de modo solicitada',
+            expect.objectContaining({ detail: 'auto-1 · rate_limit', severity: 'warn' }),
+        );
+        expect(mocks.recordTerminalActivity).toHaveBeenCalledWith(
+            'system',
+            'Saída do plan mode solicitada',
+            expect.objectContaining({ detail: expect.stringContaining('approve · 3 ação(ões)') }),
+        );
+        expect(mocks.broadcastSse).toHaveBeenCalledWith(
+            'hook.start',
+            expect.objectContaining({ hookType: 'preToolUse', hookInvocationId: 'hk-1' }),
+        );
+        expect(mocks.broadcastSse).toHaveBeenCalledWith(
+            'sampling.requested',
+            expect.objectContaining({ requestId: 'sample-1', serverName: 'browser', mcpRequestId: 7 }),
+        );
+        expect(mocks.broadcastSse).toHaveBeenCalledWith(
+            'commands.changed',
+            expect.objectContaining({ count: 2, commands: expect.any(Array) }),
+        );
+        expect(mocks.broadcastSse).toHaveBeenCalledWith(
+            'capabilities.changed',
+            expect.objectContaining({ changes: expect.objectContaining({ ui: expect.any(Object) }) }),
+        );
+        expect(mocks.broadcastSse).toHaveBeenCalledWith(
+            'auto_mode_switch.completed',
+            expect.objectContaining({ requestId: 'auto-1', response: 'yes_always' }),
+        );
+        expect(mocks.broadcastSse).toHaveBeenCalledWith(
+            'exit_plan_mode.requested',
+            expect.objectContaining({
+                requestId: 'plan-1',
+                recommendedAction: 'approve',
+                actions: ['approve', 'edit', 'reject'],
+            }),
+        );
+        expect(mocks.println).toHaveBeenCalledWith(expect.stringContaining('HOOK'));
+        expect(mocks.println).toHaveBeenCalledWith(expect.stringContaining('SAMPLE'));
+        expect(mocks.println).toHaveBeenCalledWith(expect.stringContaining('PLAN'));
+        expect(refreshPromptIfIdle).toHaveBeenCalled();
+    });
+
     it('cleanup remove listeners vanilla registrados', async () => {
         const { setupTerminalSdkSessionEventListeners } =
             await import('../../../src/copilot/terminal/events/sdk-session-events.js');

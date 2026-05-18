@@ -31,8 +31,11 @@ describe('terminal/event-adapter-events.js — contrato', () => {
         expect(handled.has('pending_messages.modified')).toBe(true);
         expect(handled.has('external_tool.completed')).toBe(true);
         expect(handled.has('session.title_changed')).toBe(true);
+        expect(handled.has('pr.consumed')).toBe(true);
+        expect(handled.has('pr.fallback_model')).toBe(true);
         expect(passthrough.has('dialog.turn_timeout')).toBe(true);
-        expect(passthrough.has('pr.consumed')).toBe(true);
+        expect(passthrough.has('pr.consumed')).toBe(false);
+        expect(passthrough.has('pr.fallback_model')).toBe(false);
         expect(passthrough.has('permission.mode_changed')).toBe(false);
         expect([...handled].filter((event) => passthrough.has(event))).toEqual([]);
         expect(ignored).toContain('assistant.streaming_delta');

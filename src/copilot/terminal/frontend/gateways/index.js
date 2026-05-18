@@ -79,6 +79,7 @@ export {
     listTerminalSdkModels,
     listTerminalSdkPendingElicitations,
     listTerminalSdkPendingPermissions,
+    listTerminalSdkSkills,
     listTerminalSdkTools,
     listTerminalSdkWorkspaceFiles,
     loginTerminalSdkMcpOauth,

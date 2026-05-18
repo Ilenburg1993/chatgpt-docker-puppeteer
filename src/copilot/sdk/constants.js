@@ -183,6 +183,10 @@ export const SESSION_EVENTS = /** @type {const} */ ({
     HOOK_START: 'hook.start',
     HOOK_END: 'hook.end',
 
+    // ── Sampling ──
+    SAMPLING_REQUESTED: 'sampling.requested',
+    SAMPLING_COMPLETED: 'sampling.completed',
+
     // ── Skill ──
     SKILL_INVOKED: 'skill.invoked',
 
@@ -217,6 +221,10 @@ export const SESSION_EVENTS = /** @type {const} */ ({
     // ── Plan Mode ──
     EXIT_PLAN_MODE_REQUESTED: 'exit_plan_mode.requested',
     EXIT_PLAN_MODE_COMPLETED: 'exit_plan_mode.completed',
+
+    // ── Auto Mode Switch ──
+    AUTO_MODE_SWITCH_REQUESTED: 'auto_mode_switch.requested',
+    AUTO_MODE_SWITCH_COMPLETED: 'auto_mode_switch.completed',
 
     // ── Shell ──
     SHELL_COMPLETED: 'shell_completed',

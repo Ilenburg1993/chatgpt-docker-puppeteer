@@ -43,7 +43,23 @@ export const TERMINAL_EVENTS = /** @type {const} */ ({
 let _busy = false;
 /** @type {import('node:readline').Interface | null} */
 let _rl = null;
-/** @type {string[]} */
+
+/**
+ * @typedef {string
+ *     | {
+ *           type?: string;
+ *           path?: string;
+ *           filePath?: string;
+ *           displayName?: string;
+ *           content?: string;
+ *           text?: string;
+ *           data?: string;
+ *           mimeType?: string;
+ *           selection?: Record<string, unknown>;
+ *       }} TerminalAttachmentQueueEntry
+ */
+
+/** @type {TerminalAttachmentQueueEntry[]} */
 let _attachmentQueue = [];
 const MAX_ATTACHMENT_QUEUE = TERMINAL_MAX_ATTACHMENTS;
 
@@ -165,21 +181,52 @@ export function setRl(value) {
     _rl = value;
 }
 
-/** @returns {string[]} */
-export function getAttachmentQueue() {
-    return [..._attachmentQueue];
+/**
+ * @param {TerminalAttachmentQueueEntry} entry
+ * @returns {TerminalAttachmentQueueEntry}
+ */
+function cloneAttachmentEntry(entry) {
+    return typeof entry === 'string' ? entry : { ...entry };
 }
 
 /**
- * @param {string} filePath
+ * @param {TerminalAttachmentQueueEntry} entry
+ * @returns {string}
+ */
+function attachmentQueueKey(entry) {
+    if (typeof entry === 'string') return `file:${entry}`;
+    const type = typeof entry?.type === 'string' ? entry.type : 'file';
+    if ((type === 'file' || type === 'directory') && typeof entry.path === 'string') {
+        return `${type}:${entry.path}`;
+    }
+    if (type === 'selection' && typeof entry.filePath === 'string') {
+        return `selection:${entry.filePath}:${String(entry.displayName ?? '')}:${String(entry.text ?? '')}`;
+    }
+    if (type === 'blob' && typeof entry.data === 'string') {
+        return `blob:${String(entry.displayName ?? '')}:${String(entry.mimeType ?? '')}:${entry.data}`;
+    }
+    if (typeof entry.content === 'string') {
+        return `content:${String(entry.displayName ?? '')}:${entry.content}`;
+    }
+    return JSON.stringify(entry);
+}
+
+/** @returns {TerminalAttachmentQueueEntry[]} */
+export function getAttachmentQueue() {
+    return _attachmentQueue.map(cloneAttachmentEntry);
+}
+
+/**
+ * @param {TerminalAttachmentQueueEntry} attachment
  * @returns {void}
  */
-export function addAttachment(filePath) {
+export function addAttachment(attachment) {
     if (_attachmentQueue.length >= MAX_ATTACHMENT_QUEUE) {
         throw new CopilotError(`[runtime-ui-state-store] Fila de attachments cheia (máx: ${MAX_ATTACHMENT_QUEUE})`);
     }
-    if (!_attachmentQueue.includes(filePath)) {
-        _attachmentQueue.push(filePath);
+    const key = attachmentQueueKey(attachment);
+    if (!_attachmentQueue.some((entry) => attachmentQueueKey(entry) === key)) {
+        _attachmentQueue.push(cloneAttachmentEntry(attachment));
     }
 }
 

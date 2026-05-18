@@ -34,6 +34,7 @@ export {
     getSdkStatus,
     listSdkBuiltInTools,
     listSdkModels,
+    listSdkSkills,
     observeAgentSdkSessionLifecycle,
     onAgentSdkLifecycleEvents,
     pingAgentSdkClient,

@@ -83,10 +83,15 @@ export const KNOWN_SDK_EVENTS = new Set([
     'command.completed',
     'command.queued',
     'commands.changed',
+    'capabilities.changed',
     'exit_plan_mode.completed',
+    'auto_mode_switch.requested',
+    'auto_mode_switch.completed',
     'external_tool.completed',
     'pending_messages.modified',
     'assistant.reasoning',
+    'sampling.requested',
+    'sampling.completed',
 ]);
 
 /**

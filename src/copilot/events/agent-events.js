@@ -221,7 +221,25 @@ export const AGENT_STEERING_SENT = 'agent:steering:sent';
 /** @readonly */
 export const AGENT_PENDING_MESSAGES_MODIFIED = 'agent:pending_messages:modified';
 /** @readonly */
+export const AGENT_HOOK_START = 'agent:hook:start';
+/** @readonly */
+export const AGENT_HOOK_END = 'agent:hook:end';
+/** @readonly */
+export const AGENT_SAMPLING_REQUESTED = 'agent:sampling:requested';
+/** @readonly */
+export const AGENT_SAMPLING_COMPLETED = 'agent:sampling:completed';
+/** @readonly */
+export const AGENT_COMMANDS_CHANGED = 'agent:commands:changed';
+/** @readonly */
+export const AGENT_CAPABILITIES_CHANGED = 'agent:capabilities:changed';
+/** @readonly */
+export const AGENT_EXIT_PLAN_MODE_REQUESTED = 'agent:exit_plan_mode:requested';
+/** @readonly */
 export const AGENT_EXIT_PLAN_MODE_COMPLETED = 'agent:exit_plan_mode:completed';
+/** @readonly */
+export const AGENT_AUTO_MODE_SWITCH_REQUESTED = 'agent:auto_mode_switch:requested';
+/** @readonly */
+export const AGENT_AUTO_MODE_SWITCH_COMPLETED = 'agent:auto_mode_switch:completed';
 /** @readonly */
 export const AGENT_EXTERNAL_TOOL_COMPLETED = 'agent:external_tool:completed';
 
@@ -294,7 +312,16 @@ export const AGENT_EVENTS = /** @type {const} */ ([
     'tool.execution_progress',
     'system.message',
     'pending_messages.modified',
+    'hook.start',
+    'hook.end',
+    'sampling.requested',
+    'sampling.completed',
+    'commands.changed',
+    'capabilities.changed',
+    'exit_plan_mode.requested',
     'exit_plan_mode.completed',
+    'auto_mode_switch.requested',
+    'auto_mode_switch.completed',
     'external_tool.completed',
     // ── streaming & SDK responses ────────────────────────────────────────
     'assistant.message',

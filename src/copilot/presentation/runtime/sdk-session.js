@@ -255,6 +255,15 @@ export async function listAgentSdkModels(runtimeId) {
 }
 
 /**
+ * @param {{ projectPaths?: string[]; skillDirectories?: string[] }} [options]
+ * @param {string | null | undefined} [runtimeId]
+ * @returns {Promise<unknown>}
+ */
+export async function listAgentSdkSkills(options, runtimeId) {
+    return getAgentSdkSessionTarget(runtimeId).listSdkSkills(options);
+}
+
+/**
  * @param {{ model?: string }} [options]
  * @param {string | null | undefined} [runtimeId]
  * @returns {Promise<unknown>}

@@ -40,19 +40,19 @@ describe('terminal/agent-sse-passthrough.js — contrato', () => {
 
         registerTerminalAgentSsePassthrough({
             agent: /** @type {any} */ (agent),
-            handledEvents: new Set(['session.title_changed']),
-            passthroughEvents: new Set(['dialog.turn_timeout', 'pr.consumed']),
+            handledEvents: new Set(['session.title_changed', 'pr.consumed', 'pr.fallback_model']),
+            passthroughEvents: new Set(['dialog.turn_timeout']),
         });
 
         expect(listeners.has('dialog.turn_timeout')).toBe(true);
-        expect(listeners.has('pr.consumed')).toBe(true);
+        expect(listeners.has('pr.consumed')).toBe(false);
+        expect(listeners.has('pr.fallback_model')).toBe(false);
         expect(listeners.has('session.title_changed')).toBe(false);
         expect(listeners.has('assistant.streaming_delta')).toBe(false);
 
         listeners.get('dialog.turn_timeout')?.[0]?.({ phase: 'inject', timeoutMs: 15000 });
-        listeners.get('pr.consumed')?.[0]?.({ tokens: 100 });
 
         expect(broadcastSse).toHaveBeenCalledWith('dialog.turn_timeout', { phase: 'inject', timeoutMs: 15000 });
-        expect(broadcastSse).toHaveBeenCalledWith('pr.consumed', { tokens: 100 });
+        expect(broadcastSse).toHaveBeenCalledTimes(1);
     });
 });

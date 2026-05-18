@@ -105,15 +105,15 @@ A situação ideal ao final deste roadmap é:
 - **GAP-017** — `/permission reset-approvals`
 - **GAP-006** — fluxo terminal agora tenta iniciar `mcp.oauth.login()` via RPC quando o evento `mcp.oauth.required` ocorre
 - **GAP-010** — `/sdk quota` agora consulta `usage.getMetrics()` em best-effort
+- **GAP-005** — `/sdk skills` agora expõe discovery de skills na superfície terminal via cadeia canônica do runtime
+- **GAP-016** — `/attach blob <mime> <base64> [--name ...]` habilita blobs inline sem roundtrip obrigatório por disco
 
 #### Confirmados e ainda pendentes
 
-- **GAP-005** — usar / integrar `session.rpc.skills.*` na superfície terminal
 - **GAP-009** — adotar `convertMcpCallToolResult()` onde fizer sentido
 - **GAP-012** — avaliar `session.rpc.instructions.getSources()` como fonte prioritária
 - **GAP-013** — mapear skills por subagente
 - **GAP-015** — suportar `requestHeaders` por turno
-- **GAP-016** — suportar blob attachments sem roundtrip obrigatório em disco
 
 #### Latentes / mitigados, mas merecem hardening
 
@@ -260,17 +260,15 @@ A situação ideal ao final deste roadmap é:
 
 #### Subfase 1.3.2 — Famílias ainda parciais ou ausentes
 
-- `assistant.usage`;
-- `hook.*`;
-- `sampling.*`;
-- `command.*` UX explícita;
-- `commands.changed`;
-- `capabilities.changed`;
-- `auto_mode_switch.*`;
-- `exit_plan_mode.requested`;
-- attachments `blob`.
+- `assistant.usage` → endurecido via owner explícito em `pr.consumed` / `pr.fallback_model`;
+- `hook.*` → exposto no terminal;
+- `sampling.*` → exposto no terminal;
+- `commands.changed` / `capabilities.changed` → expostos com narrativa terminal básica;
+- `auto_mode_switch.*` → exposto no terminal;
+- `exit_plan_mode.requested` → exposto no terminal;
+- attachments `blob` → superfície mínima entregue via `/attach blob`.
 
-**Status:** pendente.
+**Status:** majoritariamente concluída; o residual principal aqui é aprofundar `command.*`/diffs ricos e manter a UX cada vez mais explicativa.
 
 ## Faixa 2 — Superfície SDK 0.3.0 sem duplicação arquitetural
 
@@ -286,11 +284,11 @@ A situação ideal ao final deste roadmap é:
 
 #### Subfase 2.1.2 — Próxima expansão canônica
 
-- `skills.*` na superfície terminal;
-- `instructions.getSources()` como fonte de verdade preferencial;
+- `skills.*` na superfície terminal — **surface mínima entregue** por `/sdk skills`;
+- `instructions.getSources()` como fonte de verdade preferencial — **já refletido** em `/sdk prompt`, ainda sem refinamento extra;
 - correlação de `assistant.usage` com quota e sessão.
 
-**Status:** pendente.
+**Status:** parcialmente concluída.
 
 ### Fase 2.2 — Inputs avançados por turno
 
@@ -306,7 +304,7 @@ A situação ideal ao final deste roadmap é:
 - suportar `UserMessageAttachmentBlob` no terminal;
 - evitar roundtrip forçado por filesystem quando não necessário.
 
-**Status:** pendente.
+**Status:** parcialmente concluída — `/attach blob` já atende o caso inline; o residual é eventual caminho binário nativo além do embed textual zero-PR.
 
 ## Faixa 3 — Confiabilidade de testes, runner e validação estrita
 
@@ -464,16 +462,16 @@ A situação ideal ao final deste roadmap é:
 ## 5. Estado resumido desta rodada
 
 - **Faixa 0**: consolidada; este arquivo passa a ser o plano único limpo e sem duplicações narrativas.
-- **Faixa 1**: endurecimento prioritário entregue para progresso/heartbeat e notificações operacionais principais; backlog de `assistant.usage`, hooks, sampling e capabilities continua aberto.
-- **Faixa 2**: reset approvals, quota metrics e OAuth MCP já entregues; `skills`, `instructions`, `requestHeaders` e blobs continuam pendentes.
+- **Faixa 1**: além do hardening de progresso/heartbeat, a superfície terminal agora cobre explicitamente `assistant.usage` (via `pr.consumed`), `hook.*`, `sampling.*`, `commands.changed`, `capabilities.changed`, `auto_mode_switch.*` e `exit_plan_mode.requested`.
+- **Faixa 2**: reset approvals, quota metrics e OAuth MCP já entregues; `skills` já têm surface mínima por `/sdk skills`, `instructions` já aparecem em `/sdk prompt`, blobs já têm surface mínima por `/attach blob`, e o grande gap remanescente passa a ser `requestHeaders` por turno.
 - **Faixa 3**: concluída nesta rodada — runner corrigido, warnings zerados, `typecheck` estrito verde e convergência entre `test:unit` e `test:copilot:unit` comprovada.
 - **Faixa 4+**: permanecem como continuação natural agora que a baseline de validação está realmente verde e sem warnings.
 
 ## 6. Próxima sequência obrigatória de execução
 
-1. retomar a **Faixa 1.3.2** com `assistant.usage`, `hook.*`, `sampling.*`, `commands.changed`, `capabilities.changed`, `auto_mode_switch.*` e `exit_plan_mode.requested`;
-2. avançar a **Faixa 2.1.2** com `skills.*` e `instructions.getSources()` como superfícies canônicas do terminal;
-3. atacar a **Faixa 2.2** com `requestHeaders` por turno e `blob attachments` sem roundtrip obrigatório em disco;
+1. atacar a **Faixa 2.2.1** com `requestHeaders` por turno, que agora é o gap funcional mais estrutural;
+2. aprofundar `skills.*` para governança/mutação e mapeamento por subagente (**GAP-013**);
+3. enriquecer `command.*`, `commands.changed` e `capabilities.changed` com diffs/estado operacional mais ricos;
 4. só depois voltar à **Faixa 4** para persistência longa, re-registro defensivo residual e upgrades arquiteturais controlados.
 
 ## 7. Observação de governança

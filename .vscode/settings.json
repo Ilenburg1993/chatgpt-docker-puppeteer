@@ -116,8 +116,17 @@
     "**/__pycache__/**": true,
     "**/.pytest_cache/**": true,
     "**/.mypy_cache/**": true,
-    "**/.ruff_cache/**": true
+    "**/.ruff_cache/**": true,
+
   },
+
+  "python.languageServer": "None",
+  "python.testing.pytestEnabled": false,
+  "python.testing.unittestEnabled": false,
+  "python.testing.autoTestDiscoverOnSaveEnabled": false,
+  "python.defaultInterpreterPath": "/usr/bin/python3",
+  "python.terminal.activateEnvironment": false,
+  "python.terminal.activateEnvInCurrentTerminal": false,
 
   // ===========================================================================
   // FASE 03) EDITOR — BASE / FORMATACAO / SAVE PIPELINE
@@ -412,8 +421,6 @@
   "typescript.workspaceSymbols.scope": "allOpenProjects",
   "typescript.updateImportsOnFileMove.enabled": "always",
   "typescript.validate.enable": true,
-  // Subfase 12.2) Python analysis complementar
-  "python.analysis.aiHoverSummaries": true,
 
   // ===========================================================================
   // FASE 13) JSON — FORMAT / VALIDATE / SCHEMAS
@@ -1006,10 +1013,6 @@
   "git-graph.repository.useMailmap": false,
   "git-graph.date.format": "Date & Time",
   "git-graph.dialog.addTag.pushToRemote": true,
-  "python.analysis.typeCheckingMode": "standard",
-  "python.defaultInterpreterPath": "/usr/bin/python3",
-  "python.terminal.activateEnvironment": false,
-  "python.terminal.activateEnvInCurrentTerminal": false,
   "github.copilot.chat.reviewSelection.instructions": [
     {
       "file": ".copilot-review-instructions.md"
@@ -1020,7 +1023,7 @@
     "D:\\"
   ],
   "js/ts.tsserver.experimental.enableProjectDiagnostics": true,
-  "js/ts.tsserver.useSyntaxServer": "auto",
+  "js/ts.tsserver.useSyntaxServer": "always",
   "js/ts.tsserver.maxMemory": 6144,
   "js/ts.preferences.preferTypeOnlyAutoImports": true,
   "js/ts.preferences.importModuleSpecifierEnding": "js",

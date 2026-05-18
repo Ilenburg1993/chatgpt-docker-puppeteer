@@ -27,6 +27,7 @@ import {
     listTerminalPendingStructuredUserInputs,
     listTerminalSdkModels,
     listTerminalSdkPendingPermissions,
+    listTerminalSdkSkills,
     listTerminalSdkTools,
     listTerminalSdkWorkspaceFiles,
     readTerminalRuntimePermissionMode,
@@ -83,9 +84,38 @@ function arrayFromSdkList(value) {
     const data = objectOrNull(value) ?? {};
     if (Array.isArray(value)) return value;
     if (Array.isArray(data['models'])) return data['models'];
+    if (Array.isArray(data['skills'])) return data['skills'];
     if (Array.isArray(data['tools'])) return data['tools'];
     if (Array.isArray(data['files'])) return data['files'];
     return [];
+}
+
+/**
+ * @param {string[]} rest
+ * @returns {{ projectPaths?: string[]; skillDirectories?: string[] }}
+ */
+function parseSdkSkillsArgs(rest) {
+    /** @type {string[]} */
+    const projectPaths = [];
+    /** @type {string[]} */
+    const skillDirectories = [];
+    for (let i = 0; i < rest.length; i++) {
+        const token = rest[i];
+        const candidate = rest[i + 1] ?? '';
+        if ((token === '--project' || token === '--project-path') && candidate.trim()) {
+            projectPaths.push(candidate.trim());
+            i += 1;
+            continue;
+        }
+        if ((token === '--dir' || token === '--skill-dir') && candidate.trim()) {
+            skillDirectories.push(candidate.trim());
+            i += 1;
+        }
+    }
+    return {
+        ...(projectPaths.length > 0 ? { projectPaths } : {}),
+        ...(skillDirectories.length > 0 ? { skillDirectories } : {}),
+    };
 }
 
 /**
@@ -635,6 +665,8 @@ export async function cmdSdk({ println }, arg = '') {
     try {
         if (sub === 'models') {
             await renderSdkModels({ println }, runtimeId);
+        } else if (sub === 'skills') {
+            await renderSdkSkills({ println }, rest, runtimeId);
         } else if (sub === 'tools') {
             await renderSdkTools({ println }, rest[0], runtimeId);
         } else if (sub === 'quota') {
@@ -665,7 +697,7 @@ export async function cmdSdk({ println }, arg = '') {
             );
             await renderSdkQuota({ println }, runtimeId, { compact: true });
             println(
-                '  \x1b[90mUso: /sdk models | /sdk tools [model] | /sdk quota | /sdk prompt | /sdk capabilities | /sdk waits | /sdk doctor | /sdk compact\x1b[0m\n',
+                '  \x1b[90mUso: /sdk models | /sdk skills [--project <path>] [--dir <path>] | /sdk tools [model] | /sdk quota | /sdk prompt | /sdk capabilities | /sdk waits | /sdk doctor | /sdk compact\x1b[0m\n',
             );
         }
     } catch (e) {
@@ -689,6 +721,66 @@ async function renderSdkModels({ println }, runtimeId) {
         println(`  \x1b[33m${id}\x1b[0m${effort ? `  \x1b[90mreasoning: ${effort}\x1b[0m` : ''}`);
     }
     if (models.length > 30) println(`  \x1b[90m... ${models.length - 30} modelos omitidos\x1b[0m`);
+    println('');
+}
+
+/**
+ * @param {CommandContext} ctx
+ * @param {string[]} rest
+ * @param {string | null | undefined} runtimeId
+ * @returns {Promise<void>}
+ */
+async function renderSdkSkills({ println }, rest, runtimeId) {
+    const options = parseSdkSkillsArgs(rest);
+    const result = await callWithRuntimeTarget(listTerminalSdkSkills, runtimeId, options);
+    const skills = arrayFromSdkList(result);
+    const enabledCount = skills.filter((skill) => objectOrNull(skill)?.['enabled'] !== false).length;
+    const invocableCount = skills.filter((skill) => objectOrNull(skill)?.['userInvocable'] === true).length;
+    /** @type {Map<string, number>} */
+    const sourceCounts = new Map();
+    for (const skill of skills) {
+        const source = String(objectOrNull(skill)?.['source'] ?? 'unknown');
+        sourceCounts.set(source, (sourceCounts.get(source) ?? 0) + 1);
+    }
+    const sourceSummary = [...sourceCounts.entries()]
+        .sort((a, b) => a[0].localeCompare(b[0], 'pt-BR'))
+        .map(([source, count]) => `${source}=${count}`)
+        .join(' · ');
+
+    println(`\n  \x1b[36mSkills SDK (${skills.length})\x1b[0m`);
+    println(
+        `  \x1b[90menabled=${enabledCount} · disabled=${skills.length - enabledCount} · slash=${invocableCount}${sourceSummary ? ` · ${sourceSummary}` : ''}\x1b[0m`,
+    );
+    if (options.projectPaths?.length || options.skillDirectories?.length) {
+        const filters = [
+            options.projectPaths?.length ? `project=${options.projectPaths.join(', ')}` : null,
+            options.skillDirectories?.length ? `dir=${options.skillDirectories.join(', ')}` : null,
+        ]
+            .filter(Boolean)
+            .join(' · ');
+        println(`  \x1b[90mfiltros: ${filters}\x1b[0m`);
+    }
+    for (const skill of skills.slice(0, 40)) {
+        const s = objectOrNull(skill) ?? {};
+        const name = String(s['name'] ?? skill);
+        const desc = String(s['description'] ?? '')
+            .replace(/\s+/g, ' ')
+            .slice(0, 90);
+        const source = String(s['source'] ?? 'unknown');
+        const enabled = s['enabled'] !== false;
+        const userInvocable = s['userInvocable'] === true;
+        const projectPath = typeof s['projectPath'] === 'string' ? s['projectPath'] : null;
+        const path = typeof s['path'] === 'string' ? s['path'] : null;
+        const badges = [enabled ? 'enabled' : 'disabled', source, userInvocable ? 'slash' : null]
+            .filter(Boolean)
+            .join(' · ');
+        println(
+            `  \x1b[33m${name}\x1b[0m${badges ? `  \x1b[90m[${badges}]\x1b[0m` : ''}${desc ? `  \x1b[90m${desc}\x1b[0m` : ''}`,
+        );
+        if (projectPath) println(`    \x1b[90mproject=${projectPath}\x1b[0m`);
+        if (path && path !== projectPath) println(`    \x1b[90mpath=${path}\x1b[0m`);
+    }
+    if (skills.length > 40) println(`  \x1b[90m... ${skills.length - 40} skills omitidas\x1b[0m`);
     println('');
 }
 

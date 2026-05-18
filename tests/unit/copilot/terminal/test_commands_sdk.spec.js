@@ -3,7 +3,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const runtimeMocks = vi.hoisted(() => {
-    /** @type {Array<Record<string, unknown>>} */
+    /** @type {Record<string, unknown>[]} */
     const pendingStructuredInputs = [];
     return {
         pendingStructuredInputs,
@@ -19,6 +19,19 @@ const runtimeMocks = vi.hoisted(() => {
         listTerminalPendingStructuredUserInputs: vi.fn(() => pendingStructuredInputs),
         listTerminalSdkModels: vi.fn(async () => ({
             models: [{ id: 'gpt-5-mini', supportedReasoningEfforts: ['high'] }],
+        })),
+        listTerminalSdkSkills: vi.fn(async () => ({
+            skills: [
+                {
+                    name: 'skill-pdf',
+                    description: 'Resume e extrai conteúdo de PDFs grandes.',
+                    source: 'project',
+                    enabled: true,
+                    userInvocable: true,
+                    path: '/repo/.github/skills/pdf/SKILL.md',
+                    projectPath: '/repo',
+                },
+            ],
         })),
         listTerminalSdkPendingPermissions: vi.fn(async () => ({
             available: true,
@@ -272,6 +285,23 @@ describe('terminal/commands/sdk', () => {
         expect(tools.output()).toContain('read_file');
     });
 
+    it('/sdk skills expõe descoberta de skills com filtros opcionais', async () => {
+        const ctx = mockCtx();
+        await cmdSdk({ println: ctx.println }, 'skills --project /repo --dir /extra-skills');
+
+        expect(runtimeMocks.listTerminalSdkSkills).toHaveBeenCalledWith({
+            projectPaths: ['/repo'],
+            skillDirectories: ['/extra-skills'],
+        });
+        expect(ctx.output()).toContain('Skills SDK (1)');
+        expect(ctx.output()).toContain('enabled=1');
+        expect(ctx.output()).toContain('project=1');
+        expect(ctx.output()).toContain('skill-pdf');
+        expect(ctx.output()).toContain('slash');
+        expect(ctx.output()).toContain('filtros: project=/repo');
+        expect(ctx.output()).toContain('dir=/extra-skills');
+    });
+
     it('/workspace lista, lê e escreve no workspace virtual SDK, deixando claro que não é FS local', async () => {
         const list = mockCtx();
         await cmdWorkspace({ println: list.println }, 'list');
@@ -514,7 +544,10 @@ describe('terminal/commands/sdk', () => {
         });
 
         const invalidEmail = mockCtx();
-        await cmdElicitation({ println: invalidEmail.println }, 'respond el-limits accept {"email":"x","count":2,"tags":["a"]}');
+        await cmdElicitation(
+            { println: invalidEmail.println },
+            'respond el-limits accept {"email":"x","count":2,"tags":["a"]}',
+        );
         expect(invalidEmail.output()).toContain('email');
         expect(runtimeMocks.resolveTerminalSdkPendingElicitation).not.toHaveBeenCalled();
 

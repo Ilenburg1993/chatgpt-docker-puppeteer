@@ -35,6 +35,7 @@ import {
     listAgentSdkModels,
     listAgentSdkPendingElicitations,
     listAgentSdkPendingPermissions,
+    listAgentSdkSkills,
     listAgentSdkTools,
     listAgentSdkWorkspaceFiles,
     loginAgentSdkMcpOauth,
@@ -199,6 +200,15 @@ export async function deleteTerminalSdkPlan(runtimeId) {
  */
 export async function listTerminalSdkModels(runtimeId) {
     return listAgentSdkModels(runtimeId);
+}
+
+/**
+ * @param {{ projectPaths?: string[]; skillDirectories?: string[] }} [options]
+ * @param {string | null | undefined} [runtimeId]
+ * @returns {Promise<unknown>}
+ */
+export async function listTerminalSdkSkills(options, runtimeId) {
+    return listAgentSdkSkills(options, runtimeId);
 }
 
 /**

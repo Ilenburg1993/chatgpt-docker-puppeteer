@@ -16,7 +16,7 @@ export function buildTerminalReplBanner(injectPort) {
     \x1b[33m/status\x1b[0m · \x1b[33m/now\x1b[0m · \x1b[33m/live [n]\x1b[0m · \x1b[33m/history [n]\x1b[0m · \x1b[33m/db-history [n] [offset]\x1b[0m · \x1b[33m/db-sessions [n]\x1b[0m · \x1b[33m/who\x1b[0m · \x1b[33m/restart\x1b[0m
     \x1b[33m/activity [n]\x1b[0m \x1b[90m← atividade atual + timeline\x1b[0m · \x1b[33m/live [n]\x1b[0m \x1b[90m← loop/stream/SSE/tools/I-O\x1b[0m
   \x1b[33m/model [list|id]\x1b[0m · \x1b[33m/reasoning [low|medium|high|xhigh|off]\x1b[0m · \x1b[33m/count\x1b[0m
-    \x1b[33m/attach [path|clear]\x1b[0m · \x1b[33m/context\x1b[0m · \x1b[33m/compact\x1b[0m · \x1b[33m/plan [on|off|autopilot|read|clear]\x1b[0m · \x1b[33m/resume [id]\x1b[0m
+    \x1b[33m/attach [path|blob|clear]\x1b[0m · \x1b[33m/context\x1b[0m · \x1b[33m/compact\x1b[0m · \x1b[33m/plan [on|off|autopilot|read|clear]\x1b[0m · \x1b[33m/resume [id]\x1b[0m
   \x1b[33m/pause\x1b[0m · \x1b[33m/dialog-resume [bootPrompt]\x1b[0m · \x1b[33m/handoff\x1b[0m \x1b[90m← pausa/retoma/handoff\x1b[0m
   \x1b[33m/queue <msg>\x1b[0m · \x1b[33m/turn <msg>\x1b[0m · \x1b[33m/mailbox [status|consume|clear]\x1b[0m \x1b[90m← zero-PR vs turno explícito\x1b[0m
   \x1b[33m/thinking [on|off]\x1b[0m · \x1b[33m/intent [n]\x1b[0m · \x1b[33m/usage [on|off|now]\x1b[0m \x1b[90m← thinking, intent e usage\x1b[0m
