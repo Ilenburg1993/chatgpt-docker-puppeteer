@@ -7,7 +7,13 @@ const altClearPendingQuestionShadow = vi.fn(() => true);
 const startAgentDialogLoop = vi.fn(async (/** @type {any} */ runtime, /** @type {string | undefined} */ bootPrompt) => {
     await runtime.startDialogLoop(bootPrompt);
 });
-const sendAgentDialogTurn = vi.fn(async () => 'Resumo final');
+const sendAgentDialogTurn = vi.fn(
+    async (
+        /** @type {any} */ _runtime,
+        /** @type {string} */ _message,
+        /** @type {number | null | undefined} */ _timeout,
+    ) => 'Resumo final',
+);
 const defaultGetSdkSessionMode = vi.fn(async () => ({ mode: 'interactive' }));
 const defaultSetSdkSessionMode = vi.fn(async (/** @type {any} */ mode) => ({ mode }));
 const defaultGetSdkSessionCapabilities = vi.fn(() => ({ ui: { elicitation: true } }));
@@ -28,6 +34,15 @@ const altInputSdkSessionUi = vi.fn(async (message) => `${message}:alt`);
 const altReadSdkPlan = vi.fn(async () => ({ path: '/tmp/alt-plan.md', content: 'alt plan' }));
 const altUpdateSdkPlan = vi.fn(async () => ({ ok: true }));
 const altDeleteSdkPlan = vi.fn(async () => ({ ok: true }));
+
+/**
+ * @param {string | null | undefined} runtimeId
+ * @returns {any}
+ */
+function selectMockRuntime(runtimeId) {
+    if (runtimeId === 'alt') return altRuntime;
+    return runtimeId === 'default' || runtimeId == null ? defaultRuntime : null;
+}
 
 const defaultRuntime = /** @type {any} */ ({
     status: 'idle',
@@ -305,6 +320,372 @@ vi.mock('#copilot/channel', () => ({
     },
 }));
 
+vi.mock('#copilot/runtime', () => ({
+    abortAgentRuntimeCurrentMessage: vi.fn(async () => undefined),
+    answerAgentPendingQuestion: (/** @type {string} */ answer, /** @type {string | null | undefined} */ runtimeId) =>
+        (selectMockRuntime(runtimeId) ?? defaultRuntime).answerPendingQuestion(answer),
+    clearAgentPendingQuestionShadow: (/** @type {string | null | undefined} */ runtimeId) =>
+        (selectMockRuntime(runtimeId) ?? defaultRuntime).clearPendingQuestionShadow(),
+    createAgentRuntimeSnapshot: vi.fn((/** @type {Record<string, unknown>} */ data) => ({
+        snapshotId: 'snap-1',
+        createdAt: 1,
+        ...data,
+    })),
+    listAgentRuntimeSnapshots: vi.fn(async () => [
+        { snapshotId: 'snap-1', createdAt: 1, model: 'gpt-5', reason: 'manual' },
+    ]),
+    loadAgentRuntimeSnapshot: vi.fn(async (/** @type {string} */ id) =>
+        id === 'snap-1' ? { snapshotId: 'snap-1', createdAt: 1, model: 'gpt-5', status: 'idle', sendCount: 1 } : null,
+    ),
+    offAgentRuntimeEvent: vi.fn(),
+    onAgentRuntimeEvent: vi.fn(),
+    onceAgentRuntimeEvent: vi.fn(),
+    pauseAgentDialogLoop: vi.fn(async () => undefined),
+    pingDefaultAgentDialogWatchdog: vi.fn(),
+    readAgentHandoffHistory: (/** @type {string | null | undefined} */ runtimeId) => [
+        { runtimeId: (selectMockRuntime(runtimeId) ?? defaultRuntime) === altRuntime ? 'alt' : 'default' },
+    ],
+    readAgentRuntimeControlState: (/** @type {string | null | undefined} */ runtimeId) => {
+        const runtime = selectMockRuntime(runtimeId);
+        if (!runtime) throw new Error(`Runtime '${runtimeId}' não encontrado.`);
+        const snap = runtime.getStatusSnapshot();
+        return {
+            status: snap.status,
+            model: snap.model,
+            reasoningEffort: snap.reasoningEffort,
+            sessionId: runtime.sessionId ?? null,
+            dialogLoopActive: Boolean(runtime.dialogLoopActive),
+            dialogPaused: Boolean(snap.dialogPaused),
+            queueSize: Number(runtime.queueSize ?? 0),
+        };
+    },
+    readAgentRuntimePermissionMode: vi.fn(() => 'selective'),
+    resumeAgentDialogLoop: vi.fn(async () => undefined),
+    saveAgentRuntimeSnapshot: vi.fn(async (_data) => '/tmp/snap-1.json'),
+    setAgentRuntimePermissionMode: vi.fn((mode) => mode),
+    startAgentRuntime: vi.fn(async () => undefined),
+    steerAgentRuntimeMessage: vi.fn(async (prompt) => prompt),
+    stopAgentRuntimeDialogLoopAuthorized: vi.fn(async () => undefined),
+    readAgentRuntimeOverviewProjection: (/** @type {string | null | undefined} */ runtimeId) => {
+        const runtime = selectMockRuntime(runtimeId);
+        if (!runtime) {
+            return {
+                requestedRuntimeId: runtimeId ?? null,
+                runtimeId: 'default',
+                runtimeFound: false,
+                usedDefaultRuntimeFallback: true,
+                agentProfileId: null,
+                agentRuntimes: [
+                    {
+                        runtimeId: 'default',
+                        status: defaultRuntime.getStatusSnapshot().status,
+                        model: defaultRuntime.model,
+                        sessionId: defaultRuntime.sessionId,
+                        isDefault: true,
+                        agentProfileId: null,
+                    },
+                    {
+                        runtimeId: 'alt',
+                        status: altRuntime.getStatusSnapshot().status,
+                        model: altRuntime.model,
+                        sessionId: altRuntime.sessionId,
+                        isDefault: false,
+                        agentProfileId: null,
+                    },
+                ],
+                snap: defaultRuntime.getStatusSnapshot(),
+                health: defaultRuntime.getHealthSnapshot(),
+                runtimeSessionId: defaultRuntime.sessionId,
+                contextWindow: defaultRuntime.getStatusSnapshot().contextState,
+                model: defaultRuntime.model,
+                reasoningEffort: defaultRuntime.reasoningEffort,
+                status: defaultRuntime.getStatusSnapshot().status,
+                sessionId: defaultRuntime.sessionId,
+                dialogLoopActive: true,
+                dialogPaused: false,
+                queueSize: 0,
+                pendingQuestion: defaultRuntime.pendingQuestion,
+                pendingQuestionKind: defaultRuntime.pendingQuestionKind,
+                pendingQuestionShadow: defaultRuntime.pendingQuestionShadow,
+                pendingQuestionShadowKind: defaultRuntime.pendingQuestionShadowKind,
+                pendingQuestionShadowState: defaultRuntime.pendingQuestionShadowState,
+                pendingQuestionShadowExpired: defaultRuntime.pendingQuestionShadowExpired,
+                pendingQuestionShadowAgeMs: defaultRuntime.pendingQuestionShadowAgeMs,
+                pendingQuestionShadowExpiresAt: defaultRuntime.pendingQuestionShadowExpiresAt,
+                pendingQuestionShadowRemainingMs: defaultRuntime.pendingQuestionShadowRemainingMs,
+                systemPromptBinding: defaultRuntime.getStatusSnapshot().systemPromptBinding,
+                systemPromptFreshness: defaultRuntime.getStatusSnapshot().systemPromptFreshness,
+                lastPrInfo: defaultRuntime.lastPrInfo,
+                dialogPrMetrics: defaultRuntime.dialogPrMetrics,
+            };
+        }
+        const snap = runtime.getStatusSnapshot();
+        return {
+            requestedRuntimeId: runtimeId ?? null,
+            runtimeId: runtime === altRuntime ? 'alt' : 'default',
+            runtimeFound: true,
+            usedDefaultRuntimeFallback: false,
+            agentProfileId: null,
+            agentRuntimes: [
+                {
+                    runtimeId: 'default',
+                    status: defaultRuntime.getStatusSnapshot().status,
+                    model: defaultRuntime.model,
+                    sessionId: defaultRuntime.sessionId,
+                    isDefault: true,
+                    agentProfileId: null,
+                },
+                {
+                    runtimeId: 'alt',
+                    status: altRuntime.getStatusSnapshot().status,
+                    model: altRuntime.model,
+                    sessionId: altRuntime.sessionId,
+                    isDefault: false,
+                    agentProfileId: null,
+                },
+            ],
+            snap,
+            health: runtime.getHealthSnapshot(),
+            runtimeSessionId: runtime.sessionId,
+            contextWindow: snap.contextState,
+            model: runtime.model,
+            reasoningEffort: runtime.reasoningEffort,
+            status: snap.status,
+            sessionId: runtime.sessionId,
+            dialogLoopActive: Boolean(runtime.dialogLoopActive),
+            dialogPaused: Boolean(snap.dialogPaused),
+            queueSize: Number(runtime.queueSize ?? 0),
+            pendingQuestion: runtime.pendingQuestion,
+            pendingQuestionKind: runtime.pendingQuestionKind,
+            pendingQuestionShadow: runtime.pendingQuestionShadow,
+            pendingQuestionShadowKind: runtime.pendingQuestionShadowKind,
+            pendingQuestionShadowState: runtime.pendingQuestionShadowState,
+            pendingQuestionShadowExpired: runtime.pendingQuestionShadowExpired,
+            pendingQuestionShadowAgeMs: runtime.pendingQuestionShadowAgeMs,
+            pendingQuestionShadowExpiresAt: runtime.pendingQuestionShadowExpiresAt,
+            pendingQuestionShadowRemainingMs: runtime.pendingQuestionShadowRemainingMs,
+            systemPromptBinding: snap.systemPromptBinding,
+            systemPromptFreshness: snap.systemPromptFreshness,
+            lastPrInfo: runtime.lastPrInfo,
+            dialogPrMetrics: runtime.dialogPrMetrics,
+        };
+    },
+}));
+
+vi.mock('../../../src/copilot/presentation/runtime/index.js', () => ({
+    readAgentRuntimeOverviewProjection: (/** @type {string | null | undefined} */ runtimeId) => {
+        const runtime = selectMockRuntime(runtimeId);
+        if (!runtime) {
+            return {
+                requestedRuntimeId: runtimeId ?? null,
+                runtimeId: 'default',
+                runtimeFound: false,
+                usedDefaultRuntimeFallback: true,
+                agentProfileId: null,
+                agentRuntimes: [
+                    {
+                        runtimeId: 'default',
+                        status: 'waiting_for_input',
+                        model: 'gpt-5',
+                        sessionId: 'runtime-123',
+                        isDefault: true,
+                        agentProfileId: null,
+                    },
+                    {
+                        runtimeId: 'alt',
+                        status: 'processing',
+                        model: 'gpt-5-mini',
+                        sessionId: 'runtime-alt',
+                        isDefault: false,
+                        agentProfileId: null,
+                    },
+                ],
+                snap: defaultRuntime.getStatusSnapshot(),
+                health: defaultRuntime.getHealthSnapshot(),
+                runtimeSessionId: defaultRuntime.sessionId,
+                contextWindow: defaultRuntime.getStatusSnapshot().contextState,
+                model: defaultRuntime.model,
+                reasoningEffort: defaultRuntime.reasoningEffort,
+                status: defaultRuntime.getStatusSnapshot().status,
+                sessionId: defaultRuntime.sessionId,
+                dialogLoopActive: true,
+                dialogPaused: false,
+                queueSize: 0,
+                pendingQuestion: defaultRuntime.pendingQuestion,
+                pendingQuestionKind: defaultRuntime.pendingQuestionKind,
+                pendingQuestionShadow: defaultRuntime.pendingQuestionShadow,
+                pendingQuestionShadowKind: defaultRuntime.pendingQuestionShadowKind,
+                pendingQuestionShadowState: defaultRuntime.pendingQuestionShadowState,
+                pendingQuestionShadowExpired: defaultRuntime.pendingQuestionShadowExpired,
+                pendingQuestionShadowAgeMs: defaultRuntime.pendingQuestionShadowAgeMs,
+                pendingQuestionShadowExpiresAt: defaultRuntime.pendingQuestionShadowExpiresAt,
+                pendingQuestionShadowRemainingMs: defaultRuntime.pendingQuestionShadowRemainingMs,
+                systemPromptBinding: defaultRuntime.getStatusSnapshot().systemPromptBinding,
+                systemPromptFreshness: defaultRuntime.getStatusSnapshot().systemPromptFreshness,
+                lastPrInfo: defaultRuntime.lastPrInfo,
+                dialogPrMetrics: defaultRuntime.dialogPrMetrics,
+            };
+        }
+        const snap = runtime.getStatusSnapshot();
+        return {
+            requestedRuntimeId: runtimeId ?? null,
+            runtimeId: runtime === altRuntime ? 'alt' : 'default',
+            runtimeFound: true,
+            usedDefaultRuntimeFallback: false,
+            agentProfileId: null,
+            agentRuntimes: [
+                {
+                    runtimeId: 'default',
+                    status: 'waiting_for_input',
+                    model: 'gpt-5',
+                    sessionId: 'runtime-123',
+                    isDefault: true,
+                    agentProfileId: null,
+                },
+                {
+                    runtimeId: 'alt',
+                    status: 'processing',
+                    model: 'gpt-5-mini',
+                    sessionId: 'runtime-alt',
+                    isDefault: false,
+                    agentProfileId: null,
+                },
+            ],
+            snap,
+            health: runtime.getHealthSnapshot(),
+            runtimeSessionId: runtime.sessionId,
+            contextWindow: snap.contextState,
+            model: runtime.model,
+            reasoningEffort: runtime.reasoningEffort,
+            status: snap.status,
+            sessionId: runtime.sessionId,
+            dialogLoopActive: Boolean(runtime.dialogLoopActive),
+            dialogPaused: Boolean(snap.dialogPaused),
+            queueSize: Number(runtime.queueSize ?? 0),
+            pendingQuestion: runtime.pendingQuestion,
+            pendingQuestionKind: runtime.pendingQuestionKind,
+            pendingQuestionShadow: runtime.pendingQuestionShadow,
+            pendingQuestionShadowKind: runtime.pendingQuestionShadowKind,
+            pendingQuestionShadowState: runtime.pendingQuestionShadowState,
+            pendingQuestionShadowExpired: runtime.pendingQuestionShadowExpired,
+            pendingQuestionShadowAgeMs: runtime.pendingQuestionShadowAgeMs,
+            pendingQuestionShadowExpiresAt: runtime.pendingQuestionShadowExpiresAt,
+            pendingQuestionShadowRemainingMs: runtime.pendingQuestionShadowRemainingMs,
+            systemPromptBinding: snap.systemPromptBinding,
+            systemPromptFreshness: snap.systemPromptFreshness,
+            lastPrInfo: runtime.lastPrInfo,
+            dialogPrMetrics: runtime.dialogPrMetrics,
+        };
+    },
+    normalizeAgentContextWindowProjection: (/** @type {unknown} */ raw) => raw ?? null,
+    readRuntimeLifecycleSnapshot: vi.fn(() => ({ shuttingDown: false, registeredShutdownHandlers: 2 })),
+    buildRuntimeLifecycleSummary: vi.fn((snapshot) => snapshot),
+    listActiveRuntimeTodosProjection: vi.fn(async () => [
+        { id: 'todo-1', title: 'Revisar fronteiras', status: 'todo' },
+        { id: 'todo-2', title: 'Validar contratos', status: 'in_progress' },
+    ]),
+    listRuntimeAvailableModelsProjection: vi.fn(async (runtimeId) => ({
+        currentModel: (selectMockRuntime(runtimeId) ?? defaultRuntime).model,
+        models: [{ id: 'gpt-5', capabilities: { supports: { reasoningEffort: true, vision: true } } }],
+    })),
+    readRuntimeAutoModelPolicyProjection: vi.fn((runtimeId) => ({
+        configuredModel: (selectMockRuntime(runtimeId) ?? defaultRuntime).model,
+        observedModel: null,
+        selectionAuthority: 'github-copilot',
+        canForcePreference: false,
+    })),
+    readRuntimeModelMetadata: vi.fn((modelId) => modelMeta.get(modelId) ?? null),
+    readRuntimeModelStatsProjection: vi.fn(() => ({
+        stats: [{ modelId: 'gpt-5', totalCalls: 2, avgLatencyMs: 44, successRate: 1, totalTokens: 200 }],
+    })),
+    setRuntimeModelProjection: vi.fn((modelId, runtimeId) => {
+        const runtime = selectMockRuntime(runtimeId) ?? defaultRuntime;
+        const previousModel = runtime.model;
+        const previousReasoningEffort = runtime.reasoningEffort;
+        const nextModelMeta = modelMeta.get(modelId) ?? null;
+        runtime.setModel(modelId);
+        runtime.model = modelId;
+        let reasoningAdjusted = false;
+        if (nextModelMeta?.supportsReasoning === false && previousReasoningEffort !== undefined) {
+            runtime.setReasoningEffort(undefined);
+            runtime.reasoningEffort = undefined;
+            reasoningAdjusted = true;
+        }
+        return {
+            previousModel,
+            previousReasoningEffort,
+            currentModel: modelId,
+            currentReasoningEffort: reasoningAdjusted ? 'off' : runtime.reasoningEffort,
+            reasoningAdjusted,
+            modelMeta: nextModelMeta,
+            runtimeId: runtime === altRuntime ? 'alt' : 'default',
+        };
+    }),
+    setRuntimeReasoningProjection: vi.fn((effort, runtimeId) => {
+        const runtime = selectMockRuntime(runtimeId) ?? defaultRuntime;
+        const previousReasoningEffort = runtime.reasoningEffort;
+        runtime.setReasoningEffort(effort);
+        runtime.reasoningEffort = effort;
+        return {
+            previousReasoningEffort,
+            currentReasoningEffort: effort,
+            runtimeId: runtime === altRuntime ? 'alt' : 'default',
+        };
+    }),
+    getAgentSdkSessionMode: vi.fn(async (/** @type {string | null | undefined} */ runtimeId) =>
+        (selectMockRuntime(runtimeId) ?? defaultRuntime).getSdkSessionMode(),
+    ),
+    setAgentSdkSessionMode: vi.fn(async (/** @type {any} */ mode, /** @type {string | null | undefined} */ runtimeId) =>
+        (selectMockRuntime(runtimeId) ?? defaultRuntime).setSdkSessionMode(mode),
+    ),
+    getAgentSdkSessionCapabilities: vi.fn(async (/** @type {string | null | undefined} */ runtimeId) =>
+        (selectMockRuntime(runtimeId) ?? defaultRuntime).getSdkSessionCapabilities(),
+    ),
+    isAgentSdkSessionUiElicitationAvailable: vi.fn(async (/** @type {string | null | undefined} */ runtimeId) =>
+        (selectMockRuntime(runtimeId) ?? defaultRuntime).isSdkSessionUiElicitationAvailable(),
+    ),
+    confirmAgentSdkSessionUi: vi.fn(
+        async (/** @type {string} */ message, /** @type {string | null | undefined} */ runtimeId) =>
+            (selectMockRuntime(runtimeId) ?? defaultRuntime).confirmSdkSessionUi(message),
+    ),
+    selectAgentSdkSessionUi: vi.fn(
+        async (
+            /** @type {string} */ message,
+            /** @type {string[]} */ options,
+            /** @type {string | null | undefined} */ runtimeId,
+        ) => (selectMockRuntime(runtimeId) ?? defaultRuntime).selectSdkSessionUi(message, options),
+    ),
+    inputAgentSdkSessionUi: vi.fn(
+        async (
+            /** @type {string} */ message,
+            /** @type {any} */ options,
+            /** @type {string | null | undefined} */ runtimeId,
+        ) => (selectMockRuntime(runtimeId) ?? defaultRuntime).inputSdkSessionUi(message, options),
+    ),
+    readAgentSdkPlan: vi.fn(async (/** @type {string | null | undefined} */ runtimeId) =>
+        (selectMockRuntime(runtimeId) ?? defaultRuntime).readSdkPlan(),
+    ),
+    updateAgentSdkPlan: vi.fn(
+        async (/** @type {string} */ content, /** @type {string | null | undefined} */ runtimeId) =>
+            (selectMockRuntime(runtimeId) ?? defaultRuntime).updateSdkPlan(content),
+    ),
+    deleteAgentSdkPlan: vi.fn(async (/** @type {string | null | undefined} */ runtimeId) =>
+        (selectMockRuntime(runtimeId) ?? defaultRuntime).deleteSdkPlan(),
+    ),
+    compactAgentSdkSession: vi.fn(async (/** @type {string | null | undefined} */ runtimeId) => ({
+        ok: true,
+        runtimeId: runtimeId ?? 'default',
+    })),
+    sendRuntimeDialogTurnForRuntime: vi.fn(
+        async (
+            /** @type {string} */ message,
+            /** @type {string} */ _from,
+            /** @type {{ timeout?: number | null } | undefined} */ options,
+            /** @type {string | null | undefined} */ runtimeId,
+        ) => sendAgentDialogTurn(selectMockRuntime(runtimeId) ?? defaultRuntime, message, options?.timeout),
+    ),
+}));
+
 vi.mock('#copilot/conversation-hub', () => ({
     conversationHub: { isReady: true },
     conversationStore: {
@@ -323,7 +704,8 @@ vi.mock('#copilot/core', async (importOriginal) => ({
     getSharedSessionBinding: () => ({ hubSessionId: 'hub-1', sdkSessionId: 'sdk-1' }),
 }));
 
-vi.mock('#copilot/observability', () => ({
+vi.mock('#copilot/observability', async (importOriginal) => ({
+    .../** @type {any} */ (await importOriginal()),
     log: vi.fn(),
     getToolStats: () => ({
         'tool.fast': { calls: 3, errors: 0, avgLatencyMs: 20 },

@@ -5,7 +5,7 @@
  * F71.4 — Testes unitários para url-validator.js (infra).
  */
 
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('#copilot/config/env', () => ({
     WEBHOOK_ALLOW_PRIVATE_HOSTS: false,
@@ -26,18 +26,25 @@ vi.mock('#copilot/config/env', () => ({
     COPILOT_DISABLED_AGENTS: '',
 }));
 
-vi.mock('node:dns/promises', () => ({
-    default: {
-        lookup: vi.fn(),
-    },
-}));
-
-import dns from 'node:dns/promises';
-import { checkResolvedIp, isPrivateIp, validateWebhookUrl } from '../../../src/copilot/core/security/url-validator.js';
+import {
+    checkResolvedIp,
+    dnsResolver,
+    isPrivateIp,
+    validateWebhookUrl,
+} from '../../../src/copilot/core/security/url-validator.js';
 
 describe('url-validator (infra)', () => {
+    /** @type {ReturnType<typeof vi.fn>} */
+    let lookupSpy;
+    const originalLookup = dnsResolver.lookup;
+
     beforeEach(() => {
-        vi.mocked(dns.lookup).mockReset();
+        lookupSpy = vi.fn();
+        dnsResolver.lookup = /** @type {typeof dnsResolver.lookup} */ (/** @type {unknown} */ (lookupSpy));
+    });
+
+    afterEach(() => {
+        dnsResolver.lookup = originalLookup;
     });
 
     // ── isPrivateIp ──────────────────────────────────────────────────────
@@ -137,29 +144,27 @@ describe('url-validator (infra)', () => {
 
     describe('checkResolvedIp()', () => {
         it('permite host que resolve para IP público', async () => {
-            vi.mocked(dns.lookup).mockResolvedValue(/** @type {any} */ ([{ address: '93.184.216.34', family: 4 }]));
+            lookupSpy.mockResolvedValue(/** @type {any} */ ([{ address: '93.184.216.34', family: 4 }]));
             await expect(checkResolvedIp('example.com')).resolves.toBeUndefined();
         });
 
         it('rejeita host que resolve para IP privado (DNS rebinding)', async () => {
-            vi.mocked(dns.lookup).mockResolvedValue(/** @type {any} */ ([{ address: '127.0.0.1', family: 4 }]));
+            lookupSpy.mockResolvedValue(/** @type {any} */ ([{ address: '127.0.0.1', family: 4 }]));
             await expect(checkResolvedIp('evil.com')).rejects.toThrow(/DNS rebinding/);
         });
 
         it('rejeita host que resolve para 10.x.x.x', async () => {
-            vi.mocked(dns.lookup).mockResolvedValue(/** @type {any} */ ([{ address: '10.0.0.5', family: 4 }]));
+            lookupSpy.mockResolvedValue(/** @type {any} */ ([{ address: '10.0.0.5', family: 4 }]));
             await expect(checkResolvedIp('internal.test')).rejects.toThrow(/DNS rebinding/);
         });
 
         it('permite IPv6 público', async () => {
-            vi.mocked(dns.lookup).mockResolvedValue(
-                /** @type {any} */ ([{ address: '2607:f8b0:4004:800::200e', family: 6 }]),
-            );
+            lookupSpy.mockResolvedValue(/** @type {any} */ ([{ address: '2607:f8b0:4004:800::200e', family: 6 }]));
             await expect(checkResolvedIp('v6only.test')).resolves.toBeUndefined();
         });
 
         it('rejeita quando qualquer registro DNS é privado', async () => {
-            vi.mocked(dns.lookup).mockResolvedValue(
+            lookupSpy.mockResolvedValue(
                 /** @type {any} */ ([
                     { address: '93.184.216.34', family: 4 },
                     { address: '::ffff:7f00:1', family: 6 },
@@ -169,14 +174,14 @@ describe('url-validator (infra)', () => {
         });
 
         it('ignora DNS failure (ambos IPv4/IPv6 falham)', async () => {
-            vi.mocked(dns.lookup).mockRejectedValue(new Error('ENOTFOUND'));
+            lookupSpy.mockRejectedValue(new Error('ENOTFOUND'));
             await expect(checkResolvedIp('no-dns.test')).resolves.toBeUndefined();
         });
 
         it('permite host privado com allowPrivate=true', async () => {
             // Não deve sequer chamar dns.lookup
             await expect(checkResolvedIp('localhost', { allowPrivate: true })).resolves.toBeUndefined();
-            expect(dns.lookup).not.toHaveBeenCalled();
+            expect(lookupSpy).not.toHaveBeenCalled();
         });
     });
 });

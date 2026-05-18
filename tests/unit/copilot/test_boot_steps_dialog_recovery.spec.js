@@ -16,13 +16,10 @@ const facadeMocks = vi.hoisted(() => ({
     isAgentSdkExperimentalEnabled: vi.fn(() => false),
 }));
 
-vi.mock('../../../src/copilot/agent/facades/agent-runtime-state.js', () => ({
+vi.mock('../../../src/copilot/agent/facades/index.js', () => ({
     clearAgentRuntimePendingQuestionShadow: facadeMocks.clearAgentRuntimePendingQuestionShadow,
     markAgentRuntimeDialogPausedForRecovery: facadeMocks.markAgentRuntimeDialogPausedForRecovery,
     shouldScheduleAgentRuntimeDialogBootRecovery: facadeMocks.shouldScheduleAgentRuntimeDialogBootRecovery,
-}));
-
-vi.mock('../../../src/copilot/agent/facades/agent-sdk-access.js', () => ({
     getAgentSdkModelStatsTracker: facadeMocks.getAgentSdkModelStatsTracker,
     isAgentSdkExperimentalEnabled: facadeMocks.isAgentSdkExperimentalEnabled,
 }));
@@ -98,10 +95,11 @@ describe('boot-steps dialog boot recovery', () => {
 
         stepScheduleDialogRecovery(true, ctx, state);
         await Promise.resolve();
+        await Promise.resolve();
 
         expect(facadeMocks.shouldScheduleAgentRuntimeDialogBootRecovery).toHaveBeenCalledTimes(1);
 
-        vi.runOnlyPendingTimers();
+        await vi.runAllTimersAsync();
         await Promise.resolve();
 
         expect(ctx.trackBackgroundTask).toHaveBeenCalledTimes(2);

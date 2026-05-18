@@ -71,9 +71,13 @@ vi.mock('#copilot/sdk', async (importOriginal) => {
     };
 });
 
-vi.mock('../../../src/copilot/server/routes/sdk/deps.js', () => ({
-    resolveSdkRouteSharedDeps: workspaceRouteMocks.resolveSdkRouteSharedDeps,
-}));
+vi.mock('../../../src/copilot/server/routes/sdk/deps.js', async (importOriginal) => {
+    const actual = /** @type {Record<string, unknown>} */ (await importOriginal());
+    return {
+        ...actual,
+        resolveSdkRouteSharedDeps: workspaceRouteMocks.resolveSdkRouteSharedDeps,
+    };
+});
 
 import { registerSessionWorkspaceRoutes } from '../../../src/copilot/server/routes/sdk/session-workspace-routes.js';
 

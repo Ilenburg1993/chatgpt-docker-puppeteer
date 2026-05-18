@@ -63,7 +63,7 @@ const altRuntime = /** @type {any} */ ({
     getHandoffManager: getRuntimeHandoffManager,
 });
 
-vi.mock('#copilot/agent', () => ({
+vi.mock('#copilot/agent/facades', () => ({
     abortRuntimeCurrentMessage: vi.fn(async () => {}),
     answerRuntimePendingQuestion: vi.fn((runtime, answer) => runtime.answerPendingQuestion?.(answer) ?? false),
     clearRuntimePendingQuestionShadow: vi.fn((runtime) => runtime.clearPendingQuestionShadow?.() ?? false),

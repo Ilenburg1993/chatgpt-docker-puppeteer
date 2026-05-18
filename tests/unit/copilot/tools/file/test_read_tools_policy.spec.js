@@ -41,13 +41,7 @@ let diffFileB;
 async function loadToolHandler(toolName) {
     vi.resetModules();
     const mod = await import('../../../../../src/copilot/tools/file/read-tools.js');
-    const tools = [
-        mod.readFileContentTool,
-        mod.listDirectoryTool,
-        mod.searchInFilesTool,
-        mod.diffFilesTool,
-        mod.workspaceSymbolSearchTool,
-    ];
+    const tools = [mod.readFileContentTool, mod.listDirectoryTool, mod.diffFilesTool];
     const tool = tools.find((candidate) => candidate.name === toolName);
     if (!tool) {
         throw new Error(`Tool não encontrada: ${toolName}`);

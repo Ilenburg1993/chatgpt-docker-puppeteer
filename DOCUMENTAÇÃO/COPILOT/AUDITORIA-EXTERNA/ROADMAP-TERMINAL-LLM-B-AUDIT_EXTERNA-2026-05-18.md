@@ -1,4 +1,4 @@
-# Roadmap de Execução — `Terminal LLM-B - Análise: Bugs, Gaps e Oportunidades de Upgrade - AUDIT_EXTERNA.md`
+# Roadmap Mestre de Execução — `Terminal LLM-B - Análise: Bugs, Gaps e Oportunidades de Upgrade - AUDIT_EXTERNA.md`
 
 > Documento-base: `DOCUMENTAÇÃO/COPILOT/AUDITORIA-EXTERNA/Terminal LLM-B - Análise: Bugs, Gaps e Oportunidades de Upgrade - AUDIT_EXTERNA.md`
 >
@@ -12,7 +12,16 @@
 
 ---
 
-## 1. Objetivo deste roadmap
+## 1. Objetivo deste roadmap mestre
+
+Este roadmap mestre consolida em um só fluxo:
+
+- a validação forense da auditoria externa;
+- o hardening focado em `session-events.d.ts` e na cadeia `session → agent → terminal`;
+- a trilha de confiabilidade de testes/runner/Vitest/typecheck;
+- a execução contínua de bugs, gaps e upgrades até a LLM-B ter uma UX operacional canônica.
+
+Ele substitui a leitura fragmentada por tema e passa a ser o **plano único de referência**, organizado em **faixas**, **fases** e **subfases**.
 
 Este roadmap existe para transformar a auditoria externa em execução real, sem tratar o documento original como verdade literal.
 
@@ -146,151 +155,332 @@ A situação ideal ao final deste roadmap é:
 
 - **ACHADO-A** — a ponte de eventos descartava `agentId`; já corrigido nesta onda
 - **ACHADO-B** — `requestHeaders` por turno é um gap real de integração, ainda pendente
-- **ACHADO-C** — warnings de teardown do Vitest merecem trilha própria de confiabilidade operacional
+- **ACHADO-C** — divergência de runner e warnings de teardown do Vitest foram confirmados, diagnosticados e corrigidos nesta rodada
 
 ---
 
-## 4. Estratégia de execução por fases
+## 4. Estratégia de execução por faixas, fases e subfases
 
-## Fase 0 — Baseline e sincronização
+## Faixa 0 — Governança documental, baseline e convergência de diagnóstico
 
-### Subfase 0.1 — Higiene de branch e baseline do repo
+### Fase 0.1 — Canonicalização documental
+
+#### Subfase 0.1.1 — Formato canônico
+
+- converter `.mds` → `.md`;
+- remover referências residuais ao formato antigo;
+- garantir que auditoria, validação e roadmap apontem para os mesmos artefatos.
+
+**Status:** concluída.
+
+#### Subfase 0.1.2 — Consolidação em roadmap mestre
+
+- absorver no roadmap principal os achados de `VALIDACAO-TERMINAL-*` e `SESSION-EVENTS-*`;
+- separar claramente o que é:
+   - bug ativo;
+   - gap funcional;
+   - hardening latente;
+   - upgrade oportunístico;
+- incluir também a trilha de runner/testes/Vitest no mesmo roadmap, sem abrir plano paralelo.
+
+**Status:** concluída nesta rodada, com saneamento do plano único e remoção das narrativas paralelas.
+
+### Fase 0.2 — Baseline técnico reproduzível
+
+#### Subfase 0.2.1 — Leitura integral e sincronização
 
 - ler `package.json` completo;
-- sincronizar local e `origin/main`;
-- executar validações exigidas pelo usuário (`lint:copilot`, `typecheck:strict:src.copilot`, `test:copilot:unit`);
-- consolidar commits pendentes e push inicial.
+- sincronizar com `origin/main`;
+- rodar baseline mínimo de lint/typecheck/testes do escopo Copilot.
 
-### Subfase 0.2 — Leitura integral e validação da auditoria
+**Status:** concluída.
 
-- ler integralmente o documento auditado;
-- confrontar item a item com código real e documentação oficial;
-- separar confirmado, latente, refutado e upgrade real.
+#### Subfase 0.2.2 — Convergência de diagnóstico
 
-**Status:** concluída nesta sessão.
+- confrontar auditoria externa, `session-events.d.ts`, README do SDK e código real;
+- verificar se há arquiteturas paralelas ou owners concorrentes de eventos;
+- consolidar o diagnóstico em uma única leitura sistêmica.
 
----
+**Status:** concluída, com follow-up contínuo.
 
-## Fase 1 — Correções P0/P1 do terminal
+## Faixa 1 — Cadeia canônica session/agent/terminal e UX operacional
 
-### Subfase 1.1 — Fluxos de robustez imediata
+### Fase 1.1 — Robustez imediata do terminal
 
-#### Escopo
+#### Subfase 1.1.1 — Fluxos críticos
 
 - restart do dialog loop;
-- timeouts seguros;
-- roteamento de input pendente;
+- timeout seguro;
+- input pendente;
 - dedup de I/O;
 - dedup de tool lifecycle;
-- estado mínimo de bootstrap/teste.
+- sinalização mínima de bootstrap/teste.
 
-#### Itens
+**Status:** majoritariamente concluída.
 
-- BUG-002
-- BUG-003
-- BUG-007
-- BUG-008
-- BUG-009
-- BUG-011
+#### Subfase 1.1.2 — Retrocompatibilidade e contratos internos
 
-**Status:** concluída nesta sessão.
+- manter helpers internos resilientes a call sites legados de teste e suporte;
+- evitar regressões por drift de assinatura em utilitários do terminal.
 
-### Subfase 1.2 — UX e integridade textual
+**Status:** concluída nesta rodada, com retrocompatibilização dos contratos exercitados pelas suítes de teste.
 
-#### Escopo
+### Fase 1.2 — UX durável e narrativa operacional
 
-- corrigir o mojibake inteiro de `commands/sdk.js`;
-- normalizar labels operacionais como `SDK→FS`, `FS→SDK`, `Permissões`, `Elicitation`, `Limitações`;
-- melhorar clareza dos subcomandos `/workspace`, `/permission`, `/sdk`.
+#### Subfase 1.2.1 — Remover “flashs” como portador único de informação
 
-#### Itens
+- promover snapshots duráveis de `tool.execution_progress`;
+- tornar heartbeat de tool longa visível no histórico;
+- garantir que `writeInlineStatus(...)` seja auxiliar, não exclusivo.
 
-- BUG-001
-- parte operacional de GAP-017
+**Status:** concluída nesta rodada para os casos priorizados; backlog complementar permanece aberto para outras famílias efêmeras.
 
-**Status:** concluída nesta sessão.
+#### Subfase 1.2.2 — Notificações sistêmicas do agent
 
-### Subfase 1.3 — Exposição mínima das RPCs mais úteis do SDK 0.3.0
+- promover `system.notification` relevantes para narrativa terminal:
+   - background task completed/idle;
+   - shell completed/detached completed;
+- padronizar o owner terminal desses eventos.
 
-#### Escopo
+**Status:** concluída nesta rodada para `agent.background.*` e `agent.shell.*`; demais famílias continuam no backlog complementar.
 
-- reset de aprovações da sessão;
-- login OAuth MCP via evento obrigatório;
-- métricas session-scoped de uso no `/sdk quota`.
+### Fase 1.3 — Cobertura explícita do recorte `session-events` 946–1828
 
-#### Itens
+#### Subfase 1.3.1 — Famílias já maduras
 
-- GAP-006
-- GAP-010
-- GAP-017
+- `assistant.message`;
+- `assistant.turn_*`;
+- `tool.execution_start/complete`;
+- `permission.*`;
+- `user_input.*`;
+- `elicitation.*`;
+- `external_tool.*`.
 
-**Status:** concluída nesta sessão.
+**Status:** bom/canônico.
 
----
+#### Subfase 1.3.2 — Famílias ainda parciais ou ausentes
 
-## Fase 2 — Hardening de estado e sessão longa
-
-### Subfase 2.1 — Interações SDK e retenção
-
-#### Objetivo
-
-Reduzir custo de retenção e poda das estruturas de UX do terminal em sessões longas.
-
-#### Itens
-
-- consolidar a melhora de **BUG-004** com:
-  - índice incremental de latest quando houver evidência de volume alto;
-  - microbenchmark local se o mapa crescer além do perfil atual.
-
-**Status:** parcialmente concluída nesta sessão; falta decidir se o índice secundário é necessário agora.
-
-### Subfase 2.2 — Timeline/backoff e reinicialização
-
-#### Objetivo
-
-Eliminar burst de resync após restart rápido do processo.
-
-#### Itens
-
-- BUG-006
-- eventual persistência leve de backoff/retry state
+- `assistant.usage`;
+- `hook.*`;
+- `sampling.*`;
+- `command.*` UX explícita;
+- `commands.changed`;
+- `capabilities.changed`;
+- `auto_mode_switch.*`;
+- `exit_plan_mode.requested`;
+- attachments `blob`.
 
 **Status:** pendente.
 
-### Subfase 2.3 — Re-registro defensivo de listeners/timers
+## Faixa 2 — Superfície SDK 0.3.0 sem duplicação arquitetural
 
-#### Objetivo
+### Fase 2.1 — RPCs operacionais mínimas
 
-Blindar cenários de recarga/boot repetido em dev-watch e recovery.
+#### Subfase 2.1.1 — Já entregues
 
-#### Itens
+- reset de approvals;
+- `mcp.oauth.login()`;
+- `/sdk quota` via `usage.getMetrics()`.
 
-- BUG-010 (na forma atual do código, não na descrição obsoleta da auditoria)
-- reavaliação dos listeners/timers do runtime do terminal
+**Status:** concluída.
 
-**Status:** pendente.
+#### Subfase 2.1.2 — Próxima expansão canônica
 
----
-
-## Fase 3 — Gaps restantes de integração SDK ↔ terminal
-
-### Subfase 3.1 — Skills e instruction sources
-
-#### Objetivo
-
-Reduzir divergência entre o que o SDK sabe e o que o terminal mostra.
-
-#### Itens
-
-- GAP-005 — `session.rpc.skills.discover()` / `skills.config`
-- GAP-012 — `session.rpc.instructions.getSources()`
-- GAP-013 — skills por subagente
+- `skills.*` na superfície terminal;
+- `instructions.getSources()` como fonte de verdade preferencial;
+- correlação de `assistant.usage` com quota e sessão.
 
 **Status:** pendente.
 
-### Subfase 3.2 — Streaming e subagentes
+### Fase 2.2 — Inputs avançados por turno
 
-#### Objetivo
+#### Subfase 2.2.1 — `requestHeaders` por turno
+
+- expor contrato ponta-a-ponta no terminal/gateway/presentation/agent;
+- evitar bypass lateral via camadas paralelas.
+
+**Status:** pendente.
+
+#### Subfase 2.2.2 — Blob attachments
+
+- suportar `UserMessageAttachmentBlob` no terminal;
+- evitar roundtrip forçado por filesystem quando não necessário.
+
+**Status:** pendente.
+
+## Faixa 3 — Confiabilidade de testes, runner e validação estrita
+
+### Fase 3.1 — Verdade do runner
+
+#### Subfase 3.1.1 — Diagnóstico de divergência
+
+- explicar por que `npm test -- --run ...` mostrou problemas que `test:copilot:unit` não mostrou;
+- separar erro real de erro causado por escopo/configuração errada.
+
+**Diagnóstico consolidado:**
+
+- `npm test -- --run ...` não era equivalente a rodar apenas um subset Copilot; ele ainda expandia para `test:unit && test:integration && test:regression`;
+- `test:unit` usava `run-mixed-tests.mjs`, que até aqui executava vitest híbrido inteiro sob uma única config;
+- quando o lote continha arquivos Copilot e não-Copilot, os testes Copilot podiam rodar sob `vitest.config.js`, sem a baseline de `tests/support/setup.js` e sem a config específica do domínio.
+
+#### Subfase 3.1.2 — Correção estrutural do runner
+
+- separar o lote Vitest em:
+   - specs Copilot → `vitest.copilot.config.js`
+   - specs genéricas → `vitest.config.js`
+- eliminar discrepância artificial entre `test:unit` e `test:copilot:unit`.
+
+**Status:** concluída nesta rodada.
+
+### Fase 3.2 — Correção de falhas reais expostas pelos testes
+
+#### Subfase 3.2.1 — Drift de contratos e mocks
+
+- mocks incompletos de `deps.js` em rotas SDK;
+- mock parcial de `#copilot/core/error-handlers` quebrando `toError` no barrel;
+- testes stale de `read-tools` assumindo exportações que já migraram para `search/`.
+
+**Status:** concluída nesta rodada.
+
+#### Subfase 3.2.2 — Contratos de retorno e filtros canônicos
+
+- retrocompatibilizar `isDuplicateIoOperation(...)`;
+- corrigir `filterIndexRowsByGlob(...)` para excluir segmentos como `node_modules`;
+- completar retorno textual de `find_symbol_usages` para UX e contratos de teste.
+
+**Status:** concluída nesta rodada.
+
+### Fase 3.3 — Typecheck estrito de testes
+
+#### Subfase 3.3.1 — Eliminar todos os erros de `typecheck:strict:tests.unit`
+
+- narrowing em arrays/matches regex;
+- mocks compatíveis com assinaturas atuais;
+- parâmetros implicit `any`;
+- handlers de tools com assinatura nova.
+
+**Status:** concluída nesta rodada.
+
+#### Subfase 3.3.2 — Padronizar validação final
+
+- `npm run typecheck:strict:tests.unit`;
+- `npm run test:unit`;
+- `npm run test:copilot:unit`;
+- `npm run typecheck:strict:src.copilot`;
+- `npm run lint:copilot`.
+
+**Status:** concluída nesta rodada; baseline inteira ficou verde.
+
+### Fase 3.4 — Warning-zero no Vitest
+
+#### Subfase 3.4.1 — Classificar warnings de workers
+
+- verificar se a causa é `pool: 'forks'`, paralelismo excessivo, teardown ou algum leak real;
+- distinguir warning infraestrutural de bug de teste.
+
+#### Subfase 3.4.2 — Fix definitivo
+
+- ajustar pool/concurrency/configuração até zerar os warnings;
+- revalidar para garantir que `test:copilot:unit` não “passe verde com ruído escondido”.
+
+**Status:** concluída nesta rodada; warnings zerados com o split correto do runner e `vitest.copilot.config.js` em `threads` com concorrência mais conservadora.
+
+## Faixa 4 — Estado longo, persistência e hardening residual
+
+### Fase 4.1 — Sessão longa
+
+#### Subfase 4.1.1 — Interações e retenção
+
+- consolidar otimização de poda das interações;
+- considerar índice incremental apenas se o volume real justificar.
+
+**Status:** parcial.
+
+#### Subfase 4.1.2 — Timeline/backoff persistente
+
+- persistir backoff/retry state onde fizer sentido;
+- evitar bursts de resync após restart curto.
+
+**Status:** pendente.
+
+### Fase 4.2 — Re-registro defensivo de timers/listeners
+
+#### Subfase 4.2.1 — Dev-watch e reinicializações anômalas
+
+- revisar listeners/timers duplicáveis em cenários extremos;
+- reduzir risco residual que substituiu o antigo BUG-010.
+
+**Status:** pendente.
+
+## Faixa 5 — Upgrades arquiteturais controlados
+
+### Fase 5.1 — Upgrades de alto encaixe
+
+#### Subfase 5.1.1 — Encaixe progressivo
+
+- `AbortSignal.timeout()` em pontos adicionais;
+- tipagem mais forte de eventos;
+- utilitário compartilhado para TTL maps;
+- `structuredClone()`/`Object.groupBy()`/`import.meta.dirname` onde agregarem valor claro.
+
+**Status:** backlog controlado.
+
+### Fase 5.2 — Upgrades deliberadamente não-baseline
+
+#### Subfase 5.2.1 — Não forçar por moda
+
+- `EventTarget` amplo;
+- `WeakRef`/`FinalizationRegistry`;
+- `scheduler.wait()`;
+- SSR/streaming alternativo sem necessidade operacional.
+
+**Status:** backlog / não-prioritário.
+
+## Faixa 6 — Critérios de saída desta trilha
+
+### Fase 6.1 — Convergência funcional
+
+#### Subfase 6.1.1 — Sem bugs ativos escondidos
+
+- nenhum bug confirmado restante sem destino formal;
+- nenhum warning recorrente do Vitest sem causa conhecida;
+- nenhuma divergência artificial entre `test:unit` e `test:copilot:unit`.
+
+### Fase 6.2 — Convergência de UX operacional
+
+#### Subfase 6.2.1 — Terminal como console de operação contínua
+
+- progresso importante deixa rastro durável;
+- agent/background/shell/tool/session têm owners claros na narrativa;
+- não há “flash” relevante que desaparece sem registro.
+
+### Fase 6.3 — Convergência de documentação
+
+#### Subfase 6.3.1 — Documentos contam a mesma história
+
+- validação, anexo de session-events e roadmap mestre sem contradições;
+- estado final narrado com o mesmo conjunto de prioridades e fases.
+
+## 5. Estado resumido desta rodada
+
+- **Faixa 0**: consolidada; este arquivo passa a ser o plano único limpo e sem duplicações narrativas.
+- **Faixa 1**: endurecimento prioritário entregue para progresso/heartbeat e notificações operacionais principais; backlog de `assistant.usage`, hooks, sampling e capabilities continua aberto.
+- **Faixa 2**: reset approvals, quota metrics e OAuth MCP já entregues; `skills`, `instructions`, `requestHeaders` e blobs continuam pendentes.
+- **Faixa 3**: concluída nesta rodada — runner corrigido, warnings zerados, `typecheck` estrito verde e convergência entre `test:unit` e `test:copilot:unit` comprovada.
+- **Faixa 4+**: permanecem como continuação natural agora que a baseline de validação está realmente verde e sem warnings.
+
+## 6. Próxima sequência obrigatória de execução
+
+1. retomar a **Faixa 1.3.2** com `assistant.usage`, `hook.*`, `sampling.*`, `commands.changed`, `capabilities.changed`, `auto_mode_switch.*` e `exit_plan_mode.requested`;
+2. avançar a **Faixa 2.1.2** com `skills.*` e `instructions.getSources()` como superfícies canônicas do terminal;
+3. atacar a **Faixa 2.2** com `requestHeaders` por turno e `blob attachments` sem roundtrip obrigatório em disco;
+4. só depois voltar à **Faixa 4** para persistência longa, re-registro defensivo residual e upgrades arquiteturais controlados.
+
+## 7. Observação de governança
+
+Os anexos temáticos continuam úteis, mas deixam de ser o “plano principal”.
+
+O **roadmap mestre canônico** passa a ser este arquivo.
 
 Tornar o terminal corretamente preparado para subagentes, sem depender apenas da mitigação `includeSubAgentStreamingEvents: false`.
 

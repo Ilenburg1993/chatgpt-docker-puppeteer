@@ -310,8 +310,11 @@ vi.mock('../../../src/copilot/presentation/runtime/index.js', () => ({
     getAgentSdkSessionMode: (/** @type {string | null | undefined} */ runtimeId) =>
         (selectMockRuntime(runtimeId) ?? defaultRuntime).getSdkSessionMode(),
     handleAgentSdkPendingPermission: vi.fn(async () => null),
-    inputAgentSdkSessionUi: (/** @type {string} */ message, _options, /** @type {string | null | undefined} */ runtimeId) =>
-        (selectMockRuntime(runtimeId) ?? defaultRuntime).inputSdkSessionUi(message),
+    inputAgentSdkSessionUi: (
+        /** @type {string} */ message,
+        /** @type {unknown} */ _options,
+        /** @type {string | null | undefined} */ runtimeId,
+    ) => (selectMockRuntime(runtimeId) ?? defaultRuntime).inputSdkSessionUi(message),
     isAgentSdkSessionUiElicitationAvailable: (/** @type {string | null | undefined} */ runtimeId) =>
         (selectMockRuntime(runtimeId) ?? defaultRuntime).isSdkSessionUiElicitationAvailable(),
     listAgentSdkModels: vi.fn(async () => []),

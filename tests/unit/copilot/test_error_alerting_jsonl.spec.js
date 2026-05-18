@@ -11,6 +11,11 @@
 
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
+const timerMocks = vi.hoisted(() => ({
+    registerInterval: vi.fn((id, _fn) => ({ id, unref: vi.fn() })),
+    cancelTimer: vi.fn(),
+}));
+
 // ─── Mock logger (usado por todos) ──────────────────────────────────────────
 
 vi.mock('#copilot/observability/logger', () => ({
@@ -19,11 +24,10 @@ vi.mock('#copilot/observability/logger', () => ({
     getRecentLogs: vi.fn(() => []),
 }));
 
-// ─── Mock timer-registry (usado por error-alerting) ─────────────────────────
-
-vi.mock('#copilot/core/timer-registry', () => ({
-    registerTimer: vi.fn(),
-    cancel: vi.fn(),
+vi.mock('#copilot/core', async (importOriginal) => ({
+    .../** @type {any} */ (await importOriginal()),
+    registerInterval: timerMocks.registerInterval,
+    cancelTimer: timerMocks.cancelTimer,
 }));
 
 vi.mock('#copilot/core/error-handlers', () => ({
@@ -42,6 +46,8 @@ describe('F49 — createErrorAlerter', () => {
 
     beforeEach(async () => {
         vi.useFakeTimers({ shouldAdvanceTime: false });
+        timerMocks.registerInterval.mockClear();
+        timerMocks.cancelTimer.mockClear();
         tracker = { getErrors: vi.fn(() => []) };
         const { createErrorAlerter } = await import('#copilot/observability/error-alerting');
         alerter = createErrorAlerter(/** @type {any} */ (tracker), {
@@ -150,9 +156,8 @@ describe('F49 — createErrorAlerter', () => {
     });
 
     it('destroy() cancela timer e reseta', async () => {
-        const { cancel } = await import('#copilot/core/timer-registry');
         alerter.destroy();
-        expect(cancel).toHaveBeenCalledWith('observability.errorAlerting');
+        expect(timerMocks.cancelTimer).toHaveBeenCalledWith(expect.stringMatching(/^observability\.errorAlerting:/u));
         expect(alerter.getLastAlert()).toBeNull();
     });
 });

@@ -107,7 +107,7 @@ describe('copilot/channel/inject.js — structural', () => {
 
     it('deve enviar Content-Length correto', () => {
         assert.ok(SRC.includes('Content-Length'));
-        assert.ok(SRC.includes('Buffer.byteLength'));
+        assert.ok(SRC.includes('utf8ByteLength'));
     });
 
     // ─── checkLlmBHealth ────────────────────────────────────────────────────────

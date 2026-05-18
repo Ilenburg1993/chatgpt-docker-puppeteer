@@ -33,19 +33,23 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('#copilot/audit', () => ({ buildAuditingPermissionHandler: mocks.buildAuditingPermissionHandler }));
-vi.mock('#copilot/boot', () => ({
+vi.mock('#copilot/boot', async (importOriginal) => ({
+    .../** @type {any} */ (await importOriginal()),
     COPILOT_PACKAGE_ROOT: '/workspace',
     WORKSPACE_ROOT: '/workspace',
     readBootSkillConfig: vi.fn(() => ({ skillDirectories: ['/skills'] })),
     resolvePersistentConfigFile: vi.fn((name) => `/tmp/copilot-test/${name}`),
 }));
-vi.mock('#copilot/config', () => ({
+vi.mock('#copilot/config', async (importOriginal) => ({
+    .../** @type {any} */ (await importOriginal()),
     COPILOT_EVENTS_MAX_BYTES: 1024 * 1024,
     COPILOT_LOG_DIR: '',
     MAESTRO_AGENT_NAME: 'agent-full',
+    COPILOT_ENABLE_CONFIG_DISCOVERY: true,
     buildCustomAgentsConfig: mocks.buildCustomAgentsConfig,
 }));
-vi.mock('#copilot/core', () => ({
+vi.mock('#copilot/core', async (importOriginal) => ({
+    .../** @type {any} */ (await importOriginal()),
     SHUTDOWN_PRIORITY: { BACKGROUND: 50 },
     buildCanonicalLocalSurfaceExcludedTools: (
         /** @type {string[]} */ toolNames,

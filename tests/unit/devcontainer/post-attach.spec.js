@@ -99,6 +99,6 @@ describe('post-attach.sh UX state', () => {
         const dir = mkdtempSync(join(tmpdir(), 'nss-'));
         const out = runAttach({ DEVCONTAINER_NSS_DIR: dir, LD_PRELOAD: '' });
         assert(out.includes('LD_PRELOAD:'), 'should print LD_PRELOAD value');
-        assert(out.includes('does not contain libnss_wrapper.so'), 'should warn about missing wrapper');
+        assert(out.includes('LD_PRELOAD não contém libnss_wrapper.so'), 'should warn about missing wrapper');
     });
 });

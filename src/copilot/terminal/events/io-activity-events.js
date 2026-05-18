@@ -34,12 +34,18 @@ const _ioDedupWindow = new Map();
 
 /**
  * @param {string} operation
- * @param {string[]} targets
- * @param {string} fallbackTarget
+ * @param {string | string[]} targets
+ * @param {string} [fallbackTarget]
  * @returns {boolean} true se deve suprimir (é duplicata dentro da janela)
  */
 function isDuplicateIoOperation(operation, targets, fallbackTarget) {
-    const keyTarget = targets.length > 0 ? targets.join(' -> ') : fallbackTarget;
+    const normalizedTargets = Array.isArray(targets)
+        ? targets
+        : typeof targets === 'string' && targets
+          ? [targets]
+          : [];
+    const normalizedFallback = fallbackTarget ?? (typeof targets === 'string' ? targets : 'unknown');
+    const keyTarget = normalizedTargets.length > 0 ? normalizedTargets.join(' -> ') : normalizedFallback;
     const key = `${operation}::${keyTarget}`;
     const now = Date.now();
     const lastTs = _ioDedupWindow.get(key);

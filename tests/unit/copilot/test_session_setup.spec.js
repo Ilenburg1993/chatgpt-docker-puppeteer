@@ -61,8 +61,7 @@ vi.mock('../../../src/copilot/agent/dialog/wiring/user-input-handler.js', () => 
     handleUserInputRequest: vi.fn(),
 }));
 
-import { createSessionRpcFacade } from '#copilot/sdk/rpc';
-import { isToolDisabled, setSessionRpc } from '#copilot/tools';
+import { isToolDisabled } from '#copilot/tools';
 import { handleUserInputRequest } from '../../../src/copilot/agent/dialog/wiring/user-input-handler.js';
 import { getAgentSdkToolsConfig } from '../../../src/copilot/agent/facades/sdk-access.js';
 import {
@@ -285,8 +284,8 @@ describe('session-setup (F63)', () => {
 
             expect(ctx.session).toBe(session);
             expect(ctx.isResumed).toBe(true);
-            expect(createSessionRpcFacade).toHaveBeenCalledWith(session);
-            expect(setSessionRpc).toHaveBeenCalledWith(expect.objectContaining({ session }));
+            expect(ctx.setSession).toHaveBeenCalledWith(session);
+            expect(ctx.setIsResumed).toHaveBeenCalledWith(true);
         });
     });
 });

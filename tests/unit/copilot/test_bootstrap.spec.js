@@ -84,7 +84,8 @@ vi.mock('../../../src/copilot/core/di-container.js', () => ({
     },
 }));
 
-vi.mock('#copilot/boot', () => ({
+vi.mock('#copilot/boot', async (importOriginal) => ({
+    .../** @type {any} */ (await importOriginal()),
     assertCopilotBootSurfaces: mocks.assertCopilotBootSurfaces,
     createCopilotBootPlan: mocks.createCopilotBootPlan,
     readCopilotBootConfig: mocks.readCopilotBootConfig,
@@ -114,7 +115,8 @@ vi.mock('../../../src/copilot/runtime-wiring.js', () => ({
     wireCopilotRuntimeDI: mocks.wireCopilotRuntimeDI,
 }));
 
-vi.mock('../../../src/copilot/tools/todo/store.js', () => ({
+vi.mock('../../../src/copilot/tools/todo/store.js', async (importOriginal) => ({
+    .../** @type {any} */ (await importOriginal()),
     startTodoCleanupJob: mocks.startTodoCleanupJob,
 }));
 

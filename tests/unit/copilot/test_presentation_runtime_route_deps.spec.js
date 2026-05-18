@@ -153,6 +153,62 @@ vi.mock('#copilot/sdk', () => ({
     workspaceReadFile: vi.fn(),
 }));
 
+vi.mock('#copilot/sdk/utils', () => ({
+    pickDefined: (/** @type {Record<string, unknown>} */ value) =>
+        Object.fromEntries(Object.entries(value).filter(([, v]) => v !== undefined)),
+}));
+
+vi.mock('#copilot/sdk/telemetry', () => ({
+    emitSdkOperationMetric: vi.fn(),
+}));
+
+vi.mock('#copilot/sdk/rpc', () => ({
+    commandsHandlePending: vi.fn(),
+    compactionCompact: vi.fn(),
+    permissionsHandlePending: vi.fn(),
+    shellExec: vi.fn(),
+    shellKill: vi.fn(),
+    toolsHandlePendingCall: vi.fn(),
+    toolsList: vi.fn(),
+    uiElicitation: vi.fn(),
+    workspaceCreateFile: vi.fn(),
+    workspaceListFiles: vi.fn(),
+    workspaceReadFile: vi.fn(),
+}));
+
+vi.mock('#copilot/sdk/session', () => ({
+    abortSession: vi.fn(),
+    approveAll: vi.fn(),
+    createClientSession: vi.fn(),
+    defaultBus: { on: vi.fn(), off: vi.fn(), emit: vi.fn() },
+    disconnectClientSession: vi.fn(),
+    forceStopClient: mocks.forceStopClient,
+    getClient: mocks.getClient,
+    getClientSession: vi.fn(),
+    getClientState: mocks.getClientState,
+    getForegroundClientSessionId: vi.fn(),
+    getLastClientSessionId: vi.fn(),
+    getSessionMessages: vi.fn(async () => []),
+    getSessionCapabilities: mocks.getSessionCapabilities,
+    incrementSessionMessageCount: vi.fn(),
+    isSessionUiElicitationAvailable: mocks.isSessionUiElicitationAvailable,
+    listActiveClientSessions: vi.fn(() => []),
+    listAllClientSessions: vi.fn(async () => []),
+    onAllSessionEvents: vi.fn(),
+    resumeClientSession: vi.fn(),
+    SDK_HOOKS: { list: vi.fn(() => []) },
+    sendSession: vi.fn(async () => ({ ok: true })),
+    sendSessionAndWait: vi.fn(async () => ({ ok: true })),
+    sessionUiConfirm: mocks.sessionUiConfirm,
+    sessionUiElicitation: mocks.sessionUiElicitation,
+    sessionUiInput: mocks.sessionUiInput,
+    sessionUiSelect: mocks.sessionUiSelect,
+    setForegroundClientSessionId: vi.fn(),
+    setSessionModel: vi.fn(),
+    stopClient: mocks.stopClient,
+    validateProviderConfig: vi.fn(),
+}));
+
 vi.mock('#copilot/tools', async (importOriginal) => ({
     ...(await importOriginal()),
     getAllTools: () => mocks.allTools,

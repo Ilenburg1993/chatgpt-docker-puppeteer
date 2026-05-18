@@ -58,9 +58,13 @@ const sessionRouterMocks = vi.hoisted(() => ({
     }),
 }));
 
-vi.mock('../../../src/copilot/server/routes/sdk/deps.js', () => ({
-    resolveSdkRouteSharedDeps: sessionRouterMocks.resolveSdkRouteSharedDeps,
-}));
+vi.mock('../../../src/copilot/server/routes/sdk/deps.js', async (importOriginal) => {
+    const actual = /** @type {Record<string, unknown>} */ (await importOriginal());
+    return {
+        ...actual,
+        resolveSdkRouteSharedDeps: sessionRouterMocks.resolveSdkRouteSharedDeps,
+    };
+});
 
 vi.mock('../../../src/copilot/server/routes/sdk/session-crud.js', async () => {
     const { Router } = await import('express');

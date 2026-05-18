@@ -94,20 +94,20 @@ Cada item foi classificado como:
 
 ## 3. Bugs confirmados — veredito item a item
 
-| ID | Veredito | Decisão final | Evidência resumida |
-| --- | --- | --- | --- |
-| BUG-001 | **Confirmado** | Prosseguir com correção completa | `src/copilot/terminal/commands/sdk.js` contém múltiplas strings corrompidas (`executável`, `permissão`, `materialização`, etc.) |
-| BUG-002 | **Parcialmente confirmado** | Corrigir hardening do cleanup | o `/restart` já registra `dialog.ready` antes do stop, mas ainda havia fragilidade de cleanup em paths excepcionais |
-| BUG-003 | **Confirmado** | Corrigir imediatamente | `IDLE_TRANSITION_TIMEOUT_MS` dependia de `LLM_B_BOOT_TIMEOUT_MS` sem guard contra `NaN` |
-| BUG-004 | **Confirmado** | Corrigir por performance/escala | `pruneCompletedInteractionMap()` faz poda + novo scan/sort linear evitável |
-| BUG-005 | **Confirmado** | Corrigir imediatamente | `printlnBlock()` re-reservava linha com `\n` extra a cada bloco, degradando layout |
-| BUG-006 | **Parcialmente confirmado** | Planejar persistência/backoff externo | `_timelineSyncFailures` é volátil e perde backoff entre reinícios |
-| BUG-007 | **Confirmado** | Corrigir imediatamente | `renderReportIntentToolPayload()` era chamado antes dos checks de supressão |
-| BUG-008 | **Confirmado** | Corrigir imediatamente | dedup de I/O considerava só o alvo primário e ignorava operações multi-target |
-| BUG-009 | **Confirmado** | Corrigir imediatamente | `tryAnswerTerminalPendingQuestionInput()` era chamado duas vezes para a mesma linha em caminhos distintos |
-| BUG-010 | **Parcialmente confirmado / remodelado** | Reclassificar | o código já não usa `setInterval` cru; hoje o risco remanescente é duplicação por re-registro do listener/timer em cenários anômalos |
-| BUG-011 | **Confirmado** | Corrigir imediatamente | faltava forma pública de inspecionar `terminalShutdownSignalsRegistered` |
-| BUG-012 | **Refutado / obsoleto** | Não priorizar como bug atual | o padrão descrito pela auditoria não corresponde ao `terminal-agent-wiring.js` atual |
+| ID      | Veredito                                 | Decisão final                         | Evidência resumida                                                                                                                   |
+| ------- | ---------------------------------------- | ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| BUG-001 | **Confirmado**                           | Prosseguir com correção completa      | `src/copilot/terminal/commands/sdk.js` contém múltiplas strings corrompidas (`executável`, `permissão`, `materialização`, etc.)      |
+| BUG-002 | **Parcialmente confirmado**              | Corrigir hardening do cleanup         | o `/restart` já registra `dialog.ready` antes do stop, mas ainda havia fragilidade de cleanup em paths excepcionais                  |
+| BUG-003 | **Confirmado**                           | Corrigir imediatamente                | `IDLE_TRANSITION_TIMEOUT_MS` dependia de `LLM_B_BOOT_TIMEOUT_MS` sem guard contra `NaN`                                              |
+| BUG-004 | **Confirmado**                           | Corrigir por performance/escala       | `pruneCompletedInteractionMap()` faz poda + novo scan/sort linear evitável                                                           |
+| BUG-005 | **Confirmado**                           | Corrigir imediatamente                | `printlnBlock()` re-reservava linha com `\n` extra a cada bloco, degradando layout                                                   |
+| BUG-006 | **Parcialmente confirmado**              | Planejar persistência/backoff externo | `_timelineSyncFailures` é volátil e perde backoff entre reinícios                                                                    |
+| BUG-007 | **Confirmado**                           | Corrigir imediatamente                | `renderReportIntentToolPayload()` era chamado antes dos checks de supressão                                                          |
+| BUG-008 | **Confirmado**                           | Corrigir imediatamente                | dedup de I/O considerava só o alvo primário e ignorava operações multi-target                                                        |
+| BUG-009 | **Confirmado**                           | Corrigir imediatamente                | `tryAnswerTerminalPendingQuestionInput()` era chamado duas vezes para a mesma linha em caminhos distintos                            |
+| BUG-010 | **Parcialmente confirmado / remodelado** | Reclassificar                         | o código já não usa `setInterval` cru; hoje o risco remanescente é duplicação por re-registro do listener/timer em cenários anômalos |
+| BUG-011 | **Confirmado**                           | Corrigir imediatamente                | faltava forma pública de inspecionar `terminalShutdownSignalsRegistered`                                                             |
+| BUG-012 | **Refutado / obsoleto**                  | Não priorizar como bug atual          | o padrão descrito pela auditoria não corresponde ao `terminal-agent-wiring.js` atual                                                 |
 
 ### Observação importante sobre BUG-010
 
@@ -117,25 +117,25 @@ A auditoria descrevia um `setInterval` clássico. O código atual usa `registerI
 
 ## 4. Gaps SDK 0.3.0 — veredito item a item
 
-| ID | Veredito | Decisão final | Evidência resumida |
-| --- | --- | --- | --- |
-| GAP-001 | **Refutado** | Já implementado | `src/copilot/agent/session/initializers/initializer.js` passa `onPermissionRequest` |
-| GAP-002 | **Parcial / latente** | Hardening recomendado | o terminal atual não sofre isso no fluxo padrão porque `includeSubAgentStreamingEvents: false`, mas a ponte local não preservava `agentId` |
-| GAP-003 | **Refutado** | Já implementado | `excludedTools` já entra na configuração de sessão |
-| GAP-004 | **Refutado** | Já suportado | `sessionIdleTimeoutSeconds` já existe na configuração client-side |
-| GAP-005 | **Confirmado** | Adicionar superfície/observabilidade | `session.rpc.skills.*` existe no SDK, mas o terminal não o consome |
-| GAP-006 | **Confirmado** | Implementar superfície terminal | o handler atual de OAuth MCP só narra; não aciona `session.rpc.mcp.oauthLogin()` |
-| GAP-007 | **Refutado** | Já migrado | o repositório já usa `createSessionFsHandler` e provider idiomático |
-| GAP-008 | **Refutado** | Já migrado | o código usa `gitHubToken` corretamente |
-| GAP-009 | **Confirmado** | Oportunidade de simplificação | `convertMcpCallToolResult()` ainda não está incorporado |
-| GAP-010 | **Confirmado** | Expor no terminal | `/sdk quota` ainda não usa `session.rpc.usage.getMetrics()` |
-| GAP-011 | **Parcial / latente** | Hardening recomendado | ausência de `agentId` no terminal só importa se subagent streaming voltar a ser habilitado |
-| GAP-012 | **Parcial / latente** | Oportunidade válida | a projeção atual é suficiente, mas não usa a RPC mais nova |
-| GAP-013 | **Confirmado** | Planejar | skills por subagente ainda não estão mapeadas como recurso de produto |
-| GAP-014 | **Refutado** | Já implementado | `enableConfigDiscovery` já é configurado |
-| GAP-015 | **Confirmado** | Planejar/refatorar | `runTerminalDialogTurn` e a pilha abaixo não expõem `requestHeaders` por turno |
-| GAP-016 | **Confirmado** | Planejar | attachments blob em memória não estão suportados no terminal atual |
-| GAP-017 | **Confirmado** | Corrigir imediatamente | o SDK já expõe `resetSessionApprovals` e o terminal não expunha a ação |
+| ID      | Veredito              | Decisão final                        | Evidência resumida                                                                                                                         |
+| ------- | --------------------- | ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| GAP-001 | **Refutado**          | Já implementado                      | `src/copilot/agent/session/initializers/initializer.js` passa `onPermissionRequest`                                                        |
+| GAP-002 | **Parcial / latente** | Hardening recomendado                | o terminal atual não sofre isso no fluxo padrão porque `includeSubAgentStreamingEvents: false`, mas a ponte local não preservava `agentId` |
+| GAP-003 | **Refutado**          | Já implementado                      | `excludedTools` já entra na configuração de sessão                                                                                         |
+| GAP-004 | **Refutado**          | Já suportado                         | `sessionIdleTimeoutSeconds` já existe na configuração client-side                                                                          |
+| GAP-005 | **Confirmado**        | Adicionar superfície/observabilidade | `session.rpc.skills.*` existe no SDK, mas o terminal não o consome                                                                         |
+| GAP-006 | **Confirmado**        | Implementar superfície terminal      | o handler atual de OAuth MCP só narra; não aciona `session.rpc.mcp.oauthLogin()`                                                           |
+| GAP-007 | **Refutado**          | Já migrado                           | o repositório já usa `createSessionFsHandler` e provider idiomático                                                                        |
+| GAP-008 | **Refutado**          | Já migrado                           | o código usa `gitHubToken` corretamente                                                                                                    |
+| GAP-009 | **Confirmado**        | Oportunidade de simplificação        | `convertMcpCallToolResult()` ainda não está incorporado                                                                                    |
+| GAP-010 | **Confirmado**        | Expor no terminal                    | `/sdk quota` ainda não usa `session.rpc.usage.getMetrics()`                                                                                |
+| GAP-011 | **Parcial / latente** | Hardening recomendado                | ausência de `agentId` no terminal só importa se subagent streaming voltar a ser habilitado                                                 |
+| GAP-012 | **Parcial / latente** | Oportunidade válida                  | a projeção atual é suficiente, mas não usa a RPC mais nova                                                                                 |
+| GAP-013 | **Confirmado**        | Planejar                             | skills por subagente ainda não estão mapeadas como recurso de produto                                                                      |
+| GAP-014 | **Refutado**          | Já implementado                      | `enableConfigDiscovery` já é configurado                                                                                                   |
+| GAP-015 | **Confirmado**        | Planejar/refatorar                   | `runTerminalDialogTurn` e a pilha abaixo não expõem `requestHeaders` por turno                                                             |
+| GAP-016 | **Confirmado**        | Planejar                             | attachments blob em memória não estão suportados no terminal atual                                                                         |
+| GAP-017 | **Confirmado**        | Corrigir imediatamente               | o SDK já expõe `resetSessionApprovals` e o terminal não expunha a ação                                                                     |
 
 ### Decisão importante sobre GAP-002 / GAP-011
 
@@ -151,27 +151,27 @@ Ou seja: a auditoria exagerou no impacto imediato, mas acertou no risco estrutur
 
 ## 5. Oportunidades de upgrade — veredito item a item
 
-| ID | Veredito | Decisão final | Observação |
-| --- | --- | --- | --- |
-| UPG-001 | **Válido, mas não prioritário** | Backlog arquitetural | `EventTarget` pode simplificar alguns fluxos, mas não é prerequisite imediato |
-| UPG-002 | **Válido e relevante** | Planejar | `AsyncLocalStorage` pode reduzir vazamento semântico de `runtimeId` |
-| UPG-003 | **Válido, mas experimental na prática** | Backlog controlado | útil, porém não deve virar baseline prematuramente |
-| UPG-004 | **Válido** | Planejar | há ROI real em mover parte do polling para canal incremental |
-| UPG-005 | **Não recomendado agora** | Refutar como prioridade | `WeakRef`/`FinalizationRegistry` aqui aumenta complexidade sem prova clara de ganho |
-| UPG-006 | **Válido, baixa prioridade** | Backlog | SSE atual funciona; a troca é melhoria de infraestrutura |
-| UPG-007 | **Válido, uso seletivo** | Planejar com critério | `structuredClone()` é bom, mas não deve substituir clones pequenos de forma dogmática |
-| UPG-008 | **Válido** | Planejar / opportunistic | `import.meta.dirname` simplifica código ESM |
-| UPG-009 | **Válido** | Planejar | tipagem mais forte de eventos combina com `@ts-check` do repo |
-| UPG-010 | **Válido** | Planejar | `AbortSignal.timeout()` encaixa bem em handlers de tools |
-| UPG-011 | **Válido** | Planejar | consolidar TTL maps reduz lógica duplicada |
-| UPG-012 | **Válido** | Aplicar oportunisticamente | `Promise.withResolvers()` já faz sentido em pontos específicos |
-| UPG-013 | **Precisa validação funcional** | Backlog investigativo | não tratar como bug sem reproduzir contrato de `autopilot` |
-| UPG-014 | **Não recomendado como baseline agora** | Refutar como prioridade | `scheduler.wait()` ainda não é a escolha canônica aqui |
-| UPG-015 | **Válido** | Planejar | vale verificar assinatura atual do hook no SDK 0.3.0 |
-| UPG-016 | **Válido e imediato** | Corrigir | virou correção concreta via `/permission reset-approvals` |
-| UPG-017 | **Refutado / já superado** | Não priorizar | o `cmdMenu` atual já recebe `executeCommandLine` injetado pelo router |
-| UPG-018 | **Válido** | Planejar | persistência de display state melhora UX de longo prazo |
-| UPG-019 | **Válido** | Planejar | tipagem explícita de `copilotServer` é hardening saudável |
+| ID      | Veredito                                | Decisão final              | Observação                                                                            |
+| ------- | --------------------------------------- | -------------------------- | ------------------------------------------------------------------------------------- |
+| UPG-001 | **Válido, mas não prioritário**         | Backlog arquitetural       | `EventTarget` pode simplificar alguns fluxos, mas não é prerequisite imediato         |
+| UPG-002 | **Válido e relevante**                  | Planejar                   | `AsyncLocalStorage` pode reduzir vazamento semântico de `runtimeId`                   |
+| UPG-003 | **Válido, mas experimental na prática** | Backlog controlado         | útil, porém não deve virar baseline prematuramente                                    |
+| UPG-004 | **Válido**                              | Planejar                   | há ROI real em mover parte do polling para canal incremental                          |
+| UPG-005 | **Não recomendado agora**               | Refutar como prioridade    | `WeakRef`/`FinalizationRegistry` aqui aumenta complexidade sem prova clara de ganho   |
+| UPG-006 | **Válido, baixa prioridade**            | Backlog                    | SSE atual funciona; a troca é melhoria de infraestrutura                              |
+| UPG-007 | **Válido, uso seletivo**                | Planejar com critério      | `structuredClone()` é bom, mas não deve substituir clones pequenos de forma dogmática |
+| UPG-008 | **Válido**                              | Planejar / opportunistic   | `import.meta.dirname` simplifica código ESM                                           |
+| UPG-009 | **Válido**                              | Planejar                   | tipagem mais forte de eventos combina com `@ts-check` do repo                         |
+| UPG-010 | **Válido**                              | Planejar                   | `AbortSignal.timeout()` encaixa bem em handlers de tools                              |
+| UPG-011 | **Válido**                              | Planejar                   | consolidar TTL maps reduz lógica duplicada                                            |
+| UPG-012 | **Válido**                              | Aplicar oportunisticamente | `Promise.withResolvers()` já faz sentido em pontos específicos                        |
+| UPG-013 | **Precisa validação funcional**         | Backlog investigativo      | não tratar como bug sem reproduzir contrato de `autopilot`                            |
+| UPG-014 | **Não recomendado como baseline agora** | Refutar como prioridade    | `scheduler.wait()` ainda não é a escolha canônica aqui                                |
+| UPG-015 | **Válido**                              | Planejar                   | vale verificar assinatura atual do hook no SDK 0.3.0                                  |
+| UPG-016 | **Válido e imediato**                   | Corrigir                   | virou correção concreta via `/permission reset-approvals`                             |
+| UPG-017 | **Refutado / já superado**              | Não priorizar              | o `cmdMenu` atual já recebe `executeCommandLine` injetado pelo router                 |
+| UPG-018 | **Válido**                              | Planejar                   | persistência de display state melhora UX de longo prazo                               |
+| UPG-019 | **Válido**                              | Planejar                   | tipagem explícita de `copilotServer` é hardening saudável                             |
 
 ---
 
@@ -196,11 +196,14 @@ Nenhuma dessas camadas expõe `requestHeaders` por mensagem/turno na superfície
 
 **Decisão:** confirmar como gap real de integração, mas não forçar patch apressado sem desenhar contrato de ponta a ponta.
 
-### ACHADO-C — warnings de teardown do Vitest
+### ACHADO-C — divergência de runner e warnings de teardown do Vitest
 
-A suite `test:copilot:unit` passou, mas houve warnings de teardown de workers do Vitest no run padrão.
+O problema foi confirmado em duas camadas diferentes:
 
-**Decisão:** registrar como debt operacional paralelo; não é um bug confirmado do terminal em si, mas afeta confiabilidade da validação contínua.
+1. havia uma **divergência estrutural de runner** entre o que `test:unit` executava e o que `test:copilot:unit` executava;
+2. havia também **warnings reais de workers do Vitest**, agravados pelo uso de `pool: 'forks'` e por concorrência alta demais para a carga do lote Copilot.
+
+**Decisão:** tratar como trilha operacional obrigatória desta mesma rodada, não como dívida paralela.
 
 ---
 
@@ -367,3 +370,77 @@ O tema desta rodada não é “embelezar” o terminal.
 - informação operacional relevante não pode existir apenas como inline transient UI;
 - eventos efêmeros do SDK podem continuar efêmeros no wire, mas a superfície terminal precisa promover snapshots duráveis quando isso for importante para a operação humana;
 - o terminal da LLM-B é uma console operacional, então clareza narrativa e persistência visual fazem parte do contrato funcional.
+
+## 11. Addendum — runner, Vitest, testes e typecheck estrito
+
+### 11.1. Por que o comando anterior parecia muito pior do que `test:copilot:unit`
+
+O comportamento anterior não era mero ruído. Havia uma combinação de fatores:
+
+1. `npm test -- --run ...` **não era equivalente** a “rodar só alguns testes Copilot”; ele continuava expandindo para o pipeline padrão e alcançando mais escopo do que parecia na linha de comando;
+2. `test:unit` usava `scripts/ci/run-mixed-tests.mjs`, que até então executava o lote Vitest híbrido inteiro sob uma única configuração base;
+3. quando o lote misturava specs Copilot e specs genéricas, testes Copilot podiam acabar rodando sob `vitest.config.js`, sem a baseline própria do domínio Copilot;
+4. além disso, havia **falhas reais** em testes stale fora da faixa terminal estrita, inclusive em mocks de SDK, contratos de barrel e parte da trilha `devcontainer`.
+
+Portanto, o problema não era “cache ruim” ou “test:copilot:unit omitindo testes” em sentido simples. O que existia era:
+
+- uma mistura inadequada de configurações no runner híbrido;
+- warnings de workers mascarando a análise;
+- e um conjunto real de testes e contratos envelhecidos que só apareceu quando a baseline correta foi rodada de ponta a ponta.
+
+### 11.2. Correções definitivas aplicadas nesta rodada
+
+#### Runner / Vitest
+
+- `scripts/ci/run-mixed-tests.mjs` passou a separar explicitamente:
+	- specs Copilot → `vitest.copilot.config.js`
+	- specs genéricas → `vitest.config.js`
+- `vitest.copilot.config.js` foi endurecido para usar:
+	- `pool: 'threads'` por default
+	- `maxWorkers: '50%'` por default
+
+Isso eliminou a discrepância artificial entre `test:unit` e `test:copilot:unit` e zerou os warnings de worker teardown na baseline final.
+
+#### Testes / contratos / mocks
+
+Foram corrigidos, entre outros:
+
+- mocks stale em rotas e barrels do SDK/runtime;
+- contratos desatualizados em `always-alive`, `loop-manager`, `snapshot`, `agent-integration` e testes de presentation/runtime;
+- seams de infraestrutura como `url-validator` com `dnsResolver.lookup` explícito para teste robusto;
+- filtros canônicos de glob em `index-search` para tratar corretamente segmentos como `node_modules`;
+- expectativas stale da trilha `devcontainer`, que já não correspondiam ao comportamento real dos scripts atuais.
+
+#### Typecheck estrito
+
+Também foi fechado o lote de erros de `typecheck:strict:tests.unit`, incluindo:
+
+- narrowing de regex/matches;
+- mocks incompatíveis com assinaturas atuais;
+- parâmetros implícitos `any`;
+- assinaturas novas de handlers e refactors do domínio Copilot.
+
+### 11.3. Resultado final reproduzível desta rodada
+
+Ao final desta rodada, a baseline exigida ficou **integralmente verde**:
+
+- `npm run lint:copilot` ✅
+- `npm run typecheck:strict:src.copilot` ✅
+- `npm run typecheck:strict:tests.unit` ✅
+- `npm run test:copilot:unit` ✅
+	- `2791/2791 testes`
+	- `951/951 suites`
+	- `warnings/errors unique=0 total=0`
+- `npm run test:unit` ✅
+	- `5069/5069 testes executados com sucesso` no lote ativo
+	- `424 arquivos` com `406 passed | 18 skipped`
+	- encerramento com `[test-runner] Mixed test run finished successfully.`
+
+### 11.4. Palavra final desta trilha paralela
+
+A resposta final para a dúvida do usuário é:
+
+- **não**, `test:copilot:unit` não estava simplesmente “escondendo” um problema por cache;
+- **sim**, havia um problema real de orquestração/configuração do runner híbrido;
+- **sim**, havia também falhas reais em testes stale fora do recorte inicial;
+- **agora**, a trilha de validação está convergente, warning-zero e pronta para a retomada contínua e profunda do roadmap funcional.

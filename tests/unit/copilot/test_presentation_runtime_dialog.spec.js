@@ -128,6 +128,9 @@ describe('presentation/runtime/dialog.js', () => {
 
         await mod.stopRuntimeDialogLoopAuthorized();
 
-        expect(mocks.agent.stopDialogLoop).toHaveBeenCalledWith({ authorized: true });
+        expect(mocks.agent.stopDialogLoop).toHaveBeenCalledWith({
+            authorized: true,
+            reason: 'authorized_stop',
+        });
     });
 });

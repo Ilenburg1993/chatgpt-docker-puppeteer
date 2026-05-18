@@ -67,7 +67,7 @@ describe('boot-wiring › pipeline nomeado', () => {
     });
 
     it('runner de boot usa policy por step e criticidade explícita', () => {
-        assert.match(SRC, /import \{ withAgentErrorPolicy \} from '\.\.\/\.\.\/error-policy\.js'/);
+        assert.match(SRC, /import \{ withAgentErrorPolicy \} from '\.\.\/\.\.\/error\/index\.js'/);
         assert.match(SRC, /async function runBootStepWithPolicy\(/);
         assert.match(SRC, /required: true/);
         assert.match(SRC, /required: false/);
@@ -77,7 +77,7 @@ describe('boot-wiring › pipeline nomeado', () => {
     });
 
     it('delega a implementação das steps para módulo dedicado', () => {
-        assert.match(SRC, /from '\.\/boot-steps\.js'/);
+        assert.match(SRC, /from '\.\/steps\/index\.js'/);
         assert.match(STEPS_SRC, /from '\.\/boot-session-prep\.js'/);
         assert.match(STEPS_SRC, /from '\.\/boot-dialog-recovery\.js'/);
         assert.match(STEPS_SRC, /from '\.\/boot-runtime-bind\.js'/);

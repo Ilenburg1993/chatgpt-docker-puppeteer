@@ -78,9 +78,10 @@ vi.mock('#copilot/sdk/event-helpers', () => ({
     SYSTEM_PROMPT_SECTIONS: {},
 }));
 
-vi.mock('#copilot/sdk/session', () => ({
-    listSessions: vi.fn(async () => []),
-    deleteSession: vi.fn(async () => {}),
+vi.mock('../../../src/copilot/agent/ports/tracing-port.js', () => ({
+    buildTelemetryConfig: vi.fn(() => null),
+    startSpan: vi.fn(async (_name, _attrs, fn) => fn()),
+    startSpanImmediate: vi.fn(() => ({ ...mockSpan })),
 }));
 
 vi.mock('#copilot/observability', () => ({
@@ -118,14 +119,28 @@ vi.mock('#copilot/observability', () => ({
 
 // ── Imports ──────────────────────────────────────────────────────────────────
 
-import { defaultMetrics, startSpan, startSpanImmediate } from '#copilot/observability';
-import { deleteSession, listSessions } from '#copilot/sdk/session';
+import { defaultMetrics } from '#copilot/observability';
+import { startSpan, startSpanImmediate } from '../../../src/copilot/agent/ports/index.js';
 import { cleanupStaleSessions } from '../../../src/copilot/agent/session/lifecycle/cleanup.js';
 import { shouldRotateSession } from '../../../src/copilot/agent/session/lifecycle/rotation.js';
 
-/** @returns {import('#copilot/sdk/types').CopilotClient} */
-function makeClient() {
-    return /** @type {any} */ ({ stop: vi.fn() });
+/**
+ * @param {{
+ *     listSessions?: ReturnType<typeof vi.fn>;
+ *     deleteSession?: ReturnType<typeof vi.fn>;
+ *     getForegroundSessionId?: ReturnType<typeof vi.fn>;
+ *     getLastSessionId?: ReturnType<typeof vi.fn>;
+ * }} [overrides]
+ * @returns {import('#copilot/sdk/types').CopilotClient}
+ */
+function makeClient(overrides = {}) {
+    return /** @type {any} */ ({
+        stop: vi.fn(),
+        listSessions: overrides.listSessions ?? vi.fn(async () => []),
+        deleteSession: overrides.deleteSession ?? vi.fn(async () => undefined),
+        getForegroundSessionId: overrides.getForegroundSessionId ?? vi.fn(async () => undefined),
+        getLastSessionId: overrides.getLastSessionId ?? vi.fn(async () => undefined),
+    });
 }
 
 /**
@@ -257,33 +272,34 @@ describe('F70: Métricas e Cleanup paralelo', () => {
         it('deleta múltiplas sessões em paralelo', async () => {
             const now = Date.now();
             const oldTime = new Date(now - 100_000_000);
-
-            vi.mocked(listSessions).mockResolvedValueOnce([
+            const listSessions = vi.fn(async () => [
                 makeSessionMetadata('old-1', oldTime),
                 makeSessionMetadata('old-2', oldTime),
                 makeSessionMetadata('old-3', oldTime),
             ]);
-            vi.mocked(deleteSession).mockResolvedValue(undefined);
+            const deleteSession = vi.fn(async () => undefined);
 
-            const client = makeClient();
+            const client = makeClient({ listSessions, deleteSession });
             const result = await cleanupStaleSessions(client, { maxAgeMs: 86_400_000 });
 
             expect(result.deleted).toBe(3);
             expect(result.deletedIds).toEqual(['old-1', 'old-2', 'old-3']);
-            expect(vi.mocked(deleteSession)).toHaveBeenCalledTimes(3);
+            expect(deleteSession).toHaveBeenCalledTimes(3);
         });
 
         it('captura erros individuais via Promise.allSettled', async () => {
             const now = Date.now();
             const oldTime = new Date(now - 100_000_000);
-
-            vi.mocked(listSessions).mockResolvedValueOnce([
+            const listSessions = vi.fn(async () => [
                 makeSessionMetadata('ok-1', oldTime),
                 makeSessionMetadata('fail-1', oldTime),
             ]);
-            vi.mocked(deleteSession).mockResolvedValueOnce(undefined).mockRejectedValueOnce(new Error('network error'));
+            const deleteSession = vi
+                .fn()
+                .mockResolvedValueOnce(undefined)
+                .mockRejectedValueOnce(new Error('network error'));
 
-            const client = makeClient();
+            const client = makeClient({ listSessions, deleteSession });
             const result = await cleanupStaleSessions(client, { maxAgeMs: 86_400_000 });
 
             expect(result.deleted).toBe(1);
@@ -295,15 +311,14 @@ describe('F70: Métricas e Cleanup paralelo', () => {
             const now = Date.now();
             const recentTime = new Date(now - 1000);
             const oldTime = new Date(now - 100_000_000);
-
-            vi.mocked(listSessions).mockResolvedValueOnce([
+            const listSessions = vi.fn(async () => [
                 makeSessionMetadata('current', oldTime),
                 makeSessionMetadata('young', recentTime),
                 makeSessionMetadata('old', oldTime),
             ]);
-            vi.mocked(deleteSession).mockResolvedValue(undefined);
+            const deleteSession = vi.fn(async () => undefined);
 
-            const client = makeClient();
+            const client = makeClient({ listSessions, deleteSession });
             const result = await cleanupStaleSessions(client, {
                 maxAgeMs: 86_400_000,
                 currentSessionId: 'current',

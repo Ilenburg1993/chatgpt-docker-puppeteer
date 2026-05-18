@@ -38,7 +38,7 @@ describe('post-start.sh repairs and status', () => {
         assert(out.includes('SSHD check skipped'));
     });
 
-    it('does not attempt repair when running as root (UID 0)', () => {
+    it('repairs NSS artifacts for the resolved target user even when running as root (UID 0)', () => {
         const dir = mkdtempSync(join(tmpdir(), 'nss-'));
         // simulate uid 0 by overriding `id` in PATH with a directory
         const fakeDir = mkdtempSync(join(tmpdir(), 'fakeid-'));
@@ -50,15 +50,18 @@ describe('post-start.sh repairs and status', () => {
             rmSync(join(dir, 'passwd'));
         } catch {}
         runPostStart(env);
-        // since uid was 0, the repair should have been skipped; file may still be missing
-        const exists = existsSync(join(dir, 'passwd'));
-        assert(!exists, 'passwd should not be created when UID=0');
+        const passwdPath = join(dir, 'passwd');
+        assert(existsSync(passwdPath), 'passwd should be created for the resolved target user even when UID=0');
+        const passwd = execSync(`cat ${passwdPath}`).toString();
+        assert(passwd.includes('node:x:'), 'root execution should still materialize NSS for the target user');
     });
 
-    it('logs LD_PRELOAD and warns when empty', () => {
+    it('logs LD_PRELOAD and normalizes it when empty', () => {
         const dir = mkdtempSync(join(tmpdir(), 'nss-'));
         const out = runPostStart({ DEVCONTAINER_NSS_DIR: dir, LD_PRELOAD: '' });
-        assert(out.includes('LD_PRELOAD is empty'));
+        assert(out.includes('LD_PRELOAD inicial: <unset>'));
+        assert(out.includes('LD_PRELOAD canonicalizado para NSS wrapper absoluto'));
+        assert(out.includes('LD_PRELOAD após normalização:'));
         const status = execSync('cat /tmp/devcontainer-health.status').toString().trim();
         assert(['ok', 'degraded'].includes(status));
     });

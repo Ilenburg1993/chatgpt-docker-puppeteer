@@ -16,7 +16,16 @@
  */
 
 import { ConfigError } from '#copilot/core';
-import dns from 'node:dns/promises';
+import { lookup as dnsLookup } from 'node:dns/promises';
+
+/**
+ * Seletor injetável para testes da resolução DNS usada por `checkResolvedIp`.
+ *
+ * Mantido como objeto mutável para evitar fragilidade com mocks de módulos built-in ESM em lotes Vitest mistos.
+ */
+export const dnsResolver = {
+    lookup: dnsLookup,
+};
 
 /**
  * Leitura direta de env para evitar import de config (L2) em core (L0).
@@ -203,11 +212,12 @@ export async function checkResolvedIp(hostname, opts) {
     /** @type {{ address: string; family: number }[]} */
     let records;
     try {
-        records = await dns.lookup(hostname, { all: true });
+        records = await dnsResolver.lookup(hostname, { all: true });
     } catch {
         return; // Não conseguiu resolver — deixa o fetch falhar naturalmente
     }
-    const privateRecord = records.find((record) => isPrivateIp(record.address));
+    const resolvedRecords = Array.isArray(records) ? records : [];
+    const privateRecord = resolvedRecords.find((record) => isPrivateIp(record.address));
     if (privateRecord) {
         throw new ConfigError(
             `[URLValidator] DNS rebinding bloqueado: ${hostname} resolveu para IP privado ${privateRecord.address}.`,

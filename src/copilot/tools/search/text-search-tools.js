@@ -55,6 +55,14 @@ export function parseUsageOutput(output, workspaceRoot) {
 }
 
 /**
+ * @param {{ file: string; line: number; text: string }[]} matches
+ * @returns {string}
+ */
+export function formatUsageMatches(matches) {
+    return matches.map((match) => `${match.file}:${match.line}: ${match.text}`.trimEnd()).join('\n');
+}
+
+/**
  * Tool: search_in_files — busca texto/regex em arquivos do workspace.
  */
 export const searchInFilesTool = buildTool({
@@ -226,13 +234,14 @@ export const findSymbolUsagesTool = buildTool({
                     success: true,
                     symbol,
                     searchPath: resolved,
+                    output: formatUsageMatches(matches),
                     matchCount: matches.length,
                     fileCount,
                     matches,
                     engine: result.engine,
                     sanitized: result.sanitized,
-                    ...(result.truncated ? { truncated: result.truncated } : {}),
-                    ...(result.nextCursor ? { nextCursor: result.nextCursor } : {}),
+                    truncated: Boolean(result.truncated),
+                    nextCursor: result.nextCursor ?? null,
                 },
                 result.io,
             );

@@ -10,6 +10,7 @@
  * @module copilot/terminal/agent-runtime-events
  */
 
+import { cancelTimer, registerInterval } from '#copilot/core';
 import {
     EMITTER_AGENT_BACKGROUND_COMPLETED,
     EMITTER_AGENT_BACKGROUND_IDLE,
@@ -39,7 +40,7 @@ import {
     terminalThemeBadge,
     terminalThemeText,
 } from '../state/events/index.js';
-import { cancelTimer, registerInterval } from '#copilot/core';
+import { renderTerminalIntent } from './intent-renderer.js';
 import { compactTerminalToolText } from './tool-activity-presenter.js';
 import {
     handleTerminalNativeToolComplete,
@@ -47,7 +48,6 @@ import {
     handleTerminalNativeToolProgress,
     handleTerminalNativeToolStart,
 } from './tool-lifecycle-runtime.js';
-import { renderTerminalIntent } from './intent-renderer.js';
 
 const AGENT_SHELL_COMPLETED_EVENT = 'agent.shell.completed';
 const AGENT_SHELL_DETACHED_COMPLETED_EVENT = 'agent.shell.detached_completed';
@@ -76,36 +76,37 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, regi
     const toolHeartbeatTimer = registerInterval(
         toolHeartbeatTimerId,
         () => {
-        const inFlight = _reg.getAllInFlight();
-        if (inFlight.length === 0) return;
-        const now = Date.now();
-        const compactDetail = getTerminalDetailLevel() === 'compact';
-        for (const entry of inFlight) {
-            const toolCallId = entry.toolCallId;
-            const elapsedMs = now - entry.t0;
-            if (elapsedMs < TOOL_HEARTBEAT_INTERVAL_MS) continue;
-            if (now - entry.lastHeartbeatAt < TOOL_HEARTBEAT_INTERVAL_MS) continue;
-            _reg.touch(toolCallId, { lastHeartbeatAt: now, lastSignalAt: entry.lastSignalAt });
-            const elapsed = (elapsedMs / 1000).toFixed(0);
-            const sinceSignal = ((now - entry.lastSignalAt) / 1000).toFixed(0);
-            const detailBase = entry.presentation?.detail ?? entry.toolName;
-            const renderedName = entry.canonicalName ?? entry.toolName;
-            recordTerminalActivity('tool', 'Tool em andamento', {
-                detail: `${detailBase} · ${elapsed}s ativos · ${sinceSignal}s sem progresso`,
-                toolName: renderedName,
-                source: 'sdk',
-                recordHistory: false,
-            });
-            if (getShowToolActivity()) {
-                const line =
-                    `  ${terminalThemeText('muted', '↳')} ${terminalThemeText('tool', compactDetail ? compactTerminalToolText(renderedName, 32) : renderedName)} ${terminalThemeText('muted', `ainda executando · ${elapsed}s · ${toolCallId || 'sem id'}`)}`.trimEnd();
-                if (compactDetail) {
-                    println(line);
-                    writeInlineStatus(line);
-                } else println(line);
+            const inFlight = _reg.getAllInFlight();
+            if (inFlight.length === 0) return;
+            const now = Date.now();
+            const compactDetail = getTerminalDetailLevel() === 'compact';
+            for (const entry of inFlight) {
+                const toolCallId = entry.toolCallId;
+                const elapsedMs = now - entry.t0;
+                if (elapsedMs < TOOL_HEARTBEAT_INTERVAL_MS) continue;
+                if (now - entry.lastHeartbeatAt < TOOL_HEARTBEAT_INTERVAL_MS) continue;
+                _reg.touch(toolCallId, { lastHeartbeatAt: now, lastSignalAt: entry.lastSignalAt });
+                const elapsed = (elapsedMs / 1000).toFixed(0);
+                const sinceSignal = ((now - entry.lastSignalAt) / 1000).toFixed(0);
+                const detailBase = entry.presentation?.detail ?? entry.toolName;
+                const renderedName = entry.canonicalName ?? entry.toolName;
+                recordTerminalActivity('tool', 'Tool em andamento', {
+                    detail: `${detailBase} · ${elapsed}s ativos · ${sinceSignal}s sem progresso`,
+                    toolName: renderedName,
+                    source: 'sdk',
+                    recordHistory: false,
+                });
+                if (getShowToolActivity()) {
+                    const line =
+                        `  ${terminalThemeText('muted', '↳')} ${terminalThemeText('tool', compactDetail ? compactTerminalToolText(renderedName, 32) : renderedName)} ${terminalThemeText('muted', `ainda executando · ${elapsed}s · ${toolCallId || 'sem id'}`)}`.trimEnd();
+                    if (compactDetail) {
+                        println(line);
+                        writeInlineStatus(line);
+                    } else println(line);
+                }
             }
-        }
-        }, TOOL_HEARTBEAT_INTERVAL_MS,
+        },
+        TOOL_HEARTBEAT_INTERVAL_MS,
     );
     if (typeof toolHeartbeatTimer.unref === 'function') {
         toolHeartbeatTimer.unref();
@@ -294,7 +295,9 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, regi
     };
 
     const onBackgroundCompleted = (/** @type {Record<string, unknown>} */ evt) => {
-        const description = /** @type {string} */ (evt?.['description'] ?? evt?.['agentType'] ?? evt?.['agentId'] ?? 'agent');
+        const description = /** @type {string} */ (
+            evt?.['description'] ?? evt?.['agentType'] ?? evt?.['agentId'] ?? 'agent'
+        );
         const status = /** @type {'completed' | 'failed'} */ (evt?.['status'] ?? 'completed');
         const failed = status === 'failed';
         recordTerminalActivity('task', failed ? 'Agente em background falhou' : 'Agente em background concluído', {
@@ -314,7 +317,9 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, regi
     };
 
     const onBackgroundIdle = (/** @type {Record<string, unknown>} */ evt) => {
-        const description = /** @type {string} */ (evt?.['description'] ?? evt?.['agentType'] ?? evt?.['agentId'] ?? 'agent');
+        const description = /** @type {string} */ (
+            evt?.['description'] ?? evt?.['agentType'] ?? evt?.['agentId'] ?? 'agent'
+        );
         recordTerminalActivity('task', 'Agente em background ocioso', {
             detail: description,
             source: 'agent',

@@ -2,8 +2,8 @@
 /**
  * tests/unit/copilot/tools/file/test_parse_file_tool.spec.js
  *
- * Testes unitários para a tool workspace_parse_file em index-tools.js.
- * Cobre: validatePath, readText, parseFileForContext, flags de inclusão.
+ * Testes unitários para a tool workspace_parse_file em index-tools.js. Cobre: validatePath, readText,
+ * parseFileForContext, flags de inclusão.
  */
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -25,7 +25,13 @@ const mocks = vi.hoisted(() => ({
     formatIndexImportRows: vi.fn(() => ''),
     formatIndexSymbolRows: vi.fn(() => ''),
     formatIndexSearchRows: vi.fn(() => ''),
-    paginateSearchItems: vi.fn(() => ({ items: [], totalItems: 0, truncated: false, nextCursor: null, cursorOffset: 0 })),
+    paginateSearchItems: vi.fn(() => ({
+        items: [],
+        totalItems: 0,
+        truncated: false,
+        nextCursor: null,
+        cursorOffset: 0,
+    })),
     normalizeSearchWindow: vi.fn(() => ({ commandMaxCount: null })),
 }));
 
@@ -38,7 +44,7 @@ vi.mock('#copilot/infra/public/io', () => ({
 }));
 
 vi.mock('#copilot/infra/public/indexing', async (importOriginal) => {
-    const actual = await importOriginal();
+    const actual = /** @type {Record<string, unknown>} */ (await importOriginal());
     return {
         ...actual,
         getIoIndexStats: mocks.getIoIndexStats,
@@ -78,7 +84,10 @@ const PARSED_PAYLOAD = {
 
 beforeEach(() => {
     vi.clearAllMocks();
-    mocks.validatePath.mockResolvedValue({ ok: true, resolved: '/workspaces/chatgpt-docker-puppeteer/src/copilot/foo.js' });
+    mocks.validatePath.mockResolvedValue({
+        ok: true,
+        resolved: '/workspaces/chatgpt-docker-puppeteer/src/copilot/foo.js',
+    });
     mocks.readText.mockResolvedValue({ content: 'export function buildTool() {}' });
     mocks.parseFileForContext.mockResolvedValue(PARSED_PAYLOAD);
 });

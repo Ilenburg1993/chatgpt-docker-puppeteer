@@ -122,7 +122,11 @@ describe('persistent-model-cache', () => {
 
             expect(spyWrite).toHaveBeenCalled();
             const call = spyWrite.mock.calls[0];
-            const written = JSON.parse(/** @type {string} */ (call[1]));
+            if (!call) {
+                throw new Error('writeFile deveria ter sido chamado ao persistir models válidos');
+            }
+            const payload = call[1];
+            const written = JSON.parse(/** @type {string} */ (payload));
             expect(written.version).toBe(2);
             expect(written.models).toHaveLength(1);
         });

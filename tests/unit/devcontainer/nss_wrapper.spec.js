@@ -120,6 +120,6 @@ cat "$PASSWD_FILE"`;
             const err = /** @type {any} */ (e);
             out = err.stdout ? err.stdout.toString() : '';
         }
-        assert(out.includes('exceeds kernel limit'));
+        assert(out.includes('exceeds kernel preload limit'));
     });
 });

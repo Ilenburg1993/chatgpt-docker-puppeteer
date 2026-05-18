@@ -62,10 +62,10 @@ O problema não está nessa modelagem. O problema aparece quando a superfície t
 
 O fluxo dominante identificado no repositório é:
 
-`SDK session event vanilla`  
-→ `src/copilot/event-handlers/**`  
-→ `agent event normalizado`  
-→ `src/copilot/terminal/events/**`  
+`SDK session event vanilla`
+→ `src/copilot/event-handlers/**`
+→ `agent event normalizado`
+→ `src/copilot/terminal/events/**`
 → `stdout local + SSE + activity-state + transcript/turn-trace`
 
 Esse desenho é correto e preferível a consumir diretamente o SDK em múltiplas camadas de UI.
@@ -105,31 +105,31 @@ Estava parcial, latente ou subexposto para:
 
 ## 4. Matriz de cobertura do recorte 946–1828
 
-| Família | Estado atual | Veredito | Observação |
-| --- | --- | --- | --- |
-| `assistant.message` | coberto | bom | render final e transcript fora do turno ativo |
-| `assistant.message_delta` | parcial | aceitável, mas exige vigilância | bom no wire; UX depende do render/live loop e do final event |
-| `assistant.reasoning` / `assistant.reasoning_delta` | parcial | aceitável | thinking/history existe, mas ainda é uma UX especializada |
-| `assistant.usage` | parcial | gap de surface | coleta/estado existem; narrativa terminal ainda é fraca |
-| `tool.execution_start` | coberto | bom | narrativa e SSE canônicos |
-| `tool.execution_progress` | antes parcial, agora endurecido | melhorar continuamente | `compact` precisava snapshot durável |
-| `tool.execution_partial_result` | coberto | bom | já tratado com narrativa e SSE |
-| `tool.execution_complete` | coberto | bom | narrativa, turn-trace e SSE |
-| `system.notification` | antes parcial, agora endurecido em parte | ainda incompleto | background/shell agora mais visíveis; restante continua a revisar |
-| `permission.*` | coberto | bom | cadeia relativamente madura |
-| `user_input.*` | coberto | bom | integração com mailbox e protocolo local |
-| `elicitation.*` | coberto | bom | UX local existe |
-| `sampling.*` | ausente no terminal | gap real | precisa decisão de UX/surface |
-| `mcp.oauth.*` | coberto em boa parte | bom com ressalvas | fluxo RPC já iniciado; UX ainda pode melhorar |
-| `external_tool.*` | coberto | bom | fluxo canônico dedicado |
-| `command.*` | parcial | gap de surface | observabilidade existe mais do que UX terminal |
-| `auto_mode_switch.*` | ausente no terminal | gap real | precisa surface explícita |
-| `commands.changed` | ausente no terminal | gap real | falta narrativa/estado terminal |
-| `capabilities.changed` | ausente no terminal | gap real | falta espelhamento de capacidade na superfície local |
-| `exit_plan_mode.requested` | ausente no terminal | gap real | `completed` existe; `requested` ainda não |
-| `session.tools_updated` | parcial | aceitável | há narrativa resumida, mas não surface rica |
-| `session.background_tasks_changed` | parcial | aceitável | visível, porém ainda minimalista |
-| `session.skills_loaded` | parcial | aceitável | visível, porém ainda minimalista |
+| Família                                             | Estado atual                             | Veredito                        | Observação                                                        |
+| --------------------------------------------------- | ---------------------------------------- | ------------------------------- | ----------------------------------------------------------------- |
+| `assistant.message`                                 | coberto                                  | bom                             | render final e transcript fora do turno ativo                     |
+| `assistant.message_delta`                           | parcial                                  | aceitável, mas exige vigilância | bom no wire; UX depende do render/live loop e do final event      |
+| `assistant.reasoning` / `assistant.reasoning_delta` | parcial                                  | aceitável                       | thinking/history existe, mas ainda é uma UX especializada         |
+| `assistant.usage`                                   | parcial                                  | gap de surface                  | coleta/estado existem; narrativa terminal ainda é fraca           |
+| `tool.execution_start`                              | coberto                                  | bom                             | narrativa e SSE canônicos                                         |
+| `tool.execution_progress`                           | antes parcial, agora endurecido          | melhorar continuamente          | `compact` precisava snapshot durável                              |
+| `tool.execution_partial_result`                     | coberto                                  | bom                             | já tratado com narrativa e SSE                                    |
+| `tool.execution_complete`                           | coberto                                  | bom                             | narrativa, turn-trace e SSE                                       |
+| `system.notification`                               | antes parcial, agora endurecido em parte | ainda incompleto                | background/shell agora mais visíveis; restante continua a revisar |
+| `permission.*`                                      | coberto                                  | bom                             | cadeia relativamente madura                                       |
+| `user_input.*`                                      | coberto                                  | bom                             | integração com mailbox e protocolo local                          |
+| `elicitation.*`                                     | coberto                                  | bom                             | UX local existe                                                   |
+| `sampling.*`                                        | ausente no terminal                      | gap real                        | precisa decisão de UX/surface                                     |
+| `mcp.oauth.*`                                       | coberto em boa parte                     | bom com ressalvas               | fluxo RPC já iniciado; UX ainda pode melhorar                     |
+| `external_tool.*`                                   | coberto                                  | bom                             | fluxo canônico dedicado                                           |
+| `command.*`                                         | parcial                                  | gap de surface                  | observabilidade existe mais do que UX terminal                    |
+| `auto_mode_switch.*`                                | ausente no terminal                      | gap real                        | precisa surface explícita                                         |
+| `commands.changed`                                  | ausente no terminal                      | gap real                        | falta narrativa/estado terminal                                   |
+| `capabilities.changed`                              | ausente no terminal                      | gap real                        | falta espelhamento de capacidade na superfície local              |
+| `exit_plan_mode.requested`                          | ausente no terminal                      | gap real                        | `completed` existe; `requested` ainda não                         |
+| `session.tools_updated`                             | parcial                                  | aceitável                       | há narrativa resumida, mas não surface rica                       |
+| `session.background_tasks_changed`                  | parcial                                  | aceitável                       | visível, porém ainda minimalista                                  |
+| `session.skills_loaded`                             | parcial                                  | aceitável                       | visível, porém ainda minimalista                                  |
 
 ---
 
@@ -238,6 +238,17 @@ Nesta rodada adicional, foram iniciados hardenings concretos alinhados a este an
 3. promoção terminal de `agent.background.completed`, `agent.background.idle`, `agent.shell.completed` e `agent.shell.detached_completed`.
 
 Isso não encerra a trilha, mas corrige imediatamente o tipo de UX que o operador relatou como problemática.
+
+### 8.1. Gate de retomada já fechado
+
+Antes de continuar as próximas fases deste anexo, a baseline de validação foi estabilizada nesta mesma rodada:
+
+- runner misto Vitest corrigido para separar specs Copilot e genéricas por configuração;
+- `vitest.copilot.config.js` endurecido para `threads` com concorrência default mais conservadora;
+- warnings de teardown zerados;
+- `lint`, `typecheck` estrito de `src.copilot`, `typecheck` estrito de testes, `test:copilot:unit` e `test:unit` todos verdes.
+
+Isso importa aqui porque a continuação das fases B e C deste anexo só faz sentido sobre uma baseline de validação confiável e repetível.
 
 ---
 

@@ -11,6 +11,95 @@ const { createQuotaMonitorMock } = vi.hoisted(() => ({
     })),
 }));
 
+const sdkMocks = vi.hoisted(() => ({
+    onLifecycleEvents: vi.fn((handlers, client) => {
+        /** @type {(() => void)[]} */
+        const unsubscribers = [];
+        for (const [event, handler] of Object.entries(handlers)) {
+            const maybeUnsub = client.on?.(event, handler);
+            if (typeof maybeUnsub === 'function') {
+                unsubscribers.push(maybeUnsub);
+                continue;
+            }
+            unsubscribers.push(() => client.off?.(event, handler));
+        }
+        return () => {
+            for (const unsub of unsubscribers) unsub();
+        };
+    }),
+    createSession: vi.fn(async (_client, options) => ({ session: { sessionId: 'created-session' }, options })),
+    deleteSession: vi.fn(async () => undefined),
+    getConfiguredSessionFsHandler: vi.fn(() => undefined),
+    listSessions: vi.fn(async (client, filter) => client.listSessions(filter)),
+    resumeOrCreate: vi.fn(async (_client, sessionId, options) => ({
+        session: { sessionId: sessionId ?? 'resumed-session' },
+        isResumed: Boolean(sessionId),
+        options,
+    })),
+    disconnectSessionSafe: vi.fn(async () => undefined),
+    getAuthStatus: vi.fn(async (client) => client.getAuthStatus()),
+    raceEvents: vi.fn(async () => ({ event: 'session.created' })),
+    getSdkRecoveryPolicy: vi.fn((error, scope) => ({
+        kind: error && typeof error === 'object' && 'code' in error ? 'network' : 'unknown',
+        scope: scope ?? 'connection',
+        retryable: true,
+    })),
+    isSdkQuotaOrRateLimitError: vi.fn(() => false),
+    listModels: vi.fn(async () => [{ id: 'gpt-5-mini' }]),
+    modelRegistry: new Map([
+        [
+            'gpt-5-mini',
+            {
+                costTier: 'low',
+                speedTier: 'fast',
+                contextWindow: 128000,
+                supportsReasoning: true,
+                supportsVision: false,
+            },
+        ],
+    ]),
+    modelStatsTracker: {
+        allStats: vi.fn(() => [{ modelId: 'gpt-5-mini', totalCalls: 1, avgLatencyMs: 12, successRate: 1 }]),
+    },
+    isExperimentalEnabled: vi.fn(() => false),
+    createTool: vi.fn((options) => ({
+        name: options?.name ?? 'mock_tool',
+        description: options?.description ?? '',
+        parameters: options?.inputSchema ?? { type: 'object', properties: {} },
+        handler: options?.execute ?? (async () => ({})),
+    })),
+    createRegistry: vi.fn(() => new Map()),
+    getToolsConfig: vi.fn(() => ({ denylist: [], allowlist: null })),
+    loadToolsConfigAsync: vi.fn(async () => undefined),
+    pickDefined: vi.fn((value) =>
+        Object.fromEntries(Object.entries(value ?? {}).filter(([, entry]) => entry !== undefined)),
+    ),
+    listAgents: vi.fn(async (session) => ({ agents: [{ name: `agent:${session.sessionId}` }] })),
+    getCurrentAgent: vi.fn(async (session) => ({ agent: { name: `current:${session.sessionId}` } })),
+    selectAgent: vi.fn(async (_session, name) => ({ agent: { name } })),
+    reloadAgents: vi.fn(async (session) => ({ agents: [{ name: `reloaded:${session.sessionId}` }] })),
+    modelsList: vi.fn(async (client) => client.rpc.models.list()),
+    toolsList: vi.fn(async (client, options) => client.rpc.tools.list(options)),
+    accountGetQuota: vi.fn(async (client) => client.rpc.account.getQuota()),
+    workspaceListFiles: vi.fn(async () => ({ files: ['plan.md'] })),
+    workspaceReadFile: vi.fn(async (_session, path) => ({ path, content: 'hello' })),
+    workspaceCreateFile: vi.fn(async (_session, path, content) => ({ path, content })),
+    compactionCompact: vi.fn(async () => ({ success: true })),
+    shellExec: vi.fn(async (_session, command, options) => ({ command, ...options })),
+    shellKill: vi.fn(async (_session, processId, signal) => ({ processId, signal })),
+    permissionsHandlePending: vi.fn(async (_session, requestId, result) => ({ requestId, result })),
+    permissionsListPending: vi.fn(async () => ({ available: true, source: 'rpc', requests: [] })),
+    permissionsResetSessionApprovals: vi.fn(async () => ({ ok: true })),
+    toolsHandlePendingCall: vi.fn(async (_session, requestId, options) => ({ requestId, ...options })),
+    commandsHandlePending: vi.fn(async (_session, requestId, options) => ({ requestId, ...options })),
+    uiElicitation: vi.fn(async (_session, message, requestedSchema) => ({
+        action: 'accept',
+        params: { message, requestedSchema },
+    })),
+    usageGetMetrics: vi.fn(async () => ({ ok: true, quotaSnapshots: {} })),
+    mcpOauthLogin: vi.fn(async (_session, serverName) => ({ ok: true, serverName })),
+}));
+
 vi.mock('#copilot/sdk', () => ({
     LIFECYCLE_EVENTS: {
         CREATED: 'sessionCreated',
@@ -72,6 +161,102 @@ vi.mock('#copilot/sdk', () => ({
     workspaceCreateFile: vi.fn(async (_session, path, content) => ({ path, content })),
     workspaceListFiles: vi.fn(async () => ({ files: ['plan.md'] })),
     workspaceReadFile: vi.fn(async (_session, path) => ({ path, content: 'hello' })),
+}));
+
+vi.mock('#copilot/sdk/constants', () => ({
+    DEFAULT_MODEL: 'auto',
+    SESSION_LIFECYCLE_EVENTS: {
+        CREATED: 'session.created',
+        UPDATED: 'session.updated',
+        DELETED: 'session.deleted',
+    },
+}));
+
+vi.mock('#copilot/sdk/event-helpers', () => ({
+    raceEvents: sdkMocks.raceEvents,
+}));
+
+vi.mock('#copilot/sdk/session', () => ({
+    LIFECYCLE_EVENTS: {
+        CREATED: 'sessionCreated',
+        UPDATED: 'sessionUpdated',
+        DELETED: 'sessionDeleted',
+    },
+    createCopilotClient: vi.fn(() => ({ sessionId: 'client-created' })),
+    disconnectSessionSafe: sdkMocks.disconnectSessionSafe,
+    onLifecycleEvents: sdkMocks.onLifecycleEvents,
+    getSessionCapabilities: vi.fn((session) => session.capabilities ?? {}),
+    isSessionUiElicitationAvailable: vi.fn((session) => Boolean(session.capabilities?.ui?.elicitation || session.ui)),
+    sessionUiConfirm: vi.fn(async (_session, message) => message === 'Confirma?'),
+    sessionUiElicitation: vi.fn(async (_session, params) => ({ action: 'accept', params })),
+    sessionUiInput: vi.fn(async (_session, message) => `${message}:input`),
+    sessionUiSelect: vi.fn(async (_session, _message, options) => options[0] ?? null),
+    createSession: sdkMocks.createSession,
+    deleteSession: sdkMocks.deleteSession,
+    getConfiguredSessionFsHandler: sdkMocks.getConfiguredSessionFsHandler,
+    listSessions: sdkMocks.listSessions,
+    resumeOrCreate: sdkMocks.resumeOrCreate,
+}));
+
+vi.mock('#copilot/sdk/telemetry', () => ({
+    createQuotaMonitor: createQuotaMonitorMock,
+    getAuthStatus: sdkMocks.getAuthStatus,
+}));
+
+vi.mock('#copilot/sdk/errors', () => ({
+    getSdkRecoveryPolicy: sdkMocks.getSdkRecoveryPolicy,
+    isSdkQuotaOrRateLimitError: sdkMocks.isSdkQuotaOrRateLimitError,
+}));
+
+vi.mock('#copilot/sdk/models', () => ({
+    listModels: sdkMocks.listModels,
+    modelRegistry: sdkMocks.modelRegistry,
+    modelStatsTracker: sdkMocks.modelStatsTracker,
+}));
+
+vi.mock('#copilot/sdk/feature-flags', () => ({
+    isExperimentalEnabled: sdkMocks.isExperimentalEnabled,
+}));
+
+vi.mock('#copilot/sdk/tools', () => ({
+    createTool: sdkMocks.createTool,
+    createRegistry: sdkMocks.createRegistry,
+    getToolsConfig: sdkMocks.getToolsConfig,
+    loadToolsConfigAsync: sdkMocks.loadToolsConfigAsync,
+}));
+
+vi.mock('#copilot/sdk/utils', () => ({
+    pickDefined: sdkMocks.pickDefined,
+}));
+
+vi.mock('#copilot/sdk/agents', () => ({
+    listAgents: sdkMocks.listAgents,
+    getCurrentAgent: sdkMocks.getCurrentAgent,
+    selectAgent: sdkMocks.selectAgent,
+    reloadAgents: sdkMocks.reloadAgents,
+}));
+
+vi.mock('#copilot/sdk/rpc', () => ({
+    modelsList: sdkMocks.modelsList,
+    toolsList: sdkMocks.toolsList,
+    accountGetQuota: sdkMocks.accountGetQuota,
+    workspaceListFiles: sdkMocks.workspaceListFiles,
+    workspaceReadFile: sdkMocks.workspaceReadFile,
+    workspaceCreateFile: sdkMocks.workspaceCreateFile,
+    compactionCompact: sdkMocks.compactionCompact,
+    shellExec: sdkMocks.shellExec,
+    shellKill: sdkMocks.shellKill,
+    permissionsHandlePending: sdkMocks.permissionsHandlePending,
+    permissionsListPending: sdkMocks.permissionsListPending,
+    permissionsResetSessionApprovals: sdkMocks.permissionsResetSessionApprovals,
+    toolsHandlePendingCall: sdkMocks.toolsHandlePendingCall,
+    commandsHandlePending: sdkMocks.commandsHandlePending,
+    uiElicitation: sdkMocks.uiElicitation,
+}));
+
+vi.mock('#copilot/sdk/rpc/experimental', () => ({
+    usageGetMetrics: sdkMocks.usageGetMetrics,
+    mcpOauthLogin: sdkMocks.mcpOauthLogin,
 }));
 
 import {
@@ -145,6 +330,8 @@ describe('sdk-access facade', () => {
             getForegroundSessionId: vi.fn(async () => 'foreground-sdk-session'),
             setForegroundSessionId: vi.fn(async () => {}),
             listSessions: vi.fn(async () => [{ sessionId: 'disk-session-1' }]),
+            on: vi.fn(() => () => {}),
+            off: vi.fn(),
         };
 
         session = {

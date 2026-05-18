@@ -31,8 +31,8 @@ describe('always-alive.js › delegação para módulos extraídos', () => {
 
     // ─── F35: AgentContext ────────────────────────────────────────────────
 
-    it('importa AgentContext de agent-context.js', () => {
-        assert.ok(src.includes("from './agent-context.js'"), 'deve importar de agent-context.js');
+    it('importa AgentContext do barrel canônico de context', () => {
+        assert.ok(src.includes("from './context/index.js'"), 'deve importar do barrel de context');
     });
 
     it('instancia ctx = new AgentContext(this) no constructor', () => {
@@ -94,7 +94,7 @@ describe('always-alive.js › delegação para módulos extraídos', () => {
 
     it('importa o helper de event bridge wiring dedicado', () => {
         assert.ok(!surfaceSrc.includes("from './event-bridge-wiring.js'"));
-        assert.ok(singletonSrc.includes("from './event-bridge-wiring.js'"));
+        assert.ok(singletonSrc.includes("from './event-bridge/index.js'"));
         assert.ok(singletonSrc.includes('ensureAgentEventBusBridge'));
         assert.ok(singletonSrc.includes('resetAgentEventBusBridgeWiring'));
     });
@@ -109,31 +109,26 @@ describe('always-alive.js › delegação para módulos extraídos', () => {
         assert.ok(src.includes('readAgentDialogLastPrInfo'));
     });
 
-    it('delegação de sessionId/shadow passa pela façade de runtime-state', () => {
-        assert.ok(src.includes("from './runtime/root-surface/index.js'"));
-        assert.ok(surfaceSrc.includes("from '../../facades/agent-runtime-state.js'"));
-        assert.ok(src.includes('readAgentRuntimeSessionId'));
-        assert.ok(src.includes('clearAgentRuntimePendingQuestionShadow'));
+    it('delegação de sessionId/shadow agora passa pela StateQueryFacade', () => {
+        assert.ok(src.includes("from './facades/index.js'"));
+        assert.ok(src.includes('StateQueryFacade'));
+        assert.ok(src.includes('this.#stateQueryFacade = new StateQueryFacade(this.ctx)'));
+        assert.ok(src.includes('return this.#stateQueryFacade.sessionId'));
     });
 
-    it('delegação de status/interação usa a façade agent-runtime-controls', () => {
-        assert.ok(src.includes("from './runtime/root-surface/index.js'"));
-        assert.ok(surfaceSrc.includes("from '../../facades/agent-runtime-controls.js'"));
-        assert.ok(src.includes('readRuntimeControlState'));
-        assert.ok(src.includes('readRuntimeInteractionState'));
-        assert.ok(src.includes('getRuntimeHandoffManager'));
-        assert.ok(src.includes('readRuntimePermissionMode'));
-        assert.ok(src.includes('readRuntimePermissionPolicySnapshot'));
-        assert.ok(src.includes('setRuntimePermissionMode'));
-        assert.ok(src.includes('readRuntimePermissionCapability'));
-        assert.ok(src.includes('readRuntimeContextFactoryCapabilities'));
-        assert.ok(src.includes('readRuntimeToolSessionContext'));
-        assert.ok(src.includes('readRuntimeToolRegistry'));
-        assert.ok(src.includes('readRuntimeToolRegistryEntries'));
+    it('delegação de status/interação usa a StateQueryFacade', () => {
+        assert.ok(src.includes('StateQueryFacade'));
+        assert.ok(src.includes('return this.#stateQueryFacade.status'));
+        assert.ok(src.includes('return this.#stateQueryFacade.dialogLoopActive'));
+        assert.ok(src.includes('return this.#stateQueryFacade.queueSize'));
+        assert.ok(src.includes('return this.#stateQueryFacade.pendingQuestion'));
+        assert.ok(src.includes('return this.#stateQueryFacade.pendingQuestionShadow'));
     });
 
-    it('getStatusSnapshot() delega para stateSnapshot(ctx, this)', () => {
-        assert.ok(src.includes('stateSnapshot(this.ctx, this)'));
+    it('getStatusSnapshot() delega para HealthFacade', () => {
+        assert.ok(src.includes('HealthFacade'));
+        assert.ok(src.includes('this.#healthFacade = new HealthFacade(this.ctx, this)'));
+        assert.ok(src.includes('return this.#healthFacade.getStatusSnapshot()'));
     });
 
     // ─── Getters sem acoplamento direto ao ctx ─────────────────────────────
@@ -172,19 +167,18 @@ describe('always-alive.js › delegação para módulos extraídos', () => {
     });
 
     it('status/dialogLoopActive/queueSize/pendingQuestion/shadow não tocam ctx diretamente', () => {
-        assert.ok(src.includes('readRuntimeControlState(this.ctx).status'));
-        assert.ok(src.includes('readRuntimeControlState(this.ctx).dialogLoopActive'));
-        assert.ok(src.includes('readRuntimeControlState(this.ctx).queueSize'));
-        assert.ok(src.includes('readRuntimeInteractionState(this.ctx).pendingQuestion'));
-        assert.ok(src.includes('readRuntimeInteractionState(this.ctx).pendingQuestionKind'));
-        assert.ok(src.includes('readRuntimeInteractionState(this.ctx).pendingQuestionShadow'));
-        assert.ok(src.includes('readRuntimeInteractionState(this.ctx).pendingQuestionShadowKind'));
-        assert.ok(src.includes('readRuntimeInteractionState(this.ctx).pendingQuestionShadowState'));
-        assert.ok(src.includes('readRuntimeInteractionState(this.ctx).pendingQuestionShadowExpired'));
-        assert.ok(src.includes('readRuntimeInteractionState(this.ctx).pendingQuestionShadowAgeMs'));
-        assert.ok(src.includes('readRuntimeInteractionState(this.ctx).pendingQuestionShadowExpiresAt'));
-        assert.ok(src.includes('readRuntimeInteractionState(this.ctx).pendingQuestionShadowRemainingMs'));
-        assert.ok(src.includes('getRuntimeHandoffManager(this.ctx)'));
+        assert.ok(src.includes('return this.#stateQueryFacade.status'));
+        assert.ok(src.includes('return this.#stateQueryFacade.dialogLoopActive'));
+        assert.ok(src.includes('return this.#stateQueryFacade.queueSize'));
+        assert.ok(src.includes('return this.#stateQueryFacade.pendingQuestion'));
+        assert.ok(src.includes('return this.#stateQueryFacade.pendingQuestionKind'));
+        assert.ok(src.includes('return this.#stateQueryFacade.pendingQuestionShadow'));
+        assert.ok(src.includes('return this.#stateQueryFacade.pendingQuestionShadowKind'));
+        assert.ok(src.includes('return this.#stateQueryFacade.pendingQuestionShadowState'));
+        assert.ok(src.includes('return this.#stateQueryFacade.pendingQuestionShadowExpired'));
+        assert.ok(src.includes('return this.#stateQueryFacade.pendingQuestionShadowAgeMs'));
+        assert.ok(src.includes('return this.#stateQueryFacade.pendingQuestionShadowExpiresAt'));
+        assert.ok(src.includes('return this.#stateQueryFacade.pendingQuestionShadowRemainingMs'));
         assert.ok(!src.includes('this.ctx.getRuntimeStatus()'));
         assert.ok(!src.includes('this.ctx.isDialogLoopActive()'));
         assert.ok(!src.includes('this.ctx.getHandoffManagerSnapshot()'));
@@ -210,12 +204,14 @@ describe('always-alive.js › delegação para módulos extraídos', () => {
     });
 
     it('permission/capabilities/tool registry não tocam ctx diretamente', () => {
-        assert.ok(src.includes('readRuntimePermissionMode(this.ctx)'));
-        assert.ok(src.includes('setRuntimePermissionMode(this.ctx, mode, opts)'));
-        assert.ok(src.includes('readRuntimePermissionCapability(this.ctx)'));
-        assert.ok(src.includes('readRuntimeContextFactoryCapabilities(this.ctx)'));
-        assert.ok(src.includes('readRuntimeToolRegistry(this.ctx)'));
-        assert.ok(src.includes('readRuntimeToolRegistryEntries(this.ctx)'));
+        assert.ok(src.includes('PermissionToolsFacade'));
+        assert.ok(src.includes('this.#permissionToolsFacade = new PermissionToolsFacade(this.ctx)'));
+        assert.ok(src.includes('return this.#permissionToolsFacade.getPermissionMode()'));
+        assert.ok(src.includes('this.#permissionToolsFacade.setPermissionMode(mode, opts)'));
+        assert.ok(src.includes('return this.#permissionToolsFacade.getPermissionCapabilitySnapshot()'));
+        assert.ok(src.includes('return this.#permissionToolsFacade.getContextFactoryCapabilitiesSnapshot()'));
+        assert.ok(src.includes('return this.#permissionToolsFacade.getToolRegistrySnapshot()'));
+        assert.ok(src.includes('return this.#permissionToolsFacade.getToolRegistryEntriesSnapshot()'));
         assert.ok(!src.includes('this.ctx.getPermissionModeSnapshot()'));
         assert.ok(!src.includes('this.ctx.setPermissionMode(mode, opts)'));
         assert.ok(!src.includes('this.ctx.getPermissionCapabilitySnapshot()'));

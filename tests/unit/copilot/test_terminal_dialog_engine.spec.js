@@ -160,6 +160,7 @@ describe('terminal/dialog/engine.js — contrato', () => {
             sessionId: null,
             dialogLoopActive: false,
             dialogPaused: false,
+            isResumed: false,
             status: 'stopped',
             queueSize: 0,
         });
@@ -205,6 +206,7 @@ describe('terminal/dialog/engine.js — contrato', () => {
             sessionId: null,
             dialogLoopActive: false,
             dialogPaused: false,
+            isResumed: false,
             status: 'stopped',
             queueSize: 0,
         });

@@ -206,8 +206,8 @@ export function createToolCallRegistry() {
      *     presentation?: import('../events/tool-activity-presenter.js').TerminalToolActivityPresentation | null;
      *     progress?: number | null;
      *     progressMessage?: string | null;
-    *     lastDurableProgressAt?: number;
-    *     lastDurableProgressMessage?: string | null;
+     *     lastDurableProgressAt?: number;
+     *     lastDurableProgressMessage?: string | null;
      *     lastHeartbeatAt?: number;
      *     lastSignalAt?: number;
      * }} patch

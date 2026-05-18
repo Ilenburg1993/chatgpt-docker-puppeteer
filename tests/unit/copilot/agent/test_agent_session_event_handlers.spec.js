@@ -42,7 +42,13 @@ vi.mock('#copilot/observability/logger', () => ({
     LOG_DIR: '/tmp/test-logs',
     getRecentLogs: vi.fn(() => []),
 }));
-vi.mock('#copilot/core/error-handlers', () => ({ logSwallowed: mocks.logSwallowed }));
+vi.mock('#copilot/core/error-handlers', async (importOriginal) => {
+    const actual = /** @type {any} */ (await importOriginal());
+    return {
+        ...actual,
+        logSwallowed: mocks.logSwallowed,
+    };
+});
 // Mock env com Proxy que retorna defaults para qualquer export não explicitamente definido
 vi.mock(
     '#copilot/config/env',

@@ -3,7 +3,7 @@
  * F67 — Teste de Integração: DialogLoopManager boot → send → stop
  *
  * Exercita o fluxo real do DialogLoopManager com módulos reais (protocol, backpressure, model-fallback) e mocks mínimos
- * para I/O externo (env, logger, state-io, watchdog, turn-executor).
+ * para I/O externo (env, logger, persistência, watchdog e executors barrel).
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -130,13 +130,15 @@ vi.mock('../../../src/copilot/agent/dialog/watchdogs/watchdog.js', () => ({
     },
 }));
 
-/* turn-executor — mock que simula host interaction via emitter */
-vi.mock('../../../src/copilot/agent/dialog/executors/turn-executor.js', () => ({
-    executeTurnImpl: vi.fn(),
+/* executors barrel — spy leve que deriva a resposta do snapshot protocolado do host */
+vi.mock('../../../src/copilot/agent/dialog/executors/index.js', () => ({
+    executeTurnImpl: vi.fn(async (_emitter, _message, _opts, ctx) => {
+        const question = ctx?.host?.getPendingQuestionSnapshot?.()?.question;
+        return typeof question === 'string' ? question.replace(/^REPLY:\s*/, '') : undefined;
+    }),
 }));
 
 /* ── SUT (real) ── */
-import { executeTurnImpl } from '../../../src/copilot/agent/dialog/executors/turn-executor.js';
 import { DialogLoopManager } from '../../../src/copilot/agent/dialog/orchestrators/loop-manager.js';
 
 /* ── helpers ── */
@@ -149,13 +151,18 @@ function makeHost() {
     return {
         getSessionId: vi.fn().mockReturnValue('sess-integ'),
         hasPendingQuestion: vi.fn().mockReturnValue(false),
+        getPendingQuestionSnapshot: vi.fn().mockReturnValue(null),
         answerPendingQuestion: vi.fn(),
         send: vi.fn().mockResolvedValue(undefined),
         sendMessage: vi.fn().mockResolvedValue(undefined),
+        sendMessageDialogBoot: vi.fn().mockResolvedValue(undefined),
         getModel: vi.fn().mockReturnValue('gpt-4o'),
         on: vi.fn(),
         once: vi.fn(),
         off: vi.fn(),
+        trackBackgroundTask: vi.fn(async (task) => {
+            await task;
+        }),
     };
 }
 
@@ -217,12 +224,14 @@ describe('F67 — Integration: DialogLoopManager boot → send → stop', () => 
     describe('send → process → resolve', () => {
         it('sendTurn() delega para TurnQueue e resolve com reply', async () => {
             await bootDlm();
-
-            vi.mocked(executeTurnImpl).mockResolvedValue('reply-content');
+            host.getPendingQuestionSnapshot.mockReturnValue({
+                protocolControlled: true,
+                kind: 'reply',
+                question: 'REPLY: reply-content',
+            });
 
             const reply = await dlm.sendTurn('question?');
             expect(reply).toBe('reply-content');
-            expect(executeTurnImpl).toHaveBeenCalled();
         });
 
         it('sendTurn() rejeita quando não active', async () => {
@@ -236,9 +245,13 @@ describe('F67 — Integration: DialogLoopManager boot → send → stop', () => 
             await bootDlm();
 
             let callCount = 0;
-            vi.mocked(executeTurnImpl).mockImplementation(async () => {
+            host.getPendingQuestionSnapshot.mockImplementation(() => {
                 callCount++;
-                return `reply-${callCount}`;
+                return {
+                    protocolControlled: true,
+                    kind: 'reply',
+                    question: `REPLY: reply-${callCount}`,
+                };
             });
 
             const [r1, r2, r3] = await Promise.all([dlm.sendTurn('q1'), dlm.sendTurn('q2'), dlm.sendTurn('q3')]);

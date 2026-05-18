@@ -34,11 +34,16 @@ function rel(abs) {
  * @returns {string[]}
  */
 function moduleSources(src) {
+    /** @type {string[]} */
     const sources = [];
     const importRegex = /^\s*import\s+(?:[\s\S]*?\s+from\s+)?['"]([^'"]+)['"]\s*;?/gm;
     const exportRegex = /^\s*export\s+[\s\S]*?\s+from\s+['"]([^'"]+)['"]\s*;?/gm;
-    for (const match of src.matchAll(importRegex)) sources.push(match[1]);
-    for (const match of src.matchAll(exportRegex)) sources.push(match[1]);
+    for (const match of src.matchAll(importRegex)) {
+        if (typeof match[1] === 'string') sources.push(match[1]);
+    }
+    for (const match of src.matchAll(exportRegex)) {
+        if (typeof match[1] === 'string') sources.push(match[1]);
+    }
     return sources;
 }
 

@@ -16,24 +16,20 @@ describe('nss-gatekeeper entrypoint wrapper', () => {
         assert.equal(out, 'hello');
     });
 
-    it('activates NSS by sourcing profile and setting LD_PRELOAD', () => {
-        // create a fake NSS profile that exports a marker
+    it('activates NSS by seeding runtime artifacts and canonicalizing LD_PRELOAD', () => {
         const fake = mkdtempSync(join(tmpdir(), 'gate-'));
         const prof = join(fake, '10-gatekeeper-nss.sh');
         writeFileSync(prof, 'export LD_PRELOAD="/tmp/fakelib.so"\necho "profile-sourced" >&2');
-        // run wrapper with env pointing to our fake profile dir
         const env = { ...process.env, DEVCONTAINER_NSS_DIR: fake };
-        // rather than plumbing through nested `bash -c` invocations and
-        // risking quoting issues, simply ask the wrapper to dump its
-        // environment and then grep for our helper variable. this is a
-        // much simpler and more reliable way to confirm that the profile was
-        // sourced and the value propagated.
         const out = execSync(`bash "${wrapper}" env`, { env }).toString();
-        assert.ok(out.includes('DEVCONTAINER_LD_PRELOAD_FROM_PROFILE=/tmp/fakelib.so'));
+        assert.ok(out.includes('DEVCONTAINER_NSS_WRAPPER_LIB=/usr/local/lib/devcontainer/libnss_wrapper.so'));
+        assert.ok(out.includes(`NSS_WRAPPER_PASSWD=${join(fake, 'passwd')}`));
+        assert.ok(out.includes(`NSS_WRAPPER_GROUP=${join(fake, 'group')}`));
+        assert.ok(out.includes('LD_PRELOAD=/usr/local/lib/devcontainer/libnss_wrapper.so'));
         rmSync(fake, { recursive: true, force: true });
     });
 
-    it('repairs broken inherited NSS bindings to the stable /etc baseline', () => {
+    it('repairs broken inherited NSS bindings into runtime artifacts instead of trusting stale inherited paths', () => {
         const fake = mkdtempSync(join(tmpdir(), 'gate-'));
         const prof = join(fake, '10-gatekeeper-nss.sh');
         // No-op override: this keeps the test independent from the host profile
@@ -46,8 +42,9 @@ describe('nss-gatekeeper entrypoint wrapper', () => {
             NSS_WRAPPER_GROUP: '/tmp/missing-group',
         };
         const out = execSync(`bash "${wrapper}" env`, { env }).toString();
-        assert.ok(out.includes('NSS_WRAPPER_PASSWD=/etc/passwd'));
-        assert.ok(out.includes('NSS_WRAPPER_GROUP=/etc/group'));
+        assert.ok(out.includes(`NSS_WRAPPER_PASSWD=${join(fake, 'passwd')}`));
+        assert.ok(out.includes(`NSS_WRAPPER_GROUP=${join(fake, 'group')}`));
+        assert.ok(out.includes('LD_PRELOAD=/usr/local/lib/devcontainer/libnss_wrapper.so'));
         rmSync(fake, { recursive: true, force: true });
     });
 });

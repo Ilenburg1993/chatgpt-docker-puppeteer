@@ -56,6 +56,7 @@ describe('agent-runtime-controls facade', () => {
             sessionId: 'sess-1',
             dialogLoopActive: true,
             dialogPaused: false,
+            isResumed: false,
             queueSize: 3,
         });
     });

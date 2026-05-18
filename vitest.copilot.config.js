@@ -58,8 +58,8 @@ export default defineConfig({
         ],
         hookTimeout: 60000,
         testTimeout: 15000,
-        pool: 'forks',
-        maxWorkers: process.env.VITEST_MAX_WORKERS ?? '75%',
+        pool: process.env.VITEST_POOL ?? 'threads',
+        maxWorkers: process.env.VITEST_MAX_WORKERS ?? '50%',
         fileParallelism: true,
         coverage: {
             provider: 'v8',

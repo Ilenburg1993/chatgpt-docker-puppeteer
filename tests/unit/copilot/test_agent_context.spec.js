@@ -261,6 +261,7 @@ describe('AgentContext', () => {
             emittedStatus = s;
         });
 
+        ctx.setStatus('starting', emitter);
         ctx.setStatus('idle', emitter);
 
         assert.equal(ctx.status, 'idle');
@@ -508,6 +509,7 @@ describe('AgentContext', () => {
 
         assert.equal(ctx.startKeepalive(), false);
 
+        ctx.setStatus('starting', emitter);
         ctx.setStatus('idle', emitter);
         ctx.setClient(/** @type {any} */ ({ id: 'client-keepalive' }));
         ctx.setSession(/** @type {any} */ ({ sessionId: 'sess-keepalive' }));

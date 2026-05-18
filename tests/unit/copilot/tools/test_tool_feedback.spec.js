@@ -13,6 +13,8 @@ import {
 } from '../../../../src/copilot/tools/index.js';
 
 describe('tool failure feedback', () => {
+    const invocation = /** @type {any} */ ({ toolCallId: 'tool-test', sessionId: 'sess-test' });
+
     it('classifica parâmetros inválidos com orientação de correção', () => {
         const feedback = enrichToolFailureResult(
             { success: false, error: 'Caminho inválido: path vazio.' },
@@ -47,7 +49,7 @@ describe('tool failure feedback', () => {
     it('preserva sucesso sem adicionar ruído ao resultado', async () => {
         const handler = withToolFailureFeedback('ok_tool', async () => ({ success: true, value: 42 }));
 
-        const result = await handler({});
+        const result = await handler({}, invocation);
 
         expect(result).toEqual({ success: true, value: 42 });
     });
@@ -59,7 +61,7 @@ describe('tool failure feedback', () => {
             throw error;
         });
 
-        const result = await handler({ mode: 'root' });
+        const result = await handler({ mode: 'root' }, invocation);
 
         expect(result).toMatchObject({
             success: false,
@@ -136,10 +138,13 @@ describe('tool failure feedback', () => {
             { parameters: { type: 'object', properties: { token: { type: 'string' } } } },
         );
 
-        const result = await handler({
-            token: 'super-secret',
-            content: 'x'.repeat(400),
-        });
+        const result = await handler(
+            {
+                token: 'super-secret',
+                content: 'x'.repeat(400),
+            },
+            invocation,
+        );
 
         expect(result).toMatchObject({
             success: false,
@@ -167,7 +172,7 @@ describe('tool failure feedback', () => {
             handler: async () => ({ success: false, error: 'Arquivo não encontrado.' }),
         });
 
-        const result = await tool.handler({ path: '/tmp/missing' });
+        const result = await tool.handler({ path: '/tmp/missing' }, invocation);
 
         expect(result).toMatchObject({
             success: false,

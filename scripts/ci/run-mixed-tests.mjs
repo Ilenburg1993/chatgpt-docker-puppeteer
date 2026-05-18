@@ -88,6 +88,8 @@ for (const input of roots) {
 const uniqueFiles = [...new Set(allFiles)].sort();
 const vitestFiles = uniqueFiles.filter((filePath) => isVitestFile(filePath));
 const nodeTestFiles = uniqueFiles.filter((filePath) => !isVitestFile(filePath));
+const copilotVitestFiles = vitestFiles.filter((filePath) => /[/\\]copilot[/\\]/.test(filePath));
+const genericVitestFiles = vitestFiles.filter((filePath) => !/[/\\]copilot[/\\]/.test(filePath));
 
 console.log(
     `[test-runner] Discovered ${uniqueFiles.length} spec files (${nodeTestFiles.length} node:test, ${vitestFiles.length} vitest).`,
@@ -101,11 +103,13 @@ for (const chunk of chunkFiles(nodeTestFiles)) {
     if (status !== 0) exitCode = status;
 }
 
-if (vitestFiles.length > 0) {
-    const hasOnlyCopilotSpecs = vitestFiles.every((filePath) => /[/\\]copilot[/\\]/.test(filePath));
-    const vitestConfigPath = hasOnlyCopilotSpecs ? 'vitest.copilot.config.js' : 'vitest.config.js';
+if (genericVitestFiles.length > 0) {
+    const status = runCommand('npx', ['vitest', 'run', '--config', 'vitest.config.js', ...genericVitestFiles]);
+    if (status !== 0) exitCode = status;
+}
 
-    const status = runCommand('npx', ['vitest', 'run', '--config', vitestConfigPath, ...vitestFiles]);
+if (copilotVitestFiles.length > 0) {
+    const status = runCommand('npx', ['vitest', 'run', '--config', 'vitest.copilot.config.js', ...copilotVitestFiles]);
     if (status !== 0) exitCode = status;
 }
 
