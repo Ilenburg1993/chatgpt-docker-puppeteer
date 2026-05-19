@@ -4,7 +4,7 @@
  * @file Projection compartilhada do lifecycle de processo: boot/shutdown e handlers registrados.
  */
 
-import { getBootLifecycleMetrics, getLastBootLifecycleReport } from '#copilot/boot';
+import { getBootLifecycleMetrics, getLastBootLifecycleReport, readCopilotBootConfig } from '#copilot/boot';
 import {
     getLastShutdownReport,
     getShutdownLifecycleMetrics,
@@ -18,6 +18,7 @@ import {
  *     shuttingDown: boolean;
  *     lastBootReport: ReturnType<typeof getLastBootLifecycleReport>;
  *     bootMetrics: ReturnType<typeof getBootLifecycleMetrics>;
+ *     bootConfig: ReturnType<typeof readCopilotBootConfig>;
  *     shutdownHandlers: ReturnType<typeof listShutdownHandlers>;
  *     lastShutdownReport: ReturnType<typeof getLastShutdownReport>;
  *     shutdownMetrics: ReturnType<typeof getShutdownLifecycleMetrics>;
@@ -54,6 +55,17 @@ import {
  *     registeredShutdownHandlers: number;
  *     activeTimerCount: number;
  *     oldestActiveTimer: { id: string; type: 'timeout' | 'interval'; ageMs: number } | null;
+ *     capabilities: {
+ *         canonicalEntrypoint: string;
+ *         serverUrl: string;
+ *         sdkRoutesEnabled: boolean;
+ *         terminalDeclaredEnabled: boolean;
+ *         configDiscoveryDefault: boolean;
+ *         subAgentStreamingDefault: boolean;
+ *         sessionFsEnabled: boolean;
+ *         bootSurfaceValidated: boolean;
+ *         warnings: string[];
+ *     };
  * }} RuntimeLifecycleSummary
  */
 
@@ -67,10 +79,39 @@ export function readRuntimeLifecycleSnapshot() {
         shuttingDown: isShuttingDown(),
         lastBootReport: getLastBootLifecycleReport(),
         bootMetrics: getBootLifecycleMetrics(),
+        bootConfig: readCopilotBootConfig(),
         shutdownHandlers: listShutdownHandlers(),
         lastShutdownReport: getLastShutdownReport(),
         shutdownMetrics: getShutdownLifecycleMetrics(),
         activeTimers: listActiveTimers(),
+    };
+}
+
+/**
+ * @param {RuntimeLifecycleSnapshot} lifecycle
+ * @returns {RuntimeLifecycleSummary['capabilities']}
+ */
+function buildRuntimeCapabilitySummary(lifecycle) {
+    const boot = lifecycle.lastBootReport;
+    const bootConfig = lifecycle.bootConfig;
+    const bootSurfaceValidationPhase = boot?.phases.find((phase) => phase.id === 'boot-surface-validation') ?? null;
+    /** @type {string[]} */
+    const warnings = [];
+    if (!bootConfig.sdk.enabled) warnings.push('sdk_routes_disabled');
+    if (!bootConfig.terminal.enabled) warnings.push('terminal_flag_disabled');
+    if (!bootConfig.sessionDefaults.enableConfigDiscovery) warnings.push('config_discovery_disabled');
+    if (!bootConfig.sessionDefaults.includeSubAgentStreamingEvents) warnings.push('subagent_streaming_guarded');
+    if (bootSurfaceValidationPhase?.status !== 'ok') warnings.push('boot_surface_validation_incomplete');
+    return {
+        canonicalEntrypoint: bootConfig.entrypoints.canonical,
+        serverUrl: bootConfig.server.url,
+        sdkRoutesEnabled: bootConfig.sdk.enabled,
+        terminalDeclaredEnabled: bootConfig.terminal.enabled,
+        configDiscoveryDefault: bootConfig.sessionDefaults.enableConfigDiscovery,
+        subAgentStreamingDefault: bootConfig.sessionDefaults.includeSubAgentStreamingEvents,
+        sessionFsEnabled: bootConfig.sdk.sessionFs.enabled,
+        bootSurfaceValidated: bootSurfaceValidationPhase?.status === 'ok',
+        warnings,
     };
 }
 
@@ -125,5 +166,6 @@ export function buildRuntimeLifecycleSummary(lifecycle = readRuntimeLifecycleSna
         oldestActiveTimer: oldestActiveTimer
             ? { id: oldestActiveTimer.id, type: oldestActiveTimer.type, ageMs: oldestActiveTimer.ageMs }
             : null,
+        capabilities: buildRuntimeCapabilitySummary(lifecycle),
     };
 }

@@ -34,8 +34,12 @@ import { broadcastSse } from './sse.js';
  * @property {number} lastReasoningProgressAt
  * @property {boolean} streamingStarted
  * @property {number} streamingChars
+ * @property {string} streamingContent
  * @property {string} streamingBuffer
  * @property {boolean} streamingLineOpen
+ * @property {number} streamingVisibleChars
+ * @property {string} lastStreamingChunk
+ * @property {number} lastStreamingChunkAt
  * @property {number} firstChunkTime
  * @property {number} turnStartTime
  * @property {string} model
@@ -46,6 +50,74 @@ import { broadcastSse } from './sse.js';
  * @property {'explicit' | 'adaptive' | 'disabled' | undefined} [timeoutStrategy]
  * @property {boolean} renderLockActive
  */
+
+/**
+ * Remove sequências ANSI e caracteres de controle que não representam conteúdo textual visível para o usuário.
+ *
+ * @param {string} text
+ * @returns {string}
+ */
+export function stripTerminalInvisibleText(text) {
+    let output = '';
+    for (let i = 0; i < text.length; i += 1) {
+        const code = text.charCodeAt(i);
+
+        if (code === 0x1b) {
+            const next = text.charCodeAt(i + 1);
+            if (next === 0x5b) {
+                i += 2;
+                while (i < text.length) {
+                    const seqCode = text.charCodeAt(i);
+                    if (seqCode >= 0x40 && seqCode <= 0x7e) break;
+                    i += 1;
+                }
+            }
+            continue;
+        }
+
+        const isControlChar =
+            (code >= 0x00 && code <= 0x08) ||
+            code === 0x0b ||
+            code === 0x0c ||
+            (code >= 0x0e && code <= 0x1f) ||
+            code === 0x7f;
+        if (isControlChar) continue;
+
+        output += text[i];
+    }
+    return output;
+}
+
+/**
+ * Mede quantos caracteres visíveis existem em um texto renderizado no terminal.
+ *
+ * @param {string} text
+ * @returns {number}
+ */
+export function measureVisibleTerminalChars(text) {
+    return stripTerminalInvisibleText(text).replace(/\s+/g, '').length;
+}
+
+/**
+ * Normaliza texto para comparacao de integridade entre stream live e mensagem final.
+ *
+ * @param {string} text
+ * @returns {string}
+ */
+export function normalizeTerminalTranscriptText(text) {
+    return stripTerminalInvisibleText(text).replace(/\r\n/g, '\n').trim();
+}
+
+/**
+ * @param {TurnDisplayState} state
+ * @param {string} reply
+ * @returns {boolean}
+ */
+export function hasStreamingTranscriptMismatch(state, reply) {
+    const streamed = normalizeTerminalTranscriptText(state.streamingContent);
+    const finalReply = normalizeTerminalTranscriptText(reply);
+    return streamed.length > 0 && finalReply.length > 0 && streamed !== finalReply;
+}
 
 /**
  * Cria estado inicial para display de turno.
@@ -65,8 +137,12 @@ export function createDisplayState({ model, effort, turnStartTime, showStreaming
         lastReasoningProgressAt: 0,
         streamingStarted: false,
         streamingChars: 0,
+        streamingContent: '',
         streamingBuffer: '',
         streamingLineOpen: false,
+        streamingVisibleChars: 0,
+        lastStreamingChunk: '',
+        lastStreamingChunkAt: 0,
         firstChunkTime: 0,
         turnStartTime,
         model,
@@ -212,6 +288,7 @@ function flushStreamingBuffer(state, opts = {}) {
  * @returns {void}
  */
 function writeStreamingText(state, text) {
+    state.streamingVisibleChars += measureVisibleTerminalChars(text);
     const prefix = `  ${terminalThemeText('success', '│')}  `;
     let rest = text;
     while (rest.length > 0) {
@@ -238,10 +315,17 @@ function writeStreamingText(state, text) {
  */
 export function createDeltaCallback(state) {
     return (chunk) => {
+        const now = Date.now();
+        if (chunk && chunk === state.lastStreamingChunk && now - state.lastStreamingChunkAt <= 75) {
+            return;
+        }
+        state.lastStreamingChunk = chunk;
+        state.lastStreamingChunkAt = now;
         if (state.firstChunkTime === 0) {
-            state.firstChunkTime = Date.now();
+            state.firstChunkTime = now;
         }
         state.streamingChars += chunk.length;
+        state.streamingContent += chunk;
         broadcastSse('delta', { chunk });
 
         if (!state.showStreaming) {
@@ -253,7 +337,9 @@ export function createDeltaCallback(state) {
             return;
         }
 
-        if (!state.streamingStarted) {
+        state.streamingBuffer += chunk;
+
+        if (!state.streamingStarted && measureVisibleTerminalChars(state.streamingBuffer) > 0) {
             state.streamingStarted = true;
             state.firstChunkTime = state.firstChunkTime || Date.now();
             ensureRenderLock(state);
@@ -277,8 +363,10 @@ export function createDeltaCallback(state) {
             );
             println('');
         }
-        state.streamingBuffer += chunk;
-        flushStreamingBuffer(state);
+
+        if (state.streamingStarted) {
+            flushStreamingBuffer(state);
+        }
     };
 }
 

@@ -11,6 +11,7 @@ import {
     EMITTER_ASSISTANT_MESSAGE,
     EMITTER_ASSISTANT_STREAMING_DELTA,
     EMITTER_ASSISTANT_TURN_END,
+    EMITTER_DIALOG_DELTA,
     EMITTER_TASK_DELTA,
     EMITTER_TASK_REASONING,
     EMITTER_TOOL_EXECUTION_PROGRESS,
@@ -69,11 +70,13 @@ export function createInactivityTimeout(emitter, opts) {
     /** @type {ReturnType<typeof setTimeout> | null} */
     let handle = null;
     let disposed = false;
-    /** @type {{
-    source: { off?: (event: string, listener: (...args: any[]) => void) => void };
-    event: string;
-    listener: (...args: any[]) => void;
-}[]} */
+    /**
+     * @type {{
+     *     source: { off?: (event: string, listener: (...args: any[]) => void) => void };
+     *     event: string;
+     *     listener: (...args: any[]) => void;
+     * }[]}
+     */
     const listeners = [];
 
     const detachProgressListeners = () => {
@@ -107,6 +110,7 @@ export function createInactivityTimeout(emitter, opts) {
         EMITTER_ASSISTANT_MESSAGE,
         EMITTER_ASSISTANT_STREAMING_DELTA,
         EMITTER_ASSISTANT_TURN_END,
+        EMITTER_DIALOG_DELTA,
         EMITTER_TASK_DELTA,
         EMITTER_TASK_REASONING,
         EMITTER_TOOL_EXECUTION_PROGRESS,
@@ -205,6 +209,7 @@ export function createAssistantReplyFallback(host, helpers) {
 
     host.on(EMITTER_ASSISTANT_MESSAGE, onAssistantMessage);
     host.on(EMITTER_ASSISTANT_TURN_END, onAssistantTurnEnd);
+    host.on(EMITTER_DIALOG_DELTA, onTaskDelta);
     host.on(EMITTER_TASK_DELTA, onTaskDelta);
 
     return {
@@ -230,6 +235,7 @@ export function createAssistantReplyFallback(host, helpers) {
         cleanup: () => {
             host.off?.(EMITTER_ASSISTANT_MESSAGE, onAssistantMessage);
             host.off?.(EMITTER_ASSISTANT_TURN_END, onAssistantTurnEnd);
+            host.off?.(EMITTER_DIALOG_DELTA, onTaskDelta);
             host.off?.(EMITTER_TASK_DELTA, onTaskDelta);
         },
     };

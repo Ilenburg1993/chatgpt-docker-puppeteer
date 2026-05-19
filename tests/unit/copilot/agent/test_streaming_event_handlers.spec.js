@@ -37,7 +37,7 @@ describe('event-handlers/streaming', () => {
             isProcessing: () => false,
             dialogLoopActive: () => false,
         });
-        expect(unsubs).toHaveLength(3);
+        expect(unsubs).toHaveLength(4);
         unsubs.forEach((u) => expect(typeof u).toBe('function'));
     });
 
@@ -90,5 +90,27 @@ describe('event-handlers/streaming', () => {
         session._emit('assistant.message_delta', { deltaContent: 'abc' });
 
         expect(emit).toHaveBeenCalledWith('task.delta', { taskId: null, chunk: 'abc' });
+    });
+
+    it('deduplica o mesmo assistant.message_delta quando a sessão foi wireada duas vezes', async () => {
+        const { wireStreamingEvents } = await import('#copilot/event-handlers/streaming');
+        const session = createMockSession();
+        const emit = vi.fn();
+
+        wireStreamingEvents(/** @type {any} */ (session), {
+            emit,
+            isProcessing: () => false,
+            dialogLoopActive: () => true,
+        });
+        wireStreamingEvents(/** @type {any} */ (session), {
+            emit,
+            isProcessing: () => false,
+            dialogLoopActive: () => true,
+        });
+
+        session._emit('assistant.message_delta', { deltaContent: 'abc' });
+
+        expect(emit).toHaveBeenCalledTimes(1);
+        expect(emit).toHaveBeenCalledWith('dialog.delta', { chunk: 'abc' });
     });
 });

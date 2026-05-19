@@ -802,7 +802,7 @@ describe('W86.7.2 — dialog turn-execution-context seam extraído', () => {
 
         assert.match(src, /from ['"]\.\.\/seams\/index\.js['"]/);
         assert.match(src, /castListenerImpl/);
-        assert.match(src, /createAssistantReplyFallbackImpl/);
+        assert.match(src, /createDialogTurnOutputCollectorImpl/);
         assert.match(src, /createInactivityTimeoutImpl/);
         assert.match(src, /detachAbortListenerImpl/);
         assert.match(src, /traceLabelImpl/);

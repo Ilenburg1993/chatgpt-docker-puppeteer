@@ -18,18 +18,18 @@ ler todos os módulos.
 
 ## Mapa atual de papéis
 
-| Papel          | Arquivos                                                                                                      |
-| -------------- | ------------------------------------------------------------------------------------------------------------- |
-| `entrypoint`   | `index.js`, `module-map.js`                                                                                   |
-| `controller`   | `controllers/agent-dialog-controller.js`                                                                      |
-| `orchestrator` | `orchestrators/loop-manager.js`                                                                               |
-| `executor`     | `executors/turn-executor.js`                                                                                  |
-| `boot`         | `boot/loop-boot-runner.js`, `boot/loop-boot-circuit.js`, `boot/loop-runtime-kit.js`                           |
-| `policy`       | `policies/compaction-policy.js`, `policies/resume-policy.js`, `policies/model-fallback.js`                    |
-| `state`        | `state/state-machine.js`, `state/pending-question-shadow.js`, `state/cost-ledger.js`, `state/backpressure.js` |
-| `wiring`       | `wiring/event-wiring.js`, `wiring/user-input-handler.js`                                                      |
-| `watchdog`     | `watchdogs/watchdog.js`, `watchdogs/watchdog-supervisor.js`                                                   |
-| `seam`         | `seams/turn-execution-context.js`, `seams/turn-input-validation.js`, `seams/turn-result-persistence.js`       |
+| Papel          | Arquivos                                                                                                                                  |
+| -------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| `entrypoint`   | `index.js`, `module-map.js`                                                                                                               |
+| `controller`   | `controllers/agent-dialog-controller.js`                                                                                                  |
+| `orchestrator` | `orchestrators/loop-manager.js`                                                                                                           |
+| `executor`     | `executors/turn-executor.js`                                                                                                              |
+| `boot`         | `boot/loop-boot-runner.js`, `boot/loop-boot-circuit.js`, `boot/loop-runtime-kit.js`                                                       |
+| `policy`       | `policies/compaction-policy.js`, `policies/resume-policy.js`, `policies/model-fallback.js`                                                |
+| `state`        | `state/state-machine.js`, `state/pending-question-shadow.js`, `state/cost-ledger.js`, `state/backpressure.js`                             |
+| `wiring`       | `wiring/event-wiring.js`, `wiring/user-input-handler.js`                                                                                  |
+| `watchdog`     | `watchdogs/watchdog.js`, `watchdogs/watchdog-supervisor.js`                                                                               |
+| `seam`         | `seams/turn-execution-context.js`, `seams/turn-output-collector.js`, `seams/turn-input-validation.js`, `seams/turn-result-persistence.js` |
 
 ## Situação física atual
 

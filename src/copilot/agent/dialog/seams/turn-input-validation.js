@@ -7,8 +7,8 @@
  *   principal.
  */
 
-import { EMITTER_TURN_END } from '#copilot/events';
 import { DialogProtocol } from '#copilot/dialog';
+import { EMITTER_TURN_END } from '#copilot/events';
 
 /**
  * @param {string} message
@@ -65,7 +65,15 @@ export function normalizeAssistantMessageEvent(evt) {
     if (!evt || typeof evt !== 'object') {
         return { content: '', ts: null };
     }
-    const content = Reflect.get(evt, 'content');
+    const nested = Reflect.get(evt, 'data');
+    const nestedRecord = nested && typeof nested === 'object' ? /** @type {Record<string, unknown>} */ (nested) : null;
+    const content =
+        Reflect.get(evt, 'content') ??
+        nestedRecord?.['content'] ??
+        Reflect.get(evt, 'message') ??
+        nestedRecord?.['message'] ??
+        Reflect.get(evt, 'text') ??
+        nestedRecord?.['text'];
     const ts = Reflect.get(evt, 'ts');
     return {
         content: typeof content === 'string' ? content : '',

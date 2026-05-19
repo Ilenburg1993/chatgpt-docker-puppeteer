@@ -20,10 +20,10 @@
 import {
     deleteAgentSdkPlan as deleteAgentSdkPlanOnAgent,
     readAgentSdkPlan as readAgentSdkPlanFromAgent,
-    readSdkSkillsGovernance as readSdkSkillsGovernanceOnAgent,
     readAgentSdkSessionMode,
-    setSdkDisabledSkills as setSdkDisabledSkillsOnAgent,
+    readSdkSkillsGovernance as readSdkSkillsGovernanceOnAgent,
     setAgentSdkSessionMode as setAgentSdkSessionModeOnAgent,
+    setSdkDisabledSkills as setSdkDisabledSkillsOnAgent,
     updateAgentSdkPlan as updateAgentSdkPlanOnAgent,
 } from '#copilot/agent/facades';
 import {

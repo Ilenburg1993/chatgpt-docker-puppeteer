@@ -173,10 +173,11 @@ export function removeCustomAgent(name) {
 /**
  * Definições de custom agents no formato aceito pelo SDK (`SessionConfig.customAgents`).
  *
- * Importante: `customAgents` são definições declarativas de sessão. Em tempo de execução, quando o runtime seleciona
- * ou delega para um desses agentes, ele passa a aparecer na telemetria/eventos como `subagent.*`.
+ * Importante: `customAgents` são definições declarativas de sessão. Em tempo de execução, quando o runtime seleciona ou
+ * delega para um desses agentes, ele passa a aparecer na telemetria/eventos como `subagent.*`.
  *
  * Em outras palavras:
+ *
  * - `custom agent` = configuração anexada à sessão;
  * - `sub-agent` = manifestação runtime de um custom agent selecionado/invocado pelo orchestrator.
  *

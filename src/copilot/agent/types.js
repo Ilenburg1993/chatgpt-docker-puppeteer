@@ -468,10 +468,11 @@
  *
  * - observar se existe um `ask_user` vivo;
  * - responder esse `ask_user` sem abrir novo PR;
- * - expor eventos auxiliares (`assistant.message`, `assistant.turn_end`) usados apenas como fallback semântico quando o
- *   modelo deriva do protocolo `REPLY:`.
+ * - expor eventos auxiliares (`assistant.message`, `assistant.turn_end`, `dialog.delta` / `task.delta`) para que o
+ *   runtime do dialog seja o owner único da resolução semântica do reply do turno explícito.
  *
- * Não é o agent inteiro; é a menor capability suficiente para o caminho quente de `sendDialogTurn()`.
+ * Não é o agent inteiro; é a menor capability suficiente para o caminho quente de `sendDialogTurn()`. `channel/` e
+ * `terminal/` não devem reinterpretar semanticamente esses eventos para decidir o reply final.
  *
  * @typedef {Object} DialogTurnHost
  * @property {() => boolean} hasPendingQuestion
@@ -687,10 +688,14 @@
  * @property {(() => Promise<unknown>) | undefined} listSdkModels - Lista modelos pelo RPC server-scoped do SDK
  * @property {((options?: { projectPaths?: string[]; skillDirectories?: string[] }) => Promise<unknown>) | undefined} listSdkSkills
  *   - Descobre skills pelo RPC server-scoped do SDK
+ *
  * @property {((options?: { projectPaths?: string[]; skillDirectories?: string[] }) => Promise<unknown>) | undefined} readSdkSkillsGovernance
  *   - Retorna projeção de governança de skills, separando descoberta runtime, config de sessão/boot e custom agents
+ *
  * @property {((disabledSkills: string[]) => Promise<unknown>) | undefined} setSdkDisabledSkills
+ *
  *   - Atualiza a lista server-scoped de `disabledSkills` do runtime SDK atual
+ *
  * @property {((options?: { model?: string }) => Promise<unknown>) | undefined} listSdkBuiltInTools - Lista tools
  *   builtin/MCP pelo RPC server-scoped do SDK
  * @property {(() => Promise<unknown>) | undefined} getSdkQuota - Retorna snapshot de quota pelo RPC server-scoped do

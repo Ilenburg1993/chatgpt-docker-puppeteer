@@ -320,6 +320,7 @@ export async function listSdkSkills(ctx, options) {
  * Lê uma projeção canônica de governança de skills do runtime SDK atual.
  *
  * A projeção separa explicitamente:
+ *
  * - skills descobertas pelo SDK/CLI (estado runtime)
  * - configuração de sessão/boot (`skillDirectories`, `disabledSkills`)
  * - custom agents declarados na sessão e suas skills pré-carregadas
@@ -329,7 +330,7 @@ export async function listSdkSkills(ctx, options) {
  * @returns {Promise<{
  *     discovery: Awaited<ReturnType<typeof skillsDiscover>>;
  *     bootSkills: ReturnType<typeof readBootSkillConfig>;
- *     customAgents: Array<{
+ *     customAgents: {
  *         name: string;
  *         displayName?: string | undefined;
  *         description?: string | undefined;
@@ -338,7 +339,7 @@ export async function listSdkSkills(ctx, options) {
  *         preloadSkills: string[];
  *         preloadEnabledSkills: string[];
  *         preloadDisabledSkills: string[];
- *     }>;
+ *     }[];
  *     semantics: {
  *         customAgentDefinition: string;
  *         subagentRuntime: string;
@@ -351,7 +352,9 @@ export async function readSdkSkillsGovernance(ctx, options) {
     const skills = Array.isArray(discovery?.skills) ? discovery.skills : [];
     const discoveredDisabled = new Set(
         skills
-            .map((skill) => (skill && typeof skill === 'object' ? /** @type {Record<string, unknown>} */ (skill) : null))
+            .map((skill) =>
+                skill && typeof skill === 'object' ? /** @type {Record<string, unknown>} */ (skill) : null,
+            )
             .filter((skill) => skill?.['enabled'] === false)
             .map((skill) => String(skill?.['name'] ?? ''))
             .filter(Boolean),

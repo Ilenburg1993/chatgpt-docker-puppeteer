@@ -194,6 +194,7 @@ import {
     getNextTurnRequestHeaders,
 } from '../../../../src/copilot/presentation/state/index.js';
 import { cmdElicitation, cmdPermission, cmdSdk, cmdWorkspace } from '../../../../src/copilot/terminal/commands/sdk.js';
+import * as terminalGateway from '../../../../src/copilot/terminal/frontend/gateways/index.js';
 import {
     clearTerminalElicitation,
     clearTerminalPermissions,
@@ -251,6 +252,44 @@ describe('terminal/commands/sdk', () => {
         expect(ctx.output()).toContain('/fs');
         expect(ctx.output()).toContain('contexto');
         expect(ctx.output()).toContain('/activity 5');
+    });
+
+    it('/sdk doctor confia no registry canônico para fs local, evitando drift com heurísticas de lista', async () => {
+        const registrySpy = vi.spyOn(terminalGateway, 'readTerminalToolRegistrySnapshot').mockReturnValue(
+            /** @type {ReturnType<typeof terminalGateway.readTerminalToolRegistrySnapshot>} */ (
+                /** @type {unknown} */ ({
+                    total: 6,
+                    disabled: [],
+                    hasCanonicalLocalFsTools: true,
+                    hasCanonicalLocalExecTools: true,
+                    hasLegacySdkShellToolsLoaded: false,
+                    toolContract: {
+                        ok: true,
+                        errorCount: 0,
+                        warningCount: 0,
+                        metadataCoverage: {
+                            descriptionPct: 100,
+                            parametersPct: 100,
+                            categoryPct: 100,
+                            tagsPct: 100,
+                            instructionsPct: 100,
+                        },
+                    },
+                })
+            ),
+        );
+        const readSpy = vi.spyOn(terminalGateway, 'listTerminalFileReadTools').mockReturnValue([]);
+        const writeSpy = vi.spyOn(terminalGateway, 'listTerminalFileWriteTools').mockReturnValue([]);
+
+        const ctx = mockCtx();
+        await cmdSdk({ println: ctx.println }, 'doctor');
+
+        expect(ctx.output()).toContain('local.fs.canonico=true');
+        expect(ctx.output()).toContain('local-fs-primary');
+
+        registrySpy.mockRestore();
+        readSpy.mockRestore();
+        writeSpy.mockRestore();
     });
 
     it('/sdk waits mostra painel unificado de interrupções SDK', async () => {
@@ -366,6 +405,7 @@ describe('terminal/commands/sdk', () => {
         expect(ctx.output()).toContain('security-scan');
         expect(ctx.output()).toContain('SessionConfig.customAgents');
         expect(ctx.output()).toContain('subagent.*');
+        expect(ctx.output()).toContain('não reescreve automaticamente');
     });
 
     it('/sdk skills agents projeta preload por custom agent sem confundir com subagent runtime', async () => {

@@ -16,6 +16,7 @@ import { LLM_B_TURN_TIMEOUT_MS } from '#copilot/config';
 import { describe, expect, it, vi } from 'vitest';
 import {
     dialogTurn,
+    dialogTurnDetailed,
     registerDialogListeners,
     startDialogMode,
     stopDialogMode,
@@ -227,12 +228,90 @@ describe('client-dialog › dialogTurn', () => {
         expect(onReasoning).toHaveBeenCalledWith('think', null);
     });
 
+    it('usa fallback de dialog.reply quando sendDialogTurn resolve string vazia', async () => {
+        const agent = createMockAgent();
+
+        agent.sendDialogTurn.mockImplementation(async () => {
+            agent._fire('dialog.reply', { reply: 'fallback via evento' });
+            return '';
+        });
+
+        await expect(dialogTurn(agent, 'hello')).resolves.toBe('fallback via evento');
+        expect(agent.off).toHaveBeenCalledWith('dialog.reply', expect.any(Function));
+    });
+
+    it('encaminha onDelta também para dialog.delta no loop ativo', async () => {
+        const agent = createMockAgent();
+        const onDelta = vi.fn();
+
+        agent.sendDialogTurn.mockImplementation(async () => {
+            agent._fire('dialog.delta', { chunk: 'stream' });
+            return 'done';
+        });
+
+        await dialogTurn(agent, 'hello', { onDelta });
+        expect(onDelta).toHaveBeenCalledWith('stream');
+    });
+
+    it('suprime duplicata imediata quando task.delta e dialog.delta entregam o mesmo chunk', async () => {
+        const agent = createMockAgent();
+        const onDelta = vi.fn();
+
+        agent.sendDialogTurn.mockImplementation(async () => {
+            agent._fire('task.delta', { chunk: 'duplicado' });
+            agent._fire('dialog.delta', { chunk: 'duplicado' });
+            return 'done';
+        });
+
+        await dialogTurn(agent, 'hello', { onDelta });
+        expect(onDelta).toHaveBeenCalledTimes(1);
+        expect(onDelta).toHaveBeenCalledWith('duplicado');
+    });
+
     it('remove listeners mesmo quando sendDialogTurn rejeita', async () => {
         const agent = createMockAgent();
         agent.sendDialogTurn.mockRejectedValue(new Error('fail'));
 
         await expect(dialogTurn(agent, 'hello', { onDelta: vi.fn() })).rejects.toThrow('fail');
         expect(agent.off).toHaveBeenCalledWith('task.delta', expect.any(Function));
+    });
+});
+
+describe('client-dialog › dialogTurnDetailed', () => {
+    it('retorna replySource=runtime_return quando o runtime devolve texto diretamente', async () => {
+        const agent = createMockAgent();
+
+        await expect(dialogTurnDetailed(agent, 'hello')).resolves.toEqual({
+            reply: 'reply text',
+            replySource: 'runtime_return',
+            hadReplyEvent: false,
+        });
+    });
+
+    it('retorna replySource=dialog.reply_fallback quando usa o espelho de transporte', async () => {
+        const agent = createMockAgent();
+
+        agent.sendDialogTurn.mockImplementation(async () => {
+            agent._fire('dialog.reply', { reply: 'fallback via evento' });
+            return '';
+        });
+
+        await expect(dialogTurnDetailed(agent, 'hello')).resolves.toEqual({
+            reply: 'fallback via evento',
+            replySource: 'dialog.reply_fallback',
+            hadReplyEvent: true,
+        });
+    });
+
+    it('retorna replySource=empty quando nenhum conteúdo textual foi materializado', async () => {
+        const agent = createMockAgent();
+        agent.sendDialogTurn.mockResolvedValue('');
+
+        await expect(dialogTurnDetailed(agent, 'hello')).resolves.toEqual({
+            reply: '',
+            replySource: 'empty',
+            hadReplyEvent: false,
+        });
     });
 });
 

@@ -142,24 +142,27 @@ export async function runReplLifecycle(injectServer, { injectPort, onReady }) {
 
     /**
      * @param {string} finalMessage
-     * @returns {void}
+     * @returns {Promise<void>}
      */
-    function queueUserTurn(finalMessage) {
+    async function queueUserTurn(finalMessage) {
         const queuedBefore = getTurnQueueDepth();
-        const turn = sendTurn(finalMessage, 'user');
+        const wasBusy = getBusy();
         if (queuedBefore > 0 || getBusy()) {
             println(formatTerminalQueuedTurnNotice({ queueDepth: queuedBefore + 1 }));
         }
-        void turn
-            .then((reply) => {
-                if (reply === null) {
-                    println('\x1b[33m  [fila] Mensagem não produziu resposta. Veja /errors ou /status.\x1b[0m');
-                }
-            })
-            .catch((e) => {
-                log('ERROR', `[TerminalServer] Turno enfileirado falhou: ${toError(e).message}`);
-            });
-        refreshPrompt();
+        try {
+            const reply = await sendTurn(finalMessage, 'user');
+            if (reply === null) {
+                println('\x1b[33m  [fila] Mensagem não produziu resposta. Veja /errors ou /status.\x1b[0m');
+            }
+        } catch (e) {
+            log('ERROR', `[TerminalServer] Turno foreground falhou: ${toError(e).message}`);
+            throw e;
+        } finally {
+            if (queuedBefore > 0 || wasBusy) {
+                refreshPrompt();
+            }
+        }
     }
 
     /**
@@ -182,7 +185,7 @@ export async function runReplLifecycle(injectServer, { injectPort, onReady }) {
             println(
                 '\x1b[90m  [intervene→turn] Modelo ocioso — mailbox não seria consumido. Encaminhando como turno.\x1b[0m',
             );
-            queueUserTurn(finalMessage);
+            await queueUserTurn(finalMessage);
             return;
         }
 
@@ -223,7 +226,7 @@ export async function runReplLifecycle(injectServer, { injectPort, onReady }) {
             return;
         }
         if (resolved.mode === 'turn') {
-            queueUserTurn(resolved.message);
+            await queueUserTurn(resolved.message);
             return;
         }
         if (resolved.mode === 'steer') {

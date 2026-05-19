@@ -55,6 +55,7 @@ export const EMITTER_SESSION_TOKEN_BUDGET_WARNING = 'session.token_budget_warnin
 // ── Dialog ───────────────────────────────────────────────────
 export const EMITTER_DIALOG_LOOP_CHANGED = 'dialog.loop.changed';
 export const EMITTER_DIALOG_READY = 'dialog.ready';
+export const EMITTER_DIALOG_DELTA = 'dialog.delta';
 export const EMITTER_DIALOG_REPLY = 'dialog.reply';
 export const EMITTER_DIALOG_STALLED = 'dialog.stalled';
 export const EMITTER_DIALOG_STOPPED = 'dialog.stopped';

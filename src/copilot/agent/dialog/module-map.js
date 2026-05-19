@@ -237,6 +237,13 @@ export const DIALOG_MODULE_LAYOUT = Object.freeze([
         summary: 'Seam interna para preparacao de contexto e lifecycle manager do turno.',
     },
     {
+        path: 'seams/turn-output-collector.js',
+        role: 'seam',
+        tier: 'internal',
+        public: false,
+        summary: 'Seam interna e owner canonico da coleta semantica de output do turno explicito.',
+    },
+    {
         path: 'seams/turn-input-validation.js',
         role: 'seam',
         tier: 'internal',

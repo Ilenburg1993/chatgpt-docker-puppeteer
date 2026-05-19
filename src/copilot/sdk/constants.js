@@ -161,6 +161,7 @@ export const SESSION_EVENTS = /** @type {const} */ ({
     // ── Assistant ──
     ASSISTANT_TURN_START: 'assistant.turn_start',
     ASSISTANT_TURN_END: 'assistant.turn_end',
+    ASSISTANT_MESSAGE_START: 'assistant.message_start',
     ASSISTANT_MESSAGE: 'assistant.message',
     ASSISTANT_MESSAGE_DELTA: 'assistant.message_delta',
     ASSISTANT_STREAMING_DELTA: 'assistant.streaming_delta',

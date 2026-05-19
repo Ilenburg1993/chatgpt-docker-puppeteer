@@ -16,8 +16,8 @@
  */
 
 import { buildAuditingPermissionHandler } from '#copilot/audit';
-import { WORKSPACE_ROOT, readBootSkillConfig } from '#copilot/boot';
-import { COPILOT_ENABLE_CONFIG_DISCOVERY, MAESTRO_AGENT_NAME, buildCustomAgentsConfig } from '#copilot/config';
+import { readCopilotBootConfig } from '#copilot/boot';
+import { MAESTRO_AGENT_NAME, buildCustomAgentsConfig } from '#copilot/config';
 import { SESSION_MAX_AGE_MS } from '#copilot/config/agent';
 import { buildCanonicalLocalSurfaceExcludedTools, toError } from '#copilot/core';
 import {
@@ -218,7 +218,8 @@ export async function initOrResumeSession(client, sessionOptions) {
     const state = await readAgentRuntimePersistedStateAsync();
     const model = sessionOptions.model ?? AGENT_SDK_DEFAULT_MODEL;
     const injectContext = sessionOptions.injectHookContext !== false;
-    const bootSkills = readBootSkillConfig();
+    const bootConfig = readCopilotBootConfig();
+    const bootSessionDefaults = bootConfig.sessionDefaults;
     const createSessionFsHandler = getAgentConfiguredSessionFsHandler();
 
     /** @type {import('#copilot/sdk/types').SystemMessageConfig | undefined} */
@@ -238,8 +239,8 @@ export async function initOrResumeSession(client, sessionOptions) {
         Array.isArray(sessionOptions.excludedTools) ? sessionOptions.excludedTools : [],
     );
     const agentContractValidation = validateAgentContracts(customAgents ?? [], availableToolNames, {
-        skillDirectories: bootSkills.skillDirectories,
-        disabledSkills: bootSkills.disabledSkills,
+        skillDirectories: bootSessionDefaults.skillDirectories,
+        disabledSkills: bootSessionDefaults.disabledSkills,
     });
     _lastAgentContractValidation = agentContractValidation;
     const validationSummary = formatValidationResult(agentContractValidation);
@@ -256,19 +257,19 @@ export async function initOrResumeSession(client, sessionOptions) {
     /** @type {Record<string, unknown>} */
     const opts = {
         model,
-        streaming: true,
+        streaming: bootSessionDefaults.streaming,
         // Limiar dinâmico lido da variável de módulo (configurável via setBackgroundCompactionThreshold).
         infiniteSessions: { enabled: true, backgroundCompactionThreshold: _backgroundCompactionThreshold },
         // Diretório de trabalho para o SDK contextualizar ferramentas de busca.
-        workingDirectory: WORKSPACE_ROOT,
+        workingDirectory: bootSessionDefaults.workingDirectory,
         // Diretórios de skills para o SDK carregar.
-        skillDirectories: bootSkills.skillDirectories,
+        skillDirectories: bootSessionDefaults.skillDirectories,
         ...pickDefinedAgentSdkOptions({
             reasoningEffort: sessionOptions.reasoningEffort,
             onUserInputRequest: sessionOptions.onUserInputRequest,
             createSessionFsHandler,
-            enableConfigDiscovery: COPILOT_ENABLE_CONFIG_DISCOVERY,
-            includeSubAgentStreamingEvents: false,
+            enableConfigDiscovery: bootSessionDefaults.enableConfigDiscovery,
+            includeSubAgentStreamingEvents: bootSessionDefaults.includeSubAgentStreamingEvents,
             hooks: sessionOptions.hooks,
             tools: sessionOptions.tools,
             mcpServers: sessionOptions.mcpServers,

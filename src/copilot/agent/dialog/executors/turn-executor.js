@@ -21,7 +21,7 @@ import {
     buildTurnResolutionListenersImpl,
     castListener as castListenerImpl,
     createAbortError as createAbortErrorImpl,
-    createAssistantReplyFallback as createAssistantReplyFallbackImpl,
+    createDialogTurnOutputCollector as createDialogTurnOutputCollectorImpl,
     createInactivityTimeout as createInactivityTimeoutImpl,
     detachAbortListener as detachAbortListenerImpl,
     dispatchTurnToHostImpl,
@@ -164,25 +164,16 @@ function createInactivityTimeout(emitter, opts) {
 }
 
 /**
- * Fallback semântico para o caso em que o modelo responde por `assistant.message` em vez de `ask_user("REPLY: ...")`.
+ * Collector canônico do output semântico do turno explícito.
  *
- * Isso preserva a política 0-PR: o turno continua sendo resolvido sobre o mesmo `ask_user`/turn em andamento, sem
- * reinicializar o loop ou abrir nova sessão. O fallback só fica elegível depois que o input foi de fato despachado ao
- * host.
+ * Este collector é o owner único da resolução semântica do reply do turno explícito no runtime. `channel/` e
+ * `terminal/` não devem reinterpretar `assistant.message`/deltas para decidir o reply final.
  *
  * @param {TurnHost} host
- * @returns {{
- *     markDispatched: () => void;
- *     tryResolve: (
- *         turnStart: number,
- *         resolve: (reply: string) => void,
- *         finalizeReply: (turnStart: number, reply: string) => void,
- *     ) => boolean;
- *     cleanup: () => void;
- * }}
+ * @returns {ReturnType<typeof createDialogTurnOutputCollectorImpl>}
  */
-function createAssistantReplyFallback(host) {
-    return createAssistantReplyFallbackImpl(host, {
+function createDialogTurnOutputCollector(host) {
+    return createDialogTurnOutputCollectorImpl(host, {
         normalizeAssistantMessageEvent,
         normalizeAssistantReplyCandidate,
         readPendingProtocolSnapshot,
@@ -383,7 +374,7 @@ export function executeTurnImpl(emitter, message, { timeout, signal, traceId, al
     }
 
     const { turnStart } = emitTurnStart(emitter, message, sendCountRef, host);
-    const replyFallback = createAssistantReplyFallback(host);
+    const turnOutputCollector = createDialogTurnOutputCollector(host);
 
     /** @param {string} msg @param {number} t @param {string} [r] */
     const waitFn = (msg, t, r) => waitForRestartAndReply(emitter, host, msg, t, r, signal);
@@ -401,13 +392,16 @@ export function executeTurnImpl(emitter, message, { timeout, signal, traceId, al
                 /** @type {{ current: ((arg: unknown) => void) | null }} */
                 const pendingListenerRef = { current: null };
                 let settled = false;
+                /** @type {(() => void) | null} */
+                let removeTurnEndAutoResolve = null;
 
                 /** @param {string} value */
                 const settleResolve = (value) => {
                     if (settled) return;
                     settled = true;
                     detachAbortListener(signal, onAbort);
-                    replyFallback.cleanup();
+                    removeTurnEndAutoResolve?.();
+                    turnOutputCollector.cleanup();
                     resolve(value);
                 };
 
@@ -416,7 +410,8 @@ export function executeTurnImpl(emitter, message, { timeout, signal, traceId, al
                     if (settled) return;
                     settled = true;
                     detachAbortListener(signal, onAbort);
-                    replyFallback.cleanup();
+                    removeTurnEndAutoResolve?.();
+                    turnOutputCollector.cleanup();
                     reject(error instanceof Error ? error : new Error(String(error)));
                 };
 
@@ -431,14 +426,35 @@ export function executeTurnImpl(emitter, message, { timeout, signal, traceId, al
                         reject: settleReject,
                         waitForRestartAndReplyFn: waitFn,
                         ...(traceId ? { traceId } : {}),
-                        tryUseReplyFallback: () =>
-                            replyFallback.tryResolve(turnStart, settleResolve, (replyTurnStart, reply) =>
-                                finalizeTurnReply(replyTurnStart, reply, {
-                                    emit: (event, payload) => emitter.emit(event, payload),
-                                    metrics: container.resolve(METRICS_STORE),
-                                }),
-                            ),
+                        tryUseReplyFallback: tryResolveReplyFallback,
                     });
+
+                const clearOuterLoopListeners = () => {
+                    emitter.off(EMITTER_LOOP_REPLY, onReplyOuter);
+                    emitter.off(EMITTER_LOOP_READY, onReadyOuter);
+                    emitter.off(EMITTER_LOOP_STOPPED, onStopOuter);
+                };
+
+                function tryResolveReplyFallback() {
+                    return turnOutputCollector.tryResolve(
+                        turnStart,
+                        (reply) => {
+                            clearTurnTimeout();
+                            clearOuterLoopListeners();
+                            settleResolve(reply);
+                        },
+                        (replyTurnStart, reply) =>
+                            finalizeTurnReply(replyTurnStart, reply, {
+                                emit: (event, payload) => emitter.emit(event, payload),
+                                metrics: container.resolve(METRICS_STORE),
+                            }),
+                    );
+                }
+
+                removeTurnEndAutoResolve = turnOutputCollector.onTurnEnd(() => {
+                    if (settled) return;
+                    void tryResolveReplyFallback();
+                });
 
                 const onAbort = () => {
                     clearTurnTimeout();
@@ -472,15 +488,9 @@ export function executeTurnImpl(emitter, message, { timeout, signal, traceId, al
                     reject: settleReject,
                     waitForRestartAndReplyFn: waitFn,
                     allowDirectDispatch,
-                    onDispatch: () => replyFallback.markDispatched(),
+                    onDispatch: () => turnOutputCollector.markDispatched(),
                     ...(traceId ? { traceId } : {}),
-                    tryUseReplyFallback: () =>
-                        replyFallback.tryResolve(turnStart, settleResolve, (replyTurnStart, reply) =>
-                            finalizeTurnReply(replyTurnStart, reply, {
-                                emit: (event, payload) => emitter.emit(event, payload),
-                                metrics: container.resolve(METRICS_STORE),
-                            }),
-                        ),
+                    tryUseReplyFallback: tryResolveReplyFallback,
                 });
             }),
     );

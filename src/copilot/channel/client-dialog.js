@@ -11,6 +11,7 @@
 
 import { LLM_B_TURN_TIMEOUT_MS } from '#copilot/config';
 import {
+    EMITTER_DIALOG_DELTA,
     EMITTER_DIALOG_READY,
     EMITTER_DIALOG_REPLY,
     EMITTER_DIALOG_STOPPED,
@@ -18,7 +19,29 @@ import {
     EMITTER_TASK_REASONING,
 } from '#copilot/events';
 import { log } from '#copilot/observability';
-import { sendRuntimeDialogTurnOnActiveLoop, startRuntimeDialogLoop, stopRuntimeDialogLoopAuthorized } from '#copilot/runtime';
+import {
+    sendRuntimeDialogTurnOnActiveLoop,
+    startRuntimeDialogLoop,
+    stopRuntimeDialogLoopAuthorized,
+} from '#copilot/runtime';
+
+const DUPLICATE_DELTA_SUPPRESSION_WINDOW_MS = 75;
+
+/**
+ * Resultado canônico do transporte de um turno explícito no dialog loop.
+ *
+ * `replySource` descreve a origem imediata do texto entregue ao consumer:
+ *
+ * - `runtime_return`: o runtime devolveu o reply diretamente
+ * - `dialog.reply_fallback`: o runtime/bridge precisou usar o espelho de transporte do evento `dialog.reply`
+ * - `empty`: nenhum conteúdo textual foi materializado pelo transporte
+ *
+ * @typedef {{
+ *     reply: string;
+ *     replySource: 'runtime_return' | 'dialog.reply_fallback' | 'empty';
+ *     hadReplyEvent: boolean;
+ * }} DialogTurnTransportResult
+ */
 
 /**
  * Interface mínima do AlwaysAliveAgent usada pelas funções de dialog.
@@ -87,6 +110,128 @@ export async function startDialogMode(agent, bootPrompt, opts = {}) {
 }
 
 /**
+ * Envia um turno de diálogo para a LLM-B no dialog loop retornando metadados canônicos de transporte.
+ *
+ * @param {BridgeAgentLike} agent
+ * @param {string} message
+ * @param {{
+ *     timeout?: number | null;
+ *     onDelta?: (chunk: string) => void;
+ *     onReasoning?: (chunk: string, reasoningId: string | null) => void;
+ * }} [opts]
+ * @returns {Promise<DialogTurnTransportResult>}
+ */
+export async function dialogTurnDetailed(agent, message, opts = {}) {
+    const { timeout = LLM_B_TURN_TIMEOUT_MS, onDelta, onReasoning } = opts;
+    /** @type {string} */
+    let replyFromEvent = '';
+    /** @type {boolean} */
+    let hadReplyEvent = false;
+
+    const onReplyTemp = (/** @type {unknown} */ rawEvt) => {
+        const evt = /** @type {{ reply?: string }} */ (rawEvt);
+        if (typeof evt.reply === 'string' && evt.reply.trim().length > 0) {
+            hadReplyEvent = true;
+            replyFromEvent = evt.reply;
+        }
+    };
+    agent.on(EMITTER_DIALOG_REPLY, onReplyTemp);
+
+    const onDeltaTemp = onDelta
+        ? (() => {
+              /** @type {string} */
+              let lastChunk = '';
+              /** @type {number} */
+              let lastChunkAt = 0;
+              return (/** @type {unknown} */ rawEvt) => {
+                  const evt = /** @type {{ chunk?: string }} */ (rawEvt);
+                  if (!evt.chunk) return;
+                  const now = Date.now();
+                  if (evt.chunk === lastChunk && now - lastChunkAt <= DUPLICATE_DELTA_SUPPRESSION_WINDOW_MS) {
+                      return;
+                  }
+                  lastChunk = evt.chunk;
+                  lastChunkAt = now;
+                  onDelta(evt.chunk);
+              };
+          })()
+        : null;
+    if (onDeltaTemp) {
+        agent.on(EMITTER_TASK_DELTA, onDeltaTemp);
+        agent.on(EMITTER_DIALOG_DELTA, onDeltaTemp);
+    }
+
+    const onReasoningTemp = onReasoning
+        ? (/** @type {unknown} */ rawEvt) => {
+              const evt = /** @type {{ chunk?: string; reasoningId?: string | null }} */ (rawEvt);
+              if (evt.chunk) onReasoning(evt.chunk, evt.reasoningId ?? null);
+          }
+        : null;
+    if (onReasoningTemp) agent.on(EMITTER_TASK_REASONING, onReasoningTemp);
+
+    try {
+        const reply = await sendRuntimeDialogTurnOnActiveLoop(message, { timeout }, agent);
+        if (reply === null && replyFromEvent.trim().length === 0) {
+            throw new Error('[LlmBridgeClient] sendDialogTurn retornou null.');
+        }
+
+        const directReply = typeof reply === 'string' ? reply : '';
+        if (directReply.trim().length > 0) {
+            /** @type {DialogTurnTransportResult} */
+            const result = {
+                reply: directReply,
+                replySource: 'runtime_return',
+                hadReplyEvent,
+            };
+            log(
+                'INFO',
+                `[LlmBridgeClient] dialogTurnDetailed resolved (source=${result.replySource}, replyLen=${result.reply.length}, hadReplyEvent=${result.hadReplyEvent}).`,
+            );
+            return result;
+        }
+
+        if (replyFromEvent.trim().length === 0) {
+            await new Promise((resolve) => setImmediate(resolve));
+        }
+        if (replyFromEvent.trim().length > 0) {
+            log(
+                'WARN',
+                '[LlmBridgeClient] sendDialogTurn retornou vazio; usando fallback de transporte via dialog.reply.',
+            );
+            /** @type {DialogTurnTransportResult} */
+            const result = {
+                reply: replyFromEvent,
+                replySource: 'dialog.reply_fallback',
+                hadReplyEvent: true,
+            };
+            log(
+                'INFO',
+                `[LlmBridgeClient] dialogTurnDetailed resolved (source=${result.replySource}, replyLen=${result.reply.length}, hadReplyEvent=${result.hadReplyEvent}).`,
+            );
+            return result;
+        }
+        /** @type {DialogTurnTransportResult} */
+        const result = {
+            reply: directReply,
+            replySource: 'empty',
+            hadReplyEvent,
+        };
+        log(
+            'WARN',
+            `[LlmBridgeClient] dialogTurnDetailed resolved sem conteúdo textual (source=${result.replySource}, hadReplyEvent=${result.hadReplyEvent}).`,
+        );
+        return result;
+    } finally {
+        agent.off(EMITTER_DIALOG_REPLY, onReplyTemp);
+        if (onDeltaTemp) {
+            agent.off(EMITTER_TASK_DELTA, onDeltaTemp);
+            agent.off(EMITTER_DIALOG_DELTA, onDeltaTemp);
+        }
+        if (onReasoningTemp) agent.off('task.reasoning', onReasoningTemp);
+    }
+}
+
+/**
  * Envia um turno de diálogo para a LLM-B no dialog loop.
  *
  * @param {BridgeAgentLike} agent
@@ -99,34 +244,8 @@ export async function startDialogMode(agent, bootPrompt, opts = {}) {
  * @returns {Promise<string>}
  */
 export async function dialogTurn(agent, message, opts = {}) {
-    const { timeout = LLM_B_TURN_TIMEOUT_MS, onDelta, onReasoning } = opts;
-
-    const onDeltaTemp = onDelta
-        ? (/** @type {unknown} */ rawEvt) => {
-              const evt = /** @type {{ chunk?: string }} */ (rawEvt);
-              if (evt.chunk) onDelta(evt.chunk);
-          }
-        : null;
-    if (onDeltaTemp) agent.on(EMITTER_TASK_DELTA, onDeltaTemp);
-
-    const onReasoningTemp = onReasoning
-        ? (/** @type {unknown} */ rawEvt) => {
-              const evt = /** @type {{ chunk?: string; reasoningId?: string | null }} */ (rawEvt);
-              if (evt.chunk) onReasoning(evt.chunk, evt.reasoningId ?? null);
-          }
-        : null;
-    if (onReasoningTemp) agent.on(EMITTER_TASK_REASONING, onReasoningTemp);
-
-    try {
-        const reply = await sendRuntimeDialogTurnOnActiveLoop(message, { timeout }, agent);
-        if (reply === null) {
-            throw new Error('[LlmBridgeClient] sendDialogTurn retornou null.');
-        }
-        return reply;
-    } finally {
-        if (onDeltaTemp) agent.off('task.delta', onDeltaTemp);
-        if (onReasoningTemp) agent.off('task.reasoning', onReasoningTemp);
-    }
+    const result = await dialogTurnDetailed(agent, message, opts);
+    return result.reply;
 }
 
 /**

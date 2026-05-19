@@ -33,6 +33,7 @@ export {
     readTerminalTranscriptFeed,
     readTerminalTurnCount,
     runTerminalDialogTurn,
+    runTerminalDialogTurnDetailed,
     seedTerminalHistoryFeed,
     startTerminalDialogMode,
     stopTerminalDialogMode,

@@ -29,7 +29,7 @@ import {
     EMITTER_TOOL_EXECUTION_START,
 } from '#copilot/events';
 import { getShowToolActivity, getShowUsage } from '../../presentation/state/index.js';
-import { broadcastSse, buildUserPrompt, println, writeInlineStatus } from '../dialog/index.js';
+import { broadcastSse, buildUserPrompt, isTerminalRenderLocked, println, writeInlineStatus } from '../dialog/index.js';
 import { readTerminalRuntimeState } from '../frontend/gateways/index.js';
 import {
     createTerminalPendingQuestionReplayState,
@@ -53,6 +53,19 @@ const AGENT_SHELL_COMPLETED_EVENT = 'agent.shell.completed';
 const AGENT_SHELL_DETACHED_COMPLETED_EVENT = 'agent.shell.detached_completed';
 const AGENT_PR_CONSUMED_EVENT = 'pr.consumed';
 const AGENT_PR_FALLBACK_MODEL_EVENT = 'pr.fallback_model';
+
+/**
+ * Evita que eventos auxiliares de runtime atravessem blocos de streaming/reasoning. O conteúdo não é perdido: activity
+ * e SSE continuam recebendo os eventos, e a UX live preserva a resposta do assistente como bloco coeso.
+ *
+ * @param {string} line
+ * @returns {void}
+ */
+function printlnWhenRenderUnlocked(line) {
+    if (isTerminalRenderLocked()) return;
+    println(line);
+}
+
 /**
  * @typedef {{
  *     on: (event: string, handler: (...args: any[]) => void) => void;
@@ -341,7 +354,7 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, regi
             severity: 'error',
             source: 'agent',
         });
-        println(`  \x1b[31m🤖 Sub-agente falhou: ${name} — ${error}\x1b[0m`);
+        printlnWhenRenderUnlocked(`  \x1b[31m🤖 Sub-agente falhou: ${name} — ${error}\x1b[0m`);
     };
 
     const onBackgroundCompleted = (/** @type {Record<string, unknown>} */ evt) => {
@@ -355,7 +368,7 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, regi
             severity: failed ? 'error' : 'info',
             source: 'agent',
         });
-        println(
+        printlnWhenRenderUnlocked(
             failed
                 ? `  \x1b[31m🤖 Background agent falhou: ${description}\x1b[0m`
                 : `  \x1b[32m🤖 Background agent concluído: ${description}\x1b[0m`,
@@ -375,7 +388,7 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, regi
             source: 'agent',
             recordHistory: false,
         });
-        println(`  \x1b[90m🤖 Background agent ocioso: ${description}\x1b[0m`);
+        printlnWhenRenderUnlocked(`  \x1b[90m🤖 Background agent ocioso: ${description}\x1b[0m`);
         broadcastSse('agent.background.idle', {
             ...evt,
             timestamp: Date.now(),
@@ -391,7 +404,7 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, regi
             severity: failed ? 'error' : 'info',
             source: 'agent',
         });
-        println(
+        printlnWhenRenderUnlocked(
             failed
                 ? `  \x1b[31m💻 Shell concluído com erro: ${description}${exitCode !== null ? ` · exit=${exitCode}` : ''}\x1b[0m`
                 : `  \x1b[32m💻 Shell concluído: ${description}${exitCode !== null ? ` · exit=${exitCode}` : ''}\x1b[0m`,
@@ -408,7 +421,7 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, regi
             detail: description,
             source: 'agent',
         });
-        println(`  \x1b[32m💻 Shell destacada concluída: ${description}\x1b[0m`);
+        printlnWhenRenderUnlocked(`  \x1b[32m💻 Shell destacada concluída: ${description}\x1b[0m`);
         broadcastSse('agent.shell.detached_completed', {
             ...evt,
             timestamp: Date.now(),
@@ -427,7 +440,7 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, regi
             severity: billing.mismatch ? 'warn' : 'info',
             recordHistory: shouldPersist,
         });
-        if (showUsage || billing.mismatch) {
+        if ((showUsage || billing.mismatch) && !isTerminalRenderLocked()) {
             println(
                 `  ${terminalThemeBadge(billing.mismatch ? 'warn' : 'info', 'USAGE')} ${terminalThemeText(billing.mismatch ? 'warn' : 'muted', detail)}`,
             );

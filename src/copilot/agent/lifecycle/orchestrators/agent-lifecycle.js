@@ -150,6 +150,18 @@ async function wireAgentSessionRuntime(ctx, host, client, session, isResumed, op
 
     ctx.stopQuotaMonitor();
 
+    const previousSessionEventUnsubscribers = ctx.getSessionEventUnsubscribersSnapshot();
+    if (previousSessionEventUnsubscribers.length > 0) {
+        for (const unsub of previousSessionEventUnsubscribers) {
+            try {
+                unsub();
+            } catch (error) {
+                log('WARN', `[AlwaysAlive] Falha ao remover listener SDK antigo: ${toError(error).message}`);
+            }
+        }
+        ctx.clearSessionEventUnsubscribers();
+    }
+
     const eventBus = container.resolve(EVENT_BUS) ?? undefined;
     const bootResult = await performBootWiring(
         client,

@@ -10,8 +10,8 @@ describe('presentation/runtime-lifecycle', () => {
             shuttingDown: false,
             lastBootReport: /** @type {any} */ ({
                 status: 'ok',
-                phaseCount: 3,
-                okCount: 3,
+                phaseCount: 4,
+                okCount: 4,
                 skippedCount: 0,
                 failedCount: 0,
                 timeoutCount: 0,
@@ -20,10 +20,21 @@ describe('presentation/runtime-lifecycle', () => {
                 phases: [
                     { id: 'observability', status: 'ok' },
                     { id: 'runtime-wiring', status: 'ok' },
+                    { id: 'boot-surface-validation', status: 'ok' },
                     { id: 'repl', status: 'ok' },
                 ],
             }),
             bootMetrics: /** @type {any} */ ([{ id: 'repl', attempts: 1, avgDurationMs: 12 }]),
+            bootConfig: /** @type {any} */ ({
+                entrypoints: { canonical: 'src/copilot/terminal/bootstrap.js' },
+                server: { url: 'http://127.0.0.1:3009' },
+                sdk: { enabled: true, sessionFs: { enabled: true } },
+                terminal: { enabled: true },
+                sessionDefaults: {
+                    enableConfigDiscovery: true,
+                    includeSubAgentStreamingEvents: false,
+                },
+            }),
             shutdownHandlers: /** @type {any} */ ([{ name: 'terminal', priority: 10 }]),
             activeTimers: [{ id: 'metrics', type: 'interval', registeredAt: 1, ageMs: 1234 }],
             lastShutdownReport: /** @type {any} */ ({
@@ -45,10 +56,10 @@ describe('presentation/runtime-lifecycle', () => {
             shuttingDown: false,
             boot: {
                 status: 'ok',
-                phases: '3/3',
-                phaseCount: 3,
-                completedCount: 3,
-                okCount: 3,
+                phases: '4/4',
+                phaseCount: 4,
+                completedCount: 4,
+                okCount: 4,
                 skippedCount: 0,
                 failedCount: 0,
                 timeoutCount: 0,
@@ -70,6 +81,17 @@ describe('presentation/runtime-lifecycle', () => {
             registeredShutdownHandlers: 1,
             activeTimerCount: 1,
             oldestActiveTimer: { id: 'metrics', type: 'interval', ageMs: 1234 },
+            capabilities: {
+                canonicalEntrypoint: 'src/copilot/terminal/bootstrap.js',
+                serverUrl: 'http://127.0.0.1:3009',
+                sdkRoutesEnabled: true,
+                terminalDeclaredEnabled: true,
+                configDiscoveryDefault: true,
+                subAgentStreamingDefault: false,
+                sessionFsEnabled: true,
+                bootSurfaceValidated: true,
+                warnings: ['subagent_streaming_guarded'],
+            },
         });
     });
 });

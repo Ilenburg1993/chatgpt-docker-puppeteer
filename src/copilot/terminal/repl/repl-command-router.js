@@ -393,13 +393,20 @@ async function _cmdTurn(message) {
         return;
     }
     const queuedBefore = getTurnQueueDepth();
-    const turn = sendTurn(prompt, 'user');
+    const wasBusy = readTerminalRuntimeControlState().status !== 'idle' || queuedBefore > 0;
     println(
-        `\x1b[36m  [turn] Mensagem enfileirada explicitamente (posição ${Math.max(1, queuedBefore + 1)}). Este caminho pode consumir PR.\x1b[0m`,
+        wasBusy
+            ? `\x1b[36m  [turn] Turno explícito aguardando posição ${Math.max(1, queuedBefore + 1)} na fila canônica. Este caminho pode consumir PR.\x1b[0m`
+            : '\x1b[36m  [turn] Turno explícito iniciado no foreground. Este caminho pode consumir PR.\x1b[0m',
     );
-    void turn.catch((e) => {
-        println(`\x1b[31m  [turn] Falha no turno enfileirado: ${toError(e).message}\x1b[0m`);
-    });
+    try {
+        const reply = await sendTurn(prompt, 'user');
+        if (reply === null) {
+            println('\x1b[33m  [turn] Turno explícito concluído sem resposta textual. Veja /errors ou /status.\x1b[0m');
+        }
+    } catch (e) {
+        println(`\x1b[31m  [turn] Falha no turno explícito: ${toError(e).message}\x1b[0m`);
+    }
 }
 
 /**

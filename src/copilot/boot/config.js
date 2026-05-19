@@ -28,6 +28,8 @@ export const BOOT_CONFIG_ENV_KEYS = Object.freeze([
     'COPILOT_SKILL_DIRECTORIES',
     'COPILOT_PINNED_CONTEXT_DIRS',
     'COPILOT_DISABLED_SKILLS',
+    'COPILOT_ENABLE_CONFIG_DISCOVERY',
+    'COPILOT_INCLUDE_SUBAGENT_STREAMING_EVENTS',
     'COPILOT_CLI_URL',
     'COPILOT_CLI_PATH',
     'COPILOT_CLI_ARGS',
@@ -150,6 +152,14 @@ function envBool(key, fallback) {
  *         sessionIdleTimeoutSeconds: number | null;
  *         baseline: readonly string[];
  *     };
+ *     sessionDefaults: {
+ *         workingDirectory: string;
+ *         skillDirectories: string[];
+ *         disabledSkills: string[];
+ *         enableConfigDiscovery: boolean;
+ *         includeSubAgentStreamingEvents: boolean;
+ *         streaming: boolean;
+ *     };
  *     terminal: {
  *         enabled: boolean;
  *         bootTimeoutMs: number;
@@ -170,6 +180,7 @@ export function readCopilotBootConfig() {
     const contract = readCopilotBootContract();
     const workspace = getWorkspaceContext();
     const sessionFs = readCopilotSessionFsBootConfig();
+    const skills = readBootSkillConfig();
     const host = envStr('LLM_B_TERMINAL_HOST', '127.0.0.1');
     const port = envInt('LLM_B_TERMINAL_PORT', 3009);
     return {
@@ -197,7 +208,7 @@ export function readCopilotBootConfig() {
             url: `http://${host}:${port}`,
         },
         sdk: {
-            enabled: envBool('COPILOT_SDK_ENABLED', false),
+            enabled: envBool('COPILOT_SDK_ENABLED', true),
             cliUrl: envOpt('COPILOT_CLI_URL'),
             cliPath: envOpt('COPILOT_CLI_PATH'),
             cliArgs: envOpt('COPILOT_CLI_ARGS'),
@@ -229,15 +240,23 @@ export function readCopilotBootConfig() {
             sessionIdleTimeoutSeconds: sessionFs.sessionIdleTimeoutSeconds,
             baseline: contract.sdkBaseline,
         },
+        sessionDefaults: {
+            workingDirectory: WORKSPACE_ROOT,
+            skillDirectories: [...skills.skillDirectories],
+            disabledSkills: [...skills.disabledSkills],
+            enableConfigDiscovery: envBool('COPILOT_ENABLE_CONFIG_DISCOVERY', false),
+            includeSubAgentStreamingEvents: envBool('COPILOT_INCLUDE_SUBAGENT_STREAMING_EVENTS', false),
+            streaming: true,
+        },
         terminal: {
-            enabled: envBool('COPILOT_TERMINAL_ENABLED', false),
+            enabled: envBool('COPILOT_TERMINAL_ENABLED', true),
             bootTimeoutMs: envInt('LLM_B_BOOT_TIMEOUT_MS', 90_000),
         },
         pm2: {
             canonicalProcess: contract.canonicalPm2Process,
             terminalEnabled: envBool(contract.terminalPm2EnvFlag, false),
         },
-        skills: readBootSkillConfig(),
+        skills,
         entrypoints: {
             canonical: contract.canonicalEntrypoint,
         },

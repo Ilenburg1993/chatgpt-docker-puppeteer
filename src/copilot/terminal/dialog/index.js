@@ -14,6 +14,7 @@ export {
     buildWaitingPrompt,
     clearInlineStatus,
     endTerminalRenderLock,
+    isTerminalRenderLocked,
     printExchange,
     println,
     printlnBlock,

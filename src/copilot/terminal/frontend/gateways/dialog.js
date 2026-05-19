@@ -63,6 +63,15 @@ export function seedTerminalHistoryFeed(role, content) {
 }
 
 /**
+ * @typedef {{
+ *     reply: string;
+ *     channel: 'dialog' | 'chat';
+ *     replySource: 'runtime_return' | 'dialog.reply_fallback' | 'direct_chat' | 'empty';
+ *     hadReplyEvent?: boolean;
+ * }} TerminalDialogTurnResult
+ */
+
+/**
  * Contagem de turnos do transporte.
  *
  * @returns {number}
@@ -108,6 +117,23 @@ export async function stopTerminalDialogMode() {
  * @returns {Promise<string>}
  */
 export async function runTerminalDialogTurn(enrichedMessage, opts) {
+    const result = await runTerminalDialogTurnDetailed(enrichedMessage, opts);
+    return result.reply;
+}
+
+/**
+ * Envia um turno ao bridge de diálogo retornando metadados canônicos de transporte.
+ *
+ * @param {string} enrichedMessage
+ * @param {{
+ *     timeout: number | null;
+ *     onDelta: (chunk: string) => void;
+ *     onReasoning?: (chunk: string, reasoningId: string | null) => void;
+ *     requestHeaders?: Record<string, string>;
+ * }} opts
+ * @returns {Promise<TerminalDialogTurnResult>}
+ */
+export async function runTerminalDialogTurnDetailed(enrichedMessage, opts) {
     const requestHeaders = opts.requestHeaders || {};
     if (Object.keys(requestHeaders).length > 0) {
         const agentStatus =
@@ -133,7 +159,11 @@ export async function runTerminalDialogTurn(enrichedMessage, opts) {
                 requestHeaders,
             };
             const result = await llmBridgeClient.chat(enrichedMessage, chatOpts);
-            return result.response;
+            return {
+                reply: result.response,
+                channel: 'chat',
+                replySource: result.response.trim().length > 0 ? 'direct_chat' : 'empty',
+            };
         } finally {
             if (hadDialogLoop) {
                 try {
@@ -144,5 +174,11 @@ export async function runTerminalDialogTurn(enrichedMessage, opts) {
             }
         }
     }
-    return llmBridgeClient.dialogTurn(enrichedMessage, opts);
+    const result = await llmBridgeClient.dialogTurnDetailed(enrichedMessage, opts);
+    return {
+        reply: result.reply,
+        channel: 'dialog',
+        replySource: result.replySource,
+        hadReplyEvent: result.hadReplyEvent,
+    };
 }

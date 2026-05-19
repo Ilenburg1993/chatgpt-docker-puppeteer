@@ -27,11 +27,12 @@ import {
     getShowUsage,
     setBusy,
 } from '../../presentation/state/index.js';
+import { renderTerminalAssistantTranscript } from '../events/index.js';
 import {
     readTerminalDialogStreamMeta,
     readTerminalRuntimeControlState,
     readTerminalRuntimeState,
-    runTerminalDialogTurn,
+    runTerminalDialogTurnDetailed,
     startTerminalAgentRuntime,
     startTerminalDialogMode,
 } from '../frontend/gateways/index.js';
@@ -54,6 +55,8 @@ import {
     createDeltaCallback,
     createDisplayState,
     createReasoningCallback,
+    hasStreamingTranscriptMismatch,
+    measureVisibleTerminalChars,
     renderStreamingFooter,
 } from './turn-display.js';
 
@@ -568,17 +571,61 @@ async function _executeTurn(message, actor, attachments = [], requestHeaders = n
             renderDeltaChunk(chunk);
         };
 
-        const reply = await runTerminalDialogTurn(enrichedMessage, {
+        const turnResult = await runTerminalDialogTurnDetailed(enrichedMessage, {
             timeout: timeoutDecision.timeoutMs,
             onDelta,
             onReasoning,
             ...(requestHeaders ? { requestHeaders } : {}),
         });
+        const reply = turnResult.reply;
         const durationMs = Date.now() - t0;
+        const replyVisibleChars = typeof reply === 'string' ? measureVisibleTerminalChars(reply) : 0;
+
+        recordTerminalActivity('turn', 'Reply do turno explícito resolvido', {
+            detail:
+                `canal=${turnResult.channel} · source=${turnResult.replySource} · ` +
+                `chars=${typeof reply === 'string' ? reply.length : 0} · visíveis=${replyVisibleChars}`,
+            source: 'dialog',
+            recordHistory: false,
+        });
+
+        if (turnResult.replySource === 'dialog.reply_fallback') {
+            log('WARN', '[TerminalServer] Turno explícito renderizado usando fallback canônico de dialog.reply.');
+        } else if (turnResult.replySource === 'empty') {
+            log('WARN', '[TerminalServer] Turno explícito concluído sem reply textual materializado no transporte.');
+        }
 
         renderStreamingFooter(displayState, durationMs);
-        if (!displayState.streamingStarted) {
-            printExchange(actor, message, reply, durationMs);
+        const minimumVisibleStreamingChars =
+            replyVisibleChars > 0 ? Math.min(replyVisibleChars, Math.max(4, Math.ceil(replyVisibleChars * 0.15))) : 0;
+        const streamingTranscriptMismatch =
+            typeof reply === 'string' ? hasStreamingTranscriptMismatch(displayState, reply) : false;
+        if (
+            !displayState.streamingStarted ||
+            (replyVisibleChars > 0 && displayState.streamingVisibleChars < minimumVisibleStreamingChars) ||
+            streamingTranscriptMismatch
+        ) {
+            if (streamingTranscriptMismatch) {
+                recordTerminalActivity('system', 'Transcript final limpo renderizado', {
+                    detail: 'stream live divergiu da mensagem final do SDK',
+                    source: 'dialog',
+                    severity: 'warn',
+                    recordHistory: false,
+                });
+            }
+            const rendered =
+                typeof reply === 'string' && reply.trim().length > 0
+                    ? renderTerminalAssistantTranscript({
+                          content: reply,
+                          title: actor === 'llm-a' ? 'Resposta da LLM-B para LLM-A' : 'Resposta da LLM-B',
+                          source: 'dialog/turn',
+                          status: 'completed',
+                          detail: `${(durationMs / 1000).toFixed(1)}s`,
+                      })
+                    : false;
+            if (!rendered) {
+                printExchange(actor, message, reply, durationMs);
+            }
         }
 
         if (displayState.firstChunkTime > 0) {

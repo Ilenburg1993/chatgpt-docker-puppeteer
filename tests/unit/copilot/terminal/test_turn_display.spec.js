@@ -8,8 +8,14 @@ vi.mock('../../../../src/copilot/terminal/dialog/sse.js', () => ({
 
 const writeSpy = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
 
-const { createDeltaCallback, createDisplayState, createReasoningCallback, renderStreamingFooter } =
-    await import('../../../../src/copilot/terminal/dialog/turn-display.js');
+const {
+    createDeltaCallback,
+    createDisplayState,
+    createReasoningCallback,
+    hasStreamingTranscriptMismatch,
+    measureVisibleTerminalChars,
+    renderStreamingFooter,
+} = await import('../../../../src/copilot/terminal/dialog/turn-display.js');
 const { endTerminalRenderLock, isTerminalRenderLocked } =
     await import('../../../../src/copilot/terminal/dialog/output.js');
 
@@ -35,7 +41,34 @@ describe('terminal/dialog/turn-display', () => {
 
         expect(state.streamingStarted).toBe(false);
         expect(state.streamingChars).toBe(3);
+        expect(state.streamingContent).toBe('abc');
         expect(state.firstChunkTime).toBeGreaterThan(0);
+    });
+
+    it('desconsidera ANSI e controles ao medir conteúdo visível', () => {
+        expect(measureVisibleTerminalChars('\x1b[32mPONG\x1b[0m')).toBe(4);
+        expect(measureVisibleTerminalChars('\r\x1b[2K   ')).toBe(0);
+    });
+
+    it('não abre streaming visual apenas com chunks vazios/brancos; deixa fallback textual decidir', () => {
+        const state = createDisplayState({
+            model: 'gpt-5-mini',
+            effort: 'high',
+            turnStartTime: Date.now(),
+            showStreaming: true,
+            showThinking: false,
+        });
+
+        const onDelta = createDeltaCallback(state);
+        onDelta('');
+        onDelta('   \n\n');
+        renderStreamingFooter(state, 20);
+
+        expect(state.streamingStarted).toBe(false);
+        expect(state.streamingChars).toBe(5);
+        expect(state.streamingContent).toBe('   \n\n');
+        expect(state.streamingVisibleChars).toBe(0);
+        expect(isTerminalRenderLocked()).toBe(false);
     });
 
     it('entra em streaming visual quando showStreaming=true', () => {
@@ -53,7 +86,41 @@ describe('terminal/dialog/turn-display', () => {
 
         expect(state.streamingStarted).toBe(true);
         expect(state.streamingChars).toBe(3);
+        expect(state.streamingContent).toBe('abc');
         expect(isTerminalRenderLocked()).toBe(false);
+    });
+
+    it('suprime chunk duplicado imediato no display live', () => {
+        const state = createDisplayState({
+            model: 'gpt-5-mini',
+            effort: 'high',
+            turnStartTime: Date.now(),
+            showStreaming: true,
+            showThinking: false,
+        });
+
+        const onDelta = createDeltaCallback(state);
+        onDelta('PAR');
+        onDelta('PAR');
+        renderStreamingFooter(state, 20);
+
+        expect(state.streamingChars).toBe(3);
+        expect(state.streamingContent).toBe('PAR');
+    });
+
+    it('detecta divergência entre stream acumulado e reply final', () => {
+        const state = createDisplayState({
+            model: 'gpt-5-mini',
+            effort: 'high',
+            turnStartTime: Date.now(),
+            showStreaming: false,
+            showThinking: false,
+        });
+
+        const onDelta = createDeltaCallback(state);
+        onDelta('PAR');
+        expect(hasStreamingTranscriptMismatch(state, 'PARTE')).toBe(true);
+        expect(hasStreamingTranscriptMismatch(state, 'PAR')).toBe(false);
     });
 
     it('mantém thinking de turno silencioso quando showThinking=false', () => {

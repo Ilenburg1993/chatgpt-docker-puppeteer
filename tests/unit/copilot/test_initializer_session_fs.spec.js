@@ -37,6 +37,16 @@ vi.mock('#copilot/boot', async (importOriginal) => ({
     .../** @type {any} */ (await importOriginal()),
     COPILOT_PACKAGE_ROOT: '/workspace',
     WORKSPACE_ROOT: '/workspace',
+    readCopilotBootConfig: vi.fn(() => ({
+        sessionDefaults: {
+            workingDirectory: '/workspace',
+            skillDirectories: ['/skills'],
+            disabledSkills: [],
+            enableConfigDiscovery: true,
+            includeSubAgentStreamingEvents: false,
+            streaming: true,
+        },
+    })),
     readBootSkillConfig: vi.fn(() => ({ skillDirectories: ['/skills'] })),
     resolvePersistentConfigFile: vi.fn((name) => `/tmp/copilot-test/${name}`),
 }));
@@ -45,7 +55,6 @@ vi.mock('#copilot/config', async (importOriginal) => ({
     COPILOT_EVENTS_MAX_BYTES: 1024 * 1024,
     COPILOT_LOG_DIR: '',
     MAESTRO_AGENT_NAME: 'agent-full',
-    COPILOT_ENABLE_CONFIG_DISCOVERY: true,
     buildCustomAgentsConfig: mocks.buildCustomAgentsConfig,
 }));
 vi.mock('#copilot/core', async (importOriginal) => ({

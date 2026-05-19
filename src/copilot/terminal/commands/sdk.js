@@ -27,8 +27,6 @@ import {
     handleTerminalSdkPendingPermission,
     inputTerminalSdkSessionUi,
     isTerminalSdkSessionUiElicitationAvailable,
-    listTerminalFileReadTools,
-    listTerminalFileWriteTools,
     listTerminalPendingStructuredUserInputs,
     listTerminalSdkModels,
     listTerminalSdkPendingPermissions,
@@ -46,8 +44,8 @@ import {
     resetTerminalSdkSessionApprovals,
     resolveTerminalSdkPendingElicitation,
     selectTerminalSdkSessionUi,
-    setTerminalSdkDisabledSkills,
     setTerminalRuntimePermissionMode,
+    setTerminalSdkDisabledSkills,
 } from '../frontend/gateways/index.js';
 import {
     buildActivityAwareGuidance,
@@ -333,15 +331,6 @@ async function promoteLocalFileToWorkspace(ctx, payload) {
 }
 
 /**
- * @param {import('../frontend/gateways/tools.js').TerminalTool[]} tools
- * @param {string} name
- * @returns {boolean}
- */
-function hasTool(tools, name) {
-    return tools.some((tool) => tool.name === name);
-}
-
-/**
  * @param {CommandContext} ctx
  * @param {string | null | undefined} runtimeId
  * @returns {Promise<void>}
@@ -354,12 +343,8 @@ async function renderSdkDoctor({ println }, runtimeId) {
     const sdkWorkspaceAvailable = sdkTools['workspace'] === true;
 
     const localFsToolNames = [...CANONICAL_LOCAL_FS_TOOL_NAMES];
-    const localReadTools = listTerminalFileReadTools();
-    const localWriteTools = listTerminalFileWriteTools();
-    const localFsToolsReady = localFsToolNames.every(
-        (name) => hasTool(localReadTools, name) || hasTool(localWriteTools, name),
-    );
     const registrySnapshot = readTerminalToolRegistrySnapshot();
+    const localFsToolsReady = registrySnapshot.hasCanonicalLocalFsTools === true;
     const contract = registrySnapshot.toolContract;
 
     const promptProjection = await callWithRuntimeTarget(readTerminalSdkSystemPromptProjection, runtimeId);
@@ -425,11 +410,8 @@ async function renderCommandFailureGuidance(println, runtimeId) {
     const caps = objectOrNull(capabilities) ?? {};
     const sdkTools = objectOrNull(caps['tools']) ?? {};
     const sdkWorkspaceAvailable = sdkTools['workspace'] === true;
-    const localReadTools = listTerminalFileReadTools();
-    const localWriteTools = listTerminalFileWriteTools();
-    const localFsToolsReady = [...CANONICAL_LOCAL_FS_TOOL_NAMES].every(
-        (name) => hasTool(localReadTools, name) || hasTool(localWriteTools, name),
-    );
+    const registrySnapshot = readTerminalToolRegistrySnapshot();
+    const localFsToolsReady = registrySnapshot.hasCanonicalLocalFsTools === true;
     const routing = decideSdkFsRouting({
         canonicalFsReady: localFsToolsReady,
         sdkWorkspaceAvailable,
@@ -811,6 +793,15 @@ async function renderSdkModels({ println }, runtimeId) {
  */
 async function renderSdkSkills({ println }, rest, runtimeId) {
     const [action = '', ...tail] = rest;
+    if (action === 'status') {
+        const state = readTerminalRuntimeState(runtimeId);
+        println('\n  \x1b[36mSkills SDK Status\x1b[0m');
+        println(`  runtime  \x1b[90m${state.runtimeId}\x1b[0m`);
+        println(
+            '  \x1b[90mUse /sdk skills para discovery, /sdk skills config para governança e /sdk skills agents para projeção por custom agent.\x1b[0m\n',
+        );
+        return;
+    }
     if (action === 'config') {
         await renderSdkSkillsConfig({ println }, runtimeId);
         return;
@@ -906,13 +897,20 @@ async function renderSdkSkillsConfig({ println }, runtimeId) {
     const disabledSkills = Array.isArray(bootSkills['disabledSkills']) ? bootSkills['disabledSkills'] : [];
 
     println('\n  \x1b[36mSkills SDK Config\x1b[0m');
-    println(`  \x1b[90mskillDirectories=${skillDirectories.length} | disabledSkills(boot)=${disabledSkills.length} | disabledSkills(runtime)=${discoveredDisabled.length}\x1b[0m`);
+    println(
+        `  \x1b[90mskillDirectories=${skillDirectories.length} | disabledSkills(boot)=${disabledSkills.length} | disabledSkills(runtime)=${discoveredDisabled.length}\x1b[0m`,
+    );
     println(`  session dirs      \x1b[90m${skillDirectories.length > 0 ? skillDirectories.join(', ') : '-'}\x1b[0m`);
     println(`  boot disabled     \x1b[90m${disabledSkills.length > 0 ? disabledSkills.join(', ') : '-'}\x1b[0m`);
-    println(`  runtime disabled  \x1b[90m${discoveredDisabled.length > 0 ? discoveredDisabled.join(', ') : '-'}\x1b[0m`);
-    println(`  semantic          \x1b[90m${String(semantics['customAgentDefinition'] ?? '-') }\x1b[0m`);
-    println(`  runtime           \x1b[90m${String(semantics['subagentRuntime'] ?? '-') }\x1b[0m`);
-    println(`  mutation          \x1b[90m${String(semantics['disabledSkillsMutationScope'] ?? '-') }\x1b[0m`);
+    println(
+        `  runtime disabled  \x1b[90m${discoveredDisabled.length > 0 ? discoveredDisabled.join(', ') : '-'}\x1b[0m`,
+    );
+    println(`  semantic          \x1b[90m${String(semantics['customAgentDefinition'] ?? '-')}\x1b[0m`);
+    println(`  runtime           \x1b[90m${String(semantics['subagentRuntime'] ?? '-')}\x1b[0m`);
+    println(`  mutation          \x1b[90m${String(semantics['disabledSkillsMutationScope'] ?? '-')}\x1b[0m`);
+    println(
+        '  \x1b[90mObservação: disable/enable ajusta disabledSkills no runtime/CLI atual; persiste no escopo server, não reescreve automaticamente o env do processo.\x1b[0m',
+    );
     println(
         '  \x1b[90mUso: /sdk skills agents | /sdk skills disable <skill...> | /sdk skills enable <skill...> | /sdk skills [--project <path>] [--dir <path>]\x1b[0m\n',
     );
@@ -955,14 +953,17 @@ async function renderSdkSkillsAgents({ println }, runtimeId) {
         const infer = entry['infer'] !== false;
         const tools = Array.isArray(entry['tools']) ? entry['tools'].map(String) : null;
 
-        println(`  \x1b[33m${name}\x1b[0m  \x1b[90m(${displayName}) | infer=${String(infer)} | tools=${tools ? tools.join(', ') || '[]' : 'all'}\x1b[0m`);
+        println(
+            `  \x1b[33m${name}\x1b[0m  \x1b[90m(${displayName}) | infer=${String(infer)} | tools=${tools ? tools.join(', ') || '[]' : 'all'}\x1b[0m`,
+        );
         if (preloadSkills.length === 0) {
             println('    \x1b[90mpreload skills: -\x1b[0m');
             continue;
         }
         println(`    \x1b[90mpreload=${preloadSkills.join(', ')}\x1b[0m`);
         if (preloadEnabledSkills.length > 0) println(`    \x1b[32menabled=${preloadEnabledSkills.join(', ')}\x1b[0m`);
-        if (preloadDisabledSkills.length > 0) println(`    \x1b[31mdisabled=${preloadDisabledSkills.join(', ')}\x1b[0m`);
+        if (preloadDisabledSkills.length > 0)
+            println(`    \x1b[31mdisabled=${preloadDisabledSkills.join(', ')}\x1b[0m`);
     }
 
     if (customAgents.length === 0) {

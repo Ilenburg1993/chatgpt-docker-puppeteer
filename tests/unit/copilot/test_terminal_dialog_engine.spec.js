@@ -109,6 +109,11 @@ vi.mock('../../../src/copilot/terminal/frontend/gateways/agent-runtime.js', () =
 }));
 vi.mock('../../../src/copilot/terminal/frontend/gateways/dialog.js', () => ({
     runTerminalDialogTurn: vi.fn(async () => 'ok'),
+    runTerminalDialogTurnDetailed: vi.fn(async () => ({
+        reply: 'ok',
+        channel: 'dialog',
+        replySource: 'runtime_return',
+    })),
     startTerminalDialogMode: vi.fn(async () => undefined),
 }));
 vi.mock('../../../src/copilot/terminal/dialog/engine-persistence.js', () => ({
@@ -121,6 +126,7 @@ vi.mock('../../../src/copilot/terminal/dialog/turn-display.js', () => ({
     createDeltaCallback: vi.fn(() => () => {}),
     createDisplayState: vi.fn(() => ({})),
     createReasoningCallback: vi.fn(() => () => {}),
+    hasStreamingTranscriptMismatch: vi.fn(() => false),
     renderStreamingFooter: vi.fn(),
 }));
 
@@ -178,11 +184,11 @@ describe('terminal/dialog/engine.js — contrato', () => {
                 displayName: 'memo.txt',
             }),
         );
-        expect(vi.mocked(dialogGateway.runTerminalDialogTurn)).toHaveBeenCalledWith(
+        expect(vi.mocked(dialogGateway.runTerminalDialogTurnDetailed)).toHaveBeenCalledWith(
             expect.stringContaining('Blob `memo.txt` (text/plain)'),
             expect.any(Object),
         );
-        expect(vi.mocked(dialogGateway.runTerminalDialogTurn)).toHaveBeenCalledWith(
+        expect(vi.mocked(dialogGateway.runTerminalDialogTurnDetailed)).toHaveBeenCalledWith(
             expect.stringContaining('Explique este artefato.'),
             expect.any(Object),
         );
@@ -197,7 +203,7 @@ describe('terminal/dialog/engine.js — contrato', () => {
         await mod.sendTurn('Mensagem com byok', 'user');
 
         expect(vi.mocked(state.clearNextTurnRequestHeaders)).toHaveBeenCalled();
-        expect(vi.mocked(dialogGateway.runTerminalDialogTurn)).toHaveBeenCalledWith(
+        expect(vi.mocked(dialogGateway.runTerminalDialogTurnDetailed)).toHaveBeenCalledWith(
             'Mensagem com byok',
             expect.objectContaining({
                 requestHeaders: { Authorization: 'Bearer test', 'X-Mode': 'byok' },

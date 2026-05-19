@@ -19,8 +19,8 @@ import {
     listSdkSkills,
     pingSdk,
     readSdkSkillsGovernance,
-    setSdkDisabledSkills,
     setForegroundSdkSessionId,
+    setSdkDisabledSkills,
     setSdkSessionMode,
 } from '../runtime/root-surface/index.js';
 

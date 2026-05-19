@@ -143,14 +143,14 @@ describe('W109 — module layout governance: agent/dialog', () => {
 
     it('mantem seams internos fora da superficie publica', () => {
         const seams = listDialogModulesByRole('seam');
-        assert.equal(seams.length, 4);
+        assert.equal(seams.length, 5);
         assert.deepEqual(
             seams.map((entry) => entry.public),
-            [false, false, false, false],
+            [false, false, false, false, false],
         );
         assert.deepEqual(
             seams.map((entry) => entry.tier),
-            ['secondary', 'internal', 'internal', 'internal'],
+            ['secondary', 'internal', 'internal', 'internal', 'internal'],
         );
     });
 
@@ -308,7 +308,12 @@ describe('W113 — module layout governance: agent/lifecycle', () => {
         const state = listLifecycleModulesByRole('state')
             .map((entry) => entry.path)
             .sort();
-        assert.deepEqual(state, ['state/file/index.js', 'state/index.js', 'state/state-file-io.js', 'state/state-io.js']);
+        assert.deepEqual(state, [
+            'state/file/index.js',
+            'state/index.js',
+            'state/state-file-io.js',
+            'state/state-io.js',
+        ]);
     });
 
     it('nao preserva shims na raiz de lifecycle apos migracao para subpastas semanticas', () => {

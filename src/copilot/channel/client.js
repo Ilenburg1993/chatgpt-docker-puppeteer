@@ -21,7 +21,7 @@ import { log } from '#copilot/observability';
 import { getAgentRuntimeControlStateForTarget } from '#copilot/runtime';
 import { logSwallowed, toError } from '../core/error-handlers.js';
 import {
-    dialogTurn as _dialogTurn,
+    dialogTurnDetailed as _dialogTurnDetailed,
     startDialogMode as _startDialogMode,
     stopDialogMode as _stopDialogMode,
 } from './client-dialog.js';
@@ -501,14 +501,30 @@ export class LlmBridgeClient {
      * @returns {Promise<string>}
      */
     async dialogTurn(message, opts = {}) {
+        const result = await this.dialogTurnDetailed(message, opts);
+        return result.reply;
+    }
+
+    /**
+     * Envia um turno de diálogo retornando metadados canônicos de transporte.
+     *
+     * @param {string} message
+     * @param {{
+     *     timeout?: number | null;
+     *     onDelta?: (chunk: string) => void;
+     *     onReasoning?: (chunk: string, reasoningId: string | null) => void;
+     * }} [opts]
+     * @returns {Promise<import('./client-dialog.js').DialogTurnTransportResult>}
+     */
+    async dialogTurnDetailed(message, opts = {}) {
         const sentAt = Date.now();
         this.#turnCount++;
 
-        const reply = await _dialogTurn(requireAgent(), message, opts);
+        const result = await _dialogTurnDetailed(requireAgent(), message, opts);
 
         this.#pushHistory({ role: 'user', content: message, timestamp: sentAt });
-        this.#pushHistory({ role: 'assistant', content: reply, timestamp: Date.now() });
-        return reply;
+        this.#pushHistory({ role: 'assistant', content: result.reply, timestamp: Date.now() });
+        return result;
     }
 
     /**

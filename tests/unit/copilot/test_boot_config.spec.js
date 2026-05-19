@@ -29,6 +29,8 @@ describe('copilot/boot — contrato central de boot', () => {
                 'COPILOT_SKILL_DIRECTORIES',
                 'COPILOT_PINNED_CONTEXT_DIRS',
                 'COPILOT_DISABLED_SKILLS',
+                'COPILOT_ENABLE_CONFIG_DISCOVERY',
+                'COPILOT_INCLUDE_SUBAGENT_STREAMING_EVENTS',
                 'LLM_B_TERMINAL_HOST',
                 'LLM_B_TERMINAL_PORT',
                 'COPILOT_CLI_URL',
@@ -48,6 +50,16 @@ describe('copilot/boot — contrato central de boot', () => {
         expect(config.paths.toolsConfigFile).toContain('tools-config.json');
         expect(config.paths.customToolsFile).toContain('custom-tools.json');
         expect(config.pm2.canonicalProcess).toBe('llm-b-terminal');
+        expect(config.sdk.enabled).toBe(true);
+        expect(config.terminal.enabled).toBe(true);
+        expect(config.sessionDefaults).toEqual(
+            expect.objectContaining({
+                workingDirectory: mod.WORKSPACE_ROOT,
+                enableConfigDiscovery: false,
+                includeSubAgentStreamingEvents: false,
+                streaming: true,
+            }),
+        );
         expect(plan.workspaceRoot).toBe(config.workspace.root);
         expect(plan.phases.map((phase) => phase.id)).toContain('terminal-pinned-context');
         expect(plan.phases.map((phase) => phase.id)).toContain('sdk-preflight');

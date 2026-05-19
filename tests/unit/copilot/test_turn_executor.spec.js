@@ -664,6 +664,73 @@ describe('turn-executor', () => {
             await expect(p).resolves.toBe('resposta por fallback');
         });
 
+        it('aceita assistant.message em formato nested data.content no fallback semântico', async () => {
+            const host = Object.assign(new EventEmitter(), {
+                hasPendingQuestion: vi.fn().mockReturnValue(true),
+                answerPendingQuestion: vi.fn(),
+                getSessionId: vi.fn().mockReturnValue('sess-1'),
+                getModel: vi.fn().mockReturnValue('gpt-5-mini'),
+            });
+
+            const p = /** @type {any} */ (executeTurnImpl)(
+                emitter,
+                'question?',
+                { timeout: 5000 },
+                { host, sendCountRef: { sendCount: 0 } },
+            );
+
+            host.emit('assistant.message', { data: { content: 'REPLY: nested fallback' } });
+            await vi.advanceTimersByTimeAsync(5100);
+            await tick();
+
+            await expect(p).resolves.toBe('nested fallback');
+        });
+
+        it('usa dialog.delta como fallback semântico quando o loop ativo só expõe streaming', async () => {
+            const host = Object.assign(new EventEmitter(), {
+                hasPendingQuestion: vi.fn().mockReturnValue(true),
+                answerPendingQuestion: vi.fn(),
+                getSessionId: vi.fn().mockReturnValue('sess-1'),
+                getModel: vi.fn().mockReturnValue('gpt-5-mini'),
+            });
+
+            const p = /** @type {any} */ (executeTurnImpl)(
+                emitter,
+                'question?',
+                { timeout: 5000 },
+                { host, sendCountRef: { sendCount: 0 } },
+            );
+
+            host.emit('dialog.delta', { chunk: 'resposta ' });
+            host.emit('dialog.delta', { chunk: 'por delta' });
+            await vi.advanceTimersByTimeAsync(5100);
+            await tick();
+
+            await expect(p).resolves.toBe('resposta por delta');
+        });
+
+        it('resolve fallback no assistant.turn_end mesmo quando timeout local está desabilitado', async () => {
+            const host = Object.assign(new EventEmitter(), {
+                hasPendingQuestion: vi.fn().mockReturnValue(true),
+                answerPendingQuestion: vi.fn(),
+                getSessionId: vi.fn().mockReturnValue('sess-1'),
+                getModel: vi.fn().mockReturnValue('gpt-5-mini'),
+            });
+
+            const p = /** @type {any} */ (executeTurnImpl)(
+                emitter,
+                'question?',
+                { timeout: null },
+                { host, sendCountRef: { sendCount: 0 } },
+            );
+
+            host.emit('dialog.delta', { chunk: 'fallback sem timeout' });
+            host.emit('assistant.turn_end', { turnId: 'turn-1' });
+            await tick();
+
+            await expect(p).resolves.toBe('fallback sem timeout');
+        });
+
         it('remove listeners externos após timeout para evitar reply tardio contabilizado', async () => {
             const host = {
                 hasPendingQuestion: vi.fn().mockReturnValue(true),

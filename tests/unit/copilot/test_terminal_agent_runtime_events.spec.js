@@ -11,6 +11,7 @@ const println = vi.fn();
 const printlnBlock = vi.fn((/** @type {string[]} */ lines) => println(lines.join('\n')));
 const buildUserPrompt = vi.fn(() => 'prompt> ');
 const broadcastSse = vi.fn();
+const isTerminalRenderLocked = vi.fn(() => false);
 const writeInlineStatus = vi.fn();
 const recordTerminalActivity = vi.fn();
 const getShowToolActivity = vi.fn(() => true);
@@ -35,6 +36,7 @@ vi.mock('../../../src/copilot/terminal/dialog/index.js', () => ({
     printlnBlock,
     buildUserPrompt,
     broadcastSse,
+    isTerminalRenderLocked,
     writeInlineStatus,
 }));
 
@@ -245,6 +247,7 @@ describe('terminal/events/agent-runtime-events.js — contrato', () => {
         });
         println.mockClear();
         writeInlineStatus.mockClear();
+        isTerminalRenderLocked.mockReturnValue(false);
 
         await vi.advanceTimersByTimeAsync(10_000);
 
@@ -554,6 +557,39 @@ describe('terminal/events/agent-runtime-events.js — contrato', () => {
                 cost: 0.0123,
             }),
         );
+    });
+
+    it('não imprime usage durante lock de renderização do stream live', async () => {
+        const { setupTerminalAgentRuntimeEventListeners } =
+            await import('../../../src/copilot/terminal/events/agent-runtime-events.js');
+        /** @type {Map<string, Function[]>} */
+        const listeners = new Map();
+        const agent = {
+            on: vi.fn((event, handler) => {
+                const list = listeners.get(event) ?? [];
+                list.push(handler);
+                listeners.set(event, list);
+            }),
+            off: vi.fn(),
+        };
+        isTerminalRenderLocked.mockReturnValue(true);
+
+        setupTerminalAgentRuntimeEventListeners({ agent: /** @type {any} */ (agent), rl: null });
+        listeners.get('pr.consumed')?.[0]?.({
+            model: 'gpt-5-mini',
+            configuredModel: 'gpt-5',
+            effectiveModel: 'gpt-5-mini',
+            cost: 0.0123,
+            modelMismatch: true,
+        });
+
+        expect(recordTerminalActivity).toHaveBeenCalledWith(
+            'system',
+            'Uso contabilizado com divergência de modelo',
+            expect.any(Object),
+        );
+        expect(println).not.toHaveBeenCalledWith(expect.stringContaining('USAGE'));
+        expect(broadcastSse).toHaveBeenCalledWith('pr.consumed', expect.any(Object));
     });
 
     it('promove pr.fallback_model para aviso operacional explícito', async () => {

@@ -5,6 +5,7 @@ import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 const stopDialogMode = vi.fn(async () => {});
 const startDialogMode = vi.fn(async () => {});
 const dialogTurn = vi.fn(async () => 'ok');
+const dialogTurnDetailed = vi.fn(async () => ({ reply: 'ok', replySource: 'runtime_return', hadReplyEvent: false }));
 const chat = vi.fn(async () => ({ response: 'chat-ok' }));
 const getAgentStatus = vi.fn(() => ({ dialogLoopActive: true, dialogPaused: false }));
 /** @type {{ role: string; content: string; timestamp?: number }[]} */
@@ -350,6 +351,7 @@ vi.mock('#copilot/channel', () => ({
         stopDialogMode,
         startDialogMode,
         dialogTurn,
+        dialogTurnDetailed,
         chat,
         getAgentStatus,
     },
@@ -445,7 +447,7 @@ describe('terminal/frontend/index', () => {
         const timelineAfterClear = runtime.readTerminalTimelineProjection();
 
         expect(startDialogMode).toHaveBeenCalled();
-        expect(dialogTurn).toHaveBeenCalled();
+        expect(dialogTurnDetailed).toHaveBeenCalled();
         expect(stopDialogMode).toHaveBeenCalled();
         expect(clearHistory).toHaveBeenCalled();
         expect(timelineBeforeClear.timelineSource).toBe('bridge');
