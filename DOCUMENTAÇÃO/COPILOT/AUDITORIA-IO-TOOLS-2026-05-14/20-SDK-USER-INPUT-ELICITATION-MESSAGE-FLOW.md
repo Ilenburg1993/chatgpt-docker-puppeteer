@@ -244,3 +244,34 @@ Rodada executada via `npm run terminal:llm-b`:
 - Turno com resposta + `report_intent` + tool genérica exibiu resposta, intents, tool start/done, summary de tools,
   usage e mensagem final.
 - Prompt final voltou para `você[modelo/high]›` sem `[I]` persistente.
+
+## Rodada UX Terminal 2026-05-19 — Perda De Resposta Durante Busy
+
+### Diagnóstico Confirmado
+
+- A imagem do terminal mostrou um turno com header, duração e usage, mas sem corpo de resposta. Isso só é possível quando
+  `sendTurn()` chega ao renderer final com `reply` vazio.
+- O listener de `assistant.message` descartava renderização quando `busy=true`, assumindo que o retorno direto do turno
+  sempre carregaria o texto final.
+- Em algumas rotas do SDK, especialmente com resposta simples/sem delta incremental, o evento `assistant.message` pode
+  ser a única fonte textual confiável enquanto o retorno direto do turno vem vazio ou parcial.
+
+### Decisão Arquitetural
+
+- Evento `assistant.message` nunca deve ser descartado. Se chega durante turno ativo, entra em buffer transitório
+  canônico.
+- O engine de turno explícito deve preferir retorno direto quando não vazio, mas usar o buffer de `assistant.message` como
+  fallback textual antes de renderizar qualquer bloco final.
+- Se nenhuma fonte textual existir, a UX deve mostrar um placeholder diagnóstico explícito, nunca um bloco vazio.
+
+### Implementado
+
+- Criado `terminal/state/assistant-message-buffer-state.js` com `record`, `read`, `takeLatest` e `clear`.
+- `sdk-session-events` limpa o buffer em `assistant.turn_start` e grava mensagens recebidas durante `busy`.
+- `dialog/engine` usa o último `assistant.message` bufferizado quando `runTerminalDialogTurnDetailed()` retorna vazio.
+- `printExchange()` mostra `[sem resposta textual materializada pelo SDK]` quando todas as fontes realmente falham.
+
+### Validação Live
+
+- Caso mínimo `oi` exibiu resposta final: `Oi! Estou pronto para a próxima instrução.`
+- Turno com `report_intent` exibiu resposta, intents, tool start/done, summary de tools, usage e mensagem final.

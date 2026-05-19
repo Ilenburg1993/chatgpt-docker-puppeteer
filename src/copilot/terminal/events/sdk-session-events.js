@@ -82,10 +82,12 @@ import {
 } from '../frontend/gateways/index.js';
 import {
     beginTerminalTurnTrace,
+    clearTerminalBufferedAssistantMessages,
     completeTerminalTurnTrace,
     createToolCallRegistry,
     getTerminalDetailLevel,
     markTerminalActivityIdle,
+    recordTerminalBufferedAssistantMessage,
     recordTerminalActivity,
     recordTerminalElicitationCompleted,
     recordTerminalElicitationPending,
@@ -272,6 +274,7 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
 
     const onAssistantTurnStart = (/** @type {{ turnId?: string | null }} */ evt) => {
         const turnId = evt?.turnId ?? null;
+        clearTerminalBufferedAssistantMessages();
         beginTerminalTurnTrace({ turnId });
         broadcastSse('assistant.turn_start', {
             turnId,
@@ -318,7 +321,14 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
             protocolKind: normalized.kind,
             timestamp: Date.now(),
         });
-        if (getBusy()) return;
+        if (getBusy()) {
+            recordTerminalBufferedAssistantMessage({
+                content: normalized.content,
+                kind: normalized.kind,
+                source: 'sdk/assistant.message',
+            });
+            return;
+        }
         const rendered = renderTerminalAssistantTranscript({
             content: normalized.content,
             title: normalized.kind === 'reply' ? 'Resposta fora do turno ativo' : 'Mensagem',

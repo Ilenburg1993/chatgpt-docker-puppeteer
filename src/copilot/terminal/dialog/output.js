@@ -750,12 +750,15 @@ export function printExchange(actor, message, reply, durationMs) {
     lines.push('');
     const replyLines = reply.split('\n');
     let inCodeBlock = false;
-    for (const line of replyLines) {
+    const visibleReplyLines = reply.trim().length > 0 ? replyLines : ['[sem resposta textual materializada pelo SDK]'];
+    for (const line of visibleReplyLines) {
         if (line.trimStart().startsWith('```')) {
             inCodeBlock = !inCodeBlock;
             lines.push(`  \x1b[32m│\x1b[0m  \x1b[2m${line}\x1b[0m`);
         } else if (inCodeBlock) {
             lines.push(`  \x1b[32m│\x1b[0m  \x1b[48;5;236m\x1b[36m${line}\x1b[0m`);
+        } else if (reply.trim().length === 0) {
+            lines.push(`  \x1b[33m│\x1b[0m  \x1b[33m${line}\x1b[0m`);
         } else {
             lines.push(`  \x1b[32m│\x1b[0m  ${line}`);
         }

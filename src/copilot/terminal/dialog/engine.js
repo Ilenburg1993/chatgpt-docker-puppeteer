@@ -38,6 +38,7 @@ import {
 } from '../frontend/gateways/index.js';
 import { normalizeTerminalModelBillingProjection } from '../frontend/projections/index.js';
 import { markTerminalActivityIdle, recordTerminalActivity } from '../state/dialog/index.js';
+import { takeLatestTerminalBufferedAssistantMessage } from '../state/events/index.js';
 import { drainPendingNotifications, getPersistenceFailureCount, persistTurnToHub } from './engine-persistence.js';
 import {
     BOOT_PROMPT,
@@ -594,21 +595,33 @@ async function _executeTurn(message, actor, attachments = [], requestHeaders = n
             onReasoning,
             ...(requestHeaders ? { requestHeaders } : {}),
         });
-        const reply = turnResult.reply;
+        const bufferedAssistantMessage = takeLatestTerminalBufferedAssistantMessage();
+        const reply =
+            typeof turnResult.reply === 'string' && turnResult.reply.trim().length > 0
+                ? turnResult.reply
+                : (bufferedAssistantMessage?.content ?? turnResult.reply);
+        const effectiveReplySource =
+            typeof turnResult.reply === 'string' && turnResult.reply.trim().length > 0
+                ? turnResult.replySource
+                : bufferedAssistantMessage
+                  ? 'assistant_message_buffer'
+                  : turnResult.replySource;
         const durationMs = Date.now() - t0;
         const replyVisibleChars = typeof reply === 'string' ? measureVisibleTerminalChars(reply) : 0;
 
         recordTerminalActivity('turn', 'Reply do turno explícito resolvido', {
             detail:
-                `canal=${turnResult.channel} · source=${turnResult.replySource} · ` +
+                `canal=${turnResult.channel} · source=${effectiveReplySource} · ` +
                 `chars=${typeof reply === 'string' ? reply.length : 0} · visíveis=${replyVisibleChars}`,
             source: 'dialog',
             recordHistory: false,
         });
 
-        if (turnResult.replySource === 'transport_mirror') {
+        if (effectiveReplySource === 'transport_mirror') {
             log('INFO', '[TerminalServer] Turno explícito renderizado usando espelho canônico de dialog.reply.');
-        } else if (turnResult.replySource === 'empty') {
+        } else if (effectiveReplySource === 'assistant_message_buffer') {
+            log('INFO', '[TerminalServer] Turno explícito renderizado usando buffer canônico de assistant.message.');
+        } else if (effectiveReplySource === 'empty') {
             log('WARN', '[TerminalServer] Turno explícito concluído sem reply textual materializado no transporte.');
         }
 

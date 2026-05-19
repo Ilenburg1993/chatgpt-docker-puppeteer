@@ -1,5 +1,11 @@
 // @ts-check
 
+export {
+    clearTerminalBufferedAssistantMessages,
+    readTerminalBufferedAssistantMessages,
+    recordTerminalBufferedAssistantMessage,
+    takeLatestTerminalBufferedAssistantMessage,
+} from '../assistant-message-buffer-state.js';
 export { markTerminalActivityIdle, recordTerminalActivity, terminalActivityEmitter } from '../activity-state.js';
 export {
     appendTerminalIntent,
