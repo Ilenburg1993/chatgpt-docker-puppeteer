@@ -66,8 +66,9 @@
  */
 
 /**
- * Opções para `session.sendAndWait(message, options)`. Campos: `prompt`, `attachments?` (file, directory, selection,
- * blob), `mode?` ("enqueue" | "immediate").
+ * Opções para `session.send(options)` e `session.sendAndWait(options, timeout?)`. Campos: `prompt`, `attachments?`
+ * (file, directory, selection, blob), `mode?` ("enqueue" | "immediate") e `requestHeaders?` para headers por turno.
+ * A borda runtime canônica valida esse objeto via `normalizeMessageOptions()` antes de chamar o SDK.
  *
  * @typedef {import('@github/copilot-sdk').MessageOptions} MessageOptions
  */

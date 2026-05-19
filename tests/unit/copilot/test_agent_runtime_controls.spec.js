@@ -118,6 +118,7 @@ describe('agent-runtime-controls facade', () => {
                 getRuntimeStatus: () => 'idle',
                 getModelSnapshot: () => 'gpt-5-mini',
                 getReasoningEffortSnapshot: () => 'high',
+                getSessionSnapshot: () => ({ sessionId: 'sdk-live-from-context' }),
                 getQueueSnapshot: () => ({ size: 3 }),
                 isDialogLoopActive: () => true,
                 isDialogLoopPaused: () => true,
@@ -142,6 +143,7 @@ describe('agent-runtime-controls facade', () => {
         expect(control.status).toBe('idle');
         expect(control.model).toBe('gpt-5-mini');
         expect(control.reasoningEffort).toBe('high');
+        expect(control.sessionId).toBe('sdk-live-from-context');
         expect(control.queueSize).toBe(3);
         expect(control.dialogLoopActive).toBe(true);
         expect(control.dialogPaused).toBe(true);

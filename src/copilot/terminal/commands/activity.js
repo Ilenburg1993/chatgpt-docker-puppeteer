@@ -20,7 +20,8 @@ function printTurnTraceSummary(println, title, trace) {
   trace           \x1b[90m${trace.traceId}\x1b[0m
   status          ${stateColor}${trace.status}\x1b[0m
   tools           \x1b[90m${trace.toolCount}\x1b[0m
-  arquivos        \x1b[90m${trace.fileCount}\x1b[0m`);
+  arquivos        \x1b[90m${trace.fileCount}\x1b[0m
+  input humano    \x1b[90m${trace.userInputCount ?? trace.userInputs?.length ?? 0}\x1b[0m`);
 
     if (trace.files.length > 0) {
         println('  arquivos tocados');
@@ -41,6 +42,22 @@ function printTurnTraceSummary(println, title, trace) {
         }
     }
 
+    const userInputs = Array.isArray(trace.userInputs) ? trace.userInputs : [];
+    if (userInputs.length > 0) {
+        println('  interações humanas');
+        for (const userInput of userInputs.slice(0, 5)) {
+            const choices =
+                Array.isArray(userInput.choices) && userInput.choices.length > 0
+                    ? ` · opções=${userInput.choices.join('|')}`
+                    : '';
+            const answer = userInput.answerPreview ? ` · resposta=${userInput.answerPreview}` : '';
+            const requestId = userInput.requestId ? ` · ${userInput.requestId}` : '';
+            println(
+                `    - ${userInput.kind ?? 'question'} · ${userInput.status ?? 'requested'}${requestId} · ${userInput.question}${choices}${answer} · ${userInput.source ?? 'sdk'}`,
+            );
+        }
+    }
+
     println('  ─────────────────────────────────────');
 }
 
@@ -55,7 +72,8 @@ function pickMostUsefulRecentTurnTrace(recent) {
             entry.tools.some(
                 /** @param {{ operation?: string; path?: string | null; target?: string | null }} tool */ (tool) =>
                     tool.operation !== 'unknown' || Boolean(tool.path) || Boolean(tool.target),
-            )
+            ) ||
+            (Array.isArray(entry.userInputs) && entry.userInputs.length > 0)
         ) {
             return entry;
         }

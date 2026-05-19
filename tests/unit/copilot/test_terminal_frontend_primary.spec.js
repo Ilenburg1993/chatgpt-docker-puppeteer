@@ -877,6 +877,8 @@ describe('terminal/frontend/index', () => {
         expect(timeline.timelineSource).toBe('hub');
         expect(timeline.timelineAuthority).toBe('persistent');
         expect(timeline.reconciliationStatus).toBe('diverged');
+        expect(timeline.sync.status).toBe('blocked');
+        expect(timeline.sync.reason).toBe('diverged-no-overlap');
         expect(timeline.turns[0]?.content).toBe('a');
     });
 

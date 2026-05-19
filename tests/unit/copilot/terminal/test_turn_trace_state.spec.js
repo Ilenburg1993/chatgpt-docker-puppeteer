@@ -10,6 +10,7 @@ import {
     readTerminalTurnTraceProjection,
     recordTerminalTurnFileActivity,
     recordTerminalTurnToolActivity,
+    recordTerminalTurnUserInputActivity,
 } from '../../../../src/copilot/terminal/state/turn-trace-state.js';
 
 describe('terminal/turn-trace-state', () => {
@@ -103,5 +104,37 @@ describe('terminal/turn-trace-state', () => {
         expect(projection.recent[0]?.tools.map((tool) => tool.toolName)).toContain('ask_user');
         expect(projection.recent[0]?.tools.map((tool) => tool.toolName)).toContain('view');
         expect(projection.recent[0]?.files[0]?.path).toBe('/tmp/file.txt');
+    });
+
+    it('registra ask_user como interação humana do turno sem depender da lista de tools', () => {
+        beginTerminalTurnTrace({ turnId: 'turn-human', timestamp: 10 });
+        recordTerminalTurnUserInputActivity({
+            requestId: 'ui-1',
+            kind: 'question',
+            question: 'Qual ambiente devo usar?',
+            choices: ['dev', 'prod'],
+            allowFreeform: false,
+            status: 'requested',
+            timestamp: 20,
+        });
+        recordTerminalTurnUserInputActivity({
+            requestId: 'ui-1',
+            status: 'answered',
+            answerPreview: 'prod',
+            timestamp: 30,
+        });
+
+        const trace = readTerminalTurnTraceProjection(3).current;
+
+        expect(trace?.toolCount).toBe(0);
+        expect(trace?.userInputCount).toBe(1);
+        expect(trace?.userInputs[0]).toMatchObject({
+            requestId: 'ui-1',
+            kind: 'question',
+            status: 'answered',
+            question: 'Qual ambiente devo usar?',
+            choices: ['dev', 'prod'],
+            answerPreview: 'prod',
+        });
     });
 });

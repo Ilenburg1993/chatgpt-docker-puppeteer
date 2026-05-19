@@ -26,6 +26,7 @@ export function cmdHelp({ injectPort, println }) {
 
   \x1b[1mComandos de Sessão\x1b[0m
   \x1b[33m/status\x1b[0m                              — status do agente + modelo + reasoning + binding/frescor do prompt
+  \x1b[33m/health\x1b[0m                              — diagnóstico/health completo do runtime, infra, IO e lifecycle
   \x1b[33m/now\x1b[0m                                 — snapshot operacional curto (loop/ask/model mismatch)
   \x1b[33m/live [n]\x1b[0m                             — fluxo live: loop, streaming, SSE, tools, arquivos e I/O real
   \x1b[33m/activity [n]\x1b[0m                        — atividade atual da LLM-B + timeline recente

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # =============================================================================
 # post-start.sh — DevContainer Start Hook (Fail-Safe Network/NSS Orchestrator)
-# Version: v2.8.1
+# Version: v2.9.0
 #
 # Purpose:
 #   Runtime-only DevContainer post-start orchestration for a GitHub/Copilot-first
@@ -31,18 +31,22 @@
 #   6. Delegate GitHub/Copilot network orchestration when enabled.
 #   7. Fallback to legacy api.github.com route fix + passive probes.
 #   8. Run passive structural diagnostics only.
-# v2.8.1 focus:
-#   - Synchronizes with github-api-route-fix.sh v1.8.6, local-dns-cache.sh
-#     v1.5.3, local-copilot-proxy.sh v1.2.3, github-copilot-network-manager.sh
-#     v1.5.3 and endpoints.github-copilot.tsv v1.1.0.
-#   - Keeps benchmark/compare jobs out of boot by sanitizing post-start actions
-#     before delegating to route-fix, DNS cache, proxy and network manager.
-#   - Adds endpoint registry consumption for legacy probes, so fallback probing
-#     remains coherent with the manager's official Copilot allowlist surface.
-#   - Fails closed for local DNS cache activation: /etc/resolv.conf is only
-#     treated as safe when dnsmasq, resolver health and status freshness agree.
-#   - Surfaces route/proxy/manager freshness, soft-degraded counters and DNS
-#     runtime proof fields in post-start summary/report for post-attach use.
+# v2.9.0 focus:
+#   - Promotes the endpoint registry canonical location to
+#     .devcontainer/scripts/network/endpoints.github-copilot.tsv, matching the
+#     actual network script topology and devcontainer.json v5.8.0.
+#   - Distinguishes endpoint sources explicitly: env override, registry,
+#     extended default, or built-in default. The manager receives
+#     DEVCONTAINER_COPILOT_PROBE_ENDPOINTS only for explicit env overrides, so
+#     the TSV registry can remain the governing source of truth.
+#   - Adds strict endpoint registry audit fields to post-start report/summary:
+#     canonical path, legacy path, selected path, status, rows, bad rows, source
+#     and max rows. Missing/degraded registry becomes diagnostics-degraded, not
+#     boot-fatal.
+#   - Strengthens DNS runtime proof reporting by separating local dnsmasq health,
+#     resolv.conf governance, current system nameservers and cache effectiveness.
+#   - Keeps all long benchmark/compare actions out of boot and preserves the
+#     fail-safe postStart contract: always exits 0 and never blocks attach.
 # =============================================================================
 
 # Fail-safe shell posture. This script may be launched by strict parent shells,
@@ -57,7 +61,7 @@ trap - ERR EXIT INT TERM 2> /dev/null || true
 # -----------------------------------------------------------------------------
 case "${1:-}" in
     --version)
-        printf '%s v%s\n' 'post-start.sh' '2.8.1'
+        printf '%s v%s\n' 'post-start.sh' '2.9.0'
         exit 0
         ;;
     --help)
@@ -68,6 +72,12 @@ Fail-safe DevContainer postStart hook. It performs only bounded runtime
 network/NSS orchestration and always exits 0 during normal hook execution.
 Long-running benchmark/compare jobs are intentionally not run from post-start;
 use npm run network:* or make network-* for prolonged benchmark collection.
+
+Endpoint registry policy in v2.9.0:
+  canonical: .devcontainer/scripts/network/endpoints.github-copilot.tsv
+  legacy:    .devcontainer/network/endpoints.github-copilot.tsv (fallback only)
+  manager:   receives explicit DEVCONTAINER_COPILOT_PROBE_ENDPOINTS only when
+             the operator supplied that env var; otherwise the registry governs.
 USAGE
         exit 0
         ;;
@@ -108,7 +118,7 @@ cfg_uint() {
 # -----------------------------------------------------------------------------
 SCRIPT_NAME="post-start.sh"
 readonly SCRIPT_NAME
-SCRIPT_VERSION="2.8.1"
+SCRIPT_VERSION="2.9.0"
 readonly SCRIPT_VERSION
 
 SCRIPT_DIR=""
@@ -323,41 +333,88 @@ readonly ALLOW_SOURCE_LOCAL_PROXY_ENV
 # unauthenticated service endpoints; 000/TLS failure is the primary red flag.
 ENABLE_EXTENDED_COPILOT_PROBES="$(cfg_bool "${DEVCONTAINER_POST_START_EXTENDED_COPILOT_PROBES:-false}" false)"
 readonly ENABLE_EXTENDED_COPILOT_PROBES
-COPILOT_ENDPOINT_REGISTRY_FILE="${DEVCONTAINER_COPILOT_ENDPOINT_REGISTRY_FILE:-${DEVCONTAINER_COPILOT_ENDPOINT_REGISTRY:-${SCRIPT_DIR}/../network/endpoints.github-copilot.tsv}}"
-readonly COPILOT_ENDPOINT_REGISTRY_FILE
+
+# Endpoint registry topology.
+# v2.9.0 canonicalizes the registry under scripts/network because the registry
+# travels with the network control-plane scripts. The older .devcontainer/network
+# path is retained only as an automatic fallback for repositories not yet moved.
+COPILOT_ENDPOINT_REGISTRY_CANONICAL_FILE="${SCRIPT_DIR}/network/endpoints.github-copilot.tsv"
+readonly COPILOT_ENDPOINT_REGISTRY_CANONICAL_FILE
+COPILOT_ENDPOINT_REGISTRY_LEGACY_FILE="${SCRIPT_DIR}/../network/endpoints.github-copilot.tsv"
+readonly COPILOT_ENDPOINT_REGISTRY_LEGACY_FILE
+COPILOT_ENDPOINT_REGISTRY_FILE_RAW="${DEVCONTAINER_COPILOT_ENDPOINT_REGISTRY_FILE:-${DEVCONTAINER_COPILOT_ENDPOINT_REGISTRY:-}}"
+readonly COPILOT_ENDPOINT_REGISTRY_FILE_RAW
+
+if [[ -n "${COPILOT_ENDPOINT_REGISTRY_FILE_RAW}" ]]; then
+    COPILOT_ENDPOINT_REGISTRY_FILE="${COPILOT_ENDPOINT_REGISTRY_FILE_RAW}"
+    COPILOT_ENDPOINT_REGISTRY_LOCATION_STATUS="explicit"
+elif [[ -r "${COPILOT_ENDPOINT_REGISTRY_CANONICAL_FILE}" ]]; then
+    COPILOT_ENDPOINT_REGISTRY_FILE="${COPILOT_ENDPOINT_REGISTRY_CANONICAL_FILE}"
+    COPILOT_ENDPOINT_REGISTRY_LOCATION_STATUS="canonical"
+elif [[ -r "${COPILOT_ENDPOINT_REGISTRY_LEGACY_FILE}" ]]; then
+    COPILOT_ENDPOINT_REGISTRY_FILE="${COPILOT_ENDPOINT_REGISTRY_LEGACY_FILE}"
+    COPILOT_ENDPOINT_REGISTRY_LOCATION_STATUS="legacy-fallback"
+else
+    COPILOT_ENDPOINT_REGISTRY_FILE="${COPILOT_ENDPOINT_REGISTRY_CANONICAL_FILE}"
+    COPILOT_ENDPOINT_REGISTRY_LOCATION_STATUS="missing-canonical"
+fi
+readonly COPILOT_ENDPOINT_REGISTRY_FILE COPILOT_ENDPOINT_REGISTRY_LOCATION_STATUS
+
 USE_COPILOT_ENDPOINT_REGISTRY="$(cfg_bool "${DEVCONTAINER_COPILOT_USE_ENDPOINT_REGISTRY:-true}" true)"
 readonly USE_COPILOT_ENDPOINT_REGISTRY
-COPILOT_ENDPOINT_REGISTRY_MAX_ROWS="$(cfg_uint "${DEVCONTAINER_POST_START_ENDPOINT_REGISTRY_MAX_ROWS:-32}" 32 1 128)"
+COPILOT_ENDPOINT_REGISTRY_MAX_ROWS="$(cfg_uint "${DEVCONTAINER_POST_START_ENDPOINT_REGISTRY_MAX_ROWS:-64}" 64 1 128)"
 readonly COPILOT_ENDPOINT_REGISTRY_MAX_ROWS
+
 DEFAULT_COPILOT_PROBE_ENDPOINTS="https://copilot-proxy.githubusercontent.com https://api.github.com https://api.github.com/rate_limit https://api.github.com/user https://api.github.com/copilot_internal/v2/token https://default.exp-tas.com https://api.githubcopilot.com https://api.individual.githubcopilot.com https://proxy.individual.githubcopilot.com"
 EXTENDED_COPILOT_PROBE_ENDPOINTS="https://github.com/login https://github.com/copilot https://origin-tracker.githubusercontent.com https://copilot-telemetry.githubusercontent.com/telemetry https://collector.github.com https://api.business.githubcopilot.com https://proxy.business.githubcopilot.com https://api.enterprise.githubcopilot.com https://proxy.enterprise.githubcopilot.com https://copilot-reports.github.com https://uploads.github.com/copilot/chat/attachments/"
 REGISTRY_COPILOT_PROBE_ENDPOINTS=""
+COPILOT_ENDPOINT_REGISTRY_ROWS="0"
+COPILOT_ENDPOINT_REGISTRY_BAD_ROWS="0"
+COPILOT_ENDPOINT_REGISTRY_STATUS="missing"
+
 if [[ "${USE_COPILOT_ENDPOINT_REGISTRY}" == "true" && -r "${COPILOT_ENDPOINT_REGISTRY_FILE}" ]]; then
-    REGISTRY_COPILOT_PROBE_ENDPOINTS="$(awk -F'	' -v max="${COPILOT_ENDPOINT_REGISTRY_MAX_ROWS}" '
-        /^[[:space:]]*#/ { next }
-        NF == 0 { next }
+    COPILOT_ENDPOINT_REGISTRY_COUNTS="$(awk -F'	' '
+        /^[[:space:]]*#/ || /^[[:space:]]*$/ { next }
         {
-            for (i=1; i<=NF; i++) {
-                if ($i ~ /^https:\/\//) {
-                    print $i
-                    emitted++
-                    break
-                }
-            }
+            rows++
+            if (NF != 5 || $1 !~ /^https:\/\// || $2 == "" || $3 == "" || $4 == "" || $5 == "") bad++
+        }
+        END { print rows+0, bad+0 }
+    ' "${COPILOT_ENDPOINT_REGISTRY_FILE}" 2> /dev/null || printf '0 1')"
+    COPILOT_ENDPOINT_REGISTRY_ROWS="${COPILOT_ENDPOINT_REGISTRY_COUNTS%% *}"
+    COPILOT_ENDPOINT_REGISTRY_BAD_ROWS="${COPILOT_ENDPOINT_REGISTRY_COUNTS##* }"
+    if [[ "${COPILOT_ENDPOINT_REGISTRY_ROWS}" =~ ^[0-9]+$ && "${COPILOT_ENDPOINT_REGISTRY_ROWS}" -gt 0 && "${COPILOT_ENDPOINT_REGISTRY_BAD_ROWS}" == "0" ]]; then
+        COPILOT_ENDPOINT_REGISTRY_STATUS="ok"
+    else
+        COPILOT_ENDPOINT_REGISTRY_STATUS="degraded"
+    fi
+    REGISTRY_COPILOT_PROBE_ENDPOINTS="$(awk -F'	' -v max="${COPILOT_ENDPOINT_REGISTRY_MAX_ROWS}" '
+        /^[[:space:]]*#/ || /^[[:space:]]*$/ { next }
+        NF == 5 && $1 ~ /^https:\/\// {
+            print $1
+            emitted++
             if (emitted >= max) exit
         }
     ' "${COPILOT_ENDPOINT_REGISTRY_FILE}" 2> /dev/null | tr '\n' ' ')"
+elif [[ "${USE_COPILOT_ENDPOINT_REGISTRY}" != "true" ]]; then
+    COPILOT_ENDPOINT_REGISTRY_STATUS="disabled"
 fi
+
 if [[ -n "${DEVCONTAINER_COPILOT_PROBE_ENDPOINTS:-}" ]]; then
     COPILOT_PROBE_ENDPOINTS="${DEVCONTAINER_COPILOT_PROBE_ENDPOINTS}"
+    COPILOT_PROBE_ENDPOINTS_SOURCE="env-override"
 elif [[ -n "${REGISTRY_COPILOT_PROBE_ENDPOINTS}" ]]; then
     COPILOT_PROBE_ENDPOINTS="${REGISTRY_COPILOT_PROBE_ENDPOINTS}"
+    COPILOT_PROBE_ENDPOINTS_SOURCE="registry"
 elif [[ "${ENABLE_EXTENDED_COPILOT_PROBES}" == "true" ]]; then
     COPILOT_PROBE_ENDPOINTS="${DEFAULT_COPILOT_PROBE_ENDPOINTS} ${EXTENDED_COPILOT_PROBE_ENDPOINTS}"
+    COPILOT_PROBE_ENDPOINTS_SOURCE="extended-default"
 else
     COPILOT_PROBE_ENDPOINTS="${DEFAULT_COPILOT_PROBE_ENDPOINTS}"
+    COPILOT_PROBE_ENDPOINTS_SOURCE="default"
 fi
-readonly DEFAULT_COPILOT_PROBE_ENDPOINTS EXTENDED_COPILOT_PROBE_ENDPOINTS REGISTRY_COPILOT_PROBE_ENDPOINTS COPILOT_PROBE_ENDPOINTS
+readonly DEFAULT_COPILOT_PROBE_ENDPOINTS EXTENDED_COPILOT_PROBE_ENDPOINTS REGISTRY_COPILOT_PROBE_ENDPOINTS COPILOT_PROBE_ENDPOINTS COPILOT_PROBE_ENDPOINTS_SOURCE
+readonly COPILOT_ENDPOINT_REGISTRY_ROWS COPILOT_ENDPOINT_REGISTRY_BAD_ROWS COPILOT_ENDPOINT_REGISTRY_STATUS
 
 # -----------------------------------------------------------------------------
 # Logging / status helpers
@@ -462,7 +519,15 @@ write_post_start_report_header() {
         printf 'github_api_route_post_start_action=%s\n' "${GITHUB_API_ROUTE_POST_START_ACTION}"
         printf 'local_dns_post_start_action=%s\n' "${LOCAL_DNS_CACHE_POST_START_ACTION}"
         printf 'copilot_endpoint_registry_file=%s\n' "${COPILOT_ENDPOINT_REGISTRY_FILE}"
+        printf 'copilot_endpoint_registry_canonical_file=%s\n' "${COPILOT_ENDPOINT_REGISTRY_CANONICAL_FILE}"
+        printf 'copilot_endpoint_registry_legacy_file=%s\n' "${COPILOT_ENDPOINT_REGISTRY_LEGACY_FILE}"
+        printf 'copilot_endpoint_registry_location_status=%s\n' "${COPILOT_ENDPOINT_REGISTRY_LOCATION_STATUS}"
+        printf 'copilot_endpoint_registry_status=%s\n' "${COPILOT_ENDPOINT_REGISTRY_STATUS}"
+        printf 'copilot_endpoint_registry_rows=%s\n' "${COPILOT_ENDPOINT_REGISTRY_ROWS}"
+        printf 'copilot_endpoint_registry_bad_rows=%s\n' "${COPILOT_ENDPOINT_REGISTRY_BAD_ROWS}"
         printf 'copilot_endpoint_registry_used=%s\n' "${USE_COPILOT_ENDPOINT_REGISTRY}"
+        printf 'copilot_endpoint_registry_max_rows=%s\n' "${COPILOT_ENDPOINT_REGISTRY_MAX_ROWS}"
+        printf 'copilot_probe_endpoints_source=%s\n' "${COPILOT_PROBE_ENDPOINTS_SOURCE}"
         printf 'boot_transport_profile=%s\n' "${BOOT_TRANSPORT_PROFILE}"
         printf 'apply_transport_recommendation=%s\n' "${POST_START_APPLY_TRANSPORT_RECOMMENDATION}"
         printf 'post_start_summary=%s\n' "${POST_START_SUMMARY_FILE}"
@@ -502,6 +567,31 @@ kv_value_any() {
         fi
     done
     return 0
+}
+
+current_resolv_conf_nameservers() {
+    if [[ -r /etc/resolv.conf ]]; then
+        awk '/^[[:space:]]*nameserver[[:space:]]+/ { if (out != "") out = out " "; out = out $2 } END { print out }' /etc/resolv.conf 2> /dev/null
+    fi
+}
+
+local_dns_cache_runtime_proof() {
+    if local_dns_cache_proven_ok; then
+        printf '%s' 'effective'
+    elif local_dns_cache_is_off_status; then
+        printf '%s' 'off'
+    else
+        printf '%s' 'incomplete'
+    fi
+}
+
+local_dns_cache_resolver_points_to_loopback_now() {
+    local nameservers
+    nameservers="$(current_resolv_conf_nameservers)"
+    case " ${nameservers} " in
+        *' 127.0.0.1 '* | *' ::1 '*) printf '%s' 'true' ;;
+        *) printf '%s' 'false' ;;
+    esac
 }
 
 recommendation_is_fresh() {
@@ -636,17 +726,9 @@ write_post_start_summary() {
     proxy_rec_confidence="$(sanitize_oneline "$(kv_value_any "${LOCAL_COPILOT_PROXY_RECOMMENDATION_FILE}" confidence)")"
     route_rec_action="$(sanitize_oneline "$(kv_value_any "${GITHUB_ROUTE_RECOMMENDATION_FILE}" recommended_action recommendation action decision)")"
     boot_transport="$(manager_recommended_transport_for_boot)"
-    registry_status="missing"
-    registry_rows="0"
-    registry_bad_rows="0"
-    if [[ -r "${COPILOT_ENDPOINT_REGISTRY_FILE}" ]]; then
-        registry_status="ok"
-        registry_rows="$(awk -F'\t' 'BEGIN{c=0} /^[[:space:]]*#/ || NF==0 {next} {c++} END{print c+0}' "${COPILOT_ENDPOINT_REGISTRY_FILE}" 2> /dev/null || printf '0')"
-        registry_bad_rows="$(awk -F'\t' 'BEGIN{bad=0} /^[[:space:]]*#/ || NF==0 {next} NF != 5 {bad++} END{print bad+0}' "${COPILOT_ENDPOINT_REGISTRY_FILE}" 2> /dev/null || printf '0')"
-        if [[ "${registry_bad_rows}" =~ ^[0-9]+$ && "${registry_bad_rows}" -gt 0 ]]; then
-            registry_status="degraded"
-        fi
-    fi
+    registry_status="${COPILOT_ENDPOINT_REGISTRY_STATUS:-missing}"
+    registry_rows="${COPILOT_ENDPOINT_REGISTRY_ROWS:-0}"
+    registry_bad_rows="${COPILOT_ENDPOINT_REGISTRY_BAD_ROWS:-0}"
 
     {
         printf 'status=%s\n' "${health}"
@@ -661,6 +743,9 @@ write_post_start_summary() {
         printf 'local_dns_cache_status_stale=%s\n' "$(kv_value_from_file "${LOCAL_DNS_CACHE_SUMMARY_FILE}" status_stale)"
         printf 'local_dns_cache_dnsmasq_process_status=%s\n' "$(kv_value_from_file "${LOCAL_DNS_CACHE_SUMMARY_FILE}" dnsmasq_process_status)"
         printf 'local_dns_cache_dnsmasq_port_status=%s\n' "$(kv_value_from_file "${LOCAL_DNS_CACHE_SUMMARY_FILE}" dnsmasq_port_status)"
+        printf 'local_dns_cache_runtime_proof=%s\n' "$(local_dns_cache_runtime_proof)"
+        printf 'local_dns_cache_system_nameservers=%s\n' "$(sanitize_oneline "$(current_resolv_conf_nameservers)")"
+        printf 'local_dns_cache_resolver_points_to_loopback_now=%s\n' "$(local_dns_cache_resolver_points_to_loopback_now)"
         printf 'local_dns_cache_selected_upstreams=%s\n' "$(sanitize_oneline "$(kv_value_from_file "${LOCAL_DNS_CACHE_SUMMARY_FILE}" selected_upstreams)")"
         printf 'github_route_status=%s\n' "${route_status:-unknown}"
         printf 'github_route_summary=%s\n' "${GITHUB_ROUTE_SUMMARY_FILE}"
@@ -691,9 +776,14 @@ write_post_start_summary() {
         printf 'copilot_network_github_api_soft_degraded_count=%s\n' "$(kv_value_from_file "${COPILOT_NETWORK_SUMMARY_FILE}" github_api_soft_degraded_count)"
         printf 'copilot_network_overall_soft_degraded_count=%s\n' "$(kv_value_from_file "${COPILOT_NETWORK_SUMMARY_FILE}" overall_soft_degraded_count)"
         printf 'endpoint_registry_file=%s\n' "${COPILOT_ENDPOINT_REGISTRY_FILE}"
+        printf 'endpoint_registry_canonical_file=%s\n' "${COPILOT_ENDPOINT_REGISTRY_CANONICAL_FILE}"
+        printf 'endpoint_registry_legacy_file=%s\n' "${COPILOT_ENDPOINT_REGISTRY_LEGACY_FILE}"
+        printf 'endpoint_registry_location_status=%s\n' "${COPILOT_ENDPOINT_REGISTRY_LOCATION_STATUS}"
         printf 'endpoint_registry_status=%s\n' "${registry_status}"
         printf 'endpoint_registry_rows=%s\n' "${registry_rows}"
         printf 'endpoint_registry_bad_rows=%s\n' "${registry_bad_rows}"
+        printf 'endpoint_registry_max_rows=%s\n' "${COPILOT_ENDPOINT_REGISTRY_MAX_ROWS}"
+        printf 'endpoint_probe_source=%s\n' "${COPILOT_PROBE_ENDPOINTS_SOURCE}"
         printf 'boot_transport_profile=%s\n' "${boot_transport}"
         printf 'apply_transport_recommendation=%s\n' "${POST_START_APPLY_TRANSPORT_RECOMMENDATION}"
         printf 'copilot_route_advisor_status=%s\n' "${advisor_status}"
@@ -1419,46 +1509,61 @@ run_copilot_network_manager_if_enabled() {
 
     local boot_transport
     boot_transport="$(manager_recommended_transport_for_boot)"
-    log_info "Executando GitHub/Copilot Network Manager: ${COPILOT_NETWORK_MANAGER_SCRIPT} action=${COPILOT_NETWORK_MANAGER_POST_START_ACTION} transport=${boot_transport}"
-    DEVCONTAINER_COPILOT_NETWORK_MANAGER_ACTION="${COPILOT_NETWORK_MANAGER_POST_START_ACTION}" \
-        DEVCONTAINER_COPILOT_TRANSPORT_PROFILE="${boot_transport}" \
-        DEVCONTAINER_GITHUB_API_HOST="${GITHUB_API_HOST}" \
-        DEVCONTAINER_GITHUB_API_ROUTE_SCRIPT="${GITHUB_API_ROUTE_SCRIPT}" \
-        DEVCONTAINER_GITHUB_ROUTE_REPORT_FILE="${GITHUB_ROUTE_REPORT_FILE}" \
-        DEVCONTAINER_GITHUB_ROUTE_STATUS_FILE="${GITHUB_ROUTE_STATUS_FILE}" \
-        DEVCONTAINER_GITHUB_ROUTE_SUMMARY_FILE="${GITHUB_ROUTE_SUMMARY_FILE}" \
-        DEVCONTAINER_GITHUB_ROUTE_METRICS_FILE="${GITHUB_ROUTE_METRICS_FILE}" \
-        DEVCONTAINER_GITHUB_ROUTE_BENCHMARK_FILE="${GITHUB_ROUTE_BENCHMARK_FILE}" \
-        DEVCONTAINER_GITHUB_ROUTE_BENCHMARK_SUMMARY_FILE="${GITHUB_ROUTE_BENCHMARK_SUMMARY_FILE}" \
-        DEVCONTAINER_GITHUB_ROUTE_RECOMMENDATION_FILE="${GITHUB_ROUTE_RECOMMENDATION_FILE}" \
-        DEVCONTAINER_COPILOT_NETWORK_REPORT_FILE="${COPILOT_NETWORK_REPORT_FILE}" \
-        DEVCONTAINER_COPILOT_NETWORK_METRICS_FILE="${COPILOT_NETWORK_METRICS_FILE}" \
-        DEVCONTAINER_COPILOT_NETWORK_STATUS_FILE="${COPILOT_NETWORK_STATUS_FILE}" \
-        DEVCONTAINER_COPILOT_NETWORK_SUMMARY_FILE="${COPILOT_NETWORK_SUMMARY_FILE}" \
-        DEVCONTAINER_COPILOT_NETWORK_DIAGNOSIS_FILE="${COPILOT_NETWORK_DIAGNOSIS_FILE}" \
-        DEVCONTAINER_COPILOT_NETWORK_RECOMMENDATION_FILE="${COPILOT_NETWORK_RECOMMENDATION_FILE}" \
-        DEVCONTAINER_COPILOT_NETWORK_RECOMMENDATION_JSON_FILE="${COPILOT_NETWORK_RECOMMENDATION_JSON_FILE}" \
-        DEVCONTAINER_COPILOT_ENDPOINT_REGISTRY_FILE="${COPILOT_ENDPOINT_REGISTRY_FILE}" \
-        DEVCONTAINER_COPILOT_ENDPOINT_REGISTRY="${COPILOT_ENDPOINT_REGISTRY_FILE}" \
-        DEVCONTAINER_COPILOT_USE_ENDPOINT_REGISTRY="${USE_COPILOT_ENDPOINT_REGISTRY}" \
-        DEVCONTAINER_LOCAL_COPILOT_PROXY_SCRIPT="${LOCAL_COPILOT_PROXY_SCRIPT}" \
-        DEVCONTAINER_LOCAL_COPILOT_PROXY_STATUS_FILE="${LOCAL_COPILOT_PROXY_STATUS_FILE}" \
-        DEVCONTAINER_LOCAL_COPILOT_PROXY_SUMMARY_FILE="${LOCAL_COPILOT_PROXY_SUMMARY_FILE}" \
-        DEVCONTAINER_LOCAL_COPILOT_PROXY_BENCHMARK_FILE="${LOCAL_COPILOT_PROXY_BENCHMARK_FILE}" \
-        DEVCONTAINER_LOCAL_COPILOT_PROXY_BENCHMARK_SUMMARY_FILE="${LOCAL_COPILOT_PROXY_BENCHMARK_SUMMARY_FILE}" \
-        DEVCONTAINER_LOCAL_COPILOT_PROXY_COMPARISON_FILE="${LOCAL_COPILOT_PROXY_COMPARISON_FILE}" \
-        DEVCONTAINER_LOCAL_COPILOT_PROXY_RECOMMENDATION_FILE="${LOCAL_COPILOT_PROXY_RECOMMENDATION_FILE}" \
-        DEVCONTAINER_LOCAL_DNS_STATUS_FILE="${LOCAL_DNS_CACHE_STATUS_FILE}" \
-        DEVCONTAINER_LOCAL_DNS_SUMMARY_FILE="${LOCAL_DNS_CACHE_SUMMARY_FILE}" \
-        DEVCONTAINER_LOCAL_DNS_REPORT_FILE="${LOCAL_DNS_CACHE_REPORT_FILE}" \
-        DEVCONTAINER_LOCAL_DNS_METRICS_FILE="${LOCAL_DNS_CACHE_METRICS_FILE}" \
-        DEVCONTAINER_LOCAL_DNS_CACHE_STATUS_FILE="${LOCAL_DNS_CACHE_STATUS_FILE}" \
-        DEVCONTAINER_LOCAL_DNS_CACHE_SUMMARY_FILE="${LOCAL_DNS_CACHE_SUMMARY_FILE}" \
-        DEVCONTAINER_COPILOT_PROBE_ENDPOINTS="${COPILOT_PROBE_ENDPOINTS}" \
-        DEVCONTAINER_COPILOT_PROBE_IP_FAMILY="${COPILOT_PROBE_IP_FAMILY}" \
-        DEVCONTAINER_COPILOT_PROBE_CONNECT_TIMEOUT="${PROBE_CONNECT_TIMEOUT}" \
-        DEVCONTAINER_COPILOT_PROBE_MAX_TIME="${PROBE_MAX_TIME}" \
+    log_info "Executando GitHub/Copilot Network Manager: ${COPILOT_NETWORK_MANAGER_SCRIPT} action=${COPILOT_NETWORK_MANAGER_POST_START_ACTION} transport=${boot_transport} registry=${COPILOT_ENDPOINT_REGISTRY_STATUS}/${COPILOT_PROBE_ENDPOINTS_SOURCE}"
+
+    (
+        export DEVCONTAINER_COPILOT_NETWORK_MANAGER_ACTION="${COPILOT_NETWORK_MANAGER_POST_START_ACTION}"
+        export DEVCONTAINER_COPILOT_TRANSPORT_PROFILE="${boot_transport}"
+        export DEVCONTAINER_GITHUB_API_HOST="${GITHUB_API_HOST}"
+        export DEVCONTAINER_GITHUB_API_ROUTE_SCRIPT="${GITHUB_API_ROUTE_SCRIPT}"
+        export DEVCONTAINER_GITHUB_ROUTE_REPORT_FILE="${GITHUB_ROUTE_REPORT_FILE}"
+        export DEVCONTAINER_GITHUB_ROUTE_STATUS_FILE="${GITHUB_ROUTE_STATUS_FILE}"
+        export DEVCONTAINER_GITHUB_ROUTE_SUMMARY_FILE="${GITHUB_ROUTE_SUMMARY_FILE}"
+        export DEVCONTAINER_GITHUB_ROUTE_METRICS_FILE="${GITHUB_ROUTE_METRICS_FILE}"
+        export DEVCONTAINER_GITHUB_ROUTE_BENCHMARK_FILE="${GITHUB_ROUTE_BENCHMARK_FILE}"
+        export DEVCONTAINER_GITHUB_ROUTE_BENCHMARK_SUMMARY_FILE="${GITHUB_ROUTE_BENCHMARK_SUMMARY_FILE}"
+        export DEVCONTAINER_GITHUB_ROUTE_RECOMMENDATION_FILE="${GITHUB_ROUTE_RECOMMENDATION_FILE}"
+        export DEVCONTAINER_COPILOT_NETWORK_REPORT_FILE="${COPILOT_NETWORK_REPORT_FILE}"
+        export DEVCONTAINER_COPILOT_NETWORK_METRICS_FILE="${COPILOT_NETWORK_METRICS_FILE}"
+        export DEVCONTAINER_COPILOT_NETWORK_STATUS_FILE="${COPILOT_NETWORK_STATUS_FILE}"
+        export DEVCONTAINER_COPILOT_NETWORK_SUMMARY_FILE="${COPILOT_NETWORK_SUMMARY_FILE}"
+        export DEVCONTAINER_COPILOT_NETWORK_DIAGNOSIS_FILE="${COPILOT_NETWORK_DIAGNOSIS_FILE}"
+        export DEVCONTAINER_COPILOT_NETWORK_RECOMMENDATION_FILE="${COPILOT_NETWORK_RECOMMENDATION_FILE}"
+        export DEVCONTAINER_COPILOT_NETWORK_RECOMMENDATION_JSON_FILE="${COPILOT_NETWORK_RECOMMENDATION_JSON_FILE}"
+        export DEVCONTAINER_COPILOT_ENDPOINT_REGISTRY_FILE="${COPILOT_ENDPOINT_REGISTRY_FILE}"
+        export DEVCONTAINER_COPILOT_ENDPOINT_REGISTRY="${COPILOT_ENDPOINT_REGISTRY_FILE}"
+        export DEVCONTAINER_COPILOT_USE_ENDPOINT_REGISTRY="${USE_COPILOT_ENDPOINT_REGISTRY}"
+        export DEVCONTAINER_POST_START_ENDPOINT_REGISTRY_MAX_ROWS="${COPILOT_ENDPOINT_REGISTRY_MAX_ROWS}"
+        export DEVCONTAINER_COPILOT_MANAGER_MAX_ENDPOINTS="${COPILOT_ENDPOINT_REGISTRY_MAX_ROWS}"
+        export DEVCONTAINER_LOCAL_COPILOT_PROXY_SCRIPT="${LOCAL_COPILOT_PROXY_SCRIPT}"
+        export DEVCONTAINER_LOCAL_COPILOT_PROXY_STATUS_FILE="${LOCAL_COPILOT_PROXY_STATUS_FILE}"
+        export DEVCONTAINER_LOCAL_COPILOT_PROXY_SUMMARY_FILE="${LOCAL_COPILOT_PROXY_SUMMARY_FILE}"
+        export DEVCONTAINER_LOCAL_COPILOT_PROXY_BENCHMARK_FILE="${LOCAL_COPILOT_PROXY_BENCHMARK_FILE}"
+        export DEVCONTAINER_LOCAL_COPILOT_PROXY_BENCHMARK_SUMMARY_FILE="${LOCAL_COPILOT_PROXY_BENCHMARK_SUMMARY_FILE}"
+        export DEVCONTAINER_LOCAL_COPILOT_PROXY_COMPARISON_FILE="${LOCAL_COPILOT_PROXY_COMPARISON_FILE}"
+        export DEVCONTAINER_LOCAL_COPILOT_PROXY_RECOMMENDATION_FILE="${LOCAL_COPILOT_PROXY_RECOMMENDATION_FILE}"
+        export DEVCONTAINER_LOCAL_DNS_STATUS_FILE="${LOCAL_DNS_CACHE_STATUS_FILE}"
+        export DEVCONTAINER_LOCAL_DNS_SUMMARY_FILE="${LOCAL_DNS_CACHE_SUMMARY_FILE}"
+        export DEVCONTAINER_LOCAL_DNS_REPORT_FILE="${LOCAL_DNS_CACHE_REPORT_FILE}"
+        export DEVCONTAINER_LOCAL_DNS_METRICS_FILE="${LOCAL_DNS_CACHE_METRICS_FILE}"
+        export DEVCONTAINER_LOCAL_DNS_CACHE_STATUS_FILE="${LOCAL_DNS_CACHE_STATUS_FILE}"
+        export DEVCONTAINER_LOCAL_DNS_CACHE_SUMMARY_FILE="${LOCAL_DNS_CACHE_SUMMARY_FILE}"
+        export DEVCONTAINER_COPILOT_PROBE_IP_FAMILY="${COPILOT_PROBE_IP_FAMILY}"
+        export DEVCONTAINER_COPILOT_PROBE_CONNECT_TIMEOUT="${PROBE_CONNECT_TIMEOUT}"
+        export DEVCONTAINER_COPILOT_PROBE_MAX_TIME="${PROBE_MAX_TIME}"
+
+        # Critical v2.9.0 distinction:
+        # If the operator explicitly supplied DEVCONTAINER_COPILOT_PROBE_ENDPOINTS,
+        # preserve it. Otherwise do NOT export it, because the manager itself must
+        # consume the registry TSV as the primary source of truth.
+        if [[ "${COPILOT_PROBE_ENDPOINTS_SOURCE}" == "env-override" ]]; then
+            export DEVCONTAINER_COPILOT_PROBE_ENDPOINTS="${COPILOT_PROBE_ENDPOINTS}"
+        else
+            unset DEVCONTAINER_COPILOT_PROBE_ENDPOINTS 2> /dev/null || true
+        fi
+
         run_with_timeout "${SUBSCRIPT_TIMEOUT_SECONDS}" bash "${COPILOT_NETWORK_MANAGER_SCRIPT}"
+    )
 
     return $?
 }
@@ -1697,6 +1802,11 @@ write_probe_headers() {
         printf 'connect_timeout=%s\n' "${PROBE_CONNECT_TIMEOUT}"
         printf 'max_time=%s\n' "${PROBE_MAX_TIME}"
         printf 'extended_probes=%s\n' "${ENABLE_EXTENDED_COPILOT_PROBES}"
+        printf 'endpoint_registry_file=%s\n' "${COPILOT_ENDPOINT_REGISTRY_FILE}"
+        printf 'endpoint_registry_status=%s\n' "${COPILOT_ENDPOINT_REGISTRY_STATUS}"
+        printf 'endpoint_registry_rows=%s\n' "${COPILOT_ENDPOINT_REGISTRY_ROWS}"
+        printf 'endpoint_registry_bad_rows=%s\n' "${COPILOT_ENDPOINT_REGISTRY_BAD_ROWS}"
+        printf 'endpoint_source=%s\n' "${COPILOT_PROBE_ENDPOINTS_SOURCE}"
         printf 'endpoints=%s\n' "${COPILOT_PROBE_ENDPOINTS}"
         printf '\n'
     } > "${COPILOT_NETWORK_REPORT_FILE}" 2> /dev/null || true
@@ -1736,8 +1846,7 @@ probe_copilot_connectivity() {
             log_warn "Copilot probe ignorado por URL inválida ou fora da allowlist local: ${url}"
             failed=1
             {
-                printf '%s	%s	%s	%s	%s	%s	%s	%s	%s	%s	%s	%s
-' \
+                printf '%s	%s	%s	%s	%s	%s	%s	%s	%s	%s	%s	%s\n' \
                     "$(ts)" "${url}" "000" "unknown" "0" "0" "0" "0" "0" "?" "none" "invalid-url"
             } >> "${COPILOT_NETWORK_METRICS_FILE}" 2> /dev/null || true
             continue
@@ -1921,6 +2030,7 @@ main() {
     log_info "Local Copilot proxy: ${LOCAL_COPILOT_PROXY_SCRIPT} (enabled=${ENABLE_LOCAL_COPILOT_PROXY})"
     log_info "GitHub API route script: ${GITHUB_API_ROUTE_SCRIPT}"
     log_info "Copilot Network Manager: ${COPILOT_NETWORK_MANAGER_SCRIPT} (enabled=${ENABLE_COPILOT_NETWORK_MANAGER})"
+    log_info "Endpoint registry: ${COPILOT_ENDPOINT_REGISTRY_FILE} status=${COPILOT_ENDPOINT_REGISTRY_STATUS} rows=${COPILOT_ENDPOINT_REGISTRY_ROWS} bad=${COPILOT_ENDPOINT_REGISTRY_BAD_ROWS} source=${COPILOT_PROBE_ENDPOINTS_SOURCE} location=${COPILOT_ENDPOINT_REGISTRY_LOCATION_STATUS}"
     log_info "Route report: ${GITHUB_ROUTE_REPORT_FILE}"
     log_info "Route summary: ${GITHUB_ROUTE_SUMMARY_FILE}"
     log_info "Route metrics: ${GITHUB_ROUTE_METRICS_FILE}"
@@ -1946,6 +2056,17 @@ main() {
         log_warn "GITHUB_API_HOST inválido/não seguro: ${GITHUB_API_HOST}"
         append_post_start_report "github_api_host=invalid value=${GITHUB_API_HOST}"
     fi
+
+    append_post_start_report "endpoint_registry_status=${COPILOT_ENDPOINT_REGISTRY_STATUS} rows=${COPILOT_ENDPOINT_REGISTRY_ROWS} bad_rows=${COPILOT_ENDPOINT_REGISTRY_BAD_ROWS} source=${COPILOT_PROBE_ENDPOINTS_SOURCE} file=${COPILOT_ENDPOINT_REGISTRY_FILE}"
+    case "${COPILOT_ENDPOINT_REGISTRY_STATUS}:${USE_COPILOT_ENDPOINT_REGISTRY}" in
+        ok:true | disabled:false)
+            :
+            ;;
+        *)
+            diagnostics_status="degraded"
+            log_warn "Endpoint registry não está plenamente saudável: status=${COPILOT_ENDPOINT_REGISTRY_STATUS}, rows=${COPILOT_ENDPOINT_REGISTRY_ROWS}, bad=${COPILOT_ENDPOINT_REGISTRY_BAD_ROWS}, file=${COPILOT_ENDPOINT_REGISTRY_FILE}."
+            ;;
+    esac
 
     log_info "Normalizando ambiente NSS/LD_PRELOAD para subprocessos do hook..."
     normalize_nss_runtime_env

@@ -9,6 +9,7 @@
  */
 
 import { LLM_B_BOOT_PROMPT, LLM_B_TURN_TIMEOUT_MS } from '#copilot/config';
+import { resolveModelSelectionMismatch } from '#copilot/core';
 import readline from 'node:readline';
 import { getBusy, getRl, getSdkSessionMode } from '../../presentation/state/index.js';
 import { readTerminalDialogStreamMeta, readTerminalRuntimeState } from '../frontend/gateways/index.js';
@@ -36,9 +37,12 @@ const ANSI_ESCAPE_PATTERN = new RegExp(`${ANSI_ESCAPE}\\[[0-?]*[ -/]*[@-~]`, 'g'
 const ANSI_CLEAR_TO_END_OF_LINE = '\x1b[K';
 const INLINE_STATUS_MIN_COLUMNS = 48;
 const INLINE_STATUS_FALLBACK_COLUMNS = 120;
-const INLINE_STATUS_MIN_ROWS = 6;
-const INLINE_STATUS_FALLBACK_ROWS = 12;
-const INLINE_STATUS_HEIGHT_RATIO = 0.33;
+const INLINE_STATUS_MIN_ROWS = 3;
+const INLINE_STATUS_FALLBACK_ROWS = 8;
+const INLINE_STATUS_HEIGHT_RATIO = 0.24;
+const INLINE_STATUS_PROMPT_GUARD_ROWS = 5;
+const PROMPT_INPUT_GUARD_COLUMNS = 48;
+const PROMPT_MAX_WIDTH_RATIO = 0.58;
 
 /**
  * Quantidade de linhas reservadas para status acima do prompt (layout: [status...][prompt]).
@@ -82,7 +86,8 @@ function resolveInlineStatusColumns() {
 function resolveInlineStatusMaxRows() {
     const rows = Number(process.stdout.rows ?? INLINE_STATUS_FALLBACK_ROWS);
     if (!Number.isFinite(rows) || rows <= 0) return INLINE_STATUS_FALLBACK_ROWS;
-    return Math.max(INLINE_STATUS_MIN_ROWS, Math.floor(rows * INLINE_STATUS_HEIGHT_RATIO));
+    const promptAwareMax = Math.max(1, Math.floor(rows) - INLINE_STATUS_PROMPT_GUARD_ROWS);
+    return Math.max(1, Math.min(promptAwareMax, Math.max(INLINE_STATUS_MIN_ROWS, Math.floor(rows * INLINE_STATUS_HEIGHT_RATIO))));
 }
 
 /**
@@ -91,6 +96,15 @@ function resolveInlineStatusMaxRows() {
 function shouldUseCompactPromptLayout() {
     if (!process.stdout.isTTY) return false;
     return resolveInlineStatusColumns() < 96;
+}
+
+/**
+ * @returns {number}
+ */
+function resolvePromptBudgetColumns() {
+    const columns = resolveInlineStatusColumns();
+    const ratioBudget = Math.floor(columns * PROMPT_MAX_WIDTH_RATIO);
+    return Math.max(24, Math.min(columns - 8, Math.min(ratioBudget, columns - PROMPT_INPUT_GUARD_COLUMNS)));
 }
 
 /**
@@ -170,12 +184,48 @@ function fitInlineStatusRows(text) {
 }
 
 /**
+ * @param {string} text
+ * @param {number} [columns]
+ * @returns {number}
+ */
+export function estimateTerminalPhysicalRows(text, columns = resolveInlineStatusColumns()) {
+    const safeColumns = Math.max(1, Math.floor(columns));
+    const lines = String(text).replace(/\r/g, '').split('\n');
+    return Math.max(
+        1,
+        lines.reduce((total, line) => {
+            const length = visibleTextLength(line);
+            return total + Math.max(1, Math.ceil(length / safeColumns));
+        }, 0),
+    );
+}
+
+/**
+ * @returns {number}
+ */
+function resolveCurrentReadlinePromptRows() {
+    const rl = getRl();
+    if (!rl) return 1;
+    const record = /** @type {{ getPrompt?: () => string; line?: string }} */ (rl);
+    const prompt = typeof record.getPrompt === 'function' ? record.getPrompt() : buildUserPrompt();
+    const line = typeof record.line === 'string' ? record.line : '';
+    return estimateTerminalPhysicalRows(`${prompt}${line}`);
+}
+
+/**
+ * @returns {number}
+ */
+function resolveStatusCursorMoveUpRows() {
+    return Math.max(1, _statusRowsReserved + resolveCurrentReadlinePromptRows() - 1);
+}
+
+/**
  * @returns {void}
  */
 function clearReservedStatusRowsPreservingCursor() {
     if (!process.stdout.isTTY || _statusRowsReserved <= 0) return;
     /** @type {string[]} */
-    const output = [`\x1b[s\x1b[${_statusRowsReserved}A`];
+    const output = [`\x1b[s\x1b[${resolveStatusCursorMoveUpRows()}A`];
     for (let i = 0; i < _statusRowsReserved; i += 1) {
         output.push('\r\x1b[K');
         if (i < _statusRowsReserved - 1) output.push('\x1b[1B');
@@ -206,7 +256,7 @@ function reserveInlineStatusRows(rl, rows) {
 function renderReservedStatusRows(rows) {
     if (_statusRowsReserved <= 0) return;
     /** @type {string[]} */
-    const output = [`\x1b[s\x1b[${_statusRowsReserved}A`];
+    const output = [`\x1b[s\x1b[${resolveStatusCursorMoveUpRows()}A`];
     for (let i = 0; i < _statusRowsReserved; i += 1) {
         output.push(`\r\x1b[K${rows[i] ?? ''}`);
         if (i < _statusRowsReserved - 1) output.push('\x1b[1B');
@@ -235,10 +285,12 @@ function resolvePromptModelProjection(state) {
     const configuredModel = typeof lastPrInfo?.['configuredModel'] === 'string' ? lastPrInfo['configuredModel'] : null;
     const effectiveModel = typeof lastPrInfo?.['effectiveModel'] === 'string' ? lastPrInfo['effectiveModel'] : null;
     const billedModel = typeof lastPrInfo?.['model'] === 'string' ? lastPrInfo['model'] : null;
-    const mismatch =
-        Boolean(lastPrInfo?.['modelMismatch']) ||
-        Boolean(configuredModel && billedModel && configuredModel !== billedModel) ||
-        Boolean(configuredModel && effectiveModel && configuredModel !== effectiveModel);
+    const mismatch = resolveModelSelectionMismatch({
+        configuredModel,
+        billedModel,
+        effectiveModel,
+        explicitMismatch: Boolean(lastPrInfo?.['modelMismatch']),
+    });
     return {
         displayModel: effectiveModel ?? billedModel ?? configuredModel ?? state.model,
         configuredModel,
@@ -263,29 +315,43 @@ export function buildUserPrompt() {
         : modelProjection.displayModel || state.model;
     /** @type {string[]} */
     const tags = [];
+    /** @type {string[]} */
+    const compactTags = [];
+
+    /**
+     * @param {string} full
+     * @param {string} [compact=full]
+     * @returns {void}
+     */
+    const pushPromptTag = (full, compact = full) => {
+        tags.push(full);
+        compactTags.push(compact);
+    };
 
     const bootstrapping = state.status === 'starting';
     if (!state.dialogLoopActive && !bootstrapping) {
-        tags.push(terminalThemeText('error', '[NOLOOP]'));
+        pushPromptTag(terminalThemeText('error', '[NOLOOP]'), terminalThemeText('error', '[NL]'));
     }
     const sdkMode = getSdkSessionMode();
     if (sdkMode && sdkMode !== 'interactive') {
-        tags.push(
+        pushPromptTag(
             terminalThemeText(
                 'thinking',
                 compactDetail ? `[M:${sdkMode.toUpperCase()}]` : `[MODE:${sdkMode.toUpperCase()}]`,
             ),
+            terminalThemeText('thinking', `[M:${sdkMode.toUpperCase()}]`),
         );
     }
     if (state.dialogPaused) {
-        tags.push(terminalThemeText('error', '[PAUSED]'));
+        pushPromptTag(terminalThemeText('error', '[PAUSED]'), terminalThemeText('error', '[P]'));
     }
     if (promptPolicy.showQueueTag && state.queueSize > 0) {
-        tags.push(terminalThemeText('muted', `[Q:${state.queueSize}]`));
+        pushPromptTag(terminalThemeText('muted', `[Q:${state.queueSize}]`));
     }
     if (state.pendingQuestion && state.pendingQuestionKind && state.pendingQuestionKind !== 'ready') {
-        tags.push(
+        pushPromptTag(
             terminalThemeText('question', compactDetail ? '[ASK]' : `[ASK:${state.pendingQuestionKind.toUpperCase()}]`),
+            terminalThemeText('question', '[ASK]'),
         );
     } else if (state.pendingQuestionShadowState) {
         const shadowTag =
@@ -297,7 +363,7 @@ export function buildUserPrompt() {
                     ? terminalThemeText('question', compactDetail ? '[SHDW]' : '[SHADOW:FRESH]')
                     : terminalThemeText('warn', '[SHADOW]');
         if (state.pendingQuestionShadowState === 'expired' || promptPolicy.showNonCriticalShadowTag) {
-            tags.push(shadowTag);
+            pushPromptTag(shadowTag, terminalThemeText('warn', '[S]'));
         }
     }
     if (
@@ -305,25 +371,32 @@ export function buildUserPrompt() {
         modelProjection.configuredModel &&
         modelProjection.displayModel !== modelProjection.configuredModel
     ) {
-        tags.push(
+        pushPromptTag(
             terminalThemeText(
                 'error',
                 compactDetail ? '[MM]' : `[MODEL:${modelProjection.configuredModel}→${modelProjection.displayModel}]`,
             ),
+            terminalThemeText('error', '[MM]'),
         );
     }
     const latestIntent = readLatestTerminalIntent();
-    if (latestIntent && Date.now() - latestIntent.timestamp < 5 * 60_000) {
+    const canShowLiveIntentTag = state.status === 'processing' || state.status === 'waiting_for_input';
+    if (canShowLiveIntentTag && latestIntent && Date.now() - latestIntent.timestamp < 5 * 60_000) {
         const riskTag =
             latestIntent.risk === 'high'
                 ? terminalThemeText('error', compactDetail ? '[I!]' : '[INTENT:HIGH]')
                 : latestIntent.risk === 'medium'
                   ? terminalThemeText('warn', compactDetail ? '[I]' : '[INTENT]')
                   : terminalThemeText('muted', compactDetail ? '[I]' : '[INTENT]');
-        tags.push(riskTag);
+        pushPromptTag(riskTag, terminalThemeText(latestIntent.risk === 'high' ? 'error' : 'muted', '[I]'));
     }
 
-    return `${terminalThemeText('success', 'você')}${terminalThemeText('muted', '[')}${terminalThemeText('info', model)}${terminalThemeText('muted', '/')}${terminalThemeText('thinking', reasoningEffort)}${terminalThemeText('muted', ']')}${tags.join('')}${terminalThemeText('muted', '›')} `;
+    const prompt = `${terminalThemeText('success', 'você')}${terminalThemeText('muted', '[')}${terminalThemeText('info', model)}${terminalThemeText('muted', '/')}${terminalThemeText('thinking', reasoningEffort)}${terminalThemeText('muted', ']')}${tags.join('')}${terminalThemeText('muted', '›')} `;
+    if (!process.stdout.isTTY || visibleTextLength(prompt) <= resolvePromptBudgetColumns()) {
+        return prompt;
+    }
+    const compactModel = shortenPromptToken(modelProjection.displayModel || state.model, 10);
+    return `${terminalThemeText('success', 'você')}${terminalThemeText('muted', '[')}${terminalThemeText('info', compactModel)}${terminalThemeText('muted', '/')}${terminalThemeText('thinking', reasoningEffort)}${terminalThemeText('muted', ']')}${compactTags.join('')}${terminalThemeText('muted', '›')} `;
 }
 
 /**

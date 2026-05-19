@@ -10,7 +10,7 @@
  */
 
 import { logSwallowed, toError } from '#copilot/core';
-import { sendSession } from '#copilot/sdk/session-runtime';
+import { logSessionTimeline, sendSession } from '#copilot/sdk/session-runtime';
 import { log } from '../ports/index.js';
 
 /**
@@ -55,7 +55,7 @@ export async function sessionLog(ctx, message, options) {
     const session = ctx.getSessionSnapshot();
     if (!session || typeof session.log !== 'function') return;
     try {
-        await session.log(message, options);
+        await logSessionTimeline(session, message, options);
     } catch (e) {
         logSwallowed(e, 'agent.sessionLog');
     }

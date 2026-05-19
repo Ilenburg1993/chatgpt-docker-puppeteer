@@ -7,6 +7,7 @@
 
 import { SESSION_EVENTS } from '#copilot/events';
 import { log } from '#copilot/observability';
+import { resolveModelSelectionMismatch } from '#copilot/core';
 import { onSessionEvent } from '#copilot/sdk/session';
 
 /**
@@ -42,9 +43,11 @@ export function wireUsageEvent(session, { emit, onPrInfo }) {
                 ? sessionRecord.__copilotEffectiveModel
                 : billedModel;
         const effectiveModel = rawEffectiveModel === 'auto' && billedModel ? billedModel : rawEffectiveModel;
-        const modelMismatch =
-            Boolean(billedModel && configuredModel && billedModel !== configuredModel) ||
-            Boolean(effectiveModel && configuredModel && effectiveModel !== configuredModel);
+        const modelMismatch = resolveModelSelectionMismatch({
+            configuredModel,
+            billedModel,
+            effectiveModel,
+        });
         const prInfo = {
             ts: Date.now(),
             ...(billedModel !== undefined ? { model: billedModel } : {}),

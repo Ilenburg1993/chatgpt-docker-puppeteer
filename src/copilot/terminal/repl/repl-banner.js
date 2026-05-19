@@ -13,7 +13,7 @@ export function buildTerminalReplBanner(injectPort) {
 \x1b[36m╔══════════════════════════════════════════════════════════════════════════╗\x1b[0m
 \x1b[36m║\x1b[0m  💬  \x1b[1mTerminal LLM-B\x1b[0m  \x1b[90m—\x1b[0m  Sessão Permanente                            \x1b[36m║\x1b[0m
 \x1b[36m╚══════════════════════════════════════════════════════════════════════════╝\x1b[0m
-    \x1b[33m/status\x1b[0m · \x1b[33m/now\x1b[0m · \x1b[33m/live [n]\x1b[0m · \x1b[33m/history [n]\x1b[0m · \x1b[33m/db-history [n] [offset]\x1b[0m · \x1b[33m/db-sessions [n]\x1b[0m · \x1b[33m/who\x1b[0m · \x1b[33m/restart\x1b[0m
+    \x1b[33m/status\x1b[0m · \x1b[33m/health\x1b[0m · \x1b[33m/now\x1b[0m · \x1b[33m/live [n]\x1b[0m · \x1b[33m/history [n]\x1b[0m · \x1b[33m/db-history [n] [offset]\x1b[0m · \x1b[33m/db-sessions [n]\x1b[0m · \x1b[33m/who\x1b[0m · \x1b[33m/restart\x1b[0m
     \x1b[33m/activity [n]\x1b[0m \x1b[90m← atividade atual + timeline\x1b[0m · \x1b[33m/live [n]\x1b[0m \x1b[90m← loop/stream/SSE/tools/I-O\x1b[0m
   \x1b[33m/model [list|id]\x1b[0m · \x1b[33m/reasoning [low|medium|high|xhigh|off]\x1b[0m · \x1b[33m/count\x1b[0m
     \x1b[33m/attach [path|blob|clear]\x1b[0m · \x1b[33m/context\x1b[0m · \x1b[33m/compact\x1b[0m · \x1b[33m/plan [on|off|autopilot|read|clear]\x1b[0m · \x1b[33m/resume [id]\x1b[0m

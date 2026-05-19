@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # =============================================================================
 # local-copilot-proxy.sh — Optional Local HTTP CONNECT Proxy Manager
-# Version: v1.2.3
+# Version: v1.3.1
 #
 # Purpose:
 #   Manage an optional loopback-only HTTP CONNECT proxy for GitHub/Copilot
@@ -38,6 +38,24 @@
 #     or forbidden-response windows.
 #   - Ensures compare-off/compare-lock-failed paths emit recommendation artifacts
 #     instead of leaving the manager with proxy_recommendation=unknown.
+#
+# v1.3.0 focus:
+#   - Promotes the canonical GitHub/Copilot endpoint registry as the default
+#     source for proxy probes, with a bounded embedded fallback set.
+#   - Rejects arbitrary probe URLs by default to avoid credential/userinfo leaks
+#     and accidental probing of non-GitHub surfaces.
+#   - Emits endpoint registry status, row counts and probe source in report and
+#     summary artifacts.
+#
+# v1.3.1 focus:
+#   - Fixes ShellCheck SC2221/SC2222 by removing a redundant Azure Front Door
+#     case pattern that was fully covered by the broader Copilot reports glob.
+#   - Fixes ShellCheck SC2086 by counting probe URLs without unquoted expansion.
+#   - Hardens probe URL parsing: HTTPS is required by default, HTTP targets are
+#     accepted only when custom probe URLs are explicitly allowed.
+#   - Normalizes expected-HTTP host matching to lowercase and reports acquired
+#     lock state in summary artifacts.
+#   - Corrects already-running start status from starting to running.
 # =============================================================================
 
 set +e
@@ -50,7 +68,7 @@ trap - ERR EXIT INT TERM 2> /dev/null || true
 # -----------------------------------------------------------------------------
 case "${1:-}" in
     --version)
-        printf '%s v%s\n' 'local-copilot-proxy.sh' '1.2.3'
+        printf '%s v%s\n' 'local-copilot-proxy.sh' '1.3.1'
         exit 0
         ;;
     --help)
@@ -71,6 +89,11 @@ never exports proxy variables into its parent process.
 Benchmark actions:
   benchmark  Measures the local proxy over multiple samples without changing env.
   compare    Runs direct-vs-proxy A/B samples and writes a recommendation.
+
+Endpoint governance:
+  By default, proxy probes are read from DEVCONTAINER_COPILOT_ENDPOINT_REGISTRY_FILE
+  when present, falling back to the embedded GitHub/Copilot endpoint set. Set
+  DEVCONTAINER_LOCAL_COPILOT_PROXY_PROBE_URLS only for an explicit override.
 USAGE
         exit 0
         ;;
@@ -123,18 +146,33 @@ cmd_available_word() {
     fi
 }
 
+space_list_to_lines() {
+    # Convert a whitespace-separated control-plane list to one item per line
+    # without unquoted expansion. Probe URLs and port lists are explicitly not
+    # allowed to contain whitespace, so this preserves the existing contract
+    # while avoiding globbing surprises.
+    awk '{ for (i = 1; i <= NF; i++) print $i }' <<< "${1:-}" 2> /dev/null || true
+}
+
 normalize_space_list() {
     local item out
     out=""
-    for item in ${1:-}; do
+    while IFS= read -r item; do
         [[ -z "${item}" ]] && continue
         if [[ -z "${out}" ]]; then
             out="${item}"
         else
             out="${out} ${item}"
         fi
-    done
+    done < <(space_list_to_lines "${1:-}")
     printf '%s' "${out}"
+}
+
+count_space_list() {
+    # Count a whitespace-separated list without unquoted expansion. This avoids
+    # glob expansion and keeps ShellCheck SC2086 satisfied while preserving the
+    # script's list contract: probe URLs themselves must not contain whitespace.
+    space_list_to_lines "${1:-}" | awk 'NF { c++ } END { print c + 0 }' 2> /dev/null || printf '0'
 }
 
 # -----------------------------------------------------------------------------
@@ -142,8 +180,17 @@ normalize_space_list() {
 # -----------------------------------------------------------------------------
 SCRIPT_NAME="local-copilot-proxy.sh"
 readonly SCRIPT_NAME
-SCRIPT_VERSION="1.2.3"
+SCRIPT_VERSION="1.3.1"
 readonly SCRIPT_VERSION
+
+SCRIPT_DIR=""
+SCRIPT_DIR_TMP=""
+if SCRIPT_DIR_TMP="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2> /dev/null && pwd -P 2> /dev/null)"; then
+    SCRIPT_DIR="${SCRIPT_DIR_TMP}"
+else
+    SCRIPT_DIR="$(pwd -P 2> /dev/null || printf '.')"
+fi
+readonly SCRIPT_DIR
 
 REQUESTED_ACTION="${DEVCONTAINER_LOCAL_COPILOT_PROXY_ACTION:-${1:-start}}"
 case "${REQUESTED_ACTION}" in
@@ -213,9 +260,103 @@ readonly COMPARISON_FILE
 RECOMMENDATION_FILE="${DEVCONTAINER_LOCAL_COPILOT_PROXY_RECOMMENDATION_FILE:-/tmp/devcontainer-copilot-proxy.recommendation}"
 readonly RECOMMENDATION_FILE
 
-DEFAULT_PROBE_URLS="https://api.github.com/ https://api.github.com/rate_limit https://api.github.com/user https://api.github.com/copilot_internal/v2/token https://copilot-proxy.githubusercontent.com/ https://api.githubcopilot.com/ https://api.individual.githubcopilot.com/ https://proxy.individual.githubcopilot.com/ https://origin-tracker.githubusercontent.com/ https://copilot-telemetry.githubusercontent.com/ https://default.exp-tas.com/"
-PROBE_URLS="$(normalize_space_list "${DEVCONTAINER_LOCAL_COPILOT_PROXY_PROBE_URLS:-${DEVCONTAINER_LOCAL_COPILOT_PROXY_PROBE_URL:-${DEFAULT_PROBE_URLS}}}")"
-readonly DEFAULT_PROBE_URLS PROBE_URLS
+DEFAULT_PROBE_URLS="https://api.github.com/ https://api.github.com/rate_limit https://api.github.com/user https://api.github.com/copilot_internal/v2/token https://github.com/login https://github.com/copilot https://copilot-proxy.githubusercontent.com/ https://api.githubcopilot.com/ https://api.individual.githubcopilot.com/ https://proxy.individual.githubcopilot.com/ https://origin-tracker.githubusercontent.com/ https://copilot-telemetry.githubusercontent.com/ https://default.exp-tas.com/"
+ENDPOINT_REGISTRY_CANONICAL_FILE="${DEVCONTAINER_COPILOT_ENDPOINT_REGISTRY_FILE:-${DEVCONTAINER_COPILOT_ENDPOINT_REGISTRY:-${SCRIPT_DIR}/endpoints.github-copilot.tsv}}"
+readonly ENDPOINT_REGISTRY_CANONICAL_FILE
+ENDPOINT_REGISTRY_LEGACY_FILE="${DEVCONTAINER_LOCAL_COPILOT_PROXY_LEGACY_ENDPOINT_REGISTRY_FILE:-${SCRIPT_DIR}/../../network/endpoints.github-copilot.tsv}"
+readonly ENDPOINT_REGISTRY_LEGACY_FILE
+USE_ENDPOINT_REGISTRY="$(cfg_bool "${DEVCONTAINER_LOCAL_COPILOT_PROXY_USE_ENDPOINT_REGISTRY:-${DEVCONTAINER_COPILOT_USE_ENDPOINT_REGISTRY:-true}}" true)"
+readonly USE_ENDPOINT_REGISTRY
+MAX_PROBE_URLS="$(cfg_uint "${DEVCONTAINER_LOCAL_COPILOT_PROXY_MAX_PROBE_URLS:-64}" 64 1 128)"
+readonly MAX_PROBE_URLS
+ALLOW_CUSTOM_PROBE_URLS="$(cfg_bool "${DEVCONTAINER_LOCAL_COPILOT_PROXY_ALLOW_CUSTOM_PROBE_URLS:-false}" false)"
+readonly ALLOW_CUSTOM_PROBE_URLS
+REGISTRY_PROBE_URLS=""
+PROBE_URL_SOURCE="default"
+PROBE_REGISTRY_FILE="none"
+PROBE_REGISTRY_STATUS="not-used"
+PROBE_REGISTRY_ROWS="0"
+PROBE_REGISTRY_BAD_ROWS="0"
+PROBE_URL_COUNT="0"
+
+read_registry_probe_urls() {
+    local file max
+    file="${1:-}"
+    max="${2:-${MAX_PROBE_URLS}}"
+    [[ -r "${file}" ]] || return 1
+    awk -F'	' -v max="${max}" '
+        /^[[:space:]]*#/ { next }
+        NF == 0 { next }
+        NF != 5 { next }
+        $1 ~ /^https:\/\// && $1 !~ /[[:space:]\\]/ && $1 !~ /@/ {
+            if (!seen[$1]++) {
+                print $1
+                emitted++
+                if (emitted >= max) exit
+            }
+        }
+    ' "${file}" 2> /dev/null
+}
+
+audit_endpoint_registry_file() {
+    local file rows bad
+    file="${1:-}"
+    [[ -r "${file}" ]] || return 1
+    rows="$(awk -F'	' '/^[[:space:]]*#/ {next} NF == 0 {next} {c++} END {print c+0}' "${file}" 2> /dev/null || printf '0')"
+    bad="$(awk -F'	' '
+        /^[[:space:]]*#/ { next }
+        NF == 0 { next }
+        NF != 5 { bad++; next }
+        $1 !~ /^https:\/\// { bad++; next }
+        $1 ~ /[[:space:]\\]/ { bad++; next }
+        $1 ~ /@/ { bad++; next }
+        END { print bad+0 }
+    ' "${file}" 2> /dev/null || printf '0')"
+    PROBE_REGISTRY_ROWS="${rows:-0}"
+    PROBE_REGISTRY_BAD_ROWS="${bad:-0}"
+    if [[ "${PROBE_REGISTRY_BAD_ROWS}" != "0" ]]; then
+        PROBE_REGISTRY_STATUS="invalid"
+        return 1
+    fi
+    if [[ "${PROBE_REGISTRY_ROWS}" == "0" ]]; then
+        PROBE_REGISTRY_STATUS="empty"
+        return 1
+    fi
+    PROBE_REGISTRY_STATUS="ok"
+    return 0
+}
+
+if [[ -n "${DEVCONTAINER_LOCAL_COPILOT_PROXY_PROBE_URLS:-}${DEVCONTAINER_LOCAL_COPILOT_PROXY_PROBE_URL:-}" ]]; then
+    PROBE_URLS="$(normalize_space_list "${DEVCONTAINER_LOCAL_COPILOT_PROXY_PROBE_URLS:-${DEVCONTAINER_LOCAL_COPILOT_PROXY_PROBE_URL:-}}")"
+    PROBE_URL_SOURCE="env-override"
+elif [[ "${USE_ENDPOINT_REGISTRY}" == "true" ]]; then
+    if [[ -r "${ENDPOINT_REGISTRY_CANONICAL_FILE}" ]]; then
+        PROBE_REGISTRY_FILE="${ENDPOINT_REGISTRY_CANONICAL_FILE}"
+    elif [[ -r "${ENDPOINT_REGISTRY_LEGACY_FILE}" ]]; then
+        PROBE_REGISTRY_FILE="${ENDPOINT_REGISTRY_LEGACY_FILE}"
+    fi
+    if [[ "${PROBE_REGISTRY_FILE}" != "none" ]]; then
+        audit_endpoint_registry_file "${PROBE_REGISTRY_FILE}" || true
+        REGISTRY_PROBE_URLS="$(read_registry_probe_urls "${PROBE_REGISTRY_FILE}" "${MAX_PROBE_URLS}" | awk 'NF { printf "%s%s", sep, $0; sep=" " }' 2> /dev/null || true)"
+        if [[ -n "${REGISTRY_PROBE_URLS}" ]]; then
+            PROBE_URLS="$(normalize_space_list "${REGISTRY_PROBE_URLS}")"
+            PROBE_URL_SOURCE="registry"
+        else
+            PROBE_URLS="$(normalize_space_list "${DEFAULT_PROBE_URLS}")"
+            PROBE_URL_SOURCE="default-registry-empty"
+        fi
+    else
+        PROBE_REGISTRY_STATUS="missing"
+        PROBE_URLS="$(normalize_space_list "${DEFAULT_PROBE_URLS}")"
+        PROBE_URL_SOURCE="default-registry-missing"
+    fi
+else
+    PROBE_REGISTRY_STATUS="disabled"
+    PROBE_URLS="$(normalize_space_list "${DEFAULT_PROBE_URLS}")"
+    PROBE_URL_SOURCE="default-registry-disabled"
+fi
+PROBE_URL_COUNT="$(count_space_list "${PROBE_URLS}")"
+readonly DEFAULT_PROBE_URLS PROBE_URLS PROBE_URL_SOURCE PROBE_REGISTRY_FILE PROBE_REGISTRY_STATUS PROBE_REGISTRY_ROWS PROBE_REGISTRY_BAD_ROWS PROBE_URL_COUNT
 CONNECT_TIMEOUT="$(cfg_uint "${DEVCONTAINER_LOCAL_COPILOT_PROXY_CONNECT_TIMEOUT:-4}" 4 1 60)"
 readonly CONNECT_TIMEOUT
 MAX_TIME="$(cfg_uint "${DEVCONTAINER_LOCAL_COPILOT_PROXY_MAX_TIME:-12}" 12 2 180)"
@@ -236,7 +377,7 @@ ALLOW_NON_LOOPBACK="$(cfg_bool "${DEVCONTAINER_LOCAL_COPILOT_PROXY_ALLOW_NON_LOO
 readonly ALLOW_NON_LOOPBACK
 CONNECT_PORTS_RAW="${DEVCONTAINER_LOCAL_COPILOT_PROXY_CONNECT_PORTS:-443}"
 CONNECT_PORTS=""
-for _connect_port_candidate in ${CONNECT_PORTS_RAW}; do
+while IFS= read -r _connect_port_candidate; do
     _connect_port="$(cfg_uint "${_connect_port_candidate}" 0 1 65535)"
     if [[ "${_connect_port}" != "0" ]]; then
         case " ${CONNECT_PORTS} " in
@@ -250,7 +391,7 @@ for _connect_port_candidate in ${CONNECT_PORTS_RAW}; do
                 ;;
         esac
     fi
-done
+done < <(space_list_to_lines "${CONNECT_PORTS_RAW}")
 if [[ -z "${CONNECT_PORTS}" ]]; then
     CONNECT_PORTS="443"
 fi
@@ -387,7 +528,16 @@ write_report_header() {
         printf 'proxy_host=%s\n' "${PROXY_HOST}"
         printf 'proxy_port=%s\n' "${PROXY_PORT}"
         printf 'proxy_url=%s\n' "${PROXY_URL}"
+        printf 'probe_url_source=%s\n' "${PROBE_URL_SOURCE}"
+        printf 'probe_url_count=%s\n' "${PROBE_URL_COUNT}"
         printf 'probe_urls=%s\n' "${PROBE_URLS}"
+        printf 'endpoint_registry_canonical_file=%s\n' "${ENDPOINT_REGISTRY_CANONICAL_FILE}"
+        printf 'endpoint_registry_legacy_file=%s\n' "${ENDPOINT_REGISTRY_LEGACY_FILE}"
+        printf 'endpoint_registry_file=%s\n' "${PROBE_REGISTRY_FILE}"
+        printf 'endpoint_registry_status=%s\n' "${PROBE_REGISTRY_STATUS}"
+        printf 'endpoint_registry_rows=%s\n' "${PROBE_REGISTRY_ROWS}"
+        printf 'endpoint_registry_bad_rows=%s\n' "${PROBE_REGISTRY_BAD_ROWS}"
+        printf 'allow_custom_probe_urls=%s\n' "${ALLOW_CUSTOM_PROBE_URLS}"
         printf 'apply_profile=%s\n' "${APPLY_PROFILE}"
         printf 'allow_non_loopback=%s\n' "${ALLOW_NON_LOOPBACK}"
         printf 'connect_ports=%s\n' "${CONNECT_PORTS}"
@@ -437,6 +587,15 @@ write_summary() {
         printf 'action=%s\n' "${ACTION}"
         printf 'mode=%s\n' "${PROXY_MODE}"
         printf 'proxy_url=%s\n' "${PROXY_URL}"
+        printf 'probe_url_source=%s\n' "${PROBE_URL_SOURCE}"
+        printf 'probe_url_count=%s\n' "${PROBE_URL_COUNT}"
+        printf 'endpoint_registry_canonical_file=%s\n' "${ENDPOINT_REGISTRY_CANONICAL_FILE}"
+        printf 'endpoint_registry_legacy_file=%s\n' "${ENDPOINT_REGISTRY_LEGACY_FILE}"
+        printf 'endpoint_registry_file=%s\n' "${PROBE_REGISTRY_FILE}"
+        printf 'endpoint_registry_status=%s\n' "${PROBE_REGISTRY_STATUS}"
+        printf 'endpoint_registry_rows=%s\n' "${PROBE_REGISTRY_ROWS}"
+        printf 'endpoint_registry_bad_rows=%s\n' "${PROBE_REGISTRY_BAD_ROWS}"
+        printf 'allow_custom_probe_urls=%s\n' "${ALLOW_CUSTOM_PROBE_URLS}"
         printf 'proxy_host=%s\n' "${PROXY_HOST}"
         printf 'proxy_port=%s\n' "${PROXY_PORT}"
         printf 'connect_ports=%s\n' "${CONNECT_PORTS}"
@@ -800,9 +959,10 @@ write_tinyproxy_config() {
         printf 'Allow ::1\n'
         printf 'ViaProxyName "devcontainer-copilot-proxy"\n'
         printf 'DisableViaHeader %s\n' "${disable_via}"
-        for port in ${CONNECT_PORTS}; do
+        while IFS= read -r port; do
+            [[ -n "${port}" ]] || continue
             printf 'ConnectPort %s\n' "${port}"
-        done
+        done < <(space_list_to_lines "${CONNECT_PORTS}")
     } > "${tmp}" 2> /dev/null || {
         safe_remove_file "${tmp}"
         return 1
@@ -878,7 +1038,7 @@ start_proxy() {
     cleanup_stale_pid_file
     if proxy_is_running; then
         log_info "tinyproxy já está em execução em ${PROXY_URL}."
-        write_status "starting"
+        write_status "running"
         append_report "tinyproxy=already-running pid=${LAST_PID}"
         LAST_REASON="already-running"
         return 0
@@ -971,6 +1131,37 @@ stop_proxy() {
 # -----------------------------------------------------------------------------
 # Probe / hints
 # -----------------------------------------------------------------------------
+lowercase() {
+    printf '%s' "${1:-}" | tr '[:upper:]' '[:lower:]'
+}
+
+probe_url_host() {
+    local url without_scheme authority host
+    url="${1:-}"
+    without_scheme="${url#*://}"
+    authority="${without_scheme%%/*}"
+    if [[ "${authority}" == \[*\]* ]]; then
+        host="${authority#\[}"
+        host="${host%%\]*}"
+    else
+        host="${authority%%:*}"
+    fi
+    lowercase "${host}"
+}
+
+is_allowed_probe_host() {
+    local host
+    host="$(probe_url_host "${1:-}")"
+    [[ "${ALLOW_CUSTOM_PROBE_URLS}" == "true" ]] && return 0
+    case "${host}" in
+        github.com | api.github.com | uploads.github.com | user-images.githubusercontent.com) return 0 ;;
+        copilot-proxy.githubusercontent.com | origin-tracker.githubusercontent.com | copilot-telemetry.githubusercontent.com | collector.github.com | default.exp-tas.com | copilot-reports.github.com) return 0 ;;
+        githubcopilot.com | *.githubcopilot.com) return 0 ;;
+        copilot-reports-*.b01.azurefd.net) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
 expected_http_ok() {
     local url code without_scheme authority host path
     url="${1:-}"
@@ -990,6 +1181,7 @@ expected_http_ok() {
     else
         host="${host%%:*}"
     fi
+    host="$(lowercase "${host}")"
 
     case "${host}" in
         api.github.com)
@@ -1016,7 +1208,7 @@ expected_http_ok() {
                     ;;
             esac
             ;;
-        copilot-proxy.githubusercontent.com | origin-tracker.githubusercontent.com | copilot-telemetry.githubusercontent.com | collector.github.com | default.exp-tas.com)
+        copilot-proxy.githubusercontent.com | origin-tracker.githubusercontent.com | copilot-telemetry.githubusercontent.com | collector.github.com | default.exp-tas.com | copilot-reports.github.com | copilot-reports-*.b01.azurefd.net)
             [[ "${code}" == "200" || "${code}" == "204" || "${code}" == "400" || "${code}" == "401" || "${code}" == "403" || "${code}" == "404" || "${code}" == "405" ]]
             return $?
             ;;
@@ -1109,14 +1301,15 @@ probe_proxy() {
         return 1
     fi
 
-    for url in ${PROBE_URLS}; do
+    while IFS= read -r url; do
+        [[ -n "${url}" ]] || continue
         total_count=$((total_count + 1))
         if probe_one_url "${url}"; then
             ok_count=$((ok_count + 1))
         else
             fail_count=$((fail_count + 1))
         fi
-    done
+    done < <(space_list_to_lines "${PROBE_URLS}")
 
     PROBE_OK_COUNT="${ok_count}"
     PROBE_TOTAL_COUNT="${total_count}"
@@ -1242,6 +1435,29 @@ doctor_action() {
         append_report "doctor=curl-missing"
         rc=1
     fi
+    if [[ "${USE_ENDPOINT_REGISTRY}" == "true" ]]; then
+        if [[ "${PROBE_REGISTRY_STATUS}" == "ok" ]]; then
+            append_report "doctor=endpoint-registry-ok file=${PROBE_REGISTRY_FILE} rows=${PROBE_REGISTRY_ROWS} source=${PROBE_URL_SOURCE}"
+        elif [[ "${PROBE_REGISTRY_STATUS}" == "missing" ]]; then
+            append_report "doctor=endpoint-registry-missing canonical=${ENDPOINT_REGISTRY_CANONICAL_FILE} legacy=${ENDPOINT_REGISTRY_LEGACY_FILE} source=${PROBE_URL_SOURCE}"
+        else
+            append_report "doctor=endpoint-registry-${PROBE_REGISTRY_STATUS} file=${PROBE_REGISTRY_FILE} rows=${PROBE_REGISTRY_ROWS} bad_rows=${PROBE_REGISTRY_BAD_ROWS}"
+            [[ "${PROBE_REGISTRY_STATUS}" == "invalid" ]] && rc=1
+        fi
+    fi
+    local _probe_url _bad_probe_urls
+    _bad_probe_urls=0
+    while IFS= read -r _probe_url; do
+        [[ -n "${_probe_url}" ]] || continue
+        if ! is_supported_probe_url "${_probe_url}"; then
+            append_report "doctor=probe-url-rejected url=$(sanitize_oneline "${_probe_url}") allow_custom_probe_urls=${ALLOW_CUSTOM_PROBE_URLS}"
+            _bad_probe_urls=$((_bad_probe_urls + 1))
+        fi
+    done < <(space_list_to_lines "${PROBE_URLS}")
+    if [[ "${_bad_probe_urls}" -gt 0 ]]; then
+        rc=1
+    fi
+    append_report "doctor=probe-url-audit source=${PROBE_URL_SOURCE} count=${PROBE_URL_COUNT} rejected=${_bad_probe_urls}"
     refresh_listen_status || true
     if proxy_is_running; then
         write_status "ok"
@@ -1346,6 +1562,7 @@ with_lock_or_run() {
             else
                 flock -x -w "${LOCK_WAIT_SECONDS}" 9 || exit 98
             fi
+            LOCK_STATUS="acquired"
             main_unlocked "$@"
         ) 9> "${LOCK_FILE}"
         rc=$?
@@ -1363,13 +1580,14 @@ with_lock_or_run() {
 # Benchmark / direct-vs-proxy comparison helpers
 # -----------------------------------------------------------------------------
 is_supported_probe_url() {
-    local url without_scheme authority
+    local url without_scheme authority hostport host port
     url="${1:-}"
     [[ -n "${url}" ]] || return 1
     [[ "${url}" != *[[:space:]]* ]] || return 1
-    [[ "${url}" != *\\* ]] || return 1
+    [[ "${url}" != *\* ]] || return 1
     case "${url}" in
-        http://* | https://*) : ;;
+        https://*) : ;;
+        http://*) [[ "${ALLOW_CUSTOM_PROBE_URLS}" == "true" ]] || return 1 ;;
         *) return 1 ;;
     esac
     without_scheme="${url#*://}"
@@ -1377,12 +1595,26 @@ is_supported_probe_url() {
     # Probe URLs are endpoint descriptors, not credential carriers. Reject
     # userinfo-bearing URLs so credentials cannot be logged into report/TSV files.
     case "${authority}" in
-        *@*) return 1 ;;
-        "") return 1 ;;
+        *@* | "") return 1 ;;
     esac
+    hostport="${authority}"
+    if [[ "${hostport}" == \[*\]* ]]; then
+        host="${hostport#\[}"
+        host="${host%%\]*}"
+        port="${hostport##*:}"
+        [[ "${hostport}" == *]:* ]] || port=""
+    else
+        host="${hostport%%:*}"
+        port=""
+        [[ "${hostport}" == *:* ]] && port="${hostport##*:}"
+    fi
+    [[ -n "${host}" ]] || return 1
+    if [[ -n "${port}" ]]; then
+        [[ "${port}" =~ ^[0-9]+$ && "${port}" -ge 1 && "${port}" -le 65535 ]] || return 1
+    fi
+    is_allowed_probe_host "${url}" || return 1
     return 0
 }
-
 write_benchmark_header() {
     printf 'timestamp\tsample_index\ttransport\tproxy_url\tprobe_url\thttp_code\tremote_ip\tdns_ms\ttcp_ms\ttls_ms\tttfb_ms\ttotal_ms\ttls_verify\tcurl_exitcode\tresult\treason\n' \
         | write_atomic_content "${BENCHMARK_FILE}" 0644 || true
@@ -1704,14 +1936,15 @@ benchmark_loop() {
 
         sample_index=$((sample_index + 1))
         log_info "benchmark sample=${sample_index}; elapsed=${elapsed}s; direct=${include_direct}; proxy=${include_proxy}."
-        for url in ${PROBE_URLS}; do
+        while IFS= read -r url; do
+            [[ -n "${url}" ]] || continue
             if [[ "${include_direct}" == "true" ]]; then
                 transport_curl_probe direct "${url}" "${sample_index}" || true
             fi
             if [[ "${include_proxy}" == "true" ]]; then
                 transport_curl_probe proxy "${url}" "${sample_index}" || true
             fi
-        done
+        done < <(space_list_to_lines "${PROBE_URLS}")
 
         now="$(date '+%s' 2> /dev/null || printf '0')"
         elapsed=$((now - start_epoch))
@@ -1860,7 +2093,7 @@ main_unlocked() {
     write_metrics_header
     TINYPROXY_VERSION="$(detect_tinyproxy_version)"
     log_info "Local Copilot proxy manager iniciado (v${SCRIPT_VERSION}); action=${ACTION}; mode=${PROXY_MODE}."
-    log_debug "PROXY_URL=${PROXY_URL}"
+    log_debug "PROXY_URL=${PROXY_URL}; PROBE_URL_SOURCE=${PROBE_URL_SOURCE}; PROBE_URL_COUNT=${PROBE_URL_COUNT}"
     log_debug "RUNTIME_DIR=${RUNTIME_DIR}"
     log_debug "CONNECT_PORTS=${CONNECT_PORTS}"
 

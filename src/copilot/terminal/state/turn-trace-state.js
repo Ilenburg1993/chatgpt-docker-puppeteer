@@ -5,6 +5,8 @@ const MAX_RECENT_TURN_TRACES = 20;
 /** @typedef {'assistant' | 'implicit'} TerminalTurnTraceSource */
 /** @typedef {'active' | 'completed' | 'interrupted'} TerminalTurnTraceStatus */
 /** @typedef {'read' | 'write' | 'edit' | 'delete' | 'list' | 'run' | 'unknown'} TerminalTurnTraceOperation */
+/** @typedef {'question' | 'ready' | 'reply' | 'stopped' | 'structured'} TerminalTurnTraceUserInputKind */
+/** @typedef {'requested' | 'answered' | 'cancelled'} TerminalTurnTraceUserInputStatus */
 
 /**
  * @typedef {{
@@ -32,6 +34,21 @@ const MAX_RECENT_TURN_TRACES = 20;
 
 /**
  * @typedef {{
+ *     requestId: string | null;
+ *     kind: TerminalTurnTraceUserInputKind;
+ *     question: string;
+ *     choices: string[];
+ *     allowFreeform: boolean;
+ *     status: TerminalTurnTraceUserInputStatus;
+ *     answerPreview: string | null;
+ *     source: string;
+ *     count: number;
+ *     updatedAt: number;
+ * }} TerminalTurnTraceUserInputEntry
+ */
+
+/**
+ * @typedef {{
  *     traceId: string;
  *     turnId: string | null;
  *     source: TerminalTurnTraceSource;
@@ -41,8 +58,10 @@ const MAX_RECENT_TURN_TRACES = 20;
  *     finishedAt: number | null;
  *     toolCount: number;
  *     fileCount: number;
+ *     userInputCount: number;
  *     tools: TerminalTurnTraceToolEntry[];
  *     files: TerminalTurnTraceFileEntry[];
+ *     userInputs: TerminalTurnTraceUserInputEntry[];
  * }} TerminalTurnTraceSnapshot
  */
 
@@ -50,6 +69,7 @@ const MAX_RECENT_TURN_TRACES = 20;
  * @typedef {TerminalTurnTraceSnapshot & {
  *     toolIndex: Map<string, number>;
  *     fileIndex: Map<string, number>;
+ *     userInputIndex: Map<string, number>;
  * }} InternalTerminalTurnTrace
  */
 
@@ -98,10 +118,13 @@ function createTurnTrace(timestamp, turnId, source) {
         finishedAt: null,
         toolCount: 0,
         fileCount: 0,
+        userInputCount: 0,
         tools: [],
         files: [],
+        userInputs: [],
         toolIndex: new Map(),
         fileIndex: new Map(),
+        userInputIndex: new Map(),
     };
 }
 
@@ -120,8 +143,10 @@ function toSnapshot(trace) {
         finishedAt: trace.finishedAt,
         toolCount: trace.tools.length,
         fileCount: trace.files.length,
+        userInputCount: trace.userInputs.length,
         tools: trace.tools.map((entry) => ({ ...entry })),
         files: trace.files.map((entry) => ({ ...entry })),
+        userInputs: trace.userInputs.map((entry) => ({ ...entry, choices: [...entry.choices] })),
     };
 }
 
@@ -301,6 +326,106 @@ export function completeTerminalTurnToolCall({ toolCallId, success, timestamp = 
 }
 
 /**
+ * @param {unknown} value
+ * @returns {TerminalTurnTraceUserInputKind}
+ */
+function normalizeUserInputKind(value) {
+    return value === 'ready' || value === 'reply' || value === 'stopped' || value === 'structured'
+        ? value
+        : 'question';
+}
+
+/**
+ * @param {unknown} value
+ * @returns {TerminalTurnTraceUserInputStatus}
+ */
+function normalizeUserInputStatus(value) {
+    return value === 'answered' || value === 'cancelled' ? value : 'requested';
+}
+
+/**
+ * @param {unknown} value
+ * @returns {string[]}
+ */
+function normalizeChoices(value) {
+    if (!Array.isArray(value)) return [];
+    return value
+        .filter((choice) => typeof choice === 'string' && choice.trim().length > 0)
+        .map((choice) => choice.trim());
+}
+
+/**
+ * @param {{
+ *     requestId?: string | null;
+ *     kind?: TerminalTurnTraceUserInputKind;
+ *     question?: string;
+ *     choices?: string[];
+ *     allowFreeform?: boolean;
+ *     status?: TerminalTurnTraceUserInputStatus;
+ *     answerPreview?: string | null;
+ *     source?: string;
+ *     turnId?: string | null;
+ *     timestamp?: number;
+ * }} input
+ * @returns {TerminalTurnTraceSnapshot}
+ */
+export function recordTerminalTurnUserInputActivity({
+    requestId = null,
+    kind = 'question',
+    question = '',
+    choices = [],
+    allowFreeform = true,
+    status = 'requested',
+    answerPreview = null,
+    source = 'sdk',
+    turnId = null,
+    timestamp = Date.now(),
+}) {
+    const normalizedTurnId = normalizeTurnId(turnId);
+    const trace = ensureCurrentTurnTrace(timestamp, normalizedTurnId, normalizedTurnId ? 'assistant' : 'implicit');
+    const normalizedRequestId = normalizeToolCallId(requestId);
+    const normalizedQuestion = typeof question === 'string' && question.trim() ? question.trim() : '(sem pergunta)';
+    const key =
+        normalizedRequestId ??
+        `${normalizeUserInputKind(kind)}\u241f${normalizedQuestion}\u241f${source}\u241f${trace.userInputs.length}`;
+    const existingIndex = trace.userInputIndex.get(key);
+    const normalizedStatus = normalizeUserInputStatus(status);
+
+    if (existingIndex == null) {
+        trace.userInputIndex.set(key, trace.userInputs.length);
+        trace.userInputs.push({
+            requestId: normalizedRequestId,
+            kind: normalizeUserInputKind(kind),
+            question: normalizedQuestion,
+            choices: normalizeChoices(choices),
+            allowFreeform: allowFreeform !== false,
+            status: normalizedStatus,
+            answerPreview:
+                typeof answerPreview === 'string' && answerPreview.trim().length > 0 ? answerPreview.trim() : null,
+            source,
+            count: 1,
+            updatedAt: timestamp,
+        });
+    } else {
+        const existing = trace.userInputs[existingIndex];
+        if (existing) {
+            existing.status = normalizedStatus;
+            existing.answerPreview =
+                typeof answerPreview === 'string' && answerPreview.trim().length > 0
+                    ? answerPreview.trim()
+                    : existing.answerPreview;
+            existing.choices = existing.choices.length > 0 ? existing.choices : normalizeChoices(choices);
+            existing.allowFreeform = existing.allowFreeform || allowFreeform !== false;
+            existing.count += 1;
+            existing.updatedAt = timestamp;
+        }
+    }
+
+    trace.updatedAt = timestamp;
+    return toSnapshot(trace);
+}
+
+/**
  * @param {{
  *     path: string;
  *     operation?: TerminalTurnTraceOperation;
@@ -350,6 +475,10 @@ export function readTerminalTurnTraceProjection(limit = 3) {
                 ...entry,
                 tools: entry.tools.map((tool) => ({ ...tool })),
                 files: entry.files.map((file) => ({ ...file })),
+                userInputs: (entry.userInputs ?? []).map((userInput) => ({
+                    ...userInput,
+                    choices: [...userInput.choices],
+                })),
             })),
     };
 }

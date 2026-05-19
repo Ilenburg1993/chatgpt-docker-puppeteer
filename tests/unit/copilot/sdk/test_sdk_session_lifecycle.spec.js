@@ -51,6 +51,7 @@ import {
     disposeSession,
     getSessionMessages,
     getSessionWorkspacePath,
+    logSessionTimeline,
     runSessionLifecycle,
     sendSessionAndWait,
     setSessionModel,
@@ -68,6 +69,7 @@ function fakeSession(overrides = {}) {
         sessionId: 'sess-test-001',
         abort: vi.fn().mockResolvedValue(undefined),
         setModel: vi.fn().mockResolvedValue(undefined),
+        log: vi.fn().mockResolvedValue(undefined),
         getMessages: vi.fn().mockResolvedValue([]),
         disconnect: vi.fn().mockResolvedValue(undefined),
         [Symbol.asyncDispose]: vi.fn().mockResolvedValue(undefined),
@@ -132,6 +134,19 @@ describe('sdk/session-lifecycle', () => {
             expect(metrics.map((metric) => `${metric.operation}:${metric.status}`)).toEqual(
                 expect.arrayContaining(['session.setModel:started', 'session.setModel:succeeded']),
             );
+        });
+
+        it('repassa modelCapabilities para session.setModel quando fornecido', async () => {
+            const s = fakeSession();
+            const modelCapabilities = { supports: { reasoningEffort: true } };
+            await setSessionModel(s, 'gpt-5.4', {
+                reasoningEffort: 'medium',
+                modelCapabilities: /** @type {any} */ (modelCapabilities),
+            });
+            expect(s.setModel).toHaveBeenCalledWith('gpt-5.4', {
+                reasoningEffort: 'medium',
+                modelCapabilities,
+            });
         });
 
         it('funciona sem options', async () => {
@@ -204,6 +219,28 @@ describe('sdk/session-lifecycle', () => {
             expect(metrics.map((metric) => `${metric.operation}:${metric.status}`)).toEqual(
                 expect.arrayContaining(['session.sendAndWait:started', 'session.sendAndWait:succeeded']),
             );
+        });
+    });
+
+    describe('logSessionTimeline', () => {
+        it('chama session.log com opções normalizadas e métricas', async () => {
+            const s = fakeSession();
+            await expect(logSessionTimeline(s, 'hello timeline', { level: 'warning', ephemeral: true })).resolves.toBe(
+                undefined,
+            );
+            expect(s.log).toHaveBeenCalledWith('hello timeline', { level: 'warning', ephemeral: true });
+            expect(metrics.map((metric) => `${metric.operation}:${metric.status}`)).toEqual(
+                expect.arrayContaining(['session.log:started', 'session.log:succeeded']),
+            );
+        });
+
+        it('rejeita message vazio e level inválido antes do SDK', async () => {
+            const s = fakeSession();
+            await expect(logSessionTimeline(s, '')).rejects.toThrow('message deve ser string');
+            await expect(logSessionTimeline(s, 'x', /** @type {any} */ ({ level: 'debug' }))).rejects.toThrow(
+                'level deve ser',
+            );
+            expect(s.log).not.toHaveBeenCalled();
         });
     });
 

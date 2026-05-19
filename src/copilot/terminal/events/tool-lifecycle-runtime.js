@@ -597,7 +597,12 @@ export function handleTerminalNativeToolComplete({ registry, evt }) {
         registry.resolveByName(eventName) ??
         (eventName ? null : registry.resolveSingleInFlight('native'));
     const name = entry?.canonicalName ?? entry?.toolName ?? eventName ?? 'tool';
-    if (shouldSuppressTerminalToolNarration(name)) return;
+    if (shouldSuppressTerminalToolNarration(name)) {
+        const suppressedToolCallId = entry?.toolCallId ?? toolCallId;
+        if (entry?.toolCallId) registry.complete(entry.toolCallId, success);
+        if (suppressedToolCallId) completeTerminalTurnToolCall({ toolCallId: suppressedToolCallId, success });
+        return;
+    }
     const suppressByInFlightName = entry ? false : registry.isNameInFlight(name);
     if (
         suppressByInFlightName ||

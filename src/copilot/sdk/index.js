@@ -289,6 +289,12 @@ export {
 } from './session/attachments.js';
 
 export { supportsElicitation, waitForElicitationCapability, watchCapabilities } from './session/capabilities.js';
+export {
+    normalizeMessageAttachments,
+    normalizeMessageOptions,
+    normalizeMessageRequestHeaders,
+    summarizeMessageOptions,
+} from './session/message-options.js';
 // ─── Faixa 5: Session Lifecycle Wrappers (rev.4) ─────────────────────────────
 export {
     abortSession,
@@ -296,6 +302,7 @@ export {
     disposeSession,
     getSessionMessages,
     getSessionWorkspacePath,
+    logSessionTimeline,
     runSessionLifecycle,
     sendSession,
     sendSessionAndWait,

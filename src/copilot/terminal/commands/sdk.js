@@ -518,6 +518,130 @@ function defaultElicitationSchema() {
 }
 
 /**
+ * @param {unknown} schema
+ * @returns {{ key: string; field: Record<string, unknown> } | null}
+ */
+function getSingleElicitationField(schema) {
+    if (!isRuntimeElicitationSchema(schema)) return null;
+    const entries = Object.entries(schema.properties);
+    if (entries.length !== 1) return null;
+    const [key, field] = /** @type {[string, unknown]} */ (entries[0]);
+    const fieldObj = objectOrNull(field);
+    return fieldObj ? { key, field: fieldObj } : null;
+}
+
+/**
+ * @param {Record<string, unknown>} field
+ * @returns {string[]}
+ */
+function allowedScalarValues(field) {
+    if (Array.isArray(field['enum'])) return field['enum'].map((entry) => String(entry));
+    const variants = Array.isArray(field['anyOf'])
+        ? field['anyOf']
+        : Array.isArray(field['oneOf'])
+          ? field['oneOf']
+          : [];
+    return variants.flatMap((variant) => {
+        const obj = objectOrNull(variant);
+        if (!obj) return [];
+        if ('const' in obj) return [String(obj['const'])];
+        if (Array.isArray(obj['enum'])) return obj['enum'].map((entry) => String(entry));
+        return [];
+    });
+}
+
+/**
+ * @param {string} raw
+ * @param {Record<string, unknown>} field
+ * @returns {string | number | boolean | string[]}
+ */
+function coerceElicitationShorthandValue(raw, field) {
+    const value = raw.trim();
+    const type = field['type'];
+    const allowed = allowedScalarValues(field);
+    if ((type === 'string' || !type) && allowed.length > 0) {
+        const numericIndex = Number(value);
+        if (Number.isInteger(numericIndex) && numericIndex >= 1 && numericIndex <= allowed.length) {
+            const selected = allowed[numericIndex - 1];
+            if (selected !== undefined) return selected;
+        }
+    }
+    if (type === 'boolean') {
+        const lower = value.toLowerCase();
+        if (['true', '1', 'yes', 'y', 'sim', 's'].includes(lower)) return true;
+        if (['false', '0', 'no', 'n', 'nao', 'não'].includes(lower)) return false;
+        throw new TypeError('Valor curto booleano deve ser true/false, yes/no ou sim/não.');
+    }
+    if (type === 'number' || type === 'integer') {
+        const parsed = Number(value);
+        if (!Number.isFinite(parsed)) throw new TypeError('Valor curto numérico deve ser number finito.');
+        return parsed;
+    }
+    if (type === 'array') {
+        if (value.startsWith('[')) {
+            const parsed = JSON.parse(value);
+            if (!Array.isArray(parsed) || !parsed.every((item) => typeof item === 'string')) {
+                throw new TypeError('Valor curto array deve ser JSON string[] ou texto separado por |.');
+            }
+            return parsed;
+        }
+        return value
+            .split(value.includes('|') ? '|' : ',')
+            .map((item) => item.trim())
+            .filter(Boolean);
+    }
+    return value;
+}
+
+/**
+ * @param {string[]} rest
+ * @param {unknown} schema
+ * @returns {{ ok: true; content: Record<string, string | number | boolean | string[]> | undefined }
+ *     | { ok: false; error: string }}
+ */
+function parseElicitationAcceptContent(rest, schema) {
+    const raw = rest.join(' ').trim();
+    if (!raw) return { ok: true, content: undefined };
+
+    if (raw.startsWith('{')) {
+        const parsed = parseJsonObject(rest);
+        if (parsed.error) return { ok: false, error: parsed.error };
+        return {
+            ok: true,
+            content: /** @type {Record<string, string | number | boolean | string[]> | undefined} */ (
+                /** @type {unknown} */ (parsed.json ?? undefined)
+            ),
+        };
+    }
+
+    const single = getSingleElicitationField(schema);
+    if (!single) {
+        return {
+            ok: false,
+            error: 'Resposta curta só é aceita quando o schema tem exatamente um campo; use JSON object.',
+        };
+    }
+
+    try {
+        return { ok: true, content: { [single.key]: coerceElicitationShorthandValue(raw, single.field) } };
+    } catch (e) {
+        return { ok: false, error: toError(e).message };
+    }
+}
+
+/**
+ * @param {unknown} schema
+ * @returns {string | null}
+ */
+function describeElicitationShorthand(schema) {
+    const single = getSingleElicitationField(schema);
+    if (!single) return null;
+    const allowed = allowedScalarValues(single.field);
+    const suffix = allowed.length > 0 ? ` (${allowed.join(' | ')})` : '';
+    return `/elicitation respond <id> accept <${single.key}>${suffix}`;
+}
+
+/**
  * @param {string | undefined} action
  * @param {string[]} rest
  * @param {unknown} [schema]
@@ -534,14 +658,9 @@ function parseElicitationResult(action, rest, schema) {
     if (action !== 'accept') {
         return { ok: true, result: { action } };
     }
-    const parsed = parseJsonObject(rest);
-    if (parsed.error) {
-        return { ok: false, error: parsed.error };
-    }
-    const content = parsed.json
-        ? /** @type {Record<string, string | number | boolean | string[]>} */ (/** @type {unknown} */ (parsed.json))
-        : undefined;
-    const normalized = normalizeElicitationContentWithSchema(content, schema);
+    const parsed = parseElicitationAcceptContent(rest, schema);
+    if (!parsed.ok) return parsed;
+    const normalized = normalizeElicitationContentWithSchema(parsed.content, schema);
     if (!normalized.ok) {
         return { ok: false, error: normalized.error };
     }
@@ -1653,11 +1772,12 @@ function renderElicitationEntry({ println }, entry) {
     if (entry.resultAction) println(`  result  \x1b[33m${entry.resultAction}\x1b[0m`);
     if (entry.resultContent) println(`\n  result content:\n${pretty(entry.resultContent, 2500)}`);
     if (entry.requestedSchema) println(`\n  schema:\n${pretty(entry.requestedSchema, 2500)}`);
-    println(
-        entry.actionable
-            ? '\n  \x1b[90mResponda com /elicitation respond <id> <accept|decline|cancel> [json]\x1b[0m\n'
-            : '',
-    );
+    if (entry.actionable) {
+        const shorthand = describeElicitationShorthand(entry.requestedSchema);
+        println('\n  \x1b[90mResponda com /elicitation respond <id> <accept|decline|cancel> [json]\x1b[0m');
+        if (shorthand) println(`  \x1b[90mAtalho: ${shorthand}\x1b[0m`);
+        println('');
+    }
 }
 
 /**

@@ -16,6 +16,7 @@ export {
     describeAutoModelPolicy,
     readAutoModelPreference,
 } from './auto-policy.js';
+export { isAutoModelSelector, resolveModelSelectionMismatch } from '#copilot/core';
 
 export {
     buildReasoningConfig,

@@ -9,8 +9,8 @@
  * @see EventBus
  */
 
+import { resolveModelSelectionMismatch, toError } from '#copilot/core';
 import { describeAutoModelPolicy, listModels, modelRegistry, modelStatsTracker } from '#copilot/sdk/models';
-import { toError } from '#copilot/core';
 import { log } from '../ports/index.js';
 import { trySetLiveSessionModel } from '../runtime/contracts/index.js';
 import { readAgentRuntimeStatusSnapshot } from '../runtime/index.js';
@@ -62,14 +62,17 @@ export function setModel(ctx, modelId) {
     const previousEffectiveModel =
         typeof previousPrInfo?.effectiveModel === 'string' ? previousPrInfo.effectiveModel : undefined;
     const previousBilledModel = typeof previousPrInfo?.model === 'string' ? previousPrInfo.model : undefined;
-    const observedModel = previousEffectiveModel ?? previousBilledModel;
     const sessionId = ctx.getSessionSnapshot()?.sessionId ?? previousPrInfo?.sessionId ?? null;
     ctx.setLastPrInfo({
         ...(previousPrInfo ?? { ts: Date.now() }),
         configuredModel: modelId,
         ...(previousEffectiveModel ? { effectiveModel: previousEffectiveModel } : {}),
         ...(previousBilledModel ? { model: previousBilledModel } : {}),
-        modelMismatch: Boolean(observedModel && observedModel !== modelId),
+        modelMismatch: resolveModelSelectionMismatch({
+            configuredModel: modelId,
+            billedModel: previousBilledModel,
+            effectiveModel: previousEffectiveModel,
+        }),
         sessionId,
         ts: Date.now(),
     });

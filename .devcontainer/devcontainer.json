@@ -1,5 +1,5 @@
 // ============================================================================
-// DevContainer — Ambiente de Desenvolvimento Controlado - v5.7.0
+// DevContainer — Ambiente de Desenvolvimento Controlado - v5.8.0
 // Projeto: chatgpt-docker-puppeteer
 //
 // Propósito:
@@ -28,7 +28,32 @@
 //   inferência. Quando declaradas, são forwardadas explicitamente e com política
 //   de UX silenciosa/ignore. O acesso operacional continua decidido pelo runtime.
 //
-// CHANGELOG v5.7.0 (2026-05-17):
+// CHANGELOG v5.8.0 (2026-05-19):
+// 🧭 CANONICAL PATH REALIGNMENT + CONTROL PLANE SYNC
+// ✅ ALINHADO: Dockerfile v1.4.2
+// ✅ ALINHADO: post-create v1.1.0
+// ✅ ALINHADO: post-start v2.8.1
+// ✅ ALINHADO: post-attach v5.7.1
+// ✅ ALINHADO: github-api-route-fix v1.8.6
+// ✅ ALINHADO: local-dns-cache v1.5.3
+// ✅ ALINHADO: local-copilot-proxy v1.2.3
+// ✅ ALINHADO: github-copilot-network-manager v1.5.3
+// ✅ ALINHADO: copilot-route-advisor v1.0.1
+// ✅ ALINHADO: nss-gatekeeper v2.1.2
+// ✅ CORRIGIDO: endpoint registry aponta para .devcontainer/scripts/network/
+// ✅ CORRIGIDO: aliases DEVCONTAINER_COPILOT_ENDPOINT_REGISTRY(_FILE)
+// ✅ CORRIGIDO: remoção do override DEVCONTAINER_COPILOT_PROBE_ENDPOINTS
+//                para permitir que o registry seja a fonte de verdade.
+// ✅ CORRIGIDO: knobs do local-copilot-proxy para nomes realmente consumidos
+//                pelo script v1.2.3.
+// ✅ ADICIONADO: metadados DEVCONTAINER_VERSION / CONTROL_PLANE_GENERATION.
+// ✅ ADICIONADO: limites explícitos de consumo do endpoint registry.
+// ✅ MANTIDO: benchmark prolongado manual/opt-in; boot permanece recommend/quick.
+// ✅ MANTIDO: proxy local desligado por padrão; sem HTTPS_PROXY/HTTP_PROXY global.
+// ✅ MANTIDO: DNS cache local em auto/ranked com fail-closed.
+// ✅ ATUALIZADO: labels runtime para devcontainer.version=5.8.0.
+//
+// // CHANGELOG v5.7.0 (2026-05-17):
 // 🧭 NETWORK CONTROL PLANE + SAFE BENCHMARK INTEGRATION
 // ✅ ALINHADO: Dockerfile v1.4.2
 // ✅ ALINHADO: package.json v1.1.0
@@ -114,7 +139,7 @@
 // ============================================================================
 {
   // ============================================================
-  // BUILD CONFIGURATION (v5.7.0 — Dockerfile v1.4.2 sync)
+  // BUILD CONFIGURATION (v5.8.0 — Dockerfile v1.4.2 sync)
   // ============================================================
   "build": {
     "args": {
@@ -144,7 +169,7 @@
     "dockerfile": "Dockerfile"
   },
   // ============================================================
-  // CONTAINER ENVIRONMENT VARIABLES (v5.7.0 — NSS/Dockerfile/network sync)
+  // CONTAINER ENVIRONMENT VARIABLES (v5.8.0 — NSS/Dockerfile/network sync)
   // ============================================================
   "containerEnv": {
     // canonical shell contract mirrored from /etc/profile.d/00-runtime.sh
@@ -158,6 +183,9 @@
     "APP_ENV": "dev",
     "APP_NAME": "chatgpt-docker-puppeteer",
     "APP_ROLE": "agent",
+    "DEVCONTAINER_VERSION": "5.8.0",
+    "DEVCONTAINER_CONTROL_PLANE_GENERATION": "network-control-plane-v5.8.0",
+    "DEVCONTAINER_CANONICAL_ENDPOINT_REGISTRY": "${containerWorkspaceFolder}/.devcontainer/scripts/network/endpoints.github-copilot.tsv",
     // CHOKIDAR_USEPOLLING e CHOKIDAR_INTERVAL removidos em v5.4.0:
     // O workspace é montado como ext4 (inotify nativo funciona).
     // Vite já configura polling explicitamente em vite.config.js (watch.usePolling: true).
@@ -226,7 +254,17 @@
     "DEVCONTAINER_COPILOT_NETWORK_BENCHMARK_INTERVAL_SECONDS": "10",
     "DEVCONTAINER_COPILOT_NETWORK_BENCHMARK_MAX_SAMPLES": "0",
     "DEVCONTAINER_COPILOT_NETWORK_RECOMMENDATION_TTL_SECONDS": "86400",
-    "DEVCONTAINER_COPILOT_ENDPOINT_REGISTRY": "${containerWorkspaceFolder}/.devcontainer/network/endpoints.github-copilot.tsv",
+    // Endpoint registry canônico:
+    // • o arquivo vive junto dos scripts de rede em .devcontainer/scripts/network/
+    // • ambos os aliases são definidos porque post-start, post-attach,
+    //   github-copilot-network-manager e post-create aceitam nomes diferentes.
+    // • NÃO definir DEVCONTAINER_COPILOT_PROBE_ENDPOINTS aqui; quando presente,
+    //   ele sobrescreve o registry e impede que a allowlist TSV governe os probes.
+    "DEVCONTAINER_COPILOT_ENDPOINT_REGISTRY": "${containerWorkspaceFolder}/.devcontainer/scripts/network/endpoints.github-copilot.tsv",
+    "DEVCONTAINER_COPILOT_ENDPOINT_REGISTRY_FILE": "${containerWorkspaceFolder}/.devcontainer/scripts/network/endpoints.github-copilot.tsv",
+    "DEVCONTAINER_COPILOT_USE_ENDPOINT_REGISTRY": "true",
+    "DEVCONTAINER_POST_START_ENDPOINT_REGISTRY_MAX_ROWS": "64",
+    "DEVCONTAINER_COPILOT_MANAGER_MAX_ENDPOINTS": "64",
     "DEVCONTAINER_COPILOT_MANAGER_RUN_API_ROUTE_FIX": "true",
     "DEVCONTAINER_COPILOT_MANAGER_FAIL_ON_DEGRADED": "false",
     "DEVCONTAINER_COPILOT_MANAGER_SUBSCRIPT_TIMEOUT_SECONDS": "90",
@@ -234,19 +272,25 @@
     "DEVCONTAINER_COPILOT_PROBE_CONNECT_TIMEOUT": "4",
     "DEVCONTAINER_COPILOT_PROBE_MAX_TIME": "12",
     "DEVCONTAINER_COPILOT_PROBE_IP_FAMILY": "4",
-    "DEVCONTAINER_COPILOT_PROBE_PROXY_MODE": "direct",
+    "DEVCONTAINER_COPILOT_PROBE_PROXY_MODE": "auto",
     "DEVCONTAINER_COPILOT_PROBE_PARALLEL": "false",
     "DEVCONTAINER_COPILOT_NETWORK_LOCK_WAIT_SECONDS": "30",
     "DEVCONTAINER_COPILOT_NETWORK_HISTORY_LOCK_WAIT_SECONDS": "10",
     "DEVCONTAINER_COPILOT_MANAGER_ALLOW_CUSTOM_ENDPOINTS": "false",
     "DEVCONTAINER_COPILOT_MANAGER_ALLOW_CUSTOM_GITHUB_API_HOST": "false",
-    "DEVCONTAINER_COPILOT_PROBE_ENDPOINTS": "https://api.github.com https://api.github.com/rate_limit https://api.github.com/user https://api.github.com/copilot_internal/v2/token https://copilot-proxy.githubusercontent.com https://origin-tracker.githubusercontent.com https://copilot-telemetry.githubusercontent.com/telemetry https://default.exp-tas.com https://api.githubcopilot.com https://api.individual.githubcopilot.com https://proxy.individual.githubcopilot.com",
+    // DEVCONTAINER_COPILOT_PROBE_ENDPOINTS deliberadamente omitido.
+    // Fallbacks permanecem nos scripts; a fonte primária agora é o TSV canônico.
 
     // DNS cache local: habilitado em modo auto/ranked após validação manual
-    // com local-dns-cache v1.5.1. O script só escreve /etc/resolv.conf
+    // com local-dns-cache v1.5.3. O script só escreve /etc/resolv.conf
     // depois de provar dnsmasq em 127.0.0.1:53 e restaura fallback em falha.
     "DEVCONTAINER_ENABLE_LOCAL_DNS_CACHE": "true",
     "DEVCONTAINER_LOCAL_DNS_CACHE_MODE": "auto",
+    "DEVCONTAINER_LOCAL_DNS_MODE": "auto",
+    "DEVCONTAINER_LOCAL_DNS_POST_START_ACTION": "start",
+    "DEVCONTAINER_LOCAL_DNS_CACHE_ACTION": "start",
+    "DEVCONTAINER_POST_START_DNS_BASELINE_ON_CACHE_OFF": "true",
+    "DEVCONTAINER_POST_START_DNS_BASELINE_ON_CACHE_FAILURE": "true",
     "DEVCONTAINER_LOCAL_DNS_BIND_ADDRESS": "127.0.0.1",
     "DEVCONTAINER_LOCAL_DNS_BIND_PORT": "53",
     "DEVCONTAINER_LOCAL_DNS_UPSTREAM_SELECTION": "ranked",
@@ -273,7 +317,7 @@
     "DEVCONTAINER_LOCAL_DNS_STRICT_ORDER": "false",
     "DEVCONTAINER_LOCAL_DNS_USE_STALE_CACHE": "false",
 
-    // Proxy HTTP CONNECT local: disponível na imagem v1.4.0, mas desligado por padrão.
+    // Proxy HTTP CONNECT local: disponível na imagem v1.4.2, mas desligado por padrão.
     // Para habilitar de forma explícita: DEVCONTAINER_ENABLE_LOCAL_COPILOT_PROXY=true
     // e DEVCONTAINER_COPILOT_PROXY_MODE=local.
     "DEVCONTAINER_ENABLE_LOCAL_COPILOT_PROXY": "false",
@@ -286,9 +330,12 @@
     "DEVCONTAINER_LOCAL_COPILOT_PROXY_BENCHMARK_DURATION_SECONDS": "600",
     "DEVCONTAINER_LOCAL_COPILOT_PROXY_BENCHMARK_INTERVAL_SECONDS": "10",
     "DEVCONTAINER_LOCAL_COPILOT_PROXY_BENCHMARK_MAX_SAMPLES": "0",
-    "DEVCONTAINER_LOCAL_COPILOT_PROXY_COMPARE_MIN_SAMPLES": "5",
-    "DEVCONTAINER_LOCAL_COPILOT_PROXY_COMPARE_MIN_IMPROVEMENT_PERCENT": "30",
-    "DEVCONTAINER_LOCAL_COPILOT_PROXY_COMPARE_MAX_FAIL_RATE_PERCENT": "10",
+    "DEVCONTAINER_LOCAL_COPILOT_PROXY_BENCHMARK_MIN_SAMPLES": "5",
+    "DEVCONTAINER_LOCAL_COPILOT_PROXY_BENCHMARK_MIN_IMPROVEMENT_PERCENT": "25",
+    "DEVCONTAINER_LOCAL_COPILOT_PROXY_BENCHMARK_MAX_FAIL_RATE_PERCENT": "10",
+    "DEVCONTAINER_LOCAL_COPILOT_PROXY_COMPARE_START_PROXY": "true",
+    "DEVCONTAINER_LOCAL_COPILOT_PROXY_COMPARE_KEEP_PROXY": "true",
+    "DEVCONTAINER_POST_START_OBSERVE_LOCAL_PROXY_STATUS": "true",
 
     // Evita duplicar probes quando o manager v1.1+ já rodou com sucesso.
     "DEVCONTAINER_POST_START_LEGACY_PROBES_AFTER_MANAGER": "false",
@@ -1146,7 +1193,7 @@
   "postCreateCommand": "bash -lc 'bash \"${containerWorkspaceFolder}/.devcontainer/scripts/post-create.sh\"'",
 
   // Roda toda vez que o container sobe (não-bloqueante por contrato).
-  // O script v2.8.0 converte actions longas em recommend/quick path: benchmark fica manual.
+  // O script v2.8.1 converte actions longas em recommend/quick path: benchmark fica manual.
   "postStartCommand": "bash -lc 'bash \"${containerWorkspaceFolder}/.devcontainer/scripts/post-start.sh\"'",
 
   // Roda a cada attach do VS Code ao container
@@ -1404,7 +1451,7 @@
     "--sysctl",
     "net.ipv4.tcp_fin_timeout=30",
     "--network=bridge",
-    // METADATA: sincronizado com Dockerfile v1.4.2 e devcontainer v5.7.0
+    // METADATA: sincronizado com Dockerfile v1.4.2 e devcontainer v5.8.0
     "--label",
     "project=chatgpt-docker-puppeteer",
     "--label",
@@ -1414,7 +1461,7 @@
     "--label",
     "image.version=1.4.2",
     "--label",
-    "devcontainer.version=5.7.0"
+    "devcontainer.version=5.8.0"
   ],
   // ============================================================
   // LIFECYCLE FINALIZATION

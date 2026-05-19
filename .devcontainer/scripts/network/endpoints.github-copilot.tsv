@@ -1,52 +1,76 @@
 # endpoints.github-copilot.tsv — GitHub/Copilot endpoint registry
-# Version: v1.1.0
-# Generated: 2026-05-17
+# Version: v1.2.0
+# Generated: 2026-05-19
 # Format: url<TAB>id<TAB>capability<TAB>criticality<TAB>expected_unauthenticated_http
 #
 # Contract:
+# - Canonical path: .devcontainer/scripts/network/endpoints.github-copilot.tsv
 # - The first column is intentionally the concrete probe URL, so parsers can read it directly.
 # - Keep comments prefixed with '#'.
 # - Active rows must be concrete HTTPS URLs; do not put wildcard URLs in active rows because curl/dig probes cannot test wildcards.
+# - Active rows must not contain credentials, spaces, tabs inside fields, backslashes, or glob characters.
 # - Official wildcard allowlist patterns are documented below as comments and represented by concrete plan-specific endpoints when practical.
 # - Proxy/transport selection must not change the official endpoint; it only changes how the container reaches it.
-# - Expected HTTP values are for unauthenticated reachability probes. 401/403/404/400 may still mean DNS/TCP/TLS/HTTP reached the service.
+# - Expected HTTP values are for unauthenticated reachability probes. 400/401/403/404/405 may still mean DNS/TCP/TLS/HTTP reached the service.
+# - 403/429 are accepted for selected GitHub REST API probes because rate limits and forbidden unauthenticated access are reachability-positive states.
+# - _ping rows are diagnostic rows used to prove transport reachability; they are not substitutes for authenticated Copilot functionality.
 #
-# Official wildcard/pattern entries that are intentionally NOT active probe rows:
+# Official public Copilot allowlist patterns intentionally NOT active as wildcard probe rows:
 # - https://github.com/login/*
 # - https://github.com/copilot/*
 # - https://github.com/enterprises/YOUR-ENTERPRISE/*
+# - https://api.github.com/user
 # - https://api.github.com/copilot_internal/*
 # - https://collector.github.com/*
+# - https://copilot-telemetry.githubusercontent.com/telemetry
+# - https://default.exp-tas.com
+# - https://copilot-proxy.githubusercontent.com
+# - https://origin-tracker.githubusercontent.com
 # - https://*.githubcopilot.com/*
 # - https://*.individual.githubcopilot.com
 # - https://*.business.githubcopilot.com
 # - https://*.enterprise.githubcopilot.com
 # - https://*.SUBDOMAIN.ghe.com
 # - https://SUBDOMAIN.ghe.com
+# - https://copilot-reports.github.com
 # - https://copilot-reports-*.b01.azurefd.net
 # - https://usagereports*.blob.core.windows.net
 #
+# Copilot cloud agent / private-runner allowlist entries represented below when concrete and useful:
+# - uploads.github.com
+# - user-images.githubusercontent.com
+# - api.individual.githubcopilot.com
+# - api.business.githubcopilot.com
+# - api.enterprise.githubcopilot.com
+#
+# Deliberately excluded from active probe rows:
+# - Package registries, certificate authority CRL/OCSP hosts, container registries and operating-system mirrors from the Copilot cloud agent firewall list.
+#   They are important for GitHub-hosted/cloud-agent build environments, but this registry governs GitHub/Copilot transport inside the DevContainer.
+# - GHE.com placeholders and enterprise-specific SUBDOMAIN values; add them only through an explicit local overlay/override.
+# - Azure report fallback wildcards and blob wildcards; keep them in firewall allowlists, not as active curl/dig probe rows, unless a concrete tenant URL is known.
+#
 # url	id	capability	criticality	expected_unauthenticated_http
-https://github.com	github_home	github_web_core	medium	200|301|302
-https://github.com/login	github_login	github_auth	medium	200|301|302
-https://github.com/login/device	github_device_login	github_auth_device	medium	200|301|302|404
+https://github.com/login	github_login	github_auth	medium	200|301|302|403
+https://github.com/login/device	github_device_login	github_auth_device	medium	200|301|302|403|404
 https://github.com/copilot/	github_copilot_web	copilot_web	medium	200|301|302|401|403|404
 https://api.github.com	github_api_root	github_rest_core	high	200|403|429
 https://api.github.com/rate_limit	github_api_rate_limit	github_rest_core	high	200|403|429
-https://api.github.com/user	github_api_user	github_identity	high	401|403
-https://api.github.com/copilot_internal/v2/token	github_api_copilot_token	copilot_token	high	401|403|404
-https://collector.github.com/	github_collector	github_analytics	low	200|204|301|302|400|401|403|404
-https://copilot-telemetry.githubusercontent.com/telemetry	copilot_telemetry	copilot_telemetry	low	200|204|400|401|403|404
-https://default.exp-tas.com	copilot_experimentation	copilot_experimentation	medium	200|204|301|302|400|401|403|404
-https://copilot-proxy.githubusercontent.com	copilot_proxy_public	copilot_suggestions	high	200|401|403|404
-https://origin-tracker.githubusercontent.com	copilot_origin_tracker	copilot_suggestions	high	200|401|403|404
-https://api.githubcopilot.com	copilot_api_generic	copilot_suggestions	high	200|400|401|403|404
-https://api.individual.githubcopilot.com	copilot_api_individual	copilot_suggestions	high	200|400|401|403|404
-https://proxy.individual.githubcopilot.com	copilot_proxy_individual	copilot_suggestions	high	200|400|401|403|404
-https://api.business.githubcopilot.com	copilot_api_business	copilot_suggestions	medium	200|400|401|403|404
-https://proxy.business.githubcopilot.com	copilot_proxy_business	copilot_suggestions	medium	200|400|401|403|404
-https://api.enterprise.githubcopilot.com	copilot_api_enterprise	copilot_suggestions	medium	200|400|401|403|404
-https://proxy.enterprise.githubcopilot.com	copilot_proxy_enterprise	copilot_suggestions	medium	200|400|401|403|404
-https://copilot-reports.github.com	copilot_reports	copilot_usage_reports	low	200|204|301|302|400|401|403|404
-https://uploads.github.com	github_uploads	copilot_cloud_agent_optional	low	200|301|302|400|401|403|404
-https://user-images.githubusercontent.com	github_user_images	copilot_cloud_agent_optional	low	200|301|302|400|401|403|404
+https://api.github.com/user	github_api_user	github_identity	high	401|403|429
+https://api.github.com/copilot_internal/v2/token	github_api_copilot_token	copilot_token	high	401|403|404|429
+https://collector.github.com/	github_collector	github_analytics	low	200|204|301|302|400|401|403|404|405
+https://copilot-telemetry.githubusercontent.com/telemetry	copilot_telemetry	copilot_telemetry	low	200|204|400|401|403|404|405
+https://default.exp-tas.com	copilot_experimentation	copilot_experimentation	medium	200|204|301|302|400|401|403|404|405
+https://copilot-proxy.githubusercontent.com/_ping	copilot_proxy_ping	copilot_transport_ping	high	200
+https://copilot-proxy.githubusercontent.com	copilot_proxy_public	copilot_suggestions	high	200|204|400|401|403|404|405
+https://origin-tracker.githubusercontent.com	copilot_origin_tracker	copilot_suggestions	high	200|204|400|401|403|404|405
+https://api.githubcopilot.com/_ping	copilot_api_ping	copilot_chat_ping	high	200
+https://api.githubcopilot.com	copilot_api_generic	copilot_suggestions	high	200|204|400|401|403|404|405
+https://api.individual.githubcopilot.com	copilot_api_individual	copilot_suggestions	high	200|204|400|401|403|404|405
+https://proxy.individual.githubcopilot.com	copilot_proxy_individual	copilot_suggestions	high	200|204|400|401|403|404|405
+https://api.business.githubcopilot.com	copilot_api_business	copilot_suggestions	medium	200|204|400|401|403|404|405
+https://proxy.business.githubcopilot.com	copilot_proxy_business	copilot_suggestions	medium	200|204|400|401|403|404|405
+https://api.enterprise.githubcopilot.com	copilot_api_enterprise	copilot_suggestions	medium	200|204|400|401|403|404|405
+https://proxy.enterprise.githubcopilot.com	copilot_proxy_enterprise	copilot_suggestions	medium	200|204|400|401|403|404|405
+https://copilot-reports.github.com	copilot_reports	copilot_usage_reports	low	200|204|301|302|400|401|403|404|405
+https://uploads.github.com	github_uploads	copilot_cloud_agent_optional	low	200|204|301|302|400|401|403|404|405
+https://user-images.githubusercontent.com	github_user_images	copilot_cloud_agent_optional	low	200|204|301|302|400|401|403|404|405

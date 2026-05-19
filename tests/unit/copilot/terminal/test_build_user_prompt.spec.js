@@ -269,4 +269,42 @@ describe('terminal/dialog/output buildUserPrompt', () => {
 
         prefs.setTerminalDetailLevel('detailed');
     });
+
+    it('compacta automaticamente o prompt para preservar espaço de digitação em TTY estreito', async () => {
+        const originalIsTTY = process.stdout.isTTY;
+        const originalColumns = process.stdout.columns;
+        Object.defineProperty(process.stdout, 'isTTY', { value: true, configurable: true });
+        Object.defineProperty(process.stdout, 'columns', { value: 72, configurable: true });
+        readTerminalRuntimeState.mockReturnValueOnce(
+            /** @type {any} */ ({
+                ...readTerminalRuntimeState(),
+                model: 'gpt-5.4',
+                pendingQuestion: { question: 'Q', kind: 'question' },
+                pendingQuestionKind: 'question',
+                lastPrInfo: {
+                    model: 'claude-haiku-4.5',
+                    configuredModel: 'gpt-5.4',
+                    effectiveModel: 'claude-haiku-4.5',
+                    modelMismatch: true,
+                    ts: Date.now(),
+                },
+            }),
+        );
+
+        try {
+            const { buildUserPrompt, stripAnsiEscapes } = await import(
+                '../../../../src/copilot/terminal/dialog/output.js'
+            );
+            const prompt = buildUserPrompt();
+            const plain = stripAnsiEscapes(prompt);
+
+            expect(plain).toContain('[ASK]');
+            expect(plain).toContain('[MM]');
+            expect(plain).not.toContain('[MODEL:gpt-5.4→claude-haiku-4.5]');
+            expect(plain.length).toBeLessThanOrEqual(34);
+        } finally {
+            Object.defineProperty(process.stdout, 'isTTY', { value: originalIsTTY, configurable: true });
+            Object.defineProperty(process.stdout, 'columns', { value: originalColumns, configurable: true });
+        }
+    });
 });

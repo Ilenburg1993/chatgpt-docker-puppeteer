@@ -34,6 +34,7 @@ export {
     completeTerminalTurnTrace,
     recordTerminalTurnFileActivity,
     recordTerminalTurnToolActivity,
+    recordTerminalTurnUserInputActivity,
 } from '../turn-trace-state.js';
 export { getTerminalDetailLevel } from '../ui-preferences.js';
 export { terminalActionChip, terminalThemeBadge, terminalThemeText } from '../ui-theme.js';

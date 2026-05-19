@@ -64,6 +64,7 @@ import {
     isSessionUiElicitationAvailable,
     listActiveClientSessions,
     listAllClientSessions,
+    logSessionTimeline,
     onAllSessionEvents,
     resumeClientSession,
     SDK_HOOKS,
@@ -158,6 +159,7 @@ const sdkSessionUiOps = Object.freeze({
 const sdkSessionRuntimeOps = Object.freeze({
     abortSession,
     getSessionMessages,
+    logSessionTimeline,
     sendSession,
     sendSessionAndWait,
     setSessionModel,

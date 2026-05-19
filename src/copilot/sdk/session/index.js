@@ -110,6 +110,13 @@ export { clearHooksLogger, log, setHooksLogger } from './hook-logger.js';
 export { HookRegistry, SDK_HOOKS } from './hook-registry.js';
 
 export {
+    normalizeMessageAttachments,
+    normalizeMessageOptions,
+    normalizeMessageRequestHeaders,
+    summarizeMessageOptions,
+} from './message-options.js';
+
+export {
     createClientFromCliUrl,
     createSession,
     deleteSession,
@@ -222,6 +229,7 @@ export {
     disposeSession,
     getSessionMessages,
     getSessionWorkspacePath,
+    logSessionTimeline,
     runSessionLifecycle,
     sendSession,
     sendSessionAndWait,

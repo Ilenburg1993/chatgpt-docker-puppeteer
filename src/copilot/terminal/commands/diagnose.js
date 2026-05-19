@@ -157,6 +157,13 @@ export async function cmdDiagnose({ hubSessionId, println }, arg = '') {
         slowestBootPhase || slowestShutdownHandler
             ? `${slowestBootPhase ? `boot=${slowestBootPhase.id}/${slowestBootPhase.avgDurationMs}ms avg` : 'boot=n/d'} ${C.grey}·${C.reset} ${slowestShutdownHandler ? `shutdown=${slowestShutdownHandler.name}/${slowestShutdownHandler.avgDurationMs}ms avg` : 'shutdown=n/d'}`
             : `${C.grey}n/d${C.reset}`;
+    const keepaliveRunning = Boolean(health?.['checks']?.['io']?.['keepaliveRunning']);
+    const keepaliveOk = Boolean(health?.['checks']?.['io']?.['ok']);
+    const keepaliveLine = keepaliveRunning
+        ? `${C.green}running${C.reset}`
+        : keepaliveOk
+          ? `${C.green}standby(dialog)${C.reset}`
+          : `${C.yellow}stopped${C.reset}`;
     const sdkFsRouteModeColor =
         sdkFsRouting.mode === 'local-fs-primary'
             ? C.green
@@ -182,7 +189,7 @@ ${C.cyan}  AGENTE${C.reset}
     sdk session   ${binding.sdkSessionId ? `${C.grey}${binding.sdkSessionId}${C.reset}` : `${C.grey}(sem sdk)${C.reset}`}
     hub session   ${hub.activeHubSessionId ? `${C.grey}${hub.activeHubSessionId}${C.reset}` : `${C.grey}(sem hub)${C.reset}`}
     bg tasks      ${C.grey}${health?.['backgroundPendingCount'] ?? 0}${C.reset}
-    keepalive     ${health?.['checks']?.['io']?.['keepaliveRunning'] ? `${C.green}running${C.reset}` : `${C.yellow}stopped${C.reset}`}
+    keepalive     ${keepaliveLine}
     quota monitor ${health?.['checks']?.['quota']?.['running'] ? `${C.green}running${C.reset}` : `${C.yellow}stopped${C.reset}`}
     issues        ${health ? (Array.isArray(health['issues']) && health['issues'].length === 0 ? `${C.green}nenhuma${C.reset}` : `${C.yellow}${Array.isArray(health['issues']) ? health['issues'].slice(0, 3).join(', ') : ''}${Array.isArray(health['issues']) && health['issues'].length > 3 ? '…' : ''}${C.reset}`) : `${C.grey}n/d${C.reset}`}
     ação          ${actionLine}

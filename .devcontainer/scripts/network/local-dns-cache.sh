@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # =============================================================================
 # local-dns-cache.sh — DevContainer Local DNS Cache Manager
-# Version: v1.5.3
+# Version: v1.6.0
 #
 # Purpose:
 #   Optional runtime-only DNS cache layer for DevContainers. Intended to be
@@ -41,6 +41,20 @@
 #     cache.
 #   - Adds process/port diagnostics and stop handling for managed dnsmasq
 #     processes discovered by command line even when the pidfile is stale.
+#
+# v1.6.0 focus:
+#   - Separates previous-summary staleness from current runtime health, fixing
+#     self-contamination where a fresh summary could inherit
+#     summary-from-different-container-init from an older /tmp artifact.
+#   - Adds explicit runtime proof fields: runtime_effective,
+#     resolver_effective, resolv_conf_points_to_cache,
+#     system_resolver_uses_cache, socket PID ownership and managed-port status.
+#   - Improves stale-pidfile semantics: a dnsmasq discovered by current config
+#     command line is treated as managed even when the pidfile is stale/missing.
+#   - Makes status/health decisions depend on current process + port + resolver
+#     proof, not merely the first line of an old status file.
+#   - Keeps the same mutation scope: only managed dnsmasq lifecycle and optional
+#     /etc/resolv.conf content rewrite via tee; no Docker/DevContainer changes.
 # =============================================================================
 
 set +e
@@ -53,7 +67,7 @@ trap - ERR EXIT INT TERM 2> /dev/null || true
 # -----------------------------------------------------------------------------
 case "${1:-}" in
     --version)
-        printf '%s v%s\n' 'local-dns-cache.sh' '1.5.3'
+        printf '%s v%s\n' 'local-dns-cache.sh' '1.6.0'
         exit 0
         ;;
     --help)
@@ -73,6 +87,10 @@ Key knobs:
   DEVCONTAINER_LOCAL_DNS_MODE=off|auto|local|required
   DEVCONTAINER_LOCAL_DNS_WRITE_RESOLV_CONF=true|false
   DEVCONTAINER_LOCAL_DNS_UPSTREAM_SELECTION=static|ranked
+
+Runtime proof fields emitted in the summary include runtime_effective,
+resolver_effective, resolv_conf_points_to_cache, system_resolver_uses_cache and
+previous_summary_stale.
 
 This script is runtime-only. It may start a bounded loopback dnsmasq helper and
 may rewrite /etc/resolv.conf when explicitly enabled by configuration.
@@ -181,7 +199,7 @@ sanitize_resolv_options() {
 # -----------------------------------------------------------------------------
 SCRIPT_NAME="local-dns-cache.sh"
 readonly SCRIPT_NAME
-SCRIPT_VERSION="1.5.3"
+SCRIPT_VERSION="1.6.0"
 readonly SCRIPT_VERSION
 
 POSITIONAL_ACTION=""
@@ -355,8 +373,18 @@ RANKING_LAST_BENCHMARK_AT="0"
 DNSMASQ_PID_EFFECTIVE="unknown"
 DNSMASQ_PROCESS_STATUS="unknown"
 DNSMASQ_PORT_STATUS="unknown"
+DNSMASQ_SOCKET_PIDS="unknown"
+DNSMASQ_SOCKET_DNSMASQ_PIDS="unknown"
+DNSMASQ_SOCKET_NON_DNSMASQ_PIDS="unknown"
 RESOLV_CONF_HEALTH="unknown"
 RESOLV_CONF_NAMESERVERS="unknown"
+RESOLV_CONF_POINTS_TO_CACHE="unknown"
+RESOLV_CONF_MANAGED="unknown"
+SYSTEM_RESOLVER_USES_CACHE="unknown"
+RUNTIME_EFFECTIVE="unknown"
+RESOLVER_EFFECTIVE="unknown"
+PREVIOUS_SUMMARY_STALE="unknown"
+PREVIOUS_SUMMARY_STALE_REASON="unknown"
 STATUS_STALE="unknown"
 STATUS_STALE_REASON="unknown"
 CONTAINER_FINGERPRINT="unknown"
@@ -545,8 +573,64 @@ append_metric() {
         >> "${METRICS_FILE}" 2> /dev/null || true
 }
 
+managed_dnsmasq_runtime_running() {
+    case "${DNSMASQ_PROCESS_STATUS:-unknown}" in
+        running-managed | running-managed-no-pidfile | running-managed-stale-pidfile) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
+runtime_effective_from_current_state() {
+    managed_dnsmasq_runtime_running || return 1
+    case "${DNSMASQ_PORT_STATUS:-unknown}" in
+        bound-managed | bound-managed-no-pidfile | bound-managed-stale-pidfile | bound-managed-unknown-port | free-or-unobserved) : ;;
+        *) return 1 ;;
+    esac
+    case "${LOCAL_PROBE_STATUS:-unknown}" in
+        ok | ok-*) return 0 ;;
+        unknown)
+            # During early collection a local probe may not have run yet. In that
+            # case, a managed process plus a non-conflicting port is promising but
+            # not proven.
+            return 2
+            ;;
+        *) return 1 ;;
+    esac
+}
+
+resolver_effective_from_current_state() {
+    [[ "${WRITE_RESOLV_CONF}" == "true" ]] || return 2
+    [[ "${RESOLV_CONF_POINTS_TO_CACHE:-false}" == "true" ]] || return 1
+    case "${SYSTEM_PROBE_STATUS:-unknown}" in
+        ok | ok-*) return 0 ;;
+        unknown) return 2 ;;
+        *) return 1 ;;
+    esac
+}
+
+collect_socket_pid_state() {
+    local pid comm pids dns_pids other_pids
+    pids=""
+    dns_pids=""
+    other_pids=""
+    while IFS= read -r pid; do
+        [[ -n "${pid}" ]] || continue
+        if [[ -z "${pids}" ]]; then pids="${pid}"; else pids="${pids} ${pid}"; fi
+        if process_is_dnsmasq "${pid}"; then
+            if [[ -z "${dns_pids}" ]]; then dns_pids="${pid}"; else dns_pids="${dns_pids} ${pid}"; fi
+        else
+            comm="$(awk 'NR == 1 {print; exit}' "/proc/${pid}/comm" 2> /dev/null || printf unknown)"
+            if [[ -z "${other_pids}" ]]; then other_pids="${pid}:${comm}"; else other_pids="${other_pids} ${pid}:${comm}"; fi
+        fi
+    done < <(socket_dnsmasq_pids)
+    DNSMASQ_SOCKET_PIDS="${pids:-none}"
+    DNSMASQ_SOCKET_DNSMASQ_PIDS="${dns_pids:-none}"
+    DNSMASQ_SOCKET_NON_DNSMASQ_PIDS="${other_pids:-none}"
+}
+
 collect_runtime_health() {
-    local pid nameservers summary_status summary_fp current_fp status_mtime age now pid_cmdline discovered_pid
+    local stale_mode pid nameservers summary_status summary_fp current_fp status_mtime age now pid_cmdline discovered_pid rt_rc resolver_rc
+    stale_mode="${1:-read-current-summary}"
     pid="$(read_dnsmasq_pid)"
     discovered_pid="$(first_managed_dnsmasq_pid_by_cmdline)"
     DNSMASQ_PID_EFFECTIVE="${pid:-${discovered_pid:-none}}"
@@ -556,8 +640,11 @@ collect_runtime_health() {
         if pid_is_alive "${pid}"; then
             if managed_dnsmasq_pid_is_alive; then
                 DNSMASQ_PROCESS_STATUS="running-managed"
+            elif [[ -n "${discovered_pid}" && "${discovered_pid}" != "${pid}" ]]; then
+                DNSMASQ_PID_EFFECTIVE="${discovered_pid}"
+                DNSMASQ_PROCESS_STATUS="running-managed-stale-pidfile"
             elif process_is_dnsmasq "${pid}"; then
-                DNSMASQ_PROCESS_STATUS="running-stale-pidfile"
+                DNSMASQ_PROCESS_STATUS="running-dnsmasq-unmanaged-pidfile"
             else
                 DNSMASQ_PROCESS_STATUS="pidfile-non-dnsmasq"
             fi
@@ -574,88 +661,147 @@ collect_runtime_health() {
         DNSMASQ_PROCESS_STATUS="running-managed-no-pidfile"
     fi
 
+    collect_socket_pid_state
     if [[ "${STRICT_PORT_CHECK}" == "true" ]] && port_in_use "${DNS_BIND_ADDRESS}" "${DNS_BIND_PORT}"; then
         case "${DNSMASQ_PROCESS_STATUS}" in
-            running-managed | running-managed-no-pidfile | running-stale-pidfile)
-                DNSMASQ_PORT_STATUS="bound-dnsmasq"
-                ;;
+            running-managed) DNSMASQ_PORT_STATUS="bound-managed" ;;
+            running-managed-no-pidfile) DNSMASQ_PORT_STATUS="bound-managed-no-pidfile" ;;
+            running-managed-stale-pidfile) DNSMASQ_PORT_STATUS="bound-managed-stale-pidfile" ;;
+            running-dnsmasq-unmanaged-pidfile) DNSMASQ_PORT_STATUS="bound-dnsmasq-unmanaged-pidfile" ;;
             *)
-                DNSMASQ_PORT_STATUS="bound-unmanaged"
+                if [[ "${DNSMASQ_SOCKET_DNSMASQ_PIDS}" != "none" ]]; then
+                    DNSMASQ_PORT_STATUS="bound-dnsmasq-unmanaged"
+                else
+                    DNSMASQ_PORT_STATUS="bound-unmanaged"
+                fi
                 ;;
         esac
     else
-        DNSMASQ_PORT_STATUS="free-or-unobserved"
+        if managed_dnsmasq_runtime_running; then
+            DNSMASQ_PORT_STATUS="bound-managed-unknown-port"
+        else
+            DNSMASQ_PORT_STATUS="free-or-unobserved"
+        fi
     fi
 
     if [[ -r /etc/resolv.conf ]]; then
         nameservers="$(awk '$1 == "nameserver" {printf "%s%s", sep, $2; sep=" "}' /etc/resolv.conf 2> /dev/null || true)"
         RESOLV_CONF_NAMESERVERS="${nameservers:-none}"
-        if verify_resolv_conf_points_to_cache; then
-            if resolv_conf_is_managed; then
+        if resolv_conf_is_managed; then
+            RESOLV_CONF_MANAGED="true"
+        else
+            RESOLV_CONF_MANAGED="false"
+        fi
+        if verify_resolv_conf_points_to_cache && [[ "${DNS_BIND_PORT}" == "53" ]]; then
+            RESOLV_CONF_POINTS_TO_CACHE="true"
+            if [[ "${RESOLV_CONF_MANAGED}" == "true" ]]; then
                 RESOLV_CONF_HEALTH="managed-points-to-cache"
             else
                 RESOLV_CONF_HEALTH="points-to-cache-unmanaged"
             fi
-        elif resolv_conf_is_managed; then
+        elif verify_resolv_conf_points_to_cache; then
+            RESOLV_CONF_POINTS_TO_CACHE="false"
+            RESOLV_CONF_HEALTH="points-to-cache-address-but-nonstandard-port"
+        elif [[ "${RESOLV_CONF_MANAGED}" == "true" ]]; then
+            RESOLV_CONF_POINTS_TO_CACHE="false"
             RESOLV_CONF_HEALTH="managed-stale-not-pointing-to-cache"
         else
+            RESOLV_CONF_POINTS_TO_CACHE="false"
             RESOLV_CONF_HEALTH="points-elsewhere"
         fi
     else
         RESOLV_CONF_NAMESERVERS="unreadable"
+        RESOLV_CONF_MANAGED="unknown"
+        RESOLV_CONF_POINTS_TO_CACHE="false"
         RESOLV_CONF_HEALTH="unreadable"
     fi
 
     current_fp="$(container_fingerprint)"
     CONTAINER_FINGERPRINT="${current_fp:-unknown}"
-    summary_status="$(summary_value_from_file "${SUMMARY_FILE}" status)"
-    summary_fp="$(summary_value_from_file "${SUMMARY_FILE}" container_fingerprint)"
+    summary_status=""
+    summary_fp=""
+    PREVIOUS_SUMMARY_STALE="false"
+    PREVIOUS_SUMMARY_STALE_REASON="fresh-or-unavailable"
     STATUS_STALE="false"
-    STATUS_STALE_REASON="fresh-or-unavailable"
+    STATUS_STALE_REASON="current-runtime-evaluated"
+
+    if [[ "${stale_mode}" != "writing-summary" ]]; then
+        summary_status="$(summary_value_from_file "${SUMMARY_FILE}" status)"
+        summary_fp="$(summary_value_from_file "${SUMMARY_FILE}" container_fingerprint)"
+        if [[ -n "${summary_fp}" && "${summary_fp}" != "${current_fp}" ]]; then
+            PREVIOUS_SUMMARY_STALE="true"
+            PREVIOUS_SUMMARY_STALE_REASON="summary-from-different-container-init"
+        elif [[ "${STATUS_STALE_MAX_SECONDS}" -gt 0 && -e "${SUMMARY_FILE}" ]]; then
+            now="$(now_epoch)"
+            status_mtime="$(file_mtime_epoch "${SUMMARY_FILE}")"
+            age=$((now - status_mtime))
+            if ((age > STATUS_STALE_MAX_SECONDS)); then
+                PREVIOUS_SUMMARY_STALE="true"
+                PREVIOUS_SUMMARY_STALE_REASON="summary-age-exceeded-${STATUS_STALE_MAX_SECONDS}s"
+            fi
+        fi
+    fi
 
     if [[ "${summary_status}" == "ok" ]] && runtime_action_requires_dnsmasq; then
-        if [[ "${WRITE_RESOLV_CONF}" == "true" && "${RESOLV_CONF_HEALTH}" != *"points-to-cache"* ]]; then
+        if [[ "${WRITE_RESOLV_CONF}" == "true" && "${RESOLV_CONF_POINTS_TO_CACHE}" != "true" ]]; then
             STATUS_STALE="true"
-            STATUS_STALE_REASON="summary-ok-but-resolv-conf-not-pointing-to-cache"
-        elif [[ "${DNSMASQ_PROCESS_STATUS}" != running-* ]]; then
+            STATUS_STALE_REASON="previous-ok-but-current-resolv-conf-not-pointing-to-cache"
+        elif ! managed_dnsmasq_runtime_running; then
             STATUS_STALE="true"
-            STATUS_STALE_REASON="summary-ok-but-dnsmasq-not-running"
+            STATUS_STALE_REASON="previous-ok-but-current-dnsmasq-not-managed-running"
         fi
     fi
 
-    if [[ -n "${summary_fp}" && "${summary_fp}" != "${current_fp}" ]]; then
-        STATUS_STALE="true"
-        STATUS_STALE_REASON="summary-from-different-container-init"
-    fi
+    runtime_effective_from_current_state
+    rt_rc=$?
+    case "${rt_rc}" in
+        0) RUNTIME_EFFECTIVE="true" ;;
+        2) RUNTIME_EFFECTIVE="unknown" ;;
+        *) RUNTIME_EFFECTIVE="false" ;;
+    esac
 
-    if [[ "${STATUS_STALE_MAX_SECONDS}" -gt 0 && -e "${SUMMARY_FILE}" ]]; then
-        now="$(now_epoch)"
-        status_mtime="$(file_mtime_epoch "${SUMMARY_FILE}")"
-        age=$((now - status_mtime))
-        if ((age > STATUS_STALE_MAX_SECONDS)); then
-            STATUS_STALE="true"
-            STATUS_STALE_REASON="summary-age-exceeded-${STATUS_STALE_MAX_SECONDS}s"
-        fi
-    fi
+    resolver_effective_from_current_state
+    resolver_rc=$?
+    case "${resolver_rc}" in
+        0)
+            RESOLVER_EFFECTIVE="true"
+            SYSTEM_RESOLVER_USES_CACHE="true"
+            ;;
+        2)
+            RESOLVER_EFFECTIVE="unknown"
+            if [[ "${RESOLV_CONF_POINTS_TO_CACHE}" == "true" ]]; then
+                SYSTEM_RESOLVER_USES_CACHE="unknown"
+            else
+                SYSTEM_RESOLVER_USES_CACHE="false"
+            fi
+            ;;
+        *)
+            RESOLVER_EFFECTIVE="false"
+            SYSTEM_RESOLVER_USES_CACHE="false"
+            ;;
+    esac
 
     if [[ -n "${pid}" && -r "/proc/${pid}/cmdline" ]]; then
         pid_cmdline="$(tr '\0' ' ' < "/proc/${pid}/cmdline" 2> /dev/null || true)"
-        append_report "dnsmasq_runtime pid=${pid} status=${DNSMASQ_PROCESS_STATUS} port=${DNSMASQ_PORT_STATUS} cmdline=${pid_cmdline}"
+        append_report "dnsmasq_runtime pid=${pid} effective_pid=${DNSMASQ_PID_EFFECTIVE} status=${DNSMASQ_PROCESS_STATUS} port=${DNSMASQ_PORT_STATUS} socket_pids=${DNSMASQ_SOCKET_PIDS} cmdline=${pid_cmdline}"
     else
-        append_report "dnsmasq_runtime pid=${DNSMASQ_PID_EFFECTIVE} status=${DNSMASQ_PROCESS_STATUS} port=${DNSMASQ_PORT_STATUS}"
+        append_report "dnsmasq_runtime pid=${DNSMASQ_PID_EFFECTIVE} status=${DNSMASQ_PROCESS_STATUS} port=${DNSMASQ_PORT_STATUS} socket_pids=${DNSMASQ_SOCKET_PIDS}"
     fi
-    append_report "resolv_conf_health=${RESOLV_CONF_HEALTH} nameservers=${RESOLV_CONF_NAMESERVERS} status_stale=${STATUS_STALE} stale_reason=${STATUS_STALE_REASON}"
+    append_report "resolv_conf_health=${RESOLV_CONF_HEALTH} nameservers=${RESOLV_CONF_NAMESERVERS} points_to_cache=${RESOLV_CONF_POINTS_TO_CACHE} managed=${RESOLV_CONF_MANAGED} runtime_effective=${RUNTIME_EFFECTIVE} resolver_effective=${RESOLVER_EFFECTIVE} status_stale=${STATUS_STALE} previous_summary_stale=${PREVIOUS_SUMMARY_STALE} stale_reason=${STATUS_STALE_REASON} previous_stale_reason=${PREVIOUS_SUMMARY_STALE_REASON}"
 }
 
 write_summary() {
     local status reason
     status="${1:-unknown}"
     reason="${2:-none}"
-    collect_runtime_health
+    collect_runtime_health "writing-summary"
     if [[ "${status}" == "ok" ]] && ! runtime_action_requires_dnsmasq; then
         STATUS_STALE="false"
         STATUS_STALE_REASON="not-runtime-action-${ACTION}"
-    elif [[ "${status}" != "ok" && "${status}" != "stale" ]]; then
+    elif [[ "${status}" == "stale" ]]; then
+        STATUS_STALE="true"
+        STATUS_STALE_REASON="${reason}"
+    elif [[ "${status}" != "ok" ]]; then
         STATUS_STALE="false"
         STATUS_STALE_REASON="not-applicable-for-${status}"
     fi
@@ -681,11 +827,21 @@ write_summary() {
         printf 'dnsmasq_pid=%s\n' "${DNSMASQ_PID_EFFECTIVE}"
         printf 'dnsmasq_process_status=%s\n' "${DNSMASQ_PROCESS_STATUS}"
         printf 'dnsmasq_port_status=%s\n' "${DNSMASQ_PORT_STATUS}"
+        printf 'dnsmasq_socket_pids=%s\n' "${DNSMASQ_SOCKET_PIDS}"
+        printf 'dnsmasq_socket_dnsmasq_pids=%s\n' "${DNSMASQ_SOCKET_DNSMASQ_PIDS}"
+        printf 'dnsmasq_socket_non_dnsmasq_pids=%s\n' "${DNSMASQ_SOCKET_NON_DNSMASQ_PIDS}"
         printf 'local_probe_status=%s\n' "${LOCAL_PROBE_STATUS}"
         printf 'system_probe_status=%s\n' "${SYSTEM_PROBE_STATUS}"
         printf 'resolv_conf_status=%s\n' "${RESOLV_CONF_STATUS}"
         printf 'resolv_conf_health=%s\n' "${RESOLV_CONF_HEALTH}"
         printf 'resolv_conf_nameservers=%s\n' "${RESOLV_CONF_NAMESERVERS}"
+        printf 'resolv_conf_points_to_cache=%s\n' "${RESOLV_CONF_POINTS_TO_CACHE}"
+        printf 'resolv_conf_managed=%s\n' "${RESOLV_CONF_MANAGED}"
+        printf 'runtime_effective=%s\n' "${RUNTIME_EFFECTIVE}"
+        printf 'resolver_effective=%s\n' "${RESOLVER_EFFECTIVE}"
+        printf 'system_resolver_uses_cache=%s\n' "${SYSTEM_RESOLVER_USES_CACHE}"
+        printf 'previous_summary_stale=%s\n' "${PREVIOUS_SUMMARY_STALE}"
+        printf 'previous_summary_stale_reason=%s\n' "${PREVIOUS_SUMMARY_STALE_REASON}"
         printf 'status_stale=%s\n' "${STATUS_STALE}"
         printf 'status_stale_reason=%s\n' "${STATUS_STALE_REASON}"
         printf 'dnsmasq_conf=%s\n' "${DNSMASQ_CONF}"
@@ -2017,21 +2173,24 @@ status_dnsmasq() {
         write_summary "off" "mode-off"
         return 0
     fi
+    if [[ "${PREVIOUS_SUMMARY_STALE}" == "true" ]]; then
+        log_warn "previous summary stale: ${PREVIOUS_SUMMARY_STALE_REASON}; avaliando runtime atual mesmo assim."
+    fi
     if [[ "${STATUS_STALE}" == "true" ]]; then
-        log_warn "status stale: ${STATUS_STALE_REASON}."
+        log_warn "runtime/status contradiction: ${STATUS_STALE_REASON}."
         write_status "stale"
         write_summary "stale" "${STATUS_STALE_REASON}"
         return 1
     fi
-    if [[ "${DNSMASQ_PROCESS_STATUS}" == running-* ]]; then
-        log_ok "dnsmasq running; process_status=${DNSMASQ_PROCESS_STATUS}; resolv_conf=${RESOLV_CONF_HEALTH}; conf=${DNSMASQ_CONF}; pid_file=${DNSMASQ_PID_FILE}"
+    if managed_dnsmasq_runtime_running; then
+        log_ok "dnsmasq managed running; process_status=${DNSMASQ_PROCESS_STATUS}; port=${DNSMASQ_PORT_STATUS}; resolv_conf=${RESOLV_CONF_HEALTH}; runtime_effective=${RUNTIME_EFFECTIVE}; resolver_effective=${RESOLVER_EFFECTIVE}"
         write_status "ok"
-        write_summary "ok" "dnsmasq-running"
+        write_summary "ok" "dnsmasq-managed-running"
         return 0
     fi
-    log_warn "dnsmasq não está rodando. process_status=${DNSMASQ_PROCESS_STATUS}; resolv_conf=${RESOLV_CONF_HEALTH}"
+    log_warn "dnsmasq gerenciado não está rodando. process_status=${DNSMASQ_PROCESS_STATUS}; port=${DNSMASQ_PORT_STATUS}; resolv_conf=${RESOLV_CONF_HEALTH}"
     write_status "stopped"
-    write_summary "stopped" "dnsmasq-not-running"
+    write_summary "stopped" "dnsmasq-not-managed-running"
     return 1
 }
 benchmark_action() {
@@ -2114,24 +2273,31 @@ health_action() {
         return 0
     fi
     collect_runtime_health
-    if [[ "${DNSMASQ_PROCESS_STATUS}" != running-* ]]; then
+    if ! managed_dnsmasq_runtime_running; then
         rc=1
     fi
-    if [[ "${WRITE_RESOLV_CONF}" == "true" && "${RESOLV_CONF_HEALTH}" != *"points-to-cache"* ]]; then
+    if [[ "${WRITE_RESOLV_CONF}" == "true" && "${RESOLV_CONF_POINTS_TO_CACHE}" != "true" ]]; then
         rc=1
     fi
     if [[ "${rc}" -eq 0 ]]; then
         probe_local_dns || rc=1
         probe_system_resolver || rc=1
+        collect_runtime_health
+    fi
+    if [[ "${rc}" -eq 0 && "${RUNTIME_EFFECTIVE}" != "true" ]]; then
+        rc=1
+    fi
+    if [[ "${rc}" -eq 0 && "${WRITE_RESOLV_CONF}" == "true" && "${RESOLVER_EFFECTIVE}" != "true" ]]; then
+        rc=1
     fi
     if [[ "${rc}" -eq 0 ]]; then
         write_status "ok"
         write_summary "ok" "health-ok"
-        log_ok "health OK: dnsmasq=${DNSMASQ_PROCESS_STATUS}; resolv_conf=${RESOLV_CONF_HEALTH}; local_probe=${LOCAL_PROBE_STATUS}; system_probe=${SYSTEM_PROBE_STATUS}"
+        log_ok "health OK: dnsmasq=${DNSMASQ_PROCESS_STATUS}; port=${DNSMASQ_PORT_STATUS}; resolv_conf=${RESOLV_CONF_HEALTH}; runtime=${RUNTIME_EFFECTIVE}; resolver=${RESOLVER_EFFECTIVE}; local_probe=${LOCAL_PROBE_STATUS}; system_probe=${SYSTEM_PROBE_STATUS}"
     else
         write_status "degraded"
         write_summary "degraded" "health-degraded"
-        log_warn "health degraded: dnsmasq=${DNSMASQ_PROCESS_STATUS}; resolv_conf=${RESOLV_CONF_HEALTH}; local_probe=${LOCAL_PROBE_STATUS}; system_probe=${SYSTEM_PROBE_STATUS}"
+        log_warn "health degraded: dnsmasq=${DNSMASQ_PROCESS_STATUS}; port=${DNSMASQ_PORT_STATUS}; resolv_conf=${RESOLV_CONF_HEALTH}; runtime=${RUNTIME_EFFECTIVE}; resolver=${RESOLVER_EFFECTIVE}; local_probe=${LOCAL_PROBE_STATUS}; system_probe=${SYSTEM_PROBE_STATUS}"
     fi
     return "${rc}"
 }
@@ -2143,11 +2309,11 @@ start_flow() {
     if [[ "${DNS_MODE}" == "off" || "${current_status}" == "off" ]]; then return 0; fi
 
     collect_runtime_health
-    if [[ "${DNSMASQ_PROCESS_STATUS}" != running-* ]]; then
+    if ! managed_dnsmasq_runtime_running; then
         write_status "degraded"
-        append_report "result=dnsmasq-not-running-before-resolv-conf process_status=${DNSMASQ_PROCESS_STATUS}"
-        restore_resolv_conf_after_failure "dnsmasq-not-running-before-resolv-conf"
-        write_summary "degraded" "dnsmasq-not-running-before-resolv-conf"
+        append_report "result=dnsmasq-not-managed-running-before-resolv-conf process_status=${DNSMASQ_PROCESS_STATUS} port_status=${DNSMASQ_PORT_STATUS}"
+        restore_resolv_conf_after_failure "dnsmasq-not-managed-running-before-resolv-conf"
+        write_summary "degraded" "dnsmasq-not-managed-running-before-resolv-conf"
         return 1
     fi
 
@@ -2155,11 +2321,11 @@ start_flow() {
         if repair_after_local_probe_failure; then
             append_report "probe_local_after_repair=ok"
             collect_runtime_health
-            if [[ "${DNSMASQ_PROCESS_STATUS}" != running-* ]]; then
+            if ! managed_dnsmasq_runtime_running; then
                 write_status "degraded"
-                append_report "result=repair-did-not-leave-dnsmasq-running process_status=${DNSMASQ_PROCESS_STATUS}"
-                restore_resolv_conf_after_failure "repair-did-not-leave-dnsmasq-running"
-                write_summary "degraded" "repair-did-not-leave-dnsmasq-running"
+                append_report "result=repair-did-not-leave-managed-dnsmasq-running process_status=${DNSMASQ_PROCESS_STATUS} port_status=${DNSMASQ_PORT_STATUS}"
+                restore_resolv_conf_after_failure "repair-did-not-leave-managed-dnsmasq-running"
+                write_summary "degraded" "repair-did-not-leave-managed-dnsmasq-running"
                 return 1
             fi
         else
@@ -2187,8 +2353,9 @@ start_flow() {
         return 1
     }
 
+    collect_runtime_health
     write_status "ok"
-    append_report "result=ok"
+    append_report "result=ok runtime_effective=${RUNTIME_EFFECTIVE} resolver_effective=${RESOLVER_EFFECTIVE}"
     write_summary "ok" "start-flow-ok"
     log_ok "Local DNS cache aplicado e validado."
     return 0

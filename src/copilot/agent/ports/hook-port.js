@@ -55,7 +55,8 @@ function normalizeHookErrorMessage(raw) {
             if (typeof errRec['message'] === 'string' && errRec['message']) return errRec['message'];
         }
         try {
-            return JSON.stringify(raw);
+            const serialized = JSON.stringify(raw);
+            return serialized && serialized !== '{}' ? serialized : 'Erro do SDK sem mensagem estruturada.';
         } catch {
             return String(raw);
         }

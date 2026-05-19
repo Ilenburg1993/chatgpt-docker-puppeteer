@@ -126,7 +126,7 @@ describe('event-handlers/usage wireUsageEvent', () => {
         expect(logLine.includes('[MODEL_MISMATCH]')).toBe(false);
     });
 
-    it('normaliza effectiveModel=auto para o modelo cobrado concreto quando Auto roteia', async () => {
+    it('normaliza Auto como seleção efetiva, sem marcar mismatch', async () => {
         /** @type {(evt: any) => void} */
         let usageHandler = () => {};
         mocks.onSessionEvent.mockImplementation((_session, _eventType, handler) => {
@@ -158,9 +158,9 @@ describe('event-handlers/usage wireUsageEvent', () => {
                 model: 'claude-haiku-4.5',
                 configuredModel: 'auto',
                 effectiveModel: 'claude-haiku-4.5',
-                modelMismatch: true,
             }),
         );
+        expect(onPrInfo.mock.calls[0]?.[0]?.modelMismatch ?? false).toBe(false);
         expect(emit).toHaveBeenCalledWith(
             'pr.consumed',
             expect.objectContaining({

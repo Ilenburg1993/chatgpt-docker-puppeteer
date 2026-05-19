@@ -15,6 +15,7 @@ import { log } from '../logger.js';
 import { modelGetCurrent, modelSwitchTo } from '../rpc/session.js';
 import { emitSdkOperationMetric } from '../telemetry/operation-metrics.js';
 
+import { normalizeMessageOptions, summarizeMessageOptions } from './message-options.js';
 import { verifyModelSwitchWithRetry } from './model-switch-verify-retry.js';
 /**
  * @typedef {import('@github/copilot-sdk').CopilotSession} CopilotSession
@@ -26,6 +27,12 @@ import { verifyModelSwitchWithRetry } from './model-switch-verify-retry.js';
  * @typedef {import('@github/copilot-sdk').MessageOptions} MessageOptions
  *
  * @typedef {'low' | 'medium' | 'high' | 'xhigh'} ReasoningEffort
+ *
+ * @typedef {import('@github/copilot-sdk').ModelCapabilitiesOverride} ModelCapabilitiesOverride
+ *
+ * @typedef {{ reasoningEffort?: ReasoningEffort; modelCapabilities?: ModelCapabilitiesOverride }} SessionModelOptions
+ *
+ * @typedef {{ level?: 'info' | 'warning' | 'error'; ephemeral?: boolean }} SessionLogOptions
  */
 
 /**
@@ -42,7 +49,7 @@ function assertSession(session, caller) {
 /**
  * @param {CopilotSession} session
  * @param {string} model
- * @param {{ reasoningEffort?: ReasoningEffort }} [options]
+ * @param {SessionModelOptions} [options]
  * @returns {Promise<{
  *     requestedModel: string;
  *     effectiveModel: string | null;
@@ -118,7 +125,12 @@ async function verifySessionModelSwitch(session, model, options) {
         await modelSwitchTo(
             session,
             model,
-            options?.reasoningEffort ? { reasoningEffort: options.reasoningEffort } : undefined,
+            options?.reasoningEffort || options?.modelCapabilities
+                ? {
+                      ...(options.reasoningEffort ? { reasoningEffort: options.reasoningEffort } : {}),
+                      ...(options.modelCapabilities ? { modelCapabilities: options.modelCapabilities } : {}),
+                  }
+                : undefined,
         );
         result.usedRpcFallback = true;
 
@@ -150,7 +162,7 @@ async function verifySessionModelSwitch(session, model, options) {
  * @param {CopilotSession} session
  * @returns {{
  *     operation: 'session.setModel' | 'session.switchModel';
- *     fn: (model: string, options?: { reasoningEffort?: ReasoningEffort }) => Promise<unknown> | unknown;
+ *     fn: (model: string, options?: SessionModelOptions) => Promise<unknown> | unknown;
  * } | null}
  */
 function resolveNativeModelSwitcher(session) {
@@ -205,19 +217,26 @@ export async function disconnectSessionSafe(session) {
  */
 export async function sendSessionAndWait(session, messageOptions, timeoutMs) {
     assertSession(session, 'sendAndWait');
+    const normalizedMessageOptions = normalizeMessageOptions(messageOptions);
+    const messageSummary = summarizeMessageOptions(normalizedMessageOptions);
     const hasTimeout = typeof timeoutMs === 'number' && Number.isFinite(timeoutMs) && timeoutMs > 0;
     log(
         'DEBUG',
-        `[session-runtime] sendAndWait: sessionId='${session.sessionId}', timeout=${hasTimeout ? String(timeoutMs) : 'none'}`,
+        `[session-runtime] sendAndWait: sessionId='${session.sessionId}', timeout=${hasTimeout ? String(timeoutMs) : 'none'}, mode=${messageSummary.mode}, attachments=${messageSummary.attachmentsCount}, promptLength=${messageSummary.promptLength}`,
     );
     const startedAt = Date.now();
-    emitSdkOperationMetric({ operation: 'session.sendAndWait', status: 'started', sessionId: session.sessionId });
+    emitSdkOperationMetric({
+        operation: 'session.sendAndWait',
+        status: 'started',
+        sessionId: session.sessionId,
+        attributes: messageSummary,
+    });
     /** @type {AssistantMessageEvent | undefined} */
     let event;
     try {
         event = hasTimeout
-            ? await session.sendAndWait(messageOptions, timeoutMs)
-            : await session.sendAndWait(messageOptions);
+            ? await session.sendAndWait(normalizedMessageOptions, timeoutMs)
+            : await session.sendAndWait(normalizedMessageOptions);
     } catch (error) {
         const sdkError = toSdkOperationError('session.sendAndWait', error);
         emitSdkOperationMetric({
@@ -247,13 +266,40 @@ export async function sendSessionAndWait(session, messageOptions, timeoutMs) {
  */
 export async function sendSession(session, messageOptions) {
     assertSession(session, 'send');
-    log('DEBUG', `[session-runtime] send: sessionId='${session.sessionId}'`);
+    const normalizedMessageOptions = normalizeMessageOptions(messageOptions);
+    const messageSummary = summarizeMessageOptions(normalizedMessageOptions);
+    log(
+        'DEBUG',
+        `[session-runtime] send: sessionId='${session.sessionId}', mode=${messageSummary.mode}, attachments=${messageSummary.attachmentsCount}, promptLength=${messageSummary.promptLength}`,
+    );
+    const startedAt = Date.now();
+    emitSdkOperationMetric({
+        operation: 'session.send',
+        status: 'started',
+        sessionId: session.sessionId,
+        attributes: messageSummary,
+    });
     let messageId;
     try {
-        messageId = await session.send(messageOptions);
+        messageId = await session.send(normalizedMessageOptions);
     } catch (error) {
-        throw toSdkOperationError('session.send', error);
+        const sdkError = toSdkOperationError('session.send', error);
+        emitSdkOperationMetric({
+            operation: 'session.send',
+            status: 'failed',
+            sessionId: session.sessionId,
+            durationMs: Date.now() - startedAt,
+            attributes: { errorKind: sdkError.kind },
+        });
+        throw sdkError;
     }
+    emitSdkOperationMetric({
+        operation: 'session.send',
+        status: 'succeeded',
+        sessionId: session.sessionId,
+        durationMs: Date.now() - startedAt,
+        attributes: { hasMessageId: Boolean(messageId) },
+    });
     log(
         'DEBUG',
         `[session-runtime] send enfileirado: sessionId='${session.sessionId}', messageId=${messageId ?? 'n/a'}`,
@@ -264,7 +310,7 @@ export async function sendSession(session, messageOptions) {
 /**
  * @param {CopilotSession} session
  * @param {string} model
- * @param {{ reasoningEffort?: ReasoningEffort }} [options]
+ * @param {SessionModelOptions} [options]
  */
 export async function setSessionModel(session, model, options) {
     assertSession(session, 'setModel');
@@ -280,6 +326,9 @@ export async function setSessionModel(session, model, options) {
     if (options?.reasoningEffort) {
         Reflect.set(session, '__copilotConfiguredReasoningEffort', options.reasoningEffort);
     }
+    if (options?.modelCapabilities) {
+        Reflect.set(session, '__copilotConfiguredModelCapabilities', options.modelCapabilities);
+    }
     try {
         if (nativeSwitcher) {
             await nativeSwitcher.fn(model, options);
@@ -287,7 +336,12 @@ export async function setSessionModel(session, model, options) {
             await modelSwitchTo(
                 session,
                 model,
-                options?.reasoningEffort ? { reasoningEffort: options.reasoningEffort } : undefined,
+                options?.reasoningEffort || options?.modelCapabilities
+                    ? {
+                          ...(options.reasoningEffort ? { reasoningEffort: options.reasoningEffort } : {}),
+                          ...(options.modelCapabilities ? { modelCapabilities: options.modelCapabilities } : {}),
+                      }
+                    : undefined,
             );
         }
     } catch (error) {
@@ -322,9 +376,73 @@ export async function setSessionModel(session, model, options) {
             verifiedSwitch: verification.verifiedSwitch,
             ...(verification.effectiveModel ? { effectiveModel: verification.effectiveModel } : {}),
             ...(verification.usedRpcFallback ? { usedRpcFallback: true } : {}),
+            ...(options?.modelCapabilities ? { modelCapabilities: true } : {}),
         },
     });
     return verification;
+}
+
+/**
+ * Registra mensagem na timeline da sessão SDK com validação e métrica canônicas.
+ *
+ * @param {CopilotSession} session
+ * @param {string} message
+ * @param {SessionLogOptions} [options]
+ * @returns {Promise<void>}
+ */
+export async function logSessionTimeline(session, message, options = {}) {
+    assertSession(session, 'log');
+    if (typeof message !== 'string' || message.trim().length === 0) {
+        throw new TypeError('[session-runtime/log] message deve ser string não-vazia.');
+    }
+    if (options.level !== undefined && !['info', 'warning', 'error'].includes(options.level)) {
+        throw new TypeError('[session-runtime/log] level deve ser info | warning | error quando fornecido.');
+    }
+    if (options.ephemeral !== undefined && typeof options.ephemeral !== 'boolean') {
+        throw new TypeError('[session-runtime/log] ephemeral deve ser boolean quando fornecido.');
+    }
+    if (typeof session.log !== 'function') {
+        throw new TypeError('[session-runtime/log] sessão não expõe session.log().');
+    }
+    const normalizedOptions = {
+        ...(options.level ? { level: options.level } : {}),
+        ...(options.ephemeral !== undefined ? { ephemeral: options.ephemeral } : {}),
+    };
+    const startedAt = Date.now();
+    emitSdkOperationMetric({
+        operation: 'session.log',
+        status: 'started',
+        sessionId: session.sessionId,
+        attributes: {
+            level: normalizedOptions.level ?? 'info',
+            ephemeral: normalizedOptions.ephemeral === true,
+            messageLength: message.length,
+        },
+    });
+    try {
+        await session.log(message, normalizedOptions);
+    } catch (error) {
+        const sdkError = toSdkOperationError('session.log', error);
+        emitSdkOperationMetric({
+            operation: 'session.log',
+            status: 'failed',
+            sessionId: session.sessionId,
+            durationMs: Date.now() - startedAt,
+            attributes: { errorKind: sdkError.kind },
+        });
+        throw sdkError;
+    }
+    emitSdkOperationMetric({
+        operation: 'session.log',
+        status: 'succeeded',
+        sessionId: session.sessionId,
+        durationMs: Date.now() - startedAt,
+        attributes: {
+            level: normalizedOptions.level ?? 'info',
+            ephemeral: normalizedOptions.ephemeral === true,
+            messageLength: message.length,
+        },
+    });
 }
 
 /** @param {CopilotSession} session @returns {Promise<SessionEvent[]>} */

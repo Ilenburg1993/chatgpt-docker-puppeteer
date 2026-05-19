@@ -60,6 +60,7 @@ export {
     sleepMs,
 } from './timer-registry.js';
 export { TOOL_NAME_RE, sanitizeToolNames } from './tool-name-policy.js';
+export { isAutoModelSelector, resolveModelSelectionMismatch } from './model-selection.js';
 
 // ─── DI Container ─────────────────────────────────────────────────────────────
 export { container } from './di-container.js';

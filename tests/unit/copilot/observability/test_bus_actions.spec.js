@@ -106,6 +106,25 @@ describe('bus-actions (FAIXA-L15)', () => {
             bus.emit({ type: 'agent:task:error', timestamp: Date.now() });
             assert.equal(alerts.length, 0);
         });
+
+        it('registra eventos de erro no ErrorTracker quando disponível', () => {
+            /** @type {any[]} */
+            const tracked = [];
+            const ea = createErrorAlerterAction({
+                bus,
+                onAlert: () => {},
+                errorTracker: /** @type {any} */ ({
+                    trackError: (err, opts) => tracked.push({ err, opts }),
+                }),
+            });
+
+            bus.emit({ type: 'hook:error_occurred', timestamp: Date.now(), errorMessage: 'falhou' });
+
+            assert.equal(tracked.length, 1);
+            assert.equal(tracked[0]?.opts.source, 'event-bus');
+            assert.equal(tracked[0]?.opts.metadata.type, 'hook:error_occurred');
+            ea.unsub();
+        });
     });
 
     describe('hasAction contract', () => {

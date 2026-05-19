@@ -28,6 +28,7 @@ import {
     EMITTER_TOOL_EXECUTION_PROGRESS,
     EMITTER_TOOL_EXECUTION_START,
 } from '#copilot/events';
+import { resolveModelSelectionMismatch } from '#copilot/core';
 import { getShowToolActivity, getShowUsage } from '../../presentation/state/index.js';
 import { broadcastSse, buildUserPrompt, isTerminalRenderLocked, println, writeInlineStatus } from '../dialog/index.js';
 import { readTerminalRuntimeState } from '../frontend/gateways/index.js';
@@ -90,10 +91,12 @@ function normalizeUsageBilling(evt) {
     const billedModel = typeof evt?.['model'] === 'string' ? evt['model'] : null;
     const configuredModel = typeof evt?.['configuredModel'] === 'string' ? evt['configuredModel'] : null;
     const effectiveModel = typeof evt?.['effectiveModel'] === 'string' ? evt['effectiveModel'] : null;
-    const mismatch =
-        Boolean(evt?.['modelMismatch']) ||
-        Boolean(billedModel && configuredModel && billedModel !== configuredModel) ||
-        Boolean(effectiveModel && configuredModel && effectiveModel !== configuredModel);
+    const mismatch = resolveModelSelectionMismatch({
+        configuredModel,
+        billedModel,
+        effectiveModel,
+        explicitMismatch: Boolean(evt?.['modelMismatch']),
+    });
     return {
         billedModel,
         configuredModel,

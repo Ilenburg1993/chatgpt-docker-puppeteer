@@ -12,13 +12,14 @@ import { log } from '../logger.js';
 
 /**
  * @typedef {import('../../core/event-bus.js').EventBus} EventBus
+ * @typedef {import('../error-tracker.js').ErrorTracker} ErrorTracker
  */
 
 /**
- * @param {{ bus: EventBus; onAlert?: (evt: { type: string; timestamp: number }) => void }} deps
+ * @param {{ bus: EventBus; onAlert?: (evt: { type: string; timestamp: number }) => void; errorTracker?: ErrorTracker | null }} deps
  * @returns {{ unsub: () => void; hasAction: true; name: string }}
  */
-export function createErrorAlerterAction({ bus, onAlert }) {
+export function createErrorAlerterAction({ bus, onAlert, errorTracker = null }) {
     /** @type {(() => void)[]} */
     const unsubs = [];
     const alertFn =
@@ -41,6 +42,10 @@ export function createErrorAlerterAction({ bus, onAlert }) {
             bus.on(pattern, (evt) => {
                 try {
                     alertFn(evt);
+                    errorTracker?.trackError?.(new Error(`EventBus error event: ${evt.type}`), {
+                        source: 'event-bus',
+                        metadata: /** @type {Record<string, unknown>} */ (evt),
+                    });
                 } catch (e) {
                     log('WARN', `[error-alerter] erro ao processar alerta: ${toError(e).message}`);
                 }

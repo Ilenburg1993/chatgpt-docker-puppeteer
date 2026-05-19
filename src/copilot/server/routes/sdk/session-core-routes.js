@@ -7,6 +7,7 @@
  * aplicadas apenas em `ask_user(kind=question)` via `answerPendingQuestion`.
  */
 
+import { resolveModelSelectionMismatch } from '#copilot/core';
 import { createEventFilter, createSseWriter } from '../../../infra/sse/utils.js';
 import { resolveSdkRouteSharedDeps } from './deps.js';
 import { validateBody, validateModel, withErrorHandler } from './session-middleware.js';
@@ -159,7 +160,7 @@ export function registerSessionCoreRoutes(router) {
         void withErrorHandler(req, res, async () => {
             const routeDeps = resolveSdkRouteSharedDeps(req);
             const id = /** @type {string} */ (req.params['id']);
-            const { model, reasoningEffort } = req.body ?? {};
+            const { model, reasoningEffort, modelCapabilities } = req.body ?? {};
             const modelValidation = validateModel(model);
             if (!modelValidation.ok) {
                 res.status(400).json(withRuntimeMeta(routeDeps, { ok: false, error: modelValidation.error }));
@@ -171,12 +172,14 @@ export function registerSessionCoreRoutes(router) {
             const verification = await routeDeps.sdkSessionRuntime.setSessionModel(
                 entry.session,
                 safeModel,
-                routeDeps.sdkSession.pickDefined({ reasoningEffort }),
+                routeDeps.sdkSession.pickDefined({ reasoningEffort, modelCapabilities }),
             );
 
             const effectiveModel = verification.effectiveModel ?? safeModel;
-            const modelMismatch =
-                verification.effectiveModel !== null && verification.effectiveModel !== verification.requestedModel;
+            const modelMismatch = resolveModelSelectionMismatch({
+                configuredModel: verification.requestedModel,
+                effectiveModel: verification.effectiveModel,
+            });
 
             const runtimeSnapshot = routeDeps.sdkRuntimeProjection.readAgentStatusSnapshotForRuntime(
                 routeDeps.runtimeId,
@@ -207,6 +210,7 @@ export function registerSessionCoreRoutes(router) {
                         usedRpcFallback: verification.usedRpcFallback,
                         modelMismatch,
                         reasoningEffort: reasoningEffort ?? null,
+                        modelCapabilitiesApplied: Boolean(modelCapabilities),
                     },
                     id,
                 ),
@@ -221,7 +225,11 @@ export function registerSessionCoreRoutes(router) {
             const { message, level, ephemeral } = req.body ?? {};
             const entry = getActiveSessionEntryOrReply(routeDeps, id, res);
             if (!entry) return;
-            await entry.session.log(message, routeDeps.sdkSession.pickDefined({ level, ephemeral }));
+            await routeDeps.sdkSessionRuntime.logSessionTimeline(
+                entry.session,
+                message,
+                routeDeps.sdkSession.pickDefined({ level, ephemeral }),
+            );
             res.json(
                 withSessionRuntimeMeta(
                     routeDeps,

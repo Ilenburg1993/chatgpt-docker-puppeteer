@@ -17,6 +17,7 @@ import { createToolCallRegistry } from '../../../src/copilot/terminal/state/tool
 
 const mocks = vi.hoisted(() => ({
     recordTerminalActivity: vi.fn(),
+    markTerminalActivityIdle: vi.fn(),
     broadcastSse: vi.fn(),
     println: vi.fn(),
     setLastSdkPlanOperation: vi.fn(),
@@ -31,6 +32,7 @@ const mocks = vi.hoisted(() => ({
     completeTerminalTurnTrace: vi.fn(() => null),
     recordTerminalTurnFileActivity: vi.fn(),
     recordTerminalTurnToolActivity: vi.fn(),
+    recordTerminalTurnUserInputActivity: vi.fn(),
     getTerminalDetailLevel: vi.fn(() => 'detailed'),
     recordTerminalUserInputRequested: vi.fn((evt) => ({
         id: evt?.requestId ?? 'ui-1',
@@ -41,6 +43,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('../../../src/copilot/terminal/state/activity-state.js', () => ({
+    markTerminalActivityIdle: mocks.markTerminalActivityIdle,
     recordTerminalActivity: mocks.recordTerminalActivity,
 }));
 vi.mock('../../../src/copilot/terminal/dialog/index.js', () => ({
@@ -69,6 +72,7 @@ vi.mock('../../../src/copilot/terminal/state/turn-trace-state.js', () => ({
     completeTerminalTurnTrace: mocks.completeTerminalTurnTrace,
     recordTerminalTurnFileActivity: mocks.recordTerminalTurnFileActivity,
     recordTerminalTurnToolActivity: mocks.recordTerminalTurnToolActivity,
+    recordTerminalTurnUserInputActivity: mocks.recordTerminalTurnUserInputActivity,
 }));
 vi.mock('../../../src/copilot/terminal/state/ui-preferences.js', () => ({
     getTerminalDetailLevel: mocks.getTerminalDetailLevel,

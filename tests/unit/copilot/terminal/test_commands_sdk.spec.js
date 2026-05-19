@@ -642,6 +642,50 @@ describe('terminal/commands/sdk', () => {
         });
     });
 
+    it('/elicitation aceita resposta curta quando o schema tem campo único', async () => {
+        recordTerminalElicitationPending({
+            requestId: 'el-short',
+            message: 'Informe ambiente',
+            mode: 'form',
+            actionable: true,
+            requestedSchema: {
+                type: 'object',
+                properties: { env: { type: 'string', enum: ['dev', 'prod'] } },
+                required: ['env'],
+            },
+        });
+
+        const show = mockCtx();
+        await cmdElicitation({ println: show.println }, 'show el-short');
+        expect(show.output()).toContain('Atalho');
+        expect(show.output()).toContain('<env>');
+
+        const valid = mockCtx();
+        await cmdElicitation({ println: valid.println }, 'respond el-short accept 2');
+        expect(runtimeMocks.resolveTerminalSdkPendingElicitation).toHaveBeenCalledWith('el-short', {
+            action: 'accept',
+            content: { env: 'prod' },
+        });
+    });
+
+    it('/elicitation exige JSON para resposta curta ambígua', async () => {
+        recordTerminalElicitationPending({
+            requestId: 'el-multi',
+            message: 'Informe dados',
+            mode: 'form',
+            requestedSchema: {
+                type: 'object',
+                properties: { env: { type: 'string' }, branch: { type: 'string' } },
+                required: ['env', 'branch'],
+            },
+        });
+
+        const invalid = mockCtx();
+        await cmdElicitation({ println: invalid.println }, 'respond el-multi accept prod');
+        expect(invalid.output()).toContain('use JSON object');
+        expect(runtimeMocks.resolveTerminalSdkPendingElicitation).not.toHaveBeenCalled();
+    });
+
     it('/elicitation aplica defaults e valida arrays anyOf na borda terminal', async () => {
         recordTerminalElicitationPending({
             requestId: 'el-defaults',

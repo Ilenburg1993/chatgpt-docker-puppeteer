@@ -42,6 +42,7 @@ vi.mock('../../../../src/copilot/terminal/frontend/index.js', () => ({
                 finishedAt: null,
                 toolCount: 1,
                 fileCount: 1,
+                userInputCount: 1,
                 tools: [
                     {
                         toolName: 'workspace.read_file',
@@ -64,6 +65,20 @@ vi.mock('../../../../src/copilot/terminal/frontend/index.js', () => ({
                         updatedAt: 2,
                     },
                 ],
+                userInputs: [
+                    {
+                        requestId: 'ui-1',
+                        kind: 'question',
+                        question: 'Qual ambiente devo usar?',
+                        choices: ['dev', 'prod'],
+                        allowFreeform: false,
+                        status: 'answered',
+                        answerPreview: 'prod',
+                        source: 'sdk',
+                        count: 2,
+                        updatedAt: 2,
+                    },
+                ],
             },
             recent: [
                 {
@@ -76,6 +91,7 @@ vi.mock('../../../../src/copilot/terminal/frontend/index.js', () => ({
                     finishedAt: 3,
                     toolCount: 1,
                     fileCount: 1,
+                    userInputCount: 0,
                     tools: [
                         {
                             toolName: 'view',
@@ -98,6 +114,7 @@ vi.mock('../../../../src/copilot/terminal/frontend/index.js', () => ({
                             updatedAt: 2,
                         },
                     ],
+                    userInputs: [],
                 },
             ],
         },
@@ -147,6 +164,8 @@ describe('terminal/commands/activity', () => {
         expect(ctx.output()).toContain('Último turno concluído');
         expect(ctx.output()).toContain('arquivos tocados');
         expect(ctx.output()).toContain('workspace.read_file');
+        expect(ctx.output()).toContain('interações humanas');
+        expect(ctx.output()).toContain('Qual ambiente devo usar?');
         expect(ctx.output()).toContain('I/O real recente');
         expect(ctx.output()).toContain('io-engine.fs.readFile.text');
         expect(ctx.output()).toContain('turn:turn-1');
@@ -183,8 +202,23 @@ describe('terminal/commands/activity', () => {
                         finishedAt: 3,
                         toolCount: 0,
                         fileCount: 0,
+                        userInputCount: 1,
                         tools: [],
                         files: [],
+                        userInputs: [
+                            {
+                                requestId: 'ui-2',
+                                kind: 'question',
+                                question: 'Confirmar deploy?',
+                                choices: ['sim', 'não'],
+                                allowFreeform: false,
+                                status: 'requested',
+                                answerPreview: null,
+                                source: 'sdk',
+                                count: 1,
+                                updatedAt: 2,
+                            },
+                        ],
                     },
                 ],
             },
@@ -195,5 +229,6 @@ describe('terminal/commands/activity', () => {
 
         expect(ctx.output()).not.toContain('Resumo do turno atual');
         expect(ctx.output()).toContain('Último turno concluído');
+        expect(ctx.output()).toContain('Confirmar deploy?');
     });
 });

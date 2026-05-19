@@ -344,7 +344,7 @@ describe('sdk routes session ownership SSOT', () => {
         });
     });
 
-    it('POST /sessions/:id/model expõe projection e repassa reasoningEffort', async () => {
+    it('POST /sessions/:id/model expõe projection e repassa reasoningEffort/modelCapabilities', async () => {
         setSharedHubSessionId('hub-5');
         setSharedSdkSessionId('sdk-msg');
         /** @type {any[]} */
@@ -357,7 +357,11 @@ describe('sdk routes session ownership SSOT', () => {
 
         const res = await request(createApp())
             .post('/sessions/sdk-msg/model')
-            .send({ model: 'gpt-4.1', reasoningEffort: 'high' })
+            .send({
+                model: 'gpt-4.1',
+                reasoningEffort: 'high',
+                modelCapabilities: { supports: { reasoningEffort: true } },
+            })
             .expect(200);
 
         assert.equal(res.body.sessionId, 'sdk-msg');
@@ -367,7 +371,13 @@ describe('sdk routes session ownership SSOT', () => {
         assert.equal(res.body.verifiedSwitch, true);
         assert.equal(res.body.modelMismatch, false);
         assert.equal(res.body.reasoningEffort, 'high');
-        assert.deepEqual(modelCalls, [{ model: 'gpt-4.1', options: { reasoningEffort: 'high' } }]);
+        assert.equal(res.body.modelCapabilitiesApplied, true);
+        assert.deepEqual(modelCalls, [
+            {
+                model: 'gpt-4.1',
+                options: { reasoningEffort: 'high', modelCapabilities: { supports: { reasoningEffort: true } } },
+            },
+        ]);
         assert.equal(res.body.isSharedSdkSession, true);
         assert.equal(res.body.boundHubSessionId, 'hub-5');
         assert.deepEqual(res.body.sharedBinding, {

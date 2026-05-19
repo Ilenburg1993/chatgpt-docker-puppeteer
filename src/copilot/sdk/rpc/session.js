@@ -115,7 +115,7 @@ export async function modelGetCurrent(session) {
  *
  * @param {CopilotSession} session
  * @param {string} modelId
- * @param {{ reasoningEffort?: string }} [options]
+ * @param {{ reasoningEffort?: string; modelCapabilities?: import('@github/copilot-sdk').ModelCapabilitiesOverride }} [options]
  * @returns {Promise<ModelSwitchResult>}
  */
 export async function modelSwitchTo(session, modelId, options) {
@@ -124,9 +124,15 @@ export async function modelSwitchTo(session, modelId, options) {
         throw new TypeError('[sdk/rpc/model.switchTo] modelId deve ser string não-vazia.');
     }
     appLog('INFO', `[sdk/rpc] model.switchTo: modelId='${modelId}', sessionId='${session.sessionId}'`);
-    const params = /** @type {{ modelId: string; reasoningEffort?: string }} */ ({ modelId });
+    const params =
+        /** @type {{ modelId: string; reasoningEffort?: string; modelCapabilities?: import('@github/copilot-sdk').ModelCapabilitiesOverride }} */ ({
+            modelId,
+        });
     if (options?.reasoningEffort) {
         params.reasoningEffort = options.reasoningEffort;
+    }
+    if (options?.modelCapabilities !== undefined) {
+        params.modelCapabilities = options.modelCapabilities;
     }
     const startedAt = Date.now();
     emitSdkOperationMetric({
@@ -136,6 +142,7 @@ export async function modelSwitchTo(session, modelId, options) {
         attributes: {
             modelId,
             ...(options?.reasoningEffort ? { reasoningEffort: options.reasoningEffort } : {}),
+            ...(options?.modelCapabilities ? { modelCapabilities: true } : {}),
         },
     });
     try {

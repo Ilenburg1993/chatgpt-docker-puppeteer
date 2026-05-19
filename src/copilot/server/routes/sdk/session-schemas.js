@@ -47,6 +47,7 @@ export const SendMessageBodySchema = z.object({
 export const SetModelBodySchema = z.object({
     model: z.string(),
     reasoningEffort: z.enum(['low', 'medium', 'high', 'xhigh']).optional(),
+    modelCapabilities: z.record(z.string(), z.unknown()).optional(),
 });
 
 /** Schema para POST /sessions/:id/resume body */

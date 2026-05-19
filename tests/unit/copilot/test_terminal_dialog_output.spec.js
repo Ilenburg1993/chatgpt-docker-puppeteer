@@ -84,4 +84,10 @@ describe('terminal/dialog/output.js — contrato', () => {
         const mod = await import('../../../src/copilot/terminal/dialog/output.js');
         expect(mod.stripAnsiEscapes('\x1b[32mLLM-B\x1b[0m')).toBe('LLM-B');
     });
+
+    it('estima linhas físicas considerando ANSI e quebra por largura', async () => {
+        const mod = await import('../../../src/copilot/terminal/dialog/output.js');
+        expect(mod.estimateTerminalPhysicalRows('\x1b[32mabcdef\x1b[0m', 3)).toBe(2);
+        expect(mod.estimateTerminalPhysicalRows('a\nbcdef', 2)).toBe(4);
+    });
 });

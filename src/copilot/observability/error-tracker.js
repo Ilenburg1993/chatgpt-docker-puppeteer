@@ -94,6 +94,21 @@ function extractErrorInfo(err) {
     if (typeof err === 'string') {
         return { message: err, stack: undefined, errorType: 'string' };
     }
+    if (err && typeof err === 'object') {
+        try {
+            const serialized = JSON.stringify(err);
+            return {
+                message:
+                    serialized && serialized !== '{}'
+                        ? serialized
+                        : 'Erro sem mensagem estruturada recebido como objeto vazio.',
+                stack: undefined,
+                errorType: err.constructor?.name ?? 'object',
+            };
+        } catch {
+            return { message: String(err), stack: undefined, errorType: err.constructor?.name ?? 'object' };
+        }
+    }
     return { message: String(err), stack: undefined, errorType: typeof err };
 }
 

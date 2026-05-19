@@ -85,6 +85,7 @@ import {
     completeTerminalTurnTrace,
     createToolCallRegistry,
     getTerminalDetailLevel,
+    markTerminalActivityIdle,
     recordTerminalActivity,
     recordTerminalElicitationCompleted,
     recordTerminalElicitationPending,
@@ -92,6 +93,7 @@ import {
     recordTerminalPermissionModeChanged,
     recordTerminalPermissionRequested,
     recordTerminalTurnFileActivity,
+    recordTerminalTurnUserInputActivity,
     recordTerminalUserInputCompleted,
     recordTerminalUserInputRequested,
     terminalThemeBadge,
@@ -104,6 +106,7 @@ import {
     handleTerminalExternalToolRequested,
     handleTerminalToolUserRequested,
 } from './tool-lifecycle-runtime.js';
+import { buildTerminalToolActivityPresentation } from './tool-activity-presenter.js';
 
 /**
  * @typedef {{
@@ -329,11 +332,17 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
     const onSessionInfo = (/** @type {{ infoType?: string; message?: string; url?: string }} */ evt) => {
         const infoType = evt?.infoType ?? 'info';
         const message = evt?.message ?? '(sem mensagem)';
-        recordTerminalActivity('system', `Info SDK · ${infoType}`, {
-            detail: message,
-            source: 'sdk',
-            recordHistory: false,
-        });
+        const modelRetry = infoType === 'model_retry';
+        recordTerminalActivity(
+            modelRetry ? 'error' : 'system',
+            modelRetry ? 'Retry de modelo em andamento' : `Info SDK · ${infoType}`,
+            {
+                detail: message,
+                source: 'sdk',
+                severity: modelRetry ? 'warn' : 'info',
+                recordHistory: modelRetry,
+            },
+        );
         if (shouldPrintSessionNarration('verbose')) {
             println(`  \x1b[90mℹ️  [${infoType}] ${message}\x1b[0m`);
             if (evt?.url) println(`  \x1b[90m    ${evt.url}\x1b[0m`);
@@ -464,6 +473,20 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
         const requestId = evt?.requestId ?? null;
         const kind = DialogProtocol.classify(question);
         const tracked = recordTerminalUserInputRequested(evt);
+        const askUserToolCallId =
+            tracked.toolCallId ?? (requestId ? `ask_user:${requestId}` : `ask_user:${Date.now()}`);
+        if (kind === 'question') {
+            _reg.register(askUserToolCallId, 'ask_user', 'native', {
+                requestId,
+                canonicalName: 'ask_user',
+                rawArgs: { question, choices, allowFreeform },
+                presentation: buildTerminalToolActivityPresentation(
+                    { toolName: 'ask_user', args: { question, choices, allowFreeform }, toolCallId: askUserToolCallId },
+                    'ask_user',
+                ),
+            });
+            if (requestId) _reg.markRequestIdForExternalTool(requestId, 'ask_user');
+        }
         if (requestId && kind !== 'question') {
             pruneSuppressedProtocolRequestIds();
             suppressedProtocolRequestIds.set(requestId, Date.now());
@@ -472,6 +495,15 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
             refreshPromptIfIdle();
             return;
         }
+        recordTerminalTurnUserInputActivity({
+            requestId,
+            kind,
+            question,
+            choices,
+            allowFreeform,
+            status: 'requested',
+            source: 'sdk',
+        });
         recordTerminalActivity('question', 'ask_user SDK solicitado', {
             detail: `${question.slice(0, 160)}${choices.length > 0 ? ` · choices=${choices.join('|')}` : ''}`,
             source: 'sdk',
@@ -547,6 +579,12 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
         }
         const wasFreeform = evt?.wasFreeform === true;
         recordTerminalUserInputCompleted(evt);
+        recordTerminalTurnUserInputActivity({
+            requestId,
+            status: 'answered',
+            answerPreview: String(evt?.answer ?? '').slice(0, 120),
+            source: 'sdk',
+        });
         recordTerminalActivity('question', 'ask_user SDK respondido', {
             detail: `${requestId ?? 'sem requestId'}${wasFreeform ? ' · freeform' : ' · choice/protocolo'}`,
             source: 'sdk',
@@ -1048,6 +1086,13 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
             error: errorMessage,
             timestamp: Date.now(),
         });
+        if (success && (hookType === 'sessionEnd' || hookType === 'session_end')) {
+            setImmediate(() => {
+                if (!getBusy()) {
+                    markTerminalActivityIdle('Turno concluído; aguardando próxima mensagem');
+                }
+            });
+        }
     };
 
     const onSamplingRequested = (

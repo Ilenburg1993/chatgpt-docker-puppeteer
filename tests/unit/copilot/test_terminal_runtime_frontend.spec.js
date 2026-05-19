@@ -647,6 +647,28 @@ describe('terminal/frontend/index', () => {
         });
     });
 
+    it('trata model=auto como seleção do SDK, não divergência de billing', async () => {
+        defaultRuntime.lastPrInfo = {
+            model: 'claude-haiku-4.5',
+            configuredModel: 'auto',
+            effectiveModel: 'claude-haiku-4.5',
+            modelMismatch: true,
+            ts: Date.now(),
+        };
+        defaultRuntime.model = 'auto';
+
+        const modelBilling = runtime.normalizeTerminalModelBillingProjection(defaultRuntime.lastPrInfo, 'auto');
+
+        expect(modelBilling).toEqual(
+            expect.objectContaining({
+                configuredModel: 'auto',
+                billedModel: 'claude-haiku-4.5',
+                effectiveModel: 'claude-haiku-4.5',
+                mismatch: false,
+            }),
+        );
+    });
+
     it('encapsula mode/plan vanilla da sessão SDK por runtime explícito', async () => {
         expect(await runtime.getTerminalSdkSessionMode('alt')).toEqual({ mode: 'plan' });
         expect(await runtime.setTerminalSdkSessionMode('autopilot', 'alt')).toEqual({ mode: 'autopilot' });

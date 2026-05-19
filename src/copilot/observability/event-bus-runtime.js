@@ -16,6 +16,7 @@ import {
     createLogObserver,
     createMetricsCollector,
 } from './bus-actions/index.js';
+import { defaultErrorTracker } from './error-tracker.js';
 import { log } from './logger.js';
 
 /**
@@ -69,7 +70,11 @@ export function createObservabilityBusRuntime({ bus, metrics, onAlert }) {
     const activityTracker = createActivityTracker({ bus });
     const healthUpdater = createHealthUpdater({ bus });
     const correlationTracer = createCorrelationTracer({ bus });
-    const errorAlerter = createErrorAlerterAction({ bus, ...(onAlert ? { onAlert } : {}) });
+    const errorAlerter = createErrorAlerterAction({
+        bus,
+        errorTracker: defaultErrorTracker,
+        ...(onAlert ? { onAlert } : {}),
+    });
 
     const actions = {
         logObserver,

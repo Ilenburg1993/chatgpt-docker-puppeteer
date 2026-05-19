@@ -10,6 +10,7 @@
 
 import {
     readAgentRuntimeHealthSnapshot,
+    readAgentRuntimeSessionId,
     readAgentRuntimeStatusSnapshot,
     readRuntimeContextFactoryCapabilities,
     readRuntimePermissionCapability,
@@ -176,7 +177,10 @@ export function readRuntimeControlState(runtime) {
         status: String(runtime.getRuntimeStatus?.() ?? snap['status'] ?? 'unknown'),
         model: String(runtime.getModelSnapshot?.() ?? snap['model'] ?? 'unknown'),
         reasoningEffort: String(runtime.getReasoningEffortSnapshot?.() ?? snap['reasoningEffort'] ?? 'off'),
-        sessionId: typeof snap['sessionId'] === 'string' ? snap['sessionId'] : null,
+        sessionId:
+            typeof snap['sessionId'] === 'string' && snap['sessionId'].length > 0
+                ? snap['sessionId']
+                : readAgentRuntimeSessionId(/** @type {any} */ (runtime)),
         dialogLoopActive: Boolean(
             health?.dialogLoopActive ?? runtime.isDialogLoopActive?.() ?? runtime.dialogLoopActive,
         ),

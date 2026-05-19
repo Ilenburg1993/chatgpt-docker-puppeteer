@@ -83,6 +83,7 @@ export {
     readTerminalTurnTraceProjection,
     recordTerminalTurnFileActivity,
     recordTerminalTurnToolActivity,
+    recordTerminalTurnUserInputActivity,
 } from './turn-trace-state.js';
 export {
     appendTerminalTranscriptTurn,

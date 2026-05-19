@@ -26,7 +26,7 @@ import { readTerminalRuntimeBase } from './shared.js';
 /** @typedef {'persistent' | 'transport' | 'reconciled' | 'none'} TerminalTimelineAuthority */
 /** @typedef {'persistent_only' | 'bridge_only' | 'aligned' | 'bridge_tail' | 'diverged' | 'empty'} TerminalTimelineReconciliation */
 /** @typedef {'none' | 'lazy'} TerminalTimelineSyncPolicy */
-/** @typedef {'disabled' | 'not_needed' | 'unavailable' | 'scheduled' | 'inflight' | 'synced' | 'failed'} TerminalTimelineSyncStatus */
+/** @typedef {'disabled' | 'not_needed' | 'unavailable' | 'scheduled' | 'inflight' | 'synced' | 'failed' | 'blocked'} TerminalTimelineSyncStatus */
 
 const TIMELINE_SYNC_CACHE_TTL_MS = 10 * 60 * 1000;
 const TIMELINE_SYNC_MAX_CACHE_ENTRIES = 500;
@@ -442,6 +442,21 @@ function maybeScheduleTimelineSync(input) {
             status: 'unavailable',
             reason: 'no-hub-session',
             pendingCount: 0,
+            syncedCount: 0,
+            failedCount: 0,
+            key: null,
+            lastError: null,
+            attempts: 0,
+            nextRetryAt: null,
+            cacheExpiresAt: null,
+        };
+    }
+    if (reconciliationStatus === 'diverged') {
+        return {
+            policy,
+            status: 'blocked',
+            reason: 'diverged-no-overlap',
+            pendingCount: bridgeTurns.length,
             syncedCount: 0,
             failedCount: 0,
             key: null,

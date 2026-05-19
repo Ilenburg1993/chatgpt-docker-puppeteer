@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # =============================================================================
 # github-api-route-fix.sh — Smart GitHub API Route Selector
-# Version: v1.8.6
+# Version: v1.9.0
 #
 # Purpose:
 #   Runtime-only network resilience helper for DevContainers. Intended to be
@@ -56,6 +56,11 @@
 #     prevents benchmark recommendations from proposing an override to the
 #     current IP, adds a passive doctor action, and hardens route/status
 #     observability without expanding mutation scope.
+#     v1.9.0 aligns post-apply verification with degraded-but-reachable REST
+#     semantics, records explicit hosts/apply/verify state in summaries,
+#     hardens official REST API version validation, preserves route-fix as the
+#     only active api.github.com mutation layer, and normalizes LF output for
+#     Linux/WSL2 execution.
 #   - Emits report, status, summary and candidate metrics files for post-start and
 #     post-attach diagnostics, including structured decision reasons.
 #   - Fail-safe shell posture: no inherited traps, no set -e/u/pipefail.
@@ -72,8 +77,7 @@ trap - ERR EXIT INT TERM 2> /dev/null || true
 CLI_ACTION=""
 case "${1:-}" in
     --version)
-        printf '%s v%s
-' 'github-api-route-fix.sh' '1.8.6'
+        printf '%s v%s\n' 'github-api-route-fix.sh' '1.9.0'
         exit 0
         ;;
     --help)
@@ -98,7 +102,7 @@ esac
 # Constants / sanitized config
 # -----------------------------------------------------------------------------
 readonly SCRIPT_NAME="github-api-route-fix.sh"
-readonly SCRIPT_VERSION="1.8.6"
+readonly SCRIPT_VERSION="1.9.0"
 
 cfg_bool() {
     case "${1:-}" in
@@ -175,6 +179,13 @@ case "${GITHUB_API_VERSION}" in
 esac
 readonly GITHUB_API_VERSION
 
+official_github_api_version_is_known() {
+    case "${1:-}" in
+        2022-11-28 | 2026-03-10) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
 FOLLOW_REDIRECTS="$(cfg_bool "${DEVCONTAINER_GITHUB_API_FOLLOW_REDIRECTS:-true}" true)"
 readonly FOLLOW_REDIRECTS
 MAX_REDIRS="$(cfg_uint "${DEVCONTAINER_GITHUB_API_MAX_REDIRS:-3}" 3 0 10)"
@@ -200,6 +211,15 @@ readonly META_SHAPED_PROBE
 SUMMARY_FUNCTIONALITY_STATUS="unknown"
 SUMMARY_FUNCTIONALITY_DETAILS="not-run"
 SUMMARY_FUNCTIONALITY_PROFILE="${FUNCTIONALITY_PROFILE}"
+ROUTE_HOSTS_APPLY_STATUS="not-attempted"
+ROUTE_VERIFY_STATUS="not-attempted"
+ROUTE_VERIFY_REASON="not-run"
+ROUTE_VERIFY_REMOTE_IP="unknown"
+ROUTE_VERIFY_LATENCY_MS="unknown"
+CURRENT_ROUTE_STATE="unknown"
+CURRENT_ROUTE_ROOT_HTTP="unknown"
+CURRENT_ROUTE_ROOT_TLS="unknown"
+ROOT_REACHABILITY_STATE="unknown"
 
 ENABLE_AUTH_PROBE="$(cfg_bool "${DEVCONTAINER_ENABLE_GITHUB_API_AUTH_PROBE:-false}" false)"
 readonly ENABLE_AUTH_PROBE
@@ -362,6 +382,7 @@ write_report_header() {
         printf 'enable_meta_candidates=%s\n' "${ENABLE_META_CANDIDATES}"
         printf 'meta_candidate_timeout=%s\n' "${META_CANDIDATE_TIMEOUT}"
         printf 'api_version=%s\n' "${GITHUB_API_VERSION}"
+        printf 'api_version_known=%s\n' "$(official_github_api_version_is_known "${GITHUB_API_VERSION}" && printf true || printf false)"
         printf 'functionality_profile=%s\n' "${FUNCTIONALITY_PROFILE}"
         printf 'functionality_strict=%s\n' "${FUNCTIONALITY_STRICT}"
         printf 'follow_redirects=%s\n' "${FOLLOW_REDIRECTS}"
@@ -446,6 +467,15 @@ write_summary() {
         printf 'current_score=%s\n' "${current_score:-unknown}"
         printf 'current_latency_ms=%s\n' "${current_latency:-unknown}"
         printf 'current_p95_latency_ms=%s\n' "${current_p95:-unknown}"
+        printf 'current_route_state=%s\n' "${CURRENT_ROUTE_STATE:-unknown}"
+        printf 'current_route_root_http=%s\n' "${CURRENT_ROUTE_ROOT_HTTP:-unknown}"
+        printf 'current_route_root_tls=%s\n' "${CURRENT_ROUTE_ROOT_TLS:-unknown}"
+        printf 'root_reachability_state=%s\n' "${ROOT_REACHABILITY_STATE:-unknown}"
+        printf 'hosts_apply_status=%s\n' "${ROUTE_HOSTS_APPLY_STATUS:-not-attempted}"
+        printf 'verify_status=%s\n' "${ROUTE_VERIFY_STATUS:-not-attempted}"
+        printf 'verify_reason=%s\n' "${ROUTE_VERIFY_REASON:-not-run}"
+        printf 'verify_remote_ip=%s\n' "${ROUTE_VERIFY_REMOTE_IP:-unknown}"
+        printf 'verify_latency_ms=%s\n' "${ROUTE_VERIFY_LATENCY_MS:-unknown}"
         printf 'cooldown_remaining_seconds=%s\n' "${cooldown_remaining:-0}"
         printf 'recovery_remaining_seconds=%s\n' "${recovery_remaining:-0}"
         printf 'reason=%s\n' "${reason:-none}"
@@ -724,6 +754,19 @@ github_api_json_content_type_is_plausible() {
         *application/json* | *text/plain* | '') return 0 ;;
         *) return 1 ;;
     esac
+}
+
+root_reachability_label() {
+    local state="${1:-unknown}" http="${2:-000}" tls="${3:-?}"
+    if [[ "${state}" == "ok" ]]; then
+        printf 'ok'
+    elif root_http_is_degraded_reachable "${http}" "${tls}"; then
+        printf 'degraded-reachable'
+    elif http_is_reachable "${http}" "${tls}"; then
+        printf 'unexpected-but-reachable'
+    else
+        printf 'failed'
+    fi
 }
 
 float_ms() {
@@ -1322,8 +1365,7 @@ probe_github_api_current_route() {
     local tmp meta body http ctype tls remote time_total latency_ms score=0
     tmp="$(make_temp_file github-api-current /tmp)"
     [[ -n "${tmp}" ]] || {
-        printf 'fail|unknown|0|0|no-temp-file
-'
+        printf 'fail|unknown|0|0|no-temp-file\n'
         return 1
     }
 
@@ -1343,21 +1385,18 @@ probe_github_api_current_route() {
     if [[ "${http}" == "200" && "${ctype}" == *"application/json"* && "${tls}" == "0" ]] && github_api_root_body_is_shaped "${body}"; then
         score=80
         if ((latency_ms > 0 && latency_ms <= 500)); then score=$((score + 5)); fi
-        printf 'ok|%s|%s|%s|%s
-' "${remote:-unknown}" "${latency_ms:-0}" "${score}" "${meta}"
+        printf 'ok|%s|%s|%s|%s\n' "${remote:-unknown}" "${latency_ms:-0}" "${score}" "${meta}"
         return 0
     fi
 
     if root_http_is_degraded_reachable "${http}" "${tls}"; then
         score=65
         if ((latency_ms > 0 && latency_ms <= 500)); then score=$((score + 3)); fi
-        printf 'degraded|%s|%s|%s|%s
-' "${remote:-unknown}" "${latency_ms:-0}" "${score}" "${meta}"
+        printf 'degraded|%s|%s|%s|%s\n' "${remote:-unknown}" "${latency_ms:-0}" "${score}" "${meta}"
         return 0
     fi
 
-    printf 'fail|%s|%s|0|%s
-' "${remote:-unknown}" "${latency_ms:-0}" "${meta}"
+    printf 'fail|%s|%s|0|%s\n' "${remote:-unknown}" "${latency_ms:-0}" "${meta}"
     return 1
 }
 
@@ -2005,6 +2044,7 @@ apply_github_api_hosts_override() {
 
 verify_github_api_hosts_override() {
     local expected_ip="$1" host="${GITHUB_API_HOST}" resolved result state remote latency score meta
+    local root_http root_tls capability_result capability_status capability_details verify_ok
     if [[ "${ENABLE_IPV6}" == "true" ]]; then
         resolved="$(getent ahosts "${host}" 2> /dev/null | awk 'NR==1{print $1}' || true)"
     else
@@ -2014,23 +2054,51 @@ verify_github_api_hosts_override() {
 
     result="$(probe_github_api_current_route)"
     IFS='|' read -r state remote latency score meta <<< "${result}"
+    root_http="$(extract_field http_code "${meta}")"
+    root_tls="$(extract_field ssl_verify_result "${meta}")"
+
+    ROUTE_VERIFY_REMOTE_IP="${remote:-unknown}"
+    ROUTE_VERIFY_LATENCY_MS="${latency:-0}"
+    ROUTE_VERIFY_STATUS="failed"
+    ROUTE_VERIFY_REASON="state=${state:-unknown};root_http=${root_http:-000};root_tls=${root_tls:-?}"
+    verify_ok="false"
 
     if [[ "${state}" == "ok" ]]; then
-        log_ok "verify OK: ${host} → IP ${remote:-unknown} | latency=${latency:-0}ms | score=${score:-0}"
+        verify_ok="true"
+        ROUTE_VERIFY_REASON="root-ok;state=${state};root_http=${root_http:-200};root_tls=${root_tls:-0}"
+    elif root_http_is_degraded_reachable "${root_http}" "${root_tls}"; then
+        capability_result="$(probe_current_functionality_summary)"
+        IFS='|' read -r capability_status capability_details <<< "${capability_result}"
+        if [[ "${capability_status}" == "ok" ]]; then
+            verify_ok="true"
+            score="85"
+            set_summary_functionality_manual "ok" "root:${root_http},${capability_details},verify_root_degraded_reachable:true"
+            ROUTE_VERIFY_REASON="root-degraded-reachable-with-functional-capabilities;root_http=${root_http};capabilities=${capability_details}"
+        else
+            ROUTE_VERIFY_REASON="root-degraded-reachable-but-capabilities-${capability_status:-unknown};root_http=${root_http};capabilities=${capability_details:-none}"
+        fi
+    fi
+
+    if [[ "${verify_ok}" == "true" ]]; then
+        log_ok "verify OK: ${host} → IP ${remote:-unknown} | latency=${latency:-0}ms | score=${score:-0} | ${ROUTE_VERIFY_REASON}"
         if [[ -n "${expected_ip}" && "${remote}" != "${expected_ip}" ]]; then
-            log_warn "verify: remote_ip=${remote}, esperado=${expected_ip}; pode haver cache/proxy."
+            log_warn "verify: remote_ip=${remote}, esperado=${expected_ip}; pode haver cache/proxy/resolver intermediário."
             if [[ "${STRICT_VERIFY_EXPECTED_IP}" == "true" ]]; then
-                append_report "verify=strict-mismatch expected=${expected_ip} remote=${remote:-unknown}"
+                ROUTE_VERIFY_STATUS="strict-mismatch"
+                ROUTE_VERIFY_REASON="strict-mismatch;expected=${expected_ip};remote=${remote:-unknown};${ROUTE_VERIFY_REASON}"
+                append_report "verify=strict-mismatch expected=${expected_ip} remote=${remote:-unknown} reason=${ROUTE_VERIFY_REASON}"
                 return 1
             fi
         fi
+        ROUTE_VERIFY_STATUS="ok"
+        append_report "verify=ok expected=${expected_ip:-none} remote=${remote:-unknown} latency_ms=${latency:-0} reason=${ROUTE_VERIFY_REASON}"
         return 0
     fi
 
-    log_warn "verify FALHOU: ${host} → IP ${remote:-unknown}; meta=${meta:-none}"
+    log_warn "verify FALHOU: ${host} → IP ${remote:-unknown}; meta=${meta:-none}; reason=${ROUTE_VERIFY_REASON}"
+    append_report "verify=failed expected=${expected_ip:-none} remote=${remote:-unknown} reason=${ROUTE_VERIFY_REASON} meta=${meta:-none}"
     return 1
 }
-
 # -----------------------------------------------------------------------------
 # Selection / hysteresis
 # -----------------------------------------------------------------------------
@@ -2175,6 +2243,10 @@ select_and_apply_route() {
     local current_capability_result current_capability_status current_capability_details current_root_http current_root_tls
     current_root_http="$(extract_field http_code "${current_meta}")"
     current_root_tls="$(extract_field ssl_verify_result "${current_meta}")"
+    CURRENT_ROUTE_STATE="${current_state:-unknown}"
+    CURRENT_ROUTE_ROOT_HTTP="${current_root_http:-000}"
+    CURRENT_ROUTE_ROOT_TLS="${current_root_tls:-?}"
+    ROOT_REACHABILITY_STATE="$(root_reachability_label "${current_state}" "${current_root_http}" "${current_root_tls}")"
     if [[ "${current_state}" == "ok" ]]; then
         current_capability_result="$(probe_current_functionality_summary)"
         IFS='|' read -r current_capability_status current_capability_details <<< "${current_capability_result}"
@@ -2334,28 +2406,33 @@ select_and_apply_route() {
         return 1
     fi
 
+    ROUTE_HOSTS_APPLY_STATUS="attempting"
     apply_github_api_hosts_override "${best_ip}" "${backup_file}"
     local apply_rc=$?
     if [[ "${apply_rc}" -ne 0 ]]; then
-        append_report "result=apply-failed selected=${best_ip}"
+        ROUTE_HOSTS_APPLY_STATUS="failed-rc-${apply_rc}"
+        append_report "result=apply-failed selected=${best_ip} rc=${apply_rc}"
         update_cache_from_records "${all_records}" ""
         write_summary "failed" "${best_ip}" "${best_score}" "${best_latency}" "${current_remote}" "${current_score}" "${current_latency}" "decision=fail;cause=hosts-apply-failed"
         return 1
     fi
 
+    ROUTE_HOSTS_APPLY_STATUS="applied"
     if ! verify_github_api_hosts_override "${best_ip}"; then
-        append_report "result=verify-failed selected=${best_ip}"
+        append_report "result=verify-failed selected=${best_ip} verify_status=${ROUTE_VERIFY_STATUS} verify_reason=${ROUTE_VERIFY_REASON}"
         if [[ "${ROLLBACK_ON_VERIFY_FAILURE}" == "true" && -n "${backup_file}" ]]; then
             restore_hosts_from_backup "${backup_file}" || true
+            ROUTE_HOSTS_APPLY_STATUS="rolled-back-after-verify-failure"
         fi
         update_cache_from_records "${all_records}" ""
         write_summary "failed" "${best_ip}" "${best_score}" "${best_latency}" "${current_remote}" "${current_score}" "${current_latency}" "decision=fail;cause=post-apply-verify-failed"
         return 1
     fi
 
+    ROUTE_HOSTS_APPLY_STATUS="applied-and-verified"
     update_cache_from_records "${all_records}" "${best_ip}"
     probe_github_api_auth_optional "${best_ip}" || true
-    append_report "result=ok selected=${best_ip} score=${best_score}"
+    append_report "result=ok selected=${best_ip} score=${best_score} verify_status=${ROUTE_VERIFY_STATUS} verify_reason=${ROUTE_VERIFY_REASON}"
     write_summary "ok" "${best_ip}" "${best_score}" "${best_latency}" "${current_remote}" "${current_score}" "${current_latency}" "decision=apply;cause=validated-candidate"
     return 0
 }
@@ -2784,9 +2861,13 @@ doctor_action() {
     }
     append_report "doctor_hosts_file=${hosts_probe}"
 
-    if [[ "${GITHUB_API_VERSION}" != "2022-11-28" && ! "${GITHUB_API_VERSION}" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]]; then
+    if [[ ! "${GITHUB_API_VERSION}" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]]; then
         log_warn "doctor: api_version inválida: ${GITHUB_API_VERSION}."
         rc=1
+    elif official_github_api_version_is_known "${GITHUB_API_VERSION}"; then
+        log_ok "doctor: api_version oficialmente conhecida no contrato local: ${GITHUB_API_VERSION}."
+    else
+        log_warn "doctor: api_version date-shaped, mas não está na allowlist local conhecida: ${GITHUB_API_VERSION}; GitHub pode responder 400/410 se não for suportada."
     fi
 
     set_summary_functionality_manual "doctor" "host:${GITHUB_API_HOST},api_version:${GITHUB_API_VERSION},profile:${FUNCTIONALITY_PROFILE}"

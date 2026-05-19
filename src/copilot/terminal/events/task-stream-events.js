@@ -17,6 +17,7 @@ import {
 import {
     appendThinkingHistoryChunk,
     finalizeThinkingHistoryEntry,
+    getBusy,
     getShowThinking,
 } from '../../presentation/state/index.js';
 import { println } from '../dialog/index.js';
@@ -44,6 +45,8 @@ export function setupTerminalTaskStreamListeners({ agent }) {
     const taskDeltaStats = new Map();
     /** @type {Map<string, number>} */
     const taskLastDeltaActivityAt = new Map();
+    /** @type {Set<string>} */
+    const taskDeltasSeenWhileBusy = new Set();
     const taskTranscripts = createTaskTranscriptAccumulator();
     let anonymousTaskThinkingSeq = 0;
     /** @type {string | null} */
@@ -121,6 +124,9 @@ export function setupTerminalTaskStreamListeners({ agent }) {
      */
     const recordTaskDelta = (taskId, chunk) => {
         const taskKey = getTaskKey(taskId);
+        if (getBusy()) {
+            taskDeltasSeenWhileBusy.add(taskKey);
+        }
         const current = taskDeltaStats.get(taskKey) ?? { chunks: 0, chars: 0 };
         taskDeltaStats.set(taskKey, {
             chunks: current.chunks + 1,
@@ -133,6 +139,7 @@ export function setupTerminalTaskStreamListeners({ agent }) {
         const chunk = evt?.chunk ?? '';
         if (!chunk) return;
         recordTaskDelta(evt.taskId, chunk);
+        if (getBusy()) return;
         const taskKey = getTaskKey(evt.taskId);
         const now = Date.now();
         const lastAt = taskLastDeltaActivityAt.get(taskKey) ?? 0;
@@ -179,7 +186,8 @@ export function setupTerminalTaskStreamListeners({ agent }) {
     const onTaskCompleted = (/** @type {{ taskId?: string | null }} */ evt = {}) => {
         const taskKey = getTaskKey(evt.taskId);
         const stats = taskDeltaStats.get(taskKey) ?? { chunks: 0, chars: 0 };
-        const hadVisiblePayload = stats.chunks > 0 || stats.chars > 0;
+        const wasAlreadyRenderedByTurn = taskDeltasSeenWhileBusy.has(taskKey);
+        const hadVisiblePayload = (stats.chunks > 0 || stats.chars > 0) && !wasAlreadyRenderedByTurn;
         recordTerminalActivity('task', 'Tarefa interna concluída', {
             detail: `${stats.chunks} chunks · ${stats.chars} chars`,
             source: 'agent',
@@ -190,6 +198,7 @@ export function setupTerminalTaskStreamListeners({ agent }) {
         taskTranscripts.flush(evt.taskId ?? undefined, 'completed', 'task.completed');
         taskDeltaStats.delete(taskKey);
         taskLastDeltaActivityAt.delete(taskKey);
+        taskDeltasSeenWhileBusy.delete(taskKey);
     };
 
     const onTaskError = (/** @type {{ taskId?: string | null }} */ evt = {}) => {
@@ -204,12 +213,14 @@ export function setupTerminalTaskStreamListeners({ agent }) {
         taskTranscripts.flush(evt.taskId ?? undefined, 'error', 'task.error');
         taskDeltaStats.delete(taskKey);
         taskLastDeltaActivityAt.delete(taskKey);
+        taskDeltasSeenWhileBusy.delete(taskKey);
     };
 
     const onAssistantTurnEnd = () => {
         for (const taskKey of taskTranscripts.flushAll('completed', 'assistant.turn_end')) {
             taskDeltaStats.delete(taskKey);
             taskLastDeltaActivityAt.delete(taskKey);
+            taskDeltasSeenWhileBusy.delete(taskKey);
         }
     };
 

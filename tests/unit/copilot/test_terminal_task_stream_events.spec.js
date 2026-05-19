@@ -130,6 +130,20 @@ describe('terminal/task-stream-events.js — contrato', () => {
         agent.emit('task.completed', { taskId: 'task-1' });
 
         expect(mocks.renderTerminalAssistantTranscript).not.toHaveBeenCalled();
+        expect(mocks.recordTerminalActivity).toHaveBeenCalledWith(
+            'task',
+            'Tarefa interna concluída',
+            expect.objectContaining({
+                detail: '1 chunks · 25 chars',
+                recordHistory: false,
+                updateCurrent: false,
+            }),
+        );
+        expect(mocks.recordTerminalActivity).not.toHaveBeenCalledWith(
+            'task',
+            'Executando tarefa interna',
+            expect.any(Object),
+        );
     });
 
     it('não promove task.completed vazio para atividade atual mesmo com taskId', async () => {

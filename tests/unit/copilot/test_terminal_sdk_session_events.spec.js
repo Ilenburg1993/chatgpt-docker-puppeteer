@@ -9,6 +9,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
     recordTerminalActivity: vi.fn(),
+    markTerminalActivityIdle: vi.fn(),
     broadcastSse: vi.fn(),
     println: vi.fn(),
     printlnBlock: vi.fn(),
@@ -24,6 +25,7 @@ const mocks = vi.hoisted(() => ({
     completeTerminalTurnTrace: vi.fn(),
     recordTerminalTurnFileActivity: vi.fn(),
     recordTerminalTurnToolActivity: vi.fn(),
+    recordTerminalTurnUserInputActivity: vi.fn(),
     getTerminalDetailLevel: vi.fn(() => 'detailed'),
     recordTerminalUserInputRequested: vi.fn((evt) => ({
         id: evt?.requestId ?? 'ui-1',
@@ -35,6 +37,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('../../../src/copilot/terminal/state/activity-state.js', () => ({
+    markTerminalActivityIdle: mocks.markTerminalActivityIdle,
     recordTerminalActivity: mocks.recordTerminalActivity,
 }));
 
@@ -68,6 +71,7 @@ vi.mock('../../../src/copilot/terminal/state/turn-trace-state.js', () => ({
     completeTerminalTurnTrace: mocks.completeTerminalTurnTrace,
     recordTerminalTurnFileActivity: mocks.recordTerminalTurnFileActivity,
     recordTerminalTurnToolActivity: mocks.recordTerminalTurnToolActivity,
+    recordTerminalTurnUserInputActivity: mocks.recordTerminalTurnUserInputActivity,
 }));
 
 vi.mock('../../../src/copilot/terminal/state/ui-preferences.js', () => ({
@@ -597,6 +601,32 @@ describe('terminal/events/sdk-session-events.js — contrato', () => {
         expect(mocks.broadcastSse).toHaveBeenCalledWith(
             'session.tools_updated',
             expect.objectContaining({ sdkCount: null }),
+        );
+    });
+
+    it('projeta model_retry como estado recuperável visível', async () => {
+        const { setupTerminalSdkSessionEventListeners } =
+            await import('../../../src/copilot/terminal/events/sdk-session-events.js');
+        const agent = createAgentHost();
+
+        setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfIdle: vi.fn() });
+        agent.emit('session.info', {
+            infoType: 'model_retry',
+            message: 'Request failed due to a transient API error. Retrying...',
+        });
+
+        expect(mocks.recordTerminalActivity).toHaveBeenCalledWith(
+            'error',
+            'Retry de modelo em andamento',
+            expect.objectContaining({
+                severity: 'warn',
+                source: 'sdk',
+                recordHistory: true,
+            }),
+        );
+        expect(mocks.broadcastSse).toHaveBeenCalledWith(
+            'session.info',
+            expect.objectContaining({ infoType: 'model_retry' }),
         );
     });
 

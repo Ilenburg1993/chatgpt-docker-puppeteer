@@ -35,7 +35,9 @@ vi.mock('../../../../src/copilot/agent/ports/logging-port.js', () => ({
     log: mocks.log,
 }));
 
-const { withAgentRuntimeToolPolicy } = await import('../../../../src/copilot/agent/ports/hook-port.js');
+const { buildAgentBusHooks, withAgentRuntimeToolPolicy } = await import(
+    '../../../../src/copilot/agent/ports/hook-port.js'
+);
 
 describe('agent/ports/hook-port', () => {
     beforeEach(() => {
@@ -84,5 +86,30 @@ describe('agent/ports/hook-port', () => {
 
         expect(result).toEqual(expect.objectContaining({ permissionDecision: 'allow' }));
         expect(mocks.recordBlockedToolCall).not.toHaveBeenCalled();
+    });
+
+    it('normaliza erro vazio do SDK para mensagem acionável no hook errorOccurred', async () => {
+        const emit = vi.fn();
+        const hooks = buildAgentBusHooks({
+            emitWebhook: vi.fn(async () => {}),
+            getModel: () => 'auto',
+            scheduleFallback: vi.fn(),
+            emit,
+            metrics: { recordSessionStart: vi.fn(), recordSessionEnd: vi.fn() },
+        });
+
+        await hooks.onErrorOccurred?.(
+            /** @type {any} */ ({ error: {}, errorContext: 'model_call', recoverable: true }),
+            /** @type {any} */ ({ sessionId: 's1' }),
+        );
+
+        expect(emit).toHaveBeenCalledWith(
+            'error',
+            expect.objectContaining({ errorMessage: 'Erro do SDK sem mensagem estruturada.' }),
+        );
+        expect(mocks.log).toHaveBeenCalledWith(
+            'WARN',
+            expect.stringContaining('Erro do SDK sem mensagem estruturada.'),
+        );
     });
 });

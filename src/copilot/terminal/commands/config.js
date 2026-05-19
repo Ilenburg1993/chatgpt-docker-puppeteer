@@ -11,6 +11,7 @@
  */
 
 import { toError } from '#copilot/core';
+import { resolveModelSelectionMismatch } from '#copilot/core';
 import {
     listTerminalAvailableModelsProjection,
     readTerminalConfigProjection,
@@ -35,10 +36,12 @@ function resolveObservedModelState(state) {
     const configuredModel = typeof lastPrInfo?.['configuredModel'] === 'string' ? lastPrInfo['configuredModel'] : null;
     const effectiveModel = typeof lastPrInfo?.['effectiveModel'] === 'string' ? lastPrInfo['effectiveModel'] : null;
     const billedModel = typeof lastPrInfo?.['model'] === 'string' ? lastPrInfo['model'] : null;
-    const modelMismatch =
-        Boolean(lastPrInfo?.['modelMismatch']) ||
-        Boolean(configuredModel && effectiveModel && configuredModel !== effectiveModel) ||
-        Boolean(configuredModel && billedModel && configuredModel !== billedModel);
+    const modelMismatch = resolveModelSelectionMismatch({
+        configuredModel,
+        billedModel,
+        effectiveModel,
+        explicitMismatch: Boolean(lastPrInfo?.['modelMismatch']),
+    });
     return {
         observedModel: effectiveModel ?? billedModel,
         configuredModel,

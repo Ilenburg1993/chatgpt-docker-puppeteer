@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # =============================================================================
 # PHASE 0 — GUARDA DE EXECUÇÃO (FAIL-SAFE ABSOLUTO)
-# CANONICAL v5.7.1
+# CANONICAL v5.8.0
 #
 # Contrato:
 # - post-attach NUNCA pode falhar
@@ -32,6 +32,21 @@
 #   longos sem executar benchmarks, probes ou scripts de rede no attach.
 # - Adiciona hints humanos sincronizados com package.json v1.1.2/Makefile v4.2.2.
 #
+# CHANGELOG v5.8.0 (2026-05-19):
+# - Sincronizado com DevContainer v5.8.0, post-create v1.1.0,
+#   post-start v2.9.0, local-dns-cache v1.6.0,
+#   github-copilot-network-manager v1.6.0, github-api-route-fix v1.9.0,
+#   local-copilot-proxy v1.3.1 e copilot-route-advisor v1.1.0.
+# - Corrige o endpoint registry canônico para
+#   .devcontainer/scripts/network/endpoints.github-copilot.tsv, preservando
+#   fallback legado em .devcontainer/network/endpoints.github-copilot.tsv.
+# - Amplia snapshot passivo para novos campos de DNS runtime/resolver proof,
+#   route verify/apply/root reachability, manager blockers, proxy probe-source
+#   e advisor registry/decision artifacts.
+# - Adiciona triagem de artifact missing/fresh/stale e hints humanos sem
+#   executar scripts, probes externos, benchmarks, start/stop ou mutações.
+# - Normaliza LF para Linux/WSL2 e mantém contrato fail-safe absoluto.
+#
 # =============================================================================
 
 # Desarma heranças perigosas
@@ -44,7 +59,7 @@ trap - ERR EXIT INT TERM 2> /dev/null || true
 
 # Versão canônica do hook (fonte única da verdade)
 readonly SCRIPT_NAME="post-attach"
-readonly SCRIPT_VERSION="5.7.1"
+readonly SCRIPT_VERSION="5.8.0"
 
 # ---------------------------------------------------------------------------
 # CLI options parser
@@ -69,7 +84,9 @@ post-attach.sh [--brief] [--help] [--version]
 
 This hook is passive/read-only. It displays the latest post-start/network
 snapshots and cached benchmark/recommendation artifacts without starting
-services, route-fix, proxy compare jobs or long-running benchmarks.
+services, route-fix, proxy compare jobs, route advisor jobs or long-running
+benchmarks. It never mutates /etc/hosts, /etc/resolv.conf, Docker, VS Code
+settings, proxy configuration or application services.
 EOF
             exit 0
             ;;
@@ -85,7 +102,7 @@ done
 
 # =============================================================================
 # PHASE 1 — UX HELPERS (API SEMÂNTICA DE OUTPUT)
-# CANONICAL v5.7.1
+# CANONICAL v5.8.0
 #
 # Finalidade:
 #   • Prover API mínima e estável de mensagens humanas
@@ -495,12 +512,62 @@ print_artifact_freshness() {
     fi
 }
 
+artifact_state() {
+    local file max_age
+    file="${1:-}"
+    max_age="${2:-${RECOMMENDATION_MAX_AGE_SECONDS:-86400}}"
+    if [[ ! -e "${file}" ]]; then
+        printf '%s\n' 'missing'
+    elif is_recent_file "${file}" "${max_age}"; then
+        printf '%s\n' 'fresh'
+    else
+        printf '%s\n' 'stale-or-unknown'
+    fi
+}
+
+print_artifact_state() {
+    local label file max_age state age size
+    label="${1:-artifact}"
+    file="${2:-}"
+    max_age="${3:-${RECOMMENDATION_MAX_AGE_SECONDS:-86400}}"
+    state="$(artifact_state "${file}" "${max_age}")"
+    age="$(file_age_human "${file}")"
+    size="?"
+    if [[ -e "${file}" ]] && command -v stat > /dev/null 2>&1; then
+        size="$(stat -c '%s' "${file}" 2> /dev/null || printf '?')"
+    fi
+    print_bullet "${label}:" "${state}; age=${age}; bytes=${size}; file=${file:-unknown}"
+}
+
+project_path() {
+    local rel
+    rel="${1:-}"
+    if [[ -n "${PROJECT_ROOT:-}" && -d "${PROJECT_ROOT}" ]]; then
+        printf '%s/%s\n' "${PROJECT_ROOT%/}" "${rel#./}"
+    else
+        printf '%s\n' "${rel}"
+    fi
+}
+
+first_readable_or_first() {
+    local first candidate
+    first=""
+    for candidate in "$@"; do
+        [[ -n "${candidate}" ]] || continue
+        [[ -n "${first}" ]] || first="${candidate}"
+        if [[ -r "${candidate}" ]]; then
+            printf '%s\n' "${candidate}"
+            return 0
+        fi
+    done
+    printf '%s\n' "${first}"
+}
+
 count_tsv_registry_rows() {
     local file
     file="${1:-}"
     [[ -r "${file}" ]] || {
-        printf '0 0
-'
+        printf '0 0\n'
         return 0
     }
     awk -F '	' '
@@ -510,8 +577,7 @@ count_tsv_registry_rows() {
             if (NF != 5 || $1 !~ /^https:\/\// || $2 == "" || $3 == "" || $4 == "" || $5 == "") bad++
         }
         END { print total+0, bad+0 }
-    ' "${file}" 2> /dev/null || printf '0 0
-'
+    ' "${file}" 2> /dev/null || printf '0 0\n'
 }
 
 print_endpoint_registry_snapshot() {
@@ -576,7 +642,7 @@ print_status_line() {
 
 # =============================================================================
 # PHASE 2 — BANNER DE ATTACH (IDENTIDADE HUMANA — INICIAL)
-# CANONICAL v5.7.1
+# CANONICAL v5.8.0
 #
 # Finalidade:
 #   • Sinalizar visualmente o evento de attach
@@ -610,7 +676,7 @@ printf "%b\n" "${BLUE}═══════════════════�
 echo ""
 # =============================================================================
 # PHASE 3 — NAMESPACE CANÔNICO DE ESTADO (UX / ATTACH)
-# CANONICAL v5.7.1
+# CANONICAL v5.8.0
 #
 # CONTRATO (NORMATIVO):
 #   • Este namespace armazena APENAS estado HUMANO / UX
@@ -718,7 +784,7 @@ fi
 # =============================================================================
 # PHASE 4 — CONTEXTO BÁSICO DO AMBIENTE (DIAGNÓSTICO HUMANO)
 # additional environment diagnostics including LD_PRELOAD
-# CANONICAL v5.7.1
+# CANONICAL v5.8.0
 #
 # CONTRATO:
 #   • Diagnóstico exclusivamente informativo
@@ -970,7 +1036,7 @@ echo ""
 # =============================================================================
 # PHASE 5 — ESTADO ESTRUTURAL
 # (STATE MANIFESTO | DIAGNÓSTICO PASSIVO)
-# CANONICAL v5.7.1
+# CANONICAL v5.8.0
 #
 # CONTRATO (INVIOLÁVEL):
 #   • Leitura ESTRITAMENTE PASSIVA
@@ -1075,7 +1141,7 @@ echo ""
 
 # =============================================================================
 # PHASE 6 — ESTADO DE SAÚDE & CAPACIDADES CRÍTICAS (PASSIVO)
-# CANONICAL v5.7.1
+# CANONICAL v5.8.0
 #
 # CONTRATO (INVIOLÁVEL):
 #   • Diagnóstico estritamente PASSIVO
@@ -1143,11 +1209,17 @@ LOCAL_PROXY_COMPARISON_FILE="${DEVCONTAINER_LOCAL_COPILOT_PROXY_COMPARISON_FILE:
 LOCAL_PROXY_RECOMMENDATION_FILE="${DEVCONTAINER_LOCAL_COPILOT_PROXY_RECOMMENDATION_FILE:-/tmp/devcontainer-copilot-proxy.recommendation}"
 COPILOT_ROUTE_ADVISOR_STATUS_FILE="${DEVCONTAINER_COPILOT_ROUTE_ADVISOR_STATUS_FILE:-/tmp/devcontainer-copilot-route-advisor.status}"
 COPILOT_ROUTE_ADVISOR_SUMMARY_FILE="${DEVCONTAINER_COPILOT_ROUTE_ADVISOR_SUMMARY_FILE:-/tmp/devcontainer-copilot-route-advisor.summary}"
-ENDPOINT_REGISTRY_FILE="${DEVCONTAINER_COPILOT_ENDPOINT_REGISTRY_FILE:-${PROJECT_ROOT}/.devcontainer/network/endpoints.github-copilot.tsv}"
-ENDPOINT_REGISTRY_FALLBACK_FILE=".devcontainer/network/endpoints.github-copilot.tsv"
-if [[ ! -r "${ENDPOINT_REGISTRY_FILE}" && -r "${ENDPOINT_REGISTRY_FALLBACK_FILE}" ]]; then
-    ENDPOINT_REGISTRY_FILE="${ENDPOINT_REGISTRY_FALLBACK_FILE}"
+COPILOT_ROUTE_ADVISOR_REPORT_FILE="${DEVCONTAINER_COPILOT_ROUTE_ADVISOR_REPORT_FILE:-/tmp/devcontainer-copilot-route-advisor.report}"
+COPILOT_ROUTE_ADVISOR_METRICS_FILE="${DEVCONTAINER_COPILOT_ROUTE_ADVISOR_METRICS_FILE:-/tmp/devcontainer-copilot-route-advisor.metrics.tsv}"
+COPILOT_ROUTE_ADVISOR_DECISIONS_FILE="${DEVCONTAINER_COPILOT_ROUTE_ADVISOR_DECISIONS_FILE:-/tmp/devcontainer-copilot-route-advisor.decisions.tsv}"
+ENDPOINT_REGISTRY_CANONICAL_FILE="${DEVCONTAINER_COPILOT_ENDPOINT_REGISTRY_FILE:-${DEVCONTAINER_COPILOT_ENDPOINT_REGISTRY:-}}"
+if [[ -z "${ENDPOINT_REGISTRY_CANONICAL_FILE}" ]]; then
+    ENDPOINT_REGISTRY_CANONICAL_FILE="$(project_path '.devcontainer/scripts/network/endpoints.github-copilot.tsv')"
 fi
+ENDPOINT_REGISTRY_LEGACY_FILE="$(project_path '.devcontainer/network/endpoints.github-copilot.tsv')"
+ENDPOINT_REGISTRY_RELATIVE_CANONICAL_FILE=".devcontainer/scripts/network/endpoints.github-copilot.tsv"
+ENDPOINT_REGISTRY_RELATIVE_LEGACY_FILE=".devcontainer/network/endpoints.github-copilot.tsv"
+ENDPOINT_REGISTRY_FILE="$(first_readable_or_first "${ENDPOINT_REGISTRY_CANONICAL_FILE}" "${ENDPOINT_REGISTRY_RELATIVE_CANONICAL_FILE}" "${ENDPOINT_REGISTRY_LEGACY_FILE}" "${ENDPOINT_REGISTRY_RELATIVE_LEGACY_FILE}")"
 
 info "Rede GitHub/Copilot e DNS local (snapshot passivo):"
 
@@ -1165,6 +1237,10 @@ if [[ -r "${POST_START_SUMMARY_FILE}" ]]; then
     print_bullet "artifact states:" "route=$(kv_or "${POST_START_SUMMARY_FILE}" copilot_network_route_artifact_state unknown); proxy=$(kv_or "${POST_START_SUMMARY_FILE}" copilot_network_proxy_artifact_state unknown)"
     print_bullet "soft degraded:" "github=$(kv_or "${POST_START_SUMMARY_FILE}" copilot_network_github_api_soft_degraded_count 0); overall=$(kv_or "${POST_START_SUMMARY_FILE}" copilot_network_overall_soft_degraded_count 0)"
     print_bullet "endpoint registry:" "$(kv_or "${POST_START_SUMMARY_FILE}" endpoint_registry_status unknown); rows=$(kv_or "${POST_START_SUMMARY_FILE}" endpoint_registry_rows 0); bad=$(kv_or "${POST_START_SUMMARY_FILE}" endpoint_registry_bad_rows 0)"
+    print_bullet "endpoint source:" "$(kv_any_or "${POST_START_SUMMARY_FILE}" unknown endpoint_probe_source endpoint_source endpoint_registry_source)"
+    print_bullet "registry usado:" "$(kv_any_or "${POST_START_SUMMARY_FILE}" unknown endpoint_registry_file endpoint_registry_used_file endpoint_registry_effective_file endpoint_registry_canonical_file)"
+    print_bullet "DNS runtime:" "runtime=$(kv_any_or "${POST_START_SUMMARY_FILE}" unknown local_dns_runtime_effective dns_cache_runtime_effective runtime_effective); resolver=$(kv_any_or "${POST_START_SUMMARY_FILE}" unknown local_dns_resolver_effective dns_cache_resolver_effective resolver_effective); resolv_cache=$(kv_any_or "${POST_START_SUMMARY_FILE}" unknown resolv_conf_points_to_cache dns_resolv_conf_points_to_cache)"
+    print_bullet "DNS resolver atual:" "nameservers=$(kv_any_or "${POST_START_SUMMARY_FILE}" unknown resolv_conf_nameservers current_nameservers effective_nameservers); loopback=$(kv_any_or "${POST_START_SUMMARY_FILE}" unknown resolv_conf_points_to_cache resolv_conf_points_to_loopback)"
     print_bullet "proxy rec.:" "$(kv_or "${POST_START_SUMMARY_FILE}" local_copilot_proxy_recommendation_action unknown); conf=$(kv_or "${POST_START_SUMMARY_FILE}" local_copilot_proxy_recommendation_confidence unknown)"
     print_bullet "route rec.:" "$(kv_or "${POST_START_SUMMARY_FILE}" github_route_recommendation_action unknown)"
     print_bullet "route current/best:" "$(kv_or "${POST_START_SUMMARY_FILE}" github_route_current_ip unknown)/$(kv_or "${POST_START_SUMMARY_FILE}" github_route_best_candidate_ip unknown); p95=$(kv_or "${POST_START_SUMMARY_FILE}" github_route_current_p95_ms unknown)/$(kv_or "${POST_START_SUMMARY_FILE}" github_route_best_candidate_p95_ms unknown)ms"
@@ -1185,13 +1261,18 @@ if [[ -r "${LOCAL_DNS_SUMMARY_FILE}" ]]; then
     print_bullet "modo/action:" "$(kv_or "${LOCAL_DNS_SUMMARY_FILE}" mode unknown)/$(kv_or "${LOCAL_DNS_SUMMARY_FILE}" action unknown)"
     print_bullet "resolv.conf:" "$(kv_or "${LOCAL_DNS_SUMMARY_FILE}" resolv_conf_health "$(kv_or "${LOCAL_DNS_SUMMARY_FILE}" resolv_conf_status unknown)")"
     print_bullet "nameservers:" "$(kv_or "${LOCAL_DNS_SUMMARY_FILE}" resolv_conf_nameservers unknown)"
+    print_bullet "runtime proof:" "runtime=$(kv_or "${LOCAL_DNS_SUMMARY_FILE}" runtime_effective unknown); resolver=$(kv_or "${LOCAL_DNS_SUMMARY_FILE}" resolver_effective unknown); system_uses_cache=$(kv_or "${LOCAL_DNS_SUMMARY_FILE}" system_resolver_uses_cache unknown)"
+    print_bullet "resolv cache:" "points=$(kv_or "${LOCAL_DNS_SUMMARY_FILE}" resolv_conf_points_to_cache unknown); managed=$(kv_or "${LOCAL_DNS_SUMMARY_FILE}" resolv_conf_managed unknown)"
+    print_bullet "previous stale:" "$(kv_or "${LOCAL_DNS_SUMMARY_FILE}" previous_summary_stale unknown); reason=$(kv_or "${LOCAL_DNS_SUMMARY_FILE}" previous_summary_stale_reason unknown)"
     print_bullet "status stale:" "$(kv_or "${LOCAL_DNS_SUMMARY_FILE}" status_stale unknown)"
     print_bullet "stale reason:" "$(kv_or "${LOCAL_DNS_SUMMARY_FILE}" status_stale_reason unknown)"
     print_bullet "upstreams:" "$(kv_or "${LOCAL_DNS_SUMMARY_FILE}" selected_upstreams unknown)"
     print_bullet "ranking:" "$(kv_or "${LOCAL_DNS_SUMMARY_FILE}" ranking_source unknown)/stale=$(kv_or "${LOCAL_DNS_SUMMARY_FILE}" ranking_stale unknown)"
     print_bullet "dnsmasq:" "$(kv_or "${LOCAL_DNS_SUMMARY_FILE}" dnsmasq_process_status unknown)/$(kv_or "${LOCAL_DNS_SUMMARY_FILE}" dnsmasq_port_status unknown)"
+    print_bullet "socket owners:" "dnsmasq=$(kv_or "${LOCAL_DNS_SUMMARY_FILE}" dnsmasq_socket_dnsmasq_pids unknown); outros=$(kv_or "${LOCAL_DNS_SUMMARY_FILE}" dnsmasq_socket_non_dnsmasq_pids unknown)"
     print_bullet "probe local:" "$(kv_or "${LOCAL_DNS_SUMMARY_FILE}" local_probe_status "$(kv_or "${LOCAL_DNS_SUMMARY_FILE}" probe_local_dns unknown)")"
-    print_bullet "fail-closed:" "restore_on_failure=$(kv_or "${LOCAL_DNS_SUMMARY_FILE}" restore_resolv_conf_on_failure unknown)"
+    print_bullet "probe sistema:" "$(kv_or "${LOCAL_DNS_SUMMARY_FILE}" system_probe_status unknown)"
+    print_bullet "fail-closed:" "restore_on_failure=$(kv_or "${LOCAL_DNS_SUMMARY_FILE}" restore_resolv_conf_on_failure unknown); repair=$(kv_or "${LOCAL_DNS_SUMMARY_FILE}" repair_on_probe_failure unknown)"
     print_bullet "concluído em:" "$(kv_or "${LOCAL_DNS_SUMMARY_FILE}" completed_at unknown)"
 else
     if [[ "${DNS_CACHE_ENABLED}" == "true" ]]; then
@@ -1203,10 +1284,14 @@ fi
 
 if [[ -r /etc/resolv.conf ]]; then
     RESOLV_FIRST_NS="$(awk '$1 == "nameserver" {print $2; exit}' /etc/resolv.conf 2> /dev/null | sanitize_oneline)"
+    DNS_POINTS_TO_CACHE="$(kv_or "${LOCAL_DNS_SUMMARY_FILE}" resolv_conf_points_to_cache unknown)"
+    DNS_RESOLVER_EFFECTIVE="$(kv_or "${LOCAL_DNS_SUMMARY_FILE}" resolver_effective unknown)"
     print_bullet "nameserver efetivo:" "${RESOLV_FIRST_NS:-unknown}"
     if [[ "${DNS_CACHE_ENABLED}" == "true" ]]; then
-        if [[ "${RESOLV_FIRST_NS}" == "127.0.0.1" || "${RESOLV_FIRST_NS}" == "::1" ]]; then
-            ok "/etc/resolv.conf aponta para o cache local"
+        if [[ "${DNS_POINTS_TO_CACHE}" == "true" || "${RESOLV_FIRST_NS}" == "127.0.0.1" || "${RESOLV_FIRST_NS}" == "::1" ]]; then
+            ok "/etc/resolv.conf aponta para o cache local ou summary prova points_to_cache=true"
+        elif [[ "${DNS_RESOLVER_EFFECTIVE}" == "false" ]]; then
+            warn "DNS cache habilitado, mas resolver efetivo não usa o cache local"
         else
             warn "DNS cache habilitado, mas /etc/resolv.conf não aponta para loopback"
         fi
@@ -1224,6 +1309,9 @@ if [[ -r "${GITHUB_ROUTE_SUMMARY_FILE}" ]]; then
     print_key_if_present "best candidate:" "${GITHUB_ROUTE_SUMMARY_FILE}" best_candidate_ip
     print_key_if_present "current p95:" "${GITHUB_ROUTE_SUMMARY_FILE}" current_p95_ms
     print_key_if_present "best p95:" "${GITHUB_ROUTE_SUMMARY_FILE}" best_candidate_p95_ms
+    print_bullet "root reachability:" "state=$(kv_or "${GITHUB_ROUTE_SUMMARY_FILE}" root_reachability_state unknown); http=$(kv_or "${GITHUB_ROUTE_SUMMARY_FILE}" current_route_root_http unknown); tls=$(kv_or "${GITHUB_ROUTE_SUMMARY_FILE}" current_route_root_tls unknown)"
+    print_bullet "apply/verify:" "apply=$(kv_or "${GITHUB_ROUTE_SUMMARY_FILE}" hosts_apply_status unknown); verify=$(kv_or "${GITHUB_ROUTE_SUMMARY_FILE}" verify_status unknown); remote=$(kv_or "${GITHUB_ROUTE_SUMMARY_FILE}" verify_remote_ip unknown); latency=$(kv_or "${GITHUB_ROUTE_SUMMARY_FILE}" verify_latency_ms unknown)ms"
+    print_bullet "verify reason:" "$(kv_or "${GITHUB_ROUTE_SUMMARY_FILE}" verify_reason unknown)"
     print_bullet "decisão:" "$(kv_or "${GITHUB_ROUTE_SUMMARY_FILE}" decision_reason "$(kv_or "${GITHUB_ROUTE_SUMMARY_FILE}" reason unknown)")"
     print_file_hint "métricas:" "${GITHUB_ROUTE_METRICS_FILE}"
 else
@@ -1236,10 +1324,12 @@ if [[ -r "${COPILOT_NETWORK_SUMMARY_FILE}" ]]; then
     print_status_line "Copilot Network Manager" "${COPILOT_STATUS}"
     print_bullet "planos:" "overall=$(kv_or "${COPILOT_NETWORK_SUMMARY_FILE}" plane_overall_status unknown); github=$(kv_or "${COPILOT_NETWORK_SUMMARY_FILE}" plane_github_api_status unknown); transport=$(kv_or "${COPILOT_NETWORK_SUMMARY_FILE}" plane_copilot_transport_status unknown); telemetry=$(kv_or "${COPILOT_NETWORK_SUMMARY_FILE}" plane_copilot_telemetry_status unknown)"
     print_bullet "soft-degraded:" "github=$(kv_or "${COPILOT_NETWORK_SUMMARY_FILE}" github_api_soft_degraded_count 0); overall=$(kv_or "${COPILOT_NETWORK_SUMMARY_FILE}" overall_soft_degraded_count 0); reason=$(kv_or "${COPILOT_NETWORK_SUMMARY_FILE}" github_api_soft_degraded_reason none)"
-    print_bullet "registry:" "$(kv_or "${COPILOT_NETWORK_SUMMARY_FILE}" endpoint_registry_status unknown); rows=$(kv_or "${COPILOT_NETWORK_SUMMARY_FILE}" endpoint_registry_rows 0); bad=$(kv_or "${COPILOT_NETWORK_SUMMARY_FILE}" endpoint_registry_bad_rows 0)"
+    print_bullet "registry:" "$(kv_or "${COPILOT_NETWORK_SUMMARY_FILE}" endpoint_registry_status unknown); rows=$(kv_or "${COPILOT_NETWORK_SUMMARY_FILE}" endpoint_registry_rows 0); bad=$(kv_or "${COPILOT_NETWORK_SUMMARY_FILE}" endpoint_registry_bad_rows 0); urls_bad=$(kv_or "${COPILOT_NETWORK_SUMMARY_FILE}" endpoint_registry_bad_urls 0); hosts_bad=$(kv_or "${COPILOT_NETWORK_SUMMARY_FILE}" endpoint_registry_bad_hosts 0)"
+    print_bullet "endpoint source:" "$(kv_any_or "${COPILOT_NETWORK_SUMMARY_FILE}" unknown endpoint_source endpoint_registry_source); file=$(kv_any_or "${COPILOT_NETWORK_SUMMARY_FILE}" unknown endpoint_registry_file endpoint_registry_canonical_file)"
+    print_bullet "manager blockers:" "$(kv_or "${COPILOT_NETWORK_SUMMARY_FILE}" manager_recommendation_blockers none)"
     print_bullet "route:" "$(kv_or "${COPILOT_NETWORK_SUMMARY_FILE}" route_status unknown) → $(kv_or "${COPILOT_NETWORK_SUMMARY_FILE}" route_selected_ip unknown)"
     print_bullet "route artifacts:" "state=$(kv_or "${COPILOT_NETWORK_SUMMARY_FILE}" github_route_artifact_state unknown); current=$(kv_or "${COPILOT_NETWORK_SUMMARY_FILE}" github_route_current_ip unknown); best=$(kv_or "${COPILOT_NETWORK_SUMMARY_FILE}" github_route_best_candidate_ip unknown)"
-    print_bullet "DNS cache efetivo:" "$(kv_or "${COPILOT_NETWORK_SUMMARY_FILE}" dns_cache_effective unknown); stale=$(kv_or "${COPILOT_NETWORK_SUMMARY_FILE}" dns_cache_status_stale unknown)"
+    print_bullet "DNS cache efetivo:" "$(kv_or "${COPILOT_NETWORK_SUMMARY_FILE}" dns_cache_effective unknown); runtime=$(kv_or "${COPILOT_NETWORK_SUMMARY_FILE}" dns_cache_runtime_effective unknown); resolver=$(kv_or "${COPILOT_NETWORK_SUMMARY_FILE}" dns_cache_resolver_effective unknown); stale=$(kv_or "${COPILOT_NETWORK_SUMMARY_FILE}" dns_cache_status_stale unknown)"
     print_bullet "endpoints:" "$(kv_or "${COPILOT_NETWORK_SUMMARY_FILE}" endpoints_ok 0)/$(kv_or "${COPILOT_NETWORK_SUMMARY_FILE}" endpoints_total 0) ok; failed=$(kv_or "${COPILOT_NETWORK_SUMMARY_FILE}" endpoints_failed 0); slow=$(kv_or "${COPILOT_NETWORK_SUMMARY_FILE}" endpoints_slow 0)"
     print_bullet "pior host atual:" "$(kv_or "${COPILOT_NETWORK_SUMMARY_FILE}" current_worst_host unknown) ($(kv_or "${COPILOT_NETWORK_SUMMARY_FILE}" current_worst_total_ms unknown)ms)"
     print_bullet "histórico:" "$(kv_or "${COPILOT_NETWORK_SUMMARY_FILE}" history_status unknown); pior=$(kv_or "${COPILOT_NETWORK_SUMMARY_FILE}" history_worst_host unknown)/p95=$(kv_or "${COPILOT_NETWORK_SUMMARY_FILE}" history_worst_p95_ms unknown)ms"
@@ -1268,6 +1358,9 @@ if [[ "${SHOW_NETWORK_RECOMMENDATIONS}" != "false" ]]; then
         print_artifact_freshness "proxy bench summary" "${LOCAL_PROXY_BENCHMARK_SUMMARY_FILE}"
         print_artifact_freshness "proxy comparison" "${LOCAL_PROXY_COMPARISON_FILE}"
         print_artifact_freshness "proxy bench tsv" "${LOCAL_PROXY_BENCHMARK_FILE}"
+        print_artifact_state "manager rec state" "${COPILOT_NETWORK_RECOMMENDATION_FILE}" "${RECOMMENDATION_MAX_AGE_SECONDS}"
+        print_artifact_state "route rec state" "${GITHUB_ROUTE_RECOMMENDATION_FILE}" "${RECOMMENDATION_MAX_AGE_SECONDS}"
+        print_artifact_state "proxy rec state" "${LOCAL_PROXY_RECOMMENDATION_FILE}" "${RECOMMENDATION_MAX_AGE_SECONDS}"
     fi
     case "$(kv_any_or "${COPILOT_NETWORK_RECOMMENDATION_FILE}" unknown recommended_action action):$(kv_any_or "${COPILOT_NETWORK_RECOMMENDATION_FILE}" unknown recommended_transport transport)" in
         prefer-proxy-opt-in:proxy-local)
@@ -1289,10 +1382,16 @@ fi
 ADVISOR_STATUS="$(status_snapshot_or "${COPILOT_ROUTE_ADVISOR_STATUS_FILE}" "${COPILOT_ROUTE_ADVISOR_SUMMARY_FILE}" status unknown)"
 if [[ -r "${COPILOT_ROUTE_ADVISOR_SUMMARY_FILE}" ]]; then
     print_status_line "Copilot Route Advisor" "${ADVISOR_STATUS}"
+    print_bullet "endpoint source:" "$(kv_or "${COPILOT_ROUTE_ADVISOR_SUMMARY_FILE}" endpoint_source unknown); configured=$(kv_or "${COPILOT_ROUTE_ADVISOR_SUMMARY_FILE}" endpoints_configured_count unknown)"
+    print_bullet "registry:" "$(kv_or "${COPILOT_ROUTE_ADVISOR_SUMMARY_FILE}" endpoint_registry_status unknown); rows=$(kv_or "${COPILOT_ROUTE_ADVISOR_SUMMARY_FILE}" endpoint_registry_rows 0); bad=$(kv_or "${COPILOT_ROUTE_ADVISOR_SUMMARY_FILE}" endpoint_registry_bad_rows 0); skipped_api=$(kv_or "${COPILOT_ROUTE_ADVISOR_SUMMARY_FILE}" endpoint_registry_skipped_api_rows 0)"
     print_bullet "better candidates:" "$(kv_or "${COPILOT_ROUTE_ADVISOR_SUMMARY_FILE}" endpoints_with_better_candidate 0)"
     print_bullet "current failed:" "$(kv_or "${COPILOT_ROUTE_ADVISOR_SUMMARY_FILE}" endpoints_current_failed 0)"
     print_bullet "melhor ganho:" "$(kv_or "${COPILOT_ROUTE_ADVISOR_SUMMARY_FILE}" global_best_improvement_ms 0)ms"
+    print_bullet "pior host:" "$(kv_or "${COPILOT_ROUTE_ADVISOR_SUMMARY_FILE}" global_worst_host unknown)/$(kv_or "${COPILOT_ROUTE_ADVISOR_SUMMARY_FILE}" global_worst_total_ms 0)ms"
     print_bullet "recomendações:" "$(kv_or "${COPILOT_ROUTE_ADVISOR_SUMMARY_FILE}" recommendations observe)"
+    print_file_hint "decisões:" "${COPILOT_ROUTE_ADVISOR_DECISIONS_FILE}"
+    print_file_hint "métricas advisor:" "${COPILOT_ROUTE_ADVISOR_METRICS_FILE}"
+    print_file_hint "report advisor:" "${COPILOT_ROUTE_ADVISOR_REPORT_FILE}"
 else
     info "Copilot Route Advisor: sem snapshot registrado (normal se não foi executado manualmente)"
 fi
@@ -1303,7 +1402,10 @@ if [[ "${DEVCONTAINER_ENABLE_LOCAL_COPILOT_PROXY:-false}" == "true" || -r "${LOC
     if [[ -r "${LOCAL_PROXY_SUMMARY_FILE}" ]]; then
         print_status_line "Proxy local Copilot" "${PROXY_STATUS}"
         print_bullet "proxy mode:" "$(kv_or "${LOCAL_PROXY_SUMMARY_FILE}" mode unknown)"
+        print_bullet "proxy URL:" "$(kv_or "${LOCAL_PROXY_SUMMARY_FILE}" proxy_url unknown)"
         print_bullet "listen:" "$(kv_or "${LOCAL_PROXY_SUMMARY_FILE}" listen_address "$(kv_or "${LOCAL_PROXY_SUMMARY_FILE}" proxy_host unknown)"):$(kv_or "${LOCAL_PROXY_SUMMARY_FILE}" listen_port "$(kv_or "${LOCAL_PROXY_SUMMARY_FILE}" proxy_port unknown)")"
+        print_bullet "probe URLs:" "source=$(kv_or "${LOCAL_PROXY_SUMMARY_FILE}" probe_url_source unknown); count=$(kv_or "${LOCAL_PROXY_SUMMARY_FILE}" probe_url_count unknown); custom=$(kv_or "${LOCAL_PROXY_SUMMARY_FILE}" allow_custom_probe_urls false)"
+        print_bullet "proxy registry:" "$(kv_or "${LOCAL_PROXY_SUMMARY_FILE}" endpoint_registry_status unknown); rows=$(kv_or "${LOCAL_PROXY_SUMMARY_FILE}" endpoint_registry_rows 0); bad=$(kv_or "${LOCAL_PROXY_SUMMARY_FILE}" endpoint_registry_bad_rows 0); file=$(kv_or "${LOCAL_PROXY_SUMMARY_FILE}" endpoint_registry_file unknown)"
         print_bullet "env file:" "$(kv_or "${LOCAL_PROXY_SUMMARY_FILE}" env_file unknown)"
         print_bullet "benchmark:" "$(kv_or "${LOCAL_PROXY_SUMMARY_FILE}" benchmark_status not-run); samples=$(kv_or "${LOCAL_PROXY_SUMMARY_FILE}" benchmark_samples 0)"
         print_bullet "comparison:" "$(kv_or "${LOCAL_PROXY_SUMMARY_FILE}" comparison_status not-run); rec=$(kv_or "${LOCAL_PROXY_SUMMARY_FILE}" recommendation_action none)"
@@ -1387,7 +1489,7 @@ fi
 
 # =============================================================================
 # PHASE 7 — QUICK START GUIDE (FIRST ATTACH ONLY)
-# CANONICAL v5.7.1
+# CANONICAL v5.8.0
 #
 # CONTRATO:
 #   • Exibido APENAS no primeiro attach
@@ -1455,7 +1557,7 @@ fi
 
 # =============================================================================
 # PHASE 8 — PM2 (OBSERVAÇÃO PASSIVA SEM DAEMONIZAÇÃO)
-# CANONICAL v5.7.1
+# CANONICAL v5.8.0
 #
 # CONTRATO:
 #   • Observação estritamente PASSIVA.
@@ -1514,7 +1616,7 @@ echo ""
 
 # =============================================================================
 # PHASE 9 — CHROME EXTERNO (CDP | DIAGNÓSTICO PASSIVO)
-# CANONICAL v5.7.1
+# CANONICAL v5.8.0
 #
 # MODELO FÍSICO (NÃO NEGOCIÁVEL):
 #
@@ -1616,7 +1718,7 @@ echo ""
 
 # =============================================================================
 # PHASE 10 — VOLUMES & CACHE (OBSERVAÇÃO PASSIVA)
-# CANONICAL v5.7.1
+# CANONICAL v5.8.0
 #
 # CONTRATO (INVIOLÁVEL):
 #   • Display estritamente PASSIVO
@@ -1665,7 +1767,7 @@ echo ""
 
 # =============================================================================
 # PHASE 10.1 — DISK USAGE (SNAPSHOT PASSIVO)
-# CANONICAL v5.7.1
+# CANONICAL v5.8.0
 #
 # CONTRATO:
 #   • Apenas leitura
@@ -1694,7 +1796,7 @@ echo ""
 
 # =============================================================================
 # PHASE 11 — DOCUMENTAÇÃO VIVA (MAPA DE PORTAS & FRONTEIRAS)
-# CANONICAL v5.7.1
+# CANONICAL v5.8.0
 #
 # CONTRATO (INVIOLÁVEL):
 #   • Documentação PURA (read-only)
@@ -1766,7 +1868,7 @@ echo ""
 
 # =============================================================================
 # PHASE 12 — QUICK TIPS (ALWAYS)
-# CANONICAL v5.7.1
+# CANONICAL v5.8.0
 #
 # CONTRATO (INVIOLÁVEL):
 #   • Quick Start Guide COMPLETO apenas no PRIMEIRO attach (PHASE 7)
@@ -1817,13 +1919,28 @@ else
     echo "  • Healthcheck: make health"
     echo "  • Rede atual: npm run network:summary"
     echo "  • Doctor rede: npm run network:doctor"
+    echo "  • Comparar proxy: npm run network:compare-transports"
+    echo "  • Advisor passivo: npm run network:advisor"
     echo "  • Documentação: DOCUMENTAÇÃO/ARQUITETURA/ARCHITECTURE.md"
     echo ""
 fi
 
 # =============================================================================
+# PHASE 12.1 — HINTS OPERACIONAIS DE REDE (PASSIVOS)
+# CANONICAL v5.8.0
+# =============================================================================
+
+info "Próximas ações manuais úteis para rede/Copilot:"
+echo "  • npm run network:summary          # ler summaries atuais"
+echo "  • npm run network:doctor           # doctors curtos, explícitos e manuais"
+echo "  • npm run network:compare-transports # A/B direct-vs-proxy quando houver tempo"
+echo "  • npm run network:advisor          # advisor passivo de candidatos/edges"
+echo "  • make health                      # healthcheck geral"
+echo ""
+
+# =============================================================================
 # FINAL BANNER
-# CANONICAL v5.7.1
+# CANONICAL v5.8.0
 # =============================================================================
 
 echo ""
@@ -1840,7 +1957,7 @@ echo ""
 
 # =============================================================================
 # ENCERRAMENTO SEMÂNTICO — ATTACH COMPLETO
-# CANONICAL v5.7.1
+# CANONICAL v5.8.0
 # =============================================================================
 
 printf "%b\n" "${BLUE}──────────────────────────────────────────────────────────────${NC}"
