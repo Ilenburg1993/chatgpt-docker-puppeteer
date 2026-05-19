@@ -85,8 +85,11 @@ export function normalizeModelChangedEvent(eventOrData) {
  * Payload normalizado de `session.tools_updated`.
  *
  * @typedef {object} NormalizedToolsUpdatedEvent
- * @property {number} count Total de tools disponíveis.
+ * @property {number} count Total de tools disponíveis quando materializado; `0` também pode significar desconhecido
+ * quando `countMaterialized=false`.
  * @property {ToolSummary[]} tools Lista enxuta de tools (nome + descrição).
+ * @property {boolean} toolsMaterialized Indica que o SDK forneceu a lista de tools no payload.
+ * @property {boolean} countMaterialized Indica que o SDK forneceu lista ou contador numérico explícito.
  * @property {number} ts Timestamp do evento.
  */
 
@@ -100,7 +103,14 @@ export function normalizeToolsUpdatedEvent(eventOrData) {
     const root = objectOrEmpty(eventOrData);
     const data = objectOrEmpty(root['data']);
 
-    const rawTools = Array.isArray(data['tools']) ? data['tools'] : Array.isArray(root['tools']) ? root['tools'] : [];
+    const dataHasTools = Array.isArray(data['tools']);
+    const rootHasTools = Array.isArray(root['tools']);
+    const toolsMaterialized = dataHasTools || rootHasTools;
+    const rawTools = dataHasTools
+        ? /** @type {unknown[]} */ (data['tools'])
+        : rootHasTools
+          ? /** @type {unknown[]} */ (root['tools'])
+          : [];
 
     /** @type {ToolSummary[]} */
     const tools = rawTools.map((t) => {
@@ -115,7 +125,10 @@ export function normalizeToolsUpdatedEvent(eventOrData) {
     });
 
     const ts = tsOrNow(root['timestamp'] ?? root['ts'] ?? data['ts']);
-    return { count: tools.length, tools, ts };
+    const explicitCount = Number(data['count'] ?? root['count'] ?? data['toolCount'] ?? root['toolCount'] ?? NaN);
+    const countMaterialized = toolsMaterialized || Number.isFinite(explicitCount);
+    const count = toolsMaterialized ? tools.length : Number.isFinite(explicitCount) ? Math.max(0, explicitCount) : 0;
+    return { count, tools, toolsMaterialized, countMaterialized, ts };
 }
 
 // ─── session.plan_changed ───────────────────────────────────────────────────

@@ -575,6 +575,31 @@ describe('terminal/events/sdk-session-events.js — contrato', () => {
         expect(mocks.println).toHaveBeenCalledWith(expect.stringContaining('Tools dinâmicas SDK atualizadas: 92 SDK'));
     });
 
+    it('não apresenta count 0 como lista SDK real quando o evento não materializou tools', async () => {
+        mocks.getShowSessionActivity.mockReturnValue(true);
+        const { setupTerminalSdkSessionEventListeners } =
+            await import('../../../src/copilot/terminal/events/sdk-session-events.js');
+        const agent = createAgentHost();
+
+        setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfIdle: vi.fn() });
+        agent.emit('session.tools_updated', { count: 0, countMaterialized: false, toolsMaterialized: false });
+
+        expect(mocks.recordTerminalActivity).toHaveBeenCalledWith(
+            'system',
+            'Tools dinâmicas SDK atualizadas',
+            expect.objectContaining({
+                detail: expect.stringContaining('SDK sinalizou atualização sem contagem materializada'),
+            }),
+        );
+        expect(mocks.println).toHaveBeenCalledWith(
+            expect.stringContaining('Tools dinâmicas SDK atualizadas: contagem SDK n/d'),
+        );
+        expect(mocks.broadcastSse).toHaveBeenCalledWith(
+            'session.tools_updated',
+            expect.objectContaining({ sdkCount: null }),
+        );
+    });
+
     it('surfa hooks, sampling, commands/capabilities, auto-mode e exit_plan_mode.requested', async () => {
         mocks.getShowSessionActivity.mockReturnValue(true);
         const { setupTerminalSdkSessionEventListeners } =

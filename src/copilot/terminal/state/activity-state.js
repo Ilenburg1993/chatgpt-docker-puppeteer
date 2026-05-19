@@ -178,6 +178,7 @@ function readFocusedActivity() {
  *     progress?: number | null;
  *     toolName?: string | null;
  *     recordHistory?: boolean;
+ *     updateCurrent?: boolean;
  *     timestamp?: number;
  * }} [opts]
  * @returns {TerminalActivitySnapshot}
@@ -190,6 +191,7 @@ export function recordTerminalActivity(phase, label, opts = {}) {
     const progress = normalizeProgress(opts.progress ?? null);
     const toolName = opts.toolName ?? null;
     const recordHistory = opts.recordHistory !== false;
+    const updateCurrent = opts.updateCurrent !== false;
     const keepStart =
         _currentActivity.phase === phase &&
         _currentActivity.label === label &&
@@ -200,7 +202,7 @@ export function recordTerminalActivity(phase, label, opts = {}) {
         _currentActivity.detail === detail &&
         _currentActivity.severity === severity &&
         _currentActivity.progress === progress;
-    if (sameSemanticPayload) {
+    if (sameSemanticPayload && updateCurrent) {
         _currentActivity = withAge({
             ..._currentActivity,
             updatedAt: timestamp,
@@ -218,10 +220,17 @@ export function recordTerminalActivity(phase, label, opts = {}) {
         severity,
         progress,
         toolName,
-        startedAt: keepStart ? _currentActivity.startedAt : timestamp,
+        startedAt: updateCurrent && keepStart ? _currentActivity.startedAt : timestamp,
         updatedAt: timestamp,
         ageMs: 0,
     });
+    if (!updateCurrent) {
+        if (recordHistory) {
+            pushHistory(next);
+        }
+        terminalActivityEmitter.emit('activity:observed', next, _currentActivity);
+        return next;
+    }
     const prev = _currentActivity;
     _currentActivity = next;
     updateFocusedActivity(next);

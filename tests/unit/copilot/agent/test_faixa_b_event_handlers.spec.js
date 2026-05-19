@@ -178,7 +178,22 @@ describe('Faixa B1 — session-lifecycle handlers', () => {
         const emit = vi.fn();
         wireSessionLifecycleEvents(/** @type {any} */ (session), { emit });
         session._emit('session.tools_updated', { tools: ['a', 'b', 'c'] });
-        expect(emit).toHaveBeenCalledWith('session.tools_updated', expect.objectContaining({ count: 3 }));
+        expect(emit).toHaveBeenCalledWith(
+            'session.tools_updated',
+            expect.objectContaining({ count: 3, toolsMaterialized: true, countMaterialized: true }),
+        );
+    });
+
+    it('emite session.tools_updated sem fabricar count quando SDK não materializa lista/contador', async () => {
+        const { wireSessionLifecycleEvents } = await import('#copilot/event-handlers/session-lifecycle');
+        const session = createMockSession();
+        const emit = vi.fn();
+        wireSessionLifecycleEvents(/** @type {any} */ (session), { emit });
+        session._emit('session.tools_updated', {});
+        expect(emit).toHaveBeenCalledWith(
+            'session.tools_updated',
+            expect.objectContaining({ count: 0, toolsMaterialized: false, countMaterialized: false }),
+        );
     });
 
     it('emite session loaded/background events com contadores', async () => {

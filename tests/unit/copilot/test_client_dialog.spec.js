@@ -148,6 +148,17 @@ describe('client-dialog › startDialogMode', () => {
         // cleanup deve ter removido o listener
         expect(agent.off).toHaveBeenCalledWith('dialog.ready', onReady);
     });
+
+    it('trata resumeSessionAttach como pronto sem deixar listener READY pendurado', async () => {
+        const agent = createMockAgent();
+        const onReady = vi.fn();
+
+        await startDialogMode(agent, undefined, { resumeSessionAttach: true, onReady });
+
+        expect(agent.startDialogLoop).toHaveBeenCalledWith(undefined, { resumeSessionAttach: true });
+        expect(onReady).toHaveBeenCalledTimes(1);
+        expect(agent.off).toHaveBeenCalledWith('dialog.ready', onReady);
+    });
 });
 
 // ─── dialogTurn ──────────────────────────────────────────────────────────────

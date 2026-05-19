@@ -97,6 +97,10 @@ export async function startDialogMode(agent, bootPrompt, opts = {}) {
     try {
         const resumeSessionAttach = opts.resumeSessionAttach === true;
         await startRuntimeDialogLoop(bootPrompt, agent, { resumeSessionAttach });
+        if (resumeSessionAttach) {
+            opts.onReady?.();
+            cleanup();
+        }
         log(
             'INFO',
             resumeSessionAttach

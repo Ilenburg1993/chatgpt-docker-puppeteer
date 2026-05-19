@@ -132,6 +132,25 @@ describe('terminal/task-stream-events.js — contrato', () => {
         expect(mocks.renderTerminalAssistantTranscript).not.toHaveBeenCalled();
     });
 
+    it('não promove task.completed vazio para atividade atual mesmo com taskId', async () => {
+        const { setupTerminalTaskStreamListeners } =
+            await import('../../../src/copilot/terminal/events/task-stream-events.js');
+        const agent = new EventEmitter();
+
+        setupTerminalTaskStreamListeners({ agent });
+        agent.emit('task.completed', { taskId: 'task-sem-delta' });
+
+        expect(mocks.recordTerminalActivity).toHaveBeenCalledWith(
+            'task',
+            'Tarefa interna concluída',
+            expect.objectContaining({
+                detail: '0 chunks · 0 chars',
+                recordHistory: false,
+                updateCurrent: false,
+            }),
+        );
+    });
+
     it('não imprime reasoning cru de tarefa quando /thinking está desligado', async () => {
         const stdoutSpy = vi.spyOn(process.stdout, 'write').mockReturnValue(true);
         mocks.getShowThinking.mockReturnValue(false);

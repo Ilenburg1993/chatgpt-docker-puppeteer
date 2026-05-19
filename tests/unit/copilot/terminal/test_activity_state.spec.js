@@ -96,4 +96,22 @@ describe('terminal/activity-state', () => {
         expect(snap.phase).toBe('tool');
         expect(snap.label).toBe('Tool concluída');
     });
+
+    it('registra evento observado sem substituir a atividade atual', () => {
+        clearTerminalActivityHistory();
+        markTerminalActivityIdle('Aguardando próxima mensagem');
+        recordTerminalActivity('task', 'Tarefa interna concluída', {
+            detail: '0 chunks · 0 chars',
+            source: 'agent',
+            recordHistory: true,
+            updateCurrent: false,
+        });
+
+        const snap = readTerminalActivitySnapshot();
+        const history = readTerminalActivityHistory(5);
+
+        expect(snap.phase).toBe('idle');
+        expect(snap.label).toBe('Pronto');
+        expect(history[0]?.label).toBe('Tarefa interna concluída');
+    });
 });

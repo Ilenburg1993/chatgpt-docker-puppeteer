@@ -134,6 +134,17 @@ describe('F40 — startDialogMode', () => {
         expect(agent.startDialogLoop).toHaveBeenCalledWith('boot prompt');
     });
 
+    it('sinaliza prontidão local no reanexo zero-PR de sessão retomada', async () => {
+        const agent = createMockAgent();
+        agent.startDialogLoop = vi.fn().mockResolvedValue(undefined);
+        const onReady = vi.fn();
+
+        await startDialogMode(agent, undefined, { resumeSessionAttach: true, onReady });
+
+        expect(agent.startDialogLoop).toHaveBeenCalledWith(undefined, { resumeSessionAttach: true });
+        expect(onReady).toHaveBeenCalledTimes(1);
+    });
+
     it('limpa listeners em caso de erro', async () => {
         const agent = createMockAgent();
         agent.startDialogLoop = vi.fn().mockRejectedValue(new Error('fail'));

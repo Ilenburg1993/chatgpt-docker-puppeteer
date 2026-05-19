@@ -344,6 +344,9 @@ async function _tryStartDialogLoop() {
         resumeSessionAttach,
         onReady: () => println('\n  \x1b[32m●\x1b[0m  LLM-B pronta — pode começar\n'),
     });
+    if (resumeSessionAttach) {
+        markTerminalActivityIdle('Sessão retomada; aguardando próxima mensagem');
+    }
 }
 
 /**

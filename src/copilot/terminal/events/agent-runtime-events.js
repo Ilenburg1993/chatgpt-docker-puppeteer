@@ -367,6 +367,7 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, regi
             detail: `${description} · status=${status}`,
             severity: failed ? 'error' : 'info',
             source: 'agent',
+            updateCurrent: failed,
         });
         printlnWhenRenderUnlocked(
             failed
@@ -387,6 +388,7 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, regi
             detail: description,
             source: 'agent',
             recordHistory: false,
+            updateCurrent: false,
         });
         printlnWhenRenderUnlocked(`  \x1b[90m🤖 Background agent ocioso: ${description}\x1b[0m`);
         broadcastSse('agent.background.idle', {

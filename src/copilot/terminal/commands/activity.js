@@ -75,7 +75,7 @@ export function cmdActivity({ println }, arg) {
     const projection = readTerminalActivityProjection(Number.isFinite(limit) && limit > 0 ? limit : 10);
     const recentIo = readTerminalIoActivityProjection(Number.isFinite(limit) && limit > 0 ? limit : 10);
     const current = projection.current;
-    const activeTurnTrace = projection.turnTrace.current ?? projection.turnTrace.recent[0] ?? null;
+    const activeTurnTrace = projection.turnTrace.current;
     const recentNonCurrent = projection.turnTrace.recent.filter((entry) => entry.traceId !== activeTurnTrace?.traceId);
     const latestCompletedTurnTrace = pickMostUsefulRecentTurnTrace(recentNonCurrent);
     const severityColor =

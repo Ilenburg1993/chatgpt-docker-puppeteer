@@ -162,9 +162,12 @@ export function setupTerminalTaskStreamListeners({ agent }) {
     const onTaskCompleted = (/** @type {{ taskId?: string | null }} */ evt = {}) => {
         const taskKey = getTaskKey(evt.taskId);
         const stats = taskDeltaStats.get(taskKey) ?? { chunks: 0, chars: 0 };
+        const hadVisiblePayload = stats.chunks > 0 || stats.chars > 0;
         recordTerminalActivity('task', 'Tarefa interna concluída', {
             detail: `${stats.chunks} chunks · ${stats.chars} chars`,
             source: 'agent',
+            recordHistory: hadVisiblePayload,
+            updateCurrent: hadVisiblePayload,
         });
         finalizeTaskThinkings(evt.taskId ?? undefined, 'completed');
         taskTranscripts.flush(evt.taskId ?? undefined, 'completed', 'task.completed');

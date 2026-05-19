@@ -153,6 +153,24 @@ describe('terminal/live-status-line', () => {
         cleanup();
     });
 
+    it('não mantém linha viva para idle com status processing defasado', async () => {
+        const { shouldRenderTerminalLiveStatusLine, formatTerminalLiveStatusLine } = await import(
+            '../../../../src/copilot/terminal/repl/live-status-line.js'
+        );
+        mocks.activity = {
+            ...mocks.activity,
+            phase: 'idle',
+            label: 'Pronto',
+            detail: 'Aguardando próxima mensagem',
+            toolName: null,
+        };
+        mocks.runtime = { ...mocks.runtime, status: 'processing', queueSize: 0 };
+
+        expect(shouldRenderTerminalLiveStatusLine()).toBe(false);
+        expect(formatTerminalLiveStatusLine()).toContain('idle:loop');
+        expect(formatTerminalLiveStatusLine()).not.toContain('processing:loop');
+    });
+
     it('não mantém heartbeat para atividade concluída quando runtime aguarda input', async () => {
         const { setupTerminalLiveStatusLine } =
             await import('../../../../src/copilot/terminal/repl/live-status-line.js');

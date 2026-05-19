@@ -663,11 +663,17 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
         refreshPromptIfIdle();
     };
 
-    const onSessionToolsUpdated = (/** @type {{ count?: number; tools?: unknown[] }} */ evt) => {
+    const onSessionToolsUpdated = (
+        /** @type {{ count?: number; tools?: unknown[]; toolsMaterialized?: boolean; countMaterialized?: boolean }} */ evt,
+    ) => {
         const hasSdkToolList = Array.isArray(evt?.tools);
+        const hasMaterializedCount =
+            evt?.countMaterialized === true ||
+            hasSdkToolList ||
+            (typeof evt?.count === 'number' && Number.isFinite(evt.count) && evt.count > 0);
         const sdkCount = hasSdkToolList
             ? evt.tools?.length ?? 0
-            : typeof evt?.count === 'number' && Number.isFinite(evt.count)
+            : hasMaterializedCount && typeof evt?.count === 'number' && Number.isFinite(evt.count)
               ? evt.count
               : null;
         const registrySnapshot = readTerminalToolRegistrySnapshot();

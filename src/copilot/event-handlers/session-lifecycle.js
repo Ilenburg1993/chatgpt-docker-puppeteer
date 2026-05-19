@@ -98,6 +98,8 @@ export function wireSessionLifecycleEvents(session, { emit }) {
             emit('session.tools_updated', {
                 count: normalized.count,
                 tools: normalized.tools,
+                toolsMaterialized: normalized.toolsMaterialized,
+                countMaterialized: normalized.countMaterialized,
                 ts: normalized.ts,
             });
         }),

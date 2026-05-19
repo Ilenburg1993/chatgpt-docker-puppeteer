@@ -124,6 +124,7 @@ vi.mock('../../../../src/copilot/terminal/events/io-activity-events.js', () => (
 }));
 
 const { cmdActivity } = await import('../../../../src/copilot/terminal/commands/activity.js');
+const terminalFrontend = await import('../../../../src/copilot/terminal/frontend/index.js');
 
 function mockCtx() {
     /** @type {string[]} */
@@ -152,5 +153,47 @@ describe('terminal/commands/activity', () => {
         expect(ctx.output()).toContain(
             '/workspaces/chatgpt-docker-puppeteer/src/copilot/terminal/commands/activity.js',
         );
+    });
+
+    it('não chama trace concluído recente de turno atual quando não há current ativo', () => {
+        vi.mocked(terminalFrontend.readTerminalActivityProjection).mockReturnValueOnce({
+            current: {
+                phase: 'idle',
+                label: 'Pronto',
+                detail: 'Aguardando próxima mensagem',
+                source: 'terminal',
+                severity: 'info',
+                progress: null,
+                toolName: null,
+                startedAt: 1,
+                updatedAt: 2,
+                ageMs: 1200,
+            },
+            history: [],
+            turnTrace: {
+                current: null,
+                recent: [
+                    {
+                        traceId: 'turn:done',
+                        turnId: 'done',
+                        source: 'assistant',
+                        status: 'completed',
+                        startedAt: 1,
+                        updatedAt: 2,
+                        finishedAt: 3,
+                        toolCount: 0,
+                        fileCount: 0,
+                        tools: [],
+                        files: [],
+                    },
+                ],
+            },
+        });
+        const ctx = mockCtx();
+
+        cmdActivity({ println: ctx.println }, '5');
+
+        expect(ctx.output()).not.toContain('Resumo do turno atual');
+        expect(ctx.output()).toContain('Último turno concluído');
     });
 });

@@ -83,6 +83,10 @@ export function formatTerminalLiveStatusLine(input = {}) {
     const progress = activity.progress !== null ? ` · ${activity.progress}%` : '';
     const loop = runtime.dialogLoopActive ? 'loop' : 'noloop';
     const queue = Number(runtime.queueSize ?? 0) > 0 ? ` · fila=${runtime.queueSize}` : '';
+    const displayStatus =
+        activity.phase === 'idle' && Number(runtime.queueSize ?? 0) === 0 && runtime.status === 'processing'
+            ? 'idle'
+            : (runtime.status ?? '-');
     const severityRole = activity.severity === 'error' ? 'error' : activity.severity === 'warn' ? 'warn' : 'muted';
     const target = activity.toolName ? ` · ${activity.toolName}` : '';
     const detailText = detail ? ` · ${detail}` : '';
@@ -90,7 +94,7 @@ export function formatTerminalLiveStatusLine(input = {}) {
         `  ${terminalThemeText('thinking', '⟲ LLM-B')} ` +
         `${terminalThemeText(severityRole, `${activity.phase}/${activity.label}`)}` +
         `${terminalThemeText('tool', target)}` +
-        `${terminalThemeText('muted', `${detailText}${progress} · ${formatLiveDuration(ageMs)} · ${model}/${effort} · ${runtime.status ?? '-'}:${loop}${queue}`)}` +
+        `${terminalThemeText('muted', `${detailText}${progress} · ${formatLiveDuration(ageMs)} · ${model}/${effort} · ${displayStatus}:${loop}${queue}`)}` +
         '\x1b[K'
     );
 }
@@ -107,8 +111,11 @@ export function shouldRenderTerminalLiveStatusLine(input = {}) {
     const activity = input.activity ?? readTerminalActivitySnapshot();
     const runtime = input.runtime ?? readTerminalRuntimeState();
     const busy = input.busy ?? getBusy();
+    const queueActive = Number(runtime.queueSize ?? 0) > 0;
     const runtimeActive =
-        busy || runtime.status === 'starting' || runtime.status === 'processing' || Number(runtime.queueSize ?? 0) > 0;
+        busy ||
+        queueActive ||
+        (activity.phase !== 'idle' && (runtime.status === 'starting' || runtime.status === 'processing'));
     if (isCompletedLiveStatusActivity(activity.label) && !runtimeActive) return false;
     if (activity.phase !== 'idle') return true;
     return runtimeActive;
