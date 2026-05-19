@@ -20,6 +20,7 @@ export {
     recordTerminalUserInputRequested,
 } from '../sdk-interactions.js';
 export { recordTerminalPromptHookSubmitted } from '../sdk-hook-events.js';
+export { buildTerminalTaskThinkingId, formatTerminalThinkingRef } from '../thinking-labels.js';
 export { createToolCallRegistry } from '../tool-call-registry.js';
 export {
     appendTerminalTranscriptTurn,

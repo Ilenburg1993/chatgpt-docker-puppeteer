@@ -16,6 +16,7 @@ import {
     EMITTER_DIALOG_LOOP_CHANGED,
     EMITTER_DIALOG_PRE_STALL_WARNING,
     EMITTER_DIALOG_READY,
+    EMITTER_DIALOG_RECOVERY,
     EMITTER_DIALOG_REPLY,
     EMITTER_DIALOG_STALLED,
     EMITTER_DIALOG_STOPPED,
@@ -73,6 +74,49 @@ export function registerAgentEventListeners(printBanner) {
     if (_agentListenersRegistered) return;
     _agentListenersRegistered = true;
     const agentEvents = readTerminalAgentRuntimeEventHost();
+    agentEvents.on(
+        EMITTER_DIALOG_RECOVERY,
+        (
+            /** @type {{
+             *     reason?: string;
+             *     recovered?: boolean;
+             *     strategy?: string;
+             *     prConsumed?: boolean;
+             *     durationMs?: number;
+             *     success?: boolean;
+             *     traceId?: string;
+             * }} */ evt,
+        ) => {
+            const recovered = evt.recovered === true;
+            const prConsumed = evt.prConsumed === true;
+            const strategy = evt.strategy ?? 'unknown';
+            const reason = evt.reason ?? 'unknown';
+            const success = evt.success !== false;
+            const severity = success ? (prConsumed ? 'warn' : 'info') : 'error';
+            const duration = typeof evt.durationMs === 'number' ? `${evt.durationMs}ms` : 'duração n/d';
+            recordTerminalActivity(
+                success && recovered ? 'system' : 'error',
+                recovered ? 'Dialog loop recuperado' : 'Dialog loop recovery sem reanexo',
+                {
+                    detail: `${reason} · ${strategy} · ${prConsumed ? '1 PR' : 'zero-PR'} · ${duration}`,
+                    severity,
+                    source: 'dialog',
+                },
+            );
+            if (!success || prConsumed) {
+                const label = success ? 'recuperado com restart' : 'falha no recovery';
+                println(`\n\x1b[33m  [dialog] ${label}: ${strategy} · ${reason} · ${duration}\x1b[0m`);
+            }
+            broadcastSse('dialog.recovery', {
+                ...evt,
+                reason,
+                recovered,
+                strategy,
+                prConsumed,
+                timestamp: Date.now(),
+            });
+        },
+    );
     agentEvents.on(EMITTER_DIALOG_STALLED, async (/** @type {{ stalledMs: number }} */ evt) => {
         const secs = Math.round(evt.stalledMs / 1000);
         const runtimeState = readTerminalRuntimeState();

@@ -152,12 +152,14 @@ describe('client-dialog › startDialogMode', () => {
     it('trata resumeSessionAttach como pronto sem deixar listener READY pendurado', async () => {
         const agent = createMockAgent();
         const onReady = vi.fn();
+        const onReply = vi.fn();
 
-        await startDialogMode(agent, undefined, { resumeSessionAttach: true, onReady });
+        await startDialogMode(agent, undefined, { resumeSessionAttach: true, onReady, onReply });
 
         expect(agent.startDialogLoop).toHaveBeenCalledWith(undefined, { resumeSessionAttach: true });
         expect(onReady).toHaveBeenCalledTimes(1);
         expect(agent.off).toHaveBeenCalledWith('dialog.ready', onReady);
+        expect(agent.off).not.toHaveBeenCalledWith('dialog.reply', expect.any(Function));
     });
 });
 

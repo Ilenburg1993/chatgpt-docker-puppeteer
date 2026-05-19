@@ -247,7 +247,7 @@ export const TERMINAL_MODULE_LAYOUT = Object.freeze([
         kind: 'file',
         role: 'event-adapter',
         tier: 'secondary',
-        risk: 'stable',
+        risk: 'hotspot',
         public: false,
         summary: 'Renderiza e transmite eventos de streaming de tarefas internas.',
     },

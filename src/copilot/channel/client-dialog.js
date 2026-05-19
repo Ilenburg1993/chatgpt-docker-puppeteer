@@ -54,7 +54,7 @@ const DUPLICATE_DELTA_SUPPRESSION_WINDOW_MS = 75;
  *
  * @param {BridgeAgentLike} agent
  * @param {{ onReady?: () => void; onReply?: (reply: string) => void; onStopped?: () => void }} opts
- * @returns {{ replyHandler: ((evt: unknown) => void) | null; cleanup: () => void }}
+ * @returns {{ replyHandler: ((evt: unknown) => void) | null; cleanupReady: () => void; cleanup: () => void }}
  */
 export function registerDialogListeners(agent, opts) {
     const { onReady, onReply, onStopped } = opts;
@@ -69,13 +69,17 @@ export function registerDialogListeners(agent, opts) {
     if (replyHandler) agent.on(EMITTER_DIALOG_REPLY, replyHandler);
     if (onStopped) agent.once(EMITTER_DIALOG_STOPPED, onStopped);
 
-    const cleanup = () => {
+    const cleanupReady = () => {
         if (onReady) agent.off('dialog.ready', onReady);
+    };
+
+    const cleanup = () => {
+        cleanupReady();
         if (replyHandler) agent.off('dialog.reply', replyHandler);
         if (onStopped) agent.off('dialog.stopped', onStopped);
     };
 
-    return { replyHandler, cleanup };
+    return { replyHandler, cleanupReady, cleanup };
 }
 
 /**
@@ -92,14 +96,14 @@ export function registerDialogListeners(agent, opts) {
  * @returns {Promise<void>}
  */
 export async function startDialogMode(agent, bootPrompt, opts = {}) {
-    const { cleanup } = registerDialogListeners(agent, opts);
+    const { cleanupReady, cleanup } = registerDialogListeners(agent, opts);
 
     try {
         const resumeSessionAttach = opts.resumeSessionAttach === true;
         await startRuntimeDialogLoop(bootPrompt, agent, { resumeSessionAttach });
         if (resumeSessionAttach) {
             opts.onReady?.();
-            cleanup();
+            cleanupReady();
         }
         log(
             'INFO',

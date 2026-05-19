@@ -74,6 +74,7 @@ export {
     recordTerminalPromptHookSubmitted,
 } from './sdk-hook-events.js';
 export { createToolCallRegistry } from './tool-call-registry.js';
+export { buildTerminalTaskThinkingId, formatTerminalThinkingRef } from './thinking-labels.js';
 export {
     beginTerminalTurnTrace,
     clearTerminalTurnTraceState,

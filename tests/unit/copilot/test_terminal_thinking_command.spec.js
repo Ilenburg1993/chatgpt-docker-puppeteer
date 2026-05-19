@@ -50,6 +50,28 @@ describe('terminal/commands/thinking.js', () => {
         expect(lines.join('\n')).toContain('LLM-B');
     });
 
+    it('não expõe sentinel legado __anonymous__ em ids curtos', async () => {
+        /** @type {string[]} */
+        const lines = [];
+        mocks.getThinkingHistory.mockReturnValue(
+            /** @type {any} */ ([
+                {
+                    id: 'task-__anonymous__',
+                    source: 'task',
+                    title: 'Task interna',
+                    content: 'pensando',
+                    chars: 8,
+                    durationMs: 10,
+                    status: 'completed',
+                },
+            ]),
+        );
+        const { cmdThinking } = await import('../../../src/copilot/terminal/commands/thinking.js');
+        cmdThinking({ println: (text) => lines.push(text) }, 'list 5');
+        expect(lines.join('\n')).toContain('task-interna');
+        expect(lines.join('\n')).not.toContain('__anonymous__');
+    });
+
     it('abre o latest completo', async () => {
         /** @type {string[]} */
         const lines = [];

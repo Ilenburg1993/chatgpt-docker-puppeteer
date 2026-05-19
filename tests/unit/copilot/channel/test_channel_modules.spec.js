@@ -62,18 +62,18 @@ function createMockAgent() {
         sendDialogTurn: vi.fn(),
         stopDialogLoop: vi.fn(),
         answerPendingQuestion: vi.fn(),
-        on(/** @type {string} */ event, /** @type {Function} */ fn) {
+        on: vi.fn((/** @type {string} */ event, /** @type {Function} */ fn) => {
             if (!listeners.has(event)) listeners.set(event, new Set());
             listeners.get(event)?.add(fn);
-        },
-        once(/** @type {string} */ event, /** @type {Function} */ fn) {
+        }),
+        once: vi.fn((/** @type {string} */ event, /** @type {Function} */ fn) => {
             if (!onceListeners.has(event)) onceListeners.set(event, new Set());
             onceListeners.get(event)?.add(fn);
-        },
-        off(/** @type {string} */ event, /** @type {Function} */ fn) {
+        }),
+        off: vi.fn((/** @type {string} */ event, /** @type {Function} */ fn) => {
             listeners.get(event)?.delete(fn);
             onceListeners.get(event)?.delete(fn);
-        },
+        }),
         _emit(/** @type {string} */ event, /** @type {unknown} */ data) {
             for (const fn of listeners.get(event) ?? []) fn(data);
             for (const fn of onceListeners.get(event) ?? []) fn(data);
@@ -138,11 +138,13 @@ describe('F40 — startDialogMode', () => {
         const agent = createMockAgent();
         agent.startDialogLoop = vi.fn().mockResolvedValue(undefined);
         const onReady = vi.fn();
+        const onReply = vi.fn();
 
-        await startDialogMode(agent, undefined, { resumeSessionAttach: true, onReady });
+        await startDialogMode(agent, undefined, { resumeSessionAttach: true, onReady, onReply });
 
         expect(agent.startDialogLoop).toHaveBeenCalledWith(undefined, { resumeSessionAttach: true });
         expect(onReady).toHaveBeenCalledTimes(1);
+        expect(agent.off).not.toHaveBeenCalledWith('dialog.reply', expect.any(Function));
     });
 
     it('limpa listeners em caso de erro', async () => {

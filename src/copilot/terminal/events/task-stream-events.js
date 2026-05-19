@@ -20,7 +20,7 @@ import {
     getShowThinking,
 } from '../../presentation/state/index.js';
 import { println } from '../dialog/index.js';
-import { recordTerminalActivity } from '../state/events/index.js';
+import { buildTerminalTaskThinkingId, formatTerminalThinkingRef, recordTerminalActivity } from '../state/events/index.js';
 import { createTaskTranscriptAccumulator } from './task-transcript-accumulator.js';
 
 /**
@@ -45,12 +45,24 @@ export function setupTerminalTaskStreamListeners({ agent }) {
     /** @type {Map<string, number>} */
     const taskLastDeltaActivityAt = new Map();
     const taskTranscripts = createTaskTranscriptAccumulator();
+    let anonymousTaskThinkingSeq = 0;
+    /** @type {string | null} */
+    let activeAnonymousTaskThinkingId = null;
 
     /**
      * @param {string | null | undefined} taskId
      * @returns {string}
      */
-    const getThinkingId = (taskId) => `task-${taskId ?? '__anonymous__'}`;
+    const getThinkingId = (taskId) => {
+        if (typeof taskId === 'string' && taskId.trim().length > 0) {
+            return buildTerminalTaskThinkingId(taskId, 1);
+        }
+        if (!activeAnonymousTaskThinkingId) {
+            anonymousTaskThinkingSeq += 1;
+            activeAnonymousTaskThinkingId = buildTerminalTaskThinkingId(null, anonymousTaskThinkingSeq);
+        }
+        return activeAnonymousTaskThinkingId;
+    };
 
     /**
      * @param {string | null | undefined} taskId
@@ -78,13 +90,17 @@ export function setupTerminalTaskStreamListeners({ agent }) {
             if (thinkingEntry && getShowThinking()) {
                 const color = status === 'error' ? '\x1b[31m' : '\x1b[90m';
                 const label = status === 'error' ? 'falhou' : 'concluído';
+                const thinkingRef = formatTerminalThinkingRef(thinkingEntry.id);
                 println(
-                    `  ${color}└── task thinking #${thinkingEntry.id.slice(-12)} ${label} · ${(Number(thinkingEntry.durationMs ?? 0) / 1000).toFixed(1)}s · ${thinkingEntry.chars} chars\x1b[0m`,
+                    `  ${color}└── task thinking #${thinkingRef} ${label} · ${(Number(thinkingEntry.durationMs ?? 0) / 1000).toFixed(1)}s · ${thinkingEntry.chars} chars\x1b[0m`,
                 );
-                println(`  \x1b[90m    /thinking show ${thinkingEntry.id.slice(-12)}  ·  /thinking latest\x1b[0m`);
+                println(`  \x1b[90m    /thinking show ${thinkingRef}  ·  /thinking latest\x1b[0m`);
             }
             taskThinkingStarts.delete(thinkingId);
             openThinkingIds.delete(thinkingId);
+            if (activeAnonymousTaskThinkingId === thinkingId) {
+                activeAnonymousTaskThinkingId = null;
+            }
         }
     };
 
@@ -153,8 +169,9 @@ export function setupTerminalTaskStreamListeners({ agent }) {
             taskThinkingStarts.set(thinkingId, Date.now());
             openThinkingIds.add(thinkingId);
             if (getShowThinking()) {
+                const thinkingRef = formatTerminalThinkingRef(thinkingId);
                 println(`  \x1b[33m↳ task thinking capturado\x1b[0m \x1b[90m(${taskId ?? 'task interna'})\x1b[0m`);
-                println(`  \x1b[90m    /thinking show ${thinkingId.slice(-12)}  ·  /thinking latest\x1b[0m`);
+                println(`  \x1b[90m    /thinking show ${thinkingRef}  ·  /thinking latest\x1b[0m`);
             }
         }
     };

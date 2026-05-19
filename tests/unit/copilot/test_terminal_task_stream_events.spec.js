@@ -170,6 +170,35 @@ describe('terminal/task-stream-events.js — contrato', () => {
         stdoutSpy.mockRestore();
     });
 
+    it('usa id interno legível para task.reasoning sem taskId e não vaza __anonymous__', async () => {
+        mocks.finalizeThinkingHistoryEntry.mockReturnValue({
+            id: 'task-internal-1',
+            ts: Date.now(),
+            source: 'task',
+            title: 'Task interna',
+            content: 'pensando...',
+            chars: 11,
+            durationMs: 15,
+            reasoningId: null,
+            taskId: null,
+            status: 'completed',
+        });
+        const { setupTerminalTaskStreamListeners } =
+            await import('../../../src/copilot/terminal/events/task-stream-events.js');
+        const agent = new EventEmitter();
+
+        setupTerminalTaskStreamListeners({ agent });
+        agent.emit('task.reasoning', { chunk: 'pensando...' });
+        agent.emit('task.completed', {});
+
+        expect(mocks.appendThinkingHistoryChunk).toHaveBeenCalledWith(
+            expect.objectContaining({ id: 'task-internal-1', source: 'task', taskId: null }),
+        );
+        expect(mocks.println).toHaveBeenCalledWith(expect.stringContaining('/thinking show task-internal-1'));
+        expect(mocks.println).toHaveBeenCalledWith(expect.stringContaining('task thinking #task-internal-1 concluído'));
+        expect(mocks.println).not.toHaveBeenCalledWith(expect.stringContaining('__anonymous__'));
+    });
+
     it('finaliza thinking aberto mesmo quando task.completed chega sem taskId', async () => {
         mocks.finalizeThinkingHistoryEntry.mockReturnValue({
             id: 'task-task-1',

@@ -9,7 +9,7 @@
  */
 
 import { appendThinkingHistoryChunk, finalizeThinkingHistoryEntry } from '../../presentation/state/index.js';
-import { recordTerminalActivity, terminalThemeText } from '../state/dialog/index.js';
+import { formatTerminalThinkingRef, recordTerminalActivity, terminalThemeText } from '../state/dialog/index.js';
 import {
     beginTerminalRenderLock,
     clearInlineStatus,
@@ -189,7 +189,7 @@ function flushReasoningSummary(state) {
     if (!state.reasoningStarted || state.reasoningSummaryRendered) return;
     const durationMs = Date.now() - state.thinkingStartTime;
     const entry = finalizeThinkingHistoryEntry(getThinkingEntryId(state), { durationMs, status: 'completed' });
-    const shortId = (entry?.id ?? getThinkingEntryId(state)).slice(-12);
+    const shortId = formatTerminalThinkingRef(entry?.id ?? getThinkingEntryId(state));
 
     if (state.showThinking) {
         writeTerminalRaw('\x1b[0m\n');

@@ -19,6 +19,7 @@ import {
     getThinkingHistoryEntry,
     setShowThinking,
 } from '../../presentation/state/index.js';
+import { formatTerminalThinkingRef } from '../state/events/index.js';
 
 /**
  * @typedef {object} ThinkingContext
@@ -65,7 +66,7 @@ export function cmdThinking(ctx, arg) {
         /** @type {string[]} */
         const lines = [`\n  \x1b[35mThinking capturado (${entries.length})\x1b[0m`];
         for (const entry of entries) {
-            const shortId = entry.id.slice(-12);
+            const shortId = formatTerminalThinkingRef(entry.id);
             const preview = entry.content.replace(/\s+/g, ' ').trim().slice(0, 72);
             lines.push(
                 `  \x1b[33m${shortId}\x1b[0m  \x1b[90m${entry.source}\x1b[0m  \x1b[90m·\x1b[0m  ${entry.title}  \x1b[90m·\x1b[0m  ${entry.chars} chars`,
@@ -91,8 +92,9 @@ export function cmdThinking(ctx, arg) {
             println(`\n  \x1b[31mThinking não encontrado: ${rawId || '(vazio)'}\x1b[0m\n`);
             return;
         }
+        const shortId = formatTerminalThinkingRef(entry.id);
         /** @type {string[]} */
-        const lines = [`\n  \x1b[35m╭─ thinking ${entry.id.slice(-12)}\x1b[0m  \x1b[90m${entry.title}\x1b[0m`];
+        const lines = [`\n  \x1b[35m╭─ thinking ${shortId}\x1b[0m  \x1b[90m${entry.title}\x1b[0m`];
         lines.push(
             `  \x1b[35m│\x1b[0m  \x1b[90mfonte=${entry.source} · status=${entry.status} · chars=${entry.chars} · duração=${(Number(entry.durationMs ?? 0) / 1000).toFixed(1)}s\x1b[0m`,
         );
