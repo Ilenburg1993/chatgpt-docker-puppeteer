@@ -172,3 +172,35 @@ Rodada executada via `npm run terminal:llm-b`:
 - `/health` exibiu diagnóstico completo e passou a mostrar `keepalive standby(dialog)`.
 - `/now` seguiu com `recommended=none` e modelo efetivo sem mismatch falso.
 - Turno curto `Responda apenas: ok-ux` retornou `ok-ux` no transcript e manteve o prompt compacto durante streaming.
+
+## Rodada UX Terminal 2026-05-19 — Redraw Único E Prompt De Espera
+
+### Diagnóstico Confirmado
+
+- Vários subsistemas chamavam `rl.setPrompt()`/`rl.prompt()` diretamente: adapters de eventos, lifecycle do REPL,
+  conclusão de turno e blocos de impressão. Em rajadas de eventos, isso podia produzir prompt duplicado ou prompt de
+  usuário pintado por cima de uma linha viva ativa.
+- `/health` podia mostrar `modo sdk desconhecido` quando a sessão SDK estava vinculada, mas nenhum evento explícito de
+  `session.mode_changed` havia sido emitido.
+- Hooks SDK bem-sucedidos eram úteis para observability, mas ocupavam transcript/atividade atual em modo `full`,
+  competindo com sinais mais importantes como resposta, waiting e thinking.
+- `writeInlineStatus()` re-reservava linhas usando sempre o prompt de usuário, mesmo durante processamento, dando a
+  impressão de que o terminal aceitava input normal enquanto o turno ainda estava ativo.
+
+### Implementado
+
+- `scheduleTerminalPromptRedraw()` tornou-se o gateway canônico para redraw de prompt: coalesce múltiplos pedidos por
+  tick e executa a pintura em linha limpa.
+- O redraw agendado agora resolve o prompt no momento da pintura; se o runtime ficou `busy` entre o pedido e o flush,
+  vence o prompt de espera.
+- `reserveInlineStatusRows()` também respeita `busy` e pinta `buildWaitingPrompt()` durante turnos ativos.
+- Event adapters, lifecycle do REPL e conclusão de turno passaram a usar o gateway comum em vez de redraws diretos.
+- A projeção de config assume `interactive` quando há SDK session vinculada e o modo explícito ainda não chegou.
+- Hooks SDK de sucesso continuam indo para activity observada e SSE, mas não imprimem linha permanente nem sequestram a
+  atividade focada; falhas seguem visíveis.
+
+### Validação Live
+
+- `/health` exibiu `modo sdk interactive`, `keepalive standby(dialog)` e `health healthy`.
+- Turnos curtos (`ok-ux-3`, `ok-ux-4`) renderizaram resposta final, thinking capturado e usage sem perder transcript.
+- Durante processamento, o rodapé passou a mostrar prompt de espera (`⏳ [modelo/reasoning]`) em vez de novo `você›`.

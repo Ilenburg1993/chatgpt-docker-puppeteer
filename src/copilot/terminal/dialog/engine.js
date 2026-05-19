@@ -46,7 +46,7 @@ import {
     clearInlineStatus,
     printExchange,
     println,
-    redrawTerminalPrompt,
+    scheduleTerminalPromptRedraw,
     SEPARATOR,
     TURN_TIMEOUT_MS,
     writeInlineStatus,
@@ -729,7 +729,7 @@ async function _executeTurn(message, actor, attachments = [], requestHeaders = n
         const rl = getRl();
         if (rl) {
             clearInlineStatus();
-            redrawTerminalPrompt(rl, buildUserPrompt());
+            scheduleTerminalPromptRedraw(rl, buildUserPrompt());
         }
     }
 }

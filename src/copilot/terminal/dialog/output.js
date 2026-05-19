@@ -31,6 +31,10 @@ export const PROMPT_WAITING = '     ';
 
 /** @type {number} */
 let _terminalRenderLockDepth = 0;
+/** @typedef {string | (() => string)} ScheduledPrompt */
+
+/** @type {WeakMap<object, { prompt: ScheduledPrompt; immediate: NodeJS.Immediate }>} */
+const _scheduledPromptRedraws = new WeakMap();
 
 const ANSI_ESCAPE = String.fromCharCode(27);
 const ANSI_ESCAPE_PATTERN = new RegExp(`${ANSI_ESCAPE}\\[[0-?]*[ -/]*[@-~]`, 'g');
@@ -244,7 +248,7 @@ function reserveInlineStatusRows(rl, rows) {
     const missingRows = rows - _statusRowsReserved;
     clearTerminalLine();
     process.stdout.write('\n'.repeat(missingRows));
-    rl.setPrompt(buildUserPrompt());
+    rl.setPrompt(getBusy() ? buildWaitingPrompt() : buildUserPrompt());
     rl.prompt();
     _statusRowsReserved = rows;
 }
@@ -449,12 +453,11 @@ function clearTerminalLine() {
 function redrawPromptIfInteractive() {
     const rl = getRl();
     if (!rl || getBusy() || _terminalRenderLockDepth > 0) return;
-    redrawTerminalPrompt(rl, buildUserPrompt());
+    scheduleTerminalPromptRedraw(rl, () => buildUserPrompt());
 }
 
 /**
- * Redesenha o prompt em uma linha limpa. Use nas bordas de conclusão de turno/comando, onde o cursor pode estar sobre
- * uma linha que já contém prompt ou status transitório.
+ * Redesenha o prompt em uma linha limpa imediatamente.
  *
  * @param {{ setPrompt: (prompt: string) => void; prompt: () => void } | null | undefined} rl
  * @param {string} [prompt]
@@ -465,6 +468,39 @@ export function redrawTerminalPrompt(rl, prompt = buildUserPrompt()) {
     clearTerminalLine();
     rl.setPrompt(prompt);
     rl.prompt();
+}
+
+/**
+ * Agenda um único redraw limpo do prompt por tick para um readline específico.
+ *
+ * Vários subsistemas podem terminar quase ao mesmo tempo (tool events, transcript, linha viva, comando REPL). Antes,
+ * cada um chamava `rl.prompt()` diretamente e, em TTYs reais, isso podia produzir `você› você›` ou esconder texto já
+ * digitado. Este gateway preserva a última intenção de prompt e executa uma única pintura limpa quando a pilha atual de
+ * writes ANSI termina.
+ *
+ * @param {{ setPrompt: (prompt: string) => void; prompt: () => void } | null | undefined} rl
+ * @param {ScheduledPrompt} [prompt]
+ * @returns {void}
+ */
+export function scheduleTerminalPromptRedraw(rl, prompt = () => buildUserPrompt()) {
+    if (!rl) return;
+    const key = /** @type {object} */ (rl);
+    const current = _scheduledPromptRedraws.get(key);
+    if (current) {
+        current.prompt = prompt;
+        return;
+    }
+    const state = {
+        prompt,
+        immediate: setImmediate(() => {
+            _scheduledPromptRedraws.delete(key);
+            if (_terminalRenderLockDepth > 0) return;
+            const nextPrompt = typeof state.prompt === 'function' ? state.prompt() : state.prompt;
+            redrawTerminalPrompt(rl, getBusy() ? buildWaitingPrompt() : nextPrompt);
+        }),
+    };
+    if (typeof state.immediate.unref === 'function') state.immediate.unref();
+    _scheduledPromptRedraws.set(key, state);
 }
 
 /**

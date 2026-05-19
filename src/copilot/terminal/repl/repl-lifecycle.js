@@ -31,6 +31,7 @@ import {
     getTurnQueueDepth,
     println,
     resetStatusRowState,
+    scheduleTerminalPromptRedraw,
     sendTurn,
 } from '../dialog/index.js';
 import {
@@ -110,8 +111,9 @@ export async function runReplLifecycle(injectServer, { injectPort, onReady }) {
      */
     function refreshPrompt() {
         if (!isReadlineOpen(rl)) return;
-        rl.setPrompt(getBusy() || getTurnQueueDepth() > 0 ? buildWaitingPrompt() : buildUserPrompt());
-        rl.prompt();
+        scheduleTerminalPromptRedraw(rl, () =>
+            getBusy() || getTurnQueueDepth() > 0 ? buildWaitingPrompt() : buildUserPrompt(),
+        );
     }
 
     /**
@@ -278,8 +280,7 @@ export async function runReplLifecycle(injectServer, { injectPort, onReady }) {
         const trimmed = line.trim();
         if (!trimmed) {
             if (isReadlineOpen(rl)) {
-                rl.setPrompt(buildUserPrompt());
-                rl.prompt();
+                scheduleTerminalPromptRedraw(rl, buildUserPrompt());
             }
             return;
         }
@@ -292,8 +293,7 @@ export async function runReplLifecycle(injectServer, { injectPort, onReady }) {
             } finally {
                 endTerminalRenderLock();
                 if (isReadlineOpen(rl)) {
-                    rl.setPrompt(buildUserPrompt());
-                    rl.prompt();
+                    scheduleTerminalPromptRedraw(rl, buildUserPrompt());
                 }
             }
             return;
@@ -316,8 +316,7 @@ export async function runReplLifecycle(injectServer, { injectPort, onReady }) {
         if (!finalMessage.trim()) {
             println('\x1b[33m  [attach] Arquivo(s) anexados. Escreva uma mensagem para enviar o turno.\x1b[0m');
             if (isReadlineOpen(rl)) {
-                rl.setPrompt(buildUserPrompt());
-                rl.prompt();
+                scheduleTerminalPromptRedraw(rl, buildUserPrompt());
             }
             return;
         }
@@ -356,8 +355,7 @@ export async function runReplLifecycle(injectServer, { injectPort, onReady }) {
             .catch((e) => {
                 log('ERROR', `[TerminalServer] Falha ao processar linha do REPL: ${toError(e).message}`);
                 if (isReadlineOpen(rl)) {
-                    rl.setPrompt(buildUserPrompt());
-                    rl.prompt();
+                    scheduleTerminalPromptRedraw(rl, buildUserPrompt());
                 }
             });
     });
@@ -387,7 +385,6 @@ export async function runReplLifecycle(injectServer, { injectPort, onReady }) {
         // em message-queue.js). Candidato a upgrade P4 futuro.
         multilineInput.reset();
         println('\n[terminal] Ctrl+C detectado. Dialog loop mantido ativo. Use /quit para encerrar.');
-        rl.setPrompt(buildUserPrompt());
-        rl.prompt();
+        scheduleTerminalPromptRedraw(rl, buildUserPrompt());
     });
 }

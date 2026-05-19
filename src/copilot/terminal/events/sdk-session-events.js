@@ -1044,10 +1044,8 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
             detail: `${hookType}${hookInvocationId ? ` · ${hookInvocationId}` : ''}`,
             source: 'sdk',
             recordHistory: false,
+            updateCurrent: false,
         });
-        if (shouldPrintSessionNarration('verbose')) {
-            println(`  ${terminalThemeBadge('info', 'HOOK')} ${terminalThemeText('muted', `${hookType} iniciado`)}`);
-        }
         broadcastSse('hook.start', {
             hookType,
             hookInvocationId,
@@ -1073,10 +1071,11 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
             source: 'sdk',
             severity: success ? 'info' : 'warn',
             recordHistory: !success,
+            updateCurrent: !success,
         });
-        if (!success || shouldPrintSessionNarration('verbose')) {
+        if (!success) {
             println(
-                `  ${terminalThemeBadge(success ? 'info' : 'warn', 'HOOK')} ${terminalThemeText(success ? 'muted' : 'warn', `${hookType} ${success ? 'concluído' : 'falhou'}${errorMessage ? ` · ${errorMessage}` : ''}`)}`,
+                `  ${terminalThemeBadge('warn', 'HOOK')} ${terminalThemeText('warn', `${hookType} falhou${errorMessage ? ` · ${errorMessage}` : ''}`)}`,
             );
         }
         broadcastSse('hook.end', {

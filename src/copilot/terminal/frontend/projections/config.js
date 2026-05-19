@@ -19,6 +19,16 @@ import {
 import { readTerminalRuntimeBase } from './shared.js';
 
 /**
+ * @param {'interactive' | 'plan' | 'autopilot' | 'shell' | null} storedMode
+ * @param {{ sdkSessionId: string | null }} binding
+ * @returns {'interactive' | 'plan' | 'autopilot' | 'shell' | null}
+ */
+function resolveSdkSessionModeProjection(storedMode, binding) {
+    if (storedMode) return storedMode;
+    return binding.sdkSessionId ? 'interactive' : null;
+}
+
+/**
  * @param {string | null | undefined} [runtimeId]
  * @returns {{
  *     currentModel: string;
@@ -59,7 +69,7 @@ export function readTerminalConfigProjection(runtimeId) {
     return {
         currentModel,
         currentReasoningEffort,
-        sdkSessionMode: getSdkSessionMode(),
+        sdkSessionMode: resolveSdkSessionModeProjection(getSdkSessionMode(), base.binding),
         sdkPlanOperation: getLastSdkPlanOperation(),
         sdkPlanChangedAt: getLastSdkPlanChangedAt(),
         modelMeta: readRuntimeModelMetadata(currentModel),

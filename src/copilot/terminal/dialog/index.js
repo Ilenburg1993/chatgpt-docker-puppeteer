@@ -21,6 +21,7 @@ export {
     PROMPT_USER,
     PROMPT_WAITING,
     resetStatusRowState,
+    scheduleTerminalPromptRedraw,
     SEPARATOR,
     TURN_TIMEOUT_MS,
     writeInlineStatus,

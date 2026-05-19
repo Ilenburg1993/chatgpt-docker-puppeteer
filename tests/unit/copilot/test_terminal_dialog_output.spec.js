@@ -90,4 +90,22 @@ describe('terminal/dialog/output.js — contrato', () => {
         expect(mod.estimateTerminalPhysicalRows('\x1b[32mabcdef\x1b[0m', 3)).toBe(2);
         expect(mod.estimateTerminalPhysicalRows('a\nbcdef', 2)).toBe(4);
     });
+
+    it('coalesce redraws de prompt na mesma rodada do event loop', async () => {
+        const mod = await import('../../../src/copilot/terminal/dialog/output.js');
+        const rl = {
+            setPrompt: vi.fn(),
+            prompt: vi.fn(),
+        };
+
+        mod.scheduleTerminalPromptRedraw(rl, 'primeiro');
+        mod.scheduleTerminalPromptRedraw(rl, 'segundo');
+
+        expect(rl.setPrompt).not.toHaveBeenCalled();
+        await new Promise((resolve) => setImmediate(resolve));
+
+        expect(rl.setPrompt).toHaveBeenCalledTimes(1);
+        expect(rl.setPrompt).toHaveBeenCalledWith('segundo');
+        expect(rl.prompt).toHaveBeenCalledTimes(1);
+    });
 });

@@ -976,6 +976,7 @@ describe('terminal/frontend/index', () => {
 
         expect(config.currentModel).toBe('gpt-5');
         expect(config.currentReasoningEffort).toBe('high');
+        expect(config.sdkSessionMode).toBe('interactive');
         expect(config.runtimeId).toBe('default');
         expect(config.agentRuntimes).toHaveLength(2);
         expect(config.modelMeta?.contextWindow).toBe(128000);

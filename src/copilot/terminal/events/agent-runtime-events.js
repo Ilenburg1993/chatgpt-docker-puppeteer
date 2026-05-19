@@ -30,7 +30,14 @@ import {
 } from '#copilot/events';
 import { resolveModelSelectionMismatch } from '#copilot/core';
 import { getShowToolActivity, getShowUsage } from '../../presentation/state/index.js';
-import { broadcastSse, buildUserPrompt, isTerminalRenderLocked, println, writeInlineStatus } from '../dialog/index.js';
+import {
+    broadcastSse,
+    buildUserPrompt,
+    isTerminalRenderLocked,
+    println,
+    scheduleTerminalPromptRedraw,
+    writeInlineStatus,
+} from '../dialog/index.js';
 import { readTerminalRuntimeState } from '../frontend/gateways/index.js';
 import {
     createTerminalPendingQuestionReplayState,
@@ -235,8 +242,7 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, regi
         }
         rl?.resume();
         if (rl) {
-            rl.setPrompt(buildUserPrompt());
-            rl.prompt();
+            scheduleTerminalPromptRedraw(rl, buildUserPrompt());
         }
     }
 
@@ -254,8 +260,7 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, regi
         });
         println('[llm-b] ⚠️  Agente parado. Use /restart para reiniciar.');
         if (rl) {
-            rl.setPrompt(buildUserPrompt());
-            rl.prompt();
+            scheduleTerminalPromptRedraw(rl, buildUserPrompt());
         }
     };
 
