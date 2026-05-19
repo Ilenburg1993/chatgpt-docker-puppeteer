@@ -30,6 +30,18 @@ const RECENTLY_COMPLETED_TTL_MS = 2 * 60_000;
 
 /**
  * @typedef {{
+ *     count: number;
+ *     totalDurationMs: number;
+ *     bytesRead: number;
+ *     bytesWritten: number;
+ *     targets: string[];
+ *     engines: string[];
+ *     latest: import('../events/io-activity-events.js').TerminalIoActivityEntry | null;
+ * }} ToolCallIoSummary
+ */
+
+/**
+ * @typedef {{
  *     toolCallId: string;
  *     toolName: string;
  *     canonicalName: string | null;
@@ -44,6 +56,7 @@ const RECENTLY_COMPLETED_TTL_MS = 2 * 60_000;
  *     lastDurableProgressMessage: string | null;
  *     rawArgs: Record<string, unknown>;
  *     presentation: import('../events/tool-activity-presenter.js').TerminalToolActivityPresentation | null;
+ *     io: ToolCallIoSummary;
  *     completedAt: number | null;
  *     success: boolean | null;
  * }} ToolCallEntry
@@ -94,6 +107,9 @@ const RECENTLY_COMPLETED_TTL_MS = 2 * 60_000;
  *     wasRecentlyCompleted: (toolCallId: string, requestId?: string | null) => boolean;
  *     markRequestIdForExternalTool: (requestId: string, toolName: string) => void;
  *     resolveNameByRequestId: (requestId: string | null | undefined) => string | null;
+ *     attachIoActivity: (
+ *         entry: import('../events/io-activity-events.js').TerminalIoActivityEntry,
+ *     ) => ToolCallEntry | null;
  *     getAllInFlight: () => ToolCallEntry[];
  *     clear: () => void;
  * }}
@@ -152,6 +168,84 @@ export function createToolCallRegistry() {
     }
 
     /**
+     * @returns {ToolCallIoSummary}
+     */
+    function createIoSummary() {
+        return {
+            count: 0,
+            totalDurationMs: 0,
+            bytesRead: 0,
+            bytesWritten: 0,
+            targets: [],
+            engines: [],
+            latest: null,
+        };
+    }
+
+    /**
+     * @param {string[]} values
+     * @param {string} value
+     * @returns {void}
+     */
+    function pushUnique(values, value) {
+        const normalized = value.trim();
+        if (!normalized || values.includes(normalized)) return;
+        values.push(normalized);
+    }
+
+    /**
+     * @param {ToolCallEntry} entry
+     * @param {import('../events/io-activity-events.js').TerminalIoActivityEntry} ioEntry
+     * @returns {number}
+     */
+    function scoreIoCorrelation(entry, ioEntry) {
+        const presentation = entry.presentation;
+        const candidateValues = [
+            presentation?.path,
+            presentation?.target,
+            ...(presentation?.fileTargets ?? []),
+            ...(presentation?.patchFiles ?? []),
+        ].filter((value) => typeof value === 'string' && value.length > 0);
+        const candidates = /** @type {Set<string>} */ (new Set(candidateValues));
+        const ioTargets = ioEntry.targets.length > 0 ? ioEntry.targets : [ioEntry.target];
+        let score = 0;
+        for (const ioTarget of ioTargets) {
+            for (const candidate of candidates) {
+                if (candidate === ioTarget) score += 10;
+                else if (candidate.endsWith(ioTarget) || ioTarget.endsWith(candidate)) score += 6;
+                else if (candidate.includes(ioTarget) || ioTarget.includes(candidate)) score += 3;
+            }
+        }
+        if (score === 0 && _active.size === 1) score = 1;
+        score += Math.max(0, 10_000 - (Date.now() - entry.lastSignalAt)) / 10_000;
+        return score;
+    }
+
+    /**
+     * @param {ToolCallEntry} entry
+     * @param {import('../events/io-activity-events.js').TerminalIoActivityEntry} ioEntry
+     * @returns {void}
+     */
+    function appendIoSummary(entry, ioEntry) {
+        entry.io.count += 1;
+        if (typeof ioEntry.durationMs === 'number' && Number.isFinite(ioEntry.durationMs)) {
+            entry.io.totalDurationMs += Math.max(0, ioEntry.durationMs);
+        }
+        if (typeof ioEntry.bytesRead === 'number' && Number.isFinite(ioEntry.bytesRead)) {
+            entry.io.bytesRead += Math.max(0, ioEntry.bytesRead);
+        }
+        if (typeof ioEntry.bytesWritten === 'number' && Number.isFinite(ioEntry.bytesWritten)) {
+            entry.io.bytesWritten += Math.max(0, ioEntry.bytesWritten);
+        }
+        for (const target of ioEntry.targets.length > 0 ? ioEntry.targets : [ioEntry.target]) {
+            if (target) pushUnique(entry.io.targets, target);
+        }
+        if (ioEntry.engine) pushUnique(entry.io.engines, ioEntry.engine);
+        entry.io.latest = ioEntry;
+        entry.lastSignalAt = Date.now();
+    }
+
+    /**
      * @param {string} toolCallId
      * @param {string} toolName
      * @param {ToolCallKind} kind
@@ -182,6 +276,7 @@ export function createToolCallRegistry() {
             lastDurableProgressMessage: null,
             rawArgs: opts.rawArgs ?? {},
             presentation: opts.presentation ?? null,
+            io: createIoSummary(),
             completedAt: null,
             success: null,
         };
@@ -420,6 +515,33 @@ export function createToolCallRegistry() {
     }
 
     /**
+     * Anexa uma operação real de I/O à tool em voo mais provável.
+     *
+     * A correlação fica no registry para que o terminal tenha um único ledger de lifecycle: adapters continuam finos,
+     * enquanto a conclusão da tool pode mostrar tempo/bytes reais de I/O sem depender de heurísticas espalhadas.
+     *
+     * @param {import('../events/io-activity-events.js').TerminalIoActivityEntry} ioEntry
+     * @returns {ToolCallEntry | null}
+     */
+    function attachIoActivity(ioEntry) {
+        pruneStale();
+        const entries = [..._active.values()];
+        if (entries.length === 0) return null;
+        let best = /** @type {ToolCallEntry | null} */ (null);
+        let bestScore = 0;
+        for (const entry of entries) {
+            const score = scoreIoCorrelation(entry, ioEntry);
+            if (score > bestScore) {
+                best = entry;
+                bestScore = score;
+            }
+        }
+        if (!best) return null;
+        appendIoSummary(best, ioEntry);
+        return best;
+    }
+
+    /**
      * @returns {ToolCallEntry[]}
      */
     function getAllInFlight() {
@@ -457,6 +579,7 @@ export function createToolCallRegistry() {
         wasRecentlyCompleted,
         markRequestIdForExternalTool,
         resolveNameByRequestId,
+        attachIoActivity,
         getAllInFlight,
         clear,
     };

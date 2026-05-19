@@ -540,7 +540,7 @@ describe('terminal/events/sdk-session-events.js — contrato', () => {
             'system',
             'Tools dinâmicas SDK atualizadas',
             expect.objectContaining({
-                detail: '92 tool(s) reportada(s) pelo evento SDK; registry local segue em /tools',
+                detail: expect.stringContaining('92 tool(s) SDK; registry local /tools='),
                 recordHistory: false,
             }),
         );
@@ -572,7 +572,7 @@ describe('terminal/events/sdk-session-events.js — contrato', () => {
         agent.emit('session.tools_updated', { count: 92 });
 
         expect(mocks.println).toHaveBeenCalledWith(expect.stringContaining('Skills SDK: 2/3 habilitadas'));
-        expect(mocks.println).toHaveBeenCalledWith(expect.stringContaining('Tools dinâmicas SDK atualizadas: 92'));
+        expect(mocks.println).toHaveBeenCalledWith(expect.stringContaining('Tools dinâmicas SDK atualizadas: 92 SDK'));
     });
 
     it('surfa hooks, sampling, commands/capabilities, auto-mode e exit_plan_mode.requested', async () => {

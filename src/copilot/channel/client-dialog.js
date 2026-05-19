@@ -33,12 +33,12 @@ const DUPLICATE_DELTA_SUPPRESSION_WINDOW_MS = 75;
  * `replySource` descreve a origem imediata do texto entregue ao consumer:
  *
  * - `runtime_return`: o runtime devolveu o reply diretamente
- * - `dialog.reply_fallback`: o runtime/bridge precisou usar o espelho de transporte do evento `dialog.reply`
+ * - `transport_mirror`: o runtime/bridge usou o espelho canônico de transporte do evento `dialog.reply`
  * - `empty`: nenhum conteúdo textual foi materializado pelo transporte
  *
  * @typedef {{
  *     reply: string;
- *     replySource: 'runtime_return' | 'dialog.reply_fallback' | 'empty';
+ *     replySource: 'runtime_return' | 'transport_mirror' | 'empty';
  *     hadReplyEvent: boolean;
  * }} DialogTurnTransportResult
  */
@@ -195,13 +195,13 @@ export async function dialogTurnDetailed(agent, message, opts = {}) {
         }
         if (replyFromEvent.trim().length > 0) {
             log(
-                'WARN',
-                '[LlmBridgeClient] sendDialogTurn retornou vazio; usando fallback de transporte via dialog.reply.',
+                'INFO',
+                '[LlmBridgeClient] sendDialogTurn retornou vazio; usando espelho canônico de transporte via dialog.reply.',
             );
             /** @type {DialogTurnTransportResult} */
             const result = {
                 reply: replyFromEvent,
-                replySource: 'dialog.reply_fallback',
+                replySource: 'transport_mirror',
                 hadReplyEvent: true,
             };
             log(

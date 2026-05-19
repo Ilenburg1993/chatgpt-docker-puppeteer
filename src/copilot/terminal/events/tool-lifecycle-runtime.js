@@ -79,6 +79,47 @@ function isReportIntentTool(toolName) {
 }
 
 /**
+ * @param {number} bytes
+ * @returns {string | null}
+ */
+function formatToolBytes(bytes) {
+    if (!Number.isFinite(bytes) || bytes <= 0) return null;
+    if (bytes < 1024) return `${Math.round(bytes)} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+/**
+ * @param {number} durationMs
+ * @returns {string | null}
+ */
+function formatToolDurationMs(durationMs) {
+    if (!Number.isFinite(durationMs) || durationMs <= 0) return null;
+    return durationMs < 1000 ? `${Math.max(1, Math.round(durationMs))}ms` : `${(durationMs / 1000).toFixed(1)}s`;
+}
+
+/**
+ * @param {import('../state/tool-call-registry.js').ToolCallEntry | null | undefined} entry
+ * @param {number} sdkDurationMs
+ * @returns {string}
+ */
+function buildToolCompletionDurationLabel(entry, sdkDurationMs) {
+    const sdkLabel = formatToolDurationMs(sdkDurationMs);
+    const io = entry?.io ?? null;
+    if (!io || io.count <= 0) return sdkLabel ?? 'n/d';
+
+    const ioDurationLabel = formatToolDurationMs(io.totalDurationMs);
+    const bytesLabel = formatToolBytes(io.bytesRead + io.bytesWritten);
+    const ioParts = [
+        `io ${io.count} op${io.count === 1 ? '' : 's'}`,
+        ioDurationLabel,
+        bytesLabel,
+        io.engines.length === 1 ? io.engines[0] : io.engines.length > 1 ? `${io.engines.length} engines` : null,
+    ].filter(Boolean);
+    return [sdkLabel ?? null, ioParts.join(' · ')].filter(Boolean).join(' · ') || 'n/d';
+}
+
+/**
  * @param {unknown} value
  * @returns {Record<string, unknown> | null}
  */
@@ -575,9 +616,11 @@ export function handleTerminalNativeToolComplete({ registry, evt }) {
         toolCallId,
     });
     const effectiveToolCallId = entry?.toolCallId ?? toolCallId;
-    if (effectiveToolCallId && registry.getEntry(effectiveToolCallId)?.kind === 'native') {
-        registry.complete(effectiveToolCallId, success);
-    }
+    const completedEntry =
+        effectiveToolCallId && registry.getEntry(effectiveToolCallId)?.kind === 'native'
+            ? registry.complete(effectiveToolCallId, success)
+            : null;
+    const metricEntry = completedEntry ?? entry;
     const completionPresentation = buildTerminalToolActivityPresentation(
         {
             ...evt,
@@ -589,12 +632,12 @@ export function handleTerminalNativeToolComplete({ registry, evt }) {
         ? completionPresentation
         : (entry?.presentation ?? completionPresentation);
     const canonicalName = presentation.canonicalToolName ?? name;
-    const durationMs = entry
-        ? Date.now() - entry.t0
+    const durationMs = metricEntry
+        ? Date.now() - metricEntry.t0
         : Number.isFinite(Number(evt?.['durationMs']))
           ? Number(evt?.['durationMs'])
           : 0;
-    const durationLabel = durationMs > 0 ? `${(durationMs / 1000).toFixed(1)}s` : 'n/d';
+    const durationLabel = buildToolCompletionDurationLabel(metricEntry, durationMs);
     if (effectiveToolCallId) completeTerminalTurnToolCall({ toolCallId: effectiveToolCallId, success });
     const activityLabel = success ? 'Tool concluída' : 'Tool falhou';
     recordTerminalActivity('tool', activityLabel, {
@@ -750,24 +793,30 @@ export function handleTerminalExternalToolCompleted({ registry, evt, verboseNarr
         source: `sdk/external/${toolName}`,
         toolCallId: resolvedToolCallId,
     });
+    /** @type {import('../state/tool-call-registry.js').ToolCallEntry | null} */
+    let completedEntry = null;
     if (resolvedEntry) {
         resolvedToolCallId = resolvedEntry.toolCallId;
-        registry.complete(resolvedEntry.toolCallId, success);
+        completedEntry = registry.complete(resolvedEntry.toolCallId, success);
     }
     const completionPresentation = buildTerminalToolActivityPresentation(evt ?? {}, toolName);
     const presentation = hasSemanticToolTarget(completionPresentation)
         ? completionPresentation
         : (resolvedEntry?.presentation ?? completionPresentation);
     const displayToolName = presentation.canonicalToolName ?? toolName;
+    const durationMs = completedEntry ? Date.now() - completedEntry.t0 : 0;
+    const durationLabel = buildToolCompletionDurationLabel(completedEntry ?? resolvedEntry, durationMs);
     recordToolTurnProjection(presentation, success ? 'completed' : 'failed', resolvedToolCallId, success);
     recordTerminalActivity('tool', success ? 'External tool concluída' : 'External tool falhou', {
-        detail: presentation.detail || `${displayToolName}${requestId ? ` · ${requestId}` : ''}`,
+        detail:
+            presentation.completeLine(success, durationLabel) ||
+            `${displayToolName}${requestId ? ` · ${requestId}` : ''}`,
         toolName: displayToolName,
         source: 'sdk',
         severity: success ? 'info' : 'error',
     });
     if (getShowToolActivity()) {
-        printToolComplete(presentation, success, 'n/d', resolvedToolCallId);
+        printToolComplete(presentation, success, durationLabel, resolvedToolCallId);
     } else if (verboseNarration) {
         println(
             `  ${success ? '\x1b[32m✓' : '\x1b[31m✗'} external tool:\x1b[0m ${displayToolName}${requestId ? ` \x1b[90m(${requestId})\x1b[0m` : ''}`,
@@ -800,8 +849,7 @@ export function handleTerminalExternalToolCompleted({ registry, evt, verboseNarr
  * @returns {void}
  */
 export function handleTerminalIoToolLifecycle({ registry, entry }) {
-    const inFlight = registry ? registry.getAllInFlight() : [];
-    const correlated = inFlight.length > 0 ? inFlight[0] : null;
+    const correlated = registry ? registry.attachIoActivity(entry) : null;
     broadcastSse(
         'tool.lifecycle',
         buildToolLifecycleIoOp(entry, {

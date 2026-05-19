@@ -66,7 +66,7 @@ export function seedTerminalHistoryFeed(role, content) {
  * @typedef {{
  *     reply: string;
  *     channel: 'dialog' | 'chat';
- *     replySource: 'runtime_return' | 'dialog.reply_fallback' | 'direct_chat' | 'empty';
+ *     replySource: 'runtime_return' | 'transport_mirror' | 'direct_chat' | 'empty';
  *     hadReplyEvent?: boolean;
  * }} TerminalDialogTurnResult
  */

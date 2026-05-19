@@ -78,6 +78,7 @@ import {
     answerTerminalPendingQuestion,
     classifyTerminalPermissionDecision,
     loginTerminalSdkMcpOauth,
+    readTerminalToolRegistrySnapshot,
 } from '../frontend/gateways/index.js';
 import {
     beginTerminalTurnTrace,
@@ -662,17 +663,31 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
         refreshPromptIfIdle();
     };
 
-    const onSessionToolsUpdated = (/** @type {{ count?: number }} */ evt) => {
-        const count = Number(evt?.count ?? 0);
+    const onSessionToolsUpdated = (/** @type {{ count?: number; tools?: unknown[] }} */ evt) => {
+        const hasSdkToolList = Array.isArray(evt?.tools);
+        const sdkCount = hasSdkToolList
+            ? evt.tools?.length ?? 0
+            : typeof evt?.count === 'number' && Number.isFinite(evt.count)
+              ? evt.count
+              : null;
+        const registrySnapshot = readTerminalToolRegistrySnapshot();
+        const localCount = Number(registrySnapshot.total ?? 0);
+        const countLabel = sdkCount === null ? 'SDK sinalizou atualização sem contagem materializada' : `${sdkCount} tool(s) SDK`;
         recordTerminalActivity('system', 'Tools dinâmicas SDK atualizadas', {
-            detail: `${count} tool(s) reportada(s) pelo evento SDK; registry local segue em /tools`,
+            detail: `${countLabel}; registry local /tools=${localCount}`,
             source: 'sdk',
             recordHistory: false,
         });
         if (shouldPrintSessionNarration('verbose')) {
-            println(`  \x1b[90m🧰 Tools dinâmicas SDK atualizadas: ${count} (registry local: /tools)\x1b[0m`);
+            const sdkLabel = sdkCount === null ? 'contagem SDK n/d' : `${sdkCount} SDK`;
+            println(`  \x1b[90m🧰 Tools dinâmicas SDK atualizadas: ${sdkLabel} · registry local: ${localCount} (/tools)\x1b[0m`);
         }
-        broadcastSse('session.tools_updated', { count, timestamp: Date.now() });
+        broadcastSse('session.tools_updated', {
+            count: sdkCount ?? localCount,
+            sdkCount,
+            localCount,
+            timestamp: Date.now(),
+        });
     };
 
     const onSessionSkillsLoaded = (/** @type {{ count?: number; enabled?: number }} */ evt) => {

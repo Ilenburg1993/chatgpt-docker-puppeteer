@@ -589,8 +589,8 @@ async function _executeTurn(message, actor, attachments = [], requestHeaders = n
             recordHistory: false,
         });
 
-        if (turnResult.replySource === 'dialog.reply_fallback') {
-            log('WARN', '[TerminalServer] Turno explícito renderizado usando fallback canônico de dialog.reply.');
+        if (turnResult.replySource === 'transport_mirror') {
+            log('INFO', '[TerminalServer] Turno explícito renderizado usando espelho canônico de dialog.reply.');
         } else if (turnResult.replySource === 'empty') {
             log('WARN', '[TerminalServer] Turno explícito concluído sem reply textual materializado no transporte.');
         }

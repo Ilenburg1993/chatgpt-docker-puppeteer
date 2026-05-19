@@ -153,6 +153,53 @@ describe('createToolCallRegistry', () => {
             expect(registry.resolveSingleInFlight('external')).toBeNull();
         });
 
+        it('anexa atividade de IO à tool ativa mais provável', () => {
+            registry.register('call-read', 'read_file_content', 'native', {
+                presentation: /** @type {any} */ ({
+                    path: 'package.json',
+                    target: 'arquivo: package.json',
+                    fileTargets: ['package.json'],
+                    patchFiles: [],
+                }),
+            });
+            registry.register('call-patch', 'patch_file', 'native', {
+                presentation: /** @type {any} */ ({
+                    path: 'src/copilot/terminal/events/tool-lifecycle-runtime.js',
+                    target: 'arquivo: src/copilot/terminal/events/tool-lifecycle-runtime.js',
+                    fileTargets: ['src/copilot/terminal/events/tool-lifecycle-runtime.js'],
+                    patchFiles: [],
+                }),
+            });
+
+            const matched = registry.attachIoActivity({
+                timestamp: 10,
+                success: true,
+                operation: 'read',
+                target: 'package.json',
+                targets: ['package.json'],
+                engine: 'io-engine.fs.readFile.text',
+                targetKind: 'file',
+                durationMs: 7,
+                bytesRead: 42,
+                bytesWritten: null,
+                riskClass: 'low',
+                error: null,
+            });
+
+            expect(matched?.toolCallId).toBe('call-read');
+            expect(registry.getEntry('call-read')?.io).toEqual(
+                expect.objectContaining({
+                    count: 1,
+                    totalDurationMs: 7,
+                    bytesRead: 42,
+                    bytesWritten: 0,
+                    targets: ['package.json'],
+                    engines: ['io-engine.fs.readFile.text'],
+                }),
+            );
+            expect(registry.getEntry('call-patch')?.io.count).toBe(0);
+        });
+
         it('clear remove todo o estado', () => {
             registry.register('call-z1', 'tool_z', 'native', { requestId: 'req-z1' });
             registry.register('call-z2', 'tool_z', 'native');

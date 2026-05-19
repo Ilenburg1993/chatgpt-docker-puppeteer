@@ -16,7 +16,11 @@ import {
     EMITTER_ASSISTANT_MESSAGE,
     EMITTER_ASSISTANT_TURN_END,
     EMITTER_DIALOG_DELTA,
+    EMITTER_EXTERNAL_TOOL_COMPLETED,
+    EMITTER_EXTERNAL_TOOL_REQUESTED,
     EMITTER_TASK_DELTA,
+    EMITTER_TOOL_EXECUTION_COMPLETE,
+    EMITTER_TOOL_EXECUTION_START,
 } from '#copilot/events';
 import { log } from '../../ports/index.js';
 
@@ -34,15 +38,18 @@ const MAX_DELTA_FALLBACK_CHARS = 50_000;
  * @returns {{
  *     markDispatched: () => void;
  *     onTurnEnd: (listener: () => void) => () => void;
+ *     onAssistantMessageCandidate: (listener: () => void) => () => void;
  *     tryResolve: (
  *         turnStart: number,
  *         resolve: (reply: string) => void,
  *         finalizeReply: (turnStart: number, reply: string) => void,
+ *         opts?: { allowDeltaFallback?: boolean },
  *     ) => boolean;
  *     snapshot: () => {
  *         dispatched: boolean;
  *         assistantMessageCandidate: string | null;
  *         deltaChars: number;
+ *         deltaEligible: boolean;
  *         pendingProtocolReply: string | null;
  *     };
  *     cleanup: () => void;
@@ -53,11 +60,13 @@ export function createDialogTurnOutputCollector(host, helpers) {
         return {
             markDispatched: () => {},
             onTurnEnd: () => () => {},
+            onAssistantMessageCandidate: () => () => {},
             tryResolve: () => false,
             snapshot: () => ({
                 dispatched: false,
                 assistantMessageCandidate: null,
                 deltaChars: 0,
+                deltaEligible: false,
                 pendingProtocolReply: null,
             }),
             cleanup: () => {},
@@ -69,8 +78,20 @@ export function createDialogTurnOutputCollector(host, helpers) {
     let assistantMessageCandidate = null;
     /** @type {string} */
     let deltaCandidate = '';
+    let signalSeq = 0;
+    let lastDeltaSeq = 0;
+    let lastToolSignalSeq = 0;
     /** @type {Set<() => void>} */
     const turnEndListeners = new Set();
+    /** @type {Set<() => void>} */
+    const assistantMessageCandidateListeners = new Set();
+
+    /**
+     * @returns {boolean}
+     */
+    function isDeltaCandidateEligible() {
+        return deltaCandidate.length > 0 && (lastToolSignalSeq === 0 || lastDeltaSeq >= lastToolSignalSeq);
+    }
 
     const onAssistantMessage = (/** @type {unknown} */ evt) => {
         if (!dispatched) return;
@@ -78,6 +99,9 @@ export function createDialogTurnOutputCollector(host, helpers) {
         const normalized = helpers.normalizeAssistantReplyCandidate(content);
         if (normalized) {
             assistantMessageCandidate = normalized;
+            for (const listener of [...assistantMessageCandidateListeners]) {
+                listener();
+            }
         }
     };
 
@@ -88,7 +112,15 @@ export function createDialogTurnOutputCollector(host, helpers) {
         const remaining = MAX_DELTA_FALLBACK_CHARS - deltaCandidate.length;
         if (remaining > 0) {
             deltaCandidate += chunk.slice(0, remaining);
+            signalSeq += 1;
+            lastDeltaSeq = signalSeq;
         }
+    };
+
+    const onToolSignal = () => {
+        if (!dispatched) return;
+        signalSeq += 1;
+        lastToolSignalSeq = signalSeq;
     };
 
     const onAssistantTurnEnd = () => {
@@ -102,12 +134,19 @@ export function createDialogTurnOutputCollector(host, helpers) {
     host.on(EMITTER_DIALOG_DELTA, onDelta);
     host.on(EMITTER_TASK_DELTA, onDelta);
     host.on(EMITTER_ASSISTANT_TURN_END, onAssistantTurnEnd);
+    host.on(EMITTER_TOOL_EXECUTION_START, onToolSignal);
+    host.on(EMITTER_TOOL_EXECUTION_COMPLETE, onToolSignal);
+    host.on(EMITTER_EXTERNAL_TOOL_REQUESTED, onToolSignal);
+    host.on(EMITTER_EXTERNAL_TOOL_COMPLETED, onToolSignal);
 
     return {
         markDispatched: () => {
             dispatched = true;
             assistantMessageCandidate = null;
             deltaCandidate = '';
+            signalSeq = 0;
+            lastDeltaSeq = 0;
+            lastToolSignalSeq = 0;
         },
         onTurnEnd: (listener) => {
             turnEndListeners.add(listener);
@@ -115,13 +154,23 @@ export function createDialogTurnOutputCollector(host, helpers) {
                 turnEndListeners.delete(listener);
             };
         },
-        tryResolve: (turnStart, resolve, finalizeReply) => {
+        onAssistantMessageCandidate: (listener) => {
+            assistantMessageCandidateListeners.add(listener);
+            return () => {
+                assistantMessageCandidateListeners.delete(listener);
+            };
+        },
+        tryResolve: (turnStart, resolve, finalizeReply, opts = {}) => {
             const pendingProtocolRawReply = helpers.readPendingProtocolSnapshot(host)?.reply ?? null;
             const pendingProtocolReply =
                 typeof pendingProtocolRawReply === 'string'
                     ? helpers.normalizeAssistantReplyCandidate(pendingProtocolRawReply)
                     : null;
-            const deltaReplyCandidate = helpers.normalizeAssistantReplyCandidate(deltaCandidate);
+            const allowDeltaFallback = opts.allowDeltaFallback !== false;
+            const deltaReplyCandidate =
+                allowDeltaFallback && isDeltaCandidateEligible()
+                    ? helpers.normalizeAssistantReplyCandidate(deltaCandidate)
+                    : null;
             const replySource = assistantMessageCandidate
                 ? 'assistant.message'
                 : deltaReplyCandidate
@@ -133,6 +182,9 @@ export function createDialogTurnOutputCollector(host, helpers) {
             if (!reply) return false;
             assistantMessageCandidate = null;
             deltaCandidate = '';
+            signalSeq = 0;
+            lastDeltaSeq = 0;
+            lastToolSignalSeq = 0;
             log(
                 'DEBUG',
                 `[DialogLoopManager] collector semântico resolveu o reply do dialog loop ` +
@@ -146,6 +198,7 @@ export function createDialogTurnOutputCollector(host, helpers) {
             dispatched,
             assistantMessageCandidate,
             deltaChars: deltaCandidate.length,
+            deltaEligible: isDeltaCandidateEligible(),
             pendingProtocolReply:
                 typeof helpers.readPendingProtocolSnapshot(host)?.reply === 'string'
                     ? helpers.normalizeAssistantReplyCandidate(helpers.readPendingProtocolSnapshot(host)?.reply ?? '')
@@ -153,10 +206,15 @@ export function createDialogTurnOutputCollector(host, helpers) {
         }),
         cleanup: () => {
             turnEndListeners.clear();
+            assistantMessageCandidateListeners.clear();
             host.off?.(EMITTER_ASSISTANT_MESSAGE, onAssistantMessage);
             host.off?.(EMITTER_DIALOG_DELTA, onDelta);
             host.off?.(EMITTER_TASK_DELTA, onDelta);
             host.off?.(EMITTER_ASSISTANT_TURN_END, onAssistantTurnEnd);
+            host.off?.(EMITTER_TOOL_EXECUTION_START, onToolSignal);
+            host.off?.(EMITTER_TOOL_EXECUTION_COMPLETE, onToolSignal);
+            host.off?.(EMITTER_EXTERNAL_TOOL_REQUESTED, onToolSignal);
+            host.off?.(EMITTER_EXTERNAL_TOOL_COMPLETED, onToolSignal);
         },
     };
 }

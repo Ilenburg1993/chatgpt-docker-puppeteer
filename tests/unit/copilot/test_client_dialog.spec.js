@@ -228,15 +228,15 @@ describe('client-dialog › dialogTurn', () => {
         expect(onReasoning).toHaveBeenCalledWith('think', null);
     });
 
-    it('usa fallback de dialog.reply quando sendDialogTurn resolve string vazia', async () => {
+    it('usa espelho de dialog.reply quando sendDialogTurn resolve string vazia', async () => {
         const agent = createMockAgent();
 
         agent.sendDialogTurn.mockImplementation(async () => {
-            agent._fire('dialog.reply', { reply: 'fallback via evento' });
+            agent._fire('dialog.reply', { reply: 'reply via evento' });
             return '';
         });
 
-        await expect(dialogTurn(agent, 'hello')).resolves.toBe('fallback via evento');
+        await expect(dialogTurn(agent, 'hello')).resolves.toBe('reply via evento');
         expect(agent.off).toHaveBeenCalledWith('dialog.reply', expect.any(Function));
     });
 
@@ -288,17 +288,17 @@ describe('client-dialog › dialogTurnDetailed', () => {
         });
     });
 
-    it('retorna replySource=dialog.reply_fallback quando usa o espelho de transporte', async () => {
+    it('retorna replySource=transport_mirror quando usa o espelho de transporte', async () => {
         const agent = createMockAgent();
 
         agent.sendDialogTurn.mockImplementation(async () => {
-            agent._fire('dialog.reply', { reply: 'fallback via evento' });
+            agent._fire('dialog.reply', { reply: 'reply via evento' });
             return '';
         });
 
         await expect(dialogTurnDetailed(agent, 'hello')).resolves.toEqual({
-            reply: 'fallback via evento',
-            replySource: 'dialog.reply_fallback',
+            reply: 'reply via evento',
+            replySource: 'transport_mirror',
             hadReplyEvent: true,
         });
     });

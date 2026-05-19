@@ -394,6 +394,8 @@ export function executeTurnImpl(emitter, message, { timeout, signal, traceId, al
                 let settled = false;
                 /** @type {(() => void) | null} */
                 let removeTurnEndAutoResolve = null;
+                /** @type {(() => void) | null} */
+                let removeAssistantMessageAutoResolve = null;
 
                 /** @param {string} value */
                 const settleResolve = (value) => {
@@ -401,6 +403,7 @@ export function executeTurnImpl(emitter, message, { timeout, signal, traceId, al
                     settled = true;
                     detachAbortListener(signal, onAbort);
                     removeTurnEndAutoResolve?.();
+                    removeAssistantMessageAutoResolve?.();
                     turnOutputCollector.cleanup();
                     resolve(value);
                 };
@@ -411,6 +414,7 @@ export function executeTurnImpl(emitter, message, { timeout, signal, traceId, al
                     settled = true;
                     detachAbortListener(signal, onAbort);
                     removeTurnEndAutoResolve?.();
+                    removeAssistantMessageAutoResolve?.();
                     turnOutputCollector.cleanup();
                     reject(error instanceof Error ? error : new Error(String(error)));
                 };
@@ -450,6 +454,24 @@ export function executeTurnImpl(emitter, message, { timeout, signal, traceId, al
                             }),
                     );
                 }
+
+                removeAssistantMessageAutoResolve = turnOutputCollector.onAssistantMessageCandidate(() => {
+                    if (settled) return;
+                    void turnOutputCollector.tryResolve(
+                        turnStart,
+                        (reply) => {
+                            clearTurnTimeout();
+                            clearOuterLoopListeners();
+                            settleResolve(reply);
+                        },
+                        (replyTurnStart, reply) =>
+                            finalizeTurnReply(replyTurnStart, reply, {
+                                emit: (event, payload) => emitter.emit(event, payload),
+                                metrics: container.resolve(METRICS_STORE),
+                            }),
+                        { allowDeltaFallback: false },
+                    );
+                });
 
                 removeTurnEndAutoResolve = turnOutputCollector.onTurnEnd(() => {
                     if (settled) return;

@@ -731,6 +731,39 @@ describe('turn-executor', () => {
             await expect(p).resolves.toBe('fallback sem timeout');
         });
 
+        it('não resolve delta pré-tool como resposta final quando há assistant.message posterior', async () => {
+            const host = Object.assign(new EventEmitter(), {
+                hasPendingQuestion: vi.fn().mockReturnValue(true),
+                answerPendingQuestion: vi.fn(),
+                getSessionId: vi.fn().mockReturnValue('sess-1'),
+                getModel: vi.fn().mockReturnValue('gpt-5-mini'),
+            });
+            let settled = false;
+
+            const p = /** @type {any} */ (executeTurnImpl)(
+                emitter,
+                'question?',
+                { timeout: null },
+                { host, sendCountRef: { sendCount: 0 } },
+            ).then((reply) => {
+                settled = true;
+                return reply;
+            });
+
+            host.emit('dialog.delta', { chunk: 'vou ler o arquivo' });
+            host.emit('tool.execution_start', { toolName: 'read_file_content' });
+            host.emit('tool.execution_complete', { toolName: 'read_file_content', success: true });
+            host.emit('assistant.turn_end', { turnId: 'turn-1' });
+            await tick();
+
+            expect(settled).toBe(false);
+
+            host.emit('assistant.message', { content: 'O nome do pacote é chatgpt-docker-puppeteer.' });
+            await tick();
+
+            await expect(p).resolves.toBe('O nome do pacote é chatgpt-docker-puppeteer.');
+        });
+
         it('remove listeners externos após timeout para evitar reply tardio contabilizado', async () => {
             const host = {
                 hasPendingQuestion: vi.fn().mockReturnValue(true),
