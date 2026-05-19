@@ -183,6 +183,8 @@ describe('session-setup (F63)', () => {
             expect(options.tools).toBe(tools);
             expect(options.hooks).toBe(busHooks);
             expect(options.reasoningEffort).toBe('medium');
+            expect(options.enableConfigDiscovery).toBe(false);
+            expect(options.includeSubAgentStreamingEvents).toBe(false);
             expect(options.injectHookContext).toBe(true);
             expect(typeof options.onPermissionRequest).toBe('function');
             expect(typeof options.onUserInputRequest).toBe('function');
@@ -201,7 +203,7 @@ describe('session-setup (F63)', () => {
 
             const options = buildSessionOptions(ctx, host, { tools, busHooks });
 
-            expect(options.excludedTools).toEqual(['create', 'edit', 'glob', 'grep', 'view']);
+            expect(options.excludedTools).toEqual(['glob', 'view']);
         });
 
         it('omite reasoningEffort quando o modelo não suporta a capability e normaliza o ctx', () => {

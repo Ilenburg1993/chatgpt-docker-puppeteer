@@ -138,6 +138,21 @@ describe('createToolCallRegistry', () => {
             expect(registry.resolveNameByRequestId(null)).toBeNull();
         });
 
+        it('resolveByName usa nome bruto e canônico para recuperar entrada ativa', () => {
+            registry.register('call-name-1', 'workspace.read_file', 'native', { canonicalName: 'read_file_content' });
+            expect(registry.resolveByName('workspace.read_file')?.toolCallId).toBe('call-name-1');
+            expect(registry.resolveByName('read_file_content')?.toolCallId).toBe('call-name-1');
+            expect(registry.resolveByName('missing')).toBeNull();
+        });
+
+        it('resolveSingleInFlight só retorna quando há uma única entrada ativa do tipo solicitado', () => {
+            registry.register('call-one', 'read_file_content', 'native');
+            expect(registry.resolveSingleInFlight('native')?.toolCallId).toBe('call-one');
+            registry.register('call-two', 'patch_file', 'native');
+            expect(registry.resolveSingleInFlight('native')).toBeNull();
+            expect(registry.resolveSingleInFlight('external')).toBeNull();
+        });
+
         it('clear remove todo o estado', () => {
             registry.register('call-z1', 'tool_z', 'native', { requestId: 'req-z1' });
             registry.register('call-z2', 'tool_z', 'native');

@@ -134,7 +134,7 @@ export function createDialogTurnOutputCollector(host, helpers) {
             assistantMessageCandidate = null;
             deltaCandidate = '';
             log(
-                'WARN',
+                'DEBUG',
                 `[DialogLoopManager] collector semântico resolveu o reply do dialog loop ` +
                     `(source=${replySource}, replyLen=${reply.length}, pendingProtocolReplyLen=${pendingProtocolReply?.length ?? 0}).`,
             );

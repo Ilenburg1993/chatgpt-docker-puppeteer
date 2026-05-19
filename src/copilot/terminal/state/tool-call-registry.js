@@ -85,6 +85,8 @@ const RECENTLY_COMPLETED_TTL_MS = 2 * 60_000;
  *     updateProgress: (toolCallId: string, progress: number | null, message: string | null) => void;
  *     complete: (toolCallId: string, success: boolean) => ToolCallEntry | null;
  *     resolveByRequestId: (requestId: string | null | undefined) => ToolCallEntry | null;
+ *     resolveByName: (toolName: string | null | undefined) => ToolCallEntry | null;
+ *     resolveSingleInFlight: (kind?: ToolCallKind) => ToolCallEntry | null;
  *     isInFlight: (toolCallId: string) => boolean;
  *     isNameInFlight: (toolName: string) => boolean;
  *     markRecentCompletion: (toolName: string, requestId?: string | null) => void;
@@ -284,6 +286,38 @@ export function createToolCallRegistry() {
     }
 
     /**
+     * Resolve a entrada ativa mais recente por nome canônico ou bruto.
+     *
+     * O SDK nem sempre repete `toolName` em `tool.execution_complete`; este índice permite preservar a apresentação
+     * rica registrada no start quando a correlação por `toolCallId` falha.
+     *
+     * @param {string | null | undefined} toolName
+     * @returns {ToolCallEntry | null}
+     */
+    function resolveByName(toolName) {
+        if (!toolName) return null;
+        pruneStale();
+        const normalized = String(toolName).trim();
+        if (!normalized) return null;
+        const matches = [..._active.values()].filter(
+            (entry) => entry.toolName === normalized || entry.canonicalName === normalized,
+        );
+        return matches.at(-1) ?? null;
+    }
+
+    /**
+     * Resolve a única tool ativa quando o SDK emitiu completion sem nome e sem ID correlacionável.
+     *
+     * @param {ToolCallKind} [kind]
+     * @returns {ToolCallEntry | null}
+     */
+    function resolveSingleInFlight(kind = undefined) {
+        pruneStale();
+        const entries = kind ? [..._active.values()].filter((entry) => entry.kind === kind) : [..._active.values()];
+        return entries.length === 1 ? (entries[0] ?? null) : null;
+    }
+
+    /**
      * @param {string} toolCallId
      * @returns {boolean}
      */
@@ -414,6 +448,8 @@ export function createToolCallRegistry() {
         updateProgress,
         complete,
         resolveByRequestId,
+        resolveByName,
+        resolveSingleInFlight,
         isInFlight,
         isNameInFlight,
         markRecentCompletion,

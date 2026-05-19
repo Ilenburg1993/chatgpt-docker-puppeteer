@@ -154,6 +154,24 @@ describe('sdk-session-events.js — integração com ToolCallRegistry', () => {
         expect(mocks.println).toHaveBeenCalledWith(expect.stringContaining('[TOOL]'));
     });
 
+    it('onExternalToolRequested resolve nome real em payload aninhado antes de registrar', async () => {
+        const { setupTerminalSdkSessionEventListeners } =
+            await import('../../../src/copilot/terminal/events/sdk-session-events.js');
+        const agent = createAgentHost();
+        const registry = createToolCallRegistry();
+
+        setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfIdle: vi.fn(), registry });
+        agent.emit('external_tool.requested', {
+            toolName: 'external_tool',
+            requestId: 'req-real-name',
+            data: { toolName: 'read_file_content', arguments: { path: 'package.json' } },
+        });
+
+        expect(registry.isNameInFlight('read_file_content')).toBe(true);
+        expect(registry.isNameInFlight('external_tool')).toBe(false);
+        expect(registry.resolveByRequestId('req-real-name')?.toolName).toBe('read_file_content');
+    });
+
     it('onExternalToolCompleted completa no registry e emite SSE correto', async () => {
         const { setupTerminalSdkSessionEventListeners } =
             await import('../../../src/copilot/terminal/events/sdk-session-events.js');
@@ -181,6 +199,35 @@ describe('sdk-session-events.js — integração com ToolCallRegistry', () => {
         );
         expect(sseCall).toBeDefined();
         expect(sseCall?.[1]?.toolName).toBe('github_api');
+    });
+
+    it('promove external_tool.completed pobre para completion rico quando há tool nativa em voo', async () => {
+        const { setupTerminalSdkSessionEventListeners } =
+            await import('../../../src/copilot/terminal/events/sdk-session-events.js');
+        const { handleTerminalNativeToolStart } =
+            await import('../../../src/copilot/terminal/events/tool-lifecycle-runtime.js');
+        const agent = createAgentHost();
+        const registry = createToolCallRegistry();
+
+        setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfIdle: vi.fn(), registry });
+
+        handleTerminalNativeToolStart({
+            registry,
+            evt: {
+                toolCallId: 'native-read-1',
+                toolName: 'read_file_content',
+                args: { path: 'package.json' },
+            },
+        });
+        mocks.println.mockClear();
+        agent.emit('external_tool.completed', {
+            toolName: 'read_file_content',
+            requestId: 'sdk-poor-complete',
+            success: true,
+        });
+
+        expect(mocks.println).toHaveBeenCalledWith(expect.stringContaining('package.json'));
+        expect(registry.isNameInFlight('read_file_content')).toBe(false);
     });
 
     it('onSessionShutdown chama registry.clear()', async () => {

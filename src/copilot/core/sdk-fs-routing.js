@@ -42,7 +42,16 @@ export const CANONICAL_LOCAL_FS_TOOL_NAMES = Object.freeze([
  *
  * @type {readonly string[]}
  */
-export const LEGACY_SDK_LOCAL_FS_TOOL_NAMES = Object.freeze(['view', 'glob', 'grep', 'create', 'edit']);
+export const LEGACY_SDK_LOCAL_FS_TOOL_NAMES = Object.freeze(['view', 'glob']);
+
+/**
+ * Nomes legados que existiram em superfícies antigas do CLI, mas que modelos/SDKs recentes frequentemente reportam
+ * como desconhecidos em `excludedTools`. Eles ficam documentados para auditoria e troubleshooting, sem serem enviados
+ * por padrão para evitar warnings de configuração a cada turno.
+ *
+ * @type {readonly string[]}
+ */
+export const COMPAT_SDK_LOCAL_FS_TOOL_NAMES = Object.freeze(['grep', 'create', 'edit']);
 
 /**
  * Superfície canônica local para execução de comandos.

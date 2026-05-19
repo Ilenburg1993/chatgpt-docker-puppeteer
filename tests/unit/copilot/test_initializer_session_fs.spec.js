@@ -74,7 +74,7 @@ vi.mock('#copilot/core', async (importOriginal) => ({
             'patch_file',
         ].every((name) => toolNames.includes(name));
         if (hasCanonicalFs) {
-            for (const name of ['view', 'glob', 'grep', 'create', 'edit']) excluded.add(name);
+            for (const name of ['view', 'glob']) excluded.add(name);
         }
         return [...excluded].sort();
     },
@@ -204,7 +204,28 @@ describe('agent/session/initializer — sessionFs wiring', () => {
         });
 
         const sessionOptions = mocks.resumeOrCreateAgentSdkSession.mock.calls.at(-1)?.[2];
-        expect(sessionOptions?.excludedTools).toEqual(['create', 'edit', 'glob', 'grep', 'view', 'web_fetch']);
+        expect(sessionOptions?.excludedTools).toEqual(['glob', 'view', 'web_fetch']);
+    });
+
+    it('recupera colisão de tools causada por enableConfigDiscovery desligando apenas a descoberta implícita', async () => {
+        const { initOrResumeSession } = await import('../../../src/copilot/agent/session/initializers/initializer.js');
+        mocks.resumeOrCreateAgentSdkSession
+            .mockRejectedValueOnce(new Error('Tool names must be unique across ALL loaded extensions'))
+            .mockResolvedValueOnce({
+                session: { sessionId: 'guarded-sess' },
+                isResumed: false,
+                model: 'auto',
+            });
+
+        await initOrResumeSession(/** @type {any} */ ({}), { model: 'auto' });
+
+        expect(mocks.resumeOrCreateAgentSdkSession).toHaveBeenCalledTimes(2);
+        expect(mocks.resumeOrCreateAgentSdkSession.mock.calls[0]?.[2]).toEqual(
+            expect.objectContaining({ enableConfigDiscovery: true }),
+        );
+        expect(mocks.resumeOrCreateAgentSdkSession.mock.calls[1]?.[2]).toEqual(
+            expect.objectContaining({ enableConfigDiscovery: false }),
+        );
     });
 
     it('preserva model=auto como configuração nativa mesmo quando o SDK observa modelo efetivo', async () => {

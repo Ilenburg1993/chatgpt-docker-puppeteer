@@ -105,6 +105,69 @@ export function getLastAgentContractValidation() {
 }
 
 /**
+ * @param {unknown} error
+ * @returns {boolean}
+ */
+function isConfigDiscoveryToolCollisionError(error) {
+    const message = toError(error).message;
+    return /tool names must be unique|already registered|duplicate tool|collisions?/i.test(message);
+}
+
+/**
+ * Executa criação/retomada com fallback explícito para `enableConfigDiscovery=false` quando a descoberta automática
+ * injeta extensões/tools com colisão de nomes. O SDK documenta que nomes de tools precisam ser únicos em todas as
+ * extensões carregadas; portanto, recuperação segura significa preservar nossa superfície explícita e desligar apenas a
+ * descoberta implícita.
+ *
+ * @param {CopilotClient} client
+ * @param {string | null} savedSessionId
+ * @param {Record<string, unknown>} opts
+ * @returns {Promise<Awaited<ReturnType<typeof resumeOrCreateAgentSdkSession>>>}
+ */
+async function resumeOrCreateWithConfigDiscoveryGuard(client, savedSessionId, opts) {
+    try {
+        return await resumeOrCreateAgentSdkSession(client, savedSessionId, opts);
+    } catch (error) {
+        if (opts['enableConfigDiscovery'] !== true || !isConfigDiscoveryToolCollisionError(error)) {
+            throw error;
+        }
+        log(
+            'WARN',
+            `[PersistentSession] enableConfigDiscovery causou colisão de tools (${toError(error).message}). ` +
+                'Retentando sessão com descoberta automática desligada e mantendo mcpServers/skillDirectories explícitos.',
+        );
+        return resumeOrCreateAgentSdkSession(client, savedSessionId, {
+            ...opts,
+            enableConfigDiscovery: false,
+        });
+    }
+}
+
+/**
+ * @param {CopilotClient} client
+ * @param {Record<string, unknown>} opts
+ * @returns {Promise<Awaited<ReturnType<typeof createAgentSdkSessionByClient>>>}
+ */
+async function createWithConfigDiscoveryGuard(client, opts) {
+    try {
+        return await createAgentSdkSessionByClient(client, opts);
+    } catch (error) {
+        if (opts['enableConfigDiscovery'] !== true || !isConfigDiscoveryToolCollisionError(error)) {
+            throw error;
+        }
+        log(
+            'WARN',
+            `[PersistentSession] createSession falhou com enableConfigDiscovery (${toError(error).message}). ` +
+                'Retentando criação com descoberta automática desligada.',
+        );
+        return createAgentSdkSessionByClient(client, {
+            ...opts,
+            enableConfigDiscovery: false,
+        });
+    }
+}
+
+/**
  * Verifica se uma sessao retomada responde a uma chamada leve antes de declarar sucesso.
  *
  * @param {CopilotSession} session
@@ -304,10 +367,10 @@ export async function initOrResumeSession(client, sessionOptions) {
             savedSessionId = null;
         }
     }
-    let result = await resumeOrCreateAgentSdkSession(client, savedSessionId, opts);
+    let result = await resumeOrCreateWithConfigDiscoveryGuard(client, savedSessionId, opts);
     if (result.isResumed && !(await _validateResumedSession(result.session))) {
         log('WARN', '[PersistentSession] Sessão retomada não passou no health-check — criando nova sessão.');
-        result = await createAgentSdkSessionByClient(client, opts);
+        result = await createWithConfigDiscoveryGuard(client, opts);
     }
 
     const requestedNativeAutoModel = model === 'auto';

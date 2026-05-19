@@ -293,6 +293,45 @@ describe('terminal/events/agent-runtime-events.js — contrato', () => {
         expect(println.mock.calls.filter(([line]) => String(line).includes('read_file_content'))).toHaveLength(1);
     });
 
+    it('preserva alvo da tool quando completion chega sem toolName e com toolCallId divergente', async () => {
+        const { setupTerminalAgentRuntimeEventListeners } =
+            await import('../../../src/copilot/terminal/events/agent-runtime-events.js');
+        /** @type {Map<string, Function[]>} */
+        const listeners = new Map();
+        const agent = {
+            on: vi.fn((event, handler) => {
+                const list = listeners.get(event) ?? [];
+                list.push(handler);
+                listeners.set(event, list);
+            }),
+            off: vi.fn(),
+        };
+
+        setupTerminalAgentRuntimeEventListeners({ agent: /** @type {any} */ (agent), rl: null });
+        listeners.get('tool.execution_start')?.[0]?.({
+            toolCallId: 'start-call',
+            toolName: 'read_file_content',
+            args: { path: 'package.json' },
+        });
+        println.mockClear();
+        listeners.get('tool.execution_complete')?.[0]?.({
+            toolCallId: 'complete-call-from-sdk',
+            success: true,
+        });
+
+        expect(println).toHaveBeenCalledWith(expect.stringContaining('package.json'));
+        expect(completeTerminalTurnToolCall).toHaveBeenCalledWith({ toolCallId: 'start-call', success: true });
+        expect(broadcastSse).toHaveBeenCalledWith(
+            'tool.lifecycle',
+            expect.objectContaining({
+                type: 'complete',
+                path: 'package.json',
+                toolCallId: 'start-call',
+                toolName: 'read_file_content',
+            }),
+        );
+    });
+
     it('promove report_intent_local para intent persistente e visível no terminal', async () => {
         const { setupTerminalAgentRuntimeEventListeners } =
             await import('../../../src/copilot/terminal/events/agent-runtime-events.js');

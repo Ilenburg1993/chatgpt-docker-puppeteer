@@ -328,6 +328,8 @@ export function buildSessionOptions(ctx, host, { tools, busHooks }) {
         .clientName('chatgpt-docker-puppeteer')
         .workingDirectory(bootConfig.workspace.root)
         .skillDirectories(bootConfig.skills.skillDirectories)
+        .enableConfigDiscovery(bootConfig.sessionDefaults.enableConfigDiscovery)
+        .includeSubAgentStreamingEvents(bootConfig.sessionDefaults.includeSubAgentStreamingEvents)
         .onPermissionRequest(getPermissionHandler(ctx))
         .tools(tools)
         .excludedTools(excludedTools);
