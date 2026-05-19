@@ -1,14 +1,19 @@
 // @ts-check
 /**
- * Buffer transitório de mensagens `assistant.message` recebidas durante um turno explícito.
+ * Facade legado do buffer de `assistant.message`.
  *
- * O renderer visual não pode descartar mensagens só porque `busy=true`: em algumas versões/rotas do SDK, o retorno
- * síncrono do turno pode vir vazio enquanto o evento `assistant.message` contém a resposta textual real.
+ * A materialização canônica do turno vive em `turn-materialization-state.js` e também captura deltas incrementais. Este
+ * módulo permanece para compatibilidade com testes/callers antigos enquanto todo fluxo novo usa a API de materialização.
  *
  * @module copilot/terminal/state/assistant-message-buffer-state
  */
 
-const MAX_BUFFERED_ASSISTANT_MESSAGES = 8;
+import {
+    clearTerminalTurnMaterialization,
+    readTerminalTurnAssistantMessages,
+    recordTerminalTurnAssistantMessage,
+    takeLatestTerminalTurnAssistantMessage,
+} from './turn-materialization-state.js';
 
 /**
  * @typedef {{
@@ -19,14 +24,11 @@ const MAX_BUFFERED_ASSISTANT_MESSAGES = 8;
  * }} BufferedAssistantMessage
  */
 
-/** @type {BufferedAssistantMessage[]} */
-let _bufferedAssistantMessages = [];
-
 /**
  * @returns {void}
  */
 export function clearTerminalBufferedAssistantMessages() {
-    _bufferedAssistantMessages = [];
+    clearTerminalTurnMaterialization();
 }
 
 /**
@@ -34,26 +36,14 @@ export function clearTerminalBufferedAssistantMessages() {
  * @returns {BufferedAssistantMessage | null}
  */
 export function recordTerminalBufferedAssistantMessage(input) {
-    const content = input.content.trim();
-    if (!content) return null;
-    const entry = {
-        content,
-        kind: input.kind ?? 'message',
-        source: input.source ?? 'sdk/assistant.message',
-        timestamp: input.timestamp ?? Date.now(),
-    };
-    _bufferedAssistantMessages.push(entry);
-    if (_bufferedAssistantMessages.length > MAX_BUFFERED_ASSISTANT_MESSAGES) {
-        _bufferedAssistantMessages = _bufferedAssistantMessages.slice(-MAX_BUFFERED_ASSISTANT_MESSAGES);
-    }
-    return { ...entry };
+    return recordTerminalTurnAssistantMessage(input);
 }
 
 /**
  * @returns {BufferedAssistantMessage[]}
  */
 export function readTerminalBufferedAssistantMessages() {
-    return _bufferedAssistantMessages.map((entry) => ({ ...entry }));
+    return readTerminalTurnAssistantMessages();
 }
 
 /**
@@ -62,8 +52,5 @@ export function readTerminalBufferedAssistantMessages() {
  * @returns {BufferedAssistantMessage | null}
  */
 export function takeLatestTerminalBufferedAssistantMessage() {
-    const latest = _bufferedAssistantMessages.at(-1) ?? null;
-    clearTerminalBufferedAssistantMessages();
-    return latest ? { ...latest } : null;
+    return takeLatestTerminalTurnAssistantMessage();
 }
-

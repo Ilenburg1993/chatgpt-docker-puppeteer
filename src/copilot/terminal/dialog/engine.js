@@ -38,7 +38,12 @@ import {
 } from '../frontend/gateways/index.js';
 import { normalizeTerminalModelBillingProjection } from '../frontend/projections/index.js';
 import { markTerminalActivityIdle, recordTerminalActivity } from '../state/dialog/index.js';
-import { takeLatestTerminalBufferedAssistantMessage } from '../state/events/index.js';
+import {
+    beginTerminalTurnMaterialization,
+    clearTerminalTurnMaterialization,
+    completeTerminalTurnMaterialization,
+    recordTerminalTurnDelta,
+} from '../state/events/index.js';
 import { drainPendingNotifications, getPersistenceFailureCount, persistTurnToHub } from './engine-persistence.js';
 import {
     BOOT_PROMPT,
@@ -447,6 +452,7 @@ async function _executeTurn(message, actor, attachments = [], requestHeaders = n
     });
 
     setBusy(true);
+    beginTerminalTurnMaterialization({ timestamp: t0, source: 'terminal/explicit-turn' });
     recordTerminalActivity('turn', actor === 'llm-a' ? 'Processando mensagem da LLM-A' : 'Processando mensagem', {
         detail: message.slice(0, 120),
         source: 'dialog',
@@ -586,6 +592,7 @@ async function _executeTurn(message, actor, attachments = [], requestHeaders = n
         /** @type {(chunk: string) => void} */
         const onDelta = (chunk) => {
             if (liveTurnSignal.firstOutputAt === 0) liveTurnSignal.firstOutputAt = Date.now();
+            recordTerminalTurnDelta({ chunk, source: 'dialog/onDelta' });
             renderDeltaChunk(chunk);
         };
 
@@ -595,32 +602,31 @@ async function _executeTurn(message, actor, attachments = [], requestHeaders = n
             onReasoning,
             ...(requestHeaders ? { requestHeaders } : {}),
         });
-        const bufferedAssistantMessage = takeLatestTerminalBufferedAssistantMessage();
-        const reply =
-            typeof turnResult.reply === 'string' && turnResult.reply.trim().length > 0
-                ? turnResult.reply
-                : (bufferedAssistantMessage?.content ?? turnResult.reply);
-        const effectiveReplySource =
-            typeof turnResult.reply === 'string' && turnResult.reply.trim().length > 0
-                ? turnResult.replySource
-                : bufferedAssistantMessage
-                  ? 'assistant_message_buffer'
-                  : turnResult.replySource;
+        const materializedReply = completeTerminalTurnMaterialization({
+            directReply: turnResult.reply,
+            directSource: turnResult.replySource,
+        });
+        const reply = materializedReply.reply ?? turnResult.reply;
+        const effectiveReplySource = materializedReply.source;
         const durationMs = Date.now() - t0;
         const replyVisibleChars = typeof reply === 'string' ? measureVisibleTerminalChars(reply) : 0;
 
         recordTerminalActivity('turn', 'Reply do turno explícito resolvido', {
             detail:
                 `canal=${turnResult.channel} · source=${effectiveReplySource} · ` +
-                `chars=${typeof reply === 'string' ? reply.length : 0} · visíveis=${replyVisibleChars}`,
+                `detail=${materializedReply.sourceDetail} · chars=${typeof reply === 'string' ? reply.length : 0} · ` +
+                `visíveis=${replyVisibleChars} · deltas=${materializedReply.diagnostics.deltaSlices}/${materializedReply.diagnostics.deltaChars}ch · ` +
+                `assistantMessages=${materializedReply.diagnostics.assistantMessageCount}`,
             source: 'dialog',
             recordHistory: false,
         });
 
-        if (effectiveReplySource === 'transport_mirror') {
-            log('INFO', '[TerminalServer] Turno explícito renderizado usando espelho canônico de dialog.reply.');
-        } else if (effectiveReplySource === 'assistant_message_buffer') {
-            log('INFO', '[TerminalServer] Turno explícito renderizado usando buffer canônico de assistant.message.');
+        if (effectiveReplySource === 'direct_reply') {
+            log('INFO', '[TerminalServer] Turno explícito renderizado usando reply direto do transporte.');
+        } else if (effectiveReplySource === 'assistant_message') {
+            log('INFO', '[TerminalServer] Turno explícito renderizado usando materialização de assistant.message.');
+        } else if (effectiveReplySource === 'stream_delta') {
+            log('WARN', '[TerminalServer] Turno explícito renderizado usando materialização de deltas incrementais.');
         } else if (effectiveReplySource === 'empty') {
             log('WARN', '[TerminalServer] Turno explícito concluído sem reply textual materializado no transporte.');
         }
@@ -713,6 +719,7 @@ async function _executeTurn(message, actor, attachments = [], requestHeaders = n
 
         return reply;
     } catch (e) {
+        clearTerminalTurnMaterialization();
         recordTerminalActivity('error', 'Erro no turno', {
             detail: toError(e).message,
             severity: 'error',

@@ -863,3 +863,68 @@ export function handleTerminalIoToolLifecycle({ registry, entry }) {
         }),
     );
 }
+
+/**
+ * Reconcilia tools que o SDK deixou sem completion explícito quando o turno terminou.
+ *
+ * Isso é deliberadamente visível como `warn`: o terminal não deve mascarar perda de evento de lifecycle, mas também não
+ * pode manter `/activity` preso em uma tool fantasma depois de `assistant.turn_end`.
+ *
+ * @param {{
+ *     registry: ReturnType<import('../state/tool-call-registry.js').createToolCallRegistry>;
+ *     reason?: string;
+ * }} input
+ * @returns {number}
+ */
+export function reconcileTerminalInFlightToolsAtTurnEnd({ registry, reason = 'assistant.turn_end' }) {
+    const entries = registry.getAllInFlight();
+    let reconciled = 0;
+    for (const entry of entries) {
+        const presentation =
+            entry.presentation ??
+            buildTerminalToolActivityPresentation(
+                {
+                    toolName: entry.toolName,
+                    args: entry.rawArgs,
+                },
+                entry.canonicalName ?? entry.toolName,
+            );
+        const completedEntry = registry.complete(entry.toolCallId, true) ?? entry;
+        const durationMs = Math.max(0, Date.now() - completedEntry.t0);
+        const durationLabel = buildToolCompletionDurationLabel(completedEntry, durationMs);
+        const canonicalName = presentation.canonicalToolName ?? entry.canonicalName ?? entry.toolName;
+        completeTerminalTurnToolCall({ toolCallId: entry.toolCallId, success: true });
+        recordToolTurnProjection(presentation, 'completed', entry.toolCallId, true);
+        recordTerminalActivity('tool', 'Tool reconciliada no fim do turno', {
+            detail: `${canonicalName} sem completion explícito (${reason}) · ${durationLabel}`,
+            toolName: canonicalName,
+            severity: 'warn',
+            source: 'sdk',
+        });
+        if (getShowToolActivity()) {
+            println(
+                `  ${terminalThemeBadge('warn', 'SYNC')} ${terminalThemeText('tool', canonicalName)} ${terminalThemeText('muted', '·')} ${terminalThemeText('warn', `completion inferida no turn_end · ${durationLabel}`)}`,
+            );
+        }
+        broadcastSse(
+            'tool.lifecycle',
+            buildToolLifecycleComplete({
+                toolCallId: entry.toolCallId,
+                toolName: entry.toolName,
+                canonicalName,
+                operation: presentation.operation,
+                path: presentation.path,
+                target: presentation.target,
+                fileTargets: presentation.fileTargets,
+                urlTargets: presentation.urlTargets,
+                searchTerms: presentation.searchTerms,
+                lineRange: presentation.lineRange,
+                patchFiles: presentation.patchFiles,
+                success: true,
+                durationMs,
+            }),
+        );
+        reconciled++;
+    }
+    return reconciled;
+}

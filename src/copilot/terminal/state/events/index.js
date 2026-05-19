@@ -8,6 +8,16 @@ export {
 } from '../assistant-message-buffer-state.js';
 export { markTerminalActivityIdle, recordTerminalActivity, terminalActivityEmitter } from '../activity-state.js';
 export {
+    beginTerminalTurnMaterialization,
+    clearTerminalTurnMaterialization,
+    completeTerminalTurnMaterialization,
+    readTerminalTurnAssistantMessages,
+    readTerminalTurnMaterialization,
+    recordTerminalTurnAssistantMessage,
+    recordTerminalTurnDelta,
+    takeLatestTerminalTurnAssistantMessage,
+} from '../turn-materialization-state.js';
+export {
     appendTerminalIntent,
     clearTerminalIntentHistory,
     normalizeTerminalIntentRisk,

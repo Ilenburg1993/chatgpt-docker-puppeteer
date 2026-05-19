@@ -396,6 +396,15 @@ export const TERMINAL_MODULE_LAYOUT = Object.freeze([
         summary: 'Estado canônico de resumo por turno para tools, arquivos tocados e activity projections.',
     },
     {
+        path: 'state/turn-materialization-state.js',
+        kind: 'file',
+        role: 'state',
+        tier: 'secondary',
+        risk: 'hotspot',
+        public: true,
+        summary: 'Materializa reply direto, assistant.message e deltas incrementais em uma resposta final canônica.',
+    },
+    {
         path: 'state/rate-limiter-state.js',
         kind: 'file',
         role: 'state',

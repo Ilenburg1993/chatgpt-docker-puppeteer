@@ -81,19 +81,19 @@ import {
     readTerminalToolRegistrySnapshot,
 } from '../frontend/gateways/index.js';
 import {
+    beginTerminalTurnMaterialization,
     beginTerminalTurnTrace,
-    clearTerminalBufferedAssistantMessages,
     completeTerminalTurnTrace,
     createToolCallRegistry,
     getTerminalDetailLevel,
     markTerminalActivityIdle,
-    recordTerminalBufferedAssistantMessage,
     recordTerminalActivity,
     recordTerminalElicitationCompleted,
     recordTerminalElicitationPending,
     recordTerminalPermissionCompleted,
     recordTerminalPermissionModeChanged,
     recordTerminalPermissionRequested,
+    recordTerminalTurnAssistantMessage,
     recordTerminalTurnFileActivity,
     recordTerminalTurnUserInputActivity,
     recordTerminalUserInputCompleted,
@@ -107,6 +107,7 @@ import {
     handleTerminalExternalToolCompleted,
     handleTerminalExternalToolRequested,
     handleTerminalToolUserRequested,
+    reconcileTerminalInFlightToolsAtTurnEnd,
 } from './tool-lifecycle-runtime.js';
 import { buildTerminalToolActivityPresentation } from './tool-activity-presenter.js';
 
@@ -274,7 +275,7 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
 
     const onAssistantTurnStart = (/** @type {{ turnId?: string | null }} */ evt) => {
         const turnId = evt?.turnId ?? null;
-        clearTerminalBufferedAssistantMessages();
+        beginTerminalTurnMaterialization({ turnId, source: 'sdk/assistant.turn_start' });
         beginTerminalTurnTrace({ turnId });
         broadcastSse('assistant.turn_start', {
             turnId,
@@ -284,6 +285,7 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
 
     const onAssistantTurnEnd = (/** @type {{ turnId?: string | null }} */ evt) => {
         const turnId = evt?.turnId ?? null;
+        reconcileTerminalInFlightToolsAtTurnEnd({ registry: _reg, reason: 'assistant.turn_end' });
         const trace = completeTerminalTurnTrace({ turnId });
         recordTerminalActivity('turn', 'Turno do assistente concluído', {
             detail: turnId ? `turnId=${turnId}` : 'resposta concluída',
@@ -322,7 +324,7 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
             timestamp: Date.now(),
         });
         if (getBusy()) {
-            recordTerminalBufferedAssistantMessage({
+            recordTerminalTurnAssistantMessage({
                 content: normalized.content,
                 kind: normalized.kind,
                 source: 'sdk/assistant.message',

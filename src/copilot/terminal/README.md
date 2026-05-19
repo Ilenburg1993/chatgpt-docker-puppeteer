@@ -59,6 +59,7 @@ também declara `risk` e scorecard para orientar a ordem de decomposição.
 | `events/agent-runtime-events.js`         | tradução dedicada dos sinais normalizados do runtime/agent para stdout/SSE |
 | `events/tool-activity-presenter.js`      | narrativa operacional de tools, arquivos e comandos para o streaming live  |
 | `state/turn-trace-state.js`              | resumo canônico por turno de tools/arquivos tocados para `/activity`       |
+| `state/turn-materialization-state.js`    | materialização canônica de reply direto, `assistant.message` e deltas      |
 | `events/task-stream-events.js`           | render e SSE do streaming de tarefas internas (`task.*`)                   |
 | `events/task-transcript-accumulator.js`  | promoção elástica de deltas de tarefa para transcript persistente          |
 | `events/assistant-transcript-renderer.js` | renderer persistente de mensagens da LLM-B fora do turno ativo             |
@@ -143,6 +144,20 @@ Se algo já existe no SDK vanilla — por exemplo:
 
 o terminal deve **observar e ampliar** esse comportamento, não recriá-lo localmente.
 
+## Materialização de turno
+
+O terminal trata cada envio explícito como um turno materializado por fontes concorrentes:
+
+- reply direto do transporte (`runTerminalDialogTurnDetailed`);
+- `assistant.message` do SDK durante `busy=true`;
+- deltas incrementais (`onDelta`) quando a resposta final textual não chega pelo transporte.
+
+A prioridade canônica é: `direct_reply` > `assistant_message` > `stream_delta` > `empty`. A
+materialização vive em `state/turn-materialization-state.js`; `dialog/engine.js` apenas registra
+deltas e consome o resultado final. Isso impede que a UX mascare uma falha do backend: `/activity`
+e logs recebem a fonte usada, contagem de deltas, caracteres visíveis e quantidade de mensagens
+SDK observadas no turno.
+
 ## Acesso ao runtime
 
 O terminal ainda tem módulos que operam diretamente sobre a façade pública do agent, mas a direção
@@ -193,6 +208,8 @@ Deve sair do `terminal/` quando virar:
   operações;
 - `state/turn-trace-state.js` reconcilia `assistant.turn_*`, tools e alterações de workspace em um
   resumo por turno exibido por `/activity`;
+- `state/turn-materialization-state.js` reconcilia reply direto, `assistant.message` e delta parcial
+  em uma única resposta materializada do turno;
 - `events/task-stream-events.js` concentra a narrativa do streaming de tarefas internas do runtime;
 - `events/intent-renderer.js` promove `assistant.intent`, `report_intent` e `report_intent_local`
   para bloco visível, `/intent`, `/activity`, SSE e transcript persistente;

@@ -19,8 +19,15 @@ const FILE_OPERATION_PATTERNS = /** @type {const} */ ([
     { match: /\b(list|ls|glob|find|search)\b/i, operation: 'list', label: 'inspecionando arquivos' },
 ]);
 
+const INSPECTION_TOOL_PATTERNS = /** @type {const} */ ([
+    { match: /\b(get|read|show)\s+(workspace|agent|system|session)\s+(info|state|context)\b/i, label: 'inspecionando contexto' },
+    { match: /\b(get|show)\s+(telemetry|metrics|health|status|capabilities)\b/i, label: 'inspecionando diagnóstico' },
+    { match: /\b(list|show)\s+(available\s+)?tools\b/i, label: 'inspecionando tools' },
+    { match: /\b(skill|invoke\s+skill|task|todo)\b/i, label: 'inspecionando recurso do agente' },
+]);
+
 /**
- * @typedef {'read' | 'write' | 'edit' | 'delete' | 'list' | 'run' | 'unknown'} TerminalToolOperation
+ * @typedef {'read' | 'write' | 'edit' | 'delete' | 'list' | 'run' | 'inspect' | 'unknown'} TerminalToolOperation
  *
  * @typedef {{
  *     toolName: string;
@@ -149,10 +156,16 @@ function inferOperation(toolName, path) {
     }
 
     if (/\b(report|intent|telemetry|diagnostic|health|status)\b/i.test(normalized)) {
-        return { operation: 'run', label: 'executando diagnóstico' };
+        return { operation: 'inspect', label: 'inspecionando diagnóstico' };
     }
     if (/\b(ask user|request user input|permission|elicitation)\b/i.test(normalized)) {
         return { operation: 'run', label: 'coletando decisão humana' };
+    }
+
+    for (const pattern of INSPECTION_TOOL_PATTERNS) {
+        if (pattern.match.test(normalized)) {
+            return { operation: 'inspect', label: pattern.label };
+        }
     }
 
     for (const pattern of FILE_OPERATION_PATTERNS) {
@@ -163,11 +176,11 @@ function inferOperation(toolName, path) {
             };
         }
     }
-    if (path) return { operation: 'unknown', label: 'operando arquivo' };
+    if (path) return { operation: 'inspect', label: 'operando arquivo' };
     if (/\b(shell|terminal|exec|bash|npm|node|test)\b/i.test(normalized)) {
         return { operation: 'run', label: 'executando comando' };
     }
-    return { operation: 'unknown', label: 'executando tool genérica' };
+    return { operation: 'inspect', label: 'executando tool genérica' };
 }
 
 /**

@@ -47,6 +47,7 @@ vi.mock('../../../src/copilot/terminal/state/activity-state.js', () => ({
     recordTerminalActivity: mocks.recordTerminalActivity,
 }));
 vi.mock('../../../src/copilot/terminal/dialog/index.js', () => ({
+    SEPARATOR: '---',
     broadcastSse: mocks.broadcastSse,
     println: mocks.println,
 }));
@@ -232,6 +233,32 @@ describe('sdk-session-events.js — integração com ToolCallRegistry', () => {
 
         expect(mocks.println).toHaveBeenCalledWith(expect.stringContaining('package.json'));
         expect(registry.isNameInFlight('read_file_content')).toBe(false);
+    });
+
+    it('reconcilia tool nativa sem completion explícito no assistant.turn_end', async () => {
+        const { setupTerminalSdkSessionEventListeners } =
+            await import('../../../src/copilot/terminal/events/sdk-session-events.js');
+        const { handleTerminalNativeToolStart } =
+            await import('../../../src/copilot/terminal/events/tool-lifecycle-runtime.js');
+        const agent = createAgentHost();
+        const registry = createToolCallRegistry();
+
+        setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfIdle: vi.fn(), registry });
+        handleTerminalNativeToolStart({
+            registry,
+            evt: {
+                toolCallId: 'native-intent-orphan',
+                toolName: 'report_intent',
+                args: { intent: 'teste' },
+            },
+        });
+        expect(registry.isNameInFlight('report_intent')).toBe(true);
+
+        agent.emit('assistant.turn_end', { turnId: 'turn-orphan' });
+
+        expect(registry.isNameInFlight('report_intent')).toBe(false);
+        expect(registry.wasRecentlyCompleted('native-intent-orphan')).toBe(true);
+        expect(mocks.println).toHaveBeenCalledWith(expect.stringContaining('[SYNC]'));
     });
 
     it('onSessionShutdown chama registry.clear()', async () => {

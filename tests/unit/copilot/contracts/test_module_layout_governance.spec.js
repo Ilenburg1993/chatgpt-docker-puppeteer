@@ -494,6 +494,7 @@ describe('W114 — module layout governance: terminal root', () => {
             'state/',
             'state/display-policy.js',
             'state/sdk-interactions.js',
+            'state/turn-materialization-state.js',
             'state/turn-trace-state.js',
             'wiring/',
             'wiring/terminal-agent-wiring.js',

@@ -76,8 +76,12 @@ export const TOOL_ALIASES = {
     run_tests: [],
     typecheck: [],
     get_system_health: [],
+    get_workspace_info: [],
+    get_agent_info: [],
+    get_telemetry: [],
 
     // Tools utilitárias
+    request_user_input: ['ask_user'],
     patch_file: ['str_replace_editor', 'edit'],
     diff_files: [],
     toggle_tool: [],

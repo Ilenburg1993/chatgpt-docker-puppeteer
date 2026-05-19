@@ -57,4 +57,26 @@ describe('terminal/tool-activity-presenter', () => {
         expect(presentation.lineRange).toEqual({ start: 10, end: 18 });
         expect(presentation.completeLine(true, '0.2s')).toContain('linhas 10-18');
     });
+
+    it('classifica tools de introspecção sem badge UNKNOWN', () => {
+        const workspace = buildTerminalToolActivityPresentation({
+            toolName: 'get_workspace_info',
+            args: {},
+        });
+        const telemetry = buildTerminalToolActivityPresentation({
+            toolName: 'get_telemetry',
+            args: {},
+        });
+        const intent = buildTerminalToolActivityPresentation({
+            toolName: 'report_intent',
+            args: { intent: 'validar UX do terminal' },
+        });
+
+        expect(workspace.canonicalToolName).toBe('get_workspace_info');
+        expect(workspace.operation).toBe('inspect');
+        expect(workspace.detail).toContain('inspecionando contexto');
+        expect(telemetry.operation).toBe('inspect');
+        expect(intent.canonicalToolName).toBe('report_intent_local');
+        expect(intent.operation).toBe('inspect');
+    });
 });
