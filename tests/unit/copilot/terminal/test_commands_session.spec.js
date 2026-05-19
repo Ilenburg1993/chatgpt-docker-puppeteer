@@ -344,10 +344,15 @@ describe('commands/session — sync commands', () => {
         answerPendingQuestion.mockReturnValue(true);
         altAnswerPendingQuestion.mockClear();
         altAnswerPendingQuestion.mockReturnValue(true);
+        defaultRuntime.dialogLoopActive = false;
+        defaultRuntime.status = 'idle';
         defaultRuntime.pendingQuestion = null;
         defaultRuntime.pendingQuestionKind = null;
         defaultRuntime.pendingQuestionShadowExpired = true;
         defaultRuntime.pendingQuestionShadowState = 'expired';
+        defaultRuntime.pendingQuestionShadow = null;
+        altRuntime.dialogLoopActive = true;
+        altRuntime.status = 'waiting_for_input';
         altRuntime.pendingQuestion = null;
         altRuntime.pendingQuestionKind = null;
     });
@@ -359,6 +364,7 @@ describe('commands/session — sync commands', () => {
         expect(ctx.output()).toContain('gpt-5-mini');
         expect(ctx.output()).toContain('healthy');
         expect(ctx.output()).toContain('modo SDK');
+        expect(ctx.output()).toContain('canal input');
         expect(ctx.output()).not.toContain('plan local');
         expect(ctx.output()).toContain('bg tasks');
         expect(ctx.output()).toContain('display');
@@ -377,6 +383,25 @@ describe('commands/session — sync commands', () => {
         expect(ctx.output()).toContain('sdk↔fs route');
         expect(ctx.output()).toContain('coleta ctx');
         expect(ctx.output()).toContain('/sdk doctor');
+    });
+
+    it('cmdStatus e cmdNow distinguem loop ativo em standby sem ask_user vivo', () => {
+        defaultRuntime.dialogLoopActive = true;
+        defaultRuntime.pendingQuestion = null;
+        defaultRuntime.pendingQuestionKind = null;
+        defaultRuntime.pendingQuestionShadow = null;
+        defaultRuntime.pendingQuestionShadowState = null;
+        defaultRuntime.pendingQuestionShadowExpired = false;
+        const statusCtx = mockCtx();
+        const nowCtx = mockCtx();
+
+        cmdStatus({ hubSessionId: 'hub-1', injectPort: 3009, println: statusCtx.println });
+        cmdNow({ hubSessionId: 'hub-1', injectPort: 3009, println: nowCtx.println });
+
+        expect(statusCtx.output()).toContain('standby sem READY vivo');
+        expect(statusCtx.output()).toContain('recovery sob demanda');
+        expect(nowCtx.output()).toContain('live=ready');
+        expect(nowCtx.output()).toContain('channel=standby');
     });
 
     it('cmdStatus destaca mismatch de modelo cobrado/configurado', () => {

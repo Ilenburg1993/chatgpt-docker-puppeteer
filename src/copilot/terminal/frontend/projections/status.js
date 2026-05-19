@@ -91,6 +91,13 @@ function objectOrNull(value) {
  *     latestPermissionType: string | null;
  *     pendingUserInputs: number;
  *     pendingStructuredUserInputs: number;
+ *     dialogInputChannel: {
+ *         state: 'offline' | 'paused' | 'ready' | 'standby' | 'waiting-human' | 'shadow' | 'missing' | 'processing';
+ *         label: string;
+ *         detail: string;
+ *         canAcceptTurn: boolean;
+ *         recoveryExpected: boolean;
+ *     };
  *     latestUserInput: ReturnType<typeof readTerminalUserInputSummary>['latest'];
  *     latestStructuredUserInput: ReturnType<typeof listTerminalPendingStructuredUserInputs>[number] | null;
  *     latestUserInputKind: 'question' | 'ready' | 'reply' | 'stopped' | null;
@@ -265,6 +272,16 @@ export function readTerminalStatusProjection({ hubSessionId = null, injectPort, 
         latestPermissionType: permissionSummary.latest?.permissionType ?? null,
         pendingUserInputs: userInputSummary.pending,
         pendingStructuredUserInputs: getTerminalPendingStructuredUserInputCount(),
+        dialogInputChannel: buildDialogInputChannelProjection({
+            dialogLoopActive: base.dialogLoopActive,
+            dialogPaused: base.dialogPaused,
+            runtimeStatus: String(base.snap['status'] ?? 'unknown'),
+            pendingQuestion: pendingQuestion !== null,
+            pendingQuestionKind: base.pendingQuestionKind,
+            pendingQuestionShadow: pendingQuestionShadow !== null,
+            pendingQuestionShadowKind: base.pendingQuestionShadowKind,
+            pendingQuestionShadowExpired: base.pendingQuestionShadowExpired,
+        }),
         latestUserInput: userInputSummary.latest ?? null,
         latestStructuredUserInput: listTerminalPendingStructuredUserInputs().at(-1) ?? null,
         latestUserInputKind: userInputSummary.latest?.kind ?? null,
@@ -274,5 +291,112 @@ export function readTerminalStatusProjection({ hubSessionId = null, injectPort, 
         instructionLoad,
         sdkFsRouting,
         ioRuntime,
+    };
+}
+
+/**
+ * Projeta a diferença entre a sessão SDK viva, o dialog loop ativo e o canal `ask_user` materializado.
+ *
+ * Um loop ativo e idle sem READY vivo não é necessariamente falha: no modo de sessão retomada, o próximo turno pode
+ * usar recovery/direct dispatch sob demanda. O estado `missing` fica reservado para o caso mais suspeito: runtime
+ * `waiting_for_input` sem pergunta viva.
+ *
+ * @param {{
+ *     dialogLoopActive: boolean;
+ *     dialogPaused: boolean;
+ *     runtimeStatus: string;
+ *     pendingQuestion: boolean;
+ *     pendingQuestionKind: import('../../../presentation/contracts/index.js').RuntimePendingQuestionKind | null;
+ *     pendingQuestionShadow: boolean;
+ *     pendingQuestionShadowKind: import('../../../presentation/contracts/index.js').RuntimePendingQuestionKind | null;
+ *     pendingQuestionShadowExpired: boolean;
+ * }} input
+ * @returns {{
+ *     state: 'offline' | 'paused' | 'ready' | 'standby' | 'waiting-human' | 'shadow' | 'missing' | 'processing';
+ *     label: string;
+ *     detail: string;
+ *     canAcceptTurn: boolean;
+ *     recoveryExpected: boolean;
+ * }}
+ */
+function buildDialogInputChannelProjection(input) {
+    if (input.dialogPaused) {
+        return {
+            state: 'paused',
+            label: 'pausado',
+            detail: 'dialog loop pausado; input humano não será entregue ao modelo até resume',
+            canAcceptTurn: false,
+            recoveryExpected: false,
+        };
+    }
+    if (!input.dialogLoopActive) {
+        return {
+            state: 'offline',
+            label: 'offline',
+            detail: 'dialog loop inativo; próximo turno precisa iniciar ou retomar o loop',
+            canAcceptTurn: false,
+            recoveryExpected: true,
+        };
+    }
+    if (input.pendingQuestion) {
+        if (input.pendingQuestionKind === 'ready') {
+            return {
+                state: 'ready',
+                label: 'READY vivo',
+                detail: 'ask_user protocolar READY está aguardando a próxima mensagem',
+                canAcceptTurn: true,
+                recoveryExpected: false,
+            };
+        }
+        if (input.pendingQuestionKind === 'question' || input.pendingQuestionKind === null) {
+            return {
+                state: 'waiting-human',
+                label: 'pergunta humana',
+                detail: 'ask_user humano está pendente; a próxima linha responde a pergunta',
+                canAcceptTurn: false,
+                recoveryExpected: false,
+            };
+        }
+        return {
+            state: 'processing',
+            label: `protocolo ${input.pendingQuestionKind}`,
+            detail: 'mensagem protocolar transitória do dialog loop está em processamento',
+            canAcceptTurn: false,
+            recoveryExpected: false,
+        };
+    }
+    if (input.pendingQuestionShadow && !input.pendingQuestionShadowExpired) {
+        return {
+            state: 'shadow',
+            label: `shadow ${input.pendingQuestionShadowKind ?? 'unknown'}`,
+            detail: 'há shadow persistida de ask_user sem pergunta viva; recovery pode reaproveitar ou limpar',
+            canAcceptTurn: input.pendingQuestionShadowKind === 'ready',
+            recoveryExpected: true,
+        };
+    }
+    if (input.runtimeStatus === 'idle') {
+        return {
+            state: 'standby',
+            label: 'standby sem READY vivo',
+            detail: 'session e loop estão ativos; próximo turno usa recovery/direct dispatch sob demanda',
+            canAcceptTurn: true,
+            recoveryExpected: true,
+        };
+    }
+    if (input.runtimeStatus === 'waiting_for_input') {
+        return {
+            state: 'missing',
+            label: 'ask_user ausente',
+            detail: 'runtime aguarda input, mas não há pergunta viva materializada no terminal',
+            canAcceptTurn: false,
+            recoveryExpected: true,
+        };
+    }
+    return {
+        state: 'processing',
+        label: input.runtimeStatus,
+        detail: 'runtime não está idle; input ordinário deve aguardar o turno atual',
+        canAcceptTurn: false,
+        recoveryExpected: false,
     };
 }

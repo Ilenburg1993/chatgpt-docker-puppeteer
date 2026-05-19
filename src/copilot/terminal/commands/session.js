@@ -89,6 +89,15 @@ export function cmdStatus({ hubSessionId, injectPort, println }, arg = '') {
           ? projection.pendingQuestionShadowText.slice(0, 80) +
             (projection.pendingQuestionShadowText.length > 80 ? '…' : '')
           : null;
+    const inputChannel = projection.dialogInputChannel;
+    const inputChannelColor =
+        inputChannel.state === 'ready' || inputChannel.state === 'standby'
+            ? '\x1b[32m'
+            : inputChannel.state === 'waiting-human' || inputChannel.state === 'shadow' || inputChannel.state === 'paused'
+              ? '\x1b[33m'
+              : inputChannel.state === 'offline' || inputChannel.state === 'missing'
+                ? '\x1b[31m'
+                : '\x1b[90m';
     const shadowExpiry =
         typeof projection.pendingQuestionShadowExpiresAt === 'number'
             ? new Date(projection.pendingQuestionShadowExpiresAt).toISOString()
@@ -215,6 +224,7 @@ export function cmdStatus({ hubSessionId, injectPort, println }, arg = '') {
         health           ${health ? `${healthColor}${health['status']}\x1b[0m` : '\x1b[90m(n/d)\x1b[0m'}
   dialog loop      ${active ? '\x1b[32m● ativo\x1b[0m' : '\x1b[31m○ inativo\x1b[0m'}
   ask_user         ${askUserStatus}
+  canal input      ${inputChannelColor}${inputChannel.label}\x1b[0m \x1b[90m(${inputChannel.state}${inputChannel.recoveryExpected ? ' · recovery sob demanda' : ''})\x1b[0m
   sdk interrupts   ${sdkInterruptions.length > 0 ? `\x1b[33m${sdkInterruptions.join(' · ')}\x1b[0m` : '\x1b[90m(nenhum)\x1b[0m'}
     sdk ui           \x1b[90melicitation=${uiElicitationFlag == null ? 'n/a' : uiElicitationFlag ? 'available' : 'unavailable'}\x1b[0m
   modelo           \x1b[36m${snap['model']}\x1b[0m
@@ -272,6 +282,9 @@ ${autoPolicyLine ? `${autoPolicyLine}\n` : ''}  ──────────�
     }
     if (activity.detail) {
         println(`  atividade info  \x1b[90m${activity.detail}\x1b[0m`);
+    }
+    if (inputChannel.detail) {
+        println(`  canal detalhe  \x1b[90m${inputChannel.detail}\x1b[0m`);
     }
     if (promptFreshnessReason) {
         println(`  prompt reason   \x1b[90m${promptFreshnessReason}\x1b[0m`);
@@ -402,6 +415,7 @@ export function cmdNow({ hubSessionId, injectPort, println }, arg = '') {
         : projection.pendingQuestionShadowState
           ? `SHADOW:${projection.pendingQuestionShadowState}`
           : 'ASK:none';
+    const channel = projection.dialogInputChannel;
     const sdkWait = [
         projection.pendingElicitations > 0 ? `ELICIT:${projection.pendingElicitations}` : null,
         projection.pendingPermissions > 0 ? `PERM:${projection.pendingPermissions}` : null,
@@ -427,7 +441,7 @@ export function cmdNow({ hubSessionId, injectPort, println }, arg = '') {
         : `model=${modelBilling.displayModel}`;
 
     println(
-        `\x1b[36m[now]\x1b[0m runtime=${projection.runtimeId} live=${live.state} status=${state} loop=${projection.dialogLoopActive ? 'on' : 'off'} mode=${mode} queue=${queue} ${ask}${sdkWait ? ` ${sdkWait}` : ''} timeline=${projection.timelineSource}:${projection.timelineReconciliationStatus}:sync=${projection.timelineSyncStatus} sse=${live.sse.clients}/${live.sse.criticalClients} ${mismatchLabel}`,
+        `\x1b[36m[now]\x1b[0m runtime=${projection.runtimeId} live=${live.state} status=${state} loop=${projection.dialogLoopActive ? 'on' : 'off'} channel=${channel.state} mode=${mode} queue=${queue} ${ask}${sdkWait ? ` ${sdkWait}` : ''} timeline=${projection.timelineSource}:${projection.timelineReconciliationStatus}:sync=${projection.timelineSyncStatus} sse=${live.sse.clients}/${live.sse.criticalClients} ${mismatchLabel}`,
     );
     if (projection.activity?.label) {
         const detail = projection.activity.detail ? ` · ${projection.activity.detail}` : '';

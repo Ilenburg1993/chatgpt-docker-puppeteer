@@ -24,6 +24,7 @@ function resolveLiveFlowState(status) {
     if (dialogPaused) return 'paused';
     if (!status.dialogLoopActive && runtimeStatus !== 'starting') return 'offline';
     if (status.pendingQuestion && status.pendingQuestionKind !== 'ready') return 'waiting-human';
+    if (status.dialogInputChannel.state === 'missing') return 'recovering';
     if (
         status.activity.phase === 'turn' ||
         status.activity.phase === 'thinking' ||
@@ -32,7 +33,13 @@ function resolveLiveFlowState(status) {
     ) {
         return 'active-turn';
     }
-    if (runtimeStatus === 'waiting_for_input' || status.pendingQuestionKind === 'ready') return 'ready';
+    if (
+        status.dialogInputChannel.canAcceptTurn ||
+        runtimeStatus === 'waiting_for_input' ||
+        status.pendingQuestionKind === 'ready'
+    ) {
+        return 'ready';
+    }
     return 'recovering';
 }
 
@@ -41,7 +48,7 @@ function resolveLiveFlowState(status) {
  * @returns {string}
  */
 function describeLiveFlowState(state) {
-    if (state === 'ready') return 'loop vivo e aguardando a proxima mensagem';
+    if (state === 'ready') return 'loop vivo e apto a receber a proxima mensagem';
     if (state === 'active-turn') return 'turno em andamento com eventos live';
     if (state === 'waiting-human') return 'aguardando resposta humana/SDK';
     if (state === 'paused') return 'dialog loop pausado pelo operador';
