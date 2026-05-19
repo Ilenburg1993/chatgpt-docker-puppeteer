@@ -212,3 +212,35 @@ Rodada executada via `npm run terminal:llm-b`:
   como linha crua durante streaming.
 - Validação live com turno curto confirmou que warnings de token budget não quebram mais o layout interativo; a linha
   viva permaneceu em prompt de espera e o transcript final foi preservado.
+
+## Rodada UX Terminal 2026-05-19 — Modo Seguro Sem Overlay ANSI
+
+### Diagnóstico Confirmado
+
+- A linha viva overlay dependia de `ANSI save cursor + cursor up + clear line` para reescrever linhas acima do prompt.
+  Esse modelo é instável em terminais reais quando há wrap, scrollback, prompt multilinha ou eventos em rajada.
+- `printExchange()` renderizava respostas linha a linha via `println()`, multiplicando redraws e limpezas de linha para
+  um único bloco de resposta.
+- A tag de intent no prompt era derivada de histórico recente, não de uma interação pendente real; em alguns fluxos ela
+  persistia após o turno e aumentava ruído visual.
+
+### Decisão Arquitetural
+
+- A autoridade visual do terminal passa a ser transcript permanente append-only.
+- Overlay ANSI de linha viva fica opt-in via `COPILOT_TERMINAL_INLINE_STATUS=overlay`; por padrão, `writeInlineStatus()`
+  não manipula cursor/scrollback.
+- Estados ricos continuam disponíveis por transcript, `/activity`, `/live`, `/intent`, `/tools`, `/usage` e SSE.
+
+### Implementado
+
+- `writeInlineStatus()` e `clearInlineStatus()` deixaram de executar cursor-up/clear-line por padrão.
+- `printlnBlock()` deixou de reservar linhas em branco quando overlay não está explicitamente habilitado.
+- `printExchange()` passou a montar o turno final completo e imprimir com um único `printlnBlock()`.
+- Prompt não exibe mais tag de intent histórica; intents permanecem como blocos persistentes e consulta via `/intent`.
+
+### Validação Live
+
+- Boot e turnos passaram a renderizar em modo append-first, sem área preta causada por overlay.
+- Turno com resposta + `report_intent` + tool genérica exibiu resposta, intents, tool start/done, summary de tools,
+  usage e mensagem final.
+- Prompt final voltou para `você[modelo/high]›` sem `[I]` persistente.

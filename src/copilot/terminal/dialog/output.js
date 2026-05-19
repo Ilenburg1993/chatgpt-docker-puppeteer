@@ -15,7 +15,6 @@ import { getBusy, getRl, getSdkSessionMode } from '../../presentation/state/inde
 import { readTerminalDialogStreamMeta, readTerminalRuntimeState } from '../frontend/gateways/index.js';
 import {
     getTerminalDetailLevel,
-    readLatestTerminalIntent,
     readTerminalActivitySnapshot,
     readTerminalPromptDisplayPolicy,
     terminalThemeText,
@@ -47,6 +46,7 @@ const INLINE_STATUS_HEIGHT_RATIO = 0.24;
 const INLINE_STATUS_PROMPT_GUARD_ROWS = 5;
 const PROMPT_INPUT_GUARD_COLUMNS = 48;
 const PROMPT_MAX_WIDTH_RATIO = 0.58;
+const INLINE_STATUS_MODE_OVERLAY = 'overlay';
 
 /**
  * Quantidade de linhas reservadas para status acima do prompt (layout: [status...][prompt]).
@@ -100,6 +100,17 @@ function resolveInlineStatusMaxRows() {
 function shouldUseCompactPromptLayout() {
     if (!process.stdout.isTTY) return false;
     return resolveInlineStatusColumns() < 96;
+}
+
+/**
+ * A linha viva overlay usa cursor-up/clear-line para pintar acima do prompt. Isso é bonito em PTY controlado, mas frágil
+ * em terminais reais: qualquer divergência de altura, wrap ou scrollback pode limpar a viewport. Por padrão o terminal
+ * agora é transcript-first; a overlay fica disponível só como opt-in explícito.
+ *
+ * @returns {boolean}
+ */
+function shouldUseInlineStatusOverlay() {
+    return process.env['COPILOT_TERMINAL_INLINE_STATUS'] === INLINE_STATUS_MODE_OVERLAY;
 }
 
 /**
@@ -383,18 +394,6 @@ export function buildUserPrompt() {
             terminalThemeText('error', '[MM]'),
         );
     }
-    const latestIntent = readLatestTerminalIntent();
-    const canShowLiveIntentTag = state.status === 'processing' || state.status === 'waiting_for_input';
-    if (canShowLiveIntentTag && latestIntent && Date.now() - latestIntent.timestamp < 5 * 60_000) {
-        const riskTag =
-            latestIntent.risk === 'high'
-                ? terminalThemeText('error', compactDetail ? '[I!]' : '[INTENT:HIGH]')
-                : latestIntent.risk === 'medium'
-                  ? terminalThemeText('warn', compactDetail ? '[I]' : '[INTENT]')
-                  : terminalThemeText('muted', compactDetail ? '[I]' : '[INTENT]');
-        pushPromptTag(riskTag, terminalThemeText(latestIntent.risk === 'high' ? 'error' : 'muted', '[I]'));
-    }
-
     const prompt = `${terminalThemeText('success', 'você')}${terminalThemeText('muted', '[')}${terminalThemeText('info', model)}${terminalThemeText('muted', '/')}${terminalThemeText('thinking', reasoningEffort)}${terminalThemeText('muted', ']')}${tags.join('')}${terminalThemeText('muted', '›')} `;
     if (!process.stdout.isTTY || visibleTextLength(prompt) <= resolvePromptBudgetColumns()) {
         return prompt;
@@ -593,6 +592,7 @@ export function println(text) {
 export function printlnBlock(lines) {
     const text = Array.isArray(lines) ? lines.join('\n') : lines;
     if (getRl()) {
+        const useOverlay = shouldUseInlineStatusOverlay();
         const hadReservedStatusRows = _statusRowsReserved > 0;
         if (_statusRowsReserved > 0) {
             clearReservedStatusRowsPreservingCursor();
@@ -600,12 +600,11 @@ export function printlnBlock(lines) {
         }
         clearTerminalLine();
         process.stdout.write(`${text.endsWith('\n') ? text : `${text}\n`}`);
-        // Re-reserva uma linha em branco acima do prompt para evitar salto visual no próximo pulso da linha viva.
-        // Se a linha já existia, mantê-la é suficiente; emitir outro \n acumulava espaços verticais.
-        if (!hadReservedStatusRows) {
+        // Overlay opt-in: re-reserva uma linha em branco acima do prompt para evitar salto visual no próximo pulso.
+        if (useOverlay && !hadReservedStatusRows) {
             process.stdout.write('\n');
         }
-        _statusRowsReserved = 1;
+        _statusRowsReserved = useOverlay ? 1 : 0;
         redrawPromptIfInteractive();
         return;
     }
@@ -624,6 +623,7 @@ export function printlnBlock(lines) {
 export function writeInlineStatus(text) {
     if (isTerminalRenderLocked()) return;
     if (!process.stdout.isTTY) return;
+    if (!shouldUseInlineStatusOverlay()) return;
     const rows = fitInlineStatusRows(text);
     const rl = getRl();
     if (!rl) {
@@ -686,6 +686,10 @@ export function writeTerminalPrefixedChunk(linePrefix, chunk, options = {}) {
  */
 export function clearInlineStatus() {
     if (isTerminalRenderLocked()) return;
+    if (!shouldUseInlineStatusOverlay()) {
+        _statusRowsReserved = 0;
+        return;
+    }
     if (!process.stdout.isTTY) {
         clearTerminalLine();
         return;
@@ -726,33 +730,36 @@ export function printExchange(actor, message, reply, durationMs) {
     const secsNum = durationMs / 1000;
     const secsColor =
         secsNum < 5 ? `\x1b[32m${secs}s\x1b[0m` : secsNum < 15 ? `\x1b[33m${secs}s\x1b[0m` : `\x1b[31m${secs}s\x1b[0m`;
+    /** @type {string[]} */
+    const lines = [];
 
     if (actor === 'llm-a') {
-        println(SEPARATOR);
-        println(`  \x1b[90m[${ts}]\x1b[0m  🤖  \x1b[34mLLM-A\x1b[0m`);
-        println('');
+        lines.push(SEPARATOR);
+        lines.push(`  \x1b[90m[${ts}]\x1b[0m  🤖  \x1b[34mLLM-A\x1b[0m`);
+        lines.push('');
         for (const line of message.split('\n')) {
-            println(`  \x1b[34m│\x1b[0m  ${line}`);
+            lines.push(`  \x1b[34m│\x1b[0m  ${line}`);
         }
-        println('');
+        lines.push('');
     }
 
-    println(SEPARATOR);
-    println(
+    lines.push(SEPARATOR);
+    lines.push(
         `  \x1b[90m[${ts}]\x1b[0m  🧠  \x1b[32mLLM-B\x1b[0m  \x1b[90m·\x1b[0m  \x1b[36m${model}\x1b[0m  \x1b[90m·\x1b[0m  \x1b[35m${effort}\x1b[0m  \x1b[90m·\x1b[0m  ${secsColor}`,
     );
-    println('');
+    lines.push('');
     const replyLines = reply.split('\n');
     let inCodeBlock = false;
     for (const line of replyLines) {
         if (line.trimStart().startsWith('```')) {
             inCodeBlock = !inCodeBlock;
-            println(`  \x1b[32m│\x1b[0m  \x1b[2m${line}\x1b[0m`);
+            lines.push(`  \x1b[32m│\x1b[0m  \x1b[2m${line}\x1b[0m`);
         } else if (inCodeBlock) {
-            println(`  \x1b[32m│\x1b[0m  \x1b[48;5;236m\x1b[36m${line}\x1b[0m`);
+            lines.push(`  \x1b[32m│\x1b[0m  \x1b[48;5;236m\x1b[36m${line}\x1b[0m`);
         } else {
-            println(`  \x1b[32m│\x1b[0m  ${line}`);
+            lines.push(`  \x1b[32m│\x1b[0m  ${line}`);
         }
     }
-    println('');
+    lines.push('');
+    printlnBlock(lines);
 }
