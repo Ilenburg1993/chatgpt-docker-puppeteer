@@ -10,6 +10,8 @@
 >
 > - `DOCUMENTAÇÃO/COPILOT/AUDITORIA-EXTERNA/COPILOTCLIENT-AUDITORIA-AMPLA-2026-05-18.md`
 > - `DOCUMENTAÇÃO/COPILOT/AUDITORIA-EXTERNA/SESSIONCONFIG-SUBAGENTES-AUDITORIA-AMPLA-2026-05-18.md`
+> - `DOCUMENTAÇÃO/COPILOT/AUDITORIA-EXTERNA/BOOT-LIFECYCLE-AUDITORIA-AMPLA-2026-05-18.md`
+> - `DOCUMENTAÇÃO/COPILOT/AUDITORIA-EXTERNA/TERMINAL-REPLY-CIRCUIT-AUDITORIA-AMPLA-2026-05-19.md`
 >
 > Data: `2026-05-18`
 >
@@ -163,6 +165,7 @@ A situação ideal ao final deste roadmap é:
 - **ACHADO-C** — divergência de runner e warnings de teardown do Vitest foram confirmados, diagnosticados e corrigidos nesta rodada
 - **ACHADO-D** — a fachada local do `CopilotClient` não estava em paridade full com o `client.d.ts` instalado; auditoria dedicada criada e correções desta rodada entregam `startClient`, `getClientSessionMetadata` e builder/options completos
 - **ACHADO-E** — `SessionConfig`/`ResumeSessionConfig` e `CustomAgentConfig` não estavam totalmente parificados com o `types.d.ts` instalado; auditoria dedicada criada e correções desta rodada entregam builder dedicado de resume, sanitização estrutural, surface HTTP serializável full e hardening de subagentes (`skills`, `mcpServers`, `description?`, `tools=[]`)
+- **ACHADO-F** — o boot/lifecycle já estava bem estruturado, mas mantinha defaults conservadores e pouca visibilidade do perfil efetivo carregado; auditoria dedicada criada e correções desta rodada ligam `/sdk/*`, `enableConfigDiscovery` e `terminal.enabled` por default, além de explicitar o guardrail de streaming de subagentes
 
 ---
 
@@ -316,6 +319,69 @@ A situação ideal ao final deste roadmap é:
 
 **Status:** majoritariamente concluída nesta rodada (`startClient` explícito, `getClientSessionMetadata`, rota `/sessions/:id` endurecida).
 
+## Faixa 3 — Circuito canônico de reply, streaming e renderização terminal
+
+### Fase 3.1 — Autoridade única de reply do turno explícito
+
+#### Subfase 3.1.1 — Collector canônico no `agent/dialog`
+
+- consolidar `assistant.message`, `assistant.message_delta`, `dialog.delta`, `task.delta` e `assistant.turn_end` sob um único owner de output do turno;
+- deixar o `turn-executor` como autoridade única de resolução semântica do reply.
+
+**Status:** concluída nesta rodada com `seams/turn-output-collector.js` e integração no `turn-executor`.
+
+#### Subfase 3.1.2 — Remover fallback duplicado do bridge
+
+- reduzir `channel/client-dialog.js` a transporte + callbacks de streaming;
+- eliminar parsing semântico paralelo onde o runtime já deveria resolver o reply.
+
+**Status:** concluída nesta rodada; o bridge agora mantém apenas fallback de transporte via `dialog.reply`.
+
+### Fase 3.2 — Streaming canônico do turno explícito
+
+#### Subfase 3.2.1 — Surface única de output incremental
+
+- definir uma surface canônica do turno explícito para streaming;
+- manter `dialog.delta` / `task.delta` apenas como compatibilidade/adaptação.
+
+**Status:** parcialmente concluída — o collector canônico já absorve `dialog.delta`/`task.delta`, mas a surface pública ainda segue dual por compatibilidade.
+
+#### Subfase 3.2.2 — Compatibilidade com observability, SSE e task-stream
+
+- preservar o ecossistema de listeners sem duplicar semântica nem conflitar com o owner do turno.
+
+**Status:** em andamento.
+
+### Fase 3.3 — Renderização terminal e transcript durável
+
+#### Subfase 3.3.1 — Sink explícito do turno ativo
+
+- o terminal fecha o turno com o reply canônico devolvido pelo runtime;
+- explicitar a relação entre `printExchange`, transcript persistente e busy suppression.
+
+**Status:** parcialmente concluída — `engine.js` já consome `runTerminalDialogTurnDetailed(...)` com `replySource` canônico.
+
+#### Subfase 3.3.2 — Reconciliação de history/timeline
+
+- bridge history passa a refletir o reply canônico de forma confiável;
+- timeline persistida volta a ser reconciliação, não compensação de perda.
+
+**Status:** em andamento.
+
+### Fase 3.4 — Hardening de drift e diagnóstico
+
+#### Subfase 3.4.1 — SDK unknown events scorecard
+
+- transformar warning bruto de evento desconhecido em diagnóstico estruturado.
+
+**Status:** pendente.
+
+#### Subfase 3.4.2 — Health/status honestos
+
+- revisar flags como `recovering`/`unhealthy` quando o sistema está funcionalmente estável.
+
+**Status:** pendente.
+
 #### Subfase 2.3.2 — Opções de `CopilotClientOptions`
 
 - garantir builder fluente e suporte de env para todas as opções relevantes do pacote instalado;
@@ -350,11 +416,11 @@ A situação ideal ao final deste roadmap é:
 
 **Status:** parcialmente concluída — `/attach blob` já atende o caso inline; o residual é eventual caminho binário nativo além do embed textual zero-PR.
 
-## Faixa 3 — Confiabilidade de testes, runner e validação estrita
+## Faixa 4 — Confiabilidade de testes, runner e validação estrita
 
-### Fase 3.1 — Verdade do runner
+### Fase 4.1 — Verdade do runner
 
-#### Subfase 3.1.1 — Diagnóstico de divergência
+#### Subfase 4.1.1 — Diagnóstico de divergência
 
 - explicar por que `npm test -- --run ...` mostrou problemas que `test:copilot:unit` não mostrou;
 - separar erro real de erro causado por escopo/configuração errada.
@@ -365,7 +431,7 @@ A situação ideal ao final deste roadmap é:
 - `test:unit` usava `run-mixed-tests.mjs`, que até aqui executava vitest híbrido inteiro sob uma única config;
 - quando o lote continha arquivos Copilot e não-Copilot, os testes Copilot podiam rodar sob `vitest.config.js`, sem a baseline de `tests/support/setup.js` e sem a config específica do domínio.
 
-#### Subfase 3.1.2 — Correção estrutural do runner
+#### Subfase 4.1.2 — Correção estrutural do runner
 
 - separar o lote Vitest em:
    - specs Copilot → `vitest.copilot.config.js`
@@ -374,9 +440,9 @@ A situação ideal ao final deste roadmap é:
 
 **Status:** concluída nesta rodada.
 
-### Fase 3.2 — Correção de falhas reais expostas pelos testes
+### Fase 4.2 — Correção de falhas reais expostas pelos testes
 
-#### Subfase 3.2.1 — Drift de contratos e mocks
+#### Subfase 4.2.1 — Drift de contratos e mocks
 
 - mocks incompletos de `deps.js` em rotas SDK;
 - mock parcial de `#copilot/core/error-handlers` quebrando `toError` no barrel;
@@ -384,7 +450,7 @@ A situação ideal ao final deste roadmap é:
 
 **Status:** concluída nesta rodada.
 
-#### Subfase 3.2.2 — Contratos de retorno e filtros canônicos
+#### Subfase 4.2.2 — Contratos de retorno e filtros canônicos
 
 - retrocompatibilizar `isDuplicateIoOperation(...)`;
 - corrigir `filterIndexRowsByGlob(...)` para excluir segmentos como `node_modules`;
@@ -392,9 +458,9 @@ A situação ideal ao final deste roadmap é:
 
 **Status:** concluída nesta rodada.
 
-### Fase 3.3 — Typecheck estrito de testes
+### Fase 4.3 — Typecheck estrito de testes
 
-#### Subfase 3.3.1 — Eliminar todos os erros de `typecheck:strict:tests.unit`
+#### Subfase 4.3.1 — Eliminar todos os erros de `typecheck:strict:tests.unit`
 
 - narrowing em arrays/matches regex;
 - mocks compatíveis com assinaturas atuais;
@@ -403,7 +469,7 @@ A situação ideal ao final deste roadmap é:
 
 **Status:** concluída nesta rodada.
 
-#### Subfase 3.3.2 — Padronizar validação final
+#### Subfase 4.3.2 — Padronizar validação final
 
 - `npm run typecheck:strict:tests.unit`;
 - `npm run test:unit`;
@@ -413,21 +479,21 @@ A situação ideal ao final deste roadmap é:
 
 **Status:** concluída nesta rodada; baseline inteira ficou verde.
 
-### Fase 3.4 — Warning-zero no Vitest
+### Fase 4.4 — Warning-zero no Vitest
 
-#### Subfase 3.4.1 — Classificar warnings de workers
+#### Subfase 4.4.1 — Classificar warnings de workers
 
 - verificar se a causa é `pool: 'forks'`, paralelismo excessivo, teardown ou algum leak real;
 - distinguir warning infraestrutural de bug de teste.
 
-#### Subfase 3.4.2 — Fix definitivo
+#### Subfase 4.4.2 — Fix definitivo
 
 - ajustar pool/concurrency/configuração até zerar os warnings;
 - revalidar para garantir que `test:copilot:unit` não “passe verde com ruído escondido”.
 
 **Status:** concluída nesta rodada; warnings zerados com o split correto do runner e `vitest.copilot.config.js` em `threads` com concorrência mais conservadora.
 
-## Faixa 4 — Estado longo, persistência e hardening residual
+## Faixa 5 — Estado longo, persistência e hardening residual
 
 ### Fase 4.1 — Sessão longa
 
@@ -454,7 +520,7 @@ A situação ideal ao final deste roadmap é:
 
 **Status:** pendente.
 
-## Faixa 5 — Upgrades arquiteturais controlados
+## Faixa 6 — Upgrades arquiteturais controlados
 
 ### Fase 5.1 — Upgrades de alto encaixe
 
@@ -478,7 +544,7 @@ A situação ideal ao final deste roadmap é:
 
 **Status:** backlog / não-prioritário.
 
-## Faixa 6 — Critérios de saída desta trilha
+## Faixa 7 — Critérios de saída desta trilha
 
 ### Fase 6.1 — Convergência funcional
 
@@ -508,14 +574,14 @@ A situação ideal ao final deste roadmap é:
 - **Faixa 0**: consolidada; este arquivo passa a ser o plano único limpo e sem duplicações narrativas.
 - **Faixa 1**: além do hardening de progresso/heartbeat, a superfície terminal agora cobre explicitamente `assistant.usage` (via `pr.consumed`), `hook.*`, `sampling.*`, `commands.changed`, `capabilities.changed`, `auto_mode_switch.*` e `exit_plan_mode.requested`.
 - **Faixa 2**: reset approvals, quota metrics e OAuth MCP já entregues; `skills` agora têm surface mais rica por `/sdk skills`, `/sdk skills config`, `/sdk skills agents` e mutação básica de `disabledSkills` via `/sdk skills disable|enable`; `instructions` já aparecem em `/sdk prompt`, blobs já têm surface mínima por `/attach blob`, `requestHeaders` por turno foram entregues via `/sdk headers` + dispatch SDK direto com reanexo controlado, e a paridade estrutural de `CopilotClient` + `SessionConfig`/`ResumeSessionConfig`/subagentes foi auditada e endurecida.
-- **Faixa 3**: concluída nesta rodada — runner corrigido, warnings zerados, `typecheck` estrito verde e convergência entre `test:unit` e `test:copilot:unit` comprovada.
-- **Faixa 4+**: permanecem como continuação natural agora que a baseline de validação está realmente verde e sem warnings.
+- **Faixa 4**: concluída nesta rodada — runner corrigido, warnings zerados, `typecheck` estrito verde e convergência entre `test:unit` e `test:copilot:unit` comprovada.
+- **Faixa 5+**: permanecem como continuação natural agora que a baseline de validação está realmente verde e sem warnings.
 
 ## 6. Próxima sequência obrigatória de execução
 
 1. consolidar `skills.*` com persistência/config declarativa alinhada ao estado server-scoped e correlação mais rica com eventos `subagent.*` (**GAP-013**);
 2. enriquecer `command.*`, `commands.changed` e `capabilities.changed` com diffs/estado operacional mais ricos;
-3. só depois voltar à **Faixa 4** para persistência longa, re-registro defensivo residual e upgrades arquiteturais controlados.
+3. só depois voltar à **Faixa 5** para persistência longa, re-registro defensivo residual e upgrades arquiteturais controlados.
 
 ## 7. Observação de governança
 

@@ -117,25 +117,25 @@ A auditoria descrevia um `setInterval` clássico. O código atual usa `registerI
 
 ## 4. Gaps SDK 0.3.0 — veredito item a item
 
-| ID      | Veredito                 | Decisão final                   | Evidência resumida                                                                                                                          |
-| ------- | ------------------------ | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
-| GAP-001 | **Refutado**             | Já implementado                 | `src/copilot/agent/session/initializers/initializer.js` passa `onPermissionRequest`                                                         |
-| GAP-002 | **Parcial / latente**    | Hardening recomendado           | o terminal atual não sofre isso no fluxo padrão porque `includeSubAgentStreamingEvents: false`, mas a ponte local não preservava `agentId`  |
-| GAP-003 | **Refutado**             | Já implementado                 | `excludedTools` já entra na configuração de sessão                                                                                          |
-| GAP-004 | **Refutado**             | Já suportado                    | `sessionIdleTimeoutSeconds` já existe na configuração client-side                                                                           |
-| GAP-005 | **Parcial / endurecido** | Superfície mínima entregue      | o terminal agora expõe discovery via `/sdk skills`; mutações/config de skills ainda merecem desenho dedicado                                |
-| GAP-006 | **Confirmado**           | Implementar superfície terminal | o handler atual de OAuth MCP só narra; não aciona `session.rpc.mcp.oauthLogin()`                                                            |
-| GAP-007 | **Refutado**             | Já migrado                      | o repositório já usa `createSessionFsHandler` e provider idiomático                                                                         |
-| GAP-008 | **Refutado**             | Já migrado                      | o código usa `gitHubToken` corretamente                                                                                                     |
-| GAP-009 | **Confirmado**           | Oportunidade de simplificação   | `convertMcpCallToolResult()` ainda não está incorporado                                                                                     |
-| GAP-010 | **Confirmado**           | Expor no terminal               | `/sdk quota` ainda não usa `session.rpc.usage.getMetrics()`                                                                                 |
-| GAP-011 | **Parcial / latente**    | Hardening recomendado           | ausência de `agentId` no terminal só importa se subagent streaming voltar a ser habilitado                                                  |
-| GAP-012 | **Parcial / latente**    | Oportunidade válida             | a projeção atual é suficiente, mas não usa a RPC mais nova                                                                                  |
-| GAP-013 | **Parcial / avançado**   | Surface terminal e mutação básica entregues | contrato/config/factory de skills por custom agent/subagente estão alinhados; `/sdk skills config|agents|disable|enable` já existe; permanecem pendentes persistência declarativa alinhada e correlação ainda mais rica com runtime |
-| GAP-014 | **Refutado**             | Já implementado                 | `enableConfigDiscovery` já é configurado                                                                                                    |
-| GAP-015 | **Corrigido nesta onda** | Superfície canônica entregue    | `/sdk headers` + store one-shot + `runTerminalDialogTurn` agora usam dispatch SDK direto com reanexo do dialog loop para turnos com headers |
-| GAP-016 | **Parcial / endurecido** | Superfície mínima entregue      | `/attach blob <mime> <base64>` agora suporta blob inline no terminal; o caminho segue zero-PR via embed textual, não binário nativo         |
-| GAP-017 | **Confirmado**           | Corrigir imediatamente          | o SDK já expõe `resetSessionApprovals` e o terminal não expunha a ação                                                                      |
+| ID      | Veredito                 | Decisão final                               | Evidência resumida                                                                                                                          |
+| ------- | ------------------------ | ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| GAP-001 | **Refutado**             | Já implementado                             | `src/copilot/agent/session/initializers/initializer.js` passa `onPermissionRequest`                                                         |
+| GAP-002 | **Parcial / latente**    | Hardening recomendado                       | o terminal atual não sofre isso no fluxo padrão porque `includeSubAgentStreamingEvents: false`, mas a ponte local não preservava `agentId`  |
+| GAP-003 | **Refutado**             | Já implementado                             | `excludedTools` já entra na configuração de sessão                                                                                          |
+| GAP-004 | **Refutado**             | Já suportado                                | `sessionIdleTimeoutSeconds` já existe na configuração client-side                                                                           |
+| GAP-005 | **Parcial / endurecido** | Superfície mínima entregue                  | o terminal agora expõe discovery via `/sdk skills`; mutações/config de skills ainda merecem desenho dedicado                                |
+| GAP-006 | **Confirmado**           | Implementar superfície terminal             | o handler atual de OAuth MCP só narra; não aciona `session.rpc.mcp.oauthLogin()`                                                            |
+| GAP-007 | **Refutado**             | Já migrado                                  | o repositório já usa `createSessionFsHandler` e provider idiomático                                                                         |
+| GAP-008 | **Refutado**             | Já migrado                                  | o código usa `gitHubToken` corretamente                                                                                                     |
+| GAP-009 | **Confirmado**           | Oportunidade de simplificação               | `convertMcpCallToolResult()` ainda não está incorporado                                                                                     |
+| GAP-010 | **Confirmado**           | Expor no terminal                           | `/sdk quota` ainda não usa `session.rpc.usage.getMetrics()`                                                                                 |
+| GAP-011 | **Parcial / latente**    | Hardening recomendado                       | ausência de `agentId` no terminal só importa se subagent streaming voltar a ser habilitado                                                  |
+| GAP-012 | **Parcial / latente**    | Oportunidade válida                         | a projeção atual é suficiente, mas não usa a RPC mais nova                                                                                  |
+| GAP-013 | **Parcial / avançado**   | Surface terminal e mutação básica entregues | contrato/config/factory de skills por custom agent/subagente estão alinhados; `/sdk skills config                                           | agents | disable | enable` já existe; permanecem pendentes persistência declarativa alinhada e correlação ainda mais rica com runtime |
+| GAP-014 | **Refutado**             | Já implementado                             | `enableConfigDiscovery` já é configurado                                                                                                    |
+| GAP-015 | **Corrigido nesta onda** | Superfície canônica entregue                | `/sdk headers` + store one-shot + `runTerminalDialogTurn` agora usam dispatch SDK direto com reanexo do dialog loop para turnos com headers |
+| GAP-016 | **Parcial / endurecido** | Superfície mínima entregue                  | `/attach blob <mime> <base64>` agora suporta blob inline no terminal; o caminho segue zero-PR via embed textual, não binário nativo         |
+| GAP-017 | **Confirmado**           | Corrigir imediatamente                      | o SDK já expõe `resetSessionApprovals` e o terminal não expunha a ação                                                                      |
 
 ### Decisão importante sobre GAP-002 / GAP-011
 
@@ -225,6 +225,34 @@ Uma auditoria dedicada a `node_modules/@github/copilot-sdk/dist/types.d.ts` conf
 Além disso, a superfície HTTP de sessões ainda não expunha toda a parte serializável restante de `SessionConfig`/`ResumeSessionConfig` (`modelCapabilities`, `enableConfigDiscovery`, `includeSubAgentStreamingEvents`, `defaultAgent`, `gitHubToken`).
 
 **Decisão:** tratar como trilha estrutural obrigatória e corrigir na mesma onda. O detalhamento completo está em `SESSIONCONFIG-SUBAGENTES-AUDITORIA-AMPLA-2026-05-18.md`.
+
+### ACHADO-F — boot/lifecycle estavam corretos na macro, mas com defaults conservadores e baixa visibilidade do perfil efetivo
+
+Uma auditoria dedicada do processo de boot/lifecycle confirmou que:
+
+1. o boot canônico já estava corretamente centrado em `terminal/bootstrap.js` + `boot/runtime-bootstrap.js`;
+2. o pipeline de lifecycle do agent já estava bem decomposto entre `session-setup`, `initializer`, `performBootWiring` e `dialog controller`;
+3. porém os defaults de `COPILOT_SDK_ENABLED`, `COPILOT_ENABLE_CONFIG_DISCOVERY` e `COPILOT_TERMINAL_ENABLED` ainda eram conservadores demais para o perfil canônico da LLM-B;
+4. além disso, `includeSubAgentStreamingEvents` seguia como hardcode local, e o projection layer não deixava claro o que estava ativo versus deliberadamente guardado.
+
+**Decisão:** corrigir imediatamente os defaults pró-capacidade seguros, explicitar o knob de streaming de subagentes e enriquecer a projeção de lifecycle com um resumo verificável de capacidades efetivas.
+
+### ACHADO-G — o circuito de reply do turno explícito tinha owner difuso entre runtime, bridge e terminal
+
+Uma auditoria dedicada do circuito `SDK event → event-handlers → agent/dialog → channel → terminal` confirmou que o problema central da resposta invisível no terminal não era apenas de renderização, mas de governança difusa do reply:
+
+1. o runtime do dialog loop resolvia o reply por caminhos múltiplos e incompletos;
+2. o bridge ainda mantinha fallback semântico paralelo;
+3. o terminal explícito dependia demais do valor retornado e pouco da origem canônica do reply.
+
+Nesta rodada, a trilha estrutural passou a ser:
+
+- `agent/dialog/seams/turn-output-collector.js` como owner canônico de coleta semântica do turno explícito;
+- `turn-executor.js` usando o collector como autoridade única de resolução do reply;
+- `channel/client-dialog.js` reduzido a transporte + fallback de `dialog.reply`;
+- `terminal/frontend/gateways/dialog.js` e `terminal/dialog/engine.js` consumindo um resultado detalhado (`reply`, `replySource`, `channel`) em vez de uma string opaca.
+
+**Decisão:** tratar essa trilha como correção estrutural obrigatória antes de nova sessão viva com a LLM-B.
 
 ---
 
