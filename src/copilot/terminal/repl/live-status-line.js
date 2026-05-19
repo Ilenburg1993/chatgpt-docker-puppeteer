@@ -21,6 +21,14 @@ const DEFAULT_LIVE_STATUS_HEARTBEAT_MS = 5_000;
 const LIVE_DETAIL_CATASTROPHIC_CHARS = 2_000;
 
 /**
+ * @param {ReturnType<typeof readTerminalRuntimeState>} runtime
+ * @returns {runtime is ReturnType<typeof readTerminalRuntimeState> & { pendingQuestion: NonNullable<ReturnType<typeof readTerminalRuntimeState>['pendingQuestion']> }}
+ */
+function hasHumanPendingQuestion(runtime) {
+    return runtime.status === 'waiting_for_input' && runtime.pendingQuestionKind === 'question' && Boolean(runtime.pendingQuestion);
+}
+
+/**
  * @param {string | null | undefined} value
  * @param {number} max
  * @returns {string}
@@ -78,6 +86,18 @@ export function formatTerminalLiveStatusLine(input = {}) {
     const stream = input.stream ?? readTerminalDialogStreamMeta();
     const model = stream?.model || runtime.model || '-';
     const effort = stream?.reasoningEffort || runtime.reasoningEffort || '-';
+    if (hasHumanPendingQuestion(runtime)) {
+        const questionText = compactLiveStatusText(runtime.pendingQuestion.question ?? 'pergunta pendente', 160);
+        const choices = Array.isArray(runtime.pendingQuestion.choices) ? runtime.pendingQuestion.choices : [];
+        const choiceText = choices.length > 0 ? ` · opções=${choices.join('|')}` : '';
+        const queue = Number(runtime.queueSize ?? 0) > 0 ? ` · fila=${runtime.queueSize}` : '';
+        return (
+            `  ${terminalThemeText('thinking', '⟲ LLM-B')} ` +
+            `${terminalThemeText('question', 'waiting-human/aguardando resposta humana')}` +
+            `${terminalThemeText('muted', ` · ${questionText}${choiceText} · ${model}/${effort} · waiting_for_input:${runtime.dialogLoopActive ? 'loop' : 'noloop'}${queue}`)}` +
+            '\x1b[K'
+        );
+    }
     const ageMs = Math.max(0, now - activity.startedAt);
     const detail = compactLiveStatusText(activity.detail ?? activity.toolName ?? '', LIVE_DETAIL_CATASTROPHIC_CHARS);
     const progress = activity.progress !== null ? ` · ${activity.progress}%` : '';
@@ -111,6 +131,7 @@ export function shouldRenderTerminalLiveStatusLine(input = {}) {
     const activity = input.activity ?? readTerminalActivitySnapshot();
     const runtime = input.runtime ?? readTerminalRuntimeState();
     const busy = input.busy ?? getBusy();
+    if (hasHumanPendingQuestion(runtime)) return true;
     const queueActive = Number(runtime.queueSize ?? 0) > 0;
     const runtimeActive =
         busy ||

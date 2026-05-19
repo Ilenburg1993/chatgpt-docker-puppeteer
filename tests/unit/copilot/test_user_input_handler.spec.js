@@ -111,6 +111,33 @@ describe('agent/dialog/user-input-handler', () => {
         await expect(promise).resolves.toEqual({ answer: 'A', wasFreeform: false });
     });
 
+    it('preserva choices de ask_user humano mesmo com dialog loop ativo', async () => {
+        const ctx = createCtx(true);
+        const promise = handleUserInputRequest(
+            { question: 'Qual cor devo usar?', allowFreeform: false, choices: ['azul', 'verde'] },
+            ctx,
+        );
+
+        expect(ctx.handleProtocolInput).toHaveBeenCalledWith({ question: 'Qual cor devo usar?' });
+        const pending = ctx.setPendingQuestion.mock.calls[0]?.[0];
+        expect(pending.kind).toBe('question');
+        expect(pending.choices).toEqual(['azul', 'verde']);
+        expect(mocks.persistAgentRuntimePendingQuestionState).toHaveBeenCalledWith(
+            expect.objectContaining({
+                question: 'Qual cor devo usar?',
+                meta: expect.objectContaining({
+                    kind: 'question',
+                    choices: ['azul', 'verde'],
+                    protocolControlled: false,
+                }),
+            }),
+            { label: 'question.persist.pending' },
+        );
+
+        expect(pending.resolve('VERDE')).toBe(true);
+        await expect(promise).resolves.toEqual({ answer: 'verde', wasFreeform: false });
+    });
+
     it('mapeia índice de choice e rejeita freeform quando allowFreeform=false', async () => {
         const ctx = createCtx(false);
         const promise = handleUserInputRequest(

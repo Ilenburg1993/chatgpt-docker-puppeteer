@@ -138,6 +138,11 @@ function normalizeUserInputAnswer(rawAnswer, choices, allowFreeform) {
         if (choices.includes(answer)) {
             return { ok: true, answer, wasFreeform: false };
         }
+        const normalizedAnswer = answer.toLocaleLowerCase();
+        const normalizedMatches = choices.filter((choice) => choice.toLocaleLowerCase() === normalizedAnswer);
+        if (normalizedMatches.length === 1) {
+            return { ok: true, answer: normalizedMatches[0] ?? answer, wasFreeform: false };
+        }
         if (!allowFreeform) {
             return { ok: false, reason: 'choice_required' };
         }
@@ -167,7 +172,7 @@ export async function handleUserInputRequest({ question, choices, allowFreeform 
             : ctx.isDialogLoopActive();
 
     if (shouldHandleProtocol) {
-        return handleDialogLoopInput({ question, allowFreeform }, ctx);
+        return handleDialogLoopInput({ question, ...(choices !== undefined && { choices }), allowFreeform }, ctx);
     }
     return handleInteractiveQuestion({ question, ...(choices !== undefined && { choices }), allowFreeform }, ctx);
 }
@@ -181,11 +186,11 @@ export async function handleUserInputRequest({ question, choices, allowFreeform 
  * F44.3 (BUG-SD-004) fix: para mensagens de protocolo (READY/REPLY), pula a persistência de `pendingQuestion` para
  * evitar I/O desnecessário em cada turno do dialog loop.
  *
- * @param {{ question: string; allowFreeform: boolean }} input
+ * @param {{ question: string; choices?: string[]; allowFreeform: boolean }} input
  * @param {UserInputContext} ctx
  * @returns {Promise<{ answer: string; wasFreeform: boolean }>}
  */
-function handleDialogLoopInput({ question, allowFreeform }, ctx) {
+function handleDialogLoopInput({ question, choices, allowFreeform }, ctx) {
     const kind = DialogProtocol.classify(question);
     ctx.handleProtocolInput({ question });
 
@@ -197,7 +202,7 @@ function handleDialogLoopInput({ question, allowFreeform }, ctx) {
         return Promise.resolve({ answer: '', wasFreeform: false });
     }
 
-    return handleInteractiveQuestion({ question, allowFreeform, kind }, ctx);
+    return handleInteractiveQuestion({ question, ...(choices !== undefined && { choices }), allowFreeform, kind }, ctx);
 }
 
 /**

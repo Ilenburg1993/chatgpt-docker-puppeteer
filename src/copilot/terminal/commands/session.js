@@ -28,7 +28,10 @@ import {
     saveTerminalSnapshotProjection,
 } from '../frontend/index.js';
 import { buildTerminalOperationalGuidance } from '../frontend/operational-guidance/index.js';
-import { tryAnswerTerminalPendingQuestionInput } from '../state/repl-runtime/index.js';
+import {
+    shouldConsumeTerminalPendingAnswerInput,
+    tryAnswerTerminalPendingQuestionInput,
+} from '../state/repl-runtime/index.js';
 import { callWithRuntimeTarget, extractRuntimeTarget, withRuntimeTarget } from './runtime-target.js';
 
 /**
@@ -753,6 +756,12 @@ export function cmdAnswer({ println }, arg) {
     }
     if (result.reason === 'protocol_controlled') {
         println('[answer] O runtime aguarda uma mensagem de diálogo. Digite o texto normalmente, sem /answer.');
+        return;
+    }
+    if (shouldConsumeTerminalPendingAnswerInput(result)) {
+        const choices =
+            result.pendingQuestionChoices.length > 0 ? ` Opções: ${result.pendingQuestionChoices.join(' | ')}.` : '';
+        println(`[answer] Resposta inválida para a pergunta pendente.${choices}`);
         return;
     }
     const projection = readTerminalStatusProjection(withRuntimeTarget({}, runtimeId));

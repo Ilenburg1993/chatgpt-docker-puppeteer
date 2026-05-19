@@ -33,7 +33,10 @@ import {
     resetStatusRowState,
     sendTurn,
 } from '../dialog/index.js';
-import { tryAnswerTerminalPendingQuestionInput } from '../state/repl-runtime/index.js';
+import {
+    shouldConsumeTerminalPendingAnswerInput,
+    tryAnswerTerminalPendingQuestionInput,
+} from '../state/repl-runtime/index.js';
 import { resolve } from '../stores/index.js';
 import { renderTerminalAutoBrief } from './auto-brief.js';
 import { resolveFreeTextDelivery } from './free-text-delivery.js';
@@ -116,6 +119,16 @@ export async function runReplLifecycle(injectServer, { injectPort, onReady }) {
      * @returns {void}
      */
     function printPendingAnswerResult(pendingAnswer) {
+        if (pendingAnswer.reason === 'invalid_choice') {
+            const choices =
+                pendingAnswer.pendingQuestionChoices.length > 0
+                    ? ` Opções: ${pendingAnswer.pendingQuestionChoices.join(' | ')}.`
+                    : '';
+            println(
+                `\x1b[33m  [answer] Resposta não corresponde às opções da pergunta pendente.${choices}\x1b[0m`,
+            );
+            return;
+        }
         println(
             pendingAnswer.ok
                 ? `\x1b[90m  [answer] Resposta enviada para pergunta pendente (${pendingAnswer.runtimeId}).\x1b[0m`
@@ -171,7 +184,7 @@ export async function runReplLifecycle(injectServer, { injectPort, onReady }) {
      */
     async function handleImmediateIntervention(finalMessage) {
         const pendingAnswer = tryAnswerTerminalPendingQuestionInput(finalMessage);
-        if (pendingAnswer.routed) {
+        if (shouldConsumeTerminalPendingAnswerInput(pendingAnswer)) {
             printPendingAnswerResult(pendingAnswer);
             refreshPrompt();
             return;
@@ -287,7 +300,7 @@ export async function runReplLifecycle(injectServer, { injectPort, onReady }) {
         }
 
         const pendingAnswer = tryAnswerTerminalPendingQuestionInput(trimmed);
-        if (pendingAnswer.routed) {
+        if (shouldConsumeTerminalPendingAnswerInput(pendingAnswer)) {
             printPendingAnswerResult(pendingAnswer);
             refreshPrompt();
             return;
@@ -326,6 +339,17 @@ export async function runReplLifecycle(injectServer, { injectPort, onReady }) {
                 dispatchImmediateCommand(escapeCmd);
                 return;
             }
+        }
+        const immediatePendingAnswer = tryAnswerTerminalPendingQuestionInput(trimmedForEscape);
+        if (shouldConsumeTerminalPendingAnswerInput(immediatePendingAnswer)) {
+            beginTerminalRenderLock();
+            try {
+                printPendingAnswerResult(immediatePendingAnswer);
+            } finally {
+                endTerminalRenderLock();
+            }
+            refreshPrompt();
+            return;
         }
         lineQueue = lineQueue
             .then(() => handleLine(line))

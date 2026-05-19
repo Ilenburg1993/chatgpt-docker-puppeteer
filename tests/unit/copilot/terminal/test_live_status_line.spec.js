@@ -188,4 +188,37 @@ describe('terminal/live-status-line', () => {
         expect(mocks.writeInlineStatus).not.toHaveBeenCalled();
         cleanup();
     });
+
+    it('prioriza ask_user humano sobre atividade antiga na linha viva', async () => {
+        const { shouldRenderTerminalLiveStatusLine, formatTerminalLiveStatusLine } = await import(
+            '../../../../src/copilot/terminal/repl/live-status-line.js'
+        );
+        mocks.activity = {
+            ...mocks.activity,
+            phase: 'thinking',
+            label: 'LLM-B trabalhando',
+            detail: 'auto · xhigh · 20s sem delta visível',
+            toolName: null,
+        };
+        mocks.runtime = {
+            ...mocks.runtime,
+            status: 'waiting_for_input',
+            pendingQuestionKind: 'question',
+            pendingQuestion: {
+                kind: 'question',
+                question: 'Qual cor devo usar no teste visual?',
+                choices: ['azul', 'verde'],
+                askedAt: Date.now(),
+                allowFreeform: false,
+                protocolControlled: false,
+            },
+        };
+
+        expect(shouldRenderTerminalLiveStatusLine()).toBe(true);
+        const line = formatTerminalLiveStatusLine();
+        expect(line).toContain('waiting-human/aguardando resposta humana');
+        expect(line).toContain('Qual cor devo usar');
+        expect(line).toContain('opções=azul|verde');
+        expect(line).not.toContain('LLM-B trabalhando');
+    });
 });

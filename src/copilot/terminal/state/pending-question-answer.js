@@ -7,6 +7,7 @@
 import {
     answerTerminalPendingQuestion,
     hasTerminalPendingStructuredUserInputRequests,
+    listTerminalPendingStructuredUserInputs,
     readTerminalRuntimeState,
 } from '../frontend/gateways/index.js';
 
@@ -22,6 +23,7 @@ import {
  *     answer: string;
  *     pendingQuestionKind: import('../../presentation/contracts/index.js').RuntimePendingQuestionKind | null;
  *     pendingQuestionText: string | null;
+ *     pendingQuestionChoices: string[];
  *     protocolControlled: boolean;
  *     shadowExpired: boolean;
  * }} TerminalPendingAnswerResult
@@ -29,7 +31,7 @@ import {
 
 /**
  * @param {string} answer
- * @param {import('../../presentation/contracts/index.js').RuntimePendingQuestion} pending
+ * @param {{ choices?: string[]; allowFreeform?: boolean }} pending
  * @returns {{ ok: true; answer: string } | { ok: false; reason: 'invalid_choice' }}
  */
 function normalizePendingQuestionAnswer(answer, pending) {
@@ -43,6 +45,11 @@ function normalizePendingQuestionAnswer(answer, pending) {
     }
     if (choices.includes(answer)) {
         return { ok: true, answer };
+    }
+    const normalizedAnswer = answer.toLocaleLowerCase();
+    const normalizedMatches = choices.filter((choice) => choice.toLocaleLowerCase() === normalizedAnswer);
+    if (normalizedMatches.length === 1) {
+        return { ok: true, answer: normalizedMatches[0] ?? answer };
     }
     if (pending.allowFreeform === false) {
         return { ok: false, reason: 'invalid_choice' };
@@ -67,12 +74,14 @@ export function tryAnswerTerminalPendingQuestionInput(rawAnswer, runtimeId, opti
     const pending = runtimeState.pendingQuestion;
     const pendingQuestionKind = runtimeState.pendingQuestionKind;
     const pendingQuestionText = pending?.question ?? null;
+    const pendingQuestionChoices = Array.isArray(pending?.choices) ? pending.choices : [];
     const protocolControlled = Boolean(pending?.protocolControlled || pendingQuestionKind !== 'question');
     const resultBase = {
         runtimeId: runtimeState.runtimeId ?? null,
         answer,
         pendingQuestionKind,
         pendingQuestionText,
+        pendingQuestionChoices,
         protocolControlled,
         shadowExpired: Boolean(runtimeState.pendingQuestionShadowExpired),
     };
@@ -81,9 +90,28 @@ export function tryAnswerTerminalPendingQuestionInput(rawAnswer, runtimeId, opti
         return { ...resultBase, routed: false, ok: false, reason: 'empty' };
     }
     if (!pending) {
-        if (hasTerminalPendingStructuredUserInputRequests()) {
-            const ok = answerTerminalPendingQuestion(answer, runtimeId);
-            return { ...resultBase, routed: true, ok, reason: ok ? 'answered' : 'answer_failed' };
+        const structuredInputs = hasTerminalPendingStructuredUserInputRequests()
+            ? listTerminalPendingStructuredUserInputs()
+            : [];
+        const structuredInput = structuredInputs[0] ?? null;
+        if (structuredInput) {
+            const normalized = normalizePendingQuestionAnswer(answer, structuredInput);
+            const structuredBase = {
+                ...resultBase,
+                pendingQuestionText: structuredInput.question,
+                pendingQuestionChoices: structuredInput.choices,
+            };
+            if (!normalized.ok) {
+                return { ...structuredBase, routed: false, ok: false, reason: normalized.reason };
+            }
+            const ok = answerTerminalPendingQuestion(normalized.answer, runtimeId);
+            return {
+                ...structuredBase,
+                answer: normalized.answer,
+                routed: true,
+                ok,
+                reason: ok ? 'answered' : 'answer_failed',
+            };
         }
         return { ...resultBase, routed: false, ok: false, reason: 'no_pending' };
     }
@@ -98,4 +126,15 @@ export function tryAnswerTerminalPendingQuestionInput(rawAnswer, runtimeId, opti
 
     const ok = answerTerminalPendingQuestion(normalized.answer, runtimeId);
     return { ...resultBase, answer: normalized.answer, routed: true, ok, reason: ok ? 'answered' : 'answer_failed' };
+}
+
+/**
+ * Indica se uma linha humana ja pertenceu ao canal de pergunta pendente e, portanto, nao deve seguir para fila,
+ * mailbox ou novo turno. Respostas invalidas tambem sao consumidas para manter a pergunta viva e dar feedback claro.
+ *
+ * @param {TerminalPendingAnswerResult} result
+ * @returns {boolean}
+ */
+export function shouldConsumeTerminalPendingAnswerInput(result) {
+    return result.routed || result.reason === 'invalid_choice';
 }

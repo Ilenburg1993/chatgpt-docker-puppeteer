@@ -29,7 +29,7 @@ export {
     writeTerminalDisplayState,
     writeTerminalDisplayToggle,
 } from './display-policy.js';
-export { tryAnswerTerminalPendingQuestionInput } from './pending-question-answer.js';
+export { shouldConsumeTerminalPendingAnswerInput, tryAnswerTerminalPendingQuestionInput } from './pending-question-answer.js';
 export {
     appendTerminalIntent,
     clearTerminalIntentHistory,

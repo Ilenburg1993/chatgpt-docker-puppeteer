@@ -376,7 +376,21 @@ function clearTerminalLine() {
 function redrawPromptIfInteractive() {
     const rl = getRl();
     if (!rl || getBusy() || _terminalRenderLockDepth > 0) return;
-    rl.setPrompt(buildUserPrompt());
+    redrawTerminalPrompt(rl, buildUserPrompt());
+}
+
+/**
+ * Redesenha o prompt em uma linha limpa. Use nas bordas de conclusão de turno/comando, onde o cursor pode estar sobre
+ * uma linha que já contém prompt ou status transitório.
+ *
+ * @param {{ setPrompt: (prompt: string) => void; prompt: () => void } | null | undefined} rl
+ * @param {string} [prompt]
+ * @returns {void}
+ */
+export function redrawTerminalPrompt(rl, prompt = buildUserPrompt()) {
+    if (!rl) return;
+    clearTerminalLine();
+    rl.setPrompt(prompt);
     rl.prompt();
 }
 

@@ -46,6 +46,7 @@ import {
     clearInlineStatus,
     printExchange,
     println,
+    redrawTerminalPrompt,
     SEPARATOR,
     TURN_TIMEOUT_MS,
     writeInlineStatus,
@@ -149,6 +150,17 @@ const LIVE_TURN_NARRATION_INTERVAL_MS = 10_000;
  * @returns {string}
  */
 function formatLiveWaitingStatus({ startedAt, model, effort, timeoutMs, timeoutStrategy }) {
+    const runtimeState = readTerminalRuntimeState();
+    if (runtimeState.status === 'waiting_for_input' && runtimeState.pendingQuestionKind === 'question') {
+        const questionText = String(runtimeState.pendingQuestion?.question ?? 'pergunta pendente')
+            .replace(/\s+/g, ' ')
+            .trim()
+            .slice(0, 160);
+        const choices = Array.isArray(runtimeState.pendingQuestion?.choices)
+            ? runtimeState.pendingQuestion.choices.join('|')
+            : '';
+        return `  \x1b[90m⏸ aguardando resposta humana\x1b[0m\x1b[90m · ${questionText}${choices ? ` · opções=${choices}` : ''} · [/answer <texto>] [/status]\x1b[0m`;
+    }
     const elapsedMs = Math.max(0, Date.now() - startedAt);
     const elapsed = `${(elapsedMs / 1000).toFixed(1)}s`;
     const frame = WAITING_FRAMES[Math.floor(elapsedMs / 600) % WAITING_FRAMES.length] ?? '⏳';
@@ -472,6 +484,8 @@ async function _executeTurn(message, actor, attachments = [], requestHeaders = n
                 }),
             );
         const narrateWaitingStatus = () => {
+            const runtimeState = readTerminalRuntimeState();
+            if (runtimeState.status === 'waiting_for_input' && runtimeState.pendingQuestionKind === 'question') return;
             const now = Date.now();
             const elapsedMs = Math.max(0, now - t0);
             if (liveTurnSignal.firstOutputAt > 0 || elapsedMs < LIVE_TURN_NARRATION_INTERVAL_MS) return;
@@ -715,8 +729,7 @@ async function _executeTurn(message, actor, attachments = [], requestHeaders = n
         const rl = getRl();
         if (rl) {
             clearInlineStatus();
-            rl.setPrompt(buildUserPrompt());
-            rl.prompt();
+            redrawTerminalPrompt(rl, buildUserPrompt());
         }
     }
 }
