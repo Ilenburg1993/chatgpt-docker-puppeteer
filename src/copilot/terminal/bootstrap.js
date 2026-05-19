@@ -32,7 +32,7 @@ if (typeof log.setConsoleLevel === 'function') {
     const consoleLevel = (
         process.env['COPILOT_TERMINAL_CONSOLE_LOG_LEVEL'] ??
         process.env['COPILOT_CONSOLE_LOG_LEVEL'] ??
-        'WARN'
+        'ERROR'
     ).toUpperCase();
     log.setConsoleLevel(/** @type {'DEBUG' | 'INFO' | 'WARN' | 'ERROR' | 'FATAL'} */ (consoleLevel));
 }

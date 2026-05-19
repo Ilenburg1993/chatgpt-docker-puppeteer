@@ -204,3 +204,11 @@ Rodada executada via `npm run terminal:llm-b`:
 - `/health` exibiu `modo sdk interactive`, `keepalive standby(dialog)` e `health healthy`.
 - Turnos curtos (`ok-ux-3`, `ok-ux-4`) renderizaram resposta final, thinking capturado e usage sem perder transcript.
 - Durante processamento, o rodapé passou a mostrar prompt de espera (`⏳ [modelo/reasoning]`) em vez de novo `você›`.
+
+### Hardening Pós-Push
+
+- O entrypoint `terminal:llm-b` agora usa console log level `ERROR` por padrão para o logger de observability. `WARN`
+  continua persistido em arquivo/ring buffer e consultável por comandos, mas deixa de atravessar a área ANSI do terminal
+  como linha crua durante streaming.
+- Validação live com turno curto confirmou que warnings de token budget não quebram mais o layout interativo; a linha
+  viva permaneceu em prompt de espera e o transcript final foi preservado.
