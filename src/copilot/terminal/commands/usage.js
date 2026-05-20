@@ -4,7 +4,7 @@
  *
  * Comando `/usage [on|off|now]` do REPL terminal LLM-B.
  *
- * Controla a exibição de token usage e custo após cada turno.
+ * Controla a exibição de telemetria de tokens/custo após cada turno.
  *
  * @module copilot/terminal/commands/usage
  * @see EventBus
@@ -23,8 +23,8 @@ import { callWithRuntimeTarget, extractRuntimeTarget } from './runtime-target.js
  * Comando `/usage [on|off|now]`.
  *
  * - Sem argumento: toggle do display pós-turno.
- * - `on`: ativa usage display pós-turno.
- * - `off`: desativa usage display pós-turno.
+ * - `on`: ativa display de telemetria pós-turno.
+ * - `off`: desativa display de telemetria pós-turno.
  * - `now`: mostra snapshot instantâneo da context window.
  *
  * @param {UsageContext} ctx
@@ -54,9 +54,9 @@ export function cmdUsage({ println }, arg) {
             const modelLabel = modelBilling.mismatch
                 ? `cfg=\x1b[35m${modelBilling.configuredModel ?? '-'}\x1b[0m · cobrado=\x1b[36m${modelBilling.billedModel ?? '-'}\x1b[0m`
                 : `modelo=\x1b[36m${modelBilling.displayModel}\x1b[0m`;
-            println(`      Último PR: ${modelLabel} · custo=\x1b[33m${cost}\x1b[0m`);
+            println(`      Última Premium Request classificada: ${modelLabel} · custo=\x1b[33m${cost}\x1b[0m`);
         } else {
-            println('      Último PR: \x1b[90msem snapshot classificado nesta sessão\x1b[0m');
+            println('      Premium Request: \x1b[90msem snapshot classificado nesta sessão\x1b[0m');
         }
         if (projection.llmUsage) {
             const llmCost =
@@ -69,9 +69,10 @@ export function cmdUsage({ println }, arg) {
                 typeof projection.llmUsage['premiumRequestReason'] === 'string'
                     ? projection.llmUsage['premiumRequestReason']
                     : 'n/d';
-            const premiumRequest = projection.llmUsage['premiumRequest'] === true ? 'PR' : 'sem novo PR';
+            const premiumRequest =
+                projection.llmUsage['premiumRequest'] === true ? 'Premium Request classificada' : 'sem Premium Request';
             println(
-                `      Último uso LLM: modelo=\x1b[36m${projection.llmUsageBilling.displayModel}\x1b[0m · ${premiumRequest} · classe=\x1b[90m${llmClass}\x1b[0m · motivo=\x1b[90m${llmReason}\x1b[0m · custo=\x1b[33m${llmCost}\x1b[0m`,
+                `      Última telemetria LLM: modelo=\x1b[36m${projection.llmUsageBilling.displayModel}\x1b[0m · ${premiumRequest} · classe=\x1b[90m${llmClass}\x1b[0m · motivo=\x1b[90m${llmReason}\x1b[0m · custo=\x1b[33m${llmCost}\x1b[0m`,
             );
         }
         if (projection.runtimeSessionId || projection.binding.sdkSessionId || projection.binding.hubSessionId) {
@@ -97,7 +98,7 @@ export function cmdUsage({ println }, arg) {
 
     setShowUsage(next);
     const status = next ? '\x1b[32mon\x1b[0m' : '\x1b[31moff\x1b[0m';
-    println(`\n  📊  Exibição de usage pós-turno: ${status}`);
+    println(`\n  📊  Exibição de telemetria pós-turno: ${status}`);
     println('  \x1b[90mUso: /usage [on|off|now]\x1b[0m\n');
 }
 

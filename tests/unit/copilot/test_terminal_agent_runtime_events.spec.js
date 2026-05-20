@@ -659,7 +659,7 @@ describe('terminal/events/agent-runtime-events.js — contrato', () => {
 
         expect(recordTerminalActivity).toHaveBeenCalledWith(
             'system',
-            'Uso contabilizado com divergência de modelo',
+            'Premium Request classificada com divergência de modelo',
             expect.objectContaining({
                 detail: 'modeloCfg=gpt-5 · modeloEfetivo=gpt-5-mini · modeloCobrado=gpt-5-mini · custo=0.0123',
                 severity: 'warn',
@@ -667,7 +667,7 @@ describe('terminal/events/agent-runtime-events.js — contrato', () => {
                 recordHistory: true,
             }),
         );
-        expect(println).toHaveBeenCalledWith(expect.stringContaining('USAGE'));
+        expect(println).toHaveBeenCalledWith(expect.stringContaining('PR'));
         expect(println).toHaveBeenCalledWith(expect.stringContaining('modeloCobrado=gpt-5-mini'));
         expect(broadcastSse).toHaveBeenCalledWith(
             'pr.consumed',
@@ -709,10 +709,10 @@ describe('terminal/events/agent-runtime-events.js — contrato', () => {
 
         expect(recordTerminalActivity).toHaveBeenCalledWith(
             'system',
-            'Uso contabilizado com divergência de modelo',
+            'Premium Request classificada com divergência de modelo',
             expect.any(Object),
         );
-        expect(println).not.toHaveBeenCalledWith(expect.stringContaining('USAGE'));
+        expect(println).not.toHaveBeenCalledWith(expect.stringContaining('PR'));
         expect(broadcastSse).toHaveBeenCalledWith('pr.consumed', expect.any(Object));
     });
 
@@ -748,7 +748,7 @@ describe('terminal/events/agent-runtime-events.js — contrato', () => {
 
         expect(recordTerminalActivity).toHaveBeenCalledWith(
             'system',
-            'Uso LLM sem novo PR',
+            'Telemetria LLM sem Premium Request',
             expect.objectContaining({
                 detail: 'modelo=gpt-5.4 · custo=0.0123 · classe=ask_user_continuation · motivo=user_input_completed_continuation · tokens=10→4',
                 source: 'agent',

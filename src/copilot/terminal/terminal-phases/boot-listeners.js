@@ -29,6 +29,18 @@ let _sighupHandlerRegistered = false;
 /** @type {(() => void) | null} */
 let _sighupHandler = null;
 
+/**
+ * SIGHUP é o sinal esperado no terminal POSIX quando o painel é reaberto/fechado.
+ * No Windows esse sinal não é suportado de forma confiável pelo Node; registrar o handler lá
+ * cria ruído de boot sem capacidade operacional real.
+ *
+ * @param {NodeJS.Platform} [platform]
+ * @returns {boolean}
+ */
+export function shouldRegisterTerminalSighupHandler(platform = process.platform) {
+    return platform !== 'win32';
+}
+
 // ---------------------------------------------------------------------------
 // Rollback
 // ---------------------------------------------------------------------------
@@ -97,7 +109,7 @@ export async function runTerminalRuntimeListenersPhase(ctx) {
         attachTerminalHubSocketIO(copilotServer.io);
     }
 
-    if (!_sighupHandlerRegistered) {
+    if (shouldRegisterTerminalSighupHandler() && !_sighupHandlerRegistered) {
         _sighupHandler = () => {
             log('INFO', '[TerminalServer] SIGHUP recebido — mantendo inject server ativo (painel reaberto).');
         };

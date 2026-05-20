@@ -32,6 +32,7 @@ import { renderTerminalIntent } from './intent-renderer.js';
 import {
     buildTerminalToolActivityPresentation,
     compactTerminalToolText,
+    isGenericTerminalToolName,
     mapTerminalToolOperationRole,
 } from './tool-activity-presenter.js';
 import {
@@ -204,7 +205,7 @@ function resolveEffectiveExternalToolName(evt, fallbackName) {
             'targetTool',
             'tool',
         ]);
-        if (name && name !== 'external_tool') return name;
+        if (name && !isGenericTerminalToolName(name)) return name;
     }
     return fallbackName;
 }

@@ -6,6 +6,7 @@
 
 import { LLM_B_REFLECTION_INTERVAL_MIN } from '#copilot/config';
 import { log } from '#copilot/observability';
+import { toError } from '../../core/error-handlers.js';
 import { cancel as cancelTimer, registerTimer } from '../../core/timer-registry.js';
 import { sendTurn } from '../dialog/index.js';
 import { readTerminalRuntimeState } from '../frontend/gateways/index.js';
@@ -42,17 +43,25 @@ export function startReflectionLoop(deps = {}) {
     logFn('INFO', `[TerminalServer] Reflection loop ativado: a cada ${reflectionIntervalMin}min.`);
 
     const runReflection = () => {
-        const runtimeState = readTerminalRuntimeStateFn();
-        if (!runtimeState.dialogLoopActive) return;
-        if (runtimeState.queueSize > 0) {
-            logFn('INFO', '[TerminalServer] Reflection loop pulado — fila ocupada.');
-            return;
+        try {
+            const runtimeState = readTerminalRuntimeStateFn();
+            if (!runtimeState.dialogLoopActive) return;
+            if (runtimeState.queueSize > 0) {
+                logFn('INFO', '[TerminalServer] Reflection loop pulado — fila ocupada.');
+                return;
+            }
+            logFn('INFO', '[TerminalServer] Executando reflection loop…');
+            sendTurnFn(
+                '[REFLEXÃO] Faça uma breve reflexão sobre as últimas mensagens desta conversa: o que foi discutido, o que está pendente, e se você tem alguma sugestão ou insight que ainda não mencionou. Seja conciso.',
+                'llm-a',
+            ).catch((e) => {
+                const err = toError(e);
+                logFn('WARN', `[TerminalServer] Reflection loop falhou: ${err.message}`);
+            });
+        } catch (e) {
+            const err = toError(e);
+            logFn('WARN', `[TerminalServer] Reflection loop falhou: ${err.message}`);
         }
-        logFn('INFO', '[TerminalServer] Executando reflection loop…');
-        sendTurnFn(
-            '[REFLEXÃO] Faça uma breve reflexão sobre as últimas mensagens desta conversa: o que foi discutido, o que está pendente, e se você tem alguma sugestão ou insight que ainda não mencionou. Seja conciso.',
-            'llm-a',
-        ).catch((e) => logFn('WARN', `[TerminalServer] Reflection loop falhou: ${e.message}`));
     };
 
     const timer = setIntervalFn(runReflection, reflectionIntervalMs);

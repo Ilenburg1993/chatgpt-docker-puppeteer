@@ -70,4 +70,31 @@ describe('terminal/terminal-phases/boot-reflection-loop', () => {
         assert.equal(clearIntervalFn.mock.calls.length, 1);
         assert.deepEqual(cancelTimerFn.mock.calls[0], ['terminal.reflection']);
     });
+
+    it('registra falha síncrona sem derrubar o timer periódico', async () => {
+        let captured = /** @type {null | (() => void)} */ (null);
+        const logFn = /** @type {(level: 'DEBUG' | 'INFO' | 'WARN' | 'ERROR' | 'FATAL', message: string) => void} */ (
+            /** @type {unknown} */ (vi.fn())
+        );
+
+        startReflectionLoop({
+            reflectionIntervalMin: 1,
+            readTerminalRuntimeStateFn: () => ({ dialogLoopActive: true, queueSize: 0 }),
+            sendTurnFn: () => {
+                throw new Error('sdk indisponível');
+            },
+            logFn,
+            registerTimerFn: vi.fn(),
+            setIntervalFn: (/** @type {() => void} */ fn, /** @type {number} */ _delay) => {
+                captured = fn;
+                return { unref() {} };
+            },
+        });
+
+        assert.doesNotThrow(() => {
+            if (captured) captured();
+        });
+        assert.equal(/** @type {import('vitest').Mock} */ (logFn).mock.calls.at(-1)?.[0], 'WARN');
+        assert.match(String(/** @type {import('vitest').Mock} */ (logFn).mock.calls.at(-1)?.[1]), /sdk indisponível/);
+    });
 });

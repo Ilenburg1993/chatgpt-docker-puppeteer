@@ -23,7 +23,7 @@ import { loadAliasesAsync } from './stores/index.js';
  *
  * @typedef {object} TerminalServerStartOptions
  * @property {TerminalServerStartDeps['startCopilotServer']} [startCopilotServer]
- * @property {() => void} [wireRuntime]
+ * @property {() => void | Promise<void>} [wireRuntime]
  * @property {() => void | Promise<void>} [loadAliases]
  * @property {() => NodeJS.Timeout} [startTodoCleanupJob]
  * @property {ReturnType<import('#copilot/boot').readCopilotBootConfig>} [bootConfig]
@@ -32,7 +32,7 @@ import { loadAliasesAsync } from './stores/index.js';
  *
  * @typedef {object} TerminalBootContext
  * @property {TerminalServerStartDeps['startCopilotServer']} startCopilotServer
- * @property {() => void} wireRuntime
+ * @property {() => void | Promise<void>} wireRuntime
  * @property {() => void | Promise<void>} loadAliases
  * @property {() => NodeJS.Timeout} startTodoCleanupJob
  * @property {ReturnType<import('#copilot/boot').readCopilotBootConfig>} bootConfig
@@ -121,7 +121,7 @@ export async function runTerminalAliasesPhase(ctx) {
  */
 export async function runTerminalRuntimeConfigPhase(ctx) {
     recordTerminalActivity('boot', 'Configurando runtime Copilot', { source: 'terminal', recordHistory: false });
-    ctx.wireRuntime();
+    await ctx.wireRuntime();
     if (ctx.bootPreflight) {
         recordTerminalActivity('boot', 'Executando preflight SDK', {
             detail: ctx.bootPreflight['pingOk'] ? 'CLI acessível' : 'CLI indisponível ou sem resposta',

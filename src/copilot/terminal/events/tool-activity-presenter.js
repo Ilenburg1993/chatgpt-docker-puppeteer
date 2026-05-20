@@ -26,6 +26,8 @@ const INSPECTION_TOOL_PATTERNS = /** @type {const} */ ([
     { match: /\b(skill|invoke\s+skill|task|todo)\b/i, label: 'inspecionando recurso do agente' },
 ]);
 
+const GENERIC_TOOL_NAMES = new Set(['external_tool', 'external tool', 'tool', 'unknown', 'unknown_tool']);
+
 /**
  * @typedef {'read' | 'write' | 'edit' | 'delete' | 'list' | 'run' | 'inspect' | 'unknown'} TerminalToolOperation
  *
@@ -65,6 +67,15 @@ function objectOrNull(value) {
  */
 function stringOrNull(value) {
     return typeof value === 'string' && value.trim().length > 0 ? value.trim() : null;
+}
+
+/**
+ * @param {string | null | undefined} value
+ * @returns {boolean}
+ */
+export function isGenericTerminalToolName(value) {
+    if (!value) return true;
+    return GENERIC_TOOL_NAMES.has(value.trim().toLowerCase());
 }
 
 /**
@@ -211,7 +222,8 @@ export function mapTerminalToolOperationRole(operation) {
  * @returns {TerminalToolActivityPresentation}
  */
 export function buildTerminalToolActivityPresentation(evt, fallbackName = 'tool') {
-    const toolName = stringOrNull(evt['toolName']) ?? stringOrNull(evt['name']) ?? fallbackName;
+    const explicitToolName = stringOrNull(evt['toolName']) ?? stringOrNull(evt['name']);
+    const toolName = explicitToolName && !isGenericTerminalToolName(explicitToolName) ? explicitToolName : fallbackName;
     const canonicalToolName = resolveToolName(toolName);
     const displayToolName =
         canonicalToolName && canonicalToolName !== toolName ? `${canonicalToolName} (alias: ${toolName})` : toolName;

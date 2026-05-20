@@ -79,4 +79,19 @@ describe('terminal/tool-activity-presenter', () => {
         expect(intent.canonicalToolName).toBe('report_intent_local');
         expect(intent.operation).toBe('inspect');
     });
+
+    it('ignora nomes genéricos do SDK quando há fallback real', () => {
+        const presentation = buildTerminalToolActivityPresentation(
+            {
+                toolName: 'unknown',
+                args: { path: 'src/copilot/terminal/events/tool-activity-presenter.js' },
+            },
+            'read_file_content',
+        );
+
+        expect(presentation.toolName).toBe('read_file_content');
+        expect(presentation.canonicalToolName).toBe('read_file_content');
+        expect(presentation.operation).toBe('read');
+        expect(presentation.detail).toContain('lendo arquivo');
+    });
 });

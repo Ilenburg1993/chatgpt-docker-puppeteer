@@ -588,7 +588,9 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, regi
         const detail = formatUsageDetail(billing);
         const showUsage = getShowUsage();
         const shouldPersist = showUsage || billing.mismatch;
-        const label = billing.mismatch ? 'Uso contabilizado com divergência de modelo' : 'Uso do turno contabilizado';
+        const label = billing.mismatch
+            ? 'Premium Request classificada com divergência de modelo'
+            : 'Premium Request classificada';
         recordTerminalActivity('system', label, {
             detail,
             source: 'agent',
@@ -597,7 +599,7 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, regi
         });
         if ((showUsage || billing.mismatch) && !isTerminalRenderLocked()) {
             println(
-                `  ${terminalThemeBadge(billing.mismatch ? 'warn' : 'info', 'USAGE')} ${terminalThemeText(billing.mismatch ? 'warn' : 'muted', detail)}`,
+                `  ${terminalThemeBadge(billing.mismatch ? 'warn' : 'info', 'PR')} ${terminalThemeText(billing.mismatch ? 'warn' : 'muted', detail)}`,
             );
         }
         broadcastSse(AGENT_PR_CONSUMED_EVENT, withAgentSseEnvelope(evt, 'agent/pr.consumed'));
@@ -612,7 +614,9 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, regi
         const detail = formatLlmUsageDetail(evt, billing);
         const showUsage = getShowUsage();
         const shouldPersist = showUsage || billing.mismatch;
-        const label = billing.mismatch ? 'Uso LLM sem novo PR com divergência de modelo' : 'Uso LLM sem novo PR';
+        const label = billing.mismatch
+            ? 'Telemetria LLM sem Premium Request com divergência de modelo'
+            : 'Telemetria LLM sem Premium Request';
         recordTerminalActivity('system', label, {
             detail,
             source: 'agent',
