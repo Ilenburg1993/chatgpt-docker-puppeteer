@@ -379,7 +379,16 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
             println(`  \x1b[90mℹ️  [${infoType}] ${message}\x1b[0m`);
             if (evt?.url) println(`  \x1b[90m    ${evt.url}\x1b[0m`);
         }
-        broadcastSse('session.info', { infoType, message, url: evt?.url, timestamp: Date.now() });
+        broadcastSse(
+            'session.info',
+            withTerminalTurnCorrelation({
+                infoType,
+                message,
+                url: evt?.url,
+                source: 'sdk/session.info',
+                timestamp: Date.now(),
+            }),
+        );
     };
 
     const onElicitationPending = (/** @type {Record<string, unknown>} */ evt) => {
@@ -656,7 +665,16 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
         });
         println(`  \x1b[33m⚠️  [${warningType}] ${message}\x1b[0m`);
         if (evt?.url) println(`  \x1b[90m    ${evt.url}\x1b[0m`);
-        broadcastSse('session.warning', { warningType, message, url: evt?.url, timestamp: Date.now() });
+        broadcastSse(
+            'session.warning',
+            withTerminalTurnCorrelation({
+                warningType,
+                message,
+                url: evt?.url,
+                source: 'sdk/session.warning',
+                timestamp: Date.now(),
+            }),
+        );
     };
 
     const onSessionModelChanged = (

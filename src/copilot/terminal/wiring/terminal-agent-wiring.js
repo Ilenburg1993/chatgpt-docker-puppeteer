@@ -43,6 +43,7 @@ import {
     writeTerminalHubSystemTurn,
 } from '../frontend/gateways/index.js';
 import { markTerminalActivityIdle, recordTerminalActivity } from '../state/dialog/index.js';
+import { withTerminalTurnCorrelation } from '../state/events/index.js';
 import { drainMailboxToTurnIfIdle } from './mailbox-drain.js';
 
 /** @type {boolean} */
@@ -249,12 +250,16 @@ export function registerAgentEventListeners(printBanner) {
 
     agentEvents.on(EMITTER_DIALOG_REPLY, (/** @type {{ reply: string }} */ evt) => {
         const { model, reasoningEffort } = readTerminalDialogStreamMeta();
-        broadcastSse('dialog.reply', {
-            content: evt.reply,
-            timestamp: Date.now(),
-            model,
-            reasoningEffort,
-        });
+        broadcastSse(
+            'dialog.reply',
+            withTerminalTurnCorrelation({
+                content: evt.reply,
+                timestamp: Date.now(),
+                model,
+                reasoningEffort,
+                source: 'terminal-agent-wiring/dialog.reply',
+            }),
+        );
     });
     // F4.6 (UPG-11): emite dialog.loop.changed para dashboard responsivo
     agentEvents.on(EMITTER_DIALOG_LOOP_CHANGED, (/** @type {{ active: boolean; ts: number }} */ evt) => {

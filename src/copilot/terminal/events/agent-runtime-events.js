@@ -365,7 +365,7 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, regi
             source: 'agent',
         });
         println(`\n  \x1b[31m⚠️  Erro de sessão [${errorType}]: ${msg}\x1b[0m`);
-        broadcastSse('session.error', { errorType, message: msg });
+        broadcastSse('session.error', withAgentSseEnvelope({ errorType, message: msg }, 'agent/session.error'));
     };
 
     const onAgentError = (/** @type {Record<string, unknown>} */ evt) => {
