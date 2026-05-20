@@ -959,22 +959,47 @@ describe('terminal/events/agent-runtime-events.js — contrato', () => {
             recoverable: true,
             errorMessage: 'Erro do SDK sem mensagem estruturada.',
         });
+        listeners.get('error')?.[0]?.({
+            hookType: 'errorOccurred',
+            errorContext: 'model_call',
+            recoverable: true,
+            errorMessage: 'Erro do SDK sem mensagem estruturada.',
+        });
 
         expect(recordTerminalActivity).toHaveBeenCalledWith(
             'error',
             'Erro recuperável de modelo SDK',
             expect.objectContaining({
                 severity: 'warn',
-                detail: expect.stringContaining('fallback=auto'),
+                detail: expect.stringContaining('auto é a única recuperação permitida'),
+                recordHistory: true,
             }),
         );
-        expect(println).toHaveBeenCalledWith(expect.stringContaining('MODEL'));
+        expect(recordTerminalActivity).toHaveBeenCalledWith(
+            'error',
+            'Erro recuperável de modelo SDK',
+            expect.objectContaining({
+                severity: 'warn',
+                detail: expect.not.stringContaining('fallback=auto'),
+                recordHistory: false,
+            }),
+        );
+        expect(println.mock.calls.filter(([line]) => String(line).includes('MODEL'))).toHaveLength(1);
         expect(broadcastSse).toHaveBeenCalledWith(
             'agent.error',
             expect.objectContaining({
                 errorContext: 'model_call',
                 recoverable: true,
+                operatorMeaning: expect.stringContaining('sem Premium Request confirmada'),
                 handledAs: 'recoverable_model_call',
+            }),
+        );
+        expect(broadcastSse).toHaveBeenCalledWith(
+            'agent.error',
+            expect.objectContaining({
+                errorContext: 'model_call',
+                recoverable: true,
+                suppressedDuplicate: true,
             }),
         );
     });

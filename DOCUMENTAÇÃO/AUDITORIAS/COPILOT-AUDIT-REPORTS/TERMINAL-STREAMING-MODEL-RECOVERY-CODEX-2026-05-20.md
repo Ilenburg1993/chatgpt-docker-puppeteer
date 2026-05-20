@@ -685,6 +685,8 @@ Implementado:
 - `tool-activity-presenter.js` passou a recuperar a identidade real da tool em `data`, `payload`, `input`, `args` e `arguments` serializado quando o SDK envia nomes genéricos como `unknown`, `tool` ou `external_tool`.
 - `tool-lifecycle-runtime.js` agora registra lifecycle nativo com o nome efetivo do presenter, reduzindo a chance de `tool.lifecycle` nascer com identidade genérica quando o payload já traz uma identidade melhor.
 - `tool-activity-presenter.js` foi reclassificado como `hotspot` no `module-map.js`; a próxima subonda deve modularizar identity resolution, target summary e rendering text para reduzir tamanho sem quebrar o fluxo único.
+- `agent-runtime-events.js` deixou de narrar erro recuperável de `model_call` como `fallback=auto`; agora descreve roteamento/retry delegado ao SDK, explicita que `auto` é a única recuperação permitida quando aplicável e que não há Premium Request confirmada.
+- Repetições idênticas de `model_call` recuperável continuam auditáveis via SSE, mas não poluem o histórico/PTY a cada ocorrência dentro da janela de throttle.
 - Boot HTTP deixou de morrer em `EADDRINUSE` e passou a realocar a porta do inject server com UX/comandos refletindo a porta efetiva.
 - O live runner canônico agora evita colisão de porta antes do boot e coleta SSE na porta efetiva escolhida.
 - `task.delta` público fora de turno agora fecha materialização canônica; `assistant.message` posterior suprime duplicata exata ou renderiza apenas o sufixo faltante.
@@ -705,7 +707,7 @@ Implementado:
 Próxima rodada recomendada:
 
 1. Fechar a recuperação `session.error`/`reconnect_restart`, distinguindo retry real de reenvio ambíguo de prompt.
-2. Normalizar wording de usage para remover qualquer ambiguidade residual com Premium Request.
+2. Normalizar wording de usage/session error em todos os comandos derivados (`/errors`, `/activity`, `/events`) para remover qualquer ambiguidade residual com Premium Request.
 3. Criar contrato único de modelo configurado/preferido/efetivo/cobrado.
 4. Continuar a normalização de tool identity em completions/progress externos sem requestId, com métricas para qualquer lifecycle ainda genérico.
 5. Adicionar eventos de boot `runtime.wired` e falha de fase.

@@ -137,6 +137,8 @@ function classifyBackgroundNarration({ description, failed = false }) {
 
 const TOOL_HEARTBEAT_INTERVAL_MS = 10_000;
 const RECOVERABLE_MODEL_ERROR_RENDER_THROTTLE_MS = 30_000;
+const RECOVERABLE_MODEL_CALL_OPERATOR_DETAIL =
+    'roteamento/retry delegado ao SDK; auto é a única recuperação permitida quando aplicável; sem Premium Request confirmada';
 
 /**
  * @param {Record<string, unknown>} evt
@@ -386,7 +388,7 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, regi
         const label = isRecoverableModelCall ? 'Erro recuperável de modelo SDK' : 'Erro do agente';
         const severity = isRecoverableModelCall ? 'warn' : 'error';
         const detail = isRecoverableModelCall
-            ? `${msg} · fallback=auto será usado quando aplicável`
+            ? `${msg} · ${RECOVERABLE_MODEL_CALL_OPERATOR_DETAIL}`
             : `[${errorContext}] ${msg}`;
         const renderKey = `${errorContext}|${msg}`;
         const now = Date.now();
@@ -401,7 +403,8 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, regi
             detail,
             severity,
             source: 'agent',
-            recordHistory: true,
+            recordHistory: !isRecoverableModelCall || shouldPrint,
+            updateCurrent: true,
         });
         if (shouldPrint && !isTerminalRenderLocked()) {
             println(
@@ -416,6 +419,8 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, regi
                     errorContext,
                     recoverable,
                     message: msg,
+                    operatorMeaning: isRecoverableModelCall ? RECOVERABLE_MODEL_CALL_OPERATOR_DETAIL : null,
+                    suppressedDuplicate: isRecoverableModelCall && !shouldPrint,
                     handledAs: isRecoverableModelCall ? 'recoverable_model_call' : 'agent_error',
                 },
                 'agent/error',
