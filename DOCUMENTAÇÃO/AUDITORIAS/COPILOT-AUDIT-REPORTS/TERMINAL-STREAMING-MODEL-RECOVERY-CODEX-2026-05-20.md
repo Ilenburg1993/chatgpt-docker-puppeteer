@@ -328,6 +328,24 @@ Critério ideal:
 - Falhas externas recuperáveis ou temporárias devem ser classificadas como `BLOCKED`, não como `FAIL` de todos os critérios downstream.
 - Quando o SDK voltar a responder, o mesmo runner deve executar o cenário completo sem exigir mudanças manuais.
 
+### A21. `/usage now` confundia snapshot histórico com consumo atual
+
+Evidência:
+
+- Em live `--no-pr` e no boot bloqueado por rate limit, `/usage now` imprimia `Última Premium Request classificada` mesmo antes de qualquer turno funcional do probe atual.
+- O dado vinha de `lastPrInfo`, isto é, último snapshot registrado no runtime, não uma confirmação de consumo no boot atual.
+
+Correção implementada:
+
+- A mensagem passou a ser `Última Premium Request registrada` e inclui nota explícita: `histórica; não implica consumo neste boot/probe`.
+- Quando não há snapshot, o texto agora fala em `sem snapshot histórico classificado`.
+- A telemetria `llm.usage` com `premiumRequest=true` passou a dizer `Premium Request nesta telemetria`, separando evento atual de registro histórico.
+
+Critério ideal:
+
+- O operador deve conseguir distinguir histórico persistido, telemetria do turno atual e Premium Request efetivamente classificada.
+- Nenhum comando deve sugerir consumo atual sem evidência causal do turno/probe corrente.
+
 ## Hipóteses Externas Rejeitadas Ou Reclassificadas
 
 ### H1. "boot-hub assume sucesso"
@@ -646,6 +664,7 @@ Implementado:
 - O live runner canônico agora evita colisão de porta antes do boot e coleta SSE na porta efetiva escolhida.
 - `task.delta` público fora de turno agora fecha materialização canônica; `assistant.message` posterior suprime duplicata exata ou renderiza apenas o sufixo faltante.
 - O live runner agora classifica rate limit do SDK como blocker de causa raiz, evitando falso diagnóstico em cascata.
+- `/usage now` agora diferencia snapshot histórico de consumo atual do boot/probe.
 - Testes unitários adicionados para runtime root, reflection sync failure e SIGHUP policy.
 - Testes unitários adicionados para reconciliação de `assistant.message` materializado, supressão visual de `question.pending` e preferência `dialog.delta`.
 - Testes unitários adicionados para normalização de objetos de erro sem `message`.

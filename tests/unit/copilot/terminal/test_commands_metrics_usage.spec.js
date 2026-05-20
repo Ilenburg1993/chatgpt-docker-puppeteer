@@ -351,6 +351,8 @@ describe('commands/metrics + usage', () => {
         expect(ctx.output()).toContain('Binding: runtime=');
         expect(ctx.output()).toContain('Modo: sdk=');
         expect(ctx.output()).toContain('gpt-5-mini');
+        expect(ctx.output()).toContain('Última Premium Request registrada');
+        expect(ctx.output()).toContain('não implica consumo neste boot/probe');
     });
 
     it('cmdUsage now aceita runtimeId explícito', () => {
