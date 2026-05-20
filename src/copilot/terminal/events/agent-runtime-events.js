@@ -50,6 +50,7 @@ import {
     terminalActionChip,
     terminalThemeBadge,
     terminalThemeText,
+    withTerminalTurnCorrelation,
 } from '../state/events/index.js';
 import { renderTerminalIntent } from './intent-renderer.js';
 import { compactTerminalToolText } from './tool-activity-presenter.js';
@@ -84,6 +85,19 @@ const INTERNAL_BACKGROUND_DESCRIPTION_PATTERNS = [
 function printlnWhenRenderUnlocked(line) {
     if (isTerminalRenderLocked()) return;
     println(line);
+}
+
+/**
+ * @param {Record<string, unknown>} evt
+ * @param {string} source
+ * @returns {Record<string, unknown> & { traceId?: string; turnId?: string; timestamp: number; source: string }}
+ */
+function withAgentSseEnvelope(evt, source) {
+    return withTerminalTurnCorrelation({
+        ...evt,
+        source: typeof evt['source'] === 'string' && evt['source'].trim().length > 0 ? evt['source'] : source,
+        timestamp: Date.now(),
+    });
 }
 
 /**
@@ -574,19 +588,13 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, regi
                 `  ${terminalThemeBadge(billing.mismatch ? 'warn' : 'info', 'USAGE')} ${terminalThemeText(billing.mismatch ? 'warn' : 'muted', detail)}`,
             );
         }
-        broadcastSse(AGENT_PR_CONSUMED_EVENT, {
-            ...evt,
-            timestamp: Date.now(),
-        });
+        broadcastSse(AGENT_PR_CONSUMED_EVENT, withAgentSseEnvelope(evt, 'agent/pr.consumed'));
     };
 
     const onLlmUsage = (/** @type {Record<string, unknown>} */ evt) => {
         const premiumRequest = evt?.['premiumRequest'] === true;
         const billing = normalizeUsageBilling(evt);
-        broadcastSse(EMITTER_LLM_USAGE, {
-            ...evt,
-            timestamp: Date.now(),
-        });
+        broadcastSse(EMITTER_LLM_USAGE, withAgentSseEnvelope(evt, 'agent/llm.usage'));
         if (premiumRequest) return;
 
         const detail = formatLlmUsageDetail(evt, billing);
@@ -618,10 +626,7 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, regi
         println(
             `  ${terminalThemeBadge('warn', 'MODEL')} ${terminalThemeText('warn', `Fallback de modelo: ${detail}`)}`,
         );
-        broadcastSse(AGENT_PR_FALLBACK_MODEL_EVENT, {
-            ...evt,
-            timestamp: Date.now(),
-        });
+        broadcastSse(AGENT_PR_FALLBACK_MODEL_EVENT, withAgentSseEnvelope(evt, 'agent/pr.fallback_model'));
     };
 
     const onDialogBootRecovery = (/** @type {Record<string, unknown>} */ evt) => {
@@ -647,10 +652,7 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, regi
                 `  ${terminalThemeBadge('warn', 'DIALOG')} ${terminalThemeText('warn', skippedPrFallback ? `Boot recovery sem fallback PR: ${detail}` : `Boot recovery com PR: ${detail}`)}`,
             );
         }
-        broadcastSse(EMITTER_DIALOG_BOOT_RECOVERY, {
-            ...evt,
-            timestamp: Date.now(),
-        });
+        broadcastSse(EMITTER_DIALOG_BOOT_RECOVERY, withAgentSseEnvelope(evt, 'agent/dialog.boot_recovery'));
     };
 
     agent.on(EMITTER_QUESTION_PENDING, onQuestion);

@@ -230,7 +230,7 @@ Esta revisao cruza o log live fornecido pelo usuario, o relatorio da LLM-B e o c
 - Criar comando/diagnostico de streaming que diga claramente: SDK nao emitiu delta, delta emitido mas display desligado, delta emitido e renderizado, ou delta emitido e reconciliado no final.
 - Expor no `/usage now` e `/status` a distincao entre `boot/resume zero-PR`, `turn billed`, `explicit /turn`, `direct chat bridge` e `recovery PR fallback`.
 - Expor no `/usage now` tambem o ultimo `llm.usage` classificado, separado do ultimo `pr.consumed`, para acabar com a ambiguidade entre token telemetry e Premium Request. **Implementado.**
-- Unificar payloads SSE de `delta`, `assistant.message`, `dialog.reply`, `user_input.*`, `tool.*` e `pr.consumed` com um envelope comum de `traceId/turnId/eventId/source`. **Parcialmente implementado: o stream SSE global agora recebe um `eventId` canonico unico por broadcast e o propaga ao pool `/events` sem regravar o replay; `delta`, diagnosticos, `assistant.message`, `user_input.*` e `tool.lifecycle` ja carregam `traceId/turnId` quando ha materializacao/trace ativa; ainda faltam `pr.consumed`, `dialog.reply` e uma `source` comum em todos os envelopes.**
+- Unificar payloads SSE de `delta`, `assistant.message`, `dialog.reply`, `user_input.*`, `tool.*` e `pr.consumed` com um envelope comum de `traceId/turnId/eventId/source`. **Parcialmente implementado: o stream SSE global agora recebe um `eventId` canonico unico por broadcast e o propaga ao pool `/events` sem regravar o replay; `delta`, diagnosticos, `assistant.message`, `user_input.*`, `tool.lifecycle`, `llm.usage`, `pr.consumed`, `pr.fallback_model` e `dialog.boot_recovery` ja carregam `traceId/turnId` quando ha materializacao/trace ativa; ainda faltam `dialog.reply` e padronizar `source` em todos os envelopes SDK vanilla.**
 - Revisar o fluxo de `requestHeaders` em `runTerminalDialogTurnDetailed`: hoje ele pode parar dialog loop e usar direct chat, portanto deve ser exibido como caminho que pode consumir PR.
 - Criar teste unitario para boot recovery com env `LLM_B_DIALOG_BOOT_RECOVERY_ALLOW_PR_FALLBACK=true`, garantindo que o fallback pago e deliberado e observavel.
 - Criar teste live automatizavel que obrigue resposta longa o suficiente para observar varios deltas, uma tool, usage e `ask_user`.
@@ -449,7 +449,7 @@ Itens descartados/renomeados:
 Pendencias apos esta revisao:
 
 - Persistir diagnosticos de streaming/reconciliacao no historico conversacional e no `/export`, nao apenas no estado live. **Parcialmente implementado: o turno `llm_b` persistido no Hub agora recebe `metadata.terminalStreamingDiagnostics`, a timeline preserva metadata e `/export` imprime resumo quando disponivel. Falta propagar tambem para transcript live nao persistido e para sync lazy de bridge tail.**
-- Propagar `traceId`/`turnId` aos diagnosticos e deltas SSE para correlação perfeita entre terminal, timeline, SSE e hub. **Parcialmente implementado para `delta`, diagnosticos de stream, `assistant.message`, `user_input.*` e `tool.lifecycle`; falta cobrir usage/PR, `dialog.reply` e correlacionar o runner externo automaticamente.**
+- Propagar `traceId`/`turnId` aos diagnosticos e deltas SSE para correlação perfeita entre terminal, timeline, SSE e hub. **Parcialmente implementado para `delta`, diagnosticos de stream, `assistant.message`, `user_input.*`, `tool.lifecycle`, usage/PR e eventos de fallback/recovery; falta cobrir `dialog.reply` e correlacionar o runner externo automaticamente.**
 - Adicionar assert live especifico para a secao `Streaming publico` no modo com turno real, alem do modo `--no-pr`.
 - Coletar SSE paralelamente no runner para comparar stdout local, replay buffer e canal externo. **Implementado para coleta e criterios basicos; falta correlacionar automaticamente stdout markers, eventos SSE e replay em turnos reais.**
 - Enriquecer o classificador de `llm.usage` com sinal local de resposta humana pendente para explicar melhor fechamentos tardios de `ask_user`. **Implementado: usage emitido enquanto `user_input.requested` ainda esta pendente agora e classificado como `ask_user_continuation` com motivo `pending_user_input_request_continuation`, e o `user_input.completed` tardio nao cria uma segunda continuacao.**
@@ -466,11 +466,12 @@ Implementado nesta revisao:
 - `user_input.requested` e `user_input.completed` passam a sair no SSE com `traceId` e `turnId` quando ocorrem dentro de turno materializado/trace ativo.
 - `tool.lifecycle` ganhou campos formais `traceId` e `turnId` no schema e todo broadcast de tools passa por `withTerminalTurnCorrelation`.
 - Eventos de tool nativa, external tool, user-requested tool, io_op e completions reconciliadas agora compartilham o mesmo envelope minimo de turno.
+- `llm.usage`, `pr.consumed`, `pr.fallback_model` e `dialog.boot_recovery` passaram a usar envelope SSE com `source`, `timestamp`, `traceId` e `turnId`.
 - Testes unitarios cobrem correlação de `user_input.*` e `tool.lifecycle`, alem de manter regressao para IO/tool lifecycle existente.
 
 Pendencias apos esta revisao:
 
-- Aplicar o mesmo helper em `pr.consumed`, `llm.usage`, `dialog.reply`, `session.error` e eventos de fallback de modelo.
+- Aplicar o mesmo helper em `dialog.reply`, `session.error`, `session.warning/info` e eventos SDK vanilla restantes.
 - Persistir `traceId/turnId` dos eventos correlacionados no Hub/export, nao apenas no SSE live.
 - Fazer o runner live real cruzar `stdout`, `terminal.sse.jsonl` e `/activity` por `traceId` para provar ausência de duplicação/perda entre canais.
 

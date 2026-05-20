@@ -622,6 +622,9 @@ describe('terminal/events/agent-runtime-events.js — contrato', () => {
     it('promove pr.consumed para narrativa explícita de uso com SSE dedicada', async () => {
         const { setupTerminalAgentRuntimeEventListeners } =
             await import('../../../src/copilot/terminal/events/agent-runtime-events.js');
+        const { beginTerminalTurnMaterialization, clearTerminalTurnMaterialization } = await import(
+            '../../../src/copilot/terminal/state/turn-materialization-state.js'
+        );
         /** @type {Map<string, Function[]>} */
         const listeners = new Map();
         const agent = {
@@ -634,6 +637,8 @@ describe('terminal/events/agent-runtime-events.js — contrato', () => {
         };
 
         setupTerminalAgentRuntimeEventListeners({ agent: /** @type {any} */ (agent), rl: null });
+        clearTerminalTurnMaterialization();
+        beginTerminalTurnMaterialization({ turnId: 'turn-usage-1', timestamp: 1000 });
         listeners.get('pr.consumed')?.[0]?.({
             model: 'gpt-5-mini',
             configuredModel: 'gpt-5',
@@ -660,8 +665,12 @@ describe('terminal/events/agent-runtime-events.js — contrato', () => {
                 model: 'gpt-5-mini',
                 configuredModel: 'gpt-5',
                 cost: 0.0123,
+                traceId: 'turn:turn-usage-1',
+                turnId: 'turn-usage-1',
+                source: 'agent/pr.consumed',
             }),
         );
+        clearTerminalTurnMaterialization();
     });
 
     it('não imprime usage durante lock de renderização do stream live', async () => {
@@ -700,6 +709,9 @@ describe('terminal/events/agent-runtime-events.js — contrato', () => {
     it('narra llm.usage sem novo PR separadamente de pr.consumed', async () => {
         const { setupTerminalAgentRuntimeEventListeners } =
             await import('../../../src/copilot/terminal/events/agent-runtime-events.js');
+        const { beginTerminalTurnMaterialization, clearTerminalTurnMaterialization } = await import(
+            '../../../src/copilot/terminal/state/turn-materialization-state.js'
+        );
         /** @type {Map<string, Function[]>} */
         const listeners = new Map();
         const agent = {
@@ -712,6 +724,8 @@ describe('terminal/events/agent-runtime-events.js — contrato', () => {
         };
 
         setupTerminalAgentRuntimeEventListeners({ agent: /** @type {any} */ (agent), rl: null });
+        clearTerminalTurnMaterialization();
+        beginTerminalTurnMaterialization({ turnId: 'turn-llm-usage-1', timestamp: 1000 });
         listeners.get('llm.usage')?.[0]?.({
             model: 'gpt-5.4',
             cost: 0.0123,
@@ -738,9 +752,13 @@ describe('terminal/events/agent-runtime-events.js — contrato', () => {
             expect.objectContaining({
                 model: 'gpt-5.4',
                 premiumRequest: false,
+                traceId: 'turn:turn-llm-usage-1',
+                turnId: 'turn-llm-usage-1',
+                source: 'agent/llm.usage',
             }),
         );
         expect(broadcastSse).not.toHaveBeenCalledWith('pr.consumed', expect.any(Object));
+        clearTerminalTurnMaterialization();
     });
 
     it('narra boot recovery quando fallback com PR é bloqueado por política', async () => {
