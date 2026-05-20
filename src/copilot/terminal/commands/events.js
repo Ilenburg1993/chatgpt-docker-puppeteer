@@ -5,8 +5,8 @@
  * @module copilot/terminal/commands/events
  */
 
+import { listTerminalPublicStreamSourcePolicies } from '../events/event-adapter-events.js';
 import { readTerminalSseEventArchiveTail } from '../state/index.js';
-import { listTerminalPublicStreamSourcePolicies } from '../events/index.js';
 
 /**
  * @typedef {object} EventsContext
