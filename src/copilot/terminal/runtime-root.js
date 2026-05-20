@@ -140,5 +140,5 @@ export async function runTerminalReplPhase(ctx) {
     if (!ctx.copilotServer) {
         throw new Error('[TerminalServer] copilot-http-server phase has not completed.');
     }
-    await startRepl(ctx.copilotServer.httpServer);
+    await startRepl(ctx.copilotServer.httpServer, { injectPort: ctx.copilotServer.port });
 }

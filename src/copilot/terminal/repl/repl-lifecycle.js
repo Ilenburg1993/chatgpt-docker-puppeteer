@@ -44,7 +44,12 @@ import { resolveFreeTextDelivery } from './free-text-delivery.js';
 import { setupTerminalLiveStatusLine } from './live-status-line.js';
 import { buildTerminalReplBanner } from './repl-banner.js';
 import { parseTerminalReplCommand } from './repl-command-parser.js';
-import { CMD_ROUTES, dispatchCmd, isReadlineOpen } from './repl-command-router.js';
+import {
+    CMD_ROUTES,
+    dispatchCmd,
+    isReadlineOpen,
+    setTerminalCommandRouterInjectPort,
+} from './repl-command-router.js';
 import {
     formatTerminalQueuedTurnNotice,
     isTerminalEscapeCommand,
@@ -64,6 +69,7 @@ import { createTerminalMultilineInputState } from './repl-multiline.js';
  * @returns {Promise<void>}
  */
 export async function runReplLifecycle(injectServer, { injectPort, onReady }) {
+    setTerminalCommandRouterInjectPort(injectPort);
     // F37: lista de comandos para tab completion
     const _cmdNames = CMD_ROUTES.flatMap(([names]) => names).map((n) => `/${n}`);
 

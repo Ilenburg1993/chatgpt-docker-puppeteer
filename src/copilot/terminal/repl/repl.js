@@ -30,7 +30,7 @@ import { runReplLifecycle } from './repl-lifecycle.js';
 export { setupAgentListeners } from './repl-listeners.js';
 
 /** @type {number} */
-const INJECT_PORT = readCopilotBootConfig().server.port;
+const DEFAULT_INJECT_PORT = readCopilotBootConfig().server.port;
 
 /**
  * Dispara o bootstrap do dialog loop sem prender o lifecycle do REPL.
@@ -42,6 +42,7 @@ const INJECT_PORT = readCopilotBootConfig().server.port;
  *     ensureDialogLoopFn?: () => Promise<void>;
  *     printlnFn?: (line: string) => void;
  *     logFn?: typeof log;
+ *     injectPort?: number;
  * }} [deps]
  * @returns {Promise<void>}
  */
@@ -49,6 +50,7 @@ export function launchTerminalDialogLoopBootstrap(deps = {}) {
     const ensureDialogLoopFn = deps.ensureDialogLoopFn ?? ensureDialogLoop;
     const printlnFn = deps.printlnFn ?? println;
     const logFn = deps.logFn ?? log;
+    const injectPort = deps.injectPort ?? DEFAULT_INJECT_PORT;
 
     recordTerminalActivity('boot', 'Inicializando dialog loop', {
         detail: 'Bootstrap assíncrono do protocolo READY/REPLY',
@@ -60,7 +62,7 @@ export function launchTerminalDialogLoopBootstrap(deps = {}) {
         .then(() => ensureDialogLoopFn())
         .then(() => {
             renderTerminalAutoBrief({
-                injectPort: INJECT_PORT,
+                injectPort,
                 phase: 'ready',
                 force: true,
                 printlnFn,
@@ -85,18 +87,20 @@ export function launchTerminalDialogLoopBootstrap(deps = {}) {
  * o event loop ativo.
  *
  * @param {import('node:http').Server} injectServer - Servidor HTTP de injeção (para fechar no /quit)
+ * @param {{ injectPort?: number }} [opts]
  * @returns {Promise<void>}
  */
-export async function startRepl(injectServer) {
+export async function startRepl(injectServer, opts = {}) {
+    const injectPort = opts.injectPort ?? DEFAULT_INJECT_PORT;
     if (!process.stdin.isTTY) {
-        println('[boot] Modo headless detectado — REPL desativado. Use POST :' + INJECT_PORT + '/inject.');
+        println('[boot] Modo headless detectado — REPL desativado. Use POST :' + injectPort + '/inject.');
         setupTerminalHeadlessEventAdapters();
-        void launchTerminalDialogLoopBootstrap();
+        void launchTerminalDialogLoopBootstrap({ injectPort });
         return;
     }
 
     await runReplLifecycle(injectServer, {
-        injectPort: INJECT_PORT,
-        onReady: () => void launchTerminalDialogLoopBootstrap(),
+        injectPort,
+        onReady: () => void launchTerminalDialogLoopBootstrap({ injectPort }),
     });
 }

@@ -103,7 +103,10 @@ export async function startCopilotServer(opts) {
         });
     });
 
-    log('INFO', `[CopilotServer] Servidor iniciado em http://${host}:${port}${io ? ' + socket.io' : ''}`);
+    const address = httpServer.address();
+    const effectivePort =
+        address && typeof address === 'object' && typeof address.port === 'number' ? address.port : port;
+    log('INFO', `[CopilotServer] Servidor iniciado em http://${host}:${effectivePort}${io ? ' + socket.io' : ''}`);
 
     /** @type {Promise<void> | null} */
     let closeInFlight = null;
@@ -149,8 +152,8 @@ export async function startCopilotServer(opts) {
         app,
         io,
         host,
-        port,
-        url: `http://${host}:${port}`,
+        port: effectivePort,
+        url: `http://${host}:${effectivePort}`,
         close: closeServer,
     };
 }

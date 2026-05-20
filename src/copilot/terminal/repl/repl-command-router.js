@@ -105,6 +105,7 @@ function resolveBoundedTimeoutMs(value, fallbackMs) {
 
 /** @type {number} */
 const INJECT_PORT = readCopilotBootConfig().server.port;
+let activeInjectPort = INJECT_PORT;
 
 const RESTART_WAIT_TIMEOUT_MS = resolveBoundedTimeoutMs(LLM_B_BOOT_TIMEOUT_MS, 60_000);
 /** @type {Promise<void>} */
@@ -623,6 +624,18 @@ export const CMD_ROUTES = [
 const _cmdRouteMap = new Map(CMD_ROUTES.flatMap(([names, fn]) => names.map((n) => [n, fn])));
 
 /**
+ * Atualiza a porta efetiva usada pelos comandos do REPL após fallback de bind do servidor HTTP.
+ *
+ * @param {number} port
+ * @returns {void}
+ */
+export function setTerminalCommandRouterInjectPort(port) {
+    if (Number.isFinite(port) && port > 0) {
+        activeInjectPort = Math.trunc(port);
+    }
+}
+
+/**
  * Despacha um comando REPL pelo nome.
  *
  * @param {string} cmd - Nome do comando (sem barra inicial)
@@ -634,7 +647,7 @@ const _cmdRouteMap = new Map(CMD_ROUTES.flatMap(([names, fn]) => names.map((n) =
  * @returns {Promise<void>}
  */
 export async function dispatchCmd(cmd, arg, rest, rl, injectServer, cleanup) {
-    const ctx = { println, hubSessionId: getHubSessionId(), injectPort: INJECT_PORT };
+    const ctx = { println, hubSessionId: getHubSessionId(), injectPort: activeInjectPort };
     const handler = _cmdRouteMap.get(cmd?.toLowerCase() ?? '');
     if (handler) {
         await handler(ctx, arg, rest, rl, injectServer, cleanup);

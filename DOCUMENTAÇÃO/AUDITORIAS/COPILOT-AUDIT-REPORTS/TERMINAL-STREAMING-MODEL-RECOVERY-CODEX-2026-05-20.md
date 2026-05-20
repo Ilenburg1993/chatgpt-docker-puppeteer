@@ -265,6 +265,27 @@ Critério ideal:
 - `session.error` final deve encerrar claramente o turno, preservar prompt e não reenviar automaticamente sem política explícita.
 - `reconnect_restart` deve indicar se houve retry zero-PR, restart bloqueado, ou necessidade de `/dialog-resume`.
 
+### A18. Porta fixa 3009 derrubava o boot quando sobrava inject server anterior
+
+Evidência live:
+
+- O runner canônico falhou antes da LLM-B com `listen EADDRINUSE: address already in use 127.0.0.1:3009`.
+- Isso é coerente com a própria UX de saída: `readline fechado. Inject server continua ativo`.
+- O problema não era streaming, mas boot frágil: uma instância anterior deixava a porta ocupada e a nova sessão morria antes de expor `/events`, `/activity` ou diagnóstico útil.
+
+Correção implementada:
+
+- `startCopilotServer()` agora retorna a porta efetiva do `http.Server`, inclusive quando a porta solicitada é `0`.
+- A fase `boot-http` tenta realocar para a próxima porta livre quando recebe `EADDRINUSE`, salvo `LLM_B_TERMINAL_PORT_STRICT=true`.
+- O REPL, banner, auto-brief e comandos usam a porta efetiva do servidor, não a constante lida no import.
+- O live runner escolhe porta livre antes de iniciar o terminal e propaga a mesma porta para o coletor SSE.
+
+Validação live:
+
+- `node scripts/copilot/run-terminal-llm-b-live-test.mjs --no-pr --timeout-ms=70000 --post-answer-delay-ms=1000`.
+- Artefato: `artifacts/terminal-live/2026-05-20T18-55-53-045Z/summary.md`.
+- Resultado: PASS; terminal subiu em `3010` com `3009` ocupada, `/events` funcionou e nenhum turno explícito foi aberto.
+
 ## Hipóteses Externas Rejeitadas Ou Reclassificadas
 
 ### H1. "boot-hub assume sucesso"
@@ -579,12 +600,16 @@ Implementado:
 - `task-stream-events.js` mostra `task.error` com `requeueBlocked=true` como "prompt preservado sem reenvio automático".
 - `/events sources` agora mostra a autoridade canônica das superfícies críticas: delta público, final textual, ask_user e lifecycle de tools.
 - `event-adapter-events.js` passou a conter `TERMINAL_PUBLIC_STREAM_SOURCE_POLICIES`, prendendo em código quais fontes são aceitas, suprimidas e fallback.
+- Boot HTTP deixou de morrer em `EADDRINUSE` e passou a realocar a porta do inject server com UX/comandos refletindo a porta efetiva.
+- O live runner canônico agora evita colisão de porta antes do boot e coleta SSE na porta efetiva escolhida.
 - Testes unitários adicionados para runtime root, reflection sync failure e SIGHUP policy.
 - Testes unitários adicionados para reconciliação de `assistant.message` materializado, supressão visual de `question.pending` e preferência `dialog.delta`.
 - Testes unitários adicionados para normalização de objetos de erro sem `message`.
 - Testes unitários adicionados para lazy import resiliente, sanitização terminal, release de display state, safe SSE payload e sufixo final formatado.
 - Teste unitário adicionado para deduplicação visual de intents equivalentes.
 - Testes unitários adicionados para bloqueio de reenvio automático de task `dialog_boot` após reconexão, UX/SSE de prompt preservado e mapa `/events sources`.
+- Testes unitários adicionados para realocação de porta no boot HTTP e modo strict sem fallback.
+- Live `--no-pr` passou em `artifacts/terminal-live/2026-05-20T18-55-53-045Z/summary.md`.
 
 Próxima rodada recomendada:
 

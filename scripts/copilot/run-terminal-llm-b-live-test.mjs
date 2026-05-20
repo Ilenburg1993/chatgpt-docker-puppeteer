@@ -10,6 +10,7 @@
 import { spawn, spawnSync } from 'node:child_process';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import http from 'node:http';
+import net from 'node:net';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -38,6 +39,26 @@ function hasFlag(name) {
 function hasCommand(name) {
     const result = spawnSync('sh', ['-lc', `command -v ${name}`], { stdio: 'ignore' });
     return result.status === 0;
+}
+
+function canListenOnPort(port, host = '127.0.0.1') {
+    return new Promise((resolve) => {
+        const server = net.createServer();
+        server.once('error', () => resolve(false));
+        server.listen(port, host, () => {
+            server.close(() => resolve(true));
+        });
+    });
+}
+
+async function resolveLiveTerminalPort(preferredPort, { scanLimit = 50 } = {}) {
+    const preferred = Number.isFinite(preferredPort) && preferredPort >= 0 ? Math.trunc(preferredPort) : 3009;
+    if (preferred === 0) return 0;
+    for (let offset = 0; offset <= scanLimit; offset += 1) {
+        const candidate = preferred + offset;
+        if (await canListenOnPort(candidate)) return candidate;
+    }
+    return preferred;
 }
 
 function nowStamp() {
@@ -591,7 +612,12 @@ async function main() {
     const dryRun = hasFlag('--dry-run');
     const noPr = hasFlag('--no-pr');
     const collectSse = !hasFlag('--no-sse');
-    const ssePort = Number(readArg('--sse-port', '3009'));
+    const requestedTerminalPort = readArg('--terminal-port', '');
+    const requestedSsePort = readArg('--sse-port', '');
+    const preferredPort = Number(requestedTerminalPort || requestedSsePort || '3009');
+    const terminalPort =
+        requestedTerminalPort || requestedSsePort ? preferredPort : await resolveLiveTerminalPort(preferredPort);
+    const ssePort = Number(requestedSsePort || String(terminalPort));
     const startedAt = new Date().toISOString();
 
     await mkdir(outDir, { recursive: true });
@@ -644,6 +670,7 @@ async function main() {
             TERMINAL_DISPLAY_PRESET: 'full',
             COPILOT_SDK_ENABLED: 'true',
             COPILOT_OPERATIONAL_PROFILE: 'production',
+            LLM_B_TERMINAL_PORT: String(terminalPort),
             TERMINAL_SSE_EVENT_ARCHIVE_DIR: path.join(outDir, 'sse-events'),
         },
         stdio: ['pipe', 'pipe', 'pipe'],
@@ -692,7 +719,7 @@ async function main() {
         if (!readySent && /LLM-B pronta/.test(plain)) {
             readySent = true;
             if (collectSse) {
-                sseCollector = startSseCollector({ port: Number.isFinite(ssePort) ? ssePort : 3009 });
+                sseCollector = startSseCollector({ port: Number.isFinite(ssePort) ? ssePort : terminalPort });
             }
             write('/usage now');
             write('/activity 12');
