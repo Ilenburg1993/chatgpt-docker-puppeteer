@@ -121,6 +121,34 @@ function readOptionalString(value) {
 }
 
 /**
+ * @param {unknown} value
+ * @returns {value is Record<string, unknown>}
+ */
+function isRecord(value) {
+    return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+/**
+ * @param {unknown} value
+ * @param {string[]} fieldNames
+ * @param {number} [depth=0]
+ * @returns {string | null}
+ */
+function findNestedStringField(value, fieldNames, depth = 0) {
+    if (!isRecord(value) || depth > 2) return null;
+    for (const fieldName of fieldNames) {
+        const fieldValue = value[fieldName];
+        if (typeof fieldValue === 'string' && fieldValue.length > 0) return fieldValue;
+    }
+    for (const nestedKey of ['data', 'payload', 'request', 'invocation', 'context', 'toolCall', 'permission']) {
+        const nested = value[nestedKey];
+        const found = findNestedStringField(nested, fieldNames, depth + 1);
+        if (found) return found;
+    }
+    return null;
+}
+
+/**
  * @param {Record<string, unknown>} data
  * @returns {{ source: string | null; eventSource: string | null; traceId: string | null; turnId: string | null; hubSessionId: string | null }}
  */
@@ -267,8 +295,11 @@ export function readTerminalSseEventArchiveState() {
  *     traceId?: string | null;
  *     turnId?: string | null;
  *     source?: string | null;
+ *     toolCallId?: string | null;
+ *     requestId?: string | null;
+ *     hubSessionId?: string | null;
  * }} [input]
- * @returns {Promise<{ entries: TerminalSseEventArchiveEntry[]; state: ReturnType<typeof readTerminalSseEventArchiveState>; filters: { limit: number; event: string | null; traceId: string | null; turnId: string | null; source: string | null } }>}
+ * @returns {Promise<{ entries: TerminalSseEventArchiveEntry[]; state: ReturnType<typeof readTerminalSseEventArchiveState>; filters: { limit: number; event: string | null; traceId: string | null; turnId: string | null; source: string | null; toolCallId: string | null; requestId: string | null; hubSessionId: string | null } }>}
  */
 export async function readTerminalSseEventArchiveTail(input = {}) {
     await flushTerminalSseEventArchive();
@@ -279,12 +310,16 @@ export async function readTerminalSseEventArchiveTail(input = {}) {
         traceId: readOptionalString(input.traceId),
         turnId: readOptionalString(input.turnId),
         source: readOptionalString(input.source),
+        toolCallId: readOptionalString(input.toolCallId),
+        requestId: readOptionalString(input.requestId),
+        hubSessionId: readOptionalString(input.hubSessionId),
     };
     const path = _terminalSseEventArchivePath;
     if (!path) {
         return { entries: [], state: readTerminalSseEventArchiveState(), filters };
     }
-    const fetchCount = filters.event || filters.traceId || filters.turnId || filters.source ? limit * 20 : limit;
+    const hasFilter = Object.entries(filters).some(([key, value]) => key !== 'limit' && Boolean(value));
+    const fetchCount = hasFilter ? limit * 20 : limit;
     const lines = await readLastNLines(path, fetchCount);
     /** @type {TerminalSseEventArchiveEntry[]} */
     const matchedEntries = [];
@@ -295,6 +330,26 @@ export async function readTerminalSseEventArchiveTail(input = {}) {
             if (filters.traceId && entry.traceId !== filters.traceId) continue;
             if (filters.turnId && entry.turnId !== filters.turnId) continue;
             if (filters.source && entry.source !== filters.source && entry.eventSource !== filters.source) continue;
+            if (
+                filters.hubSessionId &&
+                entry.hubSessionId !== filters.hubSessionId &&
+                findNestedStringField(entry.payload, ['hubSessionId', 'hub_session_id', 'sessionId']) !==
+                    filters.hubSessionId
+            ) {
+                continue;
+            }
+            if (
+                filters.toolCallId &&
+                findNestedStringField(entry.payload, ['toolCallId', 'tool_call_id', 'callId']) !== filters.toolCallId
+            ) {
+                continue;
+            }
+            if (
+                filters.requestId &&
+                findNestedStringField(entry.payload, ['requestId', 'request_id', 'pendingRequestId']) !== filters.requestId
+            ) {
+                continue;
+            }
             matchedEntries.push(entry);
         } catch {
             // JSONL truncado/corrompido não deve quebrar a UX do terminal.

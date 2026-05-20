@@ -15,6 +15,9 @@ const readTerminalSseEventArchiveTail = vi.fn(async () => ({
         traceId: 'turn:abc',
         turnId: null,
         source: null,
+        toolCallId: null,
+        requestId: null,
+        hubSessionId: null,
     },
     entries: [
         {
@@ -25,7 +28,10 @@ const readTerminalSseEventArchiveTail = vi.fn(async () => ({
             eventSource: null,
             traceId: 'turn:abc',
             turnId: 'turn-1',
+            hubSessionId: 'hub-1',
             payload: {
+                toolCallId: 'call_123',
+                requestId: 'req-123',
                 content: 'DELTA-CANONICAL-1',
             },
         },
@@ -57,12 +63,79 @@ describe('terminal/commands/events', () => {
         expect(ctx.output()).toContain('Eventos SSE');
         expect(ctx.output()).toContain('#42');
         expect(ctx.output()).toContain('DELTA-CANONICAL-1');
+        expect(ctx.output()).toContain('call=call_123');
+        expect(ctx.output()).toContain('req=req-123');
+    });
+
+    it('consulta por tool call, request e hub session', async () => {
+        readTerminalSseEventArchiveTail.mockResolvedValueOnce({
+            state: {
+                path: 'data/copilot-terminal/sse-events/terminal-sse-events-2026-05-20.jsonl',
+                events: 2,
+                queueDepth: 0,
+                error: null,
+            },
+            filters: {
+                limit: 12,
+                event: null,
+                traceId: null,
+                turnId: null,
+                source: 'sdk',
+                toolCallId: 'call_123',
+                requestId: 'req-123',
+                hubSessionId: 'hub-1',
+            },
+            entries: [
+                {
+                    timestamp: 1710000000000,
+                    eventId: 42,
+                    event: 'tool.lifecycle',
+                    source: 'sdk',
+                    eventSource: null,
+                    traceId: null,
+                    turnId: null,
+                    hubSessionId: 'hub-1',
+                    payload: {
+                        toolCallId: 'call_123',
+                        requestId: 'req-123',
+                        toolName: 'read_file_content',
+                    },
+                },
+            ],
+        });
+        const ctx = mockCtx();
+
+        await cmdEvents({ println: ctx.println }, '12 tool=call_123 request=req-123 hub=hub-1 source=sdk');
+
+        expect(readTerminalSseEventArchiveTail).toHaveBeenLastCalledWith(
+            expect.objectContaining({
+                limit: 12,
+                toolCallId: 'call_123',
+                requestId: 'req-123',
+                hubSessionId: 'hub-1',
+                source: 'sdk',
+            }),
+        );
+        expect(ctx.output()).toContain('tool=call_123');
+        expect(ctx.output()).toContain('request=req-123');
+        expect(ctx.output()).toContain('hub=hub-1');
+        expect(ctx.output()).toContain('call=call_123');
+        expect(ctx.output()).toContain('req=req-123');
     });
 
     it('mostra vazio quando archive nao tem entradas', async () => {
         readTerminalSseEventArchiveTail.mockResolvedValueOnce({
             state: { path: null, events: 0, queueDepth: 0, error: null },
-            filters: { limit: 20, event: null, traceId: null, turnId: null, source: null },
+            filters: {
+                limit: 20,
+                event: null,
+                traceId: null,
+                turnId: null,
+                source: null,
+                toolCallId: null,
+                requestId: null,
+                hubSessionId: null,
+            },
             entries: [],
         });
         const ctx = mockCtx();

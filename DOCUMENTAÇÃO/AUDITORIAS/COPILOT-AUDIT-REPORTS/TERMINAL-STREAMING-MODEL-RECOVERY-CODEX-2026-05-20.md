@@ -611,8 +611,7 @@ Implementado nesta revisao:
 
 Pendencias apos esta revisao:
 
-- Ampliar o comando `/events` para filtros de `toolCallId`, `requestId` e `hubSessionId`, mantendo os filtros ja criados por
-  limite, `event`, `traceId`, `turnId` e `source`.
+- Fazer `/events` aceitar `--json`/`--raw` para inspeção automatizada e comparação direta com `terminal.sse.jsonl`.
 - Incluir o caminho/estado do archive SSE nos exports de diagnóstico.
 - Aplicar compactação inteligente para payloads muito grandes: manter payload publico quando seguro, mas gravar hash/referência de blob quando necessário, sem perder causalidade.
 
@@ -622,8 +621,8 @@ Data: 2026-05-20.
 
 Implementado nesta revisao:
 
-- Criado comando `/events [n] [event=<nome>] [trace=<id>] [turn=<id>] [source=<origem>]` para consultar o tail do
-  archive JSONL publico sem abrir turno SDK.
+- Criado comando `/events [n] [event=<nome>] [trace=<id>] [turn=<id>] [source=<origem>] [tool=<id>]
+  [request=<id>] [hub=<id>]` para consultar o tail do archive JSONL publico sem abrir turno SDK.
 - A leitura do archive drena a fila pendente antes de consultar o arquivo, tolera linhas JSONL truncadas/corrompidas e
   limita a janela de leitura para manter a UX responsiva.
 - O flush do archive deixou de retornar cedo quando havia gravação em voo: agora ele aguarda o append ativo e drena todos
@@ -638,11 +637,11 @@ Implementado nesta revisao:
   testes, sessões manuais e probes automatizados.
 - A infra do archive aceita `TERMINAL_SSE_EVENT_ARCHIVE_DIR`, permitindo testes unitarios com diretório temporário sem
   poluir `data/copilot-terminal/sse-events`.
-- Testes unitarios cobrem o comando `/events` e o novo handler de shutdown.
+- Testes unitarios cobrem o comando `/events`, filtros por tool/request/hub, tail do archive, diretório temporário e o
+  novo handler de shutdown.
 
 Pendencias apos esta revisao:
 
-- Acrescentar filtros de `/events` por `toolCallId`, `requestId` e `hubSessionId`.
 - Fazer `/events` aceitar `--json`/`--raw` para inspeção automatizada e comparação direta com `terminal.sse.jsonl`.
 - Fazer o runner comparar o tail de `/events` com o coletor HTTP `GET /events`, detectando divergencia entre archive local
   e stream externo no mesmo `eventId`.

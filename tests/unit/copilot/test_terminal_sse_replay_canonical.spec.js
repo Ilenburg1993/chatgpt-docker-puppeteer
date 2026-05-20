@@ -11,6 +11,7 @@ import { getSseClients, getTerminalReplayBuffer } from '../../../src/copilot/inf
 import {
     readTerminalSseEventArchiveTail,
     readTerminalSseEventArchiveState,
+    recordTerminalSseEventArchive,
     resetTerminalSseEventArchiveForTests,
 } from '../../../src/copilot/terminal/state/index.js';
 
@@ -53,7 +54,11 @@ describe('terminal SSE replay canonical', () => {
             clients.add(clientA);
             clients.add(clientB);
             try {
-                broadcastSse('unit.delta', { content: 'abc' });
+                broadcastSse('unit.delta', {
+                    content: 'abc',
+                    requestId: 'req-unit',
+                    toolCallId: 'call_unit',
+                });
                 await nextImmediate();
             } finally {
                 clients.delete(clientA);
@@ -76,8 +81,30 @@ describe('terminal SSE replay canonical', () => {
             expect(tail.entries[0]).toMatchObject({
                 event: 'unit.delta',
                 eventId,
-                payload: { content: 'abc' },
+                payload: {
+                    content: 'abc',
+                    requestId: 'req-unit',
+                    toolCallId: 'call_unit',
+                },
             });
+
+            recordTerminalSseEventArchive({
+                event: 'unit.tool',
+                eventId: eventId + 1,
+                data: {
+                    hubSessionId: 'hub-unit',
+                    requestId: 'req-unit',
+                    toolCallId: 'call_unit',
+                },
+            });
+            const byTool = await readTerminalSseEventArchiveTail({
+                event: 'unit.tool',
+                hubSessionId: 'hub-unit',
+                requestId: 'req-unit',
+                toolCallId: 'call_unit',
+            });
+            expect(byTool.entries).toHaveLength(1);
+            expect(byTool.entries[0]?.eventId).toBe(eventId + 1);
         } finally {
             resetTerminalSseEventArchiveForTests();
             if (previousArchiveDir === undefined) {
