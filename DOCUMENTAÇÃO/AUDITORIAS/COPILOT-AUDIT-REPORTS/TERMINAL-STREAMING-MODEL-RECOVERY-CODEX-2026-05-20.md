@@ -577,3 +577,21 @@ Pendencias apos esta revisao:
 - Persistir envelopes evento-a-evento completos do turno, nao apenas o resumo por mensagem/turno. Isso deve incluir deltas, tools, `user_input.*`, `permission.*`, `elicitation.*` e usage em uma estrutura consultavel.
 - Fazer o runner live real executar `/export` ao final do roteiro e comparar o Markdown exportado com `terminal.plain.log` e `terminal.sse.jsonl`.
 - Adicionar compactacao/limite inteligente para metadata de transcript quando o SDK gerar payloads grandes, mantendo hashes/referencias para o archive JSONL em vez de truncar silenciosamente.
+
+## Atualizacao Codex - runner live com export auditavel
+
+Data: 2026-05-20.
+
+Implementado nesta revisao:
+
+- O runner canônico `terminal:llm-b:live-test` agora executa `/export artifacts/.../conversation-export.md` no roteiro real, depois de `/usage now`, `/activity`, `/tools diag`, `/errors` e `/health`.
+- O artefato `summary.md` ganhou referência ao Markdown exportado e status de inspeção do export.
+- O `summary.json` agora inclui um bloco `export` com `ok`, caminho, presença de transcript, presença de diagnóstico de streaming e presença de envelope.
+- Novos critérios do runner real: `export-created`, `export-transcript`, `export-streaming-diagnostics` e `export-envelope`.
+- O modo `--no-pr` permanece sem `/export`, pois não abre turno nem deve produzir conversa nova.
+
+Pendencias apos esta revisao:
+
+- Rodar o roteiro live real com SDK após essa mudança para confirmar, no mesmo artefato, delta parcial, final, tool, ask_user, SSE externo e export Markdown.
+- Comparar automaticamente trechos do Markdown exportado com `terminal.plain.log` e `terminal.sse.jsonl`, não apenas verificar presença de marcadores.
+- Transformar falhas do runner em recomendações acionáveis no próprio `summary.md`.

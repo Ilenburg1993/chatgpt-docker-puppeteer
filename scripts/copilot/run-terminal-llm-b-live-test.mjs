@@ -8,7 +8,7 @@
  */
 
 import { spawn, spawnSync } from 'node:child_process';
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import http from 'node:http';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -62,6 +62,8 @@ function buildReport({
     exitCode,
     outputPath,
     plainOutputPath,
+    exportPath,
+    exportSummary,
     sseRawPath,
     sseJsonlPath,
     sseSummary,
@@ -82,6 +84,7 @@ function buildReport({
         '',
         `- Raw output: ${outputPath}`,
         `- Plain output: ${plainOutputPath}`,
+        `- Exported Markdown: ${exportPath ?? '-'}`,
         `- SSE raw output: ${sseRawPath}`,
         `- SSE JSONL: ${sseJsonlPath}`,
         '',
@@ -94,6 +97,7 @@ function buildReport({
         `- Events with traceId: ${sseSummary.eventsWithTraceId ?? 0}`,
         `- TraceIds: ${(sseSummary.traceIds ?? []).slice(0, 8).join(', ') || '-'}`,
         `- Errors: ${sseSummary.errors.length}`,
+        `- Export: ${exportSummary?.ok ? 'ok' : exportSummary ? 'failed' : 'n/a'}${exportSummary?.detail ? ` · ${exportSummary.detail}` : ''}`,
         '',
         '## Criteria',
         '',
@@ -216,7 +220,7 @@ function evaluateSseCriteria(sseSummary, { expectPublicEvents, plain = '' }) {
     ];
 }
 
-function evaluateOutput(plain, sseSummary) {
+function evaluateOutput(plain, sseSummary, exportSummary) {
     const markerCount = (plain.match(/DELTA-CANONICAL-\d/g) ?? []).length;
     const duplicatePathologies = [
         /__anonymous__/,
@@ -285,6 +289,26 @@ function evaluateOutput(plain, sseSummary) {
             pass: /readline fechado/.test(plain),
             detail: 'terminal exited through /quit',
         },
+        {
+            id: 'export-created',
+            pass: Boolean(exportSummary?.ok),
+            detail: exportSummary?.detail ?? 'conversation export was not inspected',
+        },
+        {
+            id: 'export-transcript',
+            pass: Boolean(exportSummary?.hasTranscript),
+            detail: 'exported Markdown contains the assistant transcript',
+        },
+        {
+            id: 'export-streaming-diagnostics',
+            pass: Boolean(exportSummary?.hasStreamingDiagnostics),
+            detail: 'exported Markdown contains streaming/final reconciliation diagnostics',
+        },
+        {
+            id: 'export-envelope',
+            pass: Boolean(exportSummary?.hasEnvelope),
+            detail: 'exported Markdown contains source/trace envelope data',
+        },
         ...evaluateSseCriteria(sseSummary, { expectPublicEvents: true, plain }),
     ];
 }
@@ -338,6 +362,29 @@ function evaluateNoPrOutput(plain, sseSummary) {
         },
         ...evaluateSseCriteria(sseSummary, { expectPublicEvents: false, plain }),
     ];
+}
+
+async function inspectExportedMarkdown(exportPath) {
+    try {
+        const content = await readFile(exportPath, 'utf8');
+        return {
+            ok: true,
+            detail: `${content.length} chars`,
+            hasTranscript: /DELTA-CANONICAL-8/.test(content) || /ASK-CANONICAL/.test(content),
+            hasStreamingDiagnostics: /streaming=/.test(content),
+            hasEnvelope: /envelope=/.test(content),
+            content,
+        };
+    } catch (error) {
+        return {
+            ok: false,
+            detail: error instanceof Error ? error.message : String(error),
+            hasTranscript: false,
+            hasStreamingDiagnostics: false,
+            hasEnvelope: false,
+            content: '',
+        };
+    }
 }
 
 function parseSseFrame(frame) {
@@ -445,6 +492,8 @@ async function main() {
     await mkdir(outDir, { recursive: true });
     const rawPath = path.join(outDir, 'terminal.raw.log');
     const plainPath = path.join(outDir, 'terminal.plain.log');
+    const exportPath = path.join(outDir, 'conversation-export.md');
+    const exportArg = path.relative(ROOT, exportPath).replaceAll(path.sep, '/');
     const sseRawPath = path.join(outDir, 'terminal.sse.log');
     const sseJsonlPath = path.join(outDir, 'terminal.sse.jsonl');
     const jsonPath = path.join(outDir, 'summary.json');
@@ -469,6 +518,7 @@ async function main() {
     let readySent = false;
     let answerSent = false;
     let postCommandsSent = false;
+    let quitSent = false;
     let exitCode = null;
     let sseCollector = null;
     const command = canUsePty
@@ -534,8 +584,18 @@ async function main() {
                 write('/tools diag');
                 write('/errors 10');
                 write('/health');
-                write('/quit');
+                write(`/export ${exportArg}`);
+                setTimeout(() => {
+                    if (!quitSent) {
+                        quitSent = true;
+                        write('/quit');
+                    }
+                }, 2_000).unref();
             }, postAnswerDelayMs).unref();
+        }
+        if (!quitSent && /Exportado:/.test(plain)) {
+            quitSent = true;
+            setTimeout(() => write('/quit'), 500).unref();
         }
     };
 
@@ -549,6 +609,7 @@ async function main() {
     sseCollector?.close();
 
     const plain = stripAnsi(raw);
+    const exportSummary = noPr ? null : await inspectExportedMarkdown(exportPath);
     const sseSummary = sseCollector?.summary() ?? {
         connected: false,
         statusCode: null,
@@ -562,7 +623,7 @@ async function main() {
         raw: '',
         disabled: !collectSse,
     };
-    const criteria = noPr ? evaluateNoPrOutput(plain, sseSummary) : evaluateOutput(plain, sseSummary);
+    const criteria = noPr ? evaluateNoPrOutput(plain, sseSummary) : evaluateOutput(plain, sseSummary, exportSummary);
     const durationMs = Date.now() - Date.parse(startedAt);
     await writeFile(rawPath, raw, 'utf8');
     await writeFile(plainPath, plain, 'utf8');
@@ -575,7 +636,24 @@ async function main() {
     await writeFile(
         jsonPath,
         `${JSON.stringify(
-            { ok: criteria.every((c) => c.pass), startedAt, durationMs, exitCode, criteria, sse: sseSummary },
+            {
+                ok: criteria.every((c) => c.pass),
+                startedAt,
+                durationMs,
+                exitCode,
+                criteria,
+                sse: sseSummary,
+                export: exportSummary
+                    ? {
+                          ok: exportSummary.ok,
+                          detail: exportSummary.detail,
+                          hasTranscript: exportSummary.hasTranscript,
+                          hasStreamingDiagnostics: exportSummary.hasStreamingDiagnostics,
+                          hasEnvelope: exportSummary.hasEnvelope,
+                          path: path.relative(ROOT, exportPath),
+                      }
+                    : null,
+            },
             null,
             2,
         )}\n`,
@@ -589,6 +667,8 @@ async function main() {
             exitCode,
             outputPath: path.relative(ROOT, rawPath),
             plainOutputPath: path.relative(ROOT, plainPath),
+            exportPath: noPr ? null : path.relative(ROOT, exportPath),
+            exportSummary,
             sseRawPath: path.relative(ROOT, sseRawPath),
             sseJsonlPath: path.relative(ROOT, sseJsonlPath),
             sseSummary,
