@@ -51,6 +51,11 @@ export {
     recordTerminalStreamDeltaDiagnostic,
 } from '../stream-diagnostics-state.js';
 export {
+    flushTerminalSseEventArchive,
+    readTerminalSseEventArchiveState,
+    recordTerminalSseEventArchive,
+} from '../sse-event-archive.js';
+export {
     beginTerminalTurnTrace,
     completeTerminalTurnToolCall,
     completeTerminalTurnTrace,

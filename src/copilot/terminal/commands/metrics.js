@@ -49,6 +49,7 @@ export function cmdMetrics({ println }, arg = '') {
         modelBilling,
         latestInject,
         streamDiagnostics,
+        sseEventArchive,
     } = projection;
 
     // ── Session info ─────────────────────────────────────────────────
@@ -187,6 +188,12 @@ export function cmdMetrics({ println }, arg = '') {
     causal      \x1b[90maceitos=${streamDiagnostics.counters.deltaCausalAccepted} · duplicados=${streamDiagnostics.counters.deltaCausalDuplicateSuppressed} · fallback temporal=${streamDiagnostics.counters.deltaTemporalFallbackSuppressed}\x1b[0m
     cumulativo  \x1b[90mnormalizados=${streamDiagnostics.counters.deltaCumulativeNormalized} · suprimidos=${streamDiagnostics.counters.deltaCumulativeSuppressed} · overlap=${streamDiagnostics.counters.deltaOverlapNormalized} · sufixo dup=${streamDiagnostics.counters.deltaDuplicateSuppressed}\x1b[0m
   final       ok=${streamDiagnostics.counters.finalAlreadyStreamed} · sufixo=${streamDiagnostics.counters.finalSuffix} · mismatch=${streamDiagnostics.counters.finalMismatch} · sem-delta=${streamDiagnostics.counters.finalNoVisibleStream} · vazio=${streamDiagnostics.counters.finalEmpty}
+
+  \x1b[35m🧾 Archive SSE\x1b[0m
+  ─────────────────────────────────────
+  eventos     ${sseEventArchive.events} \x1b[90m(lastId=${sseEventArchive.lastEventId ?? '-'})\x1b[0m
+  fila        ${sseEventArchive.queueDepth} \x1b[90m(flush=${sseEventArchive.flushInFlight ? 'inflight' : sseEventArchive.flushScheduled ? 'scheduled' : 'idle'} · falhas=${sseEventArchive.failedEvents} · dropped=${sseEventArchive.droppedEvents})\x1b[0m
+  arquivo     \x1b[90m${sseEventArchive.enabled ? sseEventArchive.path ?? '(aguardando primeiro evento)' : 'desabilitado'}\x1b[0m${sseEventArchive.error ? `\n  erro        \x1b[31m${sseEventArchive.error}\x1b[0m` : ''}
 
   \x1b[35m🚀 Inject\x1b[0m
   ─────────────────────────────────────

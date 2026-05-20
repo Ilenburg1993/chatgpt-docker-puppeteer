@@ -5,6 +5,10 @@
 
 import { describe, expect, it } from 'vitest';
 import { getSseClients, getTerminalReplayBuffer } from '../../../src/copilot/infra/sse/state.js';
+import {
+    readTerminalSseEventArchiveState,
+    resetTerminalSseEventArchiveForTests,
+} from '../../../src/copilot/terminal/state/index.js';
 
 /**
  * @returns {Promise<void>}
@@ -28,6 +32,7 @@ function createRawClient(writes) {
 
 describe('terminal SSE replay canonical', () => {
     it('usa um único replay eventId para raw clients e fanout /events', async () => {
+        resetTerminalSseEventArchiveForTests();
         await import('../../../src/copilot/server/routes/sse.js');
         const { broadcastSse } = await import('../../../src/copilot/terminal/dialog/sse.js');
 
@@ -52,5 +57,10 @@ describe('terminal SSE replay canonical', () => {
         expect(writes).toHaveLength(2);
         expect(writes.every((payload) => payload.startsWith(`id: ${eventId}\n`))).toBe(true);
         expect(writes.join('\n')).not.toContain('__terminalSseEventId');
+
+        const archive = readTerminalSseEventArchiveState();
+        expect(archive.events).toBe(1);
+        expect(archive.lastEventId).toBe(eventId);
+        expect(archive.path).toContain('terminal-sse-events-');
     });
 });

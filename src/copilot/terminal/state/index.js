@@ -100,6 +100,12 @@ export {
     recordTerminalStreamDeltaDiagnostic,
 } from './stream-diagnostics-state.js';
 export {
+    flushTerminalSseEventArchive,
+    readTerminalSseEventArchiveState,
+    recordTerminalSseEventArchive,
+    resetTerminalSseEventArchiveForTests,
+} from './sse-event-archive.js';
+export {
     TERMINAL_DETAIL_LEVELS,
     getTerminalDetailLevel,
     isTerminalDetailLevel,

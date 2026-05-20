@@ -595,3 +595,23 @@ Pendencias apos esta revisao:
 - Rodar o roteiro live real com SDK após essa mudança para confirmar, no mesmo artefato, delta parcial, final, tool, ask_user, SSE externo e export Markdown.
 - Comparar automaticamente trechos do Markdown exportado com `terminal.plain.log` e `terminal.sse.jsonl`, não apenas verificar presença de marcadores.
 - Transformar falhas do runner em recomendações acionáveis no próprio `summary.md`.
+
+## Atualizacao Codex - archive duravel evento-a-evento SSE
+
+Data: 2026-05-20.
+
+Implementado nesta revisao:
+
+- Criado `src/copilot/terminal/state/sse-event-archive.js`, archive JSONL canonico para eventos publicos do terminal.
+- A gravacao ocorre no ponto unico `broadcastSse()`, depois da atribuicao do `eventId` canonico e antes dos fanouts raw/socket/EventFanout. Isso evita instrumentacao paralela por tipo de evento.
+- Cada linha JSONL inclui `schemaVersion`, `ts`, `timestamp`, `event`, `eventId`, `source`, `eventSource`, `traceId`, `turnId`, `hubSessionId` e `payload`.
+- O archive usa fila assíncrona em batches, preservando a UX do terminal e expondo `queueDepth`, `flushScheduled`, `flushInFlight`, `failedEvents`, `droppedEvents`, `lastEventId`, `path` e `error`.
+- O `/metrics` agora mostra uma seção `Archive SSE`, tornando visivel se a trilha duravel esta ativa, enfileirada, em falha ou saudavel.
+- Testes unitarios validam que `broadcastSse()` continua usando um unico replay eventId e agora registra o mesmo evento no archive.
+
+Pendencias apos esta revisao:
+
+- Criar comando dedicado `/events` ou ampliar `/audit` para consultar o tail desse archive por `traceId`, `event`, `toolCallId` e `requestId`.
+- Incluir o caminho/estado do archive SSE no runner live e nos exports de diagnóstico.
+- Aplicar compactação inteligente para payloads muito grandes: manter payload publico quando seguro, mas gravar hash/referência de blob quando necessário, sem perder causalidade.
+- Adicionar flush coordenado no shutdown central para reduzir janela de perda em encerramento abrupto.

@@ -6,7 +6,11 @@
 import { defaultErrorTracker } from '#copilot/observability';
 import { readRuntimeLatestInjectHistoryEntryForRuntime } from '../../../presentation/state/index.js';
 import { readToolStatsProjection } from '../../../presentation/system/index.js';
-import { readTerminalActivitySnapshot, readTerminalStreamDiagnosticsProjection } from '../../state/projections/index.js';
+import {
+    readTerminalActivitySnapshot,
+    readTerminalSseEventArchiveState,
+    readTerminalStreamDiagnosticsProjection,
+} from '../../state/projections/index.js';
 import { normalizeTerminalModelBillingProjection, readTerminalRuntimeBase } from './shared.js';
 import { readTerminalTimelineProjection, readTerminalTimelineSyncTelemetry } from './timeline.js';
 
@@ -42,6 +46,7 @@ import { readTerminalTimelineProjection, readTerminalTimelineSyncTelemetry } fro
  *     errorStats: { total: number; buffered: number };
  *     activity: import('../../state/activity-state.js').TerminalActivitySnapshot;
  *     streamDiagnostics: ReturnType<typeof readTerminalStreamDiagnosticsProjection>;
+ *     sseEventArchive: ReturnType<typeof readTerminalSseEventArchiveState>;
  * }}
  */
 export function readTerminalMetricsProjection(runtimeId) {
@@ -92,6 +97,7 @@ export function readTerminalMetricsProjection(runtimeId) {
         toolBlockedCount,
         activity: readTerminalActivitySnapshot(),
         streamDiagnostics: readTerminalStreamDiagnosticsProjection(8),
+        sseEventArchive: readTerminalSseEventArchiveState(),
         errorStats: {
             total: Number(errorStats.total ?? 0),
             buffered: Number(errorStats.buffered ?? 0),

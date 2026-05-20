@@ -14,6 +14,7 @@ import { attachSseReplayEventId, eventFanout } from '../../infra/sse/index.js';
 import { getSseClients, getSseCriticalClients, getTerminalReplayBuffer } from '../../infra/sse/state.js';
 import { CRITICAL_EVENTS } from '../../presentation/state/index.js';
 import { getHubSessionId } from '../../presentation/state/index.js';
+import { recordTerminalSseEventArchive } from '../state/events/index.js';
 
 export { CRITICAL_EVENTS } from '../../presentation/state/index.js';
 
@@ -63,6 +64,11 @@ export function broadcastSse(event, data) {
     const safeEvent = String(event).replace(/[\r\n]/g, '_');
     const enrichedData = { ...safeData, hubSessionId: hubSessionId ?? null };
     const eventId = getTerminalReplayBuffer().push(safeEvent, enrichedData);
+    recordTerminalSseEventArchive({
+        event: safeEvent,
+        eventId,
+        data: enrichedData,
+    });
 
     emitSse(_sseClients, _sseCriticalClients, safeEvent, enrichedData, eventId);
     emitSocket(safeEvent, enrichedData);
