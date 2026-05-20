@@ -16,12 +16,18 @@ const {
     measureVisibleTerminalChars,
     renderStreamingFooter,
 } = await import('../../../../src/copilot/terminal/dialog/turn-display.js');
+const { broadcastSse } = await import('../../../../src/copilot/terminal/dialog/sse.js');
 const { endTerminalRenderLock, isTerminalRenderLocked } =
     await import('../../../../src/copilot/terminal/dialog/output.js');
+const { beginTerminalTurnMaterialization, clearTerminalTurnMaterialization } = await import(
+    '../../../../src/copilot/terminal/state/turn-materialization-state.js'
+);
 
 describe('terminal/dialog/turn-display', () => {
     beforeEach(() => {
         writeSpy.mockClear();
+        vi.mocked(broadcastSse).mockClear();
+        clearTerminalTurnMaterialization();
         while (isTerminalRenderLocked()) {
             endTerminalRenderLock();
         }
@@ -123,6 +129,32 @@ describe('terminal/dialog/turn-display', () => {
         const outputBeforeFooter = writeSpy.mock.calls.map(([chunk]) => String(chunk)).join('');
         expect(state.streamingStarted).toBe(true);
         expect(outputBeforeFooter).toContain('Oi');
+    });
+
+    it('propaga traceId e turnId canônicos no SSE de delta', () => {
+        beginTerminalTurnMaterialization({ turnId: 'turn-123', timestamp: 1000 });
+        const state = createDisplayState({
+            model: 'gpt-5-mini',
+            effort: 'high',
+            turnStartTime: Date.now(),
+            showStreaming: false,
+            showThinking: false,
+        });
+
+        const onDelta = createDeltaCallback(state);
+        onDelta('abc', { streamId: 'stream-1', chunkSeq: 1, eventId: 'event-1' });
+
+        expect(broadcastSse).toHaveBeenCalledWith(
+            'delta',
+            expect.objectContaining({
+                chunk: 'abc',
+                traceId: 'turn:turn-123',
+                turnId: 'turn-123',
+                streamId: 'stream-1',
+                chunkSeq: 1,
+                eventId: 'event-1',
+            }),
+        );
     });
 
     it('detecta divergência entre stream acumulado e reply final', () => {

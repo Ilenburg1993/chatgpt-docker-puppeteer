@@ -39,6 +39,8 @@ const MAX_STREAM_DIAGNOSTIC_EVENTS = 80;
  *     rawChars: number;
  *     normalizedChars: number;
  *     streamId: string | null;
+ *     traceId: string | null;
+ *     turnId: string | null;
  *     chunkSeq: number | string | null;
  *     eventId: string | null;
  *     causationId: string | null;
@@ -155,6 +157,8 @@ function pushEvent(entry) {
  *     rawChars?: number;
  *     normalizedChars?: number;
  *     streamId?: unknown;
+ *     traceId?: unknown;
+ *     turnId?: unknown;
  *     chunkSeq?: unknown;
  *     eventId?: unknown;
  *     causationId?: unknown;
@@ -190,6 +194,8 @@ export function recordTerminalStreamDeltaDiagnostic(input) {
         rawChars: Number(input.rawChars ?? 0),
         normalizedChars: Number(input.normalizedChars ?? 0),
         streamId: stringOrNull(input.streamId),
+        traceId: stringOrNull(input.traceId),
+        turnId: stringOrNull(input.turnId),
         chunkSeq: scalarOrNull(input.chunkSeq),
         eventId: stringOrNull(input.eventId),
         causationId: stringOrNull(input.causationId),

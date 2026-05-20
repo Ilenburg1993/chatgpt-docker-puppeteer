@@ -230,7 +230,7 @@ Esta revisao cruza o log live fornecido pelo usuario, o relatorio da LLM-B e o c
 - Criar comando/diagnostico de streaming que diga claramente: SDK nao emitiu delta, delta emitido mas display desligado, delta emitido e renderizado, ou delta emitido e reconciliado no final.
 - Expor no `/usage now` e `/status` a distincao entre `boot/resume zero-PR`, `turn billed`, `explicit /turn`, `direct chat bridge` e `recovery PR fallback`.
 - Expor no `/usage now` tambem o ultimo `llm.usage` classificado, separado do ultimo `pr.consumed`, para acabar com a ambiguidade entre token telemetry e Premium Request. **Implementado.**
-- Unificar payloads SSE de `delta`, `assistant.message`, `dialog.reply`, `user_input.*`, `tool.*` e `pr.consumed` com um envelope comum de `traceId/turnId/eventId/source`. **Parcialmente implementado: o stream SSE global agora recebe um `eventId` canonico unico por broadcast e o propaga ao pool `/events` sem regravar o replay; ainda faltam `traceId/turnId/source` comuns em todos os eventos.**
+- Unificar payloads SSE de `delta`, `assistant.message`, `dialog.reply`, `user_input.*`, `tool.*` e `pr.consumed` com um envelope comum de `traceId/turnId/eventId/source`. **Parcialmente implementado: o stream SSE global agora recebe um `eventId` canonico unico por broadcast e o propaga ao pool `/events` sem regravar o replay; `delta` e `assistant.message` ja carregam `traceId/turnId` quando ha materializacao ativa; ainda faltam `user_input.*`, `tool.*`, `pr.consumed` e `dialog.reply`.**
 - Revisar o fluxo de `requestHeaders` em `runTerminalDialogTurnDetailed`: hoje ele pode parar dialog loop e usar direct chat, portanto deve ser exibido como caminho que pode consumir PR.
 - Criar teste unitario para boot recovery com env `LLM_B_DIALOG_BOOT_RECOVERY_ALLOW_PR_FALLBACK=true`, garantindo que o fallback pago e deliberado e observavel.
 - Criar teste live automatizavel que obrigue resposta longa o suficiente para observar varios deltas, uma tool, usage e `ask_user`.
@@ -289,7 +289,7 @@ Esta revisao cruza o log live fornecido pelo usuario, o relatorio da LLM-B e o c
 - H5. Expor as metricas em `/activity` e `/metrics`. **Implementado com secao `Streaming publico`, contadores e ultimas decisoes.**
 - H6. Criar teste live guiado com resposta longa, tool, final message e ask_user.
 - H7. Adicionar replay SSE de deltas por `Last-Event-ID`. **Parcialmente implementado: `broadcastSse()` grava o replay global uma unica vez, raw clients e `/events` compartilham o mesmo ID, e o pool Express nao duplica o buffer. O runner live agora coleta `/events`; falta assert live com turno real observando deltas no canal externo.**
-- H8. Propagar `turnId` e `traceId` em todo delta.
+- H8. Propagar `turnId` e `traceId` em todo delta. **Implementado para o renderer do dialog engine: `delta` SSE e diagnosticos de streaming recebem a correlacao da materializacao ativa.**
 - H9. Persistir final reconciliation no historico/export.
 
 #### Faixa K - Runner canonico de teste live LLM-B
@@ -436,6 +436,7 @@ Implementado nesta revisao:
 - O SSE global deixou de ter múltiplos donos de replay: `terminal/dialog/sse.broadcastSse()` atribui um `eventId` unico, grava `getTerminalReplayBuffer()` uma vez, envia esse ID aos clientes raw legados e publica o mesmo ID no fanout interno. O router `/events` remove o metadado interno antes de expor o payload e entrega o evento sem regravar o replay global.
 - O runner live ganhou `--no-pr`, uma rota de sanity check sem turno LLM: `/usage now`, `/activity`, `/metrics`, `/errors`, `/quit`.
 - O runner live agora abre uma conexao SSE paralela em `GET :3009/events`, persiste raw/JSONL e valida conexao, ausencia de metadado interno vazado, IDs monotônicos e eventos publicos quando o roteiro real e executado.
+- `delta` SSE passou a carregar `traceId` e `turnId` extraidos da materializacao ativa, e os diagnosticos de stream passaram a guardar a mesma correlacao. `assistant.message` tambem propaga `traceId/turnId` quando ocorre dentro de turno materializado.
 - Testes unitarios foram adicionados/atualizados para o bridge de deltas e o novo estado de diagnostico.
 - Teste unitario novo garante que dois raw clients + fanout `/events` nao incrementam o replay global mais de uma vez para o mesmo broadcast.
 - Live `--no-pr` em PTY passou em `artifacts/terminal-live/no-pr-codex-2026-05-20-r2/summary.md`, validando boot/resume, `/usage now`, `/activity`, `/metrics`, `/errors` e `/quit` sem abrir turno, sem tools e sem erros.
@@ -448,7 +449,7 @@ Itens descartados/renomeados:
 Pendencias apos esta revisao:
 
 - Persistir diagnosticos de streaming/reconciliacao no historico conversacional e no `/export`, nao apenas no estado live. **Parcialmente implementado: o turno `llm_b` persistido no Hub agora recebe `metadata.terminalStreamingDiagnostics`, a timeline preserva metadata e `/export` imprime resumo quando disponivel. Falta propagar tambem para transcript live nao persistido e para sync lazy de bridge tail.**
-- Propagar `traceId`/`turnId` aos diagnosticos e deltas SSE para correlação perfeita entre terminal, timeline, SSE e hub.
+- Propagar `traceId`/`turnId` aos diagnosticos e deltas SSE para correlação perfeita entre terminal, timeline, SSE e hub. **Parcialmente implementado para `delta`, diagnosticos de stream e `assistant.message`; falta cobrir todos os eventos de tools/user_input/usage e correlacionar o runner externo automaticamente.**
 - Adicionar assert live especifico para a secao `Streaming publico` no modo com turno real, alem do modo `--no-pr`.
 - Coletar SSE paralelamente no runner para comparar stdout local, replay buffer e canal externo. **Implementado para coleta e criterios basicos; falta correlacionar automaticamente stdout markers, eventos SSE e replay em turnos reais.**
 - Enriquecer o classificador de `llm.usage` com sinal local de resposta humana pendente para explicar melhor fechamentos tardios de `ask_user`.

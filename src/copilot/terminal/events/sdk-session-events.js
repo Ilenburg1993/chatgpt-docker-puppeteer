@@ -94,6 +94,7 @@ import {
     recordTerminalPermissionCompleted,
     recordTerminalPermissionModeChanged,
     recordTerminalPermissionRequested,
+    readTerminalTurnMaterialization,
     recordTerminalTurnAssistantMessage,
     recordTerminalTurnFileActivity,
     recordTerminalTurnUserInputActivity,
@@ -334,9 +335,13 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
             source: 'sdk',
             recordHistory: false,
         });
+        const materialization = readTerminalTurnMaterialization();
+        const turnId = materialization?.turnId ?? null;
         broadcastSse('assistant.message', {
             content: normalized.content,
             protocolKind: normalized.kind,
+            ...(turnId ? { turnId } : {}),
+            ...(materialization ? { traceId: turnId ? `turn:${turnId}` : materialization.turnKey } : {}),
             timestamp: Date.now(),
         });
         if (getBusy()) {
