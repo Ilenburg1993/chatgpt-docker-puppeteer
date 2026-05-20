@@ -711,6 +711,33 @@ async function _executeTurn(message, actor, attachments = [], requestHeaders = n
             renderedChars: finalRenderDecision.content.length,
             severity: finalRenderDecision.severity,
         });
+        const terminalStreamingDiagnostics = {
+            schemaVersion: 1,
+            source: 'terminal.dialog.engine',
+            turnKey: materializedReply.snapshot?.turnKey ?? null,
+            turnId: materializedReply.snapshot?.turnId ?? null,
+            materialization: {
+                source: effectiveReplySource,
+                sourceDetail: materializedReply.sourceDetail,
+                deltaSlices: materializedReply.diagnostics.deltaSlices,
+                deltaChars: materializedReply.diagnostics.deltaChars,
+                assistantMessageCount: materializedReply.diagnostics.assistantMessageCount,
+                droppedDeltaSlices: materializedReply.diagnostics.droppedDeltaSlices,
+                droppedDeltaChars: materializedReply.diagnostics.droppedDeltaChars,
+            },
+            finalReconciliation: {
+                mode: finalRenderDecision.mode,
+                reason: finalRenderDecision.reason,
+                severity: finalRenderDecision.severity,
+                renderedChars: finalRenderDecision.content.length,
+            },
+            publicStream: {
+                started: displayState.streamingStarted,
+                chars: displayState.streamingChars,
+                visibleChars: displayState.streamingVisibleChars,
+                firstChunkMs: displayState.firstChunkTime > 0 ? displayState.firstChunkTime - t0 : null,
+            },
+        };
         if (finalRenderDecision.mode !== 'none') {
             if (finalRenderDecision.reason === 'stream_mismatch') {
                 recordTerminalActivity('system', 'Transcript final limpo renderizado', {
@@ -752,6 +779,9 @@ async function _executeTurn(message, actor, attachments = [], requestHeaders = n
                                     : 'dialog/turn',
                           status: 'completed',
                           detail: `${(durationMs / 1000).toFixed(1)}s · ${finalRenderDecision.reason}`,
+                          metadata: {
+                              terminalStreamingDiagnostics,
+                          },
                       })
                     : false;
             if (!rendered) {
@@ -807,34 +837,7 @@ async function _executeTurn(message, actor, attachments = [], requestHeaders = n
         if (_hubSessionId) {
             try {
                 await persistTurnToHub(_hubSessionId, message, reply, actor, durationMs, {
-                    terminalStreamingDiagnostics: {
-                        schemaVersion: 1,
-                        source: 'terminal.dialog.engine',
-                        turnKey: materializedReply.snapshot?.turnKey ?? null,
-                        turnId: materializedReply.snapshot?.turnId ?? null,
-                        materialization: {
-                            source: effectiveReplySource,
-                            sourceDetail: materializedReply.sourceDetail,
-                            deltaSlices: materializedReply.diagnostics.deltaSlices,
-                            deltaChars: materializedReply.diagnostics.deltaChars,
-                            assistantMessageCount: materializedReply.diagnostics.assistantMessageCount,
-                            droppedDeltaSlices: materializedReply.diagnostics.droppedDeltaSlices,
-                            droppedDeltaChars: materializedReply.diagnostics.droppedDeltaChars,
-                        },
-                        finalReconciliation: {
-                            mode: finalRenderDecision.mode,
-                            reason: finalRenderDecision.reason,
-                            severity: finalRenderDecision.severity,
-                            renderedChars: finalRenderDecision.content.length,
-                        },
-                        publicStream: {
-                            started: displayState.streamingStarted,
-                            chars: displayState.streamingChars,
-                            visibleChars: displayState.streamingVisibleChars,
-                            firstChunkMs:
-                                displayState.firstChunkTime > 0 ? displayState.firstChunkTime - t0 : null,
-                        },
-                    },
+                    terminalStreamingDiagnostics,
                 });
             } catch (hubErr) {
                 log('WARN', `[TerminalServer] Hub writeTurn falhou: ${toError(hubErr).message}`);

@@ -541,6 +541,20 @@ describe('terminal/frontend/index', () => {
             content: 'mensagem fora do turno ativo',
             source: 'sdk/assistant.message',
             timestamp: 1710000003000,
+            metadata: {
+                assistantMessageEnvelope: {
+                    source: 'sdk/assistant.message',
+                    traceId: 'trace-transcript-1',
+                    turnId: 'turn-transcript-1',
+                    eventId: 'evt-transcript-1',
+                },
+                terminalStreamingDiagnostics: {
+                    finalReconciliation: {
+                        mode: 'full',
+                        reason: 'no_visible_stream',
+                    },
+                },
+            },
         });
         const transcriptStats = transcriptState.readTerminalTranscriptStats();
 
@@ -561,6 +575,11 @@ describe('terminal/frontend/index', () => {
                 rawRole: 'llm_b',
                 content: 'mensagem fora do turno ativo',
                 origin: 'terminal',
+                metadata: expect.objectContaining({
+                    assistantMessageEnvelope: expect.objectContaining({
+                        traceId: 'trace-transcript-1',
+                    }),
+                }),
             }),
         ]);
         expect(writeTurn).toHaveBeenCalledWith(
@@ -573,6 +592,16 @@ describe('terminal/frontend/index', () => {
                     source: 'terminal.timeline_sync',
                     originalOrigin: 'terminal',
                     originalRole: 'llm_b',
+                    originalMetadata: expect.objectContaining({
+                        assistantMessageEnvelope: expect.objectContaining({
+                            eventId: 'evt-transcript-1',
+                        }),
+                    }),
+                    terminalStreamingDiagnostics: expect.objectContaining({
+                        finalReconciliation: expect.objectContaining({
+                            reason: 'no_visible_stream',
+                        }),
+                    }),
                 }),
             }),
         );

@@ -307,8 +307,8 @@ function mapTerminalTranscriptTurn(turn, index) {
         persisted: false,
         origin: 'terminal',
         turnId: null,
-        sdkTurnId: null,
-        metadata: null,
+        sdkTurnId: typeof turn.metadata?.['sdkTurnId'] === 'string' ? turn.metadata['sdkTurnId'] : null,
+        metadata: turn.metadata ? { ...turn.metadata } : null,
     };
 }
 
@@ -375,6 +375,12 @@ function buildTimelineSyncKey(hubSessionId, turns) {
 async function persistBridgeTailToHub(hubSessionId, turns, sdkSessionId) {
     let syncedCount = 0;
     for (const turn of turns) {
+        const originalMetadata = turn.metadata && typeof turn.metadata === 'object' ? turn.metadata : null;
+        const terminalStreamingDiagnostics =
+            originalMetadata?.['terminalStreamingDiagnostics'] &&
+            typeof originalMetadata['terminalStreamingDiagnostics'] === 'object'
+                ? /** @type {Record<string, unknown>} */ (originalMetadata['terminalStreamingDiagnostics'])
+                : null;
         let lastError = null;
         for (let attempt = 1; attempt <= TIMELINE_SYNC_WRITE_MAX_ATTEMPTS; attempt += 1) {
             try {
@@ -389,6 +395,8 @@ async function persistBridgeTailToHub(hubSessionId, turns, sdkSessionId) {
                         originalRole: turn.rawRole,
                         originalTimestamp: turn.timestamp,
                         signature: buildTimelineSignature(turn),
+                        ...(terminalStreamingDiagnostics ? { terminalStreamingDiagnostics } : {}),
+                        ...(originalMetadata ? { originalMetadata } : {}),
                     },
                 });
                 lastError = null;

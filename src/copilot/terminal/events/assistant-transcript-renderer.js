@@ -67,6 +67,7 @@ export function claimTerminalAssistantTranscript(content) {
  *     status?: 'message' | 'completed' | 'error';
  *     detail?: string | null;
  *     truncated?: boolean;
+ *     metadata?: Record<string, unknown> | null;
  * }} input
  * @returns {boolean}
  */
@@ -98,6 +99,7 @@ export function renderTerminalAssistantTranscript(input) {
         rawRole: 'llm_b',
         content,
         source,
+        metadata: input.metadata ?? null,
     });
     return true;
 }

@@ -46,13 +46,20 @@ export async function cmdExport({ println }, arg) {
     for (const turn of projection.turns) {
         const time = new Date(turn.timestamp ?? Date.now()).toLocaleTimeString('pt-BR');
         const role = turn.role === 'user' ? '👤 Usuário' : turn.rawRole === 'llm_a' ? '🤖 LLM-A' : '🧠 LLM-B';
+        const metadata = turn.metadata && typeof turn.metadata === 'object' ? turn.metadata : null;
         const streamingDiagnostics =
-            turn.metadata?.['terminalStreamingDiagnostics'] &&
-            typeof turn.metadata['terminalStreamingDiagnostics'] === 'object'
-                ? /** @type {Record<string, any>} */ (turn.metadata['terminalStreamingDiagnostics'])
+            metadata?.['terminalStreamingDiagnostics'] && typeof metadata['terminalStreamingDiagnostics'] === 'object'
+                ? /** @type {Record<string, any>} */ (metadata['terminalStreamingDiagnostics'])
                 : null;
+        const envelope = readExportEnvelope(metadata);
         lines.push(`## ${role} — ${time}`, '');
         lines.push(`> origem=${turn.origin}${turn.persisted ? ' · persistido' : ' · vivo'}`, '');
+        if (envelope) {
+            lines.push(
+                `> envelope=${envelope.source} · trace=${envelope.traceId ?? '-'} · turn=${envelope.turnId ?? '-'} · evento=${envelope.eventId ?? '-'}`,
+                '',
+            );
+        }
         if (streamingDiagnostics) {
             const materialization =
                 streamingDiagnostics['materialization'] && typeof streamingDiagnostics['materialization'] === 'object'
@@ -83,4 +90,44 @@ export async function cmdExport({ println }, arg) {
     } catch (e) {
         println(`  \x1b[31m❌ Erro ao exportar: ${toError(e).message ?? e}\x1b[0m`);
     }
+}
+
+/**
+ * @param {Record<string, unknown> | null} metadata
+ * @returns {{ source: string; traceId: string | null; turnId: string | null; eventId: string | null } | null}
+ */
+function readExportEnvelope(metadata) {
+    if (!metadata) return null;
+    const direct = extractEnvelopeLike(metadata);
+    if (direct) return direct;
+    const assistantEnvelope =
+        metadata['assistantMessageEnvelope'] && typeof metadata['assistantMessageEnvelope'] === 'object'
+            ? extractEnvelopeLike(/** @type {Record<string, unknown>} */ (metadata['assistantMessageEnvelope']))
+            : null;
+    if (assistantEnvelope) return assistantEnvelope;
+    const original =
+        metadata['originalMetadata'] && typeof metadata['originalMetadata'] === 'object'
+            ? readExportEnvelope(/** @type {Record<string, unknown>} */ (metadata['originalMetadata']))
+            : null;
+    return original;
+}
+
+/**
+ * @param {Record<string, unknown>} value
+ * @returns {{ source: string; traceId: string | null; turnId: string | null; eventId: string | null } | null}
+ */
+function extractEnvelopeLike(value) {
+    const source = typeof value['eventSource'] === 'string' ? value['eventSource'] : value['source'];
+    const hasEnvelope =
+        typeof source === 'string' ||
+        typeof value['traceId'] === 'string' ||
+        typeof value['turnId'] === 'string' ||
+        typeof value['eventId'] === 'string';
+    if (!hasEnvelope) return null;
+    return {
+        source: typeof source === 'string' ? source : '-',
+        traceId: typeof value['traceId'] === 'string' ? value['traceId'] : null,
+        turnId: typeof value['turnId'] === 'string' ? value['turnId'] : null,
+        eventId: typeof value['eventId'] === 'string' ? value['eventId'] : null,
+    };
 }

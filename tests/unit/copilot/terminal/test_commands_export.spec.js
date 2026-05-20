@@ -24,6 +24,28 @@ const readTerminalTimelineProjection = vi.fn(() => ({
             persisted: true,
             content: 'oi',
             timestamp: 1710000001000,
+            metadata: {
+                assistantMessageEnvelope: {
+                    source: 'sdk/assistant.message',
+                    traceId: 'trace-export-1',
+                    turnId: 'turn-export-1',
+                    eventId: 'evt-export-1',
+                },
+                terminalStreamingDiagnostics: {
+                    materialization: {
+                        source: 'stream_delta',
+                        deltaSlices: 3,
+                        deltaChars: 12,
+                    },
+                    finalReconciliation: {
+                        mode: 'suffix',
+                        reason: 'stream_suffix',
+                    },
+                    publicStream: {
+                        visibleChars: 8,
+                    },
+                },
+            },
         },
     ],
 }));
@@ -59,6 +81,10 @@ describe('terminal/commands/export', () => {
 
         expect(readTerminalTimelineProjection).toHaveBeenCalled();
         expect(writeFile).toHaveBeenCalledOnce();
+        const [, content] = writeFile.mock.calls[0];
+        expect(String(content)).toContain('envelope=sdk/assistant.message');
+        expect(String(content)).toContain('trace=trace-export-1');
+        expect(String(content)).toContain('streaming=suffix/stream_suffix');
         expect(ctx.output()).toContain('Exportado');
     });
 

@@ -348,16 +348,14 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
             source: 'sdk',
             recordHistory: false,
         });
-        broadcastSse(
-            'assistant.message',
-            withSdkSessionSseEnvelope(
-                {
-                    content: normalized.content,
-                    protocolKind: normalized.kind,
-                },
-                'sdk/assistant.message',
-            ),
+        const assistantMessageEnvelope = withSdkSessionSseEnvelope(
+            {
+                content: normalized.content,
+                protocolKind: normalized.kind,
+            },
+            'sdk/assistant.message',
         );
+        broadcastSse('assistant.message', assistantMessageEnvelope);
         if (getBusy()) {
             recordTerminalTurnAssistantMessage({
                 content: normalized.content,
@@ -372,6 +370,9 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
             source: 'sdk/assistant.message',
             status: 'message',
             detail: normalized.kind,
+            metadata: {
+                assistantMessageEnvelope,
+            },
         });
         if (rendered) refreshPromptIfIdle();
     };

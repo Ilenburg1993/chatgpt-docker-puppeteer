@@ -32,6 +32,7 @@ const TERMINAL_TRANSCRIPT_HEAP_PRESSURE = 0.92;
  *     source: string;
  *     timestamp: number;
  *     archived: boolean;
+ *     metadata: Record<string, unknown> | null;
  * }} TerminalTranscriptTurn
  */
 
@@ -104,12 +105,22 @@ function hashString(value) {
 }
 
 /**
+ * @param {unknown} value
+ * @returns {Record<string, unknown> | null}
+ */
+function normalizeTranscriptMetadata(value) {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+    return { .../** @type {Record<string, unknown>} */ (value) };
+}
+
+/**
  * @param {{
  *     role?: 'assistant' | 'user' | 'system' | 'llm_a';
  *     rawRole?: string;
  *     content: string;
  *     source?: string;
  *     timestamp?: number;
+ *     metadata?: Record<string, unknown> | null;
  * }} turn
  * @returns {TerminalTranscriptTurn | null}
  */
@@ -128,6 +139,7 @@ export function appendTerminalTranscriptTurn(turn) {
         source: turn.source ?? 'terminal.transcript',
         timestamp,
         archived: false,
+        metadata: normalizeTranscriptMetadata(turn.metadata),
     };
     const archive = appendTerminalTranscriptArchive(entry);
     entry.archived = archive.archived;

@@ -557,3 +557,23 @@ Implementado adicionalmente nesta revisao:
 - `summary.md` do runner agora mostra `Events with source`, `Events with traceId` e `TraceIds`.
 - `evaluateSseCriteria()` valida `sse-source-envelope`, `sse-critical-events-sourced`, `sse-trace-envelope` e `sse-stdout-trace-overlap` no modo com turno real.
 - O modo `--no-pr` continua sem exigir `traceId`, mas ainda valida que eventos SSE de objeto possuam origem operacional.
+
+## Atualizacao Codex - persistencia/export de envelopes do transcript
+
+Data: 2026-05-20.
+
+Implementado nesta revisao:
+
+- O transcript local do terminal (`transcript-state`) agora preserva `metadata` estruturada por mensagem, em vez de guardar apenas `role/content/source/timestamp`.
+- Mensagens publicas vindas de `assistant.message` fora de turno ativo passam a carregar no transcript o envelope SSE normalizado (`assistantMessageEnvelope`) com `source/timestamp/traceId/turnId/eventId` quando disponivel.
+- Complementos/finais renderizados pelo dialog engine passam a anexar ao transcript local o mesmo `terminalStreamingDiagnostics` persistido no Hub, eliminando a janela em que o texto aparecia ao vivo mas ainda nao tinha trilha auditavel antes do sync/persistencia.
+- A projection de timeline deixou de descartar metadata de entradas `origin=terminal`; essa metadata agora aparece em `/history`, `/export` e sync lazy quando o Hub ainda nao era a fonte primaria.
+- O sync lazy de bridge/transcript para Hub preserva `originalMetadata` e promove `terminalStreamingDiagnostics` para o turno persistido quando existir, evitando perda de diagnostico em mensagens fora do caminho principal de `persistTurnToHub`.
+- O comando `/export` agora imprime resumo de envelope (`source`, `trace`, `turn`, `event`) e continua imprimindo resumo de streaming/reconciliacao quando `terminalStreamingDiagnostics` estiver presente.
+- Testes unitarios cobrem export com envelope/streaming e timeline/sync de transcript local com metadata preservada.
+
+Pendencias apos esta revisao:
+
+- Persistir envelopes evento-a-evento completos do turno, nao apenas o resumo por mensagem/turno. Isso deve incluir deltas, tools, `user_input.*`, `permission.*`, `elicitation.*` e usage em uma estrutura consultavel.
+- Fazer o runner live real executar `/export` ao final do roteiro e comparar o Markdown exportado com `terminal.plain.log` e `terminal.sse.jsonl`.
+- Adicionar compactacao/limite inteligente para metadata de transcript quando o SDK gerar payloads grandes, mantendo hashes/referencias para o archive JSONL em vez de truncar silenciosamente.
