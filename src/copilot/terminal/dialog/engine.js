@@ -797,6 +797,8 @@ async function _executeTurn(message, actor, attachments = [], requestHeaders = n
                     terminalStreamingDiagnostics: {
                         schemaVersion: 1,
                         source: 'terminal.dialog.engine',
+                        turnKey: materializedReply.snapshot?.turnKey ?? null,
+                        turnId: materializedReply.snapshot?.turnId ?? null,
                         materialization: {
                             source: effectiveReplySource,
                             sourceDetail: materializedReply.sourceDetail,
