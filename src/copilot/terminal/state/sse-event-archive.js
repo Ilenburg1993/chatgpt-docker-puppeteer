@@ -8,14 +8,30 @@
  * @module copilot/terminal/state/sse-event-archive
  */
 
-import { mkdir, appendFile } from 'node:fs/promises';
+import { mkdir, appendFile, open } from 'node:fs/promises';
 import { join } from 'node:path';
 import { toError } from '../../core/error-handlers.js';
 
-const TERMINAL_SSE_EVENT_ARCHIVE_DIR = join(process.cwd(), 'data', 'copilot-terminal', 'sse-events');
+const DEFAULT_TERMINAL_SSE_EVENT_ARCHIVE_DIR = join(process.cwd(), 'data', 'copilot-terminal', 'sse-events');
 const TERMINAL_SSE_EVENT_ARCHIVE_SOFT_QUEUE = 10_000;
 const TERMINAL_SSE_EVENT_ARCHIVE_CATASTROPHIC_QUEUE = 100_000;
 const TERMINAL_SSE_EVENT_ARCHIVE_BATCH_LINES = 256;
+
+/**
+ * @typedef {{
+ *     schemaVersion: 1;
+ *     ts: string;
+ *     timestamp: number;
+ *     event: string;
+ *     eventId: number;
+ *     source: string | null;
+ *     eventSource: string | null;
+ *     traceId: string | null;
+ *     turnId: string | null;
+ *     hubSessionId: string | null;
+ *     payload: Record<string, unknown>;
+ * }} TerminalSseEventArchiveEntry
+ */
 
 /** @type {string | null} */
 let _terminalSseEventArchivePath = null;
@@ -25,6 +41,8 @@ let _terminalSseEventArchiveError = null;
 let _terminalSseEventArchiveQueue = [];
 let _terminalSseEventArchiveFlushScheduled = false;
 let _terminalSseEventArchiveFlushInFlight = false;
+/** @type {Promise<void> | null} */
+let _terminalSseEventArchiveFlushPromise = null;
 let _terminalSseEventArchiveEvents = 0;
 let _terminalSseEventArchiveBytes = 0;
 let _terminalSseEventArchiveFailedEvents = 0;
@@ -41,11 +59,57 @@ function isTerminalSseEventArchiveEnabled() {
 /**
  * @returns {string}
  */
+function resolveTerminalSseEventArchiveDir() {
+    const configured = process.env['TERMINAL_SSE_EVENT_ARCHIVE_DIR'];
+    return typeof configured === 'string' && configured.trim() ? configured : DEFAULT_TERMINAL_SSE_EVENT_ARCHIVE_DIR;
+}
+
+/**
+ * @returns {string}
+ */
 function resolveTerminalSseEventArchivePath() {
     if (_terminalSseEventArchivePath) return _terminalSseEventArchivePath;
     const day = new Date().toISOString().slice(0, 10);
-    _terminalSseEventArchivePath = join(TERMINAL_SSE_EVENT_ARCHIVE_DIR, `terminal-sse-events-${day}.jsonl`);
+    _terminalSseEventArchivePath = join(resolveTerminalSseEventArchiveDir(), `terminal-sse-events-${day}.jsonl`);
     return _terminalSseEventArchivePath;
+}
+
+/**
+ * @param {string} filePath
+ * @param {number} [n=50]
+ * @returns {Promise<string[]>}
+ */
+async function readLastNLines(filePath, n = 50) {
+    const blockSize = 65_536;
+    let fileHandle;
+    try {
+        fileHandle = await open(filePath, 'r');
+        const { size } = await fileHandle.stat();
+        if (size === 0) return [];
+        let remaining = size;
+        let tail = '';
+        /** @type {string[]} */
+        const lines = [];
+        while (remaining > 0 && lines.length < n) {
+            const readSize = Math.min(blockSize, remaining);
+            remaining -= readSize;
+            const buffer = Buffer.alloc(readSize);
+            await fileHandle.read(buffer, 0, readSize, remaining);
+            tail = buffer.toString('utf8') + tail;
+            const split = tail.split('\n');
+            for (let index = split.length - 1; index >= 1 && lines.length < n; index -= 1) {
+                const line = split[index];
+                if (line?.trim()) lines.unshift(line);
+            }
+            tail = split[0] ?? '';
+        }
+        if (tail.trim() && lines.length < n) lines.unshift(tail);
+        return lines.slice(-n);
+    } catch {
+        return [];
+    } finally {
+        await fileHandle?.close();
+    }
 }
 
 /**
@@ -86,22 +150,38 @@ function scheduleTerminalSseEventArchiveFlush() {
  * @returns {Promise<void>}
  */
 export async function flushTerminalSseEventArchive() {
-    if (_terminalSseEventArchiveFlushInFlight || _terminalSseEventArchiveQueue.length === 0) return;
+    if (_terminalSseEventArchiveFlushInFlight) {
+        await _terminalSseEventArchiveFlushPromise;
+        if (_terminalSseEventArchiveQueue.length === 0) return;
+    }
+    if (_terminalSseEventArchiveQueue.length === 0) return;
     _terminalSseEventArchiveFlushInFlight = true;
+    const flushPromise = (async () => {
+        try {
+            await mkdir(resolveTerminalSseEventArchiveDir(), { recursive: true });
+            while (_terminalSseEventArchiveQueue.length > 0) {
+                const batch = _terminalSseEventArchiveQueue.splice(0, TERMINAL_SSE_EVENT_ARCHIVE_BATCH_LINES);
+                if (batch.length === 0) break;
+                const content = batch.join('');
+                await appendFile(resolveTerminalSseEventArchivePath(), content, 'utf8');
+                _terminalSseEventArchiveBytes += Buffer.byteLength(content, 'utf8');
+            }
+            _terminalSseEventArchiveError = null;
+        } catch (error) {
+            _terminalSseEventArchiveError = toError(error).message;
+            _terminalSseEventArchiveFailedEvents += 1;
+        } finally {
+            _terminalSseEventArchiveFlushInFlight = false;
+            if (_terminalSseEventArchiveQueue.length > 0) scheduleTerminalSseEventArchiveFlush();
+        }
+    })();
+    _terminalSseEventArchiveFlushPromise = flushPromise;
     try {
-        const batch = _terminalSseEventArchiveQueue.splice(0, TERMINAL_SSE_EVENT_ARCHIVE_BATCH_LINES);
-        if (batch.length === 0) return;
-        await mkdir(TERMINAL_SSE_EVENT_ARCHIVE_DIR, { recursive: true });
-        const content = batch.join('');
-        await appendFile(resolveTerminalSseEventArchivePath(), content, 'utf8');
-        _terminalSseEventArchiveBytes += Buffer.byteLength(content, 'utf8');
-        _terminalSseEventArchiveError = null;
-    } catch (error) {
-        _terminalSseEventArchiveError = toError(error).message;
-        _terminalSseEventArchiveFailedEvents += 1;
+        await flushPromise;
     } finally {
-        _terminalSseEventArchiveFlushInFlight = false;
-        if (_terminalSseEventArchiveQueue.length > 0) scheduleTerminalSseEventArchiveFlush();
+        if (_terminalSseEventArchiveFlushPromise === flushPromise) {
+            _terminalSseEventArchiveFlushPromise = null;
+        }
     }
 }
 
@@ -181,6 +261,54 @@ export function readTerminalSseEventArchiveState() {
 }
 
 /**
+ * @param {{
+ *     limit?: number;
+ *     event?: string | null;
+ *     traceId?: string | null;
+ *     turnId?: string | null;
+ *     source?: string | null;
+ * }} [input]
+ * @returns {Promise<{ entries: TerminalSseEventArchiveEntry[]; state: ReturnType<typeof readTerminalSseEventArchiveState>; filters: { limit: number; event: string | null; traceId: string | null; turnId: string | null; source: string | null } }>}
+ */
+export async function readTerminalSseEventArchiveTail(input = {}) {
+    await flushTerminalSseEventArchive();
+    const limit = Number.isFinite(input.limit) && Number(input.limit) > 0 ? Math.min(500, Math.floor(Number(input.limit))) : 20;
+    const filters = {
+        limit,
+        event: readOptionalString(input.event),
+        traceId: readOptionalString(input.traceId),
+        turnId: readOptionalString(input.turnId),
+        source: readOptionalString(input.source),
+    };
+    const path = _terminalSseEventArchivePath;
+    if (!path) {
+        return { entries: [], state: readTerminalSseEventArchiveState(), filters };
+    }
+    const fetchCount = filters.event || filters.traceId || filters.turnId || filters.source ? limit * 20 : limit;
+    const lines = await readLastNLines(path, fetchCount);
+    /** @type {TerminalSseEventArchiveEntry[]} */
+    const matchedEntries = [];
+    for (const line of lines) {
+        try {
+            const entry = /** @type {TerminalSseEventArchiveEntry} */ (JSON.parse(line));
+            if (filters.event && entry.event !== filters.event) continue;
+            if (filters.traceId && entry.traceId !== filters.traceId) continue;
+            if (filters.turnId && entry.turnId !== filters.turnId) continue;
+            if (filters.source && entry.source !== filters.source && entry.eventSource !== filters.source) continue;
+            matchedEntries.push(entry);
+        } catch {
+            // JSONL truncado/corrompido não deve quebrar a UX do terminal.
+        }
+    }
+    const entries = matchedEntries.slice(-limit);
+    return {
+        entries,
+        state: readTerminalSseEventArchiveState(),
+        filters,
+    };
+}
+
+/**
  * @returns {void}
  */
 export function resetTerminalSseEventArchiveForTests() {
@@ -189,6 +317,7 @@ export function resetTerminalSseEventArchiveForTests() {
     _terminalSseEventArchiveQueue = [];
     _terminalSseEventArchiveFlushScheduled = false;
     _terminalSseEventArchiveFlushInFlight = false;
+    _terminalSseEventArchiveFlushPromise = null;
     _terminalSseEventArchiveEvents = 0;
     _terminalSseEventArchiveBytes = 0;
     _terminalSseEventArchiveFailedEvents = 0;

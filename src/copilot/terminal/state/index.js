@@ -102,6 +102,7 @@ export {
 export {
     flushTerminalSseEventArchive,
     readTerminalSseEventArchiveState,
+    readTerminalSseEventArchiveTail,
     recordTerminalSseEventArchive,
     resetTerminalSseEventArchiveForTests,
 } from './sse-event-archive.js';

@@ -20,7 +20,7 @@ export function buildTerminalReplBanner(injectPort) {
   \x1b[33m/pause\x1b[0m · \x1b[33m/dialog-resume [bootPrompt]\x1b[0m · \x1b[33m/handoff\x1b[0m \x1b[90m← pausa/retoma/handoff\x1b[0m
   \x1b[33m/queue <msg>\x1b[0m · \x1b[33m/turn <msg>\x1b[0m · \x1b[33m/mailbox [status|consume|clear]\x1b[0m \x1b[90m← zero-PR vs turno explícito\x1b[0m
   \x1b[33m/thinking [on|off]\x1b[0m · \x1b[33m/intent [n]\x1b[0m · \x1b[33m/usage [on|off|now]\x1b[0m \x1b[90m← thinking, intent e usage\x1b[0m
-  \x1b[33m/tools\x1b[0m · \x1b[33m/errors [n]\x1b[0m · \x1b[33m/audit [n]\x1b[0m \x1b[90m← F22: tool stats, error tracker, audit log\x1b[0m
+  \x1b[33m/tools\x1b[0m · \x1b[33m/errors [n]\x1b[0m · \x1b[33m/events [n]\x1b[0m · \x1b[33m/audit [n]\x1b[0m \x1b[90m← tools, erros, SSE e audit log\x1b[0m
   \x1b[33m/sdk [status|models|tools|quota|prompt|capabilities|waits|compact]\x1b[0m · \x1b[33m/workspace [list|read|write|sync|mirror|promote]\x1b[0m · \x1b[33m/fs [list|read|search|create|write]\x1b[0m · \x1b[33m/scope [list|declare|find]\x1b[0m · \x1b[33m/index [status|build|search|symbol]\x1b[0m · \x1b[33m/elicitation\x1b[0m · \x1b[33m/permission [mode|respond]\x1b[0m
   \x1b[33m/display [toggle] [on|off]\x1b[0m · \x1b[33m/metrics\x1b[0m · \x1b[33m/export [path]\x1b[0m \x1b[90m← F24: display, metrics, export\x1b[0m
   \x1b[33m/remember [tag:] texto\x1b[0m · \x1b[33m/recall [tag]\x1b[0m · \x1b[33m/recall ?busca\x1b[0m · \x1b[33m/forget <id>\x1b[0m

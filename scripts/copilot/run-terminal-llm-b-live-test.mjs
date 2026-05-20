@@ -275,6 +275,11 @@ function evaluateOutput(plain, sseSummary, exportSummary) {
             detail: 'llm.usage telemetry surfaced separately from PR',
         },
         {
+            id: 'sse-archive-query-visible',
+            pass: /Eventos SSE/.test(plain) && /arquivo=/.test(plain),
+            detail: '/events rendered the durable public SSE archive tail',
+        },
+        {
             id: 'no-obvious-duplication',
             pass: !duplicatePathologies.some((pattern) => pattern.test(plain)),
             detail: 'no known duplicate/pathology markers detected',
@@ -344,6 +349,11 @@ function evaluateNoPrOutput(plain, sseSummary) {
             id: 'metrics-visible',
             pass: /Métricas da Sessão/.test(plain) && /Streaming público/.test(plain),
             detail: '/metrics rendered session and public streaming counters',
+        },
+        {
+            id: 'sse-archive-query-visible',
+            pass: /Eventos SSE/.test(plain) && /arquivo=/.test(plain),
+            detail: '/events rendered the durable public SSE archive tail without opening a turn',
         },
         {
             id: 'no-tools-started',
@@ -501,7 +511,7 @@ async function main() {
 
     if (dryRun) {
         const prompt = noPr
-            ? '/usage now\n/activity 20\n/metrics\n/errors 10\n/quit'
+            ? '/usage now\n/activity 20\n/metrics\n/events 20\n/errors 10\n/quit'
             : buildScenarioPrompt();
         await writeFile(path.join(outDir, 'prompt.txt'), `${prompt}\n`, 'utf8');
         console.log(`[terminal-live] dry-run prompt written to ${path.relative(ROOT, path.join(outDir, 'prompt.txt'))}`);
@@ -537,6 +547,7 @@ async function main() {
             TERMINAL_DISPLAY_PRESET: 'full',
             COPILOT_SDK_ENABLED: 'true',
             COPILOT_OPERATIONAL_PROFILE: 'production',
+            TERMINAL_SSE_EVENT_ARCHIVE_DIR: path.join(outDir, 'sse-events'),
         },
         stdio: ['pipe', 'pipe', 'pipe'],
     });
@@ -566,6 +577,7 @@ async function main() {
             write('/activity 12');
             if (noPr) {
                 write('/metrics');
+                write('/events 20');
                 write('/errors 10');
                 write('/quit');
                 return;
@@ -582,6 +594,7 @@ async function main() {
                 write('/usage now');
                 write('/activity 40');
                 write('/tools diag');
+                write('/events 60');
                 write('/errors 10');
                 write('/health');
                 write(`/export ${exportArg}`);

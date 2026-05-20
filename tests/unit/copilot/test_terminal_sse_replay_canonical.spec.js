@@ -4,8 +4,12 @@
  */
 
 import { describe, expect, it } from 'vitest';
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { getSseClients, getTerminalReplayBuffer } from '../../../src/copilot/infra/sse/state.js';
 import {
+    readTerminalSseEventArchiveTail,
     readTerminalSseEventArchiveState,
     resetTerminalSseEventArchiveForTests,
 } from '../../../src/copilot/terminal/state/index.js';
@@ -32,35 +36,56 @@ function createRawClient(writes) {
 
 describe('terminal SSE replay canonical', () => {
     it('usa um único replay eventId para raw clients e fanout /events', async () => {
+        const previousArchiveDir = process.env['TERMINAL_SSE_EVENT_ARCHIVE_DIR'];
+        const archiveDir = await mkdtemp(join(tmpdir(), 'copilot-terminal-sse-archive-'));
+        process.env['TERMINAL_SSE_EVENT_ARCHIVE_DIR'] = archiveDir;
         resetTerminalSseEventArchiveForTests();
-        await import('../../../src/copilot/server/routes/sse.js');
-        const { broadcastSse } = await import('../../../src/copilot/terminal/dialog/sse.js');
-
-        const clients = getSseClients();
-        const writes = /** @type {string[]} */ ([]);
-        const clientA = createRawClient(writes);
-        const clientB = createRawClient(writes);
-        const before = getTerminalReplayBuffer().lastId;
-
-        clients.add(clientA);
-        clients.add(clientB);
         try {
-            broadcastSse('unit.delta', { content: 'abc' });
-            await nextImmediate();
+            await import('../../../src/copilot/server/routes/sse.js');
+            const { broadcastSse } = await import('../../../src/copilot/terminal/dialog/sse.js');
+
+            const clients = getSseClients();
+            const writes = /** @type {string[]} */ ([]);
+            const clientA = createRawClient(writes);
+            const clientB = createRawClient(writes);
+            const before = getTerminalReplayBuffer().lastId;
+
+            clients.add(clientA);
+            clients.add(clientB);
+            try {
+                broadcastSse('unit.delta', { content: 'abc' });
+                await nextImmediate();
+            } finally {
+                clients.delete(clientA);
+                clients.delete(clientB);
+            }
+
+            const eventId = before + 1;
+            expect(getTerminalReplayBuffer().lastId).toBe(eventId);
+            expect(writes).toHaveLength(2);
+            expect(writes.every((payload) => payload.startsWith(`id: ${eventId}\n`))).toBe(true);
+            expect(writes.join('\n')).not.toContain('__terminalSseEventId');
+
+            const archive = readTerminalSseEventArchiveState();
+            expect(archive.events).toBe(1);
+            expect(archive.lastEventId).toBe(eventId);
+            expect(archive.path).toContain(archiveDir);
+
+            const tail = await readTerminalSseEventArchiveTail({ limit: 5, event: 'unit.delta' });
+            expect(tail.entries).toHaveLength(1);
+            expect(tail.entries[0]).toMatchObject({
+                event: 'unit.delta',
+                eventId,
+                payload: { content: 'abc' },
+            });
         } finally {
-            clients.delete(clientA);
-            clients.delete(clientB);
+            resetTerminalSseEventArchiveForTests();
+            if (previousArchiveDir === undefined) {
+                delete process.env['TERMINAL_SSE_EVENT_ARCHIVE_DIR'];
+            } else {
+                process.env['TERMINAL_SSE_EVENT_ARCHIVE_DIR'] = previousArchiveDir;
+            }
+            await rm(archiveDir, { force: true, recursive: true });
         }
-
-        const eventId = before + 1;
-        expect(getTerminalReplayBuffer().lastId).toBe(eventId);
-        expect(writes).toHaveLength(2);
-        expect(writes.every((payload) => payload.startsWith(`id: ${eventId}\n`))).toBe(true);
-        expect(writes.join('\n')).not.toContain('__terminalSseEventId');
-
-        const archive = readTerminalSseEventArchiveState();
-        expect(archive.events).toBe(1);
-        expect(archive.lastEventId).toBe(eventId);
-        expect(archive.path).toContain('terminal-sse-events-');
     });
 });

@@ -611,7 +611,39 @@ Implementado nesta revisao:
 
 Pendencias apos esta revisao:
 
-- Criar comando dedicado `/events` ou ampliar `/audit` para consultar o tail desse archive por `traceId`, `event`, `toolCallId` e `requestId`.
-- Incluir o caminho/estado do archive SSE no runner live e nos exports de diagnóstico.
+- Ampliar o comando `/events` para filtros de `toolCallId`, `requestId` e `hubSessionId`, mantendo os filtros ja criados por
+  limite, `event`, `traceId`, `turnId` e `source`.
+- Incluir o caminho/estado do archive SSE nos exports de diagnóstico.
 - Aplicar compactação inteligente para payloads muito grandes: manter payload publico quando seguro, mas gravar hash/referência de blob quando necessário, sem perder causalidade.
-- Adicionar flush coordenado no shutdown central para reduzir janela de perda em encerramento abrupto.
+
+## Atualizacao Codex - consulta operacional do archive SSE
+
+Data: 2026-05-20.
+
+Implementado nesta revisao:
+
+- Criado comando `/events [n] [event=<nome>] [trace=<id>] [turn=<id>] [source=<origem>]` para consultar o tail do
+  archive JSONL publico sem abrir turno SDK.
+- A leitura do archive drena a fila pendente antes de consultar o arquivo, tolera linhas JSONL truncadas/corrompidas e
+  limita a janela de leitura para manter a UX responsiva.
+- O flush do archive deixou de retornar cedo quando havia gravação em voo: agora ele aguarda o append ativo e drena todos
+  os batches pendentes antes de liberar a consulta ou o shutdown.
+- A ajuda e o banner do terminal passaram a listar `/events`, separando claramente o endpoint HTTP `GET /events` do
+  comando REPL que consulta a trilha duravel local.
+- O shutdown central do terminal agora registra `terminal.sseEventArchive` como finalizador de auditoria, drenando a fila
+  SSE em `/quit`, SIGTERM/SIGINT e shutdown por falha de boot.
+- O runner live passou a executar `/events` tanto no roteiro real quanto no `--no-pr`, validando que a trilha duravel esta
+  consultavel sem consumo adicional de turno.
+- O runner live passa a isolar `TERMINAL_SSE_EVENT_ARCHIVE_DIR` dentro do diretório de artefatos, evitando mistura entre
+  testes, sessões manuais e probes automatizados.
+- A infra do archive aceita `TERMINAL_SSE_EVENT_ARCHIVE_DIR`, permitindo testes unitarios com diretório temporário sem
+  poluir `data/copilot-terminal/sse-events`.
+- Testes unitarios cobrem o comando `/events` e o novo handler de shutdown.
+
+Pendencias apos esta revisao:
+
+- Acrescentar filtros de `/events` por `toolCallId`, `requestId` e `hubSessionId`.
+- Fazer `/events` aceitar `--json`/`--raw` para inspeção automatizada e comparação direta com `terminal.sse.jsonl`.
+- Fazer o runner comparar o tail de `/events` com o coletor HTTP `GET /events`, detectando divergencia entre archive local
+  e stream externo no mesmo `eventId`.
+- Adicionar compactacao/hash de payload grande antes da persistencia JSONL.

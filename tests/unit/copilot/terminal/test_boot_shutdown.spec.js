@@ -7,10 +7,11 @@ import { registerTerminalShutdownHandlers } from '../../../../src/copilot/termin
 
 describe('terminal/terminal-phases/boot-shutdown', () => {
     it('registra handlers canônicos do terminal e executa rollbacks semânticos', async () => {
-        /** @type {{ name: string; handler: () => Promise<void>; priority: unknown }[]} */
+        /** @type {{ name: string; handler: () => Promise<void>; priority: unknown; options: unknown }[]} */
         const registrations = [];
         const rollbackRuntimeListenersPhase = vi.fn(async () => undefined);
         const rollbackPinnedContextPhaseFn = vi.fn(async () => undefined);
+        const flushTerminalSseEventArchiveFn = vi.fn(async () => undefined);
 
         registerTerminalShutdownHandlers(
             /** @type {import('../../../../src/copilot/terminal/index.js').TerminalBootContext} */ ({
@@ -34,23 +35,31 @@ describe('terminal/terminal-phases/boot-shutdown', () => {
             {
                 rollbackRuntimeListenersPhase,
                 rollbackPinnedContextPhaseFn,
+                flushTerminalSseEventArchiveFn,
                 logFn: vi.fn(),
-                registerShutdownHandlerFn: (name, handler, priority) => {
-                    registrations.push({ name, handler, priority });
+                registerShutdownHandlerFn: (name, handler, priority, options) => {
+                    registrations.push({ name, handler, priority, options });
                 },
             },
         );
 
         assert.deepEqual(
             registrations.map((entry) => entry.name),
-            ['terminal.reflectionTimer', 'terminal.pinnedFilesLoader', 'terminal.activityEmitter'],
+            [
+                'terminal.reflectionTimer',
+                'terminal.pinnedFilesLoader',
+                'terminal.activityEmitter',
+                'terminal.sseEventArchive',
+            ],
         );
 
         await registrations[0]?.handler();
         await registrations[1]?.handler();
         await registrations[2]?.handler();
+        await registrations[3]?.handler();
 
         assert.equal(rollbackRuntimeListenersPhase.mock.calls.length, 2);
         assert.equal(rollbackPinnedContextPhaseFn.mock.calls.length, 1);
+        assert.equal(flushTerminalSseEventArchiveFn.mock.calls.length, 1);
     });
 });

@@ -17,6 +17,7 @@ export { cmdCompact, cmdContext } from './context.js';
 export { cmdDiagnose } from './diagnose.js';
 export { cmdDisplay } from './display.js';
 export { cmdErrors } from './errors.js';
+export { cmdEvents } from './events.js';
 export { cmdExport } from './export.js';
 export { cmdFs } from './fs.js';
 export { cmdGh } from './gh.js';

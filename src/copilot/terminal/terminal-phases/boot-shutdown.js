@@ -6,6 +6,7 @@
 
 import { registerShutdownHandler, SHUTDOWN_PRIORITY } from '#copilot/core';
 import { log } from '#copilot/observability';
+import { flushTerminalSseEventArchive } from '../state/events/index.js';
 import { rollbackTerminalPinnedContextPhase } from './boot-pinned.js';
 
 /**
@@ -15,6 +16,7 @@ import { rollbackTerminalPinnedContextPhase } from './boot-pinned.js';
  * @param {{
  *     rollbackRuntimeListenersPhase: () => Promise<void>;
  *     rollbackPinnedContextPhaseFn?: typeof rollbackTerminalPinnedContextPhase;
+ *     flushTerminalSseEventArchiveFn?: typeof flushTerminalSseEventArchive;
  *     registerShutdownHandlerFn?: typeof registerShutdownHandler;
  *     logFn?: (level: 'DEBUG' | 'INFO' | 'WARN' | 'ERROR' | 'FATAL', message: string) => void;
  * }} deps
@@ -23,6 +25,7 @@ import { rollbackTerminalPinnedContextPhase } from './boot-pinned.js';
 export function registerTerminalShutdownHandlers(ctx, deps) {
     const rollbackRuntimeListenersPhase = deps.rollbackRuntimeListenersPhase;
     const rollbackPinnedContextPhaseFn = deps.rollbackPinnedContextPhaseFn ?? rollbackTerminalPinnedContextPhase;
+    const flushTerminalSseEventArchiveFn = deps.flushTerminalSseEventArchiveFn ?? flushTerminalSseEventArchive;
     const registerShutdownHandlerFn = deps.registerShutdownHandlerFn ?? registerShutdownHandler;
     const logFn = deps.logFn ?? log;
 
@@ -51,5 +54,15 @@ export function registerTerminalShutdownHandlers(ctx, deps) {
             logFn('INFO', '[TerminalServer] Activity emitter desacoplado via shutdown handler.');
         },
         SHUTDOWN_PRIORITY.TERMINAL_ACTIVITY,
+    );
+
+    registerShutdownHandlerFn(
+        'terminal.sseEventArchive',
+        async () => {
+            await flushTerminalSseEventArchiveFn();
+            logFn('INFO', '[TerminalServer] Archive SSE drenado via shutdown handler.');
+        },
+        SHUTDOWN_PRIORITY.AUDIT_FINALIZER,
+        { timeoutMs: 10_000 },
     );
 }

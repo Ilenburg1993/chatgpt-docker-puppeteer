@@ -53,6 +53,7 @@ export {
 export {
     flushTerminalSseEventArchive,
     readTerminalSseEventArchiveState,
+    readTerminalSseEventArchiveTail,
     recordTerminalSseEventArchive,
 } from '../sse-event-archive.js';
 export {
