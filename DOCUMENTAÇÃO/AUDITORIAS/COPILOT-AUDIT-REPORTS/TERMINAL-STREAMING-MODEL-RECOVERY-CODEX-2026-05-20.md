@@ -625,7 +625,7 @@ Fase I1. Inventário e classificação de emitters
 - I1.1 Mapear todos os listeners do SDK e eventos derivados (`dialog.delta`, `task.delta`, `assistant.message`, `question.pending`). Status: feito nesta revisão.
 - I1.2 Classificar cada emissor como fonte canônica, adaptador, fallback ou legado. Status: ampliado nesta revisão; `/events sources` expõe classe, owner, emissor, eventos aceitos, supressões e fallback das superfícies críticas.
 - I1.3 Bloquear novos eventos públicos fora de `broadcastSse()` por teste arquitetural. Status: feito nesta revisão para fanout durável/SSE: `eventFanout.publish()` e `recordTerminalSseEventArchive()` ficam concentrados em `dialog/sse.js` e no arquivo de archive.
-- I1.4 Expor `/events sources` ou `/health` com contagem por fonte/adaptador. Status: parcialmente feito; `/events sources` mostra fonte e classe, falta contagem dinâmica por sessão.
+- I1.4 Expor `/events sources` ou `/health` com contagem por fonte/adaptador. Status: feito em `/events sources [n]`, com contagem recente por política a partir do archive SSE.
 
 Fase I2. Política explícita de compat/fallback
 
@@ -687,6 +687,7 @@ Implementado:
 - `tool-activity-presenter.js` foi reclassificado como `hotspot` no `module-map.js`; a próxima subonda deve modularizar identity resolution, target summary e rendering text para reduzir tamanho sem quebrar o fluxo único.
 - `agent-runtime-events.js` deixou de narrar erro recuperável de `model_call` como `fallback=auto`; agora descreve roteamento/retry delegado ao SDK, explicita que `auto` é a única recuperação permitida quando aplicável e que não há Premium Request confirmada.
 - Repetições idênticas de `model_call` recuperável continuam auditáveis via SSE, mas não poluem o histórico/PTY a cada ocorrência dentro da janela de throttle.
+- `/events sources [n]` agora consulta o archive SSE e mostra `recentes=N` por política, permitindo identificar rapidamente quando uma superfície pública está materializando eventos demais ou duplicados.
 - Boot HTTP deixou de morrer em `EADDRINUSE` e passou a realocar a porta do inject server com UX/comandos refletindo a porta efetiva.
 - O live runner canônico agora evita colisão de porta antes do boot e coleta SSE na porta efetiva escolhida.
 - `task.delta` público fora de turno agora fecha materialização canônica; `assistant.message` posterior suprime duplicata exata ou renderiza apenas o sufixo faltante.
@@ -711,5 +712,5 @@ Próxima rodada recomendada:
 3. Criar contrato único de modelo configurado/preferido/efetivo/cobrado.
 4. Continuar a normalização de tool identity em completions/progress externos sem requestId, com métricas para qualquer lifecycle ainda genérico.
 5. Adicionar eventos de boot `runtime.wired` e falha de fase.
-6. Expandir `/events sources` com contagem dinâmica por fonte/adaptador e links para `/events source=...`.
+6. Expandir `/events sources` com links/copy hints para `/events event=...` e `/events source=...`.
 7. Expandir o cenário live para elicitation quando a capability estiver disponível.

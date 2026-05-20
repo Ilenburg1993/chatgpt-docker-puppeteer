@@ -52,14 +52,18 @@ function mockCtx() {
 }
 
 describe('terminal/commands/events', () => {
-    it('mostra mapa de fontes canônicas sem consultar archive SSE', async () => {
+    it('mostra mapa de fontes canônicas com contagem recente do archive SSE', async () => {
         const ctx = mockCtx();
 
-        await cmdEvents({ println: ctx.println }, 'sources');
+        await cmdEvents({ println: ctx.println }, 'sources 50');
 
-        expect(readTerminalSseEventArchiveTail).not.toHaveBeenCalled();
+        expect(readTerminalSseEventArchiveTail).toHaveBeenCalledWith(
+            expect.objectContaining({ limit: 50, event: null, source: null }),
+        );
         expect(ctx.output()).toContain('Fontes canônicas do terminal');
+        expect(ctx.output()).toContain('janela=últimos 5 eventos');
         expect(ctx.output()).toContain('assistant.text.delta');
+        expect(ctx.output()).toContain('recentes=1');
         expect(ctx.output()).toContain('task.delta only when dialog loop is inactive');
         expect(ctx.output()).toContain('ask_user.visible-question');
     });

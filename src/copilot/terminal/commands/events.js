@@ -95,6 +95,21 @@ function isEventsSourcesArg(arg) {
 }
 
 /**
+ * @param {string} arg
+ * @returns {number}
+ */
+function parseSourcesLimit(arg) {
+    const tokens = arg.trim().split(/\s+/u).filter(Boolean).slice(1);
+    for (const token of tokens) {
+        if (/^\d+$/u.test(token)) return Math.min(500, Math.max(1, Number(token)));
+        if (token.startsWith('limit=') && /^\d+$/u.test(token.slice('limit='.length))) {
+            return Math.min(500, Math.max(1, Number(token.slice('limit='.length))));
+        }
+    }
+    return 200;
+}
+
+/**
  * @param {unknown} value
  * @returns {string}
  */
@@ -132,12 +147,31 @@ function summarizePayload(payload) {
 export async function cmdEvents({ println }, arg = '') {
     if (isEventsSourcesArg(arg)) {
         const policies = listTerminalPublicStreamSourcePolicies();
+        const limit = parseSourcesLimit(arg);
+        const projection = await readTerminalSseEventArchiveTail({
+            limit,
+            event: null,
+            traceId: null,
+            turnId: null,
+            source: null,
+            toolCallId: null,
+            requestId: null,
+            hubSessionId: null,
+        });
+        const counts = new Map(projection.entries.map((entry) => [entry.event, 0]));
+        for (const entry of projection.entries) {
+            counts.set(entry.event, (counts.get(entry.event) ?? 0) + 1);
+        }
         println('\n  \x1b[36m🧭 Fontes canônicas do terminal\x1b[0m');
+        println(
+            `  \x1b[90mjanela=últimos ${projection.filters.limit} eventos · archive=${projection.state.path ?? '(sem arquivo)'}\x1b[0m`,
+        );
         for (const policy of policies) {
+            const policyCount = policy.publicEvents.reduce((sum, event) => sum + (counts.get(event) ?? 0), 0);
             println(`  \x1b[33m${policy.id}\x1b[0m \x1b[90m(${policy.class})\x1b[0m`);
             println(`    owner       \x1b[90m${policy.owner}\x1b[0m`);
             println(`    emitter     \x1b[90m${policy.canonicalEmitter}\x1b[0m`);
-            println(`    eventos     \x1b[90m${policy.publicEvents.join(', ')}\x1b[0m`);
+            println(`    eventos     \x1b[90m${policy.publicEvents.join(', ')} · recentes=${policyCount}\x1b[0m`);
             println(`    aceita      \x1b[90m${policy.accepts.join(', ')}\x1b[0m`);
             println(`    suprime     \x1b[90m${policy.suppresses.join(', ')}\x1b[0m`);
             println(`    fallback    \x1b[90m${policy.fallback}\x1b[0m`);
