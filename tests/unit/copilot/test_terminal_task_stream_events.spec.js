@@ -23,24 +23,57 @@ vi.mock('../../../src/copilot/terminal/state/activity-state.js', () => ({
     recordTerminalActivity: mocks.recordTerminalActivity,
 }));
 
-vi.mock('../../../src/copilot/terminal/dialog/index.js', () => ({
+vi.mock('../../../src/copilot/terminal/dialog/index.js', async (importOriginal) => {
+    const actual = /** @type {Record<string, unknown>} */ (await importOriginal());
+    return {
+        ...actual,
+        println: mocks.println,
+    };
+});
+
+vi.mock('../../../src/copilot/terminal/dialog/sse.js', () => ({
+    broadcastSse: vi.fn(),
+    CRITICAL_EVENTS: new Set(),
+    nextSseEventId: vi.fn(() => 1),
+}));
+
+vi.mock('../../../src/copilot/terminal/dialog/output.js', () => ({
+    beginTerminalRenderLock: vi.fn(),
+    clearInlineStatus: vi.fn(),
+    endTerminalRenderLock: vi.fn(),
     println: mocks.println,
+    SEPARATOR: '---',
+    writeTerminalRaw: (chunk) => process.stdout.write(String(chunk)),
 }));
 
 vi.mock('../../../src/copilot/presentation/state/index.js', () => ({
     appendThinkingHistoryChunk: mocks.appendThinkingHistoryChunk,
     finalizeThinkingHistoryEntry: mocks.finalizeThinkingHistoryEntry,
     getBusy: mocks.getBusy,
+    getShowIntentActivity: vi.fn(() => true),
+    getShowSessionActivity: vi.fn(() => true),
     getShowStreaming: mocks.getShowStreaming,
     getShowThinking: mocks.getShowThinking,
+    getShowToolActivity: vi.fn(() => true),
+    getShowUsage: vi.fn(() => true),
+    setShowIntentActivity: vi.fn(),
+    setShowSessionActivity: vi.fn(),
+    setShowStreaming: vi.fn(),
+    setShowThinking: vi.fn(),
+    setShowToolActivity: vi.fn(),
+    setShowUsage: vi.fn(),
 }));
 
 vi.mock('../../../src/copilot/terminal/events/assistant-transcript-renderer.js', () => ({
     renderTerminalAssistantTranscript: mocks.renderTerminalAssistantTranscript,
 }));
 
+vi.mock('../../../src/copilot/terminal/frontend/gateways/index.js', () => ({
+    readTerminalDialogStreamMeta: () => ({ model: 'gpt-test', reasoningEffort: 'high' }),
+}));
+
 describe('terminal/task-stream-events.js — contrato', () => {
-    beforeEach(() => {
+    beforeEach(async () => {
         mocks.recordTerminalActivity.mockClear();
         mocks.println.mockClear();
         mocks.renderTerminalAssistantTranscript.mockClear();
@@ -52,6 +85,8 @@ describe('terminal/task-stream-events.js — contrato', () => {
         mocks.getShowThinking.mockReturnValue(true);
         mocks.appendThinkingHistoryChunk.mockClear();
         mocks.finalizeThinkingHistoryEntry.mockClear();
+        const stream = await import('../../../src/copilot/terminal/events/public-assistant-stream.js');
+        stream.resetPublicAssistantStreamsForTests();
     });
 
     it('importa sem erros', async () => {
@@ -87,7 +122,7 @@ describe('terminal/task-stream-events.js — contrato', () => {
         stdoutSpy.mockRestore();
     });
 
-    it('registra task.delta sem imprimir streaming bruto e persiste transcript no fechamento', async () => {
+    it('renderiza task.delta público ao vivo e não duplica transcript no fechamento', async () => {
         const stdoutSpy = vi.spyOn(process.stdout, 'write').mockReturnValue(true);
         const { setupTerminalTaskStreamListeners } =
             await import('../../../src/copilot/terminal/events/task-stream-events.js');
@@ -108,14 +143,30 @@ describe('terminal/task-stream-events.js — contrato', () => {
         );
         expect(mocks.println).not.toHaveBeenCalledWith(expect.stringContaining('task streaming'));
         expect(mocks.println).not.toHaveBeenCalledWith(expect.stringContaining('task complete'));
+        expect(stdoutSpy).toHaveBeenCalled();
+        expect(stdoutSpy.mock.calls.map(([chunk]) => String(chunk)).join('')).toContain('OK-LIVE-1');
+        expect(mocks.renderTerminalAssistantTranscript).not.toHaveBeenCalled();
+        stdoutSpy.mockRestore();
+    });
+
+    it('persiste transcript de task.delta no fechamento quando streaming visual está desligado', async () => {
+        const stdoutSpy = vi.spyOn(process.stdout, 'write').mockReturnValue(true);
+        mocks.getShowStreaming.mockReturnValue(false);
+        const { setupTerminalTaskStreamListeners } =
+            await import('../../../src/copilot/terminal/events/task-stream-events.js');
+        const agent = new EventEmitter();
+
+        setupTerminalTaskStreamListeners({ agent });
+        agent.emit('task.delta', { taskId: 'task-1', chunk: 'OK-FINAL-1' });
+        agent.emit('task.completed', { taskId: 'task-1' });
+
         expect(mocks.renderTerminalAssistantTranscript).toHaveBeenCalledWith(
             expect.objectContaining({
-                content: 'OK-LIVE-1',
+                content: 'OK-FINAL-1',
                 source: 'agent/task.delta',
                 status: 'completed',
             }),
         );
-        expect(stdoutSpy).not.toHaveBeenCalled();
         stdoutSpy.mockRestore();
     });
 

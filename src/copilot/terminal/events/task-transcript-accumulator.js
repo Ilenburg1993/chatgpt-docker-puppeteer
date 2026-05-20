@@ -20,6 +20,7 @@ const ANONYMOUS_TASK_KEY = '__anonymous__';
  *     content: string;
  *     truncated: boolean;
  *     seenWhileBusy: boolean;
+ *     liveRendered: boolean;
  * }} TaskTranscriptEntry
  */
 
@@ -47,6 +48,7 @@ function taskKeyToId(taskKey) {
  * }} [options]
  * @returns {{
  *     record: (taskId: string | null | undefined, chunk: string) => void;
+ *     markLiveRendered: (taskId: string | null | undefined) => void;
  *     flush: (taskId: string | null | undefined, status: 'completed' | 'error', reason: string) => boolean;
  *     flushAll: (status: 'completed' | 'error', reason: string) => string[];
  *     delete: (taskId: string | null | undefined) => void;
@@ -67,7 +69,7 @@ export function createTaskTranscriptAccumulator(options = {}) {
      */
     function record(taskId, chunk) {
         const taskKey = getTaskTranscriptKey(taskId);
-        const entry = entries.get(taskKey) ?? { content: '', truncated: false, seenWhileBusy: false };
+        const entry = entries.get(taskKey) ?? { content: '', truncated: false, seenWhileBusy: false, liveRendered: false };
         entry.seenWhileBusy = entry.seenWhileBusy || isBusy();
         if (entry.content.length < maxChars) {
             const remaining = maxChars - entry.content.length;
@@ -76,6 +78,17 @@ export function createTaskTranscriptAccumulator(options = {}) {
         } else {
             entry.truncated = true;
         }
+        entries.set(taskKey, entry);
+    }
+
+    /**
+     * @param {string | null | undefined} taskId
+     * @returns {void}
+     */
+    function markLiveRendered(taskId) {
+        const taskKey = getTaskTranscriptKey(taskId);
+        const entry = entries.get(taskKey) ?? { content: '', truncated: false, seenWhileBusy: false, liveRendered: false };
+        entry.liveRendered = true;
         entries.set(taskKey, entry);
     }
 
@@ -91,7 +104,7 @@ export function createTaskTranscriptAccumulator(options = {}) {
         if (!entry) return false;
         entries.delete(taskKey);
         const content = entry.content.trim();
-        if (!content || entry.seenWhileBusy) return false;
+        if (!content || entry.seenWhileBusy || entry.liveRendered) return false;
         return renderTranscript({
             content,
             title: status === 'error' ? 'Saída de tarefa falhada' : 'Saída de tarefa',
@@ -104,6 +117,7 @@ export function createTaskTranscriptAccumulator(options = {}) {
 
     return {
         record,
+        markLiveRendered,
         flush,
         flushAll: (status, reason) => {
             const processed = [];

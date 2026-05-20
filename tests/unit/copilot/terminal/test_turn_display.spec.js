@@ -90,7 +90,7 @@ describe('terminal/dialog/turn-display', () => {
         expect(isTerminalRenderLocked()).toBe(false);
     });
 
-    it('suprime chunk duplicado imediato no display live', () => {
+    it('preserva chunks repetidos legítimos no display live', () => {
         const state = createDisplayState({
             model: 'gpt-5-mini',
             effort: 'high',
@@ -104,8 +104,25 @@ describe('terminal/dialog/turn-display', () => {
         onDelta('PAR');
         renderStreamingFooter(state, 20);
 
-        expect(state.streamingChars).toBe(3);
-        expect(state.streamingContent).toBe('PAR');
+        expect(state.streamingChars).toBe(6);
+        expect(state.streamingContent).toBe('PARPAR');
+    });
+
+    it('descarrega chunks curtos imediatamente quando streaming visual está ativo', () => {
+        const state = createDisplayState({
+            model: 'gpt-5-mini',
+            effort: 'high',
+            turnStartTime: Date.now(),
+            showStreaming: true,
+            showThinking: false,
+        });
+
+        const onDelta = createDeltaCallback(state);
+        onDelta('Oi');
+
+        const outputBeforeFooter = writeSpy.mock.calls.map(([chunk]) => String(chunk)).join('');
+        expect(state.streamingStarted).toBe(true);
+        expect(outputBeforeFooter).toContain('Oi');
     });
 
     it('detecta divergência entre stream acumulado e reply final', () => {

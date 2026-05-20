@@ -38,8 +38,6 @@ import { broadcastSse } from './sse.js';
  * @property {string} streamingBuffer
  * @property {boolean} streamingLineOpen
  * @property {number} streamingVisibleChars
- * @property {string} lastStreamingChunk
- * @property {number} lastStreamingChunkAt
  * @property {number} firstChunkTime
  * @property {number} turnStartTime
  * @property {string} model
@@ -141,8 +139,6 @@ export function createDisplayState({ model, effort, turnStartTime, showStreaming
         streamingBuffer: '',
         streamingLineOpen: false,
         streamingVisibleChars: 0,
-        lastStreamingChunk: '',
-        lastStreamingChunkAt: 0,
         firstChunkTime: 0,
         turnStartTime,
         model,
@@ -274,7 +270,7 @@ export function createReasoningCallback(state) {
  */
 function flushStreamingBuffer(state, opts = {}) {
     if (!state.streamingBuffer) return;
-    if (!opts.force && state.streamingBuffer.length < 48 && !/[\n.!?:;]\s*$/.test(state.streamingBuffer)) return;
+    if (!opts.force && !state.streamingStarted) return;
     writeStreamingText(state, state.streamingBuffer);
     state.streamingBuffer = '';
 }
@@ -316,11 +312,6 @@ function writeStreamingText(state, text) {
 export function createDeltaCallback(state) {
     return (chunk) => {
         const now = Date.now();
-        if (chunk && chunk === state.lastStreamingChunk && now - state.lastStreamingChunkAt <= 75) {
-            return;
-        }
-        state.lastStreamingChunk = chunk;
-        state.lastStreamingChunkAt = now;
         if (state.firstChunkTime === 0) {
             state.firstChunkTime = now;
         }

@@ -27,3 +27,4 @@ export {
     writeInlineStatus,
 } from './output.js';
 export { broadcastSse, CRITICAL_EVENTS, nextSseEventId } from './sse.js';
+export { createDeltaCallback, createDisplayState, renderStreamingFooter } from './turn-display.js';

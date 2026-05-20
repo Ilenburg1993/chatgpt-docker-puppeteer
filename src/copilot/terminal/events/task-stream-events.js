@@ -22,6 +22,11 @@ import {
 } from '../../presentation/state/index.js';
 import { println } from '../dialog/index.js';
 import { buildTerminalTaskThinkingId, formatTerminalThinkingRef, recordTerminalActivity } from '../state/events/index.js';
+import {
+    finalizeAllPublicAssistantStreams,
+    finalizePublicAssistantStream,
+    renderPublicAssistantStreamDelta,
+} from './public-assistant-stream.js';
 import { createTaskTranscriptAccumulator } from './task-transcript-accumulator.js';
 
 /**
@@ -140,6 +145,10 @@ export function setupTerminalTaskStreamListeners({ agent }) {
         if (!chunk) return;
         recordTaskDelta(evt.taskId, chunk);
         if (getBusy()) return;
+        const { liveRendered } = renderPublicAssistantStreamDelta({ key: getTaskKey(evt.taskId), chunk });
+        if (liveRendered) {
+            taskTranscripts.markLiveRendered(evt.taskId);
+        }
         const taskKey = getTaskKey(evt.taskId);
         const now = Date.now();
         const lastAt = taskLastDeltaActivityAt.get(taskKey) ?? 0;
@@ -186,6 +195,10 @@ export function setupTerminalTaskStreamListeners({ agent }) {
     const onTaskCompleted = (/** @type {{ taskId?: string | null }} */ evt = {}) => {
         const taskKey = getTaskKey(evt.taskId);
         const stats = taskDeltaStats.get(taskKey) ?? { chunks: 0, chars: 0 };
+        const { liveRendered } = finalizePublicAssistantStream({ key: taskKey });
+        if (liveRendered) {
+            taskTranscripts.markLiveRendered(evt.taskId);
+        }
         const wasAlreadyRenderedByTurn = taskDeltasSeenWhileBusy.has(taskKey);
         const hadVisiblePayload = (stats.chunks > 0 || stats.chars > 0) && !wasAlreadyRenderedByTurn;
         recordTerminalActivity('task', 'Tarefa interna concluída', {
@@ -204,6 +217,10 @@ export function setupTerminalTaskStreamListeners({ agent }) {
     const onTaskError = (/** @type {{ taskId?: string | null }} */ evt = {}) => {
         const taskKey = getTaskKey(evt.taskId);
         const stats = taskDeltaStats.get(taskKey) ?? { chunks: 0, chars: 0 };
+        const { liveRendered } = finalizePublicAssistantStream({ key: taskKey });
+        if (liveRendered) {
+            taskTranscripts.markLiveRendered(evt.taskId);
+        }
         recordTerminalActivity('error', 'Tarefa interna falhou', {
             detail: `${stats.chunks} chunks · ${stats.chars} chars`,
             source: 'agent',
@@ -217,6 +234,9 @@ export function setupTerminalTaskStreamListeners({ agent }) {
     };
 
     const onAssistantTurnEnd = () => {
+        for (const taskKey of finalizeAllPublicAssistantStreams()) {
+            taskTranscripts.markLiveRendered(taskKey === '__anonymous__' ? null : taskKey);
+        }
         for (const taskKey of taskTranscripts.flushAll('completed', 'assistant.turn_end')) {
             taskDeltaStats.delete(taskKey);
             taskLastDeltaActivityAt.delete(taskKey);

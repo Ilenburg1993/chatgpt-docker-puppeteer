@@ -25,7 +25,7 @@ import {
     stopRuntimeDialogLoopAuthorized,
 } from '#copilot/runtime';
 
-const DUPLICATE_DELTA_SUPPRESSION_WINDOW_MS = 75;
+const CROSS_CHANNEL_DELTA_SUPPRESSION_WINDOW_MS = 75;
 
 /**
  * Resultado canônico do transporte de um turno explícito no dialog loop.
@@ -145,28 +145,33 @@ export async function dialogTurnDetailed(agent, message, opts = {}) {
     };
     agent.on(EMITTER_DIALOG_REPLY, onReplyTemp);
 
-    const onDeltaTemp = onDelta
+    const createDeltaListener = onDelta
         ? (() => {
-              /** @type {string} */
-              let lastChunk = '';
-              /** @type {number} */
-              let lastChunkAt = 0;
-              return (/** @type {unknown} */ rawEvt) => {
+              /** @type {{ chunk: string; source: 'task.delta' | 'dialog.delta'; at: number } | null} */
+              let lastDelta = null;
+              return (/** @type {'task.delta' | 'dialog.delta'} */ source) => (/** @type {unknown} */ rawEvt) => {
                   const evt = /** @type {{ chunk?: string }} */ (rawEvt);
                   if (!evt.chunk) return;
                   const now = Date.now();
-                  if (evt.chunk === lastChunk && now - lastChunkAt <= DUPLICATE_DELTA_SUPPRESSION_WINDOW_MS) {
+                  if (
+                      lastDelta &&
+                      lastDelta.chunk === evt.chunk &&
+                      lastDelta.source !== source &&
+                      now - lastDelta.at <= CROSS_CHANNEL_DELTA_SUPPRESSION_WINDOW_MS
+                  ) {
+                      lastDelta = { chunk: evt.chunk, source, at: now };
                       return;
                   }
-                  lastChunk = evt.chunk;
-                  lastChunkAt = now;
+                  lastDelta = { chunk: evt.chunk, source, at: now };
                   onDelta(evt.chunk);
               };
           })()
         : null;
-    if (onDeltaTemp) {
-        agent.on(EMITTER_TASK_DELTA, onDeltaTemp);
-        agent.on(EMITTER_DIALOG_DELTA, onDeltaTemp);
+    const onTaskDeltaTemp = createDeltaListener ? createDeltaListener('task.delta') : null;
+    const onDialogDeltaTemp = createDeltaListener ? createDeltaListener('dialog.delta') : null;
+    if (onTaskDeltaTemp && onDialogDeltaTemp) {
+        agent.on(EMITTER_TASK_DELTA, onTaskDeltaTemp);
+        agent.on(EMITTER_DIALOG_DELTA, onDialogDeltaTemp);
     }
 
     const onReasoningTemp = onReasoning
@@ -231,9 +236,9 @@ export async function dialogTurnDetailed(agent, message, opts = {}) {
         return result;
     } finally {
         agent.off(EMITTER_DIALOG_REPLY, onReplyTemp);
-        if (onDeltaTemp) {
-            agent.off(EMITTER_TASK_DELTA, onDeltaTemp);
-            agent.off(EMITTER_DIALOG_DELTA, onDeltaTemp);
+        if (onTaskDeltaTemp && onDialogDeltaTemp) {
+            agent.off(EMITTER_TASK_DELTA, onTaskDeltaTemp);
+            agent.off(EMITTER_DIALOG_DELTA, onDialogDeltaTemp);
         }
         if (onReasoningTemp) agent.off('task.reasoning', onReasoningTemp);
     }

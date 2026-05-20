@@ -281,6 +281,22 @@ describe('client-dialog › dialogTurn', () => {
         expect(onDelta).toHaveBeenCalledWith('duplicado');
     });
 
+    it('preserva chunks repetidos quando eles vêm do mesmo canal canônico', async () => {
+        const agent = createMockAgent();
+        const onDelta = vi.fn();
+
+        agent.sendDialogTurn.mockImplementation(async () => {
+            agent._fire('dialog.delta', { chunk: 'eco' });
+            agent._fire('dialog.delta', { chunk: 'eco' });
+            return 'done';
+        });
+
+        await dialogTurn(agent, 'hello', { onDelta });
+        expect(onDelta).toHaveBeenCalledTimes(2);
+        expect(onDelta).toHaveBeenNthCalledWith(1, 'eco');
+        expect(onDelta).toHaveBeenNthCalledWith(2, 'eco');
+    });
+
     it('remove listeners mesmo quando sendDialogTurn rejeita', async () => {
         const agent = createMockAgent();
         agent.sendDialogTurn.mockRejectedValue(new Error('fail'));
