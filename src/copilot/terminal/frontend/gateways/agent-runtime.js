@@ -60,6 +60,7 @@ import {
  *     pendingQuestionShadowRemainingMs: number | null;
  *     contextWindow: { tokens: number; tokenLimit: number; utilization: number } | null;
  *     lastPrInfo: { model?: string; cost?: number; quotaSnapshots?: Record<string, unknown>; ts: number } | null;
+ *     lastLlmUsage: Record<string, unknown> | null;
  * }}
  */
 export function readTerminalRuntimeState(runtimeId) {
@@ -91,6 +92,7 @@ export function readTerminalRuntimeState(runtimeId) {
          *     ts: number;
          * } | null}
          */ (runtime.lastPrInfo),
+        lastLlmUsage: /** @type {Record<string, unknown> | null} */ (runtime.lastLlmUsage),
     };
 }
 

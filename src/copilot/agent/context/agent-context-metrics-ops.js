@@ -2,8 +2,8 @@
 /**
  * src/copilot/agent/context/agent-context-metrics-ops.js
  *
- * Operações sobre `metricsState` do AgentContext: contadores de envio, cache de snapshot e PR info. Extraídas de
- * `agent-context.js` na Faixa C3.1.
+ * Operações sobre `metricsState` do AgentContext: contadores de envio, cache de snapshot, PR info e telemetria LLM.
+ * Extraídas de `agent-context.js` na Faixa C3.1.
  *
  * @module copilot/agent/context/agent-context-metrics-ops
  * @internal
@@ -135,4 +135,25 @@ export function setLastPrInfo(ctx, info) {
  */
 export function getLastPrInfoSnapshot(ctx) {
     return ctx.metricsState.lastPrInfo ? { ...ctx.metricsState.lastPrInfo } : null;
+}
+
+/**
+ * Atualiza a última telemetria LLM classificada. Não atualiza `lastPrInfo`.
+ *
+ * @param {MetricsOpsCtx} ctx
+ * @param {Record<string, unknown> | null} info
+ * @returns {void}
+ */
+export function setLastLlmUsage(ctx, info) {
+    ctx.metricsState.lastLlmUsage = info ? { ...info } : null;
+}
+
+/**
+ * Retorna cópia rasa da última telemetria LLM classificada.
+ *
+ * @param {MetricsOpsCtx} ctx
+ * @returns {Record<string, unknown> | null}
+ */
+export function getLastLlmUsageSnapshot(ctx) {
+    return ctx.metricsState.lastLlmUsage ? { ...ctx.metricsState.lastLlmUsage } : null;
 }

@@ -25,6 +25,7 @@ describe('event-bridge-map › contratos declarativos', () => {
         assert.equal(AGENT_EVENT_BRIDGE_MAP.ready, 'agent:ready');
         assert.equal(AGENT_EVENT_BRIDGE_MAP['task.started'], 'agent:task:started');
         assert.equal(AGENT_EVENT_BRIDGE_MAP['question.answered'], 'agent:question:answered');
+        assert.equal(AGENT_EVENT_BRIDGE_MAP['llm.usage'], 'agent:llm:usage');
         assert.equal(AGENT_EVENT_BRIDGE_MAP['session.idle'], 'agent:session:idle');
         assert.equal(AGENT_EVENT_BRIDGE_MAP['dialog.pre_stall_warning'], 'agent:dialog:pre_stall_warning');
     });

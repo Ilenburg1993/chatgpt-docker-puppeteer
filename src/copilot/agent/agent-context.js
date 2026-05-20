@@ -118,7 +118,7 @@ export class AgentContext {
                 (options.reasoningEffort ?? (COPILOT_REASONING_EFFORT || undefined)),
             mcpBridge: options.mcpBridge ?? null,
         };
-        this.metricsState = { sendCount: 0, statusSnapshotCache: null, lastPrInfo: null };
+        this.metricsState = { sendCount: 0, statusSnapshotCache: null, lastPrInfo: null, lastLlmUsage: null };
         this.runtimeState = {
             status: 'stopped',
             metricsTimer: null,
@@ -237,6 +237,13 @@ export class AgentContext {
     /** @param {{ model?: string; cost?: number; quotaSnapshots?: Record<string, unknown>; ts: number } | null} value */
     set lastPrInfo(value) {
         this.setLastPrInfo(value);
+    }
+    get lastLlmUsage() {
+        return this.metricsState.lastLlmUsage;
+    }
+    /** @param {Record<string, unknown> | null} value */
+    set lastLlmUsage(value) {
+        this.setLastLlmUsage(value);
     }
     get contextState() {
         return this.sessionState.contextState;
@@ -464,6 +471,13 @@ export class AgentContext {
     }
     getLastPrInfoSnapshot() {
         return metricsOps.getLastPrInfoSnapshot(this);
+    }
+    /** @param {Record<string, unknown> | null} info */
+    setLastLlmUsage(info) {
+        metricsOps.setLastLlmUsage(this, info);
+    }
+    getLastLlmUsageSnapshot() {
+        return metricsOps.getLastLlmUsageSnapshot(this);
     }
 
     /** @param {ReturnType<typeof setInterval>} timer */

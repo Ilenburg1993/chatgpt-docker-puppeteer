@@ -20,6 +20,7 @@ export const TERMINAL_EXPLICIT_AGENT_EVENTS = new Set([
     'dialog.pre_stall_warning',
     'dialog.recovery',
     'session.usage',
+    'llm.usage',
     'session.compaction_complete',
     'elicitation.pending',
     'elicitation.completed',

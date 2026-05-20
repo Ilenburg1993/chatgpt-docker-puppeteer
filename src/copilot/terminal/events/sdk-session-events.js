@@ -99,6 +99,7 @@ import {
     recordTerminalTurnUserInputActivity,
     recordTerminalUserInputCompleted,
     recordTerminalUserInputRequested,
+    shouldSuppressTerminalAssistantMessageAsUserInputEcho,
     terminalThemeBadge,
     terminalThemeText,
 } from '../state/events/index.js';
@@ -315,6 +316,19 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
         }
         const normalized = normalizeAssistantTranscriptContent(extractAssistantMessageContent(evt));
         if (!normalized) return;
+        if (
+            shouldSuppressTerminalAssistantMessageAsUserInputEcho({
+                content: normalized.content,
+                runtimeId: typeof data['runtimeId'] === 'string' ? data['runtimeId'] : null,
+            })
+        ) {
+            recordTerminalActivity('question', 'Eco de resposta humana suprimido', {
+                detail: normalized.content.slice(0, 160),
+                source: 'sdk/assistant.message',
+                recordHistory: false,
+            });
+            return;
+        }
         recordTerminalActivity('turn', 'Mensagem da LLM-B recebida', {
             detail: `${normalized.kind}${normalized.content ? ` · ${normalized.content.slice(0, 160)}` : ''}`,
             source: 'sdk',

@@ -1164,13 +1164,23 @@ export class AlwaysAliveAgent extends EventEmitter {
     }
 
     /**
-     * Último snapshot de billing do PR consumido. Atualizado quando `assistant.usage` é emitido pelo SDK.
+     * Último snapshot de billing do PR consumido. Atualizado apenas quando `assistant.usage` é classificado como
+     * `premium_request`; continuações de `ask_user` e usage interno ficam em `llm.usage`.
      *
      * @returns {{ model?: string; cost?: number; quotaSnapshots?: Record<string, unknown>; ts: number } | null}
      */
     get lastPrInfo() {
         // Retorna cópia rasa para evitar mutação externa do estado interno.
         return readAgentDialogLastPrInfo(this.ctx);
+    }
+
+    /**
+     * Última telemetria LLM classificada. Inclui usos sem novo PR, como `ask_user_continuation`.
+     *
+     * @returns {Record<string, unknown> | null}
+     */
+    get lastLlmUsage() {
+        return this.ctx.getLastLlmUsageSnapshot();
     }
 
     /**

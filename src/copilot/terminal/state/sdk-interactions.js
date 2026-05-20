@@ -27,6 +27,7 @@ import {
 
 const MAX_COMPLETED_INTERACTIONS_PER_KIND = 100;
 const COMPLETED_INTERACTION_TTL_MS = 30 * 60_000;
+const USER_INPUT_ECHO_SUPPRESSION_TTL_MS = 10_000;
 
 let _syntheticInteractionSeq = 0;
 
@@ -104,6 +105,9 @@ const _userInputs = new Map();
 /** @type {string | null} */
 let _latestUserInputId = null;
 
+/** @type {{ answer: string; runtimeId: string | null; requestId: string | null; ts: number }[]} */
+const _recentUserInputAnswerEchoGuards = [];
+
 /**
  * @param {unknown} value
  * @returns {Record<string, unknown> | null}
@@ -118,6 +122,14 @@ function objectOrNull(value) {
  */
 function normalizeRuntimeId(value) {
     return typeof value === 'string' && value.trim().length > 0 ? value : null;
+}
+
+/**
+ * @param {unknown} value
+ * @returns {string}
+ */
+function normalizeEchoComparableText(value) {
+    return typeof value === 'string' ? value.replace(/\s+/g, ' ').trim() : '';
 }
 
 /**
@@ -520,8 +532,64 @@ export function recordTerminalUserInputCompleted(evt) {
     entry.answer = normalized.answer || null;
     entry.wasFreeform = normalized.wasFreeform;
     entry.data = { ...entry.data, completion: normalized.data };
+    recordTerminalUserInputAnswerEchoGuard({
+        answer: normalized.answer,
+        runtimeId,
+        requestId: entry.requestId,
+        ts: normalized.ts,
+    });
     pruneTerminalSdkInteractions(normalized.ts);
     return entry;
+}
+
+/**
+ * Registra localmente uma resposta humana recém-enviada para bloquear ecos em canais de streaming que podem chegar
+ * antes do evento SDK `user_input.completed`.
+ *
+ * @param {{ answer: string; runtimeId?: string | null; requestId?: string | null; ts?: number }} input
+ * @returns {void}
+ */
+export function recordTerminalUserInputAnswerEchoGuard({ answer, runtimeId = null, requestId = null, ts = Date.now() }) {
+    const normalizedAnswer = normalizeEchoComparableText(answer);
+    if (!normalizedAnswer) return;
+    _recentUserInputAnswerEchoGuards.unshift({
+        answer: normalizedAnswer,
+        runtimeId: normalizeRuntimeId(runtimeId),
+        requestId: typeof requestId === 'string' && requestId.trim() ? requestId.trim() : null,
+        ts,
+    });
+    if (_recentUserInputAnswerEchoGuards.length > 32) {
+        _recentUserInputAnswerEchoGuards.length = 32;
+    }
+}
+
+/**
+ * Detecta `assistant.message` que é apenas eco protocolar imediato da resposta humana enviada para `ask_user`.
+ *
+ * O SDK pode emitir a resposta do operador no canal de mensagem pública logo após `user_input.completed`. Esse texto já
+ * tem fonte canônica própria (`question.answered`/`user_input.completed`) e mostrá-lo como fala da LLM-B confunde
+ * autoria, histórico e auditoria de transcript.
+ *
+ * @param {{ content?: string; runtimeId?: string | null; now?: number }} input
+ * @returns {boolean}
+ */
+export function shouldSuppressTerminalAssistantMessageAsUserInputEcho({ content, runtimeId = null, now = Date.now() }) {
+    const normalizedContent = normalizeEchoComparableText(content);
+    if (!normalizedContent) return false;
+    const normalizedRuntimeId = normalizeRuntimeId(runtimeId);
+    for (const guard of _recentUserInputAnswerEchoGuards) {
+        if (now - guard.ts > USER_INPUT_ECHO_SUPPRESSION_TTL_MS) continue;
+        if (normalizedRuntimeId && guard.runtimeId && guard.runtimeId !== normalizedRuntimeId) continue;
+        if (guard.answer === normalizedContent) return true;
+    }
+    for (const entry of _userInputs.values()) {
+        if (entry.status !== 'completed') continue;
+        if (!entry.completedAt || now - entry.completedAt > USER_INPUT_ECHO_SUPPRESSION_TTL_MS) continue;
+        if (normalizedRuntimeId && entry.runtimeId && entry.runtimeId !== normalizedRuntimeId) continue;
+        if (normalizeEchoComparableText(entry.answer) !== normalizedContent) continue;
+        return true;
+    }
+    return false;
 }
 
 /**
@@ -559,6 +627,7 @@ export function readTerminalUserInputSummary(opts = {}) {
  */
 export function clearTerminalUserInputs() {
     _userInputs.clear();
+    _recentUserInputAnswerEchoGuards.length = 0;
     _latestUserInputId = null;
 }
 

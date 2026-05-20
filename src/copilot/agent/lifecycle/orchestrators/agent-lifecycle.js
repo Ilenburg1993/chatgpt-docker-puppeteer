@@ -16,6 +16,7 @@ import {
     EMITTER_BEFORE_STOP,
     EMITTER_DIALOG_LOOP_CHANGED,
     EMITTER_ERROR,
+    EMITTER_LLM_USAGE,
     EMITTER_READY,
     EMITTER_STATUS,
     EMITTER_STOPPED,
@@ -169,7 +170,16 @@ async function wireAgentSessionRuntime(ctx, host, client, session, isResumed, op
         isResumed,
         host,
         {
-            emit: (event, payload) => host.emit(event, payload),
+            emit: (event, payload) => {
+                if (event === EMITTER_LLM_USAGE) {
+                    ctx.setLastLlmUsage(
+                        payload && typeof payload === 'object'
+                            ? /** @type {Record<string, unknown>} */ (payload)
+                            : null,
+                    );
+                }
+                return host.emit(event, payload);
+            },
             getStatusSnapshot: () => host.getStatusSnapshot(),
             onCheckpointPath: (path) => {
                 ctx.setLastCheckpointPath(path);

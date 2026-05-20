@@ -92,6 +92,8 @@ export const AGENT_SESSION_COMPACTION_COMPLETE = 'agent:session:compaction_compl
 /** @readonly */
 export const AGENT_SESSION_USAGE = 'agent:session:usage';
 /** @readonly */
+export const AGENT_LLM_USAGE = 'agent:llm:usage';
+/** @readonly */
 export const AGENT_SESSION_TOKEN_BUDGET_WARNING = 'agent:session:token_budget_warning';
 /** @readonly */
 export const AGENT_SESSION_MODE_CHANGED = 'agent:session:mode_changed';
@@ -275,6 +277,7 @@ export const AGENT_EVENTS = /** @type {const} */ ([
     'session.compaction_complete',
     'session.fatal',
     'session.usage',
+    'llm.usage',
     'session.token_budget_warning',
     'session.mode_changed',
     'session.history_synced',
@@ -401,6 +404,7 @@ export const HIGH_FREQUENCY_EVENTS = /** @type {ReadonlySet<AgentEventName>} */ 
         'task.delta',
         'task.reasoning',
         'session.usage',
+        'llm.usage',
         'dialog.turn_start',
         'dialog.turn_end',
         'assistant.streaming_delta',

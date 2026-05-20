@@ -125,6 +125,7 @@ export function readAgentRuntimeOverview(runtimeId) {
  *     systemPromptBinding: Record<string, unknown> | null;
  *     systemPromptFreshness: Record<string, unknown> | null;
  *     lastPrInfo: Record<string, any> | null;
+ *     lastLlmUsage: Record<string, any> | null;
  *     dialogPrMetrics: Record<string, any> | null;
  * }}
  */
@@ -172,6 +173,7 @@ export function readAgentRuntimeOverviewProjection(runtimeId) {
         systemPromptBinding,
         systemPromptFreshness,
         lastPrInfo: /** @type {Record<string, any> | null} */ (prBudget.lastPrInfo),
+        lastLlmUsage: /** @type {Record<string, any> | null} */ (prBudget.lastLlmUsage),
         dialogPrMetrics: /** @type {Record<string, any> | null} */ (prBudget.prMetrics),
     };
 }

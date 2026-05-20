@@ -59,7 +59,7 @@ import { createSnapshot, listSnapshotsAsync, loadSnapshotAsync, saveSnapshotAsyn
  *         | { boots: number; resumesWithPR: number; resumesZeroPR: number; totalPR: number }
  *         | null
  *         | undefined;
- *     lastPrInfo?:
+     *     lastPrInfo?:
  *         | {
  *               model?: string;
  *               configuredModel?: string;
@@ -70,8 +70,9 @@ import { createSnapshot, listSnapshotsAsync, loadSnapshotAsync, saveSnapshotAsyn
  *               quotaSnapshots?: Record<string, unknown>;
  *               ts: number;
  *           }
- *         | null
- *         | undefined;
+     *         | null
+     *         | undefined;
+ *     lastLlmUsage?: Record<string, unknown> | null | undefined;
  *     pendingQuestion?: import('../types.js').PendingQuestion | null | undefined;
  *     pendingQuestionKind?: import('../types.js').PendingQuestionKind | null | undefined;
  *     pendingQuestionShadow?: import('../types.js').PendingQuestionShadow | null | undefined;
@@ -111,6 +112,7 @@ import { createSnapshot, listSnapshotsAsync, loadSnapshotAsync, saveSnapshotAsyn
  *         quotaSnapshots?: Record<string, unknown>;
  *         ts: number;
  *     } | null;
+ *     lastLlmUsage: Record<string, unknown> | null;
  * }} AgentRuntimePrBudgetSnapshot
  *
  *
@@ -203,6 +205,7 @@ export function readRuntimePrBudgetSnapshot(runtime) {
         sessionId: controlState.sessionId,
         prMetrics: runtime.dialogPrMetrics ?? { boots: 0, resumesWithPR: 0, resumesZeroPR: 0, totalPR: 0 },
         lastPrInfo: runtime.lastPrInfo ?? null,
+        lastLlmUsage: runtime.lastLlmUsage ?? null,
     };
 }
 

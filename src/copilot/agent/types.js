@@ -116,6 +116,8 @@
  *     ts: number;
  * } | null} lastPrInfo
  *   - Último snapshot de billing/quota.
+ * @property {Record<string, unknown> | null} lastLlmUsage
+ *   - Última telemetria LLM classificada (`llm.usage`), sem equivaler automaticamente a PR.
  */
 
 /**

@@ -684,6 +684,52 @@ describe('terminal/events/agent-runtime-events.js — contrato', () => {
         expect(broadcastSse).toHaveBeenCalledWith('pr.consumed', expect.any(Object));
     });
 
+    it('narra llm.usage sem novo PR separadamente de pr.consumed', async () => {
+        const { setupTerminalAgentRuntimeEventListeners } =
+            await import('../../../src/copilot/terminal/events/agent-runtime-events.js');
+        /** @type {Map<string, Function[]>} */
+        const listeners = new Map();
+        const agent = {
+            on: vi.fn((event, handler) => {
+                const list = listeners.get(event) ?? [];
+                list.push(handler);
+                listeners.set(event, list);
+            }),
+            off: vi.fn(),
+        };
+
+        setupTerminalAgentRuntimeEventListeners({ agent: /** @type {any} */ (agent), rl: null });
+        listeners.get('llm.usage')?.[0]?.({
+            model: 'gpt-5.4',
+            cost: 0.0123,
+            classification: 'ask_user_continuation',
+            premiumRequest: false,
+            premiumRequestReason: 'user_input_completed_continuation',
+            inputTokens: 10,
+            outputTokens: 4,
+        });
+
+        expect(recordTerminalActivity).toHaveBeenCalledWith(
+            'system',
+            'Uso LLM sem novo PR',
+            expect.objectContaining({
+                detail: 'modelo=gpt-5.4 · custo=0.0123 · classe=ask_user_continuation · motivo=user_input_completed_continuation · tokens=10→4',
+                source: 'agent',
+                recordHistory: true,
+            }),
+        );
+        expect(println).toHaveBeenCalledWith(expect.stringContaining('LLM'));
+        expect(println).toHaveBeenCalledWith(expect.stringContaining('ask_user_continuation'));
+        expect(broadcastSse).toHaveBeenCalledWith(
+            'llm.usage',
+            expect.objectContaining({
+                model: 'gpt-5.4',
+                premiumRequest: false,
+            }),
+        );
+        expect(broadcastSse).not.toHaveBeenCalledWith('pr.consumed', expect.any(Object));
+    });
+
     it('narra boot recovery quando fallback com PR é bloqueado por política', async () => {
         const { setupTerminalAgentRuntimeEventListeners } =
             await import('../../../src/copilot/terminal/events/agent-runtime-events.js');

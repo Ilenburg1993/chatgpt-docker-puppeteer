@@ -64,6 +64,7 @@ import { readTerminalSessionBinding } from '../gateways/index.js';
  *     systemPromptBinding: Record<string, unknown> | null;
  *     systemPromptFreshness: Record<string, unknown> | null;
  *     lastPrInfo: Record<string, any> | null;
+ *     lastLlmUsage: Record<string, any> | null;
  *     dialogPrMetrics: Record<string, any> | null;
  * }} TerminalRuntimeBase
  */

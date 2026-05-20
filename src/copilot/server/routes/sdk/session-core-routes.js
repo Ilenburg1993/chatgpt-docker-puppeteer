@@ -3,8 +3,9 @@
  * Rotas core de sessão SDK: send, stream, model, log, abort e messages.
  *
  * Atenção arquitetural: `/sessions/:id/send` é uma rota direta do SDK. Ela chama `sendSession*()` e pode emitir
- * `assistant.usage` / `pr.consumed`. Intervenções zero-PR de usuário/LLM-A devem passar pelo mailbox do runtime e serem
- * aplicadas apenas em `ask_user(kind=question)` via `answerPendingQuestion`.
+ * `assistant.usage`; `pr.consumed` só nasce quando essa usage é classificada como Premium Request. Intervenções zero-PR
+ * de usuário/LLM-A devem passar pelo mailbox do runtime e serem aplicadas apenas em `ask_user(kind=question)` via
+ * `answerPendingQuestion`.
  */
 
 import { resolveModelSelectionMismatch } from '#copilot/core';

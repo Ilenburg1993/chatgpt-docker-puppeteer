@@ -10,6 +10,7 @@ import {
     listTerminalPendingStructuredUserInputs,
     readTerminalRuntimeState,
 } from '../frontend/gateways/index.js';
+import { recordTerminalUserInputAnswerEchoGuard } from './sdk-interactions.js';
 
 /**
  * @typedef {'answered' | 'answer_failed' | 'empty' | 'no_pending' | 'protocol_controlled' | 'invalid_choice'} TerminalPendingAnswerReason
@@ -105,6 +106,12 @@ export function tryAnswerTerminalPendingQuestionInput(rawAnswer, runtimeId, opti
                 return { ...structuredBase, routed: false, ok: false, reason: normalized.reason };
             }
             const ok = answerTerminalPendingQuestion(normalized.answer, runtimeId);
+            if (ok) {
+                recordTerminalUserInputAnswerEchoGuard({
+                    answer: normalized.answer,
+                    runtimeId: runtimeState.runtimeId ?? runtimeId ?? null,
+                });
+            }
             return {
                 ...structuredBase,
                 answer: normalized.answer,
@@ -125,6 +132,16 @@ export function tryAnswerTerminalPendingQuestionInput(rawAnswer, runtimeId, opti
     }
 
     const ok = answerTerminalPendingQuestion(normalized.answer, runtimeId);
+    if (ok) {
+        recordTerminalUserInputAnswerEchoGuard({
+            answer: normalized.answer,
+            runtimeId: runtimeState.runtimeId ?? runtimeId ?? null,
+            requestId:
+                pending && typeof pending['requestId'] === 'string' && pending['requestId'].trim().length > 0
+                    ? pending['requestId']
+                    : null,
+        });
+    }
     return { ...resultBase, answer: normalized.answer, routed: true, ok, reason: ok ? 'answered' : 'answer_failed' };
 }
 

@@ -55,14 +55,14 @@ import {
  * @property {number} [pausedAt] - Timestamp do pause (ms)
  * @property {string | null} [pendingTurnMessage] - Última mensagem enviada sem resposta confirmada
  * @property {number | null} [pendingTurnTs] - Timestamp do envio pendente (ms)
- * @property {boolean} [pendingTurnConsumedPR] - Se `assistant.usage` já foi emitido para este turno
+ * @property {boolean} [pendingTurnConsumedPR] - Se o turno já teve `assistant.usage` classificado como `premium_request`
  * @property {number} [lastPrConsumedAt] - Timestamp do último PR consumido (ms)
  * @property {string} [lastPrModel] - Modelo que consumiu o último PR
  * @property {string} [lastPrConfiguredModel] - Modelo configurado no runtime no momento do consumo
  * @property {string} [lastPrEffectiveModel] - Modelo efetivo observado na sessão viva / SDK
  * @property {boolean} [lastPrModelMismatch] - `true` quando modelo cobrado difere do configurado
  * @property {number} [lastPrCost] - Custo reportado pelo SDK no último PR
- * @property {Record<string, unknown> | null} [lastQuotaSnapshots] - Snapshots de cota do último `assistant.usage`
+ * @property {Record<string, unknown> | null} [lastQuotaSnapshots] - Snapshots de cota do último PR classificado
  * @property {{ boots?: number; resumesWithPR?: number; resumesZeroPR?: number; totalPR?: number }} [prMetrics] -
  *   Contadores de consumo de Premium Requests do dialog loop
  * @property {boolean} [gracefulShutdown] - F56.1: true se o último shutdown foi graceful (via stop()); false se

@@ -21,7 +21,12 @@ import {
     getShowThinking,
 } from '../../presentation/state/index.js';
 import { println } from '../dialog/index.js';
-import { buildTerminalTaskThinkingId, formatTerminalThinkingRef, recordTerminalActivity } from '../state/events/index.js';
+import {
+    buildTerminalTaskThinkingId,
+    formatTerminalThinkingRef,
+    recordTerminalActivity,
+    shouldSuppressTerminalAssistantMessageAsUserInputEcho,
+} from '../state/events/index.js';
 import {
     finalizeAllPublicAssistantStreams,
     finalizePublicAssistantStream,
@@ -159,6 +164,15 @@ export function setupTerminalTaskStreamListeners({ agent }) {
     const onTaskDelta = (/** @type {{ taskId?: string | null; chunk?: string } & Record<string, unknown>} */ evt) => {
         const chunk = evt?.chunk ?? '';
         if (!chunk) return;
+        if (shouldSuppressTerminalAssistantMessageAsUserInputEcho({ content: chunk })) {
+            recordTerminalActivity('question', 'Eco de resposta humana suprimido no streaming', {
+                detail: chunk.slice(0, 160),
+                source: 'agent/task.delta',
+                recordHistory: false,
+                updateCurrent: false,
+            });
+            return;
+        }
         const taskKey = getTaskKey(evt);
         recordTaskDelta(evt, chunk);
         if (getBusy()) return;

@@ -54,7 +54,25 @@ export function cmdUsage({ println }, arg) {
             const modelLabel = modelBilling.mismatch
                 ? `cfg=\x1b[35m${modelBilling.configuredModel ?? '-'}\x1b[0m · cobrado=\x1b[36m${modelBilling.billedModel ?? '-'}\x1b[0m`
                 : `modelo=\x1b[36m${modelBilling.displayModel}\x1b[0m`;
-            println(`      Último turno: ${modelLabel} · custo=\x1b[33m${cost}\x1b[0m`);
+            println(`      Último PR: ${modelLabel} · custo=\x1b[33m${cost}\x1b[0m`);
+        } else {
+            println('      Último PR: \x1b[90msem snapshot classificado nesta sessão\x1b[0m');
+        }
+        if (projection.llmUsage) {
+            const llmCost =
+                projection.llmUsageBilling.cost === null ? '?' : projection.llmUsageBilling.cost.toFixed(4);
+            const llmClass =
+                typeof projection.llmUsage['classification'] === 'string'
+                    ? projection.llmUsage['classification']
+                    : 'unknown';
+            const llmReason =
+                typeof projection.llmUsage['premiumRequestReason'] === 'string'
+                    ? projection.llmUsage['premiumRequestReason']
+                    : 'n/d';
+            const premiumRequest = projection.llmUsage['premiumRequest'] === true ? 'PR' : 'sem novo PR';
+            println(
+                `      Último uso LLM: modelo=\x1b[36m${projection.llmUsageBilling.displayModel}\x1b[0m · ${premiumRequest} · classe=\x1b[90m${llmClass}\x1b[0m · motivo=\x1b[90m${llmReason}\x1b[0m · custo=\x1b[33m${llmCost}\x1b[0m`,
+            );
         }
         if (projection.runtimeSessionId || projection.binding.sdkSessionId || projection.binding.hubSessionId) {
             println(

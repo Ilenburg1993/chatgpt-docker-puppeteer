@@ -10,6 +10,9 @@ import {
     pruneTerminalSdkInteractions,
     recordTerminalElicitationCompleted,
     recordTerminalElicitationPending,
+    recordTerminalUserInputCompleted,
+    recordTerminalUserInputRequested,
+    shouldSuppressTerminalAssistantMessageAsUserInputEcho,
 } from '../../../../src/copilot/terminal/state/sdk-interactions.js';
 
 describe('terminal/sdk-interactions', () => {
@@ -58,5 +61,38 @@ describe('terminal/sdk-interactions', () => {
 
         expect(first.id).not.toBe(second.id);
         expect(listTerminalElicitations()).toHaveLength(2);
+    });
+
+    it('identifica eco imediato de resposta humana de ask_user em assistant.message', () => {
+        const base = Date.now();
+        recordTerminalUserInputRequested({
+            requestId: 'ask-1',
+            question: 'ASK-CANONICAL: responda SIM',
+            timestamp: base,
+        });
+        recordTerminalUserInputCompleted({
+            requestId: 'ask-1',
+            answer: 'SIM',
+            timestamp: base + 100,
+        });
+
+        expect(
+            shouldSuppressTerminalAssistantMessageAsUserInputEcho({
+                content: ' SIM ',
+                now: base + 500,
+            }),
+        ).toBe(true);
+        expect(
+            shouldSuppressTerminalAssistantMessageAsUserInputEcho({
+                content: 'SIM',
+                now: base + 20_000,
+            }),
+        ).toBe(false);
+        expect(
+            shouldSuppressTerminalAssistantMessageAsUserInputEcho({
+                content: 'SIM, recebido.',
+                now: base + 500,
+            }),
+        ).toBe(false);
     });
 });

@@ -49,10 +49,12 @@ export {
 export {
     cacheStatusSnapshot,
     getFreshStatusSnapshotCache,
+    getLastLlmUsageSnapshot,
     getLastPrInfoSnapshot,
     getSendCountSnapshot,
     incrementSendCount,
     invalidateStatusSnapshot,
+    setLastLlmUsage,
     setLastPrInfo,
     setSendCount,
 } from './agent-context-metrics-ops.js';

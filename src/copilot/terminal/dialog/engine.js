@@ -43,6 +43,7 @@ import {
     clearTerminalTurnMaterialization,
     completeTerminalTurnMaterialization,
     recordTerminalTurnDelta,
+    shouldSuppressTerminalAssistantMessageAsUserInputEcho,
 } from '../state/events/index.js';
 import { drainPendingNotifications, getPersistenceFailureCount, persistTurnToHub } from './engine-persistence.js';
 import {
@@ -591,6 +592,15 @@ async function _executeTurn(message, actor, attachments = [], requestHeaders = n
         const renderDeltaChunk = createDeltaCallback(displayState);
         /** @type {(chunk: string, envelope?: Record<string, unknown>) => void} */
         const onDelta = (chunk, envelope = {}) => {
+            if (shouldSuppressTerminalAssistantMessageAsUserInputEcho({ content: chunk })) {
+                recordTerminalActivity('question', 'Eco de resposta humana suprimido no streaming', {
+                    detail: chunk.slice(0, 160),
+                    source: 'sdk.assistant.message_delta',
+                    recordHistory: false,
+                    updateCurrent: false,
+                });
+                return;
+            }
             if (liveTurnSignal.firstOutputAt === 0) liveTurnSignal.firstOutputAt = Date.now();
             recordTerminalTurnDelta({
                 chunk,

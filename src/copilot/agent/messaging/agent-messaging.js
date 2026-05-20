@@ -247,7 +247,8 @@ export function enqueueTask(ctx, host, message, { timeoutMs, attachments, reques
  * Envia uma mensagem ao agente (enfileira para processamento sequencial).
  *
  * Esta é a fila de tarefas do agente/SDK. Ela não é o mailbox zero-PR de intervenção do produto: ao processar a task, o
- * executor chama `session.send()` e pode gerar `assistant.usage` / `pr.consumed`.
+ * executor chama `session.send()` e pode gerar `assistant.usage`; `pr.consumed` só é emitido se essa usage for
+ * classificada como nova Premium Request user-initiated.
  *
  * @param {AgentContext} ctx
  * @param {MessagingHost} host

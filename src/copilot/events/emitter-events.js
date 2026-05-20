@@ -48,6 +48,7 @@ export const EMITTER_SESSION_SHUTDOWN = 'session.shutdown';
 export const EMITTER_SESSION_HANDOFF = 'session.handoff';
 export const EMITTER_SESSION_WORKSPACE_FILE_CHANGED = 'session.workspace_file_changed';
 export const EMITTER_SESSION_USAGE = 'session.usage';
+export const EMITTER_LLM_USAGE = 'llm.usage';
 export const EMITTER_SESSION_COMPACTION_START = 'session.compaction_start';
 export const EMITTER_SESSION_COMPACTION_COMPLETE = 'session.compaction_complete';
 export const EMITTER_SESSION_TOKEN_BUDGET_WARNING = 'session.token_budget_warning';

@@ -34,6 +34,7 @@ const mocks = vi.hoisted(() => ({
         kind: 'question',
     })),
     recordTerminalUserInputCompleted: vi.fn(() => null),
+    shouldSuppressTerminalAssistantMessageAsUserInputEcho: vi.fn(() => false),
     renderTerminalAssistantTranscript: vi.fn(() => true),
 }));
 
@@ -89,6 +90,7 @@ vi.mock('../../../src/copilot/terminal/state/sdk-interactions.js', async () => {
         ...actual,
         recordTerminalUserInputRequested: mocks.recordTerminalUserInputRequested,
         recordTerminalUserInputCompleted: mocks.recordTerminalUserInputCompleted,
+        shouldSuppressTerminalAssistantMessageAsUserInputEcho: mocks.shouldSuppressTerminalAssistantMessageAsUserInputEcho,
     };
 });
 
@@ -128,6 +130,7 @@ describe('terminal/events/sdk-session-events.js — contrato', () => {
         mocks.getBusy.mockReturnValue(false);
         mocks.getShowSessionActivity.mockReturnValue(false);
         mocks.getTerminalDetailLevel.mockReturnValue('detailed');
+        mocks.shouldSuppressTerminalAssistantMessageAsUserInputEcho.mockReturnValue(false);
         mocks.completeTerminalTurnTrace.mockReturnValue(null);
         mocks.consumeRuntimeInterventionMailbox.mockReturnValue(null);
         mocks.enqueueRuntimeInterventionMailbox.mockReturnValue({
@@ -217,6 +220,29 @@ describe('terminal/events/sdk-session-events.js — contrato', () => {
             expect.objectContaining({ content: 'mensagem do turno ativo', protocolKind: 'question' }),
         );
         expect(mocks.renderTerminalAssistantTranscript).not.toHaveBeenCalled();
+    });
+
+    it('suprime assistant.message que ecoa resposta humana recém-concluída de ask_user', async () => {
+        mocks.shouldSuppressTerminalAssistantMessageAsUserInputEcho.mockReturnValue(true);
+        const { setupTerminalSdkSessionEventListeners } =
+            await import('../../../src/copilot/terminal/events/sdk-session-events.js');
+        const agent = createAgentHost();
+        const refreshPromptIfIdle = vi.fn();
+
+        setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfIdle });
+        agent.emit('assistant.message', { content: 'SIM' });
+
+        expect(mocks.shouldSuppressTerminalAssistantMessageAsUserInputEcho).toHaveBeenCalledWith(
+            expect.objectContaining({ content: 'SIM' }),
+        );
+        expect(mocks.broadcastSse).not.toHaveBeenCalledWith('assistant.message', expect.anything());
+        expect(mocks.renderTerminalAssistantTranscript).not.toHaveBeenCalled();
+        expect(mocks.recordTerminalActivity).toHaveBeenCalledWith(
+            'question',
+            'Eco de resposta humana suprimido',
+            expect.objectContaining({ source: 'sdk/assistant.message' }),
+        );
+        expect(refreshPromptIfIdle).not.toHaveBeenCalled();
     });
 
     it('mantém session.model_changed silencioso por default e só narra em modo verbose', async () => {

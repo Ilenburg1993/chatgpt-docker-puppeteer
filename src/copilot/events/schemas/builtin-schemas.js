@@ -140,6 +140,11 @@ export const BUILTIN_SCHEMAS = [
 
     // ── Metrics ──────────────────────────────────────────
     { type: 'agent:metrics', required: ['type', 'timestamp'], description: 'Snapshot periódico de métricas do agente' },
+    {
+        type: 'agent:llm:usage',
+        required: ['type', 'timestamp'],
+        description: 'Telemetria de uso LLM classificada, sem equivaler automaticamente a Premium Request',
+    },
 
     // ── Pending Messages ─────────────────────────────────
     {

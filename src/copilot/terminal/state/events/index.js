@@ -32,8 +32,10 @@ export {
     recordTerminalPermissionCompleted,
     recordTerminalPermissionModeChanged,
     recordTerminalPermissionRequested,
+    recordTerminalUserInputAnswerEchoGuard,
     recordTerminalUserInputCompleted,
     recordTerminalUserInputRequested,
+    shouldSuppressTerminalAssistantMessageAsUserInputEcho,
 } from '../sdk-interactions.js';
 export { recordTerminalPromptHookSubmitted } from '../sdk-hook-events.js';
 export { buildTerminalTaskThinkingId, formatTerminalThinkingRef } from '../thinking-labels.js';

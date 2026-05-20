@@ -7,6 +7,11 @@
 
 import { EventEmitter } from 'node:events';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+    clearTerminalUserInputs,
+    recordTerminalUserInputCompleted,
+    recordTerminalUserInputRequested,
+} from '../../../src/copilot/terminal/state/sdk-interactions.js';
 
 const mocks = vi.hoisted(() => ({
     recordTerminalActivity: vi.fn(),
@@ -70,6 +75,25 @@ vi.mock('../../../src/copilot/terminal/events/assistant-transcript-renderer.js',
 
 vi.mock('../../../src/copilot/terminal/frontend/gateways/index.js', () => ({
     readTerminalDialogStreamMeta: () => ({ model: 'gpt-test', reasoningEffort: 'high' }),
+    classifyTerminalUserInputQuestionKind: () => 'question',
+    normalizeTerminalUserInputRequestedEvent: (evt) => ({
+        requestId: evt?.requestId ?? null,
+        runtimeId: evt?.runtimeId ?? null,
+        question: evt?.question ?? '',
+        choices: Array.isArray(evt?.choices) ? evt.choices : [],
+        allowFreeform: evt?.allowFreeform !== false,
+        toolCallId: evt?.toolCallId ?? null,
+        data: evt?.data ?? {},
+        ts: evt?.timestamp ?? evt?.ts ?? Date.now(),
+    }),
+    normalizeTerminalUserInputCompletedEvent: (evt) => ({
+        requestId: evt?.requestId ?? null,
+        runtimeId: evt?.runtimeId ?? null,
+        answer: evt?.answer ?? '',
+        wasFreeform: typeof evt?.wasFreeform === 'boolean' ? evt.wasFreeform : null,
+        data: evt?.data ?? {},
+        ts: evt?.timestamp ?? evt?.ts ?? Date.now(),
+    }),
 }));
 
 describe('terminal/task-stream-events.js — contrato', () => {
@@ -85,6 +109,7 @@ describe('terminal/task-stream-events.js — contrato', () => {
         mocks.getShowThinking.mockReturnValue(true);
         mocks.appendThinkingHistoryChunk.mockClear();
         mocks.finalizeThinkingHistoryEntry.mockClear();
+        clearTerminalUserInputs();
         const stream = await import('../../../src/copilot/terminal/events/public-assistant-stream.js');
         stream.resetPublicAssistantStreamsForTests();
     });
@@ -146,6 +171,27 @@ describe('terminal/task-stream-events.js — contrato', () => {
         expect(stdoutSpy).toHaveBeenCalled();
         expect(stdoutSpy.mock.calls.map(([chunk]) => String(chunk)).join('')).toContain('OK-LIVE-1');
         expect(mocks.renderTerminalAssistantTranscript).not.toHaveBeenCalled();
+        stdoutSpy.mockRestore();
+    });
+
+    it('suprime task.delta que ecoa resposta humana recém-concluída de ask_user', async () => {
+        const stdoutSpy = vi.spyOn(process.stdout, 'write').mockReturnValue(true);
+        const base = Date.now();
+        recordTerminalUserInputRequested({ requestId: 'ask-1', question: 'ASK-CANONICAL', timestamp: base });
+        recordTerminalUserInputCompleted({ requestId: 'ask-1', answer: 'SIM', timestamp: base + 1 });
+        const { setupTerminalTaskStreamListeners } =
+            await import('../../../src/copilot/terminal/events/task-stream-events.js');
+        const agent = new EventEmitter();
+
+        setupTerminalTaskStreamListeners({ agent });
+        agent.emit('task.delta', { taskId: null, chunk: 'SIM' });
+
+        expect(stdoutSpy).not.toHaveBeenCalled();
+        expect(mocks.recordTerminalActivity).toHaveBeenCalledWith(
+            'question',
+            'Eco de resposta humana suprimido no streaming',
+            expect.objectContaining({ source: 'agent/task.delta' }),
+        );
         stdoutSpy.mockRestore();
     });
 

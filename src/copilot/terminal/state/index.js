@@ -59,6 +59,7 @@ export {
     readTerminalElicitationSummary,
     readTerminalPermissionSummary,
     readTerminalUserInputSummary,
+    recordTerminalUserInputAnswerEchoGuard,
     recordTerminalElicitationCompleted,
     recordTerminalElicitationPending,
     recordTerminalPermissionCompleted,
@@ -66,6 +67,7 @@ export {
     recordTerminalPermissionRequested,
     recordTerminalUserInputCompleted,
     recordTerminalUserInputRequested,
+    shouldSuppressTerminalAssistantMessageAsUserInputEcho,
 } from './sdk-interactions.js';
 export {
     clearTerminalPromptHookEvents,

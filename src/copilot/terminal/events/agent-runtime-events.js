@@ -17,6 +17,7 @@ import {
     EMITTER_ASSISTANT_INTENT,
     EMITTER_DIALOG_BOOT_RECOVERY,
     EMITTER_ERROR,
+    EMITTER_LLM_USAGE,
     EMITTER_QUESTION_PENDING,
     EMITTER_SESSION_COMPACTION_COMPLETE,
     EMITTER_SESSION_COMPACTION_START,
@@ -171,6 +172,25 @@ function formatUsageDetail(billing) {
         parts.push(`custo=${billing.cost.toFixed(4)}`);
     }
     return parts.join(' · ') || 'sem metadados de billing';
+}
+
+/**
+ * @param {Record<string, unknown>} evt
+ * @param {ReturnType<typeof normalizeUsageBilling>} billing
+ * @returns {string}
+ */
+function formatLlmUsageDetail(evt, billing) {
+    const parts = [formatUsageDetail(billing)];
+    const classification = typeof evt?.['classification'] === 'string' ? evt['classification'] : null;
+    const reason = typeof evt?.['premiumRequestReason'] === 'string' ? evt['premiumRequestReason'] : null;
+    const inputTokens = typeof evt?.['inputTokens'] === 'number' ? evt['inputTokens'] : null;
+    const outputTokens = typeof evt?.['outputTokens'] === 'number' ? evt['outputTokens'] : null;
+    if (classification) parts.push(`classe=${classification}`);
+    if (reason) parts.push(`motivo=${reason}`);
+    if (inputTokens !== null || outputTokens !== null) {
+        parts.push(`tokens=${inputTokens ?? '?'}→${outputTokens ?? '?'}`);
+    }
+    return parts.filter(Boolean).join(' · ');
 }
 
 /**
@@ -560,6 +580,32 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, regi
         });
     };
 
+    const onLlmUsage = (/** @type {Record<string, unknown>} */ evt) => {
+        const premiumRequest = evt?.['premiumRequest'] === true;
+        const billing = normalizeUsageBilling(evt);
+        broadcastSse(EMITTER_LLM_USAGE, {
+            ...evt,
+            timestamp: Date.now(),
+        });
+        if (premiumRequest) return;
+
+        const detail = formatLlmUsageDetail(evt, billing);
+        const showUsage = getShowUsage();
+        const shouldPersist = showUsage || billing.mismatch;
+        const label = billing.mismatch ? 'Uso LLM sem novo PR com divergência de modelo' : 'Uso LLM sem novo PR';
+        recordTerminalActivity('system', label, {
+            detail,
+            source: 'agent',
+            severity: billing.mismatch ? 'warn' : 'info',
+            recordHistory: shouldPersist,
+        });
+        if ((showUsage || billing.mismatch) && !isTerminalRenderLocked()) {
+            println(
+                `  ${terminalThemeBadge(billing.mismatch ? 'warn' : 'info', 'LLM')} ${terminalThemeText(billing.mismatch ? 'warn' : 'muted', detail)}`,
+            );
+        }
+    };
+
     const onPrFallbackModel = (/** @type {Record<string, unknown>} */ evt) => {
         const from = typeof evt?.['from'] === 'string' ? evt['from'] : '?';
         const to = typeof evt?.['to'] === 'string' ? evt['to'] : '?';
@@ -625,6 +671,7 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, regi
     agent.on(EMITTER_AGENT_BACKGROUND_IDLE, onBackgroundIdle);
     agent.on(AGENT_SHELL_COMPLETED_EVENT, onShellCompleted);
     agent.on(AGENT_SHELL_DETACHED_COMPLETED_EVENT, onShellDetachedCompleted);
+    agent.on(EMITTER_LLM_USAGE, onLlmUsage);
     agent.on(AGENT_PR_CONSUMED_EVENT, onPrConsumed);
     agent.on(AGENT_PR_FALLBACK_MODEL_EVENT, onPrFallbackModel);
     agent.on(EMITTER_DIALOG_BOOT_RECOVERY, onDialogBootRecovery);
@@ -658,6 +705,7 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, regi
         agent.off(EMITTER_AGENT_BACKGROUND_IDLE, onBackgroundIdle);
         agent.off(AGENT_SHELL_COMPLETED_EVENT, onShellCompleted);
         agent.off(AGENT_SHELL_DETACHED_COMPLETED_EVENT, onShellDetachedCompleted);
+        agent.off(EMITTER_LLM_USAGE, onLlmUsage);
         agent.off(AGENT_PR_CONSUMED_EVENT, onPrConsumed);
         agent.off(AGENT_PR_FALLBACK_MODEL_EVENT, onPrFallbackModel);
         agent.off(EMITTER_DIALOG_BOOT_RECOVERY, onDialogBootRecovery);
