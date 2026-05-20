@@ -216,6 +216,37 @@ describe('agent-messaging › processQueue', () => {
         assert.ok(typeof startedTaskId === 'string' && /** @type {string} */ (startedTaskId).startsWith('task-'));
     });
 
+    it('não emite task.delta da fila interna quando o dialog loop já está ativo', async () => {
+        const emitter = new EventEmitter();
+        const ctx = new AgentContext(emitter);
+        ctx.status = 'idle';
+        ctx.isDialogLoopActive = () => true;
+        /** @type {((event: any) => void) | null} */
+        let sessionEventHandler = null;
+        ctx.session = /** @type {any} */ ({
+            sessionId: 'test-dialog-active',
+            on: (eventName, handler) => {
+                if (eventName === 'assistant.message_delta') sessionEventHandler = handler;
+                return () => {};
+            },
+            sendAndWait: async () => {
+                sessionEventHandler?.({ data: { deltaContent: 'shadow' } });
+                return { data: { content: 'pong' } };
+            },
+        });
+        let deltaCount = 0;
+        emitter.on('task.delta', () => {
+            deltaCount++;
+        });
+
+        const resultPromise = sendMessageDialogBoot(ctx, emitter, 'boot');
+        processQueue(ctx, emitter, { tryReconnect: async () => false });
+
+        const result = await resultPromise;
+        assert.equal(result, 'pong');
+        assert.equal(deltaCount, 0);
+    });
+
     it('não processa quando o agente não está idle', async () => {
         const emitter = new EventEmitter();
         const ctx = new AgentContext(emitter);

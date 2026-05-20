@@ -49,16 +49,11 @@ function pruneRecentIntentHashes(now = Date.now()) {
  * @returns {string}
  */
 function hashIntentInput(input) {
+    // Intents equivalentes podem chegar por três rotas quase simultâneas:
+    // `assistant.intent`, `report_intent` e alias local `report_intent_local`.
+    // A UI precisa de uma única intenção canônica; source/toolCallId são envelopes, não identidade semântica.
     return createHash('sha256')
-        .update(
-            [
-                input.intent.replace(/\s+/g, ' ').trim(),
-                input.tool ?? '',
-                normalizeTerminalIntentRisk(input.risk),
-                input.source ?? '',
-                input.toolCallId ?? '',
-            ].join('\n'),
-        )
+        .update([input.intent.replace(/\s+/g, ' ').trim(), normalizeTerminalIntentRisk(input.risk)].join('\n'))
         .digest('hex');
 }
 

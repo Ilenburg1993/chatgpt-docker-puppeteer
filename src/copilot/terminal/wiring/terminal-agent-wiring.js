@@ -31,6 +31,7 @@ import {
     createTerminalHandledAgentEventsSet,
     createTerminalPassthroughAgentEventsSet,
     registerTerminalAgentSsePassthrough,
+    renderTerminalAssistantTranscript,
     setupTerminalTaskStreamListeners,
 } from '../events/index.js';
 import {
@@ -43,7 +44,7 @@ import {
     writeTerminalHubSystemTurn,
 } from '../frontend/gateways/index.js';
 import { markTerminalActivityIdle, recordTerminalActivity } from '../state/dialog/index.js';
-import { withTerminalTurnCorrelation } from '../state/events/index.js';
+import { shouldSuppressTerminalAssistantMessageAsMaterializedTurn, withTerminalTurnCorrelation } from '../state/events/index.js';
 import { drainMailboxToTurnIfIdle } from './mailbox-drain.js';
 
 /** @type {boolean} */
@@ -52,6 +53,7 @@ let _agentListenersRegistered = false;
 const WATCHDOG_RECOVERY_WAIT_MS = Math.max(5_000, Math.min(30_000, Math.round(LLM_B_TURN_TIMEOUT_MS * 0.2)));
 
 const AUTO_RESTART_DIALOG_STOP_REASONS = new Set(['watchdog_restart', 'model_stopped']);
+const EMITTER_DIALOG_TURN_END = 'dialog.turn_end';
 
 /**
  * @template {Record<string, unknown>} T
@@ -310,6 +312,61 @@ export function registerAgentEventListeners(printBanner) {
             }),
         );
     });
+    agentEvents.on(
+        EMITTER_DIALOG_TURN_END,
+        (
+            /** @type {{
+             *     reply?: string;
+             *     turnId?: string | number | null;
+             *     durationMs?: number;
+             *     timestamp?: number;
+             * }} */ evt,
+        ) => {
+            const reply = typeof evt.reply === 'string' ? evt.reply : '';
+            const turnId =
+                typeof evt.turnId === 'string' || typeof evt.turnId === 'number' ? String(evt.turnId) : null;
+            const envelope = withTerminalAgentSseEnvelope(
+                {
+                    ...evt,
+                    reply,
+                    ...(turnId ? { turnId } : {}),
+                },
+                'terminal-agent-wiring/dialog.turn_end',
+            );
+            broadcastSse('dialog.turn_end', envelope);
+            if (!reply.trim()) return;
+            if (shouldSuppressTerminalAssistantMessageAsMaterializedTurn({ content: reply, turnId })) {
+                recordTerminalActivity('turn', 'dialog.turn_end reconciliado sem novo bloco visual', {
+                    detail: turnId ? `turn=${turnId} · conteúdo já materializado` : 'conteúdo já materializado',
+                    source: 'dialog.turn_end',
+                    recordHistory: false,
+                    updateCurrent: false,
+                });
+                return;
+            }
+            recordTerminalActivity('turn', 'Mensagem final do dialog loop recebida', {
+                detail: turnId ? `turn=${turnId}` : 'turno sem id',
+                source: 'dialog.turn_end',
+                recordHistory: false,
+                updateCurrent: false,
+            });
+            renderTerminalAssistantTranscript({
+                content: reply,
+                title: 'Continuação da LLM-B',
+                source: 'dialog.turn_end',
+                status: 'completed',
+                detail: [
+                    turnId ? `turn=${turnId}` : null,
+                    typeof evt.durationMs === 'number' ? `${(evt.durationMs / 1000).toFixed(1)}s` : null,
+                ]
+                    .filter(Boolean)
+                    .join(' · '),
+                metadata: {
+                    assistantMessageEnvelope: envelope,
+                },
+            });
+        },
+    );
     // F4.6 (UPG-11): emite dialog.loop.changed para dashboard responsivo
     agentEvents.on(EMITTER_DIALOG_LOOP_CHANGED, (/** @type {{ active: boolean; ts: number }} */ evt) => {
         broadcastSse(

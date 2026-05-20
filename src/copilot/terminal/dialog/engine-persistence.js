@@ -79,16 +79,24 @@ export async function persistTurnToHub(hubSessionId, message, reply, actor, dura
     const store = readTerminalHubStore();
     /** @type {'user' | 'llm_a'} */
     const senderRole = actor === 'llm-a' ? 'llm_a' : 'user';
-    const msgTurnId = await store.writeTurn(hubSessionId, {
-        role: senderRole,
-        content: message,
-    });
-    const replyTurnId = await store.writeTurn(hubSessionId, {
-        role: 'llm_b',
-        content: reply,
-        durationMs,
-        ...(replyMetadata ? { metadata: replyMetadata } : {}),
-    });
+    let msgTurnId;
+    let replyTurnId;
+    try {
+        msgTurnId = await store.writeTurn(hubSessionId, {
+            role: senderRole,
+            content: message,
+        });
+        replyTurnId = await store.writeTurn(hubSessionId, {
+            role: 'llm_b',
+            content: reply,
+            durationMs,
+            ...(replyMetadata ? { metadata: replyMetadata } : {}),
+        });
+    } catch (writeErr) {
+        _persistenceFailureCount++;
+        log('WARN', `[dialog] writeTurn falhou: ${toError(writeErr).message}`);
+        throw writeErr;
+    }
 
     if (isTerminalHubReady()) {
         try {
@@ -145,11 +153,22 @@ export async function persistTurnToHub(hubSessionId, message, reply, actor, dura
  * @param {number} durationMs
  */
 function _enqueuePendingNotification(hubSessionId, msgTurnId, replyTurnId, senderRole, message, reply, durationMs) {
-    if (_pendingNotifications.length >= MAX_PENDING_NOTIFICATIONS) return;
-    const msgTurn = readTerminalHubTurn(msgTurnId);
-    const replyTurn = readTerminalHubTurn(replyTurnId);
-    const msgTurnNumber = typeof msgTurn?.['turn_number'] === 'number' ? msgTurn['turn_number'] : 0;
-    const replyTurnNumber = typeof replyTurn?.['turn_number'] === 'number' ? replyTurn['turn_number'] : 0;
+    if (_pendingNotifications.length >= MAX_PENDING_NOTIFICATIONS) {
+        _persistenceFailureCount++;
+        log('WARN', `[dialog] fila de notificações pendentes cheia; descartando notificação do turno ${replyTurnId}`);
+        return;
+    }
+    let msgTurnNumber = 0;
+    let replyTurnNumber = 0;
+    try {
+        const msgTurn = readTerminalHubTurn(msgTurnId);
+        const replyTurn = readTerminalHubTurn(replyTurnId);
+        msgTurnNumber = typeof msgTurn?.['turn_number'] === 'number' ? msgTurn['turn_number'] : 0;
+        replyTurnNumber = typeof replyTurn?.['turn_number'] === 'number' ? replyTurn['turn_number'] : 0;
+    } catch (readErr) {
+        _persistenceFailureCount++;
+        log('WARN', `[dialog] fallback de notificação sem turn_number: ${toError(readErr).message}`);
+    }
     _pendingNotifications.push({
         hubSessionId,
         userTurn: {

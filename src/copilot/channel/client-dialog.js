@@ -224,6 +224,8 @@ export async function dialogTurnDetailed(agent, message, opts = {}) {
               let sawCumulativeSnapshot = false;
               /** @type {'task.delta' | 'dialog.delta' | null} */
               let lastEmittedSource = null;
+              /** @type {'dialog.delta' | null} */
+              let canonicalDialogDeltaSource = null;
               /** @type {string | null} */
               let lastEmittedCausalKey = null;
 
@@ -291,6 +293,12 @@ export async function dialogTurnDetailed(agent, message, opts = {}) {
               return (/** @type {'task.delta' | 'dialog.delta'} */ source) => (/** @type {unknown} */ rawEvt) => {
                   const evt = /** @type {{ chunk?: string } & Record<string, unknown>} */ (rawEvt);
                   if (!evt.chunk) return;
+                  if (canonicalDialogDeltaSource === 'dialog.delta' && source === 'task.delta') {
+                      return;
+                  }
+                  if (source === 'dialog.delta') {
+                      canonicalDialogDeltaSource = 'dialog.delta';
+                  }
                   const now = Date.now();
                   const causalKey = resolveDeltaCausalKey(evt);
                   if (causalKey) {

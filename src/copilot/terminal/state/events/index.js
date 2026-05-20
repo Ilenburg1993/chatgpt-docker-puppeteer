@@ -15,6 +15,8 @@ export {
     readTerminalTurnMaterialization,
     recordTerminalTurnAssistantMessage,
     recordTerminalTurnDelta,
+    shouldSuppressTerminalAssistantMessageAsMaterializedTurn,
+    shouldSuppressTerminalTaskDeltaAsMaterializedDialog,
     takeLatestTerminalTurnAssistantMessage,
 } from '../turn-materialization-state.js';
 export {

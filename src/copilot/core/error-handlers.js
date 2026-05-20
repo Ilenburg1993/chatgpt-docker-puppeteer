@@ -76,12 +76,26 @@ export function toError(value) {
         return /** @type {NormalizedError} */ (value);
     }
     if (typeof value === 'string') return /** @type {NormalizedError} */ (new Error(value));
-    if (typeof value === 'object' && value !== null && 'message' in value) {
-        const err = /** @type {NormalizedError} */ (
-            new Error(String(/** @type {{ message: unknown }} */ (value).message))
-        );
-        if ('stack' in value) err.stack = String(/** @type {{ stack: unknown }} */ (value).stack);
-        if ('code' in value) err.code = /** @type {string | number} */ (/** @type {{ code: unknown }} */ (value).code);
+    if (typeof value === 'object' && value !== null) {
+        const objectValue = /** @type {Record<string, unknown>} */ (value);
+        const serialized = (() => {
+            try {
+                return JSON.stringify(objectValue);
+            } catch {
+                return '';
+            }
+        })();
+        const message =
+            typeof objectValue['message'] === 'string' && objectValue['message'].trim().length > 0
+                ? objectValue['message']
+                : serialized && serialized !== '{}'
+                  ? serialized
+                  : 'Erro recebido como objeto sem mensagem estruturada.';
+        const err = /** @type {NormalizedError} */ (new Error(message));
+        if (typeof objectValue['stack'] === 'string') err.stack = objectValue['stack'];
+        if (typeof objectValue['code'] === 'string' || typeof objectValue['code'] === 'number') {
+            err.code = objectValue['code'];
+        }
         return err;
     }
     return /** @type {NormalizedError} */ (new Error(String(value)));

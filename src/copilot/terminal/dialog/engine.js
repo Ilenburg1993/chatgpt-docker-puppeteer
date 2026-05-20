@@ -68,6 +68,7 @@ import {
     createDisplayState,
     createReasoningCallback,
     measureVisibleTerminalChars,
+    releaseDisplayState,
     renderStreamingFooter,
 } from './turn-display.js';
 import { decideFinalTranscriptRender } from './turn-reconciliation.js';
@@ -563,6 +564,9 @@ async function _executeTurn(message, actor, attachments = [], requestHeaders = n
         }
     }
 
+    /** @type {ReturnType<typeof createDisplayState> | null} */
+    let displayState = null;
+
     try {
         await ensureDialogLoop();
 
@@ -584,7 +588,7 @@ async function _executeTurn(message, actor, attachments = [], requestHeaders = n
         const showThinking = getShowThinking();
         const { model, reasoningEffort } = readTerminalDialogStreamMeta();
         const effort = reasoningEffort;
-        const displayState = createDisplayState({
+        displayState = createDisplayState({
             model,
             effort,
             turnStartTime: t0,
@@ -865,6 +869,7 @@ async function _executeTurn(message, actor, attachments = [], requestHeaders = n
         }
         return null;
     } finally {
+        releaseDisplayState(displayState);
         if (waitingTicker !== null) {
             if (waitingTickerId) cancelTimer(waitingTickerId);
         }

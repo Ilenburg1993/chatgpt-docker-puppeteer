@@ -27,6 +27,12 @@ import {
 } from './output.js';
 import { broadcastSse } from './sse.js';
 
+const TERMINAL_ESCAPE_SEQUENCE_RE = new RegExp(
+    String.raw`\x1B(?:\][\s\S]*?(?:\x07|\x1B\\)|P[\s\S]*?\x1B\\|_[\s\S]*?\x1B\\|\^[\s\S]*?\x1B\\|X[\s\S]*?\x1B\\|\[[0-?]*[ -/]*[@-~]|[@-Z\\-_])`,
+    'g',
+);
+const TERMINAL_UNSAFE_CONTROL_RE = new RegExp(String.raw`[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]`, 'g');
+
 /**
  * Estado mutável compartilhado entre os callbacks de reasoning e streaming.
  *
@@ -63,34 +69,18 @@ import { broadcastSse } from './sse.js';
  * @returns {string}
  */
 export function stripTerminalInvisibleText(text) {
-    let output = '';
-    for (let i = 0; i < text.length; i += 1) {
-        const code = text.charCodeAt(i);
+    return String(text ?? '').replace(TERMINAL_ESCAPE_SEQUENCE_RE, '').replace(TERMINAL_UNSAFE_CONTROL_RE, '');
+}
 
-        if (code === 0x1b) {
-            const next = text.charCodeAt(i + 1);
-            if (next === 0x5b) {
-                i += 2;
-                while (i < text.length) {
-                    const seqCode = text.charCodeAt(i);
-                    if (seqCode >= 0x40 && seqCode <= 0x7e) break;
-                    i += 1;
-                }
-            }
-            continue;
-        }
-
-        const isControlChar =
-            (code >= 0x00 && code <= 0x08) ||
-            code === 0x0b ||
-            code === 0x0c ||
-            (code >= 0x0e && code <= 0x1f) ||
-            code === 0x7f;
-        if (isControlChar) continue;
-
-        output += text[i];
-    }
-    return output;
+/**
+ * Sanitiza texto não confiável antes de renderizar no terminal. Deltas do modelo, tools e SDK não podem executar
+ * sequências ANSI/OSC; newlines e tabs permanecem como conteúdo textual.
+ *
+ * @param {string} text
+ * @returns {string}
+ */
+export function sanitizeTerminalRenderText(text) {
+    return stripTerminalInvisibleText(text);
 }
 
 /**
@@ -304,9 +294,10 @@ function flushStreamingBuffer(state, opts = {}) {
  * @returns {void}
  */
 function writeStreamingText(state, text) {
-    state.streamingVisibleChars += measureVisibleTerminalChars(text);
+    const safeText = sanitizeTerminalRenderText(text);
+    state.streamingVisibleChars += measureVisibleTerminalChars(safeText);
     const prefix = `  ${terminalThemeText('success', '│')}  `;
-    let rest = text;
+    let rest = safeText;
     while (rest.length > 0) {
         if (!state.streamingLineOpen) {
             writeTerminalRaw(prefix);
@@ -439,5 +430,17 @@ export function renderStreamingFooter(state, durationMs) {
     if (state.reasoningStarted && !state.streamingStarted) {
         flushReasoningSummary(state);
     }
+    releaseRenderLock(state);
+}
+
+/**
+ * Libera recursos visuais de um turno mesmo quando o SDK falha antes do footer normal.
+ *
+ * @param {TurnDisplayState | null | undefined} state
+ * @returns {void}
+ */
+export function releaseDisplayState(state) {
+    if (!state) return;
+    flushStreamingBuffer(state, { force: true });
     releaseRenderLock(state);
 }

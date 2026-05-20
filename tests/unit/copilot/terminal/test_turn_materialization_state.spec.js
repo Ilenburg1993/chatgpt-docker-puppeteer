@@ -9,6 +9,8 @@ import {
     readTerminalTurnMaterialization,
     recordTerminalTurnAssistantMessage,
     recordTerminalTurnDelta,
+    shouldSuppressTerminalAssistantMessageAsMaterializedTurn,
+    shouldSuppressTerminalTaskDeltaAsMaterializedDialog,
 } from '../../../../src/copilot/terminal/state/turn-materialization-state.js';
 
 describe('terminal/state/turn-materialization-state', () => {
@@ -98,5 +100,98 @@ describe('terminal/state/turn-materialization-state', () => {
 
         expect(snapshot.turnId).toBe('sdk-turn');
         expect(snapshot.deltaChars).toBe('antes do id'.length);
+    });
+
+    it('suprime assistant.message equivalente a deltas ainda ativos no turno', () => {
+        clearTerminalTurnMaterialization();
+        beginTerminalTurnMaterialization({ turnId: 'live-1', timestamp: 1000 });
+        recordTerminalTurnDelta({ chunk: 'olá, ', timestamp: 1001 });
+        recordTerminalTurnDelta({ chunk: 'mundo', timestamp: 1002 });
+
+        expect(
+            shouldSuppressTerminalAssistantMessageAsMaterializedTurn({
+                content: 'olá, mundo',
+                turnId: 'live-1',
+                now: 1003,
+            }),
+        ).toBe(true);
+        expect(
+            shouldSuppressTerminalAssistantMessageAsMaterializedTurn({
+                content: 'conteúdo diferente',
+                turnId: 'live-1',
+                now: 1003,
+            }),
+        ).toBe(false);
+    });
+
+    it('suprime turn_end parcial quando o delta canônico já contém o mesmo texto', () => {
+        clearTerminalTurnMaterialization();
+        beginTerminalTurnMaterialization({ turnId: 'live-prefix', timestamp: 1000 });
+        recordTerminalTurnDelta({
+            chunk: 'DELTA-CANONICAL-1: texto já exibido no terminal. DELTA-CANONICAL-2: continuação visível.',
+            source: 'dialog/onDelta',
+            timestamp: 1001,
+        });
+
+        expect(
+            shouldSuppressTerminalAssistantMessageAsMaterializedTurn({
+                content: 'DELTA-CANONICAL-1: texto já exibido no terminal.',
+                turnId: 'live-prefix',
+                now: 1002,
+            }),
+        ).toBe(true);
+    });
+
+    it('suprime assistant.message equivalente a turno recém-concluído', () => {
+        clearTerminalTurnMaterialization();
+        beginTerminalTurnMaterialization({ turnId: 'done-1', timestamp: 1000 });
+        recordTerminalTurnDelta({ chunk: 'resposta final', timestamp: 1001 });
+        completeTerminalTurnMaterialization({
+            directReply: 'resposta final',
+            directSource: 'runtime_return',
+            timestamp: 1002,
+        });
+
+        expect(
+            shouldSuppressTerminalAssistantMessageAsMaterializedTurn({
+                content: ' resposta   final ',
+                turnId: 'done-1',
+                now: 1003,
+            }),
+        ).toBe(true);
+        expect(
+            shouldSuppressTerminalAssistantMessageAsMaterializedTurn({
+                content: 'resposta final',
+                turnId: 'outro-turno',
+                now: 1003,
+            }),
+        ).toBe(false);
+    });
+
+    it('suprime task.delta tardio quando dialog.delta já materializou o mesmo trecho', () => {
+        clearTerminalTurnMaterialization();
+        beginTerminalTurnMaterialization({ turnId: 'live-task', timestamp: 1000 });
+        recordTerminalTurnDelta({
+            chunk: '✅ **Teste canônico validado**',
+            source: 'dialog/onDelta',
+            timestamp: 1001,
+        });
+
+        expect(shouldSuppressTerminalTaskDeltaAsMaterializedDialog({ chunk: 'Teste canônico' })).toBe(true);
+        expect(shouldSuppressTerminalTaskDeltaAsMaterializedDialog({ chunk: 'conteúdo novo' })).toBe(false);
+    });
+
+    it('não suprime task.delta quando ele é a única fonte pública disponível', () => {
+        clearTerminalTurnMaterialization();
+        expect(shouldSuppressTerminalTaskDeltaAsMaterializedDialog({ chunk: 'fallback vivo' })).toBe(false);
+
+        beginTerminalTurnMaterialization({ turnId: 'task-only', timestamp: 1000 });
+        recordTerminalTurnDelta({
+            chunk: 'fallback vivo',
+            source: 'public-assistant-stream',
+            timestamp: 1001,
+        });
+
+        expect(shouldSuppressTerminalTaskDeltaAsMaterializedDialog({ chunk: 'fallback vivo' })).toBe(false);
     });
 });

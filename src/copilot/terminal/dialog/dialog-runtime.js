@@ -17,12 +17,31 @@ let _engineModule = null;
  */
 function loadEngineModule() {
     if (_engineModulePromise === null) {
-        _engineModulePromise = import('./engine.js').then((mod) => {
-            _engineModule = mod;
-            return mod;
-        });
+        _engineModulePromise = import('./engine.js')
+            .then((mod) => {
+                _engineModule = mod;
+                return mod;
+            })
+            .catch((err) => {
+                _engineModulePromise = null;
+                _engineModule = null;
+                throw err;
+            });
     }
     return _engineModulePromise;
+}
+
+/**
+ * Projeta o estado de carregamento do runtime lazy sem fingir que a fila do engine é conhecida antes do import.
+ *
+ * @returns {{ loaded: boolean; importInFlight: boolean; turnQueueDepth: number | null }}
+ */
+export function getDialogRuntimeLoadState() {
+    return {
+        loaded: _engineModule !== null,
+        importInFlight: _engineModulePromise !== null && _engineModule === null,
+        turnQueueDepth: _engineModule?.getTurnQueueDepth() ?? null,
+    };
 }
 
 /**

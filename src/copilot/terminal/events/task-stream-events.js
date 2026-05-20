@@ -26,6 +26,7 @@ import {
     formatTerminalThinkingRef,
     recordTerminalActivity,
     shouldSuppressTerminalAssistantMessageAsUserInputEcho,
+    shouldSuppressTerminalTaskDeltaAsMaterializedDialog,
 } from '../state/events/index.js';
 import {
     finalizeAllPublicAssistantStreams,
@@ -171,6 +172,9 @@ export function setupTerminalTaskStreamListeners({ agent }) {
                 recordHistory: false,
                 updateCurrent: false,
             });
+            return;
+        }
+        if (shouldSuppressTerminalTaskDeltaAsMaterializedDialog({ chunk })) {
             return;
         }
         const taskKey = getTaskKey(evt);

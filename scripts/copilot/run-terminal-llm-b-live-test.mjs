@@ -16,7 +16,10 @@ import { fileURLToPath } from 'node:url';
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const DEFAULT_TIMEOUT_MS = 180_000;
 const DEFAULT_POST_ANSWER_DELAY_MS = 6_000;
+const DEFAULT_POST_ASK_CONTINUATION_WAIT_MS = 45_000;
 const ANSI_RE = /\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])/g;
+const POST_ASK_FINAL_RE =
+    /(?:POST-ASK-CANONICAL-FINAL|Teste can[oô]nico|Usu[aá]rio confirmou SIM|confirmou SIM|respondeu SIM|Sistema operacional)/iu;
 
 function stripAnsi(value) {
     return String(value ?? '').replace(ANSI_RE, '');
@@ -52,6 +55,7 @@ function buildScenarioPrompt() {
         'Depois leia as primeiras 3 linhas de package.json usando read_file_content.',
         'Em seguida escreva uma resposta pública longa, com frases separadas DELTA-CANONICAL-1 até DELTA-CANONICAL-8, para validar deltas parciais e final.',
         'Por fim chame ask_user perguntando exatamente "ASK-CANONICAL: responda SIM para fechar o teste".',
+        'Depois que o usuário responder SIM, escreva uma última mensagem pública contendo exatamente "POST-ASK-CANONICAL-FINAL: usuário confirmou SIM".',
         'Não use outras tools além de report_intent, read_file_content e ask_user.',
     ].join(' ');
 }
@@ -120,6 +124,11 @@ function summarizeSseEvents(events) {
     const eventSourceEvents = payloadObjects.filter(
         (evt) => typeof evt.data.eventSource === 'string' && evt.data.eventSource.length > 0,
     );
+    const sourceEnvelopeEvents = payloadObjects.filter(
+        (evt) =>
+            (typeof evt.data.source === 'string' && evt.data.source.length > 0) ||
+            (typeof evt.data.eventSource === 'string' && evt.data.eventSource.length > 0),
+    );
     const traceEvents = payloadObjects.filter(
         (evt) => typeof evt.data.traceId === 'string' && evt.data.traceId.length > 0,
     );
@@ -136,6 +145,7 @@ function summarizeSseEvents(events) {
         payloadObjects,
         sourceEvents,
         eventSourceEvents,
+        sourceEnvelopeEvents,
         traceEvents,
         traceIds,
         criticalEvents,
@@ -178,8 +188,7 @@ function evaluateSseCriteria(sseSummary, { expectPublicEvents, plain = '' }) {
         ];
     }
     const summary = summarizeSseEvents(sseSummary.events);
-    const { publicEvents, ids, names, payloadObjects, sourceEvents, eventSourceEvents, traceEvents, traceIds, criticalEvents } =
-        summary;
+    const { publicEvents, ids, names, payloadObjects, sourceEnvelopeEvents, traceEvents, traceIds, criticalEvents } = summary;
     const monotonic = ids.every((id, index) => index === 0 || id > ids[index - 1]);
     const plainTraceIds = extractPlainTraceIds(plain);
     const traceOverlap = traceIds.filter((traceId) => plainTraceIds.includes(traceId));
@@ -214,10 +223,8 @@ function evaluateSseCriteria(sseSummary, { expectPublicEvents, plain = '' }) {
         },
         {
             id: 'sse-source-envelope',
-            pass:
-                payloadObjects.length === 0 ||
-                sourceEvents.length + eventSourceEvents.length === payloadObjects.length,
-            detail: `${sourceEvents.length + eventSourceEvents.length}/${payloadObjects.length} object payload events include source/eventSource`,
+            pass: payloadObjects.length === 0 || sourceEnvelopeEvents.length === payloadObjects.length,
+            detail: `${sourceEnvelopeEvents.length}/${payloadObjects.length} object payload events include source/eventSource`,
         },
         {
             id: 'sse-critical-events-sourced',
@@ -239,10 +246,33 @@ function evaluateSseCriteria(sseSummary, { expectPublicEvents, plain = '' }) {
 
 function evaluateOutput(plain, sseSummary, exportSummary) {
     const markerCount = (plain.match(/DELTA-CANONICAL-\d/g) ?? []).length;
+    const preEventsPlain = plain.split(/\n\s*voc[eê]\[[^\n]*?›\s+\/events\b/i)[0] ?? plain;
     const archiveRawEvents = extractArchiveRawEvents(plain);
     const sseIds = summarizeSseEvents(sseSummary.events).ids;
     const archiveIds = archiveRawEvents.map((evt) => evt.eventId).filter((id) => Number.isFinite(id));
     const archiveSseOverlap = archiveIds.filter((id) => sseIds.includes(id));
+    const askRenderedByQuestionPending = /\[(?:QUESTION|ASK:[^\]]+)\]\s+LLM-B perguntou:\s*"ASK-CANONICAL: responda SIM para fechar o teste"/.test(
+        preEventsPlain,
+    );
+    const askRenderedBySdk = /\[ASK\]\s+ASK-CANONICAL: responda SIM para fechar o teste/.test(preEventsPlain);
+    const liveDeltaBlockVisible = /\[[^\]\n]*\]\s+🧠\s+LLM-B[\s\S]{0,2200}DELTA-CANONICAL-8/.test(
+        preEventsPlain,
+    );
+    const assistantMessageDeltaBlockVisible = /\[LLM-B\]\s+Mensagem[\s\S]{0,2200}DELTA-CANONICAL-8/.test(
+        preEventsPlain,
+    );
+    const postAskFinalMarker = String.raw`(?:POST-ASK-CANONICAL-FINAL|Teste can[oô]nico|Usu[aá]rio confirmou SIM|confirmou SIM|respondeu SIM|Sistema operacional)`;
+    const finalRenderedByLiveTurn = new RegExp(
+        String.raw`\[[^\]\n]*\]\s+🧠\s+LLM-B[\s\S]{0,1800}${postAskFinalMarker}`,
+        'iu',
+    ).test(preEventsPlain);
+    const finalRenderedByAssistantMessage = new RegExp(
+        String.raw`\[LLM-B\]\s+Mensagem[\s\S]{0,1800}${postAskFinalMarker}`,
+        'iu',
+    ).test(preEventsPlain);
+    const taskDeltaActivityDuringDialog =
+        /task\s+·\s+Executando tarefa interna\s+—\s+delta/.test(preEventsPlain) ||
+        /"label":"Executando tarefa interna","detail":"delta/.test(preEventsPlain);
     const duplicatePathologies = [
         /__anonymous__/,
         /hook:error_occurred/,
@@ -265,8 +295,8 @@ function evaluateOutput(plain, sseSummary, exportSummary) {
         },
         {
             id: 'final-delta-block',
-            pass: /\[LLM-B\] Mensagem[\s\S]*DELTA-CANONICAL-8/.test(plain),
-            detail: 'final assistant transcript contains the canonical delta block',
+            pass: liveDeltaBlockVisible || assistantMessageDeltaBlockVisible,
+            detail: `canonical delta block visible live=${liveDeltaBlockVisible ? 'yes' : 'no'} assistant.message=${assistantMessageDeltaBlockVisible ? 'yes' : 'no'}`,
         },
         {
             id: 'tool-start-done',
@@ -277,6 +307,11 @@ function evaluateOutput(plain, sseSummary, exportSummary) {
             id: 'ask-user-visible',
             pass: /\[ASK\] ASK-CANONICAL: responda SIM para fechar o teste/.test(plain),
             detail: 'ask_user prompt rendered persistently',
+        },
+        {
+            id: 'ask-user-single-source',
+            pass: askRenderedBySdk && !askRenderedByQuestionPending,
+            detail: `ask_user rendered by sdk=${askRenderedBySdk ? 'yes' : 'no'} question.pending=${askRenderedByQuestionPending ? 'yes' : 'no'}`,
         },
         {
             id: 'ask-user-answer',
@@ -291,8 +326,16 @@ function evaluateOutput(plain, sseSummary, exportSummary) {
             detail: 'human answer was not rendered as an LLM-B authored transcript or live delta',
         },
         {
+            id: 'post-ask-final-visible',
+            pass: finalRenderedByLiveTurn || finalRenderedByAssistantMessage,
+            detail: `post-ask final visible live=${finalRenderedByLiveTurn ? 'yes' : 'no'} assistant.message=${finalRenderedByAssistantMessage ? 'yes' : 'no'}`,
+        },
+        {
             id: 'llm-usage-visible',
-            pass: /Uso LLM sem novo PR/.test(plain) || /Último uso LLM/.test(plain),
+            pass:
+                /Telemetria LLM sem Premium Request/.test(plain) ||
+                /Última telemetria LLM/.test(plain) ||
+                /Premium Request classificada/.test(plain),
             detail: 'llm.usage telemetry surfaced separately from PR',
         },
         {
@@ -314,6 +357,18 @@ function evaluateOutput(plain, sseSummary, exportSummary) {
             id: 'no-obvious-duplication',
             pass: !duplicatePathologies.some((pattern) => pattern.test(plain)),
             detail: 'no known duplicate/pathology markers detected',
+        },
+        {
+            id: 'no-final-delta-duplication',
+            pass: !(finalRenderedByLiveTurn && finalRenderedByAssistantMessage),
+            detail: `final rendered live=${finalRenderedByLiveTurn ? 'yes' : 'no'} assistant.message=${finalRenderedByAssistantMessage ? 'yes' : 'no'}`,
+        },
+        {
+            id: 'no-parallel-task-delta-after-dialog',
+            pass:
+                !/delta suppressed\/(?:duplicate_suffix|causal_duplicate)\s+·\s+task\.delta/.test(plain) &&
+                !(liveDeltaBlockVisible && taskDeltaActivityDuringDialog),
+            detail: `dialog.delta is canonical; task.delta activity=${taskDeltaActivityDuringDialog ? 'yes' : 'no'}`,
         },
         {
             id: 'no-terminal-errors',
@@ -369,7 +424,7 @@ function evaluateNoPrOutput(plain, sseSummary) {
         },
         {
             id: 'usage-visible',
-            pass: /Último PR:/.test(plain) && /Modo: sdk=/.test(plain),
+            pass: /Premium Request:|Última Premium Request classificada:/.test(plain) && /Modo: sdk=/.test(plain),
             detail: '/usage now rendered context, PR and SDK mode telemetry',
         },
         {
@@ -514,7 +569,7 @@ function startSseCollector({ port = 3009, pathname = '/events' } = {}) {
                 statusCode,
                 eventCount: events.length,
                 eventsWithId: events.filter((evt) => Number.isFinite(evt.id)).length,
-                eventsWithSource: correlation.sourceEvents.length + correlation.eventSourceEvents.length,
+                eventsWithSource: correlation.sourceEnvelopeEvents.length,
                 eventsWithTraceId: correlation.traceEvents.length,
                 traceIds: correlation.traceIds,
                 errors: [...errors],
@@ -528,6 +583,9 @@ function startSseCollector({ port = 3009, pathname = '/events' } = {}) {
 async function main() {
     const timeoutMs = Number(readArg('--timeout-ms', String(DEFAULT_TIMEOUT_MS)));
     const postAnswerDelayMs = Number(readArg('--post-answer-delay-ms', String(DEFAULT_POST_ANSWER_DELAY_MS)));
+    const postAskContinuationWaitMs = Number(
+        readArg('--post-ask-continuation-wait-ms', String(DEFAULT_POST_ASK_CONTINUATION_WAIT_MS)),
+    );
     const outDir = path.resolve(ROOT, readArg('--out-dir', `artifacts/terminal-live/${nowStamp()}`));
     const requestedTransport = readArg('--transport', 'pty');
     const dryRun = hasFlag('--dry-run');
@@ -568,6 +626,8 @@ async function main() {
     let quitSent = false;
     let exitCode = null;
     let sseCollector = null;
+    let postAskContinuationObserved = false;
+    let postAnswerCommandTimer = null;
     const command = canUsePty
         ? {
               cmd: 'script',
@@ -590,6 +650,30 @@ async function main() {
     });
 
     const write = (line) => child.stdin.write(ensureLine(line));
+    const schedulePostAnswerDiagnostics = (delayMs = postAnswerDelayMs) => {
+        if (postCommandsSent) return;
+        postCommandsSent = true;
+        if (postAnswerCommandTimer) {
+            clearTimeout(postAnswerCommandTimer);
+            postAnswerCommandTimer = null;
+        }
+        setTimeout(() => {
+            write('/usage now');
+            write('/activity 40');
+            write('/tools diag');
+            write('/events 60');
+            write('/events 100 --raw');
+            write('/errors 10');
+            write('/health');
+            write(`/export ${exportArg}`);
+            setTimeout(() => {
+                if (!quitSent) {
+                    quitSent = true;
+                    write('/quit');
+                }
+            }, 2_000).unref();
+        }, Math.max(0, delayMs)).unref();
+    };
     const timeout = setTimeout(() => {
         write('/quit');
         setTimeout(() => child.kill('SIGTERM'), 2_000).unref();
@@ -626,24 +710,30 @@ async function main() {
             answerSent = true;
             setTimeout(() => write('SIM'), 500).unref();
         }
+        if (answerSent && !postAskContinuationObserved && POST_ASK_FINAL_RE.test(plain)) {
+            postAskContinuationObserved = true;
+            schedulePostAnswerDiagnostics(500);
+        }
         if (answerSent && !postCommandsSent && /Resposta enviada para pergunta pendente/.test(plain)) {
+            postAnswerCommandTimer = setTimeout(() => {
+                schedulePostAnswerDiagnostics(0);
+            }, Math.max(1_000, postAskContinuationWaitMs)).unref();
+        }
+        if (!postCommandsSent && /Erro de sessão \[query\]|session\.error|CAPIError|Failed to get response from the AI model/.test(plain)) {
             postCommandsSent = true;
+            if (postAnswerCommandTimer) {
+                clearTimeout(postAnswerCommandTimer);
+                postAnswerCommandTimer = null;
+            }
             setTimeout(() => {
-                write('/usage now');
                 write('/activity 40');
-                write('/tools diag');
-                write('/events 60');
                 write('/events 100 --raw');
                 write('/errors 10');
-                write('/health');
-                write(`/export ${exportArg}`);
-                setTimeout(() => {
-                    if (!quitSent) {
-                        quitSent = true;
-                        write('/quit');
-                    }
-                }, 2_000).unref();
-            }, postAnswerDelayMs).unref();
+                if (!quitSent) {
+                    quitSent = true;
+                    write('/quit');
+                }
+            }, 1_000).unref();
         }
         if (!quitSent && /Exportado:/.test(plain)) {
             quitSent = true;

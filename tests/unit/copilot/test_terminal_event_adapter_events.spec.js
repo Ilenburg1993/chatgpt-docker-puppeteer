@@ -35,6 +35,8 @@ describe('terminal/event-adapter-events.js — contrato', () => {
         expect(handled.has('pr.consumed')).toBe(true);
         expect(handled.has('pr.fallback_model')).toBe(true);
         expect(handled.has('dialog.recovery')).toBe(true);
+        expect(handled.has('dialog.turn_end')).toBe(true);
+        expect(passthrough.has('dialog.turn_end')).toBe(false);
         expect(passthrough.has('dialog.turn_timeout')).toBe(true);
         expect(passthrough.has('dialog.recovery')).toBe(false);
         expect(passthrough.has('pr.consumed')).toBe(false);

@@ -15,6 +15,8 @@ const {
     hasStreamingTranscriptMismatch,
     measureVisibleTerminalChars,
     renderStreamingFooter,
+    releaseDisplayState,
+    sanitizeTerminalRenderText,
 } = await import('../../../../src/copilot/terminal/dialog/turn-display.js');
 const { broadcastSse } = await import('../../../../src/copilot/terminal/dialog/sse.js');
 const { endTerminalRenderLock, isTerminalRenderLocked } =
@@ -56,6 +58,12 @@ describe('terminal/dialog/turn-display', () => {
         expect(measureVisibleTerminalChars('\r\x1b[2K   ')).toBe(0);
     });
 
+    it('remove CSI, OSC e controles antes de renderizar texto não confiável', () => {
+        expect(sanitizeTerminalRenderText('ok\x1b[2J\x1b]8;;https://evil.example\x07link\x1b]8;;\x07\u0007!')).toBe(
+            'oklink!',
+        );
+    });
+
     it('não abre streaming visual apenas com chunks vazios/brancos; deixa fallback textual decidir', () => {
         const state = createDisplayState({
             model: 'gpt-5-mini',
@@ -94,6 +102,25 @@ describe('terminal/dialog/turn-display', () => {
         expect(state.streamingChars).toBe(3);
         expect(state.streamingContent).toBe('abc');
         expect(isTerminalRenderLocked()).toBe(false);
+    });
+
+    it('sanitiza deltas antes de escrever no terminal, preservando o conteúdo textual', () => {
+        const state = createDisplayState({
+            model: 'gpt-5-mini',
+            effort: 'high',
+            turnStartTime: Date.now(),
+            showStreaming: true,
+            showThinking: false,
+        });
+
+        const onDelta = createDeltaCallback(state);
+        onDelta('Oi\x1b[2J mundo\x07.');
+        renderStreamingFooter(state, 20);
+
+        const output = writeSpy.mock.calls.map(([chunk]) => String(chunk)).join('');
+        expect(output).toContain('Oi mundo.');
+        expect(output).not.toContain('\x1b[2J');
+        expect(output).not.toContain('\x07');
     });
 
     it('preserva chunks repetidos legítimos no display live', () => {
@@ -223,6 +250,23 @@ describe('terminal/dialog/turn-display', () => {
         expect(isTerminalRenderLocked()).toBe(true);
 
         renderStreamingFooter(state, 20);
+        expect(isTerminalRenderLocked()).toBe(false);
+    });
+
+    it('releaseDisplayState libera lock mesmo sem footer normal', () => {
+        const state = createDisplayState({
+            model: 'gpt-5-mini',
+            effort: 'high',
+            turnStartTime: Date.now(),
+            showStreaming: true,
+            showThinking: false,
+        });
+
+        const onDelta = createDeltaCallback(state);
+        onDelta('abc');
+        expect(isTerminalRenderLocked()).toBe(true);
+
+        releaseDisplayState(state);
         expect(isTerminalRenderLocked()).toBe(false);
     });
 

@@ -467,7 +467,10 @@ export function processQueue(ctx, host, callbacks) {
     ctx.pingKeepalive();
 
     void executeTask(session, task, {
-        onDelta: (chunk, taskId) => host.emit(EMITTER_TASK_DELTA, { taskId, chunk }),
+        onDelta: (chunk, taskId) => {
+            if (ctx.isDialogLoopActive()) return;
+            host.emit(EMITTER_TASK_DELTA, { taskId, chunk });
+        },
         setStatus: (status) => ctx.setStatus(status, host),
         emit: (event, payload) => host.emit(event, payload),
         tryReconnect: (error) => callbacks.tryReconnect(error),

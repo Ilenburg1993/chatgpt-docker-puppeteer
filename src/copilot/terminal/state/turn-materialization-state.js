@@ -11,6 +11,8 @@
 
 const MAX_ASSISTANT_MESSAGES_PER_TURN = 16;
 const MAX_DELTA_SLICES_PER_TURN = 8192;
+const RECENT_COMPLETED_TURNS_MAX = 32;
+const RECENT_COMPLETED_TURN_TTL_MS = 5 * 60_000;
 
 /**
  * @typedef {'terminal/explicit-turn' | 'sdk/assistant.turn_start' | 'sdk/assistant.message' | 'dialog/onDelta'} TerminalTurnMaterializationSource
@@ -71,6 +73,9 @@ const MAX_DELTA_SLICES_PER_TURN = 8192;
 /** @type {InternalTerminalTurnMaterialization | null} */
 let _currentTurnMaterialization = null;
 
+/** @type {{ turnKey: string; turnId: string | null; normalizedReply: string; normalizedDeltaText: string; completedAt: number }[]} */
+const _recentCompletedTurnMaterializations = [];
+
 /**
  * @param {unknown} value
  * @returns {string | null}
@@ -88,6 +93,30 @@ function normalizeTurnId(value) {
  */
 function createTurnKey(turnId, timestamp) {
     return turnId ? `turn:${turnId}` : `terminal:${timestamp}`;
+}
+
+/**
+ * @param {unknown} value
+ * @returns {string}
+ */
+function normalizeComparableTranscript(value) {
+    return typeof value === 'string' ? value.replace(/\s+/g, ' ').trim() : '';
+}
+
+/**
+ * @param {number} [now]
+ * @returns {void}
+ */
+function pruneRecentCompletedTurnMaterializations(now = Date.now()) {
+    for (let i = _recentCompletedTurnMaterializations.length - 1; i >= 0; i -= 1) {
+        const entry = _recentCompletedTurnMaterializations[i];
+        if (!entry || now - entry.completedAt > RECENT_COMPLETED_TURN_TTL_MS) {
+            _recentCompletedTurnMaterializations.splice(i, 1);
+        }
+    }
+    if (_recentCompletedTurnMaterializations.length > RECENT_COMPLETED_TURNS_MAX) {
+        _recentCompletedTurnMaterializations.length = RECENT_COMPLETED_TURNS_MAX;
+    }
 }
 
 /**
@@ -168,6 +197,7 @@ export function beginTerminalTurnMaterialization({
  */
 export function clearTerminalTurnMaterialization() {
     _currentTurnMaterialization = null;
+    _recentCompletedTurnMaterializations.length = 0;
 }
 
 /**
@@ -290,6 +320,18 @@ export function completeTerminalTurnMaterialization({
         current.status = status;
         current.updatedAt = timestamp;
         current.completedAt = timestamp;
+        const normalizedReply = normalizeComparableTranscript(reply);
+        const normalizedDeltaText = normalizeComparableTranscript(current.deltaText);
+        if (normalizedReply || normalizedDeltaText) {
+            _recentCompletedTurnMaterializations.unshift({
+                turnKey: current.turnKey,
+                turnId: current.turnId,
+                normalizedReply,
+                normalizedDeltaText,
+                completedAt: timestamp,
+            });
+            pruneRecentCompletedTurnMaterializations(timestamp);
+        }
     }
     const materializedSnapshot = current ? snapshot(current) : null;
     _currentTurnMaterialization = null;
@@ -307,6 +349,74 @@ export function completeTerminalTurnMaterialization({
         },
         snapshot: materializedSnapshot,
     };
+}
+
+/**
+ * Decide se um `assistant.message` do SDK já está coberto pela materialização canônica do turno.
+ *
+ * O SDK pode entregar a mesma fala pública por `assistant.message_delta`, retorno direto do turno e, logo depois,
+ * `assistant.message`. A fonte canônica visual do terminal é o turno/delta já materializado; `assistant.message` deve
+ * continuar arquivado em SSE, mas não abrir um segundo bloco visual nem trocar a atividade atual quando é equivalente.
+ *
+ * @param {{ content?: string | null; turnId?: string | number | null; now?: number }} input
+ * @returns {boolean}
+ */
+export function shouldSuppressTerminalAssistantMessageAsMaterializedTurn({
+    content,
+    turnId = null,
+    now = Date.now(),
+}) {
+    const normalizedContent = normalizeComparableTranscript(content);
+    if (!normalizedContent) return false;
+    const normalizedTurnId = normalizeTurnId(turnId);
+
+    const matches = (/** @type {{ turnId: string | null; normalizedReply: string; normalizedDeltaText: string }} */ entry) => {
+        if (normalizedTurnId && entry.turnId && normalizedTurnId !== entry.turnId) return false;
+        if (entry.normalizedReply && entry.normalizedReply === normalizedContent) return true;
+        if (entry.normalizedDeltaText && entry.normalizedDeltaText === normalizedContent) return true;
+        if (entry.normalizedDeltaText && normalizedContent.startsWith(entry.normalizedDeltaText)) {
+            return normalizeComparableTranscript(normalizedContent.slice(entry.normalizedDeltaText.length)).length === 0;
+        }
+        if (
+            entry.normalizedDeltaText &&
+            normalizedContent.length >= 24 &&
+            entry.normalizedDeltaText.includes(normalizedContent)
+        ) {
+            return true;
+        }
+        return false;
+    };
+
+    if (_currentTurnMaterialization) {
+        const currentEntry = {
+            turnId: _currentTurnMaterialization.turnId,
+            normalizedReply: '',
+            normalizedDeltaText: normalizeComparableTranscript(_currentTurnMaterialization.deltaText),
+        };
+        if (matches(currentEntry)) return true;
+    }
+
+    pruneRecentCompletedTurnMaterializations(now);
+    return _recentCompletedTurnMaterializations.some(matches);
+}
+
+/**
+ * Decide se um `task.delta` tardio já foi coberto por `dialog.delta` no turno ativo.
+ *
+ * Esse caso aparece quando o SDK alimenta simultaneamente o loop explícito e a fila interna do agente. O renderer deve
+ * continuar aceitando `task.delta` como fallback fora do dialog loop, mas durante um turno com deltas canônicos já
+ * materializados ele não deve abrir atividade/transcript paralelo.
+ *
+ * @param {{ chunk?: string | null }} input
+ * @returns {boolean}
+ */
+export function shouldSuppressTerminalTaskDeltaAsMaterializedDialog({ chunk }) {
+    const normalizedChunk = normalizeComparableTranscript(chunk);
+    if (!normalizedChunk || !_currentTurnMaterialization) return false;
+    const hasDialogDelta = _currentTurnMaterialization.deltaSlices.some((entry) => entry.source === 'dialog/onDelta');
+    if (!hasDialogDelta) return false;
+    const normalizedDeltaText = normalizeComparableTranscript(_currentTurnMaterialization.deltaText);
+    return Boolean(normalizedDeltaText && normalizedDeltaText.includes(normalizedChunk));
 }
 
 /**

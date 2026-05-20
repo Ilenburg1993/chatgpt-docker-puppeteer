@@ -88,6 +88,54 @@ describe('terminal/commands/export', () => {
         expect(ctx.output()).toContain('Exportado');
     });
 
+    it('usa terminalStreamingDiagnostics como envelope quando não há assistantMessageEnvelope', async () => {
+        readTerminalTimelineProjection.mockReturnValueOnce({
+            timelineSource: 'hub',
+            reconciliationStatus: 'aligned',
+            sync: {
+                status: 'not_needed',
+            },
+            turns: [
+                {
+                    role: 'assistant',
+                    rawRole: 'llm_b',
+                    origin: 'hub',
+                    persisted: true,
+                    content: 'resposta via delta canônico',
+                    timestamp: 1710000001000,
+                    metadata: {
+                        terminalStreamingDiagnostics: {
+                            source: 'terminal.dialog.engine',
+                            turnKey: 'terminal-turn-key-1',
+                            turnId: 42,
+                            materialization: {
+                                source: 'stream_delta',
+                                deltaSlices: 4,
+                                deltaChars: 24,
+                            },
+                            finalReconciliation: {
+                                mode: 'none',
+                                reason: 'already_streamed',
+                            },
+                            publicStream: {
+                                visibleChars: 24,
+                            },
+                        },
+                    },
+                },
+            ],
+        });
+        const ctx = mockCtx();
+
+        await cmdExport({ println: ctx.println }, '/tmp/conversa.md');
+
+        const [, content] = writeFile.mock.calls[0];
+        expect(String(content)).toContain('envelope=terminal.dialog.engine');
+        expect(String(content)).toContain('trace=terminal-turn-key-1');
+        expect(String(content)).toContain('turn=42');
+        expect(String(content)).toContain('streaming=none/already_streamed');
+    });
+
     it('reporta histórico vazio quando o frontend runtime não tem feed', async () => {
         readTerminalTimelineProjection.mockReturnValueOnce({
             timelineSource: 'empty',

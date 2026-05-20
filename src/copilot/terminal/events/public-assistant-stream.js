@@ -12,6 +12,7 @@
 import { getShowStreaming } from '../../presentation/state/index.js';
 import { readTerminalDialogStreamMeta } from '../frontend/gateways/index.js';
 import { createDeltaCallback, createDisplayState, renderStreamingFooter } from '../dialog/index.js';
+import { recordTerminalTurnDelta } from '../state/events/index.js';
 
 /**
  * @typedef {{
@@ -64,6 +65,16 @@ export function renderPublicAssistantStreamDelta(input) {
     if (!chunk) return { liveRendered: false };
     const streamKey = normalizeStreamKey(input.key);
     const stream = getOrCreateStream(streamKey);
+    recordTerminalTurnDelta({
+        chunk,
+        source: 'public-assistant-stream',
+        sdkSource: typeof input['source'] === 'string' ? input['source'] : null,
+        streamId: typeof input['streamId'] === 'string' ? input['streamId'] : null,
+        chunkSeq: typeof input['chunkSeq'] === 'number' ? input['chunkSeq'] : null,
+        eventId: typeof input['eventId'] === 'string' ? input['eventId'] : null,
+        causationId: typeof input['causationId'] === 'string' ? input['causationId'] : null,
+        timestamp: typeof input['ts'] === 'number' ? input['ts'] : Date.now(),
+    });
     const renderDelta = createDeltaCallback(stream.state);
     renderDelta(chunk, input);
     return { liveRendered: stream.state.streamingStarted };

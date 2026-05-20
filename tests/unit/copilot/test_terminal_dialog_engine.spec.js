@@ -129,6 +129,7 @@ vi.mock('../../../src/copilot/terminal/dialog/turn-display.js', () => ({
     hasStreamingTranscriptMismatch: vi.fn(() => false),
     measureVisibleTerminalChars: vi.fn((text) => String(text ?? '').replace(/\s+/g, '').length),
     normalizeTerminalTranscriptText: vi.fn((text) => String(text ?? '').trim()),
+    releaseDisplayState: vi.fn(),
     renderStreamingFooter: vi.fn(),
 }));
 
@@ -211,6 +212,16 @@ describe('terminal/dialog/engine.js — contrato', () => {
                 requestHeaders: { Authorization: 'Bearer test', 'X-Mode': 'byok' },
             }),
         );
+    });
+
+    it('libera display state quando o SDK falha durante o turno', async () => {
+        const dialogGateway = await import('../../../src/copilot/terminal/frontend/gateways/dialog.js');
+        const turnDisplay = await import('../../../src/copilot/terminal/dialog/turn-display.js');
+
+        vi.mocked(dialogGateway.runTerminalDialogTurnDetailed).mockRejectedValueOnce(new Error('sdk stream failed'));
+
+        await expect(mod.sendTurn('forçar erro de stream', 'user')).resolves.toBeNull();
+        expect(vi.mocked(turnDisplay.releaseDisplayState)).toHaveBeenCalledWith(expect.any(Object));
     });
 
     it('pausa o boot do dialog loop quando a policy SDK bloqueia reconnect por auth', async () => {

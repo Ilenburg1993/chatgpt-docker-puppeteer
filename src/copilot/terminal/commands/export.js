@@ -105,6 +105,11 @@ function readExportEnvelope(metadata) {
             ? extractEnvelopeLike(/** @type {Record<string, unknown>} */ (metadata['assistantMessageEnvelope']))
             : null;
     if (assistantEnvelope) return assistantEnvelope;
+    const streamingEnvelope =
+        metadata['terminalStreamingDiagnostics'] && typeof metadata['terminalStreamingDiagnostics'] === 'object'
+            ? extractEnvelopeLike(/** @type {Record<string, unknown>} */ (metadata['terminalStreamingDiagnostics']))
+            : null;
+    if (streamingEnvelope) return streamingEnvelope;
     const original =
         metadata['originalMetadata'] && typeof metadata['originalMetadata'] === 'object'
             ? readExportEnvelope(/** @type {Record<string, unknown>} */ (metadata['originalMetadata']))
@@ -118,16 +123,28 @@ function readExportEnvelope(metadata) {
  */
 function extractEnvelopeLike(value) {
     const source = typeof value['eventSource'] === 'string' ? value['eventSource'] : value['source'];
+    const traceId =
+        typeof value['traceId'] === 'string'
+            ? value['traceId']
+            : typeof value['turnKey'] === 'string'
+              ? value['turnKey']
+              : null;
+    const turnId =
+        typeof value['turnId'] === 'string'
+            ? value['turnId']
+            : typeof value['turnId'] === 'number'
+              ? String(value['turnId'])
+              : null;
     const hasEnvelope =
         typeof source === 'string' ||
-        typeof value['traceId'] === 'string' ||
-        typeof value['turnId'] === 'string' ||
+        traceId !== null ||
+        turnId !== null ||
         typeof value['eventId'] === 'string';
     if (!hasEnvelope) return null;
     return {
         source: typeof source === 'string' ? source : '-',
-        traceId: typeof value['traceId'] === 'string' ? value['traceId'] : null,
-        turnId: typeof value['turnId'] === 'string' ? value['turnId'] : null,
+        traceId,
+        turnId,
         eventId: typeof value['eventId'] === 'string' ? value['eventId'] : null,
     };
 }

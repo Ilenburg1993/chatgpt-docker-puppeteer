@@ -303,6 +303,26 @@ describe('client-dialog › dialogTurn', () => {
         expect(onDelta).toHaveBeenCalledWith('duplicado');
     });
 
+    it('usa dialog.delta como fonte canônica e ignora task.delta posterior do mesmo stream', async () => {
+        const agent = createMockAgent();
+        const onDelta = vi.fn();
+        /** @type {any[]} */
+        const diagnostics = [];
+
+        agent.sendDialogTurn.mockImplementation(async () => {
+            agent._fire('dialog.delta', { chunk: 'canônico', streamId: 's1', chunkSeq: 1 });
+            agent._fire('task.delta', { chunk: 'canônico', streamId: 's1', chunkSeq: 1 });
+            return 'done';
+        });
+
+        await dialogTurn(agent, 'hello', { onDelta, onDeltaDiagnostic: (event) => diagnostics.push(event) });
+        expect(onDelta).toHaveBeenCalledTimes(1);
+        expect(onDelta).toHaveBeenCalledWith('canônico');
+        expect(diagnostics.map((entry) => `${entry.action}:${entry.reason}:${entry.source}`)).toEqual([
+            'accepted:raw:dialog.delta',
+        ]);
+    });
+
     it('suprime duplicata por chave causal mesmo quando o delta chega por canais paralelos', async () => {
         const agent = createMockAgent();
         const onDelta = vi.fn();

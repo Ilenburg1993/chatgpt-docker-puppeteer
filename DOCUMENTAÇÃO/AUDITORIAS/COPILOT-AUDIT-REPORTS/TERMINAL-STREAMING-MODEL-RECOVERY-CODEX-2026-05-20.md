@@ -34,6 +34,32 @@ Componentes já existentes e relevantes:
 
 Ainda assim, há problemas relevantes.
 
+## Mapa De Emissores Concorrentes
+
+Esta é a raiz das duplicações observadas no terminal.
+
+Fluxo real validado:
+
+1. O SDK local emite eventos de sessão: `assistant.message_delta`, `assistant.streaming_delta`, `assistant.message`, `user_input.requested`, `tool_execution.*`, `session.usage_info` e correlatos.
+2. `src/copilot/event-handlers/streaming.js` adapta `assistant.message_delta`:
+   - se o dialog loop está ativo, emite `dialog.delta`;
+   - se o agente está fora de um turno explícito e não está processando, emite `task.delta`;
+   - se está processando por outro caminho, pode não emitir para evitar eco.
+3. `src/copilot/agent/messaging/agent-messaging.js` também observa a sessão SDK enquanto aguarda idle e preserva o último `assistant.message` para resolver tasks.
+4. `src/copilot/terminal/events/sdk-session-events.js` observa eventos SDK brutos para apresentar `assistant.message`, `user_input.requested`, permissions, elicitation e usage.
+5. `src/copilot/terminal/events/agent-runtime-events.js` observa eventos do runtime/agente, incluindo `question.pending`, `dialog.*`, background, PR/usage e recuperação.
+6. `src/copilot/terminal/events/task-stream-events.js` observa `task.delta` para materializar transcript quando não há turno explícito vivo.
+7. `broadcastSse()` fanouta qualquer evento público para PTY/HTTP/SSE/JSONL/Socket.io.
+
+Contrato canônico decidido nesta revisão:
+
+- Texto público do turno explícito: `dialog.delta` é a fonte visual canônica; `task.delta` é somente fallback para fluxos sem dialog loop.
+- Mensagem final: `assistant.message` é fonte de arquivo/evento, mas não fonte visual se o turno já foi materializado por delta ou reply direto equivalente.
+- Pergunta ao usuário: `user_input.requested` é a fonte visual canônica; `question.pending` é estado/replay.
+- Tools: `tool.lifecycle` deve ser o evento público canônico; eventos SDK/local antigos só podem existir como adaptadores com `source` explícito.
+- SSE/JSONL: `broadcastSse()` é o ponto único de fanout público e arquivo durável. Qualquer evento público fora dele é bug arquitetural.
+- Compatibilidade/fallback só é aceitável com dono, condição de ativação, métrica e plano de remoção. Fallback silencioso é dívida arquitetural.
+
 ## Achados Validados
 
 ### A1. `wireRuntime()` não era aguardado no boot
@@ -117,6 +143,116 @@ Critério: boot deve separar `boot:partial`, `ready:canonical`, `degraded:real`,
 O roadmap anterior misturava histórico, itens já feitos, hipóteses rejeitadas e próximos passos. Isso reduzia valor operacional.
 
 Status: corrigido por esta reconstrução.
+
+### A11. Teste live 2026-05-20 confirmou duplicação por fontes concorrentes
+
+Artefatos: `artifacts/terminal-live/ask-user-duplication-codex-2026-05-20/`.
+
+O cenário PTY acionou `report_intent`, `read_file_content`, deltas `DELTA-CANONICAL-1..8`, `ask_user`, resposta humana `SIM`, `/activity`, `/tools diag`, `/events`, `/errors`, `/health` e `/export`.
+
+Achados confirmados:
+
+- `ask_user` aparecia duas vezes: `question.pending` local imprimia `[QUESTION] LLM-B perguntou...` e, milissegundos depois, `user_input.requested` do SDK imprimia `[ASK] ...`.
+- A resposta final após `ask_user` aparecia duas vezes: deltas `terminal-turn-display/delta` já materializavam o texto, mas `sdk/assistant.message` abria um segundo bloco visual idêntico.
+- O fluxo de delta tinha duas fontes: `dialog.delta` e `task.delta`. A origem é a fiação simultânea do stream SDK pelo handler de streaming do dialog loop e pelo caminho de task interno em `agent/messaging/agent-messaging.js`.
+
+Status: corrigido e reexecutado nesta revisão.
+Regra nova: `user_input.requested` é a apresentação canônica de `ask_user`; `question.pending` fica como sinal de estado/replay. `dialog.delta` é a fonte canônica quando presente; `task.delta` é fallback. `assistant.message` continua arquivado em SSE, mas não reabre bloco visual quando o turno/delta já materializou conteúdo equivalente.
+
+Artefatos pós-correção: `artifacts/terminal-live/ask-user-duplication-codex-2026-05-20-rerun/`.
+
+Resultado pós-correção:
+
+- `ask_user` apareceu uma vez no PTY: `sdk=yes question.pending=no`.
+- A resposta final não apareceu simultaneamente como bloco vivo e bloco `assistant.message`.
+- A timeline de deltas deixou de registrar `task.delta` como fonte paralela suprimida após `dialog.delta`.
+- O runner passou a tratar essas três propriedades como critérios explícitos: `ask-user-single-source`, `no-final-delta-duplication` e `no-parallel-task-delta-after-dialog`.
+
+### A12. `agent:emitter:error [object Object]` precisava normalização
+
+O teste live registrou um erro recuperável de modelo durante retry, mas o error tracker apresentou `[object Object]`. Isso não é aceitável como diagnóstico operacional.
+
+Status: corrigido na normalização central e coberto por teste unitário.
+Critério: qualquer erro de hook/session/model deve ser normalizado com `name`, `message`, `code`, `event`, `source`, `recoverable`, `traceId` e causa resumida.
+
+### A13. Auditoria externa 2 validou riscos reais em `terminal/dialog`
+
+Arquivo lido integralmente: `src/DOCUMENTAÇÃO/COPILOT/AUDIT_EXTERNA_2.md`.
+
+Validação crítica:
+
+- Aceito: `dialog-runtime.js` cacheava promise de import rejeitada, impedindo retry sem restart.
+- Aceito: `turn-display.js` dependia do footer normal para liberar render lock; erro no SDK após início de streaming poderia deixar lock preso.
+- Aceito: deltas do modelo eram escritos com `writeTerminalRaw()` sem sanitização completa de ANSI/OSC.
+- Aceito: `sse.js` usava `JSON.stringify()` direto e truncava apenas `content`, não payloads aninhados, `chunk`, BigInt ou ciclos.
+- Aceito: `engine-persistence.js` não contabilizava falha de `writeTurn()` e descartava notificação pendente silenciosamente quando a fila enchia.
+- Aceito: `turn-reconciliation.js` calculava sufixo a partir do texto normalizado e podia perder Markdown/quebras de linha.
+- Rejeitado como prioridade atual: trocar a suíte consolidada para `node:test`; Vitest segue canônico para `src/copilot`.
+- Rejeitado como API local atual: `session.keepAlive` e `session.updateMetadata`; não existem no pacote `@github/copilot-sdk@0.3.0` instalado.
+- Reclassificado: `Symbol.dispose`, permission model do Node e `SessionFsProvider` são diretrizes seletivas, não mudanças globais imediatas.
+
+Status: incorporado ao roadmap canônico, com P0 aplicado nesta revisão para os itens aceitos acima.
+
+### A14. Diálogo P0 endurecido contra falhas de runtime longo
+
+Status: implementado nesta revisão.
+
+Mudanças aplicadas:
+
+- `dialog-runtime.js` reseta `_engineModulePromise` e `_engineModule` se o import lazy falhar, permitindo retry real.
+- `getDialogRuntimeLoadState()` expõe `loaded`, `importInFlight` e `turnQueueDepth:null` quando a fila ainda não é conhecida.
+- `turn-display.js` ganhou sanitização terminal-safe para CSI/OSC/DCS/APC/controles antes de renderizar chunks.
+- `releaseDisplayState()` libera lock e flush pendente mesmo em erro; `engine.js` chama no `finally`.
+- `sse.js` normaliza payloads recursivamente, converte BigInt, corta strings gigantes, substitui ciclos e isola falhas de archive/fanout.
+- `writeSseEvent()` passa a tratar backpressure básico: `client.write() === false` remove cliente lento.
+- `engine-persistence.js` contabiliza falhas de write, loga descartes por fila cheia e não deixa fallback de leitura derrubar enqueue.
+- `turn-reconciliation.js` preserva sufixo bruto original quando stream parcial é completado pela mensagem final.
+
+### A15. `report_intent` tinha três rotas visuais equivalentes
+
+O live test e os logs longos mostraram a mesma intenção aparecendo por `sdk/assistant.intent`, `tool/report_intent` e `tool/report_intent_local`. A causa não era uma única chamada duplicada, mas três adaptadores legítimos promovendo o mesmo payload sem chave semântica comum.
+
+Status: corrigido nesta revisão.
+
+Decisão canônica:
+
+- A identidade visual de uma intenção é o texto normalizado e o risco, não `source`, `toolCallId` ou alias da tool.
+- `source` e `toolCallId` continuam sendo envelope de auditoria, mas não podem multiplicar a UX.
+- Quando a mesma intenção chega por rotas equivalentes dentro da janela TTL, apenas a primeira materialização visual entra na timeline/transcript.
+
+### A16. O live runner interferia na continuação pós-`ask_user`
+
+O artefato `artifacts/terminal-live/2026-05-20T18-24-53-129Z/` mostrou `user_input.completed`, `assistant.turn_end` e `assistant.turn_start` para `turn:2`, mas o runner disparava `/usage`, `/activity`, `/events`, `/export` e `/quit` logo após "Resposta enviada para pergunta pendente". Isso criava falso negativo para a continuação pós-`ask_user` e podia competir com a própria materialização do turno.
+
+Status: corrigido parcialmente nesta revisão.
+
+Mudanças:
+
+- O prompt canônico agora exige uma fala pública pós-`ask_user` com marcador `POST-ASK-CANONICAL-FINAL`.
+- O runner espera a continuação pós-ask ou uma janela explícita antes dos comandos diagnósticos.
+- O runner reconhece erro terminal de sessão/modelo e encerra diagnóstico cedo em vez de aguardar timeout opaco.
+
+Falta: repetir uma rodada live estável sem falha externa de CAPI para confirmar o marcador pós-ask ponta a ponta.
+
+### A17. Erro recuperável de modelo escalou para `reconnect_restart` com nova ambiguidade
+
+Artefato: `artifacts/terminal-live/canonical-flow-codex-post-ask-continuation-2026-05-20/`.
+
+A rodada live posterior falhou antes de `ask_user`: o SDK reportou várias vezes `errorOccurred` com `errorContext=model_call`, `recoverable=true`, mas o payload de erro chegou como `{}`. Após retries, a sessão terminou com `CAPIError: Connection error`, o dialog loop emitiu `reconnect_restart`, e o terminal bloqueou restart automático.
+
+Achados:
+
+- A normalização central já evita `[object Object]`, mas a informação útil do SDK ainda pode chegar vazia no hook e só aparecer no erro final.
+- Após `session.error`, houve nova sequência `userPromptSubmitted`/`sessionStart` com o mesmo prompt inicial, o que precisa ser auditado para garantir que recuperação não reenvie prompt sem intenção explícita do operador.
+- O live runner antigo deixava o processo até timeout; agora reconhece falha de sessão e captura `/activity`, `/events --raw` e `/errors`.
+
+Status: aberto como gap de recuperação de sessão.
+
+Critério ideal:
+
+- `recoverable=true` deve aparecer como retry em andamento, com contador, request id e próximo passo.
+- `session.error` final deve encerrar claramente o turno, preservar prompt e não reenviar automaticamente sem política explícita.
+- `reconnect_restart` deve indicar se houve retry zero-PR, restart bloqueado, ou necessidade de `/dialog-resume`.
 
 ## Hipóteses Externas Rejeitadas Ou Reclassificadas
 
@@ -232,6 +368,8 @@ Fase C1. Deltas públicos
 - C1.2 Comparar delta PTY x SSE HTTP x JSONL. Status: parcialmente feito.
 - C1.3 Exibir delta parcial com flush controlado e sem apagar linha viva. Status: pendente de prova live.
 - C1.4 Reconciliar delta final com transcript e marcar divergência. Status: pendente.
+- C1.5 Tornar `dialog.delta` fonte canônica quando presente e `task.delta` apenas fallback. Status: feito nesta revisão.
+- C1.6 Reexecutar teste live e exigir ausência de supressões causadas por `task.delta` pós-`dialog.delta`. Status: feito nesta revisão.
 
 Fase C2. Deduplicação
 
@@ -239,6 +377,10 @@ Fase C2. Deduplicação
 - C2.2 Deduplicar por identidade de evento (`eventId`, `traceId`, `turnId`, `callId`). Status: parcialmente feito para `assistant.message_delta` por objeto/eventId.
 - C2.3 Criar métrica de supressão por motivo. Status: pendente.
 - C2.4 Testar repetição legítima de texto. Status: pendente.
+- C2.5 Reconciliar `sdk/assistant.message` tardio com turno/delta já materializado. Status: feito nesta revisão.
+- C2.6 Arquivar `assistant.message` tardio em SSE sem alterar a UX quando for equivalente. Status: feito nesta revisão.
+- C2.7 Testar equivalência de conteúdo normalizada por `turnId`. Status: feito nesta revisão.
+- C2.8 Deduplicar `assistant.intent`/`report_intent`/`report_intent_local` por identidade semântica. Status: feito nesta revisão.
 
 Fase C3. Arquivo JSONL
 
@@ -247,6 +389,9 @@ Fase C3. Arquivo JSONL
 - C3.3 Expor `/events --raw`. Status: feito.
 - C3.4 Adicionar diff de payload PTY/SSE/archive no live runner. Status: pendente.
 - C3.5 Implementar rotação por tamanho/idade com índice. Status: pendente.
+- C3.6 Safe stringify/normalização de payload no ponto único `broadcastSse()`. Status: feito nesta revisão.
+- C3.7 Tratar backpressure básico de raw SSE desconectando cliente lento. Status: feito nesta revisão.
+- C3.8 Medir `sse.dropped`, `sse.truncated` e `sse.stringifyError`. Status: pendente.
 
 ### Faixa D. Tools, I/O E Permissões
 
@@ -272,6 +417,10 @@ Fase E1. Ask user
 - E1.2 Registrar resposta do operador com correlação e redaction quando necessário. Status: pendente.
 - E1.3 Garantir que pergunta e resposta fiquem no transcript consultável. Status: pendente.
 - E1.4 Testar pergunta, resposta, cancelamento e timeout. Status: pendente.
+- E1.5 Remover dupla apresentação `question.pending` + `user_input.requested`. Status: feito nesta revisão.
+- E1.6 Manter `question.pending` apenas para estado interno e replay de pergunta pendente em boot. Status: feito nesta revisão.
+- E1.7 Reexecutar live com `ask_user` e exigir apenas uma pergunta persistente no PTY. Status: feito nesta revisão.
+- E1.8 Exigir continuação pós-`ask_user` com marcador canônico e espera ativa antes de diagnósticos. Status: iniciado nesta revisão; pendente de rodada estável.
 
 Fase E2. Elicitation
 
@@ -321,11 +470,16 @@ Fase G1. Cenário canônico sem PR
 
 Fase G2. Cenário canônico com LLM-B
 
-- G2.1 Prompt que force delta parcial visível. Status: pendente.
-- G2.2 Prompt que force tool simples e tool com I/O. Status: pendente.
-- G2.3 Prompt que force `ask_user` ao final. Status: pendente.
+- G2.1 Prompt que force delta parcial visível. Status: feito no cenário live e promovido a critério explícito; ainda falta fechar critérios SSE/export restantes.
+- G2.2 Prompt que force tool simples e tool com I/O. Status: feito no cenário live; ainda falta enriquecer correlação de permissões e I/O no JSONL.
+- G2.3 Prompt que force `ask_user` ao final. Status: feito e reexecutado pós-correção.
 - G2.4 Prompt que force elicitation quando capability existir. Status: pendente.
 - G2.5 Comparar PTY, SSE, JSONL, transcript e SQLite. Status: pendente.
+- G2.6 Falhar se a mesma pergunta `ask_user` aparecer por mais de uma fonte visual. Status: feito no live runner.
+- G2.7 Falhar se a mesma resposta final aparecer como delta materializado e bloco `assistant.message`. Status: feito no live runner.
+- G2.8 Falhar se `task.delta` reaparecer enquanto `dialog.delta` já é fonte canônica. Status: feito no live runner e na origem `agent-messaging`.
+- G2.9 Falhar se `report_intent` triplicar a timeline por rotas equivalentes. Status: coberto por teste unitário; pendente critério live explícito.
+- G2.10 Distinguir falha externa de CAPI de regressão de UX/transcript. Status: iniciado no live runner.
 
 Fase G3. Fake SDK determinístico
 
@@ -354,6 +508,30 @@ Fase H3. FS e watchers
 - H3.2 Limitar pinned files por bytes com feedback claro. Status: pendente.
 - H3.3 Suportar attach binário por MIME quando seguro. Status: pendente.
 
+### Faixa I. Arquitetura Canônica Sem Fluxos Paralelos Opacos
+
+Fase I1. Inventário e classificação de emitters
+
+- I1.1 Mapear todos os listeners do SDK e eventos derivados (`dialog.delta`, `task.delta`, `assistant.message`, `question.pending`). Status: feito nesta revisão.
+- I1.2 Classificar cada emissor como fonte canônica, adaptador, fallback ou legado. Status: iniciado nesta revisão.
+- I1.3 Bloquear novos eventos públicos fora de `broadcastSse()` por teste arquitetural. Status: pendente.
+- I1.4 Expor `/events sources` ou `/health` com contagem por fonte/adaptador. Status: pendente.
+
+Fase I2. Política explícita de compat/fallback
+
+- I2.1 Criar tabela de fallbacks permitidos com dono, motivo, condição, métrica e data de revisão. Status: pendente.
+- I2.2 Renomear fallbacks saudáveis para "adapters" quando forem parte do fluxo canônico. Status: pendente.
+- I2.3 Remover fallbacks silenciosos sem métrica. Status: pendente.
+- I2.4 Fazer `task.delta` fallback explícito apenas quando `dialog.delta` não existir para o stream. Status: feito nesta revisão no cliente de diálogo.
+- I2.5 Garantir que `agent-messaging` não emita `task.delta` enquanto o dialog loop estiver ativo. Status: feito nesta revisão na origem.
+- I2.6 Auditar recuperação `session.error` -> `reconnect_restart` para impedir reenvio automático ambíguo de prompt. Status: pendente.
+
+Fase I3. Microkernel de eventos públicos
+
+- I3.1 Extrair normalizador canônico de eventos públicos de assistant/user_input/tool antes do renderer. Status: pendente.
+- I3.2 Fazer terminal PTY, SSE HTTP, JSONL e export consumirem a mesma materialização. Status: parcialmente feito.
+- I3.3 Gerar relatório de divergência quando PTY/SSE/export discordarem. Status: pendente.
+
 ## Execução Iniciada Nesta Revisão
 
 Implementado:
@@ -365,12 +543,38 @@ Implementado:
 - Mensagens de usage agora diferenciam "Premium Request classificada" de "Telemetria LLM sem Premium Request".
 - A apresentação canônica de tools ignora nomes genéricos (`unknown`, `tool`, `external_tool`) quando há fallback real.
 - O handler de `assistant.message_delta` agora tem contrato explícito: preserva chunks repetidos legítimos e deduplica por identidade de evento.
+- Teste live completo com LLM-B reproduziu a duplicação de `ask_user`, delta final e fontes paralelas de delta.
+- `question.pending` deixou de imprimir pergunta no fluxo normal; `user_input.requested` do SDK é a única apresentação canônica de `ask_user`.
+- `assistant.message` tardio agora é reconciliado contra materialização ativa ou recém-concluída do turno antes de renderizar novo bloco visual.
+- `dialog.delta` passou a prevalecer como fonte canônica de delta no cliente de diálogo; `task.delta` posterior é ignorado como cópia derivada.
+- O live runner agora falha explicitamente em duplicação visual de `ask_user`, duplicação visual do delta final e reentrada paralela de `task.delta` após `dialog.delta`.
+- `toError()` agora serializa objetos de erro sem `message`, preserva `stack`/`code` quando existirem e evita o diagnóstico inútil `[object Object]`.
+- Auditoria externa 2 foi lida integralmente, validada criticamente e incorporada como achados A13/A14.
+- `dialog-runtime.js` agora permite retry após falha de import lazy e expõe estado de carregamento sem falsear queue depth.
+- `turn-display.js` sanitiza ANSI/OSC/controles antes de renderizar chunks não confiáveis e expõe `releaseDisplayState()` para liberação segura.
+- `engine.js` libera display state no `finally`, inclusive em erro de SDK após início de streaming/reasoning.
+- `sse.js` normaliza payloads públicos com BigInt/circular/string gigante e isola falhas de archive/fanout.
+- `engine-persistence.js` contabiliza falhas de write e descartes da fila de notificação.
+- `turn-reconciliation.js` preserva Markdown/quebras do sufixo original.
+- `agent-messaging.js` corta `task.delta` na origem quando o dialog loop está ativo; `task.delta` deixou de ser rota paralela durante turnos explícitos.
+- `events/intent-renderer.js` deduplica intents semanticamente equivalentes vindos de `assistant.intent`, `report_intent` e `report_intent_local`.
+- `commands/export.js` recupera envelope de origem também de `terminalStreamingDiagnostics`, garantindo `source/trace` em export Markdown.
+- `terminal-agent-wiring.js` promove `dialog.turn_end` a evento explícito, não passthrough residual, para que finais sem `assistant.message` tenham rota canônica.
+- O live runner agora exige marcador pós-`ask_user`, aguarda continuação antes de comandos diagnósticos e trata `session.error` como falha terminal capturável.
+- Rodada live `2026-05-20T18-24-53-129Z` confirmou que o runner antigo interferia no pós-ask ao diagnosticar logo após resposta humana.
+- Rodada live `canonical-flow-codex-post-ask-continuation-2026-05-20` expôs falha externa/SDK `CAPIError: Connection error` antes do ask_user e gerou novo gap A17.
 - Testes unitários adicionados para runtime root, reflection sync failure e SIGHUP policy.
+- Testes unitários adicionados para reconciliação de `assistant.message` materializado, supressão visual de `question.pending` e preferência `dialog.delta`.
+- Testes unitários adicionados para normalização de objetos de erro sem `message`.
+- Testes unitários adicionados para lazy import resiliente, sanitização terminal, release de display state, safe SSE payload e sufixo final formatado.
+- Teste unitário adicionado para deduplicação visual de intents equivalentes.
 
 Próxima rodada recomendada:
 
-1. Normalizar wording de usage para remover ambiguidade com Premium Request.
-2. Criar contrato único de modelo configurado/preferido/efetivo/cobrado.
-3. Expandir live runner para cenário com delta parcial, tool, `ask_user` e comparação PTY/SSE/JSONL/transcript.
-4. Atacar `tool unknown` por normalização central, não por casos especiais de renderer.
-5. Adicionar eventos de boot `runtime.wired` e falha de fase.
+1. Criar teste arquitetural que impeça evento público fora de `broadcastSse()` e classifique emitters canônicos/adapters/fallbacks.
+2. Fechar a recuperação `session.error`/`reconnect_restart`, distinguindo retry real de reenvio ambíguo de prompt.
+3. Normalizar wording de usage para remover qualquer ambiguidade residual com Premium Request.
+4. Criar contrato único de modelo configurado/preferido/efetivo/cobrado.
+5. Atacar `tool unknown` por normalização central, não por casos especiais de renderer.
+6. Adicionar eventos de boot `runtime.wired` e falha de fase.
+7. Expandir o cenário live para elicitation quando a capability estiver disponível.

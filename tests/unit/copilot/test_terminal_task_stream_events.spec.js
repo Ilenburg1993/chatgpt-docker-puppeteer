@@ -12,6 +12,12 @@ import {
     recordTerminalUserInputCompleted,
     recordTerminalUserInputRequested,
 } from '../../../src/copilot/terminal/state/sdk-interactions.js';
+import {
+    beginTerminalTurnMaterialization,
+    clearTerminalTurnMaterialization,
+    recordTerminalTurnDelta,
+    shouldSuppressTerminalAssistantMessageAsMaterializedTurn,
+} from '../../../src/copilot/terminal/state/turn-materialization-state.js';
 
 const mocks = vi.hoisted(() => ({
     recordTerminalActivity: vi.fn(),
@@ -110,6 +116,7 @@ describe('terminal/task-stream-events.js — contrato', () => {
         mocks.appendThinkingHistoryChunk.mockClear();
         mocks.finalizeThinkingHistoryEntry.mockClear();
         clearTerminalUserInputs();
+        clearTerminalTurnMaterialization();
         const stream = await import('../../../src/copilot/terminal/events/public-assistant-stream.js');
         stream.resetPublicAssistantStreamsForTests();
     });
@@ -144,6 +151,36 @@ describe('terminal/task-stream-events.js — contrato', () => {
         expect(mocks.println).toHaveBeenCalledWith(expect.stringContaining('task thinking capturado'));
         expect(mocks.println).toHaveBeenCalledWith(expect.stringContaining('/thinking show'));
         expect(stdoutSpy).not.toHaveBeenCalled();
+        stdoutSpy.mockRestore();
+    });
+
+    it('registra task.delta público como materialização canônica para suprimir assistant.message equivalente', async () => {
+        const stdoutSpy = vi.spyOn(process.stdout, 'write').mockReturnValue(true);
+        const stream = await import('../../../src/copilot/terminal/events/public-assistant-stream.js');
+
+        stream.renderPublicAssistantStreamDelta({
+            key: 'task:post-ask',
+            chunk: '✅ Teste canônico repetido ',
+            source: 'agent/task.delta',
+            streamId: 'task:post-ask',
+            chunkSeq: 1,
+        });
+        stream.renderPublicAssistantStreamDelta({
+            key: 'task:post-ask',
+            chunk: 'e validado',
+            source: 'agent/task.delta',
+            streamId: 'task:post-ask',
+            chunkSeq: 2,
+        });
+
+        expect(
+            shouldSuppressTerminalAssistantMessageAsMaterializedTurn({
+                content: '✅ Teste canônico repetido e validado',
+            }),
+        ).toBe(true);
+        expect(stdoutSpy.mock.calls.map(([chunk]) => String(chunk)).join('')).toContain(
+            'Teste canônico repetido e validado',
+        );
         stdoutSpy.mockRestore();
     });
 
@@ -241,6 +278,31 @@ describe('terminal/task-stream-events.js — contrato', () => {
             'Executando tarefa interna',
             expect.any(Object),
         );
+    });
+
+    it('ignora task.delta paralelo quando dialog.delta já materializou o mesmo texto', async () => {
+        const stdoutSpy = vi.spyOn(process.stdout, 'write').mockReturnValue(true);
+        beginTerminalTurnMaterialization({ turnId: 'turn-dialog', timestamp: 1000 });
+        recordTerminalTurnDelta({
+            chunk: '✅ **Teste canônico validado**',
+            source: 'dialog/onDelta',
+            timestamp: 1001,
+        });
+        const { setupTerminalTaskStreamListeners } =
+            await import('../../../src/copilot/terminal/events/task-stream-events.js');
+        const agent = new EventEmitter();
+
+        setupTerminalTaskStreamListeners({ agent });
+        agent.emit('task.delta', { taskId: 'task-shadow', chunk: 'Teste canônico' });
+
+        expect(stdoutSpy).not.toHaveBeenCalled();
+        expect(mocks.recordTerminalActivity).not.toHaveBeenCalledWith(
+            'task',
+            'Executando tarefa interna',
+            expect.any(Object),
+        );
+        expect(mocks.renderTerminalAssistantTranscript).not.toHaveBeenCalled();
+        stdoutSpy.mockRestore();
     });
 
     it('não promove task.completed vazio para atividade atual mesmo com taskId', async () => {

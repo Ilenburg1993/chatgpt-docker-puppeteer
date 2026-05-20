@@ -238,8 +238,12 @@ describe('terminal/events/agent-runtime-events.js — contrato', () => {
             progressMessage: 'abrindo arquivo grande',
         });
 
-        expect(println).toHaveBeenCalledWith(expect.stringContaining('ASK'));
-        expect(println).toHaveBeenCalledWith(expect.stringContaining('PICK'));
+        expect(recordTerminalActivity).toHaveBeenCalledWith(
+            'question',
+            'question.pending reconciliado pelo ask_user SDK',
+            expect.objectContaining({ detail: expect.stringContaining('Confirme se deseja abrir') }),
+        );
+        expect(println).not.toHaveBeenCalledWith(expect.stringContaining('LLM-B perguntou'));
         expect(println).toHaveBeenCalledWith(expect.stringContaining('abrindo arquivo grande'));
         expect(writeInlineStatus).toHaveBeenCalledWith(expect.stringContaining('workspace.read_file'));
         expect(writeInlineStatus).toHaveBeenCalledWith(expect.stringContaining('abrindo arquivo grande'));
@@ -403,6 +407,51 @@ describe('terminal/events/agent-runtime-events.js — contrato', () => {
         );
     });
 
+    it('deduplica visualmente intents equivalentes vindos de assistant.intent e report_intent_local', async () => {
+        const { setupTerminalAgentRuntimeEventListeners } =
+            await import('../../../src/copilot/terminal/events/agent-runtime-events.js');
+        const { __test__: terminalIntentRendererTestHarness } = await import(
+            '../../../src/copilot/terminal/events/intent-renderer.js'
+        );
+        terminalIntentRendererTestHarness.clearRecentIntentHashes();
+        /** @type {Map<string, Function[]>} */
+        const listeners = new Map();
+        const agent = {
+            on: vi.fn((event, handler) => {
+                const list = listeners.get(event) ?? [];
+                list.push(handler);
+                listeners.set(event, list);
+            }),
+            off: vi.fn(),
+        };
+
+        setupTerminalAgentRuntimeEventListeners({ agent: /** @type {any} */ (agent), rl: null });
+        listeners.get('assistant.intent')?.[0]?.({
+            intent: 'terminal live canonical deltas tools ask_user usage',
+        });
+        listeners.get('tool.execution_start')?.[0]?.({
+            toolCallId: 'intent-tool-dup',
+            toolName: 'report_intent_local',
+            args: {
+                intent: 'terminal live canonical deltas tools ask_user usage',
+            },
+        });
+
+        expect(printlnBlock).toHaveBeenCalledTimes(1);
+        expect(recordTerminalActivity).toHaveBeenCalledWith(
+            'turn',
+            'Intenção da LLM-B',
+            expect.objectContaining({
+                detail: 'terminal live canonical deltas tools ask_user usage',
+                source: 'sdk/assistant.intent',
+            }),
+        );
+        const intentActivities = recordTerminalActivity.mock.calls.filter(
+            (call) => call[0] === 'turn' && call[1] === 'Intenção da LLM-B',
+        );
+        expect(intentActivities).toHaveLength(1);
+    });
+
     it('funciona em modo headless sem readline e ainda emite SSE de tools', async () => {
         const { setupTerminalAgentRuntimeEventListeners } =
             await import('../../../src/copilot/terminal/events/agent-runtime-events.js');
@@ -437,7 +486,12 @@ describe('terminal/events/agent-runtime-events.js — contrato', () => {
                 path: 'tmp/live.md',
             }),
         );
-        expect(println).toHaveBeenCalledWith(expect.stringContaining('LLM-B perguntou: "Confirmar operação?"'));
+        expect(recordTerminalActivity).toHaveBeenCalledWith(
+            'question',
+            'question.pending reconciliado pelo ask_user SDK',
+            expect.objectContaining({ detail: 'Confirmar operação?' }),
+        );
+        expect(println).not.toHaveBeenCalledWith(expect.stringContaining('LLM-B perguntou: "Confirmar operação?"'));
         expect(buildUserPrompt).not.toHaveBeenCalled();
     });
 

@@ -272,6 +272,15 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, regi
         if (!decision.render) {
             return;
         }
+        if (source === 'event') {
+            recordTerminalActivity('question', 'question.pending reconciliado pelo ask_user SDK', {
+                detail: question.slice(0, 160),
+                source: 'agent',
+                recordHistory: false,
+                updateCurrent: false,
+            });
+            return;
+        }
         const compactDetail = getTerminalDetailLevel() === 'compact';
         const questionText = compactDetail ? compactTerminalToolText(question, 96) : question;
 

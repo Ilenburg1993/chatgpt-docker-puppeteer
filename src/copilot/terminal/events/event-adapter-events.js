@@ -14,6 +14,7 @@ import { AGENT_EVENTS } from '#copilot/events';
 export const TERMINAL_EXPLICIT_AGENT_EVENTS = new Set([
     'dialog.stalled',
     'dialog.reply',
+    'dialog.turn_end',
     'dialog.loop.changed',
     'dialog.ready',
     'dialog.stopped',
@@ -101,7 +102,6 @@ export const TERMINAL_AGENT_SSE_PASSTHROUGH_EVENTS = new Set([
     'dialog.boot_recovery',
     'dialog.paused',
     'dialog.resumed',
-    'dialog.turn_end',
     'dialog.turn_start',
     'dialog.turn_timeout',
     'handoff.accepted',

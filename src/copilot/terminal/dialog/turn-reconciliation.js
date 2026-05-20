@@ -24,6 +24,22 @@ import { measureVisibleTerminalChars, normalizeTerminalTranscriptText } from './
  */
 
 /**
+ * Encontra o índice bruto em `reply` imediatamente após o prefixo já transmitido, preservando Markdown, quebras e
+ * espaços do sufixo original. O comparador normalizado decide equivalência; a renderização nunca deve usar o texto
+ * normalizado como conteúdo final.
+ *
+ * @param {string} reply
+ * @param {string} streamedNormalized
+ * @returns {number | null}
+ */
+function findRawSuffixStart(reply, streamedNormalized) {
+    for (let index = 0; index <= reply.length; index += 1) {
+        if (normalizeTerminalTranscriptText(reply.slice(0, index)) === streamedNormalized) return index;
+    }
+    return null;
+}
+
+/**
  * @param {{
  *     reply: string | null;
  *     streamedContent: string;
@@ -49,7 +65,8 @@ export function decideFinalTranscriptRender(input) {
     }
 
     if (finalNormalized.startsWith(streamedNormalized)) {
-        const suffix = finalNormalized.slice(streamedNormalized.length);
+        const rawSuffixStart = findRawSuffixStart(reply, streamedNormalized);
+        const suffix = rawSuffixStart === null ? reply.slice(streamedNormalized.length) : reply.slice(rawSuffixStart);
         if (measureVisibleTerminalChars(suffix) === 0) {
             return { mode: 'none', reason: 'already_streamed', content: '', severity: 'info' };
         }

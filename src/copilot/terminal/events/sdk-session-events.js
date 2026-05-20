@@ -99,6 +99,7 @@ import {
     recordTerminalTurnUserInputActivity,
     recordTerminalUserInputCompleted,
     recordTerminalUserInputRequested,
+    shouldSuppressTerminalAssistantMessageAsMaterializedTurn,
     shouldSuppressTerminalAssistantMessageAsUserInputEcho,
     terminalThemeBadge,
     terminalThemeText,
@@ -343,11 +344,6 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
             });
             return;
         }
-        recordTerminalActivity('turn', 'Mensagem da LLM-B recebida', {
-            detail: `${normalized.kind}${normalized.content ? ` · ${normalized.content.slice(0, 160)}` : ''}`,
-            source: 'sdk',
-            recordHistory: false,
-        });
         const assistantMessageEnvelope = withSdkSessionSseEnvelope(
             {
                 content: normalized.content,
@@ -364,6 +360,32 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
             });
             return;
         }
+        const assistantMessageTurnId =
+            typeof assistantMessageEnvelope.turnId === 'string' || typeof assistantMessageEnvelope.turnId === 'number'
+                ? assistantMessageEnvelope.turnId
+                : typeof data['turnId'] === 'string' || typeof data['turnId'] === 'number'
+                  ? data['turnId']
+                  : null;
+        if (
+            shouldSuppressTerminalAssistantMessageAsMaterializedTurn({
+                content: normalized.content,
+                turnId: assistantMessageTurnId,
+            })
+        ) {
+            recordTerminalActivity('turn', 'assistant.message reconciliado sem novo bloco visual', {
+                detail: `${normalized.kind} · conteúdo já materializado por delta/turno`,
+                source: 'sdk/assistant.message',
+                severity: 'info',
+                recordHistory: false,
+                updateCurrent: false,
+            });
+            return;
+        }
+        recordTerminalActivity('turn', 'Mensagem da LLM-B recebida', {
+            detail: `${normalized.kind}${normalized.content ? ` · ${normalized.content.slice(0, 160)}` : ''}`,
+            source: 'sdk',
+            recordHistory: false,
+        });
         const rendered = renderTerminalAssistantTranscript({
             content: normalized.content,
             title: normalized.kind === 'reply' ? 'Resposta fora do turno ativo' : 'Mensagem',

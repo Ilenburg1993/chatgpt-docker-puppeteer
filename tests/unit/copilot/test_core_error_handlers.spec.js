@@ -30,6 +30,34 @@ describe('core/error-handlers', () => {
         vi.restoreAllMocks();
     });
 
+    // ── toError ───────────────────────────────────────────────────────────
+
+    describe('toError', () => {
+        it('serializa objetos sem message para evitar [object Object] no tracker', () => {
+            const err = mod.toError({
+                type: 'hook:error_occurred',
+                recoverable: true,
+                context: 'sdk-model-retry',
+            });
+
+            expect(err.message).toContain('"type":"hook:error_occurred"');
+            expect(err.message).toContain('"recoverable":true');
+            expect(err.message).not.toBe('[object Object]');
+        });
+
+        it('preserva message, stack e code quando recebe objeto estruturado', () => {
+            const err = mod.toError({
+                message: 'falha estruturada',
+                stack: 'STACK\nat sdk',
+                code: 'SDK_RETRY',
+            });
+
+            expect(err.message).toBe('falha estruturada');
+            expect(err.stack).toBe('STACK\nat sdk');
+            expect(err.code).toBe('SDK_RETRY');
+        });
+    });
+
     // ── logSwallowed ──────────────────────────────────────────────────────
 
     describe('logSwallowed', () => {
