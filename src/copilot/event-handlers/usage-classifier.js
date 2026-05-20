@@ -130,6 +130,8 @@ export function normalizeAssistantUsageEvent(evt, session) {
  *         premiumRequestReason: string;
  *         pendingUserMessages: number;
  *         pendingAskUserContinuations: number;
+ *         pendingUserInputRequests: number;
+ *         askUserRequestId?: string;
  *     };
  * }}
  */
@@ -138,6 +140,8 @@ export function createAssistantUsageClassifier() {
     let pendingAskUserContinuations = 0;
     /** @type {Set<string>} */
     const pendingUserInputRequests = new Set();
+    /** @type {Set<string>} */
+    const userInputRequestsMatchedByUsage = new Set();
 
     return {
         recordUserMessage() {
@@ -152,6 +156,9 @@ export function createAssistantUsageClassifier() {
             const data = asRecord(/** @type {{ data?: unknown } | null | undefined} */ (evt)?.data) ?? {};
             const requestId = asString(data['requestId']) ?? asString(data['id']);
             if (requestId) pendingUserInputRequests.delete(requestId);
+            if (requestId && userInputRequestsMatchedByUsage.delete(requestId)) {
+                return;
+            }
             pendingAskUserContinuations += 1;
         },
         classify(usage) {
@@ -165,6 +172,7 @@ export function createAssistantUsageClassifier() {
                     premiumRequestReason: 'user_input_completed_continuation',
                     pendingUserMessages,
                     pendingAskUserContinuations,
+                    pendingUserInputRequests: pendingUserInputRequests.size,
                 };
             }
             if (pendingUserMessages > 0 && (!initiator || initiator === 'user')) {
@@ -175,6 +183,31 @@ export function createAssistantUsageClassifier() {
                     premiumRequestReason: initiator === 'user' ? 'user_message:initiator:user' : 'user_message',
                     pendingUserMessages,
                     pendingAskUserContinuations,
+                    pendingUserInputRequests: pendingUserInputRequests.size,
+                };
+            }
+            if (pendingUserInputRequests.size > 0) {
+                const requestId = pendingUserInputRequests.values().next().value;
+                if (!requestId) {
+                    return {
+                        classification: LLM_USAGE_CLASSIFICATIONS.UNATTRIBUTED,
+                        premiumRequest: false,
+                        premiumRequestReason: 'pending_user_input_request_without_id',
+                        pendingUserMessages,
+                        pendingAskUserContinuations,
+                        pendingUserInputRequests: pendingUserInputRequests.size,
+                    };
+                }
+                pendingUserInputRequests.delete(requestId);
+                userInputRequestsMatchedByUsage.add(requestId);
+                return {
+                    classification: LLM_USAGE_CLASSIFICATIONS.ASK_USER_CONTINUATION,
+                    premiumRequest: false,
+                    premiumRequestReason: 'pending_user_input_request_continuation',
+                    pendingUserMessages,
+                    pendingAskUserContinuations,
+                    pendingUserInputRequests: pendingUserInputRequests.size,
+                    askUserRequestId: requestId,
                 };
             }
             if (parentToolCallId) {
@@ -184,6 +217,7 @@ export function createAssistantUsageClassifier() {
                     premiumRequestReason: 'parent_tool_call',
                     pendingUserMessages,
                     pendingAskUserContinuations,
+                    pendingUserInputRequests: pendingUserInputRequests.size,
                 };
             }
             if (initiator) {
@@ -193,6 +227,7 @@ export function createAssistantUsageClassifier() {
                     premiumRequestReason: `initiator:${initiator}`,
                     pendingUserMessages,
                     pendingAskUserContinuations,
+                    pendingUserInputRequests: pendingUserInputRequests.size,
                 };
             }
             return {
@@ -201,6 +236,7 @@ export function createAssistantUsageClassifier() {
                 premiumRequestReason: pendingUserInputRequests.size > 0 ? 'pending_user_input_request' : 'no_user_message',
                 pendingUserMessages,
                 pendingAskUserContinuations,
+                pendingUserInputRequests: pendingUserInputRequests.size,
             };
         },
     };

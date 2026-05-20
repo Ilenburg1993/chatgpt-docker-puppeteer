@@ -136,6 +136,50 @@ describe('event-handlers/usage wireUsageEvent', () => {
         expect(mocks.log).toHaveBeenCalledWith('DEBUG', expect.stringContaining('LLM usage sem novo PR'));
     });
 
+    it('classifica usage emitido antes de user_input.completed como continuação de ask_user sem duplicar completed tardio', async () => {
+        const { emit, handlers, onPrInfo } = await setupUsageHarness({
+            sessionId: 'sdk-late-ask',
+            model: 'gpt-5.4',
+        });
+
+        handlers.get('user_input.requested')?.({ data: { requestId: 'ask-late', question: 'Confirma?' } });
+        handlers.get('assistant.usage')?.({
+            data: {
+                model: 'gpt-5.4',
+                cost: 0.1,
+                initiator: 'agent',
+            },
+        });
+        handlers.get('user_input.completed')?.({ data: { requestId: 'ask-late', answer: 'SIM' } });
+        handlers.get('assistant.usage')?.({
+            data: {
+                model: 'gpt-5.4',
+                cost: 0.2,
+                initiator: 'agent',
+            },
+        });
+
+        expect(onPrInfo).not.toHaveBeenCalled();
+        expect(emit).toHaveBeenCalledWith(
+            'llm.usage',
+            expect.objectContaining({
+                classification: 'ask_user_continuation',
+                premiumRequest: false,
+                premiumRequestReason: 'pending_user_input_request_continuation',
+                askUserRequestId: 'ask-late',
+            }),
+        );
+        expect(emit).toHaveBeenCalledWith(
+            'llm.usage',
+            expect.objectContaining({
+                classification: 'non_user_initiated',
+                premiumRequest: false,
+                premiumRequestReason: 'initiator:agent',
+            }),
+        );
+        expect(emit).not.toHaveBeenCalledWith('pr.consumed', expect.any(Object));
+    });
+
     it('classifica initiator:user com user.message pendente como PR real', async () => {
         const { emit, handlers, onPrInfo } = await setupUsageHarness({
             sessionId: 'sdk-user',

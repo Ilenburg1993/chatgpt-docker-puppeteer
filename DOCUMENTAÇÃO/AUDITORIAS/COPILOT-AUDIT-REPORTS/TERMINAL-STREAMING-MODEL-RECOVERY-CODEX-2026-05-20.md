@@ -452,7 +452,7 @@ Pendencias apos esta revisao:
 - Propagar `traceId`/`turnId` aos diagnosticos e deltas SSE para correlação perfeita entre terminal, timeline, SSE e hub. **Parcialmente implementado para `delta`, diagnosticos de stream e `assistant.message`; falta cobrir todos os eventos de tools/user_input/usage e correlacionar o runner externo automaticamente.**
 - Adicionar assert live especifico para a secao `Streaming publico` no modo com turno real, alem do modo `--no-pr`.
 - Coletar SSE paralelamente no runner para comparar stdout local, replay buffer e canal externo. **Implementado para coleta e criterios basicos; falta correlacionar automaticamente stdout markers, eventos SSE e replay em turnos reais.**
-- Enriquecer o classificador de `llm.usage` com sinal local de resposta humana pendente para explicar melhor fechamentos tardios de `ask_user`.
+- Enriquecer o classificador de `llm.usage` com sinal local de resposta humana pendente para explicar melhor fechamentos tardios de `ask_user`. **Implementado: usage emitido enquanto `user_input.requested` ainda esta pendente agora e classificado como `ask_user_continuation` com motivo `pending_user_input_request_continuation`, e o `user_input.completed` tardio nao cria uma segunda continuacao.**
 
 ## Validacao live Codex - SSE no runner sem PR
 
@@ -467,3 +467,14 @@ Critérios relevantes:
 - O coletor SSE conectou em `/events` e recebeu `connected`.
 - O payload publico SSE nao vazou `__terminalSseEventId`.
 - O teste encerrou limpo via `/quit`.
+
+## Atualizacao Codex - classificacao tardia de ask_user
+
+Data: 2026-05-20.
+
+Implementado:
+
+- `assistant.usage` que chega enquanto ha `user_input.requested` pendente agora e classificado como `ask_user_continuation`, mesmo se o SDK ainda nao emitiu `user_input.completed`.
+- O classificador marca o requestId usado por essa usage; quando `user_input.completed` chega depois, ele nao incrementa uma segunda continuacao.
+- O evento continua `llm.usage`, sem `pr.consumed`, preservando a regra de que `ask_user` nao abre Premium Request novo.
+- Teste unitario cobre a ordem real observada no live: `user_input.requested -> assistant.usage(initiator:agent) -> user_input.completed -> assistant.usage(initiator:agent)`.
