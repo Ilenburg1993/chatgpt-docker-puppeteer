@@ -49,9 +49,16 @@ export function createLogObserver({ bus }) {
      */
     function on(type, level, label) {
         unsubs.push(
-            bus.on(type, () => {
+            bus.on(type, (evt) => {
                 try {
-                    log(level, `[log-observer] ${label} via EventBus`);
+                    const data = evt && typeof evt === 'object' ? /** @type {Record<string, unknown>} */ (evt) : {};
+                    const detail =
+                        typeof data['errorMessage'] === 'string' && data['errorMessage'].length > 0
+                            ? ` · ${data['errorMessage']}`
+                            : typeof data['message'] === 'string' && data['message'].length > 0
+                              ? ` · ${data['message']}`
+                              : '';
+                    log(level, `[log-observer] ${label} via EventBus${detail}`);
                 } catch (e) {
                     log('WARN', `[log-observer] erro em ${type}: ${toError(e).message}`);
                 }
@@ -72,7 +79,9 @@ export function createLogObserver({ bus }) {
     on(HOOK_POST_TOOL_USE, 'DEBUG', 'hook:post_tool_use');
     on(HOOK_SESSION_START, 'INFO', 'hook:session_start');
     on(HOOK_SESSION_END, 'INFO', 'hook:session_end');
-    on(HOOK_ERROR_OCCURRED, 'ERROR', 'hook:error_occurred');
+    // Erros de hook já são promovidos pelo error-alerter com tracking estruturado; aqui ficam como trilha diagnóstica
+    // para evitar duas linhas ERROR idênticas no terminal durante turnos longos.
+    on(HOOK_ERROR_OCCURRED, 'DEBUG', 'hook:error_occurred');
 
     // Handoff
     on(AGENT_HANDOFF_RECEIVED, 'INFO', 'handoff:received');

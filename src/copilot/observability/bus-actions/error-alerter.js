@@ -24,8 +24,10 @@ export function createErrorAlerterAction({ bus, onAlert, errorTracker = null }) 
     const unsubs = [];
     const alertFn =
         onAlert ??
-        ((/** @type {{ type: string }} */ evt) => {
-            log('ERROR', `[error-alerter] ALERTA: evento ${evt.type} detectado`);
+        ((/** @type {{ type: string; errorMessage?: string; message?: string; source?: string }} */ evt) => {
+            const detail = evt.errorMessage || evt.message || '';
+            const source = evt.source ? ` · source=${evt.source}` : '';
+            log('ERROR', `[error-alerter] ALERTA: ${evt.type}${source}${detail ? ` · ${detail}` : ''}`);
         });
 
     // Match error/fatal events via wildcard patterns

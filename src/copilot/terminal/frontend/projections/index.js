@@ -2,6 +2,7 @@
 
 export {
     listTerminalAvailableModelsProjection,
+    observeTerminalModelChangeProjection,
     readTerminalConfigProjection,
     readTerminalModelStatsProjection,
     setTerminalModelProjection,

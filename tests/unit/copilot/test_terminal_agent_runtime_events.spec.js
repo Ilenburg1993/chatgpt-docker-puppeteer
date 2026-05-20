@@ -12,12 +12,17 @@ const printlnBlock = vi.fn((/** @type {string[]} */ lines) => println(lines.join
 const buildUserPrompt = vi.fn(() => 'prompt> ');
 const broadcastSse = vi.fn();
 const isTerminalRenderLocked = vi.fn(() => false);
+const scheduleTerminalPromptRedraw = vi.fn((/** @type {any} */ rl, /** @type {string} */ prompt) => {
+    rl?.setPrompt?.(prompt);
+    rl?.prompt?.();
+});
 const writeInlineStatus = vi.fn();
 const recordTerminalActivity = vi.fn();
 const getShowToolActivity = vi.fn(() => true);
 const getShowUsage = vi.fn(() => true);
 const getShowStreaming = vi.fn(() => true);
 const getShowIntentActivity = vi.fn(() => true);
+const getShowSessionActivity = vi.fn(() => false);
 const readTerminalRuntimeState = vi.fn(
     () =>
         /** @type {any} */ ({
@@ -37,6 +42,7 @@ vi.mock('../../../src/copilot/terminal/dialog/index.js', () => ({
     buildUserPrompt,
     broadcastSse,
     isTerminalRenderLocked,
+    scheduleTerminalPromptRedraw,
     writeInlineStatus,
 }));
 
@@ -49,6 +55,7 @@ vi.mock('../../../src/copilot/presentation/state/index.js', () => ({
     getShowUsage,
     getShowStreaming,
     getShowIntentActivity,
+    getShowSessionActivity,
 }));
 
 vi.mock('../../../src/copilot/terminal/frontend/gateways/agent-runtime.js', () => ({
@@ -74,6 +81,7 @@ describe('terminal/events/agent-runtime-events.js — contrato', () => {
         vi.useRealTimers();
         getTerminalDetailLevel.mockReturnValue('detailed');
         getShowUsage.mockReturnValue(true);
+        getShowSessionActivity.mockReturnValue(false);
         printlnBlock.mockImplementation((/** @type {string[]} */ lines) => println(lines.join('\n')));
         readTerminalRuntimeState.mockReturnValue(
             /** @type {any} */ ({
@@ -550,6 +558,50 @@ describe('terminal/events/agent-runtime-events.js — contrato', () => {
         expect(broadcastSse).toHaveBeenCalledWith(
             'agent.shell.completed',
             expect.objectContaining({ shellId: 'shell-1', exitCode: 0 }),
+        );
+    });
+
+    it('não narra persistências internas de background como se fossem atividade da LLM-B', async () => {
+        const { setupTerminalAgentRuntimeEventListeners } =
+            await import('../../../src/copilot/terminal/events/agent-runtime-events.js');
+        /** @type {Map<string, Function[]>} */
+        const listeners = new Map();
+        const agent = {
+            on: vi.fn((event, handler) => {
+                const list = listeners.get(event) ?? [];
+                list.push(handler);
+                listeners.set(event, list);
+            }),
+            off: vi.fn(),
+        };
+
+        setupTerminalAgentRuntimeEventListeners({ agent: /** @type {any} */ (agent), rl: null });
+        listeners.get('agent.background.completed')?.[0]?.({
+            status: 'completed',
+            description: 'Persist latest PR consumption snapshot',
+        });
+        listeners.get('agent.background.idle')?.[0]?.({
+            description: 'always_alive',
+        });
+
+        expect(recordTerminalActivity).toHaveBeenCalledWith(
+            'task',
+            'Tarefa interna concluída',
+            expect.objectContaining({
+                detail: 'Persist latest PR consumption snapshot · status=completed',
+                recordHistory: false,
+                updateCurrent: false,
+            }),
+        );
+        expect(println).not.toHaveBeenCalledWith(expect.stringContaining('Persist latest PR consumption snapshot'));
+        expect(println).not.toHaveBeenCalledWith(expect.stringContaining('Background agent ocioso: always_alive'));
+        expect(broadcastSse).toHaveBeenCalledWith(
+            'agent.background.completed',
+            expect.objectContaining({ visible: false, internal: true }),
+        );
+        expect(broadcastSse).toHaveBeenCalledWith(
+            'agent.background.idle',
+            expect.objectContaining({ visible: false, internal: true }),
         );
     });
 

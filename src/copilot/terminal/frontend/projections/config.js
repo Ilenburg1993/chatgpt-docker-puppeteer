@@ -5,6 +5,7 @@
 
 import {
     listRuntimeAvailableModelsProjection,
+    observeRuntimeModelChangeProjection,
     readRuntimeAutoModelPolicyProjection,
     readRuntimeModelMetadata,
     readRuntimeModelStatsProjection,
@@ -133,6 +134,15 @@ export function setTerminalModelProjection(modelId, runtimeId) {
         ...projected,
         binding,
     };
+}
+
+/**
+ * @param {{ previousModel?: string | null; newModel: string; reasoningEffort?: string | null; ts?: number }} event
+ * @param {string | null | undefined} [runtimeId]
+ * @returns {ReturnType<typeof observeRuntimeModelChangeProjection>}
+ */
+export function observeTerminalModelChangeProjection(event, runtimeId) {
+    return observeRuntimeModelChangeProjection(event, runtimeId);
 }
 
 /**

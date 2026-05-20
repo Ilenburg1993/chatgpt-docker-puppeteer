@@ -64,6 +64,7 @@ vi.mock('#copilot/observability/logger', () => ({
 const mockWaitForAgentSdkEvent = vi.fn(
     (/** @type {any} */ _emitter, /** @type {any} */ _event, /** @type {any} */ _opts) => Promise.resolve({}),
 );
+const mockWatchdogInstances = vi.hoisted(() => /** @type {any[]} */ ([]));
 vi.mock('../../../src/copilot/agent/facades/agent-sdk-runtime.js', () => ({
     waitForAgentSdkEvent: (
         /** @type {import('node:events').EventEmitter} */ emitter,
@@ -85,6 +86,12 @@ vi.mock('../../../src/copilot/agent/dialog/executors/index.js', () => ({
 
 vi.mock('../../../src/copilot/agent/dialog/watchdogs/watchdog.js', () => ({
     DialogWatchdog: class MockWatchdog {
+        options;
+        /** @param {any} options */
+        constructor(options) {
+            this.options = options;
+            mockWatchdogInstances.push(this);
+        }
         start = vi.fn();
         stop = vi.fn();
         ping = vi.fn();
@@ -140,6 +147,7 @@ describe('DialogLoopManager', () => {
 
     beforeEach(() => {
         vi.clearAllMocks();
+        mockWatchdogInstances.length = 0;
         mockWaitForAgentSdkEvent.mockImplementation(() => Promise.resolve({}));
         vi.mocked(readAgentRuntimeDialogPersistedState).mockResolvedValue({
             dialogPaused: false,
@@ -175,6 +183,19 @@ describe('DialogLoopManager', () => {
                 expect.objectContaining({ dialogLoopActive: true, dialogPaused: false }),
                 'dialog.state.resumed_session_attach',
             );
+        });
+
+        it('suprime watchdog em sessão retomada idle-ready para não reiniciar sem turno em voo', async () => {
+            await dlm.startResumedSession();
+            const stalled = vi.fn();
+            dlm.on('stalled', stalled);
+
+            const watchdog = mockWatchdogInstances.at(-1);
+            watchdog.options.onStall(731_000);
+            watchdog.options.onPreStallWarning(650_000);
+
+            expect(stalled).not.toHaveBeenCalled();
+            expect(watchdog.ping).toHaveBeenCalledTimes(2);
         });
 
         it('start() limpa paused em memória mesmo quando o estado persistido vinha pausado', async () => {

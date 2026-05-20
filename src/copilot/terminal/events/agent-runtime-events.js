@@ -29,7 +29,7 @@ import {
     EMITTER_TOOL_EXECUTION_START,
 } from '#copilot/events';
 import { resolveModelSelectionMismatch } from '#copilot/core';
-import { getShowToolActivity, getShowUsage } from '../../presentation/state/index.js';
+import { getShowSessionActivity, getShowToolActivity, getShowUsage } from '../../presentation/state/index.js';
 import {
     broadcastSse,
     buildUserPrompt,
@@ -62,6 +62,15 @@ const AGENT_SHELL_DETACHED_COMPLETED_EVENT = 'agent.shell.detached_completed';
 const AGENT_PR_CONSUMED_EVENT = 'pr.consumed';
 const AGENT_PR_FALLBACK_MODEL_EVENT = 'pr.fallback_model';
 
+const INTERNAL_BACKGROUND_DESCRIPTION_PATTERNS = [
+    /^persist\b/i,
+    /^read persisted state\b/i,
+    /^sync resumed session history\b/i,
+    /^cleanup stale sdk sessions\b/i,
+    /^retry dialog loop recovery\b/i,
+    /^always_alive$/i,
+];
+
 /**
  * Evita que eventos auxiliares de runtime atravessem blocos de streaming/reasoning. O conteúdo não é perdido: activity
  * e SSE continuam recebendo os eventos, e a UX live preserva a resposta do assistente como bloco coeso.
@@ -72,6 +81,34 @@ const AGENT_PR_FALLBACK_MODEL_EVENT = 'pr.fallback_model';
 function printlnWhenRenderUnlocked(line) {
     if (isTerminalRenderLocked()) return;
     println(line);
+}
+
+/**
+ * @param {string} description
+ * @returns {boolean}
+ */
+function isInternalBackgroundDescription(description) {
+    const normalized = description.trim();
+    return INTERNAL_BACKGROUND_DESCRIPTION_PATTERNS.some((pattern) => pattern.test(normalized));
+}
+
+/**
+ * @param {{ description: string; failed?: boolean }} input
+ * @returns {{ print: boolean; recordHistory: boolean; updateCurrent: boolean; labelPrefix: string }}
+ */
+function classifyBackgroundNarration({ description, failed = false }) {
+    if (failed) {
+        return { print: true, recordHistory: true, updateCurrent: true, labelPrefix: 'Agente em background' };
+    }
+    if (isInternalBackgroundDescription(description)) {
+        return {
+            print: false,
+            recordHistory: false,
+            updateCurrent: false,
+            labelPrefix: 'Tarefa interna',
+        };
+    }
+    return { print: true, recordHistory: true, updateCurrent: false, labelPrefix: 'Agente em background' };
 }
 
 /**
@@ -371,19 +408,30 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, regi
         );
         const status = /** @type {'completed' | 'failed'} */ (evt?.['status'] ?? 'completed');
         const failed = status === 'failed';
-        recordTerminalActivity('task', failed ? 'Agente em background falhou' : 'Agente em background concluído', {
+        const narration = classifyBackgroundNarration({ description, failed });
+        const activityLabel = failed
+            ? 'Agente em background falhou'
+            : narration.labelPrefix === 'Tarefa interna'
+              ? 'Tarefa interna concluída'
+              : 'Agente em background concluído';
+        recordTerminalActivity('task', activityLabel, {
             detail: `${description} · status=${status}`,
             severity: failed ? 'error' : 'info',
             source: 'agent',
-            updateCurrent: failed,
+            recordHistory: narration.recordHistory,
+            updateCurrent: narration.updateCurrent,
         });
-        printlnWhenRenderUnlocked(
-            failed
-                ? `  \x1b[31m🤖 Background agent falhou: ${description}\x1b[0m`
-                : `  \x1b[32m🤖 Background agent concluído: ${description}\x1b[0m`,
-        );
+        if (narration.print) {
+            printlnWhenRenderUnlocked(
+                failed
+                    ? `  \x1b[31m🤖 Background agent falhou: ${description}\x1b[0m`
+                    : `  \x1b[32m🤖 Background agent concluído: ${description}\x1b[0m`,
+            );
+        }
         broadcastSse('agent.background.completed', {
             ...evt,
+            visible: narration.print,
+            internal: !narration.recordHistory,
             timestamp: Date.now(),
         });
     };
@@ -398,9 +446,14 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, regi
             recordHistory: false,
             updateCurrent: false,
         });
-        printlnWhenRenderUnlocked(`  \x1b[90m🤖 Background agent ocioso: ${description}\x1b[0m`);
+        const shouldPrint = getShowSessionActivity() && !isInternalBackgroundDescription(description);
+        if (shouldPrint) {
+            printlnWhenRenderUnlocked(`  \x1b[90m🤖 Background agent ocioso: ${description}\x1b[0m`);
+        }
         broadcastSse('agent.background.idle', {
             ...evt,
+            visible: shouldPrint,
+            internal: !shouldPrint,
             timestamp: Date.now(),
         });
     };

@@ -87,6 +87,7 @@ export {
     loadTerminalSnapshotProjection,
     normalizeContextWindowProjection,
     normalizeTerminalModelBillingProjection,
+    observeTerminalModelChangeProjection,
     readTerminalActivityProjection,
     readTerminalConfigProjection,
     readTerminalContextProjection,

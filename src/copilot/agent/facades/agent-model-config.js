@@ -87,6 +87,43 @@ export function setModel(ctx, modelId) {
 }
 
 /**
+ * Materializa, no estado observado do runtime, uma confirmação emitida pela sessão SDK sobre o modelo vivo.
+ *
+ * Diferente de `setModel()`, esta função não tenta trocar nada no SDK. Ela apenas fecha o ciclo de feedback:
+ * operador configura `/model`, SDK emite `session.model_changed`, prompt/status passam a distinguir com clareza
+ * modelo configurado, modelo efetivo e eventual roteamento divergente.
+ *
+ * @param {import('../agent-context.js').AgentContext | { ctx?: import('../agent-context.js').AgentContext }} target
+ * @param {{ previousModel?: string | null; newModel: string; reasoningEffort?: string | null; ts?: number }} event
+ * @returns {void}
+ */
+export function observeRuntimeModelChange(target, event) {
+    const ctx = /** @type {import('../agent-context.js').AgentContext} */ (
+        'ctx' in target && target.ctx ? target.ctx : target
+    );
+    const newModel = typeof event.newModel === 'string' && event.newModel.length > 0 ? event.newModel : 'unknown';
+    const configuredModel = ctx.getModelSnapshot?.() ?? newModel;
+    const previousPrInfo = ctx.getLastPrInfoSnapshot?.() ?? null;
+    const billedModel = typeof previousPrInfo?.model === 'string' ? previousPrInfo.model : undefined;
+    const sessionId = ctx.getSessionSnapshot()?.sessionId ?? previousPrInfo?.sessionId ?? null;
+    ctx.setLastPrInfo({
+        ...(previousPrInfo ?? {}),
+        configuredModel,
+        effectiveModel: newModel,
+        ...(billedModel ? { model: billedModel } : {}),
+        modelMismatch: resolveModelSelectionMismatch({
+            configuredModel,
+            billedModel,
+            effectiveModel: newModel,
+        }),
+        ...(event.previousModel ? { previousEffectiveModel: event.previousModel } : {}),
+        ...(event.reasoningEffort ? { reasoningEffort: event.reasoningEffort } : {}),
+        sessionId,
+        ts: typeof event.ts === 'number' && Number.isFinite(event.ts) ? event.ts : Date.now(),
+    });
+}
+
+/**
  * Explica a política local de `model="auto"` sem assumir controle do roteamento interno do Copilot.
  *
  * @param {import('../types.js').IAlwaysAliveAgent} runtime

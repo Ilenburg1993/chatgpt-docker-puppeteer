@@ -24,6 +24,7 @@ export {
     getReasoningEffort,
     listAvailableModels,
     listSdkCatalogModels,
+    observeRuntimeModelChange,
     readRuntimeAutoModelPolicy,
     readRuntimeModelSelection,
     readSdkModelMetadata,

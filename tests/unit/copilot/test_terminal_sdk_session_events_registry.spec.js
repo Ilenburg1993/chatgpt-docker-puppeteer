@@ -18,8 +18,10 @@ import { createToolCallRegistry } from '../../../src/copilot/terminal/state/tool
 const mocks = vi.hoisted(() => ({
     recordTerminalActivity: vi.fn(),
     markTerminalActivityIdle: vi.fn(),
+    observeTerminalModelChangeProjection: vi.fn(),
     broadcastSse: vi.fn(),
     println: vi.fn(),
+    printlnBlock: vi.fn(),
     setLastSdkPlanOperation: vi.fn(),
     setSdkSessionMode: vi.fn(),
     getShowSessionActivity: vi.fn(() => false),
@@ -30,6 +32,7 @@ const mocks = vi.hoisted(() => ({
     answerTerminalPendingQuestion: vi.fn(() => true),
     beginTerminalTurnTrace: vi.fn(),
     completeTerminalTurnTrace: vi.fn(() => null),
+    completeTerminalTurnToolCall: vi.fn(),
     recordTerminalTurnFileActivity: vi.fn(),
     recordTerminalTurnToolActivity: vi.fn(),
     recordTerminalTurnUserInputActivity: vi.fn(),
@@ -50,6 +53,7 @@ vi.mock('../../../src/copilot/terminal/dialog/index.js', () => ({
     SEPARATOR: '---',
     broadcastSse: mocks.broadcastSse,
     println: mocks.println,
+    printlnBlock: mocks.printlnBlock,
 }));
 vi.mock('../../../src/copilot/presentation/state/index.js', async (importOriginal) => {
     const actual = /** @type {Record<string, unknown>} */ (await importOriginal());
@@ -68,9 +72,13 @@ vi.mock('../../../src/copilot/terminal/frontend/gateways/agent-runtime.js', () =
     answerTerminalPendingQuestion: mocks.answerTerminalPendingQuestion,
     drainMailboxToTurnIfIdle: vi.fn(),
 }));
+vi.mock('../../../src/copilot/terminal/frontend/projections/index.js', () => ({
+    observeTerminalModelChangeProjection: mocks.observeTerminalModelChangeProjection,
+}));
 vi.mock('../../../src/copilot/terminal/state/turn-trace-state.js', () => ({
     beginTerminalTurnTrace: mocks.beginTerminalTurnTrace,
     completeTerminalTurnTrace: mocks.completeTerminalTurnTrace,
+    completeTerminalTurnToolCall: mocks.completeTerminalTurnToolCall,
     recordTerminalTurnFileActivity: mocks.recordTerminalTurnFileActivity,
     recordTerminalTurnToolActivity: mocks.recordTerminalTurnToolActivity,
     recordTerminalTurnUserInputActivity: mocks.recordTerminalTurnUserInputActivity,

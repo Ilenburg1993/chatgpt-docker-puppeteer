@@ -10,6 +10,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({
     recordTerminalActivity: vi.fn(),
     markTerminalActivityIdle: vi.fn(),
+    observeTerminalModelChangeProjection: vi.fn(),
     broadcastSse: vi.fn(),
     println: vi.fn(),
     printlnBlock: vi.fn(),
@@ -64,6 +65,10 @@ vi.mock('../../../src/copilot/presentation/state/index.js', async (importOrigina
 
 vi.mock('../../../src/copilot/terminal/frontend/gateways/agent-runtime.js', () => ({
     answerTerminalPendingQuestion: mocks.answerTerminalPendingQuestion,
+}));
+
+vi.mock('../../../src/copilot/terminal/frontend/projections/index.js', () => ({
+    observeTerminalModelChangeProjection: mocks.observeTerminalModelChangeProjection,
 }));
 
 vi.mock('../../../src/copilot/terminal/state/turn-trace-state.js', () => ({
@@ -222,6 +227,11 @@ describe('terminal/events/sdk-session-events.js — contrato', () => {
         setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfIdle: vi.fn() });
         agent.emit('session.model_changed', { previousModel: 'auto', newModel: 'gpt-5.4', reasoningEffort: 'high' });
 
+        expect(mocks.observeTerminalModelChangeProjection).toHaveBeenCalledWith({
+            previousModel: 'auto',
+            newModel: 'gpt-5.4',
+            reasoningEffort: 'high',
+        });
         expect(mocks.recordTerminalActivity).toHaveBeenCalledWith(
             'system',
             'Modelo SDK alterado',

@@ -388,10 +388,12 @@ export function buildUserPrompt() {
     ) {
         pushPromptTag(
             terminalThemeText(
-                'error',
-                compactDetail ? '[MM]' : `[MODEL:${modelProjection.configuredModel}→${modelProjection.displayModel}]`,
+                'warn',
+                compactDetail
+                    ? '[MM]'
+                    : `[MODEL-CHECK:${modelProjection.configuredModel}→${modelProjection.displayModel}]`,
             ),
-            terminalThemeText('error', '[MM]'),
+            terminalThemeText('warn', '[MM]'),
         );
     }
     const prompt = `${terminalThemeText('success', 'você')}${terminalThemeText('muted', '[')}${terminalThemeText('info', model)}${terminalThemeText('muted', '/')}${terminalThemeText('thinking', reasoningEffort)}${terminalThemeText('muted', ']')}${tags.join('')}${terminalThemeText('muted', '›')} `;

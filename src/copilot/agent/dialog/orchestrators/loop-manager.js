@@ -104,18 +104,16 @@ export class DialogLoopManager extends EventEmitter {
         super();
         const runtimeKit = createDialogLoopRuntimeKit(options, {
             onStall: (stalledMs) => {
-                if (this.#shouldSuppressWatchdogEscalation()) {
-                    log(
-                        'INFO',
-                        '[DialogLoopManager] Watchdog stall suprimido: aguardando input humano legítimo (pending question kind=question).',
-                    );
+                const suppressionReason = this.#resolveWatchdogSuppressionReason();
+                if (suppressionReason) {
+                    log('INFO', `[DialogLoopManager] Watchdog stall suprimido: ${suppressionReason}.`);
                     this.#watchdogSupervisor.ping();
                     return;
                 }
                 this.emit(EMITTER_LOOP_STALLED, { stalledMs });
             },
             onPreStallWarning: (stalledMs) => {
-                if (this.#shouldSuppressWatchdogEscalation()) {
+                if (this.#resolveWatchdogSuppressionReason()) {
                     this.#watchdogSupervisor.ping();
                     return;
                 }
@@ -441,20 +439,28 @@ export class DialogLoopManager extends EventEmitter {
     }
 
     /**
-     * Indica se o watchdog deve suprimir escalonamento por stall.
+     * Explica se o watchdog deve suprimir escalonamento por stall.
      *
-     * Regra: quando o loop está ativo e há pergunta pendente de tipo `question` (input humano), inatividade não deve
-     * ser tratada como travamento do loop.
+     * O watchdog observa "ausência de atividade no loop", mas nem toda ausência é travamento. Em sessão retomada, por
+     * exemplo, o loop fica legitimamente ativo e pronto, com fila vazia, esperando o operador. Esse estado não pode
+     * virar restart com PR. A supressão é limitada aos estados que têm uma explicação canônica e observável:
      *
-     * @returns {boolean}
+     * - idle-ready: loop ativo, sem stop em andamento, sem turno na fila;
+     * - human-input: `ask_user` pendente de input humano;
+     * - human-input-shadow: pergunta humana restaurada do shadow persistido ainda fresca.
+     *
+     * @returns {string | null}
      */
-    #shouldSuppressWatchdogEscalation() {
+    #resolveWatchdogSuppressionReason() {
         if (!this.#state.active || this.#state.stopping) {
-            return false;
+            return null;
+        }
+        if (this.#turnQueue.depth === 0) {
+            return 'loop ativo em idle-ready; aguardando próximo turno humano, sem trabalho em voo';
         }
         const pending = this.#host?.getPendingQuestionSnapshot?.();
         if (pending?.kind === 'question' && pending.protocolControlled !== true) {
-            return true;
+            return 'aguardando input humano legítimo (pending question kind=question)';
         }
         const shadow = this.#host?.getPendingQuestionShadowSnapshot?.();
         const shadowKind =
@@ -462,7 +468,10 @@ export class DialogLoopManager extends EventEmitter {
                 ? shadow.meta.kind
                 : null;
         const shadowExpired = Boolean(this.#host?.isPendingQuestionShadowExpired?.());
-        return shadowKind === 'question' && !shadowExpired;
+        if (shadowKind === 'question' && !shadowExpired) {
+            return 'aguardando input humano restaurado do shadow persistido';
+        }
+        return null;
     }
 
     /**

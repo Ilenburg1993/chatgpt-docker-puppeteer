@@ -10,6 +10,7 @@
 
 import {
     listSdkCatalogModels,
+    observeRuntimeModelChange,
     readRuntimeAutoModelPolicy,
     readRuntimeModelSelection,
     readSdkModelMetadata,
@@ -99,6 +100,24 @@ export function setRuntimeModelProjection(modelId, runtimeId) {
         reasoningAdjusted,
         modelMeta,
         runtimeId: selection.runtimeId,
+    };
+}
+
+/**
+ * Registra no runtime uma confirmação de modelo emitida pelo SDK, sem disparar nova troca de modelo.
+ *
+ * @param {{ previousModel?: string | null; newModel: string; reasoningEffort?: string | null; ts?: number }} event
+ * @param {string | null | undefined} [runtimeId]
+ * @returns {{ runtimeId: string; configuredModel: string; observedModel: string }}
+ */
+export function observeRuntimeModelChangeProjection(event, runtimeId) {
+    const selection = requireAgentRuntimeSelection(runtimeId);
+    observeRuntimeModelChange(selection.runtime, event);
+    const after = readRuntimeModelSelection(selection.runtime);
+    return {
+        runtimeId: selection.runtimeId,
+        configuredModel: after.model,
+        observedModel: event.newModel,
     };
 }
 

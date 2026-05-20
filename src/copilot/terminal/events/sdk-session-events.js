@@ -80,6 +80,7 @@ import {
     loginTerminalSdkMcpOauth,
     readTerminalToolRegistrySnapshot,
 } from '../frontend/gateways/index.js';
+import { observeTerminalModelChangeProjection } from '../frontend/projections/index.js';
 import {
     beginTerminalTurnMaterialization,
     beginTerminalTurnTrace,
@@ -207,6 +208,7 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
 
     const SUPPRESSED_PROTOCOL_TTL_MS = 10 * 60_000;
     const SUPPRESSED_PROTOCOL_MAX = 512;
+    let permissionHelpPrinted = false;
 
     /**
      * @param {number} [now]
@@ -406,7 +408,10 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
         println(
             `\n  \x1b[33m🔐 Permissão solicitada:\x1b[0m ${entry.permissionType}${entry.requestId ? ` \x1b[90m(${entry.requestId})\x1b[0m` : ''}`,
         );
-        println('  \x1b[90mAcompanhe a decisão com /status ou /activity; o SDK/hook decidirá o resultado.\x1b[0m');
+        if (!permissionHelpPrinted) {
+            println('  \x1b[90mAcompanhe a decisão com /permission list, /status ou /activity.\x1b[0m');
+            permissionHelpPrinted = true;
+        }
         broadcastSse('permission.requested', { ...entry, timestamp: Date.now() });
         refreshPromptIfIdle();
     };
@@ -432,6 +437,8 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
             : wasDeniedByPolicy
               ? 'Permissão SDK negada (política)'
               : 'Permissão SDK concluída';
+        const ambiguousEcho =
+            entry?.permissionType === 'permission.requested' && granted == null && !entry?.result && !entry?.requestId;
 
         recordTerminalActivity('system', label, {
             detail: entry
@@ -439,13 +446,17 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
                 : 'sem request local',
             source: 'sdk',
             severity: ok || granted == null ? 'info' : 'warn',
+            recordHistory: !ambiguousEcho,
+            updateCurrent: false,
         });
 
         const resultLabel = granted == null ? '' : granted ? '\x1b[32maprovada\x1b[0m' : '\x1b[31mnão aprovada\x1b[0m';
         const policyIndicator = wasDeniedByPolicy ? ' \x1b[90m(política)\x1b[0m' : '';
-        println(
-            `  ${ok ? '\x1b[32m✓' : '\x1b[33m•'} Permissão:\x1b[0m ${entry?.permissionType ?? 'unknown'} ${resultLabel}${policyIndicator}`,
-        );
+        if (!ambiguousEcho) {
+            println(
+                `  ${ok ? '\x1b[32m✓' : '\x1b[33m•'} Permissão:\x1b[0m ${entry?.permissionType ?? 'unknown'} ${resultLabel}${policyIndicator}`,
+            );
+        }
         broadcastSse('permission.completed', { ...data, timestamp: Date.now(), decision, wasDeniedByPolicy });
         refreshPromptIfIdle();
     };
@@ -630,6 +641,7 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
         const previousModel = evt?.previousModel ?? 'unknown';
         const newModel = evt?.newModel ?? 'unknown';
         const reasoningEffort = evt?.reasoningEffort ?? null;
+        observeTerminalModelChangeProjection({ previousModel, newModel, reasoningEffort });
         recordTerminalActivity('system', 'Modelo SDK alterado', {
             detail: `${previousModel} → ${newModel}${reasoningEffort ? ` · ${reasoningEffort}` : ''}`,
             source: 'sdk',

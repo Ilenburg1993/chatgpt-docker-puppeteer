@@ -141,7 +141,7 @@ describe('terminal/dialog/output buildUserPrompt', () => {
         const prompt = buildUserPrompt();
 
         expect(prompt).toContain('claude-haiku-4.5');
-        expect(prompt).toContain('[MODEL:gpt-5.4→claude-haiku-4.5]');
+        expect(prompt).toContain('[MODEL-CHECK:gpt-5.4→claude-haiku-4.5]');
     });
 
     it('inclui marcador SHADOW quando só há shadow expirada', async () => {
@@ -250,7 +250,7 @@ describe('terminal/dialog/output buildUserPrompt', () => {
         expect(prompt).toContain('[MM]');
         expect(prompt).toContain('[Q:3]');
         expect(prompt).not.toContain('[ASK:QUESTION]');
-        expect(prompt).not.toContain('[MODEL:gpt-5.4→claude-haiku-4.5]');
+        expect(prompt).not.toContain('[MODEL-CHECK:gpt-5.4→claude-haiku-4.5]');
 
         prefs.setTerminalDetailLevel('detailed');
     });
@@ -300,7 +300,7 @@ describe('terminal/dialog/output buildUserPrompt', () => {
 
             expect(plain).toContain('[ASK]');
             expect(plain).toContain('[MM]');
-            expect(plain).not.toContain('[MODEL:gpt-5.4→claude-haiku-4.5]');
+            expect(plain).not.toContain('[MODEL-CHECK:gpt-5.4→claude-haiku-4.5]');
             expect(plain.length).toBeLessThanOrEqual(34);
         } finally {
             Object.defineProperty(process.stdout, 'isTTY', { value: originalIsTTY, configurable: true });
