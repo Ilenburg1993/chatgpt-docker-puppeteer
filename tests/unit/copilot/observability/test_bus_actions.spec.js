@@ -125,6 +125,29 @@ describe('bus-actions (FAIXA-L15)', () => {
             assert.equal(tracked[0]?.opts.metadata.type, 'hook:error_occurred');
             ea.unsub();
         });
+
+        it('não polui ErrorTracker com hook model_call recuperável', () => {
+            /** @type {any[]} */
+            const tracked = [];
+            const ea = createErrorAlerterAction({
+                bus,
+                onAlert: () => {},
+                errorTracker: /** @type {any} */ ({
+                    trackError: (err, opts) => tracked.push({ err, opts }),
+                }),
+            });
+
+            bus.emit({
+                type: 'hook:error_occurred',
+                timestamp: Date.now(),
+                errorContext: 'model_call',
+                recoverable: true,
+                errorMessage: 'Erro do SDK sem mensagem estruturada.',
+            });
+
+            assert.equal(tracked.length, 0);
+            ea.unsub();
+        });
     });
 
     describe('hasAction contract', () => {

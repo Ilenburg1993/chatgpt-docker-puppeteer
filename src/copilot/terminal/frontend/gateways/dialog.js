@@ -110,7 +110,7 @@ export async function stopTerminalDialogMode() {
  * @param {string} enrichedMessage
  * @param {{
  *     timeout: number | null;
- *     onDelta: (chunk: string) => void;
+ *     onDelta: (chunk: string, envelope?: Record<string, unknown>) => void;
  *     onReasoning?: (chunk: string, reasoningId: string | null) => void;
  *     requestHeaders?: Record<string, string>;
  * }} opts
@@ -127,7 +127,7 @@ export async function runTerminalDialogTurn(enrichedMessage, opts) {
  * @param {string} enrichedMessage
  * @param {{
  *     timeout: number | null;
- *     onDelta: (chunk: string) => void;
+ *     onDelta: (chunk: string, envelope?: Record<string, unknown>) => void;
  *     onReasoning?: (chunk: string, reasoningId: string | null) => void;
  *     requestHeaders?: Record<string, string>;
  * }} opts

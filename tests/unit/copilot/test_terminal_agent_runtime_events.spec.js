@@ -82,6 +82,7 @@ describe('terminal/events/agent-runtime-events.js — contrato', () => {
         getTerminalDetailLevel.mockReturnValue('detailed');
         getShowUsage.mockReturnValue(true);
         getShowSessionActivity.mockReturnValue(false);
+        isTerminalRenderLocked.mockReturnValue(false);
         printlnBlock.mockImplementation((/** @type {string[]} */ lines) => println(lines.join('\n')));
         readTerminalRuntimeState.mockReturnValue(
             /** @type {any} */ ({
@@ -683,6 +684,43 @@ describe('terminal/events/agent-runtime-events.js — contrato', () => {
         expect(broadcastSse).toHaveBeenCalledWith('pr.consumed', expect.any(Object));
     });
 
+    it('narra boot recovery quando fallback com PR é bloqueado por política', async () => {
+        const { setupTerminalAgentRuntimeEventListeners } =
+            await import('../../../src/copilot/terminal/events/agent-runtime-events.js');
+        /** @type {Map<string, Function[]>} */
+        const listeners = new Map();
+        const agent = {
+            on: vi.fn((event, handler) => {
+                const list = listeners.get(event) ?? [];
+                list.push(handler);
+                listeners.set(event, list);
+            }),
+            off: vi.fn(),
+        };
+
+        setupTerminalAgentRuntimeEventListeners({ agent: /** @type {any} */ (agent), rl: null });
+        listeners.get('dialog.boot_recovery')?.[0]?.({
+            zeroPR: false,
+            skippedPrFallback: true,
+            reason: 'zero_pr_resume_failed',
+            error: 'resume attach failed',
+        });
+
+        expect(recordTerminalActivity).toHaveBeenCalledWith(
+            'system',
+            'Boot recovery preservou zero-PR',
+            expect.objectContaining({
+                detail: expect.stringContaining('fallback PR bloqueado'),
+                severity: 'warn',
+            }),
+        );
+        expect(println).toHaveBeenCalledWith(expect.stringContaining('Boot recovery sem fallback PR'));
+        expect(broadcastSse).toHaveBeenCalledWith(
+            'dialog.boot_recovery',
+            expect.objectContaining({ skippedPrFallback: true }),
+        );
+    });
+
     it('promove pr.fallback_model para aviso operacional explícito', async () => {
         const { setupTerminalAgentRuntimeEventListeners } =
             await import('../../../src/copilot/terminal/events/agent-runtime-events.js');
@@ -713,6 +751,47 @@ describe('terminal/events/agent-runtime-events.js — contrato', () => {
         expect(broadcastSse).toHaveBeenCalledWith(
             'pr.fallback_model',
             expect.objectContaining({ from: 'gpt-5', to: 'gpt-5-mini' }),
+        );
+    });
+
+    it('explica erro recuperável de model_call como evento operacional de modelo', async () => {
+        const { setupTerminalAgentRuntimeEventListeners } =
+            await import('../../../src/copilot/terminal/events/agent-runtime-events.js');
+        /** @type {Map<string, Function[]>} */
+        const listeners = new Map();
+        const agent = {
+            on: vi.fn((event, handler) => {
+                const list = listeners.get(event) ?? [];
+                list.push(handler);
+                listeners.set(event, list);
+            }),
+            off: vi.fn(),
+        };
+
+        setupTerminalAgentRuntimeEventListeners({ agent: /** @type {any} */ (agent), rl: null });
+        listeners.get('error')?.[0]?.({
+            hookType: 'errorOccurred',
+            errorContext: 'model_call',
+            recoverable: true,
+            errorMessage: 'Erro do SDK sem mensagem estruturada.',
+        });
+
+        expect(recordTerminalActivity).toHaveBeenCalledWith(
+            'error',
+            'Erro recuperável de modelo SDK',
+            expect.objectContaining({
+                severity: 'warn',
+                detail: expect.stringContaining('fallback=auto'),
+            }),
+        );
+        expect(println).toHaveBeenCalledWith(expect.stringContaining('MODEL'));
+        expect(broadcastSse).toHaveBeenCalledWith(
+            'agent.error',
+            expect.objectContaining({
+                errorContext: 'model_call',
+                recoverable: true,
+                handledAs: 'recoverable_model_call',
+            }),
         );
     });
 

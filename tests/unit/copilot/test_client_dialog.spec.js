@@ -266,6 +266,28 @@ describe('client-dialog › dialogTurn', () => {
         expect(onDelta).toHaveBeenCalledWith('stream');
     });
 
+    it('encaminha envelope causal para consumidores que aceitam segundo argumento', async () => {
+        const agent = createMockAgent();
+        /** @type {Array<{ chunk: string; meta: Record<string, unknown> | undefined }>} */
+        const calls = [];
+        function onDelta(/** @type {string} */ chunk, /** @type {Record<string, unknown> | undefined} */ meta) {
+            calls.push({ chunk, meta });
+        }
+
+        agent.sendDialogTurn.mockImplementation(async () => {
+            agent._fire('dialog.delta', { chunk: 'stream', streamId: 's1', chunkSeq: 7 });
+            return 'done';
+        });
+
+        await dialogTurn(agent, 'hello', { onDelta });
+        expect(calls).toEqual([
+            {
+                chunk: 'stream',
+                meta: expect.objectContaining({ source: 'dialog.delta', streamId: 's1', chunkSeq: 7 }),
+            },
+        ]);
+    });
+
     it('suprime duplicata imediata quando task.delta e dialog.delta entregam o mesmo chunk', async () => {
         const agent = createMockAgent();
         const onDelta = vi.fn();
@@ -279,6 +301,37 @@ describe('client-dialog › dialogTurn', () => {
         await dialogTurn(agent, 'hello', { onDelta });
         expect(onDelta).toHaveBeenCalledTimes(1);
         expect(onDelta).toHaveBeenCalledWith('duplicado');
+    });
+
+    it('suprime duplicata por chave causal mesmo quando o delta chega por canais paralelos', async () => {
+        const agent = createMockAgent();
+        const onDelta = vi.fn();
+
+        agent.sendDialogTurn.mockImplementation(async () => {
+            agent._fire('task.delta', { chunk: 'mesmo-evento', streamId: 's1', chunkSeq: 1 });
+            agent._fire('dialog.delta', { chunk: 'mesmo-evento', streamId: 's1', chunkSeq: 1 });
+            return 'done';
+        });
+
+        await dialogTurn(agent, 'hello', { onDelta });
+        expect(onDelta).toHaveBeenCalledTimes(1);
+        expect(onDelta).toHaveBeenCalledWith('mesmo-evento');
+    });
+
+    it('preserva chunks iguais com chaves causais diferentes', async () => {
+        const agent = createMockAgent();
+        const onDelta = vi.fn();
+
+        agent.sendDialogTurn.mockImplementation(async () => {
+            agent._fire('task.delta', { chunk: 'eco', streamId: 's1', chunkSeq: 1 });
+            agent._fire('dialog.delta', { chunk: 'eco', streamId: 's1', chunkSeq: 2 });
+            return 'done';
+        });
+
+        await dialogTurn(agent, 'hello', { onDelta });
+        expect(onDelta).toHaveBeenCalledTimes(2);
+        expect(onDelta).toHaveBeenNthCalledWith(1, 'eco');
+        expect(onDelta).toHaveBeenNthCalledWith(2, 'eco');
     });
 
     it('preserva chunks repetidos quando eles vêm do mesmo canal canônico', async () => {
@@ -295,6 +348,38 @@ describe('client-dialog › dialogTurn', () => {
         expect(onDelta).toHaveBeenCalledTimes(2);
         expect(onDelta).toHaveBeenNthCalledWith(1, 'eco');
         expect(onDelta).toHaveBeenNthCalledWith(2, 'eco');
+    });
+
+    it('normaliza snapshots cumulativos para emitir apenas o sufixo novo', async () => {
+        const agent = createMockAgent();
+        const onDelta = vi.fn();
+
+        agent.sendDialogTurn.mockImplementation(async () => {
+            agent._fire('dialog.delta', { chunk: 'ok', streamId: 's1', chunkSeq: 1 });
+            agent._fire('dialog.delta', { chunk: 'ok-live', streamId: 's1', chunkSeq: 2 });
+            return 'ok-live';
+        });
+
+        await dialogTurn(agent, 'hello', { onDelta });
+        expect(onDelta).toHaveBeenCalledTimes(2);
+        expect(onDelta).toHaveBeenNthCalledWith(1, 'ok');
+        expect(onDelta).toHaveBeenNthCalledWith(2, '-live');
+    });
+
+    it('suprime sufixo repetido depois de snapshot cumulativo', async () => {
+        const agent = createMockAgent();
+        const onDelta = vi.fn();
+
+        agent.sendDialogTurn.mockImplementation(async () => {
+            agent._fire('dialog.delta', { chunk: 'ok', streamId: 's1', chunkSeq: 1 });
+            agent._fire('dialog.delta', { chunk: 'ok-live', streamId: 's1', chunkSeq: 2 });
+            agent._fire('dialog.delta', { chunk: '-live', streamId: 's1', chunkSeq: 3 });
+            return 'ok-live';
+        });
+
+        await dialogTurn(agent, 'hello', { onDelta });
+        expect(onDelta).toHaveBeenCalledTimes(2);
+        expect(onDelta.mock.calls.map(([chunk]) => chunk).join('')).toBe('ok-live');
     });
 
     it('remove listeners mesmo quando sendDialogTurn rejeita', async () => {

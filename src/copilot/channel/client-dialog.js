@@ -28,6 +28,42 @@ import {
 const CROSS_CHANNEL_DELTA_SUPPRESSION_WINDOW_MS = 75;
 
 /**
+ * @param {unknown} value
+ * @returns {string}
+ */
+function stringOrEmpty(value) {
+    return typeof value === 'string' && value.trim().length > 0 ? value.trim() : '';
+}
+
+/**
+ * @param {unknown} value
+ * @returns {string}
+ */
+function scalarOrEmpty(value) {
+    if (typeof value === 'string') return stringOrEmpty(value);
+    if (typeof value === 'number' && Number.isFinite(value)) return String(value);
+    return '';
+}
+
+/**
+ * Identidade causal do delta. Quando presente, ela e mais forte que dedupe textual: dois chunks iguais com chaves
+ * diferentes sao conteudo distinto; duas entregas com a mesma chave sao o mesmo evento reemitido por canais paralelos.
+ *
+ * @param {Record<string, unknown>} evt
+ * @returns {string | null}
+ */
+function resolveDeltaCausalKey(evt) {
+    const eventId = stringOrEmpty(evt['eventId']) || stringOrEmpty(evt['causationId']) || stringOrEmpty(evt['id']);
+    if (eventId) return `event:${eventId}`;
+
+    const streamId = stringOrEmpty(evt['streamId']) || stringOrEmpty(evt['messageId']) || stringOrEmpty(evt['responseId']);
+    const chunkSeq = scalarOrEmpty(evt['chunkSeq']) || scalarOrEmpty(evt['sequence']) || scalarOrEmpty(evt['seq']);
+    if (streamId && chunkSeq) return `stream:${streamId}:${chunkSeq}`;
+
+    return null;
+}
+
+/**
  * Resultado canônico do transporte de um turno explícito no dialog loop.
  *
  * `replySource` descreve a origem imediata do texto entregue ao consumer:
@@ -124,7 +160,7 @@ export async function startDialogMode(agent, bootPrompt, opts = {}) {
  * @param {string} message
  * @param {{
  *     timeout?: number | null;
- *     onDelta?: (chunk: string) => void;
+ *     onDelta?: (chunk: string, envelope?: Record<string, unknown>) => void;
  *     onReasoning?: (chunk: string, reasoningId: string | null) => void;
  * }} [opts]
  * @returns {Promise<DialogTurnTransportResult>}
@@ -147,23 +183,103 @@ export async function dialogTurnDetailed(agent, message, opts = {}) {
 
     const createDeltaListener = onDelta
         ? (() => {
-              /** @type {{ chunk: string; source: 'task.delta' | 'dialog.delta'; at: number } | null} */
+              /** @type {{ chunk: string; source: 'task.delta' | 'dialog.delta'; at: number; causalKey: string | null } | null} */
               let lastDelta = null;
+              /** @type {Set<string>} */
+              const seenCausalKeys = new Set();
+              let emittedText = '';
+              let sawCumulativeSnapshot = false;
+              /** @type {'task.delta' | 'dialog.delta' | null} */
+              let lastEmittedSource = null;
+              /** @type {string | null} */
+              let lastEmittedCausalKey = null;
+
+              /**
+               * Alguns bridges entregam `deltaContent` incremental, outros ecoam snapshots cumulativos ou sufixos ja
+               * cobertos por um snapshot anterior. Normalizar aqui evita que o renderer tenha de adivinhar.
+               *
+               * @param {string} rawChunk
+               * @param {'task.delta' | 'dialog.delta'} source
+               * @param {string | null} causalKey
+               * @returns {string}
+               */
+              const normalizeAppendableChunk = (rawChunk, source, causalKey) => {
+                  if (!emittedText) return rawChunk;
+
+                  const hasDistinctCausalProgress =
+                      Boolean(causalKey) && Boolean(lastEmittedCausalKey) && causalKey !== lastEmittedCausalKey;
+                  const shouldTrustAsDuplicate =
+                      sawCumulativeSnapshot || (source !== lastEmittedSource && !hasDistinctCausalProgress);
+
+                  if (rawChunk === emittedText && shouldTrustAsDuplicate) {
+                      sawCumulativeSnapshot = true;
+                      return '';
+                  }
+
+                  if (rawChunk !== emittedText && rawChunk.startsWith(emittedText)) {
+                      sawCumulativeSnapshot = true;
+                      return rawChunk.slice(emittedText.length);
+                  }
+
+                  if (rawChunk !== emittedText && emittedText.startsWith(rawChunk) && shouldTrustAsDuplicate) {
+                      sawCumulativeSnapshot = true;
+                      return '';
+                  }
+
+                  if (emittedText.endsWith(rawChunk) && shouldTrustAsDuplicate) {
+                      return '';
+                  }
+
+                  if (shouldTrustAsDuplicate) {
+                      for (let overlap = Math.min(emittedText.length, rawChunk.length); overlap > 0; overlap -= 1) {
+                          if (emittedText.endsWith(rawChunk.slice(0, overlap))) {
+                              return rawChunk.slice(overlap);
+                          }
+                      }
+                  }
+
+                  return rawChunk;
+              };
+
               return (/** @type {'task.delta' | 'dialog.delta'} */ source) => (/** @type {unknown} */ rawEvt) => {
-                  const evt = /** @type {{ chunk?: string }} */ (rawEvt);
+                  const evt = /** @type {{ chunk?: string }} & Record<string, unknown> */ (rawEvt);
                   if (!evt.chunk) return;
                   const now = Date.now();
+                  const causalKey = resolveDeltaCausalKey(evt);
+                  if (causalKey) {
+                      if (seenCausalKeys.has(causalKey)) {
+                          lastDelta = { chunk: evt.chunk, source, at: now, causalKey };
+                          return;
+                      }
+                      seenCausalKeys.add(causalKey);
+                  }
                   if (
+                      !causalKey &&
+                      !lastDelta?.causalKey &&
                       lastDelta &&
                       lastDelta.chunk === evt.chunk &&
                       lastDelta.source !== source &&
                       now - lastDelta.at <= CROSS_CHANNEL_DELTA_SUPPRESSION_WINDOW_MS
                   ) {
-                      lastDelta = { chunk: evt.chunk, source, at: now };
+                      lastDelta = { chunk: evt.chunk, source, at: now, causalKey };
                       return;
                   }
-                  lastDelta = { chunk: evt.chunk, source, at: now };
-                  onDelta(evt.chunk);
+                  lastDelta = { chunk: evt.chunk, source, at: now, causalKey };
+                  const appendableChunk = normalizeAppendableChunk(evt.chunk, source, causalKey);
+                  if (!appendableChunk) return;
+                  emittedText += appendableChunk;
+                  lastEmittedSource = source;
+                  lastEmittedCausalKey = causalKey;
+                  if (onDelta.length >= 2) {
+                      onDelta(appendableChunk, {
+                          ...evt,
+                          source,
+                          rawChunk: evt.chunk,
+                          normalizedChunk: appendableChunk,
+                      });
+                  } else {
+                      onDelta(appendableChunk);
+                  }
               };
           })()
         : null;
@@ -251,7 +367,7 @@ export async function dialogTurnDetailed(agent, message, opts = {}) {
  * @param {string} message
  * @param {{
  *     timeout?: number | null;
- *     onDelta?: (chunk: string) => void;
+ *     onDelta?: (chunk: string, envelope?: Record<string, unknown>) => void;
  *     onReasoning?: (chunk: string, reasoningId: string | null) => void;
  * }} [opts]
  * @returns {Promise<string>}

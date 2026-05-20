@@ -254,6 +254,25 @@ export function buildSessionHooks(ctx, host) {
         },
         getModel: () => ctx.getModelSnapshot(),
         scheduleFallback: (model) => scheduleDialogFallback(ctx, model),
+        applyModelFallback: (model, event) => {
+            const previousModel = event.previousModel ?? ctx.getModelSnapshot();
+            const hostWithModel = /** @type {{ setModel?: (modelId: string) => void }} */ (host);
+            if (typeof hostWithModel.setModel !== 'function') {
+                return false;
+            }
+            hostWithModel.setModel(model);
+            host.emit('pr.fallback_model', {
+                from: previousModel,
+                to: model,
+                reason: event.reason,
+                trigger: 'hook:error_occurred',
+                errorContext: 'model_call',
+                recoverable: true,
+                sessionId: event.sessionId,
+                ts: Date.now(),
+            });
+            return true;
+        },
         emit: (event, payload) => host.emit(event, payload),
         metrics: metricsStore,
     });

@@ -56,7 +56,7 @@ function getOrCreateStream(streamKey) {
 }
 
 /**
- * @param {{ key?: string | null; chunk: string }} input
+ * @param {{ key?: string | null; chunk: string } & Record<string, unknown>} input
  * @returns {{ liveRendered: boolean }}
  */
 export function renderPublicAssistantStreamDelta(input) {
@@ -65,7 +65,7 @@ export function renderPublicAssistantStreamDelta(input) {
     const streamKey = normalizeStreamKey(input.key);
     const stream = getOrCreateStream(streamKey);
     const renderDelta = createDeltaCallback(stream.state);
-    renderDelta(chunk);
+    renderDelta(chunk, input);
     return { liveRendered: stream.state.streamingStarted };
 }
 

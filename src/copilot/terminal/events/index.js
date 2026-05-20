@@ -7,7 +7,11 @@ export {
     __test__ as terminalAssistantTranscriptRendererTestHarness,
 } from './assistant-transcript-renderer.js';
 export { renderTerminalIntent, __test__ as terminalIntentRendererTestHarness } from './intent-renderer.js';
-export { createTaskTranscriptAccumulator, getTaskTranscriptKey } from './task-transcript-accumulator.js';
+export {
+    createTaskTranscriptAccumulator,
+    getTaskTranscriptKey,
+    isInternalTaskTranscriptKey,
+} from './task-transcript-accumulator.js';
 export {
     TERMINAL_AGENT_SSE_PASSTHROUGH_EVENTS,
     TERMINAL_EXPLICIT_AGENT_EVENTS,

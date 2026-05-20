@@ -118,6 +118,10 @@ export const COPILOT_FILE_TOOLS_MAX_DIFF_OUTPUT_BYTES = envPositiveOrInfinity(
     Number.POSITIVE_INFINITY,
 );
 export const LLM_B_BOOT_TIMEOUT_MS = envInt('LLM_B_BOOT_TIMEOUT_MS', 90_000);
+export const LLM_B_DIALOG_BOOT_RECOVERY_ALLOW_PR_FALLBACK = envBool(
+    'LLM_B_DIALOG_BOOT_RECOVERY_ALLOW_PR_FALLBACK',
+    false,
+);
 export const LLM_B_DIALOG_QUEUE_MAX = envInt('LLM_B_DIALOG_QUEUE_MAX', 10);
 export const LLM_B_WATCHDOG_STALL_MS = envInt('LLM_B_WATCHDOG_STALL_MS', 15 * 60 * 1_000);
 // Intervalo derivado do stall threshold (10%) — garante que o tick pré-stall (80%) sempre seja capturado antes do stall (100%).

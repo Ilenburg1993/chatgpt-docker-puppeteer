@@ -23,6 +23,7 @@ import {
     normalizeElicitationPendingEvent,
 } from '#copilot/sdk/session';
 import { log } from './logging/index.js';
+import { decideModelCallAutoFallback } from './model-error-recovery.js';
 
 export {
     createQueuedElicitationHandler,
@@ -62,6 +63,44 @@ function normalizeHookErrorMessage(raw) {
         }
     }
     return String(raw);
+}
+
+/**
+ * @param {AgentSessionHookInput} input
+ * @param {{ errorContext: string; recoverable?: boolean; normalizedMessage: string; sessionId: string }} event
+ * @returns {boolean}
+ */
+function recoverModelCallIfNeeded(input, event) {
+    const currentModel = input.getModel() ?? null;
+    const fallbackModel = getCopilotFallbackModel();
+    const decision = decideModelCallAutoFallback({
+        errorContext: event.errorContext,
+        recoverable: event.recoverable,
+        currentModel,
+        fallbackModel,
+    });
+    if (!decision.shouldFallback || !decision.targetModel) return false;
+
+    const applied = input.applyModelFallback?.(decision.targetModel, {
+        previousModel: currentModel,
+        reason: decision.reason,
+        errorMessage: event.normalizedMessage,
+        sessionId: event.sessionId,
+    });
+    if (applied === true) {
+        log(
+            'WARN',
+            `[agent/hook-port] model_call recuperável em modelo explícito — fallback live aplicado: ${currentModel ?? 'unknown'} → ${decision.targetModel}`,
+        );
+        return true;
+    }
+
+    input.scheduleFallback(decision.targetModel);
+    log(
+        'WARN',
+        `[agent/hook-port] model_call recuperável em modelo explícito — fallback agendado: ${currentModel ?? 'unknown'} → ${decision.targetModel}`,
+    );
+    return true;
 }
 
 /**
@@ -128,6 +167,13 @@ function createAgentSessionLifecycleHooks(input) {
             },
         });
 
+        const modelRecoveryApplied = recoverModelCallIfNeeded(input, {
+            errorContext,
+            recoverable: errorInput.recoverable,
+            normalizedMessage,
+            sessionId,
+        });
+
         if (errorContext === 'rate_limit' || errorContext === 'quota') {
             const rateLimitScope = classifySdkRateLimitScope(errorInput.error);
             if (rateLimitScope !== 'session') {
@@ -148,7 +194,7 @@ function createAgentSessionLifecycleHooks(input) {
         });
 
         /** @type {'retry' | 'abort'} */
-        const errorHandling = errorInput.recoverable ? 'retry' : 'abort';
+        const errorHandling = modelRecoveryApplied ? 'abort' : errorInput.recoverable ? 'retry' : 'abort';
         return { errorHandling };
     };
 
@@ -201,6 +247,12 @@ function createRuntimeDisableHook(isDisabledFn) {
  *     emitWebhook: (event: string, payload: object) => Promise<void>;
  *     getModel: () => string | undefined;
  *     scheduleFallback: (model: string) => void;
+ *     applyModelFallback?: (model: string, event: {
+ *         previousModel: string | null;
+ *         reason: string;
+ *         errorMessage: string;
+ *         sessionId: string;
+ *     }) => boolean;
  *     emit: (event: string, payload: object) => void;
  *     metrics: { recordSessionStart: () => void; recordSessionEnd: () => void };
  * }} AgentSessionHookInput

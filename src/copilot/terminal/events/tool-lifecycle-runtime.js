@@ -15,6 +15,7 @@
  * @module copilot/terminal/tool-lifecycle-runtime
  */
 
+import { recordToolCall } from '#copilot/observability';
 import { getShowToolActivity } from '../../presentation/state/index.js';
 import { broadcastSse, clearInlineStatus, println, writeInlineStatus } from '../dialog/index.js';
 import {
@@ -76,6 +77,20 @@ function isReportIntentTool(toolName) {
         normalized.endsWith('.report_intent') ||
         normalized.endsWith('.report_intent_local')
     );
+}
+
+/**
+ * Tools diagnosticas nativas do SDK nao passam necessariamente pelo wrapper canonico de tools locais, mas ainda sao
+ * atividade operacional real da LLM-B e devem aparecer em `/tools diag`.
+ *
+ * @param {string} toolName
+ * @param {number} durationMs
+ * @param {boolean} success
+ * @returns {void}
+ */
+function recordTerminalDiagnosticToolStats(toolName, durationMs, success) {
+    if (!isReportIntentTool(toolName)) return;
+    recordToolCall(toolName, durationMs, success);
 }
 
 /**
@@ -642,6 +657,7 @@ export function handleTerminalNativeToolComplete({ registry, evt }) {
         : Number.isFinite(Number(evt?.['durationMs']))
           ? Number(evt?.['durationMs'])
           : 0;
+    recordTerminalDiagnosticToolStats(canonicalName, durationMs, success);
     const durationLabel = buildToolCompletionDurationLabel(metricEntry, durationMs);
     if (effectiveToolCallId) completeTerminalTurnToolCall({ toolCallId: effectiveToolCallId, success });
     const activityLabel = success ? 'Tool concluída' : 'Tool falhou';
@@ -810,6 +826,7 @@ export function handleTerminalExternalToolCompleted({ registry, evt, verboseNarr
         : (resolvedEntry?.presentation ?? completionPresentation);
     const displayToolName = presentation.canonicalToolName ?? toolName;
     const durationMs = completedEntry ? Date.now() - completedEntry.t0 : 0;
+    recordTerminalDiagnosticToolStats(displayToolName, durationMs, success);
     const durationLabel = buildToolCompletionDurationLabel(completedEntry ?? resolvedEntry, durationMs);
     recordToolTurnProjection(presentation, success ? 'completed' : 'failed', resolvedToolCallId, success);
     recordTerminalActivity('tool', success ? 'External tool concluída' : 'External tool falhou', {
@@ -893,6 +910,7 @@ export function reconcileTerminalInFlightToolsAtTurnEnd({ registry, reason = 'as
         const durationMs = Math.max(0, Date.now() - completedEntry.t0);
         const durationLabel = buildToolCompletionDurationLabel(completedEntry, durationMs);
         const canonicalName = presentation.canonicalToolName ?? entry.canonicalName ?? entry.toolName;
+        recordTerminalDiagnosticToolStats(canonicalName, durationMs, true);
         completeTerminalTurnToolCall({ toolCallId: entry.toolCallId, success: true });
         recordToolTurnProjection(presentation, 'completed', entry.toolCallId, true);
         recordTerminalActivity('tool', 'Tool reconciliada no fim do turno', {

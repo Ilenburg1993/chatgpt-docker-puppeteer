@@ -38,6 +38,7 @@ import {
     COPILOT_TOOL_PERMISSIONS_LOG,
     COPILOT_WORKING_DIRECTORY,
     LLM_B_BOOT_TIMEOUT_MS,
+    LLM_B_DIALOG_BOOT_RECOVERY_ALLOW_PR_FALLBACK,
     LLM_B_DIALOG_QUEUE_MAX,
     LLM_B_WATCHDOG_MS,
     LLM_B_WATCHDOG_STALL_MS,
@@ -69,6 +70,8 @@ export const WATCHDOG_THRESHOLDS = Object.freeze({
 export const DIALOG_QUEUE_MAX = LLM_B_DIALOG_QUEUE_MAX;
 /** Timeout de boot do loop (ms) */
 export const BOOT_TIMEOUT_MS = LLM_B_BOOT_TIMEOUT_MS;
+/** Fallback automático de boot recovery para `startDialogLoop()` com PR. Default: bloqueado. */
+export const DIALOG_BOOT_RECOVERY_ALLOW_PR_FALLBACK = LLM_B_DIALOG_BOOT_RECOVERY_ALLOW_PR_FALLBACK;
 /** Janela zero-PR para aceitar READY/REPLY tardio depois do timeout nominal de boot. */
 export const BOOT_LATE_PROTOCOL_GRACE_MS = Math.min(30_000, Math.max(5_000, Math.round(BOOT_TIMEOUT_MS * 0.25)));
 /** Intervalo do watchdog do loop (ms) */

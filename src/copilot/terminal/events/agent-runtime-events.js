@@ -15,6 +15,8 @@ import {
     EMITTER_AGENT_BACKGROUND_COMPLETED,
     EMITTER_AGENT_BACKGROUND_IDLE,
     EMITTER_ASSISTANT_INTENT,
+    EMITTER_DIALOG_BOOT_RECOVERY,
+    EMITTER_ERROR,
     EMITTER_QUESTION_PENDING,
     EMITTER_SESSION_COMPACTION_COMPLETE,
     EMITTER_SESSION_COMPACTION_START,
@@ -119,6 +121,7 @@ function classifyBackgroundNarration({ description, failed = false }) {
  */
 
 const TOOL_HEARTBEAT_INTERVAL_MS = 10_000;
+const RECOVERABLE_MODEL_ERROR_RENDER_THROTTLE_MS = 30_000;
 
 /**
  * @param {Record<string, unknown>} evt
@@ -182,6 +185,8 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, regi
     // Garante sempre um registry session-scoped — em produção é injetado pelo event-adapters.js
     const _reg = registry ?? createToolCallRegistry();
     const pendingQuestionReplay = createTerminalPendingQuestionReplayState();
+    /** @type {Map<string, number>} */
+    const recoverableModelErrorPrintedAtByKey = new Map();
     const toolHeartbeatTimerId = `terminal.agent-runtime-events.tool-heartbeat:${Date.now()}:${Math.random().toString(36).slice(2)}`;
     const toolHeartbeatTimer = registerInterval(
         toolHeartbeatTimerId,
@@ -327,6 +332,47 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, regi
         });
         println(`\n  \x1b[31m⚠️  Erro de sessão [${errorType}]: ${msg}\x1b[0m`);
         broadcastSse('session.error', { errorType, message: msg });
+    };
+
+    const onAgentError = (/** @type {Record<string, unknown>} */ evt) => {
+        const hookType = typeof evt?.['hookType'] === 'string' ? evt['hookType'] : null;
+        const errorContext = typeof evt?.['errorContext'] === 'string' ? evt['errorContext'] : 'unknown';
+        const msg = typeof evt?.['errorMessage'] === 'string' ? evt['errorMessage'] : 'unknown error';
+        const recoverable = evt?.['recoverable'] === true;
+        const isRecoverableModelCall = hookType === 'errorOccurred' && errorContext === 'model_call' && recoverable;
+        const label = isRecoverableModelCall ? 'Erro recuperável de modelo SDK' : 'Erro do agente';
+        const severity = isRecoverableModelCall ? 'warn' : 'error';
+        const detail = isRecoverableModelCall
+            ? `${msg} · fallback=auto será usado quando aplicável`
+            : `[${errorContext}] ${msg}`;
+        const renderKey = `${errorContext}|${msg}`;
+        const now = Date.now();
+        const lastRenderedAt = recoverableModelErrorPrintedAtByKey.get(renderKey) ?? 0;
+        const shouldPrint =
+            !isRecoverableModelCall || now - lastRenderedAt >= RECOVERABLE_MODEL_ERROR_RENDER_THROTTLE_MS;
+        if (isRecoverableModelCall && shouldPrint) {
+            recoverableModelErrorPrintedAtByKey.set(renderKey, now);
+        }
+
+        recordTerminalActivity('error', label, {
+            detail,
+            severity,
+            source: 'agent',
+            recordHistory: true,
+        });
+        if (shouldPrint && !isTerminalRenderLocked()) {
+            println(
+                `\n  ${terminalThemeBadge(severity, isRecoverableModelCall ? 'MODEL' : 'ERROR')} ${terminalThemeText(severity, detail)}`,
+            );
+        }
+        broadcastSse('agent.error', {
+            hookType,
+            errorContext,
+            recoverable,
+            message: msg,
+            handledAs: isRecoverableModelCall ? 'recoverable_model_call' : 'agent_error',
+            timestamp: Date.now(),
+        });
     };
 
     const onCompactionStart = () => {
@@ -532,7 +578,37 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, regi
         });
     };
 
+    const onDialogBootRecovery = (/** @type {Record<string, unknown>} */ evt) => {
+        const skippedPrFallback = evt?.['skippedPrFallback'] === true;
+        const prFallback = evt?.['prFallback'] === true;
+        const zeroPR = evt?.['zeroPR'] === true;
+        const reason = typeof evt?.['reason'] === 'string' ? evt['reason'] : zeroPR ? 'zero_pr_attach' : 'unknown';
+        const error = typeof evt?.['error'] === 'string' ? evt['error'] : null;
+        const detail = [
+            reason,
+            zeroPR ? 'zero-PR' : prFallback ? 'fallback com PR' : skippedPrFallback ? 'fallback PR bloqueado' : 'sem PR',
+            error,
+        ]
+            .filter(Boolean)
+            .join(' · ');
+        recordTerminalActivity('system', skippedPrFallback ? 'Boot recovery preservou zero-PR' : 'Boot recovery do dialog loop', {
+            detail,
+            source: 'dialog',
+            severity: skippedPrFallback || prFallback ? 'warn' : 'info',
+        });
+        if ((skippedPrFallback || prFallback) && !isTerminalRenderLocked()) {
+            println(
+                `  ${terminalThemeBadge('warn', 'DIALOG')} ${terminalThemeText('warn', skippedPrFallback ? `Boot recovery sem fallback PR: ${detail}` : `Boot recovery com PR: ${detail}`)}`,
+            );
+        }
+        broadcastSse(EMITTER_DIALOG_BOOT_RECOVERY, {
+            ...evt,
+            timestamp: Date.now(),
+        });
+    };
+
     agent.on(EMITTER_QUESTION_PENDING, onQuestion);
+    agent.on(EMITTER_ERROR, onAgentError);
     agent.on(EMITTER_STOPPED, onStopped);
     agent.on(EMITTER_TOOL_EXECUTION_START, onToolStart);
     agent.on(EMITTER_TOOL_EXECUTION_PARTIAL_RESULT, onToolPartialResult);
@@ -551,6 +627,7 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, regi
     agent.on(AGENT_SHELL_DETACHED_COMPLETED_EVENT, onShellDetachedCompleted);
     agent.on(AGENT_PR_CONSUMED_EVENT, onPrConsumed);
     agent.on(AGENT_PR_FALLBACK_MODEL_EVENT, onPrFallbackModel);
+    agent.on(EMITTER_DIALOG_BOOT_RECOVERY, onDialogBootRecovery);
 
     const runtimeState = readTerminalRuntimeState();
     if (runtimeState.pendingQuestion && runtimeState.pendingQuestionKind !== 'ready') {
@@ -564,6 +641,7 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, regi
     return () => {
         cancelTimer(toolHeartbeatTimerId);
         agent.off(EMITTER_QUESTION_PENDING, onQuestion);
+        agent.off(EMITTER_ERROR, onAgentError);
         agent.off(EMITTER_STOPPED, onStopped);
         agent.off(EMITTER_TOOL_EXECUTION_START, onToolStart);
         agent.off(EMITTER_TOOL_EXECUTION_PARTIAL_RESULT, onToolPartialResult);
@@ -582,5 +660,6 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, regi
         agent.off(AGENT_SHELL_DETACHED_COMPLETED_EVENT, onShellDetachedCompleted);
         agent.off(AGENT_PR_CONSUMED_EVENT, onPrConsumed);
         agent.off(AGENT_PR_FALLBACK_MODEL_EVENT, onPrFallbackModel);
+        agent.off(EMITTER_DIALOG_BOOT_RECOVERY, onDialogBootRecovery);
     };
 }

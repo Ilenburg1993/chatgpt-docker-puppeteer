@@ -14,29 +14,6 @@ import {
 } from '#copilot/sdk/session';
 
 /**
- * @param {unknown} raw
- * @returns {string}
- */
-function normalizeSdkMessage(raw) {
-    if (typeof raw === 'string') return raw;
-    if (raw && typeof raw === 'object') {
-        const rec = /** @type {Record<string, unknown>} */ (raw);
-        const nestedError = rec['error'];
-        if (typeof rec['message'] === 'string' && rec['message']) return rec['message'];
-        if (nestedError && typeof nestedError === 'object') {
-            const errRec = /** @type {Record<string, unknown>} */ (nestedError);
-            if (typeof errRec['message'] === 'string' && errRec['message']) return errRec['message'];
-        }
-        try {
-            return JSON.stringify(raw);
-        } catch {
-            return String(raw);
-        }
-    }
-    return String(raw ?? 'Unknown error');
-}
-
-/**
  * @param {import('./contracts.js').CopilotSessionLike} session
  * @param {Pick<import('./contracts.js').SessionWirerCallbacks, 'emit'>} cb
  * @returns {(() => void)[]}
@@ -85,13 +62,6 @@ export function wireSdkResponseEvents(session, { emit }) {
                 const turnId = data['turnId'];
                 emit('assistant.turn_end', { turnId: turnId ?? null, ts: Date.now() });
                 log('DEBUG', `[session-event-wirer] assistant.turn_end turnId=${turnId ?? '?'}`);
-            },
-            [SESSION_EVENTS.SESSION_ERROR]: (evt) => {
-                const data = /** @type {Record<string, unknown>} */ (evt?.data ?? {});
-                const errorType = /** @type {string} */ (data['errorType'] ?? 'unknown');
-                const message = normalizeSdkMessage(data['message']);
-                emit('session.error', { errorType, message, ts: Date.now() });
-                log('ERROR', `[session-event-wirer] session.error type=${errorType}: ${message}`);
             },
             [SESSION_EVENTS.SESSION_SHUTDOWN]: (evt) => {
                 const data = /** @type {Record<string, unknown>} */ (evt?.data ?? {});

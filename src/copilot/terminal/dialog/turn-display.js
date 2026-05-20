@@ -307,17 +307,25 @@ function writeStreamingText(state, text) {
  * Cria callback de streaming delta para display de resposta.
  *
  * @param {TurnDisplayState} state
- * @returns {(chunk: string) => void}
+ * @returns {(chunk: string, envelope?: Record<string, unknown>) => void}
  */
 export function createDeltaCallback(state) {
-    return (chunk) => {
+    return (chunk, envelope = {}) => {
         const now = Date.now();
         if (state.firstChunkTime === 0) {
             state.firstChunkTime = now;
         }
         state.streamingChars += chunk.length;
         state.streamingContent += chunk;
-        broadcastSse('delta', { chunk });
+        broadcastSse('delta', {
+            chunk,
+            ...(typeof envelope['streamId'] === 'string' ? { streamId: envelope['streamId'] } : {}),
+            ...(typeof envelope['chunkSeq'] === 'number' ? { chunkSeq: envelope['chunkSeq'] } : {}),
+            ...(typeof envelope['source'] === 'string' ? { source: envelope['source'] } : {}),
+            ...(typeof envelope['eventId'] === 'string' ? { eventId: envelope['eventId'] } : {}),
+            ...(typeof envelope['causationId'] === 'string' ? { causationId: envelope['causationId'] } : {}),
+            ...(typeof envelope['ts'] === 'number' ? { ts: envelope['ts'] } : {}),
+        });
 
         if (!state.showStreaming) {
             recordTerminalActivity('streaming', 'Gerando resposta', {

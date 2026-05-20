@@ -73,7 +73,15 @@ describe('event-handlers/streaming', () => {
 
         session._emit('assistant.message_delta', { deltaContent: 'abc' });
 
-        expect(emit).toHaveBeenCalledWith('dialog.delta', { chunk: 'abc' });
+        expect(emit).toHaveBeenCalledWith(
+            'dialog.delta',
+            expect.objectContaining({
+                chunk: 'abc',
+                streamId: expect.any(String),
+                chunkSeq: 1,
+                source: 'sdk.assistant.message_delta',
+            }),
+        );
     });
 
     it('emite task.delta quando dialogLoopActive=false e não está processing', async () => {
@@ -89,7 +97,16 @@ describe('event-handlers/streaming', () => {
 
         session._emit('assistant.message_delta', { deltaContent: 'abc' });
 
-        expect(emit).toHaveBeenCalledWith('task.delta', { taskId: null, chunk: 'abc' });
+        expect(emit).toHaveBeenCalledWith(
+            'task.delta',
+            expect.objectContaining({
+                taskId: null,
+                chunk: 'abc',
+                streamId: expect.any(String),
+                chunkSeq: 1,
+                source: 'sdk.assistant.message_delta',
+            }),
+        );
     });
 
     it('deduplica o mesmo assistant.message_delta quando a sessão foi wireada duas vezes', async () => {
@@ -111,6 +128,6 @@ describe('event-handlers/streaming', () => {
         session._emit('assistant.message_delta', { deltaContent: 'abc' });
 
         expect(emit).toHaveBeenCalledTimes(1);
-        expect(emit).toHaveBeenCalledWith('dialog.delta', { chunk: 'abc' });
+        expect(emit).toHaveBeenCalledWith('dialog.delta', expect.objectContaining({ chunk: 'abc' }));
     });
 });

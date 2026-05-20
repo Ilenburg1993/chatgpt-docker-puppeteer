@@ -33,6 +33,30 @@ const HOOK_NAME_TO_EVENTBUS = {
     error_occurred: HOOK_ERROR_OCCURRED,
 };
 
+/**
+ * @param {unknown} raw
+ * @returns {string}
+ */
+function normalizeHookErrorMessage(raw) {
+    if (typeof raw === 'string') return raw;
+    if (raw && typeof raw === 'object') {
+        const rec = /** @type {Record<string, unknown>} */ (raw);
+        if (typeof rec['message'] === 'string' && rec['message']) return rec['message'];
+        const nestedError = rec['error'];
+        if (nestedError && typeof nestedError === 'object') {
+            const errRec = /** @type {Record<string, unknown>} */ (nestedError);
+            if (typeof errRec['message'] === 'string' && errRec['message']) return errRec['message'];
+        }
+        try {
+            const serialized = JSON.stringify(raw);
+            return serialized && serialized !== '{}' ? serialized : 'Erro do SDK sem mensagem estruturada.';
+        } catch {
+            return String(raw);
+        }
+    }
+    return String(raw);
+}
+
 export class HookBus extends EventEmitter {
     /** @type {EventBus | null} */
     #eventBus = null;
@@ -78,7 +102,23 @@ export class HookBus extends EventEmitter {
         const busType = HOOK_NAME_TO_EVENTBUS[hookName];
         if (busType && this.#eventBus) {
             try {
-                this.#eventBus.emit({ type: busType, hookName, sessionId, timestamp: event.timestamp, input, output });
+                const inputRecord =
+                    input && typeof input === 'object' ? /** @type {Record<string, unknown>} */ (input) : {};
+                this.#eventBus.emit({
+                    type: busType,
+                    hookName,
+                    sessionId,
+                    timestamp: event.timestamp,
+                    input,
+                    output,
+                    ...(hookName === 'error_occurred'
+                        ? {
+                              errorContext: inputRecord['errorContext'],
+                              recoverable: inputRecord['recoverable'],
+                              errorMessage: normalizeHookErrorMessage(inputRecord['error']),
+                          }
+                        : {}),
+                });
             } catch (e) {
                 log('WARN', `[sdk/hook-bus] EventBus erro em '${busType}': ${toError(e).message}`);
             }
@@ -158,7 +198,7 @@ export function attachBus(hooks, bus = defaultBus) {
             bus.emitHook(
                 'error_occurred',
                 invocation?.sessionId ?? '',
-                { errorContext: input.errorContext, recoverable: input.recoverable },
+                { error: input.error, errorContext: input.errorContext, recoverable: input.recoverable },
                 result,
             );
             return result;

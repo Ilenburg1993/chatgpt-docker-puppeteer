@@ -10,10 +10,33 @@
 import { toError } from '../../core/error-handlers.js';
 import { log } from '../logger.js';
 
+const RECOVERABLE_HOOK_ALERT_THROTTLE_MS = 30_000;
+
 /**
  * @typedef {import('../../core/event-bus.js').EventBus} EventBus
  * @typedef {import('../error-tracker.js').ErrorTracker} ErrorTracker
  */
+
+/**
+ * @param {{ type: string; errorContext?: unknown; recoverable?: unknown; sessionId?: unknown; errorMessage?: unknown; message?: unknown }} evt
+ * @returns {boolean}
+ */
+function isRecoverableModelCallHookError(evt) {
+    return evt.type === 'hook:error_occurred' && evt.errorContext === 'model_call' && evt.recoverable === true;
+}
+
+/**
+ * @param {{ type: string; errorContext?: unknown; sessionId?: unknown; errorMessage?: unknown; message?: unknown }} evt
+ * @returns {string}
+ */
+function buildAlertDedupeKey(evt) {
+    return [
+        evt.type,
+        typeof evt.errorContext === 'string' ? evt.errorContext : '',
+        typeof evt.sessionId === 'string' ? evt.sessionId : '',
+        typeof evt.errorMessage === 'string' ? evt.errorMessage : typeof evt.message === 'string' ? evt.message : '',
+    ].join('|');
+}
 
 /**
  * @param {{ bus: EventBus; onAlert?: (evt: { type: string; timestamp: number }) => void; errorTracker?: ErrorTracker | null }} deps
@@ -22,11 +45,25 @@ import { log } from '../logger.js';
 export function createErrorAlerterAction({ bus, onAlert, errorTracker = null }) {
     /** @type {(() => void)[]} */
     const unsubs = [];
+    /** @type {Map<string, number>} */
+    const lastRecoverableAlertAtByKey = new Map();
     const alertFn =
         onAlert ??
-        ((/** @type {{ type: string; errorMessage?: string; message?: string; source?: string }} */ evt) => {
+        ((/** @type {{ type: string; errorMessage?: string; message?: string; source?: string; errorContext?: unknown; recoverable?: unknown; sessionId?: unknown }} */ evt) => {
             const detail = evt.errorMessage || evt.message || '';
             const source = evt.source ? ` · source=${evt.source}` : '';
+            if (isRecoverableModelCallHookError(evt)) {
+                const key = buildAlertDedupeKey(evt);
+                const now = Date.now();
+                const last = lastRecoverableAlertAtByKey.get(key) ?? 0;
+                if (now - last < RECOVERABLE_HOOK_ALERT_THROTTLE_MS) return;
+                lastRecoverableAlertAtByKey.set(key, now);
+                log(
+                    'WARN',
+                    `[error-alerter] Recuperável: ${evt.type} · context=model_call${source}${detail ? ` · ${detail}` : ''}`,
+                );
+                return;
+            }
             log('ERROR', `[error-alerter] ALERTA: ${evt.type}${source}${detail ? ` · ${detail}` : ''}`);
         });
 
@@ -44,10 +81,12 @@ export function createErrorAlerterAction({ bus, onAlert, errorTracker = null }) 
             bus.on(pattern, (evt) => {
                 try {
                     alertFn(evt);
-                    errorTracker?.trackError?.(new Error(`EventBus error event: ${evt.type}`), {
-                        source: 'event-bus',
-                        metadata: /** @type {Record<string, unknown>} */ (evt),
-                    });
+                    if (!isRecoverableModelCallHookError(evt)) {
+                        errorTracker?.trackError?.(new Error(`EventBus error event: ${evt.type}`), {
+                            source: 'event-bus',
+                            metadata: /** @type {Record<string, unknown>} */ (evt),
+                        });
+                    }
                 } catch (e) {
                     log('WARN', `[error-alerter] erro ao processar alerta: ${toError(e).message}`);
                 }

@@ -88,6 +88,30 @@ describe('boot-steps dialog boot recovery', () => {
         expect(ctx.startDialogLoop).toHaveBeenCalledWith(undefined, { resumeSessionAttach: true });
     });
 
+    it('bloqueia fallback automático com PR quando a reanexação zero-PR falha', async () => {
+        const ctx = createCtx({
+            startDialogLoop: vi.fn(async (_bootPrompt, opts) => {
+                if (opts?.resumeSessionAttach === true) {
+                    throw new Error('resume attach failed');
+                }
+            }),
+        });
+
+        await runDialogBootRecovery(ctx);
+
+        expect(ctx.startDialogLoop).toHaveBeenCalledTimes(1);
+        expect(ctx.startDialogLoop).toHaveBeenCalledWith(undefined, { resumeSessionAttach: true });
+        expect(ctx.emit).toHaveBeenCalledWith(
+            'dialog.boot_recovery',
+            expect.objectContaining({
+                zeroPR: false,
+                skippedPrFallback: true,
+                reason: 'zero_pr_resume_failed',
+                error: 'resume attach failed',
+            }),
+        );
+    });
+
     it('stepScheduleDialogRecovery consulta a decisão semântica de scheduling e agenda o timer quando aplicável', async () => {
         facadeMocks.shouldScheduleAgentRuntimeDialogBootRecovery.mockResolvedValue(true);
         const ctx = createCtx();

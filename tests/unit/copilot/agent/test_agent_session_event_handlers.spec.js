@@ -220,19 +220,13 @@ describe('F43 — event-handlers/sdk-responses', () => {
         );
     });
 
-    it('emite session.error com errorType e message', async () => {
+    it('não duplica session.error; lifecycle handler é o dono canônico', async () => {
         const { wireSdkResponseEvents } = await import('#copilot/event-handlers/sdk-responses');
         const session = createMockSession();
         const emit = vi.fn();
         wireSdkResponseEvents(/** @type {any} */ (session), { emit });
         session._emit('session.error', { errorType: 'rate_limit', message: 'Too many requests' });
-        expect(emit).toHaveBeenCalledWith(
-            'session.error',
-            expect.objectContaining({
-                errorType: 'rate_limit',
-                message: 'Too many requests',
-            }),
-        );
+        expect(emit).not.toHaveBeenCalledWith('session.error', expect.anything());
     });
 
     it('emite session.handoff com fromAgent/toAgent', async () => {

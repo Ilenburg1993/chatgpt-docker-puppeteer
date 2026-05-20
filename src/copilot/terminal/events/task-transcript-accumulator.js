@@ -13,7 +13,7 @@ import { getBusy } from '../../presentation/state/index.js';
 import { renderTerminalAssistantTranscript } from './assistant-transcript-renderer.js';
 
 const DEFAULT_TASK_TRANSCRIPT_CATASTROPHIC_CHARS = 32 * 1024 * 1024;
-const ANONYMOUS_TASK_KEY = '__anonymous__';
+const INTERNAL_TASK_KEY = 'internal-task';
 
 /**
  * @typedef {{
@@ -29,7 +29,15 @@ const ANONYMOUS_TASK_KEY = '__anonymous__';
  * @returns {string}
  */
 export function getTaskTranscriptKey(taskId) {
-    return taskId ?? ANONYMOUS_TASK_KEY;
+    return typeof taskId === 'string' && taskId.trim().length > 0 ? taskId.trim() : INTERNAL_TASK_KEY;
+}
+
+/**
+ * @param {string} taskKey
+ * @returns {boolean}
+ */
+export function isInternalTaskTranscriptKey(taskKey) {
+    return taskKey === INTERNAL_TASK_KEY;
 }
 
 /**
@@ -37,7 +45,7 @@ export function getTaskTranscriptKey(taskId) {
  * @returns {string | null}
  */
 function taskKeyToId(taskKey) {
-    return taskKey === ANONYMOUS_TASK_KEY ? null : taskKey;
+    return isInternalTaskTranscriptKey(taskKey) ? null : taskKey;
 }
 
 /**

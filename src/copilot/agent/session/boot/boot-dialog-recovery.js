@@ -4,7 +4,7 @@
  * @file Seams de recuperação do dialog loop durante boot/resume.
  */
 
-import { BOOT_RECOVERY_DELAY_MS } from '#copilot/config/agent';
+import { BOOT_RECOVERY_DELAY_MS, DIALOG_BOOT_RECOVERY_ALLOW_PR_FALLBACK } from '#copilot/config/agent';
 import { cancelTimer, registerTimeout, toError } from '#copilot/core';
 import { EMITTER_DIALOG_BOOT_RECOVERY } from '#copilot/events';
 import {
@@ -76,9 +76,31 @@ export async function runDialogBootRecovery(ctx) {
         log('INFO', '[AlwaysAlive] F53: Dialog loop reanexado à sessão retomada sem boot prompt.');
         ctx.emit(EMITTER_DIALOG_BOOT_RECOVERY, { zeroPR: true, ts: Date.now() });
     } catch (e) {
-        log('WARN', `[AlwaysAlive] F53: Boot recovery falhou (${toError(e).message}) — fallback para startDialogLoop.`);
+        const error = toError(e);
+        if (!DIALOG_BOOT_RECOVERY_ALLOW_PR_FALLBACK) {
+            log(
+                'WARN',
+                `[AlwaysAlive] F53: Boot recovery zero-PR falhou (${error.message}) — fallback com PR bloqueado por política.`,
+            );
+            ctx.emit(EMITTER_DIALOG_BOOT_RECOVERY, {
+                zeroPR: false,
+                skippedPrFallback: true,
+                reason: 'zero_pr_resume_failed',
+                error: error.message,
+                ts: Date.now(),
+            });
+            return;
+        }
+
+        log('WARN', `[AlwaysAlive] F53: Boot recovery zero-PR falhou (${error.message}) — fallback com PR permitido.`);
         try {
             await ctx.startDialogLoop();
+            ctx.emit(EMITTER_DIALOG_BOOT_RECOVERY, {
+                zeroPR: false,
+                prFallback: true,
+                reason: 'zero_pr_resume_failed',
+                ts: Date.now(),
+            });
         } catch (e2) {
             log('WARN', `[AlwaysAlive] F53: Fallback startDialogLoop também falhou: ${toError(e2).message}`);
         }

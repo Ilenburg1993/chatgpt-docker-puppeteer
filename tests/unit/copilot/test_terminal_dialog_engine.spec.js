@@ -127,6 +127,8 @@ vi.mock('../../../src/copilot/terminal/dialog/turn-display.js', () => ({
     createDisplayState: vi.fn(() => ({})),
     createReasoningCallback: vi.fn(() => () => {}),
     hasStreamingTranscriptMismatch: vi.fn(() => false),
+    measureVisibleTerminalChars: vi.fn((text) => String(text ?? '').replace(/\s+/g, '').length),
+    normalizeTerminalTranscriptText: vi.fn((text) => String(text ?? '').trim()),
     renderStreamingFooter: vi.fn(),
 }));
 

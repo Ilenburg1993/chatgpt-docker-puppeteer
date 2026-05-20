@@ -27,6 +27,11 @@ const MAX_DELTA_SLICES_PER_TURN = 8192;
  * @typedef {{
  *     chunk: string;
  *     source: string;
+ *     sdkSource: string | null;
+ *     streamId: string | null;
+ *     chunkSeq: number | null;
+ *     eventId: string | null;
+ *     causationId: string | null;
  *     timestamp: number;
  * }} TerminalTurnMaterializedDelta
  *
@@ -201,7 +206,16 @@ export function recordTerminalTurnAssistantMessage(input) {
 }
 
 /**
- * @param {{ chunk: string; source?: string; timestamp?: number }} input
+ * @param {{
+ *     chunk: string;
+ *     source?: string;
+ *     sdkSource?: string | null;
+ *     streamId?: string | null;
+ *     chunkSeq?: number | null;
+ *     eventId?: string | null;
+ *     causationId?: string | null;
+ *     timestamp?: number;
+ * }} input
  * @returns {TerminalTurnMaterializedDelta | null}
  */
 export function recordTerminalTurnDelta(input) {
@@ -214,6 +228,11 @@ export function recordTerminalTurnDelta(input) {
     const entry = {
         chunk: input.chunk,
         source: input.source ?? 'dialog/onDelta',
+        sdkSource: input.sdkSource ?? null,
+        streamId: input.streamId ?? null,
+        chunkSeq: input.chunkSeq ?? null,
+        eventId: input.eventId ?? null,
+        causationId: input.causationId ?? null,
         timestamp,
     };
     _currentTurnMaterialization.deltaText += input.chunk;

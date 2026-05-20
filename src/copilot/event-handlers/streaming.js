@@ -14,6 +14,11 @@ const SEEN_MESSAGE_DELTA_EVENTS = new WeakSet();
 /** @type {WeakMap<object, Set<string>>} */
 const SEEN_MESSAGE_DELTA_IDS_BY_SESSION = new WeakMap();
 
+/** @type {WeakMap<object, { streamId: string; chunkSeq: number }>} */
+const MESSAGE_DELTA_STREAM_STATE_BY_SESSION = new WeakMap();
+
+let fallbackStreamCounter = 0;
+
 /**
  * @param {unknown} value
  * @returns {string}
@@ -35,6 +40,43 @@ function resolveMessageDeltaEventId(evt, data) {
         stringOrEmpty(data['deltaId']) ||
         ''
     );
+}
+
+/**
+ * @param {Record<string, unknown>} evt
+ * @param {Record<string, unknown>} data
+ * @returns {string}
+ */
+function resolveMessageDeltaStreamId(evt, data) {
+    return (
+        stringOrEmpty(data['streamId']) ||
+        stringOrEmpty(data['messageId']) ||
+        stringOrEmpty(data['responseId']) ||
+        stringOrEmpty(evt['streamId']) ||
+        stringOrEmpty(evt['messageId']) ||
+        stringOrEmpty(evt['id']) ||
+        ''
+    );
+}
+
+/**
+ * @param {import('./contracts.js').CopilotSessionLike} session
+ * @param {Record<string, unknown>} evt
+ * @param {Record<string, unknown>} data
+ * @returns {{ streamId: string; chunkSeq: number }}
+ */
+function nextMessageDeltaStreamPosition(session, evt, data) {
+    let state = MESSAGE_DELTA_STREAM_STATE_BY_SESSION.get(session);
+    if (!state) {
+        const sdkStreamId = resolveMessageDeltaStreamId(evt, data);
+        state = {
+            streamId: sdkStreamId || `assistant-message:${Date.now()}:${++fallbackStreamCounter}`,
+            chunkSeq: 0,
+        };
+        MESSAGE_DELTA_STREAM_STATE_BY_SESSION.set(session, state);
+    }
+    state.chunkSeq += 1;
+    return { streamId: state.streamId, chunkSeq: state.chunkSeq };
 }
 
 /**
@@ -101,19 +143,32 @@ export function wireStreamingEvents(session, { emit, isProcessing, dialogLoopAct
         }),
         onSessionEvent(session, SESSION_EVENTS.ASSISTANT_MESSAGE_START, () => {
             SEEN_MESSAGE_DELTA_IDS_BY_SESSION.delete(session);
+            MESSAGE_DELTA_STREAM_STATE_BY_SESSION.delete(session);
         }),
         onSessionEvent(session, SESSION_EVENTS.ASSISTANT_MESSAGE_DELTA, (evt) => {
             const d = /** @type {Record<string, unknown>} */ (evt?.data ?? {});
             const chunk = /** @type {string} */ (d['deltaContent'] ?? d['content'] ?? '');
             if (!chunk) return;
             if (shouldSkipDuplicateMessageDelta(session, evt, d)) return;
+            const event = /** @type {Record<string, unknown>} */ (evt ?? {});
+            const eventId = resolveMessageDeltaEventId(event, d) || null;
+            const { streamId, chunkSeq } = nextMessageDeltaStreamPosition(session, event, d);
+            const envelope = {
+                chunk,
+                streamId,
+                chunkSeq,
+                eventId,
+                causationId: eventId,
+                source: 'sdk.assistant.message_delta',
+                ts: typeof evt?.timestamp === 'number' ? evt.timestamp : Date.now(),
+            };
 
             if (dialogLoopActive()) {
-                emit('dialog.delta', { chunk });
+                emit('dialog.delta', envelope);
                 return;
             }
             if (isProcessing()) return;
-            emit('task.delta', { taskId: null, chunk });
+            emit('task.delta', { taskId: null, ...envelope });
         }),
     ];
 }

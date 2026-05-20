@@ -62,10 +62,10 @@ import {
     createDeltaCallback,
     createDisplayState,
     createReasoningCallback,
-    hasStreamingTranscriptMismatch,
     measureVisibleTerminalChars,
     renderStreamingFooter,
 } from './turn-display.js';
+import { decideFinalTranscriptRender } from './turn-reconciliation.js';
 
 export { drainPendingNotifications, getPersistenceFailureCount };
 
@@ -589,11 +589,20 @@ async function _executeTurn(message, actor, attachments = [], requestHeaders = n
         };
 
         const renderDeltaChunk = createDeltaCallback(displayState);
-        /** @type {(chunk: string) => void} */
-        const onDelta = (chunk) => {
+        /** @type {(chunk: string, envelope?: Record<string, unknown>) => void} */
+        const onDelta = (chunk, envelope = {}) => {
             if (liveTurnSignal.firstOutputAt === 0) liveTurnSignal.firstOutputAt = Date.now();
-            recordTerminalTurnDelta({ chunk, source: 'dialog/onDelta' });
-            renderDeltaChunk(chunk);
+            recordTerminalTurnDelta({
+                chunk,
+                source: 'dialog/onDelta',
+                sdkSource: typeof envelope['source'] === 'string' ? envelope['source'] : null,
+                streamId: typeof envelope['streamId'] === 'string' ? envelope['streamId'] : null,
+                chunkSeq: typeof envelope['chunkSeq'] === 'number' ? envelope['chunkSeq'] : null,
+                eventId: typeof envelope['eventId'] === 'string' ? envelope['eventId'] : null,
+                causationId: typeof envelope['causationId'] === 'string' ? envelope['causationId'] : null,
+                timestamp: typeof envelope['ts'] === 'number' ? envelope['ts'] : Date.now(),
+            });
+            renderDeltaChunk(chunk, envelope);
         };
 
         const turnResult = await runTerminalDialogTurnDetailed(enrichedMessage, {
@@ -632,31 +641,53 @@ async function _executeTurn(message, actor, attachments = [], requestHeaders = n
         }
 
         renderStreamingFooter(displayState, durationMs);
-        const minimumVisibleStreamingChars =
-            replyVisibleChars > 0 ? Math.min(replyVisibleChars, Math.max(4, Math.ceil(replyVisibleChars * 0.15))) : 0;
-        const streamingTranscriptMismatch =
-            typeof reply === 'string' ? hasStreamingTranscriptMismatch(displayState, reply) : false;
-        if (
-            !displayState.streamingStarted ||
-            (replyVisibleChars > 0 && displayState.streamingVisibleChars < minimumVisibleStreamingChars) ||
-            streamingTranscriptMismatch
-        ) {
-            if (streamingTranscriptMismatch) {
+        const finalRenderDecision = decideFinalTranscriptRender({
+            reply: typeof reply === 'string' ? reply : null,
+            streamedContent: displayState.streamingContent,
+            streamingStarted: displayState.streamingStarted,
+            streamingVisibleChars: displayState.streamingVisibleChars,
+        });
+        if (finalRenderDecision.mode !== 'none') {
+            if (finalRenderDecision.reason === 'stream_mismatch') {
                 recordTerminalActivity('system', 'Transcript final limpo renderizado', {
                     detail: 'stream live divergiu da mensagem final do SDK',
                     source: 'dialog',
                     severity: 'warn',
                     recordHistory: false,
                 });
+            } else if (finalRenderDecision.reason === 'stream_suffix') {
+                recordTerminalActivity('streaming', 'Transcript final completou stream parcial', {
+                    detail: `${measureVisibleTerminalChars(finalRenderDecision.content)} caracteres visíveis restantes`,
+                    source: 'dialog',
+                    severity: 'info',
+                    recordHistory: false,
+                });
+            } else if (finalRenderDecision.reason === 'no_visible_stream') {
+                recordTerminalActivity('streaming', 'Resposta final sem delta público visível', {
+                    detail: 'SDK concluiu o turno antes de entregar assistant.message_delta público ao renderer',
+                    source: 'dialog',
+                    severity: 'info',
+                    recordHistory: true,
+                });
             }
             const rendered =
-                typeof reply === 'string' && reply.trim().length > 0
+                finalRenderDecision.content.trim().length > 0
                     ? renderTerminalAssistantTranscript({
-                          content: reply,
-                          title: actor === 'llm-a' ? 'Resposta da LLM-B para LLM-A' : 'Resposta da LLM-B',
-                          source: 'dialog/turn',
+                          content: finalRenderDecision.content,
+                          title:
+                              finalRenderDecision.mode === 'suffix'
+                                  ? 'Complemento da LLM-B'
+                                  : actor === 'llm-a'
+                                    ? 'Resposta da LLM-B para LLM-A'
+                                    : 'Resposta da LLM-B',
+                          source:
+                              finalRenderDecision.mode === 'suffix'
+                                  ? 'dialog/turn-suffix'
+                                  : finalRenderDecision.reason === 'stream_mismatch'
+                                    ? 'dialog/turn-final'
+                                    : 'dialog/turn',
                           status: 'completed',
-                          detail: `${(durationMs / 1000).toFixed(1)}s`,
+                          detail: `${(durationMs / 1000).toFixed(1)}s · ${finalRenderDecision.reason}`,
                       })
                     : false;
             if (!rendered) {

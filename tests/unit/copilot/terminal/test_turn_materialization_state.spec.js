@@ -58,6 +58,34 @@ describe('terminal/state/turn-materialization-state', () => {
         expect(materialized.diagnostics.deltaSlices).toBe(2);
     });
 
+    it('preserva identidade causal dos deltas no snapshot do turno', () => {
+        clearTerminalTurnMaterialization();
+        beginTerminalTurnMaterialization({ turnId: '42', timestamp: 1000 });
+        recordTerminalTurnDelta({
+            chunk: 'abc',
+            source: 'dialog/onDelta',
+            sdkSource: 'sdk.assistant.message_delta',
+            streamId: 's1',
+            chunkSeq: 3,
+            eventId: 'evt-1',
+            causationId: 'evt-1',
+            timestamp: 1001,
+        });
+
+        const snapshot = readTerminalTurnMaterialization();
+        expect(snapshot?.deltaSlices.at(-1)).toEqual(
+            expect.objectContaining({
+                chunk: 'abc',
+                source: 'dialog/onDelta',
+                sdkSource: 'sdk.assistant.message_delta',
+                streamId: 's1',
+                chunkSeq: 3,
+                eventId: 'evt-1',
+                causationId: 'evt-1',
+            }),
+        );
+    });
+
     it('anexa turnId do SDK ao turno explícito sem apagar deltas já recebidos', () => {
         clearTerminalTurnMaterialization();
         beginTerminalTurnMaterialization({ timestamp: 1000, source: 'terminal/explicit-turn' });

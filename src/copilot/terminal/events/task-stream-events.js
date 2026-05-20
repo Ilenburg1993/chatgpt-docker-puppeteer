@@ -27,7 +27,11 @@ import {
     finalizePublicAssistantStream,
     renderPublicAssistantStreamDelta,
 } from './public-assistant-stream.js';
-import { createTaskTranscriptAccumulator } from './task-transcript-accumulator.js';
+import {
+    createTaskTranscriptAccumulator,
+    getTaskTranscriptKey,
+    isInternalTaskTranscriptKey,
+} from './task-transcript-accumulator.js';
 
 /**
  * @typedef {{
@@ -113,22 +117,34 @@ export function setupTerminalTaskStreamListeners({ agent }) {
     };
 
     /**
-     * @param {string | null | undefined} taskId
+     * @param {unknown} value
      * @returns {string}
      */
-    const getTaskKey = (taskId) => taskId ?? '__anonymous__';
+    const stringOrEmpty = (value) => (typeof value === 'string' && value.trim().length > 0 ? value.trim() : '');
+
+    /**
+     * @param {{ taskId?: string | null } & Record<string, unknown>} evt
+     * @returns {string}
+     */
+    const getTaskKey = (evt) => {
+        const taskId = stringOrEmpty(evt.taskId);
+        if (taskId) return getTaskTranscriptKey(taskId);
+        const streamId = stringOrEmpty(evt['streamId']) || stringOrEmpty(evt['messageId']) || stringOrEmpty(evt['responseId']);
+        if (streamId) return getTaskTranscriptKey(`stream:${streamId}`);
+        return getTaskTranscriptKey(null);
+    };
 
     /**
      * Task deltas são transitórios durante o streaming, mas não podem desaparecer. Enquanto há um turno explícito em
      * andamento, `turn-display.js` já renderiza a resposta; fora desse caminho, acumulamos o conteúdo e imprimimos um
      * transcript estável no fechamento da tarefa/turno.
      *
-     * @param {string | null | undefined} taskId
+     * @param {{ taskId?: string | null } & Record<string, unknown>} evt
      * @param {string} chunk
      * @returns {void}
      */
-    const recordTaskDelta = (taskId, chunk) => {
-        const taskKey = getTaskKey(taskId);
+    const recordTaskDelta = (evt, chunk) => {
+        const taskKey = getTaskKey(evt);
         if (getBusy()) {
             taskDeltasSeenWhileBusy.add(taskKey);
         }
@@ -137,19 +153,19 @@ export function setupTerminalTaskStreamListeners({ agent }) {
             chunks: current.chunks + 1,
             chars: current.chars + chunk.length,
         });
-        taskTranscripts.record(taskId, chunk);
+        taskTranscripts.record(isInternalTaskTranscriptKey(taskKey) ? null : taskKey, chunk);
     };
 
-    const onTaskDelta = (/** @type {{ taskId?: string | null; chunk?: string }} */ evt) => {
+    const onTaskDelta = (/** @type {{ taskId?: string | null; chunk?: string } & Record<string, unknown>} */ evt) => {
         const chunk = evt?.chunk ?? '';
         if (!chunk) return;
-        recordTaskDelta(evt.taskId, chunk);
+        const taskKey = getTaskKey(evt);
+        recordTaskDelta(evt, chunk);
         if (getBusy()) return;
-        const { liveRendered } = renderPublicAssistantStreamDelta({ key: getTaskKey(evt.taskId), chunk });
+        const { liveRendered } = renderPublicAssistantStreamDelta({ ...evt, key: taskKey, chunk });
         if (liveRendered) {
-            taskTranscripts.markLiveRendered(evt.taskId);
+            taskTranscripts.markLiveRendered(isInternalTaskTranscriptKey(taskKey) ? null : taskKey);
         }
-        const taskKey = getTaskKey(evt.taskId);
         const now = Date.now();
         const lastAt = taskLastDeltaActivityAt.get(taskKey) ?? 0;
         if (now - lastAt < TASK_DELTA_ACTIVITY_THROTTLE_MS) {
@@ -192,12 +208,12 @@ export function setupTerminalTaskStreamListeners({ agent }) {
         }
     };
 
-    const onTaskCompleted = (/** @type {{ taskId?: string | null }} */ evt = {}) => {
-        const taskKey = getTaskKey(evt.taskId);
+    const onTaskCompleted = (/** @type {{ taskId?: string | null } & Record<string, unknown>} */ evt = {}) => {
+        const taskKey = getTaskKey(evt);
         const stats = taskDeltaStats.get(taskKey) ?? { chunks: 0, chars: 0 };
         const { liveRendered } = finalizePublicAssistantStream({ key: taskKey });
         if (liveRendered) {
-            taskTranscripts.markLiveRendered(evt.taskId);
+            taskTranscripts.markLiveRendered(isInternalTaskTranscriptKey(taskKey) ? null : taskKey);
         }
         const wasAlreadyRenderedByTurn = taskDeltasSeenWhileBusy.has(taskKey);
         const hadVisiblePayload = (stats.chunks > 0 || stats.chars > 0) && !wasAlreadyRenderedByTurn;
@@ -208,18 +224,18 @@ export function setupTerminalTaskStreamListeners({ agent }) {
             updateCurrent: hadVisiblePayload,
         });
         finalizeTaskThinkings(evt.taskId ?? undefined, 'completed');
-        taskTranscripts.flush(evt.taskId ?? undefined, 'completed', 'task.completed');
+        taskTranscripts.flush(isInternalTaskTranscriptKey(taskKey) ? null : taskKey, 'completed', 'task.completed');
         taskDeltaStats.delete(taskKey);
         taskLastDeltaActivityAt.delete(taskKey);
         taskDeltasSeenWhileBusy.delete(taskKey);
     };
 
-    const onTaskError = (/** @type {{ taskId?: string | null }} */ evt = {}) => {
-        const taskKey = getTaskKey(evt.taskId);
+    const onTaskError = (/** @type {{ taskId?: string | null } & Record<string, unknown>} */ evt = {}) => {
+        const taskKey = getTaskKey(evt);
         const stats = taskDeltaStats.get(taskKey) ?? { chunks: 0, chars: 0 };
         const { liveRendered } = finalizePublicAssistantStream({ key: taskKey });
         if (liveRendered) {
-            taskTranscripts.markLiveRendered(evt.taskId);
+            taskTranscripts.markLiveRendered(isInternalTaskTranscriptKey(taskKey) ? null : taskKey);
         }
         recordTerminalActivity('error', 'Tarefa interna falhou', {
             detail: `${stats.chunks} chunks · ${stats.chars} chars`,
@@ -227,7 +243,7 @@ export function setupTerminalTaskStreamListeners({ agent }) {
             severity: 'error',
         });
         finalizeTaskThinkings(evt.taskId ?? undefined, 'error');
-        taskTranscripts.flush(evt.taskId ?? undefined, 'error', 'task.error');
+        taskTranscripts.flush(isInternalTaskTranscriptKey(taskKey) ? null : taskKey, 'error', 'task.error');
         taskDeltaStats.delete(taskKey);
         taskLastDeltaActivityAt.delete(taskKey);
         taskDeltasSeenWhileBusy.delete(taskKey);
@@ -235,7 +251,7 @@ export function setupTerminalTaskStreamListeners({ agent }) {
 
     const onAssistantTurnEnd = () => {
         for (const taskKey of finalizeAllPublicAssistantStreams()) {
-            taskTranscripts.markLiveRendered(taskKey === '__anonymous__' ? null : taskKey);
+            taskTranscripts.markLiveRendered(isInternalTaskTranscriptKey(taskKey) ? null : taskKey);
         }
         for (const taskKey of taskTranscripts.flushAll('completed', 'assistant.turn_end')) {
             taskDeltaStats.delete(taskKey);

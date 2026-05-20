@@ -67,6 +67,29 @@ describe('HookBus — emissão e escuta', () => {
             bus.emitHook('error_occurred', 'sid', {}, null);
         }, 'emitHook deve capturar erros de listeners internos');
     });
+
+    it('enriquece hook:error_occurred no EventBus com mensagem normalizada', async () => {
+        const { HookBus } = await import('../../../src/copilot/hooks/bus.js');
+        const { createEventBus } = await import('../../../src/copilot/core/event-bus.js');
+        const bus = new HookBus();
+        const eventBus = createEventBus();
+        /** @type {any[]} */
+        const events = [];
+        eventBus.on('hook:error_occurred', (evt) => events.push(evt));
+        bus.setEventBus(eventBus);
+
+        bus.emitHook(
+            'error_occurred',
+            'sid',
+            { error: {}, errorContext: 'model_call', recoverable: true },
+            { errorHandling: 'retry' },
+        );
+
+        assert.equal(events.length, 1);
+        assert.equal(events[0]?.errorContext, 'model_call');
+        assert.equal(events[0]?.recoverable, true);
+        assert.equal(events[0]?.errorMessage, 'Erro do SDK sem mensagem estruturada.');
+    });
 });
 
 describe('attachBus — envolve SessionHooks', () => {

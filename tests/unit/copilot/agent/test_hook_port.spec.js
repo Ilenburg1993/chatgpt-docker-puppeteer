@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
     classifySdkRateLimitScope: vi.fn(() => 'session'),
     defaultHookBus: { on: vi.fn(), off: vi.fn() },
     modelSelector: { suggestFallback: vi.fn(() => null) },
+    getCopilotFallbackModel: vi.fn(() => null),
     recordBlockedToolCall: vi.fn(),
     defaultAuditLog: { record: vi.fn() },
     log: vi.fn(),
@@ -28,7 +29,7 @@ vi.mock('#copilot/audit', () => ({
 }));
 
 vi.mock('#copilot/config', () => ({
-    getCopilotFallbackModel: vi.fn(() => null),
+    getCopilotFallbackModel: mocks.getCopilotFallbackModel,
 }));
 
 vi.mock('../../../../src/copilot/agent/ports/logging-port.js', () => ({
@@ -42,6 +43,7 @@ const { buildAgentBusHooks, withAgentRuntimeToolPolicy } = await import(
 describe('agent/ports/hook-port', () => {
     beforeEach(() => {
         vi.clearAllMocks();
+        mocks.getCopilotFallbackModel.mockReturnValue(null);
     });
 
     it('registra blocked metric quando runtime policy nega a tool', async () => {
@@ -98,7 +100,7 @@ describe('agent/ports/hook-port', () => {
             metrics: { recordSessionStart: vi.fn(), recordSessionEnd: vi.fn() },
         });
 
-        await hooks.onErrorOccurred?.(
+        const result = await hooks.onErrorOccurred?.(
             /** @type {any} */ ({ error: {}, errorContext: 'model_call', recoverable: true }),
             /** @type {any} */ ({ sessionId: 's1' }),
         );
@@ -110,6 +112,41 @@ describe('agent/ports/hook-port', () => {
         expect(mocks.log).toHaveBeenCalledWith(
             'WARN',
             expect.stringContaining('Erro do SDK sem mensagem estruturada.'),
+        );
+    });
+
+    it('aplica fallback live para auto quando model_call recuperável ocorre em modelo explícito', async () => {
+        mocks.getCopilotFallbackModel.mockReturnValue('auto');
+        const emit = vi.fn();
+        const applyModelFallback = vi.fn(() => true);
+        const scheduleFallback = vi.fn();
+        const hooks = buildAgentBusHooks({
+            emitWebhook: vi.fn(async () => {}),
+            getModel: () => 'gpt-5.4',
+            scheduleFallback,
+            applyModelFallback,
+            emit,
+            metrics: { recordSessionStart: vi.fn(), recordSessionEnd: vi.fn() },
+        });
+
+        const result = await hooks.onErrorOccurred?.(
+            /** @type {any} */ ({ error: {}, errorContext: 'model_call', recoverable: true }),
+            /** @type {any} */ ({ sessionId: 's1' }),
+        );
+
+        expect(applyModelFallback).toHaveBeenCalledWith(
+            'auto',
+            expect.objectContaining({
+                previousModel: 'gpt-5.4',
+                reason: 'recoverable_model_call_on_explicit_model',
+                sessionId: 's1',
+            }),
+        );
+        expect(scheduleFallback).not.toHaveBeenCalled();
+        expect(result).toEqual(expect.objectContaining({ errorHandling: 'abort' }));
+        expect(emit).toHaveBeenCalledWith(
+            'error',
+            expect.objectContaining({ errorContext: 'model_call', recoverable: true }),
         );
     });
 });
