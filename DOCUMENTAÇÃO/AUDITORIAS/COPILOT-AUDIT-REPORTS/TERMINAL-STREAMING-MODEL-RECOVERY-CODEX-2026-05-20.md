@@ -490,6 +490,22 @@ Critérios relevantes:
 - O payload publico SSE nao vazou `__terminalSseEventId`.
 - O teste encerrou limpo via `/quit`.
 
+## Validacao live Codex - envelopes sem PR
+
+Comando: `npm run terminal:llm-b:live-test -- --no-pr --transport=pty --timeout-ms=120000 --out-dir=artifacts/terminal-live/no-pr-envelope-codex-2026-05-20`.
+
+Resultado: PASS em `artifacts/terminal-live/no-pr-envelope-codex-2026-05-20/summary.md`.
+
+Critérios relevantes:
+
+- Terminal retomou sessão SDK e entrou em REPL interativo.
+- Nenhum turno LLM explícito foi aberto durante o probe.
+- `/usage now` mostrou telemetria de PR/contexto sem disparar novo consumo.
+- `/activity` e `/metrics` exibiram a seção `Streaming público`.
+- `/errors 10` permaneceu limpo.
+- Coletor SSE conectou em `/events`, sem erro e sem vazamento de metadado interno.
+- Encerramento limpo via `/quit`.
+
 ## Atualizacao Codex - classificacao tardia de ask_user
 
 Data: 2026-05-20.
