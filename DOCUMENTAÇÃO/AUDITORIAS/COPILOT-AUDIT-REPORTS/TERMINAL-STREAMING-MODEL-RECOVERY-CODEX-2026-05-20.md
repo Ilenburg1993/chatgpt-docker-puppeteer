@@ -11,6 +11,8 @@ Mas ha uma correcao importante: a conclusao de que a janela `CROSS_CHANNEL_DELTA
 
 O log fornecido pelo usuario revela um segundo eixo critico, nao tratado com profundidade suficiente no relatorio da LLM-B: apos `/model gpt-5.4`, o SDK emite `session.model_change`, mas os turnos seguintes entram em `hook:error_occurred` recuperavel com `errorContext=model_call`. A UX mostrava apenas alertas genericos de erro e retries, sem aplicar fallback live para `auto`, sem explicar causa provavel e sem impedir ruido no ErrorTracker. Isso gera a percepcao correta de que "nada aparece", embora o problema raiz seja backend/model routing preso em erro recuperavel.
 
+Revisao adicional desta rodada: `assistant.usage` no SDK 0.3.0 e telemetria de chamada LLM (tokens, custo, quota, modelo, `initiator`, `parentToolCallId`), nao prova isolada de Premium Request consumido. O fluxo antigo convertia todo `assistant.usage` em `pr.consumed`; isso era incorreto especialmente apos `ask_user`, que existe justamente para manter o dialog loop vivo sem abrir novo turno pago. O contrato canonico agora e: `assistant.usage -> llm.usage` sempre; `pr.consumed` apenas quando a usage for classificada como `premium_request` por uma causa user-initiated explicita.
+
 ## Evidencias observadas
 
 - `terminal:llm-b` inicia com `COPILOT_MODEL=auto`, mas o modelo efetivo observado e `gpt-5.3-codex`.
@@ -80,6 +82,7 @@ O log fornecido pelo usuario revela um segundo eixo critico, nao tratado com pro
 - Background interno foi parcialmente filtrado, mas eventos de erro recuperavel ainda vazavam como ruido bruto.
 - `hook:error_occurred` era emitido no EventBus sem mensagem normalizada.
 - `error-alerter` elevava erro recuperavel de modelo a `ERROR`, repetindo linhas quase identicas.
+- Antes desta rodada, `event-handlers/usage.js` tratava qualquer `assistant.usage` como `pr.consumed`. Isso misturava telemetria LLM com billing/PR e fazia continuacoes de `ask_user` parecerem novo consumo.
 
 ## Situacao ideal
 
@@ -95,6 +98,9 @@ O log fornecido pelo usuario revela um segundo eixo critico, nao tratado com pro
 10. `/model` deve informar que modelo explicito e tentativa operacional; `auto` continua sendo fallback canonico.
 11. `/quit` durante erro de modelo deve encerrar limpo, sem continuar despejando alerta opaco.
 12. Documentos de arquitetura devem distinguir claramente display dedupe, bridge dedupe, SSE replay e transcript reconciliation.
+13. `assistant.usage` deve ser sempre auditavel como `llm.usage`, mas nunca deve implicar `pr.consumed` sem classificacao causal.
+14. `ask_user` deve ser tratado como continuacao de input humano dentro do mesmo dialog loop; usage gerado apos sua resposta deve aparecer como `ask_user_continuation`, nao como novo PR.
+15. Testes live da LLM-B devem ser canônicos, versionados e opt-in: o roteiro precisa cobrir deltas parciais, final, tools, ask_user, usage, errors, health e transcript, com artefatos persistidos.
 
 ## Roadmap
 
@@ -173,6 +179,13 @@ O log fornecido pelo usuario revela um segundo eixo critico, nao tratado com pro
 - `assistant.message_delta` agora gera envelopes locais com `streamId`, `chunkSeq`, `eventId` quando disponivel, `source` e `ts`.
 - `dialog.delta`/`task.delta` propagam esses envelopes; consumidores antigos continuam recebendo apenas `chunk`.
 - O SSE `delta` passa a incluir metadados causais quando disponiveis, preparando a remocao futura da janela temporal cross-channel.
+- `assistant.usage` deixou de ser sinonimo de `pr.consumed`: foi criado classificador canonico que emite `llm.usage` para toda telemetria LLM e so emite `pr.consumed` quando ha `user.message` pendente classificado como `premium_request`.
+- Continuacoes de `ask_user`, usage com `initiator`, usage com `parentToolCallId` e usage sem `user.message` ficam como `llm.usage` sem novo PR, com `classification`, `premiumRequest:false` e `premiumRequestReason`.
+- O terminal passou a narrar `llm.usage` sem novo PR como evento separado de `pr.consumed`, inclusive com classe/motivo/tokens quando disponiveis.
+- `lastPrInfo` e a persistencia "Persist latest PR consumption snapshot" agora so sao atualizados por `premium_request`; telemetria LLM nao-premium nao sobrescreve snapshot de PR.
+- Criado runner opt-in `npm run terminal:llm-b:live-test`, que sobe `terminal:llm-b`, envia um roteiro canonico, responde `ask_user`, coleta stdout bruto/plain e grava relatorio JSON/MD com criterios objetivos.
+- Runner live usa PTY por padrao (`script`) para validar a UX real do VS Code task terminal; modo headless fica apenas como diagnostico.
+- Respostas humanas de `ask_user` agora registram um guardiao local de eco e sao suprimidas em `assistant.message`, `dialog.delta` e `task.delta` quando o SDK ecoa exatamente o valor respondido.
 
 ## Validacao live
 
@@ -216,10 +229,12 @@ Esta revisao cruza o log live fornecido pelo usuario, o relatorio da LLM-B e o c
 - Medir quantas vezes a janela temporal degradada em `client-dialog.js` ainda e usada; a meta e tornar essa dependencia rara e, depois, removivel.
 - Criar comando/diagnostico de streaming que diga claramente: SDK nao emitiu delta, delta emitido mas display desligado, delta emitido e renderizado, ou delta emitido e reconciliado no final.
 - Expor no `/usage now` e `/status` a distincao entre `boot/resume zero-PR`, `turn billed`, `explicit /turn`, `direct chat bridge` e `recovery PR fallback`.
+- Expor no `/usage now` tambem o ultimo `llm.usage` classificado, separado do ultimo `pr.consumed`, para acabar com a ambiguidade entre token telemetry e Premium Request. **Implementado.**
 - Unificar payloads SSE de `delta`, `assistant.message`, `dialog.reply`, `user_input.*`, `tool.*` e `pr.consumed` com um envelope comum de `traceId/turnId/eventId/source`.
 - Revisar o fluxo de `requestHeaders` em `runTerminalDialogTurnDetailed`: hoje ele pode parar dialog loop e usar direct chat, portanto deve ser exibido como caminho que pode consumir PR.
 - Criar teste unitario para boot recovery com env `LLM_B_DIALOG_BOOT_RECOVERY_ALLOW_PR_FALLBACK=true`, garantindo que o fallback pago e deliberado e observavel.
 - Criar teste live automatizavel que obrigue resposta longa o suficiente para observar varios deltas, uma tool, usage e `ask_user`.
+- Evoluir o runner live para fase de elicitation estruturada com resposta automatica segura, mantendo isso opt-in e separado do turno LLM principal.
 - Criar fixture de SDK fake para simular `assistant.message_delta` cumulativo, incremental, duplicado por canais diferentes e final divergente.
 - Fechar lacunas de replay/backpressure no SSE: nenhum delta publico deve ser descartado sem metrica.
 - Melhorar `/model` para mostrar historico curto: configurado, efetivo, cobrado, ultimo fallback e causa.
@@ -232,18 +247,20 @@ Esta revisao cruza o log live fornecido pelo usuario, o relatorio da LLM-B e o c
 - Descartar UX que imprime `hook:error_occurred` cru. O operador precisa de causa, contexto, retry/fallback e acao sugerida.
 - Descartar chaves operacionais novas como `__anonymous__` para eventos sem identidade. Quando nao houver identidade real, usar chave interna claramente marcada e nao apresentada como ator.
 - Descartar fluxos paralelos para `session.error`, transcript final, usage e tools. Cada evento deve ter dono canonico.
+- Descartar a regra antiga `assistant.usage -> pr.consumed`. O fluxo correto e `assistant.usage -> llm.usage`, com `pr.consumed` derivado apenas por classificador causal.
 - Descartar testes live de uma unica mensagem curta como criterio suficiente; respostas curtas frequentemente chegam sem delta parcial visivel.
 - Descartar "bypass" de premium request como objetivo. O objetivo correto e impedir consumo acidental e tornar todo consumo observavel, nao contornar cobranca do provedor.
 
 ### Novos achados
 
 - `boot-dialog-recovery.js` tinha fallback automatico para `ctx.startDialogLoop()` quando a reanexacao zero-PR falhava. Esse caminho podia parecer consumo de PR no boot, pois abria boot de dialog loop sem comando explicito do operador.
-- A mensagem "Persist latest PR consumption snapshot" nao significa necessariamente novo consumo. Ela e persistencia interna de snapshot. A UX ja evita imprimir isso como atividade da LLM-B, mas o relatorio deve manter a distincao: o sinal de consumo real e `assistant.usage -> pr.consumed`.
+- A mensagem "Persist latest PR consumption snapshot" nao significa novo consumo por si. Ela e persistencia interna do ultimo snapshot de PR ja classificado. A distincao canonica agora e: `llm.usage` e telemetria de chamada LLM; `pr.consumed` e apenas usage classificado como `premium_request`.
 - O log de `/model gpt-5.4` mostra duas coisas diferentes misturadas na percepcao do operador: configuracao do modelo mudou, mas o modelo efetivo/cobrado pode continuar roteado para outro alvo ou falhar em `model_call`. A UX deve sempre separar configurado, efetivo e cobrado.
 - O caminho direct chat com `requestHeaders` ainda e potencialmente consumidor de PR e deve ser tratado como excecao operacional, nao como caminho normal do terminal.
 - O teste live mais util nao e reiniciar muitas vezes o terminal. E iniciar uma vez, inspecionar `/status`, `/usage now`, `/activity`, executar um unico turno rico e fechar com `/quit`.
 - O teste live Codex desta revisao confirmou que `report_intent` aparecia no transcript/timeline, mas nao entrava no agregado de `/tools diag`; isso foi corrigido contabilizando tools diagnosticas no lifecycle do terminal.
-- O teste live Codex confirmou que responder `ask_user` com `SIM` conclui a pergunta, mas tambem materializa uma mensagem publica curta `SIM` da LLM-B e contabiliza usage. Isso precisa de contrato explicito: pode ser comportamento esperado do SDK ao fechar a ferramenta, mas a UX deve deixar claro que se trata da conclusao do mesmo fluxo de input humano, nao de uma resposta espontanea nova.
+- O teste live Codex confirmou que responder `ask_user` com `SIM` pode fazer o SDK ecoar `SIM` por `assistant.message`/`assistant.message_delta`. Isso nao deve aparecer como fala da LLM-B: a fonte canonica e `user_input.completed`/`question.answered`. Foi criado guardiao local de eco humano para transcript e streaming.
+- O SDK documenta `assistant.usage` como metricas de chamada LLM, com `initiator` e `parentToolCallId` para indicar origem. Portanto, usage sem `user.message` nao deve ser contado como PR por inferencia. Esse foi o bug semantico principal desta rodada.
 
 ### Roadmap refinado
 
@@ -255,8 +272,13 @@ Esta revisao cruza o log live fornecido pelo usuario, o relatorio da LLM-B e o c
 - G4. Documentar `LLM_B_DIALOG_BOOT_RECOVERY_ALLOW_PR_FALLBACK` como opt-in operacional.
 - G5. Adicionar `/usage now` com origem do ultimo consumo: boot, turn, direct-chat, recovery fallback ou unknown.
 - G6. Marcar direct chat bridge como caminho PR-risk em `/activity`.
-- G7. Diferenciar snapshot de PR de consumo real em todos os textos do terminal.
+- G7. Diferenciar snapshot de PR de consumo real em todos os textos do terminal. **Implementado no terminal e em `/usage now`; falta ampliar para todos os exports/relatorios.**
 - G8. Adicionar teste de regressao para nenhum boot recovery pago sem env.
+- G9. Classificar `assistant.usage` por causa (`premium_request`, `ask_user_continuation`, `tool_originated`, `non_user_initiated`, `unattributed_llm_usage`). **Implementado.**
+- G10. Impedir que `ask_user` gere `pr.consumed`. **Implementado com teste unitario.**
+- G11. Impedir que usage com `initiator`/`parentToolCallId` gere `pr.consumed`. **Implementado com teste unitario.**
+- G12. Adicionar `llm.usage` ao EventBus/terminal/SSE como canal canonico de telemetria nao ambigua. **Implementado.**
+- G13. Expor ultimo `llm.usage` e classificacao no estado runtime/frontend, sem sobrescrever `lastPrInfo`. **Implementado no AgentContext, runtime overview, terminal gateway e `/usage now`.**
 
 #### Faixa H - Streaming live end-to-end
 
@@ -269,6 +291,21 @@ Esta revisao cruza o log live fornecido pelo usuario, o relatorio da LLM-B e o c
 - H7. Adicionar replay SSE de deltas por `Last-Event-ID`.
 - H8. Propagar `turnId` e `traceId` em todo delta.
 - H9. Persistir final reconciliation no historico/export.
+
+#### Faixa K - Runner canonico de teste live LLM-B
+
+- K1. Criar runner opt-in para `terminal:llm-b`, fora do CI padrão, com captura raw/plain. **Implementado em `scripts/copilot/run-terminal-llm-b-live-test.mjs`.**
+- K2. Expor script npm dedicado. **Implementado: `npm run terminal:llm-b:live-test`.**
+- K3. Suportar `--dry-run` para validar roteiro sem SDK/PR. **Implementado.**
+- K4. Validar ready, deltas, tool start/done, ask_user visivel, resposta humana registrada, `llm.usage`, ausencia de erros e `/quit` limpo. **Implementado no runner.**
+- K5. Persistir artefatos `terminal.raw.log`, `terminal.plain.log`, `summary.json`, `summary.md`. **Implementado.**
+- K6. Adicionar fase opcional de elicitation estruturada (`/elicitation request-json` + resposta) sem bloquear readline.
+- K7. Adicionar assert de final reconciliation mais preciso: stream parcial, final message e sufixo/mismatch, sem contar o bloco de integridade como duplicação falsa. **Parcialmente implementado: runner valida bloco final e nao trata prompt+parcial+final como duplicacao falsa.**
+- K8. Adicionar assert de `pr.consumed` causal: um turno humano pode gerar PR, `ask_user` nao pode. **Parcialmente implementado: runner valida `llm.usage` separado e ausencia de eco de resposta; falta assert causal explicito sobre evento `pr.consumed`.**
+- K9. Adicionar modo `--no-pr` que apenas inspeciona `/usage now`, `/activity`, `/health` e sai, para sanity check de boot/resume sem consumo.
+- K10. Adicionar integração com `/export` para comparar transcript persistido contra stdout plain.
+- K11. Adicionar coleta SSE paralela de `GET :3009/events` para comparar terminal local e canal externo.
+- K12. Adicionar relatório de gaps automatico no MD do runner quando algum critério falhar.
 
 #### Faixa I - Modelo, erro e recuperacao
 
@@ -286,8 +323,8 @@ Esta revisao cruza o log live fornecido pelo usuario, o relatorio da LLM-B e o c
 - J3. Garantir que mailbox zero-PR aplicado em `ask_user` seja mostrado e persistido.
 - J4. Unificar `user_input.requested/completed` com envelope de turno.
 - J5. Expor perguntas pendentes em `/activity`, `/now` e `/health`.
-- J6. Distinguir visualmente resposta humana encaminhada para `ask_user` de mensagem publica nova quando o SDK ecoar/confirmar o valor.
-- J7. Garantir que usage apos resposta de `ask_user` seja explicado como fechamento do fluxo SDK, nao como boot ou recovery.
+- J6. Distinguir visualmente resposta humana encaminhada para `ask_user` de mensagem publica nova quando o SDK ecoar/confirmar o valor. **Implementado por guardiao local de eco humano em `assistant.message`, `dialog.delta` e `task.delta`.**
+- J7. Garantir que usage apos resposta de `ask_user` seja explicado como fechamento do fluxo SDK, nao como boot ou recovery. **Implementado no classificador/terminal; live confirmou ausencia de novo `pr.consumed`, mas a ordem real do SDK ainda pode classificar a usage de fechamento como `non_user_initiated` quando `user_input.completed` chega tarde.**
 - J8. Incluir `report_intent`/tools nativas de diagnostico no agregado de `/tools diag` ou documentar uma categoria separada de "diagnostico/intent". **Implementado para `report_intent`/`report_intent_local`.**
 
 ## Plano de validacao live recomendado
@@ -305,7 +342,16 @@ Faca um teste integrado curto do terminal. Primeiro chame report_intent com o in
 4. Rodar `/activity 30`, `/usage now`, `/tools diag`, `/errors 10`, `/health`.
 5. Encerrar com `/quit`.
 
-O criterio de sucesso nao e "nao houve uso". Um turno real pode gerar `assistant.usage`. O criterio correto e: boot/resume nao gera consumo acidental, deltas parciais aparecem quando emitidos, final nao duplica stream, tools aparecem com nome/tempo/I-O, `ask_user` aparece e permanece consultavel, e qualquer consumo real aparece como `pr.consumed` com modelo configurado/efetivo/cobrado.
+Alternativa canônica automatizada:
+
+```bash
+npm run terminal:llm-b:live-test -- --dry-run
+npm run terminal:llm-b:live-test
+```
+
+O primeiro comando apenas grava o prompt canônico sem acionar SDK. O segundo executa o roteiro real e pode consumir uma Premium Request pelo turno humano explícito; por isso permanece fora do CI padrão.
+
+O criterio de sucesso nao e "nao houve uso". Um turno real pode gerar `assistant.usage`. O criterio correto e: boot/resume nao gera consumo acidental, deltas parciais aparecem quando emitidos, final nao duplica stream, tools aparecem com nome/tempo/I-O, `ask_user` aparece e permanece consultavel, toda chamada LLM aparece como `llm.usage` classificado, e apenas consumo causalmente premium aparece como `pr.consumed` com modelo configurado/efetivo/cobrado.
 
 ## Validacao live Codex desta revisao
 
@@ -328,5 +374,47 @@ Resultados observados:
 Gaps observados no live:
 
 - `report_intent` aparecia na timeline e no resumo de turno, mas nao aparecia em `/tools diag`; a superficie de stats foi ajustada apos o live para cobrir `report_intent`/`report_intent_local`.
-- A resposta humana `SIM` ao `ask_user` apareceu tambem como mensagem curta da LLM-B com usage. Isso nao quebrou o fluxo, mas a UX precisa explicar melhor a relacao entre resposta humana, fechamento da tool e usage associado.
+- A resposta humana `SIM` ao `ask_user` apareceu inicialmente tambem como mensagem curta da LLM-B; isso foi corrigido depois com guardiao de eco humano para transcript e streaming.
 - O modelo configurado ficou `auto`, mas o efetivo/cobrado mudou de `gpt-5.4-mini` para `gpt-5.3-codex` durante o turno. Isso e comportamento aceitavel do `auto`, mas `/status` e `/usage` devem continuar destacando configurado/efetivo/cobrado.
+
+## Validacao live Codex - semantica de `llm.usage` e `pr.consumed`
+
+Comando: `npm run terminal:llm-b`, `COPILOT_MODEL=auto`, `TERMINAL_DISPLAY_PRESET=full`.
+
+Resultados observados:
+
+- `/usage now` passou a exibir `Ultimo PR` separado de `Ultimo uso LLM`.
+- O turno integrado mostrou deltas publicos, `report_intent`, `read_file_content`, I/O real e pergunta `ask_user`.
+- `llm.usage` apareceu na timeline com classificacao e motivo, sem ser automaticamente transformado em `pr.consumed`.
+- O live revelou que o SDK real pode emitir `initiator:user` na primeira usage de um turno humano. O classificador foi ajustado: `initiator:user` com `user.message` pendente e `premium_request`; `ask_user` continua tendo prioridade e permanece `ask_user_continuation`/zero-PR.
+- Responder `SIM` ao `ask_user` registrou `question.answered` e nao gerou novo `pr.consumed` no live observado.
+- `/errors 10` permaneceu limpo.
+
+Gap restante:
+
+- O SDK pode emitir usage de fechamento com `initiator:agent` antes de `user_input.completed`; nesse caso ela fica corretamente como "sem novo PR", mas nem sempre como `ask_user_continuation`. Falta enriquecer o classificador com sinal local de resposta humana pendente para melhorar a explicacao sem reabrir risco de falso PR.
+
+## Validacao live Codex - runner canonico PTY
+
+Comando: `npm run terminal:llm-b:live-test -- --transport=pty --timeout-ms=240000 --post-answer-delay-ms=6000`.
+
+Artefato PASS: `artifacts/terminal-live/2026-05-20T09-47-12-519Z/summary.md`.
+
+O runner agora sobe `terminal:llm-b` dentro de pseudo-terminal via `script`, em vez de pipes headless, porque a UX real do operador depende de readline/TTY. O modo headless permanece util como diagnostico via HTTP `/inject`, mas nao valida prompt, comandos e linha viva.
+
+Critérios validados:
+
+- ready/REPL interativo;
+- deltas parciais e bloco final `DELTA-CANONICAL-1..8`;
+- `report_intent` e `read_file_content` com start/done, tempo e I/O real;
+- `ask_user` persistente e resposta humana registrada;
+- resposta humana `SIM` nao renderizada como transcript nem delta da LLM-B;
+- `llm.usage` separado de PR;
+- `/errors 10` limpo;
+- `/quit` limpo.
+
+Achados novos do runner:
+
+- O primeiro desenho do runner, com `stdin` em pipe, colocou o terminal em modo headless e nao exercitou a UX real. Corrigido com transporte PTY default.
+- O criterio de duplicacao nao pode contar prompt + stream parcial + final como tripla duplicacao. Corrigido: duplicacao patologica agora foca marcadores anormais e eco humano.
+- O SDK pode ecoar resposta humana de `ask_user` por canais publicos antes ou depois de `user_input.completed`. Corrigido com guardiao local registrado no momento em que o terminal envia a resposta humana.
