@@ -117,6 +117,70 @@ export const TERMINAL_AGENT_SSE_PASSTHROUGH_EVENTS = new Set([
 ]);
 
 /**
+ * Fonte de autoridade para superfícies públicas que historicamente geraram duplicidade visual.
+ *
+ * @type {ReadonlyArray<{
+ *     id: string;
+ *     canonicalEmitter: string;
+ *     publicEvents: string[];
+ *     accepts: string[];
+ *     suppresses: string[];
+ *     fallback: string;
+ *     owner: string;
+ * }>}
+ */
+export const TERMINAL_PUBLIC_STREAM_SOURCE_POLICIES = Object.freeze([
+    {
+        id: 'assistant.text.delta',
+        canonicalEmitter: 'terminal/dialog/turn-display.createDeltaCallback',
+        publicEvents: ['delta'],
+        accepts: ['dialog.delta'],
+        suppresses: ['task.delta after dialog.delta', 'assistant.message already materialized'],
+        fallback: 'task.delta only when dialog loop is inactive',
+        owner: 'terminal/dialog + terminal/state/turn-materialization-state.js',
+    },
+    {
+        id: 'assistant.text.final',
+        canonicalEmitter: 'terminal/state/turn-materialization-state.completeTerminalTurnMaterialization',
+        publicEvents: ['assistant.message', 'dialog.turn_end'],
+        accepts: ['turn return', 'assistant.message', 'dialog.turn_end'],
+        suppresses: ['assistant.message equivalent to active/recent materialization'],
+        fallback: 'dialog.turn_end may render final text only when no prior materialization covered it',
+        owner: 'terminal/dialog/engine.js + terminal/wiring/terminal-agent-wiring.js',
+    },
+    {
+        id: 'ask_user.visible-question',
+        canonicalEmitter: 'terminal/events/sdk-session-events.user_input.requested',
+        publicEvents: ['user_input.requested'],
+        accepts: ['user_input.requested'],
+        suppresses: ['question.pending visual duplicate'],
+        fallback: 'question.pending is retained as state/replay signal, not normal visual renderer',
+        owner: 'terminal/events/sdk-session-events.js + terminal/events/agent-runtime-events.js',
+    },
+    {
+        id: 'tool.lifecycle',
+        canonicalEmitter: 'terminal/events/tool-lifecycle-runtime.handleTerminalNativeToolStart',
+        publicEvents: ['tool.lifecycle'],
+        accepts: ['tool.execution_start', 'tool.execution_progress', 'tool.execution_complete'],
+        suppresses: ['generic unknown tool label when registry has a stronger identity'],
+        fallback: 'external_tool.* remains separate until promoted to canonical tool lifecycle',
+        owner: 'terminal/events/tool-lifecycle-runtime.js',
+    },
+]);
+
+/**
+ * @returns {Array<(typeof TERMINAL_PUBLIC_STREAM_SOURCE_POLICIES)[number]>}
+ */
+export function listTerminalPublicStreamSourcePolicies() {
+    return TERMINAL_PUBLIC_STREAM_SOURCE_POLICIES.map((policy) => ({
+        ...policy,
+        publicEvents: [...policy.publicEvents],
+        accepts: [...policy.accepts],
+        suppresses: [...policy.suppresses],
+    }));
+}
+
+/**
  * @returns {Set<string>}
  */
 export function createTerminalHandledAgentEventsSet() {

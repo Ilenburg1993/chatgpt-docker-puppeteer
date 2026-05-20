@@ -524,7 +524,7 @@ Fase H3. FS e watchers
 Fase I1. Inventário e classificação de emitters
 
 - I1.1 Mapear todos os listeners do SDK e eventos derivados (`dialog.delta`, `task.delta`, `assistant.message`, `question.pending`). Status: feito nesta revisão.
-- I1.2 Classificar cada emissor como fonte canônica, adaptador, fallback ou legado. Status: iniciado nesta revisão.
+- I1.2 Classificar cada emissor como fonte canônica, adaptador, fallback ou legado. Status: parcialmente feito; `/events sources` expõe o mapa operacional das superfícies críticas.
 - I1.3 Bloquear novos eventos públicos fora de `broadcastSse()` por teste arquitetural. Status: pendente.
 - I1.4 Expor `/events sources` ou `/health` com contagem por fonte/adaptador. Status: pendente.
 
@@ -577,12 +577,14 @@ Implementado:
 - `agent-messaging.js` agora distingue tasks `user_queue` e `dialog_boot`; requeue pós-reconexão de `dialog_boot` é bloqueado para evitar prompt duplicado.
 - `terminal-agent-wiring.js` descreve `reconnect_restart` como preservação sem replay, com `promptReplayBlocked=true` no SSE.
 - `task-stream-events.js` mostra `task.error` com `requeueBlocked=true` como "prompt preservado sem reenvio automático".
+- `/events sources` agora mostra a autoridade canônica das superfícies críticas: delta público, final textual, ask_user e lifecycle de tools.
+- `event-adapter-events.js` passou a conter `TERMINAL_PUBLIC_STREAM_SOURCE_POLICIES`, prendendo em código quais fontes são aceitas, suprimidas e fallback.
 - Testes unitários adicionados para runtime root, reflection sync failure e SIGHUP policy.
 - Testes unitários adicionados para reconciliação de `assistant.message` materializado, supressão visual de `question.pending` e preferência `dialog.delta`.
 - Testes unitários adicionados para normalização de objetos de erro sem `message`.
 - Testes unitários adicionados para lazy import resiliente, sanitização terminal, release de display state, safe SSE payload e sufixo final formatado.
 - Teste unitário adicionado para deduplicação visual de intents equivalentes.
-- Testes unitários adicionados para bloqueio de reenvio automático de task `dialog_boot` após reconexão e para UX/SSE de prompt preservado.
+- Testes unitários adicionados para bloqueio de reenvio automático de task `dialog_boot` após reconexão, UX/SSE de prompt preservado e mapa `/events sources`.
 
 Próxima rodada recomendada:
 

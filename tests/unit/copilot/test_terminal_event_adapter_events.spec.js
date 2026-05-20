@@ -14,6 +14,7 @@ describe('terminal/event-adapter-events.js — contrato', () => {
             TERMINAL_AGENT_SSE_PASSTHROUGH_EVENTS,
             createTerminalHandledAgentEventsSet,
             createTerminalPassthroughAgentEventsSet,
+            listTerminalPublicStreamSourcePolicies,
             listTerminalIgnoredAgentEvents,
         } = await import('../../../src/copilot/terminal/events/event-adapter-events.js');
 
@@ -46,5 +47,28 @@ describe('terminal/event-adapter-events.js — contrato', () => {
         expect([...handled].filter((event) => passthrough.has(event))).toEqual([]);
         expect(ignored).toContain('assistant.streaming_delta');
         expect(ignored).toContain('session.keepalive');
+
+        const sourcePolicies = listTerminalPublicStreamSourcePolicies();
+        expect(sourcePolicies.map((policy) => policy.id)).toEqual(
+            expect.arrayContaining([
+                'assistant.text.delta',
+                'assistant.text.final',
+                'ask_user.visible-question',
+                'tool.lifecycle',
+            ]),
+        );
+        expect(sourcePolicies.find((policy) => policy.id === 'assistant.text.delta')).toEqual(
+            expect.objectContaining({
+                publicEvents: ['delta'],
+                accepts: ['dialog.delta'],
+                fallback: 'task.delta only when dialog loop is inactive',
+            }),
+        );
+        expect(sourcePolicies.find((policy) => policy.id === 'ask_user.visible-question')).toEqual(
+            expect.objectContaining({
+                accepts: ['user_input.requested'],
+                suppresses: ['question.pending visual duplicate'],
+            }),
+        );
     });
 });

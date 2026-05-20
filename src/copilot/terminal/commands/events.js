@@ -6,6 +6,7 @@
  */
 
 import { readTerminalSseEventArchiveTail } from '../state/index.js';
+import { listTerminalPublicStreamSourcePolicies } from '../events/index.js';
 
 /**
  * @typedef {object} EventsContext
@@ -85,6 +86,15 @@ function parseEventsArg(arg) {
 }
 
 /**
+ * @param {string} arg
+ * @returns {boolean}
+ */
+function isEventsSourcesArg(arg) {
+    const first = arg.trim().split(/\s+/u).filter(Boolean)[0] ?? '';
+    return first === 'sources' || first === 'source-map' || first === 'authority';
+}
+
+/**
  * @param {unknown} value
  * @returns {string}
  */
@@ -120,6 +130,22 @@ function summarizePayload(payload) {
  * @returns {Promise<void>}
  */
 export async function cmdEvents({ println }, arg = '') {
+    if (isEventsSourcesArg(arg)) {
+        const policies = listTerminalPublicStreamSourcePolicies();
+        println('\n  \x1b[36m🧭 Fontes canônicas do terminal\x1b[0m');
+        for (const policy of policies) {
+            println(`  \x1b[33m${policy.id}\x1b[0m`);
+            println(`    owner       \x1b[90m${policy.owner}\x1b[0m`);
+            println(`    emitter     \x1b[90m${policy.canonicalEmitter}\x1b[0m`);
+            println(`    eventos     \x1b[90m${policy.publicEvents.join(', ')}\x1b[0m`);
+            println(`    aceita      \x1b[90m${policy.accepts.join(', ')}\x1b[0m`);
+            println(`    suprime     \x1b[90m${policy.suppresses.join(', ')}\x1b[0m`);
+            println(`    fallback    \x1b[90m${policy.fallback}\x1b[0m`);
+        }
+        println('');
+        return;
+    }
+
     const { query, format } = parseEventsArg(arg);
     const projection = await readTerminalSseEventArchiveTail(query);
     const { state, entries, filters } = projection;
