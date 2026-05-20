@@ -17,6 +17,7 @@ export {
     TERMINAL_EXPLICIT_AGENT_EVENTS,
     createTerminalHandledAgentEventsSet,
     createTerminalPassthroughAgentEventsSet,
+    findTerminalPublicStreamSourcePolicyByEvent,
     listTerminalPublicStreamSourcePolicies,
     listTerminalIgnoredAgentEvents,
 } from './event-adapter-events.js';

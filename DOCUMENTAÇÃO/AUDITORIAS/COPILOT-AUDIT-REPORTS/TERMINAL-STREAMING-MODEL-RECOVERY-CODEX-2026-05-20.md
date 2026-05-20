@@ -623,9 +623,9 @@ Fase H3. FS e watchers
 Fase I1. Inventário e classificação de emitters
 
 - I1.1 Mapear todos os listeners do SDK e eventos derivados (`dialog.delta`, `task.delta`, `assistant.message`, `question.pending`). Status: feito nesta revisão.
-- I1.2 Classificar cada emissor como fonte canônica, adaptador, fallback ou legado. Status: parcialmente feito; `/events sources` expõe o mapa operacional das superfícies críticas.
-- I1.3 Bloquear novos eventos públicos fora de `broadcastSse()` por teste arquitetural. Status: pendente.
-- I1.4 Expor `/events sources` ou `/health` com contagem por fonte/adaptador. Status: pendente.
+- I1.2 Classificar cada emissor como fonte canônica, adaptador, fallback ou legado. Status: ampliado nesta revisão; `/events sources` expõe classe, owner, emissor, eventos aceitos, supressões e fallback das superfícies críticas.
+- I1.3 Bloquear novos eventos públicos fora de `broadcastSse()` por teste arquitetural. Status: feito nesta revisão para fanout durável/SSE: `eventFanout.publish()` e `recordTerminalSseEventArchive()` ficam concentrados em `dialog/sse.js` e no arquivo de archive.
+- I1.4 Expor `/events sources` ou `/health` com contagem por fonte/adaptador. Status: parcialmente feito; `/events sources` mostra fonte e classe, falta contagem dinâmica por sessão.
 
 Fase I2. Política explícita de compat/fallback
 
@@ -678,6 +678,13 @@ Implementado:
 - `task-stream-events.js` mostra `task.error` com `requeueBlocked=true` como "prompt preservado sem reenvio automático".
 - `/events sources` agora mostra a autoridade canônica das superfícies críticas: delta público, final textual, ask_user e lifecycle de tools.
 - `event-adapter-events.js` passou a conter `TERMINAL_PUBLIC_STREAM_SOURCE_POLICIES`, prendendo em código quais fontes são aceitas, suprimidas e fallback.
+- `TERMINAL_PUBLIC_STREAM_SOURCE_POLICIES` agora cobre também elicitation, permission, estado do dialog loop, usage telemetry, erro de sessão e lifecycle do terminal, com classe explícita (`content`, `interaction`, `tool`, `state`, `telemetry`, `diagnostic`, `lifecycle`).
+- `/events sources` passou a exibir a classe da fonte, deixando claro se a superfície é conteúdo, interação, tool, estado, telemetria, diagnóstico ou lifecycle.
+- O teste arquitetural de eventos agora impede bypass do fanout durável: `eventFanout.publish()` não pode surgir fora de `dialog/sse.js`, e escrita no archive não pode aparecer fora do ponto único de fanout e do próprio arquivo de archive.
+- `events/event-adapter-events.js` foi reclassificado como `watch` no `module-map.js`, pois a matriz canônica cresceu e passou a ser peça de governança ativa, não arquivo estável pequeno.
+- `tool-activity-presenter.js` passou a recuperar a identidade real da tool em `data`, `payload`, `input`, `args` e `arguments` serializado quando o SDK envia nomes genéricos como `unknown`, `tool` ou `external_tool`.
+- `tool-lifecycle-runtime.js` agora registra lifecycle nativo com o nome efetivo do presenter, reduzindo a chance de `tool.lifecycle` nascer com identidade genérica quando o payload já traz uma identidade melhor.
+- `tool-activity-presenter.js` foi reclassificado como `hotspot` no `module-map.js`; a próxima subonda deve modularizar identity resolution, target summary e rendering text para reduzir tamanho sem quebrar o fluxo único.
 - Boot HTTP deixou de morrer em `EADDRINUSE` e passou a realocar a porta do inject server com UX/comandos refletindo a porta efetiva.
 - O live runner canônico agora evita colisão de porta antes do boot e coleta SSE na porta efetiva escolhida.
 - `task.delta` público fora de turno agora fecha materialização canônica; `assistant.message` posterior suprime duplicata exata ou renderiza apenas o sufixo faltante.
@@ -697,10 +704,10 @@ Implementado:
 
 Próxima rodada recomendada:
 
-1. Criar teste arquitetural que impeça evento público fora de `broadcastSse()` e classifique emitters canônicos/adapters/fallbacks.
-2. Fechar a recuperação `session.error`/`reconnect_restart`, distinguindo retry real de reenvio ambíguo de prompt.
-3. Normalizar wording de usage para remover qualquer ambiguidade residual com Premium Request.
-4. Criar contrato único de modelo configurado/preferido/efetivo/cobrado.
-5. Atacar `tool unknown` por normalização central, não por casos especiais de renderer.
-6. Adicionar eventos de boot `runtime.wired` e falha de fase.
+1. Fechar a recuperação `session.error`/`reconnect_restart`, distinguindo retry real de reenvio ambíguo de prompt.
+2. Normalizar wording de usage para remover qualquer ambiguidade residual com Premium Request.
+3. Criar contrato único de modelo configurado/preferido/efetivo/cobrado.
+4. Continuar a normalização de tool identity em completions/progress externos sem requestId, com métricas para qualquer lifecycle ainda genérico.
+5. Adicionar eventos de boot `runtime.wired` e falha de fase.
+6. Expandir `/events sources` com contagem dinâmica por fonte/adaptador e links para `/events source=...`.
 7. Expandir o cenário live para elicitation quando a capability estiver disponível.

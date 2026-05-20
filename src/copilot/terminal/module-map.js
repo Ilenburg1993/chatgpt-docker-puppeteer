@@ -211,9 +211,9 @@ export const TERMINAL_MODULE_LAYOUT = Object.freeze([
         kind: 'file',
         role: 'event-adapter',
         tier: 'secondary',
-        risk: 'stable',
+        risk: 'watch',
         public: false,
-        summary: 'Matriz de cobertura dos eventos do agent: adapters explícitos, passthrough residual e ignorados.',
+        summary: 'Matriz contratual dos eventos do agent, fontes públicas canônicas, passthrough residual e ignorados.',
     },
     {
         path: 'events/agent-runtime-events.js',
@@ -301,9 +301,9 @@ export const TERMINAL_MODULE_LAYOUT = Object.freeze([
         kind: 'file',
         role: 'event-adapter',
         tier: 'secondary',
-        risk: 'watch',
+        risk: 'hotspot',
         public: false,
-        summary: 'Presenter puro para narrativa operacional de tools, arquivos e comandos no terminal.',
+        summary: 'Presenter canônico para identidade/narrativa operacional de tools, arquivos e comandos no terminal.',
     },
     {
         path: 'state/activity-state.js',

@@ -433,16 +433,17 @@ function hasSemanticToolTarget(presentation) {
  */
 export function handleTerminalNativeToolStart({ registry, evt }) {
     const toolCallId = /** @type {string} */ (evt?.['toolCallId'] ?? '');
-    const name = /** @type {string} */ (evt?.['toolName'] ?? evt?.['name'] ?? 'tool');
-    if (shouldSuppressTerminalToolNarration(name)) return;
+    const rawName = /** @type {string} */ (evt?.['toolName'] ?? evt?.['name'] ?? 'tool');
     const rawArgs = objectArgsOrEmpty(evt?.['args'] ?? evt?.['arguments'] ?? evt?.['input'] ?? null);
+    const presentation = buildTerminalToolActivityPresentation(evt, rawName);
+    const name = presentation.toolName;
+    if (shouldSuppressTerminalToolNarration(name)) return;
     renderReportIntentToolPayload({
         toolName: name,
         evt: { ...evt, args: rawArgs },
         source: `tool/${name}`,
         toolCallId,
     });
-    const presentation = buildTerminalToolActivityPresentation(evt, name);
     const canonicalName = presentation.canonicalToolName ?? name;
     if (toolCallId && registry.isInFlight(toolCallId)) {
         registry.touch(toolCallId, { rawArgs, presentation });
@@ -658,7 +659,7 @@ export function handleTerminalNativeToolComplete({ registry, evt }) {
     const presentation = hasSemanticToolTarget(completionPresentation)
         ? completionPresentation
         : (entry?.presentation ?? completionPresentation);
-    const canonicalName = presentation.canonicalToolName ?? name;
+    const canonicalName = presentation.canonicalToolName ?? presentation.toolName;
     const durationMs = metricEntry
         ? Date.now() - metricEntry.t0
         : Number.isFinite(Number(evt?.['durationMs']))
@@ -700,7 +701,8 @@ export function handleTerminalNativeToolComplete({ registry, evt }) {
  * @returns {void}
  */
 export function handleTerminalToolUserRequested(evt) {
-    const toolName = /** @type {string} */ (evt?.['toolName'] ?? 'tool');
+    const presentation = buildTerminalToolActivityPresentation(evt, /** @type {string} */ (evt?.['toolName'] ?? 'tool'));
+    const toolName = presentation.canonicalToolName ?? presentation.toolName;
     const requestId = typeof evt?.['requestId'] === 'string' ? evt['requestId'] : null;
     recordTerminalTurnToolActivity({
         toolName,
@@ -810,8 +812,9 @@ export function handleTerminalExternalToolCompleted({ registry, evt, verboseNarr
     let resolvedToolCallId = evtToolCallId;
     const resolvedByRequest = registry.resolveByRequestId(requestId);
     const resolvedName = resolvedByRequest?.toolName ?? registry.resolveNameByRequestId(requestId);
-    const toolName =
-        effectiveOriginalToolName === 'external_tool' && resolvedName ? resolvedName : effectiveOriginalToolName;
+    const toolName = isGenericTerminalToolName(effectiveOriginalToolName) && resolvedName
+        ? resolvedName
+        : effectiveOriginalToolName;
     const resolvedEntry = resolvedByRequest ?? registry.resolveByName(toolName);
     renderReportIntentToolPayload({
         toolName,

@@ -358,6 +358,49 @@ describe('terminal/events/agent-runtime-events.js — contrato', () => {
         );
     });
 
+    it('normaliza nome genérico de tool a partir de payload aninhado antes de registrar lifecycle', async () => {
+        const { setupTerminalAgentRuntimeEventListeners } =
+            await import('../../../src/copilot/terminal/events/agent-runtime-events.js');
+        /** @type {Map<string, Function[]>} */
+        const listeners = new Map();
+        const agent = {
+            on: vi.fn((event, handler) => {
+                const list = listeners.get(event) ?? [];
+                list.push(handler);
+                listeners.set(event, list);
+            }),
+            off: vi.fn(),
+        };
+
+        setupTerminalAgentRuntimeEventListeners({ agent: /** @type {any} */ (agent), rl: null });
+        listeners.get('tool.execution_start')?.[0]?.({
+            toolCallId: 'generic-nested-1',
+            toolName: 'unknown',
+            data: {
+                toolName: 'patch_file',
+                args: { path: 'src/copilot/terminal/dialog/engine.js' },
+            },
+        });
+
+        expect(recordTerminalActivity).toHaveBeenCalledWith(
+            'tool',
+            'Executando tool',
+            expect.objectContaining({
+                toolName: 'patch_file',
+                detail: expect.stringContaining('editando arquivo'),
+            }),
+        );
+        expect(broadcastSse).toHaveBeenCalledWith(
+            'tool.lifecycle',
+            expect.objectContaining({
+                type: 'start',
+                toolCallId: 'generic-nested-1',
+                toolName: 'patch_file',
+                operation: 'edit',
+            }),
+        );
+    });
+
     it('promove report_intent_local para intent persistente e visível no terminal', async () => {
         const { setupTerminalAgentRuntimeEventListeners } =
             await import('../../../src/copilot/terminal/events/agent-runtime-events.js');

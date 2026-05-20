@@ -5,7 +5,7 @@
  * @module copilot/terminal/commands/events
  */
 
-import { listTerminalPublicStreamSourcePolicies } from '../events/event-adapter-events.js';
+import { listTerminalPublicStreamSourcePolicies } from '../events/index.js';
 import { readTerminalSseEventArchiveTail } from '../state/index.js';
 
 /**
@@ -134,7 +134,7 @@ export async function cmdEvents({ println }, arg = '') {
         const policies = listTerminalPublicStreamSourcePolicies();
         println('\n  \x1b[36m🧭 Fontes canônicas do terminal\x1b[0m');
         for (const policy of policies) {
-            println(`  \x1b[33m${policy.id}\x1b[0m`);
+            println(`  \x1b[33m${policy.id}\x1b[0m \x1b[90m(${policy.class})\x1b[0m`);
             println(`    owner       \x1b[90m${policy.owner}\x1b[0m`);
             println(`    emitter     \x1b[90m${policy.canonicalEmitter}\x1b[0m`);
             println(`    eventos     \x1b[90m${policy.publicEvents.join(', ')}\x1b[0m`);

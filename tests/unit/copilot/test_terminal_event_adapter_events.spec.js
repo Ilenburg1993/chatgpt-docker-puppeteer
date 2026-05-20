@@ -6,6 +6,20 @@
  */
 
 import { describe, expect, it } from 'vitest';
+import { readdirSync, readFileSync } from 'node:fs';
+import { join, relative } from 'node:path';
+
+/**
+ * @param {string} dir
+ * @returns {string[]}
+ */
+function listJsFiles(dir) {
+    return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+        const full = join(dir, entry.name);
+        if (entry.isDirectory()) return listJsFiles(full);
+        return entry.isFile() && entry.name.endsWith('.js') ? [full] : [];
+    });
+}
 
 describe('terminal/event-adapter-events.js — contrato', () => {
     it('declara eventos tratados explicitamente e a janela residual de passthrough SSE', async () => {
@@ -14,6 +28,7 @@ describe('terminal/event-adapter-events.js — contrato', () => {
             TERMINAL_AGENT_SSE_PASSTHROUGH_EVENTS,
             createTerminalHandledAgentEventsSet,
             createTerminalPassthroughAgentEventsSet,
+            findTerminalPublicStreamSourcePolicyByEvent,
             listTerminalPublicStreamSourcePolicies,
             listTerminalIgnoredAgentEvents,
         } = await import('../../../src/copilot/terminal/events/event-adapter-events.js');
@@ -54,11 +69,30 @@ describe('terminal/event-adapter-events.js — contrato', () => {
                 'assistant.text.delta',
                 'assistant.text.final',
                 'ask_user.visible-question',
+                'elicitation.visible-request',
+                'permission.visible-request',
                 'tool.lifecycle',
+                'dialog.loop.state',
+                'usage.telemetry',
+                'session.error.diagnostic',
+                'terminal.lifecycle',
             ]),
         );
+        expect(new Set(sourcePolicies.map((policy) => policy.id)).size).toBe(sourcePolicies.length);
+        for (const policy of sourcePolicies) {
+            expect(policy.class).toMatch(/^(content|interaction|tool|state|telemetry|diagnostic|lifecycle)$/u);
+            expect(policy.canonicalEmitter).toBeTruthy();
+            expect(policy.owner).toBeTruthy();
+            expect(policy.publicEvents.length).toBeGreaterThan(0);
+            expect(policy.accepts.length).toBeGreaterThan(0);
+            expect(policy.suppresses.length).toBeGreaterThan(0);
+            expect(policy.fallback).toBeTruthy();
+        }
+        const publicEvents = sourcePolicies.flatMap((policy) => policy.publicEvents);
+        expect(new Set(publicEvents).size).toBe(publicEvents.length);
         expect(sourcePolicies.find((policy) => policy.id === 'assistant.text.delta')).toEqual(
             expect.objectContaining({
+                class: 'content',
                 publicEvents: ['delta'],
                 accepts: ['dialog.delta'],
                 fallback: 'task.delta only when dialog loop is inactive',
@@ -70,5 +104,39 @@ describe('terminal/event-adapter-events.js — contrato', () => {
                 suppresses: ['question.pending visual duplicate'],
             }),
         );
+        expect(findTerminalPublicStreamSourcePolicyByEvent('dialog.loop.changed')).toEqual(
+            expect.objectContaining({
+                id: 'dialog.loop.state',
+                class: 'state',
+            }),
+        );
+        expect(findTerminalPublicStreamSourcePolicyByEvent('session.usage')).toEqual(
+            expect.objectContaining({
+                id: 'usage.telemetry',
+                fallback: 'usage is telemetry only; pr.consumed is the only public PR-consumption signal',
+            }),
+        );
+        expect(findTerminalPublicStreamSourcePolicyByEvent('missing.event')).toBeNull();
+    });
+
+    it('impede bypass do fanout publico duravel fora de dialog/sse.js', () => {
+        const terminalRoot = join(process.cwd(), 'src/copilot/terminal');
+        const allowed = new Set([join(terminalRoot, 'dialog/sse.js'), join(terminalRoot, 'state/sse-event-archive.js')]);
+        const offenders = listJsFiles(terminalRoot)
+            .filter((file) => !allowed.has(file))
+            .flatMap((file) => {
+                const source = readFileSync(file, 'utf8');
+                /** @type {string[]} */
+                const reasons = [];
+                if (/eventFanout\.publish\s*\(/u.test(source)) {
+                    reasons.push('eventFanout.publish');
+                }
+                if (/recordTerminalSseEventArchive\s*\(/u.test(source)) {
+                    reasons.push('recordTerminalSseEventArchive');
+                }
+                return reasons.map((reason) => `${relative(process.cwd(), file)}:${reason}`);
+            });
+
+        expect(offenders).toEqual([]);
     });
 });

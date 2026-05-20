@@ -121,6 +121,7 @@ export const TERMINAL_AGENT_SSE_PASSTHROUGH_EVENTS = new Set([
  *
  * @type {ReadonlyArray<{
  *     id: string;
+ *     class: 'content' | 'interaction' | 'tool' | 'state' | 'telemetry' | 'diagnostic' | 'lifecycle';
  *     canonicalEmitter: string;
  *     publicEvents: string[];
  *     accepts: string[];
@@ -132,6 +133,7 @@ export const TERMINAL_AGENT_SSE_PASSTHROUGH_EVENTS = new Set([
 export const TERMINAL_PUBLIC_STREAM_SOURCE_POLICIES = Object.freeze([
     {
         id: 'assistant.text.delta',
+        class: 'content',
         canonicalEmitter: 'terminal/dialog/turn-display.createDeltaCallback',
         publicEvents: ['delta'],
         accepts: ['dialog.delta'],
@@ -141,6 +143,7 @@ export const TERMINAL_PUBLIC_STREAM_SOURCE_POLICIES = Object.freeze([
     },
     {
         id: 'assistant.text.final',
+        class: 'content',
         canonicalEmitter: 'terminal/state/turn-materialization-state.completeTerminalTurnMaterialization',
         publicEvents: ['assistant.message', 'dialog.turn_end'],
         accepts: ['turn return', 'assistant.message', 'dialog.turn_end'],
@@ -150,6 +153,7 @@ export const TERMINAL_PUBLIC_STREAM_SOURCE_POLICIES = Object.freeze([
     },
     {
         id: 'ask_user.visible-question',
+        class: 'interaction',
         canonicalEmitter: 'terminal/events/sdk-session-events.user_input.requested',
         publicEvents: ['user_input.requested'],
         accepts: ['user_input.requested'],
@@ -158,13 +162,74 @@ export const TERMINAL_PUBLIC_STREAM_SOURCE_POLICIES = Object.freeze([
         owner: 'terminal/events/sdk-session-events.js + terminal/events/agent-runtime-events.js',
     },
     {
+        id: 'elicitation.visible-request',
+        class: 'interaction',
+        canonicalEmitter: 'terminal/events/sdk-session-events.elicitation.pending',
+        publicEvents: ['elicitation.pending', 'elicitation.completed'],
+        accepts: ['elicitation.pending', 'elicitation.completed'],
+        suppresses: ['parallel question.pending renderer for the same request'],
+        fallback: 'none; elicitation must remain schema-aware and visible through /elicitation and /events',
+        owner: 'terminal/events/sdk-session-events.js + terminal/state/elicitation-state.js',
+    },
+    {
+        id: 'permission.visible-request',
+        class: 'interaction',
+        canonicalEmitter: 'terminal/events/sdk-session-events.permission.requested',
+        publicEvents: ['permission.requested', 'permission.completed', 'permission.mode_changed'],
+        accepts: ['permission.requested', 'permission.completed', 'permission.mode_changed'],
+        suppresses: ['repeated generic permission hints after first visible help line'],
+        fallback: 'manual /permission respond is the operator fallback; no hidden auto-renderer',
+        owner: 'terminal/events/sdk-session-events.js + terminal/commands/permission.js',
+    },
+    {
         id: 'tool.lifecycle',
+        class: 'tool',
         canonicalEmitter: 'terminal/events/tool-lifecycle-runtime.handleTerminalNativeToolStart',
         publicEvents: ['tool.lifecycle'],
         accepts: ['tool.execution_start', 'tool.execution_progress', 'tool.execution_complete'],
         suppresses: ['generic unknown tool label when registry has a stronger identity'],
         fallback: 'external_tool.* remains separate until promoted to canonical tool lifecycle',
         owner: 'terminal/events/tool-lifecycle-runtime.js',
+    },
+    {
+        id: 'dialog.loop.state',
+        class: 'state',
+        canonicalEmitter: 'terminal/wiring/terminal-agent-wiring.dialog.loop.changed',
+        publicEvents: ['dialog.loop.changed', 'dialog.ready', 'dialog.stopped'],
+        accepts: ['dialog.loop.changed', 'dialog.ready', 'dialog.stopped'],
+        suppresses: ['equivalent dialog.loop.changed state inside the debounce window'],
+        fallback: 'none; loop recovery must emit explicit state instead of replaying stale prompts',
+        owner: 'terminal/wiring/terminal-agent-wiring.js',
+    },
+    {
+        id: 'usage.telemetry',
+        class: 'telemetry',
+        canonicalEmitter: 'terminal/events/agent-runtime-events.llm.usage',
+        publicEvents: ['llm.usage', 'session.usage'],
+        accepts: ['assistant.usage', 'session.usage_info', 'llm.usage', 'session.usage'],
+        suppresses: ['wording that implies Premium Request without pr.consumed evidence'],
+        fallback: 'usage is telemetry only; pr.consumed is the only public PR-consumption signal',
+        owner: 'event-handlers/usage-classifier.js + terminal/events/agent-runtime-events.js',
+    },
+    {
+        id: 'session.error.diagnostic',
+        class: 'diagnostic',
+        canonicalEmitter: 'terminal/events/sdk-session-events.session.error',
+        publicEvents: ['session.error'],
+        accepts: ['session.error', 'hook:error_occurred normalized by error tracker'],
+        suppresses: ['[object Object] rendering', 'repeated empty SDK errors without new diagnostic payload'],
+        fallback: '/errors preserves raw diagnostic context when SDK payload is sparse',
+        owner: 'terminal/events/sdk-session-events.js + terminal/errors/error-tracker.js',
+    },
+    {
+        id: 'terminal.lifecycle',
+        class: 'lifecycle',
+        canonicalEmitter: 'terminal/terminal-phases.boot-listeners',
+        publicEvents: ['terminal.started', 'terminal.activity', 'activity.changed', 'skills.reloaded'],
+        accepts: ['boot phase lifecycle', 'pinned context reload', 'activity state changes'],
+        suppresses: ['transient boot degraded states presented as final diagnosis'],
+        fallback: 'ready auto-brief supersedes boot partial brief when registry/dialog become canonical',
+        owner: 'terminal/terminal-phases/boot-listeners.js + terminal/terminal-phases/boot-pinned.js',
     },
 ]);
 
@@ -178,6 +243,16 @@ export function listTerminalPublicStreamSourcePolicies() {
         accepts: [...policy.accepts],
         suppresses: [...policy.suppresses],
     }));
+}
+
+/**
+ * @param {string} event
+ * @returns {(typeof TERMINAL_PUBLIC_STREAM_SOURCE_POLICIES)[number] | null}
+ */
+export function findTerminalPublicStreamSourcePolicyByEvent(event) {
+    const normalized = String(event).trim();
+    if (!normalized) return null;
+    return TERMINAL_PUBLIC_STREAM_SOURCE_POLICIES.find((policy) => policy.publicEvents.includes(normalized)) ?? null;
 }
 
 /**

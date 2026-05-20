@@ -63,6 +63,24 @@ function objectOrNull(value) {
 
 /**
  * @param {unknown} value
+ * @returns {Record<string, unknown> | null}
+ */
+function objectOrParsedJson(value) {
+    const object = objectOrNull(value);
+    if (object) return object;
+    if (typeof value !== 'string') return null;
+    const text = value.trim();
+    if (!text.startsWith('{')) return null;
+    try {
+        const parsed = JSON.parse(text);
+        return objectOrNull(parsed);
+    } catch {
+        return null;
+    }
+}
+
+/**
+ * @param {unknown} value
  * @returns {string | null}
  */
 function stringOrNull(value) {
@@ -104,6 +122,63 @@ function normalizeToolArgsPayload(raw) {
         return /** @type {Record<string, unknown>} */ (wrappedArgs);
     }
     return base;
+}
+
+/**
+ * @param {Record<string, unknown>} record
+ * @param {string[]} keys
+ * @returns {string | null}
+ */
+function readFirstSpecificToolName(record, keys) {
+    for (const key of keys) {
+        const value = stringOrNull(record[key]);
+        if (value && !isGenericTerminalToolName(value)) return value;
+    }
+    return null;
+}
+
+/**
+ * Eventos de tool do SDK podem chegar como `external_tool`, `tool` ou `unknown` no topo, enquanto a identidade real
+ * vive dentro de `data`, `payload`, `input`, `args` ou `arguments` serializado. A UX inteira depende deste ponto central
+ * para não espalhar casos especiais nos renderers.
+ *
+ * @param {Record<string, unknown>} evt
+ * @returns {string | null}
+ */
+function inferNestedToolName(evt) {
+    const candidates = [
+        evt,
+        evt['data'],
+        evt['payload'],
+        evt['input'],
+        evt['args'],
+        evt['arguments'],
+        objectOrParsedJson(evt['data']),
+        objectOrParsedJson(evt['payload']),
+        objectOrParsedJson(evt['input']),
+        objectOrParsedJson(evt['args']),
+        objectOrParsedJson(evt['arguments']),
+    ];
+    for (const candidate of candidates) {
+        const object = objectOrParsedJson(candidate);
+        if (!object) continue;
+        const name = readFirstSpecificToolName(object, [
+            'canonicalToolName',
+            'canonicalName',
+            'toolName',
+            'tool_name',
+            'mcpToolName',
+            'requestedTool',
+            'targetTool',
+            'functionName',
+            'commandName',
+            'name',
+            'tool',
+            'operation',
+        ]);
+        if (name) return name;
+    }
+    return null;
 }
 
 /**
@@ -223,7 +298,11 @@ export function mapTerminalToolOperationRole(operation) {
  */
 export function buildTerminalToolActivityPresentation(evt, fallbackName = 'tool') {
     const explicitToolName = stringOrNull(evt['toolName']) ?? stringOrNull(evt['name']);
-    const toolName = explicitToolName && !isGenericTerminalToolName(explicitToolName) ? explicitToolName : fallbackName;
+    const nestedToolName = inferNestedToolName(evt);
+    const toolName =
+        explicitToolName && !isGenericTerminalToolName(explicitToolName)
+            ? explicitToolName
+            : (nestedToolName ?? fallbackName);
     const canonicalToolName = resolveToolName(toolName);
     const displayToolName =
         canonicalToolName && canonicalToolName !== toolName ? `${canonicalToolName} (alias: ${toolName})` : toolName;

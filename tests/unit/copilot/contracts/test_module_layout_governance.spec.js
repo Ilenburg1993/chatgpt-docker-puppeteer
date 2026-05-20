@@ -470,7 +470,7 @@ describe('W114 — module layout governance: terminal root', () => {
         assert.equal(scorecard.byRisk['hotspot'], listTerminalModulesByRisk('hotspot').length);
         assert.deepEqual(scorecard.watch, [
             'dev-watch.js',
-            'events/tool-activity-presenter.js',
+            'events/event-adapter-events.js',
             'runtime-root.js',
             'state/activity-state.js',
             'stores/',
@@ -485,6 +485,7 @@ describe('W114 — module layout governance: terminal root', () => {
             'events/io-activity-events.js',
             'events/sdk-session-events.js',
             'events/task-stream-events.js',
+            'events/tool-activity-presenter.js',
             'frontend/',
             'frontend/gateways/sdk-session.js',
             'repl/',

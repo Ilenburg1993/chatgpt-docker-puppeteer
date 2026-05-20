@@ -94,4 +94,26 @@ describe('terminal/tool-activity-presenter', () => {
         expect(presentation.operation).toBe('read');
         expect(presentation.detail).toContain('lendo arquivo');
     });
+
+    it('recupera identidade real de tool em payloads SDK aninhados', () => {
+        const fromData = buildTerminalToolActivityPresentation({
+            toolName: 'external_tool',
+            data: {
+                toolName: 'patch_file',
+                args: { path: 'src/copilot/terminal/dialog/engine.js' },
+            },
+        });
+        const fromJsonArguments = buildTerminalToolActivityPresentation({
+            name: 'unknown',
+            arguments: JSON.stringify({
+                mcpToolName: 'read_file_content',
+                path: 'src/copilot/terminal/events/sdk-session-events.js',
+            }),
+        });
+
+        expect(fromData.toolName).toBe('patch_file');
+        expect(fromData.operation).toBe('edit');
+        expect(fromJsonArguments.toolName).toBe('read_file_content');
+        expect(fromJsonArguments.operation).toBe('read');
+    });
 });
