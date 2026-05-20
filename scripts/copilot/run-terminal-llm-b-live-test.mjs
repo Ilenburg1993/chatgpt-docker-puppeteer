@@ -795,7 +795,12 @@ async function main() {
                 schedulePostAnswerDiagnostics(0);
             }, Math.max(1_000, postAskContinuationWaitMs)).unref();
         }
-        if (!postCommandsSent && /Erro de sessão \[query\]|session\.error|CAPIError|Failed to get response from the AI model/.test(plain)) {
+        if (
+            !postCommandsSent &&
+            /Erro de sessão \[(?:query|rate_limit)\]|You've hit your rate limit|session\.error|CAPIError|Failed to get response from the AI model/i.test(
+                plain,
+            )
+        ) {
             postCommandsSent = true;
             if (postAnswerCommandTimer) {
                 clearTimeout(postAnswerCommandTimer);

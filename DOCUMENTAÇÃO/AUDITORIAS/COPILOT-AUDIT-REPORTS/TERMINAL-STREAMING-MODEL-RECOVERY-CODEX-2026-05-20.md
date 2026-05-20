@@ -321,6 +321,7 @@ Correção implementada:
 
 - O live runner agora detecta blocker `sdk-rate-limit`.
 - Quando há blocker, o summary passa a ter status `BLOCKED`, registra request/reset quando disponíveis, e troca a cascata de falsos negativos por critérios mínimos: terminal pronto, REPL, SSE conectado e causa raiz.
+- O runner também encerra cedo ao ver `Erro de sessão [rate_limit]`, capturando `/activity`, `/events --raw` e `/errors` em vez de aguardar timeout longo.
 - Isso não valida o fluxo de delta/tool/ask_user; apenas impede que indisponibilidade externa seja confundida com regressão de UX.
 
 Critério ideal:
