@@ -744,6 +744,7 @@ Implementado:
 - `toError()` agora preserva `errorMessage` e `detail` de objetos SDK antes de serializar payload bruto.
 - `runtime-root.js` agora emite `terminal.runtime.wired` e `terminal.runtime.wire_failed` com fase, duração e diagnóstico normalizado.
 - `/events sources` classifica os eventos de fiação do runtime em `terminal.lifecycle`.
+- `/events sources` agora imprime comandos de investigação por política (`/events event=... 50` e `/events source=... 50`), reduzindo atrito para rastrear duplicações.
 - Testes unitários adicionados para runtime root, reflection sync failure e SIGHUP policy.
 - Testes unitários adicionados para reconciliação de `assistant.message` materializado, supressão visual de `question.pending` e preferência `dialog.delta`.
 - Testes unitários adicionados para normalização de objetos de erro sem `message`.
@@ -757,7 +758,7 @@ Implementado:
 - Live completo desta rodada ficou `BLOCKED` por rate limit em `artifacts/terminal-live/codex-continue-2026-05-20-full/summary.md`.
 - Live `--no-pr` desta rodada passou em `artifacts/terminal-live/codex-continue-2026-05-20-no-pr-rerun/summary.md`.
 - Testes unitários adicionados para recoverable `model_call` não poluir `/errors`, para `task.error` de rate limit não duplicar `session.error`, e para `agent:task:error` não criar erro sintético `event-bus`.
-- Testes unitários adicionados para `terminal.runtime.wired` e `terminal.runtime.wire_failed`.
+- Testes unitários adicionados para `terminal.runtime.wired`, `terminal.runtime.wire_failed` e hints de investigação em `/events sources`.
 
 Próxima rodada recomendada:
 
@@ -766,5 +767,5 @@ Próxima rodada recomendada:
 3. Criar contrato único de modelo configurado/preferido/efetivo/cobrado.
 4. Continuar a normalização de tool identity em completions/progress externos sem requestId, com métricas para qualquer lifecycle ainda genérico.
 5. Integrar falha de `wireRuntime()` ao `ErrorTracker` com metadados de fase.
-6. Expandir `/events sources` com links/copy hints para `/events event=...` e `/events source=...`.
+6. Expandir `/events sources` com filtros compostos por classe e evento. Hints básicos de `/events event=...` e `/events source=...` já foram feitos.
 7. Expandir o cenário live para elicitation quando a capability estiver disponível.

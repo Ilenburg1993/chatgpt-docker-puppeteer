@@ -110,6 +110,17 @@ function parseSourcesLimit(arg) {
 }
 
 /**
+ * @param {{ canonicalEmitter: string; publicEvents: string[] }} policy
+ * @returns {string}
+ */
+function buildPolicyQueryHints(policy) {
+    const event = policy.publicEvents[0] ?? '';
+    const eventHint = event ? `/events event=${event} 50` : null;
+    const sourceHint = policy.canonicalEmitter ? `/events source=${policy.canonicalEmitter} 50` : null;
+    return [eventHint, sourceHint].filter(Boolean).join(' · ');
+}
+
+/**
  * @param {unknown} value
  * @returns {string}
  */
@@ -172,6 +183,7 @@ export async function cmdEvents({ println }, arg = '') {
             println(`    owner       \x1b[90m${policy.owner}\x1b[0m`);
             println(`    emitter     \x1b[90m${policy.canonicalEmitter}\x1b[0m`);
             println(`    eventos     \x1b[90m${policy.publicEvents.join(', ')} · recentes=${policyCount}\x1b[0m`);
+            println(`    investigar  \x1b[90m${buildPolicyQueryHints(policy)}\x1b[0m`);
             println(`    aceita      \x1b[90m${policy.accepts.join(', ')}\x1b[0m`);
             println(`    suprime     \x1b[90m${policy.suppresses.join(', ')}\x1b[0m`);
             println(`    fallback    \x1b[90m${policy.fallback}\x1b[0m`);
