@@ -47,6 +47,8 @@
  * @property {ToolLifecycleType} type - Tipo discriminante do evento
  * @property {ToolLifecycleSource} source - Fonte de origem
  * @property {number} timestamp - Timestamp do evento
+ * @property {string | null} traceId - Identidade causal do turno terminal, quando disponível
+ * @property {string | null} turnId - ID do turno SDK/terminal, quando disponível
  * @property {string | null} toolCallId - ID da chamada de tool (SDK only)
  * @property {string} toolName - Nome da tool ou tipo de operação
  * @property {string | null} rawToolName - Nome original antes de normalização
@@ -78,6 +80,8 @@
 /**
  * @typedef {object} ToolLifecycleEventInput
  * @property {string | null} [toolCallId]
+ * @property {string | null} [traceId]
+ * @property {string | null} [turnId]
  * @property {string | null} [toolName]
  * @property {string | null} [rawToolName]
  * @property {string | null} [requestId]
@@ -120,6 +124,8 @@ export function buildToolLifecycleEvent(type, source, fields) {
         type,
         source,
         timestamp: fields.timestamp ?? Date.now(),
+        traceId: fields.traceId ?? null,
+        turnId: fields.turnId ?? null,
 
         toolCallId: fields.toolCallId ?? null,
         toolName: fields.toolName ?? 'tool',

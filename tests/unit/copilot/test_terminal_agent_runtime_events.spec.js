@@ -32,6 +32,7 @@ const readTerminalRuntimeState = vi.fn(
 );
 const recordTerminalTurnToolActivity = vi.fn();
 const completeTerminalTurnToolCall = vi.fn();
+const readTerminalTurnTraceProjection = vi.fn(() => ({ current: null, recent: [] }));
 const getTerminalDetailLevel = vi.fn(() => 'detailed');
 const recordToolCall = vi.fn();
 
@@ -65,6 +66,7 @@ vi.mock('../../../src/copilot/terminal/frontend/gateways/agent-runtime.js', () =
 vi.mock('../../../src/copilot/terminal/state/turn-trace-state.js', () => ({
     recordTerminalTurnToolActivity,
     completeTerminalTurnToolCall,
+    readTerminalTurnTraceProjection,
 }));
 
 vi.mock('../../../src/copilot/observability/index.js', () => ({
@@ -90,6 +92,7 @@ describe('terminal/events/agent-runtime-events.js — contrato', () => {
                 pendingQuestionKind: null,
             }),
         );
+        readTerminalTurnTraceProjection.mockReturnValue({ current: null, recent: [] });
     });
 
     afterEach(() => {
@@ -109,6 +112,9 @@ describe('terminal/events/agent-runtime-events.js — contrato', () => {
     it('apresenta tools de arquivo com alvo e operação durante streaming', async () => {
         const { setupTerminalAgentRuntimeEventListeners } =
             await import('../../../src/copilot/terminal/events/agent-runtime-events.js');
+        const { beginTerminalTurnMaterialization, clearTerminalTurnMaterialization } = await import(
+            '../../../src/copilot/terminal/state/turn-materialization-state.js'
+        );
         /** @type {Map<string, Function[]>} */
         const listeners = new Map();
         const rl = {
@@ -127,6 +133,8 @@ describe('terminal/events/agent-runtime-events.js — contrato', () => {
         };
 
         setupTerminalAgentRuntimeEventListeners({ agent: /** @type {any} */ (agent), rl: /** @type {any} */ (rl) });
+        clearTerminalTurnMaterialization();
+        beginTerminalTurnMaterialization({ turnId: 'turn-tool-1', timestamp: 1000 });
         listeners.get('tool.execution_start')?.[0]?.({
             toolCallId: 'tool-1',
             toolName: 'workspace.read_file',
@@ -172,6 +180,8 @@ describe('terminal/events/agent-runtime-events.js — contrato', () => {
                 toolName: 'workspace.read_file',
                 operation: 'read',
                 path: 'src/copilot/terminal/repl/repl.js',
+                traceId: 'turn:turn-tool-1',
+                turnId: 'turn-tool-1',
             }),
         );
         expect(broadcastSse).toHaveBeenCalledWith(
@@ -184,8 +194,11 @@ describe('terminal/events/agent-runtime-events.js — contrato', () => {
                 success: true,
                 toolCallId: 'tool-1',
                 toolName: 'workspace.read_file',
+                traceId: 'turn:turn-tool-1',
+                turnId: 'turn-tool-1',
             }),
         );
+        clearTerminalTurnMaterialization();
     });
 
     it('usa progresso inline e pergunta compacta quando detalhe terminal está em compact', async () => {

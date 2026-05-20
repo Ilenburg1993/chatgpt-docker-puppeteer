@@ -58,5 +58,6 @@ export {
     recordTerminalTurnToolActivity,
     recordTerminalTurnUserInputActivity,
 } from '../turn-trace-state.js';
+export { readTerminalTurnCorrelation, withTerminalTurnCorrelation } from '../turn-correlation-state.js';
 export { getTerminalDetailLevel } from '../ui-preferences.js';
 export { terminalActionChip, terminalThemeBadge, terminalThemeText } from '../ui-theme.js';

@@ -24,6 +24,7 @@ const mocks = vi.hoisted(() => ({
     answerTerminalPendingQuestion: vi.fn(() => true),
     beginTerminalTurnTrace: vi.fn(),
     completeTerminalTurnTrace: vi.fn(),
+    readTerminalTurnTraceProjection: vi.fn(() => ({ current: null, recent: [] })),
     recordTerminalTurnFileActivity: vi.fn(),
     recordTerminalTurnToolActivity: vi.fn(),
     recordTerminalTurnUserInputActivity: vi.fn(),
@@ -75,6 +76,7 @@ vi.mock('../../../src/copilot/terminal/frontend/projections/index.js', () => ({
 vi.mock('../../../src/copilot/terminal/state/turn-trace-state.js', () => ({
     beginTerminalTurnTrace: mocks.beginTerminalTurnTrace,
     completeTerminalTurnTrace: mocks.completeTerminalTurnTrace,
+    readTerminalTurnTraceProjection: mocks.readTerminalTurnTraceProjection,
     recordTerminalTurnFileActivity: mocks.recordTerminalTurnFileActivity,
     recordTerminalTurnToolActivity: mocks.recordTerminalTurnToolActivity,
     recordTerminalTurnUserInputActivity: mocks.recordTerminalTurnUserInputActivity,
@@ -132,6 +134,7 @@ describe('terminal/events/sdk-session-events.js — contrato', () => {
         mocks.getTerminalDetailLevel.mockReturnValue('detailed');
         mocks.shouldSuppressTerminalAssistantMessageAsUserInputEcho.mockReturnValue(false);
         mocks.completeTerminalTurnTrace.mockReturnValue(null);
+        mocks.readTerminalTurnTraceProjection.mockReturnValue({ current: null, recent: [] });
         mocks.consumeRuntimeInterventionMailbox.mockReturnValue(null);
         mocks.enqueueRuntimeInterventionMailbox.mockReturnValue({
             enqueued: true,
@@ -459,6 +462,43 @@ describe('terminal/events/sdk-session-events.js — contrato', () => {
             expect.objectContaining({ serverName: 'github', requestId: 'oauth-1' }),
         );
         expect(refreshPromptIfIdle).toHaveBeenCalled();
+    });
+
+    it('propaga traceId e turnId em user_input.requested/completed durante turno ativo', async () => {
+        const { setupTerminalSdkSessionEventListeners } =
+            await import('../../../src/copilot/terminal/events/sdk-session-events.js');
+        const agent = createAgentHost();
+
+        setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfIdle: vi.fn() });
+        agent.emit('assistant.turn_start', { turnId: 'turn-ui-1' });
+        agent.emit('user_input.requested', {
+            requestId: 'ui-traced',
+            question: 'Confirma?',
+            choices: ['sim', 'não'],
+            allowFreeform: true,
+        });
+        agent.emit('user_input.completed', {
+            requestId: 'ui-traced',
+            answer: 'sim',
+            wasFreeform: false,
+        });
+
+        expect(mocks.broadcastSse).toHaveBeenCalledWith(
+            'user_input.requested',
+            expect.objectContaining({
+                requestId: 'ui-traced',
+                traceId: 'turn:turn-ui-1',
+                turnId: 'turn-ui-1',
+            }),
+        );
+        expect(mocks.broadcastSse).toHaveBeenCalledWith(
+            'user_input.completed',
+            expect.objectContaining({
+                requestId: 'ui-traced',
+                traceId: 'turn:turn-ui-1',
+                turnId: 'turn-ui-1',
+            }),
+        );
     });
 
     it('suprime READY/REPLY protocolar de ask_user da narrativa terminal', async () => {

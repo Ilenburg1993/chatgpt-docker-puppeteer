@@ -13,7 +13,7 @@ import {
     formatTerminalThinkingRef,
     recordTerminalActivity,
     recordTerminalStreamDeltaDiagnostic,
-    readTerminalTurnMaterialization,
+    readTerminalTurnCorrelation,
     terminalThemeText,
 } from '../state/dialog/index.js';
 import {
@@ -25,19 +25,6 @@ import {
     writeTerminalRaw,
 } from './output.js';
 import { broadcastSse } from './sse.js';
-
-/**
- * @returns {{ traceId: string | null; turnId: string | null }}
- */
-function readCurrentTurnCorrelation() {
-    const snapshot = readTerminalTurnMaterialization();
-    if (!snapshot) return { traceId: null, turnId: null };
-    const turnId = snapshot.turnId ?? null;
-    return {
-        traceId: turnId ? `turn:${turnId}` : snapshot.turnKey,
-        turnId,
-    };
-}
 
 /**
  * Estado mutável compartilhado entre os callbacks de reasoning e streaming.
@@ -336,7 +323,7 @@ export function createDeltaCallback(state) {
         }
         state.streamingChars += chunk.length;
         state.streamingContent += chunk;
-        const correlation = readCurrentTurnCorrelation();
+        const correlation = readTerminalTurnCorrelation();
         broadcastSse('delta', {
             chunk,
             ...(correlation.traceId ? { traceId: correlation.traceId } : {}),

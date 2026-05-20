@@ -94,7 +94,6 @@ import {
     recordTerminalPermissionCompleted,
     recordTerminalPermissionModeChanged,
     recordTerminalPermissionRequested,
-    readTerminalTurnMaterialization,
     recordTerminalTurnAssistantMessage,
     recordTerminalTurnFileActivity,
     recordTerminalTurnUserInputActivity,
@@ -103,6 +102,7 @@ import {
     shouldSuppressTerminalAssistantMessageAsUserInputEcho,
     terminalThemeBadge,
     terminalThemeText,
+    withTerminalTurnCorrelation,
 } from '../state/events/index.js';
 import { drainMailboxToTurnIfIdle } from '../wiring/mailbox/index.js';
 import { renderTerminalAssistantTranscript } from './assistant-transcript-renderer.js';
@@ -335,15 +335,14 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
             source: 'sdk',
             recordHistory: false,
         });
-        const materialization = readTerminalTurnMaterialization();
-        const turnId = materialization?.turnId ?? null;
-        broadcastSse('assistant.message', {
-            content: normalized.content,
-            protocolKind: normalized.kind,
-            ...(turnId ? { turnId } : {}),
-            ...(materialization ? { traceId: turnId ? `turn:${turnId}` : materialization.turnKey } : {}),
-            timestamp: Date.now(),
-        });
+        broadcastSse(
+            'assistant.message',
+            withTerminalTurnCorrelation({
+                content: normalized.content,
+                protocolKind: normalized.kind,
+                timestamp: Date.now(),
+            }),
+        );
         if (getBusy()) {
             recordTerminalTurnAssistantMessage({
                 content: normalized.content,
@@ -551,14 +550,17 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
             source: 'sdk',
             severity: allowFreeform ? 'info' : 'warn',
         });
-        broadcastSse('user_input.requested', {
-            requestId: evt?.requestId ?? null,
-            question,
-            choices,
-            allowFreeform,
-            toolCallId: evt?.toolCallId ?? null,
-            timestamp: Date.now(),
-        });
+        broadcastSse(
+            'user_input.requested',
+            withTerminalTurnCorrelation({
+                requestId: evt?.requestId ?? null,
+                question,
+                choices,
+                allowFreeform,
+                toolCallId: evt?.toolCallId ?? null,
+                timestamp: Date.now(),
+            }),
+        );
         if (shouldPrintSessionNarration('important')) {
             const optionsLabel = choices.length > 0 ? ` · opções=${choices.length}` : '';
             println(
@@ -632,12 +634,15 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
             source: 'sdk',
             recordHistory: false,
         });
-        broadcastSse('user_input.completed', {
-            requestId,
-            answer: evt?.answer ?? '',
-            wasFreeform,
-            timestamp: Date.now(),
-        });
+        broadcastSse(
+            'user_input.completed',
+            withTerminalTurnCorrelation({
+                requestId,
+                answer: evt?.answer ?? '',
+                wasFreeform,
+                timestamp: Date.now(),
+            }),
+        );
         refreshPromptIfIdle();
     };
 

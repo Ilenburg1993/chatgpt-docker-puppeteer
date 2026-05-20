@@ -45,7 +45,7 @@ import {
     recordTerminalFinalReconciliationDiagnostic,
     recordTerminalStreamDeltaDiagnostic,
     recordTerminalTurnDelta,
-    readTerminalTurnMaterialization,
+    readTerminalTurnCorrelation,
     shouldSuppressTerminalAssistantMessageAsUserInputEcho,
 } from '../state/events/index.js';
 import { drainPendingNotifications, getPersistenceFailureCount, persistTurnToHub } from './engine-persistence.js';
@@ -631,8 +631,7 @@ async function _executeTurn(message, actor, attachments = [], requestHeaders = n
         };
 
         const onDeltaDiagnostic = (/** @type {Record<string, any>} */ event) => {
-            const materialization = readTerminalTurnMaterialization();
-            const turnId = materialization?.turnId ?? null;
+            const correlation = readTerminalTurnCorrelation();
             recordTerminalStreamDeltaDiagnostic({
                 action: event['action'],
                 reason: event['reason'],
@@ -640,8 +639,8 @@ async function _executeTurn(message, actor, attachments = [], requestHeaders = n
                 causalKey: event['causalKey'],
                 rawChars: event['rawChars'],
                 normalizedChars: event['normalizedChars'],
-                traceId: turnId ? `turn:${turnId}` : (materialization?.turnKey ?? null),
-                turnId,
+                traceId: correlation.traceId,
+                turnId: correlation.turnId,
                 streamId: event['streamId'],
                 chunkSeq: event['chunkSeq'],
                 eventId: event['eventId'],

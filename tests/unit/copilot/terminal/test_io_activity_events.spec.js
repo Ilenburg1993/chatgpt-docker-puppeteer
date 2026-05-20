@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const recordTerminalActivity = vi.fn();
 const recordTerminalTurnFileActivity = vi.fn();
+const readTerminalTurnTraceProjection = vi.fn(() => ({ current: null, recent: [] }));
 const broadcastSse = vi.fn();
 const println = vi.fn();
 const getShowToolActivity = vi.fn(() => true);
@@ -16,6 +17,7 @@ vi.mock('../../../../src/copilot/terminal/state/activity-state.js', () => ({
 
 vi.mock('../../../../src/copilot/terminal/state/turn-trace-state.js', () => ({
     recordTerminalTurnFileActivity,
+    readTerminalTurnTraceProjection,
 }));
 
 vi.mock('../../../../src/copilot/terminal/dialog/index.js', () => ({
@@ -31,6 +33,7 @@ describe('terminal/io-activity-events', () => {
     beforeEach(() => {
         vi.clearAllMocks();
         getShowToolActivity.mockReturnValue(true);
+        readTerminalTurnTraceProjection.mockReturnValue({ current: null, recent: [] });
     });
 
     it('projeta operações reais de I/O para activity, turn trace, stdout e SSE', async () => {

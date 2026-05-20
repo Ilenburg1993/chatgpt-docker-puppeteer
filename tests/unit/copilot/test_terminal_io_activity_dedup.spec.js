@@ -20,6 +20,7 @@ const mocks = vi.hoisted(() => ({
     terminalThemeBadge: vi.fn((_, label) => `[${label}]`),
     terminalThemeText: vi.fn((_, text) => text),
     getTerminalDetailLevel: vi.fn(() => 'detailed'),
+    readTerminalTurnTraceProjection: vi.fn(() => ({ current: null, recent: [] })),
 }));
 
 vi.mock('../../../src/copilot/terminal/state/activity-state.js', () => ({
@@ -39,6 +40,7 @@ vi.mock('../../../src/copilot/presentation/state/index.js', () => ({
 
 vi.mock('../../../src/copilot/terminal/state/turn-trace-state.js', () => ({
     recordTerminalTurnFileActivity: mocks.recordTerminalTurnFileActivity,
+    readTerminalTurnTraceProjection: mocks.readTerminalTurnTraceProjection,
 }));
 
 vi.mock('../../../src/copilot/terminal/state/ui-theme.js', () => ({

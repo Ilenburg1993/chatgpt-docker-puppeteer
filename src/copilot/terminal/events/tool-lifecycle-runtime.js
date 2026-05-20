@@ -26,6 +26,7 @@ import {
     recordTerminalTurnToolActivity,
     terminalThemeBadge,
     terminalThemeText,
+    withTerminalTurnCorrelation,
 } from '../state/events/index.js';
 import { renderTerminalIntent } from './intent-renderer.js';
 import {
@@ -91,6 +92,14 @@ function isReportIntentTool(toolName) {
 function recordTerminalDiagnosticToolStats(toolName, durationMs, success) {
     if (!isReportIntentTool(toolName)) return;
     recordToolCall(toolName, durationMs, success);
+}
+
+/**
+ * @param {import('./tool-lifecycle-event.js').ToolLifecycleEvent} event
+ * @returns {void}
+ */
+function broadcastToolLifecycle(event) {
+    broadcastSse('tool.lifecycle', withTerminalTurnCorrelation(event));
 }
 
 /**
@@ -462,8 +471,7 @@ export function handleTerminalNativeToolStart({ registry, evt }) {
         source: 'sdk',
     });
     printToolStart(presentation);
-    broadcastSse(
-        'tool.lifecycle',
+    broadcastToolLifecycle(
         buildToolLifecycleStart({
             toolCallId,
             toolName: name,
@@ -528,8 +536,7 @@ export function handleTerminalNativeToolProgress({ registry, evt }) {
     if (shouldPrint) {
         printToolProgress(presentation, progress, progressMessage, { persistInHistory: persistMilestone });
     }
-    broadcastSse(
-        'tool.lifecycle',
+    broadcastToolLifecycle(
         buildToolLifecycleProgress({
             toolCallId,
             toolName: name,
@@ -572,8 +579,7 @@ export function handleTerminalNativeToolPartialResult({ registry, evt }) {
         source: 'sdk',
         recordHistory: false,
     });
-    broadcastSse(
-        'tool.lifecycle',
+    broadcastToolLifecycle(
         buildToolLifecyclePartialResult({
             toolCallId,
             toolName: name,
@@ -669,8 +675,7 @@ export function handleTerminalNativeToolComplete({ registry, evt }) {
         source: 'sdk',
     });
     printToolComplete(presentation, success, durationLabel, effectiveToolCallId || null);
-    broadcastSse(
-        'tool.lifecycle',
+    broadcastToolLifecycle(
         buildToolLifecycleComplete({
             toolCallId: effectiveToolCallId || toolCallId,
             toolName: name,
@@ -712,7 +717,7 @@ export function handleTerminalToolUserRequested(evt) {
     println(
         `\n  \x1b[33m🧩 Tool aguarda usuário:\x1b[0m ${toolName}${requestId ? ` \x1b[90m(${requestId})\x1b[0m` : ''}`,
     );
-    broadcastSse('tool.lifecycle', buildToolLifecycleUserRequested({ toolName, requestId: requestId ?? null }));
+    broadcastToolLifecycle(buildToolLifecycleUserRequested({ toolName, requestId: requestId ?? null }));
 }
 
 /**
@@ -760,8 +765,7 @@ export function handleTerminalExternalToolRequested({ registry, evt, verboseNarr
         const targetLabel = presentation.target || presentation.path || requestId || '';
         println(`  \x1b[90m↗ external tool: ${displayToolName}${targetLabel ? ` · ${targetLabel}` : ''}\x1b[0m`);
     }
-    broadcastSse(
-        'tool.lifecycle',
+    broadcastToolLifecycle(
         buildToolLifecycleExternalRequested({
             toolName: displayToolName,
             requestId: requestId ?? '',
@@ -844,8 +848,7 @@ export function handleTerminalExternalToolCompleted({ registry, evt, verboseNarr
             `  ${success ? '\x1b[32m✓' : '\x1b[31m✗'} external tool:\x1b[0m ${displayToolName}${requestId ? ` \x1b[90m(${requestId})\x1b[0m` : ''}`,
         );
     }
-    broadcastSse(
-        'tool.lifecycle',
+    broadcastToolLifecycle(
         buildToolLifecycleExternalCompleted({
             toolName: displayToolName,
             requestId: requestId ?? '',
@@ -872,8 +875,7 @@ export function handleTerminalExternalToolCompleted({ registry, evt, verboseNarr
  */
 export function handleTerminalIoToolLifecycle({ registry, entry }) {
     const correlated = registry ? registry.attachIoActivity(entry) : null;
-    broadcastSse(
-        'tool.lifecycle',
+    broadcastToolLifecycle(
         buildToolLifecycleIoOp(entry, {
             correlatedToolCallId: correlated?.toolCallId ?? null,
             correlatedToolName: correlated?.toolName ?? null,
@@ -924,8 +926,7 @@ export function reconcileTerminalInFlightToolsAtTurnEnd({ registry, reason = 'as
                 `  ${terminalThemeBadge('warn', 'SYNC')} ${terminalThemeText('tool', canonicalName)} ${terminalThemeText('muted', '·')} ${terminalThemeText('warn', `completion inferida no turn_end · ${durationLabel}`)}`,
             );
         }
-        broadcastSse(
-            'tool.lifecycle',
+        broadcastToolLifecycle(
             buildToolLifecycleComplete({
                 toolCallId: entry.toolCallId,
                 toolName: entry.toolName,
