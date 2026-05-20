@@ -346,6 +346,23 @@ Critério ideal:
 - O operador deve conseguir distinguir histórico persistido, telemetria do turno atual e Premium Request efetivamente classificada.
 - Nenhum comando deve sugerir consumo atual sem evidência causal do turno/probe corrente.
 
+### A22. `dialog.loop.changed` podia aparecer duplicado como evento público equivalente
+
+Evidência:
+
+- O boot/resume pode emitir `dialog.loop.changed active=true` por caminhos legítimos próximos: start normal do controller, idempotência `ready_already_waiting` e restauração de sessão.
+- A duplicação não indica necessariamente bug no agente, mas no terminal ela aparece como duas mudanças públicas de estado idênticas.
+
+Correção implementada:
+
+- `terminal-agent-wiring.js` ganhou dedupe de borda para `dialog.loop.changed` equivalente dentro de janela curta.
+- Mudanças reais de estado (`true -> false`, `false -> true`) continuam passando.
+- Reemissões idempotentes são registradas como atividade interna suprimida, sem fanout SSE/UX duplicado.
+
+Critério ideal:
+
+- O lifecycle pode ser idempotente internamente, mas o terminal deve expor apenas transições de estado úteis ao operador.
+
 ## Hipóteses Externas Rejeitadas Ou Reclassificadas
 
 ### H1. "boot-hub assume sucesso"
@@ -665,6 +682,7 @@ Implementado:
 - `task.delta` público fora de turno agora fecha materialização canônica; `assistant.message` posterior suprime duplicata exata ou renderiza apenas o sufixo faltante.
 - O live runner agora classifica rate limit do SDK como blocker de causa raiz, evitando falso diagnóstico em cascata.
 - `/usage now` agora diferencia snapshot histórico de consumo atual do boot/probe.
+- `dialog.loop.changed` equivalente agora é deduplicado na borda terminal/SSE.
 - Testes unitários adicionados para runtime root, reflection sync failure e SIGHUP policy.
 - Testes unitários adicionados para reconciliação de `assistant.message` materializado, supressão visual de `question.pending` e preferência `dialog.delta`.
 - Testes unitários adicionados para normalização de objetos de erro sem `message`.

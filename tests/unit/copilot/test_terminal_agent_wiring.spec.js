@@ -43,4 +43,19 @@ describe('terminal/wiring/terminal-agent-wiring.js — contrato', () => {
         expect(mod.shouldAutoRestartStoppedDialog('recovery_restart')).toBe(false);
         expect(mod.shouldAutoRestartStoppedDialog('unknown')).toBe(false);
     });
+
+    it('deduplica dialog.loop.changed equivalente em janela curta', async () => {
+        const mod = await import('../../../src/copilot/terminal/wiring/terminal-agent-wiring.js');
+
+        expect(mod.shouldSuppressDialogLoopChangedSse(null, { active: true, at: 1000 })).toBe(false);
+        expect(
+            mod.shouldSuppressDialogLoopChangedSse({ active: true, at: 1000 }, { active: true, at: 1100 }),
+        ).toBe(true);
+        expect(
+            mod.shouldSuppressDialogLoopChangedSse({ active: true, at: 1000 }, { active: false, at: 1100 }),
+        ).toBe(false);
+        expect(
+            mod.shouldSuppressDialogLoopChangedSse({ active: true, at: 1000 }, { active: true, at: 1500 }),
+        ).toBe(false);
+    });
 });

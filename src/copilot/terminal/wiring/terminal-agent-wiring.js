@@ -54,6 +54,7 @@ const WATCHDOG_RECOVERY_WAIT_MS = Math.max(5_000, Math.min(30_000, Math.round(LL
 
 const AUTO_RESTART_DIALOG_STOP_REASONS = new Set(['watchdog_restart', 'model_stopped']);
 const EMITTER_DIALOG_TURN_END = 'dialog.turn_end';
+const DIALOG_LOOP_CHANGED_DEDUP_WINDOW_MS = 250;
 
 /**
  * @template {Record<string, unknown>} T
@@ -119,6 +120,20 @@ export function describeDialogStoppedRestartPolicy(reason) {
         terminalMessage: `Loop encerrado (${label}). Restart automático bloqueado; use /dialog-resume se precisar.`,
         sse: { reason, restarting: false },
     };
+}
+
+/**
+ * @param {{ active: boolean; at: number } | null} last
+ * @param {{ active: boolean; at: number }} next
+ * @returns {boolean}
+ */
+export function shouldSuppressDialogLoopChangedSse(last, next) {
+    return Boolean(
+        last &&
+            last.active === next.active &&
+            next.at - last.at >= 0 &&
+            next.at - last.at <= DIALOG_LOOP_CHANGED_DEDUP_WINDOW_MS,
+    );
 }
 
 /**
@@ -339,6 +354,8 @@ export function registerAgentEventListeners(printBanner) {
     // SSE: transmite respostas da LLM-B para clientes subscritos
     let lastStreamingKbReported = -1;
     let lastStreamingReportAt = 0;
+    /** @type {{ active: boolean; reason: string; at: number } | null} */
+    let lastDialogLoopChangedSse = null;
 
     agentEvents.on(EMITTER_DIALOG_REPLY, (/** @type {{ reply: string }} */ evt) => {
         const { model, reasoningEffort } = readTerminalDialogStreamMeta();
@@ -409,11 +426,23 @@ export function registerAgentEventListeners(printBanner) {
         },
     );
     // F4.6 (UPG-11): emite dialog.loop.changed para dashboard responsivo
-    agentEvents.on(EMITTER_DIALOG_LOOP_CHANGED, (/** @type {{ active: boolean; ts: number }} */ evt) => {
+    agentEvents.on(EMITTER_DIALOG_LOOP_CHANGED, (/** @type {{ active: boolean; ts: number; reason?: string }} */ evt) => {
+        const at = typeof evt.ts === 'number' ? evt.ts : Date.now();
+        const reason = typeof evt.reason === 'string' && evt.reason.trim().length > 0 ? evt.reason : '';
+        if (shouldSuppressDialogLoopChangedSse(lastDialogLoopChangedSse, { active: evt.active, at })) {
+            recordTerminalActivity('system', 'dialog.loop.changed duplicado suprimido', {
+                detail: `active=${evt.active}${reason ? ` · ${reason}` : ''}`,
+                source: 'terminal-agent-wiring/dialog.loop.changed',
+                recordHistory: false,
+                updateCurrent: false,
+            });
+            return;
+        }
+        lastDialogLoopChangedSse = { active: evt.active, reason, at };
         broadcastSse(
             'dialog.loop.changed',
             withTerminalAgentSseEnvelope(
-                { active: evt.active, timestamp: evt.ts },
+                { active: evt.active, timestamp: at, ...(reason ? { reason } : {}) },
                 'terminal-agent-wiring/dialog.loop.changed',
             ),
         );
