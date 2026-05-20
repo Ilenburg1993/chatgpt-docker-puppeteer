@@ -320,7 +320,11 @@ describe('terminal/events/sdk-session-events.js — contrato', () => {
 
         expect(mocks.broadcastSse).toHaveBeenCalledWith(
             'assistant.turn_start',
-            expect.objectContaining({ turnId: 'turn-1' }),
+            expect.objectContaining({
+                turnId: 'turn-1',
+                traceId: 'turn:turn-1',
+                source: 'sdk/assistant.turn_start',
+            }),
         );
         expect(mocks.beginTerminalTurnTrace).toHaveBeenCalledWith({ turnId: 'turn-1' });
         expect(mocks.completeTerminalTurnTrace).toHaveBeenCalledWith({ turnId: 'turn-1' });
@@ -329,11 +333,20 @@ describe('terminal/events/sdk-session-events.js — contrato', () => {
         );
         expect(mocks.broadcastSse).toHaveBeenCalledWith(
             'session.workspace_file_changed',
-            expect.objectContaining({ operation: 'update', path: 'files/plan.md' }),
+            expect.objectContaining({
+                operation: 'update',
+                path: 'files/plan.md',
+                traceId: 'turn:turn-1',
+                source: 'sdk/session.workspace_file_changed',
+            }),
         );
         expect(mocks.broadcastSse).toHaveBeenCalledWith(
             'assistant.turn_end',
-            expect.objectContaining({ turnId: 'turn-1' }),
+            expect.objectContaining({
+                turnId: 'turn-1',
+                traceId: 'turn:turn-1',
+                source: 'sdk/assistant.turn_end',
+            }),
         );
         expect(mocks.recordTerminalActivity).toHaveBeenCalledWith(
             'system',
@@ -435,7 +448,11 @@ describe('terminal/events/sdk-session-events.js — contrato', () => {
         );
         expect(mocks.broadcastSse).toHaveBeenCalledWith(
             'permission.requested',
-            expect.objectContaining({ id: 'perm-1', permissionType: 'file_write' }),
+            expect.objectContaining({
+                id: 'perm-1',
+                permissionType: 'file_write',
+                source: 'sdk/permission.requested',
+            }),
         );
         expect(mocks.broadcastSse).toHaveBeenCalledWith(
             'permission.mode_changed',
@@ -459,7 +476,11 @@ describe('terminal/events/sdk-session-events.js — contrato', () => {
         );
         expect(mocks.broadcastSse).toHaveBeenCalledWith(
             'mcp.oauth.required',
-            expect.objectContaining({ serverName: 'github', requestId: 'oauth-1' }),
+            expect.objectContaining({
+                serverName: 'github',
+                requestId: 'oauth-1',
+                source: 'sdk/mcp.oauth.required',
+            }),
         );
         expect(refreshPromptIfIdle).toHaveBeenCalled();
     });

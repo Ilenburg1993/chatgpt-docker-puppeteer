@@ -47,6 +47,7 @@ import {
     recordTerminalTurnDelta,
     readTerminalTurnCorrelation,
     shouldSuppressTerminalAssistantMessageAsUserInputEcho,
+    withTerminalTurnCorrelation,
 } from '../state/events/index.js';
 import { drainPendingNotifications, getPersistenceFailureCount, persistTurnToHub } from './engine-persistence.js';
 import {
@@ -471,7 +472,15 @@ async function _executeTurn(message, actor, attachments = [], requestHeaders = n
             `\x1b[90m  ↳ requestHeaders por turno detectados (${Object.keys(requestHeaders).join(', ')}); usando dispatch SDK direto com reanexo do dialog loop.\x1b[0m`,
         );
     }
-    broadcastSse('busy', { busy: true, actor });
+    broadcastSse(
+        'busy',
+        withTerminalTurnCorrelation({
+            busy: true,
+            actor,
+            source: 'terminal-dialog/busy',
+            timestamp: Date.now(),
+        }),
+    );
     const rl = getRl();
     /** @type {NodeJS.Timeout | null} */
     let waitingTicker = null;
@@ -860,7 +869,14 @@ async function _executeTurn(message, actor, attachments = [], requestHeaders = n
         if (readTerminalRuntimeControlState().dialogLoopActive) {
             markTerminalActivityIdle();
         }
-        broadcastSse('busy', { busy: false });
+        broadcastSse(
+            'busy',
+            withTerminalTurnCorrelation({
+                busy: false,
+                source: 'terminal-dialog/busy',
+                timestamp: Date.now(),
+            }),
+        );
         const rl = getRl();
         if (rl) {
             clearInlineStatus();

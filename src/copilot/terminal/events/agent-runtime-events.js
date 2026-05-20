@@ -399,14 +399,19 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, regi
                 `\n  ${terminalThemeBadge(severity, isRecoverableModelCall ? 'MODEL' : 'ERROR')} ${terminalThemeText(severity, detail)}`,
             );
         }
-        broadcastSse('agent.error', {
-            hookType,
-            errorContext,
-            recoverable,
-            message: msg,
-            handledAs: isRecoverableModelCall ? 'recoverable_model_call' : 'agent_error',
-            timestamp: Date.now(),
-        });
+        broadcastSse(
+            'agent.error',
+            withAgentSseEnvelope(
+                {
+                    hookType,
+                    errorContext,
+                    recoverable,
+                    message: msg,
+                    handledAs: isRecoverableModelCall ? 'recoverable_model_call' : 'agent_error',
+                },
+                'agent/error',
+            ),
+        );
     };
 
     const onCompactionStart = () => {
@@ -415,7 +420,7 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, regi
             source: 'agent',
         });
         println(`  ${terminalThemeText('warn', '🗜️  Compactando context window…')}`);
-        broadcastSse('compaction.start', {});
+        broadcastSse('compaction.start', withAgentSseEnvelope({}, 'agent/compaction.start'));
     };
 
     const onCompactionComplete = (/** @type {Record<string, unknown>} */ evt) => {
@@ -438,7 +443,7 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, regi
         } else if (!success) {
             println(`  ${terminalThemeText('error', '🗜️  Compactação falhou')}`);
         }
-        broadcastSse('compaction.complete', { success, pre, post });
+        broadcastSse('compaction.complete', withAgentSseEnvelope({ success, pre, post }, 'agent/compaction.complete'));
     };
 
     const onIntent = (/** @type {Record<string, unknown>} */ evt) => {
@@ -508,12 +513,17 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, regi
                     : `  \x1b[32m🤖 Background agent concluído: ${description}\x1b[0m`,
             );
         }
-        broadcastSse('agent.background.completed', {
-            ...evt,
-            visible: narration.print,
-            internal: !narration.recordHistory,
-            timestamp: Date.now(),
-        });
+        broadcastSse(
+            'agent.background.completed',
+            withAgentSseEnvelope(
+                {
+                    ...evt,
+                    visible: narration.print,
+                    internal: !narration.recordHistory,
+                },
+                'agent/background.completed',
+            ),
+        );
     };
 
     const onBackgroundIdle = (/** @type {Record<string, unknown>} */ evt) => {
@@ -530,12 +540,17 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, regi
         if (shouldPrint) {
             printlnWhenRenderUnlocked(`  \x1b[90m🤖 Background agent ocioso: ${description}\x1b[0m`);
         }
-        broadcastSse('agent.background.idle', {
-            ...evt,
-            visible: shouldPrint,
-            internal: !shouldPrint,
-            timestamp: Date.now(),
-        });
+        broadcastSse(
+            'agent.background.idle',
+            withAgentSseEnvelope(
+                {
+                    ...evt,
+                    visible: shouldPrint,
+                    internal: !shouldPrint,
+                },
+                'agent/background.idle',
+            ),
+        );
     };
 
     const onShellCompleted = (/** @type {Record<string, unknown>} */ evt) => {
@@ -552,10 +567,7 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, regi
                 ? `  \x1b[31m💻 Shell concluído com erro: ${description}${exitCode !== null ? ` · exit=${exitCode}` : ''}\x1b[0m`
                 : `  \x1b[32m💻 Shell concluído: ${description}${exitCode !== null ? ` · exit=${exitCode}` : ''}\x1b[0m`,
         );
-        broadcastSse('agent.shell.completed', {
-            ...evt,
-            timestamp: Date.now(),
-        });
+        broadcastSse(AGENT_SHELL_COMPLETED_EVENT, withAgentSseEnvelope({ ...evt }, 'agent/shell.completed'));
     };
 
     const onShellDetachedCompleted = (/** @type {Record<string, unknown>} */ evt) => {
@@ -565,10 +577,10 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, regi
             source: 'agent',
         });
         printlnWhenRenderUnlocked(`  \x1b[32m💻 Shell destacada concluída: ${description}\x1b[0m`);
-        broadcastSse('agent.shell.detached_completed', {
-            ...evt,
-            timestamp: Date.now(),
-        });
+        broadcastSse(
+            AGENT_SHELL_DETACHED_COMPLETED_EVENT,
+            withAgentSseEnvelope({ ...evt }, 'agent/shell.detached_completed'),
+        );
     };
 
     const onPrConsumed = (/** @type {Record<string, unknown>} */ evt) => {

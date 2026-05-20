@@ -54,6 +54,20 @@ const WATCHDOG_RECOVERY_WAIT_MS = Math.max(5_000, Math.min(30_000, Math.round(LL
 const AUTO_RESTART_DIALOG_STOP_REASONS = new Set(['watchdog_restart', 'model_stopped']);
 
 /**
+ * @template {Record<string, unknown>} T
+ * @param {T} payload
+ * @param {string} source
+ * @returns {T & { source: string; timestamp: number; traceId?: string; turnId?: string }}
+ */
+function withTerminalAgentSseEnvelope(payload, source) {
+    return withTerminalTurnCorrelation({
+        ...payload,
+        source,
+        timestamp: typeof payload['timestamp'] === 'number' ? payload['timestamp'] : Date.now(),
+    });
+}
+
+/**
  * Política local de UX: restart automático é exceção. O Agent continua sendo dono do lifecycle, mas o terminal só
  * reabre o loop sozinho quando a razão representa falha operacional clara.
  *
@@ -108,14 +122,19 @@ export function registerAgentEventListeners(printBanner) {
                 const label = success ? 'recuperado com restart' : 'falha no recovery';
                 println(`\n\x1b[33m  [dialog] ${label}: ${strategy} · ${reason} · ${duration}\x1b[0m`);
             }
-            broadcastSse('dialog.recovery', {
-                ...evt,
-                reason,
-                recovered,
-                strategy,
-                prConsumed,
-                timestamp: Date.now(),
-            });
+            broadcastSse(
+                'dialog.recovery',
+                withTerminalAgentSseEnvelope(
+                    {
+                        ...evt,
+                        reason,
+                        recovered,
+                        strategy,
+                        prConsumed,
+                    },
+                    'terminal-agent-wiring/dialog.recovery',
+                ),
+            );
         },
     );
     agentEvents.on(EMITTER_DIALOG_STALLED, async (/** @type {{ stalledMs: number }} */ evt) => {
@@ -134,11 +153,17 @@ export function registerAgentEventListeners(printBanner) {
                 `[TerminalServer] Watchdog stall ignorado (${secs}s): runtime aguardando input humano (pendingQuestionKind=question).`,
             );
             pingTerminalDialogWatchdog();
-            broadcastSse('dialog.stalled', {
-                stalledMs: evt.stalledMs,
-                ignored: true,
-                reason: 'waiting_for_input_question',
-            });
+            broadcastSse(
+                'dialog.stalled',
+                withTerminalAgentSseEnvelope(
+                    {
+                        stalledMs: evt.stalledMs,
+                        ignored: true,
+                        reason: 'waiting_for_input_question',
+                    },
+                    'terminal-agent-wiring/dialog.stalled',
+                ),
+            );
             return;
         }
 
@@ -175,7 +200,13 @@ export function registerAgentEventListeners(printBanner) {
             println(`\n[watchdog] ✅  Dialog loop recuperado sem consumir PR (ask_user preservado).`);
             log('INFO', '[TerminalServer] F52: Watchdog recovery zero-PR — ask_user reapareceu após abort.');
             pingTerminalDialogWatchdog();
-            broadcastSse('dialog.stalled', { stalledMs: evt.stalledMs, recoveredZeroPR: true });
+            broadcastSse(
+                'dialog.stalled',
+                withTerminalAgentSseEnvelope(
+                    { stalledMs: evt.stalledMs, recoveredZeroPR: true },
+                    'terminal-agent-wiring/dialog.stalled',
+                ),
+            );
             return;
         }
 
@@ -204,7 +235,13 @@ export function registerAgentEventListeners(printBanner) {
                 log('ERROR', `[TerminalServer] Falha no fallback de restart após watchdog: ${e2.message}`),
             );
         });
-        broadcastSse('dialog.stalled', { stalledMs: evt.stalledMs, recoveredZeroPR: false });
+        broadcastSse(
+            'dialog.stalled',
+            withTerminalAgentSseEnvelope(
+                { stalledMs: evt.stalledMs, recoveredZeroPR: false },
+                'terminal-agent-wiring/dialog.stalled',
+            ),
+        );
     });
 
     // F41B.7: pré-stall warning — ação preemptiva quando loop está a 80% do limiar de stall.
@@ -227,7 +264,13 @@ export function registerAgentEventListeners(printBanner) {
                 source: 'watchdog',
             });
             log('INFO', `[TerminalServer] Pré-stall (${secs}s) suprimido: terminal ativo (${runtimeState.status}).`);
-            broadcastSse('dialog.pre_stall_warning', { stalledMs: evt.stalledMs, suppressed: true });
+            broadcastSse(
+                'dialog.pre_stall_warning',
+                withTerminalAgentSseEnvelope(
+                    { stalledMs: evt.stalledMs, suppressed: true },
+                    'terminal-agent-wiring/dialog.pre_stall_warning',
+                ),
+            );
             return;
         }
 
@@ -241,7 +284,13 @@ export function registerAgentEventListeners(printBanner) {
             severity: 'warn',
             source: 'watchdog',
         });
-        broadcastSse('dialog.pre_stall_warning', { stalledMs: evt.stalledMs, suppressed: false, remainingSecs });
+        broadcastSse(
+            'dialog.pre_stall_warning',
+            withTerminalAgentSseEnvelope(
+                { stalledMs: evt.stalledMs, suppressed: false, remainingSecs },
+                'terminal-agent-wiring/dialog.pre_stall_warning',
+            ),
+        );
     });
 
     // SSE: transmite respostas da LLM-B para clientes subscritos
@@ -263,18 +312,23 @@ export function registerAgentEventListeners(printBanner) {
     });
     // F4.6 (UPG-11): emite dialog.loop.changed para dashboard responsivo
     agentEvents.on(EMITTER_DIALOG_LOOP_CHANGED, (/** @type {{ active: boolean; ts: number }} */ evt) => {
-        broadcastSse('dialog.loop.changed', { active: evt.active, timestamp: evt.ts });
+        broadcastSse(
+            'dialog.loop.changed',
+            withTerminalAgentSseEnvelope(
+                { active: evt.active, timestamp: evt.ts },
+                'terminal-agent-wiring/dialog.loop.changed',
+            ),
+        );
     });
     agentEvents.on(EMITTER_DIALOG_READY, () => {
         const { model, reasoningEffort } = readTerminalDialogStreamMeta();
         lastStreamingKbReported = -1;
         lastStreamingReportAt = 0;
         markTerminalActivityIdle('Aguardando próxima mensagem');
-        broadcastSse('dialog.ready', {
-            timestamp: Date.now(),
-            model,
-            reasoningEffort,
-        });
+        broadcastSse(
+            'dialog.ready',
+            withTerminalAgentSseEnvelope({ model, reasoningEffort }, 'terminal-agent-wiring/dialog.ready'),
+        );
         // Drain do mailbox zero-PR: cobre abort pelo watchdog (que não dispara TURN_END).
         drainMailboxToTurnIfIdle('dialog_ready');
     });
@@ -297,11 +351,17 @@ export function registerAgentEventListeners(printBanner) {
         // F1.1: NÃO registrar activity aqui — turn-display.js é o único responsável
         // por recordTerminalActivity('streaming', ...). Registrar aqui causava duplicação
         // no histórico com source='sdk' vs source='dialog' (dois caminhos para o mesmo evento).
-        broadcastSse('streaming.progress', {
-            totalBytes,
-            kb,
-            timestamp: now,
-        });
+        broadcastSse(
+            'streaming.progress',
+            withTerminalAgentSseEnvelope(
+                {
+                    totalBytes,
+                    kb,
+                    timestamp: now,
+                },
+                'terminal-agent-wiring/streaming.progress',
+            ),
+        );
     });
 
     // DL-PERM: dialog loop permanente — reinicia automaticamente se o modelo encerrar o loop.
@@ -314,7 +374,13 @@ export function registerAgentEventListeners(printBanner) {
                 source: 'dialog',
             });
             log('INFO', '[TerminalServer] Dialog loop encerrado para recovery semântico coordenado pelo Agent.');
-            broadcastSse('dialog.stopped', { authorized: true, reason, recovery: true });
+            broadcastSse(
+                'dialog.stopped',
+                withTerminalAgentSseEnvelope(
+                    { authorized: true, reason, recovery: true },
+                    'terminal-agent-wiring/dialog.stopped',
+                ),
+            );
             return;
         }
 
@@ -325,7 +391,10 @@ export function registerAgentEventListeners(printBanner) {
             });
             println(`\n\x1b[33m  [dialog] Loop encerrado por autorização explícita do usuário.\x1b[0m`);
             log('INFO', '[TerminalServer] Dialog loop encerrado com autorização do usuário.');
-            broadcastSse('dialog.stopped', { authorized: true, reason });
+            broadcastSse(
+                'dialog.stopped',
+                withTerminalAgentSseEnvelope({ authorized: true, reason }, 'terminal-agent-wiring/dialog.stopped'),
+            );
             return;
         }
 
@@ -337,7 +406,10 @@ export function registerAgentEventListeners(printBanner) {
             });
             println(`\n\x1b[33m  [dialog] Loop encerrado enquanto pausado pelo usuário — não reiniciando.\x1b[0m`);
             log('INFO', '[TerminalServer] Dialog loop encerrado com dialogPaused=true. Não reiniciando.');
-            broadcastSse('dialog.stopped', { reason, paused: true });
+            broadcastSse(
+                'dialog.stopped',
+                withTerminalAgentSseEnvelope({ reason, paused: true }, 'terminal-agent-wiring/dialog.stopped'),
+            );
             return;
         }
 
@@ -356,7 +428,10 @@ export function registerAgentEventListeners(printBanner) {
                 'WARN',
                 `[TerminalServer] Dialog loop encerrado (${label}). Restart automático bloqueado por política.`,
             );
-            broadcastSse('dialog.stopped', { reason, restarting: false });
+            broadcastSse(
+                'dialog.stopped',
+                withTerminalAgentSseEnvelope({ reason, restarting: false }, 'terminal-agent-wiring/dialog.stopped'),
+            );
             return;
         }
         recordTerminalActivity('system', 'Reiniciando dialog loop', {
@@ -366,7 +441,10 @@ export function registerAgentEventListeners(printBanner) {
         });
         println(`\n\x1b[33m  [dialog] Loop encerrado (${label}) — reiniciando automaticamente…\x1b[0m`);
         log('WARN', `[TerminalServer] Dialog loop encerrado (${label}). Reiniciando.`);
-        broadcastSse('dialog.stopped', { reason, restarting: true });
+        broadcastSse(
+            'dialog.stopped',
+            withTerminalAgentSseEnvelope({ reason, restarting: true }, 'terminal-agent-wiring/dialog.stopped'),
+        );
         ensureDialogLoop().catch((e) =>
             log('ERROR', `[TerminalServer] Falha ao reiniciar dialog loop após stop: ${e.message}`),
         );
@@ -376,12 +454,17 @@ export function registerAgentEventListeners(printBanner) {
     agentEvents.on(EMITTER_SESSION_USAGE, (/** @type {{ currentTokens: number; tokenLimit: number }} */ data) => {
         const { currentTokens = 0, tokenLimit = 0 } = data;
         if (tokenLimit > 0) {
-            broadcastSse('session.usage', {
-                tokens: currentTokens,
-                tokenLimit,
-                utilization: currentTokens / tokenLimit,
-                timestamp: Date.now(),
-            });
+            broadcastSse(
+                'session.usage',
+                withTerminalAgentSseEnvelope(
+                    {
+                        tokens: currentTokens,
+                        tokenLimit,
+                        utilization: currentTokens / tokenLimit,
+                    },
+                    'terminal-agent-wiring/session.usage',
+                ),
+            );
         }
     });
 
@@ -391,7 +474,13 @@ export function registerAgentEventListeners(printBanner) {
         (/** @type {{ compactionTokensUsed?: { cachedInput?: number }; success?: boolean }} */ evt) => {
             const cachedInput = evt?.compactionTokensUsed?.cachedInput ?? 0;
             if (cachedInput > 0) {
-                broadcastSse('session.compaction_complete', { cachedInput, timestamp: Date.now() });
+                broadcastSse(
+                    'session.compaction_complete',
+                    withTerminalAgentSseEnvelope(
+                        { cachedInput },
+                        'terminal-agent-wiring/session.compaction_complete',
+                    ),
+                );
             }
         },
     );

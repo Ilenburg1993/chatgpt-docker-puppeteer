@@ -52,7 +52,15 @@ describe('terminal/agent-sse-passthrough.js — contrato', () => {
 
         listeners.get('dialog.turn_timeout')?.[0]?.({ phase: 'inject', timeoutMs: 15000 });
 
-        expect(broadcastSse).toHaveBeenCalledWith('dialog.turn_timeout', { phase: 'inject', timeoutMs: 15000 });
+        expect(broadcastSse).toHaveBeenCalledWith(
+            'dialog.turn_timeout',
+            expect.objectContaining({
+                phase: 'inject',
+                timeoutMs: 15000,
+                source: 'agent/passthrough/dialog.turn_timeout',
+                timestamp: expect.any(Number),
+            }),
+        );
         expect(broadcastSse).toHaveBeenCalledTimes(1);
     });
 });

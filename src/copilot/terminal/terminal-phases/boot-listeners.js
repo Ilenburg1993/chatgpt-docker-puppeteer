@@ -107,6 +107,7 @@ export async function runTerminalRuntimeListenersPhase(ctx) {
 
     broadcastSse('terminal.started', {
         timestamp: Date.now(),
+        source: 'terminal-boot/terminal.started',
         operationMode: (() => {
             const s = getMcpStatus();
             return s.available && s.toolCount > 0 && !s.circuitOpen ? 'connected' : 'standalone';

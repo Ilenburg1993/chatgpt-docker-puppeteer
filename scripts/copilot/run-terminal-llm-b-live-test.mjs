@@ -90,6 +90,9 @@ function buildReport({
         `- Connected: ${sseSummary.connected ? 'yes' : 'no'}`,
         `- Events: ${sseSummary.eventCount}`,
         `- Events with id: ${sseSummary.eventsWithId}`,
+        `- Events with source: ${sseSummary.eventsWithSource ?? 0}`,
+        `- Events with traceId: ${sseSummary.eventsWithTraceId ?? 0}`,
+        `- TraceIds: ${(sseSummary.traceIds ?? []).slice(0, 8).join(', ') || '-'}`,
         `- Errors: ${sseSummary.errors.length}`,
         '',
         '## Criteria',
@@ -100,7 +103,50 @@ function buildReport({
     return `${lines.join('\n')}\n`;
 }
 
-function evaluateSseCriteria(sseSummary, { expectPublicEvents }) {
+function isObjectPayload(value) {
+    return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+function summarizeSseEvents(events) {
+    const publicEvents = events.filter((evt) => !['connected', 'heartbeat'].includes(evt.event));
+    const ids = publicEvents.map((evt) => evt.id).filter((id) => Number.isFinite(id));
+    const names = new Set(publicEvents.map((evt) => evt.event));
+    const payloadObjects = publicEvents.filter((evt) => isObjectPayload(evt.data));
+    const sourceEvents = payloadObjects.filter((evt) => typeof evt.data.source === 'string' && evt.data.source.length > 0);
+    const eventSourceEvents = payloadObjects.filter(
+        (evt) => typeof evt.data.eventSource === 'string' && evt.data.eventSource.length > 0,
+    );
+    const traceEvents = payloadObjects.filter(
+        (evt) => typeof evt.data.traceId === 'string' && evt.data.traceId.length > 0,
+    );
+    const traceIds = [...new Set(traceEvents.map((evt) => evt.data.traceId))].sort();
+    const criticalEvents = payloadObjects.filter((evt) =>
+        ['delta', 'assistant.message', 'dialog.reply', 'tool.lifecycle', 'user_input.requested', 'user_input.completed'].includes(
+            evt.event,
+        ),
+    );
+    return {
+        publicEvents,
+        ids,
+        names,
+        payloadObjects,
+        sourceEvents,
+        eventSourceEvents,
+        traceEvents,
+        traceIds,
+        criticalEvents,
+    };
+}
+
+function extractPlainTraceIds(plain) {
+    const ids = new Set();
+    for (const match of plain.matchAll(/\btrace(?:Id)?\s*[=:]?\s*(turn:[A-Za-z0-9_.:-]+)/giu)) {
+        ids.add(match[1]);
+    }
+    return [...ids].sort();
+}
+
+function evaluateSseCriteria(sseSummary, { expectPublicEvents, plain = '' }) {
     if (sseSummary.disabled) {
         return [
             {
@@ -110,10 +156,15 @@ function evaluateSseCriteria(sseSummary, { expectPublicEvents }) {
             },
         ];
     }
-    const publicEvents = sseSummary.events.filter((evt) => !['connected', 'heartbeat'].includes(evt.event));
-    const ids = publicEvents.map((evt) => evt.id).filter((id) => Number.isFinite(id));
+    const summary = summarizeSseEvents(sseSummary.events);
+    const { publicEvents, ids, names, payloadObjects, sourceEvents, eventSourceEvents, traceEvents, traceIds, criticalEvents } =
+        summary;
     const monotonic = ids.every((id, index) => index === 0 || id > ids[index - 1]);
-    const names = new Set(publicEvents.map((evt) => evt.event));
+    const plainTraceIds = extractPlainTraceIds(plain);
+    const traceOverlap = traceIds.filter((traceId) => plainTraceIds.includes(traceId));
+    const criticalWithSource = criticalEvents.filter(
+        (evt) => typeof evt.data.source === 'string' || typeof evt.data.eventSource === 'string',
+    );
     return [
         {
             id: 'sse-connected',
@@ -139,6 +190,28 @@ function evaluateSseCriteria(sseSummary, { expectPublicEvents }) {
                 names.has('tool.lifecycle') ||
                 names.has('user_input.requested'),
             detail: `observed public SSE events: ${[...names].slice(0, 8).join(', ') || 'none'}`,
+        },
+        {
+            id: 'sse-source-envelope',
+            pass:
+                payloadObjects.length === 0 ||
+                sourceEvents.length + eventSourceEvents.length === payloadObjects.length,
+            detail: `${sourceEvents.length + eventSourceEvents.length}/${payloadObjects.length} object payload events include source/eventSource`,
+        },
+        {
+            id: 'sse-critical-events-sourced',
+            pass: criticalEvents.length === 0 || criticalWithSource.length === criticalEvents.length,
+            detail: `${criticalWithSource.length}/${criticalEvents.length} critical transcript/tool/user-input events include source/eventSource`,
+        },
+        {
+            id: 'sse-trace-envelope',
+            pass: !expectPublicEvents || traceEvents.length > 0,
+            detail: `${traceEvents.length}/${payloadObjects.length} object payload events include traceId; traceIds=${traceIds.slice(0, 5).join(', ') || '-'}`,
+        },
+        {
+            id: 'sse-stdout-trace-overlap',
+            pass: !expectPublicEvents || traceIds.length === 0 || traceOverlap.length > 0,
+            detail: `stdout traceIds=${plainTraceIds.slice(0, 5).join(', ') || '-'} · sse traceIds=${traceIds.slice(0, 5).join(', ') || '-'} · overlap=${traceOverlap.slice(0, 5).join(', ') || '-'}`,
         },
     ];
 }
@@ -212,7 +285,7 @@ function evaluateOutput(plain, sseSummary) {
             pass: /readline fechado/.test(plain),
             detail: 'terminal exited through /quit',
         },
-        ...evaluateSseCriteria(sseSummary, { expectPublicEvents: true }),
+        ...evaluateSseCriteria(sseSummary, { expectPublicEvents: true, plain }),
     ];
 }
 
@@ -263,7 +336,7 @@ function evaluateNoPrOutput(plain, sseSummary) {
             pass: /readline fechado/.test(plain),
             detail: 'terminal exited through /quit',
         },
-        ...evaluateSseCriteria(sseSummary, { expectPublicEvents: false }),
+        ...evaluateSseCriteria(sseSummary, { expectPublicEvents: false, plain }),
     ];
 }
 
@@ -341,11 +414,15 @@ function startSseCollector({ port = 3009, pathname = '/events' } = {}) {
             req.destroy();
         },
         summary() {
+            const correlation = summarizeSseEvents(events);
             return {
                 connected,
                 statusCode,
                 eventCount: events.length,
                 eventsWithId: events.filter((evt) => Number.isFinite(evt.id)).length,
+                eventsWithSource: correlation.sourceEvents.length + correlation.eventSourceEvents.length,
+                eventsWithTraceId: correlation.traceEvents.length,
+                traceIds: correlation.traceIds,
                 errors: [...errors],
                 events: [...events],
                 raw,
@@ -477,6 +554,9 @@ async function main() {
         statusCode: null,
         eventCount: 0,
         eventsWithId: 0,
+        eventsWithSource: 0,
+        eventsWithTraceId: 0,
+        traceIds: [],
         errors: collectSse ? ['collector-not-started'] : [],
         events: [],
         raw: '',

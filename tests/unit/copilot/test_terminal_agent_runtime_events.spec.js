@@ -567,11 +567,21 @@ describe('terminal/events/agent-runtime-events.js — contrato', () => {
         expect(println).toHaveBeenCalledWith(expect.stringContaining('Shell concluído: npm run lint:copilot · exit=0'));
         expect(broadcastSse).toHaveBeenCalledWith(
             'agent.background.completed',
-            expect.objectContaining({ agentId: 'bg-1', status: 'completed' }),
+            expect.objectContaining({
+                agentId: 'bg-1',
+                status: 'completed',
+                source: 'agent/background.completed',
+                timestamp: expect.any(Number),
+            }),
         );
         expect(broadcastSse).toHaveBeenCalledWith(
             'agent.shell.completed',
-            expect.objectContaining({ shellId: 'shell-1', exitCode: 0 }),
+            expect.objectContaining({
+                shellId: 'shell-1',
+                exitCode: 0,
+                source: 'agent/shell.completed',
+                timestamp: expect.any(Number),
+            }),
         );
     });
 

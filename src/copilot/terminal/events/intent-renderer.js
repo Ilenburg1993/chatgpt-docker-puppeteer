@@ -17,6 +17,7 @@ import {
     recordTerminalActivity,
     terminalThemeBadge,
     terminalThemeText,
+    withTerminalTurnCorrelation,
 } from '../state/events/index.js';
 
 const RECENT_INTENT_TTL_MS = 5 * 60_000;
@@ -147,15 +148,19 @@ export function renderTerminalIntent(input) {
         printlnBlock(lines);
     }
 
-    broadcastSse('assistant.intent', {
-        id: entry.id,
-        intent: entry.intent,
-        tool: entry.tool,
-        risk: entry.risk,
-        source: entry.source,
-        toolCallId: entry.toolCallId,
-        timestamp: entry.timestamp,
-    });
+    broadcastSse(
+        'assistant.intent',
+        withTerminalTurnCorrelation({
+            id: entry.id,
+            intent: entry.intent,
+            tool: entry.tool,
+            risk: entry.risk,
+            source: entry.source,
+            eventSource: 'terminal-intent/assistant.intent',
+            toolCallId: entry.toolCallId,
+            timestamp: entry.timestamp,
+        }),
+    );
 
     return entry;
 }

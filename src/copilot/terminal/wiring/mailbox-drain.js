@@ -36,6 +36,7 @@ import {
     getBusy,
 } from '../../presentation/state/index.js';
 import { broadcastSse, getTurnQueueDepth, println, sendTurn } from '../dialog/index.js';
+import { withTerminalTurnCorrelation } from '../state/events/index.js';
 
 /**
  * Resultado de uma operação de drenagem do mailbox.
@@ -60,13 +61,17 @@ import { broadcastSse, getTurnQueueDepth, println, sendTurn } from '../dialog/in
 export function deliverEntryAsTurnIfIdle(entry, trigger) {
     if (!getBusy() && getTurnQueueDepth() === 0) {
         println(`\x1b[90m  [mailbox→turn] Entrada drenada após ${trigger} (${entry.source}/${entry.modeHint}).\x1b[0m`);
-        broadcastSse('intervention.mailbox.drained', {
-            entryId: entry.id,
-            source: entry.source,
-            modeHint: entry.modeHint,
-            timestamp: Date.now(),
-            trigger,
-        });
+        broadcastSse(
+            'intervention.mailbox.drained',
+            withTerminalTurnCorrelation({
+                entryId: entry.id,
+                source: entry.source,
+                eventSource: 'terminal-mailbox/intervention.mailbox.drained',
+                modeHint: entry.modeHint,
+                timestamp: Date.now(),
+                trigger,
+            }),
+        );
         void sendTurn(entry.message, 'user').catch((e) => {
             log('WARN', `[mailbox.drain] Falha ao enfileirar turno (trigger=${trigger}): ${String(e?.message ?? e)}`);
         });

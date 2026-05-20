@@ -9,6 +9,7 @@
 
 import { AGENT_EVENTS } from '#copilot/events';
 import { broadcastSse } from '../dialog/index.js';
+import { withTerminalTurnCorrelation } from '../state/events/index.js';
 
 /**
  * @typedef {{
@@ -30,7 +31,14 @@ export function registerTerminalAgentSsePassthrough({ agent, handledEvents, pass
             continue;
         }
         agent.on(evt, (/** @type {unknown} */ data) => {
-            broadcastSse(evt, /** @type {object} */ (data ?? {}));
+            broadcastSse(
+                evt,
+                withTerminalTurnCorrelation({
+                    ...(data && typeof data === 'object' ? /** @type {Record<string, unknown>} */ (data) : {}),
+                    source: `agent/passthrough/${evt}`,
+                    timestamp: Date.now(),
+                }),
+            );
         });
     }
 }

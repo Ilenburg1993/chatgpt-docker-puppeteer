@@ -46,6 +46,7 @@ export async function runTerminalPinnedContextPhase(ctx) {
         );
         broadcastSse('skills.reloaded', {
             updatedAt,
+            source: 'terminal-boot/skills.reloaded',
             fileCount,
             trigger: evt?.file ?? null,
             type: evt?.type ?? 'change',
@@ -59,6 +60,7 @@ export async function runTerminalPinnedContextPhase(ctx) {
             current,
             previous: previous ?? null,
             timestamp: Date.now(),
+            source: 'terminal-boot/activity.changed',
         });
     };
     terminalActivityEmitter.on('activity:changed', ctx.activityChangedHandler);

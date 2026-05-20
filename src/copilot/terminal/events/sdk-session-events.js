@@ -148,6 +148,22 @@ function compactSummaryText(value, max = 36) {
 }
 
 /**
+ * Envelope único para eventos vanilla do SDK expostos via SSE do terminal.
+ *
+ * @template {Record<string, unknown>} T
+ * @param {T} payload
+ * @param {string} source
+ * @returns {T & { source: string; timestamp: number; traceId?: string; turnId?: string }}
+ */
+function withSdkSessionSseEnvelope(payload, source) {
+    return withTerminalTurnCorrelation({
+        ...payload,
+        source,
+        timestamp: typeof payload['timestamp'] === 'number' ? payload['timestamp'] : Date.now(),
+    });
+}
+
+/**
  * @param {import('../state/turn-trace-state.js').TerminalTurnTraceSnapshot | null} trace
  * @returns {void}
  */
@@ -281,10 +297,10 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
         const turnId = evt?.turnId ?? null;
         beginTerminalTurnMaterialization({ turnId, source: 'sdk/assistant.turn_start' });
         beginTerminalTurnTrace({ turnId });
-        broadcastSse('assistant.turn_start', {
-            turnId,
-            timestamp: Date.now(),
-        });
+        broadcastSse(
+            'assistant.turn_start',
+            withSdkSessionSseEnvelope({ turnId }, 'sdk/assistant.turn_start'),
+        );
     };
 
     const onAssistantTurnEnd = (/** @type {{ turnId?: string | null }} */ evt) => {
@@ -297,10 +313,7 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
             recordHistory: false,
         });
         renderTurnTraceSummary(trace);
-        broadcastSse('assistant.turn_end', {
-            turnId,
-            timestamp: Date.now(),
-        });
+        broadcastSse('assistant.turn_end', withSdkSessionSseEnvelope({ turnId }, 'sdk/assistant.turn_end'));
         // Drenar entradas stranded do mailbox zero-PR: se o modelo completou sem chamar ask_user,
         // as entradas não serão consumidas automaticamente. Usar setImmediate para aguardar
         // setBusy(false) do engine.js antes de verificar o estado de ociosidade.
@@ -337,11 +350,13 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
         });
         broadcastSse(
             'assistant.message',
-            withTerminalTurnCorrelation({
-                content: normalized.content,
-                protocolKind: normalized.kind,
-                timestamp: Date.now(),
-            }),
+            withSdkSessionSseEnvelope(
+                {
+                    content: normalized.content,
+                    protocolKind: normalized.kind,
+                },
+                'sdk/assistant.message',
+            ),
         );
         if (getBusy()) {
             recordTerminalTurnAssistantMessage({
@@ -405,7 +420,10 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
                 ? '  \x1b[90m/elicitation show latest  ·  /elicitation respond latest accept {"answer":"..."}\x1b[0m'
                 : '  \x1b[90m/elicitation show latest  ·  /elicitation list\x1b[0m',
         );
-        broadcastSse('elicitation.pending', { ...entry, timestamp: Date.now() });
+        broadcastSse(
+            'elicitation.pending',
+            withSdkSessionSseEnvelope({ ...entry }, 'sdk/elicitation.pending'),
+        );
         refreshPromptIfIdle();
     };
 
@@ -421,7 +439,10 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
         if (entry) {
             println(`  \x1b[32m✓ Elicitation concluída:\x1b[0m \x1b[90m${entry.id}\x1b[0m`);
         }
-        broadcastSse('elicitation.completed', { ...data, timestamp: Date.now() });
+        broadcastSse(
+            'elicitation.completed',
+            withSdkSessionSseEnvelope({ ...data }, 'sdk/elicitation.completed'),
+        );
         refreshPromptIfIdle();
     };
 
@@ -439,7 +460,10 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
             println('  \x1b[90mAcompanhe a decisão com /permission list, /status ou /activity.\x1b[0m');
             permissionHelpPrinted = true;
         }
-        broadcastSse('permission.requested', { ...entry, timestamp: Date.now() });
+        broadcastSse(
+            'permission.requested',
+            withSdkSessionSseEnvelope({ ...entry }, 'sdk/permission.requested'),
+        );
         refreshPromptIfIdle();
     };
 
@@ -484,7 +508,10 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
                 `  ${ok ? '\x1b[32m✓' : '\x1b[33m•'} Permissão:\x1b[0m ${entry?.permissionType ?? 'unknown'} ${resultLabel}${policyIndicator}`,
             );
         }
-        broadcastSse('permission.completed', { ...data, timestamp: Date.now(), decision, wasDeniedByPolicy });
+        broadcastSse(
+            'permission.completed',
+            withSdkSessionSseEnvelope({ ...data, decision, wasDeniedByPolicy }, 'sdk/permission.completed'),
+        );
         refreshPromptIfIdle();
     };
 
@@ -501,7 +528,7 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
                 `  ${terminalThemeBadge('warn', 'PERM')} ${terminalThemeText('warn', `permission.mode_changed → ${mode}`)}`,
             );
         }
-        broadcastSse('permission.mode_changed', { mode, timestamp: Date.now() });
+        broadcastSse('permission.mode_changed', withSdkSessionSseEnvelope({ mode }, 'sdk/permission.mode_changed'));
         refreshPromptIfIdle();
     };
 
@@ -561,14 +588,16 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
         });
         broadcastSse(
             'user_input.requested',
-            withTerminalTurnCorrelation({
-                requestId: evt?.requestId ?? null,
-                question,
-                choices,
-                allowFreeform,
-                toolCallId: evt?.toolCallId ?? null,
-                timestamp: Date.now(),
-            }),
+            withSdkSessionSseEnvelope(
+                {
+                    requestId: evt?.requestId ?? null,
+                    question,
+                    choices,
+                    allowFreeform,
+                    toolCallId: evt?.toolCallId ?? null,
+                },
+                'sdk/user_input.requested',
+            ),
         );
         if (shouldPrintSessionNarration('important')) {
             const optionsLabel = choices.length > 0 ? ` · opções=${choices.length}` : '';
@@ -592,16 +621,20 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
                 println(
                     `  ${terminalThemeBadge('info', 'MAILBOX')} ${terminalThemeText('info', `intervenção aplicada automaticamente (${mailboxEntry.source}/${mailboxEntry.modeHint})`)}${terminalThemeText('muted', ` · fila restante=${mailboxSummary.queueSize}`)}`,
                 );
-                broadcastSse('intervention.mailbox.applied', {
-                    runtimeId,
-                    entryId: mailboxEntry.id,
-                    source: mailboxEntry.source,
-                    modeHint: mailboxEntry.modeHint,
-                    mergedCount: mailboxEntry.mergedCount,
-                    queueSize: mailboxSummary.queueSize,
-                    dropped: mailboxSummary.dropped,
-                    timestamp: Date.now(),
-                });
+                broadcastSse(
+                    'intervention.mailbox.applied',
+                    withTerminalTurnCorrelation({
+                        runtimeId,
+                        entryId: mailboxEntry.id,
+                        source: mailboxEntry.source,
+                        eventSource: 'sdk/intervention.mailbox.applied',
+                        modeHint: mailboxEntry.modeHint,
+                        mergedCount: mailboxEntry.mergedCount,
+                        queueSize: mailboxSummary.queueSize,
+                        dropped: mailboxSummary.dropped,
+                        timestamp: Date.now(),
+                    }),
+                );
             } else {
                 enqueueRuntimeInterventionMailbox({
                     runtimeId,
@@ -645,12 +678,14 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
         });
         broadcastSse(
             'user_input.completed',
-            withTerminalTurnCorrelation({
-                requestId,
-                answer: evt?.answer ?? '',
-                wasFreeform,
-                timestamp: Date.now(),
-            }),
+            withSdkSessionSseEnvelope(
+                {
+                    requestId,
+                    answer: evt?.answer ?? '',
+                    wasFreeform,
+                },
+                'sdk/user_input.completed',
+            ),
         );
         refreshPromptIfIdle();
     };
@@ -693,12 +728,17 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
                 `  \x1b[36m🧠 Modelo SDK: ${previousModel} → ${newModel}${reasoningEffort ? ` · ${reasoningEffort}` : ''}\x1b[0m`,
             );
         }
-        broadcastSse('session.model_changed', {
-            previousModel,
-            newModel,
-            reasoningEffort,
-            timestamp: Date.now(),
-        });
+        broadcastSse(
+            'session.model_changed',
+            withSdkSessionSseEnvelope(
+                {
+                    previousModel,
+                    newModel,
+                    reasoningEffort,
+                },
+                'sdk/session.model_changed',
+            ),
+        );
         refreshPromptIfIdle();
     };
 
@@ -710,10 +750,7 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
             recordHistory: false,
         });
         if (shouldPrintSessionNarration('verbose')) println(`  \x1b[90m🪪 Título da sessão: ${title}\x1b[0m`);
-        broadcastSse('session.title_changed', {
-            title,
-            timestamp: Date.now(),
-        });
+        broadcastSse('session.title_changed', withSdkSessionSseEnvelope({ title }, 'sdk/session.title_changed'));
     };
 
     const onSessionContextChanged = (/** @type {{ cwd?: string; branch?: string; repository?: string }} */ evt) => {
@@ -726,12 +763,17 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
         });
         if (shouldPrintSessionNarration('verbose'))
             println(`  \x1b[90m📁 Contexto SDK: ${cwd}${branch}${repository}\x1b[0m`);
-        broadcastSse('session.context_changed', {
-            cwd: evt?.cwd,
-            branch: evt?.branch,
-            repository: evt?.repository,
-            timestamp: Date.now(),
-        });
+        broadcastSse(
+            'session.context_changed',
+            withSdkSessionSseEnvelope(
+                {
+                    cwd: evt?.cwd,
+                    branch: evt?.branch,
+                    repository: evt?.repository,
+                },
+                'sdk/session.context_changed',
+            ),
+        );
     };
 
     const onSessionModeChanged = (
@@ -747,11 +789,10 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
         if (shouldPrintSessionNarration('verbose')) {
             println(`  \x1b[35m🧭 Modo SDK: ${previousMode} → ${newMode ?? 'unknown'}\x1b[0m`);
         }
-        broadcastSse('session.mode_changed', {
-            previousMode,
-            newMode,
-            timestamp: Date.now(),
-        });
+        broadcastSse(
+            'session.mode_changed',
+            withSdkSessionSseEnvelope({ previousMode, newMode }, 'sdk/session.mode_changed'),
+        );
         refreshPromptIfIdle();
     };
 
@@ -763,7 +804,7 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
             source: 'sdk',
         });
         if (shouldPrintSessionNarration('verbose')) println(`  \x1b[33m📝 Plan SDK: ${operation ?? 'alterado'}\x1b[0m`);
-        broadcastSse('session.plan_changed', { operation, timestamp: Date.now() });
+        broadcastSse('session.plan_changed', withSdkSessionSseEnvelope({ operation }, 'sdk/session.plan_changed'));
         refreshPromptIfIdle();
     };
 
@@ -792,12 +833,17 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
             const sdkLabel = sdkCount === null ? 'contagem SDK n/d' : `${sdkCount} SDK`;
             println(`  \x1b[90m🧰 Tools dinâmicas SDK atualizadas: ${sdkLabel} · registry local: ${localCount} (/tools)\x1b[0m`);
         }
-        broadcastSse('session.tools_updated', {
-            count: sdkCount ?? localCount,
-            sdkCount,
-            localCount,
-            timestamp: Date.now(),
-        });
+        broadcastSse(
+            'session.tools_updated',
+            withSdkSessionSseEnvelope(
+                {
+                    count: sdkCount ?? localCount,
+                    sdkCount,
+                    localCount,
+                },
+                'sdk/session.tools_updated',
+            ),
+        );
     };
 
     const onSessionSkillsLoaded = (/** @type {{ count?: number; enabled?: number }} */ evt) => {
@@ -810,7 +856,10 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
         });
         if (shouldPrintSessionNarration('verbose'))
             println(`  \x1b[90m🎛️  Skills SDK: ${enabled}/${count} habilitadas\x1b[0m`);
-        broadcastSse('session.skills_loaded', { count, enabled, timestamp: Date.now() });
+        broadcastSse(
+            'session.skills_loaded',
+            withSdkSessionSseEnvelope({ count, enabled }, 'sdk/session.skills_loaded'),
+        );
     };
 
     const onSessionExtensionsLoaded = (/** @type {{ count?: number }} */ evt) => {
@@ -820,7 +869,10 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
             source: 'sdk',
             recordHistory: false,
         });
-        broadcastSse('session.extensions_loaded', { count, timestamp: Date.now() });
+        broadcastSse(
+            'session.extensions_loaded',
+            withSdkSessionSseEnvelope({ count }, 'sdk/session.extensions_loaded'),
+        );
     };
 
     const onSessionMcpServersLoaded = (/** @type {{ count?: number }} */ evt) => {
@@ -831,7 +883,10 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
             recordHistory: false,
         });
         if (shouldPrintSessionNarration('verbose')) println(`  \x1b[90mMCP servers carregados: ${count}\x1b[0m`);
-        broadcastSse('session.mcp_servers_loaded', { count, timestamp: Date.now() });
+        broadcastSse(
+            'session.mcp_servers_loaded',
+            withSdkSessionSseEnvelope({ count }, 'sdk/session.mcp_servers_loaded'),
+        );
     };
 
     const onSessionBackgroundTasksChanged = (/** @type {{ count?: number }} */ evt) => {
@@ -842,7 +897,10 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
             severity: count > 0 ? 'warn' : 'info',
             recordHistory: count > 0,
         });
-        broadcastSse('session.background_tasks_changed', { count, timestamp: Date.now() });
+        broadcastSse(
+            'session.background_tasks_changed',
+            withSdkSessionSseEnvelope({ count }, 'sdk/session.background_tasks_changed'),
+        );
     };
 
     const onSessionTaskComplete = (/** @type {{ summary?: string | null }} */ evt) => {
@@ -854,10 +912,10 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
         if (shouldPrintSessionNarration('important')) {
             println(`  \x1b[32m🏁 Task concluída${summary ? `: ${summary}` : ''}\x1b[0m`);
         }
-        broadcastSse('session.task_complete', {
-            summary: summary || null,
-            timestamp: Date.now(),
-        });
+        broadcastSse(
+            'session.task_complete',
+            withSdkSessionSseEnvelope({ summary: summary || null }, 'sdk/session.task_complete'),
+        );
     };
 
     const onSessionTruncation = (
@@ -874,12 +932,17 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
         println(
             `  \x1b[33m✂️  Truncation SDK: ${messageTruncatedCount} msgs · ${tokensTruncated.toLocaleString('pt-BR')} tokens · ${reason}\x1b[0m`,
         );
-        broadcastSse('session.truncation', {
-            messageTruncatedCount,
-            tokensTruncated,
-            reason,
-            timestamp: Date.now(),
-        });
+        broadcastSse(
+            'session.truncation',
+            withSdkSessionSseEnvelope(
+                {
+                    messageTruncatedCount,
+                    tokensTruncated,
+                    reason,
+                },
+                'sdk/session.truncation',
+            ),
+        );
     };
 
     const onSessionSnapshotRewind = (/** @type {{ snapshotId?: string; reason?: string }} */ evt) => {
@@ -891,11 +954,10 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
             source: 'sdk',
         });
         println(`  \x1b[33m⏪ Snapshot rewind: ${snapshotId} · ${reason}\x1b[0m`);
-        broadcastSse('session.snapshot_rewind', {
-            snapshotId,
-            reason,
-            timestamp: Date.now(),
-        });
+        broadcastSse(
+            'session.snapshot_rewind',
+            withSdkSessionSseEnvelope({ snapshotId, reason }, 'sdk/session.snapshot_rewind'),
+        );
     };
 
     const onSessionShutdown = (/** @type {{ shutdownType?: string; reason?: string }} */ evt) => {
@@ -907,11 +969,10 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
             source: 'sdk',
         });
         println(`  \x1b[33m🛑 Shutdown SDK: ${shutdownType}${reason ? ` · ${reason}` : ''}\x1b[0m`);
-        broadcastSse('session.shutdown', {
-            shutdownType,
-            reason,
-            timestamp: Date.now(),
-        });
+        broadcastSse(
+            'session.shutdown',
+            withSdkSessionSseEnvelope({ shutdownType, reason }, 'sdk/session.shutdown'),
+        );
         // Limpeza defensiva em shutdown para não carregar estado órfão em sessões subsequentes.
         suppressedProtocolRequestIds.clear();
         _reg.clear();
@@ -930,13 +991,18 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
         if (shouldPrintSessionNarration('important')) {
             println(`  \x1b[36m🔁 Handoff SDK: ${fromAgent} → ${toAgent}${reason ? ` · ${reason}` : ''}\x1b[0m`);
         }
-        broadcastSse('session.handoff', {
-            fromAgent,
-            toAgent,
-            reason,
-            context: evt?.context,
-            timestamp: Date.now(),
-        });
+        broadcastSse(
+            'session.handoff',
+            withSdkSessionSseEnvelope(
+                {
+                    fromAgent,
+                    toAgent,
+                    reason,
+                    context: evt?.context,
+                },
+                'sdk/session.handoff',
+            ),
+        );
     };
 
     const onWorkspaceFileChanged = (/** @type {{ path?: string; operation?: 'create' | 'update' | string }} */ evt) => {
@@ -956,11 +1022,10 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
         });
         if (shouldPrintSessionNarration('verbose'))
             println(`  \x1b[90m🗂️  Workspace file ${operation}: ${path}\x1b[0m`);
-        broadcastSse('session.workspace_file_changed', {
-            path,
-            operation,
-            timestamp: Date.now(),
-        });
+        broadcastSse(
+            'session.workspace_file_changed',
+            withSdkSessionSseEnvelope({ path, operation }, 'sdk/session.workspace_file_changed'),
+        );
     };
 
     const onToolUserRequested = (/** @type {{ toolName?: string; requestId?: string }} */ evt) => {
@@ -1009,7 +1074,10 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
         if (shouldPrintSessionNarration(severity === 'warn' ? 'important' : 'verbose')) {
             println(`  \x1b[90mMCP ${serverName}: ${status}\x1b[0m`);
         }
-        broadcastSse('mcp.server.status_changed', { serverName, status, timestamp: Date.now() });
+        broadcastSse(
+            'mcp.server.status_changed',
+            withSdkSessionSseEnvelope({ serverName, status }, 'sdk/mcp.server.status_changed'),
+        );
     };
 
     const onMcpOauthRequired = (/** @type {{ serverName?: string; requestId?: string }} */ evt) => {
@@ -1023,7 +1091,10 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
         println(
             `\n  \x1b[33m🔑 OAuth MCP necessário:\x1b[0m ${serverName}${requestId ? ` \x1b[90m(${requestId})\x1b[0m` : ''}`,
         );
-        broadcastSse('mcp.oauth.required', { serverName, requestId, timestamp: Date.now() });
+        broadcastSse(
+            'mcp.oauth.required',
+            withSdkSessionSseEnvelope({ serverName, requestId }, 'sdk/mcp.oauth.required'),
+        );
         if (serverName !== 'unknown') {
             void (async () => {
                 try {
@@ -1046,13 +1117,18 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
                     if (loginUrl) {
                         println(`  \x1b[36m${loginUrl}\x1b[0m`);
                     }
-                    broadcastSse('mcp.oauth.login_started', {
-                        serverName,
-                        requestId,
-                        loginUrl,
-                        payload,
-                        timestamp: Date.now(),
-                    });
+                    broadcastSse(
+                        'mcp.oauth.login_started',
+                        withSdkSessionSseEnvelope(
+                            {
+                                serverName,
+                                requestId,
+                                loginUrl,
+                                payload,
+                            },
+                            'sdk/mcp.oauth.login_started',
+                        ),
+                    );
                     refreshPromptIfIdle();
                 } catch (error) {
                     const message = error instanceof Error ? error.message : String(error ?? 'erro desconhecido');
@@ -1065,12 +1141,17 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
                     println(
                         `  ${terminalThemeBadge('warn', 'MCP')} ${terminalThemeText('warn', `oauth.login indisponível para ${serverName}: ${message}`)}`,
                     );
-                    broadcastSse('mcp.oauth.login_failed', {
-                        serverName,
-                        requestId,
-                        error: message,
-                        timestamp: Date.now(),
-                    });
+                    broadcastSse(
+                        'mcp.oauth.login_failed',
+                        withSdkSessionSseEnvelope(
+                            {
+                                serverName,
+                                requestId,
+                                error: message,
+                            },
+                            'sdk/mcp.oauth.login_failed',
+                        ),
+                    );
                     refreshPromptIfIdle();
                 }
             })();
@@ -1087,7 +1168,10 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
         if (shouldPrintSessionNarration('important')) {
             println(`  \x1b[32m✓ OAuth MCP concluído${requestId ? ` (${requestId})` : ''}\x1b[0m`);
         }
-        broadcastSse('mcp.oauth.completed', { requestId, timestamp: Date.now() });
+        broadcastSse(
+            'mcp.oauth.completed',
+            withSdkSessionSseEnvelope({ requestId }, 'sdk/mcp.oauth.completed'),
+        );
         refreshPromptIfIdle();
     };
 
@@ -1098,7 +1182,10 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
             source: 'sdk',
             recordHistory: false,
         });
-        broadcastSse('pending_messages.modified', { count, timestamp: Date.now() });
+        broadcastSse(
+            'pending_messages.modified',
+            withSdkSessionSseEnvelope({ count }, 'sdk/pending_messages.modified'),
+        );
     };
 
     const onHookStart = (
@@ -1112,12 +1199,17 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
             recordHistory: false,
             updateCurrent: false,
         });
-        broadcastSse('hook.start', {
-            hookType,
-            hookInvocationId,
-            input: evt?.input ?? null,
-            timestamp: Date.now(),
-        });
+        broadcastSse(
+            'hook.start',
+            withSdkSessionSseEnvelope(
+                {
+                    hookType,
+                    hookInvocationId,
+                    input: evt?.input ?? null,
+                },
+                'sdk/hook.start',
+            ),
+        );
     };
 
     const onHookEnd = (
@@ -1144,13 +1236,18 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
                 `  ${terminalThemeBadge('warn', 'HOOK')} ${terminalThemeText('warn', `${hookType} falhou${errorMessage ? ` · ${errorMessage}` : ''}`)}`,
             );
         }
-        broadcastSse('hook.end', {
-            hookType,
-            hookInvocationId,
-            success,
-            error: errorMessage,
-            timestamp: Date.now(),
-        });
+        broadcastSse(
+            'hook.end',
+            withSdkSessionSseEnvelope(
+                {
+                    hookType,
+                    hookInvocationId,
+                    success,
+                    error: errorMessage,
+                },
+                'sdk/hook.end',
+            ),
+        );
         if (success && (hookType === 'sessionEnd' || hookType === 'session_end')) {
             setImmediate(() => {
                 if (!getBusy()) {
@@ -1176,12 +1273,17 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
                 `  ${terminalThemeBadge('warn', 'SAMPLE')} ${terminalThemeText('warn', `${serverName} solicitou sampling${requestId ? ` (${requestId})` : ''}`)}`,
             );
         }
-        broadcastSse('sampling.requested', {
-            requestId,
-            serverName,
-            mcpRequestId,
-            timestamp: Date.now(),
-        });
+        broadcastSse(
+            'sampling.requested',
+            withSdkSessionSseEnvelope(
+                {
+                    requestId,
+                    serverName,
+                    mcpRequestId,
+                },
+                'sdk/sampling.requested',
+            ),
+        );
         refreshPromptIfIdle();
     };
 
@@ -1192,10 +1294,7 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
             source: 'sdk',
             recordHistory: false,
         });
-        broadcastSse('sampling.completed', {
-            requestId,
-            timestamp: Date.now(),
-        });
+        broadcastSse('sampling.completed', withSdkSessionSseEnvelope({ requestId }, 'sdk/sampling.completed'));
         refreshPromptIfIdle();
     };
 
@@ -1218,11 +1317,7 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
                 `  ${terminalThemeBadge('info', 'CMDS')} ${terminalThemeText('muted', `${count} comando(s)${preview ? ` · ${preview}` : ''}`)}`,
             );
         }
-        broadcastSse('commands.changed', {
-            count,
-            commands,
-            timestamp: Date.now(),
-        });
+        broadcastSse('commands.changed', withSdkSessionSseEnvelope({ count, commands }, 'sdk/commands.changed'));
         refreshPromptIfIdle();
     };
 
@@ -1251,11 +1346,16 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
                 `  ${terminalThemeBadge('info', 'CAPS')} ${terminalThemeText('muted', changeBits || 'capabilities alteradas')}`,
             );
         }
-        broadcastSse('capabilities.changed', {
-            capabilities: evt?.capabilities ?? null,
-            changes: evt?.changes ?? null,
-            timestamp: Date.now(),
-        });
+        broadcastSse(
+            'capabilities.changed',
+            withSdkSessionSseEnvelope(
+                {
+                    capabilities: evt?.capabilities ?? null,
+                    changes: evt?.changes ?? null,
+                },
+                'sdk/capabilities.changed',
+            ),
+        );
         refreshPromptIfIdle();
     };
 
@@ -1272,11 +1372,10 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
                 `  ${terminalThemeBadge('warn', 'AUTO')} ${terminalThemeText('warn', `SDK solicitou auto mode switch${errorCode ? ` · ${errorCode}` : ''}`)}`,
             );
         }
-        broadcastSse('auto_mode_switch.requested', {
-            requestId,
-            errorCode,
-            timestamp: Date.now(),
-        });
+        broadcastSse(
+            'auto_mode_switch.requested',
+            withSdkSessionSseEnvelope({ requestId, errorCode }, 'sdk/auto_mode_switch.requested'),
+        );
         refreshPromptIfIdle();
     };
 
@@ -1288,11 +1387,10 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
             source: 'sdk',
             recordHistory: false,
         });
-        broadcastSse('auto_mode_switch.completed', {
-            requestId,
-            response,
-            timestamp: Date.now(),
-        });
+        broadcastSse(
+            'auto_mode_switch.completed',
+            withSdkSessionSseEnvelope({ requestId, response }, 'sdk/auto_mode_switch.completed'),
+        );
         refreshPromptIfIdle();
     };
 
@@ -1320,13 +1418,18 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
                 println(`  ${terminalThemeText('muted', preview)}`);
             }
         }
-        broadcastSse('exit_plan_mode.requested', {
-            requestId,
-            recommendedAction,
-            actions,
-            planPreview: preview,
-            timestamp: Date.now(),
-        });
+        broadcastSse(
+            'exit_plan_mode.requested',
+            withSdkSessionSseEnvelope(
+                {
+                    requestId,
+                    recommendedAction,
+                    actions,
+                    planPreview: preview,
+                },
+                'sdk/exit_plan_mode.requested',
+            ),
+        );
         refreshPromptIfIdle();
     };
 
@@ -1340,10 +1443,10 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
                 `  \x1b[32m✅ SDK concluiu saída do plan mode${evt?.requestId ? ` (${evt.requestId})` : ''}\x1b[0m`,
             );
         }
-        broadcastSse('exit_plan_mode.completed', {
-            requestId: evt?.requestId,
-            timestamp: Date.now(),
-        });
+        broadcastSse(
+            'exit_plan_mode.completed',
+            withSdkSessionSseEnvelope({ requestId: evt?.requestId }, 'sdk/exit_plan_mode.completed'),
+        );
         refreshPromptIfIdle();
     };
 
@@ -1354,10 +1457,10 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
             source: 'sdk',
             recordHistory: false,
         });
-        broadcastSse('assistant.reasoning_complete', {
-            contentLength,
-            timestamp: Date.now(),
-        });
+        broadcastSse(
+            'assistant.reasoning_complete',
+            withSdkSessionSseEnvelope({ contentLength }, 'sdk/assistant.reasoning_complete'),
+        );
     };
 
     agent.on(EMITTER_ASSISTANT_TURN_START, onAssistantTurnStart);

@@ -15,6 +15,7 @@ import {
     recordTerminalStreamDeltaDiagnostic,
     readTerminalTurnCorrelation,
     terminalThemeText,
+    withTerminalTurnCorrelation,
 } from '../state/dialog/index.js';
 import {
     beginTerminalRenderLock,
@@ -204,12 +205,17 @@ function flushReasoningSummary(state) {
         println(`  ${terminalThemeText('muted', `    /thinking latest  ·  id ${shortId}`)}`);
         println('');
     }
-    broadcastSse('reasoning.complete', {
-        content: state.reasoningContent,
-        reasoningId: state.reasoningId,
-        durationMs,
-        chars: state.reasoningChars,
-    });
+    broadcastSse(
+        'reasoning.complete',
+        withTerminalTurnCorrelation({
+            content: state.reasoningContent,
+            reasoningId: state.reasoningId,
+            durationMs,
+            chars: state.reasoningChars,
+            source: 'terminal-turn-display/reasoning.complete',
+            timestamp: Date.now(),
+        }),
+    );
     state.reasoningSummaryRendered = true;
 }
 
@@ -265,7 +271,15 @@ export function createReasoningCallback(state) {
                 });
             }
         }
-        broadcastSse('reasoning', { chunk, reasoningId: rId });
+        broadcastSse(
+            'reasoning',
+            withTerminalTurnCorrelation({
+                chunk,
+                reasoningId: rId,
+                source: 'terminal-turn-display/reasoning',
+                timestamp: Date.now(),
+            }),
+        );
     };
 }
 
@@ -328,12 +342,13 @@ export function createDeltaCallback(state) {
             chunk,
             ...(correlation.traceId ? { traceId: correlation.traceId } : {}),
             ...(correlation.turnId ? { turnId: correlation.turnId } : {}),
+            source: typeof envelope['source'] === 'string' ? envelope['source'] : 'terminal-turn-display/delta',
             ...(typeof envelope['streamId'] === 'string' ? { streamId: envelope['streamId'] } : {}),
             ...(typeof envelope['chunkSeq'] === 'number' ? { chunkSeq: envelope['chunkSeq'] } : {}),
-            ...(typeof envelope['source'] === 'string' ? { source: envelope['source'] } : {}),
             ...(typeof envelope['eventId'] === 'string' ? { eventId: envelope['eventId'] } : {}),
             ...(typeof envelope['causationId'] === 'string' ? { causationId: envelope['causationId'] } : {}),
             ...(typeof envelope['ts'] === 'number' ? { ts: envelope['ts'] } : {}),
+            timestamp: now,
         });
 
         if (!state.showStreaming) {

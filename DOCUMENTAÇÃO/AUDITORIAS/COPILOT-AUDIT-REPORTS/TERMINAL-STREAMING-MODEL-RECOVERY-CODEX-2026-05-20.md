@@ -63,7 +63,7 @@ Revisao adicional desta rodada: `assistant.usage` no SDK 0.3.0 e telemetria de c
 
 ### Lacunas restantes de streaming
 
-- `assistant.message`, `dialog.reply`, replay SSE e persistencia de historico ainda precisam carregar a mesma causalidade completa do delta.
+- Replay SSE, persistencia de historico e export ainda precisam carregar a mesma causalidade completa do delta em todos os artefatos de consulta posterior.
 - A janela temporal degradada em `client-dialog.js` ainda deve ser metrificada para sabermos quando ela deixou de ser necessaria.
 - O terminal ainda deve diferenciar explicitamente no `/activity` "SDK nao emitiu delta publico" de "delta emitido mas streaming visual desligado".
 - Testes live precisam cobrir uma resposta longa com deltas reais do SDK, pois respostas curtas podem chegar apenas como mensagem final.
@@ -225,12 +225,12 @@ Esta revisao cruza o log live fornecido pelo usuario, o relatorio da LLM-B e o c
 
 - Persistir no historico de conversa os metadados de mismatch final/parcial, nao apenas na UX/timeline.
 - Expor no `/activity` contadores dedicados para `delta causal`, `delta temporal fallback`, `delta cumulative normalized`, `delta suppressed` e `final suffix`.
-- Propagar causalidade completa tambem em `assistant.message`, `dialog.reply`, replay SSE e export Markdown.
+- Propagar causalidade completa tambem em replay SSE, historico persistido e export Markdown; `assistant.message` e `dialog.reply` ja carregam envelope live.
 - Medir quantas vezes a janela temporal degradada em `client-dialog.js` ainda e usada; a meta e tornar essa dependencia rara e, depois, removivel.
 - Criar comando/diagnostico de streaming que diga claramente: SDK nao emitiu delta, delta emitido mas display desligado, delta emitido e renderizado, ou delta emitido e reconciliado no final.
 - Expor no `/usage now` e `/status` a distincao entre `boot/resume zero-PR`, `turn billed`, `explicit /turn`, `direct chat bridge` e `recovery PR fallback`.
 - Expor no `/usage now` tambem o ultimo `llm.usage` classificado, separado do ultimo `pr.consumed`, para acabar com a ambiguidade entre token telemetry e Premium Request. **Implementado.**
-- Unificar payloads SSE de `delta`, `assistant.message`, `dialog.reply`, `user_input.*`, `tool.*` e `pr.consumed` com um envelope comum de `traceId/turnId/eventId/source`. **Parcialmente implementado: o stream SSE global agora recebe um `eventId` canonico unico por broadcast e o propaga ao pool `/events` sem regravar o replay; `delta`, diagnosticos, `assistant.message`, `dialog.reply`, `user_input.*`, `tool.lifecycle`, `llm.usage`, `pr.consumed`, `pr.fallback_model`, `session.error`, `session.info`, `session.warning` e `dialog.boot_recovery` ja carregam `traceId/turnId` quando ha materializacao/trace ativa; ainda falta padronizar `source` em todos os envelopes SDK vanilla e cobrir eventos residuais.**
+- Unificar payloads SSE de `delta`, `assistant.message`, `dialog.reply`, `user_input.*`, `tool.*` e `pr.consumed` com um envelope comum de `traceId/turnId/eventId/source`. **Parcialmente implementado: o stream SSE global agora recebe um `eventId` canonico unico por broadcast e o propaga ao pool `/events` sem regravar o replay; `delta`, diagnosticos, `assistant.message`, `dialog.reply`, `user_input.*`, `tool.lifecycle`, `llm.usage`, `pr.consumed`, `pr.fallback_model`, `session.error`, `session.info`, `session.warning`, `assistant.intent`, eventos SDK vanilla, eventos de background/shell/compaction, watchdog/dialog lifecycle, reasoning, busy e boot signals ja carregam `source/timestamp` e `traceId/turnId` quando ha materializacao/trace ativa. Ainda falta provar isso em live real cruzando stdout/SSE/activity por `traceId`.**
 - Revisar o fluxo de `requestHeaders` em `runTerminalDialogTurnDetailed`: hoje ele pode parar dialog loop e usar direct chat, portanto deve ser exibido como caminho que pode consumir PR.
 - Criar teste unitario para boot recovery com env `LLM_B_DIALOG_BOOT_RECOVERY_ALLOW_PR_FALLBACK=true`, garantindo que o fallback pago e deliberado e observavel.
 - Criar teste live automatizavel que obrigue resposta longa o suficiente para observar varios deltas, uma tool, usage e `ask_user`.
@@ -305,7 +305,7 @@ Esta revisao cruza o log live fornecido pelo usuario, o relatorio da LLM-B e o c
 - K9. Adicionar modo `--no-pr` que apenas inspeciona `/usage now`, `/activity`, `/metrics`, `/errors` e sai, para sanity check de boot/resume sem consumo. **Implementado no runner; o modo nao envia turno nem invoca tools.**
 - K10. Adicionar integração com `/export` para comparar transcript persistido contra stdout plain.
 - K11. Adicionar coleta SSE paralela de `GET :3009/events` para comparar terminal local e canal externo. **Implementado no runner: gera `terminal.sse.log`, `terminal.sse.jsonl`, criterios `sse-*` e resumo SSE no `summary.md`. Falta usar esses artefatos em um turno real com deltas.**
-- K12. Adicionar relatório de gaps automatico no MD do runner quando algum critério falhar.
+- K12. Adicionar relatório de gaps automatico no MD do runner quando algum critério falhar. **Parcialmente implementado: o runner grava criterios detalhados no `summary.md` e agora inclui contadores de `source`, `traceId` e overlap stdout/SSE; falta transformar falhas em recomendações acionáveis.**
 
 #### Faixa I - Modelo, erro e recuperacao
 
@@ -436,6 +436,7 @@ Implementado nesta revisao:
 - O SSE global deixou de ter múltiplos donos de replay: `terminal/dialog/sse.broadcastSse()` atribui um `eventId` unico, grava `getTerminalReplayBuffer()` uma vez, envia esse ID aos clientes raw legados e publica o mesmo ID no fanout interno. O router `/events` remove o metadado interno antes de expor o payload e entrega o evento sem regravar o replay global.
 - O runner live ganhou `--no-pr`, uma rota de sanity check sem turno LLM: `/usage now`, `/activity`, `/metrics`, `/errors`, `/quit`.
 - O runner live agora abre uma conexao SSE paralela em `GET :3009/events`, persiste raw/JSONL e valida conexao, ausencia de metadado interno vazado, IDs monotônicos e eventos publicos quando o roteiro real e executado.
+- O runner live passou a calcular envelope/correlação do SSE: eventos com `source/eventSource`, eventos com `traceId`, lista de `traceIds` e overlap entre stdout plain e `terminal.sse.jsonl`.
 - `delta` SSE passou a carregar `traceId` e `turnId` extraidos da materializacao ativa, e os diagnosticos de stream passaram a guardar a mesma correlacao. `assistant.message` tambem propaga `traceId/turnId` quando ocorre dentro de turno materializado.
 - Testes unitarios foram adicionados/atualizados para o bridge de deltas e o novo estado de diagnostico.
 - Teste unitario novo garante que dois raw clients + fanout `/events` nao incrementam o replay global mais de uma vez para o mesmo broadcast.
@@ -451,7 +452,7 @@ Pendencias apos esta revisao:
 - Persistir diagnosticos de streaming/reconciliacao no historico conversacional e no `/export`, nao apenas no estado live. **Parcialmente implementado: o turno `llm_b` persistido no Hub agora recebe `metadata.terminalStreamingDiagnostics`, a timeline preserva metadata e `/export` imprime resumo quando disponivel. Falta propagar tambem para transcript live nao persistido e para sync lazy de bridge tail.**
 - Propagar `traceId`/`turnId` aos diagnosticos e deltas SSE para correlação perfeita entre terminal, timeline, SSE e hub. **Parcialmente implementado para `delta`, diagnosticos de stream, `assistant.message`, `dialog.reply`, `user_input.*`, `tool.lifecycle`, usage/PR, session error/info/warning e eventos de fallback/recovery; falta correlacionar o runner externo automaticamente e varrer eventos residuais.**
 - Adicionar assert live especifico para a secao `Streaming publico` no modo com turno real, alem do modo `--no-pr`.
-- Coletar SSE paralelamente no runner para comparar stdout local, replay buffer e canal externo. **Implementado para coleta e criterios basicos; falta correlacionar automaticamente stdout markers, eventos SSE e replay em turnos reais.**
+- Coletar SSE paralelamente no runner para comparar stdout local, replay buffer e canal externo. **Implementado para coleta, criterios basicos e correlação stdout/SSE por `traceId`; falta validar isso em um turno real com deltas.**
 - Enriquecer o classificador de `llm.usage` com sinal local de resposta humana pendente para explicar melhor fechamentos tardios de `ask_user`. **Implementado: usage emitido enquanto `user_input.requested` ainda esta pendente agora e classificado como `ask_user_continuation` com motivo `pending_user_input_request_continuation`, e o `user_input.completed` tardio nao cria uma segunda continuacao.**
 
 ## Atualizacao Codex - correlação canônica de user_input e tools
@@ -472,9 +473,9 @@ Implementado nesta revisao:
 
 Pendencias apos esta revisao:
 
-- Aplicar o mesmo helper nos eventos SDK vanilla restantes e padronizar `source` em todos eles.
 - Persistir `traceId/turnId` dos eventos correlacionados no Hub/export, nao apenas no SSE live.
 - Fazer o runner live real cruzar `stdout`, `terminal.sse.jsonl` e `/activity` por `traceId` para provar ausência de duplicação/perda entre canais.
+- Auditar os poucos eventos de boot/replay que nao possuem turno ativo e garantir que consumidores externos saibam diferenciar `source` operacional de campos semanticos legados como `source` de mailbox.
 
 ## Validacao live Codex - SSE no runner sem PR
 
@@ -506,6 +507,20 @@ Critérios relevantes:
 - Coletor SSE conectou em `/events`, sem erro e sem vazamento de metadado interno.
 - Encerramento limpo via `/quit`.
 
+## Validacao live Codex - envelopes source sem PR
+
+Comando: `npm run terminal:llm-b:live-test -- --no-pr --transport=pty --timeout-ms=120000 --out-dir=artifacts/terminal-live/no-pr-envelope-source-codex-2026-05-20`.
+
+Resultado: PASS em `artifacts/terminal-live/no-pr-envelope-source-codex-2026-05-20/summary.md`.
+
+Critérios relevantes:
+
+- Boot/resume entrou no REPL interativo e não abriu turno LLM.
+- `/usage now`, `/activity`, `/metrics` e `/errors 10` renderizaram sem erros.
+- O coletor SSE conectou em `/events`, sem vazar `__terminalSseEventId`.
+- O novo relatório do runner incluiu contadores de `source`, `traceId` e overlap stdout/SSE.
+- Como o modo `--no-pr` não abriu turno, nenhum evento público com `traceId` era esperado; a validação de correlação completa permanece pendente para o roteiro live com turno real.
+
 ## Atualizacao Codex - classificacao tardia de ask_user
 
 Data: 2026-05-20.
@@ -516,3 +531,29 @@ Implementado:
 - O classificador marca o requestId usado por essa usage; quando `user_input.completed` chega depois, ele nao incrementa uma segunda continuacao.
 - O evento continua `llm.usage`, sem `pr.consumed`, preservando a regra de que `ask_user` nao abre Premium Request novo.
 - Teste unitario cobre a ordem real observada no live: `user_input.requested -> assistant.usage(initiator:agent) -> user_input.completed -> assistant.usage(initiator:agent)`.
+
+## Atualizacao Codex - envelopes SSE residuais
+
+Data: 2026-05-20.
+
+Implementado:
+
+- Criado helper local de envelope para eventos vanilla do SDK em `sdk-session-events.js`, preservando a mesma regra de correlação por materialização ativa/turn trace.
+- `assistant.turn_start/end`, `assistant.message`, `elicitation.*`, `permission.*`, `user_input.*`, `session.*`, `mcp.*`, `hook.*`, `sampling.*`, `commands.changed`, `capabilities.changed`, `auto_mode_switch.*`, `exit_plan_mode.*` e `assistant.reasoning_complete` passaram a carregar `source`, `timestamp` e `traceId/turnId` quando há turno ativo.
+- Eventos normalizados do agent (`agent.error`, compaction, background, shell) agora usam o mesmo envelope de `source/timestamp/traceId/turnId`.
+- O passthrough SSE estreito de eventos sem adapter dedicado deixou de repassar payload cru e passa a marcar `source=agent/passthrough/<evento>`.
+- O wiring do terminal padronizou watchdog, dialog recovery/stalled/stopped/ready, streaming progress, session usage e compaction cache com envelope de terminal.
+- `busy`, `reasoning`, `reasoning.complete`, `assistant.intent`, `terminal.started`, `skills.reloaded` e `activity.changed` passaram a carregar origem operacional explicita; nos eventos de mailbox que já tinham `source` semântico, foi adicionado `eventSource` para não corromper a origem da intervenção.
+- Testes unitários de SDK session, agent runtime, passthrough e turn display foram atualizados para validar `source/timestamp/traceId` nos contratos principais.
+
+Pendencias apos esta revisao:
+
+- O contrato live ainda precisa provar a correlação em um turno real longo com delta parcial, final, tool, ask_user e SSE externo no mesmo `traceId`.
+- A persistência Hub/export ainda deve guardar envelopes evento-a-evento, não apenas o resumo de streaming do turno.
+- O runner live deve diferenciar automaticamente campos semânticos (`source` de mailbox/intenção) de origem operacional (`eventSource`) para evitar falsos positivos em auditoria.
+
+Implementado adicionalmente nesta revisao:
+
+- `summary.md` do runner agora mostra `Events with source`, `Events with traceId` e `TraceIds`.
+- `evaluateSseCriteria()` valida `sse-source-envelope`, `sse-critical-events-sourced`, `sse-trace-envelope` e `sse-stdout-trace-overlap` no modo com turno real.
+- O modo `--no-pr` continua sem exigir `traceId`, mas ainda valida que eventos SSE de objeto possuam origem operacional.
