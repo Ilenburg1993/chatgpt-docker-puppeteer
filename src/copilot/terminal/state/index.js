@@ -94,6 +94,12 @@ export {
     readTerminalTranscriptTurns,
 } from './transcript-state.js';
 export {
+    clearTerminalStreamDiagnosticsForTests,
+    readTerminalStreamDiagnosticsProjection,
+    recordTerminalFinalReconciliationDiagnostic,
+    recordTerminalStreamDeltaDiagnostic,
+} from './stream-diagnostics-state.js';
+export {
     TERMINAL_DETAIL_LEVELS,
     getTerminalDetailLevel,
     isTerminalDetailLevel,

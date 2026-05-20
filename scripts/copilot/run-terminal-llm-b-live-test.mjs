@@ -2,9 +2,9 @@
 /**
  * Canonical live runner for `terminal:llm-b`.
  *
- * This is intentionally opt-in and not part of default CI: it talks to the real SDK and can consume a Premium Request
- * for the explicit user turn. It exists to make terminal validation repeatable instead of relying on ad hoc visual
- * inspection.
+ * This is intentionally opt-in and not part of default CI: the default scenario talks to the real SDK and can consume
+ * a Premium Request for the explicit user turn. Use `--no-pr` for a boot/resume/control-only probe that validates UX
+ * telemetry without sending an LLM turn.
  */
 
 import { spawn, spawnSync } from 'node:child_process';
@@ -151,12 +151,63 @@ function evaluateOutput(plain) {
     ];
 }
 
+function evaluateNoPrOutput(plain) {
+    return [
+        {
+            id: 'ready',
+            pass: /LLM-B pronta/.test(plain),
+            detail: 'terminal reached ready state',
+        },
+        {
+            id: 'interactive-repl',
+            pass: !/Modo headless detectado/.test(plain),
+            detail: 'terminal ran with an interactive REPL/TTY surface',
+        },
+        {
+            id: 'no-explicit-turn',
+            pass: !/\[intervene→turn\]/.test(plain) && !/Processando mensagem/.test(plain),
+            detail: 'no explicit LLM turn was opened during --no-pr probe',
+        },
+        {
+            id: 'usage-visible',
+            pass: /Último PR:/.test(plain) && /Modo: sdk=/.test(plain),
+            detail: '/usage now rendered context, PR and SDK mode telemetry',
+        },
+        {
+            id: 'activity-visible',
+            pass: /Atividade Atual da LLM-B/.test(plain) && /Streaming público/.test(plain),
+            detail: '/activity rendered activity and streaming diagnostics sections',
+        },
+        {
+            id: 'metrics-visible',
+            pass: /Métricas da Sessão/.test(plain) && /Streaming público/.test(plain),
+            detail: '/metrics rendered session and public streaming counters',
+        },
+        {
+            id: 'no-tools-started',
+            pass: !/\[TOOL\]/.test(plain) && !/\[DONE\]/.test(plain),
+            detail: 'probe did not invoke tools',
+        },
+        {
+            id: 'no-terminal-errors',
+            pass: /Nenhum erro recente/.test(plain) && !/\bERROR\b/.test(plain),
+            detail: 'terminal error tracker stayed clean',
+        },
+        {
+            id: 'clean-quit',
+            pass: /readline fechado/.test(plain),
+            detail: 'terminal exited through /quit',
+        },
+    ];
+}
+
 async function main() {
     const timeoutMs = Number(readArg('--timeout-ms', String(DEFAULT_TIMEOUT_MS)));
     const postAnswerDelayMs = Number(readArg('--post-answer-delay-ms', String(DEFAULT_POST_ANSWER_DELAY_MS)));
     const outDir = path.resolve(ROOT, readArg('--out-dir', `artifacts/terminal-live/${nowStamp()}`));
     const requestedTransport = readArg('--transport', 'pty');
     const dryRun = hasFlag('--dry-run');
+    const noPr = hasFlag('--no-pr');
     const startedAt = new Date().toISOString();
 
     await mkdir(outDir, { recursive: true });
@@ -166,7 +217,9 @@ async function main() {
     const mdPath = path.join(outDir, 'summary.md');
 
     if (dryRun) {
-        const prompt = buildScenarioPrompt();
+        const prompt = noPr
+            ? '/usage now\n/activity 20\n/metrics\n/errors 10\n/quit'
+            : buildScenarioPrompt();
         await writeFile(path.join(outDir, 'prompt.txt'), `${prompt}\n`, 'utf8');
         console.log(`[terminal-live] dry-run prompt written to ${path.relative(ROOT, path.join(outDir, 'prompt.txt'))}`);
         return;
@@ -223,6 +276,12 @@ async function main() {
             readySent = true;
             write('/usage now');
             write('/activity 12');
+            if (noPr) {
+                write('/metrics');
+                write('/errors 10');
+                write('/quit');
+                return;
+            }
             write(buildScenarioPrompt());
         }
         if (!answerSent && /\[ASK\] ASK-CANONICAL: responda SIM para fechar o teste/.test(plain)) {
@@ -251,7 +310,7 @@ async function main() {
     clearTimeout(timeout);
 
     const plain = stripAnsi(raw);
-    const criteria = evaluateOutput(plain);
+    const criteria = noPr ? evaluateNoPrOutput(plain) : evaluateOutput(plain);
     const durationMs = Date.now() - Date.parse(startedAt);
     await writeFile(rawPath, raw, 'utf8');
     await writeFile(plainPath, plain, 'utf8');

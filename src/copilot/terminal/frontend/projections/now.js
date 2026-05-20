@@ -20,6 +20,7 @@ import {
     readTerminalActivityHistory,
     readTerminalActivitySnapshot,
     readTerminalDisplayState,
+    readTerminalStreamDiagnosticsProjection,
     readTerminalTurnTraceProjection,
 } from '../../state/projections/index.js';
 import {
@@ -55,6 +56,7 @@ import { readTerminalTimelineProjection } from './timeline.js';
  *     current: import('../../state/activity-state.js').TerminalActivitySnapshot;
  *     history: import('../../state/activity-state.js').TerminalActivityHistoryEntry[];
  *     turnTrace: ReturnType<typeof readTerminalTurnTraceProjection>;
+ *     streamDiagnostics: ReturnType<typeof readTerminalStreamDiagnosticsProjection>;
  * }}
  */
 export function readTerminalActivityProjection(limit = 10) {
@@ -62,6 +64,7 @@ export function readTerminalActivityProjection(limit = 10) {
         current: readTerminalActivitySnapshot(),
         history: readTerminalActivityHistory(limit),
         turnTrace: readTerminalTurnTraceProjection(3),
+        streamDiagnostics: readTerminalStreamDiagnosticsProjection(limit),
     };
 }
 

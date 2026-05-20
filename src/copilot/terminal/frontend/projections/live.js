@@ -72,6 +72,7 @@ function describeLiveFlowState(state) {
  *     display: ReturnType<typeof readTerminalDisplayProjection>;
  *     recentIo: ReturnType<typeof readTerminalIoActivityProjection>;
  *     turnTrace: ReturnType<typeof readTerminalActivityProjection>['turnTrace'];
+ *     streamDiagnostics: ReturnType<typeof readTerminalActivityProjection>['streamDiagnostics'];
  *     stream: {
  *         streaming: boolean;
  *         thinking: boolean;
@@ -118,6 +119,7 @@ export function readTerminalLiveFlowProjection(input = {}) {
         display,
         recentIo,
         turnTrace: activity.turnTrace,
+        streamDiagnostics: activity.streamDiagnostics,
         stream: {
             streaming: Boolean(display.streaming),
             thinking: Boolean(display.thinking),

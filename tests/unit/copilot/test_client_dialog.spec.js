@@ -306,6 +306,8 @@ describe('client-dialog › dialogTurn', () => {
     it('suprime duplicata por chave causal mesmo quando o delta chega por canais paralelos', async () => {
         const agent = createMockAgent();
         const onDelta = vi.fn();
+        /** @type {any[]} */
+        const diagnostics = [];
 
         agent.sendDialogTurn.mockImplementation(async () => {
             agent._fire('task.delta', { chunk: 'mesmo-evento', streamId: 's1', chunkSeq: 1 });
@@ -313,9 +315,13 @@ describe('client-dialog › dialogTurn', () => {
             return 'done';
         });
 
-        await dialogTurn(agent, 'hello', { onDelta });
+        await dialogTurn(agent, 'hello', { onDelta, onDeltaDiagnostic: (event) => diagnostics.push(event) });
         expect(onDelta).toHaveBeenCalledTimes(1);
         expect(onDelta).toHaveBeenCalledWith('mesmo-evento');
+        expect(diagnostics.map((entry) => `${entry.action}:${entry.reason}`)).toEqual([
+            'accepted:raw',
+            'suppressed:causal_duplicate',
+        ]);
     });
 
     it('preserva chunks iguais com chaves causais diferentes', async () => {
@@ -353,6 +359,8 @@ describe('client-dialog › dialogTurn', () => {
     it('normaliza snapshots cumulativos para emitir apenas o sufixo novo', async () => {
         const agent = createMockAgent();
         const onDelta = vi.fn();
+        /** @type {any[]} */
+        const diagnostics = [];
 
         agent.sendDialogTurn.mockImplementation(async () => {
             agent._fire('dialog.delta', { chunk: 'ok', streamId: 's1', chunkSeq: 1 });
@@ -360,10 +368,14 @@ describe('client-dialog › dialogTurn', () => {
             return 'ok-live';
         });
 
-        await dialogTurn(agent, 'hello', { onDelta });
+        await dialogTurn(agent, 'hello', { onDelta, onDeltaDiagnostic: (event) => diagnostics.push(event) });
         expect(onDelta).toHaveBeenCalledTimes(2);
         expect(onDelta).toHaveBeenNthCalledWith(1, 'ok');
         expect(onDelta).toHaveBeenNthCalledWith(2, '-live');
+        expect(diagnostics.map((entry) => `${entry.action}:${entry.reason}:${entry.normalizedChars}`)).toEqual([
+            'accepted:raw:2',
+            'normalized:cumulative_snapshot:5',
+        ]);
     });
 
     it('suprime sufixo repetido depois de snapshot cumulativo', async () => {

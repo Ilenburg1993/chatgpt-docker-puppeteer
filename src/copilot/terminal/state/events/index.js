@@ -47,6 +47,10 @@ export {
     readTerminalTranscriptTurns,
 } from '../transcript-state.js';
 export {
+    recordTerminalFinalReconciliationDiagnostic,
+    recordTerminalStreamDeltaDiagnostic,
+} from '../stream-diagnostics-state.js';
+export {
     beginTerminalTurnTrace,
     completeTerminalTurnToolCall,
     completeTerminalTurnTrace,

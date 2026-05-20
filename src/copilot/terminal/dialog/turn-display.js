@@ -9,7 +9,12 @@
  */
 
 import { appendThinkingHistoryChunk, finalizeThinkingHistoryEntry } from '../../presentation/state/index.js';
-import { formatTerminalThinkingRef, recordTerminalActivity, terminalThemeText } from '../state/dialog/index.js';
+import {
+    formatTerminalThinkingRef,
+    recordTerminalActivity,
+    recordTerminalStreamDeltaDiagnostic,
+    terminalThemeText,
+} from '../state/dialog/index.js';
 import {
     beginTerminalRenderLock,
     clearInlineStatus,
@@ -328,6 +333,17 @@ export function createDeltaCallback(state) {
         });
 
         if (!state.showStreaming) {
+            recordTerminalStreamDeltaDiagnostic({
+                action: 'accepted',
+                reason: 'display_off',
+                source: typeof envelope['source'] === 'string' ? envelope['source'] : 'dialog/render',
+                rawChars: chunk.length,
+                normalizedChars: chunk.length,
+                streamId: envelope['streamId'],
+                chunkSeq: envelope['chunkSeq'],
+                eventId: envelope['eventId'],
+                causationId: envelope['causationId'],
+            });
             recordTerminalActivity('streaming', 'Gerando resposta', {
                 detail: `${state.model} · ${state.effort}`,
                 source: 'dialog',

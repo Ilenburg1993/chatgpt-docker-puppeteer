@@ -48,6 +48,7 @@ export function cmdMetrics({ println }, arg = '') {
         activity,
         modelBilling,
         latestInject,
+        streamDiagnostics,
     } = projection;
 
     // ── Session info ─────────────────────────────────────────────────
@@ -179,6 +180,13 @@ export function cmdMetrics({ println }, arg = '') {
   fase        ${activity.phase}
   label       ${activity.label}${typeof activity.progress === 'number' ? ` (${activity.progress}%)` : ''}
   detalhe     ${activity.detail ?? '\x1b[90m(nenhum)\x1b[0m'}
+
+  \x1b[35m🌊 Streaming público\x1b[0m
+  ─────────────────────────────────────
+  deltas      aceitos=${streamDiagnostics.counters.deltaAccepted} · normalizados=${streamDiagnostics.counters.deltaNormalized} · suprimidos=${streamDiagnostics.counters.deltaSuppressed}
+    causal      \x1b[90maceitos=${streamDiagnostics.counters.deltaCausalAccepted} · duplicados=${streamDiagnostics.counters.deltaCausalDuplicateSuppressed} · fallback temporal=${streamDiagnostics.counters.deltaTemporalFallbackSuppressed}\x1b[0m
+    cumulativo  \x1b[90mnormalizados=${streamDiagnostics.counters.deltaCumulativeNormalized} · suprimidos=${streamDiagnostics.counters.deltaCumulativeSuppressed} · overlap=${streamDiagnostics.counters.deltaOverlapNormalized} · sufixo dup=${streamDiagnostics.counters.deltaDuplicateSuppressed}\x1b[0m
+  final       ok=${streamDiagnostics.counters.finalAlreadyStreamed} · sufixo=${streamDiagnostics.counters.finalSuffix} · mismatch=${streamDiagnostics.counters.finalMismatch} · sem-delta=${streamDiagnostics.counters.finalNoVisibleStream} · vazio=${streamDiagnostics.counters.finalEmpty}
 
   \x1b[35m🚀 Inject\x1b[0m
   ─────────────────────────────────────

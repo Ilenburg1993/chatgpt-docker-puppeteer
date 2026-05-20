@@ -282,11 +282,11 @@ Esta revisao cruza o log live fornecido pelo usuario, o relatorio da LLM-B e o c
 
 #### Faixa H - Streaming live end-to-end
 
-- H1. Registrar metrica `delta.causal.accepted`.
-- H2. Registrar metrica `delta.temporal_fallback.accepted`.
-- H3. Registrar metrica `delta.cumulative_suffix.normalized`.
-- H4. Registrar metrica `delta.duplicate.suppressed`.
-- H5. Expor as metricas em `/activity` e `/metrics`.
+- H1. Registrar metrica `delta.causal.accepted`. **Implementado em `stream-diagnostics-state.js` e alimentado por `client-dialog.js`.**
+- H2. Registrar metrica de fallback temporal cross-channel. **Implementado como `deltaTemporalFallbackSuppressed`; o nome anterior `accepted` foi descartado porque o fallback temporal existe para supressao defensiva, nao para aceite.**
+- H3. Registrar metrica `delta.cumulative_suffix.normalized`. **Implementado como `deltaCumulativeNormalized` + eventos recentes com `reason=cumulative_snapshot`.**
+- H4. Registrar metrica `delta.duplicate.suppressed`. **Implementado para duplicata causal, fallback temporal, prefixo cumulativo e sufixo repetido.**
+- H5. Expor as metricas em `/activity` e `/metrics`. **Implementado com secao `Streaming publico`, contadores e ultimas decisoes.**
 - H6. Criar teste live guiado com resposta longa, tool, final message e ask_user.
 - H7. Adicionar replay SSE de deltas por `Last-Event-ID`.
 - H8. Propagar `turnId` e `traceId` em todo delta.
@@ -302,7 +302,7 @@ Esta revisao cruza o log live fornecido pelo usuario, o relatorio da LLM-B e o c
 - K6. Adicionar fase opcional de elicitation estruturada (`/elicitation request-json` + resposta) sem bloquear readline.
 - K7. Adicionar assert de final reconciliation mais preciso: stream parcial, final message e sufixo/mismatch, sem contar o bloco de integridade como duplicação falsa. **Parcialmente implementado: runner valida bloco final e nao trata prompt+parcial+final como duplicacao falsa.**
 - K8. Adicionar assert de `pr.consumed` causal: um turno humano pode gerar PR, `ask_user` nao pode. **Parcialmente implementado: runner valida `llm.usage` separado e ausencia de eco de resposta; falta assert causal explicito sobre evento `pr.consumed`.**
-- K9. Adicionar modo `--no-pr` que apenas inspeciona `/usage now`, `/activity`, `/health` e sai, para sanity check de boot/resume sem consumo.
+- K9. Adicionar modo `--no-pr` que apenas inspeciona `/usage now`, `/activity`, `/metrics`, `/errors` e sai, para sanity check de boot/resume sem consumo. **Implementado no runner; o modo nao envia turno nem invoca tools.**
 - K10. Adicionar integração com `/export` para comparar transcript persistido contra stdout plain.
 - K11. Adicionar coleta SSE paralela de `GET :3009/events` para comparar terminal local e canal externo.
 - K12. Adicionar relatório de gaps automatico no MD do runner quando algum critério falhar.
@@ -418,3 +418,34 @@ Achados novos do runner:
 - O primeiro desenho do runner, com `stdin` em pipe, colocou o terminal em modo headless e nao exercitou a UX real. Corrigido com transporte PTY default.
 - O criterio de duplicacao nao pode contar prompt + stream parcial + final como tripla duplicacao. Corrigido: duplicacao patologica agora foca marcadores anormais e eco humano.
 - O SDK pode ecoar resposta humana de `ask_user` por canais publicos antes ou depois de `user_input.completed`. Corrigido com guardiao local registrado no momento em que o terminal envia a resposta humana.
+
+## Atualizacao Codex - diagnostico canonico de streaming
+
+Data: 2026-05-20.
+
+Implementado nesta revisao:
+
+- Criado `src/copilot/terminal/state/stream-diagnostics-state.js` como estado unico de decisoes de streaming publico.
+- `client-dialog.js` agora emite diagnosticos para cada delta aceito, normalizado ou suprimido, incluindo origem, causal key, bytes/chars brutos, chars normalizados e motivo.
+- A normalizacao de snapshots cumulativos deixou de ser uma string anonima e passou a produzir razao canonica: `raw`, `cumulative_snapshot`, `cumulative_prefix`, `duplicate_suffix` ou `overlap_normalized`.
+- Duplicatas por causalidade e fallback temporal cross-channel agora ficam registradas; antes o operador so via "nada apareceu".
+- `engine.js` registra reconciliação final (`already_streamed`, `stream_suffix`, `stream_mismatch`, `no_visible_stream`, `empty_reply`) junto com tamanhos de stream/final/rendered.
+- `turn-display.js` registra quando o delta publico existe, mas o display de streaming esta desligado, distinguindo "nao houve delta" de "delta nao foi mostrado por politica de display".
+- `/activity` ganhou a secao `Streaming publico`, com contadores e ultimas decisoes.
+- `/metrics` ganhou contadores agregados de streaming publico.
+- O runner live ganhou `--no-pr`, uma rota de sanity check sem turno LLM: `/usage now`, `/activity`, `/metrics`, `/errors`, `/quit`.
+- Testes unitarios foram adicionados/atualizados para o bridge de deltas e o novo estado de diagnostico.
+- Live `--no-pr` em PTY passou em `artifacts/terminal-live/no-pr-codex-2026-05-20-r2/summary.md`, validando boot/resume, `/usage now`, `/activity`, `/metrics`, `/errors` e `/quit` sem abrir turno, sem tools e sem erros.
+
+Itens descartados/renomeados:
+
+- `delta.temporal_fallback.accepted` foi descartado como nome canonico. O fallback temporal e uma heuristica de supressao quando falta causalidade, portanto o contador correto e `deltaTemporalFallbackSuppressed`.
+- "Usage" nao deve mais ser usado como sinonimo de Premium Request em texto de operador, teste ou roadmap. O vocabulario canonico e `llm.usage` para telemetria de modelo e `pr.consumed` para consumo premium causal.
+
+Pendencias apos esta revisao:
+
+- Persistir diagnosticos de streaming/reconciliacao no historico conversacional e no `/export`, nao apenas no estado live.
+- Propagar `traceId`/`turnId` aos diagnosticos e deltas SSE para correlação perfeita entre terminal, timeline, SSE e hub.
+- Adicionar assert live especifico para a secao `Streaming publico` no modo com turno real, alem do modo `--no-pr`.
+- Coletar SSE paralelamente no runner para comparar stdout local, replay buffer e canal externo.
+- Enriquecer o classificador de `llm.usage` com sinal local de resposta humana pendente para explicar melhor fechamentos tardios de `ask_user`.

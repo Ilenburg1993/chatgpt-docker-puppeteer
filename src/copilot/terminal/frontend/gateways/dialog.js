@@ -111,6 +111,7 @@ export async function stopTerminalDialogMode() {
  * @param {{
  *     timeout: number | null;
  *     onDelta: (chunk: string, envelope?: Record<string, unknown>) => void;
+ *     onDeltaDiagnostic?: (event: import('../../../channel/client-dialog.js').DialogDeltaDiagnosticEvent) => void;
  *     onReasoning?: (chunk: string, reasoningId: string | null) => void;
  *     requestHeaders?: Record<string, string>;
  * }} opts
@@ -128,6 +129,7 @@ export async function runTerminalDialogTurn(enrichedMessage, opts) {
  * @param {{
  *     timeout: number | null;
  *     onDelta: (chunk: string, envelope?: Record<string, unknown>) => void;
+ *     onDeltaDiagnostic?: (event: import('../../../channel/client-dialog.js').DialogDeltaDiagnosticEvent) => void;
  *     onReasoning?: (chunk: string, reasoningId: string | null) => void;
  *     requestHeaders?: Record<string, string>;
  * }} opts

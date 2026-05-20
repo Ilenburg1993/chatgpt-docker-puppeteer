@@ -80,6 +80,38 @@ function resolveDeltaCausalKey(evt) {
  */
 
 /**
+ * @typedef {'accepted' | 'normalized' | 'suppressed'} DialogDeltaDiagnosticAction
+ */
+
+/**
+ * @typedef {'raw'
+ *     | 'causal_duplicate'
+ *     | 'temporal_cross_channel'
+ *     | 'cumulative_snapshot'
+ *     | 'cumulative_prefix'
+ *     | 'duplicate_suffix'
+ *     | 'overlap_normalized'} DialogDeltaDiagnosticReason
+ */
+
+/**
+ * @typedef {{
+ *     action: DialogDeltaDiagnosticAction;
+ *     reason: DialogDeltaDiagnosticReason;
+ *     source: 'task.delta' | 'dialog.delta';
+ *     causalKey: string | null;
+ *     rawChunk: string;
+ *     normalizedChunk: string;
+ *     rawChars: number;
+ *     normalizedChars: number;
+ *     at: number;
+ *     streamId?: unknown;
+ *     chunkSeq?: unknown;
+ *     eventId?: unknown;
+ *     causationId?: unknown;
+ * }} DialogDeltaDiagnosticEvent
+ */
+
+/**
  * Interface mínima do AlwaysAliveAgent usada pelas funções de dialog.
  *
  * @typedef {import('./client.js').BridgeAgentLike} BridgeAgentLike
@@ -161,12 +193,13 @@ export async function startDialogMode(agent, bootPrompt, opts = {}) {
  * @param {{
  *     timeout?: number | null;
  *     onDelta?: (chunk: string, envelope?: Record<string, unknown>) => void;
+ *     onDeltaDiagnostic?: (event: DialogDeltaDiagnosticEvent) => void;
  *     onReasoning?: (chunk: string, reasoningId: string | null) => void;
  * }} [opts]
  * @returns {Promise<DialogTurnTransportResult>}
  */
 export async function dialogTurnDetailed(agent, message, opts = {}) {
-    const { timeout = LLM_B_TURN_TIMEOUT_MS, onDelta, onReasoning } = opts;
+    const { timeout = LLM_B_TURN_TIMEOUT_MS, onDelta, onDeltaDiagnostic, onReasoning } = opts;
     /** @type {string} */
     let replyFromEvent = '';
     /** @type {boolean} */
@@ -181,7 +214,7 @@ export async function dialogTurnDetailed(agent, message, opts = {}) {
     };
     agent.on(EMITTER_DIALOG_REPLY, onReplyTemp);
 
-    const createDeltaListener = onDelta
+    const createDeltaListener = onDelta || onDeltaDiagnostic
         ? (() => {
               /** @type {{ chunk: string; source: 'task.delta' | 'dialog.delta'; at: number; causalKey: string | null } | null} */
               let lastDelta = null;
@@ -195,16 +228,30 @@ export async function dialogTurnDetailed(agent, message, opts = {}) {
               let lastEmittedCausalKey = null;
 
               /**
+               * @param {DialogDeltaDiagnosticEvent} event
+               * @returns {void}
+               */
+              const emitDeltaDiagnostic = (event) => {
+                  if (!onDeltaDiagnostic) return;
+                  try {
+                      onDeltaDiagnostic(event);
+                  } catch (err) {
+                      const message = err instanceof Error ? err.message : String(err);
+                      log('WARN', `[LlmBridgeClient] onDeltaDiagnostic falhou: ${message}`);
+                  }
+              };
+
+              /**
                * Alguns bridges entregam `deltaContent` incremental, outros ecoam snapshots cumulativos ou sufixos ja
                * cobertos por um snapshot anterior. Normalizar aqui evita que o renderer tenha de adivinhar.
                *
                * @param {string} rawChunk
                * @param {'task.delta' | 'dialog.delta'} source
                * @param {string | null} causalKey
-               * @returns {string}
+               * @returns {{ chunk: string; reason: DialogDeltaDiagnosticReason }}
                */
               const normalizeAppendableChunk = (rawChunk, source, causalKey) => {
-                  if (!emittedText) return rawChunk;
+                  if (!emittedText) return { chunk: rawChunk, reason: 'raw' };
 
                   const hasDistinctCausalProgress =
                       Boolean(causalKey) && Boolean(lastEmittedCausalKey) && causalKey !== lastEmittedCausalKey;
@@ -213,42 +260,57 @@ export async function dialogTurnDetailed(agent, message, opts = {}) {
 
                   if (rawChunk === emittedText && shouldTrustAsDuplicate) {
                       sawCumulativeSnapshot = true;
-                      return '';
+                      return { chunk: '', reason: 'cumulative_snapshot' };
                   }
 
                   if (rawChunk !== emittedText && rawChunk.startsWith(emittedText)) {
                       sawCumulativeSnapshot = true;
-                      return rawChunk.slice(emittedText.length);
+                      return { chunk: rawChunk.slice(emittedText.length), reason: 'cumulative_snapshot' };
                   }
 
                   if (rawChunk !== emittedText && emittedText.startsWith(rawChunk) && shouldTrustAsDuplicate) {
                       sawCumulativeSnapshot = true;
-                      return '';
+                      return { chunk: '', reason: 'cumulative_prefix' };
                   }
 
                   if (emittedText.endsWith(rawChunk) && shouldTrustAsDuplicate) {
-                      return '';
+                      return { chunk: '', reason: 'duplicate_suffix' };
                   }
 
                   if (shouldTrustAsDuplicate) {
                       for (let overlap = Math.min(emittedText.length, rawChunk.length); overlap > 0; overlap -= 1) {
                           if (emittedText.endsWith(rawChunk.slice(0, overlap))) {
-                              return rawChunk.slice(overlap);
+                              return { chunk: rawChunk.slice(overlap), reason: 'overlap_normalized' };
                           }
                       }
                   }
 
-                  return rawChunk;
+                  return { chunk: rawChunk, reason: 'raw' };
               };
 
               return (/** @type {'task.delta' | 'dialog.delta'} */ source) => (/** @type {unknown} */ rawEvt) => {
-                  const evt = /** @type {{ chunk?: string }} & Record<string, unknown> */ (rawEvt);
+                  const evt = /** @type {{ chunk?: string } & Record<string, unknown>} */ (rawEvt);
                   if (!evt.chunk) return;
                   const now = Date.now();
                   const causalKey = resolveDeltaCausalKey(evt);
                   if (causalKey) {
                       if (seenCausalKeys.has(causalKey)) {
                           lastDelta = { chunk: evt.chunk, source, at: now, causalKey };
+                          emitDeltaDiagnostic({
+                              action: 'suppressed',
+                              reason: 'causal_duplicate',
+                              source,
+                              causalKey,
+                              rawChunk: evt.chunk,
+                              normalizedChunk: '',
+                              rawChars: evt.chunk.length,
+                              normalizedChars: 0,
+                              at: now,
+                              streamId: evt['streamId'],
+                              chunkSeq: evt['chunkSeq'],
+                              eventId: evt['eventId'],
+                              causationId: evt['causationId'],
+                          });
                           return;
                       }
                       seenCausalKeys.add(causalKey);
@@ -262,14 +324,63 @@ export async function dialogTurnDetailed(agent, message, opts = {}) {
                       now - lastDelta.at <= CROSS_CHANNEL_DELTA_SUPPRESSION_WINDOW_MS
                   ) {
                       lastDelta = { chunk: evt.chunk, source, at: now, causalKey };
+                      emitDeltaDiagnostic({
+                          action: 'suppressed',
+                          reason: 'temporal_cross_channel',
+                          source,
+                          causalKey,
+                          rawChunk: evt.chunk,
+                          normalizedChunk: '',
+                          rawChars: evt.chunk.length,
+                          normalizedChars: 0,
+                          at: now,
+                          streamId: evt['streamId'],
+                          chunkSeq: evt['chunkSeq'],
+                          eventId: evt['eventId'],
+                          causationId: evt['causationId'],
+                      });
                       return;
                   }
                   lastDelta = { chunk: evt.chunk, source, at: now, causalKey };
-                  const appendableChunk = normalizeAppendableChunk(evt.chunk, source, causalKey);
-                  if (!appendableChunk) return;
+                  const normalized = normalizeAppendableChunk(evt.chunk, source, causalKey);
+                  const appendableChunk = normalized.chunk;
+                  if (!appendableChunk) {
+                      emitDeltaDiagnostic({
+                          action: 'suppressed',
+                          reason: normalized.reason,
+                          source,
+                          causalKey,
+                          rawChunk: evt.chunk,
+                          normalizedChunk: '',
+                          rawChars: evt.chunk.length,
+                          normalizedChars: 0,
+                          at: now,
+                          streamId: evt['streamId'],
+                          chunkSeq: evt['chunkSeq'],
+                          eventId: evt['eventId'],
+                          causationId: evt['causationId'],
+                      });
+                      return;
+                  }
                   emittedText += appendableChunk;
                   lastEmittedSource = source;
                   lastEmittedCausalKey = causalKey;
+                  emitDeltaDiagnostic({
+                      action: normalized.reason === 'raw' ? 'accepted' : 'normalized',
+                      reason: normalized.reason,
+                      source,
+                      causalKey,
+                      rawChunk: evt.chunk,
+                      normalizedChunk: appendableChunk,
+                      rawChars: evt.chunk.length,
+                      normalizedChars: appendableChunk.length,
+                      at: now,
+                      streamId: evt['streamId'],
+                      chunkSeq: evt['chunkSeq'],
+                      eventId: evt['eventId'],
+                      causationId: evt['causationId'],
+                  });
+                  if (!onDelta) return;
                   if (onDelta.length >= 2) {
                       onDelta(appendableChunk, {
                           ...evt,
@@ -368,6 +479,7 @@ export async function dialogTurnDetailed(agent, message, opts = {}) {
  * @param {{
  *     timeout?: number | null;
  *     onDelta?: (chunk: string, envelope?: Record<string, unknown>) => void;
+ *     onDeltaDiagnostic?: (event: DialogDeltaDiagnosticEvent) => void;
  *     onReasoning?: (chunk: string, reasoningId: string | null) => void;
  * }} [opts]
  * @returns {Promise<string>}

@@ -42,6 +42,8 @@ import {
     beginTerminalTurnMaterialization,
     clearTerminalTurnMaterialization,
     completeTerminalTurnMaterialization,
+    recordTerminalFinalReconciliationDiagnostic,
+    recordTerminalStreamDeltaDiagnostic,
     recordTerminalTurnDelta,
     shouldSuppressTerminalAssistantMessageAsUserInputEcho,
 } from '../state/events/index.js';
@@ -593,6 +595,18 @@ async function _executeTurn(message, actor, attachments = [], requestHeaders = n
         /** @type {(chunk: string, envelope?: Record<string, unknown>) => void} */
         const onDelta = (chunk, envelope = {}) => {
             if (shouldSuppressTerminalAssistantMessageAsUserInputEcho({ content: chunk })) {
+                recordTerminalStreamDeltaDiagnostic({
+                    action: 'suppressed',
+                    reason: 'human_answer_echo',
+                    source: typeof envelope['source'] === 'string' ? envelope['source'] : 'dialog/onDelta',
+                    causalKey: null,
+                    rawChars: chunk.length,
+                    normalizedChars: 0,
+                    streamId: envelope['streamId'],
+                    chunkSeq: envelope['chunkSeq'],
+                    eventId: envelope['eventId'],
+                    causationId: envelope['causationId'],
+                });
                 recordTerminalActivity('question', 'Eco de resposta humana suprimido no streaming', {
                     detail: chunk.slice(0, 160),
                     source: 'sdk.assistant.message_delta',
@@ -615,9 +629,26 @@ async function _executeTurn(message, actor, attachments = [], requestHeaders = n
             renderDeltaChunk(chunk, envelope);
         };
 
+        const onDeltaDiagnostic = (/** @type {Record<string, any>} */ event) => {
+            recordTerminalStreamDeltaDiagnostic({
+                action: event['action'],
+                reason: event['reason'],
+                source: event['source'],
+                causalKey: event['causalKey'],
+                rawChars: event['rawChars'],
+                normalizedChars: event['normalizedChars'],
+                streamId: event['streamId'],
+                chunkSeq: event['chunkSeq'],
+                eventId: event['eventId'],
+                causationId: event['causationId'],
+                timestamp: event['at'],
+            });
+        };
+
         const turnResult = await runTerminalDialogTurnDetailed(enrichedMessage, {
             timeout: timeoutDecision.timeoutMs,
             onDelta,
+            onDeltaDiagnostic,
             onReasoning,
             ...(requestHeaders ? { requestHeaders } : {}),
         });
@@ -656,6 +687,16 @@ async function _executeTurn(message, actor, attachments = [], requestHeaders = n
             streamedContent: displayState.streamingContent,
             streamingStarted: displayState.streamingStarted,
             streamingVisibleChars: displayState.streamingVisibleChars,
+        });
+        recordTerminalFinalReconciliationDiagnostic({
+            mode: finalRenderDecision.mode,
+            reason: finalRenderDecision.reason,
+            source: 'dialog/turn-final',
+            streamedChars: displayState.streamingChars,
+            streamingVisibleChars: displayState.streamingVisibleChars,
+            finalChars: typeof reply === 'string' ? reply.length : 0,
+            renderedChars: finalRenderDecision.content.length,
+            severity: finalRenderDecision.severity,
         });
         if (finalRenderDecision.mode !== 'none') {
             if (finalRenderDecision.reason === 'stream_mismatch') {

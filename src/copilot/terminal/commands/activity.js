@@ -82,6 +82,54 @@ function pickMostUsefulRecentTurnTrace(recent) {
 }
 
 /**
+ * @param {ActivityContext['println']} println
+ * @param {any} diagnostics
+ * @returns {void}
+ */
+function printStreamDiagnostics(println, diagnostics) {
+    if (!diagnostics?.counters || !diagnostics?.totals) return;
+    const c = diagnostics.counters;
+    const suppressedPct = (diagnostics.totals.suppressedRatio * 100).toFixed(0);
+    const normalizedPct = (diagnostics.totals.normalizedRatio * 100).toFixed(0);
+    println('  \x1b[36mStreaming público\x1b[0m');
+    println(
+        `  deltas          aceitos=${c.deltaAccepted} · normalizados=${c.deltaNormalized} · suprimidos=${c.deltaSuppressed} \x1b[90m(sup=${suppressedPct}% · norm=${normalizedPct}%)\x1b[0m`,
+    );
+    println(
+        `  causal          aceitos=${c.deltaCausalAccepted} · duplicados=${c.deltaCausalDuplicateSuppressed} · fallback temporal=${c.deltaTemporalFallbackSuppressed}`,
+    );
+    println(
+        `  cumulativo      normalizados=${c.deltaCumulativeNormalized} · suprimidos=${c.deltaCumulativeSuppressed} · overlap=${c.deltaOverlapNormalized} · sufixo dup=${c.deltaDuplicateSuppressed}`,
+    );
+    println(
+        `  final           ok=${c.finalAlreadyStreamed} · sufixo=${c.finalSuffix} · mismatch=${c.finalMismatch} · sem-delta=${c.finalNoVisibleStream} · vazio=${c.finalEmpty}`,
+    );
+    if (diagnostics.recent.length > 0) {
+        println('  decisões recentes');
+        for (const entry of diagnostics.recent.slice(0, 5)) {
+            const ts = new Date(entry.timestamp).toLocaleTimeString('pt-BR', {
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit',
+            });
+            if (entry.kind === 'delta') {
+                const color =
+                    entry.action === 'suppressed' ? '\x1b[33m' : entry.action === 'normalized' ? '\x1b[36m' : '\x1b[90m';
+                println(
+                    `    ${color}[${ts}]\x1b[0m delta · ${entry.action}/${entry.reason} · ${entry.source} · raw=${entry.rawChars} norm=${entry.normalizedChars}`,
+                );
+            } else {
+                const color = entry.severity === 'warn' ? '\x1b[33m' : entry.severity === 'error' ? '\x1b[31m' : '\x1b[90m';
+                println(
+                    `    ${color}[${ts}]\x1b[0m final · ${entry.mode}/${entry.reason} · stream=${entry.streamingVisibleChars} final=${entry.finalChars}`,
+                );
+            }
+        }
+    }
+    println('  ─────────────────────────────────────');
+}
+
+/**
  * Exibe a atividade atual do terminal + timeline recente.
  *
  * @param {ActivityContext} ctx
@@ -138,6 +186,8 @@ export function cmdActivity({ println }, arg) {
         }
         println('  ─────────────────────────────────────');
     }
+
+    printStreamDiagnostics(println, projection.streamDiagnostics);
 
     if (projection.history.length === 0) {
         println('  \x1b[90mSem histórico de atividade ainda.\x1b[0m\n');
