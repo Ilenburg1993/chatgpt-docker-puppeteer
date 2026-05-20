@@ -130,4 +130,52 @@ describe('event-handlers/streaming', () => {
         expect(emit).toHaveBeenCalledTimes(1);
         expect(emit).toHaveBeenCalledWith('dialog.delta', expect.objectContaining({ chunk: 'abc' }));
     });
+
+    it('preserva chunks repetidos legítimos quando não há identidade de evento duplicada', async () => {
+        const { wireStreamingEvents } = await import('#copilot/event-handlers/streaming');
+        const session = createMockSession();
+        const emit = vi.fn();
+
+        wireStreamingEvents(/** @type {any} */ (session), {
+            emit,
+            isProcessing: () => false,
+            dialogLoopActive: () => true,
+        });
+
+        session._emit('assistant.message_delta', { deltaContent: 'PAR' });
+        session._emit('assistant.message_delta', { deltaContent: 'PAR' });
+
+        expect(emit).toHaveBeenCalledTimes(2);
+        expect(emit).toHaveBeenNthCalledWith(
+            1,
+            'dialog.delta',
+            expect.objectContaining({ chunk: 'PAR', chunkSeq: 1 }),
+        );
+        expect(emit).toHaveBeenNthCalledWith(
+            2,
+            'dialog.delta',
+            expect.objectContaining({ chunk: 'PAR', chunkSeq: 2 }),
+        );
+    });
+
+    it('deduplica por identidade de evento sem deduplicar pelo texto do chunk', async () => {
+        const { wireStreamingEvents } = await import('#copilot/event-handlers/streaming');
+        const session = createMockSession();
+        const emit = vi.fn();
+
+        wireStreamingEvents(/** @type {any} */ (session), {
+            emit,
+            isProcessing: () => false,
+            dialogLoopActive: () => true,
+        });
+
+        session._emit('assistant.message_delta', { deltaContent: 'abc', deltaId: 'delta-1' });
+        session._emit('assistant.message_delta', { deltaContent: 'abc', deltaId: 'delta-1' });
+
+        expect(emit).toHaveBeenCalledTimes(1);
+        expect(emit).toHaveBeenCalledWith(
+            'dialog.delta',
+            expect.objectContaining({ chunk: 'abc', eventId: 'delta-1' }),
+        );
+    });
 });

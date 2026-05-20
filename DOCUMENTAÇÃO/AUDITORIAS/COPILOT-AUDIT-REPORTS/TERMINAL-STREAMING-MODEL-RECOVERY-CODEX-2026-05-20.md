@@ -235,8 +235,8 @@ Fase C1. Deltas públicos
 
 Fase C2. Deduplicação
 
-- C2.1 Remover dedupe textual cego que pode perder repetição legítima. Status: parcialmente investigado.
-- C2.2 Deduplicar por identidade de evento (`eventId`, `traceId`, `turnId`, `callId`). Status: pendente.
+- C2.1 Remover dedupe textual cego que pode perder repetição legítima. Status: feito no contrato unitário de `wireStreamingEvents`.
+- C2.2 Deduplicar por identidade de evento (`eventId`, `traceId`, `turnId`, `callId`). Status: parcialmente feito para `assistant.message_delta` por objeto/eventId.
 - C2.3 Criar métrica de supressão por motivo. Status: pendente.
 - C2.4 Testar repetição legítima de texto. Status: pendente.
 
@@ -364,6 +364,7 @@ Implementado:
 - SIGHUP ganhou política explícita via `shouldRegisterTerminalSighupHandler()`.
 - Mensagens de usage agora diferenciam "Premium Request classificada" de "Telemetria LLM sem Premium Request".
 - A apresentação canônica de tools ignora nomes genéricos (`unknown`, `tool`, `external_tool`) quando há fallback real.
+- O handler de `assistant.message_delta` agora tem contrato explícito: preserva chunks repetidos legítimos e deduplica por identidade de evento.
 - Testes unitários adicionados para runtime root, reflection sync failure e SIGHUP policy.
 
 Próxima rodada recomendada:
