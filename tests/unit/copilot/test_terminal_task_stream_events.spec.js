@@ -131,6 +131,33 @@ describe('terminal/task-stream-events.js — contrato', () => {
         expect(typeof mod.setupTerminalTaskStreamListeners).toBe('function');
     });
 
+    it('mostra task.error com requeue bloqueado como prompt preservado', async () => {
+        const { setupTerminalTaskStreamListeners } =
+            await import('../../../src/copilot/terminal/events/task-stream-events.js');
+        const agent = new EventEmitter();
+
+        setupTerminalTaskStreamListeners({ agent });
+        agent.emit('task.error', {
+            taskId: 'dialog-task-1',
+            origin: 'dialog_boot',
+            requeueBlocked: true,
+            error: 'reenvio automático foi bloqueado',
+        });
+
+        expect(mocks.recordTerminalActivity).toHaveBeenCalledWith(
+            'error',
+            'Tarefa interna falhou',
+            expect.objectContaining({
+                detail: 'dialog_boot · reenvio automático bloqueado após reconexão',
+                severity: 'error',
+                source: 'agent',
+            }),
+        );
+        expect(mocks.println).toHaveBeenCalledWith(
+            expect.stringContaining('prompt preservado sem reenvio automático'),
+        );
+    });
+
     it('consome chunk em task.reasoning como thinking colapsado de tarefa interna', async () => {
         const stdoutSpy = vi.spyOn(process.stdout, 'write').mockReturnValue(true);
         const { setupTerminalTaskStreamListeners } =

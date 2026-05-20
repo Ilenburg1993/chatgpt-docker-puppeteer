@@ -164,6 +164,8 @@
  * @property {function(Error): void} reject - Callback de erro
  * @property {number} enqueuedAt - Timestamp em ms
  * @property {number | null} [timeoutMs] - Timeout informativo; null desabilita bloqueio local.
+ * @property {'user_queue' | 'dialog_boot'} [origin] - Origem operacional da task. `dialog_boot` não pode ser
+ *   reenfileirada automaticamente após reconexão para evitar duplicar prompt/turno já entregue ao dialog loop.
  * @property {import('#copilot/sdk/types').MessageOptions['attachments']} [attachments] - Anexos (arquivos, imagens,
  *   seleções) a enviar junto com a mensagem.
  * @property {Record<string, string>} [requestHeaders] - Headers HTTP customizados a aplicar no turno direto do SDK.

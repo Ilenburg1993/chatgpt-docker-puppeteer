@@ -255,11 +255,22 @@ export function setupTerminalTaskStreamListeners({ agent }) {
         if (liveRendered) {
             taskTranscripts.markLiveRendered(isInternalTaskTranscriptKey(taskKey) ? null : taskKey);
         }
+        const requeueBlocked = evt['requeueBlocked'] === true;
+        const origin = typeof evt['origin'] === 'string' ? evt['origin'] : null;
+        const error = typeof evt['error'] === 'string' ? evt['error'] : null;
+        const detail = requeueBlocked
+            ? `${origin ?? 'task'} · reenvio automático bloqueado após reconexão`
+            : `${stats.chunks} chunks · ${stats.chars} chars`;
         recordTerminalActivity('error', 'Tarefa interna falhou', {
-            detail: `${stats.chunks} chunks · ${stats.chars} chars`,
+            detail,
             source: 'agent',
             severity: 'error',
         });
+        if (requeueBlocked) {
+            println(
+                `  \x1b[33m↳ prompt preservado sem reenvio automático\x1b[0m \x1b[90m(${origin ?? 'origem n/d'}${error ? ` · ${error}` : ''})\x1b[0m`,
+            );
+        }
         finalizeTaskThinkings(evt.taskId ?? undefined, 'error');
         taskTranscripts.flush(isInternalTaskTranscriptKey(taskKey) ? null : taskKey, 'error', 'task.error');
         taskDeltaStats.delete(taskKey);

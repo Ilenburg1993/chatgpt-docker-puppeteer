@@ -246,7 +246,18 @@ Achados:
 - Após `session.error`, houve nova sequência `userPromptSubmitted`/`sessionStart` com o mesmo prompt inicial, o que precisa ser auditado para garantir que recuperação não reenvie prompt sem intenção explícita do operador.
 - O live runner antigo deixava o processo até timeout; agora reconhece falha de sessão e captura `/activity`, `/events --raw` e `/errors`.
 
-Status: aberto como gap de recuperação de sessão.
+Status: parcialmente corrigido após o commit `cdab72e0`.
+
+Correção estrutural iniciada:
+
+- Tasks do agente agora possuem `origin`.
+- `sendMessageDialogBoot()` marca tasks como `dialog_boot`.
+- Após uma reconexão bem-sucedida causada por erro de sessão/modelo, uma task `dialog_boot` não é reenfileirada automaticamente.
+- Em vez de reenviar o mesmo prompt, o executor rejeita a task com erro explícito e emite `task.error` com `requeueBlocked=true`.
+- O terminal agora transforma `reconnect_restart` em mensagem operacional explícita: reconexão concluída, prompt preservado e replay automático bloqueado.
+- `task.error` com `requeueBlocked=true` deixa de parecer uma falha genérica e passa a informar que o prompt ficou preservado sem reenvio automático.
+
+Isso evita o pior comportamento: reenvio silencioso do prompt do operador após uma queda/reconexão no meio do turno.
 
 Critério ideal:
 
@@ -524,7 +535,7 @@ Fase I2. Política explícita de compat/fallback
 - I2.3 Remover fallbacks silenciosos sem métrica. Status: pendente.
 - I2.4 Fazer `task.delta` fallback explícito apenas quando `dialog.delta` não existir para o stream. Status: feito nesta revisão no cliente de diálogo.
 - I2.5 Garantir que `agent-messaging` não emita `task.delta` enquanto o dialog loop estiver ativo. Status: feito nesta revisão na origem.
-- I2.6 Auditar recuperação `session.error` -> `reconnect_restart` para impedir reenvio automático ambíguo de prompt. Status: pendente.
+- I2.6 Auditar recuperação `session.error` -> `reconnect_restart` para impedir reenvio automático ambíguo de prompt. Status: parcialmente feito; requeue de `dialog_boot` bloqueado e UX/SSE explicitam prompt preservado sem replay.
 
 Fase I3. Microkernel de eventos públicos
 
@@ -563,11 +574,15 @@ Implementado:
 - O live runner agora exige marcador pós-`ask_user`, aguarda continuação antes de comandos diagnósticos e trata `session.error` como falha terminal capturável.
 - Rodada live `2026-05-20T18-24-53-129Z` confirmou que o runner antigo interferia no pós-ask ao diagnosticar logo após resposta humana.
 - Rodada live `canonical-flow-codex-post-ask-continuation-2026-05-20` expôs falha externa/SDK `CAPIError: Connection error` antes do ask_user e gerou novo gap A17.
+- `agent-messaging.js` agora distingue tasks `user_queue` e `dialog_boot`; requeue pós-reconexão de `dialog_boot` é bloqueado para evitar prompt duplicado.
+- `terminal-agent-wiring.js` descreve `reconnect_restart` como preservação sem replay, com `promptReplayBlocked=true` no SSE.
+- `task-stream-events.js` mostra `task.error` com `requeueBlocked=true` como "prompt preservado sem reenvio automático".
 - Testes unitários adicionados para runtime root, reflection sync failure e SIGHUP policy.
 - Testes unitários adicionados para reconciliação de `assistant.message` materializado, supressão visual de `question.pending` e preferência `dialog.delta`.
 - Testes unitários adicionados para normalização de objetos de erro sem `message`.
 - Testes unitários adicionados para lazy import resiliente, sanitização terminal, release de display state, safe SSE payload e sufixo final formatado.
 - Teste unitário adicionado para deduplicação visual de intents equivalentes.
+- Testes unitários adicionados para bloqueio de reenvio automático de task `dialog_boot` após reconexão e para UX/SSE de prompt preservado.
 
 Próxima rodada recomendada:
 

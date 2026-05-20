@@ -304,4 +304,50 @@ describe('agent-messaging › processQueue', () => {
         assert.equal(reconnectCalls, 0);
         assert.equal(ctx.status, 'idle');
     });
+
+    it('bloqueia reenvio automático de task dialog_boot após reconexão para evitar prompt duplicado', async () => {
+        const emitter = new EventEmitter();
+        const ctx = new AgentContext(emitter);
+        ctx.status = 'idle';
+        let sessionHandler = /** @type {((event: any) => void) | null} */ (null);
+        ctx.session = /** @type {any} */ ({
+            sessionId: 'sess-network-retry',
+            on: (/** @type {string | ((event: any) => void)} */ eventName, /** @type {unknown} */ handler) => {
+                if (typeof eventName === 'function') {
+                    sessionHandler = eventName;
+                    return () => {};
+                }
+                return () => {};
+            },
+            send: async () => {
+                sessionHandler?.({
+                    type: 'session.error',
+                    data: {
+                        errorType: 'network',
+                        message: 'temporary connection error',
+                    },
+                });
+            },
+        });
+
+        let reconnectCalls = 0;
+        /** @type {any[]} */
+        const taskErrors = [];
+        emitter.on('task.error', (evt) => taskErrors.push(evt));
+        const resultPromise = sendMessageDialogBoot(ctx, emitter, 'boot prompt');
+        processQueue(ctx, emitter, {
+            tryReconnect: async () => {
+                reconnectCalls++;
+                return true;
+            },
+        });
+
+        await assert.rejects(() => resultPromise, /reenvio automático foi bloqueado/i);
+        assert.equal(reconnectCalls, 1);
+        assert.equal(ctx.status, 'idle');
+        assert.equal(ctx.messageQueue.size, 0);
+        assert.equal(taskErrors.length, 1);
+        assert.equal(taskErrors[0].requeueBlocked, true);
+        assert.equal(taskErrors[0].origin, 'dialog_boot');
+    });
 });

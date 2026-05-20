@@ -201,6 +201,7 @@ async function sendAndWaitWithInactivityTimeout(session, sendOpts, timeoutMs) {
  * @property {number | null} [timeoutMs]
  * @property {import('#copilot/sdk/types').MessageOptions['attachments']} [attachments]
  * @property {Record<string, string>} [requestHeaders]
+ * @property {'user_queue' | 'dialog_boot'} [origin]
  * @property {number} enqueuedAt
  * @property {number} [attempts] - Número de tentativas realizadas (para limitar reintentos após reconexão)
  * @property {(text: string) => void} resolve
@@ -218,11 +219,17 @@ async function sendAndWaitWithInactivityTimeout(session, sendOpts, timeoutMs) {
  *     attachments?: import('#copilot/sdk/types').MessageOptions['attachments'];
  *     requestHeaders?: Record<string, string>;
  *     signal?: AbortSignal;
+ *     origin?: import('../types.js').AgentTask['origin'];
  *     resolve: (v: string | PromiseLike<string>) => void;
  *     reject: (r: unknown) => void;
  * }} opts
  */
-export function enqueueTask(ctx, host, message, { timeoutMs, attachments, requestHeaders, signal, resolve, reject }) {
+export function enqueueTask(
+    ctx,
+    host,
+    message,
+    { timeoutMs, attachments, requestHeaders, signal, origin = 'user_queue', resolve, reject },
+) {
     const safeTimeoutMs = normalizeTimeoutMs(timeoutMs);
     const task = /** @type {AgentTask} */ ({
         id: `task-${Date.now()}-${globalThis.crypto.randomUUID().slice(-8)}`,
@@ -231,6 +238,7 @@ export function enqueueTask(ctx, host, message, { timeoutMs, attachments, reques
         reject,
         enqueuedAt: Date.now(),
         timeoutMs: safeTimeoutMs,
+        origin,
         ...(attachments !== undefined ? { attachments } : {}),
         ...(requestHeaders !== undefined ? { requestHeaders } : {}),
     });
@@ -298,7 +306,7 @@ export function sendMessage(ctx, host, message, { timeoutMs, attachments, reques
  */
 export function sendMessageDialogBoot(ctx, host, message, opts = {}) {
     return new Promise((resolve, reject) => {
-        enqueueTask(ctx, host, message, { ...opts, resolve, reject });
+        enqueueTask(ctx, host, message, { ...opts, origin: 'dialog_boot', resolve, reject });
     });
 }
 
@@ -393,6 +401,21 @@ export async function executeTask(session, task, callbacks) {
 
             const recovered = await tryReconnect(taskError);
             if (recovered) {
+                if (task.origin === 'dialog_boot') {
+                    const blocked = new Error(
+                        `[task-executor] Reconexão concluída após falha de turno do dialog, mas reenvio automático foi bloqueado para evitar duplicação do prompt (taskId: ${task.id})`,
+                    );
+                    setStatus('idle');
+                    emit('task.error', {
+                        taskId: task.id,
+                        error: blocked.message,
+                        recovered: true,
+                        requeueBlocked: true,
+                        origin: task.origin,
+                    });
+                    task.reject(blocked);
+                    return;
+                }
                 task.attempts = (task.attempts ?? 0) + 1;
                 if (task.attempts >= MAX_TASK_RETRIES) {
                     setStatus('idle');

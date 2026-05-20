@@ -81,6 +81,47 @@ export function shouldAutoRestartStoppedDialog(reason) {
 }
 
 /**
+ * Descreve a política operacional aplicada a uma parada do dialog loop.
+ *
+ * @param {string} reason
+ * @returns {{
+ *     label: string;
+ *     activityTitle: string;
+ *     activityDetail: string;
+ *     terminalMessage: string;
+ *     sse: Record<string, unknown>;
+ * }}
+ */
+export function describeDialogStoppedRestartPolicy(reason) {
+    if (reason === 'reconnect_restart') {
+        return {
+            label: 'reconexão SDK',
+            activityTitle: 'Dialog loop preservado após reconexão',
+            activityDetail: 'reconexão SDK concluída; reenvio automático de prompt bloqueado',
+            terminalMessage:
+                'Loop reconectado; reenvio automático do prompt foi bloqueado para evitar duplicação. Use /dialog-resume ou reenvie a mensagem se quiser continuar.',
+            sse: {
+                reason,
+                restarting: false,
+                reconnect: true,
+                promptReplayBlocked: true,
+                operatorAction: '/dialog-resume',
+            },
+        };
+    }
+
+    const isWatchdog = reason === 'watchdog_restart';
+    const label = isWatchdog ? 'reinício por watchdog' : `reason: ${reason}`;
+    return {
+        label,
+        activityTitle: 'Dialog loop encerrado sem restart automático',
+        activityDetail: label,
+        terminalMessage: `Loop encerrado (${label}). Restart automático bloqueado; use /dialog-resume se precisar.`,
+        sse: { reason, restarting: false },
+    };
+}
+
+/**
  * Registra todos os event listeners do AlwaysAliveAgent no terminal server.
  *
  * @param {() => void} printBanner - Callback para imprimir o banner de status após agente pronto
@@ -470,27 +511,26 @@ export function registerAgentEventListeners(printBanner) {
             return;
         }
 
-        const isWatchdog = reason === 'watchdog_restart';
-        const label = isWatchdog ? 'reinício por watchdog' : `reason: ${reason}`;
+        const stopPolicy = describeDialogStoppedRestartPolicy(reason);
         if (!shouldAutoRestartStoppedDialog(reason)) {
-            recordTerminalActivity('system', 'Dialog loop encerrado sem restart automático', {
-                detail: label,
+            recordTerminalActivity('system', stopPolicy.activityTitle, {
+                detail: stopPolicy.activityDetail,
                 severity: 'warn',
                 source: 'dialog',
             });
-            println(
-                `\n\x1b[33m  [dialog] Loop encerrado (${label}). Restart automático bloqueado; use /dialog-resume se precisar.\x1b[0m`,
-            );
+            println(`\n\x1b[33m  [dialog] ${stopPolicy.terminalMessage}\x1b[0m`);
             log(
                 'WARN',
-                `[TerminalServer] Dialog loop encerrado (${label}). Restart automático bloqueado por política.`,
+                `[TerminalServer] Dialog loop encerrado (${stopPolicy.label}). Restart automático bloqueado por política.`,
             );
             broadcastSse(
                 'dialog.stopped',
-                withTerminalAgentSseEnvelope({ reason, restarting: false }, 'terminal-agent-wiring/dialog.stopped'),
+                withTerminalAgentSseEnvelope(stopPolicy.sse, 'terminal-agent-wiring/dialog.stopped'),
             );
             return;
         }
+        const isWatchdog = reason === 'watchdog_restart';
+        const label = isWatchdog ? 'reinício por watchdog' : `reason: ${reason}`;
         recordTerminalActivity('system', 'Reiniciando dialog loop', {
             detail: label,
             severity: 'warn',

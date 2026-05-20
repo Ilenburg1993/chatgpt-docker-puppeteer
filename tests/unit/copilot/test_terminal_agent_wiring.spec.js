@@ -18,6 +18,23 @@ describe('terminal/wiring/terminal-agent-wiring.js — contrato', () => {
         expect(typeof mod.registerAgentEventListeners).toBe('function');
     });
 
+    it('descreve reconnect_restart como prompt preservado sem reenvio automático', async () => {
+        const mod = await import('../../../src/copilot/terminal/wiring/terminal-agent-wiring.js');
+
+        const policy = mod.describeDialogStoppedRestartPolicy('reconnect_restart');
+
+        expect(policy.activityTitle).toBe('Dialog loop preservado após reconexão');
+        expect(policy.activityDetail).toContain('reenvio automático de prompt bloqueado');
+        expect(policy.terminalMessage).toContain('reenvio automático do prompt foi bloqueado');
+        expect(policy.sse).toEqual(
+            expect.objectContaining({
+                reconnect: true,
+                promptReplayBlocked: true,
+                restarting: false,
+            }),
+        );
+    });
+
     it('restringe restart automático a razões operacionais excepcionais', async () => {
         const mod = await import('../../../src/copilot/terminal/wiring/terminal-agent-wiring.js');
 

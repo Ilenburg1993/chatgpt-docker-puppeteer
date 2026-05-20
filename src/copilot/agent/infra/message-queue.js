@@ -28,6 +28,8 @@ import { log } from '../ports/index.js';
  * @property {function(Error): void} reject - Callback de rejeição da Promise
  * @property {number} enqueuedAt - Timestamp em ms do momento de enqueue
  * @property {number | null} [timeoutMs] - Timeout informativo; null desabilita bloqueio local.
+ * @property {'user_queue' | 'dialog_boot'} [origin] - Origem operacional da task. `dialog_boot` não deve ser
+ *   reenfileirada automaticamente após reconexão.
  * @property {import('#copilot/sdk/types').MessageOptions['attachments']} [attachments] - Anexos adicionais
  * @property {Record<string, string>} [requestHeaders] - Headers HTTP customizados a aplicar no turno direto do SDK
  */
