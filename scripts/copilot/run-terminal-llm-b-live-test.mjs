@@ -142,6 +142,23 @@ function summarizeSseEvents(events) {
     };
 }
 
+function extractArchiveRawEvents(plain) {
+    const entries = [];
+    for (const line of plain.split('\n')) {
+        const trimmed = line.trim();
+        if (!trimmed.startsWith('{') || !trimmed.endsWith('}') || !trimmed.includes('"schemaVersion"')) continue;
+        try {
+            const parsed = JSON.parse(trimmed);
+            if (parsed && typeof parsed === 'object' && typeof parsed.event === 'string') {
+                entries.push(parsed);
+            }
+        } catch {
+            // Saida humana pode conter linhas parciais; o runner ignora e reporta pelos criterios agregados.
+        }
+    }
+    return entries;
+}
+
 function extractPlainTraceIds(plain) {
     const ids = new Set();
     for (const match of plain.matchAll(/\btrace(?:Id)?\s*[=:]?\s*(turn:[A-Za-z0-9_.:-]+)/giu)) {
@@ -222,6 +239,10 @@ function evaluateSseCriteria(sseSummary, { expectPublicEvents, plain = '' }) {
 
 function evaluateOutput(plain, sseSummary, exportSummary) {
     const markerCount = (plain.match(/DELTA-CANONICAL-\d/g) ?? []).length;
+    const archiveRawEvents = extractArchiveRawEvents(plain);
+    const sseIds = summarizeSseEvents(sseSummary.events).ids;
+    const archiveIds = archiveRawEvents.map((evt) => evt.eventId).filter((id) => Number.isFinite(id));
+    const archiveSseOverlap = archiveIds.filter((id) => sseIds.includes(id));
     const duplicatePathologies = [
         /__anonymous__/,
         /hook:error_occurred/,
@@ -280,6 +301,16 @@ function evaluateOutput(plain, sseSummary, exportSummary) {
             detail: '/events rendered the durable public SSE archive tail',
         },
         {
+            id: 'sse-archive-raw-visible',
+            pass: archiveRawEvents.length > 0,
+            detail: `/events --raw exposed ${archiveRawEvents.length} archived event(s)`,
+        },
+        {
+            id: 'sse-archive-http-overlap',
+            pass: sseIds.length === 0 || archiveSseOverlap.length > 0,
+            detail: `archiveIds=${archiveIds.slice(0, 8).join(', ') || '-'} · httpIds=${sseIds.slice(0, 8).join(', ') || '-'} · overlap=${archiveSseOverlap.slice(0, 8).join(', ') || '-'}`,
+        },
+        {
             id: 'no-obvious-duplication',
             pass: !duplicatePathologies.some((pattern) => pattern.test(plain)),
             detail: 'no known duplicate/pathology markers detected',
@@ -319,6 +350,7 @@ function evaluateOutput(plain, sseSummary, exportSummary) {
 }
 
 function evaluateNoPrOutput(plain, sseSummary) {
+    const archiveRawEvents = extractArchiveRawEvents(plain);
     return [
         {
             id: 'ready',
@@ -354,6 +386,11 @@ function evaluateNoPrOutput(plain, sseSummary) {
             id: 'sse-archive-query-visible',
             pass: /Eventos SSE/.test(plain) && /arquivo=/.test(plain),
             detail: '/events rendered the durable public SSE archive tail without opening a turn',
+        },
+        {
+            id: 'sse-archive-raw-visible',
+            pass: archiveRawEvents.length > 0,
+            detail: `/events --raw exposed ${archiveRawEvents.length} archived control event(s) without opening a turn`,
         },
         {
             id: 'no-tools-started',
@@ -511,7 +548,7 @@ async function main() {
 
     if (dryRun) {
         const prompt = noPr
-            ? '/usage now\n/activity 20\n/metrics\n/events 20\n/errors 10\n/quit'
+            ? '/usage now\n/activity 20\n/metrics\n/events 20\n/events 20 --raw\n/errors 10\n/quit'
             : buildScenarioPrompt();
         await writeFile(path.join(outDir, 'prompt.txt'), `${prompt}\n`, 'utf8');
         console.log(`[terminal-live] dry-run prompt written to ${path.relative(ROOT, path.join(outDir, 'prompt.txt'))}`);
@@ -578,6 +615,7 @@ async function main() {
             if (noPr) {
                 write('/metrics');
                 write('/events 20');
+                write('/events 20 --raw');
                 write('/errors 10');
                 write('/quit');
                 return;
@@ -595,6 +633,7 @@ async function main() {
                 write('/activity 40');
                 write('/tools diag');
                 write('/events 60');
+                write('/events 100 --raw');
                 write('/errors 10');
                 write('/health');
                 write(`/export ${exportArg}`);
