@@ -84,8 +84,10 @@ import { observeTerminalModelChangeProjection } from '../frontend/projections/in
 import {
     beginTerminalTurnMaterialization,
     beginTerminalTurnTrace,
+    completeTerminalTurnMaterialization,
     completeTerminalTurnTrace,
     createToolCallRegistry,
+    getTerminalAssistantMessageMaterializationDecision,
     getTerminalDetailLevel,
     markTerminalActivityIdle,
     recordTerminalActivity,
@@ -99,7 +101,6 @@ import {
     recordTerminalTurnUserInputActivity,
     recordTerminalUserInputCompleted,
     recordTerminalUserInputRequested,
-    shouldSuppressTerminalAssistantMessageAsMaterializedTurn,
     shouldSuppressTerminalAssistantMessageAsUserInputEcho,
     terminalThemeBadge,
     terminalThemeText,
@@ -366,19 +367,47 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
                 : typeof data['turnId'] === 'string' || typeof data['turnId'] === 'number'
                   ? data['turnId']
                   : null;
-        if (
-            shouldSuppressTerminalAssistantMessageAsMaterializedTurn({
-                content: normalized.content,
-                turnId: assistantMessageTurnId,
-            })
-        ) {
+        const materializationDecision = getTerminalAssistantMessageMaterializationDecision({
+            content: normalized.content,
+            turnId: assistantMessageTurnId,
+        });
+        if (materializationDecision.action === 'suppress') {
+            completeTerminalTurnMaterialization({
+                directReply: normalized.content,
+                directSource: 'sdk/assistant.message',
+            });
             recordTerminalActivity('turn', 'assistant.message reconciliado sem novo bloco visual', {
-                detail: `${normalized.kind} · conteúdo já materializado por delta/turno`,
+                detail: `${normalized.kind} · ${materializationDecision.reason}`,
                 source: 'sdk/assistant.message',
                 severity: 'info',
                 recordHistory: false,
                 updateCurrent: false,
             });
+            return;
+        }
+        if (materializationDecision.action === 'render_suffix') {
+            completeTerminalTurnMaterialization({
+                directReply: normalized.content,
+                directSource: 'sdk/assistant.message',
+            });
+            recordTerminalActivity('streaming', 'assistant.message completou delta público', {
+                detail: `${normalized.kind} · ${materializationDecision.reason}`,
+                source: 'sdk/assistant.message',
+                severity: 'info',
+                recordHistory: false,
+            });
+            const rendered = renderTerminalAssistantTranscript({
+                content: materializationDecision.suffix,
+                title: 'Complemento da LLM-B',
+                source: 'sdk/assistant.message',
+                status: 'completed',
+                detail: materializationDecision.reason,
+                metadata: {
+                    assistantMessageEnvelope,
+                    materializationDecision,
+                },
+            });
+            if (rendered) refreshPromptIfIdle();
             return;
         }
         recordTerminalActivity('turn', 'Mensagem da LLM-B recebida', {

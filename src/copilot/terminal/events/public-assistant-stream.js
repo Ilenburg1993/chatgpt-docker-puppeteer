@@ -12,7 +12,12 @@
 import { getShowStreaming } from '../../presentation/state/index.js';
 import { readTerminalDialogStreamMeta } from '../frontend/gateways/index.js';
 import { createDeltaCallback, createDisplayState, renderStreamingFooter } from '../dialog/index.js';
-import { recordTerminalTurnDelta } from '../state/events/index.js';
+import {
+    completeTerminalTurnMaterialization,
+    readTerminalTurnMaterialization,
+    recordTerminalTurnDelta,
+} from '../state/events/index.js';
+import { claimTerminalAssistantTranscript } from './assistant-transcript-renderer.js';
 
 /**
  * @typedef {{
@@ -91,6 +96,16 @@ export function finalizePublicAssistantStream(input = {}) {
     streams.delete(streamKey);
     const liveRendered = stream.state.streamingStarted;
     renderStreamingFooter(stream.state, Date.now() - stream.startedAt);
+    const materialization = readTerminalTurnMaterialization();
+    if (materialization?.source === 'public-assistant-stream') {
+        const materialized = completeTerminalTurnMaterialization({
+            directReply: null,
+            directSource: 'public-assistant-stream',
+        });
+        if (materialized.reply) {
+            claimTerminalAssistantTranscript(materialized.reply);
+        }
+    }
     return { liveRendered };
 }
 

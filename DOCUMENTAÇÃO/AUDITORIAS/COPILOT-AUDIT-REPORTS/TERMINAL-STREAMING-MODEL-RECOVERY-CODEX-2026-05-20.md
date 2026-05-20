@@ -286,6 +286,48 @@ Validação live:
 - Artefato: `artifacts/terminal-live/2026-05-20T18-55-53-045Z/summary.md`.
 - Resultado: PASS; terminal subiu em `3010` com `3009` ocupada, `/events` funcionou e nenhum turno explícito foi aberto.
 
+### A19. `task.delta` público ainda podia duplicar o `assistant.message` final
+
+Evidência:
+
+- A sessão live mostrou blocos em que um delta público aparecia primeiro e, em seguida, a mesma mensagem final era emitida por `sdk/assistant.message`.
+- A rota de `dialog.delta` do turno explícito já tinha reconciliação de sufixo, mas a rota pública fora de turno (`task.delta` quando `getBusy() === false`) apenas renderizava e finalizava footer.
+- Ao finalizar esse stream público, o estado global não registrava materialização concluída com o texto bruto já exibido. Assim, uma mensagem final maior que o prefixo podia abrir outro bloco inteiro.
+
+Correção implementada:
+
+- `turn-materialization-state.js` passou a reconhecer `public-assistant-stream` como fonte de materialização.
+- O estado recente agora guarda também `reply` e `deltaText` brutos, não apenas texto normalizado.
+- Foi criada a decisão canônica `getTerminalAssistantMessageMaterializationDecision()`, com três saídas: `suppress`, `render_suffix` e `render_full`.
+- `public-assistant-stream.finalizePublicAssistantStream()` agora conclui a materialização pública e reivindica o transcript já exibido.
+- `sdk-session-events.onAssistantMessage()` deixou de fazer apenas boolean dedupe: agora renderiza somente o sufixo faltante quando o delta público já exibiu o prefixo.
+
+Critério ideal:
+
+- Delta público parcial deve continuar visível imediatamente.
+- Mensagem final equivalente deve ser suprimida.
+- Mensagem final que apenas completa o delta deve renderizar só o complemento.
+- Mensagem final divergente deve renderizar completa, com diagnóstico de mismatch.
+
+### A20. Live completo bloqueado por rate limit precisa virar diagnóstico de causa raiz
+
+Evidência:
+
+- Rodada live `artifacts/terminal-live/2026-05-20T19-05-51-881Z/summary.md` subiu o terminal, conectou SSE e enviou o cenário canônico.
+- Antes de qualquer tool, delta ou `ask_user`, o SDK retornou: `You've hit your rate limit... reset in 1 hour 51 minutes`.
+- O runner antigo marcou dezenas de critérios como falha (`partial-deltas`, `ask-user-visible`, `export-*`, etc.), embora a causa primária fosse indisponibilidade externa do SDK.
+
+Correção implementada:
+
+- O live runner agora detecta blocker `sdk-rate-limit`.
+- Quando há blocker, o summary passa a ter status `BLOCKED`, registra request/reset quando disponíveis, e troca a cascata de falsos negativos por critérios mínimos: terminal pronto, REPL, SSE conectado e causa raiz.
+- Isso não valida o fluxo de delta/tool/ask_user; apenas impede que indisponibilidade externa seja confundida com regressão de UX.
+
+Critério ideal:
+
+- Falhas externas recuperáveis ou temporárias devem ser classificadas como `BLOCKED`, não como `FAIL` de todos os critérios downstream.
+- Quando o SDK voltar a responder, o mesmo runner deve executar o cenário completo sem exigir mudanças manuais.
+
 ## Hipóteses Externas Rejeitadas Ou Reclassificadas
 
 ### H1. "boot-hub assume sucesso"
@@ -602,6 +644,8 @@ Implementado:
 - `event-adapter-events.js` passou a conter `TERMINAL_PUBLIC_STREAM_SOURCE_POLICIES`, prendendo em código quais fontes são aceitas, suprimidas e fallback.
 - Boot HTTP deixou de morrer em `EADDRINUSE` e passou a realocar a porta do inject server com UX/comandos refletindo a porta efetiva.
 - O live runner canônico agora evita colisão de porta antes do boot e coleta SSE na porta efetiva escolhida.
+- `task.delta` público fora de turno agora fecha materialização canônica; `assistant.message` posterior suprime duplicata exata ou renderiza apenas o sufixo faltante.
+- O live runner agora classifica rate limit do SDK como blocker de causa raiz, evitando falso diagnóstico em cascata.
 - Testes unitários adicionados para runtime root, reflection sync failure e SIGHUP policy.
 - Testes unitários adicionados para reconciliação de `assistant.message` materializado, supressão visual de `question.pending` e preferência `dialog.delta`.
 - Testes unitários adicionados para normalização de objetos de erro sem `message`.
@@ -609,7 +653,9 @@ Implementado:
 - Teste unitário adicionado para deduplicação visual de intents equivalentes.
 - Testes unitários adicionados para bloqueio de reenvio automático de task `dialog_boot` após reconexão, UX/SSE de prompt preservado e mapa `/events sources`.
 - Testes unitários adicionados para realocação de porta no boot HTTP e modo strict sem fallback.
+- Testes unitários adicionados para decisão `suppress/render_suffix/render_full` entre delta público e `assistant.message`.
 - Live `--no-pr` passou em `artifacts/terminal-live/2026-05-20T18-55-53-045Z/summary.md`.
+- Live completo `artifacts/terminal-live/2026-05-20T19-05-51-881Z/summary.md` ficou bloqueado por rate limit antes de delta/tool/ask_user; não valida o cenário funcional.
 
 Próxima rodada recomendada:
 

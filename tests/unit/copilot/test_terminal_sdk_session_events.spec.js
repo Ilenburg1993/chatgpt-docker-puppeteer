@@ -6,6 +6,11 @@
  */
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+    beginTerminalTurnMaterialization,
+    clearTerminalTurnMaterialization,
+    recordTerminalTurnDelta,
+} from '../../../src/copilot/terminal/state/turn-materialization-state.js';
 
 const mocks = vi.hoisted(() => ({
     recordTerminalActivity: vi.fn(),
@@ -146,6 +151,7 @@ describe('terminal/events/sdk-session-events.js — contrato', () => {
         });
         mocks.readRuntimeInterventionMailboxSummary.mockReturnValue({ queueSize: 0, dropped: 0, runtimeId: 'default' });
         mocks.answerTerminalPendingQuestion.mockReturnValue(true);
+        clearTerminalTurnMaterialization();
     });
 
     it('importa sem erros', async () => {
@@ -223,6 +229,40 @@ describe('terminal/events/sdk-session-events.js — contrato', () => {
             expect.objectContaining({ content: 'mensagem do turno ativo', protocolKind: 'question' }),
         );
         expect(mocks.renderTerminalAssistantTranscript).not.toHaveBeenCalled();
+    });
+
+    it('renderiza apenas o sufixo de assistant.message quando delta público já exibiu o prefixo', async () => {
+        beginTerminalTurnMaterialization({ turnId: 'turn-prefix', timestamp: 1000, source: 'public-assistant-stream' });
+        recordTerminalTurnDelta({
+            chunk: 'Vou chamar ask_user ',
+            source: 'public-assistant-stream',
+            timestamp: 1001,
+        });
+        const { setupTerminalSdkSessionEventListeners } =
+            await import('../../../src/copilot/terminal/events/sdk-session-events.js');
+        const agent = createAgentHost();
+        const refreshPromptIfIdle = vi.fn();
+
+        setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfIdle });
+        agent.emit('assistant.message', {
+            content: 'Vou chamar ask_user e aguardar sua resposta.',
+            turnId: 'turn-prefix',
+        });
+
+        expect(mocks.recordTerminalActivity).toHaveBeenCalledWith(
+            'streaming',
+            'assistant.message completou delta público',
+            expect.objectContaining({ detail: 'question · stream_suffix', source: 'sdk/assistant.message' }),
+        );
+        expect(mocks.renderTerminalAssistantTranscript).toHaveBeenCalledWith(
+            expect.objectContaining({
+                title: 'Complemento da LLM-B',
+                content: 'e aguardar sua resposta.',
+                source: 'sdk/assistant.message',
+                detail: 'stream_suffix',
+            }),
+        );
+        expect(refreshPromptIfIdle).toHaveBeenCalled();
     });
 
     it('suprime assistant.message que ecoa resposta humana recém-concluída de ask_user', async () => {

@@ -85,6 +85,7 @@ function buildReport({
     criteria,
     durationMs,
     exitCode,
+    blocker,
     outputPath,
     plainOutputPath,
     exportPath,
@@ -96,6 +97,7 @@ function buildReport({
     transport,
 }) {
     const ok = criteria.every((criterion) => criterion.pass);
+    const status = blocker ? 'BLOCKED' : ok ? 'PASS' : 'FAIL';
     const lines = [
         '# Terminal LLM-B Live Test',
         '',
@@ -103,7 +105,8 @@ function buildReport({
         `Duration: ${durationMs}ms`,
         `Exit code: ${String(exitCode)}`,
         `Transport: ${transport}`,
-        `Status: ${ok ? 'PASS' : 'FAIL'}`,
+        `Status: ${status}`,
+        ...(blocker ? [`Blocker: ${blocker.id} · ${blocker.detail}`] : []),
         '',
         '## Artifacts',
         '',
@@ -130,6 +133,22 @@ function buildReport({
         '',
     ];
     return `${lines.join('\n')}\n`;
+}
+
+function detectLiveBlocker(plain) {
+    const rateLimitMatch = plain.match(
+        /You've hit your rate limit\.[^\n]*(?:reset in ([^.]+)\.)?[^\n]*(?:Request ID: ([^)]+))?/i,
+    );
+    if (rateLimitMatch) {
+        return {
+            id: 'sdk-rate-limit',
+            detail: `GitHub Copilot SDK rate limit${rateLimitMatch[1] ? ` · reset em ${rateLimitMatch[1].trim()}` : ''}${rateLimitMatch[2] ? ` · request=${rateLimitMatch[2].trim()}` : ''}`,
+        };
+    }
+    if (/\[rate_limit\]/i.test(plain)) {
+        return { id: 'sdk-rate-limit', detail: 'GitHub Copilot SDK rate limit' };
+    }
+    return null;
 }
 
 function isObjectPayload(value) {
@@ -487,6 +506,36 @@ function evaluateNoPrOutput(plain, sseSummary) {
     ];
 }
 
+function evaluateBlockedOutput(plain, sseSummary, blocker) {
+    return [
+        {
+            id: 'ready',
+            pass: /LLM-B pronta/.test(plain),
+            detail: 'terminal reached ready state before blocker',
+        },
+        {
+            id: 'interactive-repl',
+            pass: !/Modo headless detectado/.test(plain),
+            detail: 'terminal ran with an interactive REPL/TTY surface',
+        },
+        {
+            id: 'blocked-by-sdk-rate-limit',
+            pass: false,
+            detail: blocker.detail,
+        },
+        {
+            id: 'sse-connected',
+            pass: sseSummary.connected,
+            detail: `SSE collector ${sseSummary.connected ? 'connected' : 'did not connect'} before blocker`,
+        },
+        {
+            id: 'root-cause-not-ux-duplication',
+            pass: true,
+            detail: 'scenario criteria skipped because SDK did not produce assistant/tool/ask_user events',
+        },
+    ];
+}
+
 async function inspectExportedMarkdown(exportPath) {
     try {
         const content = await readFile(exportPath, 'utf8');
@@ -778,7 +827,6 @@ async function main() {
     sseCollector?.close();
 
     const plain = stripAnsi(raw);
-    const exportSummary = noPr ? null : await inspectExportedMarkdown(exportPath);
     const sseSummary = sseCollector?.summary() ?? {
         connected: false,
         statusCode: null,
@@ -792,7 +840,13 @@ async function main() {
         raw: '',
         disabled: !collectSse,
     };
-    const criteria = noPr ? evaluateNoPrOutput(plain, sseSummary) : evaluateOutput(plain, sseSummary, exportSummary);
+    const blocker = noPr ? null : detectLiveBlocker(plain);
+    const exportSummary = noPr || blocker ? null : await inspectExportedMarkdown(exportPath);
+    const criteria = blocker
+        ? evaluateBlockedOutput(plain, sseSummary, blocker)
+        : noPr
+          ? evaluateNoPrOutput(plain, sseSummary)
+          : evaluateOutput(plain, sseSummary, exportSummary);
     const durationMs = Date.now() - Date.parse(startedAt);
     await writeFile(rawPath, raw, 'utf8');
     await writeFile(plainPath, plain, 'utf8');
@@ -807,6 +861,8 @@ async function main() {
         `${JSON.stringify(
             {
                 ok: criteria.every((c) => c.pass),
+                blocked: Boolean(blocker),
+                blocker,
                 startedAt,
                 durationMs,
                 exitCode,
@@ -834,6 +890,7 @@ async function main() {
             criteria,
             durationMs,
             exitCode,
+            blocker,
             outputPath: path.relative(ROOT, rawPath),
             plainOutputPath: path.relative(ROOT, plainPath),
             exportPath: noPr ? null : path.relative(ROOT, exportPath),

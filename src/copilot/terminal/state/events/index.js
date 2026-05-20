@@ -11,6 +11,7 @@ export {
     beginTerminalTurnMaterialization,
     clearTerminalTurnMaterialization,
     completeTerminalTurnMaterialization,
+    getTerminalAssistantMessageMaterializationDecision,
     readTerminalTurnAssistantMessages,
     readTerminalTurnMaterialization,
     recordTerminalTurnAssistantMessage,

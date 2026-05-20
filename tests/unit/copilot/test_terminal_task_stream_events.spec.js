@@ -16,6 +16,7 @@ import {
     beginTerminalTurnMaterialization,
     clearTerminalTurnMaterialization,
     recordTerminalTurnDelta,
+    getTerminalAssistantMessageMaterializationDecision,
     shouldSuppressTerminalAssistantMessageAsMaterializedTurn,
 } from '../../../src/copilot/terminal/state/turn-materialization-state.js';
 
@@ -76,6 +77,7 @@ vi.mock('../../../src/copilot/presentation/state/index.js', () => ({
 }));
 
 vi.mock('../../../src/copilot/terminal/events/assistant-transcript-renderer.js', () => ({
+    claimTerminalAssistantTranscript: vi.fn(() => true),
     renderTerminalAssistantTranscript: mocks.renderTerminalAssistantTranscript,
 }));
 
@@ -234,6 +236,30 @@ describe('terminal/task-stream-events.js — contrato', () => {
         expect(mocks.println).not.toHaveBeenCalledWith(expect.stringContaining('task complete'));
         expect(stdoutSpy).toHaveBeenCalled();
         expect(stdoutSpy.mock.calls.map(([chunk]) => String(chunk)).join('')).toContain('OK-LIVE-1');
+        expect(mocks.renderTerminalAssistantTranscript).not.toHaveBeenCalled();
+        stdoutSpy.mockRestore();
+    });
+
+    it('fecha materialização pública para assistant.message renderizar só sufixo posterior', async () => {
+        const stdoutSpy = vi.spyOn(process.stdout, 'write').mockReturnValue(true);
+        const { setupTerminalTaskStreamListeners } =
+            await import('../../../src/copilot/terminal/events/task-stream-events.js');
+        const agent = new EventEmitter();
+
+        setupTerminalTaskStreamListeners({ agent });
+        agent.emit('task.delta', {
+            taskId: 'task-prefix',
+            streamId: 'stream-prefix',
+            chunk: 'Vou chamar ask_user ',
+        });
+        agent.emit('task.completed', { taskId: 'task-prefix', streamId: 'stream-prefix' });
+
+        const decision = getTerminalAssistantMessageMaterializationDecision({
+            content: 'Vou chamar ask_user e aguardar sua resposta.',
+        });
+
+        expect(decision.action).toBe('render_suffix');
+        expect(decision.suffix).toBe('e aguardar sua resposta.');
         expect(mocks.renderTerminalAssistantTranscript).not.toHaveBeenCalled();
         stdoutSpy.mockRestore();
     });

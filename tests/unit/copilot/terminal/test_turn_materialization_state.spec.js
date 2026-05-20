@@ -6,6 +6,7 @@ import {
     beginTerminalTurnMaterialization,
     clearTerminalTurnMaterialization,
     completeTerminalTurnMaterialization,
+    getTerminalAssistantMessageMaterializationDecision,
     readTerminalTurnMaterialization,
     recordTerminalTurnAssistantMessage,
     recordTerminalTurnDelta,
@@ -124,6 +125,31 @@ describe('terminal/state/turn-materialization-state', () => {
         ).toBe(false);
     });
 
+    it('identifica sufixo de assistant.message quando delta público já mostrou prefixo', () => {
+        clearTerminalTurnMaterialization();
+        beginTerminalTurnMaterialization({ turnId: 'live-prefix', timestamp: 1000, source: 'public-assistant-stream' });
+        recordTerminalTurnDelta({
+            chunk: 'Vou verificar o terminal e ',
+            source: 'public-assistant-stream',
+            timestamp: 1001,
+        });
+
+        const decision = getTerminalAssistantMessageMaterializationDecision({
+            content: 'Vou verificar o terminal e chamar ask_user no final.',
+            turnId: 'live-prefix',
+            now: 1002,
+        });
+
+        expect(decision).toEqual(
+            expect.objectContaining({
+                action: 'render_suffix',
+                reason: 'stream_suffix',
+                suffix: 'chamar ask_user no final.',
+                matchedTurnKey: 'turn:live-prefix',
+            }),
+        );
+    });
+
     it('suprime turn_end parcial quando o delta canônico já contém o mesmo texto', () => {
         clearTerminalTurnMaterialization();
         beginTerminalTurnMaterialization({ turnId: 'live-prefix', timestamp: 1000 });
@@ -166,6 +192,30 @@ describe('terminal/state/turn-materialization-state', () => {
                 now: 1003,
             }),
         ).toBe(false);
+    });
+
+    it('preserva sufixo após fechamento de materialização pública parcial', () => {
+        clearTerminalTurnMaterialization();
+        beginTerminalTurnMaterialization({ turnId: 'done-prefix', timestamp: 1000, source: 'public-assistant-stream' });
+        recordTerminalTurnDelta({
+            chunk: 'Primeira metade ',
+            source: 'public-assistant-stream',
+            timestamp: 1001,
+        });
+        completeTerminalTurnMaterialization({
+            directReply: null,
+            directSource: 'public-assistant-stream',
+            timestamp: 1002,
+        });
+
+        const decision = getTerminalAssistantMessageMaterializationDecision({
+            content: 'Primeira metade e segunda metade.',
+            turnId: 'done-prefix',
+            now: 1003,
+        });
+
+        expect(decision.action).toBe('render_suffix');
+        expect(decision.suffix).toBe('e segunda metade.');
     });
 
     it('suprime task.delta tardio quando dialog.delta já materializou o mesmo trecho', () => {

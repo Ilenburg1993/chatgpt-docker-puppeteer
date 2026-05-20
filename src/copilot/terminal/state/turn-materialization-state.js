@@ -15,7 +15,7 @@ const RECENT_COMPLETED_TURNS_MAX = 32;
 const RECENT_COMPLETED_TURN_TTL_MS = 5 * 60_000;
 
 /**
- * @typedef {'terminal/explicit-turn' | 'sdk/assistant.turn_start' | 'sdk/assistant.message' | 'dialog/onDelta'} TerminalTurnMaterializationSource
+ * @typedef {'terminal/explicit-turn' | 'sdk/assistant.turn_start' | 'sdk/assistant.message' | 'dialog/onDelta' | 'public-assistant-stream'} TerminalTurnMaterializationSource
  * @typedef {'active' | 'completed' | 'failed' | 'interrupted'} TerminalTurnMaterializationStatus
  * @typedef {'direct_reply' | 'assistant_message' | 'stream_delta' | 'empty'} TerminalTurnMaterializedSource
  *
@@ -73,7 +73,7 @@ const RECENT_COMPLETED_TURN_TTL_MS = 5 * 60_000;
 /** @type {InternalTerminalTurnMaterialization | null} */
 let _currentTurnMaterialization = null;
 
-/** @type {{ turnKey: string; turnId: string | null; normalizedReply: string; normalizedDeltaText: string; completedAt: number }[]} */
+/** @type {{ turnKey: string; turnId: string | null; reply: string; deltaText: string; normalizedReply: string; normalizedDeltaText: string; completedAt: number }[]} */
 const _recentCompletedTurnMaterializations = [];
 
 /**
@@ -101,6 +101,24 @@ function createTurnKey(turnId, timestamp) {
  */
 function normalizeComparableTranscript(value) {
     return typeof value === 'string' ? value.replace(/\s+/g, ' ').trim() : '';
+}
+
+/**
+ * Encontra o sufixo bruto de uma mensagem final preservando markdown/quebras originais.
+ *
+ * @param {string} finalContent
+ * @param {string} alreadyRenderedContent
+ * @returns {string | null}
+ */
+function findRawSuffixAfterRenderedPrefix(finalContent, alreadyRenderedContent) {
+    const renderedNormalized = normalizeComparableTranscript(alreadyRenderedContent);
+    if (!renderedNormalized) return null;
+    for (let index = 0; index <= finalContent.length; index += 1) {
+        if (normalizeComparableTranscript(finalContent.slice(0, index)) === renderedNormalized) {
+            return finalContent.slice(index);
+        }
+    }
+    return null;
 }
 
 /**
@@ -252,7 +270,10 @@ export function recordTerminalTurnDelta(input) {
     if (!input.chunk) return null;
     const timestamp = input.timestamp ?? Date.now();
     if (!_currentTurnMaterialization) {
-        beginTerminalTurnMaterialization({ timestamp, source: 'dialog/onDelta' });
+        beginTerminalTurnMaterialization({
+            timestamp,
+            source: input.source === 'public-assistant-stream' ? 'public-assistant-stream' : 'dialog/onDelta',
+        });
     }
     if (!_currentTurnMaterialization) return null;
     const entry = {
@@ -326,6 +347,8 @@ export function completeTerminalTurnMaterialization({
             _recentCompletedTurnMaterializations.unshift({
                 turnKey: current.turnKey,
                 turnId: current.turnId,
+                reply: reply ?? '',
+                deltaText: current.deltaText,
                 normalizedReply,
                 normalizedDeltaText,
                 completedAt: timestamp,
@@ -352,13 +375,117 @@ export function completeTerminalTurnMaterialization({
 }
 
 /**
+ * Decide como tratar uma `assistant.message` final quando já houve materialização parcial ou completa do mesmo turno.
+ *
+ * @param {{ content?: string | null | undefined; turnId?: string | number | null; now?: number }} input
+ * @returns {{
+ *     action: 'render_full' | 'render_suffix' | 'suppress';
+ *     reason: 'empty' | 'no_materialization' | 'already_materialized' | 'stream_suffix' | 'stream_mismatch';
+ *     suffix: string;
+ *     matchedTurnKey: string | null;
+ * }}
+ */
+export function getTerminalAssistantMessageMaterializationDecision({
+    content,
+    turnId = null,
+    now = Date.now(),
+}) {
+    const finalContent = typeof content === 'string' ? content : '';
+    const normalizedContent = normalizeComparableTranscript(finalContent);
+    if (!normalizedContent) {
+        return { action: 'suppress', reason: 'empty', suffix: '', matchedTurnKey: null };
+    }
+    const normalizedTurnId = normalizeTurnId(turnId);
+
+    const decideFromEntry = (
+        /** @type {{ turnKey: string; turnId: string | null; reply?: string; deltaText?: string; normalizedReply: string; normalizedDeltaText: string }} */ entry,
+    ) => {
+        if (normalizedTurnId && entry.turnId && normalizedTurnId !== entry.turnId) return null;
+        if (entry.normalizedReply && entry.normalizedReply === normalizedContent) {
+            return {
+                action: /** @type {'suppress'} */ ('suppress'),
+                reason: /** @type {'already_materialized'} */ ('already_materialized'),
+                suffix: '',
+                matchedTurnKey: entry.turnKey,
+            };
+        }
+        if (entry.normalizedDeltaText && entry.normalizedDeltaText === normalizedContent) {
+            return {
+                action: /** @type {'suppress'} */ ('suppress'),
+                reason: /** @type {'already_materialized'} */ ('already_materialized'),
+                suffix: '',
+                matchedTurnKey: entry.turnKey,
+            };
+        }
+        if (entry.normalizedDeltaText && normalizedContent.startsWith(entry.normalizedDeltaText)) {
+            const suffix = findRawSuffixAfterRenderedPrefix(finalContent, entry.deltaText ?? entry.normalizedDeltaText);
+            const renderableSuffix = (suffix ?? finalContent.slice(entry.normalizedDeltaText.length)).replace(/^\s+/, '');
+            if (!normalizeComparableTranscript(renderableSuffix)) {
+                return {
+                    action: /** @type {'suppress'} */ ('suppress'),
+                    reason: /** @type {'already_materialized'} */ ('already_materialized'),
+                    suffix: '',
+                    matchedTurnKey: entry.turnKey,
+                };
+            }
+            return {
+                action: /** @type {'render_suffix'} */ ('render_suffix'),
+                reason: /** @type {'stream_suffix'} */ ('stream_suffix'),
+                suffix: renderableSuffix,
+                matchedTurnKey: entry.turnKey,
+            };
+        }
+        if (
+            entry.normalizedDeltaText &&
+            normalizedContent.length >= 24 &&
+            entry.normalizedDeltaText.includes(normalizedContent)
+        ) {
+            return {
+                action: /** @type {'suppress'} */ ('suppress'),
+                reason: /** @type {'already_materialized'} */ ('already_materialized'),
+                suffix: '',
+                matchedTurnKey: entry.turnKey,
+            };
+        }
+        return null;
+    };
+
+    if (_currentTurnMaterialization) {
+        const currentDecision = decideFromEntry({
+            turnKey: _currentTurnMaterialization.turnKey,
+            turnId: _currentTurnMaterialization.turnId,
+            reply: '',
+            deltaText: _currentTurnMaterialization.deltaText,
+            normalizedReply: '',
+            normalizedDeltaText: normalizeComparableTranscript(_currentTurnMaterialization.deltaText),
+        });
+        if (currentDecision) return currentDecision;
+        if (normalizeComparableTranscript(_currentTurnMaterialization.deltaText)) {
+            return {
+                action: 'render_full',
+                reason: 'stream_mismatch',
+                suffix: '',
+                matchedTurnKey: _currentTurnMaterialization.turnKey,
+            };
+        }
+    }
+
+    pruneRecentCompletedTurnMaterializations(now);
+    for (const entry of _recentCompletedTurnMaterializations) {
+        const decision = decideFromEntry(entry);
+        if (decision) return decision;
+    }
+    return { action: 'render_full', reason: 'no_materialization', suffix: '', matchedTurnKey: null };
+}
+
+/**
  * Decide se um `assistant.message` do SDK já está coberto pela materialização canônica do turno.
  *
  * O SDK pode entregar a mesma fala pública por `assistant.message_delta`, retorno direto do turno e, logo depois,
  * `assistant.message`. A fonte canônica visual do terminal é o turno/delta já materializado; `assistant.message` deve
  * continuar arquivado em SSE, mas não abrir um segundo bloco visual nem trocar a atividade atual quando é equivalente.
  *
- * @param {{ content?: string | null; turnId?: string | number | null; now?: number }} input
+ * @param {{ content?: string | null | undefined; turnId?: string | number | null; now?: number }} input
  * @returns {boolean}
  */
 export function shouldSuppressTerminalAssistantMessageAsMaterializedTurn({
@@ -366,38 +493,9 @@ export function shouldSuppressTerminalAssistantMessageAsMaterializedTurn({
     turnId = null,
     now = Date.now(),
 }) {
-    const normalizedContent = normalizeComparableTranscript(content);
-    if (!normalizedContent) return false;
-    const normalizedTurnId = normalizeTurnId(turnId);
-
-    const matches = (/** @type {{ turnId: string | null; normalizedReply: string; normalizedDeltaText: string }} */ entry) => {
-        if (normalizedTurnId && entry.turnId && normalizedTurnId !== entry.turnId) return false;
-        if (entry.normalizedReply && entry.normalizedReply === normalizedContent) return true;
-        if (entry.normalizedDeltaText && entry.normalizedDeltaText === normalizedContent) return true;
-        if (entry.normalizedDeltaText && normalizedContent.startsWith(entry.normalizedDeltaText)) {
-            return normalizeComparableTranscript(normalizedContent.slice(entry.normalizedDeltaText.length)).length === 0;
-        }
-        if (
-            entry.normalizedDeltaText &&
-            normalizedContent.length >= 24 &&
-            entry.normalizedDeltaText.includes(normalizedContent)
-        ) {
-            return true;
-        }
-        return false;
-    };
-
-    if (_currentTurnMaterialization) {
-        const currentEntry = {
-            turnId: _currentTurnMaterialization.turnId,
-            normalizedReply: '',
-            normalizedDeltaText: normalizeComparableTranscript(_currentTurnMaterialization.deltaText),
-        };
-        if (matches(currentEntry)) return true;
-    }
-
-    pruneRecentCompletedTurnMaterializations(now);
-    return _recentCompletedTurnMaterializations.some(matches);
+    return (
+        getTerminalAssistantMessageMaterializationDecision({ content, turnId, now }).action === 'suppress'
+    );
 }
 
 /**
