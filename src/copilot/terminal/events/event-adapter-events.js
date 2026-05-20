@@ -224,12 +224,19 @@ export const TERMINAL_PUBLIC_STREAM_SOURCE_POLICIES = Object.freeze([
     {
         id: 'terminal.lifecycle',
         class: 'lifecycle',
-        canonicalEmitter: 'terminal/terminal-phases.boot-listeners',
-        publicEvents: ['terminal.started', 'terminal.activity', 'activity.changed', 'skills.reloaded'],
-        accepts: ['boot phase lifecycle', 'pinned context reload', 'activity state changes'],
+        canonicalEmitter: 'terminal/runtime-root + terminal/terminal-phases.boot-listeners',
+        publicEvents: [
+            'terminal.started',
+            'terminal.runtime.wired',
+            'terminal.runtime.wire_failed',
+            'terminal.activity',
+            'activity.changed',
+            'skills.reloaded',
+        ],
+        accepts: ['boot phase lifecycle', 'runtime wiring lifecycle', 'pinned context reload', 'activity state changes'],
         suppresses: ['transient boot degraded states presented as final diagnosis'],
         fallback: 'ready auto-brief supersedes boot partial brief when registry/dialog become canonical',
-        owner: 'terminal/terminal-phases/boot-listeners.js + terminal/terminal-phases/boot-pinned.js',
+        owner: 'terminal/runtime-root.js + terminal/terminal-phases/boot-listeners.js + terminal/terminal-phases/boot-pinned.js',
     },
 ]);
 

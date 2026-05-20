@@ -19,9 +19,49 @@ describe('terminal/runtime-root', () => {
             /** @type {import('../../../../src/copilot/terminal/runtime-root.js').TerminalBootContext} */ ({
                 wireRuntime,
                 bootPreflight: null,
+                broadcastSse: vi.fn(),
             }),
         );
 
         assert.deepEqual(order, ['wire:start', 'wire:done']);
+    });
+
+    it('emite terminal.runtime.wired após wireRuntime concluir', async () => {
+        const broadcastSse = vi.fn();
+
+        await runTerminalRuntimeConfigPhase(
+            /** @type {import('../../../../src/copilot/terminal/runtime-root.js').TerminalBootContext} */ ({
+                wireRuntime: vi.fn(async () => {}),
+                bootPreflight: { ok: true },
+                broadcastSse,
+            }),
+        );
+
+        assert.equal(broadcastSse.mock.calls[0]?.[0], 'terminal.runtime.wired');
+        assert.equal(broadcastSse.mock.calls[0]?.[1]?.phase, 'runtime-config');
+        assert.equal(broadcastSse.mock.calls[0]?.[1]?.preflightOk, true);
+    });
+
+    it('emite terminal.runtime.wire_failed e relança erro da fase', async () => {
+        const broadcastSse = vi.fn();
+        const error = new Error('runtime down');
+
+        await assert.rejects(
+            () =>
+                runTerminalRuntimeConfigPhase(
+                    /** @type {import('../../../../src/copilot/terminal/runtime-root.js').TerminalBootContext} */ ({
+                        wireRuntime: vi.fn(async () => {
+                            throw error;
+                        }),
+                        bootPreflight: null,
+                        broadcastSse,
+                    }),
+                ),
+            /runtime down/,
+        );
+
+        assert.equal(broadcastSse.mock.calls[0]?.[0], 'terminal.runtime.wire_failed');
+        assert.equal(broadcastSse.mock.calls[0]?.[1]?.phase, 'runtime-config');
+        assert.equal(broadcastSse.mock.calls[0]?.[1]?.error.message, 'runtime down');
     });
 });

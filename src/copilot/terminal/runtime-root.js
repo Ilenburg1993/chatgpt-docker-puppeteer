@@ -8,7 +8,9 @@
  */
 
 import { readCopilotBootConfig } from '#copilot/boot';
+import { toError } from '#copilot/core';
 import { log } from '#copilot/observability';
+import { broadcastSse as defaultBroadcastSse } from './dialog/index.js';
 import { startRepl } from './repl/index.js';
 import { applyTerminalBootDisplayPreset, recordTerminalActivity } from './state/boot/index.js';
 import { loadAliasesAsync } from './stores/index.js';
@@ -24,6 +26,7 @@ import { loadAliasesAsync } from './stores/index.js';
  * @typedef {object} TerminalServerStartOptions
  * @property {TerminalServerStartDeps['startCopilotServer']} [startCopilotServer]
  * @property {() => void | Promise<void>} [wireRuntime]
+ * @property {(event: string, payload: object) => void} [broadcastSse]
  * @property {() => void | Promise<void>} [loadAliases]
  * @property {() => NodeJS.Timeout} [startTodoCleanupJob]
  * @property {ReturnType<import('#copilot/boot').readCopilotBootConfig>} [bootConfig]
@@ -33,6 +36,7 @@ import { loadAliasesAsync } from './stores/index.js';
  * @typedef {object} TerminalBootContext
  * @property {TerminalServerStartDeps['startCopilotServer']} startCopilotServer
  * @property {() => void | Promise<void>} wireRuntime
+ * @property {(event: string, payload: object) => void} broadcastSse
  * @property {() => void | Promise<void>} loadAliases
  * @property {() => NodeJS.Timeout} startTodoCleanupJob
  * @property {ReturnType<import('#copilot/boot').readCopilotBootConfig>} bootConfig
@@ -77,6 +81,7 @@ export function createTerminalBootContext(options = {}) {
     return {
         startCopilotServer: options.startCopilotServer,
         wireRuntime: options.wireRuntime,
+        broadcastSse: options.broadcastSse ?? defaultBroadcastSse,
         loadAliases,
         startTodoCleanupJob: options.startTodoCleanupJob,
         bootConfig: options.bootConfig ?? readCopilotBootConfig(),
@@ -121,7 +126,39 @@ export async function runTerminalAliasesPhase(ctx) {
  */
 export async function runTerminalRuntimeConfigPhase(ctx) {
     recordTerminalActivity('boot', 'Configurando runtime Copilot', { source: 'terminal', recordHistory: false });
-    await ctx.wireRuntime();
+    const startedAt = Date.now();
+    const broadcast = typeof ctx.broadcastSse === 'function' ? ctx.broadcastSse : defaultBroadcastSse;
+    try {
+        await ctx.wireRuntime();
+    } catch (error) {
+        const err = toError(error);
+        const durationMs = Date.now() - startedAt;
+        recordTerminalActivity('error', 'Falha ao configurar runtime Copilot', {
+            detail: err.message,
+            severity: 'error',
+            source: 'terminal',
+        });
+        broadcast('terminal.runtime.wire_failed', {
+            source: 'terminal/runtime-root.runtime-config',
+            phase: 'runtime-config',
+            durationMs,
+            error: {
+                name: err.name,
+                message: err.message,
+                code: err.code ?? null,
+            },
+            timestamp: Date.now(),
+        });
+        throw err;
+    }
+    const durationMs = Date.now() - startedAt;
+    broadcast('terminal.runtime.wired', {
+        source: 'terminal/runtime-root.runtime-config',
+        phase: 'runtime-config',
+        durationMs,
+        preflightOk: ctx.bootPreflight ? ctx.bootPreflight['ok'] === true : null,
+        timestamp: Date.now(),
+    });
     if (ctx.bootPreflight) {
         recordTerminalActivity('boot', 'Executando preflight SDK', {
             detail: ctx.bootPreflight['pingOk'] ? 'CLI acessível' : 'CLI indisponível ou sem resposta',

@@ -388,6 +388,24 @@ Validação:
 - Resultado: `PASS`, sem turno explícito, sem tools, sem erros, com `/usage now`, `/activity`, `/metrics`, `/events`, `/events --raw` e `/errors`.
 - O cenário funcional completo segue bloqueado por rate limit externo até reset do SDK; isso não valida delta/tool/ask_user nesta rodada.
 
+### A24. Fiação do runtime precisava de evento próprio no fluxo público
+
+Evidência:
+
+- O roadmap já apontava `terminal.runtime.wired` e falha de fase como pendentes.
+- `runTerminalRuntimeConfigPhase()` aguardava `wireRuntime()`, mas a conclusão da fase ficava implícita em atividade/log. Em caso de falha, o operador dependia de erro genérico do boot.
+
+Correção implementada nesta rodada:
+
+- `runtime-root.js` passou a emitir `terminal.runtime.wired` com `phase=runtime-config`, duração, `preflightOk` e timestamp.
+- Falhas de `wireRuntime()` agora emitem `terminal.runtime.wire_failed` com erro normalizado, registram atividade terminal de erro e relançam a falha para o lifecycle.
+- A política `/events sources` foi atualizada para classificar esses eventos dentro de `terminal.lifecycle`.
+- Testes unitários cobrem sucesso e falha da fiação do runtime.
+
+Critério ideal:
+
+- Toda fase crítica de boot deve ter start/success/failure auditável por `/events`, e não apenas por log lateral.
+
 ## Hipóteses Externas Rejeitadas Ou Reclassificadas
 
 ### H1. "boot-hub assume sucesso"
@@ -447,8 +465,8 @@ Fase A1. Fiação do runtime
 
 - A1.1 Aguardar `wireRuntime()` no boot. Status: feito.
 - A1.2 Cobrir `wireRuntime()` assíncrono por teste unitário. Status: feito.
-- A1.3 Emitir evento `terminal.runtime.wired` com duração e resultado. Status: pendente.
-- A1.4 Registrar falha de `wireRuntime()` no error tracker com `phase=runtime-config`. Status: pendente.
+- A1.3 Emitir evento `terminal.runtime.wired` com duração e resultado. Status: feito nesta rodada.
+- A1.4 Registrar falha de `wireRuntime()` com `phase=runtime-config`. Status: parcialmente feito via atividade + `terminal.runtime.wire_failed`; falta integrar ao `ErrorTracker`.
 
 Fase A2. Reflection loop
 
@@ -724,6 +742,8 @@ Implementado:
 - `agent:task:error` deixou de gerar entrada sintética duplicada `event-bus` no `ErrorTracker`.
 - `task.error` de rate limit deixou de duplicar `session.error` em `/errors` e deixou de aparecer como "Tarefa interna falhou · 0 chunks" na timeline terminal.
 - `toError()` agora preserva `errorMessage` e `detail` de objetos SDK antes de serializar payload bruto.
+- `runtime-root.js` agora emite `terminal.runtime.wired` e `terminal.runtime.wire_failed` com fase, duração e diagnóstico normalizado.
+- `/events sources` classifica os eventos de fiação do runtime em `terminal.lifecycle`.
 - Testes unitários adicionados para runtime root, reflection sync failure e SIGHUP policy.
 - Testes unitários adicionados para reconciliação de `assistant.message` materializado, supressão visual de `question.pending` e preferência `dialog.delta`.
 - Testes unitários adicionados para normalização de objetos de erro sem `message`.
@@ -737,6 +757,7 @@ Implementado:
 - Live completo desta rodada ficou `BLOCKED` por rate limit em `artifacts/terminal-live/codex-continue-2026-05-20-full/summary.md`.
 - Live `--no-pr` desta rodada passou em `artifacts/terminal-live/codex-continue-2026-05-20-no-pr-rerun/summary.md`.
 - Testes unitários adicionados para recoverable `model_call` não poluir `/errors`, para `task.error` de rate limit não duplicar `session.error`, e para `agent:task:error` não criar erro sintético `event-bus`.
+- Testes unitários adicionados para `terminal.runtime.wired` e `terminal.runtime.wire_failed`.
 
 Próxima rodada recomendada:
 
@@ -744,6 +765,6 @@ Próxima rodada recomendada:
 2. Fechar a recuperação `session.error`/`reconnect_restart`, distinguindo retry real de reenvio ambíguo de prompt.
 3. Criar contrato único de modelo configurado/preferido/efetivo/cobrado.
 4. Continuar a normalização de tool identity em completions/progress externos sem requestId, com métricas para qualquer lifecycle ainda genérico.
-5. Adicionar eventos de boot `runtime.wired` e falha de fase.
+5. Integrar falha de `wireRuntime()` ao `ErrorTracker` com metadados de fase.
 6. Expandir `/events sources` com links/copy hints para `/events event=...` e `/events source=...`.
 7. Expandir o cenário live para elicitation quando a capability estiver disponível.
