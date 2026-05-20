@@ -611,7 +611,7 @@ Implementado nesta revisao:
 
 Pendencias apos esta revisao:
 
-- Fazer `/events` aceitar `--json`/`--raw` para inspeção automatizada e comparação direta com `terminal.sse.jsonl`.
+- Comparar automaticamente `/events --raw` com `terminal.sse.jsonl` no runner live.
 - Incluir o caminho/estado do archive SSE nos exports de diagnóstico.
 - Aplicar compactação inteligente para payloads muito grandes: manter payload publico quando seguro, mas gravar hash/referência de blob quando necessário, sem perder causalidade.
 
@@ -623,6 +623,8 @@ Implementado nesta revisao:
 
 - Criado comando `/events [n] [event=<nome>] [trace=<id>] [turn=<id>] [source=<origem>] [tool=<id>]
   [request=<id>] [hub=<id>]` para consultar o tail do archive JSONL publico sem abrir turno SDK.
+- O comando `/events` agora aceita `--json` e `--raw`, permitindo inspeção automatizada e comparação direta com
+  artefatos `terminal.sse.jsonl` sem scraping da saída colorida.
 - A leitura do archive drena a fila pendente antes de consultar o arquivo, tolera linhas JSONL truncadas/corrompidas e
   limita a janela de leitura para manter a UX responsiva.
 - O flush do archive deixou de retornar cedo quando havia gravação em voo: agora ele aguarda o append ativo e drena todos
@@ -642,7 +644,6 @@ Implementado nesta revisao:
 
 Pendencias apos esta revisao:
 
-- Fazer `/events` aceitar `--json`/`--raw` para inspeção automatizada e comparação direta com `terminal.sse.jsonl`.
 - Fazer o runner comparar o tail de `/events` com o coletor HTTP `GET /events`, detectando divergencia entre archive local
   e stream externo no mesmo `eventId`.
 - Adicionar compactacao/hash de payload grande antes da persistencia JSONL.

@@ -14,7 +14,7 @@ import { readTerminalSseEventArchiveTail } from '../state/index.js';
 
 /**
  * @param {string} arg
- * @returns {{ limit: number; event: string | null; traceId: string | null; turnId: string | null; source: string | null; toolCallId: string | null; requestId: string | null; hubSessionId: string | null }}
+ * @returns {{ query: { limit: number; event: string | null; traceId: string | null; turnId: string | null; source: string | null; toolCallId: string | null; requestId: string | null; hubSessionId: string | null }; format: 'text' | 'json' | 'raw' }}
  */
 function parseEventsArg(arg) {
     const tokens = arg.trim().split(/\s+/u).filter(Boolean);
@@ -33,9 +33,15 @@ function parseEventsArg(arg) {
     let requestId = null;
     /** @type {string | null} */
     let hubSessionId = null;
+    /** @type {'text' | 'json' | 'raw'} */
+    let format = 'text';
     for (const token of tokens) {
         if (/^\d+$/u.test(token)) {
             limit = Math.min(500, Math.max(1, Number(token)));
+        } else if (token === '--json' || token === 'json' || token === 'format=json') {
+            format = 'json';
+        } else if (token === '--raw' || token === 'raw' || token === 'format=raw') {
+            format = 'raw';
         } else if (token.startsWith('event=')) {
             event = token.slice('event='.length) || null;
         } else if (token.startsWith('trace=')) {
@@ -72,7 +78,10 @@ function parseEventsArg(arg) {
             event = token;
         }
     }
-    return { limit, event, traceId, turnId, source, toolCallId, requestId, hubSessionId };
+    return {
+        query: { limit, event, traceId, turnId, source, toolCallId, requestId, hubSessionId },
+        format,
+    };
 }
 
 /**
@@ -111,9 +120,19 @@ function summarizePayload(payload) {
  * @returns {Promise<void>}
  */
 export async function cmdEvents({ println }, arg = '') {
-    const query = parseEventsArg(arg);
+    const { query, format } = parseEventsArg(arg);
     const projection = await readTerminalSseEventArchiveTail(query);
     const { state, entries, filters } = projection;
+
+    if (format === 'json') {
+        println(JSON.stringify({ state, filters, entries }, null, 2));
+        return;
+    }
+    if (format === 'raw') {
+        for (const entry of entries) println(JSON.stringify(entry));
+        return;
+    }
+
     const filterParts = [
         filters.event ? `event=${filters.event}` : null,
         filters.traceId ? `trace=${filters.traceId}` : null,

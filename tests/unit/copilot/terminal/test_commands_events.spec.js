@@ -123,6 +123,26 @@ describe('terminal/commands/events', () => {
         expect(ctx.output()).toContain('req=req-123');
     });
 
+    it('emite JSON estruturado para automacao', async () => {
+        const ctx = mockCtx();
+
+        await cmdEvents({ println: ctx.println }, '3 --json event=delta');
+
+        const parsed = JSON.parse(ctx.output());
+        expect(parsed.filters).toMatchObject({ limit: 5, event: 'delta' });
+        expect(parsed.entries[0]).toMatchObject({ eventId: 42, event: 'delta' });
+    });
+
+    it('emite JSONL raw para comparacao com artefatos SSE', async () => {
+        const ctx = mockCtx();
+
+        await cmdEvents({ println: ctx.println }, '3 --raw event=delta');
+
+        const lines = ctx.output().trim().split('\n');
+        expect(lines).toHaveLength(1);
+        expect(JSON.parse(lines[0])).toMatchObject({ eventId: 42, event: 'delta' });
+    });
+
     it('mostra vazio quando archive nao tem entradas', async () => {
         readTerminalSseEventArchiveTail.mockResolvedValueOnce({
             state: { path: null, events: 0, queueDepth: 0, error: null },

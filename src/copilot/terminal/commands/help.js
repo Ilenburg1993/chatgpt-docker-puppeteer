@@ -77,7 +77,7 @@ export function cmdHelp({ injectPort, println }) {
   \x1b[33m/elicitation [list|show|request]\x1b[0m      — formulários/URL estruturados do SDK
   \x1b[33m/permission [list|all|show|clear|mode|respond]\x1b[0m — permissões SDK observadas + governança + resposta manual
   \x1b[33m/errors [n]\x1b[0m                          — mostra últimos N erros rastreados (default: 10)
-  \x1b[33m/events [n] [event=delta] [trace=<id>] [tool=<id>] [request=<id>]\x1b[0m — tail do archive SSE público do terminal
+  \x1b[33m/events [n] [event=delta] [trace=<id>] [tool=<id>] [--json|--raw]\x1b[0m — tail do archive SSE público do terminal
   \x1b[33m/audit [n]\x1b[0m                           — últimas N entradas do audit log (default: 10)
   \x1b[33m/display [toggle] [on|off]\x1b[0m           — gerencia toggles de exibição (thinking, streaming, usage, tools, intent)
   \x1b[33m/display preset <default|minimal|verbose|debug|focus>\x1b[0m — aplica presets de UX
