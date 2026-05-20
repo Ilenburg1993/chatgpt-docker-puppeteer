@@ -10,7 +10,7 @@
 
 import { MAX_SSE_CONTENT_CHARS } from '#copilot/config';
 import { broadcastGlobal, broadcastToSession } from '#copilot/conversation-hub';
-import { eventFanout } from '../../infra/sse/index.js';
+import { attachSseReplayEventId, eventFanout } from '../../infra/sse/index.js';
 import { getSseClients, getSseCriticalClients, getTerminalReplayBuffer } from '../../infra/sse/state.js';
 import { CRITICAL_EVENTS } from '../../presentation/state/index.js';
 import { getHubSessionId } from '../../presentation/state/index.js';
@@ -59,10 +59,15 @@ export function broadcastSse(event, data) {
         };
     }
 
-    emitSse(_sseClients, _sseCriticalClients, event, safeData);
-    emitSocket(event, safeData);
+    const hubSessionId = getHubSessionId();
+    const safeEvent = String(event).replace(/[\r\n]/g, '_');
+    const enrichedData = { ...safeData, hubSessionId: hubSessionId ?? null };
+    const eventId = getTerminalReplayBuffer().push(safeEvent, enrichedData);
 
-    eventFanout.publish('terminal', event, safeData);
+    emitSse(_sseClients, _sseCriticalClients, safeEvent, enrichedData, eventId);
+    emitSocket(safeEvent, enrichedData);
+
+    eventFanout.publish('terminal', safeEvent, attachSseReplayEventId(enrichedData, eventId));
 }
 
 /**
@@ -73,14 +78,14 @@ export function broadcastSse(event, data) {
  * @param {object} data
  * @param {{
  *     hubSessionId?: string | null;
- *     replayBuffer?: import('../../infra/sse/replay-buffer.js').SseReplayBuffer;
+ *     eventId?: number;
  * }} [ctx]
  * @returns {boolean}
  */
 function writeSseEvent(client, event, data, ctx = {}) {
     const safeEvent = String(event).replace(/[\r\n]/g, '_');
     const enrichedData = { ...data, hubSessionId: ctx.hubSessionId ?? null };
-    const eventId = ctx.replayBuffer ? ctx.replayBuffer.push(safeEvent, enrichedData) : nextSseEventId();
+    const eventId = Number.isFinite(ctx.eventId) ? Number(ctx.eventId) : nextSseEventId();
     const payload = `id: ${eventId}\nevent: ${safeEvent}\ndata: ${JSON.stringify(enrichedData)}\n\n`;
     try {
         client.write(payload);
@@ -97,12 +102,13 @@ function writeSseEvent(client, event, data, ctx = {}) {
  * @param {Set<import('node:http').ServerResponse>} criticalClients
  * @param {string} event
  * @param {object} data
+ * @param {number} eventId
  * @returns {void}
  */
-function emitSse(clients, criticalClients, event, data) {
+function emitSse(clients, criticalClients, event, data, eventId) {
     if (clients.size === 0 && criticalClients.size === 0) return;
 
-    const ctx = { hubSessionId: getHubSessionId(), replayBuffer: getTerminalReplayBuffer() };
+    const ctx = { hubSessionId: getHubSessionId(), eventId };
 
     for (const client of clients) {
         if (!writeSseEvent(client, event, data, ctx)) {

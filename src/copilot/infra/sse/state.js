@@ -7,9 +7,9 @@
  * Onda 4.4 — L64.5: implementação própria de estado SSE. Elimina a inversão de camada server → terminal identificada na
  * PARTE-25C.
  *
- * - `_serverSseClients` / `_serverSseCriticalClients`: Sets de clientes do servidor
- * - `_serverReplayBuffer`: buffer de replay dedicado ao endpoint /events do servidor (o `createSseWriter` escreve nele
- *   automaticamente via replayBuffer.push())
+ * - `_serverSseClients` / `_serverSseCriticalClients`: Sets legados de clientes raw do terminal.
+ * - `_serverReplayBuffer`: buffer de replay compartilhado do stream global. O dono canônico da gravação é
+ *   `terminal/dialog/sse.broadcastSse()`, que atribui um ID uma única vez e o propaga via fanout para os pools Express.
  *
  * @module copilot/infra/sse/state
  */
@@ -22,7 +22,7 @@ const _serverSseClients = new Set();
 /** @type {Set<import('node:http').ServerResponse>} */
 const _serverSseCriticalClients = new Set();
 
-/** Buffer de replay SSE dedicado ao servidor — preenchido pelo createSseWriter. (lazy init) */
+/** Buffer de replay SSE global do terminal — preenchido uma vez por broadcast canônico. (lazy init) */
 /** @type {SseReplayBuffer | null} */
 let _serverReplayBuffer = null;
 
@@ -47,8 +47,9 @@ export function getSseCriticalClients() {
 /**
  * Retorna o buffer de replay SSE do servidor (lazy-initialized para evitar TDZ em ciclos de import).
  *
- * Nota: na camada server, este buffer é gerenciado pelo createSseWriter (infra/sse/utils.js), que chama
- * replayBuffer.push() automaticamente a cada evento enviado.
+ * Nota: eventos emitidos por `terminal/dialog/sse.broadcastSse()` já chegam ao fanout com ID de replay atribuído. O
+ * router Express reutiliza esse ID para entregar `/events` sem regravar o replay global. Outros publishers sem ID ainda
+ * podem ser gravados pelo `SseClientPool`, preservando compatibilidade.
  *
  * @returns {SseReplayBuffer}
  */

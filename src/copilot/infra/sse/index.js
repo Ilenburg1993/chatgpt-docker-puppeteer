@@ -9,6 +9,7 @@
  */
 
 export { EventFanout, eventFanout } from './fanout.js';
+export { attachSseReplayEventId, detachSseReplayEventId, SSE_REPLAY_EVENT_ID_FIELD } from './envelope.js';
 export { SseReplayBuffer } from './replay-buffer.js';
 export { getSseClients, getSseCriticalClients, getTerminalReplayBuffer } from './state.js';
 export { SseClientPool } from './stream-hub.js';

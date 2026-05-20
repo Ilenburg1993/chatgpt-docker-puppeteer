@@ -22,6 +22,7 @@ import { MAX_SSE_CLIENTS, MAX_SSE_CONTENT_CHARS, MAX_SSE_LIFETIME_MS } from '#co
 import { defaultMetrics } from '#copilot/observability';
 import { Router } from 'express';
 import { eventFanout } from '../../infra/sse/fanout.js';
+import { detachSseReplayEventId } from '../../infra/sse/envelope.js';
 import { SseReplayBuffer } from '../../infra/sse/replay-buffer.js';
 import { getTerminalReplayBuffer } from '../../infra/sse/state.js';
 import { SseClientPool } from '../../infra/sse/stream-hub.js';
@@ -91,9 +92,14 @@ function _onFanoutEvent(fEvt) {
         }
     }
 
-    _globalPool.broadcast(safeEvent, payload, { filterEvent: safeEvent });
+    const { payload: publicPayload, eventId } = detachSseReplayEventId(payload);
+
+    _globalPool.broadcast(safeEvent, publicPayload, {
+        filterEvent: safeEvent,
+        ...(eventId != null ? { eventId, skipReplay: true } : {}),
+    });
     if (isCritical) {
-        _criticalPool.broadcast(safeEvent, payload, { filterEvent: safeEvent });
+        _criticalPool.broadcast(safeEvent, publicPayload, { filterEvent: safeEvent });
     }
 }
 

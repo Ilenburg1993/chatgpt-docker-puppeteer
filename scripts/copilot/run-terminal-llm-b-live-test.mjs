@@ -9,6 +9,7 @@
 
 import { spawn, spawnSync } from 'node:child_process';
 import { mkdir, writeFile } from 'node:fs/promises';
+import http from 'node:http';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -55,7 +56,18 @@ function buildScenarioPrompt() {
     ].join(' ');
 }
 
-function buildReport({ criteria, durationMs, exitCode, outputPath, plainOutputPath, startedAt, transport }) {
+function buildReport({
+    criteria,
+    durationMs,
+    exitCode,
+    outputPath,
+    plainOutputPath,
+    sseRawPath,
+    sseJsonlPath,
+    sseSummary,
+    startedAt,
+    transport,
+}) {
     const ok = criteria.every((criterion) => criterion.pass);
     const lines = [
         '# Terminal LLM-B Live Test',
@@ -70,6 +82,15 @@ function buildReport({ criteria, durationMs, exitCode, outputPath, plainOutputPa
         '',
         `- Raw output: ${outputPath}`,
         `- Plain output: ${plainOutputPath}`,
+        `- SSE raw output: ${sseRawPath}`,
+        `- SSE JSONL: ${sseJsonlPath}`,
+        '',
+        '## SSE',
+        '',
+        `- Connected: ${sseSummary.connected ? 'yes' : 'no'}`,
+        `- Events: ${sseSummary.eventCount}`,
+        `- Events with id: ${sseSummary.eventsWithId}`,
+        `- Errors: ${sseSummary.errors.length}`,
         '',
         '## Criteria',
         '',
@@ -79,7 +100,50 @@ function buildReport({ criteria, durationMs, exitCode, outputPath, plainOutputPa
     return `${lines.join('\n')}\n`;
 }
 
-function evaluateOutput(plain) {
+function evaluateSseCriteria(sseSummary, { expectPublicEvents }) {
+    if (sseSummary.disabled) {
+        return [
+            {
+                id: 'sse-disabled',
+                pass: true,
+                detail: 'SSE collector disabled by --no-sse',
+            },
+        ];
+    }
+    const publicEvents = sseSummary.events.filter((evt) => !['connected', 'heartbeat'].includes(evt.event));
+    const ids = publicEvents.map((evt) => evt.id).filter((id) => Number.isFinite(id));
+    const monotonic = ids.every((id, index) => index === 0 || id > ids[index - 1]);
+    const names = new Set(publicEvents.map((evt) => evt.event));
+    return [
+        {
+            id: 'sse-connected',
+            pass: sseSummary.connected && sseSummary.errors.length === 0,
+            detail: `SSE collector connected with ${sseSummary.errors.length} error(s)`,
+        },
+        {
+            id: 'sse-no-internal-envelope',
+            pass: !sseSummary.raw.includes('__terminalSseEventId'),
+            detail: 'internal replay envelope metadata was not exposed to SSE clients',
+        },
+        {
+            id: 'sse-event-ids-monotonic',
+            pass: publicEvents.length === 0 || (ids.length > 0 && monotonic),
+            detail: `observed ${ids.length}/${publicEvents.length} public SSE events with monotonic ids`,
+        },
+        {
+            id: 'sse-public-events',
+            pass:
+                !expectPublicEvents ||
+                names.has('delta') ||
+                names.has('assistant.message') ||
+                names.has('tool.lifecycle') ||
+                names.has('user_input.requested'),
+            detail: `observed public SSE events: ${[...names].slice(0, 8).join(', ') || 'none'}`,
+        },
+    ];
+}
+
+function evaluateOutput(plain, sseSummary) {
     const markerCount = (plain.match(/DELTA-CANONICAL-\d/g) ?? []).length;
     const duplicatePathologies = [
         /__anonymous__/,
@@ -148,10 +212,11 @@ function evaluateOutput(plain) {
             pass: /readline fechado/.test(plain),
             detail: 'terminal exited through /quit',
         },
+        ...evaluateSseCriteria(sseSummary, { expectPublicEvents: true }),
     ];
 }
 
-function evaluateNoPrOutput(plain) {
+function evaluateNoPrOutput(plain, sseSummary) {
     return [
         {
             id: 'ready',
@@ -198,7 +263,95 @@ function evaluateNoPrOutput(plain) {
             pass: /readline fechado/.test(plain),
             detail: 'terminal exited through /quit',
         },
+        ...evaluateSseCriteria(sseSummary, { expectPublicEvents: false }),
     ];
+}
+
+function parseSseFrame(frame) {
+    const lines = frame.split(/\r?\n/u);
+    let event = 'message';
+    let id = null;
+    const dataLines = [];
+    for (const line of lines) {
+        if (line.startsWith('event:')) {
+            event = line.slice('event:'.length).trim();
+        } else if (line.startsWith('id:')) {
+            const parsed = Number(line.slice('id:'.length).trim());
+            id = Number.isFinite(parsed) ? parsed : null;
+        } else if (line.startsWith('data:')) {
+            dataLines.push(line.slice('data:'.length).trimStart());
+        }
+    }
+    const dataRaw = dataLines.join('\n');
+    let data = dataRaw;
+    if (dataRaw) {
+        try {
+            data = JSON.parse(dataRaw);
+        } catch {
+            data = dataRaw;
+        }
+    }
+    return { id, event, data };
+}
+
+function startSseCollector({ port = 3009, pathname = '/events' } = {}) {
+    let raw = '';
+    let buffer = '';
+    let connected = false;
+    let statusCode = null;
+    const errors = [];
+    const events = [];
+
+    const req = http.request(
+        {
+            host: '127.0.0.1',
+            port,
+            path: pathname,
+            method: 'GET',
+            headers: { Accept: 'text/event-stream' },
+        },
+        (res) => {
+            statusCode = res.statusCode ?? null;
+            connected = statusCode === 200;
+            res.setEncoding('utf8');
+            res.on('data', (chunk) => {
+                raw += chunk;
+                buffer += chunk;
+                const frames = buffer.split(/\r?\n\r?\n/u);
+                buffer = frames.pop() ?? '';
+                for (const frame of frames) {
+                    if (!frame.trim()) continue;
+                    events.push(parseSseFrame(frame));
+                }
+            });
+        },
+    );
+    req.on('error', (err) => {
+        errors.push(err instanceof Error ? err.message : String(err));
+    });
+    req.end();
+
+    return {
+        get raw() {
+            return raw;
+        },
+        events,
+        errors,
+        close() {
+            req.destroy();
+        },
+        summary() {
+            return {
+                connected,
+                statusCode,
+                eventCount: events.length,
+                eventsWithId: events.filter((evt) => Number.isFinite(evt.id)).length,
+                errors: [...errors],
+                events: [...events],
+                raw,
+            };
+        },
+    };
 }
 
 async function main() {
@@ -208,11 +361,15 @@ async function main() {
     const requestedTransport = readArg('--transport', 'pty');
     const dryRun = hasFlag('--dry-run');
     const noPr = hasFlag('--no-pr');
+    const collectSse = !hasFlag('--no-sse');
+    const ssePort = Number(readArg('--sse-port', '3009'));
     const startedAt = new Date().toISOString();
 
     await mkdir(outDir, { recursive: true });
     const rawPath = path.join(outDir, 'terminal.raw.log');
     const plainPath = path.join(outDir, 'terminal.plain.log');
+    const sseRawPath = path.join(outDir, 'terminal.sse.log');
+    const sseJsonlPath = path.join(outDir, 'terminal.sse.jsonl');
     const jsonPath = path.join(outDir, 'summary.json');
     const mdPath = path.join(outDir, 'summary.md');
 
@@ -236,6 +393,7 @@ async function main() {
     let answerSent = false;
     let postCommandsSent = false;
     let exitCode = null;
+    let sseCollector = null;
     const command = canUsePty
         ? {
               cmd: 'script',
@@ -274,6 +432,9 @@ async function main() {
         }
         if (!readySent && /LLM-B pronta/.test(plain)) {
             readySent = true;
+            if (collectSse) {
+                sseCollector = startSseCollector({ port: Number.isFinite(ssePort) ? ssePort : 3009 });
+            }
             write('/usage now');
             write('/activity 12');
             if (noPr) {
@@ -308,15 +469,36 @@ async function main() {
         child.on('close', (code) => resolve(code));
     });
     clearTimeout(timeout);
+    sseCollector?.close();
 
     const plain = stripAnsi(raw);
-    const criteria = noPr ? evaluateNoPrOutput(plain) : evaluateOutput(plain);
+    const sseSummary = sseCollector?.summary() ?? {
+        connected: false,
+        statusCode: null,
+        eventCount: 0,
+        eventsWithId: 0,
+        errors: collectSse ? ['collector-not-started'] : [],
+        events: [],
+        raw: '',
+        disabled: !collectSse,
+    };
+    const criteria = noPr ? evaluateNoPrOutput(plain, sseSummary) : evaluateOutput(plain, sseSummary);
     const durationMs = Date.now() - Date.parse(startedAt);
     await writeFile(rawPath, raw, 'utf8');
     await writeFile(plainPath, plain, 'utf8');
+    await writeFile(sseRawPath, sseSummary.raw, 'utf8');
+    await writeFile(
+        sseJsonlPath,
+        `${sseSummary.events.map((evt) => JSON.stringify(evt)).join('\n')}${sseSummary.events.length ? '\n' : ''}`,
+        'utf8',
+    );
     await writeFile(
         jsonPath,
-        `${JSON.stringify({ ok: criteria.every((c) => c.pass), startedAt, durationMs, exitCode, criteria }, null, 2)}\n`,
+        `${JSON.stringify(
+            { ok: criteria.every((c) => c.pass), startedAt, durationMs, exitCode, criteria, sse: sseSummary },
+            null,
+            2,
+        )}\n`,
         'utf8',
     );
     await writeFile(
@@ -327,6 +509,9 @@ async function main() {
             exitCode,
             outputPath: path.relative(ROOT, rawPath),
             plainOutputPath: path.relative(ROOT, plainPath),
+            sseRawPath: path.relative(ROOT, sseRawPath),
+            sseJsonlPath: path.relative(ROOT, sseJsonlPath),
+            sseSummary,
             startedAt,
             transport,
         }),

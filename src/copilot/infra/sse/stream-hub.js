@@ -24,6 +24,7 @@ import { SseReplayBuffer } from './replay-buffer.js';
  *     replayEvent?: string;
  *     filterEvent?: string;
  *     skipReplay?: boolean;
+ *     eventId?: number;
  * }} BroadcastOptions
  */
 
@@ -157,10 +158,12 @@ export class SseClientPool {
     broadcast(event, payload, opts = {}) {
         const replayEvent = opts.replayEvent ?? event;
         const filterEvent = opts.filterEvent ?? replayEvent;
-        const eventId = opts.skipReplay ? undefined : this.#replayBuffer.push(replayEvent, payload);
+        const explicitEventId = Number.isFinite(opts.eventId) ? Number(opts.eventId) : undefined;
+        const eventId = explicitEventId ?? (opts.skipReplay ? undefined : this.#replayBuffer.push(replayEvent, payload));
 
         this.#count('broadcast');
         if (opts.skipReplay) this.#count('broadcast_skip_replay');
+        if (explicitEventId != null) this.#count('broadcast_external_event_id');
 
         let delivered = 0;
         let filteredOut = 0;
