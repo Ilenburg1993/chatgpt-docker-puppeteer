@@ -464,7 +464,9 @@ function evaluateNoPrOutput(plain, sseSummary) {
         },
         {
             id: 'usage-visible',
-            pass: /Premium Request:|Última Premium Request classificada:/.test(plain) && /Modo: sdk=/.test(plain),
+            pass:
+                /Premium Request:|Última (?:Premium Request|telemetria PR) classificada:/.test(plain) &&
+                /Modo: sdk=/.test(plain),
             detail: '/usage now rendered context, PR and SDK mode telemetry',
         },
         {

@@ -40,6 +40,35 @@ import {
 } from './task-transcript-accumulator.js';
 
 /**
+ * @param {unknown} value
+ * @returns {string}
+ */
+function stringifyTaskError(value) {
+    if (typeof value === 'string') return value;
+    if (value instanceof Error) return value.message;
+    if (value && typeof value === 'object') {
+        const rec = /** @type {Record<string, unknown>} */ (value);
+        if (typeof rec['message'] === 'string') return rec['message'];
+        if (typeof rec['errorMessage'] === 'string') return rec['errorMessage'];
+        try {
+            return JSON.stringify(value);
+        } catch {
+            return String(value);
+        }
+    }
+    return value == null ? '' : String(value);
+}
+
+/**
+ * @param {unknown} value
+ * @returns {boolean}
+ */
+function isSdkRateLimitError(value) {
+    const text = stringifyTaskError(value);
+    return /rate[_ -]?limit|hit your rate limit|limit to reset/i.test(text);
+}
+
+/**
  * @typedef {{
  *     on: (event: string, handler: (...args: any[]) => void) => void;
  *     off: (event: string, handler: (...args: any[]) => void) => void;
@@ -257,15 +286,18 @@ export function setupTerminalTaskStreamListeners({ agent }) {
         }
         const requeueBlocked = evt['requeueBlocked'] === true;
         const origin = typeof evt['origin'] === 'string' ? evt['origin'] : null;
-        const error = typeof evt['error'] === 'string' ? evt['error'] : null;
+        const error = stringifyTaskError(evt['error']);
+        const hasCanonicalSessionError = isSdkRateLimitError(evt['error']);
         const detail = requeueBlocked
             ? `${origin ?? 'task'} · reenvio automático bloqueado após reconexão`
             : `${stats.chunks} chunks · ${stats.chars} chars`;
-        recordTerminalActivity('error', 'Tarefa interna falhou', {
-            detail,
-            source: 'agent',
-            severity: 'error',
-        });
+        if (!hasCanonicalSessionError) {
+            recordTerminalActivity('error', 'Tarefa interna falhou', {
+                detail,
+                source: 'agent',
+                severity: 'error',
+            });
+        }
         if (requeueBlocked) {
             println(
                 `  \x1b[33m↳ prompt preservado sem reenvio automático\x1b[0m \x1b[90m(${origin ?? 'origem n/d'}${error ? ` · ${error}` : ''})\x1b[0m`,

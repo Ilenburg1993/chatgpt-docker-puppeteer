@@ -335,6 +335,47 @@ describe('agent-event-observer — lifecycle e erros', () => {
         observer.detach();
     });
 
+    it('agent.error recuperável de model_call não polui ErrorTracker', () => {
+        const { metrics, calls } = makeMetricsMock();
+        const { errorTracker, errors } = makeErrorTrackerMock();
+        const observer = createAgentEventObserver({ metrics, errorTracker });
+        const agent = new EventEmitter();
+        observer.attach(agent);
+
+        agent.emit('error', {
+            hookType: 'errorOccurred',
+            errorContext: 'model_call',
+            recoverable: true,
+            errorMessage: 'Erro do SDK sem mensagem estruturada.',
+        });
+
+        assert.strictEqual(errors.length, 0, 'retry recuperável de modelo não deve aparecer em /errors');
+        const counters = (calls.get('recordCounter') ?? []).map((c) => c[0]);
+        assert.ok(counters.includes('agent.emitter.error'));
+
+        observer.detach();
+    });
+
+    it('task.error de rate_limit é contabilizado mas não duplica session.error no ErrorTracker', () => {
+        const { metrics, calls } = makeMetricsMock();
+        const { errorTracker, errors } = makeErrorTrackerMock();
+        const observer = createAgentEventObserver({ metrics, errorTracker });
+        const agent = new EventEmitter();
+        observer.attach(agent);
+
+        agent.emit('task.error', {
+            taskId: 'rate-limit-task',
+            durationMs: 1,
+            error: new Error("You've hit your rate limit. Please wait for your limit to reset."),
+        });
+
+        assert.strictEqual(errors.length, 0, 'rate_limit canônico pertence a session.error');
+        const counters = (calls.get('recordCounter') ?? []).map((c) => c[0]);
+        assert.ok(counters.includes('tasks.errors'));
+
+        observer.detach();
+    });
+
     it('dialog.turn_timeout propaga para ErrorTracker', () => {
         const { metrics } = makeMetricsMock();
         const { errorTracker, errors } = makeErrorTrackerMock();

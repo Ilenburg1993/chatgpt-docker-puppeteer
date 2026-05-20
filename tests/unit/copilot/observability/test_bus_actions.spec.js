@@ -148,6 +148,23 @@ describe('bus-actions (FAIXA-L15)', () => {
             assert.equal(tracked.length, 0);
             ea.unsub();
         });
+
+        it('não cria erro sintético event-bus para agent:task:error', () => {
+            /** @type {any[]} */
+            const tracked = [];
+            const ea = createErrorAlerterAction({
+                bus,
+                onAlert: () => {},
+                errorTracker: /** @type {any} */ ({
+                    trackError: (err, opts) => tracked.push({ err, opts }),
+                }),
+            });
+
+            bus.emit({ type: 'agent:task:error', timestamp: Date.now(), error: new Error('falha causal') });
+
+            assert.equal(tracked.length, 0);
+            ea.unsub();
+        });
     });
 
     describe('hasAction contract', () => {

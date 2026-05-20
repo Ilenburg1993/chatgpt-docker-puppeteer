@@ -163,7 +163,7 @@ export function cmdMetrics({ println }, arg = '') {
   bridge/live ${bridgeTurnCount} \x1b[90m(${timelineSource} · ${timelineAuthority} · ${timelineReconciliationStatus})\x1b[0m
   sync Hub    ${timelineSyncStatus} \x1b[90m(pendentes=${timelineSyncPendingCount} · agendados=${timelineSyncTelemetry.scheduledTotal} · gravados=${timelineSyncTelemetry.turnsSyncedTotal} · falhas=${timelineSyncTelemetry.failedTotal} · retries=${timelineSyncTelemetry.retryTotal} · cache=${timelineSyncTelemetry.completedCacheSize}/${timelineSyncTelemetry.failureCacheSize})\x1b[0m
   contexto    ${ctxStr}
-  último PR   ${lastModel} · ${costStr} · ${billingStatus}
+  telemetria PR ${lastModel} · ${costStr} · ${billingStatus} \x1b[90m(histórica)\x1b[0m
   prompt      ${promptLabel} \x1b[90m(digest=${promptDigest ?? '-'} · ação=${promptAction})\x1b[0m
 
   \x1b[35m🔧 Ferramentas\x1b[0m

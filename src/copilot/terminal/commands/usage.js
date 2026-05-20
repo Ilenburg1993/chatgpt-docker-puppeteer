@@ -55,7 +55,7 @@ export function cmdUsage({ println }, arg) {
                 ? `cfg=\x1b[35m${modelBilling.configuredModel ?? '-'}\x1b[0m · cobrado=\x1b[36m${modelBilling.billedModel ?? '-'}\x1b[0m`
                 : `modelo=\x1b[36m${modelBilling.displayModel}\x1b[0m`;
             println(
-                `      Última Premium Request registrada: ${modelLabel} · custo=\x1b[33m${cost}\x1b[0m \x1b[90m(histórica; não implica consumo neste boot/probe)\x1b[0m`,
+                `      Última telemetria PR classificada: ${modelLabel} · custo=\x1b[33m${cost}\x1b[0m \x1b[90m(histórica; não implica consumo neste boot/probe)\x1b[0m`,
             );
         } else {
             println('      Premium Request: \x1b[90msem snapshot histórico classificado\x1b[0m');

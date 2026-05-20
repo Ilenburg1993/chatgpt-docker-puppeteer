@@ -88,6 +88,10 @@ export function toError(value) {
         const message =
             typeof objectValue['message'] === 'string' && objectValue['message'].trim().length > 0
                 ? objectValue['message']
+                : typeof objectValue['errorMessage'] === 'string' && objectValue['errorMessage'].trim().length > 0
+                  ? objectValue['errorMessage']
+                  : typeof objectValue['detail'] === 'string' && objectValue['detail'].trim().length > 0
+                    ? objectValue['detail']
                 : serialized && serialized !== '{}'
                   ? serialized
                   : 'Erro recebido como objeto sem mensagem estruturada.';

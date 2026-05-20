@@ -26,6 +26,18 @@ function isRecoverableModelCallHookError(evt) {
 }
 
 /**
+ * Alguns eventos de erro do bus são envelopes de alerta para uma falha causal já rastreada por outro dono
+ * canônico (`sdk:session.error`, `agent:task:error`, tool lifecycle etc.). O alerter pode narrar/logar esses
+ * eventos, mas não deve criar uma segunda entrada sintética em `/errors`.
+ *
+ * @param {{ type: string }} evt
+ * @returns {boolean}
+ */
+function shouldTrackSyntheticBusError(evt) {
+    return evt.type !== 'agent:task:error';
+}
+
+/**
  * @param {{ type: string; errorContext?: unknown; sessionId?: unknown; errorMessage?: unknown; message?: unknown }} evt
  * @returns {string}
  */
@@ -81,7 +93,7 @@ export function createErrorAlerterAction({ bus, onAlert, errorTracker = null }) 
             bus.on(pattern, (evt) => {
                 try {
                     alertFn(evt);
-                    if (!isRecoverableModelCallHookError(evt)) {
+                    if (!isRecoverableModelCallHookError(evt) && shouldTrackSyntheticBusError(evt)) {
                         errorTracker?.trackError?.(new Error(`EventBus error event: ${evt.type}`), {
                             source: 'event-bus',
                             metadata: /** @type {Record<string, unknown>} */ (evt),

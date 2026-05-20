@@ -338,7 +338,8 @@ Evidência:
 
 Correção implementada:
 
-- A mensagem passou a ser `Última Premium Request registrada` e inclui nota explícita: `histórica; não implica consumo neste boot/probe`.
+- A mensagem passou a ser `Última telemetria PR classificada` e inclui nota explícita: `histórica; não implica consumo neste boot/probe`.
+- `/metrics` passou a usar `telemetria PR ... (histórica)` em vez de `último PR`, evitando sugerir consumo atual durante boot/probe.
 - Quando não há snapshot, o texto agora fala em `sem snapshot histórico classificado`.
 - A telemetria `llm.usage` com `premiumRequest=true` passou a dizer `Premium Request nesta telemetria`, separando evento atual de registro histórico.
 
@@ -363,6 +364,29 @@ Correção implementada:
 Critério ideal:
 
 - O lifecycle pode ser idempotente internamente, mas o terminal deve expor apenas transições de estado úteis ao operador.
+
+### A23. Rate limit e retries recuperáveis ainda geravam ruído em `/errors`
+
+Evidência desta rodada:
+
+- Live completo: `artifacts/terminal-live/codex-continue-2026-05-20-full/summary.md`.
+- Resultado: `BLOCKED` por `sdk-rate-limit`, com terminal pronto e SSE conectado, antes de qualquer delta/tool/`ask_user`.
+- Durante o bloqueio, `/errors` listava várias entradas equivalentes: `agent:emitter:error` para retries recuperáveis de `model_call`, `sdk:session.error` para rate limit, `event-bus` para `agent:task:error`, `agent:task:error` com o mesmo rate limit e `swallowed:agent.backpressure.mutex`.
+- Isso mascarava a causa raiz: um bloqueio externo do SDK, não cinco falhas independentes do terminal.
+
+Correção implementada nesta rodada:
+
+- `agent.error` recuperável de `model_call` continua auditável no stream público, mas não entra mais em `/errors` como erro operacional vermelho.
+- `error-alerter` deixou de criar entrada sintética `event-bus` para `agent:task:error`, pois o erro causal pertence ao handler da task ou a `session.error`.
+- `task.error` de rate limit deixou de duplicar `session.error` no `ErrorTracker`; a métrica da task continua sendo contabilizada.
+- `task-stream-events` deixou de narrar `Tarefa interna falhou · 0 chunks` quando o evento causal já é um rate limit canônico de sessão.
+- `toError()` passou a preservar `errorMessage` e `detail` de objetos SDK antes de cair em JSON bruto.
+
+Validação:
+
+- Sonda sem PR pós-correção: `artifacts/terminal-live/codex-continue-2026-05-20-no-pr-rerun/summary.md`.
+- Resultado: `PASS`, sem turno explícito, sem tools, sem erros, com `/usage now`, `/activity`, `/metrics`, `/events`, `/events --raw` e `/errors`.
+- O cenário funcional completo segue bloqueado por rate limit externo até reset do SDK; isso não valida delta/tool/ask_user nesta rodada.
 
 ## Hipóteses Externas Rejeitadas Ou Reclassificadas
 
@@ -466,8 +490,8 @@ Fase B2. Modelo
 Fase B3. Usage versus Premium Request
 
 - B3.1 Renomear mensagens ambíguas de "uso contabilizado". Status: feito para UX principal do terminal.
-- B3.2 Criar classificador `sdkUsage`, `tokenUsage`, `billingUsage`, `premiumRequest`. Status: pendente.
-- B3.3 Mostrar "PR desconhecida" quando não houver prova. Status: pendente.
+- B3.2 Criar classificador `sdkUsage`, `tokenUsage`, `billingUsage`, `premiumRequest`. Status: iniciado com separação entre snapshot histórico, telemetria LLM e PR atual.
+- B3.3 Mostrar "PR desconhecida" quando não houver prova. Status: parcialmente feito; snapshots históricos agora são rotulados como históricos.
 - B3.4 Provar que `ask_user` não é PR no relatório live. Status: pendente.
 
 ### Faixa C. Streaming, Transcript E Arquivo Durável
@@ -577,6 +601,7 @@ Fase G1. Cenário canônico sem PR
 - G1.2 Validar `/events --raw`. Status: feito.
 - G1.3 Validar prompt longo sem sobreposição. Status: pendente.
 - G1.4 Validar ausência de PR para `ask_user`. Status: pendente.
+- G1.5 Validar `/usage now`, `/metrics`, `/activity`, `/events`, `/errors` sem turno explícito e sem erro. Status: feito em `artifacts/terminal-live/codex-continue-2026-05-20-no-pr-rerun/summary.md`.
 
 Fase G2. Cenário canônico com LLM-B
 
@@ -590,6 +615,7 @@ Fase G2. Cenário canônico com LLM-B
 - G2.8 Falhar se `task.delta` reaparecer enquanto `dialog.delta` já é fonte canônica. Status: feito no live runner e na origem `agent-messaging`.
 - G2.9 Falhar se `report_intent` triplicar a timeline por rotas equivalentes. Status: coberto por teste unitário; pendente critério live explícito.
 - G2.10 Distinguir falha externa de CAPI de regressão de UX/transcript. Status: iniciado no live runner.
+- G2.11 Reexecutar cenário completo após reset do rate limit e anexar evidência delta/tool/ask_user/post-ask. Status: bloqueado por SDK em `artifacts/terminal-live/codex-continue-2026-05-20-full/summary.md`.
 
 Fase G3. Fake SDK determinístico
 
@@ -692,8 +718,12 @@ Implementado:
 - O live runner canônico agora evita colisão de porta antes do boot e coleta SSE na porta efetiva escolhida.
 - `task.delta` público fora de turno agora fecha materialização canônica; `assistant.message` posterior suprime duplicata exata ou renderiza apenas o sufixo faltante.
 - O live runner agora classifica rate limit do SDK como blocker de causa raiz, evitando falso diagnóstico em cascata.
-- `/usage now` agora diferencia snapshot histórico de consumo atual do boot/probe.
+- `/usage now` e `/metrics` agora diferenciam snapshot histórico de PR de consumo atual do boot/probe.
 - `dialog.loop.changed` equivalente agora é deduplicado na borda terminal/SSE.
+- `agent.error` recuperável de `model_call` não polui mais `/errors`; ele permanece auditável como evento público/atividade de retry.
+- `agent:task:error` deixou de gerar entrada sintética duplicada `event-bus` no `ErrorTracker`.
+- `task.error` de rate limit deixou de duplicar `session.error` em `/errors` e deixou de aparecer como "Tarefa interna falhou · 0 chunks" na timeline terminal.
+- `toError()` agora preserva `errorMessage` e `detail` de objetos SDK antes de serializar payload bruto.
 - Testes unitários adicionados para runtime root, reflection sync failure e SIGHUP policy.
 - Testes unitários adicionados para reconciliação de `assistant.message` materializado, supressão visual de `question.pending` e preferência `dialog.delta`.
 - Testes unitários adicionados para normalização de objetos de erro sem `message`.
@@ -704,11 +734,14 @@ Implementado:
 - Testes unitários adicionados para decisão `suppress/render_suffix/render_full` entre delta público e `assistant.message`.
 - Live `--no-pr` passou em `artifacts/terminal-live/2026-05-20T18-55-53-045Z/summary.md`.
 - Live completo `artifacts/terminal-live/2026-05-20T19-05-51-881Z/summary.md` ficou bloqueado por rate limit antes de delta/tool/ask_user; não valida o cenário funcional.
+- Live completo desta rodada ficou `BLOCKED` por rate limit em `artifacts/terminal-live/codex-continue-2026-05-20-full/summary.md`.
+- Live `--no-pr` desta rodada passou em `artifacts/terminal-live/codex-continue-2026-05-20-no-pr-rerun/summary.md`.
+- Testes unitários adicionados para recoverable `model_call` não poluir `/errors`, para `task.error` de rate limit não duplicar `session.error`, e para `agent:task:error` não criar erro sintético `event-bus`.
 
 Próxima rodada recomendada:
 
-1. Fechar a recuperação `session.error`/`reconnect_restart`, distinguindo retry real de reenvio ambíguo de prompt.
-2. Normalizar wording de usage/session error em todos os comandos derivados (`/errors`, `/activity`, `/events`) para remover qualquer ambiguidade residual com Premium Request.
+1. Reexecutar o cenário completo com LLM-B após reset do rate limit e exigir delta parcial, tool, `ask_user`, resposta humana e pós-ask no mesmo artefato.
+2. Fechar a recuperação `session.error`/`reconnect_restart`, distinguindo retry real de reenvio ambíguo de prompt.
 3. Criar contrato único de modelo configurado/preferido/efetivo/cobrado.
 4. Continuar a normalização de tool identity em completions/progress externos sem requestId, com métricas para qualquer lifecycle ainda genérico.
 5. Adicionar eventos de boot `runtime.wired` e falha de fase.

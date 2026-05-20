@@ -16,6 +16,33 @@ import { startSpanImmediate } from '../otel.js';
 /** @typedef {import('./context.js').ObserverContext} ObserverContext */
 
 /**
+ * @param {unknown} value
+ * @returns {boolean}
+ */
+function isSdkRateLimitError(value) {
+    let text;
+    if (value instanceof Error) {
+        text = value.message;
+    } else if (typeof value === 'string') {
+        text = value;
+    } else if (value && typeof value === 'object') {
+        const rec = /** @type {Record<string, unknown>} */ (value);
+        if (typeof rec['message'] === 'string') {
+            text = rec['message'];
+        } else {
+            try {
+                text = JSON.stringify(rec);
+            } catch {
+                text = String(value);
+            }
+        }
+    } else {
+        text = String(value ?? '');
+    }
+    return /rate[_ -]?limit|hit your rate limit|limit to reset/i.test(text);
+}
+
+/**
  * Registra handlers de dialog/task/tool no EventEmitter do agente.
  *
  * @param {ObserverContext} ctx
@@ -273,7 +300,7 @@ export function attachDialogTaskHandlers(ctx) {
                     entry.span.end();
                 }
             }
-            if (errorTracker) {
+            if (errorTracker && !isSdkRateLimitError(evt?.error)) {
                 const err = toError(evt?.error);
                 errorTracker.trackError(err, { source: AGENT_TASK_ERROR, metadata: { taskId } });
             }
