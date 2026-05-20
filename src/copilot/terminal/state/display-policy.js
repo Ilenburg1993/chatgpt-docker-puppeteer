@@ -69,7 +69,7 @@ export const TERMINAL_DISPLAY_TOGGLE_KEYS = Object.freeze([
 const TOGGLE_DESCRIPTORS = Object.freeze({
     thinking: { key: 'thinking', label: 'Thinking (raciocínio)', command: '/display thinking [on|off]' },
     streaming: { key: 'streaming', label: 'Streaming (resposta incremental)', command: '/display streaming [on|off]' },
-    usage: { key: 'usage', label: 'Usage (tokens pós-turno)', command: '/display usage [on|off]' },
+    usage: { key: 'usage', label: 'Telemetria LLM (tokens/custo)', command: '/display usage [on|off]' },
     tools: { key: 'tools', label: 'Tool activity (início/fim/progresso)', command: '/display tools [on|off]' },
     intent: { key: 'intent', label: 'Intent (o que a LLM-B está tentando fazer)', command: '/display intent [on|off]' },
     session: {
@@ -84,7 +84,7 @@ export const TERMINAL_DISPLAY_PRESETS = Object.freeze({
     default: {
         name: 'default',
         label: 'Default',
-        description: 'Equilíbrio operacional: resposta incremental, usage, tools e intent.',
+        description: 'Equilíbrio operacional: resposta incremental, telemetria LLM, tools e intent.',
         state: Object.freeze({
             thinking: false,
             streaming: true,
@@ -149,7 +149,7 @@ export const TERMINAL_DISPLAY_PRESETS = Object.freeze({
     focus: {
         name: 'focus',
         label: 'Focus',
-        description: 'Oculta streaming/intent, mantendo usage e lifecycle de tools.',
+        description: 'Oculta streaming/intent, mantendo telemetria LLM e lifecycle de tools.',
         state: Object.freeze({
             thinking: false,
             streaming: false,

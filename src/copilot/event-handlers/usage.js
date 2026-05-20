@@ -64,7 +64,7 @@ export function wireUsageEvent(session, { emit, onPrInfo }) {
             }
             log(
                 modelMismatch ? 'WARN' : 'DEBUG',
-                `[AlwaysAlive] LLM usage sem novo PR: classification=${classification.classification} reason=${classification.premiumRequestReason} billedModel=${billedModel ?? '?'} configuredModel=${configuredModel ?? '?'} effectiveModel=${effectiveModel ?? '?'} cost=${cost ?? '?'}${modelMismatch ? ' [MODEL_MISMATCH]' : ''}`,
+                `[AlwaysAlive] Telemetria LLM sem Premium Request: classification=${classification.classification} reason=${classification.premiumRequestReason} billedModel=${billedModel ?? '?'} configuredModel=${configuredModel ?? '?'} effectiveModel=${effectiveModel ?? '?'} cost=${cost ?? '?'}${modelMismatch ? ' [MODEL_MISMATCH]' : ''}`,
             );
         }),
     ];

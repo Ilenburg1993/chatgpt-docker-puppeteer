@@ -67,7 +67,7 @@ export function cmdHelp({ injectPort, println }) {
   \x1b[33m/thinking list [n]\x1b[0m                  — lista thinkings capturados (colapsados)
   \x1b[33m/thinking show <id>|latest\x1b[0m          — abre thinking completo capturado
   \x1b[33m/intent [n|clear]\x1b[0m                    — consulta intents persistidos de report_intent/assistant.intent
-  \x1b[33m/usage [on|off|now]\x1b[0m                  — toggle usage pós-turno ou snapshot instantâneo
+  \x1b[33m/usage [on|off|now]\x1b[0m                  — telemetria de tokens/custo; PR só quando classificada
   \x1b[33m/tools [diag|all|raw]\x1b[0m                — stats de tools (canônico, diagnóstico e raw)
   \x1b[33m/sdk [status|models|tools|quota|prompt|capabilities|waits|compact]\x1b[0m — catálogo/quota/capabilities/ops SDK via Agent
   \x1b[33m/workspace [list|read|write|sync|mirror|promote]\x1b[0m — workspace SDK + convergência SDK↔FS auditável
@@ -79,7 +79,7 @@ export function cmdHelp({ injectPort, println }) {
   \x1b[33m/errors [n]\x1b[0m                          — mostra últimos N erros rastreados (default: 10)
   \x1b[33m/events [n] [event=delta] [trace=<id>] [tool=<id>] [--json|--raw]\x1b[0m — tail do archive SSE público do terminal
   \x1b[33m/audit [n]\x1b[0m                           — últimas N entradas do audit log (default: 10)
-  \x1b[33m/display [toggle] [on|off]\x1b[0m           — gerencia toggles de exibição (thinking, streaming, usage, tools, intent)
+  \x1b[33m/display [toggle] [on|off]\x1b[0m           — gerencia toggles de exibição (thinking, streaming, telemetria, tools, intent)
   \x1b[33m/display preset <default|minimal|verbose|debug|focus>\x1b[0m — aplica presets de UX
   \x1b[33m/display theme <elegant|vivid|mono>\x1b[0m — ajusta paleta visual (sóbria, contraste alto, sem cor)
   \x1b[33m/display detail <compact|detailed>\x1b[0m — define densidade textual da UX live

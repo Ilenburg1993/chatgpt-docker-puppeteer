@@ -133,7 +133,7 @@ describe('event-handlers/usage wireUsageEvent', () => {
             }),
         );
         expect(emit).not.toHaveBeenCalledWith('pr.consumed', expect.any(Object));
-        expect(mocks.log).toHaveBeenCalledWith('DEBUG', expect.stringContaining('LLM usage sem novo PR'));
+        expect(mocks.log).toHaveBeenCalledWith('DEBUG', expect.stringContaining('Telemetria LLM sem Premium Request'));
     });
 
     it('classifica usage emitido antes de user_input.completed como continuação de ask_user sem duplicar completed tardio', async () => {

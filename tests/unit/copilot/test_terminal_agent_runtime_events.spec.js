@@ -716,7 +716,7 @@ describe('terminal/events/agent-runtime-events.js — contrato', () => {
         expect(broadcastSse).toHaveBeenCalledWith('pr.consumed', expect.any(Object));
     });
 
-    it('narra llm.usage sem novo PR separadamente de pr.consumed', async () => {
+    it('narra llm.usage sem Premium Request separadamente de pr.consumed', async () => {
         const { setupTerminalAgentRuntimeEventListeners } =
             await import('../../../src/copilot/terminal/events/agent-runtime-events.js');
         const { beginTerminalTurnMaterialization, clearTerminalTurnMaterialization } = await import(
