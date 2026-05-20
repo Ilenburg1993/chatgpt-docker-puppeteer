@@ -45,6 +45,7 @@ const TIMELINE_SYNC_FAILURE_RETRY_DELAYS_MS = [1_000, 5_000, 15_000];
  *     origin: 'hub' | 'bridge' | 'terminal';
  *     turnId: number | null;
  *     sdkTurnId: string | null;
+ *     metadata: Record<string, unknown> | null;
  * }} TerminalTimelineTurn
  */
 
@@ -268,6 +269,7 @@ function mapHubTimelineTurn(turn, index) {
         origin: 'hub',
         turnId: typeof turn['id'] === 'number' ? turn['id'] : null,
         sdkTurnId,
+        metadata,
     };
 }
 
@@ -287,6 +289,7 @@ function mapBridgeTimelineTurn(turn, index) {
         origin: 'bridge',
         turnId: null,
         sdkTurnId: null,
+        metadata: null,
     };
 }
 
@@ -305,6 +308,7 @@ function mapTerminalTranscriptTurn(turn, index) {
         origin: 'terminal',
         turnId: null,
         sdkTurnId: null,
+        metadata: null,
     };
 }
 

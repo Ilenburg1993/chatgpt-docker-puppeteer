@@ -46,8 +46,32 @@ export async function cmdExport({ println }, arg) {
     for (const turn of projection.turns) {
         const time = new Date(turn.timestamp ?? Date.now()).toLocaleTimeString('pt-BR');
         const role = turn.role === 'user' ? '👤 Usuário' : turn.rawRole === 'llm_a' ? '🤖 LLM-A' : '🧠 LLM-B';
+        const streamingDiagnostics =
+            turn.metadata?.['terminalStreamingDiagnostics'] &&
+            typeof turn.metadata['terminalStreamingDiagnostics'] === 'object'
+                ? /** @type {Record<string, any>} */ (turn.metadata['terminalStreamingDiagnostics'])
+                : null;
         lines.push(`## ${role} — ${time}`, '');
         lines.push(`> origem=${turn.origin}${turn.persisted ? ' · persistido' : ' · vivo'}`, '');
+        if (streamingDiagnostics) {
+            const materialization =
+                streamingDiagnostics['materialization'] && typeof streamingDiagnostics['materialization'] === 'object'
+                    ? /** @type {Record<string, any>} */ (streamingDiagnostics['materialization'])
+                    : {};
+            const finalReconciliation =
+                streamingDiagnostics['finalReconciliation'] &&
+                typeof streamingDiagnostics['finalReconciliation'] === 'object'
+                    ? /** @type {Record<string, any>} */ (streamingDiagnostics['finalReconciliation'])
+                    : {};
+            const publicStream =
+                streamingDiagnostics['publicStream'] && typeof streamingDiagnostics['publicStream'] === 'object'
+                    ? /** @type {Record<string, any>} */ (streamingDiagnostics['publicStream'])
+                    : {};
+            lines.push(
+                `> streaming=${String(finalReconciliation['mode'] ?? '-')}/${String(finalReconciliation['reason'] ?? '-')} · materializacao=${String(materialization['source'] ?? '-')} · deltas=${String(materialization['deltaSlices'] ?? 0)}/${String(materialization['deltaChars'] ?? 0)}ch · streamVisivel=${String(publicStream['visibleChars'] ?? 0)}ch`,
+                '',
+            );
+        }
         lines.push(turn.content, '');
         lines.push('---', '');
     }

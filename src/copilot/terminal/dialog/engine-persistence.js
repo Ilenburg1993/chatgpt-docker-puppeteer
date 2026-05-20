@@ -72,9 +72,10 @@ export function getPersistenceFailureCount() {
  * @param {string} reply
  * @param {string} actor
  * @param {number} durationMs
+ * @param {Record<string, unknown> | null} [replyMetadata]
  * @returns {Promise<void>}
  */
-export async function persistTurnToHub(hubSessionId, message, reply, actor, durationMs) {
+export async function persistTurnToHub(hubSessionId, message, reply, actor, durationMs, replyMetadata = null) {
     const store = readTerminalHubStore();
     /** @type {'user' | 'llm_a'} */
     const senderRole = actor === 'llm-a' ? 'llm_a' : 'user';
@@ -86,6 +87,7 @@ export async function persistTurnToHub(hubSessionId, message, reply, actor, dura
         role: 'llm_b',
         content: reply,
         durationMs,
+        ...(replyMetadata ? { metadata: replyMetadata } : {}),
     });
 
     if (isTerminalHubReady()) {

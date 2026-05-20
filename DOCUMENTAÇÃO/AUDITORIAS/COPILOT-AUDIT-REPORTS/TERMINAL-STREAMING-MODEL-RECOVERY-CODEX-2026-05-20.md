@@ -444,7 +444,7 @@ Itens descartados/renomeados:
 
 Pendencias apos esta revisao:
 
-- Persistir diagnosticos de streaming/reconciliacao no historico conversacional e no `/export`, nao apenas no estado live.
+- Persistir diagnosticos de streaming/reconciliacao no historico conversacional e no `/export`, nao apenas no estado live. **Parcialmente implementado: o turno `llm_b` persistido no Hub agora recebe `metadata.terminalStreamingDiagnostics`, a timeline preserva metadata e `/export` imprime resumo quando disponivel. Falta propagar tambem para transcript live nao persistido e para sync lazy de bridge tail.**
 - Propagar `traceId`/`turnId` aos diagnosticos e deltas SSE para correlação perfeita entre terminal, timeline, SSE e hub.
 - Adicionar assert live especifico para a secao `Streaming publico` no modo com turno real, alem do modo `--no-pr`.
 - Coletar SSE paralelamente no runner para comparar stdout local, replay buffer e canal externo.

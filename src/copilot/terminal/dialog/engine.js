@@ -793,7 +793,34 @@ async function _executeTurn(message, actor, attachments = [], requestHeaders = n
         const _hubSessionId = getHubSessionId();
         if (_hubSessionId) {
             try {
-                await persistTurnToHub(_hubSessionId, message, reply, actor, durationMs);
+                await persistTurnToHub(_hubSessionId, message, reply, actor, durationMs, {
+                    terminalStreamingDiagnostics: {
+                        schemaVersion: 1,
+                        source: 'terminal.dialog.engine',
+                        materialization: {
+                            source: effectiveReplySource,
+                            sourceDetail: materializedReply.sourceDetail,
+                            deltaSlices: materializedReply.diagnostics.deltaSlices,
+                            deltaChars: materializedReply.diagnostics.deltaChars,
+                            assistantMessageCount: materializedReply.diagnostics.assistantMessageCount,
+                            droppedDeltaSlices: materializedReply.diagnostics.droppedDeltaSlices,
+                            droppedDeltaChars: materializedReply.diagnostics.droppedDeltaChars,
+                        },
+                        finalReconciliation: {
+                            mode: finalRenderDecision.mode,
+                            reason: finalRenderDecision.reason,
+                            severity: finalRenderDecision.severity,
+                            renderedChars: finalRenderDecision.content.length,
+                        },
+                        publicStream: {
+                            started: displayState.streamingStarted,
+                            chars: displayState.streamingChars,
+                            visibleChars: displayState.streamingVisibleChars,
+                            firstChunkMs:
+                                displayState.firstChunkTime > 0 ? displayState.firstChunkTime - t0 : null,
+                        },
+                    },
+                });
             } catch (hubErr) {
                 log('WARN', `[TerminalServer] Hub writeTurn falhou: ${toError(hubErr).message}`);
             }
