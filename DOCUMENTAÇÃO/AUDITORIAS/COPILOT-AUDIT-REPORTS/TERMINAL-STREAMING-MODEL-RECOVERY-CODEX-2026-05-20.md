@@ -447,11 +447,10 @@ Entregas:
 
 Falta:
 
-- Live smoke com provider real quando não houver bloqueio externo/rate limit.
-- Provar Kilo Gateway, Ollama Cloud e pelo menos um provider OpenAI-compatible local/remoto, sem registrar chaves.
+- Elicitation real em BYOK, quando houver cenário confiável sem custo/risco operacional excessivo.
 - Suíte determinística fake de sessão SDK BYOK end-to-end sem rede.
 - Persistência opcional da escolha de perfil via comando seguro, caso o operador queira gravar alteração no `.env.local` em vez de apenas no processo atual.
-- Smoke real remoto com `.env.local` local do operador, arquivando apenas metadados redigidos.
+- Ampliar smoke real remoto para mais providers OpenAI-compatible quando houver credenciais disponíveis.
 
 Validação local:
 
@@ -461,11 +460,12 @@ Validação local:
 - Smoke sem rede confirmou preset `ollama-local`, normalização `/v1`, modelo explícito e ausência de segredo.
 - Testes unitários confirmaram preset Kilo Gateway, perfil ativo, resumo sem segredo e comandos `/byok profiles`, `/byok use`, `/byok model`.
 - Testes unitários confirmaram descoberta remota OpenAI-compatible, cache, timeout/fallback e renderização de modelos descobertos em `/byok models`.
-- Busca por fragmentos da chave de teste fornecida não encontrou vazamento em arquivos versionáveis fora de artefatos ignoráveis.
+- Smoke real Kilo/Ollama Cloud passou em `artifacts/terminal-live/2026-05-21T12-12-19-528Z/summary.md`, com 9 segredos locais verificados contra output do terminal.
+- Busca por fragmentos das chaves de teste fornecidas não encontrou vazamento em arquivos versionáveis fora de artefatos ignoráveis.
 
 Observação de segurança:
 
-- As chaves reais fornecidas para teste não foram gravadas em `.env`, documentação, logs ou artefatos. O caminho recomendado é o operador inseri-las em `.env.local` ou injetá-las efemeramente no processo.
+- As chaves reais fornecidas para teste foram gravadas somente em `.env.local`, que é gitignored e é o arquivo único operacional definido para segredos/perfis BYOK. Elas não devem ser promovidas para `.env`, documentação, logs versionáveis ou commits.
 
 ### A26. Live completo 2026-05-21 validou o circuito canônico após BYOK
 
@@ -540,7 +540,7 @@ Validação:
 
 - Typecheck strict PASS.
 - Unit Copilot PASS com 2925 testes na rodada de descoberta; 2927 testes após a correção de prefixo truncado em `dialog.turn_end`.
-- Smoke seguro tentou descoberta Kilo somente se chave existir em `.env.local`/env; sem chave presente, ficou `skipped` sem segredo.
+- Smoke seguro com chave em `.env.local` confirmou descoberta Kilo real via provider, sem imprimir segredo no terminal ou no resumo.
 
 ### A29. `dialog.turn_end` podia renderizar prefixo truncado já coberto por `assistant.message`
 
@@ -590,6 +590,40 @@ Regra nova:
 
 - Quando o timeout do próprio runner dispara antes do fechamento do cenário, o resultado passa a ser blocker `live-timeout`, com detalhe sobre `ask`, `postAsk` e diagnósticos.
 - Isso não transforma cenário incompleto em PASS; apenas evita misturar latência/timeout do SDK/modelo com regressão falsa de UX downstream.
+
+### A31. BYOK real validou fluxo completo e expôs o último falso positivo do harness
+
+Evidência:
+
+- Smoke sem PR real: `artifacts/terminal-live/2026-05-21T12-02-58-405Z/summary.md`.
+- Live real completo após correção de `dialog.turn_end`: `artifacts/terminal-live/2026-05-21T12-12-19-528Z/summary.md`.
+- Tentativa com modelo pago/creditado: `artifacts/terminal-live/2026-05-21T12-03-39-776Z/summary.md`.
+
+Achados:
+
+- `.env.local` é o arquivo único operacional e gitignored para segredos/perfis BYOK; as chaves reais ficam ali, nunca em docs, commits ou artefatos versionáveis.
+- Kilo Gateway/Kilo Code respondeu descoberta real de modelos via `https://api.kilo.ai/api/gateway/models`, com catálogo remoto de 346 modelos.
+- Ollama Cloud foi exercitado como perfil alternativo no mesmo processo, com alternância de provider/modelo antes do turno funcional.
+- O turno completo em `kilo-auto/free` passou com deltas parciais, bloco final, `report_intent`, `read_file_content`, `ask_user`, resposta humana `SIM`, continuação pós-ask, `/events`, `/events --raw`, `/health`, `/export`, SSE HTTP e JSONL durável.
+- A telemetria do turno BYOK indicou `premiumRequest=false` e `classification=ask_user_continuation` na continuação pós-ask.
+- O runner verificou ausência de vazamento de 9 valores secretos locais no output do terminal.
+- O modelo `kilo-auto/balanced` retornou `402 Add credits to continue`; isso foi classificado como blocker externo `byok-provider-credits`, não como falha do terminal.
+- O live anterior `artifacts/terminal-live/2026-05-21T12-09-42-449Z/summary.md` já mostrava `dialog.turn_end` com `reply=""` e `replySuppressed=true`, mas o runner ainda acusava duplicação porque a regex atravessava blocos do terminal.
+
+Correções implementadas nesta revisão:
+
+- `dialog.turn_end` agora preserva lifecycle em SSE/JSONL, mas remove `reply` quando o texto já foi materializado por `assistant.message` ou `dialog.delta`. O payload passa a trazer `replySuppressed=true`, `replySuppressionReason=already_materialized`, `originalReplyChars` e `transcriptCanonicalSource`.
+- O live runner passou a analisar blocos reais do terminal para `🧠 LLM-B` e `[LLM-B] Mensagem`, eliminando falso positivo por janela textual que atravessava separadores.
+- `/byok models` passou a limitar a listagem humana por padrão, mantendo `/byok models all` e `/byok models <n>` para inspeção ampla.
+- O perfil local Kilo foi ajustado para `kilo-auto/free` como default de smoke real, preservando `kilo-auto/balanced` e outros modelos para alternância explícita.
+
+Status: corrigido e validado.
+
+Critério resultante:
+
+- `dialog.turn_end` é evento de ciclo, não fonte concorrente de transcript.
+- O runner só acusa duplicação quando o mesmo marcador aparece em dois blocos reais distintos, não quando uma regex cruza de um bloco para o próximo.
+- BYOK real está comprovado no fluxo canônico do terminal; ainda faltam elicitation real e persistência segura por comando em `.env.local`.
 
 ## Hipóteses Externas Rejeitadas Ou Reclassificadas
 
@@ -890,7 +924,7 @@ Fase J2. Env governance e segredo
 - J2.2 Garantir que API keys não sejam impressas, arquivadas ou repassadas como env amplo do child CLI. Status: feito nesta revisão.
 - J2.3 Atualizar `.env.local.example`, `.env.example`, `.env.expert.example` e `.env.schema.json`. Status: feito nesta revisão.
 - J2.4 Atualizar guia de env com política BYOK e redaction. Status: feito nesta revisão.
-- J2.5 Adicionar auditoria automatizada para impedir vazamento de `COPILOT_BYOK_API_KEY` em logs/artefatos. Status: manual smoke feito; CI guard pendente.
+- J2.5 Adicionar auditoria automatizada para impedir vazamento de `COPILOT_BYOK_API_KEY` em logs/artefatos. Status: live runner verifica segredos locais contra output terminal; CI guard pendente.
 - J2.6 Consolidar `.env.local` como arquivo único do operador para perfis, metadata e segredos. Status: feito nesta revisão.
 - J2.7 Criar `COPILOT_BYOK_PROFILES_JSON` e `COPILOT_BYOK_PROFILE` para alternância segura entre providers/modelos. Status: feito nesta revisão.
 - J2.8 Adicionar preset Kilo Gateway/Kilo Code sem registrar token real. Status: feito nesta revisão.
@@ -906,13 +940,13 @@ Fase J3. Provider e model list
 - J3.7 Listar perfis redigidos para UX/diagnóstico sem expor segredo. Status: feito nesta revisão.
 - J3.8 Cachear catálogo remoto com TTL e timeout configuráveis. Status: feito nesta revisão.
 - J3.9 Permitir endpoint explícito por env/perfil. Status: feito nesta revisão.
-- J3.10 Inferir capabilities reais por modelo remoto quando o provider informar metadados ricos. Status: pendente.
+- J3.10 Inferir capabilities reais por modelo remoto quando o provider informar metadados ricos. Status: parcialmente feito; Kilo/Ollama expõem catálogos, mas a inferência ainda é conservadora.
 
 Fase J4. Sessão e lifecycle
 
 - J4.1 Injetar `provider`, `model` e `modelCapabilities` na sessão persistente. Status: feito nesta revisão.
 - J4.2 Omitir `reasoningEffort` quando o provider declara não suportar reasoning. Status: feito nesta revisão.
-- J4.3 Persistir modelo BYOK efetivo de forma clara em status/model UX. Status: parcialmente feito; profile/model/provider aparecem, mas falta confirmação real pós-smoke remoto.
+- J4.3 Persistir modelo BYOK efetivo de forma clara em status/model UX. Status: parcialmente feito; live Kilo confirmou `kilo-auto/free`, mas ainda falta contrato único configurado/preferido/efetivo/cobrado.
 - J4.4 Bloquear BYOK incompleto com erro acionável antes de criar sessão. Status: feito nesta revisão.
 - J4.5 Suportar troca runtime de provider sem restart completo. Status: pendente; requer política de rotação de sessão e não deve criar loop paralelo.
 - J4.6 Diferenciar troca efêmera de processo e persistência em `.env.local`. Status: parcialmente feito; comandos efêmeros existem, persistência segura pendente.
@@ -923,7 +957,7 @@ Fase J5. UX e comandos
 - J5.2 Criar `/byok models`. Status: feito nesta revisão.
 - J5.3 Criar `/byok env`. Status: feito nesta revisão.
 - J5.4 Integrar BYOK em `/status`, `/health`, `/model` e auto-brief. Status: feito nesta revisão.
-- J5.5 Mostrar diferença entre modelo BYOK configurado, modelo SDK efetivo e provider. Status: parcialmente feito; falta consolidar billing/effective model pós-smoke real.
+- J5.5 Mostrar diferença entre modelo BYOK configurado, modelo SDK efetivo e provider. Status: parcialmente feito; live real mostrou provider/model/status, mas falta consolidar billing/effective model em uma linha canônica.
 - J5.6 Bloquear `/model <id>` enganoso quando BYOK está ativo e orientar alteração por env/restart. Status: feito nesta revisão.
 - J5.7 Criar `/byok reload`. Status: feito nesta revisão.
 - J5.8 Criar `/byok profiles`. Status: feito nesta revisão.
@@ -939,10 +973,10 @@ Fase J6. Testes
 - J6.1 Cobrir helpers de provider/env/redaction por unit test. Status: feito nesta revisão.
 - J6.2 Cobrir `ClientOptionsBuilder` com `onListModels` BYOK e remoção de segredos do child env. Status: feito nesta revisão.
 - J6.3 Criar fake SDK BYOK determinístico sem rede. Status: parcialmente feito por unit tests de resolução/comando; falta sessão SDK fake end-to-end.
-- J6.4 Rodar live test com `/byok`, delta, tool, `ask_user` e elicitation quando disponível. Status: delta/tool/ask_user PASS em `artifacts/terminal-live/2026-05-21T10-22-43-042Z/summary.md`; `/byok` e elicitation pendentes no live.
-- J6.5 Rodar smoke real Kilo/Ollama Cloud/OpenAI-compatible sem gravar segredo em artefato. Status: pendente.
+- J6.4 Rodar live test com `/byok`, delta, tool, `ask_user` e elicitation quando disponível. Status: `/byok`, delta, tool e ask_user PASS em `artifacts/terminal-live/2026-05-21T12-12-19-528Z/summary.md`; elicitation pendente.
+- J6.5 Rodar smoke real Kilo/Ollama Cloud/OpenAI-compatible sem gravar segredo em artefato. Status: PASS em `artifacts/terminal-live/2026-05-21T12-12-19-528Z/summary.md`.
 - J6.6 Adicionar comando live/harness específico para `/byok status`, `/byok models` e `/byok env` sem abrir turno. Status: feito nesta revisão com `--byok-probe`.
-- J6.7 Cobrir `/byok profiles`, `/byok use`, `/byok model`, `/byok provider` e `/byok reload`. Status: profiles/use/model/provider cobertos por live fixture em `artifacts/terminal-live/2026-05-21T11-50-03-576Z/summary.md`; reload ainda precisa unit/live dedicado.
+- J6.7 Cobrir `/byok profiles`, `/byok use`, `/byok model`, `/byok provider` e `/byok reload`. Status: profiles/use/model/reload cobertos por live real em `artifacts/terminal-live/2026-05-21T12-12-19-528Z/summary.md`; provider direto coberto por fixture em `artifacts/terminal-live/2026-05-21T11-50-03-576Z/summary.md`.
 - J6.8 Cobrir descoberta remota, cache e fallback estático em unit tests. Status: feito nesta revisão.
 - J6.9 Rodar smoke seguro de descoberta real usando apenas `.env.local`/env, sem colocar segredo no comando. Status: feito; sem chave Kilo local, resultado `skipped`.
 - J6.10 Rodar live BYOK sem turno explícito para status/env/profiles/models/use-sdk/events/errors. Status: PASS em `artifacts/terminal-live/2026-05-21T11-33-14-457Z/summary.md`.
@@ -956,9 +990,9 @@ Fase J7. Providers amplos
 - J7.3 Azure AI Foundry como OpenAI-compatible. Status: suportado por contrato; pendente smoke.
 - J7.4 Anthropic direto. Status: suportado por contrato; pendente smoke.
 - J7.5 Ollama local. Status: suportado por contrato; pendente smoke.
-- J7.6 Ollama Cloud. Status: suportado por contrato OpenAI-compatible; pendente confirmação do endpoint efetivo.
+- J7.6 Ollama Cloud. Status: perfil real exercitado no live BYOK; catálogo remoto disponível. Falta turno funcional dedicado no provider.
 - J7.7 LiteLLM/vLLM/routers locais. Status: suportado por contrato OpenAI-compatible; pendente smoke.
-- J7.8 Kilo Gateway/Kilo Code. Status: suportado por contrato OpenAI-compatible; pendente smoke real redigido.
+- J7.8 Kilo Gateway/Kilo Code. Status: PASS em live real com `kilo-auto/free`; catálogo remoto de 346 modelos; modelo pago `kilo-auto/balanced` bloqueado por créditos do provider.
 
 ## Execução Iniciada Nesta Revisão
 
@@ -1050,6 +1084,9 @@ Implementado:
 - Live completo pós-A29 em `artifacts/terminal-live/2026-05-21T11-26-10-340Z/summary.md` validou boot, SSE, tool e `ask_user`, mas ficou incompleto por timeout antes da continuação pós-ask; o runner agora classifica esse caso como blocker `live-timeout`.
 - Live BYOK sem PR passou em `artifacts/terminal-live/2026-05-21T11-33-14-457Z/summary.md`: `/byok`, `/byok env`, `/byok profiles`, `/byok models refresh`, `/byok use sdk`, `/events`, `/events --raw` e `/errors`, sem abrir turno explícito.
 - Live BYOK fixture sem PR passou em `artifacts/terminal-live/2026-05-21T11-50-03-576Z/summary.md`: perfil `codex-fixture`, descoberta automática `fonte=provider` via endpoint local `/v1/models`, catálogo `fixture/model-a|fixture/model-b|fixture/model-remote-c`, troca runtime para `fixture/model-b`, troca para provider direto `fixture/model-c`, retorno ao SDK, `/events`, `/events --raw` e `/errors`, sem vazamento do token fictício e sem turno explícito.
+- Live BYOK real sem PR passou em `artifacts/terminal-live/2026-05-21T12-02-58-405Z/summary.md`: `.env.local` recarregado, perfil Kilo ativo, catálogo Kilo remoto disponível, perfil alternativo Ollama Cloud exercitado, `/events`, `/events --raw`, `/metrics`, `/errors`, sem turno explícito e sem vazamento de segredos.
+- Live BYOK real completo passou em `artifacts/terminal-live/2026-05-21T12-12-19-528Z/summary.md`: Kilo `kilo-auto/free`, troca de modelo dentro do Kilo, alternância para Ollama Cloud, deltas parciais, bloco final, tool, `ask_user`, resposta humana, continuação pós-ask, telemetry sem Premium Request, SSE/JSONL/export e ausência de duplicação.
+- Live BYOK real com `kilo-auto/balanced` ficou `BLOCKED` por `byok-provider-credits` em `artifacts/terminal-live/2026-05-21T12-03-39-776Z/summary.md`; o runner agora classifica esse caso como falha externa de créditos/modelo, não como bug do terminal.
 - Smoke BYOK local sem rede validou `ollama-local`, normalização de `baseUrl` para `/v1`, modelo explícito e resumo sem segredo.
 - Testes BYOK desta rodada validaram Kilo Gateway como OpenAI-compatible, perfil ativo por `COPILOT_BYOK_PROFILE`, resumos redigidos e comandos `/byok profiles`, `/byok use` e `/byok model`.
 - Teste BYOK adicional validou override transiente de modelo mantendo provider e credenciais do perfil ativo.
@@ -1060,16 +1097,17 @@ Implementado:
 - Testes unitários adicionados para `terminal.runtime.wired`, `terminal.runtime.wire_failed` e hints de investigação em `/events sources`.
 - Testes unitários adicionados para BYOK provider/env/redaction/model list e para `ClientOptionsBuilder` com `onListModels` e remoção de segredos do child env.
 - Testes unitários adicionados para suprimir prefixo truncado de `dialog.turn_end` quando transcript completo já foi materializado por `assistant.message`.
+- Teste unitário adicionado para `dialog.turn_end` emitir lifecycle sem `reply` quando o transcript já foi materializado.
+- O live runner agora analisa blocos estruturados do terminal para detectar duplicação final, evitando falso positivo quando uma regex atravessa de `🧠 LLM-B` para `[LLM-B] Mensagem`.
 
 Próxima rodada recomendada:
 
-1. Reexecutar live completo com orçamento maior ou cenário canônico menor para confirmar pós-A29 até `/export` sem bater `live-timeout`.
-2. Integrar BYOK em `/events sources`, sem duplicar o fluxo de sessão.
-3. Rodar smoke real Kilo/Ollama Cloud via `.env.local`, arquivando só metadados redigidos; o provider fake/local já passou com `--byok-probe --byok-fixture`.
-4. Inserir as chaves reais apenas em `.env.local`/secret manager e rodar smoke real Kilo/Ollama Cloud/OpenAI-compatible.
-5. Expandir o cenário live para elicitation quando a capability estiver disponível.
-6. Fechar a recuperação `session.error`/`reconnect_restart`, distinguindo retry real de reenvio ambíguo de prompt.
-7. Criar contrato único de modelo configurado/preferido/efetivo/cobrado, incluindo billing/effective model real em BYOK.
-8. Continuar a normalização de tool identity em completions/progress externos sem requestId, com métricas para qualquer lifecycle ainda genérico.
-9. Integrar falha de `wireRuntime()` ao `ErrorTracker` com metadados de fase.
-10. Expandir `/events sources` com filtros compostos por classe e evento. Hints básicos de `/events event=...` e `/events source=...` já foram feitos.
+1. Integrar BYOK em `/events sources`, sem duplicar o fluxo de sessão.
+2. Expandir o cenário live para elicitation quando a capability estiver disponível.
+3. Fechar a recuperação `session.error`/`reconnect_restart`, distinguindo retry real de reenvio ambíguo de prompt.
+4. Criar contrato único de modelo configurado/preferido/efetivo/cobrado, incluindo billing/effective model real em BYOK.
+5. Implementar `/byok persist` atômico/redigido para editar `.env.local` de forma segura.
+6. Rodar turno funcional dedicado em Ollama Cloud e, quando disponível, Ollama local/LiteLLM/vLLM.
+7. Continuar a normalização de tool identity em completions/progress externos sem requestId, com métricas para qualquer lifecycle ainda genérico.
+8. Integrar falha de `wireRuntime()` ao `ErrorTracker` com metadados de fase.
+9. Expandir `/events sources` com filtros compostos por classe e evento. Hints básicos de `/events event=...` e `/events source=...` já foram feitos.

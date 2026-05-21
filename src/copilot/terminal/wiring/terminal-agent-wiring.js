@@ -72,6 +72,52 @@ function withTerminalAgentSseEnvelope(payload, source) {
 }
 
 /**
+ * `dialog.turn_end` e um evento de ciclo de vida, nao uma segunda fonte canonica de transcript. Quando o texto ja foi
+ * materializado por `dialog.delta` ou `assistant.message`, mantemos o evento publico, mas removemos o `reply` do payload
+ * para que SSE/JSONL/export nao preservem um prefixo truncado como se fosse uma nova mensagem.
+ *
+ * @param {{
+ *     reply?: string;
+ *     turnId?: string | number | null;
+ *     durationMs?: number;
+ *     timestamp?: number;
+ *     [key: string]: unknown;
+ * }} evt
+ * @returns {{
+ *     envelope: Record<string, unknown>;
+ *     reply: string;
+ *     turnId: string | null;
+ *     replyAlreadyMaterialized: boolean;
+ * }}
+ */
+export function createDialogTurnEndSseEnvelope(evt) {
+    const reply = typeof evt.reply === 'string' ? evt.reply : '';
+    const turnId = typeof evt.turnId === 'string' || typeof evt.turnId === 'number' ? String(evt.turnId) : null;
+    const timestamp = typeof evt.timestamp === 'number' ? evt.timestamp : Date.now();
+    const replyAlreadyMaterialized =
+        reply.trim().length > 0 &&
+        (shouldSuppressTerminalAssistantMessageAsMaterializedTurn({ content: reply, turnId, now: timestamp }) ||
+            isTerminalAssistantTranscriptCovered(reply));
+    const envelope = withTerminalAgentSseEnvelope(
+        {
+            ...evt,
+            reply: replyAlreadyMaterialized ? '' : reply,
+            ...(turnId ? { turnId } : {}),
+            ...(replyAlreadyMaterialized
+                ? {
+                      replySuppressed: true,
+                      replySuppressionReason: 'already_materialized',
+                      originalReplyChars: reply.length,
+                      transcriptCanonicalSource: 'assistant.message_or_dialog.delta',
+                  }
+                : {}),
+        },
+        'terminal-agent-wiring/dialog.turn_end',
+    );
+    return { envelope, reply, turnId, replyAlreadyMaterialized };
+}
+
+/**
  * Política local de UX: restart automático é exceção. O Agent continua sendo dono do lifecycle, mas o terminal só
  * reabre o loop sozinho quando a razão representa falha operacional clara.
  *
@@ -381,23 +427,10 @@ export function registerAgentEventListeners(printBanner) {
              *     timestamp?: number;
              * }} */ evt,
         ) => {
-            const reply = typeof evt.reply === 'string' ? evt.reply : '';
-            const turnId =
-                typeof evt.turnId === 'string' || typeof evt.turnId === 'number' ? String(evt.turnId) : null;
-            const envelope = withTerminalAgentSseEnvelope(
-                {
-                    ...evt,
-                    reply,
-                    ...(turnId ? { turnId } : {}),
-                },
-                'terminal-agent-wiring/dialog.turn_end',
-            );
+            const { envelope, reply, turnId, replyAlreadyMaterialized } = createDialogTurnEndSseEnvelope(evt);
             broadcastSse('dialog.turn_end', envelope);
             if (!reply.trim()) return;
-            if (
-                shouldSuppressTerminalAssistantMessageAsMaterializedTurn({ content: reply, turnId }) ||
-                isTerminalAssistantTranscriptCovered(reply)
-            ) {
+            if (replyAlreadyMaterialized) {
                 recordTerminalActivity('turn', 'dialog.turn_end reconciliado sem novo bloco visual', {
                     detail: turnId ? `turn=${turnId} · conteúdo já materializado` : 'conteúdo já materializado',
                     source: 'dialog.turn_end',

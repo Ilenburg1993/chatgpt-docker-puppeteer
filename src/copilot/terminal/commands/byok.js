@@ -65,7 +65,7 @@ function renderStatus(projection, println) {
         println(`  \x1b[31m  erro: ${error}\x1b[0m`);
     }
     println('  \x1b[90mArquivo unico de BYOK: .env.local. Mudancas via comando valem para o processo atual; use /restart para nova sessao SDK.\x1b[0m');
-    println('  \x1b[90mUso: /byok | /byok reload | /byok profiles | /byok models [refresh] | /byok use <perfil|sdk> | /byok model <id> | /byok provider <preset> [model] [baseUrl] | /byok env\x1b[0m\n');
+    println('  \x1b[90mUso: /byok | /byok reload | /byok profiles | /byok models [refresh|all|n] | /byok use <perfil|sdk> | /byok model <id> | /byok provider <preset> [model] [baseUrl] | /byok env\x1b[0m\n');
 }
 
 /**
@@ -137,8 +137,14 @@ export async function cmdByok({ println }, arg) {
 
     if (sub === 'models') {
         const forceRefresh = rest.some((item) => ['refresh', 'force', '--refresh', '--force'].includes(item.toLowerCase()));
+        const showAll = rest.some((item) => ['all', '--all'].includes(item.toLowerCase()));
+        const explicitLimit = rest
+            .map((item) => Number.parseInt(item, 10))
+            .find((value) => Number.isFinite(value) && value > 0);
+        const limit = showAll ? Number.POSITIVE_INFINITY : explicitLimit ?? 80;
         const discovered = await discoverConfiguredByokModelsFromEnv(process.env, { forceRefresh });
         const modelList = discovered.models.length > 0 ? discovered.models : models;
+        const visibleModels = modelList.slice(0, limit);
         const sourceLabel =
             discovered.source === 'remote'
                 ? 'provider'
@@ -156,11 +162,16 @@ export async function cmdByok({ println }, arg) {
             println('    \x1b[33mNenhum modelo BYOK configurado. Defina COPILOT_BYOK_MODEL ou COPILOT_BYOK_MODELS.\x1b[0m\n');
             return;
         }
-        for (const model of modelList) {
+        for (const model of visibleModels) {
             const reasoning = model.capabilities?.supports?.reasoningEffort ? 'reasoning' : 'no-reasoning';
             const vision = model.capabilities?.supports?.vision ? 'vision' : 'no-vision';
             const ctxTokens = model.capabilities?.limits?.max_context_window_tokens ?? 'n/a';
             println(`    \x1b[33m${model.id}\x1b[0m  \x1b[90m${reasoning} · ${vision} · ctx=${ctxTokens}\x1b[0m`);
+        }
+        if (visibleModels.length < modelList.length) {
+            println(
+                `\n  \x1b[90mexibindo ${visibleModels.length}/${modelList.length}; use /byok models all ou /byok models <n> para ampliar.\x1b[0m`,
+            );
         }
         println('');
         return;

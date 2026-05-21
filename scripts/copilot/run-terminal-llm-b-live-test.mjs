@@ -13,12 +13,14 @@ import http from 'node:http';
 import net from 'node:net';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { parse as parseDotenv } from 'dotenv';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const DEFAULT_TIMEOUT_MS = 180_000;
 const DEFAULT_POST_ANSWER_DELAY_MS = 6_000;
 const DEFAULT_POST_ASK_CONTINUATION_WAIT_MS = 45_000;
 const ANSI_RE = /\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])/g;
+const SECRET_ENV_RE = /(?:API[_-]?KEY|TOKEN|SECRET|PASSWORD|BEARER)/iu;
 const POST_ASK_FINAL_RE =
     /(?:POST-ASK-CANONICAL-FINAL|Teste can[oô]nico|Usu[aá]rio confirmou SIM|confirmou SIM|respondeu SIM|Sistema operacional)/iu;
 
@@ -131,6 +133,123 @@ function buildByokFixtureEnv({ baseUrl = 'http://127.0.0.1:11434/v1' } = {}) {
             },
         }),
     };
+}
+
+async function loadDotenvLocalEnv() {
+    try {
+        const content = await readFile(path.join(ROOT, '.env.local'), 'utf8');
+        return parseDotenv(content);
+    } catch (error) {
+        if (error?.code === 'ENOENT') return {};
+        throw error;
+    }
+}
+
+function collectSecretValues(env) {
+    const values = [];
+    for (const [key, value] of Object.entries(env)) {
+        if (!SECRET_ENV_RE.test(key)) continue;
+        if (typeof value !== 'string' || value.length < 8) continue;
+        values.push({ key, value });
+    }
+    return values;
+}
+
+function hasSecretLeak(text, secretValues) {
+    return secretValues.some(({ value }) => value.length > 0 && text.includes(value));
+}
+
+function parseProfilesJson(raw) {
+    if (!raw || raw.trim() === '') return {};
+    try {
+        const parsed = JSON.parse(raw);
+        return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
+    } catch {
+        return {};
+    }
+}
+
+function profileHasUsableSecret(profileName, profile, env) {
+    const tokenEnv = typeof profile?.bearerTokenEnv === 'string' ? profile.bearerTokenEnv : null;
+    const apiKeyEnv = typeof profile?.apiKeyEnv === 'string' ? profile.apiKeyEnv : null;
+    if (tokenEnv && env[tokenEnv]) return true;
+    if (apiKeyEnv && env[apiKeyEnv]) return true;
+    if (/^kilo\b/iu.test(profileName)) return Boolean(env.KILO_CODE_API_KEY || env.KILO_API_KEY);
+    if (/ollama-cloud/iu.test(profileName)) return Boolean(env.OLLAMA_CLOUD_API_KEY || env.OLLAMA_API_KEY);
+    return Boolean(profile?.bearerToken || profile?.apiKey);
+}
+
+function chooseRealByokProfile(env, requestedProfile) {
+    const profiles = parseProfilesJson(env.COPILOT_BYOK_PROFILES_JSON);
+    if (requestedProfile) return requestedProfile;
+    if (profiles.kilo && profileHasUsableSecret('kilo', profiles.kilo, env)) return 'kilo';
+    if (profiles['ollama-cloud'] && profileHasUsableSecret('ollama-cloud', profiles['ollama-cloud'], env)) {
+        return 'ollama-cloud';
+    }
+    const usable = Object.entries(profiles).find(([name, profile]) => profileHasUsableSecret(name, profile, env));
+    return usable?.[0] ?? Object.keys(profiles)[0] ?? '';
+}
+
+function chooseAlternateByokProfile(env, activeProfile, requestedAltProfile) {
+    if (requestedAltProfile) return requestedAltProfile === activeProfile ? '' : requestedAltProfile;
+    const profiles = parseProfilesJson(env.COPILOT_BYOK_PROFILES_JSON);
+    const first = Object.entries(profiles).find(
+        ([name, profile]) => name !== activeProfile && profileHasUsableSecret(name, profile, env),
+    );
+    return first?.[0] ?? '';
+}
+
+function profileModel(env, profileName) {
+    const profiles = parseProfilesJson(env.COPILOT_BYOK_PROFILES_JSON);
+    const profile = profiles[profileName];
+    return typeof profile?.model === 'string' && profile.model.trim() ? profile.model.trim() : '';
+}
+
+function buildRealByokRuntime({ dotenvEnv, requestedProfile, requestedAltProfile, requestedModel, requestedAltModel }) {
+    const mergedEnv = { ...process.env, ...dotenvEnv };
+    const profile = chooseRealByokProfile(mergedEnv, requestedProfile);
+    const altProfile = chooseAlternateByokProfile(mergedEnv, profile, requestedAltProfile);
+    const model = requestedModel || profileModel(mergedEnv, profile);
+    const altModel = requestedAltModel || profileModel(mergedEnv, altProfile);
+    return {
+        env: {
+            ...dotenvEnv,
+            COPILOT_BYOK_ENABLED: 'true',
+            ...(profile ? { COPILOT_BYOK_PROFILE: profile } : {}),
+            ...(requestedModel ? { COPILOT_BYOK_MODEL: requestedModel } : {}),
+            COPILOT_BYOK_MODEL_DISCOVERY_ENABLED: mergedEnv.COPILOT_BYOK_MODEL_DISCOVERY_ENABLED ?? 'true',
+        },
+        profile,
+        altProfile,
+        model,
+        altModel,
+        redacted: {
+            enabled: true,
+            profile: profile || null,
+            altProfile: altProfile || null,
+            model: model || null,
+            altModel: altModel || null,
+            dotenvLocalLoaded: Object.keys(dotenvEnv).length > 0,
+            secretKeysPresent: collectSecretValues(mergedEnv).map(({ key }) => key).sort(),
+        },
+    };
+}
+
+function buildByokRealPreflightCommands({ profile, altProfile, model, altModel }) {
+    const commands = ['/byok reload', '/byok env', '/byok profiles'];
+    if (profile) commands.push(`/byok use ${profile}`);
+    commands.push('/byok', '/byok models refresh');
+    if (altModel && altModel !== model) {
+        commands.push(`/byok model ${altModel}`, '/byok');
+    }
+    if (model) {
+        commands.push(`/byok model ${model}`, '/byok');
+    }
+    if (altProfile) {
+        commands.push(`/byok use ${altProfile}`, '/byok', '/byok models refresh');
+        if (profile) commands.push(`/byok use ${profile}`, '/byok');
+    }
+    return commands;
 }
 
 function startByokFixtureProviderServer() {
@@ -246,6 +365,13 @@ function detectLiveBlocker(plain, runtime = {}) {
     if (/\[rate_limit\]/i.test(plain)) {
         return { id: 'sdk-rate-limit', detail: 'GitHub Copilot SDK rate limit' };
     }
+    const byokCreditsMatch = plain.match(/\b402\s+Add credits to continue,\s*or switch to a free model\b/i);
+    if (byokCreditsMatch) {
+        return {
+            id: 'byok-provider-credits',
+            detail: 'BYOK provider rejected the selected paid model with 402; switch to a free/credited model',
+        };
+    }
     if (runtime.timedOut) {
         return {
             id: 'live-timeout',
@@ -315,6 +441,33 @@ function extractArchiveRawEvents(plain) {
         }
     }
     return entries;
+}
+
+function extractTerminalBlocks(plain, headerRe) {
+    const lines = String(plain ?? '').split('\n');
+    const blocks = [];
+    for (let i = 0; i < lines.length; i += 1) {
+        if (!headerRe.test(lines[i] ?? '')) continue;
+        const block = [lines[i]];
+        for (let j = i + 1; j < lines.length; j += 1) {
+            const line = lines[j] ?? '';
+            if (
+                /^\s*(?:você\[|─{8,}|\[[A-Z][^\]]+\]|\[\d{2}:\d{2}:\d{2}\]\s+🧠\s+LLM-B|\[LLM-B\]\s+Mensagem)/u.test(
+                    line,
+                )
+            ) {
+                break;
+            }
+            block.push(line);
+            if (/^\s*└──/u.test(line) || /^\s*📊\s/u.test(line)) break;
+        }
+        blocks.push(block.join('\n'));
+    }
+    return blocks;
+}
+
+function terminalBlockContains(plain, headerRe, markerRe) {
+    return extractTerminalBlocks(plain, headerRe).some((block) => markerRe.test(block));
 }
 
 function normalizeTranscriptCoverageText(value) {
@@ -467,21 +620,28 @@ function evaluateOutput(plain, sseSummary, exportSummary) {
         preEventsPlain,
     );
     const askRenderedBySdk = /\[ASK\]\s+ASK-CANONICAL: responda SIM para fechar o teste/.test(preEventsPlain);
-    const liveDeltaBlockVisible = /\[[^\]\n]*\]\s+🧠\s+LLM-B[\s\S]{0,2200}DELTA-CANONICAL-8/.test(
+    const liveDeltaBlockVisible = terminalBlockContains(
         preEventsPlain,
+        /^\s*\[[^\]\n]*\]\s+🧠\s+LLM-B/u,
+        /DELTA-CANONICAL-8/u,
     );
-    const assistantMessageDeltaBlockVisible = /\[LLM-B\]\s+Mensagem[\s\S]{0,2200}DELTA-CANONICAL-8/.test(
+    const assistantMessageDeltaBlockVisible = terminalBlockContains(
         preEventsPlain,
+        /^\s*\[LLM-B\]\s+Mensagem/u,
+        /DELTA-CANONICAL-8/u,
     );
     const postAskFinalMarker = String.raw`(?:POST-ASK-CANONICAL-FINAL|Teste can[oô]nico|Usu[aá]rio confirmou SIM|confirmou SIM|respondeu SIM|Sistema operacional)`;
-    const finalRenderedByLiveTurn = new RegExp(
-        String.raw`\[[^\]\n]*\]\s+🧠\s+LLM-B[\s\S]{0,1800}${postAskFinalMarker}`,
-        'iu',
-    ).test(preEventsPlain);
-    const finalRenderedByAssistantMessage = new RegExp(
-        String.raw`\[LLM-B\]\s+Mensagem[\s\S]{0,1800}${postAskFinalMarker}`,
-        'iu',
-    ).test(preEventsPlain);
+    const postAskFinalRe = new RegExp(postAskFinalMarker, 'iu');
+    const finalRenderedByLiveTurn = terminalBlockContains(
+        preEventsPlain,
+        /^\s*\[[^\]\n]*\]\s+🧠\s+LLM-B/u,
+        postAskFinalRe,
+    );
+    const finalRenderedByAssistantMessage = terminalBlockContains(
+        preEventsPlain,
+        /^\s*\[LLM-B\]\s+Mensagem/u,
+        postAskFinalRe,
+    );
     const taskDeltaActivityDuringDialog =
         /task\s+·\s+Executando tarefa interna\s+—\s+delta/.test(preEventsPlain) ||
         /"label":"Executando tarefa interna","detail":"delta/.test(preEventsPlain);
@@ -804,6 +964,60 @@ function evaluateByokProbeOutput(plain, sseSummary, { fixture = false } = {}) {
     return criteria;
 }
 
+function evaluateByokRealOutput(plain, secretValues, { profile, altProfile, model, altModel } = {}) {
+    const criteria = [
+        {
+            id: 'byok-real-dotenv-reload',
+            pass: /\.env\.local recarregado/.test(plain),
+            detail: '/byok reload loaded operator-local BYOK config',
+        },
+        {
+            id: 'byok-real-status-ready',
+            pass: /BYOK status/.test(plain) && /enabled:\s+sim/.test(plain) && /ready:\s+sim/.test(plain),
+            detail: 'BYOK status reached enabled+ready without printing secrets',
+        },
+        {
+            id: 'byok-real-profile-active',
+            pass: !profile || new RegExp(`profile:\\s+${profile.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&')}`, 'u').test(plain),
+            detail: `active BYOK profile ${profile || '(auto)'} was rendered`,
+        },
+        {
+            id: 'byok-real-model-catalog',
+            pass: /BYOK models/.test(plain) && !/Nenhum modelo BYOK configurado/.test(plain),
+            detail: 'BYOK model catalog command returned a usable catalog or remote/static fallback',
+        },
+        {
+            id: 'byok-real-model-switch',
+            pass:
+                !model ||
+                new RegExp(`model:\\s+${model.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&')}`, 'u').test(plain) ||
+                /BYOK models[\s\S]{0,1200}/.test(plain),
+            detail: `BYOK model switch path exercised for ${model || '(profile default)'}`,
+        },
+        {
+            id: 'byok-real-alt-provider-switch',
+            pass:
+                !altProfile ||
+                new RegExp(`profile:\\s+${altProfile.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&')}`, 'u').test(plain),
+            detail: altProfile ? `alternate BYOK profile ${altProfile} was exercised` : 'no alternate usable profile configured',
+        },
+        {
+            id: 'byok-real-alt-model-switch',
+            pass:
+                !altModel ||
+                new RegExp(`model:\\s+${altModel.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&')}`, 'u').test(plain) ||
+                /BYOK models[\s\S]{0,1200}/.test(plain),
+            detail: altModel ? `alternate BYOK model ${altModel} was exercised` : 'no alternate model configured',
+        },
+        {
+            id: 'byok-real-no-secret-leak',
+            pass: !hasSecretLeak(plain, secretValues),
+            detail: `${secretValues.length} local secret value(s) checked against terminal output`,
+        },
+    ];
+    return criteria;
+}
+
 function evaluateBlockedOutput(plain, sseSummary, blocker) {
     return [
         {
@@ -960,6 +1174,11 @@ async function main() {
     const noPr = hasFlag('--no-pr');
     const byokProbe = hasFlag('--byok-probe');
     const byokFixture = hasFlag('--byok-fixture');
+    const byokReal = hasFlag('--byok-real');
+    const byokRealProfile = readArg('--byok-real-profile', '');
+    const byokRealAltProfile = readArg('--byok-real-alt-profile', '');
+    const byokRealModel = readArg('--byok-real-model', '');
+    const byokRealAltModel = readArg('--byok-real-alt-model', '');
     const collectSse = !hasFlag('--no-sse');
     const requestedTerminalPort = readArg('--terminal-port', '');
     const requestedSsePort = readArg('--sse-port', '');
@@ -980,10 +1199,29 @@ async function main() {
     const mdPath = path.join(outDir, 'summary.md');
     const byokFixtureProvider = byokFixture ? await startByokFixtureProviderServer() : null;
     const byokFixtureBaseUrl = byokFixtureProvider?.baseUrl ?? 'http://127.0.0.1:11434/v1';
+    const dotenvEnv = byokReal ? await loadDotenvLocalEnv() : {};
+    const realByok = byokReal
+        ? buildRealByokRuntime({
+              dotenvEnv,
+              requestedProfile: byokRealProfile,
+              requestedAltProfile: byokRealAltProfile,
+              requestedModel: byokRealModel,
+              requestedAltModel: byokRealAltModel,
+          })
+        : null;
+    const secretValues = byokReal ? collectSecretValues({ ...process.env, ...dotenvEnv, ...(realByok?.env ?? {}) }) : [];
 
     if (dryRun) {
         const prompt = byokProbe
             ? buildByokProbeCommands({ fixtureBaseUrl: byokFixtureBaseUrl }).join('\n')
+            : byokReal
+              ? [
+                    ...buildByokRealPreflightCommands(realByok ?? {}),
+                    noPr ? null : buildScenarioPrompt(),
+                    noPr ? '/quit' : null,
+                ]
+                    .filter(Boolean)
+                    .join('\n')
             : noPr
               ? buildNoPrProbeCommands().join('\n')
               : buildScenarioPrompt();
@@ -1021,7 +1259,9 @@ async function main() {
         cwd: ROOT,
         env: {
             ...process.env,
+            ...dotenvEnv,
             ...(byokFixture ? buildByokFixtureEnv({ baseUrl: byokFixtureBaseUrl }) : {}),
+            ...(realByok?.env ?? {}),
             COPILOT_MODEL: 'auto',
             COPILOT_REASONING_EFFORT: 'high',
             TERMINAL_DISPLAY_PRESET: 'full',
@@ -1081,11 +1321,19 @@ async function main() {
             }
             write('/usage now');
             write('/activity 12');
-            if (byokProbe || noPr) {
-                const commands = byokProbe
-                    ? buildByokProbeCommands({ fixtureBaseUrl: byokFixtureBaseUrl })
-                    : buildNoPrProbeCommands();
-                sendCommandSequence(write, commands, { delayMs: byokProbe ? 350 : 150 });
+            if (byokProbe || noPr || byokReal) {
+                const commands = byokReal
+                    ? [
+                          ...buildByokRealPreflightCommands(realByok ?? {}),
+                          ...(noPr ? ['/usage now', '/activity 20', '/metrics', '/events 60', '/events 100 --raw', '/errors 10', '/quit'] : []),
+                      ]
+                    : byokProbe
+                      ? buildByokProbeCommands({ fixtureBaseUrl: byokFixtureBaseUrl })
+                      : buildNoPrProbeCommands();
+                sendCommandSequence(write, commands, { delayMs: byokReal || byokProbe ? 350 : 150 });
+                if (byokReal && !noPr) {
+                    setTimeout(() => write(buildScenarioPrompt()), Math.max(4_000, commands.length * 350 + 1_000)).unref();
+                }
                 return;
             }
             write(buildScenarioPrompt());
@@ -1160,13 +1408,17 @@ async function main() {
         ? null
         : detectLiveBlocker(plain, { timedOut, answerSent, postAskContinuationObserved, postCommandsSent });
     const exportSummary = noPr || byokProbe || blocker ? null : await inspectExportedMarkdown(exportPath);
-    const criteria = blocker
+    const baseCriteria = blocker
         ? evaluateBlockedOutput(plain, sseSummary, blocker)
         : byokProbe
           ? evaluateByokProbeOutput(plain, sseSummary, { fixture: byokFixture })
           : noPr
             ? evaluateNoPrOutput(plain, sseSummary)
             : evaluateOutput(plain, sseSummary, exportSummary);
+    const criteria = [
+        ...baseCriteria,
+        ...(byokReal ? evaluateByokRealOutput(plain, secretValues, realByok ?? {}) : []),
+    ];
     const durationMs = Date.now() - Date.parse(startedAt);
     await writeFile(rawPath, raw, 'utf8');
     await writeFile(plainPath, plain, 'utf8');
@@ -1188,6 +1440,7 @@ async function main() {
                 exitCode,
                 criteria,
                 sse: sseSummary,
+                byokReal: realByok?.redacted ?? null,
                 export: exportSummary
                     ? {
                           ok: exportSummary.ok,
@@ -1223,6 +1476,9 @@ async function main() {
         }),
         'utf8',
     );
+    if (realByok) {
+        await writeFile(path.join(outDir, 'byok.real.redacted.json'), `${JSON.stringify(realByok.redacted, null, 2)}\n`, 'utf8');
+    }
     const failed = criteria.filter((criterion) => !criterion.pass);
     console.log(`[terminal-live] summary: ${path.relative(ROOT, mdPath)}`);
     if (failed.length > 0 || exitCode !== 0) {

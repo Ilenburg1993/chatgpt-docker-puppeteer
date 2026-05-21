@@ -6,6 +6,11 @@
  */
 
 import { describe, expect, it } from 'vitest';
+import {
+    beginTerminalTurnMaterialization,
+    clearTerminalTurnMaterialization,
+    completeTerminalTurnMaterialization,
+} from '../../../src/copilot/terminal/state/turn-materialization-state.js';
 
 describe('terminal/wiring/terminal-agent-wiring.js — contrato', () => {
     it('importa sem erros', async () => {
@@ -57,5 +62,37 @@ describe('terminal/wiring/terminal-agent-wiring.js — contrato', () => {
         expect(
             mod.shouldSuppressDialogLoopChangedSse({ active: true, at: 1000 }, { active: true, at: 1500 }),
         ).toBe(false);
+    });
+
+    it('preserva dialog.turn_end como lifecycle sem arquivar reply ja materializado', async () => {
+        clearTerminalTurnMaterialization();
+        beginTerminalTurnMaterialization({ turnId: 'turn-live', timestamp: 1000 });
+        completeTerminalTurnMaterialization({
+            directReply:
+                'DELTA-CANONICAL-FINAL: resposta completa ja materializada por assistant.message antes do turn_end.',
+            directSource: 'sdk/assistant.message',
+            timestamp: 1001,
+        });
+        const mod = await import('../../../src/copilot/terminal/wiring/terminal-agent-wiring.js');
+
+        const truncatedReply = 'DELTA-CANONICAL-FINAL: resposta completa ja materializada';
+        const result = mod.createDialogTurnEndSseEnvelope({
+            turnId: 'turn-live',
+            reply: truncatedReply,
+            durationMs: 1234,
+            timestamp: 1002,
+        });
+
+        expect(result.replyAlreadyMaterialized).toBe(true);
+        expect(result.envelope).toEqual(
+            expect.objectContaining({
+                reply: '',
+                replySuppressed: true,
+                replySuppressionReason: 'already_materialized',
+                originalReplyChars: truncatedReply.length,
+                turnId: 'turn-live',
+            }),
+        );
+        clearTerminalTurnMaterialization();
     });
 });
