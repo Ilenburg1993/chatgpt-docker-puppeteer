@@ -23,7 +23,7 @@ import {
     normalizeElicitationPendingEvent,
 } from '#copilot/sdk/session';
 import { log } from './logging/index.js';
-import { decideModelCallAutoFallback } from './model-error-recovery.js';
+import { decideModelCallAutoFallback, decideModelCallErrorHandling } from './model-error-recovery.js';
 
 export {
     createQueuedElicitationHandler,
@@ -63,6 +63,43 @@ function normalizeHookErrorMessage(raw) {
         }
     }
     return String(raw);
+}
+
+/**
+ * Em BYOK há duas verdades úteis, mas distintas: o modelo configurado para o perfil e o modelo efetivo da sessão já
+ * anexada ao SDK. Erros live precisam usar a sessão como fonte primária, porque `/byok use` pode preparar o próximo
+ * perfil sem reiniciar imediatamente a sessão atual.
+ *
+ * @param {{ getModel: () => string | undefined }} input
+ * @param {{ model?: string | null }} byokSummary
+ * @returns {string | null}
+ */
+function resolveActiveByokModel(input, byokSummary) {
+    const activeModel = input.getModel();
+    if (typeof activeModel === 'string' && activeModel.trim()) return activeModel.trim();
+    const configuredModel = byokSummary.model;
+    if (typeof configuredModel === 'string' && configuredModel.trim()) return configuredModel.trim();
+    return null;
+}
+
+/**
+ * @param {AgentSessionHookInput} input
+ * @param {string} sessionId
+ * @returns {Promise<void>}
+ */
+async function abortCurrentByokProviderTurn(input, sessionId) {
+    if (typeof input.abortCurrentMessage !== 'function') return;
+    try {
+        await input.abortCurrentMessage();
+        log('WARN', `[agent/hook-port] turno BYOK abortado após erro de provider (session=${sessionId || 'unknown'}).`);
+    } catch (error) {
+        log(
+            'WARN',
+            `[agent/hook-port] falha ao abortar turno BYOK após erro de provider: ${
+                error instanceof Error ? error.message : String(error)
+            }`,
+        );
+    }
 }
 
 /**
@@ -156,6 +193,7 @@ function createAgentSessionLifecycleHooks(input) {
         const errorContext = String(errorInput.errorContext ?? '');
         const normalizedMessage = normalizeHookErrorMessage(errorInput.error);
         const byokSummary = readConfiguredByokSummary();
+        const byokModel = resolveActiveByokModel(input, byokSummary);
         log(
             'WARN',
             `[agent/hook-port] SDK errorOccurred [${errorContext}]: ${normalizedMessage} (recuperável: ${errorInput.recoverable})`,
@@ -202,12 +240,20 @@ function createAgentSessionLifecycleHooks(input) {
             byokEnabled: byokSummary.enabled === true,
             byokProviderType: byokSummary.providerType ?? null,
             byokProfile: byokSummary.profile ?? null,
-            byokModel: byokSummary.model ?? null,
+            byokModel,
         });
 
-        /** @type {'retry' | 'abort'} */
-        const errorHandling = modelRecoveryApplied ? 'abort' : errorInput.recoverable ? 'retry' : 'abort';
-        return { errorHandling };
+        if (errorContext === 'model_call' && byokSummary.enabled === true) {
+            await abortCurrentByokProviderTurn(input, sessionId);
+        }
+
+        const handlingDecision = decideModelCallErrorHandling({
+            errorContext,
+            recoverable: errorInput.recoverable,
+            byokEnabled: byokSummary.enabled === true,
+            modelRecoveryApplied,
+        });
+        return { errorHandling: handlingDecision.errorHandling };
     };
 
     return {
@@ -266,6 +312,7 @@ function createRuntimeDisableHook(isDisabledFn) {
  *         sessionId: string;
  *     }) => boolean;
  *     emit: (event: string, payload: object) => void;
+ *     abortCurrentMessage?: (() => Promise<void>) | undefined;
  *     metrics: { recordSessionStart: () => void; recordSessionEnd: () => void };
  * }} AgentSessionHookInput
  */

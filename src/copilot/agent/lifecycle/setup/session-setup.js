@@ -274,6 +274,12 @@ export function buildSessionHooks(ctx, host) {
             });
             return true;
         },
+        abortCurrentMessage: async () => {
+            const hostWithAbort = /** @type {{ abortCurrentMessage?: () => Promise<void> }} */ (host);
+            if (typeof hostWithAbort.abortCurrentMessage === 'function') {
+                await hostWithAbort.abortCurrentMessage();
+            }
+        },
         emit: (event, payload) => host.emit(event, payload),
         metrics: metricsStore,
     });

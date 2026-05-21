@@ -3,7 +3,7 @@
 const MAX_RECENT_TURN_TRACES = 20;
 
 /** @typedef {'assistant' | 'implicit'} TerminalTurnTraceSource */
-/** @typedef {'active' | 'completed' | 'interrupted'} TerminalTurnTraceStatus */
+/** @typedef {'active' | 'completed' | 'failed' | 'interrupted'} TerminalTurnTraceStatus */
 /** @typedef {'read' | 'write' | 'edit' | 'delete' | 'list' | 'run' | 'inspect' | 'unknown'} TerminalTurnTraceOperation */
 /** @typedef {'question' | 'ready' | 'reply' | 'stopped' | 'structured'} TerminalTurnTraceUserInputKind */
 /** @typedef {'requested' | 'answered' | 'cancelled'} TerminalTurnTraceUserInputStatus */

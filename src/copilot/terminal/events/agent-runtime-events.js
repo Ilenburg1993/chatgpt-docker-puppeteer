@@ -45,6 +45,8 @@ import { readTerminalRuntimeState } from '../frontend/gateways/index.js';
 import {
     createTerminalPendingQuestionReplayState,
     createToolCallRegistry,
+    completeTerminalTurnMaterialization,
+    completeTerminalTurnTrace,
     getTerminalDetailLevel,
     recordTerminalActivity,
     terminalActionChip,
@@ -140,7 +142,7 @@ const RECOVERABLE_MODEL_ERROR_RENDER_THROTTLE_MS = 30_000;
 const RECOVERABLE_MODEL_CALL_OPERATOR_DETAIL =
     'roteamento/retry delegado ao SDK; auto é a única recuperação permitida quando aplicável; sem Premium Request confirmada';
 const RECOVERABLE_BYOK_MODEL_CALL_OPERATOR_DETAIL =
-    'erro de provider BYOK; fallback para Copilot auto bloqueado por contrato; troque provider/modelo via /byok use ou /byok model; sem Premium Request';
+    'erro de provider BYOK; fallback para Copilot auto bloqueado por contrato; retry automático bloqueado para não prender o terminal; troque provider/modelo via /byok use ou /byok model; sem Premium Request';
 
 /**
  * @param {Record<string, unknown>} evt
@@ -416,8 +418,13 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, regi
         const msg = typeof evt?.['errorMessage'] === 'string' ? evt['errorMessage'] : 'unknown error';
         const recoverable = evt?.['recoverable'] === true;
         const isRecoverableModelCall = hookType === 'errorOccurred' && errorContext === 'model_call' && recoverable;
+        const isByokModelCall = isRecoverableModelCall && isByokRecoverableModelCall(evt);
         const operatorDetail = isRecoverableModelCall ? resolveRecoverableModelCallOperatorDetail(evt) : null;
-        const label = isRecoverableModelCall ? 'Erro recuperável de modelo SDK' : 'Erro do agente';
+        const label = isByokModelCall
+            ? 'Erro de provider BYOK'
+            : isRecoverableModelCall
+              ? 'Erro recuperável de modelo SDK'
+              : 'Erro do agente';
         const severity = isRecoverableModelCall ? 'warn' : 'error';
         const detail = isRecoverableModelCall ? `${msg} · ${operatorDetail}` : `[${errorContext}] ${msg}`;
         const renderKey = `${errorContext}|${msg}`;
@@ -427,6 +434,17 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, regi
             !isRecoverableModelCall || now - lastRenderedAt >= RECOVERABLE_MODEL_ERROR_RENDER_THROTTLE_MS;
         if (isRecoverableModelCall && shouldPrint) {
             recoverableModelErrorPrintedAtByKey.set(renderKey, now);
+        }
+
+        if (isByokModelCall) {
+            completeTerminalTurnMaterialization({
+                timestamp: now,
+                status: 'failed',
+            });
+            completeTerminalTurnTrace({
+                timestamp: now,
+                status: 'failed',
+            });
         }
 
         recordTerminalActivity('error', label, {

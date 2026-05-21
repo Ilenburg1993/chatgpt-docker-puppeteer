@@ -32,6 +32,7 @@ const readTerminalRuntimeState = vi.fn(
 );
 const recordTerminalTurnToolActivity = vi.fn();
 const completeTerminalTurnToolCall = vi.fn();
+const completeTerminalTurnTrace = vi.fn();
 const readTerminalTurnTraceProjection = vi.fn(() => ({ current: null, recent: [] }));
 const getTerminalDetailLevel = vi.fn(() => 'detailed');
 const recordToolCall = vi.fn();
@@ -66,6 +67,7 @@ vi.mock('../../../src/copilot/terminal/frontend/gateways/agent-runtime.js', () =
 vi.mock('../../../src/copilot/terminal/state/turn-trace-state.js', () => ({
     recordTerminalTurnToolActivity,
     completeTerminalTurnToolCall,
+    completeTerminalTurnTrace,
     readTerminalTurnTraceProjection,
 }));
 
@@ -1005,6 +1007,9 @@ describe('terminal/events/agent-runtime-events.js — contrato', () => {
     });
 
     it('explica erro recuperável de model_call BYOK sem sugerir fallback Copilot auto', async () => {
+        const { beginTerminalTurnMaterialization, readTerminalTurnMaterialization, clearTerminalTurnMaterialization } = await import(
+            '../../../src/copilot/terminal/state/turn-materialization-state.js'
+        );
         const { setupTerminalAgentRuntimeEventListeners } =
             await import('../../../src/copilot/terminal/events/agent-runtime-events.js');
         /** @type {Map<string, Function[]>} */
@@ -1018,6 +1023,8 @@ describe('terminal/events/agent-runtime-events.js — contrato', () => {
             off: vi.fn(),
         };
 
+        clearTerminalTurnMaterialization();
+        beginTerminalTurnMaterialization({ turnId: 'byok-turn-1', source: 'sdk/assistant.turn_start' });
         setupTerminalAgentRuntimeEventListeners({ agent: /** @type {any} */ (agent), rl: null });
         listeners.get('error')?.[0]?.({
             hookType: 'errorOccurred',
@@ -1032,7 +1039,7 @@ describe('terminal/events/agent-runtime-events.js — contrato', () => {
 
         expect(recordTerminalActivity).toHaveBeenCalledWith(
             'error',
-            'Erro recuperável de modelo SDK',
+            'Erro de provider BYOK',
             expect.objectContaining({
                 severity: 'warn',
                 detail: expect.stringContaining('fallback para Copilot auto bloqueado por contrato'),
@@ -1041,7 +1048,7 @@ describe('terminal/events/agent-runtime-events.js — contrato', () => {
         );
         expect(recordTerminalActivity).toHaveBeenCalledWith(
             'error',
-            'Erro recuperável de modelo SDK',
+            'Erro de provider BYOK',
             expect.objectContaining({
                 detail: expect.not.stringContaining('auto é a única recuperação permitida'),
             }),
@@ -1055,6 +1062,13 @@ describe('terminal/events/agent-runtime-events.js — contrato', () => {
                 handledAs: 'recoverable_model_call',
             }),
         );
+        expect(readTerminalTurnMaterialization()).toBeNull();
+        expect(completeTerminalTurnTrace).toHaveBeenCalledWith(
+            expect.objectContaining({
+                status: 'failed',
+            }),
+        );
+        clearTerminalTurnMaterialization();
     });
 
     it('reanuncia pergunta pendente viva ao registrar listeners do terminal', async () => {

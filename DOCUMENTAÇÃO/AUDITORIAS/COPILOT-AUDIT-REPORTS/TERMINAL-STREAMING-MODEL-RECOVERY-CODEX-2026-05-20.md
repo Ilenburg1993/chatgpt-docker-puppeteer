@@ -860,6 +860,34 @@ Validação:
 
 Status: implementado para raciocínio SDK, retomada de sessão, narrativa de erro, descoberta agregada e agrupamento visual de variantes. Ainda falta rodar turno funcional OpenRouter com modelo recomendado alternativo e fechar diagnóstico Gemini 403.
 
+### A42. Falha de provider BYOK ainda podia prender o turno e o harness
+
+Achado:
+
+- O live negativo com Cerebras mostrou que a política de erro já bloqueava fallback Copilot auto, mas a UX ainda deixava o turno como `active` em `/activity`. Para o operador, isso parecia trabalho em andamento mesmo depois de a causa raiz já estar conhecida.
+- O mesmo cenário expôs um bug no live runner: a condição que detectava `erro de provider BYOK` estava fora do guarda `!postCommandsSent` por precedência de operadores. O resultado era uma avalanche de `/activity 40` até o fechamento do terminal, seguida antes por `EPIPE` em algumas execuções.
+- O live Kilo positivo expôs outro falso negativo do harness: os comandos diagnósticos eram disparados assim que o marcador pós-`ask_user` aparecia no stream, antes de o turno estabilizar. Isso inseria `/usage now` no meio do bloco da LLM-B e podia quebrar o critério `final-delta-block` sem bug real no renderer.
+
+Correção:
+
+- `agent-runtime-events.js` agora encerra a materialização textual e o turn trace como `failed` quando chega erro recuperável de `model_call` em BYOK. O erro permanece como atividade atual, mas `/activity` passa a mostrar o último turno concluído com `status failed`, em vez de turno eterno `active`.
+- `turn-trace-state.js` ganhou status explícito `failed`, preservando a diferença entre falha operacional e interrupção.
+- O live runner passou a:
+  - reaplicar o modelo solicitado após alternância temporária de provider;
+  - classificar `erro de provider BYOK`/`Operation cancelled by user` como blocker `byok-provider-model-call-aborted`;
+  - proteger escrita em stdin contra `EPIPE`;
+  - enviar diagnóstico de erro apenas uma vez;
+  - esperar `Resposta concluída`/`Turno concluído` antes de disparar diagnósticos pós-`ask_user`.
+
+Validação:
+
+- Unit tests: `COPILOT_BYOK_ENABLED=false COPILOT_BYOK_PROFILE= COPILOT_BYOK_PROFILES_JSON= npx vitest run tests/unit/copilot/agent/test_hook_port.spec.js tests/unit/copilot/test_terminal_agent_runtime_events.spec.js tests/unit/copilot/test_hooks_module.spec.js` passou com 138 testes.
+- Typecheck: `npm run typecheck:strict:src.copilot` passou.
+- Live Kilo real completo passou em `artifacts/terminal-live/byok-kilo-canonical-after-runner-fix-2026-05-21/summary.md`: deltas parciais, bloco final, tools, `ask_user`, resposta humana, pós-ask, `/usage`, `/activity`, `/tools`, `/events`, `/errors`, `/health`, export, SSE HTTP/JSONL e ausência de duplicação.
+- Live Cerebras real ficou corretamente `BLOCKED` por provider em `artifacts/terminal-live/byok-cerebras-failure-after-turn-fail-2026-05-21/summary.md`: catálogo/cockpit/recomendação OK, segredo não vazou, sem Premium Request, sem fallback Copilot, e `/activity` mostrou `Último turno concluído` com `status failed`.
+
+Status: implementado nesta revisão para UX de falha BYOK e robustez do harness. Cerebras continua bloqueado por comportamento do provider/modelo real, não por duplicação de terminal.
+
 ## Hipóteses Externas Rejeitadas Ou Reclassificadas
 
 ### H1. "boot-hub assume sucesso"
@@ -1222,6 +1250,7 @@ Fase J5. UX e comandos
 - J5.27 Separar capacidade semântica de reasoning BYOK de `reasoningEffort` do SDK quando o id literal do provider contém `:`. Status: feito nesta revisão.
 - J5.28 Narrar erros BYOK como erros de provider customizado, bloqueando fallback Copilot auto e orientando troca por `/byok use`/`/byok model`. Status: feito nesta revisão.
 - J5.29 Agrupar visualmente modelos repetidos entre providers, preservando variantes por `profile`, preço, limites e auth. Status: feito nesta revisão via filtro `grouped`.
+- J5.30 Encerrar turno/materialização como `failed` quando o provider BYOK falha antes de qualquer delta público. Status: feito nesta revisão; `/activity` deixa de mostrar turno preso como `active`.
 
 Fase J6. Testes
 
@@ -1252,6 +1281,8 @@ Fase J6. Testes
 - J6.25 Cobrir `/byok models all-providers`, `/byok models all-providers grouped` e `/byok recommend all-providers` por unit test e por comando operacional real sem segredo. Status: feito nesta revisão.
 - J6.26 Rodar turno funcional OpenRouter free usando um modelo recomendado alternativo ao que retornou 400. Status: pendente.
 - J6.27 Investigar Gemini 403 separando Google AI Studio, Google Cloud e compatibilidade OpenAI endpoint, sem imprimir chave. Status: pendente.
+- J6.28 Rodar live Kilo real após correção do harness pós-ask, garantindo que comandos diagnósticos não entrem no meio do stream. Status: PASS em `artifacts/terminal-live/byok-kilo-canonical-after-runner-fix-2026-05-21/summary.md`.
+- J6.29 Rodar live Cerebras real para validar caminho negativo de provider: catálogo/cockpit/recomendação OK, erro sem fallback Copilot, turno `failed`, sem secret leak e sem Premium Request. Status: BLOCKED por provider em `artifacts/terminal-live/byok-cerebras-failure-after-turn-fail-2026-05-21/summary.md`, com terminal/harness corretos.
 
 Fase J7. Providers amplos
 
@@ -1270,7 +1301,7 @@ Fase J7. Providers amplos
 - J7.13 Hugging Face Router. Status: preset, key local e catalogo real `129` modelos. Falta turno funcional live e filtros por politica `:fastest|:cheapest|:preferred`.
 - J7.14 Cloudflare Workers AI. Status: preset e key/account local; OpenAI-compatible chat suportado, mas `/models` retornou `405`, entao fallback estatico esta correto. Falta probe de chat.
 - J7.15 NVIDIA NIM. Status: preset, key local e catalogo real `117` modelos. Falta turno funcional live.
-- J7.16 Cerebras. Status: preset, key local e catalogo real `4` modelos. Falta turno funcional live.
+- J7.16 Cerebras. Status: preset, key local, catalogo real `4` modelos e live negativo validado: provider falha em `model_call`, terminal bloqueia fallback Copilot, encerra turno como `failed` e orienta troca de modelo/provider. Falta descobrir modelo/configuração funcional.
 - J7.17 Chutes. Status: preset, key local e catalogo real `13` modelos com pricing. Falta turno funcional live.
 - J7.18 Z.AI. Status: preset, key local e catalogo real `7` modelos. Falta turno funcional live.
 
@@ -1357,6 +1388,8 @@ Implementado:
 - Sessões BYOK agora carregam metadados seguros de provider/perfil/preset no runtime para que a telemetria não dependa de inferência frágil.
 - `assistant.usage` de mensagem humana em BYOK passou a ser classificado como `byok_user_message`, com `premiumRequest=false` e sem emissão de `pr.consumed`.
 - O live runner passou a exigir `byok-real-usage-not-pr` e `byok-real-usage-classified` em execuções BYOK reais com turno funcional.
+- O live runner agora reaplica o modelo principal após alternância temporária de provider em BYOK real, detecta blocker de provider BYOK antes do timeout, evita `EPIPE` ao fechar terminal e só dispara diagnósticos pós-`ask_user` depois que o turno estabiliza.
+- `agent-runtime-events.js` encerra materialização e turn trace como `failed` quando `model_call` BYOK falha, de modo que `/activity` mostre falha concluída em vez de turno preso como ativo.
 - `/byok models` passou a mostrar uma página padrão menor em catálogos grandes, mantendo `/byok models all` e `/byok models <n>` para inspeção ampla.
 - Testes unitários adicionados para runtime root, reflection sync failure e SIGHUP policy.
 - Testes unitários adicionados para reconciliação de `assistant.message` materializado, supressão visual de `question.pending` e preferência `dialog.delta`.
@@ -1380,6 +1413,8 @@ Implementado:
 - Live sem PR pós-correção do prompt passou em `artifacts/terminal-live/2026-05-21T12-34-44-644Z/summary.md`: BYOK persistido entrou no boot, auto-brief ready mostrou `kilo-auto/free`, prompt exibiu `você[kilo-auto…/high]›`, `/usage` manteve telemetria PR histórica separada e `/errors` ficou limpo.
 - Live BYOK real pós-correção de usage passou em `artifacts/terminal-live/2026-05-21T12-40-35-670Z/summary.md`: Kilo/Ollama Cloud, deltas, tools, `ask_user`, pós-ask, prompt ativo e arquivo durável seguiram íntegros, e a usage do turno BYOK foi renderizada como `byok_user_message` sem Premium Request.
 - Live BYOK real com guarda automática de usage passou em `artifacts/terminal-live/2026-05-21T12-45-53-564Z/summary.md`: além do circuito completo, o summary agora prova explicitamente que o modelo BYOK não apareceu como `[PR]` e que a primeira usage foi `byok_user_message`.
+- Live Kilo real pós-correção do harness passou em `artifacts/terminal-live/byok-kilo-canonical-after-runner-fix-2026-05-21/summary.md`: deltas parciais, final, tools, `ask_user`, pós-ask, `/events`, `/events --raw`, `/tools`, `/health`, export e ausência de duplicação.
+- Live Cerebras real pós-correção de erro ficou `BLOCKED` em `artifacts/terminal-live/byok-cerebras-failure-after-turn-fail-2026-05-21/summary.md`: o terminal/harness se comportaram corretamente e o bloqueio ficou atribuído ao provider/modelo.
 - Teste unitário de `/byok models` cobre limitação padrão de 24 itens e ampliação explícita por número.
 - Probe BYOK real sem PR em `artifacts/terminal-live/2026-05-21T12-50-11-039Z/summary.md` confirmou catálogo Kilo remoto paginado (`24/346`), troca de modelo, alternância para Ollama Cloud, SSE/control plane e ausência de vazamento de segredos.
 - Live BYOK real com `kilo-auto/balanced` ficou `BLOCKED` por `byok-provider-credits` em `artifacts/terminal-live/2026-05-21T12-03-39-776Z/summary.md`; o runner agora classifica esse caso como falha externa de créditos/modelo, não como bug do terminal.
@@ -1401,7 +1436,7 @@ Próxima rodada recomendada:
 1. Rodar turno funcional live com OpenRouter free em modelo recomendado alternativo ao que retornou `400`, validando deltas, final, tools, `ask_user`, usage sem PR, retorno ao SDK e ausência de duplicações.
 2. Calibrar estimativa BYOK por provider/modelo com tokenização real quando disponível, mantendo fallback conservador por bytes UTF-8.
 3. Persistir no artefato live uma seção explícita de recomendação contextual quando `contextWindow` estiver disponível.
-4. Validar Cloudflare Workers AI por chat real, já que `/models` respondeu `405` e precisa manter fallback estatico claro.
+4. Descobrir uma configuração/modelo Cerebras funcional ou marcar recomendações Cerebras como probe-only quando o `model_call` real falhar repetidamente.
 5. Expandir o cenário live para elicitation quando a capability estiver disponível.
 6. Fechar a recuperação `session.error`/`reconnect_restart`, distinguindo retry real de reenvio ambíguo de prompt.
 7. Criar contrato único de modelo configurado/preferido/efetivo/cobrado, incluindo billing/effective model real em BYOK.

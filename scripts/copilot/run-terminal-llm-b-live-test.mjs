@@ -23,6 +23,8 @@ const ANSI_RE = /\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])/g;
 const SECRET_ENV_RE = /(?:API[_-]?KEY|TOKEN|SECRET|PASSWORD|BEARER)/iu;
 const POST_ASK_FINAL_RE =
     /(?:POST-ASK-CANONICAL-FINAL|Teste can[oô]nico|Usu[aá]rio confirmou SIM|confirmou SIM|respondeu SIM|Sistema operacional)/iu;
+const TURN_SETTLED_AFTER_ASK_RE =
+    /(?:Resposta concluída|Turno concluído; aguardando próxima mensagem|Turno do assistente concluído)/iu;
 
 function stripAnsi(value) {
     return String(value ?? '').replace(ANSI_RE, '');
@@ -253,7 +255,11 @@ function buildByokRealPreflightCommands({ profile, altProfile, model, altModel }
     }
     if (altProfile) {
         commands.push(`/byok use ${altProfile}`, '/byok', '/byok providers', '/byok models refresh', '/byok models free reasoning safe 8', '/byok recommend reasoning safe 8');
-        if (profile) commands.push(`/byok use ${profile}`, '/byok');
+        if (profile) {
+            commands.push(`/byok use ${profile}`);
+            if (model) commands.push(`/byok model ${model}`);
+            commands.push('/byok');
+        }
     }
     return commands;
 }
@@ -376,6 +382,13 @@ function detectLiveBlocker(plain, runtime = {}) {
         return {
             id: 'byok-provider-credits',
             detail: 'BYOK provider rejected the selected paid model with 402; switch to a free/credited model',
+        };
+    }
+    if (/erro de provider BYOK/i.test(plain) || /\[cancellation\]\s+Operation cancelled by user/i.test(plain)) {
+        const modelMatch = plain.match(/modelo=([^\s·\n]+)/i);
+        return {
+            id: 'byok-provider-model-call-aborted',
+            detail: `BYOK provider model_call failed and was aborted without Copilot fallback${modelMatch?.[1] ? ` · model=${modelMatch[1]}` : ''}`,
         };
     }
     if (runtime.timedOut) {
@@ -998,6 +1011,7 @@ function evaluateByokRealOutput(plain, secretValues, { profile, altProfile, mode
     const byokUsageClassified =
         /\bclasse=byok_user_message\b/u.test(plain) ||
         /"classification"\s*:\s*"byok_user_message"/u.test(plain);
+    const byokProviderBlocked = /erro de provider BYOK/i.test(plain) || /\[cancellation\]\s+Operation cancelled by user/i.test(plain);
     const criteria = [
         {
             id: 'byok-real-dotenv-reload',
@@ -1072,10 +1086,12 @@ function evaluateByokRealOutput(plain, secretValues, { profile, altProfile, mode
         },
         {
             id: 'byok-real-usage-classified',
-            pass: !byokTurnOpened || byokUsageClassified,
-            detail: byokTurnOpened
-                ? `BYOK user-message usage classification observed=${byokUsageClassified ? 'yes' : 'no'}`
-                : 'no BYOK user turn opened in this probe',
+            pass: !byokTurnOpened || byokUsageClassified || byokProviderBlocked,
+            detail: byokProviderBlocked
+                ? 'BYOK provider aborted before usage telemetry; no Premium Request was inferred'
+                : byokTurnOpened
+                  ? `BYOK user-message usage classification observed=${byokUsageClassified ? 'yes' : 'no'}`
+                  : 'no BYOK user turn opened in this probe',
         },
     ];
     return criteria;
@@ -1336,7 +1352,22 @@ async function main() {
         stdio: ['pipe', 'pipe', 'pipe'],
     });
 
-    const write = (line) => child.stdin.write(ensureLine(line));
+    let childClosed = false;
+    child.stdin.on('error', (error) => {
+        if (error?.code === 'EPIPE') return;
+        console.warn(`[terminal-live] stdin error: ${error?.message ?? String(error)}`);
+    });
+    const write = (line) => {
+        if (childClosed || child.stdin.destroyed || child.stdin.writableEnded) return false;
+        try {
+            return child.stdin.write(ensureLine(line));
+        } catch (error) {
+            if (error?.code !== 'EPIPE') {
+                console.warn(`[terminal-live] write failed: ${error?.message ?? String(error)}`);
+            }
+            return false;
+        }
+    };
     const schedulePostAnswerDiagnostics = (delayMs = postAnswerDelayMs) => {
         if (postCommandsSent) return;
         postCommandsSent = true;
@@ -1409,6 +1440,8 @@ async function main() {
         const afterAnswerPlain = answerSent ? plain.slice(answerPlainOffset) : '';
         if (answerSent && !postAskContinuationObserved && POST_ASK_FINAL_RE.test(afterAnswerPlain)) {
             postAskContinuationObserved = true;
+        }
+        if (postAskContinuationObserved && !postCommandsSent && TURN_SETTLED_AFTER_ASK_RE.test(afterAnswerPlain)) {
             schedulePostAnswerDiagnostics(500);
         }
         if (answerSent && !postCommandsSent && /Resposta enviada para pergunta pendente/.test(plain)) {
@@ -1418,9 +1451,10 @@ async function main() {
         }
         if (
             !postCommandsSent &&
-            /Erro de sessão \[(?:query|rate_limit)\]|You've hit your rate limit|session\.error|CAPIError|Failed to get response from the AI model/i.test(
+            (/Erro de sessão \[(?:query|rate_limit)\]|You've hit your rate limit|session\.error|CAPIError|Failed to get response from the AI model/i.test(
                 plain,
-            )
+            ) ||
+                /erro de provider BYOK|\[cancellation\]\s+Operation cancelled by user/i.test(plain))
         ) {
             postCommandsSent = true;
             if (postAnswerCommandTimer) {
@@ -1447,7 +1481,10 @@ async function main() {
     child.stderr.on('data', onData);
 
     exitCode = await new Promise((resolve) => {
-        child.on('close', (code) => resolve(code));
+        child.on('close', (code) => {
+            childClosed = true;
+            resolve(code);
+        });
     });
     clearTimeout(timeout);
     sseCollector?.close();

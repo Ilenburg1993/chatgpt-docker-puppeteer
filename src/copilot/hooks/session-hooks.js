@@ -21,6 +21,7 @@ import { getCopilotFallbackModel, readConfiguredByokSummary } from '#copilot/con
 import { toError } from '#copilot/core';
 import { classifySdkRateLimitScope } from '#copilot/sdk/errors';
 import { hostname } from 'node:os';
+import { decideModelCallErrorHandling } from '../agent/ports/model-error-recovery.js';
 import { createErrorHandler } from './error-handler.js';
 import { log } from './logger.js';
 
@@ -45,6 +46,19 @@ function normalizeHookErrorMessage(raw) {
         }
     }
     return String(raw);
+}
+
+/**
+ * @param {() => string | undefined} getModel
+ * @param {{ model?: string | null }} byokSummary
+ * @returns {string | null}
+ */
+function resolveActiveByokModel(getModel, byokSummary) {
+    const activeModel = getModel();
+    if (typeof activeModel === 'string' && activeModel.trim()) return activeModel.trim();
+    const configuredModel = byokSummary.model;
+    if (typeof configuredModel === 'string' && configuredModel.trim()) return configuredModel.trim();
+    return null;
 }
 
 /**
@@ -79,11 +93,17 @@ export function createSessionHooks(ctx) {
 
     const onErrorOccurred = createErrorHandler({
         maxRetries: 3,
-        strategy: (input) => (input.recoverable ? 'retry' : 'abort'),
+        strategy: (input) =>
+            decideModelCallErrorHandling({
+                errorContext: input.errorContext,
+                recoverable: input.recoverable,
+                byokEnabled: readConfiguredByokSummary().enabled === true,
+            }).errorHandling,
         onError: (input, invocation) => {
             const sessionId = invocation?.sessionId ?? '';
             const normalizedMessage = normalizeHookErrorMessage(input.error);
             const byokSummary = readConfiguredByokSummary();
+            const byokModel = resolveActiveByokModel(getModel, byokSummary);
             log(
                 'WARN',
                 `[hooks/session-lifecycle] SDK errorOccurred [${input.errorContext}]: ${normalizedMessage} (recuperável: ${input.recoverable})`,
@@ -138,7 +158,7 @@ export function createSessionHooks(ctx) {
                 byokEnabled: byokSummary.enabled === true,
                 byokProviderType: byokSummary.providerType ?? null,
                 byokProfile: byokSummary.profile ?? null,
-                byokModel: byokSummary.model ?? null,
+                byokModel,
             });
         },
     });
