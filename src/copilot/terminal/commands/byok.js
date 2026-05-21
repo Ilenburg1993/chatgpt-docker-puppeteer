@@ -13,12 +13,13 @@ import fs from 'node:fs/promises';
 import { config as loadDotenv } from 'dotenv';
 
 import { discoverConfiguredByokModelsFromEnv } from '#copilot/config';
-import { readTerminalByokProjection } from '../frontend/index.js';
+import { readTerminalByokProjection, readTerminalRuntimeState } from '../frontend/index.js';
 
 const DEFAULT_BYOK_MODELS_DISPLAY_LIMIT = 24;
 const DEFAULT_BYOK_RECOMMEND_DISPLAY_LIMIT = 8;
 const BYOK_LOW_REQUEST_TOKEN_LIMIT = 8_000;
 const BYOK_COMFORTABLE_REQUEST_TOKEN_LIMIT = 32_000;
+const BYOK_RECOMMEND_RESPONSE_RESERVE_TOKENS = 1_024;
 const BYOK_RUNTIME_SELECTOR_ENV_KEYS = Object.freeze([
     'COPILOT_BYOK_PROFILE',
     'COPILOT_BYOK_PROVIDER_PRESET',
@@ -86,6 +87,46 @@ function compactNumber(value) {
 }
 
 /**
+ * @param {unknown} value
+ * @returns {number | null}
+ */
+function finitePositiveNumber(value) {
+    return typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : null;
+}
+
+/**
+ * @param {ReturnType<typeof readTerminalRuntimeState> | null} runtimeState
+ * @returns {{ estimatedRequestTokens: number; contextTokens: number; tokenLimit: number | null; utilization: number | null } | null}
+ */
+function estimateCurrentByokRequestBudget(runtimeState) {
+    const contextState = runtimeState?.contextWindow ?? null;
+    if (!contextState) return null;
+    const tokenLimit = finitePositiveNumber(/** @type {{ tokenLimit?: unknown }} */ (contextState).tokenLimit);
+    const directTokens = finitePositiveNumber(/** @type {{ tokens?: unknown }} */ (contextState).tokens);
+    const utilization = finitePositiveNumber(/** @type {{ utilization?: unknown }} */ (contextState).utilization);
+    const contextTokens =
+        directTokens ?? (tokenLimit !== null && utilization !== null ? Math.ceil(tokenLimit * utilization) : null);
+    if (contextTokens === null) return null;
+    return {
+        estimatedRequestTokens: Math.max(0, contextTokens + BYOK_RECOMMEND_RESPONSE_RESERVE_TOKENS),
+        contextTokens,
+        tokenLimit,
+        utilization,
+    };
+}
+
+/**
+ * @returns {ReturnType<typeof estimateCurrentByokRequestBudget>}
+ */
+function readCurrentByokRequestBudget() {
+    try {
+        return estimateCurrentByokRequestBudget(readTerminalRuntimeState());
+    } catch {
+        return null;
+    }
+}
+
+/**
  * @param {import('#copilot/sdk/types').ModelInfo} model
  * @returns {number}
  */
@@ -114,11 +155,18 @@ function rankByokModels(models) {
 
 /**
  * @param {import('#copilot/sdk/types').ModelInfo} model
+ * @param {ReturnType<typeof estimateCurrentByokRequestBudget>} [runtimeBudget]
  * @returns {{ level: 'ok' | 'caution' | 'blocked'; label: string }}
  */
-function classifyByokModelBudget(model) {
+function classifyByokModelBudget(model, runtimeBudget = null) {
     const meta = getByokModelMetadata(model);
     const limit = meta?.rateLimits?.maxRequestTokens ?? meta?.rateLimits?.tokensPerMinute ?? null;
+    if (limit !== null && runtimeBudget !== null && runtimeBudget.estimatedRequestTokens > limit) {
+        return {
+            level: 'blocked',
+            label: `bloqueado para contexto atual (${runtimeBudget.estimatedRequestTokens}/${limit} tokens); use /compact, sessão fresca ou provider maior`,
+        };
+    }
     if (limit !== null && limit < BYOK_LOW_REQUEST_TOKEN_LIMIT) {
         return {
             level: 'blocked',
@@ -198,9 +246,10 @@ function parseRecommendArgs(rest) {
 /**
  * @param {import('#copilot/sdk/types').ModelInfo} model
  * @param {ReturnType<typeof parseRecommendArgs>} filters
+ * @param {ReturnType<typeof estimateCurrentByokRequestBudget>} [runtimeBudget]
  * @returns {boolean}
  */
-function matchesRecommendFilters(model, filters) {
+function matchesRecommendFilters(model, filters, runtimeBudget = null) {
     const meta = getByokModelMetadata(model);
     const context = model.capabilities?.limits?.max_context_window_tokens ?? 0;
     const maxRequest = meta?.rateLimits?.maxRequestTokens ?? meta?.rateLimits?.tokensPerMinute ?? null;
@@ -215,7 +264,7 @@ function matchesRecommendFilters(model, filters) {
     if (filters.reasoning && !model.capabilities?.supports?.reasoningEffort) return false;
     if (filters.minContext !== null && context < filters.minContext) return false;
     if (filters.minRequest !== null && (maxRequest === null || maxRequest < filters.minRequest)) return false;
-    if (filters.avoidLowLimit && classifyByokModelBudget(model).level === 'blocked') return false;
+    if (filters.avoidLowLimit && classifyByokModelBudget(model, runtimeBudget).level === 'blocked') return false;
     return true;
 }
 
@@ -266,10 +315,13 @@ function renderModelTags(model) {
 /**
  * @param {import('#copilot/sdk/types').ModelInfo[]} models
  * @param {ReturnType<typeof parseRecommendArgs>} filters
+ * @param {ReturnType<typeof estimateCurrentByokRequestBudget>} [runtimeBudget]
  * @returns {import('#copilot/sdk/types').ModelInfo[]}
  */
-function recommendByokModels(models, filters) {
-    return rankByokModels(models).filter((model) => matchesRecommendFilters(model, filters)).slice(0, filters.limit);
+function recommendByokModels(models, filters, runtimeBudget = null) {
+    return rankByokModels(models)
+        .filter((model) => matchesRecommendFilters(model, filters, runtimeBudget))
+        .slice(0, filters.limit);
 }
 
 /**
@@ -591,8 +643,9 @@ export async function cmdByok({ println }, arg) {
         const filters = parseRecommendArgs(rest);
         const limit = showAll ? Number.POSITIVE_INFINITY : filters.limit === DEFAULT_BYOK_RECOMMEND_DISPLAY_LIMIT ? DEFAULT_BYOK_MODELS_DISPLAY_LIMIT : filters.limit;
         const discovered = await discoverConfiguredByokModelsFromEnv(process.env, { forceRefresh });
+        const runtimeBudget = readCurrentByokRequestBudget();
         const modelList = rankByokModels(discovered.models.length > 0 ? discovered.models : models).filter((model) =>
-            matchesRecommendFilters(model, filters),
+            matchesRecommendFilters(model, filters, runtimeBudget),
         );
         const visibleModels = modelList.slice(0, limit);
         const filterLabel = renderByokFilterLabel(filters);
@@ -629,9 +682,10 @@ export async function cmdByok({ println }, arg) {
 
     if (sub === 'recommend' || sub === 'rec') {
         const filters = parseRecommendArgs(rest);
+        const runtimeBudget = readCurrentByokRequestBudget();
         const discovered = await discoverConfiguredByokModelsFromEnv(process.env, { forceRefresh: filters.forceRefresh });
         const modelList = discovered.models.length > 0 ? discovered.models : models;
-        const recommended = recommendByokModels(modelList, filters);
+        const recommended = recommendByokModels(modelList, filters, runtimeBudget);
         const sourceLabel =
             discovered.source === 'remote'
                 ? 'provider'
@@ -645,6 +699,15 @@ export async function cmdByok({ println }, arg) {
         println(
             `  \x1b[90mfonte=${sourceLabel}${discovered.endpoint ? ` · endpoint=${discovered.endpoint}` : ''} · filtros=${filterLabel || '-'}\x1b[0m\n`,
         );
+        if (runtimeBudget !== null) {
+            const contextLabel =
+                runtimeBudget.tokenLimit !== null
+                    ? `${runtimeBudget.contextTokens}/${runtimeBudget.tokenLimit}`
+                    : `${runtimeBudget.contextTokens}`;
+            println(
+                `  \x1b[90mcontexto atual≈${contextLabel} tokens · estimativa pré-turno≈${runtimeBudget.estimatedRequestTokens} tokens\x1b[0m\n`,
+            );
+        }
         if (discovered.error) {
             println(`  \x1b[33m  aviso: descoberta remota indisponível (${discovered.error}); usando catálogo estático.\x1b[0m`);
         }
@@ -654,7 +717,7 @@ export async function cmdByok({ println }, arg) {
         }
         let index = 1;
         for (const model of recommended) {
-            const budget = classifyByokModelBudget(model);
+            const budget = classifyByokModelBudget(model, runtimeBudget);
             const color = budget.level === 'ok' ? '\x1b[32m' : budget.level === 'caution' ? '\x1b[33m' : '\x1b[31m';
             println(`    ${index}. \x1b[33m${model.id}\x1b[0m`);
             println(`       \x1b[90m${renderModelTags(model)}\x1b[0m`);

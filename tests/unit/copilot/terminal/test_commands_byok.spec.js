@@ -2,13 +2,14 @@
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-const { chmod, discoverConfiguredByokModelsFromEnv, loadDotenv, readFile, readTerminalByokProjection, rename, writeFile } =
+const { chmod, discoverConfiguredByokModelsFromEnv, loadDotenv, readFile, readTerminalByokProjection, readTerminalRuntimeState, rename, writeFile } =
     vi.hoisted(() => ({
         chmod: vi.fn(),
         discoverConfiguredByokModelsFromEnv: vi.fn(),
         loadDotenv: vi.fn(),
         readFile: vi.fn(),
         readTerminalByokProjection: vi.fn(),
+        readTerminalRuntimeState: vi.fn(() => ({ contextWindow: null })),
         rename: vi.fn(),
         writeFile: vi.fn(),
     }));
@@ -31,6 +32,7 @@ vi.mock('#copilot/config', () => ({
 
 vi.mock('../../../../src/copilot/terminal/frontend/index.js', () => ({
     readTerminalByokProjection,
+    readTerminalRuntimeState,
 }));
 
 const { cmdByok } = await import('../../../../src/copilot/terminal/commands/byok.js');
@@ -85,6 +87,8 @@ describe('terminal /byok command', () => {
         loadDotenv.mockReset();
         readFile.mockReset();
         readTerminalByokProjection.mockReset();
+        readTerminalRuntimeState.mockReset();
+        readTerminalRuntimeState.mockReturnValue({ contextWindow: null });
         rename.mockReset();
         writeFile.mockReset();
         delete process.env['COPILOT_BYOK_ENABLED'];
@@ -503,6 +507,47 @@ describe('terminal /byok command', () => {
         expect(ctx.output()).toContain('groq-small-budget');
         expect(ctx.output()).toContain('baixo para turno real');
         expect(ctx.output()).toContain('sessão fresca');
+    });
+
+    it('recomenda modelos BYOK considerando o orçamento vivo da sessão atual', async () => {
+        readTerminalRuntimeState.mockReturnValue({
+            contextWindow: { tokens: 63000, tokenLimit: 200000, utilization: 0.315 },
+        });
+        discoverConfiguredByokModelsFromEnv.mockResolvedValue({
+            models: [
+                {
+                    id: 'openrouter/almost-enough',
+                    capabilities: { supports: { reasoningEffort: true, vision: false }, limits: { max_context_window_tokens: 200000 } },
+                    byok: {
+                        freeTier: true,
+                        provider: 'openrouter',
+                        rateLimits: { maxRequestTokens: 64000 },
+                    },
+                },
+                {
+                    id: 'openrouter-roomy',
+                    capabilities: { supports: { reasoningEffort: true, vision: false }, limits: { max_context_window_tokens: 200000 } },
+                    byok: {
+                        freeTier: true,
+                        provider: 'openrouter',
+                        rateLimits: { maxRequestTokens: 128000 },
+                    },
+                },
+            ],
+            source: 'remote',
+            endpoint: 'https://openrouter.ai/api/v1/models',
+            fromCache: false,
+            error: null,
+        });
+        mockProjection();
+        const ctx = mockCtx();
+
+        await cmdByok({ println: ctx.println }, 'recommend free reasoning safe 5');
+
+        expect(ctx.output()).toContain('contexto atual≈63000/200000 tokens');
+        expect(ctx.output()).toContain('estimativa pré-turno≈64024 tokens');
+        expect(ctx.output()).toContain('openrouter-roomy');
+        expect(ctx.output()).not.toContain('openrouter/almost-enough');
     });
 
     it('recarrega .env.local sem imprimir segredos', async () => {
