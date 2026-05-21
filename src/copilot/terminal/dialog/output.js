@@ -296,22 +296,29 @@ function shortenPromptToken(value, max = 18) {
 
 /**
  * @param {ReturnType<typeof readTerminalRuntimeState>} state
- * @returns {{ displayModel: string; configuredModel: string | null; mismatch: boolean }}
+ * @returns {{ displayModel: string; configuredModel: string | null; observedModel: string | null; mismatch: boolean }}
  */
 function resolvePromptModelProjection(state) {
     const lastPrInfo = /** @type {Record<string, unknown> | null} */ (state.lastPrInfo ?? null);
-    const configuredModel = typeof lastPrInfo?.['configuredModel'] === 'string' ? lastPrInfo['configuredModel'] : null;
+    const activeModel = state.model || 'unknown';
+    const observedConfiguredModel =
+        typeof lastPrInfo?.['configuredModel'] === 'string' ? lastPrInfo['configuredModel'] : null;
     const effectiveModel = typeof lastPrInfo?.['effectiveModel'] === 'string' ? lastPrInfo['effectiveModel'] : null;
     const billedModel = typeof lastPrInfo?.['model'] === 'string' ? lastPrInfo['model'] : null;
-    const mismatch = resolveModelSelectionMismatch({
-        configuredModel,
-        billedModel,
-        effectiveModel,
-        explicitMismatch: Boolean(lastPrInfo?.['modelMismatch']),
-    });
+    const observedModel = effectiveModel ?? billedModel ?? null;
+    const telemetryMatchesActiveConfig = !observedConfiguredModel || observedConfiguredModel === activeModel;
+    const mismatch =
+        telemetryMatchesActiveConfig &&
+        resolveModelSelectionMismatch({
+            configuredModel: activeModel,
+            billedModel,
+            effectiveModel,
+            explicitMismatch: Boolean(lastPrInfo?.['modelMismatch']),
+        });
     return {
-        displayModel: effectiveModel ?? billedModel ?? configuredModel ?? state.model,
-        configuredModel,
+        displayModel: activeModel,
+        configuredModel: activeModel,
+        observedModel,
         mismatch,
     };
 }
@@ -387,14 +394,15 @@ export function buildUserPrompt() {
     if (
         modelProjection.mismatch &&
         modelProjection.configuredModel &&
-        modelProjection.displayModel !== modelProjection.configuredModel
+        modelProjection.observedModel &&
+        modelProjection.observedModel !== modelProjection.configuredModel
     ) {
         pushPromptTag(
             terminalThemeText(
                 'warn',
                 compactDetail
                     ? '[MM]'
-                    : `[MODEL-CHECK:${modelProjection.configuredModel}→${modelProjection.displayModel}]`,
+                    : `[MODEL-CHECK:${modelProjection.configuredModel}→${modelProjection.observedModel}]`,
             ),
             terminalThemeText('warn', '[MM]'),
         );

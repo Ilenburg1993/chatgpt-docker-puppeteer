@@ -675,6 +675,24 @@ Correção:
 
 Status: implementado nesta revisão.
 
+### A35. Prompt vivo confundia telemetria histórica com identidade ativa do modelo
+
+Achado:
+
+- Após o boot persistente em BYOK, o auto-brief e `/metrics` já indicavam `kilo-auto/free`, mas o prompt ainda podia aparecer como `você[claude-haiku-4.5/high]›`.
+- A causa era estrutural: `buildUserPrompt()` e `readTerminalDialogStreamMeta()` priorizavam `lastPrInfo.effectiveModel/model`, que é telemetria histórica de consumo/roteamento, antes de `state.model`, que é a configuração ativa do runtime.
+- Isso não quebrava o roteamento BYOK, mas quebrava a UX: o operador parecia estar em outro modelo/provider, e a linha viva podia mascarar a diferença entre estado atual e auditoria de billing.
+
+Correção:
+
+- O prompt e a linha de espera passam a usar `state.model` como identidade canônica viva.
+- `lastPrInfo` continua disponível para `/usage`, `/metrics`, `/status` e alertas de billing/roteamento, mas só gera tag `[MODEL-CHECK:cfg→observado]` no prompt quando a telemetria pertence ao mesmo modelo configurado atual.
+- Telemetria antiga de outro modelo não contamina mais a identidade do prompt.
+- Unit tests cobrem mismatch observado do modelo atual e ignoram mismatch histórico de outro modelo.
+- Probe live sem PR confirmou o prompt correto `você[kilo-auto…/high]›` com BYOK persistido em `.env.local`: `artifacts/terminal-live/2026-05-21T12-34-44-644Z/summary.md`.
+
+Status: implementado nesta revisão.
+
 ## Hipóteses Externas Rejeitadas Ou Reclassificadas
 
 ### H1. "boot-hub assume sucesso"
@@ -997,10 +1015,10 @@ Fase J4. Sessão e lifecycle
 
 - J4.1 Injetar `provider`, `model` e `modelCapabilities` na sessão persistente. Status: feito nesta revisão.
 - J4.2 Omitir `reasoningEffort` quando o provider declara não suportar reasoning. Status: feito nesta revisão.
-- J4.3 Persistir modelo BYOK efetivo de forma clara em status/model UX. Status: parcialmente feito; live Kilo confirmou `kilo-auto/free`, mas ainda falta contrato único configurado/preferido/efetivo/cobrado.
+- J4.3 Persistir modelo BYOK efetivo de forma clara em status/model UX. Status: feito para identidade viva do terminal; prompt, waiting prompt, auto-brief e `/metrics` convergem em `state.model`. Ainda resta enriquecer billing/effective de provider em comandos diagnósticos.
 - J4.4 Bloquear BYOK incompleto com erro acionável antes de criar sessão. Status: feito nesta revisão.
 - J4.5 Suportar troca runtime de provider sem restart completo. Status: pendente; requer política de rotação de sessão e não deve criar loop paralelo.
-- J4.6 Diferenciar troca efêmera de processo e persistência em `.env.local`. Status: parcialmente feito; comandos efêmeros existem, persistência segura pendente.
+- J4.6 Diferenciar troca efêmera de processo e persistência em `.env.local`. Status: feito; `/byok use|model|provider` são efêmeros e `/byok persist ...` grava seletores não secretos.
 
 Fase J5. UX e comandos
 
@@ -1008,7 +1026,7 @@ Fase J5. UX e comandos
 - J5.2 Criar `/byok models`. Status: feito nesta revisão.
 - J5.3 Criar `/byok env`. Status: feito nesta revisão.
 - J5.4 Integrar BYOK em `/status`, `/health`, `/model` e auto-brief. Status: feito nesta revisão.
-- J5.5 Mostrar diferença entre modelo BYOK configurado, modelo SDK efetivo e provider. Status: parcialmente feito; live real mostrou provider/model/status, mas falta consolidar billing/effective model em uma linha canônica.
+- J5.5 Mostrar diferença entre modelo BYOK configurado, modelo SDK efetivo e provider. Status: parcialmente feito; prompt foi corrigido para identidade ativa e comandos mostram histórico, mas ainda falta uma linha diagnóstica única para configurado/preferido/efetivo/cobrado.
 - J5.6 Bloquear `/model <id>` enganoso quando BYOK está ativo e orientar alteração por env/restart. Status: feito nesta revisão.
 - J5.7 Criar `/byok reload`. Status: feito nesta revisão.
 - J5.8 Criar `/byok profiles`. Status: feito nesta revisão.
@@ -1019,6 +1037,7 @@ Fase J5. UX e comandos
 - J5.13 Criar `/byok models refresh` com descoberta forçada. Status: feito nesta revisão.
 - J5.14 Mostrar fonte do catálogo (`provider`, `provider-cache`, `static`, `static-fallback`) no terminal. Status: feito nesta revisão.
 - J5.15 Integrar BYOK em `/events sources` como fonte pública de provider/config sem fanout paralelo. Status: feito nesta revisão.
+- J5.16 Impedir que `lastPrInfo` histórico sobrescreva o modelo ativo no prompt e na linha de espera. Status: feito nesta revisão; live sem PR confirmou `kilo-auto/free` no prompt.
 
 Fase J6. Testes
 
@@ -1119,6 +1138,7 @@ Implementado:
 - `runtime-root.js` agora emite `terminal.runtime.wired` e `terminal.runtime.wire_failed` com fase, duração e diagnóstico normalizado.
 - `/events sources` classifica os eventos de fiação do runtime em `terminal.lifecycle`.
 - `/events sources` agora imprime comandos de investigação por política (`/events event=... 50` e `/events source=... 50`), reduzindo atrito para rastrear duplicações.
+- O prompt vivo e o waiting prompt agora usam o modelo ativo do runtime (`state.model`) como identidade canônica; `lastPrInfo` histórico não sobrescreve mais BYOK/modelo atual.
 - Testes unitários adicionados para runtime root, reflection sync failure e SIGHUP policy.
 - Testes unitários adicionados para reconciliação de `assistant.message` materializado, supressão visual de `question.pending` e preferência `dialog.delta`.
 - Testes unitários adicionados para normalização de objetos de erro sem `message`.
@@ -1138,6 +1158,7 @@ Implementado:
 - Live BYOK fixture sem PR passou em `artifacts/terminal-live/2026-05-21T11-50-03-576Z/summary.md`: perfil `codex-fixture`, descoberta automática `fonte=provider` via endpoint local `/v1/models`, catálogo `fixture/model-a|fixture/model-b|fixture/model-remote-c`, troca runtime para `fixture/model-b`, troca para provider direto `fixture/model-c`, retorno ao SDK, `/events`, `/events --raw` e `/errors`, sem vazamento do token fictício e sem turno explícito.
 - Live BYOK real sem PR passou em `artifacts/terminal-live/2026-05-21T12-02-58-405Z/summary.md`: `.env.local` recarregado, perfil Kilo ativo, catálogo Kilo remoto disponível, perfil alternativo Ollama Cloud exercitado, `/events`, `/events --raw`, `/metrics`, `/errors`, sem turno explícito e sem vazamento de segredos.
 - Live BYOK real completo passou em `artifacts/terminal-live/2026-05-21T12-12-19-528Z/summary.md`: Kilo `kilo-auto/free`, troca de modelo dentro do Kilo, alternância para Ollama Cloud, deltas parciais, bloco final, tool, `ask_user`, resposta humana, continuação pós-ask, telemetry sem Premium Request, SSE/JSONL/export e ausência de duplicação.
+- Live sem PR pós-correção do prompt passou em `artifacts/terminal-live/2026-05-21T12-34-44-644Z/summary.md`: BYOK persistido entrou no boot, auto-brief ready mostrou `kilo-auto/free`, prompt exibiu `você[kilo-auto…/high]›`, `/usage` manteve telemetria PR histórica separada e `/errors` ficou limpo.
 - Live BYOK real com `kilo-auto/balanced` ficou `BLOCKED` por `byok-provider-credits` em `artifacts/terminal-live/2026-05-21T12-03-39-776Z/summary.md`; o runner agora classifica esse caso como falha externa de créditos/modelo, não como bug do terminal.
 - Smoke BYOK local sem rede validou `ollama-local`, normalização de `baseUrl` para `/v1`, modelo explícito e resumo sem segredo.
 - Testes BYOK desta rodada validaram Kilo Gateway como OpenAI-compatible, perfil ativo por `COPILOT_BYOK_PROFILE`, resumos redigidos e comandos `/byok profiles`, `/byok use` e `/byok model`.

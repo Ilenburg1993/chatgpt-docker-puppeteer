@@ -123,7 +123,7 @@ describe('terminal/dialog/output buildUserPrompt', () => {
         expect(prompt).toContain('high');
     });
 
-    it('prefere modelo efetivo observado quando há mismatch com o configurado', async () => {
+    it('mantém o modelo ativo como identidade do prompt e sinaliza mismatch observado', async () => {
         readTerminalRuntimeState.mockReturnValueOnce(
             /** @type {any} */ ({
                 ...readTerminalRuntimeState(),
@@ -140,8 +140,30 @@ describe('terminal/dialog/output buildUserPrompt', () => {
         const { buildUserPrompt } = await import('../../../../src/copilot/terminal/dialog/output.js');
         const prompt = buildUserPrompt();
 
+        expect(prompt).toContain('gpt-5.4');
         expect(prompt).toContain('claude-haiku-4.5');
         expect(prompt).toContain('[MODEL-CHECK:gpt-5.4→claude-haiku-4.5]');
+    });
+
+    it('ignora telemetria histórica de modelo anterior no prompt ativo', async () => {
+        readTerminalRuntimeState.mockReturnValueOnce(
+            /** @type {any} */ ({
+                ...readTerminalRuntimeState(),
+                model: 'kilo-auto/free',
+                lastPrInfo: {
+                    model: 'claude-haiku-4.5',
+                    configuredModel: 'gpt-5.4',
+                    effectiveModel: 'claude-haiku-4.5',
+                    modelMismatch: true,
+                    ts: Date.now(),
+                },
+            }),
+        );
+        const { buildUserPrompt } = await import('../../../../src/copilot/terminal/dialog/output.js');
+        const prompt = buildUserPrompt();
+
+        expect(prompt).toContain('kilo-auto/free');
+        expect(prompt).not.toContain('[MODEL-CHECK:gpt-5.4→claude-haiku-4.5]');
     });
 
     it('inclui marcador SHADOW quando só há shadow expirada', async () => {

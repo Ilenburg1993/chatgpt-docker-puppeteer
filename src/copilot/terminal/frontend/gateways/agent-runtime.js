@@ -7,7 +7,6 @@
  */
 
 import { getSharedSessionBinding } from '#copilot/core';
-import { resolveModelSelectionMismatch } from '#copilot/core';
 import {
     abortAgentRuntimeCurrentMessage,
     answerAgentPendingQuestion,
@@ -269,20 +268,8 @@ export function readTerminalSessionBinding() {
  */
 export function readTerminalDialogStreamMeta(runtimeId) {
     const state = readTerminalRuntimeState(runtimeId);
-    const lastPrInfo = /** @type {Record<string, unknown> | null} */ (state.lastPrInfo ?? null);
-    const configuredModel = typeof lastPrInfo?.['configuredModel'] === 'string' ? lastPrInfo['configuredModel'] : null;
-    const effectiveModel = typeof lastPrInfo?.['effectiveModel'] === 'string' ? lastPrInfo['effectiveModel'] : null;
-    const billedModel = typeof lastPrInfo?.['model'] === 'string' ? lastPrInfo['model'] : null;
-    const mismatch = resolveModelSelectionMismatch({
-        configuredModel,
-        billedModel,
-        effectiveModel,
-        explicitMismatch: Boolean(lastPrInfo?.['modelMismatch']),
-    });
     return {
-        model: mismatch
-            ? (effectiveModel ?? billedModel ?? state.model)
-            : (effectiveModel ?? billedModel ?? state.model),
+        model: state.model,
         reasoningEffort: state.reasoningEffort,
     };
 }

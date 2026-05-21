@@ -660,7 +660,7 @@ describe('terminal/frontend/index', () => {
         expect(notifyTerminalTurn).toHaveBeenCalled();
     });
 
-    it('prefere effectiveModel no stream meta quando há mismatch', async () => {
+    it('mantém o modelo ativo no stream meta mesmo quando há mismatch histórico', async () => {
         defaultRuntime.lastPrInfo = {
             model: 'claude-haiku-4.5',
             configuredModel: 'gpt-5.4',
@@ -671,7 +671,7 @@ describe('terminal/frontend/index', () => {
         defaultRuntime.model = 'gpt-5.4';
 
         expect(runtime.readTerminalDialogStreamMeta()).toEqual({
-            model: 'claude-haiku-4.5',
+            model: 'gpt-5.4',
             reasoningEffort: 'high',
         });
     });
