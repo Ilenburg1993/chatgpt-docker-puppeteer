@@ -79,6 +79,7 @@ describe('BYOK provider chat health state', () => {
             profile: 'kilo',
             provider: 'kilo-code',
             model: 'kilo-auto/free',
+            successContext: 'llm.usage',
             timestamp: 1_700_000_010_000,
         });
         await flushByokProviderHealth();
@@ -95,6 +96,7 @@ describe('BYOK provider chat health state', () => {
         expect(health?.successCount).toBe(1);
         expect(health?.lastFailureAt).toBe(1_700_000_000_000);
         expect(health?.lastSuccessAt).toBe(1_700_000_010_000);
+        expect(health?.lastSuccessContext).toBe('llm.usage');
     });
 
     it('persiste health agente separado do chat para tool calling e ask_user', async () => {

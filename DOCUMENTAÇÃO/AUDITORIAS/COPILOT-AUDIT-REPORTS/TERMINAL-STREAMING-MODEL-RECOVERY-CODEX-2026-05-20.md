@@ -1535,7 +1535,7 @@ Fase J5. UX e comandos
 - J5.31 Explicar filtros vazios causados por `safe`, listando candidatos removidos e motivos de bloqueio. Status: feito nesta revisão.
 - J5.32 Mostrar side-channel de quota/PR do GitHub Copilot como histórico quando BYOK está ativo, sem narrar como cobrança BYOK. Status: feito nesta revisão em `/usage now`, `/metrics` e harness live.
 - J5.33 Criar `/byok probe` como admissão de chat descartável para provider/modelo selecionado, sem transcript live nem loop paralelo. Status: feito nesta revisão.
-- J5.34 Mostrar ao operador a diferença entre catálogo BYOK, health de probe e health de turno real. Status: iniciado; `/byok probe` grava health redigida e a distinção ainda deve entrar na recomendação agregada.
+- J5.34 Mostrar ao operador a diferença entre catálogo BYOK, health de probe e health de turno real. Status: feito nesta revisão; o health de chat persiste a origem do sucesso (`probe` descartável ou `turno` vivo), `/byok models`/`/byok recommend` levam essa evidência no mesmo ranking canônico e o live Kilo completo em `artifacts/terminal-live/byok-kilo-health-provenance-canonical-2026-05-21/summary.md` confirmou a transição `chat=ok(probe,...)` -> `chat=ok(turno,...)` no circuito real.
 - J5.35 Mostrar admissão local como quarto degrau antes do provider (`catalogado`, `admitido`, `probe`, `turno vivo`) e arquivar blocker sem degradar health. Status: feito nesta revisão para turno e probes com `terminal.byok.admission_blocked`.
 - J5.36 Fazer `/byok recommend` apontar para a probe agent descartável e para a sequência de seleção profile/modelo de cada candidato. Status: feito nesta revisão.
 
@@ -1743,6 +1743,8 @@ Implementado:
 - O live runner agora analisa blocos estruturados do terminal para detectar duplicação final, evitando falso positivo quando uma regex atravessa de `🧠 LLM-B` para `[LLM-B] Mensagem`.
 - O cockpit BYOK agora separa custo em `free`, `profile-free`, `metered` e `cost?`. `profile-free` vem de metadata redigida do perfil/conta, não de preço confirmado por modelo, e aparece com `freeHint`.
 - O cockpit BYOK agora separa saúde de `chat` e saúde de `agent`: catálogo remoto, canário textual e compatibilidade de tool/`ask_user` não são mais tratados como a mesma evidência.
+- O health de chat BYOK agora preserva a origem do último sucesso: `chat=ok(probe,...)` vem de chat probe descartável e `chat=ok(turno,...)` vem de usage BYOK de turno vivo. `/byok models` e `/byok recommend` herdam a distinção pelo mesmo tag canônico.
+- Live Kilo completo em `artifacts/terminal-live/byok-kilo-health-provenance-canonical-2026-05-21/summary.md` passou com delta parcial, bloco final único, `report_intent`, `read_file_content`, `ask_user`, resposta humana, pós-ask, `/events`, SSE/JSONL/export e sem duplicação; o cockpit mostrou `probe` antes do turno e `turno` após a usage BYOK real.
 - `/byok probe agent` abre uma sessão SDK fora do dialog loop com tool canária e resposta sintética de `ask_user`; o live Kilo sem PR validou `toolCalls=1`, `ask=1`, `answer=1`.
 - `withEphemeralSession()` remove o estado SDK persistido de probes depois do cleanup, evitando que diagnósticos de modelo apareçam como sessões retomáveis do operador; o inventário ainda pode mostrar canários antigos criados antes desta limpeza.
 - O runner BYOK real passou a fotografar `/session sdk` antes e depois dos probes descartáveis; o live NVIDIA sem PR confirmou contagem estável de `probe-residue` (`3 -> 3`) em `artifacts/terminal-live/byok-nvidia-probe-session-cleanup-nopr-2026-05-21/summary.md`.

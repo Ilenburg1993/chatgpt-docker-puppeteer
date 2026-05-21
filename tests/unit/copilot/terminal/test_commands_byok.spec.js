@@ -350,6 +350,7 @@ describe('terminal /byok command', () => {
             profile: 'groq-free',
             provider: 'groq',
             model: 'probe-model',
+            successContext: 'byok_probe',
         });
         expect(flushByokProviderHealth).toHaveBeenCalled();
         expect(ctx.output()).toContain('sessão SDK descartável');
@@ -1072,6 +1073,87 @@ describe('terminal /byok command', () => {
         expect(ctx.output()).toContain('ok para uso geral');
         expect(ctx.output()).toContain('/byok probe agent model:free-comfortable');
         expect(ctx.output()).toContain('live fake descartável');
+    });
+
+    it('distingue health de chat vindo de probe e de turno vivo no ranking BYOK', async () => {
+        readByokProviderModelHealth.mockImplementation(({ model }) =>
+            model === 'probe-ok'
+                ? {
+                      key: 'kilo|kilo-code|probe-ok',
+                      profile: 'kilo',
+                      provider: 'kilo-code',
+                      model,
+                      lastStatus: 'ok',
+                      failureCount: 0,
+                      successCount: 1,
+                      lastFailureAt: null,
+                      lastSuccessAt: Date.now(),
+                      lastMessage: null,
+                      lastErrorContext: null,
+                      lastSuccessContext: 'byok_probe',
+                      agentProbeStatus: null,
+                      agentProbeFailureCount: 0,
+                      agentProbeSuccessCount: 0,
+                      lastAgentProbeFailureAt: null,
+                      lastAgentProbeSuccessAt: null,
+                      lastAgentProbeMessage: null,
+                      lastAgentProbeErrorContext: null,
+                  }
+                : model === 'turn-ok'
+                  ? {
+                        key: 'kilo|kilo-code|turn-ok',
+                        profile: 'kilo',
+                        provider: 'kilo-code',
+                        model,
+                        lastStatus: 'ok',
+                        failureCount: 0,
+                        successCount: 1,
+                        lastFailureAt: null,
+                        lastSuccessAt: Date.now(),
+                        lastMessage: null,
+                        lastErrorContext: null,
+                        lastSuccessContext: 'llm.usage',
+                        agentProbeStatus: null,
+                        agentProbeFailureCount: 0,
+                        agentProbeSuccessCount: 0,
+                        lastAgentProbeFailureAt: null,
+                        lastAgentProbeSuccessAt: null,
+                        lastAgentProbeMessage: null,
+                        lastAgentProbeErrorContext: null,
+                    }
+                  : null,
+        );
+        discoverConfiguredByokModelsFromEnv.mockResolvedValue({
+            models: [
+                {
+                    id: 'probe-ok',
+                    capabilities: {
+                        supports: { reasoningEffort: true, vision: false },
+                        limits: { max_context_window_tokens: 200000 },
+                    },
+                    byok: { freeTier: true, provider: 'kilo-code', profile: 'kilo' },
+                },
+                {
+                    id: 'turn-ok',
+                    capabilities: {
+                        supports: { reasoningEffort: true, vision: false },
+                        limits: { max_context_window_tokens: 200000 },
+                    },
+                    byok: { freeTier: true, provider: 'kilo-code', profile: 'kilo' },
+                },
+            ],
+            source: 'remote',
+            endpoint: 'https://provider.example/v1/models',
+            fromCache: false,
+            error: null,
+        });
+        mockProjection();
+        const ctx = mockCtx();
+
+        await cmdByok({ println: ctx.println }, 'recommend free reasoning 2');
+
+        expect(ctx.output()).toContain('chat=ok(probe,');
+        expect(ctx.output()).toContain('chat=ok(turno,');
     });
 
     it('exclui de recommend safe modelo com falha operacional recente', async () => {

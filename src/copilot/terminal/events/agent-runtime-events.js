@@ -810,6 +810,7 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, regi
                         : typeof evt?.['model'] === 'string'
                           ? evt['model']
                           : null,
+                successContext: 'llm.usage',
                 timestamp: typeof evt?.['ts'] === 'number' ? evt['ts'] : Date.now(),
             });
         }

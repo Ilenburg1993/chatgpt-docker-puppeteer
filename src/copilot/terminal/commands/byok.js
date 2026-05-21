@@ -559,6 +559,25 @@ function isByokAgentProbeCurrentlyFailed(health) {
 }
 
 /**
+ * @param {string | null | undefined} context
+ * @returns {string}
+ */
+function renderByokChatHealthEvidence(context) {
+    const normalized = typeof context === 'string' ? context.trim() : '';
+    if (!normalized) return 'histórico';
+    if (normalized === 'byok_probe') return 'probe';
+    if (normalized === 'llm.usage' || normalized === 'live_turn') return 'turno';
+    if (
+        normalized === 'model_call' ||
+        normalized.startsWith('session.') ||
+        normalized.startsWith('dialog.')
+    ) {
+        return 'turno';
+    }
+    return normalized.length > 24 ? `${normalized.slice(0, 21)}...` : normalized;
+}
+
+/**
  * @param {import('#copilot/sdk/types').ModelInfo} model
  * @returns {ReturnType<typeof readByokProviderModelHealth>}
  */
@@ -619,10 +638,10 @@ function readHealthForByokProfile(profile) {
 function renderByokHealthTag(health) {
     if (!health) return 'chat=?';
     if (isByokHealthCurrentlyFailed(health)) {
-        return `chat=failed(${formatByokHealthAge(health.lastFailureAt)}${health.failureCount > 1 ? `,x${health.failureCount}` : ''})`;
+        return `chat=failed(${renderByokChatHealthEvidence(health.lastErrorContext)},${formatByokHealthAge(health.lastFailureAt)}${health.failureCount > 1 ? `,x${health.failureCount}` : ''})`;
     }
     if (health.lastStatus !== 'ok') return 'chat=?';
-    return `chat=ok(${formatByokHealthAge(health.lastSuccessAt)}${health.successCount > 1 ? `,x${health.successCount}` : ''})`;
+    return `chat=ok(${renderByokChatHealthEvidence(health.lastSuccessContext)},${formatByokHealthAge(health.lastSuccessAt)}${health.successCount > 1 ? `,x${health.successCount}` : ''})`;
 }
 
 /**
@@ -1240,7 +1259,10 @@ export async function cmdByok({ println }, arg) {
                 errorContext: 'byok_agent_probe',
             });
         } else if (probe.ok) {
-            recordByokProviderModelCallSuccess(healthIdentity);
+            recordByokProviderModelCallSuccess({
+                ...healthIdentity,
+                successContext: 'byok_probe',
+            });
         } else if (providerAttempted) {
             recordByokProviderModelCallFailure({
                 ...healthIdentity,

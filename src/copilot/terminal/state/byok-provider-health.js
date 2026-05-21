@@ -31,6 +31,7 @@ const DEFAULT_BYOK_PROVIDER_HEALTH_PATH = join(process.cwd(), 'data', 'copilot-t
  * @property {number | null} lastSuccessAt
  * @property {string | null} lastMessage
  * @property {string | null} lastErrorContext
+ * @property {string | null} lastSuccessContext
  * @property {'failed' | 'ok' | null} agentProbeStatus
  * @property {number} agentProbeFailureCount
  * @property {number} agentProbeSuccessCount
@@ -159,6 +160,9 @@ function normalizeRecord(value) {
         lastSuccessAt: normalizeTimestamp(value['lastSuccessAt']),
         lastMessage: sanitizeHealthText(/** @type {string | null | undefined} */ (value['lastMessage'])),
         lastErrorContext: sanitizeHealthText(/** @type {string | null | undefined} */ (value['lastErrorContext'])),
+        lastSuccessContext: sanitizeHealthText(
+            /** @type {string | null | undefined} */ (value['lastSuccessContext']),
+        ),
         agentProbeStatus,
         agentProbeFailureCount: normalizeCount(value['agentProbeFailureCount']),
         agentProbeSuccessCount: normalizeCount(value['agentProbeSuccessCount']),
@@ -294,6 +298,7 @@ export function recordByokProviderModelCallFailure(input) {
         lastSuccessAt: previous?.lastSuccessAt ?? null,
         lastMessage: sanitizeHealthText(input.message) ?? previous?.lastMessage ?? null,
         lastErrorContext: sanitizeHealthText(input.errorContext) ?? previous?.lastErrorContext ?? null,
+        lastSuccessContext: previous?.lastSuccessContext ?? null,
         agentProbeStatus: previous?.agentProbeStatus ?? null,
         agentProbeFailureCount: previous?.agentProbeFailureCount ?? 0,
         agentProbeSuccessCount: previous?.agentProbeSuccessCount ?? 0,
@@ -307,7 +312,7 @@ export function recordByokProviderModelCallFailure(input) {
 }
 
 /**
- * @param {{ profile?: string | null; provider?: string | null; model?: string | null; timestamp?: number }} input
+ * @param {{ profile?: string | null; provider?: string | null; model?: string | null; successContext?: string | null; timestamp?: number }} input
  * @returns {void}
  */
 export function recordByokProviderModelCallSuccess(input) {
@@ -331,6 +336,7 @@ export function recordByokProviderModelCallSuccess(input) {
         lastSuccessAt: now,
         lastMessage: null,
         lastErrorContext: null,
+        lastSuccessContext: sanitizeHealthText(input.successContext) ?? previous?.lastSuccessContext ?? null,
         agentProbeStatus: previous?.agentProbeStatus ?? null,
         agentProbeFailureCount: previous?.agentProbeFailureCount ?? 0,
         agentProbeSuccessCount: previous?.agentProbeSuccessCount ?? 0,
@@ -368,6 +374,7 @@ export function recordByokProviderModelAgentProbeFailure(input) {
         lastSuccessAt: previous?.lastSuccessAt ?? null,
         lastMessage: previous?.lastMessage ?? null,
         lastErrorContext: previous?.lastErrorContext ?? null,
+        lastSuccessContext: previous?.lastSuccessContext ?? null,
         agentProbeStatus: 'failed',
         agentProbeFailureCount: (previous?.agentProbeFailureCount ?? 0) + 1,
         agentProbeSuccessCount: previous?.agentProbeSuccessCount ?? 0,
@@ -406,6 +413,7 @@ export function recordByokProviderModelAgentProbeSuccess(input) {
         lastSuccessAt: previous?.lastSuccessAt ?? null,
         lastMessage: previous?.lastMessage ?? null,
         lastErrorContext: previous?.lastErrorContext ?? null,
+        lastSuccessContext: previous?.lastSuccessContext ?? null,
         agentProbeStatus: 'ok',
         agentProbeFailureCount: previous?.agentProbeFailureCount ?? 0,
         agentProbeSuccessCount: (previous?.agentProbeSuccessCount ?? 0) + 1,
