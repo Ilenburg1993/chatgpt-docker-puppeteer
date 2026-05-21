@@ -45,6 +45,7 @@ export {
     quickResume,
     quickSession,
     shutdownClient,
+    withEphemeralSession,
     withSession,
 } from './client-facade.js';
 

@@ -67,6 +67,7 @@ import {
     cmdSessionList as _cmdSessionList,
     cmdSessionRestore as _cmdSessionRestore,
     cmdSessionSave as _cmdSessionSave,
+    cmdSessionSdk as _cmdSessionSdk,
     cmdSkills as _cmdSkills,
     cmdStatus as _cmdStatus,
     cmdThinking as _cmdThinking,
@@ -91,7 +92,7 @@ import {
 } from '../frontend/gateways/index.js';
 import { clearRateLimiters } from '../state/repl-runtime/index.js';
 import { deliverEntryAsTurnIfIdle } from '../wiring/mailbox/index.js';
-import { parseTerminalReplCommand } from './repl-command-parser.js';
+import { parseTerminalReplCommand, parseTerminalSubcommand } from './repl-command-parser.js';
 
 /**
  * @param {unknown} value
@@ -494,21 +495,26 @@ async function _cmdQuit(rl, injectServer, cleanup) {
 }
 
 /**
- * F41.5: Dispatcher para subcomandos de `/session save|list|restore`.
+ * Dispatcher para o cockpit de sessão SDK e snapshots locais.
  *
  * @param {string} subCmd
  * @param {string[]} rest
  */
 async function _cmdSessionDispatch(subCmd, rest) {
-    const sub = (subCmd || '').toLowerCase();
-    if (sub === 'save') {
-        await _cmdSessionSave({ println }, rest.join(' ') || undefined);
+    const parsed = parseTerminalSubcommand(subCmd, rest);
+    const sub = parsed.subcommand.toLowerCase();
+    if (!sub || sub === 'sdk') {
+        await _cmdSessionSdk({ println }, sub === 'sdk' ? parsed.rest.join(' ') : '');
+    } else if (sub === 'save') {
+        await _cmdSessionSave({ println }, parsed.rest.join(' ') || undefined);
     } else if (sub === 'list') {
         await _cmdSessionList({ println });
     } else if (sub === 'restore') {
-        await _cmdSessionRestore({ println }, rest[0] || '');
+        await _cmdSessionRestore({ println }, parsed.rest[0] || '');
     } else {
-        println('\x1b[33m  Uso: /session save [reason] | /session list | /session restore <id>\x1b[0m');
+        println(
+            '\x1b[33m  Uso: /session [sdk [n]|sdk next <new|resume <id|#n|current|last|foreground>|auto>] | /session save [reason] | /session list | /session restore <id>\x1b[0m',
+        );
     }
 }
 

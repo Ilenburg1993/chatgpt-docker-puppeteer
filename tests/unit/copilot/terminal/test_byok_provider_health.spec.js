@@ -10,6 +10,8 @@ import {
     flushByokProviderHealth,
     readByokProviderHealthState,
     readByokProviderModelHealth,
+    recordByokProviderModelAgentProbeFailure,
+    recordByokProviderModelAgentProbeSuccess,
     recordByokProviderModelCallFailure,
     recordByokProviderModelCallSuccess,
     resetByokProviderHealthForTests,
@@ -93,5 +95,45 @@ describe('BYOK provider chat health state', () => {
         expect(health?.successCount).toBe(1);
         expect(health?.lastFailureAt).toBe(1_700_000_000_000);
         expect(health?.lastSuccessAt).toBe(1_700_000_010_000);
+    });
+
+    it('persiste health agente separado do chat para tool calling e ask_user', async () => {
+        await useTempHealthPath();
+
+        recordByokProviderModelCallSuccess({
+            profile: 'kilo',
+            provider: 'kilo-code',
+            model: 'kilo-auto/free',
+            timestamp: 1_700_000_000_000,
+        });
+        recordByokProviderModelAgentProbeFailure({
+            profile: 'kilo',
+            provider: 'kilo-code',
+            model: 'kilo-auto/free',
+            message: 'tool was not invoked',
+            errorContext: 'byok_agent_probe',
+            timestamp: 1_700_000_010_000,
+        });
+        recordByokProviderModelAgentProbeSuccess({
+            profile: 'kilo',
+            provider: 'kilo-code',
+            model: 'kilo-auto/free',
+            timestamp: 1_700_000_020_000,
+        });
+        await flushByokProviderHealth();
+        resetByokProviderHealthForTests();
+
+        const health = readByokProviderModelHealth({
+            profile: 'kilo',
+            provider: 'kilo-code',
+            model: 'kilo-auto/free',
+        });
+
+        expect(health?.lastStatus).toBe('ok');
+        expect(health?.agentProbeStatus).toBe('ok');
+        expect(health?.agentProbeFailureCount).toBe(1);
+        expect(health?.agentProbeSuccessCount).toBe(1);
+        expect(health?.lastAgentProbeFailureAt).toBe(1_700_000_010_000);
+        expect(health?.lastAgentProbeSuccessAt).toBe(1_700_000_020_000);
     });
 });

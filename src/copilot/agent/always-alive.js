@@ -683,6 +683,16 @@ export class AlwaysAliveAgent extends EventEmitter {
     }
 
     /**
+     * Remove permanentemente uma sessão persistida/acessível pelo client SDK atual.
+     *
+     * @param {string} sessionId
+     * @returns {Promise<void>}
+     */
+    async deleteSdkSession(sessionId) {
+        await this.#sdkQueryFacade.deleteSdkSession(sessionId);
+    }
+
+    /**
      * Retorna o modo vanilla atual da sessão SDK (`interactive`, `plan`, `autopilot`).
      *
      * @returns {Promise<import('#copilot/sdk/types').ModeResult>}

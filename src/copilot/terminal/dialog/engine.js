@@ -52,6 +52,11 @@ import {
     withTerminalTurnCorrelation,
 } from '../state/events/index.js';
 import { recordByokProviderModelCallFailure } from '../state/byok-provider-health.js';
+import {
+    TERMINAL_BYOK_ADMISSION_MODE_ENV,
+    evaluateTerminalByokTurnBudget,
+    readTerminalByokAdmissionMode,
+} from '../byok/admission.js';
 import { drainPendingNotifications, getPersistenceFailureCount, persistTurnToHub } from './engine-persistence.js';
 import {
     BOOT_PROMPT,
@@ -153,120 +158,8 @@ let _ensureDialogLoopInFlight = null;
 
 const WAITING_FRAMES = ['⏳', '⌛', '⏳'];
 const LIVE_TURN_NARRATION_INTERVAL_MS = 10_000;
-const BYOK_TURN_RESPONSE_RESERVE_TOKENS = 1_024;
-const BYOK_LOW_REQUEST_TOKEN_LIMIT = 8_000;
-const BYOK_ADMISSION_MODE_ENV = 'COPILOT_BYOK_ADMISSION_MODE';
 const BYOK_TURN_TIMEOUT_ENV = 'TERMINAL_BYOK_TURN_TIMEOUT_MS';
-
-/**
- * @param {unknown} value
- * @returns {number | null}
- */
-function finitePositiveNumber(value) {
-    return typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : null;
-}
-
-/**
- * @param {ReturnType<typeof readConfiguredByokSummary>} byok
- * @param {ReturnType<typeof readTerminalRuntimeState>} runtimeState
- * @param {string} message
- * @returns {{
- *     shouldWarn: boolean;
- *     shouldBlock: boolean;
- *     severity: 'none' | 'warn' | 'block';
- *     label: string;
- *     estimatedRequestTokens: number;
- *     limit: number | null;
- *     utilization: number | null;
- * }}
- */
-export function evaluateTerminalByokTurnBudget(byok, runtimeState, message) {
-    const limit = byok.limits?.maxRequestTokens ?? byok.limits?.tokensPerMinute ?? null;
-    const contextState = runtimeState.contextWindow;
-    const tokenLimit =
-        finitePositiveNumber(/** @type {{ tokenLimit?: unknown }} */ (contextState ?? {}).tokenLimit) ??
-        finitePositiveNumber(byok.capabilities?.contextWindowTokens) ??
-        null;
-    const directTokens = finitePositiveNumber(/** @type {{ tokens?: unknown }} */ (contextState ?? {}).tokens);
-    const utilization = finitePositiveNumber(/** @type {{ utilization?: unknown }} */ (contextState ?? {}).utilization);
-    const estimatedContextTokens =
-        directTokens ?? (tokenLimit !== null && utilization !== null ? Math.ceil(tokenLimit * utilization) : 0);
-    const estimatedMessageTokens = Math.ceil(utf8ByteLength(message, 'terminal byok budget estimate') / 4);
-    const estimatedRequestTokens = Math.max(
-        0,
-        estimatedContextTokens + estimatedMessageTokens + BYOK_TURN_RESPONSE_RESERVE_TOKENS,
-    );
-    if (!byok.enabled || !byok.ready || limit === null) {
-        return {
-            shouldWarn: false,
-            shouldBlock: false,
-            severity: 'none',
-            label: 'sem limite BYOK declarado',
-            estimatedRequestTokens,
-            limit,
-            utilization,
-        };
-    }
-    if (estimatedRequestTokens > limit) {
-        return {
-            shouldWarn: true,
-            shouldBlock: true,
-            severity: 'block',
-            label: `requisição estimada ${estimatedRequestTokens} tokens > limite BYOK ${limit}; o provider pode recusar antes do streaming`,
-            estimatedRequestTokens,
-            limit,
-            utilization,
-        };
-    }
-    if (limit < BYOK_LOW_REQUEST_TOKEN_LIMIT) {
-        return {
-            shouldWarn: true,
-            shouldBlock: false,
-            severity: 'warn',
-            label: `limite BYOK baixo (${limit} tokens); prefira sessão fresca, prompt mínimo ou /byok recommend safe`,
-            estimatedRequestTokens,
-            limit,
-            utilization,
-        };
-    }
-    if (estimatedRequestTokens > limit * 0.85) {
-        return {
-            shouldWarn: true,
-            shouldBlock: false,
-            severity: 'warn',
-            label: `requisição estimada em ${estimatedRequestTokens}/${limit} tokens; margem BYOK estreita`,
-            estimatedRequestTokens,
-            limit,
-            utilization,
-        };
-    }
-    return {
-        shouldWarn: false,
-        shouldBlock: false,
-        severity: 'none',
-        label: 'orçamento BYOK suficiente para a estimativa atual',
-        estimatedRequestTokens,
-        limit,
-        utilization,
-    };
-}
-
-/**
- * @param {NodeJS.ProcessEnv} [env]
- * @returns {'block' | 'warn' | 'off'}
- */
-export function readTerminalByokAdmissionMode(env = process.env) {
-    const raw = String(env[BYOK_ADMISSION_MODE_ENV] ?? 'block')
-        .trim()
-        .toLowerCase();
-    if (raw === 'off' || raw === 'disabled' || raw === 'false' || raw === '0') {
-        return 'off';
-    }
-    if (raw === 'warn' || raw === 'warning' || raw === 'warn-only') {
-        return 'warn';
-    }
-    return 'block';
-}
+export { evaluateTerminalByokTurnBudget, readTerminalByokAdmissionMode };
 
 /**
  * @param {string | undefined} raw
@@ -686,7 +579,7 @@ async function _executeTurn(message, actor, attachments = [], requestHeaders = n
         const budgetColor = byokBudget.severity === 'block' && admissionMode === 'block' ? '\x1b[31m' : '\x1b[33m';
         println(`${budgetColor}  ⚠️  BYOK budget: ${byokBudget.label}.\x1b[0m`);
         println(
-            `\x1b[90m     Dica: /byok recommend reasoning safe · /compact · /byok use <perfil> · /byok model <id> · ${BYOK_ADMISSION_MODE_ENV}=warn para permitir mesmo assim\x1b[0m`,
+            `\x1b[90m     Dica: /byok recommend reasoning safe · /compact · /byok use <perfil> · /byok model <id> · ${TERMINAL_BYOK_ADMISSION_MODE_ENV}=warn para permitir mesmo assim\x1b[0m`,
         );
         if (shouldBlockTerminalByokTurnBudget(byokBudget, admissionMode)) {
             recordTerminalActivity('system', 'Turno BYOK bloqueado por admission control', {
@@ -1079,10 +972,17 @@ async function _executeTurn(message, actor, attachments = [], requestHeaders = n
             const latestRuntimeState = readTerminalRuntimeState();
             const ctxWin = latestRuntimeState.contextWindow;
             const prInfo = /** @type {Record<string, unknown> | null} */ (latestRuntimeState.lastPrInfo);
-            if (ctxWin || prInfo) {
+            const llmUsage = /** @type {Record<string, unknown> | null} */ (latestRuntimeState.lastLlmUsage ?? null);
+            const prefersLlmUsage =
+                llmUsage !== null && (llmUsage['premiumRequest'] === false || llmUsage['byokProvider'] === true);
+            const usageInfo = prefersLlmUsage ? llmUsage : prInfo;
+            if (ctxWin || usageInfo) {
                 const parts = [];
-                if (prInfo) {
-                    const modelBilling = normalizeTerminalModelBillingProjection(prInfo, latestRuntimeState.model);
+                if (usageInfo) {
+                    const modelBilling = normalizeTerminalModelBillingProjection(usageInfo, latestRuntimeState.model);
+                    if (!prefersLlmUsage && readConfiguredByokSummary().enabled) {
+                        parts.push('quota/PR histórico');
+                    }
                     if (modelBilling.mismatch) {
                         if (modelBilling.configuredModel) {
                             parts.push(`modeloCfg=\x1b[35m${modelBilling.configuredModel}\x1b[0m`);
@@ -1091,7 +991,9 @@ async function _executeTurn(message, actor, attachments = [], requestHeaders = n
                             parts.push(`modeloCobrado=\x1b[36m${modelBilling.billedModel}\x1b[0m`);
                         }
                     } else if (modelBilling.displayModel !== '-') {
-                        parts.push(`modelo=\x1b[36m${modelBilling.displayModel}\x1b[0m`);
+                        parts.push(
+                            `${prefersLlmUsage ? 'llm' : 'modelo'}=\x1b[36m${modelBilling.displayModel}\x1b[0m`,
+                        );
                     }
                     if (modelBilling.cost !== null) {
                         parts.push(`custo=\x1b[33m${modelBilling.cost.toFixed(4)}\x1b[0m`);

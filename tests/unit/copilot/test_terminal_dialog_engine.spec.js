@@ -180,7 +180,7 @@ describe('terminal/dialog/engine.js — contrato', () => {
         expect(typeof mod.evaluateTerminalByokTurnBudget).toBe('function');
     });
 
-    it('avisa quando o orçamento BYOK declarado é baixo para turno real', async () => {
+    it('bloqueia quando o limite BYOK declarado não comporta o envelope terminal', async () => {
         const result = mod.evaluateTerminalByokTurnBudget(
             {
                 enabled: true,
@@ -193,9 +193,10 @@ describe('terminal/dialog/engine.js — contrato', () => {
         );
 
         expect(result.shouldWarn).toBe(true);
-        expect(result.shouldBlock).toBe(false);
-        expect(result.severity).toBe('warn');
-        expect(result.label).toContain('limite BYOK baixo');
+        expect(result.shouldBlock).toBe(true);
+        expect(result.severity).toBe('block');
+        expect(result.label).toContain('provider pode recusar');
+        expect(result.estimatedRequestTokens).toBeGreaterThan(6000);
         expect(result.limit).toBe(6000);
     });
 
@@ -570,5 +571,11 @@ describe('terminal/dialog/engine.js — contrato', () => {
         expect(src).toContain('byok_provider_watchdog_only');
         expect(src).toContain('allowDisabled: false');
         expect(src).toContain('timeout: timeoutDecision.timeoutMs');
+    });
+
+    it('prefere telemetria LLM nao-PR no footer de usage do turno', () => {
+        expect(src).toContain('latestRuntimeState.lastLlmUsage');
+        expect(src).toContain("llmUsage['premiumRequest'] === false");
+        expect(src).toContain('quota/PR histórico');
     });
 });

@@ -13,7 +13,7 @@
  */
 
 import { forceStopClient, getClient, getClientState, stopClient } from './client.js';
-import { createSession, disconnectSession, resumeOrCreate } from './lifecycle.js';
+import { createSession, deleteSession, disconnectSession, resumeOrCreate } from './lifecycle.js';
 
 /**
  * @typedef {import('@github/copilot-sdk').CopilotSession} CopilotSession
@@ -94,9 +94,43 @@ export async function withSession(opts, fn) {
         const disposable = /** @type {{ [Symbol.asyncDispose]?: () => Promise<void> }} */ (result.session);
         const asyncDispose = disposable[Symbol.asyncDispose];
         if (typeof asyncDispose === 'function') {
-            await asyncDispose();
+            await asyncDispose.call(result.session);
         } else {
             await quickDisconnect(result.session);
+        }
+    }
+}
+
+/**
+ * Cria uma sessão de sonda e remove também o estado persistido ao terminar.
+ *
+ * `disconnect()` sozinho só solta o handle em memória; probes de catálogo/modelo não devem deixar sessões temporárias
+ * no inventário operacional que o operador retomará depois.
+ *
+ * @template T
+ * @param {Partial<SessionCreateOptions>} opts
+ * @param {(result: SessionResult) => Promise<T> | T} fn
+ * @returns {Promise<T>}
+ */
+export async function withEphemeralSession(opts, fn) {
+    if (typeof fn !== 'function') {
+        throw new TypeError('[sdk/client-facade] withEphemeralSession requer callback fn');
+    }
+    const client = await getClient();
+    const result = await createSession(client, /** @type {SessionCreateOptions} */ (opts));
+    try {
+        return await fn(result);
+    } finally {
+        const disposable = /** @type {{ [Symbol.asyncDispose]?: () => Promise<void> }} */ (result.session);
+        const asyncDispose = disposable[Symbol.asyncDispose];
+        try {
+            if (typeof asyncDispose === 'function') {
+                await asyncDispose.call(result.session);
+            } else {
+                await disconnectSession(result.session);
+            }
+        } finally {
+            await deleteSession(client, result.sessionId);
         }
     }
 }

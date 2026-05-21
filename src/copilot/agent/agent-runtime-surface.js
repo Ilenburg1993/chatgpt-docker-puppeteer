@@ -16,6 +16,7 @@ export {
     compactSdkSession,
     confirmSdkSessionUi,
     createSdkWorkspaceFile,
+    deleteSdkSession,
     deleteSdkPlan,
     deselectSdkAgent,
     dialogEnsureAttached,

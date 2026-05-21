@@ -108,4 +108,20 @@ describe('terminal/dialog/output.js — contrato', () => {
         expect(rl.setPrompt).toHaveBeenCalledWith('segundo');
         expect(rl.prompt).toHaveBeenCalledTimes(1);
     });
+
+    it('ignora redraw agendado quando o readline fecha antes da pintura', async () => {
+        const mod = await import('../../../src/copilot/terminal/dialog/output.js');
+        const rl = {
+            closed: false,
+            setPrompt: vi.fn(),
+            prompt: vi.fn(),
+        };
+
+        mod.scheduleTerminalPromptRedraw(rl, 'prompt que nao deve voltar');
+        rl.closed = true;
+        await new Promise((resolve) => setImmediate(resolve));
+
+        expect(rl.setPrompt).not.toHaveBeenCalled();
+        expect(rl.prompt).not.toHaveBeenCalled();
+    });
 });

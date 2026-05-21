@@ -148,6 +148,8 @@ vi.mock('../../../src/copilot/agent/session/context/index.js', () => ({
 describe('agent/session/initializer — sessionFs wiring', () => {
     beforeEach(() => {
         vi.clearAllMocks();
+        process.env.COPILOT_BYOK_ENABLED = 'false';
+        delete process.env.COPILOT_BYOK_PROFILE;
     });
 
     it('injeta createSessionFsHandler configurado no fluxo initOrResumeSession', async () => {
@@ -328,5 +330,145 @@ describe('agent/session/initializer — sessionFs wiring', () => {
             expect.objectContaining({ label: 'session.initializer.resume' }),
         );
         expect(result).toEqual(expect.objectContaining({ model: 'auto', reasoningEffort: 'xhigh' }));
+    });
+
+    it('nao retoma sessao SDK BYOK antiga quando o boot voltou ao SDK Copilot', async () => {
+        const { initOrResumeSession } = await import('../../../src/copilot/agent/session/initializers/initializer.js');
+        mocks.readState.mockResolvedValueOnce({
+            sessionId: 'byok-sess',
+            model: 'shared-model',
+            startedAt: Date.now(),
+            resumedAt: Date.now(),
+            resumeCount: 1,
+            byokSessionBinding: {
+                enabled: true,
+                profile: 'provider-a',
+                preset: 'openai-compatible',
+                providerType: 'openai',
+                baseUrl: 'https://provider-a.example/v1',
+                model: 'shared-model',
+            },
+        });
+
+        await initOrResumeSession(/** @type {any} */ ({}), { model: 'auto' });
+
+        expect(mocks.resumeOrCreateAgentSdkSession).toHaveBeenCalledWith(
+            expect.anything(),
+            null,
+            expect.any(Object),
+        );
+        expect(mocks.persistState).toHaveBeenCalledWith(
+            expect.objectContaining({
+                byokSessionBinding: null,
+                sdkSessionBootDecision: expect.objectContaining({
+                    outcome: 'created',
+                    requestedMode: 'auto',
+                    resumeCandidateSessionId: null,
+                    reason: expect.stringContaining('provider-boundary:'),
+                }),
+            }),
+            expect.objectContaining({ label: 'session.initializer.create' }),
+        );
+    });
+
+    it('explica quando resume explícito cai em criação de sessão nova', async () => {
+        const { initOrResumeSession } = await import('../../../src/copilot/agent/session/initializers/initializer.js');
+        mocks.readState.mockResolvedValueOnce({
+            sessionId: 'persisted-session',
+            model: 'auto',
+            startedAt: Date.now(),
+            resumedAt: Date.now(),
+            resumeCount: 1,
+            nextSdkSessionBoot: {
+                mode: 'resume',
+                sessionId: 'listed-session',
+            },
+        });
+
+        await initOrResumeSession(/** @type {any} */ ({}), { model: 'auto' });
+
+        expect(mocks.resumeOrCreateAgentSdkSession).toHaveBeenCalledWith(
+            expect.anything(),
+            'listed-session',
+            expect.any(Object),
+        );
+        expect(mocks.persistState).toHaveBeenCalledWith(
+            expect.objectContaining({
+                sdkSessionBootDecision: expect.objectContaining({
+                    outcome: 'created',
+                    requestedMode: 'resume',
+                    resumeCandidateSessionId: 'listed-session',
+                    reason: expect.stringContaining('sdk-resume-fallback-created-new-session'),
+                }),
+            }),
+            expect.objectContaining({ label: 'session.initializer.create' }),
+        );
+    });
+
+    it('cria sessao nova e persiste binding redigido quando BYOK ativo encontra estado antigo sem binding', async () => {
+        const { initOrResumeSession } = await import('../../../src/copilot/agent/session/initializers/initializer.js');
+        const previous = Object.fromEntries(
+            [
+                'COPILOT_BYOK_ENABLED',
+                'COPILOT_BYOK_PROFILE',
+                'COPILOT_BYOK_PROVIDER_PRESET',
+                'COPILOT_BYOK_BASE_URL',
+                'COPILOT_BYOK_MODEL',
+            ].map((key) => [key, process.env[key]]),
+        );
+        Object.assign(process.env, {
+            COPILOT_BYOK_ENABLED: 'true',
+            COPILOT_BYOK_PROFILE: '',
+            COPILOT_BYOK_PROVIDER_PRESET: 'openai-compatible',
+            COPILOT_BYOK_BASE_URL: 'https://provider-b.example/v1',
+            COPILOT_BYOK_MODEL: 'shared-model',
+        });
+        mocks.readState.mockResolvedValueOnce({
+            sessionId: 'legacy-byok-sess',
+            model: 'shared-model',
+            startedAt: Date.now(),
+            resumedAt: Date.now(),
+            resumeCount: 1,
+        });
+
+        try {
+            await initOrResumeSession(/** @type {any} */ ({}), { model: 'auto' });
+        } finally {
+            for (const [key, value] of Object.entries(previous)) {
+                if (value === undefined) {
+                    delete process.env[key];
+                } else {
+                    process.env[key] = value;
+                }
+            }
+        }
+
+        expect(mocks.resumeOrCreateAgentSdkSession).toHaveBeenCalledWith(
+            expect.anything(),
+            null,
+            expect.objectContaining({
+                model: 'shared-model',
+                provider: expect.objectContaining({ baseUrl: 'https://provider-b.example/v1' }),
+            }),
+        );
+        expect(mocks.persistState).toHaveBeenCalledWith(
+            expect.objectContaining({
+                byokSessionBinding: {
+                    enabled: true,
+                    profile: null,
+                    preset: 'openai-compatible',
+                    providerType: 'openai',
+                    baseUrl: 'https://provider-b.example/v1',
+                    model: 'shared-model',
+                },
+                sdkSessionBootDecision: expect.objectContaining({
+                    outcome: 'created',
+                    requestedMode: 'auto',
+                    resumeCandidateSessionId: null,
+                    reason: expect.stringContaining('provider-boundary:'),
+                }),
+            }),
+            expect.objectContaining({ label: 'session.initializer.create' }),
+        );
     });
 });

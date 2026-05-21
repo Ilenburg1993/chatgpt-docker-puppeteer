@@ -249,12 +249,96 @@ function _validateSessionForResume(sessionId, lastActivityMs) {
 }
 
 /**
+ * @typedef {{
+ *     enabled: true;
+ *     profile: string | null;
+ *     preset: string | null;
+ *     providerType: string | null;
+ *     baseUrl: string | null;
+ *     model: string;
+ * }} ByokSessionBinding
+ */
+
+/**
+ * @param {ReturnType<typeof resolveConfiguredByokSessionOverrides>} byok
+ * @param {string} model
+ * @returns {ByokSessionBinding | null}
+ */
+function buildByokSessionBinding(byok, model) {
+    if (!byok.enabled) return null;
+    return {
+        enabled: true,
+        profile: byok.summary.profile ?? null,
+        preset: byok.summary.preset ?? null,
+        providerType: byok.summary.providerType ?? null,
+        baseUrl: byok.summary.baseUrl ?? null,
+        model,
+    };
+}
+
+/**
+ * @param {unknown} value
+ * @returns {ByokSessionBinding | null}
+ */
+function readPersistedByokSessionBinding(value) {
+    if (!value || typeof value !== 'object' || Reflect.get(value, 'enabled') !== true) return null;
+    const model = Reflect.get(value, 'model');
+    if (typeof model !== 'string' || model.trim().length === 0) return null;
+    /** @param {'profile' | 'preset' | 'providerType' | 'baseUrl'} key */
+    const readOptionalString = (key) => {
+        const field = Reflect.get(value, key);
+        return typeof field === 'string' && field.trim().length > 0 ? field.trim() : null;
+    };
+    return {
+        enabled: true,
+        profile: readOptionalString('profile'),
+        preset: readOptionalString('preset'),
+        providerType: readOptionalString('providerType'),
+        baseUrl: readOptionalString('baseUrl'),
+        model: model.trim(),
+    };
+}
+
+/**
+ * @param {ReturnType<typeof buildByokSessionBinding>} current
+ * @param {ReturnType<typeof readPersistedByokSessionBinding>} persisted
+ * @returns {string | null}
+ */
+function compareByokSessionBindings(current, persisted) {
+    if (!current) return persisted ? 'sessao persistida nasceu em BYOK e o boot atual voltou ao SDK Copilot' : null;
+    if (!persisted) return 'sessao persistida nao traz binding BYOK seguro para o provider atual';
+    if (current.profile !== persisted.profile) return buildByokBindingMismatch('profile', current.profile, persisted.profile);
+    if (current.preset !== persisted.preset) return buildByokBindingMismatch('preset', current.preset, persisted.preset);
+    if (current.providerType !== persisted.providerType) {
+        return buildByokBindingMismatch('providerType', current.providerType, persisted.providerType);
+    }
+    if (current.baseUrl !== persisted.baseUrl) return buildByokBindingMismatch('baseUrl', current.baseUrl, persisted.baseUrl);
+    if (current.model !== persisted.model) return buildByokBindingMismatch('model', current.model, persisted.model);
+    return null;
+}
+
+/**
+ * @param {string} field
+ * @param {string | null} current
+ * @param {string | null} persisted
+ * @returns {string}
+ */
+function buildByokBindingMismatch(field, current, persisted) {
+    return `binding BYOK ${field}='${persisted ?? '-'}' difere do boot atual '${current ?? '-'}'`;
+}
+
+/**
  * @param {import('../../lifecycle/state/index.js').AliveAgentState | null} state
  * @param {ReturnType<typeof resolveConfiguredByokSessionOverrides>} byok
  * @param {string} model
  * @returns {{ ok: true } | { ok: false; reason: string }}
  */
-function validatePersistedSessionForByokResume(state, byok, model) {
+function validatePersistedSessionForProviderResume(state, byok, model) {
+    const bindingMismatch = compareByokSessionBindings(
+        buildByokSessionBinding(byok, model),
+        readPersistedByokSessionBinding(state ? Reflect.get(state, 'byokSessionBinding') : null),
+    );
+    if (bindingMismatch) return { ok: false, reason: bindingMismatch };
     if (!byok.enabled) return { ok: true };
     if (state?.model && state.model !== model) {
         return { ok: false, reason: `modelo persistido '${state.model}' difere do BYOK ativo '${model}'` };
@@ -272,6 +356,48 @@ function validatePersistedSessionForByokResume(state, byok, model) {
         };
     }
     return { ok: true };
+}
+
+/**
+ * @param {import('../../lifecycle/state/index.js').AliveAgentState | null} state
+ * @returns {{ mode: 'new' } | { mode: 'resume'; sessionId: string } | null}
+ */
+function readNextSdkSessionBootSelection(state) {
+    const raw = state && typeof state === 'object' ? Reflect.get(state, 'nextSdkSessionBoot') : null;
+    if (!raw || typeof raw !== 'object') return null;
+    const mode = Reflect.get(raw, 'mode');
+    if (mode === 'new') return { mode };
+    const sessionId = Reflect.get(raw, 'sessionId');
+    return mode === 'resume' && typeof sessionId === 'string' && sessionId.trim()
+        ? { mode, sessionId: sessionId.trim() }
+        : null;
+}
+
+/**
+ * @param {'auto' | 'new' | 'resume'} requestedMode
+ * @param {string | null} resumeCandidateSessionId
+ * @param {string} reason
+ * @param {Awaited<ReturnType<typeof resumeOrCreateWithConfigDiscoveryGuard>>} result
+ * @returns {{
+ *     outcome: 'created' | 'resumed';
+ *     requestedMode: 'auto' | 'new' | 'resume';
+ *     selectedSessionId: string;
+ *     resumeCandidateSessionId: string | null;
+ *     reason: string;
+ *     decidedAt: number;
+ * }}
+ */
+function buildSdkSessionBootDecision(requestedMode, resumeCandidateSessionId, reason, result) {
+    const resumeFallbackReason =
+        resumeCandidateSessionId && !result.isResumed ? `${reason}: sdk-resume-fallback-created-new-session` : reason;
+    return {
+        outcome: result.isResumed ? 'resumed' : 'created',
+        requestedMode,
+        selectedSessionId: result.session.sessionId,
+        resumeCandidateSessionId,
+        reason: resumeFallbackReason,
+        decidedAt: Date.now(),
+    };
 }
 
 /**
@@ -395,12 +521,34 @@ export async function initOrResumeSession(client, sessionOptions) {
     // O princípio operacional atual é session-first: retomar a sessão anterior sempre que o SDK permitir.
     // Rotação continua disponível para fluxos explícitos via sessionOptions.allowSessionRotation.
     let savedSessionId = _validateSessionForResume(state?.sessionId, state?.resumedAt ?? state?.startedAt);
-    const byokResumeDecision = validatePersistedSessionForByokResume(state, byok, model);
-    if (savedSessionId && !byokResumeDecision.ok) {
+    /** @type {'auto' | 'new' | 'resume'} */
+    let requestedSdkSessionBootMode = 'auto';
+    let sdkSessionBootReason = savedSessionId ? 'auto-resume-persisted-session' : 'auto-create-without-resume-candidate';
+    const nextSdkSessionBoot = readNextSdkSessionBootSelection(state);
+    if (nextSdkSessionBoot?.mode === 'new') {
+        log('INFO', '[PersistentSession] Diretiva do operador: criar nova sessão SDK neste boot.');
+        requestedSdkSessionBootMode = 'new';
+        sdkSessionBootReason = 'operator-next-boot-new-session';
+        savedSessionId = null;
+    } else if (nextSdkSessionBoot?.mode === 'resume') {
+        requestedSdkSessionBootMode = 'resume';
+        const explicitSessionId = _validateSessionForResume(nextSdkSessionBoot.sessionId, Date.now());
+        if (explicitSessionId) {
+            log('INFO', `[PersistentSession] Diretiva do operador: retomar sessão SDK '${explicitSessionId}'.`);
+            sdkSessionBootReason = 'operator-next-boot-resume-session';
+            savedSessionId = explicitSessionId;
+        } else {
+            log('WARN', '[PersistentSession] Diretiva de retomada traz sessionId inválido; mantendo seleção persistida.');
+            sdkSessionBootReason = 'operator-next-boot-resume-invalid-session-id';
+        }
+    }
+    const providerResumeDecision = validatePersistedSessionForProviderResume(state, byok, model);
+    if (savedSessionId && !providerResumeDecision.ok && !nextSdkSessionBoot) {
         log(
             'INFO',
-            `[PersistentSession] BYOK exige nova sessão SDK — ${byokResumeDecision.reason}.`,
+            `[PersistentSession] Binding do provider exige nova sessão SDK — ${providerResumeDecision.reason}.`,
         );
+        sdkSessionBootReason = `provider-boundary: ${providerResumeDecision.reason}`;
         savedSessionId = null;
     }
     const allowSessionRotation = Reflect.get(sessionOptions, 'allowSessionRotation') === true;
@@ -415,14 +563,23 @@ export async function initOrResumeSession(client, sessionOptions) {
         if (decision.shouldRotate) {
             log('INFO', `[PersistentSession] F43.2: Rotacionando sessão — ${decision.reason}`);
             defaultMetrics.recordSessionRotation();
+            sdkSessionBootReason = `session-rotation: ${decision.reason}`;
             savedSessionId = null;
         }
     }
+    const resumeCandidateSessionId = savedSessionId;
     let result = await resumeOrCreateWithConfigDiscoveryGuard(client, savedSessionId, opts);
     if (result.isResumed && !(await _validateResumedSession(result.session))) {
         log('WARN', '[PersistentSession] Sessão retomada não passou no health-check — criando nova sessão.');
+        sdkSessionBootReason = 'resumed-session-health-check-failed';
         result = await createWithConfigDiscoveryGuard(client, opts);
     }
+    const sdkSessionBootDecision = buildSdkSessionBootDecision(
+        requestedSdkSessionBootMode,
+        resumeCandidateSessionId,
+        sdkSessionBootReason,
+        result,
+    );
     if (byok.enabled && byok.provider) {
         Reflect.set(result.session, '__copilotByokEnabled', true);
         Reflect.set(result.session, '__copilotByokProvider', byok.provider);
@@ -472,10 +629,13 @@ export async function initOrResumeSession(client, sessionOptions) {
                 model: effectiveModel,
                 systemPromptBinding: buildSystemPromptBindingSnapshot(systemPromptStatus, result.session.sessionId),
                 reasoningEffort: effectiveReasoningEffort,
+                byokSessionBinding: buildByokSessionBinding(byok, model),
+                sdkSessionBootDecision,
                 dialogPaused: false,
                 pendingTurnMessage: null,
                 pendingTurnTs: null,
                 pendingTurnConsumedPR: false,
+                nextSdkSessionBoot: null,
             },
             { label: 'session.initializer.resume' },
         );
@@ -494,8 +654,11 @@ export async function initOrResumeSession(client, sessionOptions) {
                 model: effectiveModel,
                 systemPromptBinding: buildSystemPromptBindingSnapshot(systemPromptStatus, result.session.sessionId),
                 reasoningEffort: effectiveReasoningEffort,
+                byokSessionBinding: buildByokSessionBinding(byok, model),
+                sdkSessionBootDecision,
                 pendingQuestion: null,
                 pendingQuestionMeta: null,
+                nextSdkSessionBoot: null,
             },
             { label: 'session.initializer.create' },
         );

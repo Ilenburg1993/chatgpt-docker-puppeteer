@@ -43,6 +43,9 @@ export function cmdHelp({ injectPort, println }) {
   \x1b[33m/interrupt <msg>\x1b[0m                     — aborta turno ativo; por padrão guarda substituição no mailbox zero-PR
   \x1b[33m/abort\x1b[0m                               — aborta apenas o turno SDK ativo
   \x1b[33m/mailbox [status|consume|clear]\x1b[0m      — inspeciona/consome/limpa a fila mailbox zero-PR
+  \x1b[33m/session [sdk [n]]\x1b[0m                   — cockpit da sessão SDK persistente; snapshots ficam em save/list/restore
+  \x1b[33m/session sdk next <new|resume <id|#n|current|last|foreground>|auto>\x1b[0m — agenda seleção de sessão SDK para o próximo boot
+  \x1b[33m/session sdk delete <id|#n>\x1b[0m        — apaga estado persistido SDK fora da sessão viva
   \x1b[33m/restart\x1b[0m                             — reinicia dialog loop
   \x1b[33m/emergency-reset\x1b[0m (\x1b[33m/ereset\x1b[0m)            — limpa rate limiters + reinicia loop
   \x1b[33m/quit\x1b[0m / \x1b[33m/exit\x1b[0m                         — encerra terminal
@@ -51,7 +54,7 @@ export function cmdHelp({ injectPort, println }) {
   \x1b[33m/model\x1b[0m                               — exibe modelo ativo
   \x1b[33m/model list\x1b[0m                          — lista modelos disponíveis (via SDK)
   \x1b[33m/model <id>\x1b[0m                          — troca modelo (ex: /model auto)
-  \x1b[33m/byok [status|reload|providers|profiles|health|models|recommend|env|use|model|provider|persist]\x1b[0m — BYOK universal via .env.local
+  \x1b[33m/byok [status|reload|providers|profiles|health|probe|models|recommend|env|use|model|provider|persist]\x1b[0m — BYOK universal via .env.local
   \x1b[33m/reasoning\x1b[0m                           — exibe nível de raciocínio atual
   \x1b[33m/reasoning low|medium|high|xhigh|off\x1b[0m — altera reasoning effort
 
@@ -87,8 +90,8 @@ export function cmdHelp({ injectPort, println }) {
   \x1b[33m/menu [n|id|run n]\x1b[0m                  — command palette inteligente (pseudo-botões/dropdown no terminal)
   \x1b[33m/metrics\x1b[0m                             — métricas consolidadas da sessão (turns, tokens, billing, inject/prompt)
   \x1b[33m/export [path]\x1b[0m                       — exporta conversa como Markdown
-  \x1b[33m/resume\x1b[0m                              — lista últimas sessões do hub (para retomar)
-  \x1b[33m/resume <sessionId>\x1b[0m                  — injeta resumo de sessão anterior como contexto
+  \x1b[33m/resume\x1b[0m                              — lista sessões do hub disponíveis para injeção de histórico
+  \x1b[33m/resume <sessionId>\x1b[0m                  — injeta resumo do hub; não troca a sessão SDK persistente
 
   \x1b[1mMemória Semântica\x1b[0m
   \x1b[33m/remember [tag:] texto\x1b[0m               — persiste memória

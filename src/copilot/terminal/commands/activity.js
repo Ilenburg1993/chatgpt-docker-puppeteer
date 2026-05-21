@@ -66,19 +66,32 @@ function printTurnTraceSummary(println, title, trace) {
  * @returns {any | null}
  */
 function pickMostUsefulRecentTurnTrace(recent) {
-    for (const entry of recent) {
-        if (entry.fileCount > 0) return entry;
-        if (
-            entry.tools.some(
-                /** @param {{ operation?: string; path?: string | null; target?: string | null }} tool */ (tool) =>
-                    tool.operation !== 'unknown' || Boolean(tool.path) || Boolean(tool.target),
-            ) ||
-            (Array.isArray(entry.userInputs) && entry.userInputs.length > 0)
-        ) {
-            return entry;
-        }
-    }
-    return recent[0] ?? null;
+    return pickRecentOperationalTurnTrace(recent) ?? pickRecentHumanTurnTrace(recent) ?? recent[0] ?? null;
+}
+
+/**
+ * @param {any[]} recent
+ * @returns {any | null}
+ */
+function pickRecentOperationalTurnTrace(recent) {
+    return (
+        recent.find(
+            (entry) =>
+                entry.fileCount > 0 ||
+                entry.tools.some(
+                    /** @param {{ operation?: string; path?: string | null; target?: string | null }} tool */ (tool) =>
+                        tool.operation !== 'unknown' || Boolean(tool.path) || Boolean(tool.target),
+                ),
+        ) ?? null
+    );
+}
+
+/**
+ * @param {any[]} recent
+ * @returns {any | null}
+ */
+function pickRecentHumanTurnTrace(recent) {
+    return recent.find((entry) => Array.isArray(entry.userInputs) && entry.userInputs.length > 0) ?? null;
 }
 
 /**
@@ -144,6 +157,7 @@ export function cmdActivity({ println }, arg) {
     const activeTurnTrace = projection.turnTrace.current;
     const recentNonCurrent = projection.turnTrace.recent.filter((entry) => entry.traceId !== activeTurnTrace?.traceId);
     const latestCompletedTurnTrace = pickMostUsefulRecentTurnTrace(recentNonCurrent);
+    const latestHumanTurnTrace = pickRecentHumanTurnTrace(recentNonCurrent);
     const severityColor =
         current.severity === 'error' ? '\x1b[31m' : current.severity === 'warn' ? '\x1b[33m' : '\x1b[32m';
     const progressLabel = typeof current.progress === 'number' ? ` · ${current.progress}%` : '';
@@ -163,6 +177,14 @@ export function cmdActivity({ println }, arg) {
 
     if (latestCompletedTurnTrace && latestCompletedTurnTrace.traceId !== activeTurnTrace?.traceId) {
         printTurnTraceSummary(println, 'Último turno concluído', latestCompletedTurnTrace);
+    }
+
+    if (
+        latestHumanTurnTrace &&
+        latestHumanTurnTrace.traceId !== latestCompletedTurnTrace?.traceId &&
+        latestHumanTurnTrace.traceId !== activeTurnTrace?.traceId
+    ) {
+        printTurnTraceSummary(println, 'Interação humana recente', latestHumanTurnTrace);
     }
 
     if (recentIo.length > 0) {

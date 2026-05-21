@@ -133,3 +133,16 @@ export async function setForegroundSdkSessionId(ctx, sessionId) {
 export async function listSdkSessions(ctx, filter) {
     return requireClient(ctx, 'listSdkSessions').listSessions(filter);
 }
+
+/**
+ * Remove permanentemente uma sessão persistida conhecida pelo client SDK atual.
+ *
+ * A proteção para não apagar a sessão viva pertence ao cockpit terminal, que tem o inventário operacional completo.
+ *
+ * @param {unknown} ctx
+ * @param {string} sessionId
+ * @returns {Promise<void>}
+ */
+export async function deleteSdkSession(ctx, sessionId) {
+    await requireClient(ctx, 'deleteSdkSession').deleteSession(sessionId);
+}

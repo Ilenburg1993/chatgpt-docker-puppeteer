@@ -717,6 +717,8 @@
  *       ) => Promise<import('#copilot/sdk/types').SessionMetadata[]>)
  *     | undefined} listSdkSessions
  *   - Lista sessões conhecidas pelo SDK atual
+ * @property {((sessionId: string) => Promise<void>) | undefined} deleteSdkSession - Remove permanentemente uma sessão
+ *   persistida conhecida pelo SDK atual
  *
  * @property {(() => Promise<unknown>) | undefined} listSdkAgents - Lista agentes customizados disponíveis na sessão
  *   atual

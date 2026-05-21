@@ -14,7 +14,9 @@ import { toError } from '#copilot/core';
 import {
     clearPendingTerminalQuestionShadow,
     clearTerminalHistory,
+    deleteTerminalSdkSession,
     listTerminalSnapshotsProjection,
+    listTerminalSdkSessionInventory,
     loadTerminalSnapshotProjection,
     readTerminalActivityProjection,
     readTerminalConfigProjection,
@@ -25,7 +27,9 @@ import {
     readTerminalLiveFlowProjection,
     readTerminalStatusProjection,
     readTerminalTimelineProjection,
+    readTerminalSdkSessionBootSelection,
     saveTerminalSnapshotProjection,
+    scheduleTerminalSdkSessionBootSelection,
 } from '../frontend/index.js';
 import { buildTerminalOperationalGuidance } from '../frontend/operational-guidance/index.js';
 import {
@@ -803,6 +807,255 @@ export function cmdClearShadow({ println }, arg = '') {
             ? '[clear-shadow] Shadow persistida de ask_user limpa.'
             : '[clear-shadow] Nenhuma shadow persistida do ask_user no momento.',
     );
+}
+
+const SDK_SESSION_PROBE_SUMMARY_RE =
+    /\bBYOK_(?:AGENT_)?PROBE\b|\bterminal_byok_probe_marker\b|\bBYOK_AGENT_PROBE_ASK\b/iu;
+
+/**
+ * @param {import('#copilot/sdk/types').SessionMetadata} entry
+ * @returns {boolean}
+ */
+function isTerminalProbeSdkSession(entry) {
+    return typeof entry.summary === 'string' && SDK_SESSION_PROBE_SUMMARY_RE.test(entry.summary);
+}
+
+/**
+ * Resolve atalhos do inventário sem trocar a sessão viva por fora do initializer.
+ *
+ * @param {string} target
+ * @param {{
+ *     currentSessionId: string | null;
+ *     lastSessionId: string | null;
+ *     foregroundSessionId: string | null;
+ *     sessions: import('#copilot/sdk/types').SessionMetadata[];
+ * }} inventory
+ * @returns {{ sessionId: string; source: string } | null}
+ */
+function resolveSdkSessionResumeTarget(target, inventory) {
+    const clean = target.trim();
+    const normalized = clean.toLowerCase();
+    if (normalized === 'current' && inventory.currentSessionId) {
+        return { sessionId: inventory.currentSessionId, source: 'current' };
+    }
+    if (normalized === 'last' && inventory.lastSessionId) {
+        return { sessionId: inventory.lastSessionId, source: 'last' };
+    }
+    if (normalized === 'foreground' && inventory.foregroundSessionId) {
+        return { sessionId: inventory.foregroundSessionId, source: 'foreground' };
+    }
+    const indexed = /^#(?<index>\d+)$/u.exec(clean);
+    if (indexed?.groups?.['index']) {
+        const index = Number.parseInt(indexed.groups['index'], 10) - 1;
+        const entry = inventory.sessions[index];
+        return entry ? { sessionId: entry.sessionId, source: clean } : null;
+    }
+    return clean ? { sessionId: clean, source: 'id' } : null;
+}
+
+/**
+ * @param {Record<string, unknown> | null | undefined} binding
+ * @returns {string}
+ */
+function renderSdkSessionProviderBinding(binding) {
+    if (!binding || binding['enabled'] !== true) return 'SDK Copilot';
+    const profile = typeof binding['profile'] === 'string' && binding['profile'] ? binding['profile'] : '-';
+    const preset = typeof binding['preset'] === 'string' && binding['preset'] ? binding['preset'] : '-';
+    const providerType =
+        typeof binding['providerType'] === 'string' && binding['providerType'] ? binding['providerType'] : '-';
+    const model = typeof binding['model'] === 'string' && binding['model'] ? binding['model'] : '-';
+    return `BYOK profile=${profile} · preset=${preset} · provider=${providerType} · model=${model}`;
+}
+
+/**
+ * @param {Record<string, unknown> | null | undefined} decision
+ * @returns {string | null}
+ */
+function renderSdkSessionBootDecision(decision) {
+    if (!decision) return null;
+    const outcome = decision['outcome'] === 'created' || decision['outcome'] === 'resumed' ? decision['outcome'] : null;
+    const requestedMode =
+        decision['requestedMode'] === 'auto' || decision['requestedMode'] === 'new' || decision['requestedMode'] === 'resume'
+            ? decision['requestedMode']
+            : null;
+    const selectedSessionId =
+        typeof decision['selectedSessionId'] === 'string' && decision['selectedSessionId']
+            ? decision['selectedSessionId']
+            : null;
+    const reason = typeof decision['reason'] === 'string' && decision['reason'] ? decision['reason'] : null;
+    if (!outcome || !requestedMode || !selectedSessionId || !reason) return null;
+    const candidate =
+        typeof decision['resumeCandidateSessionId'] === 'string' && decision['resumeCandidateSessionId']
+            ? ` · candidato=${decision['resumeCandidateSessionId']}`
+            : '';
+    return `${outcome} · request=${requestedMode} · sessão=${selectedSessionId}${candidate} · motivo=${reason}`;
+}
+
+/**
+ * Cockpit de sessão SDK persistente. Diferencia sessão SDK, dialog loop, hub e snapshots locais sem trocar a sessão viva
+ * por um caminho paralelo.
+ *
+ * @param {SessionContext} ctx
+ * @param {string} [arg]
+ * @returns {Promise<void>}
+ */
+export async function cmdSessionSdk({ println }, arg = '') {
+    const { runtimeId, arg: cleanArg } = extractRuntimeTarget(arg);
+    const [rawAction = 'status', ...rest] = cleanArg.trim().split(/\s+/u).filter(Boolean);
+    const action = rawAction.toLowerCase();
+    if (action === 'next') {
+        const [rawMode = '', ...modeRest] = rest;
+        const mode = rawMode.toLowerCase();
+        if (mode === 'new') {
+            const result = await scheduleTerminalSdkSessionBootSelection({ mode: 'new' });
+            if (!result.ok) throw result.error;
+            println('  \x1b[32mPróximo boot: criar nova sessão SDK.\x1b[0m');
+        } else if (mode === 'resume') {
+            const target = modeRest.join(' ').trim();
+            if (!target) {
+                println('  \x1b[33mUso: /session sdk next resume <sessionId|#n|current|last|foreground>\x1b[0m');
+                return;
+            }
+            let resolved;
+            if (/^(?:#\d+|current|last|foreground)$/iu.test(target)) {
+                let inventory;
+                try {
+                    inventory = await listTerminalSdkSessionInventory(runtimeId);
+                } catch (error) {
+                    println(`  \x1b[31mNão foi possível resolver o atalho de sessão SDK: ${toError(error).message}\x1b[0m`);
+                    return;
+                }
+                resolved = resolveSdkSessionResumeTarget(target, inventory);
+                if (!resolved) {
+                    println(`  \x1b[33mAtalho de sessão SDK indisponível: ${target}. Rode /session sdk para ver o inventário.\x1b[0m`);
+                    return;
+                }
+            } else {
+                resolved = resolveSdkSessionResumeTarget(target, {
+                    currentSessionId: null,
+                    lastSessionId: null,
+                    foregroundSessionId: null,
+                    sessions: [],
+                });
+            }
+            if (!resolved) {
+                println(`  \x1b[33mSessão SDK não resolvida para ${target}. Rode /session sdk para ver o inventário.\x1b[0m`);
+                return;
+            }
+            const result = await scheduleTerminalSdkSessionBootSelection({
+                mode: 'resume',
+                sessionId: resolved.sessionId,
+            });
+            if (!result.ok) throw result.error;
+            println(
+                `  \x1b[32mPróximo boot: tentar retomar sessão SDK ${resolved.sessionId}${resolved.source === 'id' ? '' : ` (${resolved.source})`}.\x1b[0m`,
+            );
+        } else if (mode === 'auto' || mode === 'clear') {
+            const result = await scheduleTerminalSdkSessionBootSelection(null);
+            if (!result.ok) throw result.error;
+            println('  \x1b[32mPróximo boot: seleção automática restaurada; a sessão persistida anterior volta a ser o padrão.\x1b[0m');
+        } else {
+            println('  \x1b[33mUso: /session sdk next <new|resume <sessionId|#n|current|last|foreground>|auto>\x1b[0m');
+            return;
+        }
+        println('  \x1b[90mA diretiva é consumida pelo initializer no próximo boot; /restart reinicia só o dialog loop.\x1b[0m');
+        return;
+    }
+    if (action === 'delete' || action === 'remove') {
+        const target = rest.join(' ').trim();
+        if (!target) {
+            println('  \x1b[33mUso: /session sdk delete <sessionId|#n>\x1b[0m');
+            println('  \x1b[90mA sessão SDK viva é protegida; para sair dela, agende /session sdk next new.\x1b[0m');
+            return;
+        }
+        let inventory;
+        try {
+            inventory = await listTerminalSdkSessionInventory(runtimeId);
+        } catch (error) {
+            println(`  \x1b[31mNão foi possível listar sessões SDK antes da exclusão: ${toError(error).message}\x1b[0m`);
+            return;
+        }
+        const resolved = resolveSdkSessionResumeTarget(target, inventory);
+        if (!resolved) {
+            println(`  \x1b[33mSessão SDK não resolvida para exclusão: ${target}. Rode /session sdk para ver o inventário.\x1b[0m`);
+            return;
+        }
+        if (resolved.sessionId === inventory.currentSessionId) {
+            println(`  \x1b[31mSessão SDK viva não apagada: ${resolved.sessionId}.\x1b[0m`);
+            println('  \x1b[90mAgende /session sdk next new ou retome outra sessão no próximo boot antes de apagar esta.\x1b[0m');
+            return;
+        }
+        try {
+            await deleteTerminalSdkSession(resolved.sessionId, runtimeId);
+        } catch (error) {
+            println(`  \x1b[31mFalha ao apagar sessão SDK ${resolved.sessionId}: ${toError(error).message}\x1b[0m`);
+            return;
+        }
+        println(
+            `  \x1b[32mSessão SDK apagada: ${resolved.sessionId}${resolved.source === 'id' ? '' : ` (${resolved.source})`}.\x1b[0m`,
+        );
+        println('  \x1b[90mdeleteSession remove estado persistido; /session sdk next controla apenas o próximo attach/create.\x1b[0m');
+        return;
+    }
+
+    const limit = Number.parseInt(rest[0] ?? '', 10);
+    const bootSelection = await readTerminalSdkSessionBootSelection();
+    let inventory;
+    try {
+        inventory = await listTerminalSdkSessionInventory(runtimeId);
+    } catch (error) {
+        println(`  \x1b[31mNão foi possível listar sessões SDK: ${toError(error).message}\x1b[0m`);
+        println('  \x1b[90mAinda assim: /resume atua no hub; /session save|list|restore atua em snapshots locais.\x1b[0m');
+        return;
+    }
+
+    const nextLabel =
+        bootSelection?.mode === 'resume'
+            ? `resume ${bootSelection.sessionId}`
+            : bootSelection?.mode === 'new'
+              ? 'new'
+              : 'auto';
+    println('\n  \x1b[36mSessão SDK\x1b[0m');
+    println(`    atual:          \x1b[33m${inventory.currentSessionId ?? '(sem sessão viva)'}\x1b[0m`);
+    println(`    last SDK:       \x1b[33m${inventory.lastSessionId ?? '-'}\x1b[0m`);
+    println(`    foreground SDK: \x1b[33m${inventory.foregroundSessionId ?? '-'}\x1b[0m`);
+    println(`    próximo boot:   \x1b[33m${nextLabel}\x1b[0m`);
+    println(`    provider bound: \x1b[33m${renderSdkSessionProviderBinding(inventory.persistedByokBinding)}\x1b[0m`);
+    const bootDecision = renderSdkSessionBootDecision(inventory.lastBootDecision);
+    if (bootDecision) {
+        println(`    último boot:    \x1b[90m${bootDecision}\x1b[0m`);
+    }
+    println(
+        '    \x1b[90m/session sdk controla sessão SDK; /restart reinicia só dialog loop; /resume injeta histórico do hub; /session save|list|restore são snapshots locais.\x1b[0m',
+    );
+    if (inventory.sessions.length === 0) {
+        println('    \x1b[90mNenhuma sessão SDK listada pelo client atual.\x1b[0m\n');
+        return;
+    }
+    println(`\n  \x1b[36mSessões SDK listadas\x1b[0m (${inventory.sessions.length})`);
+    for (const [index, entry] of inventory.sessions
+        .slice(0, Number.isFinite(limit) && limit > 0 ? limit : 12)
+        .entries()) {
+        const flags = [
+            entry.sessionId === inventory.currentSessionId ? 'atual' : null,
+            entry.sessionId === inventory.lastSessionId ? 'last' : null,
+            entry.sessionId === inventory.foregroundSessionId ? 'foreground' : null,
+            isTerminalProbeSdkSession(entry) ? 'probe-residue' : null,
+            entry.isRemote ? 'remote' : 'local',
+        ]
+            .filter(Boolean)
+            .join(',');
+        const start = entry.startTime instanceof Date ? entry.startTime.toISOString() : String(entry.startTime ?? '-');
+        const modified =
+            entry.modifiedTime instanceof Date ? entry.modifiedTime.toISOString() : String(entry.modifiedTime ?? '-');
+        println(`    \x1b[90m#${index + 1}\x1b[0m \x1b[33m${entry.sessionId}\x1b[0m  \x1b[90m${flags || '-'}\x1b[0m`);
+        println(`      \x1b[90mstart=${start} · modified=${modified}${entry.summary ? ` · ${entry.summary}` : ''}\x1b[0m`);
+    }
+    println(
+        '\n  \x1b[90mPróximo boot: /session sdk next new | /session sdk next resume <id|#n|current|last|foreground> | /session sdk next auto\x1b[0m',
+    );
+    println('  \x1b[90mLimpeza persistida: /session sdk delete <id|#n>; sessão viva é protegida contra exclusão.\x1b[0m');
+    println('  \x1b[90mprobe-residue marca canários persistidos por diagnósticos antigos; probes novos usam sessão efêmera.\x1b[0m\n');
 }
 
 /**

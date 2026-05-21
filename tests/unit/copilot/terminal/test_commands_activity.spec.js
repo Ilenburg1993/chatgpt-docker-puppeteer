@@ -231,4 +231,98 @@ describe('terminal/commands/activity', () => {
         expect(ctx.output()).toContain('Último turno concluído');
         expect(ctx.output()).toContain('Confirmar deploy?');
     });
+
+    it('preserva trace operacional recente quando o SDK separa tools e ask_user em turnos distintos', () => {
+        vi.mocked(terminalFrontend.readTerminalActivityProjection).mockReturnValueOnce({
+            current: {
+                phase: 'idle',
+                label: 'Pronto',
+                detail: 'Turno concluído',
+                source: 'terminal',
+                severity: 'info',
+                progress: null,
+                toolName: null,
+                startedAt: 1,
+                updatedAt: 2,
+                ageMs: 0,
+            },
+            history: [],
+            turnTrace: {
+                current: null,
+                recent: [
+                    {
+                        traceId: 'turn:ask',
+                        turnId: 'ask',
+                        source: 'assistant',
+                        status: 'completed',
+                        startedAt: 20,
+                        updatedAt: 30,
+                        finishedAt: 30,
+                        toolCount: 0,
+                        fileCount: 0,
+                        userInputCount: 1,
+                        tools: [],
+                        files: [],
+                        userInputs: [
+                            {
+                                requestId: 'ask-1',
+                                kind: 'question',
+                                question: 'ASK-CANONICAL?',
+                                choices: ['SIM'],
+                                allowFreeform: false,
+                                status: 'answered',
+                                answerPreview: 'SIM',
+                                source: 'sdk',
+                                count: 2,
+                                updatedAt: 30,
+                            },
+                        ],
+                    },
+                    {
+                        traceId: 'turn:tools',
+                        turnId: 'tools',
+                        source: 'assistant',
+                        status: 'completed',
+                        startedAt: 10,
+                        updatedAt: 19,
+                        finishedAt: 19,
+                        toolCount: 1,
+                        fileCount: 1,
+                        userInputCount: 0,
+                        tools: [
+                            {
+                                toolName: 'read_file_content',
+                                operation: 'read',
+                                path: 'package.json',
+                                target: 'package.json',
+                                source: 'sdk',
+                                status: 'completed',
+                                success: true,
+                                count: 1,
+                                updatedAt: 19,
+                            },
+                        ],
+                        files: [
+                            {
+                                path: 'package.json',
+                                operation: 'read',
+                                source: 'sdk',
+                                count: 1,
+                                updatedAt: 19,
+                            },
+                        ],
+                        userInputs: [],
+                    },
+                ],
+            },
+        });
+        const ctx = mockCtx();
+
+        cmdActivity({ println: ctx.println }, '5');
+
+        expect(ctx.output()).toContain('Último turno concluído');
+        expect(ctx.output()).toContain('read_file_content');
+        expect(ctx.output()).toContain('Interação humana recente');
+        expect(ctx.output()).toContain('ASK-CANONICAL?');
+    });
 });

@@ -24,6 +24,7 @@ const SECRET_ENV_RE = /(?:API[_-]?KEY|TOKEN|SECRET|PASSWORD|BEARER)/iu;
 const POST_ASK_FINAL_RE = /POST-ASK-CANONICAL-FINAL:\s*usu[aá]rio confirmou SIM/iu;
 const TURN_SETTLED_AFTER_ASK_RE =
     /(?:Resposta concluída|Turno concluído; aguardando próxima mensagem|Turno do assistente concluído)/iu;
+const REPL_PROMPT_TAIL_RE = /(?:^|\n)voc[eê]\[[^\n]*?›\s*$/iu;
 
 function stripAnsi(value) {
     return String(value ?? '').replace(ANSI_RE, '');
@@ -70,6 +71,10 @@ function nowStamp() {
 
 function ensureLine(input) {
     return input.endsWith('\n') ? input : `${input}\n`;
+}
+
+function escapeRegExp(value) {
+    return String(value ?? '').replace(/[.*+?^${}()|[\]\\]/gu, '\\$&');
 }
 
 function buildScenarioPrompt() {
@@ -270,9 +275,10 @@ function buildByokCatalogCommands(provider) {
 }
 
 function buildByokRealPreflightCommands({ profile, altProfile, model, altModel, provider, altProvider }) {
-    const commands = ['/byok reload', '/byok env', '/byok providers', '/byok health', '/byok profiles'];
+    const commands = ['/session', '/byok reload', '/byok env', '/byok providers', '/byok health', '/byok profiles'];
     if (profile) commands.push(`/byok use ${profile}`);
-    commands.push('/byok', ...buildByokCatalogCommands(provider));
+    if (model) commands.push(`/byok model ${model}`);
+    commands.push('/byok', '/byok probe timeout:45000', '/byok probe agent timeout:60000', ...buildByokCatalogCommands(provider));
     if (altModel && altModel !== model) {
         commands.push(`/byok model ${altModel}`, '/byok');
     }
@@ -338,6 +344,266 @@ function sendCommandSequence(write, commands, { delayMs = 250 } = {}) {
     commands.forEach((commandLine, index) => {
         setTimeout(() => write(commandLine), index * delayMs).unref();
     });
+}
+
+function extractSdkSessionCockpitId(plain, label) {
+    const match = String(plain ?? '').match(new RegExp(`\\b${escapeRegExp(label)}:\\s+([^\\s]+)`, 'iu'));
+    const sessionId = match?.[1]?.trim();
+    return sessionId && !sessionId.startsWith('(') ? sessionId : '';
+}
+
+function sessionCycleBootCriteria(boot, { expectCreated = false, expectResumed = false } = {}) {
+    const plain = String(boot?.plain ?? '');
+    return [
+        {
+            id: `${boot.id}-ready`,
+            pass: /LLM-B pronta/u.test(plain),
+            detail: `${boot.label} reached the REPL ready state`,
+        },
+        {
+            id: `${boot.id}-cockpit`,
+            pass: /\bSessão SDK\b/u.test(plain) && /\bPróximo boot:/u.test(plain),
+            detail: `${boot.label} rendered the SDK session cockpit`,
+        },
+        {
+            id: `${boot.id}-clean-close`,
+            pass: boot.exitCode === 0 && !/ERR_USE_AFTER_CLOSE|UnhandledPromiseRejection|EPIPE/iu.test(plain),
+            detail: `${boot.label} closed without redraw/stdin lifecycle errors`,
+        },
+        ...(expectCreated
+            ? [
+                  {
+                      id: `${boot.id}-new-boot`,
+                      pass: /último boot:\s+created\s+·\s+request=new/iu.test(plain),
+                      detail: `${boot.label} consumed the scheduled next-boot create-new directive`,
+                  },
+              ]
+            : []),
+        ...(expectResumed
+            ? [
+                  {
+                      id: `${boot.id}-resume-boot`,
+                      pass: /último boot:\s+resumed\s+·\s+request=resume/iu.test(plain),
+                      detail: `${boot.label} consumed the scheduled next-boot resume directive`,
+                  },
+              ]
+            : []),
+    ];
+}
+
+async function runSessionCycleBoot({
+    id,
+    label,
+    outDir,
+    commands,
+    terminalPort,
+    requestedTransport,
+    timeoutMs,
+}) {
+    const canUsePty = requestedTransport === 'pty' && hasCommand('script');
+    const transport = canUsePty ? 'pty:script' : 'stdio:headless';
+    const command = canUsePty
+        ? {
+              cmd: 'script',
+              args: ['-qfec', 'npm run terminal:llm-b', '/dev/null'],
+          }
+        : { cmd: 'npm', args: ['run', 'terminal:llm-b'] };
+    let raw = '';
+    let ready = false;
+    let childClosed = false;
+    let waitingForPrompt = false;
+    let commandOutputOffset = 0;
+    const remainingCommands = [...commands];
+    const child = spawn(command.cmd, command.args, {
+        cwd: ROOT,
+        env: {
+            ...process.env,
+            COPILOT_MODEL: 'auto',
+            COPILOT_REASONING_EFFORT: 'high',
+            TERMINAL_DISPLAY_PRESET: 'full',
+            COPILOT_SDK_ENABLED: 'true',
+            COPILOT_OPERATIONAL_PROFILE: 'production',
+            LLM_B_TERMINAL_PORT: String(terminalPort),
+            TERMINAL_SSE_EVENT_ARCHIVE_DIR: path.join(outDir, `${id}-sse-events`),
+        },
+        stdio: ['pipe', 'pipe', 'pipe'],
+    });
+    const write = (line) => {
+        if (childClosed || child.stdin.destroyed || child.stdin.writableEnded) return false;
+        try {
+            return child.stdin.write(ensureLine(line));
+        } catch (error) {
+            if (error?.code !== 'EPIPE') {
+                console.warn(`[terminal-live] ${label} write failed: ${error?.message ?? String(error)}`);
+            }
+            return false;
+        }
+    };
+    const sendNextCommand = () => {
+        const next = remainingCommands.shift();
+        if (!next) return;
+        waitingForPrompt = next.trim() !== '/quit';
+        commandOutputOffset = stripAnsi(raw).length;
+        write(next);
+    };
+    child.stdin.on('error', (error) => {
+        if (error?.code !== 'EPIPE') {
+            console.warn(`[terminal-live] ${label} stdin error: ${error?.message ?? String(error)}`);
+        }
+    });
+    const onData = (chunk) => {
+        const text = chunk.toString('utf8');
+        raw += text;
+        process.stdout.write(text);
+        const plain = stripAnsi(raw);
+        if (!ready && /LLM-B pronta/u.test(plain)) {
+            ready = true;
+            sendNextCommand();
+            return;
+        }
+        if (waitingForPrompt && hasReturnedToReplPrompt(plain, commandOutputOffset)) {
+            waitingForPrompt = false;
+            sendNextCommand();
+        }
+    };
+    child.stdout.on('data', onData);
+    child.stderr.on('data', onData);
+    const timeout = setTimeout(() => {
+        write('/quit');
+        setTimeout(() => child.kill('SIGTERM'), 2_000).unref();
+    }, Number.isFinite(timeoutMs) ? timeoutMs : DEFAULT_TIMEOUT_MS);
+    const exitCode = await new Promise((resolve) => {
+        child.on('close', (code) => {
+            childClosed = true;
+            resolve(code);
+        });
+    });
+    clearTimeout(timeout);
+    const plain = stripAnsi(raw);
+    await writeFile(path.join(outDir, `${id}.raw.log`), raw, 'utf8');
+    await writeFile(path.join(outDir, `${id}.plain.log`), plain, 'utf8');
+    return {
+        id,
+        label,
+        exitCode,
+        raw,
+        plain,
+        sessionId: extractSdkSessionCockpitId(plain, 'atual'),
+        lastSessionId: extractSdkSessionCockpitId(plain, 'last SDK'),
+        transport,
+    };
+}
+
+async function runSessionCycleLiveTest({ outDir, requestedTransport, timeoutMs, terminalPort, startedAt }) {
+    const boot1 = await runSessionCycleBoot({
+        id: 'session-cycle-boot-1',
+        label: 'boot 1 / schedule new',
+        outDir,
+        commands: ['/session sdk', '/session sdk next new', '/quit'],
+        terminalPort,
+        requestedTransport,
+        timeoutMs,
+    });
+    const resumeTarget = boot1.lastSessionId || boot1.sessionId || 'last';
+    const boot2 = await runSessionCycleBoot({
+        id: 'session-cycle-boot-2',
+        label: 'boot 2 / create new and schedule resume',
+        outDir,
+        commands: ['/session sdk', `/session sdk next resume ${resumeTarget}`, '/quit'],
+        terminalPort,
+        requestedTransport,
+        timeoutMs,
+    });
+    const boot3 = await runSessionCycleBoot({
+        id: 'session-cycle-boot-3',
+        label: 'boot 3 / resume prior session and restore auto',
+        outDir,
+        commands: ['/session sdk', '/session sdk next auto', '/session sdk', '/quit'],
+        terminalPort,
+        requestedTransport,
+        timeoutMs,
+    });
+    const boots = [boot1, boot2, boot3];
+    const criteria = [
+        ...sessionCycleBootCriteria(boot1),
+        {
+            id: 'session-cycle-schedule-new',
+            pass: /Próximo boot:\s+criar nova sessão SDK/iu.test(boot1.plain),
+            detail: 'boot 1 scheduled SDK new-session selection for the next boot',
+        },
+        {
+            id: 'session-cycle-resume-target',
+            pass: Boolean(boot1.lastSessionId || boot1.sessionId),
+            detail: `boot 1 exposed a resumable SDK target (${resumeTarget})`,
+        },
+        ...sessionCycleBootCriteria(boot2, { expectCreated: true }),
+        {
+            id: 'session-cycle-schedule-resume',
+            pass:
+                Boolean(resumeTarget) &&
+                new RegExp(`Próximo boot:\\s+tentar retomar sessão SDK ${escapeRegExp(resumeTarget)}`, 'iu').test(
+                    boot2.plain,
+                ),
+            detail: 'boot 2 scheduled explicit resume of a listed pre-cycle SDK session',
+        },
+        ...sessionCycleBootCriteria(boot3, { expectResumed: true }),
+        {
+            id: 'session-cycle-restore-auto',
+            pass:
+                /seleção automática restaurada/iu.test(boot3.plain) &&
+                /próximo boot:\s+auto/iu.test(boot3.plain),
+            detail: 'boot 3 cleared the explicit selector and rendered next boot as auto again',
+        },
+    ];
+    const durationMs = Date.now() - Date.parse(startedAt);
+    const ok = criteria.every((criterion) => criterion.pass);
+    const summary = {
+        ok,
+        startedAt,
+        durationMs,
+        terminalPort,
+        resumeTarget,
+        boots: boots.map((boot) => ({
+            id: boot.id,
+            label: boot.label,
+            exitCode: boot.exitCode,
+            sessionId: boot.sessionId || null,
+            lastSessionId: boot.lastSessionId || null,
+            transport: boot.transport,
+        })),
+        criteria,
+    };
+    await writeFile(path.join(outDir, 'summary.json'), `${JSON.stringify(summary, null, 2)}\n`, 'utf8');
+    await writeFile(
+        path.join(outDir, 'summary.md'),
+        [
+            '# Terminal LLM-B SDK Session Cycle Live Test',
+            '',
+            `Started: ${startedAt}`,
+            `Duration: ${durationMs}ms`,
+            `Status: ${ok ? 'PASS' : 'FAIL'}`,
+            `Terminal port: ${terminalPort}`,
+            `Resume target: ${resumeTarget}`,
+            '',
+            '## Boots',
+            '',
+            ...summary.boots.map(
+                (boot) =>
+                    `- ${boot.id}: ${boot.label} · exit=${String(boot.exitCode)} · session=${boot.sessionId ?? '-'} · last=${boot.lastSessionId ?? '-'} · ${boot.transport}`,
+            ),
+            '',
+            '## Criteria',
+            '',
+            ...criteria.map((criterion) => `- ${criterion.pass ? '[x]' : '[ ]'} ${criterion.id}: ${criterion.detail}`),
+            '',
+        ].join('\n'),
+        'utf8',
+    );
+    return summary;
+}
+
+function hasReturnedToReplPrompt(plain, outputOffset) {
+    return REPL_PROMPT_TAIL_RE.test(String(plain ?? '').slice(outputOffset));
 }
 
 function buildReport({
@@ -412,6 +678,16 @@ function detectLiveBlocker(plain, runtime = {}) {
         return {
             id: 'byok-provider-credits',
             detail: 'BYOK provider rejected the selected paid model with 402; switch to a free/credited model',
+        };
+    }
+    const byokAdmissionMatch = plain.match(
+        /Turno não enviado ao provider BYOK:[^\n]*|terminal\.byok\.admission_blocked|BYOK budget:[^\n]*limite BYOK[^\n]*/i,
+    );
+    if (byokAdmissionMatch) {
+        return {
+            id: 'byok-admission-blocked',
+            detail:
+                'BYOK admission control contained the turn before provider streaming because the declared request budget is too small',
         };
     }
     if (
@@ -943,8 +1219,8 @@ function evaluateByokProbeOutput(plain, sseSummary, { fixture = false } = {}) {
         },
         {
             id: 'byok-health-visible',
-            pass: /BYOK chat health/.test(plain),
-            detail: '/byok health rendered persisted operational chat health',
+            pass: /BYOK operational health/.test(plain),
+            detail: '/byok health rendered persisted BYOK operational health',
         },
         {
             id: 'byok-models-visible',
@@ -958,8 +1234,11 @@ function evaluateByokProbeOutput(plain, sseSummary, { fixture = false } = {}) {
         },
         {
             id: 'byok-recommend-visible',
-            pass: /BYOK recommend/.test(plain) && /Use \/byok model <id>/.test(plain),
-            detail: '/byok recommend rendered ranked operational recommendations',
+            pass:
+                /BYOK recommend/.test(plain) &&
+                /\/byok probe agent(?:\s+profile:[^\s]+)?\s+model:/.test(plain) &&
+                /live fake descartável/.test(plain),
+            detail: '/byok recommend rendered ranked operational recommendations with disposable agent probe actions',
         },
         {
             id: 'byok-use-sdk-visible',
@@ -1038,20 +1317,26 @@ function evaluateByokProbeOutput(plain, sseSummary, { fixture = false } = {}) {
     return criteria;
 }
 
-function evaluateByokRealOutput(plain, secretValues, { profile, altProfile, model, altModel } = {}) {
+function evaluateByokRealOutput(plain, secretValues, { profile, altProfile, model, altModel, noPr = false } = {}) {
     const byokModels = [...new Set([model, altModel].filter((value) => typeof value === 'string' && value.length > 0))];
     const byokModelPrLines = byokModels.flatMap((candidate) => {
         const escaped = candidate.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&');
         return plain.match(new RegExp(`^\\s*\\[PR\\]\\s+modelo=${escaped}\\b.*$`, 'gmu')) ?? [];
     });
     const byokTurnOpened =
-        /\[intervene→turn\]/u.test(plain) ||
-        /DELTA-CANONICAL-\d/u.test(plain) ||
-        /\[ASK\]\s+ASK-CANONICAL/u.test(plain);
+        !noPr &&
+        (/\[intervene→turn\]/u.test(plain) ||
+            /DELTA-CANONICAL-\d/u.test(plain) ||
+            /\[ASK\]\s+ASK-CANONICAL/u.test(plain));
     const byokUsageClassified =
         /\bclasse=byok_user_message\b/u.test(plain) ||
         /"classification"\s*:\s*"byok_user_message"/u.test(plain);
+    const byokAdmissionBlocked =
+        /Turno não enviado ao provider BYOK|terminal\.byok\.admission_blocked|resultado:\s+admission-blocked/i.test(
+            plain,
+        );
     const byokProviderBlocked =
+        byokAdmissionBlocked ||
         /erro de provider BYOK/i.test(plain) ||
         /Erro de sessão BYOK/i.test(plain) ||
         /\[query\]\s+Failed to get response from the AI model/i.test(plain) ||
@@ -1081,6 +1366,33 @@ function evaluateByokRealOutput(plain, secretValues, { profile, altProfile, mode
             id: 'byok-real-provider-cockpit',
             pass: /BYOK providers/.test(plain) && /\/byok use /.test(plain),
             detail: 'BYOK provider cockpit showed configured providers and operator actions',
+        },
+        {
+            id: 'byok-real-sdk-session-cockpit',
+            pass: /Sessão SDK/.test(plain) && /\/restart reinicia só dialog loop/.test(plain),
+            detail: 'operator can distinguish SDK session cockpit from dialog loop, hub resume and snapshots',
+        },
+        {
+            id: 'byok-real-chat-probe',
+            pass:
+                /BYOK chat probe/.test(plain) &&
+                /BYOK agent probe/.test(plain) &&
+                /sessão SDK descartável/.test(plain),
+            detail: 'BYOK preflight exercised disposable chat and agent probes before the live operator turn',
+        },
+        {
+            id: 'byok-real-chat-probe-ok',
+            pass: byokAdmissionBlocked || /BYOK chat probe[\s\S]{0,1400}resultado:\s+ok/.test(plain),
+            detail: byokAdmissionBlocked
+                ? 'BYOK chat probe was admission-blocked before the provider because its declared budget is too small'
+                : 'BYOK chat probe produced a real disposable assistant response',
+        },
+        {
+            id: 'byok-real-agent-probe-ok',
+            pass: byokAdmissionBlocked || /BYOK agent probe[\s\S]{0,1800}resultado:\s+ok/.test(plain),
+            detail: byokAdmissionBlocked
+                ? 'BYOK agent probe was admission-blocked before tool/ask_user because its declared budget is too small'
+                : 'BYOK agent probe validated tool calling and ask_user on the disposable session',
         },
         {
             id: 'byok-real-model-filtering',
@@ -1131,7 +1443,9 @@ function evaluateByokRealOutput(plain, secretValues, { profile, altProfile, mode
         {
             id: 'byok-real-usage-classified',
             pass: !byokTurnOpened || byokUsageClassified || byokProviderBlocked,
-            detail: byokProviderBlocked
+            detail: byokAdmissionBlocked
+                ? 'BYOK turn never reached provider usage because admission blocked the request envelope'
+                : byokProviderBlocked
                 ? 'BYOK provider aborted before usage telemetry; no Premium Request was inferred'
                 : byokTurnOpened
                   ? `BYOK user-message usage classification observed=${byokUsageClassified ? 'yes' : 'no'}`
@@ -1148,7 +1462,7 @@ function evaluateByokRealOutput(plain, secretValues, { profile, altProfile, mode
         },
         {
             id: 'byok-real-health-command',
-            pass: /BYOK chat health/.test(plain),
+            pass: /BYOK operational health/.test(plain),
             detail: '/byok health was available in the real BYOK diagnostic path',
         },
     ];
@@ -1180,7 +1494,7 @@ function evaluateBlockedOutput(plain, sseSummary, blocker) {
         {
             id: 'root-cause-not-ux-duplication',
             pass: true,
-            detail: 'scenario criteria skipped because SDK did not produce assistant/tool/ask_user events',
+            detail: 'scenario criteria skipped because the blocker prevented assistant/tool/ask_user streaming',
         },
     ];
 }
@@ -1309,6 +1623,7 @@ async function main() {
     const requestedTransport = readArg('--transport', 'pty');
     const dryRun = hasFlag('--dry-run');
     const noPr = hasFlag('--no-pr');
+    const sessionCycle = hasFlag('--session-cycle');
     const byokProbe = hasFlag('--byok-probe');
     const byokFixture = hasFlag('--byok-fixture');
     const byokReal = hasFlag('--byok-real');
@@ -1348,6 +1663,20 @@ async function main() {
         : null;
     const secretValues = byokReal ? collectSecretValues({ ...process.env, ...dotenvEnv, ...(realByok?.env ?? {}) }) : [];
 
+    if (sessionCycle) {
+        const summary = await runSessionCycleLiveTest({
+            outDir,
+            requestedTransport,
+            timeoutMs,
+            terminalPort,
+            startedAt,
+        });
+        console.log(`[terminal-live] session cycle summary: ${path.relative(ROOT, path.join(outDir, 'summary.md'))}`);
+        if (!summary.ok) process.exitCode = 1;
+        await byokFixtureProvider?.close();
+        return;
+    }
+
     if (dryRun) {
         const prompt = byokProbe
             ? buildByokProbeCommands({ fixtureBaseUrl: byokFixtureBaseUrl }).join('\n')
@@ -1378,6 +1707,8 @@ async function main() {
     let answerSent = false;
     let postCommandsSent = false;
     let quitSent = false;
+    let scenarioSent = false;
+    let scenarioPlainOffset = 0;
     let byokNoPrCanQuit = !(byokReal && noPr);
     let exitCode = null;
     let sseCollector = null;
@@ -1385,6 +1716,12 @@ async function main() {
     let answerPlainOffset = 0;
     let postAnswerCommandTimer = null;
     let timedOut = false;
+    /** @type {string[]} */
+    let promptSynchronizedCommands = [];
+    /** @type {null | (() => void)} */
+    let onPromptSynchronizedCommandsDrained = null;
+    let promptSynchronizedCommandOutputOffset = 0;
+    let waitingForPromptSynchronizedCommand = false;
     const command = canUsePty
         ? {
               cmd: 'script',
@@ -1427,6 +1764,25 @@ async function main() {
             return false;
         }
     };
+    const sendNextPromptSynchronizedCommand = () => {
+        const next = promptSynchronizedCommands.shift();
+        if (!next) {
+            waitingForPromptSynchronizedCommand = false;
+            const onDrained = onPromptSynchronizedCommandsDrained;
+            onPromptSynchronizedCommandsDrained = null;
+            onDrained?.();
+            return;
+        }
+        waitingForPromptSynchronizedCommand = true;
+        promptSynchronizedCommandOutputOffset = stripAnsi(raw).length;
+        write(next);
+    };
+    const startPromptSynchronizedCommandSequence = (commands, onDrained = null) => {
+        promptSynchronizedCommands = [...commands];
+        onPromptSynchronizedCommandsDrained = onDrained;
+        waitingForPromptSynchronizedCommand = false;
+        sendNextPromptSynchronizedCommand();
+    };
     const schedulePostAnswerDiagnostics = (delayMs = postAnswerDelayMs) => {
         if (postCommandsSent) return;
         postCommandsSent = true;
@@ -1462,6 +1818,12 @@ async function main() {
         raw += text;
         process.stdout.write(text);
         const plain = stripAnsi(raw);
+        if (
+            waitingForPromptSynchronizedCommand &&
+            hasReturnedToReplPrompt(plain, promptSynchronizedCommandOutputOffset)
+        ) {
+            sendNextPromptSynchronizedCommand();
+        }
         if (/Modo headless detectado/.test(plain) && !canUsePty && !readySent) {
             console.warn(
                 '[terminal-live] terminal entrou em modo headless; comandos REPL não serão exercitados neste transporte.',
@@ -1472,32 +1834,38 @@ async function main() {
             if (collectSse) {
                 sseCollector = startSseCollector({ port: Number.isFinite(ssePort) ? ssePort : terminalPort });
             }
-            write('/usage now');
-            write('/activity 12');
             if (byokProbe || noPr || byokReal) {
                 const commands = byokReal
                     ? [
+                          '/usage now',
+                          '/activity 12',
                           ...buildByokRealPreflightCommands(realByok ?? {}),
                           ...(noPr ? buildByokRealNoPrDiagnosticCommands() : []),
                       ]
                     : byokProbe
-                      ? buildByokProbeCommands({ fixtureBaseUrl: byokFixtureBaseUrl })
-                      : buildNoPrProbeCommands();
-                sendCommandSequence(write, commands, { delayMs: byokReal || byokProbe ? 350 : 150 });
-                if (byokReal && noPr) {
-                    setTimeout(() => {
+                      ? ['/usage now', '/activity 12', ...buildByokProbeCommands({ fixtureBaseUrl: byokFixtureBaseUrl })]
+                      : ['/usage now', '/activity 12', ...buildNoPrProbeCommands()];
+                startPromptSynchronizedCommandSequence(commands, () => {
+                    if (byokReal && noPr) {
                         if (!quitSent) {
                             quitSent = true;
                             byokNoPrCanQuit = true;
                             write('/quit');
                         }
-                    }, 90_000).unref();
-                }
-                if (byokReal && !noPr) {
-                    setTimeout(() => write(buildScenarioPrompt()), Math.max(4_000, commands.length * 350 + 1_000)).unref();
-                }
+                        return;
+                    }
+                    if (byokReal && !noPr) {
+                        scenarioPlainOffset = stripAnsi(raw).length;
+                        scenarioSent = true;
+                        write(buildScenarioPrompt());
+                    }
+                });
                 return;
             }
+            write('/usage now');
+            write('/activity 12');
+            scenarioPlainOffset = stripAnsi(raw).length;
+            scenarioSent = true;
             write(buildScenarioPrompt());
         }
         if (!answerSent && /\[ASK\] ASK-CANONICAL: responda SIM para fechar o teste/.test(plain)) {
@@ -1517,13 +1885,17 @@ async function main() {
                 schedulePostAnswerDiagnostics(0);
             }, Math.max(1_000, postAskContinuationWaitMs)).unref();
         }
+        const scenarioTailPlain = scenarioSent ? plain.slice(scenarioPlainOffset) : '';
         if (
             !postCommandsSent &&
             (/Erro de sessão \[(?:query|rate_limit)\]|You've hit your rate limit|session\.error|CAPIError|Failed to get response from the AI model/i.test(
-                plain,
+                scenarioTailPlain,
             ) ||
-                /erro de provider BYOK|\[cancellation\]\s+Operation cancelled by user/i.test(plain)) &&
-            !(byokReal && noPr)
+                /erro de provider BYOK|\[cancellation\]\s+Operation cancelled by user|Turno não enviado ao provider BYOK|terminal\.byok\.admission_blocked/i.test(
+                    scenarioTailPlain,
+                )) &&
+            !(byokReal && noPr) &&
+            (!byokReal || scenarioSent)
         ) {
             postCommandsSent = true;
             if (postAnswerCommandTimer) {
@@ -1607,7 +1979,7 @@ async function main() {
             : evaluateOutput(plain, sseSummary, exportSummary);
     const criteria = [
         ...baseCriteria,
-        ...(byokReal ? evaluateByokRealOutput(plain, secretValues, realByok ?? {}) : []),
+        ...(byokReal ? evaluateByokRealOutput(plain, secretValues, { ...(realByok ?? {}), noPr }) : []),
     ];
     const durationMs = Date.now() - Date.parse(startedAt);
     await writeFile(rawPath, raw, 'utf8');
@@ -1672,7 +2044,9 @@ async function main() {
     const failed = criteria.filter((criterion) => !criterion.pass);
     console.log(`[terminal-live] summary: ${path.relative(ROOT, mdPath)}`);
     if (failed.length > 0 || exitCode !== 0) {
-        console.error(`[terminal-live] FAIL: ${failed.map((criterion) => criterion.id).join(', ') || 'exitCode'}`);
+        console.error(
+            `[terminal-live] ${blocker ? 'BLOCKED' : 'FAIL'}: ${failed.map((criterion) => criterion.id).join(', ') || 'exitCode'}`,
+        );
         process.exitCode = 1;
     }
 }

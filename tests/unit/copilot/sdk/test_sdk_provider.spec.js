@@ -473,7 +473,7 @@ describe('F72 — BYOK env configuration', () => {
                 preset: 'openrouter',
                 secretKey: 'OPENROUTER_API_KEY',
                 baseUrl: 'https://openrouter.ai/api/v1',
-                model: 'deepseek/deepseek-v4-flash:free',
+                model: 'openrouter/free',
             },
             {
                 preset: 'groq',

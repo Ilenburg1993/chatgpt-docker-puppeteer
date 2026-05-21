@@ -71,6 +71,27 @@ import {
  * @property {number} [lastAskUserAt] - F56.2: timestamp do último ask_user recebido (ms)
  * @property {import('../../../config/system-prompt/freshness.js').SystemPromptBindingSnapshot | null} [systemPromptBinding]
  *   Binding persistido do system prompt aplicado à sessão SDK atual
+ * @property {{
+ *     enabled: true;
+ *     profile: string | null;
+ *     preset: string | null;
+ *     providerType: string | null;
+ *     baseUrl: string | null;
+ *     model: string;
+ * } | null} [byokSessionBinding]
+ *   Identidade redigida do provider BYOK que criou/retomou a sessão SDK persistida. Nunca carrega segredos.
+ * @property {{
+ *     outcome: 'created' | 'resumed';
+ *     requestedMode: 'auto' | 'new' | 'resume';
+ *     selectedSessionId: string;
+ *     resumeCandidateSessionId: string | null;
+ *     reason: string;
+ *     decidedAt: number;
+ * } | null} [sdkSessionBootDecision]
+ *   Decisão redigida do initializer para a sessão SDK atual. Explica por que houve resume ou criação sem guardar
+ *   credenciais/provider headers.
+ * @property {{ mode: 'new'; requestedAt?: number } | { mode: 'resume'; sessionId: string; requestedAt?: number } | null} [nextSdkSessionBoot]
+ *   Diretiva efêmera do operador para o próximo boot da sessão SDK; consumida pelo initializer.
  */
 
 // ─── Cache in-process ────────────────────────────────────────────────────────

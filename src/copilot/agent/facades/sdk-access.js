@@ -76,6 +76,7 @@ export {
 export {
     createAgentSdkSessionByClient,
     deleteAgentSdkSessionByClient,
+    deleteSdkSession,
     getAgentConfiguredSessionFsHandler,
     getForegroundSdkSessionId,
     getLastSdkSessionId,

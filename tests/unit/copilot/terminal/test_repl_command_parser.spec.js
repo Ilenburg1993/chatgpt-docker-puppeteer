@@ -2,7 +2,10 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { parseTerminalReplCommand } from '../../../../src/copilot/terminal/repl/repl-command-parser.js';
+import {
+    parseTerminalReplCommand,
+    parseTerminalSubcommand,
+} from '../../../../src/copilot/terminal/repl/repl-command-parser.js';
 
 describe('terminal/repl-command-parser', () => {
     it('ignora input humano comum', () => {
@@ -26,6 +29,17 @@ describe('terminal/repl-command-parser', () => {
             command: 'status',
             arg: '--runtime alt',
             rest: ['--runtime', 'alt'],
+        });
+    });
+
+    it('preserva subcomando e argumentos tokenizados para dispatchers compostos', () => {
+        expect(parseTerminalSubcommand('sdk next new', ['sdk', 'next', 'new'])).toEqual({
+            subcommand: 'sdk',
+            rest: ['next', 'new'],
+        });
+        expect(parseTerminalSubcommand('sdk next resume #1')).toEqual({
+            subcommand: 'sdk',
+            rest: ['next', 'resume', '#1'],
         });
     });
 });

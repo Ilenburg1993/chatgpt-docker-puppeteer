@@ -275,6 +275,7 @@ export {
     quickResume,
     quickSession,
     shutdownClient,
+    withEphemeralSession,
     withSession,
 } from './session/client-facade.js';
 

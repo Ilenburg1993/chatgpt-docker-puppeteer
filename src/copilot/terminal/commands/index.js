@@ -46,6 +46,7 @@ export {
     cmdSessionList,
     cmdSessionRestore,
     cmdSessionSave,
+    cmdSessionSdk,
     cmdStatus,
     cmdWho,
 } from './session.js';

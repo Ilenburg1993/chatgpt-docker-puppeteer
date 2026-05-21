@@ -258,12 +258,11 @@ function clearReservedStatusRowsPreservingCursor() {
  * @returns {void}
  */
 function reserveInlineStatusRows(rl, rows) {
-    if (!rl || rows <= _statusRowsReserved) return;
+    if (!rl || !isTerminalReadlineOpen(rl) || rows <= _statusRowsReserved) return;
     const missingRows = rows - _statusRowsReserved;
     clearTerminalLine();
     process.stdout.write('\n'.repeat(missingRows));
-    rl.setPrompt(getBusy() ? buildWaitingPrompt() : buildUserPrompt());
-    rl.prompt();
+    paintTerminalPrompt(rl, getBusy() ? buildWaitingPrompt() : buildUserPrompt());
     _statusRowsReserved = rows;
 }
 
@@ -460,6 +459,28 @@ function clearTerminalLine() {
 }
 
 /**
+ * Readline pode fechar entre a intenção de redraw e o tick que a materializa.
+ *
+ * @param {unknown} rl
+ * @returns {boolean}
+ */
+function isTerminalReadlineOpen(rl) {
+    return Boolean(rl) && /** @type {{ closed?: boolean }} */ (rl).closed !== true;
+}
+
+/**
+ * @param {{ setPrompt: (prompt: string) => void; prompt: () => void; closed?: boolean }} rl
+ * @param {string} prompt
+ * @returns {void}
+ */
+function paintTerminalPrompt(rl, prompt) {
+    if (!isTerminalReadlineOpen(rl)) return;
+    rl.setPrompt(prompt);
+    if (!isTerminalReadlineOpen(rl)) return;
+    rl.prompt();
+}
+
+/**
  * @returns {void}
  */
 function redrawPromptIfInteractive() {
@@ -471,15 +492,14 @@ function redrawPromptIfInteractive() {
 /**
  * Redesenha o prompt em uma linha limpa imediatamente.
  *
- * @param {{ setPrompt: (prompt: string) => void; prompt: () => void } | null | undefined} rl
+ * @param {{ setPrompt: (prompt: string) => void; prompt: () => void; closed?: boolean } | null | undefined} rl
  * @param {string} [prompt]
  * @returns {void}
  */
 export function redrawTerminalPrompt(rl, prompt = buildUserPrompt()) {
-    if (!rl) return;
+    if (!rl || !isTerminalReadlineOpen(rl)) return;
     clearTerminalLine();
-    rl.setPrompt(prompt);
-    rl.prompt();
+    paintTerminalPrompt(rl, prompt);
 }
 
 /**
@@ -490,12 +510,12 @@ export function redrawTerminalPrompt(rl, prompt = buildUserPrompt()) {
  * digitado. Este gateway preserva a última intenção de prompt e executa uma única pintura limpa quando a pilha atual de
  * writes ANSI termina.
  *
- * @param {{ setPrompt: (prompt: string) => void; prompt: () => void } | null | undefined} rl
+ * @param {{ setPrompt: (prompt: string) => void; prompt: () => void; closed?: boolean } | null | undefined} rl
  * @param {ScheduledPrompt} [prompt]
  * @returns {void}
  */
 export function scheduleTerminalPromptRedraw(rl, prompt = () => buildUserPrompt()) {
-    if (!rl) return;
+    if (!isTerminalReadlineOpen(rl)) return;
     const key = /** @type {object} */ (rl);
     const current = _scheduledPromptRedraws.get(key);
     if (current) {
@@ -506,7 +526,7 @@ export function scheduleTerminalPromptRedraw(rl, prompt = () => buildUserPrompt(
         prompt,
         immediate: setImmediate(() => {
             _scheduledPromptRedraws.delete(key);
-            if (_terminalRenderLockDepth > 0) return;
+            if (_terminalRenderLockDepth > 0 || !isTerminalReadlineOpen(rl)) return;
             const nextPrompt = typeof state.prompt === 'function' ? state.prompt() : state.prompt;
             redrawTerminalPrompt(rl, getBusy() ? buildWaitingPrompt() : nextPrompt);
         }),

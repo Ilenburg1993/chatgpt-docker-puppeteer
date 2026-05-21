@@ -82,6 +82,7 @@ export {
     compactSdkSession,
     confirmSdkSessionUi,
     createSdkWorkspaceFile,
+    deleteSdkSession,
     deselectSdkAgent,
     execSdkShell,
     getCurrentSdkAgent,

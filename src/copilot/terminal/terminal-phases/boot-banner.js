@@ -41,6 +41,8 @@ export function buildTerminalStandaloneBannerView(opts, deps = {}) {
             : `│  Modo: CONECTADO   (MCP: ${String(mcp.toolCount).padEnd(2)} tools via :3008)              │`,
         `│  Inject server: ${opts.serverUrl.padEnd(40).slice(0, 40)} │`,
         '│  Comandos: /help  /status  /queue  /turn  /mailbox         │',
+        '│  Sessão SDK: auto-resume padrão; gestão em /session sdk     │',
+        '│  Pré-boot seguinte: /session sdk next new|resume|auto       │',
         '└─────────────────────────────────────────────────────────────┘',
         '',
     ];

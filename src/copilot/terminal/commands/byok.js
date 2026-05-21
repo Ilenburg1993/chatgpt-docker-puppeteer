@@ -13,11 +13,20 @@ import fs from 'node:fs/promises';
 import { config as loadDotenv } from 'dotenv';
 
 import { discoverConfiguredByokModelsFromEnv, readConfiguredByokProfilesFromEnv } from '#copilot/config';
-import { readTerminalByokProjection, readTerminalRuntimeState } from '../frontend/index.js';
+import {
+    probeTerminalConfiguredByokAgent,
+    probeTerminalConfiguredByokChat,
+    readTerminalByokProjection,
+    readTerminalRuntimeState,
+} from '../frontend/index.js';
 import {
     clearByokProviderModelHealth,
     flushByokProviderHealth,
     listByokProviderModelHealth,
+    recordByokProviderModelAgentProbeFailure,
+    recordByokProviderModelAgentProbeSuccess,
+    recordByokProviderModelCallFailure,
+    recordByokProviderModelCallSuccess,
     readByokProviderHealthState,
     readByokProviderModelHealth,
 } from '../state/byok-provider-health.js';
@@ -531,11 +540,22 @@ function formatByokHealthAge(timestamp) {
 }
 
 /**
- * @param {{ lastStatus: 'failed' | 'ok'; lastFailureAt: number | null; lastSuccessAt: number | null }} health
+ * @param {{ lastStatus: 'failed' | 'ok' | null; lastFailureAt: number | null; lastSuccessAt: number | null }} health
  * @returns {boolean}
  */
 function isByokHealthCurrentlyFailed(health) {
     return health.lastStatus === 'failed' && (health.lastFailureAt ?? 0) >= (health.lastSuccessAt ?? 0);
+}
+
+/**
+ * @param {{ agentProbeStatus?: 'failed' | 'ok' | null; lastAgentProbeFailureAt?: number | null; lastAgentProbeSuccessAt?: number | null }} health
+ * @returns {boolean}
+ */
+function isByokAgentProbeCurrentlyFailed(health) {
+    return (
+        health.agentProbeStatus === 'failed' &&
+        (health.lastAgentProbeFailureAt ?? 0) >= (health.lastAgentProbeSuccessAt ?? 0)
+    );
 }
 
 /**
@@ -565,7 +585,7 @@ function readHealthForByokModel(model) {
  */
 function isByokModelKnownFailed(model) {
     const health = readHealthForByokModel(model);
-    return health ? isByokHealthCurrentlyFailed(health) : false;
+    return health ? isByokHealthCurrentlyFailed(health) || isByokAgentProbeCurrentlyFailed(health) : false;
 }
 
 /**
@@ -583,8 +603,11 @@ function readHealthForByokProfile(profile) {
     return (
         listByokProviderModelHealth().find(
             (health) =>
-                health.profile === profile.name ||
-                Boolean(profile.model && health.model === profile.model && providerCandidates.includes(health.provider)),
+                Boolean(
+                    profile.model &&
+                        health.model === profile.model &&
+                        (health.profile === profile.name || providerCandidates.includes(health.provider)),
+                ),
         ) ?? null
     );
 }
@@ -598,7 +621,20 @@ function renderByokHealthTag(health) {
     if (isByokHealthCurrentlyFailed(health)) {
         return `chat=failed(${formatByokHealthAge(health.lastFailureAt)}${health.failureCount > 1 ? `,x${health.failureCount}` : ''})`;
     }
+    if (health.lastStatus !== 'ok') return 'chat=?';
     return `chat=ok(${formatByokHealthAge(health.lastSuccessAt)}${health.successCount > 1 ? `,x${health.successCount}` : ''})`;
+}
+
+/**
+ * @param {ReturnType<typeof readByokProviderModelHealth>} health
+ * @returns {string}
+ */
+function renderByokAgentProbeHealthTag(health) {
+    if (!health || !health.agentProbeStatus) return 'agent=?';
+    if (isByokAgentProbeCurrentlyFailed(health)) {
+        return `agent=failed(${formatByokHealthAge(health.lastAgentProbeFailureAt)}${health.agentProbeFailureCount > 1 ? `,x${health.agentProbeFailureCount}` : ''})`;
+    }
+    return `agent=ok(${formatByokHealthAge(health.lastAgentProbeSuccessAt)}${health.agentProbeSuccessCount > 1 ? `,x${health.agentProbeSuccessCount}` : ''})`;
 }
 
 /**
@@ -741,10 +777,81 @@ function renderModelTags(model) {
     if (meta?.provider) tags.push(`provider=${meta.provider}`);
     if (meta?.profile) tags.push(`profile=${meta.profile}`);
     const health = readHealthForByokModel(model);
-    if (health) tags.push(renderByokHealthTag(health));
+    if (health) tags.push(renderByokHealthTag(health), renderByokAgentProbeHealthTag(health));
     const inputs = meta?.inputModalities?.length ? meta.inputModalities.join('+') : '';
     if (inputs && inputs !== 'text') tags.push(`in=${inputs}`);
     return tags.join(' · ');
+}
+
+/**
+ * @param {import('#copilot/sdk/types').ModelInfo} model
+ * @returns {string}
+ */
+function renderByokRecommendationActionHint(model) {
+    const meta = getByokModelMetadata(model);
+    const profile = meta?.profile ?? null;
+    const profileSelector = profile ? ` profile:${profile}` : '';
+    const probe = `/byok probe agent${profileSelector} model:${model.id}`;
+    const selection = profile
+        ? `/byok use ${profile} -> /byok model ${model.id}`
+        : `/byok model ${model.id}`;
+    return `teste=${probe} · seleção=${selection}`;
+}
+
+/**
+ * O catálogo ativo e o health operacional são superfícies diferentes: o primeiro descreve oferta/configuração, o
+ * segundo registra se chat/agente realmente funcionaram. Quando a seleção ativa já falhou, o cockpit deve transformar
+ * essa diferença em ação explícita sem trocar o provider/modelo silenciosamente.
+ *
+ * @param {ReturnType<typeof readTerminalByokProjection>} projection
+ * @returns {import('#copilot/sdk/types').ModelInfo[]}
+ */
+function listActiveByokHealthAlternatives(projection) {
+    const { summary } = projection;
+    const activeModel = summary.model ?? null;
+    return rankByokModels(
+        projection.models.map((model) =>
+            withByokCatalogSource(model, {
+                profileName: summary.profile,
+                preset: summary.preset,
+                providerType: summary.providerType,
+            }),
+        ),
+    )
+        .filter((model) => model.id !== activeModel && !isByokModelKnownFailed(model))
+        .slice(0, 3);
+}
+
+/**
+ * @param {ReturnType<typeof readTerminalByokProjection>} projection
+ * @param {ReturnType<typeof readByokProviderModelHealth>} activeHealth
+ * @param {(text: string) => void} println
+ * @returns {void}
+ */
+function renderActiveByokHealthGuidance(projection, activeHealth, println) {
+    if (!activeHealth) return;
+    const chatFailed = isByokHealthCurrentlyFailed(activeHealth);
+    const agentFailed = isByokAgentProbeCurrentlyFailed(activeHealth);
+    if (!chatFailed && !agentFailed) return;
+    const failureScope = [chatFailed ? 'chat real' : null, agentFailed ? 'probe agente' : null]
+        .filter(Boolean)
+        .join(' + ');
+    println(
+        `  \x1b[31m  healthGate: seleção ativa com falha recente em ${failureScope}; catálogo disponível não equivale a runtime saudável.\x1b[0m`,
+    );
+    const alternatives = listActiveByokHealthAlternatives(projection);
+    if (alternatives.length === 0) {
+        const provider = projection.summary.preset ?? projection.summary.providerType ?? projection.summary.profile;
+        const providerFilter = provider ? ` provider:${provider}` : '';
+        println(
+            `  \x1b[90m  ação: rode /byok recommend${providerFilter} free reasoning safe e confirme com /byok probe agent antes da sessão viva.\x1b[0m`,
+        );
+        return;
+    }
+    println('  \x1b[90m  candidatos do mesmo catálogo ativo, preservando troca explícita:\x1b[0m');
+    for (const model of alternatives) {
+        println(`  \x1b[90m    - ${model.id}: ${renderByokRecommendationActionHint(model)}\x1b[0m`);
+    }
 }
 
 /**
@@ -801,6 +908,7 @@ function renderStatus(projection, println) {
     });
     if (activeHealth) {
         println(`    chatHealth:    \x1b[33m${renderByokHealthTag(activeHealth)}\x1b[0m`);
+        println(`    agentHealth:   \x1b[33m${renderByokAgentProbeHealthTag(activeHealth)}\x1b[0m`);
     }
     const costTag = renderByokProfileCostTag(summary.profile);
     if (costTag) {
@@ -813,8 +921,9 @@ function renderStatus(projection, println) {
     for (const error of summary.errors) {
         println(`  \x1b[31m  erro: ${error}\x1b[0m`);
     }
+    renderActiveByokHealthGuidance(projection, activeHealth, println);
     println('  \x1b[90mArquivo unico de BYOK: .env.local. Mudancas via comando valem para o processo atual; use /restart para nova sessao SDK.\x1b[0m');
-    println('  \x1b[90mUso: /byok | /byok reload | /byok providers | /byok profiles | /byok health [clear] | /byok models [all-providers|grouped|refresh|all|n] [free|metered|cost?] [provider:<nome>] [reasoning] [vision] [safe] [ctx>N] [maxReq>N] | /byok recommend [all-providers] [grouped] [filtros] [n] | /byok use <perfil|sdk> | /byok model <id> | /byok provider <preset> [model] [baseUrl] | /byok persist <sdk|profile|model|provider> | /byok env\x1b[0m\n');
+    println('  \x1b[90mUso: /byok | /byok reload | /byok providers | /byok profiles | /byok health [clear] | /byok probe [chat|agent] [profile:<nome>] [model:<id>] | /byok models [all-providers|grouped|refresh|all|n] [free|metered|cost?] [provider:<nome>] [reasoning] [vision] [safe] [ctx>N] [maxReq>N] | /byok recommend [all-providers] [grouped] [filtros] [n] | /byok use <perfil|sdk> | /byok model <id> | /byok provider <preset> [model] [baseUrl] | /byok persist <sdk|profile|model|provider> | /byok env\x1b[0m\n');
 }
 
 /**
@@ -824,7 +933,7 @@ function renderStatus(projection, println) {
 function renderByokHealth(println) {
     const state = readByokProviderHealthState();
     const records = listByokProviderModelHealth();
-    println(`\n  \x1b[36mBYOK chat health\x1b[0m (${records.length})`);
+    println(`\n  \x1b[36mBYOK operational health\x1b[0m (${records.length})`);
     println(
         `  \x1b[90mpersist=${state.enabled ? 'on' : 'off'} · arquivo=${state.path ?? '-'} · carregado=${state.loaded ? 'sim' : 'nao'} · dirty=${state.dirty ? 'sim' : 'nao'}\x1b[0m`,
     );
@@ -840,11 +949,14 @@ function renderByokHealth(println) {
             record.provider ? `provider=${record.provider}` : null,
             record.model ? `model=${record.model}` : null,
             label,
+            renderByokAgentProbeHealthTag(record),
         ].filter(Boolean);
         println(`    \x1b[33m${record.key}\x1b[0m`);
         println(`      \x1b[90m${parts.join(' · ')}\x1b[0m`);
         if (record.lastMessage) println(`      \x1b[90multimo erro=${record.lastMessage}\x1b[0m`);
         if (record.lastErrorContext) println(`      \x1b[90mcontexto=${record.lastErrorContext}\x1b[0m`);
+        if (record.lastAgentProbeMessage) println(`      \x1b[90multimo erro agent=${record.lastAgentProbeMessage}\x1b[0m`);
+        if (record.lastAgentProbeErrorContext) println(`      \x1b[90mcontexto agent=${record.lastAgentProbeErrorContext}\x1b[0m`);
     }
     if (records.length > 30) {
         println(`  \x1b[90m... ${records.length - 30} registro(s) omitidos. Use filtros de /byok models ou /byok providers para cockpit resumido.\x1b[0m`);
@@ -871,6 +983,52 @@ function clearRuntimeSelectors(except = []) {
     for (const key of BYOK_RUNTIME_SELECTOR_ENV_KEYS) {
         if (!keep.has(key)) delete process.env[key];
     }
+}
+
+/**
+ * @param {string[]} rest
+ * @returns {{ env: Record<string, string | undefined>; model: string | null; profile: string | null; timeoutMs: number | undefined }}
+ */
+function buildByokProbeSelection(rest) {
+    /** @type {Record<string, string | undefined>} */
+    const env = { ...process.env };
+    /** @type {string | null} */
+    let model = null;
+    /** @type {string | null} */
+    let profile = null;
+    /** @type {number | undefined} */
+    let timeoutMs;
+    for (const raw of rest) {
+        const item = raw.trim();
+        const lower = item.toLowerCase();
+        if (!item || lower === 'active' || lower === '--active') continue;
+        if (lower.startsWith('profile:') || lower.startsWith('profile=')) {
+            profile = item.slice(item.indexOf(lower.startsWith('profile:') ? ':' : '=') + 1).trim() || null;
+            continue;
+        }
+        if (lower.startsWith('model:') || lower.startsWith('model=')) {
+            model = item.slice(item.indexOf(lower.startsWith('model:') ? ':' : '=') + 1).trim() || null;
+            continue;
+        }
+        if (lower.startsWith('timeout:') || lower.startsWith('timeout=')) {
+            const value = Number.parseInt(
+                item.slice(item.indexOf(lower.startsWith('timeout:') ? ':' : '=') + 1),
+                10,
+            );
+            if (Number.isFinite(value) && value > 0) timeoutMs = value;
+            continue;
+        }
+        if (!model) model = item;
+    }
+    if (profile) {
+        env['COPILOT_BYOK_ENABLED'] = 'true';
+        env['COPILOT_BYOK_PROFILE'] = profile;
+    }
+    if (model) {
+        env['COPILOT_BYOK_ENABLED'] = 'true';
+        env['COPILOT_BYOK_MODEL'] = model;
+    }
+    return { env, model, profile, timeoutMs };
 }
 
 /**
@@ -1047,10 +1205,81 @@ export async function cmdByok({ println }, arg) {
         if ((rest[0] ?? '').toLowerCase() === 'clear') {
             clearByokProviderModelHealth();
             await flushByokProviderHealth();
-            println('  \x1b[32mBYOK chat health limpo no processo atual e no store persistente.\x1b[0m\n');
+            println('  \x1b[32mBYOK operational health limpo no processo atual e no store persistente.\x1b[0m\n');
             return;
         }
         renderByokHealth(println);
+        return;
+    }
+
+    if (sub === 'probe' || sub === 'check') {
+        const mode = /^(agent|runtime|full)$/iu.test(rest[0] ?? '') ? 'agent' : 'chat';
+        const explicitChatMode = /^(chat|canary)$/iu.test(rest[0] ?? '');
+        const selection = buildByokProbeSelection(mode === 'agent' || explicitChatMode ? rest.slice(1) : rest);
+        println(`\n  \x1b[36mBYOK ${mode} probe\x1b[0m`);
+        println(
+            `  \x1b[90mEscopo: sessão SDK descartável; não troca o dialog loop nem grava transcript live.${mode === 'chat' ? ' Chat nega tools.' : ' Agent exige tool customizada + ask_user com resposta sintética.'}${selection.profile ? ` profile=${selection.profile}` : ''}${selection.model ? ` model=${selection.model}` : ''}\x1b[0m`,
+        );
+        const probe = await (mode === 'agent' ? probeTerminalConfiguredByokAgent : probeTerminalConfiguredByokChat)({
+            env: selection.env,
+            ...(selection.model ? { model: selection.model } : {}),
+            ...(selection.timeoutMs ? { timeoutMs: selection.timeoutMs } : {}),
+        });
+        const healthIdentity = {
+            profile: probe.profile,
+            provider: probe.preset ?? probe.providerType,
+            model: probe.model,
+        };
+        const providerAttempted = probe.status !== 'admission-blocked';
+        if (mode === 'agent' && probe.ok) {
+            recordByokProviderModelAgentProbeSuccess(healthIdentity);
+        } else if (mode === 'agent' && providerAttempted) {
+            recordByokProviderModelAgentProbeFailure({
+                ...healthIdentity,
+                message: probe.errors[0] ?? `agent probe ${probe.status}`,
+                errorContext: 'byok_agent_probe',
+            });
+        } else if (probe.ok) {
+            recordByokProviderModelCallSuccess(healthIdentity);
+        } else if (providerAttempted) {
+            recordByokProviderModelCallFailure({
+                ...healthIdentity,
+                message: probe.errors[0] ?? `probe ${probe.status}`,
+                errorContext: 'byok_probe',
+            });
+        }
+        await flushByokProviderHealth();
+        const color = probe.ok ? '\x1b[32m' : '\x1b[31m';
+        println(
+            `    resultado: ${color}${probe.status}\x1b[0m · profile=${valueOrDash(probe.profile)} · preset=${valueOrDash(probe.preset)} · provider=${valueOrDash(probe.providerType)} · model=${valueOrDash(probe.model)}`,
+        );
+        println(
+            `    sinal:     deltas=${probe.deltaCount}/${probe.deltaChars} chars · final=${probe.finalChars} chars · finalEvent=${yesNo(probe.observedFinalEvent)} · ${probe.elapsedMs}ms`,
+        );
+        if (mode === 'agent') {
+            println(
+                `    agente:    toolCalls=${Number(Reflect.get(probe, 'toolCallCount') ?? 0)} · ask=${Number(Reflect.get(probe, 'userInputRequestCount') ?? 0)} · answer=${Number(Reflect.get(probe, 'userInputAnswerCount') ?? 0)}`,
+            );
+        }
+        if (probe.sessionId) {
+            println(`    \x1b[90msessão temporária=${probe.sessionId}\x1b[0m`);
+        }
+        for (const warning of probe.warnings) {
+            println(`  \x1b[33m  aviso: ${warning}\x1b[0m`);
+        }
+        for (const error of probe.errors.slice(0, 4)) {
+            println(`  \x1b[31m  erro: ${error}\x1b[0m`);
+        }
+        if (!providerAttempted) {
+            println(
+                '  \x1b[90mA probe foi barrada antes do provider porque o limite declarado não comporta o envelope SDK do terminal; health real do modelo não foi degradado por essa admissão.\x1b[0m',
+            );
+        }
+        println(
+            mode === 'agent'
+                ? '  \x1b[90mAgent probe confirma a fronteira exigida pelo terminal: streaming + tool calling + ask_user. Chat probe isolado continua disponível com /byok probe chat.\x1b[0m\n'
+                : '  \x1b[90mCatálogo mostra oferta; chat probe confirma conversa canária. Para validar runtime agente, rode /byok probe agent antes do live.\x1b[0m\n',
+        );
         return;
     }
 
@@ -1087,7 +1316,7 @@ export async function cmdByok({ println }, arg) {
             const metadata = profile.metadataKeys.length ? ` · meta=${profile.metadataKeys.join(',')}` : '';
             const cost = renderByokProfileCostTag(profile.name);
             const health = readHealthForByokProfile(profile);
-            const healthLabel = ` · ${renderByokHealthTag(health)}`;
+            const healthLabel = ` · ${renderByokHealthTag(health)} · ${renderByokAgentProbeHealthTag(health)}`;
             const readiness =
                 profile.auth.bearerTokenConfigured || profile.auth.apiKeyConfigured || profile.auth.headersConfigured
                     ? '\x1b[32mready\x1b[0m'
@@ -1212,9 +1441,10 @@ export async function cmdByok({ println }, arg) {
             println(`    ${index}. \x1b[33m${entry.model.id}\x1b[0m`);
             println(`       \x1b[90m${renderModelTags(entry.model)}${variantLabel}\x1b[0m`);
             println(`       ${color}${budget.label}\x1b[0m`);
+            println(`       \x1b[90m${renderByokRecommendationActionHint(entry.model)}\x1b[0m`);
             index += 1;
         }
-        println('\n  \x1b[90mUse /byok model <id> para trocar apenas o modelo do provider/perfil ativo; use /byok use <perfil> para trocar provider.\x1b[0m\n');
+        println('\n  \x1b[90mA probe agent é a live fake descartável do terminal: valida streaming/tool/ask_user antes de trocar a sessão viva. Use /byok use <perfil> para mudar provider e /byok model <id> para mudar só o modelo ativo.\x1b[0m\n');
         return;
     }
 

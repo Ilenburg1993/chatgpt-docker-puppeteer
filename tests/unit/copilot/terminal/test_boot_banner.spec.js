@@ -27,6 +27,14 @@ describe('terminal/terminal-phases/boot-banner', () => {
             view.lines.some((line) => line.includes('MCP tools indisponíveis')),
             true,
         );
+        assert.equal(
+            view.lines.some((line) => line.includes('Sessão SDK: auto-resume padrão')),
+            true,
+        );
+        assert.equal(
+            view.lines.some((line) => line.includes('/session sdk next new|resume|auto')),
+            true,
+        );
     });
 
     it('imprime aviso de preflight quando warnings existem', () => {

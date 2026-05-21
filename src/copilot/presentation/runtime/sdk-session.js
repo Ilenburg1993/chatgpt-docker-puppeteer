@@ -19,8 +19,10 @@
 
 import {
     deleteAgentSdkPlan as deleteAgentSdkPlanOnAgent,
+    persistAgentRuntimeStatePartial,
     readAgentSdkPlan as readAgentSdkPlanFromAgent,
     readAgentSdkSessionMode,
+    readAgentRuntimePersistedStateAsync,
     readSdkSkillsGovernance as readSdkSkillsGovernanceOnAgent,
     setAgentSdkSessionMode as setAgentSdkSessionModeOnAgent,
     setSdkDisabledSkills as setSdkDisabledSkillsOnAgent,
@@ -243,6 +245,120 @@ export async function getAgentSdkSessionMode(runtimeId) {
  */
 export async function setAgentSdkSessionMode(mode, runtimeId) {
     return setAgentSdkSessionModeOnAgent(getAgentSdkSessionTarget(runtimeId), mode);
+}
+
+/**
+ * Lê o cockpit mínimo de sessões SDK do runtime alvo.
+ *
+ * @param {string | null | undefined} [runtimeId]
+ * @param {import('#copilot/sdk/types').SessionListFilter} [filter]
+ * @returns {Promise<{
+ *     currentSessionId: string | null;
+ *     lastSessionId: string | null;
+ *     foregroundSessionId: string | null;
+ *     persistedByokBinding: Record<string, unknown> | null;
+ *     lastBootDecision: Record<string, unknown> | null;
+ *     sessions: import('#copilot/sdk/types').SessionMetadata[];
+ * }>}
+ */
+export async function listAgentSdkSessionInventory(runtimeId, filter) {
+    const agent = getAgentSdkSessionTarget(runtimeId);
+    const snap = readAgentStatusSnapshot(agent);
+    const [lastSessionId, foregroundSessionId, sessions, state] = await Promise.all([
+        agent.getLastSdkSessionId(),
+        agent.getForegroundSdkSessionId(),
+        agent.listSdkSessions(filter),
+        readAgentRuntimePersistedStateAsync(),
+    ]);
+    const persistedByokBinding =
+        state?.byokSessionBinding && typeof state.byokSessionBinding === 'object'
+            ? /** @type {Record<string, unknown>} */ (state.byokSessionBinding)
+            : null;
+    const lastBootDecision =
+        state?.sdkSessionBootDecision && typeof state.sdkSessionBootDecision === 'object'
+            ? /** @type {Record<string, unknown>} */ (state.sdkSessionBootDecision)
+            : null;
+    return {
+        currentSessionId: typeof snap['sessionId'] === 'string' ? snap['sessionId'] : null,
+        lastSessionId: typeof lastSessionId === 'string' ? lastSessionId : null,
+        foregroundSessionId: typeof foregroundSessionId === 'string' ? foregroundSessionId : null,
+        persistedByokBinding,
+        lastBootDecision,
+        sessions,
+    };
+}
+
+/**
+ * Remove uma sessão SDK persistida por meio do runtime alvo.
+ *
+ * @param {string} sessionId
+ * @param {string | null | undefined} [runtimeId]
+ * @returns {Promise<void>}
+ */
+export async function deleteAgentSdkSession(sessionId, runtimeId) {
+    const target = getAgentSdkSessionTarget(runtimeId);
+    if (typeof target.deleteSdkSession !== 'function') {
+        throw new TypeError('AGENT_SDK_DELETE_SESSION_UNAVAILABLE');
+    }
+    await target.deleteSdkSession(sessionId);
+}
+
+/**
+ * @returns {Promise<
+ *     | { mode: 'new'; requestedAt?: number | null }
+ *     | { mode: 'resume'; sessionId: string; requestedAt?: number | null }
+ *     | null
+ * >}
+ */
+export async function readAgentSdkSessionBootSelection() {
+    const state = await readAgentRuntimePersistedStateAsync();
+    const raw = state && typeof state === 'object' ? Reflect.get(state, 'nextSdkSessionBoot') : null;
+    if (!raw || typeof raw !== 'object') return null;
+    const mode = Reflect.get(raw, 'mode');
+    const requestedAt = Reflect.get(raw, 'requestedAt');
+    if (mode === 'new') {
+        return { mode, requestedAt: typeof requestedAt === 'number' ? requestedAt : null };
+    }
+    const sessionId = Reflect.get(raw, 'sessionId');
+    if (mode === 'resume' && typeof sessionId === 'string' && sessionId.trim()) {
+        return {
+            mode,
+            sessionId: sessionId.trim(),
+            requestedAt: typeof requestedAt === 'number' ? requestedAt : null,
+        };
+    }
+    return null;
+}
+
+/**
+ * Agenda a escolha de sessão SDK para o próximo boot do runtime permanente.
+ *
+ * A sessão viva atual não é trocada por este comando; a diretiva é consumida no initializer para manter attach/resume
+ * com uma única autoridade.
+ *
+ * @param {{ mode: 'new' } | { mode: 'resume'; sessionId: string } | null} selection
+ * @returns {Promise<import('../../agent/error/index.js').AgentPolicyResult<import('../../agent/lifecycle/state/index.js').AliveAgentState>>}
+ */
+export async function scheduleAgentSdkSessionBootSelection(selection) {
+    if (
+        selection &&
+        selection.mode === 'resume' &&
+        (typeof selection.sessionId !== 'string' || selection.sessionId.trim().length === 0)
+    ) {
+        throw new TypeError('[runtime/sdk-session] selection.sessionId deve ser string não-vazia.');
+    }
+    return persistAgentRuntimeStatePartial(
+        {
+            nextSdkSessionBoot: selection
+                ? {
+                      ...selection,
+                      ...(selection.mode === 'resume' ? { sessionId: selection.sessionId.trim() } : {}),
+                      requestedAt: Date.now(),
+                  }
+                : null,
+        },
+        { label: 'sdk.session.next_boot_selection' },
+    );
 }
 
 /**

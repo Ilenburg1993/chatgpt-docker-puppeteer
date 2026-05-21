@@ -10,6 +10,23 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const answerPendingQuestion = vi.fn((/** @type {string} */ _arg) => true);
 const clearPendingQuestionShadow = vi.fn(() => true);
+const listTerminalSdkSessionInventory = vi.fn(async () => ({
+    currentSessionId: 'sdk-current',
+    lastSessionId: 'sdk-last',
+    foregroundSessionId: 'sdk-foreground',
+    sessions: [
+        {
+            sessionId: 'sdk-current',
+            startTime: new Date('2026-05-21T00:00:00.000Z'),
+            modifiedTime: new Date('2026-05-21T00:01:00.000Z'),
+            summary: 'sessão atual',
+            isRemote: false,
+        },
+    ],
+}));
+const readTerminalSdkSessionBootSelection = vi.fn(async () => null);
+const scheduleTerminalSdkSessionBootSelection = vi.fn(async () => ({ ok: true, data: {}, error: null }));
+const deleteTerminalSdkSession = vi.fn(async () => undefined);
 
 const defaultRuntime = /** @type {any} */ ({
     status: 'idle',
@@ -311,6 +328,14 @@ vi.mock('#copilot/conversation-hub', () => ({
     },
 }));
 
+vi.mock('../../../../src/copilot/terminal/frontend/index.js', async (importOriginal) => ({
+    ...(await importOriginal()),
+    listTerminalSdkSessionInventory,
+    readTerminalSdkSessionBootSelection,
+    scheduleTerminalSdkSessionBootSelection,
+    deleteTerminalSdkSession,
+}));
+
 const {
     cmdStatus,
     cmdNow,
@@ -325,6 +350,7 @@ const {
     cmdSessionSave,
     cmdSessionList,
     cmdSessionRestore,
+    cmdSessionSdk,
     cmdClearShadow,
 } = await import('../../../../src/copilot/terminal/commands/session.js');
 
@@ -588,6 +614,122 @@ describe('commands/session — sync commands', () => {
 });
 
 describe('commands/session — async commands', () => {
+    beforeEach(() => {
+        listTerminalSdkSessionInventory.mockClear();
+        readTerminalSdkSessionBootSelection.mockClear();
+        readTerminalSdkSessionBootSelection.mockResolvedValue(null);
+        scheduleTerminalSdkSessionBootSelection.mockClear();
+        scheduleTerminalSdkSessionBootSelection.mockResolvedValue({ ok: true, data: {}, error: null });
+        deleteTerminalSdkSession.mockClear();
+    });
+
+    it('cmdSessionSdk distingue inventário SDK de resume do hub e snapshots', async () => {
+        const ctx = mockCtx();
+        await cmdSessionSdk({ println: ctx.println }, '2');
+        expect(ctx.output()).toContain('Sessão SDK');
+        expect(ctx.output()).toContain('/restart reinicia só dialog loop');
+        expect(ctx.output()).toContain('/resume injeta histórico do hub');
+        expect(ctx.output()).toContain('#1');
+    });
+
+    it('cmdSessionSdk agenda uma sessão nova para o próximo boot', async () => {
+        const ctx = mockCtx();
+        await cmdSessionSdk({ println: ctx.println }, 'next new');
+        expect(scheduleTerminalSdkSessionBootSelection).toHaveBeenCalledWith({ mode: 'new' });
+        expect(ctx.output()).toContain('Próximo boot: criar nova sessão SDK');
+    });
+
+    it('cmdSessionSdk agenda resume por indice do inventário', async () => {
+        const ctx = mockCtx();
+        await cmdSessionSdk({ println: ctx.println }, 'next resume #1');
+        expect(scheduleTerminalSdkSessionBootSelection).toHaveBeenCalledWith({
+            mode: 'resume',
+            sessionId: 'sdk-current',
+        });
+        expect(ctx.output()).toContain('(#1)');
+    });
+
+    it('cmdSessionSdk apaga sessão persistida por índice fora da sessão viva', async () => {
+        listTerminalSdkSessionInventory.mockResolvedValueOnce({
+            currentSessionId: 'sdk-current',
+            lastSessionId: 'sdk-current',
+            foregroundSessionId: null,
+            sessions: [
+                {
+                    sessionId: 'sdk-old',
+                    startTime: new Date('2026-05-20T00:00:00.000Z'),
+                    modifiedTime: new Date('2026-05-20T00:01:00.000Z'),
+                    summary: 'sessão antiga',
+                    isRemote: false,
+                },
+            ],
+        });
+        const ctx = mockCtx();
+        await cmdSessionSdk({ println: ctx.println }, 'delete #1');
+        expect(deleteTerminalSdkSession).toHaveBeenCalledWith('sdk-old', null);
+        expect(ctx.output()).toContain('Sessão SDK apagada: sdk-old (#1)');
+        expect(ctx.output()).toContain('deleteSession');
+    });
+
+    it('cmdSessionSdk protege a sessão SDK viva contra delete', async () => {
+        const ctx = mockCtx();
+        await cmdSessionSdk({ println: ctx.println }, 'delete current');
+        expect(deleteTerminalSdkSession).not.toHaveBeenCalled();
+        expect(ctx.output()).toContain('Sessão SDK viva não apagada');
+        expect(ctx.output()).toContain('/session sdk next new');
+    });
+
+    it('cmdSessionSdk marca resíduos de probes antigos sem esconder a sessão', async () => {
+        listTerminalSdkSessionInventory.mockResolvedValueOnce({
+            currentSessionId: 'sdk-current',
+            lastSessionId: 'sdk-current',
+            foregroundSessionId: null,
+            sessions: [
+                {
+                    sessionId: 'sdk-probe',
+                    startTime: new Date('2026-05-21T00:00:00.000Z'),
+                    modifiedTime: new Date('2026-05-21T00:01:00.000Z'),
+                    summary: 'Responda somente com o texto BYOK_PROBE_OK.',
+                    isRemote: false,
+                },
+            ],
+        });
+        const ctx = mockCtx();
+        await cmdSessionSdk({ println: ctx.println }, '2');
+        expect(ctx.output()).toContain('sdk-probe');
+        expect(ctx.output()).toContain('probe-residue');
+        expect(ctx.output()).toContain('probes novos usam sessão efêmera');
+    });
+
+    it('cmdSessionSdk expõe binding BYOK redigido e decisão do último boot SDK', async () => {
+        listTerminalSdkSessionInventory.mockResolvedValueOnce({
+            currentSessionId: 'sdk-new',
+            lastSessionId: 'sdk-new',
+            foregroundSessionId: 'sdk-new',
+            persistedByokBinding: {
+                enabled: true,
+                profile: 'groq-free',
+                preset: 'groq',
+                providerType: 'openai',
+                model: 'qwen/qwen3-32b',
+            },
+            lastBootDecision: {
+                outcome: 'created',
+                requestedMode: 'auto',
+                selectedSessionId: 'sdk-new',
+                resumeCandidateSessionId: null,
+                reason: 'provider-boundary: binding BYOK model mudou',
+            },
+            sessions: [],
+        });
+        const ctx = mockCtx();
+        await cmdSessionSdk({ println: ctx.println }, '');
+        expect(ctx.output()).toContain('provider bound');
+        expect(ctx.output()).toContain('BYOK profile=groq-free');
+        expect(ctx.output()).toContain('último boot');
+        expect(ctx.output()).toContain('provider-boundary');
+    });
+
     it('cmdSessionSave salva e imprime path', async () => {
         const ctx = mockCtx();
         await cmdSessionSave({ println: ctx.println }, 'test-reason');

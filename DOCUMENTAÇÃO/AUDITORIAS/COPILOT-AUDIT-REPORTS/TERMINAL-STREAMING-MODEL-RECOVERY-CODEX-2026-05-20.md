@@ -741,7 +741,7 @@ Achado:
 - A rodada de providers gratuitos mostrou que BYOK nao pode ser apenas "baseUrl + key + model": OpenRouter, Groq, Gemini, Mistral, Hugging Face, Cloudflare Workers AI, NVIDIA NIM, Cerebras, Chutes e Z.AI possuem contratos OpenAI-compatible parecidos, mas catalogos, metadata e semantica de custo diferentes.
 - O arquivo `DOCUMENTAÇÃO/Provedores de LLMs com acesso gratuito.md` foi lido integralmente e usado como inventario inicial, mas a fonte de autoridade operacional continua sendo a documentacao oficial do provider e o comportamento live do endpoint.
 - Sem enriquecimento de catalogo, `/byok models` força o operador a pesquisar fora do terminal quais modelos sao free, vision, reasoning, long-context, pagos, roteadores, previews ou limitados.
-- O default anterior do OpenRouter (`openrouter/free`) era menos solido do que escolher um modelo `:free` real retornado pelo catalogo. O perfil foi movido para um modelo free descoberto no endpoint oficial.
+- A tentativa de preferir um modelo OpenRouter `:free` específico parecia mais determinística do que o roteador `openrouter/free`, mas os probes desta rodada marcaram `deepseek/deepseek-v4-flash:free` como falho e o roteador passou no fluxo agente canônico. O preset/template voltaram a `openrouter/free`; o cockpit continua exibindo modelos `:free` reais e health por modelo para seleção consciente.
 
 Correção:
 
@@ -972,7 +972,194 @@ Validação:
 - Probe real BYOK sem PR OpenRouter -> Groq passou em `artifacts/terminal-live/byok-provider-cost-cockpit-2026-05-21/summary.md`, confirmando `cost=profile-free(...)` em status, providers, profiles e modelos, sem abrir turno e sem vazamento de segredo.
 - Evidência do live: Groq exibiu `qwen/qwen3-32b profile-free`, `freeHint=6k TPM observed...`, `maxReq=6000`, `TPM=6000`; o filtro `safe` mostrou "O filtro safe removeu 4 candidato(s)" com razões acionáveis; `/usage now` e `/metrics` mostraram side-channel GitHub Copilot como histórico e não cobrança BYOK.
 
+### A46. Sessão SDK precisava de cockpit próprio e BYOK precisava de probe de chat isolado
+
+Situação atual observada:
+
+- O terminal usa quatro conceitos que não podem continuar dissolvidos na palavra "sessão": runtime/agent, dialog loop, sessão SDK persistente, hub session e snapshot local.
+- `/resume` atua no hub: injeta histórico resumido de uma hub session na sessão ativa. Ele não chama `client.resumeSession()` e não deve sugerir retomada de estado SDK.
+- `/session save|list|restore` atua em snapshots locais de runtime. Isso é útil para inspeção/recuperação do terminal, mas não é o mesmo contrato persistente do SDK.
+- O SDK local e a documentação oficial possuem o contrato necessário para cockpit SDK: `createSession`, `resumeSession`, `listSessions`, `getLastSessionId`, foreground session e BYOK reentregando o `provider` ao retomar.
+- O catálogo BYOK já responde "quais modelos o provider anuncia"; ele não responde sozinho "este provider/modelo consegue abrir chat agora com a configuração real do operador".
+
+Situação ideal:
+
+- O operador vê no próprio terminal qual sessão SDK está viva, qual foi a última sessão SDK, qual sessão está em foreground, qual diretiva one-shot será usada no próximo boot e quais IDs SDK podem ser retomados.
+- Trocar o alvo do próximo boot não inventa attach paralelo no meio do dialog loop. A diretiva é persistida e consumida por um único initializer: `auto`, `new` ou `resume <sessionId>`.
+- A orientação do help deixa claro que `/restart` reinicia dialog loop, `/resume` injeta hub history e `/session save|list|restore` manipula snapshots.
+- O seletor BYOK ganha uma admissão de chat antes da sessão viva: `/byok probe` cria sessão SDK descartável com o mesmo provider/modelo resolvido, nega permissões, não registra transcript live e mede deltas + final canário.
+- O resultado do probe alimenta a mesma saúde operacional redigida de BYOK já usada por turno real. Assim "catalogado", "probe ok" e "turno vivo ok/falhou" convergem sem criar outro renderer, outro loop ou outro fanout.
+
+Status desta revisão:
+
+- Implementado cockpit inicial `/session`/`/session sdk` e agenda one-shot `/session sdk next <new|resume <id>|auto>`.
+- Implementado `/byok probe [profile:<nome>] [model:<id>] [timeout:<ms>]` com sessão SDK descartável e health store redigida.
+- Implementado `/byok probe agent` para validar, antes da sessão viva, `tool calling` e `ask_user` no runtime agente com uma tool canária e resposta sintética confinadas ao probe.
+- O runner live BYOK real agora separa probe `--no-pr` de turno vivo: chat/agent probes podem provar provider/modelo sem exigir `byok_user_message` de uma conversa que não foi aberta.
+- Pendente: UX de pré-sessão antes do attach automático, `disconnect` explícito quando houver razão operacional para soltar o handle vivo sem inventar outro attach no mesmo REPL, probe agregado de candidatos recomendados e live longo provando troca `auto -> new -> resume` em conjunto com BYOK.
+
 Status: implementado nesta revisão. Ainda falta enriquecer perfis com metadados mais formais de limite gratuito por provider quando APIs oficiais expuserem quotas estruturadas.
+
+### A47. Probe BYOK de chat não provava runtime agente e deixava resíduo de sessão
+
+Situação atual observada:
+
+- O catálogo remoto só prova anúncio de modelo.
+- O probe de chat isolado prova que o provider/modelo responde a um prompt simples, mas não prova as duas capacidades que sustentam o terminal agente: chamar tool e atravessar `ask_user`.
+- No live Kilo de 2026-05-21, `/byok probe agent` provou `toolCalls=1`, `ask=1`, `answer=1` em sessão fora do dialog loop. Isso fecha o falso conforto de modelos que "conversam", mas quebram o circuito operacional.
+- A primeira implementação do probe usava `disconnect()` apenas. O SDK preserva a sessão desconectada, portanto `/session` passou a listar canários `BYOK_PROBE_OK` e `BYOK_AGENT_PROBE_*` como se fossem sessões do operador.
+
+Situação ideal:
+
+- A admissão BYOK tem degraus explícitos: `catalogado`, `chat probe`, `agent probe`, `turno vivo`.
+- `chat probe` e `agent probe` usam o mesmo `ProviderConfig` resolvido do terminal, mas não entram no dialog loop, não escrevem transcript live e não poluem o inventário SDK que o operador usa para retomar sessões.
+- A saúde operacional diferencia `chat=...` de `agent=...`, de modo que catálogo disponível e runtime agente compatível não sejam confundidos.
+- O harness `--no-pr` prova control plane, probes e redaction sem inventar telemetria de usage; o harness com turno vivo continua exigindo deltas, final, tools, `ask_user`, pós-ask e classificação BYOK sem Premium Request.
+
+Status desta revisão:
+
+- Adicionado `withEphemeralSession()` na facade SDK: a sonda desconecta e chama `deleteSession()` no mesmo cleanup.
+- `probeTerminalConfiguredByokChat()` e `probeTerminalConfiguredByokAgent()` passaram a usar a primitiva efêmera.
+- `/byok status`, `/byok providers`, `/byok models`, `/byok recommend` e `/byok health` carregam saúde de agente separada da saúde de chat.
+- `/byok recommend` agora transforma recomendação em ação operacional: cada candidato mostra o comando de `agent probe` descartável e a sequência de seleção de profile/modelo sem trocar a sessão viva no escuro.
+- Live BYOK Kilo `--no-pr` PASS em `artifacts/terminal-live/byok-kilo-agent-probe-nopr-2026-05-21-r2/summary.md`: probe de chat, probe de agente, catálogo, provider cockpit, sessão SDK cockpit, redaction e arquivo SSE sem turno do operador.
+
+Status: implementado nesta revisão para admissão de agente e cleanup de probes. A rodada seguinte deve validar novamente o turno canônico vivo com o probe de agente como preflight e continuar a gestão explícita de sessão SDK.
+
+### A48. Admissão BYOK precisava cobrir probes e turno vivo com o mesmo envelope conservador
+
+Situação atual observada:
+
+- O live Groq com `groq-free` + `qwen/qwen3-32b` mostrou que catálogo válido não basta: o provider aceitava descoberta, mas recusava probes e turno real com `413` por orçamento de requisição/TPM abaixo do envelope SDK observado.
+- A lacuna estava no ponto de autoridade. O turno vivo tinha política de budget, mas probe de chat, probe de agente e harness ainda podiam tentar o provider para só então descobrir que um limite de `6000` tokens não comporta a sessão terminal.
+- Isso sujava o diagnóstico: health parecia falha de provider/modelo quando a seleção já era inadequada antes da chamada, e o runner esperava delta/tool/`ask_user` de um turno que o terminal deliberadamente não deveria enviar.
+
+Situação ideal:
+
+- Catálogo responde "o provider anuncia este modelo".
+- Health responde "chat/agente funcionaram quando o provider foi tentado".
+- Admissão responde "o envelope atual do terminal cabe no limite declarado antes de chamar o provider".
+- Probes e turno vivo usam a mesma política conservadora. Quando o contexto real ainda não está disponível, o terminal aplica um piso explícito de envelope, não uma estimativa otimista zero.
+- O evento público `terminal.byok.admission_blocked` arquiva a decisão com estimativa, limite, modo e correlação de turno; isso é diagnóstico operacional, não erro rastreado do provider.
+
+Correção desta revisão:
+
+- Criado `src/copilot/terminal/byok/admission.js` como contrato único para budget de turno e probe.
+- Probes BYOK de chat/agente retornam `admission-blocked` antes de abrir sessão efêmera quando o provider declara limite insuficiente para o envelope conservador.
+- Turno vivo usa o mesmo piso conservador de `16384` tokens quando o contexto disponível não basta para estimar o request; o operador ainda pode assumir o risco explicitamente com `COPILOT_BYOK_ADMISSION_MODE=warn|off`.
+- `/byok probe` não degrada health do provider quando a sonda foi bloqueada por admissão local.
+- O live runner classifica `terminal.byok.admission_blocked` como blocker de causa raiz, captura `/activity`, `/events --raw` e `/errors`, encerra cedo e deixa de esperar streaming impossível.
+
+Validação:
+
+- Unit tests focados para engine, `/byok probe`, sessão SDK e initializer passaram com 92 testes.
+- Live Groq em `artifacts/terminal-live/byok-groq-qwen-admission-runner-r2-2026-05-21/summary.md` ficou `BLOCKED` em vez de timeout longo e o summary preservou o blocker canônico `byok-admission-blocked`.
+- O JSONL do live arquivou `terminal.byok.admission_blocked` com `estimatedRequestTokens=16384`, `limit=6000`, `reason=estimated_request_exceeds_provider_limit` e `source=terminal-dialog/byok-admission`.
+- `/errors` permaneceu vazio; `/byok recommend reasoning safe` explicou que os candidatos Groq com limite baixo são inadequados para turno real/contexto atual.
+
+### A49. Sessão SDK listável ainda não era apagável pelo operador
+
+Situação atual observada:
+
+- O SDK instalado já expõe `listSessions()`, `resumeSession()` e `deleteSession()`. O terminal vinha aproximando o cockpit correto com `/session sdk`, inventário numerado e diretiva one-shot para o próximo boot, mas a remoção persistida ainda ficava fora do fluxo do operador.
+- Isso deixava um buraco prático depois da adoção de probes efêmeras: os canários novos já são apagados no cleanup, mas resíduos antigos, sessões de teste e sessões obsoletas por provider/modelo ainda exigiam saída lateral para limpeza.
+- A exclusão não pode virar uma troca live improvisada de sessão. A sessão SDK viva ainda pertence ao initializer + runtime atual; apagar esse estado enquanto o handle está em uso confundiria "persistência destruída" com "dialog loop reiniciado".
+
+Situação ideal:
+
+- O cockpit de sessão SDK oferece inventário, escolha do próximo boot e limpeza persistida no mesmo vocabulário.
+- O alvo da limpeza usa a mesma resolução auditável de IDs/índices já usada por resume (`<id>` ou `#n`), sem criar uma segunda sintaxe.
+- A sessão SDK viva é protegida contra delete. Para abandonar a sessão atual, o operador agenda `next new` ou `next resume ...`, reinicia o terminal e só então apaga a sessão antiga.
+
+Correção desta revisão:
+
+- A borda canônica de runtime passou a expor `deleteSdkSession()` a partir do `CopilotClient.deleteSession()` já disponível no SDK.
+- `/session sdk delete <sessionId|#n>` remove somente estado SDK persistido fora da sessão viva e narra explicitamente a diferença entre `deleteSession` e a diretiva `/session sdk next`.
+- `/help` e o próprio cockpit `/session sdk` passaram a mostrar a operação de limpeza e a proteção da sessão ativa.
+- O banner do terminal passou a emitir uma pré-sessão advisory antes do attach do dialog loop: auto-resume continua sendo o default, mas o operador vê no boot que `/session sdk` é o cockpit e que `/session sdk next new|resume|auto` governa o boot seguinte.
+
+Status: implementado nesta revisão com teste unitário para exclusão por índice, teste de guarda para a sessão viva e banner advisory de pré-sessão. `disconnect()` fica fora da UX de troca live por ora: no SDK ele solta o handle em memória e invalida a sessão corrente, enquanto o runtime permanente ainda precisa de um owner único para attach/create/resume. O próximo passo deve decidir se uma etapa explícita de pré-sessão realmente compensa interromper o auto-attach default ou se o advisory + diretiva one-shot já cobrem o operador sem criar outro modo de boot.
+
+### A50. Saúde BYOK e redraw de sessão ainda escondiam falhas de operação
+
+Situação atual observada:
+
+- Um catálogo BYOK pode continuar listando o modelo ativo depois de uma falha recente de chat. Sem um gate visível em `/byok status`, o operador vê disponibilidade e saúde misturadas e pode repetir uma seleção já falha sem notar que o caminho seguro é sondar ou trocar.
+- A leitura de health por profile ainda podia herdar o resultado de outro modelo do mesmo profile depois de override de modelo. Isso é exatamente o tipo de atalho que torna o cockpit confiante demais.
+- O primeiro live manual de `/session sdk next new` encontrou duas raízes separadas: redraw de prompt agendado depois de `/quit` podia chamar `rl.prompt()` sobre `readline` fechado, e o dispatcher de `/session` tratava o `arg` agregado `"sdk next new"` como se fosse apenas o subcomando.
+
+Situação ideal:
+
+- `/byok status` distingue modelo catalogado de modelo saudável e, se o par ativo falhou recentemente, aponta probes e alternativas explícitas sem troca silenciosa.
+- Health operacional é atribuída por profile/provider/modelo efetivo. Override de modelo não herda sucesso ou falha de irmão de catálogo.
+- O gateway único de redraw do terminal nunca pinta prompt em `readline` fechado. O roteador de comandos compostos preserva subcomando e resto tokenizado até o owner real do comando.
+
+Correção desta revisão:
+
+- `/byok status` ganhou `healthGate` para falha recente do modelo ativo, com comando de probe e seleção de alternativas do mesmo catálogo.
+- `readHealthForByokProfile()` passou a exigir modelo correspondente antes de usar fallback de health dentro do profile.
+- `dialog/output.js` passou a validar `readline` aberto antes de reservar status, redesenhar ou materializar redraw agendado; o caso de fechamento antes do `setImmediate` ficou coberto por teste.
+- O parser ganhou `parseTerminalSubcommand()` e o dispatcher de `/session` deixou de perder `next new|resume|auto`.
+
+Validação:
+
+- `npx vitest run tests/unit/copilot/terminal/test_commands_byok.spec.js` passou com a cobertura do health gate e da atribuição correta de health por modelo.
+- Live OpenRouter sem PR em `artifacts/terminal-live/byok-openrouter-health-gate-router-nopr-2026-05-21/summary.md` passou com probes de chat/agente, catálogo filtrado, recomendação, cockpit de sessão e ausência de erro/segredo/PR.
+- Live manual de sessão em 2026-05-21 confirmou `/session sdk next new`, boot seguinte com `request=new`, `/session sdk next resume #1`, retorno `/session sdk next auto` e `/quit` sem `ERR_USE_AFTER_CLOSE`.
+
+Status: implementado nesta revisão. A próxima rodada deve continuar de sessão para testes funcionais em mais providers e formalizar um artefato live automatizado para o ciclo `new -> resume -> auto`.
+
+### A51. `/activity` podia escolher a trace humana e esconder tools do mesmo turno operacional
+
+Situação atual observada:
+
+- O live Ollama Cloud canônico mostrou `report_intent` e `read_file_content` ao vivo, `/tools diag` contabilizou as duas tools, e os eventos públicos arquivaram `tool.lifecycle` com I/O real.
+- O SDK desse provider fechou o subturno de tools como `turn:0`, abriu a resposta/pergunta como `turn:1` e a continuação pós-`ask_user` como `turn:2`.
+- `/activity` selecionava uma única "trace útil". Como `turn:1` continha a interação humana, o resumo dizia `tools 0` mesmo com uma trace operacional imediatamente anterior carregando as tools e arquivos do mesmo circuito humano.
+
+Situação ideal:
+
+- O terminal não falsifica `turnId` de subturnos distintos só para produzir um resumo bonito.
+- Quando o SDK reparte o circuito entre subturno operacional e subturno de interação, `/activity` preserva ambos os fatos: trace operacional recente como resumo principal e interação humana recente como bloco complementar.
+
+Correção desta revisão:
+
+- A seleção de trace em `commands/activity.js` passou a priorizar atividade operacional (`files` ou tools com alvo/operação) antes de cair em input humano.
+- Quando a interação humana mais recente vive em outra trace, `/activity` imprime `Interação humana recente` em separado.
+- O teste unitário cobre explicitamente `turn:tools` seguido de `turn:ask` para impedir regressão de cockpit.
+
+Validação:
+
+- `npx vitest run tests/unit/copilot/terminal/test_commands_activity.spec.js` passou com a nova cobertura.
+- Live Ollama Cloud canônico em `artifacts/terminal-live/byok-ollama-cloud-canonical-2026-05-21/summary.md` passou com deltas parciais/final, tools, `ask_user`, resposta humana, continuação pós-ask, `/activity`, `/tools`, `/events`, `/health`, export, SSE/JSONL e ausência de duplicação/PR.
+
+Status: implementado nesta revisão. A arquitetura continua respeitando turnos SDK distintos; a UX agora deixa essa repartição menos enganosa para o operador.
+
+### A52. Gestão de sessão precisava de ciclo live repetível e de verdade sobre resume-miss
+
+Situação atual observada:
+
+- A rodada manual já tinha provado `/session sdk next new`, `/session sdk next resume ...` e retorno `auto`, mas ainda não havia artefato canônico multi-boot. Isso deixava a cobertura mais importante da gestão de sessão presa à memória do operador.
+- O primeiro ensaio automatizado capturou um caso legítimo que a UX ainda explicava mal: uma sessão `current` recém-criada em boot sem turno não estava no inventário retomável do client; o próximo boot recebeu `request=resume`, o wrapper `resumeOrCreate()` caiu para `createSession()`, e o motivo persistido ainda dizia apenas `operator-next-boot-resume-session`.
+
+Situação ideal:
+
+- O runner live deve provar gestão de sessão sem abrir turno LLM: boot 1 agenda `new`, boot 2 consome a criação e agenda `resume` de uma sessão realmente listada, boot 3 consome a retomada e restaura `auto`.
+- A decisão persistida do initializer deve manter juntos o pedido e o resultado. Se houve candidato de resume mas o SDK criou outra sessão, o cockpit precisa dizer que houve fallback de resume, não deixar `created · request=resume` com motivo ambíguo.
+
+Correção desta revisão:
+
+- `run-terminal-llm-b-live-test.mjs` ganhou `--session-cycle`, com três boots PTY, logs por boot, summary JSON/MD e critérios de ready/cockpit/clean-close/`new`/`resume`/`auto`.
+- O ciclo escolhe primeiro `last SDK` do cockpit como alvo retomável e usa `current` apenas como reserva; isso evita tratar uma sessão viva vazia e ainda não listada como prova de resume persistido.
+- `buildSdkSessionBootDecision()` agora acrescenta `sdk-resume-fallback-created-new-session` quando havia candidato de resume e o resultado efetivo do SDK foi criação nova.
+
+Validação:
+
+- O primeiro artefato `artifacts/terminal-live/sdk-session-cycle-2026-05-21/summary.md` foi útil como negativo diagnóstico: apontou `created · request=resume` para uma sessão `current` sem entrada listada.
+- `npx vitest run tests/unit/copilot/test_initializer_session_fs.spec.js tests/unit/copilot/terminal/test_commands_session.spec.js` passou com cobertura do motivo de fallback de resume.
+- O ciclo revisado PASS em `artifacts/terminal-live/sdk-session-cycle-2026-05-21-r2/summary.md`: `next new`, boot criado, `next resume` de `last SDK`, boot retomado e seletor `auto` restaurado sem `ERR_USE_AFTER_CLOSE`.
+
+Status: implementado nesta revisão. A próxima discussão de sessão pode se concentrar na UX de pré-sessão e troca deliberada de provider/binding, não em provar de novo que o cockpit one-shot atravessa boots reais.
 
 ## Hipóteses Externas Rejeitadas Ou Reclassificadas
 
@@ -1066,6 +1253,14 @@ Fase B1. Contrato SDK real
 - B1.2 Criar adaptador de capabilities com `requestUserInput`, `requestElicitation`, streaming e subagent streaming. Status: pendente.
 - B1.3 Rejeitar nomes de API inexistentes no roadmap operacional. Status: feito neste documento.
 - B1.4 Adicionar teste de contrato contra `types.d.ts`/event names usados pelo terminal. Status: pendente.
+
+Fase B1.5. Cockpit de sessão SDK
+
+- B1.5.1 Separar em UX os conceitos de sessão SDK, hub session, snapshot e dialog loop. Status: feito nesta revisão em `/session` e `/help`.
+- B1.5.2 Expor inventário SDK com sessão viva, última, foreground, IDs listados, binding BYOK redigido e última decisão de boot (`created`/`resumed`, modo e motivo). Status: feito nesta revisão.
+- B1.5.3 Agendar seleção one-shot do próximo boot (`auto`, `new`, `resume <id>`) e consumi-la no initializer único. Status: feito nesta revisão.
+- B1.5.4 Criar pré-sessão opcional no boot com orientação para retomar default, abrir nova ou escolher ID SDK sem quebrar o default "continuar anterior". Status: advisory de boot feito; gate interativo antes do attach ainda em avaliação.
+- B1.5.5 Definir política segura para `deleteSession`/`disconnect` no terminal, distinguindo sessão viva e dados persistidos. Status: feito para `deleteSession`; `disconnect` documentado como cleanup/owner de runtime, não troca live de sessão.
 
 Fase B2. Modelo
 
@@ -1339,6 +1534,10 @@ Fase J5. UX e comandos
 - J5.30 Encerrar turno/materialização como `failed` quando o provider BYOK falha antes de qualquer delta público. Status: feito nesta revisão; `/activity` deixa de mostrar turno preso como `active`.
 - J5.31 Explicar filtros vazios causados por `safe`, listando candidatos removidos e motivos de bloqueio. Status: feito nesta revisão.
 - J5.32 Mostrar side-channel de quota/PR do GitHub Copilot como histórico quando BYOK está ativo, sem narrar como cobrança BYOK. Status: feito nesta revisão em `/usage now`, `/metrics` e harness live.
+- J5.33 Criar `/byok probe` como admissão de chat descartável para provider/modelo selecionado, sem transcript live nem loop paralelo. Status: feito nesta revisão.
+- J5.34 Mostrar ao operador a diferença entre catálogo BYOK, health de probe e health de turno real. Status: iniciado; `/byok probe` grava health redigida e a distinção ainda deve entrar na recomendação agregada.
+- J5.35 Mostrar admissão local como quarto degrau antes do provider (`catalogado`, `admitido`, `probe`, `turno vivo`) e arquivar blocker sem degradar health. Status: feito nesta revisão para turno e probes com `terminal.byok.admission_blocked`.
+- J5.36 Fazer `/byok recommend` apontar para a probe agent descartável e para a sequência de seleção profile/modelo de cada candidato. Status: feito nesta revisão.
 
 Fase J6. Testes
 
@@ -1381,6 +1580,11 @@ Fase J6. Testes
 - J6.37 Rodar probe real OpenRouter -> Groq pós-diagnóstico `safe`, provando que Groq não aparece mais como "nenhum modelo" opaco. Status: PASS em `artifacts/terminal-live/byok-openrouter-groq-cockpit-safe-diagnostics-2026-05-21/summary.md`.
 - J6.38 Garantir que o live runner BYOK `--no-pr` não aborte por erros históricos de `/byok health` e execute diagnósticos completos antes de `/quit`. Status: feito nesta revisão.
 - J6.36 Fazer o live runner BYOK real preservar provider/perfil alvo nos comandos de catálogo depois de `/byok reload`, usando `provider:<nome>` em refresh/free/recommend. Status: feito nesta revisão.
+- J6.39 Cobrir `/byok probe` com unit test e smoke real provider/modelo antes de expor a seleção ao turno vivo. Status: unit test e smoke real OpenRouter sem PR PASS em `artifacts/terminal-live/byok-openrouter-health-gate-router-nopr-2026-05-21/summary.md`.
+- J6.40 Rodar live de gestão de sessão SDK com `/session`, `/session sdk next new`, boot seguinte, `/session sdk next resume <id>` e retorno `auto`. Status: live manual PASS e ciclo automatizado PASS em `artifacts/terminal-live/sdk-session-cycle-2026-05-21-r2/summary.md`; o artefato negativo anterior `sdk-session-cycle-2026-05-21` também documentou resume-miss de sessão `current` ainda não listada.
+- J6.41 Cobrir `/byok probe agent` com tool canária, `ask_user` sintético e health `agent=...` distinto de chat. Status: unit tests e live Kilo `--no-pr` PASS em `artifacts/terminal-live/byok-kilo-agent-probe-nopr-2026-05-21-r2/summary.md`.
+- J6.42 Garantir que probes BYOK descartáveis removam a sessão SDK persistida depois do diagnóstico, em vez de poluir `/session`. Status: `withEphemeralSession()` implementado e coberto por unit test nesta revisão; falta repetir inventário live após probes para confirmar ausência de novos canários.
+- J6.43 Rodar live real Groq com limite baixo e exigir blocker de admissão antes de provider/streaming quando o envelope terminal não cabe. Status: feito em `artifacts/terminal-live/byok-groq-qwen-admission-runner-2026-05-21/summary.md`.
 
 Fase J7. Providers amplos
 
@@ -1389,10 +1593,10 @@ Fase J7. Providers amplos
 - J7.3 Azure AI Foundry como OpenAI-compatible. Status: suportado por contrato; pendente smoke.
 - J7.4 Anthropic direto. Status: suportado por contrato; pendente smoke.
 - J7.5 Ollama local. Status: suportado por contrato; pendente smoke.
-- J7.6 Ollama Cloud. Status: perfil real exercitado no live BYOK; catálogo remoto disponível. Falta turno funcional dedicado no provider.
+- J7.6 Ollama Cloud. Status: catálogo remoto e turno funcional dedicado PASS em `artifacts/terminal-live/byok-ollama-cloud-canonical-2026-05-21/summary.md`, incluindo probes descartáveis, delta parcial/final, tools, `ask_user`, pós-ask, SSE/export e usage BYOK sem PR.
 - J7.7 LiteLLM/vLLM/routers locais. Status: suportado por contrato OpenAI-compatible; pendente smoke.
 - J7.8 Kilo Gateway/Kilo Code. Status: PASS em live real com `kilo-auto/free`; catálogo remoto de 346 modelos; modelo pago `kilo-auto/balanced` bloqueado por créditos do provider.
-- J7.9 OpenRouter. Status: preset, key local, catalogo real `358` modelos, `28` free; default movido para modelo `:free` real; alternância real sem PR passou. Falta turno funcional live.
+- J7.9 OpenRouter. Status: preset, key local, catalogo real `358` modelos, `28` free; o modelo estático `deepseek/deepseek-v4-flash:free` ficou com health negativo em probes, mas `openrouter/free` passou em probe estrito sem PR e no turno funcional canônico completo com deltas, tools, `ask_user`, pós-ask, SSE/export e usage BYOK sem PR.
 - J7.10 Groq. Status: preset, key local, catalogo real `16` modelos, limites `maxReq`/`TPM` declarados localmente e alternância real sem PR passou. Turno funcional em sessão longa bloqueado por orçamento do provider; requer admission/fresh-session.
 - J7.11 Gemini OpenAI-compatible. Status: preset, key local e catalogo real `53` modelos. Falta turno funcional live e validar diferenca entre Google AI Studio e Google Cloud key.
 - J7.12 Mistral. Status: preset, key local e catalogo real `64` modelos. Falta turno funcional live.
@@ -1538,23 +1742,44 @@ Implementado:
 - Teste unitário adicionado para `dialog.turn_end` emitir lifecycle sem `reply` quando o transcript já foi materializado.
 - O live runner agora analisa blocos estruturados do terminal para detectar duplicação final, evitando falso positivo quando uma regex atravessa de `🧠 LLM-B` para `[LLM-B] Mensagem`.
 - O cockpit BYOK agora separa custo em `free`, `profile-free`, `metered` e `cost?`. `profile-free` vem de metadata redigida do perfil/conta, não de preço confirmado por modelo, e aparece com `freeHint`.
+- O cockpit BYOK agora separa saúde de `chat` e saúde de `agent`: catálogo remoto, canário textual e compatibilidade de tool/`ask_user` não são mais tratados como a mesma evidência.
+- `/byok probe agent` abre uma sessão SDK fora do dialog loop com tool canária e resposta sintética de `ask_user`; o live Kilo sem PR validou `toolCalls=1`, `ask=1`, `answer=1`.
+- `withEphemeralSession()` remove o estado SDK persistido de probes depois do cleanup, evitando que diagnósticos de modelo apareçam como sessões retomáveis do operador; o inventário ainda pode mostrar canários antigos criados antes desta limpeza.
+- O live runner BYOK real no modo `--no-pr` agora valida probes de chat/agente sem exigir classificação de usage de um turno que não foi aberto.
+- O live runner aplica `--byok-real-model` antes dos probes descartáveis e exige `byok-real-chat-probe-ok`/`byok-real-agent-probe-ok`; catálogo/probe exercitado não mascaram mais provider/modelo que falhou antes do turno canônico.
+- O runner deixou de tratar `BYOK operational health` histórico da fase de preflight como blocker do turno funcional seguinte; detecção de falha real agora é ancorada no trecho emitido depois do prompt de cenário.
+- Live Kilo canônico pós-agent-probe passou em `artifacts/terminal-live/byok-kilo-agent-probe-canonical-2026-05-21-r5/summary.md`: preflight de chat/agente, deltas parciais, final, tool, `ask_user`, resposta humana, continuação pós-ask, health BYOK, SSE/JSONL/export e ausência de duplicação.
+- `/session sdk` agora numera o inventário, permite agendar retomada por `#n`, `current`, `last` ou `foreground`, apaga estado persistido fora da sessão viva com `/session sdk delete <id|#n>` e marca sessões-canário antigas como `probe-residue` sem confundi-las com `/restart`, `/resume` do hub ou snapshots locais.
+- `/session sdk next new|resume|auto` agora atravessa o roteador composto sem perder tokens; o live manual validou `request=new` no boot seguinte e o retorno para `auto`.
+- O live runner ganhou `--session-cycle`: três boots sem turno LLM validam `next new`, retomada explícita de sessão SDK listada e retorno `auto`; o artefato PASS está em `artifacts/terminal-live/sdk-session-cycle-2026-05-21-r2/summary.md`.
+- A sessão SDK persistida agora recebe `byokSessionBinding` redigido (`profile`, `preset`, `providerType`, `baseUrl`, `model`); o initializer cria sessão nova ao voltar SDK <-> BYOK, trocar provider/perfil/baseUrl ou encontrar sessão BYOK antiga sem binding seguro, preservando override explícito do operador via `/session sdk next resume ...`.
+- Quando o initializer recebe um candidato de resume mas o SDK cai para criação nova, `sdkSessionBootDecision.reason` registra `sdk-resume-fallback-created-new-session`; `created · request=resume` não parece mais uma retomada silenciosamente bem-sucedida.
+- O redraw do prompt agora ignora `readline` fechado no caminho imediato e no `setImmediate` coalescido; `/quit` não deve mais produzir `ERR_USE_AFTER_CLOSE` quando status/comando deixam redraw pendente.
+- `/activity` agora prioriza a trace operacional recente e mostra uma interação humana recente separada quando tools e `ask_user` caem em subturnos SDK distintos.
+- O footer pós-turno prefere `lastLlmUsage` não-PR em BYOK e deixa o fallback de quota histórico rotulado como `quota/PR histórico`, evitando que um snapshot antigo de Copilot pareça o modelo efetivo do turno BYOK.
 - O filtro `free` inclui `profile-free` para tornar provedores com plano/cota gratuita operacionalmente descobríveis, mas a UI preserva a distinção para evitar falsa promessa de preço zero por modelo.
 - Quando `safe` remove todos os candidatos, `/byok models` e `/byok recommend` mostram quais modelos foram removidos e por qual limite/health, em vez de deixar o operador com um "nenhum modelo" opaco.
 - `/usage now` e `/metrics` mostram "GitHub Copilot quota/PR side-channel" quando BYOK está ativo, explicitando que snapshot PR histórico não é cobrança BYOK.
 - Live BYOK real sem PR OpenRouter -> Groq passou em `artifacts/terminal-live/byok-provider-cost-cockpit-2026-05-21/summary.md`: OpenRouter exibiu catálogo free/profile-free, Groq exibiu `qwen/qwen3-32b profile-free`, filtros `safe` explicaram limites de 6000 tokens, `/byok providers` e `/byok profiles` exibiram `cost=profile-free(...)`, `/events` arquivou controle público e `/errors` ficou limpo.
+- Live OpenRouter estrito sem PR passou em `artifacts/terminal-live/byok-openrouter-free-router-nopr-strict-2026-05-21/summary.md`: `openrouter/free` passou chat probe e agent probe descartáveis antes do cockpit de catálogo/recomendação, enquanto o summary exige sucesso real das sondas.
+- Live OpenRouter canônico passou em `artifacts/terminal-live/byok-openrouter-free-router-canonical-2026-05-21/summary.md`: `openrouter/free` validou preflight, deltas parciais/final, tools, `ask_user`, resposta humana, continuação pós-ask, usage `byok_user_message`, health por modelo, SSE/JSONL/export e ausência de duplicação.
+- Live OpenRouter sem PR pós-health gate passou em `artifacts/terminal-live/byok-openrouter-health-gate-router-nopr-2026-05-21/summary.md`: status/catálogo/recomendação/probes deixaram claro que catálogo e saúde são fatos distintos sem cair em Premium Request.
+- Live Ollama Cloud canônico passou em `artifacts/terminal-live/byok-ollama-cloud-canonical-2026-05-21/summary.md`: `qwen3-coder-next` validou probes, deltas, tools, `ask_user`, pós-ask, `/activity`, `/tools`, `/events`, `/health`, export e SSE/JSONL sem duplicação nem Premium Request.
+- Live NVIDIA sem PR passou em `artifacts/terminal-live/byok-nvidia-session-delete-cockpit-nopr-2026-05-21/summary.md`: o provider `nvidia-nim` validou probes descartáveis de chat/agente para `openai/gpt-oss-120b`, inventário `/session sdk` com binding BYOK e limpeza persistida anunciada no cockpit, troca auxiliar para Kilo, filtros/recommendation e ausência de uso Premium Request.
 
 Próxima rodada recomendada:
 
-1. Rodar turno funcional live com OpenRouter free em modelo recomendado alternativo ao que retornou `400`, validando deltas, final, tools, `ask_user`, usage sem PR, retorno ao SDK e ausência de duplicações.
-2. Calibrar estimativa BYOK por provider/modelo com tokenização real quando disponível, mantendo fallback conservador por bytes UTF-8.
-3. Persistir no artefato live uma seção explícita de recomendação contextual quando `contextWindow` estiver disponível.
-4. Fazer `/byok recommend all-providers safe` considerar health persistido por profile/provider/model mesmo quando a descoberta agregada retorna variantes equivalentes com ids ou provider aliases diferentes.
-5. Expandir o cenário live para elicitation quando a capability estiver disponível.
-6. Fechar a recuperação `session.error`/`reconnect_restart`, distinguindo retry real de reenvio ambíguo de prompt.
-7. Criar contrato único de modelo configurado/preferido/efetivo/cobrado, incluindo billing/effective model real em BYOK.
-8. Expandir smoke de elicitation real em BYOK e fake SDK end-to-end sem rede.
-9. Rodar turno funcional dedicado em Ollama Cloud e, quando disponível, Ollama local/LiteLLM/vLLM.
-10. Continuar a normalização de tool identity em completions/progress externos sem requestId, com métricas para qualquer lifecycle ainda genérico.
-11. Integrar falha de `wireRuntime()` ao `ErrorTracker` com metadados de fase.
+1. Calibrar estimativa BYOK por provider/modelo com tokenização real quando disponível, mantendo fallback conservador por bytes UTF-8.
+2. Persistir no artefato live uma seção explícita de recomendação contextual quando `contextWindow` estiver disponível.
+3. Fazer `/byok recommend all-providers safe` considerar health persistido por profile/provider/model mesmo quando a descoberta agregada retorna variantes equivalentes com ids ou provider aliases diferentes.
+4. Expandir o cenário live para elicitation quando a capability estiver disponível.
+5. Fechar a recuperação `session.error`/`reconnect_restart`, distinguindo retry real de reenvio ambíguo de prompt.
+6. Criar contrato único de modelo configurado/preferido/efetivo/cobrado, incluindo billing/effective model real em BYOK.
+7. Expandir smoke de elicitation real em BYOK e fake SDK end-to-end sem rede.
+8. Rodar turno funcional dedicado, quando disponível, em Ollama local/LiteLLM/vLLM.
+9. Continuar a normalização de tool identity em completions/progress externos sem requestId, com métricas para qualquer lifecycle ainda genérico.
+10. Integrar falha de `wireRuntime()` ao `ErrorTracker` com metadados de fase.
+11. Generalizar a escolha inicial health-aware além do OpenRouter: o preset OpenRouter voltou ao router `openrouter/free` após probes e turno canônico, mas provedores com múltiplos defaults estáticos ainda precisam promover health persistido, custo e capability antes de fixar a primeira seleção.
 12. Investigar Gemini 403 com probes de autenticação redigidos, distinguindo chave Google AI Studio, chave Google Cloud e endpoint OpenAI-compatible.
 13. Formalizar metadata de cotas gratuitas por provider (`freeLimit`, janela, RPM/TPM/RPD, fonte e data de observação) para reduzir dependência de texto livre em `profile-free`.
+14. Ampliar `/session sdk` para uma UX operacional de escolha/reentrada mais direta, decidindo se a pré-sessão advisory já basta ou se haverá gate explícito antes do attach sem confundir novo boot de sessão SDK com `/restart` do dialog loop nem com `/resume` do hub.

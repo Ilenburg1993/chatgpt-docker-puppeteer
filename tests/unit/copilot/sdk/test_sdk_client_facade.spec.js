@@ -33,6 +33,7 @@ const {
     mockGetClientState,
     mockForceStopClient,
     mockCreateSession,
+    mockDeleteSession,
     mockResumeOrCreate,
     mockDisconnectSession,
 } = vi.hoisted(() => ({
@@ -41,6 +42,7 @@ const {
     mockGetClientState: vi.fn(),
     mockForceStopClient: vi.fn(),
     mockCreateSession: vi.fn(),
+    mockDeleteSession: vi.fn(),
     mockResumeOrCreate: vi.fn(),
     mockDisconnectSession: vi.fn(),
 }));
@@ -75,7 +77,7 @@ vi.mock('../../../../src/copilot/sdk/session/lifecycle.js', () => ({
     resumeOrCreate: mockResumeOrCreate,
     disconnectSession: mockDisconnectSession,
     createClientFromCliUrl: vi.fn(),
-    deleteSession: vi.fn(),
+    deleteSession: mockDeleteSession,
     listSessions: vi.fn(),
 }));
 
@@ -102,6 +104,7 @@ import {
     quickResume,
     quickSession,
     shutdownClient,
+    withEphemeralSession,
     withSession,
 } from '../../../../src/copilot/sdk/session/client-facade.js';
 
@@ -115,6 +118,7 @@ beforeEach(() => {
     vi.clearAllMocks();
     mockGetClient.mockResolvedValue(mockClient);
     mockCreateSession.mockResolvedValue(mockResult);
+    mockDeleteSession.mockResolvedValue(undefined);
     mockResumeOrCreate.mockResolvedValue({ ...mockResult, isResumed: true });
     mockStopClient.mockResolvedValue([]);
 });
@@ -175,9 +179,44 @@ describe('withSession()', () => {
         expect(mockDisconnectSession).not.toHaveBeenCalled();
     });
 
+    it('preserva o this da sessão ao chamar Symbol.asyncDispose', async () => {
+        const session = {
+            ...mockSession,
+            disconnected: false,
+            async [Symbol.asyncDispose]() {
+                this.disconnected = true;
+            },
+        };
+        mockCreateSession.mockResolvedValueOnce({ ...mockResult, session });
+
+        await withSession({}, () => 'done');
+
+        expect(session.disconnected).toBe(true);
+    });
+
     it('usa disconnectSession como fallback de cleanup', async () => {
         await withSession({}, () => 'done');
         expect(mockDisconnectSession).toHaveBeenCalledWith(mockSession);
+    });
+});
+
+describe('withEphemeralSession()', () => {
+    it('desconecta e remove a sessão persistida depois do probe', async () => {
+        const result = await withEphemeralSession({ model: 'probe' }, async ({ sessionId }) => `probe:${sessionId}`);
+
+        expect(result).toBe('probe:sess-123');
+        expect(mockDisconnectSession).toHaveBeenCalledWith(mockSession);
+        expect(mockDeleteSession).toHaveBeenCalledWith(mockClient, 'sess-123');
+    });
+
+    it('remove a sessão persistida mesmo quando o probe falha', async () => {
+        await expect(
+            withEphemeralSession({}, async () => {
+                throw new Error('probe failed');
+            }),
+        ).rejects.toThrow('probe failed');
+
+        expect(mockDeleteSession).toHaveBeenCalledWith(mockClient, 'sess-123');
     });
 });
 
@@ -236,6 +275,7 @@ describe('sdk/index.js barrel re-exports client-facade', () => {
         expect(typeof barrel.ensureClient).toBe('function');
         expect(typeof barrel.shutdownClient).toBe('function');
         expect(typeof barrel.isClientReady).toBe('function');
+        expect(typeof barrel.withEphemeralSession).toBe('function');
         expect(typeof barrel.withSession).toBe('function');
     });
 });

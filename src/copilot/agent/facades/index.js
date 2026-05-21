@@ -143,6 +143,7 @@ export {
     createAgentSdkToolsRegistry,
     createSdkWorkspaceFile,
     deleteAgentSdkSessionByClient,
+    deleteSdkSession,
     deselectSdkAgent,
     disconnectAgentSdkSession,
     ensureAgentSdkClientStarted,

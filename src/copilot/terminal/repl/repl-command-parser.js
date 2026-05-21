@@ -31,3 +31,16 @@ export function parseTerminalReplCommand(line, resolveLine = (value) => value) {
         rest,
     };
 }
+
+/**
+ * Normaliza o contrato duplo do dispatcher: `arg` agregado e `rest` tokenizado.
+ *
+ * @param {string} [arg]
+ * @param {string[]} [rest]
+ * @returns {{ subcommand: string; rest: string[] }}
+ */
+export function parseTerminalSubcommand(arg = '', rest = []) {
+    const tokens = rest.length > 0 ? rest : arg.split(/\s+/u).filter(Boolean);
+    const [subcommand = '', ...subcommandRest] = tokens;
+    return { subcommand, rest: subcommandRest };
+}

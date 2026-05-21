@@ -3,7 +3,9 @@
  * Current-process operational health for BYOK provider/model pairs.
  *
  * The model catalog says "the provider lists this model"; this state says "a real chat turn using this provider/model
- * recently worked or failed". It is intentionally fed by runtime events, not by another discovery path.
+ * recently worked or failed". It also records the stricter disposable agent probe, which verifies tool calling and
+ * `ask_user` independently from plain chat. It is intentionally fed by runtime events/probes, not by another discovery
+ * path.
  *
  * @module copilot/terminal/state/byok-provider-health
  */
@@ -16,7 +18,29 @@ const MAX_BYOK_PROVIDER_HEALTH_RECORDS = 200;
 const BYOK_PROVIDER_HEALTH_SCHEMA_VERSION = 1;
 const DEFAULT_BYOK_PROVIDER_HEALTH_PATH = join(process.cwd(), 'data', 'copilot-terminal', 'byok-provider-health.json');
 
-/** @type {Map<string, { key: string; profile: string | null; provider: string | null; model: string | null; lastStatus: 'failed' | 'ok'; failureCount: number; successCount: number; lastFailureAt: number | null; lastSuccessAt: number | null; lastMessage: string | null; lastErrorContext: string | null }>} */
+/**
+ * @typedef {object} ByokProviderHealthRecord
+ * @property {string} key
+ * @property {string | null} profile
+ * @property {string | null} provider
+ * @property {string | null} model
+ * @property {'failed' | 'ok' | null} lastStatus
+ * @property {number} failureCount
+ * @property {number} successCount
+ * @property {number | null} lastFailureAt
+ * @property {number | null} lastSuccessAt
+ * @property {string | null} lastMessage
+ * @property {string | null} lastErrorContext
+ * @property {'failed' | 'ok' | null} agentProbeStatus
+ * @property {number} agentProbeFailureCount
+ * @property {number} agentProbeSuccessCount
+ * @property {number | null} lastAgentProbeFailureAt
+ * @property {number | null} lastAgentProbeSuccessAt
+ * @property {string | null} lastAgentProbeMessage
+ * @property {string | null} lastAgentProbeErrorContext
+ */
+
+/** @type {Map<string, ByokProviderHealthRecord>} */
 const _byokProviderHealthByKey = new Map();
 let _byokProviderHealthHydrated = false;
 let _byokProviderHealthFlushScheduled = false;
@@ -113,7 +137,7 @@ function normalizeCount(value) {
 
 /**
  * @param {unknown} value
- * @returns {{ key: string; profile: string | null; provider: string | null; model: string | null; lastStatus: 'failed' | 'ok'; failureCount: number; successCount: number; lastFailureAt: number | null; lastSuccessAt: number | null; lastMessage: string | null; lastErrorContext: string | null } | null}
+ * @returns {ByokProviderHealthRecord | null}
  */
 function normalizeRecord(value) {
     if (!isRecord(value)) return null;
@@ -121,7 +145,8 @@ function normalizeRecord(value) {
     const provider = normalizePart(/** @type {string | null | undefined} */ (value['provider']));
     const model = normalizePart(/** @type {string | null | undefined} */ (value['model']));
     const lastStatus = normalizeStatus(value['lastStatus']);
-    if (!lastStatus || (!profile && !provider && !model)) return null;
+    const agentProbeStatus = normalizeStatus(value['agentProbeStatus']);
+    if ((!lastStatus && !agentProbeStatus) || (!profile && !provider && !model)) return null;
     const record = {
         key: healthKey({ profile, provider, model }),
         profile,
@@ -134,9 +159,22 @@ function normalizeRecord(value) {
         lastSuccessAt: normalizeTimestamp(value['lastSuccessAt']),
         lastMessage: sanitizeHealthText(/** @type {string | null | undefined} */ (value['lastMessage'])),
         lastErrorContext: sanitizeHealthText(/** @type {string | null | undefined} */ (value['lastErrorContext'])),
+        agentProbeStatus,
+        agentProbeFailureCount: normalizeCount(value['agentProbeFailureCount']),
+        agentProbeSuccessCount: normalizeCount(value['agentProbeSuccessCount']),
+        lastAgentProbeFailureAt: normalizeTimestamp(value['lastAgentProbeFailureAt']),
+        lastAgentProbeSuccessAt: normalizeTimestamp(value['lastAgentProbeSuccessAt']),
+        lastAgentProbeMessage: sanitizeHealthText(
+            /** @type {string | null | undefined} */ (value['lastAgentProbeMessage']),
+        ),
+        lastAgentProbeErrorContext: sanitizeHealthText(
+            /** @type {string | null | undefined} */ (value['lastAgentProbeErrorContext']),
+        ),
     };
     if (record.failureCount === 0 && record.lastFailureAt) record.failureCount = 1;
     if (record.successCount === 0 && record.lastSuccessAt) record.successCount = 1;
+    if (record.agentProbeFailureCount === 0 && record.lastAgentProbeFailureAt) record.agentProbeFailureCount = 1;
+    if (record.agentProbeSuccessCount === 0 && record.lastAgentProbeSuccessAt) record.agentProbeSuccessCount = 1;
     return record;
 }
 
@@ -256,6 +294,13 @@ export function recordByokProviderModelCallFailure(input) {
         lastSuccessAt: previous?.lastSuccessAt ?? null,
         lastMessage: sanitizeHealthText(input.message) ?? previous?.lastMessage ?? null,
         lastErrorContext: sanitizeHealthText(input.errorContext) ?? previous?.lastErrorContext ?? null,
+        agentProbeStatus: previous?.agentProbeStatus ?? null,
+        agentProbeFailureCount: previous?.agentProbeFailureCount ?? 0,
+        agentProbeSuccessCount: previous?.agentProbeSuccessCount ?? 0,
+        lastAgentProbeFailureAt: previous?.lastAgentProbeFailureAt ?? null,
+        lastAgentProbeSuccessAt: previous?.lastAgentProbeSuccessAt ?? null,
+        lastAgentProbeMessage: previous?.lastAgentProbeMessage ?? null,
+        lastAgentProbeErrorContext: previous?.lastAgentProbeErrorContext ?? null,
     });
     pruneByokProviderHealth();
     scheduleByokProviderHealthFlush();
@@ -286,6 +331,88 @@ export function recordByokProviderModelCallSuccess(input) {
         lastSuccessAt: now,
         lastMessage: null,
         lastErrorContext: null,
+        agentProbeStatus: previous?.agentProbeStatus ?? null,
+        agentProbeFailureCount: previous?.agentProbeFailureCount ?? 0,
+        agentProbeSuccessCount: previous?.agentProbeSuccessCount ?? 0,
+        lastAgentProbeFailureAt: previous?.lastAgentProbeFailureAt ?? null,
+        lastAgentProbeSuccessAt: previous?.lastAgentProbeSuccessAt ?? null,
+        lastAgentProbeMessage: previous?.lastAgentProbeMessage ?? null,
+        lastAgentProbeErrorContext: previous?.lastAgentProbeErrorContext ?? null,
+    });
+    pruneByokProviderHealth();
+    scheduleByokProviderHealthFlush();
+}
+
+/**
+ * @param {{ profile?: string | null; provider?: string | null; model?: string | null; message?: string | null; errorContext?: string | null; timestamp?: number }} input
+ * @returns {void}
+ */
+export function recordByokProviderModelAgentProbeFailure(input) {
+    hydrateByokProviderHealthFromDisk();
+    const profile = normalizePart(input.profile);
+    const provider = normalizePart(input.provider);
+    const model = normalizePart(input.model);
+    if (!profile && !provider && !model) return;
+    const key = healthKey({ profile, provider, model });
+    const now = typeof input.timestamp === 'number' && Number.isFinite(input.timestamp) ? input.timestamp : Date.now();
+    const previous = _byokProviderHealthByKey.get(key);
+    _byokProviderHealthByKey.set(key, {
+        key,
+        profile,
+        provider,
+        model,
+        lastStatus: previous?.lastStatus ?? null,
+        failureCount: previous?.failureCount ?? 0,
+        successCount: previous?.successCount ?? 0,
+        lastFailureAt: previous?.lastFailureAt ?? null,
+        lastSuccessAt: previous?.lastSuccessAt ?? null,
+        lastMessage: previous?.lastMessage ?? null,
+        lastErrorContext: previous?.lastErrorContext ?? null,
+        agentProbeStatus: 'failed',
+        agentProbeFailureCount: (previous?.agentProbeFailureCount ?? 0) + 1,
+        agentProbeSuccessCount: previous?.agentProbeSuccessCount ?? 0,
+        lastAgentProbeFailureAt: now,
+        lastAgentProbeSuccessAt: previous?.lastAgentProbeSuccessAt ?? null,
+        lastAgentProbeMessage: sanitizeHealthText(input.message) ?? previous?.lastAgentProbeMessage ?? null,
+        lastAgentProbeErrorContext:
+            sanitizeHealthText(input.errorContext) ?? previous?.lastAgentProbeErrorContext ?? null,
+    });
+    pruneByokProviderHealth();
+    scheduleByokProviderHealthFlush();
+}
+
+/**
+ * @param {{ profile?: string | null; provider?: string | null; model?: string | null; timestamp?: number }} input
+ * @returns {void}
+ */
+export function recordByokProviderModelAgentProbeSuccess(input) {
+    hydrateByokProviderHealthFromDisk();
+    const profile = normalizePart(input.profile);
+    const provider = normalizePart(input.provider);
+    const model = normalizePart(input.model);
+    if (!profile && !provider && !model) return;
+    const key = healthKey({ profile, provider, model });
+    const now = typeof input.timestamp === 'number' && Number.isFinite(input.timestamp) ? input.timestamp : Date.now();
+    const previous = _byokProviderHealthByKey.get(key);
+    _byokProviderHealthByKey.set(key, {
+        key,
+        profile,
+        provider,
+        model,
+        lastStatus: previous?.lastStatus ?? null,
+        failureCount: previous?.failureCount ?? 0,
+        successCount: previous?.successCount ?? 0,
+        lastFailureAt: previous?.lastFailureAt ?? null,
+        lastSuccessAt: previous?.lastSuccessAt ?? null,
+        lastMessage: previous?.lastMessage ?? null,
+        lastErrorContext: previous?.lastErrorContext ?? null,
+        agentProbeStatus: 'ok',
+        agentProbeFailureCount: previous?.agentProbeFailureCount ?? 0,
+        agentProbeSuccessCount: (previous?.agentProbeSuccessCount ?? 0) + 1,
+        lastAgentProbeFailureAt: previous?.lastAgentProbeFailureAt ?? null,
+        lastAgentProbeSuccessAt: now,
+        lastAgentProbeMessage: null,
+        lastAgentProbeErrorContext: null,
     });
     pruneByokProviderHealth();
     scheduleByokProviderHealthFlush();
@@ -293,7 +420,7 @@ export function recordByokProviderModelCallSuccess(input) {
 
 /**
  * @param {{ profile?: string | null; provider?: string | null; model?: string | null }} input
- * @returns {{ key: string; profile: string | null; provider: string | null; model: string | null; lastStatus: 'failed' | 'ok'; failureCount: number; successCount: number; lastFailureAt: number | null; lastSuccessAt: number | null; lastMessage: string | null; lastErrorContext: string | null } | null}
+ * @returns {ByokProviderHealthRecord | null}
  */
 export function readByokProviderModelHealth(input) {
     hydrateByokProviderHealthFromDisk();
@@ -301,13 +428,23 @@ export function readByokProviderModelHealth(input) {
 }
 
 /**
- * @returns {Array<{ key: string; profile: string | null; provider: string | null; model: string | null; lastStatus: 'failed' | 'ok'; failureCount: number; successCount: number; lastFailureAt: number | null; lastSuccessAt: number | null; lastMessage: string | null; lastErrorContext: string | null }>}
+ * @returns {ByokProviderHealthRecord[]}
  */
 export function listByokProviderModelHealth() {
     hydrateByokProviderHealthFromDisk();
     return [..._byokProviderHealthByKey.values()].sort((a, b) => {
-        const aTime = Math.max(a.lastFailureAt ?? 0, a.lastSuccessAt ?? 0);
-        const bTime = Math.max(b.lastFailureAt ?? 0, b.lastSuccessAt ?? 0);
+        const aTime = Math.max(
+            a.lastFailureAt ?? 0,
+            a.lastSuccessAt ?? 0,
+            a.lastAgentProbeFailureAt ?? 0,
+            a.lastAgentProbeSuccessAt ?? 0,
+        );
+        const bTime = Math.max(
+            b.lastFailureAt ?? 0,
+            b.lastSuccessAt ?? 0,
+            b.lastAgentProbeFailureAt ?? 0,
+            b.lastAgentProbeSuccessAt ?? 0,
+        );
         return bTime - aTime;
     });
 }

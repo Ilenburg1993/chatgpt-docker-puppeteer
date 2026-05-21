@@ -7,6 +7,7 @@
  */
 
 import {
+    deleteSdkSession,
     getForegroundSdkSessionId,
     getLastSdkSessionId,
     getSdkAuthStatus,
@@ -168,6 +169,16 @@ export class SdkQueryFacade {
      */
     async listSdkSessions(filter) {
         return listSdkSessions(this.ctx, filter);
+    }
+
+    /**
+     * Remove permanentemente uma sessão persistida/acessível pelo client SDK atual.
+     *
+     * @param {string} sessionId
+     * @returns {Promise<void>}
+     */
+    async deleteSdkSession(sessionId) {
+        await deleteSdkSession(this.ctx, sessionId);
     }
 
     /**
