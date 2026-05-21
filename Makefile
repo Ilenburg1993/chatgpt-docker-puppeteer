@@ -9,10 +9,17 @@
 # • Healthcheck é conservador: fatal reprova; degraded/advisory orientam humanos
 # • Rede GitHub/Copilot é opt-in/manual para mutações e benchmarks prolongados
 # • Compatível com Docker / DevContainer do zero
-# • Alinhado com package.json v1.1.3 e scripts de rede canônicos
+# • Alinhado com package.json v1.1.4 e scripts de rede/control-plane canônicos
 #
-# Versão: 4.3.0
-# Data:   2026-05-19
+# Versão: 4.4.0
+# Data:   2026-05-20
+# Changelog v4.4.0:
+#   - Sincroniza com package.json v1.1.4, DevContainer v5.9.0, Dockerfile v1.5.0 e post-create v1.2.1.
+#   - Integra network-control-plane-state.sh v1.1.0 como agregador passivo canônico.
+#   - Adiciona targets network-state*, network-control-plane*, network-registry-status ampliado e aliases humanos.
+#   - Inclui control-plane em network-syntax, network-shellcheck, network-doctor, network-validate e summaries.
+#   - Expande artifacts para DNS action/events, route action, sync-local-auth, health e network-control-plane.
+#   - Mantém benchmarks e mutações como ações manuais explícitas; summaries/state continuam passivos.
 # Changelog v4.3.0:
 #   - Sincroniza com healthcheck.sh v3.0.0, package.json v1.1.3 e DevContainer v5.8.0.
 #   - Health deixa de ser PM2-first e passa a chamar o classificador canônico do container.
@@ -86,6 +93,7 @@ POST_CREATE_SCRIPT ?= .devcontainer/scripts/post-create.sh
 POST_START_SCRIPT ?= .devcontainer/scripts/post-start.sh
 POST_ATTACH_SCRIPT ?= .devcontainer/scripts/post-attach.sh
 HEALTHCHECK_SCRIPT ?= .devcontainer/scripts/healthcheck.sh
+NETWORK_CONTROL_PLANE_SCRIPT ?= .devcontainer/scripts/network-control-plane-state.sh
 NETWORK_LOCAL_DNS_SCRIPT ?= .devcontainer/scripts/network/local-dns-cache.sh
 NETWORK_ROUTE_SCRIPT ?= .devcontainer/scripts/network/github-api-route-fix.sh
 NETWORK_MANAGER_SCRIPT ?= .devcontainer/scripts/network/github-copilot-network-manager.sh
@@ -153,7 +161,7 @@ endif
 help:
 	@echo ""
 	@echo "$(CYAN)╔════════════════════════════════════════════════════════════╗$(NC)"
-	@echo "$(CYAN)║  ChatGPT Docker Puppeteer — Makefile v4.3 (DEV)            ║$(NC)"
+	@echo "$(CYAN)║  ChatGPT Docker Puppeteer — Makefile v4.4 (DEV)            ║$(NC)"
 	@echo "$(CYAN)║  Health-Classified • Network-Ready • PM2-Ready             ║$(NC)"
 	@echo "$(CYAN)╚════════════════════════════════════════════════════════════╝$(NC)"
 	@echo ""
@@ -196,8 +204,10 @@ help:
 	@echo "  $(CYAN)make semantic-preflight$(NC) Preflight PM2+MCP+RAG+LSP"
 	@echo ""
 	@echo "$(CYAN)$(BOLD)🌐 GitHub/Copilot Network:$(NC)"
-	@echo "  $(CYAN)make network-status$(NC)       Snapshots passivos de rota/manager/proxy"
+	@echo "  $(CYAN)make network-status$(NC)       Snapshots passivos de DNS/rota/manager/proxy/advisor"
 	@echo "  $(CYAN)make network-summary$(NC)      Exibir summaries/recommendations atuais"
+	@echo "  $(CYAN)make network-state$(NC)        Estado consolidado passivo do control plane"
+	@echo "  $(CYAN)make network-state-json$(NC)   JSON consolidado do control plane"
 	@echo "  $(CYAN)make network-validate$(NC)     bash -n + ShellCheck + doctor"
 	@echo "  $(CYAN)make network-route-probe$(NC)  Probe dry-run api.github.com"
 	@echo "  $(CYAN)make network-route-benchmark$(NC) Benchmark prolongado api.github.com"
@@ -303,7 +313,7 @@ info:
 	@echo "  npm:  $(GREEN)$$($(NPM) --version 2>/dev/null || echo 'não instalado')$(NC)"
 	@echo "  PM2:  $(GREEN)$$($(PM2) --version 2>/dev/null || echo 'não disponível')$(NC)"
 	@echo "  Diretório: $(BOLD)$$(pwd)$(NC)"
-	@echo "  Makefile: $(BOLD)v4.3.0$(NC)"
+	@echo "  Makefile: $(BOLD)v4.4.0$(NC)"
 	@echo ""
 	@echo "$(YELLOW)Pacotes base instalados no projeto:$(NC)"
 	@echo "  • $(GREEN)chalk$(NC) (^5.6.2) - Terminal colors"
@@ -312,10 +322,10 @@ info:
 	@echo ""
 
 version:
-	@echo "Makefile v4.3.0 — DEV / Health-Classified / Network-Control-Plane-Ready"
-	@echo "Data: 2026-05-19"
-	@echo "Stack: devcontainer 5.8.0 | healthcheck 3.0.0 | package 1.1.3 | network control plane 2026-05-19"
-	@echo "Targets: 125+ | Aliases: 13 | Coverage: package.json scripts v1.1.3"
+	@echo "Makefile v4.4.0 — DEV / Health-Classified / Network-Control-Plane-Ready"
+	@echo "Data: 2026-05-20"
+	@echo "Stack: devcontainer 5.9.0 | Dockerfile 1.5.0 | post-create 1.2.1 | healthcheck 3.0.0 | package 1.1.4 | network-control-plane 1.1.0"
+	@echo "Targets: 135+ | Aliases: 18 | Coverage: package.json scripts v1.1.4"
 
 # =============================================================================
 # 1️⃣ DESCOBERTA DE AMBIENTE (somente leitura)
@@ -509,7 +519,12 @@ health-summary:
 		/tmp/devcontainer-health.status \
 		/tmp/devcontainer-health.summary \
 		/tmp/devcontainer-health.events.tsv \
-		/tmp/devcontainer-health.report; do \
+		/tmp/devcontainer-health.report \
+		/tmp/devcontainer-network-control-plane.status \
+		/tmp/devcontainer-network-control-plane.summary \
+		/tmp/devcontainer-network-control-plane.report \
+		/tmp/devcontainer-network-control-plane.events.tsv \
+		/tmp/devcontainer-network-control-plane.state.json; do \
 		if [ -r "$$f" ]; then \
 			echo ""; echo "===== $$f ====="; cat "$$f"; \
 		fi; \
@@ -580,6 +595,7 @@ validate-platform:
 # =============================================================================
 
 .PHONY: network-help network-status network-summary network-summary-current network-summary-boot network-summary-all network-artifacts network-syntax network-shellcheck network-validate network-validate-soft network-doctor network-doctor-soft network-health network-registry-status
+.PHONY: network-state network-state-status network-state-summary network-state-report network-state-events network-state-json network-state-doctor network-state-strict network-control-plane network-control-plane-status network-control-plane-summary network-control-plane-report network-control-plane-events network-control-plane-json network-control-plane-doctor
 .PHONY: network-dns-status network-dns-doctor network-dns-benchmark network-dns-start network-dns-health network-dns-stop network-dns-summary network-dns-lock-diagnose
 .PHONY: network-route-status network-route-doctor network-route-summary network-route-probe network-route-benchmark
 .PHONY: network-proxy-status network-proxy-doctor network-proxy-env network-proxy-start network-proxy-stop network-proxy-benchmark network-proxy-compare network-proxy-compare-quick network-proxy-summary network-proxy-lock-diagnose
@@ -588,12 +604,15 @@ validate-platform:
 
 network-help:
 	@echo ""
-	@echo "$(CYAN)$(BOLD)🌐 GitHub/Copilot Network Control Plane — Makefile v4.3.0$(NC)"
+	@echo "$(CYAN)$(BOLD)🌐 GitHub/Copilot Network Control Plane — Makefile v4.4.0$(NC)"
 	@echo "  $(CYAN)make network-status$(NC)                    Lê status passivo de DNS/manager/route/proxy/advisor"
 	@echo "  $(CYAN)make network-summary$(NC)                   Mostra snapshot atual + health"
 	@echo "  $(CYAN)make network-summary-boot$(NC)              Mostra snapshots de lifecycle/boot"
 	@echo "  $(CYAN)make network-summary-all$(NC)               Mostra snapshots atuais + boot + advisor"
 	@echo "  $(CYAN)make network-health$(NC)                    Roda healthcheck canônico do DevContainer"
+	@echo "  $(CYAN)make network-state$(NC)                     Estado consolidado passivo do control plane"
+	@echo "  $(CYAN)make network-state-json$(NC)                JSON consolidado para automação/diagnóstico"
+	@echo "  $(CYAN)make network-state-doctor$(NC)              Doctor passivo do agregador control-plane"
 	@echo "  $(CYAN)make network-validate$(NC)                  bash -n + ShellCheck + doctor + health"
 	@echo "  $(CYAN)make network-dns-start$(NC)                 Inicia DNS cache local com prova antes de resolv.conf"
 	@echo "  $(CYAN)make network-dns-health$(NC)                Health do DNS cache local"
@@ -627,6 +646,38 @@ network-registry-status:
 		exit 1; \
 	fi
 
+network-state:
+	@bash "$(NETWORK_CONTROL_PLANE_SCRIPT)" summary
+
+network-state-status:
+	@bash "$(NETWORK_CONTROL_PLANE_SCRIPT)" status
+
+network-state-summary:
+	@bash "$(NETWORK_CONTROL_PLANE_SCRIPT)" summary
+
+network-state-report:
+	@bash "$(NETWORK_CONTROL_PLANE_SCRIPT)" report
+
+network-state-events:
+	@bash "$(NETWORK_CONTROL_PLANE_SCRIPT)" events
+
+network-state-json:
+	@bash "$(NETWORK_CONTROL_PLANE_SCRIPT)" json
+
+network-state-doctor:
+	@bash "$(NETWORK_CONTROL_PLANE_SCRIPT)" doctor
+
+network-state-strict:
+	@bash "$(NETWORK_CONTROL_PLANE_SCRIPT)" --strict summary
+
+network-control-plane: network-state
+network-control-plane-status: network-state-status
+network-control-plane-summary: network-state-summary
+network-control-plane-report: network-state-report
+network-control-plane-events: network-state-events
+network-control-plane-json: network-state-json
+network-control-plane-doctor: network-state-doctor
+
 network-status:
 	@echo "$(CYAN)🌐 Network status snapshots$(NC)"
 	@DEVCONTAINER_LOCAL_DNS_ACTION=status bash "$(NETWORK_LOCAL_DNS_SCRIPT)" || true
@@ -634,6 +685,7 @@ network-status:
 	@DEVCONTAINER_GITHUB_API_ROUTE_ACTION=status bash "$(NETWORK_ROUTE_SCRIPT)" || true
 	@DEVCONTAINER_LOCAL_COPILOT_PROXY_ACTION=status bash "$(NETWORK_PROXY_SCRIPT)" || true
 	@DEVCONTAINER_COPILOT_ROUTE_ADVISOR_ACTION=status bash "$(NETWORK_ADVISOR_SCRIPT)" || true
+	@bash "$(NETWORK_CONTROL_PLANE_SCRIPT)" status || true
 
 network-summary: network-summary-current
 
@@ -645,8 +697,11 @@ network-summary-current:
 		/tmp/devcontainer-local-dns-cache.status \
 		/tmp/devcontainer-local-dns-cache.summary \
 		/tmp/devcontainer-local-dns-cache.metrics.tsv \
+		/tmp/devcontainer-local-dns-cache.action.summary \
+		/tmp/devcontainer-local-dns-cache.events.tsv \
 		/tmp/devcontainer-github-api-route.status \
 		/tmp/devcontainer-github-api-route.summary \
+		/tmp/devcontainer-github-api-route.action.summary \
 		/tmp/devcontainer-github-api-route.benchmark.summary \
 		/tmp/devcontainer-github-api-route.recommendation \
 		/tmp/devcontainer-copilot-network.status \
@@ -661,7 +716,12 @@ network-summary-current:
 		/tmp/devcontainer-copilot-proxy.recommendation \
 		/tmp/devcontainer-copilot-route-advisor.status \
 		/tmp/devcontainer-copilot-route-advisor.summary \
-		/tmp/devcontainer-copilot-route-advisor.decisions.tsv; do \
+		/tmp/devcontainer-copilot-route-advisor.decisions.tsv \
+		/tmp/devcontainer-network-control-plane.status \
+		/tmp/devcontainer-network-control-plane.summary \
+		/tmp/devcontainer-network-control-plane.report \
+		/tmp/devcontainer-network-control-plane.events.tsv \
+		/tmp/devcontainer-network-control-plane.state.json; do \
 		if [ -r "$$f" ]; then \
 			echo ""; echo "===== $$f ====="; cat "$$f"; \
 		fi; \
@@ -671,10 +731,17 @@ network-summary-boot:
 	@echo "$(CYAN)📄 Lifecycle/boot snapshots$(NC)"
 	@for f in \
 		/tmp/devcontainer-health.summary \
+		/tmp/devcontainer-post-create.status \
 		/tmp/devcontainer-post-create.summary \
+		/tmp/devcontainer-post-create.report \
+		/tmp/devcontainer-post-create.events.tsv \
+		/tmp/devcontainer-sync-local-auth.status \
+		/tmp/devcontainer-sync-local-auth.summary \
+		/tmp/devcontainer-sync-local-auth.report \
 		/tmp/devcontainer-post-start.summary \
 		/tmp/devcontainer-post-start.report \
 		/tmp/devcontainer-post-attach.summary \
+		/tmp/devcontainer-network-control-plane.summary \
 		.devcontainer/.initialized; do \
 		if [ -r "$$f" ]; then \
 			echo ""; echo "===== $$f ====="; cat "$$f"; \
@@ -687,7 +754,7 @@ network-summary-all:
 
 network-artifacts:
 	@echo "$(CYAN)📦 Control-plane artifacts em /tmp$(NC)"
-	@ls -lh /tmp/devcontainer-health.* /tmp/devcontainer-post-create.* /tmp/devcontainer-post-start.* /tmp/devcontainer-post-attach.* /tmp/devcontainer-local-dns-cache.* /tmp/devcontainer-github-api-route.* /tmp/devcontainer-copilot-network.* /tmp/devcontainer-copilot-proxy.* /tmp/devcontainer-copilot-route-advisor.* 2>/dev/null || true
+	@ls -lh /tmp/devcontainer-health.* /tmp/devcontainer-post-create.* /tmp/devcontainer-post-start.* /tmp/devcontainer-post-attach.* /tmp/devcontainer-local-dns-cache.* /tmp/devcontainer-github-api-route.* /tmp/devcontainer-copilot-network.* /tmp/devcontainer-copilot-proxy.* /tmp/devcontainer-copilot-route-advisor.* /tmp/devcontainer-network-control-plane.* 2>/dev/null || true
 
 network-syntax:
 	@echo "$(CYAN)🔎 bash -n hooks/scripts de rede e health$(NC)"
@@ -695,6 +762,7 @@ network-syntax:
 	@bash -n "$(POST_START_SCRIPT)"
 	@bash -n "$(POST_ATTACH_SCRIPT)"
 	@bash -n "$(HEALTHCHECK_SCRIPT)"
+	@bash -n "$(NETWORK_CONTROL_PLANE_SCRIPT)"
 	@bash -n "$(NETWORK_LOCAL_DNS_SCRIPT)"
 	@bash -n "$(NETWORK_ROUTE_SCRIPT)"
 	@bash -n "$(NETWORK_MANAGER_SCRIPT)"
@@ -705,17 +773,18 @@ network-syntax:
 network-shellcheck:
 	@echo "$(CYAN)🔎 ShellCheck hooks/scripts de rede e health$(NC)"
 	@command -v shellcheck >/dev/null 2>&1 || { echo "$(RED)❌ shellcheck não instalado$(NC)"; exit 127; }
-	@shellcheck "$(POST_CREATE_SCRIPT)" "$(POST_START_SCRIPT)" "$(POST_ATTACH_SCRIPT)" "$(HEALTHCHECK_SCRIPT)" \
+	@shellcheck "$(POST_CREATE_SCRIPT)" "$(POST_START_SCRIPT)" "$(POST_ATTACH_SCRIPT)" "$(HEALTHCHECK_SCRIPT)" "$(NETWORK_CONTROL_PLANE_SCRIPT)" \
 		"$(NETWORK_LOCAL_DNS_SCRIPT)" "$(NETWORK_ROUTE_SCRIPT)" "$(NETWORK_MANAGER_SCRIPT)" \
 		"$(NETWORK_PROXY_SCRIPT)" "$(NETWORK_ADVISOR_SCRIPT)"
 	@echo "$(GREEN)✅ ShellCheck OK$(NC)"
 
-network-validate: network-syntax network-shellcheck network-doctor health-brief
+network-validate: network-syntax network-shellcheck network-doctor network-state-doctor health-brief
 	@echo "$(GREEN)✅ Network control plane validado$(NC)"
 
 network-validate-soft: network-syntax
 	@$(MAKE) -f "$(firstword $(MAKEFILE_LIST))" network-shellcheck || true
 	@$(MAKE) -f "$(firstword $(MAKEFILE_LIST))" network-doctor-soft || true
+	@$(MAKE) -f "$(firstword $(MAKEFILE_LIST))" network-state-doctor || true
 	@$(MAKE) -f "$(firstword $(MAKEFILE_LIST))" health-brief || true
 
 network-doctor:
@@ -725,6 +794,7 @@ network-doctor:
 	@DEVCONTAINER_LOCAL_COPILOT_PROXY_ACTION=doctor bash "$(NETWORK_PROXY_SCRIPT)" || true
 	@DEVCONTAINER_COPILOT_ROUTE_ADVISOR_ACTION=doctor bash "$(NETWORK_ADVISOR_SCRIPT)" || true
 	@DEVCONTAINER_COPILOT_NETWORK_MANAGER_ACTION=doctor bash "$(NETWORK_MANAGER_SCRIPT)"
+	@bash "$(NETWORK_CONTROL_PLANE_SCRIPT)" doctor
 
 network-doctor-soft:
 	@echo "$(CYAN)🩺 Network doctor soft$(NC)"
@@ -733,6 +803,7 @@ network-doctor-soft:
 	@DEVCONTAINER_LOCAL_COPILOT_PROXY_ACTION=doctor bash "$(NETWORK_PROXY_SCRIPT)" || true
 	@DEVCONTAINER_COPILOT_ROUTE_ADVISOR_ACTION=doctor bash "$(NETWORK_ADVISOR_SCRIPT)" || true
 	@DEVCONTAINER_COPILOT_NETWORK_MANAGER_ACTION=doctor bash "$(NETWORK_MANAGER_SCRIPT)" || true
+	@bash "$(NETWORK_CONTROL_PLANE_SCRIPT)" doctor || true
 
 network-dns-status:
 	@DEVCONTAINER_LOCAL_DNS_ACTION=status bash "$(NETWORK_LOCAL_DNS_SCRIPT)"
@@ -772,6 +843,8 @@ network-dns-summary:
 		/tmp/devcontainer-local-dns-cache.status \
 		/tmp/devcontainer-local-dns-cache.summary \
 		/tmp/devcontainer-local-dns-cache.metrics.tsv \
+		/tmp/devcontainer-local-dns-cache.action.summary \
+		/tmp/devcontainer-local-dns-cache.events.tsv \
 		/tmp/devcontainer-local-dns-cache.report; do \
 		if [ -r "$$f" ]; then \
 			echo ""; echo "===== $$f ====="; cat "$$f"; \
@@ -798,6 +871,7 @@ network-route-summary:
 		/tmp/devcontainer-github-api-route.status \
 		/tmp/devcontainer-github-api-route.summary \
 		/tmp/devcontainer-github-api-route.metrics.tsv \
+		/tmp/devcontainer-github-api-route.action.summary \
 		/tmp/devcontainer-github-api-route.benchmark.summary \
 		/tmp/devcontainer-github-api-route.recommendation \
 		/tmp/devcontainer-github-api-route.report; do \
@@ -916,6 +990,7 @@ network-manager-status:
 
 network-manager-doctor:
 	@DEVCONTAINER_COPILOT_NETWORK_MANAGER_ACTION=doctor bash "$(NETWORK_MANAGER_SCRIPT)"
+	@bash "$(NETWORK_CONTROL_PLANE_SCRIPT)" doctor
 
 network-manager-summary:
 	@echo "$(CYAN)📄 Copilot Network Manager summaries/diagnosis$(NC)"
@@ -1595,5 +1670,5 @@ docs-list:
 	@ls -1 docs/integration/*.md 2>/dev/null || echo "$(YELLOW)Sem arquivos .md em docs/integration/$(NC)"
 
 # =============================================================================
-# FIM DO MAKEFILE v4.1.0
+# FIM DO MAKEFILE v4.4.0
 # =============================================================================

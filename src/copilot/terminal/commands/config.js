@@ -27,6 +27,33 @@ import { callWithRuntimeTarget, extractRuntimeTarget } from './runtime-target.js
 /** Esforços de raciocínio válidos. @type {readonly ReasoningEffort[]} */
 const VALID_EFFORTS = /** @type {const} */ (['low', 'medium', 'high', 'xhigh']);
 
+const DISABLED_BYOK_SUMMARY = Object.freeze({
+    enabled: false,
+    ready: false,
+    preset: null,
+    providerType: null,
+    baseUrl: null,
+    model: null,
+    wireApi: null,
+    azureApiVersion: null,
+    auth: {
+        apiKeyConfigured: false,
+        bearerTokenConfigured: false,
+        headersConfigured: false,
+    },
+    modelList: {
+        configured: false,
+        count: 0,
+    },
+    capabilities: {
+        reasoningEffort: false,
+        vision: false,
+        contextWindowTokens: null,
+    },
+    warnings: [],
+    errors: [],
+});
+
 /**
  * @param {ReturnType<typeof readTerminalRuntimeState>} state
  * @returns {{ observedModel: string | null; configuredModel: string | null; modelMismatch: boolean }}
@@ -69,11 +96,13 @@ function resolveObservedModelState(state) {
  */
 export async function cmdModel({ println }, arg) {
     const { runtimeId, arg: cleanArg } = extractRuntimeTarget(arg);
+    const configProjection = callWithRuntimeTarget(readTerminalConfigProjection, runtimeId);
     const {
         currentModel: current,
         modelMeta: meta,
         autoModelPolicy,
-    } = callWithRuntimeTarget(readTerminalConfigProjection, runtimeId);
+    } = configProjection;
+    const byok = configProjection.byok ?? DISABLED_BYOK_SUMMARY;
 
     if (!cleanArg || cleanArg.trim() === '') {
         println(`\n  🤖  Modelo ativo: \x1b[36m${current}\x1b[0m`);
@@ -99,7 +128,15 @@ export async function cmdModel({ println }, arg) {
                 `  \x1b[90m    caps: reasoning=${meta.supportsReasoning ? 'yes' : 'no'}  vision=${meta.supportsVision ? 'yes' : 'no'}\x1b[0m`,
             );
         }
-        println(`  \x1b[90mUso: /model list | stats | <id>\x1b[0m\n`);
+        if (byok.enabled) {
+            const ready = byok.ready ? '\x1b[32mready\x1b[0m' : '\x1b[31mincompleto\x1b[0m';
+            println(
+                `  \x1b[90m    byok: ${ready} · preset=${byok.preset ?? '-'} · provider=${byok.providerType ?? '-'} · model=${byok.model ?? '-'} · /byok\x1b[0m`,
+            );
+        }
+        println(
+            `  \x1b[90mUso: ${byok.enabled ? '/model list | stats  (/model <id> é governado por COPILOT_BYOK_MODEL)' : '/model list | stats | <id>'}\x1b[0m\n`,
+        );
         return;
     }
 
@@ -126,6 +163,12 @@ export async function cmdModel({ println }, arg) {
     }
 
     if (trimmed === 'list') {
+        if (byok.enabled) {
+            const ready = byok.ready ? 'ready' : 'incompleto';
+            println(
+                `\x1b[90m  BYOK ${ready}: catálogo vem de onListModels/configuração BYOK quando a sessão SDK usa provider customizado.\x1b[0m`,
+            );
+        }
         println('\x1b[90m  Consultando modelos disponíveis…\x1b[0m');
         try {
             const { models } = await callWithRuntimeTarget(listTerminalAvailableModelsProjection, runtimeId);
@@ -149,6 +192,17 @@ export async function cmdModel({ println }, arg) {
     }
 
     // Troca de modelo
+    if (byok.enabled) {
+        println(
+            `\n  \x1b[33mBYOK está ativo: /model <id> não troca provider customizado em runtime.\x1b[0m`,
+        );
+        println(
+            `  \x1b[90mModelo BYOK canônico: ${byok.model ?? '(ausente)'} · preset=${byok.preset ?? '-'} · provider=${byok.providerType ?? '-'}.\x1b[0m`,
+        );
+        println('  \x1b[90mAltere COPILOT_BYOK_MODEL/COPILOT_BYOK_PROVIDER_* no ambiente e reinicie a sessão.\x1b[0m\n');
+        return;
+    }
+
     const {
         previousModel: previous,
         previousReasoningEffort,

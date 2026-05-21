@@ -25,6 +25,7 @@ import {
     DEFAULT_EXCLUDED_TOOLS,
     MAESTRO_AGENT_NAME,
     normalizeAgentToolList,
+    resolveConfiguredByokSessionOverrides,
     resolveToolName,
     SessionConfigBuilder,
 } from '#copilot/config';
@@ -336,6 +337,8 @@ export function buildSessionOptions(ctx, host, { tools, busHooks }) {
     const mcpBridge = readAgentMcpCapabilitySnapshot(ctx);
     const mcpConfig = /** @type {Record<string, MCPServerConfig> | null} */ (mcpBridge.buildConfig());
     const bootConfig = readCopilotBootConfig();
+    const byok = resolveConfiguredByokSessionOverrides(process.env, ctx.getModelSnapshot());
+    const model = byok.enabled && byok.model ? byok.model : ctx.getModelSnapshot();
     const excludedTools = buildCanonicalLocalSurfaceExcludedTools(
         tools.map((tool) => tool.name),
         DEFAULT_EXCLUDED_TOOLS,
@@ -343,7 +346,7 @@ export function buildSessionOptions(ctx, host, { tools, busHooks }) {
     bindAgentSessionExcludedTools(excludedTools);
 
     const builder = new SessionConfigBuilder()
-        .model(ctx.getModelSnapshot())
+        .model(model)
         .clientName('chatgpt-docker-puppeteer')
         .workingDirectory(bootConfig.workspace.root)
         .skillDirectories(bootConfig.skills.skillDirectories)
@@ -354,6 +357,15 @@ export function buildSessionOptions(ctx, host, { tools, busHooks }) {
         .excludedTools(excludedTools);
 
     builder.hooks(busHooks);
+    if (byok.enabled && byok.provider) {
+        builder.provider(byok.provider);
+        if (byok.modelCapabilities) {
+            builder.modelCapabilities(byok.modelCapabilities);
+        }
+        if (byok.supportsReasoning === false) {
+            ctx.setReasoningEffort(undefined);
+        }
+    }
     if (mcpConfig) {
         builder.mcpServers(mcpConfig);
     }

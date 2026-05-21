@@ -12,7 +12,7 @@
 import { toError } from '#copilot/core';
 import { log } from '#copilot/observability';
 import { printlnBlock } from '../dialog/index.js';
-import { readTerminalStatusProjection } from '../frontend/index.js';
+import { readTerminalByokProjection, readTerminalStatusProjection } from '../frontend/index.js';
 import { buildTerminalOperationalGuidance } from '../frontend/operational-guidance/index.js';
 import { readTerminalDisplayState, resolveTerminalBootDisplayPreset } from '../state/repl-runtime/index.js';
 
@@ -77,6 +77,9 @@ function buildAutoBriefFingerprint(projection) {
         projection.timelineSyncStatus,
         projection.ioRuntime.cache.aggregate.hitRatio,
         projection.ioRuntime.scopes.active,
+        readTerminalByokProjection().summary.enabled,
+        readTerminalByokProjection().summary.ready,
+        readTerminalByokProjection().summary.model,
     ].join('|');
 }
 
@@ -118,11 +121,17 @@ export function buildTerminalAutoBrief(input = {}) {
     const sessionTag = isResumed ? `retomada(#${resumeCount})` : 'nova';
     const ready = projection.toolLoad.total > 0 || projection.dialogLoopActive;
     const io = summarizeIoRuntime(projection.ioRuntime);
+    const byok = readTerminalByokProjection().summary;
     /** @type {string[]} */
     const lines = [];
     lines.push(
         `[auto-brief:${phase}] runtime=${projection.runtimeId} · modelo=${model}/${reasoning} · sessão=${sessionTag} · display=${displayPreset} · thinking=${displayState.thinking ? 'on' : 'off'} · streaming=${displayState.streaming ? 'on' : 'off'}`,
     );
+    if (byok.enabled) {
+        lines.push(
+            `[auto-brief:${phase}] byok=${byok.ready ? 'ready' : 'incompleto'} · preset=${byok.preset ?? '-'} · provider=${byok.providerType ?? '-'} · model=${byok.model ?? '-'} · auth=${byok.auth.bearerTokenConfigured ? 'bearer' : byok.auth.apiKeyConfigured ? 'apiKey' : byok.auth.headersConfigured ? 'headers' : 'none'}`,
+        );
+    }
     lines.push(
         `[auto-brief:${phase}] tools=${projection.toolLoad.total} · fs=${yn(projection.toolLoad.hasCanonicalLocalFsTools)} · exec=${yn(projection.toolLoad.hasCanonicalLocalExecTools)} · sdkWorkspace=${yn(projection.toolLoad.hasSdkWorkspaceTooling)} · contrato=${projection.toolLoad.toolContract.ok ? 'ok' : `${projection.toolLoad.toolContract.errorCount} erro(s)`}`,
     );

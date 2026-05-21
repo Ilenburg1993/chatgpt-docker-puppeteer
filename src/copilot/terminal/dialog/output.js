@@ -91,7 +91,10 @@ function resolveInlineStatusMaxRows() {
     const rows = Number(process.stdout.rows ?? INLINE_STATUS_FALLBACK_ROWS);
     if (!Number.isFinite(rows) || rows <= 0) return INLINE_STATUS_FALLBACK_ROWS;
     const promptAwareMax = Math.max(1, Math.floor(rows) - INLINE_STATUS_PROMPT_GUARD_ROWS);
-    return Math.max(1, Math.min(promptAwareMax, Math.max(INLINE_STATUS_MIN_ROWS, Math.floor(rows * INLINE_STATUS_HEIGHT_RATIO))));
+    return Math.max(
+        1,
+        Math.min(promptAwareMax, Math.max(INLINE_STATUS_MIN_ROWS, Math.floor(rows * INLINE_STATUS_HEIGHT_RATIO))),
+    );
 }
 
 /**
@@ -103,9 +106,9 @@ function shouldUseCompactPromptLayout() {
 }
 
 /**
- * A linha viva overlay usa cursor-up/clear-line para pintar acima do prompt. Isso é bonito em PTY controlado, mas frágil
- * em terminais reais: qualquer divergência de altura, wrap ou scrollback pode limpar a viewport. Por padrão o terminal
- * agora é transcript-first; a overlay fica disponível só como opt-in explícito.
+ * A linha viva overlay usa cursor-up/clear-line para pintar acima do prompt. Isso é bonito em PTY controlado, mas
+ * frágil em terminais reais: qualquer divergência de altura, wrap ou scrollback pode limpar a viewport. Por padrão o
+ * terminal agora é transcript-first; a overlay fica disponível só como opt-in explícito.
  *
  * @returns {boolean}
  */
@@ -335,7 +338,7 @@ export function buildUserPrompt() {
 
     /**
      * @param {string} full
-     * @param {string} [compact=full]
+     * @param {string} [compact=full] Default is `full`
      * @returns {void}
      */
     const pushPromptTag = (full, compact = full) => {

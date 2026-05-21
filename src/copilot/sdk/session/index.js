@@ -147,10 +147,20 @@ export {
 export { approveAll, createAllowlistPermissionHandler, createPermissionHandler } from './permissions.js';
 
 export {
+    BYOK_ENV_KEYS,
+    BYOK_SECRET_ENV_KEYS,
     anthropicProvider,
     azureProvider,
+    buildConfiguredByokModelListHandler,
     isValidProviderType,
     openaiProvider,
+    readConfiguredByokModelsFromEnv,
+    readConfiguredByokProfileSummaries,
+    readConfiguredByokProfilesFromEnv,
+    readConfiguredByokState,
+    readConfiguredByokSummary,
+    redactProviderConfig,
+    resolveConfiguredByokSessionOverrides,
     validateProviderConfig,
 } from './provider.js';
 export {

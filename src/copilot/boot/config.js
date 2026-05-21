@@ -11,6 +11,7 @@
  */
 
 import { resolve } from 'node:path';
+import { BYOK_ENV_KEYS, readConfiguredByokSummary } from '../sdk/session/provider.js';
 import { readCopilotBootContract } from './contract.js';
 import { readCopilotSessionFsBootConfig, SESSION_FS_ENV_KEYS } from './session-fs.js';
 import { readBootSkillConfig } from './skills.js';
@@ -54,6 +55,7 @@ export const BOOT_CONFIG_ENV_KEYS = Object.freeze([
     'LLM_B_TERMINAL_PORT',
     'LLM_B_TERMINAL_TOKEN',
     'LLM_B_BOOT_TIMEOUT_MS',
+    ...BYOK_ENV_KEYS,
 ]);
 
 /**
@@ -150,6 +152,7 @@ function envBool(key, fallback) {
  *             storageRootDir: string;
  *         };
  *         sessionIdleTimeoutSeconds: number | null;
+ *         byok: import('../sdk/session/provider.js').ByokSummary;
  *         baseline: readonly string[];
  *     };
  *     sessionDefaults: {
@@ -238,6 +241,7 @@ export function readCopilotBootConfig() {
                 storageRootDir: sessionFs.storageRootDir,
             },
             sessionIdleTimeoutSeconds: sessionFs.sessionIdleTimeoutSeconds,
+            byok: readConfiguredByokSummary(),
             baseline: contract.sdkBaseline,
         },
         sessionDefaults: {

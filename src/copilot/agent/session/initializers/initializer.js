@@ -17,7 +17,12 @@
 
 import { buildAuditingPermissionHandler } from '#copilot/audit';
 import { readCopilotBootConfig } from '#copilot/boot';
-import { MAESTRO_AGENT_NAME, buildCustomAgentsConfig } from '#copilot/config';
+import {
+    MAESTRO_AGENT_NAME,
+    buildCustomAgentsConfig,
+    redactProviderConfig,
+    resolveConfiguredByokSessionOverrides,
+} from '#copilot/config';
 import { SESSION_MAX_AGE_MS } from '#copilot/config/agent';
 import { buildCanonicalLocalSurfaceExcludedTools, toError } from '#copilot/core';
 import {
@@ -279,7 +284,11 @@ export async function initOrResumeSession(client, sessionOptions) {
     await ensureAgentSdkToolsConfigLoaded();
 
     const state = await readAgentRuntimePersistedStateAsync();
-    const model = sessionOptions.model ?? AGENT_SDK_DEFAULT_MODEL;
+    const requestedModel = sessionOptions.model ?? AGENT_SDK_DEFAULT_MODEL;
+    const byok = resolveConfiguredByokSessionOverrides(process.env, requestedModel);
+    const model = byok.enabled && byok.model ? byok.model : requestedModel;
+    const sdkReasoningEffort =
+        byok.enabled && byok.supportsReasoning === false ? undefined : sessionOptions.reasoningEffort;
     const injectContext = sessionOptions.injectHookContext !== false;
     const bootConfig = readCopilotBootConfig();
     const bootSessionDefaults = bootConfig.sessionDefaults;
@@ -316,6 +325,12 @@ export async function initOrResumeSession(client, sessionOptions) {
     } else {
         log('INFO', validationSummary);
     }
+    if (byok.enabled) {
+        log(
+            'INFO',
+            `[PersistentSession] BYOK ativo: preset=${byok.summary.preset} provider=${byok.summary.providerType} model=${model} baseUrl=${byok.summary.baseUrl} auth=${byok.summary.auth.bearerTokenConfigured ? 'bearer' : byok.summary.auth.apiKeyConfigured ? 'apiKey' : 'none'} providerConfig=${JSON.stringify(redactProviderConfig(byok.provider ?? null))}`,
+        );
+    }
 
     /** @type {Record<string, unknown>} */
     const opts = {
@@ -328,7 +343,9 @@ export async function initOrResumeSession(client, sessionOptions) {
         // Diretórios de skills para o SDK carregar.
         skillDirectories: bootSessionDefaults.skillDirectories,
         ...pickDefinedAgentSdkOptions({
-            reasoningEffort: sessionOptions.reasoningEffort,
+            reasoningEffort: sdkReasoningEffort,
+            provider: byok.provider,
+            modelCapabilities: byok.modelCapabilities,
             onUserInputRequest: sessionOptions.onUserInputRequest,
             createSessionFsHandler,
             enableConfigDiscovery: bootSessionDefaults.enableConfigDiscovery,
@@ -395,7 +412,7 @@ export async function initOrResumeSession(client, sessionOptions) {
     }
     const effectiveReasoningEffort =
         result.reasoningEffort ??
-        sessionOptions.reasoningEffort ??
+        sdkReasoningEffort ??
         (state?.reasoningEffort === 'low' ||
         state?.reasoningEffort === 'medium' ||
         state?.reasoningEffort === 'high' ||

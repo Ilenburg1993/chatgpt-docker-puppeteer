@@ -14,6 +14,7 @@ Verificações realizadas nesta revisão:
 - SDK local: `@github/copilot-sdk@0.3.0`.
 - O SDK expõe eventos `assistant.streaming_delta`, `assistant.message_delta`, `assistant.reasoning_delta`, `user_input.*`, `elicitation.*`, `tool_execution.*`, `session.usage_info` e `assistant.usage`.
 - O README do SDK 0.3.0 documenta `assistant.message_delta`, `onUserInputRequest`, `onElicitationRequest` e `includeSubAgentStreamingEvents`.
+- A documentação oficial de BYOK do GitHub Copilot SDK confirma o contrato `provider` por sessão, `model` explícito, `ProviderConfig`, `wireApi`, Ollama local via OpenAI-compatible e `onListModels` customizado: <https://docs.github.com/en/copilot/how-tos/copilot-sdk/authenticate-copilot-sdk/bring-your-own-key>.
 - Não há `session.keepAlive` nem `session.updateMetadata` no pacote instalado. Qualquer roadmap que use esses nomes deve ser tratado como adaptação futura, não como API disponível.
 - `session.usage`, `assistant.usage` e `session.usage_info` não equivalem automaticamente a Premium Request consumido. A UX deve distinguir "uso do turno", "tokens/contexto/custo reportado" e "premium request confirmada".
 
@@ -232,7 +233,14 @@ Mudanças:
 - O runner espera a continuação pós-ask ou uma janela explícita antes dos comandos diagnósticos.
 - O runner reconhece erro terminal de sessão/modelo e encerra diagnóstico cedo em vez de aguardar timeout opaco.
 
-Falta: repetir uma rodada live estável sem falha externa de CAPI para confirmar o marcador pós-ask ponta a ponta.
+Status atualizado em 2026-05-21: corrigido e validado.
+
+Validação:
+
+- Artefato: `artifacts/terminal-live/2026-05-21T10-22-43-042Z/summary.md`.
+- Resultado: PASS.
+- O runner observou deltas parciais, bloco final, tools, `ask_user`, resposta humana, continuação pós-`ask_user`, `/usage now`, `/activity`, `/tools diag`, `/events`, `/events --raw`, `/errors`, `/health`, `/export`, SSE HTTP e JSONL durável.
+- O falso negativo anterior vinha do próprio harness: ele procurava o marcador pós-ask no log inteiro, onde o texto já existia no prompt. A checagem agora observa apenas o trecho posterior à resposta humana.
 
 ### A17. Erro recuperável de modelo escalou para `reconnect_restart` com nova ambiguidade
 
@@ -406,6 +414,106 @@ Critério ideal:
 
 - Toda fase crítica de boot deve ter start/success/failure auditável por `/events`, e não apenas por log lateral.
 
+### A25. BYOK existia como builder, mas não como fluxo operacional completo
+
+Investigação:
+
+- `src/copilot/sdk/session/provider.js` já possuía builders `openaiProvider`, `azureProvider` e `anthropicProvider`.
+- `SessionConfigBuilder` e `ResumeSessionConfigBuilder` já aceitavam `provider`.
+- Rotas SDK aceitavam `provider` no body.
+- Faltava o caminho canônico do terminal: env seguro -> provider validado -> sessão persistente -> lista de modelos -> UX -> documentação -> testes.
+
+Decisão canônica:
+
+- BYOK usa exclusivamente o campo `provider` nativo do SDK. Não há loop paralelo de LLM no terminal.
+- `COPILOT_BYOK_ENABLED=true` é a chave de ativação operacional. Ter uma API key no ambiente não deve ativar BYOK por acidente.
+- `COPILOT_BYOK_MODEL` é obrigatório quando BYOK está ativo; `model=auto` não é válido para provider customizado. Quando `COPILOT_BYOK_PROFILE` está ativo, o modelo pode vir do perfil.
+- `.env.local` é o arquivo único do operador para perfis, metadata e segredos BYOK. Templates versionados só mostram contrato e exemplos sem segredo.
+- Segredos nunca entram em boot config, `/config`, `/byok`, JSONL, docs ou commits. A UX só mostra presença de `apiKey`, `bearerToken` ou headers.
+- Providers fora do trio nativo do SDK (`openai`, `azure`, `anthropic`) entram por endpoint OpenAI-compatible: Kilo Gateway, Ollama local/cloud, LiteLLM, vLLM, Foundry Local, routers e proxies internos.
+
+Status: implementação operacional consolidada em fluxo único, com perfis e Kilo Gateway, validada por testes determinísticos nesta revisão.
+
+Entregas:
+
+- Leitura segura de `COPILOT_BYOK_*`, `OPENAI_*`, `AZURE_OPENAI_*`, `ANTHROPIC_*`, `OLLAMA_*` e `KILO_*`.
+- Perfis declarativos via `COPILOT_BYOK_PROFILES_JSON` e seleção por `COPILOT_BYOK_PROFILE`.
+- Presets `kilo-code`, `kilo-gateway` e `kilo` resolvem Kilo Gateway como OpenAI-compatible com Bearer token.
+- Redaction canônica de provider.
+- `onListModels` customizado quando BYOK está ativo.
+- Sessões do agente recebem `provider`, modelo explícito e `modelCapabilities`.
+- `/byok` mostra status, modelos, perfis, recarga de `.env.local` e troca efêmera de SDK/perfil/modelo/provider sem expor segredos.
+- Templates e schema receberam knobs BYOK.
+
+Falta:
+
+- Live smoke com provider real quando não houver bloqueio externo/rate limit.
+- Provar Kilo Gateway, Ollama Cloud e pelo menos um provider OpenAI-compatible local/remoto, sem registrar chaves.
+- Suíte determinística fake para BYOK sem rede.
+- Persistência opcional da escolha de perfil via comando seguro, caso o operador queira gravar alteração no `.env.local` em vez de apenas no processo atual.
+
+Validação local:
+
+- `typecheck:strict:src.copilot`: PASS.
+- `lint:copilot`: PASS.
+- `test:copilot:unit`: 2920 testes PASS.
+- Smoke sem rede confirmou preset `ollama-local`, normalização `/v1`, modelo explícito e ausência de segredo.
+- Testes unitários confirmaram preset Kilo Gateway, perfil ativo, resumo sem segredo e comandos `/byok profiles`, `/byok use`, `/byok model`.
+- Busca por fragmentos da chave de teste fornecida não encontrou vazamento em arquivos versionáveis fora de artefatos ignoráveis.
+
+Observação de segurança:
+
+- As chaves reais fornecidas para teste não foram gravadas em `.env`, documentação, logs ou artefatos. O caminho recomendado é o operador inseri-las em `.env.local` ou injetá-las efemeramente no processo.
+
+### A26. Live completo 2026-05-21 validou o circuito canônico após BYOK
+
+Artefato: `artifacts/terminal-live/2026-05-21T10-22-43-042Z/summary.md`.
+
+Resultado: PASS.
+
+Critérios relevantes:
+
+- PTY interativo pronto.
+- Deltas parciais visíveis: 30 marcadores `DELTA-CANONICAL`.
+- Bloco final de delta visível sem duplicação.
+- `read_file_content` renderizou start/done.
+- `ask_user` apareceu uma única vez, pela fonte canônica `user_input.requested`.
+- Resposta humana foi registrada e não virou eco da LLM-B.
+- Continuação pós-`ask_user` apareceu por `assistant.message`.
+- Telemetria `llm.usage` foi mostrada separada de Premium Request.
+- `/events` e `/events --raw` consultaram o arquivo durável SSE.
+- SSE HTTP e JSONL tiveram ids monotônicos e envelope `source/trace`.
+- `/errors` permaneceu limpo.
+
+Leitura arquitetural:
+
+- O circuito atual está muito mais próximo do fluxo único: SDK events -> normalização/materialização -> `broadcastSse()` -> PTY/SSE/JSONL/export.
+- Ainda há trabalho em elicitation e BYOK real smoke, mas a regressão crítica de duplicação de delta/ask_user foi coberta por teste live funcional.
+
+### A27. BYOK precisava deixar de ser env plano e virar perfis operacionais
+
+Investigação:
+
+- Um único provider por env plano resolve o caso simples, mas é frágil para operação real: trocar SDK -> BYOK -> outro provider -> outro modelo exigia editar várias variáveis e reiniciar sem diagnóstico.
+- A demanda atual inclui Kilo Code/Gateway, Ollama Cloud, LLM local e futuras rotas OpenAI-compatible. Isso exige perfis nomeados, metadata operacional e comandos explícitos.
+- O pacote local do SDK continua recebendo apenas um `provider` por sessão; portanto, perfis são uma camada de resolução de configuração, não um segundo runtime.
+
+Decisão canônica:
+
+- `.env.local` é o arquivo único do operador.
+- `COPILOT_BYOK_PROFILES_JSON` descreve todos os perfis BYOK.
+- `COPILOT_BYOK_PROFILE` escolhe o perfil ativo.
+- `/byok reload` recarrega `.env.local`; `/byok profiles` lista perfis redigidos; `/byok use <perfil|sdk>` alterna o processo atual; `/byok model <id>` troca modelo no provider ativo; `/byok provider <preset> [model] [baseUrl]` cobre investigação efêmera.
+- Kilo Gateway entra como OpenAI-compatible em `https://api.kilo.ai/api/gateway`, autenticado por Bearer token via `KILO_API_KEY` ou `KILO_CODE_API_KEY`.
+
+Status: implementado nesta rodada.
+
+Riscos remanescentes:
+
+- Trocas por comando ainda são efêmeras; persistir em `.env.local` deve ser opt-in, atômico e redigido.
+- Smoke real com chaves deve arquivar apenas metadados redigidos e nunca payloads completos.
+- Precisamos confirmar, em live longo, se o SDK reporta `usage`/modelo efetivo de providers BYOK de maneira consistente com o provider selecionado.
+
 ## Hipóteses Externas Rejeitadas Ou Reclassificadas
 
 ### H1. "boot-hub assume sucesso"
@@ -455,6 +563,7 @@ Propriedades obrigatórias:
 - Usage não é confundido com Premium Request.
 - Boot é transacional: cada fase tem start, success, failure, rollback e evento arquivado.
 - Arquitetura tem um fluxo único: SDK events -> normalização -> state/materialization -> fanout SSE -> arquivo durável -> terminal/HTTP/commands.
+- BYOK e multi-provider usam o mesmo fluxo de sessão, eventos, tools, `ask_user`, elicitation e transcript do Copilot SDK; trocar provider não cria outro renderer, outro loop ou outro arquivo de histórico.
 - Diagnósticos são evidência, não maquiagem: se o backend falha, a UX mostra a falha e o fluxo backend é corrigido.
 
 ## Roadmap
@@ -686,6 +795,81 @@ Fase I3. Microkernel de eventos públicos
 - I3.2 Fazer terminal PTY, SSE HTTP, JSONL e export consumirem a mesma materialização. Status: parcialmente feito.
 - I3.3 Gerar relatório de divergência quando PTY/SSE/export discordarem. Status: pendente.
 
+### Faixa J. BYOK, Multi-Provider E LLMs Locais
+
+Fase J1. Contrato SDK e documentação oficial
+
+- J1.1 Validar `ProviderConfig` no pacote local `@github/copilot-sdk@0.3.0`. Status: feito.
+- J1.2 Validar documentação oficial GitHub para BYOK, `wireApi`, Ollama local e `onListModels`. Status: feito.
+- J1.3 Documentar que `session.keepAlive`/`session.updateMetadata` não fazem parte do pacote local. Status: feito.
+- J1.4 Registrar limites: provider custom exige `model` explícito e não usa `auto`. Status: feito.
+
+Fase J2. Env governance e segredo
+
+- J2.1 Criar superfície `COPILOT_BYOK_*` canônica. Status: feito nesta revisão.
+- J2.2 Garantir que API keys não sejam impressas, arquivadas ou repassadas como env amplo do child CLI. Status: feito nesta revisão.
+- J2.3 Atualizar `.env.local.example`, `.env.example`, `.env.expert.example` e `.env.schema.json`. Status: feito nesta revisão.
+- J2.4 Atualizar guia de env com política BYOK e redaction. Status: feito nesta revisão.
+- J2.5 Adicionar auditoria automatizada para impedir vazamento de `COPILOT_BYOK_API_KEY` em logs/artefatos. Status: manual smoke feito; CI guard pendente.
+- J2.6 Consolidar `.env.local` como arquivo único do operador para perfis, metadata e segredos. Status: feito nesta revisão.
+- J2.7 Criar `COPILOT_BYOK_PROFILES_JSON` e `COPILOT_BYOK_PROFILE` para alternância segura entre providers/modelos. Status: feito nesta revisão.
+- J2.8 Adicionar preset Kilo Gateway/Kilo Code sem registrar token real. Status: feito nesta revisão.
+
+Fase J3. Provider e model list
+
+- J3.1 Resolver presets `openai`, `openai-compatible`, `azure`, `anthropic`, `ollama-local`, `ollama-cloud`, `kilo-code`, `kilo-gateway`, `kilo` e `custom`. Status: feito nesta revisão.
+- J3.2 Criar `readConfiguredByokState()` com status pronto/erro/aviso. Status: feito nesta revisão.
+- J3.3 Criar `redactProviderConfig()`. Status: feito nesta revisão.
+- J3.4 Criar `onListModels` estático por `COPILOT_BYOK_MODEL(S)`. Status: feito nesta revisão.
+- J3.5 Permitir catálogo dinâmico via endpoint `/v1/models` quando seguro. Status: pendente.
+- J3.6 Resolver perfis antes da validação final de provider, preservando overrides explícitos do processo. Status: feito nesta revisão.
+- J3.7 Listar perfis redigidos para UX/diagnóstico sem expor segredo. Status: feito nesta revisão.
+
+Fase J4. Sessão e lifecycle
+
+- J4.1 Injetar `provider`, `model` e `modelCapabilities` na sessão persistente. Status: feito nesta revisão.
+- J4.2 Omitir `reasoningEffort` quando o provider declara não suportar reasoning. Status: feito nesta revisão.
+- J4.3 Persistir modelo BYOK efetivo de forma clara em status/model UX. Status: parcialmente feito; profile/model/provider aparecem, mas falta confirmação real pós-smoke remoto.
+- J4.4 Bloquear BYOK incompleto com erro acionável antes de criar sessão. Status: feito nesta revisão.
+- J4.5 Suportar troca runtime de provider sem restart completo. Status: pendente; requer política de rotação de sessão e não deve criar loop paralelo.
+- J4.6 Diferenciar troca efêmera de processo e persistência em `.env.local`. Status: parcialmente feito; comandos efêmeros existem, persistência segura pendente.
+
+Fase J5. UX e comandos
+
+- J5.1 Criar `/byok status`. Status: feito nesta revisão.
+- J5.2 Criar `/byok models`. Status: feito nesta revisão.
+- J5.3 Criar `/byok env`. Status: feito nesta revisão.
+- J5.4 Integrar BYOK em `/status`, `/health`, `/model` e auto-brief. Status: feito nesta revisão.
+- J5.5 Mostrar diferença entre modelo BYOK configurado, modelo SDK efetivo e provider. Status: parcialmente feito; falta consolidar billing/effective model pós-smoke real.
+- J5.6 Bloquear `/model <id>` enganoso quando BYOK está ativo e orientar alteração por env/restart. Status: feito nesta revisão.
+- J5.7 Criar `/byok reload`. Status: feito nesta revisão.
+- J5.8 Criar `/byok profiles`. Status: feito nesta revisão.
+- J5.9 Criar `/byok use <perfil|sdk>`. Status: feito nesta revisão.
+- J5.10 Criar `/byok model <id>`. Status: feito nesta revisão.
+- J5.11 Criar `/byok provider <preset> [model] [baseUrl]`. Status: feito nesta revisão.
+- J5.12 Criar `/byok persist` atômico/redigido para editar `.env.local` sem expor segredo. Status: pendente.
+
+Fase J6. Testes
+
+- J6.1 Cobrir helpers de provider/env/redaction por unit test. Status: feito nesta revisão.
+- J6.2 Cobrir `ClientOptionsBuilder` com `onListModels` BYOK e remoção de segredos do child env. Status: feito nesta revisão.
+- J6.3 Criar fake SDK BYOK determinístico sem rede. Status: parcialmente feito por unit tests de resolução/comando; falta sessão SDK fake end-to-end.
+- J6.4 Rodar live test com `/byok`, delta, tool, `ask_user` e elicitation quando disponível. Status: delta/tool/ask_user PASS em `artifacts/terminal-live/2026-05-21T10-22-43-042Z/summary.md`; `/byok` e elicitation pendentes no live.
+- J6.5 Rodar smoke real Kilo/Ollama Cloud/OpenAI-compatible sem gravar segredo em artefato. Status: pendente.
+- J6.6 Adicionar comando live/harness específico para `/byok status`, `/byok models` e `/byok env` sem abrir turno. Status: pendente.
+- J6.7 Cobrir `/byok profiles`, `/byok use`, `/byok model`, `/byok provider` e `/byok reload`. Status: parcialmente feito; reload/provider ainda precisam unit dedicado.
+
+Fase J7. Providers amplos
+
+- J7.1 OpenAI direto. Status: suportado por contrato; pendente smoke.
+- J7.2 Azure OpenAI nativo. Status: suportado por contrato; pendente smoke.
+- J7.3 Azure AI Foundry como OpenAI-compatible. Status: suportado por contrato; pendente smoke.
+- J7.4 Anthropic direto. Status: suportado por contrato; pendente smoke.
+- J7.5 Ollama local. Status: suportado por contrato; pendente smoke.
+- J7.6 Ollama Cloud. Status: suportado por contrato OpenAI-compatible; pendente confirmação do endpoint efetivo.
+- J7.7 LiteLLM/vLLM/routers locais. Status: suportado por contrato OpenAI-compatible; pendente smoke.
+- J7.8 Kilo Gateway/Kilo Code. Status: suportado por contrato OpenAI-compatible; pendente smoke real redigido.
+
 ## Execução Iniciada Nesta Revisão
 
 Implementado:
@@ -718,6 +902,15 @@ Implementado:
 - Rodada live `2026-05-20T18-24-53-129Z` confirmou que o runner antigo interferia no pós-ask ao diagnosticar logo após resposta humana.
 - Rodada live `canonical-flow-codex-post-ask-continuation-2026-05-20` expôs falha externa/SDK `CAPIError: Connection error` antes do ask_user e gerou novo gap A17.
 - `agent-messaging.js` agora distingue tasks `user_queue` e `dialog_boot`; requeue pós-reconexão de `dialog_boot` é bloqueado para evitar prompt duplicado.
+- BYOK foi investigado contra documentação oficial do GitHub, documentação oficial do Kilo Gateway e pacote local `@github/copilot-sdk@0.3.0`.
+- `sdk/session/provider.js` agora resolve presets BYOK, perfis declarativos, Kilo Gateway, valida env, redige segredos, cria resumo seguro e fornece `onListModels` customizado.
+- `ClientOptionsBuilder` registra `onListModels` BYOK e remove segredos BYOK do env repassado ao child CLI.
+- As sessões da LLM-B recebem `provider`, modelo explícito e `modelCapabilities` pelo fluxo canônico de sessão SDK.
+- `/byok` foi adicionado ao terminal com status, modelos, perfis, reload de `.env.local`, troca SDK/perfil/modelo/provider e contrato de env sem expor credenciais.
+- Templates `.env*`, schema e guia de env foram atualizados com contrato BYOK, perfis e Kilo Gateway.
+- A porta de configuração `src/copilot/config/byok.js` evita que agent/terminal importem diretamente internals do SDK, mantendo a arquitetura de aliases/barrels.
+- O runner live foi corrigido para detectar o pós-`ask_user` apenas depois da resposta humana, removendo falso negativo gerado pelo próprio prompt.
+- `/status`, `/health`, `/model` e auto-brief agora mostram BYOK redigido; `/model <id>` é bloqueado quando BYOK governa o provider customizado via env.
 - `terminal-agent-wiring.js` descreve `reconnect_restart` como preservação sem replay, com `promptReplayBlocked=true` no SSE.
 - `task-stream-events.js` mostra `task.error` com `requeueBlocked=true` como "prompt preservado sem reenvio automático".
 - `/events sources` agora mostra a autoridade canônica das superfícies críticas: delta público, final textual, ask_user e lifecycle de tools.
@@ -757,15 +950,22 @@ Implementado:
 - Live completo `artifacts/terminal-live/2026-05-20T19-05-51-881Z/summary.md` ficou bloqueado por rate limit antes de delta/tool/ask_user; não valida o cenário funcional.
 - Live completo desta rodada ficou `BLOCKED` por rate limit em `artifacts/terminal-live/codex-continue-2026-05-20-full/summary.md`.
 - Live `--no-pr` desta rodada passou em `artifacts/terminal-live/codex-continue-2026-05-20-no-pr-rerun/summary.md`.
+- Live completo pós-correção passou em `artifacts/terminal-live/2026-05-21T10-22-43-042Z/summary.md`: deltas parciais, final, tool, `ask_user`, resposta humana, continuação pós-ask, `/events`, `/events --raw`, `/tools diag`, `/health`, `/errors` e export.
+- Smoke BYOK local sem rede validou `ollama-local`, normalização de `baseUrl` para `/v1`, modelo explícito e resumo sem segredo.
+- Testes BYOK desta rodada validaram Kilo Gateway como OpenAI-compatible, perfil ativo por `COPILOT_BYOK_PROFILE`, resumos redigidos e comandos `/byok profiles`, `/byok use` e `/byok model`.
+- `node --check scripts/copilot/run-terminal-llm-b-live-test.mjs`, parse de `.env.schema.json`, busca anti-vazamento dos segredos fornecidos, typecheck strict, lint e unit copilot passaram nesta trilha.
 - Testes unitários adicionados para recoverable `model_call` não poluir `/errors`, para `task.error` de rate limit não duplicar `session.error`, e para `agent:task:error` não criar erro sintético `event-bus`.
 - Testes unitários adicionados para `terminal.runtime.wired`, `terminal.runtime.wire_failed` e hints de investigação em `/events sources`.
+- Testes unitários adicionados para BYOK provider/env/redaction/model list e para `ClientOptionsBuilder` com `onListModels` e remoção de segredos do child env.
 
 Próxima rodada recomendada:
 
-1. Reexecutar o cenário completo com LLM-B após reset do rate limit e exigir delta parcial, tool, `ask_user`, resposta humana e pós-ask no mesmo artefato.
-2. Fechar a recuperação `session.error`/`reconnect_restart`, distinguindo retry real de reenvio ambíguo de prompt.
-3. Criar contrato único de modelo configurado/preferido/efetivo/cobrado.
-4. Continuar a normalização de tool identity em completions/progress externos sem requestId, com métricas para qualquer lifecycle ainda genérico.
-5. Integrar falha de `wireRuntime()` ao `ErrorTracker` com metadados de fase.
-6. Expandir `/events sources` com filtros compostos por classe e evento. Hints básicos de `/events event=...` e `/events source=...` já foram feitos.
-7. Expandir o cenário live para elicitation quando a capability estiver disponível.
+1. Integrar BYOK em `/events sources`, sem duplicar o fluxo de sessão.
+2. Criar harness live sem turno para `/byok status`, `/byok profiles`, `/byok models`, `/byok env` e smoke de boot com provider fake/local.
+3. Rodar smoke real Kilo/Ollama Cloud/OpenAI-compatible apenas com env efêmero ou `.env.local`, sem gravar segredo, e arquivar só metadados redigidos.
+4. Expandir o cenário live para elicitation quando a capability estiver disponível.
+5. Fechar a recuperação `session.error`/`reconnect_restart`, distinguindo retry real de reenvio ambíguo de prompt.
+6. Criar contrato único de modelo configurado/preferido/efetivo/cobrado, incluindo billing/effective model real em BYOK.
+7. Continuar a normalização de tool identity em completions/progress externos sem requestId, com métricas para qualquer lifecycle ainda genérico.
+8. Integrar falha de `wireRuntime()` ao `ErrorTracker` com metadados de fase.
+9. Expandir `/events sources` com filtros compostos por classe e evento. Hints básicos de `/events event=...` e `/events source=...` já foram feitos.

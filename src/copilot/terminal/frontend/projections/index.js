@@ -1,6 +1,7 @@
 // @ts-check
 
 export {
+    readTerminalByokProjection,
     listTerminalAvailableModelsProjection,
     observeTerminalModelChangeProjection,
     readTerminalConfigProjection,

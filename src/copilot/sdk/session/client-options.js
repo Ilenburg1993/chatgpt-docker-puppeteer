@@ -11,6 +11,7 @@
 
 import { COPILOT_CANONICAL_OTEL_SOURCE_NAME } from '#copilot/boot/contract';
 import { log } from '../logger.js';
+import { BYOK_SECRET_ENV_KEYS, buildConfiguredByokModelListHandler } from './provider.js';
 import { buildConfiguredClientSessionFsConfig, getConfiguredSessionIdleTimeoutSeconds } from './session-fs.js';
 
 /**
@@ -199,6 +200,9 @@ export class ClientOptionsBuilder {
 
         if (process.env['PATH']) filtered['PATH'] = process.env['PATH'];
         if (process.env['HOME']) filtered['HOME'] = process.env['HOME'];
+        for (const secretKey of BYOK_SECRET_ENV_KEYS) {
+            delete filtered[secretKey];
+        }
 
         this.#opts.env = filtered;
         return this;
@@ -404,6 +408,11 @@ export function buildCopilotClientOptionsFromEnv(overrides = {}) {
     const sessionIdleTimeoutSeconds = getConfiguredSessionIdleTimeoutSeconds();
     if (sessionIdleTimeoutSeconds !== undefined) {
         builder.sessionIdleTimeoutSeconds(sessionIdleTimeoutSeconds);
+    }
+
+    const byokListModels = buildConfiguredByokModelListHandler(process.env);
+    if (byokListModels) {
+        builder.onListModels(byokListModels);
     }
 
     return builder.merge(overrides).build();

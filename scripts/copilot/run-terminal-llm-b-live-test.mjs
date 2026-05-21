@@ -704,6 +704,7 @@ async function main() {
     let exitCode = null;
     let sseCollector = null;
     let postAskContinuationObserved = false;
+    let answerPlainOffset = 0;
     let postAnswerCommandTimer = null;
     const command = canUsePty
         ? {
@@ -786,9 +787,11 @@ async function main() {
         }
         if (!answerSent && /\[ASK\] ASK-CANONICAL: responda SIM para fechar o teste/.test(plain)) {
             answerSent = true;
+            answerPlainOffset = plain.length;
             setTimeout(() => write('SIM'), 500).unref();
         }
-        if (answerSent && !postAskContinuationObserved && POST_ASK_FINAL_RE.test(plain)) {
+        const afterAnswerPlain = answerSent ? plain.slice(answerPlainOffset) : '';
+        if (answerSent && !postAskContinuationObserved && POST_ASK_FINAL_RE.test(afterAnswerPlain)) {
             postAskContinuationObserved = true;
             schedulePostAnswerDiagnostics(500);
         }

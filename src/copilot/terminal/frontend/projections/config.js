@@ -4,6 +4,12 @@
  */
 
 import {
+    BYOK_ENV_KEYS,
+    readConfiguredByokModelsFromEnv,
+    readConfiguredByokProfileSummaries,
+    readConfiguredByokSummary,
+} from '#copilot/config';
+import {
     listRuntimeAvailableModelsProjection,
     observeRuntimeModelChangeProjection,
     readRuntimeAutoModelPolicyProjection,
@@ -58,6 +64,7 @@ function resolveSdkSessionModeProjection(storedMode, binding) {
  *     runtimeFound: boolean;
  *     usedDefaultRuntimeFallback: boolean;
  *     runtimeFallbackWarning: string | null;
+ *     byok: ReturnType<typeof readConfiguredByokSummary>;
  *     agentRuntimes: import('./shared.js').TerminalRuntimeBase['agentRuntimes'];
  *     runtimeSessionId: string | null;
  * }}
@@ -84,6 +91,7 @@ export function readTerminalConfigProjection(runtimeId) {
         runtimeFound: base.runtimeFound,
         usedDefaultRuntimeFallback: base.usedDefaultRuntimeFallback,
         runtimeFallbackWarning: base.runtimeFallbackWarning,
+        byok: readConfiguredByokSummary(),
         agentRuntimes: base.agentRuntimes,
         runtimeSessionId: base.runtimeSessionId,
     };
@@ -105,6 +113,29 @@ export async function listTerminalAvailableModelsProjection(runtimeId) {
  */
 export function readTerminalModelStatsProjection(runtimeId) {
     return readRuntimeModelStatsProjection(runtimeId);
+}
+
+/**
+ * @returns {{
+ *     summary: ReturnType<typeof readConfiguredByokSummary>;
+ *     models: ReturnType<typeof readConfiguredByokModelsFromEnv>;
+ *     profiles: ReturnType<typeof readConfiguredByokProfileSummaries>;
+ *     envKeys: readonly string[];
+ * }}
+ */
+export function readTerminalByokProjection() {
+    const summary = readConfiguredByokSummary();
+    return {
+        summary,
+        models: readConfiguredByokModelsFromEnv(process.env, {
+            model: summary.model,
+            contextWindowTokens: summary.capabilities.contextWindowTokens,
+            supportsReasoning: summary.capabilities.reasoningEffort,
+            supportsVision: summary.capabilities.vision,
+        }),
+        profiles: readConfiguredByokProfileSummaries(),
+        envKeys: BYOK_ENV_KEYS,
+    };
 }
 
 /**

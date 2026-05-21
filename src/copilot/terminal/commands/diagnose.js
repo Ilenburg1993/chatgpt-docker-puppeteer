@@ -39,6 +39,19 @@ const C = {
     magenta: '\x1b[35m',
 };
 
+const DISABLED_BYOK_SUMMARY = Object.freeze({
+    enabled: false,
+    ready: false,
+    preset: null,
+    providerType: null,
+    model: null,
+    auth: {
+        apiKeyConfigured: false,
+        bearerTokenConfigured: false,
+        headersConfigured: false,
+    },
+});
+
 /**
  * Exibe diagnóstico completo do terminal LLM-B.
  *
@@ -122,6 +135,10 @@ export async function cmdDiagnose({ hubSessionId, println }, arg = '') {
     const sdkModeLine = configProjection.sdkSessionMode
         ? `${C.magenta}${configProjection.sdkSessionMode}${C.reset}`
         : `${C.grey}desconhecido${C.reset}`;
+    const byok = configProjection.byok ?? DISABLED_BYOK_SUMMARY;
+    const byokLine = byok.enabled
+        ? `${byok.ready ? `${C.green}ready${C.reset}` : `${C.red}incompleto${C.reset}`} ${C.grey}preset=${byok.preset ?? '-'} · provider=${byok.providerType ?? '-'} · model=${byok.model ?? '-'} · auth=${byok.auth.bearerTokenConfigured ? 'bearer' : byok.auth.apiKeyConfigured ? 'apiKey' : byok.auth.headersConfigured ? 'headers' : 'none'}${C.reset}`
+        : `${C.grey}off${C.reset}`;
     const planOpLine = configProjection.sdkPlanOperation
         ? `${C.yellow}${configProjection.sdkPlanOperation}${C.reset}${configProjection.sdkPlanChangedAt ? ` ${C.grey}@ ${new Date(configProjection.sdkPlanChangedAt).toLocaleTimeString('pt-BR')}${C.reset}` : ''}`
         : `${C.grey}(sem alteração)${C.reset}`;
@@ -180,6 +197,7 @@ ${C.cyan}  AGENTE${C.reset}
     health        ${health ? `${health['status'] === 'healthy' ? C.green : health['status'] === 'degraded' ? C.yellow : C.red}${health['status']}${C.reset}` : `${C.grey}n/d${C.reset}`}
     dialog loop   ${dialogLoopActive ? `${C.green}● ativo${C.reset}` : `${C.red}○ inativo${C.reset}`}
     modelo        ${C.magenta}${snap['model']}${C.reset}
+    byok          ${byokLine}
     reasoning     ${C.magenta}${configProjection.currentReasoningEffort}${C.reset}
     modo sdk      ${sdkModeLine}
     plan arquivo  ${planOpLine}

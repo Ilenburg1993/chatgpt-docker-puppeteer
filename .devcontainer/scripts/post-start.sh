@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # =============================================================================
 # post-start.sh — DevContainer Start Hook (Fail-Safe Network/NSS Orchestrator)
-# Version: v2.9.0
+# Version: v3.0.2
 #
 # Purpose:
 #   Runtime-only DevContainer post-start orchestration for a GitHub/Copilot-first
@@ -47,6 +47,37 @@
 #     resolv.conf governance, current system nameservers and cache effectiveness.
 #   - Keeps all long benchmark/compare actions out of boot and preserves the
 #     fail-safe postStart contract: always exits 0 and never blocks attach.
+#
+# v3.0.0 focus:
+#   - Makes the local DNS cache default-on at the post-start orchestration layer,
+#     matching local-dns-cache.sh v1.8.0 default-on governance.
+#   - Treats DNS cache success as proven only when the runtime summary reports
+#     a managed dnsmasq, strong local DNS probe proof, resolver effectiveness,
+#     no resolv.conf drift and no target-port conflict.
+#   - Propagates v1.8.0 DNS artifacts: action.summary, events TSV, probe tool,
+#     proof reason, Docker embedded DNS split-horizon, write privilege preflight,
+#     warmup status, backup trust and resolv.conf search/domain preservation.
+#   - Adds a post-start call to network-control-plane-state.sh as a read-only
+#     aggregator after the primary orchestration has produced artifacts.
+#   - Hardens the fallback DNS baseline to preserve Docker search/domain hints
+#     and optionally prefer Docker embedded DNS 127.0.0.11 when already present.
+
+# v3.0.1 focus:
+#   - Normalizes delivery to LF and removes CRLF-induced Bash parse failures.
+#   - Writes explicit local-DNS disabled/missing summaries so stale DNS artifacts
+#     cannot contaminate post-start/post-attach/control-plane state.
+#   - Fixes DNS baseline duplicate handling and safely preserves Docker embedded
+#     DNS 127.0.0.11 when it is already the active Docker resolver.
+#   - Hardens list iteration to avoid accidental globbing while preserving the
+#     intentional space-separated configuration contracts.
+#   - Runs make info from PROJECT_ROOT and keeps all failures non-fatal.
+
+# v3.0.2 focus:
+#   - Removes ShellCheck SC2030/SC2031 false/semantic warnings by replacing
+#     subshell export blocks with explicit env(1) invocation arrays.
+#   - Keeps subscript environment isolation without relying on assignments made
+#     inside `( ... )` groups.
+#   - Adds a generic run_env_with_timeout helper for external bash subscripts.
 # =============================================================================
 
 # Fail-safe shell posture. This script may be launched by strict parent shells,
@@ -61,7 +92,7 @@ trap - ERR EXIT INT TERM 2> /dev/null || true
 # -----------------------------------------------------------------------------
 case "${1:-}" in
     --version)
-        printf '%s v%s\n' 'post-start.sh' '2.9.0'
+        printf '%s v%s\n' 'post-start.sh' '3.0.2'
         exit 0
         ;;
     --help)
@@ -73,11 +104,17 @@ network/NSS orchestration and always exits 0 during normal hook execution.
 Long-running benchmark/compare jobs are intentionally not run from post-start;
 use npm run network:* or make network-* for prolonged benchmark collection.
 
-Endpoint registry policy in v2.9.0:
+Endpoint registry policy in v3.0.2:
   canonical: .devcontainer/scripts/network/endpoints.github-copilot.tsv
   legacy:    .devcontainer/network/endpoints.github-copilot.tsv (fallback only)
   manager:   receives explicit DEVCONTAINER_COPILOT_PROBE_ENDPOINTS only when
              the operator supplied that env var; otherwise the registry governs.
+
+DNS policy in v3.0.2:
+  local DNS cache is enabled by default and delegated to local-dns-cache.sh.
+  Success requires strong runtime proof from local-dns-cache.sh v1.8.0+.
+  Baseline resolv.conf fallback remains fail-safe, but preserves Docker DNS
+  search/domain semantics and avoids loopback unless explicitly allowed.
 USAGE
         exit 0
         ;;
@@ -113,12 +150,39 @@ cfg_uint() {
     printf '%s' "${value}"
 }
 
+space_list_to_lines() {
+    # Intentional, bounded whitespace splitting without pathname expansion.
+    # Used for env-configured lists such as DNS servers and probe URLs.
+    local value
+    value="${1:-}"
+    [[ -n "${value}" ]] || return 0
+    awk -v s="${value}" 'BEGIN { n=split(s,a,/[[:space:]]+/); for (i=1;i<=n;i++) if (a[i] != "") print a[i]; }' 2> /dev/null
+}
+
+colon_list_to_lines() {
+    local value
+    value="${1:-}"
+    [[ -n "${value}" ]] || return 0
+    awk -v s="${value}" 'BEGIN { n=split(s,a,/:/); for (i=1;i<=n;i++) if (a[i] != "") print a[i]; }' 2> /dev/null
+}
+
+space_list_contains() {
+    local list needle item
+    list="${1:-}"
+    needle="${2:-}"
+    [[ -n "${needle}" ]] || return 1
+    while IFS= read -r item; do
+        [[ "${item}" == "${needle}" ]] && return 0
+    done < <(space_list_to_lines "${list}")
+    return 1
+}
+
 # -----------------------------------------------------------------------------
 # Constants / sanitized config
 # -----------------------------------------------------------------------------
 SCRIPT_NAME="post-start.sh"
 readonly SCRIPT_NAME
-SCRIPT_VERSION="2.9.0"
+SCRIPT_VERSION="3.0.2"
 readonly SCRIPT_VERSION
 
 SCRIPT_DIR=""
@@ -182,6 +246,10 @@ LOCAL_DNS_CACHE_REPORT_FILE="${DEVCONTAINER_LOCAL_DNS_REPORT_FILE:-${DEVCONTAINE
 readonly LOCAL_DNS_CACHE_REPORT_FILE
 LOCAL_DNS_CACHE_METRICS_FILE="${DEVCONTAINER_LOCAL_DNS_METRICS_FILE:-${DEVCONTAINER_LOCAL_DNS_CACHE_METRICS_FILE:-/tmp/devcontainer-local-dns-cache.metrics.tsv}}"
 readonly LOCAL_DNS_CACHE_METRICS_FILE
+LOCAL_DNS_CACHE_ACTION_SUMMARY_FILE="${DEVCONTAINER_LOCAL_DNS_ACTION_SUMMARY_FILE:-${DEVCONTAINER_LOCAL_DNS_CACHE_ACTION_SUMMARY_FILE:-/tmp/devcontainer-local-dns-cache.action.summary}}"
+readonly LOCAL_DNS_CACHE_ACTION_SUMMARY_FILE
+LOCAL_DNS_CACHE_EVENTS_FILE="${DEVCONTAINER_LOCAL_DNS_EVENTS_FILE:-${DEVCONTAINER_LOCAL_DNS_CACHE_EVENTS_FILE:-/tmp/devcontainer-local-dns-cache.events.tsv}}"
+readonly LOCAL_DNS_CACHE_EVENTS_FILE
 LOCAL_COPILOT_PROXY_STATUS_FILE="${DEVCONTAINER_LOCAL_COPILOT_PROXY_STATUS_FILE:-/tmp/devcontainer-copilot-proxy.status}"
 readonly LOCAL_COPILOT_PROXY_STATUS_FILE
 LOCAL_COPILOT_PROXY_SUMMARY_FILE="${DEVCONTAINER_LOCAL_COPILOT_PROXY_SUMMARY_FILE:-/tmp/devcontainer-copilot-proxy.summary}"
@@ -208,11 +276,33 @@ POST_START_REPORT_FILE="${DEVCONTAINER_POST_START_REPORT_FILE:-/tmp/devcontainer
 readonly POST_START_REPORT_FILE
 POST_START_SUMMARY_FILE="${DEVCONTAINER_POST_START_SUMMARY_FILE:-/tmp/devcontainer-post-start.summary}"
 readonly POST_START_SUMMARY_FILE
+NETWORK_CONTROL_PLANE_SCRIPT="${DEVCONTAINER_NETWORK_CONTROL_PLANE_SCRIPT:-${SCRIPT_DIR}/network/network-control-plane-state.sh}"
+readonly NETWORK_CONTROL_PLANE_SCRIPT
+NETWORK_CONTROL_PLANE_STATUS_FILE="${DEVCONTAINER_NETWORK_CONTROL_PLANE_STATUS_FILE:-/tmp/devcontainer-network-control-plane.status}"
+readonly NETWORK_CONTROL_PLANE_STATUS_FILE
+NETWORK_CONTROL_PLANE_SUMMARY_FILE="${DEVCONTAINER_NETWORK_CONTROL_PLANE_SUMMARY_FILE:-/tmp/devcontainer-network-control-plane.summary}"
+readonly NETWORK_CONTROL_PLANE_SUMMARY_FILE
+NETWORK_CONTROL_PLANE_REPORT_FILE="${DEVCONTAINER_NETWORK_CONTROL_PLANE_REPORT_FILE:-/tmp/devcontainer-network-control-plane.report}"
+readonly NETWORK_CONTROL_PLANE_REPORT_FILE
+NETWORK_CONTROL_PLANE_EVENTS_FILE="${DEVCONTAINER_NETWORK_CONTROL_PLANE_EVENTS_FILE:-/tmp/devcontainer-network-control-plane.events.tsv}"
+readonly NETWORK_CONTROL_PLANE_EVENTS_FILE
+NETWORK_CONTROL_PLANE_JSON_FILE="${DEVCONTAINER_NETWORK_CONTROL_PLANE_JSON_FILE:-/tmp/devcontainer-network-control-plane.state.json}"
+readonly NETWORK_CONTROL_PLANE_JSON_FILE
 
 MAKE_INFO_TIMEOUT_SECONDS="$(cfg_uint "${DEVCONTAINER_MAKE_TIMEOUT:-10}" 10 1 120)"
 readonly MAKE_INFO_TIMEOUT_SECONDS
 SUBSCRIPT_TIMEOUT_SECONDS="$(cfg_uint "${DEVCONTAINER_POST_START_SUBSCRIPT_TIMEOUT_SECONDS:-90}" 90 5 600)"
 readonly SUBSCRIPT_TIMEOUT_SECONDS
+NETWORK_CONTROL_PLANE_TIMEOUT_SECONDS="$(cfg_uint "${DEVCONTAINER_NETWORK_CONTROL_PLANE_TIMEOUT_SECONDS:-10}" 10 2 60)"
+readonly NETWORK_CONTROL_PLANE_TIMEOUT_SECONDS
+ENABLE_NETWORK_CONTROL_PLANE_STATE="$(cfg_bool "${DEVCONTAINER_ENABLE_NETWORK_CONTROL_PLANE_STATE:-true}" true)"
+readonly ENABLE_NETWORK_CONTROL_PLANE_STATE
+NETWORK_CONTROL_PLANE_POST_START_ACTION="${DEVCONTAINER_NETWORK_CONTROL_PLANE_POST_START_ACTION:-summary}"
+case "${NETWORK_CONTROL_PLANE_POST_START_ACTION}" in
+    summary | status | doctor | json | events | report) : ;;
+    *) NETWORK_CONTROL_PLANE_POST_START_ACTION="summary" ;;
+esac
+readonly NETWORK_CONTROL_PLANE_POST_START_ACTION
 PROBE_CONNECT_TIMEOUT="$(cfg_uint "${DEVCONTAINER_COPILOT_PROBE_CONNECT_TIMEOUT:-5}" 5 1 60)"
 readonly PROBE_CONNECT_TIMEOUT
 PROBE_MAX_TIME="$(cfg_uint "${DEVCONTAINER_COPILOT_PROBE_MAX_TIME:-10}" 10 2 120)"
@@ -242,11 +332,17 @@ DNS_FIX_ALLOW_LOOPBACK_SERVERS="$(cfg_bool "${DEVCONTAINER_DNS_FIX_ALLOW_LOOPBAC
 readonly DNS_FIX_ALLOW_LOOPBACK_SERVERS
 DNS_FIX_MAX_NAMESERVERS="$(cfg_uint "${DEVCONTAINER_DNS_FIX_MAX_NAMESERVERS:-3}" 3 1 3)"
 readonly DNS_FIX_MAX_NAMESERVERS
+DNS_FIX_PRESERVE_SEARCH="$(cfg_bool "${DEVCONTAINER_POST_START_DNS_FIX_PRESERVE_SEARCH:-true}" true)"
+readonly DNS_FIX_PRESERVE_SEARCH
+DNS_BASELINE_PREFER_DOCKER_EMBEDDED="$(cfg_bool "${DEVCONTAINER_POST_START_DNS_BASELINE_PREFER_DOCKER_EMBEDDED:-true}" true)"
+readonly DNS_BASELINE_PREFER_DOCKER_EMBEDDED
+DOCKER_EMBEDDED_RESOLVER="${DEVCONTAINER_LOCAL_DNS_DOCKER_EMBEDDED_RESOLVER:-127.0.0.11}"
+readonly DOCKER_EMBEDDED_RESOLVER
 DNS_BASELINE_ON_CACHE_OFF="$(cfg_bool "${DEVCONTAINER_POST_START_DNS_BASELINE_ON_CACHE_OFF:-true}" true)"
 readonly DNS_BASELINE_ON_CACHE_OFF
 DNS_BASELINE_ON_CACHE_FAILURE="$(cfg_bool "${DEVCONTAINER_POST_START_DNS_BASELINE_ON_CACHE_FAILURE:-true}" true)"
 readonly DNS_BASELINE_ON_CACHE_FAILURE
-ENABLE_LOCAL_DNS_CACHE="$(cfg_bool "${DEVCONTAINER_ENABLE_LOCAL_DNS_CACHE:-false}" false)"
+ENABLE_LOCAL_DNS_CACHE="$(cfg_bool "${DEVCONTAINER_ENABLE_LOCAL_DNS_CACHE:-true}" true)"
 readonly ENABLE_LOCAL_DNS_CACHE
 LOCAL_DNS_CACHE_SCRIPT="${DEVCONTAINER_LOCAL_DNS_CACHE_SCRIPT:-${SCRIPT_DIR}/network/local-dns-cache.sh}"
 readonly LOCAL_DNS_CACHE_SCRIPT
@@ -507,10 +603,15 @@ write_post_start_report_header() {
         printf 'local_dns_status_file=%s\n' "${LOCAL_DNS_CACHE_STATUS_FILE}"
         printf 'local_dns_summary_file=%s\n' "${LOCAL_DNS_CACHE_SUMMARY_FILE}"
         printf 'local_dns_metrics_file=%s\n' "${LOCAL_DNS_CACHE_METRICS_FILE}"
+        printf 'local_dns_action_summary_file=%s\n' "${LOCAL_DNS_CACHE_ACTION_SUMMARY_FILE}"
+        printf 'local_dns_events_file=%s\n' "${LOCAL_DNS_CACHE_EVENTS_FILE}"
         printf 'copilot_network_diagnosis_file=%s\n' "${COPILOT_NETWORK_DIAGNOSIS_FILE}"
         printf 'copilot_network_recommendation_file=%s\n' "${COPILOT_NETWORK_RECOMMENDATION_FILE}"
         printf 'copilot_network_recommendation_json_file=%s\n' "${COPILOT_NETWORK_RECOMMENDATION_JSON_FILE}"
         printf 'dns_fix_max_nameservers=%s\n' "${DNS_FIX_MAX_NAMESERVERS}"
+        printf 'dns_fix_preserve_search=%s\n' "${DNS_FIX_PRESERVE_SEARCH}"
+        printf 'dns_baseline_prefer_docker_embedded=%s\n' "${DNS_BASELINE_PREFER_DOCKER_EMBEDDED}"
+        printf 'docker_embedded_resolver=%s\n' "${DOCKER_EMBEDDED_RESOLVER}"
         printf 'local_proxy_post_start_action=%s\n' "${LOCAL_COPILOT_PROXY_POST_START_ACTION}"
         printf 'local_proxy_benchmark_summary_file=%s\n' "${LOCAL_COPILOT_PROXY_BENCHMARK_SUMMARY_FILE}"
         printf 'local_proxy_comparison_file=%s\n' "${LOCAL_COPILOT_PROXY_COMPARISON_FILE}"
@@ -531,6 +632,12 @@ write_post_start_report_header() {
         printf 'boot_transport_profile=%s\n' "${BOOT_TRANSPORT_PROFILE}"
         printf 'apply_transport_recommendation=%s\n' "${POST_START_APPLY_TRANSPORT_RECOMMENDATION}"
         printf 'post_start_summary=%s\n' "${POST_START_SUMMARY_FILE}"
+        printf 'network_control_plane_script=%s\n' "${NETWORK_CONTROL_PLANE_SCRIPT}"
+        printf 'network_control_plane_status_file=%s\n' "${NETWORK_CONTROL_PLANE_STATUS_FILE}"
+        printf 'network_control_plane_summary_file=%s\n' "${NETWORK_CONTROL_PLANE_SUMMARY_FILE}"
+        printf 'network_control_plane_json_file=%s\n' "${NETWORK_CONTROL_PLANE_JSON_FILE}"
+        printf 'network_control_plane_enabled=%s\n' "${ENABLE_NETWORK_CONTROL_PLANE_STATE}"
+        printf 'network_control_plane_action=%s\n' "${NETWORK_CONTROL_PLANE_POST_START_ACTION}"
         printf '\n'
     } > "${POST_START_REPORT_FILE}" 2> /dev/null || true
 }
@@ -573,6 +680,66 @@ current_resolv_conf_nameservers() {
     if [[ -r /etc/resolv.conf ]]; then
         awk '/^[[:space:]]*nameserver[[:space:]]+/ { if (out != "") out = out " "; out = out $2 } END { print out }' /etc/resolv.conf 2> /dev/null
     fi
+}
+
+current_resolv_conf_first_nameserver() {
+    if [[ -r /etc/resolv.conf ]]; then
+        awk '/^[[:space:]]*nameserver[[:space:]]+/ { print $2; exit }' /etc/resolv.conf 2> /dev/null
+    fi
+}
+
+current_resolv_conf_has_docker_embedded() {
+    local nameservers
+    nameservers="$(current_resolv_conf_nameservers)"
+    case " ${nameservers} " in
+        *" ${DOCKER_EMBEDDED_RESOLVER} "*) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
+is_safe_resolv_domain_token() {
+    local token label labels old_ifs
+    token="${1:-}"
+    [[ -n "${token}" && ${#token} -le 253 ]] || return 1
+    [[ "${token}" == "." ]] && return 0
+    [[ "${token}" != *..* ]] || return 1
+    [[ "${token}" =~ ^[A-Za-z0-9_.-]+$ ]] || return 1
+
+    old_ifs="${IFS}"
+    IFS='.' read -r -a labels <<< "${token}"
+    IFS="${old_ifs}"
+
+    for label in "${labels[@]}"; do
+        [[ -z "${label}" ]] && continue
+        [[ ${#label} -le 63 ]] || return 1
+        [[ "${label}" =~ ^[A-Za-z0-9_]([A-Za-z0-9_-]*[A-Za-z0-9_])?$ ]] || return 1
+    done
+    return 0
+}
+
+safe_resolv_search_line_from_current() {
+    local line key token out count
+    [[ "${DNS_FIX_PRESERVE_SEARCH}" == "true" && -r /etc/resolv.conf ]] || return 0
+
+    line="$(awk '$1 == "search" || $1 == "domain" {line=$0} END {if (line != "") print line}' /etc/resolv.conf 2> /dev/null || true)"
+    [[ -n "${line}" ]] || return 0
+
+    # shellcheck disable=SC2086 # intentional resolv.conf tokenization after sanitation below
+    set -- ${line}
+    key="${1:-}"
+    shift || true
+    [[ "${key}" == "search" || "${key}" == "domain" ]] || return 0
+
+    out="${key}"
+    count=0
+    for token in "$@"; do
+        is_safe_resolv_domain_token "${token}" || continue
+        out="${out} ${token}"
+        count=$((count + 1))
+        [[ "${count}" -ge 12 ]] && break
+    done
+
+    [[ "${count}" -gt 0 ]] && printf '%s\n' "${out}"
 }
 
 local_dns_cache_runtime_proof() {
@@ -655,29 +822,64 @@ route_fix_proven_ok() {
 
 local_dns_cache_proven_ok() {
     local dns_status status_stale process_status port_status resolv_health nameservers
+    local runtime_effective resolver_effective system_uses_cache points_to_cache drift
+    local local_probe_status local_probe_proven local_probe_tool target_conflict write_privilege
     dns_status="$(read_status_value "${LOCAL_DNS_CACHE_STATUS_FILE}")"
     status_stale="$(kv_value_from_file "${LOCAL_DNS_CACHE_SUMMARY_FILE}" status_stale)"
     process_status="$(kv_value_from_file "${LOCAL_DNS_CACHE_SUMMARY_FILE}" dnsmasq_process_status)"
     port_status="$(kv_value_from_file "${LOCAL_DNS_CACHE_SUMMARY_FILE}" dnsmasq_port_status)"
     resolv_health="$(kv_value_from_file "${LOCAL_DNS_CACHE_SUMMARY_FILE}" resolv_conf_health)"
     nameservers="$(kv_value_from_file "${LOCAL_DNS_CACHE_SUMMARY_FILE}" resolv_conf_nameservers)"
+    runtime_effective="$(kv_value_from_file "${LOCAL_DNS_CACHE_SUMMARY_FILE}" runtime_effective)"
+    resolver_effective="$(kv_value_from_file "${LOCAL_DNS_CACHE_SUMMARY_FILE}" resolver_effective)"
+    system_uses_cache="$(kv_value_from_file "${LOCAL_DNS_CACHE_SUMMARY_FILE}" system_resolver_uses_cache)"
+    points_to_cache="$(kv_value_from_file "${LOCAL_DNS_CACHE_SUMMARY_FILE}" resolv_conf_points_to_cache)"
+    drift="$(kv_value_from_file "${LOCAL_DNS_CACHE_SUMMARY_FILE}" resolv_conf_drift)"
+    local_probe_status="$(kv_value_from_file "${LOCAL_DNS_CACHE_SUMMARY_FILE}" local_probe_status)"
+    local_probe_proven="$(kv_value_from_file "${LOCAL_DNS_CACHE_SUMMARY_FILE}" local_probe_proven)"
+    local_probe_tool="$(kv_value_from_file "${LOCAL_DNS_CACHE_SUMMARY_FILE}" local_probe_tool)"
+    target_conflict="$(kv_value_from_file "${LOCAL_DNS_CACHE_SUMMARY_FILE}" dnsmasq_target_port_conflict_status)"
+    write_privilege="$(kv_value_from_file "${LOCAL_DNS_CACHE_SUMMARY_FILE}" resolv_conf_write_privilege_status)"
 
     [[ "${dns_status}" == "ok" ]] || return 1
     [[ "${status_stale}" != "true" ]] || return 1
+    [[ "${drift}" != "true" ]] || return 1
     case "${process_status}" in
-        running*) : ;;
+        running-managed | running-managed-no-pidfile | running-managed-stale-pidfile | running*) : ;;
         *) return 1 ;;
     esac
     case "${port_status}" in
-        bound-managed | listening-managed | running-managed | ok | unknown) : ;;
+        bound-managed | bound-managed-no-pidfile | bound-managed-stale-pidfile | listening-managed | running-managed | ok | unknown) : ;;
         *) return 1 ;;
     esac
-    case "${resolv_health}:${nameservers}" in
-        *points-to-cache*:* | *ok*:* | *:127.0.0.1* | *:::1*) return 0 ;;
-        *) return 1 ;;
+    case "${target_conflict}" in
+        '' | unknown | none | ok | no-conflict | target-free | managed | bound-managed | controlled) : ;;
+        conflict* | bound-unmanaged | bound-owner-unavailable | port-in-use*) return 1 ;;
     esac
-}
 
+    # v1.8.0+ strong proof: process presence is not enough.  The DNS cache must
+    # have answered through a real DNS client probe before post-start treats it
+    # as the system resolver for default-on operation.
+    if [[ "${local_probe_proven}" == "true" ]]; then
+        :
+    elif [[ "${local_probe_status}" == ok* && "${local_probe_tool}" != "process-only" && -n "${local_probe_tool}" ]]; then
+        :
+    else
+        return 1
+    fi
+
+    [[ "${runtime_effective}" == "true" || -z "${runtime_effective}" ]] || return 1
+    [[ "${points_to_cache}" == "true" ]] || return 1
+    [[ "${resolver_effective}" == "true" || "${system_uses_cache}" == "true" ]] || return 1
+    case "${resolv_health}:${nameservers}" in
+        *points-to-cache*:* | *ok*:* | *:127.0.0.1* | *:::1*) : ;;
+        *) return 1 ;;
+    esac
+    case "${write_privilege}" in
+        denied | blocked | read-only | failed) return 1 ;;
+    esac
+    return 0
+}
 local_dns_cache_is_off_status() {
     local dns_status
     dns_status="$(read_status_value "${LOCAL_DNS_CACHE_STATUS_FILE}")"
@@ -739,6 +941,9 @@ write_post_start_summary() {
         printf 'local_dns_cache_status=%s\n' "${dns_status}"
         printf 'local_dns_cache_summary=%s\n' "${LOCAL_DNS_CACHE_SUMMARY_FILE}"
         printf 'local_dns_cache_metrics=%s\n' "${LOCAL_DNS_CACHE_METRICS_FILE}"
+        printf 'local_dns_cache_action_summary=%s\n' "${LOCAL_DNS_CACHE_ACTION_SUMMARY_FILE}"
+        printf 'local_dns_cache_events=%s\n' "${LOCAL_DNS_CACHE_EVENTS_FILE}"
+        printf 'local_dns_cache_report=%s\n' "${LOCAL_DNS_CACHE_REPORT_FILE}"
         printf 'local_dns_cache_resolv_conf_health=%s\n' "$(kv_value_from_file "${LOCAL_DNS_CACHE_SUMMARY_FILE}" resolv_conf_health)"
         printf 'local_dns_cache_status_stale=%s\n' "$(kv_value_from_file "${LOCAL_DNS_CACHE_SUMMARY_FILE}" status_stale)"
         printf 'local_dns_cache_dnsmasq_process_status=%s\n' "$(kv_value_from_file "${LOCAL_DNS_CACHE_SUMMARY_FILE}" dnsmasq_process_status)"
@@ -747,6 +952,29 @@ write_post_start_summary() {
         printf 'local_dns_cache_system_nameservers=%s\n' "$(sanitize_oneline "$(current_resolv_conf_nameservers)")"
         printf 'local_dns_cache_resolver_points_to_loopback_now=%s\n' "$(local_dns_cache_resolver_points_to_loopback_now)"
         printf 'local_dns_cache_selected_upstreams=%s\n' "$(sanitize_oneline "$(kv_value_from_file "${LOCAL_DNS_CACHE_SUMMARY_FILE}" selected_upstreams)")"
+        printf 'local_dns_cache_runtime_effective=%s\n' "$(kv_value_from_file "${LOCAL_DNS_CACHE_SUMMARY_FILE}" runtime_effective)"
+        printf 'local_dns_cache_resolver_effective=%s\n' "$(kv_value_from_file "${LOCAL_DNS_CACHE_SUMMARY_FILE}" resolver_effective)"
+        printf 'local_dns_cache_system_resolver_uses_cache=%s\n' "$(kv_value_from_file "${LOCAL_DNS_CACHE_SUMMARY_FILE}" system_resolver_uses_cache)"
+        printf 'local_dns_cache_resolv_conf_points_to_cache=%s\n' "$(kv_value_from_file "${LOCAL_DNS_CACHE_SUMMARY_FILE}" resolv_conf_points_to_cache)"
+        printf 'local_dns_cache_resolv_conf_drift=%s\n' "$(kv_value_from_file "${LOCAL_DNS_CACHE_SUMMARY_FILE}" resolv_conf_drift)"
+        printf 'local_dns_cache_resolv_conf_drift_reason=%s\n' "$(sanitize_oneline "$(kv_value_from_file "${LOCAL_DNS_CACHE_SUMMARY_FILE}" resolv_conf_drift_reason)")"
+        printf 'local_dns_cache_local_probe_status=%s\n' "$(kv_value_from_file "${LOCAL_DNS_CACHE_SUMMARY_FILE}" local_probe_status)"
+        printf 'local_dns_cache_local_probe_tool=%s\n' "$(kv_value_from_file "${LOCAL_DNS_CACHE_SUMMARY_FILE}" local_probe_tool)"
+        printf 'local_dns_cache_local_probe_proven=%s\n' "$(kv_value_from_file "${LOCAL_DNS_CACHE_SUMMARY_FILE}" local_probe_proven)"
+        printf 'local_dns_cache_local_probe_proof_reason=%s\n' "$(sanitize_oneline "$(kv_value_from_file "${LOCAL_DNS_CACHE_SUMMARY_FILE}" local_probe_proof_reason)")"
+        printf 'local_dns_cache_system_probe_status=%s\n' "$(kv_value_from_file "${LOCAL_DNS_CACHE_SUMMARY_FILE}" system_probe_status)"
+        printf 'local_dns_cache_docker_embedded_resolver_detected=%s\n' "$(kv_value_from_file "${LOCAL_DNS_CACHE_SUMMARY_FILE}" docker_embedded_resolver_detected)"
+        printf 'local_dns_cache_docker_embedded_upstream_status=%s\n' "$(kv_value_from_file "${LOCAL_DNS_CACHE_SUMMARY_FILE}" docker_embedded_upstream_status)"
+        printf 'local_dns_cache_docker_embedded_split_status=%s\n' "$(kv_value_from_file "${LOCAL_DNS_CACHE_SUMMARY_FILE}" docker_embedded_split_status)"
+        printf 'local_dns_cache_docker_embedded_split_domains=%s\n' "$(sanitize_oneline "$(kv_value_from_file "${LOCAL_DNS_CACHE_SUMMARY_FILE}" docker_embedded_split_domains)")"
+        printf 'local_dns_cache_dnsmasq_target_port_conflict_status=%s\n' "$(kv_value_from_file "${LOCAL_DNS_CACHE_SUMMARY_FILE}" dnsmasq_target_port_conflict_status)"
+        printf 'local_dns_cache_resolv_conf_write_privilege_status=%s\n' "$(kv_value_from_file "${LOCAL_DNS_CACHE_SUMMARY_FILE}" resolv_conf_write_privilege_status)"
+        printf 'local_dns_cache_warmup_status=%s\n' "$(kv_value_from_file "${LOCAL_DNS_CACHE_SUMMARY_FILE}" warmup_status)"
+        printf 'local_dns_cache_warmup_ok_count=%s\n' "$(kv_value_from_file "${LOCAL_DNS_CACHE_SUMMARY_FILE}" warmup_ok_count)"
+        printf 'local_dns_cache_warmup_failed_count=%s\n' "$(kv_value_from_file "${LOCAL_DNS_CACHE_SUMMARY_FILE}" warmup_failed_count)"
+        printf 'local_dns_cache_resolv_backup_trust_status=%s\n' "$(kv_value_from_file "${LOCAL_DNS_CACHE_SUMMARY_FILE}" resolv_backup_trust_status)"
+        printf 'local_dns_cache_resolv_conf_search_line=%s\n' "$(sanitize_oneline "$(kv_value_from_file "${LOCAL_DNS_CACHE_SUMMARY_FILE}" resolv_conf_search_line)")"
+        printf 'local_dns_cache_resolv_conf_domain_line=%s\n' "$(sanitize_oneline "$(kv_value_from_file "${LOCAL_DNS_CACHE_SUMMARY_FILE}" resolv_conf_domain_line)")"
         printf 'github_route_status=%s\n' "${route_status:-unknown}"
         printf 'github_route_summary=%s\n' "${GITHUB_ROUTE_SUMMARY_FILE}"
         printf 'github_route_metrics=%s\n' "${GITHUB_ROUTE_METRICS_FILE}"
@@ -796,6 +1024,13 @@ write_post_start_summary() {
         printf 'local_copilot_proxy_recommendation=%s\n' "${LOCAL_COPILOT_PROXY_RECOMMENDATION_FILE}"
         printf 'local_copilot_proxy_recommendation_action=%s\n' "${proxy_rec_action:-unknown}"
         printf 'local_copilot_proxy_recommendation_confidence=%s\n' "${proxy_rec_confidence:-unknown}"
+        printf 'network_control_plane_status=%s\n' "$(read_status_value "${NETWORK_CONTROL_PLANE_STATUS_FILE}")"
+        printf 'network_control_plane_summary=%s\n' "${NETWORK_CONTROL_PLANE_SUMMARY_FILE}"
+        printf 'network_control_plane_report=%s\n' "${NETWORK_CONTROL_PLANE_REPORT_FILE}"
+        printf 'network_control_plane_events=%s\n' "${NETWORK_CONTROL_PLANE_EVENTS_FILE}"
+        printf 'network_control_plane_json=%s\n' "${NETWORK_CONTROL_PLANE_JSON_FILE}"
+        printf 'network_control_plane_overall=%s\n' "$(kv_value_from_file "${NETWORK_CONTROL_PLANE_SUMMARY_FILE}" status)"
+        printf 'network_control_plane_next_actions=%s\n' "$(sanitize_oneline "$(kv_value_from_file "${NETWORK_CONTROL_PLANE_SUMMARY_FILE}" next_actions)")"
         printf 'post_start_report=%s\n' "${POST_START_REPORT_FILE}"
         printf 'health_error_log=%s\n' "${HEALTH_ERROR_LOG}"
         printf 'completed_at=%s\n' "$(ts)"
@@ -832,6 +1067,23 @@ run_with_timeout() {
     fi
 
     "$@"
+    return $?
+}
+
+run_env_with_timeout() {
+    # Run an external command with an explicit environment overlay.
+    # This avoids `export` mutations inside subshell groups, which ShellCheck
+    # correctly flags with SC2030/SC2031 even when the isolation is intentional.
+    local seconds
+    seconds="$1"
+    shift
+
+    if has_cmd timeout; then
+        timeout "${seconds}" env "$@"
+        return $?
+    fi
+
+    env "$@"
     return $?
 }
 
@@ -921,25 +1173,21 @@ is_allowed_dns_fix_nameserver() {
 }
 
 is_safe_hostname() {
-    local host label old_ifs
+    local host label labels old_ifs
     host="${1:-}"
     [[ ${#host} -ge 1 && ${#host} -le 253 ]] || return 1
     [[ "${host}" =~ ^[A-Za-z0-9][A-Za-z0-9.-]*[A-Za-z0-9]$ ]] || return 1
     [[ "${host}" != *..* ]] || return 1
     [[ "${host}" == *.* ]] || return 1
+
     old_ifs="${IFS}"
-    IFS='.'
-    for label in ${host}; do
-        [[ ${#label} -ge 1 && ${#label} -le 63 ]] || {
-            IFS="${old_ifs}"
-            return 1
-        }
-        [[ "${label}" =~ ^[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?$ ]] || {
-            IFS="${old_ifs}"
-            return 1
-        }
-    done
+    IFS='.' read -r -a labels <<< "${host}"
     IFS="${old_ifs}"
+
+    for label in "${labels[@]}"; do
+        [[ ${#label} -ge 1 && ${#label} -le 63 ]] || return 1
+        [[ "${label}" =~ ^[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?$ ]] || return 1
+    done
     return 0
 }
 
@@ -990,7 +1238,8 @@ is_safe_copilot_probe_url() {
 sanitize_resolv_options() {
     local token clean n
     clean=""
-    for token in ${DNS_FIX_OPTIONS}; do
+    while IFS= read -r token; do
+        [[ -n "${token}" ]] || continue
         case "${token}" in
             timeout:[0-9]*)
                 n="${token#timeout:}"
@@ -1022,7 +1271,7 @@ sanitize_resolv_options() {
                 log_warn "DNS fix: ignorando opção resolv.conf não permitida: ${token}"
                 ;;
         esac
-    done
+    done < <(space_list_to_lines "${DNS_FIX_OPTIONS}")
     clean="${clean# }"
     printf '%s\n' "${clean}"
 }
@@ -1142,7 +1391,7 @@ canonicalize_ld_preload() {
         return 0
     fi
 
-    local nss_lib old_preload new_preload token old_ifs
+    local nss_lib old_preload new_preload token
     nss_lib="$(resolve_nss_wrapper_lib 2> /dev/null || true)"
 
     if [[ -z "${nss_lib}" || ! -r "${nss_lib}" ]]; then
@@ -1152,10 +1401,8 @@ canonicalize_ld_preload() {
 
     old_preload="${LD_PRELOAD:-}"
     new_preload=""
-    old_ifs="${IFS}"
 
-    IFS=':'
-    for token in ${old_preload}; do
+    while IFS= read -r token; do
         [[ -z "${token}" ]] && continue
         case "${token}" in
             libnss_wrapper.so | */libnss_wrapper.so)
@@ -1167,8 +1414,7 @@ canonicalize_ld_preload() {
         else
             new_preload="${new_preload}:${token}"
         fi
-    done
-    IFS="${old_ifs}"
+    done < <(colon_list_to_lines "${old_preload}")
 
     if [[ -n "${new_preload}" ]]; then
         export LD_PRELOAD="${nss_lib}:${new_preload}"
@@ -1222,11 +1468,10 @@ normalize_nss_runtime_env() {
 }
 
 check_ld_preload() {
-    local val degraded token found_nss old_ifs
+    local val degraded token found_nss
     val="${LD_PRELOAD:-}"
     degraded=0
     found_nss=0
-    old_ifs="${IFS}"
 
     if [[ -z "${val}" ]]; then
         log_warn "LD_PRELOAD vazio; NSS wrapper pode não estar ativo."
@@ -1243,8 +1488,7 @@ check_ld_preload() {
         degraded=1
     fi
 
-    IFS=':'
-    for token in ${val}; do
+    while IFS= read -r token; do
         [[ -z "${token}" ]] && continue
         case "${token}" in
             libnss_wrapper.so)
@@ -1262,8 +1506,7 @@ check_ld_preload() {
                 fi
                 ;;
         esac
-    done
-    IFS="${old_ifs}"
+    done < <(colon_list_to_lines "${val}")
 
     if [[ "${found_nss}" -eq 0 ]]; then
         log_warn "LD_PRELOAD não contém libnss_wrapper.so; NSS wrapper pode não estar ativo."
@@ -1275,14 +1518,18 @@ check_ld_preload() {
         degraded=1
     fi
 
-    if [[ -n "${NSS_WRAPPER_PASSWD:-}" && (! -r "${NSS_WRAPPER_PASSWD}" || ! -s "${NSS_WRAPPER_PASSWD}") ]]; then
-        log_warn "NSS_WRAPPER_PASSWD inválido, ilegível ou vazio: ${NSS_WRAPPER_PASSWD}"
-        degraded=1
+    if [[ -n "${NSS_WRAPPER_PASSWD:-}" ]]; then
+        if [[ ! -r "${NSS_WRAPPER_PASSWD}" || ! -s "${NSS_WRAPPER_PASSWD}" ]]; then
+            log_warn "NSS_WRAPPER_PASSWD inválido, ilegível ou vazio: ${NSS_WRAPPER_PASSWD}"
+            degraded=1
+        fi
     fi
 
-    if [[ -n "${NSS_WRAPPER_GROUP:-}" && (! -r "${NSS_WRAPPER_GROUP}" || ! -s "${NSS_WRAPPER_GROUP}") ]]; then
-        log_warn "NSS_WRAPPER_GROUP inválido, ilegível ou vazio: ${NSS_WRAPPER_GROUP}"
-        degraded=1
+    if [[ -n "${NSS_WRAPPER_GROUP:-}" ]]; then
+        if [[ ! -r "${NSS_WRAPPER_GROUP}" || ! -s "${NSS_WRAPPER_GROUP}" ]]; then
+            log_warn "NSS_WRAPPER_GROUP inválido, ilegível ou vazio: ${NSS_WRAPPER_GROUP}"
+            degraded=1
+        fi
     fi
 
     return "${degraded}"
@@ -1389,6 +1636,174 @@ audit_nss_artifacts() {
 }
 
 # -----------------------------------------------------------------------------
+# DNS summary hygiene
+# -----------------------------------------------------------------------------
+write_local_dns_synthetic_summary() {
+    local status reason runtime resolver points drift
+    status="${1:-off}"
+    reason="${2:-synthetic}"
+    case "${status}" in
+        off | disabled | skipped | stopped)
+            runtime="false"
+            resolver="false"
+            points="false"
+            drift="false"
+            ;;
+        *)
+            runtime="false"
+            resolver="false"
+            points="false"
+            drift="unknown"
+            ;;
+    esac
+
+    {
+        printf 'status=%s\n' "${status}"
+        printf 'script_version=post-start-%s\n' "${SCRIPT_VERSION}"
+        printf 'summary_kind=synthetic-local-dns\n'
+        printf 'synthetic_reason=%s\n' "${reason}"
+        printf 'mode=%s\n' "${DEVCONTAINER_LOCAL_DNS_MODE:-auto}"
+        printf 'action=%s\n' "${LOCAL_DNS_CACHE_POST_START_ACTION}"
+        printf 'runtime_effective=%s\n' "${runtime}"
+        printf 'resolver_effective=%s\n' "${resolver}"
+        printf 'system_resolver_uses_cache=%s\n' "${resolver}"
+        printf 'resolv_conf_points_to_cache=%s\n' "${points}"
+        printf 'resolv_conf_managed=false\n'
+        printf 'resolv_conf_health=%s\n' "$(if [[ "${points}" == "true" ]]; then printf 'managed-points-to-cache'; else printf 'points-elsewhere'; fi)"
+        printf 'resolv_conf_nameservers=%s\n' "$(sanitize_oneline "$(current_resolv_conf_nameservers)")"
+        printf 'resolv_conf_first_nameserver=%s\n' "$(sanitize_oneline "$(current_resolv_conf_first_nameserver)")"
+        printf 'resolv_conf_drift=%s\n' "${drift}"
+        printf 'resolv_conf_drift_reason=%s\n' "${reason}"
+        printf 'status_stale=false\n'
+        printf 'previous_summary_stale=false\n'
+        printf 'dnsmasq_process_status=not-run\n'
+        printf 'dnsmasq_port_status=not-run\n'
+        printf 'dnsmasq_target_port_conflict_status=unknown\n'
+        printf 'selected_upstreams=unknown\n'
+        printf 'local_probe_status=not-run\n'
+        printf 'local_probe_tool=none\n'
+        printf 'local_probe_proven=false\n'
+        printf 'local_probe_proof_reason=%s\n' "${reason}"
+        printf 'system_probe_status=not-run\n'
+        printf 'docker_embedded_resolver_detected=%s\n' "$(if current_resolv_conf_has_docker_embedded; then printf true; else printf false; fi)"
+        printf 'docker_embedded_upstream_status=unknown\n'
+        printf 'docker_embedded_split_status=not-run\n'
+        printf 'docker_embedded_split_domains=unknown\n'
+        printf 'resolv_conf_write_privilege_status=not-checked\n'
+        printf 'warmup_status=not-run\n'
+        printf 'warmup_ok_count=0\n'
+        printf 'warmup_failed_count=0\n'
+        printf 'resolv_backup_trust_status=unknown\n'
+        printf 'resolv_conf_search_line=%s\n' "$(sanitize_oneline "$(safe_resolv_search_line_from_current)")"
+        printf 'resolv_conf_domain_line=none\n'
+        printf 'completed_at=%s\n' "$(ts)"
+    } | write_atomic_file "${LOCAL_DNS_CACHE_SUMMARY_FILE}" 0644 || true
+}
+
+write_route_synthetic_summary() {
+    local status reason
+    status="${1:-skipped}"
+    reason="${2:-not-run}"
+    write_status_file "${GITHUB_ROUTE_STATUS_FILE}" "${status}"
+    {
+        printf 'status=%s\n' "${status}"
+        printf 'summary_kind=synthetic-runtime-route\n'
+        printf 'script_version=post-start-%s\n' "${SCRIPT_VERSION}"
+        printf 'synthetic_reason=%s\n' "${reason}"
+        printf 'current_route_state=not-run\n'
+        printf 'current_ip=unknown\n'
+        printf 'selected_ip=none\n'
+        printf 'selected_latency_ms=unknown\n'
+        printf 'selected_p95_latency_ms=unknown\n'
+        printf 'root_reachability_state=unknown\n'
+        printf 'current_route_root_http=unknown\n'
+        printf 'current_route_root_tls=unknown\n'
+        printf 'hosts_apply_status=not-attempted\n'
+        printf 'verify_status=not-attempted\n'
+        printf 'verify_remote_ip=unknown\n'
+        printf 'verify_latency_ms=unknown\n'
+        printf 'verify_reason=%s\n' "${reason}"
+        printf 'decision_reason=decision=skipped;cause=%s\n' "${reason}"
+        printf 'completed_at=%s\n' "$(ts)"
+    } | write_atomic_file "${GITHUB_ROUTE_SUMMARY_FILE}" 0644 || true
+}
+
+write_manager_synthetic_summary() {
+    local status reason
+    status="${1:-skipped}"
+    reason="${2:-not-run}"
+    write_status_file "${COPILOT_NETWORK_STATUS_FILE}" "${status}"
+    {
+        printf 'status=%s\n' "${status}"
+        printf 'summary_kind=synthetic-copilot-network\n'
+        printf 'script_version=post-start-%s\n' "${SCRIPT_VERSION}"
+        printf 'synthetic_reason=%s\n' "${reason}"
+        printf 'plane_overall_status=not-run\n'
+        printf 'plane_github_api_status=not-run\n'
+        printf 'plane_copilot_transport_status=not-run\n'
+        printf 'plane_copilot_telemetry_status=not-run\n'
+        printf 'recommendations=observe\n'
+        printf 'manager_recommendation_blockers=%s\n' "${reason}"
+        printf 'next_diagnostic_actions=run-manager-doctor\n'
+        printf 'route_status=not-run\n'
+        printf 'route_selected_ip=unknown\n'
+        printf 'dns_cache_effective=%s\n' "$(local_dns_cache_runtime_proof)"
+        printf 'dns_cache_runtime_effective=%s\n' "$(kv_value_from_file "${LOCAL_DNS_CACHE_SUMMARY_FILE}" runtime_effective)"
+        printf 'dns_cache_resolver_effective=%s\n' "$(kv_value_from_file "${LOCAL_DNS_CACHE_SUMMARY_FILE}" resolver_effective)"
+        printf 'dns_cache_status_stale=%s\n' "$(kv_value_from_file "${LOCAL_DNS_CACHE_SUMMARY_FILE}" status_stale)"
+        printf 'dns_cache_resolv_conf_drift=%s\n' "$(kv_value_from_file "${LOCAL_DNS_CACHE_SUMMARY_FILE}" resolv_conf_drift)"
+        printf 'endpoints_total=0\n'
+        printf 'endpoints_ok=0\n'
+        printf 'endpoints_failed=0\n'
+        printf 'endpoints_slow=0\n'
+        printf 'current_worst_host=unknown\n'
+        printf 'primary_bottleneck=not-run\n'
+        printf 'endpoint_source=%s\n' "${COPILOT_PROBE_ENDPOINTS_SOURCE}"
+        printf 'endpoint_registry_file=%s\n' "${COPILOT_ENDPOINT_REGISTRY_FILE}"
+        printf 'endpoint_registry_status=%s\n' "${COPILOT_ENDPOINT_REGISTRY_STATUS}"
+        printf 'endpoint_registry_rows=%s\n' "${COPILOT_ENDPOINT_REGISTRY_ROWS}"
+        printf 'endpoint_registry_bad_rows=%s\n' "${COPILOT_ENDPOINT_REGISTRY_BAD_ROWS}"
+        printf 'completed_at=%s\n' "$(ts)"
+    } | write_atomic_file "${COPILOT_NETWORK_SUMMARY_FILE}" 0644 || true
+}
+
+write_proxy_synthetic_summary() {
+    local status reason
+    status="${1:-off}"
+    reason="${2:-not-run}"
+    write_status_file "${LOCAL_COPILOT_PROXY_STATUS_FILE}" "${status}"
+    {
+        printf 'status=%s\n' "${status}"
+        printf 'summary_kind=synthetic-local-copilot-proxy\n'
+        printf 'script_version=post-start-%s\n' "${SCRIPT_VERSION}"
+        printf 'synthetic_reason=%s\n' "${reason}"
+        printf 'mode=off\n'
+        printf 'proxy_url=unknown\n'
+        printf 'listen_address=unknown\n'
+        printf 'listen_port=unknown\n'
+        printf 'probe_url_source=%s\n' "${COPILOT_PROBE_ENDPOINTS_SOURCE}"
+        printf 'probe_url_count=0\n'
+        printf 'endpoint_registry_status=%s\n' "${COPILOT_ENDPOINT_REGISTRY_STATUS}"
+        printf 'endpoint_registry_rows=%s\n' "${COPILOT_ENDPOINT_REGISTRY_ROWS}"
+        printf 'endpoint_registry_bad_rows=%s\n' "${COPILOT_ENDPOINT_REGISTRY_BAD_ROWS}"
+        printf 'endpoint_registry_file=%s\n' "${COPILOT_ENDPOINT_REGISTRY_FILE}"
+        printf 'benchmark_status=not-run\n'
+        printf 'comparison_status=not-run\n'
+        printf 'recommendation_action=none\n'
+        printf 'completed_at=%s\n' "$(ts)"
+    } | write_atomic_file "${LOCAL_COPILOT_PROXY_SUMMARY_FILE}" 0644 || true
+}
+
+is_allowed_dns_baseline_nameserver() {
+    local ns
+    ns="${1:-}"
+    if [[ "${DNS_BASELINE_PREFER_DOCKER_EMBEDDED}" == "true" && "${ns}" == "${DOCKER_EMBEDDED_RESOLVER}" ]] && current_resolv_conf_has_docker_embedded; then
+        return 0
+    fi
+    is_allowed_dns_fix_nameserver "${ns}"
+}
+
+# -----------------------------------------------------------------------------
 # DNS baseline
 # -----------------------------------------------------------------------------
 fix_dns() {
@@ -1397,8 +1812,10 @@ fix_dns() {
         return 0
     fi
 
-    local tmp ns count configured
+    local tmp ns count configured safe_options search_line emitted docker_embedded_included
     count=0
+    emitted=""
+    docker_embedded_included="false"
     tmp="$(make_temp_file resolv.conf /tmp)"
     [[ -n "${tmp}" ]] || return 1
     : > "${tmp}" 2>> "${HEALTH_ERROR_LOG}" || {
@@ -1406,9 +1823,28 @@ fix_dns() {
         return 1
     }
 
-    for ns in ${DNS_FIX_SERVERS}; do
+    search_line="$(safe_resolv_search_line_from_current)"
+    if [[ -n "${search_line}" ]]; then
+        printf '%s\n' "${search_line}" >> "${tmp}"
+    fi
+
+    if [[ "${DNS_BASELINE_PREFER_DOCKER_EMBEDDED}" == "true" ]] && current_resolv_conf_has_docker_embedded; then
+        if is_allowed_dns_baseline_nameserver "${DOCKER_EMBEDDED_RESOLVER}"; then
+            printf 'nameserver %s\n' "${DOCKER_EMBEDDED_RESOLVER}" >> "${tmp}"
+            emitted="${DOCKER_EMBEDDED_RESOLVER}"
+            docker_embedded_included="true"
+            count=$((count + 1))
+        fi
+    fi
+
+    while IFS= read -r ns; do
+        [[ -n "${ns}" ]] || continue
         if is_allowed_dns_fix_nameserver "${ns}"; then
+            if space_list_contains "${emitted}" "${ns}"; then
+                continue
+            fi
             printf 'nameserver %s\n' "${ns}" >> "${tmp}"
+            emitted="${emitted}${emitted:+ }${ns}"
             count=$((count + 1))
             if ((count >= DNS_FIX_MAX_NAMESERVERS)); then
                 break
@@ -1416,9 +1852,8 @@ fix_dns() {
         else
             log_warn "DNS fix: ignorando nameserver inválido ou não permitido: ${ns}"
         fi
-    done
+    done < <(space_list_to_lines "${DNS_FIX_SERVERS}")
 
-    local safe_options
     safe_options="$(sanitize_resolv_options)"
     if [[ -n "${safe_options}" ]]; then
         printf 'options %s\n' "${safe_options}" >> "${tmp}"
@@ -1440,16 +1875,21 @@ fix_dns() {
     rm -f "${tmp}" 2> /dev/null || true
 
     configured="$(awk '/^nameserver/{printf "%s ", $2}' /etc/resolv.conf 2> /dev/null)"
-    log_info "DNS configurado: ${configured}"
+    log_info "DNS baseline configurado: ${configured} docker_embedded_included=${docker_embedded_included} preserved_search=$(sanitize_oneline "${search_line:-none}")"
+    append_post_start_report "dns_baseline=updated nameservers=$(sanitize_oneline "${configured}") docker_embedded_included=${docker_embedded_included} preserved_search=$(sanitize_oneline "${search_line:-none}")"
     return 0
 }
-
 run_local_dns_cache_if_enabled() {
     if [[ "${ENABLE_LOCAL_DNS_CACHE}" != "true" ]]; then
+        write_status_file "${LOCAL_DNS_CACHE_STATUS_FILE}" "off"
+        write_local_dns_synthetic_summary "off" "disabled-by-config"
+        append_post_start_report "local_dns_cache=disabled-by-config status_file=${LOCAL_DNS_CACHE_STATUS_FILE} summary_file=${LOCAL_DNS_CACHE_SUMMARY_FILE}"
         return 2
     fi
 
     if [[ ! -f "${LOCAL_DNS_CACHE_SCRIPT}" ]]; then
+        write_status_file "${LOCAL_DNS_CACHE_STATUS_FILE}" "degraded"
+        write_local_dns_synthetic_summary "degraded" "script-missing"
         log_warn "DNS cache local habilitado, mas subscript ausente: ${LOCAL_DNS_CACHE_SCRIPT}"
         return 1
     fi
@@ -1463,6 +1903,10 @@ run_local_dns_cache_if_enabled() {
         DEVCONTAINER_LOCAL_DNS_CACHE_SUMMARY_FILE="${LOCAL_DNS_CACHE_SUMMARY_FILE}" \
         DEVCONTAINER_LOCAL_DNS_REPORT_FILE="${LOCAL_DNS_CACHE_REPORT_FILE}" \
         DEVCONTAINER_LOCAL_DNS_METRICS_FILE="${LOCAL_DNS_CACHE_METRICS_FILE}" \
+        DEVCONTAINER_LOCAL_DNS_ACTION_SUMMARY_FILE="${LOCAL_DNS_CACHE_ACTION_SUMMARY_FILE}" \
+        DEVCONTAINER_LOCAL_DNS_CACHE_ACTION_SUMMARY_FILE="${LOCAL_DNS_CACHE_ACTION_SUMMARY_FILE}" \
+        DEVCONTAINER_LOCAL_DNS_EVENTS_FILE="${LOCAL_DNS_CACHE_EVENTS_FILE}" \
+        DEVCONTAINER_LOCAL_DNS_CACHE_EVENTS_FILE="${LOCAL_DNS_CACHE_EVENTS_FILE}" \
         run_with_timeout "${SUBSCRIPT_TIMEOUT_SECONDS}" bash "${LOCAL_DNS_CACHE_SCRIPT}"
     return $?
 }
@@ -1473,10 +1917,12 @@ run_local_dns_cache_if_enabled() {
 run_github_api_route_fix() {
     if [[ "${ENABLE_GITHUB_API_ROUTE_FIX}" != "true" ]]; then
         log_info "GitHub API route fix desabilitado por DEVCONTAINER_ENABLE_GITHUB_API_ROUTE_FIX=${ENABLE_GITHUB_API_ROUTE_FIX}."
+        write_route_synthetic_summary "skipped" "disabled-by-config"
         return 0
     fi
 
     if [[ ! -f "${GITHUB_API_ROUTE_SCRIPT}" ]]; then
+        write_route_synthetic_summary "degraded" "script-missing"
         log_warn "GitHub API route: subscript ausente: ${GITHUB_API_ROUTE_SCRIPT}"
         return 1
     fi
@@ -1499,71 +1945,71 @@ run_github_api_route_fix() {
 
 run_copilot_network_manager_if_enabled() {
     if [[ "${ENABLE_COPILOT_NETWORK_MANAGER}" != "true" ]]; then
+        write_manager_synthetic_summary "skipped" "disabled-by-config"
         return 2
     fi
 
     if [[ ! -f "${COPILOT_NETWORK_MANAGER_SCRIPT}" ]]; then
+        write_manager_synthetic_summary "degraded" "script-missing"
         log_warn "Copilot network manager habilitado, mas subscript ausente: ${COPILOT_NETWORK_MANAGER_SCRIPT}"
         return 1
     fi
 
     local boot_transport
+    local -a manager_env
     boot_transport="$(manager_recommended_transport_for_boot)"
     log_info "Executando GitHub/Copilot Network Manager: ${COPILOT_NETWORK_MANAGER_SCRIPT} action=${COPILOT_NETWORK_MANAGER_POST_START_ACTION} transport=${boot_transport} registry=${COPILOT_ENDPOINT_REGISTRY_STATUS}/${COPILOT_PROBE_ENDPOINTS_SOURCE}"
 
-    (
-        export DEVCONTAINER_COPILOT_NETWORK_MANAGER_ACTION="${COPILOT_NETWORK_MANAGER_POST_START_ACTION}"
-        export DEVCONTAINER_COPILOT_TRANSPORT_PROFILE="${boot_transport}"
-        export DEVCONTAINER_GITHUB_API_HOST="${GITHUB_API_HOST}"
-        export DEVCONTAINER_GITHUB_API_ROUTE_SCRIPT="${GITHUB_API_ROUTE_SCRIPT}"
-        export DEVCONTAINER_GITHUB_ROUTE_REPORT_FILE="${GITHUB_ROUTE_REPORT_FILE}"
-        export DEVCONTAINER_GITHUB_ROUTE_STATUS_FILE="${GITHUB_ROUTE_STATUS_FILE}"
-        export DEVCONTAINER_GITHUB_ROUTE_SUMMARY_FILE="${GITHUB_ROUTE_SUMMARY_FILE}"
-        export DEVCONTAINER_GITHUB_ROUTE_METRICS_FILE="${GITHUB_ROUTE_METRICS_FILE}"
-        export DEVCONTAINER_GITHUB_ROUTE_BENCHMARK_FILE="${GITHUB_ROUTE_BENCHMARK_FILE}"
-        export DEVCONTAINER_GITHUB_ROUTE_BENCHMARK_SUMMARY_FILE="${GITHUB_ROUTE_BENCHMARK_SUMMARY_FILE}"
-        export DEVCONTAINER_GITHUB_ROUTE_RECOMMENDATION_FILE="${GITHUB_ROUTE_RECOMMENDATION_FILE}"
-        export DEVCONTAINER_COPILOT_NETWORK_REPORT_FILE="${COPILOT_NETWORK_REPORT_FILE}"
-        export DEVCONTAINER_COPILOT_NETWORK_METRICS_FILE="${COPILOT_NETWORK_METRICS_FILE}"
-        export DEVCONTAINER_COPILOT_NETWORK_STATUS_FILE="${COPILOT_NETWORK_STATUS_FILE}"
-        export DEVCONTAINER_COPILOT_NETWORK_SUMMARY_FILE="${COPILOT_NETWORK_SUMMARY_FILE}"
-        export DEVCONTAINER_COPILOT_NETWORK_DIAGNOSIS_FILE="${COPILOT_NETWORK_DIAGNOSIS_FILE}"
-        export DEVCONTAINER_COPILOT_NETWORK_RECOMMENDATION_FILE="${COPILOT_NETWORK_RECOMMENDATION_FILE}"
-        export DEVCONTAINER_COPILOT_NETWORK_RECOMMENDATION_JSON_FILE="${COPILOT_NETWORK_RECOMMENDATION_JSON_FILE}"
-        export DEVCONTAINER_COPILOT_ENDPOINT_REGISTRY_FILE="${COPILOT_ENDPOINT_REGISTRY_FILE}"
-        export DEVCONTAINER_COPILOT_ENDPOINT_REGISTRY="${COPILOT_ENDPOINT_REGISTRY_FILE}"
-        export DEVCONTAINER_COPILOT_USE_ENDPOINT_REGISTRY="${USE_COPILOT_ENDPOINT_REGISTRY}"
-        export DEVCONTAINER_POST_START_ENDPOINT_REGISTRY_MAX_ROWS="${COPILOT_ENDPOINT_REGISTRY_MAX_ROWS}"
-        export DEVCONTAINER_COPILOT_MANAGER_MAX_ENDPOINTS="${COPILOT_ENDPOINT_REGISTRY_MAX_ROWS}"
-        export DEVCONTAINER_LOCAL_COPILOT_PROXY_SCRIPT="${LOCAL_COPILOT_PROXY_SCRIPT}"
-        export DEVCONTAINER_LOCAL_COPILOT_PROXY_STATUS_FILE="${LOCAL_COPILOT_PROXY_STATUS_FILE}"
-        export DEVCONTAINER_LOCAL_COPILOT_PROXY_SUMMARY_FILE="${LOCAL_COPILOT_PROXY_SUMMARY_FILE}"
-        export DEVCONTAINER_LOCAL_COPILOT_PROXY_BENCHMARK_FILE="${LOCAL_COPILOT_PROXY_BENCHMARK_FILE}"
-        export DEVCONTAINER_LOCAL_COPILOT_PROXY_BENCHMARK_SUMMARY_FILE="${LOCAL_COPILOT_PROXY_BENCHMARK_SUMMARY_FILE}"
-        export DEVCONTAINER_LOCAL_COPILOT_PROXY_COMPARISON_FILE="${LOCAL_COPILOT_PROXY_COMPARISON_FILE}"
-        export DEVCONTAINER_LOCAL_COPILOT_PROXY_RECOMMENDATION_FILE="${LOCAL_COPILOT_PROXY_RECOMMENDATION_FILE}"
-        export DEVCONTAINER_LOCAL_DNS_STATUS_FILE="${LOCAL_DNS_CACHE_STATUS_FILE}"
-        export DEVCONTAINER_LOCAL_DNS_SUMMARY_FILE="${LOCAL_DNS_CACHE_SUMMARY_FILE}"
-        export DEVCONTAINER_LOCAL_DNS_REPORT_FILE="${LOCAL_DNS_CACHE_REPORT_FILE}"
-        export DEVCONTAINER_LOCAL_DNS_METRICS_FILE="${LOCAL_DNS_CACHE_METRICS_FILE}"
-        export DEVCONTAINER_LOCAL_DNS_CACHE_STATUS_FILE="${LOCAL_DNS_CACHE_STATUS_FILE}"
-        export DEVCONTAINER_LOCAL_DNS_CACHE_SUMMARY_FILE="${LOCAL_DNS_CACHE_SUMMARY_FILE}"
-        export DEVCONTAINER_COPILOT_PROBE_IP_FAMILY="${COPILOT_PROBE_IP_FAMILY}"
-        export DEVCONTAINER_COPILOT_PROBE_CONNECT_TIMEOUT="${PROBE_CONNECT_TIMEOUT}"
-        export DEVCONTAINER_COPILOT_PROBE_MAX_TIME="${PROBE_MAX_TIME}"
-
-        # Critical v2.9.0 distinction:
-        # If the operator explicitly supplied DEVCONTAINER_COPILOT_PROBE_ENDPOINTS,
-        # preserve it. Otherwise do NOT export it, because the manager itself must
-        # consume the registry TSV as the primary source of truth.
-        if [[ "${COPILOT_PROBE_ENDPOINTS_SOURCE}" == "env-override" ]]; then
-            export DEVCONTAINER_COPILOT_PROBE_ENDPOINTS="${COPILOT_PROBE_ENDPOINTS}"
-        else
-            unset DEVCONTAINER_COPILOT_PROBE_ENDPOINTS 2> /dev/null || true
-        fi
-
-        run_with_timeout "${SUBSCRIPT_TIMEOUT_SECONDS}" bash "${COPILOT_NETWORK_MANAGER_SCRIPT}"
+    manager_env=(
+        "DEVCONTAINER_COPILOT_NETWORK_MANAGER_ACTION=${COPILOT_NETWORK_MANAGER_POST_START_ACTION}"
+        "DEVCONTAINER_COPILOT_TRANSPORT_PROFILE=${boot_transport}"
+        "DEVCONTAINER_GITHUB_API_HOST=${GITHUB_API_HOST}"
+        "DEVCONTAINER_GITHUB_API_ROUTE_SCRIPT=${GITHUB_API_ROUTE_SCRIPT}"
+        "DEVCONTAINER_GITHUB_ROUTE_REPORT_FILE=${GITHUB_ROUTE_REPORT_FILE}"
+        "DEVCONTAINER_GITHUB_ROUTE_STATUS_FILE=${GITHUB_ROUTE_STATUS_FILE}"
+        "DEVCONTAINER_GITHUB_ROUTE_SUMMARY_FILE=${GITHUB_ROUTE_SUMMARY_FILE}"
+        "DEVCONTAINER_GITHUB_ROUTE_METRICS_FILE=${GITHUB_ROUTE_METRICS_FILE}"
+        "DEVCONTAINER_GITHUB_ROUTE_BENCHMARK_FILE=${GITHUB_ROUTE_BENCHMARK_FILE}"
+        "DEVCONTAINER_GITHUB_ROUTE_BENCHMARK_SUMMARY_FILE=${GITHUB_ROUTE_BENCHMARK_SUMMARY_FILE}"
+        "DEVCONTAINER_GITHUB_ROUTE_RECOMMENDATION_FILE=${GITHUB_ROUTE_RECOMMENDATION_FILE}"
+        "DEVCONTAINER_COPILOT_NETWORK_REPORT_FILE=${COPILOT_NETWORK_REPORT_FILE}"
+        "DEVCONTAINER_COPILOT_NETWORK_METRICS_FILE=${COPILOT_NETWORK_METRICS_FILE}"
+        "DEVCONTAINER_COPILOT_NETWORK_STATUS_FILE=${COPILOT_NETWORK_STATUS_FILE}"
+        "DEVCONTAINER_COPILOT_NETWORK_SUMMARY_FILE=${COPILOT_NETWORK_SUMMARY_FILE}"
+        "DEVCONTAINER_COPILOT_NETWORK_DIAGNOSIS_FILE=${COPILOT_NETWORK_DIAGNOSIS_FILE}"
+        "DEVCONTAINER_COPILOT_NETWORK_RECOMMENDATION_FILE=${COPILOT_NETWORK_RECOMMENDATION_FILE}"
+        "DEVCONTAINER_COPILOT_NETWORK_RECOMMENDATION_JSON_FILE=${COPILOT_NETWORK_RECOMMENDATION_JSON_FILE}"
+        "DEVCONTAINER_COPILOT_ENDPOINT_REGISTRY_FILE=${COPILOT_ENDPOINT_REGISTRY_FILE}"
+        "DEVCONTAINER_COPILOT_ENDPOINT_REGISTRY=${COPILOT_ENDPOINT_REGISTRY_FILE}"
+        "DEVCONTAINER_COPILOT_USE_ENDPOINT_REGISTRY=${USE_COPILOT_ENDPOINT_REGISTRY}"
+        "DEVCONTAINER_POST_START_ENDPOINT_REGISTRY_MAX_ROWS=${COPILOT_ENDPOINT_REGISTRY_MAX_ROWS}"
+        "DEVCONTAINER_COPILOT_MANAGER_MAX_ENDPOINTS=${COPILOT_ENDPOINT_REGISTRY_MAX_ROWS}"
+        "DEVCONTAINER_LOCAL_COPILOT_PROXY_SCRIPT=${LOCAL_COPILOT_PROXY_SCRIPT}"
+        "DEVCONTAINER_LOCAL_COPILOT_PROXY_STATUS_FILE=${LOCAL_COPILOT_PROXY_STATUS_FILE}"
+        "DEVCONTAINER_LOCAL_COPILOT_PROXY_SUMMARY_FILE=${LOCAL_COPILOT_PROXY_SUMMARY_FILE}"
+        "DEVCONTAINER_LOCAL_COPILOT_PROXY_BENCHMARK_FILE=${LOCAL_COPILOT_PROXY_BENCHMARK_FILE}"
+        "DEVCONTAINER_LOCAL_COPILOT_PROXY_BENCHMARK_SUMMARY_FILE=${LOCAL_COPILOT_PROXY_BENCHMARK_SUMMARY_FILE}"
+        "DEVCONTAINER_LOCAL_COPILOT_PROXY_COMPARISON_FILE=${LOCAL_COPILOT_PROXY_COMPARISON_FILE}"
+        "DEVCONTAINER_LOCAL_COPILOT_PROXY_RECOMMENDATION_FILE=${LOCAL_COPILOT_PROXY_RECOMMENDATION_FILE}"
+        "DEVCONTAINER_LOCAL_DNS_STATUS_FILE=${LOCAL_DNS_CACHE_STATUS_FILE}"
+        "DEVCONTAINER_LOCAL_DNS_SUMMARY_FILE=${LOCAL_DNS_CACHE_SUMMARY_FILE}"
+        "DEVCONTAINER_LOCAL_DNS_REPORT_FILE=${LOCAL_DNS_CACHE_REPORT_FILE}"
+        "DEVCONTAINER_LOCAL_DNS_METRICS_FILE=${LOCAL_DNS_CACHE_METRICS_FILE}"
+        "DEVCONTAINER_LOCAL_DNS_ACTION_SUMMARY_FILE=${LOCAL_DNS_CACHE_ACTION_SUMMARY_FILE}"
+        "DEVCONTAINER_LOCAL_DNS_EVENTS_FILE=${LOCAL_DNS_CACHE_EVENTS_FILE}"
+        "DEVCONTAINER_LOCAL_DNS_CACHE_STATUS_FILE=${LOCAL_DNS_CACHE_STATUS_FILE}"
+        "DEVCONTAINER_LOCAL_DNS_CACHE_SUMMARY_FILE=${LOCAL_DNS_CACHE_SUMMARY_FILE}"
+        "DEVCONTAINER_COPILOT_PROBE_IP_FAMILY=${COPILOT_PROBE_IP_FAMILY}"
+        "DEVCONTAINER_COPILOT_PROBE_CONNECT_TIMEOUT=${PROBE_CONNECT_TIMEOUT}"
+        "DEVCONTAINER_COPILOT_PROBE_MAX_TIME=${PROBE_MAX_TIME}"
     )
+
+    if [[ "${COPILOT_PROBE_ENDPOINTS_SOURCE}" == "env-override" ]]; then
+        manager_env+=("DEVCONTAINER_COPILOT_PROBE_ENDPOINTS=${COPILOT_PROBE_ENDPOINTS}")
+        run_env_with_timeout "${SUBSCRIPT_TIMEOUT_SECONDS}" "${manager_env[@]}" bash "${COPILOT_NETWORK_MANAGER_SCRIPT}"
+    else
+        run_env_with_timeout "${SUBSCRIPT_TIMEOUT_SECONDS}" -u DEVCONTAINER_COPILOT_PROBE_ENDPOINTS "${manager_env[@]}" bash "${COPILOT_NETWORK_MANAGER_SCRIPT}"
+    fi
 
     return $?
 }
@@ -1571,14 +2017,17 @@ run_copilot_network_manager_if_enabled() {
 run_local_copilot_proxy_if_enabled() {
     # Contract: proxy is observed by default and started only by explicit opt-in.
     if [[ "${ENABLE_LOCAL_COPILOT_PROXY}" != "true" && "${OBSERVE_LOCAL_COPILOT_PROXY_STATUS}" != "true" ]]; then
+        write_proxy_synthetic_summary "off" "observe-disabled"
         return 2
     fi
 
     if [[ ! -f "${LOCAL_COPILOT_PROXY_SCRIPT}" ]]; then
         if [[ "${ENABLE_LOCAL_COPILOT_PROXY}" == "true" ]]; then
+            write_proxy_synthetic_summary "degraded" "script-missing"
             log_warn "Proxy local Copilot habilitado, mas subscript ausente: ${LOCAL_COPILOT_PROXY_SCRIPT}"
             return 1
         fi
+        write_proxy_synthetic_summary "off" "script-missing-observe-only"
         append_post_start_report "local_copilot_proxy=missing-observe-only script=${LOCAL_COPILOT_PROXY_SCRIPT}"
         return 2
     fi
@@ -1664,6 +2113,72 @@ source_local_copilot_proxy_env_for_hook_if_enabled() {
 
     append_post_start_report "proxy_env_source=no-safe-keys file=${LOCAL_COPILOT_PROXY_ENV_FILE}"
     return 1
+}
+
+write_control_plane_synthetic_summary() {
+    local status reason
+    status="${1:-skipped}"
+    reason="${2:-not-run}"
+    write_status_file "${NETWORK_CONTROL_PLANE_STATUS_FILE}" "${status}"
+    {
+        printf 'status=%s\n' "${status}"
+        printf 'summary_kind=synthetic-network-control-plane\n'
+        printf 'script_version=post-start-%s\n' "${SCRIPT_VERSION}"
+        printf 'synthetic_reason=%s\n' "${reason}"
+        printf 'overall=%s\n' "${status}"
+        printf 'health_status=%s\n' "$(read_status_value "${HEALTH_STATUS_FILE}")"
+        printf 'network_status=%s\n' "$(read_status_value "${NETWORK_STATUS_FILE}")"
+        printf 'diagnostics_status=%s\n' "$(read_status_value "${DIAGNOSTICS_STATUS_FILE}")"
+        printf 'dns_status=%s\n' "$(read_status_value "${LOCAL_DNS_CACHE_STATUS_FILE}")"
+        printf 'manager_status=%s\n' "$(read_status_value "${COPILOT_NETWORK_STATUS_FILE}")"
+        printf 'route_status=%s\n' "$(read_status_value "${GITHUB_ROUTE_STATUS_FILE}")"
+        printf 'proxy_status=%s\n' "$(read_status_value "${LOCAL_COPILOT_PROXY_STATUS_FILE}")"
+        printf 'next_actions=run-network-control-plane-state\n'
+        printf 'completed_at=%s\n' "$(ts)"
+    } | write_atomic_file "${NETWORK_CONTROL_PLANE_SUMMARY_FILE}" 0644 || true
+}
+
+# -----------------------------------------------------------------------------
+# Passive control-plane aggregation
+# -----------------------------------------------------------------------------
+run_network_control_plane_state_if_enabled() {
+    if [[ "${ENABLE_NETWORK_CONTROL_PLANE_STATE}" != "true" ]]; then
+        write_control_plane_synthetic_summary "skipped" "disabled-by-config"
+        append_post_start_report "network_control_plane=skipped opt_in=false"
+        return 2
+    fi
+    if [[ ! -f "${NETWORK_CONTROL_PLANE_SCRIPT}" ]]; then
+        write_control_plane_synthetic_summary "skipped" "script-missing"
+        append_post_start_report "network_control_plane=missing script=${NETWORK_CONTROL_PLANE_SCRIPT}"
+        return 2
+    fi
+
+    local -a control_plane_env
+    control_plane_env=(
+        "DEVCONTAINER_PROJECT_ROOT=${PROJECT_ROOT}"
+        "DEVCONTAINER_HEALTH_STATUS_FILE=${HEALTH_STATUS_FILE}"
+        "DEVCONTAINER_POST_START_SUMMARY_FILE=${POST_START_SUMMARY_FILE}"
+        "DEVCONTAINER_LOCAL_DNS_STATUS_FILE=${LOCAL_DNS_CACHE_STATUS_FILE}"
+        "DEVCONTAINER_LOCAL_DNS_SUMMARY_FILE=${LOCAL_DNS_CACHE_SUMMARY_FILE}"
+        "DEVCONTAINER_COPILOT_NETWORK_STATUS_FILE=${COPILOT_NETWORK_STATUS_FILE}"
+        "DEVCONTAINER_COPILOT_NETWORK_SUMMARY_FILE=${COPILOT_NETWORK_SUMMARY_FILE}"
+        "DEVCONTAINER_GITHUB_ROUTE_STATUS_FILE=${GITHUB_ROUTE_STATUS_FILE}"
+        "DEVCONTAINER_GITHUB_ROUTE_SUMMARY_FILE=${GITHUB_ROUTE_SUMMARY_FILE}"
+        "DEVCONTAINER_LOCAL_COPILOT_PROXY_STATUS_FILE=${LOCAL_COPILOT_PROXY_STATUS_FILE}"
+        "DEVCONTAINER_LOCAL_COPILOT_PROXY_SUMMARY_FILE=${LOCAL_COPILOT_PROXY_SUMMARY_FILE}"
+        "DEVCONTAINER_COPILOT_ROUTE_ADVISOR_STATUS_FILE=${COPILOT_ROUTE_ADVISOR_STATUS_FILE}"
+        "DEVCONTAINER_COPILOT_ROUTE_ADVISOR_SUMMARY_FILE=${COPILOT_ROUTE_ADVISOR_SUMMARY_FILE}"
+        "DEVCONTAINER_COPILOT_ENDPOINT_REGISTRY_FILE=${COPILOT_ENDPOINT_REGISTRY_FILE}"
+        "DEVCONTAINER_NETWORK_CONTROL_PLANE_STATUS_FILE=${NETWORK_CONTROL_PLANE_STATUS_FILE}"
+        "DEVCONTAINER_NETWORK_CONTROL_PLANE_SUMMARY_FILE=${NETWORK_CONTROL_PLANE_SUMMARY_FILE}"
+        "DEVCONTAINER_NETWORK_CONTROL_PLANE_REPORT_FILE=${NETWORK_CONTROL_PLANE_REPORT_FILE}"
+        "DEVCONTAINER_NETWORK_CONTROL_PLANE_EVENTS_FILE=${NETWORK_CONTROL_PLANE_EVENTS_FILE}"
+        "DEVCONTAINER_NETWORK_CONTROL_PLANE_JSON_FILE=${NETWORK_CONTROL_PLANE_JSON_FILE}"
+    )
+
+    log_info "Executando agregador passivo de control-plane: ${NETWORK_CONTROL_PLANE_SCRIPT} action=${NETWORK_CONTROL_PLANE_POST_START_ACTION}"
+    run_env_with_timeout "${NETWORK_CONTROL_PLANE_TIMEOUT_SECONDS}" "${control_plane_env[@]}" bash "${NETWORK_CONTROL_PLANE_SCRIPT}" --quiet "${NETWORK_CONTROL_PLANE_POST_START_ACTION}"
+    return $?
 }
 
 # -----------------------------------------------------------------------------
@@ -1836,7 +2351,8 @@ probe_copilot_connectivity() {
     write_probe_headers
     family_arg="$(curl_family_args)"
 
-    for url in ${COPILOT_PROBE_ENDPOINTS}; do
+    while IFS= read -r url; do
+        [[ -n "${url}" ]] || continue
         if should_skip_probe_url "${url}" "${route_fix_ok}"; then
             log_info "Copilot probe skip: ${url} já validado pelo GitHub API route fix."
             continue
@@ -1904,7 +2420,7 @@ probe_copilot_connectivity() {
             printf 'probe url=%s http=%s remote_ip=%s dns_ms=%s tcp_ms=%s tls_ms=%s ttfb_ms=%s total_ms=%s tls_verify=%s status=%s\n' \
                 "${url}" "${http_code:-000}" "${remote_ip:-unknown}" "${dns_ms}" "${tcp_ms}" "${tls_ms}" "${ttfb_ms}" "${total_ms}" "${tls_verify:-?}" "${status}"
         } >> "${COPILOT_NETWORK_REPORT_FILE}" 2> /dev/null || true
-    done
+    done < <(space_list_to_lines "${COPILOT_PROBE_ENDPOINTS}")
 
     if [[ "${failed}" -eq 0 ]]; then
         write_status_file "${COPILOT_NETWORK_STATUS_FILE}" "ok"
@@ -1934,7 +2450,11 @@ run_make_info() {
         return 1
     fi
 
-    run_with_timeout "${MAKE_INFO_TIMEOUT_SECONDS}" make info > /dev/null 2>> "${HEALTH_ERROR_LOG}"
+    if [[ -d "${PROJECT_ROOT}" ]]; then
+        run_with_timeout "${MAKE_INFO_TIMEOUT_SECONDS}" make -C "${PROJECT_ROOT}" info > /dev/null 2>> "${HEALTH_ERROR_LOG}"
+    else
+        run_with_timeout "${MAKE_INFO_TIMEOUT_SECONDS}" make info > /dev/null 2>> "${HEALTH_ERROR_LOG}"
+    fi
     return $?
 }
 
@@ -2005,7 +2525,7 @@ run_sync_local_auth() {
 main() {
     local status network_status diagnostics_status github_api_route_fix_ok
     local nss_env_rc dns_rc dns_cache_rc proxy_rc manager_rc github_api_route_rc make_rc nss_rc probe_rc
-    local dns_cache_status proxy_status manager_status run_legacy_probes manager_was_invoked
+    local dns_cache_status proxy_status manager_status run_legacy_probes manager_was_invoked control_plane_rc
 
     status="ok"
     network_status="ok"
@@ -2035,10 +2555,13 @@ main() {
     log_info "Route summary: ${GITHUB_ROUTE_SUMMARY_FILE}"
     log_info "Route metrics: ${GITHUB_ROUTE_METRICS_FILE}"
     log_info "Local DNS summary: ${LOCAL_DNS_CACHE_SUMMARY_FILE}"
+    log_info "Local DNS action summary: ${LOCAL_DNS_CACHE_ACTION_SUMMARY_FILE}"
+    log_info "Local DNS events: ${LOCAL_DNS_CACHE_EVENTS_FILE}"
     log_info "Copilot network diagnosis: ${COPILOT_NETWORK_DIAGNOSIS_FILE}"
     log_info "Copilot network recommendation: ${COPILOT_NETWORK_RECOMMENDATION_FILE}"
     log_info "Copilot network report: ${COPILOT_NETWORK_REPORT_FILE}"
     log_info "Copilot network summary: ${COPILOT_NETWORK_SUMMARY_FILE}"
+    log_info "Network control-plane state: ${NETWORK_CONTROL_PLANE_SCRIPT} (enabled=${ENABLE_NETWORK_CONTROL_PLANE_STATE})"
     log_info "Health error log: ${HEALTH_ERROR_LOG}"
     log_debug "Debug habilitado por DEVCONTAINER_VERBOSE_NETWORK=${DEVCONTAINER_VERBOSE_NETWORK:-false}."
     log_debug "PATH=${PATH:-<unset>}"
@@ -2089,6 +2612,7 @@ main() {
     if [[ "${dns_cache_rc}" -eq 0 ]] && local_dns_cache_proven_ok; then
         log_ok "DNS cache local comprovadamente ativo e saudável."
         append_summary_snapshot_to_report "local_dns_cache_summary" "${LOCAL_DNS_CACHE_SUMMARY_FILE}"
+        append_summary_snapshot_to_report "local_dns_cache_action_summary" "${LOCAL_DNS_CACHE_ACTION_SUMMARY_FILE}"
     elif [[ "${dns_cache_rc}" -eq 0 ]] && local_dns_cache_is_off_status; then
         log_info "DNS cache local retornou status=${dns_cache_status}."
         if [[ "${DNS_BASELINE_ON_CACHE_OFF}" == "true" ]]; then
@@ -2105,6 +2629,7 @@ main() {
         diagnostics_status="degraded"
         log_warn "DNS cache local declarou ok, mas não houve prova completa de dnsmasq/resolv.conf saudável; aplicando baseline conservador."
         append_summary_snapshot_to_report "local_dns_cache_summary" "${LOCAL_DNS_CACHE_SUMMARY_FILE}"
+        append_summary_snapshot_to_report "local_dns_cache_action_summary" "${LOCAL_DNS_CACHE_ACTION_SUMMARY_FILE}"
         if [[ "${DNS_BASELINE_ON_CACHE_FAILURE}" == "true" ]]; then
             fix_dns || network_status="degraded"
         fi
@@ -2125,6 +2650,7 @@ main() {
         network_status="degraded"
         log_warn "DNS cache local falhou/degradou."
         append_summary_snapshot_to_report "local_dns_cache_summary" "${LOCAL_DNS_CACHE_SUMMARY_FILE}"
+        append_summary_snapshot_to_report "local_dns_cache_action_summary" "${LOCAL_DNS_CACHE_ACTION_SUMMARY_FILE}"
         if [[ "${DNS_BASELINE_ON_CACHE_FAILURE}" == "true" ]]; then
             log_warn "Tentando DNS fix baseline como fallback controlado."
             fix_dns || true
@@ -2251,12 +2777,23 @@ main() {
     write_status_file "${DIAGNOSTICS_STATUS_FILE}" "${diagnostics_status}"
     write_post_start_summary "${status}" "${network_status}" "${diagnostics_status}"
 
+    run_network_control_plane_state_if_enabled
+    control_plane_rc=$?
+    append_post_start_report "network_control_plane_rc=${control_plane_rc} status=$(read_status_value "${NETWORK_CONTROL_PLANE_STATUS_FILE}")"
+    if [[ "${control_plane_rc}" -ne 0 && "${control_plane_rc}" -ne 2 ]]; then
+        diagnostics_status="degraded"
+        write_status_file "${DIAGNOSTICS_STATUS_FILE}" "${diagnostics_status}"
+        log_warn "Agregador network-control-plane-state retornou rc=${control_plane_rc}; diagnóstico degradado, boot preservado."
+    fi
+    write_post_start_summary "${status}" "${network_status}" "${diagnostics_status}"
+
     log_info "health.status=${status} (${HEALTH_STATUS_FILE})"
     log_info "network.status=${network_status} (${NETWORK_STATUS_FILE})"
     log_info "diagnostics.status=${diagnostics_status} (${DIAGNOSTICS_STATUS_FILE})"
     log_info "copilot.network.status=$(read_status_value "${COPILOT_NETWORK_STATUS_FILE}") (${COPILOT_NETWORK_STATUS_FILE})"
     log_info "post-start.report=${POST_START_REPORT_FILE}"
     log_info "post-start.summary=${POST_START_SUMMARY_FILE}"
+    log_info "network-control-plane.status=$(read_status_value "${NETWORK_CONTROL_PLANE_STATUS_FILE}") (${NETWORK_CONTROL_PLANE_STATUS_FILE})"
 
     append_post_start_report "final_health_status=${status}"
     append_post_start_report "final_network_status=${network_status}"

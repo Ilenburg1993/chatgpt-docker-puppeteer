@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # =============================================================================
 # local-dns-cache.sh — DevContainer Local DNS Cache Manager
-# Version: v1.6.0
+# Version: v1.8.0
 #
 # Purpose:
 #   Optional runtime-only DNS cache layer for DevContainers. Intended to be
@@ -55,6 +55,47 @@
 #     proof, not merely the first line of an old status file.
 #   - Keeps the same mutation scope: only managed dnsmasq lifecycle and optional
 #     /etc/resolv.conf content rewrite via tee; no Docker/DevContainer changes.
+#
+# v1.6.1 focus:
+#   - Adds /etc/resolv.conf drift forensics: inode, mtime, checksum, first
+#     nameserver, summary age and explicit drift reason.
+#   - Repairs the misleading socket-owner state where a bound port with hidden
+#     or unreported PIDs was summarized as "none".
+#   - Best-effort repairs managed stale pidfiles when the current dnsmasq
+#     process is found by command line and the pidfile points elsewhere.
+#   - Reclassifies status/health as stale when a previous OK summary claimed
+#     cache ownership but current /etc/resolv.conf has drifted.
+#   - Keeps benchmark-only state separate from runtime resolver effectiveness.
+#
+# v1.7.0 focus:
+#   - Adds explicit action artifacts so benchmark/doctor diagnostics no longer
+#     overwrite the runtime resolver summary by default.
+#   - Preserves Docker embedded DNS awareness: detects 127.0.0.11, can include
+#     it as a controlled upstream, and reports that choice explicitly.
+#   - Preserves safe search/domain directives when rewriting /etc/resolv.conf,
+#     avoiding accidental loss of Docker/Compose search behavior.
+#   - Adds backup metadata for /etc/resolv.conf and refuses stale backup restore
+#     across container-init boundaries unless explicitly allowed.
+#   - Adds bounded DNS warmup for GitHub/Copilot hosts after a proven start, to
+#     prime the local cache without adding long benchmarks to boot.
+#   - Gates optional dnsmasq features through --test probes when possible,
+#     avoiding hard failure on older distro dnsmasq builds.
+#
+# v1.8.0 focus:
+#   - Hardens DNS for default-on operation: no /etc/resolv.conf rewrite unless
+#     the local cache is proven through a real DNS client probe, not merely by
+#     process presence.
+#   - Adds split-horizon Docker embedded DNS routing by default when 127.0.0.11
+#     is detected, preserving Docker/Compose service discovery without sending
+#     all public GitHub/Copilot DNS traffic through Docker's embedded resolver.
+#   - Avoids boot-time live upstream benchmarks by default even when ranked
+#     selection is configured; ranking is persistent/manual unless explicitly
+#     re-enabled for start.
+#   - Fixes target-port detection so a listener on 127.0.0.11:53 or another
+#     loopback address is not mistaken for a conflict on 127.0.0.1:53.
+#   - Adds richer proof/summary fields for default-on governance: local probe
+#     tool/proof, Docker split domains, resolv.conf write privilege, and target
+#     port conflict status.
 # =============================================================================
 
 set +e
@@ -67,7 +108,7 @@ trap - ERR EXIT INT TERM 2> /dev/null || true
 # -----------------------------------------------------------------------------
 case "${1:-}" in
     --version)
-        printf '%s v%s\n' 'local-dns-cache.sh' '1.6.0'
+        printf '%s v%s\n' 'local-dns-cache.sh' '1.8.0'
         exit 0
         ;;
     --help)
@@ -89,8 +130,17 @@ Key knobs:
   DEVCONTAINER_LOCAL_DNS_UPSTREAM_SELECTION=static|ranked
 
 Runtime proof fields emitted in the summary include runtime_effective,
-resolver_effective, resolv_conf_points_to_cache, system_resolver_uses_cache and
-previous_summary_stale.
+resolver_effective, resolv_conf_points_to_cache, system_resolver_uses_cache,
+previous_summary_stale, resolv_conf_drift and resolv_conf identity fields.
+
+v1.7.0+ emits action.summary and events TSV artifacts, preserves safe
+search/domain directives when rewriting /etc/resolv.conf, tracks Docker embedded
+DNS 127.0.0.11, and can warm GitHub/Copilot DNS names after a proven start.
+
+v1.8.0 makes default-on operation stricter: /etc/resolv.conf is not rewritten
+unless the local cache is proven by dig/drill/nslookup, Docker embedded DNS is
+split-routed by default when detected, and ranked mode avoids live boot
+benchmarks unless explicitly enabled.
 
 This script is runtime-only. It may start a bounded loopback dnsmasq helper and
 may rewrite /etc/resolv.conf when explicitly enabled by configuration.
@@ -199,7 +249,7 @@ sanitize_resolv_options() {
 # -----------------------------------------------------------------------------
 SCRIPT_NAME="local-dns-cache.sh"
 readonly SCRIPT_NAME
-SCRIPT_VERSION="1.6.0"
+SCRIPT_VERSION="1.8.0"
 readonly SCRIPT_VERSION
 
 POSITIONAL_ACTION=""
@@ -278,6 +328,12 @@ METRICS_FILE="${DEVCONTAINER_LOCAL_DNS_METRICS_FILE:-/tmp/devcontainer-local-dns
 readonly METRICS_FILE
 RESOLV_BACKUP_FILE="${DEVCONTAINER_LOCAL_DNS_RESOLV_BACKUP_FILE:-/tmp/devcontainer-local-dns-cache.resolv.conf.backup}"
 readonly RESOLV_BACKUP_FILE
+RESOLV_BACKUP_META_FILE="${DEVCONTAINER_LOCAL_DNS_RESOLV_BACKUP_META_FILE:-${RESOLV_BACKUP_FILE}.meta}"
+readonly RESOLV_BACKUP_META_FILE
+ACTION_SUMMARY_FILE="${DEVCONTAINER_LOCAL_DNS_ACTION_SUMMARY_FILE:-/tmp/devcontainer-local-dns-cache.action.summary}"
+readonly ACTION_SUMMARY_FILE
+EVENTS_FILE="${DEVCONTAINER_LOCAL_DNS_EVENTS_FILE:-/tmp/devcontainer-local-dns-cache.events.tsv}"
+readonly EVENTS_FILE
 RESOLV_MANAGED_MARKER="devcontainer-local-dns-cache managed"
 readonly RESOLV_MANAGED_MARKER
 
@@ -291,6 +347,20 @@ RESTORE_RESOLV_CONF_ON_STOP="$(cfg_bool "${DEVCONTAINER_LOCAL_DNS_RESTORE_RESOLV
 readonly RESTORE_RESOLV_CONF_ON_STOP
 RESTORE_RESOLV_CONF_ON_FAILURE="$(cfg_bool "${DEVCONTAINER_LOCAL_DNS_RESTORE_RESOLV_CONF_ON_FAILURE:-true}" true)"
 readonly RESTORE_RESOLV_CONF_ON_FAILURE
+ALLOW_STALE_RESOLV_BACKUP_RESTORE="$(cfg_bool "${DEVCONTAINER_LOCAL_DNS_ALLOW_STALE_RESOLV_BACKUP_RESTORE:-false}" false)"
+readonly ALLOW_STALE_RESOLV_BACKUP_RESTORE
+PRESERVE_RESOLV_SEARCH="$(cfg_bool "${DEVCONTAINER_LOCAL_DNS_PRESERVE_RESOLV_SEARCH:-true}" true)"
+readonly PRESERVE_RESOLV_SEARCH
+DNS_DOMAIN_NEEDED="$(cfg_bool "${DEVCONTAINER_LOCAL_DNS_DOMAIN_NEEDED:-true}" true)"
+readonly DNS_DOMAIN_NEEDED
+DOCKER_EMBEDDED_RESOLVER="${DEVCONTAINER_LOCAL_DNS_DOCKER_EMBEDDED_RESOLVER:-127.0.0.11}"
+readonly DOCKER_EMBEDDED_RESOLVER
+DOCKER_EMBEDDED_DNS_MODE="${DEVCONTAINER_LOCAL_DNS_DOCKER_EMBEDDED_MODE:-auto}"
+case "${DOCKER_EMBEDDED_DNS_MODE}" in
+    auto | off | prefer | fallback | split | generic) : ;;
+    *) DOCKER_EMBEDDED_DNS_MODE="auto" ;;
+esac
+readonly DOCKER_EMBEDDED_DNS_MODE
 ENABLE_IPV6_UPSTREAMS="$(cfg_bool "${DEVCONTAINER_LOCAL_DNS_ENABLE_IPV6_UPSTREAMS:-false}" false)"
 readonly ENABLE_IPV6_UPSTREAMS
 ALLOW_NON_LOOPBACK_BIND="$(cfg_bool "${DEVCONTAINER_LOCAL_DNS_ALLOW_NON_LOOPBACK_BIND:-false}" false)"
@@ -339,6 +409,28 @@ STOP_BY_SOCKET_OWNER="$(cfg_bool "${DEVCONTAINER_LOCAL_DNS_STOP_BY_SOCKET_OWNER:
 readonly STOP_BY_SOCKET_OWNER
 REPAIR_ON_PROBE_FAILURE="$(cfg_bool "${DEVCONTAINER_LOCAL_DNS_REPAIR_ON_PROBE_FAILURE:-true}" true)"
 readonly REPAIR_ON_PROBE_FAILURE
+REPAIR_STALE_PIDFILE="$(cfg_bool "${DEVCONTAINER_LOCAL_DNS_REPAIR_STALE_PIDFILE:-true}" true)"
+readonly REPAIR_STALE_PIDFILE
+UPDATE_RUNTIME_SUMMARY_FOR_ACTIONS="$(cfg_bool "${DEVCONTAINER_LOCAL_DNS_ACTION_UPDATE_RUNTIME_SUMMARY:-false}" false)"
+readonly UPDATE_RUNTIME_SUMMARY_FOR_ACTIONS
+DNS_WARMUP="$(cfg_bool "${DEVCONTAINER_LOCAL_DNS_WARMUP:-true}" true)"
+readonly DNS_WARMUP
+DNS_WARMUP_HOSTS="${DEVCONTAINER_LOCAL_DNS_WARMUP_HOSTS:-${DNS_BENCHMARK_HOSTS}}"
+readonly DNS_WARMUP_HOSTS
+DNS_WARMUP_RECORD_TYPES="${DEVCONTAINER_LOCAL_DNS_WARMUP_RECORD_TYPES:-A}"
+readonly DNS_WARMUP_RECORD_TYPES
+DNS_WARMUP_MAX_HOSTS="$(cfg_uint "${DEVCONTAINER_LOCAL_DNS_WARMUP_MAX_HOSTS:-12}" 12 1 64)"
+readonly DNS_WARMUP_MAX_HOSTS
+REQUIRE_PROVEN_LOCAL_PROBE_FOR_RESOLV_CONF="$(cfg_bool "${DEVCONTAINER_LOCAL_DNS_REQUIRE_PROVEN_LOCAL_PROBE_FOR_RESOLV_CONF:-true}" true)"
+readonly REQUIRE_PROVEN_LOCAL_PROBE_FOR_RESOLV_CONF
+ALLOW_PROCESS_ONLY_LOCAL_PROBE="$(cfg_bool "${DEVCONTAINER_LOCAL_DNS_ALLOW_PROCESS_ONLY_LOCAL_PROBE:-false}" false)"
+readonly ALLOW_PROCESS_ONLY_LOCAL_PROBE
+DOCKER_EMBEDDED_ROUTE_UNQUALIFIED="$(cfg_bool "${DEVCONTAINER_LOCAL_DNS_DOCKER_EMBEDDED_ROUTE_UNQUALIFIED:-true}" true)"
+readonly DOCKER_EMBEDDED_ROUTE_UNQUALIFIED
+DOCKER_EMBEDDED_ROUTE_SEARCH_DOMAINS="$(cfg_bool "${DEVCONTAINER_LOCAL_DNS_DOCKER_EMBEDDED_ROUTE_SEARCH_DOMAINS:-true}" true)"
+readonly DOCKER_EMBEDDED_ROUTE_SEARCH_DOMAINS
+REBIND_OK_DOCKER_DOMAINS="$(cfg_bool "${DEVCONTAINER_LOCAL_DNS_REBIND_OK_DOCKER_DOMAINS:-true}" true)"
+readonly REBIND_OK_DOCKER_DOMAINS
 
 # Persistent upstream ranking and health/staleness controls.
 RANKING_FILE="${DEVCONTAINER_LOCAL_DNS_RANKING_FILE:-${XDG_CACHE_HOME:-${HOME:-/tmp}/.cache}/devcontainer/network/dns-upstream-ranking.tsv}"
@@ -357,13 +449,30 @@ RANKING_HYSTERESIS_SCORE_MARGIN="$(cfg_uint "${DEVCONTAINER_LOCAL_DNS_RANKING_HY
 readonly RANKING_HYSTERESIS_SCORE_MARGIN
 RANKING_FORCE_REBENCHMARK="$(cfg_bool "${DEVCONTAINER_LOCAL_DNS_FORCE_REBENCHMARK:-false}" false)"
 readonly RANKING_FORCE_REBENCHMARK
-RANKING_REBENCHMARK_ON_START="$(cfg_bool "${DEVCONTAINER_LOCAL_DNS_REBENCHMARK_ON_START:-true}" true)"
+RANKING_REBENCHMARK_ON_START="$(cfg_bool "${DEVCONTAINER_LOCAL_DNS_REBENCHMARK_ON_START:-false}" false)"
 readonly RANKING_REBENCHMARK_ON_START
 STATUS_STALE_MAX_SECONDS="$(cfg_uint "${DEVCONTAINER_LOCAL_DNS_STATUS_STALE_MAX_SECONDS:-0}" 0 0 604800)"
 readonly STATUS_STALE_MAX_SECONDS
 SELECTED_UPSTREAMS=""
 UPSTREAM_COUNT="0"
+RESOLV_CONF_SEARCH_LINE="none"
+RESOLV_CONF_DOMAIN_LINE="none"
+RESOLV_BACKUP_TRUST_STATUS="unknown"
+DOCKER_EMBEDDED_RESOLVER_DETECTED="unknown"
+DOCKER_EMBEDDED_UPSTREAM_STATUS="unknown"
+DOCKER_EMBEDDED_SPLIT_STATUS="unknown"
+DOCKER_EMBEDDED_SPLIT_DOMAINS="none"
+DNSMASQ_TARGET_PORT_CONFLICT_STATUS="unknown"
+RESOLV_CONF_WRITE_PRIVILEGE_STATUS="unknown"
+DNSMASQ_OPTION_COMPAT_STATUS="unknown"
+WARMUP_STATUS="not-run"
+WARMUP_HOSTS_COUNT="0"
+WARMUP_OK_COUNT="0"
+WARMUP_FAILED_COUNT="0"
 LOCAL_PROBE_STATUS="unknown"
+LOCAL_PROBE_TOOL="unknown"
+LOCAL_PROBE_PROVEN="false"
+LOCAL_PROBE_PROOF_REASON="not-run"
 SYSTEM_PROBE_STATUS="unknown"
 RESOLV_CONF_STATUS="unknown"
 RANKING_SOURCE="unknown"
@@ -376,8 +485,17 @@ DNSMASQ_PORT_STATUS="unknown"
 DNSMASQ_SOCKET_PIDS="unknown"
 DNSMASQ_SOCKET_DNSMASQ_PIDS="unknown"
 DNSMASQ_SOCKET_NON_DNSMASQ_PIDS="unknown"
+DNSMASQ_SOCKET_OWNER_VISIBILITY="unknown"
+DNSMASQ_PIDFILE_STATUS="unknown"
 RESOLV_CONF_HEALTH="unknown"
 RESOLV_CONF_NAMESERVERS="unknown"
+RESOLV_CONF_FIRST_NAMESERVER="unknown"
+RESOLV_CONF_MTIME_EPOCH="0"
+RESOLV_CONF_INODE="unknown"
+RESOLV_CONF_SHA256="unknown"
+RESOLV_CONF_DRIFT="unknown"
+RESOLV_CONF_DRIFT_REASON="unknown"
+RESOLV_CONF_SUMMARY_AGE_SECONDS="unknown"
 RESOLV_CONF_POINTS_TO_CACHE="unknown"
 RESOLV_CONF_MANAGED="unknown"
 SYSTEM_RESOLVER_USES_CACHE="unknown"
@@ -541,9 +659,21 @@ write_report_header() {
         printf 'use_stale_cache=%s\n' "${DNS_USE_STALE_CACHE}"
         printf 'takeover_stale_dnsmasq=%s\n' "${TAKEOVER_STALE_DNSMASQ}"
         printf 'restore_resolv_conf_on_failure=%s\n' "${RESTORE_RESOLV_CONF_ON_FAILURE}"
+        printf 'allow_stale_resolv_backup_restore=%s\n' "${ALLOW_STALE_RESOLV_BACKUP_RESTORE}"
+        printf 'preserve_resolv_search=%s\n' "${PRESERVE_RESOLV_SEARCH}"
+        printf 'docker_embedded_dns_mode=%s\n' "${DOCKER_EMBEDDED_DNS_MODE}"
+        printf 'docker_embedded_resolver=%s\n' "${DOCKER_EMBEDDED_RESOLVER}"
+        printf 'dns_warmup=%s\n' "${DNS_WARMUP}"
+        printf 'dns_warmup_hosts=%s\n' "${DNS_WARMUP_HOSTS}"
+        printf 'require_proven_local_probe_for_resolv_conf=%s\n' "${REQUIRE_PROVEN_LOCAL_PROBE_FOR_RESOLV_CONF}"
+        printf 'allow_process_only_local_probe=%s\n' "${ALLOW_PROCESS_ONLY_LOCAL_PROBE}"
+        printf 'docker_embedded_route_unqualified=%s\n' "${DOCKER_EMBEDDED_ROUTE_UNQUALIFIED}"
+        printf 'docker_embedded_route_search_domains=%s\n' "${DOCKER_EMBEDDED_ROUTE_SEARCH_DOMAINS}"
+        printf 'rebind_ok_docker_domains=%s\n' "${REBIND_OK_DOCKER_DOMAINS}"
         printf 'dnsmasq_start_mode=%s\n' "${DNSMASQ_START_MODE}"
         printf 'prefer_unprivileged_dnsmasq=%s\n' "${PREFER_UNPRIVILEGED_DNSMASQ}"
         printf 'repair_on_probe_failure=%s\n' "${REPAIR_ON_PROBE_FAILURE}"
+        printf 'repair_stale_pidfile=%s\n' "${REPAIR_STALE_PIDFILE}"
         printf 'ranking_file=%s\n' "${RANKING_FILE}"
         printf 'ranking_lock_wait_seconds=%s\n' "${RANKING_LOCK_WAIT_SECONDS}"
         printf 'ranking_max_age_seconds=%s\n' "${RANKING_MAX_AGE_SECONDS}"
@@ -573,6 +703,94 @@ append_metric() {
         >> "${METRICS_FILE}" 2> /dev/null || true
 }
 
+ensure_events_header() {
+    if [[ ! -s "${EVENTS_FILE}" ]]; then
+        printf '%s
+' 'timestamp	event	severity	detail' | safe_write_file "${EVENTS_FILE}" 0644 || true
+    fi
+}
+
+append_event() {
+    local event severity detail
+    event="${1:-event}"
+    severity="${2:-info}"
+    detail="${3:-}"
+    ensure_parent_dir "${EVENTS_FILE}"
+    ensure_events_header
+    detail="$(printf '%s' "${detail}" | tr '
+
+' '   ')"
+    printf '%s	%s	%s	%s
+' "$(ts)" "${event}" "${severity}" "${detail}" >> "${EVENTS_FILE}" 2> /dev/null || true
+}
+
+write_action_summary() {
+    local status reason kind
+    status="${1:-unknown}"
+    reason="${2:-none}"
+    kind="${3:-${ACTION}}"
+    {
+        printf 'summary_kind=action
+'
+        printf 'status=%s
+' "${status}"
+        printf 'reason=%s
+' "${reason}"
+        printf 'script_version=%s
+' "${SCRIPT_VERSION}"
+        printf 'action=%s
+' "${kind}"
+        printf 'mode=%s
+' "${DNS_MODE}"
+        printf 'selected_upstreams=%s
+' "${SELECTED_UPSTREAMS:-unknown}"
+        printf 'upstream_count=%s
+' "${UPSTREAM_COUNT:-0}"
+        printf 'ranking_source=%s
+' "${RANKING_SOURCE:-unknown}"
+        printf 'ranking_stale=%s
+' "${RANKING_STALE:-unknown}"
+        printf 'ranking_reason=%s
+' "${RANKING_REASON:-unknown}"
+        printf 'runtime_effective=%s
+' "${RUNTIME_EFFECTIVE:-unknown}"
+        printf 'resolver_effective=%s
+' "${RESOLVER_EFFECTIVE:-unknown}"
+        printf 'local_probe_tool=%s
+' "${LOCAL_PROBE_TOOL:-unknown}"
+        printf 'local_probe_proven=%s
+' "${LOCAL_PROBE_PROVEN:-false}"
+        printf 'local_probe_proof_reason=%s
+' "${LOCAL_PROBE_PROOF_REASON:-unknown}"
+        printf 'resolv_conf_drift=%s
+' "${RESOLV_CONF_DRIFT:-unknown}"
+        printf 'docker_embedded_resolver_detected=%s
+' "${DOCKER_EMBEDDED_RESOLVER_DETECTED:-unknown}"
+        printf 'docker_embedded_upstream_status=%s
+' "${DOCKER_EMBEDDED_UPSTREAM_STATUS:-unknown}"
+        printf 'docker_embedded_split_status=%s
+' "${DOCKER_EMBEDDED_SPLIT_STATUS:-unknown}"
+        printf 'docker_embedded_split_domains=%s
+' "${DOCKER_EMBEDDED_SPLIT_DOMAINS:-none}"
+        printf 'warmup_status=%s
+' "${WARMUP_STATUS:-not-run}"
+        printf 'warmup_hosts_count=%s
+' "${WARMUP_HOSTS_COUNT:-0}"
+        printf 'warmup_ok_count=%s
+' "${WARMUP_OK_COUNT:-0}"
+        printf 'warmup_failed_count=%s
+' "${WARMUP_FAILED_COUNT:-0}"
+        printf 'report=%s
+' "${REPORT_FILE}"
+        printf 'metrics=%s
+' "${METRICS_FILE}"
+        printf 'events=%s
+' "${EVENTS_FILE}"
+        printf 'completed_at=%s
+' "$(ts)"
+    } | safe_write_file "${ACTION_SUMMARY_FILE}" 0644 || true
+}
+
 managed_dnsmasq_runtime_running() {
     case "${DNSMASQ_PROCESS_STATUS:-unknown}" in
         running-managed | running-managed-no-pidfile | running-managed-stale-pidfile) return 0 ;;
@@ -587,7 +805,16 @@ runtime_effective_from_current_state() {
         *) return 1 ;;
     esac
     case "${LOCAL_PROBE_STATUS:-unknown}" in
-        ok | ok-*) return 0 ;;
+        ok | ok-dig | ok-drill | ok-nslookup)
+            [[ "${LOCAL_PROBE_PROVEN:-false}" == "true" ]] && return 0
+            return 2
+            ;;
+        ok-process-only)
+            # Process presence alone is not enough for default-on resolver
+            # governance. It is useful as an advisory status, but not proof that
+            # /etc/resolv.conf can safely be pointed at the cache.
+            return 2
+            ;;
         unknown)
             # During early collection a local probe may not have run yet. In that
             # case, a managed process plus a non-conflicting port is promising but
@@ -608,11 +835,240 @@ resolver_effective_from_current_state() {
     esac
 }
 
+resolv_conf_state_refresh() {
+    local nameservers first_ns search_line domain_line
+    if [[ -r /etc/resolv.conf ]]; then
+        nameservers="$(awk '$1 == "nameserver" {printf "%s%s", sep, $2; sep=" "}' /etc/resolv.conf 2> /dev/null || true)"
+        first_ns="$(awk '$1 == "nameserver" {print $2; exit}' /etc/resolv.conf 2> /dev/null || true)"
+        search_line="$(awk '$1 == "search" {line=$0} END{if(line!="") print line}' /etc/resolv.conf 2> /dev/null || true)"
+        domain_line="$(awk '$1 == "domain" {line=$0} END{if(line!="") print line}' /etc/resolv.conf 2> /dev/null || true)"
+        RESOLV_CONF_NAMESERVERS="${nameservers:-none}"
+        RESOLV_CONF_FIRST_NAMESERVER="${first_ns:-none}"
+        RESOLV_CONF_SEARCH_LINE="${search_line:-none}"
+        RESOLV_CONF_DOMAIN_LINE="${domain_line:-none}"
+        if printf '%s
+' "${nameservers}" | awk -v docker_ns="${DOCKER_EMBEDDED_RESOLVER}" '{for (i=1;i<=NF;i++) if ($i == docker_ns) found=1} END{exit found?0:1}'; then
+            DOCKER_EMBEDDED_RESOLVER_DETECTED="true"
+        else
+            DOCKER_EMBEDDED_RESOLVER_DETECTED="false"
+        fi
+        RESOLV_CONF_MTIME_EPOCH="$(file_mtime_epoch /etc/resolv.conf)"
+        RESOLV_CONF_INODE="$(stat -c '%i' /etc/resolv.conf 2> /dev/null || printf 'unknown')"
+        if has_cmd sha256sum; then
+            RESOLV_CONF_SHA256="$(sha256sum /etc/resolv.conf 2> /dev/null | awk '{print $1; exit}' || printf 'unknown')"
+        elif has_cmd cksum; then
+            RESOLV_CONF_SHA256="cksum:$(cksum /etc/resolv.conf 2> /dev/null | awk '{print $1":"$2; exit}' || printf 'unknown')"
+        else
+            RESOLV_CONF_SHA256="unavailable"
+        fi
+        if resolv_conf_is_managed; then
+            RESOLV_CONF_MANAGED="true"
+        else
+            RESOLV_CONF_MANAGED="false"
+        fi
+        if verify_resolv_conf_points_to_cache && [[ "${DNS_BIND_PORT}" == "53" ]]; then
+            RESOLV_CONF_POINTS_TO_CACHE="true"
+            if [[ "${RESOLV_CONF_MANAGED}" == "true" ]]; then
+                RESOLV_CONF_HEALTH="managed-points-to-cache"
+            else
+                RESOLV_CONF_HEALTH="points-to-cache-unmanaged"
+            fi
+        elif verify_resolv_conf_points_to_cache; then
+            RESOLV_CONF_POINTS_TO_CACHE="false"
+            RESOLV_CONF_HEALTH="points-to-cache-address-but-nonstandard-port"
+        elif [[ "${RESOLV_CONF_MANAGED}" == "true" ]]; then
+            RESOLV_CONF_POINTS_TO_CACHE="false"
+            RESOLV_CONF_HEALTH="managed-stale-not-pointing-to-cache"
+        else
+            RESOLV_CONF_POINTS_TO_CACHE="false"
+            RESOLV_CONF_HEALTH="points-elsewhere"
+        fi
+    else
+        RESOLV_CONF_NAMESERVERS="unreadable"
+        RESOLV_CONF_FIRST_NAMESERVER="unreadable"
+        RESOLV_CONF_SEARCH_LINE="unreadable"
+        RESOLV_CONF_DOMAIN_LINE="unreadable"
+        DOCKER_EMBEDDED_RESOLVER_DETECTED="unknown"
+        RESOLV_CONF_MTIME_EPOCH="0"
+        RESOLV_CONF_INODE="unknown"
+        RESOLV_CONF_SHA256="unreadable"
+        RESOLV_CONF_MANAGED="unknown"
+        RESOLV_CONF_POINTS_TO_CACHE="false"
+        RESOLV_CONF_HEALTH="unreadable"
+    fi
+}
+
+compute_resolv_conf_drift_from_previous_summary() {
+    local old_status old_nameservers old_points old_mtime old_inode old_hash summary_mtime now age
+    RESOLV_CONF_DRIFT="false"
+    RESOLV_CONF_DRIFT_REASON="current-runtime-evaluated"
+    RESOLV_CONF_SUMMARY_AGE_SECONDS="unknown"
+    [[ -r "${SUMMARY_FILE}" ]] || return 0
+
+    old_status="$(summary_value_from_file "${SUMMARY_FILE}" status)"
+    old_nameservers="$(summary_value_from_file "${SUMMARY_FILE}" resolv_conf_nameservers)"
+    old_points="$(summary_value_from_file "${SUMMARY_FILE}" resolv_conf_points_to_cache)"
+    old_mtime="$(summary_value_from_file "${SUMMARY_FILE}" resolv_conf_mtime_epoch)"
+    old_inode="$(summary_value_from_file "${SUMMARY_FILE}" resolv_conf_inode)"
+    old_hash="$(summary_value_from_file "${SUMMARY_FILE}" resolv_conf_sha256)"
+    summary_mtime="$(file_mtime_epoch "${SUMMARY_FILE}")"
+    now="$(now_epoch)"
+    if is_nonnegative_int "${now}" && is_nonnegative_int "${summary_mtime}" && ((summary_mtime > 0 && now >= summary_mtime)); then
+        age=$((now - summary_mtime))
+        RESOLV_CONF_SUMMARY_AGE_SECONDS="${age}"
+    fi
+
+    if [[ "${old_status}" == "ok" || "${old_points}" == "true" ]]; then
+        if [[ "${old_points}" == "true" && "${RESOLV_CONF_POINTS_TO_CACHE}" != "true" ]]; then
+            RESOLV_CONF_DRIFT="true"
+            RESOLV_CONF_DRIFT_REASON="previous-summary-claimed-cache-current-resolv-conf-does-not"
+            return 0
+        fi
+        if [[ -n "${old_nameservers}" && "${old_nameservers}" != "${RESOLV_CONF_NAMESERVERS}" ]]; then
+            RESOLV_CONF_DRIFT="true"
+            RESOLV_CONF_DRIFT_REASON="nameservers-changed-since-summary"
+            return 0
+        fi
+        if [[ -n "${old_inode}" && "${old_inode}" != "unknown" && "${old_inode}" != "${RESOLV_CONF_INODE}" ]]; then
+            RESOLV_CONF_DRIFT="true"
+            RESOLV_CONF_DRIFT_REASON="inode-changed-since-summary"
+            return 0
+        fi
+        if [[ -n "${old_hash}" && "${old_hash}" != "unknown" && "${old_hash}" != "unavailable" && "${old_hash}" != "${RESOLV_CONF_SHA256}" ]]; then
+            RESOLV_CONF_DRIFT="true"
+            RESOLV_CONF_DRIFT_REASON="content-hash-changed-since-summary"
+            return 0
+        fi
+        if [[ -n "${old_mtime}" && "${old_mtime}" =~ ^[0-9]+$ && "${RESOLV_CONF_MTIME_EPOCH}" =~ ^[0-9]+$ && "${old_mtime}" != "${RESOLV_CONF_MTIME_EPOCH}" ]]; then
+            # mtime alone is lower-confidence than nameserver/hash/inode, but it is
+            # valuable forensic evidence for post-attach when another process rewrites
+            # /etc/resolv.conf between lifecycle phases.
+            RESOLV_CONF_DRIFT="possible"
+            RESOLV_CONF_DRIFT_REASON="mtime-changed-since-summary"
+        fi
+    fi
+}
+
+ss_listen_lines_for_port() {
+    local port address
+    port="${1:-${DNS_BIND_PORT}}"
+    address="${2:-}"
+    has_cmd ss || return 0
+    {
+        ss -H -lnup 2> /dev/null || true
+        ss -H -lntp 2> /dev/null || true
+        ss -H -lntu 2> /dev/null || true
+    } | awk -v p="${port}" -v addr="${address}" '
+        function normalize_host(field, host) {
+            host=field
+            sub(/:[0-9]+$/, "", host)
+            gsub(/^\[/, "", host)
+            gsub(/\]$/, "", host)
+            return host
+        }
+        function host_matches(host) {
+            if (addr == "") return 1
+            if (host == addr) return 1
+            if (host == "*" || host == "0.0.0.0") return 1
+            if (host == "::" || host == "[::]") return 1
+            return 0
+        }
+        {
+            for (i = 1; i <= NF; i++) {
+                field=$i
+                if (field ~ ":" p "$") {
+                    host=normalize_host(field)
+                    if (host_matches(host)) { print; next }
+                }
+            }
+        }
+    ' | awk 'NF && !seen[$0]++'
+}
+
+socket_owner_lines() {
+    [[ "${STOP_BY_SOCKET_OWNER}" == "true" ]] || return 0
+    ss_listen_lines_for_port "${DNS_BIND_PORT}" "${DNS_BIND_ADDRESS}"
+}
+
+socket_owner_visibility_state() {
+    local lines
+    if ! has_cmd ss; then
+        printf 'ss-unavailable'
+        return 0
+    fi
+    lines="$(socket_owner_lines)"
+    if [[ -z "${lines}" ]]; then
+        printf 'none'
+        return 0
+    fi
+    if printf '%s\n' "${lines}" | grep -q 'pid=[0-9]'; then
+        printf 'visible'
+    elif printf '%s\n' "${lines}" | grep -q 'users:'; then
+        printf 'users-without-pid'
+    else
+        printf 'hidden-or-unavailable'
+    fi
+}
+
+write_privileged_file_from_stdin() {
+    local target mode tmp dir
+    target="${1:-}"
+    mode="${2:-0644}"
+    [[ -n "${target}" ]] || return 1
+    ensure_parent_dir "${target}"
+    dir="$(dirname "${target}" 2> /dev/null || printf '/tmp')"
+    tmp="$(mktemp "${dir%/}/.${SCRIPT_NAME}.priv.XXXXXX" 2> /dev/null || true)"
+    [[ -n "${tmp}" ]] || return 1
+    cat > "${tmp}" 2> /dev/null || {
+        rm -f "${tmp}" 2> /dev/null || true
+        return 1
+    }
+    chmod "${mode}" "${tmp}" 2> /dev/null || true
+    mv -f "${tmp}" "${target}" 2> /dev/null && return 0
+    safe_sudo tee "${target}" < "${tmp}" > /dev/null 2> /dev/null || {
+        rm -f "${tmp}" 2> /dev/null || true
+        return 1
+    }
+    safe_sudo chmod "${mode}" "${target}" 2> /dev/null || chmod "${mode}" "${target}" 2> /dev/null || true
+    rm -f "${tmp}" 2> /dev/null || true
+    return 0
+}
+
+repair_managed_pidfile_if_safe() {
+    local discovered current status
+    [[ "${REPAIR_STALE_PIDFILE}" == "true" ]] || return 1
+    discovered="$(first_managed_dnsmasq_pid_by_cmdline)"
+    [[ "${discovered}" =~ ^[0-9]+$ ]] || return 1
+    pid_is_alive "${discovered}" || return 1
+    current="$(read_dnsmasq_pid)"
+    if [[ "${current}" == "${discovered}" ]]; then
+        DNSMASQ_PIDFILE_STATUS="current"
+        return 0
+    fi
+    status="missing"
+    if [[ -n "${current}" ]]; then
+        if pid_is_alive "${current}"; then
+            status="different-live-${current}"
+        else
+            status="stale-dead-${current}"
+        fi
+    fi
+    if printf '%s\n' "${discovered}" | write_privileged_file_from_stdin "${DNSMASQ_PID_FILE}" 0644; then
+        DNSMASQ_PIDFILE_STATUS="repaired-from-${status}-to-${discovered}"
+        append_report "dnsmasq_pidfile_repaired old=${current:-none} new=${discovered} status=${status}"
+        return 0
+    fi
+    DNSMASQ_PIDFILE_STATUS="repair-failed-from-${status}-to-${discovered}"
+    append_report "dnsmasq_pidfile_repair_failed old=${current:-none} new=${discovered} status=${status}"
+    return 1
+}
+
 collect_socket_pid_state() {
-    local pid comm pids dns_pids other_pids
+    local pid comm pids dns_pids other_pids visibility
     pids=""
     dns_pids=""
     other_pids=""
+    visibility="$(socket_owner_visibility_state)"
     while IFS= read -r pid; do
         [[ -n "${pid}" ]] || continue
         if [[ -z "${pids}" ]]; then pids="${pid}"; else pids="${pids} ${pid}"; fi
@@ -623,9 +1079,16 @@ collect_socket_pid_state() {
             if [[ -z "${other_pids}" ]]; then other_pids="${pid}:${comm}"; else other_pids="${other_pids} ${pid}:${comm}"; fi
         fi
     done < <(socket_dnsmasq_pids)
-    DNSMASQ_SOCKET_PIDS="${pids:-none}"
-    DNSMASQ_SOCKET_DNSMASQ_PIDS="${dns_pids:-none}"
-    DNSMASQ_SOCKET_NON_DNSMASQ_PIDS="${other_pids:-none}"
+    DNSMASQ_SOCKET_OWNER_VISIBILITY="${visibility:-unknown}"
+    if [[ -z "${pids}" && "${visibility}" != "none" && "${visibility}" != "ss-unavailable" ]]; then
+        DNSMASQ_SOCKET_PIDS="unavailable"
+        DNSMASQ_SOCKET_DNSMASQ_PIDS="unavailable"
+        DNSMASQ_SOCKET_NON_DNSMASQ_PIDS="unavailable"
+    else
+        DNSMASQ_SOCKET_PIDS="${pids:-none}"
+        DNSMASQ_SOCKET_DNSMASQ_PIDS="${dns_pids:-none}"
+        DNSMASQ_SOCKET_NON_DNSMASQ_PIDS="${other_pids:-none}"
+    fi
 }
 
 collect_runtime_health() {
@@ -635,6 +1098,14 @@ collect_runtime_health() {
     discovered_pid="$(first_managed_dnsmasq_pid_by_cmdline)"
     DNSMASQ_PID_EFFECTIVE="${pid:-${discovered_pid:-none}}"
     DNSMASQ_PROCESS_STATUS="stopped"
+    DNSMASQ_PIDFILE_STATUS="unknown"
+    if [[ -z "${pid}" ]]; then
+        DNSMASQ_PIDFILE_STATUS="missing"
+    elif pid_is_alive "${pid}"; then
+        DNSMASQ_PIDFILE_STATUS="live"
+    else
+        DNSMASQ_PIDFILE_STATUS="stale-dead"
+    fi
 
     if [[ -n "${pid}" ]]; then
         if pid_is_alive "${pid}"; then
@@ -661,6 +1132,17 @@ collect_runtime_health() {
         DNSMASQ_PROCESS_STATUS="running-managed-no-pidfile"
     fi
 
+    if [[ "${DNSMASQ_PROCESS_STATUS}" == "running-managed-stale-pidfile" || "${DNSMASQ_PROCESS_STATUS}" == "running-managed-no-pidfile" ]]; then
+        repair_managed_pidfile_if_safe || true
+        pid="$(read_dnsmasq_pid)"
+        discovered_pid="$(first_managed_dnsmasq_pid_by_cmdline)"
+        if [[ -n "${pid}" && -n "${discovered_pid}" && "${pid}" == "${discovered_pid}" ]]; then
+            DNSMASQ_PID_EFFECTIVE="${pid}"
+            DNSMASQ_PROCESS_STATUS="running-managed"
+            [[ "${DNSMASQ_PIDFILE_STATUS}" == repaired-* ]] || DNSMASQ_PIDFILE_STATUS="current"
+        fi
+    fi
+
     collect_socket_pid_state
     if [[ "${STRICT_PORT_CHECK}" == "true" ]] && port_in_use "${DNS_BIND_ADDRESS}" "${DNS_BIND_PORT}"; then
         case "${DNSMASQ_PROCESS_STATUS}" in
@@ -669,8 +1151,10 @@ collect_runtime_health() {
             running-managed-stale-pidfile) DNSMASQ_PORT_STATUS="bound-managed-stale-pidfile" ;;
             running-dnsmasq-unmanaged-pidfile) DNSMASQ_PORT_STATUS="bound-dnsmasq-unmanaged-pidfile" ;;
             *)
-                if [[ "${DNSMASQ_SOCKET_DNSMASQ_PIDS}" != "none" ]]; then
+                if [[ "${DNSMASQ_SOCKET_DNSMASQ_PIDS}" != "none" && "${DNSMASQ_SOCKET_DNSMASQ_PIDS}" != "unavailable" ]]; then
                     DNSMASQ_PORT_STATUS="bound-dnsmasq-unmanaged"
+                elif [[ "${DNSMASQ_SOCKET_OWNER_VISIBILITY}" != "visible" && "${DNSMASQ_SOCKET_OWNER_VISIBILITY}" != "none" ]]; then
+                    DNSMASQ_PORT_STATUS="bound-owner-unavailable"
                 else
                     DNSMASQ_PORT_STATUS="bound-unmanaged"
                 fi
@@ -684,37 +1168,7 @@ collect_runtime_health() {
         fi
     fi
 
-    if [[ -r /etc/resolv.conf ]]; then
-        nameservers="$(awk '$1 == "nameserver" {printf "%s%s", sep, $2; sep=" "}' /etc/resolv.conf 2> /dev/null || true)"
-        RESOLV_CONF_NAMESERVERS="${nameservers:-none}"
-        if resolv_conf_is_managed; then
-            RESOLV_CONF_MANAGED="true"
-        else
-            RESOLV_CONF_MANAGED="false"
-        fi
-        if verify_resolv_conf_points_to_cache && [[ "${DNS_BIND_PORT}" == "53" ]]; then
-            RESOLV_CONF_POINTS_TO_CACHE="true"
-            if [[ "${RESOLV_CONF_MANAGED}" == "true" ]]; then
-                RESOLV_CONF_HEALTH="managed-points-to-cache"
-            else
-                RESOLV_CONF_HEALTH="points-to-cache-unmanaged"
-            fi
-        elif verify_resolv_conf_points_to_cache; then
-            RESOLV_CONF_POINTS_TO_CACHE="false"
-            RESOLV_CONF_HEALTH="points-to-cache-address-but-nonstandard-port"
-        elif [[ "${RESOLV_CONF_MANAGED}" == "true" ]]; then
-            RESOLV_CONF_POINTS_TO_CACHE="false"
-            RESOLV_CONF_HEALTH="managed-stale-not-pointing-to-cache"
-        else
-            RESOLV_CONF_POINTS_TO_CACHE="false"
-            RESOLV_CONF_HEALTH="points-elsewhere"
-        fi
-    else
-        RESOLV_CONF_NAMESERVERS="unreadable"
-        RESOLV_CONF_MANAGED="unknown"
-        RESOLV_CONF_POINTS_TO_CACHE="false"
-        RESOLV_CONF_HEALTH="unreadable"
-    fi
+    resolv_conf_state_refresh
 
     current_fp="$(container_fingerprint)"
     CONTAINER_FINGERPRINT="${current_fp:-unknown}"
@@ -740,12 +1194,20 @@ collect_runtime_health() {
                 PREVIOUS_SUMMARY_STALE_REASON="summary-age-exceeded-${STATUS_STALE_MAX_SECONDS}s"
             fi
         fi
+        compute_resolv_conf_drift_from_previous_summary
+    else
+        RESOLV_CONF_DRIFT="false"
+        RESOLV_CONF_DRIFT_REASON="writing-current-summary"
+        RESOLV_CONF_SUMMARY_AGE_SECONDS="0"
     fi
 
     if [[ "${summary_status}" == "ok" ]] && runtime_action_requires_dnsmasq; then
         if [[ "${WRITE_RESOLV_CONF}" == "true" && "${RESOLV_CONF_POINTS_TO_CACHE}" != "true" ]]; then
             STATUS_STALE="true"
             STATUS_STALE_REASON="previous-ok-but-current-resolv-conf-not-pointing-to-cache"
+        elif [[ "${RESOLV_CONF_DRIFT}" == "true" ]]; then
+            STATUS_STALE="true"
+            STATUS_STALE_REASON="resolv-conf-drift:${RESOLV_CONF_DRIFT_REASON}"
         elif ! managed_dnsmasq_runtime_running; then
             STATUS_STALE="true"
             STATUS_STALE_REASON="previous-ok-but-current-dnsmasq-not-managed-running"
@@ -787,7 +1249,7 @@ collect_runtime_health() {
     else
         append_report "dnsmasq_runtime pid=${DNSMASQ_PID_EFFECTIVE} status=${DNSMASQ_PROCESS_STATUS} port=${DNSMASQ_PORT_STATUS} socket_pids=${DNSMASQ_SOCKET_PIDS}"
     fi
-    append_report "resolv_conf_health=${RESOLV_CONF_HEALTH} nameservers=${RESOLV_CONF_NAMESERVERS} points_to_cache=${RESOLV_CONF_POINTS_TO_CACHE} managed=${RESOLV_CONF_MANAGED} runtime_effective=${RUNTIME_EFFECTIVE} resolver_effective=${RESOLVER_EFFECTIVE} status_stale=${STATUS_STALE} previous_summary_stale=${PREVIOUS_SUMMARY_STALE} stale_reason=${STATUS_STALE_REASON} previous_stale_reason=${PREVIOUS_SUMMARY_STALE_REASON}"
+    append_report "resolv_conf_health=${RESOLV_CONF_HEALTH} nameservers=${RESOLV_CONF_NAMESERVERS} first_nameserver=${RESOLV_CONF_FIRST_NAMESERVER} mtime=${RESOLV_CONF_MTIME_EPOCH} inode=${RESOLV_CONF_INODE} hash=${RESOLV_CONF_SHA256} points_to_cache=${RESOLV_CONF_POINTS_TO_CACHE} managed=${RESOLV_CONF_MANAGED} drift=${RESOLV_CONF_DRIFT} drift_reason=${RESOLV_CONF_DRIFT_REASON} runtime_effective=${RUNTIME_EFFECTIVE} resolver_effective=${RESOLVER_EFFECTIVE} local_probe=${LOCAL_PROBE_STATUS}/${LOCAL_PROBE_TOOL}/proven=${LOCAL_PROBE_PROVEN} docker_split=${DOCKER_EMBEDDED_SPLIT_STATUS}/${DOCKER_EMBEDDED_SPLIT_DOMAINS} status_stale=${STATUS_STALE} previous_summary_stale=${PREVIOUS_SUMMARY_STALE} stale_reason=${STATUS_STALE_REASON} previous_stale_reason=${PREVIOUS_SUMMARY_STALE_REASON}"
 }
 
 write_summary() {
@@ -806,6 +1268,7 @@ write_summary() {
         STATUS_STALE_REASON="not-applicable-for-${status}"
     fi
     {
+        printf 'summary_kind=runtime\n'
         printf 'status=%s\n' "${status}"
         printf 'reason=%s\n' "${reason}"
         printf 'script_version=%s\n' "${SCRIPT_VERSION}"
@@ -830,13 +1293,39 @@ write_summary() {
         printf 'dnsmasq_socket_pids=%s\n' "${DNSMASQ_SOCKET_PIDS}"
         printf 'dnsmasq_socket_dnsmasq_pids=%s\n' "${DNSMASQ_SOCKET_DNSMASQ_PIDS}"
         printf 'dnsmasq_socket_non_dnsmasq_pids=%s\n' "${DNSMASQ_SOCKET_NON_DNSMASQ_PIDS}"
+        printf 'dnsmasq_socket_owner_visibility=%s\n' "${DNSMASQ_SOCKET_OWNER_VISIBILITY}"
+        printf 'dnsmasq_pidfile_status=%s\n' "${DNSMASQ_PIDFILE_STATUS}"
         printf 'local_probe_status=%s\n' "${LOCAL_PROBE_STATUS}"
+        printf 'local_probe_tool=%s\n' "${LOCAL_PROBE_TOOL}"
+        printf 'local_probe_proven=%s\n' "${LOCAL_PROBE_PROVEN}"
+        printf 'local_probe_proof_reason=%s\n' "${LOCAL_PROBE_PROOF_REASON}"
         printf 'system_probe_status=%s\n' "${SYSTEM_PROBE_STATUS}"
         printf 'resolv_conf_status=%s\n' "${RESOLV_CONF_STATUS}"
         printf 'resolv_conf_health=%s\n' "${RESOLV_CONF_HEALTH}"
         printf 'resolv_conf_nameservers=%s\n' "${RESOLV_CONF_NAMESERVERS}"
+        printf 'resolv_conf_search_line=%s\n' "${RESOLV_CONF_SEARCH_LINE}"
+        printf 'resolv_conf_domain_line=%s\n' "${RESOLV_CONF_DOMAIN_LINE}"
+        printf 'resolv_conf_first_nameserver=%s\n' "${RESOLV_CONF_FIRST_NAMESERVER}"
+        printf 'resolv_conf_mtime_epoch=%s\n' "${RESOLV_CONF_MTIME_EPOCH}"
+        printf 'resolv_conf_inode=%s\n' "${RESOLV_CONF_INODE}"
+        printf 'resolv_conf_sha256=%s\n' "${RESOLV_CONF_SHA256}"
         printf 'resolv_conf_points_to_cache=%s\n' "${RESOLV_CONF_POINTS_TO_CACHE}"
         printf 'resolv_conf_managed=%s\n' "${RESOLV_CONF_MANAGED}"
+        printf 'resolv_conf_drift=%s\n' "${RESOLV_CONF_DRIFT}"
+        printf 'resolv_conf_drift_reason=%s\n' "${RESOLV_CONF_DRIFT_REASON}"
+        printf 'resolv_conf_summary_age_seconds=%s\n' "${RESOLV_CONF_SUMMARY_AGE_SECONDS}"
+        printf 'resolv_backup_trust_status=%s\n' "${RESOLV_BACKUP_TRUST_STATUS}"
+        printf 'docker_embedded_resolver_detected=%s\n' "${DOCKER_EMBEDDED_RESOLVER_DETECTED}"
+        printf 'docker_embedded_upstream_status=%s\n' "${DOCKER_EMBEDDED_UPSTREAM_STATUS}"
+        printf 'docker_embedded_split_status=%s\n' "${DOCKER_EMBEDDED_SPLIT_STATUS}"
+        printf 'docker_embedded_split_domains=%s\n' "${DOCKER_EMBEDDED_SPLIT_DOMAINS}"
+        printf 'dnsmasq_target_port_conflict_status=%s\n' "${DNSMASQ_TARGET_PORT_CONFLICT_STATUS}"
+        printf 'resolv_conf_write_privilege_status=%s\n' "${RESOLV_CONF_WRITE_PRIVILEGE_STATUS}"
+        printf 'dnsmasq_option_compat_status=%s\n' "${DNSMASQ_OPTION_COMPAT_STATUS}"
+        printf 'warmup_status=%s\n' "${WARMUP_STATUS}"
+        printf 'warmup_hosts_count=%s\n' "${WARMUP_HOSTS_COUNT}"
+        printf 'warmup_ok_count=%s\n' "${WARMUP_OK_COUNT}"
+        printf 'warmup_failed_count=%s\n' "${WARMUP_FAILED_COUNT}"
         printf 'runtime_effective=%s\n' "${RUNTIME_EFFECTIVE}"
         printf 'resolver_effective=%s\n' "${RESOLVER_EFFECTIVE}"
         printf 'system_resolver_uses_cache=%s\n' "${SYSTEM_RESOLVER_USES_CACHE}"
@@ -849,6 +1338,8 @@ write_summary() {
         printf 'dnsmasq_log_file=%s\n' "${DNSMASQ_LOG_FILE}"
         printf 'report=%s\n' "${REPORT_FILE}"
         printf 'metrics=%s\n' "${METRICS_FILE}"
+        printf 'action_summary=%s\n' "${ACTION_SUMMARY_FILE}"
+        printf 'events=%s\n' "${EVENTS_FILE}"
         printf 'completed_at=%s\n' "$(ts)"
     } | safe_write_file "${SUMMARY_FILE}" 0644 || true
 }
@@ -928,12 +1419,201 @@ is_valid_bind_address() {
     is_ipv4 "$1" || is_ipv6_literal "$1"
 }
 
+docker_embedded_resolver_should_be_considered() {
+    case "${DOCKER_EMBEDDED_DNS_MODE}" in
+        off) return 1 ;;
+        prefer | fallback | split | generic) return 0 ;;
+        auto)
+            if [[ "${DOCKER_EMBEDDED_RESOLVER_DETECTED:-unknown}" == "true" ]]; then return 0; fi
+            if [[ -r /etc/resolv.conf ]] && awk -v ns="${DOCKER_EMBEDDED_RESOLVER}" '$1=="nameserver" && $2==ns {found=1} END{exit found?0:1}' /etc/resolv.conf 2> /dev/null; then return 0; fi
+            return 1
+            ;;
+    esac
+    return 1
+}
+
+docker_embedded_generic_upstream_enabled() {
+    docker_embedded_resolver_should_be_considered || return 1
+    case "${DOCKER_EMBEDDED_DNS_MODE}" in
+        prefer | fallback | generic) return 0 ;;
+        auto | split) return 1 ;;
+    esac
+    return 1
+}
+
+docker_embedded_split_dns_enabled() {
+    docker_embedded_resolver_should_be_considered || return 1
+    case "${DOCKER_EMBEDDED_DNS_MODE}" in
+        auto | split | prefer | fallback) return 0 ;;
+        generic | off) return 1 ;;
+    esac
+    return 1
+}
+
+is_docker_embedded_resolver() {
+    [[ "${1:-}" == "${DOCKER_EMBEDDED_RESOLVER}" ]]
+}
+
+is_safe_resolv_domain_token() {
+    local token label old_ifs
+    token="${1:-}"
+    [[ -n "${token}" && ${#token} -le 253 ]] || return 1
+    [[ "${token}" == "." ]] && return 0
+    [[ "${token}" != *..* ]] || return 1
+    [[ "${token}" =~ ^[A-Za-z0-9_.-]+$ ]] || return 1
+    old_ifs="${IFS}"
+    IFS='.'
+    for label in ${token}; do
+        [[ -z "${label}" ]] && continue
+        [[ ${#label} -le 63 ]] || { IFS="${old_ifs}"; return 1; }
+        [[ "${label}" =~ ^[A-Za-z0-9_]([A-Za-z0-9_-]*[A-Za-z0-9_])?$ ]] || { IFS="${old_ifs}"; return 1; }
+    done
+    IFS="${old_ifs}"
+    return 0
+}
+
+safe_resolv_search_line_from_current() {
+    [[ "${PRESERVE_RESOLV_SEARCH}" == "true" && -r /etc/resolv.conf ]] || return 0
+    awk '
+        $1 == "search" || $1 == "domain" {line=$0}
+        END { if (line != "") print line }
+    ' /etc/resolv.conf 2> /dev/null | while IFS= read -r line; do
+        set -- ${line}
+        key="${1:-}"
+        shift || true
+        [[ "${key}" == "search" || "${key}" == "domain" ]] || continue
+        out="${key}"
+        count=0
+        for token in "$@"; do
+            is_safe_resolv_domain_token "${token}" || continue
+            out="${out} ${token}"
+            count=$((count + 1))
+            [[ "${count}" -ge 12 ]] && break
+        done
+        [[ "${count}" -gt 0 ]] && printf '%s\n' "${out}"
+        break
+    done
+}
+
+
+safe_resolv_search_domains_from_current() {
+    local line key token count
+    line="$(safe_resolv_search_line_from_current)"
+    [[ -n "${line}" ]] || return 0
+    set -- ${line}
+    key="${1:-}"
+    shift || true
+    [[ "${key}" == "search" || "${key}" == "domain" ]] || return 0
+    count=0
+    for token in "$@"; do
+        is_safe_resolv_domain_token "${token}" || continue
+        printf '%s\n' "${token}"
+        count=$((count + 1))
+        [[ "${count}" -ge 12 ]] && break
+    done
+}
+
+dnsmasq_safe_domain_pattern() {
+    local token
+    token="${1:-}"
+    is_safe_resolv_domain_token "${token}" || return 1
+    [[ "${token}" == "." ]] && return 1
+    printf '%s' "${token}" | tr -c 'A-Za-z0-9._-' '-'
+}
+
+emit_docker_embedded_split_config_lines() {
+    local domain domains any
+    docker_embedded_split_dns_enabled || {
+        DOCKER_EMBEDDED_SPLIT_STATUS="disabled"
+        DOCKER_EMBEDDED_SPLIT_DOMAINS="none"
+        return 0
+    }
+
+    any="false"
+    domains=""
+    if [[ "${DOCKER_EMBEDDED_ROUTE_UNQUALIFIED}" == "true" ]]; then
+        printf 'server=//%s\n' "${DOCKER_EMBEDDED_RESOLVER}"
+        any="true"
+        domains="unqualified"
+    fi
+
+    if [[ "${DOCKER_EMBEDDED_ROUTE_SEARCH_DOMAINS}" == "true" ]]; then
+        while IFS= read -r domain; do
+            [[ -n "${domain}" ]] || continue
+            domain="$(dnsmasq_safe_domain_pattern "${domain}")" || continue
+            [[ -n "${domain}" ]] || continue
+            printf 'server=/%s/%s\n' "${domain}" "${DOCKER_EMBEDDED_RESOLVER}"
+            if [[ "${REBIND_OK_DOCKER_DOMAINS}" == "true" ]]; then
+                printf 'rebind-domain-ok=/%s/\n' "${domain}"
+            fi
+            if [[ -z "${domains}" ]]; then domains="${domain}"; else domains="${domains},${domain}"; fi
+            any="true"
+        done < <(safe_resolv_search_domains_from_current)
+    fi
+
+    if [[ "${any}" == "true" ]]; then
+        DOCKER_EMBEDDED_SPLIT_STATUS="enabled"
+        DOCKER_EMBEDDED_SPLIT_DOMAINS="${domains:-unqualified}"
+        append_report "docker_embedded_split_dns=enabled resolver=${DOCKER_EMBEDDED_RESOLVER} domains=${DOCKER_EMBEDDED_SPLIT_DOMAINS}"
+    else
+        DOCKER_EMBEDDED_SPLIT_STATUS="skipped-no-domains"
+        DOCKER_EMBEDDED_SPLIT_DOMAINS="none"
+        append_report "docker_embedded_split_dns=skipped-no-domains resolver=${DOCKER_EMBEDDED_RESOLVER}"
+    fi
+}
+
+dnsmasq_config_line_supported() {
+    local line tmp test_log rc
+    line="${1:-}"
+    [[ -n "${line}" ]] || return 1
+    has_cmd dnsmasq || return 1
+    tmp="$(make_temp_file dnsmasq-option-test /tmp)"
+    [[ -n "${tmp}" ]] || return 1
+    test_log="$(make_temp_file dnsmasq-option-test-log /tmp)"
+    [[ -n "${test_log}" ]] || test_log="/dev/null"
+    {
+        printf 'no-resolv\n'
+        printf 'no-hosts\n'
+        printf 'port=0\n'
+        printf 'cache-size=0\n'
+        printf '%s\n' "${line}"
+        printf 'server=1.1.1.1\n'
+    } > "${tmp}" 2> /dev/null || { rm -f "${tmp}" "${test_log}" 2> /dev/null || true; return 1; }
+    dnsmasq --test --conf-file="${tmp}" > "${test_log}" 2>&1
+    rc=$?
+    if [[ "${rc}" -ne 0 ]]; then
+        append_report "dnsmasq_optional_line_unsupported line=${line} output=$(tr '\n' ' ' < "${test_log}" 2> /dev/null || true)"
+    fi
+    rm -f "${tmp}" "${test_log}" 2> /dev/null || true
+    return "${rc}"
+}
+
+emit_dnsmasq_optional_config_line() {
+    local line label
+    line="${1:-}"
+    label="${2:-${line}}"
+    [[ -n "${line}" ]] || return 1
+    if [[ "${DNS_VALIDATE_CONFIG}" == "true" && -n "${line}" ]]; then
+        if ! dnsmasq_config_line_supported "${line}"; then
+            DNSMASQ_OPTION_COMPAT_STATUS="skipped-${label}"
+            append_event "dnsmasq-option-skipped" "warn" "${label}"
+            return 1
+        fi
+    fi
+    printf '%s\n' "${line}"
+    DNSMASQ_OPTION_COMPAT_STATUS="ok"
+    return 0
+}
+
 is_valid_nameserver() {
     if is_ipv4 "$1"; then
         if is_ipv4_unusable_nameserver "$1"; then
             return 1
         fi
         if is_ipv4_loopback "$1" && [[ "${ALLOW_LOOPBACK_UPSTREAMS}" != "true" ]]; then
+            if is_docker_embedded_resolver "$1" && docker_embedded_generic_upstream_enabled; then
+                return 0
+            fi
             return 1
         fi
         return 0
@@ -1041,15 +1721,19 @@ dnsmasq_is_running() {
 }
 
 port_in_use() {
-    local address port line
+    local address port
     address="${1:-127.0.0.1}"
     port="${2:-53}"
+    DNSMASQ_TARGET_PORT_CONFLICT_STATUS="unknown"
     if has_cmd ss; then
-        while IFS= read -r line; do
-            [[ "${line}" == *":${port} "* || "${line}" == *":${port}" ]] || continue
-            [[ "${line}" == *"${address}:${port}"* || "${line}" == *"*:${port}"* || "${line}" == *"[::]:${port}"* ]] && return 0
-        done < <(ss -H -lntu 2> /dev/null || true)
+        if ss_listen_lines_for_port "${port}" "${address}" | awk 'NF{found=1} END{exit found?0:1}'; then
+            DNSMASQ_TARGET_PORT_CONFLICT_STATUS="in-use"
+            return 0
+        fi
+        DNSMASQ_TARGET_PORT_CONFLICT_STATUS="free"
+        return 1
     fi
+    DNSMASQ_TARGET_PORT_CONFLICT_STATUS="unknown-no-ss"
     return 1
 }
 
@@ -1089,14 +1773,46 @@ load_ranking_state() {
 }
 
 valid_upstreams_static() {
-    local upstream
+    local upstream emitted docker_emitted
+    emitted=""
+    docker_emitted="false"
+
+    if [[ "${DOCKER_EMBEDDED_DNS_MODE}" == "prefer" ]] && docker_embedded_generic_upstream_enabled; then
+        printf '%s
+' "${DOCKER_EMBEDDED_RESOLVER}"
+        emitted="${DOCKER_EMBEDDED_RESOLVER}"
+        docker_emitted="true"
+    fi
+
     for upstream in ${DNS_UPSTREAMS}; do
         if is_valid_nameserver "${upstream}"; then
-            printf '%s\n' "${upstream}"
+            if ! printf '%s
+' "${emitted}" | awk -v u="${upstream}" '$0 == u {found=1} END{exit found?0:1}'; then
+                printf '%s
+' "${upstream}"
+                emitted="${emitted}${emitted:+
+}${upstream}"
+            fi
         else
             append_report "ignored_invalid_upstream=${upstream}"
         fi
     done
+
+    if [[ "${docker_emitted}" != "true" && "${DOCKER_EMBEDDED_DNS_MODE}" != "off" ]] && docker_embedded_generic_upstream_enabled; then
+        if ! printf '%s
+' "${emitted}" | awk -v u="${DOCKER_EMBEDDED_RESOLVER}" '$0 == u {found=1} END{exit found?0:1}'; then
+            printf '%s
+' "${DOCKER_EMBEDDED_RESOLVER}"
+            docker_emitted="true"
+        fi
+    fi
+
+    if [[ "${docker_emitted}" == "true" ]]; then
+        DOCKER_EMBEDDED_UPSTREAM_STATUS="included-${DOCKER_EMBEDDED_DNS_MODE}"
+        append_report "docker_embedded_resolver=included resolver=${DOCKER_EMBEDDED_RESOLVER} mode=${DOCKER_EMBEDDED_DNS_MODE}"
+    else
+        DOCKER_EMBEDDED_UPSTREAM_STATUS="not-included"
+    fi
 }
 
 benchmark_one_upstream() {
@@ -1303,11 +2019,28 @@ choose_ranked_upstreams() {
     if [[ "${RANKING_FORCE_REBENCHMARK}" == "true" || "${ACTION}" == "benchmark" ]]; then
         need_live="true"
     elif [[ -z "${persistent}" ]]; then
-        need_live="true"
+        if [[ "${ACTION}" == "start" || "${ACTION}" == "restart" || "${ACTION}" == "health" || "${ACTION}" == "status" ]] && [[ "${RANKING_REBENCHMARK_ON_START}" != "true" ]]; then
+            need_live="false-static"
+        else
+            need_live="true"
+        fi
     elif ! ranking_is_fresh; then
         need_live="true"
     elif [[ "${RANKING_REBENCHMARK_ON_START}" == "true" && "${age}" -ge "${RANKING_REBENCHMARK_MIN_SECONDS}" ]]; then
         need_live="true"
+    fi
+
+    if [[ "${need_live}" == "false-static" ]]; then
+        local static_selected
+        RANKING_SOURCE="static"
+        RANKING_STALE="unknown"
+        RANKING_REASON="no-persistent-ranking-live-benchmark-disabled-on-start"
+        static_selected="$(valid_upstreams_static)"
+        SELECTED_UPSTREAMS="$(printf '%s\n' "${static_selected}" | awk 'NF{printf "%s%s", sep, $0; sep=" "}')"
+        UPSTREAM_COUNT="$(printf '%s\n' "${static_selected}" | awk 'NF{c++} END{print c+0}')"
+        write_ranking_state
+        printf '%s\n' "${static_selected}"
+        return 0
     fi
 
     if [[ "${need_live}" != "true" ]]; then
@@ -1455,13 +2188,20 @@ write_dnsmasq_config() {
         if [[ "${READ_ETC_HOSTS}" != "true" ]]; then
             printf 'no-hosts\n'
         fi
-        printf 'domain-needed\n'
+        if [[ "${DNS_DOMAIN_NEEDED}" == "true" ]]; then
+            if docker_embedded_split_dns_enabled && [[ "${DOCKER_EMBEDDED_ROUTE_UNQUALIFIED}" == "true" ]]; then
+                append_report "dnsmasq_domain_needed=skipped reason=docker-embedded-unqualified-split"
+                append_event "dnsmasq-domain-needed-skipped" "info" "docker-embedded-unqualified-split"
+            else
+                printf 'domain-needed\n'
+            fi
+        fi
         printf 'bogus-priv\n'
         if [[ "${STOP_DNS_REBIND}" == "true" ]]; then
-            printf 'stop-dns-rebind\n'
+            emit_dnsmasq_optional_config_line 'stop-dns-rebind' 'stop-dns-rebind' || true
         fi
         if [[ "${DNS_LOOP_DETECT}" == "true" ]]; then
-            printf 'dns-loop-detect\n'
+            emit_dnsmasq_optional_config_line 'dns-loop-detect' 'dns-loop-detect' || true
         fi
         printf 'bind-interfaces\n'
         printf 'listen-address=%s\n' "${DNS_BIND_ADDRESS}"
@@ -1480,21 +2220,26 @@ write_dnsmasq_config() {
         printf 'pid-file=%s\n' "${DNSMASQ_PID_FILE}"
         printf 'log-facility=%s\n' "${DNSMASQ_LOG_FILE}"
         printf 'log-async=25\n'
-        printf 'local-service\n'
+        if is_loopback_address "${DNS_BIND_ADDRESS}"; then
+            emit_dnsmasq_optional_config_line 'local-service=host' 'local-service-host' || printf 'local-service\n'
+        else
+            emit_dnsmasq_optional_config_line 'local-service' 'local-service' || true
+        fi
+        emit_docker_embedded_split_config_lines || true
         if [[ "${DNS_ALL_SERVERS}" == "true" ]]; then
-            printf 'all-servers\n'
+            emit_dnsmasq_optional_config_line 'all-servers' 'all-servers' || true
         fi
         if [[ "${DNS_STRICT_ORDER}" == "true" ]]; then
-            printf 'strict-order\n'
+            emit_dnsmasq_optional_config_line 'strict-order' 'strict-order' || true
         fi
         if [[ "${DNS_USE_STALE_CACHE}" == "true" ]]; then
-            printf 'use-stale-cache=%s\n' "${DNS_USE_STALE_CACHE_TTL}"
+            emit_dnsmasq_optional_config_line "use-stale-cache=${DNS_USE_STALE_CACHE_TTL}" 'use-stale-cache' || true
         fi
         if [[ "${DNS_FAST_RETRY}" == "true" ]]; then
-            printf 'fast-dns-retry=%s,%s\n' "${DNS_FAST_RETRY_INITIAL_MS}" "${DNS_FAST_RETRY_WINDOW_MS}"
+            emit_dnsmasq_optional_config_line "fast-dns-retry=${DNS_FAST_RETRY_INITIAL_MS},${DNS_FAST_RETRY_WINDOW_MS}" 'fast-dns-retry' || true
         fi
         if [[ "${LOG_QUERIES}" == "true" ]]; then
-            printf 'log-queries=extra\n'
+            emit_dnsmasq_optional_config_line 'log-queries=extra' 'log-queries-extra' || printf 'log-queries\n'
         fi
     } > "${tmp}" 2> /dev/null || {
         rm -f "${tmp}" 2> /dev/null || true
@@ -1579,37 +2324,117 @@ probe_with_dig() {
     return 1
 }
 
+probe_with_drill() {
+    local kind host server port out answer_count answers rc
+    kind="${1:-local}"
+    host="${2:-${PROBE_HOST}}"
+    server="${3:-${DNS_BIND_ADDRESS}}"
+    port="${4:-${DNS_BIND_PORT}}"
+    has_cmd drill || return 1
+    out="$(drill -Q -p "${port}" @"${server}" "${host}" A 2> /dev/null || true)"
+    answers="$(printf '%s\n' "${out}" | awk '/^[0-9]+(\.[0-9]+){3}$/ {print}' | tr '\n' ' ')"
+    answer_count="$(printf '%s\n' "${answers}" | awk '{print NF}')"
+    [[ "${answer_count}" =~ ^[0-9]+$ ]] || answer_count=0
+    rc=1
+    ((answer_count > 0)) && rc=0
+    append_metric "${kind}-drill" "${host}" "${server}" "${port}" "${rc}" "${answer_count}" "0" "${answers}"
+    if [[ "${rc}" -eq 0 ]]; then
+        append_report "probe=ok kind=${kind} tool=drill host=${host} server=${server} port=${port} answers=${answers}"
+        return 0
+    fi
+    append_report "probe=fail kind=${kind} tool=drill host=${host} server=${server} port=${port}"
+    return 1
+}
+
+probe_with_nslookup() {
+    local kind host server port out answer_count answers rc
+    kind="${1:-local}"
+    host="${2:-${PROBE_HOST}}"
+    server="${3:-${DNS_BIND_ADDRESS}}"
+    port="${4:-${DNS_BIND_PORT}}"
+    has_cmd nslookup || return 1
+    out="$(nslookup -timeout="${PROBE_TIMEOUT}" -port="${port}" "${host}" "${server}" 2> /dev/null || true)"
+    answers="$(printf '%s\n' "${out}" | awk '/^Address: / {print $2}' | awk '/^[0-9]+(\.[0-9]+){3}$/ {print}' | tr '\n' ' ')"
+    answer_count="$(printf '%s\n' "${answers}" | awk '{print NF}')"
+    [[ "${answer_count}" =~ ^[0-9]+$ ]] || answer_count=0
+    rc=1
+    ((answer_count > 0)) && rc=0
+    append_metric "${kind}-nslookup" "${host}" "${server}" "${port}" "${rc}" "${answer_count}" "0" "${answers}"
+    if [[ "${rc}" -eq 0 ]]; then
+        append_report "probe=ok kind=${kind} tool=nslookup host=${host} server=${server} port=${port} answers=${answers}"
+        return 0
+    fi
+    append_report "probe=fail kind=${kind} tool=nslookup host=${host} server=${server} port=${port}"
+    return 1
+}
+
+local_probe_status_is_proven() {
+    [[ "${LOCAL_PROBE_PROVEN:-false}" == "true" ]] || return 1
+    case "${LOCAL_PROBE_STATUS:-unknown}" in
+        ok | ok-dig | ok-drill | ok-nslookup) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
 probe_local_dns() {
+    LOCAL_PROBE_TOOL="none"
+    LOCAL_PROBE_PROVEN="false"
+    LOCAL_PROBE_PROOF_REASON="not-probed"
+
     if has_cmd dig; then
+        LOCAL_PROBE_TOOL="dig"
         if probe_with_dig "local" "${PROBE_HOST}" "${DNS_BIND_ADDRESS}" "${DNS_BIND_PORT}"; then
-            LOCAL_PROBE_STATUS="ok"
+            LOCAL_PROBE_STATUS="ok-dig"
+            LOCAL_PROBE_PROVEN="true"
+            LOCAL_PROBE_PROOF_REASON="dig-target-server-success"
             return 0
         fi
-        LOCAL_PROBE_STATUS="failed"
-        return 1
     fi
 
-    if has_cmd getent; then
-        local out
-        out="$(getent hosts "${PROBE_HOST}" 2> /dev/null || true)"
-        if [[ -n "${out}" ]]; then
-            append_report "probe=ok tool=getent host=${PROBE_HOST} answer=${out}"
-            append_metric "local-getent" "${PROBE_HOST}" "system" "" "0" "1" "0" "${out}"
-            LOCAL_PROBE_STATUS="ok-getent"
+    if has_cmd drill; then
+        LOCAL_PROBE_TOOL="drill"
+        if probe_with_drill "local" "${PROBE_HOST}" "${DNS_BIND_ADDRESS}" "${DNS_BIND_PORT}"; then
+            LOCAL_PROBE_STATUS="ok-drill"
+            LOCAL_PROBE_PROVEN="true"
+            LOCAL_PROBE_PROOF_REASON="drill-target-server-success"
             return 0
         fi
+    fi
+
+    if has_cmd nslookup; then
+        LOCAL_PROBE_TOOL="nslookup"
+        if probe_with_nslookup "local" "${PROBE_HOST}" "${DNS_BIND_ADDRESS}" "${DNS_BIND_PORT}"; then
+            LOCAL_PROBE_STATUS="ok-nslookup"
+            LOCAL_PROBE_PROVEN="true"
+            LOCAL_PROBE_PROOF_REASON="nslookup-target-server-success"
+            return 0
+        fi
+    fi
+
+    if dnsmasq_is_running && [[ "${ALLOW_PROCESS_ONLY_LOCAL_PROBE}" == "true" ]]; then
+        append_report "probe=fallback-process-only rc=0 allowed=true"
+        append_metric "fallback-process-only" "${PROBE_HOST}" "process" "" "0" "0" "0" ""
+        LOCAL_PROBE_STATUS="ok-process-only"
+        LOCAL_PROBE_TOOL="process"
+        LOCAL_PROBE_PROVEN="false"
+        LOCAL_PROBE_PROOF_REASON="process-only-allowed-but-not-dns-proof"
+        return 0
     fi
 
     if dnsmasq_is_running; then
-        append_report "probe=fallback-process-only rc=0"
+        append_report "probe=fallback-process-only rc=0 allowed=false proof=failed"
         append_metric "fallback-process-only" "${PROBE_HOST}" "process" "" "0" "0" "0" ""
-        LOCAL_PROBE_STATUS="ok-process-only"
-        return 0
+        LOCAL_PROBE_STATUS="failed-unproven-process-only"
+        LOCAL_PROBE_TOOL="${LOCAL_PROBE_TOOL:-process}"
+        LOCAL_PROBE_PROVEN="false"
+        LOCAL_PROBE_PROOF_REASON="no-targeted-dns-client-probe-available"
+        return 1
     fi
 
     append_report "probe=fallback-process-only rc=1"
     append_metric "fallback-process-only" "${PROBE_HOST}" "process" "" "1" "0" "0" ""
     LOCAL_PROBE_STATUS="failed"
+    LOCAL_PROBE_PROOF_REASON="dnsmasq-not-running-or-probe-failed"
     return 1
 }
 
@@ -1742,9 +2567,9 @@ stop_stale_dnsmasq_from_pidfile() {
 socket_dnsmasq_pids() {
     [[ "${STOP_BY_SOCKET_OWNER}" == "true" ]] || return 0
     has_cmd ss || return 0
-    ss -H -lntup 2> /dev/null \
-        | awk -v bind="${DNS_BIND_ADDRESS}:${DNS_BIND_PORT}" -v port=":${DNS_BIND_PORT}" '
-            $0 ~ port {
+    socket_owner_lines \
+        | awk '
+            {
                 while (match($0, /pid=[0-9]+/)) {
                     pid=substr($0, RSTART+4, RLENGTH-4)
                     print pid
@@ -1864,7 +2689,10 @@ diagnose_dnsmasq_failure() {
     fi
     if has_cmd ss; then
         append_report "dnsmasq_socket_snapshot_begin"
-        ss -H -lntup 2> /dev/null | awk -v p=":${DNS_BIND_PORT}" '$0 ~ p {print "ss: "$0}' >> "${REPORT_FILE}" 2> /dev/null || true
+        {
+            ss -H -lnup 2> /dev/null || true
+            ss -H -lntp 2> /dev/null || true
+        } | awk -v p=":${DNS_BIND_PORT}" '$0 ~ p {print "ss: "$0}' >> "${REPORT_FILE}" 2> /dev/null || true
         append_report "dnsmasq_socket_snapshot_end"
     fi
     append_report "dnsmasq_diagnostics=end"
@@ -1913,6 +2741,19 @@ start_dnsmasq() {
         append_report "result=invalid-resolv-port bind_port=${DNS_BIND_PORT}"
         write_status "degraded"
         write_summary "degraded" "invalid-resolv-port"
+        return 1
+    fi
+
+    if [[ "${WRITE_RESOLV_CONF}" == "true" ]] && ! can_write_resolv_conf_noninteractive; then
+        log_warn "/etc/resolv.conf não parece gravável sem sudo não-interativo; DNS cache não será aplicado ao resolver do sistema."
+        append_report "result=resolv-conf-write-privilege-unavailable status=${RESOLV_CONF_WRITE_PRIVILEGE_STATUS}"
+        if [[ "${DNS_MODE}" == "auto" ]]; then
+            write_status "off"
+            write_summary "off" "resolv-conf-write-privilege-unavailable-auto"
+            return 0
+        fi
+        write_status "degraded"
+        write_summary "degraded" "resolv-conf-write-privilege-unavailable"
         return 1
     fi
 
@@ -2002,35 +2843,57 @@ restore_or_fallback_resolv_conf() {
     [[ "${WRITE_RESOLV_CONF}" == "true" ]] || return 0
     [[ "${RESTORE_RESOLV_CONF_ON_STOP}" == "true" ]] || return 0
 
+    resolv_conf_state_refresh
     if [[ -s "${RESOLV_BACKUP_FILE}" ]]; then
-        if safe_sudo tee /etc/resolv.conf < "${RESOLV_BACKUP_FILE}" > /dev/null 2>&1; then
-            log_info "/etc/resolv.conf restaurado a partir de ${RESOLV_BACKUP_FILE}."
-            append_report "resolv_conf=restored backup=${RESOLV_BACKUP_FILE}"
-            RESOLV_CONF_STATUS="restored"
-            return 0
+        if resolv_backup_meta_is_current || [[ "${ALLOW_STALE_RESOLV_BACKUP_RESTORE}" == "true" ]]; then
+            if safe_sudo tee /etc/resolv.conf < "${RESOLV_BACKUP_FILE}" > /dev/null 2>&1; then
+                log_info "/etc/resolv.conf restaurado a partir de ${RESOLV_BACKUP_FILE}."
+                append_report "resolv_conf=restored backup=${RESOLV_BACKUP_FILE} backup_trust=${RESOLV_BACKUP_TRUST_STATUS:-unknown}"
+                append_event "resolv-conf-restored" "info" "backup=${RESOLV_BACKUP_FILE}"
+                RESOLV_CONF_STATUS="restored"
+                return 0
+            fi
+        else
+            RESOLV_BACKUP_TRUST_STATUS="stale-or-missing-meta"
+            append_report "resolv_conf_backup=not-restored reason=stale-or-missing-meta backup=${RESOLV_BACKUP_FILE} meta=${RESOLV_BACKUP_META_FILE}"
+            append_event "resolv-backup-rejected" "warn" "stale-or-missing-meta"
         fi
     fi
 
-    local tmp upstream count
+    local tmp upstream count search_line
     tmp="$(make_temp_file resolv-stop-fallback /tmp)"
     [[ -n "${tmp}" ]] || return 1
     count=0
+    search_line="$(safe_resolv_search_line_from_current)"
     {
-        printf '# Generated fallback by %s v%s at %s\n' "${SCRIPT_NAME}" "${SCRIPT_VERSION}" "$(ts)"
+        printf '# Generated fallback by %s v%s at %s
+' "${SCRIPT_NAME}" "${SCRIPT_VERSION}" "$(ts)"
+        if [[ -n "${search_line}" ]]; then
+            printf '%s
+' "${search_line}"
+        fi
         for upstream in ${DNS_UPSTREAMS}; do
-            if is_valid_nameserver "${upstream}"; then
-                printf 'nameserver %s\n' "${upstream}"
+            if is_valid_nameserver "${upstream}" && ! is_loopback_address "${upstream}"; then
+                printf 'nameserver %s
+' "${upstream}"
                 count=$((count + 1))
                 [[ "${count}" -ge 3 ]] && break
             fi
         done
-        printf 'options %s\n' "${DNS_OPTIONS}"
+        if ((count == 0)) && docker_embedded_resolver_should_be_considered; then
+            printf 'nameserver %s
+' "${DOCKER_EMBEDDED_RESOLVER}"
+            count=1
+        fi
+        printf 'options %s
+' "${DNS_OPTIONS}"
     } > "${tmp}" 2> /dev/null || true
 
     if [[ "${count}" -gt 0 ]] && safe_sudo tee /etc/resolv.conf < "${tmp}" > /dev/null 2>&1; then
         rm -f "${tmp}" 2> /dev/null || true
         log_info "/etc/resolv.conf restaurado para fallback upstream."
         append_report "resolv_conf=fallback-restored"
+        append_event "resolv-conf-fallback-restored" "warn" "count=${count}"
         RESOLV_CONF_STATUS="fallback-restored"
         return 0
     fi
@@ -2038,6 +2901,7 @@ restore_or_fallback_resolv_conf() {
     rm -f "${tmp}" 2> /dev/null || true
     log_warn "não foi possível restaurar /etc/resolv.conf."
     append_report "resolv_conf=restore-failed"
+    append_event "resolv-conf-restore-failed" "error" "backup=${RESOLV_BACKUP_FILE}"
     RESOLV_CONF_STATUS="restore-failed"
     return 1
 }
@@ -2090,8 +2954,35 @@ resolv_conf_is_managed() {
     grep -F -q "${RESOLV_MANAGED_MARKER}" /etc/resolv.conf 2> /dev/null
 }
 
+resolv_backup_meta_is_current() {
+    local fp meta_fp
+    [[ -s "${RESOLV_BACKUP_FILE}" && -r "${RESOLV_BACKUP_META_FILE}" ]] || return 1
+    fp="$(container_fingerprint)"
+    meta_fp="$(summary_value_from_file "${RESOLV_BACKUP_META_FILE}" container_fingerprint)"
+    [[ -n "${meta_fp}" && "${meta_fp}" == "${fp}" ]] || return 1
+    RESOLV_BACKUP_TRUST_STATUS="current"
+    return 0
+}
+
+write_resolv_backup_meta() {
+    {
+        printf 'container_fingerprint=%s\n' "$(container_fingerprint)"
+        printf 'created_at=%s\n' "$(ts)"
+        printf 'backup_file=%s\n' "${RESOLV_BACKUP_FILE}"
+        printf 'source_nameservers=%s\n' "${RESOLV_CONF_NAMESERVERS:-unknown}"
+        printf 'source_first_nameserver=%s\n' "${RESOLV_CONF_FIRST_NAMESERVER:-unknown}"
+        printf 'source_search_line=%s\n' "${RESOLV_CONF_SEARCH_LINE:-none}"
+        printf 'source_domain_line=%s\n' "${RESOLV_CONF_DOMAIN_LINE:-none}"
+        printf 'source_inode=%s\n' "${RESOLV_CONF_INODE:-unknown}"
+        printf 'source_mtime_epoch=%s\n' "${RESOLV_CONF_MTIME_EPOCH:-0}"
+        printf 'source_sha256=%s\n' "${RESOLV_CONF_SHA256:-unknown}"
+    } | safe_write_file "${RESOLV_BACKUP_META_FILE}" 0600 || true
+}
+
 backup_resolv_conf_once() {
     [[ -r /etc/resolv.conf ]] || return 0
+
+    resolv_conf_state_refresh
 
     if resolv_conf_is_managed; then
         append_report "resolv_conf_backup=preserved existing=${RESOLV_BACKUP_FILE} reason=current-managed"
@@ -2099,13 +2990,18 @@ backup_resolv_conf_once() {
     fi
 
     if [[ -s "${RESOLV_BACKUP_FILE}" ]] && ! grep -F -q "${RESOLV_MANAGED_MARKER}" "${RESOLV_BACKUP_FILE}" 2> /dev/null; then
-        append_report "resolv_conf_backup=preserved existing=${RESOLV_BACKUP_FILE}"
-        return 0
+        if resolv_backup_meta_is_current; then
+            append_report "resolv_conf_backup=preserved existing=${RESOLV_BACKUP_FILE} trust=current"
+            return 0
+        fi
+        append_report "resolv_conf_backup=refresh reason=stale-or-missing-meta existing=${RESOLV_BACKUP_FILE}"
     fi
 
     cp /etc/resolv.conf "${RESOLV_BACKUP_FILE}" 2> /dev/null || return 0
     chmod 0600 "${RESOLV_BACKUP_FILE}" 2> /dev/null || true
-    append_report "resolv_conf_backup=${RESOLV_BACKUP_FILE}"
+    write_resolv_backup_meta
+    RESOLV_BACKUP_TRUST_STATUS="created-current"
+    append_report "resolv_conf_backup=${RESOLV_BACKUP_FILE} meta=${RESOLV_BACKUP_META_FILE}"
     return 0
 }
 
@@ -2116,8 +3012,29 @@ verify_resolv_conf_points_to_cache() {
     ' /etc/resolv.conf 2> /dev/null
 }
 
+can_write_resolv_conf_noninteractive() {
+    if [[ "${WRITE_RESOLV_CONF}" != "true" ]]; then
+        RESOLV_CONF_WRITE_PRIVILEGE_STATUS="disabled"
+        return 0
+    fi
+    if [[ -w /etc/resolv.conf ]]; then
+        RESOLV_CONF_WRITE_PRIVILEGE_STATUS="direct-writable"
+        return 0
+    fi
+    if [[ "$(id -u 2> /dev/null || echo 1)" == "0" ]]; then
+        RESOLV_CONF_WRITE_PRIVILEGE_STATUS="root"
+        return 0
+    fi
+    if has_cmd sudo && sudo -n true 2> /dev/null; then
+        RESOLV_CONF_WRITE_PRIVILEGE_STATUS="sudo-noninteractive"
+        return 0
+    fi
+    RESOLV_CONF_WRITE_PRIVILEGE_STATUS="unavailable"
+    return 1
+}
+
 write_resolv_conf() {
-    local tmp
+    local tmp search_line
     [[ "${WRITE_RESOLV_CONF}" == "true" ]] || {
         log_info "rewrite de /etc/resolv.conf desabilitado."
         RESOLV_CONF_STATUS="disabled"
@@ -2130,14 +3047,31 @@ write_resolv_conf() {
         return 1
     fi
 
+    if ! can_write_resolv_conf_noninteractive; then
+        log_warn "não escrevendo /etc/resolv.conf: sem permissão direta ou sudo não-interativo."
+        RESOLV_CONF_STATUS="write-privilege-unavailable"
+        append_event "resolv-conf-write-privilege-unavailable" "error" "target=/etc/resolv.conf"
+        return 1
+    fi
+
     backup_resolv_conf_once || true
 
+    search_line="$(safe_resolv_search_line_from_current)"
     tmp="$(make_temp_file resolv.conf /tmp)"
     [[ -n "${tmp}" ]] || return 1
     {
-        printf '# %s by %s v%s at %s\n' "${RESOLV_MANAGED_MARKER}" "${SCRIPT_NAME}" "${SCRIPT_VERSION}" "$(ts)"
-        printf 'nameserver %s\n' "${DNS_BIND_ADDRESS}"
-        printf 'options %s\n' "${DNS_OPTIONS}"
+        printf '# %s by %s v%s at %s
+' "${RESOLV_MANAGED_MARKER}" "${SCRIPT_NAME}" "${SCRIPT_VERSION}" "$(ts)"
+        printf '# source-nameservers: %s
+' "${RESOLV_CONF_NAMESERVERS:-unknown}"
+        if [[ -n "${search_line}" ]]; then
+            printf '%s
+' "${search_line}"
+        fi
+        printf 'nameserver %s
+' "${DNS_BIND_ADDRESS}"
+        printf 'options %s
+' "${DNS_OPTIONS}"
     } > "${tmp}" 2> /dev/null || {
         rm -f "${tmp}" 2> /dev/null || true
         return 1
@@ -2147,6 +3081,7 @@ write_resolv_conf() {
         rm -f "${tmp}" 2> /dev/null || true
         log_warn "falha ao escrever /etc/resolv.conf via tee."
         RESOLV_CONF_STATUS="write-failed"
+        append_event "resolv-conf-write-failed" "error" "target=/etc/resolv.conf"
         return 1
     fi
 
@@ -2155,11 +3090,13 @@ write_resolv_conf() {
     if ! verify_resolv_conf_points_to_cache; then
         log_warn "/etc/resolv.conf foi escrito, mas não aponta para ${DNS_BIND_ADDRESS}."
         append_report "resolv_conf=verify-failed expected_nameserver=${DNS_BIND_ADDRESS}"
+        append_event "resolv-conf-verify-failed" "error" "expected=${DNS_BIND_ADDRESS}"
         RESOLV_CONF_STATUS="verify-failed"
         return 1
     fi
 
-    append_report "resolv_conf=updated nameserver=${DNS_BIND_ADDRESS} options=${DNS_OPTIONS}"
+    append_report "resolv_conf=updated nameserver=${DNS_BIND_ADDRESS} options=${DNS_OPTIONS} preserved_search=$(printf '%s' "${search_line:-none}" | tr ' ' '_')"
+    append_event "resolv-conf-updated" "info" "nameserver=${DNS_BIND_ADDRESS}"
     RESOLV_CONF_STATUS="updated"
     log_ok "/etc/resolv.conf aponta para cache DNS local (${DNS_BIND_ADDRESS})."
     return 0
@@ -2183,12 +3120,12 @@ status_dnsmasq() {
         return 1
     fi
     if managed_dnsmasq_runtime_running; then
-        log_ok "dnsmasq managed running; process_status=${DNSMASQ_PROCESS_STATUS}; port=${DNSMASQ_PORT_STATUS}; resolv_conf=${RESOLV_CONF_HEALTH}; runtime_effective=${RUNTIME_EFFECTIVE}; resolver_effective=${RESOLVER_EFFECTIVE}"
+        log_ok "dnsmasq managed running; process_status=${DNSMASQ_PROCESS_STATUS}; port=${DNSMASQ_PORT_STATUS}; pidfile=${DNSMASQ_PIDFILE_STATUS}; resolv_conf=${RESOLV_CONF_HEALTH}; drift=${RESOLV_CONF_DRIFT}; runtime_effective=${RUNTIME_EFFECTIVE}; resolver_effective=${RESOLVER_EFFECTIVE}"
         write_status "ok"
         write_summary "ok" "dnsmasq-managed-running"
         return 0
     fi
-    log_warn "dnsmasq gerenciado não está rodando. process_status=${DNSMASQ_PROCESS_STATUS}; port=${DNSMASQ_PORT_STATUS}; resolv_conf=${RESOLV_CONF_HEALTH}"
+    log_warn "dnsmasq gerenciado não está rodando. process_status=${DNSMASQ_PROCESS_STATUS}; port=${DNSMASQ_PORT_STATUS}; pidfile=${DNSMASQ_PIDFILE_STATUS}; resolv_conf=${RESOLV_CONF_HEALTH}; drift=${RESOLV_CONF_DRIFT}"
     write_status "stopped"
     write_summary "stopped" "dnsmasq-not-managed-running"
     return 1
@@ -2203,15 +3140,24 @@ benchmark_action() {
         SELECTED_UPSTREAMS=""
         UPSTREAM_COUNT="0"
         write_status "degraded"
-        write_summary "degraded" "benchmark-no-functional-upstream"
+        write_action_summary "degraded" "benchmark-no-functional-upstream" "benchmark"
+        if [[ "${UPDATE_RUNTIME_SUMMARY_FOR_ACTIONS}" == "true" ]]; then
+            write_summary "degraded" "benchmark-no-functional-upstream"
+        fi
         return 1
     fi
-    SELECTED_UPSTREAMS="$(printf '%s' "${selected}" | tr '\n' ' ' | sed 's/[[:space:]]*$//')"
-    UPSTREAM_COUNT="$(printf '%s\n' "${selected}" | awk 'NF{c++} END{print c+0}')"
+    SELECTED_UPSTREAMS="$(printf '%s' "${selected}" | tr '
+' ' ' | sed 's/[[:space:]]*$//')"
+    UPSTREAM_COUNT="$(printf '%s
+' "${selected}" | awk 'NF{c++} END{print c+0}')"
     append_report "benchmark_ranked_upstreams=${SELECTED_UPSTREAMS} source=${RANKING_SOURCE} reason=${RANKING_REASON}"
+    append_event "dns-benchmark" "info" "source=${RANKING_SOURCE};upstreams=${SELECTED_UPSTREAMS}"
     log_ok "benchmark upstreams: ${SELECTED_UPSTREAMS}"
-    write_status "ok"
-    write_summary "ok" "benchmark-ok"
+    write_status "benchmark-ok"
+    write_action_summary "ok" "benchmark-ok" "benchmark"
+    if [[ "${UPDATE_RUNTIME_SUMMARY_FOR_ACTIONS}" == "true" ]]; then
+        write_summary "ok" "benchmark-ok"
+    fi
     return 0
 }
 doctor_action() {
@@ -2233,6 +3179,10 @@ doctor_action() {
         log_warn "doctor: WRITE_RESOLV_CONF=true exige DNS_BIND_PORT=53."
         rc=1
     fi
+    if [[ "${WRITE_RESOLV_CONF}" == "true" ]] && ! can_write_resolv_conf_noninteractive; then
+        log_warn "doctor: /etc/resolv.conf não parece gravável sem interação; status=${RESOLV_CONF_WRITE_PRIVILEGE_STATUS}."
+        rc=1
+    fi
     if ! is_valid_bind_address "${DNS_BIND_ADDRESS}"; then
         log_warn "doctor: bind address inseguro/não permitido: ${DNS_BIND_ADDRESS}"
         rc=1
@@ -2245,7 +3195,15 @@ doctor_action() {
         log_warn "doctor: primeiro upstream DNS parece inválido; verifique DEVCONTAINER_LOCAL_DNS_UPSTREAMS."
     fi
     collect_runtime_health
-    log_info "doctor: dnsmasq_process_status=${DNSMASQ_PROCESS_STATUS}; dnsmasq_port_status=${DNSMASQ_PORT_STATUS}; resolv_conf_health=${RESOLV_CONF_HEALTH}; status_stale=${STATUS_STALE}."
+    if docker_embedded_resolver_should_be_considered; then
+        log_ok "doctor: Docker embedded DNS elegível: ${DOCKER_EMBEDDED_RESOLVER} modo=${DOCKER_EMBEDDED_DNS_MODE}."
+    else
+        log_info "doctor: Docker embedded DNS não será incluído como upstream."
+    fi
+    if [[ "${PRESERVE_RESOLV_SEARCH}" == "true" ]]; then
+        log_info "doctor: preservação de search/domain resolv.conf habilitada; linha atual=${RESOLV_CONF_SEARCH_LINE}/${RESOLV_CONF_DOMAIN_LINE}."
+    fi
+    log_info "doctor: dnsmasq_process_status=${DNSMASQ_PROCESS_STATUS}; dnsmasq_port_status=${DNSMASQ_PORT_STATUS}; pidfile=${DNSMASQ_PIDFILE_STATUS}; socket_owner_visibility=${DNSMASQ_SOCKET_OWNER_VISIBILITY}; resolv_conf_health=${RESOLV_CONF_HEALTH}; drift=${RESOLV_CONF_DRIFT}/${RESOLV_CONF_DRIFT_REASON}; status_stale=${STATUS_STALE}."
     if [[ "${DNS_UPSTREAM_SELECTION}" == "ranked" ]]; then
         if [[ -s "${RANKING_FILE}" ]]; then
             log_ok "doctor: ranking persistente detectado: ${RANKING_FILE}"
@@ -2254,11 +3212,17 @@ doctor_action() {
         fi
     fi
     if [[ "${rc}" -eq 0 ]]; then
-        write_status "ok"
-        write_summary "ok" "doctor"
+        write_status "doctor-ok"
+        write_action_summary "ok" "doctor" "doctor"
+        if [[ "${UPDATE_RUNTIME_SUMMARY_FOR_ACTIONS}" == "true" ]]; then
+            write_summary "ok" "doctor"
+        fi
     else
-        write_status "degraded"
-        write_summary "degraded" "doctor"
+        write_status "doctor-degraded"
+        write_action_summary "degraded" "doctor" "doctor"
+        if [[ "${UPDATE_RUNTIME_SUMMARY_FOR_ACTIONS}" == "true" ]]; then
+            write_summary "degraded" "doctor"
+        fi
     fi
     return "${rc}"
 }
@@ -2284,22 +3248,73 @@ health_action() {
         probe_system_resolver || rc=1
         collect_runtime_health
     fi
+    if [[ "${rc}" -eq 0 && "${REQUIRE_PROVEN_LOCAL_PROBE_FOR_RESOLV_CONF}" == "true" ]] && ! local_probe_status_is_proven; then
+        rc=1
+    fi
     if [[ "${rc}" -eq 0 && "${RUNTIME_EFFECTIVE}" != "true" ]]; then
         rc=1
     fi
     if [[ "${rc}" -eq 0 && "${WRITE_RESOLV_CONF}" == "true" && "${RESOLVER_EFFECTIVE}" != "true" ]]; then
         rc=1
     fi
+    if [[ "${rc}" -eq 0 && "${WRITE_RESOLV_CONF}" == "true" && "${RESOLV_CONF_DRIFT}" == "true" ]]; then
+        rc=1
+    fi
     if [[ "${rc}" -eq 0 ]]; then
         write_status "ok"
         write_summary "ok" "health-ok"
-        log_ok "health OK: dnsmasq=${DNSMASQ_PROCESS_STATUS}; port=${DNSMASQ_PORT_STATUS}; resolv_conf=${RESOLV_CONF_HEALTH}; runtime=${RUNTIME_EFFECTIVE}; resolver=${RESOLVER_EFFECTIVE}; local_probe=${LOCAL_PROBE_STATUS}; system_probe=${SYSTEM_PROBE_STATUS}"
+        log_ok "health OK: dnsmasq=${DNSMASQ_PROCESS_STATUS}; port=${DNSMASQ_PORT_STATUS}; pidfile=${DNSMASQ_PIDFILE_STATUS}; resolv_conf=${RESOLV_CONF_HEALTH}; drift=${RESOLV_CONF_DRIFT}; runtime=${RUNTIME_EFFECTIVE}; resolver=${RESOLVER_EFFECTIVE}; local_probe=${LOCAL_PROBE_STATUS}; system_probe=${SYSTEM_PROBE_STATUS}"
     else
         write_status "degraded"
         write_summary "degraded" "health-degraded"
-        log_warn "health degraded: dnsmasq=${DNSMASQ_PROCESS_STATUS}; port=${DNSMASQ_PORT_STATUS}; resolv_conf=${RESOLV_CONF_HEALTH}; runtime=${RUNTIME_EFFECTIVE}; resolver=${RESOLVER_EFFECTIVE}; local_probe=${LOCAL_PROBE_STATUS}; system_probe=${SYSTEM_PROBE_STATUS}"
+        log_warn "health degraded: dnsmasq=${DNSMASQ_PROCESS_STATUS}; port=${DNSMASQ_PORT_STATUS}; pidfile=${DNSMASQ_PIDFILE_STATUS}; resolv_conf=${RESOLV_CONF_HEALTH}; drift=${RESOLV_CONF_DRIFT}/${RESOLV_CONF_DRIFT_REASON}; runtime=${RUNTIME_EFFECTIVE}; resolver=${RESOLVER_EFFECTIVE}; local_probe=${LOCAL_PROBE_STATUS}; system_probe=${SYSTEM_PROBE_STATUS}"
     fi
     return "${rc}"
+}
+
+warmup_dns_cache() {
+    local host rr count ok_count fail_count
+    [[ "${DNS_WARMUP}" == "true" ]] || {
+        WARMUP_STATUS="disabled"
+        return 0
+    }
+    has_cmd dig || {
+        WARMUP_STATUS="skipped-no-dig"
+        return 0
+    }
+    count=0
+    ok_count=0
+    fail_count=0
+    for host in ${DNS_WARMUP_HOSTS}; do
+        is_safe_hostname "${host}" || continue
+        count=$((count + 1))
+        for rr in ${DNS_WARMUP_RECORD_TYPES}; do
+            case "${rr}" in A | AAAA) : ;; *) continue ;; esac
+            if dig +time="${PROBE_TIMEOUT}" +tries=1 @"${DNS_BIND_ADDRESS}" -p "${DNS_BIND_PORT}" "${host}" "${rr}" +short > /dev/null 2>&1; then
+                append_metric "warmup-${rr}" "${host}" "${DNS_BIND_ADDRESS}" "${DNS_BIND_PORT}" "0" "1" "0" ""
+                ok_count=$((ok_count + 1))
+            else
+                append_metric "warmup-${rr}" "${host}" "${DNS_BIND_ADDRESS}" "${DNS_BIND_PORT}" "1" "0" "0" ""
+                fail_count=$((fail_count + 1))
+            fi
+        done
+        [[ "${count}" -ge "${DNS_WARMUP_MAX_HOSTS}" ]] && break
+    done
+    WARMUP_HOSTS_COUNT="${count}"
+    WARMUP_OK_COUNT="${ok_count}"
+    WARMUP_FAILED_COUNT="${fail_count}"
+    if ((count == 0)); then
+        WARMUP_STATUS="skipped-no-valid-hosts"
+    elif ((ok_count > 0 && fail_count == 0)); then
+        WARMUP_STATUS="ok"
+    elif ((ok_count > 0)); then
+        WARMUP_STATUS="partial"
+    else
+        WARMUP_STATUS="failed"
+    fi
+    append_report "dns_warmup status=${WARMUP_STATUS} hosts=${WARMUP_HOSTS_COUNT} ok=${WARMUP_OK_COUNT} failed=${WARMUP_FAILED_COUNT}"
+    append_event "dns-warmup" "info" "status=${WARMUP_STATUS};hosts=${WARMUP_HOSTS_COUNT};ok=${WARMUP_OK_COUNT};failed=${WARMUP_FAILED_COUNT}"
+    return 0
 }
 
 start_flow() {
@@ -2331,10 +3346,19 @@ start_flow() {
         else
             restore_resolv_conf_after_failure "local-probe-failed"
             write_status "degraded"
-            append_report "result=probe-local-failed"
+            append_report "result=probe-local-failed proof=${LOCAL_PROBE_PROVEN} reason=${LOCAL_PROBE_PROOF_REASON}"
             write_summary "degraded" "probe-local-failed"
             return 1
         fi
+    fi
+
+    if [[ "${REQUIRE_PROVEN_LOCAL_PROBE_FOR_RESOLV_CONF}" == "true" ]] && ! local_probe_status_is_proven; then
+        write_status "degraded"
+        append_report "result=local-probe-not-proven-before-resolv-conf status=${LOCAL_PROBE_STATUS} tool=${LOCAL_PROBE_TOOL} reason=${LOCAL_PROBE_PROOF_REASON}"
+        append_event "local-probe-not-proven" "error" "status=${LOCAL_PROBE_STATUS};tool=${LOCAL_PROBE_TOOL};reason=${LOCAL_PROBE_PROOF_REASON}"
+        restore_resolv_conf_after_failure "local-probe-not-proven-before-resolv-conf"
+        write_summary "degraded" "local-probe-not-proven-before-resolv-conf"
+        return 1
     fi
 
     write_resolv_conf || {
@@ -2353,6 +3377,7 @@ start_flow() {
         return 1
     }
 
+    warmup_dns_cache || true
     collect_runtime_health
     write_status "ok"
     append_report "result=ok runtime_effective=${RUNTIME_EFFECTIVE} resolver_effective=${RESOLVER_EFFECTIVE}"
@@ -2370,6 +3395,8 @@ main_unlocked() {
     else
         write_report_header
         write_metrics_header
+        ensure_events_header
+        append_event "action-start" "info" "action=${ACTION};mode=${DNS_MODE}"
         write_status "running"
     fi
     log_info "Local DNS cache manager iniciado (v${SCRIPT_VERSION}); action=${ACTION}; mode=${DNS_MODE}."

@@ -432,16 +432,19 @@ describe('ClientOptionsBuilder', () => {
         try {
             process.env.COPILOT_CLI_URL = 'test';
             process.env.GITHUB_TOKEN = 'ghp';
+            process.env.COPILOT_BYOK_API_KEY = 'byok-secret';
             process.env.SECRET_KEY = 'should-not-pass';
             const opts = new ClientOptionsBuilder().envPassthrough().build();
             expect(opts.env).toBeDefined();
             expect(opts.env?.COPILOT_CLI_URL).toBe('test');
             expect(opts.env?.GITHUB_TOKEN).toBe('ghp');
+            expect(opts.env?.COPILOT_BYOK_API_KEY).toBeUndefined();
             expect(opts.env?.SECRET_KEY).toBeUndefined();
             expect(opts.env?.PATH).toBeDefined();
         } finally {
             // Restaurar env original (apenas as chaves adicionadas)
             delete process.env.COPILOT_CLI_URL;
+            delete process.env.COPILOT_BYOK_API_KEY;
             delete process.env.SECRET_KEY;
             if (original.GITHUB_TOKEN !== undefined) {
                 process.env.GITHUB_TOKEN = original.GITHUB_TOKEN;
@@ -607,6 +610,26 @@ describe('ClientOptionsBuilder', () => {
                 sourceName: 'llm-b-terminal',
                 captureContent: true,
             });
+        } finally {
+            process.env = original;
+        }
+    });
+
+    it('buildCopilotClientOptionsFromEnv registra onListModels BYOK seguro', () => {
+        const original = { ...process.env };
+        try {
+            delete process.env.COPILOT_CLI_URL;
+            process.env.COPILOT_BYOK_ENABLED = 'true';
+            process.env.COPILOT_BYOK_BASE_URL = 'https://provider.example/v1';
+            process.env.COPILOT_BYOK_MODEL = 'provider-model';
+            process.env.COPILOT_BYOK_MODELS = 'provider-model,provider-model-2';
+            process.env.COPILOT_BYOK_API_KEY = 'secret';
+
+            const opts = buildCopilotClientOptionsFromEnv();
+
+            expect(opts.onListModels).toBeTypeOf('function');
+            expect(opts.onListModels?.()).toHaveLength(2);
+            expect(opts.env?.COPILOT_BYOK_API_KEY).toBeUndefined();
         } finally {
             process.env = original;
         }

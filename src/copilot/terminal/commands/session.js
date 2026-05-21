@@ -34,6 +34,19 @@ import {
 } from '../state/repl-runtime/index.js';
 import { callWithRuntimeTarget, extractRuntimeTarget, withRuntimeTarget } from './runtime-target.js';
 
+const DISABLED_BYOK_SUMMARY = Object.freeze({
+    enabled: false,
+    ready: false,
+    preset: null,
+    providerType: null,
+    model: null,
+    auth: {
+        apiKeyConfigured: false,
+        bearerTokenConfigured: false,
+        headersConfigured: false,
+    },
+});
+
 /**
  * Referência ao _hubSessionId gerenciado pelo terminal server. É passado como parâmetro pois não pode ser importado
  * estaticamente (é mutável).
@@ -130,10 +143,14 @@ export function cmdStatus({ hubSessionId, injectPort, println }, arg = '') {
           : `\x1b[90mparado · ${lifecycle.registeredShutdownHandlers} handlers registrados\x1b[0m`;
     const modelMeta = configProjection.modelMeta ?? configProjection.observedModelMeta;
     const autoPolicy = configProjection.autoModelPolicy;
+    const byok = configProjection.byok ?? DISABLED_BYOK_SUMMARY;
     const autoPolicyLine =
         configProjection.currentModel === 'auto'
             ? `        auto policy      \x1b[90mpref=${autoPolicy.preferredModel}/${autoPolicy.preferredReasoningEffort} · autoridade=GitHub Copilot · último=${autoPolicy.observedModel ?? 'n/d'}\x1b[0m`
             : '';
+    const byokLine = byok.enabled
+        ? `    byok provider    ${byok.ready ? '\x1b[32mready\x1b[0m' : '\x1b[31mincompleto\x1b[0m'} \x1b[90mpreset=${byok.preset ?? '-'} · provider=${byok.providerType ?? '-'} · model=${byok.model ?? '-'} · auth=${byok.auth.bearerTokenConfigured ? 'bearer' : byok.auth.apiKeyConfigured ? 'apiKey' : byok.auth.headersConfigured ? 'headers' : 'none'} · /byok\x1b[0m`
+        : '';
     const modelBilling = projection.modelBilling;
     const display = readTerminalDisplayProjection();
     const activitySeverityColor =
@@ -231,7 +248,7 @@ export function cmdStatus({ hubSessionId, injectPort, println }, arg = '') {
   sdk interrupts   ${sdkInterruptions.length > 0 ? `\x1b[33m${sdkInterruptions.join(' · ')}\x1b[0m` : '\x1b[90m(nenhum)\x1b[0m'}
     sdk ui           \x1b[90melicitation=${uiElicitationFlag == null ? 'n/a' : uiElicitationFlag ? 'available' : 'unavailable'}\x1b[0m
   modelo           \x1b[36m${snap['model']}\x1b[0m
-  reasoning        \x1b[35m${effort}\x1b[0m
+${byokLine ? `${byokLine}\n` : ''}  reasoning        \x1b[35m${effort}\x1b[0m
     modo SDK         ${sdkModeColor}${sdkMode}\x1b[0m
         permission mode  \x1b[33m${projection.permissionMode}\x1b[0m
     plan arquivo     ${sdkPlanOpLabel}

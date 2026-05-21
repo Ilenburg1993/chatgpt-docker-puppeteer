@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # =============================================================================
 # PHASE 0 — GUARDA DE EXECUÇÃO (FAIL-SAFE ABSOLUTO)
-# CANONICAL v5.8.0
+# CANONICAL v5.9.0
 #
 # Contrato:
 # - post-attach NUNCA pode falhar
@@ -47,6 +47,28 @@
 #   executar scripts, probes externos, benchmarks, start/stop ou mutações.
 # - Normaliza LF para Linux/WSL2 e mantém contrato fail-safe absoluto.
 #
+# CHANGELOG v5.8.1 (2026-05-20):
+# - Sincronizado com github-copilot-network-manager v1.6.1 e
+#   local-dns-cache v1.6.1.
+# - Deixa explícito drift de /etc/resolv.conf: leitura runtime atual nunca é
+#   mascarada por summary antigo ou divergente.
+# - Adiciona leitura passiva dos novos campos de DNS: pidfile status, socket
+#   owner visibility, resolv inode/mtime/sha e drift_reason.
+# - Separa artifact de benchmark do route-fix de estado operacional de rota.
+# - Mostra next_diagnostic_actions do manager sem confundi-las com recomendação
+#   operacional de transporte.
+# - Atualiza comandos sugeridos para package.json v1.1.3/Makefile v4.3.0.
+#
+# CHANGELOG v5.9.0 (2026-05-20):
+# - Sincronizado com local-dns-cache v1.8.0 e network-control-plane-state v1.0.0.
+# - Exibe prova local de DNS por ferramenta/proveniência, não apenas status textual.
+# - Mostra split-horizon Docker DNS, preservação de search/domain, warmup,
+#   action.summary, events TSV, privilege preflight e conflito real de porta.
+# - Adiciona snapshot consolidado do Network Control Plane quando artifact existir.
+# - Endurece a UX default-on do DNS: OK só aparece quando leitura runtime atual,
+#   summary e prova local/resolver são coerentes.
+# - Atualiza quick tips para network:state e aliases canônicos atuais.
+#
 # =============================================================================
 
 # Desarma heranças perigosas
@@ -59,7 +81,7 @@ trap - ERR EXIT INT TERM 2> /dev/null || true
 
 # Versão canônica do hook (fonte única da verdade)
 readonly SCRIPT_NAME="post-attach"
-readonly SCRIPT_VERSION="5.8.0"
+readonly SCRIPT_VERSION="5.9.0"
 
 # ---------------------------------------------------------------------------
 # CLI options parser
@@ -83,10 +105,11 @@ post-attach.sh [--brief] [--help] [--version]
 --version  print script version and exit
 
 This hook is passive/read-only. It displays the latest post-start/network
-snapshots and cached benchmark/recommendation artifacts without starting
-services, route-fix, proxy compare jobs, route advisor jobs or long-running
-benchmarks. It never mutates /etc/hosts, /etc/resolv.conf, Docker, VS Code
-settings, proxy configuration or application services.
+snapshots, the optional network-control-plane aggregate and cached
+benchmark/recommendation artifacts without starting services, route-fix, proxy
+compare jobs, route advisor jobs, DNS probes or long-running benchmarks. It
+never mutates /etc/hosts, /etc/resolv.conf, Docker, VS Code settings, proxy
+configuration or application services.
 EOF
             exit 0
             ;;
@@ -102,7 +125,7 @@ done
 
 # =============================================================================
 # PHASE 1 — UX HELPERS (API SEMÂNTICA DE OUTPUT)
-# CANONICAL v5.8.0
+# CANONICAL v5.9.0
 #
 # Finalidade:
 #   • Prover API mínima e estável de mensagens humanas
@@ -250,7 +273,7 @@ read_status_snapshot() {
             ok)
                 ok "${status_label}: OK"
                 ;;
-            degraded | fail | failed | error)
+            degraded | fail | failed | error | stale | invalid | lock-failed)
                 warn "${status_label}: ${status_value}"
                 ;;
             *)
@@ -598,6 +621,36 @@ print_endpoint_registry_snapshot() {
     print_bullet "endpoint registry:" "${status}; rows=${rows}; bad=${bad}; age=${age}; file=${file}"
 }
 
+print_network_control_plane_snapshot() {
+    # $1=status-file, $2=summary-file, $3=json-file, $4=events-file
+    local status_file summary_file json_file events_file cp_status
+    status_file="${1:-}"
+    summary_file="${2:-}"
+    json_file="${3:-}"
+    events_file="${4:-}"
+
+    if [[ ! -r "${summary_file}" ]]; then
+        info "Network Control Plane: sem snapshot consolidado registrado"
+        print_artifact_state "state summary" "${summary_file}" "${RECOMMENDATION_MAX_AGE_SECONDS}"
+        return 0
+    fi
+
+    cp_status="$(status_snapshot_or "${status_file}" "${summary_file}" status unknown)"
+    print_status_line "Network Control Plane" "${cp_status}"
+    print_bullet "versão state:" "$(kv_or "${summary_file}" script_version unknown)"
+    print_bullet "health/post-start:" "$(kv_or "${summary_file}" health_status unknown)/$(kv_or "${summary_file}" post_start_status unknown)"
+    print_bullet "registry:" "$(kv_or "${summary_file}" registry_status unknown); rows=$(kv_or "${summary_file}" registry_rows 0); bad=$(kv_or "${summary_file}" registry_bad_rows 0)"
+    print_bullet "resolv atual:" "first=$(kv_or "${summary_file}" current_resolv_first_nameserver unknown); nameservers=$(kv_or "${summary_file}" current_resolv_nameservers unknown)"
+    print_bullet "DNS agregado:" "status=$(kv_or "${summary_file}" dns_status unknown); drift=$(kv_or "${summary_file}" dns_resolv_conf_drift unknown)"
+    print_bullet "manager agregado:" "status=$(kv_or "${summary_file}" manager_status unknown); endpoints=$(kv_or "${summary_file}" manager_endpoints_ok 0)/$(kv_or "${summary_file}" manager_endpoints_total 0); action=$(kv_or "${summary_file}" manager_recommendation_action unknown)"
+    print_bullet "transporte rec.:" "$(kv_or "${summary_file}" manager_recommended_transport unknown); next=$(kv_or "${summary_file}" manager_next_diagnostic_actions none)"
+    print_bullet "route/proxy/advisor:" "route=$(kv_or "${summary_file}" route_status unknown); proxy=$(kv_or "${summary_file}" proxy_status unknown); advisor=$(kv_or "${summary_file}" advisor_status unknown)"
+    print_bullet "eventos state:" "ok=$(kv_or "${summary_file}" events_ok 0); warn=$(kv_or "${summary_file}" events_warning 0); degraded=$(kv_or "${summary_file}" events_degraded 0); fatal=$(kv_or "${summary_file}" events_fatal 0)"
+    print_bullet "próximas ações:" "$(kv_or "${summary_file}" next_actions none)"
+    print_artifact_state "state json" "${json_file}" "${RECOMMENDATION_MAX_AGE_SECONDS}"
+    print_artifact_state "state events" "${events_file}" "${RECOMMENDATION_MAX_AGE_SECONDS}"
+}
+
 print_key_if_present() {
     local label file key value
     label="${1:-campo:}"
@@ -631,7 +684,7 @@ print_status_line() {
         off | disabled | skipped)
             info "${label}: ${status}"
             ;;
-        degraded | fail | failed | error | stale)
+        degraded | fail | failed | error | stale | invalid | lock-failed)
             warn "${label}: $(status_to_human "${status}")"
             ;;
         *)
@@ -640,9 +693,35 @@ print_status_line() {
     esac
 }
 
+is_loopback_nameserver() {
+    case "${1:-}" in
+        127.* | ::1 | localhost) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
+current_resolv_nameservers() {
+    if [[ -r /etc/resolv.conf ]]; then
+        awk '$1 == "nameserver" {printf "%s%s", sep, $2; sep=" "}' /etc/resolv.conf 2> /dev/null | sanitize_oneline
+    else
+        printf '%s\n' 'unreadable'
+    fi
+}
+
+truthy() {
+    case "${1:-}" in true | TRUE | 1 | yes | YES | on | ON) return 0 ;; *) return 1 ;; esac
+}
+
+route_status_is_benchmark_artifact() {
+    case "${1:-}" in
+        benchmark | benchmark-* | *benchmark*) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
 # =============================================================================
 # PHASE 2 — BANNER DE ATTACH (IDENTIDADE HUMANA — INICIAL)
-# CANONICAL v5.8.0
+# CANONICAL v5.9.0
 #
 # Finalidade:
 #   • Sinalizar visualmente o evento de attach
@@ -676,7 +755,7 @@ printf "%b\n" "${BLUE}═══════════════════�
 echo ""
 # =============================================================================
 # PHASE 3 — NAMESPACE CANÔNICO DE ESTADO (UX / ATTACH)
-# CANONICAL v5.8.0
+# CANONICAL v5.9.0
 #
 # CONTRATO (NORMATIVO):
 #   • Este namespace armazena APENAS estado HUMANO / UX
@@ -784,7 +863,7 @@ fi
 # =============================================================================
 # PHASE 4 — CONTEXTO BÁSICO DO AMBIENTE (DIAGNÓSTICO HUMANO)
 # additional environment diagnostics including LD_PRELOAD
-# CANONICAL v5.8.0
+# CANONICAL v5.9.0
 #
 # CONTRATO:
 #   • Diagnóstico exclusivamente informativo
@@ -1036,7 +1115,7 @@ echo ""
 # =============================================================================
 # PHASE 5 — ESTADO ESTRUTURAL
 # (STATE MANIFESTO | DIAGNÓSTICO PASSIVO)
-# CANONICAL v5.8.0
+# CANONICAL v5.9.0
 #
 # CONTRATO (INVIOLÁVEL):
 #   • Leitura ESTRITAMENTE PASSIVA
@@ -1141,7 +1220,7 @@ echo ""
 
 # =============================================================================
 # PHASE 6 — ESTADO DE SAÚDE & CAPACIDADES CRÍTICAS (PASSIVO)
-# CANONICAL v5.8.0
+# CANONICAL v5.9.0
 #
 # CONTRATO (INVIOLÁVEL):
 #   • Diagnóstico estritamente PASSIVO
@@ -1162,12 +1241,17 @@ HEALTH_STATUS_FILE="${DEVCONTAINER_HEALTH_STATUS_FILE:-/tmp/devcontainer-health.
 NETWORK_STATUS_FILE="${DEVCONTAINER_NETWORK_STATUS_FILE:-/tmp/devcontainer-network.status}"
 DIAGNOSTICS_STATUS_FILE="${DEVCONTAINER_DIAGNOSTICS_STATUS_FILE:-/tmp/devcontainer-diagnostics.status}"
 GITHUB_ROUTE_REPORT_FILE="${DEVCONTAINER_GITHUB_ROUTE_REPORT_FILE:-/tmp/devcontainer-github-api-route.report}"
+NETWORK_CONTROL_PLANE_STATUS_FILE="${DEVCONTAINER_NETWORK_CONTROL_PLANE_STATUS_FILE:-/tmp/devcontainer-network-control-plane.status}"
+NETWORK_CONTROL_PLANE_SUMMARY_FILE="${DEVCONTAINER_NETWORK_CONTROL_PLANE_SUMMARY_FILE:-/tmp/devcontainer-network-control-plane.summary}"
+NETWORK_CONTROL_PLANE_STATE_JSON_FILE="${DEVCONTAINER_NETWORK_CONTROL_PLANE_STATE_JSON_FILE:-/tmp/devcontainer-network-control-plane.state.json}"
+NETWORK_CONTROL_PLANE_EVENTS_FILE="${DEVCONTAINER_NETWORK_CONTROL_PLANE_EVENTS_FILE:-/tmp/devcontainer-network-control-plane.events.tsv}"
 
 info "Estado conhecido do sistema:"
 
 read_status_snapshot "${HEALTH_STATUS_FILE}" "Último healthcheck registrado"
 read_status_snapshot "${NETWORK_STATUS_FILE}" "Último network check registrado"
 read_status_snapshot "${DIAGNOSTICS_STATUS_FILE}" "Último diagnostics check registrado"
+read_status_snapshot "${NETWORK_CONTROL_PLANE_STATUS_FILE}" "Último control-plane state registrado"
 
 if [[ -r "${GITHUB_ROUTE_REPORT_FILE}" ]]; then
     ok "Relatório de rota GitHub API detectado"
@@ -1190,6 +1274,9 @@ echo ""
 POST_START_SUMMARY_FILE="${DEVCONTAINER_POST_START_SUMMARY_FILE:-/tmp/devcontainer-post-start.summary}"
 LOCAL_DNS_STATUS_FILE="${DEVCONTAINER_LOCAL_DNS_STATUS_FILE:-${DEVCONTAINER_LOCAL_DNS_CACHE_STATUS_FILE:-/tmp/devcontainer-local-dns-cache.status}}"
 LOCAL_DNS_SUMMARY_FILE="${DEVCONTAINER_LOCAL_DNS_SUMMARY_FILE:-${DEVCONTAINER_LOCAL_DNS_CACHE_SUMMARY_FILE:-/tmp/devcontainer-local-dns-cache.summary}}"
+LOCAL_DNS_ACTION_SUMMARY_FILE="${DEVCONTAINER_LOCAL_DNS_ACTION_SUMMARY_FILE:-/tmp/devcontainer-local-dns-cache.action.summary}"
+LOCAL_DNS_EVENTS_FILE="${DEVCONTAINER_LOCAL_DNS_EVENTS_FILE:-/tmp/devcontainer-local-dns-cache.events.tsv}"
+LOCAL_DNS_METRICS_FILE="${DEVCONTAINER_LOCAL_DNS_METRICS_FILE:-/tmp/devcontainer-local-dns-cache.metrics.tsv}"
 COPILOT_NETWORK_STATUS_FILE="${DEVCONTAINER_COPILOT_NETWORK_STATUS_FILE:-/tmp/devcontainer-copilot-network.status}"
 COPILOT_NETWORK_SUMMARY_FILE="${DEVCONTAINER_COPILOT_NETWORK_SUMMARY_FILE:-/tmp/devcontainer-copilot-network.summary}"
 COPILOT_NETWORK_DIAGNOSIS_FILE="${DEVCONTAINER_COPILOT_NETWORK_DIAGNOSIS_FILE:-/tmp/devcontainer-copilot-network.diagnosis.tsv}"
@@ -1241,6 +1328,7 @@ if [[ -r "${POST_START_SUMMARY_FILE}" ]]; then
     print_bullet "registry usado:" "$(kv_any_or "${POST_START_SUMMARY_FILE}" unknown endpoint_registry_file endpoint_registry_used_file endpoint_registry_effective_file endpoint_registry_canonical_file)"
     print_bullet "DNS runtime:" "runtime=$(kv_any_or "${POST_START_SUMMARY_FILE}" unknown local_dns_runtime_effective dns_cache_runtime_effective runtime_effective); resolver=$(kv_any_or "${POST_START_SUMMARY_FILE}" unknown local_dns_resolver_effective dns_cache_resolver_effective resolver_effective); resolv_cache=$(kv_any_or "${POST_START_SUMMARY_FILE}" unknown resolv_conf_points_to_cache dns_resolv_conf_points_to_cache)"
     print_bullet "DNS resolver atual:" "nameservers=$(kv_any_or "${POST_START_SUMMARY_FILE}" unknown resolv_conf_nameservers current_nameservers effective_nameservers); loopback=$(kv_any_or "${POST_START_SUMMARY_FILE}" unknown resolv_conf_points_to_cache resolv_conf_points_to_loopback)"
+    print_bullet "DNS default-on:" "probe=$(kv_any_or "${POST_START_SUMMARY_FILE}" unknown local_probe_proven dns_local_probe_proven); split=$(kv_any_or "${POST_START_SUMMARY_FILE}" unknown docker_embedded_split_status dns_docker_embedded_split_status); write_priv=$(kv_any_or "${POST_START_SUMMARY_FILE}" unknown resolv_conf_write_privilege_status dns_resolv_conf_write_privilege_status)"
     print_bullet "proxy rec.:" "$(kv_or "${POST_START_SUMMARY_FILE}" local_copilot_proxy_recommendation_action unknown); conf=$(kv_or "${POST_START_SUMMARY_FILE}" local_copilot_proxy_recommendation_confidence unknown)"
     print_bullet "route rec.:" "$(kv_or "${POST_START_SUMMARY_FILE}" github_route_recommendation_action unknown)"
     print_bullet "route current/best:" "$(kv_or "${POST_START_SUMMARY_FILE}" github_route_current_ip unknown)/$(kv_or "${POST_START_SUMMARY_FILE}" github_route_best_candidate_ip unknown); p95=$(kv_or "${POST_START_SUMMARY_FILE}" github_route_current_p95_ms unknown)/$(kv_or "${POST_START_SUMMARY_FILE}" github_route_best_candidate_p95_ms unknown)ms"
@@ -1250,6 +1338,7 @@ else
 fi
 
 print_endpoint_registry_snapshot "${ENDPOINT_REGISTRY_FILE}"
+print_network_control_plane_snapshot "${NETWORK_CONTROL_PLANE_STATUS_FILE}" "${NETWORK_CONTROL_PLANE_SUMMARY_FILE}" "${NETWORK_CONTROL_PLANE_STATE_JSON_FILE}" "${NETWORK_CONTROL_PLANE_EVENTS_FILE}"
 
 # DNS cache local
 DNS_CACHE_ENABLED="${DEVCONTAINER_ENABLE_LOCAL_DNS_CACHE:-false}"
@@ -1258,21 +1347,37 @@ DNS_STATUS="$(status_snapshot_or "${LOCAL_DNS_STATUS_FILE}" "${LOCAL_DNS_SUMMARY
 if [[ -r "${LOCAL_DNS_SUMMARY_FILE}" ]]; then
     print_status_line "DNS cache local" "${DNS_STATUS}"
     print_bullet "habilitado:" "${DNS_CACHE_ENABLED}"
+    print_bullet "versão DNS:" "$(kv_or "${LOCAL_DNS_SUMMARY_FILE}" script_version unknown)"
     print_bullet "modo/action:" "$(kv_or "${LOCAL_DNS_SUMMARY_FILE}" mode unknown)/$(kv_or "${LOCAL_DNS_SUMMARY_FILE}" action unknown)"
     print_bullet "resolv.conf:" "$(kv_or "${LOCAL_DNS_SUMMARY_FILE}" resolv_conf_health "$(kv_or "${LOCAL_DNS_SUMMARY_FILE}" resolv_conf_status unknown)")"
+    print_bullet "write privilege:" "$(kv_or "${LOCAL_DNS_SUMMARY_FILE}" resolv_conf_write_privilege_status unknown); target_port=$(kv_or "${LOCAL_DNS_SUMMARY_FILE}" dnsmasq_target_port_conflict_status unknown)"
     print_bullet "nameservers:" "$(kv_or "${LOCAL_DNS_SUMMARY_FILE}" resolv_conf_nameservers unknown)"
+    print_bullet "search/domain:" "search=$(kv_or "${LOCAL_DNS_SUMMARY_FILE}" resolv_conf_search_line none); domain=$(kv_or "${LOCAL_DNS_SUMMARY_FILE}" resolv_conf_domain_line none)"
     print_bullet "runtime proof:" "runtime=$(kv_or "${LOCAL_DNS_SUMMARY_FILE}" runtime_effective unknown); resolver=$(kv_or "${LOCAL_DNS_SUMMARY_FILE}" resolver_effective unknown); system_uses_cache=$(kv_or "${LOCAL_DNS_SUMMARY_FILE}" system_resolver_uses_cache unknown)"
+    print_bullet "local proof:" "status=$(kv_or "${LOCAL_DNS_SUMMARY_FILE}" local_probe_status unknown); tool=$(kv_or "${LOCAL_DNS_SUMMARY_FILE}" local_probe_tool unknown); proven=$(kv_or "${LOCAL_DNS_SUMMARY_FILE}" local_probe_proven unknown); reason=$(kv_or "${LOCAL_DNS_SUMMARY_FILE}" local_probe_proof_reason unknown)"
     print_bullet "resolv cache:" "points=$(kv_or "${LOCAL_DNS_SUMMARY_FILE}" resolv_conf_points_to_cache unknown); managed=$(kv_or "${LOCAL_DNS_SUMMARY_FILE}" resolv_conf_managed unknown)"
     print_bullet "previous stale:" "$(kv_or "${LOCAL_DNS_SUMMARY_FILE}" previous_summary_stale unknown); reason=$(kv_or "${LOCAL_DNS_SUMMARY_FILE}" previous_summary_stale_reason unknown)"
     print_bullet "status stale:" "$(kv_or "${LOCAL_DNS_SUMMARY_FILE}" status_stale unknown)"
     print_bullet "stale reason:" "$(kv_or "${LOCAL_DNS_SUMMARY_FILE}" status_stale_reason unknown)"
     print_bullet "upstreams:" "$(kv_or "${LOCAL_DNS_SUMMARY_FILE}" selected_upstreams unknown)"
-    print_bullet "ranking:" "$(kv_or "${LOCAL_DNS_SUMMARY_FILE}" ranking_source unknown)/stale=$(kv_or "${LOCAL_DNS_SUMMARY_FILE}" ranking_stale unknown)"
+    print_bullet "ranking:" "$(kv_or "${LOCAL_DNS_SUMMARY_FILE}" ranking_source unknown)/stale=$(kv_or "${LOCAL_DNS_SUMMARY_FILE}" ranking_stale unknown); reason=$(kv_or "${LOCAL_DNS_SUMMARY_FILE}" ranking_reason unknown)"
+    print_bullet "Docker DNS:" "detected=$(kv_or "${LOCAL_DNS_SUMMARY_FILE}" docker_embedded_resolver_detected unknown); upstream=$(kv_or "${LOCAL_DNS_SUMMARY_FILE}" docker_embedded_upstream_status unknown); split=$(kv_or "${LOCAL_DNS_SUMMARY_FILE}" docker_embedded_split_status unknown)"
+    print_bullet "Docker split:" "$(kv_or "${LOCAL_DNS_SUMMARY_FILE}" docker_embedded_split_domains none)"
+    print_bullet "dnsmasq compat:" "$(kv_or "${LOCAL_DNS_SUMMARY_FILE}" dnsmasq_option_compat_status unknown)"
     print_bullet "dnsmasq:" "$(kv_or "${LOCAL_DNS_SUMMARY_FILE}" dnsmasq_process_status unknown)/$(kv_or "${LOCAL_DNS_SUMMARY_FILE}" dnsmasq_port_status unknown)"
-    print_bullet "socket owners:" "dnsmasq=$(kv_or "${LOCAL_DNS_SUMMARY_FILE}" dnsmasq_socket_dnsmasq_pids unknown); outros=$(kv_or "${LOCAL_DNS_SUMMARY_FILE}" dnsmasq_socket_non_dnsmasq_pids unknown)"
+    print_bullet "pidfile:" "$(kv_or "${LOCAL_DNS_SUMMARY_FILE}" dnsmasq_pidfile_status unknown); pid=$(kv_or "${LOCAL_DNS_SUMMARY_FILE}" dnsmasq_pid unknown)"
+    print_bullet "socket owners:" "visibility=$(kv_or "${LOCAL_DNS_SUMMARY_FILE}" dnsmasq_socket_owner_visibility unknown); dnsmasq=$(kv_or "${LOCAL_DNS_SUMMARY_FILE}" dnsmasq_socket_dnsmasq_pids unknown); outros=$(kv_or "${LOCAL_DNS_SUMMARY_FILE}" dnsmasq_socket_non_dnsmasq_pids unknown)"
     print_bullet "probe local:" "$(kv_or "${LOCAL_DNS_SUMMARY_FILE}" local_probe_status "$(kv_or "${LOCAL_DNS_SUMMARY_FILE}" probe_local_dns unknown)")"
     print_bullet "probe sistema:" "$(kv_or "${LOCAL_DNS_SUMMARY_FILE}" system_probe_status unknown)"
+    print_bullet "warmup:" "status=$(kv_or "${LOCAL_DNS_SUMMARY_FILE}" warmup_status not-run); hosts=$(kv_or "${LOCAL_DNS_SUMMARY_FILE}" warmup_hosts_count 0); ok=$(kv_or "${LOCAL_DNS_SUMMARY_FILE}" warmup_ok_count 0); failed=$(kv_or "${LOCAL_DNS_SUMMARY_FILE}" warmup_failed_count 0)"
+    print_bullet "resolv drift:" "$(kv_or "${LOCAL_DNS_SUMMARY_FILE}" resolv_conf_drift unknown); reason=$(kv_or "${LOCAL_DNS_SUMMARY_FILE}" resolv_conf_drift_reason unknown)"
+    print_bullet "resolv forensic:" "first=$(kv_or "${LOCAL_DNS_SUMMARY_FILE}" resolv_conf_first_nameserver unknown); mtime=$(kv_or "${LOCAL_DNS_SUMMARY_FILE}" resolv_conf_mtime_epoch unknown); inode=$(kv_or "${LOCAL_DNS_SUMMARY_FILE}" resolv_conf_inode unknown)"
+    print_bullet "resolv sha256:" "$(kv_or "${LOCAL_DNS_SUMMARY_FILE}" resolv_conf_sha256 unknown)"
+    print_bullet "backup trust:" "$(kv_or "${LOCAL_DNS_SUMMARY_FILE}" resolv_backup_trust_status unknown)"
     print_bullet "fail-closed:" "restore_on_failure=$(kv_or "${LOCAL_DNS_SUMMARY_FILE}" restore_resolv_conf_on_failure unknown); repair=$(kv_or "${LOCAL_DNS_SUMMARY_FILE}" repair_on_probe_failure unknown)"
+    print_artifact_state "DNS action" "${LOCAL_DNS_ACTION_SUMMARY_FILE}" "${RECOMMENDATION_MAX_AGE_SECONDS}"
+    print_artifact_state "DNS events" "${LOCAL_DNS_EVENTS_FILE}" "${RECOMMENDATION_MAX_AGE_SECONDS}"
+    print_file_hint "DNS métricas:" "${LOCAL_DNS_METRICS_FILE}"
     print_bullet "concluído em:" "$(kv_or "${LOCAL_DNS_SUMMARY_FILE}" completed_at unknown)"
 else
     if [[ "${DNS_CACHE_ENABLED}" == "true" ]]; then
@@ -1284,16 +1389,33 @@ fi
 
 if [[ -r /etc/resolv.conf ]]; then
     RESOLV_FIRST_NS="$(awk '$1 == "nameserver" {print $2; exit}' /etc/resolv.conf 2> /dev/null | sanitize_oneline)"
+    RESOLV_ALL_NS="$(current_resolv_nameservers)"
     DNS_POINTS_TO_CACHE="$(kv_or "${LOCAL_DNS_SUMMARY_FILE}" resolv_conf_points_to_cache unknown)"
     DNS_RESOLVER_EFFECTIVE="$(kv_or "${LOCAL_DNS_SUMMARY_FILE}" resolver_effective unknown)"
+    DNS_RESOLV_DRIFT="$(kv_or "${LOCAL_DNS_SUMMARY_FILE}" resolv_conf_drift unknown)"
+    DNS_RESOLV_DRIFT_REASON="$(kv_or "${LOCAL_DNS_SUMMARY_FILE}" resolv_conf_drift_reason unknown)"
+    DNS_SUMMARY_FIRST_NS="$(kv_or "${LOCAL_DNS_SUMMARY_FILE}" resolv_conf_first_nameserver unknown)"
+    DNS_LOCAL_PROBE_PROVEN="$(kv_or "${LOCAL_DNS_SUMMARY_FILE}" local_probe_proven unknown)"
+    DNS_LOCAL_PROBE_TOOL="$(kv_or "${LOCAL_DNS_SUMMARY_FILE}" local_probe_tool unknown)"
+    DNS_WRITE_PRIVILEGE="$(kv_or "${LOCAL_DNS_SUMMARY_FILE}" resolv_conf_write_privilege_status unknown)"
+    DNS_SPLIT_STATUS="$(kv_or "${LOCAL_DNS_SUMMARY_FILE}" docker_embedded_split_status unknown)"
     print_bullet "nameserver efetivo:" "${RESOLV_FIRST_NS:-unknown}"
+    print_bullet "nameservers atuais:" "${RESOLV_ALL_NS:-unknown}"
     if [[ "${DNS_CACHE_ENABLED}" == "true" ]]; then
-        if [[ "${DNS_POINTS_TO_CACHE}" == "true" || "${RESOLV_FIRST_NS}" == "127.0.0.1" || "${RESOLV_FIRST_NS}" == "::1" ]]; then
-            ok "/etc/resolv.conf aponta para o cache local ou summary prova points_to_cache=true"
+        if truthy "${DNS_RESOLV_DRIFT}"; then
+            warn "DNS cache habilitado, mas há drift entre summary e /etc/resolv.conf atual (${DNS_RESOLV_DRIFT_REASON})"
+        elif is_loopback_nameserver "${RESOLV_FIRST_NS}" && [[ "${DNS_POINTS_TO_CACHE}" == "true" && "${DNS_RESOLVER_EFFECTIVE}" == "true" && "${DNS_LOCAL_PROBE_PROVEN}" == "true" ]]; then
+            ok "/etc/resolv.conf atual aponta para cache local; summary prova resolver_effective=true e local_probe_proven=true (${DNS_LOCAL_PROBE_TOOL})"
+        elif is_loopback_nameserver "${RESOLV_FIRST_NS}" && [[ "${DNS_LOCAL_PROBE_PROVEN}" != "true" ]]; then
+            warn "/etc/resolv.conf atual aponta para loopback, mas a prova local do DNS não está forte: proven=${DNS_LOCAL_PROBE_PROVEN}; tool=${DNS_LOCAL_PROBE_TOOL}"
+        elif is_loopback_nameserver "${RESOLV_FIRST_NS}"; then
+            info "/etc/resolv.conf atual aponta para loopback; resolver=${DNS_RESOLVER_EFFECTIVE}; write_priv=${DNS_WRITE_PRIVILEGE}; docker_split=${DNS_SPLIT_STATUS}"
+        elif [[ "${DNS_POINTS_TO_CACHE}" == "true" ]]; then
+            warn "summary afirma points_to_cache=true, mas leitura runtime atual mostra nameserver=${RESOLV_FIRST_NS:-unknown}; summary_first=${DNS_SUMMARY_FIRST_NS}"
         elif [[ "${DNS_RESOLVER_EFFECTIVE}" == "false" ]]; then
             warn "DNS cache habilitado, mas resolver efetivo não usa o cache local"
         else
-            warn "DNS cache habilitado, mas /etc/resolv.conf não aponta para loopback"
+            warn "DNS cache habilitado, mas /etc/resolv.conf atual não aponta para loopback"
         fi
     fi
 fi
@@ -1301,7 +1423,12 @@ fi
 # GitHub API route summary
 ROUTE_STATUS="$(status_snapshot_or "${GITHUB_ROUTE_STATUS_FILE}" "${GITHUB_ROUTE_SUMMARY_FILE}" status unknown)"
 if [[ -r "${GITHUB_ROUTE_SUMMARY_FILE}" ]]; then
-    print_status_line "GitHub API route-fix" "${ROUTE_STATUS}"
+    if route_status_is_benchmark_artifact "${ROUTE_STATUS}"; then
+        info "GitHub API route-fix: ${ROUTE_STATUS} (artifact de benchmark; não é estado runtime de /etc/hosts)"
+    else
+        print_status_line "GitHub API route-fix" "${ROUTE_STATUS}"
+    fi
+    print_bullet "runtime route:" "state=$(kv_or "${GITHUB_ROUTE_SUMMARY_FILE}" current_route_state unknown); current=$(kv_or "${GITHUB_ROUTE_SUMMARY_FILE}" current_ip unknown); selected=$(kv_or "${GITHUB_ROUTE_SUMMARY_FILE}" selected_ip unknown)"
     print_bullet "api.github.com IP:" "$(kv_or "${GITHUB_ROUTE_SUMMARY_FILE}" selected_ip "$(kv_or "${GITHUB_ROUTE_SUMMARY_FILE}" current_ip unknown)")"
     print_bullet "latência rota:" "$(kv_or "${GITHUB_ROUTE_SUMMARY_FILE}" selected_latency_ms unknown)ms"
     print_bullet "p95 rota:" "$(kv_or "${GITHUB_ROUTE_SUMMARY_FILE}" selected_p95_latency_ms unknown)ms"
@@ -1313,6 +1440,9 @@ if [[ -r "${GITHUB_ROUTE_SUMMARY_FILE}" ]]; then
     print_bullet "apply/verify:" "apply=$(kv_or "${GITHUB_ROUTE_SUMMARY_FILE}" hosts_apply_status unknown); verify=$(kv_or "${GITHUB_ROUTE_SUMMARY_FILE}" verify_status unknown); remote=$(kv_or "${GITHUB_ROUTE_SUMMARY_FILE}" verify_remote_ip unknown); latency=$(kv_or "${GITHUB_ROUTE_SUMMARY_FILE}" verify_latency_ms unknown)ms"
     print_bullet "verify reason:" "$(kv_or "${GITHUB_ROUTE_SUMMARY_FILE}" verify_reason unknown)"
     print_bullet "decisão:" "$(kv_or "${GITHUB_ROUTE_SUMMARY_FILE}" decision_reason "$(kv_or "${GITHUB_ROUTE_SUMMARY_FILE}" reason unknown)")"
+    if route_status_is_benchmark_artifact "${ROUTE_STATUS}"; then
+        print_artifact_freshness "benchmark route:" "${GITHUB_ROUTE_BENCHMARK_SUMMARY_FILE}"
+    fi
     print_file_hint "métricas:" "${GITHUB_ROUTE_METRICS_FILE}"
 else
     info "GitHub API route summary ainda não registrado"
@@ -1325,17 +1455,26 @@ if [[ -r "${COPILOT_NETWORK_SUMMARY_FILE}" ]]; then
     print_bullet "planos:" "overall=$(kv_or "${COPILOT_NETWORK_SUMMARY_FILE}" plane_overall_status unknown); github=$(kv_or "${COPILOT_NETWORK_SUMMARY_FILE}" plane_github_api_status unknown); transport=$(kv_or "${COPILOT_NETWORK_SUMMARY_FILE}" plane_copilot_transport_status unknown); telemetry=$(kv_or "${COPILOT_NETWORK_SUMMARY_FILE}" plane_copilot_telemetry_status unknown)"
     print_bullet "soft-degraded:" "github=$(kv_or "${COPILOT_NETWORK_SUMMARY_FILE}" github_api_soft_degraded_count 0); overall=$(kv_or "${COPILOT_NETWORK_SUMMARY_FILE}" overall_soft_degraded_count 0); reason=$(kv_or "${COPILOT_NETWORK_SUMMARY_FILE}" github_api_soft_degraded_reason none)"
     print_bullet "registry:" "$(kv_or "${COPILOT_NETWORK_SUMMARY_FILE}" endpoint_registry_status unknown); rows=$(kv_or "${COPILOT_NETWORK_SUMMARY_FILE}" endpoint_registry_rows 0); bad=$(kv_or "${COPILOT_NETWORK_SUMMARY_FILE}" endpoint_registry_bad_rows 0); urls_bad=$(kv_or "${COPILOT_NETWORK_SUMMARY_FILE}" endpoint_registry_bad_urls 0); hosts_bad=$(kv_or "${COPILOT_NETWORK_SUMMARY_FILE}" endpoint_registry_bad_hosts 0)"
+    print_key_if_present "registry bad URLs:" "${COPILOT_NETWORK_SUMMARY_FILE}" endpoint_registry_bad_url_examples
+    print_key_if_present "registry bad hosts:" "${COPILOT_NETWORK_SUMMARY_FILE}" endpoint_registry_bad_host_examples
     print_bullet "endpoint source:" "$(kv_any_or "${COPILOT_NETWORK_SUMMARY_FILE}" unknown endpoint_source endpoint_registry_source); file=$(kv_any_or "${COPILOT_NETWORK_SUMMARY_FILE}" unknown endpoint_registry_file endpoint_registry_canonical_file)"
     print_bullet "manager blockers:" "$(kv_or "${COPILOT_NETWORK_SUMMARY_FILE}" manager_recommendation_blockers none)"
+    print_bullet "diagnóstico seguinte:" "$(kv_any_or "${COPILOT_NETWORK_SUMMARY_FILE}" observe manager_next_diagnostic_actions next_diagnostic_actions)"
     print_bullet "route:" "$(kv_or "${COPILOT_NETWORK_SUMMARY_FILE}" route_status unknown) → $(kv_or "${COPILOT_NETWORK_SUMMARY_FILE}" route_selected_ip unknown)"
     print_bullet "route artifacts:" "state=$(kv_or "${COPILOT_NETWORK_SUMMARY_FILE}" github_route_artifact_state unknown); current=$(kv_or "${COPILOT_NETWORK_SUMMARY_FILE}" github_route_current_ip unknown); best=$(kv_or "${COPILOT_NETWORK_SUMMARY_FILE}" github_route_best_candidate_ip unknown)"
-    print_bullet "DNS cache efetivo:" "$(kv_or "${COPILOT_NETWORK_SUMMARY_FILE}" dns_cache_effective unknown); runtime=$(kv_or "${COPILOT_NETWORK_SUMMARY_FILE}" dns_cache_runtime_effective unknown); resolver=$(kv_or "${COPILOT_NETWORK_SUMMARY_FILE}" dns_cache_resolver_effective unknown); stale=$(kv_or "${COPILOT_NETWORK_SUMMARY_FILE}" dns_cache_status_stale unknown)"
-    print_bullet "endpoints:" "$(kv_or "${COPILOT_NETWORK_SUMMARY_FILE}" endpoints_ok 0)/$(kv_or "${COPILOT_NETWORK_SUMMARY_FILE}" endpoints_total 0) ok; failed=$(kv_or "${COPILOT_NETWORK_SUMMARY_FILE}" endpoints_failed 0); slow=$(kv_or "${COPILOT_NETWORK_SUMMARY_FILE}" endpoints_slow 0)"
-    print_bullet "pior host atual:" "$(kv_or "${COPILOT_NETWORK_SUMMARY_FILE}" current_worst_host unknown) ($(kv_or "${COPILOT_NETWORK_SUMMARY_FILE}" current_worst_total_ms unknown)ms)"
+    print_bullet "DNS cache efetivo:" "$(kv_or "${COPILOT_NETWORK_SUMMARY_FILE}" dns_cache_effective unknown); runtime=$(kv_or "${COPILOT_NETWORK_SUMMARY_FILE}" dns_cache_runtime_effective unknown); resolver=$(kv_or "${COPILOT_NETWORK_SUMMARY_FILE}" dns_cache_resolver_effective unknown); stale=$(kv_or "${COPILOT_NETWORK_SUMMARY_FILE}" dns_cache_status_stale unknown); drift=$(kv_or "${COPILOT_NETWORK_SUMMARY_FILE}" dns_cache_resolv_conf_drift unknown)"
+    MANAGER_ENDPOINTS_TOTAL="$(kv_or "${COPILOT_NETWORK_SUMMARY_FILE}" endpoints_total 0)"
+    MANAGER_CURRENT_WORST="$(kv_or "${COPILOT_NETWORK_SUMMARY_FILE}" current_worst_host unknown)"
+    print_bullet "endpoints:" "$(kv_or "${COPILOT_NETWORK_SUMMARY_FILE}" endpoints_ok 0)/${MANAGER_ENDPOINTS_TOTAL} ok; failed=$(kv_or "${COPILOT_NETWORK_SUMMARY_FILE}" endpoints_failed 0); slow=$(kv_or "${COPILOT_NETWORK_SUMMARY_FILE}" endpoints_slow 0)"
+    if [[ "${MANAGER_ENDPOINTS_TOTAL}" == "0" && "${MANAGER_CURRENT_WORST}" != "unknown" && -n "${MANAGER_CURRENT_WORST}" ]]; then
+        warn "Manager summary incoerente: endpoints_total=0, mas current_worst_host=${MANAGER_CURRENT_WORST}. Regerar com manager v1.6.1+."
+    fi
+    print_bullet "pior host atual:" "${MANAGER_CURRENT_WORST} ($(kv_or "${COPILOT_NETWORK_SUMMARY_FILE}" current_worst_total_ms unknown)ms)"
     print_bullet "histórico:" "$(kv_or "${COPILOT_NETWORK_SUMMARY_FILE}" history_status unknown); pior=$(kv_or "${COPILOT_NETWORK_SUMMARY_FILE}" history_worst_host unknown)/p95=$(kv_or "${COPILOT_NETWORK_SUMMARY_FILE}" history_worst_p95_ms unknown)ms"
     print_bullet "bottleneck:" "$(kv_or "${COPILOT_NETWORK_SUMMARY_FILE}" primary_bottleneck unknown)"
     print_bullet "proxy artifact:" "state=$(kv_or "${COPILOT_NETWORK_SUMMARY_FILE}" local_proxy_artifact_state unknown); action=$(kv_or "${COPILOT_NETWORK_SUMMARY_FILE}" local_proxy_recommendation_action unknown)"
     print_bullet "recomendações:" "$(kv_or "${COPILOT_NETWORK_SUMMARY_FILE}" recommendations observe)"
+    print_bullet "ações diagnósticas:" "$(kv_any_or "${COPILOT_NETWORK_SUMMARY_FILE}" observe manager_next_diagnostic_actions next_diagnostic_actions recommendations)"
     print_file_hint "diagnóstico:" "${COPILOT_NETWORK_DIAGNOSIS_FILE}"
     print_bullet "concluído em:" "$(kv_or "${COPILOT_NETWORK_SUMMARY_FILE}" completed_at unknown)"
 else
@@ -1350,6 +1489,7 @@ if [[ "${SHOW_NETWORK_RECOMMENDATIONS}" != "false" ]]; then
     print_recommendation_snapshot "Route-fix" "${GITHUB_ROUTE_RECOMMENDATION_FILE}"
     print_recommendation_snapshot "Proxy local" "${LOCAL_PROXY_RECOMMENDATION_FILE}"
     print_file_hint "manager json:" "${COPILOT_NETWORK_RECOMMENDATION_JSON_FILE}"
+    print_key_if_present "manager next diag:" "${COPILOT_NETWORK_RECOMMENDATION_FILE}" next_diagnostic_actions
     print_bullet "manager route p95:" "current=$(kv_or "${COPILOT_NETWORK_RECOMMENDATION_FILE}" route_current_p95_ms unknown); best=$(kv_or "${COPILOT_NETWORK_RECOMMENDATION_FILE}" route_best_candidate_p95_ms unknown)ms"
     print_bullet "manager fail-rate:" "current=$(kv_or "${COPILOT_NETWORK_RECOMMENDATION_FILE}" route_current_fail_rate_percent unknown); best=$(kv_or "${COPILOT_NETWORK_RECOMMENDATION_FILE}" route_best_candidate_fail_rate_percent unknown)%"
     if [[ "${SHOW_BENCHMARK_ARTIFACTS}" != "false" ]]; then
@@ -1489,7 +1629,7 @@ fi
 
 # =============================================================================
 # PHASE 7 — QUICK START GUIDE (FIRST ATTACH ONLY)
-# CANONICAL v5.8.0
+# CANONICAL v5.9.0
 #
 # CONTRATO:
 #   • Exibido APENAS no primeiro attach
@@ -1557,7 +1697,7 @@ fi
 
 # =============================================================================
 # PHASE 8 — PM2 (OBSERVAÇÃO PASSIVA SEM DAEMONIZAÇÃO)
-# CANONICAL v5.8.0
+# CANONICAL v5.9.0
 #
 # CONTRATO:
 #   • Observação estritamente PASSIVA.
@@ -1616,7 +1756,7 @@ echo ""
 
 # =============================================================================
 # PHASE 9 — CHROME EXTERNO (CDP | DIAGNÓSTICO PASSIVO)
-# CANONICAL v5.8.0
+# CANONICAL v5.9.0
 #
 # MODELO FÍSICO (NÃO NEGOCIÁVEL):
 #
@@ -1718,7 +1858,7 @@ echo ""
 
 # =============================================================================
 # PHASE 10 — VOLUMES & CACHE (OBSERVAÇÃO PASSIVA)
-# CANONICAL v5.8.0
+# CANONICAL v5.9.0
 #
 # CONTRATO (INVIOLÁVEL):
 #   • Display estritamente PASSIVO
@@ -1767,7 +1907,7 @@ echo ""
 
 # =============================================================================
 # PHASE 10.1 — DISK USAGE (SNAPSHOT PASSIVO)
-# CANONICAL v5.8.0
+# CANONICAL v5.9.0
 #
 # CONTRATO:
 #   • Apenas leitura
@@ -1796,7 +1936,7 @@ echo ""
 
 # =============================================================================
 # PHASE 11 — DOCUMENTAÇÃO VIVA (MAPA DE PORTAS & FRONTEIRAS)
-# CANONICAL v5.8.0
+# CANONICAL v5.9.0
 #
 # CONTRATO (INVIOLÁVEL):
 #   • Documentação PURA (read-only)
@@ -1868,7 +2008,7 @@ echo ""
 
 # =============================================================================
 # PHASE 12 — QUICK TIPS (ALWAYS)
-# CANONICAL v5.8.0
+# CANONICAL v5.9.0
 #
 # CONTRATO (INVIOLÁVEL):
 #   • Quick Start Guide COMPLETO apenas no PRIMEIRO attach (PHASE 7)
@@ -1918,29 +2058,33 @@ else
     echo "  • Ver logs: make logs-follow"
     echo "  • Healthcheck: make health"
     echo "  • Rede atual: npm run network:summary"
+    echo "  • Estado agregado: npm run network:state"
     echo "  • Doctor rede: npm run network:doctor"
-    echo "  • Comparar proxy: npm run network:compare-transports"
-    echo "  • Advisor passivo: npm run network:advisor"
+    echo "  • Comparar proxy: npm run network:manager:compare"
+    echo "  • Advisor passivo: npm run network:advisor:probe"
     echo "  • Documentação: DOCUMENTAÇÃO/ARQUITETURA/ARCHITECTURE.md"
     echo ""
 fi
 
 # =============================================================================
 # PHASE 12.1 — HINTS OPERACIONAIS DE REDE (PASSIVOS)
-# CANONICAL v5.8.0
+# CANONICAL v5.9.0
 # =============================================================================
 
 info "Próximas ações manuais úteis para rede/Copilot:"
-echo "  • npm run network:summary          # ler summaries atuais"
-echo "  • npm run network:doctor           # doctors curtos, explícitos e manuais"
-echo "  • npm run network:compare-transports # A/B direct-vs-proxy quando houver tempo"
-echo "  • npm run network:advisor          # advisor passivo de candidatos/edges"
-echo "  • make health                      # healthcheck geral"
+echo "  • npm run network:summary           # ler summaries atuais"
+echo "  • npm run network:state             # visão consolidada do control plane"
+echo "  • npm run network:dns:health        # prova curta do DNS default-on"
+echo "  • npm run network:doctor            # doctors curtos, explícitos e manuais"
+echo "  • npm run network:manager:recommend # regenerar recomendação sem benchmark longo"
+echo "  • npm run network:manager:compare   # A/B direct-vs-proxy quando houver tempo"
+echo "  • npm run network:advisor:probe     # advisor passivo de candidatos/edges"
+echo "  • make health                       # healthcheck geral"
 echo ""
 
 # =============================================================================
 # FINAL BANNER
-# CANONICAL v5.8.0
+# CANONICAL v5.9.0
 # =============================================================================
 
 echo ""
@@ -1957,7 +2101,7 @@ echo ""
 
 # =============================================================================
 # ENCERRAMENTO SEMÂNTICO — ATTACH COMPLETO
-# CANONICAL v5.8.0
+# CANONICAL v5.9.0
 # =============================================================================
 
 printf "%b\n" "${BLUE}──────────────────────────────────────────────────────────────${NC}"

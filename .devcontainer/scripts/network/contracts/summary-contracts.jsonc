@@ -1,0 +1,836 @@
+// =============================================================================
+// summary-contracts.jsonc — DevContainer Network/Copilot summary contracts
+// Version: v1.0.0
+// Generated: 2026-05-20
+//
+// Canonical path:
+//   .devcontainer/scripts/network/contracts/summary-contracts.jsonc
+//
+// Purpose:
+//   Declare the machine-readable contracts for /tmp/devcontainer-* status,
+//   summary, action.summary, events, metrics and aggregate state artifacts.
+//
+// This file is JSONC for maintainers, but the object below is deliberately
+// valid JSON after comment stripping. Do not put secrets here.
+// =============================================================================
+{
+  "$schema": "https://example.invalid/devcontainer/network/summary-contracts.schema.json",
+  "schemaVersion": "1.0.0",
+  "name": "devcontainer-network-summary-contracts",
+  "canonicalPath": ".devcontainer/scripts/network/contracts/summary-contracts.jsonc",
+  "generatedAt": "2026-05-20",
+  "status": "canonical-draft",
+  "scope": "Contracts for key=value status/summary/action artifacts emitted by the DevContainer GitHub/Copilot network control plane.",
+  "designPrinciples": [
+    "Contracts are read/write agreements, not runtime probes.",
+    "post-create emits structural baseline only; post-start emits runtime orchestration; post-attach emits passive UX; network-control-plane emits consolidated truth.",
+    "Action/benchmark summaries are never runtime truth unless explicitly named runtime summaries.",
+    "Unknown is allowed for unavailable data, but contradictions are degraded or failed.",
+    "No artifact may contain secrets, tokens, Authorization headers, cookies, raw env dumps, SSH keys or PAT values.",
+    "All paths are local container paths. External URLs are only allowed in endpoint registry/diagnostic reports, never as secret-bearing values."
+  ],
+  "common": {
+    "fileFormats": {
+      "singleTokenStatus": {
+        "description": "One line, one token. Example: ok",
+        "lineRules": ["LF line endings", "no CRLF", "no ANSI color", "no spaces before/after token", "max 128 bytes"]
+      },
+      "keyValueStatus": {
+        "description": "Small key=value status file. Usually includes status and script_version.",
+        "lineRules": [
+          "LF line endings",
+          "blank lines allowed but discouraged",
+          "comments are not allowed in runtime output",
+          "keys are unique"
+        ]
+      },
+      "keyValueSummary": {
+        "description": "Machine-readable key=value summary. Values are single-line strings.",
+        "lineRules": [
+          "LF line endings",
+          "key=value per line",
+          "key names: ^[a-z][a-z0-9_]*$",
+          "no duplicate keys",
+          "no control characters",
+          "no raw multiline values",
+          "max line length 8192 bytes"
+        ]
+      },
+      "eventsTsv": {
+        "description": "Event stream TSV with header. Preferred header: timestamp<TAB>severity<TAB>component<TAB>code<TAB>message, or epoch<TAB>event<TAB>details for legacy post-create.",
+        "lineRules": [
+          "LF line endings",
+          "tab separated",
+          "header required",
+          "messages one-line sanitized",
+          "no secrets"
+        ]
+      },
+      "metricsTsv": {
+        "description": "Metrics TSV. Header required; no secrets; numeric columns must use decimal strings or unknown."
+      },
+      "jsonState": {
+        "description": "JSON object generated from summaries/events; must parse with JSON.parse and must not contain comments."
+      }
+    },
+    "statusValues": {
+      "healthy": ["ok", "ready-ok", "running", "present", "fresh", "valid", "recorded", "complete"],
+      "neutral": [
+        "off",
+        "disabled",
+        "skipped",
+        "not-run",
+        "not-attempted",
+        "not-needed",
+        "missing-optional",
+        "unknown",
+        "observe"
+      ],
+      "advisory": ["advisory", "warning", "present-stale", "legacy", "inconsistent", "lock-timeout"],
+      "degraded": [
+        "degraded",
+        "ready-degraded",
+        "stale",
+        "unhealthy",
+        "failed-soft",
+        "partial",
+        "summary-missing",
+        "drift",
+        "invalid"
+      ],
+      "failed": ["failed", "fatal", "lock-failed", "missing", "unreadable", "invalid-contract"]
+    },
+    "severityOrder": ["ok", "info", "advisory", "warning", "degraded", "failed", "fatal"],
+    "fallbackValues": ["unknown", "none", "not-run", "not-attempted", "skipped", "unavailable"],
+    "fieldTypes": {
+      "status": {
+        "type": "enumToken",
+        "values": "common.statusValues.*",
+        "requiredByDefault": true
+      },
+      "summary_kind": {
+        "type": "token",
+        "pattern": "^[a-z0-9][a-z0-9._-]*$"
+      },
+      "script_version": {
+        "type": "versionOrToken",
+        "pattern": "^(v?[0-9]+(\\.[0-9]+){1,3}|[a-z0-9._-]+-[vV]?[0-9]+(\\.[0-9]+){1,3}|unknown|missing)$"
+      },
+      "completed_at": {
+        "type": "timestamp",
+        "formats": ["rfc3339-ish", "unknown"]
+      },
+      "created_at": {
+        "type": "timestamp",
+        "formats": ["rfc3339-ish", "unknown"]
+      },
+      "report": {
+        "type": "pathOrUnknown"
+      },
+      "events": {
+        "type": "pathOrUnknown"
+      },
+      "json": {
+        "type": "pathOrUnknown"
+      },
+      "enabled": {
+        "type": "booleanString"
+      },
+      "rows": {
+        "type": "uintString"
+      },
+      "bad": {
+        "type": "uintString"
+      },
+      "*_status": {
+        "type": "statusToken"
+      },
+      "*_file": {
+        "type": "pathOrUnknown"
+      },
+      "*_path": {
+        "type": "pathOrUnknown"
+      },
+      "*_rows": {
+        "type": "uintString"
+      },
+      "*_bad_rows": {
+        "type": "uintString"
+      },
+      "*_count": {
+        "type": "uintString"
+      },
+      "*_total": {
+        "type": "uintString"
+      },
+      "*_ok": {
+        "type": "uintString"
+      },
+      "*_ms": {
+        "type": "numberOrUnknown"
+      },
+      "*_seconds": {
+        "type": "uintString"
+      },
+      "*_epoch": {
+        "type": "uintStringOrZero"
+      },
+      "*_sha256": {
+        "type": "sha256OrUnknown"
+      },
+      "*_ip": {
+        "type": "ipOrUnknownOrNone"
+      },
+      "*_host": {
+        "type": "hostnameOrUnknown"
+      },
+      "*_url": {
+        "type": "httpsUrlOrUnknown"
+      },
+      "*_actions": {
+        "type": "csvTokensOrNone"
+      },
+      "*_recommendations": {
+        "type": "csvTokensOrNone"
+      }
+    },
+    "securityRules": [
+      "Never write token, password, secret, Authorization, Cookie, Set-Cookie, GH_TOKEN, GITHUB_TOKEN, PAT, SSH key or private URL query credentials.",
+      "If a value may contain a secret, emit redacted or omitted instead.",
+      "Avoid raw environment dumps; summaries should contain derived statuses, paths, versions and counts only.",
+      "Reports may be more verbose, but control-plane summaries must stay safe for copy/paste into issues."
+    ],
+    "freshness": {
+      "defaultMaxAgeSeconds": 86400,
+      "staleArtifactPolicy": "stale artifacts are advisory unless they contradict current runtime facts; contradictions are degraded",
+      "currentRuntimeFacts": ["/etc/resolv.conf", "/etc/hosts", "process state read by component-specific scripts"]
+    }
+  },
+  "artifacts": {
+    "postCreate.status": {
+      "path": "/tmp/devcontainer-post-create.status",
+      "format": "keyValueStatus",
+      "producer": ".devcontainer/scripts/post-create.sh",
+      "producerVersion": "v1.2.2",
+      "role": "structural-gate-status",
+      "statusKey": "status",
+      "requiredKeys": ["status", "script_version", "script_audit_status", "endpoint_registry_status", "created_at"],
+      "recommendedKeys": ["package_json_status", "makefile_status", "toolchain_contract_status"],
+      "optionalKeys": [],
+      "acceptedStatusValues": ["ready-ok", "ready-degraded", "failed", "fatal"],
+      "consumers": ["post-attach.sh", "network-control-plane-state.sh", "Makefile/package network:* summaries"],
+      "criticalInvariants": [
+        "status=ready-ok only when script_audit_status=OK and endpoint_registry_status=ok and package/make/devcontainer/dockerfile statuses are ok",
+        "created_at must be a single-line timestamp; no secrets"
+      ],
+      "notes": []
+    },
+    "postCreate.summary": {
+      "path": "/tmp/devcontainer-post-create.summary",
+      "format": "keyValueSummary",
+      "producer": ".devcontainer/scripts/post-create.sh",
+      "producerVersion": "v1.2.2",
+      "role": "structural-baseline",
+      "statusKey": "status",
+      "expectedSummaryKind": "post-create-structural",
+      "requiredKeys": [
+        "summary_kind",
+        "status",
+        "script_name",
+        "script_version",
+        "project_root",
+        "devcontainer_version",
+        "dockerfile_version",
+        "package_json_version",
+        "makefile_version",
+        "script_audit_status",
+        "endpoint_registry_file",
+        "endpoint_registry_status",
+        "endpoint_registry_rows",
+        "endpoint_registry_bad_rows",
+        "local_dns_expected",
+        "manager_expected",
+        "network_control_plane_expected",
+        "state_file"
+      ],
+      "recommendedKeys": [
+        "package_json_status",
+        "makefile_status",
+        "toolchain_contract_status",
+        "toolchain_contract_missing",
+        "toolchain_contract_report",
+        "health_status_file",
+        "health_summary_file",
+        "health_report_file",
+        "health_events_file",
+        "sync_local_auth_status_file",
+        "sync_local_auth_summary_file",
+        "sync_local_auth_report_file"
+      ],
+      "optionalKeys": [],
+      "acceptedStatusValues": ["ready-ok", "ready-degraded", "failed", "fatal"],
+      "consumers": ["post-attach.sh", "network-control-plane-state.sh", "Makefile/package network:* summaries"],
+      "criticalInvariants": [
+        "summary_kind MUST be post-create-structural",
+        "endpoint_registry_status=ok requires endpoint_registry_rows > 0 and endpoint_registry_bad_rows=0",
+        "toolchain_contract_status=ok requires toolchain_contract_missing=0"
+      ],
+      "notes": [
+        "post-create is structural only; it must not represent runtime DNS/proxy/route health. Runtime state belongs to post-start and network-control-plane."
+      ]
+    },
+    "postStart.summary": {
+      "path": "/tmp/devcontainer-post-start.summary",
+      "format": "keyValueSummary",
+      "producer": ".devcontainer/scripts/post-start.sh",
+      "producerVersion": "v3.0.2",
+      "role": "runtime-orchestration-snapshot",
+      "statusKey": "status",
+      "requiredKeys": [
+        "status",
+        "network_status",
+        "diagnostics_status",
+        "script_version",
+        "local_dns_cache_status",
+        "github_route_status",
+        "copilot_network_status",
+        "local_copilot_proxy_status",
+        "endpoint_registry_status",
+        "completed_at"
+      ],
+      "recommendedKeys": [
+        "summary_kind",
+        "local_dns_cache_local_probe_status",
+        "local_dns_cache_system_probe_status",
+        "local_dns_cache_docker_embedded_split_status",
+        "local_dns_cache_dnsmasq_target_port_conflict_status",
+        "local_dns_cache_resolv_conf_write_privilege_status",
+        "local_dns_cache_warmup_status",
+        "network_control_plane_status",
+        "network_control_plane_report",
+        "network_control_plane_events",
+        "post_start_report"
+      ],
+      "optionalKeys": [],
+      "acceptedStatusValues": ["ok", "degraded", "failed", "fatal"],
+      "consumers": ["post-attach.sh", "network-control-plane-state.sh", "Makefile/package network:* summaries"],
+      "criticalInvariants": [
+        "status=ok requires network_status=ok or diagnostics_status not fatal",
+        "local_dns_cache_status=ok requires local_dns_cache_local_probe_status=ok|proven|true when DNS is default-on",
+        "endpoint_registry_status=ok requires canonical registry readable"
+      ],
+      "notes": []
+    },
+    "postAttach.summary": {
+      "path": "/tmp/devcontainer-post-attach.summary",
+      "format": "keyValueSummary",
+      "producer": ".devcontainer/scripts/post-attach.sh",
+      "producerVersion": "v5.9.0",
+      "role": "interactive-ux-passive-snapshot",
+      "statusKey": "status",
+      "requiredKeys": ["status", "script_version", "completed_at"],
+      "recommendedKeys": [
+        "health_status",
+        "post_start_status",
+        "local_dns_cache_status",
+        "github_route_status",
+        "copilot_network_status",
+        "local_copilot_proxy_status",
+        "network_control_plane_status"
+      ],
+      "optionalKeys": [],
+      "acceptedStatusValues": ["ok", "advisory", "degraded", "failed", "unknown"],
+      "consumers": ["post-attach.sh", "network-control-plane-state.sh", "Makefile/package network:* summaries"],
+      "criticalInvariants": [],
+      "notes": [
+        "post-attach is passive UX. It must not be used as authority over runtime state when network-control-plane.summary exists."
+      ]
+    },
+    "health.status": {
+      "path": "/tmp/devcontainer-health.status",
+      "format": "singleTokenStatus",
+      "producer": ".devcontainer/scripts/healthcheck.sh",
+      "producerVersion": "v3.0.0",
+      "role": "health-classifier-status",
+      "statusKey": "status",
+      "requiredKeys": ["<single-token-status-line>"],
+      "recommendedKeys": [],
+      "optionalKeys": [],
+      "acceptedStatusValues": ["ok", "degraded", "failed", "fatal", "unhealthy"],
+      "consumers": ["post-attach.sh", "network-control-plane-state.sh", "Makefile/package network:* summaries"],
+      "criticalInvariants": [],
+      "notes": []
+    },
+    "health.summary": {
+      "path": "/tmp/devcontainer-health.summary",
+      "format": "keyValueSummary",
+      "producer": ".devcontainer/scripts/healthcheck.sh",
+      "producerVersion": "v3.0.0",
+      "role": "health-classifier-summary",
+      "statusKey": "status",
+      "requiredKeys": ["status", "docker_status", "script_version", "endpoint_registry_status", "completed_at"],
+      "recommendedKeys": ["fatal_count", "degraded_count", "advisory_count", "ok_count", "report", "events"],
+      "optionalKeys": [],
+      "acceptedStatusValues": ["ok", "degraded", "failed", "fatal", "unhealthy"],
+      "consumers": ["post-attach.sh", "network-control-plane-state.sh", "Makefile/package network:* summaries"],
+      "criticalInvariants": [
+        "docker_status must be one of healthy|unhealthy|starting|unknown-compatible tokens",
+        "status=ok must imply no fatal findings"
+      ],
+      "notes": []
+    },
+    "syncLocalAuth.summary": {
+      "path": "/tmp/devcontainer-sync-local-auth.summary",
+      "format": "keyValueSummary",
+      "producer": ".devcontainer/scripts/sync-local-auth.sh",
+      "producerVersion": "v2.0.0",
+      "role": "local-env-auth-bootstrap-summary",
+      "statusKey": "status",
+      "requiredKeys": [
+        "status",
+        "script_version",
+        "profile_status",
+        "gh_status",
+        "gh_setup_git_status",
+        "completed_at"
+      ],
+      "recommendedKeys": ["summary_file", "report_file"],
+      "optionalKeys": [],
+      "acceptedStatusValues": ["ok", "degraded", "failed", "skipped", "unknown"],
+      "consumers": ["post-attach.sh", "network-control-plane-state.sh", "Makefile/package network:* summaries"],
+      "criticalInvariants": [],
+      "notes": ["Must never expose token values or environment secret values."]
+    },
+    "localDns.status": {
+      "path": "/tmp/devcontainer-local-dns-cache.status",
+      "format": "singleTokenStatus",
+      "producer": ".devcontainer/scripts/network/local-dns-cache.sh",
+      "producerVersion": "v1.8.0",
+      "role": "dns-runtime-status",
+      "statusKey": "status",
+      "requiredKeys": ["<single-token-status-line>"],
+      "recommendedKeys": [],
+      "optionalKeys": [],
+      "acceptedStatusValues": ["ok", "off", "disabled", "skipped", "degraded", "failed", "lock-failed"],
+      "consumers": ["post-attach.sh", "network-control-plane-state.sh", "Makefile/package network:* summaries"],
+      "criticalInvariants": [],
+      "notes": []
+    },
+    "localDns.summary": {
+      "path": "/tmp/devcontainer-local-dns-cache.summary",
+      "format": "keyValueSummary",
+      "producer": ".devcontainer/scripts/network/local-dns-cache.sh",
+      "producerVersion": "v1.8.0",
+      "role": "dns-runtime-summary",
+      "statusKey": "status",
+      "expectedSummaryKind": "runtime",
+      "requiredKeys": [
+        "summary_kind",
+        "status",
+        "script_version",
+        "dnsmasq_process_status",
+        "dnsmasq_port_status",
+        "dnsmasq_pidfile_status",
+        "local_probe_status",
+        "system_probe_status",
+        "resolv_conf_status",
+        "resolv_conf_points_to_cache",
+        "resolv_conf_drift",
+        "resolver_effective",
+        "runtime_effective",
+        "docker_embedded_upstream_status",
+        "docker_embedded_split_status",
+        "dnsmasq_target_port_conflict_status",
+        "resolv_conf_write_privilege_status",
+        "warmup_status",
+        "report",
+        "events",
+        "completed_at"
+      ],
+      "recommendedKeys": [
+        "local_probe_tool",
+        "local_probe_proven",
+        "local_probe_proof_reason",
+        "resolv_conf_first_nameserver",
+        "resolv_conf_sha256",
+        "resolv_conf_mtime_epoch",
+        "resolv_conf_inode",
+        "resolv_backup_trust_status",
+        "dnsmasq_socket_owner_visibility",
+        "docker_embedded_split_domains",
+        "system_resolver_uses_cache"
+      ],
+      "optionalKeys": [],
+      "acceptedStatusValues": ["ok", "off", "disabled", "skipped", "degraded", "failed", "lock-failed"],
+      "consumers": ["post-attach.sh", "network-control-plane-state.sh", "Makefile/package network:* summaries"],
+      "criticalInvariants": [
+        "summary_kind MUST be runtime except synthetic summaries emitted by post-start must set summary_kind=synthetic-local-dns",
+        "status=ok with resolv_conf_points_to_cache=true requires local_probe_proven=true and resolv_conf_drift=false",
+        "dnsmasq_target_port_conflict_status must not be conflict when status=ok",
+        "resolv_conf_write_privilege_status must be writable|not-needed for a successful rewrite mode"
+      ],
+      "notes": []
+    },
+    "localDns.action.summary": {
+      "path": "/tmp/devcontainer-local-dns-cache.action.summary",
+      "format": "keyValueSummary",
+      "producer": ".devcontainer/scripts/network/local-dns-cache.sh",
+      "producerVersion": "v1.8.0",
+      "role": "dns-action-non-runtime-summary",
+      "statusKey": "status",
+      "expectedSummaryKind": "action",
+      "requiredKeys": ["summary_kind", "status", "script_version", "action", "completed_at"],
+      "recommendedKeys": [
+        "docker_embedded_upstream_status",
+        "docker_embedded_split_status",
+        "warmup_status",
+        "report",
+        "events"
+      ],
+      "optionalKeys": [],
+      "acceptedStatusValues": ["ok", "benchmark-ok", "doctor-ok", "degraded", "failed", "skipped"],
+      "consumers": ["post-attach.sh", "network-control-plane-state.sh", "Makefile/package network:* summaries"],
+      "criticalInvariants": ["Action summaries MUST NOT overwrite localDns.summary runtime fields by default"],
+      "notes": []
+    },
+    "githubRoute.summary": {
+      "path": "/tmp/devcontainer-github-api-route.summary",
+      "format": "keyValueSummary",
+      "producer": ".devcontainer/scripts/network/github-api-route-fix.sh",
+      "producerVersion": "v1.9.1",
+      "role": "github-api-runtime-route-summary",
+      "statusKey": "status",
+      "expectedSummaryKind": "runtime-route",
+      "requiredKeys": [
+        "status",
+        "summary_kind",
+        "runtime_route_status",
+        "hosts_apply_status",
+        "verify_status",
+        "functionality_status",
+        "report",
+        "completed_at"
+      ],
+      "recommendedKeys": [
+        "script_version",
+        "selected_ip",
+        "current_ip",
+        "current_route_status",
+        "root_reachability_status",
+        "tls_status",
+        "http_status",
+        "p95_ms",
+        "decision",
+        "cause"
+      ],
+      "optionalKeys": [],
+      "acceptedStatusValues": ["ok", "degraded", "failed", "skipped", "unknown"],
+      "consumers": ["post-attach.sh", "network-control-plane-state.sh", "Makefile/package network:* summaries"],
+      "criticalInvariants": [
+        "summary_kind MUST be runtime-route for the runtime summary",
+        "benchmark-ok MUST NOT appear as status in this file; benchmark/action data belongs in githubRoute.action.summary",
+        "hosts_apply_status=applied requires selected_ip to be a concrete IP address"
+      ],
+      "notes": []
+    },
+    "githubRoute.action.summary": {
+      "path": "/tmp/devcontainer-github-api-route.action.summary",
+      "format": "keyValueSummary",
+      "producer": ".devcontainer/scripts/network/github-api-route-fix.sh",
+      "producerVersion": "v1.9.1",
+      "role": "github-api-action-non-runtime-summary",
+      "statusKey": "status",
+      "expectedSummaryKind": "action",
+      "requiredKeys": ["status", "summary_kind", "script_version", "action", "action_status", "report", "completed_at"],
+      "recommendedKeys": ["selected_ip", "current_ip", "verify_status", "benchmark_summary", "recommendation"],
+      "optionalKeys": [],
+      "acceptedStatusValues": ["ok", "benchmark-ok", "doctor-ok", "probe-ok", "degraded", "failed", "skipped"],
+      "consumers": ["post-attach.sh", "network-control-plane-state.sh", "Makefile/package network:* summaries"],
+      "criticalInvariants": [
+        "Action summary is informational and MUST NOT be interpreted as current runtime route status"
+      ],
+      "notes": []
+    },
+    "copilotManager.summary": {
+      "path": "/tmp/devcontainer-copilot-network.summary",
+      "format": "keyValueSummary",
+      "producer": ".devcontainer/scripts/network/github-copilot-network-manager.sh",
+      "producerVersion": "v1.6.1",
+      "role": "copilot-network-manager-runtime-summary",
+      "statusKey": "status",
+      "requiredKeys": [
+        "status",
+        "history_status",
+        "route_status",
+        "dns_cache_status",
+        "plane_overall_status",
+        "plane_github_api_status",
+        "plane_copilot_transport_status",
+        "plane_copilot_telemetry_status",
+        "endpoint_registry_status",
+        "endpoints_total",
+        "endpoints_ok",
+        "report",
+        "completed_at"
+      ],
+      "recommendedKeys": [
+        "summary_kind",
+        "endpoint_registry_bad_hosts",
+        "endpoint_registry_bad_urls",
+        "endpoint_registry_bad_host_examples",
+        "endpoint_registry_bad_url_examples",
+        "current_worst_host",
+        "manager_recommendation_action",
+        "manager_recommended_transport",
+        "manager_recommendation_confidence",
+        "manager_recommendation_blockers",
+        "next_diagnostic_actions",
+        "manager_next_diagnostic_actions",
+        "dns_cache_resolv_conf_drift",
+        "github_route_report"
+      ],
+      "optionalKeys": [],
+      "acceptedStatusValues": ["ok", "degraded", "failed", "lock-failed", "unknown"],
+      "consumers": ["post-attach.sh", "network-control-plane-state.sh", "Makefile/package network:* summaries"],
+      "criticalInvariants": [
+        "endpoint_registry_status=ok requires endpoint_registry_bad_hosts=0 and endpoint_registry_bad_urls=0 when those keys are present",
+        "endpoints_total=0 with current_worst_host not unknown|none is invalid-contract",
+        "manager_recommendation_action is operational recommendation; next_diagnostic_actions are advisory and must be modeled separately"
+      ],
+      "notes": []
+    },
+    "localProxy.summary": {
+      "path": "/tmp/devcontainer-copilot-proxy.summary",
+      "format": "keyValueSummary",
+      "producer": ".devcontainer/scripts/network/local-copilot-proxy.sh",
+      "producerVersion": "v1.3.1",
+      "role": "local-proxy-runtime-summary",
+      "statusKey": "status",
+      "requiredKeys": [
+        "status",
+        "endpoint_registry_status",
+        "listen_status",
+        "probe_status",
+        "benchmark_status",
+        "comparison_status",
+        "lock_status",
+        "report",
+        "completed_at"
+      ],
+      "recommendedKeys": [
+        "script_version",
+        "mode",
+        "proxy_url",
+        "recommendation_action",
+        "recommended_action",
+        "confidence",
+        "probe_urls_source",
+        "probe_urls_count"
+      ],
+      "optionalKeys": [],
+      "acceptedStatusValues": ["ok", "running", "off", "disabled", "skipped", "degraded", "failed", "lock-failed"],
+      "consumers": ["post-attach.sh", "network-control-plane-state.sh", "Makefile/package network:* summaries"],
+      "criticalInvariants": [
+        "Proxy remains opt-in: status=off|disabled is healthy when DEVCONTAINER_ENABLE_LOCAL_COPILOT_PROXY is not true",
+        "Proxy URL must be loopback HTTP, never HTTPS proxy URL, when emitted"
+      ],
+      "notes": []
+    },
+    "copilotAdvisor.summary": {
+      "path": "/tmp/devcontainer-copilot-route-advisor.summary",
+      "format": "keyValueSummary",
+      "producer": ".devcontainer/scripts/network/copilot-route-advisor.sh",
+      "producerVersion": "v1.1.0",
+      "role": "passive-route-advisor-summary",
+      "statusKey": "status",
+      "requiredKeys": [
+        "status",
+        "script_version",
+        "advisor_status",
+        "endpoint_registry_status",
+        "lock_status",
+        "github_route_status",
+        "local_dns_cache_status",
+        "manager_status",
+        "manager_plane_overall_status",
+        "manager_endpoint_registry_status",
+        "report",
+        "completed_at"
+      ],
+      "recommendedKeys": [
+        "endpoints_total",
+        "endpoints_current_failed",
+        "endpoints_with_better_candidate",
+        "recommendations"
+      ],
+      "optionalKeys": [],
+      "acceptedStatusValues": ["ok", "advisory", "degraded", "failed", "skipped", "lock-failed", "unknown"],
+      "consumers": ["post-attach.sh", "network-control-plane-state.sh", "Makefile/package network:* summaries"],
+      "criticalInvariants": [
+        "Advisor is passive: it must never imply /etc/hosts or /etc/resolv.conf mutation",
+        "endpoints_with_better_candidate > 0 is advisory, not automatic route application"
+      ],
+      "notes": []
+    },
+    "networkControlPlane.status": {
+      "path": "/tmp/devcontainer-network-control-plane.status",
+      "format": "singleTokenStatus",
+      "producer": ".devcontainer/scripts/network-control-plane-state.sh",
+      "producerVersion": "v1.1.0",
+      "role": "aggregated-control-plane-status",
+      "statusKey": "status",
+      "requiredKeys": ["<single-token-status-line>"],
+      "recommendedKeys": [],
+      "optionalKeys": [],
+      "acceptedStatusValues": ["ok", "advisory", "degraded", "failed", "fatal"],
+      "consumers": ["post-attach.sh", "network-control-plane-state.sh", "Makefile/package network:* summaries"],
+      "criticalInvariants": [],
+      "notes": []
+    },
+    "networkControlPlane.summary": {
+      "path": "/tmp/devcontainer-network-control-plane.summary",
+      "format": "keyValueSummary",
+      "producer": ".devcontainer/scripts/network-control-plane-state.sh",
+      "producerVersion": "v1.1.0",
+      "role": "aggregated-control-plane-summary",
+      "statusKey": "status",
+      "requiredKeys": [
+        "status",
+        "script",
+        "script_version",
+        "completed_at",
+        "project_root",
+        "health_status",
+        "post_start_status",
+        "registry_status",
+        "registry_file",
+        "registry_rows",
+        "registry_bad_rows",
+        "current_resolv_nameservers",
+        "current_resolv_first_nameserver",
+        "current_hosts_api_github_com_ip",
+        "dns_status",
+        "dns_resolv_conf_drift",
+        "manager_status",
+        "route_status",
+        "route_summary_kind",
+        "route_action_status",
+        "proxy_status",
+        "advisor_status",
+        "events_ok",
+        "events_advisory",
+        "events_warning",
+        "events_degraded",
+        "events_failed",
+        "events_fatal",
+        "next_actions",
+        "report",
+        "events",
+        "json"
+      ],
+      "recommendedKeys": [
+        "dns_local_probe_proven",
+        "dns_docker_embedded_split_status",
+        "dns_warmup_status",
+        "manager_endpoint_registry_status",
+        "manager_endpoints_ok",
+        "manager_endpoints_total",
+        "manager_recommendation_action",
+        "manager_recommended_transport",
+        "manager_next_diagnostic_actions",
+        "route_selected_ip",
+        "route_current_ip",
+        "route_verify_status",
+        "proxy_recommendation_action",
+        "advisor_recommendations"
+      ],
+      "optionalKeys": [],
+      "acceptedStatusValues": ["ok", "advisory", "degraded", "failed", "fatal"],
+      "consumers": ["post-attach.sh", "network-control-plane-state.sh", "Makefile/package network:* summaries"],
+      "criticalInvariants": [
+        "status is derived from event severities",
+        "dns_resolv_conf_drift=true must make status at least degraded",
+        "registry_status=ok with manager_endpoint_registry_status=invalid must make status at least degraded",
+        "route_summary_kind not runtime-route with route_status starting benchmark must make status at least degraded"
+      ],
+      "notes": []
+    }
+  },
+  "crossArtifactInvariants": [
+    {
+      "id": "dns-current-runtime-wins",
+      "severity": "degraded",
+      "rule": "If localDns.summary says resolv_conf_points_to_cache=true but networkControlPlane.current_resolv_first_nameserver does not match localDns.bind_address, dns_resolv_conf_drift must be true and aggregate status must be at least degraded."
+    },
+    {
+      "id": "dns-default-on-needs-proof",
+      "severity": "degraded",
+      "rule": "When DNS cache is enabled/default-on, localDns.summary status=ok requires local_probe_proven=true and local_probe_status ok/proven/true. process-only proof is insufficient."
+    },
+    {
+      "id": "route-runtime-vs-action",
+      "severity": "degraded",
+      "rule": "githubRoute.summary must not contain benchmark-ok/benchmarking as runtime status. Benchmark and doctor outputs belong to githubRoute.action.summary."
+    },
+    {
+      "id": "manager-registry-consensus",
+      "severity": "degraded",
+      "rule": "If registry local audit is ok but manager endpoint_registry_status is invalid, aggregate status must be at least degraded and next_actions must include npm run network:manager:doctor."
+    },
+    {
+      "id": "manager-worst-host-needs-endpoint-count",
+      "severity": "degraded",
+      "rule": "manager endpoints_total=0 together with current_worst_host not in [unknown, none] is invalid-contract."
+    },
+    {
+      "id": "proxy-is-opt-in",
+      "severity": "advisory",
+      "rule": "Proxy status off/disabled is healthy unless DEVCONTAINER_ENABLE_LOCAL_COPILOT_PROXY=true or manager explicitly recommends manual opt-in."
+    },
+    {
+      "id": "post-create-is-structural",
+      "severity": "failed",
+      "rule": "post-create artifacts must not claim runtime network health for DNS/route/proxy/manager. They may only report structural baselines, expected versions, artifacts and declared contracts."
+    },
+    {
+      "id": "network-control-plane-aggregate-authority",
+      "severity": "info",
+      "rule": "When present and fresh, networkControlPlane.summary is the preferred human/machine read model over individual component summaries. Individual summaries remain sources of truth for their own component details."
+    }
+  ],
+  "validatorProfile": {
+    "name": "summary-contracts-v1",
+    "recommendedCommand": "node scripts/tools/network-summary-contracts.mjs validate .devcontainer/scripts/network/contracts/summary-contracts.jsonc",
+    "fallbackShellChecks": [
+      "grep -R $'\\r' /tmp/devcontainer-*.summary /tmp/devcontainer-*.status 2>/dev/null must be empty",
+      "awk -F= 'NF<2 && $0 !~ /^$/ { bad++ } END { exit bad?1:0 }' /tmp/devcontainer-*.summary",
+      "python3 -m json.tool /tmp/devcontainer-network-control-plane.state.json"
+    ],
+    "validationLevels": {
+      "syntax": ["JSONC parse", "no duplicate artifact ids", "no duplicate requiredKeys per artifact"],
+      "contract": [
+        "required files match artifact formats",
+        "required keys present when artifact exists",
+        "status values accepted",
+        "no duplicate keys in summaries"
+      ],
+      "semantic": [
+        "crossArtifactInvariants",
+        "freshness",
+        "runtime-vs-action separation",
+        "no-secret key/value heuristics"
+      ]
+    }
+  },
+  "migration": {
+    "from": "implicit per-script summaries",
+    "to": "explicit summary-contracts.jsonc v1.0.0",
+    "nextSteps": [
+      "Add package scripts network:contracts:validate and network:contracts:explain.",
+      "Add Makefile targets network-contracts-validate and network-contracts-explain.",
+      "Teach network-control-plane-state.sh to optionally read this contract in doctor mode without requiring Node.",
+      "Teach post-create.sh to audit presence of this contract but not require runtime artifacts during post-create.",
+      "Later generate TypeScript validators from this JSONC contract."
+    ]
+  }
+}

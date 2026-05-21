@@ -89,6 +89,7 @@ export {
     normalizeTerminalModelBillingProjection,
     observeTerminalModelChangeProjection,
     readTerminalActivityProjection,
+    readTerminalByokProjection,
     readTerminalConfigProjection,
     readTerminalContextProjection,
     readTerminalCountProjection,

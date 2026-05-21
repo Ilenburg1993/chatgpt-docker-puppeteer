@@ -24,8 +24,15 @@ vi.mock('@github/copilot-sdk', () => {
 import {
     anthropicProvider,
     azureProvider,
+    buildConfiguredByokModelListHandler,
     isValidProviderType,
     openaiProvider,
+    readConfiguredByokProfileSummaries,
+    readConfiguredByokProfilesFromEnv,
+    readConfiguredByokState,
+    readConfiguredByokSummary,
+    redactProviderConfig,
+    resolveConfiguredByokSessionOverrides,
     validateProviderConfig,
 } from '#copilot/sdk/session';
 
@@ -239,5 +246,160 @@ describe('F71 — Barrel re-exports (sdk/index.js)', () => {
         expect(barrel.anthropicProvider).toBeTypeOf('function');
         expect(barrel.validateProviderConfig).toBeTypeOf('function');
         expect(barrel.isValidProviderType).toBeTypeOf('function');
+    });
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
+// F72 — BYOK env configuration
+// ═════════════════════════════════════════════════════════════════════════════
+
+describe('F72 — BYOK env configuration', () => {
+    it('fica desabilitado sem intenção explícita de BYOK', () => {
+        const state = readConfiguredByokState({});
+        expect(state.enabled).toBe(false);
+        expect(state.summary.ready).toBe(false);
+    });
+
+    it('monta provider Ollama local OpenAI-compatible sem segredo', () => {
+        const state = readConfiguredByokState({
+            COPILOT_BYOK_ENABLED: 'true',
+            COPILOT_BYOK_PROVIDER_PRESET: 'ollama-local',
+            COPILOT_BYOK_MODEL: 'qwen2.5-coder',
+            OLLAMA_LOCAL_BASE_URL: 'http://localhost:11434',
+        });
+
+        expect(state.ready).toBe(true);
+        expect(state.provider).toMatchObject({
+            type: 'openai',
+            baseUrl: 'http://localhost:11434/v1',
+        });
+        expect(state.provider?.apiKey).toBeUndefined();
+        expect(state.model).toBe('qwen2.5-coder');
+    });
+
+    it('exige modelo explícito para BYOK', () => {
+        const state = readConfiguredByokState({
+            COPILOT_BYOK_ENABLED: 'true',
+            COPILOT_BYOK_PROVIDER_PRESET: 'openai',
+            COPILOT_BYOK_API_KEY: 'secret',
+        });
+
+        expect(state.ready).toBe(false);
+        expect(state.summary.errors.join('\n')).toContain('COPILOT_BYOK_MODEL');
+    });
+
+    it('redige apiKey, bearerToken e headers', () => {
+        const redacted = redactProviderConfig({
+            type: 'openai',
+            baseUrl: 'https://api.example.test/v1',
+            apiKey: 'secret',
+            bearerToken: 'token',
+            headers: { 'x-private': 'value' },
+        });
+
+        expect(redacted).toEqual({
+            type: 'openai',
+            baseUrl: 'https://api.example.test/v1',
+            apiKey: '[redacted]',
+            bearerToken: '[redacted]',
+            headers: { 'x-private': '[redacted]' },
+        });
+    });
+
+    it('resolve overrides de sessão com modelCapabilities e provider', () => {
+        const overrides = resolveConfiguredByokSessionOverrides(
+            {
+                COPILOT_BYOK_ENABLED: 'true',
+                COPILOT_BYOK_PROVIDER_PRESET: 'openai-compatible',
+                COPILOT_BYOK_BASE_URL: 'https://provider.example/v1',
+                COPILOT_BYOK_MODEL: 'provider-model',
+                COPILOT_BYOK_SUPPORTS_REASONING: 'true',
+                COPILOT_BYOK_CONTEXT_WINDOW_TOKENS: '64000',
+            },
+            'auto',
+        );
+
+        expect(overrides.enabled).toBe(true);
+        expect(overrides.model).toBe('provider-model');
+        expect(overrides.provider).toMatchObject({ type: 'openai', baseUrl: 'https://provider.example/v1' });
+        expect(overrides.modelCapabilities?.supports?.reasoningEffort).toBe(true);
+        expect(overrides.modelCapabilities?.limits?.max_context_window_tokens).toBe(64000);
+    });
+
+    it('fornece onListModels estático para client.listModels em BYOK', () => {
+        const handler = buildConfiguredByokModelListHandler({
+            COPILOT_BYOK_ENABLED: 'true',
+            COPILOT_BYOK_BASE_URL: 'https://provider.example/v1',
+            COPILOT_BYOK_MODEL: 'a',
+            COPILOT_BYOK_MODELS: 'a,b',
+        });
+
+        expect(handler?.().map((model) => model.id)).toEqual(['a', 'b']);
+    });
+
+    it('summary seguro mostra apenas presença de auth', () => {
+        const summary = readConfiguredByokSummary({
+            COPILOT_BYOK_ENABLED: 'true',
+            COPILOT_BYOK_PROVIDER_PRESET: 'ollama-cloud',
+            COPILOT_BYOK_MODEL: 'qwen3-coder-next',
+            OLLAMA_CLOUD_API_KEY: 'secret',
+        });
+
+        expect(summary.ready).toBe(true);
+        expect(summary.auth.apiKeyConfigured).toBe(true);
+        expect(JSON.stringify(summary)).not.toContain('secret');
+    });
+
+    it('resolve preset Kilo Gateway como OpenAI-compatible com bearer token', () => {
+        const state = readConfiguredByokState({
+            COPILOT_BYOK_ENABLED: 'true',
+            COPILOT_BYOK_PROVIDER_PRESET: 'kilo-code',
+            COPILOT_BYOK_MODEL: 'anthropic/claude-sonnet-4.5',
+            KILO_API_KEY: 'kilo-secret',
+        });
+
+        expect(state.ready).toBe(true);
+        expect(state.provider).toMatchObject({
+            type: 'openai',
+            baseUrl: 'https://api.kilo.ai/api/gateway',
+            bearerToken: 'kilo-secret',
+        });
+        expect(state.summary.auth.bearerTokenConfigured).toBe(true);
+        expect(JSON.stringify(state.summary)).not.toContain('kilo-secret');
+    });
+
+    it('resolve perfil ativo a partir de COPILOT_BYOK_PROFILES_JSON sem vazar segredo', () => {
+        const profilesJson = JSON.stringify({
+            kilo: {
+                preset: 'kilo-code',
+                model: 'anthropic/claude-sonnet-4.5',
+                bearerTokenEnv: 'KILO_API_KEY',
+                metadata: { owner: 'terminal-llm-b' },
+            },
+        });
+        const env = {
+            COPILOT_BYOK_ENABLED: 'true',
+            COPILOT_BYOK_PROFILE: 'kilo',
+            COPILOT_BYOK_PROFILES_JSON: profilesJson,
+            KILO_API_KEY: 'kilo-secret',
+        };
+
+        const state = readConfiguredByokState(env);
+        const profiles = readConfiguredByokProfileSummaries(env);
+
+        expect(readConfiguredByokProfilesFromEnv(env).kilo).toBeTruthy();
+        expect(state.ready).toBe(true);
+        expect(state.summary.profile).toBe('kilo');
+        expect(state.model).toBe('anthropic/claude-sonnet-4.5');
+        expect(state.provider?.bearerToken).toBe('kilo-secret');
+        expect(profiles[0]).toMatchObject({
+            name: 'kilo',
+            preset: 'kilo-code',
+            model: 'anthropic/claude-sonnet-4.5',
+            auth: { bearerTokenConfigured: true },
+            metadataKeys: ['owner'],
+        });
+        expect(JSON.stringify(state.summary)).not.toContain('kilo-secret');
+        expect(JSON.stringify(profiles)).not.toContain('kilo-secret');
     });
 });

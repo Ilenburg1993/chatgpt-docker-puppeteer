@@ -166,6 +166,52 @@ forçar cor (por exemplo PM2, testes e helpers específicos).
 - mantenha apenas templates (`*.example`) no repositório;
 - se a mesma chave existir no host e em `.env.local`, o valor local vence.
 
+### BYOK do Terminal LLM-B
+
+O BYOK do `src/copilot` usa o campo `provider` nativo do `@github/copilot-sdk`; portanto, não há
+um segundo loop paralelo de chamadas a LLM. O caminho operacional é:
+
+- knobs não sensíveis em [`.env.example`](../../.env.example) e
+  [`.env.expert.example`](../../.env.expert.example);
+- o arquivo canônico do operador é `.env.local` (gitignored). Ali ficam perfis, modelos, metadata
+  operacional e segredos;
+- segredos (`COPILOT_BYOK_API_KEY`, `COPILOT_BYOK_BEARER_TOKEN`, `OPENAI_API_KEY`,
+  `OLLAMA_CLOUD_API_KEY`, `KILO_API_KEY`, `KILO_CODE_API_KEY`, etc.) apenas em `.env.local`, no host
+  ou em secrets manager;
+- diagnóstico seguro via `/byok`, que mostra presença de credencial, provider e modelo, mas nunca
+  imprime o valor do segredo;
+- `COPILOT_BYOK_MODEL` obrigatório quando `COPILOT_BYOK_ENABLED=true`, porque o SDK exige modelo
+  explícito para provider customizado.
+
+Perfis canônicos:
+
+- `COPILOT_BYOK_PROFILES_JSON` contém um objeto JSON keyed por perfil (`kilo`, `ollama-cloud`,
+  `ollama-local`, `openai-prod`, etc.);
+- `COPILOT_BYOK_PROFILE` escolhe o perfil ativo;
+- cada perfil pode declarar `preset`, `model`, `baseUrl`, `apiKeyEnv`, `bearerTokenEnv`, `headers`,
+  `metadata`, `contextWindowTokens`, `supportsReasoning` e `supportsVision`;
+- `apiKey` e `bearerToken` diretos são aceitos para runtime efêmero, mas o padrão recomendado é
+  apontar para variáveis (`apiKeyEnv`/`bearerTokenEnv`) que vivem no mesmo `.env.local`.
+
+Presets canônicos: `openai`, `openai-compatible`, `azure`, `anthropic`, `ollama-local`,
+`ollama-cloud`, `kilo-code`, `kilo-gateway`, `kilo` e `custom`. Providers não suportados
+diretamente pelo SDK devem entrar via endpoint OpenAI-compatible (por exemplo Kilo Gateway, LiteLLM,
+vLLM, Ollama local/cloud ou proxy interno).
+
+Comandos principais:
+
+- `/byok status` mostra o provider ativo redigido;
+- `/byok reload` recarrega `.env.local` no processo atual;
+- `/byok profiles` lista perfis sem segredos;
+- `/byok use <perfil>` troca o perfil BYOK ativo no processo atual;
+- `/byok use sdk` desativa BYOK e devolve a escolha de provider/modelo ao Copilot SDK;
+- `/byok model <id>` troca o modelo dentro do provider/perfil ativo;
+- `/byok provider <preset> [model] [baseUrl]` faz override efêmero sem perfil.
+
+Depois de qualquer troca de provider/modelo, use `/restart` para abrir uma nova sessão SDK com o
+contrato recém-resolvido. O terminal não cria outro renderer, outro loop ou outro histórico para
+BYOK: delta, final, tools, `ask_user`, elicitation e transcript continuam no fluxo canônico.
+
 ## Limite Deliberado do Template
 
 O template [`.env.example`](../../.env.example) foi consolidado para cobrir o baseline operacional e

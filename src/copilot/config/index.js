@@ -118,6 +118,18 @@ export { RESUME_SESSION_CONFIG_KEYS, SessionConfigBuilder, sanitizeResumeSession
 
 // ─── Client Options Builder (Faixa C) ────────────────────────────────────────
 export { ClientOptionsBuilder, buildCopilotClientOptionsFromEnv } from './client-options.js';
+export {
+    BYOK_ENV_KEYS,
+    BYOK_SECRET_ENV_KEYS,
+    buildConfiguredByokModelListHandler,
+    readConfiguredByokModelsFromEnv,
+    readConfiguredByokProfileSummaries,
+    readConfiguredByokProfilesFromEnv,
+    readConfiguredByokState,
+    readConfiguredByokSummary,
+    redactProviderConfig,
+    resolveConfiguredByokSessionOverrides,
+} from './byok.js';
 
 export { PinnedFilesLoader } from './pinned-files.js';
 

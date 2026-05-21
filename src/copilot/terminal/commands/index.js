@@ -12,6 +12,7 @@ export { cmdActivity } from './activity.js';
 export { cmdAlias } from './alias.js';
 export { cmdAttach } from './attach.js';
 export { cmdAudit } from './audit.js';
+export { cmdByok } from './byok.js';
 export { cmdModel, cmdReasoning } from './config.js';
 export { cmdCompact, cmdContext } from './context.js';
 export { cmdDiagnose } from './diagnose.js';

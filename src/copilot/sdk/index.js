@@ -419,10 +419,20 @@ export {
 // ─── Faixa 12: Provider/BYOK Support ─────────────────────────────────────────
 
 export {
+    BYOK_ENV_KEYS,
+    BYOK_SECRET_ENV_KEYS,
     anthropicProvider,
     azureProvider,
+    buildConfiguredByokModelListHandler,
     isValidProviderType,
     openaiProvider,
+    readConfiguredByokModelsFromEnv,
+    readConfiguredByokProfileSummaries,
+    readConfiguredByokProfilesFromEnv,
+    readConfiguredByokState,
+    readConfiguredByokSummary,
+    redactProviderConfig,
+    resolveConfiguredByokSessionOverrides,
     validateProviderConfig,
 } from './session/provider.js';
 

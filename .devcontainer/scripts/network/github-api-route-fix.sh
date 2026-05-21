@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # =============================================================================
 # github-api-route-fix.sh — Smart GitHub API Route Selector
-# Version: v1.9.0
+# Version: v1.9.1
 #
 # Purpose:
 #   Runtime-only network resilience helper for DevContainers. Intended to be
@@ -61,6 +61,12 @@
 #     hardens official REST API version validation, preserves route-fix as the
 #     only active api.github.com mutation layer, and normalizes LF output for
 #     Linux/WSL2 execution.
+#     v1.9.1 separates runtime route state from long-running benchmark/action
+#     artifacts, preventing benchmark runs from overwriting the operational
+#     route summary with selected_ip=none/current=unknown. It adds an explicit
+#     action summary file, summary_kind/runtime_route_status fields, preserves
+#     runtime summaries by default during benchmark, improves current-route
+#     degraded-but-functional labeling, and strengthens passive status output.
 #   - Emits report, status, summary and candidate metrics files for post-start and
 #     post-attach diagnostics, including structured decision reasons.
 #   - Fail-safe shell posture: no inherited traps, no set -e/u/pipefail.
@@ -77,7 +83,7 @@ trap - ERR EXIT INT TERM 2> /dev/null || true
 CLI_ACTION=""
 case "${1:-}" in
     --version)
-        printf '%s v%s\n' 'github-api-route-fix.sh' '1.9.0'
+        printf '%s v%s\n' 'github-api-route-fix.sh' '1.9.1'
         exit 0
         ;;
     --help)
@@ -89,6 +95,15 @@ Environment-driven actions:
 
 The optional positional action is accepted for manual use. Environment variables
 continue to take precedence so lifecycle hooks remain deterministic.
+
+Benchmark action writes benchmark/recommendation/action artifacts and preserves
+the operational route summary by default. Set
+DEVCONTAINER_GITHUB_API_BENCHMARK_UPDATE_RUNTIME_SUMMARY=true only if you
+intentionally want benchmark to overwrite the runtime summary.
+
+For other non-runtime actions such as doctor, clear-cache and probe, set
+DEVCONTAINER_GITHUB_API_ACTION_UPDATE_RUNTIME_SUMMARY=true only when you
+intentionally want those actions to replace the operational route summary.
 USAGE
         exit 0
         ;;
@@ -102,7 +117,7 @@ esac
 # Constants / sanitized config
 # -----------------------------------------------------------------------------
 readonly SCRIPT_NAME="github-api-route-fix.sh"
-readonly SCRIPT_VERSION="1.9.0"
+readonly SCRIPT_VERSION="1.9.1"
 
 cfg_bool() {
     case "${1:-}" in
@@ -148,6 +163,7 @@ readonly GITHUB_ROUTE_METRICS_FILE="${DEVCONTAINER_GITHUB_ROUTE_METRICS_FILE:-/t
 readonly GITHUB_ROUTE_BENCHMARK_FILE="${DEVCONTAINER_GITHUB_ROUTE_BENCHMARK_FILE:-/tmp/devcontainer-github-api-route.benchmark.tsv}"
 readonly GITHUB_ROUTE_BENCHMARK_SUMMARY_FILE="${DEVCONTAINER_GITHUB_ROUTE_BENCHMARK_SUMMARY_FILE:-/tmp/devcontainer-github-api-route.benchmark.summary}"
 readonly GITHUB_ROUTE_RECOMMENDATION_FILE="${DEVCONTAINER_GITHUB_ROUTE_RECOMMENDATION_FILE:-/tmp/devcontainer-github-api-route.recommendation}"
+readonly GITHUB_ROUTE_ACTION_SUMMARY_FILE="${DEVCONTAINER_GITHUB_ROUTE_ACTION_SUMMARY_FILE:-/tmp/devcontainer-github-api-route.action.summary}"
 
 CONNECT_TIMEOUT="$(cfg_uint "${DEVCONTAINER_GITHUB_API_ROUTE_CONNECT_TIMEOUT:-3}" 3 1 30)"
 readonly CONNECT_TIMEOUT
@@ -322,6 +338,10 @@ BENCHMARK_MIN_IMPROVEMENT_PERCENT="$(cfg_uint "${DEVCONTAINER_GITHUB_API_BENCHMA
 readonly BENCHMARK_MIN_IMPROVEMENT_PERCENT
 BENCHMARK_RECOMMENDATION_TTL_SECONDS="$(cfg_uint "${DEVCONTAINER_GITHUB_API_BENCHMARK_RECOMMENDATION_TTL_SECONDS:-86400}" 86400 60 604800)"
 readonly BENCHMARK_RECOMMENDATION_TTL_SECONDS
+BENCHMARK_UPDATE_RUNTIME_SUMMARY="$(cfg_bool "${DEVCONTAINER_GITHUB_API_BENCHMARK_UPDATE_RUNTIME_SUMMARY:-false}" false)"
+readonly BENCHMARK_UPDATE_RUNTIME_SUMMARY
+ACTION_UPDATE_RUNTIME_SUMMARY="$(cfg_bool "${DEVCONTAINER_GITHUB_API_ACTION_UPDATE_RUNTIME_SUMMARY:-false}" false)"
+readonly ACTION_UPDATE_RUNTIME_SUMMARY
 
 # -----------------------------------------------------------------------------
 # Logging / reporting
@@ -414,6 +434,7 @@ write_report_header() {
         printf 'benchmark_file=%s\n' "${GITHUB_ROUTE_BENCHMARK_FILE}"
         printf 'benchmark_summary_file=%s\n' "${GITHUB_ROUTE_BENCHMARK_SUMMARY_FILE}"
         printf 'recommendation_file=%s\n' "${GITHUB_ROUTE_RECOMMENDATION_FILE}"
+        printf 'action_summary_file=%s\n' "${GITHUB_ROUTE_ACTION_SUMMARY_FILE}"
         printf 'benchmark_duration_seconds=%s\n' "${BENCHMARK_DURATION_SECONDS}"
         printf 'benchmark_interval_seconds=%s\n' "${BENCHMARK_INTERVAL_SECONDS}"
         printf 'benchmark_max_samples=%s\n' "${BENCHMARK_MAX_SAMPLES}"
@@ -423,6 +444,8 @@ write_report_header() {
         printf 'benchmark_max_fail_rate_percent=%s\n' "${BENCHMARK_MAX_FAIL_RATE_PERCENT}"
         printf 'benchmark_min_improvement_percent=%s\n' "${BENCHMARK_MIN_IMPROVEMENT_PERCENT}"
         printf 'benchmark_recommendation_ttl_seconds=%s\n' "${BENCHMARK_RECOMMENDATION_TTL_SECONDS}"
+        printf 'benchmark_update_runtime_summary=%s\n' "${BENCHMARK_UPDATE_RUNTIME_SUMMARY}"
+        printf 'action_update_runtime_summary=%s\n' "${ACTION_UPDATE_RUNTIME_SUMMARY}"
         printf '\n'
     } > "${GITHUB_ROUTE_REPORT_FILE}" 2> /dev/null || true
 }
@@ -459,6 +482,9 @@ write_summary() {
     recovery_remaining="${13:-0}"
     content="$(
         printf 'status=%s\n' "${status}"
+        printf 'summary_kind=runtime-route\n'
+        printf 'action=%s\n' "${ACTION}"
+        printf 'runtime_route_status=%s\n' "${status}"
         printf 'selected_ip=%s\n' "${selected_ip:-none}"
         printf 'selected_score=%s\n' "${selected_score:-unknown}"
         printf 'selected_latency_ms=%s\n' "${selected_latency:-unknown}"
@@ -495,6 +521,30 @@ write_summary() {
     write_atomic_file "${GITHUB_ROUTE_SUMMARY_FILE}" "$(printf '%s\n' "${content}")" 0644 || {
         ensure_parent_dir "${GITHUB_ROUTE_SUMMARY_FILE}"
         printf '%s\n' "${content}" > "${GITHUB_ROUTE_SUMMARY_FILE}" 2> /dev/null || true
+    }
+}
+
+write_action_summary() {
+    local status reason content
+    status="${1:-unknown}"
+    reason="${2:-none}"
+    content="$(
+        printf 'status=%s\n' "${status}"
+        printf 'summary_kind=action\n'
+        printf 'action=%s\n' "${ACTION}"
+        printf 'reason=%s\n' "${reason}"
+        printf 'script=%s\n' "${SCRIPT_NAME}"
+        printf 'script_version=%s\n' "${SCRIPT_VERSION}"
+        printf 'runtime_summary=%s\n' "${GITHUB_ROUTE_SUMMARY_FILE}"
+        printf 'benchmark=%s\n' "${GITHUB_ROUTE_BENCHMARK_FILE}"
+        printf 'benchmark_summary=%s\n' "${GITHUB_ROUTE_BENCHMARK_SUMMARY_FILE}"
+        printf 'recommendation=%s\n' "${GITHUB_ROUTE_RECOMMENDATION_FILE}"
+        printf 'report=%s\n' "${GITHUB_ROUTE_REPORT_FILE}"
+        printf 'completed_at=%s\n' "$(ts)"
+    )"
+    write_atomic_file "${GITHUB_ROUTE_ACTION_SUMMARY_FILE}" "$(printf '%s\n' "${content}")" 0644 || {
+        ensure_parent_dir "${GITHUB_ROUTE_ACTION_SUMMARY_FILE}"
+        printf '%s\n' "${content}" > "${GITHUB_ROUTE_ACTION_SUMMARY_FILE}" 2> /dev/null || true
     }
 }
 
@@ -2224,6 +2274,10 @@ select_and_apply_route() {
 
     if has_proxy_env && [[ "${PROXY_MODE}" != "direct" ]]; then
         if probe_proxy_route_if_configured; then
+            CURRENT_ROUTE_STATE="proxy-route-ok"
+            ROOT_REACHABILITY_STATE="ok"
+            ROUTE_VERIFY_STATUS="not-needed-proxy-route"
+            ROUTE_VERIFY_REASON="proxy-route-ok;no-hosts-mutation"
             set_summary_functionality_manual "proxy-root-ok" "root:200,transport:proxy"
             write_summary "ok" "${PROXY_ROUTE_REMOTE:-proxy}" "" "${PROXY_ROUTE_LATENCY_MS:-}" "${PROXY_ROUTE_REMOTE:-proxy}" "" "${PROXY_ROUTE_LATENCY_MS:-}" "decision=keep;cause=proxy-route-ok"
             return 0
@@ -2258,6 +2312,8 @@ select_and_apply_route() {
         if [[ "${current_capability_status}" == "ok" ]]; then
             current_state="ok"
             current_score="85"
+            CURRENT_ROUTE_STATE="degraded-reachable-functional"
+            ROOT_REACHABILITY_STATE="degraded-reachable"
             set_summary_functionality_manual "ok" "root:${current_root_http},${current_capability_details},root_degraded_reachable:true"
             append_report "current_functionality status=ok details=root:${current_root_http},${current_capability_details} current_root_degraded_reachable=true"
         else
@@ -2387,10 +2443,15 @@ select_and_apply_route() {
     append_candidate_metric "${ip}" "${score}" "${root_http}" "${rate_http}" "${user_http}" "${latency_ms}" "${remote}" "${reason}" "true" "${record_p95:-unknown}" "${record_recent_failures:-0}" "${record_cooldown_remaining:-0}" "${record_recovery_remaining:-0}"
 
     if [[ "${DRY_RUN}" == "true" || "${ACTION}" == "probe" ]]; then
-        log_ok "dry-run ativo: candidato validado, mas /etc/hosts não será alterado."
+        log_ok "dry-run/probe ativo: candidato validado, mas /etc/hosts não será alterado."
         append_report "result=dry-run selected=${best_ip} score=${best_score}"
         update_cache_from_records "${all_records}" ""
-        write_summary "ok" "${best_ip}" "${best_score}" "${best_latency}" "${current_remote}" "${current_score}" "${current_latency}" "decision=probe-only;cause=validated-candidate"
+        write_action_summary "probe-ok" "probe-only;validated-candidate;selected=${best_ip};score=${best_score};latency_ms=${best_latency}"
+        if [[ "${ACTION_UPDATE_RUNTIME_SUMMARY}" == "true" ]]; then
+            write_summary "ok" "${best_ip}" "${best_score}" "${best_latency}" "${current_remote}" "${current_score}" "${current_latency}" "decision=probe-only;cause=validated-candidate;runtime-summary-overwrite-explicit=true"
+        else
+            append_report "runtime_summary=preserved reason=probe-or-dry-run summary=${GITHUB_ROUTE_SUMMARY_FILE}"
+        fi
         return 0
     fi
 
@@ -2796,14 +2857,20 @@ benchmark_action() {
 
     if generate_benchmark_summary; then
         set_summary_functionality_manual "benchmark-ok" "profile:${FUNCTIONALITY_PROFILE},samples:${sample_index}"
-        write_summary "benchmark-ok" "none" "unknown" "unknown" "unknown" "unknown" "unknown" "decision=benchmark;cause=completed"
+        write_action_summary "benchmark-ok" "benchmark-completed;samples=${sample_index}"
+        if [[ "${BENCHMARK_UPDATE_RUNTIME_SUMMARY}" == "true" ]]; then
+            write_summary "benchmark-ok" "none" "unknown" "unknown" "unknown" "unknown" "unknown" "decision=benchmark;cause=completed;runtime-summary-overwrite-explicit=true"
+        else
+            append_report "runtime_summary=preserved reason=benchmark-action summary=${GITHUB_ROUTE_SUMMARY_FILE}"
+        fi
         write_status "benchmark-ok"
-        append_report "benchmark=ok samples=${sample_index} benchmark_file=${GITHUB_ROUTE_BENCHMARK_FILE} benchmark_summary=${GITHUB_ROUTE_BENCHMARK_SUMMARY_FILE} recommendation=${GITHUB_ROUTE_RECOMMENDATION_FILE}"
-        log_ok "benchmark concluído: samples=${sample_index}; summary=${GITHUB_ROUTE_BENCHMARK_SUMMARY_FILE}; recommendation=${GITHUB_ROUTE_RECOMMENDATION_FILE}."
+        append_report "benchmark=ok samples=${sample_index} benchmark_file=${GITHUB_ROUTE_BENCHMARK_FILE} benchmark_summary=${GITHUB_ROUTE_BENCHMARK_SUMMARY_FILE} recommendation=${GITHUB_ROUTE_RECOMMENDATION_FILE} action_summary=${GITHUB_ROUTE_ACTION_SUMMARY_FILE}"
+        log_ok "benchmark concluído: samples=${sample_index}; summary=${GITHUB_ROUTE_BENCHMARK_SUMMARY_FILE}; recommendation=${GITHUB_ROUTE_RECOMMENDATION_FILE}; runtime summary preservado por padrão."
         return 0
     fi
 
     write_status "benchmark-degraded"
+    write_action_summary "benchmark-degraded" "benchmark-summary-failed;samples=${sample_index}"
     append_report "benchmark=summary-failed samples=${sample_index}"
     log_warn "benchmark executou, mas falhou ao gerar summary/recommendation."
     return 1
@@ -2873,10 +2940,20 @@ doctor_action() {
     set_summary_functionality_manual "doctor" "host:${GITHUB_API_HOST},api_version:${GITHUB_API_VERSION},profile:${FUNCTIONALITY_PROFILE}"
     if [[ "${rc}" -eq 0 ]]; then
         write_status "ok"
-        write_summary "ok" "none" "unknown" "unknown" "unknown" "unknown" "unknown" "decision=doctor;cause=ok"
+        write_action_summary "doctor-ok" "doctor-ok"
+        if [[ "${ACTION_UPDATE_RUNTIME_SUMMARY}" == "true" ]]; then
+            write_summary "ok" "none" "unknown" "unknown" "unknown" "unknown" "unknown" "decision=doctor;cause=ok;runtime-summary-overwrite-explicit=true"
+        else
+            append_report "runtime_summary=preserved reason=doctor summary=${GITHUB_ROUTE_SUMMARY_FILE}"
+        fi
     else
         write_status "degraded"
-        write_summary "degraded" "none" "unknown" "unknown" "unknown" "unknown" "unknown" "decision=doctor;cause=degraded"
+        write_action_summary "doctor-degraded" "doctor-degraded"
+        if [[ "${ACTION_UPDATE_RUNTIME_SUMMARY}" == "true" ]]; then
+            write_summary "degraded" "none" "unknown" "unknown" "unknown" "unknown" "unknown" "decision=doctor;cause=degraded;runtime-summary-overwrite-explicit=true"
+        else
+            append_report "runtime_summary=preserved reason=doctor-degraded summary=${GITHUB_ROUTE_SUMMARY_FILE}"
+        fi
     fi
     return "${rc}"
 }
@@ -2884,9 +2961,13 @@ doctor_action() {
 status_action() {
     local status
     status="$(read_first_line_or "${GITHUB_ROUTE_STATUS_FILE}" unknown)"
-    log_info "status=${status}; report=${GITHUB_ROUTE_REPORT_FILE}; summary=${GITHUB_ROUTE_SUMMARY_FILE}; metrics=${GITHUB_ROUTE_METRICS_FILE}; benchmark_summary=${GITHUB_ROUTE_BENCHMARK_SUMMARY_FILE}; recommendation=${GITHUB_ROUTE_RECOMMENDATION_FILE}; cache=${CACHE_FILE}"
+    log_info "status=${status}; report=${GITHUB_ROUTE_REPORT_FILE}; summary=${GITHUB_ROUTE_SUMMARY_FILE}; action_summary=${GITHUB_ROUTE_ACTION_SUMMARY_FILE}; metrics=${GITHUB_ROUTE_METRICS_FILE}; benchmark_summary=${GITHUB_ROUTE_BENCHMARK_SUMMARY_FILE}; recommendation=${GITHUB_ROUTE_RECOMMENDATION_FILE}; cache=${CACHE_FILE}"
     if [[ -r "${GITHUB_ROUTE_SUMMARY_FILE}" ]]; then
         sed -n '1,200p' "${GITHUB_ROUTE_SUMMARY_FILE}" 2> /dev/null || true
+    fi
+    if [[ -r "${GITHUB_ROUTE_ACTION_SUMMARY_FILE}" ]]; then
+        printf '%s\n' '--- action.summary ---'
+        sed -n '1,120p' "${GITHUB_ROUTE_ACTION_SUMMARY_FILE}" 2> /dev/null || true
     fi
     if [[ -r "${GITHUB_ROUTE_BENCHMARK_SUMMARY_FILE}" ]]; then
         printf '%s\n' '--- benchmark.summary ---'
@@ -2915,7 +2996,12 @@ main() {
             write_report_header
             clear_cache
             write_status "cache-cleared"
-            write_summary "cache-cleared" "" "" "" "" "" "" "decision=cache;cause=clear-cache"
+            write_action_summary "cache-cleared" "cache-cleared"
+            if [[ "${ACTION_UPDATE_RUNTIME_SUMMARY}" == "true" ]]; then
+                write_summary "cache-cleared" "" "" "" "" "" "" "decision=cache;cause=clear-cache;runtime-summary-overwrite-explicit=true"
+            else
+                append_report "runtime_summary=preserved reason=clear-cache summary=${GITHUB_ROUTE_SUMMARY_FILE}"
+            fi
             log_ok "cache de rota GitHub API limpo: ${CACHE_FILE}"
             return 0
             ;;

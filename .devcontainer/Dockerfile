@@ -1,10 +1,10 @@
 # syntax=docker/dockerfile:1
 # =============================================================================
-# Dockerfile v1.4.2 — ChatGPT Docker Puppeteer DevContainer (CANÔNICO / DEFINITIVO)
+# Dockerfile v1.5.0 — ChatGPT Docker Puppeteer DevContainer (CANÔNICO / DEFINITIVO)
 # Base: Node.js 24 + Debian Bookworm (Microsoft DevContainers)
 # hadolint global ignore=DL3008,DL3059,DL3009
 #
-# OBJETIVO MACRO (v1.4.2)
+# OBJETIVO MACRO (v1.5.0)
 #   Este Dockerfile define uma imagem DEV (apenas desenvolvimento) com foco em:
 #   - Estabilidade máxima do VS Code Server (Remote - Containers / Dev Containers)
 #   - Compatibilidade alta com GitHub Copilot / Copilot Chat e fluxos de agente
@@ -26,8 +26,36 @@
 #   altos no host (na prática, root-equivalent). Isso é deliberado para DEV.
 #
 # VERSÃO
-#   - Todas as versões/contratos internos nesta imagem usam "1.4.2".
-#   - ARG VERSION default é 1.4.2 e é propagado para contratos e labels OCI.
+#   - Todas as versões/contratos internos nesta imagem usam "1.5.0".
+#   - ARG VERSION default é 1.5.0 e é propagado para contratos e labels OCI.
+#
+# CHANGELOG v1.5.0:
+#   - Sincroniza a imagem com devcontainer.json v5.9.0 e com o control plane
+#     runtime atual: post-start v3.0.2, post-attach v5.9.0, healthcheck v3.0.0,
+#     local-dns-cache v1.8.0, github-api-route-fix v1.9.1,
+#     github-copilot-network-manager v1.6.1, local-copilot-proxy v1.3.1,
+#     copilot-route-advisor v1.1.0, network-control-plane-state v1.0.0 e
+#     endpoints.github-copilot.tsv v1.2.0.
+#   - Promove o DNS local para default-on também no nível da imagem, mas com
+#     governança fail-safe: dnsmasq só governa /etc/resolv.conf quando o hook
+#     runtime prova resposta DNS real, ausência de drift e porta controlada.
+#   - Corrige o endpoint registry default da imagem para
+#     .devcontainer/scripts/network/endpoints.github-copilot.tsv, removendo o
+#     caminho legado .devcontainer/network como fonte primária.
+#   - Atualiza o default do Copilot Network Manager para start/runtime snapshot,
+#     em vez de recommendation-only, preservando benchmark/compare como ações
+#     manuais e explicitamente opt-in.
+#   - Adiciona defaults de network-control-plane-state.sh como agregador passivo
+#     pós-start, sem curl/dig/probes próprios e sem mutação.
+#   - Atualiza a instalação do repositório Docker para o formato oficial
+#     docker.sources com Signed-By e suite derivada de /etc/os-release, mantendo
+#     apenas Docker CLI + plugins; dockerd/containerd não viram serviço de runtime.
+#   - Endurece o healthcheck image-level para delegar ao healthcheck do workspace
+#     quando presente, com fallback estrutural mínimo quando o workspace ainda não
+#     foi montado.
+#   - Preserva Bookworm como base estável. Migração para Trixie fica explícita
+#     como projeto separado, porque PowerShell/Microsoft repo e compatibilidade
+#     de DevContainer devem ser revalidadas em conjunto.
 #
 # CHANGELOG v1.4.2:
 #   - Faz auditoria conservadora de gaps de tooling básico recomendado para DEV:
@@ -90,9 +118,9 @@ SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
 # ---------------------------------------------------------------------------
 # Build-time metadata (OCI)
-# - VERSION deve ser "1.4.2" para o release canônico (pode ser override via build-arg).
+# - VERSION deve ser "1.5.0" para o release canônico (pode ser override via build-arg).
 # ---------------------------------------------------------------------------
-ARG VERSION=1.4.2
+ARG VERSION=1.5.0
 ARG BUILD_DATE=unknown
 ARG VCS_REF=unknown
 ARG IMAGE_NAME=chatgpt-docker-puppeteer
@@ -105,7 +133,9 @@ LABEL org.opencontainers.image.title="${IMAGE_NAME}" \
     org.opencontainers.image.created="${BUILD_DATE}" \
     org.opencontainers.image.revision="${VCS_REF}" \
     org.opencontainers.image.environment="${BUILD_ENV}" \
-    org.opencontainers.image.description="DevContainer for ChatGPT Puppeteer Agent (DEV) — Canonical v1.4.2"
+    org.opencontainers.image.description="DevContainer for ChatGPT Puppeteer Agent (DEV) — Canonical v1.5.0" \
+    devcontainer.image.version="1.5.0" \
+    devcontainer.control-plane.generation="network-control-plane-v5.9.0"
 
 # ---------------------------------------------------------------------------
 # Build-time feedback (logs)
@@ -393,9 +423,9 @@ RUN --mount=type=cache,id=apt-cache,target=/var/cache/apt,sharing=locked \
 # Princípios:
 #   • Ferramentas de linha de comando apenas (sem serviços)
 #   • Úteis para: rede/TLS, inspeção de processos, encoding, análise de código, etc.
-#   • v1.4.2 aceita apenas complementos passivos e básicos:
+#   • v1.5.0 aceita apenas complementos passivos e básicos:
 #       - sudo/rsync/gawk/acl/uuid-runtime/net-tools/ethtool/pinentry-curses
-#   • v1.4.2 rejeita dependências que criem daemons, policy global ou mutação de rede:
+#   • v1.5.0 rejeita dependências que criem daemons, policy global ou mutação de rede:
 #       - docker-ce/containerd/dockerd, resolvconf/systemd-resolved, iptables/nftables,
 #         openssh-server, iperf3 daemonizado e keyring/DBus persistente.
 # =============================================================================
@@ -703,14 +733,14 @@ RUN mkdir -p /etc/powershell \
 RUN cat > /etc/powershell/PowerShell.Contract.ps1 <<'EOF'
 # =============================================================================
 # PowerShell Contract — DevContainer
-# Version: 1.4.2
+# Version: 1.5.0
 #
 # Authority Model:
 #   • PowerShell  → Instrumental (subordinado)
 #   • Bash        → Canonical (autoridade)
 # =============================================================================
 
-$env:POWERSHELL_CONTRACT_VERSION = "1.4.2"
+$env:POWERSHELL_CONTRACT_VERSION = "1.5.0"
 $env:POWERSHELL_CONTRACT_LOADED  = "true"
 $env:POWERSHELL_ROLE             = "instrumental"
 $env:POWERSHELL_AUTHORITY        = "subordinate"
@@ -764,22 +794,35 @@ ARG DOCKER_GID=999
 
 RUN --mount=type=cache,id=apt-cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,id=apt-lib,target=/var/lib/apt,sharing=locked \
-    apt-get update \
-    && apt-get install -y --no-install-recommends \
+    set -e; \
+    apt-get update; \
+    apt-get install -y --no-install-recommends \
     ca-certificates \
     curl \
-    gnupg \
-    && install -m 0755 -d /etc/apt/keyrings \
-    && curl -fsSL --retry 5 --retry-delay 2 --retry-connrefused --retry-all-errors https://download.docker.com/linux/debian/gpg \
-    | gpg --dearmor -o /etc/apt/keyrings/docker.gpg \
-    && chmod a+r /etc/apt/keyrings/docker.gpg \
-    && echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/debian bookworm stable" \
-    > /etc/apt/sources.list.d/docker.list \
-    && apt-get update \
-    && apt-get install -y --no-install-recommends \
+    gnupg; \
+    install -m 0755 -d /etc/apt/keyrings; \
+    curl -fsSL --retry 5 --retry-delay 2 --retry-connrefused --retry-all-errors \
+    https://download.docker.com/linux/debian/gpg -o /etc/apt/keyrings/docker.asc; \
+    chmod a+r /etc/apt/keyrings/docker.asc; \
+    . /etc/os-release; \
+    docker_suite="${VERSION_CODENAME:-bookworm}"; \
+    case "${docker_suite}" in bookworm|trixie|bullseye) : ;; *) docker_suite="bookworm" ;; esac; \
+    { \
+    echo 'Types: deb'; \
+    echo 'URIs: https://download.docker.com/linux/debian'; \
+    echo "Suites: ${docker_suite}"; \
+    echo 'Components: stable'; \
+    echo "Architectures: $(dpkg --print-architecture)"; \
+    echo 'Signed-By: /etc/apt/keyrings/docker.asc'; \
+    } > /etc/apt/sources.list.d/docker.sources; \
+    apt-get update; \
+    apt-get install -y --no-install-recommends \
     docker-ce-cli \
     docker-compose-plugin \
-    docker-buildx-plugin
+    docker-buildx-plugin; \
+    docker --version; \
+    docker buildx version; \
+    docker compose version
 
 # Grupo docker — alinhamento defensivo com host (best-effort)
 RUN set -e; \
@@ -814,7 +857,7 @@ RUN set -e; \
 RUN set -e; \
     echo ""; \
     echo "═══════════════════════════════════════════════════"; \
-    echo " Tool Validation Gate — DevContainer v1.4.2"; \
+    echo " Tool Validation Gate — DevContainer v1.5.0"; \
     echo "═══════════════════════════════════════════════════"; \
     _ok=0; _fail=0; _warn=0; \
     _check() { \
@@ -982,7 +1025,7 @@ RUN mkdir -p \
 
 
 # =============================================================================
-# SECTION 8.5 — ENV DEFAULTS (DOCUMENTAÇÃO / SAFE DEFAULTS DEV) — v1.4.2
+# SECTION 8.5 — ENV DEFAULTS (DOCUMENTAÇÃO / SAFE DEFAULTS DEV) — v1.5.0
 #
 # Hierarquia prática (maior prioridade -> menor):
 #   1) devcontainer.json: remoteEnv (processos geridos pelo VS Code)
@@ -1040,7 +1083,7 @@ ENV PUPPETEER_LOCAL_LAUNCH_DISABLED=true \
     MOCK_CHROME=0 \
     ENABLE_STATE_FILE=true
 
-# CHROME PROXY SERVICE (v1.4.2)
+# CHROME PROXY SERVICE (v1.5.0)
 ENV WS_IDLE_TIMEOUT_MS=300000 \
     ALLOWED_ORIGINS="http://localhost:3008,http://127.0.0.1:3008"
 
@@ -1051,43 +1094,85 @@ ENV WS_IDLE_TIMEOUT_MS=300000 \
 ENV UV_THREADPOOL_SIZE=16
 
 # GitHub/Copilot network architecture defaults (runtime-only).
-# These are intentionally conservative:
+# v1.5.0 aligns image defaults with devcontainer.json v5.9.0.
+# These remain bounded and non-daemonizing at build time:
 #   - tools are installed in the image;
+#   - DNS cache is default-on only when lifecycle scripts run and prove safety;
 #   - benchmark/compare never run during build;
-#   - post-start observes recommendations by default and never applies proxy transport
-#     unless explicitly allowed by DEVCONTAINER_POST_START_APPLY_TRANSPORT_RECOMMENDATION.
+#   - proxy transport is still opt-in and is never exported globally unless the
+#     operator explicitly chooses that policy.
 # The lifecycle behavior remains controlled by devcontainer.json/Makefile.
-ENV DEVCONTAINER_ENABLE_LOCAL_DNS_CACHE=false \
+ENV DEVCONTAINER_ENABLE_LOCAL_DNS_CACHE=true \
     DEVCONTAINER_LOCAL_DNS_CACHE_MODE=auto \
+    DEVCONTAINER_LOCAL_DNS_MODE=auto \
+    DEVCONTAINER_LOCAL_DNS_POST_START_ACTION=start \
+    DEVCONTAINER_LOCAL_DNS_CACHE_ACTION=start \
     DEVCONTAINER_LOCAL_DNS_BIND_ADDRESS=127.0.0.1 \
     DEVCONTAINER_LOCAL_DNS_BIND_PORT=53 \
     DEVCONTAINER_LOCAL_DNS_WRITE_RESOLV_CONF=true \
+    DEVCONTAINER_LOCAL_DNS_REPAIR_ON_PROBE_FAILURE=true \
+    DEVCONTAINER_LOCAL_DNS_VALIDATE_CONFIG=true \
+    DEVCONTAINER_LOCAL_DNS_STRICT_PORT_CHECK=true \
+    DEVCONTAINER_LOCAL_DNS_TAKEOVER_STALE_DNSMASQ=true \
+    DEVCONTAINER_LOCAL_DNS_STOP_BY_SOCKET_OWNER=true \
+    DEVCONTAINER_LOCAL_DNS_UPSTREAM_SELECTION=ranked \
+    DEVCONTAINER_LOCAL_DNS_UPSTREAMS="1.1.1.1 1.0.0.1 8.8.8.8 8.8.4.4 9.9.9.9 149.112.112.112" \
+    DEVCONTAINER_LOCAL_DNS_BENCHMARK_HOSTS="api.github.com github.com copilot-proxy.githubusercontent.com api.githubcopilot.com" \
+    DEVCONTAINER_LOCAL_DNS_RANKED_START_LIVE_BENCHMARK=false \
+    DEVCONTAINER_LOCAL_DNS_PROCESS_ONLY_PROOF=false \
+    DEVCONTAINER_LOCAL_DNS_REQUIRE_LOCAL_PROBE=true \
+    DEVCONTAINER_LOCAL_DNS_DOCKER_EMBEDDED_MODE=auto \
+    DEVCONTAINER_LOCAL_DNS_DOCKER_EMBEDDED_RESOLVER=127.0.0.11 \
+    DEVCONTAINER_LOCAL_DNS_DOCKER_SPLIT_HORIZON=true \
+    DEVCONTAINER_LOCAL_DNS_PRESERVE_SEARCH=true \
+    DEVCONTAINER_LOCAL_DNS_WARMUP=true \
+    DEVCONTAINER_LOCAL_DNS_WARMUP_HOSTS="api.github.com github.com copilot-proxy.githubusercontent.com api.githubcopilot.com" \
+    DEVCONTAINER_POST_START_DNS_BASELINE_ON_CACHE_OFF=true \
+    DEVCONTAINER_POST_START_DNS_BASELINE_ON_CACHE_FAILURE=true \
     DEVCONTAINER_ENABLE_LOCAL_COPILOT_PROXY=false \
     DEVCONTAINER_COPILOT_PROXY_MODE=off \
     DEVCONTAINER_LOCAL_COPILOT_PROXY_MODE=off \
     DEVCONTAINER_LOCAL_COPILOT_PROXY_HOST=127.0.0.1 \
     DEVCONTAINER_LOCAL_COPILOT_PROXY_PORT=3128 \
-    DEVCONTAINER_ENABLE_COPILOT_NETWORK_MANAGER=false \
+    DEVCONTAINER_LOCAL_COPILOT_PROXY_APPLY_PROFILE=false \
+    DEVCONTAINER_LOCAL_COPILOT_PROXY_STATUS_STRICT=false \
+    DEVCONTAINER_ENABLE_COPILOT_NETWORK_MANAGER=true \
     DEVCONTAINER_COPILOT_NETWORK_MANAGER_MODE=active \
-    DEVCONTAINER_COPILOT_NETWORK_MANAGER_POST_START_ACTION=recommend \
+    DEVCONTAINER_COPILOT_NETWORK_MANAGER_POST_START_ACTION=start \
     DEVCONTAINER_COPILOT_TRANSPORT_PROFILE=auto \
     DEVCONTAINER_POST_START_APPLY_TRANSPORT_RECOMMENDATION=false \
     DEVCONTAINER_COPILOT_PROBE_IP_FAMILY=4 \
+    DEVCONTAINER_COPILOT_PROBE_CONNECT_TIMEOUT=4 \
+    DEVCONTAINER_COPILOT_PROBE_MAX_TIME=12 \
+    DEVCONTAINER_COPILOT_PROBE_PROXY_MODE=auto \
+    DEVCONTAINER_COPILOT_PROBE_PARALLEL=false \
     DEVCONTAINER_GITHUB_API_ENABLE_IPV6=false \
     DEVCONTAINER_GITHUB_API_FUNCTIONALITY_PROFILE=copilot \
+    DEVCONTAINER_ENABLE_GITHUB_API_ROUTE_FIX=true \
+    DEVCONTAINER_GITHUB_API_HOST=api.github.com \
+    DEVCONTAINER_GITHUB_API_ROUTE_PROXY_MODE=auto \
+    DEVCONTAINER_GITHUB_API_STRICT_VERIFY_EXPECTED_IP=true \
     DEVCONTAINER_GITHUB_API_BENCHMARK_DURATION_SECONDS=${NETWORK_BENCHMARK_DURATION_SECONDS} \
     DEVCONTAINER_GITHUB_API_BENCHMARK_INTERVAL_SECONDS=${NETWORK_BENCHMARK_INTERVAL_SECONDS} \
+    DEVCONTAINER_GITHUB_API_BENCHMARK_UPDATE_RUNTIME_SUMMARY=false \
+    DEVCONTAINER_GITHUB_API_ACTION_UPDATE_RUNTIME_SUMMARY=false \
     DEVCONTAINER_LOCAL_COPILOT_PROXY_BENCHMARK_DURATION_SECONDS=${NETWORK_BENCHMARK_DURATION_SECONDS} \
     DEVCONTAINER_LOCAL_COPILOT_PROXY_BENCHMARK_INTERVAL_SECONDS=${NETWORK_BENCHMARK_INTERVAL_SECONDS} \
     DEVCONTAINER_COPILOT_NETWORK_BENCHMARK_DURATION_SECONDS=${NETWORK_BENCHMARK_DURATION_SECONDS} \
     DEVCONTAINER_COPILOT_NETWORK_BENCHMARK_INTERVAL_SECONDS=${NETWORK_BENCHMARK_INTERVAL_SECONDS} \
     DEVCONTAINER_COPILOT_NETWORK_RECOMMENDATION_TTL_SECONDS=${NETWORK_RECOMMENDATION_TTL_SECONDS} \
-    DEVCONTAINER_COPILOT_ENDPOINT_REGISTRY=${APP_DIR}/.devcontainer/network/endpoints.github-copilot.tsv \
-    DEVCONTAINER_COPILOT_MANAGER_RUN_API_ROUTE_FIX=true
+    DEVCONTAINER_COPILOT_ENDPOINT_REGISTRY=${APP_DIR}/.devcontainer/scripts/network/endpoints.github-copilot.tsv \
+    DEVCONTAINER_COPILOT_ENDPOINT_REGISTRY_FILE=${APP_DIR}/.devcontainer/scripts/network/endpoints.github-copilot.tsv \
+    DEVCONTAINER_COPILOT_USE_ENDPOINT_REGISTRY=true \
+    DEVCONTAINER_COPILOT_MANAGER_MAX_ENDPOINTS=64 \
+    DEVCONTAINER_POST_START_ENDPOINT_REGISTRY_MAX_ROWS=64 \
+    DEVCONTAINER_COPILOT_MANAGER_RUN_API_ROUTE_FIX=true \
+    DEVCONTAINER_ENABLE_NETWORK_CONTROL_PLANE_STATE=true \
+    DEVCONTAINER_NETWORK_CONTROL_PLANE_POST_START_ACTION=summary
 
 
 # =============================================================================
-# SECTION 9 — SHELL CONTRACT + GATEKEEPER NSS + UX BASELINE + HANDOFF (v1.4.2)
+# SECTION 9 — SHELL CONTRACT + GATEKEEPER NSS + UX BASELINE + HANDOFF (v1.5.0)
 #
 # Objetivos:
 #   [A] Infra: bash-completion + dumb-init (entrypoint)
@@ -1133,7 +1218,7 @@ RUN command -v dumb-init >/dev/null 2>&1
 RUN mkdir -p /etc/profile.d \
     && printf '%s\n' \
     '# Canonical Runtime Shell Contract' \
-    '# Version: 1.4.2' \
+    '# Version: 1.5.0' \
     '# Declarative only — no logic, no side effects' \
     '# AI-AWARE CONTRACT (Semantic Hints Only)' \
     '' \
@@ -1181,7 +1266,7 @@ RUN mkdir -p /etc/profile.d \
 #   - Deve poder ser sourceado por /etc/profile.
 RUN cat > /etc/profile.d/10-gatekeeper-nss.sh <<'EOF'
 # DevContainer Gatekeeper — NSS Wrapper
-# Version: 1.4.2
+# Version: 1.5.0
 # Scope: Universal (all shells)
 # Mutability: READ-ONLY (Image-level)
 # Behavior: Fail-safe; canonicalizes LD_PRELOAD and binds NSS to valid files.
@@ -1306,7 +1391,30 @@ RUN sed -i 's/\r$//' /usr/local/bin/nss-gatekeeper \
 # Healthcheck e utilitário de JSONC (image-level, independentes do workspace).
 RUN cat > /usr/local/bin/devcontainer-healthcheck.sh <<'EOF'
 #!/usr/bin/env bash
+# Image-level healthcheck shim — DevContainer v1.5.0
+#
+# Contract:
+# - Prefer the workspace canonical healthcheck when the workspace is mounted.
+# - Fall back to structural image checks before post-create/post-start exist.
+# - Keep output short because Docker stores only a bounded healthcheck payload.
+# - Never use exit code 2; Docker reserves it.
 set -Eeuo pipefail
+
+workspace="${DEVCONTAINER_WORKSPACE_FOLDER:-${APP_DIR:-/workspaces/chatgpt-docker-puppeteer}}"
+canonical="${DEVCONTAINER_WORKSPACE_HEALTHCHECK:-${workspace}/.devcontainer/scripts/healthcheck.sh}"
+
+if [ -r "${canonical}" ] && command -v bash >/dev/null 2>&1; then
+  if timeout 20s bash "${canonical}" --quiet >/tmp/devcontainer-image-healthcheck.workspace.out 2>&1; then
+    printf '%s
+' 'workspace-healthcheck=ok'
+    exit 0
+  fi
+  rc="$?"
+  printf 'workspace-healthcheck=failed rc=%s
+' "${rc}"
+  sed -n '1,20p' /tmp/devcontainer-image-healthcheck.workspace.out 2>/dev/null || true
+  exit 1
+fi
 
 command -v node >/dev/null 2>&1
 command -v npm >/dev/null 2>&1
@@ -1316,8 +1424,23 @@ command -v dumb-init >/dev/null 2>&1
 node --version >/dev/null
 npm --version >/dev/null
 
+node_major="$(node -p 'process.versions.node.split(".")[0]' 2>/dev/null || echo 0)"
+case "${node_major}" in ''|*[!0-9]*) node_major=0 ;; esac
+if [ "${node_major}" -lt "${DEVCONTAINER_HEALTHCHECK_MIN_NODE_MAJOR:-24}" ]; then
+  printf 'node-major-too-low=%s
+' "${node_major}"
+  exit 1
+fi
+
 uid="$(id -u)"
-getent passwd "${uid}" >/dev/null 2>&1 || getent passwd "$(id -un 2>/dev/null || true)" >/dev/null 2>&1
+if ! getent passwd "${uid}" >/dev/null 2>&1; then
+  user="$(id -un 2>/dev/null || true)"
+  [ -n "${user}" ] && getent passwd "${user}" >/dev/null 2>&1 || {
+    printf 'nss=unresolved uid=%s
+' "${uid}"
+    exit 1
+  }
+fi
 
 if [ -n "${LD_PRELOAD:-}" ]; then
   old_ifs="${IFS}"
@@ -1326,25 +1449,28 @@ if [ -n "${LD_PRELOAD:-}" ]; then
     [ -z "${token}" ] && continue
     case "${token}" in
       libnss_wrapper.so)
+        printf '%s
+' 'ld_preload=relative-nss-wrapper'
         exit 1
         ;;
       */libnss_wrapper.so)
-        [ -r "${token}" ] || exit 1
+        [ -r "${token}" ] || { printf 'ld_preload=nss-wrapper-unreadable:%s
+' "${token}"; exit 1; }
         ;;
       */*)
-        # Other absolute/path-like preloads must be readable.
-        [ -r "${token}" ] || exit 1
+        [ -r "${token}" ] || { printf 'ld_preload=unreadable:%s
+' "${token}"; exit 1; }
         ;;
-      *)
-        # Non-NSS bare library names may be valid via the dynamic loader path.
-        :
-        ;;
+      *) : ;;
     esac
   done
   IFS="${old_ifs}"
 fi
 
 [ -d "${HOME:-/home/node}" ]
+[ -w /tmp ]
+printf '%s
+' 'image-healthcheck=ok fallback=structural'
 exit 0
 EOF
 
@@ -1355,7 +1481,7 @@ RUN cat > /usr/local/bin/jsonc-validate <<'EOF'
 /**
  * jsonc-validate — DevContainer JSONC validation utility.
  *
- * Canonical version: 1.4.2
+ * Canonical version: 1.5.0
  *
  * Purpose:
  *   Validate JSON and JSON-with-comments files during local development,
@@ -1379,7 +1505,7 @@ RUN cat > /usr/local/bin/jsonc-validate <<'EOF'
 const fs = require('node:fs');
 const path = require('node:path');
 
-const VERSION = '1.4.2';
+const VERSION = '1.5.0';
 
 /**
  * Converts an unknown thrown value into a readable string.
@@ -1622,7 +1748,7 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=90s --retries=3 \
 # [D] UX BASELINE (GLOBAL, READ-ONLY, INTERACTIVE-ONLY, POSIX-SAFE)
 RUN cat > /etc/profile.d/20-devcontainer-ux.sh <<'EOF'
 # DevContainer UX Contract
-# Version: 1.4.2
+# Version: 1.5.0
 # Scope: Interactive shells only
 # Mutability: READ-ONLY (Image-level)
 
@@ -1664,7 +1790,7 @@ EOF
 RUN chmod 0444 /etc/profile.d/20-devcontainer-ux.sh
 
 # =============================================================================
-# SECTION 9.6 — BASH HARDENING (.bashrc persistent overrides) — v1.4.2
+# SECTION 9.6 — BASH HARDENING (.bashrc persistent overrides) — v1.5.0
 #
 # Problema: ~/.bashrc vem da base image (node) e define HISTSIZE=1000.
 # Em login shells (ordem: profile.d → .profile → .bashrc), o .bashrc do
@@ -1682,7 +1808,7 @@ RUN chmod 0444 /etc/profile.d/20-devcontainer-ux.sh
 # =============================================================================
 RUN cat >> "${HOME_DIR}/.bashrc" <<'BASH_HARDENING'
 
-# === DevContainer bash hardening (v1.4.2 — appended by Dockerfile) ===
+# === DevContainer bash hardening (v1.5.0 — appended by Dockerfile) ===
 # Applied last in .bashrc → these always win over profile.d (20-devcontainer-ux.sh)
 # and the base-image defaults. Do NOT remove — needed for DevContainer stability.
 HISTSIZE=10000
@@ -1709,9 +1835,9 @@ ENTRYPOINT ["dumb-init", "--", "/usr/local/bin/nss-gatekeeper"]
 CMD ["sleep", "infinity"]
 
 # =============================================================================
-# FINAL NOTES (v1.4.2)
+# FINAL NOTES (v1.5.0)
 #   - dnsmasq-base/tinyproxy-bin são instalados como binários, sem auto-start
-#   - utilitários passivos adicionais em v1.4.2: rsync/gawk/acl/uuidgen/net-tools/ethtool
+#   - utilitários passivos adicionais em v1.5.0: rsync/gawk/acl/uuidgen/net-tools/ethtool
 #   - dockerd NÃO é instalado
 #   - Docker CLI opera via socket do host (bind mount)
 #   - NSS wrapper é ativado em runtime pelo entrypoint/profile e refinado pelos hooks

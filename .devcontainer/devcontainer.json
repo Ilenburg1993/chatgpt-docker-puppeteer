@@ -1,5 +1,5 @@
 // ============================================================================
-// DevContainer — Ambiente de Desenvolvimento Controlado - v5.8.0
+// DevContainer — Ambiente de Desenvolvimento Controlado - v5.9.0
 // Projeto: chatgpt-docker-puppeteer
 //
 // Propósito:
@@ -27,6 +27,34 @@
 //   Portas de controle (ex.: Chrome Proxy / Debug) não são auto-expostas por
 //   inferência. Quando declaradas, são forwardadas explicitamente e com política
 //   de UX silenciosa/ignore. O acesso operacional continua decidido pelo runtime.
+//
+// CHANGELOG v5.9.0 (2026-05-20):
+// 🌐 DEFAULT-ON DNS + POST-START 3.0.2 + CONTROL PLANE STATE SYNC
+// ✅ ALINHADO: Dockerfile v1.4.2
+// ✅ ALINHADO: package.json v1.1.3
+// ✅ ALINHADO: Makefile v4.3.0
+// ✅ ALINHADO: post-create v1.1.0
+// ✅ ALINHADO: post-start v3.0.2
+// ✅ ALINHADO: post-attach v5.9.0
+// ✅ ALINHADO: healthcheck v3.0.0
+// ✅ ALINHADO: sync-local-auth v2.0.0
+// ✅ ALINHADO: network-control-plane-state v1.0.0
+// ✅ ALINHADO: github-api-route-fix v1.9.1
+// ✅ ALINHADO: local-dns-cache v1.8.0
+// ✅ ALINHADO: local-copilot-proxy v1.3.1
+// ✅ ALINHADO: github-copilot-network-manager v1.6.1
+// ✅ ALINHADO: copilot-route-advisor v1.1.0
+// ✅ ALINHADO: endpoints.github-copilot.tsv v1.2.0
+// ✅ CORRIGIDO: post-start agora usa action=start para o manager, gerando
+//                snapshot runtime bounded em vez de apenas recomendação stale.
+// ✅ CORRIGIDO: DNS local default-on com prova forte antes de governar resolv.conf.
+// ✅ ADICIONADO: knobs v1.8.0 para Docker embedded DNS split-horizon, warmup,
+//                ranking sem benchmark no boot, stale detection e probe forte.
+// ✅ ADICIONADO: network-control-plane-state como agregador passivo pós-start.
+// ✅ ADICIONADO: separação explícita entre summary runtime e action.summary.
+// ✅ MANTIDO: proxy local desligado por padrão; nenhum HTTP(S)_PROXY global.
+// ✅ MANTIDO: benchmark prolongado manual/opt-in; boot permanece bounded.
+// ✅ ATUALIZADO: labels runtime para devcontainer.version=5.9.0.
 //
 // CHANGELOG v5.8.0 (2026-05-19):
 // 🧭 CANONICAL PATH REALIGNMENT + CONTROL PLANE SYNC
@@ -139,7 +167,7 @@
 // ============================================================================
 {
   // ============================================================
-  // BUILD CONFIGURATION (v5.8.0 — Dockerfile v1.4.2 sync)
+  // BUILD CONFIGURATION (v5.9.0 — Dockerfile v1.4.2 sync)
   // ============================================================
   "build": {
     "args": {
@@ -169,7 +197,7 @@
     "dockerfile": "Dockerfile"
   },
   // ============================================================
-  // CONTAINER ENVIRONMENT VARIABLES (v5.8.0 — NSS/Dockerfile/network sync)
+  // CONTAINER ENVIRONMENT VARIABLES (v5.9.0 — NSS/Dockerfile/network sync)
   // ============================================================
   "containerEnv": {
     // canonical shell contract mirrored from /etc/profile.d/00-runtime.sh
@@ -183,9 +211,14 @@
     "APP_ENV": "dev",
     "APP_NAME": "chatgpt-docker-puppeteer",
     "APP_ROLE": "agent",
-    "DEVCONTAINER_VERSION": "5.8.0",
-    "DEVCONTAINER_CONTROL_PLANE_GENERATION": "network-control-plane-v5.8.0",
+    "DEVCONTAINER_VERSION": "5.9.0",
+    "DEVCONTAINER_CONTROL_PLANE_GENERATION": "network-control-plane-v5.9.0",
     "DEVCONTAINER_CANONICAL_ENDPOINT_REGISTRY": "${containerWorkspaceFolder}/.devcontainer/scripts/network/endpoints.github-copilot.tsv",
+    "DEVCONTAINER_POST_START_SCRIPT_VERSION_EXPECTED": "3.0.2",
+    "DEVCONTAINER_POST_ATTACH_SCRIPT_VERSION_EXPECTED": "5.9.0",
+    "DEVCONTAINER_HEALTHCHECK_SCRIPT_VERSION_EXPECTED": "3.0.0",
+    "DEVCONTAINER_NETWORK_CONTROL_PLANE_SCRIPT_VERSION_EXPECTED": "1.0.0",
+    "DEVCONTAINER_SYNC_LOCAL_AUTH_SCRIPT_VERSION_EXPECTED": "2.0.0",
     // CHOKIDAR_USEPOLLING e CHOKIDAR_INTERVAL removidos em v5.4.0:
     // O workspace é montado como ext4 (inotify nativo funciona).
     // Vite já configura polling explicitamente em vite.config.js (watch.usePolling: true).
@@ -229,6 +262,15 @@
     "DEVCONTAINER_GITHUB_API_CACHE_LOCK_WAIT_SECONDS": "10",
     "DEVCONTAINER_GITHUB_API_HOSTS_LOCK_WAIT_SECONDS": "15",
     "DEVCONTAINER_GITHUB_API_ROUTE_CACHE_MAX_ENTRIES": "128",
+    "DEVCONTAINER_GITHUB_API_ROUTE_CACHE_MAX_AGE_SECONDS": "86400",
+    "DEVCONTAINER_GITHUB_API_ACTION_UPDATE_RUNTIME_SUMMARY": "false",
+    "DEVCONTAINER_GITHUB_API_BENCHMARK_UPDATE_RUNTIME_SUMMARY": "false",
+    "DEVCONTAINER_GITHUB_API_ROUTE_CONNECT_TIMEOUT": "4",
+    "DEVCONTAINER_GITHUB_API_ROUTE_MAX_TIME": "12",
+    "DEVCONTAINER_GITHUB_API_VERSION": "2022-11-28",
+    "DEVCONTAINER_GITHUB_API_ROLLBACK_ON_VERIFY_FAILURE": "true",
+    "DEVCONTAINER_GITHUB_API_OPTIMIZE_WHEN_CURRENT_OK": "false",
+    "DEVCONTAINER_GITHUB_API_HYSTERESIS_SCORE_MARGIN": "5000",
     "DEVCONTAINER_GITHUB_API_RECENT_FAILURE_HARD_BLOCK_SECONDS": "0",
     "DEVCONTAINER_SKIP_GITHUB_API_PROBES_AFTER_ROUTE_FIX": "true",
 
@@ -247,7 +289,7 @@
     // =========================================================
     "DEVCONTAINER_ENABLE_COPILOT_NETWORK_MANAGER": "true",
     "DEVCONTAINER_COPILOT_NETWORK_MANAGER_MODE": "active",
-    "DEVCONTAINER_COPILOT_NETWORK_MANAGER_POST_START_ACTION": "recommend",
+    "DEVCONTAINER_COPILOT_NETWORK_MANAGER_POST_START_ACTION": "start",
     "DEVCONTAINER_COPILOT_TRANSPORT_PROFILE": "auto",
     "DEVCONTAINER_POST_START_APPLY_TRANSPORT_RECOMMENDATION": "false",
     "DEVCONTAINER_COPILOT_NETWORK_BENCHMARK_DURATION_SECONDS": "600",
@@ -273,17 +315,26 @@
     "DEVCONTAINER_COPILOT_PROBE_MAX_TIME": "12",
     "DEVCONTAINER_COPILOT_PROBE_IP_FAMILY": "4",
     "DEVCONTAINER_COPILOT_PROBE_PROXY_MODE": "auto",
-    "DEVCONTAINER_COPILOT_PROBE_PARALLEL": "false",
+    "DEVCONTAINER_COPILOT_PROBE_PARALLEL": "true",
     "DEVCONTAINER_COPILOT_NETWORK_LOCK_WAIT_SECONDS": "30",
     "DEVCONTAINER_COPILOT_NETWORK_HISTORY_LOCK_WAIT_SECONDS": "10",
+    "DEVCONTAINER_COPILOT_NETWORK_HISTORY_ENABLED": "true",
+    "DEVCONTAINER_COPILOT_NETWORK_HISTORY_MAX_LINES": "2000",
+    "DEVCONTAINER_COPILOT_NETWORK_HISTORY_WINDOW": "40",
+    "DEVCONTAINER_COPILOT_NETWORK_HISTORY_SLOW_THRESHOLD": "1500",
+    "DEVCONTAINER_COPILOT_NETWORK_HISTORY_FAIL_THRESHOLD": "3",
+    "DEVCONTAINER_COPILOT_MANAGER_PARALLEL_PROBES": "true",
+    "DEVCONTAINER_COPILOT_MANAGER_MARK_UNSTABLE_AS_DEGRADED": "true",
+    "DEVCONTAINER_COPILOT_MANAGER_FAIL_ON_UNSTABLE": "false",
     "DEVCONTAINER_COPILOT_MANAGER_ALLOW_CUSTOM_ENDPOINTS": "false",
     "DEVCONTAINER_COPILOT_MANAGER_ALLOW_CUSTOM_GITHUB_API_HOST": "false",
     // DEVCONTAINER_COPILOT_PROBE_ENDPOINTS deliberadamente omitido.
     // Fallbacks permanecem nos scripts; a fonte primária agora é o TSV canônico.
 
-    // DNS cache local: habilitado em modo auto/ranked após validação manual
-    // com local-dns-cache v1.5.3. O script só escreve /etc/resolv.conf
-    // depois de provar dnsmasq em 127.0.0.1:53 e restaura fallback em falha.
+    // DNS cache local: default-on em modo auto/ranked com local-dns-cache v1.8.0.
+    // O script só escreve /etc/resolv.conf depois de prova local forte
+    // (dig/drill/nslookup), preserva search/domain e mantém split-horizon
+    // para Docker embedded DNS quando 127.0.0.11 existir no runtime.
     "DEVCONTAINER_ENABLE_LOCAL_DNS_CACHE": "true",
     "DEVCONTAINER_LOCAL_DNS_CACHE_MODE": "auto",
     "DEVCONTAINER_LOCAL_DNS_MODE": "auto",
@@ -316,6 +367,30 @@
     "DEVCONTAINER_LOCAL_DNS_ALL_SERVERS": "false",
     "DEVCONTAINER_LOCAL_DNS_STRICT_ORDER": "false",
     "DEVCONTAINER_LOCAL_DNS_USE_STALE_CACHE": "false",
+    "DEVCONTAINER_LOCAL_DNS_USE_STALE_CACHE_TTL": "60",
+    "DEVCONTAINER_LOCAL_DNS_ACTION_UPDATE_RUNTIME_SUMMARY": "false",
+    "DEVCONTAINER_LOCAL_DNS_REQUIRE_PROVEN_LOCAL_PROBE_FOR_RESOLV_CONF": "true",
+    "DEVCONTAINER_LOCAL_DNS_ALLOW_PROCESS_ONLY_LOCAL_PROBE": "false",
+    "DEVCONTAINER_LOCAL_DNS_REPAIR_STALE_PIDFILE": "true",
+    "DEVCONTAINER_LOCAL_DNS_PRESERVE_RESOLV_SEARCH": "true",
+    "DEVCONTAINER_LOCAL_DNS_DOCKER_EMBEDDED_MODE": "auto",
+    "DEVCONTAINER_LOCAL_DNS_DOCKER_EMBEDDED_RESOLVER": "127.0.0.11",
+    "DEVCONTAINER_LOCAL_DNS_DOCKER_EMBEDDED_ROUTE_UNQUALIFIED": "true",
+    "DEVCONTAINER_LOCAL_DNS_DOCKER_EMBEDDED_ROUTE_SEARCH_DOMAINS": "true",
+    "DEVCONTAINER_LOCAL_DNS_REBIND_OK_DOCKER_DOMAINS": "true",
+    "DEVCONTAINER_LOCAL_DNS_RESTORE_RESOLV_CONF_ON_FAILURE": "true",
+    "DEVCONTAINER_LOCAL_DNS_RESTORE_RESOLV_CONF_ON_STOP": "true",
+    "DEVCONTAINER_LOCAL_DNS_WARMUP": "true",
+    "DEVCONTAINER_LOCAL_DNS_WARMUP_HOSTS": "api.github.com github.com copilot-proxy.githubusercontent.com api.githubcopilot.com default.exp-tas.com origin-tracker.githubusercontent.com",
+    "DEVCONTAINER_LOCAL_DNS_WARMUP_MAX_HOSTS": "8",
+    "DEVCONTAINER_LOCAL_DNS_WARMUP_RECORD_TYPES": "A",
+    "DEVCONTAINER_LOCAL_DNS_REBENCHMARK_ON_START": "false",
+    "DEVCONTAINER_LOCAL_DNS_FORCE_REBENCHMARK": "false",
+    "DEVCONTAINER_LOCAL_DNS_RANKING_MAX_AGE_SECONDS": "86400",
+    "DEVCONTAINER_LOCAL_DNS_REBENCHMARK_MIN_SECONDS": "900",
+    "DEVCONTAINER_LOCAL_DNS_RANKING_HYSTERESIS_SCORE_MARGIN": "5000",
+    "DEVCONTAINER_LOCAL_DNS_STATUS_STALE_MAX_SECONDS": "300",
+    "DEVCONTAINER_LOCAL_DNS_FAST_RETRY": "false",
 
     // Proxy HTTP CONNECT local: disponível na imagem v1.4.2, mas desligado por padrão.
     // Para habilitar de forma explícita: DEVCONTAINER_ENABLE_LOCAL_COPILOT_PROXY=true
@@ -327,6 +402,12 @@
     "DEVCONTAINER_LOCAL_COPILOT_PROXY_PORT": "3128",
     "DEVCONTAINER_LOCAL_COPILOT_PROXY_APPLY_PROFILE": "false",
     "DEVCONTAINER_LOCAL_COPILOT_PROXY_STATUS_STRICT": "false",
+    "DEVCONTAINER_LOCAL_COPILOT_PROXY_USE_ENDPOINT_REGISTRY": "true",
+    "DEVCONTAINER_LOCAL_COPILOT_PROXY_ALLOW_CUSTOM_PROBE_URLS": "false",
+    "DEVCONTAINER_LOCAL_COPILOT_PROXY_ALLOW_NON_LOOPBACK": "false",
+    "DEVCONTAINER_LOCAL_COPILOT_PROXY_CONNECT_PORTS": "443",
+    "DEVCONTAINER_LOCAL_COPILOT_PROXY_REMOVE_PROFILE_ON_STOP": "true",
+    "DEVCONTAINER_POST_START_SOURCE_LOCAL_PROXY_ENV": "false",
     "DEVCONTAINER_LOCAL_COPILOT_PROXY_BENCHMARK_DURATION_SECONDS": "600",
     "DEVCONTAINER_LOCAL_COPILOT_PROXY_BENCHMARK_INTERVAL_SECONDS": "10",
     "DEVCONTAINER_LOCAL_COPILOT_PROXY_BENCHMARK_MAX_SAMPLES": "0",
@@ -339,6 +420,12 @@
 
     // Evita duplicar probes quando o manager v1.1+ já rodou com sucesso.
     "DEVCONTAINER_POST_START_LEGACY_PROBES_AFTER_MANAGER": "false",
+    "DEVCONTAINER_POST_START_SUBSCRIPT_TIMEOUT_SECONDS": "90",
+    "DEVCONTAINER_ENABLE_NETWORK_CONTROL_PLANE_STATE": "true",
+    "DEVCONTAINER_NETWORK_CONTROL_PLANE_POST_START_ACTION": "summary",
+    "DEVCONTAINER_NETWORK_CONTROL_PLANE_TIMEOUT_SECONDS": "10",
+    "DEVCONTAINER_NETWORK_CONTROL_PLANE_SCRIPT": "${containerWorkspaceFolder}/.devcontainer/scripts/network/network-control-plane-state.sh",
+    "DEVCONTAINER_HEALTHCHECK_MIN_NODE_MAJOR": "24",
     // Safe to globalize as long as NSS_WRAPPER_* points at files that always exist.
     // This keeps base container processes (including VS Code bootstrap paths)
     // on a safe, always-readable NSS baseline before profile hooks refine it.
@@ -1193,7 +1280,7 @@
   "postCreateCommand": "bash -lc 'bash \"${containerWorkspaceFolder}/.devcontainer/scripts/post-create.sh\"'",
 
   // Roda toda vez que o container sobe (não-bloqueante por contrato).
-  // O script v2.8.1 converte actions longas em recommend/quick path: benchmark fica manual.
+  // O script v3.0.2 é fail-safe, default-on para DNS e chama o control-plane passivo.
   "postStartCommand": "bash -lc 'bash \"${containerWorkspaceFolder}/.devcontainer/scripts/post-start.sh\"'",
 
   // Roda a cada attach do VS Code ao container
@@ -1451,7 +1538,7 @@
     "--sysctl",
     "net.ipv4.tcp_fin_timeout=30",
     "--network=bridge",
-    // METADATA: sincronizado com Dockerfile v1.4.2 e devcontainer v5.8.0
+    // METADATA: sincronizado com Dockerfile v1.4.2 e devcontainer v5.9.0
     "--label",
     "project=chatgpt-docker-puppeteer",
     "--label",
@@ -1461,7 +1548,7 @@
     "--label",
     "image.version=1.4.2",
     "--label",
-    "devcontainer.version=5.8.0"
+    "devcontainer.version=5.9.0"
   ],
   // ============================================================
   // LIFECYCLE FINALIZATION

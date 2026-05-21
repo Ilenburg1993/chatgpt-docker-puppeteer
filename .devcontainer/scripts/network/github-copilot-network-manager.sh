@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # =============================================================================
 # github-copilot-network-manager.sh — GitHub/Copilot Network Orchestrator
-# Version: v1.6.0
+# Version: v1.6.1
 #
 # Purpose:
 #   Runtime-only GitHub/Copilot network manager for DevContainers. Intended to be
@@ -42,6 +42,17 @@
 #   - Tightens registry audit and keeps all route/proxy mutations delegated or
 #     opt-in by policy.
 #
+# v1.6.1 focus:
+#   - Reconciles endpoint registry v1.2.0 with the manager allowlist, including
+#     Copilot reports hosts and official diagnostic _ping endpoints.
+#   - Exposes exact bad registry host/URL examples instead of hiding them behind
+#     aggregate counters, making hosts_bad actionable.
+#   - Separates operational recommendation from next diagnostic actions, so
+#     keep-direct and compare/advisor suggestions no longer look contradictory.
+#   - Prevents recommend-only runs from writing endpoints=0/0 while reusing
+#     previous metrics that still contain a worst host.
+#   - Detects /etc/resolv.conf drift between the DNS summary and current runtime.
+#
 # Notes:
 #   - HTTP 401/403/404 can be healthy for unauthenticated connectivity probes.
 #   - This script validates transport shape, TLS, timing and route behavior; it is
@@ -58,7 +69,7 @@ trap - ERR EXIT INT TERM 2> /dev/null || true
 # -----------------------------------------------------------------------------
 case "${1:-}" in
     --version)
-        printf '%s v%s\n' 'github-copilot-network-manager.sh' '1.6.0'
+        printf '%s v%s\n' 'github-copilot-network-manager.sh' '1.6.1'
         exit 0
         ;;
     --help)
@@ -119,7 +130,7 @@ cfg_uint() {
 # -----------------------------------------------------------------------------
 SCRIPT_NAME="github-copilot-network-manager.sh"
 readonly SCRIPT_NAME
-SCRIPT_VERSION="1.6.0"
+SCRIPT_VERSION="1.6.1"
 readonly SCRIPT_VERSION
 
 SCRIPT_DIR=""
@@ -420,6 +431,7 @@ DNS_CACHE_RESOLVER_EFFECTIVE="unknown"
 DNS_CACHE_RESOLV_CONF_POINTS_TO_CACHE="unknown"
 DNS_CACHE_RESOLV_CONF_MANAGED="unknown"
 DNS_CACHE_SYSTEM_RESOLVER_USES_CACHE="unknown"
+DNS_CACHE_RESOLV_CONF_DRIFT="unknown"
 DNS_CACHE_PREVIOUS_SUMMARY_STALE="unknown"
 DNS_CACHE_PREVIOUS_SUMMARY_STALE_REASON="unknown"
 DNS_RESOLV_CONF_NAMESERVER="unknown"
@@ -431,6 +443,11 @@ CURRENT_WORST_HOST=""
 CURRENT_WORST_TOTAL_MS="0"
 PRIMARY_BOTTLENECK="unknown"
 RECOMMENDATIONS="observe"
+NEXT_DIAGNOSTIC_ACTIONS="none"
+CURRENT_ENDPOINTS_TOTAL="0"
+CURRENT_ENDPOINTS_OK="0"
+CURRENT_ENDPOINTS_SLOW="0"
+CURRENT_ENDPOINTS_FAILED="0"
 ROUTE_FIX_SUMMARY_ALLOWED="false"
 ROUTE_FIX_DECISION="not-run"
 ROUTE_RECOMMENDATION_ACTION="unknown"
@@ -456,6 +473,8 @@ ENDPOINT_REGISTRY_ROWS="0"
 ENDPOINT_REGISTRY_BAD_ROWS="0"
 ENDPOINT_REGISTRY_BAD_URLS="0"
 ENDPOINT_REGISTRY_BAD_HOSTS="0"
+ENDPOINT_REGISTRY_BAD_URL_EXAMPLES="none"
+ENDPOINT_REGISTRY_BAD_HOST_EXAMPLES="none"
 MANAGER_RECOMMENDATION_BLOCKERS="none"
 MANAGER_RECOMMENDATION_ACTION="unknown"
 MANAGER_RECOMMENDED_TRANSPORT="unknown"
@@ -742,6 +761,7 @@ write_summary() {
         printf 'dns_cache_resolv_conf_points_to_cache=%s\n' "${DNS_CACHE_RESOLV_CONF_POINTS_TO_CACHE}"
         printf 'dns_cache_resolv_conf_managed=%s\n' "${DNS_CACHE_RESOLV_CONF_MANAGED}"
         printf 'dns_cache_system_resolver_uses_cache=%s\n' "${DNS_CACHE_SYSTEM_RESOLVER_USES_CACHE}"
+        printf 'dns_cache_resolv_conf_drift=%s\n' "${DNS_CACHE_RESOLV_CONF_DRIFT}"
         printf 'dns_cache_previous_summary_stale=%s\n' "${DNS_CACHE_PREVIOUS_SUMMARY_STALE}"
         printf 'dns_cache_previous_summary_stale_reason=%s\n' "${DNS_CACHE_PREVIOUS_SUMMARY_STALE_REASON}"
         printf 'dns_resolv_conf_nameserver=%s\n' "${DNS_RESOLV_CONF_NAMESERVER}"
@@ -756,6 +776,7 @@ write_summary() {
         printf 'current_worst_total_ms=%s\n' "${CURRENT_WORST_TOTAL_MS:-0}"
         printf 'primary_bottleneck=%s\n' "${PRIMARY_BOTTLENECK:-unknown}"
         printf 'recommendations=%s\n' "${RECOMMENDATIONS:-observe}"
+        printf 'next_diagnostic_actions=%s\n' "${NEXT_DIAGNOSTIC_ACTIONS:-none}"
         printf 'diagnosis=%s\n' "${DIAGNOSIS_FILE}"
         printf 'probes_rc=%s\n' "${probes_rc}"
         printf 'endpoints_total=%s\n' "${total}"
@@ -776,6 +797,8 @@ write_summary() {
         printf 'endpoint_registry_bad_rows=%s\n' "${ENDPOINT_REGISTRY_BAD_ROWS}"
         printf 'endpoint_registry_bad_urls=%s\n' "${ENDPOINT_REGISTRY_BAD_URLS}"
         printf 'endpoint_registry_bad_hosts=%s\n' "${ENDPOINT_REGISTRY_BAD_HOSTS}"
+        printf 'endpoint_registry_bad_url_examples=%s\n' "${ENDPOINT_REGISTRY_BAD_URL_EXAMPLES}"
+        printf 'endpoint_registry_bad_host_examples=%s\n' "${ENDPOINT_REGISTRY_BAD_HOST_EXAMPLES}"
         printf 'github_route_report=%s\n' "${GITHUB_ROUTE_REPORT_FILE}"
         printf 'github_route_summary=%s\n' "${GITHUB_ROUTE_SUMMARY_FILE}"
         printf 'github_route_benchmark=%s\n' "${GITHUB_ROUTE_BENCHMARK_FILE}"
@@ -807,6 +830,7 @@ write_summary() {
         printf 'manager_recommendation_action=%s\n' "${MANAGER_RECOMMENDATION_ACTION}"
         printf 'manager_recommendation_confidence=%s\n' "${MANAGER_RECOMMENDATION_CONFIDENCE}"
         printf 'manager_recommendation_blockers=%s\n' "${MANAGER_RECOMMENDATION_BLOCKERS}"
+        printf 'manager_next_diagnostic_actions=%s\n' "${NEXT_DIAGNOSTIC_ACTIONS:-none}"
         printf 'manager_cached_route_recommendation_action=%s\n' "${ROUTE_RECOMMENDATION_ACTION}"
         printf 'manager_cached_proxy_recommendation_action=%s\n' "${PROXY_RECOMMENDATION_ACTION}"
         printf 'manager_cached_proxy_recommendation_confidence=%s\n' "${PROXY_RECOMMENDATION_CONFIDENCE}"
@@ -975,8 +999,10 @@ is_allowed_probe_host() {
     if [[ "${host}" == "copilot-telemetry.githubusercontent.com" ]]; then return 0; fi
     if [[ "${host}" == "collector.github.com" ]]; then return 0; fi
     if [[ "${host}" == "default.exp-tas.com" ]]; then return 0; fi
+    if [[ "${host}" == "copilot-reports.github.com" ]]; then return 0; fi
     if [[ "${host}" == *.githubcopilot.com ]]; then return 0; fi
     if [[ "${host}" == copilot-reports-*.b01.azurefd.net || "${host}" == copilot-reports-production-*.b01.azurefd.net ]]; then return 0; fi
+    if [[ "${host}" == usagereports*.blob.core.windows.net ]]; then return 0; fi
     return 1
 }
 
@@ -1080,7 +1106,7 @@ endpoint_class() {
         printf 'github-uploads'
     elif [[ "${host}" == "user-images.githubusercontent.com" ]]; then
         printf 'github-user-images'
-    elif [[ "${host}" == copilot-reports-*.b01.azurefd.net || "${host}" == copilot-reports-production-*.b01.azurefd.net ]]; then
+    elif [[ "${host}" == "copilot-reports.github.com" || "${host}" == copilot-reports-*.b01.azurefd.net || "${host}" == copilot-reports-production-*.b01.azurefd.net || "${host}" == usagereports*.blob.core.windows.net ]]; then
         printf 'copilot-reports'
     elif [[ "${url}" == "https://api.github.com" || "${url}" == "https://api.github.com/" ]]; then
         printf 'github-api-root'
@@ -1175,8 +1201,8 @@ expected_status_label() {
         printf '200|301|302|403|404|429'
     elif [[ "${host}" == "uploads.github.com" || "${host}" == "user-images.githubusercontent.com" ]]; then
         printf '200|204|301|302|400|401|403|404|405'
-    elif [[ "${host}" == copilot-reports-*.b01.azurefd.net || "${host}" == copilot-reports-production-*.b01.azurefd.net ]]; then
-        printf '200|204|301|302|403|404'
+    elif [[ "${host}" == "copilot-reports.github.com" || "${host}" == copilot-reports-*.b01.azurefd.net || "${host}" == copilot-reports-production-*.b01.azurefd.net || "${host}" == usagereports*.blob.core.windows.net ]]; then
+        printf '200|204|301|302|400|401|403|404|405'
     elif [[ "${url}" == "https://api.github.com" || "${url}" == "https://api.github.com/" ]]; then
         printf '200|403|429(degraded)'
     elif [[ "${url}" == https://api.github.com/rate_limit* ]]; then
@@ -1218,8 +1244,8 @@ expected_status_ok() {
         [[ "${code}" == "200" || "${code}" == "301" || "${code}" == "302" || "${code}" == "403" || "${code}" == "404" || "${code}" == "429" ]]
     elif [[ "${host}" == "uploads.github.com" || "${host}" == "user-images.githubusercontent.com" ]]; then
         [[ "${code}" == "200" || "${code}" == "204" || "${code}" == "301" || "${code}" == "302" || "${code}" == "400" || "${code}" == "401" || "${code}" == "403" || "${code}" == "404" || "${code}" == "405" ]]
-    elif [[ "${host}" == copilot-reports-*.b01.azurefd.net || "${host}" == copilot-reports-production-*.b01.azurefd.net ]]; then
-        [[ "${code}" == "200" || "${code}" == "204" || "${code}" == "301" || "${code}" == "302" || "${code}" == "403" || "${code}" == "404" ]]
+    elif [[ "${host}" == "copilot-reports.github.com" || "${host}" == copilot-reports-*.b01.azurefd.net || "${host}" == copilot-reports-production-*.b01.azurefd.net || "${host}" == usagereports*.blob.core.windows.net ]]; then
+        [[ "${code}" == "200" || "${code}" == "204" || "${code}" == "301" || "${code}" == "302" || "${code}" == "400" || "${code}" == "401" || "${code}" == "403" || "${code}" == "404" || "${code}" == "405" ]]
     elif [[ "${url}" == "https://api.github.com" || "${url}" == "https://api.github.com/" ]]; then
         [[ "${code}" == "200" ]]
     elif [[ "${url}" == https://api.github.com/rate_limit* ]]; then
@@ -1613,6 +1639,7 @@ reset_current_diagnosis() {
     DNS_CACHE_RESOLV_CONF_POINTS_TO_CACHE="unknown"
     DNS_CACHE_RESOLV_CONF_MANAGED="unknown"
     DNS_CACHE_SYSTEM_RESOLVER_USES_CACHE="unknown"
+    DNS_CACHE_RESOLV_CONF_DRIFT="unknown"
     DNS_CACHE_PREVIOUS_SUMMARY_STALE="unknown"
     DNS_CACHE_PREVIOUS_SUMMARY_STALE_REASON="unknown"
     DNS_RESOLV_CONF_NAMESERVER="unknown"
@@ -1627,6 +1654,11 @@ reset_current_diagnosis() {
     OVERALL_SOFT_DEGRADED_COUNT="0"
     GITHUB_API_SOFT_DEGRADED_REASON="unknown"
     RECOMMENDATIONS="observe"
+    NEXT_DIAGNOSTIC_ACTIONS="none"
+    CURRENT_ENDPOINTS_TOTAL="0"
+    CURRENT_ENDPOINTS_OK="0"
+    CURRENT_ENDPOINTS_SLOW="0"
+    CURRENT_ENDPOINTS_FAILED="0"
 }
 
 detect_dns_cache_state() {
@@ -1692,7 +1724,19 @@ detect_dns_cache_state() {
         active_by_resolv="true"
     fi
 
-    if [[ "${status_stale}" == "true" ]]; then
+    DNS_CACHE_RESOLV_CONF_DRIFT="false"
+    if [[ "${points_to_cache}" == "true" && "${active_by_resolv}" != "true" ]]; then
+        DNS_CACHE_RESOLV_CONF_DRIFT="true"
+    elif [[ -n "${local_nameservers}" && "${local_nameservers}" != "unknown" && "${nameserver}" != "unknown" ]]; then
+        case " ${local_nameservers} " in
+            *" ${nameserver} "*) : ;;
+            *) DNS_CACHE_RESOLV_CONF_DRIFT="true" ;;
+        esac
+    fi
+
+    if [[ "${DNS_CACHE_RESOLV_CONF_DRIFT}" == "true" ]]; then
+        DNS_CACHE_STATUS="drift"
+    elif [[ "${status_stale}" == "true" ]]; then
         DNS_CACHE_STATUS="stale"
     elif [[ "${local_status}" == "ok" && "${runtime_effective}" == "true" && "${resolver_effective}" == "true" ]]; then
         DNS_CACHE_STATUS="ok"
@@ -1732,7 +1776,7 @@ detect_dns_cache_state() {
         DNS_CACHE_EFFECTIVE="unknown"
     fi
 
-    append_report "dns_cache status=${DNS_CACHE_STATUS} effective=${DNS_CACHE_EFFECTIVE} nameserver=${DNS_RESOLV_CONF_NAMESERVER} reason=${DNS_CACHE_REASON} resolv_status=${DNS_CACHE_RESOLV_CONF_STATUS} resolv_health=${DNS_CACHE_RESOLV_CONF_HEALTH} status_stale=${DNS_CACHE_STATUS_STALE} stale_reason=${DNS_CACHE_STATUS_STALE_REASON} runtime_effective=${DNS_CACHE_RUNTIME_EFFECTIVE} resolver_effective=${DNS_CACHE_RESOLVER_EFFECTIVE} points_to_cache=${DNS_CACHE_RESOLV_CONF_POINTS_TO_CACHE} system_uses_cache=${DNS_CACHE_SYSTEM_RESOLVER_USES_CACHE} previous_summary_stale=${DNS_CACHE_PREVIOUS_SUMMARY_STALE} ranking_source=${DNS_CACHE_RANKING_SOURCE} ranking_stale=${DNS_CACHE_RANKING_STALE} upstream_count=${DNS_CACHE_UPSTREAM_COUNT} dnsmasq=${DNS_CACHE_DNSMASQ_PROCESS_STATUS}/${DNS_CACHE_DNSMASQ_PORT_STATUS}"
+    append_report "dns_cache status=${DNS_CACHE_STATUS} effective=${DNS_CACHE_EFFECTIVE} nameserver=${DNS_RESOLV_CONF_NAMESERVER} reason=${DNS_CACHE_REASON} resolv_status=${DNS_CACHE_RESOLV_CONF_STATUS} resolv_health=${DNS_CACHE_RESOLV_CONF_HEALTH} resolv_drift=${DNS_CACHE_RESOLV_CONF_DRIFT} status_stale=${DNS_CACHE_STATUS_STALE} stale_reason=${DNS_CACHE_STATUS_STALE_REASON} runtime_effective=${DNS_CACHE_RUNTIME_EFFECTIVE} resolver_effective=${DNS_CACHE_RESOLVER_EFFECTIVE} points_to_cache=${DNS_CACHE_RESOLV_CONF_POINTS_TO_CACHE} system_uses_cache=${DNS_CACHE_SYSTEM_RESOLVER_USES_CACHE} previous_summary_stale=${DNS_CACHE_PREVIOUS_SUMMARY_STALE} ranking_source=${DNS_CACHE_RANKING_SOURCE} ranking_stale=${DNS_CACHE_RANKING_STALE} upstream_count=${DNS_CACHE_UPSTREAM_COUNT} dnsmasq=${DNS_CACHE_DNSMASQ_PROCESS_STATUS}/${DNS_CACHE_DNSMASQ_PORT_STATUS}"
 }
 
 analyze_current_metrics() {
@@ -1856,12 +1900,16 @@ analyze_current_metrics() {
     PLANE_COPILOT_TRANSPORT_STATUS="${copilot_status}"
     PLANE_COPILOT_TELEMETRY_STATUS="${telemetry_status}"
     PLANE_OVERALL_STATUS="${overall_status}"
+    CURRENT_ENDPOINTS_TOTAL="${total_endpoints}"
+    CURRENT_ENDPOINTS_OK="${total_ok}"
+    CURRENT_ENDPOINTS_SLOW="${total_slow}"
+    CURRENT_ENDPOINTS_FAILED="${total_failures}"
 
     rec="observe"
     if [[ "${PLANE_GITHUB_API_STATUS}" != "ok" ]]; then
         rec="$(join_recommendation "${rec}" "inspect-github-api-route-fix")"
     fi
-    if [[ "${DNS_CACHE_STATUS}" == "stale" || "${DNS_CACHE_STATUS}" == "runtime-only" || "${DNS_CACHE_STATUS}" == "active-unreported" ]]; then
+    if [[ "${DNS_CACHE_STATUS}" == "drift" || "${DNS_CACHE_STATUS}" == "stale" || "${DNS_CACHE_STATUS}" == "runtime-only" || "${DNS_CACHE_STATUS}" == "active-unreported" ]]; then
         rec="$(join_recommendation "${rec}" "repair-local-dns-cache-runtime-mismatch")"
     elif [[ "${DNS_CACHE_STATUS}" != "ok" && "${PRIMARY_BOTTLENECK}" == "dns-bound" ]]; then
         rec="$(join_recommendation "${rec}" "enable-or-repair-local-dns-cache")"
@@ -1878,6 +1926,11 @@ analyze_current_metrics() {
         rec="$(join_recommendation "${rec}" "warm-dns-cache-and-retest")"
     fi
     RECOMMENDATIONS="${rec:-observe}"
+    if [[ "${RECOMMENDATIONS}" == "observe" ]]; then
+        NEXT_DIAGNOSTIC_ACTIONS="none"
+    else
+        NEXT_DIAGNOSTIC_ACTIONS="${RECOMMENDATIONS}"
+    fi
 
     {
         printf 'plane	status	endpoints	ok	slow	failures	worst_host	worst_total_ms	primary_bottleneck
@@ -2076,12 +2129,14 @@ history_action() {
 }
 
 validate_endpoint_registry() {
-    local rows bad_rows bad_urls bad_hosts url line nf
+    local rows bad_rows bad_urls bad_hosts url line nf host bad_url_examples bad_host_examples
     ENDPOINT_REGISTRY_STATUS="missing"
     ENDPOINT_REGISTRY_ROWS="0"
     ENDPOINT_REGISTRY_BAD_ROWS="0"
     ENDPOINT_REGISTRY_BAD_URLS="0"
     ENDPOINT_REGISTRY_BAD_HOSTS="0"
+    ENDPOINT_REGISTRY_BAD_URL_EXAMPLES="none"
+    ENDPOINT_REGISTRY_BAD_HOST_EXAMPLES="none"
 
     if [[ "${USE_ENDPOINT_REGISTRY}" != "true" ]]; then
         ENDPOINT_REGISTRY_STATUS="disabled"
@@ -2105,6 +2160,8 @@ validate_endpoint_registry() {
 
     bad_urls=0
     bad_hosts=0
+    bad_url_examples=""
+    bad_host_examples=""
     while IFS= read -r line || [[ -n "${line}" ]]; do
         case "${line}" in
             '' | \#*) continue ;;
@@ -2114,10 +2171,24 @@ validate_endpoint_registry() {
         url="${line%%$'\t'*}"
         if [[ "${url}" != https://* || "${url}" == *[[:space:]]* || "${url}" == *\\* || "${url}" == *@* ]]; then
             bad_urls=$((bad_urls + 1))
+            if [[ -z "${bad_url_examples}" ]]; then
+                bad_url_examples="${url}"
+            else
+                bad_url_examples="${bad_url_examples},${url}"
+            fi
             continue
         fi
         if ! is_safe_https_url "${url}"; then
             bad_hosts=$((bad_hosts + 1))
+            host="$(url_host "${url}")"
+            if [[ -z "${bad_host_examples}" ]]; then
+                bad_host_examples="${host}"
+            else
+                case ",${bad_host_examples}," in
+                    *,"${host}",*) : ;;
+                    *) bad_host_examples="${bad_host_examples},${host}" ;;
+                esac
+            fi
         fi
     done < "${ENDPOINT_REGISTRY_FILE}"
 
@@ -2125,9 +2196,11 @@ validate_endpoint_registry() {
     ENDPOINT_REGISTRY_BAD_ROWS="${bad_rows:-0}"
     ENDPOINT_REGISTRY_BAD_URLS="${bad_urls:-0}"
     ENDPOINT_REGISTRY_BAD_HOSTS="${bad_hosts:-0}"
+    ENDPOINT_REGISTRY_BAD_URL_EXAMPLES="${bad_url_examples:-none}"
+    ENDPOINT_REGISTRY_BAD_HOST_EXAMPLES="${bad_host_examples:-none}"
     if [[ "${bad_rows:-0}" != "0" || "${bad_urls:-0}" != "0" || "${bad_hosts:-0}" != "0" ]]; then
         ENDPOINT_REGISTRY_STATUS="invalid"
-        append_report "endpoint_registry_audit status=invalid file=${ENDPOINT_REGISTRY_FILE} source=${ENDPOINT_REGISTRY_SOURCE} rows=${ENDPOINT_REGISTRY_ROWS} bad_rows=${ENDPOINT_REGISTRY_BAD_ROWS} bad_urls=${ENDPOINT_REGISTRY_BAD_URLS} bad_hosts=${ENDPOINT_REGISTRY_BAD_HOSTS}"
+        append_report "endpoint_registry_audit status=invalid file=${ENDPOINT_REGISTRY_FILE} source=${ENDPOINT_REGISTRY_SOURCE} rows=${ENDPOINT_REGISTRY_ROWS} bad_rows=${ENDPOINT_REGISTRY_BAD_ROWS} bad_urls=${ENDPOINT_REGISTRY_BAD_URLS} bad_hosts=${ENDPOINT_REGISTRY_BAD_HOSTS} bad_url_examples=${ENDPOINT_REGISTRY_BAD_URL_EXAMPLES} bad_host_examples=${ENDPOINT_REGISTRY_BAD_HOST_EXAMPLES}"
         return 1
     fi
     if [[ "${rows:-0}" == "0" ]]; then
@@ -2178,7 +2251,7 @@ doctor_action() {
         if [[ "${ENDPOINT_REGISTRY_STATUS}" == "missing" ]]; then
             log_warn "doctor: endpoint registry ausente; usando endpoints embutidos."
         else
-            log_warn "doctor: endpoint registry ${ENDPOINT_REGISTRY_STATUS}; source=${ENDPOINT_REGISTRY_SOURCE}; rows=${ENDPOINT_REGISTRY_ROWS}; bad_rows=${ENDPOINT_REGISTRY_BAD_ROWS}; bad_urls=${ENDPOINT_REGISTRY_BAD_URLS}; bad_hosts=${ENDPOINT_REGISTRY_BAD_HOSTS}."
+            log_warn "doctor: endpoint registry ${ENDPOINT_REGISTRY_STATUS}; source=${ENDPOINT_REGISTRY_SOURCE}; rows=${ENDPOINT_REGISTRY_ROWS}; bad_rows=${ENDPOINT_REGISTRY_BAD_ROWS}; bad_urls=${ENDPOINT_REGISTRY_BAD_URLS}; bad_hosts=${ENDPOINT_REGISTRY_BAD_HOSTS}; bad_host_examples=${ENDPOINT_REGISTRY_BAD_HOST_EXAMPLES}."
             rc=1
         fi
     fi
@@ -2279,7 +2352,7 @@ generate_manager_recommendation() {
     local generated_epoch generated_at expires_epoch route_action route_conf route_reason proxy_action proxy_conf proxy_reason
     local action transport confidence reason boot_policy route_policy route_recommended_ip route_current_ip route_best_candidate_ip
     local route_current_p95 route_best_candidate_p95 route_current_fail_rate route_best_candidate_fail_rate
-    local proxy_artifact_state route_artifact_state recommendation_blockers
+    local proxy_artifact_state route_artifact_state recommendation_blockers next_actions
     generated_epoch="$(date '+%s' 2> /dev/null || printf '0')"
     generated_at="$(ts)"
     expires_epoch=$((generated_epoch + MANAGER_RECOMMENDATION_TTL_SECONDS))
@@ -2338,7 +2411,7 @@ generate_manager_recommendation() {
     if [[ "${ENDPOINT_REGISTRY_STATUS}" != "ok" && "${USE_ENDPOINT_REGISTRY}" == "true" ]]; then
         recommendation_blockers="$(join_recommendation "${recommendation_blockers}" "endpoint-registry-${ENDPOINT_REGISTRY_STATUS}")"
     fi
-    if [[ "${DNS_CACHE_STATUS}" == "stale" || "${DNS_CACHE_STATUS}" == "runtime-only" || "${DNS_CACHE_STATUS}" == "active-unreported" ]]; then
+    if [[ "${DNS_CACHE_STATUS}" == "drift" || "${DNS_CACHE_STATUS}" == "stale" || "${DNS_CACHE_STATUS}" == "runtime-only" || "${DNS_CACHE_STATUS}" == "active-unreported" ]]; then
         recommendation_blockers="$(join_recommendation "${recommendation_blockers}" "dns-cache-${DNS_CACHE_STATUS}")"
     fi
     [[ -n "${recommendation_blockers}" ]] || recommendation_blockers="none"
@@ -2418,6 +2491,11 @@ generate_manager_recommendation() {
         reason="${reason};route-policy=observe-more-route-data"
     fi
 
+    next_actions="${NEXT_DIAGNOSTIC_ACTIONS:-none}"
+    if [[ "${next_actions}" == "observe" ]]; then
+        next_actions="none"
+    fi
+
     boot_policy="read-recommendation-then-quick-verify"
     MANAGER_RECOMMENDATION_ACTION="${action}"
     MANAGER_RECOMMENDED_TRANSPORT="${transport}"
@@ -2449,6 +2527,7 @@ generate_manager_recommendation() {
         printf 'recommended_transport=%s\n' "${transport}"
         printf 'confidence=%s\n' "${confidence}"
         printf 'blockers=%s\n' "${recommendation_blockers}"
+        printf 'next_diagnostic_actions=%s\n' "${next_actions}"
         printf 'reason=%s\n' "$(sanitize_oneline <<< "${reason}")"
         printf 'boot_policy=%s\n' "${boot_policy}"
         printf 'route_policy=%s\n' "${route_policy}"
@@ -2485,6 +2564,7 @@ generate_manager_recommendation() {
         printf '  "recommended_action": "%s",\n' "$(json_escape "${action}")"
         printf '  "recommended_transport": "%s",\n' "$(json_escape "${transport}")"
         printf '  "confidence": "%s",\n' "$(json_escape "${confidence}")"
+        printf '  "next_diagnostic_actions": "%s",\n' "$(json_escape "${next_actions}")"
         printf '  "reason": "%s",\n' "$(json_escape "${reason}")"
         printf '  "boot_policy": "%s",\n' "$(json_escape "${boot_policy}")"
         printf '  "route_policy": "%s",\n' "$(json_escape "${route_policy}")"
@@ -2506,7 +2586,7 @@ generate_manager_recommendation() {
         printf '}\n'
     } | safe_write_file "${MANAGER_RECOMMENDATION_JSON_FILE}" 0644 || return 1
 
-    append_report "manager_recommendation action=${action} transport=${transport} confidence=${confidence} blockers=${recommendation_blockers} reason=$(sanitize_oneline <<< "${reason}") route_policy=${route_policy} route_current=${route_current_ip} route_best_candidate=${route_best_candidate_ip} proxy_action=${proxy_action}"
+    append_report "manager_recommendation action=${action} transport=${transport} confidence=${confidence} blockers=${recommendation_blockers} next_actions=${next_actions} reason=$(sanitize_oneline <<< "${reason}") route_policy=${route_policy} route_current=${route_current_ip} route_best_candidate=${route_best_candidate_ip} proxy_action=${proxy_action}"
     return 0
 }
 
@@ -2523,7 +2603,7 @@ recommend_action() {
         return 1
     }
     write_status "recommendation-ok"
-    write_summary "0" "0" "0" "0" "0" "0" "recommendation-ok" "${HISTORY_STATUS}" "${HISTORY_UNSTABLE_HOSTS}"
+    write_summary "0" "0" "${CURRENT_ENDPOINTS_FAILED}" "${CURRENT_ENDPOINTS_SLOW}" "${CURRENT_ENDPOINTS_OK}" "${CURRENT_ENDPOINTS_TOTAL}" "recommendation-ok" "${HISTORY_STATUS}" "${HISTORY_UNSTABLE_HOSTS}"
     log_info "recommendation=${MANAGER_RECOMMENDATION_FILE}; transport=${MANAGER_RECOMMENDED_TRANSPORT}; action=${MANAGER_RECOMMENDATION_ACTION}; confidence=${MANAGER_RECOMMENDATION_CONFIDENCE}"
     return 0
 }
@@ -2583,13 +2663,16 @@ compare_transports_action() {
     else
         append_report "local_proxy_compare=ok"
     fi
+    if [[ -s "${METRICS_FILE}" ]]; then
+        analyze_current_metrics || true
+    fi
     generate_manager_recommendation || final_rc=1
     if [[ "${proxy_rc}" -ne 0 || "${final_rc}" -ne 0 ]]; then
         final_status="compare-transports-degraded"
         final_rc=1
     fi
     write_status "${final_status}"
-    write_summary "0" "0" "0" "0" "0" "0" "${final_status}" "${HISTORY_STATUS}" "${HISTORY_UNSTABLE_HOSTS}"
+    write_summary "0" "0" "${CURRENT_ENDPOINTS_FAILED}" "${CURRENT_ENDPOINTS_SLOW}" "${CURRENT_ENDPOINTS_OK}" "${CURRENT_ENDPOINTS_TOTAL}" "${final_status}" "${HISTORY_STATUS}" "${HISTORY_UNSTABLE_HOSTS}"
     return "${final_rc}"
 }
 
@@ -2619,7 +2702,7 @@ main_unlocked() {
     append_report "endpoint_source=${ENDPOINT_SOURCE} endpoint_registry_file=${ENDPOINT_REGISTRY_FILE} endpoint_registry_source=${ENDPOINT_REGISTRY_SOURCE}"
     log_debug "TRANSPORT_PROFILE=${TRANSPORT_PROFILE}; PROBE_IP_FAMILY=${PROBE_IP_FAMILY}; PROBE_PROXY_MODE=${PROBE_PROXY_MODE}; PARALLEL=${PROBE_PARALLEL}"
     validate_manager_contract
-    validate_endpoint_registry || append_report "endpoint_registry=invalid_or_missing status=${ENDPOINT_REGISTRY_STATUS} rows=${ENDPOINT_REGISTRY_ROWS} bad_rows=${ENDPOINT_REGISTRY_BAD_ROWS}"
+    validate_endpoint_registry || append_report "endpoint_registry=invalid_or_missing status=${ENDPOINT_REGISTRY_STATUS} rows=${ENDPOINT_REGISTRY_ROWS} bad_rows=${ENDPOINT_REGISTRY_BAD_ROWS} bad_urls=${ENDPOINT_REGISTRY_BAD_URLS} bad_hosts=${ENDPOINT_REGISTRY_BAD_HOSTS} bad_host_examples=${ENDPOINT_REGISTRY_BAD_HOST_EXAMPLES}"
 
     if [[ "${MANAGER_MODE}" == "off" ]]; then
         write_status "off"
