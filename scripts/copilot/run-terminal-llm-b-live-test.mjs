@@ -965,6 +965,18 @@ function evaluateByokProbeOutput(plain, sseSummary, { fixture = false } = {}) {
 }
 
 function evaluateByokRealOutput(plain, secretValues, { profile, altProfile, model, altModel } = {}) {
+    const byokModels = [...new Set([model, altModel].filter((value) => typeof value === 'string' && value.length > 0))];
+    const byokModelPrLines = byokModels.flatMap((candidate) => {
+        const escaped = candidate.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&');
+        return plain.match(new RegExp(`^\\s*\\[PR\\]\\s+modelo=${escaped}\\b.*$`, 'gmu')) ?? [];
+    });
+    const byokTurnOpened =
+        /\[intervene→turn\]/u.test(plain) ||
+        /DELTA-CANONICAL-\d/u.test(plain) ||
+        /\[ASK\]\s+ASK-CANONICAL/u.test(plain);
+    const byokUsageClassified =
+        /\bclasse=byok_user_message\b/u.test(plain) ||
+        /"classification"\s*:\s*"byok_user_message"/u.test(plain);
     const criteria = [
         {
             id: 'byok-real-dotenv-reload',
@@ -1013,6 +1025,21 @@ function evaluateByokRealOutput(plain, secretValues, { profile, altProfile, mode
             id: 'byok-real-no-secret-leak',
             pass: !hasSecretLeak(plain, secretValues),
             detail: `${secretValues.length} local secret value(s) checked against terminal output`,
+        },
+        {
+            id: 'byok-real-usage-not-pr',
+            pass: byokModelPrLines.length === 0,
+            detail:
+                byokModelPrLines.length > 0
+                    ? `BYOK model usage was rendered as PR: ${byokModelPrLines.slice(0, 2).join(' | ')}`
+                    : 'BYOK model usage was not rendered as Premium Request',
+        },
+        {
+            id: 'byok-real-usage-classified',
+            pass: !byokTurnOpened || byokUsageClassified,
+            detail: byokTurnOpened
+                ? `BYOK user-message usage classification observed=${byokUsageClassified ? 'yes' : 'no'}`
+                : 'no BYOK user turn opened in this probe',
         },
     ];
     return criteria;
