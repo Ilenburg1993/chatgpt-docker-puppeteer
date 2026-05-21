@@ -892,6 +892,17 @@ function renderSdkSessionBootDecision(decision) {
 }
 
 /**
+ * @param {unknown} summary
+ * @returns {string}
+ */
+function renderSdkSessionSummaryPreview(summary) {
+    if (typeof summary !== 'string') return '';
+    const compact = summary.replace(/\s+/gu, ' ').trim();
+    if (!compact) return '';
+    return compact.length > 180 ? `${compact.slice(0, 177)}...` : compact;
+}
+
+/**
  * Cockpit de sessão SDK persistente. Diferencia sessão SDK, dialog loop, hub e snapshots locais sem trocar a sessão viva
  * por um caminho paralelo.
  *
@@ -998,7 +1009,7 @@ export async function cmdSessionSdk({ println }, arg = '') {
         return;
     }
 
-    const limit = Number.parseInt(rest[0] ?? '', 10);
+    const limit = Number.parseInt(action === 'status' ? (rest[0] ?? '') : rawAction, 10);
     const bootSelection = await readTerminalSdkSessionBootSelection();
     let inventory;
     try {
@@ -1033,9 +1044,8 @@ export async function cmdSessionSdk({ println }, arg = '') {
         return;
     }
     println(`\n  \x1b[36mSessões SDK listadas\x1b[0m (${inventory.sessions.length})`);
-    for (const [index, entry] of inventory.sessions
-        .slice(0, Number.isFinite(limit) && limit > 0 ? limit : 12)
-        .entries()) {
+    const visibleSessions = inventory.sessions.slice(0, Number.isFinite(limit) && limit > 0 ? limit : 12);
+    for (const [index, entry] of visibleSessions.entries()) {
         const flags = [
             entry.sessionId === inventory.currentSessionId ? 'atual' : null,
             entry.sessionId === inventory.lastSessionId ? 'last' : null,
@@ -1048,8 +1058,14 @@ export async function cmdSessionSdk({ println }, arg = '') {
         const start = entry.startTime instanceof Date ? entry.startTime.toISOString() : String(entry.startTime ?? '-');
         const modified =
             entry.modifiedTime instanceof Date ? entry.modifiedTime.toISOString() : String(entry.modifiedTime ?? '-');
+        const summary = renderSdkSessionSummaryPreview(entry.summary);
         println(`    \x1b[90m#${index + 1}\x1b[0m \x1b[33m${entry.sessionId}\x1b[0m  \x1b[90m${flags || '-'}\x1b[0m`);
-        println(`      \x1b[90mstart=${start} · modified=${modified}${entry.summary ? ` · ${entry.summary}` : ''}\x1b[0m`);
+        println(`      \x1b[90mstart=${start} · modified=${modified}${summary ? ` · ${summary}` : ''}\x1b[0m`);
+    }
+    if (inventory.sessions.length > visibleSessions.length) {
+        println(
+            `    \x1b[90m... ${inventory.sessions.length - visibleSessions.length} sessão(ões) omitida(s). Amplie com /session sdk <n>.\x1b[0m`,
+        );
     }
     println(
         '\n  \x1b[90mPróximo boot: /session sdk next new | /session sdk next resume <id|#n|current|last|foreground> | /session sdk next auto\x1b[0m',

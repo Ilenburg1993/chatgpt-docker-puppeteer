@@ -1296,6 +1296,33 @@ Validacao:
 
 Status: implementado e validado em unit test + live real `--no-pr`. A rodada seguinte pode explorar shortlist `all-providers` e politicas para surfacing de perfis cujo filtro `safe` fica vazio.
 
+### A58. Cockpit `/session sdk` ainda ignorava limite numerico e despejava previews longos
+
+Situacao atual observada:
+
+- O live `byok-kilo-shortlist-preflight-2026-05-21` reexercitou `/session sdk 8` antes dos probes. O comando deveria listar oito sessoes, mas `cmdSessionSdk()` interpretava o primeiro token numerico como `action` e lia o limite apenas em `rest[0]`, caindo no default de doze.
+- Cada entry ainda imprimia `entry.summary` inteiro. Em sessoes de live test, esse summary e o proprio prompt canônico grande; o cockpit de escolha de sessao ficava dominado por texto antigo antes de o operador enxergar `next new|resume|auto`.
+- O problema nao e persistencia SDK. E materializacao UX do inventario: o SDK ja entrega sessoes listaveis; o terminal estava projetando demais.
+
+Situacao ideal:
+
+- `/session sdk <n>` respeita `n` quando o operador quer uma amostra curta do inventario.
+- A lista mostra IDs, flags, timestamps e um preview compacto suficiente para reconhecimento, sem transformar historico de prompt em dump de transcript.
+- Quando houver mais sessoes, a UX explica quantas foram omitidas e como ampliar a janela deliberadamente.
+
+Correcao desta revisao:
+
+- O parser do cockpit usa o token numerico inicial como limite em modo status.
+- O summary SDK e compactado por whitespace e truncado em preview curto antes de renderizar.
+- A lista imprime a contagem omitida com a acao `/session sdk <n>`.
+
+Validacao:
+
+- Unit test cobre `/session sdk 1` com duas sessoes e summary longo, exigindo que a segunda sessao nao apareca, que o preview seja truncado e que a orientacao de ampliar a janela seja mostrada.
+- Live real BYOK `--no-pr` reexecutou `/session sdk 8` no preflight `artifacts/terminal-live/byok-kilo-session-cockpit-limit-2026-05-21/summary.md`: o cockpit mostrou a janela curta, informou a contagem omitida e seguiu para catalogo/probes sem abrir turno Copilot.
+
+Status: implementado e validado em unit test + live BYOK real `--no-pr`.
+
 ## Hipóteses Externas Rejeitadas Ou Reclassificadas
 
 ### H1. "boot-hub assume sucesso"
@@ -1725,6 +1752,7 @@ Fase J6. Testes
 - J6.46 Fazer o live runner bloquear pergunta `ask_user` simulada como texto/JSON publico quando o terminal nao recebeu `user_input.requested`. Status: feito no harness; NVIDIA abriu a evidencia negativa em `artifacts/terminal-live/byok-nvidia-representative-agent-probe-2026-05-21/summary.md` e a reexecucao em `artifacts/terminal-live/byok-nvidia-textual-ask-gate-r2-2026-05-21/summary.md` classificou `ask_user_text+ask_user_question_json` como `byok-live-tool-protocol-missed` em 35s.
 - J6.47 Promover em `/byok recommend ... safe` somente modelos com probe agente positivo de tools + `ask_user`, mantendo o catalogo amplo em `/byok models`. Status: feito com unit tests e diagnostico acionavel para candidatos ainda nao sondados.
 - J6.48 Criar shortlist de probes agentes ranqueadas como live fake BYOK, preservando `(profile, provider, model)` por candidato e cobrindo a superficie no runner `--no-pr`. Status: PASS em unit test multi-profile e em `artifacts/terminal-live/byok-kilo-shortlist-preflight-2026-05-21/summary.md`.
+- J6.49 Fazer `/session sdk <n>` respeitar a janela numerica e resumir previews de sessoes antigas para manter o cockpit de retomada legivel. Status: PASS em unit test e no preflight real `artifacts/terminal-live/byok-kilo-session-cockpit-limit-2026-05-21/summary.md`.
 
 Fase J7. Providers amplos
 

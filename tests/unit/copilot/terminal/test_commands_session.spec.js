@@ -632,6 +632,37 @@ describe('commands/session — async commands', () => {
         expect(ctx.output()).toContain('#1');
     });
 
+    it('cmdSessionSdk respeita limite numérico e compacta previews longos', async () => {
+        listTerminalSdkSessionInventory.mockResolvedValueOnce({
+            currentSessionId: 'sdk-current',
+            lastSessionId: 'sdk-last',
+            foregroundSessionId: null,
+            sessions: [
+                {
+                    sessionId: 'sdk-current',
+                    startTime: new Date('2026-05-21T00:00:00.000Z'),
+                    modifiedTime: new Date('2026-05-21T00:01:00.000Z'),
+                    summary: `Prompt longo ${'delta '.repeat(80)}`,
+                    isRemote: false,
+                },
+                {
+                    sessionId: 'sdk-second',
+                    startTime: new Date('2026-05-21T00:02:00.000Z'),
+                    modifiedTime: new Date('2026-05-21T00:03:00.000Z'),
+                    summary: 'segunda sessão',
+                    isRemote: false,
+                },
+            ],
+        });
+        const ctx = mockCtx();
+        await cmdSessionSdk({ println: ctx.println }, '1');
+        expect(ctx.output()).toContain('sdk-current');
+        expect(ctx.output()).not.toContain('sdk-second');
+        expect(ctx.output()).toContain('/session sdk <n>');
+        expect(ctx.output()).toContain('...');
+        expect(ctx.output()).not.toContain('delta delta delta delta delta delta delta delta delta delta delta delta delta delta delta delta delta delta delta delta delta delta delta delta delta delta delta delta delta delta delta delta delta delta delta delta delta delta delta delta');
+    });
+
     it('cmdSessionSdk agenda uma sessão nova para o próximo boot', async () => {
         const ctx = mockCtx();
         await cmdSessionSdk({ println: ctx.println }, 'next new');
