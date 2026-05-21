@@ -144,6 +144,51 @@ describe('terminal /byok command', () => {
         expect(ctx.output()).not.toContain('secret');
     });
 
+    it('lista providers disponíveis com comandos operacionais redigidos', async () => {
+        mockProjection({
+            profiles: [
+                {
+                    name: 'openrouter-free',
+                    preset: 'openrouter',
+                    providerType: 'openai',
+                    baseUrl: 'https://openrouter.ai/api/v1',
+                    model: 'z-ai/glm-4.5-air:free',
+                    auth: { apiKeyConfigured: true, bearerTokenConfigured: false, headersConfigured: false },
+                    metadataKeys: ['tier', 'owner'],
+                },
+                {
+                    name: 'groq-free',
+                    preset: 'groq',
+                    providerType: 'openai',
+                    baseUrl: 'https://api.groq.com/openai/v1',
+                    model: 'openai/gpt-oss-120b',
+                    auth: { apiKeyConfigured: false, bearerTokenConfigured: true, headersConfigured: false },
+                    metadataKeys: ['limits'],
+                },
+            ],
+            summary: {
+                enabled: true,
+                ready: true,
+                profile: 'groq-free',
+                preset: 'groq',
+                providerType: 'openai',
+                model: 'openai/gpt-oss-120b',
+            },
+        });
+        const ctx = mockCtx();
+
+        await cmdByok({ println: ctx.println }, 'providers');
+
+        expect(ctx.output()).toContain('BYOK providers');
+        expect(ctx.output()).toContain('openrouter-free');
+        expect(ctx.output()).toContain('groq-free');
+        expect(ctx.output()).toContain('← ativo');
+        expect(ctx.output()).toContain('/byok use groq-free');
+        expect(ctx.output()).toContain('/byok models refresh provider:groq');
+        expect(ctx.output()).toContain('meta=tier,owner');
+        expect(ctx.output()).not.toContain('secret');
+    });
+
     it('ativa perfil no processo atual', async () => {
         process.env['COPILOT_BYOK_MODEL'] = 'stale-model';
         process.env['COPILOT_BYOK_PROVIDER_PRESET'] = 'stale-provider';
@@ -300,6 +345,59 @@ describe('terminal /byok command', () => {
         expect(expandedCtx.output()).toContain('exibindo 26/30');
     });
 
+    it('filtra catálogo BYOK por provider, gratuidade, capacidade e limite', async () => {
+        discoverConfiguredByokModelsFromEnv.mockResolvedValue({
+            models: [
+                {
+                    id: 'openrouter/free-reasoning',
+                    capabilities: { supports: { reasoningEffort: true, vision: false }, limits: { max_context_window_tokens: 200000 } },
+                    byok: {
+                        freeTier: true,
+                        provider: 'openrouter',
+                        rateLimits: { maxRequestTokens: 64000 },
+                    },
+                },
+                {
+                    id: 'openrouter/free-low',
+                    capabilities: { supports: { reasoningEffort: true, vision: false }, limits: { max_context_window_tokens: 200000 } },
+                    byok: {
+                        freeTier: true,
+                        provider: 'openrouter',
+                        rateLimits: { maxRequestTokens: 4000 },
+                    },
+                },
+                {
+                    id: 'groq/free-reasoning',
+                    capabilities: { supports: { reasoningEffort: true, vision: false }, limits: { max_context_window_tokens: 131072 } },
+                    byok: {
+                        freeTier: true,
+                        provider: 'groq',
+                        rateLimits: { maxRequestTokens: 64000 },
+                    },
+                },
+                {
+                    id: 'openrouter/paid-vision',
+                    capabilities: { supports: { reasoningEffort: true, vision: true }, limits: { max_context_window_tokens: 128000 } },
+                    byok: { freeTier: false, provider: 'openrouter' },
+                },
+            ],
+            source: 'remote',
+            endpoint: 'https://openrouter.ai/api/v1/models',
+            fromCache: false,
+            error: null,
+        });
+        mockProjection();
+        const ctx = mockCtx();
+
+        await cmdByok({ println: ctx.println }, 'models provider:openrouter free reasoning safe 10');
+
+        expect(ctx.output()).toContain('filtros=provider:openrouter,free,reasoning,safe');
+        expect(ctx.output()).toContain('openrouter/free-reasoning');
+        expect(ctx.output()).not.toContain('openrouter/free-low');
+        expect(ctx.output()).not.toContain('groq/free-reasoning');
+        expect(ctx.output()).not.toContain('openrouter/paid-vision');
+    });
+
     it('recomenda modelos BYOK com filtros e alerta limites baixos', async () => {
         discoverConfiguredByokModelsFromEnv.mockResolvedValue({
             models: [
@@ -342,6 +440,41 @@ describe('terminal /byok command', () => {
         expect(ctx.output()).not.toContain('free-low-limit');
         expect(ctx.output()).not.toContain('paid-vision');
         expect(ctx.output()).toContain('ok para uso geral');
+    });
+
+    it('recomenda modelos BYOK filtrando provider e modelos medidos', async () => {
+        discoverConfiguredByokModelsFromEnv.mockResolvedValue({
+            models: [
+                {
+                    id: 'openrouter/free',
+                    capabilities: { supports: { reasoningEffort: true, vision: false }, limits: { max_context_window_tokens: 128000 } },
+                    byok: { freeTier: true, provider: 'openrouter' },
+                },
+                {
+                    id: 'openrouter/paid',
+                    capabilities: { supports: { reasoningEffort: true, vision: false }, limits: { max_context_window_tokens: 128000 } },
+                    byok: { freeTier: false, provider: 'openrouter' },
+                },
+                {
+                    id: 'groq/paid',
+                    capabilities: { supports: { reasoningEffort: true, vision: false }, limits: { max_context_window_tokens: 128000 } },
+                    byok: { freeTier: false, provider: 'groq' },
+                },
+            ],
+            source: 'remote',
+            endpoint: 'https://openrouter.ai/api/v1/models',
+            fromCache: false,
+            error: null,
+        });
+        mockProjection();
+        const ctx = mockCtx();
+
+        await cmdByok({ println: ctx.println }, 'recommend provider:openrouter metered reasoning 5');
+
+        expect(ctx.output()).toContain('filtros=provider:openrouter,metered,reasoning');
+        expect(ctx.output()).toContain('openrouter/paid');
+        expect(ctx.output()).not.toContain('openrouter/free');
+        expect(ctx.output()).not.toContain('groq/paid');
     });
 
     it('recomenda modelos BYOK mostrando aviso quando o limite do provider é baixo', async () => {

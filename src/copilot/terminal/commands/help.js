@@ -51,7 +51,7 @@ export function cmdHelp({ injectPort, println }) {
   \x1b[33m/model\x1b[0m                               — exibe modelo ativo
   \x1b[33m/model list\x1b[0m                          — lista modelos disponíveis (via SDK)
   \x1b[33m/model <id>\x1b[0m                          — troca modelo (ex: /model auto)
-  \x1b[33m/byok [status|reload|profiles|models|recommend|env|use|model|provider|persist]\x1b[0m — BYOK universal via .env.local
+  \x1b[33m/byok [status|reload|providers|profiles|models|recommend|env|use|model|provider|persist]\x1b[0m — BYOK universal via .env.local
   \x1b[33m/reasoning\x1b[0m                           — exibe nível de raciocínio atual
   \x1b[33m/reasoning low|medium|high|xhigh|off\x1b[0m — altera reasoning effort
 

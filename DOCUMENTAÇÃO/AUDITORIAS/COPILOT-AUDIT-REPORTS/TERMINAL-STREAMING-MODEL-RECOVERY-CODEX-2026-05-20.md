@@ -796,6 +796,33 @@ Validação:
 
 Status: parcialmente implementado. Ainda falta admission control automático antes de abrir um turno BYOK real: estimar prompt/contexto atual, comparar com limites do modelo/provider e sugerir sessão fresca, compactação segura ou outro provider antes de chamar o SDK.
 
+### A40. O operador ainda não tinha cockpit explícito de providers e filtros no catálogo
+
+Achado:
+
+- A implementação universal de BYOK já carregava presets e perfis, mas a UX ainda obrigava o operador a inferir providers disponíveis a partir de `/byok profiles` e `/byok models`.
+- Isso ficava especialmente ruim com muitos providers: o operador precisava descobrir manualmente quais perfis estavam prontos, qual comando usar para alternar, e como filtrar modelos por provider, gratuidade, custo desconhecido, reasoning, vision e limites.
+- O live com Gemini e Mistral evidenciou um caso importante: alguns catálogos reais retornam modelos operacionais, mas não informam gratuidade/preço de forma confiável. Nesses casos, filtrar por `free` deve retornar vazio com clareza, enquanto a recomendação operacional deve continuar útil usando `reasoning`, `safe`, `ctx>` e `maxReq>` sem presumir gratuidade.
+
+Correção:
+
+- Criado `/byok providers`, um cockpit redigido que lista todos os perfis configurados, perfil ativo, preset, provider, modelo, tipo de autenticação, metadata disponível e comandos diretos de operação.
+- `/byok models` passou a aceitar os mesmos filtros centrais de recomendação: `free`, `metered`, `cost?`, `provider:<nome>`, `reasoning`, `vision`, `safe`, `ctx>N`, `maxReq>N`, além de `refresh`, `all` e limite numérico.
+- `/byok recommend` passou a aceitar filtro `provider:<nome>` e filtros de custo `metered`/`cost?`, usando o mesmo pipeline de ranking e budget.
+- O harness live BYOK passou a validar `/byok providers`, catálogo filtrado e recomendação operacional. Para providers que retornam `cost?`, o harness testa `free` em `/byok models` e usa recomendação sem `free` para não transformar ausência de metadata em falha falsa.
+- O `.env.local` local foi atualizado como cofre gitignored para expor todos os perfis BYOK configurados pelo operador sem duplicar nem imprimir segredos.
+
+Validação:
+
+- Unit tests cobrem `/byok providers`, filtros de `/byok models` por provider/gratuidade/capacidade/limite e filtros de `/byok recommend` por provider/modelos medidos.
+- `npx vitest run tests/unit/copilot/terminal/test_commands_byok.spec.js tests/unit/copilot/sdk/test_sdk_provider.spec.js tests/unit/copilot/test_terminal_dialog_engine.spec.js` passou.
+- `npm run typecheck:strict:src.copilot` passou.
+- Probe real sem PR Gemini -> Mistral passou em `artifacts/terminal-live/byok-real-gemini-mistral-nopr-2026-05-21-r2/summary.md`.
+- Probe real sem PR NVIDIA NIM -> Cerebras passou em `artifacts/terminal-live/byok-real-nvidia-cerebras-nopr-2026-05-21/summary.md`.
+- Probe real sem PR Hugging Face -> Chutes passou em `artifacts/terminal-live/byok-real-huggingface-chutes-nopr-2026-05-21/summary.md`.
+
+Status: implementado nesta revisão. Ainda falta turno funcional real em mais providers, com admission control antes do turno para evitar custo/limite inesperado.
+
 ## Hipóteses Externas Rejeitadas Ou Reclassificadas
 
 ### H1. "boot-hub assume sucesso"
@@ -1151,6 +1178,9 @@ Fase J5. UX e comandos
 - J5.20 Criar uma recomendação interativa ainda mais forte (`/byok recommend`, filtros `free`, `vision`, `reasoning`, `ctx>`) a partir do mesmo ranking. Status: feito nesta revisão; falta evoluir para recomendação sensível ao contexto real do turno.
 - J5.21 Mostrar limites free/operacionais (`maxReq`, `TPM`, `RPM`, `RPD`) em status, catálogo e recomendação. Status: feito nesta revisão.
 - J5.22 Implementar admission control antes de turno BYOK longo, usando limites declarados e estimativa do contexto atual. Status: pendente.
+- J5.23 Criar `/byok providers` como cockpit redigido de providers, perfis prontos e comandos diretos. Status: feito nesta revisão.
+- J5.24 Unificar filtros de `/byok models` e `/byok recommend` para provider, free, metered, cost?, reasoning, vision, safe, ctx e maxReq. Status: feito nesta revisão.
+- J5.25 Distinguir explicitamente "free confirmado" de "custo desconhecido" na recomendação e nos testes live. Status: feito nesta revisão para o cockpit; falta enriquecer docs/provider metadata quando APIs públicas expuserem limites.
 
 Fase J6. Testes
 
@@ -1174,6 +1204,9 @@ Fase J6. Testes
 - J6.18 Rodar probe real de catalogo multi-provider sem vazar segredos. Status: feito nesta revisão; todos os providers novos testados em descoberta/fallback.
 - J6.19 Rodar probe real sem PR com troca Groq -> OpenRouter, limites explícitos e recomendação operacional. Status: PASS em `artifacts/terminal-live/byok-real-groq-openrouter-nopr-recommend-2026-05-21/summary.md`.
 - J6.20 Rodar turno funcional em provider novo com contexto compatível com limite free. Status: pendente; Groq falhou por orçamento baixo em sessão longa, o que agora alimenta admission control.
+- J6.21 Rodar probe real sem PR Gemini -> Mistral cobrindo provider cockpit, catálogo filtrado e recomendação sem assumir gratuidade. Status: PASS em `artifacts/terminal-live/byok-real-gemini-mistral-nopr-2026-05-21-r2/summary.md`.
+- J6.22 Rodar probe real sem PR NVIDIA NIM -> Cerebras cobrindo provider cockpit, catálogo filtrado, troca de provider/modelo e ausência de vazamento. Status: PASS em `artifacts/terminal-live/byok-real-nvidia-cerebras-nopr-2026-05-21/summary.md`.
+- J6.23 Rodar probe real sem PR Hugging Face -> Chutes cobrindo provider cockpit, catálogo filtrado, troca de provider/modelo e ausência de vazamento. Status: PASS em `artifacts/terminal-live/byok-real-huggingface-chutes-nopr-2026-05-21/summary.md`.
 
 Fase J7. Providers amplos
 
@@ -1320,9 +1353,9 @@ Implementado:
 
 Próxima rodada recomendada:
 
-1. Rodar turno funcional live com OpenRouter free e Groq/Gemini, validando deltas, final, tools, `ask_user`, usage sem PR, retorno ao SDK e ausência de duplicações.
-2. Implementar admission control BYOK antes do turno: estimar contexto/prompt, comparar com `maxReq`/`TPM`/janela e orientar sessão fresca, compactação ou troca de provider antes de chamar o SDK.
-3. Evoluir `/byok recommend` para ficar sensível ao contexto atual da sessão, além dos filtros ja implementados (`free`, `vision`, `reasoning`, `ctx`, `maxReq`, `safe`).
+1. Implementar admission control BYOK antes do turno: estimar contexto/prompt, comparar com `maxReq`/`TPM`/janela e orientar sessão fresca, compactação ou troca de provider antes de chamar o SDK.
+2. Rodar turno funcional live com OpenRouter free e providers `cost?` de contexto amplo, validando deltas, final, tools, `ask_user`, usage sem PR, retorno ao SDK e ausência de duplicações.
+3. Evoluir `/byok recommend` para ficar sensível ao contexto atual da sessão, além dos filtros ja implementados (`provider`, `free`, `metered`, `cost?`, `vision`, `reasoning`, `ctx`, `maxReq`, `safe`).
 4. Validar Cloudflare Workers AI por chat real, já que `/models` respondeu `405` e precisa manter fallback estatico claro.
 5. Expandir o cenário live para elicitation quando a capability estiver disponível.
 6. Fechar a recuperação `session.error`/`reconnect_restart`, distinguindo retry real de reenvio ambíguo de prompt.

@@ -91,11 +91,15 @@ function buildByokProbeCommands({ fixtureBaseUrl = 'http://127.0.0.1:11434/v1' }
     return [
         '/byok',
         '/byok env',
+        '/byok providers',
         '/byok profiles',
         '/byok models refresh',
+        '/byok models free reasoning safe 8',
         '/byok recommend free reasoning safe 5',
         '/byok use codex-fixture',
+        '/byok providers',
         '/byok models refresh',
+        '/byok models provider:openai-compatible free reasoning safe 8',
         '/byok recommend free reasoning safe 5',
         '/byok model fixture/model-b',
         '/byok',
@@ -238,9 +242,9 @@ function buildRealByokRuntime({ dotenvEnv, requestedProfile, requestedAltProfile
 }
 
 function buildByokRealPreflightCommands({ profile, altProfile, model, altModel }) {
-    const commands = ['/byok reload', '/byok env', '/byok profiles'];
+    const commands = ['/byok reload', '/byok env', '/byok providers', '/byok profiles'];
     if (profile) commands.push(`/byok use ${profile}`);
-    commands.push('/byok', '/byok models refresh', '/byok recommend free reasoning safe 8');
+    commands.push('/byok', '/byok models refresh', '/byok models free reasoning safe 8', '/byok recommend reasoning safe 8');
     if (altModel && altModel !== model) {
         commands.push(`/byok model ${altModel}`, '/byok');
     }
@@ -248,7 +252,7 @@ function buildByokRealPreflightCommands({ profile, altProfile, model, altModel }
         commands.push(`/byok model ${model}`, '/byok');
     }
     if (altProfile) {
-        commands.push(`/byok use ${altProfile}`, '/byok', '/byok models refresh', '/byok recommend free reasoning safe 8');
+        commands.push(`/byok use ${altProfile}`, '/byok', '/byok providers', '/byok models refresh', '/byok models free reasoning safe 8', '/byok recommend reasoning safe 8');
         if (profile) commands.push(`/byok use ${profile}`, '/byok');
     }
     return commands;
@@ -885,9 +889,19 @@ function evaluateByokProbeOutput(plain, sseSummary, { fixture = false } = {}) {
             detail: '/byok profiles rendered configured profile information or the empty-state',
         },
         {
+            id: 'byok-providers-visible',
+            pass: /BYOK providers/.test(plain) && /\/byok use |Nenhum provider BYOK configurado/.test(plain),
+            detail: '/byok providers rendered the redacted provider cockpit and operator actions',
+        },
+        {
             id: 'byok-models-visible',
             pass: /BYOK models/.test(plain),
             detail: '/byok models refresh rendered model catalog state without exposing secrets',
+        },
+        {
+            id: 'byok-model-filters-visible',
+            pass: /BYOK models[\s\S]{0,500}filtros=free,reasoning,safe/.test(plain),
+            detail: '/byok models accepted operator filters for free/reasoning/safe discovery',
         },
         {
             id: 'byok-recommend-visible',
@@ -1004,6 +1018,16 @@ function evaluateByokRealOutput(plain, secretValues, { profile, altProfile, mode
             id: 'byok-real-model-catalog',
             pass: /BYOK models/.test(plain) && !/Nenhum modelo BYOK configurado/.test(plain),
             detail: 'BYOK model catalog command returned a usable catalog or remote/static fallback',
+        },
+        {
+            id: 'byok-real-provider-cockpit',
+            pass: /BYOK providers/.test(plain) && /\/byok use /.test(plain),
+            detail: 'BYOK provider cockpit showed configured providers and operator actions',
+        },
+        {
+            id: 'byok-real-model-filtering',
+            pass: /BYOK models[\s\S]{0,800}filtros=free,reasoning,safe/.test(plain),
+            detail: 'BYOK real probe exercised filtered model discovery',
         },
         {
             id: 'byok-real-recommendation',

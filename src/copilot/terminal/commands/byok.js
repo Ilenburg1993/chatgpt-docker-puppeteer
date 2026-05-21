@@ -143,12 +143,15 @@ function classifyByokModelBudget(model) {
 
 /**
  * @param {string[]} rest
- * @returns {{ limit: number; freeOnly: boolean; vision: boolean; reasoning: boolean; minContext: number | null; minRequest: number | null; avoidLowLimit: boolean; forceRefresh: boolean }}
+ * @returns {{ limit: number; freeOnly: boolean; meteredOnly: boolean; unknownCostOnly: boolean; provider: string | null; vision: boolean; reasoning: boolean; minContext: number | null; minRequest: number | null; avoidLowLimit: boolean; forceRefresh: boolean }}
  */
 function parseRecommendArgs(rest) {
     const state = {
         limit: DEFAULT_BYOK_RECOMMEND_DISPLAY_LIMIT,
         freeOnly: false,
+        meteredOnly: false,
+        unknownCostOnly: false,
+        provider: /** @type {string | null} */ (null),
         vision: false,
         reasoning: false,
         minContext: /** @type {number | null} */ (null),
@@ -165,12 +168,20 @@ function parseRecommendArgs(rest) {
             state.forceRefresh = true;
         } else if (['free', '--free'].includes(item)) {
             state.freeOnly = true;
+        } else if (['paid', 'metered', '--paid', '--metered'].includes(item)) {
+            state.meteredOnly = true;
+        } else if (['cost?', 'unknown-cost', '--cost?', '--unknown-cost'].includes(item)) {
+            state.unknownCostOnly = true;
         } else if (['vision', '--vision'].includes(item)) {
             state.vision = true;
         } else if (['reasoning', '--reasoning'].includes(item)) {
             state.reasoning = true;
         } else if (['safe', 'no-low-limit', '--safe', '--no-low-limit'].includes(item)) {
             state.avoidLowLimit = true;
+        } else if (item.startsWith('provider:')) {
+            state.provider = item.slice(9) || null;
+        } else if (item.startsWith('provider=')) {
+            state.provider = item.slice(9) || null;
         } else if (item.startsWith('ctx>=')) {
             state.minContext = Number.parseInt(item.slice(5), 10) || null;
         } else if (item.startsWith('ctx>')) {
@@ -194,12 +205,38 @@ function matchesRecommendFilters(model, filters) {
     const context = model.capabilities?.limits?.max_context_window_tokens ?? 0;
     const maxRequest = meta?.rateLimits?.maxRequestTokens ?? meta?.rateLimits?.tokensPerMinute ?? null;
     if (filters.freeOnly && meta?.freeTier !== true) return false;
+    if (filters.meteredOnly && meta?.freeTier !== false) return false;
+    if (filters.unknownCostOnly && meta?.freeTier !== null) return false;
+    if (filters.provider) {
+        const haystack = [meta?.provider, meta?.source, model.id].filter(Boolean).join(' ').toLowerCase();
+        if (!haystack.includes(filters.provider)) return false;
+    }
     if (filters.vision && !model.capabilities?.supports?.vision) return false;
     if (filters.reasoning && !model.capabilities?.supports?.reasoningEffort) return false;
     if (filters.minContext !== null && context < filters.minContext) return false;
     if (filters.minRequest !== null && (maxRequest === null || maxRequest < filters.minRequest)) return false;
     if (filters.avoidLowLimit && classifyByokModelBudget(model).level === 'blocked') return false;
     return true;
+}
+
+/**
+ * @param {ReturnType<typeof parseRecommendArgs>} filters
+ * @returns {string}
+ */
+function renderByokFilterLabel(filters) {
+    return [
+        filters.provider ? `provider:${filters.provider}` : null,
+        filters.freeOnly ? 'free' : null,
+        filters.meteredOnly ? 'metered' : null,
+        filters.unknownCostOnly ? 'cost?' : null,
+        filters.reasoning ? 'reasoning' : null,
+        filters.vision ? 'vision' : null,
+        filters.avoidLowLimit ? 'safe' : null,
+        filters.minContext !== null ? `ctx>${filters.minContext}` : null,
+        filters.minRequest !== null ? `maxReq>${filters.minRequest}` : null,
+    ]
+        .filter(Boolean)
+        .join(',');
 }
 
 /**
@@ -233,6 +270,20 @@ function renderModelTags(model) {
  */
 function recommendByokModels(models, filters) {
     return rankByokModels(models).filter((model) => matchesRecommendFilters(model, filters)).slice(0, filters.limit);
+}
+
+/**
+ * @param {{ auth: { bearerTokenConfigured: boolean; apiKeyConfigured: boolean; headersConfigured: boolean } }} profile
+ * @returns {string}
+ */
+function renderProfileAuth(profile) {
+    return profile.auth.bearerTokenConfigured
+        ? 'bearer'
+        : profile.auth.apiKeyConfigured
+          ? 'apiKey'
+          : profile.auth.headersConfigured
+            ? 'headers'
+            : 'none';
 }
 
 /**
@@ -275,7 +326,7 @@ function renderStatus(projection, println) {
         println(`  \x1b[31m  erro: ${error}\x1b[0m`);
     }
     println('  \x1b[90mArquivo unico de BYOK: .env.local. Mudancas via comando valem para o processo atual; use /restart para nova sessao SDK.\x1b[0m');
-    println('  \x1b[90mUso: /byok | /byok reload | /byok profiles | /byok models [refresh|all|n] | /byok recommend [free] [reasoning] [vision] [safe] [ctx>N] [maxReq>N] [n] | /byok use <perfil|sdk> | /byok model <id> | /byok provider <preset> [model] [baseUrl] | /byok persist <sdk|profile|model|provider> | /byok env\x1b[0m\n');
+    println('  \x1b[90mUso: /byok | /byok reload | /byok providers | /byok profiles | /byok models [refresh|all|n] [free|metered|cost?] [provider:<nome>] [reasoning] [vision] [safe] [ctx>N] [maxReq>N] | /byok recommend [filtros] [n] | /byok use <perfil|sdk> | /byok model <id> | /byok provider <preset> [model] [baseUrl] | /byok persist <sdk|profile|model|provider> | /byok env\x1b[0m\n');
 }
 
 /**
@@ -453,7 +504,7 @@ export async function cmdByok({ println }, arg) {
             println(`    \x1b[33m${key}\x1b[0m`);
         }
         println('\n  \x1b[90mPerfis vivem em COPILOT_BYOK_PROFILES_JSON; o ativo em COPILOT_BYOK_PROFILE. Exemplos seguros ficam em .env.local.example.\x1b[0m');
-        println('  \x1b[90mUso: /byok | /byok profiles | /byok models | /byok env\x1b[0m\n');
+        println('  \x1b[90mUso: /byok | /byok providers | /byok profiles | /byok models | /byok env\x1b[0m\n');
         return;
     }
 
@@ -481,6 +532,41 @@ export async function cmdByok({ println }, arg) {
         return;
     }
 
+    if (sub === 'providers' || sub === 'provider-list') {
+        const presetCounts = new Map();
+        for (const profile of profiles) {
+            const key = profile.preset ?? profile.providerType ?? 'custom';
+            presetCounts.set(key, (presetCounts.get(key) ?? 0) + 1);
+        }
+        const configuredPresets = [...presetCounts.entries()]
+            .sort((a, b) => String(a[0]).localeCompare(String(b[0])))
+            .map(([preset, count]) => `${preset}=${count}`)
+            .join(' · ');
+        println(`\n  \x1b[36mBYOK providers\x1b[0m (${profiles.length} perfil(is))`);
+        println(`  \x1b[90mativo=${summary.profile ?? summary.preset ?? 'sdk'} · prontos=${profiles.length} · presets=${configuredPresets || '-'}\x1b[0m\n`);
+        if (profiles.length === 0) {
+            println('    \x1b[33mNenhum provider BYOK configurado. Adicione perfis em COPILOT_BYOK_PROFILES_JSON no .env.local.\x1b[0m\n');
+            return;
+        }
+        for (const profile of profiles) {
+            const active = profile.name === summary.profile ? ' \x1b[32m← ativo\x1b[0m' : '';
+            const metadata = profile.metadataKeys.length ? ` · meta=${profile.metadataKeys.join(',')}` : '';
+            const readiness =
+                profile.auth.bearerTokenConfigured || profile.auth.apiKeyConfigured || profile.auth.headersConfigured
+                    ? '\x1b[32mready\x1b[0m'
+                    : '\x1b[33msem credencial\x1b[0m';
+            println(`    \x1b[33m${profile.name}\x1b[0m${active} · ${readiness}`);
+            println(
+                `      \x1b[90mpreset=${profile.preset ?? '-'} · provider=${profile.providerType ?? '-'} · model=${profile.model ?? '-'} · auth=${renderProfileAuth(profile)}${metadata}\x1b[0m`,
+            );
+            println(
+                `      \x1b[90mcomandos: /byok use ${profile.name} · /byok models refresh provider:${profile.preset ?? profile.providerType ?? profile.name} · /byok recommend provider:${profile.preset ?? profile.providerType ?? profile.name} free reasoning safe\x1b[0m`,
+            );
+        }
+        println('\n  \x1b[90mUse /byok models free reasoning safe para ver candidatos em todos os providers; use provider:<nome> para filtrar.\x1b[0m\n');
+        return;
+    }
+
     if (sub === 'profiles') {
         println(`\n  \x1b[36mBYOK profiles\x1b[0m (${profiles.length})\n`);
         if (profiles.length === 0) {
@@ -489,17 +575,10 @@ export async function cmdByok({ println }, arg) {
         }
         for (const profile of profiles) {
             const active = profile.name === summary.profile ? ' \x1b[32m← ativo\x1b[0m' : '';
-            const auth = profile.auth.bearerTokenConfigured
-                ? 'bearer'
-                : profile.auth.apiKeyConfigured
-                  ? 'apiKey'
-                  : profile.auth.headersConfigured
-                    ? 'headers'
-                    : 'none';
             const metadata = profile.metadataKeys.length ? ` · meta=${profile.metadataKeys.join(',')}` : '';
             println(`    \x1b[33m${profile.name}\x1b[0m${active}`);
             println(
-                `      \x1b[90mpreset=${profile.preset ?? '-'} · provider=${profile.providerType ?? '-'} · model=${profile.model ?? '-'} · auth=${auth}${metadata}\x1b[0m`,
+                `      \x1b[90mpreset=${profile.preset ?? '-'} · provider=${profile.providerType ?? '-'} · model=${profile.model ?? '-'} · auth=${renderProfileAuth(profile)}${metadata}\x1b[0m`,
             );
         }
         println('\n  \x1b[90mUso: /byok use <perfil> para ativar no processo atual; depois /restart para abrir nova sessão SDK.\x1b[0m\n');
@@ -509,13 +588,14 @@ export async function cmdByok({ println }, arg) {
     if (sub === 'models') {
         const forceRefresh = rest.some((item) => ['refresh', 'force', '--refresh', '--force'].includes(item.toLowerCase()));
         const showAll = rest.some((item) => ['all', '--all'].includes(item.toLowerCase()));
-        const explicitLimit = rest
-            .map((item) => Number.parseInt(item, 10))
-            .find((value) => Number.isFinite(value) && value > 0);
-        const limit = showAll ? Number.POSITIVE_INFINITY : explicitLimit ?? DEFAULT_BYOK_MODELS_DISPLAY_LIMIT;
+        const filters = parseRecommendArgs(rest);
+        const limit = showAll ? Number.POSITIVE_INFINITY : filters.limit === DEFAULT_BYOK_RECOMMEND_DISPLAY_LIMIT ? DEFAULT_BYOK_MODELS_DISPLAY_LIMIT : filters.limit;
         const discovered = await discoverConfiguredByokModelsFromEnv(process.env, { forceRefresh });
-        const modelList = rankByokModels(discovered.models.length > 0 ? discovered.models : models);
+        const modelList = rankByokModels(discovered.models.length > 0 ? discovered.models : models).filter((model) =>
+            matchesRecommendFilters(model, filters),
+        );
         const visibleModels = modelList.slice(0, limit);
+        const filterLabel = renderByokFilterLabel(filters);
         const sourceLabel =
             discovered.source === 'remote'
                 ? 'provider'
@@ -526,13 +606,13 @@ export async function cmdByok({ println }, arg) {
                     : 'static';
         println(`\n  \x1b[36mBYOK models\x1b[0m (${modelList.length})`);
         println(
-            `  \x1b[90mfonte=${sourceLabel}${discovered.endpoint ? ` · endpoint=${discovered.endpoint}` : ''} · ordem=free/capability/context\x1b[0m\n`,
+            `  \x1b[90mfonte=${sourceLabel}${discovered.endpoint ? ` · endpoint=${discovered.endpoint}` : ''} · ordem=free/capability/context · filtros=${filterLabel || '-'}\x1b[0m\n`,
         );
         if (discovered.error) {
             println(`  \x1b[33m  aviso: descoberta remota indisponível (${discovered.error}); usando catálogo estático.\x1b[0m`);
         }
         if (modelList.length === 0) {
-            println('    \x1b[33mNenhum modelo BYOK configurado. Defina COPILOT_BYOK_MODEL ou COPILOT_BYOK_MODELS.\x1b[0m\n');
+            println('    \x1b[33mNenhum modelo BYOK encontrado para os filtros atuais. Remova filtros ou rode /byok models refresh.\x1b[0m\n');
             return;
         }
         for (const model of visibleModels) {
@@ -560,17 +640,10 @@ export async function cmdByok({ println }, arg) {
                   : discovered.source === 'static-fallback'
                     ? 'static-fallback'
                     : 'static';
-        const filterLabel = [
-            filters.freeOnly ? 'free' : null,
-            filters.reasoning ? 'reasoning' : null,
-            filters.vision ? 'vision' : null,
-            filters.avoidLowLimit ? 'safe' : null,
-            filters.minContext !== null ? `ctx>${filters.minContext}` : null,
-            filters.minRequest !== null ? `maxReq>${filters.minRequest}` : null,
-        ].filter(Boolean);
+        const filterLabel = renderByokFilterLabel(filters);
         println(`\n  \x1b[36mBYOK recommend\x1b[0m (${recommended.length}/${modelList.length})`);
         println(
-            `  \x1b[90mfonte=${sourceLabel}${discovered.endpoint ? ` · endpoint=${discovered.endpoint}` : ''} · filtros=${filterLabel.join(',') || '-'}\x1b[0m\n`,
+            `  \x1b[90mfonte=${sourceLabel}${discovered.endpoint ? ` · endpoint=${discovered.endpoint}` : ''} · filtros=${filterLabel || '-'}\x1b[0m\n`,
         );
         if (discovered.error) {
             println(`  \x1b[33m  aviso: descoberta remota indisponível (${discovered.error}); usando catálogo estático.\x1b[0m`);
