@@ -464,4 +464,35 @@ describe('F72 — BYOK env configuration', () => {
         expect(JSON.stringify(state.summary)).not.toContain('kilo-secret');
         expect(JSON.stringify(profiles)).not.toContain('kilo-secret');
     });
+
+    it('permite override transiente de modelo mantendo provider e credenciais do perfil ativo', () => {
+        const profilesJson = JSON.stringify({
+            local: {
+                preset: 'openai-compatible',
+                baseUrl: 'http://127.0.0.1:11434/v1',
+                model: 'fixture/model-a',
+                bearerToken: 'fixture-secret',
+                models: 'fixture/model-a,fixture/model-b',
+            },
+        });
+        const env = {
+            COPILOT_BYOK_ENABLED: 'true',
+            COPILOT_BYOK_PROFILE: 'local',
+            COPILOT_BYOK_PROFILES_JSON: profilesJson,
+            COPILOT_BYOK_MODEL: 'fixture/model-b',
+        };
+
+        const state = readConfiguredByokState(env);
+        const models = buildConfiguredByokModelListHandler(env);
+
+        expect(state.ready).toBe(true);
+        expect(state.summary.profile).toBe('local');
+        expect(state.model).toBe('fixture/model-b');
+        expect(state.provider).toMatchObject({
+            type: 'openai',
+            baseUrl: 'http://127.0.0.1:11434/v1',
+            bearerToken: 'fixture-secret',
+        });
+        expect(models).toBeDefined();
+    });
 });

@@ -505,7 +505,12 @@ function resolveProfileEnv(env) {
                 profileError: `COPILOT_BYOK_PROFILE '${profileName}' was not found in COPILOT_BYOK_PROFILES_JSON.`,
             };
         }
-        return { env: applyProfileToEnv(profile, env), profile: profileName, profileError: null };
+        const profileEnv = applyProfileToEnv(profile, env);
+        const modelOverride = optionalString(env['COPILOT_BYOK_MODEL']);
+        if (modelOverride) {
+            profileEnv['COPILOT_BYOK_MODEL'] = modelOverride;
+        }
+        return { env: profileEnv, profile: profileName, profileError: null };
     } catch (error) {
         return { env, profile: profileName, profileError: errorMessage(error) };
     }

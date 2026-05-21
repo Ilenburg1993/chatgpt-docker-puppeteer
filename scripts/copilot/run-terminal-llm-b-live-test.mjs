@@ -85,19 +85,98 @@ function buildNoPrProbeCommands() {
     return ['/usage now', '/activity 20', '/metrics', '/events 20', '/events 20 --raw', '/errors 10', '/quit'];
 }
 
-function buildByokProbeCommands() {
+function buildByokProbeCommands({ fixtureBaseUrl = 'http://127.0.0.1:11434/v1' } = {}) {
     return [
         '/byok',
         '/byok env',
         '/byok profiles',
         '/byok models refresh',
+        '/byok use codex-fixture',
+        '/byok models refresh',
+        '/byok model fixture/model-b',
+        '/byok',
+        `/byok provider openai-compatible fixture/model-c ${fixtureBaseUrl}`,
+        '/byok',
         '/byok use sdk',
+        '/byok',
         '/usage now',
         '/events 30',
         '/events 30 --raw',
         '/errors 10',
         '/quit',
     ];
+}
+
+function buildByokFixtureEnv({ baseUrl = 'http://127.0.0.1:11434/v1' } = {}) {
+    const fixtureToken = ['codex', 'fixture', 'token', 'never', 'print'].join('-');
+    return {
+        COPILOT_BYOK_ENABLED: 'false',
+        COPILOT_BYOK_MODEL_DISCOVERY_ENABLED: 'true',
+        COPILOT_BYOK_MODELS: 'fixture/model-a,fixture/model-b',
+        COPILOT_BYOK_PROFILES_JSON: JSON.stringify({
+            'codex-fixture': {
+                preset: 'openai-compatible',
+                baseUrl,
+                bearerToken: fixtureToken,
+                model: 'fixture/model-a',
+                models: 'fixture/model-a,fixture/model-b',
+                modelDiscoveryEnabled: true,
+                contextWindowTokens: 123456,
+                supportsReasoning: true,
+                supportsVision: false,
+                metadata: {
+                    owner: 'terminal-live',
+                    purpose: 'byok-control-plane-fixture',
+                },
+            },
+        }),
+    };
+}
+
+function startByokFixtureProviderServer() {
+    return new Promise((resolve, reject) => {
+        const server = http.createServer((req, res) => {
+            if (req.url === '/v1/models' || req.url === '/models') {
+                res.writeHead(200, { 'content-type': 'application/json' });
+                res.end(
+                    JSON.stringify({
+                        object: 'list',
+                        data: [
+                            { id: 'fixture/model-a', object: 'model' },
+                            { id: 'fixture/model-b', object: 'model' },
+                            { id: 'fixture/model-remote-c', object: 'model' },
+                        ],
+                    }),
+                );
+                return;
+            }
+            res.writeHead(404, { 'content-type': 'application/json' });
+            res.end(JSON.stringify({ error: 'not_found' }));
+        });
+        server.once('error', reject);
+        server.listen(0, '127.0.0.1', () => {
+            const address = server.address();
+            if (!address || typeof address === 'string') {
+                server.close();
+                reject(new Error('BYOK fixture provider did not expose a TCP address'));
+                return;
+            }
+            server.unref();
+            resolve({
+                baseUrl: `http://127.0.0.1:${address.port}/v1`,
+                close: () =>
+                    new Promise((closeResolve) => {
+                        server.close(() => closeResolve());
+                    }),
+            });
+        });
+    });
+}
+
+function sendCommandSequence(write, commands, { delayMs = 250 } = {}) {
+    commands.forEach((commandLine, index) => {
+        setTimeout(() => write(commandLine), index * delayMs).unref();
+    });
 }
 
 function buildReport({
@@ -610,9 +689,9 @@ function evaluateNoPrOutput(plain, sseSummary) {
     ];
 }
 
-function evaluateByokProbeOutput(plain, sseSummary) {
+function evaluateByokProbeOutput(plain, sseSummary, { fixture = false } = {}) {
     const archiveRawEvents = extractArchiveRawEvents(plain);
-    return [
+    const criteria = [
         {
             id: 'ready',
             pass: /LLM-B pronta/.test(plain),
@@ -654,6 +733,11 @@ function evaluateByokProbeOutput(plain, sseSummary) {
             detail: '/byok use sdk returned the process to the SDK-governed mode',
         },
         {
+            id: 'byok-no-secret-leak',
+            pass: !/codex-fixture-token-never-print/.test(plain),
+            detail: 'BYOK probe did not print fixture bearer token',
+        },
+        {
             id: 'sse-archive-query-visible',
             pass: /Eventos SSE/.test(plain) && /arquivo=/.test(plain),
             detail: '/events rendered the durable public SSE archive tail',
@@ -675,6 +759,49 @@ function evaluateByokProbeOutput(plain, sseSummary) {
         },
         ...evaluateSseCriteria(sseSummary, { expectPublicEvents: false, plain }),
     ];
+    if (fixture) {
+        criteria.splice(
+            8,
+            0,
+            {
+                id: 'byok-fixture-profile-visible',
+                pass: /codex-fixture/.test(plain) && /meta=owner,purpose|meta=purpose,owner/.test(plain),
+                detail: 'fixture profile appeared with redacted metadata keys',
+            },
+            {
+                id: 'byok-fixture-profile-activation',
+                pass: /profile:\s+codex-fixture/.test(plain) && /model:\s+fixture\/model-a/.test(plain),
+                detail: '/byok use codex-fixture activated profile model in the current process',
+            },
+            {
+                id: 'byok-fixture-model-list',
+                pass: /BYOK models[\s\S]{0,800}fixture\/model-a/.test(plain) && /fixture\/model-b/.test(plain),
+                detail: '/byok models refresh returned fixture model catalog',
+            },
+            {
+                id: 'byok-fixture-remote-discovery',
+                pass:
+                    /BYOK models[\s\S]{0,1200}fonte=provider/.test(plain) &&
+                    /endpoint=http:\/\/127\.0\.0\.1:\d+\/v1\/models/.test(plain) &&
+                    /fixture\/model-remote-c/.test(plain),
+                detail: 'fixture provider /models endpoint was discovered live and redacted',
+            },
+            {
+                id: 'byok-fixture-model-switch',
+                pass: /model:\s+fixture\/model-b/.test(plain),
+                detail: '/byok model switched model inside active BYOK process state',
+            },
+            {
+                id: 'byok-fixture-provider-switch',
+                pass:
+                    /preset:\s+openai-compatible/.test(plain) &&
+                    /model:\s+fixture\/model-c/.test(plain) &&
+                    /baseUrl:\s+http:\/\/127\.0\.0\.1:\d+\/v1/.test(plain),
+                detail: '/byok provider switched provider preset/model/baseUrl in the current process',
+            },
+        );
+    }
+    return criteria;
 }
 
 function evaluateBlockedOutput(plain, sseSummary, blocker) {
@@ -832,6 +959,7 @@ async function main() {
     const dryRun = hasFlag('--dry-run');
     const noPr = hasFlag('--no-pr');
     const byokProbe = hasFlag('--byok-probe');
+    const byokFixture = hasFlag('--byok-fixture');
     const collectSse = !hasFlag('--no-sse');
     const requestedTerminalPort = readArg('--terminal-port', '');
     const requestedSsePort = readArg('--sse-port', '');
@@ -850,15 +978,18 @@ async function main() {
     const sseJsonlPath = path.join(outDir, 'terminal.sse.jsonl');
     const jsonPath = path.join(outDir, 'summary.json');
     const mdPath = path.join(outDir, 'summary.md');
+    const byokFixtureProvider = byokFixture ? await startByokFixtureProviderServer() : null;
+    const byokFixtureBaseUrl = byokFixtureProvider?.baseUrl ?? 'http://127.0.0.1:11434/v1';
 
     if (dryRun) {
         const prompt = byokProbe
-            ? buildByokProbeCommands().join('\n')
+            ? buildByokProbeCommands({ fixtureBaseUrl: byokFixtureBaseUrl }).join('\n')
             : noPr
               ? buildNoPrProbeCommands().join('\n')
               : buildScenarioPrompt();
         await writeFile(path.join(outDir, 'prompt.txt'), `${prompt}\n`, 'utf8');
         console.log(`[terminal-live] dry-run prompt written to ${path.relative(ROOT, path.join(outDir, 'prompt.txt'))}`);
+        await byokFixtureProvider?.close();
         return;
     }
 
@@ -890,6 +1021,7 @@ async function main() {
         cwd: ROOT,
         env: {
             ...process.env,
+            ...(byokFixture ? buildByokFixtureEnv({ baseUrl: byokFixtureBaseUrl }) : {}),
             COPILOT_MODEL: 'auto',
             COPILOT_REASONING_EFFORT: 'high',
             TERMINAL_DISPLAY_PRESET: 'full',
@@ -950,8 +1082,10 @@ async function main() {
             write('/usage now');
             write('/activity 12');
             if (byokProbe || noPr) {
-                const commands = byokProbe ? buildByokProbeCommands() : buildNoPrProbeCommands();
-                for (const commandLine of commands) write(commandLine);
+                const commands = byokProbe
+                    ? buildByokProbeCommands({ fixtureBaseUrl: byokFixtureBaseUrl })
+                    : buildNoPrProbeCommands();
+                sendCommandSequence(write, commands, { delayMs: byokProbe ? 350 : 150 });
                 return;
             }
             write(buildScenarioPrompt());
@@ -1006,6 +1140,7 @@ async function main() {
     });
     clearTimeout(timeout);
     sseCollector?.close();
+    await byokFixtureProvider?.close();
 
     const plain = stripAnsi(raw);
     const sseSummary = sseCollector?.summary() ?? {
@@ -1028,7 +1163,7 @@ async function main() {
     const criteria = blocker
         ? evaluateBlockedOutput(plain, sseSummary, blocker)
         : byokProbe
-          ? evaluateByokProbeOutput(plain, sseSummary)
+          ? evaluateByokProbeOutput(plain, sseSummary, { fixture: byokFixture })
           : noPr
             ? evaluateNoPrOutput(plain, sseSummary)
             : evaluateOutput(plain, sseSummary, exportSummary);
