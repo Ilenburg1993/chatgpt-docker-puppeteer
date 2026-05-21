@@ -3,6 +3,7 @@
 export { registerTerminalAgentSsePassthrough } from './agent-sse-passthrough.js';
 export {
     claimTerminalAssistantTranscript,
+    isTerminalAssistantTranscriptCovered,
     renderTerminalAssistantTranscript,
     __test__ as terminalAssistantTranscriptRendererTestHarness,
 } from './assistant-transcript-renderer.js';

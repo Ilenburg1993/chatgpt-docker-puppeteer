@@ -409,6 +409,18 @@ export function getTerminalAssistantMessageMaterializationDecision({
                 matchedTurnKey: entry.turnKey,
             };
         }
+        if (
+            entry.normalizedReply &&
+            normalizedContent.length >= 24 &&
+            entry.normalizedReply.includes(normalizedContent)
+        ) {
+            return {
+                action: /** @type {'suppress'} */ ('suppress'),
+                reason: /** @type {'already_materialized'} */ ('already_materialized'),
+                suffix: '',
+                matchedTurnKey: entry.turnKey,
+            };
+        }
         if (entry.normalizedDeltaText && entry.normalizedDeltaText === normalizedContent) {
             return {
                 action: /** @type {'suppress'} */ ('suppress'),

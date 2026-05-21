@@ -15,8 +15,9 @@ import { appendTerminalTranscriptTurn, terminalThemeBadge, terminalThemeText } f
 
 const RECENT_TRANSCRIPT_TTL_MS = 5 * 60_000;
 const RECENT_TRANSCRIPT_MAX = 128;
+const RECENT_TRANSCRIPT_COVERAGE_MIN_CHARS = 32;
 
-/** @type {Map<string, number>} */
+/** @type {Map<string, { ts: number; normalized: string }>} */
 const recentTranscriptHashes = new Map();
 
 /**
@@ -32,8 +33,8 @@ function normalizeTranscriptContent(content) {
  * @returns {void}
  */
 function pruneRecentTranscriptHashes(now = Date.now()) {
-    for (const [hash, ts] of recentTranscriptHashes.entries()) {
-        if (now - ts > RECENT_TRANSCRIPT_TTL_MS) recentTranscriptHashes.delete(hash);
+    for (const [hash, entry] of recentTranscriptHashes.entries()) {
+        if (now - entry.ts > RECENT_TRANSCRIPT_TTL_MS) recentTranscriptHashes.delete(hash);
     }
     if (recentTranscriptHashes.size <= RECENT_TRANSCRIPT_MAX) return;
     const overflow = recentTranscriptHashes.size - RECENT_TRANSCRIPT_MAX;
@@ -47,15 +48,34 @@ function pruneRecentTranscriptHashes(now = Date.now()) {
 
 /**
  * @param {string} content
+ * @param {{ minChars?: number }} [options]
  * @returns {boolean}
  */
-export function claimTerminalAssistantTranscript(content) {
+export function isTerminalAssistantTranscriptCovered(content, options = {}) {
+    const normalized = normalizeTranscriptContent(content);
+    const minChars = Math.max(1, options.minChars ?? RECENT_TRANSCRIPT_COVERAGE_MIN_CHARS);
+    if (normalized.length < minChars) return false;
+    pruneRecentTranscriptHashes();
+    for (const entry of recentTranscriptHashes.values()) {
+        if (entry.normalized === normalized) return true;
+        if (entry.normalized.length >= minChars && entry.normalized.includes(normalized)) return true;
+    }
+    return false;
+}
+
+/**
+ * @param {string} content
+ * @param {{ suppressIfCoveredByRecent?: boolean }} [options]
+ * @returns {boolean}
+ */
+export function claimTerminalAssistantTranscript(content, options = {}) {
     const normalized = normalizeTranscriptContent(content);
     if (!normalized) return false;
     pruneRecentTranscriptHashes();
     const hash = createHash('sha256').update(normalized).digest('hex');
     if (recentTranscriptHashes.has(hash)) return false;
-    recentTranscriptHashes.set(hash, Date.now());
+    if (options.suppressIfCoveredByRecent && isTerminalAssistantTranscriptCovered(normalized)) return false;
+    recentTranscriptHashes.set(hash, { ts: Date.now(), normalized });
     return true;
 }
 
@@ -67,13 +87,17 @@ export function claimTerminalAssistantTranscript(content) {
  *     status?: 'message' | 'completed' | 'error';
  *     detail?: string | null;
  *     truncated?: boolean;
+ *     suppressIfCoveredByRecent?: boolean;
  *     metadata?: Record<string, unknown> | null;
  * }} input
  * @returns {boolean}
  */
 export function renderTerminalAssistantTranscript(input) {
     const content = input.content.trim();
-    if (!content || !claimTerminalAssistantTranscript(content)) return false;
+    const claimOptions = input.suppressIfCoveredByRecent ? { suppressIfCoveredByRecent: true } : {};
+    if (!content || !claimTerminalAssistantTranscript(content, claimOptions)) {
+        return false;
+    }
 
     const title = input.title ?? 'Mensagem da LLM-B';
     const source = input.source ?? 'sdk';

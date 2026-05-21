@@ -30,6 +30,7 @@ import { broadcastSse, ensureDialogLoop, println } from '../dialog/index.js';
 import {
     createTerminalHandledAgentEventsSet,
     createTerminalPassthroughAgentEventsSet,
+    isTerminalAssistantTranscriptCovered,
     registerTerminalAgentSsePassthrough,
     renderTerminalAssistantTranscript,
     setupTerminalTaskStreamListeners,
@@ -393,7 +394,10 @@ export function registerAgentEventListeners(printBanner) {
             );
             broadcastSse('dialog.turn_end', envelope);
             if (!reply.trim()) return;
-            if (shouldSuppressTerminalAssistantMessageAsMaterializedTurn({ content: reply, turnId })) {
+            if (
+                shouldSuppressTerminalAssistantMessageAsMaterializedTurn({ content: reply, turnId }) ||
+                isTerminalAssistantTranscriptCovered(reply)
+            ) {
                 recordTerminalActivity('turn', 'dialog.turn_end reconciliado sem novo bloco visual', {
                     detail: turnId ? `turn=${turnId} · conteúdo já materializado` : 'conteúdo já materializado',
                     source: 'dialog.turn_end',
@@ -413,6 +417,7 @@ export function registerAgentEventListeners(printBanner) {
                 title: 'Continuação da LLM-B',
                 source: 'dialog.turn_end',
                 status: 'completed',
+                suppressIfCoveredByRecent: true,
                 detail: [
                     turnId ? `turn=${turnId}` : null,
                     typeof evt.durationMs === 'number' ? `${(evt.durationMs / 1000).toFixed(1)}s` : null,

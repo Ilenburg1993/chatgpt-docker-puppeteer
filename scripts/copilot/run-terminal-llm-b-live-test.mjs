@@ -135,7 +135,7 @@ function buildReport({
     return `${lines.join('\n')}\n`;
 }
 
-function detectLiveBlocker(plain) {
+function detectLiveBlocker(plain, runtime = {}) {
     const rateLimitMatch = plain.match(
         /You've hit your rate limit\.[^\n]*(?:reset in ([^.]+)\.)?[^\n]*(?:Request ID: ([^)]+))?/i,
     );
@@ -147,6 +147,16 @@ function detectLiveBlocker(plain) {
     }
     if (/\[rate_limit\]/i.test(plain)) {
         return { id: 'sdk-rate-limit', detail: 'GitHub Copilot SDK rate limit' };
+    }
+    if (runtime.timedOut) {
+        return {
+            id: 'live-timeout',
+            detail:
+                `runner timeout before scenario completion` +
+                ` · ask=${runtime.answerSent ? 'answered' : 'not-answered'}` +
+                ` · postAsk=${runtime.postAskContinuationObserved ? 'observed' : 'missing'}` +
+                ` · diagnostics=${runtime.postCommandsSent ? 'started' : 'not-started'}`,
+        };
     }
     return null;
 }
@@ -207,6 +217,69 @@ function extractArchiveRawEvents(plain) {
         }
     }
     return entries;
+}
+
+function normalizeTranscriptCoverageText(value) {
+    return stripAnsi(value).replace(/\s+/gu, ' ').trim();
+}
+
+function eventPayload(evt) {
+    if (isObjectPayload(evt?.payload)) return evt.payload;
+    if (isObjectPayload(evt?.data)) return evt.data;
+    return null;
+}
+
+function eventPublicId(evt) {
+    const id = Number(evt?.eventId ?? evt?.id);
+    return Number.isFinite(id) ? id : null;
+}
+
+function eventTurnKey(evt, payload) {
+    const turnId = payload?.turnId ?? evt?.turnId;
+    const traceId = payload?.traceId ?? evt?.traceId;
+    if (typeof turnId === 'string' || typeof turnId === 'number') return `turn:${turnId}`;
+    if (typeof traceId === 'string' && traceId.length > 0) return `trace:${traceId}`;
+    return null;
+}
+
+function findTruncatedTurnEndDuplicate(events) {
+    const assistantMessages = [];
+    for (const evt of events) {
+        const payload = eventPayload(evt);
+        if (!payload) continue;
+        const eventName = typeof evt?.event === 'string' ? evt.event : '';
+        if (eventName === 'assistant.message') {
+            const content = normalizeTranscriptCoverageText(payload.content);
+            if (content.length >= 32) {
+                assistantMessages.push({
+                    content,
+                    eventId: eventPublicId(evt),
+                    turnKey: eventTurnKey(evt, payload),
+                });
+            }
+            continue;
+        }
+        if (eventName !== 'dialog.turn_end') continue;
+        const reply = normalizeTranscriptCoverageText(payload.reply);
+        if (reply.length < 32) continue;
+        const turnKey = eventTurnKey(evt, payload);
+        const match = assistantMessages.find(
+            (entry) =>
+                entry.content !== reply &&
+                entry.content.includes(reply) &&
+                (!turnKey || !entry.turnKey || entry.turnKey === turnKey),
+        );
+        if (match) {
+            return {
+                turnEndEventId: eventPublicId(evt),
+                assistantMessageEventId: match.eventId,
+                replyChars: reply.length,
+                contentChars: match.content.length,
+                turnKey: turnKey ?? match.turnKey ?? null,
+            };
+        }
+    }
+    return null;
 }
 
 function extractPlainTraceIds(plain) {
@@ -291,6 +364,7 @@ function evaluateOutput(plain, sseSummary, exportSummary) {
     const sseIds = summarizeSseEvents(sseSummary.events).ids;
     const archiveIds = archiveRawEvents.map((evt) => evt.eventId).filter((id) => Number.isFinite(id));
     const archiveSseOverlap = archiveIds.filter((id) => sseIds.includes(id));
+    const truncatedTurnEndDuplicate = findTruncatedTurnEndDuplicate([...sseSummary.events, ...archiveRawEvents]);
     const askRenderedByQuestionPending = /\[(?:QUESTION|ASK:[^\]]+)\]\s+LLM-B perguntou:\s*"ASK-CANONICAL: responda SIM para fechar o teste"/.test(
         preEventsPlain,
     );
@@ -395,13 +469,22 @@ function evaluateOutput(plain, sseSummary, exportSummary) {
         },
         {
             id: 'no-obvious-duplication',
-            pass: !duplicatePathologies.some((pattern) => pattern.test(plain)),
-            detail: 'no known duplicate/pathology markers detected',
+            pass: !duplicatePathologies.some((pattern) => pattern.test(plain)) && !truncatedTurnEndDuplicate,
+            detail: truncatedTurnEndDuplicate
+                ? `dialog.turn_end #${truncatedTurnEndDuplicate.turnEndEventId ?? '?'} repeated prefix of assistant.message #${truncatedTurnEndDuplicate.assistantMessageEventId ?? '?'}`
+                : 'no known duplicate/pathology markers detected',
         },
         {
             id: 'no-final-delta-duplication',
             pass: !(finalRenderedByLiveTurn && finalRenderedByAssistantMessage),
             detail: `final rendered live=${finalRenderedByLiveTurn ? 'yes' : 'no'} assistant.message=${finalRenderedByAssistantMessage ? 'yes' : 'no'}`,
+        },
+        {
+            id: 'no-truncated-turn-end-duplication',
+            pass: !truncatedTurnEndDuplicate,
+            detail: truncatedTurnEndDuplicate
+                ? `turn=${truncatedTurnEndDuplicate.turnKey ?? '-'} · dialog.turn_end #${truncatedTurnEndDuplicate.turnEndEventId ?? '?'} chars=${truncatedTurnEndDuplicate.replyChars} covered by assistant.message #${truncatedTurnEndDuplicate.assistantMessageEventId ?? '?'} chars=${truncatedTurnEndDuplicate.contentChars}`
+                : 'dialog.turn_end did not render/archive a truncated prefix already covered by assistant.message',
         },
         {
             id: 'no-parallel-task-delta-after-dialog',
@@ -521,7 +604,7 @@ function evaluateBlockedOutput(plain, sseSummary, blocker) {
             detail: 'terminal ran with an interactive REPL/TTY surface',
         },
         {
-            id: 'blocked-by-sdk-rate-limit',
+            id: `blocked-by-${blocker.id}`,
             pass: false,
             detail: blocker.detail,
         },
@@ -706,6 +789,7 @@ async function main() {
     let postAskContinuationObserved = false;
     let answerPlainOffset = 0;
     let postAnswerCommandTimer = null;
+    let timedOut = false;
     const command = canUsePty
         ? {
               cmd: 'script',
@@ -754,6 +838,7 @@ async function main() {
         }, Math.max(0, delayMs)).unref();
     };
     const timeout = setTimeout(() => {
+        timedOut = true;
         write('/quit');
         setTimeout(() => child.kill('SIGTERM'), 2_000).unref();
     }, Number.isFinite(timeoutMs) ? timeoutMs : DEFAULT_TIMEOUT_MS);
@@ -850,7 +935,9 @@ async function main() {
         raw: '',
         disabled: !collectSse,
     };
-    const blocker = noPr ? null : detectLiveBlocker(plain);
+    const blocker = noPr
+        ? null
+        : detectLiveBlocker(plain, { timedOut, answerSent, postAskContinuationObserved, postCommandsSent });
     const exportSummary = noPr || blocker ? null : await inspectExportedMarkdown(exportPath);
     const criteria = blocker
         ? evaluateBlockedOutput(plain, sseSummary, blocker)

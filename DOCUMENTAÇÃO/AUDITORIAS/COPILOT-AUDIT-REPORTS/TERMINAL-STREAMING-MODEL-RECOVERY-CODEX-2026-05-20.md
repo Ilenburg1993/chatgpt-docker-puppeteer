@@ -539,8 +539,57 @@ Status: implementado nesta rodada.
 Validação:
 
 - Typecheck strict PASS.
-- Unit Copilot PASS com 2925 testes.
+- Unit Copilot PASS com 2925 testes na rodada de descoberta; 2927 testes após a correção de prefixo truncado em `dialog.turn_end`.
 - Smoke seguro tentou descoberta Kilo somente se chave existir em `.env.local`/env; sem chave presente, ficou `skipped` sem segredo.
+
+### A29. `dialog.turn_end` podia renderizar prefixo truncado já coberto por `assistant.message`
+
+Evidência:
+
+- Live completo: `artifacts/terminal-live/2026-05-21T11-14-22-468Z/summary.md`.
+- Resultado geral do runner: PASS.
+- O mesmo artefato mostrou uma anomalia visual residual no PTY: `assistant.message` renderizou a resposta longa completa e, logo depois, `dialog.turn_end` abriu um bloco `Continuação da LLM-B` contendo apenas o prefixo truncado da mesma resposta.
+- O JSONL público confirma a causa: `assistant.message` trouxe o conteúdo completo em `eventId=181`, enquanto `dialog.turn_end` trouxe `reply` truncado em `eventId=191`.
+
+Diagnóstico:
+
+- O runner não classificou como duplicação porque seus critérios olhavam os marcadores finais e não a relação "prefixo truncado já coberto por transcript recente".
+- A reconciliação de materialização já suprimia conteúdo idêntico e alguns casos de delta, mas não cobria `entry.normalizedReply.includes(truncatedReply)`.
+- O renderer persistente mantinha apenas hashes exatos, então não conseguia reconhecer que um prefixo longo já estava coberto por uma mensagem completa recém-renderizada.
+
+Status: corrigido nesta revisão.
+
+Regra nova:
+
+- `dialog.turn_end` continua sendo evento público de auditoria/SSE.
+- Ele só pode abrir bloco visual se ainda não houver materialização ou transcript recente cobrindo o texto.
+- Prefixos truncados longos de uma mensagem já renderizada são reconciliados como "sem novo bloco visual".
+
+Validação:
+
+- Testes unitários adicionados em `test_turn_materialization_state.spec.js` e `test_assistant_transcript_renderer.spec.js`.
+- O live runner agora possui o critério `no-truncated-turn-end-duplication`, cruzando eventos SSE/JSONL de `assistant.message` e `dialog.turn_end`.
+- Rodada focada `npm run test:copilot:unit -- tests/unit/copilot/terminal/test_turn_materialization_state.spec.js tests/unit/copilot/terminal/test_assistant_transcript_renderer.spec.js` passou com 2927 testes totais.
+
+### A30. Live completo pode esgotar o orçamento antes da continuação pós-`ask_user`
+
+Evidência:
+
+- Live completo pós-A29: `artifacts/terminal-live/2026-05-21T11-26-10-340Z/summary.md`.
+- O terminal subiu, SSE conectou, `report_intent` e `read_file_content` rodaram, `ask_user` apareceu uma única vez e a resposta humana `SIM` foi registrada.
+- O modelo ficou mais de 190s sem saída pública incremental antes do `ask_user` e o runner atingiu o timeout antes da continuação `POST-ASK-CANONICAL-FINAL` e antes dos comandos diagnósticos `/events`, `/errors`, `/health` e `/export`.
+
+Diagnóstico:
+
+- Não houve evidência de duplicação, erro interno do terminal ou falha de `ask_user`.
+- O summary anterior classificava em cascata como falha de delta/export/SSE archive, embora a causa primária fosse "cenário incompleto por timeout".
+
+Status: mitigado no runner nesta revisão.
+
+Regra nova:
+
+- Quando o timeout do próprio runner dispara antes do fechamento do cenário, o resultado passa a ser blocker `live-timeout`, com detalhe sobre `ask`, `postAsk` e diagnósticos.
+- Isso não transforma cenário incompleto em PASS; apenas evita misturar latência/timeout do SDK/modelo com regressão falsa de UX downstream.
 
 ## Hipóteses Externas Rejeitadas Ou Reclassificadas
 
@@ -822,6 +871,9 @@ Fase I3. Microkernel de eventos públicos
 - I3.1 Extrair normalizador canônico de eventos públicos de assistant/user_input/tool antes do renderer. Status: pendente.
 - I3.2 Fazer terminal PTY, SSE HTTP, JSONL e export consumirem a mesma materialização. Status: parcialmente feito.
 - I3.3 Gerar relatório de divergência quando PTY/SSE/export discordarem. Status: pendente.
+- I3.4 Suprimir visualmente `dialog.turn_end` truncado quando `assistant.message` completo já cobriu o transcript. Status: feito nesta revisão.
+- I3.5 Expandir o live runner para detectar prefixo/sufixo duplicado entre `assistant.message`, `dialog.turn_end` e blocos persistentes do PTY. Status: feito para `assistant.message`/`dialog.turn_end`; parser estruturado de blocos PTY persistentes ainda pendente.
+- I3.6 Classificar timeout do cenário live como blocker de causa raiz, sem cascata falsa em critérios downstream. Status: feito nesta revisão.
 
 ### Faixa J. BYOK, Multi-Provider E LLMs Locais
 
@@ -966,6 +1018,8 @@ Implementado:
 - O live runner agora classifica rate limit do SDK como blocker de causa raiz, evitando falso diagnóstico em cascata.
 - `/usage now` e `/metrics` agora diferenciam snapshot histórico de PR de consumo atual do boot/probe.
 - `dialog.loop.changed` equivalente agora é deduplicado na borda terminal/SSE.
+- `dialog.turn_end` truncado agora é reconciliado contra materialização/transcript recente: se `assistant.message` completo já cobriu o texto, o evento segue em SSE/auditoria, mas não abre bloco `Continuação da LLM-B`.
+- O live runner agora falha explicitamente em `no-truncated-turn-end-duplication` quando `dialog.turn_end` repete prefixo longo de `assistant.message`.
 - `agent.error` recuperável de `model_call` não polui mais `/errors`; ele permanece auditável como evento público/atividade de retry.
 - `agent:task:error` deixou de gerar entrada sintética duplicada `event-bus` no `ErrorTracker`.
 - `task.error` de rate limit deixou de duplicar `session.error` em `/errors` e deixou de aparecer como "Tarefa interna falhou · 0 chunks" na timeline terminal.
@@ -986,6 +1040,8 @@ Implementado:
 - Live completo desta rodada ficou `BLOCKED` por rate limit em `artifacts/terminal-live/codex-continue-2026-05-20-full/summary.md`.
 - Live `--no-pr` desta rodada passou em `artifacts/terminal-live/codex-continue-2026-05-20-no-pr-rerun/summary.md`.
 - Live completo pós-correção passou em `artifacts/terminal-live/2026-05-21T10-22-43-042Z/summary.md`: deltas parciais, final, tool, `ask_user`, resposta humana, continuação pós-ask, `/events`, `/events --raw`, `/tools diag`, `/health`, `/errors` e export.
+- Live completo com BYOK/discovery já integrado passou em `artifacts/terminal-live/2026-05-21T11-14-22-468Z/summary.md`: deltas, tool, `ask_user`, resposta humana, `llm.usage`, `/events`, SSE HTTP e export. A inspeção manual desse artefato revelou o gap A29 de `dialog.turn_end` truncado, corrigido logo depois.
+- Live completo pós-A29 em `artifacts/terminal-live/2026-05-21T11-26-10-340Z/summary.md` validou boot, SSE, tool e `ask_user`, mas ficou incompleto por timeout antes da continuação pós-ask; o runner agora classifica esse caso como blocker `live-timeout`.
 - Smoke BYOK local sem rede validou `ollama-local`, normalização de `baseUrl` para `/v1`, modelo explícito e resumo sem segredo.
 - Testes BYOK desta rodada validaram Kilo Gateway como OpenAI-compatible, perfil ativo por `COPILOT_BYOK_PROFILE`, resumos redigidos e comandos `/byok profiles`, `/byok use` e `/byok model`.
 - Descoberta automática BYOK foi adicionada para providers OpenAI-compatible: endpoint explícito ou `<baseUrl>/models`, timeout, TTL cache, fonte visível em `/byok models` e fallback estático redigido.
@@ -994,15 +1050,17 @@ Implementado:
 - Testes unitários adicionados para recoverable `model_call` não poluir `/errors`, para `task.error` de rate limit não duplicar `session.error`, e para `agent:task:error` não criar erro sintético `event-bus`.
 - Testes unitários adicionados para `terminal.runtime.wired`, `terminal.runtime.wire_failed` e hints de investigação em `/events sources`.
 - Testes unitários adicionados para BYOK provider/env/redaction/model list e para `ClientOptionsBuilder` com `onListModels` e remoção de segredos do child env.
+- Testes unitários adicionados para suprimir prefixo truncado de `dialog.turn_end` quando transcript completo já foi materializado por `assistant.message`.
 
 Próxima rodada recomendada:
 
-1. Integrar BYOK em `/events sources`, sem duplicar o fluxo de sessão.
-2. Criar harness live sem turno para `/byok status`, `/byok profiles`, `/byok models refresh`, `/byok env`, `/byok use sdk` e smoke de boot com provider fake/local.
-3. Inserir as chaves reais apenas em `.env.local`/secret manager e rodar smoke real Kilo/Ollama Cloud/OpenAI-compatible, arquivando só metadados redigidos.
-4. Expandir o cenário live para elicitation quando a capability estiver disponível.
-5. Fechar a recuperação `session.error`/`reconnect_restart`, distinguindo retry real de reenvio ambíguo de prompt.
-6. Criar contrato único de modelo configurado/preferido/efetivo/cobrado, incluindo billing/effective model real em BYOK.
-7. Continuar a normalização de tool identity em completions/progress externos sem requestId, com métricas para qualquer lifecycle ainda genérico.
-8. Integrar falha de `wireRuntime()` ao `ErrorTracker` com metadados de fase.
-9. Expandir `/events sources` com filtros compostos por classe e evento. Hints básicos de `/events event=...` e `/events source=...` já foram feitos.
+1. Reexecutar live completo com orçamento maior ou cenário canônico menor para confirmar pós-A29 até `/export` sem bater `live-timeout`.
+2. Integrar BYOK em `/events sources`, sem duplicar o fluxo de sessão.
+3. Criar harness live sem turno para `/byok status`, `/byok profiles`, `/byok models refresh`, `/byok env`, `/byok use sdk` e smoke de boot com provider fake/local.
+4. Inserir as chaves reais apenas em `.env.local`/secret manager e rodar smoke real Kilo/Ollama Cloud/OpenAI-compatible, arquivando só metadados redigidos.
+5. Expandir o cenário live para elicitation quando a capability estiver disponível.
+6. Fechar a recuperação `session.error`/`reconnect_restart`, distinguindo retry real de reenvio ambíguo de prompt.
+7. Criar contrato único de modelo configurado/preferido/efetivo/cobrado, incluindo billing/effective model real em BYOK.
+8. Continuar a normalização de tool identity em completions/progress externos sem requestId, com métricas para qualquer lifecycle ainda genérico.
+9. Integrar falha de `wireRuntime()` ao `ErrorTracker` com metadados de fase.
+10. Expandir `/events sources` com filtros compostos por classe e evento. Hints básicos de `/events event=...` e `/events source=...` já foram feitos.

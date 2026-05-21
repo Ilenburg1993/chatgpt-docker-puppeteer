@@ -194,6 +194,25 @@ describe('terminal/state/turn-materialization-state', () => {
         ).toBe(false);
     });
 
+    it('suprime turn_end truncado quando a resposta final completa já foi materializada', () => {
+        clearTerminalTurnMaterialization();
+        beginTerminalTurnMaterialization({ turnId: 'done-full', timestamp: 1000 });
+        completeTerminalTurnMaterialization({
+            directReply:
+                'DELTA-CANONICAL-1: resposta completa já exibida no terminal. DELTA-CANONICAL-2: continuação final.',
+            directSource: 'sdk/assistant.message',
+            timestamp: 1001,
+        });
+
+        expect(
+            shouldSuppressTerminalAssistantMessageAsMaterializedTurn({
+                content: 'DELTA-CANONICAL-1: resposta completa já exibida no terminal.',
+                turnId: 'done-full',
+                now: 1002,
+            }),
+        ).toBe(true);
+    });
+
     it('preserva sufixo após fechamento de materialização pública parcial', () => {
         clearTerminalTurnMaterialization();
         beginTerminalTurnMaterialization({ turnId: 'done-prefix', timestamp: 1000, source: 'public-assistant-stream' });
