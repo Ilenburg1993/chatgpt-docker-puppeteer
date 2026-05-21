@@ -389,6 +389,13 @@ export async function initOrResumeSession(client, sessionOptions) {
         log('WARN', '[PersistentSession] Sessão retomada não passou no health-check — criando nova sessão.');
         result = await createWithConfigDiscoveryGuard(client, opts);
     }
+    if (byok.enabled && byok.provider) {
+        Reflect.set(result.session, '__copilotByokEnabled', true);
+        Reflect.set(result.session, '__copilotByokProvider', byok.provider);
+        if (byok.summary.profile) Reflect.set(result.session, '__copilotByokProfile', byok.summary.profile);
+        if (byok.summary.preset) Reflect.set(result.session, '__copilotByokPreset', byok.summary.preset);
+        if (byok.summary.providerType) Reflect.set(result.session, '__copilotByokProviderType', byok.summary.providerType);
+    }
 
     const requestedNativeAutoModel = model === 'auto';
     const persistedConcreteModel =

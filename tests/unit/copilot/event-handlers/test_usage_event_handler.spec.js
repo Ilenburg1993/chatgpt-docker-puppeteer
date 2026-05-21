@@ -105,6 +105,51 @@ describe('event-handlers/usage wireUsageEvent', () => {
         expect(mocks.log).toHaveBeenCalledWith('WARN', expect.stringContaining('[MODEL_MISMATCH]'));
     });
 
+    it('não contabiliza Premium Request para user.message em sessão BYOK', async () => {
+        const session = {
+            sessionId: 'sdk-byok',
+            model: 'kilo-auto/free',
+            config: {
+                model: 'kilo-auto/free',
+                provider: { type: 'openai', baseUrl: 'https://example.invalid/v1' },
+            },
+            __copilotEffectiveModel: 'kilo-auto/free',
+            __copilotByokEnabled: true,
+            __copilotByokProfile: 'kilo',
+            __copilotByokPreset: 'kilo-code',
+            __copilotByokProviderType: 'openai',
+        };
+        const { emit, handlers, onPrInfo } = await setupUsageHarness(session);
+
+        handlers.get('user.message')?.({ data: { content: 'turno BYOK' } });
+        handlers.get('assistant.usage')?.({
+            data: {
+                model: 'kilo-auto/free',
+                cost: 0,
+                inputTokens: 100,
+                outputTokens: 20,
+                initiator: 'user',
+            },
+        });
+
+        expect(onPrInfo).not.toHaveBeenCalled();
+        expect(emit).toHaveBeenCalledWith(
+            'llm.usage',
+            expect.objectContaining({
+                model: 'kilo-auto/free',
+                classification: 'byok_user_message',
+                premiumRequest: false,
+                premiumRequestReason: 'byok_user_message:initiator:user',
+                byokProvider: true,
+                byokProfile: 'kilo',
+                byokPreset: 'kilo-code',
+                byokProviderType: 'openai',
+            }),
+        );
+        expect(emit).not.toHaveBeenCalledWith('pr.consumed', expect.any(Object));
+        expect(mocks.log).toHaveBeenCalledWith('DEBUG', expect.stringContaining('Telemetria LLM sem Premium Request'));
+    });
+
     it('não contabiliza PR para continuação de ask_user', async () => {
         const session = {
             sessionId: 'sdk-456',

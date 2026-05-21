@@ -693,6 +693,29 @@ Correção:
 
 Status: implementado nesta revisão.
 
+### A36. Usage BYOK ainda podia ser classificado como Premium Request
+
+Achado:
+
+- Após a correção do prompt ativo em BYOK, o live real completo passou, mas expôs uma ambiguidade residual de billing: a primeira telemetria `assistant.usage` de um turno BYOK acionado pelo usuário ainda podia aparecer como `[PR]` e ser classificada como `premium_request`.
+- A causa era o classificador central de usage: qualquer `assistant.usage` imediatamente posterior a `user.message`, com `initiator=user`, era tratado como Premium Request, independentemente do provider ativo.
+- Isso conflita com a regra operacional deste roadmap: BYOK usa provider customizado do operador e não deve ser narrado como consumo de Premium Request Copilot. `assistant.usage` em BYOK é telemetria LLM do provider, não prova de PR.
+
+Correção:
+
+- Sessões inicializadas com BYOK agora recebem projeção segura de provider em runtime: `__copilotByokEnabled`, provider redigido, perfil, preset e tipo.
+- `normalizeAssistantUsageEvent()` propaga apenas metadados seguros (`byokProvider`, `byokProfile`, `byokPreset`, `byokProviderType`) para a telemetria.
+- `createAssistantUsageClassifier()` ganhou a classificação `byok_user_message`, que consome o marcador pendente de mensagem humana sem emitir `pr.consumed` e sem atualizar `lastPrInfo`.
+- O terminal passa a renderizar a telemetria como `[LLM] ... classe=byok_user_message`, mantendo `premiumRequest=false`.
+
+Validação:
+
+- Unit test cobre `user.message` seguido de `assistant.usage` em sessão BYOK e garante ausência de `pr.consumed`.
+- Live real completo pós-correção: `artifacts/terminal-live/2026-05-21T12-40-35-670Z/summary.md`.
+- Evidência do live: deltas parciais, bloco final, tools, `ask_user`, resposta humana, continuação pós-ask, alternância Kilo/Ollama Cloud, SSE/JSONL/export e ausência de duplicação seguiram PASS; a primeira usage BYOK apareceu como `classification=byok_user_message`, `premiumRequest=false`.
+
+Status: implementado nesta revisão.
+
 ## Hipóteses Externas Rejeitadas Ou Reclassificadas
 
 ### H1. "boot-hub assume sucesso"
@@ -796,9 +819,10 @@ Fase B2. Modelo
 Fase B3. Usage versus Premium Request
 
 - B3.1 Renomear mensagens ambíguas de "uso contabilizado". Status: feito para UX principal do terminal.
-- B3.2 Criar classificador `sdkUsage`, `tokenUsage`, `billingUsage`, `premiumRequest`. Status: iniciado com separação entre snapshot histórico, telemetria LLM e PR atual.
+- B3.2 Criar classificador `sdkUsage`, `tokenUsage`, `billingUsage`, `premiumRequest`. Status: ampliado; o classificador distingue snapshot histórico, telemetria LLM, PR atual, continuação de `ask_user` e mensagem humana BYOK.
 - B3.3 Mostrar "PR desconhecida" quando não houver prova. Status: parcialmente feito; snapshots históricos agora são rotulados como históricos.
-- B3.4 Provar que `ask_user` não é PR no relatório live. Status: pendente.
+- B3.4 Provar que `ask_user` não é PR no relatório live. Status: feito nos lives BYOK reais, incluindo `artifacts/terminal-live/2026-05-21T12-40-35-670Z/summary.md`.
+- B3.5 Provar que `assistant.usage` de mensagem humana BYOK não vira PR Copilot. Status: feito nesta revisão, com unit test e live real.
 
 ### Faixa C. Streaming, Transcript E Arquivo Durável
 
@@ -1019,6 +1043,7 @@ Fase J4. Sessão e lifecycle
 - J4.4 Bloquear BYOK incompleto com erro acionável antes de criar sessão. Status: feito nesta revisão.
 - J4.5 Suportar troca runtime de provider sem restart completo. Status: pendente; requer política de rotação de sessão e não deve criar loop paralelo.
 - J4.6 Diferenciar troca efêmera de processo e persistência em `.env.local`. Status: feito; `/byok use|model|provider` são efêmeros e `/byok persist ...` grava seletores não secretos.
+- J4.7 Marcar sessões BYOK com metadados seguros para usage/telemetria sem expor provider ou segredo bruto. Status: feito nesta revisão.
 
 Fase J5. UX e comandos
 
@@ -1038,6 +1063,7 @@ Fase J5. UX e comandos
 - J5.14 Mostrar fonte do catálogo (`provider`, `provider-cache`, `static`, `static-fallback`) no terminal. Status: feito nesta revisão.
 - J5.15 Integrar BYOK em `/events sources` como fonte pública de provider/config sem fanout paralelo. Status: feito nesta revisão.
 - J5.16 Impedir que `lastPrInfo` histórico sobrescreva o modelo ativo no prompt e na linha de espera. Status: feito nesta revisão; live sem PR confirmou `kilo-auto/free` no prompt.
+- J5.17 Mostrar usage BYOK como telemetria LLM, não Premium Request. Status: feito nesta revisão; live real confirmou `[LLM] ... classe=byok_user_message`.
 
 Fase J6. Testes
 
@@ -1053,6 +1079,7 @@ Fase J6. Testes
 - J6.10 Rodar live BYOK sem turno explícito para status/env/profiles/models/use-sdk/events/errors. Status: PASS em `artifacts/terminal-live/2026-05-21T11-33-14-457Z/summary.md`.
 - J6.11 Rodar live BYOK com fixture efêmero para entrada em perfil, descoberta automática via `/v1/models`, troca de modelo dentro do perfil, troca para provider direto e retorno ao SDK na mesma sessão. Status: PASS em `artifacts/terminal-live/2026-05-21T11-50-03-576Z/summary.md`.
 - J6.12 Garantir que `COPILOT_BYOK_MODEL` possa sobrescrever apenas o modelo de um `COPILOT_BYOK_PROFILE` ativo, preservando provider/credenciais/capabilities do perfil. Status: feito nesta revisão, com unit test e live fixture PASS.
+- J6.13 Rodar live BYOK real com Kilo e Ollama Cloud validando prompt ativo, delta parcial, tool, `ask_user`, resposta humana, pós-ask, SSE/JSONL/export, ausência de duplicação e usage sem PR. Status: PASS em `artifacts/terminal-live/2026-05-21T12-40-35-670Z/summary.md`.
 
 Fase J7. Providers amplos
 
@@ -1139,6 +1166,8 @@ Implementado:
 - `/events sources` classifica os eventos de fiação do runtime em `terminal.lifecycle`.
 - `/events sources` agora imprime comandos de investigação por política (`/events event=... 50` e `/events source=... 50`), reduzindo atrito para rastrear duplicações.
 - O prompt vivo e o waiting prompt agora usam o modelo ativo do runtime (`state.model`) como identidade canônica; `lastPrInfo` histórico não sobrescreve mais BYOK/modelo atual.
+- Sessões BYOK agora carregam metadados seguros de provider/perfil/preset no runtime para que a telemetria não dependa de inferência frágil.
+- `assistant.usage` de mensagem humana em BYOK passou a ser classificado como `byok_user_message`, com `premiumRequest=false` e sem emissão de `pr.consumed`.
 - Testes unitários adicionados para runtime root, reflection sync failure e SIGHUP policy.
 - Testes unitários adicionados para reconciliação de `assistant.message` materializado, supressão visual de `question.pending` e preferência `dialog.delta`.
 - Testes unitários adicionados para normalização de objetos de erro sem `message`.
@@ -1159,6 +1188,7 @@ Implementado:
 - Live BYOK real sem PR passou em `artifacts/terminal-live/2026-05-21T12-02-58-405Z/summary.md`: `.env.local` recarregado, perfil Kilo ativo, catálogo Kilo remoto disponível, perfil alternativo Ollama Cloud exercitado, `/events`, `/events --raw`, `/metrics`, `/errors`, sem turno explícito e sem vazamento de segredos.
 - Live BYOK real completo passou em `artifacts/terminal-live/2026-05-21T12-12-19-528Z/summary.md`: Kilo `kilo-auto/free`, troca de modelo dentro do Kilo, alternância para Ollama Cloud, deltas parciais, bloco final, tool, `ask_user`, resposta humana, continuação pós-ask, telemetry sem Premium Request, SSE/JSONL/export e ausência de duplicação.
 - Live sem PR pós-correção do prompt passou em `artifacts/terminal-live/2026-05-21T12-34-44-644Z/summary.md`: BYOK persistido entrou no boot, auto-brief ready mostrou `kilo-auto/free`, prompt exibiu `você[kilo-auto…/high]›`, `/usage` manteve telemetria PR histórica separada e `/errors` ficou limpo.
+- Live BYOK real pós-correção de usage passou em `artifacts/terminal-live/2026-05-21T12-40-35-670Z/summary.md`: Kilo/Ollama Cloud, deltas, tools, `ask_user`, pós-ask, prompt ativo e arquivo durável seguiram íntegros, e a usage do turno BYOK foi renderizada como `byok_user_message` sem Premium Request.
 - Live BYOK real com `kilo-auto/balanced` ficou `BLOCKED` por `byok-provider-credits` em `artifacts/terminal-live/2026-05-21T12-03-39-776Z/summary.md`; o runner agora classifica esse caso como falha externa de créditos/modelo, não como bug do terminal.
 - Smoke BYOK local sem rede validou `ollama-local`, normalização de `baseUrl` para `/v1`, modelo explícito e resumo sem segredo.
 - Testes BYOK desta rodada validaram Kilo Gateway como OpenAI-compatible, perfil ativo por `COPILOT_BYOK_PROFILE`, resumos redigidos e comandos `/byok profiles`, `/byok use` e `/byok model`.

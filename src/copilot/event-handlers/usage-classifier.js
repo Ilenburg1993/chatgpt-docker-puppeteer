@@ -14,6 +14,7 @@ import { resolveModelSelectionMismatch } from '#copilot/core';
 
 export const LLM_USAGE_CLASSIFICATIONS = Object.freeze({
     PREMIUM_REQUEST: 'premium_request',
+    BYOK_USER_MESSAGE: 'byok_user_message',
     ASK_USER_CONTINUATION: 'ask_user_continuation',
     TOOL_ORIGINATED: 'tool_originated',
     NON_USER_INITIATED: 'non_user_initiated',
@@ -51,6 +52,10 @@ function asRecord(value) {
  * @returns {{
  *     configuredModel?: string;
  *     effectiveModel?: string;
+ *     byokProvider?: boolean;
+ *     byokProfile?: string;
+ *     byokPreset?: string;
+ *     byokProviderType?: string;
  *     sessionId: string | null;
  * }}
  */
@@ -62,6 +67,11 @@ export function readUsageSessionProjection(session) {
      *     sessionId?: unknown;
      *     __copilotConfiguredModel?: unknown;
      *     __copilotEffectiveModel?: unknown;
+     *     __copilotByokEnabled?: unknown;
+     *     __copilotByokProfile?: unknown;
+     *     __copilotByokPreset?: unknown;
+     *     __copilotByokProviderType?: unknown;
+     *     __copilotByokProvider?: unknown;
      * }}
      */ (session);
     const configuredModel =
@@ -69,9 +79,22 @@ export function readUsageSessionProjection(session) {
         asString(sessionRecord.config?.model) ??
         asString(sessionRecord.__copilotConfiguredModel);
     const effectiveModel = asString(sessionRecord.__copilotEffectiveModel);
+    const configRecord = asRecord(sessionRecord.config);
+    const byokProvider = Boolean(
+        sessionRecord.__copilotByokEnabled === true ||
+            asRecord(sessionRecord.__copilotByokProvider) ||
+            asRecord(configRecord?.['provider']),
+    );
+    const byokProfile = asString(sessionRecord.__copilotByokProfile);
+    const byokPreset = asString(sessionRecord.__copilotByokPreset);
+    const byokProviderType = asString(sessionRecord.__copilotByokProviderType);
     return {
         ...(configuredModel ? { configuredModel } : {}),
         ...(effectiveModel ? { effectiveModel } : {}),
+        ...(byokProvider ? { byokProvider } : {}),
+        ...(byokProfile ? { byokProfile } : {}),
+        ...(byokPreset ? { byokPreset } : {}),
+        ...(byokProviderType ? { byokProviderType } : {}),
         sessionId: asString(sessionRecord.sessionId) ?? null,
     };
 }
@@ -116,6 +139,10 @@ export function normalizeAssistantUsageEvent(evt, session) {
         ...(asString(data['providerCallId']) ? { providerCallId: asString(data['providerCallId']) } : {}),
         ...(asString(data['parentToolCallId']) ? { parentToolCallId: asString(data['parentToolCallId']) } : {}),
         ...(asRecord(data['copilotUsage']) ? { copilotUsage: asRecord(data['copilotUsage']) } : {}),
+        ...(sessionProjection.byokProvider ? { byokProvider: true } : {}),
+        ...(sessionProjection.byokProfile ? { byokProfile: sessionProjection.byokProfile } : {}),
+        ...(sessionProjection.byokPreset ? { byokPreset: sessionProjection.byokPreset } : {}),
+        ...(sessionProjection.byokProviderType ? { byokProviderType: sessionProjection.byokProviderType } : {}),
     };
 }
 
@@ -177,6 +204,17 @@ export function createAssistantUsageClassifier() {
             }
             if (pendingUserMessages > 0 && (!initiator || initiator === 'user')) {
                 pendingUserMessages -= 1;
+                if (usage['byokProvider'] === true) {
+                    return {
+                        classification: LLM_USAGE_CLASSIFICATIONS.BYOK_USER_MESSAGE,
+                        premiumRequest: false,
+                        premiumRequestReason:
+                            initiator === 'user' ? 'byok_user_message:initiator:user' : 'byok_user_message',
+                        pendingUserMessages,
+                        pendingAskUserContinuations,
+                        pendingUserInputRequests: pendingUserInputRequests.size,
+                    };
+                }
                 return {
                     classification: LLM_USAGE_CLASSIFICATIONS.PREMIUM_REQUEST,
                     premiumRequest: true,
