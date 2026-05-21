@@ -152,6 +152,7 @@ export {
     anthropicProvider,
     azureProvider,
     buildConfiguredByokModelListHandler,
+    discoverConfiguredByokModelsFromEnv,
     isValidProviderType,
     openaiProvider,
     readConfiguredByokModelsFromEnv,

@@ -10,6 +10,7 @@
 
 import { config as loadDotenv } from 'dotenv';
 
+import { discoverConfiguredByokModelsFromEnv } from '#copilot/config';
 import { readTerminalByokProjection } from '../frontend/index.js';
 
 /**
@@ -64,7 +65,7 @@ function renderStatus(projection, println) {
         println(`  \x1b[31m  erro: ${error}\x1b[0m`);
     }
     println('  \x1b[90mArquivo unico de BYOK: .env.local. Mudancas via comando valem para o processo atual; use /restart para nova sessao SDK.\x1b[0m');
-    println('  \x1b[90mUso: /byok | /byok reload | /byok profiles | /byok use <perfil|sdk> | /byok model <id> | /byok provider <preset> [model] [baseUrl] | /byok env\x1b[0m\n');
+    println('  \x1b[90mUso: /byok | /byok reload | /byok profiles | /byok models [refresh] | /byok use <perfil|sdk> | /byok model <id> | /byok provider <preset> [model] [baseUrl] | /byok env\x1b[0m\n');
 }
 
 /**
@@ -99,7 +100,7 @@ export async function cmdByok({ println }, arg) {
     }
 
     if (sub === 'reload') {
-        const result = loadDotenv({ path: '.env.local', override: true });
+        const result = loadDotenv({ path: '.env.local', override: true, quiet: true });
         if (result.error) {
             println(`  \x1b[31mNão foi possível recarregar .env.local: ${result.error.message}\x1b[0m\n`);
             return;
@@ -135,12 +136,27 @@ export async function cmdByok({ println }, arg) {
     }
 
     if (sub === 'models') {
-        println(`\n  \x1b[36mBYOK models\x1b[0m (${models.length})\n`);
-        if (models.length === 0) {
+        const forceRefresh = rest.some((item) => ['refresh', 'force', '--refresh', '--force'].includes(item.toLowerCase()));
+        const discovered = await discoverConfiguredByokModelsFromEnv(process.env, { forceRefresh });
+        const modelList = discovered.models.length > 0 ? discovered.models : models;
+        const sourceLabel =
+            discovered.source === 'remote'
+                ? 'provider'
+                : discovered.source === 'remote-cache'
+                  ? 'provider-cache'
+                  : discovered.source === 'static-fallback'
+                    ? 'static-fallback'
+                    : 'static';
+        println(`\n  \x1b[36mBYOK models\x1b[0m (${modelList.length})`);
+        println(`  \x1b[90mfonte=${sourceLabel}${discovered.endpoint ? ` · endpoint=${discovered.endpoint}` : ''}\x1b[0m\n`);
+        if (discovered.error) {
+            println(`  \x1b[33m  aviso: descoberta remota indisponível (${discovered.error}); usando catálogo estático.\x1b[0m`);
+        }
+        if (modelList.length === 0) {
             println('    \x1b[33mNenhum modelo BYOK configurado. Defina COPILOT_BYOK_MODEL ou COPILOT_BYOK_MODELS.\x1b[0m\n');
             return;
         }
-        for (const model of models) {
+        for (const model of modelList) {
             const reasoning = model.capabilities?.supports?.reasoningEffort ? 'reasoning' : 'no-reasoning';
             const vision = model.capabilities?.supports?.vision ? 'vision' : 'no-vision';
             const ctxTokens = model.capabilities?.limits?.max_context_window_tokens ?? 'n/a';

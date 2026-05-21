@@ -23,6 +23,7 @@ export {
     buildCopilotClientOptionsFromEnv,
     buildConfiguredByokModelListHandler,
     customizeSystemMessage,
+    discoverConfiguredByokModelsFromEnv,
     getSectionDescription,
     getSectionNames,
     readConfiguredByokModelsFromEnv,

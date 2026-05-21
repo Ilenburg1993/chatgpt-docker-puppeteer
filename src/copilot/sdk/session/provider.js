@@ -61,6 +61,19 @@ import { log } from '../logger.js';
  * @property {string[]} errors
  */
 
+/**
+ * @typedef {'static' | 'remote' | 'remote-cache' | 'static-fallback'} ByokModelDiscoverySource
+ */
+
+/**
+ * @typedef {object} ByokModelDiscoveryResult
+ * @property {import('../types.js').ModelInfo[]} models
+ * @property {ByokModelDiscoverySource} source
+ * @property {string | null} endpoint
+ * @property {boolean} fromCache
+ * @property {string | null} error
+ */
+
 /** @type {readonly string[]} */
 export const BYOK_ENV_KEYS = Object.freeze([
     'COPILOT_BYOK_ENABLED',
@@ -77,6 +90,10 @@ export const BYOK_ENV_KEYS = Object.freeze([
     'COPILOT_BYOK_MODEL',
     'COPILOT_BYOK_MODELS',
     'COPILOT_BYOK_MODELS_JSON',
+    'COPILOT_BYOK_MODELS_ENDPOINT',
+    'COPILOT_BYOK_MODEL_DISCOVERY_ENABLED',
+    'COPILOT_BYOK_MODEL_DISCOVERY_TIMEOUT_MS',
+    'COPILOT_BYOK_MODEL_DISCOVERY_TTL_MS',
     'COPILOT_BYOK_CONTEXT_WINDOW_TOKENS',
     'COPILOT_BYOK_SUPPORTS_REASONING',
     'COPILOT_BYOK_SUPPORTS_VISION',
@@ -99,6 +116,9 @@ export const BYOK_ENV_KEYS = Object.freeze([
     'KILO_MODEL',
     'KILO_DEFAULT_MODEL',
 ]);
+
+/** @type {Map<string, { expiresAt: number; models: import('../types.js').ModelInfo[] }>} */
+const BYOK_MODEL_DISCOVERY_CACHE = new Map();
 
 /** @type {readonly string[]} */
 export const BYOK_SECRET_ENV_KEYS = Object.freeze([
@@ -352,6 +372,21 @@ function applyProfileToEnv(profile, env) {
     const azureApiVersion = firstProfileString(profile, 'azureApiVersion', ['apiVersion', 'COPILOT_BYOK_AZURE_API_VERSION']);
     const model = firstProfileString(profile, 'model', ['modelId', 'id', 'COPILOT_BYOK_MODEL']);
     const models = firstProfileString(profile, 'models', ['COPILOT_BYOK_MODELS']);
+    const modelsEndpoint = firstProfileString(profile, 'modelsEndpoint', [
+        'modelEndpoint',
+        'modelsUrl',
+        'modelsURL',
+        'COPILOT_BYOK_MODELS_ENDPOINT',
+    ]);
+    const modelDiscoveryEnabled = optionalBooleanString(
+        profile['modelDiscoveryEnabled'] ?? profile['discoverModels'] ?? profile['COPILOT_BYOK_MODEL_DISCOVERY_ENABLED'],
+    );
+    const modelDiscoveryTimeoutMs = optionalNumberString(
+        profile['modelDiscoveryTimeoutMs'] ?? profile['COPILOT_BYOK_MODEL_DISCOVERY_TIMEOUT_MS'],
+    );
+    const modelDiscoveryTtlMs = optionalNumberString(
+        profile['modelDiscoveryTtlMs'] ?? profile['COPILOT_BYOK_MODEL_DISCOVERY_TTL_MS'],
+    );
     const modelsJson = profile['modelsJson'] ?? profile['modelsJSON'] ?? profile['COPILOT_BYOK_MODELS_JSON'];
     const contextWindowTokens = optionalNumberString(
         profile['contextWindowTokens'] ?? profile['contextWindow'] ?? profile['COPILOT_BYOK_CONTEXT_WINDOW_TOKENS'],
@@ -379,6 +414,10 @@ function applyProfileToEnv(profile, env) {
     if (azureApiVersion) next['COPILOT_BYOK_AZURE_API_VERSION'] = azureApiVersion;
     if (model) next['COPILOT_BYOK_MODEL'] = model;
     if (models) next['COPILOT_BYOK_MODELS'] = models;
+    if (modelsEndpoint) next['COPILOT_BYOK_MODELS_ENDPOINT'] = modelsEndpoint;
+    if (modelDiscoveryEnabled) next['COPILOT_BYOK_MODEL_DISCOVERY_ENABLED'] = modelDiscoveryEnabled;
+    if (modelDiscoveryTimeoutMs) next['COPILOT_BYOK_MODEL_DISCOVERY_TIMEOUT_MS'] = modelDiscoveryTimeoutMs;
+    if (modelDiscoveryTtlMs) next['COPILOT_BYOK_MODEL_DISCOVERY_TTL_MS'] = modelDiscoveryTtlMs;
     if (Array.isArray(modelsJson) || (modelsJson && typeof modelsJson === 'object')) {
         next['COPILOT_BYOK_MODELS_JSON'] = JSON.stringify(modelsJson);
     } else if (typeof modelsJson === 'string' && modelsJson.trim()) {
@@ -617,6 +656,112 @@ function errorMessage(error) {
 }
 
 /**
+ * @param {unknown} value
+ * @returns {string | undefined}
+ */
+function modelIdFromUnknown(value) {
+    if (typeof value === 'string') return value.trim() || undefined;
+    if (!value || typeof value !== 'object') return undefined;
+    const item = /** @type {Record<string, unknown>} */ (value);
+    for (const key of ['id', 'name', 'model']) {
+        const id = optionalString(item[key]);
+        if (id) return id;
+    }
+    return undefined;
+}
+
+/**
+ * @param {string} id
+ * @param {{ contextWindowTokens: number; supportsReasoning: boolean; supportsVision: boolean }} caps
+ * @returns {import('../types.js').ModelInfo}
+ */
+function createByokModelInfo(id, caps) {
+    return {
+        id,
+        name: id,
+        capabilities: {
+            supports: { vision: caps.supportsVision, reasoningEffort: caps.supportsReasoning },
+            limits: { max_context_window_tokens: caps.contextWindowTokens },
+        },
+        policy: { state: 'enabled', terms: '' },
+        billing: { multiplier: 0 },
+    };
+}
+
+/**
+ * @param {unknown} payload
+ * @param {{ contextWindowTokens: number; supportsReasoning: boolean; supportsVision: boolean }} caps
+ * @returns {import('../types.js').ModelInfo[]}
+ */
+function normalizeDiscoveredModels(payload, caps) {
+    const root = asPlainObject(payload);
+    const rawItems = Array.isArray(payload)
+        ? payload
+        : Array.isArray(root['data'])
+          ? root['data']
+          : Array.isArray(root['models'])
+            ? root['models']
+            : [];
+    const seen = new Set();
+    /** @type {import('../types.js').ModelInfo[]} */
+    const models = [];
+    for (const item of rawItems) {
+        const id = modelIdFromUnknown(item);
+        if (!id || seen.has(id)) continue;
+        seen.add(id);
+        models.push(createByokModelInfo(id, caps));
+    }
+    return models;
+}
+
+/**
+ * @param {ProviderConfig} provider
+ * @param {Record<string, string | undefined>} env
+ * @returns {string}
+ */
+function resolveByokModelsEndpoint(provider, env) {
+    const explicit = firstEnv(env, ['COPILOT_BYOK_MODELS_ENDPOINT']);
+    if (explicit) {
+        try {
+            return new URL(explicit).toString();
+        } catch {
+            const path = explicit.startsWith('/') ? explicit.slice(1) : explicit;
+            return new URL(path, `${provider.baseUrl.replace(/\/+$/u, '')}/`).toString();
+        }
+    }
+    return new URL('models', `${provider.baseUrl.replace(/\/+$/u, '')}/`).toString();
+}
+
+/**
+ * @param {ProviderConfig} provider
+ * @returns {Record<string, string>}
+ */
+function createByokModelDiscoveryHeaders(provider) {
+    const headers = { ...(provider.headers ?? {}) };
+    if (provider.bearerToken && headers['Authorization'] === undefined && headers['authorization'] === undefined) {
+        headers['Authorization'] = `Bearer ${provider.bearerToken}`;
+    } else if (provider.apiKey) {
+        if (provider.type === PROVIDER_TYPES.AZURE && headers['api-key'] === undefined && headers['Api-Key'] === undefined) {
+            headers['api-key'] = provider.apiKey;
+        } else if (headers['Authorization'] === undefined && headers['authorization'] === undefined) {
+            headers['Authorization'] = `Bearer ${provider.apiKey}`;
+        }
+    }
+    return headers;
+}
+
+/**
+ * @param {string} endpoint
+ * @param {ProviderConfig} provider
+ * @returns {string}
+ */
+function byokDiscoveryCacheKey(endpoint, provider) {
+    const headerKeys = Object.keys(provider.headers ?? {}).sort().join(',');
+    const authMode = provider.bearerToken ? 'bearer' : provider.apiKey ? 'apiKey' : 'none';
+    return `${provider.type ?? PROVIDER_TYPES.OPENAI}|${endpoint}|${authMode}|${headerKeys}`;
+}
+
+/**
  * @param {ProviderConfig | null} provider
  * @returns {ProviderConfig | null}
  */
@@ -800,32 +945,85 @@ export function readConfiguredByokModelsFromEnv(env = process.env, fallback = {}
     ids = ids.length > 0 ? ids : parseCsv(effectiveEnv['COPILOT_BYOK_MODELS']);
     if (ids.length === 0 && fallback.model) ids = [fallback.model];
 
-    return ids.map((id) => ({
-        id,
-        name: id,
-        capabilities: {
-            supports: { vision: supportsVision, reasoningEffort: supportsReasoning },
-            limits: { max_context_window_tokens: contextWindowTokens },
-        },
-        policy: { state: 'enabled', terms: '' },
-        billing: { multiplier: 0 },
-    }));
+    return ids.map((id) => createByokModelInfo(id, { contextWindowTokens, supportsReasoning, supportsVision }));
 }
 
 /**
  * @param {Record<string, string | undefined>} [env]
- * @returns {(() => import('../types.js').ModelInfo[]) | undefined}
+ * @param {{ forceRefresh?: boolean }} [options]
+ * @returns {Promise<ByokModelDiscoveryResult>}
  */
-export function buildConfiguredByokModelListHandler(env = process.env) {
+export async function discoverConfiguredByokModelsFromEnv(env = process.env, options = {}) {
     const state = readConfiguredByokState(env);
-    if (!state.enabled) return undefined;
-    return () =>
-        readConfiguredByokModelsFromEnv(env, {
-            model: state.model,
+    const staticModels = readConfiguredByokModelsFromEnv(env, {
+        model: state.model,
+        contextWindowTokens: state.summary.capabilities.contextWindowTokens,
+        supportsReasoning: state.summary.capabilities.reasoningEffort,
+        supportsVision: state.summary.capabilities.vision,
+    });
+    if (!state.enabled || !state.ready || !state.provider) {
+        return { models: staticModels, source: 'static', endpoint: null, fromCache: false, error: null };
+    }
+
+    const effectiveEnv = resolveProfileEnv(env).env;
+    const discoveryEnabled = parseBoolean(effectiveEnv['COPILOT_BYOK_MODEL_DISCOVERY_ENABLED']) ?? true;
+    if (!discoveryEnabled) {
+        return { models: staticModels, source: 'static', endpoint: null, fromCache: false, error: null };
+    }
+    if (state.provider.type !== PROVIDER_TYPES.OPENAI) {
+        return { models: staticModels, source: 'static', endpoint: null, fromCache: false, error: null };
+    }
+
+    const endpoint = resolveByokModelsEndpoint(state.provider, effectiveEnv);
+    const ttlMs = parsePositiveInteger(effectiveEnv['COPILOT_BYOK_MODEL_DISCOVERY_TTL_MS'], 300_000);
+    const timeoutMs = parsePositiveInteger(effectiveEnv['COPILOT_BYOK_MODEL_DISCOVERY_TIMEOUT_MS'], 7_000);
+    const cacheKey = byokDiscoveryCacheKey(endpoint, state.provider);
+    const now = Date.now();
+    const cached = BYOK_MODEL_DISCOVERY_CACHE.get(cacheKey);
+    if (!options.forceRefresh && cached && cached.expiresAt > now) {
+        return { models: cached.models, source: 'remote-cache', endpoint, fromCache: true, error: null };
+    }
+
+    try {
+        const signal = AbortSignal.timeout(timeoutMs);
+        const response = await fetch(endpoint, {
+            method: 'GET',
+            headers: createByokModelDiscoveryHeaders(state.provider),
+            signal,
+        });
+        if (!response.ok) {
+            throw new Error(`model discovery failed: HTTP ${response.status}`);
+        }
+        const payload = await response.json();
+        const models = normalizeDiscoveredModels(payload, {
             contextWindowTokens: state.summary.capabilities.contextWindowTokens,
             supportsReasoning: state.summary.capabilities.reasoningEffort,
             supportsVision: state.summary.capabilities.vision,
         });
+        if (models.length === 0) {
+            throw new Error('model discovery returned no usable model ids');
+        }
+        BYOK_MODEL_DISCOVERY_CACHE.set(cacheKey, { expiresAt: now + ttlMs, models });
+        return { models, source: 'remote', endpoint, fromCache: false, error: null };
+    } catch (error) {
+        return {
+            models: staticModels,
+            source: 'static-fallback',
+            endpoint,
+            fromCache: false,
+            error: errorMessage(error),
+        };
+    }
+}
+
+/**
+ * @param {Record<string, string | undefined>} [env]
+ * @returns {(() => Promise<import('../types.js').ModelInfo[]>) | undefined}
+ */
+export function buildConfiguredByokModelListHandler(env = process.env) {
+    const state = readConfiguredByokState(env);
+    if (!state.enabled) return undefined;
+    return async () => (await discoverConfiguredByokModelsFromEnv(env)).models;
 }
 
 /**

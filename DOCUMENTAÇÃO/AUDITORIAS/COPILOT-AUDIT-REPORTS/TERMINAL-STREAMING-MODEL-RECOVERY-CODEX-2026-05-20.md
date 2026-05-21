@@ -440,9 +440,9 @@ Entregas:
 - Perfis declarativos via `COPILOT_BYOK_PROFILES_JSON` e seleção por `COPILOT_BYOK_PROFILE`.
 - Presets `kilo-code`, `kilo-gateway` e `kilo` resolvem Kilo Gateway como OpenAI-compatible com Bearer token.
 - Redaction canônica de provider.
-- `onListModels` customizado quando BYOK está ativo.
+- `onListModels` customizado quando BYOK está ativo, com descoberta automática de modelos e fallback estático.
 - Sessões do agente recebem `provider`, modelo explícito e `modelCapabilities`.
-- `/byok` mostra status, modelos, perfis, recarga de `.env.local` e troca efêmera de SDK/perfil/modelo/provider sem expor segredos.
+- `/byok` mostra status, modelos descobertos, perfis, recarga de `.env.local` e troca efêmera de SDK/perfil/modelo/provider sem expor segredos.
 - Templates e schema receberam knobs BYOK.
 
 Falta:
@@ -451,6 +451,7 @@ Falta:
 - Provar Kilo Gateway, Ollama Cloud e pelo menos um provider OpenAI-compatible local/remoto, sem registrar chaves.
 - Suíte determinística fake para BYOK sem rede.
 - Persistência opcional da escolha de perfil via comando seguro, caso o operador queira gravar alteração no `.env.local` em vez de apenas no processo atual.
+- Harness live específico de BYOK que rode `/byok profiles`, `/byok models refresh`, `/byok use`, `/byok model`, `/byok use sdk` e confirme que o fluxo canônico de sessão permanece único.
 
 Validação local:
 
@@ -459,6 +460,7 @@ Validação local:
 - `test:copilot:unit`: 2920 testes PASS.
 - Smoke sem rede confirmou preset `ollama-local`, normalização `/v1`, modelo explícito e ausência de segredo.
 - Testes unitários confirmaram preset Kilo Gateway, perfil ativo, resumo sem segredo e comandos `/byok profiles`, `/byok use`, `/byok model`.
+- Testes unitários confirmaram descoberta remota OpenAI-compatible, cache, timeout/fallback e renderização de modelos descobertos em `/byok models`.
 - Busca por fragmentos da chave de teste fornecida não encontrou vazamento em arquivos versionáveis fora de artefatos ignoráveis.
 
 Observação de segurança:
@@ -504,6 +506,7 @@ Decisão canônica:
 - `COPILOT_BYOK_PROFILES_JSON` descreve todos os perfis BYOK.
 - `COPILOT_BYOK_PROFILE` escolhe o perfil ativo.
 - `/byok reload` recarrega `.env.local`; `/byok profiles` lista perfis redigidos; `/byok use <perfil|sdk>` alterna o processo atual; `/byok model <id>` troca modelo no provider ativo; `/byok provider <preset> [model] [baseUrl]` cobre investigação efêmera.
+- `/byok models [refresh]` consulta automaticamente o catálogo do provider quando disponível; se falhar, cai para catálogo estático com aviso redigido.
 - Kilo Gateway entra como OpenAI-compatible em `https://api.kilo.ai/api/gateway`, autenticado por Bearer token via `KILO_API_KEY` ou `KILO_CODE_API_KEY`.
 
 Status: implementado nesta rodada.
@@ -513,6 +516,31 @@ Riscos remanescentes:
 - Trocas por comando ainda são efêmeras; persistir em `.env.local` deve ser opt-in, atômico e redigido.
 - Smoke real com chaves deve arquivar apenas metadados redigidos e nunca payloads completos.
 - Precisamos confirmar, em live longo, se o SDK reporta `usage`/modelo efetivo de providers BYOK de maneira consistente com o provider selecionado.
+
+### A28. Catálogo de modelos BYOK precisava ser automático, cacheado e não bloqueante
+
+Investigação:
+
+- O SDK 0.3.0 aceita `onListModels` assíncrono, então o catálogo BYOK não precisa ficar restrito a `COPILOT_BYOK_MODELS`.
+- Providers OpenAI-compatible expõem, em geral, `GET /models` ou `GET /v1/models`, incluindo Kilo Gateway e Ollama OpenAI-compatible.
+- Catálogo remoto não pode ser requisito duro de boot: provider pode estar offline, chave pode estar ausente, rede pode falhar, e ainda assim o terminal deve manter fallback estático acionável.
+
+Decisão canônica:
+
+- `discoverConfiguredByokModelsFromEnv()` é a porta assíncrona de descoberta.
+- `readConfiguredByokModelsFromEnv()` permanece fallback estático determinístico.
+- `buildConfiguredByokModelListHandler()` usa descoberta remota com fallback e retorna `Promise<ModelInfo[]>`, como permitido pelo SDK.
+- `COPILOT_BYOK_MODELS_ENDPOINT` permite endpoint explícito.
+- `COPILOT_BYOK_MODEL_DISCOVERY_ENABLED`, `COPILOT_BYOK_MODEL_DISCOVERY_TIMEOUT_MS` e `COPILOT_BYOK_MODEL_DISCOVERY_TTL_MS` controlam ativação, timeout e cache.
+- `/byok models refresh` força nova consulta, sem imprimir headers ou tokens.
+
+Status: implementado nesta rodada.
+
+Validação:
+
+- Typecheck strict PASS.
+- Unit Copilot PASS com 2925 testes.
+- Smoke seguro tentou descoberta Kilo somente se chave existir em `.env.local`/env; sem chave presente, ficou `skipped` sem segredo.
 
 ## Hipóteses Externas Rejeitadas Ou Reclassificadas
 
@@ -820,10 +848,13 @@ Fase J3. Provider e model list
 - J3.1 Resolver presets `openai`, `openai-compatible`, `azure`, `anthropic`, `ollama-local`, `ollama-cloud`, `kilo-code`, `kilo-gateway`, `kilo` e `custom`. Status: feito nesta revisão.
 - J3.2 Criar `readConfiguredByokState()` com status pronto/erro/aviso. Status: feito nesta revisão.
 - J3.3 Criar `redactProviderConfig()`. Status: feito nesta revisão.
-- J3.4 Criar `onListModels` estático por `COPILOT_BYOK_MODEL(S)`. Status: feito nesta revisão.
-- J3.5 Permitir catálogo dinâmico via endpoint `/v1/models` quando seguro. Status: pendente.
+- J3.4 Criar `onListModels` por `COPILOT_BYOK_MODEL(S)` com fallback estático. Status: feito nesta revisão.
+- J3.5 Permitir catálogo dinâmico via endpoint `/models`/`/v1/models` quando seguro. Status: feito nesta revisão para providers OpenAI-compatible.
 - J3.6 Resolver perfis antes da validação final de provider, preservando overrides explícitos do processo. Status: feito nesta revisão.
 - J3.7 Listar perfis redigidos para UX/diagnóstico sem expor segredo. Status: feito nesta revisão.
+- J3.8 Cachear catálogo remoto com TTL e timeout configuráveis. Status: feito nesta revisão.
+- J3.9 Permitir endpoint explícito por env/perfil. Status: feito nesta revisão.
+- J3.10 Inferir capabilities reais por modelo remoto quando o provider informar metadados ricos. Status: pendente.
 
 Fase J4. Sessão e lifecycle
 
@@ -848,6 +879,8 @@ Fase J5. UX e comandos
 - J5.10 Criar `/byok model <id>`. Status: feito nesta revisão.
 - J5.11 Criar `/byok provider <preset> [model] [baseUrl]`. Status: feito nesta revisão.
 - J5.12 Criar `/byok persist` atômico/redigido para editar `.env.local` sem expor segredo. Status: pendente.
+- J5.13 Criar `/byok models refresh` com descoberta forçada. Status: feito nesta revisão.
+- J5.14 Mostrar fonte do catálogo (`provider`, `provider-cache`, `static`, `static-fallback`) no terminal. Status: feito nesta revisão.
 
 Fase J6. Testes
 
@@ -858,6 +891,8 @@ Fase J6. Testes
 - J6.5 Rodar smoke real Kilo/Ollama Cloud/OpenAI-compatible sem gravar segredo em artefato. Status: pendente.
 - J6.6 Adicionar comando live/harness específico para `/byok status`, `/byok models` e `/byok env` sem abrir turno. Status: pendente.
 - J6.7 Cobrir `/byok profiles`, `/byok use`, `/byok model`, `/byok provider` e `/byok reload`. Status: parcialmente feito; reload/provider ainda precisam unit dedicado.
+- J6.8 Cobrir descoberta remota, cache e fallback estático em unit tests. Status: feito nesta revisão.
+- J6.9 Rodar smoke seguro de descoberta real usando apenas `.env.local`/env, sem colocar segredo no comando. Status: feito; sem chave Kilo local, resultado `skipped`.
 
 Fase J7. Providers amplos
 
@@ -903,10 +938,10 @@ Implementado:
 - Rodada live `canonical-flow-codex-post-ask-continuation-2026-05-20` expôs falha externa/SDK `CAPIError: Connection error` antes do ask_user e gerou novo gap A17.
 - `agent-messaging.js` agora distingue tasks `user_queue` e `dialog_boot`; requeue pós-reconexão de `dialog_boot` é bloqueado para evitar prompt duplicado.
 - BYOK foi investigado contra documentação oficial do GitHub, documentação oficial do Kilo Gateway e pacote local `@github/copilot-sdk@0.3.0`.
-- `sdk/session/provider.js` agora resolve presets BYOK, perfis declarativos, Kilo Gateway, valida env, redige segredos, cria resumo seguro e fornece `onListModels` customizado.
+- `sdk/session/provider.js` agora resolve presets BYOK, perfis declarativos, Kilo Gateway, valida env, redige segredos, cria resumo seguro e fornece `onListModels` assíncrono com descoberta remota/cache/fallback.
 - `ClientOptionsBuilder` registra `onListModels` BYOK e remove segredos BYOK do env repassado ao child CLI.
 - As sessões da LLM-B recebem `provider`, modelo explícito e `modelCapabilities` pelo fluxo canônico de sessão SDK.
-- `/byok` foi adicionado ao terminal com status, modelos, perfis, reload de `.env.local`, troca SDK/perfil/modelo/provider e contrato de env sem expor credenciais.
+- `/byok` foi adicionado ao terminal com status, modelos descobertos, perfis, reload de `.env.local`, troca SDK/perfil/modelo/provider e contrato de env sem expor credenciais.
 - Templates `.env*`, schema e guia de env foram atualizados com contrato BYOK, perfis e Kilo Gateway.
 - A porta de configuração `src/copilot/config/byok.js` evita que agent/terminal importem diretamente internals do SDK, mantendo a arquitetura de aliases/barrels.
 - O runner live foi corrigido para detectar o pós-`ask_user` apenas depois da resposta humana, removendo falso negativo gerado pelo próprio prompt.
@@ -953,6 +988,8 @@ Implementado:
 - Live completo pós-correção passou em `artifacts/terminal-live/2026-05-21T10-22-43-042Z/summary.md`: deltas parciais, final, tool, `ask_user`, resposta humana, continuação pós-ask, `/events`, `/events --raw`, `/tools diag`, `/health`, `/errors` e export.
 - Smoke BYOK local sem rede validou `ollama-local`, normalização de `baseUrl` para `/v1`, modelo explícito e resumo sem segredo.
 - Testes BYOK desta rodada validaram Kilo Gateway como OpenAI-compatible, perfil ativo por `COPILOT_BYOK_PROFILE`, resumos redigidos e comandos `/byok profiles`, `/byok use` e `/byok model`.
+- Descoberta automática BYOK foi adicionada para providers OpenAI-compatible: endpoint explícito ou `<baseUrl>/models`, timeout, TTL cache, fonte visível em `/byok models` e fallback estático redigido.
+- Smoke seguro de descoberta real foi executado sem colocar chave no comando; como `.env.local`/env não continham chave Kilo, o resultado foi `skipped`.
 - `node --check scripts/copilot/run-terminal-llm-b-live-test.mjs`, parse de `.env.schema.json`, busca anti-vazamento dos segredos fornecidos, typecheck strict, lint e unit copilot passaram nesta trilha.
 - Testes unitários adicionados para recoverable `model_call` não poluir `/errors`, para `task.error` de rate limit não duplicar `session.error`, e para `agent:task:error` não criar erro sintético `event-bus`.
 - Testes unitários adicionados para `terminal.runtime.wired`, `terminal.runtime.wire_failed` e hints de investigação em `/events sources`.
@@ -961,8 +998,8 @@ Implementado:
 Próxima rodada recomendada:
 
 1. Integrar BYOK em `/events sources`, sem duplicar o fluxo de sessão.
-2. Criar harness live sem turno para `/byok status`, `/byok profiles`, `/byok models`, `/byok env` e smoke de boot com provider fake/local.
-3. Rodar smoke real Kilo/Ollama Cloud/OpenAI-compatible apenas com env efêmero ou `.env.local`, sem gravar segredo, e arquivar só metadados redigidos.
+2. Criar harness live sem turno para `/byok status`, `/byok profiles`, `/byok models refresh`, `/byok env`, `/byok use sdk` e smoke de boot com provider fake/local.
+3. Inserir as chaves reais apenas em `.env.local`/secret manager e rodar smoke real Kilo/Ollama Cloud/OpenAI-compatible, arquivando só metadados redigidos.
 4. Expandir o cenário live para elicitation quando a capability estiver disponível.
 5. Fechar a recuperação `session.error`/`reconnect_restart`, distinguindo retry real de reenvio ambíguo de prompt.
 6. Criar contrato único de modelo configurado/preferido/efetivo/cobrado, incluindo billing/effective model real em BYOK.

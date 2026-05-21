@@ -615,7 +615,7 @@ describe('ClientOptionsBuilder', () => {
         }
     });
 
-    it('buildCopilotClientOptionsFromEnv registra onListModels BYOK seguro', () => {
+    it('buildCopilotClientOptionsFromEnv registra onListModels BYOK seguro', async () => {
         const original = { ...process.env };
         try {
             delete process.env.COPILOT_CLI_URL;
@@ -624,11 +624,12 @@ describe('ClientOptionsBuilder', () => {
             process.env.COPILOT_BYOK_MODEL = 'provider-model';
             process.env.COPILOT_BYOK_MODELS = 'provider-model,provider-model-2';
             process.env.COPILOT_BYOK_API_KEY = 'secret';
+            process.env.COPILOT_BYOK_MODEL_DISCOVERY_ENABLED = 'false';
 
             const opts = buildCopilotClientOptionsFromEnv();
 
             expect(opts.onListModels).toBeTypeOf('function');
-            expect(opts.onListModels?.()).toHaveLength(2);
+            await expect(opts.onListModels?.()).resolves.toHaveLength(2);
             expect(opts.env?.COPILOT_BYOK_API_KEY).toBeUndefined();
         } finally {
             process.env = original;

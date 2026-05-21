@@ -25,6 +25,7 @@ import {
     anthropicProvider,
     azureProvider,
     buildConfiguredByokModelListHandler,
+    discoverConfiguredByokModelsFromEnv,
     isValidProviderType,
     openaiProvider,
     readConfiguredByokProfileSummaries,
@@ -326,15 +327,76 @@ describe('F72 — BYOK env configuration', () => {
         expect(overrides.modelCapabilities?.limits?.max_context_window_tokens).toBe(64000);
     });
 
-    it('fornece onListModels estático para client.listModels em BYOK', () => {
+    it('fornece onListModels com fallback estático para client.listModels em BYOK', async () => {
         const handler = buildConfiguredByokModelListHandler({
             COPILOT_BYOK_ENABLED: 'true',
             COPILOT_BYOK_BASE_URL: 'https://provider.example/v1',
             COPILOT_BYOK_MODEL: 'a',
             COPILOT_BYOK_MODELS: 'a,b',
+            COPILOT_BYOK_MODEL_DISCOVERY_ENABLED: 'false',
         });
 
-        expect(handler?.().map((model) => model.id)).toEqual(['a', 'b']);
+        expect(handler).toBeTypeOf('function');
+        const models = await handler?.();
+        expect(models?.map((model) => model.id)).toEqual(['a', 'b']);
+    });
+
+    it('descobre modelos remotos OpenAI-compatible com timeout/cache e sem vazar segredo', async () => {
+        const fetchMock = vi.fn(async () => ({
+            ok: true,
+            status: 200,
+            json: async () => ({ data: [{ id: 'remote-a' }, { id: 'remote-b' }, { id: 'remote-a' }] }),
+        }));
+        vi.stubGlobal('fetch', fetchMock);
+        try {
+            const env = {
+                COPILOT_BYOK_ENABLED: 'true',
+                COPILOT_BYOK_BASE_URL: 'https://provider.example/v1',
+                COPILOT_BYOK_MODEL: 'fallback-model',
+                COPILOT_BYOK_BEARER_TOKEN: 'unit-token',
+            };
+
+            const first = await discoverConfiguredByokModelsFromEnv(env, { forceRefresh: true });
+            const second = await discoverConfiguredByokModelsFromEnv(env);
+
+            expect(first.source).toBe('remote');
+            expect(first.endpoint).toBe('https://provider.example/v1/models');
+            expect(first.models.map((model) => model.id)).toEqual(['remote-a', 'remote-b']);
+            expect(second.source).toBe('remote-cache');
+            expect(fetchMock).toHaveBeenCalledTimes(1);
+            expect(fetchMock.mock.calls[0]?.[1]?.headers).toMatchObject({ Authorization: 'Bearer unit-token' });
+            expect(JSON.stringify(first)).not.toContain('unit-token');
+        } finally {
+            vi.unstubAllGlobals();
+        }
+    });
+
+    it('faz fallback estático quando descoberta remota falha', async () => {
+        vi.stubGlobal(
+            'fetch',
+            vi.fn(async () => ({
+                ok: false,
+                status: 503,
+                json: async () => ({}),
+            })),
+        );
+        try {
+            const result = await discoverConfiguredByokModelsFromEnv(
+                {
+                    COPILOT_BYOK_ENABLED: 'true',
+                    COPILOT_BYOK_BASE_URL: 'https://provider.example/v1',
+                    COPILOT_BYOK_MODEL: 'fallback-model',
+                    COPILOT_BYOK_MODELS: 'fallback-model,static-b',
+                },
+                { forceRefresh: true },
+            );
+
+            expect(result.source).toBe('static-fallback');
+            expect(result.models.map((model) => model.id)).toEqual(['fallback-model', 'static-b']);
+            expect(result.error).toContain('HTTP 503');
+        } finally {
+            vi.unstubAllGlobals();
+        }
     });
 
     it('summary seguro mostra apenas presença de auth', () => {

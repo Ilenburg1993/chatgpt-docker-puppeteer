@@ -189,9 +189,19 @@ Perfis canônicos:
   `ollama-local`, `openai-prod`, etc.);
 - `COPILOT_BYOK_PROFILE` escolhe o perfil ativo;
 - cada perfil pode declarar `preset`, `model`, `baseUrl`, `apiKeyEnv`, `bearerTokenEnv`, `headers`,
-  `metadata`, `contextWindowTokens`, `supportsReasoning` e `supportsVision`;
+  `metadata`, `modelsEndpoint`, `modelDiscoveryEnabled`, `modelDiscoveryTimeoutMs`,
+  `modelDiscoveryTtlMs`, `contextWindowTokens`, `supportsReasoning` e `supportsVision`;
 - `apiKey` e `bearerToken` diretos são aceitos para runtime efêmero, mas o padrão recomendado é
   apontar para variáveis (`apiKeyEnv`/`bearerTokenEnv`) que vivem no mesmo `.env.local`.
+
+Descoberta automática de modelos:
+
+- por padrão, providers OpenAI-compatible tentam `GET <baseUrl>/models`;
+- `COPILOT_BYOK_MODELS_ENDPOINT` permite sobrescrever o endpoint, absoluto ou relativo ao `baseUrl`;
+- `COPILOT_BYOK_MODEL_DISCOVERY_ENABLED=false` desliga a descoberta e usa somente catálogo estático;
+- `COPILOT_BYOK_MODEL_DISCOVERY_TIMEOUT_MS` e `COPILOT_BYOK_MODEL_DISCOVERY_TTL_MS` controlam timeout e cache;
+- se a chamada remota falhar, o sistema cai para `COPILOT_BYOK_MODELS`, `COPILOT_BYOK_MODELS_JSON` ou
+  `COPILOT_BYOK_MODEL`, sempre com aviso redigido.
 
 Presets canônicos: `openai`, `openai-compatible`, `azure`, `anthropic`, `ollama-local`,
 `ollama-cloud`, `kilo-code`, `kilo-gateway`, `kilo` e `custom`. Providers não suportados
@@ -203,6 +213,7 @@ Comandos principais:
 - `/byok status` mostra o provider ativo redigido;
 - `/byok reload` recarrega `.env.local` no processo atual;
 - `/byok profiles` lista perfis sem segredos;
+- `/byok models [refresh]` lista modelos descobertos automaticamente ou o fallback estático;
 - `/byok use <perfil>` troca o perfil BYOK ativo no processo atual;
 - `/byok use sdk` desativa BYOK e devolve a escolha de provider/modelo ao Copilot SDK;
 - `/byok model <id>` troca o modelo dentro do provider/perfil ativo;

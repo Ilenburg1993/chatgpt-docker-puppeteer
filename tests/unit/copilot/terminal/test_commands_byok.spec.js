@@ -2,7 +2,8 @@
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-const { loadDotenv, readTerminalByokProjection } = vi.hoisted(() => ({
+const { discoverConfiguredByokModelsFromEnv, loadDotenv, readTerminalByokProjection } = vi.hoisted(() => ({
+    discoverConfiguredByokModelsFromEnv: vi.fn(),
     loadDotenv: vi.fn(),
     readTerminalByokProjection: vi.fn(),
 }));
@@ -13,6 +14,10 @@ vi.mock('../../../../src/copilot/terminal/frontend/index.js', () => ({
 
 vi.mock('dotenv', () => ({
     config: loadDotenv,
+}));
+
+vi.mock('#copilot/config', () => ({
+    discoverConfiguredByokModelsFromEnv,
 }));
 
 const { cmdByok } = await import('../../../../src/copilot/terminal/commands/byok.js');
@@ -61,6 +66,7 @@ function mockCtx() {
 
 describe('terminal /byok command', () => {
     afterEach(() => {
+        discoverConfiguredByokModelsFromEnv.mockReset();
         loadDotenv.mockReset();
         readTerminalByokProjection.mockReset();
         delete process.env['COPILOT_BYOK_ENABLED'];
@@ -163,6 +169,32 @@ describe('terminal /byok command', () => {
         expect(process.env['COPILOT_BYOK_MODEL']).toBe('anthropic/claude-sonnet-4.5');
     });
 
+    it('lista modelos descobertos automaticamente pelo provider', async () => {
+        discoverConfiguredByokModelsFromEnv.mockResolvedValue({
+            models: [
+                {
+                    id: 'remote-a',
+                    capabilities: {
+                        supports: { reasoningEffort: true, vision: false },
+                        limits: { max_context_window_tokens: 200000 },
+                    },
+                },
+            ],
+            source: 'remote',
+            endpoint: 'https://api.kilo.ai/api/gateway/models',
+            fromCache: false,
+            error: null,
+        });
+        mockProjection();
+        const ctx = mockCtx();
+
+        await cmdByok({ println: ctx.println }, 'models');
+
+        expect(ctx.output()).toContain('fonte=provider');
+        expect(ctx.output()).toContain('remote-a');
+        expect(ctx.output()).toContain('ctx=200000');
+    });
+
     it('recarrega .env.local sem imprimir segredos', async () => {
         loadDotenv.mockReturnValue({ parsed: { KILO_API_KEY: 'secret' } });
         mockProjection({
@@ -181,7 +213,7 @@ describe('terminal /byok command', () => {
 
         await cmdByok({ println: ctx.println }, 'reload');
 
-        expect(loadDotenv).toHaveBeenCalledWith({ path: '.env.local', override: true });
+        expect(loadDotenv).toHaveBeenCalledWith({ path: '.env.local', override: true, quiet: true });
         expect(ctx.output()).toContain('.env.local recarregado');
         expect(ctx.output()).toContain('BYOK status');
         expect(ctx.output()).not.toContain('secret');
