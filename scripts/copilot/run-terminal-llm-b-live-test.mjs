@@ -275,10 +275,16 @@ function buildByokCatalogCommands(provider) {
 }
 
 function buildByokRealPreflightCommands({ profile, altProfile, model, altModel, provider, altProvider }) {
-    const commands = ['/session', '/byok reload', '/byok env', '/byok providers', '/byok health', '/byok profiles'];
+    const commands = ['/session sdk 8', '/byok reload', '/byok env', '/byok providers', '/byok health', '/byok profiles'];
     if (profile) commands.push(`/byok use ${profile}`);
     if (model) commands.push(`/byok model ${model}`);
-    commands.push('/byok', '/byok probe timeout:45000', '/byok probe agent timeout:60000', ...buildByokCatalogCommands(provider));
+    commands.push(
+        '/byok',
+        '/byok probe timeout:45000',
+        '/byok probe agent timeout:60000',
+        '/session sdk 8',
+        ...buildByokCatalogCommands(provider),
+    );
     if (altModel && altModel !== model) {
         commands.push(`/byok model ${altModel}`, '/byok');
     }
@@ -794,6 +800,12 @@ function extractTerminalBlocks(plain, headerRe) {
         blocks.push(block.join('\n'));
     }
     return blocks;
+}
+
+function extractSdkSessionCockpitProbeResidueCounts(plain) {
+    return extractTerminalBlocks(plain, /^\s*Sessão SDK\b/u).map(
+        (block) => block.match(/\bprobe-residue\b/gu)?.length ?? 0,
+    );
 }
 
 function terminalBlockContains(plain, headerRe, markerRe) {
@@ -1341,6 +1353,9 @@ function evaluateByokRealOutput(plain, secretValues, { profile, altProfile, mode
         /Erro de sessão BYOK/i.test(plain) ||
         /\[query\]\s+Failed to get response from the AI model/i.test(plain) ||
         /\[cancellation\]\s+Operation cancelled by user/i.test(plain);
+    const sessionProbeResidueCounts = extractSdkSessionCockpitProbeResidueCounts(plain);
+    const preflightProbeResidueCount = sessionProbeResidueCounts[0];
+    const postProbeResidueCount = sessionProbeResidueCounts[1];
     const criteria = [
         {
             id: 'byok-real-dotenv-reload',
@@ -1371,6 +1386,17 @@ function evaluateByokRealOutput(plain, secretValues, { profile, altProfile, mode
             id: 'byok-real-sdk-session-cockpit',
             pass: /Sessão SDK/.test(plain) && /\/restart reinicia só dialog loop/.test(plain),
             detail: 'operator can distinguish SDK session cockpit from dialog loop, hub resume and snapshots',
+        },
+        {
+            id: 'byok-real-probe-session-cleanup',
+            pass:
+                sessionProbeResidueCounts.length >= 2 &&
+                preflightProbeResidueCount !== undefined &&
+                preflightProbeResidueCount === postProbeResidueCount,
+            detail:
+                sessionProbeResidueCounts.length >= 2
+                    ? `SDK probe-residue count stayed stable around disposable BYOK probes (${preflightProbeResidueCount} -> ${postProbeResidueCount})`
+                    : 'SDK session cockpit was not rendered before and after disposable BYOK probes',
         },
         {
             id: 'byok-real-chat-probe',
