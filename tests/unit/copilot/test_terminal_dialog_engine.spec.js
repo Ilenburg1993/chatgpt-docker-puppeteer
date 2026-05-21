@@ -8,6 +8,18 @@
 import { readFile } from 'node:fs/promises';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 
+const configMocks = vi.hoisted(() => ({
+    readConfiguredByokSummary: vi.fn(() => ({
+        enabled: false,
+        ready: false,
+        profile: null,
+        provider: null,
+        model: null,
+        limits: null,
+        capabilities: null,
+    })),
+}));
+
 vi.mock('#copilot/bridges', () => ({ emitNerv: vi.fn() }));
 vi.mock('#copilot/config', async (importOriginal) => {
     const actual = /** @type {any} */ (await importOriginal());
@@ -17,6 +29,7 @@ vi.mock('#copilot/config', async (importOriginal) => {
         LLM_B_TURN_TIMEOUT_MS: 120_000,
         LLM_B_BOOT_PROMPT: undefined,
         LLM_B_DIALOG_QUEUE_MAX: 10,
+        readConfiguredByokSummary: configMocks.readConfiguredByokSummary,
     };
 });
 vi.mock('#copilot/core', async (importOriginal) => {
@@ -177,6 +190,8 @@ describe('terminal/dialog/engine.js — contrato', () => {
         );
 
         expect(result.shouldWarn).toBe(true);
+        expect(result.shouldBlock).toBe(false);
+        expect(result.severity).toBe('warn');
         expect(result.label).toContain('limite BYOK baixo');
         expect(result.limit).toBe(6000);
     });
@@ -194,8 +209,120 @@ describe('terminal/dialog/engine.js — contrato', () => {
         );
 
         expect(result.shouldWarn).toBe(true);
+        expect(result.shouldBlock).toBe(true);
+        expect(result.severity).toBe('block');
         expect(result.label).toContain('provider pode recusar');
         expect(result.estimatedRequestTokens).toBeGreaterThan(12000);
+    });
+
+    it('normaliza modo de admission control BYOK com default restritivo', async () => {
+        expect(mod.readTerminalByokAdmissionMode({})).toBe('block');
+        expect(mod.readTerminalByokAdmissionMode({ COPILOT_BYOK_ADMISSION_MODE: 'warn-only' })).toBe('warn');
+        expect(mod.readTerminalByokAdmissionMode({ COPILOT_BYOK_ADMISSION_MODE: 'off' })).toBe('off');
+    });
+
+    it('bloqueia turno BYOK antes de chamar SDK quando estimativa excede limite declarado', async () => {
+        const runtime = await import('../../../src/copilot/terminal/frontend/gateways/agent-runtime.js');
+        const dialogGateway = await import('../../../src/copilot/terminal/frontend/gateways/dialog.js');
+        const sse = await import('../../../src/copilot/terminal/dialog/sse.js');
+
+        vi.mocked(dialogGateway.runTerminalDialogTurnDetailed).mockClear();
+        vi.mocked(sse.broadcastSse).mockClear();
+        configMocks.readConfiguredByokSummary.mockReturnValueOnce({
+            enabled: true,
+            ready: true,
+            profile: 'tiny-byok',
+            provider: 'test',
+            model: 'tiny-model',
+            limits: { maxRequestTokens: 12000, tokensPerMinute: null },
+            capabilities: { contextWindowTokens: 131072 },
+        });
+        vi.mocked(runtime.readTerminalRuntimeState).mockReturnValueOnce({
+            runtimeId: 'default',
+            model: 'tiny-model',
+            reasoningEffort: 'medium',
+            status: 'idle',
+            sessionId: null,
+            dialogLoopActive: true,
+            dialogPaused: false,
+            queueSize: 0,
+            pendingQuestion: null,
+            pendingQuestionKind: null,
+            pendingQuestionShadow: null,
+            pendingQuestionShadowKind: null,
+            pendingQuestionShadowState: null,
+            pendingQuestionShadowExpired: false,
+            pendingQuestionShadowAgeMs: null,
+            pendingQuestionShadowExpiresAt: null,
+            pendingQuestionShadowRemainingMs: null,
+            contextWindow: { tokens: 11800, tokenLimit: 131072, utilization: 0.09 },
+            lastPrInfo: null,
+        });
+
+        await expect(mod.sendTurn('mensagem acima do orçamento', 'user')).resolves.toBeNull();
+
+        expect(vi.mocked(dialogGateway.runTerminalDialogTurnDetailed)).not.toHaveBeenCalled();
+        expect(vi.mocked(sse.broadcastSse)).toHaveBeenCalledWith(
+            'terminal.byok.admission_blocked',
+            expect.objectContaining({
+                reason: 'estimated_request_exceeds_provider_limit',
+                admissionMode: 'block',
+            }),
+        );
+    });
+
+    it('permite override explícito para warn-only quando BYOK excede limite', async () => {
+        const runtime = await import('../../../src/copilot/terminal/frontend/gateways/agent-runtime.js');
+        const dialogGateway = await import('../../../src/copilot/terminal/frontend/gateways/dialog.js');
+
+        vi.mocked(dialogGateway.runTerminalDialogTurnDetailed).mockClear();
+        configMocks.readConfiguredByokSummary.mockReturnValueOnce({
+            enabled: true,
+            ready: true,
+            profile: 'tiny-byok',
+            provider: 'test',
+            model: 'tiny-model',
+            limits: { maxRequestTokens: 12000, tokensPerMinute: null },
+            capabilities: { contextWindowTokens: 131072 },
+        });
+        vi.mocked(runtime.readTerminalRuntimeState).mockReturnValueOnce({
+            runtimeId: 'default',
+            model: 'tiny-model',
+            reasoningEffort: 'medium',
+            status: 'idle',
+            sessionId: null,
+            dialogLoopActive: true,
+            dialogPaused: false,
+            queueSize: 0,
+            pendingQuestion: null,
+            pendingQuestionKind: null,
+            pendingQuestionShadow: null,
+            pendingQuestionShadowKind: null,
+            pendingQuestionShadowState: null,
+            pendingQuestionShadowExpired: false,
+            pendingQuestionShadowAgeMs: null,
+            pendingQuestionShadowExpiresAt: null,
+            pendingQuestionShadowRemainingMs: null,
+            contextWindow: { tokens: 11800, tokenLimit: 131072, utilization: 0.09 },
+            lastPrInfo: null,
+        });
+
+        const previousMode = process.env.COPILOT_BYOK_ADMISSION_MODE;
+        process.env.COPILOT_BYOK_ADMISSION_MODE = 'warn';
+        try {
+            await expect(mod.sendTurn('mensagem acima do orçamento com override', 'user')).resolves.toBe('ok');
+        } finally {
+            if (previousMode === undefined) {
+                delete process.env.COPILOT_BYOK_ADMISSION_MODE;
+            } else {
+                process.env.COPILOT_BYOK_ADMISSION_MODE = previousMode;
+            }
+        }
+
+        expect(vi.mocked(dialogGateway.runTerminalDialogTurnDetailed)).toHaveBeenCalledWith(
+            'mensagem acima do orçamento com override',
+            expect.any(Object),
+        );
     });
 
     it('embute blob attachment estruturado no próximo turno do usuário', async () => {
