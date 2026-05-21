@@ -469,6 +469,150 @@ describe('terminal/dialog/engine.js — contrato', () => {
         });
     });
 
+    it('expõe turno BYOK vazio como falha operacional quando não há input humano pendente', async () => {
+        const dialogGateway = await import('../../../src/copilot/terminal/frontend/gateways/dialog.js');
+        const health = await import('../../../src/copilot/terminal/state/byok-provider-health.js');
+        const sse = await import('../../../src/copilot/terminal/dialog/sse.js');
+
+        vi.mocked(health.recordByokProviderModelCallFailure).mockClear();
+        vi.mocked(sse.broadcastSse).mockClear();
+        configMocks.readConfiguredByokSummary.mockReturnValue({
+            enabled: true,
+            ready: true,
+            profile: 'kilo',
+            providerType: 'openai',
+            preset: 'kilo-code',
+            model: 'kilo-auto/free',
+            limits: null,
+            capabilities: null,
+        });
+        vi.mocked(dialogGateway.runTerminalDialogTurnDetailed).mockResolvedValueOnce({
+            reply: '',
+            channel: 'dialog',
+            replySource: 'empty',
+        });
+
+        await expect(mod.sendTurn('forçar reply vazio BYOK', 'user')).resolves.toBe('');
+
+        expect(vi.mocked(health.recordByokProviderModelCallFailure)).toHaveBeenCalledWith(
+            expect.objectContaining({
+                profile: 'kilo',
+                provider: 'kilo-code',
+                model: 'kilo-auto/free',
+                errorContext: 'dialog.byok_empty_output',
+            }),
+        );
+        expect(vi.mocked(sse.broadcastSse)).toHaveBeenCalledWith(
+            'terminal.turn.empty_output',
+            expect.objectContaining({
+                actor: 'user',
+                source: 'terminal-dialog/empty-output',
+                assistantMessageCount: 0,
+            }),
+        );
+
+        configMocks.readConfiguredByokSummary.mockReturnValue({
+            enabled: false,
+            ready: false,
+            profile: null,
+            provider: null,
+            model: null,
+            limits: null,
+            capabilities: null,
+        });
+    });
+
+    it('aceita reply vazio quando ask_user deixou input humano pendente', async () => {
+        const dialogGateway = await import('../../../src/copilot/terminal/frontend/gateways/dialog.js');
+        const runtime = await import('../../../src/copilot/terminal/frontend/gateways/agent-runtime.js');
+        const health = await import('../../../src/copilot/terminal/state/byok-provider-health.js');
+        const sse = await import('../../../src/copilot/terminal/dialog/sse.js');
+
+        vi.mocked(health.recordByokProviderModelCallFailure).mockClear();
+        vi.mocked(sse.broadcastSse).mockClear();
+        configMocks.readConfiguredByokSummary.mockReturnValue({
+            enabled: true,
+            ready: true,
+            profile: 'kilo',
+            providerType: 'openai',
+            preset: 'kilo-code',
+            model: 'kilo-auto/free',
+            limits: null,
+            capabilities: null,
+        });
+        vi.mocked(runtime.readTerminalRuntimeState).mockReturnValue({
+            runtimeId: 'default',
+            model: 'kilo-auto/free',
+            reasoningEffort: 'high',
+            status: 'waiting_for_input',
+            sessionId: 'sdk-ask',
+            dialogLoopActive: true,
+            dialogPaused: false,
+            queueSize: 0,
+            pendingQuestion: {
+                question: 'ASK-CANONICAL?',
+                choices: ['SIM'],
+                kind: 'question',
+                allowFreeform: true,
+                askedAt: 1,
+            },
+            pendingQuestionKind: 'question',
+            pendingQuestionShadow: null,
+            pendingQuestionShadowKind: null,
+            pendingQuestionShadowState: null,
+            pendingQuestionShadowExpired: false,
+            pendingQuestionShadowAgeMs: null,
+            pendingQuestionShadowExpiresAt: null,
+            pendingQuestionShadowRemainingMs: null,
+            contextWindow: null,
+            lastPrInfo: null,
+        });
+        vi.mocked(dialogGateway.runTerminalDialogTurnDetailed).mockResolvedValueOnce({
+            reply: '',
+            channel: 'dialog',
+            replySource: 'empty',
+        });
+
+        await expect(mod.sendTurn('forçar ask_user vazio', 'user')).resolves.toBe('');
+
+        expect(vi.mocked(health.recordByokProviderModelCallFailure)).not.toHaveBeenCalled();
+        expect(vi.mocked(sse.broadcastSse)).not.toHaveBeenCalledWith(
+            'terminal.turn.empty_output',
+            expect.any(Object),
+        );
+
+        vi.mocked(runtime.readTerminalRuntimeState).mockReturnValue({
+            runtimeId: 'default',
+            model: 'gpt-5-mini',
+            reasoningEffort: 'medium',
+            status: 'idle',
+            sessionId: null,
+            dialogLoopActive: true,
+            dialogPaused: false,
+            queueSize: 0,
+            pendingQuestion: null,
+            pendingQuestionKind: null,
+            pendingQuestionShadow: null,
+            pendingQuestionShadowKind: null,
+            pendingQuestionShadowState: null,
+            pendingQuestionShadowExpired: false,
+            pendingQuestionShadowAgeMs: null,
+            pendingQuestionShadowExpiresAt: null,
+            pendingQuestionShadowRemainingMs: null,
+            contextWindow: null,
+            lastPrInfo: null,
+        });
+        configMocks.readConfiguredByokSummary.mockReturnValue({
+            enabled: false,
+            ready: false,
+            profile: null,
+            provider: null,
+            model: null,
+            limits: null,
+            capabilities: null,
+        });
+    });
+
     it('pausa o boot do dialog loop quando a policy SDK bloqueia reconnect por auth', async () => {
         const runtime = await import('../../../src/copilot/terminal/frontend/gateways/agent-runtime.js');
         const nerv = await import('#copilot/bridges');

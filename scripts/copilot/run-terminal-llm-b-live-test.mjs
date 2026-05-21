@@ -708,15 +708,15 @@ function detectLiveBlocker(plain, runtime = {}) {
             detail: `BYOK provider turn failed and was contained without Copilot fallback${modelMatch?.[1] ? ` · model=${modelMatch[1]}` : ''}`,
         };
     }
-    const emptyTurnEnd = findEmptyDialogTurnEnd(runtime.sseEvents);
-    if (runtime.timedOut && emptyTurnEnd) {
+    const emptyOutput = findTerminalEmptyOutputEvent(runtime.sseEvents) ?? findEmptyDialogTurnEnd(runtime.sseEvents);
+    if (/Turno terminou sem saída pública/i.test(plain) || emptyOutput) {
         return {
             id: 'assistant-empty-turn',
             detail:
-                'terminal reached dialog.turn_end with empty reply before the canonical ask/final' +
-                `${emptyTurnEnd.traceId ? ` · trace=${emptyTurnEnd.traceId}` : ''}` +
-                `${emptyTurnEnd.turnId ? ` · turn=${emptyTurnEnd.turnId}` : ''}` +
-                `${Number.isFinite(emptyTurnEnd.eventId) ? ` · sse=#${emptyTurnEnd.eventId}` : ''}`,
+                'terminal reached an explicit turn with empty public output before the canonical ask/final' +
+                `${emptyOutput?.traceId ? ` · trace=${emptyOutput.traceId}` : ''}` +
+                `${emptyOutput?.turnId ? ` · turn=${emptyOutput.turnId}` : ''}` +
+                `${Number.isFinite(emptyOutput?.eventId) ? ` · sse=#${emptyOutput.eventId}` : ''}`,
         };
     }
     if (runtime.timedOut) {
@@ -741,8 +741,23 @@ function findEmptyDialogTurnEnd(events) {
     for (let index = events.length - 1; index >= 0; index -= 1) {
         const evt = events[index];
         if (evt?.event !== 'dialog.turn_end' || !isObjectPayload(evt.data)) continue;
+        if (evt.data.replySuppressed === true) continue;
         const reply = typeof evt.data.reply === 'string' ? evt.data.reply.trim() : '';
         if (reply.length > 0) continue;
+        return {
+            eventId: evt.id,
+            traceId: typeof evt.data.traceId === 'string' ? evt.data.traceId : null,
+            turnId: typeof evt.data.turnId === 'string' ? evt.data.turnId : null,
+        };
+    }
+    return null;
+}
+
+function findTerminalEmptyOutputEvent(events) {
+    if (!Array.isArray(events)) return null;
+    for (let index = events.length - 1; index >= 0; index -= 1) {
+        const evt = events[index];
+        if (evt?.event !== 'terminal.turn.empty_output' || !isObjectPayload(evt.data)) continue;
         return {
             eventId: evt.id,
             traceId: typeof evt.data.traceId === 'string' ? evt.data.traceId : null,
@@ -1944,7 +1959,7 @@ async function main() {
             (/Erro de sessão \[(?:query|rate_limit)\]|You've hit your rate limit|session\.error|CAPIError|Failed to get response from the AI model/i.test(
                 scenarioTailPlain,
             ) ||
-                /erro de provider BYOK|\[cancellation\]\s+Operation cancelled by user|Turno não enviado ao provider BYOK|terminal\.byok\.admission_blocked/i.test(
+                /erro de provider BYOK|\[cancellation\]\s+Operation cancelled by user|Turno não enviado ao provider BYOK|terminal\.byok\.admission_blocked|Turno terminou sem saída pública/i.test(
                     scenarioTailPlain,
                 )) &&
             !(byokReal && noPr) &&

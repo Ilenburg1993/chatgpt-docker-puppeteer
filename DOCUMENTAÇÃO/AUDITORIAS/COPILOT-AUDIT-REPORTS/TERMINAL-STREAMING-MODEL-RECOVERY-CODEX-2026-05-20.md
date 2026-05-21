@@ -1203,9 +1203,38 @@ Situação ideal:
 Correção desta revisão:
 
 - O detector de blocker do runner passou a olhar `dialog.turn_end` no SSE já coletado. Se o cenário expira depois de um final vazio, o blocker é `assistant-empty-turn`, não `live-timeout`.
+- Após a correção estrutural de `A55`, o runner também aceita o evento explícito `terminal.turn.empty_output`/alerta visual e encerra a coleta diagnóstica cedo, sem gastar todo o timeout canônico esperando um `ask_user` que já não virá naquele turno.
+- A repetição Kilo em `artifacts/terminal-live/byok-kilo-empty-output-diagnostic-2026-05-21/summary.md` revelou a borda oposta: um `dialog.turn_end` lifecycle pode ter `reply=""` porque o transcript já foi materializado e o envelope marca `replySuppressed=true`. O detector passou a ignorar esse final suprimido e a reservar `assistant-empty-turn` para o evento/alerta explícito ou para lifecycle realmente sem materialização.
+- A repetição positiva em `artifacts/terminal-live/byok-kilo-canonical-pass-2026-05-21-r2/summary.md` confirmou essa fronteira no circuito completo: o mesmo Kilo emitiu deltas, tools, `ask_user`, resposta humana, pós-ask, SSE/export e final único; o runner não confundiu mais o `turn_end` suprimido com turno vazio.
 - A correção é de bancada, não de máscara: a UX/stream seguem mostrando o turno vazio; a próxima investigação fica focada em por que o provider encerrou sem transcript requerido.
 
-Status: implementado no runner; precisa ser confirmado na próxima repetição do live que encerre com reply vazio.
+Status: implementado no runner e confirmado em live positivo; o caso negativo permanece explícito no artefato diagnóstico e não volta a virar timeout genérico.
+
+### A55. Turno BYOK vazio ainda podia parecer sucesso de provider ao operador
+
+Situação atual observada:
+
+- O mesmo live Kilo de `A54` exibiu uma fronteira semântica importante: `llm.usage` comprova que o provider respondeu à chamada, mas não comprova que o turno explícito materializou transcript público, delta ou input humano.
+- Antes desta revisão, `agent-runtime-events.js` registrava health BYOK de chamada bem-sucedida em `llm.usage`; depois disso, `dialog/engine.js` apenas logava warning quando a reconciliação final ficava `source=empty` e retornava o terminal para `idle`.
+- Isso mascarava o caso de maior valor para o operador: o provider/SDK fez trabalho interno e encerrou o turno sem resposta consultável no terminal.
+
+Situação ideal:
+
+- O executor único do turno explícito deve distinguir dois resultados vazios:
+  - `ask_user`/elicitation abriu input humano pendente e o turno pode não ter transcript final;
+  - não há delta, `assistant.message` nem input humano pendente, portanto o turno terminou sem saída pública operacional.
+- O segundo caso precisa deixar trilha visual e estruturada, revisar o trace como falha recente e contaminar o health BYOK com contexto próprio, sem inventar transcript e sem criar canal paralelo.
+
+Correção desta revisão:
+
+- `dialog/engine.js` agora materializa a decisão logo após `completeTerminalTurnMaterialization()`.
+- Input humano vivo continua válido: a atividade registra `Turno sem transcript final aguardando input humano`.
+- Turno vazio sem input humano publica `terminal.turn.empty_output`, imprime alerta operacional no terminal, revisa o trace recente para `failed` e, quando o runtime está em BYOK, grava `dialog.byok_empty_output` no health do perfil/provider/modelo.
+- O live runner passou a tratar esse alerta/evento como blocker conclusivo e a coletar `/activity`, `/events`, `/errors` e cockpit BYOK antes de sair.
+- Os diagnósticos persistidos no turno passam a distinguir `expectedPendingInput` de `emptyOutputFailure`, preservando a separação entre telemetria de chamada (`usage`) e resultado público do turno.
+- O live positivo em `artifacts/terminal-live/byok-kilo-canonical-pass-2026-05-21-r2/summary.md` confirmou que o hardening não cria falso erro no caminho feliz: `182` deltas públicos foram aceitos no turno principal, o `ask_user` ficou com fonte única SDK e o final pós-input foi materializado por `assistant.message`.
+
+Status: implementado no executor, coberto por testes unitários e validado em live positivo; o alerta/health negativo já foi capturado no artefato diagnóstico da borda vazia.
 
 ## Hipóteses Externas Rejeitadas Ou Reclassificadas
 
@@ -1631,6 +1660,7 @@ Fase J6. Testes
 - J6.41 Cobrir `/byok probe agent` com tool canária, `ask_user` sintético e health `agent=...` distinto de chat. Status: unit tests e live Kilo `--no-pr` PASS em `artifacts/terminal-live/byok-kilo-agent-probe-nopr-2026-05-21-r2/summary.md`.
 - J6.42 Garantir que probes BYOK descartáveis removam a sessão SDK persistida depois do diagnóstico, em vez de poluir `/session`. Status: PASS; `withEphemeralSession()` está coberto por unit test e o runner live BYOK real mede `/session sdk` antes/depois dos probes. A prova NVIDIA sem turno do operador em `artifacts/terminal-live/byok-nvidia-probe-session-cleanup-nopr-2026-05-21/summary.md` manteve o inventário legado `probe-residue` estável (`3 -> 3`), sem criar novo canário.
 - J6.43 Rodar live real Groq com limite baixo e exigir blocker de admissão antes de provider/streaming quando o envelope terminal não cabe. Status: feito em `artifacts/terminal-live/byok-groq-qwen-admission-runner-2026-05-21/summary.md`.
+- J6.44 Rodar live Kilo completo após o hardening de turno vazio e tornar o harness consciente de `dialog.turn_end` com `replySuppressed=true`. Status: PASS em `artifacts/terminal-live/byok-kilo-canonical-pass-2026-05-21-r2/summary.md`, cobrindo probes descartáveis, delta parcial/final, tools, `ask_user`, resposta humana, pós-ask, provider cockpit, health, SSE/JSONL/export e ausência de duplicação.
 
 Fase J7. Providers amplos
 

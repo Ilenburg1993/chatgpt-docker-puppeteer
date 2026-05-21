@@ -271,6 +271,94 @@ function resolveByokTurnErrorDescriptor(error, byok) {
 }
 
 /**
+ * Input humano pendente e uma saida terminal valida do turno: ask_user/elicitation podem encerrar o turno sem texto
+ * final do assistente porque a proxima acao pertence ao operador. Fora desse caso, um reply vazio de turno explicito
+ * nao pode virar `idle` silencioso.
+ *
+ * @param {ReturnType<typeof readTerminalRuntimeState>} runtimeState
+ * @returns {boolean}
+ */
+function hasPendingHumanInputOutcome(runtimeState) {
+    return (
+        runtimeState.status === 'waiting_for_input' &&
+        runtimeState.pendingQuestion !== null &&
+        runtimeState.pendingQuestionKind !== 'ready'
+    );
+}
+
+/**
+ * @param {{
+ *     actor: string;
+ *     byok: ReturnType<typeof readConfiguredByokSummary>;
+ *     materialization: ReturnType<typeof completeTerminalTurnMaterialization>;
+ *     timestamp?: number;
+ * }} input
+ * @returns {{ expectedPendingInput: boolean; emptyOutputFailure: boolean }}
+ */
+function recordTerminalExplicitEmptyOutput(input) {
+    if (input.materialization.source !== 'empty') {
+        return { expectedPendingInput: false, emptyOutputFailure: false };
+    }
+
+    const timestamp = input.timestamp ?? Date.now();
+    const runtimeState = readTerminalRuntimeState();
+    if (hasPendingHumanInputOutcome(runtimeState)) {
+        recordTerminalActivity('question', 'Turno sem transcript final aguardando input humano', {
+            detail: `kind=${runtimeState.pendingQuestionKind ?? 'question'} · source=${input.materialization.sourceDetail}`,
+            source: 'dialog',
+            severity: 'info',
+            recordHistory: false,
+        });
+        return { expectedPendingInput: true, emptyOutputFailure: false };
+    }
+
+    const failureDetail =
+        `actor=${input.actor} · source=${input.materialization.sourceDetail} · ` +
+        `deltas=${input.materialization.diagnostics.deltaSlices}/${input.materialization.diagnostics.deltaChars}ch · ` +
+        `assistantMessages=${input.materialization.diagnostics.assistantMessageCount}`;
+    reviseRecentTerminalTurnTraceStatus({ timestamp, status: 'failed' });
+    recordTerminalActivity('error', 'Turno sem saída pública materializada', {
+        detail: `${failureDetail} · sem ask_user/elicitation pendente`,
+        source: 'dialog',
+        severity: 'error',
+    });
+    broadcastSse(
+        'terminal.turn.empty_output',
+        withTerminalTurnCorrelation({
+            source: 'terminal-dialog/empty-output',
+            actor: input.actor,
+            sourceDetail: input.materialization.sourceDetail,
+            deltaSlices: input.materialization.diagnostics.deltaSlices,
+            deltaChars: input.materialization.diagnostics.deltaChars,
+            assistantMessageCount: input.materialization.diagnostics.assistantMessageCount,
+            pendingQuestionKind: runtimeState.pendingQuestionKind,
+            runtimeStatus: runtimeState.status,
+            timestamp,
+        }),
+    );
+    println(
+        '\x1b[31m  ⛔ Turno terminou sem saída pública, sem delta materializado e sem ask_user/elicitation pendente.\x1b[0m',
+    );
+    println('\x1b[90m     Consulte /activity, /live e /byok health para separar provider, SDK e transcript.\x1b[0m');
+
+    if (input.byok.enabled === true && input.byok.ready === true) {
+        recordByokProviderModelCallFailure({
+            profile: input.byok.profile ?? null,
+            provider:
+                input.byok.preset ??
+                input.byok.providerType ??
+                (typeof Reflect.get(input.byok, 'provider') === 'string' ? Reflect.get(input.byok, 'provider') : null),
+            model: input.byok.model ?? null,
+            message: 'turno explícito encerrou sem saída pública materializada',
+            errorContext: 'dialog.byok_empty_output',
+            timestamp,
+        });
+    }
+
+    return { expectedPendingInput: false, emptyOutputFailure: true };
+}
+
+/**
  * @param {ReturnType<typeof evaluateTerminalByokTurnBudget>} budget
  * @param {'block' | 'warn' | 'off'} [mode]
  * @returns {boolean}
@@ -836,6 +924,11 @@ async function _executeTurn(message, actor, attachments = [], requestHeaders = n
             directReply: turnResult.reply,
             directSource: turnResult.replySource,
         });
+        const emptyOutput = recordTerminalExplicitEmptyOutput({
+            actor,
+            byok: byokSummary,
+            materialization: materializedReply,
+        });
         const reply = materializedReply.reply ?? turnResult.reply;
         const effectiveReplySource = materializedReply.source;
         const durationMs = Date.now() - t0;
@@ -886,6 +979,8 @@ async function _executeTurn(message, actor, attachments = [], requestHeaders = n
             materialization: {
                 source: effectiveReplySource,
                 sourceDetail: materializedReply.sourceDetail,
+                expectedPendingInput: emptyOutput.expectedPendingInput,
+                emptyOutputFailure: emptyOutput.emptyOutputFailure,
                 deltaSlices: materializedReply.diagnostics.deltaSlices,
                 deltaChars: materializedReply.diagnostics.deltaChars,
                 assistantMessageCount: materializedReply.diagnostics.assistantMessageCount,
