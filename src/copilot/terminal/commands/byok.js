@@ -594,6 +594,68 @@ function renderSafeRecommendationEvidenceDiagnostics(println, budgetSafeModels) 
 }
 
 /**
+ * A shortlist agregada e uma mesa de admissao, nao um segundo catalogo. Quando varios perfis entram no mesmo
+ * ranking, o operador precisa ver por que um profile desapareceu antes de sondar o top-N.
+ *
+ * @param {(text: string) => void} println
+ * @param {ReturnType<typeof readTerminalByokProjection>} projection
+ * @param {import('#copilot/sdk/types').ModelInfo[]} modelList
+ * @param {import('#copilot/sdk/types').ModelInfo[]} eligibleModels
+ * @param {import('#copilot/sdk/types').ModelInfo[]} shortlistedModels
+ * @param {ReturnType<typeof parseRecommendArgs>} filters
+ * @param {ReturnType<typeof estimateCurrentByokRequestBudget>} runtimeBudget
+ * @returns {void}
+ */
+function renderByokShortlistProfileCoverage(
+    println,
+    projection,
+    modelList,
+    eligibleModels,
+    shortlistedModels,
+    filters,
+    runtimeBudget,
+) {
+    if (!filters.allProviders) return;
+    const profiles = selectProfilesForDiscovery(projection, filters);
+    if (profiles.length === 0) return;
+    println('  \x1b[90mCobertura por perfil antes das probes:\x1b[0m');
+    for (const profile of profiles.slice(0, 12)) {
+        /** @param {import('#copilot/sdk/types').ModelInfo} model */
+        const fromProfile = (model) => getByokModelMetadata(model)?.profile === profile.name;
+        const catalogCount = modelList.filter(fromProfile).length;
+        const eligibleCount = eligibleModels.filter(fromProfile).length;
+        const shortlistCount = shortlistedModels.filter(fromProfile).length;
+        const filtersWithoutSafeCount =
+            filters.avoidLowLimit && eligibleCount === 0
+                ? modelList.filter(
+                      (model) =>
+                          fromProfile(model) &&
+                          matchesRecommendFilters(model, withoutSafeFilter(filters), runtimeBudget),
+                  ).length
+                : 0;
+        const coverage =
+            catalogCount === 0
+                ? 'catalogo=0'
+                : eligibleCount > 0
+                  ? `catalogo=${catalogCount} · elegiveis=${eligibleCount} · shortlist=${shortlistCount}`
+                  : filtersWithoutSafeCount > 0
+                    ? `catalogo=${catalogCount} · safe removeu=${filtersWithoutSafeCount}`
+                    : `catalogo=${catalogCount} · filtros removeram=${catalogCount}`;
+        const action =
+            eligibleCount === 0
+                ? ` · ação=/byok models all-providers provider:${profile.name} 5`
+                : shortlistCount === 0
+                  ? ` · ação=/byok probe shortlist all-providers provider:${profile.name} 1`
+                  : '';
+        println(`    \x1b[90m- ${profile.name}: ${coverage}${action}\x1b[0m`);
+    }
+    if (profiles.length > 12) {
+        println(`    \x1b[90m... ${profiles.length - 12} perfil(is) omitido(s); filtre com provider:<perfil|preset>.\x1b[0m`);
+    }
+    println('');
+}
+
+/**
  * @param {import('#copilot/sdk/types').ModelInfo} model
  * @returns {string}
  */
@@ -1486,9 +1548,10 @@ export async function cmdByok({ println }, arg) {
             const runtimeBudget = readCurrentByokRequestBudget();
             const discovered = await discoverByokCatalogForCommand(projection, filters);
             const modelList = discovered.models.length > 0 ? discovered.models : models;
-            const candidates = rankByokModels(modelList)
-                .filter((model) => matchesRecommendFilters(model, filters, runtimeBudget))
-                .slice(0, filters.limit);
+            const eligibleModels = rankByokModels(modelList).filter((model) =>
+                matchesRecommendFilters(model, filters, runtimeBudget),
+            );
+            const candidates = eligibleModels.slice(0, filters.limit);
             println(`\n  \x1b[36mBYOK shortlist agent probe\x1b[0m (${candidates.length}/${modelList.length})`);
             println(
                 `  \x1b[90mEscopo: ${filters.allProviders ? 'todos os perfis selecionados' : 'provider/perfil ativo'} + ranking do catalogo + filtros=${renderByokFilterLabel(filters) || 'safe'}; cada candidato roda a mesma sessão SDK descartável de /byok probe agent, sem trocar o dialog loop vivo.${timeoutMs ? ` timeout=${timeoutMs}ms` : ''}\x1b[0m\n`,
@@ -1496,6 +1559,15 @@ export async function cmdByok({ println }, arg) {
             for (const error of discovered.errors.slice(0, 6)) {
                 println(`  \x1b[33m  aviso: descoberta remota indisponível (${error}); usando catálogo disponível.\x1b[0m`);
             }
+            renderByokShortlistProfileCoverage(
+                println,
+                projection,
+                modelList,
+                eligibleModels,
+                candidates,
+                filters,
+                runtimeBudget,
+            );
             if (candidates.length === 0) {
                 println('    \x1b[33mNenhum candidato cabe na shortlist atual. Ajuste provider/filtros, remova safe para inspeção ou rode /byok models.\x1b[0m\n');
                 renderEmptyByokFilterDiagnostics(println, modelList, filters, runtimeBudget);

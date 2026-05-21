@@ -524,6 +524,94 @@ describe('terminal /byok command', () => {
         expect(ctx.output()).not.toContain('tmp-kilo-shortlist');
     });
 
+    it('explica cobertura por perfil na shortlist agregada antes de sondar o top-N', async () => {
+        discoverConfiguredByokModelsFromEnv
+            .mockResolvedValueOnce({
+                models: [
+                    {
+                        id: 'kilo/ranked',
+                        capabilities: {
+                            supports: { reasoningEffort: true, vision: false },
+                            limits: { max_context_window_tokens: 200000 },
+                        },
+                        byok: { freeTier: true, rateLimits: { maxRequestTokens: 128000 } },
+                    },
+                ],
+                source: 'remote',
+                endpoint: 'https://kilo.example/v1/models',
+                fromCache: false,
+                error: null,
+            })
+            .mockResolvedValueOnce({
+                models: [
+                    {
+                        id: 'groq/compact',
+                        capabilities: {
+                            supports: { reasoningEffort: true, vision: false },
+                            limits: { max_context_window_tokens: 128000 },
+                        },
+                        byok: { freeTier: true, rateLimits: { maxRequestTokens: 6000 } },
+                    },
+                ],
+                source: 'remote',
+                endpoint: 'https://groq.example/v1/models',
+                fromCache: false,
+                error: null,
+            });
+        probeTerminalConfiguredByokAgent.mockResolvedValue({
+            ok: true,
+            status: 'ok',
+            elapsedMs: 111,
+            model: 'kilo/ranked',
+            profile: 'kilo',
+            preset: 'kilo-code',
+            providerType: 'openai',
+            deltaCount: 2,
+            deltaChars: 16,
+            finalChars: 16,
+            observedFinalEvent: true,
+            toolCallCount: 2,
+            markerToolCallCount: 1,
+            readToolCallCount: 1,
+            userInputRequestCount: 1,
+            userInputAnswerCount: 1,
+            sessionId: 'tmp-kilo-ranked',
+            errors: [],
+            warnings: [],
+        });
+        mockProjection({
+            profiles: [
+                {
+                    name: 'kilo',
+                    preset: 'kilo-code',
+                    providerType: 'openai',
+                    baseUrl: 'https://api.kilo.ai/api/gateway',
+                    model: 'kilo/ranked',
+                    auth: { apiKeyConfigured: false, bearerTokenConfigured: true, headersConfigured: false },
+                    metadataKeys: [],
+                },
+                {
+                    name: 'groq-free',
+                    preset: 'groq',
+                    providerType: 'openai',
+                    baseUrl: 'https://api.groq.com/openai/v1',
+                    model: 'groq/compact',
+                    auth: { apiKeyConfigured: true, bearerTokenConfigured: false, headersConfigured: false },
+                    metadataKeys: [],
+                },
+            ],
+        });
+        const ctx = mockCtx();
+
+        await cmdByok({ println: ctx.println }, 'probe shortlist all-providers free reasoning safe 1');
+
+        expect(probeTerminalConfiguredByokAgent).toHaveBeenCalledTimes(1);
+        expect(ctx.output()).toContain('Cobertura por perfil antes das probes');
+        expect(ctx.output()).toContain('kilo: catalogo=1 · elegiveis=1 · shortlist=1');
+        expect(ctx.output()).toContain('groq-free: catalogo=1 · safe removeu=1');
+        expect(ctx.output()).toContain('/byok models all-providers provider:groq-free 5');
+    });
+
     it('não degrada health real quando admission bloqueia a probe antes do provider', async () => {
         mockProjection();
         probeTerminalConfiguredByokChat.mockResolvedValue({

@@ -1323,6 +1323,33 @@ Validacao:
 
 Status: implementado e validado em unit test + live BYOK real `--no-pr`.
 
+### A59. Shortlist BYOK agregada escondia a cobertura real por perfil
+
+Situacao atual observada:
+
+- `A57` criou a sonda de shortlist sem mutar a sessao viva, mas `all-providers` ainda projetava apenas a fila global ranqueada.
+- Quando um perfil nao aparecia no top-N, o operador nao distinguia tres fatos diferentes: provider sem modelos descobertos, provider removido pelos filtros/capabilities/budget ou provider elegivel que ficou fora da janela sondada.
+- Essa ambiguidade e especialmente ruim no caso `safe`: um provider com catalogo real e limite baixo pode desaparecer corretamente, mas o cockpit nao explicava a exclusao antes da probe.
+
+Situacao ideal:
+
+- A shortlist continua sendo ranking -> filtros -> `agent probe` descartavel. Nao nasce outro catalogo nem outra politica de health.
+- Em `all-providers`, a UX mostra cobertura por perfil antes das probes: modelos no catalogo, modelos elegiveis, quantos entraram no top-N e se `safe` removeu candidatos.
+- Perfis filtrados recebem uma acao curta de inspecao/probe para o operador nao precisar inferir o comando correto.
+
+Correcao desta revisao:
+
+- `/byok probe shortlist all-providers ...` ganhou painel compacto `Cobertura por perfil antes das probes`.
+- O painel usa o mesmo catalogo normalizado, o mesmo filtro e a mesma janela top-N da shortlist; `safe removeu=N` e calculado apenas removendo temporariamente o filtro de budget.
+- Perfis sem candidato elegivel apontam `/byok models all-providers provider:<perfil> 5`; perfis elegiveis fora da janela apontam a shortlist filtrada daquele profile.
+
+Validacao:
+
+- Unit test cobre Kilo elegivel no top-N e Groq presente no catalogo, mas removido por `safe` por limite baixo, exigindo a explicacao e o comando operacional.
+- Live canônico BYOK Kilo `artifacts/terminal-live/2026-05-21T23-13-37-245Z/summary.md` continuou PASS nesta rodada com deltas, tools, `ask_user`, resposta humana, pos-ask, SSE/export e ausencia de duplicacao enquanto a frente de selecao evoluia.
+
+Status: implementado nesta revisao; a proxima rodada live agregada pode sondar `all-providers` real com janela pequena para calibrar a densidade visual do cockpit.
+
 ## Hipóteses Externas Rejeitadas Ou Reclassificadas
 
 ### H1. "boot-hub assume sucesso"
@@ -1753,6 +1780,7 @@ Fase J6. Testes
 - J6.47 Promover em `/byok recommend ... safe` somente modelos com probe agente positivo de tools + `ask_user`, mantendo o catalogo amplo em `/byok models`. Status: feito com unit tests e diagnostico acionavel para candidatos ainda nao sondados.
 - J6.48 Criar shortlist de probes agentes ranqueadas como live fake BYOK, preservando `(profile, provider, model)` por candidato e cobrindo a superficie no runner `--no-pr`. Status: PASS em unit test multi-profile e em `artifacts/terminal-live/byok-kilo-shortlist-preflight-2026-05-21/summary.md`.
 - J6.49 Fazer `/session sdk <n>` respeitar a janela numerica e resumir previews de sessoes antigas para manter o cockpit de retomada legivel. Status: PASS em unit test e no preflight real `artifacts/terminal-live/byok-kilo-session-cockpit-limit-2026-05-21/summary.md`.
+- J6.50 Expor cobertura por perfil na shortlist `all-providers` antes de sondar o top-N, diferenciando catalogo vazio, filtros e exclusao por `safe`. Status: feito nesta revisao com unit test; live canônico Kilo permaneceu PASS em `artifacts/terminal-live/2026-05-21T23-13-37-245Z/summary.md`.
 
 Fase J7. Providers amplos
 
