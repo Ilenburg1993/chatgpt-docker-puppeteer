@@ -135,6 +135,9 @@ vi.mock('../../../src/copilot/terminal/dialog/engine-persistence.js', () => ({
     persistTurnToHub: vi.fn(async () => undefined),
 }));
 vi.mock('../../../src/copilot/terminal/dialog/sse.js', () => ({ broadcastSse: vi.fn() }));
+vi.mock('../../../src/copilot/terminal/state/byok-provider-health.js', () => ({
+    recordByokProviderModelCallFailure: vi.fn(),
+}));
 vi.mock('../../../src/copilot/terminal/dialog/turn-display.js', () => ({
     createDeltaCallback: vi.fn(() => () => {}),
     createDisplayState: vi.fn(() => ({})),
@@ -219,6 +222,40 @@ describe('terminal/dialog/engine.js — contrato', () => {
         expect(mod.readTerminalByokAdmissionMode({})).toBe('block');
         expect(mod.readTerminalByokAdmissionMode({ COPILOT_BYOK_ADMISSION_MODE: 'warn-only' })).toBe('warn');
         expect(mod.readTerminalByokAdmissionMode({ COPILOT_BYOK_ADMISSION_MODE: 'off' })).toBe('off');
+    });
+
+    it('mantém Copilot SDK em watchdog-only e ativa timeout de inatividade para BYOK', async () => {
+        const timeoutPolicy = await import('../../../src/copilot/presentation/dialog-timeout-policy.js');
+        const resolveMock = vi.mocked(timeoutPolicy.resolveOptionalDialogTimeout);
+        resolveMock.mockClear();
+
+        mod.resolveTerminalDialogTurnTimeout({
+            byok: { enabled: false, ready: false },
+            runtimeState: { queueSize: 0, contextWindow: null },
+            metricsSummary: null,
+            message: 'oi',
+        });
+        expect(resolveMock).toHaveBeenLastCalledWith(
+            expect.objectContaining({
+                explicitTimeoutMs: 0,
+                allowDisabled: true,
+                phase: 'dialog',
+            }),
+        );
+
+        mod.resolveTerminalDialogTurnTimeout({
+            byok: { enabled: true, ready: true },
+            runtimeState: { queueSize: 0, contextWindow: null },
+            metricsSummary: null,
+            message: 'oi',
+        });
+        expect(resolveMock).toHaveBeenLastCalledWith(
+            expect.objectContaining({
+                explicitTimeoutMs: undefined,
+                allowDisabled: false,
+                phase: 'dialog',
+            }),
+        );
     });
 
     it('bloqueia turno BYOK antes de chamar SDK quando estimativa excede limite declarado', async () => {
@@ -389,6 +426,48 @@ describe('terminal/dialog/engine.js — contrato', () => {
         expect(vi.mocked(turnDisplay.releaseDisplayState)).toHaveBeenCalledWith(expect.any(Object));
     });
 
+    it('classifica timeout de inatividade BYOK como falha operacional do provider/modelo', async () => {
+        const dialogGateway = await import('../../../src/copilot/terminal/frontend/gateways/dialog.js');
+        const health = await import('../../../src/copilot/terminal/state/byok-provider-health.js');
+
+        configMocks.readConfiguredByokSummary.mockReturnValue({
+            enabled: true,
+            ready: true,
+            profile: 'mistral-free',
+            providerType: 'mistral',
+            preset: 'mistral',
+            model: 'codestral-latest',
+            limits: null,
+            capabilities: null,
+        });
+        vi.mocked(dialogGateway.runTerminalDialogTurnDetailed).mockRejectedValueOnce(
+            Object.assign(new Error('[DialogLoopManager] sendTurn sem progresso por 120000ms'), {
+                code: 'DIALOG_TIMEOUT',
+            }),
+        );
+
+        await expect(mod.sendTurn('forçar stall BYOK', 'user')).resolves.toBeNull();
+
+        expect(vi.mocked(health.recordByokProviderModelCallFailure)).toHaveBeenCalledWith(
+            expect.objectContaining({
+                profile: 'mistral-free',
+                provider: 'mistral',
+                model: 'codestral-latest',
+                errorContext: 'dialog.byok_inactivity_timeout',
+            }),
+        );
+
+        configMocks.readConfiguredByokSummary.mockReturnValue({
+            enabled: false,
+            ready: false,
+            profile: null,
+            provider: null,
+            model: null,
+            limits: null,
+            capabilities: null,
+        });
+    });
+
     it('pausa o boot do dialog loop quando a policy SDK bloqueia reconnect por auth', async () => {
         const runtime = await import('../../../src/copilot/terminal/frontend/gateways/agent-runtime.js');
         const nerv = await import('#copilot/bridges');
@@ -484,10 +563,12 @@ describe('terminal/dialog/engine.js — contrato', () => {
         );
     });
 
-    it('envia turnos interativos em modo watchdog-only (timeout nulo) por contrato estrutural', () => {
+    it('envia turnos Copilot em modo watchdog-only e BYOK com guardião de inatividade', () => {
         expect(src).toContain('resolveOptionalDialogTimeout({');
         expect(src).toContain('explicitTimeoutMs: 0');
         expect(src).toContain('allowDisabled: true');
+        expect(src).toContain('byok_provider_watchdog_only');
+        expect(src).toContain('allowDisabled: false');
         expect(src).toContain('timeout: timeoutDecision.timeoutMs');
     });
 });

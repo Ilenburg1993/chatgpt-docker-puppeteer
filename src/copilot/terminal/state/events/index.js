@@ -66,6 +66,7 @@ export {
     recordTerminalTurnFileActivity,
     recordTerminalTurnToolActivity,
     recordTerminalTurnUserInputActivity,
+    reviseRecentTerminalTurnTraceStatus,
 } from '../turn-trace-state.js';
 export { readTerminalTurnCorrelation, withTerminalTurnCorrelation } from '../turn-correlation-state.js';
 export { getTerminalDetailLevel } from '../ui-preferences.js';

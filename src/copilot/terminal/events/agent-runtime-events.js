@@ -11,6 +11,7 @@
  */
 
 import { cancelTimer, registerInterval } from '#copilot/core';
+import { readConfiguredByokSummary } from '#copilot/config';
 import {
     EMITTER_AGENT_BACKGROUND_COMPLETED,
     EMITTER_AGENT_BACKGROUND_IDLE,
@@ -53,6 +54,7 @@ import {
     terminalThemeBadge,
     terminalThemeText,
     withTerminalTurnCorrelation,
+    reviseRecentTerminalTurnTraceStatus,
 } from '../state/events/index.js';
 import {
     recordByokProviderModelCallFailure,
@@ -175,6 +177,58 @@ function resolveRecoverableModelCallOperatorDetail(evt) {
         model ? `modelo=${model}` : null,
     ].filter(Boolean);
     return bits.join(' · ');
+}
+
+/**
+ * @param {string} value
+ * @returns {string}
+ */
+function sanitizeOperationalErrorMessage(value) {
+    return value
+        .replace(/\bBearer\s+[A-Za-z0-9._~+/=-]{12,}/giu, 'Bearer [redacted]')
+        .replace(/\b(sk|gsk|hf|csk|nvapi|cpk|cfat|AIza)[A-Za-z0-9._~+/=-]{8,}/gu, '[redacted]')
+        .replace(/((?:api[_-]?key|authorization|token|secret)\s*[:=]\s*["']?)[^"',\s;]{8,}/giu, '$1[redacted]');
+}
+
+/**
+ * @param {{ errorType: string; message: string }} input
+ * @returns {{ enabled: boolean; profile: string | null; provider: string | null; model: string | null; operatorDetail: string | null }}
+ */
+function resolveByokSessionErrorDescriptor({ errorType, message }) {
+    let byok;
+    try {
+        byok = readConfiguredByokSummary();
+    } catch {
+        return { enabled: false, profile: null, provider: null, model: null, operatorDetail: null };
+    }
+    if (byok.enabled !== true) {
+        return { enabled: false, profile: null, provider: null, model: null, operatorDetail: null };
+    }
+    const normalizedType = errorType.trim().toLowerCase();
+    const providerLikeError =
+        ['query', 'model_call', 'rate_limit', 'quota', 'provider', 'network', 'fetch'].includes(normalizedType) ||
+        /\b(ai model|provider|model|retry|retried|server error|rate limit|quota|timeout)\b/iu.test(message);
+    if (!providerLikeError) {
+        return { enabled: false, profile: null, provider: null, model: null, operatorDetail: null };
+    }
+    const runtimeState = readTerminalRuntimeState();
+    const provider = byok.preset ?? byok.providerType ?? null;
+    const model = byok.model ?? runtimeState.model ?? null;
+    const bits = [
+        'erro de sessão BYOK vindo do SDK; registrado como saúde do provider/modelo',
+        provider ? `provider=${provider}` : null,
+        byok.profile ? `perfil=${byok.profile}` : null,
+        model ? `modelo=${model}` : null,
+        'sem Premium Request',
+        'ações: /byok health · /byok recommend safe · /byok use <perfil> · /byok model <id>',
+    ].filter(Boolean);
+    return {
+        enabled: true,
+        profile: byok.profile ?? null,
+        provider,
+        model,
+        operatorDetail: bits.join(' · '),
+    };
 }
 
 /**
@@ -405,15 +459,61 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, regi
     };
 
     const onSessionError = (/** @type {Record<string, unknown>} */ evt) => {
-        const msg = /** @type {string} */ (evt?.['message'] ?? 'unknown error');
+        const msg = sanitizeOperationalErrorMessage(/** @type {string} */ (evt?.['message'] ?? 'unknown error'));
         const errorType = /** @type {string} */ (evt?.['errorType'] ?? 'error');
-        recordTerminalActivity('error', 'Erro de sessão', {
-            detail: `[${errorType}] ${msg}`,
+        const byokError = resolveByokSessionErrorDescriptor({ errorType, message: msg });
+        const detail = byokError.enabled && byokError.operatorDetail ? `[${errorType}] ${msg} · ${byokError.operatorDetail}` : `[${errorType}] ${msg}`;
+
+        if (byokError.enabled) {
+            const now = Date.now();
+            recordByokProviderModelCallFailure({
+                profile: byokError.profile,
+                provider: byokError.provider,
+                model: byokError.model,
+                message: msg,
+                errorContext: `session.${errorType}`,
+                timestamp: now,
+            });
+            completeTerminalTurnMaterialization({
+                timestamp: now,
+                status: 'failed',
+            });
+            const revisedTrace = reviseRecentTerminalTurnTraceStatus({
+                timestamp: now,
+                status: 'failed',
+            });
+            if (!revisedTrace) {
+                completeTerminalTurnTrace({
+                    timestamp: now,
+                    status: 'failed',
+                });
+            }
+        }
+
+        recordTerminalActivity('error', byokError.enabled ? 'Erro de sessão BYOK' : 'Erro de sessão', {
+            detail,
             severity: 'error',
             source: 'agent',
         });
-        println(`\n  \x1b[31m⚠️  Erro de sessão [${errorType}]: ${msg}\x1b[0m`);
-        broadcastSse('session.error', withAgentSseEnvelope({ errorType, message: msg }, 'agent/session.error'));
+        println(
+            `\n  ${terminalThemeBadge('error', byokError.enabled ? 'BYOK' : 'ERROR')} ${terminalThemeText('error', byokError.enabled ? detail : `Erro de sessão [${errorType}]: ${msg}`)}`,
+        );
+        broadcastSse(
+            'session.error',
+            withAgentSseEnvelope(
+                {
+                    errorType,
+                    message: msg,
+                    byokProvider: byokError.enabled,
+                    byokProfile: byokError.profile,
+                    byokProviderType: byokError.provider,
+                    byokModel: byokError.model,
+                    operatorMeaning: byokError.operatorDetail,
+                    handledAs: byokError.enabled ? 'byok_session_error' : 'session_error',
+                },
+                'agent/session.error',
+            ),
+        );
     };
 
     const onAgentError = (/** @type {Record<string, unknown>} */ evt) => {

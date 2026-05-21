@@ -33,9 +33,11 @@ const readTerminalRuntimeState = vi.fn(
 const recordTerminalTurnToolActivity = vi.fn();
 const completeTerminalTurnToolCall = vi.fn();
 const completeTerminalTurnTrace = vi.fn();
+const reviseRecentTerminalTurnTraceStatus = vi.fn(() => null);
 const readTerminalTurnTraceProjection = vi.fn(() => ({ current: null, recent: [] }));
 const getTerminalDetailLevel = vi.fn(() => 'detailed');
 const recordToolCall = vi.fn();
+const readConfiguredByokSummary = vi.fn(() => ({ enabled: false }));
 
 vi.mock('../../../src/copilot/terminal/dialog/index.js', () => ({
     SEPARATOR: '---',
@@ -68,12 +70,21 @@ vi.mock('../../../src/copilot/terminal/state/turn-trace-state.js', () => ({
     recordTerminalTurnToolActivity,
     completeTerminalTurnToolCall,
     completeTerminalTurnTrace,
+    reviseRecentTerminalTurnTraceStatus,
     readTerminalTurnTraceProjection,
 }));
 
 vi.mock('../../../src/copilot/observability/index.js', () => ({
     recordToolCall,
 }));
+
+vi.mock('#copilot/config', async (importOriginal) => {
+    const actual = await importOriginal();
+    return {
+        .../** @type {Record<string, unknown>} */ (actual),
+        readConfiguredByokSummary,
+    };
+});
 
 vi.mock('../../../src/copilot/terminal/state/ui-preferences.js', () => ({
     getTerminalDetailLevel,
@@ -86,6 +97,8 @@ describe('terminal/events/agent-runtime-events.js — contrato', () => {
         getTerminalDetailLevel.mockReturnValue('detailed');
         getShowUsage.mockReturnValue(true);
         getShowSessionActivity.mockReturnValue(false);
+        readConfiguredByokSummary.mockReturnValue({ enabled: false });
+        reviseRecentTerminalTurnTraceStatus.mockReturnValue(null);
         isTerminalRenderLocked.mockReturnValue(false);
         printlnBlock.mockImplementation((/** @type {string[]} */ lines) => println(lines.join('\n')));
         readTerminalRuntimeState.mockReturnValue(
@@ -1069,6 +1082,79 @@ describe('terminal/events/agent-runtime-events.js — contrato', () => {
             }),
         );
         clearTerminalTurnMaterialization();
+    });
+
+    it('classifica session.error query em BYOK como falha de provider e revisa o turno tardio', async () => {
+        const { clearTerminalTurnMaterialization } = await import(
+            '../../../src/copilot/terminal/state/turn-materialization-state.js'
+        );
+        const { clearByokProviderModelHealth, readByokProviderModelHealth } = await import(
+            '../../../src/copilot/terminal/state/byok-provider-health.js'
+        );
+        const { setupTerminalAgentRuntimeEventListeners } =
+            await import('../../../src/copilot/terminal/events/agent-runtime-events.js');
+        /** @type {Map<string, Function[]>} */
+        const listeners = new Map();
+        const agent = {
+            on: vi.fn((event, handler) => {
+                const list = listeners.get(event) ?? [];
+                list.push(handler);
+                listeners.set(event, list);
+            }),
+            off: vi.fn(),
+        };
+
+        clearTerminalTurnMaterialization();
+        clearByokProviderModelHealth();
+        readConfiguredByokSummary.mockReturnValue({
+            enabled: true,
+            ready: true,
+            profile: 'mistral-free',
+            preset: 'mistral',
+            providerType: 'openai',
+            model: 'codestral-latest',
+        });
+        reviseRecentTerminalTurnTraceStatus.mockReturnValue({ traceId: 'turn:0', status: 'failed' });
+
+        setupTerminalAgentRuntimeEventListeners({ agent: /** @type {any} */ (agent), rl: null });
+        listeners.get('session.error')?.[0]?.({
+            errorType: 'query',
+            message:
+                'Failed to get response from the AI model; retried 5 times (total retry wait time: 6.55 seconds) Last error: Unknown error',
+        });
+
+        expect(recordTerminalActivity).toHaveBeenCalledWith(
+            'error',
+            'Erro de sessão BYOK',
+            expect.objectContaining({
+                severity: 'error',
+                detail: expect.stringContaining('sem Premium Request'),
+            }),
+        );
+        expect(reviseRecentTerminalTurnTraceStatus).toHaveBeenCalledWith(
+            expect.objectContaining({
+                status: 'failed',
+            }),
+        );
+        expect(completeTerminalTurnTrace).not.toHaveBeenCalledWith(expect.objectContaining({ status: 'failed' }));
+        expect(readByokProviderModelHealth({ profile: 'mistral-free', provider: 'mistral', model: 'codestral-latest' })).toEqual(
+            expect.objectContaining({
+                lastStatus: 'failed',
+                lastErrorContext: 'session.query',
+            }),
+        );
+        expect(println).toHaveBeenCalledWith(expect.stringContaining('BYOK'));
+        expect(broadcastSse).toHaveBeenCalledWith(
+            'session.error',
+            expect.objectContaining({
+                byokProvider: true,
+                byokProfile: 'mistral-free',
+                byokProviderType: 'mistral',
+                byokModel: 'codestral-latest',
+                handledAs: 'byok_session_error',
+            }),
+        );
+        clearByokProviderModelHealth();
     });
 
     it('reanuncia pergunta pendente viva ao registrar listeners do terminal', async () => {

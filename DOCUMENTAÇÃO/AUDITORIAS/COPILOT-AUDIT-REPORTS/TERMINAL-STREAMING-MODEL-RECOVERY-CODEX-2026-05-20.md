@@ -919,6 +919,32 @@ Validação:
 
 Status: implementado para saúde operacional em memória e persistida em JSON redigido, com prova positiva Kilo e prova negativa Cerebras.
 
+### A44. Falhas BYOK por `session.error [query]` não entravam na saúde operacional
+
+Achado:
+
+- O live real Mistral com `mistral-free`/`codestral-latest` não falhou pelo hook `errorOccurred` de `model_call`; o SDK retornou deltas parciais repetidos, vários `model_retry` e só depois emitiu `session.error [query] Failed to get response from the AI model...`.
+- Como a saúde operacional BYOK era alimentada apenas por `agent.error model_call` e `llm.usage`, o cockpit não marcava Mistral como `chat=failed`.
+- A ordem dos eventos também era enganosa: `assistant.turn_end` fechava o trace como `completed` milissegundos antes do `session.error`, deixando `/activity` com narrativa de sucesso seguida de erro solto.
+- Isso não era um problema de catálogo: o catálogo Mistral retornou 64 modelos e recomendações úteis. O bug era de classificação de falha tardia no fluxo de sessão.
+
+Correção:
+
+- `agent-runtime-events.js` agora trata `session.error` em sessão BYOK como falha operacional de provider/modelo quando o erro é `query`, `model_call`, `rate_limit`, `quota`, `provider`, `network`, `fetch` ou mensagem com semântica de modelo/provider/retry/timeout.
+- A mensagem é redigida antes de ser renderizada/arquivada, evitando vazamento acidental de token em erro de provider.
+- O erro passa a ser narrado como `Erro de sessão BYOK`, com `provider`, `perfil`, `modelo`, `sem Premium Request` e próximos comandos (`/byok health`, `/byok recommend safe`, `/byok use`, `/byok model`).
+- `turn-trace-state.js` ganhou `reviseRecentTerminalTurnTraceStatus()`, que corrige traces recém-fechados quando a falha chega depois de `assistant.turn_end`, em vez de criar outro trace paralelo.
+- O live runner agora reconhece `Erro de sessão BYOK`/`session.error [query]` como blocker `byok-provider-turn-failed`, mantendo critérios de terminal separados da indisponibilidade do provider.
+
+Validação:
+
+- Teste que expõe `session.error [query]` em BYOK marca `mistral-free|mistral|codestral-latest` como `chat=failed`, emite SSE `handledAs=byok_session_error` e revisa o trace tardio para `failed`.
+- `npx vitest run tests/unit/copilot/test_terminal_agent_runtime_events.spec.js tests/unit/copilot/terminal/test_byok_provider_health.spec.js tests/unit/copilot/terminal/test_commands_byok.spec.js` passou com 55 testes.
+- `npm run typecheck:strict:src.copilot` passou.
+- Artefato base que motivou o achado: `artifacts/terminal-live/byok-mistral-canonical-2026-05-21/summary.md`.
+
+Status: implementado nesta revisão e validado no live Mistral pós-classificação registrado em `artifacts/terminal-live/byok-mistral-inactivity-guard-2026-05-21/summary.md`: o cenário ficou `BLOCKED` por provider, com `chat=failed`, `session.query` persistido e trace do turno revisado para `failed`, sem virar falha genérica do terminal.
+
 ## Hipóteses Externas Rejeitadas Ou Reclassificadas
 
 ### H1. "boot-hub assume sucesso"
@@ -1317,6 +1343,10 @@ Fase J6. Testes
 - J6.30 Rodar live BYOK real validando saúde operacional no cockpit e recomendação segura. Status: PASS em `artifacts/terminal-live/byok-kilo-health-cockpit-pass-2026-05-21/summary.md`, com `/byok providers` exibindo `chat=ok` e `/byok recommend reasoning safe` carregando a evidência do turno real.
 - J6.31 Persistir saúde operacional BYOK redigida entre sessões e expor `/byok health [clear]`. Status: feito nesta revisão, com store `data/copilot-terminal/byok-provider-health.json`, redaction de mensagens, reidratação e unit tests.
 - J6.32 Rodar live negativo novo com provider falho e restart subsequente para provar `chat=failed` reidratado. Status: BLOCKED esperado em `artifacts/terminal-live/byok-cerebras-health-persist-r2-2026-05-21/summary.md`; critérios operacionais BYOK passaram.
+- J6.33 Classificar falha BYOK tardia por `session.error [query]` como saúde operacional do provider/modelo, revisando trace recém-fechado. Status: feito nesta revisão com unit test; artefato motivador `artifacts/terminal-live/byok-mistral-canonical-2026-05-21/summary.md`.
+- J6.34 Reexecutar live Mistral real após J6.33 para confirmar `BLOCKED` limpo por provider, `/byok health` com `chat=failed` e ausência de falha genérica do terminal. Status: executado parcialmente em `artifacts/terminal-live/byok-mistral-session-error-classified-2026-05-21/summary.md`; a falha mudou de `session.error [query]` para stall silencioso pós-`model_retry`, abrindo J6.35.
+- J6.35 Remover `watchdog-only` de turnos BYOK reais e usar timeout de inatividade reiniciado por progresso observável, preservando `watchdog-only` para GitHub Copilot SDK. Status: feito nesta revisão; falta live Mistral pós-guardião.
+- J6.36 Fazer o live runner BYOK real preservar provider/perfil alvo nos comandos de catálogo depois de `/byok reload`, usando `provider:<nome>` em refresh/free/recommend. Status: feito nesta revisão.
 
 Fase J7. Providers amplos
 
@@ -1454,6 +1484,10 @@ Implementado:
 - Live BYOK real com health cockpit passou em `artifacts/terminal-live/byok-kilo-health-cockpit-pass-2026-05-21/summary.md`: `/byok providers` pós-turno mostrou `chat=ok`, `/byok recommend reasoning safe` preservou a saúde operacional, e o harness confirmou deltas, final, tools, `ask_user`, pós-ask, SSE/export e ausência de duplicações.
 - Saúde operacional BYOK agora persiste em `data/copilot-terminal/byok-provider-health.json` de forma redigida; `/byok health` mostra o store e `/byok health clear` limpa processo e disco sem tocar segredos.
 - Live Cerebras com health persistido em `artifacts/terminal-live/byok-cerebras-health-persist-r2-2026-05-21/summary.md` provou reidratação de `chat=failed` no cockpit e no comando `/byok health`; o bloqueio permaneceu atribuído ao provider/modelo, não ao terminal.
+- Falhas BYOK tardias por `session.error [query]` agora entram no mesmo contrato de saúde operacional: `agent-runtime-events.js` registra `chat=failed`, narra `Erro de sessão BYOK`, revisa trace recém-fechado para `failed` e o live runner classifica o cenário como `byok-provider-turn-failed`. Achado motivado por Mistral em `artifacts/terminal-live/byok-mistral-canonical-2026-05-21/summary.md`.
+- A reexecução Mistral em `artifacts/terminal-live/byok-mistral-session-error-classified-2026-05-21/summary.md` revelou uma segunda raiz: provider BYOK pode emitir pequenos deltas e `model_retry`, depois ficar mudo sem `session.error`. O terminal agora mantém GitHub Copilot SDK em `watchdog-only`, mas turnos BYOK usam timeout de inatividade do executor; o erro resultante alimenta `/byok health` como `dialog.byok_inactivity_timeout`, completa materialização/trace como `failed` e orienta o operador sem mencionar Premium Request.
+- O live runner BYOK real agora reancora o perfil/provider alvo depois de `/byok reload` e filtra catálogo/recomendação com `provider:<nome>`, evitando diagnosticar Kilo/Ollama quando o teste funcional solicitado é Mistral/Gemini/etc.
+- Live Mistral real pós-classificação em `artifacts/terminal-live/byok-mistral-inactivity-guard-2026-05-21/summary.md` ficou `BLOCKED` por provider, não por UX/terminal: deltas parciais `report_intent` apareceram sem duplicação, `session.error [query]` foi mostrado como `Erro de sessão BYOK`, `/activity` marcou trace `failed`, `/byok providers` mostrou `mistral-free ... chat=failed`, `/byok health` persistiu `session.query`, e `/byok recommend` continuou funcional para modelos alternativos.
 - Teste unitário de `/byok models` cobre limitação padrão de 24 itens e ampliação explícita por número.
 - Probe BYOK real sem PR em `artifacts/terminal-live/2026-05-21T12-50-11-039Z/summary.md` confirmou catálogo Kilo remoto paginado (`24/346`), troca de modelo, alternância para Ollama Cloud, SSE/control plane e ausência de vazamento de segredos.
 - Live BYOK real com `kilo-auto/balanced` ficou `BLOCKED` por `byok-provider-credits` em `artifacts/terminal-live/2026-05-21T12-03-39-776Z/summary.md`; o runner agora classifica esse caso como falha externa de créditos/modelo, não como bug do terminal.

@@ -7,7 +7,7 @@
  */
 
 import { emitNerv } from '#copilot/bridges';
-import { LLM_B_BOOT_TIMEOUT_MS, readConfiguredByokSummary } from '#copilot/config';
+import { LLM_B_BOOT_TIMEOUT_MS, TERMINAL_BYOK_TURN_TIMEOUT_MS, readConfiguredByokSummary } from '#copilot/config';
 import { cancelTimer, container, registerInterval, sleepMs, toError } from '#copilot/core';
 import { utf8ByteLength } from '#copilot/infra/public/buffer';
 import { log, METRICS_STORE } from '#copilot/observability';
@@ -42,13 +42,16 @@ import {
     beginTerminalTurnMaterialization,
     clearTerminalTurnMaterialization,
     completeTerminalTurnMaterialization,
+    completeTerminalTurnTrace,
     recordTerminalFinalReconciliationDiagnostic,
     recordTerminalStreamDeltaDiagnostic,
     recordTerminalTurnDelta,
     readTerminalTurnCorrelation,
+    reviseRecentTerminalTurnTraceStatus,
     shouldSuppressTerminalAssistantMessageAsUserInputEcho,
     withTerminalTurnCorrelation,
 } from '../state/events/index.js';
+import { recordByokProviderModelCallFailure } from '../state/byok-provider-health.js';
 import { drainPendingNotifications, getPersistenceFailureCount, persistTurnToHub } from './engine-persistence.js';
 import {
     BOOT_PROMPT,
@@ -153,6 +156,7 @@ const LIVE_TURN_NARRATION_INTERVAL_MS = 10_000;
 const BYOK_TURN_RESPONSE_RESERVE_TOKENS = 1_024;
 const BYOK_LOW_REQUEST_TOKEN_LIMIT = 8_000;
 const BYOK_ADMISSION_MODE_ENV = 'COPILOT_BYOK_ADMISSION_MODE';
+const BYOK_TURN_TIMEOUT_ENV = 'TERMINAL_BYOK_TURN_TIMEOUT_MS';
 
 /**
  * @param {unknown} value
@@ -262,6 +266,115 @@ export function readTerminalByokAdmissionMode(env = process.env) {
         return 'warn';
     }
     return 'block';
+}
+
+/**
+ * @param {string | undefined} raw
+ * @returns {{ kind: 'unset' } | { kind: 'disabled' } | { kind: 'explicit'; timeoutMs: number }}
+ */
+function parseByokTurnTimeoutOverride(raw) {
+    if (typeof raw !== 'string' || raw.trim().length === 0) return { kind: 'unset' };
+    const normalized = raw.trim().toLowerCase();
+    if (['0', 'off', 'false', 'disabled', 'none', 'watchdog', 'watchdog-only'].includes(normalized)) {
+        return { kind: 'disabled' };
+    }
+    const parsed = Number(raw);
+    if (!Number.isFinite(parsed) || parsed <= 0) return { kind: 'unset' };
+    return { kind: 'explicit', timeoutMs: Math.max(15_000, Math.round(parsed)) };
+}
+
+/**
+ * Resolve a janela de inatividade do turno do terminal.
+ *
+ * O fluxo SDK/Copilot continua `watchdog-only` por contrato histórico. BYOK e providers externos têm outro modo de
+ * falha: podem emitir retry/deltas parciais e depois ficar mudos sem `session.error`. Para BYOK, portanto, usamos a
+ * política de timeout de inatividade do executor: o relógio reinicia a cada progresso observável e só falha quando o
+ * provider para de se mover.
+ *
+ * @param {{
+ *     byok: ReturnType<typeof readConfiguredByokSummary>;
+ *     runtimeState: ReturnType<typeof readTerminalRuntimeState>;
+ *     metricsSummary: any;
+ *     message: string;
+ * }} input
+ * @returns {ReturnType<typeof resolveOptionalDialogTimeout>}
+ */
+export function resolveTerminalDialogTurnTimeout(input) {
+    const recentLatency = input.metricsSummary?.dialog?.turnLatency ?? {};
+    const common = {
+        defaultTimeoutMs: TURN_TIMEOUT_MS,
+        queueDepth: input.runtimeState.queueSize,
+        contextUtilization: input.runtimeState.contextWindow?.utilization,
+        recentP50Ms: Number(recentLatency?.p50 ?? 0),
+        recentP95Ms: Number(recentLatency?.p95 ?? 0),
+        recentP99Ms: Number(recentLatency?.p99 ?? 0),
+        payloadChars: input.message.length,
+        phase: /** @type {'dialog'} */ ('dialog'),
+    };
+    const byokActive = input.byok.enabled === true && input.byok.ready === true;
+    if (!byokActive) {
+        return resolveOptionalDialogTimeout({
+            ...common,
+            explicitTimeoutMs: 0,
+            allowDisabled: true,
+        });
+    }
+
+    const override = parseByokTurnTimeoutOverride(TERMINAL_BYOK_TURN_TIMEOUT_MS);
+    if (override.kind === 'disabled') {
+        const advisory = resolveOptionalDialogTimeout({
+            ...common,
+            allowDisabled: false,
+        });
+        return {
+            timeoutMs: null,
+            strategy: 'disabled',
+            reasons: [`${BYOK_TURN_TIMEOUT_ENV}:disabled`, 'byok_provider_watchdog_only'],
+            advisoryTimeoutMs: advisory.timeoutMs ?? TURN_TIMEOUT_MS,
+        };
+    }
+
+    return resolveOptionalDialogTimeout({
+        ...common,
+        explicitTimeoutMs: override.kind === 'explicit' ? override.timeoutMs : undefined,
+        allowDisabled: false,
+    });
+}
+
+/**
+ * @param {unknown} error
+ * @returns {string}
+ */
+function errorCodeOf(error) {
+    if (!error || typeof error !== 'object') return '';
+    const code = Reflect.get(error, 'code');
+    return typeof code === 'string' ? code : '';
+}
+
+/**
+ * @param {unknown} error
+ * @param {ReturnType<typeof readConfiguredByokSummary>} byok
+ * @returns {{ message: string; errorContext: string; provider: string | null; profile: string | null; model: string | null } | null}
+ */
+function resolveByokTurnErrorDescriptor(error, byok) {
+    if (byok.enabled !== true || byok.ready !== true) return null;
+    const err = toError(error);
+    const message = err.message || 'erro no turno BYOK';
+    const code = errorCodeOf(error);
+    const timeoutLike = code === 'DIALOG_TIMEOUT' || /sendTurn sem progresso|inactivity timeout|timeout/i.test(message);
+    const providerLike =
+        timeoutLike || /failed to get response|ai model|provider|model_call|rate limit|quota|retry|retried/i.test(message);
+    if (!providerLike) return null;
+    return {
+        message,
+        errorContext: timeoutLike ? 'dialog.byok_inactivity_timeout' : 'dialog.byok_turn_error',
+        provider:
+            byok.preset ??
+            byok.providerType ??
+            (typeof Reflect.get(byok, 'provider') === 'string' ? Reflect.get(byok, 'provider') : null),
+        profile: byok.profile ?? null,
+        model: byok.model ?? null,
+    };
 }
 
 /**
@@ -561,7 +674,8 @@ async function _executeTurn(message, actor, attachments = [], requestHeaders = n
         }
     }
 
-    const byokBudget = evaluateTerminalByokTurnBudget(readConfiguredByokSummary(), runtimeState, message);
+    const byokSummary = readConfiguredByokSummary();
+    const byokBudget = evaluateTerminalByokTurnBudget(byokSummary, runtimeState, message);
     if (byokBudget.shouldWarn) {
         const admissionMode = readTerminalByokAdmissionMode();
         recordTerminalActivity('system', 'Orçamento BYOK apertado', {
@@ -606,15 +720,11 @@ async function _executeTurn(message, actor, attachments = [], requestHeaders = n
             return null;
         }
     })();
-    const timeoutDecision = resolveOptionalDialogTimeout({
-        explicitTimeoutMs: 0,
-        allowDisabled: true,
-        defaultTimeoutMs: TURN_TIMEOUT_MS,
-        queueDepth: runtimeState.queueSize,
-        contextUtilization: runtimeState.contextWindow?.utilization,
-        recentP50Ms: Number(metricsSummary?.dialog?.turnLatency?.p50 ?? 0),
-        recentP95Ms: Number(metricsSummary?.dialog?.turnLatency?.p95 ?? 0),
-        recentP99Ms: Number(metricsSummary?.dialog?.turnLatency?.p99 ?? 0),
+    const timeoutDecision = resolveTerminalDialogTurnTimeout({
+        byok: byokSummary,
+        runtimeState,
+        metricsSummary,
+        message,
     });
 
     setBusy(true);
@@ -1010,14 +1120,44 @@ async function _executeTurn(message, actor, attachments = [], requestHeaders = n
 
         return reply;
     } catch (e) {
-        clearTerminalTurnMaterialization();
+        const err = toError(e);
+        const byokFailure = resolveByokTurnErrorDescriptor(e, readConfiguredByokSummary());
+        if (byokFailure) {
+            const now = Date.now();
+            recordByokProviderModelCallFailure({
+                profile: byokFailure.profile,
+                provider: byokFailure.provider,
+                model: byokFailure.model,
+                message: byokFailure.message,
+                errorContext: byokFailure.errorContext,
+                timestamp: now,
+            });
+            completeTerminalTurnMaterialization({ timestamp: now, status: 'failed' });
+            const revisedTrace = reviseRecentTerminalTurnTraceStatus({ timestamp: now, status: 'failed' });
+            if (!revisedTrace) {
+                completeTerminalTurnTrace({ timestamp: now, status: 'failed' });
+            }
+            recordTerminalActivity('error', 'Falha de provider BYOK no turno', {
+                detail:
+                    `${byokFailure.errorContext} · perfil=${byokFailure.profile ?? '-'} · ` +
+                    `provider=${byokFailure.provider ?? '-'} · modelo=${byokFailure.model ?? '-'} · ` +
+                    'sem Premium Request',
+                severity: 'error',
+                source: 'dialog',
+            });
+            println(
+                `\x1b[31m[byok] ${byokFailure.errorContext}: ${byokFailure.message} · sem Premium Request · use /byok health ou /byok recommend safe\x1b[0m`,
+            );
+        } else {
+            clearTerminalTurnMaterialization();
+        }
         recordTerminalActivity('error', 'Erro no turno', {
-            detail: toError(e).message,
+            detail: err.message,
             severity: 'error',
             source: 'dialog',
         });
-        println(`[erro] ${toError(e).message}`);
-        log('ERROR', `[TerminalServer] Erro no turno ${actor}: ${toError(e).message}`);
+        println(`[erro] ${err.message}`);
+        log('ERROR', `[TerminalServer] Erro no turno ${actor}: ${err.message}`);
         if (!readTerminalRuntimeControlState().dialogLoopActive) {
             log('WARN', '[TerminalServer] Dialog loop inativo após erro — reagendando ensureDialogLoop');
             void (async () => {

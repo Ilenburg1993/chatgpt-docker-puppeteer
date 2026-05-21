@@ -214,12 +214,24 @@ function profileModel(env, profileName) {
     return typeof profile?.model === 'string' && profile.model.trim() ? profile.model.trim() : '';
 }
 
+function profileProvider(env, profileName) {
+    const profiles = parseProfilesJson(env.COPILOT_BYOK_PROFILES_JSON);
+    const profile = profiles[profileName];
+    for (const key of ['preset', 'providerType', 'provider', 'name']) {
+        const value = profile?.[key];
+        if (typeof value === 'string' && value.trim()) return value.trim();
+    }
+    return profileName || '';
+}
+
 function buildRealByokRuntime({ dotenvEnv, requestedProfile, requestedAltProfile, requestedModel, requestedAltModel }) {
     const mergedEnv = { ...process.env, ...dotenvEnv };
     const profile = chooseRealByokProfile(mergedEnv, requestedProfile);
     const altProfile = chooseAlternateByokProfile(mergedEnv, profile, requestedAltProfile);
     const model = requestedModel || profileModel(mergedEnv, profile);
     const altModel = requestedAltModel || profileModel(mergedEnv, altProfile);
+    const provider = profileProvider(mergedEnv, profile);
+    const altProvider = profileProvider(mergedEnv, altProfile);
     return {
         env: {
             ...dotenvEnv,
@@ -232,22 +244,35 @@ function buildRealByokRuntime({ dotenvEnv, requestedProfile, requestedAltProfile
         altProfile,
         model,
         altModel,
+        provider,
+        altProvider,
         redacted: {
             enabled: true,
             profile: profile || null,
             altProfile: altProfile || null,
             model: model || null,
             altModel: altModel || null,
+            provider: provider || null,
+            altProvider: altProvider || null,
             dotenvLocalLoaded: Object.keys(dotenvEnv).length > 0,
             secretKeysPresent: collectSecretValues(mergedEnv).map(({ key }) => key).sort(),
         },
     };
 }
 
-function buildByokRealPreflightCommands({ profile, altProfile, model, altModel }) {
+function buildByokCatalogCommands(provider) {
+    const providerFilter = provider ? ` provider:${provider}` : '';
+    return [
+        `/byok models refresh${providerFilter}`,
+        `/byok models free reasoning safe 8${providerFilter}`,
+        `/byok recommend reasoning safe 8${providerFilter}`,
+    ];
+}
+
+function buildByokRealPreflightCommands({ profile, altProfile, model, altModel, provider, altProvider }) {
     const commands = ['/byok reload', '/byok env', '/byok providers', '/byok health', '/byok profiles'];
     if (profile) commands.push(`/byok use ${profile}`);
-    commands.push('/byok', '/byok models refresh', '/byok models free reasoning safe 8', '/byok recommend reasoning safe 8');
+    commands.push('/byok', ...buildByokCatalogCommands(provider));
     if (altModel && altModel !== model) {
         commands.push(`/byok model ${altModel}`, '/byok');
     }
@@ -255,7 +280,7 @@ function buildByokRealPreflightCommands({ profile, altProfile, model, altModel }
         commands.push(`/byok model ${model}`, '/byok');
     }
     if (altProfile) {
-        commands.push(`/byok use ${altProfile}`, '/byok', '/byok providers', '/byok health', '/byok models refresh', '/byok models free reasoning safe 8', '/byok recommend reasoning safe 8');
+        commands.push(`/byok use ${altProfile}`, '/byok', '/byok providers', '/byok health', ...buildByokCatalogCommands(altProvider));
         if (profile) {
             commands.push(`/byok use ${profile}`);
             if (model) commands.push(`/byok model ${model}`);
@@ -385,11 +410,16 @@ function detectLiveBlocker(plain, runtime = {}) {
             detail: 'BYOK provider rejected the selected paid model with 402; switch to a free/credited model',
         };
     }
-    if (/erro de provider BYOK/i.test(plain) || /\[cancellation\]\s+Operation cancelled by user/i.test(plain)) {
+    if (
+        /erro de provider BYOK/i.test(plain) ||
+        /Erro de sessão BYOK/i.test(plain) ||
+        /\[query\]\s+Failed to get response from the AI model/i.test(plain) ||
+        /\[cancellation\]\s+Operation cancelled by user/i.test(plain)
+    ) {
         const modelMatch = plain.match(/modelo=([^\s·\n]+)/i);
         return {
-            id: 'byok-provider-model-call-aborted',
-            detail: `BYOK provider model_call failed and was aborted without Copilot fallback${modelMatch?.[1] ? ` · model=${modelMatch[1]}` : ''}`,
+            id: 'byok-provider-turn-failed',
+            detail: `BYOK provider turn failed and was contained without Copilot fallback${modelMatch?.[1] ? ` · model=${modelMatch[1]}` : ''}`,
         };
     }
     if (runtime.timedOut) {
@@ -1017,7 +1047,11 @@ function evaluateByokRealOutput(plain, secretValues, { profile, altProfile, mode
     const byokUsageClassified =
         /\bclasse=byok_user_message\b/u.test(plain) ||
         /"classification"\s*:\s*"byok_user_message"/u.test(plain);
-    const byokProviderBlocked = /erro de provider BYOK/i.test(plain) || /\[cancellation\]\s+Operation cancelled by user/i.test(plain);
+    const byokProviderBlocked =
+        /erro de provider BYOK/i.test(plain) ||
+        /Erro de sessão BYOK/i.test(plain) ||
+        /\[query\]\s+Failed to get response from the AI model/i.test(plain) ||
+        /\[cancellation\]\s+Operation cancelled by user/i.test(plain);
     const criteria = [
         {
             id: 'byok-real-dotenv-reload',
@@ -1046,7 +1080,7 @@ function evaluateByokRealOutput(plain, secretValues, { profile, altProfile, mode
         },
         {
             id: 'byok-real-model-filtering',
-            pass: /BYOK models[\s\S]{0,800}filtros=free,reasoning,safe/.test(plain),
+            pass: /BYOK models[\s\S]{0,1000}filtros=[^\n]*free[^\n]*reasoning[^\n]*safe/.test(plain),
             detail: 'BYOK real probe exercised filtered model discovery',
         },
         {

@@ -225,6 +225,44 @@ export function completeTerminalTurnTrace({ turnId = null, timestamp = Date.now(
 }
 
 /**
+ * Reconciles late lifecycle failures emitted after `assistant.turn_end`.
+ *
+ * Some providers surface a transport/query failure only after the SDK already emitted the assistant turn end event.
+ * In that case the trace was closed as completed a few milliseconds earlier. This function revises the most recent
+ * matching trace instead of creating a parallel error trace.
+ *
+ * @param {{ turnId?: string | null; timestamp?: number; status?: Exclude<TerminalTurnTraceStatus, 'active'>; maxAgeMs?: number }} [input]
+ * @returns {TerminalTurnTraceSnapshot | null}
+ */
+export function reviseRecentTerminalTurnTraceStatus({
+    turnId = null,
+    timestamp = Date.now(),
+    status = 'failed',
+    maxAgeMs = 30_000,
+} = {}) {
+    const normalizedTurnId = normalizeTurnId(turnId);
+    if (_currentTurnTrace) {
+        return completeTerminalTurnTrace({ turnId: normalizedTurnId, timestamp, status });
+    }
+    for (let index = _recentTurnTraces.length - 1; index >= 0; index -= 1) {
+        const trace = _recentTurnTraces[index];
+        if (!trace) continue;
+        if (normalizedTurnId && trace.turnId && trace.turnId !== normalizedTurnId) continue;
+        const ageMs = timestamp - (trace.finishedAt ?? trace.updatedAt);
+        if (Number.isFinite(ageMs) && ageMs > maxAgeMs) continue;
+        const revised = {
+            ...trace,
+            status,
+            updatedAt: timestamp,
+            finishedAt: timestamp,
+        };
+        _recentTurnTraces[index] = revised;
+        return { ...revised };
+    }
+    return null;
+}
+
+/**
  * @param {{
  *     toolName: string;
  *     operation?: TerminalTurnTraceOperation;
