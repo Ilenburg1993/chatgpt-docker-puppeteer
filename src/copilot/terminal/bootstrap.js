@@ -7,6 +7,8 @@
  * @module copilot/terminal/bootstrap
  */
 
+import './bootstrap-dotenv.js';
+
 import { bootCopilot } from '../boot/runtime-bootstrap.js';
 import { log } from '../observability/logger.js';
 import { handleTerminalBootFailure, registerTerminalShutdownSignals } from './bootstrap-lifecycle.js';

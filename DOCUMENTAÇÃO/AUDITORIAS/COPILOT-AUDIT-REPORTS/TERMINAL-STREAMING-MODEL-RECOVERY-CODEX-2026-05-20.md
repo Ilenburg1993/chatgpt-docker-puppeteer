@@ -641,7 +641,24 @@ Correção:
 
 Status: implementado nesta revisão.
 
-### A33. Permanência BYOK não podia depender de edição manual do operador
+### A33. `.env.local` precisava carregar antes das leituras estáticas do terminal
+
+Achado:
+
+- A permanência operacional de BYOK em `.env.local` só é confiável se o entrypoint carregar o arquivo antes de `readCopilotBootConfig()`, auto-brief, projeções e runtime wiring.
+- O comando `/byok reload` resolvia o processo já em execução, mas não garantia que o próximo boot canônico partisse do arquivo local.
+
+Correção:
+
+- Criado `terminal/bootstrap-dotenv-loader.js`, testável, com `dotenv.config({ path: '.env.local', override: false, quiet: true })`.
+- Criado `terminal/bootstrap-dotenv.js` como side-effect import precoce no topo de `terminal/bootstrap.js`.
+- `override=false` preserva env explícito da task, shell ou harness; `.env.local` entra como default operacional do operador.
+- `module-map.js` passou a registrar os novos módulos de boot.
+- Probe sem PR confirmou auto-brief de boot e ready com BYOK `ready` vindo diretamente do `.env.local`: `artifacts/terminal-live/2026-05-21T12-30-28-011Z/summary.md`.
+
+Status: implementado nesta revisão.
+
+### A34. Permanência BYOK não podia depender de edição manual do operador
 
 Achado:
 
@@ -961,6 +978,7 @@ Fase J2. Env governance e segredo
 - J2.6 Consolidar `.env.local` como arquivo único do operador para perfis, metadata e segredos. Status: feito nesta revisão.
 - J2.7 Criar `COPILOT_BYOK_PROFILES_JSON` e `COPILOT_BYOK_PROFILE` para alternância segura entre providers/modelos. Status: feito nesta revisão.
 - J2.8 Adicionar preset Kilo Gateway/Kilo Code sem registrar token real. Status: feito nesta revisão.
+- J2.9 Carregar `.env.local` no entrypoint `terminal:llm-b` antes das leituras estáticas de configuração, sem sobrescrever env explícito. Status: feito nesta revisão.
 
 Fase J3. Provider e model list
 
