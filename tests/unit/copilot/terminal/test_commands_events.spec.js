@@ -68,6 +68,9 @@ describe('terminal/commands/events', () => {
         expect(ctx.output()).toContain('/events source=terminal/dialog/turn-display.createDeltaCallback 50');
         expect(ctx.output()).toContain('task.delta only when dialog loop is inactive');
         expect(ctx.output()).toContain('ask_user.visible-question');
+        expect(ctx.output()).toContain('byok.provider.config');
+        expect(ctx.output()).toContain('COPILOT_BYOK_* resolved into SDK provider');
+        expect(ctx.output()).toContain('/byok env · /byok profiles · /byok models refresh · /status');
     });
 
     it('consulta archive SSE com filtros de evento e trace', async () => {

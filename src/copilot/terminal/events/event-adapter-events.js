@@ -121,7 +121,7 @@ export const TERMINAL_AGENT_SSE_PASSTHROUGH_EVENTS = new Set([
  *
  * @type {ReadonlyArray<{
  *     id: string;
- *     class: 'content' | 'interaction' | 'tool' | 'state' | 'telemetry' | 'diagnostic' | 'lifecycle';
+ *     class: 'content' | 'interaction' | 'tool' | 'state' | 'telemetry' | 'diagnostic' | 'lifecycle' | 'provider';
  *     canonicalEmitter: string;
  *     publicEvents: string[];
  *     accepts: string[];
@@ -210,6 +210,24 @@ export const TERMINAL_PUBLIC_STREAM_SOURCE_POLICIES = Object.freeze([
         suppresses: ['wording that implies Premium Request without pr.consumed evidence'],
         fallback: 'usage is telemetry only; pr.consumed is the only public PR-consumption signal',
         owner: 'event-handlers/usage-classifier.js + terminal/events/agent-runtime-events.js',
+    },
+    {
+        id: 'byok.provider.config',
+        class: 'provider',
+        canonicalEmitter: 'sdk/session/provider.readConfiguredByokState + terminal/frontend/projections/config',
+        publicEvents: ['terminal.started', 'llm.usage', 'session.usage'],
+        accepts: [
+            'COPILOT_BYOK_* resolved into SDK provider',
+            '/byok status/profiles/models/use/model/provider/reload commands',
+            'provider model catalog discovery',
+        ],
+        suppresses: [
+            'raw API keys/tokens/headers in terminal/SSE/JSONL',
+            'parallel non-SDK BYOK LLM loop',
+            'provider switch presented as active SDK session before restart/reattach confirmation',
+        ],
+        fallback: '/byok env · /byok profiles · /byok models refresh · /status',
+        owner: 'sdk/session/provider.js + terminal/commands/byok.js + terminal/frontend/projections/config.js',
     },
     {
         id: 'session.error.diagnostic',

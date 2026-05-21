@@ -2,14 +2,23 @@
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-const { discoverConfiguredByokModelsFromEnv, loadDotenv, readTerminalByokProjection } = vi.hoisted(() => ({
-    discoverConfiguredByokModelsFromEnv: vi.fn(),
-    loadDotenv: vi.fn(),
-    readTerminalByokProjection: vi.fn(),
-}));
+const { chmod, discoverConfiguredByokModelsFromEnv, loadDotenv, readFile, readTerminalByokProjection, rename, writeFile } =
+    vi.hoisted(() => ({
+        chmod: vi.fn(),
+        discoverConfiguredByokModelsFromEnv: vi.fn(),
+        loadDotenv: vi.fn(),
+        readFile: vi.fn(),
+        readTerminalByokProjection: vi.fn(),
+        rename: vi.fn(),
+        writeFile: vi.fn(),
+    }));
 
-vi.mock('../../../../src/copilot/terminal/frontend/index.js', () => ({
-    readTerminalByokProjection,
+vi.mock('node:fs/promises', () => ({
+    default: { readFile, writeFile, rename, chmod },
+    readFile,
+    writeFile,
+    rename,
+    chmod,
 }));
 
 vi.mock('dotenv', () => ({
@@ -18,6 +27,10 @@ vi.mock('dotenv', () => ({
 
 vi.mock('#copilot/config', () => ({
     discoverConfiguredByokModelsFromEnv,
+}));
+
+vi.mock('../../../../src/copilot/terminal/frontend/index.js', () => ({
+    readTerminalByokProjection,
 }));
 
 const { cmdByok } = await import('../../../../src/copilot/terminal/commands/byok.js');
@@ -67,8 +80,13 @@ function mockCtx() {
 describe('terminal /byok command', () => {
     afterEach(() => {
         discoverConfiguredByokModelsFromEnv.mockReset();
+        chmod.mockReset();
+        chmod.mockResolvedValue(undefined);
         loadDotenv.mockReset();
+        readFile.mockReset();
         readTerminalByokProjection.mockReset();
+        rename.mockReset();
+        writeFile.mockReset();
         delete process.env['COPILOT_BYOK_ENABLED'];
         delete process.env['COPILOT_BYOK_PROFILE'];
         delete process.env['COPILOT_BYOK_PROVIDER_PRESET'];
@@ -231,5 +249,75 @@ describe('terminal /byok command', () => {
         expect(process.env['COPILOT_BYOK_MODEL']).toBe('anthropic/claude-sonnet-4.5');
         expect(process.env['COPILOT_BYOK_BASE_URL']).toBe('https://api.kilo.ai/api/gateway');
         expect(ctx.output()).toContain('BYOK status');
+    });
+
+    it('persiste perfil BYOK em .env.local sem gravar segredo novo', async () => {
+        readFile.mockResolvedValue(
+            [
+                'COPILOT_BYOK_ENABLED=false',
+                'COPILOT_BYOK_PROFILE=old',
+                'COPILOT_BYOK_MODEL=old-model',
+                'COPILOT_BYOK_PROVIDER_PRESET=old-provider',
+                'KILO_CODE_API_KEY=existing-secret',
+                '',
+            ].join('\n'),
+        );
+        mockProjection({
+            profiles: [
+                {
+                    name: 'kilo',
+                    preset: 'kilo-code',
+                    providerType: 'openai',
+                    baseUrl: 'https://api.kilo.ai/api/gateway',
+                    model: 'kilo-auto/free',
+                    auth: { apiKeyConfigured: false, bearerTokenConfigured: true, headersConfigured: false },
+                    metadataKeys: [],
+                },
+            ],
+        });
+        const ctx = mockCtx();
+
+        await cmdByok({ println: ctx.println }, 'persist profile kilo');
+
+        expect(process.env['COPILOT_BYOK_ENABLED']).toBe('true');
+        expect(process.env['COPILOT_BYOK_PROFILE']).toBe('kilo');
+        expect(writeFile).toHaveBeenCalledWith(
+            expect.stringMatching(/^\.env\.local\.tmp-/),
+            expect.stringContaining('COPILOT_BYOK_PROFILE=kilo'),
+            expect.objectContaining({ mode: 0o600 }),
+        );
+        const written = String(writeFile.mock.calls[0][1]);
+        expect(written).toContain('COPILOT_BYOK_ENABLED=true');
+        expect(written).not.toContain('COPILOT_BYOK_MODEL=old-model');
+        expect(written).toContain('KILO_CODE_API_KEY=existing-secret');
+        expect(rename).toHaveBeenCalledWith(expect.stringMatching(/^\.env\.local\.tmp-/), '.env.local');
+        expect(ctx.output()).toContain('Perfil BYOK persistido: kilo');
+        expect(ctx.output()).not.toContain('existing-secret');
+    });
+
+    it('persiste volta ao SDK removendo seletores BYOK conflitantes', async () => {
+        readFile.mockResolvedValue(
+            [
+                'COPILOT_BYOK_ENABLED=true',
+                'COPILOT_BYOK_PROFILE=kilo',
+                'COPILOT_BYOK_MODEL=kilo-auto/free',
+                'COPILOT_BYOK_PROVIDER_PRESET=kilo-code',
+                'COPILOT_BYOK_BASE_URL=https://api.kilo.ai/api/gateway',
+                '',
+            ].join('\n'),
+        );
+        mockProjection();
+        const ctx = mockCtx();
+
+        await cmdByok({ println: ctx.println }, 'persist sdk');
+
+        const written = String(writeFile.mock.calls[0][1]);
+        expect(process.env['COPILOT_BYOK_ENABLED']).toBe('false');
+        expect(process.env['COPILOT_BYOK_PROFILE']).toBeUndefined();
+        expect(written).toContain('COPILOT_BYOK_ENABLED=false');
+        expect(written).not.toContain('COPILOT_BYOK_PROFILE=');
+        expect(written).not.toContain('COPILOT_BYOK_MODEL=');
+        expect(written).not.toContain('COPILOT_BYOK_PROVIDER_PRESET=');
+        expect(ctx.output()).toContain('SDK Copilot governará o próximo boot');
     });
 });

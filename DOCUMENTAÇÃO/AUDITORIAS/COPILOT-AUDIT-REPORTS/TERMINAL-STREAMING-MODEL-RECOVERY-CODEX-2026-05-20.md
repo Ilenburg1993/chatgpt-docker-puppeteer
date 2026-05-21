@@ -597,6 +597,7 @@ Evidência:
 
 - Smoke sem PR real: `artifacts/terminal-live/2026-05-21T12-02-58-405Z/summary.md`.
 - Live real completo após correção de `dialog.turn_end`: `artifacts/terminal-live/2026-05-21T12-12-19-528Z/summary.md`.
+- Live adicional após ativar `.env.local` local para `kilo`: `artifacts/terminal-live/2026-05-21T12-26-08-467Z/summary.md`.
 - Tentativa com modelo pago/creditado: `artifacts/terminal-live/2026-05-21T12-03-39-776Z/summary.md`.
 
 Achados:
@@ -623,7 +624,39 @@ Critério resultante:
 
 - `dialog.turn_end` é evento de ciclo, não fonte concorrente de transcript.
 - O runner só acusa duplicação quando o mesmo marcador aparece em dois blocos reais distintos, não quando uma regex cruza de um bloco para o próximo.
-- BYOK real está comprovado no fluxo canônico do terminal; ainda faltam elicitation real e persistência segura por comando em `.env.local`.
+- BYOK real está comprovado no fluxo canônico do terminal; ainda falta elicitation real em BYOK.
+
+### A32. BYOK precisava entrar no mapa de fontes públicas sem criar outro fanout
+
+Achado:
+
+- O BYOK já estava integrado ao SDK, aos comandos, à projeção de configuração, ao live runner e ao fluxo real de `ask_user`/deltas/tools, mas `/events sources` ainda não explicitava BYOK como superfície governada.
+- Sem essa entrada, o operador via o BYOK em `/byok`, `/status` e `/health`, mas não no mapa de autoridade que explica quais fontes públicas podem emitir conteúdo, telemetria e estado.
+
+Correção:
+
+- Adicionada a política `byok.provider.config` em `TERMINAL_PUBLIC_STREAM_SOURCE_POLICIES`.
+- A política deixa explícito que BYOK aceita `COPILOT_BYOK_*`, comandos `/byok`, descoberta de catálogo e projeções de provider, mas suprime segredo bruto, loops LLM paralelos e confirmação enganosa de troca de provider antes de restart/reattach.
+- A correção não adiciona outro broadcast nem outro renderer. BYOK continua usando o fluxo único do SDK; `/events sources` apenas documenta e audita a autoridade existente.
+
+Status: implementado nesta revisão.
+
+### A33. Permanência BYOK não podia depender de edição manual do operador
+
+Achado:
+
+- `/byok use`, `/byok model` e `/byok provider` eram intencionalmente efêmeros, bons para investigação dentro do processo atual, mas não davam um caminho seguro para gravar a escolha em `.env.local`.
+- Isso deixava uma diferença confusa entre o boot do harness, comandos de runtime e o próximo boot real do operador.
+
+Correção:
+
+- Criado `/byok persist <sdk|profile <nome>|model <id>|provider <preset> [model] [baseUrl]>`.
+- O comando grava apenas seletores não secretos, preserva segredos já existentes, usa escrita por arquivo temporário + rename e mantém permissão `0600`.
+- `persist profile` ativa `COPILOT_BYOK_ENABLED=true` e `COPILOT_BYOK_PROFILE=<nome>`, removendo overrides conflitantes de modelo/provider.
+- `persist sdk` desativa BYOK e remove seletores conflitantes para o próximo boot voltar ao SDK Copilot.
+- Após gravar `.env.local` local com `COPILOT_BYOK_ENABLED=true` e `COPILOT_BYOK_PROFILE=kilo`, um novo live real PASS confirmou boot, deltas, tools, `ask_user`, resposta humana, continuação pós-ask, SSE/JSONL/export e ausência de duplicação.
+
+Status: implementado nesta revisão.
 
 ## Hipóteses Externas Rejeitadas Ou Reclassificadas
 
@@ -887,7 +920,7 @@ Fase H3. FS e watchers
 Fase I1. Inventário e classificação de emitters
 
 - I1.1 Mapear todos os listeners do SDK e eventos derivados (`dialog.delta`, `task.delta`, `assistant.message`, `question.pending`). Status: feito nesta revisão.
-- I1.2 Classificar cada emissor como fonte canônica, adaptador, fallback ou legado. Status: ampliado nesta revisão; `/events sources` expõe classe, owner, emissor, eventos aceitos, supressões e fallback das superfícies críticas.
+- I1.2 Classificar cada emissor como fonte canônica, adaptador, fallback ou legado. Status: ampliado nesta revisão; `/events sources` expõe classe, owner, emissor, eventos aceitos, supressões e fallback das superfícies críticas, incluindo BYOK como provider governado.
 - I1.3 Bloquear novos eventos públicos fora de `broadcastSse()` por teste arquitetural. Status: feito nesta revisão para fanout durável/SSE: `eventFanout.publish()` e `recordTerminalSseEventArchive()` ficam concentrados em `dialog/sse.js` e no arquivo de archive.
 - I1.4 Expor `/events sources` ou `/health` com contagem por fonte/adaptador. Status: feito em `/events sources [n]`, com contagem recente por política a partir do archive SSE.
 
@@ -964,16 +997,17 @@ Fase J5. UX e comandos
 - J5.9 Criar `/byok use <perfil|sdk>`. Status: feito nesta revisão.
 - J5.10 Criar `/byok model <id>`. Status: feito nesta revisão.
 - J5.11 Criar `/byok provider <preset> [model] [baseUrl]`. Status: feito nesta revisão.
-- J5.12 Criar `/byok persist` atômico/redigido para editar `.env.local` sem expor segredo. Status: pendente.
+- J5.12 Criar `/byok persist` atômico/redigido para editar `.env.local` sem expor segredo. Status: feito nesta revisão.
 - J5.13 Criar `/byok models refresh` com descoberta forçada. Status: feito nesta revisão.
 - J5.14 Mostrar fonte do catálogo (`provider`, `provider-cache`, `static`, `static-fallback`) no terminal. Status: feito nesta revisão.
+- J5.15 Integrar BYOK em `/events sources` como fonte pública de provider/config sem fanout paralelo. Status: feito nesta revisão.
 
 Fase J6. Testes
 
 - J6.1 Cobrir helpers de provider/env/redaction por unit test. Status: feito nesta revisão.
 - J6.2 Cobrir `ClientOptionsBuilder` com `onListModels` BYOK e remoção de segredos do child env. Status: feito nesta revisão.
 - J6.3 Criar fake SDK BYOK determinístico sem rede. Status: parcialmente feito por unit tests de resolução/comando; falta sessão SDK fake end-to-end.
-- J6.4 Rodar live test com `/byok`, delta, tool, `ask_user` e elicitation quando disponível. Status: `/byok`, delta, tool e ask_user PASS em `artifacts/terminal-live/2026-05-21T12-12-19-528Z/summary.md`; elicitation pendente.
+- J6.4 Rodar live test com `/byok`, delta, tool, `ask_user` e elicitation quando disponível. Status: `/byok`, delta, tool e ask_user PASS em `artifacts/terminal-live/2026-05-21T12-12-19-528Z/summary.md` e `artifacts/terminal-live/2026-05-21T12-26-08-467Z/summary.md`; elicitation pendente.
 - J6.5 Rodar smoke real Kilo/Ollama Cloud/OpenAI-compatible sem gravar segredo em artefato. Status: PASS em `artifacts/terminal-live/2026-05-21T12-12-19-528Z/summary.md`.
 - J6.6 Adicionar comando live/harness específico para `/byok status`, `/byok models` e `/byok env` sem abrir turno. Status: feito nesta revisão com `--byok-probe`.
 - J6.7 Cobrir `/byok profiles`, `/byok use`, `/byok model`, `/byok provider` e `/byok reload`. Status: profiles/use/model/reload cobertos por live real em `artifacts/terminal-live/2026-05-21T12-12-19-528Z/summary.md`; provider direto coberto por fixture em `artifacts/terminal-live/2026-05-21T11-50-03-576Z/summary.md`.
@@ -1106,7 +1140,7 @@ Próxima rodada recomendada:
 2. Expandir o cenário live para elicitation quando a capability estiver disponível.
 3. Fechar a recuperação `session.error`/`reconnect_restart`, distinguindo retry real de reenvio ambíguo de prompt.
 4. Criar contrato único de modelo configurado/preferido/efetivo/cobrado, incluindo billing/effective model real em BYOK.
-5. Implementar `/byok persist` atômico/redigido para editar `.env.local` de forma segura.
+5. Expandir smoke de elicitation real em BYOK e fake SDK end-to-end sem rede.
 6. Rodar turno funcional dedicado em Ollama Cloud e, quando disponível, Ollama local/LiteLLM/vLLM.
 7. Continuar a normalização de tool identity em completions/progress externos sem requestId, com métricas para qualquer lifecycle ainda genérico.
 8. Integrar falha de `wireRuntime()` ao `ErrorTracker` com metadados de fase.

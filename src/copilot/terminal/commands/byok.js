@@ -8,6 +8,8 @@
  * @module copilot/terminal/commands/byok
  */
 
+import fs from 'node:fs/promises';
+
 import { config as loadDotenv } from 'dotenv';
 
 import { discoverConfiguredByokModelsFromEnv } from '#copilot/config';
@@ -65,7 +67,7 @@ function renderStatus(projection, println) {
         println(`  \x1b[31m  erro: ${error}\x1b[0m`);
     }
     println('  \x1b[90mArquivo unico de BYOK: .env.local. Mudancas via comando valem para o processo atual; use /restart para nova sessao SDK.\x1b[0m');
-    println('  \x1b[90mUso: /byok | /byok reload | /byok profiles | /byok models [refresh|all|n] | /byok use <perfil|sdk> | /byok model <id> | /byok provider <preset> [model] [baseUrl] | /byok env\x1b[0m\n');
+    println('  \x1b[90mUso: /byok | /byok reload | /byok profiles | /byok models [refresh|all|n] | /byok use <perfil|sdk> | /byok model <id> | /byok provider <preset> [model] [baseUrl] | /byok persist <sdk|profile|model|provider> | /byok env\x1b[0m\n');
 }
 
 /**
@@ -74,6 +76,145 @@ function renderStatus(projection, println) {
  */
 function normalizeArg(value) {
     return value.trim();
+}
+
+/**
+ * @param {string} value
+ * @returns {string}
+ */
+function assertSafeEnvValue(value) {
+    const normalized = normalizeArg(value);
+    if (!normalized) throw new Error('valor vazio');
+    if (/[\r\n]/u.test(normalized) || normalized.includes('\0')) throw new Error('valor contém quebra de linha ou NUL');
+    return normalized;
+}
+
+/**
+ * @param {string} text
+ * @param {string} key
+ * @param {string} value
+ * @returns {string}
+ */
+function setEnvLine(text, key, value) {
+    const line = `${key}=${value}`;
+    const re = new RegExp(`^${key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}=.*$`, 'm');
+    if (re.test(text)) return text.replace(re, line);
+    return `${text.replace(/\s*$/u, '')}\n${line}\n`;
+}
+
+/**
+ * @param {string} text
+ * @param {string} key
+ * @returns {string}
+ */
+function deleteEnvLine(text, key) {
+    const re = new RegExp(`^${key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}=.*(?:\r?\n|$)`, 'm');
+    return text.replace(re, '');
+}
+
+/**
+ * @param {(text: string) => string} mutate
+ * @returns {Promise<void>}
+ */
+async function mutateEnvLocal(mutate) {
+    const path = '.env.local';
+    let text = '';
+    try {
+        text = await fs.readFile(path, 'utf8');
+    } catch (error) {
+        if (/** @type {{ code?: string }} */ (error).code !== 'ENOENT') throw error;
+    }
+    const next = mutate(text);
+    const normalized = next.endsWith('\n') ? next : `${next}\n`;
+    const temp = `${path}.tmp-${process.pid}-${Date.now()}`;
+    await fs.writeFile(temp, normalized, { encoding: 'utf8', mode: 0o600 });
+    await fs.rename(temp, path);
+    await Promise.resolve(fs.chmod(path, 0o600)).catch(() => undefined);
+}
+
+/**
+ * @param {string[]} rest
+ * @param {ReturnType<typeof readTerminalByokProjection>} projection
+ * @returns {Promise<string>}
+ */
+async function persistByokSelection(rest, projection) {
+    const [kindRaw = '', ...values] = rest;
+    const kind = kindRaw.toLowerCase();
+    if (!kind || kind === 'help') {
+        return 'Uso: /byok persist <sdk|profile <nome>|model <id>|provider <preset> [model] [baseUrl]>';
+    }
+    if (kind === 'sdk' || kind === 'off' || kind === 'copilot') {
+        await mutateEnvLocal((text) => {
+            let next = setEnvLine(text, 'COPILOT_BYOK_ENABLED', 'false');
+            next = deleteEnvLine(next, 'COPILOT_BYOK_PROFILE');
+            next = deleteEnvLine(next, 'COPILOT_BYOK_MODEL');
+            next = deleteEnvLine(next, 'COPILOT_BYOK_PROVIDER_PRESET');
+            next = deleteEnvLine(next, 'COPILOT_BYOK_BASE_URL');
+            return next;
+        });
+        process.env['COPILOT_BYOK_ENABLED'] = 'false';
+        delete process.env['COPILOT_BYOK_PROFILE'];
+        delete process.env['COPILOT_BYOK_MODEL'];
+        delete process.env['COPILOT_BYOK_PROVIDER_PRESET'];
+        delete process.env['COPILOT_BYOK_BASE_URL'];
+        return 'BYOK persistido como desativado; SDK Copilot governará o próximo boot.';
+    }
+
+    if (kind === 'profile' || kind === 'use') {
+        const profileName = assertSafeEnvValue(values.join(' '));
+        if (!projection.profiles.some((profile) => profile.name === profileName)) {
+            return `Perfil BYOK não encontrado: ${profileName}. Veja /byok profiles.`;
+        }
+        await mutateEnvLocal((text) => {
+            let next = setEnvLine(text, 'COPILOT_BYOK_ENABLED', 'true');
+            next = setEnvLine(next, 'COPILOT_BYOK_PROFILE', profileName);
+            next = deleteEnvLine(next, 'COPILOT_BYOK_MODEL');
+            next = deleteEnvLine(next, 'COPILOT_BYOK_PROVIDER_PRESET');
+            next = deleteEnvLine(next, 'COPILOT_BYOK_BASE_URL');
+            return next;
+        });
+        process.env['COPILOT_BYOK_ENABLED'] = 'true';
+        process.env['COPILOT_BYOK_PROFILE'] = profileName;
+        delete process.env['COPILOT_BYOK_MODEL'];
+        delete process.env['COPILOT_BYOK_PROVIDER_PRESET'];
+        delete process.env['COPILOT_BYOK_BASE_URL'];
+        return `Perfil BYOK persistido: ${profileName}.`;
+    }
+
+    if (kind === 'model') {
+        const model = assertSafeEnvValue(values.join(' '));
+        await mutateEnvLocal((text) => {
+            let next = setEnvLine(text, 'COPILOT_BYOK_ENABLED', 'true');
+            next = setEnvLine(next, 'COPILOT_BYOK_MODEL', model);
+            return next;
+        });
+        process.env['COPILOT_BYOK_ENABLED'] = 'true';
+        process.env['COPILOT_BYOK_MODEL'] = model;
+        return `Modelo BYOK persistido: ${model}.`;
+    }
+
+    if (kind === 'provider') {
+        const [presetRaw, modelRaw, baseUrlRaw] = values;
+        const preset = assertSafeEnvValue(presetRaw ?? '');
+        const model = modelRaw ? assertSafeEnvValue(modelRaw) : null;
+        const baseUrl = baseUrlRaw ? assertSafeEnvValue(baseUrlRaw) : null;
+        await mutateEnvLocal((text) => {
+            let next = setEnvLine(text, 'COPILOT_BYOK_ENABLED', 'true');
+            next = deleteEnvLine(next, 'COPILOT_BYOK_PROFILE');
+            next = setEnvLine(next, 'COPILOT_BYOK_PROVIDER_PRESET', preset);
+            if (model) next = setEnvLine(next, 'COPILOT_BYOK_MODEL', model);
+            if (baseUrl) next = setEnvLine(next, 'COPILOT_BYOK_BASE_URL', baseUrl);
+            return next;
+        });
+        process.env['COPILOT_BYOK_ENABLED'] = 'true';
+        delete process.env['COPILOT_BYOK_PROFILE'];
+        process.env['COPILOT_BYOK_PROVIDER_PRESET'] = preset;
+        if (model) process.env['COPILOT_BYOK_MODEL'] = model;
+        if (baseUrl) process.env['COPILOT_BYOK_BASE_URL'] = baseUrl;
+        return `Provider BYOK persistido: ${preset}${model ? ` · model=${model}` : ''}.`;
+    }
+
+    return `Subcomando persist desconhecido: ${kind}. Use /byok persist help.`;
 }
 
 /**
@@ -96,6 +237,18 @@ export async function cmdByok({ println }, arg) {
         }
         println('\n  \x1b[90mPerfis vivem em COPILOT_BYOK_PROFILES_JSON; o ativo em COPILOT_BYOK_PROFILE. Exemplos seguros ficam em .env.local.example.\x1b[0m');
         println('  \x1b[90mUso: /byok | /byok profiles | /byok models | /byok env\x1b[0m\n');
+        return;
+    }
+
+    if (sub === 'persist') {
+        try {
+            const message = await persistByokSelection(rest, projection);
+            println(`  \x1b[32m${message}\x1b[0m`);
+            println('  \x1b[90mGravação feita em .env.local sem imprimir segredos. Use /restart para reabrir a sessão SDK com a configuração persistida.\x1b[0m\n');
+        } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            println(`  \x1b[31mNão foi possível persistir BYOK: ${message}\x1b[0m\n`);
+        }
         return;
     }
 
