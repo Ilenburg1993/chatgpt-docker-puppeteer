@@ -15,6 +15,8 @@ import { config as loadDotenv } from 'dotenv';
 import { discoverConfiguredByokModelsFromEnv } from '#copilot/config';
 import { readTerminalByokProjection } from '../frontend/index.js';
 
+const DEFAULT_BYOK_MODELS_DISPLAY_LIMIT = 24;
+
 /**
  * @typedef {object} ByokCommandContext
  * @property {(text: string) => void} println
@@ -294,7 +296,7 @@ export async function cmdByok({ println }, arg) {
         const explicitLimit = rest
             .map((item) => Number.parseInt(item, 10))
             .find((value) => Number.isFinite(value) && value > 0);
-        const limit = showAll ? Number.POSITIVE_INFINITY : explicitLimit ?? 80;
+        const limit = showAll ? Number.POSITIVE_INFINITY : explicitLimit ?? DEFAULT_BYOK_MODELS_DISPLAY_LIMIT;
         const discovered = await discoverConfiguredByokModelsFromEnv(process.env, { forceRefresh });
         const modelList = discovered.models.length > 0 ? discovered.models : models;
         const visibleModels = modelList.slice(0, limit);

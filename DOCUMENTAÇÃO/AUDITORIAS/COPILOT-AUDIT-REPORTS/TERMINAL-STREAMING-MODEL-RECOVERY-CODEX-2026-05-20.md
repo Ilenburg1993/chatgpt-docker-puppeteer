@@ -718,6 +718,21 @@ Validação:
 
 Status: implementado nesta revisão.
 
+### A37. `/byok models refresh` ainda era verboso demais para o terminal
+
+Achado:
+
+- O live real com Kilo mostrou catálogo remoto de 346 modelos. Mesmo com suporte a `all` e limite explícito, o padrão humano ainda imprimia uma página grande demais para o terminal.
+- Isso não é falha funcional de BYOK, mas é falha de cockpit: a UX passa a esconder contexto útil em um bloco enorme de modelos e aumenta ruído nos testes live.
+
+Correção:
+
+- A listagem padrão de `/byok models` e `/byok models refresh` agora mostra 24 modelos.
+- O operador continua com liberdade ampla: `/byok models all` mostra tudo e `/byok models <n>` escolhe o tamanho da página.
+- Unit test cobre a página padrão e ampliação explícita.
+
+Status: implementado nesta revisão.
+
 ## Hipóteses Externas Rejeitadas Ou Reclassificadas
 
 ### H1. "boot-hub assume sucesso"
@@ -1062,10 +1077,11 @@ Fase J5. UX e comandos
 - J5.11 Criar `/byok provider <preset> [model] [baseUrl]`. Status: feito nesta revisão.
 - J5.12 Criar `/byok persist` atômico/redigido para editar `.env.local` sem expor segredo. Status: feito nesta revisão.
 - J5.13 Criar `/byok models refresh` com descoberta forçada. Status: feito nesta revisão.
-- J5.14 Mostrar fonte do catálogo (`provider`, `provider-cache`, `static`, `static-fallback`) no terminal. Status: feito nesta revisão.
+- J5.14 Mostrar fonte do catálogo (`provider`, `provider-cache`, `static`, `static-fallback`) no terminal. Status: feito nesta revisão; a listagem padrão agora é paginada em 24 itens, com `all`/`<n>` para ampliação.
 - J5.15 Integrar BYOK em `/events sources` como fonte pública de provider/config sem fanout paralelo. Status: feito nesta revisão.
 - J5.16 Impedir que `lastPrInfo` histórico sobrescreva o modelo ativo no prompt e na linha de espera. Status: feito nesta revisão; live sem PR confirmou `kilo-auto/free` no prompt.
 - J5.17 Mostrar usage BYOK como telemetria LLM, não Premium Request. Status: feito nesta revisão; live real confirmou `[LLM] ... classe=byok_user_message`.
+- J5.18 Reduzir ruído de `/byok models refresh` em catálogos remotos grandes sem impedir inspeção completa. Status: feito nesta revisão.
 
 Fase J6. Testes
 
@@ -1083,6 +1099,7 @@ Fase J6. Testes
 - J6.12 Garantir que `COPILOT_BYOK_MODEL` possa sobrescrever apenas o modelo de um `COPILOT_BYOK_PROFILE` ativo, preservando provider/credenciais/capabilities do perfil. Status: feito nesta revisão, com unit test e live fixture PASS.
 - J6.13 Rodar live BYOK real com Kilo e Ollama Cloud validando prompt ativo, delta parcial, tool, `ask_user`, resposta humana, pós-ask, SSE/JSONL/export, ausência de duplicação e usage sem PR. Status: PASS em `artifacts/terminal-live/2026-05-21T12-40-35-670Z/summary.md` e `artifacts/terminal-live/2026-05-21T12-45-53-564Z/summary.md`.
 - J6.14 Fazer o live runner falhar automaticamente se usage de modelo BYOK aparecer como `[PR]` ou se faltar `byok_user_message` em turno real. Status: feito nesta revisão.
+- J6.15 Cobrir paginação padrão de `/byok models` por unit test. Status: feito nesta revisão.
 
 Fase J7. Providers amplos
 
@@ -1172,6 +1189,7 @@ Implementado:
 - Sessões BYOK agora carregam metadados seguros de provider/perfil/preset no runtime para que a telemetria não dependa de inferência frágil.
 - `assistant.usage` de mensagem humana em BYOK passou a ser classificado como `byok_user_message`, com `premiumRequest=false` e sem emissão de `pr.consumed`.
 - O live runner passou a exigir `byok-real-usage-not-pr` e `byok-real-usage-classified` em execuções BYOK reais com turno funcional.
+- `/byok models` passou a mostrar uma página padrão menor em catálogos grandes, mantendo `/byok models all` e `/byok models <n>` para inspeção ampla.
 - Testes unitários adicionados para runtime root, reflection sync failure e SIGHUP policy.
 - Testes unitários adicionados para reconciliação de `assistant.message` materializado, supressão visual de `question.pending` e preferência `dialog.delta`.
 - Testes unitários adicionados para normalização de objetos de erro sem `message`.
@@ -1194,6 +1212,7 @@ Implementado:
 - Live sem PR pós-correção do prompt passou em `artifacts/terminal-live/2026-05-21T12-34-44-644Z/summary.md`: BYOK persistido entrou no boot, auto-brief ready mostrou `kilo-auto/free`, prompt exibiu `você[kilo-auto…/high]›`, `/usage` manteve telemetria PR histórica separada e `/errors` ficou limpo.
 - Live BYOK real pós-correção de usage passou em `artifacts/terminal-live/2026-05-21T12-40-35-670Z/summary.md`: Kilo/Ollama Cloud, deltas, tools, `ask_user`, pós-ask, prompt ativo e arquivo durável seguiram íntegros, e a usage do turno BYOK foi renderizada como `byok_user_message` sem Premium Request.
 - Live BYOK real com guarda automática de usage passou em `artifacts/terminal-live/2026-05-21T12-45-53-564Z/summary.md`: além do circuito completo, o summary agora prova explicitamente que o modelo BYOK não apareceu como `[PR]` e que a primeira usage foi `byok_user_message`.
+- Teste unitário de `/byok models` cobre limitação padrão de 24 itens e ampliação explícita por número.
 - Live BYOK real com `kilo-auto/balanced` ficou `BLOCKED` por `byok-provider-credits` em `artifacts/terminal-live/2026-05-21T12-03-39-776Z/summary.md`; o runner agora classifica esse caso como falha externa de créditos/modelo, não como bug do terminal.
 - Smoke BYOK local sem rede validou `ollama-local`, normalização de `baseUrl` para `/v1`, modelo explícito e resumo sem segredo.
 - Testes BYOK desta rodada validaram Kilo Gateway como OpenAI-compatible, perfil ativo por `COPILOT_BYOK_PROFILE`, resumos redigidos e comandos `/byok profiles`, `/byok use` e `/byok model`.

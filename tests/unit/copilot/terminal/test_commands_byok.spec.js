@@ -213,6 +213,39 @@ describe('terminal /byok command', () => {
         expect(ctx.output()).toContain('ctx=200000');
     });
 
+    it('limita a página padrão de modelos BYOK e permite ampliar por número', async () => {
+        const discoverModels = discoverConfiguredByokModelsFromEnv;
+        const models = Array.from({ length: 30 }, (_, index) => ({
+            id: `remote-${index + 1}`,
+            capabilities: {
+                supports: { reasoningEffort: true, vision: false },
+                limits: { max_context_window_tokens: 200000 },
+            },
+        }));
+        discoverModels.mockResolvedValue({
+            models,
+            source: 'remote',
+            endpoint: 'https://api.kilo.ai/api/gateway/models',
+            fromCache: false,
+            error: null,
+        });
+        mockProjection();
+        const defaultCtx = mockCtx();
+
+        await cmdByok({ println: defaultCtx.println }, 'models refresh');
+
+        expect(defaultCtx.output()).toContain('remote-24');
+        expect(defaultCtx.output()).not.toContain('remote-25');
+        expect(defaultCtx.output()).toContain('exibindo 24/30');
+
+        const expandedCtx = mockCtx();
+        await cmdByok({ println: expandedCtx.println }, 'models refresh 26');
+
+        expect(expandedCtx.output()).toContain('remote-26');
+        expect(expandedCtx.output()).not.toContain('remote-27');
+        expect(expandedCtx.output()).toContain('exibindo 26/30');
+    });
+
     it('recarrega .env.local sem imprimir segredos', async () => {
         loadDotenv.mockReturnValue({ parsed: { KILO_API_KEY: 'secret' } });
         mockProjection({
