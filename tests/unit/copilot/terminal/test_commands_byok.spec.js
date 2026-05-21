@@ -2,10 +2,17 @@
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-const readTerminalByokProjection = vi.fn();
+const { loadDotenv, readTerminalByokProjection } = vi.hoisted(() => ({
+    loadDotenv: vi.fn(),
+    readTerminalByokProjection: vi.fn(),
+}));
 
 vi.mock('../../../../src/copilot/terminal/frontend/index.js', () => ({
     readTerminalByokProjection,
+}));
+
+vi.mock('dotenv', () => ({
+    config: loadDotenv,
 }));
 
 const { cmdByok } = await import('../../../../src/copilot/terminal/commands/byok.js');
@@ -54,6 +61,7 @@ function mockCtx() {
 
 describe('terminal /byok command', () => {
     afterEach(() => {
+        loadDotenv.mockReset();
         readTerminalByokProjection.mockReset();
         delete process.env['COPILOT_BYOK_ENABLED'];
         delete process.env['COPILOT_BYOK_PROFILE'];
@@ -153,5 +161,43 @@ describe('terminal /byok command', () => {
 
         expect(process.env['COPILOT_BYOK_ENABLED']).toBe('true');
         expect(process.env['COPILOT_BYOK_MODEL']).toBe('anthropic/claude-sonnet-4.5');
+    });
+
+    it('recarrega .env.local sem imprimir segredos', async () => {
+        loadDotenv.mockReturnValue({ parsed: { KILO_API_KEY: 'secret' } });
+        mockProjection({
+            summary: {
+                enabled: true,
+                ready: true,
+                profile: 'kilo',
+                preset: 'kilo-code',
+                providerType: 'openai',
+                baseUrl: 'https://api.kilo.ai/api/gateway',
+                model: 'anthropic/claude-sonnet-4.5',
+                auth: { apiKeyConfigured: false, bearerTokenConfigured: true, headersConfigured: false },
+            },
+        });
+        const ctx = mockCtx();
+
+        await cmdByok({ println: ctx.println }, 'reload');
+
+        expect(loadDotenv).toHaveBeenCalledWith({ path: '.env.local', override: true });
+        expect(ctx.output()).toContain('.env.local recarregado');
+        expect(ctx.output()).toContain('BYOK status');
+        expect(ctx.output()).not.toContain('secret');
+    });
+
+    it('troca provider efemero no processo atual', async () => {
+        mockProjection();
+        const ctx = mockCtx();
+
+        await cmdByok({ println: ctx.println }, 'provider kilo-code anthropic/claude-sonnet-4.5 https://api.kilo.ai/api/gateway');
+
+        expect(process.env['COPILOT_BYOK_ENABLED']).toBe('true');
+        expect(process.env['COPILOT_BYOK_PROFILE']).toBeUndefined();
+        expect(process.env['COPILOT_BYOK_PROVIDER_PRESET']).toBe('kilo-code');
+        expect(process.env['COPILOT_BYOK_MODEL']).toBe('anthropic/claude-sonnet-4.5');
+        expect(process.env['COPILOT_BYOK_BASE_URL']).toBe('https://api.kilo.ai/api/gateway');
+        expect(ctx.output()).toContain('BYOK status');
     });
 });
