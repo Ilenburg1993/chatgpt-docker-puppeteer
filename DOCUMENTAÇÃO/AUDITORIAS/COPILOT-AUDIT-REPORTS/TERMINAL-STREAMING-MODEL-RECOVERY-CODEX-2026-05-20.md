@@ -730,6 +730,7 @@ Correção:
 - A listagem padrão de `/byok models` e `/byok models refresh` agora mostra 24 modelos.
 - O operador continua com liberdade ampla: `/byok models all` mostra tudo e `/byok models <n>` escolhe o tamanho da página.
 - Unit test cobre a página padrão e ampliação explícita.
+- Probe BYOK real sem turno confirmou `exibindo 24/346`: `artifacts/terminal-live/2026-05-21T12-50-11-039Z/summary.md`.
 
 Status: implementado nesta revisão.
 
@@ -1213,6 +1214,7 @@ Implementado:
 - Live BYOK real pós-correção de usage passou em `artifacts/terminal-live/2026-05-21T12-40-35-670Z/summary.md`: Kilo/Ollama Cloud, deltas, tools, `ask_user`, pós-ask, prompt ativo e arquivo durável seguiram íntegros, e a usage do turno BYOK foi renderizada como `byok_user_message` sem Premium Request.
 - Live BYOK real com guarda automática de usage passou em `artifacts/terminal-live/2026-05-21T12-45-53-564Z/summary.md`: além do circuito completo, o summary agora prova explicitamente que o modelo BYOK não apareceu como `[PR]` e que a primeira usage foi `byok_user_message`.
 - Teste unitário de `/byok models` cobre limitação padrão de 24 itens e ampliação explícita por número.
+- Probe BYOK real sem PR em `artifacts/terminal-live/2026-05-21T12-50-11-039Z/summary.md` confirmou catálogo Kilo remoto paginado (`24/346`), troca de modelo, alternância para Ollama Cloud, SSE/control plane e ausência de vazamento de segredos.
 - Live BYOK real com `kilo-auto/balanced` ficou `BLOCKED` por `byok-provider-credits` em `artifacts/terminal-live/2026-05-21T12-03-39-776Z/summary.md`; o runner agora classifica esse caso como falha externa de créditos/modelo, não como bug do terminal.
 - Smoke BYOK local sem rede validou `ollama-local`, normalização de `baseUrl` para `/v1`, modelo explícito e resumo sem segredo.
 - Testes BYOK desta rodada validaram Kilo Gateway como OpenAI-compatible, perfil ativo por `COPILOT_BYOK_PROFILE`, resumos redigidos e comandos `/byok profiles`, `/byok use` e `/byok model`.
