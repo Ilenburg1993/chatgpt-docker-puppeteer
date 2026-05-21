@@ -220,6 +220,17 @@ function classifyByokModelCost(model) {
 }
 
 /**
+ * @param {string | null | undefined} profileName
+ * @returns {string}
+ */
+function renderByokProfileCostTag(profileName) {
+    const hint = readByokProfileCostHint(profileName);
+    if (hint.profileFreeTier !== true) return '';
+    const detail = hint.profileCostDetail ? `(${String(hint.profileCostDetail).slice(0, 40)})` : '';
+    return ` · cost=profile-free${detail}`;
+}
+
+/**
  * @param {ReturnType<typeof readTerminalRuntimeState> | null} runtimeState
  * @returns {{ estimatedRequestTokens: number; contextTokens: number; tokenLimit: number | null; utilization: number | null } | null}
  */
@@ -791,6 +802,10 @@ function renderStatus(projection, println) {
     if (activeHealth) {
         println(`    chatHealth:    \x1b[33m${renderByokHealthTag(activeHealth)}\x1b[0m`);
     }
+    const costTag = renderByokProfileCostTag(summary.profile);
+    if (costTag) {
+        println(`    cost:          \x1b[33m${costTag.replace(/^ · /u, '')}\x1b[0m`);
+    }
     println(`    modelList:     ${summary.modelList.count} modelo(s)`);
     for (const warning of summary.warnings) {
         println(`  \x1b[33m  aviso: ${warning}\x1b[0m`);
@@ -1070,6 +1085,7 @@ export async function cmdByok({ println }, arg) {
         for (const profile of profiles) {
             const active = profile.name === summary.profile ? ' \x1b[32m← ativo\x1b[0m' : '';
             const metadata = profile.metadataKeys.length ? ` · meta=${profile.metadataKeys.join(',')}` : '';
+            const cost = renderByokProfileCostTag(profile.name);
             const health = readHealthForByokProfile(profile);
             const healthLabel = ` · ${renderByokHealthTag(health)}`;
             const readiness =
@@ -1078,7 +1094,7 @@ export async function cmdByok({ println }, arg) {
                     : '\x1b[33msem credencial\x1b[0m';
             println(`    \x1b[33m${profile.name}\x1b[0m${active} · ${readiness}`);
             println(
-                `      \x1b[90mpreset=${profile.preset ?? '-'} · provider=${profile.providerType ?? '-'} · model=${profile.model ?? '-'} · auth=${renderProfileAuth(profile)}${metadata}${healthLabel}\x1b[0m`,
+                `      \x1b[90mpreset=${profile.preset ?? '-'} · provider=${profile.providerType ?? '-'} · model=${profile.model ?? '-'} · auth=${renderProfileAuth(profile)}${metadata}${cost}${healthLabel}\x1b[0m`,
             );
             println(
                 `      \x1b[90mcomandos: /byok use ${profile.name} · /byok models refresh provider:${profile.preset ?? profile.providerType ?? profile.name} · /byok recommend provider:${profile.preset ?? profile.providerType ?? profile.name} free reasoning safe\x1b[0m`,
@@ -1097,9 +1113,10 @@ export async function cmdByok({ println }, arg) {
         for (const profile of profiles) {
             const active = profile.name === summary.profile ? ' \x1b[32m← ativo\x1b[0m' : '';
             const metadata = profile.metadataKeys.length ? ` · meta=${profile.metadataKeys.join(',')}` : '';
+            const cost = renderByokProfileCostTag(profile.name);
             println(`    \x1b[33m${profile.name}\x1b[0m${active}`);
             println(
-                `      \x1b[90mpreset=${profile.preset ?? '-'} · provider=${profile.providerType ?? '-'} · model=${profile.model ?? '-'} · auth=${renderProfileAuth(profile)}${metadata}\x1b[0m`,
+                `      \x1b[90mpreset=${profile.preset ?? '-'} · provider=${profile.providerType ?? '-'} · model=${profile.model ?? '-'} · auth=${renderProfileAuth(profile)}${metadata}${cost}\x1b[0m`,
             );
         }
         println('\n  \x1b[90mUso: /byok use <perfil> para ativar no processo atual; depois /restart para abrir nova sessão SDK.\x1b[0m\n');

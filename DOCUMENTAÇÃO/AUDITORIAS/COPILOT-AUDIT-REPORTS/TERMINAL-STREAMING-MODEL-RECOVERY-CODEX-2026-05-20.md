@@ -959,6 +959,7 @@ Correção:
 - `profile-free` é inferido apenas de metadata segura do perfil (`freeTier`, `free`, `included`, `freeFirst`, `freeLimit`, `costPolicy`) ou, como fallback fraco, do nome do perfil. A UI mostra `profile-free` e `freeHint=...`, preservando a origem da inferência.
 - O filtro `free` agora inclui `free` confirmado e `profile-free`, mas a tag visual nunca mascara `profile-free` como preço confirmado por modelo.
 - O ranking prioriza `free` confirmado e depois `profile-free`, antes de capacidades e contexto.
+- `/byok status`, `/byok providers` e `/byok profiles` agora mostram `cost=profile-free(...)` quando a cota vem de metadata do perfil, antes mesmo de o operador abrir catálogo por modelo.
 - Quando `safe` zera a lista, o terminal agora mostra quantos candidatos foram removidos e lista os primeiros motivos de bloqueio (`baixo para turno real`, `contexto atual excede limite`, health falho etc.).
 - `/usage now` e `/metrics` passaram a narrar telemetria PR histórica como "GitHub Copilot quota/PR side-channel" quando BYOK está ativo, deixando explícito que não é cobrança BYOK.
 - O live runner BYOK no modo `--no-pr` deixou de abortar a sessão ao encontrar erros históricos em `/byok health`, bloqueia `/quit` prematuro até completar diagnósticos e sempre roda `/usage`, `/activity`, `/metrics`, `/events`, `/errors`.
@@ -968,6 +969,7 @@ Validação:
 - Unit tests: `npx vitest run tests/unit/copilot/terminal/test_commands_byok.spec.js tests/unit/copilot/terminal/test_commands_metrics_usage.spec.js` passou com 34 testes, cobrindo `profile-free`, diagnóstico de `safe` e side-channel de usage em BYOK.
 - Checks: `node --check src/copilot/terminal/commands/byok.js`, `node --check src/copilot/terminal/commands/usage.js`, `node --check src/copilot/terminal/commands/metrics.js` e `node --check scripts/copilot/run-terminal-llm-b-live-test.mjs` passaram.
 - Probe real BYOK sem PR OpenRouter -> Groq passou em `artifacts/terminal-live/byok-openrouter-groq-cockpit-safe-diagnostics-2026-05-21/summary.md`.
+- Probe real BYOK sem PR OpenRouter -> Groq passou em `artifacts/terminal-live/byok-provider-cost-cockpit-2026-05-21/summary.md`, confirmando `cost=profile-free(...)` em status, providers, profiles e modelos, sem abrir turno e sem vazamento de segredo.
 - Evidência do live: Groq exibiu `qwen/qwen3-32b profile-free`, `freeHint=6k TPM observed...`, `maxReq=6000`, `TPM=6000`; o filtro `safe` mostrou "O filtro safe removeu 4 candidato(s)" com razões acionáveis; `/usage now` e `/metrics` mostraram side-channel GitHub Copilot como histórico e não cobrança BYOK.
 
 Status: implementado nesta revisão. Ainda falta enriquecer perfis com metadados mais formais de limite gratuito por provider quando APIs oficiais expuserem quotas estruturadas.
@@ -1539,7 +1541,7 @@ Implementado:
 - O filtro `free` inclui `profile-free` para tornar provedores com plano/cota gratuita operacionalmente descobríveis, mas a UI preserva a distinção para evitar falsa promessa de preço zero por modelo.
 - Quando `safe` remove todos os candidatos, `/byok models` e `/byok recommend` mostram quais modelos foram removidos e por qual limite/health, em vez de deixar o operador com um "nenhum modelo" opaco.
 - `/usage now` e `/metrics` mostram "GitHub Copilot quota/PR side-channel" quando BYOK está ativo, explicitando que snapshot PR histórico não é cobrança BYOK.
-- Live BYOK real sem PR OpenRouter -> Groq passou em `artifacts/terminal-live/byok-openrouter-groq-cockpit-safe-diagnostics-2026-05-21/summary.md`: OpenRouter exibiu catálogo free/profile-free, Groq exibiu `qwen/qwen3-32b profile-free`, filtros `safe` explicaram limites de 6000 tokens, `/events` arquivou controle público e `/errors` ficou limpo.
+- Live BYOK real sem PR OpenRouter -> Groq passou em `artifacts/terminal-live/byok-provider-cost-cockpit-2026-05-21/summary.md`: OpenRouter exibiu catálogo free/profile-free, Groq exibiu `qwen/qwen3-32b profile-free`, filtros `safe` explicaram limites de 6000 tokens, `/byok providers` e `/byok profiles` exibiram `cost=profile-free(...)`, `/events` arquivou controle público e `/errors` ficou limpo.
 
 Próxima rodada recomendada:
 

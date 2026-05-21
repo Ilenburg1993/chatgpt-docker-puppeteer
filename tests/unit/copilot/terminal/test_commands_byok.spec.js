@@ -196,6 +196,10 @@ describe('terminal /byok command', () => {
 
     it('lista providers disponíveis com comandos operacionais redigidos', async () => {
         const now = Date.now();
+        readConfiguredByokProfilesFromEnv.mockReturnValue({
+            'openrouter-free': { metadata: { freeFirst: true } },
+            'groq-free': { metadata: { freeLimit: '6k TPM observed on current plan' } },
+        });
         readByokProviderModelHealth.mockReturnValue(null);
         listByokProviderModelHealth.mockReturnValue([
             {
@@ -253,6 +257,7 @@ describe('terminal /byok command', () => {
         expect(ctx.output()).toContain('/byok use groq-free');
         expect(ctx.output()).toContain('/byok models refresh provider:groq');
         expect(ctx.output()).toContain('meta=tier,owner');
+        expect(ctx.output()).toContain('cost=profile-free');
         expect(ctx.output()).toContain('chat=ok');
         expect(ctx.output()).not.toContain('secret');
     });
