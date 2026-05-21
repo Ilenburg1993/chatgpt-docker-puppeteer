@@ -469,6 +469,57 @@ describe('terminal/dialog/engine.js — contrato', () => {
         });
     });
 
+    it('classifica 402 BYOK como bloqueio de credito no turno vivo sem duplicar erro generico no terminal', async () => {
+        const dialogGateway = await import('../../../src/copilot/terminal/frontend/gateways/dialog.js');
+        const health = await import('../../../src/copilot/terminal/state/byok-provider-health.js');
+        const activity = await import('../../../src/copilot/terminal/state/activity-state.js');
+
+        vi.mocked(activity.recordTerminalActivity).mockClear();
+        configMocks.readConfiguredByokSummary.mockReturnValue({
+            enabled: true,
+            ready: true,
+            profile: 'chutes-ai',
+            providerType: 'openai',
+            preset: 'chutes',
+            model: 'Qwen/Qwen3.5-397B-A17B-TEE',
+            limits: null,
+            capabilities: null,
+        });
+        vi.mocked(dialogGateway.runTerminalDialogTurnDetailed).mockRejectedValueOnce(
+            new Error('402 402 status code (no body)'),
+        );
+
+        await expect(mod.sendTurn('forcar credito BYOK', 'user')).resolves.toBeNull();
+
+        expect(vi.mocked(health.recordByokProviderModelCallFailure)).toHaveBeenCalledWith(
+            expect.objectContaining({
+                profile: 'chutes-ai',
+                provider: 'chutes',
+                errorContext: 'dialog.byok_provider_credits',
+            }),
+        );
+        expect(vi.mocked(activity.recordTerminalActivity)).toHaveBeenCalledWith(
+            'error',
+            'Falha de provider BYOK no turno',
+            expect.objectContaining({ source: 'dialog' }),
+        );
+        expect(vi.mocked(activity.recordTerminalActivity)).not.toHaveBeenCalledWith(
+            'error',
+            'Erro no turno',
+            expect.anything(),
+        );
+
+        configMocks.readConfiguredByokSummary.mockReturnValue({
+            enabled: false,
+            ready: false,
+            profile: null,
+            provider: null,
+            model: null,
+            limits: null,
+            capabilities: null,
+        });
+    });
+
     it('expõe turno BYOK vazio como falha operacional quando não há input humano pendente', async () => {
         const dialogGateway = await import('../../../src/copilot/terminal/frontend/gateways/dialog.js');
         const health = await import('../../../src/copilot/terminal/state/byok-provider-health.js');

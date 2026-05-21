@@ -60,6 +60,7 @@ import {
     recordByokProviderModelCallFailure,
     recordByokProviderModelCallSuccess,
 } from '../state/byok-provider-health.js';
+import { classifyTerminalByokProviderFailure } from '../byok/provider-failure.js';
 import { renderTerminalIntent } from './intent-renderer.js';
 import { compactTerminalToolText } from './tool-activity-presenter.js';
 import {
@@ -192,35 +193,38 @@ function sanitizeOperationalErrorMessage(value) {
 
 /**
  * @param {{ errorType: string; message: string }} input
- * @returns {{ enabled: boolean; profile: string | null; provider: string | null; model: string | null; operatorDetail: string | null }}
+ * @returns {{ enabled: boolean; profile: string | null; provider: string | null; model: string | null; operatorDetail: string | null; failure: import('../byok/provider-failure.js').TerminalByokProviderFailure | null }}
  */
 function resolveByokSessionErrorDescriptor({ errorType, message }) {
     let byok;
     try {
         byok = readConfiguredByokSummary();
     } catch {
-        return { enabled: false, profile: null, provider: null, model: null, operatorDetail: null };
+        return { enabled: false, profile: null, provider: null, model: null, operatorDetail: null, failure: null };
     }
     if (byok.enabled !== true) {
-        return { enabled: false, profile: null, provider: null, model: null, operatorDetail: null };
+        return { enabled: false, profile: null, provider: null, model: null, operatorDetail: null, failure: null };
     }
     const normalizedType = errorType.trim().toLowerCase();
+    const failure = classifyTerminalByokProviderFailure(message);
     const providerLikeError =
         ['query', 'model_call', 'rate_limit', 'quota', 'provider', 'network', 'fetch'].includes(normalizedType) ||
+        failure.kind !== 'unknown' ||
         /\b(ai model|provider|model|retry|retried|server error|rate limit|quota|timeout)\b/iu.test(message);
     if (!providerLikeError) {
-        return { enabled: false, profile: null, provider: null, model: null, operatorDetail: null };
+        return { enabled: false, profile: null, provider: null, model: null, operatorDetail: null, failure: null };
     }
     const runtimeState = readTerminalRuntimeState();
     const provider = byok.preset ?? byok.providerType ?? null;
     const model = byok.model ?? runtimeState.model ?? null;
     const bits = [
         'erro de sessão BYOK vindo do SDK; registrado como saúde do provider/modelo',
+        failure.kind !== 'unknown' ? failure.operatorLabel : null,
         provider ? `provider=${provider}` : null,
         byok.profile ? `perfil=${byok.profile}` : null,
         model ? `modelo=${model}` : null,
         'sem Premium Request',
-        'ações: /byok health · /byok recommend safe · /byok use <perfil> · /byok model <id>',
+        `ação: ${failure.operatorAction}`,
     ].filter(Boolean);
     return {
         enabled: true,
@@ -228,6 +232,7 @@ function resolveByokSessionErrorDescriptor({ errorType, message }) {
         provider,
         model,
         operatorDetail: bits.join(' · '),
+        failure,
     };
 }
 
@@ -471,7 +476,10 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, regi
                 provider: byokError.provider,
                 model: byokError.model,
                 message: msg,
-                errorContext: `session.${errorType}`,
+                errorContext:
+                    byokError.failure && byokError.failure.kind !== 'unknown'
+                        ? byokError.failure.errorContext
+                        : `session.${errorType}`,
                 timestamp: now,
             });
             completeTerminalTurnMaterialization({

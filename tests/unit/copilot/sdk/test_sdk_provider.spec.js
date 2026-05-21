@@ -399,7 +399,17 @@ describe('F72 — BYOK env configuration', () => {
             expect(first.source).toBe('remote');
             expect(first.endpoint).toBe('https://provider.example/v1/models');
             expect(first.models.map((model) => model.id)).toEqual(['remote-a', 'remote-b']);
+            expect(first.configuredModel).toEqual({
+                id: 'fallback-model',
+                inCatalog: false,
+                authoritative: true,
+            });
             expect(second.source).toBe('remote-cache');
+            expect(second.configuredModel).toEqual({
+                id: 'fallback-model',
+                inCatalog: false,
+                authoritative: true,
+            });
             expect(fetchMock).toHaveBeenCalledTimes(1);
             expect(fetchMock.mock.calls[0]?.[1]?.headers).toMatchObject({ Authorization: 'Bearer unit-token' });
             expect(JSON.stringify(first)).not.toContain('unit-token');
@@ -431,6 +441,11 @@ describe('F72 — BYOK env configuration', () => {
             expect(result.source).toBe('static-fallback');
             expect(result.models.map((model) => model.id)).toEqual(['fallback-model', 'static-b']);
             expect(result.error).toContain('HTTP 503');
+            expect(result.configuredModel).toEqual({
+                id: 'fallback-model',
+                inCatalog: null,
+                authoritative: false,
+            });
         } finally {
             vi.unstubAllGlobals();
         }

@@ -57,6 +57,7 @@ import {
     evaluateTerminalByokTurnBudget,
     readTerminalByokAdmissionMode,
 } from '../byok/admission.js';
+import { classifyTerminalByokProviderFailure } from '../byok/provider-failure.js';
 import { drainPendingNotifications, getPersistenceFailureCount, persistTurnToHub } from './engine-persistence.js';
 import {
     BOOT_PROMPT,
@@ -247,26 +248,34 @@ function errorCodeOf(error) {
 /**
  * @param {unknown} error
  * @param {ReturnType<typeof readConfiguredByokSummary>} byok
- * @returns {{ message: string; errorContext: string; provider: string | null; profile: string | null; model: string | null } | null}
+ * @returns {{ message: string; errorContext: string; provider: string | null; profile: string | null; model: string | null; failure: import('../byok/provider-failure.js').TerminalByokProviderFailure } | null}
  */
 function resolveByokTurnErrorDescriptor(error, byok) {
     if (byok.enabled !== true || byok.ready !== true) return null;
     const err = toError(error);
     const message = err.message || 'erro no turno BYOK';
+    const failure = classifyTerminalByokProviderFailure(error);
     const code = errorCodeOf(error);
     const timeoutLike = code === 'DIALOG_TIMEOUT' || /sendTurn sem progresso|inactivity timeout|timeout/i.test(message);
     const providerLike =
-        timeoutLike || /failed to get response|ai model|provider|model_call|rate limit|quota|retry|retried/i.test(message);
+        timeoutLike ||
+        failure.kind !== 'unknown' ||
+        /failed to get response|ai model|provider|model_call|rate limit|quota|retry|retried/i.test(message);
     if (!providerLike) return null;
     return {
         message,
-        errorContext: timeoutLike ? 'dialog.byok_inactivity_timeout' : 'dialog.byok_turn_error',
+        errorContext: timeoutLike
+            ? 'dialog.byok_inactivity_timeout'
+            : failure.kind === 'unknown'
+              ? 'dialog.byok_turn_error'
+              : `dialog.byok_${failure.errorContext.replace(/^provider\./u, 'provider_').replace(/\./gu, '_')}`,
         provider:
             byok.preset ??
             byok.providerType ??
             (typeof Reflect.get(byok, 'provider') === 'string' ? Reflect.get(byok, 'provider') : null),
         profile: byok.profile ?? null,
         model: byok.model ?? null,
+        failure,
     };
 }
 
@@ -1143,17 +1152,18 @@ async function _executeTurn(message, actor, attachments = [], requestHeaders = n
                 source: 'dialog',
             });
             println(
-                `\x1b[31m[byok] ${byokFailure.errorContext}: ${byokFailure.message} · sem Premium Request · use /byok health ou /byok recommend safe\x1b[0m`,
+                `\x1b[31m[byok] ${byokFailure.errorContext}: ${byokFailure.message} · ${byokFailure.failure.operatorLabel} · sem Premium Request\x1b[0m`,
             );
+            println(`\x1b[90m       ação: ${byokFailure.failure.operatorAction}\x1b[0m`);
         } else {
             clearTerminalTurnMaterialization();
+            recordTerminalActivity('error', 'Erro no turno', {
+                detail: err.message,
+                severity: 'error',
+                source: 'dialog',
+            });
+            println(`[erro] ${err.message}`);
         }
-        recordTerminalActivity('error', 'Erro no turno', {
-            detail: err.message,
-            severity: 'error',
-            source: 'dialog',
-        });
-        println(`[erro] ${err.message}`);
         log('ERROR', `[TerminalServer] Erro no turno ${actor}: ${err.message}`);
         if (!readTerminalRuntimeControlState().dialogLoopActive) {
             log('WARN', '[TerminalServer] Dialog loop inativo após erro — reagendando ensureDialogLoop');

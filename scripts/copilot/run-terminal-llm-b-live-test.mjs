@@ -682,7 +682,9 @@ function detectLiveBlocker(plain, runtime = {}) {
     if (/\[rate_limit\]/i.test(plain)) {
         return { id: 'sdk-rate-limit', detail: 'GitHub Copilot SDK rate limit' };
     }
-    const byokCreditsMatch = plain.match(/\b402\s+Add credits to continue,\s*or switch to a free model\b/i);
+    const byokCreditsMatch = plain.match(
+        /\b402\s+Add credits to continue,\s*or switch to a free model\b|provider BYOK recusou a chamada por credito, saldo ou cota(?: \(HTTP 402\))?/i,
+    );
     if (byokCreditsMatch) {
         return {
             id: 'byok-provider-credits',
@@ -717,6 +719,16 @@ function detectLiveBlocker(plain, runtime = {}) {
             detail:
                 'BYOK live turn rendered tool-shaped protocol or a textual ask_user simulation without materializing the required live terminal interaction' +
                 `${byokLiveToolProtocolMiss.markers.length > 0 ? ` · text=${byokLiveToolProtocolMiss.markers.join('+')}` : ''}`,
+        };
+    }
+    const liveDeltaProtocolMiss = findLiveDeltaProtocolMiss(plain, runtime.sseEvents);
+    if (liveDeltaProtocolMiss) {
+        return {
+            id: 'assistant-delta-protocol-missed',
+            detail:
+                'assistant reached canonical ask_user after public streaming without emitting the full DELTA-CANONICAL-1..8 test series' +
+                ` · deltaEvents=${liveDeltaProtocolMiss.deltaEvents}` +
+                ` · markers=${liveDeltaProtocolMiss.markers.join(',') || 'none'}`,
         };
     }
     if (
@@ -781,6 +793,34 @@ function findByokRealLiveToolProtocolMiss(plain) {
     ].filter(Boolean);
     const hasTextifiedAsk = markers.includes('ask_user') || markers.includes('ask_user_text') || markers.includes('ask_user_question_json');
     return hasTextifiedAsk || markers.length >= 2 ? { markers } : null;
+}
+
+function findLiveDeltaProtocolMiss(plain, events) {
+    const publicDeltas = Array.isArray(events)
+        ? events.filter((evt) => evt?.event === 'delta' && typeof evt?.data?.chunk === 'string')
+        : [];
+    if (publicDeltas.length === 0) return null;
+    const askMaterialized =
+        /\[ASK\]\s+ASK-CANONICAL:\s+responda SIM para fechar o teste/u.test(plain) ||
+        (Array.isArray(events) &&
+            events.some(
+                (evt) =>
+                    evt?.event === 'user_input.requested' &&
+                    /ASK-CANONICAL:\s+responda SIM para fechar o teste/u.test(
+                        String(evt?.data?.question ?? evt?.data?.prompt ?? ''),
+                    ),
+            ));
+    if (!askMaterialized) return null;
+    const markers = new Set(
+        [...String(plain ?? '').matchAll(/\bDELTA-CANONICAL-(\d+)\b/gu)]
+            .map((match) => Number(match[1]))
+            .filter((value) => Number.isInteger(value) && value >= 1 && value <= 8),
+    );
+    if (markers.size >= 8) return null;
+    return {
+        deltaEvents: publicDeltas.length,
+        markers: [...markers].sort((a, b) => a - b),
+    };
 }
 
 function isObjectPayload(value) {

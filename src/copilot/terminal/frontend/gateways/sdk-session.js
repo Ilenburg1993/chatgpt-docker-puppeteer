@@ -28,6 +28,7 @@ import {
 } from '#copilot/sdk/session';
 import { createTool } from '#copilot/sdk/tools';
 import { evaluateTerminalByokProbeBudget } from '../../byok/admission.js';
+import { classifyTerminalByokProviderFailure } from '../../byok/provider-failure.js';
 import {
     compactAgentSdkSession,
     confirmAgentSdkSessionUi,
@@ -177,6 +178,7 @@ export function classifyTerminalUserInputQuestionKind(question) {
  *     sessionId: string | null;
  *     errors: string[];
  *     warnings: string[];
+ *     providerFailure?: import('../../byok/provider-failure.js').TerminalByokProviderFailure | null;
  * }>}
  */
 export async function probeTerminalConfiguredByokChat(options = {}) {
@@ -202,6 +204,7 @@ export async function probeTerminalConfiguredByokChat(options = {}) {
                     ? [...byokState.errors]
                     : ['BYOK não está ativo/pronto para probe.'],
             warnings: [...byokState.warnings],
+            providerFailure: null,
         };
     }
     const byok = resolveConfiguredByokSessionOverrides(env, options.model ?? undefined);
@@ -238,6 +241,7 @@ export async function probeTerminalConfiguredByokChat(options = {}) {
             observedFinalEvent: false,
             sessionId: null,
             errors: [admission.label],
+            providerFailure: null,
         };
     }
     let deltaCount = 0;
@@ -247,6 +251,8 @@ export async function probeTerminalConfiguredByokChat(options = {}) {
     let sessionId = null;
     /** @type {string[]} */
     const errors = [];
+    /** @type {import('../../byok/provider-failure.js').TerminalByokProviderFailure | null} */
+    let providerFailure = null;
 
     try {
         await withEphemeralSession(
@@ -283,7 +289,10 @@ export async function probeTerminalConfiguredByokChat(options = {}) {
                                 : typeof event?.data?.error === 'string'
                                   ? event.data.error
                                   : null;
-                        if (message) errors.push(message);
+                        if (message) {
+                            errors.push(message);
+                            providerFailure ??= classifyTerminalByokProviderFailure(message);
+                        }
                     },
                 });
                 try {
@@ -297,6 +306,7 @@ export async function probeTerminalConfiguredByokChat(options = {}) {
         );
     } catch (error) {
         errors.push(error instanceof Error ? error.message : String(error));
+        providerFailure ??= classifyTerminalByokProviderFailure(error);
         return {
             ok: false,
             status: 'failed',
@@ -308,6 +318,7 @@ export async function probeTerminalConfiguredByokChat(options = {}) {
             observedFinalEvent,
             sessionId,
             errors,
+            providerFailure,
         };
     }
 
@@ -324,6 +335,7 @@ export async function probeTerminalConfiguredByokChat(options = {}) {
         observedFinalEvent,
         sessionId,
         errors: ok ? errors : [...errors, 'Probe concluiu sem delta nem mensagem final.'],
+        providerFailure,
     };
 }
 
@@ -361,6 +373,7 @@ const BYOK_AGENT_PROBE_ANSWER = 'BYOK_AGENT_PROBE_USER_OK';
  *     sessionId: string | null;
  *     errors: string[];
  *     warnings: string[];
+ *     providerFailure?: import('../../byok/provider-failure.js').TerminalByokProviderFailure | null;
  * }>}
  */
 export async function probeTerminalConfiguredByokAgent(options = {}) {
@@ -391,6 +404,7 @@ export async function probeTerminalConfiguredByokAgent(options = {}) {
                     ? [...byokState.errors]
                     : ['BYOK não está ativo/pronto para probe agente.'],
             warnings: [...byokState.warnings],
+            providerFailure: null,
         };
     }
 
@@ -436,6 +450,7 @@ export async function probeTerminalConfiguredByokAgent(options = {}) {
             userInputAnswerCount: 0,
             sessionId: null,
             errors: [admission.label],
+            providerFailure: null,
         };
     }
 
@@ -450,6 +465,8 @@ export async function probeTerminalConfiguredByokAgent(options = {}) {
     let sessionId = null;
     /** @type {string[]} */
     const errors = [];
+    /** @type {import('../../byok/provider-failure.js').TerminalByokProviderFailure | null} */
+    let providerFailure = null;
     const onUserInputRequest = createStaticInputHandler(
         { [BYOK_AGENT_PROBE_QUESTION.toLowerCase()]: BYOK_AGENT_PROBE_ANSWER },
         BYOK_AGENT_PROBE_ANSWER,
@@ -546,7 +563,10 @@ export async function probeTerminalConfiguredByokAgent(options = {}) {
                                 : typeof event?.data?.error === 'string'
                                   ? event.data.error
                                   : null;
-                        if (message) errors.push(message);
+                        if (message) {
+                            errors.push(message);
+                            providerFailure ??= classifyTerminalByokProviderFailure(message);
+                        }
                     },
                 });
                 try {
@@ -560,6 +580,7 @@ export async function probeTerminalConfiguredByokAgent(options = {}) {
         );
     } catch (error) {
         errors.push(error instanceof Error ? error.message : String(error));
+        providerFailure ??= classifyTerminalByokProviderFailure(error);
         return {
             ok: false,
             status: 'failed',
@@ -576,6 +597,7 @@ export async function probeTerminalConfiguredByokAgent(options = {}) {
             userInputAnswerCount,
             sessionId,
             errors,
+            providerFailure,
         };
     }
 
@@ -604,6 +626,7 @@ export async function probeTerminalConfiguredByokAgent(options = {}) {
         userInputAnswerCount,
         sessionId,
         errors,
+        providerFailure,
     };
 }
 

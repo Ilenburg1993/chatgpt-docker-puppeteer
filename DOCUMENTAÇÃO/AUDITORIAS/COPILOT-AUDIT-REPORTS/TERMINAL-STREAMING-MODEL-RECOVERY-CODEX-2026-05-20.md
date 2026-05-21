@@ -1350,6 +1350,92 @@ Validacao:
 
 Status: implementado nesta revisao; a proxima rodada live agregada pode sondar `all-providers` real com janela pequena para calibrar a densidade visual do cockpit.
 
+### A60. Perfil BYOK podia continuar "ready" com modelo obsoleto fora do catálogo remoto
+
+Situacao atual observada:
+
+- O live canônico Chutes `artifacts/terminal-live/byok-chutes-canonical-2026-05-21/summary.md` ficou `BLOCKED` no preflight: o perfil ativo nasceu com `Qwen/Qwen3-Next-80B-A3B-Instruct`, mas a discovery fresca de `https://llm.chutes.ai/v1/models` retornou outro catálogo real com IDs `*-TEE`.
+- Isso não é apenas instabilidade externa. A fronteira atual exige `model` síncrono ao criar a sessão BYOK, enquanto `onListModels`/discovery remota entram depois; um perfil com seletor antigo continua `ready` pela configuração local e só falha no provider.
+- Trocar automaticamente o modelo configurado por qualquer modelo do catálogo seria outro erro: esconderia mudança de custo/capability e confundiria a autoridade do operador.
+
+Situacao ideal:
+
+- Discovery remota autoritativa carrega evidência explícita de `modelo configurado presente|ausente`; fallback estático não deve fingir essa certeza.
+- O cockpit explica o drift e aponta a rota única de repair: inspecionar catálogo, sondar o candidato descartavelmente com `/byok probe agent`, então selecionar/persistir o modelo explicitamente.
+- Seeds estáticos de presets precisam acompanhar IDs atuais conhecidos, mas continuam sendo fallback; saúde e discovery remota governam a confiança operacional.
+
+Correcao desta revisao:
+
+- `discoverConfiguredByokModelsFromEnv()` agora retorna `configuredModel` com `id`, `inCatalog` e `authoritative`.
+- `/byok models`, `/byok recommend` e shortlist imprimem aviso acionável quando o modelo configurado não aparece em catálogo remoto fresco/cacheado.
+- O preset estático `chutes` foi atualizado do conjunto obsoleto sem sufixo `-TEE` para seeds que apareceram no catálogo remoto real atual.
+
+Validacao:
+
+- Unit tests cobrem discovery remota/cache/fallback e o aviso do cockpit quando o perfil Chutes-like mantém seletor antigo.
+- O live seguinte usou override explícito para `Qwen/Qwen3.5-397B-A17B-TEE`, presente no catálogo remoto atual, e ficou `BLOCKED` por `402` em chat + agent probe: `artifacts/terminal-live/byok-chutes-current-model-canonical-2026-05-21/summary.md`.
+- Chamada OpenAI-compatible direta ao endpoint Chutes com esse mesmo modelo retornou `402` por quota/saldo do provider. Isso separa drift de ID (`404` no perfil antigo) de indisponibilidade econômica externa (`402` no catálogo atual).
+
+Status: implementado no provider/cockpit. Repair Chutes persistente não deve promover o modelo atual enquanto a conta seguir bloqueada por quota.
+
+### A61. Falha BYOK de crédito/cota ainda chegava como erro cru por probes e turno vivo
+
+Situacao atual observada:
+
+- A rodada Chutes com modelo atual do catalogo remoto saiu do drift `404`, mas o provider recusou chat + agent probe com `402 402 status code (no body)`.
+- Probe descartavel, `session.error` e catch do turno vivo liam erros BYOK por heuristicas locais diferentes. O cockpit acabava mostrando a string crua e o turno BYOK podia imprimir a falha especializada seguida do mesmo `[erro]` generico.
+- Isso atrapalha a decisao operacional: bloqueio externo de credito/saldo/cota nao e bug de streaming, nao e ausencia de tool/`ask_user` e nao deve parecer Premium Request.
+
+Situacao ideal:
+
+- Uma taxonomia terminal pequena e compartilhada classifica bloqueios externos BYOK de credito/cota, rate-limit, auth, modelo/rota, timeout, rede e upstream.
+- Probes, turno e `session.error` preservam a mensagem original para auditoria, mas mostram o mesmo diagnostico e a mesma acao para o operador.
+- Health persiste a classe conhecida da falha (`provider.credits`, `provider.auth`, etc.); falha sem classe mantem o contexto de origem em vez de fabricar certeza.
+
+Correcao desta revisao:
+
+- `terminal/byok/provider-failure.js` virou a borda canonica de classificacao externa BYOK e reconhece inclusive `402 ... status code (no body)`.
+- `/byok probe chat|agent` agora materializa `diagnostico` + `acao` junto ao erro original e grava o contexto classificado na saude do provider/modelo.
+- O catch de turno BYOK usa o mesmo classificador, gera contexto `dialog.byok_provider_*` quando a classe e conhecida e deixou de repetir a mesma falha como erro generico logo em seguida.
+- `session.error` BYOK usa a mesma leitura; quando a falha continua desconhecida, preserva `session.<tipo>` como contexto de health.
+- O live runner reconhece o diagnostico de credito/cota novo como blocker externo `byok-provider-credits`.
+
+Validacao:
+
+- Unit tests cobrem `402` sem body, auth/modelo/rede, probe com `provider.credits` e turno vivo BYOK sem activity generica duplicada.
+- Typecheck estrito e `git diff --check` passaram antes da proxima rodada live.
+- Live Chutes com `Qwen/Qwen3.5-397B-A17B-TEE` reconfirmou o bloqueio externo no diagnostico novo: `artifacts/terminal-live/byok-chutes-provider-credits-classified-2026-05-21/summary.md` terminou `BLOCKED` por `byok-provider-credits`, com `/byok health` registrando `provider.credits` em chat e agent probe.
+- Live Kilo seguinte comprovou que a taxonomia nao quebrou o fluxo funcional: probes chat/agent, tool, `ask_user`, resposta humana, pos-ask, `/activity`, `/tools`, `/events`, `/export`, `/byok providers`, `/byok health` e alternancia Kilo/Ollama Cloud materializaram no terminal em `artifacts/terminal-live/byok-kilo-provider-failure-taxonomy-regression-2026-05-21/summary.md`.
+
+Status: implementado e validado nesta revisao.
+
+### A62. Live runner confundia streaming publico saudavel com modelo que descumpriu o roteiro de delta
+
+Situacao atual observada:
+
+- A rodada Kilo pos-A61 teve `24` `dialog.delta` aceitos, fonte canonica `terminal-turn-display/delta`, final reconciliado sem duplicacao e `ask_user` real.
+- O modelo, porem, escreveu apenas a frase `DELTA-CANONICAL-1 -> 8` antes do `ask_user`; nao materializou as oito sentencas publicas exigidas pelo roteiro.
+- O summary antigo marcava `partial-deltas` e `final-delta-block` como falha terminal direta, embora o problema imediato fosse obediencia do modelo ao cenario de teste, nao ausencia de transporte, renderer ou fanout.
+
+Situacao ideal:
+
+- O harness deve continuar exigindo deltas parciais, bloco final, tools e `ask_user`.
+- Quando ha deltas publicos reais e o fluxo ja alcancou o `ask_user`, mas a serie `DELTA-CANONICAL-1..8` nao foi emitida, o relatorio deve registrar blocker de protocolo do assistente.
+- Esse blocker preserva a prova de streaming real para auditoria e impede regressao falsa contra o terminal.
+
+Correcao desta revisao:
+
+- O live runner ganhou a classificacao `assistant-delta-protocol-missed`.
+- A classificacao so dispara quando SSE publico contem `delta`, o `ask_user` canonico foi materializado e a serie de marcadores continua incompleta.
+- Runs com ausencia real de streaming seguem falhando pelos criterios de delta; runs com pseudo-tool textual continuam bloqueados pela guarda especifica de protocolo de tools/`ask_user`.
+
+Validacao:
+
+- A rodada seguinte obedeceu a serie completa e permaneceu `PASS` em `artifacts/terminal-live/byok-kilo-delta-protocol-blocker-2026-05-21/summary.md`: `18` marcadores, `21` deltas publicos aceitos, tools, `ask_user`, pos-ask, SSE/JSONL/export e zero erros rastreados.
+- A nova classificacao fica armada para a evidencia negativa futura; o pass acima prova que ela nao bloqueia o caminho canonico quando o assistente materializa a serie inteira.
+
+Status: implementado nesta revisao.
+
 ## Hipóteses Externas Rejeitadas Ou Reclassificadas
 
 ### H1. "boot-hub assume sucesso"
@@ -1781,6 +1867,9 @@ Fase J6. Testes
 - J6.48 Criar shortlist de probes agentes ranqueadas como live fake BYOK, preservando `(profile, provider, model)` por candidato e cobrindo a superficie no runner `--no-pr`. Status: PASS em unit test multi-profile e em `artifacts/terminal-live/byok-kilo-shortlist-preflight-2026-05-21/summary.md`.
 - J6.49 Fazer `/session sdk <n>` respeitar a janela numerica e resumir previews de sessoes antigas para manter o cockpit de retomada legivel. Status: PASS em unit test e no preflight real `artifacts/terminal-live/byok-kilo-session-cockpit-limit-2026-05-21/summary.md`.
 - J6.50 Expor cobertura por perfil na shortlist `all-providers` antes de sondar o top-N, diferenciando catalogo vazio, filtros e exclusao por `safe`. Status: feito nesta revisao com unit test; live canônico Kilo permaneceu PASS em `artifacts/terminal-live/2026-05-21T23-13-37-245Z/summary.md`.
+- J6.51 Detectar drift entre modelo BYOK configurado e catálogo remoto autoritativo, sem auto-troca opaca do seletor. Status: implementado em discovery/cockpit com unit tests; o live Chutes `artifacts/terminal-live/byok-chutes-canonical-2026-05-21/summary.md` é a evidência bloqueada que motivou o repair.
+- J6.52 Classificar falhas externas BYOK de forma unica em probe, turno e `session.error`, com leitura acionavel para `402`/credito sem duplicar erro generico. Status: implementado e reconfirmado no live Chutes `artifacts/terminal-live/byok-chutes-provider-credits-classified-2026-05-21/summary.md`.
+- J6.53 Separar no live runner ausencia real de streaming de modelo que alcanca `ask_user` apos deltas publicos sem emitir a serie `DELTA-CANONICAL-1..8`. Status: implementado nesta revisao com blocker `assistant-delta-protocol-missed`; live Kilo completo seguinte permaneceu PASS em `artifacts/terminal-live/byok-kilo-delta-protocol-blocker-2026-05-21/summary.md` quando o assistente emitiu a serie inteira.
 
 Fase J7. Providers amplos
 
@@ -1800,7 +1889,7 @@ Fase J7. Providers amplos
 - J7.14 Cloudflare Workers AI. Status: preset e key/account local; OpenAI-compatible chat suportado, mas `/models` retornou `405`, entao fallback estatico esta correto. Falta probe de chat.
 - J7.15 NVIDIA NIM. Status: preset, key local e catalogo real `117` modelos. `openai/gpt-oss-120b` passou probes descartaveis reforcados e tools reais no live, mas simulou `ask_user` como Markdown/JSON publico; falta modelo/configuracao com interacao humana real no turno canônico.
 - J7.16 Cerebras. Status: preset, key local, catalogo real `4` modelos e live negativo validado: provider falha em `model_call`, terminal bloqueia fallback Copilot, encerra turno como `failed` e orienta troca de modelo/provider. Falta descobrir modelo/configuração funcional.
-- J7.17 Chutes. Status: preset, key local e catalogo real `13` modelos com pricing. Falta turno funcional live.
+- J7.17 Chutes. Status: preset, key local e catalogo real `13` modelos com pricing. O perfil local antigo expôs drift de ID (`404` para `Qwen/Qwen3-Next-80B-A3B-Instruct`); o probe com modelo atual `Qwen/Qwen3.5-397B-A17B-TEE` ficou `BLOCKED` por quota/saldo externo `402` em `artifacts/terminal-live/byok-chutes-current-model-canonical-2026-05-21/summary.md`. Falta turno funcional após saldo/provider permitir a chamada.
 - J7.18 Z.AI. Status: preset, key local e catalogo real `7` modelos. Falta turno funcional live.
 
 ## Execução Iniciada Nesta Revisão

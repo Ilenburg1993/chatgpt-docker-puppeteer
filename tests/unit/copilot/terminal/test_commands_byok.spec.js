@@ -422,6 +422,55 @@ describe('terminal /byok command', () => {
         expect(ctx.output()).not.toContain('token');
     });
 
+    it('explica bloqueio externo de credito/cota em probe BYOK sem degradar o diagnostico em erro cru', async () => {
+        mockProjection();
+        probeTerminalConfiguredByokAgent.mockResolvedValue({
+            ok: false,
+            status: 'failed',
+            elapsedMs: 456,
+            model: 'metered-model',
+            profile: 'chutes-ai',
+            preset: 'chutes',
+            providerType: 'openai',
+            deltaCount: 0,
+            deltaChars: 0,
+            finalChars: 0,
+            observedFinalEvent: false,
+            toolCallCount: 0,
+            markerToolCallCount: 0,
+            readToolCallCount: 0,
+            userInputRequestCount: 0,
+            userInputAnswerCount: 0,
+            sessionId: 'tmp-agent-probe',
+            errors: ['402 402 status code (no body)'],
+            warnings: [],
+            providerFailure: {
+                kind: 'credits',
+                message: '402 402 status code (no body)',
+                statusCode: 402,
+                errorContext: 'provider.credits',
+                operatorLabel: 'provider BYOK recusou a chamada por credito, saldo ou cota (HTTP 402)',
+                operatorAction: 'troque para modelo free e valide com /byok probe agent',
+                external: true,
+            },
+        });
+        const ctx = mockCtx();
+
+        await cmdByok({ println: ctx.println }, 'probe agent profile:chutes-ai model:metered-model');
+
+        expect(recordByokProviderModelAgentProbeFailure).toHaveBeenCalledWith(
+            expect.objectContaining({
+                profile: 'chutes-ai',
+                provider: 'chutes',
+                model: 'metered-model',
+                errorContext: 'provider.credits',
+            }),
+        );
+        expect(ctx.output()).toContain('diagnóstico: provider BYOK recusou a chamada por credito');
+        expect(ctx.output()).toContain('ação: troque para modelo free');
+        expect(ctx.output()).toContain('erro: 402 402 status code (no body)');
+    });
+
     it('sonda shortlist recomendada sem trocar a sessão viva e preserva profile/modelo de cada candidato', async () => {
         discoverConfiguredByokModelsFromEnv.mockResolvedValue({
             models: [
@@ -1260,6 +1309,47 @@ describe('terminal /byok command', () => {
         expect(ctx.output()).toContain('profile-free');
         expect(ctx.output()).toContain('freeHint=6k TPM observed on current plan');
         expect(ctx.output()).not.toContain('Nenhum modelo BYOK encontrado');
+    });
+
+    it('avisa quando o modelo configurado sumiu do catálogo remoto autoritativo', async () => {
+        discoverConfiguredByokModelsFromEnv.mockResolvedValue({
+            models: [
+                {
+                    id: 'provider/current-model',
+                    capabilities: {
+                        supports: { reasoningEffort: true, vision: false },
+                        limits: { max_context_window_tokens: 128000 },
+                    },
+                    byok: { freeTier: true, provider: 'chutes', rateLimits: { maxRequestTokens: 64000 } },
+                },
+            ],
+            source: 'remote',
+            endpoint: 'https://llm.chutes.ai/v1/models',
+            fromCache: false,
+            error: null,
+            configuredModel: {
+                id: 'provider/stale-model',
+                inCatalog: false,
+                authoritative: true,
+            },
+        });
+        mockProjection({
+            summary: {
+                enabled: true,
+                ready: true,
+                profile: 'chutes-ai',
+                preset: 'chutes',
+                providerType: 'openai',
+                model: 'provider/stale-model',
+            },
+        });
+        const ctx = mockCtx();
+
+        await cmdByok({ println: ctx.println }, 'models refresh');
+
+        expect(ctx.output()).toContain("model configurado 'provider/stale-model' nao apareceu no catalogo remoto atual");
+        expect(ctx.output()).toContain('/byok probe agent profile:chutes-ai model:<id>');
+        expect(ctx.output()).toContain('provider/current-model');
     });
 
     it('explica quando o filtro safe remove modelos BYOK existentes por limites baixos', async () => {

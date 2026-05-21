@@ -883,7 +883,7 @@ function selectProfilesForDiscovery(projection, filters) {
 /**
  * @param {ReturnType<typeof readTerminalByokProjection>} projection
  * @param {ReturnType<typeof parseRecommendArgs>} filters
- * @returns {Promise<{ models: import('#copilot/sdk/types').ModelInfo[]; sourceLabel: string; endpoint: string | null; errors: string[]; profileCount: number }>}
+ * @returns {Promise<{ models: import('#copilot/sdk/types').ModelInfo[]; sourceLabel: string; endpoint: string | null; errors: string[]; warnings: string[]; profileCount: number }>}
  */
 async function discoverByokCatalogForCommand(projection, filters) {
     if (!filters.allProviders) {
@@ -907,6 +907,10 @@ async function discoverByokCatalogForCommand(projection, filters) {
             sourceLabel,
             endpoint: discovered.endpoint,
             errors: discovered.error ? [discovered.error] : [],
+            warnings: renderConfiguredByokCatalogWarnings(discovered, {
+                profile: projection.summary.profile,
+                provider: projection.summary.preset ?? projection.summary.providerType,
+            }),
             profileCount: projection.summary.profile ? 1 : 0,
         };
     }
@@ -914,6 +918,7 @@ async function discoverByokCatalogForCommand(projection, filters) {
     const profiles = selectProfilesForDiscovery(projection, filters);
     const models = [];
     const errors = [];
+    const warnings = [];
     const sourceCounts = new Map();
     /** @type {string | null} */
     let endpoint = null;
@@ -927,6 +932,7 @@ async function discoverByokCatalogForCommand(projection, filters) {
         sourceCounts.set(discovered.source, (sourceCounts.get(discovered.source) ?? 0) + 1);
         if (!endpoint && discovered.endpoint) endpoint = discovered.endpoint;
         if (discovered.error) errors.push(`${profile.name}: ${discovered.error}`);
+        warnings.push(...renderConfiguredByokCatalogWarnings(discovered, { profile: profile.name, provider: profile.preset ?? profile.providerType }));
         const profileModels = discovered.models.length > 0 ? discovered.models : [];
         for (const model of profileModels) {
             models.push(
@@ -948,8 +954,38 @@ async function discoverByokCatalogForCommand(projection, filters) {
         sourceLabel,
         endpoint,
         errors,
+        warnings,
         profileCount: profiles.length,
     };
+}
+
+/**
+ * @param {Awaited<ReturnType<typeof discoverConfiguredByokModelsFromEnv>>} discovered
+ * @param {{ profile: string | null | undefined; provider: string | null | undefined }} source
+ * @returns {string[]}
+ */
+function renderConfiguredByokCatalogWarnings(discovered, source) {
+    const configuredModel = discovered.configuredModel;
+    if (!configuredModel?.authoritative || configuredModel.inCatalog !== false || !configuredModel.id) return [];
+    const owner = source.profile ? `perfil=${source.profile}` : source.provider ? `provider=${source.provider}` : 'seleção ativa';
+    const selector = source.profile ? ` profile:${source.profile}` : '';
+    return [
+        `${owner}: model configurado '${configuredModel.id}' nao apareceu no catalogo remoto atual. O terminal nao troca seletor silenciosamente; explore /byok models${selector ? ` all-providers${selector}` : ''} e valide um candidato com /byok probe agent${selector} model:<id> antes de /byok model <id>.`,
+    ];
+}
+
+/**
+ * @param {(text: string) => void} println
+ * @param {string[]} warnings
+ * @returns {void}
+ */
+function renderByokCatalogWarnings(println, warnings) {
+    for (const warning of warnings.slice(0, 6)) {
+        println(`  \x1b[33m  aviso: ${warning}\x1b[0m`);
+    }
+    if (warnings.length > 6) {
+        println(`  \x1b[33m  aviso: +${warnings.length - 6} alerta(s) de seletor/catálogo omitidos; use provider:<nome> para isolar.\x1b[0m`);
+    }
 }
 
 /**
@@ -1254,7 +1290,7 @@ async function recordByokProbeHealth(mode, probe) {
         recordByokProviderModelAgentProbeFailure({
             ...healthIdentity,
             message: probe.errors[0] ?? `agent probe ${probe.status}`,
-            errorContext: 'byok_agent_probe',
+            errorContext: probe.providerFailure?.errorContext ?? 'byok_agent_probe',
         });
     } else if (probe.ok) {
         recordByokProviderModelCallSuccess({
@@ -1265,7 +1301,7 @@ async function recordByokProbeHealth(mode, probe) {
         recordByokProviderModelCallFailure({
             ...healthIdentity,
             message: probe.errors[0] ?? `probe ${probe.status}`,
-            errorContext: 'byok_probe',
+            errorContext: probe.providerFailure?.errorContext ?? 'byok_probe',
         });
     }
     await flushByokProviderHealth();
@@ -1297,6 +1333,10 @@ function renderByokProbeResult(println, mode, probe, options = {}) {
         println(`${indent}\x1b[90msessão temporária=${probe.sessionId}\x1b[0m`);
     }
     if (options.showWarnings !== false) {
+        if (probe.providerFailure) {
+            println(`${indent}\x1b[33mdiagnóstico: ${probe.providerFailure.operatorLabel}\x1b[0m`);
+            println(`${indent}\x1b[90mação: ${probe.providerFailure.operatorAction}\x1b[0m`);
+        }
         for (const warning of probe.warnings) {
             println(`${indent}\x1b[33maviso: ${warning}\x1b[0m`);
         }
@@ -1559,6 +1599,7 @@ export async function cmdByok({ println }, arg) {
             for (const error of discovered.errors.slice(0, 6)) {
                 println(`  \x1b[33m  aviso: descoberta remota indisponível (${error}); usando catálogo disponível.\x1b[0m`);
             }
+            renderByokCatalogWarnings(println, discovered.warnings);
             renderByokShortlistProfileCoverage(
                 println,
                 projection,
@@ -1706,6 +1747,7 @@ export async function cmdByok({ println }, arg) {
         if (discovered.errors.length > 6) {
             println(`  \x1b[33m  aviso: +${discovered.errors.length - 6} erro(s) de descoberta omitidos; use provider:<nome> para isolar.\x1b[0m`);
         }
+        renderByokCatalogWarnings(println, discovered.warnings);
         if (modelList.length === 0) {
             println('    \x1b[33mNenhum modelo BYOK encontrado para os filtros atuais. Remova filtros, use provider:<nome> ou rode /byok models all-providers refresh.\x1b[0m\n');
             renderEmptyByokFilterDiagnostics(println, discovered.models.length > 0 ? discovered.models : models, filters, runtimeBudget);
@@ -1759,6 +1801,7 @@ export async function cmdByok({ println }, arg) {
         if (discovered.errors.length > 6) {
             println(`  \x1b[33m  aviso: +${discovered.errors.length - 6} erro(s) de descoberta omitidos; use provider:<nome> para isolar.\x1b[0m`);
         }
+        renderByokCatalogWarnings(println, discovered.warnings);
         if (recommendedEntries.length === 0) {
             println('    \x1b[33mNenhum modelo atende aos filtros. Tente remover filtros ou rode /byok models refresh.\x1b[0m\n');
             renderEmptyByokFilterDiagnostics(println, modelList, filters, runtimeBudget);

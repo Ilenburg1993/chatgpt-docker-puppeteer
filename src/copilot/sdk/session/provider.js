@@ -73,6 +73,7 @@ import { log } from '../logger.js';
  * @property {string | null} endpoint
  * @property {boolean} fromCache
  * @property {string | null} error
+ * @property {{ id: string | null; inCatalog: boolean | null; authoritative: boolean }} configuredModel
  */
 
 /** @type {readonly string[]} */
@@ -391,8 +392,12 @@ const BYOK_PROVIDER_PRESETS = Object.freeze({
         baseUrl: 'https://llm.chutes.ai/v1',
         modelEnvKeys: Object.freeze(['CHUTES_MODEL', 'CHUTES_AI_MODEL']),
         apiKeyEnvKeys: Object.freeze(['CHUTES_API_KEY', 'CHUTES_AI']),
-        defaultModel: 'Qwen/Qwen3-Next-80B-A3B-Instruct',
-        staticModels: Object.freeze(['Qwen/Qwen3-Next-80B-A3B-Instruct', 'zai-org/GLM-5-Turbo', 'Qwen/Qwen2.5-Coder-32B-Instruct']),
+        defaultModel: 'Qwen/Qwen3.5-397B-A17B-TEE',
+        staticModels: Object.freeze([
+            'Qwen/Qwen3.5-397B-A17B-TEE',
+            'Qwen/Qwen3-235B-A22B-Thinking-2507',
+            'Qwen/Qwen2.5-Coder-32B-Instruct-TEE',
+        ]),
         contextWindowTokens: 131_072,
         supportsReasoning: true,
         supportsVision: true,
@@ -1329,6 +1334,25 @@ function byokDiscoveryCacheKey(endpoint, provider) {
 }
 
 /**
+ * A sessão BYOK ainda precisa nascer com um `model` explícito. Quando o catálogo remoto é fresco, o cockpit deve
+ * saber se esse seletor continua existindo no provider sem substituir silenciosamente a escolha do operador.
+ *
+ * @param {string | null} model
+ * @param {import('../types.js').ModelInfo[]} models
+ * @param {boolean} authoritative
+ * @returns {{ id: string | null; inCatalog: boolean | null; authoritative: boolean }}
+ */
+function summarizeConfiguredByokModelCatalog(model, models, authoritative) {
+    if (!model) return { id: null, inCatalog: null, authoritative };
+    if (!authoritative) return { id: model, inCatalog: null, authoritative };
+    return {
+        id: model,
+        inCatalog: models.some((candidate) => candidate.id === model),
+        authoritative,
+    };
+}
+
+/**
  * @param {ProviderConfig | null} provider
  * @returns {ProviderConfig | null}
  */
@@ -1594,16 +1618,37 @@ export async function discoverConfiguredByokModelsFromEnv(env = process.env, opt
         ...state.summary.limits,
     });
     if (!state.enabled || !state.ready || !state.provider) {
-        return { models: staticModels, source: 'static', endpoint: null, fromCache: false, error: null };
+        return {
+            models: staticModels,
+            source: 'static',
+            endpoint: null,
+            fromCache: false,
+            error: null,
+            configuredModel: summarizeConfiguredByokModelCatalog(state.model, staticModels, false),
+        };
     }
 
     const effectiveEnv = resolveProfileEnv(env).env;
     const discoveryEnabled = parseBoolean(effectiveEnv['COPILOT_BYOK_MODEL_DISCOVERY_ENABLED']) ?? true;
     if (!discoveryEnabled) {
-        return { models: staticModels, source: 'static', endpoint: null, fromCache: false, error: null };
+        return {
+            models: staticModels,
+            source: 'static',
+            endpoint: null,
+            fromCache: false,
+            error: null,
+            configuredModel: summarizeConfiguredByokModelCatalog(state.model, staticModels, false),
+        };
     }
     if (state.provider.type !== PROVIDER_TYPES.OPENAI) {
-        return { models: staticModels, source: 'static', endpoint: null, fromCache: false, error: null };
+        return {
+            models: staticModels,
+            source: 'static',
+            endpoint: null,
+            fromCache: false,
+            error: null,
+            configuredModel: summarizeConfiguredByokModelCatalog(state.model, staticModels, false),
+        };
     }
 
     const endpoint = resolveByokModelsEndpoint(state.provider, effectiveEnv);
@@ -1613,7 +1658,14 @@ export async function discoverConfiguredByokModelsFromEnv(env = process.env, opt
     const now = Date.now();
     const cached = BYOK_MODEL_DISCOVERY_CACHE.get(cacheKey);
     if (!options.forceRefresh && cached && cached.expiresAt > now) {
-        return { models: cached.models, source: 'remote-cache', endpoint, fromCache: true, error: null };
+        return {
+            models: cached.models,
+            source: 'remote-cache',
+            endpoint,
+            fromCache: true,
+            error: null,
+            configuredModel: summarizeConfiguredByokModelCatalog(state.model, cached.models, true),
+        };
     }
 
     try {
@@ -1637,7 +1689,14 @@ export async function discoverConfiguredByokModelsFromEnv(env = process.env, opt
             throw new Error('model discovery returned no usable model ids');
         }
         BYOK_MODEL_DISCOVERY_CACHE.set(cacheKey, { expiresAt: now + ttlMs, models });
-        return { models, source: 'remote', endpoint, fromCache: false, error: null };
+        return {
+            models,
+            source: 'remote',
+            endpoint,
+            fromCache: false,
+            error: null,
+            configuredModel: summarizeConfiguredByokModelCatalog(state.model, models, true),
+        };
     } catch (error) {
         return {
             models: staticModels,
@@ -1645,6 +1704,7 @@ export async function discoverConfiguredByokModelsFromEnv(env = process.env, opt
             endpoint,
             fromCache: false,
             error: errorMessage(error),
+            configuredModel: summarizeConfiguredByokModelCatalog(state.model, staticModels, false),
         };
     }
 }
