@@ -422,6 +422,108 @@ describe('terminal /byok command', () => {
         expect(ctx.output()).not.toContain('token');
     });
 
+    it('sonda shortlist recomendada sem trocar a sessão viva e preserva profile/modelo de cada candidato', async () => {
+        discoverConfiguredByokModelsFromEnv.mockResolvedValue({
+            models: [
+                {
+                    id: 'kilo/model-a',
+                    capabilities: { supports: { reasoningEffort: true, vision: false }, limits: { max_context_window_tokens: 200000 } },
+                    byok: {
+                        freeTier: true,
+                        profile: 'kilo',
+                        provider: 'kilo-code',
+                        rateLimits: { maxRequestTokens: 64000 },
+                    },
+                },
+                {
+                    id: 'openrouter/model-b',
+                    capabilities: { supports: { reasoningEffort: true, vision: false }, limits: { max_context_window_tokens: 180000 } },
+                    byok: {
+                        freeTier: true,
+                        profile: 'openrouter-free',
+                        provider: 'openrouter',
+                        rateLimits: { maxRequestTokens: 64000 },
+                    },
+                },
+            ],
+            source: 'remote',
+            endpoint: 'https://provider.example/v1/models',
+            fromCache: false,
+            error: null,
+        });
+        probeTerminalConfiguredByokAgent
+            .mockResolvedValueOnce({
+                ok: true,
+                status: 'ok',
+                elapsedMs: 111,
+                model: 'kilo/model-a',
+                profile: 'kilo',
+                preset: 'kilo-code',
+                providerType: 'openai',
+                deltaCount: 2,
+                deltaChars: 16,
+                finalChars: 24,
+                observedFinalEvent: true,
+                toolCallCount: 2,
+                markerToolCallCount: 1,
+                readToolCallCount: 1,
+                userInputRequestCount: 1,
+                userInputAnswerCount: 1,
+                sessionId: 'tmp-kilo-shortlist',
+                errors: [],
+                warnings: [],
+            })
+            .mockResolvedValueOnce({
+                ok: true,
+                status: 'ok',
+                elapsedMs: 222,
+                model: 'openrouter/model-b',
+                profile: 'openrouter-free',
+                preset: 'openrouter',
+                providerType: 'openai',
+                deltaCount: 3,
+                deltaChars: 20,
+                finalChars: 30,
+                observedFinalEvent: true,
+                toolCallCount: 2,
+                markerToolCallCount: 1,
+                readToolCallCount: 1,
+                userInputRequestCount: 1,
+                userInputAnswerCount: 1,
+                sessionId: 'tmp-openrouter-shortlist',
+                errors: [],
+                warnings: [],
+            });
+        mockProjection();
+        const ctx = mockCtx();
+
+        await cmdByok({ println: ctx.println }, 'probe shortlist free reasoning safe 2 timeout:15000');
+
+        expect(probeTerminalConfiguredByokAgent).toHaveBeenNthCalledWith(
+            1,
+            expect.objectContaining({
+                env: expect.objectContaining({ COPILOT_BYOK_PROFILE: 'kilo' }),
+                model: 'kilo/model-a',
+                timeoutMs: 15000,
+            }),
+        );
+        expect(probeTerminalConfiguredByokAgent).toHaveBeenNthCalledWith(
+            2,
+            expect.objectContaining({
+                env: expect.objectContaining({ COPILOT_BYOK_PROFILE: 'openrouter-free' }),
+                model: 'openrouter/model-b',
+                timeoutMs: 15000,
+            }),
+        );
+        expect(recordByokProviderModelAgentProbeSuccess).toHaveBeenCalledTimes(2);
+        expect(ctx.output()).toContain('BYOK shortlist agent probe');
+        expect(ctx.output()).toContain('kilo/model-a');
+        expect(ctx.output()).toContain('openrouter/model-b');
+        expect(ctx.output()).toContain('Shortlist encerrada: ok=2/2');
+        expect(ctx.output()).toContain('/byok recommend ... safe');
+        expect(ctx.output()).not.toContain('tmp-kilo-shortlist');
+    });
+
     it('não degrada health real quando admission bloqueia a probe antes do provider', async () => {
         mockProjection();
         probeTerminalConfiguredByokChat.mockResolvedValue({

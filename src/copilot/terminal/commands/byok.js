@@ -35,6 +35,7 @@ import {
 
 const DEFAULT_BYOK_MODELS_DISPLAY_LIMIT = 24;
 const DEFAULT_BYOK_RECOMMEND_DISPLAY_LIMIT = 8;
+const DEFAULT_BYOK_SHORTLIST_PROBE_LIMIT = 3;
 const BYOK_LOW_REQUEST_TOKEN_LIMIT = 8_000;
 const BYOK_COMFORTABLE_REQUEST_TOKEN_LIMIT = 32_000;
 const BYOK_RECOMMEND_RESPONSE_RESERVE_TOKENS = 1_024;
@@ -62,6 +63,10 @@ const BYOK_RUNTIME_SELECTOR_ENV_KEYS = Object.freeze([
 /**
  * @typedef {object} ByokCommandContext
  * @property {(text: string) => void} println
+ */
+
+/**
+ * @typedef {Awaited<ReturnType<typeof probeTerminalConfiguredByokChat>> | Awaited<ReturnType<typeof probeTerminalConfiguredByokAgent>>} ByokProbeResult
  */
 
 /**
@@ -787,7 +792,7 @@ function withByokCatalogSource(model, source) {
         byok: {
             ...meta,
             provider: meta.provider ?? source.preset ?? source.providerType ?? source.profileName ?? null,
-            profile: source.profileName ?? null,
+            profile: meta.profile ?? source.profileName ?? null,
             source: meta.source ?? source.preset ?? source.providerType ?? source.profileName ?? undefined,
             profileFreeTier: meta.profileFreeTier ?? profileCostHint.profileFreeTier,
             profileCostSource: meta.profileCostSource ?? profileCostHint.profileCostSource,
@@ -1061,7 +1066,7 @@ function renderStatus(projection, println) {
     renderActiveByokHealthGuidance(projection, activeHealth, println);
     println('  \x1b[90mArquivo unico de BYOK: .env.local. Mudancas via comando preparam o processo; o rebind da sessão SDK acontece no próximo boot.\x1b[0m');
     printByokSdkSessionBoundaryHint(println);
-    println('  \x1b[90mUso: /byok | /byok reload | /byok providers | /byok profiles | /byok health [clear] | /byok probe [chat|agent] [profile:<nome>] [model:<id>] | /byok models [all-providers|grouped|refresh|all|n] [free|metered|cost?] [provider:<nome>] [reasoning] [vision] [safe] [ctx>N] [maxReq>N] | /byok recommend [all-providers] [grouped] [filtros] [n] | /byok use <perfil|sdk> | /byok model <id> | /byok provider <preset> [model] [baseUrl] | /byok persist <sdk|profile|model|provider> | /byok env\x1b[0m\n');
+    println('  \x1b[90mUso: /byok | /byok reload | /byok providers | /byok profiles | /byok health [clear] | /byok probe [chat|agent] [profile:<nome>] [model:<id>] | /byok probe shortlist [all-providers] [filtros] [n] [timeout:<ms>] | /byok models [all-providers|grouped|refresh|all|n] [free|metered|cost?] [provider:<nome>] [reasoning] [vision] [safe] [ctx>N] [maxReq>N] | /byok recommend [all-providers] [grouped] [filtros] [n] | /byok use <perfil|sdk> | /byok model <id> | /byok provider <preset> [model] [baseUrl] | /byok persist <sdk|profile|model|provider> | /byok env\x1b[0m\n');
 }
 
 /**
@@ -1167,6 +1172,123 @@ function buildByokProbeSelection(rest) {
         env['COPILOT_BYOK_MODEL'] = model;
     }
     return { env, model, profile, timeoutMs };
+}
+
+/**
+ * @param {'chat' | 'agent'} mode
+ * @param {ByokProbeResult} probe
+ * @returns {Promise<boolean>}
+ */
+async function recordByokProbeHealth(mode, probe) {
+    const healthIdentity = {
+        profile: probe.profile,
+        provider: probe.preset ?? probe.providerType,
+        model: probe.model,
+    };
+    const providerAttempted = probe.status !== 'admission-blocked';
+    if (mode === 'agent' && probe.ok) {
+        recordByokProviderModelAgentProbeSuccess(healthIdentity);
+    } else if (mode === 'agent' && providerAttempted) {
+        recordByokProviderModelAgentProbeFailure({
+            ...healthIdentity,
+            message: probe.errors[0] ?? `agent probe ${probe.status}`,
+            errorContext: 'byok_agent_probe',
+        });
+    } else if (probe.ok) {
+        recordByokProviderModelCallSuccess({
+            ...healthIdentity,
+            successContext: 'byok_probe',
+        });
+    } else if (providerAttempted) {
+        recordByokProviderModelCallFailure({
+            ...healthIdentity,
+            message: probe.errors[0] ?? `probe ${probe.status}`,
+            errorContext: 'byok_probe',
+        });
+    }
+    await flushByokProviderHealth();
+    return providerAttempted;
+}
+
+/**
+ * @param {(text: string) => void} println
+ * @param {'chat' | 'agent'} mode
+ * @param {ByokProbeResult} probe
+ * @param {{ indent?: string; providerAttempted?: boolean; showSession?: boolean; showWarnings?: boolean }} [options]
+ * @returns {void}
+ */
+function renderByokProbeResult(println, mode, probe, options = {}) {
+    const indent = options.indent ?? '    ';
+    const color = probe.ok ? '\x1b[32m' : '\x1b[31m';
+    println(
+        `${indent}resultado: ${color}${probe.status}\x1b[0m · profile=${valueOrDash(probe.profile)} · preset=${valueOrDash(probe.preset)} · provider=${valueOrDash(probe.providerType)} · model=${valueOrDash(probe.model)}`,
+    );
+    println(
+        `${indent}sinal:     deltas=${probe.deltaCount}/${probe.deltaChars} chars · final=${probe.finalChars} chars · finalEvent=${yesNo(probe.observedFinalEvent)} · ${probe.elapsedMs}ms`,
+    );
+    if (mode === 'agent') {
+        println(
+            `${indent}agente:    toolCalls=${Number(Reflect.get(probe, 'toolCallCount') ?? 0)} · marker=${Number(Reflect.get(probe, 'markerToolCallCount') ?? 0)} · read=${Number(Reflect.get(probe, 'readToolCallCount') ?? 0)} · ask=${Number(Reflect.get(probe, 'userInputRequestCount') ?? 0)} · answer=${Number(Reflect.get(probe, 'userInputAnswerCount') ?? 0)}`,
+        );
+    }
+    if (options.showSession !== false && probe.sessionId) {
+        println(`${indent}\x1b[90msessão temporária=${probe.sessionId}\x1b[0m`);
+    }
+    if (options.showWarnings !== false) {
+        for (const warning of probe.warnings) {
+            println(`${indent}\x1b[33maviso: ${warning}\x1b[0m`);
+        }
+        for (const error of probe.errors.slice(0, 4)) {
+            println(`${indent}\x1b[31merro: ${error}\x1b[0m`);
+        }
+    }
+    if (options.providerAttempted === false) {
+        println(
+            `${indent}\x1b[90mA probe foi barrada antes do provider porque o limite declarado não comporta o envelope SDK do terminal; health real do modelo não foi degradado por essa admissão.\x1b[0m`,
+        );
+    }
+}
+
+/**
+ * @param {'chat' | 'agent'} mode
+ * @param {ReturnType<typeof buildByokProbeSelection>} selection
+ * @returns {Promise<{ probe: ByokProbeResult; providerAttempted: boolean }>}
+ */
+async function runByokProbe(mode, selection) {
+    const probe = await (mode === 'agent' ? probeTerminalConfiguredByokAgent : probeTerminalConfiguredByokChat)({
+        env: selection.env,
+        ...(selection.model ? { model: selection.model } : {}),
+        ...(selection.timeoutMs ? { timeoutMs: selection.timeoutMs } : {}),
+    });
+    return {
+        probe,
+        providerAttempted: await recordByokProbeHealth(mode, probe),
+    };
+}
+
+/**
+ * @param {string[]} rest
+ * @returns {boolean}
+ */
+function hasExplicitByokProbeLimit(rest) {
+    return rest.some((item) => {
+        const numeric = Number.parseInt(item.toLowerCase(), 10);
+        return Number.isFinite(numeric) && numeric > 0;
+    });
+}
+
+/**
+ * @param {import('#copilot/sdk/types').ModelInfo} model
+ * @param {number | undefined} timeoutMs
+ * @returns {ReturnType<typeof buildByokProbeSelection>}
+ */
+function buildByokModelProbeSelection(model, timeoutMs) {
+    const meta = getByokModelMetadata(model);
+    return buildByokProbeSelection([
+        ...(meta?.profile ? [`profile:${meta.profile}`] : []),
+        `model:${model.id}`,
+        ...(timeoutMs ? [`timeout:${timeoutMs}`] : []),
+    ]);
 }
 
 /**
@@ -1353,6 +1475,51 @@ export async function cmdByok({ println }, arg) {
     }
 
     if (sub === 'probe' || sub === 'check') {
+        if (/^(shortlist|recommend|recommended)$/iu.test(rest[0] ?? '')) {
+            const shortlistArgs = rest.slice(1);
+            const filters = parseRecommendArgs(shortlistArgs);
+            const timeoutMs = buildByokProbeSelection(
+                shortlistArgs.filter((item) => /^(?:--)?timeout[:=]/iu.test(item)),
+            ).timeoutMs;
+            if (!filters.avoidLowLimit) filters.avoidLowLimit = true;
+            if (!hasExplicitByokProbeLimit(shortlistArgs)) filters.limit = DEFAULT_BYOK_SHORTLIST_PROBE_LIMIT;
+            const runtimeBudget = readCurrentByokRequestBudget();
+            const discovered = await discoverByokCatalogForCommand(projection, filters);
+            const modelList = discovered.models.length > 0 ? discovered.models : models;
+            const candidates = rankByokModels(modelList)
+                .filter((model) => matchesRecommendFilters(model, filters, runtimeBudget))
+                .slice(0, filters.limit);
+            println(`\n  \x1b[36mBYOK shortlist agent probe\x1b[0m (${candidates.length}/${modelList.length})`);
+            println(
+                `  \x1b[90mEscopo: ${filters.allProviders ? 'todos os perfis selecionados' : 'provider/perfil ativo'} + ranking do catalogo + filtros=${renderByokFilterLabel(filters) || 'safe'}; cada candidato roda a mesma sessão SDK descartável de /byok probe agent, sem trocar o dialog loop vivo.${timeoutMs ? ` timeout=${timeoutMs}ms` : ''}\x1b[0m\n`,
+            );
+            for (const error of discovered.errors.slice(0, 6)) {
+                println(`  \x1b[33m  aviso: descoberta remota indisponível (${error}); usando catálogo disponível.\x1b[0m`);
+            }
+            if (candidates.length === 0) {
+                println('    \x1b[33mNenhum candidato cabe na shortlist atual. Ajuste provider/filtros, remova safe para inspeção ou rode /byok models.\x1b[0m\n');
+                renderEmptyByokFilterDiagnostics(println, modelList, filters, runtimeBudget);
+                return;
+            }
+            let passed = 0;
+            let attempted = 0;
+            for (const [index, model] of candidates.entries()) {
+                println(`    ${index + 1}. \x1b[33m${model.id}\x1b[0m  \x1b[90m${renderModelTags(model)}\x1b[0m`);
+                const result = await runByokProbe('agent', buildByokModelProbeSelection(model, timeoutMs));
+                renderByokProbeResult(println, 'agent', result.probe, {
+                    indent: '       ',
+                    providerAttempted: result.providerAttempted,
+                    showSession: false,
+                });
+                if (result.providerAttempted) attempted += 1;
+                if (result.probe.ok) passed += 1;
+                println('');
+            }
+            println(
+                `  \x1b[90mShortlist encerrada: ok=${passed}/${candidates.length} · providerTentado=${attempted}/${candidates.length}. A saúde persistida alimenta /byok recommend ... safe; a sessão viva só muda com /byok use e /byok model.\x1b[0m\n`,
+            );
+            return;
+        }
         const mode = /^(agent|runtime|full)$/iu.test(rest[0] ?? '') ? 'agent' : 'chat';
         const explicitChatMode = /^(chat|canary)$/iu.test(rest[0] ?? '');
         const selection = buildByokProbeSelection(mode === 'agent' || explicitChatMode ? rest.slice(1) : rest);
@@ -1360,64 +1527,8 @@ export async function cmdByok({ println }, arg) {
         println(
             `  \x1b[90mEscopo: sessão SDK descartável; não troca o dialog loop nem grava transcript live.${mode === 'chat' ? ' Chat nega tools.' : ' Agent exige tools representativas do terminal + ask_user com resposta sintética.'}${selection.profile ? ` profile=${selection.profile}` : ''}${selection.model ? ` model=${selection.model}` : ''}\x1b[0m`,
         );
-        const probe = await (mode === 'agent' ? probeTerminalConfiguredByokAgent : probeTerminalConfiguredByokChat)({
-            env: selection.env,
-            ...(selection.model ? { model: selection.model } : {}),
-            ...(selection.timeoutMs ? { timeoutMs: selection.timeoutMs } : {}),
-        });
-        const healthIdentity = {
-            profile: probe.profile,
-            provider: probe.preset ?? probe.providerType,
-            model: probe.model,
-        };
-        const providerAttempted = probe.status !== 'admission-blocked';
-        if (mode === 'agent' && probe.ok) {
-            recordByokProviderModelAgentProbeSuccess(healthIdentity);
-        } else if (mode === 'agent' && providerAttempted) {
-            recordByokProviderModelAgentProbeFailure({
-                ...healthIdentity,
-                message: probe.errors[0] ?? `agent probe ${probe.status}`,
-                errorContext: 'byok_agent_probe',
-            });
-        } else if (probe.ok) {
-            recordByokProviderModelCallSuccess({
-                ...healthIdentity,
-                successContext: 'byok_probe',
-            });
-        } else if (providerAttempted) {
-            recordByokProviderModelCallFailure({
-                ...healthIdentity,
-                message: probe.errors[0] ?? `probe ${probe.status}`,
-                errorContext: 'byok_probe',
-            });
-        }
-        await flushByokProviderHealth();
-        const color = probe.ok ? '\x1b[32m' : '\x1b[31m';
-        println(
-            `    resultado: ${color}${probe.status}\x1b[0m · profile=${valueOrDash(probe.profile)} · preset=${valueOrDash(probe.preset)} · provider=${valueOrDash(probe.providerType)} · model=${valueOrDash(probe.model)}`,
-        );
-        println(
-            `    sinal:     deltas=${probe.deltaCount}/${probe.deltaChars} chars · final=${probe.finalChars} chars · finalEvent=${yesNo(probe.observedFinalEvent)} · ${probe.elapsedMs}ms`,
-        );
-        if (mode === 'agent') {
-            println(
-                `    agente:    toolCalls=${Number(Reflect.get(probe, 'toolCallCount') ?? 0)} · marker=${Number(Reflect.get(probe, 'markerToolCallCount') ?? 0)} · read=${Number(Reflect.get(probe, 'readToolCallCount') ?? 0)} · ask=${Number(Reflect.get(probe, 'userInputRequestCount') ?? 0)} · answer=${Number(Reflect.get(probe, 'userInputAnswerCount') ?? 0)}`,
-            );
-        }
-        if (probe.sessionId) {
-            println(`    \x1b[90msessão temporária=${probe.sessionId}\x1b[0m`);
-        }
-        for (const warning of probe.warnings) {
-            println(`  \x1b[33m  aviso: ${warning}\x1b[0m`);
-        }
-        for (const error of probe.errors.slice(0, 4)) {
-            println(`  \x1b[31m  erro: ${error}\x1b[0m`);
-        }
-        if (!providerAttempted) {
-            println(
-                '  \x1b[90mA probe foi barrada antes do provider porque o limite declarado não comporta o envelope SDK do terminal; health real do modelo não foi degradado por essa admissão.\x1b[0m',
-            );
-        }
+        const { probe, providerAttempted } = await runByokProbe(mode, selection);
+        renderByokProbeResult(println, mode, probe, { providerAttempted });
         println(
             mode === 'agent'
                 ? '  \x1b[90mAgent probe confirma a fronteira exigida pelo terminal: streaming + tools representativas + ask_user. Chat probe isolado continua disponível com /byok probe chat.\x1b[0m\n'

@@ -996,7 +996,7 @@ Status desta revisão:
 - Implementado `/byok probe [profile:<nome>] [model:<id>] [timeout:<ms>]` com sessão SDK descartável e health store redigida.
 - Implementado `/byok probe agent` para validar, antes da sessão viva, `tool calling` e `ask_user` no runtime agente com uma tool canária e resposta sintética confinadas ao probe.
 - O runner live BYOK real agora separa probe `--no-pr` de turno vivo: chat/agent probes podem provar provider/modelo sem exigir `byok_user_message` de uma conversa que não foi aberta.
-- Pendente: UX de pré-sessão antes do attach automático, `disconnect` explícito quando houver razão operacional para soltar o handle vivo sem inventar outro attach no mesmo REPL, probe agregado de candidatos recomendados e live longo provando troca `auto -> new -> resume` em conjunto com BYOK.
+- Pendente: UX de pré-sessão antes do attach automático, `disconnect` explícito quando houver razão operacional para soltar o handle vivo sem inventar outro attach no mesmo REPL e nova rodada live combinando troca `auto -> new -> resume` com shortlist BYOK agregada.
 
 Status: implementado nesta revisão. Ainda falta enriquecer perfis com metadados mais formais de limite gratuito por provider quando APIs oficiais expuserem quotas estruturadas.
 
@@ -1266,6 +1266,35 @@ Validacao:
 - Testes unitarios de `/byok` cobrem probe representativo e recomendacao `safe` que exige evidencia de probe agente.
 
 Status: implementado nesta revisao para probe representativo, harness e promocao segura; falta decidir se `terminal workflow` vira terceira dimensão persistida de health ou permanece como evidencia de artefato live canônico.
+
+### A57. Shortlist BYOK precisava sondar ranking real sem colapsar identidades de profile
+
+Situacao atual observada:
+
+- O cockpit ja tinha catalogo, recomendacao, `chat probe` e `agent probe`, mas a operacao "testar candidatos como live fake antes de trocar a sessao viva" ainda exigia repetir manualmente `/byok probe agent profile:... model:...`.
+- A primeira implementacao da shortlist reaproveitou o fluxo correto de probe, e o teste multi-candidato imediatamente expôs uma raiz mais antiga: `withByokCatalogSource()` preservava o provider vindo do metadata do modelo, mas sobrescrevia `byok.profile` com o profile do resumo ativo.
+- Essa perda de identidade e perigosa. Um modelo listado com profile próprio podia ser sondado com a credencial do provider anterior, poluindo health, ranking e a confiança do operador sobre o que foi realmente testado.
+
+Situacao ideal:
+
+- A shortlist deve ser somente orquestracao do caminho canonico existente: ranking/filtros -> `agent probe` descartavel -> health redigido. Ela nao cria renderer, loop de chat, sessao viva ou canal de tool paralelo.
+- Cada candidato carrega sua identidade completa `(profile, provider, model)` ate a criacao da sessao efemera. Metadata explicito do modelo vence o fallback de source usado apenas para catalogo ativo.
+- O operador pode sondar o provider/perfil ativo ou todos os perfis selecionados com `all-providers`, vendo quantos candidatos passaram e sabendo que a sessao viva so muda por `/byok use` e `/byok model`.
+
+Correcao desta revisao:
+
+- Adicionado `/byok probe shortlist [all-providers] [filtros] [n] [timeout:<ms>]`, com limite conservador default de tres candidatos, filtro `safe` default e alias `recommend|recommended` dentro de `probe`.
+- A renderizacao e a gravacao de health de probes foram extraidas para um unico helper compartilhado entre `chat`, `agent` e shortlist.
+- `withByokCatalogSource()` agora preserva `byok.profile` declarado pelo modelo quando existir; o fallback do source ativo so entra quando o catalogo nao trouxe profile.
+- O live runner BYOK sem PR passou a exercitar shortlist de um candidato no preflight, separando essa admissao da conversa canônica do operador.
+
+Validacao:
+
+- Unit test de `/byok probe shortlist` cobre dois candidatos de profiles diferentes e exige env/model/timeout corretos em cada `agent probe`.
+- O teste que revelou o bug passou apos a correcao de normalizacao de profile; a suite focada de `/byok` continua sendo a barreira contra regressao de identidade no seletor agregado.
+- Live real BYOK sem turno explicito PASS em `artifacts/terminal-live/byok-kilo-shortlist-preflight-2026-05-21/summary.md`: o preflight Kilo observou `BYOK shortlist agent probe`, cleanup de probes efemeros, cockpit de sessao SDK, catalogo/recomendacao, alternancia auxiliar para Ollama Cloud e zero leak de segredo.
+
+Status: implementado e validado em unit test + live real `--no-pr`. A rodada seguinte pode explorar shortlist `all-providers` e politicas para surfacing de perfis cujo filtro `safe` fica vazio.
 
 ## Hipóteses Externas Rejeitadas Ou Reclassificadas
 
@@ -1695,6 +1724,7 @@ Fase J6. Testes
 - J6.45 Reforcar `/byok probe agent` com uma tool representativa do terminal, nao apenas marker interno, e provar o caminho feliz no live Kilo. Status: feito; `read_file_content` sintético entrou no probe e `artifacts/terminal-live/byok-kilo-representative-agent-probe-2026-05-21-r2/summary.md` passou.
 - J6.46 Fazer o live runner bloquear pergunta `ask_user` simulada como texto/JSON publico quando o terminal nao recebeu `user_input.requested`. Status: feito no harness; NVIDIA abriu a evidencia negativa em `artifacts/terminal-live/byok-nvidia-representative-agent-probe-2026-05-21/summary.md` e a reexecucao em `artifacts/terminal-live/byok-nvidia-textual-ask-gate-r2-2026-05-21/summary.md` classificou `ask_user_text+ask_user_question_json` como `byok-live-tool-protocol-missed` em 35s.
 - J6.47 Promover em `/byok recommend ... safe` somente modelos com probe agente positivo de tools + `ask_user`, mantendo o catalogo amplo em `/byok models`. Status: feito com unit tests e diagnostico acionavel para candidatos ainda nao sondados.
+- J6.48 Criar shortlist de probes agentes ranqueadas como live fake BYOK, preservando `(profile, provider, model)` por candidato e cobrindo a superficie no runner `--no-pr`. Status: PASS em unit test multi-profile e em `artifacts/terminal-live/byok-kilo-shortlist-preflight-2026-05-21/summary.md`.
 
 Fase J7. Providers amplos
 

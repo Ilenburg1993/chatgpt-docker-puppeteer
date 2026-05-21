@@ -273,6 +273,7 @@ function buildByokCatalogCommands(provider) {
         `/byok models refresh${providerFilter}`,
         `/byok models free reasoning safe 8${providerFilter}`,
         `/byok recommend reasoning safe 8${providerFilter}`,
+        `/byok probe shortlist free reasoning safe 1 timeout:60000${providerFilter}`,
     ];
 }
 
@@ -1499,6 +1500,11 @@ function evaluateByokRealOutput(plain, secretValues, { profile, altProfile, mode
                 /BYOK agent probe/.test(plain) &&
                 /sessão SDK descartável/.test(plain),
             detail: 'BYOK preflight exercised disposable chat and agent probes before the live operator turn',
+        },
+        {
+            id: 'byok-real-shortlist-probe',
+            pass: /BYOK shortlist agent probe/.test(plain) && /Shortlist encerrada: ok=\d+\/\d+/.test(plain),
+            detail: 'BYOK preflight exercised a ranked disposable shortlist probe without mutating the live session',
         },
         {
             id: 'byok-real-chat-probe-ok',
