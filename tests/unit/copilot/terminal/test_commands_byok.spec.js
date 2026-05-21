@@ -2,13 +2,14 @@
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-const { chmod, clearByokProviderModelHealth, discoverConfiguredByokModelsFromEnv, flushByokProviderHealth, listByokProviderModelHealth, loadDotenv, probeTerminalConfiguredByokAgent, probeTerminalConfiguredByokChat, readByokProviderHealthState, readByokProviderModelHealth, readConfiguredByokProfilesFromEnv, readFile, readTerminalByokProjection, readTerminalRuntimeState, recordByokProviderModelAgentProbeFailure, recordByokProviderModelAgentProbeSuccess, recordByokProviderModelCallFailure, recordByokProviderModelCallSuccess, rename, writeFile } =
+const { chmod, clearByokProviderModelHealth, discoverConfiguredByokModelsFromEnv, flushByokProviderHealth, listByokProviderModelHealth, listTerminalSdkSessionInventory, loadDotenv, probeTerminalConfiguredByokAgent, probeTerminalConfiguredByokChat, readByokProviderHealthState, readByokProviderModelHealth, readConfiguredByokProfilesFromEnv, readFile, readTerminalByokProjection, readTerminalRuntimeState, recordByokProviderModelAgentProbeFailure, recordByokProviderModelAgentProbeSuccess, recordByokProviderModelCallFailure, recordByokProviderModelCallSuccess, rename, setTerminalModelProjection, writeFile } =
     vi.hoisted(() => ({
         chmod: vi.fn(),
         clearByokProviderModelHealth: vi.fn(),
         discoverConfiguredByokModelsFromEnv: vi.fn(),
         flushByokProviderHealth: vi.fn(() => Promise.resolve()),
         listByokProviderModelHealth: vi.fn(() => []),
+        listTerminalSdkSessionInventory: vi.fn(),
         loadDotenv: vi.fn(),
         probeTerminalConfiguredByokAgent: vi.fn(),
         probeTerminalConfiguredByokChat: vi.fn(),
@@ -33,6 +34,7 @@ const { chmod, clearByokProviderModelHealth, discoverConfiguredByokModelsFromEnv
         recordByokProviderModelAgentProbeFailure: vi.fn(),
         recordByokProviderModelAgentProbeSuccess: vi.fn(),
         rename: vi.fn(),
+        setTerminalModelProjection: vi.fn(),
         writeFile: vi.fn(),
     }));
 
@@ -56,8 +58,10 @@ vi.mock('#copilot/config', () => ({
 vi.mock('../../../../src/copilot/terminal/frontend/index.js', () => ({
     probeTerminalConfiguredByokChat,
     probeTerminalConfiguredByokAgent,
+    listTerminalSdkSessionInventory,
     readTerminalByokProjection,
     readTerminalRuntimeState,
+    setTerminalModelProjection,
 }));
 
 vi.mock('../../../../src/copilot/terminal/state/byok-provider-health.js', () => ({
@@ -126,6 +130,15 @@ describe('terminal /byok command', () => {
         flushByokProviderHealth.mockResolvedValue(undefined);
         listByokProviderModelHealth.mockReset();
         listByokProviderModelHealth.mockReturnValue([]);
+        listTerminalSdkSessionInventory.mockReset();
+        listTerminalSdkSessionInventory.mockResolvedValue({
+            currentSessionId: null,
+            lastSessionId: null,
+            foregroundSessionId: null,
+            persistedByokBinding: null,
+            lastBootDecision: null,
+            sessions: [],
+        });
         loadDotenv.mockReset();
         probeTerminalConfiguredByokChat.mockReset();
         probeTerminalConfiguredByokAgent.mockReset();
@@ -154,6 +167,7 @@ describe('terminal /byok command', () => {
         recordByokProviderModelAgentProbeFailure.mockReset();
         recordByokProviderModelAgentProbeSuccess.mockReset();
         rename.mockReset();
+        setTerminalModelProjection.mockReset();
         writeFile.mockReset();
         delete process.env['COPILOT_BYOK_ENABLED'];
         delete process.env['COPILOT_BYOK_PROFILE'];
@@ -186,6 +200,8 @@ describe('terminal /byok command', () => {
         expect(ctx.output()).toContain('BYOK status');
         expect(ctx.output()).toContain('.env.local');
         expect(ctx.output()).toContain('bearer=');
+        expect(ctx.output()).toContain('/session sdk next new');
+        expect(ctx.output()).toContain('/restart reinicia só o dialog loop');
         expect(ctx.output()).not.toContain('secret');
     });
 
@@ -603,6 +619,78 @@ describe('terminal /byok command', () => {
 
         expect(process.env['COPILOT_BYOK_ENABLED']).toBe('true');
         expect(process.env['COPILOT_BYOK_MODEL']).toBe('anthropic/claude-sonnet-4.5');
+        expect(setTerminalModelProjection).not.toHaveBeenCalled();
+    });
+
+    it('troca modelo na sessão viva quando o provider BYOK bound é o mesmo', async () => {
+        mockProjection({
+            summary: {
+                enabled: true,
+                ready: true,
+                profile: 'kilo',
+                preset: 'kilo-code',
+                providerType: 'openai',
+                baseUrl: 'https://api.kilo.ai/api/gateway',
+                model: 'kilo-auto/free',
+            },
+        });
+        listTerminalSdkSessionInventory.mockResolvedValue({
+            currentSessionId: 'sdk-kilo',
+            lastSessionId: 'sdk-kilo',
+            foregroundSessionId: 'sdk-kilo',
+            persistedByokBinding: {
+                enabled: true,
+                profile: 'kilo',
+                preset: 'kilo-code',
+                providerType: 'openai',
+                baseUrl: 'https://api.kilo.ai/api/gateway',
+                model: 'kilo-auto/free',
+            },
+            lastBootDecision: null,
+            sessions: [],
+        });
+        const ctx = mockCtx();
+
+        await cmdByok({ println: ctx.println }, 'model anthropic/claude-sonnet-4.5');
+
+        expect(setTerminalModelProjection).toHaveBeenCalledWith('anthropic/claude-sonnet-4.5');
+        expect(ctx.output()).toContain('Modelo BYOK solicitado na sessão viva');
+        expect(ctx.output()).toContain('Provider/perfil foram preservados');
+    });
+
+    it('não atravessa provider com setModel quando o binding BYOK vivo diverge', async () => {
+        mockProjection({
+            summary: {
+                enabled: true,
+                ready: true,
+                profile: 'kilo',
+                preset: 'kilo-code',
+                providerType: 'openai',
+                baseUrl: 'https://api.kilo.ai/api/gateway',
+                model: 'kilo-auto/free',
+            },
+        });
+        listTerminalSdkSessionInventory.mockResolvedValue({
+            currentSessionId: 'sdk-openrouter',
+            lastSessionId: 'sdk-openrouter',
+            foregroundSessionId: 'sdk-openrouter',
+            persistedByokBinding: {
+                enabled: true,
+                profile: 'openrouter-free',
+                preset: 'openrouter',
+                providerType: 'openai',
+                baseUrl: 'https://openrouter.ai/api/v1',
+                model: 'openrouter/free',
+            },
+            lastBootDecision: null,
+            sessions: [],
+        });
+        const ctx = mockCtx();
+
+        await cmdByok({ println: ctx.println }, 'model anthropic/claude-sonnet-4.5');
+
+        expect(setTerminalModelProjection).not.toHaveBeenCalled();
+        expect(ctx.output()).toContain('Sessão viva não está bound ao mesmo provider BYOK');
     });
 
     it('lista modelos descobertos automaticamente pelo provider', async () => {

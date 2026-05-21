@@ -1161,6 +1161,52 @@ Validação:
 
 Status: implementado nesta revisão. A próxima discussão de sessão pode se concentrar na UX de pré-sessão e troca deliberada de provider/binding, não em provar de novo que o cockpit one-shot atravessa boots reais.
 
+### A53. Seletores BYOK ainda narravam `/restart` como rebind de sessão SDK
+
+Situação atual observada:
+
+- A arquitetura já separa `dialog loop` e sessão SDK persistente: `/restart` reinicia o loop, enquanto `/session sdk next new|resume|auto` é consumido pelo initializer no boot seguinte.
+- Parte da UX BYOK ainda dizia que `/restart` "abre nova sessão SDK" após `/byok use`, `/byok persist` e status. Isso contradizia o cockpit de sessão e dava ao operador uma ação que não troca provider binding na raiz.
+- Essa ambiguidade é especialmente perigosa em BYOK multi-provider: mudar env/projeção de profile/provider no processo não prova que o handle SDK vivo foi recriado com outro `ProviderConfig`.
+- Havia também uma mistura ruim entre troca de provider e troca de modelo: o SDK expõe `session.setModel()` para preservar histórico na sessão viva, mas esse caminho só é seguro quando o provider BYOK bound já é o mesmo.
+
+Situação ideal:
+
+- BYOK deve explicar uma única fronteira de provider: comandos de seleção preparam o processo e `.env.local`; entrar/sair de BYOK ou rebinding de profile/provider acontece em uma nova sessão SDK no próximo boot.
+- `/restart` permanece estritamente "reiniciar dialog loop". Se houver troca de provider/profile/binding, a UX aponta `/session sdk next new` e reinício da task do terminal.
+- Troca de modelo no mesmo provider pode usar o caminho vivo canônico do runtime (`setTerminalModelProjection()` -> `runtime.setModel()` -> `session.setModel()`), mas nunca deve atravessar provider bound só porque o env mudou.
+- O operador não deve confundir status/projeção de seleção BYOK com confirmação de que a sessão SDK viva já foi recriada.
+
+Correção desta revisão:
+
+- `commands/byok.js` ganhou um helper único de fronteira de sessão SDK e passou a usá-lo em status, profiles, persist e retorno para SDK.
+- A mensagem canônica agora diz para agendar `/session sdk next new` e reiniciar a task do terminal para provider/profile; também declara que `/restart` reinicia só o dialog loop.
+- `/byok model <id>` agora inspeciona o binding persistido da sessão viva. Quando profile/preset/provider/baseUrl são os mesmos, usa a projection viva de modelo; quando divergem, prepara apenas o próximo boot e recusa um `setModel()` cruzando provider.
+- `/model <id>` sob BYOK aponta o operador para a distinção acima em vez de mandar reiniciar sessão genericamente.
+- Testes cobrem a orientação nova de `/byok status`, o `setModel()` vivo de mesmo provider e a recusa quando o binding BYOK vivo diverge.
+
+Status: implementado nesta revisão para narrativa e caminho seguro de troca BYOK. O próximo passo de UX, se necessário, deve ser um comando operacional de reentrada que continue usando o initializer único, não um reattach paralelo dentro do REPL.
+
+### A54. Live BYOK não distinguia turno explicitamente vazio de timeout opaco
+
+Situação atual observada:
+
+- O live Kilo de fronteira de modelo em `artifacts/terminal-live/byok-kilo-live-model-boundary-2026-05-21/summary.md` provou o novo caminho de `/byok model`: o terminal mostrou `Modelo BYOK solicitado na sessão viva` e o evento de `session.model_changed` para o provider Kilo já bound.
+- No turno canônico seguinte, o provider executou `report_intent` e `read_file_content`, emitiu usage BYOK sem Premium Request, fechou `assistant.turn_end` e publicou `dialog.turn_end` com `reply=""` antes de qualquer delta/`ask_user`.
+- O terminal registrou a verdade operacional no SSE (`Reply do turno explícito resolvido ... source=empty` e retorno a `idle`), mas o live runner ficou esperando o `ask_user` ausente até classificar genericamente `live-timeout`.
+
+Situação ideal:
+
+- Um teste canônico não deve transformar `dialog.turn_end` vazio em timeout indistinto quando o próprio stream público já prova que o turno acabou sem transcript.
+- O artefato deve separar `assistant-empty-turn` de stall/timeout real, preservando `traceId`, `turnId` e id SSE para a investigação de provider/SDK.
+
+Correção desta revisão:
+
+- O detector de blocker do runner passou a olhar `dialog.turn_end` no SSE já coletado. Se o cenário expira depois de um final vazio, o blocker é `assistant-empty-turn`, não `live-timeout`.
+- A correção é de bancada, não de máscara: a UX/stream seguem mostrando o turno vazio; a próxima investigação fica focada em por que o provider encerrou sem transcript requerido.
+
+Status: implementado no runner; precisa ser confirmado na próxima repetição do live que encerre com reply vazio.
+
 ## Hipóteses Externas Rejeitadas Ou Reclassificadas
 
 ### H1. "boot-hub assume sucesso"
@@ -1566,7 +1612,7 @@ Fase J6. Testes
 - J6.23 Rodar probe real sem PR Hugging Face -> Chutes cobrindo provider cockpit, catálogo filtrado, troca de provider/modelo e ausência de vazamento. Status: PASS em `artifacts/terminal-live/byok-real-huggingface-chutes-nopr-2026-05-21/summary.md`.
 - J6.24 Rodar live Kilo real completo após os hardenings de BYOK/reasoning/fallback, cobrindo delta, tool, `ask_user`, pós-ask, SSE, `/events`, `/tools`, `/usage`, `/health` e export. Status: PASS em `artifacts/terminal-live/2026-05-21T17-25-49-956Z/summary.md`.
 - J6.25 Cobrir `/byok models all-providers`, `/byok models all-providers grouped` e `/byok recommend all-providers` por unit test e por comando operacional real sem segredo. Status: feito nesta revisão.
-- J6.26 Rodar turno funcional OpenRouter free usando um modelo recomendado alternativo ao que retornou 400. Status: pendente.
+- J6.26 Rodar turno funcional OpenRouter free usando um modelo recomendado alternativo ao que retornou 400. Status: PASS com o router `openrouter/free` em `artifacts/terminal-live/byok-openrouter-free-router-canonical-2026-05-21/summary.md`; a reexecução em `artifacts/terminal-live/byok-openrouter-free-canonical-2026-05-21/summary.md` ficou `BLOCKED` por falha de provider após probes/cockpit passarem, preservando a distinção entre prova canônica anterior e instabilidade externa posterior.
 - J6.27 Investigar Gemini 403 separando Google AI Studio, Google Cloud e compatibilidade OpenAI endpoint, sem imprimir chave. Status: pendente.
 - J6.28 Rodar live Kilo real após correção do harness pós-ask, garantindo que comandos diagnósticos não entrem no meio do stream. Status: PASS em `artifacts/terminal-live/byok-kilo-canonical-after-runner-fix-2026-05-21/summary.md`.
 - J6.29 Rodar live Cerebras real para validar caminho negativo de provider: catálogo/cockpit/recomendação OK, erro sem fallback Copilot, turno `failed`, sem secret leak e sem Premium Request. Status: BLOCKED por provider em `artifacts/terminal-live/byok-cerebras-failure-after-turn-fail-2026-05-21/summary.md`, com terminal/harness corretos.
@@ -1766,6 +1812,7 @@ Implementado:
 - Live BYOK real sem PR OpenRouter -> Groq passou em `artifacts/terminal-live/byok-provider-cost-cockpit-2026-05-21/summary.md`: OpenRouter exibiu catálogo free/profile-free, Groq exibiu `qwen/qwen3-32b profile-free`, filtros `safe` explicaram limites de 6000 tokens, `/byok providers` e `/byok profiles` exibiram `cost=profile-free(...)`, `/events` arquivou controle público e `/errors` ficou limpo.
 - Live OpenRouter estrito sem PR passou em `artifacts/terminal-live/byok-openrouter-free-router-nopr-strict-2026-05-21/summary.md`: `openrouter/free` passou chat probe e agent probe descartáveis antes do cockpit de catálogo/recomendação, enquanto o summary exige sucesso real das sondas.
 - Live OpenRouter canônico passou em `artifacts/terminal-live/byok-openrouter-free-router-canonical-2026-05-21/summary.md`: `openrouter/free` validou preflight, deltas parciais/final, tools, `ask_user`, resposta humana, continuação pós-ask, usage `byok_user_message`, health por modelo, SSE/JSONL/export e ausência de duplicação.
+- Reexecução OpenRouter canônica em `artifacts/terminal-live/byok-openrouter-free-canonical-2026-05-21/summary.md` ficou `BLOCKED` depois de boot, probes e cockpit: o turno vivo falhou como erro BYOK de provider/modelo, sem fallback Copilot, sem Premium Request inferida e sem mascarar o bloqueio como bug visual do terminal.
 - Live OpenRouter sem PR pós-health gate passou em `artifacts/terminal-live/byok-openrouter-health-gate-router-nopr-2026-05-21/summary.md`: status/catálogo/recomendação/probes deixaram claro que catálogo e saúde são fatos distintos sem cair em Premium Request.
 - Live Ollama Cloud canônico passou em `artifacts/terminal-live/byok-ollama-cloud-canonical-2026-05-21/summary.md`: `qwen3-coder-next` validou probes, deltas, tools, `ask_user`, pós-ask, `/activity`, `/tools`, `/events`, `/health`, export e SSE/JSONL sem duplicação nem Premium Request.
 - Live NVIDIA sem PR passou em `artifacts/terminal-live/byok-nvidia-session-delete-cockpit-nopr-2026-05-21/summary.md`: o provider `nvidia-nim` validou probes descartáveis de chat/agente para `openai/gpt-oss-120b`, inventário `/session sdk` com binding BYOK e limpeza persistida anunciada no cockpit, troca auxiliar para Kilo, filtros/recommendation e ausência de uso Premium Request.

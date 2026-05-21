@@ -708,6 +708,17 @@ function detectLiveBlocker(plain, runtime = {}) {
             detail: `BYOK provider turn failed and was contained without Copilot fallback${modelMatch?.[1] ? ` · model=${modelMatch[1]}` : ''}`,
         };
     }
+    const emptyTurnEnd = findEmptyDialogTurnEnd(runtime.sseEvents);
+    if (runtime.timedOut && emptyTurnEnd) {
+        return {
+            id: 'assistant-empty-turn',
+            detail:
+                'terminal reached dialog.turn_end with empty reply before the canonical ask/final' +
+                `${emptyTurnEnd.traceId ? ` · trace=${emptyTurnEnd.traceId}` : ''}` +
+                `${emptyTurnEnd.turnId ? ` · turn=${emptyTurnEnd.turnId}` : ''}` +
+                `${Number.isFinite(emptyTurnEnd.eventId) ? ` · sse=#${emptyTurnEnd.eventId}` : ''}`,
+        };
+    }
     if (runtime.timedOut) {
         return {
             id: 'live-timeout',
@@ -723,6 +734,22 @@ function detectLiveBlocker(plain, runtime = {}) {
 
 function isObjectPayload(value) {
     return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+function findEmptyDialogTurnEnd(events) {
+    if (!Array.isArray(events)) return null;
+    for (let index = events.length - 1; index >= 0; index -= 1) {
+        const evt = events[index];
+        if (evt?.event !== 'dialog.turn_end' || !isObjectPayload(evt.data)) continue;
+        const reply = typeof evt.data.reply === 'string' ? evt.data.reply.trim() : '';
+        if (reply.length > 0) continue;
+        return {
+            eventId: evt.id,
+            traceId: typeof evt.data.traceId === 'string' ? evt.data.traceId : null,
+            turnId: typeof evt.data.turnId === 'string' ? evt.data.turnId : null,
+        };
+    }
+    return null;
 }
 
 function summarizeSseEvents(events) {
@@ -1994,7 +2021,13 @@ async function main() {
     };
     const blocker = noPr || byokProbe
         ? null
-        : detectLiveBlocker(plain, { timedOut, answerSent, postAskContinuationObserved, postCommandsSent });
+        : detectLiveBlocker(plain, {
+              timedOut,
+              answerSent,
+              postAskContinuationObserved,
+              postCommandsSent,
+              sseEvents: sseSummary.events,
+          });
     const exportSummary = noPr || byokProbe || blocker ? null : await inspectExportedMarkdown(exportPath);
     const baseCriteria = blocker
         ? evaluateBlockedOutput(plain, sseSummary, blocker)

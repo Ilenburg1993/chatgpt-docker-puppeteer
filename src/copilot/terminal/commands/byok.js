@@ -16,8 +16,10 @@ import { discoverConfiguredByokModelsFromEnv, readConfiguredByokProfilesFromEnv 
 import {
     probeTerminalConfiguredByokAgent,
     probeTerminalConfiguredByokChat,
+    listTerminalSdkSessionInventory,
     readTerminalByokProjection,
     readTerminalRuntimeState,
+    setTerminalModelProjection,
 } from '../frontend/index.js';
 import {
     clearByokProviderModelHealth,
@@ -76,6 +78,92 @@ function yesNo(value) {
  */
 function valueOrDash(value) {
     return value && value.length > 0 ? value : '-';
+}
+
+/**
+ * Explica a fronteira entre seletor BYOK e sessão SDK viva. Provider/profile vivem no contrato de criação/retomada de
+ * sessão; `/restart` reinicia apenas o dialog loop e não pode ser narrado como rebind de provider.
+ *
+ * @param {(text: string) => void} println
+ * @param {{ persisted?: boolean }} [options]
+ * @returns {void}
+ */
+function printByokSdkSessionBoundaryHint(println, options = {}) {
+    const prefix = options.persisted
+        ? 'A seleção persistida será aplicada por uma nova sessão SDK.'
+        : 'A seleção BYOK foi preparada no processo atual.';
+    println(
+        `  \x1b[90m${prefix} Para entrar/sair de BYOK ou rebind de provider/perfil, agende /session sdk next new e reinicie a task do terminal; /restart reinicia só o dialog loop.\x1b[0m`,
+    );
+    println(
+        '  \x1b[90m/byok model <id> tenta setModel na sessão viva apenas quando ela já está bound ao mesmo provider BYOK.\x1b[0m',
+    );
+}
+
+/**
+ * @param {unknown} value
+ * @returns {string | null}
+ */
+function readByokBindingText(value) {
+    return typeof value === 'string' && value.trim() ? value.trim() : null;
+}
+
+/**
+ * @param {ReturnType<typeof readTerminalByokProjection>['summary']} summary
+ * @param {Record<string, unknown> | null | undefined} binding
+ * @returns {boolean}
+ */
+function isSameLiveByokProviderBoundary(summary, binding) {
+    if (!summary.enabled || !summary.ready || !binding || binding['enabled'] !== true) return false;
+    return (
+        readByokBindingText(binding['profile']) === summary.profile &&
+        readByokBindingText(binding['preset']) === summary.preset &&
+        readByokBindingText(binding['providerType']) === summary.providerType &&
+        readByokBindingText(binding['baseUrl']) === summary.baseUrl
+    );
+}
+
+/**
+ * Troca modelo no runtime vivo apenas quando o handle SDK atual já nasceu com o mesmo provider BYOK.
+ *
+ * @param {ReturnType<typeof readTerminalByokProjection>['summary']} summary
+ * @param {string} model
+ * @param {(text: string) => void} println
+ * @returns {Promise<void>}
+ */
+async function tryApplyLiveByokModelSwitch(summary, model, println) {
+    if (!summary.enabled || !summary.ready) return;
+
+    let inventory;
+    try {
+        inventory = await listTerminalSdkSessionInventory();
+    } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        println(
+            `  \x1b[33mSessão viva não inspecionada para setModel BYOK: ${message}. A seleção do processo continua pronta para o próximo boot.\x1b[0m`,
+        );
+        return;
+    }
+    if (!inventory.currentSessionId || !isSameLiveByokProviderBoundary(summary, inventory.persistedByokBinding)) {
+        println(
+            '  \x1b[33mSessão viva não está bound ao mesmo provider BYOK; modelo preparado para o próximo boot, sem setModel cruzando provider.\x1b[0m',
+        );
+        return;
+    }
+    try {
+        setTerminalModelProjection(model);
+        println(
+            `  \x1b[32mModelo BYOK solicitado na sessão viva: ${model}.\x1b[0m`,
+        );
+        println(
+            '  \x1b[90mProvider/perfil foram preservados; confirme o modelo efetivo no próximo turno por usage/session.model_changed.\x1b[0m',
+        );
+    } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        println(
+            `  \x1b[33mNão foi possível pedir setModel BYOK no runtime vivo: ${message}. A seleção do processo continua pronta para o próximo boot.\x1b[0m`,
+        );
+    }
 }
 
 /**
@@ -941,7 +1029,8 @@ function renderStatus(projection, println) {
         println(`  \x1b[31m  erro: ${error}\x1b[0m`);
     }
     renderActiveByokHealthGuidance(projection, activeHealth, println);
-    println('  \x1b[90mArquivo unico de BYOK: .env.local. Mudancas via comando valem para o processo atual; use /restart para nova sessao SDK.\x1b[0m');
+    println('  \x1b[90mArquivo unico de BYOK: .env.local. Mudancas via comando preparam o processo; o rebind da sessão SDK acontece no próximo boot.\x1b[0m');
+    printByokSdkSessionBoundaryHint(println);
     println('  \x1b[90mUso: /byok | /byok reload | /byok providers | /byok profiles | /byok health [clear] | /byok probe [chat|agent] [profile:<nome>] [model:<id>] | /byok models [all-providers|grouped|refresh|all|n] [free|metered|cost?] [provider:<nome>] [reasoning] [vision] [safe] [ctx>N] [maxReq>N] | /byok recommend [all-providers] [grouped] [filtros] [n] | /byok use <perfil|sdk> | /byok model <id> | /byok provider <preset> [model] [baseUrl] | /byok persist <sdk|profile|model|provider> | /byok env\x1b[0m\n');
 }
 
@@ -1212,7 +1301,9 @@ export async function cmdByok({ println }, arg) {
         try {
             const message = await persistByokSelection(rest, projection);
             println(`  \x1b[32m${message}\x1b[0m`);
-            println('  \x1b[90mGravação feita em .env.local sem imprimir segredos. Use /restart para reabrir a sessão SDK com a configuração persistida.\x1b[0m\n');
+            println('  \x1b[90mGravação feita em .env.local sem imprimir segredos.\x1b[0m');
+            printByokSdkSessionBoundaryHint(println, { persisted: true });
+            println('');
         } catch (error) {
             const message = error instanceof Error ? error.message : String(error);
             println(`  \x1b[31mNão foi possível persistir BYOK: ${message}\x1b[0m\n`);
@@ -1370,7 +1461,9 @@ export async function cmdByok({ println }, arg) {
                 `      \x1b[90mpreset=${profile.preset ?? '-'} · provider=${profile.providerType ?? '-'} · model=${profile.model ?? '-'} · auth=${renderProfileAuth(profile)}${metadata}${cost}\x1b[0m`,
             );
         }
-        println('\n  \x1b[90mUso: /byok use <perfil> para ativar no processo atual; depois /restart para abrir nova sessão SDK.\x1b[0m\n');
+        println('\n  \x1b[90mUso: /byok use <perfil> prepara o seletor no processo atual.\x1b[0m');
+        printByokSdkSessionBoundaryHint(println);
+        println('');
         return;
     }
 
@@ -1480,7 +1573,8 @@ export async function cmdByok({ println }, arg) {
             process.env['COPILOT_BYOK_ENABLED'] = 'false';
             clearRuntimeSelectors();
             println('\n  \x1b[32mBYOK desativado no processo atual; o SDK Copilot volta a governar a próxima sessão.\x1b[0m');
-            println('  \x1b[90mUse /restart para reabrir o dialog loop com o SDK sem provider customizado.\x1b[0m\n');
+            printByokSdkSessionBoundaryHint(println);
+            println('');
             return;
         }
         if (!profiles.some((profile) => profile.name === target)) {
@@ -1500,10 +1594,12 @@ export async function cmdByok({ println }, arg) {
             println('  \x1b[31mUso: /byok model <model-id>\x1b[0m\n');
             return;
         }
+        const previousSummary = projection.summary;
         process.env['COPILOT_BYOK_ENABLED'] = 'true';
         clearRuntimeSelectors(['COPILOT_BYOK_PROFILE']);
         process.env['COPILOT_BYOK_MODEL'] = model;
         renderStatus(readTerminalByokProjection(), println);
+        await tryApplyLiveByokModelSwitch(previousSummary, model, println);
         return;
     }
 

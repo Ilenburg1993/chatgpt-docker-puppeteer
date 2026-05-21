@@ -199,7 +199,9 @@ export async function cmdModel({ println }, arg) {
         println(
             `  \x1b[90mModelo BYOK canônico: ${byok.model ?? '(ausente)'} · preset=${byok.preset ?? '-'} · provider=${byok.providerType ?? '-'}.\x1b[0m`,
         );
-        println('  \x1b[90mAltere COPILOT_BYOK_MODEL/COPILOT_BYOK_PROVIDER_* no ambiente e reinicie a sessão.\x1b[0m\n');
+        println(
+            '  \x1b[90mUse /byok model <id> para trocar modelo no mesmo provider quando a sessão viva já estiver bound; troca de provider/perfil continua em /byok + /session sdk next new no próximo boot.\x1b[0m\n',
+        );
         return;
     }
 
