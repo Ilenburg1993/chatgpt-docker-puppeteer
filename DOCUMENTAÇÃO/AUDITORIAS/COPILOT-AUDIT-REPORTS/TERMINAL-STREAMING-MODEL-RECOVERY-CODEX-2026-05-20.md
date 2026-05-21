@@ -941,10 +941,11 @@ Fase J6. Testes
 - J6.3 Criar fake SDK BYOK determinístico sem rede. Status: parcialmente feito por unit tests de resolução/comando; falta sessão SDK fake end-to-end.
 - J6.4 Rodar live test com `/byok`, delta, tool, `ask_user` e elicitation quando disponível. Status: delta/tool/ask_user PASS em `artifacts/terminal-live/2026-05-21T10-22-43-042Z/summary.md`; `/byok` e elicitation pendentes no live.
 - J6.5 Rodar smoke real Kilo/Ollama Cloud/OpenAI-compatible sem gravar segredo em artefato. Status: pendente.
-- J6.6 Adicionar comando live/harness específico para `/byok status`, `/byok models` e `/byok env` sem abrir turno. Status: pendente.
+- J6.6 Adicionar comando live/harness específico para `/byok status`, `/byok models` e `/byok env` sem abrir turno. Status: feito nesta revisão com `--byok-probe`.
 - J6.7 Cobrir `/byok profiles`, `/byok use`, `/byok model`, `/byok provider` e `/byok reload`. Status: parcialmente feito; reload/provider ainda precisam unit dedicado.
 - J6.8 Cobrir descoberta remota, cache e fallback estático em unit tests. Status: feito nesta revisão.
 - J6.9 Rodar smoke seguro de descoberta real usando apenas `.env.local`/env, sem colocar segredo no comando. Status: feito; sem chave Kilo local, resultado `skipped`.
+- J6.10 Rodar live BYOK sem turno explícito para status/env/profiles/models/use-sdk/events/errors. Status: PASS em `artifacts/terminal-live/2026-05-21T11-33-14-457Z/summary.md`.
 
 Fase J7. Providers amplos
 
@@ -1020,6 +1021,7 @@ Implementado:
 - `dialog.loop.changed` equivalente agora é deduplicado na borda terminal/SSE.
 - `dialog.turn_end` truncado agora é reconciliado contra materialização/transcript recente: se `assistant.message` completo já cobriu o texto, o evento segue em SSE/auditoria, mas não abre bloco `Continuação da LLM-B`.
 - O live runner agora falha explicitamente em `no-truncated-turn-end-duplication` quando `dialog.turn_end` repete prefixo longo de `assistant.message`.
+- O live runner ganhou `--byok-probe`, que executa `/byok`, `/byok env`, `/byok profiles`, `/byok models refresh`, `/byok use sdk`, `/events` e `/errors` sem abrir turno LLM.
 - `agent.error` recuperável de `model_call` não polui mais `/errors`; ele permanece auditável como evento público/atividade de retry.
 - `agent:task:error` deixou de gerar entrada sintética duplicada `event-bus` no `ErrorTracker`.
 - `task.error` de rate limit deixou de duplicar `session.error` em `/errors` e deixou de aparecer como "Tarefa interna falhou · 0 chunks" na timeline terminal.
@@ -1042,6 +1044,7 @@ Implementado:
 - Live completo pós-correção passou em `artifacts/terminal-live/2026-05-21T10-22-43-042Z/summary.md`: deltas parciais, final, tool, `ask_user`, resposta humana, continuação pós-ask, `/events`, `/events --raw`, `/tools diag`, `/health`, `/errors` e export.
 - Live completo com BYOK/discovery já integrado passou em `artifacts/terminal-live/2026-05-21T11-14-22-468Z/summary.md`: deltas, tool, `ask_user`, resposta humana, `llm.usage`, `/events`, SSE HTTP e export. A inspeção manual desse artefato revelou o gap A29 de `dialog.turn_end` truncado, corrigido logo depois.
 - Live completo pós-A29 em `artifacts/terminal-live/2026-05-21T11-26-10-340Z/summary.md` validou boot, SSE, tool e `ask_user`, mas ficou incompleto por timeout antes da continuação pós-ask; o runner agora classifica esse caso como blocker `live-timeout`.
+- Live BYOK sem PR passou em `artifacts/terminal-live/2026-05-21T11-33-14-457Z/summary.md`: `/byok`, `/byok env`, `/byok profiles`, `/byok models refresh`, `/byok use sdk`, `/events`, `/events --raw` e `/errors`, sem abrir turno explícito.
 - Smoke BYOK local sem rede validou `ollama-local`, normalização de `baseUrl` para `/v1`, modelo explícito e resumo sem segredo.
 - Testes BYOK desta rodada validaram Kilo Gateway como OpenAI-compatible, perfil ativo por `COPILOT_BYOK_PROFILE`, resumos redigidos e comandos `/byok profiles`, `/byok use` e `/byok model`.
 - Descoberta automática BYOK foi adicionada para providers OpenAI-compatible: endpoint explícito ou `<baseUrl>/models`, timeout, TTL cache, fonte visível em `/byok models` e fallback estático redigido.
@@ -1056,8 +1059,8 @@ Próxima rodada recomendada:
 
 1. Reexecutar live completo com orçamento maior ou cenário canônico menor para confirmar pós-A29 até `/export` sem bater `live-timeout`.
 2. Integrar BYOK em `/events sources`, sem duplicar o fluxo de sessão.
-3. Criar harness live sem turno para `/byok status`, `/byok profiles`, `/byok models refresh`, `/byok env`, `/byok use sdk` e smoke de boot com provider fake/local.
-4. Inserir as chaves reais apenas em `.env.local`/secret manager e rodar smoke real Kilo/Ollama Cloud/OpenAI-compatible, arquivando só metadados redigidos.
+3. Rodar `--byok-probe` com provider fake/local e depois com Kilo/Ollama Cloud real via `.env.local`, arquivando só metadados redigidos.
+4. Inserir as chaves reais apenas em `.env.local`/secret manager e rodar smoke real Kilo/Ollama Cloud/OpenAI-compatible.
 5. Expandir o cenário live para elicitation quando a capability estiver disponível.
 6. Fechar a recuperação `session.error`/`reconnect_restart`, distinguindo retry real de reenvio ambíguo de prompt.
 7. Criar contrato único de modelo configurado/preferido/efetivo/cobrado, incluindo billing/effective model real em BYOK.

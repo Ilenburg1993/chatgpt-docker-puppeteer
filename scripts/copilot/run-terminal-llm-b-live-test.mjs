@@ -81,6 +81,25 @@ function buildScenarioPrompt() {
     ].join(' ');
 }
 
+function buildNoPrProbeCommands() {
+    return ['/usage now', '/activity 20', '/metrics', '/events 20', '/events 20 --raw', '/errors 10', '/quit'];
+}
+
+function buildByokProbeCommands() {
+    return [
+        '/byok',
+        '/byok env',
+        '/byok profiles',
+        '/byok models refresh',
+        '/byok use sdk',
+        '/usage now',
+        '/events 30',
+        '/events 30 --raw',
+        '/errors 10',
+        '/quit',
+    ];
+}
+
 function buildReport({
     criteria,
     durationMs,
@@ -591,6 +610,73 @@ function evaluateNoPrOutput(plain, sseSummary) {
     ];
 }
 
+function evaluateByokProbeOutput(plain, sseSummary) {
+    const archiveRawEvents = extractArchiveRawEvents(plain);
+    return [
+        {
+            id: 'ready',
+            pass: /LLM-B pronta/.test(plain),
+            detail: 'terminal reached ready state',
+        },
+        {
+            id: 'interactive-repl',
+            pass: !/Modo headless detectado/.test(plain),
+            detail: 'terminal ran with an interactive REPL/TTY surface',
+        },
+        {
+            id: 'no-explicit-turn',
+            pass: !/\[intervene→turn\]/.test(plain) && !/Processando mensagem/.test(plain),
+            detail: 'BYOK probe did not open an explicit LLM turn',
+        },
+        {
+            id: 'byok-status-visible',
+            pass: /BYOK status/.test(plain) && /\.env\.local/.test(plain),
+            detail: '/byok rendered the redacted canonical status',
+        },
+        {
+            id: 'byok-env-visible',
+            pass: /BYOK env canonico/.test(plain) && /COPILOT_BYOK_PROFILES_JSON/.test(plain),
+            detail: '/byok env rendered the canonical operator contract',
+        },
+        {
+            id: 'byok-profiles-visible',
+            pass: /BYOK profiles/.test(plain),
+            detail: '/byok profiles rendered configured profile information or the empty-state',
+        },
+        {
+            id: 'byok-models-visible',
+            pass: /BYOK models/.test(plain),
+            detail: '/byok models refresh rendered model catalog state without exposing secrets',
+        },
+        {
+            id: 'byok-use-sdk-visible',
+            pass: /BYOK desativado no processo atual|SDK Copilot/.test(plain),
+            detail: '/byok use sdk returned the process to the SDK-governed mode',
+        },
+        {
+            id: 'sse-archive-query-visible',
+            pass: /Eventos SSE/.test(plain) && /arquivo=/.test(plain),
+            detail: '/events rendered the durable public SSE archive tail',
+        },
+        {
+            id: 'sse-archive-raw-visible',
+            pass: archiveRawEvents.length > 0,
+            detail: `/events --raw exposed ${archiveRawEvents.length} archived control event(s)`,
+        },
+        {
+            id: 'no-terminal-errors',
+            pass: /Nenhum erro recente/.test(plain) && !/\bERROR\b/.test(plain),
+            detail: 'terminal error tracker stayed clean',
+        },
+        {
+            id: 'clean-quit',
+            pass: /readline fechado/.test(plain),
+            detail: 'terminal exited through /quit',
+        },
+        ...evaluateSseCriteria(sseSummary, { expectPublicEvents: false, plain }),
+    ];
+}
+
 function evaluateBlockedOutput(plain, sseSummary, blocker) {
     return [
         {
@@ -745,6 +831,7 @@ async function main() {
     const requestedTransport = readArg('--transport', 'pty');
     const dryRun = hasFlag('--dry-run');
     const noPr = hasFlag('--no-pr');
+    const byokProbe = hasFlag('--byok-probe');
     const collectSse = !hasFlag('--no-sse');
     const requestedTerminalPort = readArg('--terminal-port', '');
     const requestedSsePort = readArg('--sse-port', '');
@@ -765,9 +852,11 @@ async function main() {
     const mdPath = path.join(outDir, 'summary.md');
 
     if (dryRun) {
-        const prompt = noPr
-            ? '/usage now\n/activity 20\n/metrics\n/events 20\n/events 20 --raw\n/errors 10\n/quit'
-            : buildScenarioPrompt();
+        const prompt = byokProbe
+            ? buildByokProbeCommands().join('\n')
+            : noPr
+              ? buildNoPrProbeCommands().join('\n')
+              : buildScenarioPrompt();
         await writeFile(path.join(outDir, 'prompt.txt'), `${prompt}\n`, 'utf8');
         console.log(`[terminal-live] dry-run prompt written to ${path.relative(ROOT, path.join(outDir, 'prompt.txt'))}`);
         return;
@@ -860,12 +949,9 @@ async function main() {
             }
             write('/usage now');
             write('/activity 12');
-            if (noPr) {
-                write('/metrics');
-                write('/events 20');
-                write('/events 20 --raw');
-                write('/errors 10');
-                write('/quit');
+            if (byokProbe || noPr) {
+                const commands = byokProbe ? buildByokProbeCommands() : buildNoPrProbeCommands();
+                for (const commandLine of commands) write(commandLine);
                 return;
             }
             write(buildScenarioPrompt());
@@ -935,15 +1021,17 @@ async function main() {
         raw: '',
         disabled: !collectSse,
     };
-    const blocker = noPr
+    const blocker = noPr || byokProbe
         ? null
         : detectLiveBlocker(plain, { timedOut, answerSent, postAskContinuationObserved, postCommandsSent });
-    const exportSummary = noPr || blocker ? null : await inspectExportedMarkdown(exportPath);
+    const exportSummary = noPr || byokProbe || blocker ? null : await inspectExportedMarkdown(exportPath);
     const criteria = blocker
         ? evaluateBlockedOutput(plain, sseSummary, blocker)
-        : noPr
-          ? evaluateNoPrOutput(plain, sseSummary)
-          : evaluateOutput(plain, sseSummary, exportSummary);
+        : byokProbe
+          ? evaluateByokProbeOutput(plain, sseSummary)
+          : noPr
+            ? evaluateNoPrOutput(plain, sseSummary)
+            : evaluateOutput(plain, sseSummary, exportSummary);
     const durationMs = Date.now() - Date.parse(startedAt);
     await writeFile(rawPath, raw, 'utf8');
     await writeFile(plainPath, plain, 'utf8');
@@ -990,7 +1078,7 @@ async function main() {
             blocker,
             outputPath: path.relative(ROOT, rawPath),
             plainOutputPath: path.relative(ROOT, plainPath),
-            exportPath: noPr ? null : path.relative(ROOT, exportPath),
+            exportPath: noPr || byokProbe ? null : path.relative(ROOT, exportPath),
             exportSummary,
             sseRawPath: path.relative(ROOT, sseRawPath),
             sseJsonlPath: path.relative(ROOT, sseJsonlPath),
