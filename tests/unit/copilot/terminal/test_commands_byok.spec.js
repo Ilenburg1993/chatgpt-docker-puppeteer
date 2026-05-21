@@ -2,12 +2,25 @@
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-const { chmod, discoverConfiguredByokModelsFromEnv, listByokProviderModelHealth, loadDotenv, readByokProviderModelHealth, readFile, readTerminalByokProjection, readTerminalRuntimeState, rename, writeFile } =
+const { chmod, clearByokProviderModelHealth, discoverConfiguredByokModelsFromEnv, flushByokProviderHealth, listByokProviderModelHealth, loadDotenv, readByokProviderHealthState, readByokProviderModelHealth, readFile, readTerminalByokProjection, readTerminalRuntimeState, rename, writeFile } =
     vi.hoisted(() => ({
         chmod: vi.fn(),
+        clearByokProviderModelHealth: vi.fn(),
         discoverConfiguredByokModelsFromEnv: vi.fn(),
+        flushByokProviderHealth: vi.fn(() => Promise.resolve()),
         listByokProviderModelHealth: vi.fn(() => []),
         loadDotenv: vi.fn(),
+        readByokProviderHealthState: vi.fn(() => ({
+            enabled: false,
+            path: null,
+            loaded: true,
+            records: 0,
+            persistedRecords: 0,
+            flushScheduled: false,
+            flushInFlight: false,
+            dirty: false,
+            error: null,
+        })),
         readByokProviderModelHealth: vi.fn(() => null),
         readFile: vi.fn(),
         readTerminalByokProjection: vi.fn(),
@@ -38,7 +51,10 @@ vi.mock('../../../../src/copilot/terminal/frontend/index.js', () => ({
 }));
 
 vi.mock('../../../../src/copilot/terminal/state/byok-provider-health.js', () => ({
+    clearByokProviderModelHealth,
+    flushByokProviderHealth,
     listByokProviderModelHealth,
+    readByokProviderHealthState,
     readByokProviderModelHealth,
 }));
 
@@ -91,9 +107,24 @@ describe('terminal /byok command', () => {
         discoverConfiguredByokModelsFromEnv.mockReset();
         chmod.mockReset();
         chmod.mockResolvedValue(undefined);
+        clearByokProviderModelHealth.mockReset();
+        flushByokProviderHealth.mockReset();
+        flushByokProviderHealth.mockResolvedValue(undefined);
         listByokProviderModelHealth.mockReset();
         listByokProviderModelHealth.mockReturnValue([]);
         loadDotenv.mockReset();
+        readByokProviderHealthState.mockReset();
+        readByokProviderHealthState.mockReturnValue({
+            enabled: false,
+            path: null,
+            loaded: true,
+            records: 0,
+            persistedRecords: 0,
+            flushScheduled: false,
+            flushInFlight: false,
+            dirty: false,
+            error: null,
+        });
         readByokProviderModelHealth.mockReset();
         readByokProviderModelHealth.mockReturnValue(null);
         readFile.mockReset();
@@ -220,6 +251,54 @@ describe('terminal /byok command', () => {
         expect(ctx.output()).toContain('meta=tier,owner');
         expect(ctx.output()).toContain('chat=ok');
         expect(ctx.output()).not.toContain('secret');
+    });
+
+    it('mostra health operacional persistido de BYOK', async () => {
+        readByokProviderHealthState.mockReturnValue({
+            enabled: true,
+            path: 'data/copilot-terminal/byok-provider-health.json',
+            loaded: true,
+            records: 1,
+            persistedRecords: 1,
+            flushScheduled: false,
+            flushInFlight: false,
+            dirty: false,
+            error: null,
+        });
+        listByokProviderModelHealth.mockReturnValue([
+            {
+                key: 'kilo|kilo-code|kilo-auto/free',
+                profile: 'kilo',
+                provider: 'kilo-code',
+                model: 'kilo-auto/free',
+                lastStatus: 'ok',
+                failureCount: 0,
+                successCount: 2,
+                lastFailureAt: null,
+                lastSuccessAt: Date.now(),
+                lastMessage: null,
+                lastErrorContext: null,
+            },
+        ]);
+        mockProjection();
+        const ctx = mockCtx();
+
+        await cmdByok({ println: ctx.println }, 'health');
+
+        expect(ctx.output()).toContain('BYOK chat health');
+        expect(ctx.output()).toContain('byok-provider-health.json');
+        expect(ctx.output()).toContain('chat=ok');
+    });
+
+    it('limpa health operacional BYOK quando solicitado', async () => {
+        mockProjection();
+        const ctx = mockCtx();
+
+        await cmdByok({ println: ctx.println }, 'health clear');
+
+        expect(clearByokProviderModelHealth).toHaveBeenCalledOnce();
+        expect(flushByokProviderHealth).toHaveBeenCalledOnce();
+        expect(ctx.output()).toContain('BYOK chat health limpo');
     });
 
     it('ativa perfil no processo atual', async () => {

@@ -904,15 +904,20 @@ Correção:
 - `/byok providers`, `/byok models` e `/byok recommend` passaram a mostrar `chat=?`, `chat=ok(...)` ou `chat=failed(...)`.
 - O filtro `safe` passou a excluir pares com falha operacional recente mesmo quando o catálogo remoto ainda lista o modelo.
 - O live runner agora executa `/byok providers` e `/byok recommend reasoning safe 8` depois de turno BYOK real ou depois de erro de provider, e valida que a saúde operacional aparece para o operador.
+- A saúde operacional deixou de ser apenas memória de processo: o store redigido `data/copilot-terminal/byok-provider-health.json` persiste `chat=ok/failed` entre reinícios sem gravar segredos nem criar outro fanout.
+- O comando `/byok health [clear]` expõe o estado operacional bruto para o operador, incluindo arquivo, flush pendente, registros e último erro redigido.
 
 Validação:
 
 - `npm run typecheck:strict:src.copilot` passou.
 - `npx vitest run tests/unit/copilot/terminal/test_commands_byok.spec.js tests/unit/copilot/test_terminal_agent_runtime_events.spec.js` passou com 50 testes.
+- `npx vitest run tests/unit/copilot/terminal/test_byok_provider_health.spec.js tests/unit/copilot/terminal/test_commands_byok.spec.js tests/unit/copilot/test_terminal_agent_runtime_events.spec.js` passou com 54 testes, cobrindo reidratação persistente, redaction de segredo, sucesso posterior a falha e `/byok health clear`.
 - Live BYOK real com Kilo passou em `artifacts/terminal-live/byok-kilo-health-cockpit-pass-2026-05-21/summary.md`: deltas parciais, bloco final, tools, `ask_user`, resposta humana, continuação pós-ask, usage BYOK sem Premium Request, `/events`, SSE/JSONL/export, ausência de duplicação, `/byok providers` com `chat=ok` e `/byok recommend safe` preservando essa evidência.
+- Live negativo BYOK real com Cerebras ficou `BLOCKED` em `artifacts/terminal-live/byok-cerebras-health-persist-r2-2026-05-21/summary.md`, mas passou todos os critérios operacionais: `chat=failed` reidratado após restart, `/byok health` visível, sem fallback Copilot, sem Premium Request e sem vazamento de segredo.
 - O harness foi endurecido para não contar menções prospectivas ao marcador pós-ask como bloco final renderizado; somente a frase final exata `POST-ASK-CANONICAL-FINAL: usuário confirmou SIM` conta como final.
+- O harness também passou a serializar diagnósticos pós-erro BYOK com atraso entre comandos, evitando que `/byok providers`, `/byok health` e `/byok recommend` sejam engolidos por `/quit`.
 
-Status: implementado para saúde operacional em memória do processo atual. Próximo passo: persistir essa saúde de forma redigida entre sessões para que falhas recorrentes de provider/modelo continuem visíveis após restart.
+Status: implementado para saúde operacional em memória e persistida em JSON redigido, com prova positiva Kilo e prova negativa Cerebras.
 
 ## Hipóteses Externas Rejeitadas Ou Reclassificadas
 
@@ -1310,6 +1315,8 @@ Fase J6. Testes
 - J6.28 Rodar live Kilo real após correção do harness pós-ask, garantindo que comandos diagnósticos não entrem no meio do stream. Status: PASS em `artifacts/terminal-live/byok-kilo-canonical-after-runner-fix-2026-05-21/summary.md`.
 - J6.29 Rodar live Cerebras real para validar caminho negativo de provider: catálogo/cockpit/recomendação OK, erro sem fallback Copilot, turno `failed`, sem secret leak e sem Premium Request. Status: BLOCKED por provider em `artifacts/terminal-live/byok-cerebras-failure-after-turn-fail-2026-05-21/summary.md`, com terminal/harness corretos.
 - J6.30 Rodar live BYOK real validando saúde operacional no cockpit e recomendação segura. Status: PASS em `artifacts/terminal-live/byok-kilo-health-cockpit-pass-2026-05-21/summary.md`, com `/byok providers` exibindo `chat=ok` e `/byok recommend reasoning safe` carregando a evidência do turno real.
+- J6.31 Persistir saúde operacional BYOK redigida entre sessões e expor `/byok health [clear]`. Status: feito nesta revisão, com store `data/copilot-terminal/byok-provider-health.json`, redaction de mensagens, reidratação e unit tests.
+- J6.32 Rodar live negativo novo com provider falho e restart subsequente para provar `chat=failed` reidratado. Status: BLOCKED esperado em `artifacts/terminal-live/byok-cerebras-health-persist-r2-2026-05-21/summary.md`; critérios operacionais BYOK passaram.
 
 Fase J7. Providers amplos
 
@@ -1445,6 +1452,8 @@ Implementado:
 - A saude operacional BYOK agora e alimentada por eventos reais de runtime: `agent.error` de `model_call` marca provider/perfil/modelo como `chat=failed`, enquanto `llm.usage` BYOK sem PR marca sucesso. `/byok providers`, `/byok models` e `/byok recommend` mostram essa evidencia, e `safe` deixa de recomendar modelos com falha real recente mesmo quando o catalogo remoto ainda lista o modelo.
 - Testes unitarios cobrem cockpit de providers com `chat=ok`, exclusao de modelo falho em `/byok recommend safe` e exibicao de `chat=failed` em `/byok models` quando o operador decide inspecionar sem `safe`.
 - Live BYOK real com health cockpit passou em `artifacts/terminal-live/byok-kilo-health-cockpit-pass-2026-05-21/summary.md`: `/byok providers` pós-turno mostrou `chat=ok`, `/byok recommend reasoning safe` preservou a saúde operacional, e o harness confirmou deltas, final, tools, `ask_user`, pós-ask, SSE/export e ausência de duplicações.
+- Saúde operacional BYOK agora persiste em `data/copilot-terminal/byok-provider-health.json` de forma redigida; `/byok health` mostra o store e `/byok health clear` limpa processo e disco sem tocar segredos.
+- Live Cerebras com health persistido em `artifacts/terminal-live/byok-cerebras-health-persist-r2-2026-05-21/summary.md` provou reidratação de `chat=failed` no cockpit e no comando `/byok health`; o bloqueio permaneceu atribuído ao provider/modelo, não ao terminal.
 - Teste unitário de `/byok models` cobre limitação padrão de 24 itens e ampliação explícita por número.
 - Probe BYOK real sem PR em `artifacts/terminal-live/2026-05-21T12-50-11-039Z/summary.md` confirmou catálogo Kilo remoto paginado (`24/346`), troca de modelo, alternância para Ollama Cloud, SSE/control plane e ausência de vazamento de segredos.
 - Live BYOK real com `kilo-auto/balanced` ficou `BLOCKED` por `byok-provider-credits` em `artifacts/terminal-live/2026-05-21T12-03-39-776Z/summary.md`; o runner agora classifica esse caso como falha externa de créditos/modelo, não como bug do terminal.
@@ -1466,7 +1475,7 @@ Próxima rodada recomendada:
 1. Rodar turno funcional live com OpenRouter free em modelo recomendado alternativo ao que retornou `400`, validando deltas, final, tools, `ask_user`, usage sem PR, retorno ao SDK e ausência de duplicações.
 2. Calibrar estimativa BYOK por provider/modelo com tokenização real quando disponível, mantendo fallback conservador por bytes UTF-8.
 3. Persistir no artefato live uma seção explícita de recomendação contextual quando `contextWindow` estiver disponível.
-4. Persistir a saúde operacional BYOK redigida entre sessões, usando a trilha JSONL/camada de estado existente, para que `chat=failed`/`chat=ok` sobreviva a restart sem criar novo fanout.
+4. Fazer `/byok recommend all-providers safe` considerar health persistido por profile/provider/model mesmo quando a descoberta agregada retorna variantes equivalentes com ids ou provider aliases diferentes.
 5. Expandir o cenário live para elicitation quando a capability estiver disponível.
 6. Fechar a recuperação `session.error`/`reconnect_restart`, distinguindo retry real de reenvio ambíguo de prompt.
 7. Criar contrato único de modelo configurado/preferido/efetivo/cobrado, incluindo billing/effective model real em BYOK.

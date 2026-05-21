@@ -93,12 +93,14 @@ function buildByokProbeCommands({ fixtureBaseUrl = 'http://127.0.0.1:11434/v1' }
         '/byok',
         '/byok env',
         '/byok providers',
+        '/byok health',
         '/byok profiles',
         '/byok models refresh',
         '/byok models free reasoning safe 8',
         '/byok recommend free reasoning safe 5',
         '/byok use codex-fixture',
         '/byok providers',
+        '/byok health',
         '/byok models refresh',
         '/byok models provider:openai-compatible free reasoning safe 8',
         '/byok recommend free reasoning safe 5',
@@ -243,7 +245,7 @@ function buildRealByokRuntime({ dotenvEnv, requestedProfile, requestedAltProfile
 }
 
 function buildByokRealPreflightCommands({ profile, altProfile, model, altModel }) {
-    const commands = ['/byok reload', '/byok env', '/byok providers', '/byok profiles'];
+    const commands = ['/byok reload', '/byok env', '/byok providers', '/byok health', '/byok profiles'];
     if (profile) commands.push(`/byok use ${profile}`);
     commands.push('/byok', '/byok models refresh', '/byok models free reasoning safe 8', '/byok recommend reasoning safe 8');
     if (altModel && altModel !== model) {
@@ -253,7 +255,7 @@ function buildByokRealPreflightCommands({ profile, altProfile, model, altModel }
         commands.push(`/byok model ${model}`, '/byok');
     }
     if (altProfile) {
-        commands.push(`/byok use ${altProfile}`, '/byok', '/byok providers', '/byok models refresh', '/byok models free reasoning safe 8', '/byok recommend reasoning safe 8');
+        commands.push(`/byok use ${altProfile}`, '/byok', '/byok providers', '/byok health', '/byok models refresh', '/byok models free reasoning safe 8', '/byok recommend reasoning safe 8');
         if (profile) {
             commands.push(`/byok use ${profile}`);
             if (model) commands.push(`/byok model ${model}`);
@@ -906,6 +908,11 @@ function evaluateByokProbeOutput(plain, sseSummary, { fixture = false } = {}) {
             detail: '/byok providers rendered the redacted provider cockpit and operator actions',
         },
         {
+            id: 'byok-health-visible',
+            pass: /BYOK chat health/.test(plain),
+            detail: '/byok health rendered persisted operational chat health',
+        },
+        {
             id: 'byok-models-visible',
             pass: /BYOK models/.test(plain),
             detail: '/byok models refresh rendered model catalog state without exposing secrets',
@@ -1100,6 +1107,11 @@ function evaluateByokRealOutput(plain, secretValues, { profile, altProfile, mode
             detail: byokProviderBlocked
                 ? 'BYOK provider failure was reflected in operator health'
                 : 'BYOK provider health cockpit rendered after live turn or stayed unknown before a turn',
+        },
+        {
+            id: 'byok-real-health-command',
+            pass: /BYOK chat health/.test(plain),
+            detail: '/byok health was available in the real BYOK diagnostic path',
         },
     ];
     return criteria;
@@ -1384,24 +1396,18 @@ async function main() {
             postAnswerCommandTimer = null;
         }
         setTimeout(() => {
-            write('/usage now');
-            write('/activity 40');
-            write('/tools diag');
-            write('/events 60');
-            write('/events 100 --raw');
-            write('/errors 10');
-            write('/health');
+            const diagnostics = ['/usage now', '/activity 40', '/tools diag', '/events 60', '/events 100 --raw', '/errors 10', '/health'];
             if (byokReal) {
-                write('/byok providers');
-                write('/byok recommend reasoning safe 8');
+                diagnostics.push('/byok providers', '/byok health', '/byok recommend reasoning safe 8');
             }
-            write(`/export ${exportArg}`);
+            diagnostics.push(`/export ${exportArg}`);
+            sendCommandSequence(write, diagnostics, { delayMs: 350 });
             setTimeout(() => {
                 if (!quitSent) {
                     quitSent = true;
                     write('/quit');
                 }
-            }, 2_000).unref();
+            }, diagnostics.length * 350 + 2_000).unref();
         }, Math.max(0, delayMs)).unref();
     };
     const timeout = setTimeout(() => {
@@ -1474,16 +1480,19 @@ async function main() {
                 postAnswerCommandTimer = null;
             }
             setTimeout(() => {
-                write('/activity 40');
+                const diagnostics = ['/activity 40'];
                 if (byokReal) {
-                    write('/byok providers');
-                    write('/byok recommend reasoning safe 8');
+                    diagnostics.push('/byok providers', '/byok health', '/byok recommend reasoning safe 8');
                 }
-                write('/events 100 --raw');
-                write('/errors 10');
+                diagnostics.push('/events 100 --raw', '/errors 10');
+                sendCommandSequence(write, diagnostics, { delayMs: 450 });
                 if (!quitSent) {
-                    quitSent = true;
-                    write('/quit');
+                    setTimeout(() => {
+                        if (!quitSent) {
+                            quitSent = true;
+                            write('/quit');
+                        }
+                    }, diagnostics.length * 450 + 1_500).unref();
                 }
             }, 1_000).unref();
         }

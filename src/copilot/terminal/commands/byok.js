@@ -14,7 +14,13 @@ import { config as loadDotenv } from 'dotenv';
 
 import { discoverConfiguredByokModelsFromEnv } from '#copilot/config';
 import { readTerminalByokProjection, readTerminalRuntimeState } from '../frontend/index.js';
-import { listByokProviderModelHealth, readByokProviderModelHealth } from '../state/byok-provider-health.js';
+import {
+    clearByokProviderModelHealth,
+    flushByokProviderHealth,
+    listByokProviderModelHealth,
+    readByokProviderHealthState,
+    readByokProviderModelHealth,
+} from '../state/byok-provider-health.js';
 
 const DEFAULT_BYOK_MODELS_DISPLAY_LIMIT = 24;
 const DEFAULT_BYOK_RECOMMEND_DISPLAY_LIMIT = 8;
@@ -643,7 +649,42 @@ function renderStatus(projection, println) {
         println(`  \x1b[31m  erro: ${error}\x1b[0m`);
     }
     println('  \x1b[90mArquivo unico de BYOK: .env.local. Mudancas via comando valem para o processo atual; use /restart para nova sessao SDK.\x1b[0m');
-    println('  \x1b[90mUso: /byok | /byok reload | /byok providers | /byok profiles | /byok models [all-providers|grouped|refresh|all|n] [free|metered|cost?] [provider:<nome>] [reasoning] [vision] [safe] [ctx>N] [maxReq>N] | /byok recommend [all-providers] [grouped] [filtros] [n] | /byok use <perfil|sdk> | /byok model <id> | /byok provider <preset> [model] [baseUrl] | /byok persist <sdk|profile|model|provider> | /byok env\x1b[0m\n');
+    println('  \x1b[90mUso: /byok | /byok reload | /byok providers | /byok profiles | /byok health [clear] | /byok models [all-providers|grouped|refresh|all|n] [free|metered|cost?] [provider:<nome>] [reasoning] [vision] [safe] [ctx>N] [maxReq>N] | /byok recommend [all-providers] [grouped] [filtros] [n] | /byok use <perfil|sdk> | /byok model <id> | /byok provider <preset> [model] [baseUrl] | /byok persist <sdk|profile|model|provider> | /byok env\x1b[0m\n');
+}
+
+/**
+ * @param {(text: string) => void} println
+ * @returns {void}
+ */
+function renderByokHealth(println) {
+    const state = readByokProviderHealthState();
+    const records = listByokProviderModelHealth();
+    println(`\n  \x1b[36mBYOK chat health\x1b[0m (${records.length})`);
+    println(
+        `  \x1b[90mpersist=${state.enabled ? 'on' : 'off'} · arquivo=${state.path ?? '-'} · carregado=${state.loaded ? 'sim' : 'nao'} · dirty=${state.dirty ? 'sim' : 'nao'}\x1b[0m`,
+    );
+    if (state.error) println(`  \x1b[31merro=${state.error}\x1b[0m`);
+    if (records.length === 0) {
+        println('  \x1b[90mNenhum turno BYOK real registrou sucesso ou falha neste estado ainda.\x1b[0m\n');
+        return;
+    }
+    for (const record of records.slice(0, 30)) {
+        const label = renderByokHealthTag(record);
+        const parts = [
+            record.profile ? `profile=${record.profile}` : null,
+            record.provider ? `provider=${record.provider}` : null,
+            record.model ? `model=${record.model}` : null,
+            label,
+        ].filter(Boolean);
+        println(`    \x1b[33m${record.key}\x1b[0m`);
+        println(`      \x1b[90m${parts.join(' · ')}\x1b[0m`);
+        if (record.lastMessage) println(`      \x1b[90multimo erro=${record.lastMessage}\x1b[0m`);
+        if (record.lastErrorContext) println(`      \x1b[90mcontexto=${record.lastErrorContext}\x1b[0m`);
+    }
+    if (records.length > 30) {
+        println(`  \x1b[90m... ${records.length - 30} registro(s) omitidos. Use filtros de /byok models ou /byok providers para cockpit resumido.\x1b[0m`);
+    }
+    println('');
 }
 
 /**
@@ -834,6 +875,17 @@ export async function cmdByok({ println }, arg) {
             const message = error instanceof Error ? error.message : String(error);
             println(`  \x1b[31mNão foi possível persistir BYOK: ${message}\x1b[0m\n`);
         }
+        return;
+    }
+
+    if (sub === 'health' || sub === 'chat-health') {
+        if ((rest[0] ?? '').toLowerCase() === 'clear') {
+            clearByokProviderModelHealth();
+            await flushByokProviderHealth();
+            println('  \x1b[32mBYOK chat health limpo no processo atual e no store persistente.\x1b[0m\n');
+            return;
+        }
+        renderByokHealth(println);
         return;
     }
 
