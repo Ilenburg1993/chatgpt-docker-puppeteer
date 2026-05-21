@@ -139,6 +139,37 @@ const TOOL_HEARTBEAT_INTERVAL_MS = 10_000;
 const RECOVERABLE_MODEL_ERROR_RENDER_THROTTLE_MS = 30_000;
 const RECOVERABLE_MODEL_CALL_OPERATOR_DETAIL =
     'roteamento/retry delegado ao SDK; auto é a única recuperação permitida quando aplicável; sem Premium Request confirmada';
+const RECOVERABLE_BYOK_MODEL_CALL_OPERATOR_DETAIL =
+    'erro de provider BYOK; fallback para Copilot auto bloqueado por contrato; troque provider/modelo via /byok use ou /byok model; sem Premium Request';
+
+/**
+ * @param {Record<string, unknown>} evt
+ * @returns {boolean}
+ */
+function isByokRecoverableModelCall(evt) {
+    if (evt?.['byokEnabled'] === true) return true;
+    const profile = typeof evt?.['byokProfile'] === 'string' ? evt['byokProfile'].trim() : '';
+    const providerType = typeof evt?.['byokProviderType'] === 'string' ? evt['byokProviderType'].trim() : '';
+    return profile.length > 0 || providerType.length > 0;
+}
+
+/**
+ * @param {Record<string, unknown>} evt
+ * @returns {string}
+ */
+function resolveRecoverableModelCallOperatorDetail(evt) {
+    if (!isByokRecoverableModelCall(evt)) return RECOVERABLE_MODEL_CALL_OPERATOR_DETAIL;
+    const providerType = typeof evt?.['byokProviderType'] === 'string' ? evt['byokProviderType'].trim() : '';
+    const profile = typeof evt?.['byokProfile'] === 'string' ? evt['byokProfile'].trim() : '';
+    const model = typeof evt?.['byokModel'] === 'string' ? evt['byokModel'].trim() : '';
+    const bits = [
+        RECOVERABLE_BYOK_MODEL_CALL_OPERATOR_DETAIL,
+        providerType ? `provider=${providerType}` : null,
+        profile ? `perfil=${profile}` : null,
+        model ? `modelo=${model}` : null,
+    ].filter(Boolean);
+    return bits.join(' · ');
+}
 
 /**
  * @param {Record<string, unknown>} evt
@@ -385,11 +416,10 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, regi
         const msg = typeof evt?.['errorMessage'] === 'string' ? evt['errorMessage'] : 'unknown error';
         const recoverable = evt?.['recoverable'] === true;
         const isRecoverableModelCall = hookType === 'errorOccurred' && errorContext === 'model_call' && recoverable;
+        const operatorDetail = isRecoverableModelCall ? resolveRecoverableModelCallOperatorDetail(evt) : null;
         const label = isRecoverableModelCall ? 'Erro recuperável de modelo SDK' : 'Erro do agente';
         const severity = isRecoverableModelCall ? 'warn' : 'error';
-        const detail = isRecoverableModelCall
-            ? `${msg} · ${RECOVERABLE_MODEL_CALL_OPERATOR_DETAIL}`
-            : `[${errorContext}] ${msg}`;
+        const detail = isRecoverableModelCall ? `${msg} · ${operatorDetail}` : `[${errorContext}] ${msg}`;
         const renderKey = `${errorContext}|${msg}`;
         const now = Date.now();
         const lastRenderedAt = recoverableModelErrorPrintedAtByKey.get(renderKey) ?? 0;
@@ -419,7 +449,12 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, regi
                     errorContext,
                     recoverable,
                     message: msg,
-                    operatorMeaning: isRecoverableModelCall ? RECOVERABLE_MODEL_CALL_OPERATOR_DETAIL : null,
+                    byokEnabled: evt?.['byokEnabled'] === true,
+                    byokProviderType:
+                        typeof evt?.['byokProviderType'] === 'string' ? evt['byokProviderType'] : null,
+                    byokProfile: typeof evt?.['byokProfile'] === 'string' ? evt['byokProfile'] : null,
+                    byokModel: typeof evt?.['byokModel'] === 'string' ? evt['byokModel'] : null,
+                    operatorMeaning: operatorDetail,
                     suppressedDuplicate: isRecoverableModelCall && !shouldPrint,
                     handledAs: isRecoverableModelCall ? 'recoverable_model_call' : 'agent_error',
                 },

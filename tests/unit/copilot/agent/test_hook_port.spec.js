@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
     defaultHookBus: { on: vi.fn(), off: vi.fn() },
     modelSelector: { suggestFallback: vi.fn(() => null) },
     getCopilotFallbackModel: vi.fn(() => null),
+    readConfiguredByokSummary: vi.fn(() => ({ enabled: false })),
     recordBlockedToolCall: vi.fn(),
     defaultAuditLog: { record: vi.fn() },
     log: vi.fn(),
@@ -30,6 +31,7 @@ vi.mock('#copilot/audit', () => ({
 
 vi.mock('#copilot/config', () => ({
     getCopilotFallbackModel: mocks.getCopilotFallbackModel,
+    readConfiguredByokSummary: mocks.readConfiguredByokSummary,
 }));
 
 vi.mock('../../../../src/copilot/agent/ports/logging-port.js', () => ({
@@ -44,6 +46,7 @@ describe('agent/ports/hook-port', () => {
     beforeEach(() => {
         vi.clearAllMocks();
         mocks.getCopilotFallbackModel.mockReturnValue(null);
+        mocks.readConfiguredByokSummary.mockReturnValue({ enabled: false });
     });
 
     it('registra blocked metric quando runtime policy nega a tool', async () => {
@@ -147,6 +150,47 @@ describe('agent/ports/hook-port', () => {
         expect(emit).toHaveBeenCalledWith(
             'error',
             expect.objectContaining({ errorContext: 'model_call', recoverable: true }),
+        );
+    });
+
+    it('bloqueia fallback Copilot auto para model_call recuperável quando BYOK está ativo', async () => {
+        mocks.getCopilotFallbackModel.mockReturnValue('auto');
+        mocks.readConfiguredByokSummary.mockReturnValue({
+            enabled: true,
+            providerType: 'openrouter',
+            profile: 'openrouter-free',
+            model: 'deepseek/deepseek-v4-flash:free',
+        });
+        const applyModelFallback = vi.fn(() => true);
+        const scheduleFallback = vi.fn();
+        const emit = vi.fn();
+        const hooks = buildAgentBusHooks({
+            emitWebhook: vi.fn(async () => {}),
+            getModel: () => 'deepseek/deepseek-v4-flash:free',
+            scheduleFallback,
+            applyModelFallback,
+            emit,
+            metrics: { recordSessionStart: vi.fn(), recordSessionEnd: vi.fn() },
+        });
+
+        const result = await hooks.onErrorOccurred?.(
+            /** @type {any} */ ({ error: {}, errorContext: 'model_call', recoverable: true }),
+            /** @type {any} */ ({ sessionId: 's1' }),
+        );
+
+        expect(applyModelFallback).not.toHaveBeenCalled();
+        expect(scheduleFallback).not.toHaveBeenCalled();
+        expect(result).toEqual(expect.objectContaining({ errorHandling: 'retry' }));
+        expect(emit).toHaveBeenCalledWith(
+            'error',
+            expect.objectContaining({
+                byokEnabled: true,
+                byokModel: 'deepseek/deepseek-v4-flash:free',
+                byokProfile: 'openrouter-free',
+                byokProviderType: 'openrouter',
+                errorContext: 'model_call',
+                recoverable: true,
+            }),
         );
     });
 });

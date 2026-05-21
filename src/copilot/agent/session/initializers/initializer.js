@@ -249,6 +249,32 @@ function _validateSessionForResume(sessionId, lastActivityMs) {
 }
 
 /**
+ * @param {import('../../lifecycle/state/index.js').AliveAgentState | null} state
+ * @param {ReturnType<typeof resolveConfiguredByokSessionOverrides>} byok
+ * @param {string} model
+ * @returns {{ ok: true } | { ok: false; reason: string }}
+ */
+function validatePersistedSessionForByokResume(state, byok, model) {
+    if (!byok.enabled) return { ok: true };
+    if (state?.model && state.model !== model) {
+        return { ok: false, reason: `modelo persistido '${state.model}' difere do BYOK ativo '${model}'` };
+    }
+    if (
+        byok.supportsReasoning === false &&
+        (state?.reasoningEffort === 'low' ||
+            state?.reasoningEffort === 'medium' ||
+            state?.reasoningEffort === 'high' ||
+            state?.reasoningEffort === 'xhigh')
+    ) {
+        return {
+            ok: false,
+            reason: `sessao persistida traz reasoningEffort='${state.reasoningEffort}' incompatível com o contrato BYOK atual`,
+        };
+    }
+    return { ok: true };
+}
+
+/**
  * Inicializa ou retoma uma sessão Copilot SDK de forma persistente.
  *
  * Fluxo:
@@ -369,6 +395,14 @@ export async function initOrResumeSession(client, sessionOptions) {
     // O princípio operacional atual é session-first: retomar a sessão anterior sempre que o SDK permitir.
     // Rotação continua disponível para fluxos explícitos via sessionOptions.allowSessionRotation.
     let savedSessionId = _validateSessionForResume(state?.sessionId, state?.resumedAt ?? state?.startedAt);
+    const byokResumeDecision = validatePersistedSessionForByokResume(state, byok, model);
+    if (savedSessionId && !byokResumeDecision.ok) {
+        log(
+            'INFO',
+            `[PersistentSession] BYOK exige nova sessão SDK — ${byokResumeDecision.reason}.`,
+        );
+        savedSessionId = null;
+    }
     const allowSessionRotation = Reflect.get(sessionOptions, 'allowSessionRotation') === true;
     if (savedSessionId && allowSessionRotation) {
         const { shouldRotateSession } = await import('../lifecycle/rotation.js');
@@ -417,15 +451,17 @@ export async function initOrResumeSession(client, sessionOptions) {
             `[PersistentSession] Retomada solicitada com model="auto" — ignorando modelo concreto persistido '${state.model}' para preservar roteamento nativo do SDK.`,
         );
     }
-    const effectiveReasoningEffort =
-        result.reasoningEffort ??
-        sdkReasoningEffort ??
-        (state?.reasoningEffort === 'low' ||
+    const persistedReasoningEffort =
+        state?.reasoningEffort === 'low' ||
         state?.reasoningEffort === 'medium' ||
         state?.reasoningEffort === 'high' ||
         state?.reasoningEffort === 'xhigh'
             ? state.reasoningEffort
-            : undefined);
+            : undefined;
+    const effectiveReasoningEffort =
+        byok.enabled && byok.supportsReasoning === false
+            ? undefined
+            : (result.reasoningEffort ?? sdkReasoningEffort ?? persistedReasoningEffort);
 
     // SYNC-SM-01 (fix): usar writeStateAsync nas chamadas dentro de funções async para não bloquear o event loop
     if (result.isResumed) {
@@ -435,7 +471,7 @@ export async function initOrResumeSession(client, sessionOptions) {
                 resumeCount: (state?.resumeCount ?? 0) + 1,
                 model: effectiveModel,
                 systemPromptBinding: buildSystemPromptBindingSnapshot(systemPromptStatus, result.session.sessionId),
-                ...(effectiveReasoningEffort !== undefined ? { reasoningEffort: effectiveReasoningEffort } : {}),
+                reasoningEffort: effectiveReasoningEffort,
                 dialogPaused: false,
                 pendingTurnMessage: null,
                 pendingTurnTs: null,
@@ -457,7 +493,7 @@ export async function initOrResumeSession(client, sessionOptions) {
                 sendCount: 0,
                 model: effectiveModel,
                 systemPromptBinding: buildSystemPromptBindingSnapshot(systemPromptStatus, result.session.sessionId),
-                ...(effectiveReasoningEffort !== undefined ? { reasoningEffort: effectiveReasoningEffort } : {}),
+                reasoningEffort: effectiveReasoningEffort,
                 pendingQuestion: null,
                 pendingQuestionMeta: null,
             },

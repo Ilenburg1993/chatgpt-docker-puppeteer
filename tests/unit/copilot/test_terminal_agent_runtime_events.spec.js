@@ -1004,6 +1004,59 @@ describe('terminal/events/agent-runtime-events.js — contrato', () => {
         );
     });
 
+    it('explica erro recuperável de model_call BYOK sem sugerir fallback Copilot auto', async () => {
+        const { setupTerminalAgentRuntimeEventListeners } =
+            await import('../../../src/copilot/terminal/events/agent-runtime-events.js');
+        /** @type {Map<string, Function[]>} */
+        const listeners = new Map();
+        const agent = {
+            on: vi.fn((event, handler) => {
+                const list = listeners.get(event) ?? [];
+                list.push(handler);
+                listeners.set(event, list);
+            }),
+            off: vi.fn(),
+        };
+
+        setupTerminalAgentRuntimeEventListeners({ agent: /** @type {any} */ (agent), rl: null });
+        listeners.get('error')?.[0]?.({
+            hookType: 'errorOccurred',
+            errorContext: 'model_call',
+            recoverable: true,
+            errorMessage: 'Provider returned 403',
+            byokEnabled: true,
+            byokProviderType: 'gemini',
+            byokProfile: 'gemini-free',
+            byokModel: 'gemini-2.5-flash',
+        });
+
+        expect(recordTerminalActivity).toHaveBeenCalledWith(
+            'error',
+            'Erro recuperável de modelo SDK',
+            expect.objectContaining({
+                severity: 'warn',
+                detail: expect.stringContaining('fallback para Copilot auto bloqueado por contrato'),
+                recordHistory: true,
+            }),
+        );
+        expect(recordTerminalActivity).toHaveBeenCalledWith(
+            'error',
+            'Erro recuperável de modelo SDK',
+            expect.objectContaining({
+                detail: expect.not.stringContaining('auto é a única recuperação permitida'),
+            }),
+        );
+        expect(broadcastSse).toHaveBeenCalledWith(
+            'agent.error',
+            expect.objectContaining({
+                byokEnabled: true,
+                byokProviderType: 'gemini',
+                operatorMeaning: expect.stringContaining('sem Premium Request'),
+                handledAs: 'recoverable_model_call',
+            }),
+        );
+    });
+
     it('reanuncia pergunta pendente viva ao registrar listeners do terminal', async () => {
         readTerminalRuntimeState.mockReturnValue(
             /** @type {any} */ ({

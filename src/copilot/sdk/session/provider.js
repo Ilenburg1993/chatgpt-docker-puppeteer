@@ -44,7 +44,7 @@ import { log } from '../logger.js';
  * @property {string | null} azureApiVersion
  * @property {{ apiKeyConfigured: boolean; bearerTokenConfigured: boolean; headersConfigured: boolean }} auth
  * @property {{ configured: boolean; count: number }} modelList
- * @property {{ reasoningEffort: boolean; vision: boolean; contextWindowTokens: number }} capabilities
+ * @property {{ reasoningEffort: boolean; sdkReasoningEffort?: boolean; vision: boolean; contextWindowTokens: number }} capabilities
  * @property {{ maxRequestTokens: number | null; tokensPerMinute: number | null; requestsPerMinute: number | null; dailyRequests: number | null }} limits
  * @property {string[]} warnings
  * @property {string[]} errors
@@ -1208,6 +1208,19 @@ function renderByokModelTerms(metadata) {
 }
 
 /**
+ * O SDK/CLI do Copilot tambem usa `:` como separador em algumas rotas internas de opções de modelo. Em BYOK,
+ * providers como OpenRouter/HuggingFace/Ollama usam `:` como parte legitima do ID (`:free`, `:fastest`,
+ * `:80b-cloud`). Nesses casos o modelo pode ser capaz de "raciocinar", mas o parametro SDK `reasoningEffort`
+ * não é um canal seguro para configurar esse raciocinio, pois pode ser reinterpretado como chave de opção.
+ *
+ * @param {string | null | undefined} model
+ * @returns {boolean}
+ */
+function supportsSdkReasoningEffortForByokModel(model) {
+    return typeof model === 'string' && model.length > 0 && !model.includes(':');
+}
+
+/**
  * @param {string | Record<string, unknown>} item
  * @param {{ contextWindowTokens: number; supportsReasoning: boolean; supportsVision: boolean; maxRequestTokens?: number | null; tokensPerMinute?: number | null; requestsPerMinute?: number | null; dailyRequests?: number | null }} caps
  * @param {'static' | 'remote'} [source]
@@ -1218,11 +1231,12 @@ function createByokModelInfo(item, caps, source = 'static') {
     if (!id) throw new Error('[sdk/provider] BYOK model id is required');
     const objectItem = typeof item === 'string' ? { id } : item;
     const metadata = buildByokModelMetadata(id, objectItem, caps, source);
+    const supportsSdkReasoningEffort = metadata.supportsReasoning && supportsSdkReasoningEffortForByokModel(id);
     const info = {
         id,
         name: optionalString(objectItem['name']) ?? id,
         capabilities: {
-            supports: { vision: metadata.supportsVision, reasoningEffort: metadata.supportsReasoning },
+            supports: { vision: metadata.supportsVision, reasoningEffort: supportsSdkReasoningEffort },
             limits: { max_context_window_tokens: metadata.contextWindowTokens },
         },
         policy: { state: 'enabled', terms: renderByokModelTerms(metadata) },
@@ -1376,7 +1390,12 @@ export function readConfiguredByokState(env = process.env) {
         azureApiVersion: null,
         auth: { apiKeyConfigured: false, bearerTokenConfigured: false, headersConfigured: false },
         modelList: { configured: false, count: 0 },
-        capabilities: { reasoningEffort: supportsReasoning, vision: supportsVision, contextWindowTokens },
+        capabilities: {
+            reasoningEffort: supportsReasoning,
+            sdkReasoningEffort: false,
+            vision: supportsVision,
+            contextWindowTokens,
+        },
         limits,
         warnings: [],
         errors: [],
@@ -1450,6 +1469,12 @@ export function readConfiguredByokState(env = process.env) {
         supportsVision,
         ...limits,
     });
+    const sdkReasoningEffort = supportsReasoning && supportsSdkReasoningEffortForByokModel(model);
+    if (supportsReasoning && model && !sdkReasoningEffort) {
+        warnings.push(
+            `reasoning do modelo BYOK detectado, mas reasoningEffort do SDK sera omitido para '${model}' porque o ID contem ':' e deve ser preservado literalmente pelo provider.`,
+        );
+    }
     /** @type {ByokSummary} */
     const summary = {
         enabled: true,
@@ -1463,7 +1488,7 @@ export function readConfiguredByokState(env = process.env) {
         azureApiVersion,
         auth: { apiKeyConfigured, bearerTokenConfigured, headersConfigured },
         modelList: { configured: models.length > 0, count: models.length },
-        capabilities: { reasoningEffort: supportsReasoning, vision: supportsVision, contextWindowTokens },
+        capabilities: { reasoningEffort: supportsReasoning, sdkReasoningEffort, vision: supportsVision, contextWindowTokens },
         limits,
         warnings,
         errors,
@@ -1474,7 +1499,7 @@ export function readConfiguredByokState(env = process.env) {
         provider,
         model,
         modelCapabilities: {
-            supports: { reasoningEffort: supportsReasoning, vision: supportsVision },
+            supports: { reasoningEffort: sdkReasoningEffort, vision: supportsVision },
             limits: { max_context_window_tokens: contextWindowTokens },
         },
         summary,
@@ -1654,14 +1679,28 @@ export function resolveConfiguredByokSessionOverrides(env = process.env, request
         throw new Error(`[sdk/provider] BYOK is enabled but not ready: ${state.errors.join('; ') || 'invalid configuration'}`);
     }
     const model = requestedModel && requestedModel !== 'auto' ? requestedModel : state.model;
+    const sdkReasoningEffort =
+        state.summary.capabilities.reasoningEffort && supportsSdkReasoningEffortForByokModel(model);
     return {
         enabled: true,
         ready: true,
         provider: state.provider,
         model,
-        modelCapabilities: state.modelCapabilities,
-        supportsReasoning: state.summary.capabilities.reasoningEffort,
-        summary: { ...state.summary, model },
+        modelCapabilities: state.modelCapabilities
+            ? {
+                  ...state.modelCapabilities,
+                  supports: {
+                      ...(state.modelCapabilities.supports ?? {}),
+                      reasoningEffort: sdkReasoningEffort,
+                  },
+              }
+            : undefined,
+        supportsReasoning: sdkReasoningEffort,
+        summary: {
+            ...state.summary,
+            model,
+            capabilities: { ...state.summary.capabilities, sdkReasoningEffort },
+        },
     };
 }
 

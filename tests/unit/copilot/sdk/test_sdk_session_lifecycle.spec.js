@@ -149,6 +149,24 @@ describe('sdk/session-lifecycle', () => {
             });
         });
 
+        it('omite reasoningEffort para model IDs BYOK com dois-pontos antes de chamar o SDK', async () => {
+            const s = fakeSession();
+            const modelCapabilities = { supports: { reasoningEffort: true, vision: true } };
+
+            await setSessionModel(s, 'deepseek/deepseek-v4-flash:free', {
+                reasoningEffort: 'high',
+                modelCapabilities,
+            });
+
+            expect(s.setModel).toHaveBeenCalledWith('deepseek/deepseek-v4-flash:free', {
+                modelCapabilities: { supports: { reasoningEffort: false, vision: true } },
+            });
+            expect(mockLog).toHaveBeenCalledWith(
+                'INFO',
+                expect.stringContaining("reasoningEffort omitido para modelo provider-literal"),
+            );
+        });
+
         it('funciona sem options', async () => {
             const s = fakeSession();
             await setSessionModel(s, 'claude-sonnet-4-5');

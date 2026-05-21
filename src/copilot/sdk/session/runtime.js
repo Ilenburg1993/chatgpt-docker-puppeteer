@@ -47,6 +47,40 @@ function assertSession(session, caller) {
 }
 
 /**
+ * Normaliza opções de troca de modelo antes de atravessar o SDK. BYOK/OpenAI-compatible providers frequentemente usam
+ * `:` como parte literal do ID (`deepseek/foo:free`, `Qwen/bar:fastest`). O SDK/CLI também usa `:` em rotas internas
+ * de opções de modelo; combinar esse ID com `reasoningEffort` pode produzir erros como
+ * `Unknown model option key: free:defaultReasoningEffort`.
+ *
+ * @param {string} model
+ * @param {SessionModelOptions | undefined} options
+ * @returns {SessionModelOptions | undefined}
+ */
+function normalizeSessionModelOptionsForModelId(model, options) {
+    if (!options || !model.includes(':')) return options;
+    const next = { ...options };
+    let changed = false;
+    if (next.reasoningEffort) {
+        delete next.reasoningEffort;
+        changed = true;
+    }
+    if (next.modelCapabilities?.supports?.reasoningEffort) {
+        next.modelCapabilities = {
+            ...next.modelCapabilities,
+            supports: { ...next.modelCapabilities.supports, reasoningEffort: false },
+        };
+        changed = true;
+    }
+    if (changed) {
+        log(
+            'INFO',
+            `[session-runtime] reasoningEffort omitido para modelo provider-literal '${model}' com ':' no ID.`,
+        );
+    }
+    return Object.keys(next).length > 0 ? next : undefined;
+}
+
+/**
  * @param {CopilotSession} session
  * @param {string} model
  * @param {SessionModelOptions} [options]
@@ -317,29 +351,30 @@ export async function setSessionModel(session, model, options) {
     if (typeof model !== 'string' || model.length === 0) {
         throw new TypeError('[session-runtime/setModel] model deve ser string não-vazia.');
     }
+    const safeOptions = normalizeSessionModelOptionsForModelId(model, options);
     log('INFO', `[session-runtime] setModel: sessionId='${session.sessionId}', model='${model}'`);
     const startedAt = Date.now();
     const nativeSwitcher = resolveNativeModelSwitcher(session);
     const operation = nativeSwitcher?.operation ?? 'rpc.model.switchTo';
     emitSdkOperationMetric({ operation, status: 'started', sessionId: session.sessionId, attributes: { model } });
     Reflect.set(session, '__copilotConfiguredModel', model);
-    if (options?.reasoningEffort) {
-        Reflect.set(session, '__copilotConfiguredReasoningEffort', options.reasoningEffort);
+    if (safeOptions?.reasoningEffort) {
+        Reflect.set(session, '__copilotConfiguredReasoningEffort', safeOptions.reasoningEffort);
     }
-    if (options?.modelCapabilities) {
-        Reflect.set(session, '__copilotConfiguredModelCapabilities', options.modelCapabilities);
+    if (safeOptions?.modelCapabilities) {
+        Reflect.set(session, '__copilotConfiguredModelCapabilities', safeOptions.modelCapabilities);
     }
     try {
         if (nativeSwitcher) {
-            await nativeSwitcher.fn(model, options);
+            await nativeSwitcher.fn(model, safeOptions);
         } else {
             await modelSwitchTo(
                 session,
                 model,
-                options?.reasoningEffort || options?.modelCapabilities
+                safeOptions?.reasoningEffort || safeOptions?.modelCapabilities
                     ? {
-                          ...(options.reasoningEffort ? { reasoningEffort: options.reasoningEffort } : {}),
-                          ...(options.modelCapabilities ? { modelCapabilities: options.modelCapabilities } : {}),
+                          ...(safeOptions.reasoningEffort ? { reasoningEffort: safeOptions.reasoningEffort } : {}),
+                          ...(safeOptions.modelCapabilities ? { modelCapabilities: safeOptions.modelCapabilities } : {}),
                       }
                     : undefined,
             );
@@ -356,7 +391,7 @@ export async function setSessionModel(session, model, options) {
         throw sdkError;
     }
 
-    const verification = await verifySessionModelSwitch(session, model, options);
+    const verification = await verifySessionModelSwitch(session, model, safeOptions);
     if (!nativeSwitcher) {
         verification.usedRpcFallback = true;
         if (!verification.effectiveModel) verification.effectiveModel = model;
@@ -376,7 +411,7 @@ export async function setSessionModel(session, model, options) {
             verifiedSwitch: verification.verifiedSwitch,
             ...(verification.effectiveModel ? { effectiveModel: verification.effectiveModel } : {}),
             ...(verification.usedRpcFallback ? { usedRpcFallback: true } : {}),
-            ...(options?.modelCapabilities ? { modelCapabilities: true } : {}),
+            ...(safeOptions?.modelCapabilities ? { modelCapabilities: true } : {}),
         },
     });
     return verification;

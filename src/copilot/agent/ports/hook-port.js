@@ -12,7 +12,7 @@
  */
 
 import { defaultAuditLog } from '#copilot/audit';
-import { getCopilotFallbackModel } from '#copilot/config';
+import { getCopilotFallbackModel, readConfiguredByokSummary } from '#copilot/config';
 import { recordBlockedToolCall } from '#copilot/observability';
 import { classifySdkRateLimitScope } from '#copilot/sdk/errors';
 import {
@@ -73,11 +73,13 @@ function normalizeHookErrorMessage(raw) {
 function recoverModelCallIfNeeded(input, event) {
     const currentModel = input.getModel() ?? null;
     const fallbackModel = getCopilotFallbackModel();
+    const byokEnabled = readConfiguredByokSummary().enabled === true;
     const decision = decideModelCallAutoFallback({
         errorContext: event.errorContext,
         recoverable: event.recoverable,
         currentModel,
         fallbackModel,
+        byokEnabled,
     });
     if (!decision.shouldFallback || !decision.targetModel) return false;
 
@@ -153,6 +155,7 @@ function createAgentSessionLifecycleHooks(input) {
         const sessionId = invocation?.sessionId ?? '';
         const errorContext = String(errorInput.errorContext ?? '');
         const normalizedMessage = normalizeHookErrorMessage(errorInput.error);
+        const byokSummary = readConfiguredByokSummary();
         log(
             'WARN',
             `[agent/hook-port] SDK errorOccurred [${errorContext}]: ${normalizedMessage} (recuperável: ${errorInput.recoverable})`,
@@ -179,7 +182,12 @@ function createAgentSessionLifecycleHooks(input) {
             if (rateLimitScope !== 'session') {
                 const currentModel = input.getModel() ?? 'unknown';
                 const fallbackModel = getCopilotFallbackModel();
-                if (fallbackModel && fallbackModel !== currentModel) {
+                if (byokSummary.enabled === true) {
+                    log(
+                        'WARN',
+                        '[agent/hook-port] rate_limit/quota em BYOK — não aplicando fallback para Copilot auto; operador deve trocar provider/modelo BYOK.',
+                    );
+                } else if (fallbackModel && fallbackModel !== currentModel) {
                     input.scheduleFallback(fallbackModel);
                 }
             }
@@ -191,6 +199,10 @@ function createAgentSessionLifecycleHooks(input) {
             errorContext,
             recoverable: errorInput.recoverable,
             sessionId,
+            byokEnabled: byokSummary.enabled === true,
+            byokProviderType: byokSummary.providerType ?? null,
+            byokProfile: byokSummary.profile ?? null,
+            byokModel: byokSummary.model ?? null,
         });
 
         /** @type {'retry' | 'abort'} */

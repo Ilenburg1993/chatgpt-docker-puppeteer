@@ -328,6 +328,42 @@ describe('F72 — BYOK env configuration', () => {
         expect(overrides.modelCapabilities?.limits?.max_context_window_tokens).toBe(64000);
     });
 
+    it('omite reasoningEffort SDK para IDs BYOK provider-literais com dois-pontos preservando metadata semântica', () => {
+        const overrides = resolveConfiguredByokSessionOverrides(
+            {
+                COPILOT_BYOK_ENABLED: 'true',
+                COPILOT_BYOK_PROVIDER_PRESET: 'openrouter',
+                COPILOT_BYOK_MODEL: 'deepseek/deepseek-v4-flash:free',
+                COPILOT_BYOK_API_KEY: 'unit-token',
+                COPILOT_BYOK_SUPPORTS_REASONING: 'true',
+            },
+            'auto',
+        );
+
+        expect(overrides.enabled).toBe(true);
+        expect(overrides.model).toBe('deepseek/deepseek-v4-flash:free');
+        expect(overrides.summary.capabilities.reasoningEffort).toBe(true);
+        expect(overrides.summary.capabilities.sdkReasoningEffort).toBe(false);
+        expect(overrides.supportsReasoning).toBe(false);
+        expect(overrides.modelCapabilities?.supports?.reasoningEffort).toBe(false);
+        expect(overrides.summary.warnings.join('\n')).toContain("ID contem ':'");
+    });
+
+    it('mantém filtro semântico de reasoning em catálogo BYOK mesmo quando sdkReasoningEffort é omitido', () => {
+        const models = readConfiguredByokModelsFromEnv({
+            COPILOT_BYOK_ENABLED: 'true',
+            COPILOT_BYOK_PROVIDER_PRESET: 'openrouter',
+            COPILOT_BYOK_API_KEY: 'unit-token',
+            COPILOT_BYOK_MODEL: 'deepseek/deepseek-v4-flash:free',
+            COPILOT_BYOK_MODELS: 'deepseek/deepseek-v4-flash:free',
+            COPILOT_BYOK_SUPPORTS_REASONING: 'true',
+        });
+
+        expect(models[0]?.id).toBe('deepseek/deepseek-v4-flash:free');
+        expect(models[0]?.capabilities.supports.reasoningEffort).toBe(false);
+        expect(/** @type {{ byok?: { supportsReasoning?: boolean } }} */ (models[0]).byok?.supportsReasoning).toBe(true);
+    });
+
     it('fornece onListModels com fallback estático para client.listModels em BYOK', async () => {
         const handler = buildConfiguredByokModelListHandler({
             COPILOT_BYOK_ENABLED: 'true',
@@ -499,7 +535,8 @@ describe('F72 — BYOK env configuration', () => {
 
         expect(staticModels[0]?.id).toBe('meta/model:free');
         expect(staticModels[0]?.capabilities.supports.vision).toBe(true);
-        expect(staticModels[0]?.capabilities.supports.reasoningEffort).toBe(true);
+        expect(staticModels[0]?.capabilities.supports.reasoningEffort).toBe(false);
+        expect(/** @type {{ byok?: { supportsReasoning?: boolean } }} */ (staticModels[0]).byok?.supportsReasoning).toBe(true);
         expect(staticModels[0]?.capabilities.limits.max_context_window_tokens).toBe(65536);
         expect(staticModels[0]?.policy?.terms).toContain('byok:free');
 
@@ -534,7 +571,8 @@ describe('F72 — BYOK env configuration', () => {
             expect(remote.source).toBe('remote');
             expect(remote.models[0]?.id).toBe('remote/reasoner:free');
             expect(remote.models[0]?.policy?.terms).toContain('byok:free');
-            expect(remote.models[0]?.capabilities.supports.reasoningEffort).toBe(true);
+            expect(remote.models[0]?.capabilities.supports.reasoningEffort).toBe(false);
+            expect(/** @type {{ byok?: { supportsReasoning?: boolean } }} */ (remote.models[0]).byok?.supportsReasoning).toBe(true);
             expect(remote.models[0]?.capabilities.limits.max_context_window_tokens).toBe(131072);
             expect(JSON.stringify(remote)).not.toContain('secret');
         } finally {

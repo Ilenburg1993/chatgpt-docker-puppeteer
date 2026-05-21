@@ -39,7 +39,8 @@ import {
  * @property {number} resumeCount - Número de retomadas bem-sucedidas desde a criação
  * @property {number} sendCount - Total de mensagens enviadas na sessão (tracking externo)
  * @property {string} model - Modelo configurado para esta sessão
- * @property {'low' | 'medium' | 'high' | 'xhigh'} [reasoningEffort] - Nível de reasoning efetivo conhecido
+ * @property {'low' | 'medium' | 'high' | 'xhigh' | undefined} [reasoningEffort] - Nível de reasoning efetivo conhecido;
+ *   `undefined` limpa reasoning persistido quando a sessão atual não pode receber `reasoningEffort` do SDK.
  * @property {string | null} pendingQuestion - Texto da pergunta pendente do modelo, ou null
  * @property {{
  *     kind: import('../../types.js').PendingQuestionKind;

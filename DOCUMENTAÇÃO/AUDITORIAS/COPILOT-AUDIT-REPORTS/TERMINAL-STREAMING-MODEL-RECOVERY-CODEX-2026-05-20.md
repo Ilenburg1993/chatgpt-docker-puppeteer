@@ -829,6 +829,37 @@ Validação:
 
 Status: implementado nesta revisão. Ainda falta turno funcional real em mais providers, com admission control antes do turno para evitar custo/limite inesperado.
 
+### A41. BYOK multi-provider precisava de contrato de erro, raciocínio SDK e descoberta agregada
+
+Achado:
+
+- OpenRouter retornou erro antes do turno funcional quando o modelo literal continha `:free` e o runtime ainda anexava `defaultReasoningEffort`/`reasoningEffort` ao modelo. Para providers que usam `:` no id, o id deve atravessar literalmente; `reasoning` continua sendo capacidade semântica do modelo, mas `reasoningEffort` do SDK precisa ser omitido.
+- Sessões SDK retomadas podiam carregar reasoning/modelo antigo incompatível com o perfil BYOK atual, contaminando a nova chamada mesmo após correção de provider.
+- Quando um provider BYOK falhava, a UX ainda usava linguagem de recuperação Copilot (`auto é a única recuperação permitida`), sugerindo fallback para GitHub Copilot. Isso é incorreto: BYOK não deve cair para Copilot auto em erro de provider customizado.
+- O cockpit já listava providers e modelos do perfil ativo, mas o operador ainda não tinha uma visão agregada simples de todos os providers/perfis sem alternar manualmente.
+
+Correção:
+
+- `sdk/session/provider.js` passou a separar `byok.supportsReasoning` de `capabilities.supports.reasoningEffort`, marcando `sdkReasoning=off` para ids literais com `:`.
+- `sdk/session/runtime.js` ganhou normalização defensiva em `setSessionModel()` para remover `reasoningEffort` quando o modelo BYOK não suporta a opção do SDK.
+- `agent/session/initializers/initializer.js` invalida retomada de sessão quando o perfil/modelo BYOK ativo diverge do snapshot persistido ou quando o snapshot contém reasoning incompatível com o modelo atual.
+- `agent/ports/model-error-recovery.js`, `agent/ports/hook-port.js` e `hooks/session-hooks.js` bloqueiam fallback Copilot auto quando BYOK está ativo e emitem metadados seguros de provider/perfil/modelo.
+- `terminal/events/agent-runtime-events.js` passou a explicar erro BYOK como falha de provider customizado, orientando `/byok use` ou `/byok model`, sem narrar Premium Request nem fallback Copilot.
+- `/byok models all-providers` e `/byok recommend all-providers` agora percorrem todos os perfis configurados, preservam o provider ativo, aplicam os mesmos filtros (`free`, `metered`, `cost?`, `provider:<nome>`, `reasoning`, `vision`, `safe`, `ctx>`, `maxReq>`) e mostram `profile=` em cada modelo.
+
+Validação:
+
+- `npm run typecheck:strict:src.copilot` passou.
+- `npx vitest run tests/unit/copilot/terminal/test_commands_byok.spec.js tests/unit/copilot/agent/test_hook_port.spec.js tests/unit/copilot/test_terminal_agent_runtime_events.spec.js tests/unit/copilot/test_terminal_sdk_session_events.spec.js tests/unit/copilot/sdk/test_sdk_provider.spec.js tests/unit/copilot/sdk/test_sdk_session_lifecycle.spec.js tests/unit/copilot/test_initializer_session_fs.spec.js tests/unit/copilot/test_session_setup.spec.js` passou com 175 testes.
+- Live Kilo real passou em `artifacts/terminal-live/2026-05-21T17-25-49-956Z/summary.md`, cobrindo deltas parciais, bloco final, tools, `ask_user`, resposta humana, continuação pós-ask, usage BYOK sem Premium Request, `/events`, SSE/JSONL/export e ausência de duplicação.
+- Comando operacional real confirmou `/byok models all-providers free reasoning safe 12`: 13 perfis varridos, `remote=11 · static-fallback=2`, 30 candidatos filtrados e avisos redigidos para Ollama local/Cloudflare.
+- Comando operacional real confirmou `/byok recommend all-providers free reasoning safe 12`: 1.150 modelos agregados antes do filtro de recomendação, candidatos com provider/profile explícitos e sem vazamento de segredos.
+- Comando operacional real confirmou `/byok models all-providers grouped free reasoning safe 12`: 23 grupos para 30 variantes, com `variants=<profile>/<provider>` preservando alternativas de roteamento por provider.
+- OpenRouter avançou além do erro antigo de `free:defaultReasoningEffort`, mas um modelo retornou `400 Provider returned error`; isso fica como falha/provider-model a investigar com seleção recomendada diferente.
+- Gemini listou catálogo e alternou provider/modelo, mas o chat real retornou `403` no endpoint OpenAI-compatible; isso fica como diagnóstico de chave/endpoint Google AI Studio vs Google Cloud, não como bug confirmado de terminal.
+
+Status: implementado para raciocínio SDK, retomada de sessão, narrativa de erro, descoberta agregada e agrupamento visual de variantes. Ainda falta rodar turno funcional OpenRouter com modelo recomendado alternativo e fechar diagnóstico Gemini 403.
+
 ## Hipóteses Externas Rejeitadas Ou Reclassificadas
 
 ### H1. "boot-hub assume sucesso"
@@ -1187,6 +1218,10 @@ Fase J5. UX e comandos
 - J5.23 Criar `/byok providers` como cockpit redigido de providers, perfis prontos e comandos diretos. Status: feito nesta revisão.
 - J5.24 Unificar filtros de `/byok models` e `/byok recommend` para provider, free, metered, cost?, reasoning, vision, safe, ctx e maxReq. Status: feito nesta revisão.
 - J5.25 Distinguir explicitamente "free confirmado" de "custo desconhecido" na recomendação e nos testes live. Status: feito nesta revisão para o cockpit; falta enriquecer docs/provider metadata quando APIs públicas expuserem limites.
+- J5.26 Criar visão agregada multi-provider sem alternar perfil ativo (`/byok models all-providers` e `/byok recommend all-providers`). Status: feito nesta revisão, com `profile=` por modelo e filtros compartilhados.
+- J5.27 Separar capacidade semântica de reasoning BYOK de `reasoningEffort` do SDK quando o id literal do provider contém `:`. Status: feito nesta revisão.
+- J5.28 Narrar erros BYOK como erros de provider customizado, bloqueando fallback Copilot auto e orientando troca por `/byok use`/`/byok model`. Status: feito nesta revisão.
+- J5.29 Agrupar visualmente modelos repetidos entre providers, preservando variantes por `profile`, preço, limites e auth. Status: feito nesta revisão via filtro `grouped`.
 
 Fase J6. Testes
 
@@ -1213,6 +1248,10 @@ Fase J6. Testes
 - J6.21 Rodar probe real sem PR Gemini -> Mistral cobrindo provider cockpit, catálogo filtrado e recomendação sem assumir gratuidade. Status: PASS em `artifacts/terminal-live/byok-real-gemini-mistral-nopr-2026-05-21-r2/summary.md`.
 - J6.22 Rodar probe real sem PR NVIDIA NIM -> Cerebras cobrindo provider cockpit, catálogo filtrado, troca de provider/modelo e ausência de vazamento. Status: PASS em `artifacts/terminal-live/byok-real-nvidia-cerebras-nopr-2026-05-21/summary.md`.
 - J6.23 Rodar probe real sem PR Hugging Face -> Chutes cobrindo provider cockpit, catálogo filtrado, troca de provider/modelo e ausência de vazamento. Status: PASS em `artifacts/terminal-live/byok-real-huggingface-chutes-nopr-2026-05-21/summary.md`.
+- J6.24 Rodar live Kilo real completo após os hardenings de BYOK/reasoning/fallback, cobrindo delta, tool, `ask_user`, pós-ask, SSE, `/events`, `/tools`, `/usage`, `/health` e export. Status: PASS em `artifacts/terminal-live/2026-05-21T17-25-49-956Z/summary.md`.
+- J6.25 Cobrir `/byok models all-providers`, `/byok models all-providers grouped` e `/byok recommend all-providers` por unit test e por comando operacional real sem segredo. Status: feito nesta revisão.
+- J6.26 Rodar turno funcional OpenRouter free usando um modelo recomendado alternativo ao que retornou 400. Status: pendente.
+- J6.27 Investigar Gemini 403 separando Google AI Studio, Google Cloud e compatibilidade OpenAI endpoint, sem imprimir chave. Status: pendente.
 
 Fase J7. Providers amplos
 
@@ -1359,7 +1398,7 @@ Implementado:
 
 Próxima rodada recomendada:
 
-1. Rodar turno funcional live com OpenRouter free e providers `cost?` de contexto amplo, validando deltas, final, tools, `ask_user`, usage sem PR, retorno ao SDK e ausência de duplicações.
+1. Rodar turno funcional live com OpenRouter free em modelo recomendado alternativo ao que retornou `400`, validando deltas, final, tools, `ask_user`, usage sem PR, retorno ao SDK e ausência de duplicações.
 2. Calibrar estimativa BYOK por provider/modelo com tokenização real quando disponível, mantendo fallback conservador por bytes UTF-8.
 3. Persistir no artefato live uma seção explícita de recomendação contextual quando `contextWindow` estiver disponível.
 4. Validar Cloudflare Workers AI por chat real, já que `/models` respondeu `405` e precisa manter fallback estatico claro.
@@ -1370,3 +1409,4 @@ Próxima rodada recomendada:
 9. Rodar turno funcional dedicado em Ollama Cloud e, quando disponível, Ollama local/LiteLLM/vLLM.
 10. Continuar a normalização de tool identity em completions/progress externos sem requestId, com métricas para qualquer lifecycle ainda genérico.
 11. Integrar falha de `wireRuntime()` ao `ErrorTracker` com metadados de fase.
+12. Investigar Gemini 403 com probes de autenticação redigidos, distinguindo chave Google AI Studio, chave Google Cloud e endpoint OpenAI-compatible.

@@ -402,6 +402,180 @@ describe('terminal /byok command', () => {
         expect(ctx.output()).not.toContain('openrouter/paid-vision');
     });
 
+    it('consulta modelos em todos os perfis BYOK sem trocar o provider ativo', async () => {
+        discoverConfiguredByokModelsFromEnv.mockImplementation(async (env) => {
+            const profile = env?.COPILOT_BYOK_PROFILE;
+            return {
+                models: [
+                    {
+                        id: profile === 'groq-free' ? 'groq/free-reasoning' : 'openrouter/free-reasoning',
+                        capabilities: {
+                            supports: { reasoningEffort: true, vision: profile !== 'groq-free' },
+                            limits: { max_context_window_tokens: profile === 'groq-free' ? 131072 : 200000 },
+                        },
+                        byok: {
+                            freeTier: true,
+                            provider: profile === 'groq-free' ? 'groq' : 'openrouter',
+                            rateLimits: { maxRequestTokens: profile === 'groq-free' ? 32000 : 64000 },
+                        },
+                    },
+                ],
+                source: 'remote',
+                endpoint: `https://${profile}.example/v1/models`,
+                fromCache: false,
+                error: null,
+            };
+        });
+        mockProjection({
+            profiles: [
+                {
+                    name: 'openrouter-free',
+                    preset: 'openrouter',
+                    providerType: 'openai',
+                    baseUrl: 'https://openrouter.ai/api/v1',
+                    model: 'openrouter/default',
+                    auth: { apiKeyConfigured: true, bearerTokenConfigured: false, headersConfigured: false },
+                    metadataKeys: [],
+                },
+                {
+                    name: 'groq-free',
+                    preset: 'groq',
+                    providerType: 'openai',
+                    baseUrl: 'https://api.groq.com/openai/v1',
+                    model: 'groq/default',
+                    auth: { apiKeyConfigured: false, bearerTokenConfigured: true, headersConfigured: false },
+                    metadataKeys: [],
+                },
+            ],
+            summary: { enabled: true, ready: true, profile: 'openrouter-free' },
+        });
+        const ctx = mockCtx();
+
+        await cmdByok({ println: ctx.println }, 'models all-providers free reasoning safe 10');
+
+        expect(discoverConfiguredByokModelsFromEnv).toHaveBeenCalledTimes(2);
+        expect(discoverConfiguredByokModelsFromEnv).toHaveBeenCalledWith(
+            expect.objectContaining({ COPILOT_BYOK_PROFILE: 'openrouter-free', COPILOT_BYOK_ENABLED: 'true' }),
+            expect.objectContaining({ forceRefresh: false }),
+        );
+        expect(discoverConfiguredByokModelsFromEnv).toHaveBeenCalledWith(
+            expect.objectContaining({ COPILOT_BYOK_PROFILE: 'groq-free', COPILOT_BYOK_ENABLED: 'true' }),
+            expect.objectContaining({ forceRefresh: false }),
+        );
+        expect(ctx.output()).toContain('filtros=all-providers,free,reasoning,safe');
+        expect(ctx.output()).toContain('perfis=2');
+        expect(ctx.output()).toContain('openrouter/free-reasoning');
+        expect(ctx.output()).toContain('groq/free-reasoning');
+        expect(ctx.output()).toContain('profile=openrouter-free');
+        expect(ctx.output()).toContain('profile=groq-free');
+        expect(process.env['COPILOT_BYOK_PROFILE']).toBeUndefined();
+    });
+
+    it('agrupa modelos repetidos entre providers preservando variantes operacionais', async () => {
+        discoverConfiguredByokModelsFromEnv.mockImplementation(async (env) => {
+            const profile = env?.COPILOT_BYOK_PROFILE;
+            return {
+                models: [
+                    {
+                        id: 'shared/free-model',
+                        capabilities: {
+                            supports: { reasoningEffort: true, vision: false },
+                            limits: { max_context_window_tokens: 128000 },
+                        },
+                        byok: {
+                            freeTier: true,
+                            provider: profile === 'groq-free' ? 'groq' : 'openrouter',
+                            rateLimits: { maxRequestTokens: 64000 },
+                        },
+                    },
+                ],
+                source: 'remote',
+                endpoint: `https://${profile}.example/v1/models`,
+                fromCache: false,
+                error: null,
+            };
+        });
+        mockProjection({
+            profiles: [
+                {
+                    name: 'openrouter-free',
+                    preset: 'openrouter',
+                    providerType: 'openai',
+                    baseUrl: 'https://openrouter.ai/api/v1',
+                    model: 'shared/free-model',
+                    auth: { apiKeyConfigured: true, bearerTokenConfigured: false, headersConfigured: false },
+                    metadataKeys: [],
+                },
+                {
+                    name: 'groq-free',
+                    preset: 'groq',
+                    providerType: 'openai',
+                    baseUrl: 'https://api.groq.com/openai/v1',
+                    model: 'shared/free-model',
+                    auth: { apiKeyConfigured: false, bearerTokenConfigured: true, headersConfigured: false },
+                    metadataKeys: [],
+                },
+            ],
+        });
+        const ctx = mockCtx();
+
+        await cmdByok({ println: ctx.println }, 'models all-providers grouped free reasoning safe 10');
+
+        expect(ctx.output()).toContain('(1 grupos/2)');
+        expect(ctx.output()).toContain('shared/free-model');
+        expect(ctx.output()).toContain('variants=openrouter-free/openrouter|groq-free/groq');
+    });
+
+    it('recomenda em todos os perfis filtrando o provider antes da descoberta', async () => {
+        discoverConfiguredByokModelsFromEnv.mockResolvedValue({
+            models: [
+                {
+                    id: 'groq/free-reasoning',
+                    capabilities: { supports: { reasoningEffort: true, vision: false }, limits: { max_context_window_tokens: 131072 } },
+                    byok: { freeTier: true, provider: 'groq', rateLimits: { maxRequestTokens: 64000 } },
+                },
+            ],
+            source: 'remote-cache',
+            endpoint: 'https://api.groq.com/openai/v1/models',
+            fromCache: true,
+            error: null,
+        });
+        mockProjection({
+            profiles: [
+                {
+                    name: 'openrouter-free',
+                    preset: 'openrouter',
+                    providerType: 'openai',
+                    baseUrl: 'https://openrouter.ai/api/v1',
+                    model: 'openrouter/default',
+                    auth: { apiKeyConfigured: true, bearerTokenConfigured: false, headersConfigured: false },
+                    metadataKeys: [],
+                },
+                {
+                    name: 'groq-free',
+                    preset: 'groq',
+                    providerType: 'openai',
+                    baseUrl: 'https://api.groq.com/openai/v1',
+                    model: 'groq/default',
+                    auth: { apiKeyConfigured: false, bearerTokenConfigured: true, headersConfigured: false },
+                    metadataKeys: [],
+                },
+            ],
+        });
+        const ctx = mockCtx();
+
+        await cmdByok({ println: ctx.println }, 'recommend all-providers provider:groq free reasoning safe 5');
+
+        expect(discoverConfiguredByokModelsFromEnv).toHaveBeenCalledTimes(1);
+        expect(discoverConfiguredByokModelsFromEnv).toHaveBeenCalledWith(
+            expect.objectContaining({ COPILOT_BYOK_PROFILE: 'groq-free' }),
+            expect.any(Object),
+        );
+        expect(ctx.output()).toContain('filtros=all-providers,provider:groq,free,reasoning,safe');
+        expect(ctx.output()).toContain('groq/free-reasoning');
+        expect(ctx.output()).not.toContain('openrouter');
+    });
+
     it('recomenda modelos BYOK com filtros e alerta limites baixos', async () => {
         discoverConfiguredByokModelsFromEnv.mockResolvedValue({
             models: [

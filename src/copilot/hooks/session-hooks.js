@@ -17,7 +17,7 @@
  */
 
 import { defaultAuditLog } from '#copilot/audit';
-import { getCopilotFallbackModel } from '#copilot/config';
+import { getCopilotFallbackModel, readConfiguredByokSummary } from '#copilot/config';
 import { toError } from '#copilot/core';
 import { classifySdkRateLimitScope } from '#copilot/sdk/errors';
 import { hostname } from 'node:os';
@@ -83,6 +83,7 @@ export function createSessionHooks(ctx) {
         onError: (input, invocation) => {
             const sessionId = invocation?.sessionId ?? '';
             const normalizedMessage = normalizeHookErrorMessage(input.error);
+            const byokSummary = readConfiguredByokSummary();
             log(
                 'WARN',
                 `[hooks/session-lifecycle] SDK errorOccurred [${input.errorContext}]: ${normalizedMessage} (recuperável: ${input.recoverable})`,
@@ -108,7 +109,12 @@ export function createSessionHooks(ctx) {
                 } else {
                     const currentModel = getModel() ?? 'unknown';
                     const fallbackModel = getCopilotFallbackModel();
-                    if (fallbackModel && fallbackModel !== currentModel) {
+                    if (byokSummary.enabled === true) {
+                        log(
+                            'WARN',
+                            '[hooks/session-lifecycle] rate_limit/quota em BYOK — fallback Copilot auto bloqueado; troque provider/modelo BYOK.',
+                        );
+                    } else if (fallbackModel && fallbackModel !== currentModel) {
                         log(
                             'WARN',
                             `[hooks/session-lifecycle] rate_limit/quota — próxima reconexão delegará seleção ao SDK via model fallback: ${fallbackModel}`,
@@ -129,6 +135,10 @@ export function createSessionHooks(ctx) {
                 errorContext: input.errorContext,
                 recoverable: input.recoverable,
                 sessionId,
+                byokEnabled: byokSummary.enabled === true,
+                byokProviderType: byokSummary.providerType ?? null,
+                byokProfile: byokSummary.profile ?? null,
+                byokModel: byokSummary.model ?? null,
             });
         },
     });

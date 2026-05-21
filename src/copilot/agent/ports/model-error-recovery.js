@@ -25,6 +25,7 @@ import { isAutoModelSelector } from '#copilot/core';
  *     recoverable?: boolean | undefined;
  *     currentModel?: string | null;
  *     fallbackModel?: string | null;
+ *     byokEnabled?: boolean | undefined;
  * }} input
  * @returns {ModelCallFallbackDecision}
  */
@@ -37,6 +38,9 @@ export function decideModelCallAutoFallback(input) {
     }
     if (input.recoverable !== true) {
         return { shouldFallback: false, targetModel: null, reason: 'non_recoverable_model_call' };
+    }
+    if (input.byokEnabled === true) {
+        return { shouldFallback: false, targetModel: null, reason: 'byok_provider_error_no_copilot_auto_fallback' };
     }
     if (!fallbackModel || !isAutoModelSelector(fallbackModel)) {
         return { shouldFallback: false, targetModel: null, reason: 'fallback_not_auto' };
