@@ -351,8 +351,8 @@ describe('commands/metrics + usage', () => {
         expect(ctx.output()).toContain('Binding: runtime=');
         expect(ctx.output()).toContain('Modo: sdk=');
         expect(ctx.output()).toContain('gpt-5-mini');
-        expect(ctx.output()).toContain('Última telemetria PR classificada');
-        expect(ctx.output()).toContain('não implica consumo neste boot/probe');
+        expect(ctx.output()).toMatch(/Última telemetria PR classificada|GitHub Copilot quota\/PR side-channel/);
+        expect(ctx.output()).toMatch(/não implica consumo neste boot\/probe|não é cobrança BYOK/);
     });
 
     it('cmdUsage now aceita runtimeId explícito', () => {

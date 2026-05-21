@@ -49,13 +49,25 @@ export function cmdUsage({ println }, arg) {
         }
 
         const modelBilling = projection.modelBilling;
+        const byok = configProjection.byok;
+        const byokActive = byok?.enabled === true;
         if (projection.pr) {
             const cost = modelBilling.cost === null ? '?' : modelBilling.cost.toFixed(4);
             const modelLabel = modelBilling.mismatch
                 ? `cfg=\x1b[35m${modelBilling.configuredModel ?? '-'}\x1b[0m · cobrado=\x1b[36m${modelBilling.billedModel ?? '-'}\x1b[0m`
                 : `modelo=\x1b[36m${modelBilling.displayModel}\x1b[0m`;
+            if (byokActive) {
+                println(
+                    `      GitHub Copilot quota/PR side-channel: ${modelLabel} · custo=\x1b[33m${cost}\x1b[0m \x1b[90m(histórica; BYOK ativo usa provider=${byok.preset ?? byok.providerType ?? '-'} · modelo=${byok.model ?? '-'}; não é cobrança BYOK)\x1b[0m`,
+                );
+            } else {
+                println(
+                    `      Última telemetria PR classificada: ${modelLabel} · custo=\x1b[33m${cost}\x1b[0m \x1b[90m(histórica; não implica consumo neste boot/probe)\x1b[0m`,
+                );
+            }
+        } else if (byokActive) {
             println(
-                `      Última telemetria PR classificada: ${modelLabel} · custo=\x1b[33m${cost}\x1b[0m \x1b[90m(histórica; não implica consumo neste boot/probe)\x1b[0m`,
+                `      GitHub Copilot quota/PR side-channel: \x1b[90msem snapshot histórico; BYOK ativo usa provider=${byok.preset ?? byok.providerType ?? '-'} · modelo=${byok.model ?? '-'}\x1b[0m`,
             );
         } else {
             println('      Premium Request: \x1b[90msem snapshot histórico classificado\x1b[0m');

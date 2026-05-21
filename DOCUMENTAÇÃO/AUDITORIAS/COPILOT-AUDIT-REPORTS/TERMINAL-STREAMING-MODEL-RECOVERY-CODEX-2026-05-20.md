@@ -945,6 +945,33 @@ Validação:
 
 Status: implementado nesta revisão e validado no live Mistral pós-classificação registrado em `artifacts/terminal-live/byok-mistral-inactivity-guard-2026-05-21/summary.md`: o cenário ficou `BLOCKED` por provider, com `chat=failed`, `session.query` persistido e trace do turno revisado para `failed`, sem virar falha genérica do terminal.
 
+### A45. Gratuidade BYOK precisava distinguir preço do modelo e cota do perfil
+
+Achado:
+
+- Groq retornava catálogo remoto real com 16 modelos e limites (`maxReq=6000`, `TPM=6000`), mas sem `pricing/freeTier` por modelo. O filtro `/byok models provider:groq free reasoning safe` ficava vazio, apesar de o perfil local `groq-free` declarar cota gratuita no plano atual.
+- Tratar esse caso como `free` confirmado seria incorreto: a API não provou preço zero por modelo. Tratar como `cost?` puro também era ruim para o operador: provedores com plano gratuito ficavam invisíveis no fluxo mais usado de descoberta.
+- O filtro `safe` removia todos os candidatos Groq por limite baixo e deixava apenas "Nenhum modelo", sem explicar que os modelos existiam mas foram bloqueados por orçamento operacional.
+
+Correção:
+
+- `/byok models` e `/byok recommend` ganharam uma classe de custo única: `free` confirmado pelo catálogo/preço, `profile-free` declarado pelo perfil/conta, `metered` e `cost?`.
+- `profile-free` é inferido apenas de metadata segura do perfil (`freeTier`, `free`, `included`, `freeFirst`, `freeLimit`, `costPolicy`) ou, como fallback fraco, do nome do perfil. A UI mostra `profile-free` e `freeHint=...`, preservando a origem da inferência.
+- O filtro `free` agora inclui `free` confirmado e `profile-free`, mas a tag visual nunca mascara `profile-free` como preço confirmado por modelo.
+- O ranking prioriza `free` confirmado e depois `profile-free`, antes de capacidades e contexto.
+- Quando `safe` zera a lista, o terminal agora mostra quantos candidatos foram removidos e lista os primeiros motivos de bloqueio (`baixo para turno real`, `contexto atual excede limite`, health falho etc.).
+- `/usage now` e `/metrics` passaram a narrar telemetria PR histórica como "GitHub Copilot quota/PR side-channel" quando BYOK está ativo, deixando explícito que não é cobrança BYOK.
+- O live runner BYOK no modo `--no-pr` deixou de abortar a sessão ao encontrar erros históricos em `/byok health`, bloqueia `/quit` prematuro até completar diagnósticos e sempre roda `/usage`, `/activity`, `/metrics`, `/events`, `/errors`.
+
+Validação:
+
+- Unit tests: `npx vitest run tests/unit/copilot/terminal/test_commands_byok.spec.js tests/unit/copilot/terminal/test_commands_metrics_usage.spec.js` passou com 34 testes, cobrindo `profile-free`, diagnóstico de `safe` e side-channel de usage em BYOK.
+- Checks: `node --check src/copilot/terminal/commands/byok.js`, `node --check src/copilot/terminal/commands/usage.js`, `node --check src/copilot/terminal/commands/metrics.js` e `node --check scripts/copilot/run-terminal-llm-b-live-test.mjs` passaram.
+- Probe real BYOK sem PR OpenRouter -> Groq passou em `artifacts/terminal-live/byok-openrouter-groq-cockpit-safe-diagnostics-2026-05-21/summary.md`.
+- Evidência do live: Groq exibiu `qwen/qwen3-32b profile-free`, `freeHint=6k TPM observed...`, `maxReq=6000`, `TPM=6000`; o filtro `safe` mostrou "O filtro safe removeu 4 candidato(s)" com razões acionáveis; `/usage now` e `/metrics` mostraram side-channel GitHub Copilot como histórico e não cobrança BYOK.
+
+Status: implementado nesta revisão. Ainda falta enriquecer perfis com metadados mais formais de limite gratuito por provider quando APIs oficiais expuserem quotas estruturadas.
+
 ## Hipóteses Externas Rejeitadas Ou Reclassificadas
 
 ### H1. "boot-hub assume sucesso"
@@ -1302,12 +1329,14 @@ Fase J5. UX e comandos
 - J5.22 Implementar admission control antes de turno BYOK longo, usando limites declarados e estimativa do contexto atual. Status: feito nesta revisão para limites declarados; `/byok recommend` usa o mesmo contexto vivo. Falta calibrar tokenização por modelo/provider.
 - J5.23 Criar `/byok providers` como cockpit redigido de providers, perfis prontos e comandos diretos. Status: feito nesta revisão.
 - J5.24 Unificar filtros de `/byok models` e `/byok recommend` para provider, free, metered, cost?, reasoning, vision, safe, ctx e maxReq. Status: feito nesta revisão.
-- J5.25 Distinguir explicitamente "free confirmado" de "custo desconhecido" na recomendação e nos testes live. Status: feito nesta revisão para o cockpit; falta enriquecer docs/provider metadata quando APIs públicas expuserem limites.
+- J5.25 Distinguir explicitamente "free confirmado" de "custo desconhecido" na recomendação e nos testes live. Status: feito e ampliado nesta revisão; o cockpit agora separa `free`, `profile-free`, `metered` e `cost?`, com `freeHint` quando a gratuidade vem do perfil/conta.
 - J5.26 Criar visão agregada multi-provider sem alternar perfil ativo (`/byok models all-providers` e `/byok recommend all-providers`). Status: feito nesta revisão, com `profile=` por modelo e filtros compartilhados.
 - J5.27 Separar capacidade semântica de reasoning BYOK de `reasoningEffort` do SDK quando o id literal do provider contém `:`. Status: feito nesta revisão.
 - J5.28 Narrar erros BYOK como erros de provider customizado, bloqueando fallback Copilot auto e orientando troca por `/byok use`/`/byok model`. Status: feito nesta revisão.
 - J5.29 Agrupar visualmente modelos repetidos entre providers, preservando variantes por `profile`, preço, limites e auth. Status: feito nesta revisão via filtro `grouped`.
 - J5.30 Encerrar turno/materialização como `failed` quando o provider BYOK falha antes de qualquer delta público. Status: feito nesta revisão; `/activity` deixa de mostrar turno preso como `active`.
+- J5.31 Explicar filtros vazios causados por `safe`, listando candidatos removidos e motivos de bloqueio. Status: feito nesta revisão.
+- J5.32 Mostrar side-channel de quota/PR do GitHub Copilot como histórico quando BYOK está ativo, sem narrar como cobrança BYOK. Status: feito nesta revisão em `/usage now`, `/metrics` e harness live.
 
 Fase J6. Testes
 
@@ -1346,6 +1375,9 @@ Fase J6. Testes
 - J6.33 Classificar falha BYOK tardia por `session.error [query]` como saúde operacional do provider/modelo, revisando trace recém-fechado. Status: feito nesta revisão com unit test; artefato motivador `artifacts/terminal-live/byok-mistral-canonical-2026-05-21/summary.md`.
 - J6.34 Reexecutar live Mistral real após J6.33 para confirmar `BLOCKED` limpo por provider, `/byok health` com `chat=failed` e ausência de falha genérica do terminal. Status: executado parcialmente em `artifacts/terminal-live/byok-mistral-session-error-classified-2026-05-21/summary.md`; a falha mudou de `session.error [query]` para stall silencioso pós-`model_retry`, abrindo J6.35.
 - J6.35 Remover `watchdog-only` de turnos BYOK reais e usar timeout de inatividade reiniciado por progresso observável, preservando `watchdog-only` para GitHub Copilot SDK. Status: feito nesta revisão; falta live Mistral pós-guardião.
+- J6.36 Rodar probe real OpenRouter -> Groq sem PR para validar `profile-free`, filtros, side-channel de usage e cockpit sem abrir turno. Status: PASS em `artifacts/terminal-live/byok-openrouter-groq-cockpit-profile-free-2026-05-21/summary.md`.
+- J6.37 Rodar probe real OpenRouter -> Groq pós-diagnóstico `safe`, provando que Groq não aparece mais como "nenhum modelo" opaco. Status: PASS em `artifacts/terminal-live/byok-openrouter-groq-cockpit-safe-diagnostics-2026-05-21/summary.md`.
+- J6.38 Garantir que o live runner BYOK `--no-pr` não aborte por erros históricos de `/byok health` e execute diagnósticos completos antes de `/quit`. Status: feito nesta revisão.
 - J6.36 Fazer o live runner BYOK real preservar provider/perfil alvo nos comandos de catálogo depois de `/byok reload`, usando `provider:<nome>` em refresh/free/recommend. Status: feito nesta revisão.
 
 Fase J7. Providers amplos
@@ -1503,6 +1535,11 @@ Implementado:
 - Testes unitários adicionados para suprimir prefixo truncado de `dialog.turn_end` quando transcript completo já foi materializado por `assistant.message`.
 - Teste unitário adicionado para `dialog.turn_end` emitir lifecycle sem `reply` quando o transcript já foi materializado.
 - O live runner agora analisa blocos estruturados do terminal para detectar duplicação final, evitando falso positivo quando uma regex atravessa de `🧠 LLM-B` para `[LLM-B] Mensagem`.
+- O cockpit BYOK agora separa custo em `free`, `profile-free`, `metered` e `cost?`. `profile-free` vem de metadata redigida do perfil/conta, não de preço confirmado por modelo, e aparece com `freeHint`.
+- O filtro `free` inclui `profile-free` para tornar provedores com plano/cota gratuita operacionalmente descobríveis, mas a UI preserva a distinção para evitar falsa promessa de preço zero por modelo.
+- Quando `safe` remove todos os candidatos, `/byok models` e `/byok recommend` mostram quais modelos foram removidos e por qual limite/health, em vez de deixar o operador com um "nenhum modelo" opaco.
+- `/usage now` e `/metrics` mostram "GitHub Copilot quota/PR side-channel" quando BYOK está ativo, explicitando que snapshot PR histórico não é cobrança BYOK.
+- Live BYOK real sem PR OpenRouter -> Groq passou em `artifacts/terminal-live/byok-openrouter-groq-cockpit-safe-diagnostics-2026-05-21/summary.md`: OpenRouter exibiu catálogo free/profile-free, Groq exibiu `qwen/qwen3-32b profile-free`, filtros `safe` explicaram limites de 6000 tokens, `/events` arquivou controle público e `/errors` ficou limpo.
 
 Próxima rodada recomendada:
 
@@ -1518,3 +1555,4 @@ Próxima rodada recomendada:
 10. Continuar a normalização de tool identity em completions/progress externos sem requestId, com métricas para qualquer lifecycle ainda genérico.
 11. Integrar falha de `wireRuntime()` ao `ErrorTracker` com metadados de fase.
 12. Investigar Gemini 403 com probes de autenticação redigidos, distinguindo chave Google AI Studio, chave Google Cloud e endpoint OpenAI-compatible.
+13. Formalizar metadata de cotas gratuitas por provider (`freeLimit`, janela, RPM/TPM/RPD, fonte e data de observação) para reduzir dependência de texto livre em `profile-free`.

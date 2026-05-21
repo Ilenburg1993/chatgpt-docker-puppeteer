@@ -12,7 +12,7 @@ import fs from 'node:fs/promises';
 
 import { config as loadDotenv } from 'dotenv';
 
-import { discoverConfiguredByokModelsFromEnv } from '#copilot/config';
+import { discoverConfiguredByokModelsFromEnv, readConfiguredByokProfilesFromEnv } from '#copilot/config';
 import { readTerminalByokProjection, readTerminalRuntimeState } from '../frontend/index.js';
 import {
     clearByokProviderModelHealth,
@@ -78,13 +78,16 @@ function valueOrDash(value) {
  *   provider?: string | null;
  *   profile?: string | null;
  *   source?: string;
+ *   profileFreeTier?: boolean | null;
+ *   profileCostSource?: string | null;
+ *   profileCostDetail?: string | null;
  *   inputModalities?: string[];
  *   outputModalities?: string[];
  *   supportsReasoning?: boolean;
  * } | undefined}
  */
 function getByokModelMetadata(model) {
-    return /** @type {{ byok?: { freeTier?: boolean | null; pricing?: { prompt?: number | null; completion?: number | null; request?: number | null }; rateLimits?: { maxRequestTokens?: number | null; tokensPerMinute?: number | null; requestsPerMinute?: number | null; dailyRequests?: number | null }; provider?: string | null; profile?: string | null; source?: string; inputModalities?: string[]; outputModalities?: string[]; supportsReasoning?: boolean } }} */ (model).byok;
+    return /** @type {{ byok?: { freeTier?: boolean | null; pricing?: { prompt?: number | null; completion?: number | null; request?: number | null }; rateLimits?: { maxRequestTokens?: number | null; tokensPerMinute?: number | null; requestsPerMinute?: number | null; dailyRequests?: number | null }; provider?: string | null; profile?: string | null; source?: string; profileFreeTier?: boolean | null; profileCostSource?: string | null; profileCostDetail?: string | null; inputModalities?: string[]; outputModalities?: string[]; supportsReasoning?: boolean } }} */ (model).byok;
 }
 
 /**
@@ -110,6 +113,110 @@ function compactNumber(value) {
  */
 function finitePositiveNumber(value) {
     return typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : null;
+}
+
+/**
+ * @param {unknown} value
+ * @returns {string | null}
+ */
+function optionalScalarString(value) {
+    if (typeof value === 'string' && value.trim()) return value.trim();
+    if (typeof value === 'number' && Number.isFinite(value)) return String(value);
+    if (typeof value === 'boolean') return value ? 'true' : 'false';
+    return null;
+}
+
+/**
+ * @param {unknown} value
+ * @returns {Record<string, unknown>}
+ */
+function asRecord(value) {
+    return value && typeof value === 'object' && !Array.isArray(value) ? /** @type {Record<string, unknown>} */ (value) : {};
+}
+
+/**
+ * @param {unknown} value
+ * @returns {boolean}
+ */
+function isTruthyProfileFlag(value) {
+    if (value === true) return true;
+    if (typeof value === 'number') return Number.isFinite(value) && value > 0;
+    if (typeof value !== 'string') return false;
+    return /^(1|true|yes|sim|on|free|included)$/iu.test(value.trim());
+}
+
+/**
+ * @param {string | null | undefined} value
+ * @returns {boolean}
+ */
+function textSuggestsFreeProfile(value) {
+    return typeof value === 'string' && /\b(free|gratis|included|allowance|quota|grant)\b/iu.test(value);
+}
+
+/**
+ * Perfis BYOK podem declarar que a conta/plano atual tem cota gratuita mesmo quando o catálogo remoto não marca preço por
+ * modelo. Isso não transforma o modelo em "free confirmado"; a UI mostra `profile-free` para preservar a origem da
+ * inferência.
+ *
+ * @param {string | null | undefined} profileName
+ * @returns {{ profileFreeTier: boolean | null; profileCostSource: string | null; profileCostDetail: string | null }}
+ */
+function readByokProfileCostHint(profileName) {
+    if (!profileName) return { profileFreeTier: null, profileCostSource: null, profileCostDetail: null };
+    try {
+        const profile = readConfiguredByokProfilesFromEnv(process.env)[profileName];
+        if (!profile) return { profileFreeTier: null, profileCostSource: null, profileCostDetail: null };
+        const metadata = asRecord(profile['metadata']);
+        const candidates = [
+            ['metadata.freeTier', metadata['freeTier']],
+            ['metadata.free', metadata['free']],
+            ['metadata.included', metadata['included']],
+            ['metadata.freeFirst', metadata['freeFirst']],
+            ['metadata.freeLimit', metadata['freeLimit']],
+            ['metadata.free_limits', metadata['free_limits']],
+            ['metadata.costPolicy', metadata['costPolicy']],
+            ['metadata.cost_policy', metadata['cost_policy']],
+            ['profile.freeTier', profile['freeTier']],
+            ['profile.free', profile['free']],
+            ['profile.freeFirst', profile['freeFirst']],
+        ];
+        for (const [source, value] of candidates) {
+            const scalar = optionalScalarString(value);
+            if (
+                isTruthyProfileFlag(value) ||
+                textSuggestsFreeProfile(scalar) ||
+                (scalar !== null && String(source).toLowerCase().includes('freelimit'))
+            ) {
+                return {
+                    profileFreeTier: true,
+                    profileCostSource: String(source),
+                    profileCostDetail: scalar,
+                };
+            }
+        }
+        if (/\bfree\b/iu.test(profileName)) {
+            return {
+                profileFreeTier: true,
+                profileCostSource: 'profile.name',
+                profileCostDetail: profileName,
+            };
+        }
+    } catch {
+        return { profileFreeTier: null, profileCostSource: null, profileCostDetail: null };
+    }
+    return { profileFreeTier: null, profileCostSource: null, profileCostDetail: null };
+}
+
+/**
+ * @param {import('#copilot/sdk/types').ModelInfo} model
+ * @returns {{ kind: 'free' | 'profile-free' | 'metered' | 'unknown'; label: string }}
+ */
+function classifyByokModelCost(model) {
+    const meta = getByokModelMetadata(model);
+    if (meta?.freeTier === true) return { kind: 'free', label: 'free' };
+    if (meta?.freeTier === false) return { kind: 'metered', label: 'metered' };
+    if (meta?.profileFreeTier === true) return { kind: 'profile-free', label: 'profile-free' };
+    return { kind: 'unknown', label: 'cost?' };
 }
 
 /**
@@ -150,9 +257,11 @@ function readCurrentByokRequestBudget() {
  */
 function scoreByokModel(model) {
     const meta = getByokModelMetadata(model);
+    const cost = classifyByokModelCost(model);
     const ctxTokens = model.capabilities?.limits?.max_context_window_tokens ?? 0;
     let score = 0;
-    if (meta?.freeTier === true) score += 1_000_000_000;
+    if (cost.kind === 'free') score += 1_000_000_000;
+    if (cost.kind === 'profile-free') score += 900_000_000;
     if (supportsByokReasoning(model)) score += 100_000_000;
     if (model.capabilities?.supports?.vision) score += 10_000_000;
     score += Math.min(Number(ctxTokens) || 0, 2_000_000);
@@ -283,11 +392,12 @@ function parseRecommendArgs(rest) {
  */
 function matchesRecommendFilters(model, filters, runtimeBudget = null) {
     const meta = getByokModelMetadata(model);
+    const cost = classifyByokModelCost(model);
     const context = model.capabilities?.limits?.max_context_window_tokens ?? 0;
     const maxRequest = meta?.rateLimits?.maxRequestTokens ?? meta?.rateLimits?.tokensPerMinute ?? null;
-    if (filters.freeOnly && meta?.freeTier !== true) return false;
-    if (filters.meteredOnly && meta?.freeTier !== false) return false;
-    if (filters.unknownCostOnly && meta?.freeTier !== null) return false;
+    if (filters.freeOnly && cost.kind !== 'free' && cost.kind !== 'profile-free') return false;
+    if (filters.meteredOnly && cost.kind !== 'metered') return false;
+    if (filters.unknownCostOnly && cost.kind !== 'unknown') return false;
     if (filters.provider) {
         const haystack = [meta?.provider, meta?.profile, meta?.source, model.id].filter(Boolean).join(' ').toLowerCase();
         if (!haystack.includes(filters.provider)) return false;
@@ -320,6 +430,37 @@ function renderByokFilterLabel(filters) {
     ]
         .filter(Boolean)
         .join(',');
+}
+
+/**
+ * @param {ReturnType<typeof parseRecommendArgs>} filters
+ * @returns {ReturnType<typeof parseRecommendArgs>}
+ */
+function withoutSafeFilter(filters) {
+    return { ...filters, avoidLowLimit: false };
+}
+
+/**
+ * @param {(text: string) => void} println
+ * @param {import('#copilot/sdk/types').ModelInfo[]} candidateModels
+ * @param {ReturnType<typeof parseRecommendArgs>} filters
+ * @param {ReturnType<typeof estimateCurrentByokRequestBudget>} runtimeBudget
+ * @returns {void}
+ */
+function renderEmptyByokFilterDiagnostics(println, candidateModels, filters, runtimeBudget) {
+    if (!filters.avoidLowLimit || candidateModels.length === 0) return;
+    const withoutSafe = rankByokModels(candidateModels).filter((model) =>
+        matchesRecommendFilters(model, withoutSafeFilter(filters), runtimeBudget),
+    );
+    if (withoutSafe.length === 0) return;
+    println(
+        `    \x1b[33mO filtro safe removeu ${withoutSafe.length} candidato(s). Eles existem, mas parecem apertados/bloqueados para turno real no contexto atual.\x1b[0m`,
+    );
+    for (const model of withoutSafe.slice(0, 4)) {
+        const budget = classifyByokModelBudget(model, runtimeBudget);
+        println(`      \x1b[90m- ${model.id}: ${budget.label}\x1b[0m`);
+    }
+    println('    \x1b[90mTente remover safe para inspeção, usar /compact, sessão fresca, ou provider/modelo com maxReq/TPM maior.\x1b[0m');
 }
 
 /**
@@ -456,6 +597,7 @@ function renderByokHealthTag(health) {
  */
 function withByokCatalogSource(model, source) {
     const meta = getByokModelMetadata(model) ?? {};
+    const profileCostHint = readByokProfileCostHint(source.profileName);
     return /** @type {import('#copilot/sdk/types').ModelInfo} */ ({
         ...model,
         byok: {
@@ -463,6 +605,9 @@ function withByokCatalogSource(model, source) {
             provider: meta.provider ?? source.preset ?? source.providerType ?? source.profileName ?? null,
             profile: source.profileName ?? null,
             source: meta.source ?? source.preset ?? source.providerType ?? source.profileName ?? undefined,
+            profileFreeTier: meta.profileFreeTier ?? profileCostHint.profileFreeTier,
+            profileCostSource: meta.profileCostSource ?? profileCostHint.profileCostSource,
+            profileCostDetail: meta.profileCostDetail ?? profileCostHint.profileCostDetail,
         },
     });
 }
@@ -562,8 +707,13 @@ async function discoverByokCatalogForCommand(projection, filters) {
  */
 function renderModelTags(model) {
     const meta = getByokModelMetadata(model);
+    const cost = classifyByokModelCost(model);
     const tags = [];
-    tags.push(meta?.freeTier === true ? 'free' : meta?.freeTier === false ? 'metered' : 'cost?');
+    tags.push(cost.label);
+    if (cost.kind === 'profile-free') {
+        const detail = meta?.profileCostDetail ? String(meta.profileCostDetail).slice(0, 48) : meta?.profileCostSource ?? 'profile';
+        tags.push(`freeHint=${detail}`);
+    }
     tags.push(supportsByokReasoning(model) ? 'reasoning' : 'no-reasoning');
     if (supportsByokReasoning(model) && !model.capabilities?.supports?.reasoningEffort) {
         tags.push('sdk-reasoning=off');
@@ -984,6 +1134,7 @@ export async function cmdByok({ println }, arg) {
         }
         if (modelList.length === 0) {
             println('    \x1b[33mNenhum modelo BYOK encontrado para os filtros atuais. Remova filtros, use provider:<nome> ou rode /byok models all-providers refresh.\x1b[0m\n');
+            renderEmptyByokFilterDiagnostics(println, discovered.models.length > 0 ? discovered.models : models, filters, runtimeBudget);
             return;
         }
         for (const entry of visibleEntries) {
@@ -1033,6 +1184,7 @@ export async function cmdByok({ println }, arg) {
         }
         if (recommendedEntries.length === 0) {
             println('    \x1b[33mNenhum modelo atende aos filtros. Tente remover filtros ou rode /byok models refresh.\x1b[0m\n');
+            renderEmptyByokFilterDiagnostics(println, modelList, filters, runtimeBudget);
             return;
         }
         let index = 1;

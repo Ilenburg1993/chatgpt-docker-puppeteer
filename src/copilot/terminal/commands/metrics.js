@@ -56,6 +56,8 @@ export function cmdMetrics({ println }, arg = '') {
     const model = snap['model'] ?? '?';
     const status = snap['status'] ?? '?';
     const sessionId = runtimeSessionId ?? '?';
+    const byok = configProjection.byok;
+    const byokActive = byok?.enabled === true;
 
     // ── Token context ────────────────────────────────────────────────
     let ctxStr = '\x1b[90m(sem dados)\x1b[0m';
@@ -74,6 +76,9 @@ export function cmdMetrics({ println }, arg = '') {
         : modelBilling.displayModel;
     const costStr = modelBilling.cost === null ? '-' : `$${modelBilling.cost.toFixed(4)}`;
     const billingStatus = modelBilling.mismatch ? '\x1b[31mmismatch\x1b[0m' : '\x1b[32mok\x1b[0m';
+    const billingLine = byokActive
+        ? `github PR side-channel ${lastModel} · ${costStr} · ${billingStatus} \x1b[90m(histórica; BYOK ativo provider=${byok.preset ?? byok.providerType ?? '-'} · modelo=${byok.model ?? '-'}; não é cobrança BYOK)\x1b[0m`
+        : `telemetria PR ${lastModel} · ${costStr} · ${billingStatus} \x1b[90m(histórica)\x1b[0m`;
     const promptDigest = typeof systemPromptBinding?.['digest'] === 'string' ? systemPromptBinding['digest'] : null;
     const promptIsStale =
         typeof systemPromptFreshness?.['isStale'] === 'boolean' ? systemPromptFreshness['isStale'] : null;
@@ -163,7 +168,7 @@ export function cmdMetrics({ println }, arg = '') {
   bridge/live ${bridgeTurnCount} \x1b[90m(${timelineSource} · ${timelineAuthority} · ${timelineReconciliationStatus})\x1b[0m
   sync Hub    ${timelineSyncStatus} \x1b[90m(pendentes=${timelineSyncPendingCount} · agendados=${timelineSyncTelemetry.scheduledTotal} · gravados=${timelineSyncTelemetry.turnsSyncedTotal} · falhas=${timelineSyncTelemetry.failedTotal} · retries=${timelineSyncTelemetry.retryTotal} · cache=${timelineSyncTelemetry.completedCacheSize}/${timelineSyncTelemetry.failureCacheSize})\x1b[0m
   contexto    ${ctxStr}
-  telemetria PR ${lastModel} · ${costStr} · ${billingStatus} \x1b[90m(histórica)\x1b[0m
+  ${billingLine}
   prompt      ${promptLabel} \x1b[90m(digest=${promptDigest ?? '-'} · ação=${promptAction})\x1b[0m
 
   \x1b[35m🔧 Ferramentas\x1b[0m

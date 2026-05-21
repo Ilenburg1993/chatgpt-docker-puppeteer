@@ -2,7 +2,7 @@
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-const { chmod, clearByokProviderModelHealth, discoverConfiguredByokModelsFromEnv, flushByokProviderHealth, listByokProviderModelHealth, loadDotenv, readByokProviderHealthState, readByokProviderModelHealth, readFile, readTerminalByokProjection, readTerminalRuntimeState, rename, writeFile } =
+const { chmod, clearByokProviderModelHealth, discoverConfiguredByokModelsFromEnv, flushByokProviderHealth, listByokProviderModelHealth, loadDotenv, readByokProviderHealthState, readByokProviderModelHealth, readConfiguredByokProfilesFromEnv, readFile, readTerminalByokProjection, readTerminalRuntimeState, rename, writeFile } =
     vi.hoisted(() => ({
         chmod: vi.fn(),
         clearByokProviderModelHealth: vi.fn(),
@@ -22,6 +22,7 @@ const { chmod, clearByokProviderModelHealth, discoverConfiguredByokModelsFromEnv
             error: null,
         })),
         readByokProviderModelHealth: vi.fn(() => null),
+        readConfiguredByokProfilesFromEnv: vi.fn(() => ({})),
         readFile: vi.fn(),
         readTerminalByokProjection: vi.fn(),
         readTerminalRuntimeState: vi.fn(() => ({ contextWindow: null })),
@@ -43,6 +44,7 @@ vi.mock('dotenv', () => ({
 
 vi.mock('#copilot/config', () => ({
     discoverConfiguredByokModelsFromEnv,
+    readConfiguredByokProfilesFromEnv,
 }));
 
 vi.mock('../../../../src/copilot/terminal/frontend/index.js', () => ({
@@ -127,6 +129,8 @@ describe('terminal /byok command', () => {
         });
         readByokProviderModelHealth.mockReset();
         readByokProviderModelHealth.mockReturnValue(null);
+        readConfiguredByokProfilesFromEnv.mockReset();
+        readConfiguredByokProfilesFromEnv.mockReturnValue({});
         readFile.mockReset();
         readTerminalByokProjection.mockReset();
         readTerminalRuntimeState.mockReset();
@@ -682,6 +686,103 @@ describe('terminal /byok command', () => {
         expect(ctx.output()).toContain('filtros=all-providers,provider:groq,free,reasoning,safe');
         expect(ctx.output()).toContain('groq/free-reasoning');
         expect(ctx.output()).not.toContain('openrouter');
+    });
+
+    it('trata plano gratuito declarado no perfil como profile-free sem mascarar custo por modelo desconhecido', async () => {
+        readConfiguredByokProfilesFromEnv.mockReturnValue({
+            'groq-free': {
+                preset: 'groq',
+                metadata: {
+                    freeLimit: '6k TPM observed on current plan',
+                },
+            },
+        });
+        discoverConfiguredByokModelsFromEnv.mockResolvedValue({
+            models: [
+                {
+                    id: 'qwen/qwen3-32b',
+                    capabilities: { supports: { reasoningEffort: true, vision: false }, limits: { max_context_window_tokens: 131072 } },
+                    byok: {
+                        freeTier: null,
+                        provider: 'groq',
+                        rateLimits: { maxRequestTokens: 6000, tokensPerMinute: 6000 },
+                    },
+                },
+            ],
+            source: 'remote',
+            endpoint: 'https://api.groq.com/openai/v1/models',
+            fromCache: false,
+            error: null,
+        });
+        mockProjection({
+            profiles: [
+                {
+                    name: 'groq-free',
+                    preset: 'groq',
+                    providerType: 'openai',
+                    baseUrl: 'https://api.groq.com/openai/v1',
+                    model: 'qwen/qwen3-32b',
+                    auth: { apiKeyConfigured: false, bearerTokenConfigured: true, headersConfigured: false },
+                    metadataKeys: ['freeLimit'],
+                },
+            ],
+            summary: { enabled: true, ready: true, profile: 'groq-free', preset: 'groq', providerType: 'openai' },
+        });
+        const ctx = mockCtx();
+
+        await cmdByok({ println: ctx.println }, 'models all-providers provider:groq free reasoning 5');
+
+        expect(ctx.output()).toContain('qwen/qwen3-32b');
+        expect(ctx.output()).toContain('profile-free');
+        expect(ctx.output()).toContain('freeHint=6k TPM observed on current plan');
+        expect(ctx.output()).not.toContain('Nenhum modelo BYOK encontrado');
+    });
+
+    it('explica quando o filtro safe remove modelos BYOK existentes por limites baixos', async () => {
+        readConfiguredByokProfilesFromEnv.mockReturnValue({
+            'groq-free': {
+                metadata: { freeLimit: '6k TPM observed on current plan' },
+            },
+        });
+        discoverConfiguredByokModelsFromEnv.mockResolvedValue({
+            models: [
+                {
+                    id: 'qwen/qwen3-32b',
+                    capabilities: { supports: { reasoningEffort: true, vision: false }, limits: { max_context_window_tokens: 131072 } },
+                    byok: {
+                        freeTier: null,
+                        provider: 'groq',
+                        rateLimits: { maxRequestTokens: 6000, tokensPerMinute: 6000 },
+                    },
+                },
+            ],
+            source: 'remote',
+            endpoint: 'https://api.groq.com/openai/v1/models',
+            fromCache: false,
+            error: null,
+        });
+        mockProjection({
+            profiles: [
+                {
+                    name: 'groq-free',
+                    preset: 'groq',
+                    providerType: 'openai',
+                    baseUrl: 'https://api.groq.com/openai/v1',
+                    model: 'qwen/qwen3-32b',
+                    auth: { apiKeyConfigured: false, bearerTokenConfigured: true, headersConfigured: false },
+                    metadataKeys: ['freeLimit'],
+                },
+            ],
+            summary: { enabled: true, ready: true, profile: 'groq-free', preset: 'groq', providerType: 'openai' },
+        });
+        const ctx = mockCtx();
+
+        await cmdByok({ println: ctx.println }, 'models all-providers provider:groq free reasoning safe 5');
+
+        expect(ctx.output()).toContain('Nenhum modelo BYOK encontrado');
+        expect(ctx.output()).toContain('O filtro safe removeu 1 candidato');
+        expect(ctx.output()).toContain('qwen/qwen3-32b');
+        expect(ctx.output()).toContain('baixo para turno real');
     });
 
     it('recomenda modelos BYOK com filtros e alerta limites baixos', async () => {

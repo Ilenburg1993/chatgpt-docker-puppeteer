@@ -290,6 +290,10 @@ function buildByokRealPreflightCommands({ profile, altProfile, model, altModel, 
     return commands;
 }
 
+function buildByokRealNoPrDiagnosticCommands() {
+    return ['/usage now', '/activity 20', '/metrics', '/events 60', '/events 100 --raw', '/errors 10'];
+}
+
 function startByokFixtureProviderServer() {
     return new Promise((resolve, reject) => {
         const server = http.createServer((req, res) => {
@@ -856,7 +860,7 @@ function evaluateNoPrOutput(plain, sseSummary) {
         {
             id: 'usage-visible',
             pass:
-                /Premium Request:|Última (?:Premium Request|telemetria PR) classificada:/.test(plain) &&
+                /Premium Request:|Última (?:Premium Request|telemetria PR) classificada:|GitHub Copilot quota\/PR side-channel:/.test(plain) &&
                 /Modo: sdk=/.test(plain),
             detail: '/usage now rendered context, PR and SDK mode telemetry',
         },
@@ -1350,8 +1354,7 @@ async function main() {
             : byokReal
               ? [
                     ...buildByokRealPreflightCommands(realByok ?? {}),
-                    noPr ? null : buildScenarioPrompt(),
-                    noPr ? '/quit' : null,
+                    ...(noPr ? buildByokRealNoPrDiagnosticCommands() : [buildScenarioPrompt()]),
                 ]
                     .filter(Boolean)
                     .join('\n')
@@ -1375,6 +1378,7 @@ async function main() {
     let answerSent = false;
     let postCommandsSent = false;
     let quitSent = false;
+    let byokNoPrCanQuit = !(byokReal && noPr);
     let exitCode = null;
     let sseCollector = null;
     let postAskContinuationObserved = false;
@@ -1413,6 +1417,7 @@ async function main() {
     });
     const write = (line) => {
         if (childClosed || child.stdin.destroyed || child.stdin.writableEnded) return false;
+        if (byokReal && noPr && String(line ?? '').trim() === '/quit' && !byokNoPrCanQuit) return false;
         try {
             return child.stdin.write(ensureLine(line));
         } catch (error) {
@@ -1439,6 +1444,7 @@ async function main() {
             setTimeout(() => {
                 if (!quitSent) {
                     quitSent = true;
+                    byokNoPrCanQuit = true;
                     write('/quit');
                 }
             }, diagnostics.length * 350 + 2_000).unref();
@@ -1446,6 +1452,7 @@ async function main() {
     };
     const timeout = setTimeout(() => {
         timedOut = true;
+        byokNoPrCanQuit = true;
         write('/quit');
         setTimeout(() => child.kill('SIGTERM'), 2_000).unref();
     }, Number.isFinite(timeoutMs) ? timeoutMs : DEFAULT_TIMEOUT_MS);
@@ -1471,12 +1478,21 @@ async function main() {
                 const commands = byokReal
                     ? [
                           ...buildByokRealPreflightCommands(realByok ?? {}),
-                          ...(noPr ? ['/usage now', '/activity 20', '/metrics', '/events 60', '/events 100 --raw', '/errors 10', '/quit'] : []),
+                          ...(noPr ? buildByokRealNoPrDiagnosticCommands() : []),
                       ]
                     : byokProbe
                       ? buildByokProbeCommands({ fixtureBaseUrl: byokFixtureBaseUrl })
                       : buildNoPrProbeCommands();
                 sendCommandSequence(write, commands, { delayMs: byokReal || byokProbe ? 350 : 150 });
+                if (byokReal && noPr) {
+                    setTimeout(() => {
+                        if (!quitSent) {
+                            quitSent = true;
+                            byokNoPrCanQuit = true;
+                            write('/quit');
+                        }
+                    }, 90_000).unref();
+                }
                 if (byokReal && !noPr) {
                     setTimeout(() => write(buildScenarioPrompt()), Math.max(4_000, commands.length * 350 + 1_000)).unref();
                 }
@@ -1506,7 +1522,8 @@ async function main() {
             (/Erro de sessão \[(?:query|rate_limit)\]|You've hit your rate limit|session\.error|CAPIError|Failed to get response from the AI model/i.test(
                 plain,
             ) ||
-                /erro de provider BYOK|\[cancellation\]\s+Operation cancelled by user/i.test(plain))
+                /erro de provider BYOK|\[cancellation\]\s+Operation cancelled by user/i.test(plain)) &&
+            !(byokReal && noPr)
         ) {
             postCommandsSent = true;
             if (postAnswerCommandTimer) {
@@ -1524,6 +1541,7 @@ async function main() {
                     setTimeout(() => {
                         if (!quitSent) {
                             quitSent = true;
+                            byokNoPrCanQuit = true;
                             write('/quit');
                         }
                     }, diagnostics.length * 450 + 1_500).unref();
@@ -1532,6 +1550,19 @@ async function main() {
         }
         if (!quitSent && /Exportado:/.test(plain)) {
             quitSent = true;
+            byokNoPrCanQuit = true;
+            setTimeout(() => write('/quit'), 500).unref();
+        }
+        if (
+            byokReal &&
+            noPr &&
+            !quitSent &&
+            /Métricas da Sessão/.test(plain) &&
+            /Eventos SSE/.test(plain) &&
+            /Nenhum erro recente/.test(plain)
+        ) {
+            quitSent = true;
+            byokNoPrCanQuit = true;
             setTimeout(() => write('/quit'), 500).unref();
         }
     };
