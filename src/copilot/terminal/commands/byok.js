@@ -14,6 +14,7 @@ import { config as loadDotenv } from 'dotenv';
 
 import { discoverConfiguredByokModelsFromEnv } from '#copilot/config';
 import { readTerminalByokProjection, readTerminalRuntimeState } from '../frontend/index.js';
+import { listByokProviderModelHealth, readByokProviderModelHealth } from '../state/byok-provider-health.js';
 
 const DEFAULT_BYOK_MODELS_DISPLAY_LIMIT = 24;
 const DEFAULT_BYOK_RECOMMEND_DISPLAY_LIMIT = 8;
@@ -150,6 +151,7 @@ function scoreByokModel(model) {
     if (model.capabilities?.supports?.vision) score += 10_000_000;
     score += Math.min(Number(ctxTokens) || 0, 2_000_000);
     if (meta?.freeTier === false) score -= 10_000;
+    if (isByokModelKnownFailed(model)) score -= 500_000_000;
     return score;
 }
 
@@ -170,6 +172,13 @@ function rankByokModels(models) {
  * @returns {{ level: 'ok' | 'caution' | 'blocked'; label: string }}
  */
 function classifyByokModelBudget(model, runtimeBudget = null) {
+    const health = readHealthForByokModel(model);
+    if (health && isByokHealthCurrentlyFailed(health)) {
+        return {
+            level: 'blocked',
+            label: `chat real falhou (${formatByokHealthAge(health.lastFailureAt)}); trocar modelo/provider ou testar novamente`,
+        };
+    }
     const meta = getByokModelMetadata(model);
     const limit = meta?.rateLimits?.maxRequestTokens ?? meta?.rateLimits?.tokensPerMinute ?? null;
     if (limit !== null && runtimeBudget !== null && runtimeBudget.estimatedRequestTokens > limit) {
@@ -349,6 +358,92 @@ function renderByokVariantSummary(variants) {
 }
 
 /**
+ * @param {number | null} timestamp
+ * @returns {string}
+ */
+function formatByokHealthAge(timestamp) {
+    if (!timestamp) return 'sem data';
+    const deltaSeconds = Math.max(0, Math.round((Date.now() - timestamp) / 1000));
+    if (deltaSeconds < 60) return `${deltaSeconds}s atras`;
+    const deltaMinutes = Math.round(deltaSeconds / 60);
+    if (deltaMinutes < 60) return `${deltaMinutes}min atras`;
+    const deltaHours = Math.round(deltaMinutes / 60);
+    if (deltaHours < 48) return `${deltaHours}h atras`;
+    return `${Math.round(deltaHours / 24)}d atras`;
+}
+
+/**
+ * @param {{ lastStatus: 'failed' | 'ok'; lastFailureAt: number | null; lastSuccessAt: number | null }} health
+ * @returns {boolean}
+ */
+function isByokHealthCurrentlyFailed(health) {
+    return health.lastStatus === 'failed' && (health.lastFailureAt ?? 0) >= (health.lastSuccessAt ?? 0);
+}
+
+/**
+ * @param {import('#copilot/sdk/types').ModelInfo} model
+ * @returns {ReturnType<typeof readByokProviderModelHealth>}
+ */
+function readHealthForByokModel(model) {
+    const meta = getByokModelMetadata(model);
+    const exact = readByokProviderModelHealth({
+        profile: meta?.profile ?? null,
+        provider: meta?.provider ?? null,
+        model: model.id,
+    });
+    if (exact) return exact;
+    return (
+        listByokProviderModelHealth().find(
+            (health) =>
+                health.model === model.id &&
+                ((meta?.profile && health.profile === meta.profile) || (meta?.provider && health.provider === meta.provider)),
+        ) ?? null
+    );
+}
+
+/**
+ * @param {import('#copilot/sdk/types').ModelInfo} model
+ * @returns {boolean}
+ */
+function isByokModelKnownFailed(model) {
+    const health = readHealthForByokModel(model);
+    return health ? isByokHealthCurrentlyFailed(health) : false;
+}
+
+/**
+ * @param {{ name: string; preset: string | null; providerType: string | null; model: string | null }} profile
+ * @returns {ReturnType<typeof readByokProviderModelHealth>}
+ */
+function readHealthForByokProfile(profile) {
+    const providerCandidates = [profile.preset, profile.providerType].filter(Boolean);
+    const exact = readByokProviderModelHealth({
+        profile: profile.name,
+        provider: profile.preset ?? profile.providerType,
+        model: profile.model,
+    });
+    if (exact) return exact;
+    return (
+        listByokProviderModelHealth().find(
+            (health) =>
+                health.profile === profile.name ||
+                Boolean(profile.model && health.model === profile.model && providerCandidates.includes(health.provider)),
+        ) ?? null
+    );
+}
+
+/**
+ * @param {ReturnType<typeof readByokProviderModelHealth>} health
+ * @returns {string}
+ */
+function renderByokHealthTag(health) {
+    if (!health) return 'chat=?';
+    if (isByokHealthCurrentlyFailed(health)) {
+        return `chat=failed(${formatByokHealthAge(health.lastFailureAt)}${health.failureCount > 1 ? `,x${health.failureCount}` : ''})`;
+    }
+    return `chat=ok(${formatByokHealthAge(health.lastSuccessAt)}${health.successCount > 1 ? `,x${health.successCount}` : ''})`;
+}
+
+/**
  * @param {import('#copilot/sdk/types').ModelInfo} model
  * @param {{ profileName?: string | null; preset?: string | null; providerType?: string | null }} source
  * @returns {import('#copilot/sdk/types').ModelInfo}
@@ -478,6 +573,8 @@ function renderModelTags(model) {
     if (meta?.rateLimits?.dailyRequests) tags.push(`RPD=${meta.rateLimits.dailyRequests}`);
     if (meta?.provider) tags.push(`provider=${meta.provider}`);
     if (meta?.profile) tags.push(`profile=${meta.profile}`);
+    const health = readHealthForByokModel(model);
+    if (health) tags.push(renderByokHealthTag(health));
     const inputs = meta?.inputModalities?.length ? meta.inputModalities.join('+') : '';
     if (inputs && inputs !== 'text') tags.push(`in=${inputs}`);
     return tags.join(' · ');
@@ -528,6 +625,15 @@ function renderStatus(projection, println) {
     ].filter(Boolean);
     if (limitParts.length > 0) {
         println(`    limits:        \x1b[33m${limitParts.join(' · ')}\x1b[0m`);
+    }
+    const activeHealth = readHealthForByokProfile({
+        name: summary.profile ?? summary.preset ?? 'runtime',
+        preset: summary.preset,
+        providerType: summary.providerType,
+        model: summary.model,
+    });
+    if (activeHealth) {
+        println(`    chatHealth:    \x1b[33m${renderByokHealthTag(activeHealth)}\x1b[0m`);
     }
     println(`    modelList:     ${summary.modelList.count} modelo(s)`);
     for (const warning of summary.warnings) {
@@ -762,13 +868,15 @@ export async function cmdByok({ println }, arg) {
         for (const profile of profiles) {
             const active = profile.name === summary.profile ? ' \x1b[32m← ativo\x1b[0m' : '';
             const metadata = profile.metadataKeys.length ? ` · meta=${profile.metadataKeys.join(',')}` : '';
+            const health = readHealthForByokProfile(profile);
+            const healthLabel = ` · ${renderByokHealthTag(health)}`;
             const readiness =
                 profile.auth.bearerTokenConfigured || profile.auth.apiKeyConfigured || profile.auth.headersConfigured
                     ? '\x1b[32mready\x1b[0m'
                     : '\x1b[33msem credencial\x1b[0m';
             println(`    \x1b[33m${profile.name}\x1b[0m${active} · ${readiness}`);
             println(
-                `      \x1b[90mpreset=${profile.preset ?? '-'} · provider=${profile.providerType ?? '-'} · model=${profile.model ?? '-'} · auth=${renderProfileAuth(profile)}${metadata}\x1b[0m`,
+                `      \x1b[90mpreset=${profile.preset ?? '-'} · provider=${profile.providerType ?? '-'} · model=${profile.model ?? '-'} · auth=${renderProfileAuth(profile)}${metadata}${healthLabel}\x1b[0m`,
             );
             println(
                 `      \x1b[90mcomandos: /byok use ${profile.name} · /byok models refresh provider:${profile.preset ?? profile.providerType ?? profile.name} · /byok recommend provider:${profile.preset ?? profile.providerType ?? profile.name} free reasoning safe\x1b[0m`,

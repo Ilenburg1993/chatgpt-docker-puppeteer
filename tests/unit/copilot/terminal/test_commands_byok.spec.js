@@ -2,11 +2,13 @@
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-const { chmod, discoverConfiguredByokModelsFromEnv, loadDotenv, readFile, readTerminalByokProjection, readTerminalRuntimeState, rename, writeFile } =
+const { chmod, discoverConfiguredByokModelsFromEnv, listByokProviderModelHealth, loadDotenv, readByokProviderModelHealth, readFile, readTerminalByokProjection, readTerminalRuntimeState, rename, writeFile } =
     vi.hoisted(() => ({
         chmod: vi.fn(),
         discoverConfiguredByokModelsFromEnv: vi.fn(),
+        listByokProviderModelHealth: vi.fn(() => []),
         loadDotenv: vi.fn(),
+        readByokProviderModelHealth: vi.fn(() => null),
         readFile: vi.fn(),
         readTerminalByokProjection: vi.fn(),
         readTerminalRuntimeState: vi.fn(() => ({ contextWindow: null })),
@@ -33,6 +35,11 @@ vi.mock('#copilot/config', () => ({
 vi.mock('../../../../src/copilot/terminal/frontend/index.js', () => ({
     readTerminalByokProjection,
     readTerminalRuntimeState,
+}));
+
+vi.mock('../../../../src/copilot/terminal/state/byok-provider-health.js', () => ({
+    listByokProviderModelHealth,
+    readByokProviderModelHealth,
 }));
 
 const { cmdByok } = await import('../../../../src/copilot/terminal/commands/byok.js');
@@ -84,7 +91,11 @@ describe('terminal /byok command', () => {
         discoverConfiguredByokModelsFromEnv.mockReset();
         chmod.mockReset();
         chmod.mockResolvedValue(undefined);
+        listByokProviderModelHealth.mockReset();
+        listByokProviderModelHealth.mockReturnValue([]);
         loadDotenv.mockReset();
+        readByokProviderModelHealth.mockReset();
+        readByokProviderModelHealth.mockReturnValue(null);
         readFile.mockReset();
         readTerminalByokProjection.mockReset();
         readTerminalRuntimeState.mockReset();
@@ -149,6 +160,23 @@ describe('terminal /byok command', () => {
     });
 
     it('lista providers disponíveis com comandos operacionais redigidos', async () => {
+        const now = Date.now();
+        readByokProviderModelHealth.mockReturnValue(null);
+        listByokProviderModelHealth.mockReturnValue([
+            {
+                key: 'groq-free|groq|openai/gpt-oss-120b',
+                profile: 'groq-free',
+                provider: 'groq',
+                model: 'openai/gpt-oss-120b',
+                lastStatus: 'ok',
+                failureCount: 0,
+                successCount: 2,
+                lastFailureAt: null,
+                lastSuccessAt: now,
+                lastMessage: null,
+                lastErrorContext: null,
+            },
+        ]);
         mockProjection({
             profiles: [
                 {
@@ -190,6 +218,7 @@ describe('terminal /byok command', () => {
         expect(ctx.output()).toContain('/byok use groq-free');
         expect(ctx.output()).toContain('/byok models refresh provider:groq');
         expect(ctx.output()).toContain('meta=tier,owner');
+        expect(ctx.output()).toContain('chat=ok');
         expect(ctx.output()).not.toContain('secret');
     });
 
@@ -618,6 +647,104 @@ describe('terminal /byok command', () => {
         expect(ctx.output()).not.toContain('free-low-limit');
         expect(ctx.output()).not.toContain('paid-vision');
         expect(ctx.output()).toContain('ok para uso geral');
+    });
+
+    it('exclui de recommend safe modelo com falha operacional recente', async () => {
+        const now = Date.now();
+        listByokProviderModelHealth.mockReturnValue([
+            {
+                key: 'cerebras-free|cerebras|gpt-oss-120b',
+                profile: 'cerebras-free',
+                provider: 'cerebras',
+                model: 'gpt-oss-120b',
+                lastStatus: 'failed',
+                failureCount: 3,
+                successCount: 0,
+                lastFailureAt: now,
+                lastSuccessAt: null,
+                lastMessage: 'Connection error',
+                lastErrorContext: 'model_call',
+            },
+        ]);
+        discoverConfiguredByokModelsFromEnv.mockResolvedValue({
+            models: [
+                {
+                    id: 'gpt-oss-120b',
+                    capabilities: { supports: { reasoningEffort: true, vision: false }, limits: { max_context_window_tokens: 131072 } },
+                    byok: {
+                        freeTier: true,
+                        provider: 'cerebras',
+                        profile: 'cerebras-free',
+                        rateLimits: { maxRequestTokens: 64000 },
+                    },
+                },
+                {
+                    id: 'kilo/healthy',
+                    capabilities: { supports: { reasoningEffort: true, vision: false }, limits: { max_context_window_tokens: 200000 } },
+                    byok: {
+                        freeTier: true,
+                        provider: 'kilo-code',
+                        profile: 'kilo',
+                        rateLimits: { maxRequestTokens: 128000 },
+                    },
+                },
+            ],
+            source: 'remote',
+            endpoint: 'https://provider.example/v1/models',
+            fromCache: false,
+            error: null,
+        });
+        mockProjection();
+        const ctx = mockCtx();
+
+        await cmdByok({ println: ctx.println }, 'recommend free reasoning safe 5');
+
+        expect(ctx.output()).toContain('kilo/healthy');
+        expect(ctx.output()).not.toContain('gpt-oss-120b');
+    });
+
+    it('mostra falha operacional em models quando safe não foi solicitado', async () => {
+        const now = Date.now();
+        listByokProviderModelHealth.mockReturnValue([
+            {
+                key: 'cerebras-free|cerebras|gpt-oss-120b',
+                profile: 'cerebras-free',
+                provider: 'cerebras',
+                model: 'gpt-oss-120b',
+                lastStatus: 'failed',
+                failureCount: 1,
+                successCount: 0,
+                lastFailureAt: now,
+                lastSuccessAt: null,
+                lastMessage: 'Connection error',
+                lastErrorContext: 'model_call',
+            },
+        ]);
+        discoverConfiguredByokModelsFromEnv.mockResolvedValue({
+            models: [
+                {
+                    id: 'gpt-oss-120b',
+                    capabilities: { supports: { reasoningEffort: true, vision: false }, limits: { max_context_window_tokens: 131072 } },
+                    byok: {
+                        freeTier: true,
+                        provider: 'cerebras',
+                        profile: 'cerebras-free',
+                        rateLimits: { maxRequestTokens: 64000 },
+                    },
+                },
+            ],
+            source: 'remote',
+            endpoint: 'https://api.cerebras.ai/v1/models',
+            fromCache: false,
+            error: null,
+        });
+        mockProjection();
+        const ctx = mockCtx();
+
+        await cmdByok({ println: ctx.println }, 'models free reasoning 5');
+
+        expect(ctx.output()).toContain('gpt-oss-120b');
+        expect(ctx.output()).toContain('chat=failed');
     });
 
     it('recomenda modelos BYOK filtrando provider e modelos medidos', async () => {

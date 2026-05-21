@@ -21,8 +21,7 @@ const DEFAULT_POST_ANSWER_DELAY_MS = 6_000;
 const DEFAULT_POST_ASK_CONTINUATION_WAIT_MS = 45_000;
 const ANSI_RE = /\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])/g;
 const SECRET_ENV_RE = /(?:API[_-]?KEY|TOKEN|SECRET|PASSWORD|BEARER)/iu;
-const POST_ASK_FINAL_RE =
-    /(?:POST-ASK-CANONICAL-FINAL|Teste can[oô]nico|Usu[aá]rio confirmou SIM|confirmou SIM|respondeu SIM|Sistema operacional)/iu;
+const POST_ASK_FINAL_RE = /POST-ASK-CANONICAL-FINAL:\s*usu[aá]rio confirmou SIM/iu;
 const TURN_SETTLED_AFTER_ASK_RE =
     /(?:Resposta concluída|Turno concluído; aguardando próxima mensagem|Turno do assistente concluído)/iu;
 
@@ -649,7 +648,7 @@ function evaluateOutput(plain, sseSummary, exportSummary) {
         /^\s*\[LLM-B\]\s+Mensagem/u,
         /DELTA-CANONICAL-8/u,
     );
-    const postAskFinalMarker = String.raw`(?:POST-ASK-CANONICAL-FINAL|Teste can[oô]nico|Usu[aá]rio confirmou SIM|confirmou SIM|respondeu SIM|Sistema operacional)`;
+    const postAskFinalMarker = String.raw`POST-ASK-CANONICAL-FINAL:\s*usu[aá]rio confirmou SIM`;
     const postAskFinalRe = new RegExp(postAskFinalMarker, 'iu');
     const finalRenderedByLiveTurn = terminalBlockContains(
         preEventsPlain,
@@ -1093,6 +1092,15 @@ function evaluateByokRealOutput(plain, secretValues, { profile, altProfile, mode
                   ? `BYOK user-message usage classification observed=${byokUsageClassified ? 'yes' : 'no'}`
                   : 'no BYOK user turn opened in this probe',
         },
+        {
+            id: 'byok-real-operator-health',
+            pass:
+                !byokTurnOpened ||
+                (byokProviderBlocked ? /chat=failed/i.test(plain) : /chat=ok/i.test(plain) || /chat=\?/i.test(plain)),
+            detail: byokProviderBlocked
+                ? 'BYOK provider failure was reflected in operator health'
+                : 'BYOK provider health cockpit rendered after live turn or stayed unknown before a turn',
+        },
     ];
     return criteria;
 }
@@ -1383,6 +1391,10 @@ async function main() {
             write('/events 100 --raw');
             write('/errors 10');
             write('/health');
+            if (byokReal) {
+                write('/byok providers');
+                write('/byok recommend reasoning safe 8');
+            }
             write(`/export ${exportArg}`);
             setTimeout(() => {
                 if (!quitSent) {
@@ -1463,6 +1475,10 @@ async function main() {
             }
             setTimeout(() => {
                 write('/activity 40');
+                if (byokReal) {
+                    write('/byok providers');
+                    write('/byok recommend reasoning safe 8');
+                }
                 write('/events 100 --raw');
                 write('/errors 10');
                 if (!quitSent) {

@@ -54,6 +54,10 @@ import {
     terminalThemeText,
     withTerminalTurnCorrelation,
 } from '../state/events/index.js';
+import {
+    recordByokProviderModelCallFailure,
+    recordByokProviderModelCallSuccess,
+} from '../state/byok-provider-health.js';
 import { renderTerminalIntent } from './intent-renderer.js';
 import { compactTerminalToolText } from './tool-activity-presenter.js';
 import {
@@ -437,6 +441,19 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, regi
         }
 
         if (isByokModelCall) {
+            recordByokProviderModelCallFailure({
+                profile: typeof evt?.['byokProfile'] === 'string' ? evt['byokProfile'] : null,
+                provider:
+                    typeof evt?.['byokProviderType'] === 'string'
+                        ? evt['byokProviderType']
+                        : typeof evt?.['byokPreset'] === 'string'
+                          ? evt['byokPreset']
+                          : null,
+                model: typeof evt?.['byokModel'] === 'string' ? evt['byokModel'] : null,
+                message: msg,
+                errorContext,
+                timestamp: now,
+            });
             completeTerminalTurnMaterialization({
                 timestamp: now,
                 status: 'failed',
@@ -677,6 +694,25 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, regi
         const billing = normalizeUsageBilling(evt);
         broadcastSse(EMITTER_LLM_USAGE, withAgentSseEnvelope(evt, 'agent/llm.usage'));
         if (premiumRequest) return;
+
+        if (evt?.['byokProvider'] === true) {
+            recordByokProviderModelCallSuccess({
+                profile: typeof evt?.['byokProfile'] === 'string' ? evt['byokProfile'] : null,
+                provider:
+                    typeof evt?.['byokPreset'] === 'string'
+                        ? evt['byokPreset']
+                        : typeof evt?.['byokProviderType'] === 'string'
+                          ? evt['byokProviderType']
+                          : null,
+                model:
+                    typeof evt?.['effectiveModel'] === 'string'
+                        ? evt['effectiveModel']
+                        : typeof evt?.['model'] === 'string'
+                          ? evt['model']
+                          : null,
+                timestamp: typeof evt?.['ts'] === 'number' ? evt['ts'] : Date.now(),
+            });
+        }
 
         const detail = formatLlmUsageDetail(evt, billing);
         const showUsage = getShowUsage();
