@@ -416,7 +416,9 @@ describe('terminal /byok command', () => {
         );
         expect(ctx.output()).toContain('BYOK agent probe');
         expect(ctx.output()).toContain('toolCalls=0');
-        expect(ctx.output()).toContain('tool calling + ask_user');
+        expect(ctx.output()).toContain('marker=0');
+        expect(ctx.output()).toContain('read=0');
+        expect(ctx.output()).toContain('tools representativas + ask_user');
         expect(ctx.output()).not.toContain('token');
     });
 
@@ -1118,6 +1120,29 @@ describe('terminal /byok command', () => {
     });
 
     it('recomenda modelos BYOK com filtros e alerta limites baixos', async () => {
+        const now = Date.now();
+        readByokProviderModelHealth.mockImplementation(({ model }) =>
+            model === 'free-comfortable'
+                ? {
+                      key: 'openrouter|openrouter|free-comfortable',
+                      profile: null,
+                      provider: 'openrouter',
+                      model,
+                      lastStatus: 'ok',
+                      failureCount: 0,
+                      successCount: 1,
+                      lastFailureAt: null,
+                      lastSuccessAt: now,
+                      lastMessage: null,
+                      lastErrorContext: null,
+                      agentProbeStatus: 'ok',
+                      agentProbeFailureCount: 0,
+                      agentProbeSuccessCount: 1,
+                      lastAgentProbeFailureAt: null,
+                      lastAgentProbeSuccessAt: now,
+                  }
+                : null,
+        );
         discoverConfiguredByokModelsFromEnv.mockResolvedValue({
             models: [
                 {
@@ -1161,6 +1186,34 @@ describe('terminal /byok command', () => {
         expect(ctx.output()).toContain('ok para uso geral');
         expect(ctx.output()).toContain('/byok probe agent model:free-comfortable');
         expect(ctx.output()).toContain('live fake descartável');
+    });
+
+    it('na recomendacao safe exige probe agente positivo antes de promover modelo ao operador', async () => {
+        discoverConfiguredByokModelsFromEnv.mockResolvedValue({
+            models: [
+                {
+                    id: 'openrouter/unverified',
+                    capabilities: { supports: { reasoningEffort: true, vision: false }, limits: { max_context_window_tokens: 200000 } },
+                    byok: {
+                        freeTier: true,
+                        rateLimits: { maxRequestTokens: 128000 },
+                        provider: 'openrouter',
+                    },
+                },
+            ],
+            source: 'remote',
+            endpoint: 'https://provider.example/v1/models',
+            fromCache: false,
+            error: null,
+        });
+        mockProjection();
+        const ctx = mockCtx();
+
+        await cmdByok({ println: ctx.println }, 'recommend free reasoning safe 2');
+
+        expect(ctx.output()).toContain('sem probe agente positivo');
+        expect(ctx.output()).toContain('/byok probe agent model:openrouter/unverified');
+        expect(ctx.output()).toContain('Use /byok models para explorar catalogo bruto');
     });
 
     it('distingue health de chat vindo de probe e de turno vivo no ranking BYOK', async () => {
@@ -1259,6 +1312,24 @@ describe('terminal /byok command', () => {
                 lastSuccessAt: null,
                 lastMessage: 'Connection error',
                 lastErrorContext: 'model_call',
+            },
+            {
+                key: 'kilo|kilo-code|kilo/healthy',
+                profile: 'kilo',
+                provider: 'kilo-code',
+                model: 'kilo/healthy',
+                lastStatus: 'ok',
+                failureCount: 0,
+                successCount: 1,
+                lastFailureAt: null,
+                lastSuccessAt: now,
+                lastMessage: null,
+                lastErrorContext: null,
+                agentProbeStatus: 'ok',
+                agentProbeFailureCount: 0,
+                agentProbeSuccessCount: 1,
+                lastAgentProbeFailureAt: null,
+                lastAgentProbeSuccessAt: now,
             },
         ]);
         discoverConfiguredByokModelsFromEnv.mockResolvedValue({
@@ -1406,6 +1477,29 @@ describe('terminal /byok command', () => {
     });
 
     it('recomenda modelos BYOK considerando o orçamento vivo da sessão atual', async () => {
+        const now = Date.now();
+        readByokProviderModelHealth.mockImplementation(({ model }) =>
+            model === 'openrouter-roomy'
+                ? {
+                      key: 'openrouter|openrouter|openrouter-roomy',
+                      profile: null,
+                      provider: 'openrouter',
+                      model,
+                      lastStatus: 'ok',
+                      failureCount: 0,
+                      successCount: 1,
+                      lastFailureAt: null,
+                      lastSuccessAt: now,
+                      lastMessage: null,
+                      lastErrorContext: null,
+                      agentProbeStatus: 'ok',
+                      agentProbeFailureCount: 0,
+                      agentProbeSuccessCount: 1,
+                      lastAgentProbeFailureAt: null,
+                      lastAgentProbeSuccessAt: now,
+                  }
+                : null,
+        );
         readTerminalRuntimeState.mockReturnValue({
             contextWindow: { tokens: 63000, tokenLimit: 200000, utilization: 0.315 },
         });

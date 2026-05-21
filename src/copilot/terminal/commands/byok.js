@@ -572,6 +572,23 @@ function renderEmptyByokFilterDiagnostics(println, candidateModels, filters, run
 }
 
 /**
+ * @param {(text: string) => void} println
+ * @param {import('#copilot/sdk/types').ModelInfo[]} budgetSafeModels
+ * @returns {void}
+ */
+function renderSafeRecommendationEvidenceDiagnostics(println, budgetSafeModels) {
+    const unverified = budgetSafeModels.filter((model) => !isByokModelAgentProbeVerified(model));
+    if (unverified.length === 0) return;
+    println(
+        `    \x1b[33mA recomendacao safe removeu ${unverified.length} candidato(s) sem probe agente positivo de tools + ask_user.\x1b[0m`,
+    );
+    for (const model of unverified.slice(0, 4)) {
+        println(`      \x1b[90m- ${model.id}: ${renderByokRecommendationActionHint(model)}\x1b[0m`);
+    }
+    println('    \x1b[90mUse /byok models para explorar catalogo bruto; rode /byok probe agent antes de promover o modelo para a sessao viva.\x1b[0m');
+}
+
+/**
  * @param {import('#copilot/sdk/types').ModelInfo} model
  * @returns {string}
  */
@@ -693,6 +710,19 @@ function readHealthForByokModel(model) {
 function isByokModelKnownFailed(model) {
     const health = readHealthForByokModel(model);
     return health ? isByokHealthCurrentlyFailed(health) || isByokAgentProbeCurrentlyFailed(health) : false;
+}
+
+/**
+ * "safe" em recomendacao nao pode significar apenas "nao falhou ainda". O terminal opera como agente: para uma
+ * selecao promovida ao operador, precisamos de evidencia positiva de tools + `ask_user` na sonda descartavel.
+ *
+ * @param {import('#copilot/sdk/types').ModelInfo} model
+ * @returns {boolean}
+ */
+function isByokModelAgentProbeVerified(model) {
+    const health = readHealthForByokModel(model);
+    if (!health || health.agentProbeStatus !== 'ok') return false;
+    return (health.lastAgentProbeSuccessAt ?? 0) >= (health.lastAgentProbeFailureAt ?? 0);
 }
 
 /**
@@ -1328,7 +1358,7 @@ export async function cmdByok({ println }, arg) {
         const selection = buildByokProbeSelection(mode === 'agent' || explicitChatMode ? rest.slice(1) : rest);
         println(`\n  \x1b[36mBYOK ${mode} probe\x1b[0m`);
         println(
-            `  \x1b[90mEscopo: sessão SDK descartável; não troca o dialog loop nem grava transcript live.${mode === 'chat' ? ' Chat nega tools.' : ' Agent exige tool customizada + ask_user com resposta sintética.'}${selection.profile ? ` profile=${selection.profile}` : ''}${selection.model ? ` model=${selection.model}` : ''}\x1b[0m`,
+            `  \x1b[90mEscopo: sessão SDK descartável; não troca o dialog loop nem grava transcript live.${mode === 'chat' ? ' Chat nega tools.' : ' Agent exige tools representativas do terminal + ask_user com resposta sintética.'}${selection.profile ? ` profile=${selection.profile}` : ''}${selection.model ? ` model=${selection.model}` : ''}\x1b[0m`,
         );
         const probe = await (mode === 'agent' ? probeTerminalConfiguredByokAgent : probeTerminalConfiguredByokChat)({
             env: selection.env,
@@ -1371,7 +1401,7 @@ export async function cmdByok({ println }, arg) {
         );
         if (mode === 'agent') {
             println(
-                `    agente:    toolCalls=${Number(Reflect.get(probe, 'toolCallCount') ?? 0)} · ask=${Number(Reflect.get(probe, 'userInputRequestCount') ?? 0)} · answer=${Number(Reflect.get(probe, 'userInputAnswerCount') ?? 0)}`,
+                `    agente:    toolCalls=${Number(Reflect.get(probe, 'toolCallCount') ?? 0)} · marker=${Number(Reflect.get(probe, 'markerToolCallCount') ?? 0)} · read=${Number(Reflect.get(probe, 'readToolCallCount') ?? 0)} · ask=${Number(Reflect.get(probe, 'userInputRequestCount') ?? 0)} · answer=${Number(Reflect.get(probe, 'userInputAnswerCount') ?? 0)}`,
             );
         }
         if (probe.sessionId) {
@@ -1390,7 +1420,7 @@ export async function cmdByok({ println }, arg) {
         }
         println(
             mode === 'agent'
-                ? '  \x1b[90mAgent probe confirma a fronteira exigida pelo terminal: streaming + tool calling + ask_user. Chat probe isolado continua disponível com /byok probe chat.\x1b[0m\n'
+                ? '  \x1b[90mAgent probe confirma a fronteira exigida pelo terminal: streaming + tools representativas + ask_user. Chat probe isolado continua disponível com /byok probe chat.\x1b[0m\n'
                 : '  \x1b[90mCatálogo mostra oferta; chat probe confirma conversa canária. Para validar runtime agente, rode /byok probe agent antes do live.\x1b[0m\n',
         );
         return;
@@ -1516,9 +1546,12 @@ export async function cmdByok({ println }, arg) {
         const runtimeBudget = readCurrentByokRequestBudget();
         const discovered = await discoverByokCatalogForCommand(projection, filters);
         const modelList = discovered.models.length > 0 ? discovered.models : models;
-        const rankedRecommended = rankByokModels(modelList).filter((model) =>
+        const budgetSafeRecommendations = rankByokModels(modelList).filter((model) =>
             matchesRecommendFilters(model, filters, runtimeBudget),
         );
+        const rankedRecommended = filters.avoidLowLimit
+            ? budgetSafeRecommendations.filter((model) => isByokModelAgentProbeVerified(model))
+            : budgetSafeRecommendations;
         const recommendedEntries = (filters.grouped
             ? groupByokModelVariants(rankedRecommended)
             : rankedRecommended.map((model) => ({ model, variants: [] }))
@@ -1546,6 +1579,7 @@ export async function cmdByok({ println }, arg) {
         if (recommendedEntries.length === 0) {
             println('    \x1b[33mNenhum modelo atende aos filtros. Tente remover filtros ou rode /byok models refresh.\x1b[0m\n');
             renderEmptyByokFilterDiagnostics(println, modelList, filters, runtimeBudget);
+            if (filters.avoidLowLimit) renderSafeRecommendationEvidenceDiagnostics(println, budgetSafeRecommendations);
             return;
         }
         let index = 1;

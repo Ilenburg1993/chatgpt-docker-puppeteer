@@ -1236,6 +1236,37 @@ Correção desta revisão:
 
 Status: implementado no executor, coberto por testes unitários e validado em live positivo; o alerta/health negativo já foi capturado no artefato diagnóstico da borda vazia.
 
+### A56. Probe agente e recomendacao `safe` ainda precisavam separar capacidade de promocao operacional
+
+Situacao atual observada:
+
+- O probe agente anterior era util, mas estreito: uma tool canaria interna + `ask_user` podia passar enquanto a live real ainda exercia nomes/fluxos diferentes das tools centrais do terminal.
+- A reexecucao Kilo com probe reforcado mostrou o caminho feliz: `marker=1`, `read=1`, `ask=1`, circuito vivo completo com `report_intent`, `read_file_content`, deltas, `ask_user` e pos-ask.
+- NVIDIA `openai/gpt-oss-120b` mostrou a borda oposta. O modelo passou chat e probe agente reforcado, materializou `report_intent` e `read_file_content` no turno vivo, mas escreveu a pergunta `ASK-CANONICAL` como Markdown/JSON publico em vez de chamar `ask_user` real.
+- Antes desta rodada, `/byok recommend ... safe` ainda promovia muitos modelos nunca sondados so porque catalogo, custo e budget pareciam favoraveis.
+
+Situacao ideal:
+
+- O probe agente deve exigir identidade de tool representativa do terminal, nao apenas uma custom tool sintética.
+- O live runner deve distinguir tool real, ask real e protocolo textual encenado; a simulacao de `ask_user` no transcript e blocker, nao silencio ate timeout.
+- Catalogo e modelos continuam amplos para exploracao. Recomendacao `safe` e superficie de promocao: ela so deve sugerir candidato com budget adequado e evidencia positiva do probe agente que prova tools + `ask_user`.
+
+Correcao desta revisao:
+
+- `/byok probe agent` ganhou tool sintética com nome canônico `read_file_content`, alem do marker interno e da resposta sintética de `ask_user`; a UX mostra `marker`, `read`, `ask` e `answer` separadamente.
+- O runner live endureceu o prompt canônico para proibir `ask_user` simulado e passou a detectar tanto JSON de tool quanto pergunta textual/JSON `ASK-CANONICAL` sem `[ASK]` real como `byok-live-tool-protocol-missed`; o gate tolera o Markdown preservado pelo renderer no marco `DELTA-CANONICAL-8`, em vez de transformar negrito do assistente em timeout opaco.
+- O preflight Gemini negativo agora encerra antes de abrir transcript vivo quando chat/agent probes falham por credencial/endpoint.
+- `/byok recommend ... safe` passou a exigir `agentProbeStatus=ok`; modelos nao sondados ficam no catalogo e o caso sem recomendacao segura aponta explicitamente `/byok probe agent`.
+
+Validacao:
+
+- Kilo positivo: `artifacts/terminal-live/byok-kilo-representative-agent-probe-2026-05-21-r2/summary.md` passou com probe representativo e circuito vivo completo.
+- Gemini negativo: `artifacts/terminal-live/byok-gemini-preflight-gate-2026-05-21/summary.md` ficou bloqueado por preflight descartavel, sem mutar o turno do operador.
+- NVIDIA evidenciou pergunta textual no live em `artifacts/terminal-live/byok-nvidia-representative-agent-probe-2026-05-21/summary.md`; a reexecucao refinada em `artifacts/terminal-live/byok-nvidia-textual-ask-gate-r2-2026-05-21/summary.md` encerrou em `byok-live-tool-protocol-missed` com `ask_user_text+ask_user_question_json`, sem esperar o timeout.
+- Testes unitarios de `/byok` cobrem probe representativo e recomendacao `safe` que exige evidencia de probe agente.
+
+Status: implementado nesta revisao para probe representativo, harness e promocao segura; falta decidir se `terminal workflow` vira terceira dimensão persistida de health ou permanece como evidencia de artefato live canônico.
+
 ## Hipóteses Externas Rejeitadas Ou Reclassificadas
 
 ### H1. "boot-hub assume sucesso"
@@ -1661,6 +1692,9 @@ Fase J6. Testes
 - J6.42 Garantir que probes BYOK descartáveis removam a sessão SDK persistida depois do diagnóstico, em vez de poluir `/session`. Status: PASS; `withEphemeralSession()` está coberto por unit test e o runner live BYOK real mede `/session sdk` antes/depois dos probes. A prova NVIDIA sem turno do operador em `artifacts/terminal-live/byok-nvidia-probe-session-cleanup-nopr-2026-05-21/summary.md` manteve o inventário legado `probe-residue` estável (`3 -> 3`), sem criar novo canário.
 - J6.43 Rodar live real Groq com limite baixo e exigir blocker de admissão antes de provider/streaming quando o envelope terminal não cabe. Status: feito em `artifacts/terminal-live/byok-groq-qwen-admission-runner-2026-05-21/summary.md`.
 - J6.44 Rodar live Kilo completo após o hardening de turno vazio e tornar o harness consciente de `dialog.turn_end` com `replySuppressed=true`. Status: PASS em `artifacts/terminal-live/byok-kilo-canonical-pass-2026-05-21-r2/summary.md`, cobrindo probes descartáveis, delta parcial/final, tools, `ask_user`, resposta humana, pós-ask, provider cockpit, health, SSE/JSONL/export e ausência de duplicação.
+- J6.45 Reforcar `/byok probe agent` com uma tool representativa do terminal, nao apenas marker interno, e provar o caminho feliz no live Kilo. Status: feito; `read_file_content` sintético entrou no probe e `artifacts/terminal-live/byok-kilo-representative-agent-probe-2026-05-21-r2/summary.md` passou.
+- J6.46 Fazer o live runner bloquear pergunta `ask_user` simulada como texto/JSON publico quando o terminal nao recebeu `user_input.requested`. Status: feito no harness; NVIDIA abriu a evidencia negativa em `artifacts/terminal-live/byok-nvidia-representative-agent-probe-2026-05-21/summary.md` e a reexecucao em `artifacts/terminal-live/byok-nvidia-textual-ask-gate-r2-2026-05-21/summary.md` classificou `ask_user_text+ask_user_question_json` como `byok-live-tool-protocol-missed` em 35s.
+- J6.47 Promover em `/byok recommend ... safe` somente modelos com probe agente positivo de tools + `ask_user`, mantendo o catalogo amplo em `/byok models`. Status: feito com unit tests e diagnostico acionavel para candidatos ainda nao sondados.
 
 Fase J7. Providers amplos
 
@@ -1678,7 +1712,7 @@ Fase J7. Providers amplos
 - J7.12 Mistral. Status: preset, key local e catalogo real `64` modelos. Falta turno funcional live.
 - J7.13 Hugging Face Router. Status: preset, key local e catalogo real `129` modelos. Falta turno funcional live e filtros por politica `:fastest|:cheapest|:preferred`.
 - J7.14 Cloudflare Workers AI. Status: preset e key/account local; OpenAI-compatible chat suportado, mas `/models` retornou `405`, entao fallback estatico esta correto. Falta probe de chat.
-- J7.15 NVIDIA NIM. Status: preset, key local e catalogo real `117` modelos. Falta turno funcional live.
+- J7.15 NVIDIA NIM. Status: preset, key local e catalogo real `117` modelos. `openai/gpt-oss-120b` passou probes descartaveis reforcados e tools reais no live, mas simulou `ask_user` como Markdown/JSON publico; falta modelo/configuracao com interacao humana real no turno canônico.
 - J7.16 Cerebras. Status: preset, key local, catalogo real `4` modelos e live negativo validado: provider falha em `model_call`, terminal bloqueia fallback Copilot, encerra turno como `failed` e orienta troca de modelo/provider. Falta descobrir modelo/configuração funcional.
 - J7.17 Chutes. Status: preset, key local e catalogo real `13` modelos com pricing. Falta turno funcional live.
 - J7.18 Z.AI. Status: preset, key local e catalogo real `7` modelos. Falta turno funcional live.
@@ -1821,7 +1855,7 @@ Implementado:
 - O cockpit BYOK agora separa saúde de `chat` e saúde de `agent`: catálogo remoto, canário textual e compatibilidade de tool/`ask_user` não são mais tratados como a mesma evidência.
 - O health de chat BYOK agora preserva a origem do último sucesso: `chat=ok(probe,...)` vem de chat probe descartável e `chat=ok(turno,...)` vem de usage BYOK de turno vivo. `/byok models` e `/byok recommend` herdam a distinção pelo mesmo tag canônico.
 - Live Kilo completo em `artifacts/terminal-live/byok-kilo-health-provenance-canonical-2026-05-21/summary.md` passou com delta parcial, bloco final único, `report_intent`, `read_file_content`, `ask_user`, resposta humana, pós-ask, `/events`, SSE/JSONL/export e sem duplicação; o cockpit mostrou `probe` antes do turno e `turno` após a usage BYOK real.
-- `/byok probe agent` abre uma sessão SDK fora do dialog loop com tool canária e resposta sintética de `ask_user`; o live Kilo sem PR validou `toolCalls=1`, `ask=1`, `answer=1`.
+- `/byok probe agent` abre uma sessão SDK fora do dialog loop com tools canárias que exercitam tanto uma identidade interna quanto o nome canônico `read_file_content`, além de resposta sintética de `ask_user`; uma sonda estreita que prova apenas uma custom tool não basta para liberar modelo para a live real do terminal.
 - `withEphemeralSession()` remove o estado SDK persistido de probes depois do cleanup, evitando que diagnósticos de modelo apareçam como sessões retomáveis do operador; o inventário ainda pode mostrar canários antigos criados antes desta limpeza.
 - O runner BYOK real passou a fotografar `/session sdk` antes e depois dos probes descartáveis; o live NVIDIA sem PR confirmou contagem estável de `probe-residue` (`3 -> 3`) em `artifacts/terminal-live/byok-nvidia-probe-session-cleanup-nopr-2026-05-21/summary.md`.
 - O live runner BYOK real no modo `--no-pr` agora valida probes de chat/agente sem exigir classificação de usage de um turno que não foi aberto.
@@ -1846,6 +1880,11 @@ Implementado:
 - Live OpenRouter sem PR pós-health gate passou em `artifacts/terminal-live/byok-openrouter-health-gate-router-nopr-2026-05-21/summary.md`: status/catálogo/recomendação/probes deixaram claro que catálogo e saúde são fatos distintos sem cair em Premium Request.
 - Live Ollama Cloud canônico passou em `artifacts/terminal-live/byok-ollama-cloud-canonical-2026-05-21/summary.md`: `qwen3-coder-next` validou probes, deltas, tools, `ask_user`, pós-ask, `/activity`, `/tools`, `/events`, `/health`, export e SSE/JSONL sem duplicação nem Premium Request.
 - Live NVIDIA sem PR passou em `artifacts/terminal-live/byok-nvidia-session-delete-cockpit-nopr-2026-05-21/summary.md`: o provider `nvidia-nim` validou probes descartáveis de chat/agente para `openai/gpt-oss-120b`, inventário `/session sdk` com binding BYOK e limpeza persistida anunciada no cockpit, troca auxiliar para Kilo, filtros/recommendation e ausência de uso Premium Request.
+- A live NVIDIA canônica em `artifacts/terminal-live/byok-nvidia-canonical-2026-05-21/summary.md` mostrou um gap mais fino: `openai/gpt-oss-120b` abriu deltas e usage `byok_user_message`, mas publicou JSON com nomes `report_intent`, `read_file_content` e `ask_user` como texto público em vez de materializar tools reais. O runner passou a reconhecer esse miss de protocolo BYOK explicitamente, coletar diagnóstico cedo e evitar que o caso se esconda atrás de timeout genérico.
+- A rodada Gemini negativa em `artifacts/terminal-live/byok-gemini-preflight-gate-2026-05-21/summary.md` agora prova a admissão correta: 403 nas probes descartáveis barra a live canônica antes de mutar transcript do operador, preservando cockpit/health para diagnóstico de credencial/endpoint.
+- O probe agente BYOK passou a exigir marker interno, `read_file_content` representativo e `ask_user`; Kilo validou o circuito inteiro em `artifacts/terminal-live/byok-kilo-representative-agent-probe-2026-05-21-r2/summary.md`.
+- A reexecucao NVIDIA em `artifacts/terminal-live/byok-nvidia-textual-ask-gate-r2-2026-05-21/summary.md` mostrou que tools reais ainda podem coexistir com `ask_user` simulado como texto/JSON. O runner agora nomeia essa borda como `byok-live-tool-protocol-missed`, reconhece `DELTA-CANONICAL-8` mesmo quando o assistente o envolve em Markdown e nao a deixa virar timeout opaco.
+- `/byok recommend ... safe` deixou de promover modelos nunca sondados: o catalogo bruto continua em `/byok models`, mas a recomendacao segura exige probe agente positivo e orienta o comando de probe quando nao ha evidencia.
 
 Próxima rodada recomendada:
 
@@ -1863,3 +1902,5 @@ Próxima rodada recomendada:
 12. Investigar Gemini 403 com probes de autenticação redigidos, distinguindo chave Google AI Studio, chave Google Cloud e endpoint OpenAI-compatible.
 13. Formalizar metadata de cotas gratuitas por provider (`freeLimit`, janela, RPM/TPM/RPD, fonte e data de observação) para reduzir dependência de texto livre em `profile-free`.
 14. Ampliar `/session sdk` para uma UX operacional de escolha/reentrada mais direta, decidindo se a pré-sessão advisory já basta ou se haverá gate explícito antes do attach sem confundir novo boot de sessão SDK com `/restart` do dialog loop nem com `/resume` do hub.
+15. Decidir se a compatibilidade `terminal workflow` deve virar terceira dimensão persistida de health BYOK ou permanecer como evidencia do live canônico; `chat` e `agent probe` ja estao separados e `safe` passou a exigir probe agente positivo.
+16. Reexecutar NVIDIA com outro modelo/configuracao, se disponivel, para procurar um caminho com `ask_user` real depois da evidencia de simulacao textual em `openai/gpt-oss-120b`.

@@ -85,6 +85,8 @@ function buildScenarioPrompt() {
         'Em seguida escreva uma resposta pública longa, com frases separadas DELTA-CANONICAL-1 até DELTA-CANONICAL-8, para validar deltas parciais e final.',
         'Por fim chame ask_user perguntando exatamente "ASK-CANONICAL: responda SIM para fechar o teste".',
         'Depois que o usuário responder SIM, escreva uma última mensagem pública contendo exatamente "POST-ASK-CANONICAL-FINAL: usuário confirmou SIM".',
+        'Antes da resposta SIM, não escreva, cite nem antecipe o marcador POST-ASK-CANONICAL-FINAL.',
+        'A pergunta ASK-CANONICAL deve ser feita pela tool ask_user real; não a simule como texto, Markdown, JSON ou pseudo-tool no transcript público.',
         'Não use outras tools além de report_intent, read_file_content e ask_user.',
     ].join(' ');
 }
@@ -696,6 +698,26 @@ function detectLiveBlocker(plain, runtime = {}) {
                 'BYOK admission control contained the turn before provider streaming because the declared request budget is too small',
         };
     }
+    const byokPreflight = findByokRealPreflightProbeFailure(plain);
+    if (byokPreflight) {
+        return {
+            id: 'byok-preflight-probe-failed',
+            detail:
+                'disposable BYOK preflight blocked the canonical live turn before operator transcript mutation' +
+                `${byokPreflight.kinds.length > 0 ? ` · probes=${byokPreflight.kinds.join('+')}` : ''}` +
+                `${byokPreflight.profile ? ` · profile=${byokPreflight.profile}` : ''}` +
+                `${byokPreflight.model ? ` · model=${byokPreflight.model}` : ''}`,
+        };
+    }
+    const byokLiveToolProtocolMiss = findByokRealLiveToolProtocolMiss(plain);
+    if (byokLiveToolProtocolMiss) {
+        return {
+            id: 'byok-live-tool-protocol-missed',
+            detail:
+                'BYOK live turn rendered tool-shaped protocol or a textual ask_user simulation without materializing the required live terminal interaction' +
+                `${byokLiveToolProtocolMiss.markers.length > 0 ? ` · text=${byokLiveToolProtocolMiss.markers.join('+')}` : ''}`,
+        };
+    }
     if (
         /erro de provider BYOK/i.test(plain) ||
         /Erro de sessão BYOK/i.test(plain) ||
@@ -730,6 +752,34 @@ function detectLiveBlocker(plain, runtime = {}) {
         };
     }
     return null;
+}
+
+function findByokRealPreflightProbeFailure(plain) {
+    const results = [...plain.matchAll(/BYOK (chat|agent) probe[\s\S]{0,1800}?resultado:\s+failed\b([^\n]*)/giu)];
+    if (results.length === 0) return null;
+    const kinds = [...new Set(results.map((result) => result[1]?.toLowerCase()).filter(Boolean))];
+    const detail = results.map((result) => result[2] ?? '').join(' ');
+    return {
+        kinds,
+        profile: detail.match(/\bprofile=([^\s·]+)/iu)?.[1] ?? null,
+        model: detail.match(/\bmodel=([^\s·]+)/iu)?.[1] ?? null,
+    };
+}
+
+function findByokRealLiveToolProtocolMiss(plain) {
+    // The live transcript intentionally preserves assistant Markdown; the
+    // public delta marker may therefore arrive as `DELTA-*` or `**DELTA-* **`.
+    if (!/(?:^|\n)\s*│\s+(?:\*{1,2})?DELTA-CANONICAL-8\b/u.test(plain)) return null;
+    if (/\[ASK\]\s+ASK-CANONICAL/u.test(plain)) return null;
+    const markers = [
+        /(?:^|\n)\s*│\s+"tool":\s*"report_intent"/mu.test(plain) ? 'report_intent' : null,
+        /(?:^|\n)\s*│\s+"tool":\s*"read_file_content"/mu.test(plain) ? 'read_file_content' : null,
+        /(?:^|\n)\s*│\s+"tool":\s*"ask_user"/mu.test(plain) ? 'ask_user' : null,
+        /(?:^|\n)\s*│\s+\*\*Pergunta ao usu[aá]rio:\*\*/mu.test(plain) ? 'ask_user_text' : null,
+        /(?:^|\n)\s*│\s+"question":\s*"ASK-CANONICAL:/mu.test(plain) ? 'ask_user_question_json' : null,
+    ].filter(Boolean);
+    const hasTextifiedAsk = markers.includes('ask_user') || markers.includes('ask_user_text') || markers.includes('ask_user_question_json');
+    return hasTextifiedAsk || markers.length >= 2 ? { markers } : null;
 }
 
 function isObjectPayload(value) {
@@ -1380,7 +1430,7 @@ function evaluateByokRealOutput(plain, secretValues, { profile, altProfile, mode
     const byokTurnOpened =
         !noPr &&
         (/\[intervene→turn\]/u.test(plain) ||
-            /DELTA-CANONICAL-\d/u.test(plain) ||
+            /(?:^|\n)\s*│\s+DELTA-CANONICAL-\d/u.test(plain) ||
             /\[ASK\]\s+ASK-CANONICAL/u.test(plain));
     const byokUsageClassified =
         /\bclasse=byok_user_message\b/u.test(plain) ||
@@ -1389,8 +1439,10 @@ function evaluateByokRealOutput(plain, secretValues, { profile, altProfile, mode
         /Turno não enviado ao provider BYOK|terminal\.byok\.admission_blocked|resultado:\s+admission-blocked/i.test(
             plain,
         );
+    const byokPreflightBlocked = Boolean(findByokRealPreflightProbeFailure(plain));
     const byokProviderBlocked =
         byokAdmissionBlocked ||
+        byokPreflightBlocked ||
         /erro de provider BYOK/i.test(plain) ||
         /Erro de sessão BYOK/i.test(plain) ||
         /\[query\]\s+Failed to get response from the AI model/i.test(plain) ||
@@ -1511,7 +1563,9 @@ function evaluateByokRealOutput(plain, secretValues, { profile, altProfile, mode
         {
             id: 'byok-real-usage-classified',
             pass: !byokTurnOpened || byokUsageClassified || byokProviderBlocked,
-            detail: byokAdmissionBlocked
+            detail: byokPreflightBlocked
+                ? 'Disposable BYOK probes blocked the live user turn before usage telemetry'
+                : byokAdmissionBlocked
                 ? 'BYOK turn never reached provider usage because admission blocked the request envelope'
                 : byokProviderBlocked
                 ? 'BYOK provider aborted before usage telemetry; no Premium Request was inferred'
@@ -1874,6 +1928,32 @@ async function main() {
             }, diagnostics.length * 350 + 2_000).unref();
         }, Math.max(0, delayMs)).unref();
     };
+    const scheduleByokPreflightDiagnostics = () => {
+        if (postCommandsSent) return;
+        postCommandsSent = true;
+        const diagnostics = ['/activity 40', '/byok providers', '/byok health', '/byok recommend reasoning safe 8', '/events 100 --raw', '/errors 10'];
+        sendCommandSequence(write, diagnostics, { delayMs: 450 });
+        setTimeout(() => {
+            if (!quitSent) {
+                quitSent = true;
+                byokNoPrCanQuit = true;
+                write('/quit');
+            }
+        }, diagnostics.length * 450 + 1_500).unref();
+    };
+    const scheduleByokLiveProtocolDiagnostics = () => {
+        if (postCommandsSent) return;
+        postCommandsSent = true;
+        const diagnostics = ['/activity 40', '/tools diag', '/byok providers', '/byok health', '/byok recommend reasoning safe 8', '/events 100 --raw', '/errors 10'];
+        sendCommandSequence(write, diagnostics, { delayMs: 450 });
+        setTimeout(() => {
+            if (!quitSent) {
+                quitSent = true;
+                byokNoPrCanQuit = true;
+                write('/quit');
+            }
+        }, diagnostics.length * 450 + 1_500).unref();
+    };
     const timeout = setTimeout(() => {
         timedOut = true;
         byokNoPrCanQuit = true;
@@ -1923,6 +2003,10 @@ async function main() {
                         return;
                     }
                     if (byokReal && !noPr) {
+                        if (findByokRealPreflightProbeFailure(stripAnsi(raw))) {
+                            scheduleByokPreflightDiagnostics();
+                            return;
+                        }
                         scenarioPlainOffset = stripAnsi(raw).length;
                         scenarioSent = true;
                         write(buildScenarioPrompt());
@@ -1954,6 +2038,14 @@ async function main() {
             }, Math.max(1_000, postAskContinuationWaitMs)).unref();
         }
         const scenarioTailPlain = scenarioSent ? plain.slice(scenarioPlainOffset) : '';
+        if (
+            byokReal &&
+            !answerSent &&
+            !postCommandsSent &&
+            findByokRealLiveToolProtocolMiss(scenarioTailPlain)
+        ) {
+            scheduleByokLiveProtocolDiagnostics();
+        }
         if (
             !postCommandsSent &&
             (/Erro de sessão \[(?:query|rate_limit)\]|You've hit your rate limit|session\.error|CAPIError|Failed to get response from the AI model/i.test(

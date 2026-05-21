@@ -328,14 +328,17 @@ export async function probeTerminalConfiguredByokChat(options = {}) {
 }
 
 const BYOK_AGENT_PROBE_TOOL = 'terminal_byok_probe_marker';
+const BYOK_AGENT_PROBE_READ_TOOL = 'read_file_content';
+const BYOK_AGENT_PROBE_READ_PATH = 'BYOK_AGENT_PROBE.md';
 const BYOK_AGENT_PROBE_QUESTION = 'BYOK_AGENT_PROBE_ASK: confirme com a resposta automatica do probe.';
 const BYOK_AGENT_PROBE_ANSWER = 'BYOK_AGENT_PROBE_USER_OK';
 
 /**
  * Executa uma sonda agente descartável para BYOK.
  *
- * Diferente do chat canário, esta sonda exige duas capacidades operacionais do runtime Copilot: uma tool customizada
- * mínima e `ask_user`. Ela não toca no dialog loop live; a resposta humana é sintética e confinada à sessão temporária.
+ * Diferente do chat canário, esta sonda exige duas capacidades operacionais do runtime Copilot: tools com identidade
+ * terminal representativa e `ask_user`. Ela não toca no dialog loop live; a resposta humana é sintética e confinada à
+ * sessão temporária.
  *
  * @param {{ env?: Record<string, string | undefined>; model?: string | null; timeoutMs?: number; prompt?: string }} [options]
  * @returns {Promise<{
@@ -351,6 +354,8 @@ const BYOK_AGENT_PROBE_ANSWER = 'BYOK_AGENT_PROBE_USER_OK';
  *     finalChars: number;
  *     observedFinalEvent: boolean;
  *     toolCallCount: number;
+ *     markerToolCallCount: number;
+ *     readToolCallCount: number;
  *     userInputRequestCount: number;
  *     userInputAnswerCount: number;
  *     sessionId: string | null;
@@ -376,6 +381,8 @@ export async function probeTerminalConfiguredByokAgent(options = {}) {
             finalChars: 0,
             observedFinalEvent: false,
             toolCallCount: 0,
+            markerToolCallCount: 0,
+            readToolCallCount: 0,
             userInputRequestCount: 0,
             userInputAnswerCount: 0,
             sessionId: null,
@@ -408,6 +415,7 @@ export async function probeTerminalConfiguredByokAgent(options = {}) {
     const prompt =
         options.prompt ??
         `Valide o runtime agente. Chame primeiro a tool ${BYOK_AGENT_PROBE_TOOL} com marker="BYOK_AGENT_PROBE_TOOL_OK". ` +
+            `Depois chame a tool ${BYOK_AGENT_PROBE_READ_TOOL} com path="${BYOK_AGENT_PROBE_READ_PATH}", startLine=1 e endLine=3. ` +
             `Depois chame ask_user perguntando exatamente "${BYOK_AGENT_PROBE_QUESTION}". ` +
             'Quando receber a resposta, responda somente com BYOK_AGENT_PROBE_DONE.';
     const admission = evaluateTerminalByokProbeBudget(byok.summary, 'agent', prompt);
@@ -422,6 +430,8 @@ export async function probeTerminalConfiguredByokAgent(options = {}) {
             finalChars: 0,
             observedFinalEvent: false,
             toolCallCount: 0,
+            markerToolCallCount: 0,
+            readToolCallCount: 0,
             userInputRequestCount: 0,
             userInputAnswerCount: 0,
             sessionId: null,
@@ -433,7 +443,8 @@ export async function probeTerminalConfiguredByokAgent(options = {}) {
     let deltaChars = 0;
     let finalContent = '';
     let observedFinalEvent = false;
-    let toolCallCount = 0;
+    let markerToolCallCount = 0;
+    let readToolCallCount = 0;
     let userInputRequestCount = 0;
     let userInputAnswerCount = 0;
     let sessionId = null;
@@ -456,7 +467,7 @@ export async function probeTerminalConfiguredByokAgent(options = {}) {
         },
         skipPermission: true,
         handler: async (/** @type {unknown} */ args) => {
-            toolCallCount += 1;
+            markerToolCallCount += 1;
             const marker =
                 args && typeof args === 'object' && typeof /** @type {{ marker?: unknown }} */ (args).marker === 'string'
                     ? /** @type {{ marker: string }} */ (args).marker
@@ -464,6 +475,32 @@ export async function probeTerminalConfiguredByokAgent(options = {}) {
             return marker.includes('BYOK_AGENT_PROBE_TOOL_OK')
                 ? 'BYOK_AGENT_PROBE_TOOL_OK'
                 : `BYOK_AGENT_PROBE_TOOL_MARKER=${marker || 'missing'}`;
+        },
+    });
+    const readTool = createTool({
+        name: BYOK_AGENT_PROBE_READ_TOOL,
+        description:
+            'Sonda interna read-only com o nome canônico da leitura de arquivo usada pelo terminal. Retorna somente conteúdo sintético.',
+        parameters: {
+            type: 'object',
+            additionalProperties: false,
+            properties: {
+                path: { type: 'string', description: `Use ${BYOK_AGENT_PROBE_READ_PATH} neste probe.` },
+                startLine: { type: 'number', description: 'Primeira linha sintética solicitada.' },
+                endLine: { type: 'number', description: 'Última linha sintética solicitada.' },
+            },
+            required: ['path'],
+        },
+        skipPermission: true,
+        handler: async (/** @type {unknown} */ args) => {
+            readToolCallCount += 1;
+            const path =
+                args && typeof args === 'object' && typeof /** @type {{ path?: unknown }} */ (args).path === 'string'
+                    ? /** @type {{ path: string }} */ (args).path
+                    : '';
+            return path === BYOK_AGENT_PROBE_READ_PATH
+                ? 'BYOK_AGENT_PROBE_READ_OK\nlinha 2\nlinha 3'
+                : `BYOK_AGENT_PROBE_READ_PATH=${path || 'missing'}`;
         },
     });
 
@@ -477,8 +514,8 @@ export async function probeTerminalConfiguredByokAgent(options = {}) {
                 enableConfigDiscovery: false,
                 includeSubAgentStreamingEvents: false,
                 systemMessage: false,
-                tools: [markerTool],
-                availableTools: [BYOK_AGENT_PROBE_TOOL, 'ask_user'],
+                tools: [markerTool, readTool],
+                availableTools: [BYOK_AGENT_PROBE_TOOL, BYOK_AGENT_PROBE_READ_TOOL, 'ask_user'],
                 onPermissionRequest: createPermissionHandler({ allowAll: true }),
                 onUserInputRequest: async (request, invocation) => {
                     userInputRequestCount += 1;
@@ -532,7 +569,9 @@ export async function probeTerminalConfiguredByokAgent(options = {}) {
             deltaChars,
             finalChars: finalContent.length,
             observedFinalEvent,
-            toolCallCount,
+            toolCallCount: markerToolCallCount + readToolCallCount,
+            markerToolCallCount,
+            readToolCallCount,
             userInputRequestCount,
             userInputAnswerCount,
             sessionId,
@@ -542,7 +581,7 @@ export async function probeTerminalConfiguredByokAgent(options = {}) {
 
     const finalChars = finalContent.length;
     const status =
-        toolCallCount === 0
+        markerToolCallCount === 0 || readToolCallCount === 0
             ? 'tool-missing'
             : userInputRequestCount === 0 || userInputAnswerCount === 0
               ? 'ask-missing'
@@ -558,7 +597,9 @@ export async function probeTerminalConfiguredByokAgent(options = {}) {
         deltaChars,
         finalChars,
         observedFinalEvent,
-        toolCallCount,
+        toolCallCount: markerToolCallCount + readToolCallCount,
+        markerToolCallCount,
+        readToolCallCount,
         userInputRequestCount,
         userInputAnswerCount,
         sessionId,
