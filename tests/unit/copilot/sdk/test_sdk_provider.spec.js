@@ -28,6 +28,7 @@ import {
     discoverConfiguredByokModelsFromEnv,
     isValidProviderType,
     openaiProvider,
+    readConfiguredByokModelsFromEnv,
     readConfiguredByokProfileSummaries,
     readConfiguredByokProfilesFromEnv,
     readConfiguredByokState,
@@ -428,6 +429,171 @@ describe('F72 — BYOK env configuration', () => {
         });
         expect(state.summary.auth.bearerTokenConfigured).toBe(true);
         expect(JSON.stringify(state.summary)).not.toContain('kilo-secret');
+    });
+
+    it('resolve presets BYOK universais com endpoints oficiais e auth seguro', () => {
+        const cases = [
+            {
+                preset: 'openrouter',
+                secretKey: 'OPENROUTER_API_KEY',
+                baseUrl: 'https://openrouter.ai/api/v1',
+                model: 'deepseek/deepseek-v4-flash:free',
+            },
+            {
+                preset: 'groq',
+                secretKey: 'GROQ_API_KEY',
+                baseUrl: 'https://api.groq.com/openai/v1',
+                model: 'qwen/qwen3-32b',
+            },
+            {
+                preset: 'gemini',
+                secretKey: 'GEMINI_API_KEY',
+                baseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai',
+                model: 'gemini-2.5-flash',
+            },
+            {
+                preset: 'cerebras',
+                secretKey: 'CEREBRAS_API_KEY',
+                baseUrl: 'https://api.cerebras.ai/v1',
+                model: 'gpt-oss-120b',
+            },
+            {
+                preset: 'cloudflare-workers-ai',
+                secretKey: 'CLOUDFLARE_API_TOKEN',
+                baseUrl: 'https://api.cloudflare.com/client/v4/accounts/account-1/ai/v1',
+                model: '@cf/meta/llama-3.1-8b-instruct',
+                extraEnv: { CLOUDFLARE_ACCOUNT_ID: 'account-1' },
+            },
+        ];
+
+        for (const item of cases) {
+            const state = readConfiguredByokState({
+                COPILOT_BYOK_ENABLED: 'true',
+                COPILOT_BYOK_PROVIDER_PRESET: item.preset,
+                [item.secretKey]: 'provider-secret',
+                ...(item.extraEnv ?? {}),
+            });
+
+            expect(state.ready, item.preset).toBe(true);
+            expect(state.provider).toMatchObject({ type: 'openai', baseUrl: item.baseUrl });
+            expect(state.model).toBe(item.model);
+            expect(JSON.stringify(state.summary)).not.toContain('provider-secret');
+        }
+    });
+
+    it('preserva metadata rica de modelos BYOK estaticos e remotos', async () => {
+        const staticModels = readConfiguredByokModelsFromEnv({
+            COPILOT_BYOK_ENABLED: 'true',
+            COPILOT_BYOK_PROVIDER_PRESET: 'openrouter',
+            COPILOT_BYOK_MODELS_JSON: JSON.stringify([
+                {
+                    id: 'meta/model:free',
+                    name: 'Meta Free',
+                    context_length: 65536,
+                    architecture: { input_modalities: ['text', 'image'], output_modalities: ['text'] },
+                    pricing: { prompt: '0', completion: '0' },
+                    supported_parameters: ['tools', 'reasoning'],
+                },
+            ]),
+        });
+
+        expect(staticModels[0]?.id).toBe('meta/model:free');
+        expect(staticModels[0]?.capabilities.supports.vision).toBe(true);
+        expect(staticModels[0]?.capabilities.supports.reasoningEffort).toBe(true);
+        expect(staticModels[0]?.capabilities.limits.max_context_window_tokens).toBe(65536);
+        expect(staticModels[0]?.policy?.terms).toContain('byok:free');
+
+        vi.stubGlobal(
+            'fetch',
+            vi.fn(async () => ({
+                ok: true,
+                status: 200,
+                json: async () => ({
+                    data: [
+                        {
+                            id: 'remote/reasoner:free',
+                            context_length: 131072,
+                            architecture: { input_modalities: ['text'], output_modalities: ['text'] },
+                            pricing: { prompt: '0', completion: '0' },
+                            supported_parameters: ['reasoning'],
+                        },
+                    ],
+                }),
+            })),
+        );
+        try {
+            const remote = await discoverConfiguredByokModelsFromEnv(
+                {
+                    COPILOT_BYOK_ENABLED: 'true',
+                    COPILOT_BYOK_PROVIDER_PRESET: 'openrouter',
+                    OPENROUTER_API_KEY: 'secret',
+                },
+                { forceRefresh: true },
+            );
+
+            expect(remote.source).toBe('remote');
+            expect(remote.models[0]?.id).toBe('remote/reasoner:free');
+            expect(remote.models[0]?.policy?.terms).toContain('byok:free');
+            expect(remote.models[0]?.capabilities.supports.reasoningEffort).toBe(true);
+            expect(remote.models[0]?.capabilities.limits.max_context_window_tokens).toBe(131072);
+            expect(JSON.stringify(remote)).not.toContain('secret');
+        } finally {
+            vi.unstubAllGlobals();
+        }
+    });
+
+    it('nao herda capabilities de provider em catalogo remoto sem evidencia por modelo', async () => {
+        vi.stubGlobal(
+            'fetch',
+            vi.fn(async () => ({
+                ok: true,
+                status: 200,
+                json: async () => ({
+                    data: [{ id: 'plain-chat-model', owned_by: 'provider-x', context_length: 8192 }],
+                }),
+            })),
+        );
+        try {
+            const remote = await discoverConfiguredByokModelsFromEnv(
+                {
+                    COPILOT_BYOK_ENABLED: 'true',
+                    COPILOT_BYOK_PROVIDER_PRESET: 'groq',
+                    GROQ_API_KEY: 'secret',
+                    COPILOT_BYOK_SUPPORTS_REASONING: 'true',
+                    COPILOT_BYOK_SUPPORTS_VISION: 'true',
+                },
+                { forceRefresh: true },
+            );
+
+            expect(remote.models[0]?.capabilities.supports.reasoningEffort).toBe(false);
+            expect(remote.models[0]?.capabilities.supports.vision).toBe(false);
+            expect(remote.models[0]?.byok?.provider).toBe('provider-x');
+        } finally {
+            vi.unstubAllGlobals();
+        }
+    });
+
+    it('propaga limites BYOK de profile para summary e modelos', () => {
+        const state = readConfiguredByokState({
+            COPILOT_BYOK_ENABLED: 'true',
+            COPILOT_BYOK_PROVIDER_PRESET: 'groq',
+            COPILOT_BYOK_MODEL: 'qwen/qwen3-32b',
+            GROQ_API_KEY: 'secret',
+            COPILOT_BYOK_MAX_REQUEST_TOKENS: '6000',
+            COPILOT_BYOK_TOKENS_PER_MINUTE: '6000',
+            COPILOT_BYOK_REQUESTS_PER_MINUTE: '30',
+        });
+        const models = readConfiguredByokModelsFromEnv({
+            COPILOT_BYOK_ENABLED: 'true',
+            COPILOT_BYOK_PROVIDER_PRESET: 'groq',
+            COPILOT_BYOK_MODEL: 'qwen/qwen3-32b',
+            COPILOT_BYOK_MAX_REQUEST_TOKENS: '6000',
+            COPILOT_BYOK_TOKENS_PER_MINUTE: '6000',
+            COPILOT_BYOK_REQUESTS_PER_MINUTE: '30',
+        });
+
+        expect(state.summary.limits).toMatchObject({ maxRequestTokens: 6000, tokensPerMinute: 6000, requestsPerMinute: 30 });
+        expect(models[0]?.byok?.rateLimits).toMatchObject({ maxRequestTokens: 6000, tokensPerMinute: 6000, requestsPerMinute: 30 });
     });
 
     it('resolve perfil ativo a partir de COPILOT_BYOK_PROFILES_JSON sem vazar segredo', () => {

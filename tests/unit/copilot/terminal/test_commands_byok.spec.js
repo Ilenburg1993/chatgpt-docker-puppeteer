@@ -90,8 +90,11 @@ describe('terminal /byok command', () => {
         delete process.env['COPILOT_BYOK_ENABLED'];
         delete process.env['COPILOT_BYOK_PROFILE'];
         delete process.env['COPILOT_BYOK_PROVIDER_PRESET'];
+        delete process.env['COPILOT_BYOK_PROVIDER_TYPE'];
         delete process.env['COPILOT_BYOK_MODEL'];
         delete process.env['COPILOT_BYOK_BASE_URL'];
+        delete process.env['COPILOT_BYOK_WIRE_API'];
+        delete process.env['COPILOT_BYOK_HEADERS_JSON'];
     });
 
     it('mostra .env.local como arquivo canônico sem expor segredos', async () => {
@@ -142,6 +145,9 @@ describe('terminal /byok command', () => {
     });
 
     it('ativa perfil no processo atual', async () => {
+        process.env['COPILOT_BYOK_MODEL'] = 'stale-model';
+        process.env['COPILOT_BYOK_PROVIDER_PRESET'] = 'stale-provider';
+        process.env['COPILOT_BYOK_BASE_URL'] = 'https://stale.example/v1';
         mockProjection({
             profiles: [
                 {
@@ -161,12 +167,18 @@ describe('terminal /byok command', () => {
 
         expect(process.env['COPILOT_BYOK_ENABLED']).toBe('true');
         expect(process.env['COPILOT_BYOK_PROFILE']).toBe('kilo');
+        expect(process.env['COPILOT_BYOK_MODEL']).toBeUndefined();
+        expect(process.env['COPILOT_BYOK_PROVIDER_PRESET']).toBeUndefined();
+        expect(process.env['COPILOT_BYOK_BASE_URL']).toBeUndefined();
         expect(ctx.output()).toContain('BYOK status');
     });
 
     it('desativa BYOK e volta para SDK', async () => {
         process.env['COPILOT_BYOK_ENABLED'] = 'true';
         process.env['COPILOT_BYOK_PROFILE'] = 'kilo';
+        process.env['COPILOT_BYOK_MODEL'] = 'stale-model';
+        process.env['COPILOT_BYOK_PROVIDER_PRESET'] = 'stale-provider';
+        process.env['COPILOT_BYOK_BASE_URL'] = 'https://stale.example/v1';
         mockProjection();
         const ctx = mockCtx();
 
@@ -174,6 +186,9 @@ describe('terminal /byok command', () => {
 
         expect(process.env['COPILOT_BYOK_ENABLED']).toBe('false');
         expect(process.env['COPILOT_BYOK_PROFILE']).toBeUndefined();
+        expect(process.env['COPILOT_BYOK_MODEL']).toBeUndefined();
+        expect(process.env['COPILOT_BYOK_PROVIDER_PRESET']).toBeUndefined();
+        expect(process.env['COPILOT_BYOK_BASE_URL']).toBeUndefined();
         expect(ctx.output()).toContain('SDK Copilot');
     });
 
@@ -196,6 +211,13 @@ describe('terminal /byok command', () => {
                         supports: { reasoningEffort: true, vision: false },
                         limits: { max_context_window_tokens: 200000 },
                     },
+                    byok: {
+                        freeTier: true,
+                        pricing: { prompt: 0, completion: 0, request: null },
+                        provider: 'fixture',
+                        inputModalities: ['text', 'image'],
+                        rateLimits: { maxRequestTokens: 6000, tokensPerMinute: 6000, requestsPerMinute: 30 },
+                    },
                 },
             ],
             source: 'remote',
@@ -210,7 +232,39 @@ describe('terminal /byok command', () => {
 
         expect(ctx.output()).toContain('fonte=provider');
         expect(ctx.output()).toContain('remote-a');
+        expect(ctx.output()).toContain('free');
+        expect(ctx.output()).toContain('provider=fixture');
         expect(ctx.output()).toContain('ctx=200000');
+        expect(ctx.output()).toContain('maxReq=6000');
+        expect(ctx.output()).toContain('TPM=6000');
+    });
+
+    it('ranqueia modelos BYOK free e capazes antes de modelos pagos ou desconhecidos', async () => {
+        discoverConfiguredByokModelsFromEnv.mockResolvedValue({
+            models: [
+                {
+                    id: 'paid-small',
+                    capabilities: { supports: { reasoningEffort: false, vision: false }, limits: { max_context_window_tokens: 8000 } },
+                    byok: { freeTier: false, pricing: { prompt: 0.1, completion: 0.2, request: null } },
+                },
+                {
+                    id: 'free-reasoning',
+                    capabilities: { supports: { reasoningEffort: true, vision: false }, limits: { max_context_window_tokens: 128000 } },
+                    byok: { freeTier: true, pricing: { prompt: 0, completion: 0, request: null } },
+                },
+            ],
+            source: 'remote',
+            endpoint: 'https://provider.example/v1/models',
+            fromCache: false,
+            error: null,
+        });
+        mockProjection();
+        const ctx = mockCtx();
+
+        await cmdByok({ println: ctx.println }, 'models');
+
+        expect(ctx.output().indexOf('free-reasoning')).toBeLessThan(ctx.output().indexOf('paid-small'));
+        expect(ctx.output()).toContain('ordem=free/capability/context');
     });
 
     it('limita a página padrão de modelos BYOK e permite ampliar por número', async () => {
@@ -246,7 +300,82 @@ describe('terminal /byok command', () => {
         expect(expandedCtx.output()).toContain('exibindo 26/30');
     });
 
+    it('recomenda modelos BYOK com filtros e alerta limites baixos', async () => {
+        discoverConfiguredByokModelsFromEnv.mockResolvedValue({
+            models: [
+                {
+                    id: 'free-low-limit',
+                    capabilities: { supports: { reasoningEffort: true, vision: false }, limits: { max_context_window_tokens: 131072 } },
+                    byok: {
+                        freeTier: true,
+                        rateLimits: { maxRequestTokens: 6000, tokensPerMinute: 6000 },
+                        provider: 'groq',
+                    },
+                },
+                {
+                    id: 'free-comfortable',
+                    capabilities: { supports: { reasoningEffort: true, vision: false }, limits: { max_context_window_tokens: 200000 } },
+                    byok: {
+                        freeTier: true,
+                        rateLimits: { maxRequestTokens: 64000, tokensPerMinute: 64000 },
+                        provider: 'openrouter',
+                    },
+                },
+                {
+                    id: 'paid-vision',
+                    capabilities: { supports: { reasoningEffort: true, vision: true }, limits: { max_context_window_tokens: 128000 } },
+                    byok: { freeTier: false, provider: 'paid' },
+                },
+            ],
+            source: 'remote',
+            endpoint: 'https://provider.example/v1/models',
+            fromCache: false,
+            error: null,
+        });
+        mockProjection();
+        const ctx = mockCtx();
+
+        await cmdByok({ println: ctx.println }, 'recommend free reasoning safe 2');
+
+        expect(ctx.output()).toContain('BYOK recommend');
+        expect(ctx.output()).toContain('free-comfortable');
+        expect(ctx.output()).not.toContain('free-low-limit');
+        expect(ctx.output()).not.toContain('paid-vision');
+        expect(ctx.output()).toContain('ok para uso geral');
+    });
+
+    it('recomenda modelos BYOK mostrando aviso quando o limite do provider é baixo', async () => {
+        discoverConfiguredByokModelsFromEnv.mockResolvedValue({
+            models: [
+                {
+                    id: 'groq-small-budget',
+                    capabilities: { supports: { reasoningEffort: true, vision: false }, limits: { max_context_window_tokens: 131072 } },
+                    byok: {
+                        freeTier: true,
+                        rateLimits: { maxRequestTokens: 6000, tokensPerMinute: 6000 },
+                        provider: 'groq',
+                    },
+                },
+            ],
+            source: 'remote',
+            endpoint: 'https://api.groq.com/openai/v1/models',
+            fromCache: false,
+            error: null,
+        });
+        mockProjection();
+        const ctx = mockCtx();
+
+        await cmdByok({ println: ctx.println }, 'recommend free reasoning');
+
+        expect(ctx.output()).toContain('groq-small-budget');
+        expect(ctx.output()).toContain('baixo para turno real');
+        expect(ctx.output()).toContain('sessão fresca');
+    });
+
     it('recarrega .env.local sem imprimir segredos', async () => {
+        process.env['COPILOT_BYOK_MODEL'] = 'stale-model';
+        process.env['COPILOT_BYOK_PROVIDER_PRESET'] = 'stale-provider';
+        process.env['COPILOT_BYOK_BASE_URL'] = 'https://stale.example/v1';
         loadDotenv.mockReturnValue({ parsed: { KILO_API_KEY: 'secret' } });
         mockProjection({
             summary: {
@@ -265,12 +394,16 @@ describe('terminal /byok command', () => {
         await cmdByok({ println: ctx.println }, 'reload');
 
         expect(loadDotenv).toHaveBeenCalledWith({ path: '.env.local', override: true, quiet: true });
+        expect(process.env['COPILOT_BYOK_MODEL']).toBeUndefined();
+        expect(process.env['COPILOT_BYOK_PROVIDER_PRESET']).toBeUndefined();
+        expect(process.env['COPILOT_BYOK_BASE_URL']).toBeUndefined();
         expect(ctx.output()).toContain('.env.local recarregado');
         expect(ctx.output()).toContain('BYOK status');
         expect(ctx.output()).not.toContain('secret');
     });
 
     it('troca provider efemero no processo atual', async () => {
+        process.env['COPILOT_BYOK_PROFILE'] = 'kilo';
         mockProjection();
         const ctx = mockCtx();
 
@@ -281,6 +414,23 @@ describe('terminal /byok command', () => {
         expect(process.env['COPILOT_BYOK_PROVIDER_PRESET']).toBe('kilo-code');
         expect(process.env['COPILOT_BYOK_MODEL']).toBe('anthropic/claude-sonnet-4.5');
         expect(process.env['COPILOT_BYOK_BASE_URL']).toBe('https://api.kilo.ai/api/gateway');
+        expect(ctx.output()).toContain('BYOK status');
+    });
+
+    it('troca provider efemero limpando modelo e baseUrl antigos quando omitidos', async () => {
+        process.env['COPILOT_BYOK_PROFILE'] = 'kilo';
+        process.env['COPILOT_BYOK_MODEL'] = 'stale-model';
+        process.env['COPILOT_BYOK_BASE_URL'] = 'https://stale.example/v1';
+        mockProjection();
+        const ctx = mockCtx();
+
+        await cmdByok({ println: ctx.println }, 'provider openrouter');
+
+        expect(process.env['COPILOT_BYOK_ENABLED']).toBe('true');
+        expect(process.env['COPILOT_BYOK_PROFILE']).toBeUndefined();
+        expect(process.env['COPILOT_BYOK_PROVIDER_PRESET']).toBe('openrouter');
+        expect(process.env['COPILOT_BYOK_MODEL']).toBeUndefined();
+        expect(process.env['COPILOT_BYOK_BASE_URL']).toBeUndefined();
         expect(ctx.output()).toContain('BYOK status');
     });
 

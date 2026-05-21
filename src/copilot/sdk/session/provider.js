@@ -45,6 +45,7 @@ import { log } from '../logger.js';
  * @property {{ apiKeyConfigured: boolean; bearerTokenConfigured: boolean; headersConfigured: boolean }} auth
  * @property {{ configured: boolean; count: number }} modelList
  * @property {{ reasoningEffort: boolean; vision: boolean; contextWindowTokens: number }} capabilities
+ * @property {{ maxRequestTokens: number | null; tokensPerMinute: number | null; requestsPerMinute: number | null; dailyRequests: number | null }} limits
  * @property {string[]} warnings
  * @property {string[]} errors
  */
@@ -95,6 +96,10 @@ export const BYOK_ENV_KEYS = Object.freeze([
     'COPILOT_BYOK_MODEL_DISCOVERY_TIMEOUT_MS',
     'COPILOT_BYOK_MODEL_DISCOVERY_TTL_MS',
     'COPILOT_BYOK_CONTEXT_WINDOW_TOKENS',
+    'COPILOT_BYOK_MAX_REQUEST_TOKENS',
+    'COPILOT_BYOK_TOKENS_PER_MINUTE',
+    'COPILOT_BYOK_REQUESTS_PER_MINUTE',
+    'COPILOT_BYOK_DAILY_REQUESTS',
     'COPILOT_BYOK_SUPPORTS_REASONING',
     'COPILOT_BYOK_SUPPORTS_VISION',
     'OPENAI_API_KEY',
@@ -102,6 +107,33 @@ export const BYOK_ENV_KEYS = Object.freeze([
     'AZURE_OPENAI_ENDPOINT',
     'ANTHROPIC_API_KEY',
     'CLAUDE_API_KEY',
+    'OPENROUTER_API_KEY',
+    'OPEN_ROUTER_KEY',
+    'GROQ_API_KEY',
+    'GROQ_KEY',
+    'GEMINI_API_KEY',
+    'GOOGLE_API_KEY',
+    'GOOGLE_GENERATIVE_AI_API_KEY',
+    'GOOGLE_AI_STUDIO_API_KEY',
+    'GOOGLE_CLOUD_GEMINI_KEY',
+    'GEMINI_KEY',
+    'MISTRAL_API_KEY',
+    'MISTRAL_KEY',
+    'HUGGING_FACE_API_KEY',
+    'HUGGING_FACE_KEY',
+    'HF_TOKEN',
+    'CLOUDFLARE_API_TOKEN',
+    'CLOUDFLARE_API_KEY',
+    'CLOUDFLARE_KEY',
+    'CLOUDFLARE_ACCOUNT_ID',
+    'NVIDIA_API_KEY',
+    'NVIDIA_KEY',
+    'CEREBRAS_API_KEY',
+    'CEREBRAS_KEY',
+    'CHUTES_API_KEY',
+    'CHUTES_AI',
+    'ZAI_API_KEY',
+    'Z_AI_KEY',
     'OLLAMA_API_KEY',
     'OLLAMA_CLOUD_API_KEY',
     'OLLAMA_CLOUD_BASE_URL',
@@ -128,11 +160,257 @@ export const BYOK_SECRET_ENV_KEYS = Object.freeze([
     'AZURE_OPENAI_API_KEY',
     'ANTHROPIC_API_KEY',
     'CLAUDE_API_KEY',
+    'OPENROUTER_API_KEY',
+    'OPEN_ROUTER_KEY',
+    'GROQ_API_KEY',
+    'GROQ_KEY',
+    'GEMINI_API_KEY',
+    'GOOGLE_API_KEY',
+    'GOOGLE_GENERATIVE_AI_API_KEY',
+    'GOOGLE_AI_STUDIO_API_KEY',
+    'GOOGLE_CLOUD_GEMINI_KEY',
+    'GEMINI_KEY',
+    'MISTRAL_API_KEY',
+    'MISTRAL_KEY',
+    'HUGGING_FACE_API_KEY',
+    'HUGGING_FACE_KEY',
+    'HF_TOKEN',
+    'CLOUDFLARE_API_TOKEN',
+    'CLOUDFLARE_API_KEY',
+    'CLOUDFLARE_KEY',
+    'NVIDIA_API_KEY',
+    'NVIDIA_KEY',
+    'CEREBRAS_API_KEY',
+    'CEREBRAS_KEY',
+    'CHUTES_API_KEY',
+    'CHUTES_AI',
+    'ZAI_API_KEY',
+    'Z_AI_KEY',
     'OLLAMA_API_KEY',
     'OLLAMA_CLOUD_API_KEY',
     'KILO_API_KEY',
     'KILO_CODE_API_KEY',
 ]);
+
+/**
+ * @typedef {object} ByokProviderPresetDefinition
+ * @property {ProviderType} providerType
+ * @property {string | ((env: Record<string, string | undefined>) => string | undefined)} [baseUrl]
+ * @property {string} [defaultModel]
+ * @property {readonly string[]} [modelEnvKeys]
+ * @property {readonly string[]} [apiKeyEnvKeys]
+ * @property {readonly string[]} [bearerTokenEnvKeys]
+ * @property {readonly string[]} [staticModels]
+ * @property {string} [modelsEndpoint]
+ * @property {number} [contextWindowTokens]
+ * @property {boolean} [supportsReasoning]
+ * @property {boolean} [supportsVision]
+ * @property {boolean} [requiresAuth]
+ * @property {Record<string, string>} [headers]
+ */
+
+/** @type {Readonly<Record<string, ByokProviderPresetDefinition>>} */
+const BYOK_PROVIDER_PRESETS = Object.freeze({
+    openai: {
+        providerType: PROVIDER_TYPES.OPENAI,
+        baseUrl: 'https://api.openai.com/v1',
+        modelEnvKeys: Object.freeze(['OPENAI_MODEL']),
+        apiKeyEnvKeys: Object.freeze(['OPENAI_API_KEY']),
+        contextWindowTokens: 128_000,
+        supportsReasoning: true,
+        supportsVision: true,
+        requiresAuth: true,
+    },
+    'openai-compatible': {
+        providerType: PROVIDER_TYPES.OPENAI,
+        modelEnvKeys: Object.freeze(['OPENAI_MODEL']),
+        apiKeyEnvKeys: Object.freeze(['OPENAI_API_KEY']),
+        contextWindowTokens: 128_000,
+        supportsReasoning: false,
+        supportsVision: false,
+    },
+    'ollama-local': {
+        providerType: PROVIDER_TYPES.OPENAI,
+        baseUrl: (env) => normalizeOllamaBaseUrl(firstEnv(env, ['OLLAMA_LOCAL_BASE_URL', 'OLLAMA_BASE_URL'])) ?? 'http://localhost:11434/v1',
+        modelEnvKeys: Object.freeze(['OLLAMA_DEFAULT_MODEL', 'OLLAMA_CHAT_MODEL']),
+        defaultModel: 'qwen3-coder-next',
+        staticModels: Object.freeze(['qwen3-coder-next']),
+        contextWindowTokens: 128_000,
+        supportsReasoning: false,
+        supportsVision: false,
+    },
+    'ollama-cloud': {
+        providerType: PROVIDER_TYPES.OPENAI,
+        baseUrl: (env) => normalizeOllamaBaseUrl(firstEnv(env, ['OLLAMA_CLOUD_BASE_URL'])) ?? 'https://ollama.com/v1',
+        modelEnvKeys: Object.freeze(['OLLAMA_DEFAULT_MODEL', 'OLLAMA_CHAT_MODEL']),
+        apiKeyEnvKeys: Object.freeze(['OLLAMA_API_KEY', 'OLLAMA_CLOUD_API_KEY']),
+        defaultModel: 'qwen3-coder-next',
+        staticModels: Object.freeze(['qwen3-coder-next', 'qwen3-next:80b-cloud']),
+        contextWindowTokens: 128_000,
+        supportsReasoning: false,
+        supportsVision: false,
+        requiresAuth: true,
+    },
+    'kilo-code': {
+        providerType: PROVIDER_TYPES.OPENAI,
+        baseUrl: (env) => firstEnv(env, ['KILO_GATEWAY_BASE_URL', 'KILO_BASE_URL']) ?? 'https://api.kilo.ai/api/gateway',
+        modelEnvKeys: Object.freeze(['KILO_MODEL', 'KILO_DEFAULT_MODEL']),
+        bearerTokenEnvKeys: Object.freeze(['KILO_API_KEY', 'KILO_CODE_API_KEY']),
+        defaultModel: 'kilo-auto/free',
+        staticModels: Object.freeze(['kilo-auto/free', 'kilo-auto/balanced', 'anthropic/claude-sonnet-4.5']),
+        contextWindowTokens: 200_000,
+        supportsReasoning: true,
+        supportsVision: true,
+        requiresAuth: true,
+    },
+    'kilo-gateway': {
+        providerType: PROVIDER_TYPES.OPENAI,
+        baseUrl: (env) => firstEnv(env, ['KILO_GATEWAY_BASE_URL', 'KILO_BASE_URL']) ?? 'https://api.kilo.ai/api/gateway',
+        modelEnvKeys: Object.freeze(['KILO_MODEL', 'KILO_DEFAULT_MODEL']),
+        bearerTokenEnvKeys: Object.freeze(['KILO_API_KEY', 'KILO_CODE_API_KEY']),
+        defaultModel: 'kilo-auto/free',
+        staticModels: Object.freeze(['kilo-auto/free', 'kilo-auto/balanced', 'anthropic/claude-sonnet-4.5']),
+        contextWindowTokens: 200_000,
+        supportsReasoning: true,
+        supportsVision: true,
+        requiresAuth: true,
+    },
+    kilo: {
+        providerType: PROVIDER_TYPES.OPENAI,
+        baseUrl: (env) => firstEnv(env, ['KILO_GATEWAY_BASE_URL', 'KILO_BASE_URL']) ?? 'https://api.kilo.ai/api/gateway',
+        modelEnvKeys: Object.freeze(['KILO_MODEL', 'KILO_DEFAULT_MODEL']),
+        bearerTokenEnvKeys: Object.freeze(['KILO_API_KEY', 'KILO_CODE_API_KEY']),
+        defaultModel: 'kilo-auto/free',
+        staticModels: Object.freeze(['kilo-auto/free', 'kilo-auto/balanced', 'anthropic/claude-sonnet-4.5']),
+        contextWindowTokens: 200_000,
+        supportsReasoning: true,
+        supportsVision: true,
+        requiresAuth: true,
+    },
+    openrouter: {
+        providerType: PROVIDER_TYPES.OPENAI,
+        baseUrl: 'https://openrouter.ai/api/v1',
+        modelEnvKeys: Object.freeze(['OPENROUTER_MODEL', 'OPEN_ROUTER_MODEL']),
+        apiKeyEnvKeys: Object.freeze(['OPENROUTER_API_KEY', 'OPEN_ROUTER_KEY']),
+        defaultModel: 'deepseek/deepseek-v4-flash:free',
+        staticModels: Object.freeze(['deepseek/deepseek-v4-flash:free', 'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free', 'google/gemma-4-31b-it:free']),
+        contextWindowTokens: 128_000,
+        supportsReasoning: true,
+        supportsVision: true,
+        requiresAuth: true,
+    },
+    groq: {
+        providerType: PROVIDER_TYPES.OPENAI,
+        baseUrl: 'https://api.groq.com/openai/v1',
+        modelEnvKeys: Object.freeze(['GROQ_MODEL']),
+        apiKeyEnvKeys: Object.freeze(['GROQ_API_KEY', 'GROQ_KEY']),
+        defaultModel: 'qwen/qwen3-32b',
+        staticModels: Object.freeze(['qwen/qwen3-32b', 'openai/gpt-oss-120b', 'openai/gpt-oss-20b', 'llama-3.3-70b-versatile']),
+        contextWindowTokens: 131_072,
+        supportsReasoning: true,
+        supportsVision: false,
+        requiresAuth: true,
+    },
+    gemini: {
+        providerType: PROVIDER_TYPES.OPENAI,
+        baseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai',
+        modelEnvKeys: Object.freeze(['GEMINI_MODEL', 'GOOGLE_GENERATIVE_AI_MODEL']),
+        apiKeyEnvKeys: Object.freeze(['GEMINI_API_KEY', 'GOOGLE_API_KEY', 'GOOGLE_GENERATIVE_AI_API_KEY', 'GOOGLE_AI_STUDIO_API_KEY', 'GEMINI_KEY']),
+        defaultModel: 'gemini-2.5-flash',
+        staticModels: Object.freeze(['gemini-2.5-flash', 'gemini-flash-latest', 'gemini-2.5-pro', 'gemini-embedding-001']),
+        contextWindowTokens: 1_048_576,
+        supportsReasoning: true,
+        supportsVision: true,
+        requiresAuth: true,
+    },
+    mistral: {
+        providerType: PROVIDER_TYPES.OPENAI,
+        baseUrl: 'https://api.mistral.ai/v1',
+        modelEnvKeys: Object.freeze(['MISTRAL_MODEL']),
+        apiKeyEnvKeys: Object.freeze(['MISTRAL_API_KEY', 'MISTRAL_KEY']),
+        defaultModel: 'codestral-latest',
+        staticModels: Object.freeze(['codestral-latest', 'mistral-small-latest', 'magistral-medium-latest']),
+        contextWindowTokens: 256_000,
+        supportsReasoning: true,
+        supportsVision: true,
+        requiresAuth: true,
+    },
+    huggingface: {
+        providerType: PROVIDER_TYPES.OPENAI,
+        baseUrl: 'https://router.huggingface.co/v1',
+        modelEnvKeys: Object.freeze(['HUGGING_FACE_MODEL', 'HF_MODEL']),
+        apiKeyEnvKeys: Object.freeze(['HUGGING_FACE_API_KEY', 'HUGGING_FACE_KEY', 'HF_TOKEN']),
+        defaultModel: 'openai/gpt-oss-120b:fastest',
+        staticModels: Object.freeze(['openai/gpt-oss-120b:fastest', 'deepseek-ai/DeepSeek-R1:fastest', 'Qwen/Qwen3-Coder-480B-A35B-Instruct:fastest']),
+        contextWindowTokens: 128_000,
+        supportsReasoning: true,
+        supportsVision: false,
+        requiresAuth: true,
+    },
+    'cloudflare-workers-ai': {
+        providerType: PROVIDER_TYPES.OPENAI,
+        baseUrl: (env) => {
+            const accountId = firstEnv(env, ['CLOUDFLARE_ACCOUNT_ID']);
+            return accountId ? `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/v1` : undefined;
+        },
+        modelEnvKeys: Object.freeze(['CLOUDFLARE_MODEL', 'CLOUDFLARE_WORKERS_AI_MODEL']),
+        apiKeyEnvKeys: Object.freeze(['CLOUDFLARE_API_TOKEN', 'CLOUDFLARE_API_KEY', 'CLOUDFLARE_KEY']),
+        defaultModel: '@cf/meta/llama-3.1-8b-instruct',
+        staticModels: Object.freeze(['@cf/meta/llama-3.1-8b-instruct', '@cf/meta/llama-3.1-70b-instruct', '@cf/qwen/qwen1.5-14b-chat-awq']),
+        contextWindowTokens: 32_768,
+        supportsReasoning: false,
+        supportsVision: false,
+        requiresAuth: true,
+    },
+    'nvidia-nim': {
+        providerType: PROVIDER_TYPES.OPENAI,
+        baseUrl: 'https://integrate.api.nvidia.com/v1',
+        modelEnvKeys: Object.freeze(['NVIDIA_MODEL', 'NVIDIA_NIM_MODEL']),
+        apiKeyEnvKeys: Object.freeze(['NVIDIA_API_KEY', 'NVIDIA_KEY']),
+        defaultModel: 'openai/gpt-oss-120b',
+        staticModels: Object.freeze(['openai/gpt-oss-120b', 'meta/llama-3.1-70b-instruct', 'meta/llama-3.1-405b-instruct']),
+        contextWindowTokens: 131_072,
+        supportsReasoning: true,
+        supportsVision: true,
+        requiresAuth: true,
+    },
+    cerebras: {
+        providerType: PROVIDER_TYPES.OPENAI,
+        baseUrl: 'https://api.cerebras.ai/v1',
+        modelEnvKeys: Object.freeze(['CEREBRAS_MODEL']),
+        apiKeyEnvKeys: Object.freeze(['CEREBRAS_API_KEY', 'CEREBRAS_KEY']),
+        defaultModel: 'gpt-oss-120b',
+        staticModels: Object.freeze(['gpt-oss-120b', 'qwen-3-coder-480b', 'llama3.3-70b']),
+        contextWindowTokens: 131_072,
+        supportsReasoning: true,
+        supportsVision: false,
+        requiresAuth: true,
+    },
+    chutes: {
+        providerType: PROVIDER_TYPES.OPENAI,
+        baseUrl: 'https://llm.chutes.ai/v1',
+        modelEnvKeys: Object.freeze(['CHUTES_MODEL', 'CHUTES_AI_MODEL']),
+        apiKeyEnvKeys: Object.freeze(['CHUTES_API_KEY', 'CHUTES_AI']),
+        defaultModel: 'Qwen/Qwen3-Next-80B-A3B-Instruct',
+        staticModels: Object.freeze(['Qwen/Qwen3-Next-80B-A3B-Instruct', 'zai-org/GLM-5-Turbo', 'Qwen/Qwen2.5-Coder-32B-Instruct']),
+        contextWindowTokens: 131_072,
+        supportsReasoning: true,
+        supportsVision: true,
+        requiresAuth: true,
+    },
+    zai: {
+        providerType: PROVIDER_TYPES.OPENAI,
+        baseUrl: 'https://api.z.ai/api/paas/v4',
+        modelEnvKeys: Object.freeze(['ZAI_MODEL', 'Z_AI_MODEL']),
+        apiKeyEnvKeys: Object.freeze(['ZAI_API_KEY', 'Z_AI_KEY']),
+        defaultModel: 'glm-4.6',
+        staticModels: Object.freeze(['glm-5.1', 'glm-4.7', 'glm-4.6', 'glm-4.5-air']),
+        contextWindowTokens: 128_000,
+        supportsReasoning: true,
+        supportsVision: true,
+        requiresAuth: true,
+    },
+});
 
 // ─── Internal Helpers ─────────────────────────────────────────────────────────
 
@@ -271,6 +549,15 @@ function parsePositiveInteger(raw, fallback) {
 
 /**
  * @param {string | undefined} raw
+ * @returns {number | null}
+ */
+function parseOptionalPositiveInteger(raw) {
+    const parsed = parsePositiveInteger(raw, 0);
+    return parsed > 0 ? parsed : null;
+}
+
+/**
+ * @param {string | undefined} raw
  * @returns {string[]}
  */
 function parseCsv(raw) {
@@ -391,6 +678,18 @@ function applyProfileToEnv(profile, env) {
     const contextWindowTokens = optionalNumberString(
         profile['contextWindowTokens'] ?? profile['contextWindow'] ?? profile['COPILOT_BYOK_CONTEXT_WINDOW_TOKENS'],
     );
+    const maxRequestTokens = optionalNumberString(
+        profile['maxRequestTokens'] ?? profile['maxInputTokens'] ?? profile['COPILOT_BYOK_MAX_REQUEST_TOKENS'],
+    );
+    const tokensPerMinute = optionalNumberString(
+        profile['tokensPerMinute'] ?? profile['tpm'] ?? profile['COPILOT_BYOK_TOKENS_PER_MINUTE'],
+    );
+    const requestsPerMinute = optionalNumberString(
+        profile['requestsPerMinute'] ?? profile['rpm'] ?? profile['COPILOT_BYOK_REQUESTS_PER_MINUTE'],
+    );
+    const dailyRequests = optionalNumberString(
+        profile['dailyRequests'] ?? profile['requestsPerDay'] ?? profile['rpd'] ?? profile['COPILOT_BYOK_DAILY_REQUESTS'],
+    );
     const supportsReasoning = optionalBooleanString(
         profile['supportsReasoning'] ?? profile['reasoning'] ?? profile['COPILOT_BYOK_SUPPORTS_REASONING'],
     );
@@ -424,6 +723,10 @@ function applyProfileToEnv(profile, env) {
         next['COPILOT_BYOK_MODELS_JSON'] = modelsJson.trim();
     }
     if (contextWindowTokens) next['COPILOT_BYOK_CONTEXT_WINDOW_TOKENS'] = contextWindowTokens;
+    if (maxRequestTokens) next['COPILOT_BYOK_MAX_REQUEST_TOKENS'] = maxRequestTokens;
+    if (tokensPerMinute) next['COPILOT_BYOK_TOKENS_PER_MINUTE'] = tokensPerMinute;
+    if (requestsPerMinute) next['COPILOT_BYOK_REQUESTS_PER_MINUTE'] = requestsPerMinute;
+    if (dailyRequests) next['COPILOT_BYOK_DAILY_REQUESTS'] = dailyRequests;
     if (supportsReasoning) next['COPILOT_BYOK_SUPPORTS_REASONING'] = supportsReasoning;
     if (supportsVision) next['COPILOT_BYOK_SUPPORTS_VISION'] = supportsVision;
     if (apiKey) next['COPILOT_BYOK_API_KEY'] = apiKey;
@@ -549,6 +852,40 @@ function normalizePreset(preset) {
 }
 
 /**
+ * @param {string} preset
+ * @returns {ByokProviderPresetDefinition | undefined}
+ */
+function getByokPresetDefinition(preset) {
+    return BYOK_PROVIDER_PRESETS[preset];
+}
+
+/**
+ * @param {ByokProviderPresetDefinition | undefined} definition
+ * @param {Record<string, string | undefined>} env
+ * @returns {string | undefined}
+ */
+function resolvePresetBaseUrl(definition, env) {
+    if (!definition?.baseUrl) return undefined;
+    return typeof definition.baseUrl === 'function' ? definition.baseUrl(env) : definition.baseUrl;
+}
+
+/**
+ * @param {readonly string[]} values
+ * @returns {string[]}
+ */
+function uniqueStrings(values) {
+    const seen = new Set();
+    const out = [];
+    for (const value of values) {
+        const normalized = typeof value === 'string' ? value.trim() : '';
+        if (!normalized || seen.has(normalized)) continue;
+        seen.add(normalized);
+        out.push(normalized);
+    }
+    return out;
+}
+
+/**
  * @param {string | undefined} raw
  * @returns {string | undefined}
  */
@@ -566,6 +903,8 @@ function normalizeOllamaBaseUrl(raw) {
 function inferProviderType(env, preset) {
     const explicit = normalizeProviderType(env['COPILOT_BYOK_PROVIDER_TYPE']);
     if (explicit) return explicit;
+    const definition = getByokPresetDefinition(preset);
+    if (definition?.providerType) return definition.providerType;
     if (preset === 'azure') return PROVIDER_TYPES.AZURE;
     if (preset === 'anthropic' || preset === 'claude') return PROVIDER_TYPES.ANTHROPIC;
     return PROVIDER_TYPES.OPENAI;
@@ -580,6 +919,9 @@ function inferProviderType(env, preset) {
 function inferBaseUrl(env, preset, providerType) {
     const explicit = firstEnv(env, ['COPILOT_BYOK_BASE_URL']);
     if (explicit) return explicit;
+    const definition = getByokPresetDefinition(preset);
+    const presetBaseUrl = resolvePresetBaseUrl(definition, env);
+    if (presetBaseUrl) return presetBaseUrl;
     if (preset === 'ollama-local') {
         return normalizeOllamaBaseUrl(firstEnv(env, ['OLLAMA_LOCAL_BASE_URL', 'OLLAMA_BASE_URL'])) ?? 'http://localhost:11434/v1';
     }
@@ -604,6 +946,9 @@ function inferBaseUrl(env, preset, providerType) {
 function inferModel(env, preset, providerType) {
     const explicit = firstEnv(env, ['COPILOT_BYOK_MODEL']);
     if (explicit) return explicit;
+    const definition = getByokPresetDefinition(preset);
+    const presetModel = firstEnv(env, [...(definition?.modelEnvKeys ?? [])]) ?? definition?.defaultModel;
+    if (presetModel) return presetModel;
     if (preset.startsWith('ollama')) return firstEnv(env, ['OLLAMA_DEFAULT_MODEL', 'OLLAMA_CHAT_MODEL']);
     if (preset === 'kilo-code' || preset === 'kilo-gateway' || preset === 'kilo') {
         return firstEnv(env, ['KILO_MODEL', 'KILO_DEFAULT_MODEL']);
@@ -622,12 +967,16 @@ function inferModel(env, preset, providerType) {
 function inferAuth(env, preset, providerType) {
     const bearerToken = firstEnv(env, ['COPILOT_BYOK_BEARER_TOKEN']);
     if (bearerToken) return { bearerToken };
+    const definition = getByokPresetDefinition(preset);
+    const presetBearerToken = firstEnv(env, [...(definition?.bearerTokenEnvKeys ?? [])]);
+    if (presetBearerToken) return { bearerToken: presetBearerToken };
     if (preset === 'kilo-code' || preset === 'kilo-gateway' || preset === 'kilo') {
         const kiloToken = firstEnv(env, ['KILO_API_KEY', 'KILO_CODE_API_KEY']);
         if (kiloToken) return { bearerToken: kiloToken };
     }
     const apiKey =
         firstEnv(env, ['COPILOT_BYOK_API_KEY']) ??
+        firstEnv(env, [...(definition?.apiKeyEnvKeys ?? [])]) ??
         (preset === 'ollama-cloud' ? firstEnv(env, ['OLLAMA_API_KEY', 'OLLAMA_CLOUD_API_KEY']) : undefined) ??
         (providerType === PROVIDER_TYPES.AZURE ? firstEnv(env, ['AZURE_OPENAI_API_KEY']) : undefined) ??
         (providerType === PROVIDER_TYPES.ANTHROPIC
@@ -676,26 +1025,215 @@ function modelIdFromUnknown(value) {
 }
 
 /**
- * @param {string} id
- * @param {{ contextWindowTokens: number; supportsReasoning: boolean; supportsVision: boolean }} caps
- * @returns {import('../types.js').ModelInfo}
+ * @param {unknown} value
+ * @returns {number | undefined}
  */
-function createByokModelInfo(id, caps) {
+function positiveNumberFromUnknown(value) {
+    if (typeof value === 'number' && Number.isFinite(value) && value > 0) return Math.trunc(value);
+    if (typeof value !== 'string' || value.trim() === '') return undefined;
+    const normalized = value.trim().replace(/,/gu, '');
+    const parsed = Number.parseFloat(normalized);
+    return Number.isFinite(parsed) && parsed > 0 ? Math.trunc(parsed) : undefined;
+}
+
+/**
+ * @param {unknown} value
+ * @returns {number | undefined}
+ */
+function priceNumberFromUnknown(value) {
+    if (typeof value === 'number' && Number.isFinite(value) && value >= 0) return value;
+    if (typeof value !== 'string' || value.trim() === '') return undefined;
+    const parsed = Number.parseFloat(value.trim().replace(/[$,]/gu, ''));
+    return Number.isFinite(parsed) && parsed >= 0 ? parsed : undefined;
+}
+
+/**
+ * @param {unknown} value
+ * @returns {string[]}
+ */
+function stringArrayFromUnknown(value) {
+    if (Array.isArray(value)) {
+        return uniqueStrings(value.map((item) => (typeof item === 'string' ? item : String(item))));
+    }
+    if (typeof value === 'string') return parseCsv(value);
+    return [];
+}
+
+/**
+ * @param {Record<string, unknown>} item
+ * @returns {number | undefined}
+ */
+function inferModelContextWindow(item) {
+    const architecture = asPlainObject(item['architecture']);
+    const caps = asPlainObject(item['capabilities']);
+    const limits = asPlainObject(caps['limits']);
+    const candidates = [
+        item['context_length'],
+        item['contextWindow'],
+        item['context_window'],
+        item['context_window_tokens'],
+        item['max_context_length'],
+        item['maxContextLength'],
+        item['max_context_window_tokens'],
+        limits['max_context_window_tokens'],
+        architecture['context_length'],
+    ];
+    for (const candidate of candidates) {
+        const value = positiveNumberFromUnknown(candidate);
+        if (value) return value;
+    }
+    return undefined;
+}
+
+/**
+ * @param {string} id
+ * @param {Record<string, unknown>} item
+ * @param {{ contextWindowTokens: number; supportsReasoning: boolean; supportsVision: boolean; maxRequestTokens?: number | null; tokensPerMinute?: number | null; requestsPerMinute?: number | null; dailyRequests?: number | null }} caps
+ * @param {'static' | 'remote'} source
+ * @returns {{
+ *   source: 'static' | 'remote';
+ *   provider: string | null;
+ *   freeTier: boolean | null;
+ *   pricing: { prompt: number | null; completion: number | null; request: number | null };
+ *   inputModalities: string[];
+ *   outputModalities: string[];
+ *   supportedParameters: string[];
+ *   contextWindowTokens: number;
+ *   rateLimits: { maxRequestTokens: number | null; tokensPerMinute: number | null; requestsPerMinute: number | null; dailyRequests: number | null };
+ *   supportsReasoning: boolean;
+ *   supportsVision: boolean;
+ * }}
+ */
+function buildByokModelMetadata(id, item, caps, source) {
+    const architecture = asPlainObject(item['architecture']);
+    const pricing = asPlainObject(item['pricing']);
+    const provider =
+        optionalString(item['provider']) ??
+        optionalString(item['owned_by']) ??
+        optionalString(item['ownedBy']) ??
+        optionalString(item['provider_name']) ??
+        null;
+    const promptPrice =
+        priceNumberFromUnknown(pricing['prompt']) ??
+        priceNumberFromUnknown(pricing['input']) ??
+        priceNumberFromUnknown(item['input_price']) ??
+        null;
+    const completionPrice =
+        priceNumberFromUnknown(pricing['completion']) ??
+        priceNumberFromUnknown(pricing['output']) ??
+        priceNumberFromUnknown(item['output_price']) ??
+        null;
+    const requestPrice = priceNumberFromUnknown(pricing['request']) ?? priceNumberFromUnknown(item['request_price']) ?? null;
+    const inputModalities = stringArrayFromUnknown(architecture['input_modalities'] ?? item['input_modalities']);
+    const outputModalities = stringArrayFromUnknown(architecture['output_modalities'] ?? item['output_modalities']);
+    const supportedParameters = stringArrayFromUnknown(item['supported_parameters'] ?? item['supportedParameters']);
+    const lowercaseId = id.toLowerCase();
+    const contextWindowTokens = inferModelContextWindow(item) ?? caps.contextWindowTokens;
+    const rateLimits = {
+        maxRequestTokens:
+            positiveNumberFromUnknown(item['max_request_tokens']) ??
+            positiveNumberFromUnknown(item['maxRequestTokens']) ??
+            positiveNumberFromUnknown(item['max_input_tokens']) ??
+            positiveNumberFromUnknown(item['maxInputTokens']) ??
+            caps.maxRequestTokens ??
+            null,
+        tokensPerMinute:
+            positiveNumberFromUnknown(item['tokens_per_minute']) ??
+            positiveNumberFromUnknown(item['tokensPerMinute']) ??
+            positiveNumberFromUnknown(item['tpm']) ??
+            caps.tokensPerMinute ??
+            null,
+        requestsPerMinute:
+            positiveNumberFromUnknown(item['requests_per_minute']) ??
+            positiveNumberFromUnknown(item['requestsPerMinute']) ??
+            positiveNumberFromUnknown(item['rpm']) ??
+            caps.requestsPerMinute ??
+            null,
+        dailyRequests:
+            positiveNumberFromUnknown(item['daily_requests']) ??
+            positiveNumberFromUnknown(item['dailyRequests']) ??
+            positiveNumberFromUnknown(item['requests_per_day']) ??
+            positiveNumberFromUnknown(item['rpd']) ??
+            caps.dailyRequests ??
+            null,
+    };
+    const pricingKnown = promptPrice !== null || completionPrice !== null || requestPrice !== null;
+    const allowProviderCapabilityFallback = source === 'static';
+    const explicitFree =
+        item['free'] === true ||
+        item['is_free'] === true ||
+        item['freeTier'] === true ||
+        /(?:^|[:/_-])free(?:$|[:/_-])/u.test(lowercaseId);
+    const zeroPriced = pricingKnown && (promptPrice ?? 0) === 0 && (completionPrice ?? 0) === 0 && (requestPrice ?? 0) === 0;
+    const supportsReasoning =
+        (allowProviderCapabilityFallback && caps.supportsReasoning) ||
+        supportedParameters.some((param) => /reasoning|include_reasoning|reasoning_effort/u.test(param.toLowerCase())) ||
+        /(?:reasoning|deepseek-r1|qwq|qwen3|gpt-oss|magistral|glm-[45]|glm-5|gemini-[23]|o[134])/u.test(lowercaseId);
+    const supportsVision =
+        (allowProviderCapabilityFallback && caps.supportsVision) ||
+        inputModalities.some((modality) => /image|vision|video/u.test(modality.toLowerCase())) ||
+        /(?:vision|vlm|vl-|vl\b|pixtral|llava|gemini|gpt-4o|llama-4-scout|internvl)/u.test(lowercaseId);
     return {
-        id,
-        name: id,
-        capabilities: {
-            supports: { vision: caps.supportsVision, reasoningEffort: caps.supportsReasoning },
-            limits: { max_context_window_tokens: caps.contextWindowTokens },
-        },
-        policy: { state: 'enabled', terms: '' },
-        billing: { multiplier: 0 },
+        source,
+        provider,
+        freeTier: explicitFree || zeroPriced ? true : pricingKnown ? false : null,
+        pricing: { prompt: promptPrice, completion: completionPrice, request: requestPrice },
+        inputModalities,
+        outputModalities,
+        supportedParameters,
+        contextWindowTokens,
+        rateLimits,
+        supportsReasoning,
+        supportsVision,
     };
 }
 
 /**
+ * @param {ReturnType<typeof buildByokModelMetadata>} metadata
+ * @returns {string}
+ */
+function renderByokModelTerms(metadata) {
+    const tags = [];
+    if (metadata.freeTier === true) tags.push('byok:free');
+    else if (metadata.freeTier === false) tags.push('byok:paid-or-metered');
+    else tags.push('byok:cost-unknown');
+    if (metadata.provider) tags.push(`provider:${metadata.provider}`);
+    if (metadata.pricing.prompt !== null || metadata.pricing.completion !== null) {
+        tags.push(`price:${metadata.pricing.prompt ?? '?'}in/${metadata.pricing.completion ?? '?'}out`);
+    }
+    if (metadata.rateLimits.maxRequestTokens !== null) tags.push(`max-request:${metadata.rateLimits.maxRequestTokens}`);
+    if (metadata.rateLimits.tokensPerMinute !== null) tags.push(`tpm:${metadata.rateLimits.tokensPerMinute}`);
+    if (metadata.rateLimits.requestsPerMinute !== null) tags.push(`rpm:${metadata.rateLimits.requestsPerMinute}`);
+    return tags.join(' ');
+}
+
+/**
+ * @param {string | Record<string, unknown>} item
+ * @param {{ contextWindowTokens: number; supportsReasoning: boolean; supportsVision: boolean; maxRequestTokens?: number | null; tokensPerMinute?: number | null; requestsPerMinute?: number | null; dailyRequests?: number | null }} caps
+ * @param {'static' | 'remote'} [source]
+ * @returns {import('../types.js').ModelInfo}
+ */
+function createByokModelInfo(item, caps, source = 'static') {
+    const id = typeof item === 'string' ? item : modelIdFromUnknown(item);
+    if (!id) throw new Error('[sdk/provider] BYOK model id is required');
+    const objectItem = typeof item === 'string' ? { id } : item;
+    const metadata = buildByokModelMetadata(id, objectItem, caps, source);
+    const info = {
+        id,
+        name: optionalString(objectItem['name']) ?? id,
+        capabilities: {
+            supports: { vision: metadata.supportsVision, reasoningEffort: metadata.supportsReasoning },
+            limits: { max_context_window_tokens: metadata.contextWindowTokens },
+        },
+        policy: { state: 'enabled', terms: renderByokModelTerms(metadata) },
+        billing: { multiplier: 0 },
+    };
+    return /** @type {import('../types.js').ModelInfo} */ (Object.assign(info, { byok: metadata }));
+}
+
+/**
  * @param {unknown} payload
- * @param {{ contextWindowTokens: number; supportsReasoning: boolean; supportsVision: boolean }} caps
+ * @param {{ contextWindowTokens: number; supportsReasoning: boolean; supportsVision: boolean; maxRequestTokens?: number | null; tokensPerMinute?: number | null; requestsPerMinute?: number | null; dailyRequests?: number | null }} caps
  * @returns {import('../types.js').ModelInfo[]}
  */
 function normalizeDiscoveredModels(payload, caps) {
@@ -714,7 +1252,7 @@ function normalizeDiscoveredModels(payload, caps) {
         const id = modelIdFromUnknown(item);
         if (!id || seen.has(id)) continue;
         seen.add(id);
-        models.push(createByokModelInfo(id, caps));
+        models.push(createByokModelInfo(typeof item === 'object' && item !== null ? /** @type {Record<string, unknown>} */ (item) : id, caps, 'remote'));
     }
     return models;
 }
@@ -734,6 +1272,9 @@ function resolveByokModelsEndpoint(provider, env) {
             return new URL(path, `${provider.baseUrl.replace(/\/+$/u, '')}/`).toString();
         }
     }
+    const preset = normalizePreset(env['COPILOT_BYOK_PROVIDER_PRESET']);
+    const definition = getByokPresetDefinition(preset);
+    if (definition?.modelsEndpoint) return definition.modelsEndpoint;
     return new URL('models', `${provider.baseUrl.replace(/\/+$/u, '')}/`).toString();
 }
 
@@ -748,6 +1289,13 @@ function createByokModelDiscoveryHeaders(provider) {
     } else if (provider.apiKey) {
         if (provider.type === PROVIDER_TYPES.AZURE && headers['api-key'] === undefined && headers['Api-Key'] === undefined) {
             headers['api-key'] = provider.apiKey;
+        } else if (
+            provider.baseUrl.includes('generativelanguage.googleapis.com') &&
+            headers['x-goog-api-key'] === undefined &&
+            headers['X-Goog-Api-Key'] === undefined
+        ) {
+            headers['Authorization'] = `Bearer ${provider.apiKey}`;
+            headers['x-goog-api-key'] = provider.apiKey;
         } else if (headers['Authorization'] === undefined && headers['authorization'] === undefined) {
             headers['Authorization'] = `Bearer ${provider.apiKey}`;
         }
@@ -800,9 +1348,20 @@ export function readConfiguredByokState(env = process.env) {
     const warnings = [];
     const errors = [];
     if (resolved.profileError) errors.push(resolved.profileError);
-    const contextWindowTokens = parsePositiveInteger(effectiveEnv['COPILOT_BYOK_CONTEXT_WINDOW_TOKENS'], 128_000);
-    const supportsReasoning = parseBoolean(effectiveEnv['COPILOT_BYOK_SUPPORTS_REASONING']) ?? false;
-    const supportsVision = parseBoolean(effectiveEnv['COPILOT_BYOK_SUPPORTS_VISION']) ?? false;
+    const presetDefinition = getByokPresetDefinition(preset);
+    const contextWindowTokens = parsePositiveInteger(
+        effectiveEnv['COPILOT_BYOK_CONTEXT_WINDOW_TOKENS'],
+        presetDefinition?.contextWindowTokens ?? 128_000,
+    );
+    const supportsReasoning =
+        parseBoolean(effectiveEnv['COPILOT_BYOK_SUPPORTS_REASONING']) ?? presetDefinition?.supportsReasoning ?? false;
+    const supportsVision = parseBoolean(effectiveEnv['COPILOT_BYOK_SUPPORTS_VISION']) ?? presetDefinition?.supportsVision ?? false;
+    const limits = {
+        maxRequestTokens: parseOptionalPositiveInteger(effectiveEnv['COPILOT_BYOK_MAX_REQUEST_TOKENS']),
+        tokensPerMinute: parseOptionalPositiveInteger(effectiveEnv['COPILOT_BYOK_TOKENS_PER_MINUTE']),
+        requestsPerMinute: parseOptionalPositiveInteger(effectiveEnv['COPILOT_BYOK_REQUESTS_PER_MINUTE']),
+        dailyRequests: parseOptionalPositiveInteger(effectiveEnv['COPILOT_BYOK_DAILY_REQUESTS']),
+    };
 
     /** @type {ByokSummary} */
     const disabledSummary = {
@@ -818,6 +1377,7 @@ export function readConfiguredByokState(env = process.env) {
         auth: { apiKeyConfigured: false, bearerTokenConfigured: false, headersConfigured: false },
         modelList: { configured: false, count: 0 },
         capabilities: { reasoningEffort: supportsReasoning, vision: supportsVision, contextWindowTokens },
+        limits,
         warnings: [],
         errors: [],
     };
@@ -854,11 +1414,14 @@ export function readConfiguredByokState(env = process.env) {
         if (!model || model === 'auto') {
             errors.push('COPILOT_BYOK_MODEL must be an explicit provider model id; BYOK cannot use model=auto.');
         }
-        if (preset === 'ollama-cloud' && !apiKeyConfigured && !bearerTokenConfigured) {
-            warnings.push('Ollama Cloud BYOK is configured without OLLAMA_API_KEY, OLLAMA_CLOUD_API_KEY, COPILOT_BYOK_API_KEY, or COPILOT_BYOK_BEARER_TOKEN.');
-        }
-        if ((preset === 'kilo-code' || preset === 'kilo-gateway' || preset === 'kilo') && !bearerTokenConfigured) {
-            warnings.push('Kilo Gateway BYOK is configured without KILO_API_KEY, KILO_CODE_API_KEY, or COPILOT_BYOK_BEARER_TOKEN.');
+        if (presetDefinition?.requiresAuth && !apiKeyConfigured && !bearerTokenConfigured && !headersConfigured) {
+            const acceptedKeys = uniqueStrings([
+                'COPILOT_BYOK_API_KEY',
+                'COPILOT_BYOK_BEARER_TOKEN',
+                ...(presetDefinition.apiKeyEnvKeys ?? []),
+                ...(presetDefinition.bearerTokenEnvKeys ?? []),
+            ]);
+            warnings.push(`${preset} BYOK is configured without an auth secret. Accepted env keys: ${acceptedKeys.join(', ')}.`);
         }
         if (baseUrl) {
             provider = validateConfig({
@@ -870,7 +1433,9 @@ export function readConfiguredByokState(env = process.env) {
                 ...(providerType === PROVIDER_TYPES.AZURE && azureApiVersion
                     ? { azure: { apiVersion: azureApiVersion } }
                     : {}),
-                ...(headers !== undefined ? { headers } : {}),
+                ...(headers !== undefined || presetDefinition?.headers !== undefined
+                    ? { headers: { ...(presetDefinition?.headers ?? {}), ...(headers ?? {}) } }
+                    : {}),
             });
             baseUrl = provider.baseUrl;
         }
@@ -878,7 +1443,13 @@ export function readConfiguredByokState(env = process.env) {
         errors.push(errorMessage(error));
     }
 
-    const models = readConfiguredByokModelsFromEnv(effectiveEnv, { model, contextWindowTokens, supportsReasoning, supportsVision });
+    const models = readConfiguredByokModelsFromEnv(effectiveEnv, {
+        model,
+        contextWindowTokens,
+        supportsReasoning,
+        supportsVision,
+        ...limits,
+    });
     /** @type {ByokSummary} */
     const summary = {
         enabled: true,
@@ -893,6 +1464,7 @@ export function readConfiguredByokState(env = process.env) {
         auth: { apiKeyConfigured, bearerTokenConfigured, headersConfigured },
         modelList: { configured: models.length > 0, count: models.length },
         capabilities: { reasoningEffort: supportsReasoning, vision: supportsVision, contextWindowTokens },
+        limits,
         warnings,
         errors,
     };
@@ -926,31 +1498,60 @@ export function readConfiguredByokSummary(env = process.env) {
  * @param {number} [fallback.contextWindowTokens]
  * @param {boolean} [fallback.supportsReasoning]
  * @param {boolean} [fallback.supportsVision]
+ * @param {number | null} [fallback.maxRequestTokens]
+ * @param {number | null} [fallback.tokensPerMinute]
+ * @param {number | null} [fallback.requestsPerMinute]
+ * @param {number | null} [fallback.dailyRequests]
  * @returns {import('../types.js').ModelInfo[]}
  */
 export function readConfiguredByokModelsFromEnv(env = process.env, fallback = {}) {
     const effectiveEnv = resolveProfileEnv(env).env;
+    const preset = normalizePreset(effectiveEnv['COPILOT_BYOK_PROVIDER_PRESET']);
+    const presetDefinition = getByokPresetDefinition(preset);
     const contextWindowTokens =
-        fallback.contextWindowTokens ?? parsePositiveInteger(effectiveEnv['COPILOT_BYOK_CONTEXT_WINDOW_TOKENS'], 128_000);
+        fallback.contextWindowTokens ??
+        parsePositiveInteger(effectiveEnv['COPILOT_BYOK_CONTEXT_WINDOW_TOKENS'], presetDefinition?.contextWindowTokens ?? 128_000);
     const supportsReasoning =
-        fallback.supportsReasoning ?? (parseBoolean(effectiveEnv['COPILOT_BYOK_SUPPORTS_REASONING']) ?? false);
+        fallback.supportsReasoning ??
+        (parseBoolean(effectiveEnv['COPILOT_BYOK_SUPPORTS_REASONING']) ?? presetDefinition?.supportsReasoning ?? false);
     const supportsVision =
-        fallback.supportsVision ?? (parseBoolean(effectiveEnv['COPILOT_BYOK_SUPPORTS_VISION']) ?? false);
+        fallback.supportsVision ?? (parseBoolean(effectiveEnv['COPILOT_BYOK_SUPPORTS_VISION']) ?? presetDefinition?.supportsVision ?? false);
+    const rateLimits = {
+        maxRequestTokens: fallback.maxRequestTokens ?? parseOptionalPositiveInteger(effectiveEnv['COPILOT_BYOK_MAX_REQUEST_TOKENS']),
+        tokensPerMinute: fallback.tokensPerMinute ?? parseOptionalPositiveInteger(effectiveEnv['COPILOT_BYOK_TOKENS_PER_MINUTE']),
+        requestsPerMinute: fallback.requestsPerMinute ?? parseOptionalPositiveInteger(effectiveEnv['COPILOT_BYOK_REQUESTS_PER_MINUTE']),
+        dailyRequests: fallback.dailyRequests ?? parseOptionalPositiveInteger(effectiveEnv['COPILOT_BYOK_DAILY_REQUESTS']),
+    };
 
-    /** @type {string[]} */
-    let ids = [];
+    /** @type {Array<string | Record<string, unknown>>} */
+    let items = [];
     const json = effectiveEnv['COPILOT_BYOK_MODELS_JSON'];
     if (json && json.trim()) {
         const parsed = JSON.parse(json);
         if (!Array.isArray(parsed)) throw new Error('[sdk/provider] COPILOT_BYOK_MODELS_JSON must be an array');
-        ids = parsed
-            .map((item) => (typeof item === 'string' ? item : typeof item?.id === 'string' ? item.id : ''))
-            .filter(Boolean);
+        items = parsed
+            .map((item) => {
+                if (typeof item === 'string' && item.trim()) return item.trim();
+                if (item && typeof item === 'object' && !Array.isArray(item) && modelIdFromUnknown(item)) {
+                    return /** @type {Record<string, unknown>} */ (item);
+                }
+                return null;
+            })
+            .filter((item) => item !== null);
     }
-    ids = ids.length > 0 ? ids : parseCsv(effectiveEnv['COPILOT_BYOK_MODELS']);
-    if (ids.length === 0 && fallback.model) ids = [fallback.model];
+    if (items.length === 0) items = parseCsv(effectiveEnv['COPILOT_BYOK_MODELS']);
+    if (items.length === 0 && presetDefinition?.staticModels?.length) items = [...presetDefinition.staticModels];
+    if (items.length === 0 && fallback.model) items = [fallback.model];
 
-    return ids.map((id) => createByokModelInfo(id, { contextWindowTokens, supportsReasoning, supportsVision }));
+    return uniqueStrings(items.map((item) => (typeof item === 'string' ? item : modelIdFromUnknown(item) ?? '')))
+        .map((id) => {
+            const objectItem = items.find((item) => typeof item !== 'string' && modelIdFromUnknown(item) === id);
+            return createByokModelInfo(
+                objectItem && typeof objectItem !== 'string' ? objectItem : id,
+                { contextWindowTokens, supportsReasoning, supportsVision, ...rateLimits },
+                'static',
+            );
+        });
 }
 
 /**
@@ -965,6 +1566,7 @@ export async function discoverConfiguredByokModelsFromEnv(env = process.env, opt
         contextWindowTokens: state.summary.capabilities.contextWindowTokens,
         supportsReasoning: state.summary.capabilities.reasoningEffort,
         supportsVision: state.summary.capabilities.vision,
+        ...state.summary.limits,
     });
     if (!state.enabled || !state.ready || !state.provider) {
         return { models: staticModels, source: 'static', endpoint: null, fromCache: false, error: null };
@@ -1004,6 +1606,7 @@ export async function discoverConfiguredByokModelsFromEnv(env = process.env, opt
             contextWindowTokens: state.summary.capabilities.contextWindowTokens,
             supportsReasoning: state.summary.capabilities.reasoningEffort,
             supportsVision: state.summary.capabilities.vision,
+            ...state.summary.limits,
         });
         if (models.length === 0) {
             throw new Error('model discovery returned no usable model ids');

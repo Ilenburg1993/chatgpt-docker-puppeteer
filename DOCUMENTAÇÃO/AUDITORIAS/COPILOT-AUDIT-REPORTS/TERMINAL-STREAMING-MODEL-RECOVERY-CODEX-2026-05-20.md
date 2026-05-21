@@ -734,6 +734,68 @@ Correção:
 
 Status: implementado nesta revisão.
 
+### A38. BYOK universal precisava deixar de ser catalogo bruto
+
+Achado:
+
+- A rodada de providers gratuitos mostrou que BYOK nao pode ser apenas "baseUrl + key + model": OpenRouter, Groq, Gemini, Mistral, Hugging Face, Cloudflare Workers AI, NVIDIA NIM, Cerebras, Chutes e Z.AI possuem contratos OpenAI-compatible parecidos, mas catalogos, metadata e semantica de custo diferentes.
+- O arquivo `DOCUMENTAÇÃO/Provedores de LLMs com acesso gratuito.md` foi lido integralmente e usado como inventario inicial, mas a fonte de autoridade operacional continua sendo a documentacao oficial do provider e o comportamento live do endpoint.
+- Sem enriquecimento de catalogo, `/byok models` força o operador a pesquisar fora do terminal quais modelos sao free, vision, reasoning, long-context, pagos, roteadores, previews ou limitados.
+- O default anterior do OpenRouter (`openrouter/free`) era menos solido do que escolher um modelo `:free` real retornado pelo catalogo. O perfil foi movido para um modelo free descoberto no endpoint oficial.
+
+Correção:
+
+- `sdk/session/provider.js` ganhou presets declarativos para `openrouter`, `groq`, `gemini`, `mistral`, `huggingface`, `cloudflare-workers-ai`, `nvidia-nim`, `cerebras`, `chutes` e `zai`, alem dos presets ja existentes `ollama-*` e `kilo-*`.
+- `BYOK_ENV_KEYS` e `BYOK_SECRET_ENV_KEYS` agora cobrem aliases reais usados pelo operador, sempre com redaction.
+- `.env.local` foi atualizado como cofre unico local e gitignored; `.env.local.example` recebeu a topologia completa sem segredos.
+- A descoberta remota passou a preservar metadata por modelo: `context_length`, modalidades de entrada/saida, parametros suportados, pricing, provider/owner e heuristica de free-tier.
+- `/byok models` agora ranqueia por `free -> capability -> context`, mostra tags `free|metered|cost?`, `reasoning`, `vision`, `ctx`, `price` e `provider`, mantendo paginacao.
+- A inferencia de capabilities deixou de aplicar capacidades do provider inteiro quando o catalogo remoto traz hints por modelo. Isso evita marcar todos os modelos OpenRouter como vision/reasoning so porque o provider como um todo oferece modelos com essas capacidades.
+
+Validação:
+
+- Probe real de catalogo, sem imprimir segredos, retornou:
+  - OpenRouter: `358` modelos, `28` free via catalogo oficial.
+  - Groq: `16` modelos via `https://api.groq.com/openai/v1/models`.
+  - Gemini: `53` modelos via endpoint OpenAI-compatible/Google.
+  - Mistral: `64` modelos.
+  - Hugging Face router: `129` modelos via `https://router.huggingface.co/v1/models`.
+  - NVIDIA NIM: `117` modelos via `https://integrate.api.nvidia.com/v1/models`.
+  - Cerebras: `4` modelos.
+  - Chutes: `13` modelos via `https://llm.chutes.ai/v1/models`.
+  - Z.AI: `7` modelos.
+  - Cloudflare Workers AI: endpoint OpenAI-compatible operacional para chat, mas `/models` retornou `405`; o fallback estatico foi acionado corretamente.
+- Unit tests cobrem presets universais, redaction, metadata rica de modelos estaticos/remotos e ranking do `/byok models`.
+- `npx vitest run tests/unit/copilot/sdk/test_sdk_provider.spec.js tests/unit/copilot/terminal/test_commands_byok.spec.js` passou.
+- `npm run typecheck:strict:src.copilot` passou.
+
+Status: implementado nesta revisão. Ainda falta live funcional com turno completo em mais de um provider novo.
+
+### A39. BYOK precisava de recomendação e alerta de orçamento antes do turno
+
+Achado:
+
+- O probe real sem PR com Groq e OpenRouter passou, mas o turno funcional longo com Groq falhou antes de streaming por limite do provider: a sessão retomada carregava contexto grande e o endpoint retornou erro de requisição acima do orçamento da conta/modelo.
+- Isso não é duplicação de delta nem falha do renderer. É falha de admissão operacional: o operador conseguia selecionar um modelo cujo catálogo era válido, mas sem aviso de que o orçamento `maxRequestTokens`/`TPM` era pequeno demais para a sessão atual.
+- Em BYOK universal, "modelo disponível" não significa "modelo adequado para este turno". Providers free variam entre catálogos enormes com limites generosos e contas com orçamento por minuto muito baixo.
+
+Correção:
+
+- Foram adicionados metadados canônicos de limites BYOK (`maxRequestTokens`, `tokensPerMinute`, `requestsPerMinute`, `dailyRequests`) em `.env*`, schema, resumo seguro, tags de modelos e profiles locais.
+- `/byok status` e `/byok models` agora mostram `maxReq`, `TPM`, `RPM` e `RPD` quando presentes.
+- `/byok recommend` foi criado sobre o mesmo catálogo canônico de `/byok models`, sem nova fonte paralela. Ele aceita filtros `free`, `reasoning`, `vision`, `safe`, `ctx>N`, `maxReq>N`, `refresh` e limite numérico.
+- A recomendação classifica orçamento baixo como alerta explícito: providers com limite abaixo de um piso operacional para turno real aparecem como adequados a probes/sessão fresca/contexto mínimo, não a sessão longa.
+- `/byok reload`, `/byok use`, `/byok provider` e `/byok persist` limpam seletores efêmeros conflitantes, incluindo limites antigos. Isso removeu o bug em que trocar de provider preservava modelo/limite de outro perfil.
+
+Validação:
+
+- Probe real sem PR em `artifacts/terminal-live/byok-real-groq-openrouter-nopr-limits2-2026-05-21/summary.md` passou com Groq ativo, catálogo remoto, limites visíveis e alternância para OpenRouter, sem abrir turno e sem vazar segredos.
+- Probe real sem PR em `artifacts/terminal-live/byok-real-groq-openrouter-nopr-recommend-2026-05-21/summary.md` passou incluindo `/byok recommend`, recomendação OpenRouter com modelos free/raciocínio e retorno ao perfil Groq, sem abrir turno e sem vazar segredos.
+- O live funcional com Groq registrou falha externa por orçamento (`TPM`/requisição acima do permitido), validando a necessidade de admission control antes de turnos longos.
+- Unit tests cobrem `/byok recommend`, filtro `safe` e aviso de orçamento baixo.
+
+Status: parcialmente implementado. Ainda falta admission control automático antes de abrir um turno BYOK real: estimar prompt/contexto atual, comparar com limites do modelo/provider e sugerir sessão fresca, compactação segura ou outro provider antes de chamar o SDK.
+
 ## Hipóteses Externas Rejeitadas Ou Reclassificadas
 
 ### H1. "boot-hub assume sucesso"
@@ -1051,7 +1113,9 @@ Fase J3. Provider e model list
 - J3.7 Listar perfis redigidos para UX/diagnóstico sem expor segredo. Status: feito nesta revisão.
 - J3.8 Cachear catálogo remoto com TTL e timeout configuráveis. Status: feito nesta revisão.
 - J3.9 Permitir endpoint explícito por env/perfil. Status: feito nesta revisão.
-- J3.10 Inferir capabilities reais por modelo remoto quando o provider informar metadados ricos. Status: parcialmente feito; Kilo/Ollama expõem catálogos, mas a inferência ainda é conservadora.
+- J3.10 Inferir capabilities reais por modelo remoto quando o provider informar metadados ricos. Status: ampliado; OpenRouter, Chutes e outros catalogos agora preservam contexto, modalidades, pricing/free-tier e parametros suportados.
+- J3.11 Ranquear catalogos grandes por valor operacional (`free -> capability -> context`) sem perder acesso ao catalogo completo. Status: feito nesta revisão.
+- J3.12 Tratar providers sem `/models` OpenAI-compatible, como Cloudflare Workers AI neste probe, com fallback estatico redigido e aviso claro. Status: feito nesta revisão.
 
 Fase J4. Sessão e lifecycle
 
@@ -1083,6 +1147,10 @@ Fase J5. UX e comandos
 - J5.16 Impedir que `lastPrInfo` histórico sobrescreva o modelo ativo no prompt e na linha de espera. Status: feito nesta revisão; live sem PR confirmou `kilo-auto/free` no prompt.
 - J5.17 Mostrar usage BYOK como telemetria LLM, não Premium Request. Status: feito nesta revisão; live real confirmou `[LLM] ... classe=byok_user_message`.
 - J5.18 Reduzir ruído de `/byok models refresh` em catálogos remotos grandes sem impedir inspeção completa. Status: feito nesta revisão.
+- J5.19 Mostrar tags operacionais por modelo (`free|metered|cost?`, reasoning, vision, contexto, pricing, provider). Status: feito nesta revisão.
+- J5.20 Criar uma recomendação interativa ainda mais forte (`/byok recommend`, filtros `free`, `vision`, `reasoning`, `ctx>`) a partir do mesmo ranking. Status: feito nesta revisão; falta evoluir para recomendação sensível ao contexto real do turno.
+- J5.21 Mostrar limites free/operacionais (`maxReq`, `TPM`, `RPM`, `RPD`) em status, catálogo e recomendação. Status: feito nesta revisão.
+- J5.22 Implementar admission control antes de turno BYOK longo, usando limites declarados e estimativa do contexto atual. Status: pendente.
 
 Fase J6. Testes
 
@@ -1101,6 +1169,11 @@ Fase J6. Testes
 - J6.13 Rodar live BYOK real com Kilo e Ollama Cloud validando prompt ativo, delta parcial, tool, `ask_user`, resposta humana, pós-ask, SSE/JSONL/export, ausência de duplicação e usage sem PR. Status: PASS em `artifacts/terminal-live/2026-05-21T12-40-35-670Z/summary.md` e `artifacts/terminal-live/2026-05-21T12-45-53-564Z/summary.md`.
 - J6.14 Fazer o live runner falhar automaticamente se usage de modelo BYOK aparecer como `[PR]` ou se faltar `byok_user_message` em turno real. Status: feito nesta revisão.
 - J6.15 Cobrir paginação padrão de `/byok models` por unit test. Status: feito nesta revisão.
+- J6.16 Cobrir presets universais OpenRouter/Groq/Gemini/Cerebras/Cloudflare por unit test. Status: feito nesta revisão.
+- J6.17 Cobrir metadata rica e ranking free-first por unit test. Status: feito nesta revisão.
+- J6.18 Rodar probe real de catalogo multi-provider sem vazar segredos. Status: feito nesta revisão; todos os providers novos testados em descoberta/fallback.
+- J6.19 Rodar probe real sem PR com troca Groq -> OpenRouter, limites explícitos e recomendação operacional. Status: PASS em `artifacts/terminal-live/byok-real-groq-openrouter-nopr-recommend-2026-05-21/summary.md`.
+- J6.20 Rodar turno funcional em provider novo com contexto compatível com limite free. Status: pendente; Groq falhou por orçamento baixo em sessão longa, o que agora alimenta admission control.
 
 Fase J7. Providers amplos
 
@@ -1112,6 +1185,16 @@ Fase J7. Providers amplos
 - J7.6 Ollama Cloud. Status: perfil real exercitado no live BYOK; catálogo remoto disponível. Falta turno funcional dedicado no provider.
 - J7.7 LiteLLM/vLLM/routers locais. Status: suportado por contrato OpenAI-compatible; pendente smoke.
 - J7.8 Kilo Gateway/Kilo Code. Status: PASS em live real com `kilo-auto/free`; catálogo remoto de 346 modelos; modelo pago `kilo-auto/balanced` bloqueado por créditos do provider.
+- J7.9 OpenRouter. Status: preset, key local, catalogo real `358` modelos, `28` free; default movido para modelo `:free` real; alternância real sem PR passou. Falta turno funcional live.
+- J7.10 Groq. Status: preset, key local, catalogo real `16` modelos, limites `maxReq`/`TPM` declarados localmente e alternância real sem PR passou. Turno funcional em sessão longa bloqueado por orçamento do provider; requer admission/fresh-session.
+- J7.11 Gemini OpenAI-compatible. Status: preset, key local e catalogo real `53` modelos. Falta turno funcional live e validar diferenca entre Google AI Studio e Google Cloud key.
+- J7.12 Mistral. Status: preset, key local e catalogo real `64` modelos. Falta turno funcional live.
+- J7.13 Hugging Face Router. Status: preset, key local e catalogo real `129` modelos. Falta turno funcional live e filtros por politica `:fastest|:cheapest|:preferred`.
+- J7.14 Cloudflare Workers AI. Status: preset e key/account local; OpenAI-compatible chat suportado, mas `/models` retornou `405`, entao fallback estatico esta correto. Falta probe de chat.
+- J7.15 NVIDIA NIM. Status: preset, key local e catalogo real `117` modelos. Falta turno funcional live.
+- J7.16 Cerebras. Status: preset, key local e catalogo real `4` modelos. Falta turno funcional live.
+- J7.17 Chutes. Status: preset, key local e catalogo real `13` modelos com pricing. Falta turno funcional live.
+- J7.18 Z.AI. Status: preset, key local e catalogo real `7` modelos. Falta turno funcional live.
 
 ## Execução Iniciada Nesta Revisão
 
@@ -1151,6 +1234,12 @@ Implementado:
 - As sessões da LLM-B recebem `provider`, modelo explícito e `modelCapabilities` pelo fluxo canônico de sessão SDK.
 - `/byok` foi adicionado ao terminal com status, modelos descobertos, perfis, reload de `.env.local`, troca SDK/perfil/modelo/provider e contrato de env sem expor credenciais.
 - Templates `.env*`, schema e guia de env foram atualizados com contrato BYOK, perfis e Kilo Gateway.
+- BYOK foi ampliado para presets universais OpenRouter, Groq, Gemini, Mistral, Hugging Face Router, Cloudflare Workers AI, NVIDIA NIM, Cerebras, Chutes e Z.AI, todos pelo fluxo nativo `provider` do SDK.
+- `.env.local` permanece o arquivo unico do operador para segredos e perfis; `.env.local.example` agora documenta a topologia multi-provider sem segredos.
+- `readConfiguredByokModelsFromEnv()` preserva metadata rica vinda de `COPILOT_BYOK_MODELS_JSON`, em vez de reduzir cada objeto a `id`.
+- `discoverConfiguredByokModelsFromEnv()` enriquece catalogos remotos com contexto, modalidades, pricing/free-tier, provider e parametros suportados.
+- `/byok models` passou a ranquear por `free -> capability -> context` e exibir tags operacionais por modelo.
+- Probe real de catalogo multi-provider validou OpenRouter, Groq, Gemini, Mistral, Hugging Face, NVIDIA NIM, Cerebras, Chutes e Z.AI; Cloudflare Workers AI caiu corretamente para fallback estatico porque `/models` retornou `405`.
 - A porta de configuração `src/copilot/config/byok.js` evita que agent/terminal importem diretamente internals do SDK, mantendo a arquitetura de aliases/barrels.
 - O runner live foi corrigido para detectar o pós-`ask_user` apenas depois da resposta humana, removendo falso negativo gerado pelo próprio prompt.
 - `/status`, `/health`, `/model` e auto-brief agora mostram BYOK redigido; `/model <id>` é bloqueado quando BYOK governa o provider customizado via env.
@@ -1231,12 +1320,14 @@ Implementado:
 
 Próxima rodada recomendada:
 
-1. Integrar BYOK em `/events sources`, sem duplicar o fluxo de sessão.
-2. Expandir o cenário live para elicitation quando a capability estiver disponível.
-3. Fechar a recuperação `session.error`/`reconnect_restart`, distinguindo retry real de reenvio ambíguo de prompt.
-4. Criar contrato único de modelo configurado/preferido/efetivo/cobrado, incluindo billing/effective model real em BYOK.
-5. Expandir smoke de elicitation real em BYOK e fake SDK end-to-end sem rede.
-6. Rodar turno funcional dedicado em Ollama Cloud e, quando disponível, Ollama local/LiteLLM/vLLM.
-7. Continuar a normalização de tool identity em completions/progress externos sem requestId, com métricas para qualquer lifecycle ainda genérico.
-8. Integrar falha de `wireRuntime()` ao `ErrorTracker` com metadados de fase.
-9. Expandir `/events sources` com filtros compostos por classe e evento. Hints básicos de `/events event=...` e `/events source=...` já foram feitos.
+1. Rodar turno funcional live com OpenRouter free e Groq/Gemini, validando deltas, final, tools, `ask_user`, usage sem PR, retorno ao SDK e ausência de duplicações.
+2. Implementar admission control BYOK antes do turno: estimar contexto/prompt, comparar com `maxReq`/`TPM`/janela e orientar sessão fresca, compactação ou troca de provider antes de chamar o SDK.
+3. Evoluir `/byok recommend` para ficar sensível ao contexto atual da sessão, além dos filtros ja implementados (`free`, `vision`, `reasoning`, `ctx`, `maxReq`, `safe`).
+4. Validar Cloudflare Workers AI por chat real, já que `/models` respondeu `405` e precisa manter fallback estatico claro.
+5. Expandir o cenário live para elicitation quando a capability estiver disponível.
+6. Fechar a recuperação `session.error`/`reconnect_restart`, distinguindo retry real de reenvio ambíguo de prompt.
+7. Criar contrato único de modelo configurado/preferido/efetivo/cobrado, incluindo billing/effective model real em BYOK.
+8. Expandir smoke de elicitation real em BYOK e fake SDK end-to-end sem rede.
+9. Rodar turno funcional dedicado em Ollama Cloud e, quando disponível, Ollama local/LiteLLM/vLLM.
+10. Continuar a normalização de tool identity em completions/progress externos sem requestId, com métricas para qualquer lifecycle ainda genérico.
+11. Integrar falha de `wireRuntime()` ao `ErrorTracker` com metadados de fase.

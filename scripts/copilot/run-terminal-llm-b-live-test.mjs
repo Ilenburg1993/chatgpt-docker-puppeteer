@@ -93,8 +93,10 @@ function buildByokProbeCommands({ fixtureBaseUrl = 'http://127.0.0.1:11434/v1' }
         '/byok env',
         '/byok profiles',
         '/byok models refresh',
+        '/byok recommend free reasoning safe 5',
         '/byok use codex-fixture',
         '/byok models refresh',
+        '/byok recommend free reasoning safe 5',
         '/byok model fixture/model-b',
         '/byok',
         `/byok provider openai-compatible fixture/model-c ${fixtureBaseUrl}`,
@@ -238,7 +240,7 @@ function buildRealByokRuntime({ dotenvEnv, requestedProfile, requestedAltProfile
 function buildByokRealPreflightCommands({ profile, altProfile, model, altModel }) {
     const commands = ['/byok reload', '/byok env', '/byok profiles'];
     if (profile) commands.push(`/byok use ${profile}`);
-    commands.push('/byok', '/byok models refresh');
+    commands.push('/byok', '/byok models refresh', '/byok recommend free reasoning safe 8');
     if (altModel && altModel !== model) {
         commands.push(`/byok model ${altModel}`, '/byok');
     }
@@ -246,7 +248,7 @@ function buildByokRealPreflightCommands({ profile, altProfile, model, altModel }
         commands.push(`/byok model ${model}`, '/byok');
     }
     if (altProfile) {
-        commands.push(`/byok use ${altProfile}`, '/byok', '/byok models refresh');
+        commands.push(`/byok use ${altProfile}`, '/byok', '/byok models refresh', '/byok recommend free reasoning safe 8');
         if (profile) commands.push(`/byok use ${profile}`, '/byok');
     }
     return commands;
@@ -888,6 +890,11 @@ function evaluateByokProbeOutput(plain, sseSummary, { fixture = false } = {}) {
             detail: '/byok models refresh rendered model catalog state without exposing secrets',
         },
         {
+            id: 'byok-recommend-visible',
+            pass: /BYOK recommend/.test(plain) && /Use \/byok model <id>/.test(plain),
+            detail: '/byok recommend rendered ranked operational recommendations',
+        },
+        {
             id: 'byok-use-sdk-visible',
             pass: /BYOK desativado no processo atual|SDK Copilot/.test(plain),
             detail: '/byok use sdk returned the process to the SDK-governed mode',
@@ -997,6 +1004,11 @@ function evaluateByokRealOutput(plain, secretValues, { profile, altProfile, mode
             id: 'byok-real-model-catalog',
             pass: /BYOK models/.test(plain) && !/Nenhum modelo BYOK configurado/.test(plain),
             detail: 'BYOK model catalog command returned a usable catalog or remote/static fallback',
+        },
+        {
+            id: 'byok-real-recommendation',
+            pass: /BYOK recommend/.test(plain) && /ok para uso geral|baixo para turno real|apertado para sessão longa/.test(plain),
+            detail: 'BYOK recommendation command rendered operational budget guidance',
         },
         {
             id: 'byok-real-model-switch',

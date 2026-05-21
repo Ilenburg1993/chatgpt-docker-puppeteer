@@ -16,6 +16,29 @@ import { discoverConfiguredByokModelsFromEnv } from '#copilot/config';
 import { readTerminalByokProjection } from '../frontend/index.js';
 
 const DEFAULT_BYOK_MODELS_DISPLAY_LIMIT = 24;
+const DEFAULT_BYOK_RECOMMEND_DISPLAY_LIMIT = 8;
+const BYOK_LOW_REQUEST_TOKEN_LIMIT = 8_000;
+const BYOK_COMFORTABLE_REQUEST_TOKEN_LIMIT = 32_000;
+const BYOK_RUNTIME_SELECTOR_ENV_KEYS = Object.freeze([
+    'COPILOT_BYOK_PROFILE',
+    'COPILOT_BYOK_PROVIDER_PRESET',
+    'COPILOT_BYOK_PROVIDER_TYPE',
+    'COPILOT_BYOK_BASE_URL',
+    'COPILOT_BYOK_WIRE_API',
+    'COPILOT_BYOK_AZURE_API_VERSION',
+    'COPILOT_BYOK_HEADERS_JSON',
+    'COPILOT_BYOK_MODEL',
+    'COPILOT_BYOK_MODELS',
+    'COPILOT_BYOK_MODELS_JSON',
+    'COPILOT_BYOK_MODELS_ENDPOINT',
+    'COPILOT_BYOK_CONTEXT_WINDOW_TOKENS',
+    'COPILOT_BYOK_MAX_REQUEST_TOKENS',
+    'COPILOT_BYOK_TOKENS_PER_MINUTE',
+    'COPILOT_BYOK_REQUESTS_PER_MINUTE',
+    'COPILOT_BYOK_DAILY_REQUESTS',
+    'COPILOT_BYOK_SUPPORTS_REASONING',
+    'COPILOT_BYOK_SUPPORTS_VISION',
+]);
 
 /**
  * @typedef {object} ByokCommandContext
@@ -36,6 +59,180 @@ function yesNo(value) {
  */
 function valueOrDash(value) {
     return value && value.length > 0 ? value : '-';
+}
+
+/**
+ * @param {import('#copilot/sdk/types').ModelInfo} model
+ * @returns {{
+ *   freeTier?: boolean | null;
+ *   pricing?: { prompt?: number | null; completion?: number | null; request?: number | null };
+ *   rateLimits?: { maxRequestTokens?: number | null; tokensPerMinute?: number | null; requestsPerMinute?: number | null; dailyRequests?: number | null };
+ *   provider?: string | null;
+ *   source?: string;
+ *   inputModalities?: string[];
+ *   outputModalities?: string[];
+ * } | undefined}
+ */
+function getByokModelMetadata(model) {
+    return /** @type {{ byok?: { freeTier?: boolean | null; pricing?: { prompt?: number | null; completion?: number | null; request?: number | null }; rateLimits?: { maxRequestTokens?: number | null; tokensPerMinute?: number | null; requestsPerMinute?: number | null; dailyRequests?: number | null }; provider?: string | null; source?: string; inputModalities?: string[]; outputModalities?: string[] } }} */ (model).byok;
+}
+
+/**
+ * @param {unknown} value
+ * @returns {string}
+ */
+function compactNumber(value) {
+    return typeof value === 'number' && Number.isFinite(value) ? String(value) : '?';
+}
+
+/**
+ * @param {import('#copilot/sdk/types').ModelInfo} model
+ * @returns {number}
+ */
+function scoreByokModel(model) {
+    const meta = getByokModelMetadata(model);
+    const ctxTokens = model.capabilities?.limits?.max_context_window_tokens ?? 0;
+    let score = 0;
+    if (meta?.freeTier === true) score += 1_000_000_000;
+    if (model.capabilities?.supports?.reasoningEffort) score += 100_000_000;
+    if (model.capabilities?.supports?.vision) score += 10_000_000;
+    score += Math.min(Number(ctxTokens) || 0, 2_000_000);
+    if (meta?.freeTier === false) score -= 10_000;
+    return score;
+}
+
+/**
+ * @param {import('#copilot/sdk/types').ModelInfo[]} models
+ * @returns {import('#copilot/sdk/types').ModelInfo[]}
+ */
+function rankByokModels(models) {
+    return models
+        .map((model, index) => ({ model, index }))
+        .sort((a, b) => scoreByokModel(b.model) - scoreByokModel(a.model) || a.index - b.index)
+        .map((item) => item.model);
+}
+
+/**
+ * @param {import('#copilot/sdk/types').ModelInfo} model
+ * @returns {{ level: 'ok' | 'caution' | 'blocked'; label: string }}
+ */
+function classifyByokModelBudget(model) {
+    const meta = getByokModelMetadata(model);
+    const limit = meta?.rateLimits?.maxRequestTokens ?? meta?.rateLimits?.tokensPerMinute ?? null;
+    if (limit !== null && limit < BYOK_LOW_REQUEST_TOKEN_LIMIT) {
+        return {
+            level: 'blocked',
+            label: `baixo para turno real (${limit} tokens); use sessão fresca, prompt mínimo ou outro provider`,
+        };
+    }
+    if (limit !== null && limit < BYOK_COMFORTABLE_REQUEST_TOKEN_LIMIT) {
+        return {
+            level: 'caution',
+            label: `apertado para sessão longa (${limit} tokens); recomendado para probes ou contexto compacto`,
+        };
+    }
+    const context = model.capabilities?.limits?.max_context_window_tokens ?? null;
+    if (typeof context === 'number' && context > 0 && context < BYOK_COMFORTABLE_REQUEST_TOKEN_LIMIT) {
+        return {
+            level: 'caution',
+            label: `contexto pequeno (${context}); evitar turnos com histórico grande`,
+        };
+    }
+    return { level: 'ok', label: 'ok para uso geral, sujeito ao plano real do provider' };
+}
+
+/**
+ * @param {string[]} rest
+ * @returns {{ limit: number; freeOnly: boolean; vision: boolean; reasoning: boolean; minContext: number | null; minRequest: number | null; avoidLowLimit: boolean; forceRefresh: boolean }}
+ */
+function parseRecommendArgs(rest) {
+    const state = {
+        limit: DEFAULT_BYOK_RECOMMEND_DISPLAY_LIMIT,
+        freeOnly: false,
+        vision: false,
+        reasoning: false,
+        minContext: /** @type {number | null} */ (null),
+        minRequest: /** @type {number | null} */ (null),
+        avoidLowLimit: false,
+        forceRefresh: false,
+    };
+    for (const rawItem of rest) {
+        const item = rawItem.toLowerCase();
+        const numeric = Number.parseInt(item, 10);
+        if (Number.isFinite(numeric) && numeric > 0) {
+            state.limit = numeric;
+        } else if (['refresh', 'force', '--refresh', '--force'].includes(item)) {
+            state.forceRefresh = true;
+        } else if (['free', '--free'].includes(item)) {
+            state.freeOnly = true;
+        } else if (['vision', '--vision'].includes(item)) {
+            state.vision = true;
+        } else if (['reasoning', '--reasoning'].includes(item)) {
+            state.reasoning = true;
+        } else if (['safe', 'no-low-limit', '--safe', '--no-low-limit'].includes(item)) {
+            state.avoidLowLimit = true;
+        } else if (item.startsWith('ctx>=')) {
+            state.minContext = Number.parseInt(item.slice(5), 10) || null;
+        } else if (item.startsWith('ctx>')) {
+            state.minContext = Number.parseInt(item.slice(4), 10) || null;
+        } else if (item.startsWith('maxreq>=')) {
+            state.minRequest = Number.parseInt(item.slice(8), 10) || null;
+        } else if (item.startsWith('maxreq>')) {
+            state.minRequest = Number.parseInt(item.slice(7), 10) || null;
+        }
+    }
+    return state;
+}
+
+/**
+ * @param {import('#copilot/sdk/types').ModelInfo} model
+ * @param {ReturnType<typeof parseRecommendArgs>} filters
+ * @returns {boolean}
+ */
+function matchesRecommendFilters(model, filters) {
+    const meta = getByokModelMetadata(model);
+    const context = model.capabilities?.limits?.max_context_window_tokens ?? 0;
+    const maxRequest = meta?.rateLimits?.maxRequestTokens ?? meta?.rateLimits?.tokensPerMinute ?? null;
+    if (filters.freeOnly && meta?.freeTier !== true) return false;
+    if (filters.vision && !model.capabilities?.supports?.vision) return false;
+    if (filters.reasoning && !model.capabilities?.supports?.reasoningEffort) return false;
+    if (filters.minContext !== null && context < filters.minContext) return false;
+    if (filters.minRequest !== null && (maxRequest === null || maxRequest < filters.minRequest)) return false;
+    if (filters.avoidLowLimit && classifyByokModelBudget(model).level === 'blocked') return false;
+    return true;
+}
+
+/**
+ * @param {import('#copilot/sdk/types').ModelInfo} model
+ * @returns {string}
+ */
+function renderModelTags(model) {
+    const meta = getByokModelMetadata(model);
+    const tags = [];
+    tags.push(meta?.freeTier === true ? 'free' : meta?.freeTier === false ? 'metered' : 'cost?');
+    tags.push(model.capabilities?.supports?.reasoningEffort ? 'reasoning' : 'no-reasoning');
+    tags.push(model.capabilities?.supports?.vision ? 'vision' : 'no-vision');
+    tags.push(`ctx=${model.capabilities?.limits?.max_context_window_tokens ?? 'n/a'}`);
+    if (meta?.pricing && (meta.pricing.prompt !== null || meta.pricing.completion !== null || meta.pricing.request !== null)) {
+        tags.push(`price=${compactNumber(meta.pricing.prompt)}/${compactNumber(meta.pricing.completion)}`);
+    }
+    if (meta?.rateLimits?.maxRequestTokens) tags.push(`maxReq=${meta.rateLimits.maxRequestTokens}`);
+    if (meta?.rateLimits?.tokensPerMinute) tags.push(`TPM=${meta.rateLimits.tokensPerMinute}`);
+    if (meta?.rateLimits?.requestsPerMinute) tags.push(`RPM=${meta.rateLimits.requestsPerMinute}`);
+    if (meta?.rateLimits?.dailyRequests) tags.push(`RPD=${meta.rateLimits.dailyRequests}`);
+    if (meta?.provider) tags.push(`provider=${meta.provider}`);
+    const inputs = meta?.inputModalities?.length ? meta.inputModalities.join('+') : '';
+    if (inputs && inputs !== 'text') tags.push(`in=${inputs}`);
+    return tags.join(' · ');
+}
+
+/**
+ * @param {import('#copilot/sdk/types').ModelInfo[]} models
+ * @param {ReturnType<typeof parseRecommendArgs>} filters
+ * @returns {import('#copilot/sdk/types').ModelInfo[]}
+ */
+function recommendByokModels(models, filters) {
+    return rankByokModels(models).filter((model) => matchesRecommendFilters(model, filters)).slice(0, filters.limit);
 }
 
 /**
@@ -61,6 +258,15 @@ function renderStatus(projection, println) {
     println(
         `    capabilities:  reasoning=${yesNo(summary.capabilities.reasoningEffort)} · vision=${yesNo(summary.capabilities.vision)} · ctx=${summary.capabilities.contextWindowTokens}`,
     );
+    const limitParts = [
+        summary.limits?.maxRequestTokens ? `maxReq=${summary.limits.maxRequestTokens}` : null,
+        summary.limits?.tokensPerMinute ? `TPM=${summary.limits.tokensPerMinute}` : null,
+        summary.limits?.requestsPerMinute ? `RPM=${summary.limits.requestsPerMinute}` : null,
+        summary.limits?.dailyRequests ? `RPD=${summary.limits.dailyRequests}` : null,
+    ].filter(Boolean);
+    if (limitParts.length > 0) {
+        println(`    limits:        \x1b[33m${limitParts.join(' · ')}\x1b[0m`);
+    }
     println(`    modelList:     ${summary.modelList.count} modelo(s)`);
     for (const warning of summary.warnings) {
         println(`  \x1b[33m  aviso: ${warning}\x1b[0m`);
@@ -69,7 +275,7 @@ function renderStatus(projection, println) {
         println(`  \x1b[31m  erro: ${error}\x1b[0m`);
     }
     println('  \x1b[90mArquivo unico de BYOK: .env.local. Mudancas via comando valem para o processo atual; use /restart para nova sessao SDK.\x1b[0m');
-    println('  \x1b[90mUso: /byok | /byok reload | /byok profiles | /byok models [refresh|all|n] | /byok use <perfil|sdk> | /byok model <id> | /byok provider <preset> [model] [baseUrl] | /byok persist <sdk|profile|model|provider> | /byok env\x1b[0m\n');
+    println('  \x1b[90mUso: /byok | /byok reload | /byok profiles | /byok models [refresh|all|n] | /byok recommend [free] [reasoning] [vision] [safe] [ctx>N] [maxReq>N] [n] | /byok use <perfil|sdk> | /byok model <id> | /byok provider <preset> [model] [baseUrl] | /byok persist <sdk|profile|model|provider> | /byok env\x1b[0m\n');
 }
 
 /**
@@ -78,6 +284,19 @@ function renderStatus(projection, println) {
  */
 function normalizeArg(value) {
     return value.trim();
+}
+
+/**
+ * Remove apenas seletores efêmeros de runtime. Segredos e perfis permanecem no ambiente e/ou .env.local.
+ *
+ * @param {Iterable<string>} [except]
+ * @returns {void}
+ */
+function clearRuntimeSelectors(except = []) {
+    const keep = new Set(except);
+    for (const key of BYOK_RUNTIME_SELECTOR_ENV_KEYS) {
+        if (!keep.has(key)) delete process.env[key];
+    }
 }
 
 /**
@@ -155,10 +374,7 @@ async function persistByokSelection(rest, projection) {
             return next;
         });
         process.env['COPILOT_BYOK_ENABLED'] = 'false';
-        delete process.env['COPILOT_BYOK_PROFILE'];
-        delete process.env['COPILOT_BYOK_MODEL'];
-        delete process.env['COPILOT_BYOK_PROVIDER_PRESET'];
-        delete process.env['COPILOT_BYOK_BASE_URL'];
+        clearRuntimeSelectors();
         return 'BYOK persistido como desativado; SDK Copilot governará o próximo boot.';
     }
 
@@ -176,10 +392,8 @@ async function persistByokSelection(rest, projection) {
             return next;
         });
         process.env['COPILOT_BYOK_ENABLED'] = 'true';
+        clearRuntimeSelectors();
         process.env['COPILOT_BYOK_PROFILE'] = profileName;
-        delete process.env['COPILOT_BYOK_MODEL'];
-        delete process.env['COPILOT_BYOK_PROVIDER_PRESET'];
-        delete process.env['COPILOT_BYOK_BASE_URL'];
         return `Perfil BYOK persistido: ${profileName}.`;
     }
 
@@ -191,6 +405,7 @@ async function persistByokSelection(rest, projection) {
             return next;
         });
         process.env['COPILOT_BYOK_ENABLED'] = 'true';
+        clearRuntimeSelectors(['COPILOT_BYOK_PROFILE']);
         process.env['COPILOT_BYOK_MODEL'] = model;
         return `Modelo BYOK persistido: ${model}.`;
     }
@@ -204,12 +419,12 @@ async function persistByokSelection(rest, projection) {
             let next = setEnvLine(text, 'COPILOT_BYOK_ENABLED', 'true');
             next = deleteEnvLine(next, 'COPILOT_BYOK_PROFILE');
             next = setEnvLine(next, 'COPILOT_BYOK_PROVIDER_PRESET', preset);
-            if (model) next = setEnvLine(next, 'COPILOT_BYOK_MODEL', model);
-            if (baseUrl) next = setEnvLine(next, 'COPILOT_BYOK_BASE_URL', baseUrl);
+            next = model ? setEnvLine(next, 'COPILOT_BYOK_MODEL', model) : deleteEnvLine(next, 'COPILOT_BYOK_MODEL');
+            next = baseUrl ? setEnvLine(next, 'COPILOT_BYOK_BASE_URL', baseUrl) : deleteEnvLine(next, 'COPILOT_BYOK_BASE_URL');
             return next;
         });
         process.env['COPILOT_BYOK_ENABLED'] = 'true';
-        delete process.env['COPILOT_BYOK_PROFILE'];
+        clearRuntimeSelectors();
         process.env['COPILOT_BYOK_PROVIDER_PRESET'] = preset;
         if (model) process.env['COPILOT_BYOK_MODEL'] = model;
         if (baseUrl) process.env['COPILOT_BYOK_BASE_URL'] = baseUrl;
@@ -255,6 +470,7 @@ export async function cmdByok({ println }, arg) {
     }
 
     if (sub === 'reload') {
+        clearRuntimeSelectors();
         const result = loadDotenv({ path: '.env.local', override: true, quiet: true });
         if (result.error) {
             println(`  \x1b[31mNão foi possível recarregar .env.local: ${result.error.message}\x1b[0m\n`);
@@ -298,7 +514,7 @@ export async function cmdByok({ println }, arg) {
             .find((value) => Number.isFinite(value) && value > 0);
         const limit = showAll ? Number.POSITIVE_INFINITY : explicitLimit ?? DEFAULT_BYOK_MODELS_DISPLAY_LIMIT;
         const discovered = await discoverConfiguredByokModelsFromEnv(process.env, { forceRefresh });
-        const modelList = discovered.models.length > 0 ? discovered.models : models;
+        const modelList = rankByokModels(discovered.models.length > 0 ? discovered.models : models);
         const visibleModels = modelList.slice(0, limit);
         const sourceLabel =
             discovered.source === 'remote'
@@ -309,7 +525,9 @@ export async function cmdByok({ println }, arg) {
                     ? 'static-fallback'
                     : 'static';
         println(`\n  \x1b[36mBYOK models\x1b[0m (${modelList.length})`);
-        println(`  \x1b[90mfonte=${sourceLabel}${discovered.endpoint ? ` · endpoint=${discovered.endpoint}` : ''}\x1b[0m\n`);
+        println(
+            `  \x1b[90mfonte=${sourceLabel}${discovered.endpoint ? ` · endpoint=${discovered.endpoint}` : ''} · ordem=free/capability/context\x1b[0m\n`,
+        );
         if (discovered.error) {
             println(`  \x1b[33m  aviso: descoberta remota indisponível (${discovered.error}); usando catálogo estático.\x1b[0m`);
         }
@@ -318,10 +536,7 @@ export async function cmdByok({ println }, arg) {
             return;
         }
         for (const model of visibleModels) {
-            const reasoning = model.capabilities?.supports?.reasoningEffort ? 'reasoning' : 'no-reasoning';
-            const vision = model.capabilities?.supports?.vision ? 'vision' : 'no-vision';
-            const ctxTokens = model.capabilities?.limits?.max_context_window_tokens ?? 'n/a';
-            println(`    \x1b[33m${model.id}\x1b[0m  \x1b[90m${reasoning} · ${vision} · ctx=${ctxTokens}\x1b[0m`);
+            println(`    \x1b[33m${model.id}\x1b[0m  \x1b[90m${renderModelTags(model)}\x1b[0m`);
         }
         if (visibleModels.length < modelList.length) {
             println(
@@ -329,6 +544,51 @@ export async function cmdByok({ println }, arg) {
             );
         }
         println('');
+        return;
+    }
+
+    if (sub === 'recommend' || sub === 'rec') {
+        const filters = parseRecommendArgs(rest);
+        const discovered = await discoverConfiguredByokModelsFromEnv(process.env, { forceRefresh: filters.forceRefresh });
+        const modelList = discovered.models.length > 0 ? discovered.models : models;
+        const recommended = recommendByokModels(modelList, filters);
+        const sourceLabel =
+            discovered.source === 'remote'
+                ? 'provider'
+                : discovered.source === 'remote-cache'
+                  ? 'provider-cache'
+                  : discovered.source === 'static-fallback'
+                    ? 'static-fallback'
+                    : 'static';
+        const filterLabel = [
+            filters.freeOnly ? 'free' : null,
+            filters.reasoning ? 'reasoning' : null,
+            filters.vision ? 'vision' : null,
+            filters.avoidLowLimit ? 'safe' : null,
+            filters.minContext !== null ? `ctx>${filters.minContext}` : null,
+            filters.minRequest !== null ? `maxReq>${filters.minRequest}` : null,
+        ].filter(Boolean);
+        println(`\n  \x1b[36mBYOK recommend\x1b[0m (${recommended.length}/${modelList.length})`);
+        println(
+            `  \x1b[90mfonte=${sourceLabel}${discovered.endpoint ? ` · endpoint=${discovered.endpoint}` : ''} · filtros=${filterLabel.join(',') || '-'}\x1b[0m\n`,
+        );
+        if (discovered.error) {
+            println(`  \x1b[33m  aviso: descoberta remota indisponível (${discovered.error}); usando catálogo estático.\x1b[0m`);
+        }
+        if (recommended.length === 0) {
+            println('    \x1b[33mNenhum modelo atende aos filtros. Tente remover filtros ou rode /byok models refresh.\x1b[0m\n');
+            return;
+        }
+        let index = 1;
+        for (const model of recommended) {
+            const budget = classifyByokModelBudget(model);
+            const color = budget.level === 'ok' ? '\x1b[32m' : budget.level === 'caution' ? '\x1b[33m' : '\x1b[31m';
+            println(`    ${index}. \x1b[33m${model.id}\x1b[0m`);
+            println(`       \x1b[90m${renderModelTags(model)}\x1b[0m`);
+            println(`       ${color}${budget.label}\x1b[0m`);
+            index += 1;
+        }
+        println('\n  \x1b[90mUse /byok model <id> para trocar apenas o modelo do provider/perfil ativo; use /byok use <perfil> para trocar provider.\x1b[0m\n');
         return;
     }
 
@@ -340,7 +600,7 @@ export async function cmdByok({ println }, arg) {
         }
         if (target === 'sdk' || target === 'off' || target === 'copilot') {
             process.env['COPILOT_BYOK_ENABLED'] = 'false';
-            delete process.env['COPILOT_BYOK_PROFILE'];
+            clearRuntimeSelectors();
             println('\n  \x1b[32mBYOK desativado no processo atual; o SDK Copilot volta a governar a próxima sessão.\x1b[0m');
             println('  \x1b[90mUse /restart para reabrir o dialog loop com o SDK sem provider customizado.\x1b[0m\n');
             return;
@@ -350,8 +610,8 @@ export async function cmdByok({ println }, arg) {
             return;
         }
         process.env['COPILOT_BYOK_ENABLED'] = 'true';
+        clearRuntimeSelectors();
         process.env['COPILOT_BYOK_PROFILE'] = target;
-        delete process.env['COPILOT_BYOK_MODEL'];
         renderStatus(readTerminalByokProjection(), println);
         return;
     }
@@ -363,6 +623,7 @@ export async function cmdByok({ println }, arg) {
             return;
         }
         process.env['COPILOT_BYOK_ENABLED'] = 'true';
+        clearRuntimeSelectors(['COPILOT_BYOK_PROFILE']);
         process.env['COPILOT_BYOK_MODEL'] = model;
         renderStatus(readTerminalByokProjection(), println);
         return;
@@ -375,7 +636,7 @@ export async function cmdByok({ println }, arg) {
             return;
         }
         process.env['COPILOT_BYOK_ENABLED'] = 'true';
-        delete process.env['COPILOT_BYOK_PROFILE'];
+        clearRuntimeSelectors();
         process.env['COPILOT_BYOK_PROVIDER_PRESET'] = preset;
         if (model) process.env['COPILOT_BYOK_MODEL'] = model;
         if (baseUrl) process.env['COPILOT_BYOK_BASE_URL'] = baseUrl;

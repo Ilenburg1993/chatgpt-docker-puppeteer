@@ -7,7 +7,7 @@
  */
 
 import { emitNerv } from '#copilot/bridges';
-import { LLM_B_BOOT_TIMEOUT_MS } from '#copilot/config';
+import { LLM_B_BOOT_TIMEOUT_MS, readConfiguredByokSummary } from '#copilot/config';
 import { cancelTimer, container, registerInterval, sleepMs, toError } from '#copilot/core';
 import { utf8ByteLength } from '#copilot/infra/public/buffer';
 import { log, METRICS_STORE } from '#copilot/observability';
@@ -150,6 +150,71 @@ let _ensureDialogLoopInFlight = null;
 
 const WAITING_FRAMES = ['⏳', '⌛', '⏳'];
 const LIVE_TURN_NARRATION_INTERVAL_MS = 10_000;
+const BYOK_TURN_RESPONSE_RESERVE_TOKENS = 1_024;
+const BYOK_LOW_REQUEST_TOKEN_LIMIT = 8_000;
+
+/**
+ * @param {unknown} value
+ * @returns {number | null}
+ */
+function finitePositiveNumber(value) {
+    return typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : null;
+}
+
+/**
+ * @param {ReturnType<typeof readConfiguredByokSummary>} byok
+ * @param {ReturnType<typeof readTerminalRuntimeState>} runtimeState
+ * @param {string} message
+ * @returns {{ shouldWarn: boolean; label: string; estimatedRequestTokens: number; limit: number | null; utilization: number | null }}
+ */
+export function evaluateTerminalByokTurnBudget(byok, runtimeState, message) {
+    const limit = byok.limits?.maxRequestTokens ?? byok.limits?.tokensPerMinute ?? null;
+    const contextState = runtimeState.contextWindow;
+    const tokenLimit =
+        finitePositiveNumber(/** @type {{ tokenLimit?: unknown }} */ (contextState ?? {}).tokenLimit) ??
+        finitePositiveNumber(byok.capabilities?.contextWindowTokens) ??
+        null;
+    const directTokens = finitePositiveNumber(/** @type {{ tokens?: unknown }} */ (contextState ?? {}).tokens);
+    const utilization = finitePositiveNumber(/** @type {{ utilization?: unknown }} */ (contextState ?? {}).utilization);
+    const estimatedContextTokens =
+        directTokens ?? (tokenLimit !== null && utilization !== null ? Math.ceil(tokenLimit * utilization) : 0);
+    const estimatedMessageTokens = Math.ceil(utf8ByteLength(message, 'terminal byok budget estimate') / 4);
+    const estimatedRequestTokens = Math.max(
+        0,
+        estimatedContextTokens + estimatedMessageTokens + BYOK_TURN_RESPONSE_RESERVE_TOKENS,
+    );
+    if (!byok.enabled || !byok.ready || limit === null) {
+        return { shouldWarn: false, label: 'sem limite BYOK declarado', estimatedRequestTokens, limit, utilization };
+    }
+    if (limit < BYOK_LOW_REQUEST_TOKEN_LIMIT) {
+        return {
+            shouldWarn: true,
+            label: `limite BYOK baixo (${limit} tokens); prefira sessão fresca, prompt mínimo ou /byok recommend safe`,
+            estimatedRequestTokens,
+            limit,
+            utilization,
+        };
+    }
+    if (estimatedRequestTokens > limit) {
+        return {
+            shouldWarn: true,
+            label: `requisição estimada ${estimatedRequestTokens} tokens > limite BYOK ${limit}; o provider pode recusar antes do streaming`,
+            estimatedRequestTokens,
+            limit,
+            utilization,
+        };
+    }
+    if (estimatedRequestTokens > limit * 0.85) {
+        return {
+            shouldWarn: true,
+            label: `requisição estimada em ${estimatedRequestTokens}/${limit} tokens; margem BYOK estreita`,
+            estimatedRequestTokens,
+            limit,
+            utilization,
+        };
+    }
+    return { shouldWarn: false, label: 'orçamento BYOK suficiente para a estimativa atual', estimatedRequestTokens, limit, utilization };
+}
 
 /**
  * @param {{
@@ -437,6 +502,17 @@ async function _executeTurn(message, actor, attachments = [], requestHeaders = n
                 `\x1b[33m  ⚠️  Context window em ${(u * 100).toFixed(0)}% — considere usar /compact em breve.\x1b[0m`,
             );
         }
+    }
+
+    const byokBudget = evaluateTerminalByokTurnBudget(readConfiguredByokSummary(), runtimeState, message);
+    if (byokBudget.shouldWarn) {
+        recordTerminalActivity('system', 'Orçamento BYOK apertado', {
+            detail: byokBudget.label,
+            source: 'dialog',
+            severity: 'warn',
+        });
+        println(`\x1b[33m  ⚠️  BYOK budget: ${byokBudget.label}.\x1b[0m`);
+        println('\x1b[90m     Dica: /byok recommend safe · /compact · /byok use <perfil> · /byok model <id>\x1b[0m');
     }
 
     const metricsSummary = (() => {

@@ -160,6 +160,44 @@ describe('terminal/dialog/engine.js — contrato', () => {
         expect(typeof mod.getTurnQueueDepth).toBe('function');
     });
 
+    it('exporta avaliação de orçamento BYOK antes do turno', async () => {
+        expect(typeof mod.evaluateTerminalByokTurnBudget).toBe('function');
+    });
+
+    it('avisa quando o orçamento BYOK declarado é baixo para turno real', async () => {
+        const result = mod.evaluateTerminalByokTurnBudget(
+            {
+                enabled: true,
+                ready: true,
+                limits: { maxRequestTokens: 6000, tokensPerMinute: 6000 },
+                capabilities: { contextWindowTokens: 131072 },
+            },
+            { contextWindow: { tokens: 1000, tokenLimit: 131072, utilization: 0.01 } },
+            'mensagem curta',
+        );
+
+        expect(result.shouldWarn).toBe(true);
+        expect(result.label).toContain('limite BYOK baixo');
+        expect(result.limit).toBe(6000);
+    });
+
+    it('avisa quando a estimativa do turno ultrapassa o limite BYOK', async () => {
+        const result = mod.evaluateTerminalByokTurnBudget(
+            {
+                enabled: true,
+                ready: true,
+                limits: { maxRequestTokens: 12000, tokensPerMinute: null },
+                capabilities: { contextWindowTokens: 131072 },
+            },
+            { contextWindow: { tokens: 11500, tokenLimit: 131072, utilization: 0.09 } },
+            'mensagem que empurra o turno acima do limite',
+        );
+
+        expect(result.shouldWarn).toBe(true);
+        expect(result.label).toContain('provider pode recusar');
+        expect(result.estimatedRequestTokens).toBeGreaterThan(12000);
+    });
+
     it('embute blob attachment estruturado no próximo turno do usuário', async () => {
         const state = await import('../../../src/copilot/presentation/state/index.js');
         const runtimeDialog = await import('../../../src/copilot/presentation/runtime/index.js');
