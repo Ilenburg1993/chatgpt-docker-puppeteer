@@ -33,6 +33,10 @@ describe('copilot MCP registry', () => {
             'repo_tree',
             'repo_write_file',
             'run_copilot_validator',
+            'run_lint_copilot',
+            'run_project_doctor',
+            'run_typecheck_copilot',
+            'run_unit_copilot',
         ]);
     });
 

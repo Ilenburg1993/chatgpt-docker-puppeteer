@@ -44,6 +44,10 @@ Esta primeira faixa expõe somente leitura, Git read-only e diagnóstico:
 - `git_branch_info`
 - `project_doctor`
 - `run_copilot_validator`
+- `run_typecheck_copilot`
+- `run_lint_copilot`
+- `run_unit_copilot`
+- `run_project_doctor`
 - `job_get_output`
 - `job_cancel`
 - `chatgpt_connector_profile`

@@ -29,6 +29,10 @@ npx vitest --config vitest.copilot.config.js run tests/unit/copilot/mcp/*.spec.j
 - `git_branch_info`
 - `project_doctor`
 - `run_copilot_validator`
+- `run_typecheck_copilot`
+- `run_lint_copilot`
+- `run_unit_copilot`
+- `run_project_doctor`
 - `job_get_output`
 - `job_cancel`
 - `chatgpt_connector_profile`
@@ -48,11 +52,11 @@ npx vitest --config vitest.copilot.config.js run tests/unit/copilot/mcp/*.spec.j
 - Faixa I repo-side: typecheck strict passou, lint completo passou, testes MCP focados passaram, smoke HTTP passou.
 - Faixa G.1 MCP: typecheck strict passou, lint completo passou, lint MCP passou, testes MCP focados passaram com 6 arquivos e 20 testes.
 - Suite unit completa apos G.1: 3019 testes totais, 3013 passaram, 6 falhas preexistentes fora do MCP permanecem.
+- Faixa H.1 MCP: typecheck strict passou, lint completo passou, lint MCP passou, testes MCP focados passaram com 6 arquivos e 21 testes.
 
 ## Proximo passo
 
-Faixa G.1 foi preparada. Continuar para Faixa H: aliases/tools canonicas para validadores (`run_typecheck_copilot`,
-`run_lint_copilot`, `run_unit_copilot`, `run_project_doctor`) sobre o mecanismo de jobs MCP.
+Faixa H.1 foi preparada. Continuar para H.2: timeout explicito por chamada de job e metadados de comando no retorno.
 
 ## Jobs MCP
 
@@ -62,6 +66,13 @@ Faixa G.1 foi preparada. Continuar para Faixa H: aliases/tools canonicas para va
 - `lint`
 - `unit-mcp`
 - `unit-copilot`
+
+Aliases canonicos:
+
+- `run_typecheck_copilot`
+- `run_lint_copilot`
+- `run_unit_copilot`
+- `run_project_doctor`
 
 Os logs de job ficam em `src/copilot/.ai/jobs/*.log` e sao ignorados pelo Git.
 

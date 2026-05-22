@@ -9,13 +9,63 @@ import { z } from 'zod';
 import { boundedWriteAnnotations, readOnlyAnnotations } from '../control-plane/annotations.js';
 import { cancelJob, readJobOutput, spawnValidatorJob } from '../control-plane/jobs.js';
 import { errorResult, okResult } from '../control-plane/result.js';
+import { projectDoctorTool } from './project-doctor.js';
 
 const validatorSchema = z.enum(['typecheck', 'lint', 'unit-mcp', 'unit-copilot']);
+
+/**
+ * @param {import('../control-plane/jobs.js').CopilotValidatorName} validator
+ * @param {string} name
+ * @param {string} title
+ * @param {string} description
+ * @returns {import('../registry.js').McpToolDefinition}
+ */
+function buildValidatorAliasTool(validator, name, title, description) {
+    return {
+        name,
+        title,
+        description,
+        inputSchema: {},
+        annotations: boundedWriteAnnotations(),
+        handler: async () => {
+            const job = await spawnValidatorJob(validator);
+            return okResult({ success: true, job }, `Started job ${job.id} (${validator}).`);
+        },
+    };
+}
 
 /**
  * @type {import('../registry.js').McpToolDefinition[]}
  */
 export const jobTools = [
+    buildValidatorAliasTool(
+        'typecheck',
+        'run_typecheck_copilot',
+        'Run Copilot typecheck',
+        'Start the canonical strict typecheck job for src/copilot.',
+    ),
+    buildValidatorAliasTool(
+        'lint',
+        'run_lint_copilot',
+        'Run Copilot lint',
+        'Start the canonical lint job for src/copilot and unit tests.',
+    ),
+    buildValidatorAliasTool(
+        'unit-copilot',
+        'run_unit_copilot',
+        'Run Copilot unit tests',
+        'Start the canonical full unit test job for src/copilot.',
+    ),
+    {
+        name: 'run_project_doctor',
+        title: 'Run project doctor',
+        description: 'Return the canonical Copilot MCP project doctor report.',
+        inputSchema: {
+            includeScripts: z.boolean().optional().describe('Include relevant npm scripts. Default: true.'),
+        },
+        annotations: readOnlyAnnotations(),
+        handler: projectDoctorTool.handler,
+    },
     {
         name: 'run_copilot_validator',
         title: 'Run Copilot validator',
@@ -60,4 +110,3 @@ export const jobTools = [
         },
     },
 ];
-

@@ -402,21 +402,21 @@ O Express server atual pode receber uma rota `/mcp`, mas a primeira versao deve 
 
 ### Faixa H — Execucao controlada
 
-**Status:** pendente.
+**Status:** H.1 concluida; H.2 ja possui base inicial concluida com jobs assincronos allowlistados.
 
 #### Fase H.1 — Scripts canonicos
 
-1. `run_typecheck_copilot`
-2. `run_lint_copilot`
-3. `run_unit_copilot`
-4. `run_project_doctor`
+1. `run_typecheck_copilot` — concluida.
+2. `run_lint_copilot` — concluida.
+3. `run_unit_copilot` — concluida.
+4. `run_project_doctor` — concluida.
 
 #### Fase H.2 — Jobs assincronos
 
-1. Comandos longos nao bloqueiam tool call indefinidamente.
-2. Saida paginada.
-3. Cancelamento.
-4. Timeout configuravel.
+1. Comandos longos nao bloqueiam tool call indefinidamente — concluido via `spawnValidatorJob`.
+2. Saida paginada — concluido via `job_get_output` com `tailBytes`.
+3. Cancelamento — concluido via `job_cancel`.
+4. Timeout configuravel — pendente como configuracao explicita por chamada; atualmente comandos rodam ate concluir/cancelar.
 
 ### Faixa I — Tunnel e ChatGPT
 
@@ -706,6 +706,27 @@ Faixa G, Fase G.1: escrita controlada (`repo_apply_patch` primeiro), com diff, p
 Faixa H ja possui a base inicial de jobs allowlistados. A proxima consolidacao cronologica e alinhar os nomes canonicos
 `run_typecheck_copilot`, `run_lint_copilot`, `run_unit_copilot` e `run_project_doctor` como aliases/tools explicitas sobre
 o mecanismo de jobs ja existente.
+
+### 2026-05-22 — Faixa H.1 aliases canonicos de validacao
+
+1. `src/copilot/mcp/tools/jobs.js` agora expoe wrappers canonicos:
+   - `run_typecheck_copilot`
+   - `run_lint_copilot`
+   - `run_unit_copilot`
+   - `run_project_doctor`
+2. `run_typecheck_copilot`, `run_lint_copilot` e `run_unit_copilot` usam `spawnValidatorJob` e retornam `job.id`.
+3. `run_project_doctor` reutiliza o handler de `project_doctor`, sem abrir processo desnecessario.
+4. `run_copilot_validator` permanece como ferramenta parametrica para compatibilidade e para `unit-mcp`.
+5. `job_get_output` e `job_cancel` continuam sendo o plano de observabilidade e controle.
+6. Validacao executada:
+   - `npm run typecheck:strict:src.copilot` passou.
+   - `npm run lint:copilot` passou.
+   - `node --max-old-space-size=6144 node_modules/.bin/eslint src/copilot/mcp tests/unit/copilot/mcp --no-cache` passou.
+   - `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/mcp/*.spec.js` passou: 6 arquivos, 21 testes.
+
+### Proximo item cronologico apos Faixa H.1
+
+Concluir H.2 adicionando timeout explicito por chamada de job e metadados de comando no retorno do job.
 
 ---
 

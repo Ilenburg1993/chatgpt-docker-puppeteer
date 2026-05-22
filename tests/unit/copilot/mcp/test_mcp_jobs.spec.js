@@ -7,6 +7,7 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'vitest';
 
 import { resolveValidatorCommand } from '../../../../src/copilot/mcp/control-plane/jobs.js';
+import { jobTools } from '../../../../src/copilot/mcp/tools/jobs.js';
 
 describe('copilot MCP jobs', () => {
     it('resolves only allowlisted validator commands', () => {
@@ -28,5 +29,12 @@ describe('copilot MCP jobs', () => {
     it('rejects unsupported validators', () => {
         assert.throws(() => resolveValidatorCommand(/** @type {any} */ ('admin-command')), /Unsupported validator/);
     });
-});
 
+    it('exposes canonical validator alias tools', () => {
+        const names = jobTools.map((tool) => tool.name);
+        assert.ok(names.includes('run_typecheck_copilot'));
+        assert.ok(names.includes('run_lint_copilot'));
+        assert.ok(names.includes('run_unit_copilot'));
+        assert.ok(names.includes('run_project_doctor'));
+    });
+});
