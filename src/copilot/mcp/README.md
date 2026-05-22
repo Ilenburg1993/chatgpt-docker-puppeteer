@@ -35,6 +35,7 @@ Cloudflare Quick Tunnel:
 
 ```bash
 npm run copilot:mcp:http
+npm run copilot:mcp:smoke:local
 npm run copilot:mcp:cloudflare:doctor
 npm run copilot:mcp:cloudflare:quick
 ```

@@ -720,3 +720,8 @@ Validadores:
     - `smoke` remoto conferindo tools criticas e divergencia contra o registry MCP local.
 11. A rodada seguinte acrescentou persistencia de `lastSmoke` no estado temporario, com horario, health remoto e resumo
     da paridade de tools do endpoint publico.
+12. O smoke HTTP local canonico passou antes do Cloudflare:
+    - `GET /health` HTTP 200;
+    - `tools/list` com 33 tools;
+    - paridade exata contra o registry local;
+    - `tools/call mcp_runtime_health` sem erro JSON-RPC.

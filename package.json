@@ -325,6 +325,7 @@
     "copilot:mcp:cloudflare:status": "node src/copilot/mcp/cloudflare/cli.js status",
     "copilot:mcp:cloudflare:run": "node src/copilot/mcp/cloudflare/cli.js run",
     "copilot:mcp:http": "node src/copilot/mcp/index.js --transport http",
+    "copilot:mcp:smoke:local": "node src/copilot/mcp/scripts/smoke-http.js",
     "copilot:mcp:stdio": "node src/copilot/mcp/index.js --transport stdio",
     "daemon:flush": "env -u NO_COLOR npx pm2 flush",
     "daemon:kill": "env -u NO_COLOR npx pm2 delete all",

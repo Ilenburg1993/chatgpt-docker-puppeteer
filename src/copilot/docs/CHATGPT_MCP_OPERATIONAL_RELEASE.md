@@ -22,6 +22,12 @@ HTTP local:
 npm run copilot:mcp:http
 ```
 
+Smoke local do endpoint HTTP:
+
+```bash
+npm run copilot:mcp:smoke:local
+```
+
 Endpoint MCP:
 
 ```text
@@ -90,12 +96,13 @@ por Cloudflare Tunnel ou mediado pelo Secure MCP Tunnel.
 Antes de colar a URL, confira:
 
 1. `npm run copilot:mcp:cloudflare:status` retorna `summary.recommendedAction` como `use` ou `smoke`.
-2. Se retornar `smoke`, rode `npm run copilot:mcp:cloudflare:smoke` e so use a URL se `ok=true`.
-3. Se retornar `start` ou `restart`, crie novo Quick Tunnel e atualize a caixa do ChatGPT.
-4. `smoke.toolsList.toolsMatchLocalRegistry` precisa ser `true`.
-5. `smoke.toolsList.expectedLocalTools` deve refletir o registry MCP local atual.
-6. `smoke.toolsList.missingCriticalTools`, `missingLocalTools` e `unexpectedRemoteTools` precisam estar vazios.
-7. Depois do smoke, `status.summary.lastSmokeOk` deve ser `true` e `lastSmokeAgeMinutes` deve ser recente.
+2. `npm run copilot:mcp:smoke:local` passa contra o origin local antes de abrir Cloudflare.
+3. Se retornar `smoke`, rode `npm run copilot:mcp:cloudflare:smoke` e so use a URL se `ok=true`.
+4. Se retornar `start` ou `restart`, crie novo Quick Tunnel e atualize a caixa do ChatGPT.
+5. `smoke.toolsList.toolsMatchLocalRegistry` precisa ser `true`.
+6. `smoke.toolsList.expectedLocalTools` deve refletir o registry MCP local atual.
+7. `smoke.toolsList.missingCriticalTools`, `missingLocalTools` e `unexpectedRemoteTools` precisam estar vazios.
+8. Depois do smoke, `status.summary.lastSmokeOk` deve ser `true` e `lastSmokeAgeMinutes` deve ser recente.
 
 ## 4. Smoke Tests
 

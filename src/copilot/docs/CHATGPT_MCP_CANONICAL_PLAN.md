@@ -910,6 +910,23 @@ Efeito operacional:
 4. O runbook Cloudflare passou a orientar `status -> smoke -> status`.
 5. O endpoint `/chatgpt-connector.json` herda o perfil atualizado.
 
+### 2026-05-22 — Smoke HTTP local canonico antes do Cloudflare
+
+1. Criado `src/copilot/mcp/scripts/smoke-http.js`.
+2. Criado script npm:
+   - `npm run copilot:mcp:smoke:local`.
+3. O smoke local valida:
+   - `GET /health`;
+   - `POST /mcp tools/list`;
+   - chamada `tools/call mcp_runtime_health`;
+   - paridade exata da lista remota contra `getCanonicalMcpTools`.
+4. O objetivo e separar falha do origin local de falha do Cloudflare Tunnel.
+5. A sequencia operacional passa a ser:
+   - subir `npm run copilot:mcp:http`;
+   - rodar `npm run copilot:mcp:smoke:local`;
+   - abrir Quick Tunnel;
+   - rodar smoke Cloudflare remoto.
+
 ### Proximo item cronologico apos Faixa I
 
 Faixa G, Fase G.1: escrita controlada (`repo_apply_patch` primeiro), com diff, path policy e auditoria.
