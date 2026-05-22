@@ -94,7 +94,13 @@ export const jobTools = [
         annotations: readOnlyAnnotations(),
         handler: async ({ jobId, tailBytes }) => {
             const result = await readJobOutput(jobId, tailBytes);
-            if (!result.job) return errorResult('Job not found.', { jobId });
+            if (!result.job) {
+                return errorResult('Job not found.', {
+                    code: 'ERR_JOB_NOT_FOUND',
+                    hint: 'Use the jobId returned by run_copilot_validator in the current MCP process.',
+                    jobId,
+                });
+            }
             return okResult({ success: true, ...result }, result.output);
         },
     },
@@ -108,7 +114,14 @@ export const jobTools = [
         annotations: boundedWriteAnnotations(),
         handler: async ({ jobId }) => {
             const result = cancelJob(jobId);
-            if (!result.ok) return errorResult(result.message, { jobId, job: result.job });
+            if (!result.ok) {
+                return errorResult(result.message, {
+                    code: result.job ? 'ERR_JOB_NOT_RUNNING' : 'ERR_JOB_NOT_FOUND',
+                    hint: 'Use job_cancel only for a running job created by run_copilot_validator.',
+                    jobId,
+                    job: result.job,
+                });
+            }
             return okResult({ success: true, job: result.job }, result.message);
         },
     },

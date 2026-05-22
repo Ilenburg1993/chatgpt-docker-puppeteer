@@ -39,12 +39,18 @@ export function okResult(structuredContent, text, meta) {
  * @returns {CallToolResult}
  */
 export function errorResult(message, details) {
+    const code =
+        details && typeof details['code'] === 'string' && details['code'].trim() ? details['code'].trim() : undefined;
+    const hint =
+        details && typeof details['hint'] === 'string' && details['hint'].trim() ? details['hint'].trim() : undefined;
     return {
         isError: true,
         content: [{ type: 'text', text: message }],
         structuredContent: {
             success: false,
+            ...(code ? { code } : {}),
             error: message,
+            ...(hint ? { hint } : {}),
             ...(details ? { details } : {}),
         },
     };

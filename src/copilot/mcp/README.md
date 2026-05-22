@@ -122,6 +122,13 @@ As tools MCP de leitura espelham o plano de IO usado pelas tools locais da LLM-B
 - `repo_symbol_search` espelha `workspace_symbol_search` para navegacao por declaracoes.
 - `repo_file_outline` espelha `workspace_parse_file` para symbols/imports/exports/outline sem expor runtime da LLM-B.
 
+Erros recuperaveis usam contratos estaveis em `structuredContent`:
+
+- `code`: identificador estavel, por exemplo `ERR_EMPTY_PATH`, `ERR_PATH_DENIED`, `ERR_INVALID_CURSOR`.
+- `error`: mensagem humana.
+- `hint`: orientacao curta de recovery quando disponivel.
+- `details`: metadados especificos da tool, preservando compatibilidade com chamadas existentes.
+
 A LLM-B continua independente do MCP server. Ela pode consumir MCP por opt-in, mas o chat local nao passa a depender do
 servidor MCP para boot ou uso normal.
 

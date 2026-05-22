@@ -56,7 +56,7 @@ export const repoReadTools = [
         annotations: readOnlyAnnotations(),
         handler: async ({ path, recursive, depth, maxEntries, showHidden }) => {
             const resolved = await resolveReadPath(normalizeOptionalRepoPath(path, DEFAULT_REPO_READ_PATH));
-            if (!resolved.ok) return errorResult(resolved.reason);
+            if (!resolved.ok) return errorResult(resolved.reason, resolved);
             const scan = await scanDirectory(resolved.resolved, {
                 workspaceRoot: WORKSPACE_ROOT,
                 recursive: recursive === true,
@@ -89,7 +89,7 @@ export const repoReadTools = [
         annotations: readOnlyAnnotations(),
         handler: async ({ recursive, depth, maxEntries, showHidden }) => {
             const resolved = await resolveReadPath('.');
-            if (!resolved.ok) return errorResult(resolved.reason);
+            if (!resolved.ok) return errorResult(resolved.reason, resolved);
             const scan = await scanDirectory(resolved.resolved, {
                 workspaceRoot: WORKSPACE_ROOT,
                 recursive: recursive === true,
@@ -120,9 +120,12 @@ export const repoReadTools = [
         annotations: readOnlyAnnotations(),
         handler: async ({ path, startLine, endLine }) => {
             const resolved = await resolveReadPath(path);
-            if (!resolved.ok) return errorResult(resolved.reason);
+            if (!resolved.ok) return errorResult(resolved.reason, resolved);
             if (startLine !== undefined && endLine !== undefined && endLine < startLine) {
-                return errorResult('endLine must be greater than or equal to startLine.');
+                return errorResult('endLine must be greater than or equal to startLine.', {
+                    code: 'ERR_INVALID_LINE_RANGE',
+                    hint: 'Use endLine greater than or equal to startLine, or omit endLine.',
+                });
             }
             const snapshot = await readText(resolved.resolved, {
                 ...(startLine !== undefined ? { startLine } : {}),
@@ -163,14 +166,20 @@ export const repoReadTools = [
         annotations: readOnlyAnnotations(),
         handler: async ({ path, startLine, endLine, chunkLines, cursor, highWaterMark }) => {
             const resolved = await resolveReadPath(path);
-            if (!resolved.ok) return errorResult(resolved.reason);
+            if (!resolved.ok) return errorResult(resolved.reason, resolved);
             const parsedCursorLine = cursor !== undefined ? Number.parseInt(cursor, 10) : null;
             if (parsedCursorLine !== null && (!Number.isFinite(parsedCursorLine) || parsedCursorLine < 1)) {
-                return errorResult('cursor must be a positive line number string.');
+                return errorResult('cursor must be a positive line number string.', {
+                    code: 'ERR_INVALID_CURSOR',
+                    hint: 'Pass the nextCursor returned by repo_read_file_chunks, or omit cursor.',
+                });
             }
             const effectiveStartLine = parsedCursorLine ?? startLine ?? 1;
             if (endLine !== undefined && endLine < effectiveStartLine) {
-                return errorResult('endLine must be greater than or equal to the effective start line.');
+                return errorResult('endLine must be greater than or equal to the effective start line.', {
+                    code: 'ERR_INVALID_LINE_RANGE',
+                    hint: 'Use endLine greater than or equal to cursor/startLine, or omit endLine.',
+                });
             }
             const snapshot = await readTextChunks(resolved.resolved, {
                 startLine: effectiveStartLine,
@@ -216,9 +225,9 @@ export const repoReadTools = [
         annotations: readOnlyAnnotations(),
         handler: async ({ pathA, pathB, contextLines }) => {
             const resolvedA = await resolveReadPath(pathA);
-            if (!resolvedA.ok) return errorResult(`pathA: ${resolvedA.reason}`);
+            if (!resolvedA.ok) return errorResult(`pathA: ${resolvedA.reason}`, { ...resolvedA, field: 'pathA' });
             const resolvedB = await resolveReadPath(pathB);
-            if (!resolvedB.ok) return errorResult(`pathB: ${resolvedB.reason}`);
+            if (!resolvedB.ok) return errorResult(`pathB: ${resolvedB.reason}`, { ...resolvedB, field: 'pathB' });
             const diff = await diffText(resolvedA.resolved, resolvedB.resolved, { contextLines: contextLines ?? 3 });
             return okResult(
                 {
@@ -262,7 +271,7 @@ export const repoReadTools = [
             cursor,
         }) => {
             const resolved = await resolveReadPath(normalizeOptionalRepoPath(path, DEFAULT_REPO_READ_PATH));
-            if (!resolved.ok) return errorResult(resolved.reason);
+            if (!resolved.ok) return errorResult(resolved.reason, resolved);
             const result = await searchText(resolved.resolved, {
                 workspaceRoot: WORKSPACE_ROOT,
                 pattern,
@@ -312,7 +321,7 @@ export const repoReadTools = [
         annotations: readOnlyAnnotations(),
         handler: async ({ name, kind, path, includePattern, caseSensitive, exactMatch, maxResults, cursor }) => {
             const resolved = await resolveReadPath(normalizeOptionalRepoPath(path, DEFAULT_REPO_READ_PATH));
-            if (!resolved.ok) return errorResult(resolved.reason);
+            if (!resolved.ok) return errorResult(resolved.reason, resolved);
             const result = await searchWorkspaceSymbols(resolved.resolved, {
                 symbolName: name,
                 kind: kind ?? 'all',
@@ -355,7 +364,7 @@ export const repoReadTools = [
         annotations: readOnlyAnnotations(),
         handler: async ({ path, includeImports, includeExports, includeOutline, includeTopComments }) => {
             const resolved = await resolveReadPath(path);
-            if (!resolved.ok) return errorResult(resolved.reason);
+            if (!resolved.ok) return errorResult(resolved.reason, resolved);
             const snapshot = await readText(resolved.resolved);
             const parsed = await parseFileForContext(resolved.resolved, snapshot.content);
             const structured = {

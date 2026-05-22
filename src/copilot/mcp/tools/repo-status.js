@@ -18,7 +18,12 @@ export async function repoStatusHandler() {
         execGit(['status', '--short', '--branch']),
         execGit(['rev-parse', '--short', 'HEAD']),
     ]);
-    if (!status.success) return errorResult(status.error ?? 'Unable to read git status.');
+    if (!status.success) {
+        return errorResult(status.error ?? 'Unable to read git status.', {
+            code: 'ERR_GIT_STATUS_FAILED',
+            hint: 'Confirm this workspace is a Git repository and Git is available in the container.',
+        });
+    }
     const structured = {
         success: true,
         workspaceRoot: getMcpWorkspaceRoot(),
@@ -32,4 +37,3 @@ export async function repoStatusHandler() {
     };
     return okResult(structured, `branch=${structured.branch}\nhead=${structured.head}\n${structured.status}`.trim());
 }
-

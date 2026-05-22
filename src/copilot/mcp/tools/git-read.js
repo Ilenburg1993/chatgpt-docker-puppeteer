@@ -22,7 +22,12 @@ export const gitReadTools = [
         annotations: readOnlyAnnotations(),
         handler: async () => {
             const status = await execGit(['status', '--short', '--branch']);
-            if (!status.success) return errorResult(status.error ?? 'Unable to read git status.');
+            if (!status.success) {
+                return errorResult(status.error ?? 'Unable to read git status.', {
+                    code: 'ERR_GIT_STATUS_FAILED',
+                    hint: 'Confirm this workspace is a Git repository and Git is available in the container.',
+                });
+            }
             return okResult({ success: true, status: status.stdout }, status.stdout || '(clean)');
         },
     },
@@ -40,7 +45,13 @@ export const gitReadTools = [
             if (staged === true) args.push('--staged');
             if (path) args.push('--', path);
             const diff = await execGit(args, { maxBufferBytes: 4 * 1024 * 1024 });
-            if (!diff.success) return errorResult(diff.error ?? 'Unable to read git diff.');
+            if (!diff.success) {
+                return errorResult(diff.error ?? 'Unable to read git diff.', {
+                    code: 'ERR_GIT_DIFF_FAILED',
+                    hint: 'Check the optional path and confirm Git can read the repository diff.',
+                    path: path ?? null,
+                });
+            }
             return okResult({ success: true, diff: diff.stdout, staged: staged === true, path: path ?? null }, diff.stdout);
         },
     },
@@ -55,7 +66,13 @@ export const gitReadTools = [
         handler: async ({ limit }) => {
             const safeLimit = String(limit ?? 10);
             const log = await execGit(['log', '--oneline', `-${safeLimit}`]);
-            if (!log.success) return errorResult(log.error ?? 'Unable to read git log.');
+            if (!log.success) {
+                return errorResult(log.error ?? 'Unable to read git log.', {
+                    code: 'ERR_GIT_LOG_FAILED',
+                    hint: 'Confirm the repository has commits and Git can access HEAD.',
+                    limit: Number(safeLimit),
+                });
+            }
             return okResult({ success: true, log: log.stdout, limit: Number(safeLimit) }, log.stdout);
         },
     },
@@ -81,4 +98,3 @@ export const gitReadTools = [
         },
     },
 ];
-

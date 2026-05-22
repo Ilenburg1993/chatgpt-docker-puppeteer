@@ -25,6 +25,10 @@ describe('copilot MCP tools', () => {
 
         const denied = await resolveReadPath('../package.json');
         assert.equal(denied.ok, false);
+        if (!denied.ok) {
+            assert.equal(denied.code, 'ERR_PATH_DENIED');
+            assert.equal(typeof denied.hint, 'string');
+        }
     });
 
     it('repo_read_file returns structured content and text content', async () => {
@@ -44,6 +48,23 @@ describe('copilot MCP tools', () => {
         assert.equal(typeof structured['returnedSha256'], 'string');
         assert.ok(Array.isArray(result.content));
         assert.ok(String(result.content[0]?.text ?? '').includes('Copilot MCP Server'));
+    });
+
+    it('read tools return stable error codes for recoverable client errors', async () => {
+        const readTool = findTool('repo_read_file');
+        const emptyPath = await readTool.handler({ path: '' });
+        assert.equal(emptyPath.isError, true);
+        assert.equal(emptyPath.structuredContent?.['success'], false);
+        assert.equal(emptyPath.structuredContent?.['code'], 'ERR_EMPTY_PATH');
+        assert.equal(typeof emptyPath.structuredContent?.['hint'], 'string');
+
+        const invalidRange = await readTool.handler({
+            path: 'src/copilot/mcp/README.md',
+            startLine: 10,
+            endLine: 2,
+        });
+        assert.equal(invalidRange.isError, true);
+        assert.equal(invalidRange.structuredContent?.['code'], 'ERR_INVALID_LINE_RANGE');
     });
 
     it('repo_tree accepts empty path and repo_root_tree exposes workspace root', async () => {

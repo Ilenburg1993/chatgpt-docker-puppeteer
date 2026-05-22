@@ -821,6 +821,48 @@ Upgrades aplicados nesta faixa:
     - tunnel vivo e stale;
     - PID morto.
 
+### 2026-05-22 — Contratos de erro recuperavel no MCP
+
+Gap tratado:
+
+1. O primeiro uso real indicou que mensagens humanas eram legiveis, mas ainda pouco estruturadas para recuperacao
+   automatica por cliente MCP.
+2. A escrita controlada ja passava `code` em varios erros, mas esse dado ficava dentro de `details`.
+3. Leitura, paths, Git, jobs e sessoes Copilot ainda tinham varios caminhos de erro somente textuais.
+
+Decisoes:
+
+1. `errorResult` preserva o formato existente e passa a promover `details.code` para `structuredContent.code`.
+2. `errorResult` tambem promove `details.hint` para `structuredContent.hint`.
+3. `details` continua existindo para compatibilidade.
+4. Path policy MCP passou a classificar erros em:
+   - `ERR_EMPTY_PATH`;
+   - `ERR_NULL_BYTE_PATH`;
+   - `ERR_PATH_DENIED`;
+   - `ERR_INVALID_PATH`.
+5. Erros de path agora carregam:
+   - `inputPath`;
+   - `mode`;
+   - `hint`.
+6. Erros de linha/cursor em leitura passaram a retornar:
+   - `ERR_INVALID_LINE_RANGE`;
+   - `ERR_INVALID_CURSOR`.
+7. Git passou a retornar:
+   - `ERR_GIT_STATUS_FAILED`;
+   - `ERR_GIT_DIFF_FAILED`;
+   - `ERR_GIT_LOG_FAILED`.
+8. Jobs passaram a retornar:
+   - `ERR_JOB_NOT_FOUND`;
+   - `ERR_JOB_NOT_RUNNING`.
+9. Sessao Copilot passou a retornar:
+   - `ERR_COPILOT_SESSION_NOT_FOUND`.
+
+Resultado esperado:
+
+1. ChatGPT pode corrigir chamadas comuns sem depender de parse textual.
+2. Clients humanos ainda veem a mesma mensagem em `content[0].text`.
+3. A LLM-B continua independente do MCP server.
+
 ### Proximo item cronologico apos Faixa I
 
 Faixa G, Fase G.1: escrita controlada (`repo_apply_patch` primeiro), com diff, path policy e auditoria.

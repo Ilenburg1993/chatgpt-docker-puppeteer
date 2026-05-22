@@ -55,7 +55,13 @@ export const copilotSessionTools = [
         annotations: readOnlyAnnotations(),
         handler: async ({ sessionId }) => {
             const entry = getActiveSdkSession(sessionId);
-            if (!entry) return errorResult('Copilot session not found.', { sessionId });
+            if (!entry) {
+                return errorResult('Copilot session not found.', {
+                    code: 'ERR_COPILOT_SESSION_NOT_FOUND',
+                    hint: 'Call copilot_sessions_list first and pass an active sessionId.',
+                    sessionId,
+                });
+            }
             return okResult({
                 success: true,
                 session: publicSessionSummary({ sessionId, ...entry }),

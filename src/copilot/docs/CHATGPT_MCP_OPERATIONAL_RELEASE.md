@@ -178,6 +178,9 @@ Runtime MCP:
 12. Jobs podem ser cancelados com `job_cancel`.
 13. Auditoria MCP registra inicio, conclusao e falha de tool call.
 14. Eventos especificos de escrita registram hashes/metadados, nao conteudo editado.
+15. Erros recuperaveis retornam `structuredContent.code` quando ha codigo estavel.
+16. Erros de path retornam `hint`, `inputPath` e `mode` em `details`.
+17. Clientes devem preferir `code` a parse de mensagem humana.
 
 ## 7. Validacao Canonica
 

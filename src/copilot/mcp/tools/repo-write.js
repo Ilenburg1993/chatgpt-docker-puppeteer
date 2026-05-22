@@ -117,7 +117,7 @@ export const repoWriteTools = [
         annotations: boundedWriteAnnotations(),
         handler: async ({ path, content, expectedHash, dryRun, diffContextLines, maxDiffLines }) => {
             const resolved = await resolveWritePath(path);
-            if (!resolved.ok) return errorResult(resolved.reason);
+            if (!resolved.ok) return errorResult(resolved.reason, resolved);
 
             try {
                 const previous = await readText(resolved.resolved);
@@ -214,7 +214,7 @@ export const repoWriteTools = [
         annotations: boundedWriteAnnotations(),
         handler: async ({ path, content, createParentDirs, dryRun, maxDiffLines }) => {
             const resolved = await resolveWritePath(path);
-            if (!resolved.ok) return errorResult(resolved.reason);
+            if (!resolved.ok) return errorResult(resolved.reason, resolved);
             const initialContent = typeof content === 'string' ? content : '';
             const diff = buildInlineDiffPreview('', initialContent, {
                 contextLines: 0,
@@ -335,7 +335,7 @@ export const repoWriteTools = [
             maxDiffLines,
         }) => {
             const resolved = await resolveWritePath(path);
-            if (!resolved.ok) return errorResult(resolved.reason);
+            if (!resolved.ok) return errorResult(resolved.reason, resolved);
             if (replace_all === true && occurrence_index !== undefined) {
                 return errorResult('Use replace_all ou occurrence_index, nao ambos na mesma chamada.', {
                     code: 'ERR_PATCH_CONFLICTING_MODE',
@@ -436,9 +436,9 @@ export const repoWriteTools = [
         annotations: boundedWriteAnnotations(),
         handler: async ({ source, destination, overwrite, confirmOverwrite, dryRun }) => {
             const src = await resolveReadPath(source);
-            if (!src.ok) return errorResult(src.reason, { field: 'source' });
+            if (!src.ok) return errorResult(src.reason, { ...src, field: 'source' });
             const dst = await resolveWritePath(destination);
-            if (!dst.ok) return errorResult(dst.reason, { field: 'destination' });
+            if (!dst.ok) return errorResult(dst.reason, { ...dst, field: 'destination' });
             if (overwrite === true && confirmOverwrite !== true) {
                 return errorResult('confirmOverwrite deve ser true quando overwrite=true.', {
                     code: 'ERR_MOVE_CONFIRM_OVERWRITE_REQUIRED',
@@ -522,7 +522,7 @@ export const repoWriteTools = [
         annotations: destructiveAnnotations(),
         handler: async ({ path, confirm, dryRun }) => {
             const resolved = await resolveWritePath(path);
-            if (!resolved.ok) return errorResult(resolved.reason);
+            if (!resolved.ok) return errorResult(resolved.reason, resolved);
             if (confirm !== true) {
                 return errorResult('confirm deve ser true para remover arquivo.', {
                     code: 'ERR_REMOVE_CONFIRM_REQUIRED',
