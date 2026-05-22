@@ -126,7 +126,11 @@ function extractSymbolsFromAst(ast) {
 
         if (node.type === 'ExportNamedDeclaration') {
             const decl = node.declaration;
-            if (decl) extractDeclSymbols(decl, true, node).forEach((s) => symbols.push(s));
+            if (decl) {
+                const declaredSymbols = extractDeclSymbols(decl, true, node);
+                declaredSymbols.forEach((s) => symbols.push(s));
+                declaredSymbols.forEach((s) => exports.push(s.name));
+            }
             for (const spec of node.specifiers ?? []) {
                 const name = spec.exported?.name ?? spec.exported?.value ?? '<unknown>';
                 exports.push(name);

@@ -151,8 +151,9 @@ Jobs e validadores:
 3. `run_lint_copilot`
 4. `run_unit_copilot`
 5. `run_project_doctor`
-6. `job_get_output`
-7. `job_cancel`
+6. `job_list`
+7. `job_get_output`
+8. `job_cancel`
 
 Escrita controlada:
 
@@ -170,8 +171,9 @@ LLM-B/Copilot SDK:
 Runtime MCP:
 
 1. `mcp_runtime_health`
-2. `mcp_tunnel_status`
-3. `mcp_capabilities_summary`
+2. `mcp_smoke_workspace`
+3. `mcp_tunnel_status`
+4. `mcp_capabilities_summary`
 
 ## 6. Guardrails
 
@@ -192,6 +194,8 @@ Runtime MCP:
 15. Erros recuperaveis retornam `structuredContent.code` quando ha codigo estavel.
 16. Erros de path retornam `hint`, `inputPath` e `mode` em `details`.
 17. Clientes devem preferir `code` a parse de mensagem humana.
+18. Listagens redigem paths protegidos e retornam apenas contagem agregada em `blockedEntriesCount`.
+19. Jobs persistem manifest em `src/copilot/.ai/jobs`, permitindo `job_list` e `job_get_output` apos restart.
 
 ## 7. Validacao Canonica
 
@@ -210,7 +214,7 @@ npm run lint:copilot
 Testes focados MCP:
 
 ```bash
-npx vitest --config vitest.copilot.config.js run tests/unit/copilot/mcp/*.spec.js
+npx vitest --config vitest.copilot.config.js run tests/unit/copilot/mcp
 ```
 
 Suite unit completa:
@@ -224,9 +228,11 @@ Estado conhecido neste release:
 1. Typecheck strict passa.
 2. Lint completo passa.
 3. Testes MCP focados passam.
-4. Suite unit completa passa apos a rodada de correcao pos-primeiro uso ChatGPT:
-   - 3038 testes aprovados;
-   - 1008 suites aprovadas;
+4. `unit-mcp` usa `tests/unit/copilot/mcp`, sem glob literal dependente de shell.
+5. Smoke HTTP local passa com 35 tools e paridade exata contra o registry.
+6. Suite unit completa passa apos a rodada de correcao pos-relatorio WORKSPACE:
+   - 3056 testes aprovados;
+   - 1012 suites aprovadas;
    - zero warnings/errors no runner compacto.
 
 ## 8. Observabilidade

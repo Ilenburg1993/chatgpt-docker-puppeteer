@@ -8,13 +8,19 @@
  * @module copilot/infra/io-scanner
  */
 
-import { DEFAULT_BLOCKED_PATH_SEGMENTS, buildIoMeta, createIoTraceId, toError } from '#copilot/core';
+import {
+    DEFAULT_BLOCKED_PATH_SEGMENTS,
+    buildIoMeta,
+    createIoTraceId,
+    evaluateIoPathPolicyAsync,
+    toError,
+} from '#copilot/core';
 import ignore from 'ignore';
 import { lstat, readdir } from 'node:fs/promises';
 import { basename, join, relative } from 'node:path';
 import pLimit from 'p-limit';
 import { nowIoMs, publishIoLifecycleEvent, publishIoOperation } from './io-observability.js';
-import { hasNullByte } from './policy/path-resource.js';
+import { hasNullByte, normalizeWorkspaceRoot } from './policy/path-resource.js';
 import { mapInBatches, normalizeBatchSize } from './scan/batching.js';
 import { buildFileFingerprint, classifyStats } from './scan/fingerprint.js';
 import { loadGitignoreMatcher } from './scan/gitignore.js';
@@ -46,6 +52,8 @@ function assertValidScannerPath(candidate, label) {
  * @property {string} path
  * @property {string} absolutePath
  * @property {number} [size]
+ * @property {boolean} [blocked]
+ * @property {string} [reasonCode]
  * @property {{ realpath: string; mtimeMs: number; size: number }} [fingerprint]
  * @property {IoScanEntry[]} [children]
  */
@@ -69,11 +77,13 @@ function assertValidScannerPath(candidate, label) {
  *     concurrency?: number;
  *     batchSize?: number;
  *     fingerprint?: boolean;
+ *     redactProtectedPaths?: boolean;
  * }} [options]
  * @returns {Promise<{
  *     path: string;
  *     entries: IoScanEntry[];
  *     scannedEntries: number;
+ *     blockedEntries: number;
  *     io: import('#copilot/core/io-contracts').IoMeta;
  * }>}
  */
@@ -91,6 +101,7 @@ export async function scanDirectory(rootPath, options = {}) {
     const includePatterns = (options.include ?? []).filter((pattern) => typeof pattern === 'string' && pattern);
     const excludePatterns = (options.exclude ?? []).filter((pattern) => typeof pattern === 'string' && pattern);
     const includeFingerprint = options.fingerprint !== false;
+    const redactProtectedPaths = options.redactProtectedPaths !== false;
     const concurrency =
         Number.isFinite(options.concurrency) && Number(options.concurrency) > 0
             ? Math.floor(Number(options.concurrency))
@@ -105,6 +116,7 @@ export async function scanDirectory(rootPath, options = {}) {
             .map((segment) => segment.toLowerCase()),
     );
     let scannedEntries = 0;
+    let blockedEntries = 0;
     let hardLimitReached = false;
     publishIoLifecycleEvent('scan', 'start', {
         traceId,
@@ -134,6 +146,17 @@ export async function scanDirectory(rootPath, options = {}) {
             if (matchesAnyPattern(absolutePath, workspaceRoot, excludePatterns)) return null;
             const relativePath = relative(workspaceRoot, absolutePath).replace(/\\/g, '/');
             if (respectGitignore && relativePath && gitignore.ignores(relativePath)) return null;
+            if (redactProtectedPaths) {
+                const policy = await evaluateIoPathPolicyAsync(absolutePath, {
+                    workspaceRoot: normalizeWorkspaceRoot(workspaceRoot),
+                    mode: 'read',
+                    blockedSegments: [...blockedSegments],
+                });
+                if (!policy.ok) {
+                    blockedEntries += 1;
+                    return null;
+                }
+            }
             let stats;
             try {
                 stats = await limit(() => lstat(absolutePath));
@@ -205,6 +228,8 @@ export async function scanDirectory(rootPath, options = {}) {
                 hardLimitReached,
                 hardMaxEntries,
                 denylist: respectDenylist ? 'enabled' : 'disabled',
+                redactedProtectedPaths: redactProtectedPaths,
+                blockedEntries,
                 gitignore: respectGitignore ? 'enabled' : 'disabled',
                 includePatternCount: includePatterns.length,
                 excludePatternCount: excludePatterns.length,
@@ -220,7 +245,7 @@ export async function scanDirectory(rootPath, options = {}) {
             scannedEntries,
             durationMs: io.durationMs ?? 0,
         });
-        return { path: rootPath, entries, scannedEntries, io };
+        return { path: rootPath, entries, scannedEntries, blockedEntries, io };
     } catch (error) {
         const io = buildIoMeta({
             operation: 'scan',

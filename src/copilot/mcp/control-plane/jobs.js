@@ -6,7 +6,7 @@
  */
 
 import { spawn } from 'node:child_process';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, readdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
@@ -33,6 +33,7 @@ const MAX_JOB_TIMEOUT_MS = 60 * 60 * 1000;
  * @property {number} timeoutMs
  * @property {boolean} timedOut
  * @property {string} logFile
+ * @property {string} manifestFile
  * @property {import('node:child_process').ChildProcess | null} process
  */
 
@@ -52,7 +53,7 @@ export function resolveValidatorCommand(validator) {
         case 'unit-mcp':
             return {
                 command: 'npx',
-                args: ['vitest', '--config', 'vitest.copilot.config.js', 'run', 'tests/unit/copilot/mcp/*.spec.js'],
+                args: ['vitest', '--config', 'vitest.copilot.config.js', 'run', 'tests/unit/copilot/mcp'],
             };
         case 'unit-copilot':
             return { command: 'npm', args: ['run', 'test:copilot:unit'] };
@@ -82,6 +83,7 @@ export async function spawnValidatorJob(validator, options = {}) {
     const command = resolveValidatorCommand(validator);
     const timeoutMs = resolveJobTimeoutMs(options.timeoutMs);
     const logFile = path.join(MCP_JOBS_DIR, `${id}.log`);
+    const manifestFile = path.join(MCP_JOBS_DIR, `${id}.json`);
     await mkdir(MCP_JOBS_DIR, { recursive: true });
     await writeFile(logFile, `$ ${command.command} ${command.args.join(' ')}\n[job:timeoutMs] ${timeoutMs}\n\n`, 'utf8');
 
@@ -105,9 +107,11 @@ export async function spawnValidatorJob(validator, options = {}) {
         timeoutMs,
         timedOut: false,
         logFile,
+        manifestFile,
         process: child,
     };
     JOBS.set(id, record);
+    await persistJobRecord(record);
 
     const timeout = setTimeout(() => {
         if (record.status !== 'running' || !record.process) return;
@@ -115,6 +119,7 @@ export async function spawnValidatorJob(validator, options = {}) {
         record.timedOut = true;
         record.endedAt = Date.now();
         void appendJobLog(record.logFile, `\n[job:timeout] timeoutMs=${timeoutMs}\n`);
+        void persistJobRecord(record);
         record.process.kill('SIGTERM');
     }, timeoutMs);
     timeout.unref();
@@ -135,6 +140,7 @@ export async function spawnValidatorJob(validator, options = {}) {
         if (record.timedOut) return;
         record.status = code === 0 ? 'completed' : 'failed';
         void appendJobLog(logFile, `\n[job:${record.status}] exitCode=${String(code)} signal=${String(signal)}\n`);
+        void persistJobRecord(record);
     });
 
     return publicJobRecord(record);
@@ -146,7 +152,7 @@ export async function spawnValidatorJob(validator, options = {}) {
  * @returns {Promise<{ job: Omit<JobRecord, 'process'> | null; output: string }>}
  */
 export async function readJobOutput(id, tailBytes = 24_000) {
-    const record = JOBS.get(id);
+    const record = JOBS.get(id) ?? (await readJobManifest(id));
     if (!record) return { job: null, output: '' };
     /** @type {string} */
     let output;
@@ -173,7 +179,41 @@ export function cancelJob(id) {
     record.endedAt = Date.now();
     record.process.kill('SIGTERM');
     void appendJobLog(record.logFile, '\n[job:cancelled]\n');
+    void persistJobRecord(record);
     return { ok: true, job: publicJobRecord(record), message: 'Job cancelled.' };
+}
+
+/**
+ * @param {{
+ *   status?: JobRecord['status'];
+ *   validator?: CopilotValidatorName;
+ *   limit?: number;
+ *   includeCompleted?: boolean;
+ * }} [options]
+ * @returns {Promise<Omit<JobRecord, 'process'>[]>}
+ */
+export async function listJobs(options = {}) {
+    const records = new Map();
+    for (const record of JOBS.values()) {
+        records.set(record.id, publicJobRecord(record));
+    }
+    await mkdir(MCP_JOBS_DIR, { recursive: true });
+    const entries = await readdir(MCP_JOBS_DIR).catch(() => []);
+    for (const entry of entries) {
+        if (!entry.endsWith('.json')) continue;
+        const id = entry.slice(0, -'.json'.length);
+        if (records.has(id)) continue;
+        const manifest = await readJobManifest(id);
+        if (manifest) records.set(id, publicJobRecord(manifest));
+    }
+    const includeCompleted = options.includeCompleted !== false;
+    const limit = Math.max(1, Math.min(200, Number(options.limit ?? 50)));
+    return [...records.values()]
+        .filter((record) => (options.status ? record.status === options.status : true))
+        .filter((record) => (options.validator ? record.validator === options.validator : true))
+        .filter((record) => (includeCompleted ? true : record.status === 'running'))
+        .sort((left, right) => right.startedAt - left.startedAt)
+        .slice(0, limit);
 }
 
 /**
@@ -183,6 +223,31 @@ export function cancelJob(id) {
 function publicJobRecord(record) {
     const { process: _process, ...publicRecord } = record;
     return publicRecord;
+}
+
+/**
+ * @param {JobRecord} record
+ * @returns {Promise<void>}
+ */
+async function persistJobRecord(record) {
+    await mkdir(MCP_JOBS_DIR, { recursive: true });
+    await writeFile(record.manifestFile, `${JSON.stringify(publicJobRecord(record), null, 2)}\n`, 'utf8');
+}
+
+/**
+ * @param {string} id
+ * @returns {Promise<JobRecord | null>}
+ */
+async function readJobManifest(id) {
+    const manifestFile = path.join(MCP_JOBS_DIR, `${id}.json`);
+    try {
+        const parsed = JSON.parse(await readFile(manifestFile, 'utf8'));
+        if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null;
+        if (!('id' in parsed) || parsed.id !== id) return null;
+        return /** @type {JobRecord} */ ({ ...parsed, manifestFile, process: null });
+    } catch {
+        return null;
+    }
 }
 
 /**

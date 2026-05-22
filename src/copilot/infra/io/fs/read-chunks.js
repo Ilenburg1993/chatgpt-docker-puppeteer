@@ -169,6 +169,9 @@ async function* iterateTextLineChunks(
  *     path: string;
  *     chunks: TextLineChunk[];
  *     totalLines: number;
+ *     returnedLineCount: number;
+ *     lastScannedLine: number;
+ *     stoppedAtRequestedWindow: boolean;
  *     bytesRead: number;
  *     chunkLines: number;
  *     startLine: number;
@@ -185,6 +188,13 @@ export async function readTextLineChunks(filePath, options = {}) {
         path: filePath,
         chunks,
         totalLines: state.totalLines,
+        returnedLineCount: chunks.reduce(
+            (/** @type {number} */ sum, /** @type {TextLineChunk} */ chunk) =>
+                sum + Math.max(0, chunk.endLine - chunk.startLine + 1),
+            0,
+        ),
+        lastScannedLine: state.totalLines,
+        stoppedAtRequestedWindow: state.stoppedAtRequestedWindow,
         bytesRead: state.bytesRead,
         chunkLines:
             Number.isFinite(options.chunkLines) && Number(options.chunkLines) > 0

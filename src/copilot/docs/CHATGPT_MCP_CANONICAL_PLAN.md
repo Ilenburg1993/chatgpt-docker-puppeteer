@@ -1222,6 +1222,88 @@ validacao no ChatGPT.
 
 ## 9. Criterios de pronto por faixa
 
+### 2026-05-22 — Correcoes apos relatorio ChatGPT WORKSPACE
+
+Relatorio externo validado:
+
+1. `unit-mcp` falhava quando o glob era passado literalmente pelo job sem expansao de shell.
+2. `repo_root_tree showHidden=true` enumerava nomes/metadados de arquivos protegidos como `.env.local`.
+3. `repo_search_text` misturava linhas de contexto e matches em contadores ambíguos.
+4. `repo_read_file_chunks` retornava `totalLines` ambíguo quando a janela parcial parava antes do fim do arquivo.
+5. `repo_file_outline` marcava simbolos como exportados, mas nao refletia `export const` em `exports[]`.
+6. `DEFAULT_MAX_DIFF_LINES=2000` precisava ser alinhado ao schema `maxDiffLines`.
+
+Correcoes aplicadas:
+
+1. `unit-mcp` passou a usar diretório: `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/mcp`.
+2. `scanDirectory` agora aplica policy de path tambem em listagem e redige paths protegidos.
+3. `repo_tree`, `repo_root_tree` e `list_directory` agora retornam:
+   - `blockedEntriesCount`;
+   - `securityPolicy.readProtectedPaths=blocked`;
+   - `securityPolicy.listProtectedPaths=redacted`;
+   - `securityPolicy.writeProtectedPaths=blocked`.
+4. `repo_search_text` agora separa:
+   - `returnedMatchCount`;
+   - `returnedLineCount`;
+   - `totalMatchCount`;
+   - `totalLineCount`.
+5. `repo_read_file_chunks` agora separa:
+   - `returnedChunkCount`;
+   - `returnedLineCount`;
+   - `lastScannedLine`;
+   - `fileTotalLines`;
+   - `fileTotalLinesKnown`.
+6. Parser IO e worker passaram a adicionar exports declarados por `export const`, `export function`, `export class` e afins
+   em `exports[]`, mantendo `symbols[].exported`.
+7. `maxDiffLines` das tools de escrita MCP agora aceita ate `2000`, alinhado ao default local.
+
+Upgrades aplicados:
+
+1. Criado `job_list`.
+2. Jobs persistem manifest JSON ao lado do log em `src/copilot/.ai/jobs`.
+3. `job_get_output` consegue ler manifest persistido quando o job nao esta mais em memoria.
+4. `mcp_runtime_health` ganhou:
+   - `status: ok | degraded | failed`;
+   - `warnings`;
+   - `critical`.
+5. Criado `mcp_smoke_workspace`, smoke read-only end-to-end para:
+   - `repo_status`;
+   - tree default;
+   - redaction de root tree;
+   - bloqueio de segredo;
+   - leitura com hash;
+   - busca textual;
+   - busca simbolica;
+   - outline;
+   - project doctor;
+   - runtime health.
+6. `mcp_capabilities_summary` ganhou versionamento e policy:
+   - `protocolVersion=workspace-mcp/0.3.0`;
+   - `capabilitiesVersion=4`;
+   - `securityPolicy`.
+
+Paridade LLM-B/MCP:
+
+1. A redaction foi implementada na engine compartilhada `scanDirectory`, beneficiando MCP e `list_directory` da LLM-B.
+2. Contadores de busca e chunks foram corrigidos na engine IO compartilhada, nao apenas no wrapper MCP.
+3. Parser/outline foi corrigido na infraestrutura compartilhada e no worker.
+4. LLM-B continua independente do MCP; somente a infraestrutura IO/index/parser e compartilhada.
+
+Validacao da rodada:
+
+1. `npm run typecheck:strict:src.copilot` passou.
+2. `npm run lint:copilot` passou.
+3. `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/mcp` passou com 12 suites e 57 testes.
+4. O mesmo comando confirmou que o alvo `unit-mcp` sem glob literal e valido para spawn sem shell.
+5. `npm run test:copilot:unit` passou com 3056 testes, 3056 aprovados, 1012 suites e zero warnings/errors.
+6. Smoke HTTP local em porta alternativa `3334` passou:
+   - `/health` HTTP 200;
+   - `tools/list` com 35 tools;
+   - paridade exata com `getCanonicalMcpTools`;
+   - `mcp_runtime_health` sem erro JSON-RPC.
+7. A porta `3333` ja estava ocupada por um servidor MCP anterior com 33 tools e tunnel ativo; ela nao foi encerrada nesta
+   rodada para evitar interromper a sessao externa em curso.
+
 ### Faixa B pronta quando
 
 1. Este arquivo existir.

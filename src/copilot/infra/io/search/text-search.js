@@ -97,6 +97,8 @@ function publishAndReturn(io, success, error) {
  *     pattern: string;
  *     output: string;
  *     matchCount: number;
+ *     returnedMatchCount?: number;
+ *     returnedLineCount?: number;
  *     engine: string;
  *     sanitized: boolean;
  *     redactions: number;
@@ -104,6 +106,8 @@ function publishAndReturn(io, success, error) {
  *     nextCursor?: string | null;
  *     cursorOffset?: number;
  *     totalMatches?: number;
+ *     totalMatchCount?: number;
+ *     totalLineCount?: number;
  *     indexFallback?: boolean;
  *     indexFallbackReason?: string | null;
  *     io: import('#copilot/core/io-contracts').IoMeta;
@@ -186,7 +190,17 @@ export async function searchText(targetPath, options) {
          * @returns {number}
          */
         function countMatchLines(text) {
-            return text.split('\n').filter((line) => /^.+:\d+:/.test(line)).length;
+            return text.split('\n').filter((line) => /^(?:.+:)?\d+:/.test(line)).length;
+        }
+
+        /**
+         * @param {string} text
+         * @returns {number}
+         */
+        function countOutputLines(text) {
+            if (!text) return 0;
+            const lines = text.split('\n');
+            return lines[lines.length - 1] === '' ? lines.length - 1 : lines.length;
         }
 
         if (canUseIndexSearch(indexSearchOptions)) {
@@ -219,6 +233,8 @@ export async function searchText(targetPath, options) {
                     pattern: options.pattern,
                     output: filteredOutput.text,
                     matchCount: windowed.items.length,
+                    returnedMatchCount: windowed.items.length,
+                    returnedLineCount: countOutputLines(filteredOutput.text),
                     engine: 'fts5-index',
                     sanitized: filteredOutput.sanitized,
                     redactions: filteredOutput.redactions,
@@ -226,6 +242,7 @@ export async function searchText(targetPath, options) {
                     nextCursor: windowed.nextCursor,
                     cursorOffset: windowed.cursorOffset,
                     totalMatches: windowed.totalItems,
+                    totalMatchCount: windowed.totalItems,
                     indexFallback: false,
                     indexFallbackReason: null,
                     io: { ...io, truncated: windowed.truncated, policyVersion: filteredOutput.policyVersion },
@@ -274,6 +291,8 @@ export async function searchText(targetPath, options) {
                 );
                 const windowedOutput = paginateSearchText(stdout, searchWindow);
                 const filteredOutput = sanitizeSearchOutput(windowedOutput.text);
+                const returnedMatchCount = countMatchLines(filteredOutput.text);
+                const totalMatchCount = countMatchLines(stdout);
                 const io = publishAndReturn(
                     buildSearchIo('io-engine.rg.search', utf8ByteLength(filteredOutput.text, 'search output'), {
                         redactions: filteredOutput.redactions,
@@ -287,14 +306,18 @@ export async function searchText(targetPath, options) {
                     targetPath,
                     pattern: options.pattern,
                     output: filteredOutput.text,
-                    matchCount: countMatchLines(filteredOutput.text),
+                    matchCount: returnedMatchCount,
+                    returnedMatchCount,
+                    returnedLineCount: countOutputLines(filteredOutput.text),
                     engine: 'rg',
                     sanitized: filteredOutput.sanitized,
                     redactions: filteredOutput.redactions,
                     truncated: windowedOutput.truncated,
                     nextCursor: windowedOutput.nextCursor,
                     cursorOffset: windowedOutput.cursorOffset,
-                    totalMatches: windowedOutput.originalLineCount,
+                    totalMatches: totalMatchCount,
+                    totalMatchCount,
+                    totalLineCount: windowedOutput.originalLineCount,
                     indexFallback,
                     indexFallbackReason,
                     io: { ...io, truncated: windowedOutput.truncated, policyVersion: filteredOutput.policyVersion },
@@ -308,6 +331,8 @@ export async function searchText(targetPath, options) {
                         pattern: options.pattern,
                         output: '',
                         matchCount: 0,
+                        returnedMatchCount: 0,
+                        returnedLineCount: 0,
                         engine: 'rg',
                         sanitized: false,
                         redactions: 0,
@@ -335,9 +360,11 @@ export async function searchText(targetPath, options) {
                 timeout: ioSearchBudget.timeoutMs,
                 maxBuffer: ioSearchBudget.maxBufferBytes,
             });
-            const windowedOutput = paginateSearchText(stdout, searchWindow);
-            const filteredOutput = sanitizeSearchOutput(windowedOutput.text);
-            const io = publishAndReturn(
+                const windowedOutput = paginateSearchText(stdout, searchWindow);
+                const filteredOutput = sanitizeSearchOutput(windowedOutput.text);
+                const returnedMatchCount = countMatchLines(filteredOutput.text);
+                const totalMatchCount = countMatchLines(stdout);
+                const io = publishAndReturn(
                 buildSearchIo('io-engine.grep.search', utf8ByteLength(filteredOutput.text, 'search output'), {
                     redactions: filteredOutput.redactions,
                     truncated: windowedOutput.truncated,
@@ -346,19 +373,23 @@ export async function searchText(targetPath, options) {
                 }),
                 true,
             );
-            return {
-                targetPath,
-                pattern: options.pattern,
-                output: filteredOutput.text,
-                matchCount: countMatchLines(filteredOutput.text),
-                engine: 'grep',
+                return {
+                    targetPath,
+                    pattern: options.pattern,
+                    output: filteredOutput.text,
+                    matchCount: returnedMatchCount,
+                    returnedMatchCount,
+                    returnedLineCount: countOutputLines(filteredOutput.text),
+                    engine: 'grep',
                 sanitized: filteredOutput.sanitized,
                 redactions: filteredOutput.redactions,
                 truncated: windowedOutput.truncated,
                 nextCursor: windowedOutput.nextCursor,
                 cursorOffset: windowedOutput.cursorOffset,
-                totalMatches: windowedOutput.originalLineCount,
-                indexFallback,
+                    totalMatches: totalMatchCount,
+                    totalMatchCount,
+                    totalLineCount: windowedOutput.originalLineCount,
+                    indexFallback,
                 indexFallbackReason,
                 io: { ...io, truncated: windowedOutput.truncated, policyVersion: filteredOutput.policyVersion },
             };
@@ -373,6 +404,8 @@ export async function searchText(targetPath, options) {
                     pattern: options.pattern,
                     output: '',
                     matchCount: 0,
+                    returnedMatchCount: 0,
+                    returnedLineCount: 0,
                     engine: 'grep',
                     sanitized: false,
                     redactions: 0,

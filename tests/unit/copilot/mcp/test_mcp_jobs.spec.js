@@ -23,7 +23,10 @@ describe('copilot MCP jobs', () => {
             command: 'npm',
             args: ['run', 'test:copilot:unit'],
         });
-        assert.equal(resolveValidatorCommand('unit-mcp').command, 'npx');
+        assert.deepEqual(resolveValidatorCommand('unit-mcp'), {
+            command: 'npx',
+            args: ['vitest', '--config', 'vitest.copilot.config.js', 'run', 'tests/unit/copilot/mcp'],
+        });
     });
 
     it('rejects unsupported validators', () => {
@@ -43,5 +46,15 @@ describe('copilot MCP jobs', () => {
         assert.ok(names.includes('run_lint_copilot'));
         assert.ok(names.includes('run_unit_copilot'));
         assert.ok(names.includes('run_project_doctor'));
+        assert.ok(names.includes('job_list'));
+    });
+
+    it('job_list returns a structured job array', async () => {
+        const tool = jobTools.find((candidate) => candidate.name === 'job_list');
+        assert.ok(tool);
+        const result = await tool.handler({ limit: 5 });
+        assert.equal(result.isError, undefined);
+        assert.equal(result.structuredContent?.['success'], true);
+        assert.ok(Array.isArray(result.structuredContent?.['jobs']));
     });
 });

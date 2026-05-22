@@ -17,6 +17,7 @@ import { mcpTunnelStatusTool } from './tools/tunnel-status.js';
 import { projectDoctorTool } from './tools/project-doctor.js';
 import { repoReadTools } from './tools/repo-read.js';
 import { repoWriteTools } from './tools/repo-write.js';
+import { mcpSmokeWorkspaceTool } from './tools/smoke-workspace.js';
 
 /**
  * @typedef {object} McpToolDefinition
@@ -41,6 +42,7 @@ export function getCanonicalMcpTools() {
         ...repoWriteTools,
         ...copilotSessionTools,
         ...metaTools,
+        mcpSmokeWorkspaceTool,
         mcpTunnelStatusTool,
         mcpRuntimeHealthTool,
     ];

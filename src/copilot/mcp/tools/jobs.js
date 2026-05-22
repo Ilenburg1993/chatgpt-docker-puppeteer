@@ -7,11 +7,12 @@
 
 import { z } from 'zod';
 import { boundedWriteAnnotations, readOnlyAnnotations } from '../control-plane/annotations.js';
-import { cancelJob, readJobOutput, spawnValidatorJob } from '../control-plane/jobs.js';
+import { cancelJob, listJobs, readJobOutput, spawnValidatorJob } from '../control-plane/jobs.js';
 import { errorResult, okResult } from '../control-plane/result.js';
 import { projectDoctorTool } from './project-doctor.js';
 
 const validatorSchema = z.enum(['typecheck', 'lint', 'unit-mcp', 'unit-copilot']);
+const jobStatusSchema = z.enum(['running', 'completed', 'failed', 'cancelled']);
 
 /**
  * @param {import('../control-plane/jobs.js').CopilotValidatorName} validator
@@ -81,6 +82,26 @@ export const jobTools = [
         handler: async ({ validator, timeoutMs }) => {
             const job = await spawnValidatorJob(validator, timeoutMs === undefined ? {} : { timeoutMs });
             return okResult({ success: true, job }, `Started job ${job.id} (${validator}).`);
+        },
+    },
+    {
+        name: 'job_list',
+        title: 'List validator jobs',
+        description: 'List active and recent validator jobs, including persisted manifests from previous MCP runs.',
+        inputSchema: {
+            status: jobStatusSchema.optional().describe('Optional job status filter.'),
+            validator: validatorSchema.optional().describe('Optional validator filter.'),
+            limit: z.number().int().min(1).max(200).optional().describe('Maximum jobs returned. Default: 50.'),
+            includeCompleted: z.boolean().optional().describe('Include completed/failed/cancelled jobs. Default: true.'),
+        },
+        annotations: readOnlyAnnotations(),
+        handler: async ({ status, validator, limit, includeCompleted }) => {
+            const jobs = await listJobs({ status, validator, limit, includeCompleted });
+            return okResult({
+                success: true,
+                count: jobs.length,
+                jobs,
+            });
         },
     },
     {

@@ -50,6 +50,7 @@ export const projectDoctorTool = {
             validators: {
                 typecheck: 'npm run typecheck:strict:src.copilot',
                 lint: 'npm run lint:copilot',
+                unitMcp: 'npx vitest --config vitest.copilot.config.js run tests/unit/copilot/mcp',
                 unit: 'npm run test:copilot:unit',
             },
             scripts: includeScripts === false ? undefined : relevantScripts,

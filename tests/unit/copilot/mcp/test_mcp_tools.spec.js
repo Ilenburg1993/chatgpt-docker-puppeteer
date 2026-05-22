@@ -81,6 +81,16 @@ describe('copilot MCP tools', () => {
         assert.ok(entries.length > 0);
     });
 
+    it('repo_root_tree redacts protected hidden path metadata', async () => {
+        const rootTool = findTool('repo_root_tree');
+        const root = await rootTool.handler({ maxEntries: 200, showHidden: true });
+        assert.equal(root.isError, undefined);
+        assert.equal(root.structuredContent?.['securityPolicy']?.['listProtectedPaths'], 'redacted');
+        assert.ok(Number(root.structuredContent?.['blockedEntriesCount'] ?? 0) > 0);
+        const entries = /** @type {{ name?: string; path?: string }[]} */ (root.structuredContent?.['entries']);
+        assert.equal(entries.some((entry) => entry.name === '.env.local' || entry.path === '.env.local'), false);
+    });
+
     it('repo_search_text accepts context lines and cursor metadata', async () => {
         const tool = findTool('repo_search_text');
         const result = await tool.handler({
@@ -94,6 +104,21 @@ describe('copilot MCP tools', () => {
         assert.equal(structured['contextLines'], 2);
         assert.equal(structured['cursor'], null);
         assert.ok('nextCursor' in structured);
+    });
+
+    it('repo_search_text returns match and line counts separately when context is included', async () => {
+        const tool = findTool('repo_search_text');
+        const result = await tool.handler({
+            pattern: 'repo_read_file_chunks',
+            path: 'src/copilot/mcp/tools/repo-read.js',
+            contextLines: 2,
+            maxResults: 20,
+        });
+        assert.equal(result.isError, undefined);
+        const structured = /** @type {Record<string, unknown>} */ (result.structuredContent);
+        assert.ok(Number(structured['returnedMatchCount'] ?? 0) > 0);
+        assert.ok(Number(structured['returnedLineCount'] ?? 0) >= Number(structured['returnedMatchCount'] ?? 0));
+        assert.ok(Number(structured['totalMatchCount'] ?? 0) >= Number(structured['returnedMatchCount'] ?? 0));
     });
 
     it('repo_read_file_chunks pages large-file reads with cursor metadata', async () => {
@@ -110,6 +135,23 @@ describe('copilot MCP tools', () => {
         assert.ok(Array.isArray(structured['chunks']));
         assert.equal(structured['chunkLines'], 20);
         assert.ok('nextCursor' in structured);
+    });
+
+    it('repo_read_file_chunks separates returned lines from scanned line metadata', async () => {
+        const tool = findTool('repo_read_file_chunks');
+        const result = await tool.handler({
+            path: 'src/copilot/mcp/tools/repo-read.js',
+            chunkLines: 1,
+            startLine: 1,
+            endLine: 3,
+        });
+        assert.equal(result.isError, undefined);
+        const structured = /** @type {Record<string, unknown>} */ (result.structuredContent);
+        assert.equal(structured['returnedLineCount'], 3);
+        assert.equal(structured['returnedChunkCount'], 3);
+        assert.equal(structured['fileTotalLinesKnown'], false);
+        assert.equal(structured['fileTotalLines'], null);
+        assert.ok(Number(structured['lastScannedLine'] ?? 0) >= 3);
     });
 
     it('repo_symbol_search and repo_file_outline expose IO navigation primitives', async () => {
@@ -132,6 +174,16 @@ describe('copilot MCP tools', () => {
         assert.equal(outlineResult.structuredContent?.['success'], true);
         assert.ok(Array.isArray(outlineResult.structuredContent?.['symbols']));
         assert.ok(Array.isArray(outlineResult.structuredContent?.['outline']));
+        const exports = /** @type {string[]} */ (outlineResult.structuredContent?.['exports'] ?? []);
+        assert.ok(exports.includes('repoReadTools'));
+    });
+
+    it('mcp_smoke_workspace runs read-only end-to-end checks', async () => {
+        const tool = findTool('mcp_smoke_workspace');
+        const result = await tool.handler({});
+        assert.equal(result.isError, undefined);
+        assert.equal(result.structuredContent?.['success'], true);
+        assert.ok(Array.isArray(result.structuredContent?.['checks']));
     });
 
     it('repo_diff_files returns a canonical unified diff', async () => {
@@ -167,6 +219,7 @@ describe('copilot MCP tools', () => {
         const validators = /** @type {Record<string, unknown>} */ (structured['validators']);
         assert.equal(validators['typecheck'], 'npm run typecheck:strict:src.copilot');
         assert.equal(validators['lint'], 'npm run lint:copilot');
+        assert.equal(validators['unitMcp'], 'npx vitest --config vitest.copilot.config.js run tests/unit/copilot/mcp');
         assert.equal(validators['unit'], 'npm run test:copilot:unit');
     });
 });

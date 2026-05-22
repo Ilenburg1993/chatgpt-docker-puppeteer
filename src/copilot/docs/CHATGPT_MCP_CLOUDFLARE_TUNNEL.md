@@ -649,8 +649,10 @@ O smoke remoto agora tambem valida a superficie de tools:
    - `repo_file_outline`;
    - `project_doctor`;
    - `run_copilot_validator`;
+   - `job_list`;
    - `job_get_output`;
    - `mcp_runtime_health`;
+   - `mcp_smoke_workspace`;
    - `mcp_tunnel_status`.
 
 Se `toolsMatchLocalRegistry=false`, `missingLocalTools` nao estiver vazio, `unexpectedRemoteTools` nao estiver vazio ou
@@ -722,6 +724,6 @@ Validadores:
     da paridade de tools do endpoint publico.
 12. O smoke HTTP local canonico passou antes do Cloudflare:
     - `GET /health` HTTP 200;
-    - `tools/list` com 33 tools;
+    - `tools/list` com 35 tools apos `job_list` e `mcp_smoke_workspace`;
     - paridade exata contra o registry local;
     - `tools/call mcp_runtime_health` sem erro JSON-RPC.

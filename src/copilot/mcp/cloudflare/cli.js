@@ -159,8 +159,10 @@ async function runSmoke() {
         'repo_file_outline',
         'project_doctor',
         'run_copilot_validator',
+        'job_list',
         'job_get_output',
         'mcp_runtime_health',
+        'mcp_smoke_workspace',
         'mcp_tunnel_status',
     ];
     const missingCriticalTools = criticalToolNames.filter((toolName) => !remoteToolNames.includes(toolName));

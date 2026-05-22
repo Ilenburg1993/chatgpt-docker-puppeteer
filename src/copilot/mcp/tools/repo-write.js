@@ -21,7 +21,7 @@ import { resolveReadPath, resolveWritePath } from '../control-plane/paths.js';
 import { errorResult, okResult } from '../control-plane/result.js';
 
 const DEFAULT_DIFF_CONTEXT_LINES = 3;
-const DEFAULT_MAX_DIFF_LINES = 160;
+const DEFAULT_MAX_DIFF_LINES = 2000;
 
 /**
  * @param {string} contentA
@@ -112,7 +112,7 @@ export const repoWriteTools = [
             expectedHash: z.string().optional().describe('Expected SHA-256 of current file content.'),
             dryRun: z.boolean().optional().describe('Return diff and hashes without writing. Default: false.'),
             diffContextLines: z.number().int().min(0).max(20).optional().describe('Context lines in diff preview.'),
-            maxDiffLines: z.number().int().min(1).max(500).optional().describe('Maximum diff preview lines.'),
+            maxDiffLines: z.number().int().min(1).max(2000).optional().describe('Maximum diff preview lines.'),
         },
         annotations: boundedWriteAnnotations(),
         handler: async ({ path, content, expectedHash, dryRun, diffContextLines, maxDiffLines }) => {
@@ -209,7 +209,7 @@ export const repoWriteTools = [
             content: z.string().optional().describe('Initial UTF-8 content. Default: empty string.'),
             createParentDirs: z.boolean().optional().describe('Create parent directories. Default: true.'),
             dryRun: z.boolean().optional().describe('Validate and return diff without writing. Default: false.'),
-            maxDiffLines: z.number().int().min(1).max(500).optional().describe('Maximum diff preview lines.'),
+            maxDiffLines: z.number().int().min(1).max(2000).optional().describe('Maximum diff preview lines.'),
         },
         annotations: boundedWriteAnnotations(),
         handler: async ({ path, content, createParentDirs, dryRun, maxDiffLines }) => {
@@ -316,9 +316,12 @@ export const repoWriteTools = [
                 .describe('1-based occurrence index to replace when old_string appears more than once.'),
             expectedHash: z.string().optional().describe('Expected SHA-256 of current file content.'),
             dryRun: z.boolean().optional().describe('Validate and return diff without writing. Default: false.'),
-            allowNoop: z.boolean().optional().describe('Allow old_string and new_string to be identical. Default: false.'),
+            allowNoop: z
+                .boolean()
+                .optional()
+                .describe('Allow old_string and new_string to be identical. Default: false.'),
             diffContextLines: z.number().int().min(0).max(20).optional().describe('Context lines in diff preview.'),
-            maxDiffLines: z.number().int().min(1).max(500).optional().describe('Maximum diff preview lines.'),
+            maxDiffLines: z.number().int().min(1).max(2000).optional().describe('Maximum diff preview lines.'),
         },
         annotations: boundedWriteAnnotations(),
         handler: async ({

@@ -119,6 +119,12 @@ export const listDirectoryTool = buildTool({
                     nextCursor: 'nextCursor' in limitedEntries ? limitedEntries.nextCursor : null,
                     cursorOffset: 'cursorOffset' in limitedEntries ? limitedEntries.cursorOffset : 0,
                     scannedBudget: scan.scannedEntries,
+                    blockedEntriesCount: scan.blockedEntries,
+                    securityPolicy: {
+                        readProtectedPaths: 'blocked',
+                        listProtectedPaths: 'redacted',
+                        writeProtectedPaths: 'blocked',
+                    },
                     totalEntries: limitedEntries.totalEntries,
                     ...(limitedEntries.truncated ? { configuredLimitEntries: configuredMaxEntries } : {}),
                     entries: limitedEntries.entries,
