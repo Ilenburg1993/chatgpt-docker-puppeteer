@@ -90,6 +90,9 @@ import {
  * } | null} [sdkSessionBootDecision]
  *   Decisão redigida do initializer para a sessão SDK atual. Explica por que houve resume ou criação sem guardar
  *   credenciais/provider headers.
+ * @property {Record<string, Record<string, unknown>>} [sdkSessionLocalMetadata]
+ *   Metadata local, redigida e por sessionId, para enriquecer o cockpit sem depender de APIs inexistentes como
+ *   `session.updateMetadata`.
  * @property {{ mode: 'new'; requestedAt?: number } | { mode: 'resume'; sessionId: string; requestedAt?: number } | null} [nextSdkSessionBoot]
  *   Diretiva efêmera do operador para o próximo boot da sessão SDK; consumida pelo initializer.
  */

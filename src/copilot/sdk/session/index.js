@@ -176,8 +176,10 @@ export {
     buildConfiguredClientSessionFsConfig,
     createLocalSessionFsProvider,
     createWorkspaceSessionFsHandler,
+    describeConfiguredSessionFs,
     getConfiguredSessionFsHandler,
     getConfiguredSessionIdleTimeoutSeconds,
+    readConfiguredSessionFsState,
 } from './session-fs.js';
 
 export {

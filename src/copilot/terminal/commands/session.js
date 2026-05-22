@@ -896,6 +896,96 @@ function renderSdkSessionSummaryPreview(summary) {
 }
 
 /**
+ * @param {string} action
+ * @param {string} rawAction
+ * @param {string[]} rest
+ * @returns {{ limit: number; offset: number; filter: import('#copilot/sdk/types').SessionListFilter | undefined; filterLabel: string }}
+ */
+function parseSdkSessionInventoryArgs(action, rawAction, rest) {
+    const tokens = action === 'status' || action === 'list' || action === 'ls' ? rest : [rawAction, ...rest];
+    let limit = 12;
+    let offset = 0;
+    /** @type {import('#copilot/sdk/types').SessionListFilter} */
+    const filter = {};
+    for (const token of tokens) {
+        if (/^\d+$/u.test(token)) {
+            limit = Math.min(100, Math.max(1, Number.parseInt(token, 10)));
+            continue;
+        }
+        const [key, ...valueParts] = token.split('=');
+        const value = valueParts.join('=').trim();
+        if (!key || !value) continue;
+        if (key === 'offset' && /^\d+$/u.test(value)) {
+            offset = Math.max(0, Number.parseInt(value, 10));
+        } else if (key === 'cwd') {
+            filter.cwd = value;
+        } else if (key === 'gitRoot') {
+            filter.gitRoot = value;
+        } else if (key === 'repository' || key === 'repo') {
+            filter.repository = value;
+        } else if (key === 'branch') {
+            filter.branch = value;
+        }
+    }
+    const filterEntries = Object.entries(filter);
+    return {
+        limit,
+        offset,
+        filter: filterEntries.length > 0 ? filter : undefined,
+        filterLabel: filterEntries.length > 0 ? filterEntries.map(([key, value]) => `${key}=${value}`).join(' · ') : 'none',
+    };
+}
+
+/**
+ * @param {unknown} state
+ * @returns {string}
+ */
+function renderSdkSessionFsState(state) {
+    if (!state || typeof state !== 'object') return 'n/d';
+    const record = /** @type {Record<string, unknown>} */ (state);
+    if (record['enabled'] !== true) return 'disabled';
+    const root = record['storageRoot'] && typeof record['storageRoot'] === 'object'
+        ? /** @type {Record<string, unknown>} */ (record['storageRoot'])
+        : null;
+    const session = record['session'] && typeof record['session'] === 'object'
+        ? /** @type {Record<string, unknown>} */ (record['session'])
+        : null;
+    const rootDisplay = typeof root?.['display'] === 'string' ? root['display'] : '(root n/d)';
+    const rootExists = root?.['exists'] === true ? 'exists' : root?.['exists'] === false ? 'missing' : 'unknown';
+    const sessionDisplay = typeof session?.['display'] === 'string' ? session['display'] : null;
+    const sessionExists =
+        session?.['exists'] === true ? 'exists' : session?.['exists'] === false ? 'missing' : session ? 'unknown' : null;
+    const statePath = typeof record['sessionStatePath'] === 'string' ? record['sessionStatePath'] : '(state n/d)';
+    return `on · root=${rootDisplay}(${rootExists}) · state=${statePath}${
+        sessionDisplay ? ` · session=${sessionDisplay}(${sessionExists ?? 'unknown'})` : ''
+    }`;
+}
+
+/**
+ * @param {Record<string, unknown> | null | undefined} metadata
+ * @returns {string | null}
+ */
+function renderSdkSessionLocalMetadata(metadata) {
+    if (!metadata) return null;
+    const model = typeof metadata['model'] === 'string' && metadata['model'] ? metadata['model'] : null;
+    const provider = metadata['provider'] && typeof metadata['provider'] === 'object'
+        ? /** @type {Record<string, unknown>} */ (metadata['provider'])
+        : null;
+    const boundary = metadata['boundary'] && typeof metadata['boundary'] === 'object'
+        ? /** @type {Record<string, unknown>} */ (metadata['boundary'])
+        : null;
+    const providerKind = typeof provider?.['kind'] === 'string' ? provider['kind'] : null;
+    const providerModel = typeof provider?.['model'] === 'string' ? provider['model'] : null;
+    const reason = typeof boundary?.['reason'] === 'string' ? boundary['reason'] : null;
+    const parts = [
+        model ? `model=${model}` : null,
+        providerKind ? `provider=${providerKind}${providerModel && providerModel !== model ? `:${providerModel}` : ''}` : null,
+        reason ? `boundary=${reason}` : null,
+    ].filter(Boolean);
+    return parts.length > 0 ? parts.join(' · ') : null;
+}
+
+/**
  * @param {unknown} value
  * @param {number} [max]
  * @returns {string}
@@ -1269,11 +1359,14 @@ export async function cmdSessionSdk({ println }, arg = '') {
         return;
     }
 
-    const limit = Number.parseInt(action === 'status' ? (rest[0] ?? '') : rawAction, 10);
+    const inventoryArgs = parseSdkSessionInventoryArgs(action, rawAction, rest);
     const bootSelection = await readTerminalSdkSessionBootSelection();
     let inventory;
     try {
-        inventory = await listTerminalSdkSessionInventory(runtimeId);
+        inventory = await listTerminalSdkSessionInventory(runtimeId, inventoryArgs.filter, {
+            enrichOffset: inventoryArgs.offset,
+            enrichLimit: inventoryArgs.limit,
+        });
     } catch (error) {
         println(`  \x1b[31mNão foi possível listar sessões SDK: ${toError(error).message}\x1b[0m`);
         println('  \x1b[90mAinda assim: /resume atua no hub; /session save|list|restore atua em snapshots locais.\x1b[0m');
@@ -1291,6 +1384,7 @@ export async function cmdSessionSdk({ println }, arg = '') {
     println(`    last SDK:       \x1b[33m${inventory.lastSessionId ?? '-'}\x1b[0m`);
     println(`    foreground SDK: \x1b[33m${inventory.foregroundSessionId ?? '-'}\x1b[0m`);
     println(`    próximo boot:   \x1b[33m${nextLabel}\x1b[0m`);
+    println(`    session fs:     \x1b[90m${renderSdkSessionFsState(inventory.sessionFs)}\x1b[0m`);
     const byokBinding = classifyTerminalByokSdkBinding(
         readTerminalByokProjection().summary,
         inventory.persistedByokBinding,
@@ -1313,9 +1407,12 @@ export async function cmdSessionSdk({ println }, arg = '') {
         println('    \x1b[90mNenhuma sessão SDK listada pelo client atual.\x1b[0m\n');
         return;
     }
-    println(`\n  \x1b[36mSessões SDK listadas\x1b[0m (${inventory.sessions.length})`);
-    const visibleSessions = inventory.sessions.slice(0, Number.isFinite(limit) && limit > 0 ? limit : 12);
+    println(
+        `\n  \x1b[36mSessões SDK listadas\x1b[0m (${inventory.sessions.length}) \x1b[90mfiltro=${inventoryArgs.filterLabel} · offset=${inventoryArgs.offset} · limit=${inventoryArgs.limit}\x1b[0m`,
+    );
+    const visibleSessions = inventory.sessions.slice(inventoryArgs.offset, inventoryArgs.offset + inventoryArgs.limit);
     for (const [index, entry] of visibleSessions.entries()) {
+        const absoluteIndex = inventoryArgs.offset + index;
         const flags = [
             entry.sessionId === inventory.currentSessionId ? 'atual' : null,
             entry.sessionId === inventory.lastSessionId ? 'last' : null,
@@ -1329,17 +1426,29 @@ export async function cmdSessionSdk({ println }, arg = '') {
         const modified =
             entry.modifiedTime instanceof Date ? entry.modifiedTime.toISOString() : String(entry.modifiedTime ?? '-');
         const summary = renderSdkSessionSummaryPreview(entry.summary);
-        println(`    \x1b[90m#${index + 1}\x1b[0m \x1b[33m${entry.sessionId}\x1b[0m  \x1b[90m${flags || '-'}\x1b[0m`);
+        const localMetadata = renderSdkSessionLocalMetadata(
+            entry.localMetadata && typeof entry.localMetadata === 'object'
+                ? /** @type {Record<string, unknown>} */ (entry.localMetadata)
+                : null,
+        );
+        println(`    \x1b[90m#${absoluteIndex + 1}\x1b[0m \x1b[33m${entry.sessionId}\x1b[0m  \x1b[90m${flags || '-'}\x1b[0m`);
         println(`      \x1b[90mstart=${start} · modified=${modified}${summary ? ` · ${summary}` : ''}\x1b[0m`);
+        if (localMetadata) {
+            println(`      \x1b[90mmetadata local: ${localMetadata}\x1b[0m`);
+        }
+        if (entry.sessionFs) {
+            println(`      \x1b[90msession fs: ${renderSdkSessionFsState(entry.sessionFs)}\x1b[0m`);
+        }
     }
-    if (inventory.sessions.length > visibleSessions.length) {
+    if (inventory.sessions.length > inventoryArgs.offset + visibleSessions.length) {
         println(
-            `    \x1b[90m... ${inventory.sessions.length - visibleSessions.length} sessão(ões) omitida(s). Amplie com /session sdk <n>.\x1b[0m`,
+            `    \x1b[90m... ${inventory.sessions.length - inventoryArgs.offset - visibleSessions.length} sessão(ões) omitida(s). Use /session sdk ${inventoryArgs.limit} offset=${inventoryArgs.offset + visibleSessions.length}.\x1b[0m`,
         );
     }
     println(
         '\n  \x1b[90mPróximo boot: /session sdk next new | /session sdk next resume <id|#n|current|last|foreground> | /session sdk next auto\x1b[0m',
     );
+    println('  \x1b[90mFiltros: /session sdk <n> offset=<n> cwd=<path> gitRoot=<path> repo=<owner/repo> branch=<nome>.\x1b[0m');
     println('  \x1b[90mLimpeza persistida: /session sdk delete <id|#n>; sessão viva é protegida contra exclusão.\x1b[0m');
     println('  \x1b[90mprobe-residue marca canários persistidos por diagnósticos antigos; probes novos usam sessão efêmera.\x1b[0m\n');
 }

@@ -747,10 +747,11 @@ export async function getTerminalSdkUsageMetrics(runtimeId) {
 /**
  * @param {string | null | undefined} [runtimeId]
  * @param {import('#copilot/sdk/types').SessionListFilter} [filter]
+ * @param {{ enrichOffset?: number; enrichLimit?: number }} [options]
  * @returns {ReturnType<typeof listAgentSdkSessionInventory>}
  */
-export async function listTerminalSdkSessionInventory(runtimeId, filter) {
-    return listAgentSdkSessionInventory(runtimeId, filter);
+export async function listTerminalSdkSessionInventory(runtimeId, filter, options) {
+    return listAgentSdkSessionInventory(runtimeId, filter, options);
 }
 
 /**

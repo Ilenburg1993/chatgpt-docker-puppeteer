@@ -21,7 +21,7 @@ import {
     scanDirectory,
     statPath,
 } from '#copilot/infra/public/io';
-import { dirname, resolve } from 'node:path';
+import { basename, dirname, isAbsolute, relative, resolve } from 'node:path';
 import { classifySdkError } from '../errors.js';
 import { log } from '../logger.js';
 import { emitSdkOperationMetric } from '../telemetry/operation-metrics.js';
@@ -160,6 +160,39 @@ function toSessionStorageKey(sessionId) {
         throw new TypeError('[sdk/session-fs] session.sessionId deve ser string não-vazia.');
     }
     return encodeURIComponent(sessionId.trim());
+}
+
+/**
+ * @param {string} absolutePath
+ * @param {string} workspaceRoot
+ * @returns {{ display: string; withinWorkspace: boolean }}
+ */
+function buildSafeSessionFsPathDisplay(absolutePath, workspaceRoot) {
+    const root = resolve(workspaceRoot);
+    const target = resolve(absolutePath);
+    const rel = relative(root, target).replace(/\\/gu, '/');
+    if (rel === '') {
+        return { display: 'workspace:.', withinWorkspace: true };
+    }
+    if (!rel.startsWith('../') && rel !== '..' && !isAbsolute(rel)) {
+        return { display: `workspace:${rel}`, withinWorkspace: true };
+    }
+    return { display: `external:${basename(target)}`, withinWorkspace: false };
+}
+
+/**
+ * @param {string | null} path
+ * @returns {Promise<boolean | null>}
+ */
+async function pathExists(path) {
+    if (!path) return null;
+    try {
+        await statPath(path, { advisoryLimits: { source: 'session.fs.state' } });
+        return true;
+    } catch (error) {
+        if (isNotFoundError(error)) return false;
+        throw error;
+    }
 }
 
 /**
@@ -393,6 +426,63 @@ export function buildConfiguredClientSessionFsConfig() {
         initialCwd: config.initialCwd,
         sessionStatePath: config.sessionStatePath,
         conventions: config.conventions,
+    };
+}
+
+/**
+ * Descreve a configuração e os caminhos de SessionFs sem expor paths absolutos fora do workspace.
+ *
+ * @param {string | null | undefined} [sessionId]
+ * @returns {{
+ *     enabled: boolean;
+ *     initialCwd: string;
+ *     sessionStatePath: string;
+ *     conventions: 'windows' | 'posix';
+ *     storageRoot: { display: string; withinWorkspace: boolean };
+ *     session: { key: string; display: string; withinWorkspace: boolean } | null;
+ * }}
+ */
+export function describeConfiguredSessionFs(sessionId) {
+    const config = readCopilotSessionFsBootConfig();
+    const storageRootDir = resolve(config.storageRootDir);
+    const storageRoot = buildSafeSessionFsPathDisplay(storageRootDir, config.initialCwd);
+    const cleanSessionId = typeof sessionId === 'string' && sessionId.trim() ? sessionId.trim() : null;
+    const sessionKey = cleanSessionId && config.enabled ? toSessionStorageKey(cleanSessionId) : null;
+    const sessionDir = sessionKey ? resolve(storageRootDir, sessionKey) : null;
+    const session = sessionKey && sessionDir ? buildSafeSessionFsPathDisplay(sessionDir, config.initialCwd) : null;
+    return {
+        enabled: config.enabled,
+        initialCwd: config.initialCwd,
+        sessionStatePath: config.sessionStatePath,
+        conventions: config.conventions,
+        storageRoot,
+        session: sessionKey && session ? { key: sessionKey, ...session } : null,
+    };
+}
+
+/**
+ * Lê estado operacional mínimo de SessionFs para cockpit/diagnóstico.
+ *
+ * @param {string | null | undefined} [sessionId]
+ * @returns {Promise<ReturnType<typeof describeConfiguredSessionFs> & {
+ *     storageRoot: ReturnType<typeof describeConfiguredSessionFs>['storageRoot'] & { exists: boolean | null };
+ *     session: (NonNullable<ReturnType<typeof describeConfiguredSessionFs>['session']> & { exists: boolean | null }) | null;
+ * }>}
+ */
+export async function readConfiguredSessionFsState(sessionId) {
+    const descriptor = describeConfiguredSessionFs(sessionId);
+    const config = readCopilotSessionFsBootConfig();
+    const storageRootDir = resolve(config.storageRootDir);
+    const sessionDir =
+        descriptor.enabled && descriptor.session ? resolve(storageRootDir, descriptor.session.key) : null;
+    const [storageRootExists, sessionExists] = await Promise.all([
+        descriptor.enabled ? pathExists(storageRootDir) : Promise.resolve(null),
+        descriptor.enabled ? pathExists(sessionDir) : Promise.resolve(null),
+    ]);
+    return {
+        ...descriptor,
+        storageRoot: { ...descriptor.storageRoot, exists: storageRootExists },
+        session: descriptor.session ? { ...descriptor.session, exists: sessionExists } : null,
     };
 }
 

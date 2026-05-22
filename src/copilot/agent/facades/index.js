@@ -187,6 +187,7 @@ export {
     pingAgentSdkClient,
     pingSdk,
     raceAgentSdkEvents,
+    readAgentConfiguredSessionFsState,
     readAgentSdkModelRegistryEntry,
     readSdkSkillsGovernance,
     readSdkWorkspaceFile,

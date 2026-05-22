@@ -83,6 +83,7 @@ export {
     listAgentSdkProtectedSessionIdsByClient,
     listAgentSdkSessionsByClient,
     listSdkSessions,
+    readAgentConfiguredSessionFsState,
     resumeOrCreateAgentSdkSession,
     setForegroundSdkSessionId,
 } from './sdk/index.js';
