@@ -9,6 +9,7 @@ import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/
 import { createServer } from 'node:http';
 import { buildChatGptConnectorProfile } from '../connection/profile.js';
 import { logMcp } from '../control-plane/audit.js';
+import { readMcpMetricsSnapshot } from '../control-plane/metrics.js';
 import { createCopilotMcpServer } from '../server.js';
 
 const MCP_PATH = '/mcp';
@@ -43,7 +44,7 @@ export async function startHttpMcpServer(opts = {}) {
 
         if (req.method === 'GET' && (url.pathname === '/' || url.pathname === '/health')) {
             res.writeHead(200, { 'content-type': 'application/json' });
-            res.end(JSON.stringify({ ok: true, name: 'copilot-mcp', mcpPath: MCP_PATH }));
+            res.end(JSON.stringify({ ok: true, name: 'copilot-mcp', mcpPath: MCP_PATH, metrics: readMcpMetricsSnapshot() }));
             return;
         }
 

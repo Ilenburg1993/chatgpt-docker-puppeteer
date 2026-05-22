@@ -56,10 +56,12 @@ npx vitest --config vitest.copilot.config.js run tests/unit/copilot/mcp/*.spec.j
 - Faixa H.2 MCP: typecheck strict passou, lint completo passou, lint MCP passou, testes MCP focados passaram com 6 arquivos e 22 testes.
 - Faixa J.1 MCP: typecheck strict passou, lint completo passou, lint MCP/config passou, testes MCP focados passaram com 7 arquivos e 24 testes.
 - Faixa J.2 MCP: typecheck strict passou, lint completo passou, lint MCP passou, testes MCP focados passaram com 8 arquivos e 27 testes.
+- Faixa K.1/K.2 MCP: typecheck strict passou, lint completo passou, lint MCP passou, testes MCP focados passaram com 9 arquivos e 29 testes.
 
 ## Proximo passo
 
-Faixa J foi preparada no lado MCP/local. Continuar para Faixa K: hardening e release operacional.
+Faixa K.1/K.2 foi preparada. Continuar para K.3: documentacao de release operacional, checklist de seguranca,
+troubleshooting e comandos.
 
 ## Jobs MCP
 
@@ -95,6 +97,12 @@ Tools de leitura segura de sessoes:
 - `copilot_session_get`
 
 Essas tools consultam o registry ativo sem criar, retomar ou acionar sessoes LLM-B.
+
+## Observabilidade MCP
+
+- `GET /health` retorna metricas em memoria.
+- `mcp_runtime_health` retorna workspace root, uptime e metricas por tool.
+- `repo_remove_file` nao retorna snapshot base64 do conteudo removido.
 
 Os logs de job ficam em `src/copilot/.ai/jobs/*.log` e sao ignorados pelo Git.
 

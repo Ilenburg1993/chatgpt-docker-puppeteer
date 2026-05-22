@@ -24,6 +24,7 @@ describe('copilot MCP registry', () => {
             'git_status',
             'job_cancel',
             'job_get_output',
+            'mcp_runtime_health',
             'project_doctor',
             'repo_apply_patch',
             'repo_create_file',

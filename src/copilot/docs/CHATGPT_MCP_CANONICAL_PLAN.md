@@ -463,23 +463,23 @@ O Express server atual pode receber uma rota `/mcp`, mas a primeira versao deve 
 
 ### Faixa K — Hardening e release operacional
 
-**Status:** pendente.
+**Status:** K.1/K.2 base concluidas; K.3 em andamento.
 
 #### Fase K.1 — Seguranca
 
-1. Revisar tool descriptions contra prompt injection.
-2. Validar inputs server-side.
-3. Limitar structured content.
-4. Redigir secrets.
-5. Testar paths fora do workspace.
+1. Revisar tool descriptions contra prompt injection — em andamento.
+2. Validar inputs server-side — concluido via schemas Zod e path policy.
+3. Limitar structured content — em andamento; snapshots de rollback nao saem mais no MCP.
+4. Redigir secrets — concluido inicialmente por path policy e remocao de snapshot base64 em `repo_remove_file`.
+5. Testar paths fora do workspace — concluido nos testes MCP de escrita.
 
 #### Fase K.2 — Observabilidade
 
-1. Metrics por tool.
-2. Latencia.
-3. Erros.
-4. Ultima chamada.
-5. Health endpoint.
+1. Metrics por tool — concluido.
+2. Latencia — concluido.
+3. Erros — concluido.
+4. Ultima chamada — concluido.
+5. Health endpoint — concluido com `GET /health` e `mcp_runtime_health`.
 
 #### Fase K.3 — Documentacao final
 
@@ -806,6 +806,32 @@ Faixa J.2: expor uma delegacao MCP segura para consultar estado de sessoes Copil
 
 Faixa K: hardening e release operacional, com revisao de seguranca das tool descriptions, outputs, prompts e superficie
 de escrita/execucao.
+
+### 2026-05-22 — Faixa K.1/K.2 hardening e observabilidade MCP
+
+1. Criado `src/copilot/mcp/control-plane/metrics.js`.
+2. Criado `src/copilot/mcp/tools/runtime-health.js`.
+3. Tool nova:
+   - `mcp_runtime_health`
+4. Registry MCP agora registra metricas por tool:
+   - chamadas;
+   - erros;
+   - duracao total;
+   - duracao media;
+   - ultima duracao;
+   - ultima chamada;
+   - ultimo status de erro.
+5. `GET /health` agora inclui snapshot de metricas.
+6. `repo_remove_file` deixou de retornar `previousSnapshotBase64`; retorna apenas `rollbackSnapshotAvailable` e hashes.
+7. Validacao executada:
+   - `npm run typecheck:strict:src.copilot` passou.
+   - `npm run lint:copilot` passou.
+   - `node --max-old-space-size=6144 node_modules/.bin/eslint src/copilot/mcp tests/unit/copilot/mcp --no-cache` passou.
+   - `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/mcp/*.spec.js` passou: 9 arquivos, 29 testes.
+
+### Proximo item cronologico apos K.1/K.2
+
+Faixa K.3: finalizar documentacao de release operacional, incluindo checklist de seguranca, troubleshooting e comandos.
 
 ---
 

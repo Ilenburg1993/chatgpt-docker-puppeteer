@@ -569,7 +569,7 @@ export const repoWriteTools = [
                     deleted: removed.deleted,
                     previousHash: removed.previousHash,
                     previousBytes: removed.previousBytes,
-                    previousSnapshotBase64: removed.previousSnapshotBase64,
+                    rollbackSnapshotAvailable: typeof removed.previousSnapshotBase64 === 'string',
                     previousSnapshotTruncated: removed.previousSnapshotTruncated,
                     io: {
                         operation: removed.io.operation,
