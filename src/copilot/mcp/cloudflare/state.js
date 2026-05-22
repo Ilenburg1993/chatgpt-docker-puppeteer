@@ -5,7 +5,27 @@
  * @module copilot/mcp/cloudflare/state
  */
 
-import { readFile } from 'node:fs/promises';
+import { readFile, writeFile } from 'node:fs/promises';
+
+/**
+ * @typedef {object} QuickTunnelSmokeState
+ * @property {string} checkedAt
+ * @property {boolean} ok
+ * @property {string} connectorUrl
+ * @property {{ ok: boolean; status?: number; error?: string }} health
+ * @property {{
+ *   ok: boolean;
+ *   status?: number;
+ *   error?: string;
+ *   tools: number;
+ *   expectedLocalTools: number;
+ *   toolsMatchLocalRegistry: boolean;
+ *   criticalToolsPresent: boolean;
+ *   missingCriticalTools: string[];
+ *   missingLocalTools: string[];
+ *   unexpectedRemoteTools: string[];
+ * }} toolsList
+ */
 
 /**
  * @typedef {object} QuickTunnelState
@@ -20,6 +40,7 @@ import { readFile } from 'node:fs/promises';
  * @property {string} stateFile
  * @property {{ name: string; description: string; mcpServerUrl: string; authentication: string }} chatgpt
  * @property {string} smokeCommand
+ * @property {QuickTunnelSmokeState} [lastSmoke]
  */
 
 /**
@@ -34,6 +55,27 @@ export async function readQuickTunnelState(stateFile) {
         if (error && typeof error === 'object' && 'code' in error && error.code === 'ENOENT') return undefined;
         return { error: error instanceof Error ? error.message : String(error) };
     }
+}
+
+/**
+ * @param {string} stateFile
+ * @param {QuickTunnelState} state
+ * @returns {Promise<void>}
+ */
+export async function saveQuickTunnelState(stateFile, state) {
+    await writeFile(stateFile, `${JSON.stringify(state, null, 2)}\n`, 'utf8');
+}
+
+/**
+ * @param {string} stateFile
+ * @param {QuickTunnelState | { error: string } | undefined} state
+ * @param {QuickTunnelSmokeState} lastSmoke
+ * @returns {Promise<boolean>}
+ */
+export async function updateQuickTunnelLastSmoke(stateFile, state, lastSmoke) {
+    if (!isQuickTunnelState(state)) return false;
+    await saveQuickTunnelState(stateFile, { ...state, lastSmoke });
+    return true;
 }
 
 /**
@@ -85,6 +127,11 @@ export function isProcessAlive(pid) {
  *   staleAfterMs: number;
  *   stale: boolean;
  *   recommendedAction: 'start' | 'restart' | 'smoke' | 'use';
+ *   lastSmokeAt: string | null;
+ *   lastSmokeOk: boolean | null;
+ *   lastSmokeAgeSeconds: number | null;
+ *   lastSmokeAgeMinutes: number | null;
+ *   lastSmokeConnectorUrl: string | null;
  *   connectorUrl: string | null;
  *   publicBaseUrl: string | null;
  *   originUrl: string | null;
@@ -105,6 +152,11 @@ export function summarizeQuickTunnelState(state, nowMs = Date.now(), staleAfterM
             staleAfterMs,
             stale: false,
             recommendedAction: 'start',
+            lastSmokeAt: null,
+            lastSmokeOk: null,
+            lastSmokeAgeSeconds: null,
+            lastSmokeAgeMinutes: null,
+            lastSmokeConnectorUrl: null,
             connectorUrl: null,
             publicBaseUrl: null,
             originUrl: null,
@@ -128,6 +180,11 @@ export function summarizeQuickTunnelState(state, nowMs = Date.now(), staleAfterM
             staleAfterMs,
             stale: false,
             recommendedAction: 'restart',
+            lastSmokeAt: null,
+            lastSmokeOk: null,
+            lastSmokeAgeSeconds: null,
+            lastSmokeAgeMinutes: null,
+            lastSmokeConnectorUrl: null,
             connectorUrl: null,
             publicBaseUrl: null,
             originUrl: null,
@@ -140,6 +197,9 @@ export function summarizeQuickTunnelState(state, nowMs = Date.now(), staleAfterM
     const ageMs = Number.isFinite(createdAtMs) ? Math.max(0, nowMs - createdAtMs) : null;
     const stale = ageMs !== null && ageMs > staleAfterMs;
     const recommendedAction = !processAlive ? 'restart' : stale ? 'smoke' : 'use';
+    const lastSmoke = normalizeLastSmoke(state.lastSmoke);
+    const lastSmokeAtMs = lastSmoke ? Date.parse(lastSmoke.checkedAt) : NaN;
+    const lastSmokeAgeMs = Number.isFinite(lastSmokeAtMs) ? Math.max(0, nowMs - lastSmokeAtMs) : null;
     return {
         mode: state.mode,
         configured: true,
@@ -151,6 +211,11 @@ export function summarizeQuickTunnelState(state, nowMs = Date.now(), staleAfterM
         staleAfterMs,
         stale,
         recommendedAction,
+        lastSmokeAt: lastSmoke?.checkedAt ?? null,
+        lastSmokeOk: lastSmoke?.ok ?? null,
+        lastSmokeAgeSeconds: lastSmokeAgeMs === null ? null : Math.round(lastSmokeAgeMs / 1000),
+        lastSmokeAgeMinutes: lastSmokeAgeMs === null ? null : Math.round(lastSmokeAgeMs / 60000),
+        lastSmokeConnectorUrl: lastSmoke?.connectorUrl ?? null,
         connectorUrl: state.connectorUrl,
         publicBaseUrl: state.publicBaseUrl,
         originUrl: state.originUrl,
@@ -169,4 +234,17 @@ export function summarizeQuickTunnelState(state, nowMs = Date.now(), staleAfterM
                   'Update or recreate the ChatGPT connector with the new /mcp URL.',
               ],
     };
+}
+
+/**
+ * @param {unknown} value
+ * @returns {QuickTunnelSmokeState | null}
+ */
+function normalizeLastSmoke(value) {
+    if (!value || typeof value !== 'object') return null;
+    if (!('checkedAt' in value) || typeof value.checkedAt !== 'string') return null;
+    if (!('ok' in value) || typeof value.ok !== 'boolean') return null;
+    if (!('connectorUrl' in value) || typeof value.connectorUrl !== 'string') return null;
+    const smoke = /** @type {QuickTunnelSmokeState} */ (value);
+    return smoke;
 }

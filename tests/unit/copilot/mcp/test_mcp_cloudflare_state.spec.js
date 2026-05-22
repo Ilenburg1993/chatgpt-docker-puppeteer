@@ -4,9 +4,16 @@
  */
 
 import assert from 'node:assert/strict';
+import fs from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
 import { describe, it } from 'vitest';
 
-import { summarizeQuickTunnelState } from '../../../../src/copilot/mcp/cloudflare/state.js';
+import {
+    readQuickTunnelState,
+    summarizeQuickTunnelState,
+    updateQuickTunnelLastSmoke,
+} from '../../../../src/copilot/mcp/cloudflare/state.js';
 
 const baseState = {
     schemaVersion: 1,
@@ -77,6 +84,43 @@ describe('copilot MCP Cloudflare quick tunnel state', () => {
         assert.equal(summary.stale, false);
         assert.equal(summary.recommendedAction, 'use');
         assert.equal(summary.ageSeconds, 60);
+    });
+
+    it('summarizes and persists the last successful remote smoke', async () => {
+        const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'copilot-mcp-cloudflare-state-'));
+        const stateFile = path.join(dir, 'quick-tunnel.json');
+        await fs.writeFile(stateFile, `${JSON.stringify(baseState, null, 2)}\n`, 'utf8');
+
+        const updated = await updateQuickTunnelLastSmoke(stateFile, baseState, {
+            checkedAt: '2026-05-22T12:02:00.000Z',
+            ok: true,
+            connectorUrl: baseState.connectorUrl,
+            health: { ok: true, status: 200 },
+            toolsList: {
+                ok: true,
+                status: 200,
+                tools: 33,
+                expectedLocalTools: 33,
+                toolsMatchLocalRegistry: true,
+                criticalToolsPresent: true,
+                missingCriticalTools: [],
+                missingLocalTools: [],
+                unexpectedRemoteTools: [],
+            },
+        });
+        assert.equal(updated, true);
+
+        const persisted = await readQuickTunnelState(stateFile);
+        const summary = summarizeQuickTunnelState(
+            persisted,
+            Date.parse('2026-05-22T12:05:00.000Z'),
+            10 * 60 * 1000,
+        );
+
+        assert.equal(summary.lastSmokeOk, true);
+        assert.equal(summary.lastSmokeAt, '2026-05-22T12:02:00.000Z');
+        assert.equal(summary.lastSmokeAgeMinutes, 3);
+        assert.equal(summary.lastSmokeConnectorUrl, baseState.connectorUrl);
     });
 
     it('recommends restart when the recorded process is gone', () => {

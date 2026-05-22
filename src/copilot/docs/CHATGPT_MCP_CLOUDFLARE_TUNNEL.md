@@ -252,6 +252,7 @@ operacao profissional:
 3. `mcp_tunnel_status` e `mcp_runtime_health` expoem a mesma informacao para o ChatGPT.
 4. Quando a sessao fica velha, a acao recomendada passa a ser `smoke`.
 5. Quando o PID gravado nao esta vivo, a acao recomendada passa a ser `restart`.
+6. Quando `smoke` roda, o resultado e gravado em `lastSmoke` no arquivo de estado temporario.
 
 Valores de `recommendedAction`:
 
@@ -384,6 +385,9 @@ A partir desta rodada, `status` tambem devolve um bloco `summary`:
   "staleAfterMs": 21600000,
   "stale": false,
   "recommendedAction": "use",
+  "lastSmokeAt": "2026-05-22T12:02:00.000Z",
+  "lastSmokeOk": true,
+  "lastSmokeAgeMinutes": 3,
   "connectorUrl": "https://alpha-beta-gamma.trycloudflare.com/mcp"
 }
 ```
@@ -714,3 +718,5 @@ Validadores:
     - `recommendedAction` para `start`, `restart`, `smoke` e `use`;
     - `doctor`, `status`, `mcp_tunnel_status` e `mcp_runtime_health` usando o mesmo resumo operacional;
     - `smoke` remoto conferindo tools criticas e divergencia contra o registry MCP local.
+11. A rodada seguinte acrescentou persistencia de `lastSmoke` no estado temporario, com horario, health remoto e resumo
+    da paridade de tools do endpoint publico.

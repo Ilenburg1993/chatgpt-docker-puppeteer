@@ -18,7 +18,12 @@ import {
     validateConfiguredPublicUrl,
 } from './config.js';
 import { getCanonicalMcpTools } from '../registry.js';
-import { isQuickTunnelState, readQuickTunnelState, summarizeQuickTunnelState } from './state.js';
+import {
+    isQuickTunnelState,
+    readQuickTunnelState,
+    summarizeQuickTunnelState,
+    updateQuickTunnelLastSmoke,
+} from './state.js';
 
 const command = process.argv[2] ?? 'doctor';
 
@@ -163,22 +168,55 @@ async function runSmoke() {
     const unexpectedRemoteTools = remoteToolNames.filter((toolName) => !localToolNames.includes(toolName));
     const toolsMatchLocalRegistry = missingLocalTools.length === 0 && unexpectedRemoteTools.length === 0;
     const criticalToolsPresent = missingCriticalTools.length === 0;
-    const report = {
-        ok: health.ok && toolsList.ok && remoteToolNames.length > 0 && toolsMatchLocalRegistry && criticalToolsPresent,
+    const ok = health.ok && toolsList.ok && remoteToolNames.length > 0 && toolsMatchLocalRegistry && criticalToolsPresent;
+    const healthSummary = {
+        ok: health.ok,
+        ...(health.status !== undefined ? { status: health.status } : {}),
+        ...(health.error ? { error: health.error } : {}),
+        body: health.body,
+    };
+    const toolsListSummary = {
+        ok: toolsList.ok,
+        ...(toolsList.status !== undefined ? { status: toolsList.status } : {}),
+        ...(toolsList.error ? { error: toolsList.error } : {}),
+        tools: remoteToolNames.length,
+        expectedLocalTools: localToolNames.length,
+        toolsMatchLocalRegistry,
+        criticalToolsPresent,
+        missingCriticalTools,
+        missingLocalTools,
+        unexpectedRemoteTools,
+        remoteToolNames,
+    };
+    const persistedToolsListSummary = {
+        ok: toolsList.ok,
+        ...(toolsList.status !== undefined ? { status: toolsList.status } : {}),
+        ...(toolsList.error ? { error: toolsList.error } : {}),
+        tools: remoteToolNames.length,
+        expectedLocalTools: localToolNames.length,
+        toolsMatchLocalRegistry,
+        criticalToolsPresent,
+        missingCriticalTools,
+        missingLocalTools,
+        unexpectedRemoteTools,
+    };
+    const lastSmoke = {
+        checkedAt: new Date().toISOString(),
+        ok,
         connectorUrl,
-        health: { ok: health.ok, status: health.status, body: health.body },
-        toolsList: {
-            ok: toolsList.ok,
-            status: toolsList.status,
-            tools: remoteToolNames.length,
-            expectedLocalTools: localToolNames.length,
-            toolsMatchLocalRegistry,
-            criticalToolsPresent,
-            missingCriticalTools,
-            missingLocalTools,
-            unexpectedRemoteTools,
-            remoteToolNames,
-        },
+        health: healthSummary,
+        toolsList: toolsListSummary,
+    };
+    const stateUpdated = await updateQuickTunnelLastSmoke(config.stateFile, state, {
+        ...lastSmoke,
+        toolsList: persistedToolsListSummary,
+    });
+    const report = {
+        ok,
+        connectorUrl,
+        stateUpdated,
+        health: healthSummary,
+        toolsList: toolsListSummary,
         chatgpt: {
             mcpServerUrl: connectorUrl,
         },

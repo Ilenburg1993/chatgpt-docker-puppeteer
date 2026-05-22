@@ -92,6 +92,7 @@ Antes de colar a URL, confira:
 4. `smoke.toolsList.toolsMatchLocalRegistry` precisa ser `true`.
 5. `smoke.toolsList.expectedLocalTools` deve refletir o registry MCP local atual.
 6. `smoke.toolsList.missingCriticalTools`, `missingLocalTools` e `unexpectedRemoteTools` precisam estar vazios.
+7. Depois do smoke, `status.summary.lastSmokeOk` deve ser `true` e `lastSmokeAgeMinutes` deve ser recente.
 
 ## 4. Smoke Tests
 

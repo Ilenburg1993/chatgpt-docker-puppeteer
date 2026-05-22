@@ -863,6 +863,38 @@ Resultado esperado:
 2. Clients humanos ainda veem a mesma mensagem em `content[0].text`.
 3. A LLM-B continua independente do MCP server.
 
+### 2026-05-22 — Persistencia do ultimo smoke remoto Cloudflare
+
+Gap tratado:
+
+1. O relatorio externo pediu diagnostico mais direto de URL ativa, ultimo health check e recuperacao de tunnel.
+2. A rodada anterior adicionou idade, stale e acao recomendada, mas o ultimo smoke remoto ainda nao ficava persistido.
+
+Implementacao:
+
+1. `QuickTunnelState` ganhou `lastSmoke` opcional.
+2. `npm run copilot:mcp:cloudflare:smoke` grava:
+   - `checkedAt`;
+   - `ok`;
+   - `connectorUrl`;
+   - resumo de `GET /health`;
+   - resumo de `tools/list`;
+   - paridade contra o registry local.
+3. `summarizeQuickTunnelState` passou a expor:
+   - `lastSmokeAt`;
+   - `lastSmokeOk`;
+   - `lastSmokeAgeSeconds`;
+   - `lastSmokeAgeMinutes`;
+   - `lastSmokeConnectorUrl`.
+4. `status`, `doctor`, `mcp_tunnel_status` e `mcp_runtime_health` herdam esses campos automaticamente pelo summary.
+5. O estado continua runtime local ignorado pelo Git, sem token, segredo ou dominio fixo.
+
+Efeito operacional:
+
+1. O ChatGPT consegue perguntar ao proprio MCP quando a URL temporaria foi testada pela ultima vez.
+2. Humanos conseguem distinguir "tunnel vivo mas nao testado recentemente" de "tunnel testado e pronto".
+3. Falhas de smoke ficam registradas no estado para recovery imediato.
+
 ### Proximo item cronologico apos Faixa I
 
 Faixa G, Fase G.1: escrita controlada (`repo_apply_patch` primeiro), com diff, path policy e auditoria.
