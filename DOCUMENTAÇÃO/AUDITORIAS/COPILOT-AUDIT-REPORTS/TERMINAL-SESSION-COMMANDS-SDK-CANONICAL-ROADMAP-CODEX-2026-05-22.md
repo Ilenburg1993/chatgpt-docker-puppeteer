@@ -284,3 +284,17 @@ Evidencia live apos as duas primeiras fatias:
   mensagem pos-ask, usage sem Premium Request, `/tools diag`, `/events`, `/errors`, `/health`, export Markdown e
   ausencia de duplicacao obvia.
 - O archive SSE mostrou `sdk.lifecycle` como evento publico materializado, com `session.updated` discreto.
+
+Terceira fatia concluida:
+
+- `/session sdk events [n]` agora resume `sdk.lifecycle` e `sdk.command.executed` diretamente a partir do archive SSE
+  canonico, sem criar novo emissor.
+- Eventos repetidos consecutivos, como rajadas de `session.updated`, sao colapsados na lente de operador, mas continuam
+  integrais no JSONL bruto para auditoria.
+- `/help` passou a expor a lente nova junto do cockpit de sessao.
+- Teste focado: `node scripts/ci/run-vitest-copilot.mjs tests/unit/copilot/terminal/test_commands_session.spec.js`.
+
+Proximo passo da Faixa B/C:
+
+- Usar a mesma lente de eventos para conectar `SessionUiApi`/elicitation e comandos SDK no cockpit, distinguindo
+  claramente "arquivo bruto completo" de "visao operacional agregada".

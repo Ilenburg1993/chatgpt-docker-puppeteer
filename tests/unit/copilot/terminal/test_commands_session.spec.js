@@ -27,6 +27,32 @@ const listTerminalSdkSessionInventory = vi.fn(async () => ({
 const readTerminalSdkSessionBootSelection = vi.fn(async () => null);
 const scheduleTerminalSdkSessionBootSelection = vi.fn(async () => ({ ok: true, data: {}, error: null }));
 const deleteTerminalSdkSession = vi.fn(async () => undefined);
+const readTerminalSseEventArchiveTail = vi.fn(async (/** @type {Record<string, unknown>} */ input = {}) => ({
+    entries: [],
+    state: {
+        enabled: true,
+        path: '/tmp/terminal-sse-events.jsonl',
+        error: null,
+        events: 0,
+        bytes: 0,
+        queueDepth: 0,
+        flushScheduled: false,
+        flushInFlight: false,
+        failedEvents: 0,
+        droppedEvents: 0,
+        lastEventId: null,
+    },
+    filters: {
+        limit: Number(input['limit'] ?? 20),
+        event: typeof input['event'] === 'string' ? input['event'] : null,
+        traceId: null,
+        turnId: null,
+        source: null,
+        toolCallId: null,
+        requestId: null,
+        hubSessionId: null,
+    },
+}));
 
 const defaultRuntime = /** @type {any} */ ({
     status: 'idle',
@@ -336,6 +362,11 @@ vi.mock('../../../../src/copilot/terminal/frontend/index.js', async (importOrigi
     deleteTerminalSdkSession,
 }));
 
+vi.mock('../../../../src/copilot/terminal/state/index.js', async (importOriginal) => ({
+    ...(await importOriginal()),
+    readTerminalSseEventArchiveTail,
+}));
+
 const {
     cmdStatus,
     cmdNow,
@@ -621,6 +652,33 @@ describe('commands/session — async commands', () => {
         scheduleTerminalSdkSessionBootSelection.mockClear();
         scheduleTerminalSdkSessionBootSelection.mockResolvedValue({ ok: true, data: {}, error: null });
         deleteTerminalSdkSession.mockClear();
+        readTerminalSseEventArchiveTail.mockClear();
+        readTerminalSseEventArchiveTail.mockResolvedValue({
+            entries: [],
+            state: {
+                enabled: true,
+                path: '/tmp/terminal-sse-events.jsonl',
+                error: null,
+                events: 0,
+                bytes: 0,
+                queueDepth: 0,
+                flushScheduled: false,
+                flushInFlight: false,
+                failedEvents: 0,
+                droppedEvents: 0,
+                lastEventId: null,
+            },
+            filters: {
+                limit: 20,
+                event: null,
+                traceId: null,
+                turnId: null,
+                source: null,
+                toolCallId: null,
+                requestId: null,
+                hubSessionId: null,
+            },
+        });
     });
 
     it('cmdSessionSdk distingue inventário SDK de resume do hub e snapshots', async () => {
@@ -761,6 +819,117 @@ describe('commands/session — async commands', () => {
         expect(ctx.output()).toContain('BYOK boundary');
         expect(ctx.output()).toContain('último boot');
         expect(ctx.output()).toContain('provider-boundary');
+    });
+
+    it('cmdSessionSdkEvents resume lifecycle e commands pelo archive SSE canônico', async () => {
+        readTerminalSseEventArchiveTail
+            .mockResolvedValueOnce({
+                entries: [
+                    {
+                        schemaVersion: 1,
+                        ts: '2026-05-22T00:00:00.000Z',
+                        timestamp: Date.parse('2026-05-22T00:00:00.000Z'),
+                        event: 'sdk.lifecycle',
+                        eventId: 10,
+                        source: 'agent/sdk.lifecycle',
+                        eventSource: 'agent/sdk.lifecycle',
+                        traceId: null,
+                        turnId: null,
+                        hubSessionId: null,
+                        payload: { type: 'session.updated', sessionId: 'sdk-current' },
+                    },
+                    {
+                        schemaVersion: 1,
+                        ts: '2026-05-22T00:00:01.000Z',
+                        timestamp: Date.parse('2026-05-22T00:00:01.000Z'),
+                        event: 'sdk.lifecycle',
+                        eventId: 11,
+                        source: 'agent/sdk.lifecycle',
+                        eventSource: 'agent/sdk.lifecycle',
+                        traceId: null,
+                        turnId: null,
+                        hubSessionId: null,
+                        payload: { type: 'session.updated', sessionId: 'sdk-current' },
+                    },
+                ],
+                state: {
+                    enabled: true,
+                    path: '/tmp/terminal-sse-events.jsonl',
+                    error: null,
+                    events: 22,
+                    bytes: 1024,
+                    queueDepth: 0,
+                    flushScheduled: false,
+                    flushInFlight: false,
+                    failedEvents: 0,
+                    droppedEvents: 0,
+                    lastEventId: 12,
+                },
+                filters: {
+                    limit: 5,
+                    event: 'sdk.lifecycle',
+                    traceId: null,
+                    turnId: null,
+                    source: null,
+                    toolCallId: null,
+                    requestId: null,
+                    hubSessionId: null,
+                },
+            })
+            .mockResolvedValueOnce({
+                entries: [
+                    {
+                        schemaVersion: 1,
+                        ts: '2026-05-22T00:00:02.000Z',
+                        timestamp: Date.parse('2026-05-22T00:00:02.000Z'),
+                        event: 'sdk.command.executed',
+                        eventId: 12,
+                        source: 'agent/sdk.command',
+                        eventSource: 'agent/sdk.command',
+                        traceId: null,
+                        turnId: null,
+                        hubSessionId: null,
+                        payload: {
+                            commandName: 'terminal_status',
+                            localCommand: '/status',
+                            sessionId: 'sdk-current',
+                            status: 'completed',
+                        },
+                    },
+                ],
+                state: {
+                    enabled: true,
+                    path: '/tmp/terminal-sse-events.jsonl',
+                    error: null,
+                    events: 22,
+                    bytes: 1024,
+                    queueDepth: 0,
+                    flushScheduled: false,
+                    flushInFlight: false,
+                    failedEvents: 0,
+                    droppedEvents: 0,
+                    lastEventId: 12,
+                },
+                filters: {
+                    limit: 5,
+                    event: 'sdk.command.executed',
+                    traceId: null,
+                    turnId: null,
+                    source: null,
+                    toolCallId: null,
+                    requestId: null,
+                    hubSessionId: null,
+                },
+            });
+        const ctx = mockCtx();
+        await cmdSessionSdk({ println: ctx.println }, 'events 5');
+        expect(readTerminalSseEventArchiveTail).toHaveBeenCalledWith({ event: 'sdk.lifecycle', limit: 5 });
+        expect(readTerminalSseEventArchiveTail).toHaveBeenCalledWith({ event: 'sdk.command.executed', limit: 5 });
+        expect(ctx.output()).toContain('Eventos SDK da sessão');
+        expect(ctx.output()).toContain('sdk.lifecycle');
+        expect(ctx.output()).toContain('×2');
+        expect(ctx.output()).toContain('terminal_status');
+        expect(ctx.output()).toContain('Este comando não cria eventos');
     });
 
     it('cmdSessionSave salva e imprime path', async () => {

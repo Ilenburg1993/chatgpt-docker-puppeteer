@@ -42,6 +42,7 @@ import {
     classifyTerminalByokSdkBinding,
     renderTerminalSdkProviderBinding,
 } from '../byok/session-binding.js';
+import { readTerminalSseEventArchiveTail } from '../state/index.js';
 
 const DISABLED_BYOK_SUMMARY = Object.freeze({
     enabled: false,
@@ -894,6 +895,126 @@ function renderSdkSessionSummaryPreview(summary) {
 }
 
 /**
+ * @param {unknown} value
+ * @param {number} [max]
+ * @returns {string}
+ */
+function compactSdkSessionEventValue(value, max = 96) {
+    const text = typeof value === 'string' ? value : value == null ? '' : String(value);
+    const compact = text.replace(/\s+/gu, ' ').trim();
+    return compact.length > max ? `${compact.slice(0, Math.max(0, max - 3))}...` : compact;
+}
+
+/**
+ * @param {unknown} payload
+ * @param {string[]} keys
+ * @returns {string | null}
+ */
+function readPayloadString(payload, keys) {
+    if (!payload || typeof payload !== 'object') return null;
+    const record = /** @type {Record<string, unknown>} */ (payload);
+    for (const key of keys) {
+        const value = record[key];
+        if (typeof value === 'string' && value.trim()) return value.trim();
+    }
+    return null;
+}
+
+/**
+ * @param {import('../state/sse-event-archive.js').TerminalSseEventArchiveEntry} entry
+ * @returns {{ key: string; line: string }}
+ */
+function summarizeSdkSessionArchiveEntry(entry) {
+    const payload = entry.payload && typeof entry.payload === 'object' ? entry.payload : {};
+    const event = entry.event;
+    const type = readPayloadString(payload, ['type', 'eventType', 'lifecycleType', 'status']) ?? '-';
+    const sessionId = readPayloadString(payload, ['sessionId', 'sdkSessionId', 'foregroundSessionId']);
+    const commandName = readPayloadString(payload, ['commandName', 'name', 'command']);
+    const localCommand = readPayloadString(payload, ['localCommand']);
+    const source = compactSdkSessionEventValue(entry.eventSource ?? entry.source ?? '-', 48);
+    const detailParts = [
+        `tipo=${compactSdkSessionEventValue(type, 42)}`,
+        sessionId ? `sessão=${compactSdkSessionEventValue(sessionId, 54)}` : null,
+        commandName ? `cmd=${compactSdkSessionEventValue(commandName, 42)}` : null,
+        localCommand ? `local=${compactSdkSessionEventValue(localCommand, 42)}` : null,
+    ].filter(Boolean);
+    return {
+        key: [event, type, sessionId ?? '', commandName ?? '', localCommand ?? '', source].join('\u001f'),
+        line: `#${entry.eventId ?? '-'} ${event} · ${source} · ${detailParts.join(' · ')}`,
+    };
+}
+
+/**
+ * @param {string[]} tokens
+ * @returns {number}
+ */
+function parseSdkSessionEventsLimit(tokens) {
+    for (const token of tokens) {
+        if (/^\d+$/u.test(token)) return Math.min(100, Math.max(1, Number(token)));
+        if (token.startsWith('limit=') && /^\d+$/u.test(token.slice('limit='.length))) {
+            return Math.min(100, Math.max(1, Number(token.slice('limit='.length))));
+        }
+    }
+    return 20;
+}
+
+/**
+ * Exibe uma lente de operador sobre eventos SDK canônicos já arquivados pelo fanout SSE.
+ *
+ * @param {SessionContext} ctx
+ * @param {string[]} tokens
+ * @returns {Promise<void>}
+ */
+async function cmdSessionSdkEvents({ println }, tokens) {
+    const limit = parseSdkSessionEventsLimit(tokens);
+    const [lifecycle, commands] = await Promise.all([
+        readTerminalSseEventArchiveTail({ event: 'sdk.lifecycle', limit }),
+        readTerminalSseEventArchiveTail({ event: 'sdk.command.executed', limit }),
+    ]);
+    const merged = [...lifecycle.entries, ...commands.entries]
+        .sort((a, b) => {
+            const ts = Number(a.timestamp ?? 0) - Number(b.timestamp ?? 0);
+            return ts || Number(a.eventId ?? 0) - Number(b.eventId ?? 0);
+        })
+        .slice(-limit);
+    const state = lifecycle.state.path || commands.state.path ? lifecycle.state : commands.state;
+    println('\n  \x1b[36mEventos SDK da sessão\x1b[0m');
+    println(
+        `  \x1b[90mfonte=archive SSE canônico · arquivo=${state.path ?? '(sem arquivo)'} · janela=${limit} · lifecycle=${lifecycle.entries.length} · commands=${commands.entries.length}\x1b[0m`,
+    );
+    if (lifecycle.state.error || commands.state.error) {
+        println(`  \x1b[31merro=${lifecycle.state.error ?? commands.state.error}\x1b[0m`);
+    }
+    if (merged.length === 0) {
+        println('  \x1b[33mNenhum sdk.lifecycle ou sdk.command.executed arquivado ainda.\x1b[0m');
+        println('  \x1b[90mRode /events event=sdk.lifecycle 20 ou /events event=sdk.command.executed 20 para diagnóstico bruto.\x1b[0m\n');
+        return;
+    }
+    /** @type {{ key: string; line: string; firstTimestamp: number; count: number }[]} */
+    const collapsed = [];
+    for (const entry of merged) {
+        const summary = summarizeSdkSessionArchiveEntry(entry);
+        const last = collapsed[collapsed.length - 1];
+        if (last && last.key === summary.key) {
+            last.count += 1;
+            continue;
+        }
+        collapsed.push({
+            key: summary.key,
+            line: summary.line,
+            firstTimestamp: Number(entry.timestamp ?? 0),
+            count: 1,
+        });
+    }
+    for (const entry of collapsed) {
+        const time = entry.firstTimestamp ? new Date(entry.firstTimestamp).toLocaleTimeString('pt-BR') : '--:--:--';
+        const repeats = entry.count > 1 ? ` \x1b[90m×${entry.count}\x1b[0m` : '';
+        println(`    \x1b[90m${time}\x1b[0m  \x1b[33m${entry.line}\x1b[0m${repeats}`);
+    }
+    println('  \x1b[90mEste comando não cria eventos; ele resume o mesmo JSONL usado por /events e pelos testes live.\x1b[0m\n');
+}
+
+/**
  * Cockpit de sessão SDK persistente. Diferencia sessão SDK, dialog loop, hub e snapshots locais sem trocar a sessão viva
  * por um caminho paralelo.
  *
@@ -905,6 +1026,10 @@ export async function cmdSessionSdk({ println }, arg = '') {
     const { runtimeId, arg: cleanArg } = extractRuntimeTarget(arg);
     const [rawAction = 'status', ...rest] = cleanArg.trim().split(/\s+/u).filter(Boolean);
     const action = rawAction.toLowerCase();
+    if (action === 'events' || action === 'eventos' || action === 'lifecycle' || action === 'commands') {
+        await cmdSessionSdkEvents({ println }, [rawAction, ...rest]);
+        return;
+    }
     if (action === 'next') {
         const [rawMode = '', ...modeRest] = rest;
         const mode = rawMode.toLowerCase();
