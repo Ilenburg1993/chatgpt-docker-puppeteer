@@ -24,10 +24,28 @@ node src/copilot/mcp/index.js --transport stdio
 
 ## ChatGPT
 
-O ChatGPT deve receber uma URL HTTPS que aponte para `/mcp`, por exemplo via Secure MCP Tunnel:
+O ChatGPT deve receber uma URL HTTPS que aponte para `/mcp`, por exemplo via Cloudflare Tunnel publicado ou Secure
+MCP Tunnel:
 
 ```text
 https://<endpoint>/mcp
+```
+
+Cloudflare Tunnel local:
+
+```bash
+npm run copilot:mcp:http
+npm run copilot:mcp:cloudflare:doctor
+npm run copilot:mcp:cloudflare:quick
+```
+
+O quick tunnel serve para smoke temporário. Para uma URL repetível no formulário do ChatGPT, publique um tunnel
+Cloudflare com hostname estável apontando para o origin `http://127.0.0.1:3333`, mantenha o token fora do Git e rode:
+
+```bash
+export CLOUDFLARE_TUNNEL_TOKEN="<token-do-tunnel>"
+export COPILOT_MCP_CLOUDFLARE_PUBLIC_URL="https://repo-mcp.example.com/mcp"
+npm run copilot:mcp:cloudflare:run
 ```
 
 ## Primeira superfície

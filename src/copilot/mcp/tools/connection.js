@@ -10,6 +10,7 @@ import { readOnlyAnnotations } from '../control-plane/annotations.js';
 import { okResult } from '../control-plane/result.js';
 import {
     buildChatGptConnectorProfile,
+    buildCloudflareTunnelRunbook,
     buildSecureTunnelRunbook,
     validatePublicConnectorUrl,
 } from '../connection/profile.js';
@@ -24,13 +25,17 @@ export const connectionTools = [
         description:
             'Return the canonical ChatGPT connector form values, tunnel checklist, and smoke prompts for this repo MCP server.',
         inputSchema: {
-            publicMcpUrl: z.string().optional().describe('Optional public HTTPS /mcp URL from Secure MCP Tunnel.'),
+            publicMcpUrl: z
+                .string()
+                .optional()
+                .describe('Optional public HTTPS /mcp URL from Cloudflare Tunnel or Secure MCP Tunnel.'),
         },
         annotations: readOnlyAnnotations(),
         handler: async ({ publicMcpUrl }) => {
             const profile = buildChatGptConnectorProfile({ publicMcpUrl });
             const runbook = buildSecureTunnelRunbook({ publicMcpUrl });
-            return okResult({ success: true, profile, runbook });
+            const cloudflareRunbook = buildCloudflareTunnelRunbook({ publicMcpUrl });
+            return okResult({ success: true, profile, runbook, cloudflareRunbook });
         },
     },
     {
@@ -51,4 +56,3 @@ export const connectionTools = [
         },
     },
 ];
-

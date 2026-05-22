@@ -8,6 +8,7 @@ import { describe, it } from 'vitest';
 
 import {
     buildChatGptConnectorProfile,
+    buildCloudflareTunnelRunbook,
     buildSecureTunnelRunbook,
     normalizeMcpUrl,
     validatePublicConnectorUrl,
@@ -28,6 +29,7 @@ describe('copilot MCP ChatGPT connection profile', () => {
         const profile = buildChatGptConnectorProfile({ publicMcpUrl: 'https://example.com/tunnel' });
         assert.equal(profile.name, 'Repo DevContainer MCP');
         assert.equal(profile.connectorUrl, 'https://example.com/tunnel/mcp');
+        assert.equal(profile.authMode, 'none-dev');
         assert.ok(profile.description.includes('Dev Container'));
         assert.ok(profile.smokePrompts.some((prompt) => prompt.includes('repo_status')));
     });
@@ -38,5 +40,15 @@ describe('copilot MCP ChatGPT connection profile', () => {
         assert.ok(runbook.stdioTunnelCommands.join('\n').includes('--mcp-command'));
         assert.equal(runbook.chatgptUrl, 'https://<endpoint-do-tunel>/mcp');
     });
-});
 
+    it('builds Cloudflare tunnel commands around the MCP origin root', () => {
+        const runbook = buildCloudflareTunnelRunbook({
+            publicMcpUrl: 'https://repo-mcp.example.com',
+            originUrl: 'http://127.0.0.1:3333',
+        });
+        assert.equal(runbook.originUrl, 'http://127.0.0.1:3333');
+        assert.equal(runbook.chatgptUrl, 'https://repo-mcp.example.com/mcp');
+        assert.ok(runbook.quickTunnelCommands.includes('npm run copilot:mcp:cloudflare:quick'));
+        assert.ok(runbook.notes.some((note) => note.includes('origin HTTP raiz')));
+    });
+});

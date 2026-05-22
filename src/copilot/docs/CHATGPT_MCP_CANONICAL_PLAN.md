@@ -44,6 +44,9 @@
 4. Build your MCP server: `https://developers.openai.com/apps-sdk/build/mcp-server`
 5. Security & Privacy: `https://developers.openai.com/apps-sdk/guides/security-privacy`
 6. Secure MCP Tunnel: `https://developers.openai.com/api/docs/guides/secure-mcp-tunnels`
+7. Cloudflare Tunnel setup: `https://developers.cloudflare.com/tunnel/setup/`
+8. Cloudflare Tunnel downloads: `https://developers.cloudflare.com/tunnel/downloads/`
+9. Cloudflare Tunnel tokens: `https://developers.cloudflare.com/tunnel/advanced/tunnel-tokens/`
 
 ### 2.3 Conclusoes oficiais relevantes
 
@@ -62,6 +65,10 @@
 13. Acoes destrutivas devem exigir confirmacao humana.
 14. Logs devem redigir dados sensiveis e manter correlation IDs.
 15. Secure MCP Tunnel permite manter o servidor privado, usando saida HTTPS outbound para OpenAI.
+16. A pagina OpenAI de criacao do conector menciona Cloudflare Tunnel como opcao para expor o MCP local em
+    desenvolvimento.
+17. Cloudflare Tunnel publicado mapeia hostname publico para service HTTP local sem abrir listener publico no container.
+18. Quick Tunnel Cloudflare e apenas smoke temporario: URL aleatoria e sem suporte a SSE segundo a documentacao oficial.
 
 ---
 
@@ -420,9 +427,18 @@ O Express server atual pode receber uma rota `/mcp`, mas a primeira versao deve 
 
 ### Faixa I — Tunnel e ChatGPT
 
-**Status:** concluida no lado repo/local; pendente apenas o preenchimento humano do endpoint real no ChatGPT.
+**Status:** reaberta para consolidar Cloudflare Tunnel como exposicao HTTPS operacional; Secure MCP Tunnel permanece
+alternativa.
 
-#### Fase I.1 — Secure MCP Tunnel
+#### Fase I.1 — Exposicao HTTPS
+
+1. Documentar Cloudflare Tunnel publicado para `http://127.0.0.1:3333`.
+2. Adicionar quick tunnel para smoke temporario.
+3. Instalar `cloudflared` no ambiente atual.
+4. Incluir instalacao reproduzivel no package e Dev Container.
+5. Manter Secure MCP Tunnel como alternativa.
+
+#### Fase I.1.a — Secure MCP Tunnel alternativo
 
 1. Documentar pre-requisitos.
 2. Definir onde `tunnel-client` roda.
@@ -625,7 +641,7 @@ Faixa G, Fase G.1: escrita controlada (`repo_apply_patch` primeiro), com diff, p
 5. Perfil canonico do formulario ChatGPT:
    - Nome: `Repo DevContainer MCP`
    - URL: `https://<endpoint-do-tunel>/mcp`
-   - Auth: `secure-mcp-tunnel` ou OAuth conforme configuracao real.
+   - Auth default local: `none-dev`; override para `secure-mcp-tunnel` ou OAuth conforme configuracao real.
 6. Runbook cobre Secure MCP Tunnel em modo HTTP e stdio.
 7. Runbook cobre smoke tests no ChatGPT: `repo_status`, `repo_tree`, `repo_read_file`, `git_status`.
 8. Validacao local deve confirmar `/health`, `/chatgpt-connector.json`, `tools/list` e chamadas read-only.
@@ -641,6 +657,36 @@ Faixa G, Fase G.1: escrita controlada (`repo_apply_patch` primeiro), com diff, p
 O repo agora fornece tudo que pode ser preparado localmente. A unica parte que nao pode ser materializada sem credenciais e
 sem acao no browser e criar o `tunnel_id`, rodar `tunnel-client` com runtime API key real, copiar o endpoint HTTPS gerado e
 preencher o formulario do ChatGPT. O runbook detalha essa operacao.
+
+### 2026-05-22 — Faixa I Cloudflare Tunnel em execucao
+
+1. Pesquisa oficial confirmou Cloudflare Tunnel na pagina OpenAI de criacao do conector ChatGPT.
+2. Pesquisa oficial Cloudflare confirmou:
+   - `cloudflared` como daemon do tunnel;
+   - tunnel remoto rodando por token;
+   - published application route de hostname para origin local;
+   - quick tunnel como smoke temporario `trycloudflare.com`;
+   - quick tunnel sem SSE.
+3. `cloudflared 2026.5.0` foi instalado no Dev Container atual a partir do `.deb` oficial.
+4. `src/copilot/mcp/cloudflare` passou a concentrar configuracao, CLI doctor/run/quick e instalador Linux.
+5. Package scripts adicionados:
+   - `copilot:mcp:cloudflare:install`;
+   - `copilot:mcp:cloudflare:doctor`;
+   - `copilot:mcp:cloudflare:quick`;
+   - `copilot:mcp:cloudflare:run`.
+6. `.devcontainer/Dockerfile` passou a instalar uma versao pinada de `cloudflared` para rebuilds.
+7. `chatgpt_connector_profile` passou a devolver tambem um runbook Cloudflare.
+8. O smoke remoto de Quick Tunnel mostrou que o transporte `auto` tentou QUIC e falhou neste Dev Container.
+9. O wrapper adotou `http2` por default, com override `COPILOT_MCP_CLOUDFLARE_PROTOCOL=auto|http2|quic`.
+10. Com HTTP/2, Quick Tunnel registrou conexao e atravessou:
+    - `GET https://<quick-tunnel>/health` com HTTP 200;
+    - `POST https://<quick-tunnel>/mcp` para `tools/list`, com 26 tools.
+11. Validacao desta rodada:
+    - `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/mcp/*.spec.js` passou com 10 arquivos e 34 testes;
+    - `npm run typecheck:strict:src.copilot` passou;
+    - `npm run lint:copilot` passou;
+    - `npm run test:copilot:unit` executou 3033 testes, 3027 passaram e as 6 falhas externas/preexistentes de
+      config/contratos voltaram a aparecer.
 
 ### Proximo item cronologico apos Faixa I
 

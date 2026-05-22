@@ -40,6 +40,21 @@ Perfil do formulario ChatGPT:
 http://127.0.0.1:3333/chatgpt-connector.json
 ```
 
+Exposicao HTTPS operacional via Cloudflare Tunnel:
+
+```bash
+npm run copilot:mcp:cloudflare:doctor
+export CLOUDFLARE_TUNNEL_TOKEN="<token-do-tunnel>"
+export COPILOT_MCP_CLOUDFLARE_PUBLIC_URL="https://<hostname-cloudflare>/mcp"
+npm run copilot:mcp:cloudflare:run
+```
+
+Quick smoke temporario:
+
+```bash
+npm run copilot:mcp:cloudflare:quick
+```
+
 Stdio local:
 
 ```bash
@@ -58,11 +73,11 @@ Campos recomendados:
 
 1. Nome: `Repo DevContainer MCP`
 2. Descricao: conector para o repo aberto no Dev Container, com leitura, Git, diagnosticos e operacoes controladas.
-3. URL: `https://<endpoint-do-tunel>/mcp`
+3. URL: `https://<hostname-cloudflare-ou-endpoint-do-tunel>/mcp`
 4. Autenticacao: conforme tunnel/OAuth disponivel.
 
 Nunca usar `localhost`, `127.0.0.1` ou URL HTTP no formulario do ChatGPT. O ChatGPT precisa de endpoint HTTPS publico
-ou mediado pelo Secure MCP Tunnel.
+por Cloudflare Tunnel ou mediado pelo Secure MCP Tunnel.
 
 ## 4. Smoke Tests
 
@@ -215,14 +230,15 @@ ChatGPT nao conecta:
 
 1. Verifique se a URL e HTTPS.
 2. Verifique se a URL termina em `/mcp`.
-3. Verifique se o tunnel-client esta rodando.
-4. Verifique se `GET /health` local responde.
-5. Verifique se o endpoint publico encaminha para `http://127.0.0.1:3333/mcp`.
+3. Verifique `npm run copilot:mcp:cloudflare:doctor` quando usar Cloudflare.
+4. Verifique se `cloudflared` ou `tunnel-client` esta rodando.
+5. Verifique se `GET /health` local responde.
+6. Verifique se o endpoint publico encaminha para `http://127.0.0.1:3333/mcp`.
 
 Tools nao aparecem:
 
 1. Reinicie o MCP server local.
-2. Reinicie o tunnel-client.
+2. Reinicie `cloudflared` ou o tunnel-client.
 3. Recarregue ou recrie o conector no ChatGPT.
 4. Valide `tools/list` local.
 5. Chame `chatgpt_connector_profile`.
@@ -271,7 +287,7 @@ Executado em 2026-05-22:
 3. `GET /chatgpt-connector.json?publicMcpUrl=https://example.openai-tunnel.test` respondeu:
    - `name=Repo DevContainer MCP`;
    - `connectorUrl=https://example.openai-tunnel.test/mcp`;
-   - `authMode=secure-mcp-tunnel`.
+   - `authMode=none-dev` no default local sem OAuth.
 4. `tools/list` respondeu com 26 tools.
 5. `tools/list` incluiu:
    - `repo_status`;

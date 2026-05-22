@@ -19,7 +19,7 @@ O resultado esperado é:
 ChatGPT
   -> Connector Apps & Connectors
   -> HTTPS /mcp
-  -> Secure MCP Tunnel ou tunnel HTTPS equivalente
+  -> Cloudflare Tunnel publicado, Secure MCP Tunnel ou tunnel HTTPS equivalente
   -> MCP local no Dev Container
   -> src/copilot/mcp
   -> repo real
@@ -53,6 +53,18 @@ ChatGPT
    - Usar least privilege.
    - Exigir confirmação humana para efeitos destrutivos.
    - Fonte: `https://developers.openai.com/apps-sdk/guides/security-privacy`
+
+5. `Set up Cloudflare Tunnel`
+   - A pagina OpenAI de conexao cita Cloudflare Tunnel para expor um MCP local durante desenvolvimento.
+   - Cloudflare publica hostname HTTPS para service HTTP local por `cloudflared`.
+   - Quick Tunnels geram `trycloudflare.com`, sao temporarios e nao suportam SSE.
+   - Fonte: `https://developers.cloudflare.com/tunnel/setup/`
+
+6. `Tunnel tokens` e `Downloads — Cloudflare Tunnel`
+   - Tunnel remoto precisa somente do token para rodar no host que alcanca o origin.
+   - O binario oficial e `cloudflared`, instalavel por pacote Cloudflare ou `.deb` oficial no Linux.
+   - Fonte: `https://developers.cloudflare.com/tunnel/advanced/tunnel-tokens/`
+   - Fonte: `https://developers.cloudflare.com/tunnel/downloads/`
 
 ---
 
@@ -96,6 +108,15 @@ Perfil do conector:
 curl http://127.0.0.1:3333/chatgpt-connector.json
 ```
 
+Doctor Cloudflare:
+
+```bash
+npm run copilot:mcp:cloudflare:doctor
+```
+
+O doctor confirma `cloudflared`, `GET /health` no origin local e a URL publica configurada quando
+`COPILOT_MCP_CLOUDFLARE_PUBLIC_URL` existir. Ele nunca imprime `CLOUDFLARE_TUNNEL_TOKEN`.
+
 ### 4.2 Subir MCP por stdio
 
 ```bash
@@ -106,7 +127,89 @@ Use `stdio` para VS Code, MCP Inspector local por comando, ou Secure MCP Tunnel 
 
 ---
 
-## 5. Pre-requisitos Secure MCP Tunnel
+## 5. Tunnel HTTPS para o ChatGPT
+
+### 5.1 Escolha canônica deste workspace
+
+Para a caixa do ChatGPT mostrada na captura, o caminho operacional desta rodada é:
+
+```text
+ChatGPT
+  -> https://<hostname-cloudflare>/mcp
+  -> Cloudflare Tunnel
+  -> http://127.0.0.1:3333/mcp
+  -> src/copilot/mcp
+```
+
+Configure a rota Cloudflare para o origin raiz:
+
+```text
+http://127.0.0.1:3333
+```
+
+Cole no ChatGPT a URL pública com o path MCP:
+
+```text
+https://<hostname-cloudflare>/mcp
+```
+
+### 5.2 Cloudflare Quick Tunnel
+
+Quick Tunnel e um smoke sem conta Cloudflare:
+
+```bash
+npm run copilot:mcp:http
+npm run copilot:mcp:cloudflare:doctor
+npm run copilot:mcp:cloudflare:quick
+```
+
+O terminal do `cloudflared` imprime uma URL HTTPS aleatoria `trycloudflare.com`; acrescente `/mcp` para o conector.
+Cloudflare o documenta como teste/desenvolvimento, com URL temporaria e sem suporte a SSE. Use hostname publicado para
+uma conexao cadastrada de modo repetivel.
+
+### 5.3 Cloudflare Tunnel publicado
+
+Para a URL estavel:
+
+1. Crie no painel Cloudflare um tunnel remoto.
+2. Adicione uma rota de published application.
+3. Escolha o hostname publico.
+4. Configure o service/origin como `http://127.0.0.1:3333` no ambiente que roda `cloudflared`.
+5. Copie o token do tunnel para segredo local.
+6. Rode:
+
+```bash
+npm run copilot:mcp:http
+export CLOUDFLARE_TUNNEL_TOKEN="<token-do-tunnel>"
+export COPILOT_MCP_CLOUDFLARE_PUBLIC_URL="https://<hostname-cloudflare>/mcp"
+npm run copilot:mcp:cloudflare:doctor
+npm run copilot:mcp:cloudflare:run
+```
+
+### 5.4 Instalacao do cloudflared
+
+Instalador desta rodada:
+
+```bash
+npm run copilot:mcp:cloudflare:install
+```
+
+Ele baixa o `.deb` oficial correspondente a arquitetura Debian e usa `dpkg -i` com `sudo -n` quando necessario.
+O rebuild do Dev Container tambem instala a versao pinada definida em `.devcontainer/Dockerfile`.
+
+O wrapper usa `http2` como transporte Cloudflare por default porque a saida UDP/QUIC pode falhar em Dev Containers.
+Para testar outro protocolo oficial:
+
+```bash
+COPILOT_MCP_CLOUDFLARE_PROTOCOL=auto npm run copilot:mcp:cloudflare:quick
+COPILOT_MCP_CLOUDFLARE_PROTOCOL=quic npm run copilot:mcp:cloudflare:run
+```
+
+### 5.5 Secure MCP Tunnel alternativo
+
+Secure MCP Tunnel continua documentado quando a preferencia for o `tunnel-client` da OpenAI.
+
+### 5.6 Pre-requisitos Secure MCP Tunnel
 
 Antes de conectar o ChatGPT:
 
@@ -238,7 +341,7 @@ Conecta o ChatGPT ao repositório aberto no VS Code Dev Container. Permite ler a
 ### URL do servidor MCP
 
 ```text
-https://<endpoint-do-tunel>/mcp
+https://<hostname-cloudflare-ou-endpoint-do-tunel>/mcp
 ```
 
 Nunca use no formulário:
@@ -248,15 +351,23 @@ http://localhost:3333/mcp
 http://127.0.0.1:3333/mcp
 ```
 
-Essas URLs só funcionam localmente. ChatGPT precisa de HTTPS alcançável por ele ou endpoint OpenAI do Secure MCP Tunnel.
+Essas URLs só funcionam localmente. ChatGPT precisa de HTTPS alcançável por ele, por exemplo Cloudflare Tunnel
+publicado, ou endpoint OpenAI do Secure MCP Tunnel.
 
 ### Autenticação
 
-Para desenvolvimento local:
+Para Cloudflare Tunnel:
 
-1. Use a opção compatível com o Secure MCP Tunnel configurado.
-2. Se estiver em modo developer sem OAuth, mantenha a superfície restrita ao túnel e auditada.
-3. Para uso real e persistente, preferir OAuth 2.1 ou a autenticação suportada pelo tunnel/infra escolhidos.
+1. O MCP server atual nao implementa OAuth proprio.
+2. Se o formulario oferecer modo sem autenticacao em developer mode, use-o apenas no ambiente controlado.
+3. Se voce selecionar OAuth, a URL `/mcp` precisa ter fluxo OAuth compativel; Cloudflare Tunnel simples nao o fornece.
+4. Uma pagina de login interativa Cloudflare Access diante de `/mcp` pode bloquear o backend do ChatGPT.
+5. O perfil JSON usa `authMode=none-dev` por default e aceita override `COPILOT_MCP_CHATGPT_AUTH_MODE`.
+
+Para Secure MCP Tunnel:
+
+1. Use a opcao compativel com o tunnel configurado.
+2. Para uso persistente fora do ambiente controlado, prefira OAuth 2.1 ou autenticacao compativel com a infraestrutura.
 
 ### Confirmação de risco
 
@@ -264,7 +375,7 @@ Marque a confirmação apenas depois de:
 
 1. `tools/list` local funcionar.
 2. `repo_status` local funcionar.
-3. O tunnel-client doctor passar.
+3. `npm run copilot:mcp:cloudflare:doctor` passar para Cloudflare ou `tunnel-client doctor` passar para Secure MCP Tunnel.
 4. Você entender que as tools podem operar o repo real.
 
 ---
@@ -436,8 +547,8 @@ Verifique:
 
 1. URL é HTTPS.
 2. URL termina em `/mcp`.
-3. tunnel-client está rodando.
-4. tunnel-client doctor passa.
+3. `cloudflared` ou `tunnel-client` está rodando.
+4. `npm run copilot:mcp:cloudflare:doctor` ou `tunnel-client doctor` passa.
 5. MCP local responde.
 6. ChatGPT developer mode está habilitado.
 
@@ -478,8 +589,8 @@ Verifique:
 2. `GET /health` responde.
 3. `GET /chatgpt-connector.json` responde.
 4. `tools/list` inclui `chatgpt_connector_profile`.
-5. Secure MCP Tunnel configurado.
-6. ChatGPT recebe `https://<endpoint>/mcp`.
+5. Cloudflare Tunnel publicado ou Secure MCP Tunnel configurado.
+6. ChatGPT recebe `https://<hostname-ou-endpoint>/mcp`.
 7. ChatGPT lista tools.
 8. ChatGPT chama `repo_status`.
 9. ChatGPT chama `repo_tree`.
@@ -559,3 +670,19 @@ Essas falhas ja apareciam antes da Faixa I e nao pertencem aos arquivos novos de
 4. `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/mcp/*.spec.js` passou: 6 arquivos, 20 testes.
 5. `npm run test:copilot:unit` ainda falha nas mesmas 6 areas preexistentes fora do MCP; nesta rodada foram 3019
    testes totais e 3013 passaram.
+
+### Validacao adicional apos Cloudflare Tunnel
+
+1. `cloudflared` foi instalado no ambiente atual e reportou `2026.5.0`.
+2. `npm run copilot:mcp:cloudflare:doctor` passou com origin local vivo e URL publica HTTPS normalizada.
+3. `npm run copilot:mcp:cloudflare:run` sem token falhou de modo explicito e sem imprimir segredo.
+4. Quick Tunnel em `auto` tentou QUIC e falhou neste Dev Container; o wrapper passou a usar `http2` por default.
+5. Quick Tunnel em HTTP/2 passou para:
+   - `GET /health` remoto com HTTP 200;
+   - `POST /mcp` remoto com `tools/list`;
+   - contagem remota de 26 tools.
+6. `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/mcp/*.spec.js` passou com 10 arquivos e 34
+   testes.
+7. `npm run typecheck:strict:src.copilot` passou.
+8. `npm run lint:copilot` passou.
+9. `npm run test:copilot:unit` repetiu as 6 falhas preexistentes fora do MCP: 3033 testes totais, 3027 passaram.

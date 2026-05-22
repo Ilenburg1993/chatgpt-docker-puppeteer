@@ -89,6 +89,7 @@ ARG GH_VERSION=2.92.0
 ARG ACTIONLINT_VERSION=1.7.12
 ARG HADOLINT_VERSION=2.14.0
 ARG YQ_VERSION=4.53.2
+ARG CLOUDFLARED_VERSION=2026.5.0
 ARG TYPESCRIPT_VERSION=6.0.3
 ARG TYPESCRIPT_LANGUAGE_SERVER_VERSION=5.2.0
 ARG JSONC_PARSER_VERSION=3.3.1
@@ -551,7 +552,8 @@ RUN set -e; \
 # Curated upstream CLI binaries
 # - `gh` from Debian bookworm lags significantly behind upstream; use the official release artifact.
 # - `actionlint` and `hadolint` close the local lint toolchain for GitHub Actions and Dockerfiles.
-# - Every upstream download is verified with the checksum published by the corresponding release.
+# - `cloudflared` exposes the local Copilot MCP endpoint through Cloudflare Tunnel when requested.
+# - Release artifacts with standard checksum files are verified before install; keep direct `.deb` downloads pinned.
 RUN set -e; \
     arch="$(dpkg --print-architecture)"; \
     case "$arch" in \
@@ -585,11 +587,14 @@ RUN set -e; \
     yq_sha256_col="$((yq_sha256_line + 1))"; \
     awk -v a="${yq_asset}" -v col="${yq_sha256_col}" 'BEGIN{found=0} ($1==a || $1=="./"a || $1 ~ "/"a"$"){if(col > NF || $col !~ /^[0-9a-fA-F]+$/) exit 2; print $col "  /tmp/yq"; found=1; exit} END{if(!found) exit 1}' /tmp/yq_checksums.txt | sha256sum -c -; \
     install -m 0755 /tmp/yq /usr/local/bin/yq; \
-    rm -rf /tmp/gh.tgz /tmp/gh_checksums.txt "/tmp/gh_${GH_VERSION}_linux_${gh_arch}" /tmp/actionlint.tgz /tmp/actionlint_checksums.txt /tmp/actionlint /tmp/hadolint /tmp/hadolint.sha256 /tmp/yq /tmp/yq_checksums.txt /tmp/yq_checksums_hashes_order.txt; \
+    curl -fsSL --retry 5 --retry-delay 2 --retry-connrefused --retry-all-errors "https://github.com/cloudflare/cloudflared/releases/download/${CLOUDFLARED_VERSION}/cloudflared-linux-${arch}.deb" -o /tmp/cloudflared.deb; \
+    dpkg -i /tmp/cloudflared.deb; \
+    rm -rf /tmp/gh.tgz /tmp/gh_checksums.txt "/tmp/gh_${GH_VERSION}_linux_${gh_arch}" /tmp/actionlint.tgz /tmp/actionlint_checksums.txt /tmp/actionlint /tmp/hadolint /tmp/hadolint.sha256 /tmp/yq /tmp/yq_checksums.txt /tmp/yq_checksums_hashes_order.txt /tmp/cloudflared.deb; \
     gh --version | head -n 1; \
     actionlint -version; \
     hadolint --version; \
-    yq --version
+    yq --version; \
+    cloudflared --version
 
 
 # =============================================================================
@@ -879,7 +884,7 @@ RUN set -e; \
     fi; \
     }; \
     echo "── System & Build ──────────────────────────────────"; \
-    _check git; _check sudo; _check rsync; _check curl; _check wget; _check openssl; \
+    _check git; _check sudo; _check rsync; _check curl; _check wget; _check openssl; _check cloudflared; \
     _check gpg; _check gawk; _check awk; _check nasm; _check cmake; _check cc; _check make; \
     _check python3; _check python; _check node; _check npm; \
     echo "── Editors & Navigation ────────────────────────────"; \
