@@ -80,6 +80,11 @@ export function isProcessAlive(pid) {
  *   stateValid: boolean;
  *   processAlive: boolean;
  *   ageMs: number | null;
+ *   ageSeconds: number | null;
+ *   ageMinutes: number | null;
+ *   staleAfterMs: number;
+ *   stale: boolean;
+ *   recommendedAction: 'start' | 'restart' | 'smoke' | 'use';
  *   connectorUrl: string | null;
  *   publicBaseUrl: string | null;
  *   originUrl: string | null;
@@ -87,7 +92,7 @@ export function isProcessAlive(pid) {
  *   recovery: string[];
  * }}
  */
-export function summarizeQuickTunnelState(state, nowMs = Date.now()) {
+export function summarizeQuickTunnelState(state, nowMs = Date.now(), staleAfterMs = 6 * 60 * 60 * 1000) {
     if (!state) {
         return {
             mode: 'temporary-trycloudflare',
@@ -95,6 +100,11 @@ export function summarizeQuickTunnelState(state, nowMs = Date.now()) {
             stateValid: false,
             processAlive: false,
             ageMs: null,
+            ageSeconds: null,
+            ageMinutes: null,
+            staleAfterMs,
+            stale: false,
+            recommendedAction: 'start',
             connectorUrl: null,
             publicBaseUrl: null,
             originUrl: null,
@@ -113,6 +123,11 @@ export function summarizeQuickTunnelState(state, nowMs = Date.now()) {
             stateValid: false,
             processAlive: false,
             ageMs: null,
+            ageSeconds: null,
+            ageMinutes: null,
+            staleAfterMs,
+            stale: false,
+            recommendedAction: 'restart',
             connectorUrl: null,
             publicBaseUrl: null,
             originUrl: null,
@@ -122,18 +137,32 @@ export function summarizeQuickTunnelState(state, nowMs = Date.now()) {
     }
     const processAlive = isProcessAlive(state.pid);
     const createdAtMs = Date.parse(state.createdAt);
+    const ageMs = Number.isFinite(createdAtMs) ? Math.max(0, nowMs - createdAtMs) : null;
+    const stale = ageMs !== null && ageMs > staleAfterMs;
+    const recommendedAction = !processAlive ? 'restart' : stale ? 'smoke' : 'use';
     return {
         mode: state.mode,
         configured: true,
         stateValid: true,
         processAlive,
-        ageMs: Number.isFinite(createdAtMs) ? Math.max(0, nowMs - createdAtMs) : null,
+        ageMs,
+        ageSeconds: ageMs === null ? null : Math.round(ageMs / 1000),
+        ageMinutes: ageMs === null ? null : Math.round(ageMs / 60000),
+        staleAfterMs,
+        stale,
+        recommendedAction,
         connectorUrl: state.connectorUrl,
         publicBaseUrl: state.publicBaseUrl,
         originUrl: state.originUrl,
         stateError: null,
         recovery: processAlive
-            ? ['Run npm run copilot:mcp:cloudflare:smoke before using the ChatGPT connector.']
+            ? stale
+                ? [
+                      'The temporary tunnel is older than the configured stale window.',
+                      'Run npm run copilot:mcp:cloudflare:smoke before reusing it.',
+                      'If smoke fails, start a new quick tunnel and update the ChatGPT connector URL.',
+                  ]
+                : ['Run npm run copilot:mcp:cloudflare:smoke before using the ChatGPT connector.']
             : [
                   'The saved quick tunnel process is no longer alive.',
                   'Start a new temporary tunnel with npm run copilot:mcp:cloudflare:quick.',

@@ -751,6 +751,76 @@ Correcoes e upgrades aplicados:
 10. Unit completo executou 3038 testes, 3032 passaram e as 6 falhas preexistentes fora do MCP permaneceram.
 11. Smoke HTTP local confirmou as novas surfaces e `tools/list` passou a expor 29 tools.
 
+### 2026-05-22 — Robustez operacional Cloudflare Quick Tunnel
+
+Decisao mantida:
+
+1. O projeto continua sem dominio fixo por desenho.
+2. O modo principal permanece `*.trycloudflare.com`.
+3. A URL temporaria deve ser tratada como estado de sessao, nao como infraestrutura permanente.
+4. Managed Tunnel com token segue apenas como caminho futuro opcional.
+
+Upgrades aplicados nesta faixa:
+
+1. Criada politica configuravel de stale para sessoes temporarias:
+   - env: `COPILOT_MCP_CLOUDFLARE_STALE_AFTER_MS`;
+   - default: `21600000` ms, equivalente a 6 horas;
+   - minimo: 60 segundos;
+   - maximo: 7 dias.
+2. `summarizeQuickTunnelState` passou a retornar:
+   - `ageSeconds`;
+   - `ageMinutes`;
+   - `staleAfterMs`;
+   - `stale`;
+   - `recommendedAction`.
+3. Acoes recomendadas canonicas:
+   - `start`: sem arquivo de estado;
+   - `restart`: arquivo invalido ou PID morto;
+   - `smoke`: PID vivo, mas sessao velha;
+   - `use`: PID vivo e sessao fresca.
+4. `npm run copilot:mcp:cloudflare:doctor` passou a incluir:
+   - estado cru da sessao temporaria;
+   - resumo operacional;
+   - politica de stale;
+   - URL efetiva a colar no ChatGPT quando disponivel.
+5. `npm run copilot:mcp:cloudflare:status` passou a incluir:
+   - `originUrl`;
+   - `localMcpUrl`;
+   - `stalePolicy`;
+   - `summary`;
+   - `recommendedAction`;
+   - dados da caixa ChatGPT quando o estado e valido.
+6. `npm run copilot:mcp:cloudflare:smoke` passou a validar nao apenas conectividade, mas tambem a superficie remota:
+   - nomes retornados por `tools/list`;
+   - comparacao com o registry local;
+   - `toolsMatchLocalRegistry`;
+   - `missingLocalTools`;
+   - `unexpectedRemoteTools`;
+   - `missingCriticalTools`.
+7. O conjunto critico remoto agora inclui as tools de IO e operacao usadas no primeiro uso real:
+   - `repo_status`;
+   - `repo_tree`;
+   - `repo_root_tree`;
+   - `repo_read_file`;
+   - `repo_read_file_chunks`;
+   - `repo_search_text`;
+   - `repo_symbol_search`;
+   - `repo_file_outline`;
+   - `project_doctor`;
+   - `run_copilot_validator`;
+   - `job_get_output`;
+   - `mcp_runtime_health`;
+   - `mcp_tunnel_status`.
+8. `mcp_tunnel_status` passou a expor a mesma politica de stale ao ChatGPT.
+9. `mcp_runtime_health` passou a carregar o resumo de tunnel com a janela configurada.
+10. Testes focados cobriram:
+    - normalizacao da janela de stale;
+    - estado ausente;
+    - estado invalido;
+    - tunnel vivo e fresco;
+    - tunnel vivo e stale;
+    - PID morto.
+
 ### Proximo item cronologico apos Faixa I
 
 Faixa G, Fase G.1: escrita controlada (`repo_apply_patch` primeiro), com diff, path policy e auditoria.

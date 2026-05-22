@@ -23,7 +23,7 @@ export const mcpTunnelStatusTool = {
     handler: async () => {
         const config = readCloudflareTunnelConfig();
         const state = await readQuickTunnelState(config.stateFile);
-        const quickTunnel = summarizeQuickTunnelState(state);
+        const quickTunnel = summarizeQuickTunnelState(state, Date.now(), config.staleAfterMs);
         return okResult({
             success: true,
             mode: quickTunnel.mode,
@@ -34,6 +34,10 @@ export const mcpTunnelStatusTool = {
             localMcpUrl: config.localMcpUrl,
             stateFile: config.stateFile,
             transportProtocol: config.transportProtocol,
+            stalePolicy: {
+                staleAfterMs: config.staleAfterMs,
+                staleAfterMinutes: Math.round(config.staleAfterMs / 60000),
+            },
             chatgpt: {
                 mcpServerUrl: quickTunnel.connectorUrl ?? config.publicMcpUrl ?? null,
                 authentication: 'none-dev',

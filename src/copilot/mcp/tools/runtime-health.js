@@ -30,7 +30,7 @@ export const mcpRuntimeHealthTool = {
             ok: true,
             workspaceRoot: getMcpWorkspaceRoot(),
             metrics,
-            tunnel: summarizeQuickTunnelState(tunnelState),
+            tunnel: summarizeQuickTunnelState(tunnelState, Date.now(), tunnelConfig.staleAfterMs),
         });
     },
 };

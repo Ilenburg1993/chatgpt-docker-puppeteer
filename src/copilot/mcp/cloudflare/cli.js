@@ -17,7 +17,8 @@ import {
     readCloudflareTunnelConfig,
     validateConfiguredPublicUrl,
 } from './config.js';
-import { isProcessAlive, isQuickTunnelState, readQuickTunnelState } from './state.js';
+import { getCanonicalMcpTools } from '../registry.js';
+import { isQuickTunnelState, readQuickTunnelState, summarizeQuickTunnelState } from './state.js';
 
 const command = process.argv[2] ?? 'doctor';
 
@@ -35,7 +36,7 @@ try {
         const config = readCloudflareTunnelConfig();
         runCloudflared(buildManagedTunnelArgs(process.env['CLOUDFLARE_TUNNEL_TOKEN']), config.transportProtocol);
     } else {
-        fail(`Unknown Cloudflare MCP command "${command}". Use doctor, quick, or run.`);
+        fail(`Unknown Cloudflare MCP command "${command}". Use doctor, quick, status, smoke, or run.`);
     }
 } catch (error) {
     fail(error instanceof Error ? error.message : String(error));
@@ -49,6 +50,8 @@ async function runDoctor() {
     const cloudflared = readCloudflaredVersion();
     const health = await probeHealth(config.healthUrl);
     const publicUrlValidation = validateConfiguredPublicUrl(config);
+    const temporaryState = await readQuickTunnelState(config.stateFile);
+    const temporaryTunnel = summarizeQuickTunnelState(temporaryState, Date.now(), config.staleAfterMs);
     const report = {
         ok: cloudflared.ok && health.ok && publicUrlValidation?.ok !== false,
         cloudflared,
@@ -63,9 +66,14 @@ async function runDoctor() {
             transportProtocol: config.transportProtocol,
             fixedDomainMode: false,
         },
-        temporaryTunnel: await readQuickTunnelState(config.stateFile),
+        temporaryTunnel,
+        temporaryTunnelState: temporaryState ?? 'not-created',
+        stalePolicy: {
+            staleAfterMs: config.staleAfterMs,
+            staleAfterMinutes: Math.round(config.staleAfterMs / 60000),
+        },
         chatgpt: {
-            publicMcpUrl: config.publicMcpUrl ?? 'not-configured',
+            publicMcpUrl: config.publicMcpUrl ?? temporaryTunnel.connectorUrl ?? 'not-configured',
             publicUrlValidation: publicUrlValidation ?? 'not-configured',
         },
         commands: {
@@ -85,14 +93,20 @@ async function runDoctor() {
 async function runStatus() {
     const config = readCloudflareTunnelConfig();
     const state = await readQuickTunnelState(config.stateFile);
-    const hasState = isQuickTunnelState(state);
-    const processAlive = hasState ? isProcessAlive(state.pid) : false;
+    const summary = summarizeQuickTunnelState(state, Date.now(), config.staleAfterMs);
     const report = {
-        ok: hasState && processAlive,
+        ok: summary.stateValid && summary.processAlive,
         stateFile: config.stateFile,
-        processAlive,
+        originUrl: config.originUrl,
+        localMcpUrl: config.localMcpUrl,
+        processAlive: summary.processAlive,
+        stalePolicy: {
+            staleAfterMs: config.staleAfterMs,
+            staleAfterMinutes: Math.round(config.staleAfterMs / 60000),
+        },
+        summary,
         state: state ?? 'not-created',
-        chatgpt: hasState
+        chatgpt: isQuickTunnelState(state)
             ? {
                   name: state.chatgpt.name,
                   description: state.chatgpt.description,
@@ -125,12 +139,46 @@ async function runSmoke() {
         },
         body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list', params: {} }),
     });
-    const tools = countMcpTools(toolsList.body);
+    const remoteToolNames = extractMcpToolNames(toolsList.body);
+    const localToolNames = getCanonicalMcpTools()
+        .map((tool) => tool.name)
+        .sort((left, right) => left.localeCompare(right));
+    const criticalToolNames = [
+        'repo_status',
+        'repo_tree',
+        'repo_root_tree',
+        'repo_read_file',
+        'repo_read_file_chunks',
+        'repo_search_text',
+        'repo_symbol_search',
+        'repo_file_outline',
+        'project_doctor',
+        'run_copilot_validator',
+        'job_get_output',
+        'mcp_runtime_health',
+        'mcp_tunnel_status',
+    ];
+    const missingCriticalTools = criticalToolNames.filter((toolName) => !remoteToolNames.includes(toolName));
+    const missingLocalTools = localToolNames.filter((toolName) => !remoteToolNames.includes(toolName));
+    const unexpectedRemoteTools = remoteToolNames.filter((toolName) => !localToolNames.includes(toolName));
+    const toolsMatchLocalRegistry = missingLocalTools.length === 0 && unexpectedRemoteTools.length === 0;
+    const criticalToolsPresent = missingCriticalTools.length === 0;
     const report = {
-        ok: health.ok && toolsList.ok && tools > 0,
+        ok: health.ok && toolsList.ok && remoteToolNames.length > 0 && toolsMatchLocalRegistry && criticalToolsPresent,
         connectorUrl,
         health: { ok: health.ok, status: health.status, body: health.body },
-        toolsList: { ok: toolsList.ok, status: toolsList.status, tools },
+        toolsList: {
+            ok: toolsList.ok,
+            status: toolsList.status,
+            tools: remoteToolNames.length,
+            expectedLocalTools: localToolNames.length,
+            toolsMatchLocalRegistry,
+            criticalToolsPresent,
+            missingCriticalTools,
+            missingLocalTools,
+            unexpectedRemoteTools,
+            remoteToolNames,
+        },
         chatgpt: {
             mcpServerUrl: connectorUrl,
         },
@@ -258,18 +306,21 @@ async function writeQuickTunnelState(config, publicBaseUrl, pid) {
 }
 
 /**
- * @param {string} stateFile
- * @returns {Promise<unknown | undefined>}
- */
-/**
  * @param {unknown} body
- * @returns {number}
+ * @returns {string[]}
  */
-function countMcpTools(body) {
-    if (!body || typeof body !== 'object') return 0;
-    if (!('result' in body) || !body.result || typeof body.result !== 'object') return 0;
-    if (!('tools' in body.result) || !Array.isArray(body.result.tools)) return 0;
-    return body.result.tools.length;
+function extractMcpToolNames(body) {
+    if (!body || typeof body !== 'object') return [];
+    if (!('result' in body) || !body.result || typeof body.result !== 'object') return [];
+    if (!('tools' in body.result) || !Array.isArray(body.result.tools)) return [];
+    return body.result.tools
+        .map((tool) => {
+            if (!tool || typeof tool !== 'object') return undefined;
+            if (!('name' in tool) || typeof tool.name !== 'string') return undefined;
+            return tool.name;
+        })
+        .filter((toolName) => typeof toolName === 'string')
+        .sort((left, right) => left.localeCompare(right));
 }
 
 /**

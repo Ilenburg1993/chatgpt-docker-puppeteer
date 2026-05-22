@@ -234,7 +234,33 @@ Esse arquivo e runtime local e fica ignorado pelo Git. Ele contem:
 6. Campos do formulario ChatGPT.
 7. Comando de smoke.
 
-### 4.5 Token do tunnel remoto futuro
+### 4.5 Janela de stale para URL temporaria
+
+Default:
+
+```bash
+COPILOT_MCP_CLOUDFLARE_STALE_AFTER_MS=21600000
+```
+
+Isto equivale a 6 horas. O valor aceito fica entre 1 minuto e 7 dias.
+
+O objetivo nao e tornar Quick Tunnel "fixo". A URL `trycloudflare.com` continua efemera. A janela de stale serve para
+operacao profissional:
+
+1. `status` mostra `ageMs`, `ageSeconds`, `ageMinutes`, `stale` e `recommendedAction`.
+2. `doctor` mostra a politica ativa e o resumo da ultima sessao.
+3. `mcp_tunnel_status` e `mcp_runtime_health` expoem a mesma informacao para o ChatGPT.
+4. Quando a sessao fica velha, a acao recomendada passa a ser `smoke`.
+5. Quando o PID gravado nao esta vivo, a acao recomendada passa a ser `restart`.
+
+Valores de `recommendedAction`:
+
+1. `start`: nenhum estado local existe; suba origin e Quick Tunnel.
+2. `restart`: estado invalido ou processo do tunnel encerrado; crie nova URL e atualize o ChatGPT.
+3. `smoke`: processo vivo, mas sessao mais antiga que a janela configurada; rode smoke antes de usar.
+4. `use`: processo vivo e sessao ainda fresca; ainda assim rode smoke antes de uma operacao longa.
+
+### 4.6 Token do tunnel remoto futuro
 
 ```bash
 CLOUDFLARE_TUNNEL_TOKEN=<segredo>
@@ -346,6 +372,24 @@ https://<aleatorio>.trycloudflare.com/mcp
 
 `status` tambem verifica se o PID do `cloudflared` registrado ainda esta vivo. Se a sessao foi encerrada, ele mostra o
 estado antigo, mas retorna `ok=false`; nesse caso, suba um novo Quick Tunnel e use a nova URL.
+
+A partir desta rodada, `status` tambem devolve um bloco `summary`:
+
+```json
+{
+  "configured": true,
+  "stateValid": true,
+  "processAlive": true,
+  "ageMinutes": 14,
+  "staleAfterMs": 21600000,
+  "stale": false,
+  "recommendedAction": "use",
+  "connectorUrl": "https://alpha-beta-gamma.trycloudflare.com/mcp"
+}
+```
+
+Esse resumo e a fonte preferencial para saber se a caixa do ChatGPT deve continuar usando a URL atual ou se deve receber
+uma URL nova.
 
 ### 7.3 Arquivo de estado
 
@@ -585,6 +629,29 @@ Tudo fica pronto para preencher a caixa quando:
 7. O endpoint colado no ChatGPT termina em `/mcp`.
 8. A opcao de autenticacao escolhida corresponde ao que existe de fato no endpoint.
 
+O smoke remoto agora tambem valida a superficie de tools:
+
+1. Compara os nomes remotos de `tools/list` com o registry local.
+2. Reporta `expectedLocalTools`, `missingLocalTools` e `unexpectedRemoteTools`.
+3. Exige que a superficie remota corresponda ao registry local.
+4. Exige que o conjunto critico esteja presente:
+   - `repo_status`;
+   - `repo_tree`;
+   - `repo_root_tree`;
+   - `repo_read_file`;
+   - `repo_read_file_chunks`;
+   - `repo_search_text`;
+   - `repo_symbol_search`;
+   - `repo_file_outline`;
+   - `project_doctor`;
+   - `run_copilot_validator`;
+   - `job_get_output`;
+   - `mcp_runtime_health`;
+   - `mcp_tunnel_status`.
+
+Se `toolsMatchLocalRegistry=false`, `missingLocalTools` nao estiver vazio, `unexpectedRemoteTools` nao estiver vazio ou
+`missingCriticalTools` nao estiver vazio, a URL pode ate estar viva, mas nao deve ser colada como conector operacional.
+
 O dado principal da captura e:
 
 ```text
@@ -642,3 +709,8 @@ Validadores:
    - nao introduzir dependencia de dominio fixo ate nova decisao explicita.
 9. Apos o upgrade de paridade IO, `tools/list` local passa a expor 32 tools; o proximo smoke remoto deve confirmar esse
    numero no endpoint temporario ativo.
+10. A rodada de robustez Cloudflare acrescentou:
+    - stale window configuravel por `COPILOT_MCP_CLOUDFLARE_STALE_AFTER_MS`;
+    - `recommendedAction` para `start`, `restart`, `smoke` e `use`;
+    - `doctor`, `status`, `mcp_tunnel_status` e `mcp_runtime_health` usando o mesmo resumo operacional;
+    - `smoke` remoto conferindo tools criticas e divergencia contra o registry MCP local.

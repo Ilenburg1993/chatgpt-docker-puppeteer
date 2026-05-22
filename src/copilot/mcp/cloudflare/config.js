@@ -9,6 +9,7 @@ import { normalizeMcpUrl, validatePublicConnectorUrl } from '../connection/profi
 
 export const DEFAULT_CLOUDFLARE_ORIGIN_URL = 'http://127.0.0.1:3333';
 export const DEFAULT_QUICK_TUNNEL_STATE_FILE = 'src/copilot/.ai/cloudflare/quick-tunnel.json';
+export const DEFAULT_QUICK_TUNNEL_STALE_AFTER_MS = 6 * 60 * 60 * 1000;
 export const TRYCLOUDFLARE_URL_PATTERN = /https:\/\/[a-z0-9][a-z0-9-]*\.trycloudflare\.com\b/i;
 
 /**
@@ -20,6 +21,7 @@ export const TRYCLOUDFLARE_URL_PATTERN = /https:\/\/[a-z0-9][a-z0-9-]*\.trycloud
  * @property {boolean} hasTunnelToken
  * @property {'auto' | 'http2' | 'quic'} transportProtocol
  * @property {string} stateFile
+ * @property {number} staleAfterMs
  */
 
 /**
@@ -39,6 +41,7 @@ export function readCloudflareTunnelConfig(env = process.env) {
             env['COPILOT_MCP_CLOUDFLARE_PROTOCOL'] ?? env['TUNNEL_TRANSPORT_PROTOCOL'],
         ),
         stateFile: normalizeStateFile(env['COPILOT_MCP_CLOUDFLARE_STATE_FILE']),
+        staleAfterMs: normalizeStaleAfterMs(env['COPILOT_MCP_CLOUDFLARE_STALE_AFTER_MS']),
     };
 }
 
@@ -64,6 +67,20 @@ export function normalizeStateFile(value) {
     if (!stateFile) return DEFAULT_QUICK_TUNNEL_STATE_FILE;
     if (stateFile.includes('\0')) throw new Error('Cloudflare state file path must not contain null bytes.');
     return stateFile;
+}
+
+/**
+ * @param {string | undefined} value
+ * @returns {number}
+ */
+export function normalizeStaleAfterMs(value) {
+    const raw = String(value ?? '').trim();
+    if (!raw) return DEFAULT_QUICK_TUNNEL_STALE_AFTER_MS;
+    const parsed = Number(raw);
+    if (!Number.isFinite(parsed) || parsed < 60_000 || parsed > 7 * 24 * 60 * 60 * 1000) {
+        throw new Error('Cloudflare quick tunnel stale window must be between 60000 and 604800000 ms.');
+    }
+    return Math.round(parsed);
 }
 
 /**

@@ -57,6 +57,8 @@ npm run copilot:mcp:cloudflare:smoke
 O modo atual nao usa dominio fixo. Cada sessao cria uma URL `trycloudflare.com` nova, registrada em
 `src/copilot/.ai/cloudflare/quick-tunnel.json`.
 Quando o processo do tunnel encerra, `status` marca a sessao como `ok=false` para evitar reutilizar URL expirada.
+Quando a sessao permanece viva por muitas horas, `status` e `mcp_tunnel_status` marcam `stale=true` e recomendam
+rodar `npm run copilot:mcp:cloudflare:smoke` antes de continuar.
 
 Stdio local:
 
@@ -81,6 +83,15 @@ Campos recomendados:
 
 Nunca usar `localhost`, `127.0.0.1` ou URL HTTP no formulario do ChatGPT. O ChatGPT precisa de endpoint HTTPS publico
 por Cloudflare Tunnel ou mediado pelo Secure MCP Tunnel.
+
+Antes de colar a URL, confira:
+
+1. `npm run copilot:mcp:cloudflare:status` retorna `summary.recommendedAction` como `use` ou `smoke`.
+2. Se retornar `smoke`, rode `npm run copilot:mcp:cloudflare:smoke` e so use a URL se `ok=true`.
+3. Se retornar `start` ou `restart`, crie novo Quick Tunnel e atualize a caixa do ChatGPT.
+4. `smoke.toolsList.toolsMatchLocalRegistry` precisa ser `true`.
+5. `smoke.toolsList.expectedLocalTools` deve refletir o registry MCP local atual.
+6. `smoke.toolsList.missingCriticalTools`, `missingLocalTools` e `unexpectedRemoteTools` precisam estar vazios.
 
 ## 4. Smoke Tests
 
