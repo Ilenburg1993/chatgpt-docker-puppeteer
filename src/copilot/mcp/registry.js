@@ -5,19 +5,20 @@
  * @module copilot/mcp/registry
  */
 
-import { gitReadTools } from './tools/git-read.js';
 import { appendMcpAuditEvent } from './control-plane/audit.js';
+import { recordMcpToolMetric } from './control-plane/metrics.js';
 import { connectionTools } from './tools/connection.js';
 import { copilotSessionTools } from './tools/copilot-session.js';
+import { gitReadTools } from './tools/git-read.js';
 import { jobTools } from './tools/jobs.js';
 import { metaTools } from './tools/meta.js';
-import { recordMcpToolMetric } from './control-plane/metrics.js';
-import { mcpRuntimeHealthTool } from './tools/runtime-health.js';
-import { mcpTunnelStatusTool } from './tools/tunnel-status.js';
 import { projectDoctorTool } from './tools/project-doctor.js';
+import { repoIndexTools } from './tools/repo-index.js';
 import { repoReadTools } from './tools/repo-read.js';
 import { repoWriteTools } from './tools/repo-write.js';
+import { mcpRuntimeHealthTool } from './tools/runtime-health.js';
 import { mcpSmokeWorkspaceTool } from './tools/smoke-workspace.js';
+import { mcpTunnelStatusTool } from './tools/tunnel-status.js';
 
 /**
  * @typedef {object} McpToolDefinition
@@ -26,7 +27,11 @@ import { mcpSmokeWorkspaceTool } from './tools/smoke-workspace.js';
  * @property {string} description
  * @property {Record<string, import('zod').ZodTypeAny>} inputSchema
  * @property {import('@modelcontextprotocol/sdk/types.js').ToolAnnotations} annotations
- * @property {(args: any) => Promise<import('@modelcontextprotocol/sdk/types.js').CallToolResult> | import('@modelcontextprotocol/sdk/types.js').CallToolResult} handler
+ * @property {(
+ *     args: any,
+ * ) =>
+ *     | Promise<import('@modelcontextprotocol/sdk/types.js').CallToolResult>
+ *     | import('@modelcontextprotocol/sdk/types.js').CallToolResult} handler
  */
 
 /**
@@ -35,6 +40,7 @@ import { mcpSmokeWorkspaceTool } from './tools/smoke-workspace.js';
 export function getCanonicalMcpTools() {
     return [
         ...repoReadTools,
+        ...repoIndexTools,
         ...gitReadTools,
         projectDoctorTool,
         ...jobTools,

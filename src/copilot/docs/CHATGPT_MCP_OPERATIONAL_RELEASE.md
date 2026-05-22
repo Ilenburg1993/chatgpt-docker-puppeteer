@@ -1,7 +1,7 @@
 # ChatGPT MCP Operational Release
 
-Documento operacional para liberar e manter o servidor MCP do `src/copilot` como conector do ChatGPT e como servidor
-opcional para o LLM-B/Copilot SDK.
+Documento operacional para liberar e manter o servidor MCP do `src/copilot` como conector do ChatGPT
+e como servidor opcional para o LLM-B/Copilot SDK.
 
 ## 1. Escopo
 
@@ -61,10 +61,10 @@ npm run copilot:mcp:cloudflare:smoke
 ```
 
 O modo atual nao usa dominio fixo. Cada sessao cria uma URL `trycloudflare.com` nova, registrada em
-`src/copilot/.ai/cloudflare/quick-tunnel.json`.
-Quando o processo do tunnel encerra, `status` marca a sessao como `ok=false` para evitar reutilizar URL expirada.
-Quando a sessao permanece viva por muitas horas, `status` e `mcp_tunnel_status` marcam `stale=true` e recomendam
-rodar `npm run copilot:mcp:cloudflare:smoke` antes de continuar.
+`src/copilot/.ai/cloudflare/quick-tunnel.json`. Quando o processo do tunnel encerra, `status` marca
+a sessao como `ok=false` para evitar reutilizar URL expirada. Quando a sessao permanece viva por
+muitas horas, `status` e `mcp_tunnel_status` marcam `stale=true` e recomendam rodar
+`npm run copilot:mcp:cloudflare:smoke` antes de continuar.
 
 Stdio local:
 
@@ -83,26 +83,31 @@ COPILOT_MCP_SERVERS=copilot-local npm run terminal:llm-b
 Campos recomendados:
 
 1. Nome: `Repo DevContainer MCP`
-2. Descricao: conector para o repo aberto no Dev Container, com leitura, Git, diagnosticos e operacoes controladas.
-3. URL: a URL temporaria exibida por `npm run copilot:mcp:cloudflare:status`, sempre terminada em `/mcp`
+2. Descricao: conector para o repo aberto no Dev Container, com leitura, Git, diagnosticos e
+   operacoes controladas.
+3. URL: a URL temporaria exibida por `npm run copilot:mcp:cloudflare:status`, sempre terminada em
+   `/mcp`
 4. Autenticacao: conforme tunnel/OAuth disponivel.
 
-O endpoint local `/chatgpt-connector.json` e a tool `chatgpt_connector_profile` retornam `chatgptFormFields` com esses
-campos ja normalizados para a caixa do ChatGPT.
+O endpoint local `/chatgpt-connector.json` e a tool `chatgpt_connector_profile` retornam
+`chatgptFormFields` com esses campos ja normalizados para a caixa do ChatGPT.
 
-Nunca usar `localhost`, `127.0.0.1` ou URL HTTP no formulario do ChatGPT. O ChatGPT precisa de endpoint HTTPS publico
-por Cloudflare Tunnel ou mediado pelo Secure MCP Tunnel.
+Nunca usar `localhost`, `127.0.0.1` ou URL HTTP no formulario do ChatGPT. O ChatGPT precisa de
+endpoint HTTPS publico por Cloudflare Tunnel ou mediado pelo Secure MCP Tunnel.
 
 Antes de colar a URL, confira:
 
-1. `npm run copilot:mcp:cloudflare:status` retorna `summary.recommendedAction` como `use` ou `smoke`.
+1. `npm run copilot:mcp:cloudflare:status` retorna `summary.recommendedAction` como `use` ou
+   `smoke`.
 2. `npm run copilot:mcp:smoke:local` passa contra o origin local antes de abrir Cloudflare.
 3. Se retornar `smoke`, rode `npm run copilot:mcp:cloudflare:smoke` e so use a URL se `ok=true`.
 4. Se retornar `start` ou `restart`, crie novo Quick Tunnel e atualize a caixa do ChatGPT.
 5. `smoke.toolsList.toolsMatchLocalRegistry` precisa ser `true`.
 6. `smoke.toolsList.expectedLocalTools` deve refletir o registry MCP local atual.
-7. `smoke.toolsList.missingCriticalTools`, `missingLocalTools` e `unexpectedRemoteTools` precisam estar vazios.
-8. Depois do smoke, `status.summary.lastSmokeOk` deve ser `true` e `lastSmokeAgeMinutes` deve ser recente.
+7. `smoke.toolsList.missingCriticalTools`, `missingLocalTools` e `unexpectedRemoteTools` precisam
+   estar vazios.
+8. Depois do smoke, `status.summary.lastSmokeOk` deve ser `true` e `lastSmokeAgeMinutes` deve ser
+   recente.
 
 ## 4. Smoke Tests
 
@@ -116,9 +121,12 @@ Depois de conectar no ChatGPT:
 6. Chame `repo_read_file` em `src/copilot/mcp/README.md` e observe `sha256`.
 7. Chame `repo_read_file_chunks` em um arquivo maior.
 8. Chame `repo_symbol_search` e `repo_file_outline` antes de qualquer alteracao de codigo.
-9. Chame `git_status`.
-10. Chame `mcp_capabilities_summary`, `mcp_tunnel_status` e `mcp_runtime_health`.
-11. Faca um `repo_apply_patch` com `dryRun=true` antes de qualquer escrita real.
+9. Chame `repo_find_symbol_usages` para analise de impacto textual.
+10. Chame `repo_index_status`; se necessario, rode `repo_index_build` em `src/copilot` e valide
+    `repo_index_search`.
+11. Chame `git_status`.
+12. Chame `mcp_capabilities_summary`, `mcp_tunnel_status` e `mcp_runtime_health`.
+13. Faca um `repo_apply_patch` com `dryRun=true` antes de qualquer escrita real.
 
 ## 5. Superficie De Tools
 
@@ -129,15 +137,26 @@ Leitura e Git:
 3. `repo_root_tree`
 4. `repo_read_file`
 5. `repo_read_file_chunks`
-6. `repo_diff_files`
-7. `repo_search_text`
-8. `repo_symbol_search`
-9. `repo_file_outline`
-10. `git_status`
-11. `git_diff`
-12. `git_log`
-13. `git_branch_info`
-14. `project_doctor`
+6. `repo_file_stats`
+7. `repo_diff_files`
+8. `repo_search_text`
+9. `repo_find_symbol_usages`
+10. `repo_symbol_search`
+11. `repo_file_outline`
+12. `git_status`
+13. `git_diff`
+14. `git_log`
+15. `git_branch_info`
+16. `project_doctor`
+
+Indice IO compartilhado:
+
+1. `repo_index_status`
+2. `repo_index_build`
+3. `repo_index_search`
+4. `repo_index_find_symbol`
+5. `repo_find_imports`
+6. `repo_index_invalidate`
 
 Conexao ChatGPT:
 
@@ -195,7 +214,8 @@ Runtime MCP:
 16. Erros de path retornam `hint`, `inputPath` e `mode` em `details`.
 17. Clientes devem preferir `code` a parse de mensagem humana.
 18. Listagens redigem paths protegidos e retornam apenas contagem agregada em `blockedEntriesCount`.
-19. Jobs persistem manifest em `src/copilot/.ai/jobs`, permitindo `job_list` e `job_get_output` apos restart.
+19. Jobs persistem manifest em `src/copilot/.ai/jobs`, permitindo `job_list` e `job_get_output` apos
+    restart.
 
 ## 7. Validacao Canonica
 
@@ -229,9 +249,10 @@ Estado conhecido neste release:
 2. Lint completo passa.
 3. Testes MCP focados passam.
 4. `unit-mcp` usa `tests/unit/copilot/mcp`, sem glob literal dependente de shell.
-5. Smoke HTTP local passa com 35 tools e paridade exata contra o registry.
+5. Smoke HTTP local deve passar com 43 tools e paridade exata contra o registry apos a familia
+   `repo_index_*`.
 6. Suite unit completa passa apos a rodada de correcao pos-relatorio WORKSPACE:
-   - 3056 testes aprovados;
+   - 3059 testes aprovados;
    - 1012 suites aprovadas;
    - zero warnings/errors no runner compacto.
 
@@ -346,18 +367,20 @@ Executado em 2026-05-22:
 7. `tools/call repo_status` respondeu `success=true` e `branch=main`.
 8. `GET /health` apos chamadas reportou metricas com chamadas registradas.
 
-Observacao para chamadas HTTP manuais: enviar header `Accept: application/json, text/event-stream`, pois o transporte
-Streamable HTTP do MCP exige aceitar JSON e SSE.
+Observacao para chamadas HTTP manuais: enviar header `Accept: application/json, text/event-stream`,
+pois o transporte Streamable HTTP do MCP exige aceitar JSON e SSE.
 
 ## 12. Correcao Pos-Primeiro Uso ChatGPT
 
 Executado em 2026-05-22 apos o primeiro uso real do conector no ChatGPT:
 
-1. Corrigido acoplamento de `hooks/` para `agent/` movendo a politica compartilhada de erro para `sdk/errors.js`.
-2. Corrigido acoplamento de `terminal/commands/session.js` para `#copilot/agent/session` movendo specs puras para
-   `config/terminal-sdk-command-specs.js`.
+1. Corrigido acoplamento de `hooks/` para `agent/` movendo a politica compartilhada de erro para
+   `sdk/errors.js`.
+2. Corrigido acoplamento de `terminal/commands/session.js` para `#copilot/agent/session` movendo
+   specs puras para `config/terminal-sdk-command-specs.js`.
 3. Corrigida governanca de barrels internos do terminal para `byok/` e `state/`.
-4. Corrigidos contratos de borda JSDoc para usar `presentation/contracts` em vez de tipos internos do SDK.
+4. Corrigidos contratos de borda JSDoc para usar `presentation/contracts` em vez de tipos internos
+   do SDK.
 5. Corrigido merge BYOK para preservar variaveis explicitas contra perfil ativo herdado.
 6. Validacao final:
    - `npm run typecheck:strict:src.copilot` passou;
@@ -366,7 +389,8 @@ Executado em 2026-05-22 apos o primeiro uso real do conector no ChatGPT:
 
 ## 13. Upgrade De Paridade IO
 
-Executado em 2026-05-22 para aproximar o MCP das tools locais de leitura/scan da LLM-B sem criar dependencia inversa:
+Executado em 2026-05-22 para aproximar o MCP das tools locais de leitura/scan da LLM-B sem criar
+dependencia inversa:
 
 1. `repo_read_file_chunks`:
    - leitura UTF-8 paginada por linhas;
@@ -388,4 +412,5 @@ Executado em 2026-05-22 para aproximar o MCP das tools locais de leitura/scan da
    - typecheck strict passou;
    - lint passou;
    - unit completo passou com 3041/3041;
-   - smoke HTTP local passou para `/health`, `tools/list`, `repo_symbol_search` e `repo_read_file_chunks`.
+   - smoke HTTP local passou para `/health`, `tools/list`, `repo_symbol_search` e
+     `repo_read_file_chunks`.

@@ -6,7 +6,8 @@
  */
 
 import { parseFileForContext } from '#copilot/infra';
-import { readText, scanDirectory, searchText, searchWorkspaceSymbols } from '#copilot/infra/public/io';
+import { getIoIndexStats } from '#copilot/infra/public/indexing';
+import { readText, scanDirectory, searchText, searchWorkspaceSymbols, statPath } from '#copilot/infra/public/io';
 import { WORKSPACE_ROOT } from '#copilot/tools';
 import { readCloudflareTunnelConfig } from '../cloudflare/config.js';
 import { readQuickTunnelState, summarizeQuickTunnelState } from '../cloudflare/state.js';
@@ -64,6 +65,12 @@ export const mcpSmokeWorkspaceTool = {
             const snapshot = await readText(resolved.resolved, { startLine: 1, endLine: 8 });
             return { bytes: snapshot.bytesRead, sha256: snapshot.contentHash };
         });
+        await runCheck(checks, 'repo_file_stats', async () => {
+            const resolved = await resolveReadPath('src/copilot/mcp/README.md');
+            if (!resolved.ok) throw new Error(resolved.reason);
+            const snapshot = await statPath(resolved.resolved);
+            return { sizeBytes: snapshot.stats.size, engine: snapshot.io.engine };
+        });
         await runCheck(checks, 'repo_search_text', async () => {
             const resolved = await resolveReadPath('src/copilot/mcp');
             if (!resolved.ok) throw new Error(resolved.reason);
@@ -74,6 +81,20 @@ export const mcpSmokeWorkspaceTool = {
                 maxResults: 10,
             });
             return { returnedMatchCount: result.returnedMatchCount ?? result.matchCount };
+        });
+        await runCheck(checks, 'repo_find_symbol_usages', async () => {
+            const resolved = await resolveReadPath('src/copilot/mcp/tools/repo-read.js');
+            if (!resolved.ok) throw new Error(resolved.reason);
+            const result = await searchText(resolved.resolved, {
+                workspaceRoot: WORKSPACE_ROOT,
+                pattern: '\\brepoReadTools\\b',
+                isRegex: true,
+                caseSensitive: true,
+                includePattern: '*.{js,ts,mjs,cjs}',
+                contextLines: 0,
+                maxResults: 10,
+            });
+            return { matchCount: result.matchCount };
         });
         await runCheck(checks, 'repo_symbol_search', async () => {
             const resolved = await resolveReadPath('src/copilot/mcp');
@@ -90,6 +111,14 @@ export const mcpSmokeWorkspaceTool = {
             const snapshot = await readText(resolved.resolved);
             const parsed = await parseFileForContext(resolved.resolved, snapshot.content);
             return { symbols: parsed.symbols.symbols.length, exports: parsed.symbols.exports.length };
+        });
+        await runCheck(checks, 'repo_index_status', async () => {
+            const stats = getIoIndexStats();
+            return {
+                enabled: stats.enabled,
+                available: stats.available,
+                files: 'files' in stats ? stats.files : 0,
+            };
         });
         await runCheck(checks, 'project_doctor', async () => {
             const result = await projectDoctorTool.handler({ includeScripts: false });

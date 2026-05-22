@@ -9,15 +9,15 @@ import { spawn, spawnSync } from 'node:child_process';
 import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
+import { getCanonicalMcpTools } from '../registry.js';
 import {
-    buildTemporaryConnectorUrl,
     buildManagedTunnelArgs,
     buildQuickTunnelArgs,
+    buildTemporaryConnectorUrl,
     extractTryCloudflareUrl,
     readCloudflareTunnelConfig,
     validateConfiguredPublicUrl,
 } from './config.js';
-import { getCanonicalMcpTools } from '../registry.js';
 import {
     isQuickTunnelState,
     readQuickTunnelState,
@@ -154,9 +154,12 @@ async function runSmoke() {
         'repo_root_tree',
         'repo_read_file',
         'repo_read_file_chunks',
+        'repo_file_stats',
         'repo_search_text',
+        'repo_find_symbol_usages',
         'repo_symbol_search',
         'repo_file_outline',
+        'repo_index_status',
         'project_doctor',
         'run_copilot_validator',
         'job_list',
@@ -170,7 +173,8 @@ async function runSmoke() {
     const unexpectedRemoteTools = remoteToolNames.filter((toolName) => !localToolNames.includes(toolName));
     const toolsMatchLocalRegistry = missingLocalTools.length === 0 && unexpectedRemoteTools.length === 0;
     const criticalToolsPresent = missingCriticalTools.length === 0;
-    const ok = health.ok && toolsList.ok && remoteToolNames.length > 0 && toolsMatchLocalRegistry && criticalToolsPresent;
+    const ok =
+        health.ok && toolsList.ok && remoteToolNames.length > 0 && toolsMatchLocalRegistry && criticalToolsPresent;
     const healthSummary = {
         ok: health.ok,
         ...(health.status !== undefined ? { status: health.status } : {}),

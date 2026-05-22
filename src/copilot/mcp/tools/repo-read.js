@@ -6,7 +6,16 @@
  */
 
 import { parseFileForContext } from '#copilot/infra';
-import { diffText, readText, readTextChunks, scanDirectory, searchText, searchWorkspaceSymbols } from '#copilot/infra/public/io';
+import {
+    diffText,
+    readBytes,
+    readText,
+    readTextChunks,
+    scanDirectory,
+    searchText,
+    searchWorkspaceSymbols,
+    statPath,
+} from '#copilot/infra/public/io';
 import { WORKSPACE_ROOT } from '#copilot/tools';
 import { z } from 'zod';
 import { readOnlyAnnotations } from '../control-plane/annotations.js';
@@ -25,6 +34,48 @@ function normalizeOptionalRepoPath(value, fallback) {
     if (value === undefined || value === null) return fallback;
     const text = String(value).trim();
     return text === '' ? fallback : text;
+}
+
+/**
+ * @param {string} value
+ * @returns {string}
+ */
+function escapeForRegex(value) {
+    return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/**
+ * @param {string} output
+ * @param {string} defaultFile
+ * @returns {{ matches: { file: string; line: number; text: string }[]; fileCount: number }}
+ */
+function parseUsageOutput(output, defaultFile) {
+    /** @type {{ file: string; line: number; text: string }[]} */
+    const matches = [];
+    const files = new Set();
+    const root = WORKSPACE_ROOT.endsWith('/') ? WORKSPACE_ROOT : `${WORKSPACE_ROOT}/`;
+    for (const rawLine of output.split('\n')) {
+        if (!rawLine.trim() || rawLine === '--') continue;
+        const matchedWithFile = rawLine.match(/^(.+?):(\d+):(.*)$/u);
+        const matchedWithoutFile = matchedWithFile ? null : rawLine.match(/^(\d+):(.*)$/u);
+        if (!matchedWithFile && !matchedWithoutFile) continue;
+        const filePath = matchedWithFile?.[1] ?? defaultFile;
+        const lineText = matchedWithFile?.[2] ?? matchedWithoutFile?.[1];
+        const text = matchedWithFile?.[3] ?? matchedWithoutFile?.[2] ?? '';
+        if (!filePath || !lineText) continue;
+        const file = filePath.startsWith(root) ? filePath.slice(root.length) : filePath;
+        files.add(file);
+        matches.push({ file, line: Number(lineText), text: text.trimEnd() });
+    }
+    return { matches, fileCount: files.size };
+}
+
+/**
+ * @param {{ file: string; line: number; text: string }[]} matches
+ * @returns {string}
+ */
+function formatUsageMatches(matches) {
+    return matches.map((match) => `${match.file}:${match.line}: ${match.text}`.trimEnd()).join('\n');
 }
 
 /**
@@ -47,7 +98,9 @@ export const repoReadTools = [
             path: z
                 .string()
                 .optional()
-                .describe('Workspace-relative directory path. Default: src/copilot. Empty string uses the default. Use "." for workspace root.'),
+                .describe(
+                    'Workspace-relative directory path. Default: src/copilot. Empty string uses the default. Use "." for workspace root.',
+                ),
             recursive: z.boolean().optional().describe('Whether to recurse into children. Default: false.'),
             depth: z.number().int().min(1).max(8).optional().describe('Maximum recursion depth. Default: 2.'),
             maxEntries: z.number().int().min(1).max(2000).optional().describe('Maximum entries returned.'),
@@ -123,7 +176,8 @@ export const repoReadTools = [
     {
         name: 'repo_read_file',
         title: 'Read repository file',
-        description: 'Read a UTF-8 file inside the workspace, optionally using a line window. Returns SHA-256 hashes for safe follow-up writes.',
+        description:
+            'Read a UTF-8 file inside the workspace, optionally using a line window. Returns SHA-256 hashes for safe follow-up writes.',
         inputSchema: {
             path: z.string().min(1).describe('Workspace-relative file path.'),
             startLine: z.number().int().min(1).optional().describe('Optional 1-based first line.'),
@@ -154,6 +208,61 @@ export const repoReadTools = [
                 returnedLines: snapshot.returnedLines,
             };
             return okResult(structured, snapshot.content);
+        },
+    },
+    {
+        name: 'repo_file_stats',
+        title: 'Repository file stats',
+        description:
+            'Return filesystem metadata for a workspace file or directory, with optional SHA-256 for safe follow-up reads/writes.',
+        inputSchema: {
+            path: z.string().min(1).describe('Workspace-relative file or directory path.'),
+            includeHash: z
+                .boolean()
+                .optional()
+                .describe('If true, compute SHA-256 for files within maxHashBytes. Default: false.'),
+            maxHashBytes: z
+                .number()
+                .int()
+                .min(1)
+                .max(25 * 1024 * 1024)
+                .optional()
+                .describe('Maximum file size eligible for hashing. Default: 5 MiB.'),
+        },
+        annotations: readOnlyAnnotations(),
+        handler: async ({ path, includeHash, maxHashBytes }) => {
+            const resolved = await resolveReadPath(path);
+            if (!resolved.ok) return errorResult(resolved.reason, resolved);
+            const statSnapshot = await statPath(resolved.resolved);
+            const stats = statSnapshot.stats;
+            const isFile = stats.isFile();
+            const effectiveMaxHashBytes = maxHashBytes ?? 5 * 1024 * 1024;
+            const shouldHash = includeHash === true && isFile && stats.size <= effectiveMaxHashBytes;
+            const bytes = shouldHash ? await readBytes(resolved.resolved) : null;
+            return okResult({
+                success: true,
+                path: resolved.relative,
+                absolutePath: resolved.resolved,
+                type: stats.isDirectory() ? 'directory' : isFile ? 'file' : 'other',
+                sizeBytes: stats.size,
+                mtimeMs: stats.mtimeMs,
+                ctimeMs: stats.ctimeMs,
+                birthtimeMs: stats.birthtimeMs,
+                mtimeIso: stats.mtime.toISOString(),
+                ctimeIso: stats.ctime.toISOString(),
+                birthtimeIso: stats.birthtime.toISOString(),
+                sha256: bytes?.contentHash ?? null,
+                hashComputed: Boolean(bytes),
+                hashSkippedReason: shouldHash
+                    ? null
+                    : includeHash === true && !isFile
+                      ? 'not-a-file'
+                      : includeHash === true && stats.size > effectiveMaxHashBytes
+                        ? 'file-too-large'
+                        : 'hash-not-requested',
+                maxHashBytes: effectiveMaxHashBytes,
+                engine: bytes?.io.engine ?? statSnapshot.io.engine,
+            });
         },
     },
     {
@@ -202,7 +311,9 @@ export const repoReadTools = [
             const lastChunk = snapshot.chunks[snapshot.chunks.length - 1];
             const lastReturnedLine = lastChunk?.endLine ?? effectiveStartLine - 1;
             const nextCursor =
-                snapshot.totalLinesKnown && lastReturnedLine < snapshot.totalLines ? String(lastReturnedLine + 1) : null;
+                snapshot.totalLinesKnown && lastReturnedLine < snapshot.totalLines
+                    ? String(lastReturnedLine + 1)
+                    : null;
             const text = snapshot.chunks.map((chunk) => chunk.content).join('\n');
             return okResult(
                 {
@@ -271,7 +382,13 @@ export const repoReadTools = [
             caseSensitive: z.boolean().optional().describe('Case-sensitive search. Default: false.'),
             includePattern: z.string().optional().describe('Optional include glob, for example *.js.'),
             excludePattern: z.string().optional().describe('Optional exclude glob.'),
-            contextLines: z.number().int().min(0).max(10).optional().describe('Lines of context around each match. Default: 0.'),
+            contextLines: z
+                .number()
+                .int()
+                .min(0)
+                .max(10)
+                .optional()
+                .describe('Lines of context around each match. Default: 0.'),
             maxResults: z.number().int().min(1).max(500).optional().describe('Maximum matches returned.'),
             cursor: z.string().optional().describe('Cursor returned by a previous repo_search_text call.'),
         },
@@ -319,6 +436,69 @@ export const repoReadTools = [
                 engine: result.engine,
             };
             return okResult(structured, result.output);
+        },
+    },
+    {
+        name: 'repo_find_symbol_usages',
+        title: 'Find repository symbol usages',
+        description:
+            'Find textual usages of a symbol in the workspace with whole-word defaults, matching the LLM-B find_symbol_usages workflow.',
+        inputSchema: {
+            symbol: z.string().min(1).describe('Symbol name to search for.'),
+            path: z.string().optional().describe('Workspace-relative search root. Default: src/copilot.'),
+            includePattern: z.string().optional().describe('Include glob. Default: *.{js,ts,mjs,cjs}.'),
+            excludePattern: z.string().optional().describe('Exclude glob, for example node_modules or dist.'),
+            wholeWord: z.boolean().optional().describe('Search only whole-word symbol occurrences. Default: true.'),
+            caseSensitive: z.boolean().optional().describe('Case-sensitive search. Default: true for symbols.'),
+            maxResults: z.number().int().min(1).max(500).optional().describe('Maximum matches returned.'),
+            cursor: z.string().optional().describe('Cursor returned by a previous repo_find_symbol_usages call.'),
+        },
+        annotations: readOnlyAnnotations(),
+        handler: async ({
+            symbol,
+            path,
+            includePattern,
+            excludePattern,
+            wholeWord,
+            caseSensitive,
+            maxResults,
+            cursor,
+        }) => {
+            const resolved = await resolveReadPath(normalizeOptionalRepoPath(path, DEFAULT_REPO_READ_PATH));
+            if (!resolved.ok) return errorResult(resolved.reason, resolved);
+            const escaped = escapeForRegex(symbol);
+            const pattern = wholeWord !== false ? `\\b${escaped}\\b` : escaped;
+            const result = await searchText(resolved.resolved, {
+                workspaceRoot: WORKSPACE_ROOT,
+                pattern,
+                isRegex: true,
+                caseSensitive: caseSensitive !== false,
+                includePattern: includePattern ?? '*.{js,ts,mjs,cjs}',
+                excludePattern,
+                contextLines: 0,
+                maxResults,
+                cursor,
+            });
+            const parsed = parseUsageOutput(result.output, resolved.relative);
+            const output = formatUsageMatches(parsed.matches);
+            return okResult(
+                {
+                    success: true,
+                    symbol,
+                    path: resolved.relative,
+                    output,
+                    matchCount: parsed.matches.length,
+                    fileCount: parsed.fileCount,
+                    matches: parsed.matches,
+                    totalMatches: result.totalMatches ?? result.matchCount,
+                    totalMatchCount: result.totalMatchCount ?? result.totalMatches ?? result.matchCount,
+                    truncated: Boolean(result.truncated),
+                    nextCursor: result.nextCursor ?? null,
+                    cursorOffset: result.cursorOffset ?? 0,
+                    engine: result.engine,
+                },
+                output,
+            );
         },
     },
     {

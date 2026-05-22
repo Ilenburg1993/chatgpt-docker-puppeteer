@@ -50,6 +50,22 @@ describe('copilot MCP tools', () => {
         assert.ok(String(result.content[0]?.text ?? '').includes('Copilot MCP Server'));
     });
 
+    it('repo_file_stats returns metadata and optional content hash', async () => {
+        const tool = findTool('repo_file_stats');
+        const result = await tool.handler({
+            path: 'src/copilot/mcp/README.md',
+            includeHash: true,
+        });
+
+        assert.equal(result.isError, undefined);
+        assert.equal(result.structuredContent?.['success'], true);
+        assert.equal(result.structuredContent?.['path'], 'src/copilot/mcp/README.md');
+        assert.equal(result.structuredContent?.['type'], 'file');
+        assert.equal(typeof result.structuredContent?.['sizeBytes'], 'number');
+        assert.equal(typeof result.structuredContent?.['sha256'], 'string');
+        assert.equal(result.structuredContent?.['hashComputed'], true);
+    });
+
     it('read tools return stable error codes for recoverable client errors', async () => {
         const readTool = findTool('repo_read_file');
         const emptyPath = await readTool.handler({ path: '' });
@@ -88,7 +104,10 @@ describe('copilot MCP tools', () => {
         assert.equal(root.structuredContent?.['securityPolicy']?.['listProtectedPaths'], 'redacted');
         assert.ok(Number(root.structuredContent?.['blockedEntriesCount'] ?? 0) > 0);
         const entries = /** @type {{ name?: string; path?: string }[]} */ (root.structuredContent?.['entries']);
-        assert.equal(entries.some((entry) => entry.name === '.env.local' || entry.path === '.env.local'), false);
+        assert.equal(
+            entries.some((entry) => entry.name === '.env.local' || entry.path === '.env.local'),
+            false,
+        );
     });
 
     it('repo_search_text accepts context lines and cursor metadata', async () => {
@@ -119,6 +138,20 @@ describe('copilot MCP tools', () => {
         assert.ok(Number(structured['returnedMatchCount'] ?? 0) > 0);
         assert.ok(Number(structured['returnedLineCount'] ?? 0) >= Number(structured['returnedMatchCount'] ?? 0));
         assert.ok(Number(structured['totalMatchCount'] ?? 0) >= Number(structured['returnedMatchCount'] ?? 0));
+    });
+
+    it('repo_find_symbol_usages mirrors LLM-B symbol usage search semantics', async () => {
+        const tool = findTool('repo_find_symbol_usages');
+        const result = await tool.handler({
+            symbol: 'repoReadTools',
+            path: 'src/copilot/mcp/tools/repo-read.js',
+            maxResults: 20,
+        });
+        assert.equal(result.isError, undefined);
+        assert.equal(result.structuredContent?.['success'], true);
+        assert.ok(Number(result.structuredContent?.['matchCount'] ?? 0) >= 1);
+        assert.ok(Array.isArray(result.structuredContent?.['matches']));
+        assert.ok(String(result.structuredContent?.['output'] ?? '').includes('repoReadTools'));
     });
 
     it('repo_read_file_chunks pages large-file reads with cursor metadata', async () => {
@@ -186,6 +219,43 @@ describe('copilot MCP tools', () => {
         assert.ok(Array.isArray(result.structuredContent?.['checks']));
     });
 
+    it('repo_index tools expose shared IO index build, status, search, symbols and imports', async () => {
+        const buildTool = findTool('repo_index_build');
+        const build = await buildTool.handler({
+            path: 'src/copilot/mcp/tools',
+            include: ['repo-index.js'],
+            maxFiles: 5,
+            pruneMissing: false,
+        });
+        assert.equal(build.isError, undefined);
+        assert.equal(build.structuredContent?.['success'], true);
+
+        const statusTool = findTool('repo_index_status');
+        const status = await statusTool.handler({});
+        assert.equal(status.isError, undefined);
+        assert.equal(status.structuredContent?.['success'], true);
+        assert.equal(typeof status.structuredContent?.['stats'], 'object');
+
+        const searchTool = findTool('repo_index_search');
+        const search = await searchTool.handler({ query: 'repoIndexTools', maxResults: 5 });
+        assert.equal(search.isError, undefined);
+        assert.equal(search.structuredContent?.['success'], true);
+        assert.equal(search.structuredContent?.['available'], true);
+        assert.ok(String(search.structuredContent?.['output'] ?? '').includes('repo-index.js'));
+
+        const symbolTool = findTool('repo_index_find_symbol');
+        const symbol = await symbolTool.handler({ symbol: 'repoIndexTools', exactMatch: true, maxResults: 5 });
+        assert.equal(symbol.isError, undefined);
+        assert.equal(symbol.structuredContent?.['success'], true);
+        assert.ok(Number(symbol.structuredContent?.['matchCount'] ?? 0) >= 1);
+
+        const importsTool = findTool('repo_find_imports');
+        const imports = await importsTool.handler({ source: 'zod', exactSource: true, maxResults: 5 });
+        assert.equal(imports.isError, undefined);
+        assert.equal(imports.structuredContent?.['success'], true);
+        assert.ok(String(imports.structuredContent?.['output'] ?? '').includes("from 'zod'"));
+    });
+
     it('repo_diff_files returns a canonical unified diff', async () => {
         const tool = findTool('repo_diff_files');
         const result = await tool.handler({
@@ -207,6 +277,9 @@ describe('copilot MCP tools', () => {
         assert.ok(Array.isArray(structured['read']));
         assert.ok(/** @type {string[]} */ (structured['read']).includes('repo_root_tree'));
         assert.ok(/** @type {string[]} */ (structured['read']).includes('repo_symbol_search'));
+        assert.ok(/** @type {string[]} */ (structured['read']).includes('repo_find_symbol_usages'));
+        assert.ok(Array.isArray(structured['index']));
+        assert.ok(/** @type {string[]} */ (structured['index']).includes('repo_index_status'));
         assert.ok(/** @type {string[]} */ (structured['runtime']).includes('mcp_tunnel_status'));
     });
 

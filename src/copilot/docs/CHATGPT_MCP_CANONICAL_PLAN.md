@@ -4,15 +4,18 @@
 **Workspace:** `/workspaces/chatgpt-docker-puppeteer`  
 **Escopo operacional:** `src/copilot/`  
 **Branch de trabalho:** `main`  
-**Estado Git inicial deste ciclo:** PR #135 mesclado em `main`, checkout local fast-forward em `origin/main`  
-**Objetivo:** criar as condicoes para que `https://chatgpt.com/` se conecte ao workspace via MCP server local/tunelado, com controle amplo, auditavel e integrado ao projeto Copilot SDK 0.3.0 existente.
+**Estado Git inicial deste ciclo:** PR #135 mesclado em `main`, checkout local fast-forward em
+`origin/main` **Objetivo:** criar as condicoes para que `https://chatgpt.com/` se conecte ao
+workspace via MCP server local/tunelado, com controle amplo, auditavel e integrado ao projeto
+Copilot SDK 0.3.0 existente.
 
 ---
 
 ## 1. Contrato de escopo
 
 1. O escopo pratico e `src/copilot/`.
-2. O restante do repositorio e contexto secundario, usado apenas quando scripts, configs ou dependencias forem necessarios.
+2. O restante do repositorio e contexto secundario, usado apenas quando scripts, configs ou
+   dependencias forem necessarios.
 3. O servidor MCP deve ficar sob `src/copilot/`.
 4. A LLM-B existente em `src/copilot` nao deve depender do MCP server para funcionar.
 5. A LLM-B pode se integrar ao MCP server como consumidor local, ponte ou delegador.
@@ -20,7 +23,8 @@
 7. A conexao remota do ChatGPT deve ser por Streamable HTTP em `/mcp`.
 8. O uso local por VS Code, Copilot SDK ou outros clientes pode usar `stdio`.
 9. SSE legado fica fora do caminho principal.
-10. O sistema deve preservar auditabilidade, reversibilidade por Git, validacao de path e logs operacionais.
+10. O sistema deve preservar auditabilidade, reversibilidade por Git, validacao de path e logs
+    operacionais.
 
 ---
 
@@ -65,11 +69,13 @@
 13. Acoes destrutivas devem exigir confirmacao humana.
 14. Logs devem redigir dados sensiveis e manter correlation IDs.
 15. Secure MCP Tunnel permite manter o servidor privado, usando saida HTTPS outbound para OpenAI.
-16. A pagina OpenAI de criacao do conector menciona Cloudflare Tunnel como opcao para expor o MCP local em
-    desenvolvimento.
+16. A pagina OpenAI de criacao do conector menciona Cloudflare Tunnel como opcao para expor o MCP
+    local em desenvolvimento.
 17. Cloudflare Quick Tunnel gera URL aleatoria `trycloudflare.com`, sem exigir dominio fixo.
-18. Quick Tunnel Cloudflare e temporario, sem suporte a SSE e com limite de desenvolvimento segundo a documentacao oficial.
-19. Essa natureza temporaria e agora uma decisao arquitetural do projeto; hostname fixo fica somente como futuro opcional.
+18. Quick Tunnel Cloudflare e temporario, sem suporte a SSE e com limite de desenvolvimento segundo
+    a documentacao oficial.
+19. Essa natureza temporaria e agora uma decisao arquitetural do projeto; hostname fixo fica somente
+    como futuro opcional.
 
 ---
 
@@ -209,7 +215,8 @@ O Express server atual pode receber uma rota `/mcp`, mas a primeira versao deve 
 20. Tools destrutivas futuras terao `destructiveHint: true`.
 21. Tools de arquivo devem reutilizar politica existente sempre que possivel.
 22. O plano deve ser atualizado ao fim de cada faixa implementada.
-23. Validadores canonicos do escopo: `typecheck:strict:src.copilot`, `lint:copilot`, `test:copilot:unit`.
+23. Validadores canonicos do escopo: `typecheck:strict:src.copilot`, `lint:copilot`,
+    `test:copilot:unit`.
 
 ---
 
@@ -403,10 +410,13 @@ O Express server atual pode receber uma rota `/mcp`, mas a primeira versao deve 
 #### Fase G.2 — Guardrails de escrita
 
 1. Path sempre dentro do workspace — concluido via `resolveReadPath`/`resolveWritePath`.
-2. Diff antes/depois — concluido para `repo_apply_patch`, `repo_write_file` e `repo_create_file`; move/remove retornam metadados antes/depois.
+2. Diff antes/depois — concluido para `repo_apply_patch`, `repo_write_file` e `repo_create_file`;
+   move/remove retornam metadados antes/depois.
 3. Audit log obrigatorio — concluido via wrapper MCP e eventos especificos por tool de escrita.
-4. Grants para operacoes destrutivas — concluido inicialmente por `destructiveHint` e `confirm`/`confirmOverwrite`.
-5. Reversibilidade por Git quando aplicavel — concluido inicialmente por hashes, snapshots de remocao e diff previews.
+4. Grants para operacoes destrutivas — concluido inicialmente por `destructiveHint` e
+   `confirm`/`confirmOverwrite`.
+5. Reversibilidade por Git quando aplicavel — concluido inicialmente por hashes, snapshots de
+   remocao e diff previews.
 
 ### Faixa H — Execucao controlada
 
@@ -428,8 +438,8 @@ O Express server atual pode receber uma rota `/mcp`, mas a primeira versao deve 
 
 ### Faixa I — Tunnel e ChatGPT
 
-**Status:** reaberta para consolidar Cloudflare Quick Tunnel temporario como exposicao HTTPS operacional; Secure MCP Tunnel
-permanece alternativa.
+**Status:** reaberta para consolidar Cloudflare Quick Tunnel temporario como exposicao HTTPS
+operacional; Secure MCP Tunnel permanece alternativa.
 
 #### Fase I.1 — Exposicao HTTPS
 
@@ -449,7 +459,8 @@ permanece alternativa.
 #### Fase I.2 — Formulario ChatGPT
 
 1. Nome: `Repo DevContainer MCP`.
-2. Descricao: conector para o repo aberto no Dev Container, com leitura, Git, diagnosticos e operacoes controladas.
+2. Descricao: conector para o repo aberto no Dev Container, com leitura, Git, diagnosticos e
+   operacoes controladas.
 3. URL: `https://<endpoint>/mcp`.
 4. Autenticacao: conforme modo do tunel/OAuth disponivel.
 
@@ -468,15 +479,19 @@ permanece alternativa.
 
 #### Fase J.1 — Consumidor local
 
-1. Decidir se LLM-B consome o MCP server via bridge existente — concluido: consumo via MCP server config opt-in.
-2. Atualizar `mcp-tool-bridge` apenas se necessario — concluido: sem alteracao obrigatoria na bridge legada.
+1. Decidir se LLM-B consome o MCP server via bridge existente — concluido: consumo via MCP server
+   config opt-in.
+2. Atualizar `mcp-tool-bridge` apenas se necessario — concluido: sem alteracao obrigatoria na bridge
+   legada.
 3. Manter fallback quando MCP offline — concluido: default `COPILOT_MCP_SERVERS` segue vazio.
 
 #### Fase J.2 — Delegacao
 
-1. Expor tools MCP futuras para criar ou acionar sessao Copilot — concluido como leitura/delegacao segura de estado.
+1. Expor tools MCP futuras para criar ou acionar sessao Copilot — concluido como leitura/delegacao
+   segura de estado.
 2. Nao fazer o boot da LLM-B depender dessas tools — concluido.
-3. Registrar eventos no hub/observability quando aplicavel — coberto pelo audit wrapper MCP; hub profundo fica para K/L.
+3. Registrar eventos no hub/observability quando aplicavel — coberto pelo audit wrapper MCP; hub
+   profundo fica para K/L.
 
 ### Faixa K — Hardening e release operacional
 
@@ -487,7 +502,8 @@ permanece alternativa.
 1. Revisar tool descriptions contra prompt injection — em andamento.
 2. Validar inputs server-side — concluido via schemas Zod e path policy.
 3. Limitar structured content — em andamento; snapshots de rollback nao saem mais no MCP.
-4. Redigir secrets — concluido inicialmente por path policy e remocao de snapshot base64 em `repo_remove_file`.
+4. Redigir secrets — concluido inicialmente por path policy e remocao de snapshot base64 em
+   `repo_remove_file`.
 5. Testar paths fora do workspace — concluido nos testes MCP de escrita.
 
 #### Fase K.2 — Observabilidade
@@ -527,7 +543,8 @@ npm run lint:copilot
 npm run test:copilot:unit
 ```
 
-Observacao: durante a sincronizacao inicial foi solicitado nao validar antes. A partir da implementacao, estes validadores voltam a ser os criterios canonicos de saida.
+Observacao: durante a sincronizacao inicial foi solicitado nao validar antes. A partir da
+implementacao, estes validadores voltam a ser os criterios canonicos de saida.
 
 ---
 
@@ -584,7 +601,8 @@ Observacao: durante a sincronizacao inicial foi solicitado nao validar antes. A 
 
 1. `npm run typecheck:strict:src.copilot` passou.
 2. `npm run lint:copilot` passou.
-3. `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/mcp/*.spec.js` passou com 2 arquivos e 6 testes.
+3. `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/mcp/*.spec.js` passou com 2
+   arquivos e 6 testes.
 4. `npm run test:copilot:unit` falhou em 6 testes preexistentes fora do modulo MCP:
    - `tests/unit/copilot/config/test_faixa_c_session_config_builder.spec.js`
    - `tests/unit/copilot/contracts/test_arch_contracts.spec.js`
@@ -594,7 +612,8 @@ Observacao: durante a sincronizacao inicial foi solicitado nao validar antes. A 
 
 ### Proximo item cronologico
 
-Faixa F, Fase F.1: Project Control Plane operacional, memoria `.ai`, auditoria MCP persistente e modelo inicial de jobs.
+Faixa F, Fase F.1: Project Control Plane operacional, memoria `.ai`, auditoria MCP persistente e
+modelo inicial de jobs.
 
 ### 2026-05-22 — Faixa F parcial
 
@@ -628,7 +647,8 @@ Faixa F, Fase F.1: Project Control Plane operacional, memoria `.ai`, auditoria M
 
 ### Proximo item cronologico apos Faixa F jobs inicial
 
-Faixa G, Fase G.1: escrita controlada (`repo_apply_patch` primeiro), com diff, path policy e auditoria.
+Faixa G, Fase G.1: escrita controlada (`repo_apply_patch` primeiro), com diff, path policy e
+auditoria.
 
 ### 2026-05-22 — Faixa I repo-side
 
@@ -642,22 +662,28 @@ Faixa G, Fase G.1: escrita controlada (`repo_apply_patch` primeiro), com diff, p
 5. Perfil canonico do formulario ChatGPT:
    - Nome: `Repo DevContainer MCP`
    - URL: `https://<endpoint-do-tunel>/mcp`
-   - Auth default local: `none-dev`; override para `secure-mcp-tunnel` ou OAuth conforme configuracao real.
+   - Auth default local: `none-dev`; override para `secure-mcp-tunnel` ou OAuth conforme
+     configuracao real.
 6. Runbook cobre Secure MCP Tunnel em modo HTTP e stdio.
 7. Runbook cobre smoke tests no ChatGPT: `repo_status`, `repo_tree`, `repo_read_file`, `git_status`.
-8. Validacao local deve confirmar `/health`, `/chatgpt-connector.json`, `tools/list` e chamadas read-only.
+8. Validacao local deve confirmar `/health`, `/chatgpt-connector.json`, `tools/list` e chamadas
+   read-only.
 9. Validacao executada:
    - `npm run typecheck:strict:src.copilot` passou.
    - `npm run lint:copilot` passou.
-   - `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/mcp/*.spec.js` passou: 5 arquivos, 13 testes.
-   - Smoke HTTP passou para `/health`, `/chatgpt-connector.json`, `tools/list` e `chatgpt_connector_url_check`.
-   - `npm run test:copilot:unit` ainda falha em 6 testes preexistentes fora do modulo MCP/ChatGPT connection.
+   - `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/mcp/*.spec.js` passou: 5
+     arquivos, 13 testes.
+   - Smoke HTTP passou para `/health`, `/chatgpt-connector.json`, `tools/list` e
+     `chatgpt_connector_url_check`.
+   - `npm run test:copilot:unit` ainda falha em 6 testes preexistentes fora do modulo MCP/ChatGPT
+     connection.
 
 ### Observacao de prontidao Faixa I
 
-O repo agora fornece tudo que pode ser preparado localmente. A unica parte que nao pode ser materializada sem credenciais e
-sem acao no browser e criar o `tunnel_id`, rodar `tunnel-client` com runtime API key real, copiar o endpoint HTTPS gerado e
-preencher o formulario do ChatGPT. O runbook detalha essa operacao.
+O repo agora fornece tudo que pode ser preparado localmente. A unica parte que nao pode ser
+materializada sem credenciais e sem acao no browser e criar o `tunnel_id`, rodar `tunnel-client` com
+runtime API key real, copiar o endpoint HTTPS gerado e preencher o formulario do ChatGPT. O runbook
+detalha essa operacao.
 
 ### 2026-05-22 — Faixa I Cloudflare Tunnel em execucao
 
@@ -669,7 +695,8 @@ preencher o formulario do ChatGPT. O runbook detalha essa operacao.
    - quick tunnel como smoke temporario `trycloudflare.com`;
    - quick tunnel sem SSE.
 3. `cloudflared 2026.5.0` foi instalado no Dev Container atual a partir do `.deb` oficial.
-4. `src/copilot/mcp/cloudflare` passou a concentrar configuracao, CLI doctor/run/quick e instalador Linux.
+4. `src/copilot/mcp/cloudflare` passou a concentrar configuracao, CLI doctor/run/quick e instalador
+   Linux.
 5. Package scripts adicionados:
    - `copilot:mcp:cloudflare:install`;
    - `copilot:mcp:cloudflare:doctor`;
@@ -677,22 +704,26 @@ preencher o formulario do ChatGPT. O runbook detalha essa operacao.
    - `copilot:mcp:cloudflare:run`.
 6. `.devcontainer/Dockerfile` passou a instalar uma versao pinada de `cloudflared` para rebuilds.
 7. `chatgpt_connector_profile` passou a devolver tambem um runbook Cloudflare.
-8. O smoke remoto de Quick Tunnel mostrou que o transporte `auto` tentou QUIC e falhou neste Dev Container.
-9. O wrapper adotou `http2` por default, com override `COPILOT_MCP_CLOUDFLARE_PROTOCOL=auto|http2|quic`.
+8. O smoke remoto de Quick Tunnel mostrou que o transporte `auto` tentou QUIC e falhou neste Dev
+   Container.
+9. O wrapper adotou `http2` por default, com override
+   `COPILOT_MCP_CLOUDFLARE_PROTOCOL=auto|http2|quic`.
 10. Com HTTP/2, Quick Tunnel registrou conexao e atravessou:
     - `GET https://<quick-tunnel>/health` com HTTP 200;
     - `POST https://<quick-tunnel>/mcp` para `tools/list`, com 26 tools.
 11. Validacao desta rodada:
-    - `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/mcp/*.spec.js` passou com 10 arquivos e 34 testes;
+    - `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/mcp/*.spec.js` passou com
+      10 arquivos e 34 testes;
     - `npm run typecheck:strict:src.copilot` passou;
     - `npm run lint:copilot` passou;
-    - `npm run test:copilot:unit` executou 3033 testes, 3027 passaram e as 6 falhas externas/preexistentes de
-      config/contratos voltaram a aparecer.
+    - `npm run test:copilot:unit` executou 3033 testes, 3027 passaram e as 6 falhas
+      externas/preexistentes de config/contratos voltaram a aparecer.
 
 ### 2026-05-22 — Faixa I Cloudflare temporario como arquitetura principal
 
 1. Decisao atual: nao usar dominio fixo.
-2. Motivo: a natureza do projeto privilegia sessoes efemeras e reconfiguraveis, sem dependencia de hostname proprio.
+2. Motivo: a natureza do projeto privilegia sessoes efemeras e reconfiguraveis, sem dependencia de
+   hostname proprio.
 3. `npm run copilot:mcp:cloudflare:quick` agora captura automaticamente a URL `trycloudflare.com`.
 4. Criado arquivo runtime local:
    - `src/copilot/.ai/cloudflare/quick-tunnel.json`
@@ -709,12 +740,14 @@ preencher o formulario do ChatGPT. O runbook detalha essa operacao.
    - `GET /health`;
    - `POST /mcp` com `tools/list`.
 9. Tunnel publicado com hostname estavel permanece somente como futuro opcional.
-10. Smoke real do modo temporario passou com URL `trycloudflare.com`, health remoto e 26 tools em `tools/list`.
+10. Smoke real do modo temporario passou com URL `trycloudflare.com`, health remoto e 26 tools em
+    `tools/list`.
 11. Validacao apos a mudanca:
     - typecheck strict passou;
     - lint passou;
     - testes MCP focados passaram com 10 arquivos e 36 testes;
-    - unit completo executou 3035 testes, 3029 passaram e as 6 falhas preexistentes fora do MCP/Cloudflare permaneceram.
+    - unit completo executou 3035 testes, 3029 passaram e as 6 falhas preexistentes fora do
+      MCP/Cloudflare permaneceram.
 
 ### 2026-05-22 — Correcoes e upgrades MCP/IO apos primeiro uso real
 
@@ -748,7 +781,8 @@ Correcoes e upgrades aplicados:
    - typecheck strict;
    - lint;
    - testes MCP com 10 arquivos e 39 testes.
-10. Unit completo executou 3038 testes, 3032 passaram e as 6 falhas preexistentes fora do MCP permaneceram.
+10. Unit completo executou 3038 testes, 3032 passaram e as 6 falhas preexistentes fora do MCP
+    permaneceram.
 11. Smoke HTTP local confirmou as novas surfaces e `tools/list` passou a expor 29 tools.
 
 ### 2026-05-22 — Robustez operacional Cloudflare Quick Tunnel
@@ -790,7 +824,8 @@ Upgrades aplicados nesta faixa:
    - `summary`;
    - `recommendedAction`;
    - dados da caixa ChatGPT quando o estado e valido.
-6. `npm run copilot:mcp:cloudflare:smoke` passou a validar nao apenas conectividade, mas tambem a superficie remota:
+6. `npm run copilot:mcp:cloudflare:smoke` passou a validar nao apenas conectividade, mas tambem a
+   superficie remota:
    - nomes retornados por `tools/list`;
    - comparacao com o registry local;
    - `toolsMatchLocalRegistry`;
@@ -825,14 +860,16 @@ Upgrades aplicados nesta faixa:
 
 Gap tratado:
 
-1. O primeiro uso real indicou que mensagens humanas eram legiveis, mas ainda pouco estruturadas para recuperacao
-   automatica por cliente MCP.
+1. O primeiro uso real indicou que mensagens humanas eram legiveis, mas ainda pouco estruturadas
+   para recuperacao automatica por cliente MCP.
 2. A escrita controlada ja passava `code` em varios erros, mas esse dado ficava dentro de `details`.
-3. Leitura, paths, Git, jobs e sessoes Copilot ainda tinham varios caminhos de erro somente textuais.
+3. Leitura, paths, Git, jobs e sessoes Copilot ainda tinham varios caminhos de erro somente
+   textuais.
 
 Decisoes:
 
-1. `errorResult` preserva o formato existente e passa a promover `details.code` para `structuredContent.code`.
+1. `errorResult` preserva o formato existente e passa a promover `details.code` para
+   `structuredContent.code`.
 2. `errorResult` tambem promove `details.hint` para `structuredContent.hint`.
 3. `details` continua existindo para compatibilidade.
 4. Path policy MCP passou a classificar erros em:
@@ -867,8 +904,10 @@ Resultado esperado:
 
 Gap tratado:
 
-1. O relatorio externo pediu diagnostico mais direto de URL ativa, ultimo health check e recuperacao de tunnel.
-2. A rodada anterior adicionou idade, stale e acao recomendada, mas o ultimo smoke remoto ainda nao ficava persistido.
+1. O relatorio externo pediu diagnostico mais direto de URL ativa, ultimo health check e recuperacao
+   de tunnel.
+2. A rodada anterior adicionou idade, stale e acao recomendada, mas o ultimo smoke remoto ainda nao
+   ficava persistido.
 
 Implementacao:
 
@@ -886,13 +925,15 @@ Implementacao:
    - `lastSmokeAgeSeconds`;
    - `lastSmokeAgeMinutes`;
    - `lastSmokeConnectorUrl`.
-4. `status`, `doctor`, `mcp_tunnel_status` e `mcp_runtime_health` herdam esses campos automaticamente pelo summary.
+4. `status`, `doctor`, `mcp_tunnel_status` e `mcp_runtime_health` herdam esses campos
+   automaticamente pelo summary.
 5. O estado continua runtime local ignorado pelo Git, sem token, segredo ou dominio fixo.
 
 Efeito operacional:
 
 1. O ChatGPT consegue perguntar ao proprio MCP quando a URL temporaria foi testada pela ultima vez.
-2. Humanos conseguem distinguir "tunnel vivo mas nao testado recentemente" de "tunnel testado e pronto".
+2. Humanos conseguem distinguir "tunnel vivo mas nao testado recentemente" de "tunnel testado e
+   pronto".
 3. Falhas de smoke ficam registradas no estado para recovery imediato.
 
 ### 2026-05-22 — Perfil ChatGPT alinhado ao Quick Tunnel temporario
@@ -929,7 +970,8 @@ Efeito operacional:
 
 ### Proximo item cronologico apos Faixa I
 
-Faixa G, Fase G.1: escrita controlada (`repo_apply_patch` primeiro), com diff, path policy e auditoria.
+Faixa G, Fase G.1: escrita controlada (`repo_apply_patch` primeiro), com diff, path policy e
+auditoria.
 
 ### 2026-05-22 — Faixa G.1 escrita controlada MCP
 
@@ -976,21 +1018,29 @@ Faixa G, Fase G.1: escrita controlada (`repo_apply_patch` primeiro), com diff, p
 10. Validacao executada:
     - `npm run typecheck:strict:src.copilot` passou.
     - `npm run lint:copilot` passou.
-    - `node --max-old-space-size=6144 node_modules/.bin/eslint src/copilot/mcp tests/unit/copilot/mcp --no-cache` passou.
-    - `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/mcp/*.spec.js` passou: 6 arquivos, 20 testes.
-    - `npm run test:copilot:unit` ainda falha em 6 testes preexistentes fora do modulo MCP; nesta rodada foram 3019 testes totais, 3013 passaram.
+    - `node --max-old-space-size=6144 node_modules/.bin/eslint src/copilot/mcp tests/unit/copilot/mcp --no-cache`
+      passou.
+    - `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/mcp/*.spec.js` passou: 6
+      arquivos, 20 testes.
+    - `npm run test:copilot:unit` ainda falha em 6 testes preexistentes fora do modulo MCP; nesta
+      rodada foram 3019 testes totais, 3013 passaram.
 11. Falhas unit completas ainda externas ao MCP:
-    - `tests/unit/copilot/config/test_faixa_c_session_config_builder.spec.js`: expectativa BYOK com 2 entradas recebeu 3.
-    - `tests/unit/copilot/contracts/test_arch_contracts.spec.js`: import externo para `#copilot/agent/session`.
-    - `tests/unit/copilot/contracts/test_global_architecture_strict.spec.js`: violacao em `hooks/session-hooks.js`.
-    - `tests/unit/copilot/contracts/test_owner_sovereignty_block_a.spec.js`: `hooks/session-hooks.js` importa runtime/agent.
-    - `tests/unit/copilot/contracts/test_terminal_barrel_governance.spec.js`: imports cross-folder do terminal sem barrels.
+    - `tests/unit/copilot/config/test_faixa_c_session_config_builder.spec.js`: expectativa BYOK com
+      2 entradas recebeu 3.
+    - `tests/unit/copilot/contracts/test_arch_contracts.spec.js`: import externo para
+      `#copilot/agent/session`.
+    - `tests/unit/copilot/contracts/test_global_architecture_strict.spec.js`: violacao em
+      `hooks/session-hooks.js`.
+    - `tests/unit/copilot/contracts/test_owner_sovereignty_block_a.spec.js`:
+      `hooks/session-hooks.js` importa runtime/agent.
+    - `tests/unit/copilot/contracts/test_terminal_barrel_governance.spec.js`: imports cross-folder
+      do terminal sem barrels.
 
 ### Proximo item cronologico apos Faixa G.1
 
-Faixa H ja possui a base inicial de jobs allowlistados. A proxima consolidacao cronologica e alinhar os nomes canonicos
-`run_typecheck_copilot`, `run_lint_copilot`, `run_unit_copilot` e `run_project_doctor` como aliases/tools explicitas sobre
-o mecanismo de jobs ja existente.
+Faixa H ja possui a base inicial de jobs allowlistados. A proxima consolidacao cronologica e alinhar
+os nomes canonicos `run_typecheck_copilot`, `run_lint_copilot`, `run_unit_copilot` e
+`run_project_doctor` como aliases/tools explicitas sobre o mecanismo de jobs ja existente.
 
 ### 2026-05-22 — Faixa H.1 aliases canonicos de validacao
 
@@ -999,19 +1049,24 @@ o mecanismo de jobs ja existente.
    - `run_lint_copilot`
    - `run_unit_copilot`
    - `run_project_doctor`
-2. `run_typecheck_copilot`, `run_lint_copilot` e `run_unit_copilot` usam `spawnValidatorJob` e retornam `job.id`.
+2. `run_typecheck_copilot`, `run_lint_copilot` e `run_unit_copilot` usam `spawnValidatorJob` e
+   retornam `job.id`.
 3. `run_project_doctor` reutiliza o handler de `project_doctor`, sem abrir processo desnecessario.
-4. `run_copilot_validator` permanece como ferramenta parametrica para compatibilidade e para `unit-mcp`.
+4. `run_copilot_validator` permanece como ferramenta parametrica para compatibilidade e para
+   `unit-mcp`.
 5. `job_get_output` e `job_cancel` continuam sendo o plano de observabilidade e controle.
 6. Validacao executada:
    - `npm run typecheck:strict:src.copilot` passou.
    - `npm run lint:copilot` passou.
-   - `node --max-old-space-size=6144 node_modules/.bin/eslint src/copilot/mcp tests/unit/copilot/mcp --no-cache` passou.
-   - `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/mcp/*.spec.js` passou: 6 arquivos, 21 testes.
+   - `node --max-old-space-size=6144 node_modules/.bin/eslint src/copilot/mcp tests/unit/copilot/mcp --no-cache`
+     passou.
+   - `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/mcp/*.spec.js` passou: 6
+     arquivos, 21 testes.
 
 ### Proximo item cronologico apos Faixa H.1
 
-Concluir H.2 adicionando timeout explicito por chamada de job e metadados de comando no retorno do job.
+Concluir H.2 adicionando timeout explicito por chamada de job e metadados de comando no retorno do
+job.
 
 ### 2026-05-22 — Faixa H.2 jobs assincronos completos
 
@@ -1033,13 +1088,16 @@ Concluir H.2 adicionando timeout explicito por chamada de job e metadados de com
 7. Validacao executada:
    - `npm run typecheck:strict:src.copilot` passou.
    - `npm run lint:copilot` passou.
-   - `node --max-old-space-size=6144 node_modules/.bin/eslint src/copilot/mcp tests/unit/copilot/mcp --no-cache` passou.
-   - `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/mcp/*.spec.js` passou: 6 arquivos, 22 testes.
+   - `node --max-old-space-size=6144 node_modules/.bin/eslint src/copilot/mcp tests/unit/copilot/mcp --no-cache`
+     passou.
+   - `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/mcp/*.spec.js` passou: 6
+     arquivos, 22 testes.
 
 ### Proximo item cronologico apos Faixa H
 
-Retomar Faixa I somente no ambiente externo quando houver endpoint HTTPS real do Secure MCP Tunnel; no repo, seguir para
-Faixa J: integracao opcional do LLM-B/Copilot SDK com o MCP local sem criar dependencia obrigatoria.
+Retomar Faixa I somente no ambiente externo quando houver endpoint HTTPS real do Secure MCP Tunnel;
+no repo, seguir para Faixa J: integracao opcional do LLM-B/Copilot SDK com o MCP local sem criar
+dependencia obrigatoria.
 
 ### 2026-05-22 — Faixa J.1 MCP local opcional para LLM-B
 
@@ -1053,16 +1111,20 @@ Faixa J: integracao opcional do LLM-B/Copilot SDK com o MCP local sem criar depe
    - default continua desligado;
    - LLM-B nao depende do MCP server;
    - MCP offline nao impede boot quando env nao habilita `copilot-local`.
-5. `mcp-tool-bridge` legado nao foi alterado nesta fase, pois o SDK ja aceita `mcpServers` em `SessionConfig`.
+5. `mcp-tool-bridge` legado nao foi alterado nesta fase, pois o SDK ja aceita `mcpServers` em
+   `SessionConfig`.
 6. Validacao executada:
    - `npm run typecheck:strict:src.copilot` passou.
    - `npm run lint:copilot` passou.
-   - `node --max-old-space-size=6144 node_modules/.bin/eslint src/copilot/mcp src/copilot/config/mcp-servers.js tests/unit/copilot/mcp --no-cache` passou.
-   - `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/mcp/*.spec.js` passou: 7 arquivos, 24 testes.
+   - `node --max-old-space-size=6144 node_modules/.bin/eslint src/copilot/mcp src/copilot/config/mcp-servers.js tests/unit/copilot/mcp --no-cache`
+     passou.
+   - `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/mcp/*.spec.js` passou: 7
+     arquivos, 24 testes.
 
 ### Proximo item cronologico apos Faixa J.1
 
-Faixa J.2: expor uma delegacao MCP segura para consultar estado de sessoes Copilot/LLM-B sem obrigar boot da LLM-B.
+Faixa J.2: expor uma delegacao MCP segura para consultar estado de sessoes Copilot/LLM-B sem obrigar
+boot da LLM-B.
 
 ### 2026-05-22 — Faixa J.2 leitura segura de sessoes Copilot
 
@@ -1084,13 +1146,15 @@ Faixa J.2: expor uma delegacao MCP segura para consultar estado de sessoes Copil
 6. Validacao executada:
    - `npm run typecheck:strict:src.copilot` passou.
    - `npm run lint:copilot` passou.
-   - `node --max-old-space-size=6144 node_modules/.bin/eslint src/copilot/mcp tests/unit/copilot/mcp --no-cache` passou.
-   - `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/mcp/*.spec.js` passou: 8 arquivos, 27 testes.
+   - `node --max-old-space-size=6144 node_modules/.bin/eslint src/copilot/mcp tests/unit/copilot/mcp --no-cache`
+     passou.
+   - `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/mcp/*.spec.js` passou: 8
+     arquivos, 27 testes.
 
 ### Proximo item cronologico apos Faixa J
 
-Faixa K: hardening e release operacional, com revisao de seguranca das tool descriptions, outputs, prompts e superficie
-de escrita/execucao.
+Faixa K: hardening e release operacional, com revisao de seguranca das tool descriptions, outputs,
+prompts e superficie de escrita/execucao.
 
 ### 2026-05-22 — Faixa K.1/K.2 hardening e observabilidade MCP
 
@@ -1107,16 +1171,20 @@ de escrita/execucao.
    - ultima chamada;
    - ultimo status de erro.
 5. `GET /health` agora inclui snapshot de metricas.
-6. `repo_remove_file` deixou de retornar `previousSnapshotBase64`; retorna apenas `rollbackSnapshotAvailable` e hashes.
+6. `repo_remove_file` deixou de retornar `previousSnapshotBase64`; retorna apenas
+   `rollbackSnapshotAvailable` e hashes.
 7. Validacao executada:
    - `npm run typecheck:strict:src.copilot` passou.
    - `npm run lint:copilot` passou.
-   - `node --max-old-space-size=6144 node_modules/.bin/eslint src/copilot/mcp tests/unit/copilot/mcp --no-cache` passou.
-   - `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/mcp/*.spec.js` passou: 9 arquivos, 29 testes.
+   - `node --max-old-space-size=6144 node_modules/.bin/eslint src/copilot/mcp tests/unit/copilot/mcp --no-cache`
+     passou.
+   - `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/mcp/*.spec.js` passou: 9
+     arquivos, 29 testes.
 
 ### Proximo item cronologico apos K.1/K.2
 
-Faixa K.3: finalizar documentacao de release operacional, incluindo checklist de seguranca, troubleshooting e comandos.
+Faixa K.3: finalizar documentacao de release operacional, incluindo checklist de seguranca,
+troubleshooting e comandos.
 
 ### 2026-05-22 — Faixa K.3 documentacao de release
 
@@ -1135,8 +1203,8 @@ Faixa K.3: finalizar documentacao de release operacional, incluindo checklist de
 
 ### Proximo item cronologico apos Faixa K
 
-Faixa L/M: usar o proprio MCP para execucoes finais de release, smoke HTTP completo e, quando houver endpoint HTTPS real,
-validacao no ChatGPT.
+Faixa L/M: usar o proprio MCP para execucoes finais de release, smoke HTTP completo e, quando houver
+endpoint HTTPS real, validacao no ChatGPT.
 
 ### 2026-05-22 — Smoke HTTP local de release
 
@@ -1172,28 +1240,37 @@ validacao no ChatGPT.
    - `mcp_tunnel_status` e `mcp_runtime_health` ja expunham estado do tunnel;
    - a rodada atual fechou as 6 falhas persistentes do unit amplo fora do MCP/Cloudflare.
 3. Correcoes arquiteturais aplicadas:
-   - politica de recuperacao de `model_call` saiu do deep import `agent/ports` e passou a viver em `sdk/errors.js`;
+   - politica de recuperacao de `model_call` saiu do deep import `agent/ports` e passou a viver em
+     `sdk/errors.js`;
    - `hooks/session-hooks.js` deixou de importar `agent`;
-   - especificacoes puras dos comandos SDK do terminal foram movidas para `config/terminal-sdk-command-specs.js`;
+   - especificacoes puras dos comandos SDK do terminal foram movidas para
+     `config/terminal-sdk-command-specs.js`;
    - `terminal/commands/session.js` deixou de importar `#copilot/agent/session`;
-   - imports internos cross-folder de `terminal/byok` e `terminal/state/byok-provider-health` passaram por barrels;
-   - contratos de borda em `presentation/contracts` substituem JSDoc direto para `#copilot/sdk/types` em terminal/presentation.
+   - imports internos cross-folder de `terminal/byok` e `terminal/state/byok-provider-health`
+     passaram por barrels;
+   - contratos de borda em `presentation/contracts` substituem JSDoc direto para
+     `#copilot/sdk/types` em terminal/presentation.
 4. Correcoes BYOK aplicadas:
    - `resolveProfileEnv` agora preserva overrides explicitos de env sobre o perfil BYOK selecionado;
-   - catalogo explicito (`COPILOT_BYOK_MODELS`, JSON ou endpoint) nao e mascarado por catalogo herdado do perfil ativo;
+   - catalogo explicito (`COPILOT_BYOK_MODELS`, JSON ou endpoint) nao e mascarado por catalogo
+     herdado do perfil ativo;
    - teste do `/byok` passou a mockar o barrel efetivo `terminal/state/index.js`.
 5. Validadores canonicos executados apos a correcao:
    - `npm run typecheck:strict:src.copilot` passou;
    - `npm run lint:copilot` passou;
-   - `npm run test:copilot:unit` passou com 3038 testes, 3038 aprovados, 1008 suites aprovadas e zero warnings/errors.
+   - `npm run test:copilot:unit` passou com 3038 testes, 3038 aprovados, 1008 suites aprovadas e
+     zero warnings/errors.
 6. Proxima frente cronologica:
    - continuar upgrades MCP/Cloudflare a partir de uma base verde;
-   - priorizar resiliencia de Quick Tunnel temporario, diagnostico de sessao e paridade de tools de leitura/scan com a LLM-B;
-   - manter LLM-B independente do MCP server, usando integracoes opcionais e contratos de IO compartilhados.
+   - priorizar resiliencia de Quick Tunnel temporario, diagnostico de sessao e paridade de tools de
+     leitura/scan com a LLM-B;
+   - manter LLM-B independente do MCP server, usando integracoes opcionais e contratos de IO
+     compartilhados.
 
 ### 2026-05-22 — Upgrade de paridade IO MCP
 
-1. O MCP passou a expor mais primitivas de leitura/scan alinhadas com `src/copilot/tools` e `#copilot/infra`:
+1. O MCP passou a expor mais primitivas de leitura/scan alinhadas com `src/copilot/tools` e
+   `#copilot/infra`:
    - `repo_read_file_chunks`;
    - `repo_diff_files`;
    - `repo_symbol_search`;
@@ -1202,17 +1279,20 @@ validacao no ChatGPT.
    - reaproveitam diretamente a infraestrutura canonica de IO;
    - preservam independencia da LLM-B em relacao ao MCP;
    - mantem outputs estruturados e read-only annotations.
-3. `mcp_capabilities_summary` e `chatgpt_connector_profile` foram atualizados para orientar o ChatGPT:
+3. `mcp_capabilities_summary` e `chatgpt_connector_profile` foram atualizados para orientar o
+   ChatGPT:
    - chunked reads para arquivos grandes;
    - busca simbolica antes de alteracoes;
    - outline/parser antes de edicoes com impacto.
 4. `tools/list` agora expoe 32 tools canonicas.
 5. Validacao focada executada:
-   - `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/mcp/*.spec.js` passou com 10 suites e 42 testes;
+   - `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/mcp/*.spec.js` passou com
+     10 suites e 42 testes;
    - `npm run typecheck:strict:src.copilot` passou;
    - `npm run lint:copilot` passou.
 6. Validacao ampla e smoke HTTP local:
-   - `npm run test:copilot:unit` passou com 3041 testes, 3041 aprovados, 1008 suites e zero warnings/errors;
+   - `npm run test:copilot:unit` passou com 3041 testes, 3041 aprovados, 1008 suites e zero
+     warnings/errors;
    - `GET /health` local passou;
    - `POST /mcp tools/list` local confirmou a presenca das novas tools;
    - `tools/call repo_symbol_search` passou para `repoReadTools`;
@@ -1227,15 +1307,19 @@ validacao no ChatGPT.
 Relatorio externo validado:
 
 1. `unit-mcp` falhava quando o glob era passado literalmente pelo job sem expansao de shell.
-2. `repo_root_tree showHidden=true` enumerava nomes/metadados de arquivos protegidos como `.env.local`.
+2. `repo_root_tree showHidden=true` enumerava nomes/metadados de arquivos protegidos como
+   `.env.local`.
 3. `repo_search_text` misturava linhas de contexto e matches em contadores ambíguos.
-4. `repo_read_file_chunks` retornava `totalLines` ambíguo quando a janela parcial parava antes do fim do arquivo.
-5. `repo_file_outline` marcava simbolos como exportados, mas nao refletia `export const` em `exports[]`.
+4. `repo_read_file_chunks` retornava `totalLines` ambíguo quando a janela parcial parava antes do
+   fim do arquivo.
+5. `repo_file_outline` marcava simbolos como exportados, mas nao refletia `export const` em
+   `exports[]`.
 6. `DEFAULT_MAX_DIFF_LINES=2000` precisava ser alinhado ao schema `maxDiffLines`.
 
 Correcoes aplicadas:
 
-1. `unit-mcp` passou a usar diretório: `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/mcp`.
+1. `unit-mcp` passou a usar diretório:
+   `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/mcp`.
 2. `scanDirectory` agora aplica policy de path tambem em listagem e redige paths protegidos.
 3. `repo_tree`, `repo_root_tree` e `list_directory` agora retornam:
    - `blockedEntriesCount`;
@@ -1253,8 +1337,8 @@ Correcoes aplicadas:
    - `lastScannedLine`;
    - `fileTotalLines`;
    - `fileTotalLinesKnown`.
-6. Parser IO e worker passaram a adicionar exports declarados por `export const`, `export function`, `export class` e afins
-   em `exports[]`, mantendo `symbols[].exported`.
+6. Parser IO e worker passaram a adicionar exports declarados por `export const`, `export function`,
+   `export class` e afins em `exports[]`, mantendo `symbols[].exported`.
 7. `maxDiffLines` das tools de escrita MCP agora aceita ate `2000`, alinhado ao default local.
 
 Upgrades aplicados:
@@ -1284,8 +1368,10 @@ Upgrades aplicados:
 
 Paridade LLM-B/MCP:
 
-1. A redaction foi implementada na engine compartilhada `scanDirectory`, beneficiando MCP e `list_directory` da LLM-B.
-2. Contadores de busca e chunks foram corrigidos na engine IO compartilhada, nao apenas no wrapper MCP.
+1. A redaction foi implementada na engine compartilhada `scanDirectory`, beneficiando MCP e
+   `list_directory` da LLM-B.
+2. Contadores de busca e chunks foram corrigidos na engine IO compartilhada, nao apenas no wrapper
+   MCP.
 3. Parser/outline foi corrigido na infraestrutura compartilhada e no worker.
 4. LLM-B continua independente do MCP; somente a infraestrutura IO/index/parser e compartilhada.
 
@@ -1293,16 +1379,90 @@ Validacao da rodada:
 
 1. `npm run typecheck:strict:src.copilot` passou.
 2. `npm run lint:copilot` passou.
-3. `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/mcp` passou com 12 suites e 57 testes.
+3. `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/mcp` passou com 12 suites e
+   57 testes.
 4. O mesmo comando confirmou que o alvo `unit-mcp` sem glob literal e valido para spawn sem shell.
-5. `npm run test:copilot:unit` passou com 3056 testes, 3056 aprovados, 1012 suites e zero warnings/errors.
+5. `npm run test:copilot:unit` passou com 3056 testes, 3056 aprovados, 1012 suites e zero
+   warnings/errors.
 6. Smoke HTTP local em porta alternativa `3334` passou:
    - `/health` HTTP 200;
    - `tools/list` com 35 tools;
    - paridade exata com `getCanonicalMcpTools`;
    - `mcp_runtime_health` sem erro JSON-RPC.
-7. A porta `3333` ja estava ocupada por um servidor MCP anterior com 33 tools e tunnel ativo; ela nao foi encerrada nesta
-   rodada para evitar interromper a sessao externa em curso.
+7. A porta `3333` ja estava ocupada por um servidor MCP anterior com 33 tools e tunnel ativo; ela
+   nao foi encerrada nesta rodada para evitar interromper a sessao externa em curso.
+
+## 9.9.1 Rodada 2026-05-22 — Paridade explicita de indice MCP/LLM-B
+
+Motivacao:
+
+1. O relatorio do ChatGPT indicou que a superficie MCP ja era util, mas ainda precisava evoluir em
+   navegacao incremental, diagnostico e paridade com as tools da LLM-B.
+2. A investigacao confirmou que a LLM-B ja possuia a familia `workspace_index_*`,
+   `workspace_find_imports`, `workspace_parse_file` e `find_symbol_usages`.
+3. O MCP ja consumia partes da engine compartilhada por baixo, mas nao expunha uma superficie
+   explicita de indice para o ChatGPT.
+4. A decisao arquitetural permanece: LLM-B e MCP nao dependem um do outro; ambos chamam a mesma
+   engine compartilhada de IO, parser, search e index.
+
+Implementacoes desta rodada:
+
+1. Adicionado `repo_file_stats`:
+   - usa `statPath` canonico;
+   - retorna tipo, tamanho, timestamps em ms/ISO e engine;
+   - pode calcular `sha256` sob limite de bytes;
+   - evita leitura completa por padrao.
+2. Adicionado `repo_find_symbol_usages`:
+   - espelha o fluxo da tool LLM-B `find_symbol_usages`;
+   - usa `searchText` compartilhado;
+   - busca whole-word por padrao;
+   - retorna `matches`, `fileCount`, `nextCursor`, `totalMatches` e `totalMatchCount`;
+   - aceita saida `arquivo:linha:texto` e `linha:texto` para buscas restritas a arquivo unico.
+3. Criada a familia `repo_index_*`:
+   - `repo_index_status`;
+   - `repo_index_build`;
+   - `repo_index_search`;
+   - `repo_index_find_symbol`;
+   - `repo_find_imports`;
+   - `repo_index_invalidate`.
+4. `repo_index_build` atualiza somente o indice SQLite local do Copilot:
+   - nao altera arquivos do repo;
+   - e anotado como `boundedWriteAnnotations` por ter efeito local de cache/indice;
+   - respeita policy de path;
+   - aceita filtros `include`, `exclude`, `extensions`, `maxFiles`, `concurrency` e `pruneMissing`.
+5. `repo_index_search`, `repo_index_find_symbol` e `repo_find_imports`:
+   - retornam `available=false` quando o indice nao existe;
+   - usam paginacao compartilhada por `cursor`;
+   - retornam `output`, `matchCount`, `totalMatches`, `truncated`, `nextCursor`, `cursorOffset` e
+     `stats`.
+6. `mcp_capabilities_summary` ganhou:
+   - categoria `index`;
+   - `capabilitiesVersion=5`;
+   - orientacao para usar `repo_index_build` antes de navegacao indexada;
+   - orientacao para usar `repo_find_symbol_usages` antes de refactors.
+7. `mcp_smoke_workspace` passou a cobrir:
+   - `repo_file_stats`;
+   - `repo_find_symbol_usages`;
+   - `repo_index_status`.
+8. O smoke remoto Cloudflare passou a tratar como criticos:
+   - `repo_file_stats`;
+   - `repo_find_symbol_usages`;
+   - `repo_index_status`.
+
+Validacao desta rodada:
+
+1. `npm run typecheck:strict:src.copilot` passou apos as correcoes.
+2. `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/mcp --reporter=dot` passou
+   com 12 suites e 60 testes.
+3. `npm run lint:copilot` passou.
+4. `npm run test:copilot:unit` passou com 3059 testes, 1012 suites e zero warnings/errors.
+5. Smoke HTTP local em porta alternativa `3334` passou:
+   - `/health` HTTP 200;
+   - `tools/list` com 43 tools;
+   - paridade exata com `getCanonicalMcpTools`;
+   - `mcp_runtime_health` sem erro JSON-RPC.
+6. A porta `3333` seguiu intocada porque ja havia um servidor MCP e um Cloudflare tunnel ativos
+   antes desta rodada.
 
 ### Faixa B pronta quando
 

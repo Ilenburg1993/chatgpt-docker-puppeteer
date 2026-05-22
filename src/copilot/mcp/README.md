@@ -24,8 +24,8 @@ node src/copilot/mcp/index.js --transport stdio
 
 ## ChatGPT
 
-O ChatGPT deve receber uma URL HTTPS que aponte para `/mcp`. O modo principal deste projeto e Cloudflare Quick Tunnel
-temporario, com dominio `trycloudflare.com` novo a cada sessao:
+O ChatGPT deve receber uma URL HTTPS que aponte para `/mcp`. O modo principal deste projeto e
+Cloudflare Quick Tunnel temporario, com dominio `trycloudflare.com` novo a cada sessao:
 
 ```text
 https://<endpoint>/mcp
@@ -47,8 +47,8 @@ npm run copilot:mcp:cloudflare:status
 npm run copilot:mcp:cloudflare:smoke
 ```
 
-`status` mostra exatamente a URL temporaria `https://<random>.trycloudflare.com/mcp` para colar no ChatGPT. O modo
-com hostname fixo fica apenas como caminho futuro opcional.
+`status` mostra exatamente a URL temporaria `https://<random>.trycloudflare.com/mcp` para colar no
+ChatGPT. O modo com hostname fixo fica apenas como caminho futuro opcional.
 
 ## Primeira superfície
 
@@ -59,10 +59,18 @@ Esta primeira faixa expõe somente leitura, Git read-only e diagnóstico:
 - `repo_root_tree`
 - `repo_read_file`
 - `repo_read_file_chunks`
+- `repo_file_stats`
 - `repo_diff_files`
 - `repo_search_text`
+- `repo_find_symbol_usages`
 - `repo_symbol_search`
 - `repo_file_outline`
+- `repo_index_status`
+- `repo_index_build`
+- `repo_index_search`
+- `repo_index_find_symbol`
+- `repo_find_imports`
+- `repo_index_invalidate`
 - `git_status`
 - `git_diff`
 - `git_log`
@@ -90,8 +98,8 @@ Esta primeira faixa expõe somente leitura, Git read-only e diagnóstico:
 - `mcp_tunnel_status`
 - `mcp_runtime_health`
 
-Validator job tools accept optional `timeoutMs` between 1000 and 3600000. Job records include the command, args, timeout,
-exit code, signal and `timedOut` flag.
+Validator job tools accept optional `timeoutMs` between 1000 and 3600000. Job records include the
+command, args, timeout, exit code, signal and `timedOut` flag.
 
 ## Copilot SDK / LLM-B
 
@@ -107,34 +115,48 @@ The `copilot-local` server is registered as a stdio MCP config that launches:
 node src/copilot/mcp/index.js --transport stdio
 ```
 
-By default `COPILOT_MCP_SERVERS` remains empty, so LLM-B boots normally when the MCP server is offline.
-The MCP server can also inspect active SDK sessions through read-only metadata tools; these tools do not start LLM-B and
-do not expose live session objects.
+By default `COPILOT_MCP_SERVERS` remains empty, so LLM-B boots normally when the MCP server is
+offline. The MCP server can also inspect active SDK sessions through read-only metadata tools; these
+tools do not start LLM-B and do not expose live session objects.
 
-As ferramentas usam a política de path existente e permanecem sob a raiz do workspace. As tools de escrita controlada
-retornam diff unificado, suportam `dryRun` quando aplicável e gravam metadados de auditoria MCP sem persistir o texto
-editado no log. Operações destrutivas exigem confirmação explícita nos argumentos.
+As ferramentas usam a política de path existente e permanecem sob a raiz do workspace. As tools de
+escrita controlada retornam diff unificado, suportam `dryRun` quando aplicável e gravam metadados de
+auditoria MCP sem persistir o texto editado no log. Operações destrutivas exigem confirmação
+explícita nos argumentos.
 
 As tools MCP de leitura espelham o plano de IO usado pelas tools locais da LLM-B:
 
-- `repo_tree` aceita `path=""` como default `src/copilot`; use `path="."` ou `repo_root_tree` para a raiz real.
-- `repo_tree` e `repo_root_tree` redigem caminhos protegidos na listagem e retornam `blockedEntriesCount`.
-- `repo_search_text` aceita `contextLines` de 0 a 10, `cursor` retornado por `nextCursor` e separa `returnedMatchCount`, `returnedLineCount`, `totalMatchCount` e `totalLineCount`.
-- `repo_read_file` retorna `sha256` e `returnedSha256` para permitir read -> apply/write com `expectedHash`.
-- `repo_read_file_chunks` pagina arquivos grandes por linhas e separa `returnedLineCount`, `lastScannedLine`, `fileTotalLines` e `fileTotalLinesKnown`.
+- `repo_tree` aceita `path=""` como default `src/copilot`; use `path="."` ou `repo_root_tree` para a
+  raiz real.
+- `repo_tree` e `repo_root_tree` redigem caminhos protegidos na listagem e retornam
+  `blockedEntriesCount`.
+- `repo_search_text` aceita `contextLines` de 0 a 10, `cursor` retornado por `nextCursor` e separa
+  `returnedMatchCount`, `returnedLineCount`, `totalMatchCount` e `totalLineCount`.
+- `repo_read_file` retorna `sha256` e `returnedSha256` para permitir read -> apply/write com
+  `expectedHash`.
+- `repo_read_file_chunks` pagina arquivos grandes por linhas e separa `returnedLineCount`,
+  `lastScannedLine`, `fileTotalLines` e `fileTotalLinesKnown`.
+- `repo_file_stats` usa o stat canonico de IO e pode calcular `sha256` sob limite de bytes.
 - `repo_diff_files` usa o diff canonico de IO para comparar dois arquivos do workspace.
+- `repo_find_symbol_usages` espelha `find_symbol_usages` para analise de impacto textual com busca
+  whole-word por padrao.
 - `repo_symbol_search` espelha `workspace_symbol_search` para navegacao por declaracoes.
-- `repo_file_outline` espelha `workspace_parse_file` para symbols/imports/exports/outline sem expor runtime da LLM-B.
+- `repo_file_outline` espelha `workspace_parse_file` para symbols/imports/exports/outline sem expor
+  runtime da LLM-B.
+- `repo_index_status`, `repo_index_build`, `repo_index_search`, `repo_index_find_symbol`,
+  `repo_find_imports` e `repo_index_invalidate` espelham a familia
+  `workspace_index_*`/`workspace_find_imports` usando a mesma engine FTS5/simbolica compartilhada.
 
 Erros recuperaveis usam contratos estaveis em `structuredContent`:
 
-- `code`: identificador estavel, por exemplo `ERR_EMPTY_PATH`, `ERR_PATH_DENIED`, `ERR_INVALID_CURSOR`.
+- `code`: identificador estavel, por exemplo `ERR_EMPTY_PATH`, `ERR_PATH_DENIED`,
+  `ERR_INVALID_CURSOR`.
 - `error`: mensagem humana.
 - `hint`: orientacao curta de recovery quando disponivel.
 - `details`: metadados especificos da tool, preservando compatibilidade com chamadas existentes.
 
-A LLM-B continua independente do MCP server. Ela pode consumir MCP por opt-in, mas o chat local nao passa a depender do
-servidor MCP para boot ou uso normal.
+A LLM-B continua independente do MCP server. Ela pode consumir MCP por opt-in, mas o chat local nao
+passa a depender do servidor MCP para boot ou uso normal.
 
 ## Perfil do conector ChatGPT
 
@@ -144,5 +166,5 @@ Com o servidor HTTP local em execução:
 curl http://127.0.0.1:3333/chatgpt-connector.json
 ```
 
-O endpoint retorna nome, descrição, URL pública esperada, checklist de túnel e prompts de smoke test para preencher o
-formulário em ChatGPT > Settings > Connectors > Create.
+O endpoint retorna nome, descrição, URL pública esperada, checklist de túnel e prompts de smoke test
+para preencher o formulário em ChatGPT > Settings > Connectors > Create.

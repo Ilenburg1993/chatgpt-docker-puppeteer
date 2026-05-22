@@ -10,10 +10,11 @@
 
 ## 1. Objetivo
 
-Este documento consolida a frente Cloudflare Tunnel do conector ChatGPT para o MCP server em `src/copilot/mcp`.
+Este documento consolida a frente Cloudflare Tunnel do conector ChatGPT para o MCP server em
+`src/copilot/mcp`.
 
-O objetivo pratico e transformar o servidor local do Dev Container em um endpoint HTTPS que a caixa de criacao de conector
-em `https://chatgpt.com/` consiga alcancar:
+O objetivo pratico e transformar o servidor local do Dev Container em um endpoint HTTPS que a caixa
+de criacao de conector em `https://chatgpt.com/` consiga alcancar:
 
 ```text
 ChatGPT
@@ -80,14 +81,17 @@ https://developers.cloudflare.com/tunnel/downloads/
 
 ### 2.3 Conclusao para este repo
 
-O servidor MCP atual usa Streamable HTTP e o adapter local responde JSON para chamadas usuais de smoke.
+O servidor MCP atual usa Streamable HTTP e o adapter local responde JSON para chamadas usuais de
+smoke.
 
 1. Quick Tunnel e o caminho principal deste projeto por enquanto.
 2. Cada sessao gera uma URL nova `trycloudflare.com`, que deve ser colada novamente no ChatGPT.
 3. A rota Cloudflare deve mapear o origin raiz `http://127.0.0.1:3333`.
-4. O campo ChatGPT deve receber o endpoint publico temporario `https://<aleatorio>.trycloudflare.com/mcp`.
+4. O campo ChatGPT deve receber o endpoint publico temporario
+   `https://<aleatorio>.trycloudflare.com/mcp`.
 5. Cloudflare Tunnel sozinho nao adiciona OAuth ao MCP.
-6. Tunnel publicado com hostname estavel fica documentado como caminho futuro opcional, nao como requisito atual.
+6. Tunnel publicado com hostname estavel fica documentado como caminho futuro opcional, nao como
+   requisito atual.
 
 ---
 
@@ -101,7 +105,8 @@ O ambiente atual recebeu:
 cloudflared version 2026.5.0
 ```
 
-A instalacao usada foi o `.deb` oficial da release Cloudflare correspondente a arquitetura Debian do container.
+A instalacao usada foi o `.deb` oficial da release Cloudflare correspondente a arquitetura Debian do
+container.
 
 ### 3.2 Instalacao repetivel
 
@@ -119,7 +124,8 @@ src/copilot/mcp/cloudflare/install-cloudflared.sh
 
 O script:
 
-1. Detecta a arquitetura por `dpkg --print-architecture` e mapeia os nomes Debian para os assets Cloudflare.
+1. Detecta a arquitetura por `dpkg --print-architecture` e mapeia os nomes Debian para os assets
+   Cloudflare.
 2. Aceita `CLOUDFLARED_RELEASE=latest` por default.
 3. Aceita `CLOUDFLARED_RELEASE=<versao>` para baixar uma release pinada.
 4. Baixa o `.deb` oficial.
@@ -194,8 +200,8 @@ O CLI grava essa URL em:
 src/copilot/.ai/cloudflare/quick-tunnel.json
 ```
 
-`COPILOT_MCP_CLOUDFLARE_PUBLIC_URL` continua existindo como override manual, mas nao e necessario no uso normal
-temporario.
+`COPILOT_MCP_CLOUDFLARE_PUBLIC_URL` continua existindo como override manual, mas nao e necessario no
+uso normal temporario.
 
 ### 4.3 Protocolo de transporte
 
@@ -205,8 +211,8 @@ O wrapper desta rodada usa HTTP/2 por default:
 COPILOT_MCP_CLOUDFLARE_PROTOCOL=http2
 ```
 
-O motivo e pratico: no smoke do Dev Container a tentativa automatica por QUIC falhou, enquanto HTTP/2 registrou o tunnel
-e atravessou `/health` e `/mcp`.
+O motivo e pratico: no smoke do Dev Container a tentativa automatica por QUIC falhou, enquanto
+HTTP/2 registrou o tunnel e atravessou `/health` e `/mcp`.
 
 Valores oficiais aceitos:
 
@@ -214,7 +220,8 @@ Valores oficiais aceitos:
 2. `http2`
 3. `quic`
 
-Cloudflare documenta que `auto` escolhe QUIC e pode fazer fallback para HTTP/2 quando UDP nao estiver disponivel.
+Cloudflare documenta que `auto` escolhe QUIC e pode fazer fallback para HTTP/2 quando UDP nao
+estiver disponivel.
 
 ### 4.4 Arquivo de estado de sessao
 
@@ -244,8 +251,8 @@ COPILOT_MCP_CLOUDFLARE_STALE_AFTER_MS=21600000
 
 Isto equivale a 6 horas. O valor aceito fica entre 1 minuto e 7 dias.
 
-O objetivo nao e tornar Quick Tunnel "fixo". A URL `trycloudflare.com` continua efemera. A janela de stale serve para
-operacao profissional:
+O objetivo nao e tornar Quick Tunnel "fixo". A URL `trycloudflare.com` continua efemera. A janela de
+stale serve para operacao profissional:
 
 1. `status` mostra `ageMs`, `ageSeconds`, `ageMinutes`, `stale` e `recommendedAction`.
 2. `doctor` mostra a politica ativa e o resumo da ultima sessao.
@@ -258,7 +265,8 @@ Valores de `recommendedAction`:
 
 1. `start`: nenhum estado local existe; suba origin e Quick Tunnel.
 2. `restart`: estado invalido ou processo do tunnel encerrado; crie nova URL e atualize o ChatGPT.
-3. `smoke`: processo vivo, mas sessao mais antiga que a janela configurada; rode smoke antes de usar.
+3. `smoke`: processo vivo, mas sessao mais antiga que a janela configurada; rode smoke antes de
+   usar.
 4. `use`: processo vivo e sessao ainda fresca; ainda assim rode smoke antes de uma operacao longa.
 
 ### 4.6 Token do tunnel remoto futuro
@@ -371,8 +379,9 @@ O endpoint para colar e:
 https://<aleatorio>.trycloudflare.com/mcp
 ```
 
-`status` tambem verifica se o PID do `cloudflared` registrado ainda esta vivo. Se a sessao foi encerrada, ele mostra o
-estado antigo, mas retorna `ok=false`; nesse caso, suba um novo Quick Tunnel e use a nova URL.
+`status` tambem verifica se o PID do `cloudflared` registrado ainda esta vivo. Se a sessao foi
+encerrada, ele mostra o estado antigo, mas retorna `ok=false`; nesse caso, suba um novo Quick Tunnel
+e use a nova URL.
 
 A partir desta rodada, `status` tambem devolve um bloco `summary`:
 
@@ -392,8 +401,8 @@ A partir desta rodada, `status` tambem devolve um bloco `summary`:
 }
 ```
 
-Esse resumo e a fonte preferencial para saber se a caixa do ChatGPT deve continuar usando a URL atual ou se deve receber
-uma URL nova.
+Esse resumo e a fonte preferencial para saber se a caixa do ChatGPT deve continuar usando a URL
+atual ou se deve receber uma URL nova.
 
 ### 7.3 Arquivo de estado
 
@@ -428,7 +437,8 @@ Quick Tunnel e o estado atual deliberado, mas tem limites:
 
 ## 8. Tunnel publicado futuro opcional
 
-Esta secao fica como referencia futura. O fluxo atual nao usa dominio fixo por decisao de arquitetura.
+Esta secao fica como referencia futura. O fluxo atual nao usa dominio fixo por decisao de
+arquitetura.
 
 ### 8.1 Objeto no Cloudflare
 
@@ -447,7 +457,8 @@ http://127.0.0.1:3333
 
 ### 8.2 Token e execucao
 
-O token do tunnel remoto e obtido no dashboard ao adicionar replica, ou pela API Cloudflare apropriada.
+O token do tunnel remoto e obtido no dashboard ao adicionar replica, ou pela API Cloudflare
+apropriada.
 
 Terminal A:
 
@@ -471,8 +482,7 @@ https://repo-mcp.seudominio.example/health
 https://repo-mcp.seudominio.example/mcp
 ```
 
-`/health` prova roteamento.
-`/mcp` prova MCP.
+`/health` prova roteamento. `/mcp` prova MCP.
 
 ---
 
@@ -502,10 +512,11 @@ Estado real nesta rodada:
 
 1. O server MCP deste repo nao expoe OAuth proprio.
 2. Cloudflare Tunnel so publica o transporte HTTPS.
-3. No developer mode, use a opcao sem autenticacao apenas se a caixa a disponibilizar e se aceitar a exposicao controlada.
+3. No developer mode, use a opcao sem autenticacao apenas se a caixa a disponibilizar e se aceitar a
+   exposicao controlada.
 4. Selecionar OAuth exige uma camada OAuth compativel com o conector.
-5. O profile helper responde `authMode=none-dev` por default; altere `COPILOT_MCP_CHATGPT_AUTH_MODE` quando houver
-   autenticacao real diferente.
+5. O profile helper responde `authMode=none-dev` por default; altere `COPILOT_MCP_CHATGPT_AUTH_MODE`
+   quando houver autenticacao real diferente.
 
 ### Confirmacao
 
@@ -527,7 +538,7 @@ npm run copilot:mcp:cloudflare:status
 npm run copilot:mcp:cloudflare:smoke
 ```
 
-```bash
+````bash
 Ou manualmente, com `PUBLIC_BASE=https://<aleatorio>.trycloudflare.com`:
 
 ```bash
@@ -536,7 +547,7 @@ curl -sS -X POST "${PUBLIC_BASE}/mcp" \
   -H 'content-type: application/json' \
   -H 'accept: application/json, text/event-stream' \
   --data '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}'
-```
+````
 
 Smoke no ChatGPT:
 
@@ -560,7 +571,8 @@ Leia src/copilot/mcp/README.md com repo_read_file.
 
 ## 11. Seguranca
 
-Este conector tem tools de escrita e jobs allowlistados. O tunnel deve ser tratado como uma porta real para o repo.
+Este conector tem tools de escrita e jobs allowlistados. O tunnel deve ser tratado como uma porta
+real para o repo.
 
 Regras minimas:
 
@@ -574,7 +586,8 @@ Regras minimas:
 
 Cloudflare Access:
 
-1. Uma pagina de login interativa antes de `/mcp` pode impedir que o backend do ChatGPT use o endpoint.
+1. Uma pagina de login interativa antes de `/mcp` pode impedir que o backend do ChatGPT use o
+   endpoint.
 2. Se autenticacao for exigida, desenhe OAuth compativel com o conector.
 3. Nao trate Cloudflare Tunnel simples como OAuth.
 
@@ -644,9 +657,12 @@ O smoke remoto agora tambem valida a superficie de tools:
    - `repo_root_tree`;
    - `repo_read_file`;
    - `repo_read_file_chunks`;
+   - `repo_file_stats`;
    - `repo_search_text`;
+   - `repo_find_symbol_usages`;
    - `repo_symbol_search`;
    - `repo_file_outline`;
+   - `repo_index_status`;
    - `project_doctor`;
    - `run_copilot_validator`;
    - `job_list`;
@@ -655,8 +671,9 @@ O smoke remoto agora tambem valida a superficie de tools:
    - `mcp_smoke_workspace`;
    - `mcp_tunnel_status`.
 
-Se `toolsMatchLocalRegistry=false`, `missingLocalTools` nao estiver vazio, `unexpectedRemoteTools` nao estiver vazio ou
-`missingCriticalTools` nao estiver vazio, a URL pode ate estar viva, mas nao deve ser colada como conector operacional.
+Se `toolsMatchLocalRegistry=false`, `missingLocalTools` nao estiver vazio, `unexpectedRemoteTools`
+nao estiver vazio ou `missingCriticalTools` nao estiver vazio, a URL pode ate estar viva, mas nao
+deve ser colada como conector operacional.
 
 O dado principal da captura e:
 
@@ -683,7 +700,8 @@ Doctor:
 
 Quick Tunnel:
 
-1. Tentativa inicial por transporte automatico escolheu QUIC e retornou erro de control stream neste container.
+1. Tentativa inicial por transporte automatico escolheu QUIC e retornou erro de control stream neste
+   container.
 2. HTTP/2 registrou a conexao Cloudflare.
 3. O wrapper passou a setar `TUNNEL_TRANSPORT_PROTOCOL=http2` por default.
 4. A URL `trycloudflare.com` temporaria retornou `GET /health` com JSON do MCP.
@@ -691,7 +709,8 @@ Quick Tunnel:
 6. A rodada posterior promoveu Quick Tunnel a modo principal e confirmou:
    - captura automatica de `https://sen-recall-handbook-tim.trycloudflare.com/mcp`;
    - escrita de `src/copilot/.ai/cloudflare/quick-tunnel.json`;
-   - `npm run copilot:mcp:cloudflare:status` retornando nome, descricao, URL e autenticacao `none-dev`;
+   - `npm run copilot:mcp:cloudflare:status` retornando nome, descricao, URL e autenticacao
+     `none-dev`;
    - `npm run copilot:mcp:cloudflare:smoke` passando com `GET /health` e `POST /mcp tools/list`;
    - 26 tools vistas pelo smoke remoto.
 
@@ -700,10 +719,12 @@ Validadores:
 1. Testes MCP focados passaram com 10 arquivos e 34 testes.
 2. Typecheck strict do `src/copilot` passou.
 3. Lint do `src/copilot` passou.
-4. Suite unit ampla do `src/copilot` voltou a apresentar 6 falhas preexistentes fora do modulo MCP/Cloudflare; elas
-   foram posteriormente corrigidas na rodada pos-primeiro uso ChatGPT.
-5. Apos promover dominio temporario como padrao, testes MCP focados passaram com 10 arquivos e 36 testes.
-6. `npm run typecheck:strict:src.copilot` e `npm run lint:copilot` passaram apos a mudanca de dominio temporario.
+4. Suite unit ampla do `src/copilot` voltou a apresentar 6 falhas preexistentes fora do modulo
+   MCP/Cloudflare; elas foram posteriormente corrigidas na rodada pos-primeiro uso ChatGPT.
+5. Apos promover dominio temporario como padrao, testes MCP focados passaram com 10 arquivos e 36
+   testes.
+6. `npm run typecheck:strict:src.copilot` e `npm run lint:copilot` passaram apos a mudanca de
+   dominio temporario.
 7. Na rodada de correcao profunda seguinte, os tres validadores canonicos passaram:
    - `npm run typecheck:strict:src.copilot`;
    - `npm run lint:copilot`;
@@ -713,17 +734,19 @@ Validadores:
    - registrar a URL ativa em `src/copilot/.ai/cloudflare/quick-tunnel.json`;
    - expor recuperacao por `copilot:mcp:cloudflare:status`, `doctor` e `smoke`;
    - nao introduzir dependencia de dominio fixo ate nova decisao explicita.
-9. Apos o upgrade de paridade IO, `tools/list` local passa a expor 32 tools; o proximo smoke remoto deve confirmar esse
-   numero no endpoint temporario ativo.
+9. Apos o upgrade de paridade IO, `tools/list` local passa a expor 32 tools; o proximo smoke remoto
+   deve confirmar esse numero no endpoint temporario ativo.
 10. A rodada de robustez Cloudflare acrescentou:
     - stale window configuravel por `COPILOT_MCP_CLOUDFLARE_STALE_AFTER_MS`;
     - `recommendedAction` para `start`, `restart`, `smoke` e `use`;
-    - `doctor`, `status`, `mcp_tunnel_status` e `mcp_runtime_health` usando o mesmo resumo operacional;
+    - `doctor`, `status`, `mcp_tunnel_status` e `mcp_runtime_health` usando o mesmo resumo
+      operacional;
     - `smoke` remoto conferindo tools criticas e divergencia contra o registry MCP local.
-11. A rodada seguinte acrescentou persistencia de `lastSmoke` no estado temporario, com horario, health remoto e resumo
-    da paridade de tools do endpoint publico.
+11. A rodada seguinte acrescentou persistencia de `lastSmoke` no estado temporario, com horario,
+    health remoto e resumo da paridade de tools do endpoint publico.
 12. O smoke HTTP local canonico passou antes do Cloudflare:
     - `GET /health` HTTP 200;
-    - `tools/list` com 35 tools apos `job_list` e `mcp_smoke_workspace`;
+    - `tools/list` com 43 tools apos a familia `repo_index_*`, `repo_file_stats` e
+      `repo_find_symbol_usages`;
     - paridade exata contra o registry local;
     - `tools/call mcp_runtime_health` sem erro JSON-RPC.
